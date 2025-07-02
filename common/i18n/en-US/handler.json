@@ -1,31 +1,4 @@
 {
-    "method.get": {
-        "other": "Get"
-    },
-    "method.post": {
-        "other": "Create"
-    },
-    "method.put": {
-        "other": "Update"
-    },
-    "method.delete": {
-        "other": "Delete"
-    },
-    "method.head": {
-        "other": "Get head"
-    },
-    "method.patch": {
-        "other": "Update partially"
-    },
-    "method.options": {
-        "other": "Get options"
-    },
-    "method.connect": {
-        "other": "Connect"
-    },
-    "method.trace": {
-        "other": "Trace"
-    },
     "handler.list": {
         "other": "list"
     },
@@ -154,33 +127,5 @@
     },
     "handler.config": {
         "other": "config"
-    },
-    "error.BadRequest": {
-        "description": "Bad request error message",
-        "other": "{{.method | default \"request for\"}} {{.handler | default \"data\"}}. The request could not be understood due to bad request."
-    },
-    "error.Unauthorized": {
-        "description": "Unauthorized error message",
-        "other": "{{.method | default \"request for\"}} {{.handler | default \"data\"}}. Authentication is required and has failed or has not been provided."
-    },
-    "error.Forbidden": {
-        "description": "Forbidden error message",
-        "other": "{{.method | default \"request for\"}} {{.handler | default \"data\"}}. You don't have permission to access this resource."
-    },
-    "error.NotFound": {
-        "description": "Not found error message",
-        "other": "{{.method | default \"request for\"}} {{.handler | default \"data\"}}. The requested resource could not be found."
-    },
-    "error.MethodNotAllowed": {
-        "description": "Method not allowed error message",
-        "other": "{{.method | default \"request for\"}} {{.handler | default \"data\"}}. The method specified in the request is not allowed for the resource."
-    },
-    "error.InternalServerError": {
-        "description": "Internal server error message",
-        "other": "{{.method | default \"request for\"}} {{.handler | default \"data\"}}. The server encountered an unexpected condition which prevented it from fulfilling the request."
-    },
-    "error.ServiceUnavailable": {
-        "description": "Service unavailable error message",
-        "other": "{{.method | default \"request for\"}} {{.handler | default \"data\"}}. The service is temporarily unavailable. Please try again later."
     }
 }

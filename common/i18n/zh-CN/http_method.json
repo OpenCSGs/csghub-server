@@ -1,0 +1,29 @@
+{
+    "method.get": {
+        "other": "获取"
+    },
+    "method.post": {
+        "other": "创建"
+    },
+    "method.put": {
+        "other": "更新"
+    },
+    "method.delete": {
+        "other": "删除"
+    },
+    "method.head": {
+        "other": "请求标头"
+    },
+    "method.patch": {
+        "other": "部分更新"
+    },
+    "method.options": {
+        "other": "请求通信选项"
+    },
+    "method.connect": {
+        "other": "建立连接"
+    },
+    "method.trace": {
+        "other": "追踪请求"
+    }
+}

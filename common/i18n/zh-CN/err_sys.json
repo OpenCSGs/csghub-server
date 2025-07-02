@@ -1,0 +1,23 @@
+{
+    "error.SYS-ERR-0": {
+        "other": "服务器内部错误"
+    },
+    "error.SYS-ERR-1": {
+        "other": "远程服务失败"
+    },
+    "error.SYS-ERR-2": {
+        "other": "内部服务故障"
+    },
+    "error.SYS-ERR-3": {
+        "other": "数据库不可用或查询执行错误"
+    },
+    "error.SYS-ERR-4": {
+        "other": "数据库中没有对应的记录"
+    },
+    "error.SYS-ERR-5": {
+        "other": "用户服务器不可用"
+    },
+    "error.SYS-ERR-6": {
+        "other": "用户服务器在数据库中未查询到该用户"
+    }
+}

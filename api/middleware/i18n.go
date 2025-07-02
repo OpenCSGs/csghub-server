@@ -60,13 +60,13 @@ func LocalizedErrorMiddleware() gin.HandlerFunc {
 		templateData := make(map[string]interface{})
 		if handlerName, ok := c.Get("Error-Handler-Name"); ok {
 			if handlerNameStr, ok := handlerName.(string); ok {
-				handlerNameStr = i18n.TranslateText(lang, string(i18n.I18nHandler)+"."+handlerNameStr, handlerNameStr)
+				handlerNameStr, _ = i18n.TranslateText(lang, string(i18n.I18nHandler)+"."+handlerNameStr, handlerNameStr)
 				templateData[string(i18n.I18nHandler)] = handlerNameStr
 			}
 		}
 		if c.Request != nil {
 			methodStr := strings.ToLower(c.Request.Method)
-			methodStr = i18n.TranslateText(lang, string(i18n.I18nMethod)+"."+methodStr, methodStr)
+			methodStr, _ = i18n.TranslateText(lang, string(i18n.I18nMethod)+"."+methodStr, methodStr)
 			templateData[string(i18n.I18nMethod)] = methodStr
 		}
 
