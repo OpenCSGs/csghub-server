@@ -81,7 +81,7 @@ func (o *ossParserComponentImpl) IsWhitelistedImage(imgNode *ast.Image) bool {
 		return true
 	}
 
-	// 如果是OSS链接且无扩展名，也视为白名单图片
+	// OSS link without an extension, also regarded as a whitelist image
 	if o.ossUrlRegex.MatchString(urlStr) && urlExt == "" {
 		return true
 	}
@@ -110,7 +110,7 @@ func (o *ossParserComponentImpl) ParseMarkdownAndFilter(markdownContent string) 
 
 	OssImageInfoList := []*OSSImageInfo{}
 
-	// 用于记录需要从文本中移除的图片URL
+	// Record the image URL that needs to be removed from the text
 	var removeImageUrls []string
 
 	err := ast.Walk(root, func(node ast.Node, entering bool) (ast.WalkStatus, error) {
@@ -123,7 +123,6 @@ func (o *ossParserComponentImpl) ParseMarkdownAndFilter(markdownContent string) 
 			if o.IsWhitelistedImage(img) && o.ossUrlRegex.MatchString(urlStr) {
 				if info, err := o.ParseOSSUrl(urlStr); err == nil {
 					OssImageInfoList = append(OssImageInfoList, info)
-					// 记录需要移除的图片URL
 					removeImageUrls = append(removeImageUrls, urlStr)
 				}
 			}
@@ -135,18 +134,18 @@ func (o *ossParserComponentImpl) ParseMarkdownAndFilter(markdownContent string) 
 		return nil, fmt.Errorf("failed to walk AST: %w", err)
 	}
 
-	// 使用正则表达式移除图片的 Markdown 语法
+	// Regular expressions to remove Markdown syntax from images
 	filteredText := markdownContent
 	for _, imageUrl := range removeImageUrls {
-		// 转义特殊字符以用于正则表达式
+		// Escape special characters for use in regular expressions
 		escapedUrl := regexp.QuoteMeta(imageUrl)
-		// 匹配图片的 Markdown 语法: ![alt text](url) 或 ![alt text](url "title")
+		// Matches the Markdown syntax for images: ![alt text](url) or ![alt text](url "title")
 		imagePattern := fmt.Sprintf(`!\[[^\]]*\]\(%s(?:\s+"[^"]*")?\)`, escapedUrl)
 		imageRegex := regexp.MustCompile(imagePattern)
 		filteredText = imageRegex.ReplaceAllString(filteredText, "")
 	}
 
-	// 清理多余的空行
+	// Clean up extra blank lines
 	filteredText = regexp.MustCompile(`\n\s*\n`).ReplaceAllString(filteredText, "\n")
 	filteredText = strings.TrimSpace(filteredText)
 

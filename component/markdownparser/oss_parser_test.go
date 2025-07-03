@@ -80,7 +80,7 @@ func TestIsWhitelistedImage(t *testing.T) {
 	// Create a mock image node without a valid extension but with alt text having extension
 	imgWithAltExt := &ast.Image{}
 	imgWithAltExt.Destination = []byte("https://example.com/image")
-	// 正确设置 alt text - 使用 Title 属性代替 SetText
+	// Set alt text correctly - use the Title property instead of SetText
 	imgWithAltExt.Title = []byte("alt-text.png")
 	source := []byte("content with alt-text.png")
 
