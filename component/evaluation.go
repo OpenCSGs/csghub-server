@@ -114,12 +114,16 @@ func (c *evaluationComponentImpl) CreateEvaluation(ctx context.Context, req type
 		req.ResourceName = resource.Name
 	} else {
 		// for share mode
+		resource := ""
 		if frame.ComputeType == string(types.ResourceTypeGPU) {
 			hardware.Gpu.Num = c.config.Argo.QuotaGPUNumber
 			hardware.Gpu.ResourceName = "nvidia.com/gpu"
+			resource = fmt.Sprintf("%s GPU · ", c.config.Argo.QuotaGPUNumber)
 		}
 		hardware.Cpu.Num = "4"
 		hardware.Memory = "32Gi"
+		resource = fmt.Sprintf("%s%s vCPU · %s", resource, hardware.Cpu.Num, hardware.Memory)
+		req.ResourceName = resource
 	}
 
 	req.Hardware = hardware
@@ -202,25 +206,26 @@ func (c *evaluationComponentImpl) GetEvaluation(ctx context.Context, req types.E
 		repoTags = append(repoTags, dsRepoTags)
 	}
 	var res = &types.EvaluationRes{
-		ID:          wf.ID,
-		RepoIds:     wf.RepoIds,
-		RepoType:    wf.RepoType,
-		Username:    wf.Username,
-		TaskName:    wf.TaskName,
-		TaskId:      wf.TaskId,
-		TaskType:    wf.TaskType,
-		TaskDesc:    wf.TaskDesc,
-		ResourceId:  wf.ResourceId,
-		Status:      string(wf.Status),
-		Reason:      wf.Reason,
-		Datasets:    repoTags,
-		Image:       wf.Image,
-		SubmitTime:  wf.SubmitTime,
-		StartTime:   wf.StartTime,
-		EndTime:     wf.EndTime,
-		ResultURL:   wf.ResultURL,
-		DownloadURL: wf.DownloadURL,
-		FailuresURL: wf.FailuresURL,
+		ID:           wf.ID,
+		RepoIds:      wf.RepoIds,
+		RepoType:     wf.RepoType,
+		Username:     wf.Username,
+		TaskName:     wf.TaskName,
+		TaskId:       wf.TaskId,
+		TaskType:     wf.TaskType,
+		TaskDesc:     wf.TaskDesc,
+		ResourceId:   wf.ResourceId,
+		ResourceName: wf.ResourceName,
+		Status:       string(wf.Status),
+		Reason:       wf.Reason,
+		Datasets:     repoTags,
+		Image:        wf.Image,
+		SubmitTime:   wf.SubmitTime,
+		StartTime:    wf.StartTime,
+		EndTime:      wf.EndTime,
+		ResultURL:    wf.ResultURL,
+		DownloadURL:  wf.DownloadURL,
+		FailuresURL:  wf.FailuresURL,
 	}
 	return res, nil
 }
