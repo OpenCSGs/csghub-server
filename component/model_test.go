@@ -201,13 +201,18 @@ func TestModelComponent_Show(t *testing.T) {
 	mc.mocks.stores.ModelMock().EXPECT().FindByPath(ctx, "ns", "n").Return(&database.Model{
 		ID:           1,
 		RepositoryID: 123,
-		Repository:   &database.Repository{ID: 123, Name: "n", Path: "foo/bar", Tags: []database.Tag{{Name: "safetensors", Category: "framework"}}},
+		Repository: &database.Repository{ID: 123, Name: "n", Path: "foo/bar", Metadata: database.Metadata{
+			Architecture: "llama",
+		}, Tags: []database.Tag{{Name: "safetensors", Category: "framework"}}},
 	}, nil)
 	mc.mocks.components.repo.EXPECT().GetUserRepoPermission(ctx, "user", &database.Repository{
 		ID:   123,
 		Name: "n",
 		Path: "foo/bar",
 		Tags: []database.Tag{{Name: "safetensors", Category: "framework"}},
+		Metadata: database.Metadata{
+			Architecture: "llama",
+		},
 	}).Return(
 		&types.UserRepoPermission{CanRead: true, CanAdmin: true}, nil,
 	)
@@ -245,6 +250,9 @@ func TestModelComponent_Show(t *testing.T) {
 		Repository: types.Repository{
 			HTTPCloneURL: "https://foo.com/s/foo/bar.git",
 			SSHCloneURL:  "test@127.0.0.1:s/foo/bar.git",
+		},
+		Metadata: types.Metadata{
+			Architecture: "llama",
 		},
 		Tags:             []types.RepoTag{{Name: "safetensors", Category: "framework"}},
 		EnableInference:  true,
