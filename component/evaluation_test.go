@@ -154,18 +154,16 @@ func TestEvaluationComponent_GetEvaluation(t *testing.T) {
 		TaskType: "evaluation",
 		Status:   "Succeed",
 	}, nil)
-	c.mocks.stores.DatasetMock().EXPECT().ListByPath(ctx, []string{"Rowan/hellaswag"}).Return([]database.Dataset{
-		{
-			Repository: &database.Repository{
-				Path: "Rowan/hellaswag",
-				Tags: []database.Tag{
-					{
-						Name:     "test",
-						Category: "test",
-						Group:    "test",
-						Scope:    "test",
-						BuiltIn:  true,
-					},
+	c.mocks.stores.DatasetMock().EXPECT().FindByOriginPath(ctx, "Rowan/hellaswag").Return(&database.Dataset{
+		Repository: &database.Repository{
+			Path: "Rowan/hellaswag",
+			Tags: []database.Tag{
+				{
+					Name:     "test",
+					Category: "test",
+					Group:    "test",
+					Scope:    "test",
+					BuiltIn:  true,
 				},
 			},
 		},

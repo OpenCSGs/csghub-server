@@ -180,12 +180,17 @@ func (c *evaluationComponentImpl) GetEvaluation(ctx context.Context, req types.E
 	if err != nil {
 		return nil, fmt.Errorf("fail to get evaluation result, %w", err)
 	}
-	datasets, err := c.datasetStore.ListByPath(ctx, wf.Datasets)
-	if err != nil {
-		return nil, fmt.Errorf("fail to get datasets for evaluation, %w", err)
-	}
 	var repoTags []types.RepoTags
-	for _, ds := range datasets {
+	for _, path := range wf.Datasets {
+		ds, err := c.datasetStore.FindByOriginPath(ctx, path)
+		if err != nil {
+			//use default value if not found
+			var dsRepoTags = types.RepoTags{
+				RepoId: path,
+			}
+			repoTags = append(repoTags, dsRepoTags)
+			continue
+		}
 		var tags []types.RepoTag
 		for _, tag := range ds.Repository.Tags {
 			tags = append(tags, types.RepoTag{

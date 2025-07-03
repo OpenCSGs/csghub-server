@@ -152,15 +152,16 @@ func (s *mirrorStoreImpl) FindWithMapping(ctx context.Context, repoType types.Re
 		Model(resRepo)
 	path := fmt.Sprintf("%s/%s", namespace, name)
 	query.Where("repository_type = ?", repoType)
-	if mapping == types.HFMapping {
+	switch mapping {
+	case types.HFMapping:
 		//compatiebility with old data
 		//TODO: remove path after sdk 0.4.6
 		query.Where("hf_path = ? or path = ?", path, path)
-	} else if mapping == types.ModelScopeMapping {
+	case types.ModelScopeMapping:
 		query.Where("ms_path = ?", path, path)
-	} else if mapping == types.AutoMapping {
+	case types.AutoMapping:
 		query.Where("hf_path = ? or ms_path = ? or path = ?", path, path, path)
-	} else {
+	default:
 		// for csg path
 		query.Where("path = ?", path)
 	}

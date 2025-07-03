@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/uptrace/bun"
+	"opencsg.com/csghub-server/common/errorx"
 )
 
 var sortBy = map[string]string{
@@ -31,6 +32,7 @@ type DatasetStore interface {
 	Update(ctx context.Context, input Dataset) (err error)
 	FindByPath(ctx context.Context, namespace string, repoPath string) (dataset *Dataset, err error)
 	Delete(ctx context.Context, input Dataset) error
+	FindByOriginPath(ctx context.Context, path string) (dataset *Dataset, err error)
 	ListByPath(ctx context.Context, paths []string) ([]Dataset, error)
 	CreateIfNotExist(ctx context.Context, input Dataset) (*Dataset, error)
 }
@@ -221,6 +223,24 @@ func (s *datasetStoreImpl) ListByPath(ctx context.Context, paths []string) (data
 
 	datasets = nil
 	return sortedDatasets, nil
+}
+
+func (s *datasetStoreImpl) FindByOriginPath(ctx context.Context, path string) (*Dataset, error) {
+	dataset := new(Dataset)
+	err := s.db.Operator.Core.
+		NewSelect().
+		Model(dataset).
+		Relation("Repository").
+		Relation("Repository.Tags", func(q *bun.SelectQuery) *bun.SelectQuery {
+			return q.Where("category = ?", "evaluation")
+		}).
+		Where("repository.hf_path = ? or repository.ms_path = ? or repository.path = ?", path, path, path).
+		Order("created_at desc").Limit(1).
+		Scan(ctx)
+	if err != nil {
+		return nil, errorx.HandleDBError(err, errorx.Ctx().Set("path", path))
+	}
+	return dataset, nil
 }
 
 func (s *datasetStoreImpl) CreateIfNotExist(ctx context.Context, input Dataset) (*Dataset, error) {

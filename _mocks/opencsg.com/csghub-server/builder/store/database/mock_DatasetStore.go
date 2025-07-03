@@ -443,6 +443,65 @@ func (_c *MockDatasetStore_Delete_Call) RunAndReturn(run func(context.Context, d
 	return _c
 }
 
+// FindByOriginPath provides a mock function with given fields: ctx, path
+func (_m *MockDatasetStore) FindByOriginPath(ctx context.Context, path string) (*database.Dataset, error) {
+	ret := _m.Called(ctx, path)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FindByOriginPath")
+	}
+
+	var r0 *database.Dataset
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*database.Dataset, error)); ok {
+		return rf(ctx, path)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *database.Dataset); ok {
+		r0 = rf(ctx, path)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.Dataset)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, path)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockDatasetStore_FindByOriginPath_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindByOriginPath'
+type MockDatasetStore_FindByOriginPath_Call struct {
+	*mock.Call
+}
+
+// FindByOriginPath is a helper method to define mock.On call
+//   - ctx context.Context
+//   - path string
+func (_e *MockDatasetStore_Expecter) FindByOriginPath(ctx interface{}, path interface{}) *MockDatasetStore_FindByOriginPath_Call {
+	return &MockDatasetStore_FindByOriginPath_Call{Call: _e.mock.On("FindByOriginPath", ctx, path)}
+}
+
+func (_c *MockDatasetStore_FindByOriginPath_Call) Run(run func(ctx context.Context, path string)) *MockDatasetStore_FindByOriginPath_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockDatasetStore_FindByOriginPath_Call) Return(dataset *database.Dataset, err error) *MockDatasetStore_FindByOriginPath_Call {
+	_c.Call.Return(dataset, err)
+	return _c
+}
+
+func (_c *MockDatasetStore_FindByOriginPath_Call) RunAndReturn(run func(context.Context, string) (*database.Dataset, error)) *MockDatasetStore_FindByOriginPath_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // FindByPath provides a mock function with given fields: ctx, namespace, repoPath
 func (_m *MockDatasetStore) FindByPath(ctx context.Context, namespace string, repoPath string) (*database.Dataset, error) {
 	ret := _m.Called(ctx, namespace, repoPath)

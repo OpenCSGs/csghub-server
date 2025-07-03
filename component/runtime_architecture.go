@@ -664,17 +664,18 @@ func (c *runtimeArchitectureComponentImpl) InitRuntimeFrameworkAndArchitectures(
 func (c *runtimeArchitectureComponentImpl) UpdateRuntimeFrameworkByType(ctx context.Context, engineType int) error {
 	var jsonFiles []string
 	var err error
-	if engineType == types.InferenceType {
+	switch engineType {
+	case types.InferenceType:
 		jsonFiles, err = getJsonfiles("inference")
 		if err != nil {
 			return fmt.Errorf("failed to get json files: %w", err)
 		}
-	} else if engineType == types.FinetuneType {
+	case types.FinetuneType:
 		jsonFiles, err = getJsonfiles("finetune")
 		if err != nil {
 			return fmt.Errorf("failed to get json files: %w", err)
 		}
-	} else if engineType == types.EvaluationType {
+	case types.EvaluationType:
 		jsonFiles, err = getJsonfiles("evaluation")
 		if err != nil {
 			return fmt.Errorf("failed to get json files: %w", err)
