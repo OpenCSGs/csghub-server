@@ -91,11 +91,7 @@ func (o *ossParserComponentImpl) IsWhitelistedImage(imgNode *ast.Image) bool {
 		altText = string(imgNode.Title)
 	}
 	altExt := strings.ToLower(path.Ext(altText))
-	if o.whitelistedExtensions[altExt] {
-		return true
-	}
-
-	return false
+	return o.whitelistedExtensions[altExt]
 }
 
 // ParseMarkdownAndFilter parses Markdown content and extracts OSS image information
