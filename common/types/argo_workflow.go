@@ -112,6 +112,7 @@ type ArgoWorkFlowRes struct {
 	RepoType     string                 `json:"repo_type,omitempty"`
 	Username     string                 `json:"username"`
 	TaskName     string                 `json:"task_name"`
+	Namespace    string                 `json:"namespace,omitempty"` // Namespace of the workflow
 	TaskId       string                 `json:"task_id"`
 	TaskType     TaskType               `json:"task_type"`
 	TaskDesc     string                 `json:"task_desc"`

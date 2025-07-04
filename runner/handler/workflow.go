@@ -153,6 +153,7 @@ func (a *ArgoHandler) GetWorkflow(ctx *gin.Context) {
 		Reason:       wf.Reason,
 		ResourceId:   wf.ResourceId,
 		ResourceName: wf.ResourceName,
+		Namespace:    wf.Namespace,
 	}
 	ctx.JSON(http.StatusOK, res)
 }

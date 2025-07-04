@@ -30,6 +30,7 @@ func NewMonitorHandlerTester(t *testing.T) *MonitorHandlerTester {
 	tester.WithParam("name", "r")
 	tester.WithParam("instance", "test-instance")
 	tester.WithParam("id", "1")
+	tester.WithParam("type", "inference")
 	return tester
 }
 
@@ -53,6 +54,7 @@ func TestMonitorHandler_CPUUsage(t *testing.T) {
 		Instance:     "test-instance",
 		LastDuration: "30m",
 		TimeRange:    "1m",
+		DeployType:   "inference",
 	}
 
 	tester.mocks.component.EXPECT().CPUUsage(tester.Ctx(), req).Return(&types.MonitorCPUResp{}, nil)
@@ -76,6 +78,7 @@ func TestMonitorHandler_MemoryUsage(t *testing.T) {
 		Instance:     "test-instance",
 		LastDuration: "30m",
 		TimeRange:    "1m",
+		DeployType:   "inference",
 	}
 
 	tester.mocks.component.EXPECT().MemoryUsage(tester.Ctx(), req).Return(&types.MonitorMemoryResp{}, nil)
@@ -99,6 +102,7 @@ func TestMonitorHandler_RequestCount(t *testing.T) {
 		Instance:     "test-instance",
 		LastDuration: "30m",
 		TimeRange:    "1m",
+		DeployType:   "inference",
 	}
 
 	tester.mocks.component.EXPECT().RequestCount(tester.Ctx(), req).Return(&types.MonitorRequestCountResp{}, nil)
@@ -121,6 +125,7 @@ func TestMonitorHandler_RequestLatency(t *testing.T) {
 		Instance:     "test-instance",
 		LastDuration: "30m",
 		TimeRange:    "1m",
+		DeployType:   "inference",
 	}
 
 	tester.mocks.component.EXPECT().RequestLatency(tester.Ctx(), req).Return(&types.MonitorRequestLatencyResp{}, nil)

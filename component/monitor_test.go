@@ -7,9 +7,11 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/deploy"
 	prometheus_mock "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/prometheus"
 	mock_rpc "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rpc"
 	mockdb "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
+	deployer "opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/prometheus"
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
@@ -22,6 +24,7 @@ func NewTestMonitorComponent(cfg *config.Config,
 	usc rpc.UserSvcClient,
 	deployTaskStore database.DeployTaskStore,
 	repoStore database.RepoStore,
+	deployer deployer.Deployer,
 ) (MonitorComponent, error) {
 	domainParts := strings.SplitN(cfg.Space.InternalRootDomain, ".", 2)
 	return &monitorComponentImpl{
@@ -30,6 +33,7 @@ func NewTestMonitorComponent(cfg *config.Config,
 		userSvcClient:   usc,
 		deployTaskStore: deployTaskStore,
 		repoStore:       repoStore,
+		deployer:        deployer,
 	}, nil
 }
 
@@ -90,7 +94,7 @@ func TestMonitor_RequestLatency(t *testing.T) {
 		},
 	}, nil)
 
-	mon, err := NewTestMonitorComponent(cfg, client, usc, deployTaskStore, repoStore)
+	mon, err := NewTestMonitorComponent(cfg, client, usc, deployTaskStore, repoStore, nil)
 	require.Nil(t, err)
 
 	resp, err := mon.RequestLatency(ctx, req)
@@ -170,7 +174,7 @@ func TestMonitor_RequestCount(t *testing.T) {
 		},
 	}, nil)
 
-	mon, err := NewTestMonitorComponent(cfg, client, usc, deployTaskStore, repoStore)
+	mon, err := NewTestMonitorComponent(cfg, client, usc, deployTaskStore, repoStore, nil)
 	require.Nil(t, err)
 
 	resp, err := mon.RequestCount(ctx, req)
@@ -254,7 +258,96 @@ func TestMonitor_MemoryUsage(t *testing.T) {
 		},
 	}, nil)
 
-	mon, err := NewTestMonitorComponent(cfg, client, usc, deployTaskStore, repoStore)
+	mon, err := NewTestMonitorComponent(cfg, client, usc, deployTaskStore, repoStore, nil)
+	require.Nil(t, err)
+
+	resp, err := mon.MemoryUsage(ctx, req)
+	require.Nil(t, err)
+	require.Equal(t, resp, &types.MonitorMemoryResp{
+		ResultType: "vector",
+		Result: []types.MonitorData{
+			{
+				Metric: map[string]string{
+					"instance": "test-instance",
+				},
+				Values: []types.MonitorValue{
+					{
+						Timestamp: 1678617600.0,
+						Value:     1,
+					},
+				},
+			},
+		},
+	})
+}
+
+func TestMonitor_MemoryUsage_Evaluation(t *testing.T) {
+	ctx := context.TODO()
+
+	req := &types.MonitorReq{
+		CurrentUser:  "user",
+		Namespace:    "ns",
+		Name:         "n",
+		RepoType:     types.SpaceRepo,
+		DeployType:   "evaluation",
+		DeployID:     1,
+		Instance:     "test-instance",
+		LastDuration: "30m",
+	}
+
+	cfg := &config.Config{}
+
+	usc := mock_rpc.NewMockUserSvcClient(t)
+	client := prometheus_mock.NewMockPrometheusClient(t)
+	deployTaskStore := mockdb.NewMockDeployTaskStore(t)
+	repoStore := mockdb.NewMockRepoStore(t)
+	mockDeployer := deploy.NewMockDeployer(t)
+
+	usc.EXPECT().GetUserInfo(ctx, req.CurrentUser, req.CurrentUser).Return(&rpc.User{
+		ID:       1,
+		Username: req.CurrentUser,
+		Roles:    []string{"person"},
+	}, nil)
+	req2 := types.EvaluationGetReq{
+		ID:       1,
+		Username: "user",
+	}
+	mockDeployer.EXPECT().GetEvaluation(ctx, req2).Return(&types.ArgoWorkFlowRes{
+		ID:        1,
+		RepoIds:   []string{"Rowan/hellaswag"},
+		Datasets:  []string{"Rowan/hellaswag"},
+		RepoType:  "model",
+		Username:  "user",
+		TaskName:  "test",
+		TaskId:    "test",
+		TaskType:  "evaluation",
+		Status:    "Succeed",
+		Namespace: "",
+	}, nil)
+
+	query := fmt.Sprintf("avg_over_time(container_memory_usage_bytes{pod='%s',namespace='%s',container='main'}[%s:])[%s:%s]",
+		req.Instance, "", req.LastDuration, req.LastDuration, req.TimeRange)
+
+	client.EXPECT().SerialData(query).Return(&types.PrometheusResponse{
+		Data: types.PrometheusData{
+			ResultType: "vector",
+			Result: []types.PrometheusResult{
+				{
+					Metric: map[string]string{
+						"pod": "test-instance",
+					},
+					Values: [][]any{
+						{
+							1678617600.0,
+							(1024 * 1024 * 1024),
+						},
+					},
+				},
+			},
+		},
+	}, nil)
+
+	mon, err := NewTestMonitorComponent(cfg, client, usc, deployTaskStore, repoStore, mockDeployer)
 	require.Nil(t, err)
 
 	resp, err := mon.MemoryUsage(ctx, req)
@@ -354,7 +447,7 @@ func TestMonitor_CPUUsage(t *testing.T) {
 		},
 	}, nil)
 
-	mon, err := NewTestMonitorComponent(cfg, client, usc, deployTaskStore, repoStore)
+	mon, err := NewTestMonitorComponent(cfg, client, usc, deployTaskStore, repoStore, nil)
 	require.Nil(t, err)
 
 	resp, err := mon.CPUUsage(ctx, req)

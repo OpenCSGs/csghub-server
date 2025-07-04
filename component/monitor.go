@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/prometheus"
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
@@ -28,6 +29,7 @@ type monitorComponentImpl struct {
 	deployTaskStore database.DeployTaskStore
 	repoStore       database.RepoStore
 	k8sNameSpace    string
+	deployer        deploy.Deployer
 }
 
 func NewMonitorComponent(cfg *config.Config) (MonitorComponent, error) {
@@ -41,19 +43,19 @@ func NewMonitorComponent(cfg *config.Config) (MonitorComponent, error) {
 		userSvcClient:   usc,
 		deployTaskStore: database.NewDeployTaskStore(),
 		repoStore:       database.NewRepoStore(),
+		deployer:        deploy.NewDeployer(),
 	}, nil
 }
 
 func (m *monitorComponentImpl) CPUUsage(ctx context.Context, req *types.MonitorReq) (*types.MonitorCPUResp, error) {
-	access, err := m.hasPermission(ctx, req)
+	access, err, namespace, container := m.hasPermission(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check user %s permission, error: %w", req.CurrentUser, err)
 	}
 	if !access {
 		return nil, fmt.Errorf("user %s has no permission to access cpu usage", req.CurrentUser)
 	}
-
-	query := fmt.Sprintf("avg_over_time(rate(container_cpu_usage_seconds_total{pod='%s',namespace='%s',container='user-container'}[1m])[%s:])[%s:%s]", req.Instance, m.k8sNameSpace, req.LastDuration, req.LastDuration, req.TimeRange)
+	query := fmt.Sprintf("avg_over_time(rate(container_cpu_usage_seconds_total{pod='%s',namespace='%s',container='%s'}[1m])[%s:])[%s:%s]", req.Instance, namespace, container, req.LastDuration, req.LastDuration, req.TimeRange)
 	slog.Debug("cpu-usage", slog.Any("query", query))
 
 	promeResp, err := m.client.SerialData(query)
@@ -121,7 +123,7 @@ func (m *monitorComponentImpl) CPULimit(ctx context.Context, req *types.MonitorR
 }
 
 func (m *monitorComponentImpl) MemoryUsage(ctx context.Context, req *types.MonitorReq) (*types.MonitorMemoryResp, error) {
-	access, err := m.hasPermission(ctx, req)
+	access, err, namespace, container := m.hasPermission(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check user %s permission, error: %w", req.CurrentUser, err)
 	}
@@ -129,8 +131,8 @@ func (m *monitorComponentImpl) MemoryUsage(ctx context.Context, req *types.Monit
 		return nil, fmt.Errorf("user %s has no permission to access memory usage", req.CurrentUser)
 	}
 
-	query := fmt.Sprintf("avg_over_time(container_memory_usage_bytes{pod='%s',namespace='%s',container='user-container'}[%s:])[%s:%s]",
-		req.Instance, m.k8sNameSpace, req.LastDuration, req.LastDuration, req.TimeRange)
+	query := fmt.Sprintf("avg_over_time(container_memory_usage_bytes{pod='%s',namespace='%s',container='%s'}[%s:])[%s:%s]",
+		req.Instance, namespace, container, req.LastDuration, req.LastDuration, req.TimeRange)
 	slog.Debug("memory-usage", slog.Any("query", query))
 
 	promeResp, err := m.client.SerialData(query)
@@ -165,7 +167,7 @@ func (m *monitorComponentImpl) MemoryUsage(ctx context.Context, req *types.Monit
 }
 
 func (m *monitorComponentImpl) RequestCount(ctx context.Context, req *types.MonitorReq) (*types.MonitorRequestCountResp, error) {
-	access, err := m.hasPermission(ctx, req)
+	access, err, namespace, _ := m.hasPermission(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check user %s permission, error: %w", req.CurrentUser, err)
 	}
@@ -175,7 +177,7 @@ func (m *monitorComponentImpl) RequestCount(ctx context.Context, req *types.Moni
 
 	// issue: github.com/knative/serving/issues/14925
 	query := fmt.Sprintf("avg_over_time(revision_request_count{pod_name='%s',namespace='%s'}[%s:])[%s:%s]",
-		req.Instance, m.k8sNameSpace, req.LastDuration, req.LastDuration, req.TimeRange)
+		req.Instance, namespace, req.LastDuration, req.LastDuration, req.TimeRange)
 	slog.Debug("request-count", slog.Any("query", query))
 
 	promeResp, err := m.client.SerialData(query)
@@ -223,7 +225,7 @@ func (m *monitorComponentImpl) RequestCount(ctx context.Context, req *types.Moni
 }
 
 func (m *monitorComponentImpl) RequestLatency(ctx context.Context, req *types.MonitorReq) (*types.MonitorRequestLatencyResp, error) {
-	access, err := m.hasPermission(ctx, req)
+	access, err, namespace, _ := m.hasPermission(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check user %s permission, error: %w", req.CurrentUser, err)
 	}
@@ -232,7 +234,7 @@ func (m *monitorComponentImpl) RequestLatency(ctx context.Context, req *types.Mo
 	}
 
 	query := fmt.Sprintf("sum(increase(revision_app_request_latencies_bucket{pod_name='%s',namespace='%s'}[%s:])) by (le)",
-		req.Instance, m.k8sNameSpace, req.LastDuration)
+		req.Instance, namespace, req.LastDuration)
 	slog.Debug("request-latency", slog.Any("query", query))
 
 	promeResp, err := m.client.SerialData(query)
@@ -337,43 +339,79 @@ func getMetrics(metrics map[string]string) map[string]string {
 	return result
 }
 
-func (m *monitorComponentImpl) hasPermission(ctx context.Context, req *types.MonitorReq) (bool, error) {
+func (m *monitorComponentImpl) hasPermission(ctx context.Context, req *types.MonitorReq) (bool, error, string, string) {
+	if req.DeployType == "evaluation" {
+		return m.hasPermissionForEval(ctx, req)
+	} else {
+		return m.hasPermissionForDeploy(ctx, req)
+	}
+}
+
+func (m *monitorComponentImpl) hasPermissionForDeploy(ctx context.Context, req *types.MonitorReq) (bool, error, string, string) {
+	namespace := m.k8sNameSpace
+	container := "user-container"
 	user, err := m.userSvcClient.GetUserInfo(ctx, req.CurrentUser, req.CurrentUser)
 	if err != nil {
-		return false, fmt.Errorf("failed to get user %s info error: %w", req.CurrentUser, err)
+		return false, fmt.Errorf("failed to get user %s info error: %w", req.CurrentUser, err), "", ""
 	}
 	if user == nil {
-		return false, fmt.Errorf("user %s not found", req.CurrentUser)
+		return false, fmt.Errorf("user %s not found", req.CurrentUser), "", ""
 	}
 	dbUser := &database.User{
 		RoleMask: strings.Join(user.Roles, ","),
 	}
 	isAdmin := dbUser.CanAdmin()
-
 	if isAdmin {
-		return true, nil
+		return true, nil, namespace, container
 	}
-
 	repo, err := m.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
-		return false, fmt.Errorf("failed to find repo by path %s/%s/%s, error: %w", req.RepoType, req.Namespace, req.Name, err)
+		return false, fmt.Errorf("failed to find repo by path %s/%s/%s, error: %w", req.RepoType, req.Namespace, req.Name, err), "", ""
 	}
-
 	deploy, err := m.deployTaskStore.GetDeployByID(ctx, req.DeployID)
 	if err != nil {
-		return false, fmt.Errorf("failed to get deploy by id %d, error: %w", req.DeployID, err)
+		return false, fmt.Errorf("failed to get deploy by id %d, error: %w", req.DeployID, err), "", ""
 	}
 
 	if repo.ID != deploy.RepoID {
-		return false, fmt.Errorf("invalid deploy id %d", req.DeployID)
+		return false, fmt.Errorf("invalid deploy id %d", req.DeployID), "", ""
 	}
 
 	if !strings.HasPrefix(req.Instance, deploy.SvcName) {
-		return false, fmt.Errorf("invalid instance %s", req.Instance)
+		return false, fmt.Errorf("invalid instance %s", req.Instance), "", ""
 	}
 
 	if deploy.UserID != user.ID {
-		return false, nil
+		return false, nil, "", ""
 	}
-	return true, nil
+	return true, nil, namespace, container
+}
+
+func (m *monitorComponentImpl) hasPermissionForEval(ctx context.Context, req *types.MonitorReq) (bool, error, string, string) {
+	user, err := m.userSvcClient.GetUserInfo(ctx, req.CurrentUser, req.CurrentUser)
+	if err != nil {
+		return false, fmt.Errorf("failed to get user %s info error: %w", req.CurrentUser, err), "", ""
+	}
+	if user == nil {
+		return false, fmt.Errorf("user %s not found", req.CurrentUser), "", ""
+	}
+	dbUser := &database.User{
+		RoleMask: strings.Join(user.Roles, ","),
+	}
+	isAdmin := dbUser.CanAdmin()
+	req2 := types.EvaluationGetReq{
+		ID:       req.DeployID,
+		Username: req.CurrentUser,
+	}
+	wf, err := m.deployer.GetEvaluation(ctx, req2)
+	if err != nil {
+		return false, fmt.Errorf("fail to get evaluation result, %w", err), "", ""
+	}
+	if isAdmin {
+		return true, nil, wf.Namespace, "main"
+	}
+	if wf.Username != user.Username {
+		return false, nil, "", ""
+	}
+	return true, nil, wf.Namespace, "main"
 }

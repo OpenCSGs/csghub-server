@@ -589,6 +589,10 @@ func createModelRoutes(config *config.Config,
 		modelsGroup.GET("/:namespace/:name/finetune/:id/request/:instance/latency",
 			middlewareCollection.Auth.NeedLogin, middleware.RepoType(types.ModelRepo), monitorHandler.RequestLatency)
 
+		// evaluation monitor
+		modelsGroup.GET("/evaluations/:id/cpu/:instance/usage", middlewareCollection.Auth.NeedLogin, monitorHandler.CPUUsageEvaluation)
+		modelsGroup.GET("/evaluations/:id/memory/:instance/usage", middlewareCollection.Auth.NeedLogin, monitorHandler.MemoryUsageEvaluation)
+
 		// deploy model as serverless
 		modelsGroup.GET("/:namespace/:name/serverless", middleware.RepoType(types.ModelRepo), modelHandler.GetDeployServerless)
 		modelsGroup.POST("/:namespace/:name/serverless", middleware.RepoType(types.ModelRepo), modelHandler.DeployServerless)
