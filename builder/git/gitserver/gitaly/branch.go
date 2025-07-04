@@ -8,6 +8,7 @@ import (
 
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 	"opencsg.com/csghub-server/builder/git/gitserver"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -35,7 +36,10 @@ func (c *Client) GetRepoBranches(ctx context.Context, req gitserver.GetBranchesR
 			if err == io.EOF {
 				break
 			}
-			return nil, err
+			return nil, errorx.FindBranchFailed(err, errorx.Ctx().
+				Set("repo_type", req.RepoType).
+				Set("path", relativePath),
+			)
 		}
 		if resp != nil {
 			for _, branch := range resp.Branches {
@@ -71,7 +75,11 @@ func (c *Client) GetRepoBranchByName(ctx context.Context, req gitserver.GetBranc
 	resp, err := c.refClient.FindBranch(ctx, branchReq)
 
 	if err != nil {
-		return nil, err
+		return nil, errorx.FindBranchFailed(err, errorx.Ctx().
+			Set("repo_type", req.RepoType).
+			Set("path", relativePath).
+			Set("branch", req.Ref),
+		)
 	}
 
 	// if branch not found, return nil
@@ -112,7 +120,11 @@ func (c *Client) DeleteRepoBranch(ctx context.Context, req gitserver.DeleteBranc
 
 	_, err = c.operationClient.UserDeleteBranch(ctx, deleteBranchReq)
 	if err != nil {
-		return err
+		return errorx.DeleteBranchFailed(err, errorx.Ctx().
+			Set("repo_type", req.RepoType).
+			Set("path", relativePath).
+			Set("branch", req.Ref),
+		)
 	}
 
 	return nil

@@ -2,7 +2,6 @@ package gitaly
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -10,6 +9,7 @@ import (
 
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 	"opencsg.com/csghub-server/builder/git/gitserver"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -35,7 +35,11 @@ func (c *Client) GetRepoCommits(ctx context.Context, req gitserver.GetRepoCommit
 	}
 	stream, err := c.commitClient.FindCommits(ctx, commitsReq)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, errorx.FindCommitFailed(err,
+			errorx.Ctx().
+				Set("repo_type", req.RepoType).
+				Set("path", relativePath),
+		)
 	}
 
 	for {
@@ -44,7 +48,11 @@ func (c *Client) GetRepoCommits(ctx context.Context, req gitserver.GetRepoCommit
 			if err == io.EOF {
 				break
 			}
-			return nil, nil, err
+			return nil, nil, errorx.FindCommitFailed(err,
+				errorx.Ctx().
+					Set("repo_type", req.RepoType).
+					Set("path", relativePath),
+			)
 		}
 		if resp != nil {
 			for _, commit := range resp.Commits {
@@ -72,7 +80,11 @@ func (c *Client) GetRepoCommits(ctx context.Context, req gitserver.GetRepoCommit
 	}
 	count, err := c.commitClient.CountCommits(ctx, countCommitsReq)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, errorx.CountCommitsFailed(err,
+			errorx.Ctx().
+				Set("repo_type", req.RepoType).
+				Set("path", relativePath),
+		)
 	}
 	repoPageOpts := &types.RepoPageOpts{
 		Total:     int(count.Count),
@@ -100,7 +112,11 @@ func (c *Client) GetRepoLastCommit(ctx context.Context, req gitserver.GetRepoLas
 	}
 	resp, err := c.commitClient.FindCommit(ctx, commitReq)
 	if err != nil {
-		return nil, err
+		return nil, errorx.FindCommitFailed(err,
+			errorx.Ctx().
+				Set("repo_type", req.RepoType).
+				Set("path", relativePath),
+		)
 	}
 	if resp != nil && resp.Commit != nil {
 		commit = types.Commit{
@@ -151,7 +167,11 @@ func (c *Client) GetSingleCommit(ctx context.Context, req gitserver.GetRepoLastC
 	}
 	commitResp, err := c.commitClient.FindCommit(ctx, commitReq)
 	if err != nil {
-		return nil, err
+		return nil, errorx.FindCommitFailed(err,
+			errorx.Ctx().
+				Set("repo_type", req.RepoType).
+				Set("path", relativePath),
+		)
 	}
 	if commitResp != nil && commitResp.Commit != nil {
 		commit = types.Commit{
@@ -172,7 +192,10 @@ func (c *Client) GetSingleCommit(ctx context.Context, req gitserver.GetRepoLastC
 		}
 
 	} else {
-		return nil, errors.New("commit not found")
+		return nil, errorx.CommitNotFound(errorx.Ctx().
+			Set("repo_type", req.RepoType).
+			Set("path", relativePath),
+		)
 	}
 	result = types.CommitResponse{
 		Commit:  &commit,
@@ -196,7 +219,11 @@ func (c *Client) GetSingleCommit(ctx context.Context, req gitserver.GetRepoLastC
 	}
 	fileStream, err := c.diffClient.DiffStats(ctx, filesReq)
 	if err != nil {
-		return nil, err
+		return nil, errorx.DiffFailed(err,
+			errorx.Ctx().
+				Set("repo_type", req.RepoType).
+				Set("path", relativePath),
+		)
 	}
 	for {
 		data, err := fileStream.Recv()
@@ -204,7 +231,11 @@ func (c *Client) GetSingleCommit(ctx context.Context, req gitserver.GetRepoLastC
 			if err == io.EOF {
 				break
 			}
-			return nil, err
+			return nil, errorx.DiffFailed(err,
+				errorx.Ctx().
+					Set("repo_type", req.RepoType).
+					Set("path", relativePath),
+			)
 		}
 		if data != nil {
 			for _, stat := range data.Stats {
@@ -235,7 +266,11 @@ func (c *Client) GetSingleCommit(ctx context.Context, req gitserver.GetRepoLastC
 	}
 	diffStream, err := c.diffClient.RawDiff(diffCtx, diffReq)
 	if err != nil {
-		return nil, err
+		return nil, errorx.DiffFailed(err,
+			errorx.Ctx().
+				Set("repo_type", req.RepoType).
+				Set("path", relativePath),
+		)
 	}
 	for {
 		data, err := diffStream.Recv()
@@ -243,7 +278,12 @@ func (c *Client) GetSingleCommit(ctx context.Context, req gitserver.GetRepoLastC
 			if err == io.EOF {
 				break
 			}
-			return nil, err
+			return nil, errorx.DiffFailed(err,
+				errorx.Ctx().
+					Set("repo_type", req.RepoType).
+					Set("path", relativePath),
+			)
+
 		}
 		if data != nil {
 			diff = data.Data
@@ -295,7 +335,11 @@ func (c *Client) GetDiffBetweenTwoCommits(ctx context.Context, req gitserver.Get
 	}
 	commitResp, err := c.diffClient.FindChangedPaths(ctx, commitReq)
 	if err != nil {
-		return nil, err
+		return nil, errorx.DiffFailed(err,
+			errorx.Ctx().
+				Set("repo_type", req.RepoType).
+				Set("path", relativePath),
+		)
 	}
 
 	if commitResp != nil {
@@ -306,7 +350,11 @@ func (c *Client) GetDiffBetweenTwoCommits(ctx context.Context, req gitserver.Get
 				if err == io.EOF {
 					break
 				}
-				return nil, err
+				return nil, errorx.DiffFailed(err,
+					errorx.Ctx().
+						Set("repo_type", req.RepoType).
+						Set("path", relativePath),
+				)
 			}
 			if data != nil {
 				var (
@@ -340,7 +388,11 @@ func (c *Client) GetDiffBetweenTwoCommits(ctx context.Context, req gitserver.Get
 
 	findCommitResp, err := c.commitClient.FindCommit(ctx, findCommitReq)
 	if err != nil {
-		return nil, err
+		return nil, errorx.FindCommitFailed(err,
+			errorx.Ctx().
+				Set("repo_type", req.RepoType).
+				Set("path", relativePath),
+		)
 	}
 
 	if findCommitResp != nil {

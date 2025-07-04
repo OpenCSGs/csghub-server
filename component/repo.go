@@ -1638,6 +1638,11 @@ func (c *repoComponentImpl) FileInfo(ctx context.Context, req *types.GetFileReq)
 	}
 	file, err := c.git.GetRepoFileContents(ctx, getFileContentReq)
 	if err != nil {
+		if errors.Is(err, errorx.ErrFileTooLarge) {
+			// return basic file info, but tell client not to show the file content
+			file.PreviewCode = types.FilePreviewCodeTooLarge
+			return file, nil
+		}
 		return nil, fmt.Errorf("failed to get git model repository file info, error: %w", err)
 	}
 	return file, nil
