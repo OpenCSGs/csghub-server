@@ -20,14 +20,14 @@ type DiscussionHandler struct {
 	sensitive  component.SensitiveComponent
 }
 
-func NewDiscussionHandler(cfg *config.Config) (*DiscussionHandler, error) {
-	c := component.NewDiscussionComponent()
-	sc, err := component.NewSensitiveComponent(cfg)
+func NewDiscussionHandler(config *config.Config) (*DiscussionHandler, error) {
+	dc := component.NewDiscussionComponent()
+	sc, err := component.NewSensitiveComponent(config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create sensitive component: %w", err)
 	}
 	return &DiscussionHandler{
-		discussion: c,
+		discussion: dc,
 		sensitive:  sc,
 	}, nil
 }
@@ -271,7 +271,7 @@ func (h *DiscussionHandler) CreateDiscussionComment(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	_, err = h.sensitive.CheckRequestV2(ctx.Request.Context(), &req)
+	_, err = h.sensitive.CheckMarkdownContent(ctx.Request.Context(), req.Content)
 	if err != nil {
 		slog.Error("failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
@@ -322,7 +322,7 @@ func (h *DiscussionHandler) UpdateComment(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	_, err = h.sensitive.CheckRequestV2(ctx.Request.Context(), &req)
+	_, err = h.sensitive.CheckMarkdownContent(ctx.Request.Context(), req.Content)
 	if err != nil {
 		slog.Error("failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())

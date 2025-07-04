@@ -102,6 +102,7 @@ type Config struct {
 		AccessKeyID     string `env:"STARHUB_SERVER_SENSITIVE_CHECK_ACCESS_KEY_ID"`
 		AccessKeySecret string `env:"STARHUB_SERVER_SENSITIVE_CHECK_ACCESS_KEY_SECRET"`
 		Region          string `env:"STARHUB_SERVER_SENSITIVE_CHECK_REGION"`
+		MaxImageCount   int    `env:"STARHUB_SERVER_SENSITIVE_CHECK_MAX_IMAGE_COUNT, default=10"`
 		Endpoint        string `env:"STARHUB_SERVER_SENSITIVE_CHECK_ENDPOINT, default=oss-cn-beijing.aliyuncs.com"`
 		EnableSSL       bool   `env:"STARHUB_SERVER_S3_ENABLE_SSH, default=true"`
 	}

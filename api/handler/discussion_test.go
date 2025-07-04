@@ -145,18 +145,17 @@ func TestDiscussionHandler_CreateDiscussionComment(t *testing.T) {
 	})
 	tester.RequireUser(t)
 
-	tester.mocks.sensitive.EXPECT().CheckRequestV2(
-		tester.Ctx(), &types.CreateCommentRequest{Content: "foo"},
-	).Return(true, nil)
+	testContent := "test markdown content. [原图2.png](http://example.com/opencsg-portal-storage/comment/d2ac13b6-10c1-449b-9a55-b5fe4e245204)![test3.png](http://example/opencsg-portal-storage/comment/d5517313-17c9-456c-9c9b-723099646fd8), contend end."
+	tester.mocks.sensitive.On("CheckMarkdownContent", tester.Ctx(), testContent).Return(true, nil)
 	tester.mocks.discussion.EXPECT().CreateDiscussionComment(
 		tester.Ctx(), types.CreateCommentRequest{
 			CurrentUser:   "u",
-			Content:       "foo",
+			Content:       testContent,
 			CommentableID: 1,
 		},
 	).Return(&types.CreateCommentResponse{ID: 1}, nil)
 	tester.WithParam("id", "1").WithParam("repo_type", "models").WithBody(
-		t, &types.CreateCommentRequest{Content: "foo"},
+		t, &types.CreateCommentRequest{Content: testContent},
 	).Execute()
 
 	tester.ResponseEq(t, 200, tester.OKText, &types.CreateCommentResponse{ID: 1})
@@ -169,9 +168,7 @@ func TestDiscussionHandler_UpdateComment(t *testing.T) {
 	})
 	tester.RequireUser(t)
 
-	tester.mocks.sensitive.EXPECT().CheckRequestV2(
-		tester.Ctx(), &types.UpdateCommentRequest{Content: "foo"},
-	).Return(true, nil)
+	tester.mocks.sensitive.On("CheckMarkdownContent", tester.Ctx(), "foo").Return(true, nil)
 	tester.mocks.discussion.EXPECT().UpdateComment(
 		tester.Ctx(), "u", int64(1), "foo",
 	).Return(nil)
