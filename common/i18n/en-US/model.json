@@ -1,0 +1,20 @@
+{
+  "model.disable_inference_reason.metadata_not_recognized": {
+    "other": "The model metadata was not recognized"
+  },
+  "model.disable_finetune_reason.metadata_not_recognized": {
+    "other": "The model metadata was not recognized"
+  },
+  "model.disable_evaluation_reason.metadata_not_recognized": {
+    "other": "The model metadata was not recognized"
+  },
+  "model.disable_inference_reason.model_not_support_inference": {
+    "other": "This model is not yet supported by the csghub inference engine"
+  },
+  "model.disable_finetune_reason.model_not_support_finetune": {
+    "other": "This model is not yet supported by the csghub finetune engine"
+  },
+  "model.disable_evaluation_reason.model_not_support_evaluation": {
+    "other": "This model is not yet supported by the csghub evaluation engine"
+  }
+}

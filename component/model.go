@@ -519,19 +519,19 @@ func (c *modelComponentImpl) Show(ctx context.Context, namespace, name, currentU
 
 func updateDisabledReason(resModel *types.Model, archs []string) {
 	if len(archs) == 0 {
-		resModel.DisableEvaluationReason = "The model metadata was not recognized"
-		resModel.DisableFinetuneReason = "The model metadata was not recognized"
-		resModel.DisableInferenceReason = "The model metadata was not recognized"
+		resModel.DisableEvaluationReason = "metadata_not_recognized"
+		resModel.DisableFinetuneReason = "metadata_not_recognized"
+		resModel.DisableInferenceReason = "metadata_not_recognized"
 		return
 	}
 	if !resModel.EnableInference {
-		resModel.DisableInferenceReason = "This model is not yet supported by the csghub inference engine"
+		resModel.DisableInferenceReason = "model_not_support_inference"
 	}
 	if !resModel.EnableFinetune {
-		resModel.DisableFinetuneReason = "This model is not yet supported by the csghub finetune engine"
+		resModel.DisableFinetuneReason = "model_not_support_finetune"
 	}
 	if !resModel.EnableEvaluation {
-		resModel.DisableEvaluationReason = "This model is not yet supported by the csghub evaluation engine"
+		resModel.DisableEvaluationReason = "model_not_support_evaluation"
 	}
 }
 

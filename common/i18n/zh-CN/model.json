@@ -1,0 +1,20 @@
+{
+  "model.disable_inference_reason.metadata_not_recognized": {
+    "other": "模型元数据未识别"
+  },
+  "model.disable_finetune_reason.metadata_not_recognized": {
+    "other": "模型元数据未识别"
+  },
+  "model.disable_evaluation_reason.metadata_not_recognized": {
+    "other": "模型元数据未识别"
+  },
+  "model.disable_inference_reason.model_not_support_inference": {
+    "other": "csghub推理框架暂未支持该模型"
+  },
+  "model.disable_finetune_reason.model_not_support_finetune": {
+    "other": "csghub微调框架暂未支持该模型"
+  },
+  "model.disable_evaluation_reason.model_not_support_evaluation": {
+    "other": "csghub评估框架暂未支持该模型"
+  }
+}

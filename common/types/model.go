@@ -163,9 +163,9 @@ type Model struct {
 	EnableInference         bool                 `json:"enable_inference"`
 	EnableFinetune          bool                 `json:"enable_finetune"`
 	EnableEvaluation        bool                 `json:"enable_evaluation"`
-	DisableInferenceReason  string               `json:"disable_inference_reason"`
-	DisableFinetuneReason   string               `json:"disable_finetune_reason"`
-	DisableEvaluationReason string               `json:"disable_evaluation_reason"`
+	DisableInferenceReason  string               `json:"disable_inference_reason" i18n:"model.disable_inference_reason"`
+	DisableFinetuneReason   string               `json:"disable_finetune_reason" i18n:"model.disable_finetune_reason"`
+	DisableEvaluationReason string               `json:"disable_evaluation_reason" i18n:"model.disable_evaluation_reason"`
 	BaseModel               string               `json:"base_model"`
 	License                 string               `json:"license"`
 	CanWrite                bool                 `json:"can_write"`
