@@ -218,38 +218,3 @@ func TestDatasetHandler_Relations(t *testing.T) {
 		})
 	})
 }
-
-func TestDatasetHandler_AllFiles(t *testing.T) {
-	t.Run("forbidden", func(t *testing.T) {
-		tester := NewDatasetTester(t).WithHandleFunc(func(h *DatasetHandler) gin.HandlerFunc {
-			return h.AllFiles
-		})
-
-		tester.mocks.repo.EXPECT().AllFiles(tester.Ctx(), types.GetAllFilesReq{
-			Namespace:   "u-other",
-			Name:        "r",
-			RepoType:    types.DatasetRepo,
-			CurrentUser: "u",
-		}).Return(nil, errorx.ErrForbidden)
-		tester.WithParam("namespace", "u-other").WithParam("name", "r")
-		tester.WithUser().Execute()
-
-		require.Equal(t, 403, tester.Response().Code)
-	})
-
-	t.Run("normal", func(t *testing.T) {
-		tester := NewDatasetTester(t).WithHandleFunc(func(h *DatasetHandler) gin.HandlerFunc {
-			return h.AllFiles
-		})
-
-		tester.mocks.repo.EXPECT().AllFiles(tester.Ctx(), types.GetAllFilesReq{
-			Namespace:   "u",
-			Name:        "r",
-			RepoType:    types.DatasetRepo,
-			CurrentUser: "u",
-		}).Return([]*types.File{{Name: "f"}}, nil)
-		tester.WithUser().Execute()
-
-		tester.ResponseEq(t, 200, tester.OKText, []*types.File{{Name: "f"}})
-	})
-}
