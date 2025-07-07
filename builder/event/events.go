@@ -28,7 +28,7 @@ func InitEventPublisher(cfg *config.Config, natsHandler mq.MessageQueue) error {
 	var handler mq.MessageQueue
 	var err error
 	if natsHandler == nil {
-		handler, err = mq.Init(cfg)
+		handler, err = mq.GetOrInit(cfg)
 		if err != nil {
 			return err
 		}

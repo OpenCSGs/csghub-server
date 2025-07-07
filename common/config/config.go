@@ -169,6 +169,10 @@ type Config struct {
 		MeterTokenSendSubject    string `env:"STARHUB_SERVER_METER_TOKEN_SEND_SUBJECT, default=accounting.metering.token"`
 		MeterQuotaSendSubject    string `env:"STARHUB_SERVER_METER_QUOTA_SEND_SUBJECT, default=accounting.metering.quota"`
 		ServiceUpdateSubject     string `env:"STARHUB_SERVER_DEPLOY_SERVICE_SUBJECT, default=deploy.service.update"`
+		SiteInternalMsgSubject   string `env:"STARHUB_SERVER_SITE_INTERNAL_MSG_SUBJECT" default:"site.internal.msg"`
+		HighPriorityMsgSubject   string `env:"STARHUB_SERVER_HIGH_PRIORITY_MSG_SUBJECT" default:"notification.message.high"`
+		NormalPriorityMsgSubject string `env:"STARHUB_SERVER_NORMAL_PRIORITY_MSG_SUBJECT" default:"notification.message.normal"`
+		SiteInternalMailSubject  string `env:"STARHUB_SERVER_SITE_INTERNAL_MAIL_SUBJECT" default:"site.internal.mail"`
 	}
 
 	Accounting struct {
@@ -292,6 +296,15 @@ type Config struct {
 		EmptyRepoType  string `env:"STARHUB_SERVER_REPO_TEMPLATE_EMPTY_REPO_TYPE, default=template"`
 		EmptyNameSpace string `env:"STARHUB_SERVER_REPO_TEMPLATE_EMPTY_NAMESPACE, default=emptynamespace"`
 		EmptyRepoName  string `env:"STARHUB_SERVER_REPO_TEMPLATE_EMPTY_REPO_NAME, default=emptyreponame"`
+	}
+
+	Notification struct {
+		Port           int    `env:"STARHUB_SERVER_NOTIFIER_PORT" default:"8095"`
+		Host           string `env:"STARHUB_SERVER_NOTIFIER_HOST" default:"http://localhost"`
+		MailerHost     string `env:"STARHUB_SERVER_MAILER_HOST" default:"smtp.qiye.aliyun.com"`
+		MailerPort     int    `env:"STARHUB_SERVER_MAILER_PORT" default:"465"`
+		MailerUsername string `env:"STARHUB_SERVER_MAILER_USERNAME" default:""`
+		MailerPassword string `env:"STARHUB_SERVER_MAILER_PASSWORD" default:""`
 	}
 
 	Prometheus struct {

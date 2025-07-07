@@ -62,6 +62,7 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 		apiV1Group.GET("/organizations", orgHandler.Index)
 		apiV1Group.GET("/organization/:namespace", orgHandler.Get)
 		apiV1Group.GET("/organization/:namespace/members", memberCtrl.OrgMembers)
+		apiV1Group.GET("/users/by-uuids", userHandler.FindByUUIDs)
 	}
 
 	//internal only
@@ -74,6 +75,8 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 		jwtGroup.GET("/:token", needAPIKey, jwtHandler.Verify)
 		// check token info
 		tokenGroup.GET("/:token_value", needAPIKey, acHandler.Get)
+		userGroup.GET("/user_uuids", needAPIKey, userHandler.GetUserUUIDs)
+		userGroup.GET("/emails", userHandler.GetEmailsInternal)
 	}
 
 	apiV1Group.Use(mustLogin())

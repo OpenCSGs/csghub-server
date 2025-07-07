@@ -468,6 +468,10 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		return nil, fmt.Errorf("error creating mcp server handler: %w", err)
 	}
 	CreateMCPServerRoutes(apiGroup, authCollection, mcpHandler, repoCommonHandler)
+
+	if err := createNotificationRoutes(config, apiGroup, authCollection); err != nil {
+		return nil, fmt.Errorf("error creating notifier routes: %w", err)
+	}
 	return r, nil
 }
 
@@ -1030,4 +1034,27 @@ func createOrgRoutes(apiGroup *gin.RouterGroup, userProxyHandler *handler.Intern
 		apiGroup.PUT("/organization/:namespace/members/:username", userProxyHandler.ProxyToApi("/api/v1/organization/%s/members/%s", "namespace", "username"))
 		apiGroup.DELETE("/organization/:namespace/members/:username", userProxyHandler.ProxyToApi("/api/v1/organization/%s/members/%s", "namespace", "username"))
 	}
+}
+
+func createNotificationRoutes(config *config.Config, apiGroup *gin.RouterGroup, middlewareCollection middleware.AuthenticatorCollection) error {
+	notificationProxyHandler, err := handler.NewInternalServiceProxyHandler(fmt.Sprintf("%s:%d", config.Notification.Host, config.Notification.Port))
+	if err != nil {
+		return fmt.Errorf("error creating notifier controller: %w", err)
+	}
+
+	notificationsGroup := apiGroup.Group("/notifications")
+	notificationsGroup.Use(middlewareCollection.NeedLogin)
+	{
+		notificationsGroup.GET("/count", notificationProxyHandler.Proxy)
+		notificationsGroup.GET("", notificationProxyHandler.Proxy)
+		notificationsGroup.POST("", notificationProxyHandler.Proxy)
+		notificationsGroup.PUT("/read", notificationProxyHandler.Proxy)
+		notificationsGroup.PUT("/setting", notificationProxyHandler.Proxy)
+		notificationsGroup.GET("/setting", notificationProxyHandler.Proxy)
+		notificationsGroup.GET("/poll/:limit", notificationProxyHandler.Proxy)
+		notificationsGroup.GET("/message-types", notificationProxyHandler.Proxy)
+		notificationsGroup.PUT("/msg-task", middlewareCollection.NeedAdmin, notificationProxyHandler.Proxy)
+	}
+
+	return nil
 }
