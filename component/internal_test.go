@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	pb "gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 	"opencsg.com/csghub-server/builder/git/gitserver"
@@ -23,6 +24,8 @@ func TestInternalComponent_Allowed(t *testing.T) {
 func TestInternalComponent_SSHAllowed(t *testing.T) {
 	ctx := context.TODO()
 	ic := initializeTestInternalComponent(ctx, t)
+
+	ic.mocks.gitServer.EXPECT().BuildRelativePath(mock.Anything, types.ModelRepo, "ns", "n").Return("models_ns/n.git", nil)
 
 	ic.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "ns").Return(database.Namespace{
 		ID: 321,

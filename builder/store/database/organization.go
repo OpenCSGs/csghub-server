@@ -141,7 +141,7 @@ func (s *orgStoreImpl) GetUserBelongOrgs(ctx context.Context, userID int64) (org
 		NewSelect().
 		Model(&orgs).
 		Join("join members on members.organization_id = organization.id").
-		Where("members.user_id = ?", userID).
+		Where("members.user_id = ? and members.deleted_at is null", userID).
 		Scan(ctx, &orgs)
 	return
 }

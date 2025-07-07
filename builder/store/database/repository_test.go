@@ -21,9 +21,11 @@ func TestRepoStore_CRUD(t *testing.T) {
 	store := database.NewRepoStoreWithDB(db)
 
 	_, err := store.CreateRepo(ctx, database.Repository{
-		Name:    "repo1",
-		UserID:  123,
-		GitPath: "foos_u/bar",
+		Name:           "repo1",
+		UserID:         123,
+		GitPath:        "models_u/bar",
+		Path:           "u/bar",
+		RepositoryType: types.ModelRepo,
 	})
 	require.Nil(t, err)
 
@@ -46,23 +48,23 @@ func TestRepoStore_CRUD(t *testing.T) {
 	require.Equal(t, 1, len(rps))
 	require.Equal(t, "repo1", rps[0].Name)
 
-	rp, err = store.Find(ctx, "u", "foO", "bAr")
+	rp, err = store.Find(ctx, "u", "model", "bAr")
 	require.Nil(t, err)
 	require.Equal(t, "repo1", rp.Name)
 
-	exist, err := store.Exists(ctx, "foO", "u", "bar")
+	exist, err := store.Exists(ctx, "model", "u", "bar")
 	require.Nil(t, err)
 	require.True(t, exist)
 
-	rp, err = store.FindByPath(ctx, "foO", "u", "bAr")
+	rp, err = store.FindByPath(ctx, "model", "u", "bAr")
 	require.Nil(t, err)
 	require.Equal(t, "repo1", rp.Name)
 
-	rp, err = store.FindByGitPath(ctx, "foos_u/bAr")
+	rp, err = store.FindByGitPath(ctx, "models_u/bAr")
 	require.Nil(t, err)
 	require.Equal(t, "repo1", rp.Name)
 
-	rps, err = store.FindByGitPaths(ctx, []string{"foos_u/bAr"})
+	rps, err = store.FindByGitPaths(ctx, []string{"models_u/bAr"})
 	require.Nil(t, err)
 	require.Equal(t, 1, len(rps))
 	require.Equal(t, "repo1", rps[0].Name)
@@ -252,14 +254,16 @@ func TestRepoStore_SetUpdateTimeByPath(t *testing.T) {
 
 	store := database.NewRepoStoreWithDB(db)
 	repo, err := store.CreateRepo(ctx, database.Repository{
-		Name:    "repo1",
-		UserID:  123,
-		GitPath: "foos_u/bar",
+		Name:           "repo1",
+		UserID:         123,
+		GitPath:        "models_u/bar",
+		RepositoryType: types.ModelRepo,
+		Path:           "u/bar",
 	})
 	require.Nil(t, err)
 
 	dt := time.Date(2022, 12, 6, 1, 2, 0, 0, time.UTC)
-	err = store.SetUpdateTimeByPath(ctx, "foo", "u", "bar", dt)
+	err = store.SetUpdateTimeByPath(ctx, types.ModelRepo, "u", "bar", dt)
 	require.Nil(t, err)
 
 	err = db.Core.NewSelect().Model(repo).WherePK().Scan(ctx)
@@ -464,7 +468,9 @@ func TestRepoStore_IsMirrorRepo(t *testing.T) {
 
 	store := database.NewRepoStoreWithDB(db)
 	rn, err := store.CreateRepo(ctx, database.Repository{
-		GitPath: "codes_ns/n",
+		GitPath:        "codes_ns/n",
+		RepositoryType: types.CodeRepo,
+		Path:           "ns/n",
 	})
 	require.Nil(t, err)
 	mi := &database.Mirror{RepositoryID: rn.ID}

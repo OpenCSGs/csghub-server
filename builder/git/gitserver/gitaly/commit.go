@@ -17,14 +17,17 @@ const SHA1EmptyTreeID = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
 
 func (c *Client) GetRepoCommits(ctx context.Context, req gitserver.GetRepoCommitsReq) ([]types.Commit, *types.RepoPageOpts, error) {
 	var commits []types.Commit
-	repoType := fmt.Sprintf("%ss", string(req.RepoType))
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
+	relativePath, err := c.BuildRelativePath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	commitsReq := &gitalypb.FindCommitsRequest{
 		Repository: &gitalypb.Repository{
 			StorageName:  c.config.GitalyServer.Storage,
-			RelativePath: BuildRelativePath(repoType, req.Namespace, req.Name),
+			RelativePath: relativePath,
 		},
 		Revision: []byte(req.Ref),
 		Limit:    int32(req.Per),
@@ -63,7 +66,7 @@ func (c *Client) GetRepoCommits(ctx context.Context, req gitserver.GetRepoCommit
 	countCommitsReq := &gitalypb.CountCommitsRequest{
 		Repository: &gitalypb.Repository{
 			StorageName:  c.config.GitalyServer.Storage,
-			RelativePath: BuildRelativePath(repoType, req.Namespace, req.Name),
+			RelativePath: relativePath,
 		},
 		Revision: []byte(req.Ref),
 	}
@@ -81,14 +84,17 @@ func (c *Client) GetRepoCommits(ctx context.Context, req gitserver.GetRepoCommit
 
 func (c *Client) GetRepoLastCommit(ctx context.Context, req gitserver.GetRepoLastCommitReq) (*types.Commit, error) {
 	var commit types.Commit
-	repoType := fmt.Sprintf("%ss", string(req.RepoType))
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
+	relativePath, err := c.BuildRelativePath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return nil, err
+	}
 
 	commitReq := &gitalypb.FindCommitRequest{
 		Repository: &gitalypb.Repository{
 			StorageName:  c.config.GitalyServer.Storage,
-			RelativePath: BuildRelativePath(repoType, req.Namespace, req.Name),
+			RelativePath: relativePath,
 		},
 		Revision: []byte(req.Ref),
 	}
@@ -128,14 +134,18 @@ func (c *Client) GetSingleCommit(ctx context.Context, req gitserver.GetRepoLastC
 		deletions int
 	)
 
-	repoType := fmt.Sprintf("%ss", string(req.RepoType))
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
+
+	relativePath, err := c.BuildRelativePath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return nil, err
+	}
 
 	commitReq := &gitalypb.FindCommitRequest{
 		Repository: &gitalypb.Repository{
 			StorageName:  c.config.GitalyServer.Storage,
-			RelativePath: BuildRelativePath(repoType, req.Namespace, req.Name),
+			RelativePath: relativePath,
 		},
 		Revision: []byte(req.Ref),
 	}
@@ -175,7 +185,7 @@ func (c *Client) GetSingleCommit(ctx context.Context, req gitserver.GetRepoLastC
 	filesReq := &gitalypb.DiffStatsRequest{
 		Repository: &gitalypb.Repository{
 			StorageName:  c.config.GitalyServer.Storage,
-			RelativePath: BuildRelativePath(repoType, req.Namespace, req.Name),
+			RelativePath: relativePath,
 		},
 		RightCommitId: req.Ref,
 	}
@@ -214,7 +224,7 @@ func (c *Client) GetSingleCommit(ctx context.Context, req gitserver.GetRepoLastC
 	diffReq := &gitalypb.RawDiffRequest{
 		Repository: &gitalypb.Repository{
 			StorageName:  c.config.GitalyServer.Storage,
-			RelativePath: BuildRelativePath(repoType, req.Namespace, req.Name),
+			RelativePath: relativePath,
 		},
 		RightCommitId: req.Ref,
 	}
@@ -248,6 +258,10 @@ func (c *Client) GetDiffBetweenTwoCommits(ctx context.Context, req gitserver.Get
 	repoType := fmt.Sprintf("%ss", string(req.RepoType))
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
+	relativePath, err := c.BuildRelativePath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return nil, err
+	}
 	callback := &types.GiteaCallbackPushReq{
 		Ref: req.Ref,
 		Repository: types.GiteaCallbackPushReq_Repository{
@@ -257,7 +271,7 @@ func (c *Client) GetDiffBetweenTwoCommits(ctx context.Context, req gitserver.Get
 	}
 	repository := &gitalypb.Repository{
 		StorageName:  c.config.GitalyServer.Storage,
-		RelativePath: BuildRelativePath(repoType, req.Namespace, req.Name),
+		RelativePath: relativePath,
 	}
 	treeReq := &gitalypb.FindChangedPathsRequest_Request_TreeRequest{
 		RightTreeRevision: req.RightCommitId,

@@ -109,11 +109,12 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 
 	r.Use(middleware.Authenticator(config))
 
-	authCollection := middleware.AuthenticatorCollection{}
-	authCollection.NeedAPIKey = middleware.OnlyAPIKeyAuthenticator(config)
-	authCollection.NeedAdmin = middleware.NeedAdmin(config)
-	authCollection.UserMatch = middleware.UserMatch()
-	authCollection.NeedLogin = middleware.MustLogin()
+	middlewareCollection := middleware.MiddlewareCollection{}
+	middlewareCollection.Auth.NeedAPIKey = middleware.OnlyAPIKeyAuthenticator(config)
+	middlewareCollection.Auth.NeedLogin = middleware.MustLogin()
+	middlewareCollection.Auth.NeedAdmin = middleware.NeedAdmin(config)
+	middlewareCollection.Auth.UserMatch = middleware.UserMatch()
+	middlewareCollection.Repo.RepoExists = middleware.RepoExists(config)
 
 	if enableSwagger {
 		r.GET("/api/v1/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
@@ -190,7 +191,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	}
 
 	// Model routes
-	createModelRoutes(config, apiGroup, authCollection, modelHandler, repoCommonHandler, monitorHandler)
+	createModelRoutes(config, apiGroup, middlewareCollection, modelHandler, repoCommonHandler, monitorHandler)
 
 	// Dataset routes
 	createDatasetRoutes(config, apiGroup, dsHandler, repoCommonHandler)
@@ -207,7 +208,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		return nil, fmt.Errorf("error creating space handler:%w", err)
 	}
 	// space routers
-	createSpaceRoutes(config, apiGroup, authCollection, spaceHandler, repoCommonHandler, monitorHandler)
+	createSpaceRoutes(config, apiGroup, middlewareCollection, spaceHandler, repoCommonHandler, monitorHandler)
 
 	spaceResourceHandler, err := handler.NewSpaceResourceHandler(config)
 	if err != nil {
@@ -217,9 +218,9 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	spaceResource := apiGroup.Group("space_resources")
 	{
 		spaceResource.GET("", spaceResourceHandler.Index)
-		spaceResource.POST("", authCollection.NeedAdmin, spaceResourceHandler.Create)
-		spaceResource.PUT("/:id", authCollection.NeedAdmin, spaceResourceHandler.Update)
-		spaceResource.DELETE("/:id", authCollection.NeedAdmin, spaceResourceHandler.Delete)
+		spaceResource.POST("", middlewareCollection.Auth.NeedAdmin, spaceResourceHandler.Create)
+		spaceResource.PUT("/:id", middlewareCollection.Auth.NeedAdmin, spaceResourceHandler.Update)
+		spaceResource.DELETE("/:id", middlewareCollection.Auth.NeedAdmin, spaceResourceHandler.Delete)
 	}
 
 	spaceSdkHandler, err := handler.NewSpaceSdkHandler(config)
@@ -230,9 +231,9 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	spaceSdk := apiGroup.Group("space_sdks")
 	{
 		spaceSdk.GET("", spaceSdkHandler.Index)
-		spaceSdk.POST("", authCollection.NeedAPIKey, spaceSdkHandler.Create)
-		spaceSdk.PUT("/:id", authCollection.NeedAPIKey, spaceSdkHandler.Update)
-		spaceSdk.DELETE("/:id", authCollection.NeedAPIKey, spaceSdkHandler.Delete)
+		spaceSdk.POST("", middlewareCollection.Auth.NeedAPIKey, spaceSdkHandler.Create)
+		spaceSdk.PUT("/:id", middlewareCollection.Auth.NeedAPIKey, spaceSdkHandler.Update)
+		spaceSdk.DELETE("/:id", middlewareCollection.Auth.NeedAPIKey, spaceSdkHandler.Delete)
 	}
 
 	userProxyHandler, err := handler.NewInternalServiceProxyHandler(fmt.Sprintf("%s:%d", config.User.Host, config.User.Port))
@@ -240,7 +241,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		return nil, fmt.Errorf("error creating user proxy handler:%w", err)
 	}
 
-	createUserRoutes(apiGroup, authCollection, userProxyHandler, userHandler)
+	createUserRoutes(apiGroup, middlewareCollection, userProxyHandler, userHandler)
 
 	tokenGroup := apiGroup.Group("token")
 	{
@@ -248,7 +249,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		tokenGroup.PUT("/:app/:token_name", userProxyHandler.ProxyToApi("/api/v1/token/%s/%s", "app", "token_name"))
 		tokenGroup.DELETE("/:app/:token_name", userProxyHandler.ProxyToApi("/api/v1/token/%s/%s", "app", "token_name"))
 		// check token info
-		tokenGroup.GET("/:token_value", authCollection.NeedAPIKey, userProxyHandler.ProxyToApi("/api/v1/token/%s", "token_value"))
+		tokenGroup.GET("/:token_value", middlewareCollection.Auth.NeedAPIKey, userProxyHandler.ProxyToApi("/api/v1/token/%s", "token_value"))
 	}
 
 	sshKeyHandler, err := handler.NewSSHKeyHandler(config)
@@ -256,9 +257,9 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		return nil, fmt.Errorf("error creating user controller:%w", err)
 	}
 	{
-		apiGroup.GET("/user/:username/ssh_keys", authCollection.UserMatch, sshKeyHandler.Index)
-		apiGroup.POST("/user/:username/ssh_keys", authCollection.UserMatch, sshKeyHandler.Create)
-		apiGroup.DELETE("/user/:username/ssh_key/:name", authCollection.UserMatch, sshKeyHandler.Delete)
+		apiGroup.GET("/user/:username/ssh_keys", middlewareCollection.Auth.UserMatch, sshKeyHandler.Index)
+		apiGroup.POST("/user/:username/ssh_keys", middlewareCollection.Auth.UserMatch, sshKeyHandler.Create)
+		apiGroup.DELETE("/user/:username/ssh_key/:name", middlewareCollection.Auth.UserMatch, sshKeyHandler.Delete)
 	}
 
 	// Organization routes
@@ -272,8 +273,8 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	createTagsRoutes(apiGroup, tagCtrl)
 
 	// JWT token
-	apiGroup.POST("/jwt/token", authCollection.NeedAPIKey, userProxyHandler.Proxy)
-	apiGroup.GET("/jwt/:token", authCollection.NeedAPIKey, userProxyHandler.ProxyToApi("/api/v1/jwt/%s", "token"))
+	apiGroup.POST("/jwt/token", middlewareCollection.Auth.NeedAPIKey, userProxyHandler.Proxy)
+	apiGroup.GET("/jwt/:token", middlewareCollection.Auth.NeedAPIKey, userProxyHandler.ProxyToApi("/api/v1/jwt/%s", "token"))
 	apiGroup.GET("/users", userProxyHandler.Proxy)
 
 	// callback
@@ -335,7 +336,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	{
 		cluster.GET("", clusterHandler.Index)
 		cluster.GET("/:id", clusterHandler.GetClusterById)
-		cluster.PUT("/:id", authCollection.NeedAPIKey, clusterHandler.Update)
+		cluster.PUT("/:id", middlewareCollection.Auth.NeedAPIKey, clusterHandler.Update)
 	}
 
 	eventHandler, err := handler.NewEventHandler()
@@ -352,7 +353,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	}
 	broadcast := apiGroup.Group("/broadcasts")
 	adminBroadcast := apiGroup.Group("/admin/broadcasts")
-	adminBroadcast.Use(authCollection.NeedAdmin)
+	adminBroadcast.Use(middlewareCollection.Auth.NeedAdmin)
 
 	adminBroadcast.POST("", broadcastHandler.Create)
 	adminBroadcast.PUT("/:id", broadcastHandler.Update)
@@ -367,7 +368,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		return nil, fmt.Errorf("error creating runtime framework architecture handler:%w", err)
 	}
 
-	createRuntimeFrameworkRoutes(apiGroup, authCollection, modelHandler, runtimeArchHandler, repoCommonHandler)
+	createRuntimeFrameworkRoutes(apiGroup, middlewareCollection, modelHandler, runtimeArchHandler, repoCommonHandler)
 
 	syncHandler, err := handler.NewSyncHandler(config)
 	if err != nil {
@@ -390,7 +391,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		return nil, fmt.Errorf("error creating accounting handler setting handler:%w", err)
 	}
 
-	createAccountRoutes(apiGroup, authCollection.NeedAPIKey, accountingHandler)
+	createAccountRoutes(apiGroup, middlewareCollection.Auth.NeedAPIKey, accountingHandler)
 
 	recomHandler, err := handler.NewRecomHandler(config)
 	if err != nil {
@@ -398,7 +399,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	}
 	recomGroup := apiGroup.Group("/recom")
 	{
-		recomGroup.POST("opweight", authCollection.NeedAPIKey, recomHandler.SetOpWeight)
+		recomGroup.POST("opweight", middlewareCollection.Auth.NeedAPIKey, recomHandler.SetOpWeight)
 	}
 
 	// telemetry
@@ -431,7 +432,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error creating discussion handler:%w", err)
 	}
-	createDiscussionRoutes(apiGroup, authCollection.NeedAPIKey, discussionHandler)
+	createDiscussionRoutes(apiGroup, middlewareCollection.Auth.NeedAPIKey, discussionHandler)
 
 	// prompt
 	promptHandler, err := handler.NewPromptHandler(config)
@@ -460,14 +461,14 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error creating space template proxy:%w", err)
 	}
-	createSpaceTemplateRoutes(apiGroup, authCollection, templateHandler)
+	createSpaceTemplateRoutes(apiGroup, middlewareCollection, templateHandler)
 
 	// mcp server
 	mcpHandler, err := handler.NewMCPServerHandler(config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating mcp server handler: %w", err)
 	}
-	CreateMCPServerRoutes(apiGroup, authCollection, mcpHandler, repoCommonHandler)
+	CreateMCPServerRoutes(apiGroup, middlewareCollection, mcpHandler, repoCommonHandler)
 	return r, nil
 }
 
@@ -483,7 +484,7 @@ func createEvaluationRoutes(apiGroup *gin.RouterGroup, evaluationHandler *handle
 
 func createModelRoutes(config *config.Config,
 	apiGroup *gin.RouterGroup,
-	authCollection middleware.AuthenticatorCollection,
+	middlewareCollection middleware.MiddlewareCollection,
 	modelHandler *handler.ModelHandler,
 	repoCommonHandler *handler.RepoHandler,
 	monitorHandler *handler.MonitorHandler) {
@@ -558,13 +559,13 @@ func createModelRoutes(config *config.Config,
 
 		// inference monitor
 		modelsGroup.GET("/:namespace/:name/run/:id/cpu/:instance/usage",
-			authCollection.NeedLogin, middleware.RepoType(types.ModelRepo), monitorHandler.CPUUsage)
+			middlewareCollection.Auth.NeedLogin, middleware.RepoType(types.ModelRepo), monitorHandler.CPUUsage)
 		modelsGroup.GET("/:namespace/:name/run/:id/memory/:instance/usage",
-			authCollection.NeedLogin, middleware.RepoType(types.ModelRepo), monitorHandler.MemoryUsage)
+			middlewareCollection.Auth.NeedLogin, middleware.RepoType(types.ModelRepo), monitorHandler.MemoryUsage)
 		modelsGroup.GET("/:namespace/:name/run/:id/request/:instance/count",
-			authCollection.NeedLogin, middleware.RepoType(types.ModelRepo), monitorHandler.RequestCount)
+			middlewareCollection.Auth.NeedLogin, middleware.RepoType(types.ModelRepo), monitorHandler.RequestCount)
 		modelsGroup.GET("/:namespace/:name/run/:id/request/:instance/latency",
-			authCollection.NeedLogin, middleware.RepoType(types.ModelRepo), monitorHandler.RequestLatency)
+			middlewareCollection.Auth.NeedLogin, middleware.RepoType(types.ModelRepo), monitorHandler.RequestLatency)
 
 		// runtime framework for both finetune and inference
 		modelsGroup.GET("/runtime_framework", middleware.RepoType(types.ModelRepo), repoCommonHandler.RuntimeFrameworkListWithType)
@@ -580,13 +581,13 @@ func createModelRoutes(config *config.Config,
 
 		// finetune monitor
 		modelsGroup.GET("/:namespace/:name/finetune/:id/cpu/:instance/usage",
-			authCollection.NeedLogin, middleware.RepoType(types.ModelRepo), monitorHandler.CPUUsage)
+			middlewareCollection.Auth.NeedLogin, middleware.RepoType(types.ModelRepo), monitorHandler.CPUUsage)
 		modelsGroup.GET("/:namespace/:name/finetune/:id/memory/:instance/usage",
-			authCollection.NeedLogin, middleware.RepoType(types.ModelRepo), monitorHandler.MemoryUsage)
+			middlewareCollection.Auth.NeedLogin, middleware.RepoType(types.ModelRepo), monitorHandler.MemoryUsage)
 		modelsGroup.GET("/:namespace/:name/finetune/:id/request/:instance/count",
-			authCollection.NeedLogin, middleware.RepoType(types.ModelRepo), monitorHandler.RequestCount)
+			middlewareCollection.Auth.NeedLogin, middleware.RepoType(types.ModelRepo), monitorHandler.RequestCount)
 		modelsGroup.GET("/:namespace/:name/finetune/:id/request/:instance/latency",
-			authCollection.NeedLogin, middleware.RepoType(types.ModelRepo), monitorHandler.RequestLatency)
+			middlewareCollection.Auth.NeedLogin, middleware.RepoType(types.ModelRepo), monitorHandler.RequestLatency)
 
 		// deploy model as serverless
 		modelsGroup.GET("/:namespace/:name/serverless", middleware.RepoType(types.ModelRepo), modelHandler.GetDeployServerless)
@@ -600,13 +601,13 @@ func createModelRoutes(config *config.Config,
 
 		// serverless monitor
 		modelsGroup.GET("/:namespace/:name/serverless/:id/cpu/:instance/usage",
-			authCollection.NeedLogin, middleware.RepoType(types.ModelRepo), monitorHandler.CPUUsage)
+			middlewareCollection.Auth.NeedLogin, middleware.RepoType(types.ModelRepo), monitorHandler.CPUUsage)
 		modelsGroup.GET("/:namespace/:name/serverless/:id/memory/:instance/usage",
-			authCollection.NeedLogin, middleware.RepoType(types.ModelRepo), monitorHandler.MemoryUsage)
+			middlewareCollection.Auth.NeedLogin, middleware.RepoType(types.ModelRepo), monitorHandler.MemoryUsage)
 		modelsGroup.GET("/:namespace/:name/serverless/:id/request/:instance/count",
-			authCollection.NeedLogin, middleware.RepoType(types.ModelRepo), monitorHandler.RequestCount)
+			middlewareCollection.Auth.NeedLogin, middleware.RepoType(types.ModelRepo), monitorHandler.RequestCount)
 		modelsGroup.GET("/:namespace/:name/serverless/:id/request/:instance/latency",
-			authCollection.NeedLogin, middleware.RepoType(types.ModelRepo), monitorHandler.RequestLatency)
+			middlewareCollection.Auth.NeedLogin, middleware.RepoType(types.ModelRepo), monitorHandler.RequestLatency)
 	}
 }
 
@@ -701,7 +702,7 @@ func createCodeRoutes(config *config.Config, apiGroup *gin.RouterGroup, codeHand
 
 func createSpaceRoutes(config *config.Config,
 	apiGroup *gin.RouterGroup,
-	authCollection middleware.AuthenticatorCollection,
+	middlewareCollection middleware.MiddlewareCollection,
 	spaceHandler *handler.SpaceHandler,
 	repoCommonHandler *handler.RepoHandler,
 	monitorHandler *handler.MonitorHandler) {
@@ -765,17 +766,17 @@ func createSpaceRoutes(config *config.Config,
 		spaces.GET("/:namespace/:name/run/:id/logs/:instance", middleware.RepoType(types.SpaceRepo), repoCommonHandler.DeployInstanceLogs)
 		// space monitor
 		spaces.GET("/:namespace/:name/run/:id/cpu/:instance/usage",
-			authCollection.NeedLogin, middleware.RepoType(types.SpaceRepo), monitorHandler.CPUUsage)
+			middlewareCollection.Auth.NeedLogin, middleware.RepoType(types.SpaceRepo), monitorHandler.CPUUsage)
 		spaces.GET("/:namespace/:name/run/:id/memory/:instance/usage",
-			authCollection.NeedLogin, middleware.RepoType(types.SpaceRepo), monitorHandler.MemoryUsage)
+			middlewareCollection.Auth.NeedLogin, middleware.RepoType(types.SpaceRepo), monitorHandler.MemoryUsage)
 		spaces.GET("/:namespace/:name/run/:id/request/:instance/count",
-			authCollection.NeedLogin, middleware.RepoType(types.SpaceRepo), monitorHandler.RequestCount)
+			middlewareCollection.Auth.NeedLogin, middleware.RepoType(types.SpaceRepo), monitorHandler.RequestCount)
 		spaces.GET("/:namespace/:name/run/:id/request/:instance/latency",
-			authCollection.NeedLogin, middleware.RepoType(types.SpaceRepo), monitorHandler.RequestLatency)
+			middlewareCollection.Auth.NeedLogin, middleware.RepoType(types.SpaceRepo), monitorHandler.RequestLatency)
 	}
 }
 
-func createUserRoutes(apiGroup *gin.RouterGroup, authCollection middleware.AuthenticatorCollection, userProxyHandler *handler.InternalServiceProxyHandler, userHandler *handler.UserHandler) {
+func createUserRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware.MiddlewareCollection, userProxyHandler *handler.InternalServiceProxyHandler, userHandler *handler.UserHandler) {
 	// deprecated
 	{
 		apiGroup.POST("/users", userProxyHandler.ProxyToApi("/api/v1/user"))
@@ -821,11 +822,11 @@ func createUserRoutes(apiGroup *gin.RouterGroup, authCollection middleware.Authe
 	apiGroup.GET("/user/:username/tokens", userProxyHandler.ProxyToApi("/api/v1/user/%s/tokens", "username"))
 
 	// serverless list
-	apiGroup.GET("/user/:username/run/serverless", authCollection.NeedAdmin, userHandler.GetRunServerless)
+	apiGroup.GET("/user/:username/run/serverless", middlewareCollection.Auth.NeedAdmin, userHandler.GetRunServerless)
 }
 
-func createRuntimeFrameworkRoutes(apiGroup *gin.RouterGroup, authCollection middleware.AuthenticatorCollection, modelHandler *handler.ModelHandler, runtimeArchHandler *handler.RuntimeArchitectureHandler, repoCommonHandler *handler.RepoHandler) {
-	needAdmin := authCollection.NeedAdmin
+func createRuntimeFrameworkRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware.MiddlewareCollection, modelHandler *handler.ModelHandler, runtimeArchHandler *handler.RuntimeArchitectureHandler, repoCommonHandler *handler.RepoHandler) {
+	needAdmin := middlewareCollection.Auth.NeedAdmin
 	runtimeFramework := apiGroup.Group("/runtime_framework")
 	{
 		runtimeFramework.GET("/:id/models", modelHandler.ListByRuntimeFrameworkID)
@@ -995,13 +996,13 @@ func createDataViewerRoutes(apiGroup *gin.RouterGroup, dsViewerHandler *handler.
 	}
 }
 
-func createSpaceTemplateRoutes(apiGroup *gin.RouterGroup, authCollection middleware.AuthenticatorCollection, templateHandler *handler.SpaceTemplateHandler) {
+func createSpaceTemplateRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware.MiddlewareCollection, templateHandler *handler.SpaceTemplateHandler) {
 	spaceTemplateGrp := apiGroup.Group("/space_templates")
 	{
-		spaceTemplateGrp.GET("", authCollection.NeedAdmin, templateHandler.Index)
-		spaceTemplateGrp.POST("", authCollection.NeedAdmin, templateHandler.Create)
-		spaceTemplateGrp.PUT("/:id", authCollection.NeedAdmin, templateHandler.Update)
-		spaceTemplateGrp.DELETE("/:id", authCollection.NeedAdmin, templateHandler.Delete)
+		spaceTemplateGrp.GET("", middlewareCollection.Auth.NeedAdmin, templateHandler.Index)
+		spaceTemplateGrp.POST("", middlewareCollection.Auth.NeedAdmin, templateHandler.Create)
+		spaceTemplateGrp.PUT("/:id", middlewareCollection.Auth.NeedAdmin, templateHandler.Update)
+		spaceTemplateGrp.DELETE("/:id", middlewareCollection.Auth.NeedAdmin, templateHandler.Delete)
 		spaceTemplateGrp.GET("/:type", templateHandler.List)
 	}
 }

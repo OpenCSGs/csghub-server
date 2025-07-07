@@ -163,6 +163,7 @@ type RepoComponent interface {
 	RemoteDiff(ctx context.Context, req types.GetDiffBetweenCommitsReq) ([]types.RemoteDiffs, error)
 	Preupload(ctx context.Context, req types.PreuploadReq) (*types.PreuploadResp, error)
 	CommitFiles(ctx context.Context, req types.CommitFilesReq) error
+	IsExists(ctx context.Context, repoType types.RepositoryType, namespace, name string) (bool, error)
 }
 
 func NewRepoComponentImpl(config *config.Config) (*repoComponentImpl, error) {
@@ -285,6 +286,24 @@ func (c *repoComponentImpl) CreateRepo(ctx context.Context, req types.CreateRepo
 		req.DefaultBranch = types.MainBranch
 	}
 
+	dbRepo := database.Repository{
+		UserID:         user.ID,
+		Path:           path.Join(req.Namespace, req.Name),
+		GitPath:        fmt.Sprintf("%ss_%s/%s", string(req.RepoType), req.Namespace, req.Name),
+		Name:           req.Name,
+		Nickname:       req.Nickname,
+		Description:    req.Description,
+		Private:        req.Private,
+		License:        req.License,
+		DefaultBranch:  req.DefaultBranch,
+		RepositoryType: req.RepoType,
+		StarCount:      req.StarCount,
+	}
+	newDBRepo, err := c.repoStore.CreateRepo(ctx, dbRepo)
+	if err != nil {
+		return nil, nil, fmt.Errorf("fail to create database repo, error: %w", err)
+	}
+
 	gitRepoReq := gitserver.CreateRepoReq{
 		Username:      req.Username,
 		Namespace:     req.Namespace,
@@ -303,27 +322,14 @@ func (c *repoComponentImpl) CreateRepo(ctx context.Context, req types.CreateRepo
 		return nil, nil, fmt.Errorf("fail to create repo in git, error: %w", err)
 	}
 
-	dbRepo := database.Repository{
-		UserID:         user.ID,
-		Path:           path.Join(req.Namespace, req.Name),
-		GitPath:        gitRepo.GitPath,
-		Name:           req.Name,
-		Nickname:       req.Nickname,
-		Description:    req.Description,
-		Private:        req.Private,
-		License:        req.License,
-		DefaultBranch:  gitRepo.DefaultBranch,
-		RepositoryType: req.RepoType,
-		HTTPCloneURL:   gitRepo.HttpCloneURL,
-		SSHCloneURL:    gitRepo.SshCloneURL,
-	}
-	newDBRepo, err := c.repoStore.CreateRepo(ctx, dbRepo)
-	if err != nil {
-		return nil, nil, fmt.Errorf("fail to create database repo, error: %w", err)
-	}
 	newDBRepo.User = user
+	newDBRepo.GitPath = gitRepo.GitPath
+	resRepo, err := c.repoStore.UpdateRepo(ctx, *newDBRepo)
+	if err != nil {
+		return nil, nil, err
+	}
 
-	return gitRepo, newDBRepo, nil
+	return gitRepo, resRepo, nil
 }
 
 func (c *repoComponentImpl) UpdateRepo(ctx context.Context, req types.UpdateRepoReq) (*database.Repository, error) {
@@ -3207,7 +3213,7 @@ func (c *repoComponentImpl) CommitFiles(ctx context.Context, req types.CommitFil
 	err = c.git.CommitFiles(ctx, gitserver.CommitFilesReq{
 		Namespace: req.Namespace,
 		Name:      req.Name,
-		RepoType:  string(req.RepoType),
+		RepoType:  req.RepoType,
 		Revision:  req.Revision,
 		Username:  user.Username,
 		Email:     user.Email,
@@ -3215,6 +3221,14 @@ func (c *repoComponentImpl) CommitFiles(ctx context.Context, req types.CommitFil
 		Files:     files,
 	})
 	return err
+}
+
+func (c *repoComponentImpl) IsExists(ctx context.Context, repoType types.RepositoryType, namespace, name string) (bool, error) {
+	_, err := c.repoStore.FindByPath(ctx, repoType, namespace, name)
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func parseGitattributesContent(content string) map[string][]string {

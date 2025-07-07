@@ -137,7 +137,7 @@ func (s *mirrorStoreImpl) FindByRepoPath(ctx context.Context, repoType types.Rep
 	err := s.db.Operator.Core.NewSelect().
 		Model(&mirror).
 		Join("JOIN repositories AS r ON mirror.repository_id = r.id ").
-		Where("LOWER(r.git_path) = LOWER(?)", fmt.Sprintf("%ss_%s/%s", repoType, namespace, name)).
+		Where("r.repository_type = ? AND LOWER(r.path) = LOWER(?)", repoType, fmt.Sprintf("%s/%s", namespace, name)).
 		Scan(ctx)
 	if err != nil {
 		return nil, err
