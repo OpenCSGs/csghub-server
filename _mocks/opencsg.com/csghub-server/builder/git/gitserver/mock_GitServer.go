@@ -28,6 +28,65 @@ func (_m *MockGitServer) EXPECT() *MockGitServer_Expecter {
 	return &MockGitServer_Expecter{mock: &_m.Mock}
 }
 
+// BuildRelativePath provides a mock function with given fields: ctx, repoType, namespace, name
+func (_m *MockGitServer) BuildRelativePath(ctx context.Context, repoType types.RepositoryType, namespace string, name string) (string, error) {
+	ret := _m.Called(ctx, repoType, namespace, name)
+
+	if len(ret) == 0 {
+		panic("no return value specified for BuildRelativePath")
+	}
+
+	var r0 string
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.RepositoryType, string, string) (string, error)); ok {
+		return rf(ctx, repoType, namespace, name)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.RepositoryType, string, string) string); ok {
+		r0 = rf(ctx, repoType, namespace, name)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.RepositoryType, string, string) error); ok {
+		r1 = rf(ctx, repoType, namespace, name)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockGitServer_BuildRelativePath_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BuildRelativePath'
+type MockGitServer_BuildRelativePath_Call struct {
+	*mock.Call
+}
+
+// BuildRelativePath is a helper method to define mock.On call
+//   - ctx context.Context
+//   - repoType types.RepositoryType
+//   - namespace string
+//   - name string
+func (_e *MockGitServer_Expecter) BuildRelativePath(ctx interface{}, repoType interface{}, namespace interface{}, name interface{}) *MockGitServer_BuildRelativePath_Call {
+	return &MockGitServer_BuildRelativePath_Call{Call: _e.mock.On("BuildRelativePath", ctx, repoType, namespace, name)}
+}
+
+func (_c *MockGitServer_BuildRelativePath_Call) Run(run func(ctx context.Context, repoType types.RepositoryType, namespace string, name string)) *MockGitServer_BuildRelativePath_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.RepositoryType), args[2].(string), args[3].(string))
+	})
+	return _c
+}
+
+func (_c *MockGitServer_BuildRelativePath_Call) Return(_a0 string, _a1 error) *MockGitServer_BuildRelativePath_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockGitServer_BuildRelativePath_Call) RunAndReturn(run func(context.Context, types.RepositoryType, string, string) (string, error)) *MockGitServer_BuildRelativePath_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CommitFiles provides a mock function with given fields: ctx, req
 func (_m *MockGitServer) CommitFiles(ctx context.Context, req gitserver.CommitFilesReq) error {
 	ret := _m.Called(ctx, req)

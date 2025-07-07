@@ -18,12 +18,15 @@ import (
 // )
 
 func (c *Client) InfoRefsResponse(ctx context.Context, req gitserver.InfoRefsReq) (io.Reader, error) {
-	repoType := fmt.Sprintf("%ss", string(req.RepoType))
+	relativePath, err := c.BuildRelativePath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return nil, err
+	}
 
 	rpcRequest := &gitalypb.InfoRefsRequest{
 		Repository: &gitalypb.Repository{
 			StorageName:  c.config.GitalyServer.Storage,
-			RelativePath: BuildRelativePath(repoType, req.Namespace, req.Name),
+			RelativePath: relativePath,
 		},
 		GitProtocol: req.GitProtocol,
 	}
@@ -52,7 +55,6 @@ type infoRefsClient interface {
 }
 
 func (c *Client) UploadPack(ctx context.Context, req gitserver.UploadPackReq) error {
-	repoType := fmt.Sprintf("%ss", string(req.RepoType))
 	ctx, waiter := c.sidechannelRegistry.Register(ctx, func(conn gitalyclient.SidechannelConn) error {
 		if _, err := io.Copy(conn, req.Request.Body); err != nil {
 			return fmt.Errorf("copy request body: %w", err)
@@ -70,15 +72,20 @@ func (c *Client) UploadPack(ctx context.Context, req gitserver.UploadPackReq) er
 	})
 	defer waiter.Close()
 
+	relativePath, err := c.BuildRelativePath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return err
+	}
+
 	rpcRequest := &gitalypb.PostUploadPackWithSidechannelRequest{
 		Repository: &gitalypb.Repository{
 			StorageName:  c.config.GitalyServer.Storage,
-			RelativePath: BuildRelativePath(repoType, req.Namespace, req.Name),
+			RelativePath: relativePath,
 		},
 		GitProtocol: req.GitProtocol,
 	}
 
-	_, err := c.smartHttpClient.PostUploadPackWithSidechannel(ctx, rpcRequest)
+	_, err = c.smartHttpClient.PostUploadPackWithSidechannel(ctx, rpcRequest)
 	if err != nil {
 		return fmt.Errorf("PostUploadPackWithSidechannel: %w", err)
 	}
@@ -91,18 +98,22 @@ func (c *Client) UploadPack(ctx context.Context, req gitserver.UploadPackReq) er
 }
 
 func (c *Client) ReceivePack(ctx context.Context, req gitserver.ReceivePackReq) error {
-	repoType := fmt.Sprintf("%ss", string(req.RepoType))
 	stream, err := c.smartHttpClient.PostReceivePack(ctx)
 	if err != nil {
 		return err
 	}
 	glRepository := fmt.Sprintf("%s/%s/%s", req.RepoType, req.Namespace, req.Name)
 
+	relativePath, err := c.BuildRelativePath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return err
+	}
+
 	rpcRequest := &gitalypb.PostReceivePackRequest{
 		Repository: &gitalypb.Repository{
 			GlRepository: glRepository,
 			StorageName:  c.config.GitalyServer.Storage,
-			RelativePath: BuildRelativePath(repoType, req.Namespace, req.Name),
+			RelativePath: relativePath,
 		},
 		GlId:         fmt.Sprintf("user-%s", strconv.FormatInt(req.UserId, 10)),
 		GlUsername:   req.Username,

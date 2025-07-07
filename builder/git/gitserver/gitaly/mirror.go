@@ -16,7 +16,6 @@ func (c *Client) CreateMirrorRepo(ctx context.Context, req gitserver.CreateMirro
 		authorHeader   string
 		err            error
 	)
-	repoType := fmt.Sprintf("%ss", string(req.RepoType))
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
 
@@ -36,10 +35,15 @@ func (c *Client) CreateMirrorRepo(ctx context.Context, req gitserver.CreateMirro
 		authorHeader = base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", req.Username, req.AccessToken)))
 	}
 
+	relativePath, err := c.BuildRelativePath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return 0, err
+	}
+
 	gitalyReq := &gitalypb.CreateRepositoryFromURLRequest{
 		Repository: &gitalypb.Repository{
 			StorageName:  c.config.GitalyServer.Storage,
-			RelativePath: BuildRelativePath(repoType, req.Namespace, req.Name),
+			RelativePath: relativePath,
 		},
 		Url:    req.CloneUrl,
 		Mirror: true,
@@ -60,14 +64,18 @@ func (c *Client) CreateMirrorRepo(ctx context.Context, req gitserver.CreateMirro
 
 func (c *Client) CreateMirrorForExistsRepo(ctx context.Context, req gitserver.CreateMirrorRepoReq) error {
 	var authorHeader string
-	repoType := fmt.Sprintf("%ss", string(req.RepoType))
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
+
+	relativePath, err := c.BuildRelativePath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return err
+	}
 
 	fetchRemoteReq := &gitalypb.FetchRemoteRequest{
 		Repository: &gitalypb.Repository{
 			StorageName:  c.config.GitalyServer.Storage,
-			RelativePath: BuildRelativePath(repoType, req.Namespace, req.Name),
+			RelativePath: relativePath,
 		},
 		Force:   true,
 		NoPrune: true,
@@ -84,7 +92,7 @@ func (c *Client) CreateMirrorForExistsRepo(ctx context.Context, req gitserver.Cr
 		fetchRemoteReq.RemoteParams.HttpAuthorizationHeader = ""
 	}
 
-	_, err := c.repoClient.FetchRemote(ctx, fetchRemoteReq)
+	_, err = c.repoClient.FetchRemote(ctx, fetchRemoteReq)
 	if err != nil {
 		return err
 	}
@@ -97,14 +105,18 @@ func (c *Client) GetMirrorTaskInfo(ctx context.Context, taskId int64) (*gitserve
 
 func (c *Client) MirrorSync(ctx context.Context, req gitserver.MirrorSyncReq) error {
 	var authorHeader string
-	repoType := fmt.Sprintf("%ss", string(req.RepoType))
 	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
+
+	relativePath, err := c.BuildRelativePath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return err
+	}
 
 	fetchRemoteReq := &gitalypb.FetchRemoteRequest{
 		Repository: &gitalypb.Repository{
 			StorageName:  c.config.GitalyServer.Storage,
-			RelativePath: BuildRelativePath(repoType, req.Namespace, req.Name),
+			RelativePath: relativePath,
 		},
 		Force:   true,
 		NoPrune: false,
@@ -122,7 +134,7 @@ func (c *Client) MirrorSync(ctx context.Context, req gitserver.MirrorSyncReq) er
 		fetchRemoteReq.RemoteParams.HttpAuthorizationHeader = ""
 	}
 
-	_, err := c.repoClient.FetchRemote(ctx, fetchRemoteReq)
+	_, err = c.repoClient.FetchRemote(ctx, fetchRemoteReq)
 	if err != nil {
 		return err
 	}

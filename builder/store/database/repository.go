@@ -115,6 +115,7 @@ type Repository struct {
 	GithubPath           string                     `bun:",nullzero" json:"github_path"`
 	StarCount            int                        `bun:",nullzero" json:"star_count"`
 	Migrated             bool                       `bun:"," json:"migrated"`
+	Hashed               bool                       `bun:"," json:"hashed"`
 	// updated_at timestamp will be updated only if files changed
 	times
 }
@@ -209,6 +210,7 @@ func (r Repository) PathWithOutPrefix() string {
 
 func (s *repoStoreImpl) CreateRepoTx(ctx context.Context, tx bun.Tx, input Repository) (*Repository, error) {
 	input.Migrated = true
+	input.Hashed = true
 	res, err := tx.NewInsert().Model(&input).Exec(ctx)
 	if err := assertAffectedOneRow(res, err); err != nil {
 		return nil, fmt.Errorf("create repository in tx failed,error:%w", err)
@@ -218,6 +220,8 @@ func (s *repoStoreImpl) CreateRepoTx(ctx context.Context, tx bun.Tx, input Repos
 }
 
 func (s *repoStoreImpl) CreateRepo(ctx context.Context, input Repository) (*Repository, error) {
+	input.Migrated = true
+	input.Hashed = true
 	res, err := s.db.Core.NewInsert().Model(&input).Exec(ctx, &input)
 	if err := assertAffectedOneRow(res, err); err != nil {
 		return nil, fmt.Errorf("create repository in tx failed,error:%w", err)
@@ -244,7 +248,7 @@ func (s *repoStoreImpl) Find(ctx context.Context, owner, repoType, repoName stri
 	err = s.db.Operator.Core.
 		NewSelect().
 		Model(repo).
-		Where("LOWER(git_path) = LOWER(?)", fmt.Sprintf("%ss_%s/%s", repoType, owner, repoName)).
+		Where("repository_type = ? AND LOWER(path) = LOWER(?)", repoType, fmt.Sprintf("%s/%s", owner, repoName)).
 		Limit(1).
 		Scan(ctx)
 	return repo, err
@@ -281,7 +285,7 @@ func (s *repoStoreImpl) FindByPath(ctx context.Context, repoType types.Repositor
 		Model(resRepo).
 		Relation("Tags").
 		Relation("Metadata").
-		Where("LOWER(git_path) = LOWER(?)", fmt.Sprintf("%ss_%s/%s", repoType, namespace, name)).
+		Where("repository_type = ? AND LOWER(path) = LOWER(?)", repoType, fmt.Sprintf("%s/%s", namespace, name)).
 		Limit(1).
 		Scan(ctx)
 	if err != nil {
@@ -318,7 +322,7 @@ func (s *repoStoreImpl) FindByGitPaths(ctx context.Context, paths []string, opts
 
 func (s *repoStoreImpl) Exists(ctx context.Context, repoType types.RepositoryType, namespace string, name string) (bool, error) {
 	return s.db.Operator.Core.NewSelect().Model((*Repository)(nil)).
-		Where("LOWER(git_path) = LOWER(?)", fmt.Sprintf("%ss_%s/%s", repoType, namespace, name)).
+		Where("repository_type = ? AND LOWER(path) = LOWER(?)", repoType, fmt.Sprintf("%s/%s", namespace, name)).
 		Exists(ctx)
 }
 
@@ -475,7 +479,7 @@ func (s *repoStoreImpl) SetUpdateTimeByPath(ctx context.Context, repoType types.
 	repo.UpdatedAt = update
 	_, err := s.db.Operator.Core.NewUpdate().Model(repo).
 		Column("updated_at").
-		Where("LOWER(git_path) = LOWER(?)", fmt.Sprintf("%ss_%s/%s", repoType, namespace, name)).
+		Where("repository_type = ? AND LOWER(path) = LOWER(?)", repoType, fmt.Sprintf("%s/%s", namespace, name)).
 		Exec(ctx)
 	return err
 }
@@ -485,7 +489,8 @@ func (s *repoStoreImpl) PublicToUser(ctx context.Context, repoType types.Reposit
 		NewSelect().
 		Column("repository.*").
 		Model(&repos).
-		Relation("Tags")
+		Relation("Tags").
+		Relation("User")
 
 	q.Where("repository.repository_type = ?", repoType)
 
@@ -564,7 +569,7 @@ func (s *repoStoreImpl) IsMirrorRepo(ctx context.Context, repoType types.Reposit
 	err := s.db.Operator.Core.NewSelect().
 		ColumnExpr("EXISTS(SELECT 1 FROM mirrors WHERE mirrors.repository_id = repositories.id) AS exists").
 		Table("repositories").
-		Where("LOWER(repositories.git_path) = LOWER(?)", fmt.Sprintf("%ss_%s/%s", repoType, namespace, name)).
+		Where("repositories.repository_type = ? AND LOWER(repositories.path) = LOWER(?)", repoType, fmt.Sprintf("%s/%s", namespace, name)).
 		Limit(1).
 		Scan(ctx, &result)
 	if err != nil {

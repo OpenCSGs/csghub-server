@@ -29,12 +29,16 @@ const (
 
 func (c *Client) GetRepoFileRaw(ctx context.Context, req gitserver.GetRepoInfoByPathReq) (string, error) {
 	var data []byte
-	repoType := fmt.Sprintf("%ss", string(req.RepoType))
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
+
+	relativePath, err := c.BuildRelativePath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return "", err
+	}
 	repository := &gitalypb.Repository{
 		StorageName:  c.config.GitalyServer.Storage,
-		RelativePath: BuildRelativePath(repoType, req.Namespace, req.Name),
+		RelativePath: relativePath,
 	}
 
 	treeEntriesReq := &gitalypb.TreeEntryRequest{
@@ -68,13 +72,17 @@ func (c *Client) GetRepoFileReader(ctx context.Context, req gitserver.GetRepoInf
 	var size int64
 	sizeChan := make(chan int64, 1)
 	pr, pw := io.Pipe()
-	repoType := fmt.Sprintf("%ss", string(req.RepoType))
 	// if we add cancel function here, it will break the download stream
 	// ctx, cancel := context.WithTimeout(ctx, c.timeoutTime)
 	// defer cancel()
+
+	relativePath, err := c.BuildRelativePath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return nil, size, err
+	}
 	repository := &gitalypb.Repository{
 		StorageName:  c.config.GitalyServer.Storage,
-		RelativePath: BuildRelativePath(repoType, req.Namespace, req.Name),
+		RelativePath: relativePath,
 	}
 
 	treeEntriesReq := &gitalypb.TreeEntryRequest{
@@ -147,13 +155,18 @@ func (c *Client) CreateRepoFile(req *types.CreateFileReq) (err error) {
 
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
+
+	relativePath, err := c.BuildRelativePath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return err
+	}
 	userCommitFilesClient, err := c.operationClient.UserCommitFiles(ctx)
 	if err != nil {
 		return err
 	}
 	repository := &gitalypb.Repository{
 		StorageName:  c.config.GitalyServer.Storage,
-		RelativePath: BuildRelativePath(repoType, req.Namespace, req.Name),
+		RelativePath: relativePath,
 		GlRepository: filepath.Join(repoType, req.Namespace, req.Name),
 	}
 
@@ -161,9 +174,13 @@ func (c *Client) CreateRepoFile(req *types.CreateFileReq) (err error) {
 
 	if len(req.StartNamespace) > 0 && len(req.StartName) > 0 {
 		startRepoType := fmt.Sprintf("%ss", string(req.StartRepoType))
+		relativePath, err := c.BuildRelativePath(ctx, req.StartRepoType, req.StartNamespace, req.StartName)
+		if err != nil {
+			return err
+		}
 		startRepo = &gitalypb.Repository{
 			StorageName:  c.config.GitalyServer.Storage,
-			RelativePath: BuildRelativePath(startRepoType, req.StartNamespace, req.StartName),
+			RelativePath: relativePath,
 			GlRepository: filepath.Join(startRepoType, req.StartNamespace, req.StartName),
 		}
 	}
@@ -250,13 +267,18 @@ func (c *Client) UpdateRepoFile(req *types.UpdateFileReq) (err error) {
 	}
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
+
+	relativePath, err := c.BuildRelativePath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return err
+	}
 	userCommitFilesClient, err := c.operationClient.UserCommitFiles(ctx)
 	if err != nil {
 		return err
 	}
 	repository := &gitalypb.Repository{
 		StorageName:  c.config.GitalyServer.Storage,
-		RelativePath: BuildRelativePath(repoType, req.Namespace, req.Name),
+		RelativePath: relativePath,
 		GlRepository: filepath.Join(repoType, req.Namespace, req.Name),
 	}
 	header := &gitalypb.UserCommitFilesActionHeader{
@@ -274,9 +296,13 @@ func (c *Client) UpdateRepoFile(req *types.UpdateFileReq) (err error) {
 
 	if len(req.StartNamespace) > 0 && len(req.StartName) > 0 {
 		startRepoType := fmt.Sprintf("%ss", string(req.StartRepoType))
+		relativePath, err := c.BuildRelativePath(ctx, req.StartRepoType, req.StartNamespace, req.StartName)
+		if err != nil {
+			return err
+		}
 		startRepo = &gitalypb.Repository{
 			StorageName:  c.config.GitalyServer.Storage,
-			RelativePath: BuildRelativePath(startRepoType, req.StartNamespace, req.StartName),
+			RelativePath: relativePath,
 			GlRepository: filepath.Join(startRepoType, req.StartNamespace, req.StartName),
 		}
 	}
@@ -370,9 +396,13 @@ func (c *Client) DeleteRepoFile(req *types.DeleteFileReq) (err error) {
 	if err != nil {
 		return err
 	}
+	relativePath, err := c.BuildRelativePath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return err
+	}
 	repository := &gitalypb.Repository{
 		StorageName:  c.config.GitalyServer.Storage,
-		RelativePath: BuildRelativePath(repoType, req.Namespace, req.Name),
+		RelativePath: relativePath,
 		GlRepository: filepath.Join(repoType, req.Namespace, req.Name),
 	}
 	actions := []*gitalypb.UserCommitFilesRequest{
@@ -526,7 +556,6 @@ func (c *Client) getBlobInfo(ctx context.Context, repo *gitalypb.Repository, pat
 
 func (c *Client) GetRepoFileTree(ctx context.Context, req gitserver.GetRepoInfoByPathReq) ([]*types.File, error) {
 	var files []*types.File
-	repoType := fmt.Sprintf("%ss", string(req.RepoType))
 	ctx, cancel := context.WithTimeout(ctx, time.Second*3)
 	defer cancel()
 	if !req.File {
@@ -536,9 +565,14 @@ func (c *Client) GetRepoFileTree(ctx context.Context, req gitserver.GetRepoInfoB
 	if req.Ref == "" {
 		req.Ref = "main"
 	}
+
+	relativePath, err := c.BuildRelativePath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return nil, err
+	}
 	repository := &gitalypb.Repository{
 		StorageName:  c.config.GitalyServer.Storage,
-		RelativePath: BuildRelativePath(repoType, req.Namespace, req.Name),
+		RelativePath: relativePath,
 	}
 
 	var revision_paths []*gitalypb.GetBlobsRequest_RevisionPath
@@ -659,7 +693,6 @@ func (c *Client) GetRepoFileTree(ctx context.Context, req gitserver.GetRepoInfoB
 }
 
 func (c *Client) GetTree(ctx context.Context, req types.GetTreeRequest) (*types.GetRepoFileTreeResp, error) {
-	repoType := fmt.Sprintf("%ss", string(req.RepoType))
 	ctx, cancel := context.WithTimeout(ctx, time.Second*3)
 	defer cancel()
 
@@ -672,9 +705,14 @@ func (c *Client) GetTree(ctx context.Context, req types.GetTreeRequest) (*types.
 	if req.Ref == "" {
 		req.Ref = "main"
 	}
+
+	relativePath, err := c.BuildRelativePath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return nil, err
+	}
 	repository := &gitalypb.Repository{
 		StorageName:  c.config.GitalyServer.Storage,
-		RelativePath: BuildRelativePath(repoType, req.Namespace, req.Name),
+		RelativePath: relativePath,
 	}
 
 	var revisionPaths []*gitalypb.GetBlobsRequest_RevisionPath
@@ -731,7 +769,6 @@ func (c *Client) GetTree(ctx context.Context, req types.GetTreeRequest) (*types.
 
 func (c *Client) GetLogsTree(ctx context.Context, req types.GetLogsTreeRequest) (*types.LogsTreeResp, error) {
 	var resp []*types.CommitForTree
-	repoType := fmt.Sprintf("%ss", string(req.RepoType))
 	ctx, cancel := context.WithTimeout(ctx, time.Second*3)
 	defer cancel()
 
@@ -743,9 +780,14 @@ func (c *Client) GetLogsTree(ctx context.Context, req types.GetLogsTreeRequest) 
 	if !strings.HasSuffix(req.Path, "/") {
 		req.Path += "/"
 	}
+
+	relativePath, err := c.BuildRelativePath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return nil, err
+	}
 	repository := &gitalypb.Repository{
 		StorageName:  c.config.GitalyServer.Storage,
-		RelativePath: BuildRelativePath(repoType, req.Namespace, req.Name),
+		RelativePath: relativePath,
 	}
 
 	gitalyReq := &gitalypb.ListLastCommitsForTreeRequest{
@@ -798,14 +840,18 @@ func (c *Client) GetLogsTree(ctx context.Context, req types.GetLogsTreeRequest) 
 
 func (c *Client) GetRepoAllFiles(ctx context.Context, req gitserver.GetRepoAllFilesReq) ([]*types.File, error) {
 	var files []*types.File
-	repoType := fmt.Sprintf("%ss", string(req.RepoType))
 	ctx, cancel := context.WithTimeout(ctx, time.Second*3)
 	defer cancel()
+
+	relativePath, err := c.BuildRelativePath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return nil, err
+	}
 
 	allFilesReq := &gitalypb.ListFilesRequest{
 		Repository: &gitalypb.Repository{
 			StorageName:  c.config.GitalyServer.Storage,
-			RelativePath: BuildRelativePath(repoType, req.Namespace, req.Name),
+			RelativePath: relativePath,
 		},
 		Revision: []byte(req.Ref),
 	}
@@ -838,14 +884,18 @@ func (c *Client) GetRepoAllFiles(ctx context.Context, req gitserver.GetRepoAllFi
 
 func (c *Client) GetRepoAllLfsPointers(ctx context.Context, req gitserver.GetRepoAllFilesReq) ([]*types.LFSPointer, error) {
 	var pointers []*types.LFSPointer
-	repoType := fmt.Sprintf("%ss", string(req.RepoType))
 	ctx, cancel := context.WithTimeout(ctx, time.Second*3)
 	defer cancel()
+
+	relativePath, err := c.BuildRelativePath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return nil, err
+	}
 
 	allPointersReq := &gitalypb.ListAllLFSPointersRequest{
 		Repository: &gitalypb.Repository{
 			StorageName:  c.config.GitalyServer.Storage,
-			RelativePath: BuildRelativePath(repoType, req.Namespace, req.Name),
+			RelativePath: relativePath,
 		},
 	}
 
@@ -887,9 +937,14 @@ func (c *Client) CommitFiles(ctx context.Context, req gitserver.CommitFilesReq) 
 	if err != nil {
 		return err
 	}
+
+	relativePath, err := c.BuildRelativePath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return err
+	}
 	repository := &gitalypb.Repository{
 		StorageName:  c.config.GitalyServer.Storage,
-		RelativePath: BuildRelativePath(repoType, req.Namespace, req.Name),
+		RelativePath: relativePath,
 		GlRepository: filepath.Join(repoType, req.Namespace, req.Name),
 	}
 

@@ -21,19 +21,24 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
 	"opencsg.com/csghub-server/builder/git/gitserver"
+	"opencsg.com/csghub-server/common/utils/common"
 )
 
 const timeoutTime = 10 * time.Second
 
 func (c *Client) RepositoryExists(ctx context.Context, req gitserver.CheckRepoReq) (bool, error) {
-	repoType := fmt.Sprintf("%ss", string(req.RepoType))
 	ctx, cancel := context.WithTimeout(ctx, timeoutTime)
 	defer cancel()
+
+	relativePath, err := c.BuildRelativePath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return false, err
+	}
 
 	r, err := c.repoClient.RepositoryExists(ctx, &gitalypb.RepositoryExistsRequest{
 		Repository: &gitalypb.Repository{
 			StorageName:  c.config.GitalyServer.Storage,
-			RelativePath: BuildRelativePath(repoType, req.Namespace, req.Name),
+			RelativePath: relativePath,
 		},
 	})
 
@@ -47,22 +52,28 @@ func (c *Client) RepositoryExists(ctx context.Context, req gitserver.CheckRepoRe
 }
 
 func (c *Client) CreateRepo(ctx context.Context, req gitserver.CreateRepoReq) (*gitserver.CreateRepoResp, error) {
-	repoType := fmt.Sprintf("%ss", string(req.RepoType))
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
+
+	relativePath, err := c.BuildRelativePath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return nil, err
+	}
 
 	gitalyReq := &gitalypb.CreateRepositoryRequest{
 		Repository: &gitalypb.Repository{
 			StorageName:  c.config.GitalyServer.Storage,
-			RelativePath: BuildRelativePath(repoType, req.Namespace, req.Name),
+			RelativePath: relativePath,
 		},
 		DefaultBranch: []byte(req.DefaultBranch),
 	}
 
-	_, err := c.repoClient.CreateRepository(ctx, gitalyReq)
+	_, err = c.repoClient.CreateRepository(ctx, gitalyReq)
 	if err != nil {
 		return nil, err
 	}
+
+	repoTypeS := fmt.Sprintf("%ss", string(req.RepoType))
 
 	return &gitserver.CreateRepoResp{
 		Username:      req.Username,
@@ -73,7 +84,7 @@ func (c *Client) CreateRepo(ctx context.Context, req gitserver.CreateRepoReq) (*
 		License:       req.License,
 		DefaultBranch: req.DefaultBranch,
 		RepoType:      req.RepoType,
-		GitPath:       strings.TrimSuffix(BuildRelativePath(repoType, req.Namespace, req.Name), ".git"),
+		GitPath:       common.BuildRelativePath(repoTypeS, req.Namespace, req.Name),
 		Private:       req.Private,
 	}, nil
 }
@@ -83,16 +94,19 @@ func (c *Client) UpdateRepo(ctx context.Context, req gitserver.UpdateRepoReq) (*
 }
 
 func (c *Client) DeleteRepo(ctx context.Context, req gitserver.DeleteRepoReq) error {
-	repoType := fmt.Sprintf("%ss", string(req.RepoType))
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
+	relativePath, err := c.BuildRelativePath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return err
+	}
 	gitalyReq := &gitalypb.RemoveRepositoryRequest{
 		Repository: &gitalypb.Repository{
 			StorageName:  c.config.GitalyServer.Storage,
-			RelativePath: BuildRelativePath(repoType, req.Namespace, req.Name),
+			RelativePath: relativePath,
 		},
 	}
-	_, err := c.repoClient.RemoveRepository(ctx, gitalyReq)
+	_, err = c.repoClient.RemoveRepository(ctx, gitalyReq)
 	if err != nil {
 		return err
 	}
@@ -101,13 +115,16 @@ func (c *Client) DeleteRepo(ctx context.Context, req gitserver.DeleteRepoReq) er
 }
 
 func (c *Client) GetRepo(ctx context.Context, req gitserver.GetRepoReq) (*gitserver.CreateRepoResp, error) {
-	repoType := fmt.Sprintf("%ss", string(req.RepoType))
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
+	relativePath, err := c.BuildRelativePath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return nil, err
+	}
 	gitalyReq := &gitalypb.FindDefaultBranchNameRequest{
 		Repository: &gitalypb.Repository{
 			StorageName:  c.config.GitalyServer.Storage,
-			RelativePath: BuildRelativePath(repoType, req.Namespace, req.Name),
+			RelativePath: relativePath,
 		},
 	}
 	resp, err := c.refClient.FindDefaultBranchName(ctx, gitalyReq)

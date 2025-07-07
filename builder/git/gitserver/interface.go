@@ -73,4 +73,5 @@ type GitServer interface {
 	// Handle git push request
 	ReceivePack(ctx context.Context, req ReceivePackReq) error
 	CommitFiles(ctx context.Context, req CommitFilesReq) error
+	BuildRelativePath(ctx context.Context, repoType types.RepositoryType, namespace, name string) (string, error)
 }

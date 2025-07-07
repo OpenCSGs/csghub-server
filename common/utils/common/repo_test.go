@@ -130,9 +130,9 @@ func TestBuildCloneInfo(t *testing.T) {
 			args: args{
 				config: &config.Config{
 					APIServer: struct {
-						Port         int    `env:"STARHUB_SERVER_SERVER_PORT, default=8080"`
-						PublicDomain string `env:"STARHUB_SERVER_PUBLIC_DOMAIN, default=http://localhost:8080"`
-						SSHDomain    string `env:"STARHUB_SERVER_SSH_DOMAIN, default=git@localhost:2222"`
+						Port         int    `env:"STARHUB_SERVER_SERVER_PORT" default:"8080"`
+						PublicDomain string `env:"STARHUB_SERVER_PUBLIC_DOMAIN" default:"http://localhost:8080"`
+						SSHDomain    string `env:"STARHUB_SERVER_SSH_DOMAIN" default:"git@localhost:2222"`
 					}{
 						Port:         8080,
 						PublicDomain: "https://opencsg.com",
@@ -154,9 +154,9 @@ func TestBuildCloneInfo(t *testing.T) {
 			args: args{
 				config: &config.Config{
 					APIServer: struct {
-						Port         int    `env:"STARHUB_SERVER_SERVER_PORT, default=8080"`
-						PublicDomain string `env:"STARHUB_SERVER_PUBLIC_DOMAIN, default=http://localhost:8080"`
-						SSHDomain    string `env:"STARHUB_SERVER_SSH_DOMAIN, default=git@localhost:2222"`
+						Port         int    `env:"STARHUB_SERVER_SERVER_PORT" default:"8080"`
+						PublicDomain string `env:"STARHUB_SERVER_PUBLIC_DOMAIN" default:"http://localhost:8080"`
+						SSHDomain    string `env:"STARHUB_SERVER_SSH_DOMAIN" default:"git@localhost:2222"`
 					}{
 						Port:         8080,
 						PublicDomain: "https://opencsg.com",
@@ -178,9 +178,9 @@ func TestBuildCloneInfo(t *testing.T) {
 			args: args{
 				config: &config.Config{
 					APIServer: struct {
-						Port         int    `env:"STARHUB_SERVER_SERVER_PORT, default=8080"`
-						PublicDomain string `env:"STARHUB_SERVER_PUBLIC_DOMAIN, default=http://localhost:8080"`
-						SSHDomain    string `env:"STARHUB_SERVER_SSH_DOMAIN, default=git@localhost:2222"`
+						Port         int    `env:"STARHUB_SERVER_SERVER_PORT" default:"8080"`
+						PublicDomain string `env:"STARHUB_SERVER_PUBLIC_DOMAIN" default:"http://localhost:8080"`
+						SSHDomain    string `env:"STARHUB_SERVER_SSH_DOMAIN" default:"git@localhost:2222"`
 					}{
 						Port:         8080,
 						PublicDomain: "https://opencsg.com",
@@ -202,9 +202,9 @@ func TestBuildCloneInfo(t *testing.T) {
 			args: args{
 				config: &config.Config{
 					APIServer: struct {
-						Port         int    `env:"STARHUB_SERVER_SERVER_PORT, default=8080"`
-						PublicDomain string `env:"STARHUB_SERVER_PUBLIC_DOMAIN, default=http://localhost:8080"`
-						SSHDomain    string `env:"STARHUB_SERVER_SSH_DOMAIN, default=git@localhost:2222"`
+						Port         int    `env:"STARHUB_SERVER_SERVER_PORT" default:"8080"`
+						PublicDomain string `env:"STARHUB_SERVER_PUBLIC_DOMAIN" default:"http://localhost:8080"`
+						SSHDomain    string `env:"STARHUB_SERVER_SSH_DOMAIN" default:"git@localhost:2222"`
 					}{
 						Port:         8080,
 						PublicDomain: "https://opencsg.com",

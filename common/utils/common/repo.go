@@ -16,10 +16,11 @@ import (
 )
 
 const (
-	ModelOrgPrefix   = "models_"
-	DatasetOrgPrefix = "datasets_"
-	SpaceOrgPrefix   = "spaces_"
-	CodeOrgPrefix    = "codes_"
+	ModelOrgPrefix       = "models_"
+	DatasetOrgPrefix     = "datasets_"
+	SpaceOrgPrefix       = "spaces_"
+	CodeOrgPrefix        = "codes_"
+	HashedRepoPathPrefix = "@hashed_repos"
 )
 
 const (
@@ -197,6 +198,11 @@ func BuildLfsPath(repoID int64, oid string, migrated bool) string {
 		lfsPath = path.Join("lfs", path.Join(oid[0:2], oid[2:4], oid[4:]))
 	}
 	return lfsPath
+}
+
+func BuildHashedRelativePath(repoID int64) string {
+	sha256Path := SHA256(strconv.FormatInt(repoID, 10))
+	return fmt.Sprintf("%s/%s/%s/%s", HashedRepoPathPrefix, sha256Path[0:2], sha256Path[2:4], sha256Path)
 }
 
 func SafeBuildLfsPath(repoID int64, oid, lfsRelativePath string, migrated bool) string {

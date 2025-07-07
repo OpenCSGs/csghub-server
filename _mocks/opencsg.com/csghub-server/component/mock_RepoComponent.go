@@ -2442,6 +2442,65 @@ func (_c *MockRepoComponent_IsAdminRole_Call) RunAndReturn(run func(database.Use
 	return _c
 }
 
+// IsExists provides a mock function with given fields: ctx, repoType, namespace, name
+func (_m *MockRepoComponent) IsExists(ctx context.Context, repoType types.RepositoryType, namespace string, name string) (bool, error) {
+	ret := _m.Called(ctx, repoType, namespace, name)
+
+	if len(ret) == 0 {
+		panic("no return value specified for IsExists")
+	}
+
+	var r0 bool
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.RepositoryType, string, string) (bool, error)); ok {
+		return rf(ctx, repoType, namespace, name)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.RepositoryType, string, string) bool); ok {
+		r0 = rf(ctx, repoType, namespace, name)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.RepositoryType, string, string) error); ok {
+		r1 = rf(ctx, repoType, namespace, name)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockRepoComponent_IsExists_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'IsExists'
+type MockRepoComponent_IsExists_Call struct {
+	*mock.Call
+}
+
+// IsExists is a helper method to define mock.On call
+//   - ctx context.Context
+//   - repoType types.RepositoryType
+//   - namespace string
+//   - name string
+func (_e *MockRepoComponent_Expecter) IsExists(ctx interface{}, repoType interface{}, namespace interface{}, name interface{}) *MockRepoComponent_IsExists_Call {
+	return &MockRepoComponent_IsExists_Call{Call: _e.mock.On("IsExists", ctx, repoType, namespace, name)}
+}
+
+func (_c *MockRepoComponent_IsExists_Call) Run(run func(ctx context.Context, repoType types.RepositoryType, namespace string, name string)) *MockRepoComponent_IsExists_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.RepositoryType), args[2].(string), args[3].(string))
+	})
+	return _c
+}
+
+func (_c *MockRepoComponent_IsExists_Call) Return(_a0 bool, _a1 error) *MockRepoComponent_IsExists_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockRepoComponent_IsExists_Call) RunAndReturn(run func(context.Context, types.RepositoryType, string, string) (bool, error)) *MockRepoComponent_IsExists_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // IsLfs provides a mock function with given fields: ctx, req
 func (_m *MockRepoComponent) IsLfs(ctx context.Context, req *types.GetFileReq) (bool, int64, error) {
 	ret := _m.Called(ctx, req)
