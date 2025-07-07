@@ -2,7 +2,9 @@ package component
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -187,6 +189,9 @@ func (c *evaluationComponentImpl) GetEvaluation(ctx context.Context, req types.E
 			//use default value if not found
 			var dsRepoTags = types.RepoTags{
 				RepoId: path,
+			}
+			if errors.Is(err, sql.ErrNoRows) {
+				dsRepoTags.Deleted = true
 			}
 			repoTags = append(repoTags, dsRepoTags)
 			continue

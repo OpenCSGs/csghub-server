@@ -131,8 +131,9 @@ type ArgoWorkFlowRes struct {
 }
 
 type RepoTags struct {
-	RepoId string    `json:"repo_id"`
-	Tags   []RepoTag `json:"tags"`
+	RepoId  string    `json:"repo_id"`
+	Tags    []RepoTag `json:"tags"`
+	Deleted bool      `json:"deleted,omitempty"` // Indicates if the repo is deleted
 }
 
 type EvaluationRes struct {
