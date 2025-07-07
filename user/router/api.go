@@ -46,7 +46,12 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 	userGroup := apiV1Group.Group("/user")
 	tokenGroup := apiV1Group.Group("/token")
 
+	internalGroup := apiV1Group.Group("/internal")
+	internalUserGroup := internalGroup.Group("/user")
+
 	needAPIKey := middleware.OnlyAPIKeyAuthenticator(config)
+	internalUserGroup.Use(needAPIKey)
+
 	jwtHandler, err := handler.NewJWTHandler(config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating jwt handler:%w", err)
@@ -62,7 +67,6 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 		apiV1Group.GET("/organizations", orgHandler.Index)
 		apiV1Group.GET("/organization/:namespace", orgHandler.Get)
 		apiV1Group.GET("/organization/:namespace/members", memberCtrl.OrgMembers)
-		apiV1Group.GET("/users/by-uuids", userHandler.FindByUUIDs)
 	}
 
 	//internal only
@@ -76,7 +80,7 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 		// check token info
 		tokenGroup.GET("/:token_value", needAPIKey, acHandler.Get)
 		userGroup.GET("/user_uuids", needAPIKey, userHandler.GetUserUUIDs)
-		userGroup.GET("/emails", userHandler.GetEmailsInternal)
+		internalUserGroup.GET("/emails", userHandler.GetEmailsInternal)
 	}
 
 	apiV1Group.Use(mustLogin())

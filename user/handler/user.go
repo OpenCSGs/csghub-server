@@ -296,3 +296,65 @@ func (h *UserHandler) Casdoor(ctx *gin.Context) {
 	targetUrl := fmt.Sprintf("%s?jwt=%s&expire=%d", h.signinSuccessRedirectURL, signed, expire.Unix())
 	ctx.Redirect(http.StatusMovedPermanently, targetUrl)
 }
+
+// GetEmailsInternal godoc
+// @Security     ApiKey
+// @Summary      Get all user emails for internal services
+// @Description  Retrieve all user email addresses for internal services
+// @Tags         User
+// @Accept       json
+// @Produce      json
+// @Param        per query int false "per" default(50)
+// @Param        page query int false "per page" default(1)
+// @Success      200  {object}  types.Response{data=[]string,total=int} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /internal/user/emails [get]
+func (h *UserHandler) GetEmailsInternal(ctx *gin.Context) {
+	per, page, err := common.GetPerAndPageFromContext(ctx)
+	if err != nil {
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	emails, count, err := h.c.GetEmailsInternal(ctx, per, page)
+	if err != nil {
+		slog.Error("Failed to get all user emails", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	httpbase.OKWithTotal(ctx, emails, count)
+}
+
+// GetUserUUIDs godoc
+// @Security     ApiKey
+// @Summary      Get user UUIDs
+// @Description  Get user UUIDs
+// @Tags         User
+// @Accept       json
+// @Produce      json
+// @Param        per query int false "per" default(20)
+// @Param        page query int false "per page" default(1)
+// @Success      200  {object}  types.Response{data=[]string,total=int} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure 	 401  {object}  types.APIUnauthorized "Unauthorized"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /user/user_uuids [get]
+func (h *UserHandler) GetUserUUIDs(ctx *gin.Context) {
+	per, page, err := common.GetPerAndPageFromContext(ctx)
+	if err != nil {
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	userUUIDs, total, err := h.c.GetUserUUIDs(ctx, per, page)
+	if err != nil {
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	respData := gin.H{
+		"data":  userUUIDs,
+		"total": total,
+	}
+	httpbase.OK(ctx, respData)
+}

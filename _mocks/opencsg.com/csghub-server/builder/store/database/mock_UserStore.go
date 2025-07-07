@@ -453,6 +453,140 @@ func (_c *MockUserStore_FindByUsername_Call) RunAndReturn(run func(context.Conte
 	return _c
 }
 
+// GetEmails provides a mock function with given fields: ctx, per, page
+func (_m *MockUserStore) GetEmails(ctx context.Context, per int, page int) ([]string, int, error) {
+	ret := _m.Called(ctx, per, page)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetEmails")
+	}
+
+	var r0 []string
+	var r1 int
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, int, int) ([]string, int, error)); ok {
+		return rf(ctx, per, page)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, int, int) []string); ok {
+		r0 = rf(ctx, per, page)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]string)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, int, int) int); ok {
+		r1 = rf(ctx, per, page)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, int, int) error); ok {
+		r2 = rf(ctx, per, page)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockUserStore_GetEmails_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetEmails'
+type MockUserStore_GetEmails_Call struct {
+	*mock.Call
+}
+
+// GetEmails is a helper method to define mock.On call
+//   - ctx context.Context
+//   - per int
+//   - page int
+func (_e *MockUserStore_Expecter) GetEmails(ctx interface{}, per interface{}, page interface{}) *MockUserStore_GetEmails_Call {
+	return &MockUserStore_GetEmails_Call{Call: _e.mock.On("GetEmails", ctx, per, page)}
+}
+
+func (_c *MockUserStore_GetEmails_Call) Run(run func(ctx context.Context, per int, page int)) *MockUserStore_GetEmails_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int), args[2].(int))
+	})
+	return _c
+}
+
+func (_c *MockUserStore_GetEmails_Call) Return(_a0 []string, _a1 int, _a2 error) *MockUserStore_GetEmails_Call {
+	_c.Call.Return(_a0, _a1, _a2)
+	return _c
+}
+
+func (_c *MockUserStore_GetEmails_Call) RunAndReturn(run func(context.Context, int, int) ([]string, int, error)) *MockUserStore_GetEmails_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetUserUUIDs provides a mock function with given fields: ctx, per, page
+func (_m *MockUserStore) GetUserUUIDs(ctx context.Context, per int, page int) ([]string, int, error) {
+	ret := _m.Called(ctx, per, page)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetUserUUIDs")
+	}
+
+	var r0 []string
+	var r1 int
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, int, int) ([]string, int, error)); ok {
+		return rf(ctx, per, page)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, int, int) []string); ok {
+		r0 = rf(ctx, per, page)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]string)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, int, int) int); ok {
+		r1 = rf(ctx, per, page)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, int, int) error); ok {
+		r2 = rf(ctx, per, page)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockUserStore_GetUserUUIDs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetUserUUIDs'
+type MockUserStore_GetUserUUIDs_Call struct {
+	*mock.Call
+}
+
+// GetUserUUIDs is a helper method to define mock.On call
+//   - ctx context.Context
+//   - per int
+//   - page int
+func (_e *MockUserStore_Expecter) GetUserUUIDs(ctx interface{}, per interface{}, page interface{}) *MockUserStore_GetUserUUIDs_Call {
+	return &MockUserStore_GetUserUUIDs_Call{Call: _e.mock.On("GetUserUUIDs", ctx, per, page)}
+}
+
+func (_c *MockUserStore_GetUserUUIDs_Call) Run(run func(ctx context.Context, per int, page int)) *MockUserStore_GetUserUUIDs_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int), args[2].(int))
+	})
+	return _c
+}
+
+func (_c *MockUserStore_GetUserUUIDs_Call) Return(_a0 []string, _a1 int, _a2 error) *MockUserStore_GetUserUUIDs_Call {
+	_c.Call.Return(_a0, _a1, _a2)
+	return _c
+}
+
+func (_c *MockUserStore_GetUserUUIDs_Call) RunAndReturn(run func(context.Context, int, int) ([]string, int, error)) *MockUserStore_GetUserUUIDs_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Index provides a mock function with given fields: ctx
 func (_m *MockUserStore) Index(ctx context.Context) ([]database.User, error) {
 	ret := _m.Called(ctx)

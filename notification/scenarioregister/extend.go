@@ -1,5 +1,3 @@
-//go:build !ee && !saas
-
 package scenarioregister
 
 import (

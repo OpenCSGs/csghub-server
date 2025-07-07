@@ -14,7 +14,7 @@ func NewNotifierRouter(conf *config.Config) (*gin.Engine, error) {
 	r := gin.New()
 	r.Use(gin.Recovery())
 	r.Use(middleware.Log(conf))
-	needAPIKey := middleware.NeedAPIKey(conf)
+	needAPIKey := middleware.OnlyAPIKeyAuthenticator(conf)
 	debugGroup := r.Group("/debug", needAPIKey)
 	pprof.RouteRegister(debugGroup, "pprof")
 	r.Use(middleware.Authenticator(conf))

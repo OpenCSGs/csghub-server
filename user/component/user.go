@@ -72,6 +72,9 @@ type UserComponent interface {
 	Index(ctx context.Context, visitorName, search string, per, page int) ([]*types.User, int, error)
 	Signin(ctx context.Context, code, state string) (*types.JWTClaims, string, error)
 	FixUserData(ctx context.Context, userName string) error
+	// should only be called by other *internal* services (no permission check)
+	GetEmailsInternal(ctx context.Context, per, page int) ([]string, int, error)
+	GetUserUUIDs(ctx context.Context, per, page int) ([]string, int, error)
 }
 
 func NewUserComponent(config *config.Config) (UserComponent, error) {
@@ -902,4 +905,21 @@ func (c *userComponentImpl) FixUserData(ctx context.Context, userName string) er
 	}
 
 	return nil
+}
+
+func (c *userComponentImpl) GetEmailsInternal(ctx context.Context, per, page int) ([]string, int, error) {
+	emails, count, err := c.userStore.GetEmails(ctx, per, page)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to get all user emails,error:%w", err)
+	}
+	return emails, count, nil
+}
+
+func (c *userComponentImpl) GetUserUUIDs(ctx context.Context, per, page int) ([]string, int, error) {
+	userUUIDs, total, err := c.userStore.GetUserUUIDs(ctx, per, page)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to get user uuids,error:%w", err)
+	}
+
+	return userUUIDs, total, nil
 }
