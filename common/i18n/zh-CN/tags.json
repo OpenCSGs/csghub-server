@@ -1,78 +1,78 @@
 {
   "Tag.I18nKey.image-classification": {
-    "other": "圖像分類"
+    "other": "图像分类"
   },
   "Tag.I18nKey.image-segmentation": {
-    "other": "圖像分割"
+    "other": "图像分割"
   },
   "Tag.I18nKey.ocr": {
-    "other": "光學字元辨識"
+    "other": "光学字符识别"
   },
   "Tag.I18nKey.skin-retouching": {
-    "other": "皮膚美化"
+    "other": "皮肤美化"
   },
   "Tag.I18nKey.image-to-image": {
-    "other": "圖像转圖像"
+    "other": "图生图"
   },
   "Tag.I18nKey.video-detection": {
-    "other": "影片偵測"
+    "other": "视频检测"
   },
   "Tag.I18nKey.video-segmentation": {
-    "other": "影片分割"
+    "other": "视频分割"
   },
   "Tag.I18nKey.video-generation": {
-    "other": "影片生成"
+    "other": "视频生成"
   },
   "Tag.I18nKey.video-captioning": {
-    "other": "影片字幕"
+    "other": "视频字幕"
   },
   "Tag.I18nKey.face-detection": {
-    "other": "人臉偵測"
+    "other": "人脸检测"
   },
   "Tag.I18nKey.face-recognition": {
-    "other": "人臉辨識"
+    "other": "人脸识别"
   },
   "Tag.I18nKey.face-image-generation": {
-    "other": "人臉圖像生成"
+    "other": "人脸图像生成"
   },
   "Tag.I18nKey.image-object-detection": {
-    "other": "圖像物件偵測"
+    "other": "图像物体检测"
   },
   "Tag.I18nKey.image-super-resolution": {
-    "other": "圖像超解析度"
+    "other": "图像超分辨率"
   },
   "Tag.I18nKey.action-detection": {
-    "other": "動作偵測"
+    "other": "动作检测"
   },
   "Tag.I18nKey.semantic-segmentation": {
-    "other": "語義分割"
+    "other": "语义分割"
   },
   "Tag.I18nKey.word-segmentation": {
-    "other": "分詞"
+    "other": "分词"
   },
   "Tag.I18nKey.named-entity-recognition": {
-    "other": "命名實體辨識"
+    "other": "命名实体识别"
   },
   "Tag.I18nKey.part-of-speech": {
-    "other": "詞性標註"
+    "other": "词性标注"
   },
   "Tag.I18nKey.document-segmentation": {
-    "other": "文件分割"
+    "other": "文档分割"
   },
   "Tag.I18nKey.text-classification": {
-    "other": "文本分類"
+    "other": "文本分类"
   },
   "Tag.I18nKey.sentiment-classification": {
-    "other": "情感分類"
+    "other": "情感分类"
   },
   "Tag.I18nKey.nli": {
-    "other": "自然語言推論"
+    "other": "自然语言推断"
   },
   "Tag.I18nKey.conversational": {
-    "other": "對話式"
+    "other": "对话式"
   },
   "Tag.I18nKey.translation": {
-    "other": "翻譯"
+    "other": "翻译"
   },
   "Tag.I18nKey.text-generation": {
     "other": "文本生成"
@@ -81,91 +81,91 @@
     "other": "文本摘要"
   },
   "Tag.I18nKey.feature-extraction": {
-    "other": "特徵提取"
+    "other": "特征提取"
   },
   "Tag.I18nKey.relation-extraction": {
-    "other": "關係抽取"
+    "other": "关系抽取"
   },
   "Tag.I18nKey.auto-speech-recognition": {
-    "other": "自動語音辨識"
+    "other": "自动语音识别"
   },
   "Tag.I18nKey.text-to-speech": {
-    "other": "文本轉語音"
+    "other": "文本转语音"
   },
   "Tag.I18nKey.audio-classification": {
-    "other": "音訊分類"
+    "other": "音频分类"
   },
   "Tag.I18nKey.text-to-image": {
-    "other": "文本转圖像"
+    "other": "文生图"
   },
   "Tag.I18nKey.visual-question-answering": {
-    "other": "視覺問答"
+    "other": "视觉问答"
   },
   "Tag.I18nKey.image-text-retrieval": {
-    "other": "圖文檢索"
+    "other": "图文检索"
   },
   "Tag.I18nKey.zero-shot": {
-    "other": "零樣本"
+    "other": "零样本"
   },
   "Tag.I18nKey.token-classification": {
-    "other": "權杖分類"
+    "other": "令牌分类"
   },
   "Tag.I18nKey.table-question-answering": {
-    "other": "表格問答"
+    "other": "表格问答"
   },
   "Tag.I18nKey.sentence-similarity": {
     "other": "句子相似度"
   },
   "Tag.I18nKey.fill-mask": {
-    "other": "遮罩填充"
+    "other": "掩码填充"
   },
   "Tag.I18nKey.summarization": {
     "other": "摘要"
   },
   "Tag.I18nKey.question-answering": {
-    "other": "問答"
+    "other": "问答"
   },
   "Tag.I18nKey.image-to-text": {
-    "other": "圖像转文本"
+    "other": "图生文"
   },
   "Tag.I18nKey.object-detection": {
-    "other": "物件偵測"
+    "other": "物体检测"
   },
   "Tag.I18nKey.image-editing": {
-    "other": "圖像編輯"
+    "other": "图像编辑"
   },
   "Tag.I18nKey.image-generation": {
-    "other": "圖像生成"
+    "other": "图像生成"
   },
   "Tag.I18nKey.speech-signal-process": {
-    "other": "語音訊號處理"
+    "other": "语音信号处理"
   },
   "Tag.I18nKey.keyword-spotting": {
-    "other": "關鍵詞檢出"
+    "other": "关键词检出"
   },
   "Tag.I18nKey.voice-activity-detection": {
-    "other": "語音活動偵測"
+    "other": "语音活动检测"
   },
   "Tag.I18nKey.object-tracking": {
-    "other": "物件追蹤"
+    "other": "物体追踪"
   },
   "Tag.I18nKey.autonomous-driving": {
-    "other": "自動駕駛"
+    "other": "自动驾驶"
   },
   "Tag.I18nKey.video-super-resolution": {
-    "other": "影片超解析度"
+    "other": "视频超分辨率"
   },
   "Tag.I18nKey.image-captioning": {
-    "other": "圖像字幕"
+    "other": "图像字幕"
   },
   "Tag.I18nKey.visual-grounding": {
-    "other": "視覺定位"
+    "other": "视觉定位"
   },
   "Tag.I18nKey.biomedicine": {
-    "other": "生物醫藥"
+    "other": "生物医药"
   },
   "Tag.I18nKey.protein-structure": {
-    "other": "蛋白質結構"
+    "other": "蛋白质结构"
   },
   "Tag.I18nKey.apache-2.0": {
     "other": "Apache-2.0"
@@ -255,58 +255,58 @@
     "other": "GGUF"
   },
   "Tag.I18nKey.Automotive": {
-    "other": "汽車"
+    "other": "汽车"
   },
   "Tag.I18nKey.Manufacturing": {
-    "other": "製造業"
+    "other": "制造业"
   },
   "Tag.I18nKey.Energy": {
     "other": "能源"
   },
   "Tag.I18nKey.Telecommunications and Electronic Information": {
-    "other": "電訊及電子資訊"
+    "other": "通信与电子信息"
   },
   "Tag.I18nKey.Transportation and Logistics": {
-    "other": "交通運輸與物流"
+    "other": "交通运输与物流"
   },
   "Tag.I18nKey.Construction and Real Estate": {
-    "other": "建築與房地產"
+    "other": "建筑与房地产"
   },
   "Tag.I18nKey.Financial Services": {
-    "other": "金融服務"
+    "other": "金融服务"
   },
   "Tag.I18nKey.Agriculture": {
-    "other": "農業"
+    "other": "农业"
   },
   "Tag.I18nKey.Chemical Industry": {
-    "other": "化學工業"
+    "other": "化学工业"
   },
   "Tag.I18nKey.Environmental Protection": {
-    "other": "環境保護"
+    "other": "环境保护"
   },
   "Tag.I18nKey.Healthcare and Medical Services": {
-    "other": "醫療健康"
+    "other": "医疗健康"
   },
   "Tag.I18nKey.Education and Training": {
-    "other": "教育培訓"
+    "other": "教育培训"
   },
   "Tag.I18nKey.Food and Beverage": {
-    "other": "食品飲品"
+    "other": "食品饮料"
   },
   "Tag.I18nKey.Retail and Consumer Goods": {
-    "other": "零售與消費品"
+    "other": "零售与消费品"
   },
   "Tag.I18nKey.Tourism and Hospitality": {
-    "other": "旅遊與款待"
+    "other": "旅游与酒店"
   },
   "Tag.I18nKey.Information Technology (IT)": {
-    "other": "資訊科技(IT)"
+    "other": "信息技术(IT)"
   },
   "Tag.I18nKey.Culture and Entertainment": {
-    "other": "文化娛樂"
+    "other": "文化娱乐"
   },
   "Tag.I18nKey.Ascend": {
-    "other": "昇騰(Ascend)"
+    "other": "昇腾(Ascend)"
   },
   "Tag.I18nKey.Vllm": {
     "other": "VLLM"
@@ -327,19 +327,22 @@
     "other": "Swift"
   },
   "Tag.I18nKey.knowledge": {
-    "other": "知識"
+    "other": "知识"
   },
   "Tag.I18nKey.reasoning": {
     "other": "推理"
   },
   "Tag.I18nKey.examination": {
-    "other": "考試"
+    "other": "考试"
   },
   "Tag.I18nKey.understanding": {
     "other": "理解"
   },
   "Tag.I18nKey.code": {
-    "other": "程式碼"
+    "other": "代码"
+  },
+  "Tag.I18nKey.bias": {
+    "other": "偏见"
   },
   "Tag.I18nKey.other": {
     "other": "其他"
@@ -351,7 +354,7 @@
     "other": "lm-evaluation-harness"
   },
   "Tag.I18nKey.Benchmark": {
-    "other": "基準測試"
+    "other": "基准测试"
   },
   "Tag.I18nKey.SGLang": {
     "other": "SGLang"
@@ -366,64 +369,64 @@
     "other": "Ktransformers"
   },
   "Tag.I18nKey.image-text-to-text": {
-    "other": "圖文转文本"
+    "other": "图文转文本"
   },
   "Tag.I18nKey.text-to-video": {
-    "other": "文本转影片"
+    "other": "文生视频"
   },
   "Tag.I18nKey.video-text-to-text": {
-    "other": "影片转文本"
+    "other": "视频转文本"
   },
   "Tag.I18nKey.any-to-any": {
     "other": "任意到任意"
   },
   "Tag.I18nKey.audio-text-to-text": {
-    "other": "音訊转文本"
+    "other": "音频转文本"
   },
   "Tag.I18nKey.English": {
-    "other": "英文"
+    "other": "英语"
   },
   "Tag.I18nKey.Arabic": {
-    "other": "阿拉伯文"
+    "other": "阿拉伯语"
   },
   "Tag.I18nKey.German": {
-    "other": "德文"
+    "other": "德语"
   },
   "Tag.I18nKey.Spanish": {
-    "other": "西班牙文"
+    "other": "西班牙语"
   },
   "Tag.I18nKey.French": {
-    "other": "法文"
+    "other": "法语"
   },
   "Tag.I18nKey.Italian": {
-    "other": "意大利文"
+    "other": "意大利语"
   },
   "Tag.I18nKey.Dutch": {
-    "other": "荷蘭文"
+    "other": "荷兰语"
   },
   "Tag.I18nKey.Portuguese": {
-    "other": "葡萄牙文"
+    "other": "葡萄牙语"
   },
   "Tag.I18nKey.Russian": {
-    "other": "俄文"
+    "other": "俄语"
   },
   "Tag.I18nKey.Japanese": {
-    "other": "日文"
+    "other": "日语"
   },
   "Tag.I18nKey.Hindi": {
-    "other": "印地文"
+    "other": "印地语"
   },
   "Tag.I18nKey.Korean": {
-    "other": "韓文"
+    "other": "韩语"
   },
   "Tag.I18nKey.Polish": {
-    "other": "波蘭文"
+    "other": "波兰语"
   },
   "Tag.I18nKey.Turkish": {
-    "other": "土耳其文"
+    "other": "土耳其语"
   },
   "Tag.I18nKey.Swedish": {
-    "other": "瑞典文"
+    "other": "瑞典语"
   },
   "Tag.I18nKey.TypeScript": {
     "other": "TypeScript"
@@ -441,7 +444,7 @@
     "other": "本地"
   },
   "Tag.I18nKey.remote": {
-    "other": "遠端"
+    "other": "远程"
   },
   "Tag.I18nKey.hybrid": {
     "other": "混合"
@@ -450,46 +453,46 @@
     "other": "官方"
   },
   "Tag.I18nKey.claimed": {
-    "other": "聲稱"
+    "other": "声明"
   },
   "Tag.I18nKey.art & culture": {
-    "other": "藝術與文化"
+    "other": "艺术与文化"
   },
   "Tag.I18nKey.browser automation": {
-    "other": "瀏覽器自動化"
+    "other": "浏览器自动化"
   },
   "Tag.I18nKey.cloud platforms": {
-    "other": "雲端平台"
+    "other": "云平台"
   },
   "Tag.I18nKey.communication": {
-    "other": "通訊"
+    "other": "通讯"
   },
   "Tag.I18nKey.customer data platforms": {
-    "other": "客戶數據平台"
+    "other": "客户数据平台"
   },
   "Tag.I18nKey.databases": {
-    "other": "數據庫"
+    "other": "数据库"
   },
   "Tag.I18nKey.developer tools": {
-    "other": "開發者工具"
+    "other": "开发者工具"
   },
   "Tag.I18nKey.file systems": {
-    "other": "檔案系統"
+    "other": "文件系统"
   },
   "Tag.I18nKey.knowledge & memory": {
-    "other": "知識與記憶"
+    "other": "知识与记忆"
   },
   "Tag.I18nKey.location services": {
-    "other": "位置服務"
+    "other": "位置服务"
   },
   "Tag.I18nKey.marketing": {
-    "other": "市場營銷"
+    "other": "市场营销"
   },
   "Tag.I18nKey.monitoring": {
-    "other": "監控"
+    "other": "监控"
   },
   "Tag.I18nKey.search": {
-    "other": "搜尋"
+    "other": "搜索"
   },
   "Tag.I18nKey.version control": {
     "other": "版本控制"
@@ -498,37 +501,37 @@
     "other": "金融"
   },
   "Tag.I18nKey.research & data": {
-    "other": "研究與數據"
+    "other": "研究与数据"
   },
   "Tag.I18nKey.social media": {
-    "other": "社交媒體"
+    "other": "社交媒体"
   },
   "Tag.I18nKey.os automation": {
-    "other": "作業系統自動化"
+    "other": "操作系统自动化"
   },
   "Tag.I18nKey.note taking": {
-    "other": "筆記記錄"
+    "other": "笔记记录"
   },
   "Tag.I18nKey.cloud storage": {
-    "other": "雲端儲存"
+    "other": "云存储"
   },
   "Tag.I18nKey.e-commerce & retail": {
-    "other": "電子商務與零售"
+    "other": "电子商务与零售"
   },
   "Tag.I18nKey.education & learning tools": {
-    "other": "教育與學習工具"
+    "other": "教育与学习工具"
   },
   "Tag.I18nKey.customer support": {
-    "other": "客戶支援"
+    "other": "客户支持"
   },
   "Tag.I18nKey.language translation": {
-    "other": "語言翻譯"
+    "other": "语言翻译"
   },
   "Tag.I18nKey.healthcare": {
-    "other": "醫療保健"
+    "other": "医疗保健"
   },
   "Tag.I18nKey.image & video processing": {
-    "other": "圖像與影片處理"
+    "other": "图像与视频处理"
   },
   "Tag.I18nKey.security": {
     "other": "安全"
@@ -538,189 +541,5 @@
   },
   "Tag.I18nKey.BSD-3-Clause": {
     "other": "BSD-3-Clause"
-  },
-  "method.get": {
-    "other": "獲取"
-  },
-  "method.post": {
-    "other": "創建"
-  },
-  "method.put": {
-    "other": "更新"
-  },
-  "method.delete": {
-    "other": "刪除"
-  },
-  "method.head": {
-    "other": "請求標頭"
-  },
-  "method.patch": {
-    "other": "部分更新"
-  },
-  "method.options": {
-    "other": "請求通信選項"
-  },
-  "method.connect": {
-    "other": "建立連接"
-  },
-  "method.trace": {
-    "other": "追蹤請求"
-  },
-  "handler.list": {
-    "other": "列表"
-  },
-  "handler.sshkey": {
-    "other": "SSH密鑰"
-  },
-  "handler.mcpserver": {
-    "other": "MCP伺服器"
-  },
-  "handler.spacesdk": {
-    "other": "空間SDK"
-  },
-  "handler.accounting": {
-    "other": "賬號"
-  },
-  "handler.discussion": {
-    "other": "討論"
-  },
-  "handler.internalserviceproxy": {
-    "other": "內部服務代理"
-  },
-  "handler.sync": {
-    "other": "同步"
-  },
-  "handler.space": {
-    "other": "空間"
-  },
-  "handler.rproxy": {
-    "other": "反向代理"
-  },
-  "handler.recom": {
-    "other": "推薦"
-  },
-  "handler.event": {
-    "other": "事件"
-  },
-  "handler.dataset": {
-    "other": "數據集"
-  },
-  "handler.cluster": {
-    "other": "集群"
-  },
-  "handler.hfdataset": {
-    "other": "Hugging Face數據集"
-  },
-  "handler.broadcast": {
-    "other": "廣播"
-  },
-  "handler.monitor": {
-    "other": "監控"
-  },
-  "handler.spacetemplate": {
-    "other": "空間模板"
-  },
-  "handler.mirrorsource": {
-    "other": "鏡像源"
-  },
-  "handler.prompt": {
-    "other": "提示詞"
-  },
-  "handler.mirror": {
-    "other": "鏡像"
-  },
-  "handler.gitcallback": {
-    "other": "Git回調"
-  },
-  "handler.repo": {
-    "other": "倉庫"
-  },
-  "handler.user": {
-    "other": "用戶"
-  },
-  "handler.tags": {
-    "other": "標籤"
-  },
-  "handler.organization": {
-    "other": "組織"
-  },
-  "handler.sensitive": {
-    "other": "敏感詞"
-  },
-  "handler.internal": {
-    "other": "內部"
-  },
-  "handler.githttp": {
-    "other": "Git HTTP"
-  },
-  "handler.evaluation": {
-    "other": "評估"
-  },
-  "handler.spaceresource": {
-    "other": "空間資源"
-  },
-  "handler.telemetry": {
-    "other": "遙測"
-  },
-  "handler.model": {
-    "other": "模型"
-  },
-  "handler.collection": {
-    "other": "集合"
-  },
-  "handler.modeltree": {
-    "other": "模型樹"
-  },
-  "handler.stat": {
-    "other": "統計"
-  },
-  "handler.dataflowproxy": {
-    "other": "數據流代理"
-  },
-  "handler.license": {
-    "other": "許可證"
-  },
-  "handler.runtimearchitecture": {
-    "other": "運行時架構"
-  },
-  "handler.code": {
-    "other": "代碼"
-  },
-  "handler.syncclientsetting": {
-    "other": "同步客戶端設置"
-  },
-  "handler.rule": {
-    "other": "規則"
-  },
-  "handler.config": {
-    "other": "配置"
-  },
-  "error.BadRequest": {
-    "description": "Bad request error message",
-    "other": "{{.method | default \"請求\"}}{{.handler | default \"內容\"}}，由於参数錯誤，伺服器無法理解該請求。"
-  },
-  "error.Unauthorized": {
-    "description": "Unauthorized error message",
-    "other": "{{.method | default \"請求\"}}{{.handler | default \"內容\"}}，需要身份驗證，但驗證失敗或尚未提供驗證信息。"
-  },
-  "error.Forbidden": {
-    "description": "Forbidden error message",
-    "other": "{{.method | default \"請求\"}}{{.handler | default \"內容\"}}，您沒有權限訪問此資源。"
-  },
-  "error.NotFound": {
-    "description": "Not found error message",
-    "other": "{{.method | default \"請求\"}}{{.handler | default \"內容\"}}，找不到請求的資源。"
-  },
-  "error.MethodNotAllowed": {
-    "description": "Method not allowed error message",
-    "other": "{{.method | default \"請求\"}}{{.handler | default \"內容\"}}，請求中指定的方法不允許用於此資源。"
-  },
-  "error.InternalServerError": {
-    "description": "Internal server error message",
-    "other": "{{.method | default \"請求\"}}{{.handler | default \"內容\"}}，伺服器遇到了意外情況，導致無法完成請求。"
-  },
-  "error.ServiceUnavailable": {
-    "description": "Service unavailable error message",
-    "other": "{{.method | default \"請求\"}}{{.handler | default \"內容\"}}，服務暫時不可用，請稍後再試。"
   }
 }

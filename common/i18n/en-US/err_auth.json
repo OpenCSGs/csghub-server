@@ -1,0 +1,32 @@
+{
+    "error.AUTH-ERR-0": {
+        "other": "Unauthorized"
+    },
+    "error.AUTH-ERR-1": {
+        "other": "User not found, please login first"
+    },
+    "error.AUTH-ERR-2": {
+        "other": "Permission denied"
+    },
+    "error.AUTH-ERR-3": {
+        "other": "Forbidden"
+    },
+    "error.AUTH-ERR-4": {
+        "other": "Invalid JWT"
+    },
+    "error.AUTH-ERR-5": {
+        "other": "Invalid authorization header"
+    },
+    "error.AUTH-ERR-6": {
+        "other": "Only admin user can access"
+    },
+    "error.AUTH-ERR-7": {
+        "other": "User not match, try to query user account not owned"
+    },
+    "error.AUTH-ERR-8": {
+        "other": "need user uuid"
+    },
+    "error.AUTH-ERR-9": {
+        "other": "Need API key for authentication"
+    }
+}

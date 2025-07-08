@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/i18n"
 )
 
@@ -68,6 +69,33 @@ func BadRequest(c *gin.Context, errMsg string) {
 	})
 }
 
+// BadRequest responds with a JSON-formatted error message.
+//
+// Example:
+//
+//	BadRequest(c, "Invalid request parameters")
+func BadRequestWithExt(c *gin.Context, err error) {
+	// get caller message
+	pc, _, _, ok := runtime.Caller(1)
+	if ok {
+		funcName := runtime.FuncForPC(pc).Name()
+		structName := parseFuncName(funcName)
+		c.Set("Error-Handler-Name", structName)
+	}
+	err, ok = errorx.GetFirstCustomError(err)
+	if ok {
+		customErr := err.(errorx.CustomError)
+		c.PureJSON(http.StatusBadRequest, R{
+			Msg:     customErr.Error(),
+			Context: customErr.Context(),
+		})
+		return
+	}
+	c.PureJSON(http.StatusBadRequest, R{
+		Msg: err.Error(),
+	})
+}
+
 // ServerError responds with a JSON-formatted error message.
 //
 // Example:
@@ -80,6 +108,15 @@ func ServerError(c *gin.Context, err error) {
 		funcName := runtime.FuncForPC(pc).Name()
 		structName := parseFuncName(funcName)
 		c.Set("Error-Handler-Name", structName)
+	}
+	err, ok = errorx.GetFirstCustomError(err)
+	if ok {
+		customErr := err.(errorx.CustomError)
+		c.PureJSON(http.StatusInternalServerError, R{
+			Msg:     customErr.Error(),
+			Context: customErr.Context(),
+		})
+		return
 	}
 	c.PureJSON(http.StatusInternalServerError, R{
 		Msg: err.Error(),
@@ -100,6 +137,15 @@ func UnauthorizedError(c *gin.Context, err error) {
 		structName := parseFuncName(funcName)
 		c.Set("Error-Handler-Name", structName)
 	}
+	err, ok = errorx.GetFirstCustomError(err)
+	if ok {
+		customErr := err.(errorx.CustomError)
+		c.PureJSON(http.StatusUnauthorized, R{
+			Msg:     customErr.Error(),
+			Context: customErr.Context(),
+		})
+		return
+	}
 	c.PureJSON(http.StatusUnauthorized, R{
 		Msg: err.Error(),
 	})
@@ -113,6 +159,15 @@ func ForbiddenError(c *gin.Context, err error) {
 		funcName := runtime.FuncForPC(pc).Name()
 		structName := parseFuncName(funcName)
 		c.Set("Error-Handler-Name", structName)
+	}
+	err, ok = errorx.GetFirstCustomError(err)
+	if ok {
+		customErr := err.(errorx.CustomError)
+		c.PureJSON(http.StatusForbidden, R{
+			Msg:     customErr.Error(),
+			Context: customErr.Context(),
+		})
+		return
 	}
 	c.PureJSON(http.StatusForbidden, R{
 		Msg: err.Error(),
@@ -132,6 +187,15 @@ func NotFoundError(c *gin.Context, err error) {
 		structName := parseFuncName(funcName)
 		c.Set("Error-Handler-Name", structName)
 	}
+	err, ok = errorx.GetFirstCustomError(err)
+	if ok {
+		customErr := err.(errorx.CustomError)
+		c.PureJSON(http.StatusNotFound, R{
+			Msg:     customErr.Error(),
+			Context: customErr.Context(),
+		})
+		return
+	}
 	c.PureJSON(http.StatusNotFound, R{
 		Msg: err.Error(),
 	})
@@ -143,6 +207,8 @@ type R struct {
 	Msg   string `json:"msg"`
 	Data  any    `json:"data,omitempty"`
 	Total int    `json:"total,omitempty"` // Total number of items, used in paginated responses
+	// error context msg
+	Context map[string]interface{} `json:"context,omitempty"`
 }
 
 type I18nOptionsMap map[i18n.I18nOptionsKey]string
