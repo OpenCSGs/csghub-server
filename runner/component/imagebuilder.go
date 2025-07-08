@@ -299,6 +299,7 @@ func wfTemplateForImageBuilder(gitImg, kanikoImg, imageDestination string, param
 	builderArgs := []string{
 		"--context=/shared/" + params.SpaceName,
 		"--destination=" + imageDestination,
+		"--build-arg=GIT_IMAGE=" + gitImg,
 	}
 	for _, arg := range kanikoArgs {
 		if arg == "" || strings.HasPrefix(arg, "--context") || strings.HasPrefix(arg, "--destination") {
