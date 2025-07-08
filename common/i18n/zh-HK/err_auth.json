@@ -9,7 +9,7 @@
         "other": "權限被拒絕"
     },
     "error.AUTH-ERR-3": {
-        "other": "禁止訪問"
+        "other": "需要設置電郵地址"
     },
     "error.AUTH-ERR-4": {
         "other": "無效的JWT令牌"

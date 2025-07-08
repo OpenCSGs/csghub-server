@@ -1,23 +1,17 @@
 {
     "error.SYS-ERR-0": {
-        "other": "伺服器內部錯誤"
+        "other": "內部伺服器錯誤"
     },
     "error.SYS-ERR-1": {
-        "other": "遠程服務失敗"
+        "other": "遠程服務調用失敗"
     },
     "error.SYS-ERR-2": {
-        "other": "內部服務故障"
+        "other": "數據庫查詢失敗"
     },
     "error.SYS-ERR-3": {
-        "other": "數據庫不可用或查詢執行錯誤"
+        "other": "未找到相關數據"
     },
     "error.SYS-ERR-4": {
-        "other": "數據庫中未找到記錄"
-    },
-    "error.SYS-ERR-5": {
-        "other": "用戶服務故障"
-    },
-    "error.SYS-ERR-6": {
-        "other": "用戶服務在數據庫中未查詢到該用戶"
+        "other": "數據重複，違反唯一性約束"
     }
 }
