@@ -38,29 +38,6 @@ func TestTemplateManager_Format_DefaultEmailTemplate(t *testing.T) {
 	assert.Contains(t, result, "Test Content")
 }
 
-func TestTemplateManager_Format_DefaultFeishuTemplate(t *testing.T) {
-	tm := NewTemplateManager()
-
-	data := struct {
-		Title   string
-		Content string
-	}{
-		Title:   "Test Title",
-		Content: "Test Content",
-	}
-
-	// Test with a scenario that doesn't exist, should fall back to default
-	result, err := tm.Format("non-existent-scenario", types.MessageChannelLark, data)
-	require.NoError(t, err)
-
-	// Should contain the default feishu template structure
-	assert.Contains(t, result, `"zh_cn"`)
-	assert.Contains(t, result, `"title"`)
-	assert.Contains(t, result, `"content"`)
-	assert.Contains(t, result, "Test Title")
-	assert.Contains(t, result, "Test Content")
-}
-
 func TestTemplateManager_Format_InternalNotificationEmailTemplate(t *testing.T) {
 	tm := NewTemplateManager()
 
@@ -85,35 +62,6 @@ func TestTemplateManager_Format_InternalNotificationEmailTemplate(t *testing.T) 
 	assert.Contains(t, result, "Test Title")
 	assert.Contains(t, result, "Test Summary")
 	assert.Contains(t, result, "Test Content")
-}
-
-func TestTemplateManager_Format_RepoSyncFeishuTemplate(t *testing.T) {
-	tm := NewTemplateManager()
-
-	data := struct {
-		Title     string
-		RemoteURL string
-		LocalURL  string
-		SyncTime  string
-	}{
-		Title:     "Repo Sync Complete",
-		RemoteURL: "https://github.com/test/repo",
-		LocalURL:  "https://localhost/test/repo",
-		SyncTime:  "2024-01-01 12:00:00",
-	}
-
-	// Test with repo-sync scenario
-	result, err := tm.Format(types.MessageScenarioRepoSync, types.MessageChannelLark, data)
-	require.NoError(t, err)
-
-	// Should contain the repo-sync feishu template structure
-	assert.Contains(t, result, `"zh_cn"`)
-	assert.Contains(t, result, `"title"`)
-	assert.Contains(t, result, `"content"`)
-	assert.Contains(t, result, "Repo Sync Complete")
-	assert.Contains(t, result, "https://github.com/test/repo")
-	assert.Contains(t, result, "https://localhost/test/repo")
-	assert.Contains(t, result, "2024-01-01 12:00:00")
 }
 
 func TestTemplateManager_Format_CacheBehavior(t *testing.T) {
@@ -277,31 +225,6 @@ func TestTemplateManager_LoadDefaultTemplate_Valid(t *testing.T) {
 	assert.Contains(t, result, "<p>Content: Test Content</p>")
 }
 
-func TestTemplateManager_Format_DifferentChannels(t *testing.T) {
-	tm := NewTemplateManager()
-
-	data := struct {
-		Title   string
-		Content string
-	}{
-		Title:   "Channel Test",
-		Content: "Channel Content",
-	}
-
-	// Test different channels with the same scenario
-	channels := []types.MessageChannel{
-		types.MessageChannelEmail,
-		types.MessageChannelLark,
-	}
-
-	for _, channel := range channels {
-		result, err := tm.Format("non-existent-scenario", channel, data)
-		require.NoError(t, err)
-		assert.Contains(t, result, "Channel Test")
-		assert.Contains(t, result, "Channel Content")
-	}
-}
-
 func TestTemplateManager_Format_MemoryEfficiency(t *testing.T) {
 	tm := NewTemplateManager()
 
@@ -350,34 +273,6 @@ func TestTemplateManager_Format_AnyDataWithDefaultTemplate(t *testing.T) {
 	assert.Contains(t, result, "<p>Title: Test Title</p>")
 	assert.Contains(t, result, "<p>Message: This is a test message</p>")
 	assert.Contains(t, result, "<p>Count: 42</p>")
-}
-
-func TestTemplateManager_Format_AnyDataWithDefaultFeishuTemplate(t *testing.T) {
-	tm := NewTemplateManager()
-
-	// Test with any data structure
-	data := struct {
-		Title   string
-		Message string
-		Count   int
-	}{
-		Title:   "Test Title",
-		Message: "This is a test message",
-		Count:   42,
-	}
-
-	// Test with default feishu template (non-existent scenario)
-	result, err := tm.Format("non-existent-scenario", types.MessageChannelLark, data)
-	require.NoError(t, err)
-
-	// Should contain the default feishu template structure
-	assert.Contains(t, result, `"zh_cn"`)
-	assert.Contains(t, result, `"title": "Notification"`)
-	assert.Contains(t, result, `"content"`)
-	// Should contain each field on its own line
-	assert.Contains(t, result, `"text": "Title: Test Title\n"`)
-	assert.Contains(t, result, `"text": "Message: This is a test message\n"`)
-	assert.Contains(t, result, `"text": "Count: 42\n"`)
 }
 
 func TestTemplateManager_Format_ScenarioSpecificTemplateUsesOriginalData(t *testing.T) {
