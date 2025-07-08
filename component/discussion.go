@@ -189,11 +189,6 @@ func (c *discussionComponentImpl) CreateDiscussionComment(ctx context.Context, r
 		return nil, fmt.Errorf("failed to find discussion by id '%d': %w", req.CommentableID, err)
 	}
 
-	repo, err := c.checkRepoReadAccess(ctx, discussion.DiscussionableID, req.CurrentUser)
-	if err != nil {
-		return nil, err
-	}
-
 	//get user by username
 	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
 	if err != nil {
@@ -210,7 +205,11 @@ func (c *discussionComponentImpl) CreateDiscussionComment(ctx context.Context, r
 		return nil, fmt.Errorf("failed to create discussion comment: %w", err)
 	}
 
-	if user.UUID != discussion.User.UUID {
+	if user.UUID != discussion.User.UUID && c.sysMQ != nil {
+		repo, err := c.checkRepoReadAccess(ctx, discussion.DiscussionableID, req.CurrentUser)
+		if err != nil {
+			return nil, err
+		}
 		go func(repoType types.RepositoryType, repoPath string, senderUUID string, userUUIDs []string) {
 			err = c.sendCommentMessage(ctx, repoType, repoPath, senderUUID, userUUIDs)
 			if err != nil {
