@@ -233,7 +233,7 @@ func (c *promptComponentImpl) ParseJsonFile(ctx context.Context, req gitserver.G
 func (c *promptComponentImpl) CreatePrompt(ctx context.Context, req types.PromptReq, body *types.CreatePromptReq) (*types.Prompt, error) {
 	u, err := c.checkPromptRepoPermission(ctx, req)
 	if err != nil {
-		return nil, fmt.Errorf("user do not allowed create prompt")
+		return nil, errorx.ErrForbiddenMsg("user do not allowed create prompt")
 	}
 	req.Path = fmt.Sprintf("%s.jsonl", body.Title)
 	exist, _ := c.checkFileExist(ctx, req)
@@ -269,7 +269,7 @@ func (c *promptComponentImpl) CreatePrompt(ctx context.Context, req types.Prompt
 func (c *promptComponentImpl) UpdatePrompt(ctx context.Context, req types.PromptReq, body *types.UpdatePromptReq) (*types.Prompt, error) {
 	u, err := c.checkPromptRepoPermission(ctx, req)
 	if err != nil {
-		return nil, fmt.Errorf("user do not allowed update prompt")
+		return nil, errorx.ErrForbiddenMsg("user do not allowed update prompt")
 	}
 	if !strings.HasSuffix(req.Path, ".jsonl") {
 		return nil, fmt.Errorf("prompt name must be end with .jsonl")
@@ -306,7 +306,7 @@ func (c *promptComponentImpl) UpdatePrompt(ctx context.Context, req types.Prompt
 func (c *promptComponentImpl) DeletePrompt(ctx context.Context, req types.PromptReq) error {
 	u, err := c.checkPromptRepoPermission(ctx, req)
 	if err != nil {
-		return fmt.Errorf("user do not allowed delete prompt")
+		return errorx.ErrForbiddenMsg("user do not allowed delete prompt")
 	}
 	if !strings.HasSuffix(req.Path, ".jsonl") {
 		return fmt.Errorf("prompt name must be end with .jsonl")
@@ -394,7 +394,7 @@ func (c *promptComponentImpl) SetRelationModels(ctx context.Context, req types.R
 	}
 
 	if !permission.CanWrite {
-		return fmt.Errorf("user %s do not allow to set relation models", req.CurrentUser)
+		return errorx.ErrForbiddenMsg("user do not allowed to set relation models")
 	}
 
 	getFileContentReq := gitserver.GetRepoInfoByPathReq{
@@ -487,7 +487,7 @@ func (c *promptComponentImpl) AddRelationModel(ctx context.Context, req types.Re
 	}
 
 	if !user.CanAdmin() {
-		return fmt.Errorf("only admin was allowed to set models for prompt")
+		return errorx.ErrForbiddenMsg("only admin was allowed to set models for prompt")
 	}
 
 	_, err = c.repoStore.FindByPath(ctx, types.PromptRepo, req.Namespace, req.Name)
@@ -544,7 +544,7 @@ func (c *promptComponentImpl) DelRelationModel(ctx context.Context, req types.Re
 	}
 
 	if !user.CanAdmin() {
-		return fmt.Errorf("only admin was allowed to delete model for prompt")
+		return errorx.ErrForbiddenMsg("only admin was allowed to delete model for prompt")
 	}
 
 	_, err = c.repoStore.FindByPath(ctx, types.PromptRepo, req.Namespace, req.Name)
@@ -621,11 +621,11 @@ func (c *promptComponentImpl) CreatePromptRepo(ctx context.Context, req *types.C
 				return nil, err
 			}
 			if !canWrite {
-				return nil, errors.New("users do not have permission to create prompt in this organization")
+				return nil, errorx.ErrForbiddenMsg("users do not have permission to create prompt in this organization")
 			}
 		} else {
 			if namespace.Path != user.Username {
-				return nil, errors.New("users do not have permission to create prompt in this namespace")
+				return nil, errorx.ErrForbiddenMsg("users do not have permission to create prompt in this namespace")
 			}
 		}
 	}
