@@ -306,67 +306,6 @@ func (_c *MockRuntimeFrameworksStore_FindByID_Call) RunAndReturn(run func(contex
 	return _c
 }
 
-// FindByNameAndComputeType provides a mock function with given fields: ctx, engineName, driverVersion, ComputeType
-func (_m *MockRuntimeFrameworksStore) FindByNameAndComputeType(ctx context.Context, engineName string, driverVersion string, ComputeType string) (*database.RuntimeFramework, error) {
-	ret := _m.Called(ctx, engineName, driverVersion, ComputeType)
-
-	if len(ret) == 0 {
-		panic("no return value specified for FindByNameAndComputeType")
-	}
-
-	var r0 *database.RuntimeFramework
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) (*database.RuntimeFramework, error)); ok {
-		return rf(ctx, engineName, driverVersion, ComputeType)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) *database.RuntimeFramework); ok {
-		r0 = rf(ctx, engineName, driverVersion, ComputeType)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*database.RuntimeFramework)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, string, string, string) error); ok {
-		r1 = rf(ctx, engineName, driverVersion, ComputeType)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockRuntimeFrameworksStore_FindByNameAndComputeType_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindByNameAndComputeType'
-type MockRuntimeFrameworksStore_FindByNameAndComputeType_Call struct {
-	*mock.Call
-}
-
-// FindByNameAndComputeType is a helper method to define mock.On call
-//   - ctx context.Context
-//   - engineName string
-//   - driverVersion string
-//   - ComputeType string
-func (_e *MockRuntimeFrameworksStore_Expecter) FindByNameAndComputeType(ctx interface{}, engineName interface{}, driverVersion interface{}, ComputeType interface{}) *MockRuntimeFrameworksStore_FindByNameAndComputeType_Call {
-	return &MockRuntimeFrameworksStore_FindByNameAndComputeType_Call{Call: _e.mock.On("FindByNameAndComputeType", ctx, engineName, driverVersion, ComputeType)}
-}
-
-func (_c *MockRuntimeFrameworksStore_FindByNameAndComputeType_Call) Run(run func(ctx context.Context, engineName string, driverVersion string, ComputeType string)) *MockRuntimeFrameworksStore_FindByNameAndComputeType_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string))
-	})
-	return _c
-}
-
-func (_c *MockRuntimeFrameworksStore_FindByNameAndComputeType_Call) Return(_a0 *database.RuntimeFramework, _a1 error) *MockRuntimeFrameworksStore_FindByNameAndComputeType_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockRuntimeFrameworksStore_FindByNameAndComputeType_Call) RunAndReturn(run func(context.Context, string, string, string) (*database.RuntimeFramework, error)) *MockRuntimeFrameworksStore_FindByNameAndComputeType_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // FindEnabledByID provides a mock function with given fields: ctx, id
 func (_m *MockRuntimeFrameworksStore) FindEnabledByID(ctx context.Context, id int64) (*database.RuntimeFramework, error) {
 	ret := _m.Called(ctx, id)

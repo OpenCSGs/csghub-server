@@ -1523,7 +1523,7 @@ func (h *ModelHandler) RemoveServerless(ctx *gin.Context) {
 
 	err = h.repo.DeleteDeploy(ctx.Request.Context(), startReq)
 	if err != nil {
-		if errors.Is(err, component.ErrForbidden) {
+		if errors.Is(err, errorx.ErrForbidden) {
 			slog.Info("not allowed to remove model serverless deploy", slog.Any("error", err), slog.Any("req", startReq))
 
 			httpbase.ForbiddenError(ctx, err)

@@ -153,6 +153,7 @@ func TestRuntimeFrameworksStore_FindByNameAndComputeType(t *testing.T) {
 	_, err := rfStore.Add(ctx, database.RuntimeFramework{
 		ID:            1,
 		FrameName:     "vllm",
+		FrameImage:    "vllm:v1.0",
 		Type:          1,
 		Enabled:       1,
 		DriverVersion: "12.1",
@@ -160,7 +161,7 @@ func TestRuntimeFrameworksStore_FindByNameAndComputeType(t *testing.T) {
 	})
 	require.Nil(t, err)
 
-	rf, err := rfStore.FindByNameAndComputeType(ctx, "vllm", "12.1", "gpu")
+	rf, err := rfStore.FindByFrameImageAndComputeType(ctx, "vllm:v1.0", "gpu")
 	require.Nil(t, err)
 	require.Equal(t, "vllm", rf.FrameName)
 }

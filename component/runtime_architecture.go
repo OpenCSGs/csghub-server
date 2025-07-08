@@ -720,7 +720,7 @@ func (c *runtimeArchitectureComponentImpl) UpdateRuntimeFrameworkByType(ctx cont
 // update runtime_framework if the updated time is different
 func (c *runtimeArchitectureComponentImpl) UpdateRuntimeFrameworkAndArch(ctx context.Context, engineType int, engineConfig types.EngineConfig) error {
 	for _, image := range engineConfig.EngineImages {
-		rf, err := c.runtimeFrameworksStore.FindByNameAndComputeType(ctx, engineConfig.EngineName, image.DriverVersion, string(image.ComputeType))
+		rf, err := c.runtimeFrameworksStore.FindByFrameImageAndComputeType(ctx, image.Image, string(image.ComputeType))
 		if err != nil {
 			if !errors.Is(err, sql.ErrNoRows) {
 				slog.Error("failed to find runtime_framework", slog.Any("error", err))

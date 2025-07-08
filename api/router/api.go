@@ -843,7 +843,7 @@ func createRuntimeFrameworkRoutes(apiGroup *gin.RouterGroup, middlewareCollectio
 		runtimeFramework.PUT("/:id/architecture", needAdmin, runtimeArchHandler.UpdateArchitecture)
 		runtimeFramework.DELETE("/:id/architecture", needAdmin, runtimeArchHandler.DeleteArchitecture)
 		runtimeFramework.POST("/scan", needAdmin, runtimeArchHandler.ScanArchitecture)
-		runtimeFramework.POST("/:namespace/:name/scan", authCollection.NeedLogin, runtimeArchHandler.ScanArchForSingleModel)
+		runtimeFramework.POST("/:namespace/:name/scan", middlewareCollection.Auth.NeedLogin, runtimeArchHandler.ScanArchForSingleModel)
 	}
 }
 

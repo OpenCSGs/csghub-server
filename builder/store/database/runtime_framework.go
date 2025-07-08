@@ -151,9 +151,9 @@ func (rf *runtimeFrameworksStoreImpl) ListByArchsNameAndType(ctx context.Context
 }
 
 // FindByNameAndComputeType
-func (rf *runtimeFrameworksStoreImpl) FindByNameAndComputeType(ctx context.Context, frameName, driverVersion, computeType string) (*RuntimeFramework, error) {
+func (rf *runtimeFrameworksStoreImpl) FindByFrameImageAndComputeType(ctx context.Context, frameImage, computeType string) (*RuntimeFramework, error) {
 	var res RuntimeFramework
-	_, err := rf.db.Core.NewSelect().Model(&res).Where("LOWER(frame_name) = LOWER(?)", frameName).Where("compute_type = ?", computeType).Where("driver_version = ?", driverVersion).Exec(ctx, &res)
+	_, err := rf.db.Core.NewSelect().Model(&res).Where("compute_type = ?", computeType).Where("frame_image = ?", frameImage).Exec(ctx, &res)
 	return &res, err
 }
 
