@@ -12,6 +12,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/ssh"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -28,6 +29,8 @@ func GetNamespaceAndNameFromContext(ctx *gin.Context) (namespace string, name st
 	}
 	if namespace == "" || name == "" {
 		err = errors.New("invalid namespace or name")
+		ext := errorx.Ctx().Set("param", "namespace or name")
+		err = errorx.ReqParamInvalid(err, ext)
 		return
 	}
 	return
@@ -40,6 +43,8 @@ func GetPerAndPageFromContext(ctx *gin.Context) (perInt int, pageInt int, err er
 	}
 	perInt, err = strconv.Atoi(per)
 	if err != nil {
+		ext := errorx.Ctx().Set("query", "per")
+		err = errorx.ReqParamInvalid(err, ext)
 		return
 	}
 	page := ctx.Query("page")
