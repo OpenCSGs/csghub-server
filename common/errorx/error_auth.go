@@ -1,5 +1,9 @@
 package errorx
 
+import (
+	"errors"
+)
+
 const errAuthPrefix = "AUTH-ERR"
 
 const (
@@ -138,5 +142,16 @@ func Unauthorized(err error, errCtx context) error {
 		code:    unauthorized,
 		err:     err,
 		context: errCtx,
+	}
+}
+
+// ErrForbiddenMsg returns a new ErrForbidden with extra message
+func ErrForbiddenMsg(msg string) error {
+
+	return CustomError{
+		prefix:  errAuthPrefix,
+		code:    forbidden,
+		err:     errors.New(msg),
+		context: nil,
 	}
 }

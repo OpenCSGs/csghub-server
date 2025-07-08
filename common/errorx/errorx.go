@@ -137,11 +137,6 @@ var (
 	ErrBadRequest            = CustomError{code: "Req-ERR-002", msg: "bad request"}
 )*/
 
-// ErrForbiddenMsg returns a new ErrForbidden with extra message
-func ErrForbiddenMsg(msg string) error {
-	return fmt.Errorf("%s, %w", msg, ErrForbidden)
-}
-
 type HTTPError struct {
 	StatusCode int
 	Message    any
