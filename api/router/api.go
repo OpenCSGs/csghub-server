@@ -468,9 +468,9 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error creating mcp server handler: %w", err)
 	}
-	CreateMCPServerRoutes(apiGroup, authCollection, mcpHandler, repoCommonHandler)
+	CreateMCPServerRoutes(apiGroup, middlewareCollection, mcpHandler, repoCommonHandler)
 
-	if err := createNotificationRoutes(config, apiGroup, authCollection); err != nil {
+	if err := createNotificationRoutes(config, apiGroup, middlewareCollection); err != nil {
 		return nil, fmt.Errorf("error creating notifier routes: %w", err)
 	}
 	return r, nil
@@ -1041,14 +1041,14 @@ func createOrgRoutes(apiGroup *gin.RouterGroup, userProxyHandler *handler.Intern
 	}
 }
 
-func createNotificationRoutes(config *config.Config, apiGroup *gin.RouterGroup, middlewareCollection middleware.AuthenticatorCollection) error {
+func createNotificationRoutes(config *config.Config, apiGroup *gin.RouterGroup, middlewareCollection middleware.MiddlewareCollection) error {
 	notificationProxyHandler, err := handler.NewInternalServiceProxyHandler(fmt.Sprintf("%s:%d", config.Notification.Host, config.Notification.Port))
 	if err != nil {
 		return fmt.Errorf("error creating notifier controller: %w", err)
 	}
 
 	notificationsGroup := apiGroup.Group("/notifications")
-	notificationsGroup.Use(middlewareCollection.NeedLogin)
+	notificationsGroup.Use(middlewareCollection.Auth.NeedLogin)
 	{
 		notificationsGroup.GET("/count", notificationProxyHandler.Proxy)
 		notificationsGroup.GET("", notificationProxyHandler.Proxy)
@@ -1058,7 +1058,7 @@ func createNotificationRoutes(config *config.Config, apiGroup *gin.RouterGroup, 
 		notificationsGroup.GET("/setting", notificationProxyHandler.Proxy)
 		notificationsGroup.GET("/poll/:limit", notificationProxyHandler.Proxy)
 		notificationsGroup.GET("/message-types", notificationProxyHandler.Proxy)
-		notificationsGroup.PUT("/msg-task", middlewareCollection.NeedAdmin, notificationProxyHandler.Proxy)
+		notificationsGroup.PUT("/msg-task", middlewareCollection.Auth.NeedAdmin, notificationProxyHandler.Proxy)
 	}
 
 	return nil
