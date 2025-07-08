@@ -41,7 +41,7 @@ func TestEvaluationHandler_Run(t *testing.T) {
 	tester := NewEvaluationTester(t).WithHandleFunc(func(h *EvaluationHandler) gin.HandlerFunc {
 		return h.RunEvaluation
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), &types.EvaluationReq{}).Return(true, nil)
 	tester.mocks.evaluation.EXPECT().CreateEvaluation(tester.Ctx(), types.EvaluationReq{
@@ -57,7 +57,7 @@ func TestEvaluationHandler_Get(t *testing.T) {
 	tester := NewEvaluationTester(t).WithHandleFunc(func(h *EvaluationHandler) gin.HandlerFunc {
 		return h.GetEvaluation
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.mocks.evaluation.EXPECT().GetEvaluation(tester.Ctx(), types.EvaluationGetReq{
 		Username: "u",
@@ -73,7 +73,7 @@ func TestEvaluationHandler_Delete(t *testing.T) {
 	tester := NewEvaluationTester(t).WithHandleFunc(func(h *EvaluationHandler) gin.HandlerFunc {
 		return h.DeleteEvaluation
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.mocks.evaluation.EXPECT().DeleteEvaluation(tester.Ctx(), types.EvaluationGetReq{
 		Username: "u",

@@ -84,7 +84,7 @@ func TestCollectionHandler_Create(t *testing.T) {
 	tester := NewCollectionTester(t).WithHandleFunc(func(h *CollectionHandler) gin.HandlerFunc {
 		return h.Create
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), &types.CreateCollectionReq{}).Return(true, nil)
 	tester.mocks.collection.EXPECT().CreateCollection(tester.Ctx(), types.CreateCollectionReq{
@@ -130,7 +130,7 @@ func TestCollectionHandler_DeleteCollection(t *testing.T) {
 	tester := NewCollectionTester(t).WithHandleFunc(func(h *CollectionHandler) gin.HandlerFunc {
 		return h.DeleteCollection
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.mocks.collection.EXPECT().DeleteCollection(
 		tester.Ctx(), int64(1), "u",
@@ -145,7 +145,7 @@ func TestCollectionHandler_AddRepoToCollection(t *testing.T) {
 	tester := NewCollectionTester(t).WithHandleFunc(func(h *CollectionHandler) gin.HandlerFunc {
 		return h.AddRepoToCollection
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.mocks.collection.EXPECT().AddReposToCollection(tester.Ctx(), types.UpdateCollectionReposReq{
 		Username: "u",
@@ -161,7 +161,7 @@ func TestCollectionHandler_RemoveRepoFromCollection(t *testing.T) {
 	tester := NewCollectionTester(t).WithHandleFunc(func(h *CollectionHandler) gin.HandlerFunc {
 		return h.RemoveRepoFromCollection
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.mocks.collection.EXPECT().RemoveReposFromCollection(tester.Ctx(), types.UpdateCollectionReposReq{
 		Username: "u",

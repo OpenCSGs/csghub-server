@@ -421,7 +421,7 @@ func TestUserHandler_GetEvaluations(t *testing.T) {
 	tester := NewUserTester(t).WithHandleFunc(func(h *UserHandler) gin.HandlerFunc {
 		return h.GetEvaluations
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.mocks.user.EXPECT().Evaluations(tester.Ctx(), &types.UserEvaluationReq{
 		CurrentUser: "u",
