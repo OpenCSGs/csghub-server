@@ -522,10 +522,6 @@ func (h *RepoHandler) Tags(ctx *gin.Context) {
 // @Router       /{repo_type}/{namespace}/{name}/tags/{category} [post]
 func (h *RepoHandler) UpdateTags(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Failed update tags", "error", err)
@@ -1109,10 +1105,6 @@ func (h *RepoHandler) CommitWithDiff(ctx *gin.Context) {
 func (h *RepoHandler) CreateMirror(ctx *gin.Context) {
 	var mirrorReq types.CreateMirrorReq
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -1159,10 +1151,6 @@ func (h *RepoHandler) CreateMirror(ctx *gin.Context) {
 // @Router       /{repo_type}/{namespace}/{name}/mirror_from_saas [post]
 func (h *RepoHandler) MirrorFromSaas(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -1200,10 +1188,6 @@ func (h *RepoHandler) MirrorFromSaas(ctx *gin.Context) {
 func (h *RepoHandler) GetMirror(ctx *gin.Context) {
 	var mirrorReq types.GetMirrorReq
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -1240,10 +1224,6 @@ func (h *RepoHandler) GetMirror(ctx *gin.Context) {
 func (h *RepoHandler) UpdateMirror(ctx *gin.Context) {
 	var mirrorReq types.UpdateMirrorReq
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -1291,10 +1271,6 @@ func (h *RepoHandler) UpdateMirror(ctx *gin.Context) {
 func (h *RepoHandler) DeleteMirror(ctx *gin.Context) {
 	var mirrorReq types.DeleteMirrorReq
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -1383,10 +1359,6 @@ func (h *RepoHandler) RuntimeFrameworkList(ctx *gin.Context) {
 // @Router       /runtime_framework [post]
 func (h *RepoHandler) RuntimeFrameworkCreate(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	var req types.RuntimeFrameworkReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -1426,10 +1398,6 @@ func (h *RepoHandler) RuntimeFrameworkCreate(ctx *gin.Context) {
 // @Router       /runtime_framework/{id} [put]
 func (h *RepoHandler) RuntimeFrameworkUpdate(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	var req types.RuntimeFrameworkReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -1486,10 +1454,6 @@ func (h *RepoHandler) RuntimeFrameworkDelete(ctx *gin.Context) {
 	}
 
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 
 	err = h.c.DeleteRuntimeFramework(ctx.Request.Context(), currentUser, id)
 	if err != nil {
@@ -1521,10 +1485,6 @@ func (h *RepoHandler) RuntimeFrameworkDelete(ctx *gin.Context) {
 // @Router       /{repo_type}/{namespace}/{name}/run [get]
 func (h *RepoHandler) DeployList(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -1561,10 +1521,6 @@ func (h *RepoHandler) DeployList(ctx *gin.Context) {
 // @Router       /{repo_type}/{namespace}/{name}/run/{id} [get]
 func (h *RepoHandler) DeployDetail(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -1637,10 +1593,6 @@ func (h *RepoHandler) DeployInstanceLogs(ctx *gin.Context) {
 	}
 
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	repoType := common.RepoTypeFromContext(ctx)
 	deployID, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
@@ -1763,10 +1715,6 @@ func (h *RepoHandler) DeployStatus(ctx *gin.Context) {
 	}
 
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
@@ -1864,10 +1812,6 @@ func (h *RepoHandler) SyncMirror(ctx *gin.Context) {
 		return
 	}
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	err = h.c.SyncMirror(ctx.Request.Context(), repoType, namespace, name, currentUser)
 	if err != nil {
 		if errors.Is(err, errorx.ErrForbidden) {
@@ -1932,10 +1876,6 @@ func (h *RepoHandler) testStatus(ctx *gin.Context) {
 // @Router       /{repo_type}/{namespace}/{name}/run/{id} [put]
 func (h *RepoHandler) DeployUpdate(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
@@ -2022,11 +1962,6 @@ func (h *RepoHandler) DeployUpdate(ctx *gin.Context) {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /models/runtime_framework [get]
 func (h *RepoHandler) RuntimeFrameworkListWithType(ctx *gin.Context) {
-	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	deployTypeStr := ctx.Query("deploy_type")
 	if deployTypeStr == "" {
 		// backward compatibility for inferences
@@ -2072,10 +2007,6 @@ func (h *RepoHandler) RuntimeFrameworkListWithType(ctx *gin.Context) {
 // @Router       /models/{namespace}/{name}/serverless/{id} [get]
 func (h *RepoHandler) ServerlessDetail(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -2143,10 +2074,6 @@ func (h *RepoHandler) ServerlessLogs(ctx *gin.Context) {
 	}
 
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	repoType := common.RepoTypeFromContext(ctx)
 	deployID, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
@@ -2234,10 +2161,6 @@ func (h *RepoHandler) ServerlessStatus(ctx *gin.Context) {
 	}
 
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
@@ -2328,10 +2251,6 @@ func (h *RepoHandler) ServerlessStatus(ctx *gin.Context) {
 // @Router       /models/{namespace}/{name}/serverless/{id} [put]
 func (h *RepoHandler) ServerlessUpdate(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {

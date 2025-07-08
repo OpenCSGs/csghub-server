@@ -53,7 +53,7 @@ func TestRepoHandler_CreateFile(t *testing.T) {
 	tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
 		return rp.CreateFile
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.mocks.repo.EXPECT().CreateFile(tester.Ctx(), &types.CreateFileReq{
 		Message:     "foo",
@@ -82,7 +82,7 @@ func TestRepoHandler_UpdateFile(t *testing.T) {
 	tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
 		return rp.UpdateFile
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.mocks.repo.EXPECT().UpdateFile(tester.Ctx(), &types.UpdateFileReq{
 		Message:     "foo",
@@ -332,7 +332,7 @@ func TestRepoHandler_UpdateTags(t *testing.T) {
 	tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
 		return rp.UpdateTags
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.mocks.repo.EXPECT().UpdateTags(
 		tester.Ctx(), "u", "r", types.ModelRepo,
@@ -432,7 +432,7 @@ func TestRepoHandler_UploadFile(t *testing.T) {
 	tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
 		return rp.UploadFile
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	bodyBuffer := new(bytes.Buffer)
 	mw := multipart.NewWriter(bodyBuffer)
@@ -622,7 +622,7 @@ func TestRepoHandler_CreateMirror(t *testing.T) {
 		return rp.CreateMirror
 	})
 
-	tester.RequireUser(t)
+	tester.WithUser()
 	tester.WithKV("repo_type", types.ModelRepo)
 	tester.WithBody(t, &types.CreateMirrorReq{
 		SourceUrl:      "https://foo.com",
@@ -648,7 +648,7 @@ func TestRepoHandler_MirrorFromSaas(t *testing.T) {
 		tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
 			return rp.MirrorFromSaas
 		})
-		tester.RequireUser(t)
+		tester.WithUser()
 
 		tester.WithParam("namespace", types.OpenCSGPrefix+"repo")
 		tester.WithKV("repo_type", types.ModelRepo)
@@ -664,7 +664,7 @@ func TestRepoHandler_MirrorFromSaas(t *testing.T) {
 		tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
 			return rp.MirrorFromSaas
 		})
-		tester.RequireUser(t)
+		tester.WithUser()
 
 		tester.WithKV("repo_type", types.ModelRepo)
 		tester.Execute()
@@ -676,7 +676,7 @@ func TestRepoHandler_GetMirror(t *testing.T) {
 	tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
 		return rp.GetMirror
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.WithKV("repo_type", types.ModelRepo)
 	tester.mocks.repo.EXPECT().GetMirror(
@@ -696,7 +696,7 @@ func TestRepoHandler_UpdateMirror(t *testing.T) {
 	tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
 		return rp.UpdateMirror
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.WithKV("repo_type", types.ModelRepo)
 	tester.WithBody(t, &types.UpdateMirrorReq{
@@ -724,7 +724,7 @@ func TestRepoHandler_DeleteMirror(t *testing.T) {
 		return rp.DeleteMirror
 	})
 
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.WithKV("repo_type", types.ModelRepo)
 	tester.mocks.repo.EXPECT().DeleteMirror(
@@ -809,7 +809,7 @@ func TestRepoHandler_DeployList(t *testing.T) {
 	tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
 		return rp.DeployList
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.WithKV("repo_type", types.ModelRepo)
 	tester.mocks.repo.EXPECT().ListDeploy(
@@ -824,7 +824,7 @@ func TestRepoHandler_DeployDetail(t *testing.T) {
 	tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
 		return rp.DeployDetail
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.WithKV("repo_type", types.ModelRepo)
 	tester.WithParam("id", "1")
@@ -847,7 +847,7 @@ func TestRepoHandler_DeployInstanceLogs(t *testing.T) {
 	tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
 		return rp.DeployInstanceLogs
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.WithKV("repo_type", types.ModelRepo)
 	tester.WithParam("id", "1")
@@ -892,7 +892,7 @@ func TestRepoHandler_DeployStatus(t *testing.T) {
 		return rp.DeployStatus
 	})
 	tester.handler.deployStatusCheckInterval = 0
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.WithKV("repo_type", types.ModelRepo)
 	tester.WithParam("id", "1")
@@ -938,7 +938,7 @@ func TestRepoHandler_SyncMirror(t *testing.T) {
 	tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
 		return rp.SyncMirror
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.WithKV("repo_type", types.ModelRepo)
 	tester.WithParam("id", "1")
@@ -956,7 +956,7 @@ func TestRepoHandler_DeployUpdate(t *testing.T) {
 		tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
 			return rp.DeployUpdate
 		})
-		tester.RequireUser(t)
+		tester.WithUser()
 
 		tester.WithKV("repo_type", types.ModelRepo)
 		tester.WithParam("id", "1")
@@ -972,7 +972,7 @@ func TestRepoHandler_DeployUpdate(t *testing.T) {
 		tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
 			return rp.DeployUpdate
 		})
-		tester.RequireUser(t)
+		tester.WithUser()
 
 		tester.WithKV("repo_type", types.ModelRepo)
 		tester.WithParam("id", "1")
@@ -1001,7 +1001,7 @@ func TestRepoHandler_RuntimeFrameworkListWithType(t *testing.T) {
 	tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
 		return rp.RuntimeFrameworkListWithType
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.WithKV("repo_type", types.ModelRepo)
 	tester.mocks.repo.EXPECT().ListRuntimeFrameworkWithType(
@@ -1018,7 +1018,7 @@ func TestRepoHandler_ServerlessDetail(t *testing.T) {
 	tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
 		return rp.ServerlessDetail
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.WithParam("id", "1")
 	tester.mocks.repo.EXPECT().DeployDetail(
@@ -1043,7 +1043,7 @@ func TestRepoHandler_ServerlessLogs(t *testing.T) {
 		return rp.ServerlessLogs
 	})
 
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.WithKV("repo_type", types.ModelRepo)
 	tester.WithParam("id", "1")
@@ -1088,7 +1088,7 @@ func TestRepoHandler_ServerlessStatus(t *testing.T) {
 		return rp.ServerlessStatus
 	})
 	tester.handler.deployStatusCheckInterval = 0
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.WithKV("repo_type", types.ModelRepo)
 	tester.WithParam("id", "1")
@@ -1135,7 +1135,7 @@ func TestRepoHandler_ServelessUpdate(t *testing.T) {
 	tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
 		return rp.ServerlessUpdate
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.WithKV("repo_type", types.ModelRepo)
 	tester.WithParam("id", "1")

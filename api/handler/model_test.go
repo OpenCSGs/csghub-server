@@ -93,7 +93,7 @@ func TestModelHandler_Create(t *testing.T) {
 	tester := NewModelTester(t).WithHandleFunc(func(h *ModelHandler) gin.HandlerFunc {
 		return h.Create
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	req := &types.CreateModelReq{CreateRepoReq: types.CreateRepoReq{Username: "u"}}
 	tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), req).Return(true, nil)
@@ -107,7 +107,7 @@ func TestModelHandler_Update(t *testing.T) {
 	tester := NewModelTester(t).WithHandleFunc(func(h *ModelHandler) gin.HandlerFunc {
 		return h.Update
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	req := &types.UpdateModelReq{UpdateRepoReq: types.UpdateRepoReq{}}
 	tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), req).Return(true, nil)
@@ -127,7 +127,7 @@ func TestModelHandler_Delete(t *testing.T) {
 	tester := NewModelTester(t).WithHandleFunc(func(h *ModelHandler) gin.HandlerFunc {
 		return h.Delete
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.mocks.model.EXPECT().Delete(tester.Ctx(), "u", "r", "u").Return(nil)
 	tester.Execute()
@@ -183,7 +183,7 @@ func TestModelHandler_SetRelations(t *testing.T) {
 	tester := NewModelTester(t).WithHandleFunc(func(h *ModelHandler) gin.HandlerFunc {
 		return h.SetRelations
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	req := &types.RelationDatasets{
 		Namespace:   "u",
@@ -200,7 +200,7 @@ func TestModelHandler_AddDatasetRelation(t *testing.T) {
 	tester := NewModelTester(t).WithHandleFunc(func(h *ModelHandler) gin.HandlerFunc {
 		return h.AddDatasetRelation
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	req := &types.RelationDataset{
 		Namespace:   "u",
@@ -217,7 +217,7 @@ func TestModelHandler_DelDatasetRelation(t *testing.T) {
 	tester := NewModelTester(t).WithHandleFunc(func(h *ModelHandler) gin.HandlerFunc {
 		return h.DelDatasetRelation
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	req := &types.RelationDataset{
 		Namespace:   "u",
@@ -234,7 +234,7 @@ func TestModelHandler_DeployDedicated(t *testing.T) {
 	tester := NewModelTester(t).WithHandleFunc(func(h *ModelHandler) gin.HandlerFunc {
 		return h.DeployDedicated
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.mocks.repo.EXPECT().AllowReadAccess(tester.Ctx(), types.ModelRepo, "u", "r", "u").Return(true, nil)
 	tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), &types.ModelRunReq{
@@ -258,7 +258,7 @@ func TestModelHandler_FinetuneCreate(t *testing.T) {
 	tester := NewModelTester(t).WithHandleFunc(func(h *ModelHandler) gin.HandlerFunc {
 		return h.FinetuneCreate
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.mocks.repo.EXPECT().AllowAdminAccess(tester.Ctx(), types.ModelRepo, "u", "r", "u").Return(true, nil)
 
@@ -279,7 +279,7 @@ func TestModelHandler_DeployDelete(t *testing.T) {
 	tester := NewModelTester(t).WithHandleFunc(func(h *ModelHandler) gin.HandlerFunc {
 		return h.DeployDelete
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.mocks.repo.EXPECT().DeleteDeploy(tester.Ctx(), types.DeployActReq{
 		RepoType:    types.ModelRepo,
@@ -299,7 +299,7 @@ func TestModelHandler_FinetuneDelete(t *testing.T) {
 	tester := NewModelTester(t).WithHandleFunc(func(h *ModelHandler) gin.HandlerFunc {
 		return h.FinetuneDelete
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.mocks.repo.EXPECT().DeleteDeploy(tester.Ctx(), types.DeployActReq{
 		RepoType:    types.ModelRepo,
@@ -319,7 +319,7 @@ func TestModelHandler_DeployStop(t *testing.T) {
 	tester := NewModelTester(t).WithHandleFunc(func(h *ModelHandler) gin.HandlerFunc {
 		return h.DeployStop
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.mocks.repo.EXPECT().DeployStop(tester.Ctx(), types.DeployActReq{
 		RepoType:    types.ModelRepo,
@@ -339,7 +339,7 @@ func TestModelHandler_DeployStart(t *testing.T) {
 	tester := NewModelTester(t).WithHandleFunc(func(h *ModelHandler) gin.HandlerFunc {
 		return h.DeployStart
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.mocks.repo.EXPECT().DeployStart(tester.Ctx(), types.DeployActReq{
 		RepoType:    types.ModelRepo,
@@ -359,7 +359,7 @@ func TestModelHandler_FinetuneStop(t *testing.T) {
 	tester := NewModelTester(t).WithHandleFunc(func(h *ModelHandler) gin.HandlerFunc {
 		return h.FinetuneStop
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.mocks.repo.EXPECT().DeployStop(tester.Ctx(), types.DeployActReq{
 		RepoType:    types.ModelRepo,
@@ -379,7 +379,7 @@ func TestModelHandler_FinetuneStart(t *testing.T) {
 	tester := NewModelTester(t).WithHandleFunc(func(h *ModelHandler) gin.HandlerFunc {
 		return h.FinetuneStart
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.mocks.repo.EXPECT().DeployStart(tester.Ctx(), types.DeployActReq{
 		RepoType:    types.ModelRepo,
@@ -399,7 +399,7 @@ func TestModelHandler_ListByRuntimeFrameworkID(t *testing.T) {
 	tester := NewModelTester(t).WithHandleFunc(func(h *ModelHandler) gin.HandlerFunc {
 		return h.ListByRuntimeFrameworkID
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.WithQuery("deploy_type", "").AddPagination(1, 10).WithParam("id", "1")
 	tester.mocks.model.EXPECT().ListModelsByRuntimeFrameworkID(
@@ -416,7 +416,7 @@ func TestModelHandler_ListAllRuntimeFramework(t *testing.T) {
 	tester := NewModelTester(t).WithHandleFunc(func(h *ModelHandler) gin.HandlerFunc {
 		return h.ListAllRuntimeFramework
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.mocks.model.EXPECT().ListAllByRuntimeFramework(
 		tester.Ctx(), "u",
@@ -461,7 +461,7 @@ func TestModelHandler_ListModelsOfRuntimeFrameworks(t *testing.T) {
 	tester := NewModelTester(t).WithHandleFunc(func(h *ModelHandler) gin.HandlerFunc {
 		return h.ListModelsOfRuntimeFrameworks
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.WithQuery("deploy_type", "").AddPagination(1, 10).WithParam("id", "1")
 	tester.mocks.model.EXPECT().ListModelsOfRuntimeFrameworks(
@@ -479,7 +479,7 @@ func TestModelHandler_DeployServerless(t *testing.T) {
 	tester := NewModelTester(t).WithHandleFunc(func(h *ModelHandler) gin.HandlerFunc {
 		return h.DeployServerless
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.mocks.model.EXPECT().Deploy(tester.Ctx(), types.DeployActReq{
 		Namespace:   "u",
@@ -497,7 +497,7 @@ func TestModelHandler_ServerlessStop(t *testing.T) {
 	tester := NewModelTester(t).WithHandleFunc(func(h *ModelHandler) gin.HandlerFunc {
 		return h.ServerlessStop
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.mocks.repo.EXPECT().DeployStop(tester.Ctx(), types.DeployActReq{
 		RepoType:    types.ModelRepo,
@@ -517,7 +517,7 @@ func TestModelHandler_ServerlessStart(t *testing.T) {
 	tester := NewModelTester(t).WithHandleFunc(func(h *ModelHandler) gin.HandlerFunc {
 		return h.ServerlessStart
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.mocks.repo.EXPECT().DeployStart(tester.Ctx(), types.DeployActReq{
 		RepoType:    types.ModelRepo,

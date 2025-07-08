@@ -121,10 +121,6 @@ func (h *ModelHandler) Index(ctx *gin.Context) {
 // @Router       /models [post]
 func (h *ModelHandler) Create(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	var req *types.CreateModelReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -171,10 +167,6 @@ func (h *ModelHandler) Create(ctx *gin.Context) {
 // @Router       /models/{namespace}/{name} [put]
 func (h *ModelHandler) Update(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	var req *types.UpdateModelReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -230,10 +222,6 @@ func (h *ModelHandler) Update(ctx *gin.Context) {
 // @Router       /models/{namespace}/{name} [delete]
 func (h *ModelHandler) Delete(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -374,10 +362,6 @@ func (h *ModelHandler) Relations(ctx *gin.Context) {
 // @Router       /models/{namespace}/{name}/relations [put]
 func (h *ModelHandler) SetRelations(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -425,10 +409,6 @@ func (h *ModelHandler) SetRelations(ctx *gin.Context) {
 // @Router       /models/{namespace}/{name}/relations/dataset [post]
 func (h *ModelHandler) AddDatasetRelation(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -476,10 +456,6 @@ func (h *ModelHandler) AddDatasetRelation(ctx *gin.Context) {
 // @Router       /models/{namespace}/{name}/relations/dataset [delete]
 func (h *ModelHandler) DelDatasetRelation(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -592,11 +568,6 @@ func convertFilePathFromRoute(path string) string {
 // @Router       /models/{namespace}/{name}/run [post]
 func (h *ModelHandler) DeployDedicated(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
-
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("failed to get namespace from context", "error", err)
@@ -677,10 +648,6 @@ func (h *ModelHandler) DeployDedicated(ctx *gin.Context) {
 // @Router       /models/{namespace}/{name}/finetune [post]
 func (h *ModelHandler) FinetuneCreate(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
@@ -764,10 +731,6 @@ func (h *ModelHandler) DeployDelete(ctx *gin.Context) {
 		err error
 	)
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -823,10 +786,6 @@ func (h *ModelHandler) FinetuneDelete(ctx *gin.Context) {
 		err error
 	)
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -883,10 +842,6 @@ func (h *ModelHandler) DeployStop(ctx *gin.Context) {
 		err error
 	)
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -942,10 +897,6 @@ func (h *ModelHandler) DeployStart(ctx *gin.Context) {
 		err error
 	)
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -1000,10 +951,6 @@ func (h *ModelHandler) DeployStart(ctx *gin.Context) {
 // @Router       /runtime_framework/{id}/models [get]
 func (h *ModelHandler) ListByRuntimeFrameworkID(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	deployTypeStr := ctx.Query("deploy_type")
 	if deployTypeStr == "" {
 		// backward compatibility for inferences
@@ -1062,10 +1009,6 @@ func (h *ModelHandler) FinetuneStop(ctx *gin.Context) {
 		err error
 	)
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -1121,10 +1064,6 @@ func (h *ModelHandler) FinetuneStart(ctx *gin.Context) {
 		err error
 	)
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -1173,10 +1112,6 @@ func (h *ModelHandler) FinetuneStart(ctx *gin.Context) {
 // @Router       /runtime_framework [get]
 func (h *ModelHandler) ListAllRuntimeFramework(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 
 	runtimes, err := h.model.ListAllByRuntimeFramework(ctx.Request.Context(), currentUser)
 	if err != nil {
@@ -1211,12 +1146,6 @@ func (h *ModelHandler) UpdateModelRuntimeFrameworks(ctx *gin.Context) {
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
-		return
-	}
-
-	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 
@@ -1278,12 +1207,6 @@ func (h *ModelHandler) DeleteModelRuntimeFrameworks(ctx *gin.Context) {
 		return
 	}
 
-	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
-
 	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -1339,10 +1262,6 @@ func (h *ModelHandler) DeleteModelRuntimeFrameworks(ctx *gin.Context) {
 func (h *ModelHandler) ListModelsOfRuntimeFrameworks(ctx *gin.Context) {
 	filter := new(types.RepoFilter)
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	filter = getFilterFromContext(ctx, filter)
 	deployTypeStr := ctx.Query("deploy_type")
 	if deployTypeStr == "" {
@@ -1391,10 +1310,6 @@ func (h *ModelHandler) ListModelsOfRuntimeFrameworks(ctx *gin.Context) {
 // @Router       /models/{namespace}/{name}/serverless [post]
 func (h *ModelHandler) DeployServerless(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
@@ -1467,10 +1382,6 @@ func (h *ModelHandler) ServerlessStart(ctx *gin.Context) {
 		err error
 	)
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -1529,10 +1440,6 @@ func (h *ModelHandler) ServerlessStop(ctx *gin.Context) {
 		err error
 	)
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)

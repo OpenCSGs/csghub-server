@@ -156,10 +156,6 @@ func (h *SpaceHandler) Show(ctx *gin.Context) {
 // @Router       /spaces [post]
 func (h *SpaceHandler) Create(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	var req types.CreateSpaceReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -200,10 +196,6 @@ func (h *SpaceHandler) Create(ctx *gin.Context) {
 // @Router       /spaces/{namespace}/{name} [put]
 func (h *SpaceHandler) Update(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	var req *types.UpdateSpaceReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -254,10 +246,6 @@ func (h *SpaceHandler) Update(ctx *gin.Context) {
 // @Router       /spaces/{namespace}/{name} [delete]
 func (h *SpaceHandler) Delete(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -289,10 +277,6 @@ func (h *SpaceHandler) Delete(ctx *gin.Context) {
 // @Router       /spaces/{namespace}/{name}/run [post]
 func (h *SpaceHandler) Run(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("failed to get namespace from context", "error", err)
@@ -367,10 +351,6 @@ func (h *SpaceHandler) Wakeup(ctx *gin.Context) {
 // @Router       /spaces/{namespace}/{name}/stop [post]
 func (h *SpaceHandler) Stop(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("failed to get namespace from context", "error", err)

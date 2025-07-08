@@ -551,7 +551,7 @@ func createModelRoutes(config *config.Config,
 		// runtime framework
 		modelsGroup.GET("/:namespace/:name/runtime_framework", repoCommonHandler.RuntimeFrameworkList)
 		// runtime framework for both finetune and inference
-		modelsGroup.GET("/runtime_framework", repoCommonHandler.RuntimeFrameworkListWithType)
+		modelsGroup.GET("/runtime_framework", middlewareCollection.Auth.NeedLogin, repoCommonHandler.RuntimeFrameworkListWithType)
 	}
 	modelsDeployGroup := modelsGroup.Group("")
 	modelsDeployGroup.Use(middlewareCollection.Auth.NeedLogin)

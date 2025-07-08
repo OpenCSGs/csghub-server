@@ -42,7 +42,7 @@ func TestCodeHandler_Create(t *testing.T) {
 	tester := NewCodeTester(t).WithHandleFunc(func(cp *CodeHandler) gin.HandlerFunc {
 		return cp.Create
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	req := &types.CreateCodeReq{CreateRepoReq: types.CreateRepoReq{Name: "c"}}
 	tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), req).Return(true, nil)
@@ -104,7 +104,7 @@ func TestCodeHandler_Update(t *testing.T) {
 	tester := NewCodeTester(t).WithHandleFunc(func(cp *CodeHandler) gin.HandlerFunc {
 		return cp.Update
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	req := &types.UpdateCodeReq{UpdateRepoReq: types.UpdateRepoReq{Nickname: tea.String("nc")}}
 	tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), req).Return(true, nil)
@@ -123,7 +123,7 @@ func TestCodeHandler_Delete(t *testing.T) {
 	tester := NewCodeTester(t).WithHandleFunc(func(cp *CodeHandler) gin.HandlerFunc {
 		return cp.Delete
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.mocks.code.EXPECT().Delete(tester.Ctx(), "u", "r", "u").Return(nil)
 	tester.Execute()
