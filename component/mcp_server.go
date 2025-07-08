@@ -404,7 +404,7 @@ func (m *mcpServerComponentImpl) Index(ctx context.Context, filter *types.RepoFi
 	)
 	repos, total, err := m.repoComponent.PublicToUser(ctx, types.MCPServerRepo, filter.Username, filter, per, page)
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to get public mcp repos,error:%w", err)
+		return nil, 0, fmt.Errorf("failed to get public mcp repos error:%w", err)
 	}
 	var repoIDs []int64
 	for _, repo := range repos {
@@ -631,11 +631,6 @@ func (m *mcpServerComponentImpl) Deploy(ctx context.Context, req *types.DeployMC
 		return nil, fmt.Errorf("failed to verify resource %s is available for MCP server deployment, %w", resource.Name, err)
 	}
 
-	valid, err := common.IsValidName(req.Name)
-	if !valid {
-		return nil, fmt.Errorf("repo name is invalid, error: %w", err)
-	}
-
 	namespace, err := m.namespaceStore.FindByPath(ctx, req.Namespace)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find namespace %s, error: %w", req.Namespace, err)
@@ -647,7 +642,7 @@ func (m *mcpServerComponentImpl) Deploy(ctx context.Context, req *types.DeployMC
 	}
 
 	if user.Email == "" {
-		return nil, fmt.Errorf("please set your email first")
+		return nil, errorx.ErrNoEmail
 	}
 
 	dbUser := database.User{}
