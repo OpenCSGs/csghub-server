@@ -579,19 +579,25 @@ func createModelRoutes(config *config.Config,
 		// delete a finetune instance
 		modelsGroup.DELETE("/:namespace/:name/finetune/:id", middleware.RepoType(types.ModelRepo), modelHandler.FinetuneDelete)
 
-		// finetune monitor
-		modelsGroup.GET("/:namespace/:name/finetune/:id/cpu/:instance/usage",
-			middlewareCollection.Auth.NeedLogin, middleware.RepoType(types.ModelRepo), monitorHandler.CPUUsage)
-		modelsGroup.GET("/:namespace/:name/finetune/:id/memory/:instance/usage",
-			middlewareCollection.Auth.NeedLogin, middleware.RepoType(types.ModelRepo), monitorHandler.MemoryUsage)
-		modelsGroup.GET("/:namespace/:name/finetune/:id/request/:instance/count",
-			middlewareCollection.Auth.NeedLogin, middleware.RepoType(types.ModelRepo), monitorHandler.RequestCount)
-		modelsGroup.GET("/:namespace/:name/finetune/:id/request/:instance/latency",
-			middlewareCollection.Auth.NeedLogin, middleware.RepoType(types.ModelRepo), monitorHandler.RequestLatency)
+		modelsMonitorGroup := modelsGroup.Group("")
+		modelsMonitorGroup.Use(middlewareCollection.Auth.NeedLogin)
+		{
+			// inference monitor
+			modelsMonitorGroup.GET("/:namespace/:name/run/:id/cpu/:instance/usage", monitorHandler.CPUUsage)
+			modelsMonitorGroup.GET("/:namespace/:name/run/:id/memory/:instance/usage", monitorHandler.MemoryUsage)
+			modelsMonitorGroup.GET("/:namespace/:name/run/:id/request/:instance/count", monitorHandler.RequestCount)
+			modelsMonitorGroup.GET("/:namespace/:name/run/:id/request/:instance/latency", monitorHandler.RequestLatency)
 
-		// evaluation monitor
-		modelsGroup.GET("/evaluations/:id/cpu/:instance/usage", middlewareCollection.Auth.NeedLogin, monitorHandler.CPUUsageEvaluation)
-		modelsGroup.GET("/evaluations/:id/memory/:instance/usage", middlewareCollection.Auth.NeedLogin, monitorHandler.MemoryUsageEvaluation)
+			// finetune monitor
+			modelsMonitorGroup.GET("/:namespace/:name/finetune/:id/cpu/:instance/usage", monitorHandler.CPUUsage)
+			modelsMonitorGroup.GET("/:namespace/:name/finetune/:id/memory/:instance/usage", monitorHandler.MemoryUsage)
+			modelsMonitorGroup.GET("/:namespace/:name/finetune/:id/request/:instance/count", monitorHandler.RequestCount)
+			modelsMonitorGroup.GET("/:namespace/:name/finetune/:id/request/:instance/latency", monitorHandler.RequestLatency)
+
+			// evaluation monitor
+			modelsMonitorGroup.GET("/evaluations/:id/cpu/:instance/usage", monitorHandler.CPUUsageEvaluation)
+			modelsMonitorGroup.GET("/evaluations/:id/memory/:instance/usage", monitorHandler.MemoryUsageEvaluation)
+		}
 
 		// deploy model as serverless
 		modelsGroup.GET("/:namespace/:name/serverless", middleware.RepoType(types.ModelRepo), modelHandler.GetDeployServerless)
