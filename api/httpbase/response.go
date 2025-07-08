@@ -86,7 +86,7 @@ func BadRequestWithExt(c *gin.Context, err error) {
 	if ok {
 		customErr := err.(errorx.CustomError)
 		c.PureJSON(http.StatusBadRequest, R{
-			Msg:     customErr.Error(),
+			Msg:     customErr.Code(),
 			Context: customErr.Context(),
 		})
 		return
@@ -113,7 +113,7 @@ func ServerError(c *gin.Context, err error) {
 	if ok {
 		customErr := err.(errorx.CustomError)
 		c.PureJSON(http.StatusInternalServerError, R{
-			Msg:     customErr.Error(),
+			Msg:     customErr.Code(),
 			Context: customErr.Context(),
 		})
 		return
@@ -141,7 +141,7 @@ func UnauthorizedError(c *gin.Context, err error) {
 	if ok {
 		customErr := err.(errorx.CustomError)
 		c.PureJSON(http.StatusUnauthorized, R{
-			Msg:     customErr.Error(),
+			Msg:     customErr.Code(),
 			Context: customErr.Context(),
 		})
 		return
@@ -164,7 +164,7 @@ func ForbiddenError(c *gin.Context, err error) {
 	if ok {
 		customErr := err.(errorx.CustomError)
 		c.PureJSON(http.StatusForbidden, R{
-			Msg:     customErr.Error(),
+			Msg:     customErr.Code(),
 			Context: customErr.Context(),
 		})
 		return
@@ -191,7 +191,7 @@ func NotFoundError(c *gin.Context, err error) {
 	if ok {
 		customErr := err.(errorx.CustomError)
 		c.PureJSON(http.StatusNotFound, R{
-			Msg:     customErr.Error(),
+			Msg:     customErr.Code(),
 			Context: customErr.Context(),
 		})
 		return
