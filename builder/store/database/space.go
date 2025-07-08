@@ -3,9 +3,9 @@ package database
 import (
 	"context"
 	"fmt"
-	"log/slog"
 
 	"github.com/uptrace/bun"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -60,7 +60,7 @@ func NewSpaceStoreWithDB(db *DB) SpaceStore {
 func (s *spaceStoreImpl) Create(ctx context.Context, input Space) (*Space, error) {
 	res, err := s.db.Core.NewInsert().Model(&input).Exec(ctx)
 	if err := assertAffectedOneRow(res, err); err != nil {
-		slog.Error("create space in db failed", slog.String("error", err.Error()))
+		err = errorx.HandleDBError(err, nil)
 		return nil, fmt.Errorf("create space in db failed,error:%w", err)
 	}
 
@@ -70,6 +70,7 @@ func (s *spaceStoreImpl) Create(ctx context.Context, input Space) (*Space, error
 
 func (s *spaceStoreImpl) Update(ctx context.Context, input Space) (err error) {
 	_, err = s.db.Core.NewUpdate().Model(&input).WherePK().Exec(ctx)
+	err = errorx.HandleDBError(err, nil)
 	return
 }
 
@@ -81,6 +82,7 @@ func (s *spaceStoreImpl) FindByPath(ctx context.Context, namespace, name string)
 		Relation("Repository.User").
 		Where("repository.path = ? and repository.repository_type = ?", fmt.Sprintf("%s/%s", namespace, name), types.SpaceRepo).
 		Scan(ctx)
+	err = errorx.HandleDBError(err, nil)
 	if err != nil {
 		return nil, fmt.Errorf("select space by path, error: %w", err)
 	}
@@ -91,6 +93,7 @@ func (s *spaceStoreImpl) FindByPath(ctx context.Context, namespace, name string)
 func (s *spaceStoreImpl) Delete(ctx context.Context, input Space) error {
 	res, err := s.db.Operator.Core.NewDelete().Model(&input).WherePK().Exec(ctx)
 	if err := assertAffectedOneRow(res, err); err != nil {
+		err = errorx.HandleDBError(err, nil)
 		return fmt.Errorf("delete space in tx failed,error:%w", err)
 	}
 	return nil
@@ -100,6 +103,7 @@ func (s *spaceStoreImpl) ByID(ctx context.Context, id int64) (*Space, error) {
 	var space Space
 	err := s.db.Core.NewSelect().Model(&space).Relation("Repository").Where("space.id = ?", id).Scan(ctx)
 	if err != nil {
+		err = errorx.HandleDBError(err, nil)
 		return nil, err
 	}
 	return &space, err
@@ -113,6 +117,7 @@ func (s *spaceStoreImpl) ByRepoIDs(ctx context.Context, repoIDs []int64) (spaces
 		Where("repository_id in (?)", bun.In(repoIDs)).
 		Scan(ctx)
 
+	err = errorx.HandleDBError(err, nil)
 	return
 
 }
@@ -120,6 +125,7 @@ func (s *spaceStoreImpl) ByRepoIDs(ctx context.Context, repoIDs []int64) (spaces
 func (s *spaceStoreImpl) ByRepoID(ctx context.Context, repoID int64) (*Space, error) {
 	var space Space
 	err := s.db.Core.NewSelect().Model(&space).Where("repository_id = ?", repoID).Scan(ctx)
+	err = errorx.HandleDBError(err, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find space by id, repository id: %d,error: %w", repoID, err)
 	}
@@ -143,13 +149,12 @@ func (s *spaceStoreImpl) ByUsername(ctx context.Context, req *types.UserSpacesRe
 		Offset((req.Page - 1) * req.PageSize)
 
 	err = query.Scan(ctx)
+	err = errorx.HandleDBError(err, nil)
 	if err != nil {
 		return
 	}
 	total, err = query.Count(ctx)
-	if err != nil {
-		return
-	}
+	err = errorx.HandleDBError(err, nil)
 	return
 }
 
@@ -165,13 +170,12 @@ func (s *spaceStoreImpl) ByUserLikes(ctx context.Context, userID int64, per, pag
 		Offset((page - 1) * per)
 
 	err = query.Scan(ctx)
+	err = errorx.HandleDBError(err, nil)
 	if err != nil {
 		return
 	}
 	total, err = query.Count(ctx)
-	if err != nil {
-		return
-	}
+	err = errorx.HandleDBError(err, nil)
 	return
 }
 
@@ -191,13 +195,12 @@ func (s *spaceStoreImpl) ByOrgPath(ctx context.Context, namespace string, per, p
 		Offset((page - 1) * per)
 
 	err = query.Scan(ctx, &spaces)
+	err = errorx.HandleDBError(err, nil)
 	if err != nil {
 		return
 	}
 	total, err = query.Count(ctx)
-	if err != nil {
-		return
-	}
+	err = errorx.HandleDBError(err, nil)
 	return
 }
 
@@ -209,6 +212,7 @@ func (s *spaceStoreImpl) ListByPath(ctx context.Context, paths []string) ([]Spac
 		Relation("Repository").
 		Where("path IN (?)", bun.In(paths)).
 		Scan(ctx, &spaces)
+	err = errorx.HandleDBError(err, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find space by path,error: %w", err)
 	}
