@@ -6,14 +6,17 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"strings"
+
+	"opencsg.com/csghub-server/common/errorx"
 )
 
 func JsonStrToMap(jsonStr string) (map[string]string, error) {
 	var resMap map[string]string
-	if len(strings.Trim(jsonStr, " ")) == 0 {
+	if len(strings.TrimSpace(jsonStr)) == 0 {
 		return map[string]string{}, nil
 	}
 	err := json.Unmarshal([]byte(jsonStr), &resMap)
+	err = errorx.InternalServerError(err, nil)
 	return resMap, err
 }
 

@@ -1241,7 +1241,7 @@ func (h *ModelHandler) UpdateModelRuntimeFrameworks(ctx *gin.Context) {
 
 	slog.Info("update runtime frameworks models", slog.Any("req", req), slog.Any("runtime framework id", id), slog.Any("deployType", deployType))
 
-	list, err := h.model.SetRuntimeFrameworkModes(ctx.Request.Context(), currentUser, deployType, id, req.Models)
+	list, err := h.model.SetRuntimeFrameworkModes(ctx.Request.Context(), deployType, id, req.Models)
 	if err != nil {
 		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
@@ -1305,7 +1305,7 @@ func (h *ModelHandler) DeleteModelRuntimeFrameworks(ctx *gin.Context) {
 
 	slog.Info("update runtime frameworks models", slog.Any("req", req), slog.Any("runtime framework id", id), slog.Any("deployType", deployType))
 
-	list, err := h.model.DeleteRuntimeFrameworkModes(ctx.Request.Context(), currentUser, deployType, id, req.Models)
+	list, err := h.model.DeleteRuntimeFrameworkModes(ctx.Request.Context(), deployType, id, req.Models)
 	if err != nil {
 		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)

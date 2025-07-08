@@ -3,10 +3,10 @@ package database
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"time"
 
 	"github.com/uptrace/bun"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -58,7 +58,7 @@ func (s *modelStoreImpl) ByRepoIDs(ctx context.Context, repoIDs []int64) (models
 		Relation("Repository").
 		Where("repository_id in (?)", bun.In(repoIDs)).
 		Scan(ctx)
-
+	err = errorx.HandleDBError(err, nil)
 	return
 }
 
@@ -68,6 +68,9 @@ func (s *modelStoreImpl) ByRepoID(ctx context.Context, repoID int64) (*Model, er
 		Model(&m).
 		Where("repository_id = ?", repoID).
 		Scan(ctx)
+	err = errorx.HandleDBError(err, errorx.Ctx().
+		Set("repo_id", repoID),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find model by id, repository id: %d,error: %w", repoID, err)
 	}
@@ -91,13 +94,18 @@ func (s *modelStoreImpl) ByUsername(ctx context.Context, username string, per, p
 		Offset((page - 1) * per)
 
 	err = query.Scan(ctx)
+	err = errorx.HandleDBError(err, errorx.Ctx().
+		Set("username", username).
+		Set("public", onlyPublic),
+	)
 	if err != nil {
 		return
 	}
 	total, err = query.Count(ctx)
-	if err != nil {
-		return
-	}
+	err = errorx.HandleDBError(err, errorx.Ctx().
+		Set("username", username).
+		Set("public", onlyPublic),
+	)
 	return
 }
 
@@ -114,13 +122,16 @@ func (s *modelStoreImpl) UserLikesModels(ctx context.Context, userID int64, per,
 		Offset((page - 1) * per)
 
 	err = query.Scan(ctx)
+	err = errorx.HandleDBError(err, errorx.Ctx().
+		Set("user_id", userID),
+	)
 	if err != nil {
 		return
 	}
 	total, err = query.Count(ctx)
-	if err != nil {
-		return
-	}
+	err = errorx.HandleDBError(err, errorx.Ctx().
+		Set("user_id", userID),
+	)
 	return
 }
 
@@ -140,13 +151,18 @@ func (s *modelStoreImpl) ByOrgPath(ctx context.Context, namespace string, per, p
 		Offset((page - 1) * per)
 
 	err = query.Scan(ctx, &models)
+	err = errorx.HandleDBError(err, errorx.Ctx().
+		Set("namespace", namespace).
+		Set("public", onlyPublic),
+	)
 	if err != nil {
 		return
 	}
 	total, err = query.Count(ctx)
-	if err != nil {
-		return
-	}
+	err = errorx.HandleDBError(err, errorx.Ctx().
+		Set("namespace", namespace).
+		Set("public", onlyPublic),
+	)
 	return
 }
 
@@ -156,9 +172,7 @@ func (s *modelStoreImpl) Count(ctx context.Context) (count int, err error) {
 		Model(&Repository{}).
 		Where("repository_type = ?", types.ModelRepo).
 		Count(ctx)
-	if err != nil {
-		return
-	}
+	err = errorx.HandleDBError(err, nil)
 	return
 }
 
@@ -169,16 +183,14 @@ func (s *modelStoreImpl) PublicCount(ctx context.Context) (count int, err error)
 		Where("repository_type = ?", types.DatasetRepo).
 		Where("private = ?", false).
 		Count(ctx)
-	if err != nil {
-		return
-	}
+	err = errorx.HandleDBError(err, nil)
 	return
 }
 
 func (s *modelStoreImpl) Create(ctx context.Context, input Model) (*Model, error) {
 	res, err := s.db.Core.NewInsert().Model(&input).Exec(ctx, &input)
 	if err := assertAffectedOneRow(res, err); err != nil {
-		slog.Error("create model in db failed", slog.String("error", err.Error()))
+		err = errorx.HandleDBError(err, nil)
 		return nil, fmt.Errorf("create model in db failed,error:%w", err)
 	}
 
@@ -187,7 +199,7 @@ func (s *modelStoreImpl) Create(ctx context.Context, input Model) (*Model, error
 
 func (s *modelStoreImpl) Update(ctx context.Context, input Model) (*Model, error) {
 	_, err := s.db.Core.NewUpdate().Model(&input).WherePK().Exec(ctx)
-
+	err = errorx.HandleDBError(err, nil)
 	return &input, err
 }
 
@@ -202,6 +214,9 @@ func (s *modelStoreImpl) FindByPath(ctx context.Context, namespace string, name 
 		Where("repository.path =?", fmt.Sprintf("%s/%s", namespace, name)).
 		Limit(1).
 		Scan(ctx)
+	err = errorx.HandleDBError(err, errorx.Ctx().
+		Set("path", fmt.Sprintf("%s/%s", namespace, name)),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find model,error: %w", err)
 	}
@@ -212,12 +227,16 @@ func (s *modelStoreImpl) FindByPath(ctx context.Context, namespace string, name 
 			return sq.Where("repository_tag.count > 0")
 		}).
 		Scan(ctx)
+	err = errorx.HandleDBError(err, errorx.Ctx().
+		Set("path", fmt.Sprintf("%s/%s", namespace, name)),
+	)
 	return resModel, err
 }
 
 func (s *modelStoreImpl) Delete(ctx context.Context, input Model) error {
 	res, err := s.db.Operator.Core.NewDelete().Model(&input).WherePK().Exec(ctx)
 	if err := assertAffectedOneRow(res, err); err != nil {
+		err = errorx.HandleDBError(err, nil)
 		return fmt.Errorf("delete model in tx failed,error:%w", err)
 	}
 	return nil
@@ -231,6 +250,7 @@ func (s *modelStoreImpl) ListByPath(ctx context.Context, paths []string) ([]Mode
 		Relation("Repository").
 		Where("repository.path IN (?)", bun.In(paths)).
 		Scan(ctx, &models)
+	err = errorx.HandleDBError(err, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find models by path,error: %w", err)
 	}
@@ -250,6 +270,7 @@ func (s *modelStoreImpl) ListByPath(ctx context.Context, paths []string) ([]Mode
 func (s *modelStoreImpl) ByID(ctx context.Context, id int64) (*Model, error) {
 	var model Model
 	err := s.db.Core.NewSelect().Model(&model).Relation("Repository").Where("model.id = ?", id).Scan(ctx)
+	err = errorx.HandleDBError(err, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -268,7 +289,7 @@ func (s *modelStoreImpl) CreateIfNotExist(ctx context.Context, input Model) (*Mo
 
 	res, err := s.db.Core.NewInsert().Model(&input).Exec(ctx, &input)
 	if err := assertAffectedOneRow(res, err); err != nil {
-		slog.Error("create model in db failed", slog.String("error", err.Error()))
+		err = errorx.HandleDBError(err, nil)
 		return nil, fmt.Errorf("create model in db failed,error:%w", err)
 	}
 
