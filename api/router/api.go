@@ -959,6 +959,10 @@ func createMappingRoutes(
 				hfSpaceAPIGroup.GET("/:namespace/:name/revision/:ref", middleware.RepoMapping(types.SpaceRepo), repoCommonHandler.SDKListFiles)
 				hfSpaceAPIGroup.GET("/:namespace/:name", middleware.RepoMapping(types.SpaceRepo), repoCommonHandler.SDKListFiles)
 			}
+			hfReposAPIGroup := hfAPIGroup.Group("/repos")
+			{
+				hfReposAPIGroup.POST("/create", middlewareCollection.Auth.NeedLogin, repoCommonHandler.CreateRepo)
+			}
 		}
 	}
 }

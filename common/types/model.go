@@ -87,7 +87,7 @@ type CreateRepoReq struct {
 	License       string         `json:"license" example:"MIT"`
 	Readme        string         `json:"readme"`
 	DefaultBranch string         `json:"default_branch" example:"main"`
-	RepoType      RepositoryType `json:"-"`
+	RepoType      RepositoryType `json:"type"`
 	ToolCount     int            `json:"tool_count"`
 	StarCount     int            `json:"star_count"`
 }
@@ -179,6 +179,7 @@ type Model struct {
 	ReportURL               string               `json:"report_url"`
 	MediumRiskCount         int                  `json:"medium_risk_count"`
 	HighRiskCount           int                  `json:"high_risk_count"`
+	URL                     string               `json:"url"`
 	MultiSource
 }
 

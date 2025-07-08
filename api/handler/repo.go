@@ -30,15 +30,79 @@ func NewRepoHandler(config *config.Config) (*RepoHandler, error) {
 	if err != nil {
 		return nil, err
 	}
+	m, err := component.NewModelComponent(config)
+	if err != nil {
+		return nil, err
+	}
+	d, err := component.NewDatasetComponent(config)
+	if err != nil {
+		return nil, err
+	}
 	return &RepoHandler{
 		c:                         uc,
+		m:                         m,
+		d:                         d,
 		deployStatusCheckInterval: 5 * time.Second,
 	}, nil
 }
 
 type RepoHandler struct {
 	c                         component.RepoComponent
+	m                         component.ModelComponent
+	d                         component.DatasetComponent
 	deployStatusCheckInterval time.Duration
+}
+
+// CreateRepo godoc
+// @Security     ApiKey
+// @Summary      Create a new repository, compatible with hf api
+// @Tags         Repository
+// @Accept       json
+// @Produce      json
+// @Param        req body types.CreateRepoReq true  "create repo request"
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /repos/create [post]
+func (h *RepoHandler) CreateRepo(ctx *gin.Context) {
+	userName := httpbase.GetCurrentUser(ctx)
+	var req *types.CreateRepoReq
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	req.Username = userName
+	req.Namespace = userName
+	switch req.RepoType {
+	case types.ModelRepo:
+		modelReq := &types.CreateModelReq{
+			CreateRepoReq: *req,
+		}
+		resp, err := h.m.Create(ctx.Request.Context(), modelReq)
+		if err != nil {
+			slog.Error("Failed to create model repo", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err), slog.Any("req", req))
+			httpbase.ServerError(ctx, err)
+			return
+		}
+		ctx.JSON(http.StatusOK, resp)
+	case types.DatasetRepo:
+		datasetReq := &types.CreateDatasetReq{
+			CreateRepoReq: *req,
+		}
+		resp, err := h.d.Create(ctx.Request.Context(), datasetReq)
+		if err != nil {
+			slog.Error("Failed to create dataset repo", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err), slog.Any("req", req))
+			httpbase.ServerError(ctx, err)
+			return
+		}
+		ctx.JSON(http.StatusOK, resp)
+	default:
+		// Unsupported repo type
+		slog.Error("Unsupported repo type", slog.String("repo_type", string(req.RepoType)))
+		httpbase.BadRequest(ctx, fmt.Sprintf("Unsupported repo type: %s", req.RepoType))
+		return
+	}
 }
 
 // CreateRepoFile godoc
