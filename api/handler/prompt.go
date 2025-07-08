@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"net/http"
 	"slices"
 	"time"
 
@@ -71,21 +70,23 @@ func (h *PromptHandler) Index(ctx *gin.Context) {
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format prompt list", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
+		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 	filter = getFilterFromContext(ctx, filter)
-	if !slices.Contains[[]string](types.Sorts, filter.Sort) {
-		msg := fmt.Sprintf("sort parameter must be one of %v", types.Sorts)
-		slog.Error("Bad request format,", slog.String("error", msg))
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": msg})
+	if !slices.Contains(types.Sorts, filter.Sort) {
+		err = fmt.Errorf("sort parameter must be one of %v", types.Sorts)
+		slog.Error("Bad request format,", slog.String("error", err.Error()))
+		err = errorx.ReqParamInvalid(err, errorx.Ctx().Set("query", "sort_filter"))
+		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 
-	if filter.Source != "" && !slices.Contains[[]string](types.Sources, filter.Source) {
-		msg := fmt.Sprintf("source parameter must be one of %v", types.Sources)
-		slog.Error("Bad request format,", slog.String("error", msg))
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": msg})
+	if filter.Source != "" && !slices.Contains(types.Sources, filter.Source) {
+		err = fmt.Errorf("source parameter must be one of %v", types.Sources)
+		slog.Error("Bad request format,", slog.String("error", err.Error()))
+		err = errorx.ReqParamInvalid(err, errorx.Ctx().Set("query", "source_filter"))
+		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 
@@ -96,11 +97,7 @@ func (h *PromptHandler) Index(ctx *gin.Context) {
 		return
 	}
 
-	respData := gin.H{
-		"data":  prompts,
-		"total": total,
-	}
-	ctx.JSON(http.StatusOK, respData)
+	httpbase.OKWithTotal(ctx, prompts, total)
 }
 
 // ListPrompt    godoc
@@ -121,7 +118,7 @@ func (h *PromptHandler) ListPrompt(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
+		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 
@@ -175,13 +172,13 @@ func (h *PromptHandler) GetPrompt(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
+		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 	filePath := ctx.Param("file_path")
 	if filePath == "" {
-		slog.Error("Bad request format", "error", err)
-		httpbase.BadRequest(ctx, "Bad request format")
+		slog.Error("Bad request format", "error", "file path is required")
+		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(errors.New("file path is required"), nil))
 		return
 	}
 	req := types.PromptReq{
@@ -222,20 +219,20 @@ func (h *PromptHandler) CreatePrompt(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
+		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 
 	var body *types.CreatePromptReq
 	if err := ctx.ShouldBindJSON(&body); err != nil {
 		slog.Error("Bad request prompt format", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
+		httpbase.BadRequestWithExt(ctx, errorx.ReqBodyFormat(err, nil))
 		return
 	}
 	_, err = h.sensitive.CheckRequestV2(ctx.Request.Context(), body)
 	if err != nil {
 		slog.Error("failed to check sensitive request", slog.Any("error", err))
-		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
+		httpbase.ServerError(ctx, fmt.Errorf("sensitive check failed: %w", err))
 		return
 	}
 
@@ -246,6 +243,10 @@ func (h *PromptHandler) CreatePrompt(ctx *gin.Context) {
 	}
 	data, err := h.prompt.CreatePrompt(ctx.Request.Context(), req, body)
 	if err != nil {
+		if errors.Is(err, errorx.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
 		slog.Error("Failed to create prompt file of repo", slog.Any("req", req), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
@@ -277,13 +278,13 @@ func (h *PromptHandler) UpdatePrompt(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
+		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 	filePath := ctx.Param("file_path")
 	if filePath == "" {
-		slog.Error("Bad request file path format", "error", err)
-		httpbase.BadRequest(ctx, "Bad request file path format")
+		slog.Error("Bad request format", "error", "file path is required")
+		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(errors.New("file path is required"), nil))
 		return
 	}
 
@@ -296,7 +297,7 @@ func (h *PromptHandler) UpdatePrompt(ctx *gin.Context) {
 	_, err = h.sensitive.CheckRequestV2(ctx.Request.Context(), body)
 	if err != nil {
 		slog.Error("failed to check sensitive request", slog.Any("error", err))
-		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
+		httpbase.BadRequestWithExt(ctx, errorx.ReqBodyFormat(err, nil))
 		return
 	}
 
@@ -308,6 +309,10 @@ func (h *PromptHandler) UpdatePrompt(ctx *gin.Context) {
 	}
 	data, err := h.prompt.UpdatePrompt(ctx.Request.Context(), req, body)
 	if err != nil {
+		if errors.Is(err, errorx.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
 		slog.Error("Failed to update prompt file of repo", slog.Any("req", req), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
@@ -339,14 +344,14 @@ func (h *PromptHandler) DeletePrompt(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
+		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 
 	filePath := ctx.Param("file_path")
 	if filePath == "" {
-		slog.Error("Bad request file path format", "error", err)
-		httpbase.BadRequest(ctx, "Bad request file path format")
+		slog.Error("Bad request format", "error", "file path is required")
+		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(errors.New("file path is required"), nil))
 		return
 	}
 
@@ -358,6 +363,10 @@ func (h *PromptHandler) DeletePrompt(ctx *gin.Context) {
 	}
 	err = h.prompt.DeletePrompt(ctx.Request.Context(), req)
 	if err != nil {
+		if errors.Is(err, errorx.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
 		slog.Error("Failed to remove prompt file of repo", slog.Any("req", req), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
@@ -382,7 +391,7 @@ func (h *PromptHandler) Relations(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
+		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 	currentUser := httpbase.GetCurrentUser(ctx)
@@ -423,7 +432,7 @@ func (h *PromptHandler) SetRelations(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
+		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 
@@ -431,7 +440,7 @@ func (h *PromptHandler) SetRelations(ctx *gin.Context) {
 	err = ctx.ShouldBindJSON(&req)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
+		httpbase.BadRequestWithExt(ctx, errorx.ReqBodyFormat(err, nil))
 		return
 	}
 	req.Namespace = namespace
@@ -440,6 +449,10 @@ func (h *PromptHandler) SetRelations(ctx *gin.Context) {
 
 	err = h.prompt.SetRelationModels(ctx.Request.Context(), req)
 	if err != nil {
+		if errors.Is(err, errorx.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
 		slog.Error("Failed to set models for prompt", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
@@ -470,7 +483,7 @@ func (h *PromptHandler) AddModelRelation(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
+		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 
@@ -478,7 +491,7 @@ func (h *PromptHandler) AddModelRelation(ctx *gin.Context) {
 	err = ctx.ShouldBindJSON(&req)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
+		httpbase.BadRequestWithExt(ctx, errorx.ReqBodyFormat(err, nil))
 		return
 	}
 	req.Namespace = namespace
@@ -487,6 +500,10 @@ func (h *PromptHandler) AddModelRelation(ctx *gin.Context) {
 
 	err = h.prompt.AddRelationModel(ctx.Request.Context(), req)
 	if err != nil {
+		if errors.Is(err, errorx.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
 		slog.Error("Failed to add model for prompt", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
@@ -517,7 +534,7 @@ func (h *PromptHandler) DelModelRelation(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
+		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 
@@ -525,7 +542,7 @@ func (h *PromptHandler) DelModelRelation(ctx *gin.Context) {
 	err = ctx.ShouldBindJSON(&req)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
+		httpbase.BadRequestWithExt(ctx, errorx.ReqBodyFormat(err, nil))
 		return
 	}
 	req.Namespace = namespace
@@ -534,6 +551,10 @@ func (h *PromptHandler) DelModelRelation(ctx *gin.Context) {
 
 	err = h.prompt.DelRelationModel(ctx.Request.Context(), req)
 	if err != nil {
+		if errors.Is(err, errorx.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
 		slog.Error("Failed to delete dataset for model", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
@@ -563,28 +584,29 @@ func (h *PromptHandler) Create(ctx *gin.Context) {
 	var req *types.CreatePromptRepoReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request prompt repo format", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
+		httpbase.BadRequestWithExt(ctx, errorx.ReqBodyFormat(err, nil))
 		return
 	}
 	_, err := h.sensitive.CheckRequestV2(ctx.Request.Context(), req)
 	if err != nil {
 		slog.Error("failed to check sensitive request", slog.Any("error", err))
-		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
+		httpbase.ServerError(ctx, fmt.Errorf("sensitive check failed: %w", err))
 		return
 	}
 	req.Username = currentUser
 
 	prompt, err := h.prompt.CreatePromptRepo(ctx.Request.Context(), req)
 	if err != nil {
+		if errors.Is(err, errorx.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
 		slog.Error("Failed to create prompt repo", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
 	slog.Info("Create prompt repo succeed", slog.String("prompt", prompt.Name))
-	respData := gin.H{
-		"data": prompt,
-	}
-	ctx.JSON(http.StatusOK, respData)
+	httpbase.OK(ctx, prompt)
 }
 
 // UpdatePromptRepo  godoc
@@ -611,14 +633,14 @@ func (h *PromptHandler) Update(ctx *gin.Context) {
 	var req *types.UpdatePromptRepoReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
+		httpbase.BadRequestWithExt(ctx, errorx.ReqBodyFormat(err, nil))
 		return
 	}
 
 	_, err := h.sensitive.CheckRequestV2(ctx.Request.Context(), req)
 	if err != nil {
 		slog.Error("failed to check sensitive request", slog.Any("error", err))
-		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
+		httpbase.ServerError(ctx, fmt.Errorf("sensitive check failed: %w", err))
 		return
 	}
 	req.Username = currentUser
@@ -626,7 +648,7 @@ func (h *PromptHandler) Update(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
+		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 	req.Namespace = namespace
@@ -665,7 +687,7 @@ func (h *PromptHandler) Delete(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
+		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 	err = h.prompt.RemoveRepo(ctx.Request.Context(), namespace, name, currentUser)
@@ -695,13 +717,13 @@ func (h *PromptHandler) Branches(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
+		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
+		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 	currentUser := httpbase.GetCurrentUser(ctx)
@@ -715,6 +737,10 @@ func (h *PromptHandler) Branches(ctx *gin.Context) {
 	}
 	branches, err := h.repo.Branches(ctx.Request.Context(), req)
 	if err != nil {
+		if errors.Is(err, errorx.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
 		slog.Error("Failed to get prompt repo branches", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
@@ -740,7 +766,7 @@ func (h *PromptHandler) Tags(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
+		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 	currentUser := httpbase.GetCurrentUser(ctx)
@@ -752,6 +778,10 @@ func (h *PromptHandler) Tags(ctx *gin.Context) {
 	}
 	tags, err := h.repo.Tags(ctx.Request.Context(), req)
 	if err != nil {
+		if errors.Is(err, errorx.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
 		slog.Error("Failed to get prompt repo tags", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
@@ -783,18 +813,22 @@ func (h *PromptHandler) UpdateTags(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Failed update tags", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
+		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 	var tags []string
 	if err := ctx.ShouldBindJSON(&tags); err != nil {
-		httpbase.BadRequest(ctx, fmt.Errorf("failed to unmarshal tags: %w", err).Error())
+		httpbase.BadRequestWithExt(ctx, errorx.ReqBodyFormat(err, nil))
 		return
 	}
 	category := ctx.Param("category")
 
 	err = h.repo.UpdateTags(ctx.Request.Context(), namespace, name, types.PromptRepo, category, currentUser, tags)
 	if err != nil {
+		if errors.Is(err, errorx.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
 		slog.Error("Failed to update tags", slog.String("error", err.Error()), slog.String("category", category), slog.String("namespace", namespace), slog.String("name", name))
 		httpbase.ServerError(ctx, err)
 		return
@@ -808,13 +842,13 @@ func (h *PromptHandler) UpdateDownloads(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
+		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
+		httpbase.BadRequestWithExt(ctx, errorx.ReqBodyFormat(err, nil))
 		return
 	}
 
@@ -824,7 +858,7 @@ func (h *PromptHandler) UpdateDownloads(ctx *gin.Context) {
 	date, err := time.Parse("2006-01-02", req.ReqDate)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
+		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 	req.Date = date

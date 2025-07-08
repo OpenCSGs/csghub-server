@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 	mock_component "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
+	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/testutil"
 	"opencsg.com/csghub-server/common/types"
@@ -79,10 +80,12 @@ func TestPromptHandler_Index(t *testing.T) {
 			if c.error {
 				require.Equal(t, 400, tester.Response().Code)
 			} else {
-				tester.ResponseEqSimple(t, 200, gin.H{
-					"data":  []types.PromptRes{{Name: "cc"}},
-					"total": 100,
-				})
+				resp := httpbase.R{
+					Msg:   "OK",
+					Data:  []types.PromptRes{{Name: "cc"}},
+					Total: 100,
+				}
+				tester.ResponseEqSimple(t, 200, resp)
 			}
 		})
 	}
@@ -237,9 +240,12 @@ func TestPromptHandler_CreatePromptRepo(t *testing.T) {
 	)
 	tester.WithBody(t, req).Execute()
 
-	tester.ResponseEqSimple(t, 200, gin.H{
-		"data": &types.PromptRes{Name: "p"},
-	})
+	resp := httpbase.R{
+		Msg:  "OK",
+		Data: &types.PromptRes{Name: "p"},
+	}
+
+	tester.ResponseEqSimple(t, 200, resp)
 }
 
 func TestPromptHandler_UpdatePromptRepo(t *testing.T) {
