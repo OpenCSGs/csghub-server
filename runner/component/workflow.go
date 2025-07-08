@@ -8,6 +8,7 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/argoproj/argo-workflows/v3/pkg/apis/workflow/v1alpha1"
@@ -25,6 +26,7 @@ import (
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
+	"opencsg.com/csghub-server/runner/common"
 )
 
 type workFlowComponentImpl struct {
@@ -38,7 +40,7 @@ type WorkFlowComponent interface {
 	// Create workflow
 	CreateWorkflow(ctx context.Context, req types.ArgoWorkFlowReq) (*database.ArgoWorkflow, error)
 	// Update workflow
-	UpdateWorkflow(ctx context.Context, update *v1alpha1.Workflow) (*database.ArgoWorkflow, error)
+	UpdateWorkflow(ctx context.Context, update *v1alpha1.Workflow, cluster cluster.Cluster) (*database.ArgoWorkflow, error)
 	// find workflow by user name
 	FindWorkFlows(ctx context.Context, username string, per, page int) ([]database.ArgoWorkflow, int, error)
 	// generate workflow templates
@@ -46,7 +48,8 @@ type WorkFlowComponent interface {
 	GetWorkflow(ctx context.Context, id int64, username string) (*database.ArgoWorkflow, error)
 	DeleteWorkflowInargo(ctx context.Context, delete *v1alpha1.Workflow) error
 	FindWorkFlowById(ctx context.Context, id int64) (database.ArgoWorkflow, error)
-	RunWorkflowsInformer(clusterPool *cluster.ClusterPool, config *config.Config)
+	RunInformer(clusterPool *cluster.ClusterPool, config *config.Config)
+	StartAcctRequestFee(wf database.ArgoWorkflow)
 }
 
 func NewWorkFlowComponent(config *config.Config, clusterPool *cluster.ClusterPool) WorkFlowComponent {
@@ -133,7 +136,7 @@ func (wc *workFlowComponentImpl) GetWorkflow(ctx context.Context, id int64, user
 }
 
 // Update workflow
-func (wc *workFlowComponentImpl) UpdateWorkflow(ctx context.Context, update *v1alpha1.Workflow) (*database.ArgoWorkflow, error) {
+func (wc *workFlowComponentImpl) UpdateWorkflow(ctx context.Context, update *v1alpha1.Workflow, cluster cluster.Cluster) (*database.ArgoWorkflow, error) {
 	oldwf, err := wc.wf.FindByTaskID(ctx, update.Name)
 	if err != nil {
 		return nil, err
@@ -158,6 +161,19 @@ func (wc *workFlowComponentImpl) UpdateWorkflow(ctx context.Context, update *v1a
 					break
 				}
 			}
+		}
+		//if oldwf.Status is error, get the log from the pod and save to reason field
+		if oldwf.Status == v1alpha1.WorkflowFailed || oldwf.Status == v1alpha1.WorkflowError {
+			//podName := fmt.Sprintf("%s-%s", oldwf.TaskId, oldwf.ClusterID)
+			logs, err := common.GetPodLog(ctx, &cluster, update.Name, update.Namespace, "main")
+			if err != nil {
+				slog.Error("failed to get pod log", slog.Any("error", err), slog.Any("pod name", update.Name))
+			} else {
+				if len(logs) > 0 {
+					oldwf.Reason = string(logs)
+				}
+			}
+
 		}
 	}
 	return wc.wf.UpdateWorkFlow(ctx, oldwf)
@@ -236,11 +252,12 @@ func generateWorkflow(req types.ArgoWorkFlowReq, config *config.Config) *v1alpha
 			Name: v.Name,
 			//NodeSelector: nodeSelector,
 			Container: &corev1.Container{
-				Image:     containerImg,
-				Command:   v.Command,
-				Env:       environments,
-				Args:      v.Args,
-				Resources: resources,
+				Image:           containerImg,
+				Command:         v.Command,
+				Env:             environments,
+				Args:            v.Args,
+				Resources:       resources,
+				ImagePullPolicy: corev1.PullAlways,
 			},
 			Outputs: v1alpha1.Outputs{
 				Parameters: []v1alpha1.Parameter{
@@ -277,9 +294,47 @@ func generateWorkflow(req types.ArgoWorkFlowReq, config *config.Config) *v1alpha
 	return workflowObject
 }
 
-func (wc *workFlowComponentImpl) RunWorkflowsInformer(clusterPool *cluster.ClusterPool, c *config.Config) {
+func (wc *workFlowComponentImpl) RunInformer(clusterPool *cluster.ClusterPool, c *config.Config) {
+	var wg sync.WaitGroup
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	defer runtime.HandleCrash()
+	for _, cls := range clusterPool.Clusters {
+		_, err := cls.Client.Discovery().ServerVersion()
+		if err != nil {
+			slog.Error("cluster is unavailable ", slog.Any("cluster config", cls.CID), slog.Any("error", err))
+			continue
+		}
+		if wc.config.Argo.QuotaNamespace != wc.config.Argo.Namespace {
+			wg.Add(2)
+			go func(cluster cluster.Cluster) {
+				defer wg.Done()
+				go wc.RunArgoInformer(stopCh, wc.config.Argo.Namespace, cls)
+			}(cls)
+			go func(cluster cluster.Cluster) {
+				defer wg.Done()
+				go wc.RunArgoInformer(stopCh, wc.config.Argo.QuotaNamespace, cls)
+			}(cls)
+
+		} else {
+			wg.Add(1)
+			go func(cluster cluster.Cluster) {
+				defer wg.Done()
+				go wc.RunArgoInformer(stopCh, wc.config.Argo.Namespace, cls)
+			}(cls)
+		}
+	}
+	wg.Wait()
+}
+
+func (wc *workFlowComponentImpl) RunArgoInformer(stopCh <-chan struct{}, namespace string, cluster cluster.Cluster) {
 	labelSelector := "workflow-scope=csghub"
-	clientset := clusterPool.Clusters[0].ArgoClient
+	client := cluster.ArgoClient
+	f := externalversions.NewFilteredSharedInformerFactory(client, 2*time.Minute, namespace, internalinterfaces.TweakListOptionsFunc(func(list *v1.ListOptions) {
+		list.LabelSelector = labelSelector
+	}))
+
+	informer := f.Argoproj().V1alpha1().Workflows().Informer()
 
 	eventHandler := cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
@@ -287,7 +342,7 @@ func (wc *workFlowComponentImpl) RunWorkflowsInformer(clusterPool *cluster.Clust
 			wf := obj.(*v1alpha1.Workflow)
 			bg, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
-			_, err := wc.UpdateWorkflow(bg, wf)
+			_, err := wc.UpdateWorkflow(bg, wf, cluster)
 			if err != nil {
 				slog.Error("fail to update workflow", slog.Any("error", err), slog.Any("job id", wf.Name))
 			}
@@ -303,7 +358,7 @@ func (wc *workFlowComponentImpl) RunWorkflowsInformer(clusterPool *cluster.Clust
 				return
 			}
 			if oldWF.Status.Nodes[oldWF.Name].Phase != newWF.Status.Nodes[oldWF.Name].Phase {
-				_, err := wc.UpdateWorkflow(bg, newWF)
+				_, err := wc.UpdateWorkflow(bg, newWF, cluster)
 				if err != nil {
 					slog.Error("fail to update workflow", slog.Any("error", err), slog.Any("job id", newWF.Name))
 				}
@@ -311,18 +366,34 @@ func (wc *workFlowComponentImpl) RunWorkflowsInformer(clusterPool *cluster.Clust
 		},
 		DeleteFunc: func(obj interface{}) {
 			//handle some special case
-			wf := obj.(*v1alpha1.Workflow)
-			bg, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer cancel()
-			err := wc.DeleteWorkflowInargo(bg, wf)
-			if err != nil {
-				slog.Error("fail to update workflow", slog.Any("error", err), slog.Any("job id", wf.Name))
+			switch wf := obj.(type) {
+			case *v1alpha1.Workflow:
+				bg, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+				err := wc.DeleteWorkflowInargo(bg, wf)
+				if err != nil {
+					slog.Error("fail to update workflow", slog.Any("error", err), slog.Any("job id", wf.Name))
+				}
+			default:
+				slog.Error("unknown type", slog.Any("type", wf))
+				return
 			}
 		},
 	}
 
-	CreateInfomerFactory(clientset, labelSelector, wc.config.Argo.Namespace, eventHandler)
+	stopper := make(chan struct{})
+	defer close(stopper)
 
+	defer runtime.HandleCrash()
+	_, err := informer.AddEventHandler(eventHandler)
+	if err != nil {
+		runtime.HandleError(fmt.Errorf("failed to add event handler for argo workflow informer"))
+	}
+	informer.Run(stopper)
+	if !cache.WaitForCacheSync(stopper, informer.HasSynced) {
+		runtime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
+		return
+	}
 }
 
 func CreateInfomerFactory(client versioned.Interface, namespace, labelSelector string, eventHandler cache.ResourceEventHandler) {

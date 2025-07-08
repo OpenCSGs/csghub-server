@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"strconv"
@@ -11,7 +12,9 @@ import (
 	"opencsg.com/csghub-server/api/workflow"
 	"opencsg.com/csghub-server/builder/temporal"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
+	"opencsg.com/csghub-server/common/utils/common"
 	"opencsg.com/csghub-server/component"
 )
 
@@ -192,5 +195,37 @@ func (r *RuntimeArchitectureHandler) ScanArchitecture(ctx *gin.Context) {
 		return
 	}
 
+	httpbase.OK(ctx, nil)
+}
+
+// ScanArchForSingleModel godoc
+// @Security     ApiKey
+// @Summary      Scan model metadata
+// @Description  Scan model metadata
+// @Tags         Model
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router        /runtime_framework/{namespace}/{name}/scan [post]
+func (r *RuntimeArchitectureHandler) ScanArchForSingleModel(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	err = r.runtimeArch.ScanModel(ctx.Request.Context(), currentUser, namespace, name)
+	if err != nil {
+		if errors.Is(err, errorx.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
+		slog.Error("Failed to scan architecture for model", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
 	httpbase.OK(ctx, nil)
 }

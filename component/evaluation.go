@@ -19,6 +19,7 @@ type evaluationComponentImpl struct {
 	deployer              deploy.Deployer
 	userStore             database.UserStore
 	modelStore            database.ModelStore
+	repoStore             database.RepoStore
 	datasetStore          database.DatasetStore
 	mirrorStore           database.MirrorStore
 	spaceResourceStore    database.SpaceResourceStore
@@ -44,6 +45,7 @@ func NewEvaluationComponent(config *config.Config) (EvaluationComponent, error) 
 	c.datasetStore = database.NewDatasetStore()
 	c.mirrorStore = database.NewMirrorStore()
 	c.tokenStore = database.NewAccessTokenStore()
+	c.repoStore = database.NewRepoStore()
 	c.runtimeFrameworkStore = database.NewRuntimeFrameworksStore()
 	c.config = config
 	ac, err := NewAccountingComponent(config)
@@ -60,24 +62,42 @@ func (c *evaluationComponentImpl) CreateEvaluation(ctx context.Context, req type
 	if err != nil {
 		return nil, fmt.Errorf("failed to get current user %s, error:%w", req.Username, err)
 	}
-	result := strings.Split(req.ModelId, "/")
-	m, err := c.modelStore.FindByPath(ctx, result[0], result[1])
-	if err != nil {
-		return nil, fmt.Errorf("cannot find model, %w", err)
+	if req.ModelIds == nil {
+		req.ModelIds = []string{}
 	}
-	if req.Revision == "" {
-		req.Revision = m.Repository.DefaultBranch
+	if req.ModelId != "" {
+		req.ModelIds = append(req.ModelIds, req.ModelId)
+	}
+	for _, modelId := range req.ModelIds {
+		result := strings.Split(modelId, "/")
+		m, err := c.modelStore.FindByPath(ctx, result[0], result[1])
+		if err != nil {
+			return nil, fmt.Errorf("cannot find model, %w", err)
+		}
+		req.Revisions = append(req.Revisions, m.Repository.DefaultBranch)
 	}
 
 	token, err := c.tokenStore.FindByUID(ctx, user.ID)
 	if err != nil {
 		return nil, fmt.Errorf("cant get git access token:%w", err)
 	}
-	mirrorRepos, err := c.GenerateMirrorRepoIds(ctx, req.Datasets)
+	var mirrorRepos []string
+	var datasetRevisions []string
+	if req.CustomDataSets != nil {
+		mirrorRepos, datasetRevisions, err = c.generateDatasetsAndTasks(ctx, req.CustomDataSets)
+		req.UseCustomDataset = true
+	} else {
+		mirrorRepos, datasetRevisions, err = c.GenerateMirrorRepoIds(ctx, req.Datasets)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate mirror repo ids, %w", err)
 	}
+	frame, err := c.runtimeFrameworkStore.FindEnabledByID(ctx, req.RuntimeFrameworkId)
+	if err != nil {
+		return nil, fmt.Errorf("cannot find available runtime framework, %w", err)
+	}
 	req.Datasets = mirrorRepos
+	req.DatasetRevisions = datasetRevisions
 	req.Token = token.Token
 	var hardware types.HardWare
 	if req.ResourceId != 0 {
@@ -89,22 +109,25 @@ func (c *evaluationComponentImpl) CreateEvaluation(ctx context.Context, req type
 		if err != nil {
 			return nil, fmt.Errorf("invalid hardware setting, %w", err)
 		}
-		if !common.ContainsGraphicResource(hardware) {
+		if frame.ComputeType != string(types.ResourceTypeCPU) && !common.ContainsGraphicResource(hardware) {
 			return nil, fmt.Errorf("evaluation requires graphics card resources")
 		}
 		req.ClusterID = resource.ClusterID
 		req.ResourceName = resource.Name
 	} else {
 		// for share mode
-		hardware.Gpu.Num = c.config.Argo.QuotaGPUNumber
-		hardware.Gpu.ResourceName = "nvidia.com/gpu"
-		hardware.Cpu.Num = "8"
+		resource := ""
+		if frame.ComputeType == string(types.ResourceTypeGPU) {
+			hardware.Gpu.Num = c.config.Argo.QuotaGPUNumber
+			hardware.Gpu.ResourceName = "nvidia.com/gpu"
+			resource = fmt.Sprintf("%s GPU · ", c.config.Argo.QuotaGPUNumber)
+		}
+		hardware.Cpu.Num = "4"
 		hardware.Memory = "32Gi"
+		resource = fmt.Sprintf("%s%s vCPU · %s", resource, hardware.Cpu.Num, hardware.Memory)
+		req.ResourceName = resource
 	}
-	frame, err := c.runtimeFrameworkStore.FindEnabledByID(ctx, req.RuntimeFrameworkId)
-	if err != nil {
-		return nil, fmt.Errorf("cannot find available runtime framework, %w", err)
-	}
+
 	req.Hardware = hardware
 	// choose image
 	containerImg := frame.FrameImage
@@ -117,23 +140,36 @@ func (c *evaluationComponentImpl) CreateEvaluation(ctx context.Context, req type
 }
 
 // generate mirror repo ids
-func (c *evaluationComponentImpl) GenerateMirrorRepoIds(ctx context.Context, datasets []string) ([]string, error) {
+func (c *evaluationComponentImpl) GenerateMirrorRepoIds(ctx context.Context, datasets []string) ([]string, []string, error) {
 	var mirrorRepos []string
+	var revisions []string
 	for _, ds := range datasets {
 		namespace := strings.Split(ds, "/")[0]
 		name := strings.Split(ds, "/")[1]
-		mirrorRepo, err := c.mirrorStore.FindByRepoPath(ctx, types.DatasetRepo, namespace, name)
+		repo, err := c.repoStore.FindByPath(ctx, types.DatasetRepo, namespace, name)
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				//no mirror, will use csghub repo
-				mirrorRepos = append(mirrorRepos, ds)
-				continue
-			}
-			return nil, fmt.Errorf("fail to get mirror repo, %w", err)
+			return nil, nil, fmt.Errorf("failed to find dataset repo, %w", err)
 		}
-		mirrorRepos = append(mirrorRepos, mirrorRepo.SourceRepoPath)
+		mirrorRepos = append(mirrorRepos, repo.OriginPath())
+		revisions = append(revisions, repo.DefaultBranch)
 	}
-	return mirrorRepos, nil
+	return mirrorRepos, revisions, nil
+}
+
+func (c *evaluationComponentImpl) generateDatasetsAndTasks(ctx context.Context, customDataSets []string) ([]string, []string, error) {
+	var mirrorRepos []string
+	var revisions []string
+	for _, cds := range customDataSets {
+		namespace := strings.Split(cds, "/")[0]
+		name := strings.Split(cds, "/")[1]
+		repo, err := c.repoStore.FindByPath(ctx, types.DatasetRepo, namespace, name)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to find dataset repo, %w", err)
+		}
+		mirrorRepos = append(mirrorRepos, repo.Path)
+		revisions = append(revisions, repo.DefaultBranch)
+	}
+	return mirrorRepos, revisions, nil
 }
 
 func (c *evaluationComponentImpl) DeleteEvaluation(ctx context.Context, req types.ArgoWorkFlowDeleteReq) error {
@@ -146,12 +182,20 @@ func (c *evaluationComponentImpl) GetEvaluation(ctx context.Context, req types.E
 	if err != nil {
 		return nil, fmt.Errorf("fail to get evaluation result, %w", err)
 	}
-	datasets, err := c.datasetStore.ListByPath(ctx, wf.Datasets)
-	if err != nil {
-		return nil, fmt.Errorf("fail to get datasets for evaluation, %w", err)
-	}
 	var repoTags []types.RepoTags
-	for _, ds := range datasets {
+	for _, path := range wf.Datasets {
+		ds, err := c.datasetStore.FindByOriginPath(ctx, path)
+		if err != nil {
+			//use default value if not found
+			var dsRepoTags = types.RepoTags{
+				RepoId: path,
+			}
+			if errors.Is(err, sql.ErrNoRows) {
+				dsRepoTags.Deleted = true
+			}
+			repoTags = append(repoTags, dsRepoTags)
+			continue
+		}
 		var tags []types.RepoTag
 		for _, tag := range ds.Repository.Tags {
 			tags = append(tags, types.RepoTag{
@@ -172,25 +216,26 @@ func (c *evaluationComponentImpl) GetEvaluation(ctx context.Context, req types.E
 		repoTags = append(repoTags, dsRepoTags)
 	}
 	var res = &types.EvaluationRes{
-		ID:          wf.ID,
-		RepoIds:     wf.RepoIds,
-		RepoType:    wf.RepoType,
-		Username:    wf.Username,
-		TaskName:    wf.TaskName,
-		TaskId:      wf.TaskId,
-		TaskType:    wf.TaskType,
-		TaskDesc:    wf.TaskDesc,
-		ResourceId:  wf.ResourceId,
-		Status:      string(wf.Status),
-		Reason:      wf.Reason,
-		Datasets:    repoTags,
-		Image:       wf.Image,
-		SubmitTime:  wf.SubmitTime,
-		StartTime:   wf.StartTime,
-		EndTime:     wf.EndTime,
-		ResultURL:   wf.ResultURL,
-		DownloadURL: wf.DownloadURL,
-		FailuresURL: wf.FailuresURL,
+		ID:           wf.ID,
+		RepoIds:      wf.RepoIds,
+		RepoType:     wf.RepoType,
+		Username:     wf.Username,
+		TaskName:     wf.TaskName,
+		TaskId:       wf.TaskId,
+		TaskType:     wf.TaskType,
+		TaskDesc:     wf.TaskDesc,
+		ResourceId:   wf.ResourceId,
+		ResourceName: wf.ResourceName,
+		Status:       string(wf.Status),
+		Reason:       wf.Reason,
+		Datasets:     repoTags,
+		Image:        wf.Image,
+		SubmitTime:   wf.SubmitTime,
+		StartTime:    wf.StartTime,
+		EndTime:      wf.EndTime,
+		ResultURL:    wf.ResultURL,
+		DownloadURL:  wf.DownloadURL,
+		FailuresURL:  wf.FailuresURL,
 	}
 	return res, nil
 }

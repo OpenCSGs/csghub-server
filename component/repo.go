@@ -2331,10 +2331,26 @@ func (c *repoComponentImpl) ListDeploy(ctx context.Context, repoType types.Repos
 }
 
 func (c *repoComponentImpl) DeleteDeploy(ctx context.Context, delReq types.DeployActReq) error {
+	if delReq.DeployType == types.ServerlessType {
+		repo, err := c.repoStore.FindByPath(ctx, delReq.RepoType, delReq.Namespace, delReq.Name)
+		if err != nil {
+			return fmt.Errorf("fail to find repo for serverless, %w", err)
+		}
+		d, err := c.deployTaskStore.GetServerlessDeployByRepID(ctx, repo.ID)
+		if err != nil {
+			return fmt.Errorf("fail to get deploy for serverless, %w", err)
+		}
+		if d != nil {
+			delReq.DeployID = d.ID
+		} else {
+			return fmt.Errorf("no deploy found for serverless type")
+		}
+	}
 	user, deploy, err := c.checkDeployPermissionForUser(ctx, delReq)
 	if err != nil {
 		return err
 	}
+
 	// delete service
 	deployRepo := types.DeployRepo{
 		SpaceID:   0,
@@ -2363,7 +2379,12 @@ func (c *repoComponentImpl) DeleteDeploy(ctx context.Context, delReq types.Deplo
 	}
 
 	// update database deploy
-	err = c.deployTaskStore.DeleteDeploy(ctx, types.RepositoryType(delReq.RepoType), deploy.RepoID, user.ID, delReq.DeployID)
+	if delReq.DeployType == types.ServerlessType {
+		err = c.deployTaskStore.DeleteDeployNow(ctx, delReq.DeployID)
+	} else {
+		err = c.deployTaskStore.DeleteDeploy(ctx, types.RepositoryType(delReq.RepoType), deploy.RepoID, user.ID, delReq.DeployID)
+	}
+
 	if err != nil {
 		return fmt.Errorf("fail to remove deploy instance, %w", err)
 	}
@@ -2823,6 +2844,10 @@ func (c *repoComponentImpl) checkDeployPermissionForUser(ctx context.Context, de
 	}
 	if deploy == nil {
 		return nil, nil, fmt.Errorf("do not found user deploy %v", deployReq.DeployID)
+	}
+	isAdmin := c.IsAdminRole(user)
+	if isAdmin {
+		return &user, deploy, nil
 	}
 	if deploy.UserID != user.ID {
 		return nil, nil, errorx.ErrForbiddenMsg("deploy was not created by user")

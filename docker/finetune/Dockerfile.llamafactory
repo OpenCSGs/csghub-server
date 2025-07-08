@@ -1,5 +1,5 @@
 # Pull from devel image instead of base
-FROM nvidia/cuda:12.4.1-devel-ubuntu22.04
+FROM nvidia/cuda:12.1.1-devel-ubuntu22.04
 
 # Set bash as the default shell
 ENV SHELL=/bin/bash \
@@ -23,15 +23,16 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && \
 
 # Install the appropriate torch version 
 RUN ln -sf /usr/bin/python3 /usr/bin/python && \
-    pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple && \
+    pip config set global.index-url https://mirrors.aliyun.com/pypi/simple && \
     pip install --no-cache-dir jupyterlab numpy==1.26.4 \
     torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1 \
-    jupyter-server-proxy==4.4.0 fastapi==0.112.2
+    jupyter-server-proxy==4.4.0 fastapi==0.112.2 \
+    gradio-client==1.10.1 pydantic==2.10.6
 
 # Create a working directory
 WORKDIR /etc/csghub
 
-RUN git clone --depth 1 https://github.com/hiyouga/LLaMA-Factory.git --branch main --single-branch && cd LLaMA-Factory && \
+RUN git clone --depth 1 https://gitee.com/xzgan/LLaMA-Factory.git --branch v0.9.3 --single-branch && cd LLaMA-Factory && \
     pip install --no-cache-dir -e ".[metrics,deepspeed]"
 
 # Setup supervisord
@@ -45,6 +46,8 @@ RUN mkdir -p /var/log/supervisord && \
 	echo '{"theme":"JupyterLab Dark"}' > /root/.jupyter/lab/user-settings/@jupyterlab/apputils-extension/themes.jupyterlab-settings && \
 	mkdir -p /root/.jupyter/lab/user-settings/@jupyterlab/notebook-extension && \
 	echo '{"codeCellConfig":{"lineNumbers":true }}' > /root/.jupyter/lab/user-settings/@jupyterlab/notebook-extension/tracker.jupyterlab-settings
+
+RUN pip install https://git-devops.opencsg.com/opensource/gradio/-/raw/main/gradio-5.31.0-py3-none-any.whl --force-reinstall --no-deps
 
 # Create a working directory
 WORKDIR /workspace/

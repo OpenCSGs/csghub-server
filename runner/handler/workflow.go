@@ -25,7 +25,7 @@ type ArgoHandler struct {
 func NewArgoHandler(config *config.Config, clusterPool *cluster.ClusterPool) (*ArgoHandler, error) {
 	wfc := component.NewWorkFlowComponent(config, clusterPool)
 	//watch workflows events
-	go wfc.RunWorkflowsInformer(clusterPool, config)
+	go wfc.RunInformer(clusterPool, config)
 	return &ArgoHandler{
 		clusterPool:        clusterPool,
 		config:             config,
@@ -133,23 +133,27 @@ func (a *ArgoHandler) GetWorkflow(ctx *gin.Context) {
 		return
 	}
 	res := types.ArgoWorkFlowRes{
-		ID:          wf.ID,
-		Username:    wf.Username,
-		TaskName:    wf.TaskName,
-		Image:       wf.Image,
-		TaskId:      wf.TaskId,
-		TaskType:    wf.TaskType,
-		TaskDesc:    wf.TaskDesc,
-		RepoIds:     wf.RepoIds,
-		RepoType:    wf.RepoType,
-		SubmitTime:  wf.SubmitTime,
-		StartTime:   wf.StartTime,
-		EndTime:     wf.EndTime,
-		Datasets:    wf.Datasets,
-		ResultURL:   wf.ResultURL,
-		DownloadURL: wf.DownloadURL,
-		FailuresURL: wf.FailuresURL,
-		Status:      wf.Status,
+		ID:           wf.ID,
+		Username:     wf.Username,
+		TaskName:     wf.TaskName,
+		Image:        wf.Image,
+		TaskId:       wf.TaskId,
+		TaskType:     wf.TaskType,
+		TaskDesc:     wf.TaskDesc,
+		RepoIds:      wf.RepoIds,
+		RepoType:     wf.RepoType,
+		SubmitTime:   wf.SubmitTime,
+		StartTime:    wf.StartTime,
+		EndTime:      wf.EndTime,
+		Datasets:     wf.Datasets,
+		ResultURL:    wf.ResultURL,
+		DownloadURL:  wf.DownloadURL,
+		FailuresURL:  wf.FailuresURL,
+		Status:       wf.Status,
+		Reason:       wf.Reason,
+		ResourceId:   wf.ResourceId,
+		ResourceName: wf.ResourceName,
+		Namespace:    wf.Namespace,
 	}
 	ctx.JSON(http.StatusOK, res)
 }

@@ -1,30 +1,48 @@
 #!/bin/bash
-mkdir -p /workspace/data
-ANSWER_MODE=${ANSWER_MODE:-"gen"}
-# download model
-csghub-cli download $MODEL_ID -k $ACCESS_TOKEN -e $HF_ENDPOINT -cd /workspace/
-insert_string=$(cat << 'EOF'
+
+download_model() {
+    modelID=$1
+    revision=$2
+    python /etc/csghub/download.py models --model_ids $modelID --endpoint $HF_ENDPOINT --token $HF_TOKEN --revision $revision --source csg
+    if [ $? -ne 0 ]; then
+        echo "Download model $modelID failed."
+        exit 1
+    fi
+    insert_string=$(cat << 'EOF'
 "chat_template":"{%- if messages[0]['role'] == 'system' -%}{%- set system_message = messages[0]['content'] -%}{%- set messages = messages[1:] -%}{%- else -%}{% set system_message = '' -%}{%- endif -%}{{ bos_token + system_message }}{%- for message in messages -%}{%- if (message['role'] == 'user') != (loop.index0 % 2 == 0) -%}{{ raise_exception('Conversation roles must alternate user/assistant/user/assistant/...') }}{%- endif -%}{%- if message['role'] == 'user' -%}{{ 'USER: ' + message['content'] + '\\n' }}{%- elif message['role'] == 'assistant' -%}{{ 'ASSISTANT: ' + message['content'] + eos_token + '\\n' }}{%- endif -%}{%- endfor -%}{%- if add_generation_prompt -%}{{ 'ASSISTANT:' }}{% endif %}",
 EOF
 )
-repo_tokenizer_config="/workspace/$MODEL_ID/tokenizer_config.json"
-# check if repo_tokenizer_config exists
-if [ ! -f "$repo_tokenizer_config" ]; then
-    echo "the model is invalid."
-    exit 1
-fi
 
-# fix some model does not contain chat_template
-if ! grep -q "chat_template" "$repo_tokenizer_config"; then
-    filename="/tmp/tokenizer_config.json"
-    cp "/workspace/$MODEL_ID/tokenizer_config.json" $filename
-    awk -v ins="$insert_string" '/tokenizer_class/ {print; print ins; next}1' "$filename" > tmpfile && mv -f tmpfile $repo_tokenizer_config
-fi
+    repo_tokenizer_config="/workspace/$modelID/tokenizer_config.json"
+    # check if repo_tokenizer_config exists
+    if [ ! -f "$repo_tokenizer_config" ]; then
+        echo "the model is invalid."
+        exit 1
+    fi
+
+    # fix some model does not contain chat_template
+    if ! grep -q "chat_template" "$repo_tokenizer_config"; then
+        filename="/tmp/tokenizer_config.json"
+        cp "/workspace/$modelID/tokenizer_config.json" $filename
+        awk -v ins="$insert_string" '/tokenizer_class/ {print; print ins; next}1' "$filename" > tmpfile && mv -f tmpfile $repo_tokenizer_config
+    fi
+    repo_config="/workspace/$modelID/config.json"
+    sed -i "s/\"max_position_embeddings\": [0-9]*/\"max_position_embeddings\": $LimitedMaxToken/" $repo_config
+}
+
+export HF_TOKEN=$ACCESS_TOKEN
+mkdir -p /workspace/data
+ANSWER_MODE=${ANSWER_MODE:-"gen"}
+# download model
+
 #fix: use local dataset
 export DATASET_SOURCE=ModelScope
 export COMPASS_DATA_CACHE=/workspace/data/
 dataset_path="/usr/local/lib/python3.10/dist-packages/opencompass/datasets/"
-find $dataset_path -type f -name "*.py" -exec sed -i 's/get_data_path(path)/"\/workspace\/data\/"+get_data_path(path)/g' {} +
+if [ ! -e "/workspace/.init" ]; then
+    find $dataset_path -type f -name "*.py" -exec sed -i 's/get_data_path(path)/"\/workspace\/data\/"+get_data_path(path)/g' {} +
+    touch /workspace/.init
+fi
 declare -A dataset_alias
 dataset_alias["ai2_arc"]="ARC-c"
 dataset_alias["ceval-exam"]="ceval"
@@ -40,19 +58,29 @@ dataset_alias["trivia_qa"]="triviaqa"
 dataset_alias["xsum"]="Xsum"
 # download datasets
 IFS=',' read -r -a dataset_repos <<< "$DATASET_IDS"
+IFS=',' read -r -a dataset_revisions <<< "$DATASET_REVISIONS"
 # Loop through the array and print each value
 dataset_tasks=""
 dataset_tasks_ori=""
-for repo in "${dataset_repos[@]}"; do
+for index in "${!dataset_repos[@]}"; do
+    repo=${dataset_repos[$index]}
+    revision=${dataset_revisions[$index]}
     # check $dataset existing
-    if [ ! -d "/workspace/data/$repo" ]; then
-        echo "Start downloading dataset $repo..."
-        csghub-cli download $repo -t dataset -r master -k $ACCESS_TOKEN -e $HF_ENDPOINT -cd /workspace/data/
-        if [ $? -ne 0 ]; then
-            echo "Download dataset $repo failed,retry with main branch"
-            #for some special case which use main branch
-            csghub-cli download $repo -t dataset -k $ACCESS_TOKEN -e $HF_ENDPOINT -cd /workspace/data/
-        fi
+    python /etc/csghub/download.py datasets --dataset_ids $repo --endpoint $HF_ENDPOINT --token $HF_TOKEN --revision $revision --source ms
+    if [ $? -ne 0 ]; then
+        echo "Download dataset $repo failed,retry with HF mirror"
+        #for some special case which use main branch
+        python /etc/csghub/download.py datasets --dataset_ids $repo --endpoint $HF_ENDPOINT --token $HF_TOKEN --revision $revision --source hf
+    fi
+    # if custom datasets, use the first csv or json file, and skip the rest
+    if [ "$USE_CUSTOM_DATASETS" = "true" ]; then
+        data_file_path=($(find /workspace/data/$repo -type f \( -name "*.csv" -o -name "*.jsonl" \) | head -n 1))
+        custom_datasets_path=$data_file_path
+        FILE_NAME="${data_file_path##*/}"
+        task_name="${FILE_NAME%.*}"
+        dataset_tasks="custom_dataset"
+        dataset_tasks_ori=$task_name
+        continue 
     fi
     # get answer mode
     task_path=`python -W ignore /etc/csghub/get_answer_mode.py $repo`
@@ -90,17 +118,41 @@ if [ -z "$dataset_tasks" ]; then
     echo "dataset_tasks is empty for dataset $DATASET_IDS"
     exit 1
 fi
-echo "Running tasks: $dataset_tasks"
+echo "Running tasks: $dataset_tasks, custom datasets: $custom_datasets_path"
 if [ -z "$GPU_NUM" ]; then
     GPU_NUM=1
 fi
 #LimitedMaxToken is gpu_num multiplied by 4096
 LimitedMaxToken=$(($GPU_NUM * 4096))
-# avoid GPU OOM
-repo_config="/workspace/$MODEL_ID/config.json"
-sed -i "s/\"max_position_embeddings\": [0-9]*/\"max_position_embeddings\": $LimitedMaxToken/" $repo_config
-
-opencompass --datasets $dataset_tasks --work-dir /workspace/output  --hf-type chat --hf-path /workspace/$MODEL_ID -a vllm --max-out-len 100 --max-seq-len $LimitedMaxToken --batch-size 8 --hf-num-gpus $GPU_NUM --max-num-workers $GPU_NUM
+jsonFiles=""
+IFS=',' read -r -a model_repos <<< "$MODEL_IDS"
+IFS=',' read -r -a model_revisions <<< "$REVISIONS"
+for index in "${!model_repos[@]}"; do
+    modelID=${model_repos[$index]}
+    revision=${model_revisions[$index]}
+    download_model $modelID $revision
+    if [ $? -ne 0 ]; then
+        echo "Download model $modelID failed."
+        exit 1
+    fi
+    model_name=`basename $modelID`
+    echo "Start evaluating model $model_name, dataset $dataset_tasks"
+    if [ "$USE_CUSTOM_DATASETS" = "true" ]; then
+        opencompass --custom-dataset-path $custom_datasets_path  --work-dir /workspace/output  --hf-type chat --hf-path /workspace/$modelID -a vllm --max-out-len 100 --max-seq-len $LimitedMaxToken --batch-size 8 --hf-num-gpus $GPU_NUM --max-num-workers $GPU_NUM --work-dir /workspace/output/$modelID
+    else
+        opencompass --datasets $dataset_tasks --work-dir /workspace/output  --hf-type chat --hf-path /workspace/$modelID -a vllm --max-out-len 100 --max-seq-len $LimitedMaxToken --batch-size 8 --hf-num-gpus $GPU_NUM --max-num-workers $GPU_NUM --work-dir /workspace/output/$modelID
+    fi
+    if [ $? -ne 0 ]; then
+        echo "Evaluation failed for model $model_name."
+        exit 1
+    fi
+    csv_file=`ls -dt /workspace/output/$modelID/**/summary/*.csv |head -n 1`
+    python /etc/csghub/upload_files.py convert "$csv_file"
+    json_file=`ls -dt /workspace/output/$modelID/**/summary/*.json | head -n 1`
+    jsonFiles="$jsonFiles $json_file"
+    # remove model to save space
+    rm -rf /workspace/$modelID
+done
 
 if [ $? -eq 0 ]; then
     echo "Evaluation completed successfully."
@@ -110,12 +162,12 @@ else
 fi
 
 # upload result to mino server
-output_dir=`ls -dt /workspace/output/* |head -n 1`
-csv_file=`ls -d $output_dir/summary/*.csv`
-python /etc/csghub/upload_files.py convert "$csv_file"
-json_file=`ls -d $output_dir/summary/*.json`
-python /etc/csghub/upload_files.py summary --file $json_file --tasks $dataset_tasks_ori
-upload_json_file=`ls -d $output_dir/summary/*upload.json`
-upload_xlsx_file=`ls -d $output_dir/summary/*upload.xlsx`
+mkdir -p /workspace/output/final
+echo "python /etc/csghub/upload_files.py summary --file $jsonFiles --tasks $dataset_tasks_ori"
+python /etc/csghub/upload_files.py summary --file $jsonFiles --tasks $dataset_tasks_ori
+upload_json_file=`ls -d /workspace/output/final/upload.json`
+upload_xlsx_file=`ls -d /workspace/output/final/upload.xlsx`
 python /etc/csghub/upload_files.py upload "$upload_json_file,$upload_xlsx_file"
-echo "finish evaluation for $MODEL_ID"
+output=`cat /tmp/output.txt`
+echo "Evaluation output: $output"
+echo "finish evaluation for $MODEL_IDS"

@@ -1,5 +1,6 @@
 # pull from devel image instead of base
-FROM nvidia/cuda:12.4.1-devel-ubuntu22.04
+ARG CUDA_VERSION=12.1.1
+FROM nvidia/cuda:${CUDA_VERSION}-devel-ubuntu22.04
 # Set bash as the default shell
 ENV SHELL=/bin/bash \
     JUPYTERHUB_SERVICE_PREFIX=/proxy/ \
@@ -36,7 +37,7 @@ RUN pip install --no-cache-dir jupyterlab numpy==1.26.4 \
 # Create a working directory
 WORKDIR /etc/csghub
 RUN pip install --no-cache-dir vllm==v0.7.3 timm==1.0.11 evalscope==0.12.0
-RUN git clone https://gitee.com/xzgan/ms-swift.git --depth 1 --branch v3.2.0.post2
+RUN git clone https://gitee.com/xzgan/ms-swift.git --depth 1 --branch v3.5.2
 RUN cd ms-swift && pip install --no-cache-dir -e "."
 #install flash-attn
 #RUN pip install https://github.com/Dao-AILab/flash-attention/releases/download/v2.7.4.post1/flash_attn-2.7.4.post1+cu12torch2.5cxx11abiFALSE-cp310-cp310-linux_x86_64.whl

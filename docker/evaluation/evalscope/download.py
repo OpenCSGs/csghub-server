@@ -28,8 +28,8 @@ if __name__ == "__main__":
     if args.command == 'models':
         repo_ids = args.model_ids.split(',')
         for repo_id in repo_ids:
-            snapshot_download(repo_id=repo_id, ignore_patterns=["*.txt", "*.bin"], endpoint=endpoint, token=token,local_dir="/workspace/"+repo_id, revision=revision, source=source)
+            snapshot_download(repo_id=repo_id, ignore_patterns=["*.txt", "*.bin"], endpoint=endpoint, token=token,cache_dir="/workspace/", revision=revision,source=source)
     elif args.command == 'datasets':
         repo_ids = args.dataset_ids.split(',')
         for repo_id in repo_ids:
-            snapshot_download(repo_id=repo_id, repo_type="dataset", endpoint=endpoint, token=token, local_dir="/workspace/"+repo_id, revision=revision,ignore_patterns=["dataset_infos.json"], source=source)
+            snapshot_download(repo_id=repo_id, repo_type="dataset", endpoint=endpoint, token=token, cache_dir="/workspace/", revision=revision,ignore_patterns=["dataset_infos.json"],source=source)

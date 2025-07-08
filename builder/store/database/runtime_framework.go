@@ -19,9 +19,11 @@ type RuntimeFrameworksStore interface {
 	Add(ctx context.Context, frame RuntimeFramework) (*RuntimeFramework, error)
 	Update(ctx context.Context, frame RuntimeFramework) (*RuntimeFramework, error)
 	Delete(ctx context.Context, frame RuntimeFramework) error
+	RemoveRuntimeFrameworkAndArch(ctx context.Context, id int64) error
 	FindEnabledByID(ctx context.Context, id int64) (*RuntimeFramework, error)
 	FindEnabledByName(ctx context.Context, name string) (*RuntimeFramework, error)
-	FindByNameAndComputeType(ctx context.Context, engineName, driverVersion, ComputeType string) (*RuntimeFramework, error)
+	FindByFrameName(ctx context.Context, name string) ([]RuntimeFramework, error)
+	FindByFrameImageAndComputeType(ctx context.Context, frameImage, ComputeType string) (*RuntimeFramework, error)
 	ListAll(ctx context.Context) ([]RuntimeFramework, error)
 	ListByIDs(ctx context.Context, ids []int64) ([]RuntimeFramework, error)
 }
@@ -149,8 +151,35 @@ func (rf *runtimeFrameworksStoreImpl) ListByArchsNameAndType(ctx context.Context
 }
 
 // FindByNameAndComputeType
-func (rf *runtimeFrameworksStoreImpl) FindByNameAndComputeType(ctx context.Context, frameName, driverVersion, computeType string) (*RuntimeFramework, error) {
+func (rf *runtimeFrameworksStoreImpl) FindByFrameImageAndComputeType(ctx context.Context, frameImage, computeType string) (*RuntimeFramework, error) {
 	var res RuntimeFramework
-	_, err := rf.db.Core.NewSelect().Model(&res).Where("LOWER(frame_name) = LOWER(?)", frameName).Where("compute_type = ?", computeType).Where("driver_version = ?", driverVersion).Exec(ctx, &res)
+	_, err := rf.db.Core.NewSelect().Model(&res).Where("compute_type = ?", computeType).Where("frame_image = ?", frameImage).Exec(ctx, &res)
 	return &res, err
+}
+
+func (rf *runtimeFrameworksStoreImpl) RemoveRuntimeFrameworkAndArch(ctx context.Context, rfId int64) error {
+	return rf.db.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		// First, delete runtime architectures associated with the framework
+		_, err := tx.NewDelete().Model(&RuntimeArchitecture{}).Where("runtime_framework_id = ?", rfId).Exec(ctx)
+		if err != nil {
+			return fmt.Errorf("error happened while removing runtime architecture, %w", err)
+		}
+
+		// Then, delete the runtime framework itself
+		_, err = tx.NewDelete().Model(&RuntimeFramework{}).Where("id = ?", rfId).Exec(ctx)
+		if err != nil {
+			return fmt.Errorf("error happened while removing runtime framework, %w", err)
+		}
+
+		return nil
+	})
+}
+
+func (rf *runtimeFrameworksStoreImpl) FindByFrameName(ctx context.Context, name string) ([]RuntimeFramework, error) {
+	var result []RuntimeFramework
+	_, err := rf.db.Core.NewSelect().Model(&result).Where("frame_name = ?", name).Exec(ctx, &result)
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
 }

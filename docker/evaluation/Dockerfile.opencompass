@@ -1,10 +1,11 @@
-FROM nvidia/cuda:12.4.1-devel-ubuntu22.04
+ARG CUDA_VERSION=12.1.1
+FROM nvidia/cuda:${CUDA_VERSION}-devel-ubuntu22.04
 RUN apt-get update && apt-get -y install python3.10 python3-pip dumb-init \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
-RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple \
-    && pip install --no-cache-dir opencompass==0.3.5 \
-    csghub-sdk==0.4.6 minio oss2
-RUN pip install --no-cache-dir vllm==0.6.3.post1 openpyxl modelscope==1.20.1 datasets==2.20.0
+RUN pip config set global.index-url https://mirrors.aliyun.com/pypi/simple
+    
+RUN pip install --no-cache-dir opencompass==0.4.2 minio oss2 vllm==0.9.1 openpyxl modelscope==1.26.0 datasets==2.20.0 csghub-sdk==0.7.2
+RUN pip install --no-cache-dir math_verify latex2sympy2_extended
 COPY ./opencompass/ /etc/csghub/
 RUN ln -s /usr/bin/python3 /usr/bin/python &&\
     chmod +x /etc/csghub/*.sh

@@ -513,7 +513,26 @@ func (c *modelComponentImpl) Show(ctx context.Context, namespace, name, currentU
 	resModel.EnableFinetune = enableFinetune
 	enableEvaluation, _ := c.runtimeArchitecturesStore.CheckEngineByArchModelNameAndType(ctx, archs, oriName, modelFormat, types.EvaluationType)
 	resModel.EnableEvaluation = enableEvaluation
+	updateDisabledReason(resModel, archs)
 	return resModel, nil
+}
+
+func updateDisabledReason(resModel *types.Model, archs []string) {
+	if len(archs) == 0 {
+		resModel.DisableEvaluationReason = "metadata_not_recognized"
+		resModel.DisableFinetuneReason = "metadata_not_recognized"
+		resModel.DisableInferenceReason = "metadata_not_recognized"
+		return
+	}
+	if !resModel.EnableInference {
+		resModel.DisableInferenceReason = "model_not_support_inference"
+	}
+	if !resModel.EnableFinetune {
+		resModel.DisableFinetuneReason = "model_not_support_finetune"
+	}
+	if !resModel.EnableEvaluation {
+		resModel.DisableEvaluationReason = "model_not_support_evaluation"
+	}
 }
 
 func (c *modelComponentImpl) GetServerless(ctx context.Context, namespace, name, currentUser string) (*types.DeployRepo, error) {

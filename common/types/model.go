@@ -156,23 +156,29 @@ type Model struct {
 	// widget UI style: generation,chat
 	WidgetType ModelWidgetType `json:"widget_type" example:"generation"`
 	// url to interact with the model
-	Status               string               `json:"status" example:"RUNNING"`
-	UserLikes            bool                 `json:"user_likes"`
-	Source               RepositorySource     `json:"source"`
-	SyncStatus           RepositorySyncStatus `json:"sync_status"`
-	EnableInference      bool                 `json:"enable_inference"`
-	EnableFinetune       bool                 `json:"enable_finetune"`
-	EnableEvaluation     bool                 `json:"enable_evaluation"`
-	BaseModel            string               `json:"base_model"`
-	License              string               `json:"license"`
-	CanWrite             bool                 `json:"can_write"`
-	CanManage            bool                 `json:"can_manage"`
-	Namespace            *Namespace           `json:"namespace"`
-	RecomOpWeight        int                  `json:"recom_op_weight,omitempty"`
-	Scores               []WeightScore        `json:"scores"`
-	SensitiveCheckStatus string               `json:"sensitive_check_status"`
-	MirrorLastUpdatedAt  time.Time            `json:"mirror_last_updated_at"`
-	Metadata             Metadata             `json:"metadata"`
+	Status                  string               `json:"status" example:"RUNNING"`
+	UserLikes               bool                 `json:"user_likes"`
+	Source                  RepositorySource     `json:"source"`
+	SyncStatus              RepositorySyncStatus `json:"sync_status"`
+	EnableInference         bool                 `json:"enable_inference"`
+	EnableFinetune          bool                 `json:"enable_finetune"`
+	EnableEvaluation        bool                 `json:"enable_evaluation"`
+	DisableInferenceReason  string               `json:"disable_inference_reason" i18n:"model.disable_inference_reason"`
+	DisableFinetuneReason   string               `json:"disable_finetune_reason" i18n:"model.disable_finetune_reason"`
+	DisableEvaluationReason string               `json:"disable_evaluation_reason" i18n:"model.disable_evaluation_reason"`
+	BaseModel               string               `json:"base_model"`
+	License                 string               `json:"license"`
+	CanWrite                bool                 `json:"can_write"`
+	CanManage               bool                 `json:"can_manage"`
+	Namespace               *Namespace           `json:"namespace"`
+	RecomOpWeight           int                  `json:"recom_op_weight,omitempty"`
+	Scores                  []WeightScore        `json:"scores"`
+	SensitiveCheckStatus    string               `json:"sensitive_check_status"`
+	MirrorLastUpdatedAt     time.Time            `json:"mirror_last_updated_at"`
+	Metadata                Metadata             `json:"metadata"`
+	ReportURL               string               `json:"report_url"`
+	MediumRiskCount         int                  `json:"medium_risk_count"`
+	HighRiskCount           int                  `json:"high_risk_count"`
 	MultiSource
 }
 
@@ -396,6 +402,7 @@ type ModelConfig struct {
 type EngineConfig struct {
 	EngineName      string      `json:"engine_name"`
 	ContainerPort   int         `json:"container_port"`
+	MinVersion      string      `json:"min_version"`
 	ModelFormat     string      `json:"model_format"`
 	EngineImages    []Image     `json:"engine_images"`
 	SupportedArchs  []string    `json:"supported_archs"`

@@ -221,3 +221,32 @@ func TestDatasetStore_UserLikesDatasets(t *testing.T) {
 	require.Equal(t, []string{"repo1", "repo3"}, names)
 
 }
+
+func TestDatasetStore_FindWithOriginalPath(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewDatasetStoreWithDB(db)
+
+	repos := []*database.Repository{
+		{ID: 10, Name: "repo2", RepositoryType: types.DatasetRepo, Path: "ns/repo2", MSPath: "ms/repo2"},
+	}
+
+	for _, repo := range repos {
+		repo.GitPath = repo.Path
+		err := db.Core.NewInsert().Model(repo).Scan(ctx, repo)
+		require.Nil(t, err)
+		_, err = store.Create(ctx, database.Dataset{
+			RepositoryID: repo.ID,
+		})
+		require.Nil(t, err)
+	}
+
+	m1, err := store.FindByOriginPath(ctx, "ns/repo2")
+	require.Nil(t, err)
+	require.Equal(t, "repo2", m1.Repository.Name)
+	m2, err := store.FindByOriginPath(ctx, "ms/repo2")
+	require.Nil(t, err)
+	require.Equal(t, "repo2", m2.Repository.Name)
+}

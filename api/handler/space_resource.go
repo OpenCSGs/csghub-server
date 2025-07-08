@@ -33,7 +33,7 @@ type SpaceResourceHandler struct {
 // @Accept       json
 // @Produce      json
 // @Param        cluster_id query string false "cluster_id"
-// @Param 		 deploy_type query int false "deploy type(0-space,1-inference,2-finetune)" Enums(0, 1, 2) default(1)
+// @Param 		 deploy_type query int false "deploy type(0-space,1-inference,2-finetune,3-serverless,4-evaluation)" Enums(0, 1, 2, 3, 4) default(1)
 // @Success      200  {object}  types.ResponseWithTotal{data=[]types.SpaceResource,total=int} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"

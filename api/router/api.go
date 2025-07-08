@@ -599,6 +599,10 @@ func createModelRoutes(config *config.Config,
 		modelsMonitorGroup.GET("/:namespace/:name/serverless/:id/memory/:instance/usage", monitorHandler.MemoryUsage)
 		modelsMonitorGroup.GET("/:namespace/:name/serverless/:id/request/:instance/count", monitorHandler.RequestCount)
 		modelsMonitorGroup.GET("/:namespace/:name/serverless/:id/request/:instance/latency", monitorHandler.RequestLatency)
+
+		// evaluation monitor
+		modelsMonitorGroup.GET("/evaluations/:id/cpu/:instance/usage", monitorHandler.CPUUsageEvaluation)
+		modelsMonitorGroup.GET("/evaluations/:id/memory/:instance/usage", monitorHandler.MemoryUsageEvaluation)
 	}
 
 	modelsServerlessGroup := modelsGroup.Group("")
@@ -874,6 +878,7 @@ func createRuntimeFrameworkRoutes(apiGroup *gin.RouterGroup, middlewareCollectio
 		runtimeFramework.PUT("/:id/architecture", needAdmin, runtimeArchHandler.UpdateArchitecture)
 		runtimeFramework.DELETE("/:id/architecture", needAdmin, runtimeArchHandler.DeleteArchitecture)
 		runtimeFramework.POST("/scan", needAdmin, runtimeArchHandler.ScanArchitecture)
+		runtimeFramework.POST("/:namespace/:name/scan", middlewareCollection.Auth.NeedLogin, runtimeArchHandler.ScanArchForSingleModel)
 	}
 }
 

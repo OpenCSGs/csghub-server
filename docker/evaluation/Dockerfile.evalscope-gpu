@@ -1,0 +1,13 @@
+FROM modelscope-registry.cn-hangzhou.cr.aliyuncs.com/modelscope-repo/modelscope:ubuntu22.04-cuda12.4.0-py311-torch2.6.0-1.26.0-LLM
+RUN apt-get update && apt-get -y install dumb-init \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+RUN pip install --no-cache-dir minio oss2 csghub-sdk==0.7.2
+COPY ./evalscope/ /etc/csghub/
+RUN ln -s /usr/bin/python3 /usr/bin/python &&\
+    chmod +x /etc/csghub/*.sh
+WORKDIR /workspace/
+ENV HUGGINGFACE_HUB_CACHE=/workspace/ \
+    HF_HUB_ENABLE_HF_TRANSFER=0 \
+    HF_HUB_DOWNLOAD_TIMEOUT=30
+ENTRYPOINT [ "/usr/bin/dumb-init", "--" ]
+CMD ["/etc/csghub/start.sh"]

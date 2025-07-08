@@ -84,6 +84,44 @@ func TestDeployTaskStore_CRUD(t *testing.T) {
 	require.Equal(t, dp.Status, common.Deleted)
 
 }
+
+func TestDeployTaskStore_DeleteNow(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewDeployTaskStoreWithDB(db)
+
+	err := store.CreateDeploy(ctx, &database.Deploy{
+		DeployName: "dp1", SvcName: "s1",
+		RepoID:  123,
+		UserID:  456,
+		SpaceID: 321,
+		Type:    types.ServerlessType,
+	})
+	require.Nil(t, err)
+
+	dp, err := store.GetServerlessDeployByRepID(ctx, 123)
+	require.Nil(t, err)
+	require.Equal(t, dp.SvcName, "s1")
+	dps, total, err := store.ListServerless(ctx, types.DeployReq{
+		DeployType: types.ServerlessType,
+		PageOpts: types.PageOpts{
+			Page:     1,
+			PageSize: 10,
+		},
+	})
+	require.Nil(t, err)
+	require.Equal(t, 1, total)
+	require.Equal(t, dps[0].SvcName, "s1")
+
+	err = store.DeleteDeployNow(ctx, dp.ID)
+	require.Nil(t, err)
+	_, err = store.GetDeployByID(ctx, dp.ID)
+	require.NotNil(t, err)
+
+}
+
 func TestDeployTaskStore_DeployTaskCRUD(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()

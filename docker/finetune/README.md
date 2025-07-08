@@ -1,10 +1,12 @@
 # CSGHUB Finetune Images Building
 
 ## Base Images
+
 - https://docs.nvidia.com/deeplearning/frameworks/support-matrix/index.html
 - https://catalog.ngc.nvidia.com/orgs/nvidia/containers/pytorch/tags
 
 ## Login Container Registry
+
 ```bash
 OPENCSG_ACR="opencsg-registry.cn-beijing.cr.aliyuncs.com"
 OPENCSG_ACR_USERNAME=""
@@ -13,6 +15,7 @@ echo "$OPENCSG_ACR_PASSWORD" | docker login $OPENCSG_ACR -u $OPENCSG_ACR_USERNAM
 ```
 
 ## Build Multi-Platform Images
+
 ```bash
 #opencsg-registry.cn-beijing.cr.aliyuncs.com/public/llama-factory:0.9.2
 export BUILDX_NO_DEFAULT_ATTESTATIONS=1
@@ -23,7 +26,21 @@ docker buildx build --platform linux/amd64,linux/arm64 \
   -f Dockerfile.llamafactory \
   --push .
 ```
+
+## Build arm64 for npu Images
+
+```bash
+export BUILDX_NO_DEFAULT_ATTESTATIONS=1
+export IMAGE_TAG=2.1-8.0.rc2.alpha003-910b-ubuntu22.04-py3.8
+docker buildx build --platform linux/arm64 \
+  -t ${OPENCSG_ACR}/public/llama-factory:${IMAGE_TAG} \
+  -t ${OPENCSG_ACR}/public/llama-factory:latest \
+  -f Dockerfile.llamafactory-npu \
+  --push .
+```
+
 ## Build Multi-Platform Images for swift
+
 ```bash
 #opencsg-registry.cn-beijing.cr.aliyuncs.com/public/ms-swift:v3.2.0.post2
 export BUILDX_NO_DEFAULT_ATTESTATIONS=1
@@ -34,26 +51,29 @@ docker buildx build --platform linux/amd64,linux/arm64 \
   -f Dockerfile.ms-swift \
   --push .
 ```
-*Note: The above command will create `linux/amd64` and `linux/arm64` images with the tags `${IMAGE_TAG}` and `latest` at the same time.*
+
+_Note: The above command will create `linux/amd64` and `linux/arm64` images with the tags `${IMAGE_TAG}` and `latest` at the same time._
 
 ## build gradio whl
+
 ```
 1. build gradio base image or pick from opencsg-registry.cn-beijing.cr.aliyuncs.com/public/gradio-build-base:1.0
 2. docker run -itd base_image
-3. download gradio resource:  git clone https://gitee.com/xzgan/gradio.git --branch 5.1.0 --single-branch
+3. download gradio resource:  git clone https://gitee.com/xzgan/gradio.git --branch 5.12.0 --single-branch
 4. build frontend js: bash scripts/build_frontend.sh
 5. build whl: python3 -m build -w
 6. check whl file in dist folder and upload to https://git-devops.opencsg.com/opensource/gradio/
 ```
 
 ## fintune image name, version and cuda version
-| Image Name | Version | CUDA Version | Fix
-| --- | --- | --- |--- |
-| llama-factory | 0.9.2 | 12.4 |- |
-| ms-swift | v3.2.0 | 12.4 |- |
 
+| Image Name    | Version | CUDA Version | Fix |
+| ------------- | ------- | ------------ | --- |
+| llama-factory | 0.9.3   | 12.1         | -   |
+| ms-swift      | v3.5.2  | 12.1         | -   |
 
 ## Run Finetune Image Locally
+
 ```bash
 docker run -d \
   --gpus device=7 \
@@ -71,6 +91,5 @@ docker run -d \
   -p 30147:8000 \
   ${OPENCSG_ACR}/public/ms-swift:${IMAGE_TAG}
 ```
-*Note: HF_ENDPOINT should be use the real csghub address.*
 
-
+_Note: HF_ENDPOINT should be use the real csghub address._

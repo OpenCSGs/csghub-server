@@ -89,6 +89,7 @@ type DeployTaskStore interface {
 	UpdateInTx(ctx context.Context, deployColumns, deployTaskColumns []string, deploy *Deploy, deployTasks ...*DeployTask) error
 	ListDeploy(ctx context.Context, repoType types.RepositoryType, repoID, userID int64) ([]Deploy, error)
 	DeleteDeploy(ctx context.Context, repoType types.RepositoryType, repoID, userID int64, deployID int64) error
+	DeleteDeployNow(ctx context.Context, deployID int64) error
 	ListDeployByUserID(ctx context.Context, userID int64, req *types.DeployReq) ([]Deploy, int, error)
 	ListInstancesByUserID(ctx context.Context, userID int64, per, page int) ([]Deploy, int, error)
 	GetDeployByID(ctx context.Context, deployID int64) (*Deploy, error)
@@ -229,6 +230,16 @@ func (s *deployTaskStoreImpl) ListDeploy(ctx context.Context, repoType types.Rep
 		return nil, err
 	}
 	return result, nil
+}
+
+func (s *deployTaskStoreImpl) DeleteDeployNow(ctx context.Context, deployID int64) error {
+	// only delete the deploy of specific repo was triggered by current login user
+	res, err := s.db.BunDB.Exec("Delete from deploys where id = ?", deployID)
+	if err != nil {
+		return err
+	}
+	err = assertAffectedOneRow(res, err)
+	return err
 }
 
 func (s *deployTaskStoreImpl) DeleteDeploy(ctx context.Context, repoType types.RepositoryType, repoID, userID int64, deployID int64) error {

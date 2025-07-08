@@ -136,6 +136,27 @@ func (r Repository) OriginName() string {
 	return oriName
 }
 
+func (r Repository) OriginPath() string {
+	oriPath := r.Path
+	if r.HFPath != "" {
+		oriPath = r.HFPath
+	} else if r.MSPath != "" {
+		oriPath = r.MSPath
+	}
+	return oriPath
+}
+
+func (r Repository) OriginNamespaceAndName() (string, string) {
+	originPath := r.Path
+	if r.HFPath != "" {
+		originPath = r.HFPath
+	} else if r.MSPath != "" {
+		originPath = r.MSPath
+	}
+	fields := strings.Split(originPath, "/")
+	return fields[0], fields[1]
+}
+
 func (r Repository) Archs() (archs []string) {
 	if r.Metadata.Architecture != "" {
 		archs = append(archs, r.Metadata.Architecture)

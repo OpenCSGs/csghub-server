@@ -713,11 +713,14 @@ func TestDeployer_SubmitEvaluation(t *testing.T) {
 	tester.mocks.runner.EXPECT().SubmitWorkFlow(ctx, mock.Anything).RunAndReturn(
 		func(ctx context.Context, awfr *types.ArgoWorkFlowReq) (*types.ArgoWorkFlowRes, error) {
 			require.Equal(t, map[string]string{
-				"REVISION":     "main",
-				"MODEL_ID":     "m1",
-				"DATASET_IDS":  "",
-				"ACCESS_TOKEN": "k",
-				"HF_ENDPOINT":  "dl",
+				"REVISIONS":               "main",
+				"MODEL_IDS":               "",
+				"DATASET_IDS":             "",
+				"USE_CUSTOM_DATASETS":     "false",
+				"DATASET_REVISIONS":       "",
+				"ACCESS_TOKEN":            "k",
+				"HF_ENDPOINT":             "dl",
+				"HF_HUB_DOWNLOAD_TIMEOUT": "30",
 			}, awfr.Templates[0].Env)
 			return &types.ArgoWorkFlowRes{ID: 1}, nil
 		},
@@ -726,7 +729,7 @@ func TestDeployer_SubmitEvaluation(t *testing.T) {
 		ModelId:          "m1",
 		Token:            "k",
 		DownloadEndpoint: "dl",
-		Revision:         "main",
+		Revisions:        []string{"main"},
 	})
 	require.NoError(t, err)
 	require.Equal(t, &types.ArgoWorkFlowRes{ID: 1}, resp)

@@ -50,7 +50,9 @@ type EvaluationReq struct {
 	Datasets           []string `json:"datasets,omitempty"`
 	ResourceId         int64    `json:"resource_id"`
 	ModelId            string   `json:"model_id"`
+	ModelIds           []string `json:"model_ids,omitempty"` // for comparison
 	ShareMode          bool     `json:"share_mode"`
+	CustomDataSets     []string `json:"custom_datasets,omitempty"` // custom datasets
 	Token              string   `json:"-"`
 	Hardware           HardWare `json:"-"`
 	UserUUID           string   `json:"-"`
@@ -60,7 +62,14 @@ type EvaluationReq struct {
 	TaskType           TaskType `json:"-"`
 	DownloadEndpoint   string   `json:"-"`
 	ResourceName       string   `json:"-"`
-	Revision           string   `json:"-"`
+	Revisions          []string `json:"-"`
+	DatasetRevisions   []string `json:"-"`
+	UseCustomDataset   bool     `json:"-"`
+}
+
+type CustomData struct {
+	TaskName string `json:"task_name"`
+	DataSet  string `json:"dataset_name"`
 }
 
 type ArgoFlowTemplate struct {
@@ -98,52 +107,56 @@ type ArgoWorkFlowListRes struct {
 }
 
 type ArgoWorkFlowRes struct {
-	ID          int64                  `json:"id"`
-	RepoIds     []string               `json:"repo_ids"`
-	RepoType    string                 `json:"repo_type,omitempty"`
-	Username    string                 `json:"username"`
-	TaskName    string                 `json:"task_name"`
-	TaskId      string                 `json:"task_id"`
-	TaskType    TaskType               `json:"task_type"`
-	TaskDesc    string                 `json:"task_desc"`
-	Datasets    []string               `json:"datasets,omitempty"`
-	ResourceId  int64                  `json:"resource_id,omitempty"`
-	Status      v1alpha1.WorkflowPhase `json:"status"`
-	Reason      string                 `json:"reason,omitempty"`
-	Image       string                 `bun:",notnull" json:"image"`
-	SubmitTime  time.Time              `json:"submit_time"`
-	StartTime   time.Time              `json:"start_time,omitempty"`
-	EndTime     time.Time              `json:"end_time,omitempty"`
-	ResultURL   string                 `json:"result_url"`
-	DownloadURL string                 `json:"download_url"`
-	FailuresURL string                 `json:"failures_url"`
+	ID           int64                  `json:"id"`
+	RepoIds      []string               `json:"repo_ids"`
+	RepoType     string                 `json:"repo_type,omitempty"`
+	Username     string                 `json:"username"`
+	TaskName     string                 `json:"task_name"`
+	Namespace    string                 `json:"namespace,omitempty"` // Namespace of the workflow
+	TaskId       string                 `json:"task_id"`
+	TaskType     TaskType               `json:"task_type"`
+	TaskDesc     string                 `json:"task_desc"`
+	Datasets     []string               `json:"datasets,omitempty"`
+	ResourceId   int64                  `json:"resource_id,omitempty"`
+	ResourceName string                 `json:"resource_name,omitempty"`
+	Status       v1alpha1.WorkflowPhase `json:"status"`
+	Reason       string                 `json:"reason,omitempty"`
+	Image        string                 `bun:",notnull" json:"image"`
+	SubmitTime   time.Time              `json:"submit_time"`
+	StartTime    time.Time              `json:"start_time,omitempty"`
+	EndTime      time.Time              `json:"end_time,omitempty"`
+	ResultURL    string                 `json:"result_url"`
+	DownloadURL  string                 `json:"download_url"`
+	FailuresURL  string                 `json:"failures_url"`
 }
 
 type RepoTags struct {
-	RepoId string    `json:"repo_id"`
-	Tags   []RepoTag `json:"tags"`
+	RepoId  string    `json:"repo_id"`
+	Tags    []RepoTag `json:"tags"`
+	Deleted bool      `json:"deleted,omitempty"` // Indicates if the repo is deleted
 }
 
 type EvaluationRes struct {
-	ID          int64      `json:"id"`
-	RepoIds     []string   `json:"repo_ids"`
-	RepoType    string     `json:"repo_type,omitempty"`
-	Username    string     `json:"username"`
-	TaskName    string     `json:"task_name"`
-	TaskId      string     `json:"task_id"`
-	TaskType    TaskType   `json:"task_type"`
-	TaskDesc    string     `json:"task_desc"`
-	Datasets    []RepoTags `json:"datasets,omitempty"`
-	ResourceId  int64      `json:"resource_id,omitempty"`
-	Status      string     `json:"status"`
-	Reason      string     `json:"reason,omitempty"`
-	Image       string     `bun:",notnull" json:"image"`
-	SubmitTime  time.Time  `json:"submit_time"`
-	StartTime   time.Time  `json:"start_time,omitempty"`
-	EndTime     time.Time  `json:"end_time,omitempty"`
-	ResultURL   string     `json:"result_url"`
-	DownloadURL string     `json:"download_url"`
-	FailuresURL string     `json:"failures_url"`
+	ID           int64      `json:"id"`
+	RepoIds      []string   `json:"repo_ids"`
+	RepoType     string     `json:"repo_type,omitempty"`
+	Username     string     `json:"username"`
+	TaskName     string     `json:"task_name"`
+	TaskId       string     `json:"task_id"`
+	TaskType     TaskType   `json:"task_type"`
+	TaskDesc     string     `json:"task_desc"`
+	Datasets     []RepoTags `json:"datasets,omitempty"`
+	ResourceId   int64      `json:"resource_id,omitempty"`
+	ResourceName string     `json:"resource_name,omitempty"`
+	Status       string     `json:"status"`
+	Reason       string     `json:"reason,omitempty"`
+	Image        string     `bun:",notnull" json:"image"`
+	SubmitTime   time.Time  `json:"submit_time"`
+	StartTime    time.Time  `json:"start_time,omitempty"`
+	EndTime      time.Time  `json:"end_time,omitempty"`
+	ResultURL    string     `json:"result_url"`
+	DownloadURL  string     `json:"download_url"`
+	FailuresURL  string     `json:"failures_url"`
 }
 
 type (

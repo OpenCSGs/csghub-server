@@ -13,29 +13,30 @@ import (
 func TestEvaluationComponent_CreateEvaluation(t *testing.T) {
 	req := types.EvaluationReq{
 		TaskName:           "test",
-		ModelId:            "opencsg/wukong",
 		Username:           "test",
 		ResourceId:         0,
 		Datasets:           []string{"opencsg/hellaswag"},
 		RuntimeFrameworkId: 1,
+		ModelIds:           []string{"opencsg/wukong"},
 	}
 	ctx := context.TODO()
 	req2 := types.EvaluationReq{
 		UserUUID:           "test",
 		TaskName:           "test",
-		ModelId:            "opencsg/wukong",
+		ModelIds:           []string{"opencsg/wukong"},
 		Username:           "test",
 		ResourceId:         0,
 		Datasets:           []string{"Rowan/hellaswag"},
+		DatasetRevisions:   []string{"main"},
 		RuntimeFrameworkId: 1,
-		Revision:           "main",
+		Revisions:          []string{"main"},
 		Hardware: types.HardWare{
 			Gpu: types.Processor{
 				Num:          "1",
 				ResourceName: "nvidia.com/gpu",
 			},
 			Cpu: types.CPU{
-				Num: "8",
+				Num: "4",
 			},
 			Memory: "32Gi",
 		},
@@ -61,22 +62,29 @@ func TestEvaluationComponent_CreateEvaluation(t *testing.T) {
 				},
 			}, nil,
 		).Maybe()
-		c.mocks.stores.MirrorMock().EXPECT().FindByRepoPath(ctx, types.DatasetRepo, "opencsg", "hellaswag").Return(&database.Mirror{
-			SourceRepoPath: "Rowan/hellaswag",
+		c.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.DatasetRepo, "opencsg", "hellaswag").Return(&database.Repository{
+			ID:            1,
+			DefaultBranch: "main",
+			HFPath:        "Rowan/hellaswag",
 		}, nil)
 		c.mocks.stores.AccessTokenMock().EXPECT().FindByUID(ctx, int64(1)).Return(&database.AccessToken{Token: "foo"}, nil)
 		c.mocks.stores.RuntimeFrameworkMock().EXPECT().FindEnabledByID(ctx, int64(1)).Return(&database.RuntimeFramework{
-			ID:         1,
-			FrameImage: "lm-evaluation-harness:0.4.6",
+			ID:          1,
+			FrameImage:  "lm-evaluation-harness:0.4.6",
+			ComputeType: string(types.ResourceTypeGPU),
 		}, nil)
+		req2.ResourceName = "1 GPU · 4 vCPU · 32Gi"
 		c.mocks.deployer.EXPECT().SubmitEvaluation(ctx, req2).Return(&types.ArgoWorkFlowRes{
 			ID:       1,
 			TaskName: "test",
 		}, nil)
+		req.ResourceName = "1 GPU · 4 vCPU · 32Gi"
 		e, err := c.CreateEvaluation(ctx, req)
 		require.NotNil(t, e)
 		require.Equal(t, "test", e.TaskName)
 		require.Nil(t, err)
+		req2.ResourceName = ""
+		req.ResourceName = ""
 	})
 	t.Run("create evaluation with resource id", func(t *testing.T) {
 		req.ResourceId = 1
@@ -97,13 +105,16 @@ func TestEvaluationComponent_CreateEvaluation(t *testing.T) {
 				},
 			}, nil,
 		).Maybe()
-		c.mocks.stores.MirrorMock().EXPECT().FindByRepoPath(ctx, types.DatasetRepo, "opencsg", "hellaswag").Return(&database.Mirror{
-			SourceRepoPath: "Rowan/hellaswag",
+		c.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.DatasetRepo, "opencsg", "hellaswag").Return(&database.Repository{
+			ID:            1,
+			DefaultBranch: "main",
+			HFPath:        "Rowan/hellaswag",
 		}, nil)
 		c.mocks.stores.AccessTokenMock().EXPECT().FindByUID(ctx, int64(1)).Return(&database.AccessToken{Token: "foo"}, nil)
 		c.mocks.stores.RuntimeFrameworkMock().EXPECT().FindEnabledByID(ctx, int64(1)).Return(&database.RuntimeFramework{
-			ID:         1,
-			FrameImage: "lm-evaluation-harness:0.4.6",
+			ID:          1,
+			FrameImage:  "lm-evaluation-harness:0.4.6",
+			ComputeType: string(types.ResourceTypeGPU),
 		}, nil)
 
 		resource, err := json.Marshal(req2.Hardware)
@@ -117,6 +128,7 @@ func TestEvaluationComponent_CreateEvaluation(t *testing.T) {
 			ID:       1,
 			TaskName: "test",
 		}, nil)
+		req.ResourceName = "1 GPU · 4 vCPU · 32Gi"
 		e, err := c.CreateEvaluation(ctx, req)
 		require.NotNil(t, e)
 		require.Equal(t, "test", e.TaskName)
@@ -142,18 +154,16 @@ func TestEvaluationComponent_GetEvaluation(t *testing.T) {
 		TaskType: "evaluation",
 		Status:   "Succeed",
 	}, nil)
-	c.mocks.stores.DatasetMock().EXPECT().ListByPath(ctx, []string{"Rowan/hellaswag"}).Return([]database.Dataset{
-		{
-			Repository: &database.Repository{
-				Path: "Rowan/hellaswag",
-				Tags: []database.Tag{
-					{
-						Name:     "test",
-						Category: "test",
-						Group:    "test",
-						Scope:    "test",
-						BuiltIn:  true,
-					},
+	c.mocks.stores.DatasetMock().EXPECT().FindByOriginPath(ctx, "Rowan/hellaswag").Return(&database.Dataset{
+		Repository: &database.Repository{
+			Path: "Rowan/hellaswag",
+			Tags: []database.Tag{
+				{
+					Name:     "test",
+					Category: "test",
+					Group:    "test",
+					Scope:    "test",
+					BuiltIn:  true,
 				},
 			},
 		},

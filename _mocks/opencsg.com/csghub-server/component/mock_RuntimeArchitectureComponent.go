@@ -333,6 +333,55 @@ func (_c *MockRuntimeArchitectureComponent_ScanAllModels_Call) RunAndReturn(run 
 	return _c
 }
 
+// ScanModel provides a mock function with given fields: ctx, currentUser, namespace, name
+func (_m *MockRuntimeArchitectureComponent) ScanModel(ctx context.Context, currentUser string, namespace string, name string) error {
+	ret := _m.Called(ctx, currentUser, namespace, name)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ScanModel")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) error); ok {
+		r0 = rf(ctx, currentUser, namespace, name)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockRuntimeArchitectureComponent_ScanModel_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ScanModel'
+type MockRuntimeArchitectureComponent_ScanModel_Call struct {
+	*mock.Call
+}
+
+// ScanModel is a helper method to define mock.On call
+//   - ctx context.Context
+//   - currentUser string
+//   - namespace string
+//   - name string
+func (_e *MockRuntimeArchitectureComponent_Expecter) ScanModel(ctx interface{}, currentUser interface{}, namespace interface{}, name interface{}) *MockRuntimeArchitectureComponent_ScanModel_Call {
+	return &MockRuntimeArchitectureComponent_ScanModel_Call{Call: _e.mock.On("ScanModel", ctx, currentUser, namespace, name)}
+}
+
+func (_c *MockRuntimeArchitectureComponent_ScanModel_Call) Run(run func(ctx context.Context, currentUser string, namespace string, name string)) *MockRuntimeArchitectureComponent_ScanModel_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string))
+	})
+	return _c
+}
+
+func (_c *MockRuntimeArchitectureComponent_ScanModel_Call) Return(_a0 error) *MockRuntimeArchitectureComponent_ScanModel_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockRuntimeArchitectureComponent_ScanModel_Call) RunAndReturn(run func(context.Context, string, string, string) error) *MockRuntimeArchitectureComponent_ScanModel_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // SetArchitectures provides a mock function with given fields: ctx, id, architectures
 func (_m *MockRuntimeArchitectureComponent) SetArchitectures(ctx context.Context, id int64, architectures []string) ([]string, error) {
 	ret := _m.Called(ctx, id, architectures)

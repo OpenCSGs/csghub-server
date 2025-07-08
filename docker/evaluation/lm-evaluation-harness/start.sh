@@ -25,20 +25,19 @@ search_path_with_most_term() {
     echo $max_count_path
     return 0
 }
-export HF_ENDPOINT="$HF_ENDPOINT/hf"
+export HF_TOKEN=$ACCESS_TOKEN
 #download datasets
-if [ ! -z "$DATASET_IDS" ]; then
+IFS=',' read -r -a dataset_repos <<< "$DATASET_IDS"
+IFS=',' read -r -a dataset_revisions <<< "$DATASET_REVISIONS"
+for index in "${!dataset_repos[@]}"; do
+    repo=${dataset_repos[$index]}
+    revision=${dataset_revisions[$index]}
     echo "Downloading datasets..."
-    python /etc/csghub/download.py datasets --dataset_ids $DATASET_IDS
-fi
+    python /etc/csghub/download.py datasets --dataset_ids $repo --endpoint $HF_ENDPOINT --token $HF_TOKEN --revision $revision --source hf
+done
 if [ $? -ne 0 ]; then
     echo "Failed to download datasets"
     exit 1
-fi
-#download models
-if [ ! -z "$MODEL_ID" ]; then
-    echo "Downloading models..."
-    python /etc/csghub/download.py models --model_ids $MODEL_ID
 fi
 if [ $? -ne 0 ]; then
     echo "Failed to download models"
@@ -55,6 +54,17 @@ script_dts_array=("allenai/winogrande" "facebook/anli" "aps/super_glue" "Rowan/h
 script_dts_multi_config_array=("allenai/winogrande")
 for repo in "${dataset_repos[@]}"; do
     repo_name="${repo#*/}"
+    if [ "$USE_CUSTOM_DATASETS" = "true" ]; then
+        task_file=$(find /workspace/$repo -name "*.yaml" -type f | head -n 1)
+        
+        if [ -z "$task_file" ]; then
+            echo "No task file found in custom dataset $repo"
+            exit 1
+        fi
+        mkdir -p /workspace/lm-evaluation-harness/lm_eval/tasks/my-custom-tasks
+        cp $task_file /workspace/lm-evaluation-harness/lm_eval/tasks/my-custom-tasks/
+    fi
+
     if [[ " ${script_dts_array[@]} " =~ " ${repo} " ]]; then
         #need replace with real path
         echo "replace script repo with namespace repo"
@@ -62,6 +72,8 @@ for repo in "${dataset_repos[@]}"; do
         if [[ " ${script_dts_multi_config_array[@]} " =~ " ${repo} " ]]; then
             grep -rl "dataset_path: $repo" "$task_dir" | xargs sed -i "s|dataset_name: .*|dataset_name: null|g"
         fi
+    else
+        find $task_dir -type f -exec sed -i "s|dataset_path: .*${repo_name}|dataset_path: $repo|g" {} +
     fi
     # search full id to cover mirror repo id
     mapfile -t yaml_files < <(grep -Rl -E "(dataset_path: ${repo}($|\s))" $task_dir)
@@ -93,39 +105,66 @@ for repo in "${dataset_repos[@]}"; do
     fi
     #fix sub task from groups
     sub_group_task_yaml=""
-    if [ ${#yaml_files[@]} -eq 1 ]; then
-        sub_group_task_yaml="${yaml_files[0]}"
-    fi
+    # pick file if contains common path
+    for yaml_file in "${yaml_files[@]}"; do
+        if [[ "$yaml_file" == "$common_path"* ]]; then
+            sub_group_task_yaml="$yaml_file"
+            break
+        fi
+    done
+
     echo "common path found for repo $repo: $common_path"
-    repo_task=`python /etc/csghub/get_task.py task --task_dir $common_path --sub_task_yaml $sub_group_task_yaml`
-    if [ ! -z "$repo_task" ]; then
-        tasks="$tasks,$repo_task"
-    fi
+    rm -rf /tmp/task.txt
+    python /etc/csghub/get_task.py task --task_dir $common_path --sub_task_yaml $sub_group_task_yaml
+    if [ -f /tmp/task.txt ]; then
+        repo_task=`cat /tmp/task.txt`
+        if [ ! -z "$repo_task" ]; then
+            tasks="$tasks,$repo_task"
+        fi
+    fi 
+    
 done
 tasks=$(echo "$tasks" | sed 's/^,//; s/,$//')
 tasks=$(echo "$tasks" | tr -d ' ' | tr ',' ',')
 echo "will start tasks: $tasks"
+IFS=',' read -r -a model_repos <<< "$MODEL_IDS"
+modelNames=""
+jsonFiles=""
+IFS=',' read -r -a model_repos <<< "$MODEL_IDS"
+IFS=',' read -r -a model_revisions <<< "$REVISIONS"
+for index in "${!model_repos[@]}"; do
+    modelID=${model_repos[$index]}
+    revision=${model_revisions[$index]}
+    echo "Start downloading model $modelID"
+    python /etc/csghub/download.py models --model_ids $modelID --endpoint $HF_ENDPOINT --token $HF_TOKEN --revision $revision --source csg
+    #fix cache bug
+    sed -i 's/"use_cache": true/"use_cache": false/g' /workspace/$modelID/config.json
+    model_name=`basename $modelID`
+    modelNames="$modelNames,$model_name"
+    accelerate launch -m lm_eval \
+            --model hf \
+            --model_args pretrained=${modelID},dtype=auto,trust_remote_code=True \
+            --tasks "$tasks,$tasks" \
+            --batch_size auto \
+            --output_path /workspace/output/
 
-
-accelerate launch -m lm_eval \
-        --model hf \
-        --model_args pretrained=${MODEL_ID},dtype=auto,trust_remote_code=True \
-        --tasks "$tasks" \
-        --batch_size auto \
-        --output_path /workspace/output/
-
-if [ $? -eq 0 ]; then
-    echo "Evaluation completed successfully."
-else
-    echo "Evaluation failed."
-    exit 1
-fi
+    if [ $? -eq 0 ]; then
+        echo "Evaluation completed successfully."
+    else
+        echo "Evaluation failed."
+        exit 1
+    fi
+    json_file=`ls -dt /workspace/output/*${model_name}*/*.json | head -n 1`
+    jsonFiles="$jsonFiles,$json_file"
+    rm -rf /workspace/$modelID
+done
 
 # upload result to mino server
-json_file=`ls -dt /workspace/output/*/*.json |head -n 1`
-model_name=`basename $MODEL_ID`
-python /etc/csghub/upload_files.py summary --file $json_file --model $model_name
-upload_json_file=`ls -d /workspace/output/*${model_name}*/*upload.json`
-upload_xlsx_file=`ls -d /workspace/output/*${model_name}*/*upload.xlsx`
+mkdir -p /workspace/output/final
+python /etc/csghub/upload_files.py summary --file $jsonFiles --model $modelNames
+upload_json_file=`ls -d /workspace/output/final/upload.json`
+upload_xlsx_file=`ls -d /workspace/output/final/upload.xlsx`
 python /etc/csghub/upload_files.py upload "$upload_json_file,$upload_xlsx_file"
-echo "finish evaluation for $MODEL_ID"
+output=`cat /tmp/output.txt`
+echo "Evaluation output: $output"
+echo "finish evaluation for $MODEL_IDS"

@@ -14,12 +14,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/blang/semver/v4"
 	gguf "github.com/gpustack/gguf-parser-go"
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/store/cache"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
 )
@@ -54,6 +56,7 @@ type RuntimeArchitectureComponent interface {
 	SetArchitectures(ctx context.Context, id int64, architectures []string) ([]string, error)
 	DeleteArchitectures(ctx context.Context, id int64, architectures []string) ([]string, error)
 	ScanAllModels(ctx context.Context, scanType int) error
+	ScanModel(ctx context.Context, currentUser, namespace, name string) error
 	UpdateModelMetadata(ctx context.Context, repo *database.Repository) (*types.ModelInfo, error)
 	// add runtime_framework tag to model
 	AddRuntimeFrameworkTag(ctx context.Context, rftags []*database.Tag, repoId, rfId int64) error
@@ -144,6 +147,29 @@ func (c *runtimeArchitectureComponentImpl) DeleteArchitectures(ctx context.Conte
 		}
 	}
 	return failedDeletes, nil
+}
+
+func (c *runtimeArchitectureComponentImpl) ScanModel(ctx context.Context, currentUser, namespace, name string) error {
+	repo, err := c.repoStore.FindByPath(ctx, types.ModelRepo, namespace, name)
+	if err != nil {
+		return fmt.Errorf("fail to find repository by namespace and name, %w", err)
+	}
+	permission, err := c.repoComponent.GetUserRepoPermission(ctx, currentUser, repo)
+	if err != nil {
+		return fmt.Errorf("fail to get user permission for repository, %w", err)
+	}
+	if !permission.CanWrite {
+		return errorx.ErrForbiddenMsg(fmt.Sprintf("user %s does not have permission to update metadata for %s ", currentUser, repo.Path))
+	}
+	modelInfo, err := c.UpdateModelMetadata(ctx, repo)
+	if err != nil {
+		return fmt.Errorf("fail to update model metadata, %w", err)
+	}
+	err = c.UpdateRuntimeFrameworkTag(ctx, modelInfo, repo)
+	if err != nil {
+		return fmt.Errorf("fail to update runtime framework tag, %w", err)
+	}
+	return nil
 }
 
 // scanType: 0-all, 1-new
@@ -638,17 +664,18 @@ func (c *runtimeArchitectureComponentImpl) InitRuntimeFrameworkAndArchitectures(
 func (c *runtimeArchitectureComponentImpl) UpdateRuntimeFrameworkByType(ctx context.Context, engineType int) error {
 	var jsonFiles []string
 	var err error
-	if engineType == types.InferenceType {
+	switch engineType {
+	case types.InferenceType:
 		jsonFiles, err = getJsonfiles("inference")
 		if err != nil {
 			return fmt.Errorf("failed to get json files: %w", err)
 		}
-	} else if engineType == types.FinetuneType {
+	case types.FinetuneType:
 		jsonFiles, err = getJsonfiles("finetune")
 		if err != nil {
 			return fmt.Errorf("failed to get json files: %w", err)
 		}
-	} else if engineType == types.EvaluationType {
+	case types.EvaluationType:
 		jsonFiles, err = getJsonfiles("evaluation")
 		if err != nil {
 			return fmt.Errorf("failed to get json files: %w", err)
@@ -674,6 +701,13 @@ func (c *runtimeArchitectureComponentImpl) UpdateRuntimeFrameworkByType(ctx cont
 			slog.Error("failed to get file info", slog.Any("file", filePath), slog.Any("error", err))
 			continue
 		}
+		if engineConfig.MinVersion != "" {
+			err = c.removeFrameAndArchByVersion(ctx, engineConfig.EngineName, engineConfig.MinVersion)
+			if err != nil {
+				slog.Error("failed to remove runtime_framework and archs", slog.Any("file", filePath), slog.Any("error", err))
+				continue
+			}
+		}
 		engineConfig.UpdatedAt = fileInfo.ModTime()
 		err = c.UpdateRuntimeFrameworkAndArch(ctx, engineType, engineConfig)
 		if err != nil {
@@ -687,7 +721,7 @@ func (c *runtimeArchitectureComponentImpl) UpdateRuntimeFrameworkByType(ctx cont
 // update runtime_framework if the updated time is different
 func (c *runtimeArchitectureComponentImpl) UpdateRuntimeFrameworkAndArch(ctx context.Context, engineType int, engineConfig types.EngineConfig) error {
 	for _, image := range engineConfig.EngineImages {
-		rf, err := c.runtimeFrameworksStore.FindByNameAndComputeType(ctx, engineConfig.EngineName, image.DriverVersion, string(image.ComputeType))
+		rf, err := c.runtimeFrameworksStore.FindByFrameImageAndComputeType(ctx, image.Image, string(image.ComputeType))
 		if err != nil {
 			if !errors.Is(err, sql.ErrNoRows) {
 				slog.Error("failed to find runtime_framework", slog.Any("error", err))
@@ -772,6 +806,34 @@ func (c *runtimeArchitectureComponentImpl) UpdateRuntimeFrameworkAndArch(ctx con
 
 	}
 
+	return nil
+}
+
+func (c *runtimeArchitectureComponentImpl) removeFrameAndArchByVersion(ctx context.Context, frameName, minVersion string) error {
+	frames, err := c.runtimeFrameworksStore.FindByFrameName(ctx, frameName)
+	if err != nil {
+		return err
+	}
+	for _, frame := range frames {
+		frameVer, err := semver.Make(frame.FrameVersion)
+		if err != nil {
+			slog.Error("failed to make semver", slog.Any("version", frameVer), slog.Any("error", err))
+			continue
+		}
+		minVer, err := semver.Make(minVersion)
+		if err != nil {
+			slog.Error("failed to make semver", slog.Any("version", minVer), slog.Any("error", err))
+			continue
+		}
+		if frameVer.LT(minVer) {
+			err = c.runtimeFrameworksStore.RemoveRuntimeFrameworkAndArch(ctx, frame.ID)
+			if err != nil {
+				return err
+			}
+			slog.Info("removed runtime_framework and arch as the version is not the minimal version", slog.Int64("runtime_framework_id", frame.ID))
+
+		}
+	}
 	return nil
 }
 

@@ -103,6 +103,24 @@ column = [
         "width": 100,
         "key": "mode",
         "fixed": "left"
+    },
+    {
+        "title": {
+            "zh-CN": "模型",
+            "en-US": "Model"
+        },
+        "width": 220,
+        "key": "model",
+        "fixed": "left"
+    },
+    {
+        "title": {
+            "zh-CN": "评分",
+            "en-US": "Score"
+        },
+        "width": 100,
+        "key": "score",
+        "fixed": "left"
     }
 ]
 
@@ -122,7 +140,8 @@ def get_metric_items(jsonObj, item, model_name):
             "dataset": item,
             "version": jsonObj['versions'][item],
             "metric": metric,
-            model_name: value,
+            "model":model_name,
+            "score": value,
         }
         metric_items.append(item_new)
     return metric_items
@@ -135,68 +154,70 @@ def is_a_sub_group(jsonObj, key):
     return False
 
 
-def json_to_summary(jsonPath, model_name):
-    with open(jsonPath, 'r', encoding='utf-8') as f:
-        jsonObj = json.load(f)
+def json_to_summary(jsonPaths, model_names):
+    
     summary_data = []
     xlsx_json = {}
-    # generate summary data
-    for k in jsonObj["group_subtasks"].keys():
-        m_items = get_metric_items(jsonObj, k, model_name)
-        summary_data.extend(m_items)
-    column.append(
-        {
-            "title": {
-                "zh-CN": model_name,
-                "en-US": model_name
-            },
-            "width": 200,
-            "key": model_name,
-            "customizeRender": {
-                "sorter": "descend"
-            }
+    final_json={}
+    json_paths = jsonPaths.split(',')
+    names = model_names.split(',')
+    for index, jsonPath in enumerate(json_paths):
+        model_name=names[index]
+        with open(jsonPath, 'r', encoding='utf-8') as f:
+            jsonObj = json.load(f)
+        # generate summary data
+        for k in jsonObj["group_subtasks"].keys():
+            m_items = get_metric_items(jsonObj, k, model_name)
+            summary_data.extend(m_items)
+        summary = {
+            "column": column,
+            "data": summary_data
         }
-    )
-    summary = {
-        "column": column,
-        "data": summary_data
-    }
-    final_json = {"summary": summary}
-    xlsx_json['summary'] = summary_data
-    # generate detail data
-    for key, value in jsonObj["group_subtasks"].items():
-        sub_data = []
-        if len(value) == 0:
-            m_items = get_metric_items(jsonObj, key, model_name)
-            sub_data.extend(m_items)
-            xlsx_json[key] = sub_data
-            final_json[key] = {"column": column, "data": sub_data}
-        else:
-            sub_g = is_a_sub_group(jsonObj, key)
-            if not sub_g:
-                # loop root group
-                for sub_key in value:
-                    m_items = get_metric_items(jsonObj, sub_key, model_name)
-                    sub_data.extend(m_items)
-                    if sub_key not in jsonObj["group_subtasks"]:
-                        continue
-                     # level 2 group
-                    value2 = jsonObj["group_subtasks"][sub_key]
-                    if len(value2) == 0:
-                        m_items = get_metric_items(jsonObj, key, model_name)
+        final_json['summary'] = summary
+        xlsx_json['summary'] = summary_data
+        # generate detail data
+        for key, value in jsonObj["group_subtasks"].items():
+            sub_data = []
+            if len(value) == 0:
+                m_items = get_metric_items(jsonObj, key, model_name)
+                sub_data.extend(m_items)
+                if key in xlsx_json:
+                    xlsx_json[key].extend(sub_data)
+                    final_json[key] = {"column": column, "data": xlsx_json[key]}
+                else:
+                    xlsx_json[key] = sub_data
+                    final_json[key] = {"column": column, "data": sub_data}
+            else:
+                sub_g = is_a_sub_group(jsonObj, key)
+                if not sub_g:
+                    # loop root group
+                    for sub_key in value:
+                        m_items = get_metric_items(jsonObj, sub_key, model_name)
                         sub_data.extend(m_items)
-                    else:
-                        for sub_sub_key in value2:
-                            m_items = get_metric_items(jsonObj, sub_sub_key, model_name)
+                        if sub_key not in jsonObj["group_subtasks"]:
+                            continue
+                        # level 2 group
+                        value2 = jsonObj["group_subtasks"][sub_key]
+                        if len(value2) == 0:
+                            m_items = get_metric_items(jsonObj, key, model_name)
                             sub_data.extend(m_items)
-                xlsx_json[key] = sub_data
-                final_json[key] = {"column": column, "data": sub_data}
-
-    json_file_path = os.path.splitext(jsonPath)[0] + '_upload.json'
+                        else:
+                            for sub_sub_key in value2:
+                                m_items = get_metric_items(jsonObj, sub_sub_key, model_name)
+                                sub_data.extend(m_items)
+                    # check xlsx_json[key] exists
+                    if key in xlsx_json:
+                        xlsx_json[key].extend(sub_data)
+                        final_json[key] = {"column": column, "data": xlsx_json[key]}
+                    else:
+                        xlsx_json[key] = sub_data
+                        final_json[key] = {"column": column, "data": sub_data}
+    final_path="/workspace/output/final/"
+    json_file_path = final_path + 'upload.json'
     with open(json_file_path, 'w', encoding='utf-8') as f:
         json.dump(final_json, f, ensure_ascii=False, indent=4)
 
-    xlsx_file = os.path.splitext(jsonPath)[0] + '_upload.xlsx'
+    xlsx_file = final_path + 'upload.xlsx'
     with pd.ExcelWriter(xlsx_file) as writer:
         for sheet_name, records in xlsx_json.items():
             df = pd.DataFrame(records)
@@ -219,4 +240,4 @@ if __name__ == "__main__":
     if args.command == 'upload':
         upload(args.files)
     elif args.command == 'summary':
-        json_to_summary(args.file, args.model)
+        json_to_summary(args.file.strip(','), args.model.strip(','))
