@@ -1,6 +1,9 @@
+ARG GIT_IMAGE=opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/alpine/git:2.36.2
+ARG SPACE_BASE_IMAGE=opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/space-base:python3.10
+
 # Download LFS content while building in order to make this step cacheable
 #===== LFS =====
-FROM opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/alpine/git:2.36.2 AS lfs
+FROM ${GIT_IMAGE} AS lfs
 WORKDIR /app
 
 COPY --link .lfs.opencsg.co .
@@ -15,7 +18,7 @@ RUN git init \
         && rm -rf .git .gitattributes
 #===============
 
-FROM opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/space-base:python3.10-1.0.2 as base
+FROM ${SPACE_BASE_IMAGE} AS base
 
 USER user
 COPY --link --chown=1000 ./ /home/user/app
