@@ -114,7 +114,7 @@ func TestCollectionHandler_UpdateCollection(t *testing.T) {
 	tester := NewCollectionTester(t).WithHandleFunc(func(h *CollectionHandler) gin.HandlerFunc {
 		return h.UpdateCollection
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), &types.CreateCollectionReq{}).Return(true, nil)
 	tester.mocks.collection.EXPECT().UpdateCollection(tester.Ctx(), types.CreateCollectionReq{
