@@ -11,7 +11,6 @@ import (
 	"opencsg.com/csghub-server/builder/dataviewer"
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
-	"opencsg.com/csghub-server/builder/git/gitserver/gitaly"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
@@ -104,6 +103,10 @@ func (c *internalComponentImpl) SSHAllowed(ctx context.Context, req types.SSHAll
 		}
 	}
 	repoType := fmt.Sprintf("%ss", string(req.RepoType))
+	relativePath, err := c.gitServer.BuildRelativePath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return nil, err
+	}
 
 	return &types.SSHAllowedResp{
 		Success:          true,
@@ -118,7 +121,7 @@ func (c *internalComponentImpl) SSHAllowed(ctx context.Context, req types.SSHAll
 		Gitaly: types.Gitaly{
 			Repo: pb.Repository{
 				StorageName:  c.config.GitalyServer.Storage,
-				RelativePath: gitaly.BuildRelativePath(repoType, req.Namespace, req.Name),
+				RelativePath: relativePath,
 				GlRepository: filepath.Join(repoType, req.Namespace, req.Name),
 			},
 			Address: c.config.GitalyServer.Address,

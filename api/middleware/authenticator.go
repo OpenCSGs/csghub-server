@@ -300,13 +300,20 @@ func UserMatch() gin.HandlerFunc {
 	}
 }
 
-type AuthenticatorCollection struct {
-	// only can be accessed by api key
-	NeedAPIKey gin.HandlerFunc
-	// user need to login first
-	NeedLogin gin.HandlerFunc
-	//user must be admin role to access
-	NeedAdmin gin.HandlerFunc
-	// user must be the owner of the resource
-	UserMatch gin.HandlerFunc
+type MiddlewareCollection struct {
+	Auth struct {
+		// only can be accessed by api key
+		NeedAPIKey gin.HandlerFunc
+		// user need to login first
+		NeedLogin gin.HandlerFunc
+		//user must be admin role to access
+		NeedAdmin gin.HandlerFunc
+		// user must be the owner of the resource
+		UserMatch gin.HandlerFunc
+	}
+
+	Repo struct {
+		// Check if repo exists
+		RepoExists gin.HandlerFunc
+	}
 }

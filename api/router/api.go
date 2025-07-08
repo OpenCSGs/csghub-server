@@ -109,11 +109,12 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 
 	r.Use(middleware.Authenticator(config))
 
-	authCollection := middleware.AuthenticatorCollection{}
-	authCollection.NeedAPIKey = middleware.OnlyAPIKeyAuthenticator(config)
-	authCollection.NeedAdmin = middleware.NeedAdmin(config)
-	authCollection.UserMatch = middleware.UserMatch()
-	authCollection.NeedLogin = middleware.MustLogin()
+	middlewareCollection := middleware.MiddlewareCollection{}
+	middlewareCollection.Auth.NeedAPIKey = middleware.OnlyAPIKeyAuthenticator(config)
+	middlewareCollection.Auth.NeedLogin = middleware.MustLogin()
+	middlewareCollection.Auth.NeedAdmin = middleware.NeedAdmin(config)
+	middlewareCollection.Auth.UserMatch = middleware.UserMatch()
+	middlewareCollection.Repo.RepoExists = middleware.RepoExists(config)
 
 	if enableSwagger {
 		r.GET("/api/v1/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
@@ -190,7 +191,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	}
 
 	// Model routes
-	createModelRoutes(config, apiGroup, authCollection, modelHandler, repoCommonHandler, monitorHandler)
+	createModelRoutes(config, apiGroup, middlewareCollection, modelHandler, repoCommonHandler, monitorHandler)
 
 	// Dataset routes
 	createDatasetRoutes(config, apiGroup, dsHandler, repoCommonHandler)
@@ -207,7 +208,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		return nil, fmt.Errorf("error creating space handler:%w", err)
 	}
 	// space routers
-	createSpaceRoutes(config, apiGroup, authCollection, spaceHandler, repoCommonHandler, monitorHandler)
+	createSpaceRoutes(config, apiGroup, middlewareCollection, spaceHandler, repoCommonHandler, monitorHandler)
 
 	spaceResourceHandler, err := handler.NewSpaceResourceHandler(config)
 	if err != nil {
@@ -217,9 +218,9 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	spaceResource := apiGroup.Group("space_resources")
 	{
 		spaceResource.GET("", spaceResourceHandler.Index)
-		spaceResource.POST("", authCollection.NeedAdmin, spaceResourceHandler.Create)
-		spaceResource.PUT("/:id", authCollection.NeedAdmin, spaceResourceHandler.Update)
-		spaceResource.DELETE("/:id", authCollection.NeedAdmin, spaceResourceHandler.Delete)
+		spaceResource.POST("", middlewareCollection.Auth.NeedAdmin, spaceResourceHandler.Create)
+		spaceResource.PUT("/:id", middlewareCollection.Auth.NeedAdmin, spaceResourceHandler.Update)
+		spaceResource.DELETE("/:id", middlewareCollection.Auth.NeedAdmin, spaceResourceHandler.Delete)
 	}
 
 	spaceSdkHandler, err := handler.NewSpaceSdkHandler(config)
@@ -230,9 +231,9 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	spaceSdk := apiGroup.Group("space_sdks")
 	{
 		spaceSdk.GET("", spaceSdkHandler.Index)
-		spaceSdk.POST("", authCollection.NeedAPIKey, spaceSdkHandler.Create)
-		spaceSdk.PUT("/:id", authCollection.NeedAPIKey, spaceSdkHandler.Update)
-		spaceSdk.DELETE("/:id", authCollection.NeedAPIKey, spaceSdkHandler.Delete)
+		spaceSdk.POST("", middlewareCollection.Auth.NeedAPIKey, spaceSdkHandler.Create)
+		spaceSdk.PUT("/:id", middlewareCollection.Auth.NeedAPIKey, spaceSdkHandler.Update)
+		spaceSdk.DELETE("/:id", middlewareCollection.Auth.NeedAPIKey, spaceSdkHandler.Delete)
 	}
 
 	userProxyHandler, err := handler.NewInternalServiceProxyHandler(fmt.Sprintf("%s:%d", config.User.Host, config.User.Port))
@@ -240,7 +241,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		return nil, fmt.Errorf("error creating user proxy handler:%w", err)
 	}
 
-	createUserRoutes(apiGroup, authCollection, userProxyHandler, userHandler)
+	createUserRoutes(apiGroup, middlewareCollection, userProxyHandler, userHandler)
 
 	tokenGroup := apiGroup.Group("token")
 	{
@@ -248,7 +249,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		tokenGroup.PUT("/:app/:token_name", userProxyHandler.ProxyToApi("/api/v1/token/%s/%s", "app", "token_name"))
 		tokenGroup.DELETE("/:app/:token_name", userProxyHandler.ProxyToApi("/api/v1/token/%s/%s", "app", "token_name"))
 		// check token info
-		tokenGroup.GET("/:token_value", authCollection.NeedAPIKey, userProxyHandler.ProxyToApi("/api/v1/token/%s", "token_value"))
+		tokenGroup.GET("/:token_value", middlewareCollection.Auth.NeedAPIKey, userProxyHandler.ProxyToApi("/api/v1/token/%s", "token_value"))
 	}
 
 	sshKeyHandler, err := handler.NewSSHKeyHandler(config)
@@ -256,9 +257,9 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		return nil, fmt.Errorf("error creating user controller:%w", err)
 	}
 	{
-		apiGroup.GET("/user/:username/ssh_keys", authCollection.UserMatch, sshKeyHandler.Index)
-		apiGroup.POST("/user/:username/ssh_keys", authCollection.UserMatch, sshKeyHandler.Create)
-		apiGroup.DELETE("/user/:username/ssh_key/:name", authCollection.UserMatch, sshKeyHandler.Delete)
+		apiGroup.GET("/user/:username/ssh_keys", middlewareCollection.Auth.UserMatch, sshKeyHandler.Index)
+		apiGroup.POST("/user/:username/ssh_keys", middlewareCollection.Auth.UserMatch, sshKeyHandler.Create)
+		apiGroup.DELETE("/user/:username/ssh_key/:name", middlewareCollection.Auth.UserMatch, sshKeyHandler.Delete)
 	}
 
 	// Organization routes
@@ -272,8 +273,8 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	createTagsRoutes(apiGroup, tagCtrl)
 
 	// JWT token
-	apiGroup.POST("/jwt/token", authCollection.NeedAPIKey, userProxyHandler.Proxy)
-	apiGroup.GET("/jwt/:token", authCollection.NeedAPIKey, userProxyHandler.ProxyToApi("/api/v1/jwt/%s", "token"))
+	apiGroup.POST("/jwt/token", middlewareCollection.Auth.NeedAPIKey, userProxyHandler.Proxy)
+	apiGroup.GET("/jwt/:token", middlewareCollection.Auth.NeedAPIKey, userProxyHandler.ProxyToApi("/api/v1/jwt/%s", "token"))
 	apiGroup.GET("/users", userProxyHandler.Proxy)
 
 	// callback
@@ -335,7 +336,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	{
 		cluster.GET("", clusterHandler.Index)
 		cluster.GET("/:id", clusterHandler.GetClusterById)
-		cluster.PUT("/:id", authCollection.NeedAPIKey, clusterHandler.Update)
+		cluster.PUT("/:id", middlewareCollection.Auth.NeedAPIKey, clusterHandler.Update)
 	}
 
 	eventHandler, err := handler.NewEventHandler()
@@ -352,7 +353,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	}
 	broadcast := apiGroup.Group("/broadcasts")
 	adminBroadcast := apiGroup.Group("/admin/broadcasts")
-	adminBroadcast.Use(authCollection.NeedAdmin)
+	adminBroadcast.Use(middlewareCollection.Auth.NeedAdmin)
 
 	adminBroadcast.POST("", broadcastHandler.Create)
 	adminBroadcast.PUT("/:id", broadcastHandler.Update)
@@ -367,7 +368,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		return nil, fmt.Errorf("error creating runtime framework architecture handler:%w", err)
 	}
 
-	createRuntimeFrameworkRoutes(apiGroup, authCollection, modelHandler, runtimeArchHandler, repoCommonHandler)
+	createRuntimeFrameworkRoutes(apiGroup, middlewareCollection, modelHandler, runtimeArchHandler, repoCommonHandler)
 
 	syncHandler, err := handler.NewSyncHandler(config)
 	if err != nil {
@@ -390,7 +391,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		return nil, fmt.Errorf("error creating accounting handler setting handler:%w", err)
 	}
 
-	createAccountRoutes(apiGroup, authCollection.NeedAPIKey, accountingHandler)
+	createAccountRoutes(apiGroup, middlewareCollection.Auth.NeedAPIKey, accountingHandler)
 
 	recomHandler, err := handler.NewRecomHandler(config)
 	if err != nil {
@@ -398,7 +399,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	}
 	recomGroup := apiGroup.Group("/recom")
 	{
-		recomGroup.POST("opweight", authCollection.NeedAPIKey, recomHandler.SetOpWeight)
+		recomGroup.POST("opweight", middlewareCollection.Auth.NeedAPIKey, recomHandler.SetOpWeight)
 	}
 
 	// telemetry
@@ -431,7 +432,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error creating discussion handler:%w", err)
 	}
-	createDiscussionRoutes(apiGroup, authCollection.NeedAPIKey, discussionHandler)
+	createDiscussionRoutes(apiGroup, middlewareCollection.Auth.NeedAPIKey, discussionHandler)
 
 	// prompt
 	promptHandler, err := handler.NewPromptHandler(config)
@@ -460,7 +461,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error creating space template proxy:%w", err)
 	}
-	createSpaceTemplateRoutes(apiGroup, authCollection, templateHandler)
+	createSpaceTemplateRoutes(apiGroup, middlewareCollection, templateHandler)
 
 	// mcp server
 	mcpHandler, err := handler.NewMCPServerHandler(config)
@@ -487,38 +488,44 @@ func createEvaluationRoutes(apiGroup *gin.RouterGroup, evaluationHandler *handle
 
 func createModelRoutes(config *config.Config,
 	apiGroup *gin.RouterGroup,
-	authCollection middleware.AuthenticatorCollection,
+	middlewareCollection middleware.MiddlewareCollection,
 	modelHandler *handler.ModelHandler,
 	repoCommonHandler *handler.RepoHandler,
 	monitorHandler *handler.MonitorHandler) {
 	// Models routes
 	modelsGroup := apiGroup.Group("/models")
+	modelsGroup.Use(middleware.RepoType(types.ModelRepo))
 	{
-		modelsGroup.POST("", modelHandler.Create)
+		modelsGroup.POST("", middlewareCollection.Auth.NeedLogin, modelHandler.Create)
 		modelsGroup.GET("", modelHandler.Index)
-		modelsGroup.PUT("/:namespace/:name", modelHandler.Update)
-		modelsGroup.DELETE("/:namespace/:name", modelHandler.Delete)
+		modelsGroup.PUT("/:namespace/:name", middlewareCollection.Auth.NeedLogin, modelHandler.Update)
+		modelsGroup.DELETE("/:namespace/:name", middlewareCollection.Auth.NeedLogin, modelHandler.Delete)
 		modelsGroup.GET("/:namespace/:name", modelHandler.Show)
-		modelsGroup.GET("/:namespace/:name/all_files", modelHandler.AllFiles)
+		modelsGroup.GET("/:namespace/:name/all_files", repoCommonHandler.AllFiles)
 		modelsGroup.GET("/:namespace/:name/relations", modelHandler.Relations)
-		modelsGroup.PUT("/:namespace/:name/relations", modelHandler.SetRelations)
-		modelsGroup.POST("/:namespace/:name/relations/dataset", modelHandler.AddDatasetRelation)
-		modelsGroup.DELETE("/:namespace/:name/relations/dataset", modelHandler.DelDatasetRelation)
-		modelsGroup.GET("/:namespace/:name/branches", middleware.RepoType(types.ModelRepo), repoCommonHandler.Branches)
-		modelsGroup.GET("/:namespace/:name/tags", middleware.RepoType(types.ModelRepo), repoCommonHandler.Tags)
-		modelsGroup.POST("/:namespace/:name/preupload/:revision", middleware.RepoType(types.ModelRepo), repoCommonHandler.Preupload)
+		modelsGroup.PUT("/:namespace/:name/relations", middlewareCollection.Auth.NeedAdmin, modelHandler.SetRelations)
+		modelsGroup.POST("/:namespace/:name/relations/dataset", middlewareCollection.Auth.NeedAdmin, modelHandler.AddDatasetRelation)
+		modelsGroup.DELETE("/:namespace/:name/relations/dataset", middlewareCollection.Auth.NeedAdmin, modelHandler.DelDatasetRelation)
+		modelsGroup.GET("/:namespace/:name/quantizations", modelHandler.ListQuantizations)
+	}
+
+	// Models repo operation routes
+	{
+		modelsGroup.GET("/:namespace/:name/branches", repoCommonHandler.Branches)
+		modelsGroup.GET("/:namespace/:name/tags", repoCommonHandler.Tags)
+		modelsGroup.POST("/:namespace/:name/preupload/:revision", repoCommonHandler.Preupload)
 		// update tags of a certain category
-		modelsGroup.POST("/:namespace/:name/tags/:category", middleware.RepoType(types.ModelRepo), repoCommonHandler.UpdateTags)
-		modelsGroup.GET("/:namespace/:name/last_commit", middleware.RepoType(types.ModelRepo), repoCommonHandler.LastCommit)
-		modelsGroup.GET("/:namespace/:name/commit/:commit_id", middleware.RepoType(types.ModelRepo), repoCommonHandler.CommitWithDiff)
-		modelsGroup.POST("/:namespace/:name/commit/:revision", middleware.RepoType(types.ModelRepo), repoCommonHandler.CommitFiles)
-		modelsGroup.GET("/:namespace/:name/remote_diff", middleware.RepoType(types.ModelRepo), repoCommonHandler.RemoteDiff)
-		modelsGroup.GET("/:namespace/:name/tree", middleware.RepoType(types.ModelRepo), repoCommonHandler.Tree)
-		modelsGroup.GET("/:namespace/:name/refs/:ref/tree/*path", middleware.RepoType(types.ModelRepo), repoCommonHandler.TreeV2)
-		modelsGroup.GET("/:namespace/:name/refs/:ref/logs_tree/*path", middleware.RepoType(types.ModelRepo), repoCommonHandler.LogsTree)
-		modelsGroup.GET("/:namespace/:name/commits", middleware.RepoType(types.ModelRepo), repoCommonHandler.Commits)
-		modelsGroup.GET("/:namespace/:name/raw/*file_path", middleware.RepoType(types.ModelRepo), repoCommonHandler.FileRaw)
-		modelsGroup.GET("/:namespace/:name/blob/*file_path", middleware.RepoType(types.ModelRepo), repoCommonHandler.FileInfo)
+		modelsGroup.POST("/:namespace/:name/tags/:category", middlewareCollection.Auth.NeedLogin, repoCommonHandler.UpdateTags)
+		modelsGroup.GET("/:namespace/:name/last_commit", repoCommonHandler.LastCommit)
+		modelsGroup.GET("/:namespace/:name/commit/:commit_id", repoCommonHandler.CommitWithDiff)
+		modelsGroup.POST("/:namespace/:name/commit/:revision", repoCommonHandler.CommitFiles)
+		modelsGroup.GET("/:namespace/:name/remote_diff", repoCommonHandler.RemoteDiff)
+		modelsGroup.GET("/:namespace/:name/tree", repoCommonHandler.Tree)
+		modelsGroup.GET("/:namespace/:name/refs/:ref/tree/*path", repoCommonHandler.TreeV2)
+		modelsGroup.GET("/:namespace/:name/refs/:ref/logs_tree/*path", repoCommonHandler.LogsTree)
+		modelsGroup.GET("/:namespace/:name/commits", repoCommonHandler.Commits)
+		modelsGroup.GET("/:namespace/:name/raw/*file_path", repoCommonHandler.FileRaw)
+		modelsGroup.GET("/:namespace/:name/blob/*file_path", repoCommonHandler.FileInfo)
 		// The DownloadFile method differs from the SDKDownload interface in a few ways
 
 		// 1.When passing the file_path parameter to the SDKDownload method,
@@ -527,90 +534,88 @@ func createModelRoutes(config *config.Config,
 		// The DownloadFile has a different file_path format for lfs files and non-lfs files,
 		// and an lfs parameter needs to be added.
 		// 2. DownloadFile returns an object store url for lfs files, while SDKDownload redirects directly.
-		modelsGroup.GET("/:namespace/:name/download/*file_path", middleware.RepoType(types.ModelRepo), repoCommonHandler.DownloadFile)
-		modelsGroup.GET("/:namespace/:name/resolve/*file_path", middleware.RepoType(types.ModelRepo), repoCommonHandler.ResolveDownload)
-		modelsGroup.POST("/:namespace/:name/raw/*file_path", middleware.RepoType(types.ModelRepo), repoCommonHandler.CreateFile)
-		modelsGroup.PUT("/:namespace/:name/raw/*file_path", middleware.RepoType(types.ModelRepo), repoCommonHandler.UpdateFile)
-		modelsGroup.POST("/:namespace/:name/update_downloads", middleware.RepoType(types.ModelRepo), repoCommonHandler.UpdateDownloads)
-		modelsGroup.PUT("/:namespace/:name/incr_downloads", middleware.RepoType(types.ModelRepo), repoCommonHandler.IncrDownloads)
-		modelsGroup.POST("/:namespace/:name/upload_file", middleware.RepoType(types.ModelRepo), repoCommonHandler.UploadFile)
-		modelsGroup.POST("/:namespace/:name/mirror", middleware.RepoType(types.ModelRepo), repoCommonHandler.CreateMirror)
-		modelsGroup.GET("/:namespace/:name/mirror", middleware.RepoType(types.ModelRepo), repoCommonHandler.GetMirror)
-		modelsGroup.PUT("/:namespace/:name/mirror", middleware.RepoType(types.ModelRepo), repoCommonHandler.UpdateMirror)
-		modelsGroup.DELETE("/:namespace/:name/mirror", middleware.RepoType(types.ModelRepo), repoCommonHandler.DeleteMirror)
-		modelsGroup.POST("/:namespace/:name/mirror/sync", middleware.RepoType(types.ModelRepo), repoCommonHandler.SyncMirror)
+		modelsGroup.GET("/:namespace/:name/download/*file_path", repoCommonHandler.DownloadFile)
+		modelsGroup.GET("/:namespace/:name/resolve/*file_path", repoCommonHandler.ResolveDownload)
+		modelsGroup.POST("/:namespace/:name/raw/*file_path", middlewareCollection.Auth.NeedLogin, repoCommonHandler.CreateFile)
+		modelsGroup.PUT("/:namespace/:name/raw/*file_path", middlewareCollection.Auth.NeedLogin, repoCommonHandler.UpdateFile)
+		modelsGroup.POST("/:namespace/:name/update_downloads", repoCommonHandler.UpdateDownloads)
+		modelsGroup.PUT("/:namespace/:name/incr_downloads", repoCommonHandler.IncrDownloads)
+		modelsGroup.POST("/:namespace/:name/upload_file", middlewareCollection.Auth.NeedLogin, repoCommonHandler.UploadFile)
+		modelsGroup.POST("/:namespace/:name/mirror", middlewareCollection.Auth.NeedLogin, repoCommonHandler.CreateMirror)
+		modelsGroup.GET("/:namespace/:name/mirror", middlewareCollection.Auth.NeedLogin, repoCommonHandler.GetMirror)
+		modelsGroup.PUT("/:namespace/:name/mirror", middlewareCollection.Auth.NeedLogin, repoCommonHandler.UpdateMirror)
+		modelsGroup.DELETE("/:namespace/:name/mirror", middlewareCollection.Auth.NeedLogin, repoCommonHandler.DeleteMirror)
+		modelsGroup.POST("/:namespace/:name/mirror/sync", middlewareCollection.Auth.NeedLogin, repoCommonHandler.SyncMirror)
 
 		// mirror from SaaS, only on-premises available
 		if !config.Saas {
-			modelsGroup.POST("/:namespace/:name/mirror_from_saas", middleware.RepoType(types.ModelRepo), repoCommonHandler.MirrorFromSaas)
+			modelsGroup.POST("/:namespace/:name/mirror_from_saas", middlewareCollection.Auth.NeedLogin, repoCommonHandler.MirrorFromSaas)
 		}
 
 		// runtime framework
-		modelsGroup.GET("/:namespace/:name/runtime_framework", middleware.RepoType(types.ModelRepo), repoCommonHandler.RuntimeFrameworkList)
-		// list model inference
-		modelsGroup.GET("/:namespace/:name/run", middleware.RepoType(types.ModelRepo), repoCommonHandler.DeployList)
-		// deploy model as inference
-		modelsGroup.POST("/:namespace/:name/run", middleware.RepoType(types.ModelRepo), modelHandler.DeployDedicated)
-		// delete a deployed inference
-		modelsGroup.DELETE("/:namespace/:name/run/:id", middleware.RepoType(types.ModelRepo), modelHandler.DeployDelete)
-		modelsGroup.GET("/:namespace/:name/run/:id", middleware.RepoType(types.ModelRepo), repoCommonHandler.DeployDetail)
-		modelsGroup.GET("/:namespace/:name/run/:id/status", middleware.RepoType(types.ModelRepo), repoCommonHandler.DeployStatus)
-		modelsGroup.GET("/:namespace/:name/run/:id/logs/:instance", middleware.RepoType(types.ModelRepo), repoCommonHandler.DeployInstanceLogs)
-		modelsGroup.PUT("/:namespace/:name/run/:id", middleware.RepoType(types.ModelRepo), repoCommonHandler.DeployUpdate)
-		modelsGroup.PUT("/:namespace/:name/run/:id/stop", middleware.RepoType(types.ModelRepo), modelHandler.DeployStop)
-		modelsGroup.PUT("/:namespace/:name/run/:id/start", middleware.RepoType(types.ModelRepo), modelHandler.DeployStart)
-
-		// inference monitor
-		modelsGroup.GET("/:namespace/:name/run/:id/cpu/:instance/usage",
-			authCollection.NeedLogin, middleware.RepoType(types.ModelRepo), monitorHandler.CPUUsage)
-		modelsGroup.GET("/:namespace/:name/run/:id/memory/:instance/usage",
-			authCollection.NeedLogin, middleware.RepoType(types.ModelRepo), monitorHandler.MemoryUsage)
-		modelsGroup.GET("/:namespace/:name/run/:id/request/:instance/count",
-			authCollection.NeedLogin, middleware.RepoType(types.ModelRepo), monitorHandler.RequestCount)
-		modelsGroup.GET("/:namespace/:name/run/:id/request/:instance/latency",
-			authCollection.NeedLogin, middleware.RepoType(types.ModelRepo), monitorHandler.RequestLatency)
-
+		modelsGroup.GET("/:namespace/:name/runtime_framework", repoCommonHandler.RuntimeFrameworkList)
 		// runtime framework for both finetune and inference
-		modelsGroup.GET("/runtime_framework", middleware.RepoType(types.ModelRepo), repoCommonHandler.RuntimeFrameworkListWithType)
-		modelsGroup.GET("/:namespace/:name/quantizations", middleware.RepoType(types.ModelRepo), modelHandler.ListQuantizations)
+		modelsGroup.GET("/runtime_framework", repoCommonHandler.RuntimeFrameworkListWithType)
+	}
+	modelsDeployGroup := modelsGroup.Group("")
+	modelsDeployGroup.Use(middlewareCollection.Auth.NeedLogin)
+	{
+		// list model inference
+		modelsDeployGroup.GET("/:namespace/:name/run", repoCommonHandler.DeployList)
+		// deploy model as inference
+		modelsDeployGroup.POST("/:namespace/:name/run", modelHandler.DeployDedicated)
+		// delete a deployed inference
+		modelsDeployGroup.DELETE("/:namespace/:name/run/:id", modelHandler.DeployDelete)
+		modelsDeployGroup.GET("/:namespace/:name/run/:id", repoCommonHandler.DeployDetail)
+		modelsDeployGroup.GET("/:namespace/:name/run/:id/status", repoCommonHandler.DeployStatus)
+		modelsDeployGroup.GET("/:namespace/:name/run/:id/logs/:instance", repoCommonHandler.DeployInstanceLogs)
+		modelsDeployGroup.PUT("/:namespace/:name/run/:id", repoCommonHandler.DeployUpdate)
+		modelsDeployGroup.PUT("/:namespace/:name/run/:id/stop", modelHandler.DeployStop)
+		modelsDeployGroup.PUT("/:namespace/:name/run/:id/start", modelHandler.DeployStart)
+
 		// deploy model as finetune instance
-		modelsGroup.POST("/:namespace/:name/finetune", middleware.RepoType(types.ModelRepo), modelHandler.FinetuneCreate)
+		modelsDeployGroup.POST("/:namespace/:name/finetune", modelHandler.FinetuneCreate)
 		// stop a finetune instance
-		modelsGroup.PUT("/:namespace/:name/finetune/:id/stop", middleware.RepoType(types.ModelRepo), modelHandler.FinetuneStop)
+		modelsDeployGroup.PUT("/:namespace/:name/finetune/:id/stop", modelHandler.FinetuneStop)
 		// start a finetune instance
-		modelsGroup.PUT("/:namespace/:name/finetune/:id/start", middleware.RepoType(types.ModelRepo), modelHandler.FinetuneStart)
+		modelsDeployGroup.PUT("/:namespace/:name/finetune/:id/start", modelHandler.FinetuneStart)
 		// delete a finetune instance
-		modelsGroup.DELETE("/:namespace/:name/finetune/:id", middleware.RepoType(types.ModelRepo), modelHandler.FinetuneDelete)
+		modelsDeployGroup.DELETE("/:namespace/:name/finetune/:id", modelHandler.FinetuneDelete)
+	}
+
+	modelsMonitorGroup := modelsGroup.Group("")
+	modelsMonitorGroup.Use(middlewareCollection.Auth.NeedLogin)
+	{
+		// inference monitor
+		modelsMonitorGroup.GET("/:namespace/:name/run/:id/cpu/:instance/usage", monitorHandler.CPUUsage)
+		modelsMonitorGroup.GET("/:namespace/:name/run/:id/memory/:instance/usage", monitorHandler.MemoryUsage)
+		modelsMonitorGroup.GET("/:namespace/:name/run/:id/request/:instance/count", monitorHandler.RequestCount)
+		modelsMonitorGroup.GET("/:namespace/:name/run/:id/request/:instance/latency", monitorHandler.RequestLatency)
 
 		// finetune monitor
-		modelsGroup.GET("/:namespace/:name/finetune/:id/cpu/:instance/usage",
-			authCollection.NeedLogin, middleware.RepoType(types.ModelRepo), monitorHandler.CPUUsage)
-		modelsGroup.GET("/:namespace/:name/finetune/:id/memory/:instance/usage",
-			authCollection.NeedLogin, middleware.RepoType(types.ModelRepo), monitorHandler.MemoryUsage)
-		modelsGroup.GET("/:namespace/:name/finetune/:id/request/:instance/count",
-			authCollection.NeedLogin, middleware.RepoType(types.ModelRepo), monitorHandler.RequestCount)
-		modelsGroup.GET("/:namespace/:name/finetune/:id/request/:instance/latency",
-			authCollection.NeedLogin, middleware.RepoType(types.ModelRepo), monitorHandler.RequestLatency)
-
-		// deploy model as serverless
-		modelsGroup.GET("/:namespace/:name/serverless", middleware.RepoType(types.ModelRepo), modelHandler.GetDeployServerless)
-		modelsGroup.POST("/:namespace/:name/serverless", middleware.RepoType(types.ModelRepo), modelHandler.DeployServerless)
-		modelsGroup.PUT("/:namespace/:name/serverless/:id/start", middleware.RepoType(types.ModelRepo), modelHandler.ServerlessStart)
-		modelsGroup.PUT("/:namespace/:name/serverless/:id/stop", middleware.RepoType(types.ModelRepo), modelHandler.ServerlessStop)
-		modelsGroup.GET("/:namespace/:name/serverless/:id", middleware.RepoType(types.ModelRepo), repoCommonHandler.ServerlessDetail)
-		modelsGroup.GET("/:namespace/:name/serverless/:id/status", middleware.RepoType(types.ModelRepo), repoCommonHandler.ServerlessStatus)
-		modelsGroup.GET("/:namespace/:name/serverless/:id/logs/:instance", middleware.RepoType(types.ModelRepo), repoCommonHandler.ServerlessLogs)
-		modelsGroup.PUT("/:namespace/:name/serverless/:id", middleware.RepoType(types.ModelRepo), repoCommonHandler.ServerlessUpdate)
+		modelsMonitorGroup.GET("/:namespace/:name/finetune/:id/cpu/:instance/usage", monitorHandler.CPUUsage)
+		modelsMonitorGroup.GET("/:namespace/:name/finetune/:id/memory/:instance/usage", monitorHandler.MemoryUsage)
+		modelsMonitorGroup.GET("/:namespace/:name/finetune/:id/request/:instance/count", monitorHandler.RequestCount)
+		modelsMonitorGroup.GET("/:namespace/:name/finetune/:id/request/:instance/latency", monitorHandler.RequestLatency)
 
 		// serverless monitor
-		modelsGroup.GET("/:namespace/:name/serverless/:id/cpu/:instance/usage",
-			authCollection.NeedLogin, middleware.RepoType(types.ModelRepo), monitorHandler.CPUUsage)
-		modelsGroup.GET("/:namespace/:name/serverless/:id/memory/:instance/usage",
-			authCollection.NeedLogin, middleware.RepoType(types.ModelRepo), monitorHandler.MemoryUsage)
-		modelsGroup.GET("/:namespace/:name/serverless/:id/request/:instance/count",
-			authCollection.NeedLogin, middleware.RepoType(types.ModelRepo), monitorHandler.RequestCount)
-		modelsGroup.GET("/:namespace/:name/serverless/:id/request/:instance/latency",
-			authCollection.NeedLogin, middleware.RepoType(types.ModelRepo), monitorHandler.RequestLatency)
+		modelsMonitorGroup.GET("/:namespace/:name/serverless/:id/cpu/:instance/usage", monitorHandler.CPUUsage)
+		modelsMonitorGroup.GET("/:namespace/:name/serverless/:id/memory/:instance/usage", monitorHandler.MemoryUsage)
+		modelsMonitorGroup.GET("/:namespace/:name/serverless/:id/request/:instance/count", monitorHandler.RequestCount)
+		modelsMonitorGroup.GET("/:namespace/:name/serverless/:id/request/:instance/latency", monitorHandler.RequestLatency)
+	}
+
+	modelsServerlessGroup := modelsGroup.Group("")
+	{
+		// deploy model as serverless
+		modelsServerlessGroup.GET("/:namespace/:name/serverless", modelHandler.GetDeployServerless)
+		modelsServerlessGroup.POST("/:namespace/:name/serverless", middlewareCollection.Auth.NeedAdmin, modelHandler.DeployServerless)
+		modelsServerlessGroup.PUT("/:namespace/:name/serverless/:id/start", middlewareCollection.Auth.NeedAdmin, modelHandler.ServerlessStart)
+		modelsServerlessGroup.PUT("/:namespace/:name/serverless/:id/stop", middlewareCollection.Auth.NeedAdmin, modelHandler.ServerlessStop)
+		modelsServerlessGroup.GET("/:namespace/:name/serverless/:id", middlewareCollection.Auth.NeedAdmin, repoCommonHandler.ServerlessDetail)
+		modelsServerlessGroup.GET("/:namespace/:name/serverless/:id/status", middlewareCollection.Auth.NeedAdmin, repoCommonHandler.ServerlessStatus)
+		modelsServerlessGroup.GET("/:namespace/:name/serverless/:id/logs/:instance", middlewareCollection.Auth.NeedAdmin, repoCommonHandler.ServerlessLogs)
+		modelsServerlessGroup.PUT("/:namespace/:name/serverless/:id", middlewareCollection.Auth.NeedAdmin, repoCommonHandler.ServerlessUpdate)
 	}
 }
 
@@ -622,7 +627,7 @@ func createDatasetRoutes(config *config.Config, apiGroup *gin.RouterGroup, dsHan
 		datasetsGroup.PUT("/:namespace/:name", dsHandler.Update)
 		datasetsGroup.DELETE("/:namespace/:name", dsHandler.Delete)
 		datasetsGroup.GET("/:namespace/:name", dsHandler.Show)
-		datasetsGroup.GET("/:namespace/:name/all_files", dsHandler.AllFiles)
+		datasetsGroup.GET("/:namespace/:name/all_files", repoCommonHandler.AllFiles)
 		datasetsGroup.GET("/:namespace/:name/relations", dsHandler.Relations)
 		datasetsGroup.GET("/:namespace/:name/branches", middleware.RepoType(types.DatasetRepo), repoCommonHandler.Branches)
 		datasetsGroup.GET("/:namespace/:name/tags", middleware.RepoType(types.DatasetRepo), repoCommonHandler.Tags)
@@ -705,7 +710,7 @@ func createCodeRoutes(config *config.Config, apiGroup *gin.RouterGroup, codeHand
 
 func createSpaceRoutes(config *config.Config,
 	apiGroup *gin.RouterGroup,
-	authCollection middleware.AuthenticatorCollection,
+	middlewareCollection middleware.MiddlewareCollection,
 	spaceHandler *handler.SpaceHandler,
 	repoCommonHandler *handler.RepoHandler,
 	monitorHandler *handler.MonitorHandler) {
@@ -769,17 +774,17 @@ func createSpaceRoutes(config *config.Config,
 		spaces.GET("/:namespace/:name/run/:id/logs/:instance", middleware.RepoType(types.SpaceRepo), repoCommonHandler.DeployInstanceLogs)
 		// space monitor
 		spaces.GET("/:namespace/:name/run/:id/cpu/:instance/usage",
-			authCollection.NeedLogin, middleware.RepoType(types.SpaceRepo), monitorHandler.CPUUsage)
+			middlewareCollection.Auth.NeedLogin, middleware.RepoType(types.SpaceRepo), monitorHandler.CPUUsage)
 		spaces.GET("/:namespace/:name/run/:id/memory/:instance/usage",
-			authCollection.NeedLogin, middleware.RepoType(types.SpaceRepo), monitorHandler.MemoryUsage)
+			middlewareCollection.Auth.NeedLogin, middleware.RepoType(types.SpaceRepo), monitorHandler.MemoryUsage)
 		spaces.GET("/:namespace/:name/run/:id/request/:instance/count",
-			authCollection.NeedLogin, middleware.RepoType(types.SpaceRepo), monitorHandler.RequestCount)
+			middlewareCollection.Auth.NeedLogin, middleware.RepoType(types.SpaceRepo), monitorHandler.RequestCount)
 		spaces.GET("/:namespace/:name/run/:id/request/:instance/latency",
-			authCollection.NeedLogin, middleware.RepoType(types.SpaceRepo), monitorHandler.RequestLatency)
+			middlewareCollection.Auth.NeedLogin, middleware.RepoType(types.SpaceRepo), monitorHandler.RequestLatency)
 	}
 }
 
-func createUserRoutes(apiGroup *gin.RouterGroup, authCollection middleware.AuthenticatorCollection, userProxyHandler *handler.InternalServiceProxyHandler, userHandler *handler.UserHandler) {
+func createUserRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware.MiddlewareCollection, userProxyHandler *handler.InternalServiceProxyHandler, userHandler *handler.UserHandler) {
 	// deprecated
 	{
 		apiGroup.POST("/users", userProxyHandler.ProxyToApi("/api/v1/user"))
@@ -825,11 +830,11 @@ func createUserRoutes(apiGroup *gin.RouterGroup, authCollection middleware.Authe
 	apiGroup.GET("/user/:username/tokens", userProxyHandler.ProxyToApi("/api/v1/user/%s/tokens", "username"))
 
 	// serverless list
-	apiGroup.GET("/user/:username/run/serverless", authCollection.NeedAdmin, userHandler.GetRunServerless)
+	apiGroup.GET("/user/:username/run/serverless", middlewareCollection.Auth.NeedAdmin, userHandler.GetRunServerless)
 }
 
-func createRuntimeFrameworkRoutes(apiGroup *gin.RouterGroup, authCollection middleware.AuthenticatorCollection, modelHandler *handler.ModelHandler, runtimeArchHandler *handler.RuntimeArchitectureHandler, repoCommonHandler *handler.RepoHandler) {
-	needAdmin := authCollection.NeedAdmin
+func createRuntimeFrameworkRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware.MiddlewareCollection, modelHandler *handler.ModelHandler, runtimeArchHandler *handler.RuntimeArchitectureHandler, repoCommonHandler *handler.RepoHandler) {
+	needAdmin := middlewareCollection.Auth.NeedAdmin
 	runtimeFramework := apiGroup.Group("/runtime_framework")
 	{
 		runtimeFramework.GET("/:id/models", modelHandler.ListByRuntimeFrameworkID)
@@ -999,13 +1004,13 @@ func createDataViewerRoutes(apiGroup *gin.RouterGroup, dsViewerHandler *handler.
 	}
 }
 
-func createSpaceTemplateRoutes(apiGroup *gin.RouterGroup, authCollection middleware.AuthenticatorCollection, templateHandler *handler.SpaceTemplateHandler) {
+func createSpaceTemplateRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware.MiddlewareCollection, templateHandler *handler.SpaceTemplateHandler) {
 	spaceTemplateGrp := apiGroup.Group("/space_templates")
 	{
-		spaceTemplateGrp.GET("", authCollection.NeedAdmin, templateHandler.Index)
-		spaceTemplateGrp.POST("", authCollection.NeedAdmin, templateHandler.Create)
-		spaceTemplateGrp.PUT("/:id", authCollection.NeedAdmin, templateHandler.Update)
-		spaceTemplateGrp.DELETE("/:id", authCollection.NeedAdmin, templateHandler.Delete)
+		spaceTemplateGrp.GET("", middlewareCollection.Auth.NeedAdmin, templateHandler.Index)
+		spaceTemplateGrp.POST("", middlewareCollection.Auth.NeedAdmin, templateHandler.Create)
+		spaceTemplateGrp.PUT("/:id", middlewareCollection.Auth.NeedAdmin, templateHandler.Update)
+		spaceTemplateGrp.DELETE("/:id", middlewareCollection.Auth.NeedAdmin, templateHandler.Delete)
 		spaceTemplateGrp.GET("/:type", templateHandler.List)
 	}
 }

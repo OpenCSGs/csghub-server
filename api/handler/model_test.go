@@ -475,22 +475,6 @@ func TestModelHandler_ListModelsOfRuntimeFrameworks(t *testing.T) {
 	})
 }
 
-func TestModelHandler_AllFiles(t *testing.T) {
-	tester := NewModelTester(t).WithHandleFunc(func(h *ModelHandler) gin.HandlerFunc {
-		return h.AllFiles
-	})
-
-	tester.mocks.repo.EXPECT().AllFiles(tester.Ctx(), types.GetAllFilesReq{
-		Namespace:   "u",
-		Name:        "r",
-		RepoType:    types.ModelRepo,
-		CurrentUser: "u",
-	}).Return([]*types.File{{Name: "foo"}}, nil)
-	tester.WithUser().Execute()
-
-	tester.ResponseEq(t, 200, tester.OKText, []*types.File{{Name: "foo"}})
-}
-
 func TestModelHandler_DeployServerless(t *testing.T) {
 	tester := NewModelTester(t).WithHandleFunc(func(h *ModelHandler) gin.HandlerFunc {
 		return h.DeployServerless

@@ -12,6 +12,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"opencsg.com/csghub-server/builder/git/gitserver"
+	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 )
 
@@ -29,6 +30,7 @@ type Client struct {
 	smartHttpClient     gitalypb.SmartHTTPServiceClient
 	remoteClient        gitalypb.RemoteServiceClient
 	timeout             time.Duration
+	repoStore           database.RepoStore
 }
 
 func NewClient(config *config.Config) (*Client, error) {
@@ -70,5 +72,6 @@ func NewClient(config *config.Config) (*Client, error) {
 		smartHttpClient:     smartHttpClient,
 		remoteClient:        remoteClient,
 		timeout:             timeoutTime,
+		repoStore:           database.NewRepoStore(),
 	}, nil
 }

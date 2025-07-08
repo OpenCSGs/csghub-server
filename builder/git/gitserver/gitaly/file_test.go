@@ -15,7 +15,9 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	gitalypb_mock "opencsg.com/csghub-server/_mocks/gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
+	database_mock "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/git/gitserver"
+	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -90,6 +92,7 @@ type gitalyTester struct {
 		operationClient *gitalypb_mock.MockOperationServiceClient
 		smartHttpClient *gitalypb_mock.MockSmartHTTPServiceClient
 		remoteClient    *gitalypb_mock.MockRemoteServiceClient
+		repoStore       *database_mock.MockRepoStore
 	}
 }
 
@@ -103,6 +106,7 @@ func newGitalyTester(t *testing.T) *gitalyTester {
 	tester.mocks.operationClient = gitalypb_mock.NewMockOperationServiceClient(t)
 	tester.mocks.smartHttpClient = gitalypb_mock.NewMockSmartHTTPServiceClient(t)
 	tester.mocks.remoteClient = gitalypb_mock.NewMockRemoteServiceClient(t)
+	tester.mocks.repoStore = database_mock.NewMockRepoStore(t)
 	tester.Client = &Client{
 		config:          &config.Config{},
 		repoClient:      tester.mocks.repoClient,
@@ -113,6 +117,7 @@ func newGitalyTester(t *testing.T) *gitalyTester {
 		operationClient: tester.mocks.operationClient,
 		smartHttpClient: tester.mocks.smartHttpClient,
 		remoteClient:    tester.mocks.remoteClient,
+		repoStore:       tester.mocks.repoStore,
 	}
 	tester.config.GitalyServer.Storage = "st"
 	return tester
@@ -122,10 +127,15 @@ func TestGitalyFile_GetRepoFileRaw(t *testing.T) {
 	tester := newGitalyTester(t)
 	ctx := context.TODO()
 
+	tester.mocks.repoStore.EXPECT().FindByPath(mock.Anything, types.ModelRepo, "ns", "n").Return(&database.Repository{
+		ID:     1,
+		Hashed: false,
+	}, nil)
+
 	tester.mocks.commitClient.EXPECT().TreeEntry(mock.Anything, &gitalypb.TreeEntryRequest{
 		Repository: &gitalypb.Repository{
 			StorageName:  "st",
-			RelativePath: "s_ns/n.git",
+			RelativePath: "models_ns/n.git",
 		},
 		Revision: []byte("main"),
 		Path:     []byte("foo"),
@@ -140,6 +150,7 @@ func TestGitalyFile_GetRepoFileRaw(t *testing.T) {
 		Name:      "n",
 		Ref:       "main",
 		Path:      "foo",
+		RepoType:  types.ModelRepo,
 	})
 	require.NoError(t, err)
 	require.Equal(t, "good", data)
@@ -154,10 +165,15 @@ func TestGitalyFile_GetRepoFileReader(t *testing.T) {
 			{Data: []byte("go"), Size: 2},
 		},
 	}
+
+	tester.mocks.repoStore.EXPECT().FindByPath(mock.Anything, types.ModelRepo, "ns", "n").Return(&database.Repository{
+		ID:     1,
+		Hashed: false,
+	}, nil)
 	tester.mocks.commitClient.EXPECT().TreeEntry(mock.Anything, &gitalypb.TreeEntryRequest{
 		Repository: &gitalypb.Repository{
 			StorageName:  "st",
-			RelativePath: "s_ns/n.git",
+			RelativePath: "models_ns/n.git",
 		},
 		Revision: []byte("main"),
 		Path:     []byte("foo"),
@@ -167,6 +183,7 @@ func TestGitalyFile_GetRepoFileReader(t *testing.T) {
 		Name:      "n",
 		Ref:       "main",
 		Path:      "foo",
+		RepoType:  types.ModelRepo,
 	})
 	require.NoError(t, err)
 	require.Equal(t, int64(2), size)
@@ -182,8 +199,12 @@ func TestGitalyFile_GetRepoFileContents(t *testing.T) {
 
 	repo := &gitalypb.Repository{
 		StorageName:  "st",
-		RelativePath: "s_ns/n.git",
+		RelativePath: "models_ns/n.git",
 	}
+	tester.mocks.repoStore.EXPECT().FindByPath(mock.Anything, types.ModelRepo, "ns", "n").Return(&database.Repository{
+		ID:     1,
+		Hashed: false,
+	}, nil)
 	tester.mocks.commitClient.EXPECT().TreeEntry(mock.Anything, &gitalypb.TreeEntryRequest{
 		Repository: repo,
 		Revision:   []byte("main"),
@@ -232,6 +253,7 @@ func TestGitalyFile_GetRepoFileContents(t *testing.T) {
 		Name:      "n",
 		Ref:       "main",
 		Path:      "foo",
+		RepoType:  types.ModelRepo,
 	})
 	require.NoError(t, err)
 	require.Equal(t, &types.File{
@@ -261,6 +283,10 @@ func TestGitalyFile_CreateRepoFile(t *testing.T) {
 	tester.mocks.operationClient.EXPECT().UserCommitFiles(mock.Anything).Return(
 		m, nil,
 	)
+	tester.mocks.repoStore.EXPECT().FindByPath(mock.Anything, types.ModelRepo, "ns", "n").Return(&database.Repository{
+		ID:     1,
+		Hashed: false,
+	}, nil)
 	err := tester.CreateRepoFile(&types.CreateFileReq{
 		Namespace: "ns",
 		Name:      "n",
@@ -269,12 +295,13 @@ func TestGitalyFile_CreateRepoFile(t *testing.T) {
 		Message:   "new",
 		FilePath:  "foo",
 		Content:   "bar",
+		RepoType:  types.ModelRepo,
 	})
 	require.NoError(t, err)
 	repository := &gitalypb.Repository{
 		StorageName:  "st",
-		RelativePath: "s_ns/n.git",
-		GlRepository: "s/ns/n",
+		RelativePath: "models_ns/n.git",
+		GlRepository: "models/ns/n",
 	}
 
 	header := &gitalypb.UserCommitFilesRequestHeader{
@@ -344,6 +371,10 @@ func TestGitalyFile_UpdateRepoFile(t *testing.T) {
 	tester.mocks.operationClient.EXPECT().UserCommitFiles(mock.Anything).Return(
 		m, nil,
 	)
+	tester.mocks.repoStore.EXPECT().FindByPath(mock.Anything, types.ModelRepo, "ns", "n").Return(&database.Repository{
+		ID:     1,
+		Hashed: false,
+	}, nil)
 	err := tester.UpdateRepoFile(&types.UpdateFileReq{
 		Namespace: "ns",
 		Name:      "n",
@@ -352,12 +383,13 @@ func TestGitalyFile_UpdateRepoFile(t *testing.T) {
 		FilePath:  "foo",
 		Content:   "bar",
 		Username:  "user-1",
+		RepoType:  types.ModelRepo,
 	})
 	require.NoError(t, err)
 	repository := &gitalypb.Repository{
 		StorageName:  "st",
-		RelativePath: "s_ns/n.git",
-		GlRepository: "s/ns/n",
+		RelativePath: "models_ns/n.git",
+		GlRepository: "models/ns/n",
 	}
 
 	header := &gitalypb.UserCommitFilesRequestHeader{
@@ -427,6 +459,10 @@ func TestGitalyFile_DeleteRepoFile(t *testing.T) {
 	tester.mocks.operationClient.EXPECT().UserCommitFiles(mock.Anything).Return(
 		m, nil,
 	)
+	tester.mocks.repoStore.EXPECT().FindByPath(mock.Anything, types.ModelRepo, "ns", "n").Return(&database.Repository{
+		ID:     1,
+		Hashed: false,
+	}, nil)
 	err := tester.DeleteRepoFile(&types.DeleteFileReq{
 		Namespace: "ns",
 		Name:      "n",
@@ -435,12 +471,13 @@ func TestGitalyFile_DeleteRepoFile(t *testing.T) {
 		FilePath:  "foo",
 		Content:   "bar",
 		Username:  "user-1",
+		RepoType:  types.ModelRepo,
 	})
 	require.NoError(t, err)
 	repository := &gitalypb.Repository{
 		StorageName:  "st",
-		RelativePath: "s_ns/n.git",
-		GlRepository: "s/ns/n",
+		RelativePath: "models_ns/n.git",
+		GlRepository: "models/ns/n",
 	}
 
 	header := &gitalypb.UserCommitFilesRequestHeader{
@@ -497,8 +534,13 @@ func TestGitalyFile_GetRepoFileTree(t *testing.T) {
 
 	repo := &gitalypb.Repository{
 		StorageName:  "st",
-		RelativePath: "s_ns/n.git",
+		RelativePath: "models_ns/n.git",
 	}
+
+	tester.mocks.repoStore.EXPECT().FindByPath(mock.Anything, types.ModelRepo, "ns", "n").Return(&database.Repository{
+		ID:     1,
+		Hashed: false,
+	}, nil)
 
 	tester.mocks.commitClient.EXPECT().ListLastCommitsForTree(mock.Anything, &gitalypb.ListLastCommitsForTreeRequest{
 		Repository:      repo,
@@ -538,6 +580,7 @@ func TestGitalyFile_GetRepoFileTree(t *testing.T) {
 		Name:      "n",
 		Ref:       "main",
 		Path:      "foo",
+		RepoType:  types.ModelRepo,
 	})
 	require.NoError(t, err)
 	require.Equal(t, []*types.File{{
@@ -580,8 +623,12 @@ func TestGitalyFile_GetTree(t *testing.T) {
 
 			repo := &gitalypb.Repository{
 				StorageName:  "st",
-				RelativePath: "s_ns/n.git",
+				RelativePath: "models_ns/n.git",
 			}
+			tester.mocks.repoStore.EXPECT().FindByPath(mock.Anything, types.ModelRepo, "ns", "n").Return(&database.Repository{
+				ID:     1,
+				Hashed: false,
+			}, nil)
 			tester.mocks.commitClient.EXPECT().GetTreeEntries(mock.Anything, &gitalypb.GetTreeEntriesRequest{
 				Repository: repo,
 				Sort:       gitalypb.GetTreeEntriesRequest_TREES_FIRST,
@@ -642,6 +689,7 @@ size 507607173`
 				Path:      c.path,
 				Limit:     500,
 				Cursor:    "c",
+				RepoType:  types.ModelRepo,
 			})
 			require.NoError(t, err)
 			require.Equal(t, []*types.File{
@@ -687,8 +735,12 @@ func TestGitalyFile_GetLogsTree(t *testing.T) {
 
 			repo := &gitalypb.Repository{
 				StorageName:  "st",
-				RelativePath: "s_ns/n.git",
+				RelativePath: "models_ns/n.git",
 			}
+			tester.mocks.repoStore.EXPECT().FindByPath(mock.Anything, types.ModelRepo, "ns", "n").Return(&database.Repository{
+				ID:     1,
+				Hashed: false,
+			}, nil)
 			tester.mocks.commitClient.EXPECT().ListLastCommitsForTree(mock.Anything, &gitalypb.ListLastCommitsForTreeRequest{
 				Repository: repo,
 				Revision:   "main",
@@ -722,6 +774,7 @@ func TestGitalyFile_GetLogsTree(t *testing.T) {
 				Path:      c.path,
 				Limit:     10,
 				Offset:    50,
+				RepoType:  types.ModelRepo,
 			})
 			require.NoError(t, err)
 			require.Equal(t, []*types.CommitForTree{
@@ -744,6 +797,11 @@ func TestGitalyFile_GetLogsTree(t *testing.T) {
 func TestGitalyFile_GetRepoAllFiles(t *testing.T) {
 	tester := newGitalyTester(t)
 	ctx := context.TODO()
+
+	tester.mocks.repoStore.EXPECT().FindByPath(mock.Anything, types.ModelRepo, "ns", "n").Return(&database.Repository{
+		ID:     1,
+		Hashed: false,
+	}, nil)
 
 	tester.mocks.commitClient.EXPECT().ListFiles(mock.Anything, &gitalypb.ListFilesRequest{
 		Repository: &gitalypb.Repository{
@@ -771,6 +829,11 @@ func TestGitalyFile_GetRepoAllFiles(t *testing.T) {
 func TestGitalyFile_GetRepoAllLfsPointers(t *testing.T) {
 	tester := newGitalyTester(t)
 	ctx := context.TODO()
+
+	tester.mocks.repoStore.EXPECT().FindByPath(mock.Anything, types.ModelRepo, "ns", "n").Return(&database.Repository{
+		ID:     1,
+		Hashed: false,
+	}, nil)
 
 	tester.mocks.blobClient.EXPECT().ListAllLFSPointers(mock.Anything, &gitalypb.ListAllLFSPointersRequest{
 		Repository: &gitalypb.Repository{

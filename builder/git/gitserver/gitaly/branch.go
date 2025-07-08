@@ -13,13 +13,16 @@ import (
 
 func (c *Client) GetRepoBranches(ctx context.Context, req gitserver.GetBranchesReq) ([]types.Branch, error) {
 	var branches []types.Branch
-	repoType := fmt.Sprintf("%ss", string(req.RepoType))
+	relativePath, err := c.BuildRelativePath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return nil, err
+	}
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
 	branchesReq := &gitalypb.FindAllBranchesRequest{
 		Repository: &gitalypb.Repository{
 			StorageName:  c.config.GitalyServer.Storage,
-			RelativePath: BuildRelativePath(repoType, req.Namespace, req.Name),
+			RelativePath: relativePath,
 		},
 	}
 	stream, err := c.refClient.FindAllBranches(ctx, branchesReq)
@@ -52,13 +55,16 @@ func (c *Client) GetRepoBranches(ctx context.Context, req gitserver.GetBranchesR
 
 func (c *Client) GetRepoBranchByName(ctx context.Context, req gitserver.GetBranchReq) (*types.Branch, error) {
 	var branch types.Branch
-	repoType := fmt.Sprintf("%ss", string(req.RepoType))
+	relativePath, err := c.BuildRelativePath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return nil, err
+	}
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
 	branchReq := &gitalypb.FindBranchRequest{
 		Repository: &gitalypb.Repository{
 			StorageName:  c.config.GitalyServer.Storage,
-			RelativePath: BuildRelativePath(repoType, req.Namespace, req.Name),
+			RelativePath: relativePath,
 		},
 		Name: []byte(req.Ref),
 	}
@@ -84,11 +90,15 @@ func (c *Client) GetRepoBranchByName(ctx context.Context, req gitserver.GetBranc
 
 func (c *Client) DeleteRepoBranch(ctx context.Context, req gitserver.DeleteBranchReq) error {
 	repoType := fmt.Sprintf("%ss", string(req.RepoType))
+	relativePath, err := c.BuildRelativePath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return err
+	}
 
 	deleteBranchReq := &gitalypb.UserDeleteBranchRequest{
 		Repository: &gitalypb.Repository{
 			StorageName:  c.config.GitalyServer.Storage,
-			RelativePath: BuildRelativePath(repoType, req.Namespace, req.Name),
+			RelativePath: relativePath,
 			GlRepository: filepath.Join(repoType, req.Namespace, req.Name),
 		},
 		BranchName: []byte(req.Ref),
@@ -100,7 +110,7 @@ func (c *Client) DeleteRepoBranch(ctx context.Context, req gitserver.DeleteBranc
 		},
 	}
 
-	_, err := c.operationClient.UserDeleteBranch(ctx, deleteBranchReq)
+	_, err = c.operationClient.UserDeleteBranch(ctx, deleteBranchReq)
 	if err != nil {
 		return err
 	}

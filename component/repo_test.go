@@ -59,7 +59,7 @@ func TestRepoComponent_CreateRepo(t *testing.T) {
 	dbrepo := &database.Repository{
 		UserID:         123,
 		Path:           "ns/name",
-		GitPath:        "gp",
+		GitPath:        "models_ns/name",
 		Name:           "name",
 		Nickname:       "nn",
 		Description:    "desc",
@@ -67,10 +67,11 @@ func TestRepoComponent_CreateRepo(t *testing.T) {
 		License:        "MIT",
 		DefaultBranch:  "main",
 		RepositoryType: types.ModelRepo,
-		HTTPCloneURL:   "http",
-		SSHCloneURL:    "ssh",
 	}
 	repo.mocks.stores.RepoMock().EXPECT().CreateRepo(ctx, *dbrepo).Return(dbrepo, nil)
+
+	dbrepo.GitPath = "@hashed_repos/a6/65/a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3"
+	repo.mocks.stores.RepoMock().EXPECT().UpdateRepo(ctx, mock.Anything).Return(dbrepo, nil)
 
 	r1, r2, err := repo.CreateRepo(ctx, types.CreateRepoReq{
 		Username:      "user",
@@ -2372,7 +2373,7 @@ func TestRepoComponent_CommitFiles(t *testing.T) {
 	repoComp.mocks.gitServer.EXPECT().CommitFiles(mock.Anything, gitserver.CommitFilesReq{
 		Namespace: req.Namespace,
 		Name:      req.Name,
-		RepoType:  string(req.RepoType),
+		RepoType:  req.RepoType,
 		Revision:  req.Revision,
 		Username:  user.Username,
 		Email:     user.Email,
@@ -2388,4 +2389,31 @@ func TestRepoComponent_CommitFiles(t *testing.T) {
 
 	err := repoComp.CommitFiles(ctx, req)
 	require.Equal(t, nil, err)
+}
+
+func TestRepoComponent_IsExists(t *testing.T) {
+	ctx := context.Background()
+
+	repoComp := initializeTestRepoComponent(ctx, t)
+
+	repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "namespace", "name").
+		Return(&database.Repository{ID: 1}, nil).Once()
+
+	exists, err := repoComp.IsExists(ctx, types.ModelRepo, "namespace", "name")
+	require.NoError(t, err)
+	require.True(t, exists)
+
+	repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "namespace", "name").
+		Return(nil, errors.New("error")).Once()
+
+	exists, err = repoComp.IsExists(ctx, types.ModelRepo, "namespace", "name")
+	require.Error(t, err)
+	require.False(t, exists)
+
+	repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "namespace", "name").
+		Return(nil, sql.ErrNoRows).Once()
+
+	exists, err = repoComp.IsExists(ctx, types.ModelRepo, "namespace", "name")
+	require.NotNil(t, err)
+	require.False(t, exists)
 }
