@@ -62,7 +62,6 @@ func LocalizedErrorMiddleware() gin.HandlerFunc {
 		if statusCode < 400 || bw.isSkipped {
 			return
 		}
-
 		// translate error msg
 		lang := c.GetHeader("Accept-Language")
 
