@@ -235,7 +235,14 @@ func (s *K8sHandler) readPodLogsFromCluster(c *gin.Context, cluster cluster.Clus
 	}
 	defer func() {
 		if ch != nil {
-			close(ch)
+			select {
+			case _, ok := <-ch:
+				if ok {
+					close(ch)
+				}
+			default:
+				close(ch)
+			}
 		}
 	}()
 

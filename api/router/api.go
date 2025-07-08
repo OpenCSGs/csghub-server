@@ -579,16 +579,6 @@ func createModelRoutes(config *config.Config,
 		modelsDeployGroup.DELETE("/:namespace/:name/finetune/:id", modelHandler.FinetuneDelete)
 	}
 
-		// deploy model as serverless
-		modelsGroup.GET("/:namespace/:name/serverless", middleware.RepoType(types.ModelRepo), modelHandler.GetDeployServerless)
-		modelsGroup.POST("/:namespace/:name/serverless", middleware.RepoType(types.ModelRepo), modelHandler.DeployServerless)
-		modelsGroup.DELETE("/:namespace/:name/serverless", middleware.RepoType(types.ModelRepo), modelHandler.RemoveServerless)
-		modelsGroup.PUT("/:namespace/:name/serverless/:id/start", middleware.RepoType(types.ModelRepo), modelHandler.ServerlessStart)
-		modelsGroup.PUT("/:namespace/:name/serverless/:id/stop", middleware.RepoType(types.ModelRepo), modelHandler.ServerlessStop)
-		modelsGroup.GET("/:namespace/:name/serverless/:id", middleware.RepoType(types.ModelRepo), repoCommonHandler.ServerlessDetail)
-		modelsGroup.GET("/:namespace/:name/serverless/:id/status", middleware.RepoType(types.ModelRepo), repoCommonHandler.ServerlessStatus)
-		modelsGroup.GET("/:namespace/:name/serverless/:id/logs/:instance", middleware.RepoType(types.ModelRepo), repoCommonHandler.ServerlessLogs)
-		modelsGroup.PUT("/:namespace/:name/serverless/:id", middleware.RepoType(types.ModelRepo), repoCommonHandler.ServerlessUpdate)
 	modelsMonitorGroup := modelsGroup.Group("")
 	modelsMonitorGroup.Use(middlewareCollection.Auth.NeedLogin)
 	{
@@ -609,10 +599,10 @@ func createModelRoutes(config *config.Config,
 		modelsMonitorGroup.GET("/:namespace/:name/serverless/:id/memory/:instance/usage", monitorHandler.MemoryUsage)
 		modelsMonitorGroup.GET("/:namespace/:name/serverless/:id/request/:instance/count", monitorHandler.RequestCount)
 		modelsMonitorGroup.GET("/:namespace/:name/serverless/:id/request/:instance/latency", monitorHandler.RequestLatency)
-    
-    // evaluation monitor
-			modelsMonitorGroup.GET("/evaluations/:id/cpu/:instance/usage", monitorHandler.CPUUsageEvaluation)
-			modelsMonitorGroup.GET("/evaluations/:id/memory/:instance/usage", monitorHandler.MemoryUsageEvaluation)
+
+		// evaluation monitor
+		modelsMonitorGroup.GET("/evaluations/:id/cpu/:instance/usage", monitorHandler.CPUUsageEvaluation)
+		modelsMonitorGroup.GET("/evaluations/:id/memory/:instance/usage", monitorHandler.MemoryUsageEvaluation)
 	}
 
 	modelsServerlessGroup := modelsGroup.Group("")
