@@ -194,14 +194,14 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	createModelRoutes(config, apiGroup, middlewareCollection, modelHandler, repoCommonHandler, monitorHandler)
 
 	// Dataset routes
-	createDatasetRoutes(config, apiGroup, dsHandler, repoCommonHandler)
+	createDatasetRoutes(config, apiGroup, middlewareCollection, dsHandler, repoCommonHandler)
 
 	codeHandler, err := handler.NewCodeHandler(config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating code handler:%w", err)
 	}
 	// Code routes
-	createCodeRoutes(config, apiGroup, codeHandler, repoCommonHandler)
+	createCodeRoutes(config, apiGroup, middlewareCollection, codeHandler, repoCommonHandler)
 
 	spaceHandler, err := handler.NewSpaceHandler(config)
 	if err != nil {
@@ -622,91 +622,112 @@ func createModelRoutes(config *config.Config,
 	}
 }
 
-func createDatasetRoutes(config *config.Config, apiGroup *gin.RouterGroup, dsHandler *handler.DatasetHandler, repoCommonHandler *handler.RepoHandler) {
+func createDatasetRoutes(
+	config *config.Config,
+	apiGroup *gin.RouterGroup,
+	middlewareCollection middleware.MiddlewareCollection,
+	dsHandler *handler.DatasetHandler,
+	repoCommonHandler *handler.RepoHandler,
+) {
 	datasetsGroup := apiGroup.Group("/datasets")
+	datasetsGroup.Use(middleware.RepoType(types.DatasetRepo))
 	{
-		datasetsGroup.POST("", dsHandler.Create)
+		datasetsGroup.POST("", middlewareCollection.Auth.NeedLogin, dsHandler.Create)
 		datasetsGroup.GET("", dsHandler.Index)
-		datasetsGroup.PUT("/:namespace/:name", dsHandler.Update)
-		datasetsGroup.DELETE("/:namespace/:name", dsHandler.Delete)
+		datasetsGroup.PUT("/:namespace/:name", middlewareCollection.Auth.NeedLogin, dsHandler.Update)
+		datasetsGroup.DELETE("/:namespace/:name", middlewareCollection.Auth.NeedLogin, dsHandler.Delete)
 		datasetsGroup.GET("/:namespace/:name", dsHandler.Show)
 		datasetsGroup.GET("/:namespace/:name/all_files", dsHandler.AllFiles)
 		datasetsGroup.GET("/:namespace/:name/relations", dsHandler.Relations)
-		datasetsGroup.GET("/:namespace/:name/branches", middleware.RepoType(types.DatasetRepo), repoCommonHandler.Branches)
-		datasetsGroup.GET("/:namespace/:name/tags", middleware.RepoType(types.DatasetRepo), repoCommonHandler.Tags)
-		datasetsGroup.POST("/:namespace/:name/preupload/:revision", middleware.RepoType(types.DatasetRepo), repoCommonHandler.Preupload)
+	}
+
+	// Models repo operation routes
+	{
+		datasetsGroup.GET("/:namespace/:name/branches", repoCommonHandler.Branches)
+		datasetsGroup.GET("/:namespace/:name/tags", repoCommonHandler.Tags)
+		datasetsGroup.POST("/:namespace/:name/preupload/:revision", repoCommonHandler.Preupload)
 		// update tags of a certain category
-		datasetsGroup.POST("/:namespace/:name/tags/:category", middleware.RepoType(types.DatasetRepo), repoCommonHandler.UpdateTags)
-		datasetsGroup.GET("/:namespace/:name/last_commit", middleware.RepoType(types.DatasetRepo), repoCommonHandler.LastCommit)
-		datasetsGroup.GET("/:namespace/:name/commit/:commit_id", middleware.RepoType(types.DatasetRepo), repoCommonHandler.CommitWithDiff)
-		datasetsGroup.POST("/:namespace/:name/commit/:revision", middleware.RepoType(types.DatasetRepo), repoCommonHandler.CommitFiles)
-		datasetsGroup.GET("/:namespace/:name/remote_diff", middleware.RepoType(types.DatasetRepo), repoCommonHandler.RemoteDiff)
-		datasetsGroup.GET("/:namespace/:name/tree", middleware.RepoType(types.DatasetRepo), repoCommonHandler.Tree)
-		datasetsGroup.GET("/:namespace/:name/refs/:ref/tree/*path", middleware.RepoType(types.DatasetRepo), repoCommonHandler.TreeV2)
-		datasetsGroup.GET("/:namespace/:name/refs/:ref/logs_tree/*path", middleware.RepoType(types.DatasetRepo), repoCommonHandler.LogsTree)
-		datasetsGroup.GET("/:namespace/:name/commits", middleware.RepoType(types.DatasetRepo), repoCommonHandler.Commits)
-		datasetsGroup.POST("/:namespace/:name/raw/*file_path", middleware.RepoType(types.DatasetRepo), repoCommonHandler.CreateFile)
-		datasetsGroup.GET("/:namespace/:name/raw/*file_path", middleware.RepoType(types.DatasetRepo), repoCommonHandler.FileRaw)
-		datasetsGroup.GET("/:namespace/:name/blob/*file_path", middleware.RepoType(types.DatasetRepo), repoCommonHandler.FileInfo)
-		datasetsGroup.GET("/:namespace/:name/download/*file_path", middleware.RepoType(types.DatasetRepo), repoCommonHandler.DownloadFile)
-		datasetsGroup.GET("/:namespace/:name/resolve/*file_path", middleware.RepoType(types.DatasetRepo), repoCommonHandler.ResolveDownload)
-		datasetsGroup.PUT("/:namespace/:name/raw/*file_path", middleware.RepoType(types.DatasetRepo), repoCommonHandler.UpdateFile)
-		datasetsGroup.POST("/:namespace/:name/update_downloads", middleware.RepoType(types.DatasetRepo), repoCommonHandler.UpdateDownloads)
-		datasetsGroup.PUT("/:namespace/:name/incr_downloads", middleware.RepoType(types.DatasetRepo), repoCommonHandler.IncrDownloads)
-		datasetsGroup.POST("/:namespace/:name/upload_file", middleware.RepoType(types.DatasetRepo), repoCommonHandler.UploadFile)
-		datasetsGroup.POST("/:namespace/:name/mirror", middleware.RepoType(types.DatasetRepo), repoCommonHandler.CreateMirror)
-		datasetsGroup.GET("/:namespace/:name/mirror", middleware.RepoType(types.DatasetRepo), repoCommonHandler.GetMirror)
-		datasetsGroup.PUT("/:namespace/:name/mirror", middleware.RepoType(types.DatasetRepo), repoCommonHandler.UpdateMirror)
-		datasetsGroup.DELETE("/:namespace/:name/mirror", middleware.RepoType(types.DatasetRepo), repoCommonHandler.DeleteMirror)
-		datasetsGroup.POST("/:namespace/:name/mirror/sync", middleware.RepoType(types.DatasetRepo), repoCommonHandler.SyncMirror)
+		datasetsGroup.POST("/:namespace/:name/tags/:category", middlewareCollection.Auth.NeedLogin, repoCommonHandler.UpdateTags)
+		datasetsGroup.GET("/:namespace/:name/last_commit", repoCommonHandler.LastCommit)
+		datasetsGroup.GET("/:namespace/:name/commit/:commit_id", repoCommonHandler.CommitWithDiff)
+		datasetsGroup.POST("/:namespace/:name/commit/:revision", repoCommonHandler.CommitFiles)
+		datasetsGroup.GET("/:namespace/:name/remote_diff", repoCommonHandler.RemoteDiff)
+		datasetsGroup.GET("/:namespace/:name/tree", repoCommonHandler.Tree)
+		datasetsGroup.GET("/:namespace/:name/refs/:ref/tree/*path", repoCommonHandler.TreeV2)
+		datasetsGroup.GET("/:namespace/:name/refs/:ref/logs_tree/*path", repoCommonHandler.LogsTree)
+		datasetsGroup.GET("/:namespace/:name/commits", repoCommonHandler.Commits)
+		datasetsGroup.POST("/:namespace/:name/raw/*file_path", middlewareCollection.Auth.NeedLogin, repoCommonHandler.CreateFile)
+		datasetsGroup.GET("/:namespace/:name/raw/*file_path", repoCommonHandler.FileRaw)
+		datasetsGroup.GET("/:namespace/:name/blob/*file_path", repoCommonHandler.FileInfo)
+		datasetsGroup.GET("/:namespace/:name/download/*file_path", repoCommonHandler.DownloadFile)
+		datasetsGroup.GET("/:namespace/:name/resolve/*file_path", repoCommonHandler.ResolveDownload)
+		datasetsGroup.PUT("/:namespace/:name/raw/*file_path", middlewareCollection.Auth.NeedLogin, repoCommonHandler.UpdateFile)
+		datasetsGroup.POST("/:namespace/:name/update_downloads", repoCommonHandler.UpdateDownloads)
+		datasetsGroup.PUT("/:namespace/:name/incr_downloads", repoCommonHandler.IncrDownloads)
+		datasetsGroup.POST("/:namespace/:name/upload_file", middlewareCollection.Auth.NeedLogin, repoCommonHandler.UploadFile)
+		datasetsGroup.POST("/:namespace/:name/mirror", middlewareCollection.Auth.NeedLogin, repoCommonHandler.CreateMirror)
+		datasetsGroup.GET("/:namespace/:name/mirror", middlewareCollection.Auth.NeedLogin, repoCommonHandler.GetMirror)
+		datasetsGroup.PUT("/:namespace/:name/mirror", middlewareCollection.Auth.NeedLogin, repoCommonHandler.UpdateMirror)
+		datasetsGroup.DELETE("/:namespace/:name/mirror", middlewareCollection.Auth.NeedLogin, repoCommonHandler.DeleteMirror)
+		datasetsGroup.POST("/:namespace/:name/mirror/sync", middlewareCollection.Auth.NeedLogin, repoCommonHandler.SyncMirror)
 
 		// mirror from SaaS, only on-premises available
 		if !config.Saas {
-			datasetsGroup.POST("/:namespace/:name/mirror_from_saas", middleware.RepoType(types.DatasetRepo), repoCommonHandler.MirrorFromSaas)
+			datasetsGroup.POST("/:namespace/:name/mirror_from_saas", middlewareCollection.Auth.NeedLogin, repoCommonHandler.MirrorFromSaas)
 		}
 	}
 }
 
-func createCodeRoutes(config *config.Config, apiGroup *gin.RouterGroup, codeHandler *handler.CodeHandler, repoCommonHandler *handler.RepoHandler) {
+func createCodeRoutes(
+	config *config.Config,
+	apiGroup *gin.RouterGroup,
+	middlewareCollection middleware.MiddlewareCollection,
+	codeHandler *handler.CodeHandler,
+	repoCommonHandler *handler.RepoHandler,
+) {
 	codesGroup := apiGroup.Group("/codes")
+	codesGroup.Use(middleware.RepoType(types.CodeRepo))
 	{
-		codesGroup.POST("", codeHandler.Create)
+		codesGroup.POST("", middlewareCollection.Auth.NeedLogin, codeHandler.Create)
 		codesGroup.GET("", codeHandler.Index)
-		codesGroup.PUT("/:namespace/:name", codeHandler.Update)
-		codesGroup.DELETE("/:namespace/:name", codeHandler.Delete)
+		codesGroup.PUT("/:namespace/:name", middlewareCollection.Auth.NeedLogin, codeHandler.Update)
+		codesGroup.DELETE("/:namespace/:name", middlewareCollection.Auth.NeedLogin, codeHandler.Delete)
 		codesGroup.GET("/:namespace/:name", codeHandler.Show)
 		codesGroup.GET("/:namespace/:name/relations", codeHandler.Relations)
-		codesGroup.GET("/:namespace/:name/branches", middleware.RepoType(types.CodeRepo), repoCommonHandler.Branches)
-		codesGroup.GET("/:namespace/:name/tags", middleware.RepoType(types.CodeRepo), repoCommonHandler.Tags)
-		codesGroup.POST("/:namespace/:name/preupload/:revision", middleware.RepoType(types.CodeRepo), repoCommonHandler.Preupload)
+	}
+
+	{
+		codesGroup.GET("/:namespace/:name/branches", repoCommonHandler.Branches)
+		codesGroup.GET("/:namespace/:name/tags", repoCommonHandler.Tags)
+		codesGroup.POST("/:namespace/:name/preupload/:revision", repoCommonHandler.Preupload)
 		// update tags of a certain category
-		codesGroup.POST("/:namespace/:name/tags/:category", middleware.RepoType(types.CodeRepo), repoCommonHandler.UpdateTags)
-		codesGroup.GET("/:namespace/:name/last_commit", middleware.RepoType(types.CodeRepo), repoCommonHandler.LastCommit)
-		codesGroup.GET("/:namespace/:name/commit/:commit_id", middleware.RepoType(types.CodeRepo), repoCommonHandler.CommitWithDiff)
-		codesGroup.POST("/:namespace/:name/commit/:revision", middleware.RepoType(types.CodeRepo), repoCommonHandler.CommitFiles)
-		codesGroup.GET("/:namespace/:name/remote_diff", middleware.RepoType(types.CodeRepo), repoCommonHandler.RemoteDiff)
-		codesGroup.GET("/:namespace/:name/tree", middleware.RepoType(types.CodeRepo), repoCommonHandler.Tree)
-		codesGroup.GET("/:namespace/:name/refs/:ref/tree/*path", middleware.RepoType(types.CodeRepo), repoCommonHandler.TreeV2)
-		codesGroup.GET("/:namespace/:name/refs/:ref/logs_tree/*path", middleware.RepoType(types.CodeRepo), repoCommonHandler.LogsTree)
-		codesGroup.GET("/:namespace/:name/commits", middleware.RepoType(types.CodeRepo), repoCommonHandler.Commits)
-		codesGroup.POST("/:namespace/:name/raw/*file_path", middleware.RepoType(types.CodeRepo), repoCommonHandler.CreateFile)
-		codesGroup.GET("/:namespace/:name/raw/*file_path", middleware.RepoType(types.CodeRepo), repoCommonHandler.FileRaw)
-		codesGroup.GET("/:namespace/:name/blob/*file_path", middleware.RepoType(types.CodeRepo), repoCommonHandler.FileInfo)
-		codesGroup.GET("/:namespace/:name/download/*file_path", middleware.RepoType(types.CodeRepo), repoCommonHandler.DownloadFile)
-		codesGroup.GET("/:namespace/:name/resolve/*file_path", middleware.RepoType(types.CodeRepo), repoCommonHandler.ResolveDownload)
-		codesGroup.PUT("/:namespace/:name/raw/*file_path", middleware.RepoType(types.CodeRepo), repoCommonHandler.UpdateFile)
-		codesGroup.POST("/:namespace/:name/update_downloads", middleware.RepoType(types.CodeRepo), repoCommonHandler.UpdateDownloads)
-		codesGroup.PUT("/:namespace/:name/incr_downloads", middleware.RepoType(types.CodeRepo), repoCommonHandler.IncrDownloads)
-		codesGroup.POST("/:namespace/:name/upload_file", middleware.RepoType(types.CodeRepo), repoCommonHandler.UploadFile)
-		codesGroup.POST("/:namespace/:name/mirror", middleware.RepoType(types.CodeRepo), repoCommonHandler.CreateMirror)
-		codesGroup.GET("/:namespace/:name/mirror", middleware.RepoType(types.CodeRepo), repoCommonHandler.GetMirror)
-		codesGroup.PUT("/:namespace/:name/mirror", middleware.RepoType(types.CodeRepo), repoCommonHandler.UpdateMirror)
-		codesGroup.DELETE("/:namespace/:name/mirror", middleware.RepoType(types.CodeRepo), repoCommonHandler.DeleteMirror)
-		codesGroup.POST("/:namespace/:name/mirror/sync", middleware.RepoType(types.CodeRepo), repoCommonHandler.SyncMirror)
+		codesGroup.POST("/:namespace/:name/tags/:category", middlewareCollection.Auth.NeedLogin, repoCommonHandler.UpdateTags)
+		codesGroup.GET("/:namespace/:name/last_commit", repoCommonHandler.LastCommit)
+		codesGroup.GET("/:namespace/:name/commit/:commit_id", repoCommonHandler.CommitWithDiff)
+		codesGroup.POST("/:namespace/:name/commit/:revision", repoCommonHandler.CommitFiles)
+		codesGroup.GET("/:namespace/:name/remote_diff", repoCommonHandler.RemoteDiff)
+		codesGroup.GET("/:namespace/:name/tree", repoCommonHandler.Tree)
+		codesGroup.GET("/:namespace/:name/refs/:ref/tree/*path", repoCommonHandler.TreeV2)
+		codesGroup.GET("/:namespace/:name/refs/:ref/logs_tree/*path", repoCommonHandler.LogsTree)
+		codesGroup.GET("/:namespace/:name/commits", repoCommonHandler.Commits)
+		codesGroup.POST("/:namespace/:name/raw/*file_path", middlewareCollection.Auth.NeedLogin, repoCommonHandler.CreateFile)
+		codesGroup.GET("/:namespace/:name/raw/*file_path", repoCommonHandler.FileRaw)
+		codesGroup.GET("/:namespace/:name/blob/*file_path", repoCommonHandler.FileInfo)
+		codesGroup.GET("/:namespace/:name/download/*file_path", repoCommonHandler.DownloadFile)
+		codesGroup.GET("/:namespace/:name/resolve/*file_path", repoCommonHandler.ResolveDownload)
+		codesGroup.PUT("/:namespace/:name/raw/*file_path", middlewareCollection.Auth.NeedLogin, repoCommonHandler.UpdateFile)
+		codesGroup.POST("/:namespace/:name/update_downloads", repoCommonHandler.UpdateDownloads)
+		codesGroup.PUT("/:namespace/:name/incr_downloads", repoCommonHandler.IncrDownloads)
+		codesGroup.POST("/:namespace/:name/upload_file", middlewareCollection.Auth.NeedLogin, repoCommonHandler.UploadFile)
+		codesGroup.POST("/:namespace/:name/mirror", middlewareCollection.Auth.NeedLogin, repoCommonHandler.CreateMirror)
+		codesGroup.GET("/:namespace/:name/mirror", middlewareCollection.Auth.NeedLogin, repoCommonHandler.GetMirror)
+		codesGroup.PUT("/:namespace/:name/mirror", middlewareCollection.Auth.NeedLogin, repoCommonHandler.UpdateMirror)
+		codesGroup.DELETE("/:namespace/:name/mirror", middlewareCollection.Auth.NeedLogin, repoCommonHandler.DeleteMirror)
+		codesGroup.POST("/:namespace/:name/mirror/sync", middlewareCollection.Auth.NeedLogin, repoCommonHandler.SyncMirror)
 
 		// mirror from SaaS, only on-premises available
 		if !config.Saas {
-			codesGroup.POST("/:namespace/:name/mirror_from_saas", middleware.RepoType(types.CodeRepo), repoCommonHandler.MirrorFromSaas)
+			codesGroup.POST("/:namespace/:name/mirror_from_saas", middlewareCollection.Auth.NeedLogin, repoCommonHandler.MirrorFromSaas)
 		}
 	}
 }
@@ -718,72 +739,79 @@ func createSpaceRoutes(config *config.Config,
 	repoCommonHandler *handler.RepoHandler,
 	monitorHandler *handler.MonitorHandler) {
 	spaces := apiGroup.Group("/spaces")
+	spaces.Use(middleware.RepoType(types.SpaceRepo))
 	{
 		// list all spaces
 		spaces.GET("", spaceHandler.Index)
-		spaces.POST("", spaceHandler.Create)
+		spaces.POST("", middlewareCollection.Auth.NeedLogin, spaceHandler.Create)
 		// show a user or org's space
 		spaces.GET("/:namespace/:name", spaceHandler.Show)
-		spaces.PUT("/:namespace/:name", spaceHandler.Update)
-		spaces.DELETE("/:namespace/:name", spaceHandler.Delete)
+		spaces.PUT("/:namespace/:name", middlewareCollection.Auth.NeedLogin, spaceHandler.Update)
+		spaces.DELETE("/:namespace/:name", middlewareCollection.Auth.NeedLogin, spaceHandler.Delete)
 		// depoly and start running the space
-		spaces.POST("/:namespace/:name/run", spaceHandler.Run)
+		spaces.POST("/:namespace/:name/run", middlewareCollection.Auth.NeedLogin, spaceHandler.Run)
 		// wake a sleeping space
 		spaces.POST("/:namespace/:name/wakeup", spaceHandler.Wakeup)
 		// stop running space
-		spaces.POST("/:namespace/:name/stop", spaceHandler.Stop)
+		spaces.POST("/:namespace/:name/stop", middlewareCollection.Auth.NeedLogin, spaceHandler.Stop)
 		// pull space running status
 		spaces.GET("/:namespace/:name/status", spaceHandler.Status)
 		// pull space building and running logs
 		spaces.GET("/:namespace/:name/logs", spaceHandler.Logs)
 		// call space webhook api
 		spaces.POST("/:namespace/:name/webhook", nil)
+	}
 
-		spaces.GET("/:namespace/:name/branches", middleware.RepoType(types.SpaceRepo), repoCommonHandler.Branches)
-		spaces.GET("/:namespace/:name/tags", middleware.RepoType(types.SpaceRepo), repoCommonHandler.Tags)
-		spaces.POST("/:namespace/:name/preupload/:revision", middleware.RepoType(types.SpaceRepo), repoCommonHandler.Preupload)
+	{
+		spaces.GET("/:namespace/:name/branches", repoCommonHandler.Branches)
+		spaces.GET("/:namespace/:name/tags", repoCommonHandler.Tags)
+		spaces.POST("/:namespace/:name/preupload/:revision", repoCommonHandler.Preupload)
 		// update tags of a certain category
-		spaces.POST("/:namespace/:name/tags/:category", middleware.RepoType(types.SpaceRepo), repoCommonHandler.UpdateTags)
-		spaces.GET("/:namespace/:name/last_commit", middleware.RepoType(types.SpaceRepo), repoCommonHandler.LastCommit)
-		spaces.GET("/:namespace/:name/commit/:commit_id", middleware.RepoType(types.SpaceRepo), repoCommonHandler.CommitWithDiff)
-		spaces.POST("/:namespace/:name/commit/:revision", middleware.RepoType(types.SpaceRepo), repoCommonHandler.CommitFiles)
-		spaces.GET("/:namespace/:name/remote_diff", middleware.RepoType(types.SpaceRepo), repoCommonHandler.RemoteDiff)
-		spaces.GET("/:namespace/:name/tree", middleware.RepoType(types.SpaceRepo), repoCommonHandler.Tree)
-		spaces.GET("/:namespace/:name/refs/:ref/tree/*path", middleware.RepoType(types.SpaceRepo), repoCommonHandler.TreeV2)
-		spaces.GET("/:namespace/:name/refs/:ref/logs_tree/*path", middleware.RepoType(types.SpaceRepo), repoCommonHandler.LogsTree)
-		spaces.GET("/:namespace/:name/commits", middleware.RepoType(types.SpaceRepo), repoCommonHandler.Commits)
-		spaces.POST("/:namespace/:name/raw/*file_path", middleware.RepoType(types.SpaceRepo), repoCommonHandler.CreateFile)
-		spaces.GET("/:namespace/:name/raw/*file_path", middleware.RepoType(types.SpaceRepo), repoCommonHandler.FileRaw)
-		spaces.GET("/:namespace/:name/blob/*file_path", middleware.RepoType(types.SpaceRepo), repoCommonHandler.FileInfo)
-		spaces.GET("/:namespace/:name/download/*file_path", middleware.RepoType(types.SpaceRepo), repoCommonHandler.DownloadFile)
-		spaces.GET("/:namespace/:name/resolve/*file_path", middleware.RepoType(types.SpaceRepo), repoCommonHandler.ResolveDownload)
-		spaces.PUT("/:namespace/:name/raw/*file_path", middleware.RepoType(types.SpaceRepo), repoCommonHandler.UpdateFile)
-		spaces.POST("/:namespace/:name/update_downloads", middleware.RepoType(types.SpaceRepo), repoCommonHandler.UpdateDownloads)
-		spaces.PUT("/:namespace/:name/incr_downloads", middleware.RepoType(types.SpaceRepo), repoCommonHandler.IncrDownloads)
-		spaces.POST("/:namespace/:name/upload_file", middleware.RepoType(types.SpaceRepo), repoCommonHandler.UploadFile)
-		spaces.POST("/:namespace/:name/mirror", middleware.RepoType(types.SpaceRepo), repoCommonHandler.CreateMirror)
-		spaces.GET("/:namespace/:name/mirror", middleware.RepoType(types.SpaceRepo), repoCommonHandler.GetMirror)
-		spaces.PUT("/:namespace/:name/mirror", middleware.RepoType(types.SpaceRepo), repoCommonHandler.UpdateMirror)
-		spaces.DELETE("/:namespace/:name/mirror", middleware.RepoType(types.SpaceRepo), repoCommonHandler.DeleteMirror)
-		spaces.POST("/:namespace/:name/mirror/sync", middleware.RepoType(types.SpaceRepo), repoCommonHandler.SyncMirror)
+		spaces.POST("/:namespace/:name/tags/:category", middlewareCollection.Auth.NeedLogin, repoCommonHandler.UpdateTags)
+		spaces.GET("/:namespace/:name/last_commit", repoCommonHandler.LastCommit)
+		spaces.GET("/:namespace/:name/commit/:commit_id", repoCommonHandler.CommitWithDiff)
+		spaces.POST("/:namespace/:name/commit/:revision", repoCommonHandler.CommitFiles)
+		spaces.GET("/:namespace/:name/remote_diff", repoCommonHandler.RemoteDiff)
+		spaces.GET("/:namespace/:name/tree", repoCommonHandler.Tree)
+		spaces.GET("/:namespace/:name/refs/:ref/tree/*path", repoCommonHandler.TreeV2)
+		spaces.GET("/:namespace/:name/refs/:ref/logs_tree/*path", repoCommonHandler.LogsTree)
+		spaces.GET("/:namespace/:name/commits", repoCommonHandler.Commits)
+		spaces.POST("/:namespace/:name/raw/*file_path", middlewareCollection.Auth.NeedLogin, repoCommonHandler.CreateFile)
+		spaces.GET("/:namespace/:name/raw/*file_path", repoCommonHandler.FileRaw)
+		spaces.GET("/:namespace/:name/blob/*file_path", repoCommonHandler.FileInfo)
+		spaces.GET("/:namespace/:name/download/*file_path", repoCommonHandler.DownloadFile)
+		spaces.GET("/:namespace/:name/resolve/*file_path", repoCommonHandler.ResolveDownload)
+		spaces.PUT("/:namespace/:name/raw/*file_path", middlewareCollection.Auth.NeedLogin, repoCommonHandler.UpdateFile)
+		spaces.POST("/:namespace/:name/update_downloads", repoCommonHandler.UpdateDownloads)
+		spaces.PUT("/:namespace/:name/incr_downloads", repoCommonHandler.IncrDownloads)
+		spaces.POST("/:namespace/:name/upload_file", middlewareCollection.Auth.NeedLogin, repoCommonHandler.UploadFile)
+		spaces.POST("/:namespace/:name/mirror", middlewareCollection.Auth.NeedLogin, repoCommonHandler.CreateMirror)
+		spaces.GET("/:namespace/:name/mirror", middlewareCollection.Auth.NeedLogin, repoCommonHandler.GetMirror)
+		spaces.PUT("/:namespace/:name/mirror", middlewareCollection.Auth.NeedLogin, repoCommonHandler.UpdateMirror)
+		spaces.DELETE("/:namespace/:name/mirror", middlewareCollection.Auth.NeedLogin, repoCommonHandler.DeleteMirror)
+		spaces.POST("/:namespace/:name/mirror/sync", middlewareCollection.Auth.NeedLogin, repoCommonHandler.SyncMirror)
 
 		// mirror from SaaS, only on-premises available
 		if !config.Saas {
-			spaces.POST("/:namespace/:name/mirror_from_saas", middleware.RepoType(types.SpaceRepo), repoCommonHandler.MirrorFromSaas)
+			spaces.POST("/:namespace/:name/mirror_from_saas", middlewareCollection.Auth.NeedLogin, repoCommonHandler.MirrorFromSaas)
 		}
-		spaces.GET("/:namespace/:name/run", middleware.RepoType(types.SpaceRepo), repoCommonHandler.DeployList)
-		spaces.GET("/:namespace/:name/run/:id", middleware.RepoType(types.SpaceRepo), repoCommonHandler.DeployDetail)
-		spaces.GET("/:namespace/:name/run/:id/status", middleware.RepoType(types.SpaceRepo), repoCommonHandler.DeployStatus)
-		spaces.GET("/:namespace/:name/run/:id/logs/:instance", middleware.RepoType(types.SpaceRepo), repoCommonHandler.DeployInstanceLogs)
+		spaces.GET("/:namespace/:name/run", middlewareCollection.Auth.NeedLogin, repoCommonHandler.DeployList)
+		spaces.GET("/:namespace/:name/run/:id", middlewareCollection.Auth.NeedLogin, repoCommonHandler.DeployDetail)
+		spaces.GET("/:namespace/:name/run/:id/status", middlewareCollection.Auth.NeedLogin, repoCommonHandler.DeployStatus)
+		spaces.GET("/:namespace/:name/run/:id/logs/:instance", middlewareCollection.Auth.NeedLogin, repoCommonHandler.DeployInstanceLogs)
+	}
+	spaceMonitorGroup := spaces.Group("")
+	spaceMonitorGroup.Use(middlewareCollection.Auth.NeedLogin)
+	{
 		// space monitor
-		spaces.GET("/:namespace/:name/run/:id/cpu/:instance/usage",
-			middlewareCollection.Auth.NeedLogin, middleware.RepoType(types.SpaceRepo), monitorHandler.CPUUsage)
-		spaces.GET("/:namespace/:name/run/:id/memory/:instance/usage",
-			middlewareCollection.Auth.NeedLogin, middleware.RepoType(types.SpaceRepo), monitorHandler.MemoryUsage)
-		spaces.GET("/:namespace/:name/run/:id/request/:instance/count",
-			middlewareCollection.Auth.NeedLogin, middleware.RepoType(types.SpaceRepo), monitorHandler.RequestCount)
-		spaces.GET("/:namespace/:name/run/:id/request/:instance/latency",
-			middlewareCollection.Auth.NeedLogin, middleware.RepoType(types.SpaceRepo), monitorHandler.RequestLatency)
+		spaceMonitorGroup.GET("/:namespace/:name/run/:id/cpu/:instance/usage",
+			monitorHandler.CPUUsage)
+		spaceMonitorGroup.GET("/:namespace/:name/run/:id/memory/:instance/usage",
+			monitorHandler.MemoryUsage)
+		spaceMonitorGroup.GET("/:namespace/:name/run/:id/request/:instance/count",
+			monitorHandler.RequestCount)
+		spaceMonitorGroup.GET("/:namespace/:name/run/:id/request/:instance/latency",
+			monitorHandler.RequestLatency)
 	}
 }
 
