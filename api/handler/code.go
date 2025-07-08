@@ -51,10 +51,6 @@ type CodeHandler struct {
 // @Router       /codes [post]
 func (h *CodeHandler) Create(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	var req *types.CreateCodeReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -157,10 +153,6 @@ func (h *CodeHandler) Index(ctx *gin.Context) {
 // @Router       /codes/{namespace}/{name} [put]
 func (h *CodeHandler) Update(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	var req *types.UpdateCodeReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -216,10 +208,6 @@ func (h *CodeHandler) Update(ctx *gin.Context) {
 // @Router       /codes/{namespace}/{name} [delete]
 func (h *CodeHandler) Delete(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)

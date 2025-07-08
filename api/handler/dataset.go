@@ -58,10 +58,6 @@ type DatasetHandler struct {
 // @Router       /datasets [post]
 func (h *DatasetHandler) Create(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	var req *types.CreateDatasetReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -167,10 +163,6 @@ func (h *DatasetHandler) Index(ctx *gin.Context) {
 // @Router       /datasets/{namespace}/{name} [put]
 func (h *DatasetHandler) Update(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	var req *types.UpdateDatasetReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -226,10 +218,6 @@ func (h *DatasetHandler) Update(ctx *gin.Context) {
 // @Router       /datasets/{namespace}/{name} [delete]
 func (h *DatasetHandler) Delete(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)

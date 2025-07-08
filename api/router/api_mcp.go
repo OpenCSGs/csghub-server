@@ -31,7 +31,7 @@ func CreateMCPServerRoutes(
 		mcpGroup.GET("/:namespace/:name/branches", repoCommonHandler.Branches)
 		mcpGroup.GET("/:namespace/:name/tags", repoCommonHandler.Tags)
 		mcpGroup.POST("/:namespace/:name/preupload/:revision", repoCommonHandler.Preupload)
-		mcpGroup.POST("/:namespace/:name/tags/:category", repoCommonHandler.UpdateTags)
+		mcpGroup.POST("/:namespace/:name/tags/:category", middlewareCollection.Auth.NeedLogin, repoCommonHandler.UpdateTags)
 		mcpGroup.GET("/:namespace/:name/last_commit", repoCommonHandler.LastCommit)
 		mcpGroup.GET("/:namespace/:name/commit/:commit_id", repoCommonHandler.CommitWithDiff)
 		mcpGroup.POST("/:namespace/:name/commit/:revision", repoCommonHandler.CommitFiles)

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/uptrace/bun"
+	"opencsg.com/csghub-server/common/errorx"
 )
 
 // Define the UserStore interface
@@ -106,10 +107,7 @@ func (u *User) SetRoles(roles []string) {
 
 func (s *UserStoreImpl) Index(ctx context.Context) (users []User, err error) {
 	err = s.db.Operator.Core.NewSelect().Model(&users).Scan(ctx, &users)
-	if err != nil {
-		return
-	}
-	return
+	return users, errorx.HandleDBError(err, nil)
 }
 
 func (s *UserStoreImpl) IndexWithSearch(ctx context.Context, search string, per, page int) (users []User, count int, err error) {
@@ -121,36 +119,33 @@ func (s *UserStoreImpl) IndexWithSearch(ctx context.Context, search string, per,
 	}
 	count, err = query.Count(ctx)
 	if err != nil {
-		return
+		return users, count, errorx.HandleDBError(err, nil)
 	}
 	query.Order("id asc").Limit(per).Offset((page - 1) * per)
 	err = query.Scan(ctx, &users)
-	if err != nil {
-		return
-	}
-	return
+	return users, count, errorx.HandleDBError(err, nil)
 }
 
 func (s *UserStoreImpl) FindByUsername(ctx context.Context, username string) (user User, err error) {
 	user.Username = username
 	err = s.db.Operator.Core.NewSelect().Model(&user).Where("username = ?", username).Scan(ctx)
-	return
+	return user, errorx.HandleDBError(err, errorx.Ctx().Set("username", username))
 }
 
 func (s *UserStoreImpl) FindByEmail(ctx context.Context, email string) (user User, err error) {
 	user.Email = email
 	err = s.db.Operator.Core.NewSelect().Model(&user).Where("email = ?", email).Scan(ctx)
-	return
+	return user, errorx.HandleDBError(err, nil)
 }
 
 func (s *UserStoreImpl) FindByID(ctx context.Context, id int) (user User, err error) {
 	user.ID = int64(id)
 	err = s.db.Operator.Core.NewSelect().Model(&user).WherePK().Scan(ctx)
-	return
+	return user, errorx.HandleDBError(err, nil)
 }
 
 func (s *UserStoreImpl) Update(ctx context.Context, user *User, oldUserName string) (err error) {
-	return s.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	err = s.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if len(oldUserName) > 0 && oldUserName != user.Username {
 			if err = assertAffectedOneRow(tx.NewUpdate().Model((*Namespace)(nil)).
 				Set("path = ?", user.Username).
@@ -171,10 +166,11 @@ func (s *UserStoreImpl) Update(ctx context.Context, user *User, oldUserName stri
 		}
 		return nil
 	})
+	return errorx.HandleDBError(err, nil)
 }
 
 func (s *UserStoreImpl) ChangeUserName(ctx context.Context, username string, newUsername string) (err error) {
-	return s.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	err = s.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if err = assertAffectedOneRow(tx.NewUpdate().Model((*Namespace)(nil)).
 			Set("path = ?", newUsername).
 			Set("updated_at = now()").
@@ -195,6 +191,7 @@ func (s *UserStoreImpl) ChangeUserName(ctx context.Context, username string, new
 		}
 		return nil
 	})
+	return errorx.HandleDBError(err, nil)
 }
 
 func (s *UserStoreImpl) Create(ctx context.Context, user *User, namespace *Namespace) (err error) {
@@ -209,23 +206,25 @@ func (s *UserStoreImpl) Create(ctx context.Context, user *User, namespace *Names
 		}
 		return nil
 	})
-	return
+	return errorx.HandleDBError(err, nil)
 }
 
 func (s *UserStoreImpl) IsExist(ctx context.Context, username string) (exists bool, err error) {
-	return s.db.Operator.Core.
+	exists, err = s.db.Operator.Core.
 		NewSelect().
 		Model((*User)(nil)).
 		Where("username =?", username).
 		Exists(ctx)
+	return exists, errorx.HandleDBError(err, nil)
 }
 
 func (s *UserStoreImpl) IsExistByUUID(ctx context.Context, uuid string) (exists bool, err error) {
-	return s.db.Operator.Core.
+	exists, err = s.db.Operator.Core.
 		NewSelect().
 		Model((*User)(nil)).
 		Where("uuid =?", uuid).
 		Exists(ctx)
+	return exists, errorx.HandleDBError(err, nil)
 }
 
 // FindByAccessToken retrieves user information based on the access token. The access token must be active and not expired.
@@ -240,7 +239,7 @@ func (s *UserStoreImpl) FindByGitAccessToken(ctx context.Context, token string) 
 		Exec(ctx, &user)
 
 	if err != nil {
-		return nil, err
+		return nil, errorx.HandleDBError(err, nil)
 	}
 	return &user, nil
 }
@@ -249,16 +248,17 @@ func (s *UserStoreImpl) FindByUUID(ctx context.Context, uuid string) (*User, err
 	var user User
 	err := s.db.Operator.Core.NewSelect().Model(&user).Where("uuid = ?", uuid).Scan(ctx)
 	if err != nil {
-		return nil, err
+		return nil, errorx.HandleDBError(err, nil)
 	}
 	return &user, nil
 }
 
 func (s *UserStoreImpl) GetActiveUserCount(ctx context.Context) (int, error) {
-	return s.db.Operator.Core.
+	count, err := s.db.Operator.Core.
 		NewSelect().
 		Model(&User{}).
 		Count(ctx)
+	return count, errorx.HandleDBError(err, nil)
 }
 
 func (s *UserStoreImpl) DeleteUserAndRelations(ctx context.Context, input User) (err error) {
@@ -267,7 +267,7 @@ func (s *UserStoreImpl) DeleteUserAndRelations(ctx context.Context, input User) 
 		return fmt.Errorf("error checking if user exists: %v", err)
 	}
 	if !exists {
-		return fmt.Errorf("user does not exist")
+		return errorx.ErrDatabaseNoRows
 	}
 
 	err = s.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
@@ -339,7 +339,7 @@ func (s *UserStoreImpl) DeleteUserAndRelations(ctx context.Context, input User) 
 
 		return nil
 	})
-	return
+	return errorx.HandleDBError(err, nil)
 }
 
 func (s *UserStoreImpl) CountUsers(ctx context.Context) (int, error) {
@@ -347,7 +347,7 @@ func (s *UserStoreImpl) CountUsers(ctx context.Context) (int, error) {
 	q := s.db.Operator.Core.NewSelect().Model(&users)
 	count, err := q.Count(ctx)
 	if err != nil {
-		return 0, fmt.Errorf("failed to count users: %w", err)
+		return 0, errorx.HandleDBError(err, nil)
 	}
 	return count, nil
 }

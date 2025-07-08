@@ -113,7 +113,7 @@ func TestSpaceHandler_Create(t *testing.T) {
 	tester := NewSpaceTester(t).WithHandleFunc(func(h *SpaceHandler) gin.HandlerFunc {
 		return h.Create
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	req := &types.CreateSpaceReq{
 		CreateRepoReq: types.CreateRepoReq{},
@@ -134,7 +134,7 @@ func TestSpaceHandler_Update(t *testing.T) {
 	tester := NewSpaceTester(t).WithHandleFunc(func(h *SpaceHandler) gin.HandlerFunc {
 		return h.Update
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	req := &types.UpdateSpaceReq{UpdateRepoReq: types.UpdateRepoReq{}}
 	tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), req).Return(true, nil)
@@ -154,7 +154,7 @@ func TestSpaceHandler_Delete(t *testing.T) {
 	tester := NewSpaceTester(t).WithHandleFunc(func(h *SpaceHandler) gin.HandlerFunc {
 		return h.Delete
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.mocks.space.EXPECT().Delete(tester.Ctx(), "u", "r", "u").Return(nil)
 	tester.Execute()
@@ -166,7 +166,7 @@ func TestSpaceHandler_Run(t *testing.T) {
 	tester := NewSpaceTester(t).WithHandleFunc(func(h *SpaceHandler) gin.HandlerFunc {
 		return h.Run
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.mocks.repo.EXPECT().AllowAdminAccess(tester.Ctx(), types.SpaceRepo, "u", "r", "u").Return(true, nil)
 	tester.mocks.space.EXPECT().Deploy(tester.Ctx(), "u", "r", "u").Return(123, nil)
@@ -190,7 +190,7 @@ func TestSpaceHandler_Stop(t *testing.T) {
 	tester := NewSpaceTester(t).WithHandleFunc(func(h *SpaceHandler) gin.HandlerFunc {
 		return h.Stop
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.mocks.repo.EXPECT().AllowAdminAccess(tester.Ctx(), types.SpaceRepo, "u", "r", "u").Return(true, nil)
 	tester.mocks.space.EXPECT().Stop(tester.Ctx(), "u", "r", false).Return(nil)

@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log/slog"
 	"strconv"
@@ -81,8 +80,8 @@ type ModelComponent interface {
 	Deploy(ctx context.Context, deployReq types.DeployActReq, req types.ModelRunReq) (int64, error)
 	ListModelsByRuntimeFrameworkID(ctx context.Context, currentUser string, per, page int, id int64, deployType int) ([]types.Model, int, error)
 	ListAllByRuntimeFramework(ctx context.Context, currentUser string) ([]database.RuntimeFramework, error)
-	SetRuntimeFrameworkModes(ctx context.Context, currentUser string, deployType int, id int64, paths []string) ([]string, error)
-	DeleteRuntimeFrameworkModes(ctx context.Context, currentUser string, deployType int, id int64, paths []string) ([]string, error)
+	SetRuntimeFrameworkModes(ctx context.Context, deployType int, id int64, paths []string) ([]string, error)
+	DeleteRuntimeFrameworkModes(ctx context.Context, deployType int, id int64, paths []string) ([]string, error)
 	ListModelsOfRuntimeFrameworks(ctx context.Context, currentUser, search, sort string, per, page int, deployType int) ([]types.Model, int, error)
 	OrgModels(ctx context.Context, req *types.OrgModelsReq) ([]types.Model, int, error)
 	ListQuantizations(ctx context.Context, namespace, name string) ([]*types.File, error)
@@ -231,7 +230,7 @@ func (c *modelComponentImpl) Create(ctx context.Context, req *types.CreateModelR
 	)
 	user, err := c.userStore.FindByUsername(ctx, req.Username)
 	if err != nil {
-		return nil, errors.New("user does not exist")
+		return nil, fmt.Errorf("failed to find user, error: %w", err)
 	}
 
 	if req.Nickname != "" {
@@ -288,7 +287,7 @@ func (c *modelComponentImpl) Create(ctx context.Context, req *types.CreateModelR
 		NewBranch: req.DefaultBranch,
 		Namespace: req.Namespace,
 		Name:      req.Name,
-		FilePath:  gitattributesFileName,
+		FilePath:  types.GitattributesFileName,
 	}, types.ModelRepo))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create .gitattributes file, cause: %w", err)
@@ -300,7 +299,7 @@ func (c *modelComponentImpl) Create(ctx context.Context, req *types.CreateModelR
 			Category:  tag.Category,
 			Group:     tag.Group,
 			BuiltIn:   tag.BuiltIn,
-			ShowName:  tag.I18nKey, // ShowName:  tag.ShowName,
+			ShowName:  tag.I18nKey, //ShowName:  tag.ShowName,
 			I18nKey:   tag.I18nKey,
 			CreatedAt: tag.CreatedAt,
 			UpdatedAt: tag.UpdatedAt,
@@ -713,10 +712,6 @@ func (c *modelComponentImpl) SetRelationDatasets(ctx context.Context, req types.
 		return fmt.Errorf("user does not exist, %w", err)
 	}
 
-	if !user.CanAdmin() {
-		return fmt.Errorf("only admin is allowed to set dataset for model")
-	}
-
 	_, err = c.repoStore.FindByPath(ctx, types.ModelRepo, req.Namespace, req.Name)
 	if err != nil {
 		return fmt.Errorf("failed to find model, error: %w", err)
@@ -763,10 +758,6 @@ func (c *modelComponentImpl) AddRelationDataset(ctx context.Context, req types.R
 	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
 	if err != nil {
 		return fmt.Errorf("user does not exist, %w", err)
-	}
-
-	if !user.CanAdmin() {
-		return fmt.Errorf("only admin was allowed to set dataset for model")
 	}
 
 	_, err = c.repoStore.FindByPath(ctx, types.ModelRepo, req.Namespace, req.Name)
@@ -821,11 +812,6 @@ func (c *modelComponentImpl) DelRelationDataset(ctx context.Context, req types.R
 	if err != nil {
 		return fmt.Errorf("user does not exist, %w", err)
 	}
-
-	if !user.CanAdmin() {
-		return fmt.Errorf("only admin was allowed to delete dataset for model")
-	}
-
 	_, err = c.repoStore.FindByPath(ctx, types.ModelRepo, req.Namespace, req.Name)
 	if err != nil {
 		return fmt.Errorf("failed to find model, error: %w", err)
@@ -1016,7 +1002,7 @@ func (c *modelComponentImpl) Deploy(ctx context.Context, deployReq types.DeployA
 	annotations[types.ResDeployUser] = user.Username
 	annoStr, err := json.Marshal(annotations)
 	if err != nil {
-		return -1, fmt.Errorf("fail to create annotations for deploy model, %w", err)
+		return -1, errorx.InternalServerError(err, nil)
 	}
 
 	resource, err := c.spaceResourceStore.FindByID(ctx, req.ResourceID)
@@ -1027,16 +1013,18 @@ func (c *modelComponentImpl) Deploy(ctx context.Context, deployReq types.DeployA
 	var hardware types.HardWare
 	err = json.Unmarshal([]byte(resource.Resources), &hardware)
 	if err != nil {
-		return -1, fmt.Errorf("invalid hardware setting, %w", err)
+		return -1, errorx.InternalServerError(err, nil)
 	}
 
 	// only vllm and sglang support multi-host inference
 	if hardware.Replicas > 1 {
 		if frame.FrameName != "vllm" && frame.FrameName != "sglang" {
-			return -1, fmt.Errorf("only vllm and sglang support multi-host inference")
+			err := fmt.Errorf("only vllm and sglang support multi-host inference")
+			return -1, errorx.InternalServerError(err, nil)
 		}
 		if req.MinReplica < 1 {
-			return -1, fmt.Errorf("Multi-host inference only supports a minimum replica count greater than 0")
+			err := fmt.Errorf("Multi-host inference only supports a minimum replica count greater than 0")
+			return -1, errorx.InternalServerError(err, nil)
 		}
 	}
 
@@ -1090,13 +1078,14 @@ func (c *modelComponentImpl) buildVariables(req types.ModelRunReq, frame *databa
 	if engineName == string(types.LlamaCpp) || engineName == string(types.Ktransformers) {
 		//check entrypoint for llama.cpp
 		if len(req.Entrypoint) < 1 {
-			return "", fmt.Errorf("entrypoint is required for llama.cpp")
+			err := fmt.Errorf("entrypoint is required for llama.cpp or ktransformers")
+			return "", errorx.ReqBodyFormat(err, errorx.Ctx().Set("body", "entrypoint"))
 		}
 		varMap := make(map[string]string)
 		varMap[types.GGUFEntryPoint] = req.Entrypoint
 		varBytes, err := json.Marshal(varMap)
 		if err != nil {
-			return "", fmt.Errorf("convert map to string error: %w", err)
+			return "", errorx.InternalServerError(err, nil)
 		}
 		return string(varBytes), nil
 	}
@@ -1118,8 +1107,7 @@ func (c *modelComponentImpl) ListModelsByRuntimeFrameworkID(ctx context.Context,
 
 	repos, total, err := c.repoStore.ListRepoByDeployType(ctx, types.ModelRepo, user.ID, "", "", types.InferenceType, per, page)
 	if err != nil {
-		newError := fmt.Errorf("failed to get public model repos,error:%w", err)
-		return nil, 0, newError
+		return nil, 0, fmt.Errorf("failed to get public model repos,error:%w", err)
 	}
 
 	for _, repo := range repos {
@@ -1138,31 +1126,13 @@ func (c *modelComponentImpl) ListModelsByRuntimeFrameworkID(ctx context.Context,
 func (c *modelComponentImpl) ListAllByRuntimeFramework(ctx context.Context, currentUser string) ([]database.RuntimeFramework, error) {
 	runtimes, err := c.runtimeFrameworksStore.ListAll(ctx)
 	if err != nil {
-		newError := fmt.Errorf("failed to get public model repos,error:%w", err)
-		return nil, newError
+		return nil, fmt.Errorf("failed to get public model repos,error:%w", err)
 	}
 
 	return runtimes, nil
 }
 
-func (c *modelComponentImpl) SetRuntimeFrameworkModes(ctx context.Context, currentUser string, deployType int, id int64, paths []string) ([]string, error) {
-	user, err := c.userStore.FindByUsername(ctx, currentUser)
-	if err != nil {
-		return nil, fmt.Errorf("cannot find user for runtime framework, %w", err)
-	}
-	isAdmin := c.repoComponent.IsAdminRole(user)
-	if !isAdmin {
-		return nil, errorx.ErrForbiddenMsg("need admin permission for runtime framework")
-	}
-	runtimeRepos, err := c.runtimeFrameworksStore.FindByID(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-
-	if runtimeRepos == nil {
-		return nil, fmt.Errorf("failed to get runtime framework")
-	}
-
+func (c *modelComponentImpl) SetRuntimeFrameworkModes(ctx context.Context, deployType int, id int64, paths []string) ([]string, error) {
 	models, err := c.modelStore.ListByPath(ctx, paths)
 	if err != nil {
 		return nil, err
@@ -1201,15 +1171,7 @@ func (c *modelComponentImpl) SetRuntimeFrameworkModes(ctx context.Context, curre
 	return failedModels, nil
 }
 
-func (c *modelComponentImpl) DeleteRuntimeFrameworkModes(ctx context.Context, currentUser string, deployType int, id int64, paths []string) ([]string, error) {
-	user, err := c.userStore.FindByUsername(ctx, currentUser)
-	if err != nil {
-		return nil, fmt.Errorf("cannot find user for runtime framework, %w", err)
-	}
-	isAdmin := c.repoComponent.IsAdminRole(user)
-	if !isAdmin {
-		return nil, errorx.ErrForbiddenMsg("need admin permission for runtime framework")
-	}
+func (c *modelComponentImpl) DeleteRuntimeFrameworkModes(ctx context.Context, deployType int, id int64, paths []string) ([]string, error) {
 	models, err := c.modelStore.ListByPath(ctx, paths)
 	if err != nil {
 		return nil, err

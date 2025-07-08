@@ -551,7 +551,7 @@ func createModelRoutes(config *config.Config,
 		// runtime framework
 		modelsGroup.GET("/:namespace/:name/runtime_framework", repoCommonHandler.RuntimeFrameworkList)
 		// runtime framework for both finetune and inference
-		modelsGroup.GET("/runtime_framework", repoCommonHandler.RuntimeFrameworkListWithType)
+		modelsGroup.GET("/runtime_framework", middlewareCollection.Auth.NeedLogin, repoCommonHandler.RuntimeFrameworkListWithType)
 	}
 	modelsDeployGroup := modelsGroup.Group("")
 	modelsDeployGroup.Use(middlewareCollection.Auth.NeedLogin)
@@ -865,14 +865,14 @@ func createRuntimeFrameworkRoutes(apiGroup *gin.RouterGroup, middlewareCollectio
 	needAdmin := middlewareCollection.Auth.NeedAdmin
 	runtimeFramework := apiGroup.Group("/runtime_framework")
 	{
-		runtimeFramework.GET("/:id/models", modelHandler.ListByRuntimeFrameworkID)
-		runtimeFramework.GET("", modelHandler.ListAllRuntimeFramework)
-		runtimeFramework.POST("", repoCommonHandler.RuntimeFrameworkCreate)
-		runtimeFramework.PUT("/:id", repoCommonHandler.RuntimeFrameworkUpdate)
-		runtimeFramework.DELETE("/:id", repoCommonHandler.RuntimeFrameworkDelete)
-		runtimeFramework.PUT("/:id/models", modelHandler.UpdateModelRuntimeFrameworks)
-		runtimeFramework.DELETE("/:id/models", modelHandler.DeleteModelRuntimeFrameworks)
-		runtimeFramework.GET("/models", modelHandler.ListModelsOfRuntimeFrameworks)
+		runtimeFramework.GET("/:id/models", middlewareCollection.Auth.NeedLogin, modelHandler.ListByRuntimeFrameworkID)
+		runtimeFramework.GET("", middlewareCollection.Auth.NeedLogin, modelHandler.ListAllRuntimeFramework)
+		runtimeFramework.POST("", middlewareCollection.Auth.NeedLogin, repoCommonHandler.RuntimeFrameworkCreate)
+		runtimeFramework.PUT("/:id", middlewareCollection.Auth.NeedLogin, repoCommonHandler.RuntimeFrameworkUpdate)
+		runtimeFramework.DELETE("/:id", middlewareCollection.Auth.NeedLogin, repoCommonHandler.RuntimeFrameworkDelete)
+		runtimeFramework.PUT("/:id/models", needAdmin, modelHandler.UpdateModelRuntimeFrameworks)
+		runtimeFramework.DELETE("/:id/models", needAdmin, modelHandler.DeleteModelRuntimeFrameworks)
+		runtimeFramework.GET("/models", middlewareCollection.Auth.NeedLogin, modelHandler.ListModelsOfRuntimeFrameworks)
 
 		runtimeFramework.GET("/:id/architecture", needAdmin, runtimeArchHandler.ListByRuntimeFrameworkID)
 		runtimeFramework.PUT("/:id/architecture", needAdmin, runtimeArchHandler.UpdateArchitecture)

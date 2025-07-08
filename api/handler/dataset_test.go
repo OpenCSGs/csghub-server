@@ -93,7 +93,7 @@ func TestDatasetHandler_Update(t *testing.T) {
 		tester := NewDatasetTester(t).WithHandleFunc(func(h *DatasetHandler) gin.HandlerFunc {
 			return h.Update
 		})
-		tester.RequireUser(t)
+		tester.WithUser()
 
 		tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), &types.UpdateDatasetReq{}).Return(true, nil)
 		tester.mocks.dataset.EXPECT().Update(tester.Ctx(), &types.UpdateDatasetReq{
@@ -117,7 +117,7 @@ func TestDatasetHandler_Update(t *testing.T) {
 		tester := NewDatasetTester(t).WithHandleFunc(func(h *DatasetHandler) gin.HandlerFunc {
 			return h.Update
 		})
-		tester.RequireUser(t)
+		tester.WithUser()
 
 		tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), &types.UpdateDatasetReq{}).Return(true, nil)
 		tester.mocks.dataset.EXPECT().Update(tester.Ctx(), &types.UpdateDatasetReq{
@@ -140,7 +140,7 @@ func TestDatasetHandler_Delete(t *testing.T) {
 		tester := NewDatasetTester(t).WithHandleFunc(func(h *DatasetHandler) gin.HandlerFunc {
 			return h.Delete
 		})
-		tester.RequireUser(t)
+		tester.WithUser()
 
 		tester.mocks.dataset.EXPECT().Delete(tester.Ctx(), "u-other", "r", "u").Return(errorx.ErrForbidden)
 		tester.WithParam("namespace", "u-other").WithParam("name", "r")
@@ -153,7 +153,7 @@ func TestDatasetHandler_Delete(t *testing.T) {
 		tester := NewDatasetTester(t).WithHandleFunc(func(h *DatasetHandler) gin.HandlerFunc {
 			return h.Delete
 		})
-		tester.RequireUser(t)
+		tester.WithUser()
 
 		tester.mocks.dataset.EXPECT().Delete(tester.Ctx(), "u", "r", "u").Return(nil)
 		tester.Execute()
