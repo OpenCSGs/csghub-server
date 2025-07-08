@@ -21,7 +21,10 @@ type DiscussionHandler struct {
 }
 
 func NewDiscussionHandler(config *config.Config) (*DiscussionHandler, error) {
-	dc := component.NewDiscussionComponent()
+	dc, err := component.NewDiscussionComponent(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create sensitive component: %w", err)
+	}
 	sc, err := component.NewSensitiveComponent(config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create sensitive component: %w", err)

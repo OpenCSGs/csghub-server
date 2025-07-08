@@ -15,6 +15,7 @@ type MemberStore interface {
 	Delete(ctx context.Context, orgID, userID int64, role string) error
 	UserMembers(ctx context.Context, userID int64) ([]Member, error)
 	OrganizationMembers(ctx context.Context, orgID int64, pageSize, page int) ([]Member, int, error)
+	UserUUIDsByOrganizationID(ctx context.Context, orgID int64) ([]string, error)
 }
 
 func NewMemberStore() MemberStore {
@@ -91,4 +92,18 @@ func (s *memberStoreImpl) OrganizationMembers(ctx context.Context, orgID int64, 
 		return nil, 0, fmt.Errorf("failed to count org members,caused by:%w", err)
 	}
 	return members, total, nil
+}
+
+func (s *memberStoreImpl) UserUUIDsByOrganizationID(ctx context.Context, orgID int64) ([]string, error) {
+	var uuids []string
+	err := s.db.Core.NewSelect().
+		Model((*Member)(nil)).
+		Column("u.uuid").
+		Join("JOIN users AS u ON u.id = member.user_id").
+		Where("member.organization_id = ?", orgID).
+		Scan(ctx, &uuids)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user UUIDs by organization ID, orgID: %d: caused by: %w", orgID, err)
+	}
+	return uuids, nil
 }
