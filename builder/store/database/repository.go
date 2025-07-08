@@ -11,6 +11,7 @@ import (
 
 	"github.com/uptrace/bun"
 	"opencsg.com/csghub-server/builder/deploy/common"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/types/enum"
 )
@@ -224,6 +225,7 @@ func (s *repoStoreImpl) CreateRepo(ctx context.Context, input Repository) (*Repo
 	input.Hashed = true
 	res, err := s.db.Core.NewInsert().Model(&input).Exec(ctx, &input)
 	if err := assertAffectedOneRow(res, err); err != nil {
+		err = errorx.HandleDBError(err, errorx.Ctx().Set("path", input.Path))
 		return nil, fmt.Errorf("create repository in tx failed,error:%w", err)
 	}
 
@@ -232,13 +234,13 @@ func (s *repoStoreImpl) CreateRepo(ctx context.Context, input Repository) (*Repo
 
 func (s *repoStoreImpl) UpdateRepo(ctx context.Context, input Repository) (*Repository, error) {
 	_, err := s.db.Core.NewUpdate().Model(&input).WherePK().Exec(ctx)
-
+	err = errorx.HandleDBError(err, errorx.Ctx().Set("path", input.Path))
 	return &input, err
 }
 
 func (s *repoStoreImpl) DeleteRepo(ctx context.Context, input Repository) error {
 	_, err := s.db.Core.NewDelete().Model(&input).WherePK().Exec(ctx)
-
+	err = errorx.HandleDBError(err, errorx.Ctx().Set("path", input.Path))
 	return err
 }
 
@@ -251,6 +253,9 @@ func (s *repoStoreImpl) Find(ctx context.Context, owner, repoType, repoName stri
 		Where("repository_type = ? AND LOWER(path) = LOWER(?)", repoType, fmt.Sprintf("%s/%s", owner, repoName)).
 		Limit(1).
 		Scan(ctx)
+	err = errorx.HandleDBError(err, errorx.Ctx().
+		Set("repo_type", repoType).
+		Set("path", fmt.Sprintf("%s/%s", owner, repoName)))
 	return repo, err
 }
 
@@ -261,6 +266,7 @@ func (s *repoStoreImpl) FindById(ctx context.Context, id int64) (*Repository, er
 		Model(resRepo).
 		Where("id =?", id).
 		Scan(ctx)
+	err = errorx.HandleDBError(err, errorx.Ctx().Set("repo_id", id))
 	return resRepo, err
 }
 
@@ -275,6 +281,7 @@ func (s *repoStoreImpl) FindByIds(ctx context.Context, ids []int64, opts ...Sele
 		Model(&repos).
 		Where("id in (?)", bun.In(ids)).
 		Scan(ctx)
+	err = errorx.HandleDBError(err, nil)
 	return repos, err
 }
 
@@ -288,6 +295,11 @@ func (s *repoStoreImpl) FindByPath(ctx context.Context, repoType types.Repositor
 		Where("repository_type = ? AND LOWER(path) = LOWER(?)", repoType, fmt.Sprintf("%s/%s", namespace, name)).
 		Limit(1).
 		Scan(ctx)
+	err = errorx.HandleDBError(err,
+		errorx.Ctx().
+			Set("repo_type", repoType).
+			Set("path", fmt.Sprintf("%s/%s", namespace, name)),
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -301,6 +313,10 @@ func (s *repoStoreImpl) FindByGitPath(ctx context.Context, path string) (*Reposi
 		Model(resRepo).
 		Where("LOWER(git_path) = LOWER(?)", path).
 		Scan(ctx)
+	err = errorx.HandleDBError(err,
+		errorx.Ctx().
+			Set("git_path", path),
+	)
 	return resRepo, err
 }
 
@@ -317,13 +333,18 @@ func (s *repoStoreImpl) FindByGitPaths(ctx context.Context, paths []string, opts
 	err := q.Model(&repos).
 		Where("LOWER(git_path) in (?)", bun.In(paths)).
 		Scan(ctx)
+	err = errorx.HandleDBError(err, nil)
 	return repos, err
 }
 
 func (s *repoStoreImpl) Exists(ctx context.Context, repoType types.RepositoryType, namespace string, name string) (bool, error) {
-	return s.db.Operator.Core.NewSelect().Model((*Repository)(nil)).
+	isExist, err := s.db.Operator.Core.NewSelect().Model((*Repository)(nil)).
 		Where("repository_type = ? AND LOWER(path) = LOWER(?)", repoType, fmt.Sprintf("%s/%s", namespace, name)).
 		Exists(ctx)
+	return isExist, errorx.HandleDBError(err, errorx.Ctx().
+		Set("repo_type", repoType).
+		Set("path", fmt.Sprintf("%s/%s", namespace, name)),
+	)
 }
 
 func (s *repoStoreImpl) All(ctx context.Context) ([]*Repository, error) {
@@ -332,6 +353,7 @@ func (s *repoStoreImpl) All(ctx context.Context) ([]*Repository, error) {
 		NewSelect().
 		Model(&repos).
 		Scan(ctx)
+	err = errorx.HandleDBError(err, nil)
 	return repos, err
 }
 
@@ -341,11 +363,13 @@ func (s *repoStoreImpl) UpdateRepoFileDownloads(ctx context.Context, repo *Repos
 		Model(rd).
 		Where("date = ? AND repository_id = ?", date.Format("2006-01-02"), repo.ID).
 		Scan(ctx)
+	err = errorx.HandleDBError(err, errorx.Ctx().
+		Set("path", repo.Path).
+		Set("date", date),
+	)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return
-	}
-
-	if errors.Is(err, sql.ErrNoRows) {
+	} else if errors.Is(err, sql.ErrNoRows) {
 		rd.ClickDownloadCount = clickDownloadCount
 		rd.Date = date
 		rd.RepositoryID = repo.ID
@@ -368,10 +392,9 @@ func (s *repoStoreImpl) UpdateRepoFileDownloads(ctx context.Context, repo *Repos
 		}
 	}
 	err = s.UpdateDownloads(ctx, repo)
-	if err != nil {
-		return
-	}
-
+	err = errorx.HandleDBError(err, errorx.Ctx().
+		Set("path", repo.Path),
+	)
 	return
 }
 
@@ -381,11 +404,13 @@ func (s *repoStoreImpl) UpdateRepoCloneDownloads(ctx context.Context, repo *Repo
 		Model(rd).
 		Where("date = ? AND repository_id = ?", date.Format("2006-01-02"), repo.ID).
 		Scan(ctx)
+	err = errorx.HandleDBError(err, errorx.Ctx().
+		Set("path", repo.Path).
+		Set("date", date),
+	)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return
-	}
-
-	if errors.Is(err, sql.ErrNoRows) {
+	} else if errors.Is(err, sql.ErrNoRows) {
 		rd.CloneCount = cloneCount
 		rd.Date = date
 		rd.RepositoryID = repo.ID
@@ -408,10 +433,9 @@ func (s *repoStoreImpl) UpdateRepoCloneDownloads(ctx context.Context, repo *Repo
 		}
 	}
 	err = s.UpdateDownloads(ctx, repo)
-	if err != nil {
-		return
-	}
-
+	err = errorx.HandleDBError(err, errorx.Ctx().
+		Set("path", repo.Path),
+	)
 	return
 }
 
@@ -422,6 +446,9 @@ func (s *repoStoreImpl) UpdateDownloads(ctx context.Context, repo *Repository) e
 		Model(&RepositoryDownload{}).
 		Where("repository_id=?", repo.ID).
 		Scan(ctx, &downloadCount)
+	err = errorx.HandleDBError(err, errorx.Ctx().
+		Set("path", repo.Path),
+	)
 	if err != nil {
 		return err
 	}
@@ -430,11 +457,9 @@ func (s *repoStoreImpl) UpdateDownloads(ctx context.Context, repo *Repository) e
 		Model(repo).
 		WherePK().
 		Exec(ctx)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return errorx.HandleDBError(err, errorx.Ctx().
+		Set("path", repo.Path),
+	)
 }
 
 func (s *repoStoreImpl) Tags(ctx context.Context, repoID int64) (tags []Tag, err error) {
@@ -445,6 +470,9 @@ func (s *repoStoreImpl) Tags(ctx context.Context, repoID int64) (tags []Tag, err
 		Where("repository_tag.repository_id = ?", repoID).
 		Where("repository_tag.count > 0")
 	err = query.Scan(ctx, &tags)
+	err = errorx.HandleDBError(err, errorx.Ctx().
+		Set("id", repoID),
+	)
 	return
 }
 
@@ -457,6 +485,9 @@ func (s *repoStoreImpl) TagsWithCategory(ctx context.Context, repoID int64, cate
 		Where("repository_tag.count > 0").
 		Where("tags.category = ?", category)
 	err = query.Scan(ctx, &tags)
+	err = errorx.HandleDBError(err, errorx.Ctx().
+		Set("id", repoID),
+	)
 	return
 }
 
@@ -471,6 +502,9 @@ func (s *repoStoreImpl) TagIDs(ctx context.Context, repoID int64, category strin
 	}
 	query.Column("repository_tag.tag_id")
 	err = query.Scan(ctx, &tagIDs)
+	err = errorx.HandleDBError(err, errorx.Ctx().
+		Set("id", repoID),
+	)
 	return tagIDs, err
 }
 
@@ -481,6 +515,10 @@ func (s *repoStoreImpl) SetUpdateTimeByPath(ctx context.Context, repoType types.
 		Column("updated_at").
 		Where("repository_type = ? AND LOWER(path) = LOWER(?)", repoType, fmt.Sprintf("%s/%s", namespace, name)).
 		Exec(ctx)
+	err = errorx.HandleDBError(err, errorx.Ctx().
+		Set("repo_type", repoType).
+		Set("path", fmt.Sprintf("%s/%s", namespace, name)),
+	)
 	return err
 }
 
@@ -544,6 +582,10 @@ func (s *repoStoreImpl) PublicToUser(ctx context.Context, repoType types.Reposit
 	}
 
 	count, err = q.Count(ctx)
+	err = errorx.HandleDBError(err, errorx.Ctx().
+		Set("repo_type", repoType).
+		Set("filter", filter),
+	)
 	if err != nil {
 		return
 	}
