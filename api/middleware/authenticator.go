@@ -2,10 +2,8 @@ package middleware
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
-	"net/http"
 	"strings"
 
 	"github.com/gin-contrib/sessions"
@@ -15,6 +13,7 @@ import (
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -30,7 +29,8 @@ func BuildJwtSession(jwtSignKey string) gin.HandlerFunc {
 		claims, err := parseJWTToken(jwtSignKey, token)
 		if err != nil {
 			slog.Debug("fail to parse jwt token", slog.String("token_get", token), slog.Any("error", err))
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+			httpbase.UnauthorizedError(c, errorx.InvalidAuthHeader(err, nil))
+			c.Abort()
 			return
 		}
 
@@ -39,7 +39,8 @@ func BuildJwtSession(jwtSignKey string) gin.HandlerFunc {
 		err = sessions.Default(c).Save()
 		if err != nil {
 			slog.Error("fail to save session", slog.Any("error", err))
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+			httpbase.UnauthorizedError(c, errorx.InvalidAuthHeader(err, nil))
+			c.Abort()
 			return
 		}
 
@@ -81,7 +82,7 @@ func Authenticator(config *config.Config) gin.HandlerFunc {
 		}
 
 		if !strings.HasPrefix(authHeader, "Bearer ") {
-			httpbase.UnauthorizedError(c, errors.New("authorization header must starts with `Bearer `"))
+			httpbase.UnauthorizedError(c, errorx.ErrInvalidAuthHeader)
 			c.Abort()
 			return
 		}
@@ -112,7 +113,7 @@ func Authenticator(config *config.Config) gin.HandlerFunc {
 			slog.String("method", c.Request.Method),
 			slog.String("url", c.Request.URL.RequestURI()),
 		)
-		httpbase.UnauthorizedError(c, errors.New("invalid Bearer token"))
+		httpbase.UnauthorizedError(c, errorx.ErrInvalidAuthHeader)
 		c.Abort()
 	}
 }
@@ -190,18 +191,19 @@ func parseJWTToken(signKey, tokenString string) (*types.JWTClaims, error) {
 		return []byte(signKey), nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("invilid JWT token,%w", err)
+		return nil, errorx.ErrInvalidAuthHeader
 	}
 
 	if !token.Valid {
-		return nil, errors.New("invalid JWT token")
+		return nil, errorx.ErrInvalidAuthHeader
 	}
 
 	claims, ok := token.Claims.(*types.JWTClaims)
 	if ok {
 		return claims, nil
 	}
-	return nil, fmt.Errorf("JWT token claims not match: %+v", *token)
+	err = fmt.Errorf("JWT token claims not match: %+v", *token)
+	return nil, errorx.InvalidAuthHeader(err, nil)
 }
 
 func OnlyAPIKeyAuthenticator(config *config.Config) gin.HandlerFunc {
@@ -214,7 +216,8 @@ func OnlyAPIKeyAuthenticator(config *config.Config) gin.HandlerFunc {
 		// Check Authorization Header format
 		if authHeader == "" {
 			slog.Info("missing authorization header", slog.Any("url", c.Request.URL))
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "missing Authorization header"})
+			httpbase.UnauthorizedError(c, errorx.ErrInvalidAuthHeader)
+			c.Abort()
 			return
 		}
 
@@ -228,7 +231,8 @@ func OnlyAPIKeyAuthenticator(config *config.Config) gin.HandlerFunc {
 				httpbase.SetCurrentUser(c, currentUser)
 			}
 		} else {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "please use API key for authentication"})
+			httpbase.UnauthorizedError(c, errorx.ErrNeedAPIKey)
+			c.Abort()
 			return
 		}
 
@@ -240,7 +244,7 @@ func MustLogin() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		currentUser := httpbase.GetCurrentUser(ctx)
 		if currentUser == "" {
-			httpbase.UnauthorizedError(ctx, errors.New("unknown user, please login first"))
+			httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 			ctx.Abort()
 			return
 		}
@@ -254,7 +258,7 @@ func NeedAdmin(config *config.Config) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		currentUser := httpbase.GetCurrentUser(ctx)
 		if currentUser == "" {
-			httpbase.UnauthorizedError(ctx, errors.New("unknown user, please login first"))
+			httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 			ctx.Abort()
 			return
 		}
@@ -272,7 +276,7 @@ func NeedAdmin(config *config.Config) gin.HandlerFunc {
 		}
 
 		if !dbUser.CanAdmin() {
-			httpbase.ForbiddenError(ctx, errors.New("only admin user can access"))
+			httpbase.ForbiddenError(ctx, errorx.ErrUserNotAdmin)
 			ctx.Abort()
 			return
 		}
@@ -285,14 +289,14 @@ func UserMatch() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		currentUser := httpbase.GetCurrentUser(ctx)
 		if currentUser == "" {
-			httpbase.UnauthorizedError(ctx, errors.New("unknown user, please login first"))
+			httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 			ctx.Abort()
 			return
 		}
 
 		userName := ctx.Param("username")
 		if userName != currentUser {
-			httpbase.UnauthorizedError(ctx, errors.New("user not match, try to query user account not owned"))
+			httpbase.UnauthorizedError(ctx, errorx.ErrUserNotMatch)
 			slog.Error("user not match, try to query user account not owned", "currentUser", currentUser, "userName", userName)
 			ctx.Abort()
 			return
