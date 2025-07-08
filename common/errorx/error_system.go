@@ -3,7 +3,6 @@ package errorx
 import (
 	"database/sql"
 	"errors"
-	"fmt"
 	"strings"
 )
 
@@ -11,32 +10,10 @@ import (
 
 const errSysPrefix = "SYS-ERR"
 
-type errSysCode int
-
-type errSys struct {
-	code errSysCode
-}
-
-func (err errSys) Error() string {
-	return fmt.Sprintf("%d", err.code)
-}
-
-func (err errSys) Code() string {
-	return errSysPrefix + "-" + fmt.Sprintf("%d", err.code)
-}
-
-func (err errSys) CustomError() CustomError {
-	return CustomError{
-		Prefix: errSysPrefix,
-		Code:   int(err.code),
-	}
-}
-
 const (
 	// --- SYS-ERR-xxx: System / Service exceptions ---
-	internalServerError errSysCode = iota
+	internalServerError = iota
 	remoteServiceFail
-	internalServiceFailure
 	// When select in DB, encounter connection failure or other error
 	databaseFailure
 	// Replace sql.ErrNoRows
@@ -47,27 +24,17 @@ const (
 var (
 	// --- SYS-ERR-xxx: System / Service exceptions ---
 	// Used when marshal error, type convert error
-	ErrInternalServerError = errSys{code: internalServerError}
-	ErrRemoteServiceFail   = errSys{code: remoteServiceFail}
+	ErrInternalServerError error = CustomError{prefix: errSysPrefix, code: internalServerError}
 	// Used in httpClient, then need to convert it to specific error, such as ErrUserServiceFailure
-	ErrInternalServiceFailure = errSys{code: internalServiceFailure}
+	ErrRemoteServiceFail = CustomError{prefix: errSysPrefix, code: remoteServiceFail}
 	// Used to instead of sql.ErrConnDone and other unhandled error
-	ErrDatabaseFailure = errSys{code: databaseFailure}
+	ErrDatabaseFailure = CustomError{prefix: errSysPrefix, code: databaseFailure}
 	// Used to instead of sql.ErrNoRows
 	//
 	// Convert it to specific error in component or handler
-	ErrDatabaseNoRows       = errSys{code: databaseNoRows}
-	ErrDatabaseDuplicateKey = errSys{code: databaseDuplicateKey}
+	ErrDatabaseNoRows       = CustomError{prefix: errSysPrefix, code: databaseNoRows}
+	ErrDatabaseDuplicateKey = CustomError{prefix: errSysPrefix, code: databaseDuplicateKey}
 )
-
-var errSysMap = map[errSysCode]errSys{
-	internalServerError:    ErrInternalServerError,
-	remoteServiceFail:      ErrRemoteServiceFail,
-	internalServiceFailure: ErrInternalServiceFailure,
-	databaseFailure:        ErrDatabaseFailure,
-	databaseNoRows:         ErrDatabaseNoRows,
-	databaseDuplicateKey:   ErrDatabaseDuplicateKey,
-}
 
 // Used in DB to convert db error to custom error
 //
@@ -77,17 +44,45 @@ func HandleDBError(err error, ctx map[string]interface{}) error {
 		return nil
 	}
 	customErr := CustomError{
-		Prefix:  errSysPrefix,
-		Context: ctx,
+		prefix:  errSysPrefix,
+		context: ctx,
+		err:     err,
 	}
 	if errors.Is(err, sql.ErrNoRows) {
-		customErr.Code = int(databaseNoRows)
-		return fmt.Errorf("%w, %w", err, customErr)
+		customErr.code = int(databaseNoRows)
+		return customErr
 	} else if strings.Contains(err.Error(), "duplicate key value") {
-		customErr.Code = int(databaseDuplicateKey)
-		return fmt.Errorf("%w, %w", err, customErr)
+		customErr.code = int(databaseDuplicateKey)
+		return customErr
 	} else {
-		customErr.Code = int(databaseFailure)
-		return fmt.Errorf("%w, %w", err, customErr)
+		customErr.code = int(databaseFailure)
+		return customErr
 	}
+}
+
+func InternalServerError(err error, ctx context) error {
+	if err == nil {
+		return nil
+	}
+	customErr := CustomError{
+		prefix:  errSysPrefix,
+		code:    internalServerError,
+		err:     err,
+		context: ctx,
+	}
+	return customErr
+}
+
+// Used to convert service error to custom error
+func RemoteSvcFail(err error, ctx context) error {
+	if err == nil {
+		return nil
+	}
+	customErr := CustomError{
+		prefix:  errSysPrefix,
+		context: ctx,
+		code:    int(remoteServiceFail),
+		err:     err,
+	}
+	return customErr
 }

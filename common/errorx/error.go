@@ -41,11 +41,9 @@ func UnwrapAllError(err error) []error {
 func GetCustomErrors(err error) []error {
 	errors := UnwrapAllError(err)
 	var customErrors []error
-	for _, err := range errors {
-		if IsValidErrorCode(err.Error()) {
-			customErrors = append(customErrors, err)
-		} else if coreError, ok := err.(CoreError); ok {
-			customErrors = append(customErrors, coreError.CustomError())
+	for i := len(errors) - 1; i >= 0; i-- {
+		if customError, ok := errors[i].(CustomError); ok {
+			customErrors = append(customErrors, customError)
 		}
 	}
 	return customErrors
@@ -53,11 +51,9 @@ func GetCustomErrors(err error) []error {
 
 func GetFirstCustomError(err error) (error, bool) {
 	errors := UnwrapAllError(err)
-	for _, err := range errors {
-		if IsValidErrorCode(err.Error()) {
-			return err, true
-		} else if coreError, ok := err.(CoreError); ok {
-			return coreError.CustomError(), true
+	for i := len(errors) - 1; i >= 0; i-- {
+		if customError, ok := errors[i].(CustomError); ok {
+			return customError, true
 		}
 	}
 	return err, false

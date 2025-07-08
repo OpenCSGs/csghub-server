@@ -4,27 +4,6 @@ import "fmt"
 
 const errReqPrefix = "REQ-ERR"
 
-type errReqCode int
-
-type errReq struct {
-	code errReqCode
-}
-
-func (err errReq) Error() string {
-	return fmt.Sprintf("%d", err.code)
-}
-
-func (err errReq) Code() string {
-	return errReqPrefix + "-" + fmt.Sprintf("%d", err.code)
-}
-
-func (err errReq) CustomError() CustomError {
-	return CustomError{
-		Prefix: errReqPrefix,
-		Code:   int(err.code),
-	}
-}
-
 const (
 	errBadRequest = iota
 
@@ -43,50 +22,43 @@ const (
 
 var (
 	// --- Req-ERR-xxx: Request related errors ---
-	ErrBadRequest = errReq{code: errBadRequest}
+	ErrBadRequest error = CustomError{prefix: errReqPrefix, code: errBadRequest}
 
 	// Request parameter format error
-	ErrReqBodyFormat = errReq{code: errReqBodyFormat}
+	ErrReqBodyFormat error = CustomError{prefix: errReqPrefix, code: errReqBodyFormat}
 	// Request body is empty
-	ErrReqBodyEmpty = errReq{code: errReqBodyEmpty}
+	ErrReqBodyEmpty error = CustomError{prefix: errReqPrefix, code: errReqBodyEmpty}
 	// Request body too large
-	ErrReqBodyTooLarge = errReq{code: errReqBodyTooLarge}
+	ErrReqBodyTooLarge error = CustomError{prefix: errReqPrefix, code: errReqBodyTooLarge}
 
 	// Duplicate request parameter
-	ErrReqParamDuplicate = errReq{code: errReqParamDuplicate}
+	ErrReqParamDuplicate error = CustomError{prefix: errReqPrefix, code: errReqParamDuplicate}
 	// Invalid request parameter
-	ErrReqParamInvalid = errReq{code: errReqParamInvalid}
+	ErrReqParamInvalid error = CustomError{prefix: errReqPrefix, code: errReqParamInvalid}
 
 	// Unsupported content type
-	ErrReqContentTypeUnsupported = errReq{code: errReqContentTypeUnsupported}
+	ErrReqContentTypeUnsupported = CustomError{prefix: errReqPrefix, code: errReqContentTypeUnsupported}
 )
 
-var errReqMap = map[errReqCode]errReq{
-	errBadRequest:      ErrBadRequest,
-	errReqBodyFormat:   ErrReqBodyFormat,
-	errReqBodyEmpty:    ErrReqBodyEmpty,
-	errReqBodyTooLarge: ErrReqBodyTooLarge,
-
-	errReqParamDuplicate: ErrReqParamDuplicate,
-	errReqParamInvalid:   ErrReqParamInvalid,
-
-	errReqContentTypeUnsupported: ErrReqContentTypeUnsupported,
-}
-
-func HandleBadRequest(originErr error, coreErr errReq, ext context) error {
-	customErr := coreErr.CustomError()
-	customErr.Context = ext
+func HandleBadRequest(originErr error, customErr CustomError, ext context) error {
+	customErr.context = ext
 	return fmt.Errorf("%w, %w", originErr, customErr)
 }
 
 func ReqBodyFormat(err error, ext context) error {
-	customErr := ErrReqBodyFormat.CustomError()
-	customErr.Context = ext
-	return fmt.Errorf("%w, %w", err, customErr)
+	return CustomError{
+		prefix:  errReqPrefix,
+		code:    errReqBodyFormat,
+		err:     err,
+		context: ext,
+	}
 }
 
 func ReqParamInvalid(err error, ext context) error {
-	customErr := ErrReqParamInvalid.CustomError()
-	customErr.Context = ext
-	return fmt.Errorf("%w, %w", err, customErr)
+	return CustomError{
+		prefix:  errReqPrefix,
+		code:    errReqParamInvalid,
+		err:     err,
+		context: ext,
+	}
 }

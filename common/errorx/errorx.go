@@ -17,33 +17,29 @@ func IsValidErrorCode(code string) bool {
 // ParseErrorString parses the corresponding error object from error code string
 // Supports format: "PREFIX-ERR-NUMBER" (e.g.: "AUTH-ERR-1", "SYS-ERR-2")
 // Returns corresponding CustomError instance, or returns generic error if parsing fails
-func ParseErrorCode(errorCode string) CustomError {
-	errUnknown := CustomError{
-		Prefix: errUnknownPrefix,
-		Code:   0,
+func ParseError(errorCode string, defaultErr CustomError, ctx context) CustomError {
+	errDefault := CustomError{
+		prefix:  defaultErr.prefix,
+		code:    defaultErr.code,
+		context: ctx,
 	}
 
 	matches := errorCodeRegex.FindStringSubmatch(errorCode)
 	if len(matches) != 3 {
-		return errUnknown
+		return errDefault
 	}
 
 	prefix := matches[1]
 	codeNum, err := strconv.Atoi(matches[2])
 	if err != nil {
-		return errUnknown
+		return errDefault
 	}
 
 	return CustomError{
-		Prefix: prefix,
-		Code:   codeNum,
+		prefix:  prefix,
+		code:    codeNum,
+		context: ctx,
 	}
-}
-
-type CoreError interface {
-	Error() string
-	Code() string
-	CustomError() CustomError
 }
 
 // CustomError used as standard error struct
@@ -51,20 +47,52 @@ type CoreError interface {
 // eg. ErrUnauthorized.GetErrCode() returns "unauthorized"
 // CustomError implements the error interface
 type CustomError struct {
-	Prefix  string  `json:"prefix"`
-	Code    int     `json:"code"`
-	Context context `json:"context,omitempty"`
+	prefix  string
+	code    int
+	err     error
+	context context
+}
+
+func NewCustomError(prefix string, code int, err error, context context) CustomError {
+	return CustomError{
+		prefix:  prefix,
+		code:    code,
+		err:     err,
+		context: context,
+	}
+}
+
+func (err CustomError) Is(other error) bool {
+	if other == nil {
+		return false
+	}
+	if customErr, ok := other.(CustomError); ok {
+		return err.prefix == customErr.prefix && err.code == customErr.code
+	}
+	return false
 }
 
 func (err CustomError) Error() string {
-	return err.Prefix + "-" + fmt.Sprintf("%d", err.Code)
+	if err.err == nil {
+		return fmt.Sprintf("%s-%d", err.prefix, err.code)
+	} else {
+		return fmt.Sprintf("%s-%d: %s", err.prefix, err.code, err.err.Error())
+	}
+}
+
+func (err CustomError) Code() string {
+	return fmt.Sprintf("%s-%d", err.prefix, err.code)
+}
+
+func (err CustomError) Context() context {
+	return err.context
 }
 
 func (err CustomError) Detail() string {
-	errorMsg := errSysPrefix + "-" + fmt.Sprintf("%d", err.Code)
-	if len(err.Context) > 0 {
+	errorMsg := fmt.Sprintf("%s-%d", err.prefix, err.code)
+	if len(err.context) > 0 {
 		var auxParts []string
-		for key, value := range err.Context {
+		for key, value := range err.context {
 			auxParts = append(auxParts, fmt.Sprintf("%s:%v", key, value))
 		}
 		errorMsg += " [" + strings.Join(auxParts, ", ") + "]"
@@ -75,14 +103,7 @@ func (err CustomError) Detail() string {
 
 // used for errors.Is to check error type
 func (err CustomError) Unwrap() error {
-	switch err.Prefix {
-	case errSysPrefix:
-		return errSysMap[errSysCode(err.Code)]
-	case errReqPrefix:
-		return errReqMap[errReqCode(err.Code)]
-	default:
-		return ErrUnknown
-	}
+	return err.err
 }
 
 var (

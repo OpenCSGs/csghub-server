@@ -1,26 +1,9 @@
 package errorx
 
-import "fmt"
-
 const errGitPrefix = "GIT-ERR"
 
-type errGit struct {
-	code errGitCode
-	msg  string
-}
-
-func (err errGit) Error() string {
-	return err.msg
-}
-
-func (err errGit) ErrorWithCode() string {
-	return errGitPrefix + "-" + fmt.Sprintf("%d", err.code) + ":" + err.msg
-}
-
-type errGitCode int
-
 const (
-	gitCloneFailed errGitCode = iota
+	gitCloneFailed = iota
 	gitPullFailed
 	gitPushFailed
 	gitCommitFailed
@@ -36,16 +19,16 @@ const (
 
 var (
 	// --- GIT-ERR-xxx: Git/Upload, Download, Resource Synchronization ---
-	ErrGitCloneFailed      = errGit{code: gitCloneFailed, msg: "git clone failed"}
-	ErrGitPullFailed       = errGit{code: gitPullFailed, msg: "git pull failed"}
-	ErrGitPushFailed       = errGit{code: gitPushFailed, msg: "git push failed"}
-	ErrGitCommitFailed     = errGit{code: gitCommitFailed, msg: "git commit failed"}
-	ErrGitAuthFailed       = errGit{code: gitAuthFailed, msg: "git authentication failed"}
-	ErrGitRepoNotFound     = errGit{code: gitRepoNotFound, msg: "git repository not found"}
-	ErrGitBranchNotFound   = errGit{code: gitBranchNotFound, msg: "git branch not found"}
-	ErrGitFileNotFound     = errGit{code: gitFileNotFound, msg: "file not found in git repository"}
-	ErrGitUploadFailed     = errGit{code: gitUploadFailed, msg: "file upload failed"}
-	ErrGitDownloadFailed   = errGit{code: gitDownloadFailed, msg: "file download failed"}
-	ErrGitConnectionFailed = errGit{code: gitConnectionFailed, msg: "git service connection failed"}
-	ErrGitLfsError         = errGit{code: gitLfsError, msg: "git lfs operation error"}
+	ErrGitCloneFailed      error = CustomError{prefix: errGitPrefix, code: gitCloneFailed}
+	ErrGitPullFailed       error = CustomError{prefix: errGitPrefix, code: gitPullFailed}
+	ErrGitPushFailed       error = CustomError{prefix: errGitPrefix, code: gitPushFailed}
+	ErrGitCommitFailed     error = CustomError{prefix: errGitPrefix, code: gitCommitFailed}
+	ErrGitAuthFailed       error = CustomError{prefix: errGitPrefix, code: gitAuthFailed}
+	ErrGitRepoNotFound     error = CustomError{prefix: errGitPrefix, code: gitRepoNotFound}
+	ErrGitBranchNotFound   error = CustomError{prefix: errGitPrefix, code: gitBranchNotFound}
+	ErrGitFileNotFound     error = CustomError{prefix: errGitPrefix, code: gitFileNotFound}
+	ErrGitUploadFailed     error = CustomError{prefix: errGitPrefix, code: gitUploadFailed}
+	ErrGitDownloadFailed   error = CustomError{prefix: errGitPrefix, code: gitDownloadFailed}
+	ErrGitConnectionFailed error = CustomError{prefix: errGitPrefix, code: gitConnectionFailed}
+	ErrGitLfsError         error = CustomError{prefix: errGitPrefix, code: gitLfsError}
 )
