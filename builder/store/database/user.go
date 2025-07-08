@@ -25,6 +25,8 @@ type UserStore interface {
 	FindByUUID(ctx context.Context, uuid string) (*User, error)
 	DeleteUserAndRelations(ctx context.Context, input User) error
 	CountUsers(ctx context.Context) (int, error)
+	GetEmails(ctx context.Context, per, page int) ([]string, int, error)
+	GetUserUUIDs(ctx context.Context, per, page int) ([]string, int, error)
 }
 
 // Implement the UserStore interface in UserStoreImpl
@@ -350,4 +352,38 @@ func (s *UserStoreImpl) CountUsers(ctx context.Context) (int, error) {
 		return 0, errorx.HandleDBError(err, nil)
 	}
 	return count, nil
+}
+
+func (s *UserStoreImpl) GetEmails(ctx context.Context, per, page int) (emails []string, count int, err error) {
+	query := s.db.Operator.Core.NewSelect().
+		Model((*User)(nil)).
+		Column("email").
+		Where("email IS NOT NULL AND email != ''")
+	count, err = query.Count(ctx)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to count emails: %w", err)
+	}
+	query = query.Order("id ASC").Limit(per).Offset((page - 1) * per)
+	err = query.Scan(ctx, &emails)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to get user emails: %w", err)
+	}
+	return
+}
+
+func (s *UserStoreImpl) GetUserUUIDs(ctx context.Context, per, page int) (uuids []string, count int, err error) {
+	query := s.db.Operator.Core.NewSelect().
+		Model((*User)(nil)).
+		Column("uuid").
+		Where("uuid IS NOT NULL AND uuid != ''")
+	count, err = query.Count(ctx)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to count user uuids: %w", err)
+	}
+	query = query.Order("id ASC").Limit(per).Offset((page - 1) * per)
+	err = query.Scan(ctx, &uuids)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to get user uuids: %w", err)
+	}
+	return uuids, count, nil
 }

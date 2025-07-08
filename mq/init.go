@@ -4,14 +4,21 @@ import (
 	"opencsg.com/csghub-server/common/config"
 )
 
-func Init(config *config.Config) (*NatsHandler, error) {
-	sysMQ, err := NewNats(config)
+var (
+	SystemMQ MessageQueue
+)
+
+func GetOrInit(config *config.Config) (MessageQueue, error) {
+	if SystemMQ != nil {
+		return SystemMQ, nil
+	}
+	mq, err := NewNats(config)
 	if err != nil {
 		return nil, err
 	}
-	err = sysMQ.GetJetStream()
-	if err != nil {
+	if err := mq.GetJetStream(); err != nil {
 		return nil, err
 	}
-	return sysMQ, nil
+	SystemMQ = mq
+	return SystemMQ, nil
 }

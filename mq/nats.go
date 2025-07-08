@@ -2,12 +2,14 @@ package mq
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"time"
 
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/types"
 )
 
 var _ MessageQueue = (*NatsHandler)(nil)
@@ -52,6 +54,25 @@ var (
 		StreamName:   "deployServiceUpdateStream", // order
 		ConsumerName: "deployServiceUpdateConsumer",
 	}
+	siteInternalMsgCfg = EventConfig{
+		StreamName:   "siteInternalMsgStream",
+		ConsumerName: "siteInternalMsgConsumer",
+	}
+
+	siteInternalMailCfg = EventConfig{
+		StreamName:   "siteInternalMailStream",
+		ConsumerName: "siteInternalMailConsumer",
+	}
+
+	highPriorityMsgCfg = EventConfig{
+		StreamName:   "highPriorityMsgStream",
+		ConsumerName: "highPriorityMsgConsumer",
+	}
+
+	normalPriorityMsgCfg = EventConfig{
+		StreamName:   "normalPriorityMsgStream",
+		ConsumerName: "normalPriorityMsgConsumer",
+	}
 )
 
 type NatsHandler struct {
@@ -66,8 +87,21 @@ type NatsHandler struct {
 	meterEvtCfg          jetstream.StreamConfig
 	meterConsumerCfg     jetstream.ConsumerConfig
 
-	js       jetstream.JetStream
-	meterJsc jetstream.Consumer
+	js                   jetstream.JetStream
+	meterJsc             jetstream.Consumer
+	siteInternalMsgJsc   jetstream.Consumer
+	highPriorityMsgJsc   jetstream.Consumer
+	normalPriorityMsgJsc jetstream.Consumer
+
+	siteInternalMsgEvtCfg       jetstream.StreamConfig
+	siteInternalMsgConsumerCfg  jetstream.ConsumerConfig
+	siteInternalMailEvtCfg      jetstream.StreamConfig
+	siteInternalMailConsumerCfg jetstream.ConsumerConfig
+
+	highPriorityMsgEvtCfg        jetstream.StreamConfig
+	highPriorityMsgConsumerCfg   jetstream.ConsumerConfig
+	normalPriorityMsgEvtCfg      jetstream.StreamConfig
+	normalPriorityMsgConsumerCfg jetstream.ConsumerConfig
 }
 
 func initStreamAndConsumerConfig(cfg EventConfig, subjectNames []string) (jetstream.StreamConfig, jetstream.ConsumerConfig) {
@@ -96,6 +130,11 @@ func NewNats(config *config.Config) (*NatsHandler, error) {
 	meterEC, meterCC := initStreamAndConsumerConfig(meterCfg, []string{config.Nats.MeterRequestSubject})
 	svcEC, _ := initStreamAndConsumerConfig(svcCfg, []string{config.Nats.ServiceUpdateSubject})
 
+	siteInternalMsgEvtCfg, siteInternalMsgConsumerCfg := initStreamAndConsumerConfig(siteInternalMsgCfg, []string{config.Nats.SiteInternalMsgSubject})
+	siteInternalMailEvtCfg, siteInternalMailConsumerCfg := initStreamAndConsumerConfig(siteInternalMailCfg, []string{config.Nats.SiteInternalMailSubject})
+	highPriorityMsgEvtCfg, highPriorityMsgConsumerCfg := initStreamAndConsumerConfig(highPriorityMsgCfg, []string{config.Nats.HighPriorityMsgSubject})
+	normalPriorityMsgEvtCfg, normalPriorityMsgConsumerCfg := initStreamAndConsumerConfig(normalPriorityMsgCfg, []string{config.Nats.NormalPriorityMsgSubject})
+
 	return &NatsHandler{
 		conn:                 nc,
 		msgFetchTimeoutInSec: config.Nats.MsgFetchTimeoutInSEC,
@@ -107,10 +146,18 @@ func NewNats(config *config.Config) (*NatsHandler, error) {
 		serviceReqSub: RequestSubject{
 			deployService: config.Nats.ServiceUpdateSubject,
 		},
-		dlqEvtCfg:        dlqEC,
-		meterEvtCfg:      meterEC,
-		meterConsumerCfg: meterCC,
-		svcEvtCfg:        svcEC,
+		dlqEvtCfg:                    dlqEC,
+		meterEvtCfg:                  meterEC,
+		meterConsumerCfg:             meterCC,
+		svcEvtCfg:                    svcEC,
+		siteInternalMsgEvtCfg:        siteInternalMsgEvtCfg,
+		siteInternalMsgConsumerCfg:   siteInternalMsgConsumerCfg,
+		siteInternalMailEvtCfg:       siteInternalMailEvtCfg,
+		siteInternalMailConsumerCfg:  siteInternalMailConsumerCfg,
+		highPriorityMsgEvtCfg:        highPriorityMsgEvtCfg,
+		highPriorityMsgConsumerCfg:   highPriorityMsgConsumerCfg,
+		normalPriorityMsgEvtCfg:      normalPriorityMsgEvtCfg,
+		normalPriorityMsgConsumerCfg: normalPriorityMsgConsumerCfg,
 	}, nil
 }
 
@@ -252,4 +299,108 @@ func (nh *NatsHandler) BuildDeployServiceConsumerWithName(consumerName string) (
 	_, conCfg := initStreamAndConsumerConfig(ec, []string{nh.serviceReqSub.deployService})
 	consumer, err := nh.js.CreateOrUpdateConsumer(ctx, svcCfg.StreamName, conCfg)
 	return consumer, err
+}
+
+func (nh *NatsHandler) PublishSiteInternalMsg(msg types.NotificationMessage) error {
+	if msg.MsgUUID == "" {
+		return errors.New("msg uuid is empty")
+	}
+	data, err := json.Marshal(msg)
+	if err != nil {
+		return err
+	}
+	err = nh.PublishData(nh.siteInternalMsgEvtCfg.Subjects[0], data)
+	return err
+}
+
+func (nh *NatsHandler) BuildSiteInternalMsgStream() error {
+	jsc, err := nh.BuildEventStreamAndConsumer(siteInternalMsgCfg, nh.siteInternalMsgEvtCfg, nh.siteInternalMsgConsumerCfg)
+	if err != nil {
+		return err
+	}
+	nh.siteInternalMsgJsc = jsc
+	return nil
+}
+
+func (nh *NatsHandler) BuildSiteInternalMsgConsumer() (jetstream.Consumer, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	consumer, err := nh.js.CreateOrUpdateConsumer(ctx, siteInternalMsgCfg.StreamName, nh.siteInternalMsgConsumerCfg)
+	return consumer, err
+}
+
+func (nh *NatsHandler) PublishSiteInternalMail(msg types.MailMessage) error {
+	if msg.MsgUUID == "" {
+		return errors.New("msg uuid is empty")
+	}
+	data, err := json.Marshal(msg)
+	if err != nil {
+		return err
+	}
+	err = nh.PublishData(nh.siteInternalMailEvtCfg.Subjects[0], data)
+	return err
+}
+
+func (nh *NatsHandler) BuildSiteInternalMailStream() error {
+	jsc, err := nh.BuildEventStreamAndConsumer(siteInternalMailCfg, nh.siteInternalMailEvtCfg, nh.siteInternalMailConsumerCfg)
+	if err != nil {
+		return err
+	}
+	nh.siteInternalMsgJsc = jsc
+	return nil
+}
+
+func (nh *NatsHandler) BuildSiteInternalMailConsumer() (jetstream.Consumer, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	consumer, err := nh.js.CreateOrUpdateConsumer(ctx, siteInternalMailCfg.StreamName, nh.siteInternalMailConsumerCfg)
+	return consumer, err
+}
+
+func (nh *NatsHandler) BuildHighPriorityMsgStream() error {
+	jsc, err := nh.BuildEventStreamAndConsumer(highPriorityMsgCfg, nh.highPriorityMsgEvtCfg, nh.highPriorityMsgConsumerCfg)
+	if err != nil {
+		return err
+	}
+	nh.highPriorityMsgJsc = jsc
+	return nil
+}
+
+func (nh *NatsHandler) BuildNormalPriorityMsgStream() error {
+	jsc, err := nh.BuildEventStreamAndConsumer(normalPriorityMsgCfg, nh.normalPriorityMsgEvtCfg, nh.normalPriorityMsgConsumerCfg)
+	if err != nil {
+		return err
+	}
+	nh.normalPriorityMsgJsc = jsc
+	return nil
+}
+
+func (nh *NatsHandler) BuildHighPriorityMsgConsumer() (jetstream.Consumer, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	consumer, err := nh.js.CreateOrUpdateConsumer(ctx, highPriorityMsgCfg.StreamName, nh.highPriorityMsgConsumerCfg)
+	return consumer, err
+}
+
+func (nh *NatsHandler) BuildNormalPriorityMsgConsumer() (jetstream.Consumer, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	consumer, err := nh.js.CreateOrUpdateConsumer(ctx, normalPriorityMsgCfg.StreamName, nh.normalPriorityMsgConsumerCfg)
+	return consumer, err
+}
+
+func (nh *NatsHandler) PublishHighPriorityMsg(msg types.ScenarioMessage) error {
+	data, err := json.Marshal(msg)
+	if err != nil {
+		return err
+	}
+	return nh.PublishData(nh.highPriorityMsgEvtCfg.Subjects[0], data)
+}
+
+func (nh *NatsHandler) PublishNormalPriorityMsg(msg types.ScenarioMessage) error {
+	data, err := json.Marshal(msg)
+	if err != nil {
+		return err
+	}
+	return nh.PublishData(nh.normalPriorityMsgEvtCfg.Subjects[0], data)
 }

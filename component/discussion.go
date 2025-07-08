@@ -4,15 +4,23 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log/slog"
+	"time"
 
+	"github.com/google/uuid"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
+	"opencsg.com/csghub-server/mq"
 )
 
 type discussionComponentImpl struct {
+	repoCompo       RepoComponent
 	discussionStore database.DiscussionStore
 	repoStore       database.RepoStore
 	userStore       database.UserStore
+	sysMQ           mq.MessageQueue
 }
 
 type DiscussionComponent interface {
@@ -27,11 +35,21 @@ type DiscussionComponent interface {
 	ListDiscussionComments(ctx context.Context, discussionID int64) ([]*types.DiscussionResponse_Comment, error)
 }
 
-func NewDiscussionComponent() DiscussionComponent {
+func NewDiscussionComponent(config *config.Config) (DiscussionComponent, error) {
+	repoCompo, err := NewRepoComponent(config)
+	if err != nil {
+		return nil, err
+	}
 	ds := database.NewDiscussionStore()
 	rs := database.NewRepoStore()
 	us := database.NewUserStore()
-	return &discussionComponentImpl{discussionStore: ds, repoStore: rs, userStore: us}
+	return &discussionComponentImpl{
+		discussionStore: ds,
+		repoStore:       rs,
+		userStore:       us,
+		sysMQ:           mq.SystemMQ,
+		repoCompo:       repoCompo,
+	}, nil
 }
 
 func (c *discussionComponentImpl) CreateRepoDiscussion(ctx context.Context, req types.CreateRepoDiscussionRequest) (*types.CreateDiscussionResponse, error) {
@@ -166,7 +184,7 @@ func (c *discussionComponentImpl) ListRepoDiscussions(ctx context.Context, req t
 func (c *discussionComponentImpl) CreateDiscussionComment(ctx context.Context, req types.CreateCommentRequest) (*types.CreateCommentResponse, error) {
 	req.CommentableType = database.CommentableTypeDiscussion
 	// get discussion by  id
-	_, err := c.discussionStore.FindByID(ctx, req.CommentableID)
+	discussion, err := c.discussionStore.FindByID(ctx, req.CommentableID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find discussion by id '%d': %w", req.CommentableID, err)
 	}
@@ -186,6 +204,21 @@ func (c *discussionComponentImpl) CreateDiscussionComment(ctx context.Context, r
 	if err != nil {
 		return nil, fmt.Errorf("failed to create discussion comment: %w", err)
 	}
+
+	if user.UUID != discussion.User.UUID && c.sysMQ != nil {
+		repo, err := c.checkRepoReadAccess(ctx, discussion.DiscussionableID, req.CurrentUser)
+		if err != nil {
+			return nil, err
+		}
+		go func(repoType types.RepositoryType, repoPath string, senderUUID string, userUUIDs []string) {
+			err = c.sendCommentMessage(ctx, repoType, repoPath, senderUUID, userUUIDs)
+			if err != nil {
+				slog.Error("failed to send comment message", slog.String("repoPath", repoPath), slog.String("repoType", repoPath),
+					slog.String("senderUUID", senderUUID), slog.Any("userUUIDs", userUUIDs), slog.Any("err", err))
+			}
+		}(repo.RepositoryType, repo.Path, user.UUID, []string{discussion.User.UUID})
+	}
+
 	return &types.CreateCommentResponse{
 		ID:              comment.ID,
 		CommentableID:   comment.CommentableID,
@@ -260,4 +293,47 @@ func (c *discussionComponentImpl) ListDiscussionComments(ctx context.Context, di
 		})
 	}
 	return resp, nil
+}
+
+func (c *discussionComponentImpl) checkRepoReadAccess(ctx context.Context, repoID int64, currentUser string) (*database.Repository, error) {
+	repo, err := c.repoStore.FindById(ctx, repoID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find repository by id '%d': %w", repoID, err)
+	}
+
+	// Check if the user has read access to the repository
+	allow, err := c.repoCompo.AllowReadAccessRepo(ctx, repo, currentUser)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check if user can access repo: %w", err)
+	}
+	if !allow {
+		return nil, errorx.ErrForbiddenMsg(fmt.Sprintf("user '%s' does not have access to repository '%s'", currentUser, repo.Path))
+	}
+
+	return repo, nil
+}
+
+func (c *discussionComponentImpl) sendCommentMessage(ctx context.Context, repoType types.RepositoryType, repoPath string, senderUUID string, userUUIDs []string) error {
+	repoTypeStr := string(repoType)
+	title := fmt.Sprintf("New %s Comment", repoTypeStr)
+	content := fmt.Sprintf("Your %s has a new comment. Join the conversation!", repoTypeStr)
+	url := fmt.Sprintf("/%ss/%s/community", repoTypeStr, repoPath)
+	if repoType == types.MCPServerRepo {
+		url = fmt.Sprintf("/mcp/servers/%s/community", repoPath)
+	}
+	msg := types.NotificationMessage{
+		MsgUUID:          uuid.New().String(),
+		UserUUIDs:        userUUIDs,
+		SenderUUID:       senderUUID,
+		NotificationType: types.NotificationComment,
+		Title:            title,
+		Content:          content,
+		CreateAt:         time.Now(),
+		ClickActionURL:   url,
+	}
+	err := c.sysMQ.PublishSiteInternalMsg(msg)
+	if err != nil {
+		return fmt.Errorf("failed to publish site msg, msg: %+v, err: %w", msg, err)
+	}
+	return nil
 }

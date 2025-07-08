@@ -164,13 +164,17 @@ type Config struct {
 	}
 
 	Nats struct {
-		URL                      string `env:"OPENCSG_ACCOUNTING_NATS_URL" default:"nats://account:g98dc5FA8v4J7ck90w@natsmaster:4222"`
-		MsgFetchTimeoutInSEC     int    `env:"OPENCSG_ACCOUNTING_MSG_FETCH_TIMEOUTINSEC" default:"5"`
-		MeterRequestSubject      string `env:"OPENCSG_ACCOUNTING_METER_EVENT_SUBJECT" default:"accounting.metering.>"`
-		MeterDurationSendSubject string `env:"STARHUB_SERVER_METER_DURATION_SEND_SUBJECT" default:"accounting.metering.duration"`
-		MeterTokenSendSubject    string `env:"STARHUB_SERVER_METER_TOKEN_SEND_SUBJECT" default:"accounting.metering.token"`
-		MeterQuotaSendSubject    string `env:"STARHUB_SERVER_METER_QUOTA_SEND_SUBJECT" default:"accounting.metering.quota"`
-		ServiceUpdateSubject     string `env:"STARHUB_SERVER_DEPLOY_SERVICE_SUBJECT" default:"deploy.service.update"`
+		URL                      string `env:"OPENCSG_ACCOUNTING_NATS_URL, default=nats://account:g98dc5FA8v4J7ck90w@natsmaster:4222"`
+		MsgFetchTimeoutInSEC     int    `env:"OPENCSG_ACCOUNTING_MSG_FETCH_TIMEOUTINSEC, default=5"`
+		MeterRequestSubject      string `env:"OPENCSG_ACCOUNTING_METER_EVENT_SUBJECT, default=accounting.metering.>"`
+		MeterDurationSendSubject string `env:"STARHUB_SERVER_METER_DURATION_SEND_SUBJECT, default=accounting.metering.duration"`
+		MeterTokenSendSubject    string `env:"STARHUB_SERVER_METER_TOKEN_SEND_SUBJECT, default=accounting.metering.token"`
+		MeterQuotaSendSubject    string `env:"STARHUB_SERVER_METER_QUOTA_SEND_SUBJECT, default=accounting.metering.quota"`
+		ServiceUpdateSubject     string `env:"STARHUB_SERVER_DEPLOY_SERVICE_SUBJECT, default=deploy.service.update"`
+		SiteInternalMsgSubject   string `env:"STARHUB_SERVER_SITE_INTERNAL_MSG_SUBJECT, default=site.internal.msg"`
+		HighPriorityMsgSubject   string `env:"STARHUB_SERVER_HIGH_PRIORITY_MSG_SUBJECT, default=notification.message.high"`
+		NormalPriorityMsgSubject string `env:"STARHUB_SERVER_NORMAL_PRIORITY_MSG_SUBJECT, default=notification.message.normal"`
+		SiteInternalMailSubject  string `env:"STARHUB_SERVER_SITE_INTERNAL_MAIL_SUBJECT, default=site.internal.mail"`
 	}
 
 	Accounting struct {
@@ -294,6 +298,17 @@ type Config struct {
 		EmptyRepoType  string `env:"STARHUB_SERVER_REPO_TEMPLATE_EMPTY_REPO_TYPE" default:"template"`
 		EmptyNameSpace string `env:"STARHUB_SERVER_REPO_TEMPLATE_EMPTY_NAMESPACE" default:"emptynamespace"`
 		EmptyRepoName  string `env:"STARHUB_SERVER_REPO_TEMPLATE_EMPTY_REPO_NAME" default:"emptyreponame"`
+	}
+
+	Notification struct {
+		Port                   int    `env:"STARHUB_SERVER_NOTIFIER_PORT" default:"8095"`
+		Host                   string `env:"STARHUB_SERVER_NOTIFIER_HOST" default:"http://localhost"`
+		MailerHost             string `env:"STARHUB_SERVER_MAILER_HOST" default:"smtp.qiye.aliyun.com"`
+		MailerPort             int    `env:"STARHUB_SERVER_MAILER_PORT" default:"465"`
+		MailerUsername         string `env:"STARHUB_SERVER_MAILER_USERNAME" default:""`
+		MailerPassword         string `env:"STARHUB_SERVER_MAILER_PASSWORD" default:""`
+		BroadcastUserPageSize  int    `env:"STARHUB_SERVER_NOTIFIER_BROADCAST_USER_PAGE_SIZE" default:"100"`
+		BroadcastEmailPageSize int    `env:"STARHUB_SERVER_NOTIFIER_BROADCAST_EMAIL_PAGE_SIZE" default:"100"`
 	}
 
 	Prometheus struct {

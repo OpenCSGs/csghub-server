@@ -26,6 +26,132 @@ func (_m *MockUserSvcClient) EXPECT() *MockUserSvcClient_Expecter {
 	return &MockUserSvcClient_Expecter{mock: &_m.Mock}
 }
 
+// FindByUUIDs provides a mock function with given fields: ctx, uuids
+func (_m *MockUserSvcClient) FindByUUIDs(ctx context.Context, uuids []string) (map[string]*types.User, error) {
+	ret := _m.Called(ctx, uuids)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FindByUUIDs")
+	}
+
+	var r0 map[string]*types.User
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, []string) (map[string]*types.User, error)); ok {
+		return rf(ctx, uuids)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, []string) map[string]*types.User); ok {
+		r0 = rf(ctx, uuids)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(map[string]*types.User)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, []string) error); ok {
+		r1 = rf(ctx, uuids)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockUserSvcClient_FindByUUIDs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindByUUIDs'
+type MockUserSvcClient_FindByUUIDs_Call struct {
+	*mock.Call
+}
+
+// FindByUUIDs is a helper method to define mock.On call
+//   - ctx context.Context
+//   - uuids []string
+func (_e *MockUserSvcClient_Expecter) FindByUUIDs(ctx interface{}, uuids interface{}) *MockUserSvcClient_FindByUUIDs_Call {
+	return &MockUserSvcClient_FindByUUIDs_Call{Call: _e.mock.On("FindByUUIDs", ctx, uuids)}
+}
+
+func (_c *MockUserSvcClient_FindByUUIDs_Call) Run(run func(ctx context.Context, uuids []string)) *MockUserSvcClient_FindByUUIDs_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].([]string))
+	})
+	return _c
+}
+
+func (_c *MockUserSvcClient_FindByUUIDs_Call) Return(_a0 map[string]*types.User, _a1 error) *MockUserSvcClient_FindByUUIDs_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockUserSvcClient_FindByUUIDs_Call) RunAndReturn(run func(context.Context, []string) (map[string]*types.User, error)) *MockUserSvcClient_FindByUUIDs_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetEmails provides a mock function with given fields: ctx, per, page
+func (_m *MockUserSvcClient) GetEmails(ctx context.Context, per int, page int) ([]string, int, error) {
+	ret := _m.Called(ctx, per, page)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetEmails")
+	}
+
+	var r0 []string
+	var r1 int
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, int, int) ([]string, int, error)); ok {
+		return rf(ctx, per, page)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, int, int) []string); ok {
+		r0 = rf(ctx, per, page)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]string)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, int, int) int); ok {
+		r1 = rf(ctx, per, page)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, int, int) error); ok {
+		r2 = rf(ctx, per, page)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockUserSvcClient_GetEmails_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetEmails'
+type MockUserSvcClient_GetEmails_Call struct {
+	*mock.Call
+}
+
+// GetEmails is a helper method to define mock.On call
+//   - ctx context.Context
+//   - per int
+//   - page int
+func (_e *MockUserSvcClient_Expecter) GetEmails(ctx interface{}, per interface{}, page interface{}) *MockUserSvcClient_GetEmails_Call {
+	return &MockUserSvcClient_GetEmails_Call{Call: _e.mock.On("GetEmails", ctx, per, page)}
+}
+
+func (_c *MockUserSvcClient_GetEmails_Call) Run(run func(ctx context.Context, per int, page int)) *MockUserSvcClient_GetEmails_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int), args[2].(int))
+	})
+	return _c
+}
+
+func (_c *MockUserSvcClient_GetEmails_Call) Return(_a0 []string, _a1 int, _a2 error) *MockUserSvcClient_GetEmails_Call {
+	_c.Call.Return(_a0, _a1, _a2)
+	return _c
+}
+
+func (_c *MockUserSvcClient_GetEmails_Call) RunAndReturn(run func(context.Context, int, int) ([]string, int, error)) *MockUserSvcClient_GetEmails_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetMemberRole provides a mock function with given fields: ctx, orgName, userName
 func (_m *MockUserSvcClient) GetMemberRole(ctx context.Context, orgName string, userName string) (membership.Role, error) {
 	ret := _m.Called(ctx, orgName, userName)
@@ -259,6 +385,73 @@ func (_c *MockUserSvcClient_GetUserInfo_Call) Return(_a0 *rpc.User, _a1 error) *
 }
 
 func (_c *MockUserSvcClient_GetUserInfo_Call) RunAndReturn(run func(context.Context, string, string) (*rpc.User, error)) *MockUserSvcClient_GetUserInfo_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetUserUUIDs provides a mock function with given fields: ctx, per, page
+func (_m *MockUserSvcClient) GetUserUUIDs(ctx context.Context, per int, page int) ([]string, int, error) {
+	ret := _m.Called(ctx, per, page)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetUserUUIDs")
+	}
+
+	var r0 []string
+	var r1 int
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, int, int) ([]string, int, error)); ok {
+		return rf(ctx, per, page)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, int, int) []string); ok {
+		r0 = rf(ctx, per, page)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]string)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, int, int) int); ok {
+		r1 = rf(ctx, per, page)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, int, int) error); ok {
+		r2 = rf(ctx, per, page)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockUserSvcClient_GetUserUUIDs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetUserUUIDs'
+type MockUserSvcClient_GetUserUUIDs_Call struct {
+	*mock.Call
+}
+
+// GetUserUUIDs is a helper method to define mock.On call
+//   - ctx context.Context
+//   - per int
+//   - page int
+func (_e *MockUserSvcClient_Expecter) GetUserUUIDs(ctx interface{}, per interface{}, page interface{}) *MockUserSvcClient_GetUserUUIDs_Call {
+	return &MockUserSvcClient_GetUserUUIDs_Call{Call: _e.mock.On("GetUserUUIDs", ctx, per, page)}
+}
+
+func (_c *MockUserSvcClient_GetUserUUIDs_Call) Run(run func(ctx context.Context, per int, page int)) *MockUserSvcClient_GetUserUUIDs_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int), args[2].(int))
+	})
+	return _c
+}
+
+func (_c *MockUserSvcClient_GetUserUUIDs_Call) Return(_a0 []string, _a1 int, _a2 error) *MockUserSvcClient_GetUserUUIDs_Call {
+	_c.Call.Return(_a0, _a1, _a2)
+	return _c
+}
+
+func (_c *MockUserSvcClient_GetUserUUIDs_Call) RunAndReturn(run func(context.Context, int, int) ([]string, int, error)) *MockUserSvcClient_GetUserUUIDs_Call {
 	_c.Call.Return(run)
 	return _c
 }

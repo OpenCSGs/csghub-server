@@ -16,6 +16,7 @@ import (
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/migration"
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/mirror"
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/moderation"
+	"opencsg.com/csghub-server/cmd/csghub-server/cmd/notification"
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/start"
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/sync"
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/trigger"
@@ -68,6 +69,7 @@ func init() {
 		moderation.Cmd,
 		dataviewer.Cmd,
 		aigateway.Cmd,
+		notification.Cmd,
 	)
 
 	addCommands()

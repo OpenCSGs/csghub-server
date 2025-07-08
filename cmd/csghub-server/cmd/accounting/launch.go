@@ -33,7 +33,7 @@ var launchCmd = &cobra.Command{
 		}
 		database.InitDB(dbConfig)
 
-		mqHandler, err := mq.Init(cfg)
+		mqHandler, err := mq.GetOrInit(cfg)
 		if err != nil {
 			return fmt.Errorf("fail to build message queue handler: %w", err)
 		}

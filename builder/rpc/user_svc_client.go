@@ -3,6 +3,7 @@ package rpc
 import (
 	"context"
 	"fmt"
+	"net/url"
 
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/builder/git/membership"
@@ -15,6 +16,9 @@ type UserSvcClient interface {
 	GetUserInfo(ctx context.Context, userName, visitorName string) (*User, error)
 	GetOrCreateFirstAvaiTokens(ctx context.Context, userName, visitorName, app, tokenName string) (string, error)
 	VerifyByAccessToken(ctx context.Context, token string) (*types.CheckAccessTokenResp, error)
+	FindByUUIDs(ctx context.Context, uuids []string) (map[string]*types.User, error)
+	GetUserUUIDs(ctx context.Context, per, page int) ([]string, int, error)
+	GetEmails(ctx context.Context, per, page int) ([]string, int, error)
 }
 
 //go:generate mockgen -destination=mocks/client.go -package=mocks . Client
@@ -92,4 +96,58 @@ func (c *UserSvcHttpClient) VerifyByAccessToken(ctx context.Context, token strin
 	}
 
 	return r.Data.(*types.CheckAccessTokenResp), nil
+}
+
+func (c *UserSvcHttpClient) FindByUUIDs(ctx context.Context, uuids []string) (map[string]*types.User, error) {
+	params := url.Values{}
+	for _, uuid := range uuids {
+		params.Add("uuids", uuid)
+	}
+	url := fmt.Sprintf("/api/v1/users/by-uuids?%s", params.Encode())
+	var resp struct {
+		Msg  string        `json:"msg"`
+		Data []*types.User `json:"data"`
+	}
+	err := c.hc.Get(ctx, url, &resp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find users by uuids: %w", err)
+	}
+	result := make(map[string]*types.User)
+	if resp.Data != nil {
+		for _, user := range resp.Data {
+			if user != nil && user.UUID != "" {
+				result[user.UUID] = user
+			}
+		}
+	}
+	return result, nil
+}
+
+func (c *UserSvcHttpClient) GetUserUUIDs(ctx context.Context, per, page int) ([]string, int, error) {
+	url := fmt.Sprintf("/api/v1/user/user_uuids?per=%d&page=%d", per, page)
+	var resp struct {
+		Data struct {
+			UserUUIDs []string `json:"data"`
+			Total     int      `json:"total"`
+		} `json:"data"`
+	}
+	err := c.hc.Get(ctx, url, &resp)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to get user uuids: %w", err)
+	}
+	return resp.Data.UserUUIDs, resp.Data.Total, nil
+}
+
+func (c *UserSvcHttpClient) GetEmails(ctx context.Context, per, page int) ([]string, int, error) {
+	url := fmt.Sprintf("/api/v1/internal/user/emails?per=%d&page=%d", per, page)
+	var resp struct {
+		Msg   string   `json:"msg"`
+		Data  []string `json:"data"`
+		Total int      `json:"total"`
+	}
+	err := c.hc.Get(ctx, url, &resp)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to get user emails: %w", err)
+	}
+	return resp.Data, resp.Total, nil
 }
