@@ -141,23 +141,26 @@ func (c *memberComponentImpl) ChangeMemberRole(ctx context.Context, orgName, use
 		return fmt.Errorf("failed to create new role,error:%w", err)
 	}
 
-	org, err := c.orgStore.FindByPath(ctx, orgName)
-	if err != nil {
-		return fmt.Errorf("failed to find org,org:%s,caused by:%w", orgName, err)
-	}
-	userUUIDs, err := c.memberStore.UserUUIDsByOrganizationID(ctx, org.ID)
-	if err != nil {
-		return fmt.Errorf("failed to get uuids by orgid,error:%w", err)
-	}
+	if c.sysMQ != nil {
 
-	title := "Organization member role change"
-	content := fmt.Sprintf("Changed permission of member %s to %s in organization %s.", userName, newRole, orgName)
-	go func(userUUIDs []string, orgName, title, content string) {
-		err := c.sendMemberMsg(ctx, userUUIDs, orgName, title, content)
+		org, err := c.orgStore.FindByPath(ctx, orgName)
 		if err != nil {
-			slog.Error("failed to send organization permission change.", slog.String("orgName", orgName), slog.String("content", content), slog.Any("err", err))
+			return fmt.Errorf("failed to find org,org:%s,caused by:%w", orgName, err)
 		}
-	}(userUUIDs, orgName, title, content)
+		userUUIDs, err := c.memberStore.UserUUIDsByOrganizationID(ctx, org.ID)
+		if err != nil {
+			return fmt.Errorf("failed to get uuids by orgid,error:%w", err)
+		}
+
+		title := "Organization member role change"
+		content := fmt.Sprintf("Changed permission of member %s to %s in organization %s.", userName, newRole, orgName)
+		go func(userUUIDs []string, orgName, title, content string) {
+			err := c.sendMemberMsg(ctx, userUUIDs, orgName, title, content)
+			if err != nil {
+				slog.Error("failed to send organization permission change.", slog.String("orgName", orgName), slog.String("content", content), slog.Any("err", err))
+			}
+		}(userUUIDs, orgName, title, content)
+	}
 
 	return nil
 }
@@ -234,18 +237,21 @@ func (c *memberComponentImpl) AddMembers(ctx context.Context, orgName string, us
 			}
 		}
 
-		userUUIDs, err := c.memberStore.UserUUIDsByOrganizationID(ctx, org.ID)
-		if err != nil {
-			return fmt.Errorf("failed to get uuids by orgid,error:%w", err)
-		}
-		title := "Organization member change"
-		content := fmt.Sprintf("New member %s joined organization %s.", userName, orgName)
-		go func(userUUIDs []string, orgName, title, content string) {
-			err = c.sendMemberMsg(ctx, userUUIDs, orgName, title, content)
+		if c.sysMQ != nil {
+			userUUIDs, err := c.memberStore.UserUUIDsByOrganizationID(ctx, org.ID)
 			if err != nil {
-				slog.Error("failed to send organization member join message", slog.String("orgName", orgName), slog.String("content", content), slog.Any("err", err))
+				return fmt.Errorf("failed to get uuids by orgid,error:%w", err)
 			}
-		}(userUUIDs, orgName, title, content)
+			title := "Organization member change"
+			content := fmt.Sprintf("New member %s joined organization %s.", userName, orgName)
+			go func(userUUIDs []string, orgName, title, content string) {
+				err = c.sendMemberMsg(ctx, userUUIDs, orgName, title, content)
+				if err != nil {
+					slog.Error("failed to send organization member join message", slog.String("orgName", orgName), slog.String("content", content), slog.Any("err", err))
+				}
+			}(userUUIDs, orgName, title, content)
+		}
+
 	}
 
 	return nil
@@ -295,18 +301,20 @@ func (c *memberComponentImpl) Delete(ctx context.Context, orgName, userName, ope
 		return err
 	}
 
-	userUUIDs, err := c.memberStore.UserUUIDsByOrganizationID(ctx, org.ID)
-	if err != nil {
-		return fmt.Errorf("failed to get uuids by orgid,error:%w", err)
-	}
-	title := "Organization member change"
-	content := fmt.Sprintf("%s left the organization %s.", userName, orgName)
-	go func(userUUIDs []string, orgName, title, content string) {
-		err = c.sendMemberMsg(ctx, userUUIDs, orgName, title, content)
+	if c.sysMQ != nil {
+		userUUIDs, err := c.memberStore.UserUUIDsByOrganizationID(ctx, org.ID)
 		if err != nil {
-			slog.Error("failed to send organization member leave message", slog.String("orgName", orgName), slog.String("userName", userName), slog.Any("err", err))
+			return fmt.Errorf("failed to get uuids by orgid,error:%w", err)
 		}
-	}(userUUIDs, orgName, title, content)
+		title := "Organization member change"
+		content := fmt.Sprintf("%s left the organization %s.", userName, orgName)
+		go func(userUUIDs []string, orgName, title, content string) {
+			err = c.sendMemberMsg(ctx, userUUIDs, orgName, title, content)
+			if err != nil {
+				slog.Error("failed to send organization member leave message", slog.String("orgName", orgName), slog.String("userName", userName), slog.Any("err", err))
+			}
+		}(userUUIDs, orgName, title, content)
+	}
 
 	if c.config.GitServer.Type == types.GitServerTypeGitea {
 		return c.gitMemberShip.RemoveMember(ctx, orgName, userName, c.toGitRole(role))
