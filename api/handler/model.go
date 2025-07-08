@@ -1375,46 +1375,6 @@ func (h *ModelHandler) ListModelsOfRuntimeFrameworks(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, respData)
 }
 
-// ModelFiles      godoc
-// @Security     ApiKey
-// @Summary      Get all files of a model
-// @Tags         Model
-// @Accept       json
-// @Produce      json
-// @Param        namespace path string true "namespace"
-// @Param        name path string true "name"
-// @Param        current_user query string false "current user"
-// @Success      200  {object}  types.Response{data=types.File} "OK"
-// @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /models/{namespace}/{name}/all_files [get]
-func (h *ModelHandler) AllFiles(ctx *gin.Context) {
-	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
-	if err != nil {
-		slog.Error("Bad request format", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
-		return
-	}
-	var req types.GetAllFilesReq
-	req.Namespace = namespace
-	req.Name = name
-	req.RepoType = types.ModelRepo
-	req.CurrentUser = httpbase.GetCurrentUser(ctx)
-	detail, err := h.repo.AllFiles(ctx.Request.Context(), req)
-	if err != nil {
-		if errors.Is(err, errorx.ErrForbidden) {
-			slog.Info("not allowed to get model all files", slog.Any("error", err), slog.Any("req", req))
-			httpbase.ForbiddenError(ctx, err)
-			return
-		}
-		slog.Error("Failed to get model all files", slog.Any("error", err), slog.Any("req", req))
-		httpbase.ServerError(ctx, err)
-		return
-	}
-
-	httpbase.OK(ctx, detail)
-}
-
 // ModelServerless  godoc
 // @Security     ApiKey
 // @Summary      run model as serverless service
