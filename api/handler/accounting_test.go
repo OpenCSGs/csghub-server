@@ -39,7 +39,7 @@ func TestAccountingHandler_QueryMeteringStatementByUserID(t *testing.T) {
 	tester := NewAccountingTester(t).WithHandleFunc(func(h *AccountingHandler) gin.HandlerFunc {
 		return h.QueryMeteringStatementByUserID
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.mocks.accounting.EXPECT().ListMeteringsByUserIDAndTime(
 		tester.Ctx(), types.ACCT_STATEMENTS_REQ{

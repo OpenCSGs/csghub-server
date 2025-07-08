@@ -460,7 +460,7 @@ func (h *GitHTTPHandler) UnLock(ctx *gin.Context) {
 			})
 			return
 		}
-		if errors.Is(err, errorx.ErrPermissionDenied) {
+		if errors.Is(err, errorx.ErrForbidden) {
 			ctx.PureJSON(http.StatusMethodNotAllowed, types.LFSLockError{
 				Message: "unable to delete lock : this lock is not created by you, try --force if you still want unlock it",
 			})

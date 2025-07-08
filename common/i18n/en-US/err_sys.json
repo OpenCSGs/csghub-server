@@ -1,0 +1,23 @@
+{
+    "error.SYS-ERR-0": {
+        "other": "Internal server error"
+    },
+    "error.SYS-ERR-1": {
+        "other": "Remote service failed"
+    },
+    "error.SYS-ERR-2": {
+        "other": "Internal service failure"
+    },
+    "error.SYS-ERR-3": {
+        "other": "Database unavailable or query execution error"
+    },
+    "error.SYS-ERR-4": {
+        "other": "No rows found in database"
+    },
+    "error.SYS-ERR-5": {
+        "other": "User service failure"
+    },
+    "error.SYS-ERR-6": {
+        "other": "User service can not found user in database"
+    }
+}

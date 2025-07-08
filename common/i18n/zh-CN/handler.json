@@ -1,0 +1,131 @@
+{
+    "handler.list": {
+        "other": "列表"
+    },
+    "handler.sshkey": {
+        "other": "SSH密钥"
+    },
+    "handler.mcpserver": {
+        "other": "MCP服务器"
+    },
+    "handler.spacesdk": {
+        "other": "空间SDK"
+    },
+    "handler.accounting": {
+        "other": "账号"
+    },
+    "handler.discussion": {
+        "other": "讨论"
+    },
+    "handler.internalserviceproxy": {
+        "other": "内部服务代理"
+    },
+    "handler.sync": {
+        "other": "同步"
+    },
+    "handler.space": {
+        "other": "空间"
+    },
+    "handler.rproxy": {
+        "other": "反向代理"
+    },
+    "handler.recom": {
+        "other": "推荐"
+    },
+    "handler.event": {
+        "other": "事件"
+    },
+    "handler.dataset": {
+        "other": "数据集"
+    },
+    "handler.cluster": {
+        "other": "集群"
+    },
+    "handler.hfdataset": {
+        "other": "Hugging Face数据集"
+    },
+    "handler.broadcast": {
+        "other": "广播"
+    },
+    "handler.monitor": {
+        "other": "监控"
+    },
+    "handler.spacetemplate": {
+        "other": "空间模板"
+    },
+    "handler.mirrorsource": {
+        "other": "镜像源"
+    },
+    "handler.prompt": {
+        "other": "提示词"
+    },
+    "handler.mirror": {
+        "other": "镜像"
+    },
+    "handler.gitcallback": {
+        "other": "Git回调"
+    },
+    "handler.repo": {
+        "other": "仓库"
+    },
+    "handler.user": {
+        "other": "用户"
+    },
+    "handler.tags": {
+        "other": "标签"
+    },
+    "handler.organization": {
+        "other": "组织"
+    },
+    "handler.sensitive": {
+        "other": "敏感词"
+    },
+    "handler.internal": {
+        "other": "内部"
+    },
+    "handler.githttp": {
+        "other": "Git HTTP"
+    },
+    "handler.evaluation": {
+        "other": "评估"
+    },
+    "handler.spaceresource": {
+        "other": "空间资源"
+    },
+    "handler.telemetry": {
+        "other": "遥测"
+    },
+    "handler.model": {
+        "other": "模型"
+    },
+    "handler.collection": {
+        "other": "集合"
+    },
+    "handler.modeltree": {
+        "other": "模型树"
+    },
+    "handler.stat": {
+        "other": "统计"
+    },
+    "handler.dataflowproxy": {
+        "other": "数据流代理"
+    },
+    "handler.license": {
+        "other": "许可证"
+    },
+    "handler.runtimearchitecture": {
+        "other": "运行时框架"
+    },
+    "handler.code": {
+        "other": "代码"
+    },
+    "handler.syncclientsetting": {
+        "other": "同步客户端设置"
+    },
+    "handler.rule": {
+        "other": "规则"
+    },
+    "handler.config": {
+        "other": "配置"
+    }
+}

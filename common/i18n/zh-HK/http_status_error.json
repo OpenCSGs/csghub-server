@@ -1,0 +1,30 @@
+{
+    "error.BadRequest": {
+        "description": "Bad request error message",
+        "other": "{{.method | default \"請求\"}}{{.handler | default \"內容\"}}，由於参数錯誤，伺服器無法理解該請求。"
+    },
+    "error.Unauthorized": {
+        "description": "Unauthorized error message",
+        "other": "{{.method | default \"請求\"}}{{.handler | default \"內容\"}}，需要身份驗證，但驗證失敗或尚未提供驗證信息。"
+    },
+    "error.Forbidden": {
+        "description": "Forbidden error message",
+        "other": "{{.method | default \"請求\"}}{{.handler | default \"內容\"}}，您沒有權限訪問此資源。"
+    },
+    "error.NotFound": {
+        "description": "Not found error message",
+        "other": "{{.method | default \"請求\"}}{{.handler | default \"內容\"}}，找不到請求的資源。"
+    },
+    "error.MethodNotAllowed": {
+        "description": "Method not allowed error message",
+        "other": "{{.method | default \"請求\"}}{{.handler | default \"內容\"}}，請求中指定的方法不允許用於此資源。"
+    },
+    "error.InternalServerError": {
+        "description": "Internal server error message",
+        "other": "{{.method | default \"請求\"}}{{.handler | default \"內容\"}}，伺服器遇到了意外情況，導致無法完成請求。"
+    },
+    "error.ServiceUnavailable": {
+        "description": "Service unavailable error message",
+        "other": "{{.method | default \"請求\"}}{{.handler | default \"內容\"}}，服務暫時不可用，請稍後再試。"
+    }
+}
