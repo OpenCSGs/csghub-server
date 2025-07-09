@@ -105,6 +105,11 @@ type RepoRequest struct {
 	Per       int    `json:"per"`
 }
 
+type ValidateYamlReq struct {
+	Content  string         `json:"content"`
+	RepoType RepositoryType `json:"repo_type"`
+}
+
 type Branch struct {
 	Name    string           `json:"name"`
 	Message string           `json:"message"`

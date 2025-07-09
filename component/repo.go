@@ -23,6 +23,7 @@ import (
 	"github.com/spf13/cast"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"gopkg.in/yaml.v3"
 	"opencsg.com/csghub-server/builder/deploy"
 	deployStatus "opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/git"
@@ -163,6 +164,7 @@ type RepoComponent interface {
 	Preupload(ctx context.Context, req types.PreuploadReq) (*types.PreuploadResp, error)
 	CommitFiles(ctx context.Context, req types.CommitFilesReq) error
 	IsExists(ctx context.Context, repoType types.RepositoryType, namespace, name string) (bool, error)
+	ValidateYaml(ctx context.Context, req types.ValidateYamlReq) error
 }
 
 func NewRepoComponentImpl(config *config.Config) (*repoComponentImpl, error) {
@@ -3272,4 +3274,30 @@ func cleanBase64(input string) string {
 		cleaned += strings.Repeat("=", 4-m)
 	}
 	return cleaned
+}
+
+// ValidateYaml
+func (c *repoComponentImpl) ValidateYaml(ctx context.Context, req types.ValidateYamlReq) error {
+	meta := metaText(req.Content)
+	if len(meta) == 0 {
+		return nil
+	}
+
+	categoryContents := make(map[string]any)
+	//parse yaml string
+	err := yaml.Unmarshal([]byte(meta), categoryContents)
+	if err != nil {
+		slog.Error("error unmarshall meta for tags", slog.Any("error", err), slog.String("meta", meta))
+		return err
+	}
+	return nil
+}
+
+func metaText(readme string) string {
+	splits := strings.Split(readme, "---")
+	if len(splits) < 2 {
+		return ""
+	}
+
+	return splits[1]
 }

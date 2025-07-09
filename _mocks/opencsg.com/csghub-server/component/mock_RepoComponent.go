@@ -3911,6 +3911,53 @@ func (_c *MockRepoComponent_UploadFile_Call) RunAndReturn(run func(context.Conte
 	return _c
 }
 
+// ValidateYaml provides a mock function with given fields: ctx, req
+func (_m *MockRepoComponent) ValidateYaml(ctx context.Context, req types.ValidateYamlReq) error {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ValidateYaml")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.ValidateYamlReq) error); ok {
+		r0 = rf(ctx, req)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockRepoComponent_ValidateYaml_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ValidateYaml'
+type MockRepoComponent_ValidateYaml_Call struct {
+	*mock.Call
+}
+
+// ValidateYaml is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.ValidateYamlReq
+func (_e *MockRepoComponent_Expecter) ValidateYaml(ctx interface{}, req interface{}) *MockRepoComponent_ValidateYaml_Call {
+	return &MockRepoComponent_ValidateYaml_Call{Call: _e.mock.On("ValidateYaml", ctx, req)}
+}
+
+func (_c *MockRepoComponent_ValidateYaml_Call) Run(run func(ctx context.Context, req types.ValidateYamlReq)) *MockRepoComponent_ValidateYaml_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.ValidateYamlReq))
+	})
+	return _c
+}
+
+func (_c *MockRepoComponent_ValidateYaml_Call) Return(_a0 error) *MockRepoComponent_ValidateYaml_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockRepoComponent_ValidateYaml_Call) RunAndReturn(run func(context.Context, types.ValidateYamlReq) error) *MockRepoComponent_ValidateYaml_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // VisiableToUser provides a mock function with given fields: ctx, repos, currentUser
 func (_m *MockRepoComponent) VisiableToUser(ctx context.Context, repos []*database.Repository, currentUser string) ([]*database.Repository, error) {
 	ret := _m.Called(ctx, repos, currentUser)
