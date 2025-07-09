@@ -13,9 +13,6 @@ import (
 
 func TestTagComponent_CreateTag(t *testing.T) {
 	ctx := context.TODO()
-
-	username := "testUser"
-
 	req := types.CreateTag{
 		Name:     "my first tag",
 		Category: "testCategory",
@@ -34,60 +31,33 @@ func TestTagComponent_CreateTag(t *testing.T) {
 
 	t.Run("admin", func(t *testing.T) {
 		tc := initializeTestTagComponent(ctx, t)
-
-		tc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, username).Return(database.User{UUID: "testUUID", RoleMask: "admin"}, nil)
 		tc.mocks.stores.TagMock().EXPECT().CreateTag(ctx, newTag).Return(&newTag, nil)
 		tc.mocks.moderationClient.EXPECT().PassTextCheck(ctx, mock.Anything, req.Name).Return(&rpc.CheckResult{
 			IsSensitive: false,
 		}, nil)
 
-		tag, err := tc.CreateTag(ctx, username, req)
+		tag, err := tc.CreateTag(ctx, req)
 		require.Nil(t, err)
 		require.Equal(t, req.Name, tag.Name)
 		require.Equal(t, true, tag.BuiltIn)
-	})
-
-	t.Run("non-admin", func(t *testing.T) {
-		tc := initializeTestTagComponent(ctx, t)
-
-		tc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, username).Return(database.User{UUID: "testUUID", RoleMask: "persion"}, nil)
-
-		tag, err := tc.CreateTag(ctx, username, req)
-		require.NotNil(t, err)
-		require.Nil(t, tag)
 	})
 }
 
 func TestTagComponent_GetTagByID(t *testing.T) {
 	ctx := context.TODO()
-	username := "testUser"
 	t.Run("admin", func(t *testing.T) {
 		tc := initializeTestTagComponent(ctx, t)
-		tc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, username).Return(database.User{UUID: "testUUID", RoleMask: "admin"}, nil)
 		tc.mocks.stores.TagMock().EXPECT().FindTagByID(ctx, int64(1)).Return(&database.Tag{ID: int64(1), Name: "test-tag"}, nil)
 
-		tag, err := tc.GetTagByID(ctx, username, int64(1))
+		tag, err := tc.GetTagByID(ctx, int64(1))
 		require.Nil(t, err)
 		require.Equal(t, int64(1), tag.ID)
 		require.Equal(t, "test-tag", tag.Name)
-	})
-
-	t.Run("non-admin", func(t *testing.T) {
-		tc := initializeTestTagComponent(ctx, t)
-
-		tc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, username).Return(database.User{UUID: "testUUID", RoleMask: "person"}, nil)
-
-		tag, err := tc.GetTagByID(ctx, username, int64(1))
-		require.NotNil(t, err)
-		require.Nil(t, tag)
 	})
 }
 
 func TestTagComponent_UpdateTag(t *testing.T) {
 	ctx := context.TODO()
-
-	username := "testUser"
-
 	req := types.UpdateTag{
 		Name:     "testTag",
 		Category: "testCategory",
@@ -107,52 +77,26 @@ func TestTagComponent_UpdateTag(t *testing.T) {
 
 	t.Run("admin", func(t *testing.T) {
 		tc := initializeTestTagComponent(ctx, t)
-
-		tc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, username).Return(database.User{UUID: "testUUID", RoleMask: "admin"}, nil)
 		tc.mocks.stores.TagMock().EXPECT().UpdateTagByID(ctx, &newTag).Return(&newTag, nil)
 		tc.mocks.moderationClient.EXPECT().PassTextCheck(ctx, mock.Anything, req.Name).Return(&rpc.CheckResult{
 			IsSensitive: false,
 		}, nil)
 
-		tag, err := tc.UpdateTag(ctx, username, int64(1), req)
+		tag, err := tc.UpdateTag(ctx, int64(1), req)
 		require.Nil(t, err)
 		require.Equal(t, req.Name, tag.Name)
 		require.Equal(t, true, tag.BuiltIn)
-	})
-
-	t.Run("non-admin", func(t *testing.T) {
-		tc := initializeTestTagComponent(ctx, t)
-
-		tc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, username).Return(database.User{UUID: "testUUID", RoleMask: "persion"}, nil)
-
-		tag, err := tc.UpdateTag(ctx, username, int64(1), req)
-		require.NotNil(t, err)
-		require.Nil(t, tag)
 	})
 }
 
 func TestTagComponent_DeleteTag(t *testing.T) {
 	ctx := context.TODO()
-
-	username := "testUser"
-
 	t.Run("admin", func(t *testing.T) {
 		tc := initializeTestTagComponent(ctx, t)
-
-		tc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, username).Return(database.User{UUID: "testUUID", RoleMask: "admin"}, nil)
 		tc.mocks.stores.TagMock().EXPECT().DeleteTagByID(ctx, int64(1)).Return(nil)
 
-		err := tc.DeleteTag(ctx, username, int64(1))
+		err := tc.DeleteTag(ctx, int64(1))
 		require.Nil(t, err)
-	})
-
-	t.Run("non-admin", func(t *testing.T) {
-		tc := initializeTestTagComponent(ctx, t)
-
-		tc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, username).Return(database.User{UUID: "testUUID", RoleMask: "persion"}, nil)
-
-		err := tc.DeleteTag(ctx, username, int64(1))
-		require.NotNil(t, err)
 	})
 }
 
@@ -243,11 +187,6 @@ func TestTagComponent_CreateCategory(t *testing.T) {
 
 	t.Run("admin", func(t *testing.T) {
 		tc := initializeTestTagComponent(ctx, t)
-
-		tc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "admin").Return(database.User{
-			Username: "admin",
-			RoleMask: "admin",
-		}, nil)
 		tc.mocks.stores.TagMock().EXPECT().CreateCategory(ctx, database.TagCategory{
 			Name:  "test-cate",
 			Scope: types.TagScope("test-scope"),
@@ -257,28 +196,12 @@ func TestTagComponent_CreateCategory(t *testing.T) {
 			Scope: "test-scope",
 		}, nil)
 
-		category, err := tc.CreateCategory(ctx, "admin", types.CreateCategory{
+		category, err := tc.CreateCategory(ctx, types.CreateCategory{
 			Name:  "test-cate",
 			Scope: "test-scope",
 		})
 		require.Nil(t, err)
 		require.NotNil(t, category)
-	})
-
-	t.Run("user", func(t *testing.T) {
-		tc := initializeTestTagComponent(ctx, t)
-
-		tc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
-			Username: "user",
-			RoleMask: "user",
-		}, nil)
-
-		category, err := tc.CreateCategory(ctx, "user", types.CreateCategory{
-			Name:  "test-cate",
-			Scope: "test-scope",
-		})
-		require.NotNil(t, err)
-		require.Nil(t, category)
 	})
 }
 
@@ -287,11 +210,6 @@ func TestTagComponent_UpdateCategory(t *testing.T) {
 
 	t.Run("admin", func(t *testing.T) {
 		tc := initializeTestTagComponent(ctx, t)
-
-		tc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "admin").Return(database.User{
-			Username: "admin",
-			RoleMask: "admin",
-		}, nil)
 		tc.mocks.stores.TagMock().EXPECT().UpdateCategory(ctx, database.TagCategory{
 			ID:    int64(1),
 			Name:  "test-cate",
@@ -302,28 +220,12 @@ func TestTagComponent_UpdateCategory(t *testing.T) {
 			Scope: "test-scope",
 		}, nil)
 
-		category, err := tc.UpdateCategory(ctx, "admin", types.UpdateCategory{
+		category, err := tc.UpdateCategory(ctx, types.UpdateCategory{
 			Name:  "test-cate",
 			Scope: "test-scope",
 		}, int64(1))
 		require.Nil(t, err)
 		require.NotNil(t, category)
-	})
-
-	t.Run("user", func(t *testing.T) {
-		tc := initializeTestTagComponent(ctx, t)
-
-		tc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
-			Username: "user",
-			RoleMask: "user",
-		}, nil)
-
-		category, err := tc.UpdateCategory(ctx, "user", types.UpdateCategory{
-			Name:  "test-cate",
-			Scope: "test-scope",
-		}, int64(1))
-		require.NotNil(t, err)
-		require.Nil(t, category)
 	})
 }
 
@@ -332,26 +234,9 @@ func TestTagComponent_DeleteCategory(t *testing.T) {
 
 	t.Run("admin", func(t *testing.T) {
 		tc := initializeTestTagComponent(ctx, t)
-
-		tc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "admin").Return(database.User{
-			Username: "admin",
-			RoleMask: "admin",
-		}, nil)
 		tc.mocks.stores.TagMock().EXPECT().DeleteCategory(ctx, int64(1)).Return(nil)
 
-		err := tc.DeleteCategory(ctx, "admin", int64(1))
+		err := tc.DeleteCategory(ctx, int64(1))
 		require.Nil(t, err)
-	})
-
-	t.Run("user", func(t *testing.T) {
-		tc := initializeTestTagComponent(ctx, t)
-
-		tc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
-			Username: "user",
-			RoleMask: "user",
-		}, nil)
-
-		err := tc.DeleteCategory(ctx, "user", int64(1))
-		require.NotNil(t, err)
 	})
 }
