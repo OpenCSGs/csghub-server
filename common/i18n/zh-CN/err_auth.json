@@ -1,32 +1,32 @@
 {
     "error.AUTH-ERR-0": {
-        "other": "未授权"
+        "other": "未授权访问"
     },
     "error.AUTH-ERR-1": {
         "other": "用户未找到，请先登录"
     },
     "error.AUTH-ERR-2": {
-        "other": "权限被拒绝"
+        "other": "访问被禁止，权限不足"
     },
     "error.AUTH-ERR-3": {
-        "other": "禁止访问"
+        "other": "需要设置邮箱地址"
     },
     "error.AUTH-ERR-4": {
         "other": "无效的JWT令牌"
     },
     "error.AUTH-ERR-5": {
-        "other": "无效的授权标头"
+        "other": "无效的授权请求头"
     },
     "error.AUTH-ERR-6": {
-        "other": "仅管理员用户可以访问"
+        "other": "需要管理员权限"
     },
     "error.AUTH-ERR-7": {
-        "other": "用户不匹配，尝试查询不属于自己的用户账户"
+        "other": "用户身份不匹配"
     },
     "error.AUTH-ERR-8": {
-        "other": "需要用户uuid"
+        "other": "需要提供用户UUID"
     },
     "error.AUTH-ERR-9": {
-        "other": "需要API密钥"
+        "other": "需要提供API密钥进行身份验证"
     }
 }

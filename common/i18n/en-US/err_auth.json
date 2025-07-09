@@ -6,13 +6,13 @@
         "other": "User not found, please login first"
     },
     "error.AUTH-ERR-2": {
-        "other": "Permission denied"
+        "other": "Access forbidden, insufficient permissions"
     },
     "error.AUTH-ERR-3": {
-        "other": "Forbidden"
+        "other": "Email address is required, please set your email first"
     },
     "error.AUTH-ERR-4": {
-        "other": "Invalid JWT"
+        "other": "Invalid JWT token"
     },
     "error.AUTH-ERR-5": {
         "other": "Invalid authorization header"
@@ -24,7 +24,7 @@
         "other": "User not match, try to query user account not owned"
     },
     "error.AUTH-ERR-8": {
-        "other": "need user uuid"
+        "other": "UUID is required to identify user account"
     },
     "error.AUTH-ERR-9": {
         "other": "Need API key for authentication"

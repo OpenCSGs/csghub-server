@@ -4,10 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"log/slog"
-	"strings"
+	"slices"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"golang.org/x/text/language"
+	"opencsg.com/csghub-server/api/httpbase"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/i18n"
 )
 
@@ -34,66 +37,86 @@ func ModifyAcceptLanguageMiddleware() gin.HandlerFunc {
 	}
 }
 
+var skipRoutes = []string{
+	"/healthz",
+}
+
+func shouldSkip(c *gin.Context) bool {
+	// Check if the request is for a static file or a health check endpoint
+	path := c.Request.URL.Path
+	// Add more conditions as needed to skip certain routes
+	return slices.Contains(skipRoutes, path)
+}
+
 // LocalizedErrorMiddleware international error message
 func LocalizedErrorMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		bw := &bodyWriter{body: bytes.NewBufferString(""), ResponseWriter: c.Writer}
+		if shouldSkip(c) {
+			bw.isSkipped = true // Mark as skipped if the route is in the skip list
+		}
 		c.Writer = bw
 		c.Next()
 
 		statusCode := c.Writer.Status()
-		if statusCode < 400 {
-			return
-		}
-
-		messageID, exists := i18n.StatusCodeMessageMap[statusCode]
-		if !exists {
-			_, err := bw.ResponseWriter.Write(bw.body.Bytes())
-			if err != nil {
-				slog.Error("unhandled statusCode, LocalizedErrorMiddleware", slog.String("err", err.Error()))
-			}
+		if statusCode < 400 || bw.isSkipped {
 			return
 		}
 		// translate error msg
 		lang := c.GetHeader("Accept-Language")
 
-		templateData := make(map[string]interface{})
-		if handlerName, ok := c.Get("Error-Handler-Name"); ok {
-			if handlerNameStr, ok := handlerName.(string); ok {
-				handlerNameStr, _ = i18n.TranslateText(lang, string(i18n.I18nHandler)+"."+handlerNameStr, handlerNameStr)
-				templateData[string(i18n.I18nHandler)] = handlerNameStr
+		respBytes := bw.body.Bytes()
+		var respObj httpbase.R
+		err := json.Unmarshal(respBytes, &respObj)
+		if err != nil {
+			slog.Error("unmarshal original httpbase.R, LocalizedErrorMiddleware", slog.String("url", c.Request.URL.Path), slog.String("err", err.Error()), slog.String("resp", string(respBytes)))
+			_, err = bw.writeInternal(respBytes)
+			if err != nil {
+				slog.Error("unmarshal original resp failed, write original resp, LocalizedErrorMiddleware", slog.String("url", c.Request.URL.Path), slog.String("err", err.Error()))
+			}
+			return
+		}
+		if errorx.IsValidErrorCode(respObj.Msg) {
+			translatedMsg, ok := i18n.TranslateText(lang, "error."+respObj.Msg, respObj.Msg)
+			if !ok {
+				slog.Error("translate error message, LocalizedErrorMiddleware", slog.String("url",
+					c.Request.URL.Path), slog.String("msg", respObj.Msg), slog.String("lang", lang))
+			} else {
+				respObj.Msg += ": " + translatedMsg
 			}
 		}
-		if c.Request != nil {
-			methodStr := strings.ToLower(c.Request.Method)
-			methodStr, _ = i18n.TranslateText(lang, string(i18n.I18nMethod)+"."+methodStr, methodStr)
-			templateData[string(i18n.I18nMethod)] = methodStr
-		}
 
-		message := i18n.TranslateTextWithData(lang, string(i18n.I18nError)+"."+messageID, templateData)
-
-		updateObj := make(map[string]interface{})
-		updateObj["msg"] = message
-		updatedBody, err := json.Marshal(updateObj)
+		updatedBody, err := json.Marshal(respObj)
 		if err != nil {
-			slog.Error("marshal updated httpbase.R", slog.String("err", err.Error()))
+			slog.Error("marshal updated httpbase.R", slog.String("url", c.Request.URL.Path), slog.String("err", err.Error()))
+			_, err = bw.writeInternal(respBytes)
+			if err != nil {
+				slog.Error("marshal updated httpbase.R, write updated httpbase.R, LocalizedErrorMiddleware", slog.String("url", c.Request.URL.Path), slog.String("err", err.Error()))
+			}
+			return
 		}
-		_, err = bw.ResponseWriter.WriteString(string(updatedBody))
+		bw.ResponseWriter.Header().Set("Content-Length", strconv.Itoa(len(updatedBody)))
+		_, err = bw.writeInternal(updatedBody)
 		if err != nil {
-			slog.Error("write updated httpbase.R, LocalizedErrorMiddleware", slog.String("err", err.Error()))
+			slog.Error("write updated httpbase.R, LocalizedErrorMiddleware", slog.String("url", c.Request.URL.Path), slog.String("err", err.Error()))
 		}
 	}
 }
 
 type bodyWriter struct {
 	gin.ResponseWriter
-	body *bytes.Buffer
+	body      *bytes.Buffer
+	isSkipped bool // Flag to indicate if the route is skipped
 }
 
 func (w *bodyWriter) Write(b []byte) (int, error) {
-	if w.Status() == 200 {
+	if w.Status() == 200 || w.isSkipped {
 		return w.ResponseWriter.Write(b) // If status is 200, write directly to the ResponseWriter
 	} else {
 		return w.body.Write(b) // If status is not 200, write to the buffer
 	}
+}
+
+func (w *bodyWriter) writeInternal(b []byte) (int, error) {
+	return w.ResponseWriter.Write(b)
 }
