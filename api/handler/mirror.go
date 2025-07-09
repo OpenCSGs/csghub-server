@@ -66,7 +66,7 @@ func (h *MirrorHandler) CreateMirrorRepo(ctx *gin.Context) {
 
 // GetMirrorRepos godoc
 // @Security     ApiKey
-// @Summary      Get mirror repos
+// @Summary      Get mirror repos, used for admin
 // @Tags         Mirror
 // @Accept       json
 // @Produce      json
@@ -77,12 +77,6 @@ func (h *MirrorHandler) CreateMirrorRepo(ctx *gin.Context) {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /mirror/repos [get]
 func (h *MirrorHandler) Repos(ctx *gin.Context) {
-	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
-
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -90,7 +84,7 @@ func (h *MirrorHandler) Repos(ctx *gin.Context) {
 		return
 	}
 
-	repos, total, err := h.mirror.Repos(ctx.Request.Context(), currentUser, per, page)
+	repos, total, err := h.mirror.Repos(ctx.Request.Context(), per, page)
 	if err != nil {
 		slog.Error("failed to get mirror repos", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -106,7 +100,7 @@ func (h *MirrorHandler) Repos(ctx *gin.Context) {
 
 // GetMirrors godoc
 // @Security     ApiKey
-// @Summary      Get mirrors
+// @Summary      Get mirrors, used for admin
 // @Tags         Mirror
 // @Accept       json
 // @Produce      json
@@ -117,12 +111,6 @@ func (h *MirrorHandler) Repos(ctx *gin.Context) {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /mirrors [get]
 func (h *MirrorHandler) Index(ctx *gin.Context) {
-	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
-
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -131,7 +119,7 @@ func (h *MirrorHandler) Index(ctx *gin.Context) {
 	}
 
 	search := ctx.Query("search")
-	repos, total, err := h.mirror.Index(ctx.Request.Context(), currentUser, per, page, search)
+	repos, total, err := h.mirror.Index(ctx.Request.Context(), per, page, search)
 	if err != nil {
 		slog.Error("failed to get mirror repos", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)

@@ -298,8 +298,9 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		return nil, fmt.Errorf("error creating mirror source controller:%w", err)
 	}
 
-	apiGroup.GET("/mirrors", mirrorHandler.Index)
+	apiGroup.GET("/mirrors", middlewareCollection.Auth.NeedAdmin, mirrorHandler.Index)
 	mirror := apiGroup.Group("/mirror")
+	mirror.Use(middlewareCollection.Auth.NeedAdmin)
 	{
 		mirror.GET("/sources", msHandler.Index)
 		mirror.POST("/sources", msHandler.Create)
@@ -308,7 +309,6 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		mirror.GET("/sources/:id", msHandler.Get)
 		mirror.POST("/repo", mirrorHandler.CreateMirrorRepo)
 		mirror.GET("/repos", mirrorHandler.Repos)
-
 	}
 
 	collectionHandler, err := handler.NewCollectionHandler(config)

@@ -83,17 +83,17 @@ func (_c *MockMirrorSourceComponent_Create_Call) RunAndReturn(run func(context.C
 	return _c
 }
 
-// Delete provides a mock function with given fields: ctx, id, currentUser
-func (_m *MockMirrorSourceComponent) Delete(ctx context.Context, id int64, currentUser string) error {
-	ret := _m.Called(ctx, id, currentUser)
+// Delete provides a mock function with given fields: ctx, id
+func (_m *MockMirrorSourceComponent) Delete(ctx context.Context, id int64) error {
+	ret := _m.Called(ctx, id)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Delete")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, int64, string) error); ok {
-		r0 = rf(ctx, id, currentUser)
+	if rf, ok := ret.Get(0).(func(context.Context, int64) error); ok {
+		r0 = rf(ctx, id)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -109,14 +109,13 @@ type MockMirrorSourceComponent_Delete_Call struct {
 // Delete is a helper method to define mock.On call
 //   - ctx context.Context
 //   - id int64
-//   - currentUser string
-func (_e *MockMirrorSourceComponent_Expecter) Delete(ctx interface{}, id interface{}, currentUser interface{}) *MockMirrorSourceComponent_Delete_Call {
-	return &MockMirrorSourceComponent_Delete_Call{Call: _e.mock.On("Delete", ctx, id, currentUser)}
+func (_e *MockMirrorSourceComponent_Expecter) Delete(ctx interface{}, id interface{}) *MockMirrorSourceComponent_Delete_Call {
+	return &MockMirrorSourceComponent_Delete_Call{Call: _e.mock.On("Delete", ctx, id)}
 }
 
-func (_c *MockMirrorSourceComponent_Delete_Call) Run(run func(ctx context.Context, id int64, currentUser string)) *MockMirrorSourceComponent_Delete_Call {
+func (_c *MockMirrorSourceComponent_Delete_Call) Run(run func(ctx context.Context, id int64)) *MockMirrorSourceComponent_Delete_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(int64), args[2].(string))
+		run(args[0].(context.Context), args[1].(int64))
 	})
 	return _c
 }
@@ -126,14 +125,14 @@ func (_c *MockMirrorSourceComponent_Delete_Call) Return(_a0 error) *MockMirrorSo
 	return _c
 }
 
-func (_c *MockMirrorSourceComponent_Delete_Call) RunAndReturn(run func(context.Context, int64, string) error) *MockMirrorSourceComponent_Delete_Call {
+func (_c *MockMirrorSourceComponent_Delete_Call) RunAndReturn(run func(context.Context, int64) error) *MockMirrorSourceComponent_Delete_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// Get provides a mock function with given fields: ctx, id, currentUser
-func (_m *MockMirrorSourceComponent) Get(ctx context.Context, id int64, currentUser string) (*database.MirrorSource, error) {
-	ret := _m.Called(ctx, id, currentUser)
+// Get provides a mock function with given fields: ctx, id
+func (_m *MockMirrorSourceComponent) Get(ctx context.Context, id int64) (*database.MirrorSource, error) {
+	ret := _m.Called(ctx, id)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Get")
@@ -141,19 +140,19 @@ func (_m *MockMirrorSourceComponent) Get(ctx context.Context, id int64, currentU
 
 	var r0 *database.MirrorSource
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, int64, string) (*database.MirrorSource, error)); ok {
-		return rf(ctx, id, currentUser)
+	if rf, ok := ret.Get(0).(func(context.Context, int64) (*database.MirrorSource, error)); ok {
+		return rf(ctx, id)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, int64, string) *database.MirrorSource); ok {
-		r0 = rf(ctx, id, currentUser)
+	if rf, ok := ret.Get(0).(func(context.Context, int64) *database.MirrorSource); ok {
+		r0 = rf(ctx, id)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*database.MirrorSource)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, int64, string) error); ok {
-		r1 = rf(ctx, id, currentUser)
+	if rf, ok := ret.Get(1).(func(context.Context, int64) error); ok {
+		r1 = rf(ctx, id)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -169,14 +168,13 @@ type MockMirrorSourceComponent_Get_Call struct {
 // Get is a helper method to define mock.On call
 //   - ctx context.Context
 //   - id int64
-//   - currentUser string
-func (_e *MockMirrorSourceComponent_Expecter) Get(ctx interface{}, id interface{}, currentUser interface{}) *MockMirrorSourceComponent_Get_Call {
-	return &MockMirrorSourceComponent_Get_Call{Call: _e.mock.On("Get", ctx, id, currentUser)}
+func (_e *MockMirrorSourceComponent_Expecter) Get(ctx interface{}, id interface{}) *MockMirrorSourceComponent_Get_Call {
+	return &MockMirrorSourceComponent_Get_Call{Call: _e.mock.On("Get", ctx, id)}
 }
 
-func (_c *MockMirrorSourceComponent_Get_Call) Run(run func(ctx context.Context, id int64, currentUser string)) *MockMirrorSourceComponent_Get_Call {
+func (_c *MockMirrorSourceComponent_Get_Call) Run(run func(ctx context.Context, id int64)) *MockMirrorSourceComponent_Get_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(int64), args[2].(string))
+		run(args[0].(context.Context), args[1].(int64))
 	})
 	return _c
 }
@@ -186,14 +184,14 @@ func (_c *MockMirrorSourceComponent_Get_Call) Return(_a0 *database.MirrorSource,
 	return _c
 }
 
-func (_c *MockMirrorSourceComponent_Get_Call) RunAndReturn(run func(context.Context, int64, string) (*database.MirrorSource, error)) *MockMirrorSourceComponent_Get_Call {
+func (_c *MockMirrorSourceComponent_Get_Call) RunAndReturn(run func(context.Context, int64) (*database.MirrorSource, error)) *MockMirrorSourceComponent_Get_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// Index provides a mock function with given fields: ctx, currentUser
-func (_m *MockMirrorSourceComponent) Index(ctx context.Context, currentUser string) ([]database.MirrorSource, error) {
-	ret := _m.Called(ctx, currentUser)
+// Index provides a mock function with given fields: ctx
+func (_m *MockMirrorSourceComponent) Index(ctx context.Context) ([]database.MirrorSource, error) {
+	ret := _m.Called(ctx)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Index")
@@ -201,19 +199,19 @@ func (_m *MockMirrorSourceComponent) Index(ctx context.Context, currentUser stri
 
 	var r0 []database.MirrorSource
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) ([]database.MirrorSource, error)); ok {
-		return rf(ctx, currentUser)
+	if rf, ok := ret.Get(0).(func(context.Context) ([]database.MirrorSource, error)); ok {
+		return rf(ctx)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string) []database.MirrorSource); ok {
-		r0 = rf(ctx, currentUser)
+	if rf, ok := ret.Get(0).(func(context.Context) []database.MirrorSource); ok {
+		r0 = rf(ctx)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]database.MirrorSource)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = rf(ctx, currentUser)
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -228,14 +226,13 @@ type MockMirrorSourceComponent_Index_Call struct {
 
 // Index is a helper method to define mock.On call
 //   - ctx context.Context
-//   - currentUser string
-func (_e *MockMirrorSourceComponent_Expecter) Index(ctx interface{}, currentUser interface{}) *MockMirrorSourceComponent_Index_Call {
-	return &MockMirrorSourceComponent_Index_Call{Call: _e.mock.On("Index", ctx, currentUser)}
+func (_e *MockMirrorSourceComponent_Expecter) Index(ctx interface{}) *MockMirrorSourceComponent_Index_Call {
+	return &MockMirrorSourceComponent_Index_Call{Call: _e.mock.On("Index", ctx)}
 }
 
-func (_c *MockMirrorSourceComponent_Index_Call) Run(run func(ctx context.Context, currentUser string)) *MockMirrorSourceComponent_Index_Call {
+func (_c *MockMirrorSourceComponent_Index_Call) Run(run func(ctx context.Context)) *MockMirrorSourceComponent_Index_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string))
+		run(args[0].(context.Context))
 	})
 	return _c
 }
@@ -245,7 +242,7 @@ func (_c *MockMirrorSourceComponent_Index_Call) Return(_a0 []database.MirrorSour
 	return _c
 }
 
-func (_c *MockMirrorSourceComponent_Index_Call) RunAndReturn(run func(context.Context, string) ([]database.MirrorSource, error)) *MockMirrorSourceComponent_Index_Call {
+func (_c *MockMirrorSourceComponent_Index_Call) RunAndReturn(run func(context.Context) ([]database.MirrorSource, error)) *MockMirrorSourceComponent_Index_Call {
 	_c.Call.Return(run)
 	return _c
 }

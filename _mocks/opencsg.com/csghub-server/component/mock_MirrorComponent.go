@@ -175,9 +175,9 @@ func (_c *MockMirrorComponent_CreatePushMirrorForFinishedMirrorTask_Call) RunAnd
 	return _c
 }
 
-// Index provides a mock function with given fields: ctx, currentUser, per, page, search
-func (_m *MockMirrorComponent) Index(ctx context.Context, currentUser string, per int, page int, search string) ([]types.Mirror, int, error) {
-	ret := _m.Called(ctx, currentUser, per, page, search)
+// Index provides a mock function with given fields: ctx, per, page, search
+func (_m *MockMirrorComponent) Index(ctx context.Context, per int, page int, search string) ([]types.Mirror, int, error) {
+	ret := _m.Called(ctx, per, page, search)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Index")
@@ -186,25 +186,25 @@ func (_m *MockMirrorComponent) Index(ctx context.Context, currentUser string, pe
 	var r0 []types.Mirror
 	var r1 int
 	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, int, int, string) ([]types.Mirror, int, error)); ok {
-		return rf(ctx, currentUser, per, page, search)
+	if rf, ok := ret.Get(0).(func(context.Context, int, int, string) ([]types.Mirror, int, error)); ok {
+		return rf(ctx, per, page, search)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, int, int, string) []types.Mirror); ok {
-		r0 = rf(ctx, currentUser, per, page, search)
+	if rf, ok := ret.Get(0).(func(context.Context, int, int, string) []types.Mirror); ok {
+		r0 = rf(ctx, per, page, search)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]types.Mirror)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, int, int, string) int); ok {
-		r1 = rf(ctx, currentUser, per, page, search)
+	if rf, ok := ret.Get(1).(func(context.Context, int, int, string) int); ok {
+		r1 = rf(ctx, per, page, search)
 	} else {
 		r1 = ret.Get(1).(int)
 	}
 
-	if rf, ok := ret.Get(2).(func(context.Context, string, int, int, string) error); ok {
-		r2 = rf(ctx, currentUser, per, page, search)
+	if rf, ok := ret.Get(2).(func(context.Context, int, int, string) error); ok {
+		r2 = rf(ctx, per, page, search)
 	} else {
 		r2 = ret.Error(2)
 	}
@@ -219,17 +219,16 @@ type MockMirrorComponent_Index_Call struct {
 
 // Index is a helper method to define mock.On call
 //   - ctx context.Context
-//   - currentUser string
 //   - per int
 //   - page int
 //   - search string
-func (_e *MockMirrorComponent_Expecter) Index(ctx interface{}, currentUser interface{}, per interface{}, page interface{}, search interface{}) *MockMirrorComponent_Index_Call {
-	return &MockMirrorComponent_Index_Call{Call: _e.mock.On("Index", ctx, currentUser, per, page, search)}
+func (_e *MockMirrorComponent_Expecter) Index(ctx interface{}, per interface{}, page interface{}, search interface{}) *MockMirrorComponent_Index_Call {
+	return &MockMirrorComponent_Index_Call{Call: _e.mock.On("Index", ctx, per, page, search)}
 }
 
-func (_c *MockMirrorComponent_Index_Call) Run(run func(ctx context.Context, currentUser string, per int, page int, search string)) *MockMirrorComponent_Index_Call {
+func (_c *MockMirrorComponent_Index_Call) Run(run func(ctx context.Context, per int, page int, search string)) *MockMirrorComponent_Index_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(int), args[3].(int), args[4].(string))
+		run(args[0].(context.Context), args[1].(int), args[2].(int), args[3].(string))
 	})
 	return _c
 }
@@ -239,14 +238,14 @@ func (_c *MockMirrorComponent_Index_Call) Return(_a0 []types.Mirror, _a1 int, _a
 	return _c
 }
 
-func (_c *MockMirrorComponent_Index_Call) RunAndReturn(run func(context.Context, string, int, int, string) ([]types.Mirror, int, error)) *MockMirrorComponent_Index_Call {
+func (_c *MockMirrorComponent_Index_Call) RunAndReturn(run func(context.Context, int, int, string) ([]types.Mirror, int, error)) *MockMirrorComponent_Index_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// Repos provides a mock function with given fields: ctx, currentUser, per, page
-func (_m *MockMirrorComponent) Repos(ctx context.Context, currentUser string, per int, page int) ([]types.MirrorRepo, int, error) {
-	ret := _m.Called(ctx, currentUser, per, page)
+// Repos provides a mock function with given fields: ctx, per, page
+func (_m *MockMirrorComponent) Repos(ctx context.Context, per int, page int) ([]types.MirrorRepo, int, error) {
+	ret := _m.Called(ctx, per, page)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Repos")
@@ -255,25 +254,25 @@ func (_m *MockMirrorComponent) Repos(ctx context.Context, currentUser string, pe
 	var r0 []types.MirrorRepo
 	var r1 int
 	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, int, int) ([]types.MirrorRepo, int, error)); ok {
-		return rf(ctx, currentUser, per, page)
+	if rf, ok := ret.Get(0).(func(context.Context, int, int) ([]types.MirrorRepo, int, error)); ok {
+		return rf(ctx, per, page)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, int, int) []types.MirrorRepo); ok {
-		r0 = rf(ctx, currentUser, per, page)
+	if rf, ok := ret.Get(0).(func(context.Context, int, int) []types.MirrorRepo); ok {
+		r0 = rf(ctx, per, page)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]types.MirrorRepo)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, int, int) int); ok {
-		r1 = rf(ctx, currentUser, per, page)
+	if rf, ok := ret.Get(1).(func(context.Context, int, int) int); ok {
+		r1 = rf(ctx, per, page)
 	} else {
 		r1 = ret.Get(1).(int)
 	}
 
-	if rf, ok := ret.Get(2).(func(context.Context, string, int, int) error); ok {
-		r2 = rf(ctx, currentUser, per, page)
+	if rf, ok := ret.Get(2).(func(context.Context, int, int) error); ok {
+		r2 = rf(ctx, per, page)
 	} else {
 		r2 = ret.Error(2)
 	}
@@ -288,16 +287,15 @@ type MockMirrorComponent_Repos_Call struct {
 
 // Repos is a helper method to define mock.On call
 //   - ctx context.Context
-//   - currentUser string
 //   - per int
 //   - page int
-func (_e *MockMirrorComponent_Expecter) Repos(ctx interface{}, currentUser interface{}, per interface{}, page interface{}) *MockMirrorComponent_Repos_Call {
-	return &MockMirrorComponent_Repos_Call{Call: _e.mock.On("Repos", ctx, currentUser, per, page)}
+func (_e *MockMirrorComponent_Expecter) Repos(ctx interface{}, per interface{}, page interface{}) *MockMirrorComponent_Repos_Call {
+	return &MockMirrorComponent_Repos_Call{Call: _e.mock.On("Repos", ctx, per, page)}
 }
 
-func (_c *MockMirrorComponent_Repos_Call) Run(run func(ctx context.Context, currentUser string, per int, page int)) *MockMirrorComponent_Repos_Call {
+func (_c *MockMirrorComponent_Repos_Call) Run(run func(ctx context.Context, per int, page int)) *MockMirrorComponent_Repos_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(int), args[3].(int))
+		run(args[0].(context.Context), args[1].(int), args[2].(int))
 	})
 	return _c
 }
@@ -307,14 +305,14 @@ func (_c *MockMirrorComponent_Repos_Call) Return(_a0 []types.MirrorRepo, _a1 int
 	return _c
 }
 
-func (_c *MockMirrorComponent_Repos_Call) RunAndReturn(run func(context.Context, string, int, int) ([]types.MirrorRepo, int, error)) *MockMirrorComponent_Repos_Call {
+func (_c *MockMirrorComponent_Repos_Call) RunAndReturn(run func(context.Context, int, int) ([]types.MirrorRepo, int, error)) *MockMirrorComponent_Repos_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// Statistics provides a mock function with given fields: ctx, currentUser
-func (_m *MockMirrorComponent) Statistics(ctx context.Context, currentUser string) ([]types.MirrorStatusCount, error) {
-	ret := _m.Called(ctx, currentUser)
+// Statistics provides a mock function with given fields: ctx
+func (_m *MockMirrorComponent) Statistics(ctx context.Context) ([]types.MirrorStatusCount, error) {
+	ret := _m.Called(ctx)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Statistics")
@@ -322,19 +320,19 @@ func (_m *MockMirrorComponent) Statistics(ctx context.Context, currentUser strin
 
 	var r0 []types.MirrorStatusCount
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) ([]types.MirrorStatusCount, error)); ok {
-		return rf(ctx, currentUser)
+	if rf, ok := ret.Get(0).(func(context.Context) ([]types.MirrorStatusCount, error)); ok {
+		return rf(ctx)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string) []types.MirrorStatusCount); ok {
-		r0 = rf(ctx, currentUser)
+	if rf, ok := ret.Get(0).(func(context.Context) []types.MirrorStatusCount); ok {
+		r0 = rf(ctx)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]types.MirrorStatusCount)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = rf(ctx, currentUser)
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -349,14 +347,13 @@ type MockMirrorComponent_Statistics_Call struct {
 
 // Statistics is a helper method to define mock.On call
 //   - ctx context.Context
-//   - currentUser string
-func (_e *MockMirrorComponent_Expecter) Statistics(ctx interface{}, currentUser interface{}) *MockMirrorComponent_Statistics_Call {
-	return &MockMirrorComponent_Statistics_Call{Call: _e.mock.On("Statistics", ctx, currentUser)}
+func (_e *MockMirrorComponent_Expecter) Statistics(ctx interface{}) *MockMirrorComponent_Statistics_Call {
+	return &MockMirrorComponent_Statistics_Call{Call: _e.mock.On("Statistics", ctx)}
 }
 
-func (_c *MockMirrorComponent_Statistics_Call) Run(run func(ctx context.Context, currentUser string)) *MockMirrorComponent_Statistics_Call {
+func (_c *MockMirrorComponent_Statistics_Call) Run(run func(ctx context.Context)) *MockMirrorComponent_Statistics_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string))
+		run(args[0].(context.Context))
 	})
 	return _c
 }
@@ -366,7 +363,7 @@ func (_c *MockMirrorComponent_Statistics_Call) Return(_a0 []types.MirrorStatusCo
 	return _c
 }
 
-func (_c *MockMirrorComponent_Statistics_Call) RunAndReturn(run func(context.Context, string) ([]types.MirrorStatusCount, error)) *MockMirrorComponent_Statistics_Call {
+func (_c *MockMirrorComponent_Statistics_Call) RunAndReturn(run func(context.Context) ([]types.MirrorStatusCount, error)) *MockMirrorComponent_Statistics_Call {
 	_c.Call.Return(run)
 	return _c
 }

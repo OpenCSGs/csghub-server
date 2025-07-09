@@ -2,7 +2,6 @@ package component
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"opencsg.com/csghub-server/builder/store/database"
@@ -17,10 +16,10 @@ type mirrorSourceComponentImpl struct {
 
 type MirrorSourceComponent interface {
 	Create(ctx context.Context, req types.CreateMirrorSourceReq) (*database.MirrorSource, error)
-	Get(ctx context.Context, id int64, currentUser string) (*database.MirrorSource, error)
-	Index(ctx context.Context, currentUser string) ([]database.MirrorSource, error)
+	Get(ctx context.Context, id int64) (*database.MirrorSource, error)
+	Index(ctx context.Context) ([]database.MirrorSource, error)
 	Update(ctx context.Context, req types.UpdateMirrorSourceReq) (*database.MirrorSource, error)
-	Delete(ctx context.Context, id int64, currentUser string) error
+	Delete(ctx context.Context, id int64) error
 }
 
 func NewMirrorSourceComponent(config *config.Config) (MirrorSourceComponent, error) {
@@ -32,13 +31,6 @@ func NewMirrorSourceComponent(config *config.Config) (MirrorSourceComponent, err
 
 func (c *mirrorSourceComponentImpl) Create(ctx context.Context, req types.CreateMirrorSourceReq) (*database.MirrorSource, error) {
 	var ms database.MirrorSource
-	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
-	if err != nil {
-		return nil, errors.New("user does not exist")
-	}
-	if !user.CanAdmin() {
-		return nil, errors.New("user does not have admin permission")
-	}
 	ms.SourceName = req.SourceName
 	ms.InfoAPIUrl = req.InfoAPiUrl
 	res, err := c.mirrorSourceStore.Create(ctx, &ms)
@@ -48,14 +40,7 @@ func (c *mirrorSourceComponentImpl) Create(ctx context.Context, req types.Create
 	return res, nil
 }
 
-func (c *mirrorSourceComponentImpl) Get(ctx context.Context, id int64, currentUser string) (*database.MirrorSource, error) {
-	user, err := c.userStore.FindByUsername(ctx, currentUser)
-	if err != nil {
-		return nil, errors.New("user does not exist")
-	}
-	if !user.CanAdmin() {
-		return nil, errors.New("user does not have admin permission")
-	}
+func (c *mirrorSourceComponentImpl) Get(ctx context.Context, id int64) (*database.MirrorSource, error) {
 	ms, err := c.mirrorSourceStore.Get(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get mirror source, error: %w", err)
@@ -63,14 +48,7 @@ func (c *mirrorSourceComponentImpl) Get(ctx context.Context, id int64, currentUs
 	return ms, nil
 }
 
-func (c *mirrorSourceComponentImpl) Index(ctx context.Context, currentUser string) ([]database.MirrorSource, error) {
-	user, err := c.userStore.FindByUsername(ctx, currentUser)
-	if err != nil {
-		return nil, errors.New("user does not exist")
-	}
-	if !user.CanAdmin() {
-		return nil, errors.New("user does not have admin permission")
-	}
+func (c *mirrorSourceComponentImpl) Index(ctx context.Context) ([]database.MirrorSource, error) {
 	ms, err := c.mirrorSourceStore.Index(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get mirror source, error: %w", err)
@@ -79,31 +57,17 @@ func (c *mirrorSourceComponentImpl) Index(ctx context.Context, currentUser strin
 }
 func (c *mirrorSourceComponentImpl) Update(ctx context.Context, req types.UpdateMirrorSourceReq) (*database.MirrorSource, error) {
 	var ms database.MirrorSource
-	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
-	if err != nil {
-		return nil, errors.New("user does not exist")
-	}
-	if !user.CanAdmin() {
-		return nil, errors.New("user does not have admin permission")
-	}
 	ms.ID = req.ID
 	ms.SourceName = req.SourceName
 	ms.InfoAPIUrl = req.InfoAPiUrl
-	err = c.mirrorSourceStore.Update(ctx, &ms)
+	err := c.mirrorSourceStore.Update(ctx, &ms)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update mirror source, error: %w", err)
 	}
 	return &ms, nil
 }
 
-func (c *mirrorSourceComponentImpl) Delete(ctx context.Context, id int64, currentUser string) error {
-	user, err := c.userStore.FindByUsername(ctx, currentUser)
-	if err != nil {
-		return errors.New("user does not exist")
-	}
-	if !user.CanAdmin() {
-		return errors.New("user does not have admin permission")
-	}
+func (c *mirrorSourceComponentImpl) Delete(ctx context.Context, id int64) error {
 	ms, err := c.mirrorSourceStore.Get(ctx, id)
 	if err != nil {
 		return fmt.Errorf("failed to find mirror source, error: %w", err)
