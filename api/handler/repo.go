@@ -72,6 +72,10 @@ func (h *RepoHandler) CreateRepo(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
+	if req.RepoType == "" {
+		req.RepoType = types.ModelRepo
+	}
+
 	req.Username = userName
 	req.Namespace = userName
 	switch req.RepoType {
@@ -81,6 +85,13 @@ func (h *RepoHandler) CreateRepo(ctx *gin.Context) {
 		}
 		resp, err := h.m.Create(ctx.Request.Context(), modelReq)
 		if err != nil {
+			if strings.Contains(err.Error(), "duplicate key") {
+				resp := &types.Model{
+					URL: fmt.Sprintf("%s/%s", req.Namespace, req.Name),
+				}
+				ctx.JSON(http.StatusConflict, resp)
+				return
+			}
 			slog.Error("Failed to create model repo", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err), slog.Any("req", req))
 			httpbase.ServerError(ctx, err)
 			return
@@ -92,6 +103,13 @@ func (h *RepoHandler) CreateRepo(ctx *gin.Context) {
 		}
 		resp, err := h.d.Create(ctx.Request.Context(), datasetReq)
 		if err != nil {
+			if strings.Contains(err.Error(), "duplicate key") {
+				resp := &types.Dataset{
+					URL: fmt.Sprintf("%s/%s", req.Namespace, req.Name),
+				}
+				ctx.JSON(http.StatusConflict, resp)
+				return
+			}
 			slog.Error("Failed to create dataset repo", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err), slog.Any("req", req))
 			httpbase.ServerError(ctx, err)
 			return

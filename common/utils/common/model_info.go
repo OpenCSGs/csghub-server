@@ -138,7 +138,7 @@ func calculateTensorParams(shape []int) int64 {
 }
 
 // fetchSafetensorsMetadata fetches the metadata header from a safetensors file
-func fetchSafetensorsMetadata(url string) (map[string]any, error) {
+var fetchSafetensorsMetadata = func(url string) (map[string]any, error) {
 	// Create a custom http.Transport that skips TLS verification
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
