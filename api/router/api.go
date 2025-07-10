@@ -980,31 +980,7 @@ func createPromptRoutes(apiGroup *gin.RouterGroup, promptHandler *handler.Prompt
 func createDataflowRoutes(apiGroup *gin.RouterGroup, dataflowHandler *handler.DataflowProxyHandler) {
 	dataflowGrp := apiGroup.Group("/dataflow")
 	dataflowGrp.Use(middleware.MustLogin())
-	{
-		jobGrp := dataflowGrp.Group("/jobs")
-		{
-			jobGrp.GET("", dataflowHandler.Proxy)
-			jobGrp.POST("", dataflowHandler.Proxy)
-			jobGrp.GET("/:id", dataflowHandler.Proxy)
-			jobGrp.DELETE("/:id", dataflowHandler.Proxy)
-			jobGrp.GET("/log/:id", dataflowHandler.Proxy)
-			jobGrp.GET("/search", dataflowHandler.Proxy)
-		}
-		templateGrp := dataflowGrp.Group("/templates")
-		{
-			templateGrp.GET("", dataflowHandler.Proxy)
-			templateGrp.POST("", dataflowHandler.Proxy)
-			templateGrp.DELETE("/:template_id", dataflowHandler.Proxy)
-		}
-		opsGrp := dataflowGrp.Group("/ops")
-		{
-			opsGrp.GET("", dataflowHandler.Proxy)
-		}
-		toolGrp := dataflowGrp.Group("/tools")
-		{
-			toolGrp.GET("", dataflowHandler.Proxy)
-		}
-	}
+	dataflowGrp.Any("/*any", dataflowHandler.Proxy)
 }
 
 func createTagsRoutes(apiGroup *gin.RouterGroup, tagHandler *handler.TagsHandler) {
