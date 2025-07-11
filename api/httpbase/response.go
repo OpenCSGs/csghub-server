@@ -2,8 +2,6 @@ package httpbase
 
 import (
 	"net/http"
-	"runtime"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/common/errorx"
@@ -57,13 +55,6 @@ func OKWithTotal(c *gin.Context, data interface{}, total int) {
 //
 //	BadRequest(c, "Invalid request parameters")
 func BadRequest(c *gin.Context, errMsg string) {
-	// get caller message
-	pc, _, _, ok := runtime.Caller(1)
-	if ok {
-		funcName := runtime.FuncForPC(pc).Name()
-		structName := parseFuncName(funcName)
-		c.Set("Error-Handler-Name", structName)
-	}
 	c.PureJSON(http.StatusBadRequest, R{
 		Msg: errMsg,
 	})
@@ -75,18 +66,11 @@ func BadRequest(c *gin.Context, errMsg string) {
 //
 //	BadRequest(c, "Invalid request parameters")
 func BadRequestWithExt(c *gin.Context, err error) {
-	// get caller message
-	pc, _, _, ok := runtime.Caller(1)
-	if ok {
-		funcName := runtime.FuncForPC(pc).Name()
-		structName := parseFuncName(funcName)
-		c.Set("Error-Handler-Name", structName)
-	}
-	err, ok = errorx.GetFirstCustomError(err)
+	err, ok := errorx.GetFirstCustomError(err)
 	if ok {
 		customErr := err.(errorx.CustomError)
 		c.PureJSON(http.StatusBadRequest, R{
-			Msg:     customErr.Error(),
+			Msg:     customErr.Code(),
 			Context: customErr.Context(),
 		})
 		return
@@ -102,18 +86,11 @@ func BadRequestWithExt(c *gin.Context, err error) {
 //
 //	ServerError(c, errors.New("internal server error"))
 func ServerError(c *gin.Context, err error) {
-	// get caller message
-	pc, _, _, ok := runtime.Caller(1)
-	if ok {
-		funcName := runtime.FuncForPC(pc).Name()
-		structName := parseFuncName(funcName)
-		c.Set("Error-Handler-Name", structName)
-	}
-	err, ok = errorx.GetFirstCustomError(err)
+	err, ok := errorx.GetFirstCustomError(err)
 	if ok {
 		customErr := err.(errorx.CustomError)
 		c.PureJSON(http.StatusInternalServerError, R{
-			Msg:     customErr.Error(),
+			Msg:     customErr.Code(),
 			Context: customErr.Context(),
 		})
 		return
@@ -130,18 +107,11 @@ func ServerError(c *gin.Context, err error) {
 //
 //	UnauthorizedError(c, errors.New("permission denied"))
 func UnauthorizedError(c *gin.Context, err error) {
-	// get caller message
-	pc, _, _, ok := runtime.Caller(1)
-	if ok {
-		funcName := runtime.FuncForPC(pc).Name()
-		structName := parseFuncName(funcName)
-		c.Set("Error-Handler-Name", structName)
-	}
-	err, ok = errorx.GetFirstCustomError(err)
+	err, ok := errorx.GetFirstCustomError(err)
 	if ok {
 		customErr := err.(errorx.CustomError)
 		c.PureJSON(http.StatusUnauthorized, R{
-			Msg:     customErr.Error(),
+			Msg:     customErr.Code(),
 			Context: customErr.Context(),
 		})
 		return
@@ -153,18 +123,11 @@ func UnauthorizedError(c *gin.Context, err error) {
 
 // ForbiddenError if the client is authenticated but does not have enough permissions.
 func ForbiddenError(c *gin.Context, err error) {
-	// get caller message
-	pc, _, _, ok := runtime.Caller(1)
-	if ok {
-		funcName := runtime.FuncForPC(pc).Name()
-		structName := parseFuncName(funcName)
-		c.Set("Error-Handler-Name", structName)
-	}
-	err, ok = errorx.GetFirstCustomError(err)
+	err, ok := errorx.GetFirstCustomError(err)
 	if ok {
 		customErr := err.(errorx.CustomError)
 		c.PureJSON(http.StatusForbidden, R{
-			Msg:     customErr.Error(),
+			Msg:     customErr.Code(),
 			Context: customErr.Context(),
 		})
 		return
@@ -180,18 +143,11 @@ func ForbiddenError(c *gin.Context, err error) {
 //
 //	NotFoundError(c, errors.New("permission denied"))
 func NotFoundError(c *gin.Context, err error) {
-	// get caller message
-	pc, _, _, ok := runtime.Caller(1)
-	if ok {
-		funcName := runtime.FuncForPC(pc).Name()
-		structName := parseFuncName(funcName)
-		c.Set("Error-Handler-Name", structName)
-	}
-	err, ok = errorx.GetFirstCustomError(err)
+	err, ok := errorx.GetFirstCustomError(err)
 	if ok {
 		customErr := err.(errorx.CustomError)
 		c.PureJSON(http.StatusNotFound, R{
-			Msg:     customErr.Error(),
+			Msg:     customErr.Code(),
 			Context: customErr.Context(),
 		})
 		return
@@ -212,31 +168,3 @@ type R struct {
 }
 
 type I18nOptionsMap map[i18n.I18nOptionsKey]string
-
-func parseFuncName(funcName string) string {
-	// 1. get strcut name and method name
-	structName := extractStructAndMethod(funcName)
-	// 2. remove "handler" suffix (if exist)
-	if strings.HasSuffix(structName, "handler") {
-		structName = strings.TrimSuffix(structName, "handler")
-	} else {
-		// maybe middleware.*, set it to empty
-		structName = ""
-	}
-	return structName
-}
-
-// extractStructAndMethod extracts the struct name from a function name.
-func extractStructAndMethod(funcName string) string {
-	parts := strings.Split(funcName, ".")
-	if len(parts) < 2 {
-		return ""
-	}
-	structName := parts[len(parts)-2]
-	// Remove the package name if it exists
-	if strings.HasPrefix(structName, "(*") && strings.HasSuffix(structName, ")") {
-		structName = structName[2 : len(structName)-1]
-	}
-	structName = strings.ToLower(structName)
-	return structName
-}
