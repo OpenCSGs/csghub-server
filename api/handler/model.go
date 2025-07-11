@@ -616,6 +616,21 @@ func (h *ModelHandler) DeployDedicated(ctx *gin.Context) {
 		CurrentUser: currentUser,
 		DeployType:  types.InferenceType,
 	}
+
+	valid, err := common.IsValidName(req.DeployName)
+	if !valid {
+		httpbase.BadRequestWithExt(ctx, err)
+		return
+	}
+
+	if len(req.EngineArgs) > 0 {
+		_, err = common.JsonStrToMap(req.EngineArgs)
+		if err != nil {
+			httpbase.BadRequestWithExt(ctx, err)
+			return
+		}
+	}
+
 	deployID, err := h.model.Deploy(ctx.Request.Context(), epReq, req)
 	if err != nil {
 		slog.Error("failed to deploy model as inference", slog.String("namespace", namespace),
@@ -692,6 +707,20 @@ func (h *ModelHandler) FinetuneCreate(ctx *gin.Context) {
 		Name:        name,
 		CurrentUser: currentUser,
 		DeployType:  types.FinetuneType,
+	}
+
+	valid, err := common.IsValidName(req.DeployName)
+	if !valid {
+		httpbase.BadRequestWithExt(ctx, err)
+		return
+	}
+
+	if len(req.EngineArgs) > 0 {
+		_, err = common.JsonStrToMap(req.EngineArgs)
+		if err != nil {
+			httpbase.BadRequestWithExt(ctx, err)
+			return
+		}
 	}
 
 	deployID, err := h.model.Deploy(ctx.Request.Context(), ftReq, *modelReq)
@@ -1353,6 +1382,21 @@ func (h *ModelHandler) DeployServerless(ctx *gin.Context) {
 	}
 
 	req.SecureLevel = 1 // public for serverless
+
+	valid, err := common.IsValidName(req.DeployName)
+	if !valid {
+		httpbase.BadRequestWithExt(ctx, err)
+		return
+	}
+
+	if len(req.EngineArgs) > 0 {
+		_, err = common.JsonStrToMap(req.EngineArgs)
+		if err != nil {
+			httpbase.BadRequestWithExt(ctx, err)
+			return
+		}
+	}
+
 	deployID, err := h.model.Deploy(ctx.Request.Context(), deployReq, req)
 	if err != nil {
 		if errors.Is(err, errorx.ErrForbidden) {

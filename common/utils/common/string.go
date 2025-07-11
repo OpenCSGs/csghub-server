@@ -16,7 +16,7 @@ func JsonStrToMap(jsonStr string) (map[string]string, error) {
 		return map[string]string{}, nil
 	}
 	err := json.Unmarshal([]byte(jsonStr), &resMap)
-	err = errorx.InternalServerError(err, nil)
+	err = errorx.InternalServerError(err, errorx.Ctx().Set("detail", err.Error()))
 	return resMap, err
 }
 

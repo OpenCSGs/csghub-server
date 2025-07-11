@@ -1,7 +1,5 @@
 package errorx
 
-import "fmt"
-
 const errReqPrefix = "REQ-ERR"
 
 const (
@@ -40,9 +38,13 @@ var (
 	ErrReqContentTypeUnsupported = CustomError{prefix: errReqPrefix, code: errReqContentTypeUnsupported}
 )
 
-func HandleBadRequest(originErr error, customErr CustomError, ext context) error {
-	customErr.context = ext
-	return fmt.Errorf("%w, %w", originErr, customErr)
+func BadRequest(originErr error, ext context) error {
+	return CustomError{
+		prefix:  errReqPrefix,
+		code:    errBadRequest,
+		err:     originErr,
+		context: ext,
+	}
 }
 
 func ReqBodyFormat(err error, ext context) error {

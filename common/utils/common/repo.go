@@ -11,6 +11,7 @@ import (
 
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/types/enum"
 )
@@ -100,7 +101,12 @@ func IsValidName(name string) (bool, error) {
 	}
 	// repeat special character check
 	if hasRepeatSpecialCharacter(name) {
-		return false, errors.New("Name contains consecutive special characters which is not allowed.")
+		err := errors.New("name contains consecutive special characters which is not allowed")
+		return false, errorx.BadRequest(err,
+			errorx.Ctx().
+				Set("name", name).
+				Set("detail", err.Error()),
+		)
 	}
 	return true, nil
 }
@@ -153,7 +159,11 @@ func validate(name string) error {
 	// Validate name
 	for _, rule := range rules {
 		if !rule.pattern.MatchString(name) {
-			return errors.New(rule.message)
+			return errorx.BadRequest(errors.New(rule.message),
+				errorx.Ctx().
+					Set("name", name).
+					Set("detail", rule.message),
+			)
 		}
 	}
 
