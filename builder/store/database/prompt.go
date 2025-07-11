@@ -6,6 +6,7 @@ import (
 	"log/slog"
 
 	"github.com/uptrace/bun"
+	"opencsg.com/csghub-server/common/errorx"
 )
 
 type Prompt struct {
@@ -42,6 +43,10 @@ func NewPromptStore() PromptStore {
 func (s *promptStoreImpl) Create(ctx context.Context, input Prompt) (*Prompt, error) {
 	res, err := s.db.Core.NewInsert().Model(&input).Exec(ctx, &input)
 	if err := assertAffectedOneRow(res, err); err != nil {
+		err := errorx.HandleDBError(err,
+			errorx.Ctx().
+				Set("repo_id", input.RepositoryID),
+		)
 		return nil, fmt.Errorf("create prompt in db failed,error:%w", err)
 	}
 
@@ -55,6 +60,10 @@ func (s *promptStoreImpl) ByRepoIDs(ctx context.Context, repoIDs []int64) (promp
 		Relation("Repository.User").
 		Where("repository_id in (?)", bun.In(repoIDs))
 	err = q.Scan(ctx)
+	err = errorx.HandleDBError(err,
+		errorx.Ctx().
+			Set("repo_ids", repoIDs),
+	)
 	return
 }
 
@@ -65,6 +74,10 @@ func (s *promptStoreImpl) ByRepoID(ctx context.Context, repoID int64) (*Prompt, 
 		Where("repository_id = ?", repoID).
 		Scan(ctx)
 	if err != nil {
+		err = errorx.HandleDBError(err,
+			errorx.Ctx().
+				Set("repo_id", repoID),
+		)
 		return nil, fmt.Errorf("failed to select prompt by repository id: %d, error: %w", repoID, err)
 	}
 
@@ -73,6 +86,10 @@ func (s *promptStoreImpl) ByRepoID(ctx context.Context, repoID int64) (*Prompt, 
 
 func (s *promptStoreImpl) Update(ctx context.Context, input Prompt) (err error) {
 	_, err = s.db.Core.NewUpdate().Model(&input).WherePK().Exec(ctx)
+	err = errorx.HandleDBError(err,
+		errorx.Ctx().
+			Set("repo_id", input.RepositoryID),
+	)
 	return
 }
 
@@ -85,6 +102,9 @@ func (s *promptStoreImpl) FindByPath(ctx context.Context, namespace string, repo
 		Where("repository.path =?", fmt.Sprintf("%s/%s", namespace, repoPath)).
 		Scan(ctx)
 	if err != nil {
+		err = errorx.HandleDBError(err,
+			errorx.Ctx().Set("path", fmt.Sprintf("%s/%s", namespace, repoPath)),
+		)
 		return nil, fmt.Errorf("failed to find prompt: %w", err)
 	}
 	err = s.db.Operator.Core.NewSelect().
@@ -94,12 +114,19 @@ func (s *promptStoreImpl) FindByPath(ctx context.Context, namespace string, repo
 			return sq.Where("repository_tag.count > 0")
 		}).
 		Scan(ctx)
+	err = errorx.HandleDBError(err,
+		errorx.Ctx().Set("path", fmt.Sprintf("%s/%s", namespace, repoPath)),
+	)
 	return resPrompt, err
 }
 
 func (s *promptStoreImpl) Delete(ctx context.Context, input Prompt) error {
 	res, err := s.db.Operator.Core.NewDelete().Model(&input).WherePK().Exec(ctx)
 	if err := assertAffectedOneRow(res, err); err != nil {
+		err = errorx.HandleDBError(err,
+			errorx.Ctx().
+				Set("repo_id", input.RepositoryID),
+		)
 		return fmt.Errorf("delete prompt failed,error:%w", err)
 	}
 	return nil
@@ -121,13 +148,18 @@ func (s *promptStoreImpl) ByUsername(ctx context.Context, username string, per, 
 
 	err = query.Scan(ctx)
 	if err != nil {
+		err = errorx.HandleDBError(err,
+			errorx.Ctx().
+				Set("username", username),
+		)
 		return
 	}
 
 	total, err = query.Count(ctx)
-	if err != nil {
-		return
-	}
+	err = errorx.HandleDBError(err,
+		errorx.Ctx().
+			Set("username", username),
+	)
 	return
 }
 
@@ -148,12 +180,15 @@ func (s *promptStoreImpl) ByOrgPath(ctx context.Context, namespace string, per, 
 
 	err = query.Scan(ctx, &prompts)
 	if err != nil {
+		err = errorx.HandleDBError(err,
+			errorx.Ctx().Set("namespace", namespace),
+		)
 		return
 	}
 	total, err = query.Count(ctx)
-	if err != nil {
-		return
-	}
+	err = errorx.HandleDBError(err,
+		errorx.Ctx().Set("namespace", namespace),
+	)
 	return
 }
 
@@ -169,6 +204,9 @@ func (s *promptStoreImpl) CreateIfNotExist(ctx context.Context, input Prompt) (*
 
 	res, err := s.db.Core.NewInsert().Model(&input).Exec(ctx, &input)
 	if err := assertAffectedOneRow(res, err); err != nil {
+		err = errorx.HandleDBError(err,
+			errorx.Ctx().Set("repository_id", input.RepositoryID),
+		)
 		slog.Error("create prompt in db failed", slog.String("error", err.Error()))
 		return nil, fmt.Errorf("create prompt in db failed,error:%w", err)
 	}
