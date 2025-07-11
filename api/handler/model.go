@@ -140,10 +140,12 @@ func (h *ModelHandler) Create(ctx *gin.Context) {
 	if err != nil {
 		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
-			return
+		} else if errors.Is(err, errorx.ErrDatabaseDuplicateKey) {
+			httpbase.BadRequestWithExt(ctx, err)
+		} else {
+			slog.Error("Failed to create model", slog.Any("error", err))
+			httpbase.ServerError(ctx, err)
 		}
-		slog.Error("Failed to create model", slog.Any("error", err))
-		httpbase.ServerError(ctx, err)
 		return
 	}
 	slog.Info("Create model succeed", slog.String("model", model.Name))
