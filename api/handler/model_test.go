@@ -278,7 +278,37 @@ func TestModelHandler_DeployDedicated(t *testing.T) {
 			Context: errorx.Ctx().Set("detail", "Length must be between 2 and 64 characters.").Set("name", ""),
 		})
 	})
+	t.Run("success_with_engine_args", func(t *testing.T) {
+		tester := NewModelTester(t).WithHandleFunc(func(h *ModelHandler) gin.HandlerFunc {
+			return h.DeployDedicated
+		})
+		tester.WithUser()
 
+		tester.mocks.repo.EXPECT().AllowReadAccess(tester.Ctx(), types.ModelRepo, "u", "r", "u").Return(true, nil)
+		tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), &types.ModelRunReq{
+			DeployName: "test",
+			MinReplica: 1,
+			MaxReplica: 2,
+			Revision:   "main",
+			EngineArgs: "{\"sss\":\"sss\"}",
+		}).Return(true, nil)
+		tester.mocks.model.EXPECT().Deploy(tester.Ctx(), types.DeployActReq{
+			Namespace:   "u",
+			Name:        "r",
+			CurrentUser: "u",
+			DeployType:  types.InferenceType,
+		}, types.ModelRunReq{DeployName: "test", MinReplica: 1, MaxReplica: 2, Revision: "main", EngineArgs: "{\"sss\":\"sss\"}"}).Return(123, nil)
+
+		tester.WithBody(t, &types.ModelRunReq{DeployName: "test", MinReplica: 1, MaxReplica: 2, Revision: "main", EngineArgs: "{\"sss\":\"sss\"}"}).Execute()
+
+		tester.ResponseEq(t, http.StatusOK, tester.OKText, types.DeployRepo{DeployID: 123})
+	})
+	t.Run("error_badrequest_engine_args", func(t *testing.T) {
+		tester := NewModelTester(t).WithHandleFunc(func(h *ModelHandler) gin.HandlerFunc {
+			return h.DeployDedicated
+		})
+		tester.WithUser()
+	})
 }
 
 func TestModelHandler_FinetuneCreate(t *testing.T) {
