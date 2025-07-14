@@ -288,7 +288,6 @@ func TestModelHandler_FinetuneCreate(t *testing.T) {
 		})
 		tester.WithUser()
 
-		tester.mocks.repo.EXPECT().AllowReadAccess(tester.Ctx(), types.ModelRepo, "u", "r", "u").Return(true, nil)
 		tester.mocks.repo.EXPECT().AllowAdminAccess(tester.Ctx(), types.ModelRepo, "u", "r", "u").Return(true, nil)
 		tester.mocks.model.EXPECT().Deploy(tester.Ctx(), types.DeployActReq{
 			Namespace:   "u",
