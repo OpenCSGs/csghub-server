@@ -296,10 +296,6 @@ func TestMirrorComponent_CheckMirrorProgress(t *testing.T) {
 func TestMirrorComponent_Repos(t *testing.T) {
 	ctx := context.TODO()
 	mc := initializeTestMirrorComponent(ctx, t)
-
-	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
-		RoleMask: "admin",
-	}, nil)
 	mc.mocks.stores.RepoMock().EXPECT().WithMirror(ctx, 10, 1).Return([]database.Repository{
 		{Path: "foo", SyncStatus: types.SyncStatusCompleted, RepositoryType: types.ModelRepo},
 	}, 100, nil)

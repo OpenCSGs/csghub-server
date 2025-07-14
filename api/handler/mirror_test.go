@@ -39,7 +39,7 @@ func TestMirrorHandler_CreateMirrorRepo(t *testing.T) {
 	tester := NewMirrorTester(t).WithHandleFunc(func(h *MirrorHandler) gin.HandlerFunc {
 		return h.CreateMirrorRepo
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.mocks.mirror.EXPECT().CreateMirrorRepo(tester.Ctx(), types.CreateMirrorRepoReq{
 		SourceNamespace:   "ns",
@@ -65,7 +65,7 @@ func TestMirrorHandler_Repos(t *testing.T) {
 	tester := NewMirrorTester(t).WithHandleFunc(func(h *MirrorHandler) gin.HandlerFunc {
 		return h.Repos
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.mocks.mirror.EXPECT().Repos(tester.Ctx(), 10, 1).Return(
 		[]types.MirrorRepo{{Path: "p"}}, 100, nil,
@@ -82,7 +82,7 @@ func TestMirrorHandler_Index(t *testing.T) {
 	tester := NewMirrorTester(t).WithHandleFunc(func(h *MirrorHandler) gin.HandlerFunc {
 		return h.Index
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.mocks.mirror.EXPECT().Index(tester.Ctx(), 10, 1, "foo").Return(
 		[]types.Mirror{{SourceUrl: "p"}}, 100, nil,
