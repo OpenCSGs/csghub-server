@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -18,6 +19,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/minio/minio-go/v7"
 	ignore "github.com/sabhiram/go-gitignore"
 	"github.com/spf13/cast"
@@ -165,6 +167,7 @@ type RepoComponent interface {
 	CommitFiles(ctx context.Context, req types.CommitFilesReq) error
 	IsExists(ctx context.Context, repoType types.RepositoryType, namespace, name string) (bool, error)
 	ValidateYaml(ctx context.Context, req types.ValidateYamlReq) error
+	ParseNDJson(ctx *gin.Context) (*types.CommitFilesReq, error)
 }
 
 func NewRepoComponentImpl(config *config.Config) (*repoComponentImpl, error) {
@@ -3159,15 +3162,31 @@ func (c *repoComponentImpl) CommitFiles(ctx context.Context, req types.CommitFil
 	if err != nil {
 		return fmt.Errorf("failed to find user, err: %w", err)
 	}
+	existFiles, err := c.git.GetRepoAllFiles(ctx, gitserver.GetRepoAllFilesReq{
+		Namespace: req.Namespace,
+		Name:      req.Name,
+		RepoType:  req.RepoType,
+		Ref:       req.Revision,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to get repo files, err: %w", err)
+	}
+
 	for _, file := range req.Files {
+		for _, existFile := range existFiles {
+			if existFile.Path == file.Path {
+				file.Action = types.CommitActionUpdate
+			}
+		}
 		var action gitserver.CommitAction
-		if file.Action == types.CommitActionCreate {
+		switch file.Action {
+		case types.CommitActionCreate:
 			action = gitserver.CommitActionCreate
-		} else if file.Action == types.CommitActionUpdate {
+		case types.CommitActionUpdate:
 			action = gitserver.CommitActionUpdate
-		} else if file.Action == types.CommitActionDelete {
+		case types.CommitActionDelete:
 			action = gitserver.CommitActionDelete
-		} else {
+		default:
 			return fmt.Errorf("invalid action: %s", file.Action)
 		}
 		files = append(files, gitserver.CommitFile{
@@ -3300,4 +3319,111 @@ func metaText(readme string) string {
 	}
 
 	return splits[1]
+}
+
+func (c *repoComponentImpl) ParseNDJson(ctx *gin.Context) (*types.CommitFilesReq, error) {
+	req := &types.CommitFilesReq{}
+	scanner := bufio.NewScanner(ctx.Request.Body)
+	maxCapacity := int(c.config.Git.MaxUnLfsFileSize)
+	buf := make([]byte, maxCapacity)
+	scanner.Buffer(buf, maxCapacity)
+
+	lineNumber := 0
+	for scanner.Scan() {
+		lineNumber++
+		line := strings.TrimSpace(scanner.Text())
+		// Skip empty lines
+		if line == "" {
+			continue
+		}
+		var item types.FormField
+		if err := json.Unmarshal([]byte(line), &item); err != nil {
+			return nil, fmt.Errorf("invalid JSON on line %d: %v", lineNumber, err)
+		}
+
+		// Parse based on key type
+		switch item.Key {
+		case "header":
+			headerBytes, err := json.Marshal(item.Value)
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal header value on line %d: %v", lineNumber, err)
+			}
+
+			var header types.CommitHeader
+			if err := json.Unmarshal(headerBytes, &header); err != nil {
+				return nil, fmt.Errorf("invalid header format on line %d: %v", lineNumber, err)
+			}
+			req.Message = header.Summary
+		case "file":
+			fileBytes, err := json.Marshal(item.Value)
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal file value on line %d: %v", lineNumber, err)
+			}
+
+			var file types.CommitFile
+			if err := json.Unmarshal(fileBytes, &file); err != nil {
+				return nil, fmt.Errorf("invalid file format on line %d: %v", lineNumber, err)
+			}
+			req.Files = append(req.Files, types.CommitFileReq{
+				Path:    file.Path,
+				Content: file.Content,
+				Action:  types.CommitActionCreate,
+			})
+		case "lfsFile":
+			fileBytes, err := json.Marshal(item.Value)
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal file value on line %d: %v", lineNumber, err)
+			}
+			var file types.CommitLFSFile
+			if err := json.Unmarshal(fileBytes, &file); err != nil {
+				return nil, fmt.Errorf("invalid file format on line %d: %v", lineNumber, err)
+			}
+			oid := fmt.Sprintf("%s:%s", file.Algo, file.OID)
+			formattedStr := fmt.Sprintf("version %s\noid %s\nsize %d\n", "https://git-lfs.github.com/spec/v1", oid, file.Size)
+
+			// Encode the string to Base64
+			content := base64.StdEncoding.EncodeToString([]byte(formattedStr))
+			req.Files = append(req.Files, types.CommitFileReq{
+				Path:    file.Path,
+				Content: content,
+				Action:  types.CommitActionCreate,
+			})
+
+		case "deletedFolder":
+			fileBytes, err := json.Marshal(item.Value)
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal file value on line %d: %v", lineNumber, err)
+			}
+
+			var file types.CommitFile
+			if err := json.Unmarshal(fileBytes, &file); err != nil {
+				return nil, fmt.Errorf("invalid file format on line %d: %v", lineNumber, err)
+			}
+			req.Files = append(req.Files, types.CommitFileReq{
+				Path:   file.Path,
+				Action: types.CommitActionDelete,
+			})
+		case "deletedFile":
+			fileBytes, err := json.Marshal(item.Value)
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal file value on line %d: %v", lineNumber, err)
+			}
+
+			var file types.CommitFile
+			if err := json.Unmarshal(fileBytes, &file); err != nil {
+				return nil, fmt.Errorf("invalid file format on line %d: %v", lineNumber, err)
+			}
+			req.Files = append(req.Files, types.CommitFileReq{
+				Path:   file.Path,
+				Action: types.CommitActionDelete,
+			})
+
+		default:
+			return nil, fmt.Errorf("unknown key type '%s' on line %d", item.Key, lineNumber)
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("error reading NDJSON: %v", err)
+	}
+	return req, nil
 }

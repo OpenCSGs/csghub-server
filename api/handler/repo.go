@@ -2682,13 +2682,12 @@ func (h *RepoHandler) CommitFiles(ctx *gin.Context) {
 }
 
 func (h *RepoHandler) CommitFilesHF(ctx *gin.Context) {
-	var req types.CommitFilesReq
-	if err := ctx.ShouldBindJSON(&req); err != nil {
+	req, err := h.c.ParseNDJson(ctx)
+	if err != nil {
 		slog.Error("invalid request body", slog.Any("error", err))
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-
 	currentUser := httpbase.GetCurrentUser(ctx)
 
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
@@ -2705,7 +2704,7 @@ func (h *RepoHandler) CommitFilesHF(ctx *gin.Context) {
 		req.Message = "initial commit"
 	}
 
-	err = h.c.CommitFiles(ctx.Request.Context(), req)
+	err = h.c.CommitFiles(ctx.Request.Context(), *req)
 	if err != nil {
 		slog.Error("failed to commit files", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)

@@ -300,3 +300,36 @@ const (
 type CommitFilesResp struct {
 	Files []string `json:"files"`
 }
+
+type CommitHeader struct {
+	Summary     string `json:"summary"`
+	Description string `json:"description"`
+}
+
+// LFSFile represents an LFS file in the commit
+type CommitLFSFile struct {
+	Path string `json:"path"`
+	Algo string `json:"algo"`
+	OID  string `json:"oid"`
+	Size int64  `json:"size"`
+}
+
+// File represents a regular file in the commit
+type CommitFile struct {
+	Content  string `json:"content"`
+	Path     string `json:"path"`
+	Encoding string `json:"encoding"`
+}
+
+// FormField represents a form field with key-value structure
+type FormField struct {
+	Key   string `json:"key"`
+	Value any    `json:"value"`
+}
+
+// CommitRequest represents the complete commit request
+type CommitRequest struct {
+	Header   *CommitHeader   `json:"header,omitempty"`
+	LFSFiles []CommitLFSFile `json:"lfsFiles,omitempty"`
+	Files    []CommitFile    `json:"files,omitempty"`
+}
