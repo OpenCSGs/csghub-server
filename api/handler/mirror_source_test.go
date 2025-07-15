@@ -39,7 +39,7 @@ func TestMirrorSourceHandler_Create(t *testing.T) {
 	tester := NewMirrorSourceTester(t).WithHandleFunc(func(h *MirrorSourceHandler) gin.HandlerFunc {
 		return h.Create
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.mocks.mirrorSource.EXPECT().Create(tester.Ctx(), types.CreateMirrorSourceReq{
 		SourceName:  "sn",
@@ -54,9 +54,9 @@ func TestMirrorSourceHandler_Index(t *testing.T) {
 	tester := NewMirrorSourceTester(t).WithHandleFunc(func(h *MirrorSourceHandler) gin.HandlerFunc {
 		return h.Index
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
-	tester.mocks.mirrorSource.EXPECT().Index(tester.Ctx(), "u").Return([]database.MirrorSource{{ID: 1}}, nil)
+	tester.mocks.mirrorSource.EXPECT().Index(tester.Ctx()).Return([]database.MirrorSource{{ID: 1}}, nil)
 	tester.Execute()
 
 	tester.ResponseEq(t, 200, tester.OKText, []database.MirrorSource{{ID: 1}})
@@ -66,7 +66,7 @@ func TestMirrorSourceHandler_Update(t *testing.T) {
 	tester := NewMirrorSourceTester(t).WithHandleFunc(func(h *MirrorSourceHandler) gin.HandlerFunc {
 		return h.Update
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.mocks.mirrorSource.EXPECT().Update(tester.Ctx(), types.UpdateMirrorSourceReq{
 		ID:          1,
@@ -84,9 +84,9 @@ func TestMirrorSourceHandler_Get(t *testing.T) {
 	tester := NewMirrorSourceTester(t).WithHandleFunc(func(h *MirrorSourceHandler) gin.HandlerFunc {
 		return h.Get
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
-	tester.mocks.mirrorSource.EXPECT().Get(tester.Ctx(), int64(1), "u").Return(&database.MirrorSource{ID: 1}, nil)
+	tester.mocks.mirrorSource.EXPECT().Get(tester.Ctx(), int64(1)).Return(&database.MirrorSource{ID: 1}, nil)
 	tester.WithParam("id", "1").Execute()
 
 	tester.ResponseEq(t, 200, tester.OKText, &database.MirrorSource{ID: 1})
@@ -96,9 +96,9 @@ func TestMirrorSourceHandler_Delete(t *testing.T) {
 	tester := NewMirrorSourceTester(t).WithHandleFunc(func(h *MirrorSourceHandler) gin.HandlerFunc {
 		return h.Delete
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
-	tester.mocks.mirrorSource.EXPECT().Delete(tester.Ctx(), int64(1), "u").Return(nil)
+	tester.mocks.mirrorSource.EXPECT().Delete(tester.Ctx(), int64(1)).Return(nil)
 	tester.WithParam("id", "1").Execute()
 
 	tester.ResponseEq(t, 200, tester.OKText, nil)

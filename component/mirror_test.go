@@ -74,9 +74,6 @@ func TestMirrorComponent_CreateMirrorRepo(t *testing.T) {
 				mc.config.GitServer.Type = types.GitServerTypeGitaly
 			}
 
-			mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
-				RoleMask: "admin",
-			}, nil)
 			repo := &database.Repository{}
 			mc.mocks.stores.RepoMock().EXPECT().FindByPath(
 				ctx, req.RepoType, "AIWizards", "sn",
@@ -299,15 +296,11 @@ func TestMirrorComponent_CheckMirrorProgress(t *testing.T) {
 func TestMirrorComponent_Repos(t *testing.T) {
 	ctx := context.TODO()
 	mc := initializeTestMirrorComponent(ctx, t)
-
-	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
-		RoleMask: "admin",
-	}, nil)
 	mc.mocks.stores.RepoMock().EXPECT().WithMirror(ctx, 10, 1).Return([]database.Repository{
 		{Path: "foo", SyncStatus: types.SyncStatusCompleted, RepositoryType: types.ModelRepo},
 	}, 100, nil)
 
-	data, total, err := mc.Repos(ctx, "user", 10, 1)
+	data, total, err := mc.Repos(ctx, 10, 1)
 	require.Nil(t, err)
 	require.Equal(t, 100, total)
 	require.Equal(t, []types.MirrorRepo{
@@ -319,14 +312,11 @@ func TestMirrorComponent_Index(t *testing.T) {
 	ctx := context.TODO()
 	mc := initializeTestMirrorComponent(ctx, t)
 
-	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
-		RoleMask: "admin",
-	}, nil)
 	mc.mocks.stores.MirrorMock().EXPECT().IndexWithPagination(ctx, 10, 1, "foo").Return(
 		[]database.Mirror{{Username: "user", LastMessage: "msg", Repository: &database.Repository{}}}, 100, nil,
 	)
 
-	data, total, err := mc.Index(ctx, "user", 10, 1, "foo")
+	data, total, err := mc.Index(ctx, 10, 1, "foo")
 	require.Nil(t, err)
 	require.Equal(t, 100, total)
 	require.Equal(t, []types.Mirror{
@@ -338,14 +328,11 @@ func TestMirrorComponent_Statistic(t *testing.T) {
 	ctx := context.TODO()
 	mc := initializeTestMirrorComponent(ctx, t)
 
-	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
-		RoleMask: "admin",
-	}, nil)
 	mc.mocks.stores.MirrorMock().EXPECT().StatusCount(ctx).Return([]database.MirrorStatusCount{
 		{Status: types.MirrorLfsSyncFinished, Count: 100},
 	}, nil)
 
-	s, err := mc.Statistics(ctx, "user")
+	s, err := mc.Statistics(ctx)
 	require.Nil(t, err)
 	require.Equal(t, []types.MirrorStatusCount{
 		{Status: types.MirrorLfsSyncFinished, Count: 100},

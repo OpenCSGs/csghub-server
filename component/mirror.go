@@ -46,9 +46,9 @@ type MirrorComponent interface {
 	// CreateMirrorRepo often called by the crawler server to create new repo which will then be mirrored from other sources
 	CreateMirrorRepo(ctx context.Context, req types.CreateMirrorRepoReq) (*database.Mirror, error)
 	CheckMirrorProgress(ctx context.Context) error
-	Repos(ctx context.Context, currentUser string, per, page int) ([]types.MirrorRepo, int, error)
-	Index(ctx context.Context, currentUser string, per, page int, search string) ([]types.Mirror, int, error)
-	Statistics(ctx context.Context, currentUser string) ([]types.MirrorStatusCount, error)
+	Repos(ctx context.Context, per, page int) ([]types.MirrorRepo, int, error)
+	Index(ctx context.Context, per, page int, search string) ([]types.Mirror, int, error)
+	Statistics(ctx context.Context) ([]types.MirrorStatusCount, error)
 }
 
 func NewMirrorComponent(config *config.Config) (MirrorComponent, error) {
@@ -141,13 +141,6 @@ func (c *mirrorComponentImpl) CreateMirrorRepo(ctx context.Context, req types.Cr
 	var username string
 	namespace := c.mapNamespaceAndName(req.SourceNamespace)
 	name := req.SourceName
-	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
-	if err != nil {
-		return nil, errors.New("user does not exist")
-	}
-	if !user.CanAdmin() {
-		return nil, errors.New("user does not have admin permission")
-	}
 	repo, err := c.repoStore.FindByPath(ctx, req.RepoType, namespace, name)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("failed to check repo existence, error: %w", err)
@@ -617,15 +610,8 @@ func (c *mirrorComponentImpl) countMirrorProgress(ctx context.Context, mirror da
 	return int8(progress), nil
 }
 
-func (c *mirrorComponentImpl) Repos(ctx context.Context, currentUser string, per, page int) ([]types.MirrorRepo, int, error) {
+func (c *mirrorComponentImpl) Repos(ctx context.Context, per, page int) ([]types.MirrorRepo, int, error) {
 	var mirrorRepos []types.MirrorRepo
-	user, err := c.userStore.FindByUsername(ctx, currentUser)
-	if err != nil {
-		return nil, 0, errors.New("user does not exist")
-	}
-	if !user.CanAdmin() {
-		return nil, 0, errors.New("user does not have admin permission")
-	}
 	repos, total, err := c.repoStore.WithMirror(ctx, per, page)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to get mirror repositories: %v", err)
@@ -641,15 +627,8 @@ func (c *mirrorComponentImpl) Repos(ctx context.Context, currentUser string, per
 	return mirrorRepos, total, nil
 }
 
-func (c *mirrorComponentImpl) Index(ctx context.Context, currentUser string, per, page int, search string) ([]types.Mirror, int, error) {
+func (c *mirrorComponentImpl) Index(ctx context.Context, per, page int, search string) ([]types.Mirror, int, error) {
 	var mirrorsResp []types.Mirror
-	user, err := c.userStore.FindByUsername(ctx, currentUser)
-	if err != nil {
-		return nil, 0, errors.New("user does not exist")
-	}
-	if !user.CanAdmin() {
-		return nil, 0, errors.New("user does not have admin permission")
-	}
 	mirrors, total, err := c.mirrorStore.IndexWithPagination(ctx, per, page, search)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to get mirror mirrors: %v", err)
@@ -678,15 +657,8 @@ func (c *mirrorComponentImpl) Index(ctx context.Context, currentUser string, per
 	return mirrorsResp, total, nil
 }
 
-func (c *mirrorComponentImpl) Statistics(ctx context.Context, currentUser string) ([]types.MirrorStatusCount, error) {
+func (c *mirrorComponentImpl) Statistics(ctx context.Context) ([]types.MirrorStatusCount, error) {
 	var scs []types.MirrorStatusCount
-	user, err := c.userStore.FindByUsername(ctx, currentUser)
-	if err != nil {
-		return nil, errors.New("user does not exist")
-	}
-	if !user.CanAdmin() {
-		return nil, errors.New("user does not have admin permission")
-	}
 	statusCounts, err := c.mirrorStore.StatusCount(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get mirror statistics: %v", err)

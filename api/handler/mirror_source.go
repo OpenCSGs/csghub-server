@@ -29,7 +29,7 @@ type MirrorSourceHandler struct {
 
 // CreateMirrorSource godoc
 // @Security     ApiKey
-// @Summary      Create mirror source
+// @Summary      Create mirror source, used for admin
 // @Tags         Mirror
 // @Accept       json
 // @Produce      json
@@ -64,7 +64,7 @@ func (h *MirrorSourceHandler) Create(ctx *gin.Context) {
 
 // GetMirrorSources godoc
 // @Security     ApiKey
-// @Summary      Get mirror sources
+// @Summary      Get mirror sources, used for admin
 // @Tags         Mirror
 // @Accept       json
 // @Produce      json
@@ -73,12 +73,7 @@ func (h *MirrorSourceHandler) Create(ctx *gin.Context) {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /mirror/sources [get]
 func (h *MirrorSourceHandler) Index(ctx *gin.Context) {
-	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
-	ms, err := h.mirrorSource.Index(ctx.Request.Context(), currentUser)
+	ms, err := h.mirrorSource.Index(ctx.Request.Context())
 	if err != nil {
 		slog.Error("Failed to get mirror sources", "error", err)
 		httpbase.ServerError(ctx, err)
@@ -89,7 +84,7 @@ func (h *MirrorSourceHandler) Index(ctx *gin.Context) {
 
 // UpdateMirrorSource godoc
 // @Security     ApiKey
-// @Summary      Update mirror source
+// @Summary      Update mirror source, used for admin
 // @Tags         Mirror
 // @Accept       json
 // @Produce      json
@@ -139,7 +134,7 @@ func (h *MirrorSourceHandler) Update(ctx *gin.Context) {
 
 // GetMirrorSource godoc
 // @Security     ApiKey
-// @Summary      Get mirror source
+// @Summary      Get mirror source, used for admin
 // @Tags         Mirror
 // @Accept       json
 // @Produce      json
@@ -149,12 +144,6 @@ func (h *MirrorSourceHandler) Update(ctx *gin.Context) {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /mirror/sources/{id} [get]
 func (h *MirrorSourceHandler) Get(ctx *gin.Context) {
-	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
-
 	var msId int64
 	id := ctx.Param("id")
 	if id == "" {
@@ -170,7 +159,7 @@ func (h *MirrorSourceHandler) Get(ctx *gin.Context) {
 		return
 	}
 
-	ms, err := h.mirrorSource.Get(ctx.Request.Context(), msId, currentUser)
+	ms, err := h.mirrorSource.Get(ctx.Request.Context(), msId)
 	if err != nil {
 		slog.Error("Failed to get mirror source", "error", err)
 		httpbase.ServerError(ctx, err)
@@ -181,7 +170,7 @@ func (h *MirrorSourceHandler) Get(ctx *gin.Context) {
 
 // DeleteMirrorSource godoc
 // @Security     ApiKey
-// @Summary      Delete mirror source
+// @Summary      Delete mirror source, used for admin
 // @Tags         Mirror
 // @Accept       json
 // @Produce      json
@@ -191,12 +180,6 @@ func (h *MirrorSourceHandler) Get(ctx *gin.Context) {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /mirror/sources/{id} [delete]
 func (h *MirrorSourceHandler) Delete(ctx *gin.Context) {
-	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
-
 	var msId int64
 	id := ctx.Param("id")
 	if id == "" {
@@ -212,7 +195,7 @@ func (h *MirrorSourceHandler) Delete(ctx *gin.Context) {
 		return
 	}
 
-	err = h.mirrorSource.Delete(ctx.Request.Context(), msId, currentUser)
+	err = h.mirrorSource.Delete(ctx.Request.Context(), msId)
 	if err != nil {
 		slog.Error("Failed to delete mirror source", "error", err)
 		httpbase.ServerError(ctx, err)

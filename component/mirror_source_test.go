@@ -12,10 +12,6 @@ import (
 func TestMirrorSourceComponent_Create(t *testing.T) {
 	ctx := context.TODO()
 	mc := initializeTestMirrorSourceComponent(ctx, t)
-
-	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
-		RoleMask: "admin",
-	}, nil)
 	mc.mocks.stores.MirrorSourceMock().EXPECT().Create(ctx, &database.MirrorSource{
 		SourceName: "sn",
 		InfoAPIUrl: "url",
@@ -33,13 +29,9 @@ func TestMirrorSourceComponent_Create(t *testing.T) {
 func TestMirrorSourceComponent_Get(t *testing.T) {
 	ctx := context.TODO()
 	mc := initializeTestMirrorSourceComponent(ctx, t)
-
-	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
-		RoleMask: "admin",
-	}, nil)
 	mc.mocks.stores.MirrorSourceMock().EXPECT().Get(ctx, int64(1)).Return(&database.MirrorSource{ID: 1}, nil)
 
-	data, err := mc.Get(ctx, 1, "user")
+	data, err := mc.Get(ctx, 1)
 	require.Nil(t, err)
 	require.Equal(t, &database.MirrorSource{ID: 1}, data)
 }
@@ -47,15 +39,11 @@ func TestMirrorSourceComponent_Get(t *testing.T) {
 func TestMirrorSourceComponent_Index(t *testing.T) {
 	ctx := context.TODO()
 	mc := initializeTestMirrorSourceComponent(ctx, t)
-
-	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
-		RoleMask: "admin",
-	}, nil)
 	mc.mocks.stores.MirrorSourceMock().EXPECT().Index(ctx).Return([]database.MirrorSource{
 		{ID: 1},
 	}, nil)
 
-	data, err := mc.Index(ctx, "user")
+	data, err := mc.Index(ctx)
 	require.Nil(t, err)
 	require.Equal(t, []database.MirrorSource{
 		{ID: 1},
@@ -65,10 +53,6 @@ func TestMirrorSourceComponent_Index(t *testing.T) {
 func TestMirrorSourceComponent_Update(t *testing.T) {
 	ctx := context.TODO()
 	mc := initializeTestMirrorSourceComponent(ctx, t)
-
-	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
-		RoleMask: "admin",
-	}, nil)
 	mc.mocks.stores.MirrorSourceMock().EXPECT().Update(ctx, &database.MirrorSource{
 		ID:         1,
 		SourceName: "sn",
@@ -92,13 +76,9 @@ func TestMirrorSourceComponent_Update(t *testing.T) {
 func TestMirrorSourceComponent_Delete(t *testing.T) {
 	ctx := context.TODO()
 	mc := initializeTestMirrorSourceComponent(ctx, t)
-
-	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
-		RoleMask: "admin",
-	}, nil)
 	mc.mocks.stores.MirrorSourceMock().EXPECT().Get(ctx, int64(1)).Return(&database.MirrorSource{ID: 1}, nil)
 	mc.mocks.stores.MirrorSourceMock().EXPECT().Delete(ctx, &database.MirrorSource{ID: 1}).Return(nil)
 
-	err := mc.Delete(ctx, 1, "user")
+	err := mc.Delete(ctx, 1)
 	require.Nil(t, err)
 }
