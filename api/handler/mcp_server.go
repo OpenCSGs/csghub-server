@@ -72,10 +72,12 @@ func (h *MCPServerHandler) Create(ctx *gin.Context) {
 	if err != nil {
 		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
-			return
+		} else if errors.Is(err, errorx.ErrDatabaseDuplicateKey) {
+			httpbase.BadRequestWithExt(ctx, err)
+		} else {
+			slog.Error("failed to create mcp server", slog.Any("req", req), slog.Any("error", err))
+			httpbase.ServerError(ctx, err)
 		}
-		slog.Error("failed to create mcp server", slog.Any("req", req), slog.Any("error", err))
-		httpbase.ServerError(ctx, err)
 		return
 	}
 	httpbase.OK(ctx, mcpServer)

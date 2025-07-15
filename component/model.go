@@ -943,10 +943,6 @@ func GetFilePaths(ctx context.Context, namespace, repoName, folder string, repoT
 
 // create model deploy as inference/serverless
 func (c *modelComponentImpl) Deploy(ctx context.Context, deployReq types.DeployActReq, req types.ModelRunReq) (int64, error) {
-	valid, err := common.IsValidName(req.DeployName)
-	if !valid {
-		return -1, fmt.Errorf("deploy name is invalid, error: %w", err)
-	}
 	m, err := c.modelStore.FindByPath(ctx, deployReq.Namespace, deployReq.Name)
 	if err != nil {
 		return -1, fmt.Errorf("cannot find model, %w", err)
@@ -1033,13 +1029,6 @@ func (c *modelComponentImpl) Deploy(ctx context.Context, deployReq types.DeployA
 	_, err = c.deployer.CheckResourceAvailable(ctx, req.ClusterID, req.OrderDetailID, &hardware)
 	if err != nil {
 		return -1, err
-	}
-
-	if len(req.EngineArgs) > 0 {
-		_, err = common.JsonStrToMap(req.EngineArgs)
-		if err != nil {
-			return -1, fmt.Errorf("invalid engine args, %w", err)
-		}
 	}
 
 	// create deploy for model

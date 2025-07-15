@@ -140,10 +140,12 @@ func (h *ModelHandler) Create(ctx *gin.Context) {
 	if err != nil {
 		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
-			return
+		} else if errors.Is(err, errorx.ErrDatabaseDuplicateKey) {
+			httpbase.BadRequestWithExt(ctx, err)
+		} else {
+			slog.Error("Failed to create model", slog.Any("error", err))
+			httpbase.ServerError(ctx, err)
 		}
-		slog.Error("Failed to create model", slog.Any("error", err))
-		httpbase.ServerError(ctx, err)
 		return
 	}
 	slog.Info("Create model succeed", slog.String("model", model.Name))
@@ -616,6 +618,21 @@ func (h *ModelHandler) DeployDedicated(ctx *gin.Context) {
 		CurrentUser: currentUser,
 		DeployType:  types.InferenceType,
 	}
+
+	valid, err := common.IsValidName(req.DeployName)
+	if !valid {
+		httpbase.BadRequestWithExt(ctx, err)
+		return
+	}
+
+	if len(req.EngineArgs) > 0 {
+		_, err = common.JsonStrToMap(req.EngineArgs)
+		if err != nil {
+			httpbase.BadRequestWithExt(ctx, err)
+			return
+		}
+	}
+
 	deployID, err := h.model.Deploy(ctx.Request.Context(), epReq, req)
 	if err != nil {
 		slog.Error("failed to deploy model as inference", slog.String("namespace", namespace),
@@ -692,6 +709,20 @@ func (h *ModelHandler) FinetuneCreate(ctx *gin.Context) {
 		Name:        name,
 		CurrentUser: currentUser,
 		DeployType:  types.FinetuneType,
+	}
+
+	valid, err := common.IsValidName(req.DeployName)
+	if !valid {
+		httpbase.BadRequestWithExt(ctx, err)
+		return
+	}
+
+	if len(req.EngineArgs) > 0 {
+		_, err = common.JsonStrToMap(req.EngineArgs)
+		if err != nil {
+			httpbase.BadRequestWithExt(ctx, err)
+			return
+		}
 	}
 
 	deployID, err := h.model.Deploy(ctx.Request.Context(), ftReq, *modelReq)
@@ -1353,6 +1384,21 @@ func (h *ModelHandler) DeployServerless(ctx *gin.Context) {
 	}
 
 	req.SecureLevel = 1 // public for serverless
+
+	valid, err := common.IsValidName(req.DeployName)
+	if !valid {
+		httpbase.BadRequestWithExt(ctx, err)
+		return
+	}
+
+	if len(req.EngineArgs) > 0 {
+		_, err = common.JsonStrToMap(req.EngineArgs)
+		if err != nil {
+			httpbase.BadRequestWithExt(ctx, err)
+			return
+		}
+	}
+
 	deployID, err := h.model.Deploy(ctx.Request.Context(), deployReq, req)
 	if err != nil {
 		if errors.Is(err, errorx.ErrForbidden) {

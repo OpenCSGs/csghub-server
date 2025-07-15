@@ -2,13 +2,16 @@ package handler
 
 import (
 	"fmt"
+	"net/http"
 	"testing"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 	mockcomponent "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
+	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/testutil"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -231,47 +234,116 @@ func TestModelHandler_DelDatasetRelation(t *testing.T) {
 }
 
 func TestModelHandler_DeployDedicated(t *testing.T) {
-	tester := NewModelTester(t).WithHandleFunc(func(h *ModelHandler) gin.HandlerFunc {
-		return h.DeployDedicated
+	t.Run("success", func(t *testing.T) {
+		tester := NewModelTester(t).WithHandleFunc(func(h *ModelHandler) gin.HandlerFunc {
+			return h.DeployDedicated
+		})
+		tester.WithUser()
+
+		tester.mocks.repo.EXPECT().AllowReadAccess(tester.Ctx(), types.ModelRepo, "u", "r", "u").Return(true, nil)
+		tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), &types.ModelRunReq{
+			DeployName: "test",
+			MinReplica: 1,
+			MaxReplica: 2,
+			Revision:   "main",
+		}).Return(true, nil)
+		tester.mocks.model.EXPECT().Deploy(tester.Ctx(), types.DeployActReq{
+			Namespace:   "u",
+			Name:        "r",
+			CurrentUser: "u",
+			DeployType:  types.InferenceType,
+		}, types.ModelRunReq{DeployName: "test", MinReplica: 1, MaxReplica: 2, Revision: "main"}).Return(123, nil)
+
+		tester.WithBody(t, &types.ModelRunReq{DeployName: "test", MinReplica: 1, MaxReplica: 2, Revision: "main"}).Execute()
+
+		tester.ResponseEq(t, 200, tester.OKText, types.DeployRepo{DeployID: 123})
 	})
-	tester.WithUser()
+	t.Run("error_badrequest", func(t *testing.T) {
+		tester := NewModelTester(t).WithHandleFunc(func(h *ModelHandler) gin.HandlerFunc {
+			return h.DeployDedicated
+		})
+		tester.WithUser()
 
-	tester.mocks.repo.EXPECT().AllowReadAccess(tester.Ctx(), types.ModelRepo, "u", "r", "u").Return(true, nil)
-	tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), &types.ModelRunReq{
-		MinReplica: 1,
-		MaxReplica: 2,
-		Revision:   "main",
-	}).Return(true, nil)
-	tester.mocks.model.EXPECT().Deploy(tester.Ctx(), types.DeployActReq{
-		Namespace:   "u",
-		Name:        "r",
-		CurrentUser: "u",
-		DeployType:  types.InferenceType,
-	}, types.ModelRunReq{MinReplica: 1, MaxReplica: 2, Revision: "main"}).Return(123, nil)
+		tester.mocks.repo.EXPECT().AllowReadAccess(tester.Ctx(), types.ModelRepo, "u", "r", "u").Return(true, nil)
+		tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), &types.ModelRunReq{
+			MinReplica: 1,
+			MaxReplica: 2,
+			Revision:   "main",
+		}).Return(true, nil)
 
-	tester.WithBody(t, &types.ModelRunReq{MinReplica: 1, MaxReplica: 2, Revision: "main"}).Execute()
+		tester.WithBody(t, &types.ModelRunReq{MinReplica: 1, MaxReplica: 2, Revision: "main"}).Execute()
 
-	tester.ResponseEq(t, 200, tester.OKText, types.DeployRepo{DeployID: 123})
+		tester.ResponseEqSimple(t, http.StatusBadRequest, httpbase.R{
+			Msg:     errorx.ErrBadRequest.Error(),
+			Context: errorx.Ctx().Set("detail", "Length must be between 2 and 64 characters.").Set("name", ""),
+		})
+	})
+	t.Run("success_with_engine_args", func(t *testing.T) {
+		tester := NewModelTester(t).WithHandleFunc(func(h *ModelHandler) gin.HandlerFunc {
+			return h.DeployDedicated
+		})
+		tester.WithUser()
+
+		tester.mocks.repo.EXPECT().AllowReadAccess(tester.Ctx(), types.ModelRepo, "u", "r", "u").Return(true, nil)
+		tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), &types.ModelRunReq{
+			DeployName: "test",
+			MinReplica: 1,
+			MaxReplica: 2,
+			Revision:   "main",
+			EngineArgs: "{\"sss\":\"sss\"}",
+		}).Return(true, nil)
+		tester.mocks.model.EXPECT().Deploy(tester.Ctx(), types.DeployActReq{
+			Namespace:   "u",
+			Name:        "r",
+			CurrentUser: "u",
+			DeployType:  types.InferenceType,
+		}, types.ModelRunReq{DeployName: "test", MinReplica: 1, MaxReplica: 2, Revision: "main", EngineArgs: "{\"sss\":\"sss\"}"}).Return(123, nil)
+
+		tester.WithBody(t, &types.ModelRunReq{DeployName: "test", MinReplica: 1, MaxReplica: 2, Revision: "main", EngineArgs: "{\"sss\":\"sss\"}"}).Execute()
+
+		tester.ResponseEq(t, http.StatusOK, tester.OKText, types.DeployRepo{DeployID: 123})
+	})
+	t.Run("error_badrequest_engine_args", func(t *testing.T) {
+		tester := NewModelTester(t).WithHandleFunc(func(h *ModelHandler) gin.HandlerFunc {
+			return h.DeployDedicated
+		})
+		tester.WithUser()
+	})
 }
 
 func TestModelHandler_FinetuneCreate(t *testing.T) {
-	tester := NewModelTester(t).WithHandleFunc(func(h *ModelHandler) gin.HandlerFunc {
-		return h.FinetuneCreate
+	t.Run("success", func(t *testing.T) {
+		tester := NewModelTester(t).WithHandleFunc(func(h *ModelHandler) gin.HandlerFunc {
+			return h.FinetuneCreate
+		})
+		tester.WithUser()
+
+		tester.mocks.repo.EXPECT().AllowAdminAccess(tester.Ctx(), types.ModelRepo, "u", "r", "u").Return(true, nil)
+		tester.mocks.model.EXPECT().Deploy(tester.Ctx(), types.DeployActReq{
+			Namespace:   "u",
+			Name:        "r",
+			CurrentUser: "u",
+			DeployType:  types.FinetuneType,
+		}, types.ModelRunReq{DeployName: "test", MinReplica: 1, MaxReplica: 1, Revision: "main", SecureLevel: 2}).Return(123, nil)
+
+		tester.WithBody(t, &types.ModelRunReq{DeployName: "test", MinReplica: 1, MaxReplica: 2, Revision: "main"}).Execute()
+
+		tester.ResponseEq(t, 200, tester.OKText, types.DeployRepo{DeployID: 123})
 	})
-	tester.WithUser()
+	t.Run("error_badrequest", func(t *testing.T) {
+		tester := NewModelTester(t).WithHandleFunc(func(h *ModelHandler) gin.HandlerFunc {
+			return h.FinetuneCreate
+		})
+		tester.WithUser()
 
-	tester.mocks.repo.EXPECT().AllowAdminAccess(tester.Ctx(), types.ModelRepo, "u", "r", "u").Return(true, nil)
+		tester.mocks.repo.EXPECT().AllowAdminAccess(tester.Ctx(), types.ModelRepo, "u", "r", "u").Return(true, nil)
+		tester.WithBody(t, &types.ModelRunReq{MinReplica: 1, MaxReplica: 2, Revision: "main"}).Execute()
 
-	tester.mocks.model.EXPECT().Deploy(tester.Ctx(), types.DeployActReq{
-		Namespace:   "u",
-		Name:        "r",
-		CurrentUser: "u",
-		DeployType:  types.FinetuneType,
-	}, types.ModelRunReq{MinReplica: 1, MaxReplica: 1, Revision: "main", SecureLevel: 2}).Return(123, nil)
-
-	tester.WithBody(t, &types.ModelRunReq{MinReplica: 1, MaxReplica: 2, Revision: "main"}).Execute()
-
-	tester.ResponseEq(t, 200, tester.OKText, types.DeployRepo{DeployID: 123})
+		tester.ResponseEqSimple(t, http.StatusBadRequest, httpbase.R{
+			Msg:     errorx.ErrBadRequest.Error(),
+			Context: errorx.Ctx().Set("detail", "Length must be between 2 and 64 characters.").Set("name", ""),
+		})
+	})
 
 }
 
@@ -476,21 +548,36 @@ func TestModelHandler_ListModelsOfRuntimeFrameworks(t *testing.T) {
 }
 
 func TestModelHandler_DeployServerless(t *testing.T) {
-	tester := NewModelTester(t).WithHandleFunc(func(h *ModelHandler) gin.HandlerFunc {
-		return h.DeployServerless
+	t.Run("success", func(t *testing.T) {
+		tester := NewModelTester(t).WithHandleFunc(func(h *ModelHandler) gin.HandlerFunc {
+			return h.DeployServerless
+		})
+		tester.WithUser()
+
+		tester.mocks.model.EXPECT().Deploy(tester.Ctx(), types.DeployActReq{
+			Namespace:   "u",
+			Name:        "r",
+			CurrentUser: "u",
+			DeployType:  types.ServerlessType,
+		}, types.ModelRunReq{DeployName: "test", MinReplica: 1, MaxReplica: 2, Revision: "main", SecureLevel: 1}).Return(123, nil)
+
+		tester.WithBody(t, &types.ModelRunReq{DeployName: "test", MinReplica: 1, MaxReplica: 2, Revision: "main"}).Execute()
+
+		tester.ResponseEq(t, 200, tester.OKText, types.DeployRepo{DeployID: 123})
 	})
-	tester.WithUser()
 
-	tester.mocks.model.EXPECT().Deploy(tester.Ctx(), types.DeployActReq{
-		Namespace:   "u",
-		Name:        "r",
-		CurrentUser: "u",
-		DeployType:  types.ServerlessType,
-	}, types.ModelRunReq{MinReplica: 1, MaxReplica: 2, Revision: "main", SecureLevel: 1}).Return(123, nil)
+	t.Run("error_badrequest", func(t *testing.T) {
+		tester := NewModelTester(t).WithHandleFunc(func(h *ModelHandler) gin.HandlerFunc {
+			return h.DeployServerless
+		})
+		tester.WithUser()
+		tester.WithBody(t, &types.ModelRunReq{MinReplica: 1, MaxReplica: 2, Revision: "main"}).Execute()
 
-	tester.WithBody(t, &types.ModelRunReq{MinReplica: 1, MaxReplica: 2, Revision: "main"}).Execute()
-
-	tester.ResponseEq(t, 200, tester.OKText, types.DeployRepo{DeployID: 123})
+		tester.ResponseEqSimple(t, 400, gin.H{
+			"msg":     errorx.ErrBadRequest.Error(),
+			"context": errorx.Ctx().Set("detail", "Length must be between 2 and 64 characters.").Set("name", ""),
+		})
+	})
 }
 
 func TestModelHandler_ServerlessStop(t *testing.T) {

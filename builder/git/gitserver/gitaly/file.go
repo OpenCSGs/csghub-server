@@ -14,9 +14,12 @@ import (
 
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"opencsg.com/csghub-server/builder/git/gitserver"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -55,6 +58,10 @@ func (c *Client) GetRepoFileRaw(ctx context.Context, req gitserver.GetRepoInfoBy
 	for {
 		treeEntriesResp, err := treeEntriesStream.Recv()
 		if err != nil {
+			grpcStatus, ok := status.FromError(err)
+			if ok && grpcStatus.Code() == codes.FailedPrecondition && strings.Contains(grpcStatus.Message(), "bigger than the maximum allowed size") {
+				return "", errorx.ErrFileTooLarge
+			}
 			if err == io.EOF {
 				break
 			}
@@ -139,6 +146,10 @@ func (c *Client) GetRepoFileContents(ctx context.Context, req gitserver.GetRepoI
 	file := files[0]
 	content, err := c.GetRepoFileRaw(ctx, req)
 	if err != nil {
+		if errors.Is(err, errorx.ErrFileTooLarge) {
+			// return file basic info, but not content
+			return file, err
+		}
 		return nil, err
 	}
 	file.Content = base64.StdEncoding.EncodeToString([]byte(content))
@@ -598,7 +609,7 @@ func (c *Client) GetRepoFileTree(ctx context.Context, req gitserver.GetRepoInfoB
 			}
 		}
 		if commitResp == nil {
-			return nil, errors.New("bad request")
+			return nil, errorx.ErrGitCommitFailed
 		}
 		commits := commitResp.Commits
 		if len(commits) > 0 {

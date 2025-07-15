@@ -172,8 +172,14 @@ func (h *SpaceHandler) Create(ctx *gin.Context) {
 
 	space, err := h.space.Create(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("Failed to create space", slog.Any("error", err))
-		httpbase.ServerError(ctx, err)
+		if errors.Is(err, errorx.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
+		} else if errors.Is(err, errorx.ErrDatabaseDuplicateKey) {
+			httpbase.BadRequestWithExt(ctx, err)
+		} else {
+			slog.Error("Failed to create space", slog.Any("error", err))
+			httpbase.ServerError(ctx, err)
+		}
 		return
 	}
 	httpbase.OK(ctx, space)
