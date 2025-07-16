@@ -454,7 +454,8 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error creating dataset viewer proxy:%w", err)
 	}
-	createDataViewerRoutes(apiGroup, dsViewerHandler)
+
+	createDataViewerRoutes(apiGroup, middlewareCollection, dsViewerHandler)
 
 	// space template
 	templateHandler, err := handler.NewSpaceTemplateHandler(config)
@@ -1001,8 +1002,13 @@ func createTagsRoutes(apiGroup *gin.RouterGroup, tagHandler *handler.TagsHandler
 	}
 }
 
-func createDataViewerRoutes(apiGroup *gin.RouterGroup, dsViewerHandler *handler.InternalServiceProxyHandler) {
+func createDataViewerRoutes(
+	apiGroup *gin.RouterGroup,
+	middlewareCollection middleware.MiddlewareCollection,
+	dsViewerHandler *handler.InternalServiceProxyHandler,
+) {
 	datasetRepoGrp := apiGroup.Group("/datasets/:namespace/:name")
+	datasetRepoGrp.Use(middlewareCollection.Auth.NeedLogin)
 	fileViewerGrp := datasetRepoGrp.Group("/viewer")
 	{
 		fileViewerGrp.Any("/*any", dsViewerHandler.Proxy)
