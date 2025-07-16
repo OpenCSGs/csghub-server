@@ -379,7 +379,12 @@ func (c *datasetViewerComponentImpl) getViewerCardData(ctx context.Context, req 
 	}
 
 	if viewer == nil || viewer.DataviewerJob == nil {
-		return nil, nil, fmt.Errorf("viewer card data is empty")
+		err := fmt.Errorf("viewer card data is empty")
+		return nil, nil, errorx.DataviewerCardNotFound(err,
+			errorx.Ctx().
+				Set("repo_id", req.RepoID).
+				Set("path", fmt.Sprintf("%s/%s", req.Namespace, req.RepoName)),
+		)
 	}
 
 	if len(viewer.DataviewerJob.CardData) < 1 &&
@@ -394,7 +399,11 @@ func (c *datasetViewerComponentImpl) getViewerCardData(ctx context.Context, req 
 	var viewerCardData dvCom.CardData
 	err = json.Unmarshal([]byte(viewer.DataviewerJob.CardData), &viewerCardData)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to unmarshal viewer card data, error: %w", err)
+		err := fmt.Errorf("failed to unmarshal viewer card data, error: %w", err)
+		return nil, nil, errorx.InternalServerError(err, errorx.Ctx().
+			Set("repo_id", req.RepoID).
+			Set("path", fmt.Sprintf("%s/%s", req.Namespace, req.RepoName)),
+		)
 	}
 
 	parquetObjs := []string{}
@@ -459,7 +468,11 @@ func (c *datasetViewerComponentImpl) getRepoCardData(ctx context.Context, req *d
 	slog.Debug("getRepoCardData", slog.Any("f.Content", f.Content))
 	decodedContent, err := base64.StdEncoding.DecodeString(f.Content)
 	if err != nil {
-		return nil, fmt.Errorf("failed to base64 decode readme.md contents, cause:%w", err)
+		err := fmt.Errorf("failed to base64 decode readme.md contents, cause:%w", err)
+		return nil, errorx.InternalServerError(err, errorx.Ctx().
+			Set("repo_id", req.RepoID).
+			Set("path", fmt.Sprintf("%s/%s", req.Namespace, req.RepoName)),
+		)
 	}
 	decodedContentStr := string(decodedContent)
 	matches := dvCom.REG.FindStringSubmatch(decodedContentStr)
@@ -467,17 +480,30 @@ func (c *datasetViewerComponentImpl) getRepoCardData(ctx context.Context, req *d
 	if len(matches) > 1 {
 		yamlString = matches[1]
 	} else {
-		return nil, fmt.Errorf("repo card yaml configs is empty")
+		err := fmt.Errorf("repo card yaml configs is empty")
+		return nil, errorx.DataviewerCardNotFound(err, errorx.Ctx().
+			Set("repo_id", req.RepoID).
+			Set("path", fmt.Sprintf("%s/%s", req.Namespace, req.RepoName)),
+		)
 	}
 
 	var card dvCom.CardData
 	err = yaml.Unmarshal([]byte(yamlString), &card)
 	if err != nil {
-		return nil, fmt.Errorf("failed to Unmarshal readme.md yaml contents, cause: %w, decodedContent: %v", err, yamlString)
+		err := fmt.Errorf("failed to Unmarshal readme.md yaml contents, cause: %w, decodedContent: %v", err, yamlString)
+		return nil, errorx.InternalServerError(err, errorx.Ctx().
+			Set("repo_id", req.RepoID).
+			Set("path", fmt.Sprintf("%s/%s", req.Namespace, req.RepoName)).
+			Set("detail", "Unmarshal readme.md yaml contents"),
+		)
 	}
 	slog.Debug("Unmarshal", slog.Any("card", card))
 	if card.Configs == nil {
-		return nil, fmt.Errorf("repo card data configs is empty")
+		err := fmt.Errorf("repo card data configs is empty")
+		return nil, errorx.DataviewerCardNotFound(err, errorx.Ctx().
+			Set("repo_id", req.RepoID).
+			Set("path", fmt.Sprintf("%s/%s", req.Namespace, req.RepoName)),
+		)
 	}
 	if calcTotal && card.DatasetInfos == nil {
 		card = c.generateCardDatasetInfo(ctx, req, card)
@@ -620,7 +646,10 @@ func (c *datasetViewerComponentImpl) getParquetFilesBySplit(ctx context.Context,
 			case workflows.SplitName.Val:
 				validator = workflows.IsValidationFile
 			default:
-				return nil, fmt.Errorf("unknown split type: %s", split)
+				err = fmt.Errorf("unknown split type: %s", split)
+				return nil, errorx.DatasetBadFormat(err,
+					errorx.Ctx().
+						Set("path", fmt.Sprintf("%s/%s", req.Namespace, req.RepoName)))
 			}
 			if validator(strings.ToLower(file.Path)) {
 				files = append(files, file)
@@ -639,8 +668,13 @@ func (c *datasetViewerComponentImpl) autoGenerateCatalog(ctx context.Context, re
 	if err != nil {
 		return nil, fmt.Errorf("failed to get repo tree, error: %w", err)
 	}
-	if tree == nil {
-		return nil, fmt.Errorf("failed to find any files")
+	if len(tree) == 0 {
+		err = fmt.Errorf("failed to find any files")
+		return nil, errorx.GitFileNotFound(err,
+			errorx.Ctx().
+				Set("path", fmt.Sprintf("%s/%s", req.Namespace, req.RepoName)).
+				Set("branch", req.Branch),
+		)
 	}
 	slog.Debug("get tree", slog.Any("tree", tree))
 	cardData := c.genDefaultCatalog(ctx, req, tree, calcTotal)
@@ -759,7 +793,12 @@ func (c *datasetViewerComponentImpl) getParquetObject(ctx context.Context, req *
 		return "", fmt.Errorf("failed to get file contents,cause:%v", err)
 	}
 	if f.LfsRelativePath == "" {
-		return "", fmt.Errorf("file LfsRelativePath is empty for %s", getFileContentReq.Path)
+		err := fmt.Errorf("file LfsRelativePath is empty for %s", getFileContentReq.Path)
+		return "", errorx.LFSNotFound(err,
+			errorx.Ctx().
+				Set("path", fmt.Sprintf("%s/%s", req.Namespace, req.RepoName)).
+				Set("file", getFileContentReq.Path),
+		)
 	}
 	// return "lfs/" + f.LfsRelativePath, nil
 	objectKey := common.BuildLfsPath(req.RepoID, f.LfsSHA256, req.Migrated)

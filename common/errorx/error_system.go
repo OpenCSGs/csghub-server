@@ -19,6 +19,8 @@ const (
 	// Replace sql.ErrNoRows
 	databaseNoRows
 	databaseDuplicateKey
+
+	lfsNotFound
 )
 
 var (
@@ -34,6 +36,8 @@ var (
 	// Convert it to specific error in component or handler
 	ErrDatabaseNoRows       = CustomError{prefix: errSysPrefix, code: databaseNoRows}
 	ErrDatabaseDuplicateKey = CustomError{prefix: errSysPrefix, code: databaseDuplicateKey}
+
+	ErrLFSNotFound = CustomError{prefix: errSysPrefix, code: lfsNotFound}
 )
 
 // Used in DB to convert db error to custom error
@@ -82,6 +86,19 @@ func RemoteSvcFail(err error, ctx context) error {
 		prefix:  errSysPrefix,
 		context: ctx,
 		code:    int(remoteServiceFail),
+		err:     err,
+	}
+	return customErr
+}
+
+func LFSNotFound(err error, ctx context) error {
+	if err == nil {
+		return nil
+	}
+	customErr := CustomError{
+		prefix:  errSysPrefix,
+		context: ctx,
+		code:    int(lfsNotFound),
 		err:     err,
 	}
 	return customErr
