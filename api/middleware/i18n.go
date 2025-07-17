@@ -3,6 +3,7 @@ package middleware
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"slices"
 	"strconv"
@@ -69,36 +70,57 @@ func LocalizedErrorMiddleware() gin.HandlerFunc {
 		var respObj httpbase.R
 		err := json.Unmarshal(respBytes, &respObj)
 		if err != nil {
-			slog.Error("unmarshal original httpbase.R, LocalizedErrorMiddleware", slog.String("url", c.Request.URL.Path), slog.String("err", err.Error()), slog.String("resp", string(respBytes)))
+			slog.Error("unmarshal original httpbase.R, LocalizedErrorMiddleware",
+				slog.String("url", c.Request.URL.Path),
+				slog.String("err", err.Error()),
+				slog.String("resp", string(respBytes)),
+			)
 			_, err = bw.writeInternal(respBytes)
 			if err != nil {
-				slog.Error("unmarshal original resp failed, write original resp, LocalizedErrorMiddleware", slog.String("url", c.Request.URL.Path), slog.String("err", err.Error()))
+				slog.Error("unmarshal original resp failed, write original resp, LocalizedErrorMiddleware",
+					slog.String("url", c.Request.URL.Path),
+					slog.String("err", err.Error()),
+				)
 			}
 			return
 		}
-		if errorx.IsValidErrorCode(respObj.Msg) {
-			translatedMsg, ok := i18n.TranslateText(lang, "error."+respObj.Msg, respObj.Msg)
+		code := respObj.Code
+		if errorx.IsValidErrorCode(code) {
+			translatedMsg, ok := i18n.TranslateText(lang, "error."+code, code)
 			if !ok {
-				slog.Error("translate error message, LocalizedErrorMiddleware", slog.String("url",
-					c.Request.URL.Path), slog.String("msg", respObj.Msg), slog.String("lang", lang))
+				slog.Error("can not translate error code",
+					slog.String("url", c.Request.URL.Path),
+					slog.String("msg", respObj.Msg),
+					slog.String("code", respObj.Code),
+					slog.String("lang", lang),
+				)
 			} else {
-				respObj.Msg += ": " + translatedMsg
+				respObj.Msg = fmt.Sprintf("%s: %s", code, translatedMsg)
 			}
 		}
 
 		updatedBody, err := json.Marshal(respObj)
 		if err != nil {
-			slog.Error("marshal updated httpbase.R", slog.String("url", c.Request.URL.Path), slog.String("err", err.Error()))
+			slog.Error("marshal updated httpbase.R",
+				slog.String("url", c.Request.URL.Path),
+				slog.String("err", err.Error()),
+			)
 			_, err = bw.writeInternal(respBytes)
 			if err != nil {
-				slog.Error("marshal updated httpbase.R, write updated httpbase.R, LocalizedErrorMiddleware", slog.String("url", c.Request.URL.Path), slog.String("err", err.Error()))
+				slog.Error("marshal updated httpbase.R failed, write origin resp, LocalizedErrorMiddleware",
+					slog.String("url", c.Request.URL.Path),
+					slog.String("err", err.Error()),
+				)
 			}
 			return
 		}
 		bw.ResponseWriter.Header().Set("Content-Length", strconv.Itoa(len(updatedBody)))
 		_, err = bw.writeInternal(updatedBody)
 		if err != nil {
-			slog.Error("write updated httpbase.R, LocalizedErrorMiddleware", slog.String("url", c.Request.URL.Path), slog.String("err", err.Error()))
+			slog.Error("write updated httpbase.R, LocalizedErrorMiddleware",
+				slog.String("url", c.Request.URL.Path),
+				slog.String("err", err.Error()),
+			)
 		}
 	}
 }

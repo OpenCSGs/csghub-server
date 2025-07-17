@@ -59,7 +59,7 @@ func TestTagHandler_AllTags(t *testing.T) {
 		err = json.Unmarshal(hr.Body.Bytes(), &resp)
 		require.Nil(t, err)
 
-		require.Equal(t, 0, resp.Code)
+		require.Equal(t, "", resp.Code)
 		require.Equal(t, "OK", resp.Msg)
 		require.NotNil(t, resp.Data)
 	})
@@ -98,7 +98,7 @@ func TestTagHandler_AllTags(t *testing.T) {
 		err = json.Unmarshal(hr.Body.Bytes(), &resp)
 		require.Nil(t, err)
 
-		require.Equal(t, 0, resp.Code)
+		require.Equal(t, "", resp.Code)
 		require.Equal(t, "OK", resp.Msg)
 		require.NotNil(t, resp.Data)
 	})
@@ -136,7 +136,7 @@ func TestTagHandler_CreateTag(t *testing.T) {
 	err = json.Unmarshal(hr.Body.Bytes(), &resp)
 	require.Nil(t, err)
 
-	require.Equal(t, 0, resp.Code)
+	require.Equal(t, "", resp.Code)
 	require.Equal(t, "", resp.Msg)
 	require.NotNil(t, resp.Data)
 }
@@ -167,7 +167,7 @@ func TestTagHandler_GetTagByID(t *testing.T) {
 	err = json.Unmarshal(hr.Body.Bytes(), &resp)
 	require.Nil(t, err)
 
-	require.Equal(t, 0, resp.Code)
+	require.Equal(t, "", resp.Code)
 	require.Equal(t, "", resp.Msg)
 	require.NotNil(t, resp.Data)
 }
@@ -205,7 +205,7 @@ func TestTagHandler_UpdateTag(t *testing.T) {
 	err = json.Unmarshal(hr.Body.Bytes(), &resp)
 	require.Nil(t, err)
 
-	require.Equal(t, 0, resp.Code)
+	require.Equal(t, "", resp.Code)
 	require.Equal(t, "", resp.Msg)
 	require.NotNil(t, resp.Data)
 }
@@ -236,7 +236,7 @@ func TestTagHandler_DeleteTag(t *testing.T) {
 	err = json.Unmarshal(hr.Body.Bytes(), &resp)
 	require.Nil(t, err)
 
-	require.Equal(t, 0, resp.Code)
+	require.Equal(t, "", resp.Code)
 	require.Equal(t, "", resp.Msg)
 	require.Nil(t, resp.Data)
 }
@@ -266,7 +266,7 @@ func TestTagHandler_AllCategories(t *testing.T) {
 	err = json.Unmarshal(hr.Body.Bytes(), &resp)
 	require.Nil(t, err)
 
-	require.Equal(t, 0, resp.Code)
+	require.Equal(t, "", resp.Code)
 	require.Equal(t, "", resp.Msg)
 	require.NotNil(t, resp.Data)
 }
@@ -305,7 +305,7 @@ func TestTagHandler_CreateCategory(t *testing.T) {
 	err = json.Unmarshal(hr.Body.Bytes(), &resp)
 	require.Nil(t, err)
 
-	require.Equal(t, 0, resp.Code)
+	require.Equal(t, "", resp.Code)
 	require.Equal(t, "", resp.Msg)
 	require.NotNil(t, resp.Data)
 }
@@ -345,7 +345,7 @@ func TestTagHandler_UpdateCategory(t *testing.T) {
 	err = json.Unmarshal(hr.Body.Bytes(), &resp)
 	require.Nil(t, err)
 
-	require.Equal(t, 0, resp.Code)
+	require.Equal(t, "", resp.Code)
 	require.Equal(t, "", resp.Msg)
 	require.NotNil(t, resp.Data)
 }
@@ -376,6 +376,6 @@ func TestTagHandler_DeleteCategory(t *testing.T) {
 	err = json.Unmarshal(hr.Body.Bytes(), &resp)
 	require.Nil(t, err)
 
-	require.Equal(t, 0, resp.Code)
+	require.Equal(t, "", resp.Code)
 	require.Equal(t, "", resp.Msg)
 }

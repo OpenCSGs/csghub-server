@@ -274,7 +274,8 @@ func TestModelHandler_DeployDedicated(t *testing.T) {
 		tester.WithBody(t, &types.ModelRunReq{MinReplica: 1, MaxReplica: 2, Revision: "main"}).Execute()
 
 		tester.ResponseEqSimple(t, http.StatusBadRequest, httpbase.R{
-			Msg:     errorx.ErrBadRequest.Error(),
+			Code:    errorx.ErrBadRequest.Error(),
+			Msg:     errorx.ErrBadRequest.Error() + ": Length must be between 2 and 64 characters.",
 			Context: errorx.Ctx().Set("detail", "Length must be between 2 and 64 characters.").Set("name", ""),
 		})
 	})
@@ -308,6 +309,22 @@ func TestModelHandler_DeployDedicated(t *testing.T) {
 			return h.DeployDedicated
 		})
 		tester.WithUser()
+
+		tester.mocks.repo.EXPECT().AllowReadAccess(tester.Ctx(), types.ModelRepo, "u", "r", "u").Return(true, nil)
+		tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), &types.ModelRunReq{
+			DeployName: "test",
+			MinReplica: 1,
+			MaxReplica: 2,
+			Revision:   "main",
+			EngineArgs: "sss",
+		}).Return(true, nil)
+
+		tester.WithBody(t, &types.ModelRunReq{DeployName: "test", MinReplica: 1, MaxReplica: 2, Revision: "main", EngineArgs: "sss"}).Execute()
+
+		tester.ResponseEqSimple(t, http.StatusBadRequest, httpbase.R{
+			Code: errorx.ErrInternalServerError.Error(),
+			Msg:  errorx.ErrInternalServerError.Error() + ": invalid character 's' looking for beginning of value",
+		})
 	})
 }
 
@@ -340,7 +357,8 @@ func TestModelHandler_FinetuneCreate(t *testing.T) {
 		tester.WithBody(t, &types.ModelRunReq{MinReplica: 1, MaxReplica: 2, Revision: "main"}).Execute()
 
 		tester.ResponseEqSimple(t, http.StatusBadRequest, httpbase.R{
-			Msg:     errorx.ErrBadRequest.Error(),
+			Code:    errorx.ErrBadRequest.Error(),
+			Msg:     errorx.ErrBadRequest.Error() + ": Length must be between 2 and 64 characters.",
 			Context: errorx.Ctx().Set("detail", "Length must be between 2 and 64 characters.").Set("name", ""),
 		})
 	})
@@ -573,9 +591,10 @@ func TestModelHandler_DeployServerless(t *testing.T) {
 		tester.WithUser()
 		tester.WithBody(t, &types.ModelRunReq{MinReplica: 1, MaxReplica: 2, Revision: "main"}).Execute()
 
-		tester.ResponseEqSimple(t, 400, gin.H{
-			"msg":     errorx.ErrBadRequest.Error(),
-			"context": errorx.Ctx().Set("detail", "Length must be between 2 and 64 characters.").Set("name", ""),
+		tester.ResponseEqSimple(t, 400, httpbase.R{
+			Code:    errorx.ErrBadRequest.Error(),
+			Msg:     errorx.ErrBadRequest.Error() + ": Length must be between 2 and 64 characters.",
+			Context: errorx.Ctx().Set("detail", "Length must be between 2 and 64 characters.").Set("name", ""),
 		})
 	})
 }
