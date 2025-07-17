@@ -8,7 +8,6 @@ import (
 
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
-	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -19,7 +18,7 @@ type syncClientSettingComponentImpl struct {
 
 type SyncClientSettingComponent interface {
 	Create(ctx context.Context, req types.CreateSyncClientSettingReq) (*database.SyncClientSetting, error)
-	Show(ctx context.Context, currentUser string) (*database.SyncClientSetting, error)
+	Show(ctx context.Context) (*database.SyncClientSetting, error)
 }
 
 func NewSyncClientSettingComponent(config *config.Config) (SyncClientSettingComponent, error) {
@@ -30,13 +29,6 @@ func NewSyncClientSettingComponent(config *config.Config) (SyncClientSettingComp
 }
 
 func (c *syncClientSettingComponentImpl) Create(ctx context.Context, req types.CreateSyncClientSettingReq) (*database.SyncClientSetting, error) {
-	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
-	if err != nil {
-		return nil, errorx.ErrUnauthorized
-	}
-	if !user.CanAdmin() {
-		return nil, fmt.Errorf("only admin was allowed create sync client setting")
-	}
 	exists, err := c.settingStore.SyncClientSettingExists(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check sync client setting if exists, error: %w", err)
@@ -58,14 +50,7 @@ func (c *syncClientSettingComponentImpl) Create(ctx context.Context, req types.C
 	return res, nil
 }
 
-func (c *syncClientSettingComponentImpl) Show(ctx context.Context, currentUser string) (*database.SyncClientSetting, error) {
-	user, err := c.userStore.FindByUsername(ctx, currentUser)
-	if err != nil {
-		return nil, errorx.ErrUnauthorized
-	}
-	if !user.CanAdmin() {
-		return nil, fmt.Errorf("only admin was allowed get sync client setting")
-	}
+func (c *syncClientSettingComponentImpl) Show(ctx context.Context) (*database.SyncClientSetting, error) {
 	res, err := c.settingStore.First(ctx)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {

@@ -462,7 +462,7 @@ func (h *PromptHandler) SetRelations(ctx *gin.Context) {
 
 // AddModelRelation   godoc
 // @Security     ApiKey
-// @Summary      add model relation for prompt
+// @Summary      add model relation for prompt, used for admin
 // @Tags         Prompt
 // @Accept       json
 // @Produce      json
@@ -513,7 +513,7 @@ func (h *PromptHandler) AddModelRelation(ctx *gin.Context) {
 
 // DeleteModelRelation  godoc
 // @Security     ApiKey
-// @Summary      delete model relation for prompt
+// @Summary      delete model relation for prompt, used for admin
 // @Tags         Prompt
 // @Accept       json
 // @Produce      json

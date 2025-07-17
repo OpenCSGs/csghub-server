@@ -382,8 +382,8 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	{
 		syncGroup.GET("/version/latest", syncHandler.Latest)
 		// syncGroup.GET("/version/oldest", syncHandler.Oldest)
-		syncGroup.GET("/client_setting", syncClientSettingHandler.Show)
-		syncGroup.POST("/client_setting", syncClientSettingHandler.Create)
+		syncGroup.GET("/client_setting", middlewareCollection.Auth.NeedAdmin, syncClientSettingHandler.Show)
+		syncGroup.POST("/client_setting", middlewareCollection.Auth.NeedAdmin, syncClientSettingHandler.Create)
 	}
 
 	accountingHandler, err := handler.NewAccountingHandler(config)
@@ -963,9 +963,9 @@ func createPromptRoutes(apiGroup *gin.RouterGroup, promptHandler *handler.Prompt
 		promptGrp.PUT("/:namespace/:name/prompt/record/*file_path", promptHandler.UpdatePrompt)
 		promptGrp.DELETE("/:namespace/:name/prompt/record/*file_path", promptHandler.DeletePrompt)
 
-		promptGrp.PUT("/:namespace/:name/relations", promptHandler.SetRelations)
-		promptGrp.POST("/:namespace/:name/relations/model", promptHandler.AddModelRelation)
-		promptGrp.DELETE("/:namespace/:name/relations/model", promptHandler.DelModelRelation)
+		promptGrp.PUT("/:namespace/:name/relations", middlewareCollection.Auth.NeedLogin, promptHandler.SetRelations)
+		promptGrp.POST("/:namespace/:name/relations/model", middlewareCollection.Auth.NeedAdmin, promptHandler.AddModelRelation)
+		promptGrp.DELETE("/:namespace/:name/relations/model", middlewareCollection.Auth.NeedAdmin, promptHandler.DelModelRelation)
 
 		promptGrp.POST("", promptHandler.Create)
 		promptGrp.PUT("/:namespace/:name", promptHandler.Update)

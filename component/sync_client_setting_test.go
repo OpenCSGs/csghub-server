@@ -13,9 +13,6 @@ func TestSyncClientSettingComponent_Create(t *testing.T) {
 	ctx := context.TODO()
 	sc := initializeTestSyncClientSettingComponent(ctx, t)
 
-	sc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
-		RoleMask: "admin",
-	}, nil)
 	sc.mocks.stores.SyncClientSettingMock().EXPECT().SyncClientSettingExists(ctx).Return(true, nil)
 	sc.mocks.stores.SyncClientSettingMock().EXPECT().DeleteAll(ctx).Return(nil)
 	sc.mocks.stores.SyncClientSettingMock().EXPECT().Create(ctx, &database.SyncClientSetting{
@@ -28,7 +25,6 @@ func TestSyncClientSettingComponent_Create(t *testing.T) {
 		Token:           "t",
 		ConcurrentCount: 1,
 		MaxBandwidth:    5,
-		CurrentUser:     "user",
 	})
 	require.Nil(t, err)
 	require.Equal(t, &database.SyncClientSetting{}, data)
@@ -39,12 +35,9 @@ func TestSyncClientSettingComponent_Show(t *testing.T) {
 	ctx := context.TODO()
 	sc := initializeTestSyncClientSettingComponent(ctx, t)
 
-	sc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
-		RoleMask: "admin",
-	}, nil)
 	sc.mocks.stores.SyncClientSettingMock().EXPECT().First(ctx).Return(&database.SyncClientSetting{}, nil)
 
-	data, err := sc.Show(ctx, "user")
+	data, err := sc.Show(ctx)
 	require.Nil(t, err)
 	require.Equal(t, &database.SyncClientSetting{}, data)
 }

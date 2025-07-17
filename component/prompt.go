@@ -486,10 +486,6 @@ func (c *promptComponentImpl) AddRelationModel(ctx context.Context, req types.Re
 		return fmt.Errorf("user does not exist, %w", err)
 	}
 
-	if !user.CanAdmin() {
-		return errorx.ErrForbiddenMsg("only admin was allowed to set models for prompt")
-	}
-
 	_, err = c.repoStore.FindByPath(ctx, types.PromptRepo, req.Namespace, req.Name)
 	if err != nil {
 		return fmt.Errorf("failed to find prompt dataset, error: %w", err)
@@ -541,10 +537,6 @@ func (c *promptComponentImpl) DelRelationModel(ctx context.Context, req types.Re
 	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
 	if err != nil {
 		return fmt.Errorf("user does not exist, %w", err)
-	}
-
-	if !user.CanAdmin() {
-		return errorx.ErrForbiddenMsg("only admin was allowed to delete model for prompt")
 	}
 
 	_, err = c.repoStore.FindByPath(ctx, types.PromptRepo, req.Namespace, req.Name)
