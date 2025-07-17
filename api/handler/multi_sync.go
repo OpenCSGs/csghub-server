@@ -36,8 +36,8 @@ func NewSyncHandler(config *config.Config) (*SyncHandler, error) {
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /sync/version/latest [get]
-func (h *SyncHandler) Latest(ctx *gin.Context) {
-	varCur := ctx.Query("cur")
+func (h *SyncHandler) Latest(c *gin.Context) {
+	varCur := c.Query("cur")
 	cur, err := strconv.ParseInt(varCur, 10, 64)
 
 	if err != nil {
