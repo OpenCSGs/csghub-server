@@ -466,10 +466,14 @@ func (h *SpaceHandler) Status(ctx *gin.Context) {
 			//user http request context instead of gin context, so that server knows the life cycle of the request
 			_, status, err := h.space.Status(ctx.Request.Context(), namespace, name)
 			if err != nil {
-				deadline, ok := ctx.Request.Context().Deadline()
-				slog.Error("failed to get space status in stream", slog.Any("error", err),
-					slog.String("namespace", namespace), slog.String("name", name),
-					slog.Any("deadline", time.Until(deadline)), slog.Bool("ok", ok))
+				if deadline, ok := ctx.Request.Context().Deadline(); ok {
+					slog.Error("failed to get space status in stream", slog.Any("error", err),
+						slog.String("namespace", namespace), slog.String("name", name),
+						slog.Any("deadline", time.Until(deadline)))
+				} else {
+					slog.Error("failed to get space status in stream", slog.Any("error", err),
+						slog.String("namespace", namespace), slog.String("name", name))
+				}
 				ctx.SSEvent("error", err.Error())
 			} else {
 				ctx.SSEvent("status", status)
@@ -557,12 +561,19 @@ func (h *SpaceHandler) Logs(ctx *gin.Context) {
 	//user http request context instead of gin context, so that server knows the life cycle of the request
 	logReader, err := h.space.Logs(ctx.Request.Context(), namespace, name)
 	if err != nil {
-		deadline, ok := ctx.Request.Context().Deadline()
-		slog.Error("failed to get space logs",
-			slog.Any("error", err),
-			slog.String("namespace", namespace), slog.String("name", name),
-			slog.Any("deadline", time.Until(deadline)), slog.Bool("ok", ok),
-		)
+		if deadline, ok := ctx.Request.Context().Deadline(); ok {
+			slog.Error("failed to get space logs",
+				slog.Any("error", err),
+				slog.String("namespace", namespace), slog.String("name", name),
+				slog.Any("deadline", time.Until(deadline)), slog.Bool("ok", ok),
+			)
+		} else {
+			slog.Error("failed to get space logs",
+				slog.Any("error", err),
+				slog.String("namespace", namespace), slog.String("name", name),
+			)
+		}
+
 		httpbase.ServerError(ctx, err)
 		return
 	}
