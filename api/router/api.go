@@ -439,7 +439,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error creating prompt handler,%w", err)
 	}
-	createPromptRoutes(apiGroup, promptHandler)
+	createPromptRoutes(apiGroup, middlewareCollection, promptHandler)
 
 	// dataflow proxy
 	dataflowHandler, err := handler.NewDataflowProxyHandler(config)
@@ -952,8 +952,13 @@ func createDiscussionRoutes(apiGroup *gin.RouterGroup, needAPIKey gin.HandlerFun
 	apiGroup.DELETE("/discussions/:id/comments/:comment_id", discussionHandler.DeleteComment)
 }
 
-func createPromptRoutes(apiGroup *gin.RouterGroup, promptHandler *handler.PromptHandler) {
+func createPromptRoutes(
+	apiGroup *gin.RouterGroup,
+	middlewareCollection middleware.MiddlewareCollection,
+	promptHandler *handler.PromptHandler,
+) {
 	promptGrp := apiGroup.Group("/prompts")
+	promptGrp.Use(middleware.RepoType(types.PromptRepo), middlewareCollection.Repo.RepoExists)
 	{
 		promptGrp.GET("", promptHandler.Index)
 		promptGrp.GET("/:namespace/:name", promptHandler.ListPrompt)
