@@ -991,8 +991,8 @@ func createPromptRoutes(
 		promptGrp.DELETE("/:namespace/:name/prompt/record/*file_path", middlewareCollection.Auth.NeedLogin, promptHandler.DeletePrompt)
 
 		promptGrp.PUT("/:namespace/:name/relations", middlewareCollection.Auth.NeedLogin, promptHandler.SetRelations)
-		promptGrp.POST("/:namespace/:name/relations/model", middlewareCollection.Auth.NeedLogin, promptHandler.AddModelRelation)
-		promptGrp.DELETE("/:namespace/:name/relations/model", middlewareCollection.Auth.NeedLogin, promptHandler.DelModelRelation)
+		promptGrp.POST("/:namespace/:name/relations/model", middlewareCollection.Auth.NeedAdmin, promptHandler.AddModelRelation)
+		promptGrp.DELETE("/:namespace/:name/relations/model", middlewareCollection.Auth.NeedAdmin, promptHandler.DelModelRelation)
 
 		promptGrp.POST("", middlewareCollection.Auth.NeedLogin, promptHandler.Create)
 		promptGrp.PUT("/:namespace/:name", middlewareCollection.Auth.NeedLogin, promptHandler.Update)
