@@ -328,6 +328,7 @@ func TestSpaceComponent_Deploy(t *testing.T) {
 		ID:         1,
 		Repository: &database.Repository{Path: "foo/bar"},
 		SKU:        "1",
+		HasAppFile: true,
 	}, nil)
 	sc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
 		Username: "user1",

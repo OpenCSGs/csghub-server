@@ -3,6 +3,7 @@ package component
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/url"
@@ -835,6 +836,13 @@ func (c *spaceComponentImpl) Deploy(ctx context.Context, namespace, name, curren
 		slog.Error("can't find space to deploy", slog.Any("error", err), slog.String("namespace", namespace), slog.String("name", name))
 		return -1, err
 	}
+	if !space.HasAppFile {
+		return -1, errorx.NoEntryFile(errors.New("no app file"),
+			errorx.Ctx().
+				Set("path", fmt.Sprintf("%s/%s", namespace, name)),
+		)
+	}
+
 	// found user id
 	user, err := c.userStore.FindByUsername(ctx, currentUser)
 	if err != nil {
