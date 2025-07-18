@@ -123,7 +123,7 @@ type Config struct {
 		// the internal root domain will be proxied to, should be internal access only
 		InternalRootDomain string `env:"STARHUB_SERVER_INTERNAL_ROOT_DOMAIN" default:"internal.example.com"`
 		// the public root domain will be proxied from
-		PublicRootDomain string `env:"STARHUB_SERVER_PUBLIC_ROOT_DOMAIN" default:"public.example.com"`
+		PublicRootDomain string `env:"STARHUB_SERVER_PUBLIC_ROOT_DOMAIN"`
 		DockerRegBase    string `env:"STARHUB_SERVER_DOCKER_REG_BASE" default:"registry.cn-beijing.aliyuncs.com/opencsg_public/"`
 		ImagePullSecret  string `env:"STARHUB_SERVER_DOCKER_IMAGE_PULL_SECRET" default:"opencsg-pull-secret"`
 		// reverse proxy listening port
