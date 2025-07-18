@@ -66,10 +66,6 @@ func getSceneFromContext(ctx *gin.Context) (int, error) {
 // @Router       /accounting/metering/{id}/statements [get]
 func (ah *AccountingHandler) QueryMeteringStatementByUserID(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
-		return
-	}
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)

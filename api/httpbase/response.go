@@ -70,7 +70,8 @@ func BadRequestWithExt(c *gin.Context, err error) {
 	if ok {
 		customErr := err.(errorx.CustomError)
 		c.PureJSON(http.StatusBadRequest, R{
-			Msg:     customErr.Code(),
+			Code:    customErr.Code(),
+			Msg:     customErr.Error(),
 			Context: customErr.Context(),
 		})
 		return
@@ -90,7 +91,8 @@ func ServerError(c *gin.Context, err error) {
 	if ok {
 		customErr := err.(errorx.CustomError)
 		c.PureJSON(http.StatusInternalServerError, R{
-			Msg:     customErr.Code(),
+			Code:    customErr.Code(),
+			Msg:     customErr.Error(),
 			Context: customErr.Context(),
 		})
 		return
@@ -111,7 +113,8 @@ func UnauthorizedError(c *gin.Context, err error) {
 	if ok {
 		customErr := err.(errorx.CustomError)
 		c.PureJSON(http.StatusUnauthorized, R{
-			Msg:     customErr.Code(),
+			Code:    customErr.Code(),
+			Msg:     customErr.Error(),
 			Context: customErr.Context(),
 		})
 		return
@@ -127,7 +130,8 @@ func ForbiddenError(c *gin.Context, err error) {
 	if ok {
 		customErr := err.(errorx.CustomError)
 		c.PureJSON(http.StatusForbidden, R{
-			Msg:     customErr.Code(),
+			Code:    customErr.Code(),
+			Msg:     customErr.Error(),
 			Context: customErr.Context(),
 		})
 		return
@@ -147,7 +151,8 @@ func NotFoundError(c *gin.Context, err error) {
 	if ok {
 		customErr := err.(errorx.CustomError)
 		c.PureJSON(http.StatusNotFound, R{
-			Msg:     customErr.Code(),
+			Code:    customErr.Code(),
+			Msg:     customErr.Error(),
 			Context: customErr.Context(),
 		})
 		return
@@ -159,7 +164,7 @@ func NotFoundError(c *gin.Context, err error) {
 
 // R is the response envelope
 type R struct {
-	Code  int    `json:"code,omitempty"`
+	Code  string `json:"code,omitempty"`
 	Msg   string `json:"msg"`
 	Data  any    `json:"data,omitempty"`
 	Total int    `json:"total,omitempty"` // Total number of items, used in paginated responses

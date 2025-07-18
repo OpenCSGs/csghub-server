@@ -41,7 +41,7 @@ func TestDiscussionHandler_CreateRepoDiscussion(t *testing.T) {
 	tester := NewDiscussionTester(t).WithHandleFunc(func(h *DiscussionHandler) gin.HandlerFunc {
 		return h.CreateRepoDiscussion
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.mocks.sensitive.EXPECT().CheckRequestV2(
 		tester.Ctx(), &types.CreateRepoDiscussionRequest{Title: "foo"},
@@ -67,7 +67,7 @@ func TestDiscussionHandler_UpdateDiscussion(t *testing.T) {
 	tester := NewDiscussionTester(t).WithHandleFunc(func(h *DiscussionHandler) gin.HandlerFunc {
 		return h.UpdateDiscussion
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.mocks.sensitive.EXPECT().CheckRequestV2(
 		tester.Ctx(), &types.UpdateDiscussionRequest{Title: "foo"},
@@ -91,7 +91,7 @@ func TestDiscussionHandler_DeleteDiscussion(t *testing.T) {
 	tester := NewDiscussionTester(t).WithHandleFunc(func(h *DiscussionHandler) gin.HandlerFunc {
 		return h.DeleteDiscussion
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.mocks.discussion.EXPECT().DeleteDiscussion(
 		tester.Ctx(), "u", int64(1),
@@ -143,7 +143,7 @@ func TestDiscussionHandler_CreateDiscussionComment(t *testing.T) {
 	tester := NewDiscussionTester(t).WithHandleFunc(func(h *DiscussionHandler) gin.HandlerFunc {
 		return h.CreateDiscussionComment
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	testContent := "test markdown content. [原图2.png](http://example.com/opencsg-portal-storage/comment/d2ac13b6-10c1-449b-9a55-b5fe4e245204)![test3.png](http://example/opencsg-portal-storage/comment/d5517313-17c9-456c-9c9b-723099646fd8), contend end."
 	tester.mocks.sensitive.On("CheckMarkdownContent", tester.Ctx(), testContent).Return(true, nil)
@@ -166,7 +166,7 @@ func TestDiscussionHandler_UpdateComment(t *testing.T) {
 	tester := NewDiscussionTester(t).WithHandleFunc(func(h *DiscussionHandler) gin.HandlerFunc {
 		return h.UpdateComment
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.mocks.sensitive.On("CheckMarkdownContent", tester.Ctx(), "foo").Return(true, nil)
 	tester.mocks.discussion.EXPECT().UpdateComment(
@@ -184,7 +184,7 @@ func TestDiscussionHandler_DeleteComment(t *testing.T) {
 	tester := NewDiscussionTester(t).WithHandleFunc(func(h *DiscussionHandler) gin.HandlerFunc {
 		return h.DeleteComment
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.mocks.discussion.EXPECT().DeleteComment(
 		tester.Ctx(), "u", int64(1),

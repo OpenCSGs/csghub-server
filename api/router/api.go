@@ -154,11 +154,11 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		return nil, fmt.Errorf("error creating HF dataset handler: %w", err)
 	}
 	//create routes for hf
-	createMappingRoutes(r, "/hf", hfdsHandler, repoCommonHandler, modelHandler, userHandler)
+	createMappingRoutes(r, "/hf", middlewareCollection, hfdsHandler, repoCommonHandler, modelHandler, userHandler)
 	//create routes for ms
-	createMappingRoutes(r, "/ms", hfdsHandler, repoCommonHandler, modelHandler, userHandler)
+	createMappingRoutes(r, "/ms", middlewareCollection, hfdsHandler, repoCommonHandler, modelHandler, userHandler)
 	//create routes for csg
-	createMappingRoutes(r, "/csg", hfdsHandler, repoCommonHandler, modelHandler, userHandler)
+	createMappingRoutes(r, "/csg", middlewareCollection, hfdsHandler, repoCommonHandler, modelHandler, userHandler)
 
 	apiGroup := r.Group("/api/v1")
 	// TODO:use middleware to handle common response
@@ -182,7 +182,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		return nil, fmt.Errorf("error creatring evaluation handler: %v", err)
 	}
 
-	createEvaluationRoutes(apiGroup, evaluationHandler)
+	createEvaluationRoutes(apiGroup, middlewareCollection, evaluationHandler)
 
 	// monitor handler
 	monitorHandler, err := handler.NewMonitorHandler(config)
@@ -319,12 +319,12 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	{
 		// list all collection
 		collections.GET("", collectionHandler.Index)
-		collections.POST("", collectionHandler.Create)
+		collections.POST("", middlewareCollection.Auth.NeedLogin, collectionHandler.Create)
 		collections.GET("/:id", collectionHandler.GetCollection)
-		collections.PUT("/:id", collectionHandler.UpdateCollection)
-		collections.DELETE("/:id", collectionHandler.DeleteCollection)
-		collections.POST("/:id/repos", collectionHandler.AddRepoToCollection)
-		collections.DELETE("/:id/repos", collectionHandler.RemoveRepoFromCollection)
+		collections.PUT("/:id", middlewareCollection.Auth.NeedLogin, collectionHandler.UpdateCollection)
+		collections.DELETE("/:id", middlewareCollection.Auth.NeedLogin, collectionHandler.DeleteCollection)
+		collections.POST("/:id/repos", middlewareCollection.Auth.NeedLogin, collectionHandler.AddRepoToCollection)
+		collections.DELETE("/:id/repos", middlewareCollection.Auth.NeedLogin, collectionHandler.RemoveRepoFromCollection)
 	}
 
 	// cluster infos
@@ -380,10 +380,10 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	}
 	syncGroup := apiGroup.Group("sync")
 	{
-		syncGroup.GET("/version/latest", syncHandler.Latest)
+		syncGroup.GET("/version/latest", middlewareCollection.Auth.NeedLogin, syncHandler.Latest)
 		// syncGroup.GET("/version/oldest", syncHandler.Oldest)
-		syncGroup.GET("/client_setting", syncClientSettingHandler.Show)
-		syncGroup.POST("/client_setting", syncClientSettingHandler.Create)
+		syncGroup.GET("/client_setting", middlewareCollection.Auth.NeedAdmin, syncClientSettingHandler.Show)
+		syncGroup.POST("/client_setting", middlewareCollection.Auth.NeedAdmin, syncClientSettingHandler.Create)
 	}
 
 	accountingHandler, err := handler.NewAccountingHandler(config)
@@ -439,7 +439,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error creating prompt handler,%w", err)
 	}
-	createPromptRoutes(apiGroup, promptHandler)
+	createPromptRoutes(apiGroup, middlewareCollection, promptHandler, repoCommonHandler)
 
 	// dataflow proxy
 	dataflowHandler, err := handler.NewDataflowProxyHandler(config)
@@ -454,7 +454,8 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error creating dataset viewer proxy:%w", err)
 	}
-	createDataViewerRoutes(apiGroup, dsViewerHandler)
+
+	createDataViewerRoutes(apiGroup, middlewareCollection, dsViewerHandler)
 
 	// space template
 	templateHandler, err := handler.NewSpaceTemplateHandler(config)
@@ -476,9 +477,10 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	return r, nil
 }
 
-func createEvaluationRoutes(apiGroup *gin.RouterGroup, evaluationHandler *handler.EvaluationHandler) {
+func createEvaluationRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware.MiddlewareCollection, evaluationHandler *handler.EvaluationHandler) {
 	// Models routes
 	evaluationsGroup := apiGroup.Group("/evaluations")
+	evaluationsGroup.Use(middlewareCollection.Auth.NeedLogin)
 	{
 		evaluationsGroup.POST("", evaluationHandler.RunEvaluation)
 		evaluationsGroup.DELETE("/:id", evaluationHandler.DeleteEvaluation)
@@ -515,6 +517,7 @@ func createModelRoutes(config *config.Config,
 		modelsGroup.GET("/:namespace/:name/tags", repoCommonHandler.Tags)
 		modelsGroup.POST("/:namespace/:name/preupload/:revision", repoCommonHandler.Preupload)
 		// update tags of a certain category
+		modelsGroup.GET("/:namespace/:name/all_files", repoCommonHandler.AllFiles)
 		modelsGroup.POST("/:namespace/:name/tags/:category", middlewareCollection.Auth.NeedLogin, repoCommonHandler.UpdateTags)
 		modelsGroup.GET("/:namespace/:name/last_commit", repoCommonHandler.LastCommit)
 		modelsGroup.GET("/:namespace/:name/commit/:commit_id", repoCommonHandler.CommitWithDiff)
@@ -557,6 +560,7 @@ func createModelRoutes(config *config.Config,
 		// runtime framework for both finetune and inference
 		modelsGroup.GET("/runtime_framework", middlewareCollection.Auth.NeedLogin, repoCommonHandler.RuntimeFrameworkListWithType)
 	}
+
 	modelsDeployGroup := modelsGroup.Group("")
 	modelsDeployGroup.Use(middlewareCollection.Auth.NeedLogin)
 	{
@@ -597,7 +601,6 @@ func createModelRoutes(config *config.Config,
 		modelsMonitorGroup.GET("/:namespace/:name/finetune/:id/memory/:instance/usage", monitorHandler.MemoryUsage)
 		modelsMonitorGroup.GET("/:namespace/:name/finetune/:id/request/:instance/count", monitorHandler.RequestCount)
 		modelsMonitorGroup.GET("/:namespace/:name/finetune/:id/request/:instance/latency", monitorHandler.RequestLatency)
-
 		// serverless monitor
 		modelsMonitorGroup.GET("/:namespace/:name/serverless/:id/cpu/:instance/usage", monitorHandler.CPUUsage)
 		modelsMonitorGroup.GET("/:namespace/:name/serverless/:id/memory/:instance/usage", monitorHandler.MemoryUsage)
@@ -702,6 +705,7 @@ func createCodeRoutes(
 		codesGroup.GET("/:namespace/:name/tags", repoCommonHandler.Tags)
 		codesGroup.POST("/:namespace/:name/preupload/:revision", repoCommonHandler.Preupload)
 		// update tags of a certain category
+		codesGroup.GET("/:namespace/:name/all_files", repoCommonHandler.AllFiles)
 		codesGroup.POST("/:namespace/:name/tags/:category", middlewareCollection.Auth.NeedLogin, repoCommonHandler.UpdateTags)
 		codesGroup.GET("/:namespace/:name/last_commit", repoCommonHandler.LastCommit)
 		codesGroup.GET("/:namespace/:name/commit/:commit_id", repoCommonHandler.CommitWithDiff)
@@ -762,7 +766,6 @@ func createSpaceRoutes(config *config.Config,
 		// call space webhook api
 		spaces.POST("/:namespace/:name/webhook", nil)
 	}
-
 	{
 		spaces.GET("/:namespace/:name/branches", repoCommonHandler.Branches)
 		spaces.GET("/:namespace/:name/tags", repoCommonHandler.Tags)
@@ -840,24 +843,24 @@ func createUserRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware
 		apiGroup.GET("/user/:username/prompts", userHandler.Prompts)
 		apiGroup.GET("/user/:username/mcps", userHandler.MCPServers)
 		// User likes
-		apiGroup.PUT("/user/:username/likes/:repo_id", userHandler.LikesAdd)
-		apiGroup.DELETE("/user/:username/likes/:repo_id", userHandler.LikesDelete)
-		apiGroup.GET("/user/:username/likes/spaces", userHandler.LikesSpaces)
-		apiGroup.GET("/user/:username/likes/codes", userHandler.LikesCodes)
-		apiGroup.GET("/user/:username/likes/models", userHandler.LikesModels)
-		apiGroup.GET("/user/:username/likes/datasets", userHandler.LikesDatasets)
-		apiGroup.GET("/user/:username/likes/mcps", userHandler.LikesMCPServers)
-		apiGroup.GET("/user/:username/run/:repo_type", userHandler.GetRunDeploys)
+		apiGroup.PUT("/user/:username/likes/:repo_id", middlewareCollection.Auth.NeedLogin, userHandler.LikesAdd)
+		apiGroup.DELETE("/user/:username/likes/:repo_id", middlewareCollection.Auth.NeedLogin, userHandler.LikesDelete)
+		apiGroup.GET("/user/:username/likes/spaces", middlewareCollection.Auth.NeedLogin, userHandler.LikesSpaces)
+		apiGroup.GET("/user/:username/likes/codes", middlewareCollection.Auth.NeedLogin, userHandler.LikesCodes)
+		apiGroup.GET("/user/:username/likes/models", middlewareCollection.Auth.NeedLogin, userHandler.LikesModels)
+		apiGroup.GET("/user/:username/likes/datasets", middlewareCollection.Auth.NeedLogin, userHandler.LikesDatasets)
+		apiGroup.GET("/user/:username/likes/mcps", middlewareCollection.Auth.NeedLogin, userHandler.LikesMCPServers)
+		apiGroup.GET("/user/:username/run/:repo_type", middlewareCollection.Auth.NeedLogin, userHandler.GetRunDeploys)
 		apiGroup.GET("/user/:username/finetune/instances", userHandler.GetFinetuneInstances)
 		// User evaluations
-		apiGroup.GET("/user/:username/evaluations", userHandler.GetEvaluations)
+		apiGroup.GET("/user/:username/evaluations", middlewareCollection.Auth.NeedLogin, userHandler.GetEvaluations)
 	}
 
 	// User collection
 	apiGroup.GET("/user/:username/collections", userHandler.UserCollections)
-	apiGroup.GET("/user/:username/likes/collections", userHandler.LikesCollections)
-	apiGroup.PUT("/user/:username/likes/collections/:id", userHandler.LikeCollection)
-	apiGroup.DELETE("/user/:username/likes/collections/:id", userHandler.UnLikeCollection)
+	apiGroup.GET("/user/:username/likes/collections", middlewareCollection.Auth.NeedLogin, userHandler.LikesCollections)
+	apiGroup.PUT("/user/:username/likes/collections/:id", middlewareCollection.Auth.NeedLogin, userHandler.LikeCollection)
+	apiGroup.DELETE("/user/:username/likes/collections/:id", middlewareCollection.Auth.NeedLogin, userHandler.UnLikeCollection)
 	// user owned tokens
 	apiGroup.GET("/user/:username/tokens", userProxyHandler.ProxyToApi("/api/v1/user/%s/tokens", "username"))
 
@@ -896,7 +899,15 @@ func createAccountRoutes(apiGroup *gin.RouterGroup, needAPIKey gin.HandlerFunc, 
 	}
 }
 
-func createMappingRoutes(r *gin.Engine, group string, hfdsHandler *handler.HFDatasetHandler, repoCommonHandler *handler.RepoHandler, modelHandler *handler.ModelHandler, userHandler *handler.UserHandler) {
+func createMappingRoutes(
+	r *gin.Engine,
+	group string,
+	middlewareCollection middleware.MiddlewareCollection,
+	hfdsHandler *handler.HFDatasetHandler,
+	repoCommonHandler *handler.RepoHandler,
+	modelHandler *handler.ModelHandler,
+	userHandler *handler.UserHandler,
+) {
 	// Huggingface SDK routes
 	hfGroup := r.Group(group)
 	{
@@ -914,7 +925,7 @@ func createMappingRoutes(r *gin.Engine, group string, hfdsHandler *handler.HFDat
 		}
 		hfAPIGroup := hfGroup.Group("/api")
 		{
-			hfAPIGroup.GET("/whoami-v2", userHandler.UserPermission)
+			hfAPIGroup.GET("/whoami-v2", middlewareCollection.Auth.NeedLogin, userHandler.UserPermission)
 			hfModelAPIGroup := hfAPIGroup.Group("/models")
 			{
 				// compatible with HF model info api, used for sdk like this:  huggingface_hub.model_info(repo_id, revision)
@@ -951,29 +962,44 @@ func createDiscussionRoutes(apiGroup *gin.RouterGroup, needAPIKey gin.HandlerFun
 	apiGroup.DELETE("/discussions/:id/comments/:comment_id", discussionHandler.DeleteComment)
 }
 
-func createPromptRoutes(apiGroup *gin.RouterGroup, promptHandler *handler.PromptHandler) {
+func createPromptRoutes(
+	apiGroup *gin.RouterGroup,
+	middlewareCollection middleware.MiddlewareCollection,
+	promptHandler *handler.PromptHandler,
+	repoCommonHandler *handler.RepoHandler,
+) {
 	promptGrp := apiGroup.Group("/prompts")
+	promptGrp.Use(middleware.RepoType(types.PromptRepo), middlewareCollection.Repo.RepoExists)
 	{
 		promptGrp.GET("", promptHandler.Index)
 		promptGrp.GET("/:namespace/:name", promptHandler.ListPrompt)
 		promptGrp.GET("/:namespace/:name/relations", promptHandler.Relations)
 		promptGrp.GET("/:namespace/:name/prompt/view/*file_path", promptHandler.GetPrompt)
-		promptGrp.POST("/:namespace/:name/prompt/record", promptHandler.CreatePrompt)
-		promptGrp.PUT("/:namespace/:name/prompt/record/*file_path", promptHandler.UpdatePrompt)
-		promptGrp.DELETE("/:namespace/:name/prompt/record/*file_path", promptHandler.DeletePrompt)
+		promptGrp.POST("/:namespace/:name/prompt/record", middlewareCollection.Auth.NeedLogin, promptHandler.CreatePrompt)
+		promptGrp.PUT("/:namespace/:name/prompt/record/*file_path", middlewareCollection.Auth.NeedLogin, promptHandler.UpdatePrompt)
+		promptGrp.DELETE("/:namespace/:name/prompt/record/*file_path", middlewareCollection.Auth.NeedLogin, promptHandler.DeletePrompt)
 
-		promptGrp.PUT("/:namespace/:name/relations", promptHandler.SetRelations)
-		promptGrp.POST("/:namespace/:name/relations/model", promptHandler.AddModelRelation)
-		promptGrp.DELETE("/:namespace/:name/relations/model", promptHandler.DelModelRelation)
+		promptGrp.PUT("/:namespace/:name/relations", middlewareCollection.Auth.NeedLogin, promptHandler.SetRelations)
+		promptGrp.POST("/:namespace/:name/relations/model", middlewareCollection.Auth.NeedAdmin, promptHandler.AddModelRelation)
+		promptGrp.DELETE("/:namespace/:name/relations/model", middlewareCollection.Auth.NeedAdmin, promptHandler.DelModelRelation)
 
-		promptGrp.POST("", promptHandler.Create)
-		promptGrp.PUT("/:namespace/:name", promptHandler.Update)
-		promptGrp.DELETE("/:namespace/:name", promptHandler.Delete)
+		promptGrp.POST("", middlewareCollection.Auth.NeedLogin, promptHandler.Create)
+		promptGrp.PUT("/:namespace/:name", middlewareCollection.Auth.NeedLogin, promptHandler.Update)
+		promptGrp.DELETE("/:namespace/:name", middlewareCollection.Auth.NeedLogin, promptHandler.Delete)
 
 		promptGrp.GET("/:namespace/:name/branches", promptHandler.Branches)
 		promptGrp.GET("/:namespace/:name/tags", promptHandler.Tags)
-		promptGrp.POST("/:namespace/:name/tags/:category", promptHandler.UpdateTags)
+		promptGrp.POST("/:namespace/:name/tags/:category", middlewareCollection.Auth.NeedLogin, promptHandler.UpdateTags)
 		promptGrp.POST("/:namespace/:name/update_downloads", promptHandler.UpdateDownloads)
+	}
+	{
+		promptGrp.GET("/:namespace/:name/all_files", repoCommonHandler.AllFiles)
+		promptGrp.POST("/:namespace/:name/mirror", middlewareCollection.Auth.NeedLogin, repoCommonHandler.CreateMirror)
+		promptGrp.GET("/:namespace/:name/mirror", middlewareCollection.Auth.NeedLogin, repoCommonHandler.GetMirror)
+		promptGrp.PUT("/:namespace/:name/mirror", middlewareCollection.Auth.NeedLogin, repoCommonHandler.UpdateMirror)
+		promptGrp.DELETE("/:namespace/:name/mirror", middlewareCollection.Auth.NeedLogin, repoCommonHandler.DeleteMirror)
+		promptGrp.POST("/:namespace/:name/mirror/sync", middlewareCollection.Auth.NeedLogin, repoCommonHandler.SyncMirror)
+		promptGrp.POST("/:namespace/:name/mirror_from_saas", middlewareCollection.Auth.NeedLogin, repoCommonHandler.MirrorFromSaas)
 	}
 }
 
@@ -1001,8 +1027,13 @@ func createTagsRoutes(apiGroup *gin.RouterGroup, tagHandler *handler.TagsHandler
 	}
 }
 
-func createDataViewerRoutes(apiGroup *gin.RouterGroup, dsViewerHandler *handler.InternalServiceProxyHandler) {
+func createDataViewerRoutes(
+	apiGroup *gin.RouterGroup,
+	middlewareCollection middleware.MiddlewareCollection,
+	dsViewerHandler *handler.InternalServiceProxyHandler,
+) {
 	datasetRepoGrp := apiGroup.Group("/datasets/:namespace/:name")
+	datasetRepoGrp.Use(middlewareCollection.Auth.NeedLogin)
 	fileViewerGrp := datasetRepoGrp.Group("/viewer")
 	{
 		fileViewerGrp.Any("/*any", dsViewerHandler.Proxy)

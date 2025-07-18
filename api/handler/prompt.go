@@ -212,10 +212,6 @@ func (h *PromptHandler) GetPrompt(ctx *gin.Context) {
 // @Router       /prompts/{namespace}/{name}/prompt/file [post]
 func (h *PromptHandler) CreatePrompt(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -271,10 +267,6 @@ func (h *PromptHandler) CreatePrompt(ctx *gin.Context) {
 // @Router       /prompts/{namespace}/{name}/prompt/file/{file_path} [put]
 func (h *PromptHandler) UpdatePrompt(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -337,10 +329,6 @@ func (h *PromptHandler) UpdatePrompt(ctx *gin.Context) {
 // @Router       /prompts/{namespace}/{name}/prompt/file/{file_path} [delete]
 func (h *PromptHandler) DeletePrompt(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -425,10 +413,6 @@ func (h *PromptHandler) Relations(ctx *gin.Context) {
 // @Router       /prompts/{namespace}/{name}/relations [put]
 func (h *PromptHandler) SetRelations(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -462,7 +446,7 @@ func (h *PromptHandler) SetRelations(ctx *gin.Context) {
 
 // AddModelRelation   godoc
 // @Security     ApiKey
-// @Summary      add model relation for prompt
+// @Summary      add model relation for prompt, used for admin
 // @Tags         Prompt
 // @Accept       json
 // @Produce      json
@@ -476,10 +460,6 @@ func (h *PromptHandler) SetRelations(ctx *gin.Context) {
 // @Router       /prompts/{namespace}/{name}/relations/model [post]
 func (h *PromptHandler) AddModelRelation(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -513,7 +493,7 @@ func (h *PromptHandler) AddModelRelation(ctx *gin.Context) {
 
 // DeleteModelRelation  godoc
 // @Security     ApiKey
-// @Summary      delete model relation for prompt
+// @Summary      delete model relation for prompt, used for admin
 // @Tags         Prompt
 // @Accept       json
 // @Produce      json
@@ -527,10 +507,6 @@ func (h *PromptHandler) AddModelRelation(ctx *gin.Context) {
 // @Router       /prompts/{namespace}/{name}/relations/model [delete]
 func (h *PromptHandler) DelModelRelation(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -577,10 +553,6 @@ func (h *PromptHandler) DelModelRelation(ctx *gin.Context) {
 // @Router       /prompts [post]
 func (h *PromptHandler) Create(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	var req *types.CreatePromptRepoReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request prompt repo format", "error", err)
@@ -626,10 +598,6 @@ func (h *PromptHandler) Create(ctx *gin.Context) {
 // @Router       /prompts/{namespace}/{name} [put]
 func (h *PromptHandler) Update(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	var req *types.UpdatePromptRepoReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -680,10 +648,6 @@ func (h *PromptHandler) Update(ctx *gin.Context) {
 // @Router       /prompts/{namespace}/{name} [delete]
 func (h *PromptHandler) Delete(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -806,10 +770,6 @@ func (h *PromptHandler) Tags(ctx *gin.Context) {
 // @Router       /prompts/{namespace}/{name}/tags/{category} [post]
 func (h *PromptHandler) UpdateTags(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Failed update tags", "error", err)

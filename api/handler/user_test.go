@@ -122,7 +122,7 @@ func TestUserHandler_LikesAdd(t *testing.T) {
 	tester := NewUserTester(t).WithHandleFunc(func(h *UserHandler) gin.HandlerFunc {
 		return h.LikesAdd
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.mocks.user.EXPECT().AddLikes(tester.Ctx(), &types.UserLikesRequest{
 		Username:    "go",
@@ -137,7 +137,7 @@ func TestUserHandler_LikesCollections(t *testing.T) {
 	tester := NewUserTester(t).WithHandleFunc(func(h *UserHandler) gin.HandlerFunc {
 		return h.LikesCollections
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.mocks.user.EXPECT().LikesCollection(tester.Ctx(), &types.UserCollectionReq{
 		Owner:       "go",
@@ -178,7 +178,7 @@ func TestUserHandler_LikeCollection(t *testing.T) {
 	tester := NewUserTester(t).WithHandleFunc(func(h *UserHandler) gin.HandlerFunc {
 		return h.LikeCollection
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.mocks.user.EXPECT().LikeCollection(tester.Ctx(), &types.UserLikesRequest{
 		CurrentUser:  "u",
@@ -192,7 +192,7 @@ func TestUserHandler_UnLikeCollection(t *testing.T) {
 	tester := NewUserTester(t).WithHandleFunc(func(h *UserHandler) gin.HandlerFunc {
 		return h.UnLikeCollection
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.mocks.user.EXPECT().UnLikeCollection(tester.Ctx(), &types.UserLikesRequest{
 		CurrentUser:  "u",
@@ -206,7 +206,7 @@ func TestUserHandler_LikesDelete(t *testing.T) {
 	tester := NewUserTester(t).WithHandleFunc(func(h *UserHandler) gin.HandlerFunc {
 		return h.LikesDelete
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.mocks.user.EXPECT().DeleteLikes(tester.Ctx(), &types.UserLikesRequest{
 		CurrentUser: "u",
@@ -220,7 +220,7 @@ func TestUserHandler_LikesSpaces(t *testing.T) {
 	tester := NewUserTester(t).WithHandleFunc(func(h *UserHandler) gin.HandlerFunc {
 		return h.LikesSpaces
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.mocks.user.EXPECT().LikesSpaces(tester.Ctx(), &types.UserSpacesReq{
 		Owner:       "foo",
@@ -242,7 +242,7 @@ func TestUserHandler_LikesCodes(t *testing.T) {
 	tester := NewUserTester(t).WithHandleFunc(func(h *UserHandler) gin.HandlerFunc {
 		return h.LikesCodes
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.mocks.user.EXPECT().LikesCodes(tester.Ctx(), &types.UserDatasetsReq{
 		Owner:       "foo",
@@ -264,7 +264,7 @@ func TestUserHandler_LikesModels(t *testing.T) {
 	tester := NewUserTester(t).WithHandleFunc(func(h *UserHandler) gin.HandlerFunc {
 		return h.LikesModels
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.mocks.user.EXPECT().LikesModels(tester.Ctx(), &types.UserDatasetsReq{
 		Owner:       "foo",
@@ -286,7 +286,7 @@ func TestUserHandler_LikesDatasets(t *testing.T) {
 	tester := NewUserTester(t).WithHandleFunc(func(h *UserHandler) gin.HandlerFunc {
 		return h.LikesDatasets
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.mocks.user.EXPECT().LikesDatasets(tester.Ctx(), &types.UserDatasetsReq{
 		Owner:       "foo",
@@ -308,7 +308,7 @@ func TestUserHandler_UserPermission(t *testing.T) {
 	tester := NewUserTester(t).WithHandleFunc(func(h *UserHandler) gin.HandlerFunc {
 		return h.UserPermission
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.Execute()
 	tester.ResponseEqSimple(t, 200, types.WhoamiResponse{
@@ -327,7 +327,7 @@ func TestUserHandler_GetRunDeploys(t *testing.T) {
 	tester := NewUserTester(t).WithHandleFunc(func(h *UserHandler) gin.HandlerFunc {
 		return h.GetRunDeploys
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.mocks.user.EXPECT().ListDeploys(tester.Ctx(), types.ModelRepo, &types.DeployReq{
 		CurrentUser: "u",
@@ -374,7 +374,7 @@ func TestUserHandler_GetRunServerless(t *testing.T) {
 	tester := NewUserTester(t).WithHandleFunc(func(h *UserHandler) gin.HandlerFunc {
 		return h.GetRunServerless
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.mocks.user.EXPECT().ListServerless(tester.Ctx(), types.DeployReq{
 		CurrentUser: "u",
@@ -465,7 +465,7 @@ func TestUserHandler_LikesMCPServers(t *testing.T) {
 	tester := NewUserTester(t).WithHandleFunc(func(h *UserHandler) gin.HandlerFunc {
 		return h.LikesMCPServers
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.mocks.user.EXPECT().LikesMCPServers(tester.Ctx(), &types.UserMCPsReq{
 		Owner:       "foo",

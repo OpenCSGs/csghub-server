@@ -27,9 +27,9 @@ func NewSyncClientSettingHandler(config *config.Config) (*SyncClientSettingHandl
 }
 
 // CreateSyncClientSetting  godoc
-// @Security     ApiKey
+// @Security    ApiKey
 // @Summary      Create sync client setting or update an existing sync client setting
-// @Description  Create sync client setting or update an existing sync client setting
+// @Description  Create sync client setting or update an existing sync client setting, used for admin
 // @Tags         Sync
 // @Accept       json
 // @Produce      json
@@ -43,11 +43,6 @@ func (h *SyncClientSettingHandler) Create(ctx *gin.Context) {
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
-		return
-	}
-	req.CurrentUser = httpbase.GetCurrentUser(ctx)
-	if req.CurrentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 		return
 	}
 	ms, err := h.c.Create(ctx.Request.Context(), req)
@@ -64,9 +59,9 @@ func (h *SyncClientSettingHandler) Create(ctx *gin.Context) {
 }
 
 // GetSyncClientSetting  godoc
-// @Security     ApiKey
+// @Security    ApiKey
 // @Summary      Get sync client setting
-// @Description  Get sync client setting
+// @Description  Get sync client setting, used for admin
 // @Tags         Sync
 // @Accept       json
 // @Produce      json
@@ -75,12 +70,7 @@ func (h *SyncClientSettingHandler) Create(ctx *gin.Context) {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /sync/client_setting [get]
 func (h *SyncClientSettingHandler) Show(ctx *gin.Context) {
-	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
-	ms, err := h.c.Show(ctx.Request.Context(), currentUser)
+	ms, err := h.c.Show(ctx.Request.Context())
 	if err != nil {
 		if errors.Is(err, errorx.ErrUnauthorized) {
 			httpbase.UnauthorizedError(ctx, err)

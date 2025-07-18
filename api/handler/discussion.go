@@ -9,7 +9,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/common/config"
-	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
 	"opencsg.com/csghub-server/component"
@@ -53,10 +52,6 @@ func NewDiscussionHandler(config *config.Config) (*DiscussionHandler, error) {
 // @Router       /{repo_type}/{namespace}/{name}/discussions [post]
 func (h *DiscussionHandler) CreateRepoDiscussion(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	repoType := h.getRepoType(ctx)
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
@@ -107,10 +102,6 @@ func (h *DiscussionHandler) CreateRepoDiscussion(ctx *gin.Context) {
 // @Router       /discussions/{id} [put]
 func (h *DiscussionHandler) UpdateDiscussion(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	id := ctx.Param("id")
 	idInt, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
@@ -156,10 +147,6 @@ func (h *DiscussionHandler) UpdateDiscussion(ctx *gin.Context) {
 // @Router       /discussions/{id} [delete]
 func (h *DiscussionHandler) DeleteDiscussion(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	id := ctx.Param("id")
 	idInt, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
@@ -258,10 +245,6 @@ func (h *DiscussionHandler) ListRepoDiscussions(ctx *gin.Context) {
 // @Router       /discussions/{id}/comments [post]
 func (h *DiscussionHandler) CreateDiscussionComment(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 
 	id := ctx.Param("id")
 	idInt, err := strconv.ParseInt(id, 10, 64)
@@ -309,10 +292,6 @@ func (h *DiscussionHandler) CreateDiscussionComment(ctx *gin.Context) {
 // @Router       /comments/{id} [put]
 func (h *DiscussionHandler) UpdateComment(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	id := ctx.Param("id")
 	idInt, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
@@ -356,10 +335,6 @@ func (h *DiscussionHandler) UpdateComment(ctx *gin.Context) {
 // @Router       /comments/{id} [delete]
 func (h *DiscussionHandler) DeleteComment(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	id := ctx.Param("id")
 	idInt, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {

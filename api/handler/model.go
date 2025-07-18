@@ -1436,10 +1436,6 @@ func (h *ModelHandler) DeployServerless(ctx *gin.Context) {
 // @Router       /models/{namespace}/{name}/serverless [delete]
 func (h *ModelHandler) RemoveServerless(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
-		return
-	}
 
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {

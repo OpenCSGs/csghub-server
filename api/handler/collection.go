@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -93,10 +92,6 @@ func (c *CollectionHandler) Index(ctx *gin.Context) {
 // @Router       /collections [post]
 func (c *CollectionHandler) Create(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
-		return
-	}
 	var req *types.CreateCollectionReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -164,11 +159,6 @@ func (c *CollectionHandler) GetCollection(ctx *gin.Context) {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /collections/{id} [put]
 func (c *CollectionHandler) UpdateCollection(ctx *gin.Context) {
-	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
-		return
-	}
 	var req *types.CreateCollectionReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -216,10 +206,6 @@ func (c *CollectionHandler) UpdateCollection(ctx *gin.Context) {
 // @Router       /collections/{id} [delete]
 func (c *CollectionHandler) DeleteCollection(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
-		return
-	}
 	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -252,10 +238,6 @@ func (c *CollectionHandler) DeleteCollection(ctx *gin.Context) {
 // @Router       /collections/{id}/repos [post]
 func (c *CollectionHandler) AddRepoToCollection(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
-		return
-	}
 	var req *types.UpdateCollectionReposReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -295,10 +277,6 @@ func (c *CollectionHandler) AddRepoToCollection(ctx *gin.Context) {
 // @Router       /collections/{id}/repos [delete]
 func (c *CollectionHandler) RemoveRepoFromCollection(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
-		return
-	}
 	var req *types.UpdateCollectionReposReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)

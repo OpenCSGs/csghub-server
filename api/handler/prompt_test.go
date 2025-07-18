@@ -127,7 +127,7 @@ func TestPromptHandler_CreatePrompt(t *testing.T) {
 	tester := NewPromptTester(t).WithHandleFunc(func(h *PromptHandler) gin.HandlerFunc {
 		return h.CreatePrompt
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	req := &types.CreatePromptReq{Prompt: types.Prompt{
 		Title: "t", Content: "c", Language: "l",
@@ -145,7 +145,7 @@ func TestPromptHandler_UpdatePrompt(t *testing.T) {
 	tester := NewPromptTester(t).WithHandleFunc(func(h *PromptHandler) gin.HandlerFunc {
 		return h.UpdatePrompt
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	req := &types.UpdatePromptReq{Prompt: types.Prompt{
 		Title: "t", Content: "c", Language: "l",
@@ -163,7 +163,7 @@ func TestPromptHandler_DeletePrompt(t *testing.T) {
 	tester := NewPromptTester(t).WithHandleFunc(func(h *PromptHandler) gin.HandlerFunc {
 		return h.DeletePrompt
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.WithUser().WithParam("file_path", "fp")
 	tester.mocks.prompt.EXPECT().DeletePrompt(tester.Ctx(), types.PromptReq{
@@ -190,7 +190,7 @@ func TestPromptHandler_SetRelations(t *testing.T) {
 	tester := NewPromptTester(t).WithHandleFunc(func(h *PromptHandler) gin.HandlerFunc {
 		return h.SetRelations
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	req := types.RelationModels{Namespace: "u", Name: "r", CurrentUser: "u"}
 	tester.mocks.prompt.EXPECT().SetRelationModels(tester.Ctx(), req).Return(nil)
@@ -203,7 +203,7 @@ func TestPromptHandler_AddModelRelation(t *testing.T) {
 	tester := NewPromptTester(t).WithHandleFunc(func(h *PromptHandler) gin.HandlerFunc {
 		return h.AddModelRelation
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	req := types.RelationModel{Namespace: "u", Name: "r", CurrentUser: "u"}
 	tester.mocks.prompt.EXPECT().AddRelationModel(tester.Ctx(), req).Return(nil)
@@ -216,7 +216,7 @@ func TestPromptHandler_DeleteModelRelation(t *testing.T) {
 	tester := NewPromptTester(t).WithHandleFunc(func(h *PromptHandler) gin.HandlerFunc {
 		return h.AddModelRelation
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	req := types.RelationModel{Namespace: "u", Name: "r", CurrentUser: "u"}
 	tester.mocks.prompt.EXPECT().AddRelationModel(tester.Ctx(), req).Return(nil)
@@ -229,7 +229,7 @@ func TestPromptHandler_CreatePromptRepo(t *testing.T) {
 	tester := NewPromptTester(t).WithHandleFunc(func(h *PromptHandler) gin.HandlerFunc {
 		return h.Create
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	req := &types.CreatePromptRepoReq{CreateRepoReq: types.CreateRepoReq{}}
 	tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), req).Return(true, nil)
@@ -252,7 +252,7 @@ func TestPromptHandler_UpdatePromptRepo(t *testing.T) {
 	tester := NewPromptTester(t).WithHandleFunc(func(h *PromptHandler) gin.HandlerFunc {
 		return h.Update
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	req := &types.UpdatePromptRepoReq{UpdateRepoReq: types.UpdateRepoReq{}}
 	tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), req).Return(true, nil)
@@ -272,7 +272,7 @@ func TestPromptHandler_DeletePromptRepo(t *testing.T) {
 	tester := NewPromptTester(t).WithHandleFunc(func(h *PromptHandler) gin.HandlerFunc {
 		return h.Delete
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	tester.mocks.prompt.EXPECT().RemoveRepo(tester.Ctx(), "u", "r", "u").Return(nil)
 	tester.Execute()
@@ -318,7 +318,7 @@ func TestPromptHandler_UpdateTags(t *testing.T) {
 	tester := NewPromptTester(t).WithHandleFunc(func(h *PromptHandler) gin.HandlerFunc {
 		return h.UpdateTags
 	})
-	tester.RequireUser(t)
+	tester.WithUser()
 
 	req := []string{"a", "b"}
 	tester.mocks.repo.EXPECT().UpdateTags(tester.Ctx(), "u", "r", types.PromptRepo, "cat", "u", req).Return(nil)

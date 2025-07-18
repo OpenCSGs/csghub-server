@@ -9,7 +9,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/common/config"
-	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
 	"opencsg.com/csghub-server/component"
@@ -209,10 +208,6 @@ func (h *UserHandler) Spaces(ctx *gin.Context) {
 // @Router       /user/{username}/likes/{repoid} [put]
 func (h *UserHandler) LikesAdd(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	var req types.UserLikesRequest
 	req.Username = ctx.Param("username")
 	req.CurrentUser = currentUser
@@ -242,11 +237,6 @@ func (h *UserHandler) LikesAdd(ctx *gin.Context) {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /user/{username}/likes/collections [get]
 func (h *UserHandler) LikesCollections(ctx *gin.Context) {
-	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	var req types.UserCollectionReq
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
@@ -327,10 +317,6 @@ func (h *UserHandler) UserCollections(ctx *gin.Context) {
 // @Router       /user/{username}/likes/collections/{id} [put]
 func (h *UserHandler) LikeCollection(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	var req types.UserLikesRequest
 	req.CurrentUser = currentUser
 	collectionID, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
@@ -361,10 +347,6 @@ func (h *UserHandler) LikeCollection(ctx *gin.Context) {
 // @Router       /user/{username}/likes/collections/{id} [delete]
 func (h *UserHandler) UnLikeCollection(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	var req types.UserLikesRequest
 	req.CurrentUser = currentUser
 	collection_id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
@@ -396,10 +378,6 @@ func (h *UserHandler) UnLikeCollection(ctx *gin.Context) {
 // @Router       /user/{username}/likes/{repoid} [delete]
 func (h *UserHandler) LikesDelete(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	var req types.UserLikesRequest
 	req.Username = ctx.Param("username")
 	req.CurrentUser = currentUser
@@ -431,10 +409,6 @@ func (h *UserHandler) LikesDelete(ctx *gin.Context) {
 // @Router       /user/{username}/likes/spaces [get]
 func (h *UserHandler) LikesSpaces(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	var req types.UserCollectionReq
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
@@ -478,10 +452,6 @@ func (h *UserHandler) LikesSpaces(ctx *gin.Context) {
 // @Router       /user/{username}/likes/codes [get]
 func (h *UserHandler) LikesCodes(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	var req types.UserDatasetsReq
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
@@ -525,10 +495,6 @@ func (h *UserHandler) LikesCodes(ctx *gin.Context) {
 // @Router       /user/{username}/likes/models [get]
 func (h *UserHandler) LikesModels(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	var req types.UserDatasetsReq
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
@@ -572,10 +538,6 @@ func (h *UserHandler) LikesModels(ctx *gin.Context) {
 // @Router       /user/{username}/likes/datasets [get]
 func (h *UserHandler) LikesDatasets(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	var req types.UserDatasetsReq
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
@@ -606,10 +568,6 @@ func (h *UserHandler) LikesDatasets(ctx *gin.Context) {
 
 func (h *UserHandler) UserPermission(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	response := types.WhoamiResponse{
 		Name: currentUser,
 		Auth: types.Auth{
@@ -642,10 +600,6 @@ func (h *UserHandler) UserPermission(ctx *gin.Context) {
 // @Router       /user/{username}/run/{repo_type} [get]
 func (h *UserHandler) GetRunDeploys(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 
 	username := ctx.Param("username")
 	if currentUser != username {
@@ -776,10 +730,6 @@ func (h *UserHandler) GetFinetuneInstances(ctx *gin.Context) {
 // @Router       /user/{username}/run/serverless [get]
 func (h *UserHandler) GetRunServerless(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
@@ -865,11 +815,6 @@ func (h *UserHandler) Prompts(ctx *gin.Context) {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /user/{username}/evaluations [get]
 func (h *UserHandler) GetEvaluations(ctx *gin.Context) {
-	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errors.New("user not found, please login first"))
-		return
-	}
 	var req types.UserEvaluationReq
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
@@ -952,10 +897,6 @@ func (h *UserHandler) MCPServers(ctx *gin.Context) {
 // @Router       /user/{username}/likes/mcps [get]
 func (h *UserHandler) LikesMCPServers(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	var req types.UserMCPsReq
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
