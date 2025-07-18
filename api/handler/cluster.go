@@ -6,7 +6,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/common/config"
-	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/component"
 )
@@ -37,11 +36,6 @@ type ClusterHandler struct {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /cluster [get]
 func (h *ClusterHandler) Index(ctx *gin.Context) {
-	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	clusters, err := h.c.Index(ctx.Request.Context())
 	if err != nil {
 		slog.Error("Failed to get cluster list", slog.Any("error", err))
@@ -63,11 +57,6 @@ func (h *ClusterHandler) Index(ctx *gin.Context) {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /cluster/{id} [get]
 func (h *ClusterHandler) GetClusterById(ctx *gin.Context) {
-	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	id := ctx.Param("id")
 	cluster, err := h.c.GetClusterById(ctx.Request.Context(), id)
 	if err != nil {

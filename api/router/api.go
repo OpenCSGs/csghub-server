@@ -270,7 +270,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error creating tag controller:%w", err)
 	}
-	createTagsRoutes(apiGroup, tagCtrl)
+	createTagsRoutes(apiGroup, middlewareCollection, tagCtrl)
 
 	// JWT token
 	apiGroup.POST("/jwt/token", middlewareCollection.Auth.NeedAPIKey, userProxyHandler.Proxy)
@@ -334,8 +334,8 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	}
 	cluster := apiGroup.Group("/cluster")
 	{
-		cluster.GET("", clusterHandler.Index)
-		cluster.GET("/:id", clusterHandler.GetClusterById)
+		cluster.GET("", middlewareCollection.Auth.NeedLogin, clusterHandler.Index)
+		cluster.GET("/:id", middlewareCollection.Auth.NeedLogin, clusterHandler.GetClusterById)
 		cluster.PUT("/:id", middlewareCollection.Auth.NeedAPIKey, clusterHandler.Update)
 	}
 
@@ -391,7 +391,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		return nil, fmt.Errorf("error creating accounting handler setting handler:%w", err)
 	}
 
-	createAccountRoutes(apiGroup, middlewareCollection.Auth.NeedAPIKey, accountingHandler)
+	createAccountRoutes(apiGroup, middlewareCollection, accountingHandler)
 
 	recomHandler, err := handler.NewRecomHandler(config)
 	if err != nil {
@@ -399,7 +399,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	}
 	recomGroup := apiGroup.Group("/recom")
 	{
-		recomGroup.POST("opweight", middlewareCollection.Auth.NeedAPIKey, recomHandler.SetOpWeight)
+		recomGroup.POST("opweight", middlewareCollection.Auth.NeedAdmin, recomHandler.SetOpWeight)
 	}
 
 	// telemetry
@@ -432,7 +432,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error creating discussion handler:%w", err)
 	}
-	createDiscussionRoutes(apiGroup, middlewareCollection.Auth.NeedAPIKey, discussionHandler)
+	createDiscussionRoutes(apiGroup, middlewareCollection, discussionHandler)
 
 	// prompt
 	promptHandler, err := handler.NewPromptHandler(config)
@@ -496,7 +496,7 @@ func createModelRoutes(config *config.Config,
 	monitorHandler *handler.MonitorHandler) {
 	// Models routes
 	modelsGroup := apiGroup.Group("/models")
-	modelsGroup.Use(middleware.RepoType(types.ModelRepo))
+	modelsGroup.Use(middleware.RepoType(types.ModelRepo), middlewareCollection.Repo.RepoExists)
 	{
 		modelsGroup.POST("", middlewareCollection.Auth.NeedLogin, modelHandler.Create)
 		modelsGroup.GET("", modelHandler.Index)
@@ -516,6 +516,7 @@ func createModelRoutes(config *config.Config,
 		modelsGroup.GET("/:namespace/:name/branches", repoCommonHandler.Branches)
 		modelsGroup.GET("/:namespace/:name/tags", repoCommonHandler.Tags)
 		modelsGroup.POST("/:namespace/:name/preupload/:revision", repoCommonHandler.Preupload)
+		modelsGroup.GET("/:namespace/:name/all_files", repoCommonHandler.AllFiles)
 		// update tags of a certain category
 		modelsGroup.GET("/:namespace/:name/all_files", repoCommonHandler.AllFiles)
 		modelsGroup.POST("/:namespace/:name/tags/:category", middlewareCollection.Auth.NeedLogin, repoCommonHandler.UpdateTags)
@@ -634,7 +635,10 @@ func createDatasetRoutes(
 	repoCommonHandler *handler.RepoHandler,
 ) {
 	datasetsGroup := apiGroup.Group("/datasets")
-	datasetsGroup.Use(middleware.RepoType(types.DatasetRepo))
+	// allow access without login
+	datasetsGroup.GET("", dsHandler.Index)
+	// must login
+	datasetsGroup.Use(middleware.MustLogin(), middleware.RepoType(types.DatasetRepo), middlewareCollection.Repo.RepoExists)
 	{
 		datasetsGroup.POST("", middlewareCollection.Auth.NeedLogin, dsHandler.Create)
 		datasetsGroup.GET("", dsHandler.Index)
@@ -690,7 +694,7 @@ func createCodeRoutes(
 	repoCommonHandler *handler.RepoHandler,
 ) {
 	codesGroup := apiGroup.Group("/codes")
-	codesGroup.Use(middleware.RepoType(types.CodeRepo))
+	codesGroup.Use(middleware.RepoType(types.CodeRepo), middlewareCollection.Repo.RepoExists)
 	{
 		codesGroup.POST("", middlewareCollection.Auth.NeedLogin, codeHandler.Create)
 		codesGroup.GET("", codeHandler.Index)
@@ -744,13 +748,13 @@ func createSpaceRoutes(config *config.Config,
 	repoCommonHandler *handler.RepoHandler,
 	monitorHandler *handler.MonitorHandler) {
 	spaces := apiGroup.Group("/spaces")
-	spaces.Use(middleware.RepoType(types.SpaceRepo))
+	spaces.Use(middleware.RepoType(types.SpaceRepo), middlewareCollection.Repo.RepoExists)
 	{
 		// list all spaces
 		spaces.GET("", spaceHandler.Index)
 		spaces.POST("", middlewareCollection.Auth.NeedLogin, spaceHandler.Create)
 		// show a user or org's space
-		spaces.GET("/:namespace/:name", spaceHandler.Show)
+		spaces.GET("/:namespace/:name", middlewareCollection.Auth.NeedLogin, spaceHandler.Show)
 		spaces.PUT("/:namespace/:name", middlewareCollection.Auth.NeedLogin, spaceHandler.Update)
 		spaces.DELETE("/:namespace/:name", middlewareCollection.Auth.NeedLogin, spaceHandler.Delete)
 		// depoly and start running the space
@@ -842,6 +846,9 @@ func createUserRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware
 		apiGroup.GET("/user/:username/spaces", userHandler.Spaces)
 		apiGroup.GET("/user/:username/prompts", userHandler.Prompts)
 		apiGroup.GET("/user/:username/mcps", userHandler.MCPServers)
+	}
+
+	{
 		// User likes
 		apiGroup.PUT("/user/:username/likes/:repo_id", middlewareCollection.Auth.NeedLogin, userHandler.LikesAdd)
 		apiGroup.DELETE("/user/:username/likes/:repo_id", middlewareCollection.Auth.NeedLogin, userHandler.LikesDelete)
@@ -850,8 +857,11 @@ func createUserRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware
 		apiGroup.GET("/user/:username/likes/models", middlewareCollection.Auth.NeedLogin, userHandler.LikesModels)
 		apiGroup.GET("/user/:username/likes/datasets", middlewareCollection.Auth.NeedLogin, userHandler.LikesDatasets)
 		apiGroup.GET("/user/:username/likes/mcps", middlewareCollection.Auth.NeedLogin, userHandler.LikesMCPServers)
-		apiGroup.GET("/user/:username/run/:repo_type", middlewareCollection.Auth.NeedLogin, userHandler.GetRunDeploys)
-		apiGroup.GET("/user/:username/finetune/instances", userHandler.GetFinetuneInstances)
+	}
+
+	{
+		apiGroup.GET("/user/:username/run/:repo_type", middlewareCollection.Auth.UserMatch, userHandler.GetRunDeploys)
+		apiGroup.GET("/user/:username/finetune/instances", middlewareCollection.Auth.UserMatch, userHandler.GetFinetuneInstances)
 		// User evaluations
 		apiGroup.GET("/user/:username/evaluations", middlewareCollection.Auth.NeedLogin, userHandler.GetEvaluations)
 	}
@@ -877,8 +887,8 @@ func createRuntimeFrameworkRoutes(apiGroup *gin.RouterGroup, middlewareCollectio
 		runtimeFramework.POST("", middlewareCollection.Auth.NeedLogin, repoCommonHandler.RuntimeFrameworkCreate)
 		runtimeFramework.PUT("/:id", middlewareCollection.Auth.NeedLogin, repoCommonHandler.RuntimeFrameworkUpdate)
 		runtimeFramework.DELETE("/:id", middlewareCollection.Auth.NeedLogin, repoCommonHandler.RuntimeFrameworkDelete)
-		runtimeFramework.PUT("/:id/models", needAdmin, modelHandler.UpdateModelRuntimeFrameworks)
-		runtimeFramework.DELETE("/:id/models", needAdmin, modelHandler.DeleteModelRuntimeFrameworks)
+		runtimeFramework.PUT("/:id/models", middlewareCollection.Auth.NeedAdmin, modelHandler.UpdateModelRuntimeFrameworks)
+		runtimeFramework.DELETE("/:id/models", middlewareCollection.Auth.NeedAdmin, modelHandler.DeleteModelRuntimeFrameworks)
 		runtimeFramework.GET("/models", middlewareCollection.Auth.NeedLogin, modelHandler.ListModelsOfRuntimeFrameworks)
 
 		runtimeFramework.GET("/:id/architecture", needAdmin, runtimeArchHandler.ListByRuntimeFrameworkID)
@@ -889,12 +899,16 @@ func createRuntimeFrameworkRoutes(apiGroup *gin.RouterGroup, middlewareCollectio
 	}
 }
 
-func createAccountRoutes(apiGroup *gin.RouterGroup, needAPIKey gin.HandlerFunc, accountingHandler *handler.AccountingHandler) {
+func createAccountRoutes(
+	apiGroup *gin.RouterGroup,
+	middlewareCollection middleware.MiddlewareCollection,
+	accountingHandler *handler.AccountingHandler,
+) {
 	accountingGroup := apiGroup.Group("/accounting")
 	{
 		meterGroup := accountingGroup.Group("/metering")
 		{
-			meterGroup.GET("/:id/statements", accountingHandler.QueryMeteringStatementByUserID)
+			meterGroup.GET("/:id/statements", middlewareCollection.Auth.NeedLogin, accountingHandler.QueryMeteringStatementByUserID)
 		}
 	}
 }
@@ -950,16 +964,16 @@ func createMappingRoutes(
 	}
 }
 
-func createDiscussionRoutes(apiGroup *gin.RouterGroup, needAPIKey gin.HandlerFunc, discussionHandler *handler.DiscussionHandler) {
-	apiGroup.POST("/:repo_type/:namespace/:name/discussions", discussionHandler.CreateRepoDiscussion)
+func createDiscussionRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware.MiddlewareCollection, discussionHandler *handler.DiscussionHandler) {
+	apiGroup.POST("/:repo_type/:namespace/:name/discussions", middlewareCollection.Auth.NeedLogin, discussionHandler.CreateRepoDiscussion)
 	apiGroup.GET("/:repo_type/:namespace/:name/discussions", discussionHandler.ListRepoDiscussions)
 	apiGroup.GET("/discussions/:id", discussionHandler.ShowDiscussion)
-	apiGroup.PUT("/discussions/:id", discussionHandler.UpdateDiscussion)
-	apiGroup.DELETE("/discussions/:id", discussionHandler.DeleteDiscussion)
-	apiGroup.POST("/discussions/:id/comments", discussionHandler.CreateDiscussionComment)
+	apiGroup.PUT("/discussions/:id", middlewareCollection.Auth.NeedLogin, discussionHandler.UpdateDiscussion)
+	apiGroup.DELETE("/discussions/:id", middlewareCollection.Auth.NeedLogin, discussionHandler.DeleteDiscussion)
+	apiGroup.POST("/discussions/:id/comments", middlewareCollection.Auth.NeedLogin, discussionHandler.CreateDiscussionComment)
 	apiGroup.GET("/discussions/:id/comments", discussionHandler.ListDiscussionComments)
-	apiGroup.PUT("/discussions/:id/comments/:comment_id", discussionHandler.UpdateComment)
-	apiGroup.DELETE("/discussions/:id/comments/:comment_id", discussionHandler.DeleteComment)
+	apiGroup.PUT("/discussions/:id/comments/:comment_id", middlewareCollection.Auth.NeedLogin, discussionHandler.UpdateComment)
+	apiGroup.DELETE("/discussions/:id/comments/:comment_id", middlewareCollection.Auth.NeedLogin, discussionHandler.DeleteComment)
 }
 
 func createPromptRoutes(
@@ -1009,21 +1023,22 @@ func createDataflowRoutes(apiGroup *gin.RouterGroup, dataflowHandler *handler.Da
 	dataflowGrp.Any("/*any", dataflowHandler.Proxy)
 }
 
-func createTagsRoutes(apiGroup *gin.RouterGroup, tagHandler *handler.TagsHandler) {
+func createTagsRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware.MiddlewareCollection, tagHandler *handler.TagsHandler) {
 	tagsGrp := apiGroup.Group("/tags")
 	{
+		// TODO: Remove admin check in tagComponent
 		categoryGrp := tagsGrp.Group("/categories")
 		{
 			categoryGrp.GET("", tagHandler.AllCategories)
-			categoryGrp.POST("", tagHandler.CreateCategory)
-			categoryGrp.PUT("/:id", tagHandler.UpdateCategory)
-			categoryGrp.DELETE("/:id", tagHandler.DeleteCategory)
+			categoryGrp.POST("", middlewareCollection.Auth.NeedAdmin, tagHandler.CreateCategory)
+			categoryGrp.PUT("/:id", middlewareCollection.Auth.NeedAdmin, tagHandler.UpdateCategory)
+			categoryGrp.DELETE("/:id", middlewareCollection.Auth.NeedAdmin, tagHandler.DeleteCategory)
 		}
 		tagsGrp.GET("", tagHandler.AllTags)
-		tagsGrp.POST("", tagHandler.CreateTag)
-		tagsGrp.GET("/:id", tagHandler.GetTagByID)
-		tagsGrp.PUT("/:id", tagHandler.UpdateTag)
-		tagsGrp.DELETE("/:id", tagHandler.DeleteTag)
+		tagsGrp.POST("", middlewareCollection.Auth.NeedAdmin, tagHandler.CreateTag)
+		tagsGrp.GET("/:id", middlewareCollection.Auth.NeedAdmin, tagHandler.GetTagByID)
+		tagsGrp.PUT("/:id", middlewareCollection.Auth.NeedAdmin, tagHandler.UpdateTag)
+		tagsGrp.DELETE("/:id", middlewareCollection.Auth.NeedAdmin, tagHandler.DeleteTag)
 	}
 }
 

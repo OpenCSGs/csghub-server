@@ -72,10 +72,6 @@ func (t *TagsHandler) AllTags(ctx *gin.Context) {
 // @Router       /tags [post]
 func (t *TagsHandler) CreateTag(ctx *gin.Context) {
 	userName := httpbase.GetCurrentUser(ctx)
-	if userName == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	var req types.CreateTag
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", slog.Any("error", err))
@@ -105,10 +101,6 @@ func (t *TagsHandler) CreateTag(ctx *gin.Context) {
 // @Router       /tags/{id} [get]
 func (t *TagsHandler) GetTagByID(ctx *gin.Context) {
 	userName := httpbase.GetCurrentUser(ctx)
-	if userName == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
 		slog.Error("Bad request format", slog.Any("error", err))
@@ -139,10 +131,6 @@ func (t *TagsHandler) GetTagByID(ctx *gin.Context) {
 // @Router       /tags/{id} [put]
 func (t *TagsHandler) UpdateTag(ctx *gin.Context) {
 	userName := httpbase.GetCurrentUser(ctx)
-	if userName == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
 		slog.Error("Bad request format", slog.Any("error", err))
@@ -178,10 +166,6 @@ func (t *TagsHandler) UpdateTag(ctx *gin.Context) {
 // @Router       /tags/{id} [delete]
 func (t *TagsHandler) DeleteTag(ctx *gin.Context) {
 	userName := httpbase.GetCurrentUser(ctx)
-	if userName == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
 		slog.Error("Bad request format", slog.Any("error", err))
@@ -235,10 +219,6 @@ func (t *TagsHandler) AllCategories(ctx *gin.Context) {
 // @Router       /tags/categories [post]
 func (t *TagsHandler) CreateCategory(ctx *gin.Context) {
 	userName := httpbase.GetCurrentUser(ctx)
-	if userName == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	var req types.CreateCategory
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", slog.Any("error", err))
@@ -272,10 +252,6 @@ func (t *TagsHandler) CreateCategory(ctx *gin.Context) {
 // @Router       /tags/categories/id [put]
 func (t *TagsHandler) UpdateCategory(ctx *gin.Context) {
 	userName := httpbase.GetCurrentUser(ctx)
-	if userName == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	var req types.UpdateCategory
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", slog.Any("error", err))
@@ -314,10 +290,6 @@ func (t *TagsHandler) UpdateCategory(ctx *gin.Context) {
 // @Router       /tags/categories/id [delete]
 func (t *TagsHandler) DeleteCategory(ctx *gin.Context) {
 	userName := httpbase.GetCurrentUser(ctx)
-	if userName == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
 		slog.Error("Bad request format", slog.Any("error", err))

@@ -8,7 +8,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/common/config"
-	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/component"
 )
@@ -40,11 +39,6 @@ type MirrorSourceHandler struct {
 // @Router       /mirror/sources [post]
 func (h *MirrorSourceHandler) Create(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
-
 	var msReq types.CreateMirrorSourceReq
 	if err := ctx.ShouldBindJSON(&msReq); err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -96,10 +90,6 @@ func (h *MirrorSourceHandler) Index(ctx *gin.Context) {
 // @Router       /mirror/sources/{id} [put]
 func (h *MirrorSourceHandler) Update(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
-	if currentUser == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 
 	var msReq types.UpdateMirrorSourceReq
 	var msId int64
