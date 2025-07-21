@@ -161,6 +161,10 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	createMappingRoutes(r, "/csg", middlewareCollection, hfdsHandler, repoCommonHandler, modelHandler, userHandler)
 
 	apiGroup := r.Group("/api/v1")
+
+	versionHandler := handler.NewVersionHandler()
+	apiGroup.GET("/version", versionHandler.Version)
+
 	// TODO:use middleware to handle common response
 	//
 	memoryStore := persist.NewMemoryStore(1 * time.Minute)

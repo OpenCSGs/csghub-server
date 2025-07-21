@@ -21,6 +21,7 @@ import (
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/sync"
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/trigger"
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/user"
+	"opencsg.com/csghub-server/cmd/csghub-server/cmd/version"
 	"opencsg.com/csghub-server/common/config"
 )
 
@@ -70,6 +71,7 @@ func init() {
 		dataviewer.Cmd,
 		aigateway.Cmd,
 		notification.Cmd,
+		version.Cmd,
 	)
 
 	addCommands()
