@@ -6,7 +6,7 @@
   "engine_images": [
     {
       "compute_type": "gpu",
-      "image": "tgi:3.2.1",
+      "image": "opencsghq/tgi:3.2.1",
       "driver_version": "12.4",
       "engine_version": "3.2.1"
     }

@@ -6,7 +6,7 @@
   "engine_images": [
     {
       "compute_type": "gpu",
-      "image": "opencompass:0.4.2",
+      "image": "opencsghq/opencompass:0.4.2",
       "driver_version": "12.1",
       "engine_version": "0.4.2"
     }

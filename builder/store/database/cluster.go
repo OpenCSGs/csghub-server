@@ -47,17 +47,16 @@ type ClusterInfo struct {
 func (r *clusterInfoStoreImpl) Add(ctx context.Context, clusterConfig string, region string) (*ClusterInfo, error) {
 	cluster, err := r.ByClusterConfig(ctx, clusterConfig)
 	if errors.Is(err, sql.ErrNoRows) {
-		newCluster := &ClusterInfo{
+		cluster = ClusterInfo{
 			ClusterID:     uuid.New().String(),
 			ClusterConfig: clusterConfig,
 			Region:        region,
 			Enable:        true,
 		}
-		_, err = r.db.Operator.Core.NewInsert().Model(newCluster).Exec(ctx)
+		_, err = r.db.Operator.Core.NewInsert().Model(&cluster).Exec(ctx)
 		if err != nil {
 			return nil, err
 		}
-		return newCluster, nil
 	}
 	return &cluster, err
 }

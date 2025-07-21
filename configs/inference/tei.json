@@ -7,13 +7,13 @@
   "engine_images": [
     {
       "compute_type": "gpu",
-      "image": "tei:1.6",
+      "image": "opencsghq/tei:1.6",
       "driver_version": "12.4",
       "engine_version": "1.6"
     },
     {
       "compute_type": "cpu",
-      "image": "tei:cpu-1.6",
+      "image": "opencsghq/tei:cpu-1.6",
       "engine_version": "1.6"
     }
   ],
