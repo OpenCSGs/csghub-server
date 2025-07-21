@@ -238,14 +238,15 @@ func generateWorkflow(req types.ArgoWorkFlowReq, config *config.Config) *v1alpha
 
 		containerImg := v.Image
 		// add prefix if image is not full path
-		if !strings.Contains(containerImg, "/") {
-			if req.RepoType == string(types.ModelRepo) {
-				// choose registry
+
+		if req.RepoType == string(types.ModelRepo) {
+			// choose registry
+			if strings.Count(containerImg, "/") == 1 {
 				containerImg = path.Join(config.Model.DockerRegBase, v.Image)
-			} else if req.RepoType == string(types.SpaceRepo) {
-				// choose registry
-				containerImg = path.Join(config.Space.DockerRegBase, v.Image)
 			}
+		} else if req.RepoType == string(types.SpaceRepo) {
+			// choose registry
+			containerImg = path.Join(config.Space.DockerRegBase, v.Image)
 		}
 
 		templates = append(templates, v1alpha1.Template{

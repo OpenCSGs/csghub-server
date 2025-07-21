@@ -168,15 +168,15 @@ func (s *serviceComponentImpl) GenerateService(ctx context.Context, cluster clus
 	annotations[KeyOrderDetailID] = strconv.FormatInt(request.OrderDetailID, 10)
 
 	containerImg := request.ImageID
-	// add prefix if image is not full path
-	if !strings.Contains(containerImg, "/") {
-		if request.RepoType == string(types.ModelRepo) {
-			// choose registry
+	if request.RepoType == string(types.ModelRepo) {
+		// choose registry
+		// add prefix if image is not full path
+		if strings.Count(containerImg, "/") == 1 {
 			containerImg = path.Join(s.modelDockerRegBase, request.ImageID)
-		} else if request.RepoType == string(types.SpaceRepo) {
-			// choose registry
-			containerImg = path.Join(s.spaceDockerRegBase, request.ImageID)
 		}
+	} else if request.RepoType == string(types.SpaceRepo) {
+		// choose registry
+		containerImg = path.Join(s.spaceDockerRegBase, request.ImageID)
 	}
 
 	templateAnnotations := make(map[string]string)

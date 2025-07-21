@@ -6,7 +6,7 @@
   "engine_images": [
     {
       "compute_type": "gpu",
-      "image": "lm-evaluation-harness:0.4.9",
+      "image": "opencsghq/lm-evaluation-harness:0.4.9",
       "driver_version": "12.1",
       "engine_version": "0.4.9"
     }

@@ -6,7 +6,7 @@
   "engine_images": [
     {
       "compute_type": "gpu",
-      "image": "ms-swift:v3.5.2-cu121",
+      "image": "opencsghq/ms-swift:v3.5.2-cu121",
       "driver_version": "12.1",
       "engine_version": "v3.5.2"
     }

@@ -14,6 +14,9 @@ if [ "x${REPO_ID}" != "x" ]; then
 
     sed -i "s#model_name = gr.Dropdown(choices=available_models, value=None, scale=3)#model_name = gr.Dropdown(choices=available_models,value=\"${MODEL_NAME}\", scale=3)#" /etc/csghub/LLaMA-Factory/src/llamafactory/webui/components/top.py
     sed -i "s#model_path = gr.Textbox(scale=3)#model_path = gr.Textbox(value=\"${REPO_ID}\",scale=3)#" /etc/csghub/LLaMA-Factory/src/llamafactory/webui/components/top.py
+    sed -i "s#Hugging Face hub#CSGHub#g" /etc/csghub/LLaMA-Factory/src/llamafactory/webui/locales.py
+    sed -i "s#Hugging Face Hub#CSGHub#g" /etc/csghub/LLaMA-Factory/src/llamafactory/webui/locales.py
+    sed -i "s#HF Hub#CSGHub#g" /etc/csghub/LLaMA-Factory/src/llamafactory/webui/locales.py
 fi
 if [ ! -f "/workspace/.csghub_init" ]; then
     if [ ! -d "/workspace/data" ]; then
@@ -29,6 +32,8 @@ if [ ! -f "/workspace/.csghub_init" ]; then
     sed -i "s/model_args.model_revision/\"$REVISION\"/g" /etc/csghub/LLaMA-Factory/src/llamafactory/model/loader.py
     touch /workspace/.csghub_init
 fi 
+#fix upload issue
+sed -i "s|and repo_type != constants.REPO_TYPE_MODEL||g" /usr/local/lib/python3.10/dist-packages/huggingface_hub/hf_api.py
 
 
 export GRADIO_ROOT_PATH="${CONTEXT_PATH}/proxy/7860"

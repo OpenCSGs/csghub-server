@@ -6,13 +6,13 @@
   "engine_images": [
     {
       "compute_type": "gpu",
-      "image": "sglang:v0.4.6.post1-cu124-srt",
+      "image": "opencsghq/sglang:v0.4.6.post1-cu124-srt",
       "driver_version": "12.4",
       "engine_version": "v0.4.6.post1"
     },
     {
       "compute_type": "gpu",
-      "image": "sglang:v0.4.6.post1-cu121-srt",
+      "image": "opencsghq/sglang:v0.4.6.post1-cu121-srt",
       "driver_version": "12.1",
       "engine_version": "v0.4.6.post1"
     }
