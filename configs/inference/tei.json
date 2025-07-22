@@ -7,15 +7,26 @@
   "engine_images": [
     {
       "compute_type": "gpu",
-      "image": "opencsghq/tei:1.6",
-      "driver_version": "12.4",
-      "engine_version": "1.6"
+      "image": "opencsghq/tei:1.7",
+      "driver_version": "12.2",
+      "engine_version": "1.7"
     },
     {
       "compute_type": "cpu",
-      "image": "opencsghq/tei:cpu-1.6",
-      "engine_version": "1.6"
+      "image": "opencsghq/tei:cpu-1.7",
+      "engine_version": "1.7"
     }
+  ],
+  "supported_archs": [
+    "JinaBertForMaskedLM",
+    "XLMRobertaForSequenceClassification",
+    "NewForSequenceClassification",
+    "ModernBertForSequenceClassification",
+    "RobertaForSequenceClassification",
+    "JinaBertForMaskedLM",
+    "NomicBertModel",
+    "GteModel",
+    "MistralModel"
   ],
   "supported_models": [
     "gte-Qwen2-7B-instruct",
