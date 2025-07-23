@@ -315,6 +315,15 @@ type Config struct {
 		ApiAddress string `env:"STARHUB_SERVER_PROMETHEUS_API_ADDRESS" default:""`
 		BasicAuth  string `env:"STARHUB_SERVER_PROMETHEUS_BASIC_AUTH" default:""`
 	}
+
+	RepoSync struct {
+		Port int `env:"STARHUB_SERVER_REPO_SYNC_PORT" default:"8091"`
+	}
+
+	LfsSync struct {
+		Host string `env:"STARHUB_SERVER_LFS_SYNC_HOST" default:"http://localhost"`
+		Port int    `env:"STARHUB_SERVER_LFS_SYNC_PORT" default:"8092"`
+	}
 }
 
 func SetConfigFile(file string) {

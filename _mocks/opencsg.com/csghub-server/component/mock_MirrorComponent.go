@@ -24,52 +24,6 @@ func (_m *MockMirrorComponent) EXPECT() *MockMirrorComponent_Expecter {
 	return &MockMirrorComponent_Expecter{mock: &_m.Mock}
 }
 
-// CheckMirrorProgress provides a mock function with given fields: ctx
-func (_m *MockMirrorComponent) CheckMirrorProgress(ctx context.Context) error {
-	ret := _m.Called(ctx)
-
-	if len(ret) == 0 {
-		panic("no return value specified for CheckMirrorProgress")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context) error); ok {
-		r0 = rf(ctx)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// MockMirrorComponent_CheckMirrorProgress_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CheckMirrorProgress'
-type MockMirrorComponent_CheckMirrorProgress_Call struct {
-	*mock.Call
-}
-
-// CheckMirrorProgress is a helper method to define mock.On call
-//   - ctx context.Context
-func (_e *MockMirrorComponent_Expecter) CheckMirrorProgress(ctx interface{}) *MockMirrorComponent_CheckMirrorProgress_Call {
-	return &MockMirrorComponent_CheckMirrorProgress_Call{Call: _e.mock.On("CheckMirrorProgress", ctx)}
-}
-
-func (_c *MockMirrorComponent_CheckMirrorProgress_Call) Run(run func(ctx context.Context)) *MockMirrorComponent_CheckMirrorProgress_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context))
-	})
-	return _c
-}
-
-func (_c *MockMirrorComponent_CheckMirrorProgress_Call) Return(_a0 error) *MockMirrorComponent_CheckMirrorProgress_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *MockMirrorComponent_CheckMirrorProgress_Call) RunAndReturn(run func(context.Context) error) *MockMirrorComponent_CheckMirrorProgress_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // CreateMirrorRepo provides a mock function with given fields: ctx, req
 func (_m *MockMirrorComponent) CreateMirrorRepo(ctx context.Context, req types.CreateMirrorRepoReq) (*database.Mirror, error) {
 	ret := _m.Called(ctx, req)
@@ -125,52 +79,6 @@ func (_c *MockMirrorComponent_CreateMirrorRepo_Call) Return(_a0 *database.Mirror
 }
 
 func (_c *MockMirrorComponent_CreateMirrorRepo_Call) RunAndReturn(run func(context.Context, types.CreateMirrorRepoReq) (*database.Mirror, error)) *MockMirrorComponent_CreateMirrorRepo_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// CreatePushMirrorForFinishedMirrorTask provides a mock function with given fields: ctx
-func (_m *MockMirrorComponent) CreatePushMirrorForFinishedMirrorTask(ctx context.Context) error {
-	ret := _m.Called(ctx)
-
-	if len(ret) == 0 {
-		panic("no return value specified for CreatePushMirrorForFinishedMirrorTask")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context) error); ok {
-		r0 = rf(ctx)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// MockMirrorComponent_CreatePushMirrorForFinishedMirrorTask_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreatePushMirrorForFinishedMirrorTask'
-type MockMirrorComponent_CreatePushMirrorForFinishedMirrorTask_Call struct {
-	*mock.Call
-}
-
-// CreatePushMirrorForFinishedMirrorTask is a helper method to define mock.On call
-//   - ctx context.Context
-func (_e *MockMirrorComponent_Expecter) CreatePushMirrorForFinishedMirrorTask(ctx interface{}) *MockMirrorComponent_CreatePushMirrorForFinishedMirrorTask_Call {
-	return &MockMirrorComponent_CreatePushMirrorForFinishedMirrorTask_Call{Call: _e.mock.On("CreatePushMirrorForFinishedMirrorTask", ctx)}
-}
-
-func (_c *MockMirrorComponent_CreatePushMirrorForFinishedMirrorTask_Call) Run(run func(ctx context.Context)) *MockMirrorComponent_CreatePushMirrorForFinishedMirrorTask_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context))
-	})
-	return _c
-}
-
-func (_c *MockMirrorComponent_CreatePushMirrorForFinishedMirrorTask_Call) Return(_a0 error) *MockMirrorComponent_CreatePushMirrorForFinishedMirrorTask_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *MockMirrorComponent_CreatePushMirrorForFinishedMirrorTask_Call) RunAndReturn(run func(context.Context) error) *MockMirrorComponent_CreatePushMirrorForFinishedMirrorTask_Call {
 	_c.Call.Return(run)
 	return _c
 }

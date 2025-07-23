@@ -35,6 +35,7 @@ type MirrorStore interface {
 	IndexWithPagination(ctx context.Context, per, page int, search string) (mirrors []Mirror, count int, err error)
 	StatusCount(ctx context.Context) ([]MirrorStatusCount, error)
 	UpdateMirrorAndRepository(ctx context.Context, mirror *Mirror, repo *Repository) error
+	Recover(ctx context.Context) error
 }
 
 func NewMirrorStore() MirrorStore {
@@ -74,6 +75,8 @@ type Mirror struct {
 	Progress               int8                   `bun:",nullzero" json:"progress"`
 	NextExecutionTimestamp time.Time              `bun:",nullzero" json:"next_execution_timestamp"`
 	Priority               types.MirrorPriority   `bun:"mirror_priority,notnull,default:0" json:"priority"`
+	CurrentTaskID          int64                  `bun:",nullzero" json:"current_task_id"`
+	CurrentTask            *MirrorTask            `bun:"rel:has-one,join:current_task_id=id" json:"current_task"`
 
 	times
 }
@@ -81,6 +84,13 @@ type Mirror struct {
 type MirrorStatusCount struct {
 	Status types.MirrorTaskStatus `bun:"status"`
 	Count  int                    `bun:"count"`
+}
+
+func (m *Mirror) RepoPath() string {
+	if m.Repository != nil {
+		return fmt.Sprintf("%ss/%s", m.Repository.RepositoryType, m.Repository.Path)
+	}
+	return ""
 }
 
 func (m *Mirror) SetStatus(status types.MirrorTaskStatus) {
@@ -282,7 +292,7 @@ func (s *mirrorStoreImpl) ToSyncRepo(ctx context.Context) ([]Mirror, error) {
 			time.Now(),
 			types.MirrorLfsSyncFailed,
 			types.MirrorRepoSyncFailed,
-			types.MirrorInit,
+			types.MirrorQueued,
 		).
 		Scan(ctx)
 	if err != nil {
@@ -308,7 +318,10 @@ func (s *mirrorStoreImpl) IndexWithPagination(ctx context.Context, per, page int
 	q := s.db.Operator.Core.NewSelect().
 		Model(&mirrors).
 		Relation("Repository").
-		Relation("MirrorSource")
+		Relation("MirrorSource").
+		Relation("CurrentTask").
+		Order("id desc")
+
 	if search != "" {
 		q = q.Where("LOWER(mirror.source_url) like ? or LOWER(mirror.local_repo_path) like ?",
 			fmt.Sprintf("%%%s%%", strings.ToLower(search)),
@@ -353,5 +366,15 @@ func (s *mirrorStoreImpl) UpdateMirrorAndRepository(ctx context.Context, mirror 
 		}
 		return nil
 	})
+	return err
+}
+
+func (s *mirrorStoreImpl) Recover(ctx context.Context) error {
+	_, err := s.db.Operator.Core.NewUpdate().
+		Model((*Mirror)(nil)).
+		Set("status = ?", types.MirrorQueued).
+		Set("updated_at = ?", time.Now()).
+		Where("status in (?)", bun.In([]types.MirrorTaskStatus{types.MirrorLfsSyncStart, types.MirrorRepoSyncStart})).
+		Exec(ctx)
 	return err
 }

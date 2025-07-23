@@ -7,7 +7,6 @@ import (
 func init() {
 	// add subcommands here
 	Cmd.AddCommand(cmdCalcRecomScore)
-	Cmd.AddCommand(cmdCreatePushMirror)
 	Cmd.AddCommand(cmdGenTelemetry)
 }
 

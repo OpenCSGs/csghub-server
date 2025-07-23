@@ -22,7 +22,6 @@ import (
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/i18n"
 	"opencsg.com/csghub-server/common/types"
-	"opencsg.com/csghub-server/mirror"
 )
 
 func RunServer(config *config.Config, enableSwagger bool) {
@@ -41,15 +40,7 @@ func RunServer(config *config.Config, enableSwagger bool) {
 		},
 		r,
 	)
-	// Initialize mirror service
-	mirrorService, err := mirror.NewMirrorPriorityQueue(config)
-	if err != nil {
-		panic(fmt.Errorf("failed to init mirror service: %w", err))
-	}
 
-	if config.MirrorServer.Enable && config.GitServer.Type == types.GitServerTypeGitaly {
-		mirrorService.EnqueueMirrorTasks()
-	}
 	i18n.InitLocalizersFromEmbedFile()
 	server.Run()
 	_ = stopOtel(context.Background())
@@ -303,6 +294,13 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	}
 
 	apiGroup.GET("/mirrors", middlewareCollection.Auth.NeedAdmin, mirrorHandler.Index)
+
+	lfsSyncProxyHandler, err := handler.NewInternalServiceProxyHandler(fmt.Sprintf("%s:%d", config.LfsSync.Host, config.LfsSync.Port))
+	if err != nil {
+		return nil, fmt.Errorf("error creating multi sync proxy handler:%w", err)
+	}
+	createLfsSyncRoutes(apiGroup, middlewareCollection, lfsSyncProxyHandler)
+
 	mirror := apiGroup.Group("/mirror")
 	mirror.Use(middlewareCollection.Auth.NeedAdmin)
 	{
@@ -520,9 +518,7 @@ func createModelRoutes(config *config.Config,
 		modelsGroup.GET("/:namespace/:name/branches", repoCommonHandler.Branches)
 		modelsGroup.GET("/:namespace/:name/tags", repoCommonHandler.Tags)
 		modelsGroup.POST("/:namespace/:name/preupload/:revision", repoCommonHandler.Preupload)
-		modelsGroup.GET("/:namespace/:name/all_files", repoCommonHandler.AllFiles)
 		// update tags of a certain category
-		modelsGroup.GET("/:namespace/:name/all_files", repoCommonHandler.AllFiles)
 		modelsGroup.POST("/:namespace/:name/tags/:category", middlewareCollection.Auth.NeedLogin, repoCommonHandler.UpdateTags)
 		modelsGroup.GET("/:namespace/:name/last_commit", repoCommonHandler.LastCommit)
 		modelsGroup.GET("/:namespace/:name/commit/:commit_id", repoCommonHandler.CommitWithDiff)
@@ -645,7 +641,6 @@ func createDatasetRoutes(
 	datasetsGroup.Use(middleware.MustLogin(), middleware.RepoType(types.DatasetRepo), middlewareCollection.Repo.RepoExists)
 	{
 		datasetsGroup.POST("", middlewareCollection.Auth.NeedLogin, dsHandler.Create)
-		datasetsGroup.GET("", dsHandler.Index)
 		datasetsGroup.PUT("/:namespace/:name", middlewareCollection.Auth.NeedLogin, dsHandler.Update)
 		datasetsGroup.DELETE("/:namespace/:name", middlewareCollection.Auth.NeedLogin, dsHandler.Delete)
 		datasetsGroup.GET("/:namespace/:name", dsHandler.Show)
@@ -1121,4 +1116,13 @@ func createNotificationRoutes(config *config.Config, apiGroup *gin.RouterGroup, 
 	}
 
 	return nil
+}
+
+func createLfsSyncRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware.MiddlewareCollection, lfsSyncHandler *handler.InternalServiceProxyHandler) {
+	lfsSyncGrp := apiGroup.Group("/lfs_sync")
+	{
+		lfsSyncGrp.POST("/stop_worker_by_id", middlewareCollection.Auth.NeedAdmin, lfsSyncHandler.ProxyToApi("/api/v1/lfs_sync/stop_worker_by_id"))
+		lfsSyncGrp.POST("/sync_now", middlewareCollection.Auth.NeedAdmin, lfsSyncHandler.ProxyToApi("/api/v1/lfs_sync/sync_now"))
+		lfsSyncGrp.POST("/cancel", middlewareCollection.Auth.NeedAdmin, lfsSyncHandler.ProxyToApi("/api/v1/lfs_sync/cancel"))
+	}
 }

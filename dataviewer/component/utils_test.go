@@ -17,7 +17,6 @@ import (
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rsa"
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/s3"
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
-	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/mirror/queue"
 	"opencsg.com/csghub-server/common/tests"
 )
 
@@ -48,7 +47,6 @@ func initializeTestDatasetViewerComponent(ctx context.Context, t interface {
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
 	mockClient := s3.NewMockClient(t)
 	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
-	mockPriorityQueue := queue.NewMockPriorityQueue(t)
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
@@ -60,7 +58,6 @@ func initializeTestDatasetViewerComponent(ctx context.Context, t interface {
 		userSvcClient:     mockUserSvcClient,
 		s3Client:          mockClient,
 		mirrorServer:      mockMirrorServer,
-		mirrorQueue:       mockPriorityQueue,
 		deployer:          mockDeployer,
 		accountingClient:  mockAccountingClient,
 		preader:           mockReader,

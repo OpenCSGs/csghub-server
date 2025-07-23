@@ -12,7 +12,6 @@ import (
 	mock_rsa "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rsa"
 	mock_s3 "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/s3"
 	mock_component "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
-	mock_mirror_queue "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/mirror/queue"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/parquet"
 	"opencsg.com/csghub-server/common/config"
@@ -40,7 +39,6 @@ type Mocks struct {
 	userSvcClient     *mock_rpc.MockUserSvcClient
 	s3Client          *mock_s3.MockClient
 	mirrorServer      *mock_mirror.MockMirrorServer
-	mirrorQueue       *mock_mirror_queue.MockPriorityQueue
 	deployer          *mock_deploy.MockDeployer
 	accountingClient  *mock_accounting.MockAccountingClient
 	preader           *mock_preader.MockReader

@@ -18,13 +18,11 @@ import (
 	deployStatus "opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/git/membership"
-	"opencsg.com/csghub-server/builder/git/mirrorserver"
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/tests"
 	"opencsg.com/csghub-server/common/types"
-	"opencsg.com/csghub-server/mirror/queue"
 )
 
 func TestRepoComponent_CreateRepo(t *testing.T) {
@@ -1387,53 +1385,29 @@ func TestRepoComponent_DeployStatus(t *testing.T) {
 }
 
 func TestRepoComponent_SyncMirror(t *testing.T) {
+	ctx := context.TODO()
+	repo := initializeTestRepoComponent(ctx, t)
+	mockUserRepoAdminPermission(ctx, repo.mocks.stores, "user")
 
-	for _, gitea := range []bool{false, true} {
-		t.Run(fmt.Sprintf("gitea %v", gitea), func(t *testing.T) {
-			ctx := context.TODO()
-			repo := initializeTestRepoComponent(ctx, t)
-			mockUserRepoAdminPermission(ctx, repo.mocks.stores, "user")
-
-			if gitea {
-				repo.config.GitServer.Type = types.GitServerTypeGitea
-			} else {
-				repo.config.GitServer.Type = types.GitServerTypeGitaly
-			}
-
-			mirror := &database.Mirror{
-				ID:             321,
-				SourceUrl:      "/models/ns/n.git",
-				Username:       "user",
-				RepositoryID:   123,
-				SourceRepoPath: "ns/n",
-			}
-
-			repo.mocks.stores.MirrorMock().EXPECT().FindByRepoID(ctx, int64(123)).Return(mirror, nil)
-			mockedRepo := &database.Repository{ID: 123}
-			repo.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(
-				mockedRepo, nil,
-			)
-
-			if gitea {
-				repo.mocks.mirrorServer.EXPECT().MirrorSync(ctx, mirrorserver.MirrorSyncReq{
-					Namespace: "root",
-					Name:      mirror.LocalRepoPath,
-				}).Return(nil)
-			} else {
-				repo.mocks.mirrorQueue.EXPECT().PushRepoMirror(&queue.MirrorTask{
-					MirrorID:  321,
-					Priority:  queue.PriorityMap[types.HighMirrorPriority],
-					CreatedAt: mirror.CreatedAt.Unix(),
-				}).Return()
-				repo.mocks.stores.MirrorMock().EXPECT().Update(ctx, mirror).Return(nil)
-			}
-
-			err := repo.SyncMirror(ctx, types.ModelRepo, "ns", "n", "user")
-			require.Nil(t, err)
-
-		})
+	mirror := &database.Mirror{
+		ID:             321,
+		SourceUrl:      "/models/ns/n.git",
+		Username:       "user",
+		RepositoryID:   123,
+		SourceRepoPath: "ns/n",
 	}
 
+	repo.mocks.stores.MirrorMock().EXPECT().FindByRepoID(ctx, int64(123)).Return(mirror, nil)
+	mockedRepo := &database.Repository{ID: 123}
+	repo.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(
+		mockedRepo, nil,
+	)
+
+	repo.mocks.stores.MirrorMock().EXPECT().Update(ctx, mirror).Return(nil)
+	repo.mocks.stores.MirrorTaskMock().EXPECT().CancelOtherTasksAndCreate(ctx, mock.Anything).Return(database.MirrorTask{}, nil)
+
+	err := repo.SyncMirror(ctx, types.ModelRepo, "ns", "n", "user")
+	require.Nil(t, err)
 }
 
 func TestRepoComponent_Branches(t *testing.T) {

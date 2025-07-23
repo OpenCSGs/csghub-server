@@ -73,6 +73,7 @@ type CreateMirrorRepoReq struct {
 }
 
 type MirrorRepo struct {
+	ID         int64                `json:"id"`
 	Path       string               `json:"path"`
 	SyncStatus RepositorySyncStatus `json:"sync_status"`
 	Progress   int8                 `json:"progress"`
@@ -88,7 +89,6 @@ type MirrorResp struct {
 type MirrorTaskStatus string
 
 const (
-	MirrorInit             MirrorTaskStatus = "waiting"
 	MirrorQueued           MirrorTaskStatus = "queued"
 	MirrorRepoSyncStart    MirrorTaskStatus = "running"
 	MirrorRepoSyncFailed   MirrorTaskStatus = "repo_failed"
@@ -99,6 +99,7 @@ const (
 	MirrorLfsSyncFinished  MirrorTaskStatus = "finished"
 	MirrorLfsSyncFatal     MirrorTaskStatus = "fatal"
 	MirrorLfsIncomplete    MirrorTaskStatus = "incomplete"
+	MirrorCanceled         MirrorTaskStatus = "cancelled"
 
 	MirrorRepoTooLarge MirrorTaskStatus = "too_large"
 )
@@ -146,4 +147,17 @@ type MirrorSource struct {
 type MirrorStatusCount struct {
 	Status MirrorTaskStatus
 	Count  int
+}
+
+type MirrorListResp struct {
+	RunningTasks    map[int]MirrorTask `json:"running_tasks"`
+	RepoMirrorTasks []MirrorTask       `json:"repo_mirror_tasks"`
+	LfsMirrorTasks  []MirrorTask       `json:"lfs_mirror_tasks"`
+}
+
+type MirrorTask struct {
+	MirrorID  int64  `json:"mirror_id"`
+	SourceUrl string `json:"source_url"`
+	Priority  int    `json:"priority"`
+	RepoPath  string `json:"repo_path"`
 }

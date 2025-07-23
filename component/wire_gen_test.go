@@ -19,7 +19,6 @@ import (
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/s3"
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
-	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/mirror/queue"
 	"opencsg.com/csghub-server/common/tests"
 )
 
@@ -37,10 +36,9 @@ func initializeTestRepoComponent(ctx context.Context, t interface {
 	mockClient := s3.NewMockClient(t)
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockAccountingComponent := component.NewMockAccountingComponent(t)
-	mockPriorityQueue := queue.NewMockPriorityQueue(t)
 	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
 	multisyncMockClient := multisync.NewMockClient(t)
-	componentRepoComponentImpl := NewTestRepoComponent(config, mockStores, mockUserSvcClient, mockGitServer, mockTagComponent, mockClient, mockDeployer, mockAccountingComponent, mockPriorityQueue, mockMirrorServer, multisyncMockClient)
+	componentRepoComponentImpl := NewTestRepoComponent(config, mockStores, mockUserSvcClient, mockGitServer, mockTagComponent, mockClient, mockDeployer, mockAccountingComponent, mockMirrorServer, multisyncMockClient)
 	mockRepoComponent := component.NewMockRepoComponent(t)
 	mockSpaceComponent := component.NewMockSpaceComponent(t)
 	mockRuntimeArchitectureComponent := component.NewMockRuntimeArchitectureComponent(t)
@@ -65,7 +63,6 @@ func initializeTestRepoComponent(ctx context.Context, t interface {
 		userSvcClient:    mockUserSvcClient,
 		s3Client:         mockClient,
 		mirrorServer:     mockMirrorServer,
-		mirrorQueue:      mockPriorityQueue,
 		deployer:         mockDeployer,
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
@@ -106,7 +103,6 @@ func initializeTestPromptComponent(ctx context.Context, t interface {
 	}
 	mockClient := s3.NewMockClient(t)
 	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
-	mockPriorityQueue := queue.NewMockPriorityQueue(t)
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
@@ -121,7 +117,6 @@ func initializeTestPromptComponent(ctx context.Context, t interface {
 		userSvcClient:    mockUserSvcClient,
 		s3Client:         mockClient,
 		mirrorServer:     mockMirrorServer,
-		mirrorQueue:      mockPriorityQueue,
 		deployer:         mockDeployer,
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
@@ -162,7 +157,6 @@ func initializeTestUserComponent(ctx context.Context, t interface {
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
 	mockClient := s3.NewMockClient(t)
 	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
-	mockPriorityQueue := queue.NewMockPriorityQueue(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
@@ -176,7 +170,6 @@ func initializeTestUserComponent(ctx context.Context, t interface {
 		userSvcClient:    mockUserSvcClient,
 		s3Client:         mockClient,
 		mirrorServer:     mockMirrorServer,
-		mirrorQueue:      mockPriorityQueue,
 		deployer:         mockDeployer,
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
@@ -218,7 +211,6 @@ func initializeTestSpaceComponent(ctx context.Context, t interface {
 	}
 	mockClient := s3.NewMockClient(t)
 	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
-	mockPriorityQueue := queue.NewMockPriorityQueue(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
@@ -232,7 +224,6 @@ func initializeTestSpaceComponent(ctx context.Context, t interface {
 		userSvcClient:    mockUserSvcClient,
 		s3Client:         mockClient,
 		mirrorServer:     mockMirrorServer,
-		mirrorQueue:      mockPriorityQueue,
 		deployer:         mockDeployer,
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
@@ -274,7 +265,6 @@ func initializeTestModelComponent(ctx context.Context, t interface {
 	}
 	mockClient := s3.NewMockClient(t)
 	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
-	mockPriorityQueue := queue.NewMockPriorityQueue(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
@@ -288,7 +278,6 @@ func initializeTestModelComponent(ctx context.Context, t interface {
 		userSvcClient:    mockUserSvcClient,
 		s3Client:         mockClient,
 		mirrorServer:     mockMirrorServer,
-		mirrorQueue:      mockPriorityQueue,
 		deployer:         mockDeployer,
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
@@ -329,7 +318,6 @@ func initializeTestAccountingComponent(ctx context.Context, t interface {
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
 	mockClient := s3.NewMockClient(t)
 	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
-	mockPriorityQueue := queue.NewMockPriorityQueue(t)
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
@@ -343,7 +331,6 @@ func initializeTestAccountingComponent(ctx context.Context, t interface {
 		userSvcClient:    mockUserSvcClient,
 		s3Client:         mockClient,
 		mirrorServer:     mockMirrorServer,
-		mirrorQueue:      mockPriorityQueue,
 		deployer:         mockDeployer,
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
@@ -385,7 +372,6 @@ func initializeTestGitHTTPComponent(ctx context.Context, t interface {
 	}
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
 	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
-	mockPriorityQueue := queue.NewMockPriorityQueue(t)
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
@@ -399,7 +385,6 @@ func initializeTestGitHTTPComponent(ctx context.Context, t interface {
 		userSvcClient:    mockUserSvcClient,
 		s3Client:         mockClient,
 		mirrorServer:     mockMirrorServer,
-		mirrorQueue:      mockPriorityQueue,
 		deployer:         mockDeployer,
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
@@ -439,7 +424,6 @@ func initializeTestDiscussionComponent(ctx context.Context, t interface {
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
 	mockClient := s3.NewMockClient(t)
 	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
-	mockPriorityQueue := queue.NewMockPriorityQueue(t)
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
@@ -454,7 +438,6 @@ func initializeTestDiscussionComponent(ctx context.Context, t interface {
 		userSvcClient:    mockUserSvcClient,
 		s3Client:         mockClient,
 		mirrorServer:     mockMirrorServer,
-		mirrorQueue:      mockPriorityQueue,
 		deployer:         mockDeployer,
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
@@ -494,7 +477,6 @@ func initializeTestRuntimeArchComponent(ctx context.Context, t interface {
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
 	mockClient := s3.NewMockClient(t)
 	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
-	mockPriorityQueue := queue.NewMockPriorityQueue(t)
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
@@ -509,7 +491,6 @@ func initializeTestRuntimeArchComponent(ctx context.Context, t interface {
 		userSvcClient:    mockUserSvcClient,
 		s3Client:         mockClient,
 		mirrorServer:     mockMirrorServer,
-		mirrorQueue:      mockPriorityQueue,
 		deployer:         mockDeployer,
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
@@ -535,8 +516,7 @@ func initializeTestMirrorComponent(ctx context.Context, t interface {
 	mockRepoComponent := component.NewMockRepoComponent(t)
 	mockGitServer := gitserver.NewMockGitServer(t)
 	mockClient := s3.NewMockClient(t)
-	mockPriorityQueue := queue.NewMockPriorityQueue(t)
-	componentMirrorComponentImpl := NewTestMirrorComponent(config, mockStores, mockMirrorServer, mockRepoComponent, mockGitServer, mockClient, mockPriorityQueue)
+	componentMirrorComponentImpl := NewTestMirrorComponent(config, mockStores, mockMirrorServer, mockRepoComponent, mockGitServer, mockClient)
 	mockAccountingComponent := component.NewMockAccountingComponent(t)
 	mockTagComponent := component.NewMockTagComponent(t)
 	mockSpaceComponent := component.NewMockSpaceComponent(t)
@@ -565,7 +545,6 @@ func initializeTestMirrorComponent(ctx context.Context, t interface {
 		userSvcClient:    mockUserSvcClient,
 		s3Client:         mockClient,
 		mirrorServer:     mockMirrorServer,
-		mirrorQueue:      mockPriorityQueue,
 		deployer:         mockDeployer,
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
@@ -605,7 +584,6 @@ func initializeTestCollectionComponent(ctx context.Context, t interface {
 	mockGitServer := gitserver.NewMockGitServer(t)
 	mockClient := s3.NewMockClient(t)
 	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
-	mockPriorityQueue := queue.NewMockPriorityQueue(t)
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
@@ -620,7 +598,6 @@ func initializeTestCollectionComponent(ctx context.Context, t interface {
 		userSvcClient:    mockUserSvcClient,
 		s3Client:         mockClient,
 		mirrorServer:     mockMirrorServer,
-		mirrorQueue:      mockPriorityQueue,
 		deployer:         mockDeployer,
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
@@ -660,7 +637,6 @@ func initializeTestBroadcastComponent(ctx context.Context, t interface {
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
 	mockClient := s3.NewMockClient(t)
 	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
-	mockPriorityQueue := queue.NewMockPriorityQueue(t)
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
@@ -675,7 +651,6 @@ func initializeTestBroadcastComponent(ctx context.Context, t interface {
 		userSvcClient:    mockUserSvcClient,
 		s3Client:         mockClient,
 		mirrorServer:     mockMirrorServer,
-		mirrorQueue:      mockPriorityQueue,
 		deployer:         mockDeployer,
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
@@ -716,7 +691,6 @@ func initializeTestDatasetComponent(ctx context.Context, t interface {
 	}
 	mockClient := s3.NewMockClient(t)
 	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
-	mockPriorityQueue := queue.NewMockPriorityQueue(t)
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
@@ -731,7 +705,6 @@ func initializeTestDatasetComponent(ctx context.Context, t interface {
 		userSvcClient:    mockUserSvcClient,
 		s3Client:         mockClient,
 		mirrorServer:     mockMirrorServer,
-		mirrorQueue:      mockPriorityQueue,
 		deployer:         mockDeployer,
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
@@ -772,7 +745,6 @@ func initializeTestCodeComponent(ctx context.Context, t interface {
 	}
 	mockClient := s3.NewMockClient(t)
 	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
-	mockPriorityQueue := queue.NewMockPriorityQueue(t)
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
@@ -787,7 +759,6 @@ func initializeTestCodeComponent(ctx context.Context, t interface {
 		userSvcClient:    mockUserSvcClient,
 		s3Client:         mockClient,
 		mirrorServer:     mockMirrorServer,
-		mirrorQueue:      mockPriorityQueue,
 		deployer:         mockDeployer,
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
@@ -828,7 +799,6 @@ func initializeTestMultiSyncComponent(ctx context.Context, t interface {
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
 	mockClient := s3.NewMockClient(t)
 	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
-	mockPriorityQueue := queue.NewMockPriorityQueue(t)
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
@@ -843,7 +813,6 @@ func initializeTestMultiSyncComponent(ctx context.Context, t interface {
 		userSvcClient:    mockUserSvcClient,
 		s3Client:         mockClient,
 		mirrorServer:     mockMirrorServer,
-		mirrorQueue:      mockPriorityQueue,
 		deployer:         mockDeployer,
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
@@ -884,7 +853,6 @@ func initializeTestInternalComponent(ctx context.Context, t interface {
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
 	mockClient := s3.NewMockClient(t)
 	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
-	mockPriorityQueue := queue.NewMockPriorityQueue(t)
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
@@ -899,7 +867,6 @@ func initializeTestInternalComponent(ctx context.Context, t interface {
 		userSvcClient:    mockUserSvcClient,
 		s3Client:         mockClient,
 		mirrorServer:     mockMirrorServer,
-		mirrorQueue:      mockPriorityQueue,
 		deployer:         mockDeployer,
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
@@ -940,7 +907,6 @@ func initializeTestMirrorSourceComponent(ctx context.Context, t interface {
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
 	mockClient := s3.NewMockClient(t)
 	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
-	mockPriorityQueue := queue.NewMockPriorityQueue(t)
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
@@ -955,7 +921,6 @@ func initializeTestMirrorSourceComponent(ctx context.Context, t interface {
 		userSvcClient:    mockUserSvcClient,
 		s3Client:         mockClient,
 		mirrorServer:     mockMirrorServer,
-		mirrorQueue:      mockPriorityQueue,
 		deployer:         mockDeployer,
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
@@ -997,7 +962,6 @@ func initializeTestSpaceResourceComponent(ctx context.Context, t interface {
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
 	mockClient := s3.NewMockClient(t)
 	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
-	mockPriorityQueue := queue.NewMockPriorityQueue(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
@@ -1011,7 +975,6 @@ func initializeTestSpaceResourceComponent(ctx context.Context, t interface {
 		userSvcClient:    mockUserSvcClient,
 		s3Client:         mockClient,
 		mirrorServer:     mockMirrorServer,
-		mirrorQueue:      mockPriorityQueue,
 		deployer:         mockDeployer,
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
@@ -1053,7 +1016,6 @@ func initializeTestTagComponent(ctx context.Context, t interface {
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
 	mockClient := s3.NewMockClient(t)
 	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
-	mockPriorityQueue := queue.NewMockPriorityQueue(t)
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
@@ -1067,7 +1029,6 @@ func initializeTestTagComponent(ctx context.Context, t interface {
 		userSvcClient:    mockUserSvcClient,
 		s3Client:         mockClient,
 		mirrorServer:     mockMirrorServer,
-		mirrorQueue:      mockPriorityQueue,
 		deployer:         mockDeployer,
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
@@ -1108,7 +1069,6 @@ func initializeTestRecomComponent(ctx context.Context, t interface {
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
 	mockClient := s3.NewMockClient(t)
 	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
-	mockPriorityQueue := queue.NewMockPriorityQueue(t)
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
@@ -1123,7 +1083,6 @@ func initializeTestRecomComponent(ctx context.Context, t interface {
 		userSvcClient:    mockUserSvcClient,
 		s3Client:         mockClient,
 		mirrorServer:     mockMirrorServer,
-		mirrorQueue:      mockPriorityQueue,
 		deployer:         mockDeployer,
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
@@ -1164,7 +1123,6 @@ func initializeTestSpaceSdkComponent(ctx context.Context, t interface {
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
 	mockClient := s3.NewMockClient(t)
 	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
-	mockPriorityQueue := queue.NewMockPriorityQueue(t)
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
@@ -1179,7 +1137,6 @@ func initializeTestSpaceSdkComponent(ctx context.Context, t interface {
 		userSvcClient:    mockUserSvcClient,
 		s3Client:         mockClient,
 		mirrorServer:     mockMirrorServer,
-		mirrorQueue:      mockPriorityQueue,
 		deployer:         mockDeployer,
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
@@ -1220,7 +1177,6 @@ func initializeTestTelemetryComponent(ctx context.Context, t interface {
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
 	mockClient := s3.NewMockClient(t)
 	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
-	mockPriorityQueue := queue.NewMockPriorityQueue(t)
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
@@ -1235,7 +1191,6 @@ func initializeTestTelemetryComponent(ctx context.Context, t interface {
 		userSvcClient:    mockUserSvcClient,
 		s3Client:         mockClient,
 		mirrorServer:     mockMirrorServer,
-		mirrorQueue:      mockPriorityQueue,
 		deployer:         mockDeployer,
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
@@ -1277,7 +1232,6 @@ func initializeTestClusterComponent(ctx context.Context, t interface {
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
 	mockClient := s3.NewMockClient(t)
 	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
-	mockPriorityQueue := queue.NewMockPriorityQueue(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
@@ -1291,7 +1245,6 @@ func initializeTestClusterComponent(ctx context.Context, t interface {
 		userSvcClient:    mockUserSvcClient,
 		s3Client:         mockClient,
 		mirrorServer:     mockMirrorServer,
-		mirrorQueue:      mockPriorityQueue,
 		deployer:         mockDeployer,
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
@@ -1333,7 +1286,6 @@ func initializeTestEvaluationComponent(ctx context.Context, t interface {
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
 	mockClient := s3.NewMockClient(t)
 	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
-	mockPriorityQueue := queue.NewMockPriorityQueue(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
@@ -1347,7 +1299,6 @@ func initializeTestEvaluationComponent(ctx context.Context, t interface {
 		userSvcClient:    mockUserSvcClient,
 		s3Client:         mockClient,
 		mirrorServer:     mockMirrorServer,
-		mirrorQueue:      mockPriorityQueue,
 		deployer:         mockDeployer,
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
@@ -1388,7 +1339,6 @@ func initializeTestHFDatasetComponent(ctx context.Context, t interface {
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
 	mockClient := s3.NewMockClient(t)
 	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
-	mockPriorityQueue := queue.NewMockPriorityQueue(t)
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
@@ -1403,7 +1353,6 @@ func initializeTestHFDatasetComponent(ctx context.Context, t interface {
 		userSvcClient:    mockUserSvcClient,
 		s3Client:         mockClient,
 		mirrorServer:     mockMirrorServer,
-		mirrorQueue:      mockPriorityQueue,
 		deployer:         mockDeployer,
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
@@ -1444,7 +1393,6 @@ func initializeTestRepoFileComponent(ctx context.Context, t interface {
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
 	mockClient := s3.NewMockClient(t)
 	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
-	mockPriorityQueue := queue.NewMockPriorityQueue(t)
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
@@ -1459,7 +1407,6 @@ func initializeTestRepoFileComponent(ctx context.Context, t interface {
 		userSvcClient:    mockUserSvcClient,
 		s3Client:         mockClient,
 		mirrorServer:     mockMirrorServer,
-		mirrorQueue:      mockPriorityQueue,
 		deployer:         mockDeployer,
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
@@ -1501,7 +1448,6 @@ func initializeTestSensitiveComponent(ctx context.Context, t interface {
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
 	mockClient := s3.NewMockClient(t)
 	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
-	mockPriorityQueue := queue.NewMockPriorityQueue(t)
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
@@ -1515,7 +1461,6 @@ func initializeTestSensitiveComponent(ctx context.Context, t interface {
 		userSvcClient:    mockUserSvcClient,
 		s3Client:         mockClient,
 		mirrorServer:     mockMirrorServer,
-		mirrorQueue:      mockPriorityQueue,
 		deployer:         mockDeployer,
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
@@ -1556,7 +1501,6 @@ func initializeTestSSHKeyComponent(ctx context.Context, t interface {
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
 	mockClient := s3.NewMockClient(t)
 	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
-	mockPriorityQueue := queue.NewMockPriorityQueue(t)
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
@@ -1571,7 +1515,6 @@ func initializeTestSSHKeyComponent(ctx context.Context, t interface {
 		userSvcClient:    mockUserSvcClient,
 		s3Client:         mockClient,
 		mirrorServer:     mockMirrorServer,
-		mirrorQueue:      mockPriorityQueue,
 		deployer:         mockDeployer,
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
@@ -1612,7 +1555,6 @@ func initializeTestListComponent(ctx context.Context, t interface {
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
 	mockClient := s3.NewMockClient(t)
 	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
-	mockPriorityQueue := queue.NewMockPriorityQueue(t)
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
@@ -1627,7 +1569,6 @@ func initializeTestListComponent(ctx context.Context, t interface {
 		userSvcClient:    mockUserSvcClient,
 		s3Client:         mockClient,
 		mirrorServer:     mockMirrorServer,
-		mirrorQueue:      mockPriorityQueue,
 		deployer:         mockDeployer,
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
@@ -1668,7 +1609,6 @@ func initializeTestSyncClientSettingComponent(ctx context.Context, t interface {
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
 	mockClient := s3.NewMockClient(t)
 	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
-	mockPriorityQueue := queue.NewMockPriorityQueue(t)
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
@@ -1683,7 +1623,6 @@ func initializeTestSyncClientSettingComponent(ctx context.Context, t interface {
 		userSvcClient:    mockUserSvcClient,
 		s3Client:         mockClient,
 		mirrorServer:     mockMirrorServer,
-		mirrorQueue:      mockPriorityQueue,
 		deployer:         mockDeployer,
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
@@ -1724,7 +1663,6 @@ func initializeTestEventComponent(ctx context.Context, t interface {
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
 	mockClient := s3.NewMockClient(t)
 	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
-	mockPriorityQueue := queue.NewMockPriorityQueue(t)
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
@@ -1739,7 +1677,6 @@ func initializeTestEventComponent(ctx context.Context, t interface {
 		userSvcClient:    mockUserSvcClient,
 		s3Client:         mockClient,
 		mirrorServer:     mockMirrorServer,
-		mirrorQueue:      mockPriorityQueue,
 		deployer:         mockDeployer,
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
@@ -1780,7 +1717,6 @@ func initializeTestSpaceTemplateComponent(ctx context.Context, t interface {
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
 	mockClient := s3.NewMockClient(t)
 	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
-	mockPriorityQueue := queue.NewMockPriorityQueue(t)
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
@@ -1795,7 +1731,6 @@ func initializeTestSpaceTemplateComponent(ctx context.Context, t interface {
 		userSvcClient:    mockUserSvcClient,
 		s3Client:         mockClient,
 		mirrorServer:     mockMirrorServer,
-		mirrorQueue:      mockPriorityQueue,
 		deployer:         mockDeployer,
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,
@@ -1836,7 +1771,6 @@ func initializeTestMCPServerComponent(ctx context.Context, t interface {
 	}
 	mockClient := s3.NewMockClient(t)
 	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
-	mockPriorityQueue := queue.NewMockPriorityQueue(t)
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockReader := parquet.NewMockReader(t)
@@ -1851,7 +1785,6 @@ func initializeTestMCPServerComponent(ctx context.Context, t interface {
 		userSvcClient:    mockUserSvcClient,
 		s3Client:         mockClient,
 		mirrorServer:     mockMirrorServer,
-		mirrorQueue:      mockPriorityQueue,
 		deployer:         mockDeployer,
 		accountingClient: mockAccountingClient,
 		preader:          mockReader,

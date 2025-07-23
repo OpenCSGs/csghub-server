@@ -729,6 +729,52 @@ func (_c *MockMirrorStore_PushedMirror_Call) RunAndReturn(run func(context.Conte
 	return _c
 }
 
+// Recover provides a mock function with given fields: ctx
+func (_m *MockMirrorStore) Recover(ctx context.Context) error {
+	ret := _m.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Recover")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context) error); ok {
+		r0 = rf(ctx)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockMirrorStore_Recover_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Recover'
+type MockMirrorStore_Recover_Call struct {
+	*mock.Call
+}
+
+// Recover is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *MockMirrorStore_Expecter) Recover(ctx interface{}) *MockMirrorStore_Recover_Call {
+	return &MockMirrorStore_Recover_Call{Call: _e.mock.On("Recover", ctx)}
+}
+
+func (_c *MockMirrorStore_Recover_Call) Run(run func(ctx context.Context)) *MockMirrorStore_Recover_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context))
+	})
+	return _c
+}
+
+func (_c *MockMirrorStore_Recover_Call) Return(_a0 error) *MockMirrorStore_Recover_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockMirrorStore_Recover_Call) RunAndReturn(run func(context.Context) error) *MockMirrorStore_Recover_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // StatusCount provides a mock function with given fields: ctx
 func (_m *MockMirrorStore) StatusCount(ctx context.Context) ([]database.MirrorStatusCount, error) {
 	ret := _m.Called(ctx)

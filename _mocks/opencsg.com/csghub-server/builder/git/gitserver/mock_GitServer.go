@@ -2246,6 +2246,53 @@ func (_c *MockGitServer_UpdateOrganization_Call) RunAndReturn(run func(*types.Ed
 	return _c
 }
 
+// UpdateRef provides a mock function with given fields: ctx, req
+func (_m *MockGitServer) UpdateRef(ctx context.Context, req gitserver.UpdateRefReq) error {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateRef")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, gitserver.UpdateRefReq) error); ok {
+		r0 = rf(ctx, req)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockGitServer_UpdateRef_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateRef'
+type MockGitServer_UpdateRef_Call struct {
+	*mock.Call
+}
+
+// UpdateRef is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req gitserver.UpdateRefReq
+func (_e *MockGitServer_Expecter) UpdateRef(ctx interface{}, req interface{}) *MockGitServer_UpdateRef_Call {
+	return &MockGitServer_UpdateRef_Call{Call: _e.mock.On("UpdateRef", ctx, req)}
+}
+
+func (_c *MockGitServer_UpdateRef_Call) Run(run func(ctx context.Context, req gitserver.UpdateRefReq)) *MockGitServer_UpdateRef_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(gitserver.UpdateRefReq))
+	})
+	return _c
+}
+
+func (_c *MockGitServer_UpdateRef_Call) Return(_a0 error) *MockGitServer_UpdateRef_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockGitServer_UpdateRef_Call) RunAndReturn(run func(context.Context, gitserver.UpdateRefReq) error) *MockGitServer_UpdateRef_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // UpdateRepo provides a mock function with given fields: ctx, req
 func (_m *MockGitServer) UpdateRepo(ctx context.Context, req gitserver.UpdateRepoReq) (*gitserver.CreateRepoResp, error) {
 	ret := _m.Called(ctx, req)

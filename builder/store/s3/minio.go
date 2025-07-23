@@ -75,6 +75,9 @@ type Core interface {
 	PresignHeader(ctx context.Context, method, bucketName, objectName string, expires time.Duration, reqParams url.Values, extraHeaders http.Header) (u *url.URL, err error)
 	NewMultipartUpload(ctx context.Context, bucket, object string, opts minio.PutObjectOptions) (uploadID string, err error)
 	CompleteMultipartUpload(ctx context.Context, bucket, object, uploadID string, parts []minio.CompletePart, opts minio.PutObjectOptions) (minio.UploadInfo, error)
+	PutObjectPart(ctx context.Context, bucket, object, uploadID string, partID int, data io.Reader, size int64, opts minio.PutObjectPartOptions) (minio.ObjectPart, error)
+	ListObjectParts(ctx context.Context, bucket, object, uploadID string, partNumberMarker, maxParts int) (result minio.ListObjectPartsResult, err error)
+	AbortMultipartUpload(ctx context.Context, bucket, object, uploadID string) error
 }
 
 func uploadAndValidate(ctx context.Context, client MinioClient, bucketName, objectName string, reader io.Reader, objectSize int64) (minio.UploadInfo, error) {

@@ -30,6 +30,22 @@ const (
 	MSSourceType  = "modelscope"
 )
 
+var MirrorTaskStatusToRepoStatusMap = map[types.MirrorTaskStatus]types.RepositorySyncStatus{
+	types.MirrorQueued:           types.SyncStatusPending,
+	types.MirrorRepoSyncStart:    types.SyncStatusInProgress,
+	types.MirrorRepoSyncFailed:   types.SyncStatusFailed,
+	types.MirrorRepoSyncFinished: types.SyncStatusInProgress,
+	types.MirrorRepoSyncFatal:    types.SyncStatusFailed,
+	types.MirrorLfsSyncStart:     types.SyncStatusInProgress,
+	types.MirrorLfsSyncFailed:    types.SyncStatusFailed,
+	types.MirrorLfsSyncFinished:  types.SyncStatusCompleted,
+	types.MirrorLfsSyncFatal:     types.SyncStatusFailed,
+	types.MirrorLfsIncomplete:    types.SyncStatusFailed,
+	types.MirrorCanceled:         types.SyncStatusCanceled,
+
+	types.MirrorRepoTooLarge: types.SyncStatusFailed,
+}
+
 func WithPrefix(name string, prefix string) string {
 	return prefix + name
 }
@@ -220,4 +236,8 @@ func SafeBuildLfsPath(repoID int64, oid, lfsRelativePath string, migrated bool) 
 		return BuildLfsPath(repoID, oid, migrated)
 	}
 	return path.Join("lfs", lfsRelativePath)
+}
+
+func MirrorTaskStatusToRepoStatus(mirrorTaskSatus types.MirrorTaskStatus) types.RepositorySyncStatus {
+	return MirrorTaskStatusToRepoStatusMap[mirrorTaskSatus]
 }
