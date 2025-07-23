@@ -12,7 +12,6 @@ import (
 	mock_rpc "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rpc"
 	mock_s3 "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/s3"
 	mock_component "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
-	mock_mirror_queue "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/mirror/queue"
 	"opencsg.com/csghub-server/builder/accounting"
 	"opencsg.com/csghub-server/builder/dataviewer"
 	"opencsg.com/csghub-server/builder/deploy"
@@ -25,7 +24,6 @@ import (
 	"opencsg.com/csghub-server/builder/store/s3"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/tests"
-	"opencsg.com/csghub-server/mirror/queue"
 )
 
 type mockedComponents struct {
@@ -85,11 +83,6 @@ var MockedMirrorServerSet = wire.NewSet(
 	wire.Bind(new(mirrorserver.MirrorServer), new(*mock_mirror.MockMirrorServer)),
 )
 
-var MockedMirrorQueueSet = wire.NewSet(
-	mock_mirror_queue.NewMockPriorityQueue,
-	wire.Bind(new(queue.PriorityQueue), new(*mock_mirror_queue.MockPriorityQueue)),
-)
-
 var MockedMultiSyncClientSet = wire.NewSet(
 	mock_multisync.NewMockClient,
 	wire.Bind(new(multisync.Client), new(*mock_multisync.MockClient)),
@@ -127,7 +120,6 @@ type Mocks struct {
 	userSvcClient    *mock_rpc.MockUserSvcClient
 	s3Client         *mock_s3.MockClient
 	mirrorServer     *mock_mirror.MockMirrorServer
-	mirrorQueue      *mock_mirror_queue.MockPriorityQueue
 	deployer         *mock_deploy.MockDeployer
 	accountingClient *mock_accounting.MockAccountingClient
 	preader          *mock_preader.MockReader
@@ -149,11 +141,11 @@ func ProvideTestConfig() *config.Config {
 var MockSuperSet = wire.NewSet(
 	MockedComponentSet, AllMockSet, MockedStoreSet, MockedGitServerSet, MockedUserSvcSet,
 	MockedS3Set, MockedS3CoreSet, MockedMultiSyncClientSet, MockedDeployerSet, ProvideTestConfig, MockedMirrorServerSet,
-	MockedMirrorQueueSet, MockedAccountingClientSet, MockedParquetReaderSet,
+	MockedAccountingClientSet, MockedParquetReaderSet,
 	MockedModerationSvcClientSet, MockedDataviewerClientSet,
 )
 
-func NewTestRepoComponent(config *config.Config, stores *tests.MockStores, rpcUser rpc.UserSvcClient, gitServer gitserver.GitServer, tagComponent TagComponent, s3Client s3.Client, deployer deploy.Deployer, accountingComponent AccountingComponent, mq queue.PriorityQueue, mirrorServer mirrorserver.MirrorServer, multiSyncClient multisync.Client) *repoComponentImpl {
+func NewTestRepoComponent(config *config.Config, stores *tests.MockStores, rpcUser rpc.UserSvcClient, gitServer gitserver.GitServer, tagComponent TagComponent, s3Client s3.Client, deployer deploy.Deployer, accountingComponent AccountingComponent, mirrorServer mirrorserver.MirrorServer, multiSyncClient multisync.Client) *repoComponentImpl {
 	return &repoComponentImpl{
 		userStore:              stores.User,
 		repoStore:              stores.Repo,
@@ -175,11 +167,11 @@ func NewTestRepoComponent(config *config.Config, stores *tests.MockStores, rpcUs
 		deployer:               deployer,
 		accountingComponent:    accountingComponent,
 		spaceResourceStore:     stores.SpaceResource,
-		mq:                     mq,
 		mirrorServer:           mirrorServer,
 		fileStore:              stores.File,
 		clusterInfoStore:       stores.ClusterInfo,
 		multiSyncClient:        multiSyncClient,
+		mirrorTaskStore:        stores.MirrorTaskStore,
 	}
 }
 
@@ -341,7 +333,7 @@ func NewTestRuntimeArchitectureComponent(stores *tests.MockStores, repoComponent
 
 var RuntimeArchComponentSet = wire.NewSet(NewTestRuntimeArchitectureComponent)
 
-func NewTestMirrorComponent(config *config.Config, stores *tests.MockStores, mirrorServer mirrorserver.MirrorServer, repoComponent RepoComponent, gitServer gitserver.GitServer, s3Client s3.Client, mq queue.PriorityQueue) *mirrorComponentImpl {
+func NewTestMirrorComponent(config *config.Config, stores *tests.MockStores, mirrorServer mirrorserver.MirrorServer, repoComponent RepoComponent, gitServer gitserver.GitServer, s3Client s3.Client) *mirrorComponentImpl {
 	return &mirrorComponentImpl{
 		tokenStore:        stores.GitServerAccessToken,
 		mirrorServer:      mirrorServer,
@@ -357,7 +349,7 @@ func NewTestMirrorComponent(config *config.Config, stores *tests.MockStores, mir
 		namespaceStore:    stores.Namespace,
 		userStore:         stores.User,
 		config:            config,
-		mq:                mq,
+		mirrorTaskStore:   stores.MirrorTaskStore,
 	}
 }
 

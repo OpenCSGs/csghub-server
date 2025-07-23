@@ -211,6 +211,10 @@ func (r *Repository) UpdateSourceBySourceTypeAndSourcePath(sourceType, sourcePat
 	}
 }
 
+func (r *Repository) SetSyncStatus(syncStatus types.RepositorySyncStatus) {
+	r.SyncStatus = syncStatus
+}
+
 type RepositoryTag struct {
 	ID           int64       `bun:",pk,autoincrement" json:"id"`
 	RepositoryID int64       `bun:",notnull" json:"repository_id"`
@@ -227,6 +231,11 @@ type RepositoryTag struct {
 
 func (r Repository) PathWithOutPrefix() string {
 	return strings.TrimPrefix(r.Path, RepositorySourceAndPrefixMapping[r.Source])
+
+}
+
+func (r Repository) IsOpenCSGRepo() bool {
+	return r.Source == types.OpenCSGSource
 
 }
 

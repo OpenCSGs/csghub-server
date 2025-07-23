@@ -1,13 +1,16 @@
 package mirror
 
 import (
+	"fmt"
 	"log/slog"
 
 	"github.com/spf13/cobra"
+	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/api/workflow"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
-	"opencsg.com/csghub-server/mirror"
+	"opencsg.com/csghub-server/mirror/manager"
+	"opencsg.com/csghub-server/mirror/router"
 )
 
 var lfsSyncCmd = &cobra.Command{
@@ -25,17 +28,30 @@ var lfsSyncCmd = &cobra.Command{
 		}
 		database.InitDB(dbConfig)
 
+		r, err := router.NewRouter(cfg)
+		if err != nil {
+			return fmt.Errorf("failed to init router: %w", err)
+		}
+		slog.Info("http server is running", slog.Any("port", cfg.LfsSync.Port))
+		server := httpbase.NewGracefulServer(
+			httpbase.GraceServerOpt{
+				Port: cfg.LfsSync.Port,
+			},
+			r,
+		)
+		go server.Run()
+
 		slog.Info("start temporal workflow")
 		err = workflow.StartWorkflow(cfg)
 		if err != nil {
 			return err
 		}
 
-		lfsSyncWorker, err := mirror.NewLFSSyncWorker(cfg, cfg.Mirror.WorkerNumber)
+		m, err := manager.GetManager(cfg)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to get manager")
 		}
-		lfsSyncWorker.Run()
+		m.Start()
 
 		return nil
 	},

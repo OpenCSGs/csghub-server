@@ -7,7 +7,6 @@ import (
 func init() {
 	// add subcommands here
 	Cmd.AddCommand(createMirrorRepoFromFile)
-	Cmd.AddCommand(checkMirrorProgress)
 	Cmd.AddCommand(lfsSyncCmd)
 	Cmd.AddCommand(repoSyncCmd)
 }

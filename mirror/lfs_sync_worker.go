@@ -9,10 +9,11 @@ import (
 )
 
 type LFSSyncWorker interface {
-	Run()
-	SyncLfs(ctx context.Context, workerID int, mirror *database.Mirror, repo *database.Repository) error
+	SetContext(ctx context.Context)
+	Run(mt *database.MirrorTask)
 }
 
-func NewLFSSyncWorker(config *config.Config, numWorkers int) (LFSSyncWorker, error) {
-	return lfssyncer.NewMinioLFSSyncWorker(config, numWorkers)
+func NewLFSSyncWorker(config *config.Config, id int) (LFSSyncWorker, error) {
+	return lfssyncer.NewLfsSyncWorker(config, id)
+
 }

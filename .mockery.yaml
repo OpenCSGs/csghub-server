@@ -99,10 +99,6 @@ packages:
     interfaces:
       Client:
       Core:
-  opencsg.com/csghub-server/mirror/queue:
-    config:
-    interfaces:
-      PriorityQueue:
   opencsg.com/csghub-server/builder/deploy:
     config:
     interfaces:

@@ -59,6 +59,7 @@ const (
 	SyncStatusInProgress RepositorySyncStatus = "inprogress"
 	SyncStatusFailed     RepositorySyncStatus = "failed"
 	SyncStatusCompleted  RepositorySyncStatus = "completed"
+	SyncStatusCanceled   RepositorySyncStatus = "canceled"
 
 	SensitiveCheckFail      SensitiveCheckStatus = -1 //sensitive content detected
 	SensitiveCheckPending   SensitiveCheckStatus = 0  //default

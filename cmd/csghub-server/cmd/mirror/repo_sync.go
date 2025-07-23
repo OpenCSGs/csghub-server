@@ -1,12 +1,18 @@
 package mirror
 
 import (
+	"context"
+	"fmt"
+	"log/slog"
+
 	"github.com/spf13/cobra"
+	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/api/workflow"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/temporal"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/mirror"
+	"opencsg.com/csghub-server/mirror/router"
 )
 
 var repoSyncCmd = &cobra.Command{
@@ -25,9 +31,24 @@ var repoSyncCmd = &cobra.Command{
 		}
 		database.InitDB(dbConfig)
 
-		repoSYncer, err := mirror.NewRepoSyncWorker(cfg, cfg.Mirror.WorkerNumber)
+		r, err := router.NewRouter(cfg)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to init router: %w", err)
+		}
+		slog.Info("http server is running", slog.Any("port", cfg.RepoSync.Port))
+		server := httpbase.NewGracefulServer(
+			httpbase.GraceServerOpt{
+				Port: cfg.RepoSync.Port,
+			},
+			r,
+		)
+		go server.Run()
+
+		// Exception recovery for mirrors.
+		mirrorStore := database.NewMirrorStore()
+		err = mirrorStore.Recover(context.Background())
+		if err != nil {
+			return fmt.Errorf("failed to recover mirrors: %w", err)
 		}
 
 		err = workflow.StartWorkflow(cfg)
@@ -35,7 +56,13 @@ var repoSyncCmd = &cobra.Command{
 			return err
 		}
 
-		repoSYncer.Run()
+		repoSyncer, err := mirror.NewRepoSyncWorker(cfg, cfg.Mirror.WorkerNumber)
+		if err != nil {
+			return err
+		}
+
+		repoSyncer.Run()
+
 		temporal.Stop()
 
 		return nil

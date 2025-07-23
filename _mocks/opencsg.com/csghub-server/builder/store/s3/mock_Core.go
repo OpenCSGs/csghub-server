@@ -6,6 +6,8 @@ import (
 	context "context"
 	http "net/http"
 
+	io "io"
+
 	minio "github.com/minio/minio-go/v7"
 
 	mock "github.com/stretchr/testify/mock"
@@ -26,6 +28,55 @@ type MockCore_Expecter struct {
 
 func (_m *MockCore) EXPECT() *MockCore_Expecter {
 	return &MockCore_Expecter{mock: &_m.Mock}
+}
+
+// AbortMultipartUpload provides a mock function with given fields: ctx, bucket, object, uploadID
+func (_m *MockCore) AbortMultipartUpload(ctx context.Context, bucket string, object string, uploadID string) error {
+	ret := _m.Called(ctx, bucket, object, uploadID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for AbortMultipartUpload")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) error); ok {
+		r0 = rf(ctx, bucket, object, uploadID)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockCore_AbortMultipartUpload_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'AbortMultipartUpload'
+type MockCore_AbortMultipartUpload_Call struct {
+	*mock.Call
+}
+
+// AbortMultipartUpload is a helper method to define mock.On call
+//   - ctx context.Context
+//   - bucket string
+//   - object string
+//   - uploadID string
+func (_e *MockCore_Expecter) AbortMultipartUpload(ctx interface{}, bucket interface{}, object interface{}, uploadID interface{}) *MockCore_AbortMultipartUpload_Call {
+	return &MockCore_AbortMultipartUpload_Call{Call: _e.mock.On("AbortMultipartUpload", ctx, bucket, object, uploadID)}
+}
+
+func (_c *MockCore_AbortMultipartUpload_Call) Run(run func(ctx context.Context, bucket string, object string, uploadID string)) *MockCore_AbortMultipartUpload_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string))
+	})
+	return _c
+}
+
+func (_c *MockCore_AbortMultipartUpload_Call) Return(_a0 error) *MockCore_AbortMultipartUpload_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockCore_AbortMultipartUpload_Call) RunAndReturn(run func(context.Context, string, string, string) error) *MockCore_AbortMultipartUpload_Call {
+	_c.Call.Return(run)
+	return _c
 }
 
 // CompleteMultipartUpload provides a mock function with given fields: ctx, bucket, object, uploadID, parts, opts
@@ -85,6 +136,67 @@ func (_c *MockCore_CompleteMultipartUpload_Call) Return(_a0 minio.UploadInfo, _a
 }
 
 func (_c *MockCore_CompleteMultipartUpload_Call) RunAndReturn(run func(context.Context, string, string, string, []minio.CompletePart, minio.PutObjectOptions) (minio.UploadInfo, error)) *MockCore_CompleteMultipartUpload_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ListObjectParts provides a mock function with given fields: ctx, bucket, object, uploadID, partNumberMarker, maxParts
+func (_m *MockCore) ListObjectParts(ctx context.Context, bucket string, object string, uploadID string, partNumberMarker int, maxParts int) (minio.ListObjectPartsResult, error) {
+	ret := _m.Called(ctx, bucket, object, uploadID, partNumberMarker, maxParts)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListObjectParts")
+	}
+
+	var r0 minio.ListObjectPartsResult
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, int, int) (minio.ListObjectPartsResult, error)); ok {
+		return rf(ctx, bucket, object, uploadID, partNumberMarker, maxParts)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, int, int) minio.ListObjectPartsResult); ok {
+		r0 = rf(ctx, bucket, object, uploadID, partNumberMarker, maxParts)
+	} else {
+		r0 = ret.Get(0).(minio.ListObjectPartsResult)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, int, int) error); ok {
+		r1 = rf(ctx, bucket, object, uploadID, partNumberMarker, maxParts)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockCore_ListObjectParts_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListObjectParts'
+type MockCore_ListObjectParts_Call struct {
+	*mock.Call
+}
+
+// ListObjectParts is a helper method to define mock.On call
+//   - ctx context.Context
+//   - bucket string
+//   - object string
+//   - uploadID string
+//   - partNumberMarker int
+//   - maxParts int
+func (_e *MockCore_Expecter) ListObjectParts(ctx interface{}, bucket interface{}, object interface{}, uploadID interface{}, partNumberMarker interface{}, maxParts interface{}) *MockCore_ListObjectParts_Call {
+	return &MockCore_ListObjectParts_Call{Call: _e.mock.On("ListObjectParts", ctx, bucket, object, uploadID, partNumberMarker, maxParts)}
+}
+
+func (_c *MockCore_ListObjectParts_Call) Run(run func(ctx context.Context, bucket string, object string, uploadID string, partNumberMarker int, maxParts int)) *MockCore_ListObjectParts_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string), args[4].(int), args[5].(int))
+	})
+	return _c
+}
+
+func (_c *MockCore_ListObjectParts_Call) Return(result minio.ListObjectPartsResult, err error) *MockCore_ListObjectParts_Call {
+	_c.Call.Return(result, err)
+	return _c
+}
+
+func (_c *MockCore_ListObjectParts_Call) RunAndReturn(run func(context.Context, string, string, string, int, int) (minio.ListObjectPartsResult, error)) *MockCore_ListObjectParts_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -208,6 +320,69 @@ func (_c *MockCore_PresignHeader_Call) Return(u *url.URL, err error) *MockCore_P
 }
 
 func (_c *MockCore_PresignHeader_Call) RunAndReturn(run func(context.Context, string, string, string, time.Duration, url.Values, http.Header) (*url.URL, error)) *MockCore_PresignHeader_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// PutObjectPart provides a mock function with given fields: ctx, bucket, object, uploadID, partID, data, size, opts
+func (_m *MockCore) PutObjectPart(ctx context.Context, bucket string, object string, uploadID string, partID int, data io.Reader, size int64, opts minio.PutObjectPartOptions) (minio.ObjectPart, error) {
+	ret := _m.Called(ctx, bucket, object, uploadID, partID, data, size, opts)
+
+	if len(ret) == 0 {
+		panic("no return value specified for PutObjectPart")
+	}
+
+	var r0 minio.ObjectPart
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, int, io.Reader, int64, minio.PutObjectPartOptions) (minio.ObjectPart, error)); ok {
+		return rf(ctx, bucket, object, uploadID, partID, data, size, opts)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, int, io.Reader, int64, minio.PutObjectPartOptions) minio.ObjectPart); ok {
+		r0 = rf(ctx, bucket, object, uploadID, partID, data, size, opts)
+	} else {
+		r0 = ret.Get(0).(minio.ObjectPart)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, int, io.Reader, int64, minio.PutObjectPartOptions) error); ok {
+		r1 = rf(ctx, bucket, object, uploadID, partID, data, size, opts)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockCore_PutObjectPart_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PutObjectPart'
+type MockCore_PutObjectPart_Call struct {
+	*mock.Call
+}
+
+// PutObjectPart is a helper method to define mock.On call
+//   - ctx context.Context
+//   - bucket string
+//   - object string
+//   - uploadID string
+//   - partID int
+//   - data io.Reader
+//   - size int64
+//   - opts minio.PutObjectPartOptions
+func (_e *MockCore_Expecter) PutObjectPart(ctx interface{}, bucket interface{}, object interface{}, uploadID interface{}, partID interface{}, data interface{}, size interface{}, opts interface{}) *MockCore_PutObjectPart_Call {
+	return &MockCore_PutObjectPart_Call{Call: _e.mock.On("PutObjectPart", ctx, bucket, object, uploadID, partID, data, size, opts)}
+}
+
+func (_c *MockCore_PutObjectPart_Call) Run(run func(ctx context.Context, bucket string, object string, uploadID string, partID int, data io.Reader, size int64, opts minio.PutObjectPartOptions)) *MockCore_PutObjectPart_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string), args[4].(int), args[5].(io.Reader), args[6].(int64), args[7].(minio.PutObjectPartOptions))
+	})
+	return _c
+}
+
+func (_c *MockCore_PutObjectPart_Call) Return(_a0 minio.ObjectPart, _a1 error) *MockCore_PutObjectPart_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockCore_PutObjectPart_Call) RunAndReturn(run func(context.Context, string, string, string, int, io.Reader, int64, minio.PutObjectPartOptions) (minio.ObjectPart, error)) *MockCore_PutObjectPart_Call {
 	_c.Call.Return(run)
 	return _c
 }

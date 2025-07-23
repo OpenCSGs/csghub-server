@@ -252,3 +252,12 @@ const (
 	CommitActionUpdate CommitAction = "update"
 	CommitActionDelete CommitAction = "delete"
 )
+
+type UpdateRefReq struct {
+	Namespace   string               `json:"namespace"`
+	Name        string               `json:"name"`
+	RepoType    types.RepositoryType `json:"repo_type"`
+	Ref         string               `json:"ref"`
+	OldObjectId string               `json:"old_object_id"`
+	NewObjectId string               `json:"new_object_id"`
+}

@@ -172,7 +172,7 @@ func TestMirrorStore_ToSync(t *testing.T) {
 		{NextExecutionTimestamp: dt, Status: types.MirrorLfsSyncFailed, Interval: "m3"},
 		{NextExecutionTimestamp: dt, Status: types.MirrorRepoSyncFinished, Interval: "m4"},
 		{NextExecutionTimestamp: dt, Status: types.MirrorRepoSyncStart, Interval: "m5"},
-		{NextExecutionTimestamp: dt, Status: types.MirrorInit, Interval: "m6"},
+		{NextExecutionTimestamp: dt, Status: types.MirrorQueued, Interval: "m6"},
 		{NextExecutionTimestamp: dt.Add(-5 * time.Hour), Status: types.MirrorLfsSyncFinished, Interval: "m7"},
 		{NextExecutionTimestamp: dt, Status: types.MirrorRepoSyncFatal, Interval: "m8"},
 		{NextExecutionTimestamp: dt, Status: types.MirrorLfsSyncStart, Interval: "m9"},

@@ -37,7 +37,6 @@ import (
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
-	"opencsg.com/csghub-server/mirror/queue"
 )
 
 const (
@@ -83,7 +82,7 @@ type repoComponentImpl struct {
 	spaceResourceStore     database.SpaceResourceStore
 	lfsMetaObjectStore     database.LfsMetaObjectStore
 	recomStore             database.RecomStore
-	mq                     queue.PriorityQueue
+	mirrorTaskStore        database.MirrorTaskStore
 	multiSyncClient        multisync.Client
 }
 
@@ -189,6 +188,7 @@ func NewRepoComponent(config *config.Config) (RepoComponent, error) {
 	c.syncVersionStore = database.NewSyncVersionStore()
 	c.syncClientSettingStore = database.NewSyncClientSettingStore()
 	c.fileStore = database.NewFileStore()
+	c.mirrorTaskStore = database.NewMirrorTaskStore()
 	var err error
 	c.git, err = git.NewGitServer(config)
 	if err != nil {
@@ -196,11 +196,6 @@ func NewRepoComponent(config *config.Config) (RepoComponent, error) {
 		slog.Error(newError.Error())
 		return nil, newError
 	}
-	mq, err := queue.GetPriorityQueueInstance()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get priority queue: %v", err)
-	}
-	c.mq = mq
 	c.mirrorServer, err = git.NewMirrorServer(config)
 	if err != nil {
 		newError := fmt.Errorf("fail to create git mirror server,error:%w", err)
@@ -1856,10 +1851,6 @@ func (c *repoComponentImpl) CreateMirror(ctx context.Context, req types.CreateMi
 	if err != nil {
 		return nil, fmt.Errorf("failed to get mirror source, err: %w, id: %d", err, req.MirrorSourceID)
 	}
-	pushAccessToken, err := c.tokenStore.GetUserGitToken(ctx, req.CurrentUser)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find access token, error: %w", err)
-	}
 	mirror.Interval = req.Interval
 	mirror.SourceUrl = req.SourceUrl
 	mirror.MirrorSourceID = req.MirrorSourceID
@@ -1878,38 +1869,6 @@ func (c *repoComponentImpl) CreateMirror(ctx context.Context, req types.CreateMi
 		}
 	}
 
-	if c.config.Saas {
-		if c.config.GitServer.Type == types.GitServerTypeGitea {
-			mirror.PushUsername = req.CurrentUser
-			mirror.PushAccessToken = pushAccessToken.Token
-			taskId, err = c.mirrorServer.CreateMirrorRepo(ctx, mirrorserver.CreateMirrorRepoReq{
-				Namespace:   "root",
-				Name:        mirror.LocalRepoPath,
-				CloneUrl:    mirror.SourceUrl,
-				Username:    mirror.Username,
-				AccessToken: mirror.AccessToken,
-				Private:     false,
-			})
-			if err != nil {
-				return nil, fmt.Errorf("failed to create pull mirror in mirror server: %v", err)
-			}
-		}
-	} else {
-		if c.config.GitServer.Type == types.GitServerTypeGitea {
-			err = c.git.MirrorSync(ctx, gitserver.MirrorSyncReq{
-				Namespace:   req.Namespace,
-				Name:        req.Name,
-				CloneUrl:    mirror.SourceUrl,
-				Username:    mirror.Username,
-				AccessToken: mirror.AccessToken,
-				RepoType:    req.RepoType,
-			})
-			if err != nil {
-				return nil, fmt.Errorf("failed to create pull mirror in mirror server: %v", err)
-			}
-		}
-	}
-
 	mirror.MirrorTaskID = taskId
 
 	reqMirror, err := c.mirrorStore.Create(ctx, &mirror)
@@ -1917,17 +1876,19 @@ func (c *repoComponentImpl) CreateMirror(ctx context.Context, req types.CreateMi
 		return nil, fmt.Errorf("failed to create mirror")
 	}
 
-	if c.config.GitServer.Type == types.GitServerTypeGitaly {
-		c.mq.PushRepoMirror(&queue.MirrorTask{
-			MirrorID:  reqMirror.ID,
-			Priority:  queue.PriorityMap[reqMirror.Priority],
-			CreatedAt: mirror.CreatedAt.Unix(),
-		})
-		reqMirror.Status = types.MirrorInit
-		err = c.mirrorStore.Update(ctx, reqMirror)
-		if err != nil {
-			return nil, fmt.Errorf("failed to update mirror status: %v", err)
-		}
+	reqMirror.Status = types.MirrorQueued
+	err = c.mirrorStore.Update(ctx, reqMirror)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update mirror status: %v", err)
+	}
+	mt := database.MirrorTask{
+		MirrorID: mirror.ID,
+		Priority: mirror.Priority,
+		Status:   types.MirrorQueued,
+	}
+	_, err = c.mirrorTaskStore.Create(ctx, mt)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create mirror task: %w", err)
 	}
 
 	return reqMirror, nil
@@ -1945,7 +1906,7 @@ func (c *repoComponentImpl) MirrorFromSaas(ctx context.Context, namespace, name,
 		}
 	}
 	if m != nil {
-		err := c.mirrorFromSaasSync(ctx, m, namespace, name, repoType)
+		err := c.mirrorFromSaasSync(ctx, m, repo, namespace, name, repoType)
 		if err != nil {
 			return fmt.Errorf("failed to trigger mirror sync, error: %w", err)
 		}
@@ -1988,25 +1949,24 @@ func (c *repoComponentImpl) MirrorFromSaas(ctx context.Context, namespace, name,
 	if err != nil {
 		return fmt.Errorf("failed to create pull mirror in mirror server: %v", err)
 	}
+	mirror.Priority = types.HighMirrorPriority
 
 	mirror.MirrorTaskID = taskId
 
-	_, err = c.mirrorStore.Create(ctx, &mirror)
+	m, err = c.mirrorStore.Create(ctx, &mirror)
 
 	if err != nil {
 		return fmt.Errorf("failed to create mirror")
 	}
 
-	if c.config.GitServer.Type == types.GitServerTypeGitaly {
-		c.mq.PushRepoMirror(&queue.MirrorTask{
-			MirrorID:    mirror.ID,
-			Priority:    queue.Priority(mirror.Priority),
-			CreatedAt:   mirror.CreatedAt.Unix(),
-			MirrorToken: syncClientSetting.Token,
-		})
-		repo.SyncStatus = types.SyncStatusPending
-	} else {
-		repo.SyncStatus = types.SyncStatusInProgress
+	mt := database.MirrorTask{
+		MirrorID: m.ID,
+		Priority: m.Priority,
+		Status:   types.MirrorQueued,
+	}
+	_, err = c.mirrorTaskStore.CancelOtherTasksAndCreate(ctx, mt)
+	if err != nil {
+		return fmt.Errorf("failed to create mirror task: %w", err)
 	}
 
 	_, err = c.repoStore.UpdateRepo(ctx, *repo)
@@ -2016,35 +1976,16 @@ func (c *repoComponentImpl) MirrorFromSaas(ctx context.Context, namespace, name,
 	return nil
 }
 
-func (c *repoComponentImpl) mirrorFromSaasSync(ctx context.Context, mirror *database.Mirror, namespace, name string, repoType types.RepositoryType) error {
+func (c *repoComponentImpl) mirrorFromSaasSync(ctx context.Context, mirror *database.Mirror, repo *database.Repository, namespace, name string, repoType types.RepositoryType) error {
 	var err error
-	syncClientSetting, err := c.syncClientSettingStore.First(ctx)
+	mt := database.MirrorTask{
+		MirrorID: mirror.ID,
+		Priority: mirror.Priority,
+		Status:   types.MirrorQueued,
+	}
+	_, err = c.mirrorTaskStore.CancelOtherTasksAndCreate(ctx, mt)
 	if err != nil {
-		return fmt.Errorf("failed to find sync client setting, error: %w", err)
-	}
-	repo, err := c.repoStore.FindById(ctx, mirror.RepositoryID)
-	if err != nil {
-		return fmt.Errorf("failed to find repo, error: %w", err)
-	}
-	if c.config.GitServer.Type == types.GitServerTypeGitea {
-		err = c.git.MirrorSync(ctx, gitserver.MirrorSyncReq{
-			Namespace:   namespace,
-			Name:        name,
-			RepoType:    repoType,
-			MirrorToken: syncClientSetting.Token,
-		})
-		if err != nil {
-			return fmt.Errorf("failed to sync mirror, error: %w", err)
-		}
-	}
-	if c.config.GitServer.Type == types.GitServerTypeGitaly {
-		c.mq.PushRepoMirror(&queue.MirrorTask{
-			MirrorID:    mirror.ID,
-			Priority:    queue.Priority(mirror.Priority),
-			CreatedAt:   mirror.CreatedAt.Unix(),
-			MirrorToken: syncClientSetting.Token,
-		})
-		repo.SyncStatus = types.SyncStatusPending
+		return fmt.Errorf("failed to create mirror task: %w", err)
 	}
 
 	_, err = c.repoStore.UpdateRepo(ctx, *repo)
@@ -2814,27 +2755,21 @@ func (c *repoComponentImpl) SyncMirror(ctx context.Context, repoType types.Repos
 		return fmt.Errorf("failed to find mirror, error: %w", err)
 	}
 	mirror.Priority = types.HighMirrorPriority
-	if c.config.GitServer.Type == types.GitServerTypeGitea {
-		err = c.mirrorServer.MirrorSync(ctx, mirrorserver.MirrorSyncReq{
-			Namespace: "root",
-			Name:      mirror.LocalRepoPath,
-		})
-		if err != nil {
-			return fmt.Errorf("failed to sync mirror, error: %w", err)
-		}
-	} else if c.config.GitServer.Type == types.GitServerTypeGitaly {
-		c.mq.PushRepoMirror(&queue.MirrorTask{
-			MirrorID:  mirror.ID,
-			Priority:  queue.PriorityMap[mirror.Priority],
-			CreatedAt: mirror.CreatedAt.Unix(),
-		})
-		mirror.Status = types.MirrorInit
-		err = c.mirrorStore.Update(ctx, mirror)
-		if err != nil {
-			return fmt.Errorf("failed to update mirror status: %v", err)
-		}
-	}
 
+	mirror.Status = types.MirrorQueued
+	err = c.mirrorStore.Update(ctx, mirror)
+	if err != nil {
+		return fmt.Errorf("failed to update mirror status: %v", err)
+	}
+	mt := database.MirrorTask{
+		MirrorID: mirror.ID,
+		Priority: mirror.Priority,
+		Status:   types.MirrorQueued,
+	}
+	_, err = c.mirrorTaskStore.CancelOtherTasksAndCreate(ctx, mt)
+	if err != nil {
+		return fmt.Errorf("failed to create mirror task: %w", err)
+	}
 	return nil
 }
 

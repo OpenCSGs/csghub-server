@@ -6,9 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"strings"
 
-	"github.com/minio/minio-go/v7"
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/git/mirrorserver"
@@ -17,7 +15,7 @@ import (
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
-	"opencsg.com/csghub-server/mirror/queue"
+	"opencsg.com/csghub-server/mirror/cache"
 )
 
 type mirrorComponentImpl struct {
@@ -38,14 +36,13 @@ type mirrorComponentImpl struct {
 	lfsMetaObjectStore database.LfsMetaObjectStore
 	userStore          database.UserStore
 	config             *config.Config
-	mq                 queue.PriorityQueue
+	syncCache          cache.Cache
+	mirrorTaskStore    database.MirrorTaskStore
 }
 
 type MirrorComponent interface {
-	CreatePushMirrorForFinishedMirrorTask(ctx context.Context) error
 	// CreateMirrorRepo often called by the crawler server to create new repo which will then be mirrored from other sources
 	CreateMirrorRepo(ctx context.Context, req types.CreateMirrorRepoReq) (*database.Mirror, error)
-	CheckMirrorProgress(ctx context.Context) error
 	Repos(ctx context.Context, per, page int) ([]types.MirrorRepo, int, error)
 	Index(ctx context.Context, per, page int, search string) ([]types.Mirror, int, error)
 	Statistics(ctx context.Context) ([]types.MirrorStatusCount, error)
@@ -61,10 +58,6 @@ func NewMirrorComponent(config *config.Config) (MirrorComponent, error) {
 			slog.Error(newError.Error())
 			return nil, newError
 		}
-	}
-	c.mq, err = queue.GetPriorityQueueInstance()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get priority queue: %v", err)
 	}
 
 	c.repoComp, err = NewRepoComponentImpl(config)
@@ -94,8 +87,14 @@ func NewMirrorComponent(config *config.Config) (MirrorComponent, error) {
 	c.namespaceStore = database.NewNamespaceStore()
 	c.lfsMetaObjectStore = database.NewLfsMetaObjectStore()
 	c.userStore = database.NewUserStore()
+	c.mirrorTaskStore = database.NewMirrorTaskStore()
 	c.saas = config.Saas
 	c.config = config
+	syncCache, err := cache.NewCache(context.Background(), config)
+	if err != nil {
+		return nil, fmt.Errorf("initializing redis: %w", err)
+	}
+	c.syncCache = syncCache
 	return c, nil
 }
 
@@ -214,14 +213,6 @@ func (c *mirrorComponentImpl) CreateMirrorRepo(ctx context.Context, req types.Cr
 		}
 	}
 
-	pushAccessToken, err := c.tokenStore.FindByType(ctx, "git")
-	if err != nil {
-		return nil, fmt.Errorf("failed to find git access token, error: %w", err)
-	}
-	if len(pushAccessToken) == 0 {
-		return nil, fmt.Errorf("failed to find git access token, error: empty table")
-	}
-
 	mirrorSource, err := c.mirrorSourceStore.Get(ctx, req.MirrorSourceID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find mirror Source, error: %w", err)
@@ -232,9 +223,6 @@ func (c *mirrorComponentImpl) CreateMirrorRepo(ctx context.Context, req types.Cr
 	mirror.MirrorSourceID = req.MirrorSourceID
 	mirror.PushUrl = gitRepo.HttpCloneURL
 	mirror.Username = req.SourceNamespace
-	mirror.PushUsername = "root"
-	//TODO: get user git access token from db git access token
-	mirror.PushAccessToken = pushAccessToken[0].Token
 	mirror.RepositoryID = repo.ID
 	mirror.Repository = repo
 	mirror.LocalRepoPath = fmt.Sprintf("%s_%s_%s_%s", mirrorSource.SourceName, req.RepoType, req.SourceNamespace, req.SourceName)
@@ -250,37 +238,28 @@ func (c *mirrorComponentImpl) CreateMirrorRepo(ctx context.Context, req types.Cr
 	}
 
 	var taskId int64
-	if c.config.GitServer.Type == types.GitServerTypeGitea {
-		taskId, err = c.mirrorServer.CreateMirrorRepo(ctx, mirrorserver.CreateMirrorRepoReq{
-			Namespace: "root",
-			Name:      mirror.LocalRepoPath,
-			CloneUrl:  mirror.SourceUrl,
-			// Username:    req.SourceNamespace,
-			// AccessToken: mirror.AccessToken,
-			Private: false,
-			SyncLfs: req.SyncLfs,
-		})
-
-		if err != nil {
-			return nil, fmt.Errorf("failed to create push mirror in mirror server: %v", err)
-		}
-	}
 	mirror.MirrorTaskID = taskId
 
 	reqMirror, err := c.mirrorStore.Create(ctx, &mirror)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create mirror")
 	}
-	if c.config.GitServer.Type == types.GitServerTypeGitaly {
-		c.mq.PushRepoMirror(&queue.MirrorTask{
-			MirrorID: reqMirror.ID,
-			Priority: queue.PriorityMap[reqMirror.Priority],
-		})
-		reqMirror.Status = types.MirrorInit
-		err = c.mirrorStore.Update(ctx, reqMirror)
-		if err != nil {
-			return nil, fmt.Errorf("failed to update mirror status: %v", err)
-		}
+
+	reqMirror.Status = types.MirrorQueued
+	err = c.mirrorStore.Update(ctx, reqMirror)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update mirror status: %v", err)
+	}
+
+	mt := database.MirrorTask{
+		MirrorID: reqMirror.ID,
+		Status:   types.MirrorQueued,
+		Priority: mirror.Priority,
+	}
+
+	_, err = c.mirrorTaskStore.Create(ctx, mt)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create mirror task: %v", err)
 	}
 
 	return reqMirror, nil
@@ -297,20 +276,6 @@ func (m *mirrorComponentImpl) mapNamespaceAndName(sourceNamespace string) string
 	}
 
 	return namespace
-}
-
-func (c *mirrorComponentImpl) CheckMirrorProgress(ctx context.Context) error {
-	mirrors, err := c.mirrorStore.Unfinished(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get unfinished mirrors: %v", err)
-	}
-	for _, mirror := range mirrors {
-		err := c.checkAndUpdateMirrorStatus(ctx, mirror)
-		if err != nil {
-			slog.Error("fail to check and update mirror status", slog.Int64("mirrorId", mirror.ID), slog.String("error", err.Error()))
-		}
-	}
-	return nil
 }
 
 var mirrorOrganizationMap = map[string]string{
@@ -335,62 +300,6 @@ var mirrorOrganizationMap = map[string]string{
 	"netease-youdao": "Netease-youdao",
 	"ByteDance":      "ByteDance",
 	"opencompass":    "opencompass",
-}
-
-var mirrorStatusAndRepoSyncStatusMapping = map[types.MirrorTaskStatus]types.RepositorySyncStatus{
-	types.MirrorInit:            types.SyncStatusPending,
-	types.MirrorRepoSyncStart:   types.SyncStatusInProgress,
-	types.MirrorLfsSyncFinished: types.SyncStatusCompleted,
-	types.MirrorLfsSyncFailed:   types.SyncStatusFailed,
-	types.MirrorLfsIncomplete:   types.SyncStatusFailed,
-}
-
-func (c *mirrorComponentImpl) checkAndUpdateMirrorStatus(ctx context.Context, mirror database.Mirror) error {
-	var statusAndProgressFunc func(ctx context.Context, mirror database.Mirror) (types.MirrorResp, error)
-	if mirror.Repository == nil {
-		return nil
-	}
-	if c.saas {
-		statusAndProgressFunc = c.getMirrorStatusAndProgressSaas
-	} else {
-		statusAndProgressFunc = c.getMirrorStatusAndProgressOnPremise
-	}
-	mirrorResp, err := statusAndProgressFunc(ctx, mirror)
-	if err != nil {
-		slog.Error("fail to get mirror status and progress", slog.Int64("mirrorId", mirror.ID), slog.String("error", err.Error()))
-	}
-	mirror.Status = mirrorResp.TaskStatus
-	mirror.Progress = mirrorResp.Progress
-	mirror.LastMessage = mirrorResp.LastMessage
-	err = c.mirrorStore.Update(ctx, &mirror)
-	if err != nil {
-		slog.Error("fail to update mirror", slog.Int64("mirrorId", mirror.ID), slog.String("error", err.Error()))
-		return err
-	}
-	if mirror.Repository.HTTPCloneURL == "" {
-		namespace, name := mirror.Repository.NamespaceAndName()
-		repoRes, err := c.git.GetRepo(ctx, gitserver.GetRepoReq{
-			Namespace: namespace,
-			Name:      name,
-			RepoType:  mirror.Repository.RepositoryType,
-		})
-		if err != nil {
-			slog.Error("fail to get repo detail from git server")
-		} else {
-			mirror.Repository.HTTPCloneURL = common.PortalCloneUrl(repoRes.HttpCloneURL, mirror.Repository.RepositoryType, c.config.GitServer.URL, c.config.Frontend.URL)
-			mirror.Repository.SSHCloneURL = repoRes.SshCloneURL
-			mirror.Repository.DefaultBranch = repoRes.DefaultBranch
-		}
-	}
-	syncStatus := mirrorStatusAndRepoSyncStatusMapping[mirrorResp.TaskStatus]
-	mirror.Repository.SyncStatus = syncStatus
-	_, err = c.repoStore.UpdateRepo(ctx, *mirror.Repository)
-	if err != nil {
-		slog.Error("fail to update repo sync status", slog.Int64("mirrorId", mirror.ID), slog.String("error", err.Error()))
-		return err
-	}
-
-	return nil
 }
 
 func getAllFiles(ctx context.Context, namespace, repoName, folder string, repoType types.RepositoryType, ref string, gsTree func(ctx context.Context, req types.GetTreeRequest) (*types.GetRepoFileTreeResp, error)) ([]*types.File, error) {
@@ -434,195 +343,23 @@ func getAllFiles(ctx context.Context, namespace, repoName, folder string, repoTy
 	return files, nil
 }
 
-func (c *mirrorComponentImpl) getMirrorStatusAndProgressOnPremise(ctx context.Context, mirror database.Mirror) (types.MirrorResp, error) {
-	task, err := c.git.GetMirrorTaskInfo(ctx, mirror.MirrorTaskID)
-	if err != nil {
-		slog.Error("fail to get mirror task info", slog.Int64("taskId", mirror.MirrorTaskID), slog.String("error", err.Error()))
-		return types.MirrorResp{
-			TaskStatus:  types.MirrorLfsSyncFailed,
-			LastMessage: "",
-			Progress:    0,
-		}, fmt.Errorf("fail to get mirror task info, %w", err)
-	}
-	if task.Status == gitserver.TaskStatusQueued {
-		return types.MirrorResp{
-			TaskStatus:  types.MirrorInit,
-			LastMessage: task.Message,
-			Progress:    0,
-		}, nil
-	} else if task.Status == gitserver.TaskStatusRunning {
-		progress, err := c.countMirrorProgress(ctx, mirror)
-		if err != nil {
-			return types.MirrorResp{
-				TaskStatus:  types.MirrorRepoSyncStart,
-				LastMessage: task.Message,
-				Progress:    0,
-			}, err
-		}
-		return types.MirrorResp{
-			TaskStatus:  types.MirrorRepoSyncStart,
-			LastMessage: task.Message,
-			Progress:    progress,
-		}, nil
-	} else if task.Status == gitserver.TaskStatusFailed {
-		return types.MirrorResp{
-			TaskStatus:  types.MirrorLfsSyncFailed,
-			LastMessage: task.Message,
-			Progress:    0,
-		}, nil
-	} else if task.Status == gitserver.TaskStatusFinished {
-		progress, err := c.countMirrorProgress(ctx, mirror)
-		if err != nil {
-			return types.MirrorResp{
-				TaskStatus:  types.MirrorLfsSyncFailed,
-				LastMessage: task.Message,
-				Progress:    0,
-			}, err
-		}
-		if progress == 100 {
-			return types.MirrorResp{
-				TaskStatus:  types.MirrorLfsSyncFinished,
-				LastMessage: task.Message,
-				Progress:    progress,
-			}, nil
-		} else {
-			return types.MirrorResp{
-				TaskStatus:  types.MirrorLfsIncomplete,
-				LastMessage: task.Message,
-				Progress:    progress,
-			}, nil
-		}
-	} else {
-		return types.MirrorResp{
-			TaskStatus:  types.MirrorLfsSyncFailed,
-			LastMessage: "",
-			Progress:    0,
-		}, nil
-	}
-}
-
-func (c *mirrorComponentImpl) getMirrorStatusAndProgressSaas(ctx context.Context, mirror database.Mirror) (types.MirrorResp, error) {
-	task, err := c.mirrorServer.GetMirrorTaskInfo(ctx, mirror.MirrorTaskID)
-	if err != nil {
-		slog.Error("fail to get mirror task info", slog.Int64("taskId", mirror.MirrorTaskID), slog.String("error", err.Error()))
-		return types.MirrorResp{
-			TaskStatus:  types.MirrorLfsSyncFailed,
-			LastMessage: "",
-			Progress:    0,
-		}, fmt.Errorf("fail to get mirror task info, %w", err)
-	}
-	if task.Status == mirrorserver.TaskStatusQueued {
-		return types.MirrorResp{
-			TaskStatus:  types.MirrorInit,
-			LastMessage: task.Message,
-			Progress:    0,
-		}, nil
-	} else if task.Status == mirrorserver.TaskStatusRunning {
-		progress, err := c.countMirrorProgress(ctx, mirror)
-		if err != nil {
-			return types.MirrorResp{
-				TaskStatus:  types.MirrorRepoSyncStart,
-				LastMessage: task.Message,
-				Progress:    0,
-			}, err
-		}
-		return types.MirrorResp{
-			TaskStatus:  types.MirrorRepoSyncStart,
-			LastMessage: task.Message,
-			Progress:    progress,
-		}, nil
-	} else if task.Status == mirrorserver.TaskStatusFailed {
-		return types.MirrorResp{
-			TaskStatus:  types.MirrorLfsSyncFailed,
-			LastMessage: task.Message,
-			Progress:    0,
-		}, nil
-	} else if task.Status == mirrorserver.TaskStatusFinished {
-		progress, err := c.countMirrorProgress(ctx, mirror)
-		if err != nil {
-			return types.MirrorResp{
-				TaskStatus:  types.MirrorLfsSyncFailed,
-				LastMessage: task.Message,
-				Progress:    0,
-			}, err
-		}
-		if progress == 100 {
-			return types.MirrorResp{
-				TaskStatus:  types.MirrorLfsSyncFinished,
-				LastMessage: task.Message,
-				Progress:    progress,
-			}, nil
-		} else {
-			return types.MirrorResp{
-				TaskStatus:  types.MirrorLfsIncomplete,
-				LastMessage: task.Message,
-				Progress:    progress,
-			}, nil
-		}
-	} else {
-		return types.MirrorResp{
-			TaskStatus:  types.MirrorLfsSyncFailed,
-			LastMessage: "",
-			Progress:    0,
-		}, nil
-	}
-}
-
-func (c *mirrorComponentImpl) countMirrorProgress(ctx context.Context, mirror database.Mirror) (int8, error) {
-	var (
-		lfsFiles          []*types.File
-		finishedFileCount int
-	)
-	namespaceAndName := strings.Split(mirror.Repository.Path, "/")
-	namespace := namespaceAndName[0]
-	name := namespaceAndName[1]
-	allFiles, err := getAllFiles(ctx, namespace, name, "", mirror.Repository.RepositoryType, "", c.git.GetTree)
-
-	if err != nil {
-		slog.Error("fail to get all files of mirror repository", slog.Int64("mirrorId", mirror.ID), slog.String("namespace", namespace), slog.String("name", name), slog.String("error", err.Error()))
-		return 0, err
-	}
-	if len(allFiles) == 0 {
-		return 0, nil
-	}
-	for _, f := range allFiles {
-		if f.Lfs {
-			lfsFiles = append(lfsFiles, f)
-		}
-	}
-	if len(lfsFiles) == 0 {
-		return 100, nil
-	}
-	for _, f := range lfsFiles {
-		objectKey := common.BuildLfsPath(mirror.Repository.ID, f.LfsSHA256, mirror.Repository.Migrated)
-		_, err := c.s3Client.StatObject(ctx, c.lfsBucket, objectKey, minio.GetObjectOptions{})
-		if err != nil {
-			if minio.ToErrorResponse(err).Code != "NoSuchKey" {
-				slog.Error("fail to check lfs file", slog.Int64("mirrorId", mirror.ID), slog.String("namespace", namespace), slog.String("name", name), slog.String("filename", f.Path), slog.String("error", err.Error()))
-				return 0, err
-			}
-		} else {
-			finishedFileCount += 1
-		}
-	}
-
-	progress := (finishedFileCount * 100) / len(lfsFiles)
-	return int8(progress), nil
-}
-
 func (c *mirrorComponentImpl) Repos(ctx context.Context, per, page int) ([]types.MirrorRepo, int, error) {
 	var mirrorRepos []types.MirrorRepo
-	repos, total, err := c.repoStore.WithMirror(ctx, per, page)
+	mirros, total, err := c.mirrorStore.IndexWithPagination(ctx, per, page, "")
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to get mirror repositories: %v", err)
 	}
-	for _, repo := range repos {
-		mirrorRepos = append(mirrorRepos, types.MirrorRepo{
-			Path:       repo.Path,
-			SyncStatus: repo.SyncStatus,
-			RepoType:   repo.RepositoryType,
-			Progress:   repo.Mirror.Progress,
-		})
+	for _, m := range mirros {
+		if m.Repository != nil && m.CurrentTask != nil {
+			RepoSyncStatus := common.MirrorTaskStatusToRepoStatus(m.CurrentTask.Status)
+			mirrorRepos = append(mirrorRepos, types.MirrorRepo{
+				ID:         m.ID,
+				Path:       m.Repository.Path,
+				SyncStatus: RepoSyncStatus,
+				RepoType:   m.Repository.RepositoryType,
+				Progress:   int8(m.CurrentTask.Progress),
+			})
+		}
 	}
 	return mirrorRepos, total, nil
 }
@@ -635,6 +372,12 @@ func (c *mirrorComponentImpl) Index(ctx context.Context, per, page int, search s
 	}
 	for _, mirror := range mirrors {
 		if mirror.Repository != nil {
+			var status types.MirrorTaskStatus
+			if mirror.CurrentTask != nil {
+				status = mirror.CurrentTask.Status
+			} else {
+				status = types.MirrorQueued
+			}
 			mirrorsResp = append(mirrorsResp, types.Mirror{
 				SourceUrl: mirror.SourceUrl,
 				MirrorSource: types.MirrorSource{
@@ -649,7 +392,7 @@ func (c *mirrorComponentImpl) Index(ctx context.Context, per, page int, search s
 				SourceRepoPath:  mirror.SourceRepoPath,
 				LocalRepoPath:   fmt.Sprintf("%ss/%s", mirror.Repository.RepositoryType, mirror.Repository.Path),
 				LastMessage:     mirror.LastMessage,
-				Status:          mirror.Status,
+				Status:          status,
 				Progress:        mirror.Progress,
 			})
 		}
