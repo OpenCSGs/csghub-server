@@ -37,6 +37,7 @@ func TestMirrorComponent_CreateMirrorRepo(t *testing.T) {
 			}
 
 			repo := &database.Repository{ID: 10}
+
 			mc.mocks.stores.RepoMock().EXPECT().FindByPath(
 				ctx, req.RepoType, "AIWizards", "sn",
 			).Return(

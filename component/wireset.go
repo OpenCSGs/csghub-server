@@ -349,6 +349,7 @@ func NewTestMirrorComponent(config *config.Config, stores *tests.MockStores, mir
 		namespaceStore:    stores.Namespace,
 		userStore:         stores.User,
 		config:            config,
+		mirrorTaskStore:   stores.MirrorTaskStore,
 	}
 }
 

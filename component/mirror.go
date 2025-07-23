@@ -213,14 +213,6 @@ func (c *mirrorComponentImpl) CreateMirrorRepo(ctx context.Context, req types.Cr
 		}
 	}
 
-	pushAccessToken, err := c.tokenStore.FindByType(ctx, "git")
-	if err != nil {
-		return nil, fmt.Errorf("failed to find git access token, error: %w", err)
-	}
-	if len(pushAccessToken) == 0 {
-		return nil, fmt.Errorf("failed to find git access token, error: empty table")
-	}
-
 	mirrorSource, err := c.mirrorSourceStore.Get(ctx, req.MirrorSourceID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find mirror Source, error: %w", err)
@@ -231,9 +223,6 @@ func (c *mirrorComponentImpl) CreateMirrorRepo(ctx context.Context, req types.Cr
 	mirror.MirrorSourceID = req.MirrorSourceID
 	mirror.PushUrl = gitRepo.HttpCloneURL
 	mirror.Username = req.SourceNamespace
-	mirror.PushUsername = "root"
-	//TODO: get user git access token from db git access token
-	mirror.PushAccessToken = pushAccessToken[0].Token
 	mirror.RepositoryID = repo.ID
 	mirror.Repository = repo
 	mirror.LocalRepoPath = fmt.Sprintf("%s_%s_%s_%s", mirrorSource.SourceName, req.RepoType, req.SourceNamespace, req.SourceName)
@@ -313,13 +302,6 @@ var mirrorOrganizationMap = map[string]string{
 	"opencompass":    "opencompass",
 }
 
-var mirrorStatusAndRepoSyncStatusMapping = map[types.MirrorTaskStatus]types.RepositorySyncStatus{
-	types.MirrorRepoSyncStart:   types.SyncStatusInProgress,
-	types.MirrorLfsSyncFinished: types.SyncStatusCompleted,
-	types.MirrorLfsSyncFailed:   types.SyncStatusFailed,
-	types.MirrorLfsIncomplete:   types.SyncStatusFailed,
-}
-
 func getAllFiles(ctx context.Context, namespace, repoName, folder string, repoType types.RepositoryType, ref string, gsTree func(ctx context.Context, req types.GetTreeRequest) (*types.GetRepoFileTreeResp, error)) ([]*types.File, error) {
 	var (
 		files  []*types.File
@@ -390,6 +372,12 @@ func (c *mirrorComponentImpl) Index(ctx context.Context, per, page int, search s
 	}
 	for _, mirror := range mirrors {
 		if mirror.Repository != nil {
+			var status types.MirrorTaskStatus
+			if mirror.CurrentTask != nil {
+				status = mirror.CurrentTask.Status
+			} else {
+				status = types.MirrorQueued
+			}
 			mirrorsResp = append(mirrorsResp, types.Mirror{
 				SourceUrl: mirror.SourceUrl,
 				MirrorSource: types.MirrorSource{
@@ -404,7 +392,7 @@ func (c *mirrorComponentImpl) Index(ctx context.Context, per, page int, search s
 				SourceRepoPath:  mirror.SourceRepoPath,
 				LocalRepoPath:   fmt.Sprintf("%ss/%s", mirror.Repository.RepositoryType, mirror.Repository.Path),
 				LastMessage:     mirror.LastMessage,
-				Status:          mirror.Status,
+				Status:          status,
 				Progress:        mirror.Progress,
 			})
 		}
