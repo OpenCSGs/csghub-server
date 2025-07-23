@@ -557,8 +557,7 @@ func (s *repoStoreImpl) PublicToUser(ctx context.Context, repoType types.Reposit
 		NewSelect().
 		Column("repository.*").
 		Model(&repos).
-		Relation("Tags").
-		Relation("User")
+		Relation("Tags")
 
 	q.Where("repository.repository_type = ?", repoType)
 
@@ -608,7 +607,6 @@ func (s *repoStoreImpl) PublicToUser(ctx context.Context, repoType types.Reposit
 				q.Where(fmt.Sprintf("%s.group = ?", asTag), tag.Group)
 			}
 		}
-
 	}
 
 	count, err = q.Count(ctx)
