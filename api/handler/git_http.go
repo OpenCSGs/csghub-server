@@ -56,13 +56,13 @@ func (h *GitHTTPHandler) InfoRefs(ctx *gin.Context) {
 	}
 	reader, err := h.gitHttp.InfoRefs(ctx.Request.Context(), req)
 	if err != nil {
-		if err == errorx.ErrUnauthorized {
+		if errors.Is(err, errorx.ErrUnauthorized) {
 			ctx.Header("WWW-Authenticate", "Basic realm=opencsg-git")
 			ctx.PureJSON(http.StatusUnauthorized, nil)
 			return
 		}
 
-		if err == errorx.ErrForbidden {
+		if errors.Is(err, errorx.ErrForbidden) {
 			ctx.PureJSON(http.StatusForbidden, gin.H{
 				"error": "You do not have permission to access this repository.",
 			})
@@ -139,13 +139,18 @@ func (h *GitHTTPHandler) GitReceivePack(ctx *gin.Context) {
 
 	err := h.gitHttp.GitReceivePack(ctx.Request.Context(), req)
 	if err != nil {
-		if err == errorx.ErrUnauthorized {
+		if errors.Is(err, errorx.ErrContentLengthTooLarge) {
+			ctx.PureJSON(http.StatusBadRequest, gin.H{
+				"error": "File too large. Please track it using Git LFS.",
+			})
+		}
+		if errors.Is(err, errorx.ErrUnauthorized) {
 			ctx.Header("WWW-Authenticate", "Basic realm=opencsg-git")
 			ctx.PureJSON(http.StatusUnauthorized, nil)
 			return
 		}
 
-		if err == errorx.ErrForbidden {
+		if errors.Is(err, errorx.ErrForbidden) {
 			ctx.PureJSON(http.StatusForbidden, gin.H{
 				"error": "You do not have permission to access this repository.",
 			})
