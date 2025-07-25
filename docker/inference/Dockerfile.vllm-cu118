@@ -1,0 +1,30 @@
+FROM nvidia/cuda:11.8.0-devel-ubuntu22.04
+# Build with some basic utilities
+RUN apt-get update && apt-get install -y \
+    python3-pip apt-utils \
+    wget curl vim \
+    git git-lfs \
+    supervisor \
+    unzip && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# alias python='python3'
+RUN ln -s /usr/bin/python3 /usr/bin/python
+RUN pip config set global.index-url https://mirrors.aliyun.com/pypi/simple
+RUN pip install --no-cache-dir numpy==1.26.4 \
+    csghub-sdk==0.4.8 ray supervisor
+# install from source
+RUN pip install --no-cache-dir https://git-devops.opencsg.com/opensource/public_files/-/raw/main/vllm-0.9.2+cu118-cp38-abi3-manylinux1_x86_64.whl --extra-index-url https://download.pytorch.org/whl/cu118
+RUN mkdir -p /var/log/supervisord
+COPY ./supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY ./vllm/ /etc/csghub/
+COPY ./vllm/multi-node-serving.sh /vllm-workspace/examples/online_serving/multi-node-serving.sh
+RUN chmod +x /etc/csghub/*.sh
+RUN chmod +x /vllm-workspace/examples/online_serving/*.sh
+
+WORKDIR /workspace/
+ENV HUGGINGFACE_HUB_CACHE=/workspace/ \
+    HF_HUB_ENABLE_HF_TRANSFER=0
+
+EXPOSE 8000
+
+ENTRYPOINT ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
