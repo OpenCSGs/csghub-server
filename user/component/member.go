@@ -16,6 +16,7 @@ import (
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -89,7 +90,7 @@ func (c *memberComponentImpl) OrgMembers(ctx context.Context, orgName, currentUs
 		}
 	}
 
-	dbmembers, total, err := c.memberStore.OrganizationMembers(ctx, org.ID, pageSize, page)
+	dbmembers, total, err := c.memberStore.OrganizationMembers(ctx, org.ID, "", pageSize, page)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to find org members,caused by:%w", err)
 	}
@@ -212,8 +213,8 @@ func (c *memberComponentImpl) AddMembers(ctx context.Context, orgName string, us
 	if err != nil {
 		return fmt.Errorf("failed to get op user membership,user:%s,caused by:%w", operatorName, err)
 	}
-	if !c.allowAddMember(opMember) {
-		return fmt.Errorf("add member operation not allowed, user:%s", operatorName)
+	if !c.allowMagnageMember(opMember) {
+		return errorx.ErrForbiddenMsg(fmt.Sprintf("add member operation not allowed, user:%s", operatorName))
 	}
 
 	for _, userName := range users {
@@ -287,13 +288,47 @@ func (c *memberComponentImpl) Delete(ctx context.Context, orgName, userName, ope
 	if err != nil {
 		return fmt.Errorf("failed to get op user membership,caused by:%w", err)
 	}
-	if !c.allowAddMember(opMember) {
-		return errors.New("operation not allowed")
-	}
 	user, err = c.userStore.FindByUsername(ctx, userName)
 	if err != nil {
 		return fmt.Errorf("failed to find user,caused by:%w", err)
 	}
+
+	// can't remove the last member of this organization
+	_, total, err := c.memberStore.OrganizationMembers(ctx, org.ID, "", 1, 1)
+	if err != nil {
+		return fmt.Errorf("failed to find org members, caused by:%w", err)
+	}
+
+	if total == 0 {
+		err := fmt.Errorf("no member in organization %s", org.Name)
+		return errorx.ReqParamInvalid(err,
+			errorx.Ctx().
+				Set("namespace", org.Namespace),
+		)
+	}
+
+	if op.ID == user.ID {
+		// admin delete itself
+		if opMember.Role == string(membership.RoleAdmin) {
+			_, adminCount, err := c.memberStore.OrganizationMembers(ctx, org.ID, "admin", 1, 1)
+			if err != nil {
+				return fmt.Errorf("failed to count admins in org, caused by: %w", err)
+			}
+			if adminCount <= 1 {
+				// only one admin, refused delete
+				err := errors.New("cannot remove the last admin from organization")
+				return errorx.LastOrgAdmin(err, errorx.Ctx().Set("username", userName))
+			}
+		} else {
+			return errorx.ErrForbiddenMsg("Non-admin members cannot remove themselves. Please ask an organization admin to perform this action.")
+		}
+	} else {
+		// only admin can delete others
+		if !c.allowMagnageMember(opMember) {
+			return errorx.ErrForbiddenMsg("operation not allowed, you do not have permission to remove other members")
+		}
+	}
+
 	m, err := c.memberStore.Find(ctx, org.ID, user.ID)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return fmt.Errorf("failed to check memberhsip existence,caused by:%w", err)
@@ -333,7 +368,7 @@ func (c *memberComponentImpl) Delete(ctx context.Context, orgName, userName, ope
 	}
 }
 
-func (c *memberComponentImpl) allowAddMember(u *database.Member) bool {
+func (c *memberComponentImpl) allowMagnageMember(u *database.Member) bool {
 	//TODO: check more roles
 	return u != nil && u.Role == string(membership.RoleAdmin)
 }
