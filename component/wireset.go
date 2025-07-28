@@ -430,6 +430,7 @@ func NewTestMultiSyncComponent(config *config.Config, stores *tests.MockStores, 
 		tagStore:         stores.Tag,
 		fileStore:        stores.File,
 		gitServer:        gitServer,
+		config:           config,
 	}
 }
 
