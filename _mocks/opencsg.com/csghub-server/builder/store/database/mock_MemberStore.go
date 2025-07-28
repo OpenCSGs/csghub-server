@@ -180,9 +180,9 @@ func (_c *MockMemberStore_Find_Call) RunAndReturn(run func(context.Context, int6
 	return _c
 }
 
-// OrganizationMembers provides a mock function with given fields: ctx, orgID, pageSize, page
-func (_m *MockMemberStore) OrganizationMembers(ctx context.Context, orgID int64, pageSize int, page int) ([]database.Member, int, error) {
-	ret := _m.Called(ctx, orgID, pageSize, page)
+// OrganizationMembers provides a mock function with given fields: ctx, orgID, role, pageSize, page
+func (_m *MockMemberStore) OrganizationMembers(ctx context.Context, orgID int64, role string, pageSize int, page int) ([]database.Member, int, error) {
+	ret := _m.Called(ctx, orgID, role, pageSize, page)
 
 	if len(ret) == 0 {
 		panic("no return value specified for OrganizationMembers")
@@ -191,25 +191,25 @@ func (_m *MockMemberStore) OrganizationMembers(ctx context.Context, orgID int64,
 	var r0 []database.Member
 	var r1 int
 	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, int64, int, int) ([]database.Member, int, error)); ok {
-		return rf(ctx, orgID, pageSize, page)
+	if rf, ok := ret.Get(0).(func(context.Context, int64, string, int, int) ([]database.Member, int, error)); ok {
+		return rf(ctx, orgID, role, pageSize, page)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, int64, int, int) []database.Member); ok {
-		r0 = rf(ctx, orgID, pageSize, page)
+	if rf, ok := ret.Get(0).(func(context.Context, int64, string, int, int) []database.Member); ok {
+		r0 = rf(ctx, orgID, role, pageSize, page)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]database.Member)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, int64, int, int) int); ok {
-		r1 = rf(ctx, orgID, pageSize, page)
+	if rf, ok := ret.Get(1).(func(context.Context, int64, string, int, int) int); ok {
+		r1 = rf(ctx, orgID, role, pageSize, page)
 	} else {
 		r1 = ret.Get(1).(int)
 	}
 
-	if rf, ok := ret.Get(2).(func(context.Context, int64, int, int) error); ok {
-		r2 = rf(ctx, orgID, pageSize, page)
+	if rf, ok := ret.Get(2).(func(context.Context, int64, string, int, int) error); ok {
+		r2 = rf(ctx, orgID, role, pageSize, page)
 	} else {
 		r2 = ret.Error(2)
 	}
@@ -225,15 +225,16 @@ type MockMemberStore_OrganizationMembers_Call struct {
 // OrganizationMembers is a helper method to define mock.On call
 //   - ctx context.Context
 //   - orgID int64
+//   - role string
 //   - pageSize int
 //   - page int
-func (_e *MockMemberStore_Expecter) OrganizationMembers(ctx interface{}, orgID interface{}, pageSize interface{}, page interface{}) *MockMemberStore_OrganizationMembers_Call {
-	return &MockMemberStore_OrganizationMembers_Call{Call: _e.mock.On("OrganizationMembers", ctx, orgID, pageSize, page)}
+func (_e *MockMemberStore_Expecter) OrganizationMembers(ctx interface{}, orgID interface{}, role interface{}, pageSize interface{}, page interface{}) *MockMemberStore_OrganizationMembers_Call {
+	return &MockMemberStore_OrganizationMembers_Call{Call: _e.mock.On("OrganizationMembers", ctx, orgID, role, pageSize, page)}
 }
 
-func (_c *MockMemberStore_OrganizationMembers_Call) Run(run func(ctx context.Context, orgID int64, pageSize int, page int)) *MockMemberStore_OrganizationMembers_Call {
+func (_c *MockMemberStore_OrganizationMembers_Call) Run(run func(ctx context.Context, orgID int64, role string, pageSize int, page int)) *MockMemberStore_OrganizationMembers_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(int64), args[2].(int), args[3].(int))
+		run(args[0].(context.Context), args[1].(int64), args[2].(string), args[3].(int), args[4].(int))
 	})
 	return _c
 }
@@ -243,7 +244,7 @@ func (_c *MockMemberStore_OrganizationMembers_Call) Return(_a0 []database.Member
 	return _c
 }
 
-func (_c *MockMemberStore_OrganizationMembers_Call) RunAndReturn(run func(context.Context, int64, int, int) ([]database.Member, int, error)) *MockMemberStore_OrganizationMembers_Call {
+func (_c *MockMemberStore_OrganizationMembers_Call) RunAndReturn(run func(context.Context, int64, string, int, int) ([]database.Member, int, error)) *MockMemberStore_OrganizationMembers_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -32,7 +32,7 @@ func TestMemberStore_CRUD(t *testing.T) {
 	require.Equal(t, 1, len(ms))
 	require.Equal(t, "foo", ms[0].Role)
 
-	ms, count, err := store.OrganizationMembers(ctx, 123, 10, 1)
+	ms, count, err := store.OrganizationMembers(ctx, 123, "", 10, 1)
 	require.Nil(t, err)
 	require.Equal(t, 1, len(ms))
 	require.Equal(t, 1, count)

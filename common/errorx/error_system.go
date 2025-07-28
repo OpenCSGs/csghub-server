@@ -21,6 +21,8 @@ const (
 	databaseDuplicateKey
 
 	lfsNotFound
+
+	lastOrgAdmin
 )
 
 var (
@@ -38,6 +40,8 @@ var (
 	ErrDatabaseDuplicateKey = CustomError{prefix: errSysPrefix, code: databaseDuplicateKey}
 
 	ErrLFSNotFound = CustomError{prefix: errSysPrefix, code: lfsNotFound}
+
+	ErrLastOrgAdmin = CustomError{prefix: errSysPrefix, code: lastOrgAdmin}
 )
 
 // Used in DB to convert db error to custom error
@@ -102,4 +106,16 @@ func LFSNotFound(err error, ctx context) error {
 		err:     err,
 	}
 	return customErr
+}
+
+func LastOrgAdmin(err error, ctx context) error {
+	if err == nil {
+		return nil
+	}
+	return CustomError{
+		prefix:  errSysPrefix,
+		err:     err,
+		code:    lastOrgAdmin,
+		context: ctx,
+	}
 }

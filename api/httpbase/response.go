@@ -162,6 +162,26 @@ func NotFoundError(c *gin.Context, err error) {
 	})
 }
 
+// ConflictError responds with a JSON-formatted error message and HTTP 409 status code.
+// Used when the request conflicts with the current state of the server.
+//
+// Example:
+//
+//	ConflictError(c, errorx.ErrCannotRemoveLastAdmin)
+func ConflictError(c *gin.Context, err error) {
+	resp := R{}
+	err, ok := errorx.GetFirstCustomError(err)
+	if ok {
+		customErr := err.(errorx.CustomError)
+		resp.Code = customErr.Code()
+		resp.Msg = customErr.Error()
+		resp.Context = customErr.Context()
+	} else {
+		resp.Msg = err.Error()
+	}
+	c.PureJSON(http.StatusConflict, resp)
+}
+
 // R is the response envelope
 type R struct {
 	Code  string `json:"code,omitempty"`
