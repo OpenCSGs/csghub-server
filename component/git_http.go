@@ -281,8 +281,12 @@ func (c *gitHTTPComponentImpl) lfsBatchUploadInfo(ctx context.Context, req types
 			Actions: map[string]*types.Link{},
 			Pointer: obj,
 		}
+
 		if largeFileWithoutMultipart(req, obj) {
-			return nil, errors.New("You need to configure your repository to enable upload of files > 5GB.\nRun \"csghub-sdk lfs-enable-largefiles ./path/to/your/repo\" and try again.")
+			resp.Error = &types.ObjectError{
+				Code:    http.StatusUnprocessableEntity,
+				Message: "Please use csghub-sdk to upload files > 5GB.\n",
+			}
 		}
 
 		if useMultipart {

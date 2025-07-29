@@ -31,6 +31,7 @@ func TestMultiSyncComponent_More(t *testing.T) {
 func TestMultiSyncComponent_SyncAsClient(t *testing.T) {
 	ctx := mock.Anything
 	mc := initializeTestMultiSyncComponent(context.TODO(), t)
+	mc.config.MultiSync.Enabled = true
 	mc.mocks.stores.MultiSyncMock().EXPECT().GetLatest(ctx).Return(database.SyncVersion{
 		Version: 1,
 	}, nil)
