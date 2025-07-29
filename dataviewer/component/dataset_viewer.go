@@ -212,7 +212,11 @@ func (c *datasetViewerComponentImpl) LimitOffsetRows(ctx context.Context, req *d
 	}
 
 	if len(paths) < 1 {
-		return nil, fmt.Errorf("no valid parquet file in request for row data")
+		err := fmt.Errorf("no valid parquet file in request for row data")
+		return nil, errorx.NoValidParquetFile(err,
+			errorx.Ctx().
+				Set("path", fmt.Sprintf("%s/%s", req.Namespace, req.RepoName)),
+		)
 	}
 
 	offset := int64(req.Page-1) * int64(req.Per)
@@ -267,7 +271,11 @@ func (c *datasetViewerComponentImpl) Rows(ctx context.Context, req *dvCom.ViewPa
 	}
 
 	if len(parquetObjs) < 1 {
-		return nil, fmt.Errorf("no valid parquet file in request for row data")
+		err := fmt.Errorf("no valid parquet file in request for row data")
+		return nil, errorx.NoValidParquetFile(err,
+			errorx.Ctx().
+				Set("path", fmt.Sprintf("%s/%s", req.Namespace, req.RepoName)),
+		)
 	}
 
 	sqlReq := types.QueryReq{
@@ -328,7 +336,11 @@ func (c *datasetViewerComponentImpl) getRepoParquetObjs(ctx context.Context, req
 	}
 	parquetObjs := c.getFilesOBJs(ctx, req, realReqFiles)
 	if len(parquetObjs) < 1 {
-		return nil, fmt.Errorf("no valid files in request")
+		err := fmt.Errorf("no valid parquet file in request for row data")
+		return nil, errorx.NoValidParquetFile(err,
+			errorx.Ctx().
+				Set("path", fmt.Sprintf("%s/%s", req.Namespace, req.RepoName)),
+		)
 	}
 	return parquetObjs, nil
 }
