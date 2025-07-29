@@ -6,19 +6,19 @@
   "engine_images": [
     {
       "compute_type": "gpu",
-      "image": "llama.cpp:b5215",
+      "image": "opencsghq/llama.cpp:b5215",
       "driver_version": "12.4",
       "engine_version": "b5215"
     },
     {
       "compute_type": "gpu",
-      "image": "llama.cpp:b5215-cu121",
+      "image": "opencsghq/llama.cpp:b5215-cu121",
       "driver_version": "12.1",
       "engine_version": "b5215"
     },
     {
       "compute_type": "cpu",
-      "image": "llama.cpp:b5215-cpu",
+      "image": "opencsghq/llama.cpp:b5215-cpu",
       "engine_version": "b5215"
     }
   ],
