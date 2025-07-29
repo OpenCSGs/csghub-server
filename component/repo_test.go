@@ -2346,10 +2346,10 @@ func TestRepoComponent_CommitFiles(t *testing.T) {
 			},
 		},
 	}
-	repoComp.mocks.gitServer.EXPECT().GetRepoFiles(ctx, gitserver.GetRepoFilesReq{
+	repoComp.mocks.gitServer.EXPECT().GetRepoAllFiles(ctx, gitserver.GetRepoAllFilesReq{
 		Namespace: ns.Path,
 		Name:      repo.Name,
-		Revisions: []string{"main"},
+		Ref:       "main",
 		RepoType:  types.ModelRepo,
 	}).Return([]*types.File{
 		{
