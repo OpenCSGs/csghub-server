@@ -83,7 +83,7 @@ func (s *memberStoreImpl) OrganizationMembers(ctx context.Context, orgID int64, 
 	var members []Member
 	var total int
 	q := s.db.Core.NewSelect().Model((*Member)(nil)).
-		Relation("User").
+		Join("JOIN users AS u ON u.id = member.user_id").
 		Where("organization_id=?", orgID)
 	if role != "" {
 		q = q.Where("role = ?", role)

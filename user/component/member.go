@@ -96,6 +96,10 @@ func (c *memberComponentImpl) OrgMembers(ctx context.Context, orgName, currentUs
 	}
 	var members []types.Member
 	for _, dbmember := range dbmembers {
+		if dbmember.User == nil {
+			slog.Warn("member user is nil, skip", "member", dbmember)
+			continue
+		}
 		m := types.Member{
 			UUID:     dbmember.User.UUID,
 			Avatar:   dbmember.User.Avatar,
