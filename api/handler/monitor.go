@@ -218,10 +218,6 @@ func getRequestParameters(ctx *gin.Context) (*types.MonitorReq, error) {
 	if len(instance) < 1 {
 		return nil, fmt.Errorf("bad request format for instance")
 	}
-	deployType := ctx.Param("type")
-	if len(deployType) < 1 {
-		return nil, fmt.Errorf("bad request format for type")
-	}
 	lastDuration, timeRange := common.GetValidTimeDuration(ctx)
 	req := &types.MonitorReq{
 		CurrentUser:  currentUser,
@@ -229,7 +225,6 @@ func getRequestParameters(ctx *gin.Context) (*types.MonitorReq, error) {
 		Name:         name,
 		RepoType:     repoType,
 		DeployID:     deployID,
-		DeployType:   deployType,
 		Instance:     instance,
 		LastDuration: lastDuration,
 		TimeRange:    timeRange,

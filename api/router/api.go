@@ -145,11 +145,11 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		return nil, fmt.Errorf("error creating HF dataset handler: %w", err)
 	}
 	//create routes for hf
-	createMappingRoutes(r, "/hf", middlewareCollection, hfdsHandler, repoCommonHandler, modelHandler, userHandler)
+	createMappingRoutes(r, "/hf", middlewareCollection, hfdsHandler, repoCommonHandler, modelHandler, userHandler, gitHTTPHandler)
 	//create routes for ms
-	createMappingRoutes(r, "/ms", middlewareCollection, hfdsHandler, repoCommonHandler, modelHandler, userHandler)
+	createMappingRoutes(r, "/ms", middlewareCollection, hfdsHandler, repoCommonHandler, modelHandler, userHandler, gitHTTPHandler)
 	//create routes for csg
-	createMappingRoutes(r, "/csg", middlewareCollection, hfdsHandler, repoCommonHandler, modelHandler, userHandler)
+	createMappingRoutes(r, "/csg", middlewareCollection, hfdsHandler, repoCommonHandler, modelHandler, userHandler, gitHTTPHandler)
 
 	apiGroup := r.Group("/api/v1")
 
@@ -920,12 +920,23 @@ func createMappingRoutes(
 	repoCommonHandler *handler.RepoHandler,
 	modelHandler *handler.ModelHandler,
 	userHandler *handler.UserHandler,
+	gitHTTPHandler *handler.GitHTTPHandler,
 ) {
 	// Huggingface SDK routes
 	hfGroup := r.Group(group)
 	{
 		hfGroup.GET("/:namespace/:name/resolve/:branch/*file_path", middleware.RepoMapping(types.ModelRepo), repoCommonHandler.SDKDownload)
 		hfGroup.HEAD("/:namespace/:name/resolve/:branch/*file_path", middleware.RepoMapping(types.ModelRepo), repoCommonHandler.HeadSDKDownload)
+		lfsGroup := hfGroup.Group("/:namespace/:name/info/lfs")
+		{
+			objectsGroup := lfsGroup.Group("/objects")
+			{
+				objectsGroup.POST("/batch", gitHTTPHandler.LfsBatchHF)
+				objectsGroup.PUT("/:oid/:size", gitHTTPHandler.LfsUpload)
+				lfsGroup.GET("/:oid", gitHTTPHandler.LfsDownload)
+			}
+			lfsGroup.POST("/verify", gitHTTPHandler.LfsVerify)
+		}
 		hfdsFileGroup := hfGroup.Group("/datasets")
 		{
 			hfdsFileGroup.GET("/:namespace/:name/resolve/:branch/*file_path", middleware.RepoMapping(types.DatasetRepo), repoCommonHandler.SDKDownload)
@@ -944,6 +955,8 @@ func createMappingRoutes(
 				// compatible with HF model info api, used for sdk like this:  huggingface_hub.model_info(repo_id, revision)
 				hfModelAPIGroup.GET("/:namespace/:name/revision/:ref", middleware.RepoMapping(types.ModelRepo), modelHandler.SDKModelInfo)
 				hfModelAPIGroup.GET("/:namespace/:name", middleware.RepoMapping(types.ModelRepo), modelHandler.SDKModelInfo)
+				hfModelAPIGroup.POST("/:namespace/:name/preupload/:revision", middleware.RepoMapping(types.ModelRepo), repoCommonHandler.PreuploadHF)
+				hfModelAPIGroup.POST("/:namespace/:name/commit/:revision", middleware.RepoMapping(types.ModelRepo), repoCommonHandler.CommitFilesHF)
 			}
 			hfDSAPIGroup := hfAPIGroup.Group("/datasets")
 			{
@@ -959,6 +972,11 @@ func createMappingRoutes(
 				hfSpaceAPIGroup.GET("/:namespace/:name/revision/:ref", middleware.RepoMapping(types.SpaceRepo), repoCommonHandler.SDKListFiles)
 				hfSpaceAPIGroup.GET("/:namespace/:name", middleware.RepoMapping(types.SpaceRepo), repoCommonHandler.SDKListFiles)
 			}
+			hfReposAPIGroup := hfAPIGroup.Group("/repos")
+			{
+				hfReposAPIGroup.POST("/create", middlewareCollection.Auth.NeedLogin, repoCommonHandler.CreateRepo)
+			}
+			hfAPIGroup.POST("/validate-yaml", middlewareCollection.Auth.NeedLogin, repoCommonHandler.ValidateYaml)
 		}
 	}
 }

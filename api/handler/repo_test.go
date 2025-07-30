@@ -30,14 +30,18 @@ type RepoTester struct {
 	*testutil.GinTester
 	handler *RepoHandler
 	mocks   struct {
-		repo *mockcomponent.MockRepoComponent
+		repo    *mockcomponent.MockRepoComponent
+		model   *mockcomponent.MockModelComponent
+		dataset *mockcomponent.MockDatasetComponent
 	}
 }
 
 func NewRepoTester(t *testing.T) *RepoTester {
 	tester := &RepoTester{GinTester: testutil.NewGinTester()}
 	tester.mocks.repo = mockcomponent.NewMockRepoComponent(t)
-	tester.handler = &RepoHandler{tester.mocks.repo, 0}
+	tester.mocks.model = mockcomponent.NewMockModelComponent(t)
+	tester.mocks.dataset = mockcomponent.NewMockDatasetComponent(t)
+	tester.handler = &RepoHandler{tester.mocks.repo, tester.mocks.model, tester.mocks.dataset, 0}
 	tester.WithParam("name", "r")
 	tester.WithParam("namespace", "u")
 	return tester

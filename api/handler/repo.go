@@ -30,15 +30,125 @@ func NewRepoHandler(config *config.Config) (*RepoHandler, error) {
 	if err != nil {
 		return nil, err
 	}
+	m, err := component.NewModelComponent(config)
+	if err != nil {
+		return nil, err
+	}
+	d, err := component.NewDatasetComponent(config)
+	if err != nil {
+		return nil, err
+	}
 	return &RepoHandler{
 		c:                         uc,
+		m:                         m,
+		d:                         d,
 		deployStatusCheckInterval: 5 * time.Second,
 	}, nil
 }
 
 type RepoHandler struct {
 	c                         component.RepoComponent
+	m                         component.ModelComponent
+	d                         component.DatasetComponent
 	deployStatusCheckInterval time.Duration
+}
+
+// CreateRepo godoc
+// @Security     ApiKey
+// @Summary      Create a new repository, compatible with hf api
+// @Tags         Repository
+// @Accept       json
+// @Produce      json
+// @Param        req body types.CreateRepoReq true  "create repo request"
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /repos/create [post]
+func (h *RepoHandler) CreateRepo(ctx *gin.Context) {
+	userName := httpbase.GetCurrentUser(ctx)
+	var req *types.CreateRepoReq
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	if req.RepoType == "" {
+		req.RepoType = types.ModelRepo
+	}
+
+	req.Username = userName
+	req.Namespace = userName
+	switch req.RepoType {
+	case types.ModelRepo:
+		modelReq := &types.CreateModelReq{
+			CreateRepoReq: *req,
+		}
+		resp, err := h.m.Create(ctx.Request.Context(), modelReq)
+		if err != nil {
+			if strings.Contains(err.Error(), "duplicate key") {
+				resp := &types.Model{
+					URL: fmt.Sprintf("%s/%s", req.Namespace, req.Name),
+				}
+				ctx.JSON(http.StatusConflict, resp)
+				return
+			}
+			slog.Error("Failed to create model repo", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err), slog.Any("req", req))
+			httpbase.ServerError(ctx, err)
+			return
+		}
+		ctx.JSON(http.StatusOK, resp)
+	case types.DatasetRepo:
+		datasetReq := &types.CreateDatasetReq{
+			CreateRepoReq: *req,
+		}
+		resp, err := h.d.Create(ctx.Request.Context(), datasetReq)
+		if err != nil {
+			if strings.Contains(err.Error(), "duplicate key") {
+				resp := &types.Dataset{
+					URL: fmt.Sprintf("%s/%s", req.Namespace, req.Name),
+				}
+				ctx.JSON(http.StatusConflict, resp)
+				return
+			}
+			slog.Error("Failed to create dataset repo", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err), slog.Any("req", req))
+			httpbase.ServerError(ctx, err)
+			return
+		}
+		ctx.JSON(http.StatusOK, resp)
+	default:
+		// Unsupported repo type
+		slog.Error("Unsupported repo type", slog.String("repo_type", string(req.RepoType)))
+		httpbase.BadRequest(ctx, fmt.Sprintf("Unsupported repo type: %s", req.RepoType))
+		return
+	}
+}
+
+// ValidateYaml godoc
+// @Security     ApiKey
+// @Summary      Validate yaml, compatible with hf api
+// @Tags         Repository
+// @Accept       json
+// @Produce      json
+// @Param        req body types.ValidateYamlReq true  "validate yaml content"
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /validate-yaml [post]
+func (h *RepoHandler) ValidateYaml(ctx *gin.Context) {
+	var req types.ValidateYamlReq
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequestWithExt(ctx, err)
+		return
+	}
+
+	err := h.c.ValidateYaml(ctx.Request.Context(), req)
+	if err != nil {
+		slog.Error("Failed to validate yaml", slog.Any("error", err), slog.Any("req", req))
+		ctx.JSON(http.StatusBadRequest, gin.H{"errors": []string{err.Error()}})
+		return
+	}
+	ctx.JSON(http.StatusOK, gin.H{})
 }
 
 // CreateRepoFile godoc
@@ -147,6 +257,60 @@ func (h *RepoHandler) UpdateFile(ctx *gin.Context) {
 		return
 	}
 	slog.Debug("Update repo file succeed", slog.String("repo_type", string(req.RepoType)), slog.String("name", name))
+	httpbase.OK(ctx, resp)
+}
+
+// DeleteRepoFile godoc
+// @Security     ApiKey
+// @Summary      Delete existing file in repository
+// @Tags         Repository
+// @Accept       json
+// @Produce      json
+// @Param		 repo_type path string true "models,datasets,codes,spaces or mcps" Enums(models,datasets,codes,spaces,mcps)
+// @Param		 namespace path string true "repo owner name"
+// @Param		 name path string true "repo name"
+// @Param		 file_path path string true "the file relative path"
+// @Param		 current_user query string false "current user name"
+// @Param        req body types.DeleteFileReq true  "delete file request"
+// @Success      200  {object}  types.ResponseWithTotal{data=types.DeleteFileResp} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /{repo_type}/{namespace}/{name}/raw/{file_path} [delete]
+func (h *RepoHandler) DeleteFile(ctx *gin.Context) {
+	userName := httpbase.GetCurrentUser(ctx)
+	var req *types.DeleteFileReq
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequestWithExt(ctx, err)
+		return
+	}
+	req.Username = userName
+
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequestWithExt(ctx, err)
+		return
+	}
+
+	filePath := ctx.Param("file_path")
+	filePath = convertFilePathFromRoute(filePath)
+	req.Namespace = namespace
+	req.Name = name
+	req.FilePath = filePath
+	req.RepoType = common.RepoTypeFromContext(ctx)
+	req.CurrentUser = userName
+	req.Content = ""
+	req.OriginPath = ""
+
+	resp, err := h.c.DeleteFile(ctx.Request.Context(), req)
+	if err != nil {
+		slog.Error("Failed to delete repo file", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err), slog.Any("req", req))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	slog.Debug("Delete repo file succeed", slog.String("repo_type", string(req.RepoType)), slog.String("name", name))
 	httpbase.OK(ctx, resp)
 }
 
@@ -2443,6 +2607,34 @@ func (h *RepoHandler) Preupload(ctx *gin.Context) {
 	httpbase.OK(ctx, resp)
 }
 
+func (h *RepoHandler) PreuploadHF(ctx *gin.Context) {
+	var req types.PreuploadReq
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	currentUser := httpbase.GetCurrentUser(ctx)
+
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		httpbase.BadRequest(ctx, err.Error())
+	}
+	req.Namespace = namespace
+	req.Name = name
+	req.CurrentUser = currentUser
+	req.RepoType = common.RepoTypeFromContext(ctx)
+	req.Revision = ctx.Param("revision")
+
+	resp, err := h.c.Preupload(ctx.Request.Context(), req)
+	if err != nil {
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	ctx.JSON(http.StatusOK, resp)
+}
+
 // CommitFiles godoc
 // @Security     ApiKey
 // @Summary      Create commit with batch files
@@ -2487,4 +2679,39 @@ func (h *RepoHandler) CommitFiles(ctx *gin.Context) {
 		return
 	}
 	httpbase.OK(ctx, nil)
+}
+
+func (h *RepoHandler) CommitFilesHF(ctx *gin.Context) {
+	req, err := h.c.ParseNDJson(ctx)
+	if err != nil {
+		slog.Error("invalid request body", slog.Any("error", err))
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	currentUser := httpbase.GetCurrentUser(ctx)
+
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("invalid request body", slog.Any("error", err))
+		httpbase.BadRequest(ctx, err.Error())
+	}
+	req.Namespace = namespace
+	req.Name = name
+	req.CurrentUser = currentUser
+	req.RepoType = common.RepoTypeFromContext(ctx)
+	req.Revision = ctx.Param("revision")
+	if req.Message == "" {
+		req.Message = "initial commit"
+	}
+
+	err = h.c.CommitFiles(ctx.Request.Context(), *req)
+	if err != nil {
+		slog.Error("failed to commit files", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	ctx.JSON(http.StatusOK, gin.H{
+		"commitUrl": fmt.Sprintf("%s/%s", namespace, name),
+		"commitOid": "",
+	})
 }

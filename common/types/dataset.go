@@ -46,6 +46,7 @@ type Dataset struct {
 	Scores               []WeightScore        `json:"scores"`
 	SensitiveCheckStatus string               `json:"sensitive_check_status"`
 	MirrorLastUpdatedAt  time.Time            `json:"mirror_last_updated_at"`
+	URL                  string               `json:"url"`
 	MultiSource
 }
 

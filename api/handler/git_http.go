@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang/gddo/httputil"
@@ -174,6 +175,48 @@ func (h *GitHTTPHandler) LfsBatch(ctx *gin.Context) {
 	batchRequest.Namespace = ctx.GetString("namespace")
 	batchRequest.Name = ctx.GetString("name")
 	batchRequest.RepoType = types.RepositoryType(ctx.GetString("repo_type"))
+
+	objectResponse, err := h.gitHttp.LFSBatch(ctx.Request.Context(), batchRequest)
+	if err != nil {
+		httpErr := &errorx.HTTPError{}
+		switch {
+		case errors.Is(err, errorx.ErrUnauthorized):
+			ctx.Header("WWW-Authenticate", "Basic realm=opencsg-git")
+			ctx.PureJSON(http.StatusUnauthorized, nil)
+			return
+		case errors.Is(err, errorx.ErrForbidden):
+			ctx.PureJSON(http.StatusForbidden, gin.H{
+				"error": "You do not have permission to access this repository.",
+			})
+			return
+		case errors.As(err, &httpErr):
+			ctx.PureJSON(httpErr.StatusCode, httpErr.Message)
+			return
+		}
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	ctx.Header("Content-Type", types.LfsMediaType)
+	ctx.PureJSON(http.StatusOK, objectResponse)
+}
+
+func (h *GitHTTPHandler) LfsBatchHF(ctx *gin.Context) {
+	var batchRequest types.BatchRequest
+	if err := ctx.ShouldBindJSON(&batchRequest); err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	batchRequest.CurrentUser = httpbase.GetCurrentUser(ctx)
+	batchRequest.Authorization = ctx.Request.Header.Get("Authorization")
+	batchRequest.Namespace = ctx.Param("namespace")
+	batchRequest.Name = ctx.Param("name")
+	batchRequest.Name = strings.ReplaceAll(batchRequest.Name, ".git", "")
+	batchRequest.RepoType = types.RepositoryType(ctx.Param("repo_type"))
+	if batchRequest.RepoType == "" {
+		batchRequest.RepoType = types.ModelRepo
+	}
 
 	objectResponse, err := h.gitHttp.LFSBatch(ctx.Request.Context(), batchRequest)
 	if err != nil {

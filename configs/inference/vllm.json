@@ -6,19 +6,32 @@
   "engine_images": [
     {
       "compute_type": "gpu",
-      "image": "vllm:v0.8.5",
+      "image": "opencsghq/vllm:v0.8.5",
       "driver_version": "12.4",
       "engine_version": "v0.8.5"
     },
     {
       "compute_type": "gpu",
-      "image": "vllm:v0.8.5-cu121",
+      "image": "opencsghq/vllm:v0.8.5-cu121",
       "driver_version": "12.1",
       "engine_version": "v0.8.5"
     },
     {
+      "compute_type": "gpu",
+      "image": "opencsghq/vllm:v0.9.2-cu118",
+      "driver_version": "11.8",
+      "engine_version": "v0.9.2",
+      "extra_archs":[
+        "Ernie4_5_ForCausalLM",
+        "Ernie4_5_MoeForCausalLM",
+        "HunYuanDenseV1ForCausalLM",
+        "HunYuanMoEV1ForCausalLM",
+        "MiMoForCausalLM"
+      ]
+    },
+    {
       "compute_type": "cpu",
-      "image": "vllm-cpu:2.4",
+      "image": "opencsghq/vllm-cpu:2.4",
       "engine_version": "0.4.12-fix1"
     }
   ],

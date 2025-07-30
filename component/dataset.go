@@ -198,6 +198,7 @@ func (c *datasetComponentImpl) Create(ctx context.Context, req *types.CreateData
 		Tags:      tags,
 		CreatedAt: dataset.CreatedAt,
 		UpdatedAt: dataset.UpdatedAt,
+		URL:       dataset.Repository.Path,
 	}
 
 	return resDataset, nil

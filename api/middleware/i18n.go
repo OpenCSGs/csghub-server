@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"golang.org/x/text/language"
@@ -40,13 +40,20 @@ func ModifyAcceptLanguageMiddleware() gin.HandlerFunc {
 
 var skipRoutes = []string{
 	"/healthz",
+	"/csg",
+	"/hf",
 }
 
 func shouldSkip(c *gin.Context) bool {
 	// Check if the request is for a static file or a health check endpoint
 	path := c.Request.URL.Path
-	// Add more conditions as needed to skip certain routes
-	return slices.Contains(skipRoutes, path)
+	// Check for path prefixes
+	for _, route := range skipRoutes {
+		if strings.HasPrefix(path, route) {
+			return true
+		}
+	}
+	return false
 }
 
 // LocalizedErrorMiddleware international error message

@@ -6,10 +6,13 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/alibabacloud-go/tea/tea"
+	"github.com/gin-gonic/gin"
 	"github.com/minio/minio-go/v7"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -20,6 +23,7 @@ import (
 	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/tests"
 	"opencsg.com/csghub-server/common/types"
@@ -2331,17 +2335,28 @@ func TestRepoComponent_CommitFiles(t *testing.T) {
 		Namespace:   ns.Path,
 		Name:        repo.Name,
 		RepoType:    types.ModelRepo,
-		Revision:    "revision",
+		Revision:    "main",
 		CurrentUser: user.Username,
 		Message:     "msg",
 		Files: []types.CommitFileReq{
 			{
 				Path:    "a.go",
-				Action:  types.CommitActionCreate,
+				Action:  types.CommitActionUpdate,
 				Content: "content",
 			},
 		},
 	}
+	repoComp.mocks.gitServer.EXPECT().GetRepoAllFiles(ctx, gitserver.GetRepoAllFilesReq{
+		Namespace: ns.Path,
+		Name:      repo.Name,
+		Ref:       "main",
+		RepoType:  types.ModelRepo,
+	}).Return([]*types.File{
+		{
+			Path: "a.go",
+			Size: 1024 * 1024 * 1024 * 1024,
+		},
+	}, nil)
 
 	repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(mock.Anything, types.ModelRepo, ns.Path, repo.Name).Return(repo, nil)
 	repoComp.mocks.gitServer.EXPECT().CommitFiles(mock.Anything, gitserver.CommitFilesReq{
@@ -2356,7 +2371,7 @@ func TestRepoComponent_CommitFiles(t *testing.T) {
 			{
 				Path:    "a.go",
 				Content: "content=",
-				Action:  gitserver.CommitActionCreate,
+				Action:  gitserver.CommitActionUpdate,
 			},
 		},
 	}).Return(nil)
@@ -2390,4 +2405,84 @@ func TestRepoComponent_IsExists(t *testing.T) {
 	exists, err = repoComp.IsExists(ctx, types.ModelRepo, "namespace", "name")
 	require.NotNil(t, err)
 	require.False(t, exists)
+}
+
+func TestParseNDJson_LFSFileGeneration(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	cfg := &config.Config{}
+	cfg.Git.MaxUnLfsFileSize = 10485760
+
+	component := &repoComponentImpl{
+		config: cfg,
+	}
+
+	// Test LFS file with specific values to verify the generated content
+	requestBody := `{"key": "header", "value": {"summary": "LFS test"}}
+{"key": "lfsFile", "value": {"path": "test.bin", "algo": "sha256", "oid": "abcdef123456", "size": 1024}}`
+
+	req := httptest.NewRequest("POST", "/test", strings.NewReader(requestBody))
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	ctx.Request = req
+
+	result, err := component.ParseNDJson(ctx)
+
+	require.NoError(t, err)
+	assert.Equal(t, "LFS test", result.Message)
+	assert.Len(t, result.Files, 1)
+	assert.Equal(t, "test.bin", result.Files[0].Path)
+	assert.Equal(t, types.CommitActionCreate, result.Files[0].Action)
+
+	// Verify the LFS pointer content is properly base64 encoded
+	expectedBase64 := "dmVyc2lvbiBodHRwczovL2dpdC1sZnMuZ2l0aHViLmNvbS9zcGVjL3YxCm9pZCBzaGEyNTY6YWJjZGVmMTIzNDU2CnNpemUgMTAyNAo="
+	assert.Equal(t, expectedBase64, result.Files[0].Content)
+}
+
+func TestParseNDJson_AllKeyTypes(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	cfg := &config.Config{}
+	cfg.Git.MaxUnLfsFileSize = 10485760
+
+	component := &repoComponentImpl{
+		config: cfg,
+	}
+
+	// Test with all supported key types in one request
+	requestBody := `{"key": "header", "value": {"summary": "Complete test", "description": "Testing all key types"}}
+{"key": "file", "value": {"path": "regular.txt", "content": "cmVndWxhciBmaWxl"}}
+{"key": "lfsFile", "value": {"path": "large.bin", "algo": "sha256", "oid": "123abc", "size": 5000}}
+{"key": "deletedFile", "value": {"path": "remove.txt"}}
+{"key": "deletedFolder", "value": {"path": "old_dir/"}}`
+
+	req := httptest.NewRequest("POST", "/test", strings.NewReader(requestBody))
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	ctx.Request = req
+
+	result, err := component.ParseNDJson(ctx)
+
+	require.NoError(t, err)
+	assert.Equal(t, "Complete test", result.Message)
+	assert.Len(t, result.Files, 4)
+
+	// Check regular file
+	assert.Equal(t, "regular.txt", result.Files[0].Path)
+	assert.Equal(t, "cmVndWxhciBmaWxl", result.Files[0].Content)
+	assert.Equal(t, types.CommitActionCreate, result.Files[0].Action)
+
+	// Check LFS file
+	assert.Equal(t, "large.bin", result.Files[1].Path)
+	assert.Equal(t, types.CommitActionCreate, result.Files[1].Action)
+
+	// Check deleted file
+	assert.Equal(t, "remove.txt", result.Files[2].Path)
+	assert.Equal(t, "", result.Files[2].Content)
+	assert.Equal(t, types.CommitActionDelete, result.Files[2].Action)
+
+	// Check deleted folder
+	assert.Equal(t, "old_dir/", result.Files[3].Path)
+	assert.Equal(t, "", result.Files[3].Content)
+	assert.Equal(t, types.CommitActionDelete, result.Files[3].Action)
 }

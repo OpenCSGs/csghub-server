@@ -6,13 +6,13 @@
   "engine_images": [
     {
       "compute_type": "gpu",
-      "image": "llama-factory:0.9.3",
+      "image": "opencsghq/llama-factory:0.9.3",
       "driver_version": "12.1",
       "engine_version": "0.9.3"
     },
     {
       "compute_type": "dcu",
-      "image": "llama-factory:0.9.3-dtk25.04",
+      "image": "opencsghq/llama-factory:0.9.3-dtk25.04",
       "driver_version": "25.04",
       "engine_version": "0.9.3"
     }

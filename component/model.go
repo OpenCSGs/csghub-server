@@ -327,6 +327,7 @@ func (c *modelComponentImpl) Create(ctx context.Context, req *types.CreateModelR
 		UpdatedAt: model.UpdatedAt,
 		BaseModel: model.BaseModel,
 		License:   model.Repository.License,
+		URL:       model.Repository.Path,
 	}
 
 	return resModel, nil
