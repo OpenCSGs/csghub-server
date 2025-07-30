@@ -17,12 +17,13 @@ func TestMemberStore_CRUD(t *testing.T) {
 	ctx := context.TODO()
 
 	userStore := database.NewUserStoreWithDB(db)
-	err := userStore.Create(ctx, &database.User{
+	user := &database.User{
 		ID:       456,
 		Username: "testuser",
 		UUID:     uuid.New().String(),
 		Password: "password",
-	}, &database.Namespace{Path: "testuser"})
+	}
+	err := userStore.Create(ctx, user, &database.Namespace{Path: "testuser"})
 	require.Nil(t, err)
 
 	store := database.NewMemberStoreWithDB(db)
@@ -48,6 +49,7 @@ func TestMemberStore_CRUD(t *testing.T) {
 	require.Equal(t, 1, len(ms))
 	require.Equal(t, 1, count)
 	require.Equal(t, "foo", ms[0].Role)
+	require.Equal(t, user, ms[0].User)
 
 	err = store.Delete(ctx, 123, 456, "foo")
 	require.Nil(t, err)

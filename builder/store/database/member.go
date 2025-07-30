@@ -83,21 +83,25 @@ func (s *memberStoreImpl) OrganizationMembers(ctx context.Context, orgID int64, 
 	var members []Member
 	var total int
 	q := s.db.Core.NewSelect().Model((*Member)(nil)).
+		Relation("User").
 		Join("JOIN users AS u ON u.id = member.user_id").
 		Where("organization_id=?", orgID)
 	if role != "" {
 		q = q.Where("role = ?", role)
 	}
-	q = q.Limit(pageSize).
-		Offset((page - 1) * pageSize)
-	err := q.Scan(ctx, &members)
-	if err != nil {
-		return nil, 0, fmt.Errorf("failed to find org members,caused by:%w", err)
-	}
-	total, err = q.Count(ctx)
+
+	total, err := q.Count(ctx)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to count org members,caused by:%w", err)
 	}
+
+	q = q.Limit(pageSize).
+		Offset((page - 1) * pageSize)
+	err = q.Scan(ctx, &members)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to find org members,caused by:%w", err)
+	}
+
 	return members, total, nil
 }
 
