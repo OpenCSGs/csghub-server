@@ -25,6 +25,20 @@ const (
 	gitConnectionFailed
 	gitLfsError
 	fileTooLarge
+	gitGetTreeEntryFailed
+	gitCommitFilesFailed
+	gitGetBlobsFailed
+	gitGetLfsPointersFailed
+	gitListLastCommitsForTreeFailed
+	gitGetBlobInfoFailed
+	gitListFilesFailed
+	gitCreateMirrorFailed
+	gitMirrorSyncFailed
+	gitCheckRepositoryExistsFailed
+	gitCreateRepositoryFailed
+	gitDeleteRepositoryFailed
+	gitGetRepositoryFailed
+	gitServiceUnavaliable
 )
 
 var (
@@ -131,6 +145,123 @@ func GitFileNotFound(err error, ctx context) error {
 	return CustomError{
 		prefix:  errGitPrefix,
 		code:    gitFileNotFound,
+		err:     err,
+		context: ctx,
+	}
+}
+
+func ErrGitGetTreeEntryFailed(err error, ctx context) error {
+	return CustomError{
+		prefix:  errGitPrefix,
+		code:    gitGetTreeEntryFailed,
+		err:     err,
+		context: ctx,
+	}
+}
+
+func ErrGitCommitFilesFailed(err error, ctx context) error {
+	return CustomError{
+		prefix:  errGitPrefix,
+		code:    gitCommitFilesFailed,
+		err:     err,
+		context: ctx,
+	}
+}
+
+func ErrGitGetBlobsFailed(err error, ctx context) error {
+	return CustomError{
+		prefix:  errGitPrefix,
+		code:    gitGetBlobsFailed,
+		err:     err,
+		context: ctx,
+	}
+}
+
+func ErrGitGetLfsPointersFailed(err error, ctx context) error {
+	return CustomError{
+		prefix:  errGitPrefix,
+		code:    gitGetLfsPointersFailed,
+		err:     err,
+		context: ctx,
+	}
+}
+
+func ErrGitListLastCommitsForTreeFailed(err error, ctx context) error {
+	return CustomError{
+		prefix:  errGitPrefix,
+		code:    gitListLastCommitsForTreeFailed,
+		err:     err,
+		context: ctx,
+	}
+}
+
+func ErrGitGetBlobInfoFailed(err error, ctx context) error {
+	return CustomError{
+		prefix:  errGitPrefix,
+		code:    gitGetBlobInfoFailed,
+		err:     err,
+		context: ctx,
+	}
+}
+
+func ErrGitListFilesFailed(err error, ctx context) error {
+	return CustomError{
+		prefix:  errGitPrefix,
+		code:    gitListFilesFailed,
+		err:     err,
+		context: ctx,
+	}
+}
+
+func ErrGitCreateMirrorFailed(err error, ctx context) error {
+	return CustomError{
+		prefix:  errGitPrefix,
+		code:    gitCreateMirrorFailed,
+		err:     err,
+		context: ctx,
+	}
+}
+
+func ErrGitMirrorSyncFailed(err error, ctx context) error {
+	return CustomError{
+		prefix:  errGitPrefix,
+		code:    gitMirrorSyncFailed,
+		err:     err,
+		context: ctx,
+	}
+}
+
+func ErrGitCheckRepositoryExistsFailed(err error, ctx context) error {
+	return CustomError{
+		prefix:  errGitPrefix,
+		code:    gitCheckRepositoryExistsFailed,
+		err:     err,
+		context: ctx,
+	}
+}
+
+func ErrGitCreateRepositoryFailed(err error, ctx context) error {
+	return CustomError{
+		prefix:  errGitPrefix,
+		code:    gitCreateRepositoryFailed,
+		err:     err,
+		context: ctx,
+	}
+}
+
+func ErrGitDeleteRepositoryFailed(err error, ctx context) error {
+	return CustomError{
+		prefix:  errGitPrefix,
+		code:    gitDeleteRepositoryFailed,
+		err:     err,
+		context: ctx,
+	}
+}
+
+func ErrGitGetRepositoryFailed(err error, ctx context) error {
+	return CustomError{
+		prefix:  errGitPrefix,
+		code:    gitGetRepositoryFailed,
 		err:     err,
 		context: ctx,
 	}
