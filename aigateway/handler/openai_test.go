@@ -87,7 +87,7 @@ func TestOpenAIHandler_GetModel(t *testing.T) {
 
 		handler.GetModel(c)
 
-		assert.Equal(t, http.StatusNotFound, w.Code)
+		assert.Equal(t, http.StatusBadRequest, w.Code)
 	})
 }
 
@@ -119,7 +119,7 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 
 		handler.Chat(c)
 
-		assert.Equal(t, http.StatusNotFound, w.Code)
+		assert.Equal(t, http.StatusBadRequest, w.Code)
 	})
 
 	t.Run("model not running", func(t *testing.T) {
@@ -143,6 +143,6 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 
 		handler.Chat(c)
 
-		assert.Equal(t, http.StatusNotFound, w.Code)
+		assert.Equal(t, http.StatusBadRequest, w.Code)
 	})
 }

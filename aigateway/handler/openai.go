@@ -111,7 +111,12 @@ func (h *OpenAIHandlerImpl) GetModel(c *gin.Context) {
 	username := httpbase.GetCurrentUser(c)
 	modelID := c.Param("model")
 	if modelID == "" {
-		c.String(http.StatusBadRequest, "model id can not be empty")
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": types.Error{
+				Code:    "model_not_found",
+				Message: "model id can not be empty",
+				Type:    "invalid_request_error",
+			}})
 		return
 	}
 
@@ -121,7 +126,12 @@ func (h *OpenAIHandlerImpl) GetModel(c *gin.Context) {
 		return
 	}
 	if model == nil {
-		c.String(http.StatusNotFound, fmt.Errorf("model '%s' not found", modelID).Error())
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": types.Error{
+				Code:    "model_not_found",
+				Message: fmt.Sprintf("model '%s' not found", modelID),
+				Type:    "invalid_request_error",
+			}})
 		return
 	}
 
@@ -165,14 +175,24 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 	}
 	if model == nil {
 		slog.Error("model not found", "model_id", modelID)
-		c.String(http.StatusNotFound, fmt.Sprintf("model '%s' not found", modelID))
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": types.Error{
+				Code:    "model_not_found",
+				Message: fmt.Sprintf("model '%s' not found", modelID),
+				Type:    "invalid_request_error",
+			}})
 		return
 	}
 
 	endpoint := model.Endpoint
 	if endpoint == "" {
 		slog.Error("model not running, endpoint is empty", "model_id", modelID)
-		c.String(http.StatusNotFound, fmt.Sprintf("model '%s' not running", modelID))
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": types.Error{
+				Code:    "model_not_running",
+				Message: fmt.Sprintf("model '%s' not running", modelID),
+				Type:    "invalid_request_error",
+			}})
 		return
 	}
 
@@ -270,12 +290,22 @@ func (h *OpenAIHandlerImpl) Embedding(c *gin.Context) {
 		return
 	}
 	if model == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("model '%s' not found", modelID)})
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": types.Error{
+				Code:    "model_not_found",
+				Message: fmt.Sprintf("model '%s' not found", modelID),
+				Type:    "invalid_request_error",
+			}})
 		return
 	}
 	endpoint := model.Endpoint
 	if endpoint == "" {
-		c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("model '%s' not running", modelID)})
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": types.Error{
+				Code:    "model_not_running",
+				Message: fmt.Sprintf("model '%s' not running", modelID),
+				Type:    "invalid_request_error",
+			}})
 		return
 	}
 	modelName, _, err := (component.ModelIDBuilder{}).From(modelID)
