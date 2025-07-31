@@ -100,13 +100,13 @@ func TestMultiSyncComponent_SyncAsClient(t *testing.T) {
 	mockedClient.EXPECT().ReadMeData(ctx, svs[0]).Return("readme", nil)
 	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "CSG_ns").Return(database.User{}, sql.ErrNoRows)
 	mc.mocks.gitServer.EXPECT().CreateUser(gitserver.CreateUserRequest{
-		Nickname: "nn",
+		Nickname: "CSG_ns",
 		Username: "CSG_ns",
 		Email:    "ba63d40b48ed06ce1fba4f23c65c058c",
 	}).Return(&gitserver.CreateUserResponse{GitID: 123}, nil)
 	mc.mocks.stores.UserMock().EXPECT().Create(ctx, mock.Anything, mock.Anything).RunAndReturn(
 		func(ctx context.Context, u *database.User, n *database.Namespace) error {
-			require.Equal(t, u.NickName, "nn")
+			require.Equal(t, u.NickName, "CSG_ns")
 			require.Equal(t, u.Username, "CSG_ns")
 			require.Equal(t, u.Email, "ba63d40b48ed06ce1fba4f23c65c058c")
 			require.Equal(t, u.GitID, int64(123))
