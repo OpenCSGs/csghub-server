@@ -284,7 +284,7 @@ func (c *multiSyncComponentImpl) createLocalDataset(ctx context.Context, m *type
 	if user.ID == 0 {
 		//create as user instead of org, no matter if the namespace is org or user
 		user, err = c.createUser(ctx, types.CreateUserRequest{
-			Name:     m.User.Nickname,
+			Name:     userName,
 			Username: userName,
 			Email:    common.MD5Hash(fmt.Sprintf("%s_%s", userName, m.User.Email)),
 			UUID:     uuid.New().String(),
@@ -422,7 +422,7 @@ func (c *multiSyncComponentImpl) createLocalModel(ctx context.Context, m *types.
 	if user.ID == 0 {
 		//create as user instead of org, no matter if the namespace is org or user
 		user, err = c.createUser(ctx, types.CreateUserRequest{
-			Name:     m.User.Nickname,
+			Name:     userName,
 			Username: userName,
 			// Add userName to email to avoid email conflict
 			Email: common.MD5Hash(fmt.Sprintf("%s_%s", userName, m.User.Email)),
@@ -561,7 +561,7 @@ func (c *multiSyncComponentImpl) createLocalCode(ctx context.Context, m *types.C
 	if user.ID == 0 {
 		//create as user instead of org, no matter if the namespace is org or user
 		user, err = c.createUser(ctx, types.CreateUserRequest{
-			Name:     m.User.Nickname,
+			Name:     userName,
 			Username: userName,
 			// Add userName to email to avoid email conflict
 			Email: common.MD5Hash(fmt.Sprintf("%s_%s", userName, m.User.Email)),
@@ -698,7 +698,7 @@ func (c *multiSyncComponentImpl) createLocalPrompt(ctx context.Context, m *types
 	if user.ID == 0 {
 		//create as user instead of org, no matter if the namespace is org or user
 		user, err = c.createUser(ctx, types.CreateUserRequest{
-			Name:     m.User.Nickname,
+			Name:     userName,
 			Username: userName,
 			// Add userName to email to avoid email conflict
 			Email: common.MD5Hash(fmt.Sprintf("%s_%s", userName, m.User.Email)),
@@ -835,7 +835,7 @@ func (c *multiSyncComponentImpl) createLocalMCPServer(ctx context.Context, m *ty
 	if user.ID == 0 {
 		//create as user instead of org, no matter if the namespace is org or user
 		user, err = c.createUser(ctx, types.CreateUserRequest{
-			Name:     m.User.Nickname,
+			Name:     userName,
 			Username: userName,
 			// Add userName to email to avoid email conflict
 			Email: common.MD5Hash(fmt.Sprintf("%s_%s", userName, m.User.Email)),
