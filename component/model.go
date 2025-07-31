@@ -410,7 +410,11 @@ func (c *modelComponentImpl) Delete(ctx context.Context, namespace, name, curren
 }
 
 func (c *modelComponentImpl) Show(ctx context.Context, namespace, name, currentUser string, needOpWeight bool) (*types.Model, error) {
-	var tags []types.RepoTag
+	var (
+		tags             []types.RepoTag
+		syncStatus       types.RepositorySyncStatus
+		mirrorTaskStatus types.MirrorTaskStatus
+	)
 	model, err := c.modelStore.FindByPath(ctx, namespace, name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find model, error: %w", err)
@@ -448,6 +452,13 @@ func (c *modelComponentImpl) Show(ctx context.Context, namespace, name, currentU
 		return nil, newError
 	}
 
+	syncStatus = types.SyncStatusPending
+
+	if model.Repository.Mirror.CurrentTask != nil {
+		syncStatus = common.MirrorTaskStatusToRepoStatus(model.Repository.Mirror.CurrentTask.Status)
+		mirrorTaskStatus = model.Repository.Mirror.CurrentTask.Status
+	}
+
 	resModel := &types.Model{
 		ID:            model.ID,
 		Name:          model.Repository.Name,
@@ -472,7 +483,7 @@ func (c *modelComponentImpl) Show(ctx context.Context, namespace, name, currentU
 		WidgetType:          types.ModelWidgetTypeGeneration,
 		UserLikes:           likeExists,
 		Source:              model.Repository.Source,
-		SyncStatus:          model.Repository.SyncStatus,
+		SyncStatus:          syncStatus,
 		BaseModel:           model.BaseModel,
 		License:             model.Repository.License,
 		MirrorLastUpdatedAt: model.Repository.Mirror.LastUpdatedAt,
@@ -495,6 +506,7 @@ func (c *modelComponentImpl) Show(ctx context.Context, namespace, name, currentU
 			MSPath:  model.Repository.MSPath,
 			CSGPath: model.Repository.CSGPath,
 		},
+		MirrorTaskStatus: mirrorTaskStatus,
 	}
 	// admin user or owner can see the sensitive check status
 	if permission.CanAdmin {
