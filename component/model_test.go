@@ -259,6 +259,7 @@ func TestModelComponent_Show(t *testing.T) {
 		EnableFinetune:   true,
 		EnableEvaluation: true,
 		WidgetType:       types.ModelWidgetTypeGeneration,
+		SyncStatus:       types.SyncStatusPending,
 	}, model)
 }
 

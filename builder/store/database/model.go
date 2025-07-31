@@ -210,6 +210,7 @@ func (s *modelStoreImpl) FindByPath(ctx context.Context, namespace string, name 
 		Model(resModel).
 		Relation("Repository.User").
 		Relation("Repository.Mirror").
+		Relation("Repository.Mirror.CurrentTask").
 		Relation("Repository.Metadata").
 		Where("repository.path =?", fmt.Sprintf("%s/%s", namespace, name)).
 		Limit(1).

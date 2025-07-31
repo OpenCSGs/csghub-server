@@ -180,6 +180,7 @@ type Model struct {
 	MediumRiskCount         int                  `json:"medium_risk_count"`
 	HighRiskCount           int                  `json:"high_risk_count"`
 	URL                     string               `json:"url"`
+	MirrorTaskStatus        MirrorTaskStatus     `json:"mirror_task_status"`
 	MultiSource
 }
 
