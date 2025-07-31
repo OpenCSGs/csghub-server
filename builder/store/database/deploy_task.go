@@ -10,6 +10,7 @@ import (
 
 	"github.com/uptrace/bun"
 	"opencsg.com/csghub-server/builder/deploy/common"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -402,12 +403,16 @@ func (s *deployTaskStoreImpl) RunningVisibleToUser(ctx context.Context, userID i
 		Relation("Repository").
 		Relation("User").
 		// running dedicated and serverless model inference
-		Where("status = ? and type in (?)", common.Running, bun.In([]int64{1, 3})).
+		Where("status = ? and type in (?)", common.Running, bun.In([]int64{types.InferenceType, types.ServerlessType})).
 		WhereGroup("AND", func(q *bun.SelectQuery) *bun.SelectQuery {
 			return q.WhereOr("deploy.user_id =?", userID). //user owned
-									WhereOr("secure_level =?", 1) // other users owned but public
+									WhereOr("secure_level =?", types.EndpointPublic) // other users owned but public
 		}).
 		Scan(ctx)
+	if errors.Is(err, sql.ErrNoRows) {
+		return []Deploy{}, nil
+	}
+	err = errorx.HandleDBError(err, nil)
 	return result, err
 }
 
