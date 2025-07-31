@@ -78,7 +78,12 @@ func (h *OpenAIHandlerImpl) ListModels(c *gin.Context) {
 	models, err := h.openaiComponent.GetAvailableModels(c.Request.Context(), currentUser)
 	if err != nil {
 		slog.Error("failed to get available models", "error", err.Error(), "current_user", currentUser)
-		c.String(http.StatusInternalServerError, fmt.Errorf("failed to get available models,error:%w", err).Error())
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": types.Error{
+				Code:    "internal_server_error",
+				Message: "Failed to retrieve models",
+				Type:    "server_error",
+			}})
 		return
 	}
 
