@@ -52,6 +52,14 @@ func (c *Client) GetRepoFileRaw(ctx context.Context, req gitserver.GetRepoInfoBy
 
 	treeEntriesStream, err := c.commitClient.TreeEntry(ctx, treeEntriesReq)
 	if err != nil {
+		errCtx := errorx.Ctx().
+			Set("path", fmt.Sprintf("%s/%s", req.Namespace, req.Name)).
+			Set("branch", req.Ref).Set("path", req.Path)
+		if status.Code(err) == codes.NotFound || status.Code(err) == codes.InvalidArgument {
+			err = errorx.GitFileNotFound(err, errCtx)
+		} else {
+			err = errorx.ErrGitGetTreeEntryFailed(err, errCtx)
+		}
 		return "", err
 	}
 
@@ -65,6 +73,9 @@ func (c *Client) GetRepoFileRaw(ctx context.Context, req gitserver.GetRepoInfoBy
 			if err == io.EOF {
 				break
 			}
+			err = errorx.ErrGitGetTreeEntryFailed(err, errorx.Ctx().
+				Set("path", fmt.Sprintf("%s/%s", req.Namespace, req.Name)).
+				Set("branch", req.Ref).Set("path", req.Path))
 			return "", err
 		}
 		if treeEntriesResp != nil {
@@ -643,6 +654,14 @@ func (c *Client) GetRepoFileTree(ctx context.Context, req gitserver.GetRepoInfoB
 		if err != nil {
 			if err == io.EOF {
 				break
+			}
+			errCtx := errorx.Ctx().
+				Set("path", fmt.Sprintf("%s/%s", req.Namespace, req.Name)).
+				Set("branch", req.Ref).Set("path", req.Path)
+			if status.Code(err) == codes.NotFound || status.Code(err) == codes.InvalidArgument {
+				err = errorx.GitFileNotFound(err, errCtx)
+			} else {
+				err = errorx.ErrGitGetBlobsFailed(err, errCtx)
 			}
 			return nil, err
 		}
