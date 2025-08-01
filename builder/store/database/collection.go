@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/uptrace/bun"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -77,7 +78,9 @@ type RankedRepository struct {
 var Fields = []string{"id", "download_count", "likes", "path", "private", "repository_type", "updated_at", "created_at", "user_id", "name", "nickname", "description"}
 
 // query collections in the database
-func (cs *collectionStoreImpl) GetCollections(ctx context.Context, filter *types.CollectionFilter, per, page int, showPrivate bool) (collections []Collection, total int, err error) {
+func (cs *collectionStoreImpl) GetCollections(
+	ctx context.Context, filter *types.CollectionFilter, per, page int, showPrivate bool) (
+	collections []Collection, total int, err error) {
 	if filter.Sort == "trending" {
 		return cs.QueryByTrending(ctx, filter, per, page)
 	}
@@ -95,10 +98,12 @@ func (cs *collectionStoreImpl) GetCollections(ctx context.Context, filter *types
 		Limit(per).Offset((page - 1) * per).
 		Scan(ctx)
 	if err != nil {
+		err := errorx.HandleDBError(err, nil)
 		return nil, 0, err
 	}
 	total, err = query.Count(ctx)
 	if err != nil {
+		err = errorx.HandleDBError(err, nil)
 		return
 	}
 
@@ -110,7 +115,9 @@ func (cs *collectionStoreImpl) GetCollections(ctx context.Context, filter *types
 }
 
 // query collections in the database
-func (cs *collectionStoreImpl) QueryByTrending(ctx context.Context, filter *types.CollectionFilter, per, page int) (collections []Collection, total int, err error) {
+func (cs *collectionStoreImpl) QueryByTrending(
+	ctx context.Context, filter *types.CollectionFilter, per, page int) (
+	collections []Collection, total int, err error) {
 	query := cs.db.Operator.Core.NewSelect().
 		Model(&collections).
 		Column("collection.*").
@@ -130,12 +137,14 @@ func (cs *collectionStoreImpl) QueryByTrending(ctx context.Context, filter *type
 	err = query.Order(sortBy[filter.Sort]).
 		Limit(per).Offset((page - 1) * per).
 		Scan(ctx)
-	if err != nil {
+	if err != nil || len(collections) == 0 {
+		err = errorx.HandleDBError(err, nil)
 		return nil, 0, err
 	}
 
 	total, err = query.Count(ctx)
 	if err != nil {
+		err = errorx.HandleDBError(err, nil)
 		return nil, 0, err
 	}
 	ids := make([]interface{}, 0)
@@ -184,7 +193,8 @@ func (cs *collectionStoreImpl) GetCollection(ctx context.Context, id int64) (*Co
 		Where("id =?", id).
 		Scan(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("can not find collection: %w", err)
+		err = errorx.HandleDBError(err, errorx.Ctx().Set("collection_id", id))
+		return nil, err
 	}
 
 	return collection, err
@@ -247,7 +257,9 @@ func (cs *collectionStoreImpl) ByUserOrgs(ctx context.Context, namespace string,
 }
 
 // get collections by ids
-func (cs *collectionStoreImpl) GetCollectionsByIDs(ctx context.Context, collections []Collection, ids []interface{}, total int, onlyPublic bool) ([]Collection, int, error) {
+func (cs *collectionStoreImpl) GetCollectionsByIDs(
+	ctx context.Context, collections []Collection, ids []interface{}, total int, onlyPublic bool) (
+	[]Collection, int, error) {
 	subQuery := cs.db.Operator.Core.NewSelect().
 		Column("cr.collection_id").
 		ColumnExpr("repository.id as repository_id").
