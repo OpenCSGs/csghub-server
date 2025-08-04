@@ -1741,6 +1741,65 @@ func (_c *MockGitServer_GetRepoFileTree_Call) RunAndReturn(run func(context.Cont
 	return _c
 }
 
+// GetRepoFiles provides a mock function with given fields: ctx, req
+func (_m *MockGitServer) GetRepoFiles(ctx context.Context, req gitserver.GetRepoFilesReq) ([]*types.File, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetRepoFiles")
+	}
+
+	var r0 []*types.File
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, gitserver.GetRepoFilesReq) ([]*types.File, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, gitserver.GetRepoFilesReq) []*types.File); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*types.File)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, gitserver.GetRepoFilesReq) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockGitServer_GetRepoFiles_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetRepoFiles'
+type MockGitServer_GetRepoFiles_Call struct {
+	*mock.Call
+}
+
+// GetRepoFiles is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req gitserver.GetRepoFilesReq
+func (_e *MockGitServer_Expecter) GetRepoFiles(ctx interface{}, req interface{}) *MockGitServer_GetRepoFiles_Call {
+	return &MockGitServer_GetRepoFiles_Call{Call: _e.mock.On("GetRepoFiles", ctx, req)}
+}
+
+func (_c *MockGitServer_GetRepoFiles_Call) Run(run func(ctx context.Context, req gitserver.GetRepoFilesReq)) *MockGitServer_GetRepoFiles_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(gitserver.GetRepoFilesReq))
+	})
+	return _c
+}
+
+func (_c *MockGitServer_GetRepoFiles_Call) Return(_a0 []*types.File, _a1 error) *MockGitServer_GetRepoFiles_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockGitServer_GetRepoFiles_Call) RunAndReturn(run func(context.Context, gitserver.GetRepoFilesReq) ([]*types.File, error)) *MockGitServer_GetRepoFiles_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetRepoLastCommit provides a mock function with given fields: ctx, req
 func (_m *MockGitServer) GetRepoLastCommit(ctx context.Context, req gitserver.GetRepoLastCommitReq) (*types.Commit, error) {
 	ret := _m.Called(ctx, req)
@@ -1855,6 +1914,65 @@ func (_c *MockGitServer_GetRepoLfsFileRaw_Call) Return(_a0 io.ReadCloser, _a1 er
 }
 
 func (_c *MockGitServer_GetRepoLfsFileRaw_Call) RunAndReturn(run func(context.Context, gitserver.GetRepoInfoByPathReq) (io.ReadCloser, error)) *MockGitServer_GetRepoLfsFileRaw_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetRepoLfsPointers provides a mock function with given fields: ctx, req
+func (_m *MockGitServer) GetRepoLfsPointers(ctx context.Context, req gitserver.GetRepoFilesReq) ([]*types.LFSPointer, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetRepoLfsPointers")
+	}
+
+	var r0 []*types.LFSPointer
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, gitserver.GetRepoFilesReq) ([]*types.LFSPointer, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, gitserver.GetRepoFilesReq) []*types.LFSPointer); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*types.LFSPointer)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, gitserver.GetRepoFilesReq) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockGitServer_GetRepoLfsPointers_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetRepoLfsPointers'
+type MockGitServer_GetRepoLfsPointers_Call struct {
+	*mock.Call
+}
+
+// GetRepoLfsPointers is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req gitserver.GetRepoFilesReq
+func (_e *MockGitServer_Expecter) GetRepoLfsPointers(ctx interface{}, req interface{}) *MockGitServer_GetRepoLfsPointers_Call {
+	return &MockGitServer_GetRepoLfsPointers_Call{Call: _e.mock.On("GetRepoLfsPointers", ctx, req)}
+}
+
+func (_c *MockGitServer_GetRepoLfsPointers_Call) Run(run func(ctx context.Context, req gitserver.GetRepoFilesReq)) *MockGitServer_GetRepoLfsPointers_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(gitserver.GetRepoFilesReq))
+	})
+	return _c
+}
+
+func (_c *MockGitServer_GetRepoLfsPointers_Call) Return(_a0 []*types.LFSPointer, _a1 error) *MockGitServer_GetRepoLfsPointers_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockGitServer_GetRepoLfsPointers_Call) RunAndReturn(run func(context.Context, gitserver.GetRepoFilesReq) ([]*types.LFSPointer, error)) *MockGitServer_GetRepoLfsPointers_Call {
 	_c.Call.Return(run)
 	return _c
 }
