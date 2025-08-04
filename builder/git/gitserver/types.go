@@ -252,3 +252,13 @@ const (
 	CommitActionUpdate CommitAction = "update"
 	CommitActionDelete CommitAction = "delete"
 )
+
+type GetRepoFilesReq struct {
+	Namespace                             string               `json:"namespace"`
+	Name                                  string               `json:"name"`
+	Ref                                   string               `json:"ref"`
+	RepoType                              types.RepositoryType `json:"repo_type"`
+	Revisions                             []string             `json:"revision"`
+	GitObjectDirectoryRelative            string               `json:"git_object_directory_relative"`
+	GitAlternateObjectDirectoriesRelative []string             `json:"git_alternate_object_directories_relative"`
+}
