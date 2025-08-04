@@ -296,6 +296,7 @@ func (s *deployTaskStoreImpl) ListInstancesByUserID(ctx context.Context, userID 
 func (s *deployTaskStoreImpl) GetDeployByID(ctx context.Context, deployID int64) (*Deploy, error) {
 	deploy := &Deploy{}
 	err := s.db.Operator.Core.NewSelect().Model(deploy).Where("id = ?", deployID).Scan(ctx, deploy)
+	err = errorx.HandleDBError(err, errorx.Ctx().Set("deploy_id", deployID))
 	return deploy, err
 }
 
