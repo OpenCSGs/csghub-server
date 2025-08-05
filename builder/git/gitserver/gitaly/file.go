@@ -613,7 +613,7 @@ func (c *Client) GetRepoFileTree(ctx context.Context, req gitserver.GetRepoInfoB
 			}
 		}
 		if commitResp == nil {
-			return nil, errorx.ErrGitCommitFailed
+			return nil, errorx.ErrGitCommitNotFound
 		}
 		commits := commitResp.Commits
 		if len(commits) > 0 {
@@ -754,6 +754,16 @@ func (c *Client) GetTree(ctx context.Context, req types.GetTreeRequest) (*types.
 		if err != nil {
 			if err == io.EOF {
 				break
+			} else if status.Code(err) == codes.NotFound || status.Code(err) == codes.InvalidArgument {
+				errCtx := errorx.Ctx().
+					Set("path", fmt.Sprintf("%s/%s", req.Namespace, req.Name)).
+					Set("branch", req.Ref).Set("path", req.Path)
+				err = errorx.GitFileNotFound(err, errCtx)
+			} else {
+				errCtx := errorx.Ctx().
+					Set("path", fmt.Sprintf("%s/%s", req.Namespace, req.Name)).
+					Set("branch", req.Ref).Set("path", req.Path)
+				err = errorx.ErrGitGetTreeEntryFailed(err, errCtx)
 			}
 			return nil, err
 		}

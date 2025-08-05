@@ -499,7 +499,11 @@ func (h *RepoHandler) FileInfo(ctx *gin.Context) {
 	file, err := h.c.FileInfo(ctx.Request.Context(), req)
 	if err != nil {
 		slog.Error("Failed to get repo file info", slog.Any("req", req), slog.Any("error", err), slog.Any("req", req))
-		httpbase.ServerError(ctx, err)
+		if errors.Is(err, errorx.ErrGitFileNotFound) || errors.Is(err, errorx.ErrGitCommitNotFound) {
+			httpbase.NotFoundError(ctx, err)
+		} else {
+			httpbase.ServerError(ctx, err)
+		}
 		return
 	}
 
@@ -795,12 +799,15 @@ func (h *RepoHandler) TreeV2(ctx *gin.Context) {
 		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
 			return
+		} else if errors.Is(err, errorx.ErrGitFileNotFound) || errors.Is(err, errorx.ErrGitCommitNotFound) {
+			httpbase.NotFoundError(ctx, err)
+		} else {
+			httpbase.ServerError(ctx, err)
 		}
-		slog.Error(
-			"Failed to get tree", slog.String("repo_type", string(req.RepoType)),
+		slog.Error("Failed to get tree",
+			slog.String("repo_type", string(req.RepoType)),
 			slog.Any("error", err), slog.Any("req", req),
 		)
-		httpbase.ServerError(ctx, err)
 		return
 	}
 
@@ -1244,7 +1251,11 @@ func (h *RepoHandler) CommitWithDiff(ctx *gin.Context) {
 	commit, err := h.c.GetCommitWithDiff(ctx.Request.Context(), req)
 	if err != nil {
 		slog.Error("Failed to get repo with commit diff", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err))
-		httpbase.ServerError(ctx, err)
+		if errors.Is(err, errorx.ErrGitCommitNotFound) {
+			httpbase.NotFoundError(ctx, err)
+		} else {
+			httpbase.ServerError(ctx, err)
+		}
 		return
 	}
 	slog.Debug("Get repo commit with diff succeed", slog.String("repo_type", string(req.RepoType)), slog.String("name", name), slog.String("commit id", req.Ref))
