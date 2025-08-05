@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -59,6 +60,7 @@ func (h *InternalHandler) SSHAllowed(ctx *gin.Context) {
 		req      types.SSHAllowedReq
 		rawReq   types.GitalyAllowedReq
 		repoPath string
+		gitEnv   types.GitEnv
 	)
 	if err := ctx.ShouldBind(&rawReq); err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -71,6 +73,23 @@ func (h *InternalHandler) SSHAllowed(ctx *gin.Context) {
 		ctx.PureJSON(http.StatusOK, gin.H{
 			"status":  true,
 			"message": "allowed",
+		})
+		return
+	}
+
+	err := json.Unmarshal([]byte(rawReq.Env), &gitEnv)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	rawReq.GitEnv = gitEnv
+	valid, err := h.internal.CheckGitCallback(ctx.Request.Context(), rawReq)
+
+	if !valid {
+		ctx.PureJSON(http.StatusOK, gin.H{
+			"status":  false,
+			"message": err.Error(),
 		})
 		return
 	}

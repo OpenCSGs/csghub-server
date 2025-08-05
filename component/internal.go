@@ -16,17 +16,19 @@ import (
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
+	"opencsg.com/csghub-server/component/checker"
 )
 
 type internalComponentImpl struct {
-	config         *config.Config
-	sshKeyStore    database.SSHKeyStore
-	repoStore      database.RepoStore
-	tokenStore     database.AccessTokenStore
-	namespaceStore database.NamespaceStore
-	repoComponent  RepoComponent
-	gitServer      gitserver.GitServer
-	dataviewer     dataviewer.DataviewerClient
+	config           *config.Config
+	sshKeyStore      database.SSHKeyStore
+	repoStore        database.RepoStore
+	tokenStore       database.AccessTokenStore
+	namespaceStore   database.NamespaceStore
+	repoComponent    RepoComponent
+	gitServer        gitserver.GitServer
+	dataviewer       dataviewer.DataviewerClient
+	callbackCheckers []checker.GitCallbackChecker
 }
 
 type InternalComponent interface {
@@ -36,6 +38,7 @@ type InternalComponent interface {
 	GetCommitDiff(ctx context.Context, req types.GetDiffBetweenTwoCommitsReq) (*types.GiteaCallbackPushReq, error)
 	LfsAuthenticate(ctx context.Context, req types.LfsAuthenticateReq) (*types.LfsAuthenticateResp, error)
 	TriggerDataviewerWorkflow(ctx context.Context, req types.UpdateViewerReq) (*types.WorkFlowInfo, error)
+	CheckGitCallback(ctx context.Context, req types.GitalyAllowedReq) (bool, error)
 }
 
 func NewInternalComponent(config *config.Config) (InternalComponent, error) {
@@ -55,6 +58,16 @@ func NewInternalComponent(config *config.Config) (InternalComponent, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create git server: %w", err)
 	}
+	fileSizeChecker, err := checker.NewFileSizeChecker(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create file size checker: %w", err)
+	}
+	lfsExistsChecker, err := checker.NewLFSExistsChecker(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create lfs exists checker: %w", err)
+	}
+
+	c.callbackCheckers = append(c.callbackCheckers, fileSizeChecker, lfsExistsChecker)
 	c.gitServer = git
 	return c, nil
 }
@@ -209,4 +222,15 @@ func (c *internalComponentImpl) TriggerDataviewerWorkflow(ctx context.Context, r
 		return nil, fmt.Errorf("fail to trigger dataviewer workflow, error: %w", err)
 	}
 	return res, nil
+}
+
+func (c *internalComponentImpl) CheckGitCallback(ctx context.Context, req types.GitalyAllowedReq) (bool, error) {
+	for _, checker := range c.callbackCheckers {
+		allowed, err := checker.Check(ctx, req)
+		if !allowed {
+			return false, err
+		}
+	}
+
+	return true, nil
 }
