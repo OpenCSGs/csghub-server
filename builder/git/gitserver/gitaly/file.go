@@ -105,6 +105,7 @@ func (c *Client) GetRepoFileReader(ctx context.Context, req gitserver.GetRepoInf
 
 	go func() {
 		defer pw.Close()
+		defer close(sizeChan)
 
 		for {
 			treeEntriesResp, err := treeEntriesStream.Recv()
@@ -128,7 +129,10 @@ func (c *Client) GetRepoFileReader(ctx context.Context, req gitserver.GetRepoInf
 			}
 		}
 	}()
-	size = <-sizeChan
+	size, ok := <-sizeChan
+	if !ok {
+		size = 0
+	}
 
 	return pr, size, nil
 }
