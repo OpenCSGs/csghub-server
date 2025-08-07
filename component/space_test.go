@@ -296,8 +296,14 @@ func TestSpaceComponent_Delete(t *testing.T) {
 		Namespace: "ns",
 		Name:      "n",
 		RepoType:  types.SpaceRepo,
-	}).Return(nil, nil)
+	}).Return(&database.Repository{
+		User: database.User{
+			UUID: "user-uuid",
+		},
+		Path: "ns/n",
+	}, nil)
 	sc.mocks.stores.SpaceMock().EXPECT().Delete(mock.Anything, database.Space{ID: 1}).Return(nil)
+
 	sc.mocks.stores.DeployTaskMock().EXPECT().GetLatestDeployBySpaceID(mock.Anything, int64(1)).Return(
 		&database.Deploy{
 			RepoID: 2,
@@ -314,8 +320,17 @@ func TestSpaceComponent_Delete(t *testing.T) {
 		mock.Anything, types.SpaceRepo, int64(2), int64(3), int64(4),
 	).Return(nil)
 
+	sc.mocks.components.repo.EXPECT().SendAssetManagementMsg(mock.Anything, types.RepoNotificationReq{
+		RepoType:  types.SpaceRepo,
+		Operation: types.OperationDelete,
+		RepoPath:  "ns/n",
+		UserUUID:  "user-uuid",
+	}).Return(nil)
+
 	err := sc.Delete(ctx, "ns", "n", "user")
-	time.Sleep(1 * time.Second)
+
+	time.Sleep(500 * time.Millisecond)
+
 	require.Nil(t, err)
 
 }
