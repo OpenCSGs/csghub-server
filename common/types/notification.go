@@ -7,10 +7,11 @@ import (
 type NotificationType string
 
 const (
-	NotificationSystem          NotificationType = "system"
-	NotificationComment         NotificationType = "comment"
-	NotificationOrganization    NotificationType = "organization"
-	NotificationAssetManagement NotificationType = "asset_management"
+	NotificationSystem               NotificationType = "system"
+	NotificationComment              NotificationType = "comment"
+	NotificationOrganization         NotificationType = "organization"
+	NotificationAssetManagement      NotificationType = "asset_management"
+	NotificationDeploymentManagement NotificationType = "deployment"
 )
 
 type ActionType string
@@ -51,6 +52,9 @@ type NotificationMessage struct {
 	ClickActionURL   string           `json:"click_action_url"`
 	Priority         int              `json:"priority"`
 	CreateAt         time.Time        `json:"create_at"`
+	// Template and Payload are used to render the message content in portal,
+	Template string         `json:"template"` // template value should be the same as the scenario name
+	Payload  map[string]any `json:"payload"`  // used to render the message content in portal
 }
 
 type NotificationsResp struct {
@@ -65,17 +69,19 @@ type NewNotifications struct {
 }
 
 type Notifications struct {
-	ID               int64  `json:"id"`
-	UserUUID         string `json:"user_uuid"`
-	SenderUUID       string `json:"sender_uuid"`
-	NotificationType string `json:"notification_type"`
-	Title            string `json:"title"`
-	Summary          string `json:"summary"`
-	Content          string `json:"content"`
-	IsRead           bool   `json:"is_read"`
-	ClickActionURL   string `json:"click_action_url"`
-	CreatedAt        int64  `json:"created_at"`
-	UpdatedAt        int64  `json:"updated_at"`
+	ID               int64          `json:"id"`
+	UserUUID         string         `json:"user_uuid"`
+	SenderUUID       string         `json:"sender_uuid"`
+	NotificationType string         `json:"notification_type"`
+	Title            string         `json:"title"`
+	Summary          string         `json:"summary"`
+	Content          string         `json:"content"`
+	Template         string         `json:"template"`
+	Payload          map[string]any `json:"payload"`
+	IsRead           bool           `json:"is_read"`
+	ClickActionURL   string         `json:"click_action_url"`
+	CreatedAt        int64          `json:"created_at"`
+	UpdatedAt        int64          `json:"updated_at"`
 }
 
 type NotificationsRequest struct {
@@ -86,7 +92,9 @@ type NotificationsRequest struct {
 	Title            string `form:"title"`
 }
 
-type MarkNotificationsAsReadReq struct {
+// BatchNotificationOperationReq represents a common request structure for batch notification operations
+// such as mark as read, mark as unread, and delete operations
+type BatchNotificationOperationReq struct {
 	IDs     []int64 `json:"ids"`
 	MarkAll bool    `json:"mark_all"`
 }
@@ -189,6 +197,13 @@ type MessageScenario string
 const (
 	MessageScenarioRepoSync             MessageScenario = "repo-sync"
 	MessageScenarioInternalNotification MessageScenario = "internal-notification"
+	MessageScenarioEmailVerifyCode      MessageScenario = "email-verify-code"
+	MessageScenarioAssetManagement      MessageScenario = "asset-management"
+	MessageScenarioUserVerify           MessageScenario = "user-verify"
+	MessageScenarioOrgVerify            MessageScenario = "org-verify"
+	MessageScenarioOrgMember            MessageScenario = "org-member"
+	MessageScenarioDiscussion           MessageScenario = "discussion"
+	MessageScenarioDeployment           MessageScenario = "deployment"
 )
 
 type MessageChannel string
@@ -228,11 +243,13 @@ const (
 )
 
 type EmailAttachment struct {
-	Path string `json:"path"`
-	Name string `json:"name"`
+	Name    string `json:"name"`
+	Content []byte `json:"content"`
+	Path    string `json:"path"`
 }
 
 type EmailReq struct {
+	From        string            `json:"from"`
 	To          []string          `json:"to"`
 	CC          []string          `json:"cc"`
 	BCC         []string          `json:"bcc"`
@@ -250,9 +267,29 @@ const (
 	EmailSourceUser                EmailSource = "user"                 // from user table
 )
 
-type NotificationEmailContent struct {
-	Subject     string            `json:"subject"`
-	Attachments []EmailAttachment `json:"attachments"`
-	ContentType EmailContentType  `json:"content_type"`
-	Source      EmailSource       `json:"source"`
+type OrgMemberOperation string
+
+const (
+	OrgMemberOperationAdd    OrgMemberOperation = "add"
+	OrgMemberOperationRemove OrgMemberOperation = "remove"
+	OrgMemberOperationUpdate OrgMemberOperation = "update"
+)
+
+type OrgMemberReq struct {
+	UserName  string             `json:"user_name"`
+	NewRole   string             `json:"new_role"`
+	OrgName   string             `json:"org_name"`
+	Operation OrgMemberOperation `json:"operation"`
+	UserUUIDs []string           `json:"user_uuids"`
+}
+
+type EmailVerifyCodeNotificationReq struct {
+	Email string `json:"email"`
+	Code  string `json:"code"`
+	TTL   int64  `json:"ttl"` // in minutes
+}
+
+type TemplateOutput struct {
+	Title   string
+	Content string
 }

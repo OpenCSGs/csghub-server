@@ -3361,6 +3361,53 @@ func (_c *MockRepoComponent_SDKListFiles_Call) RunAndReturn(run func(context.Con
 	return _c
 }
 
+// SendAssetManagementMsg provides a mock function with given fields: ctx, req
+func (_m *MockRepoComponent) SendAssetManagementMsg(ctx context.Context, req types.RepoNotificationReq) error {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SendAssetManagementMsg")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.RepoNotificationReq) error); ok {
+		r0 = rf(ctx, req)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockRepoComponent_SendAssetManagementMsg_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SendAssetManagementMsg'
+type MockRepoComponent_SendAssetManagementMsg_Call struct {
+	*mock.Call
+}
+
+// SendAssetManagementMsg is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.RepoNotificationReq
+func (_e *MockRepoComponent_Expecter) SendAssetManagementMsg(ctx interface{}, req interface{}) *MockRepoComponent_SendAssetManagementMsg_Call {
+	return &MockRepoComponent_SendAssetManagementMsg_Call{Call: _e.mock.On("SendAssetManagementMsg", ctx, req)}
+}
+
+func (_c *MockRepoComponent_SendAssetManagementMsg_Call) Run(run func(ctx context.Context, req types.RepoNotificationReq)) *MockRepoComponent_SendAssetManagementMsg_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.RepoNotificationReq))
+	})
+	return _c
+}
+
+func (_c *MockRepoComponent_SendAssetManagementMsg_Call) Return(_a0 error) *MockRepoComponent_SendAssetManagementMsg_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockRepoComponent_SendAssetManagementMsg_Call) RunAndReturn(run func(context.Context, types.RepoNotificationReq) error) *MockRepoComponent_SendAssetManagementMsg_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // SyncMirror provides a mock function with given fields: ctx, repoType, namespace, name, currentUser
 func (_m *MockRepoComponent) SyncMirror(ctx context.Context, repoType types.RepositoryType, namespace string, name string, currentUser string) error {
 	ret := _m.Called(ctx, repoType, namespace, name, currentUser)

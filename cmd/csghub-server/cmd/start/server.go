@@ -102,6 +102,8 @@ var serverCmd = &cobra.Command{
 			PublicRootDomain:        cfg.Space.PublicRootDomain,
 			S3Internal:              s3Internal,
 			IsMasterHost:            cfg.IsMasterHost,
+			APIToken:                cfg.APIToken,
+			NotificationEndpoint:    fmt.Sprintf("%s:%d", cfg.Notification.Host, cfg.Notification.Port),
 		})
 		if err != nil {
 			return fmt.Errorf("failed to init deploy: %w", err)

@@ -2,13 +2,17 @@ package component
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	mockrpc "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rpc"
 	mockdb "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
+	mockcomp "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -237,11 +241,32 @@ func TestDiscussionComponent_CreateDisussionComment(t *testing.T) {
 	mockRepoStore := mockdb.NewMockRepoStore(t)
 	mockUserStore := mockdb.NewMockUserStore(t)
 	mockDiscussionStore := mockdb.NewMockDiscussionStore(t)
-	// new discussionComponentImpl from mock db store
+	mockRepoComponent := mockcomp.NewMockRepoComponent(t)
+	mockNotificationRpc := mockrpc.NewMockNotificationSvcClient(t)
+	config := &config.Config{}
+	config.Notification.NotificationRetryCount = 1
+	config.APIToken = "test-api-token"
+	config.Notification.Host = "localhost"
+	config.Notification.Port = 8095
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+
+	mockNotificationRpc.EXPECT().
+		Send(mock.Anything, mock.Anything).
+		Run(func(ctx context.Context, msg *types.MessageRequest) {
+			wg.Done()
+		}).
+		Return(nil).
+		Once()
+
 	comp := &discussionComponentImpl{
-		repoStore:       mockRepoStore,
-		userStore:       mockUserStore,
-		discussionStore: mockDiscussionStore,
+		repoStore:             mockRepoStore,
+		userStore:             mockUserStore,
+		discussionStore:       mockDiscussionStore,
+		repoCompo:             mockRepoComponent,
+		notificationSvcClient: mockNotificationRpc,
+		config:                config,
 	}
 
 	req := types.CreateCommentRequest{
@@ -250,6 +275,7 @@ func TestDiscussionComponent_CreateDisussionComment(t *testing.T) {
 		CommentableType: database.CommentableTypeDiscussion,
 		CurrentUser:     "user",
 	}
+
 	disc := database.Discussion{
 		ID:                 1,
 		Title:              "test discussion",
@@ -258,21 +284,36 @@ func TestDiscussionComponent_CreateDisussionComment(t *testing.T) {
 		UserID:             1,
 		User: &database.User{
 			ID:       1,
-			Username: "user",
-			Avatar:   "avatar",
+			Username: "user2",
+			UUID:     "other-uuid",
 		},
 	}
+
 	mockDiscussionStore.EXPECT().FindByID(mock.Anything, int64(1)).Return(&disc, nil).Once()
+	mockRepoStore.EXPECT().FindById(mock.Anything, int64(1)).Return(&database.Repository{
+		ID:   1,
+		Path: "repo/path",
+	}, nil).Once()
+	mockRepoComponent.EXPECT().
+		AllowReadAccessRepo(
+			mock.Anything,
+			mock.MatchedBy(func(repo *database.Repository) bool {
+				return repo != nil && repo.ID == 1
+			}),
+			"user",
+		).
+		Return(true, nil).
+		Once()
 
 	user := &database.User{
 		ID:       1,
 		Username: "user",
 		Avatar:   "avatar",
+		UUID:     "test-uuid",
 	}
 	mockUserStore.EXPECT().FindByUsername(mock.Anything, user.Username).Return(*user, nil).Once()
 
 	comment := database.Comment{
-		// ID:              1,
 		Content:         req.Content,
 		UserID:          user.ID,
 		CommentableID:   req.CommentableID,
@@ -281,6 +322,9 @@ func TestDiscussionComponent_CreateDisussionComment(t *testing.T) {
 	mockDiscussionStore.EXPECT().CreateComment(mock.Anything, comment).Return(&comment, nil).Once()
 
 	resp, err := comp.CreateDiscussionComment(context.TODO(), req)
+
+	wg.Wait()
+
 	require.Nil(t, err)
 	require.Equal(t, int64(1), resp.CommentableID)
 	require.Equal(t, "user", resp.User.Username)

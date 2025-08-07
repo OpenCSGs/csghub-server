@@ -3,6 +3,7 @@ package component
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -12,20 +13,20 @@ import (
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/git/membership"
+	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
-	"opencsg.com/csghub-server/mq"
 )
 
 type memberComponentImpl struct {
-	memberStore   database.MemberStore
-	orgStore      database.OrgStore
-	userStore     database.UserStore
-	gitServer     gitserver.GitServer
-	gitMemberShip membership.GitMemerShip
-	config        *config.Config
-	sysMQ         mq.MessageQueue
+	memberStore           database.MemberStore
+	orgStore              database.OrgStore
+	userStore             database.UserStore
+	gitServer             gitserver.GitServer
+	gitMemberShip         membership.GitMemerShip
+	config                *config.Config
+	notificationSvcClient rpc.NotificationSvcClient
 }
 
 type MemberComponent interface {
@@ -51,14 +52,16 @@ func NewMemberComponent(config *config.Config) (MemberComponent, error) {
 			return nil, fmt.Errorf("failed to create git membership:%w", err)
 		}
 	}
+	notificationSvcClient := rpc.NewNotificationSvcHttpClient(fmt.Sprintf("%s:%d", config.Notification.Host, config.Notification.Port),
+		rpc.AuthWithApiKey(config.APIToken))
 	return &memberComponentImpl{
-		memberStore:   database.NewMemberStore(),
-		orgStore:      database.NewOrgStore(),
-		userStore:     database.NewUserStore(),
-		gitServer:     gs,
-		gitMemberShip: gms,
-		config:        config,
-		sysMQ:         mq.SystemMQ,
+		memberStore:           database.NewMemberStore(),
+		orgStore:              database.NewOrgStore(),
+		userStore:             database.NewUserStore(),
+		gitServer:             gs,
+		gitMemberShip:         gms,
+		config:                config,
+		notificationSvcClient: notificationSvcClient,
 	}, nil
 }
 
@@ -141,26 +144,26 @@ func (c *memberComponentImpl) ChangeMemberRole(ctx context.Context, orgName, use
 		return fmt.Errorf("failed to create new role,error:%w", err)
 	}
 
-	if c.sysMQ != nil {
-
-		org, err := c.orgStore.FindByPath(ctx, orgName)
-		if err != nil {
-			return fmt.Errorf("failed to find org,org:%s,caused by:%w", orgName, err)
-		}
-		userUUIDs, err := c.memberStore.UserUUIDsByOrganizationID(ctx, org.ID)
-		if err != nil {
-			return fmt.Errorf("failed to get uuids by orgid,error:%w", err)
-		}
-
-		title := "Organization member role change"
-		content := fmt.Sprintf("Changed permission of member %s to %s in organization %s.", userName, newRole, orgName)
-		go func(userUUIDs []string, orgName, title, content string) {
-			err := c.sendMemberMsg(ctx, userUUIDs, orgName, title, content)
-			if err != nil {
-				slog.Error("failed to send organization permission change.", slog.String("orgName", orgName), slog.String("content", content), slog.Any("err", err))
-			}
-		}(userUUIDs, orgName, title, content)
+	org, err := c.orgStore.FindByPath(ctx, orgName)
+	if err != nil {
+		return fmt.Errorf("failed to find org,org:%s,caused by:%w", orgName, err)
 	}
+	userUUIDs, err := c.memberStore.UserUUIDsByOrganizationID(ctx, org.ID)
+	if err != nil {
+		return fmt.Errorf("failed to get uuids by orgid,error:%w", err)
+	}
+
+	title := "Organization member role change"
+	content := fmt.Sprintf("Changed permission of member %s to %s in organization %s.", userName, newRole, orgName)
+
+	go func() {
+		notificationCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		err = c.sendMemberMsg(notificationCtx, userUUIDs, orgName, title, content)
+		if err != nil {
+			slog.Error("failed to send organization permission change.", slog.String("orgName", orgName), slog.String("content", content), slog.Any("err", err))
+		}
+	}()
 
 	return nil
 }
@@ -237,19 +240,22 @@ func (c *memberComponentImpl) AddMembers(ctx context.Context, orgName string, us
 			}
 		}
 
-		if c.sysMQ != nil {
-			userUUIDs, err := c.memberStore.UserUUIDsByOrganizationID(ctx, org.ID)
-			if err != nil {
-				return fmt.Errorf("failed to get uuids by orgid,error:%w", err)
-			}
-			title := "Organization member change"
-			content := fmt.Sprintf("New member %s joined organization %s.", userName, orgName)
-			go func(userUUIDs []string, orgName, title, content string) {
-				err = c.sendMemberMsg(ctx, userUUIDs, orgName, title, content)
+		userUUIDs, err := c.memberStore.UserUUIDsByOrganizationID(ctx, org.ID)
+		if err != nil {
+			return fmt.Errorf("failed to get uuids by orgid,error:%w", err)
+		}
+		title := "Organization member change"
+		content := fmt.Sprintf("New member %s joined organization %s.", userName, orgName)
+
+		if len(userUUIDs) > 0 {
+			go func(orgName, title, content string, userUUIDs []string) {
+				notificationCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+				defer cancel()
+				err = c.sendMemberMsg(notificationCtx, userUUIDs, orgName, title, content)
 				if err != nil {
 					slog.Error("failed to send organization member join message", slog.String("orgName", orgName), slog.String("content", content), slog.Any("err", err))
 				}
-			}(userUUIDs, orgName, title, content)
+			}(orgName, title, content, userUUIDs)
 		}
 
 	}
@@ -301,19 +307,22 @@ func (c *memberComponentImpl) Delete(ctx context.Context, orgName, userName, ope
 		return err
 	}
 
-	if c.sysMQ != nil {
-		userUUIDs, err := c.memberStore.UserUUIDsByOrganizationID(ctx, org.ID)
-		if err != nil {
-			return fmt.Errorf("failed to get uuids by orgid,error:%w", err)
-		}
-		title := "Organization member change"
-		content := fmt.Sprintf("%s left the organization %s.", userName, orgName)
-		go func(userUUIDs []string, orgName, title, content string) {
-			err = c.sendMemberMsg(ctx, userUUIDs, orgName, title, content)
+	userUUIDs, err := c.memberStore.UserUUIDsByOrganizationID(ctx, org.ID)
+	if err != nil {
+		return fmt.Errorf("failed to get uuids by orgid,error:%w", err)
+	}
+	title := "Organization member change"
+	content := fmt.Sprintf("%s left the organization %s.", userName, orgName)
+
+	if len(userUUIDs) > 0 {
+		go func() {
+			notificationCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			err = c.sendMemberMsg(notificationCtx, userUUIDs, orgName, title, content)
 			if err != nil {
 				slog.Error("failed to send organization member leave message", slog.String("orgName", orgName), slog.String("userName", userName), slog.Any("err", err))
 			}
-		}(userUUIDs, orgName, title, content)
+		}()
 	}
 
 	if c.config.GitServer.Type == types.GitServerTypeGitea {
@@ -352,9 +361,29 @@ func (c *memberComponentImpl) sendMemberMsg(ctx context.Context, userUUIDs []str
 		CreateAt:         time.Now(),
 		ClickActionURL:   url,
 	}
-	err := c.sysMQ.PublishSiteInternalMsg(msg)
+	msgBytes, err := json.Marshal(msg)
 	if err != nil {
-		return fmt.Errorf("failed to publish site msg, msg: %+v, err: %w", msg, err)
+		return fmt.Errorf("failed to marshal message, err: %w", err)
 	}
+	notificationMsg := types.MessageRequest{
+		Scenario:   types.MessageScenarioInternalNotification,
+		Parameters: string(msgBytes),
+		Priority:   types.MessagePriorityHigh,
+	}
+
+	var sendErr error
+	retryCount := c.config.Notification.NotificationRetryCount
+	for i := range retryCount {
+		if sendErr = c.notificationSvcClient.Send(ctx, &notificationMsg); sendErr == nil {
+			break
+		}
+		if i < retryCount-1 {
+			slog.Warn("failed to send notification, retrying", "notification_msg", notificationMsg, "attempt", i+1, "error", sendErr.Error())
+		}
+	}
+	if sendErr != nil {
+		return fmt.Errorf("failed to send notification after %d attempts, err: %w", retryCount, sendErr)
+	}
+
 	return nil
 }

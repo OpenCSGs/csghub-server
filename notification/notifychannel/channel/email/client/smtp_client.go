@@ -6,6 +6,7 @@ import (
 	"gopkg.in/gomail.v2"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
+	"opencsg.com/csghub-server/notification/utils"
 )
 
 type emailService struct {
@@ -37,7 +38,8 @@ func NewEmailService(config *config.Config) EmailService {
 func (m *emailService) Send(req types.EmailReq) error {
 	message := gomail.NewMessage()
 
-	message.SetHeader("From", m.username)
+	displayName := utils.ExtractDisplayNameFromEmail(m.username)
+	message.SetHeader("From", message.FormatAddress(m.username, displayName))
 	message.SetHeader("To", req.To...)
 	message.SetHeader("Cc", req.CC...)
 	message.SetHeader("Bcc", req.BCC...)

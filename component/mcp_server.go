@@ -14,6 +14,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
@@ -152,6 +153,20 @@ func (m *mcpServerComponentImpl) Create(ctx context.Context, req *types.CreateMC
 		UpdatedAt: mcpServer.UpdatedAt,
 	}
 
+	go func() {
+		notificationCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		repoNotificationReq := types.RepoNotificationReq{
+			RepoType:  types.MCPServerRepo,
+			RepoPath:  mcpServer.Repository.Path,
+			Operation: types.OperationCreate,
+			UserUUID:  dbRepo.User.UUID,
+		}
+		if err = m.repoComponent.SendAssetManagementMsg(notificationCtx, repoNotificationReq); err != nil {
+			slog.Error("failed to send asset management notification message", slog.Any("req", repoNotificationReq), slog.Any("err", err))
+		}
+	}()
+
 	return res, nil
 }
 
@@ -211,7 +226,7 @@ func (m *mcpServerComponentImpl) Delete(ctx context.Context, req *types.UpdateMC
 		Name:      req.Name,
 		RepoType:  types.MCPServerRepo,
 	}
-	_, err = m.repoComponent.DeleteRepo(ctx, deleteRepoReq)
+	repo, err := m.repoComponent.DeleteRepo(ctx, deleteRepoReq)
 	if err != nil {
 		return fmt.Errorf("failed to delete repo of mcp server %s/%s, error: %w", req.Namespace, req.Name, err)
 	}
@@ -220,6 +235,21 @@ func (m *mcpServerComponentImpl) Delete(ctx context.Context, req *types.UpdateMC
 	if err != nil {
 		return fmt.Errorf("failed to delete mcp server, error: %w", err)
 	}
+
+	go func() {
+		notificationCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		repoNotificationReq := types.RepoNotificationReq{
+			RepoType:  types.MCPServerRepo,
+			RepoPath:  repo.Path,
+			Operation: types.OperationDelete,
+			UserUUID:  repo.User.UUID,
+		}
+		if err = m.repoComponent.SendAssetManagementMsg(notificationCtx, repoNotificationReq); err != nil {
+			slog.Error("failed to send asset management notification message", slog.Any("req", repoNotificationReq), slog.Any("err", err))
+		}
+	}()
+
 	return nil
 
 }

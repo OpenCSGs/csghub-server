@@ -5,7 +5,10 @@ package mq
 import (
 	context "context"
 
+	config "opencsg.com/csghub-server/common/config"
+
 	jetstream "github.com/nats-io/nats.go/jetstream"
+
 	mock "github.com/stretchr/testify/mock"
 
 	mq "opencsg.com/csghub-server/mq"
@@ -293,17 +296,17 @@ func (_c *MockMessageQueue_BuildHighPriorityMsgConsumer_Call) RunAndReturn(run f
 	return _c
 }
 
-// BuildHighPriorityMsgStream provides a mock function with no fields
-func (_m *MockMessageQueue) BuildHighPriorityMsgStream() error {
-	ret := _m.Called()
+// BuildHighPriorityMsgStream provides a mock function with given fields: conf
+func (_m *MockMessageQueue) BuildHighPriorityMsgStream(conf *config.Config) error {
+	ret := _m.Called(conf)
 
 	if len(ret) == 0 {
 		panic("no return value specified for BuildHighPriorityMsgStream")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func() error); ok {
-		r0 = rf()
+	if rf, ok := ret.Get(0).(func(*config.Config) error); ok {
+		r0 = rf(conf)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -317,13 +320,14 @@ type MockMessageQueue_BuildHighPriorityMsgStream_Call struct {
 }
 
 // BuildHighPriorityMsgStream is a helper method to define mock.On call
-func (_e *MockMessageQueue_Expecter) BuildHighPriorityMsgStream() *MockMessageQueue_BuildHighPriorityMsgStream_Call {
-	return &MockMessageQueue_BuildHighPriorityMsgStream_Call{Call: _e.mock.On("BuildHighPriorityMsgStream")}
+//   - conf *config.Config
+func (_e *MockMessageQueue_Expecter) BuildHighPriorityMsgStream(conf interface{}) *MockMessageQueue_BuildHighPriorityMsgStream_Call {
+	return &MockMessageQueue_BuildHighPriorityMsgStream_Call{Call: _e.mock.On("BuildHighPriorityMsgStream", conf)}
 }
 
-func (_c *MockMessageQueue_BuildHighPriorityMsgStream_Call) Run(run func()) *MockMessageQueue_BuildHighPriorityMsgStream_Call {
+func (_c *MockMessageQueue_BuildHighPriorityMsgStream_Call) Run(run func(conf *config.Config)) *MockMessageQueue_BuildHighPriorityMsgStream_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run()
+		run(args[0].(*config.Config))
 	})
 	return _c
 }
@@ -333,7 +337,7 @@ func (_c *MockMessageQueue_BuildHighPriorityMsgStream_Call) Return(_a0 error) *M
 	return _c
 }
 
-func (_c *MockMessageQueue_BuildHighPriorityMsgStream_Call) RunAndReturn(run func() error) *MockMessageQueue_BuildHighPriorityMsgStream_Call {
+func (_c *MockMessageQueue_BuildHighPriorityMsgStream_Call) RunAndReturn(run func(*config.Config) error) *MockMessageQueue_BuildHighPriorityMsgStream_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -440,17 +444,17 @@ func (_c *MockMessageQueue_BuildNormalPriorityMsgConsumer_Call) RunAndReturn(run
 	return _c
 }
 
-// BuildNormalPriorityMsgStream provides a mock function with no fields
-func (_m *MockMessageQueue) BuildNormalPriorityMsgStream() error {
-	ret := _m.Called()
+// BuildNormalPriorityMsgStream provides a mock function with given fields: conf
+func (_m *MockMessageQueue) BuildNormalPriorityMsgStream(conf *config.Config) error {
+	ret := _m.Called(conf)
 
 	if len(ret) == 0 {
 		panic("no return value specified for BuildNormalPriorityMsgStream")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func() error); ok {
-		r0 = rf()
+	if rf, ok := ret.Get(0).(func(*config.Config) error); ok {
+		r0 = rf(conf)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -464,13 +468,14 @@ type MockMessageQueue_BuildNormalPriorityMsgStream_Call struct {
 }
 
 // BuildNormalPriorityMsgStream is a helper method to define mock.On call
-func (_e *MockMessageQueue_Expecter) BuildNormalPriorityMsgStream() *MockMessageQueue_BuildNormalPriorityMsgStream_Call {
-	return &MockMessageQueue_BuildNormalPriorityMsgStream_Call{Call: _e.mock.On("BuildNormalPriorityMsgStream")}
+//   - conf *config.Config
+func (_e *MockMessageQueue_Expecter) BuildNormalPriorityMsgStream(conf interface{}) *MockMessageQueue_BuildNormalPriorityMsgStream_Call {
+	return &MockMessageQueue_BuildNormalPriorityMsgStream_Call{Call: _e.mock.On("BuildNormalPriorityMsgStream", conf)}
 }
 
-func (_c *MockMessageQueue_BuildNormalPriorityMsgStream_Call) Run(run func()) *MockMessageQueue_BuildNormalPriorityMsgStream_Call {
+func (_c *MockMessageQueue_BuildNormalPriorityMsgStream_Call) Run(run func(conf *config.Config)) *MockMessageQueue_BuildNormalPriorityMsgStream_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run()
+		run(args[0].(*config.Config))
 	})
 	return _c
 }
@@ -480,211 +485,7 @@ func (_c *MockMessageQueue_BuildNormalPriorityMsgStream_Call) Return(_a0 error) 
 	return _c
 }
 
-func (_c *MockMessageQueue_BuildNormalPriorityMsgStream_Call) RunAndReturn(run func() error) *MockMessageQueue_BuildNormalPriorityMsgStream_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// BuildSiteInternalMailConsumer provides a mock function with no fields
-func (_m *MockMessageQueue) BuildSiteInternalMailConsumer() (jetstream.Consumer, error) {
-	ret := _m.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for BuildSiteInternalMailConsumer")
-	}
-
-	var r0 jetstream.Consumer
-	var r1 error
-	if rf, ok := ret.Get(0).(func() (jetstream.Consumer, error)); ok {
-		return rf()
-	}
-	if rf, ok := ret.Get(0).(func() jetstream.Consumer); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(jetstream.Consumer)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockMessageQueue_BuildSiteInternalMailConsumer_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BuildSiteInternalMailConsumer'
-type MockMessageQueue_BuildSiteInternalMailConsumer_Call struct {
-	*mock.Call
-}
-
-// BuildSiteInternalMailConsumer is a helper method to define mock.On call
-func (_e *MockMessageQueue_Expecter) BuildSiteInternalMailConsumer() *MockMessageQueue_BuildSiteInternalMailConsumer_Call {
-	return &MockMessageQueue_BuildSiteInternalMailConsumer_Call{Call: _e.mock.On("BuildSiteInternalMailConsumer")}
-}
-
-func (_c *MockMessageQueue_BuildSiteInternalMailConsumer_Call) Run(run func()) *MockMessageQueue_BuildSiteInternalMailConsumer_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *MockMessageQueue_BuildSiteInternalMailConsumer_Call) Return(_a0 jetstream.Consumer, _a1 error) *MockMessageQueue_BuildSiteInternalMailConsumer_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockMessageQueue_BuildSiteInternalMailConsumer_Call) RunAndReturn(run func() (jetstream.Consumer, error)) *MockMessageQueue_BuildSiteInternalMailConsumer_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// BuildSiteInternalMailStream provides a mock function with no fields
-func (_m *MockMessageQueue) BuildSiteInternalMailStream() error {
-	ret := _m.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for BuildSiteInternalMailStream")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func() error); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// MockMessageQueue_BuildSiteInternalMailStream_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BuildSiteInternalMailStream'
-type MockMessageQueue_BuildSiteInternalMailStream_Call struct {
-	*mock.Call
-}
-
-// BuildSiteInternalMailStream is a helper method to define mock.On call
-func (_e *MockMessageQueue_Expecter) BuildSiteInternalMailStream() *MockMessageQueue_BuildSiteInternalMailStream_Call {
-	return &MockMessageQueue_BuildSiteInternalMailStream_Call{Call: _e.mock.On("BuildSiteInternalMailStream")}
-}
-
-func (_c *MockMessageQueue_BuildSiteInternalMailStream_Call) Run(run func()) *MockMessageQueue_BuildSiteInternalMailStream_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *MockMessageQueue_BuildSiteInternalMailStream_Call) Return(_a0 error) *MockMessageQueue_BuildSiteInternalMailStream_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *MockMessageQueue_BuildSiteInternalMailStream_Call) RunAndReturn(run func() error) *MockMessageQueue_BuildSiteInternalMailStream_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// BuildSiteInternalMsgConsumer provides a mock function with no fields
-func (_m *MockMessageQueue) BuildSiteInternalMsgConsumer() (jetstream.Consumer, error) {
-	ret := _m.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for BuildSiteInternalMsgConsumer")
-	}
-
-	var r0 jetstream.Consumer
-	var r1 error
-	if rf, ok := ret.Get(0).(func() (jetstream.Consumer, error)); ok {
-		return rf()
-	}
-	if rf, ok := ret.Get(0).(func() jetstream.Consumer); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(jetstream.Consumer)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockMessageQueue_BuildSiteInternalMsgConsumer_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BuildSiteInternalMsgConsumer'
-type MockMessageQueue_BuildSiteInternalMsgConsumer_Call struct {
-	*mock.Call
-}
-
-// BuildSiteInternalMsgConsumer is a helper method to define mock.On call
-func (_e *MockMessageQueue_Expecter) BuildSiteInternalMsgConsumer() *MockMessageQueue_BuildSiteInternalMsgConsumer_Call {
-	return &MockMessageQueue_BuildSiteInternalMsgConsumer_Call{Call: _e.mock.On("BuildSiteInternalMsgConsumer")}
-}
-
-func (_c *MockMessageQueue_BuildSiteInternalMsgConsumer_Call) Run(run func()) *MockMessageQueue_BuildSiteInternalMsgConsumer_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *MockMessageQueue_BuildSiteInternalMsgConsumer_Call) Return(_a0 jetstream.Consumer, _a1 error) *MockMessageQueue_BuildSiteInternalMsgConsumer_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockMessageQueue_BuildSiteInternalMsgConsumer_Call) RunAndReturn(run func() (jetstream.Consumer, error)) *MockMessageQueue_BuildSiteInternalMsgConsumer_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// BuildSiteInternalMsgStream provides a mock function with no fields
-func (_m *MockMessageQueue) BuildSiteInternalMsgStream() error {
-	ret := _m.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for BuildSiteInternalMsgStream")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func() error); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// MockMessageQueue_BuildSiteInternalMsgStream_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BuildSiteInternalMsgStream'
-type MockMessageQueue_BuildSiteInternalMsgStream_Call struct {
-	*mock.Call
-}
-
-// BuildSiteInternalMsgStream is a helper method to define mock.On call
-func (_e *MockMessageQueue_Expecter) BuildSiteInternalMsgStream() *MockMessageQueue_BuildSiteInternalMsgStream_Call {
-	return &MockMessageQueue_BuildSiteInternalMsgStream_Call{Call: _e.mock.On("BuildSiteInternalMsgStream")}
-}
-
-func (_c *MockMessageQueue_BuildSiteInternalMsgStream_Call) Run(run func()) *MockMessageQueue_BuildSiteInternalMsgStream_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *MockMessageQueue_BuildSiteInternalMsgStream_Call) Return(_a0 error) *MockMessageQueue_BuildSiteInternalMsgStream_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *MockMessageQueue_BuildSiteInternalMsgStream_Call) RunAndReturn(run func() error) *MockMessageQueue_BuildSiteInternalMsgStream_Call {
+func (_c *MockMessageQueue_BuildNormalPriorityMsgStream_Call) RunAndReturn(run func(*config.Config) error) *MockMessageQueue_BuildNormalPriorityMsgStream_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1310,98 +1111,6 @@ func (_c *MockMessageQueue_PublishNormalPriorityMsg_Call) Return(_a0 error) *Moc
 }
 
 func (_c *MockMessageQueue_PublishNormalPriorityMsg_Call) RunAndReturn(run func(types.ScenarioMessage) error) *MockMessageQueue_PublishNormalPriorityMsg_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// PublishSiteInternalMail provides a mock function with given fields: msg
-func (_m *MockMessageQueue) PublishSiteInternalMail(msg types.MailMessage) error {
-	ret := _m.Called(msg)
-
-	if len(ret) == 0 {
-		panic("no return value specified for PublishSiteInternalMail")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(types.MailMessage) error); ok {
-		r0 = rf(msg)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// MockMessageQueue_PublishSiteInternalMail_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PublishSiteInternalMail'
-type MockMessageQueue_PublishSiteInternalMail_Call struct {
-	*mock.Call
-}
-
-// PublishSiteInternalMail is a helper method to define mock.On call
-//   - msg types.MailMessage
-func (_e *MockMessageQueue_Expecter) PublishSiteInternalMail(msg interface{}) *MockMessageQueue_PublishSiteInternalMail_Call {
-	return &MockMessageQueue_PublishSiteInternalMail_Call{Call: _e.mock.On("PublishSiteInternalMail", msg)}
-}
-
-func (_c *MockMessageQueue_PublishSiteInternalMail_Call) Run(run func(msg types.MailMessage)) *MockMessageQueue_PublishSiteInternalMail_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(types.MailMessage))
-	})
-	return _c
-}
-
-func (_c *MockMessageQueue_PublishSiteInternalMail_Call) Return(_a0 error) *MockMessageQueue_PublishSiteInternalMail_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *MockMessageQueue_PublishSiteInternalMail_Call) RunAndReturn(run func(types.MailMessage) error) *MockMessageQueue_PublishSiteInternalMail_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// PublishSiteInternalMsg provides a mock function with given fields: msg
-func (_m *MockMessageQueue) PublishSiteInternalMsg(msg types.NotificationMessage) error {
-	ret := _m.Called(msg)
-
-	if len(ret) == 0 {
-		panic("no return value specified for PublishSiteInternalMsg")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(types.NotificationMessage) error); ok {
-		r0 = rf(msg)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// MockMessageQueue_PublishSiteInternalMsg_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PublishSiteInternalMsg'
-type MockMessageQueue_PublishSiteInternalMsg_Call struct {
-	*mock.Call
-}
-
-// PublishSiteInternalMsg is a helper method to define mock.On call
-//   - msg types.NotificationMessage
-func (_e *MockMessageQueue_Expecter) PublishSiteInternalMsg(msg interface{}) *MockMessageQueue_PublishSiteInternalMsg_Call {
-	return &MockMessageQueue_PublishSiteInternalMsg_Call{Call: _e.mock.On("PublishSiteInternalMsg", msg)}
-}
-
-func (_c *MockMessageQueue_PublishSiteInternalMsg_Call) Run(run func(msg types.NotificationMessage)) *MockMessageQueue_PublishSiteInternalMsg_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(types.NotificationMessage))
-	})
-	return _c
-}
-
-func (_c *MockMessageQueue_PublishSiteInternalMsg_Call) Return(_a0 error) *MockMessageQueue_PublishSiteInternalMsg_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *MockMessageQueue_PublishSiteInternalMsg_Call) RunAndReturn(run func(types.NotificationMessage) error) *MockMessageQueue_PublishSiteInternalMsg_Call {
 	_c.Call.Return(run)
 	return _c
 }

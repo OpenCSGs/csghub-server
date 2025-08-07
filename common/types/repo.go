@@ -270,3 +270,17 @@ type ScanReq struct {
 	Models    []string
 	Task      PipelineTask
 }
+
+type OperationType string
+
+const (
+	OperationCreate OperationType = "create"
+	OperationDelete OperationType = "delete"
+)
+
+type RepoNotificationReq struct {
+	RepoType  RepositoryType
+	RepoPath  string
+	Operation OperationType
+	UserUUID  string
+}

@@ -24,6 +24,54 @@ func (_m *MockNotificationComponent) EXPECT() *MockNotificationComponent_Expecte
 	return &MockNotificationComponent_Expecter{mock: &_m.Mock}
 }
 
+// DeleteNotifications provides a mock function with given fields: ctx, uid, req
+func (_m *MockNotificationComponent) DeleteNotifications(ctx context.Context, uid string, req types.BatchNotificationOperationReq) error {
+	ret := _m.Called(ctx, uid, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteNotifications")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, types.BatchNotificationOperationReq) error); ok {
+		r0 = rf(ctx, uid, req)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockNotificationComponent_DeleteNotifications_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteNotifications'
+type MockNotificationComponent_DeleteNotifications_Call struct {
+	*mock.Call
+}
+
+// DeleteNotifications is a helper method to define mock.On call
+//   - ctx context.Context
+//   - uid string
+//   - req types.BatchNotificationOperationReq
+func (_e *MockNotificationComponent_Expecter) DeleteNotifications(ctx interface{}, uid interface{}, req interface{}) *MockNotificationComponent_DeleteNotifications_Call {
+	return &MockNotificationComponent_DeleteNotifications_Call{Call: _e.mock.On("DeleteNotifications", ctx, uid, req)}
+}
+
+func (_c *MockNotificationComponent_DeleteNotifications_Call) Run(run func(ctx context.Context, uid string, req types.BatchNotificationOperationReq)) *MockNotificationComponent_DeleteNotifications_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(types.BatchNotificationOperationReq))
+	})
+	return _c
+}
+
+func (_c *MockNotificationComponent_DeleteNotifications_Call) Return(_a0 error) *MockNotificationComponent_DeleteNotifications_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockNotificationComponent_DeleteNotifications_Call) RunAndReturn(run func(context.Context, string, types.BatchNotificationOperationReq) error) *MockNotificationComponent_DeleteNotifications_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetNotificationSetting provides a mock function with given fields: ctx, uid, location
 func (_m *MockNotificationComponent) GetNotificationSetting(ctx context.Context, uid string, location *time.Location) (*types.NotificationSetting, error) {
 	ret := _m.Called(ctx, uid, location)
@@ -209,7 +257,7 @@ func (_c *MockNotificationComponent_ListNotifications_Call) RunAndReturn(run fun
 }
 
 // MarkAsRead provides a mock function with given fields: ctx, uid, req
-func (_m *MockNotificationComponent) MarkAsRead(ctx context.Context, uid string, req types.MarkNotificationsAsReadReq) error {
+func (_m *MockNotificationComponent) MarkAsRead(ctx context.Context, uid string, req types.BatchNotificationOperationReq) error {
 	ret := _m.Called(ctx, uid, req)
 
 	if len(ret) == 0 {
@@ -217,7 +265,7 @@ func (_m *MockNotificationComponent) MarkAsRead(ctx context.Context, uid string,
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, types.MarkNotificationsAsReadReq) error); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, types.BatchNotificationOperationReq) error); ok {
 		r0 = rf(ctx, uid, req)
 	} else {
 		r0 = ret.Error(0)
@@ -234,14 +282,14 @@ type MockNotificationComponent_MarkAsRead_Call struct {
 // MarkAsRead is a helper method to define mock.On call
 //   - ctx context.Context
 //   - uid string
-//   - req types.MarkNotificationsAsReadReq
+//   - req types.BatchNotificationOperationReq
 func (_e *MockNotificationComponent_Expecter) MarkAsRead(ctx interface{}, uid interface{}, req interface{}) *MockNotificationComponent_MarkAsRead_Call {
 	return &MockNotificationComponent_MarkAsRead_Call{Call: _e.mock.On("MarkAsRead", ctx, uid, req)}
 }
 
-func (_c *MockNotificationComponent_MarkAsRead_Call) Run(run func(ctx context.Context, uid string, req types.MarkNotificationsAsReadReq)) *MockNotificationComponent_MarkAsRead_Call {
+func (_c *MockNotificationComponent_MarkAsRead_Call) Run(run func(ctx context.Context, uid string, req types.BatchNotificationOperationReq)) *MockNotificationComponent_MarkAsRead_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(types.MarkNotificationsAsReadReq))
+		run(args[0].(context.Context), args[1].(string), args[2].(types.BatchNotificationOperationReq))
 	})
 	return _c
 }
@@ -251,7 +299,55 @@ func (_c *MockNotificationComponent_MarkAsRead_Call) Return(_a0 error) *MockNoti
 	return _c
 }
 
-func (_c *MockNotificationComponent_MarkAsRead_Call) RunAndReturn(run func(context.Context, string, types.MarkNotificationsAsReadReq) error) *MockNotificationComponent_MarkAsRead_Call {
+func (_c *MockNotificationComponent_MarkAsRead_Call) RunAndReturn(run func(context.Context, string, types.BatchNotificationOperationReq) error) *MockNotificationComponent_MarkAsRead_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// MarkAsUnread provides a mock function with given fields: ctx, uid, req
+func (_m *MockNotificationComponent) MarkAsUnread(ctx context.Context, uid string, req types.BatchNotificationOperationReq) error {
+	ret := _m.Called(ctx, uid, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for MarkAsUnread")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, types.BatchNotificationOperationReq) error); ok {
+		r0 = rf(ctx, uid, req)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockNotificationComponent_MarkAsUnread_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'MarkAsUnread'
+type MockNotificationComponent_MarkAsUnread_Call struct {
+	*mock.Call
+}
+
+// MarkAsUnread is a helper method to define mock.On call
+//   - ctx context.Context
+//   - uid string
+//   - req types.BatchNotificationOperationReq
+func (_e *MockNotificationComponent_Expecter) MarkAsUnread(ctx interface{}, uid interface{}, req interface{}) *MockNotificationComponent_MarkAsUnread_Call {
+	return &MockNotificationComponent_MarkAsUnread_Call{Call: _e.mock.On("MarkAsUnread", ctx, uid, req)}
+}
+
+func (_c *MockNotificationComponent_MarkAsUnread_Call) Run(run func(ctx context.Context, uid string, req types.BatchNotificationOperationReq)) *MockNotificationComponent_MarkAsUnread_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(types.BatchNotificationOperationReq))
+	})
+	return _c
+}
+
+func (_c *MockNotificationComponent_MarkAsUnread_Call) Return(_a0 error) *MockNotificationComponent_MarkAsUnread_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockNotificationComponent_MarkAsUnread_Call) RunAndReturn(run func(context.Context, string, types.BatchNotificationOperationReq) error) *MockNotificationComponent_MarkAsUnread_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -409,53 +505,6 @@ func (_c *MockNotificationComponent_PublishMessage_Call) Return(_a0 error) *Mock
 }
 
 func (_c *MockNotificationComponent_PublishMessage_Call) RunAndReturn(run func(context.Context, types.ScenarioMessage) error) *MockNotificationComponent_PublishMessage_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// PublishNotificationMessage provides a mock function with given fields: ctx, message
-func (_m *MockNotificationComponent) PublishNotificationMessage(ctx context.Context, message types.NotificationMessage) error {
-	ret := _m.Called(ctx, message)
-
-	if len(ret) == 0 {
-		panic("no return value specified for PublishNotificationMessage")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, types.NotificationMessage) error); ok {
-		r0 = rf(ctx, message)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// MockNotificationComponent_PublishNotificationMessage_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PublishNotificationMessage'
-type MockNotificationComponent_PublishNotificationMessage_Call struct {
-	*mock.Call
-}
-
-// PublishNotificationMessage is a helper method to define mock.On call
-//   - ctx context.Context
-//   - message types.NotificationMessage
-func (_e *MockNotificationComponent_Expecter) PublishNotificationMessage(ctx interface{}, message interface{}) *MockNotificationComponent_PublishNotificationMessage_Call {
-	return &MockNotificationComponent_PublishNotificationMessage_Call{Call: _e.mock.On("PublishNotificationMessage", ctx, message)}
-}
-
-func (_c *MockNotificationComponent_PublishNotificationMessage_Call) Run(run func(ctx context.Context, message types.NotificationMessage)) *MockNotificationComponent_PublishNotificationMessage_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(types.NotificationMessage))
-	})
-	return _c
-}
-
-func (_c *MockNotificationComponent_PublishNotificationMessage_Call) Return(_a0 error) *MockNotificationComponent_PublishNotificationMessage_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *MockNotificationComponent_PublishNotificationMessage_Call) RunAndReturn(run func(context.Context, types.NotificationMessage) error) *MockNotificationComponent_PublishNotificationMessage_Call {
 	_c.Call.Return(run)
 	return _c
 }

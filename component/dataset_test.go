@@ -3,7 +3,9 @@ package component
 import (
 	"context"
 	"testing"
+	"time"
 
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/git/membership"
@@ -25,23 +27,39 @@ func TestDatasetCompnent_Create(t *testing.T) {
 	dc.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "ns").Return(
 		database.Namespace{}, nil,
 	)
+
 	dc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
 		RoleMask: "admin",
 		Username: "user",
 	}, nil)
+
 	rq := req.CreateRepoReq
 	rq.RepoType = types.DatasetRepo
 	rq.Readme = "\n---\nlicense: \n---\n\t"
 	rq.DefaultBranch = "main"
 	rq.Nickname = "n"
-	dc.mocks.components.repo.EXPECT().CreateRepo(ctx, rq).Return(&gitserver.CreateRepoResp{}, &database.Repository{}, nil)
-	dc.mocks.stores.DatasetMock().EXPECT().Create(ctx, database.Dataset{
-		Repository: &database.Repository{},
-	}).Return(&database.Dataset{
-		Repository: &database.Repository{
-			Tags: []database.Tag{{Name: "t1"}},
-		},
+
+	dc.mocks.components.repo.EXPECT().CreateRepo(ctx, rq).Return(&gitserver.CreateRepoResp{}, &database.Repository{
+		Tags: []database.Tag{{Name: "t1"}},
+		User: database.User{UUID: "user-uuid"},
 	}, nil)
+
+	dc.mocks.stores.DatasetMock().EXPECT().Create(ctx, mock.Anything).RunAndReturn(
+		func(ctx context.Context, ds database.Dataset) (*database.Dataset, error) {
+			require.NotNil(t, ds.Repository)
+			require.Equal(t, "user-uuid", ds.Repository.User.UUID)
+			require.Len(t, ds.Repository.Tags, 1)
+			require.Equal(t, "t1", ds.Repository.Tags[0].Name)
+			return &database.Dataset{
+				Repository: &database.Repository{
+					Tags: []database.Tag{{Name: "t1"}},
+					User: database.User{UUID: "user-uuid"},
+					Path: "ns/n",
+				},
+			}, nil
+		},
+	)
+
 	dc.mocks.gitServer.EXPECT().CreateRepoFile(buildCreateFileReq(
 		&types.CreateFileParams{
 			Username:  "user",
@@ -53,6 +71,7 @@ func TestDatasetCompnent_Create(t *testing.T) {
 			FilePath:  types.ReadmeFileName,
 		}, types.DatasetRepo),
 	).Return(nil)
+
 	dc.mocks.gitServer.EXPECT().CreateRepoFile(buildCreateFileReq(
 		&types.CreateFileParams{
 			Username:  "user",
@@ -61,19 +80,29 @@ func TestDatasetCompnent_Create(t *testing.T) {
 			Content:   types.DatasetGitattributesContent,
 			Namespace: "ns",
 			Name:      "n",
-			FilePath:  gitattributesFileName,
+			FilePath:  types.GitattributesFileName,
 		}, types.DatasetRepo),
 	).Return(nil)
 
+	dc.mocks.components.repo.EXPECT().SendAssetManagementMsg(mock.Anything, types.RepoNotificationReq{
+		RepoType:  types.DatasetRepo,
+		Operation: types.OperationCreate,
+		RepoPath:  "ns/n",
+		UserUUID:  "user-uuid",
+	}).Return(nil)
+
 	resp, err := dc.Create(ctx, req)
+	time.Sleep(10 * time.Millisecond)
 	require.Nil(t, err)
 	require.Equal(t, &types.Dataset{
 		User: types.User{Username: "user"},
 		Repository: types.Repository{
-			HTTPCloneURL: "/s/.git",
-			SSHCloneURL:  ":s/.git",
+			HTTPCloneURL: "/s/ns/n.git",
+			SSHCloneURL:  ":s/ns/n.git",
 		},
 		Tags: []types.RepoTag{{Name: "t1"}},
+		Path: "ns/n",
+		URL:  "ns/n",
 	}, resp)
 
 }
@@ -148,16 +177,33 @@ func TestDatasetCompnent_Delete(t *testing.T) {
 	ctx := context.TODO()
 	dc := initializeTestDatasetComponent(ctx, t)
 
-	dc.mocks.stores.DatasetMock().EXPECT().FindByPath(ctx, "ns", "n").Return(&database.Dataset{}, nil)
+	mockDataset := &database.Dataset{
+		ID: 123,
+	}
+	mockRepo := &database.Repository{
+		User: database.User{
+			UUID: "user-uuid",
+		},
+		Path: "ns/n",
+	}
+
+	dc.mocks.stores.DatasetMock().EXPECT().FindByPath(ctx, "ns", "n").Return(mockDataset, nil)
 	dc.mocks.components.repo.EXPECT().DeleteRepo(ctx, types.DeleteRepoReq{
 		Username:  "user",
 		Namespace: "ns",
 		Name:      "n",
 		RepoType:  types.DatasetRepo,
-	}).Return(&database.Repository{}, nil)
-	dc.mocks.stores.DatasetMock().EXPECT().Delete(ctx, database.Dataset{}).Return(nil)
+	}).Return(mockRepo, nil)
+	dc.mocks.stores.DatasetMock().EXPECT().Delete(ctx, *mockDataset).Return(nil)
+	dc.mocks.components.repo.EXPECT().SendAssetManagementMsg(mock.Anything, types.RepoNotificationReq{
+		RepoType:  types.DatasetRepo,
+		Operation: types.OperationDelete,
+		RepoPath:  "ns/n",
+		UserUUID:  "user-uuid",
+	}).Return(nil)
 
 	err := dc.Delete(ctx, "ns", "n", "user")
+	time.Sleep(10 * time.Millisecond)
 	require.Nil(t, err)
 
 }
