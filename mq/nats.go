@@ -54,16 +54,6 @@ var (
 		StreamName:   "deployServiceUpdateStream", // order
 		ConsumerName: "deployServiceUpdateConsumer",
 	}
-	siteInternalMsgCfg = EventConfig{
-		StreamName:   "siteInternalMsgStream",
-		ConsumerName: "siteInternalMsgConsumer",
-	}
-
-	siteInternalMailCfg = EventConfig{
-		StreamName:   "siteInternalMailStream",
-		ConsumerName: "siteInternalMailConsumer",
-	}
-
 	highPriorityMsgCfg = EventConfig{
 		StreamName:   "highPriorityMsgStream",
 		ConsumerName: "highPriorityMsgConsumer",
@@ -89,12 +79,8 @@ type NatsHandler struct {
 
 	js                   jetstream.JetStream
 	meterJsc             jetstream.Consumer
-	siteInternalMsgJsc   jetstream.Consumer
 	highPriorityMsgJsc   jetstream.Consumer
 	normalPriorityMsgJsc jetstream.Consumer
-
-	siteInternalMailEvtCfg      jetstream.StreamConfig
-	siteInternalMailConsumerCfg jetstream.ConsumerConfig
 
 	highPriorityMsgEvtCfg        jetstream.StreamConfig
 	highPriorityMsgConsumerCfg   jetstream.ConsumerConfig
