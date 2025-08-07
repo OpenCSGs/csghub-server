@@ -3,7 +3,6 @@ package component
 import (
 	"context"
 	"errors"
-	"math"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
@@ -237,7 +236,7 @@ func TestDatasetViewerComponent_LimitOffsetRowsNoCard(t *testing.T) {
 		Ref:       "main",
 		Path:      "foo",
 		RepoType:  types.DatasetRepo,
-		Limit:     500,
+		Limit:     types.MaxFileTreeSize,
 		Recursive: true,
 	}).Return(
 		&types.GetRepoFileTreeResp{Files: []*types.File{
@@ -521,7 +520,7 @@ func TestDatasetViewerComponent_LimitOffsetRows_NoValidParquetFile(t *testing.T)
 		Ref:       "main",
 		Path:      "foo",
 		RepoType:  types.DatasetRepo,
-		Limit:     math.MaxInt,
+		Limit:     types.MaxFileTreeSize,
 		Recursive: true,
 	}).Return(&types.GetRepoFileTreeResp{Files: []*types.File{}}, nil)
 
