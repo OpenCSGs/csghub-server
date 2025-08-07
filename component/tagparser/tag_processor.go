@@ -25,6 +25,14 @@ type MCPTagStore interface {
 	AllMCPTags(ctx context.Context) ([]*database.Tag, error)
 }
 
+type CodeTagStore interface {
+	AllCodeTags(ctx context.Context) ([]*database.Tag, error)
+}
+
+type SpaceTagStore interface {
+	AllSpaceTags(ctx context.Context) ([]*database.Tag, error)
+}
+
 type TagProcessor interface {
 	ProcessReadme(ctx context.Context, content string) (tagsMatched, tagsNew []*database.Tag, err error)
 	ProcessFramework(ctx context.Context, fileName string) (*database.Tag, error)
@@ -63,6 +71,20 @@ func NewMCPTagProcessor(ts MCPTagStore) TagProcessor {
 	p := new(tagProcessor)
 	p.existingTags = ts.AllMCPTags
 	p.tagScope = types.MCPTagScope
+	return p
+}
+
+func NewCodeTagProcessor(ts CodeTagStore) TagProcessor {
+	p := new(tagProcessor)
+	p.existingTags = ts.AllCodeTags
+	p.tagScope = types.CodeTagScope
+	return p
+}
+
+func NewSpaceTagProcessor(ts SpaceTagStore) TagProcessor {
+	p := new(tagProcessor)
+	p.existingTags = ts.AllSpaceTags
+	p.tagScope = types.SpaceTagScope
 	return p
 }
 

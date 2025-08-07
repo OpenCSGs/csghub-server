@@ -97,8 +97,13 @@ func (c *tagComponentImpl) UpdateMetaTags(ctx context.Context, tagScope types.Ta
 	} else if tagScope == types.MCPTagScope {
 		tp = tagparser.NewMCPTagProcessor(c.tagStore)
 		repoType = types.MCPServerRepo
+	} else if tagScope == types.CodeTagScope {
+		tp = tagparser.NewCodeTagProcessor(c.tagStore)
+		repoType = types.CodeRepo
+	} else if tagScope == types.SpaceTagScope {
+		tp = tagparser.NewSpaceTagProcessor(c.tagStore)
+		repoType = types.SpaceRepo
 	} else {
-		// skip tag process for code and space now
 		return nil, nil
 	}
 	tagsMatched, tagToCreate, err := tp.ProcessReadme(ctx, content)
