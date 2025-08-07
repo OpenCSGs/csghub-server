@@ -1,11 +1,11 @@
 {
-    "errors.DAT-ERR-0": {
+    "error.DAT-ERR-0": {
         "other": "Dataviewer card not found"
     },
-    "errors.DAT-ERR-1": {
+    "error.DAT-ERR-1": {
         "other": "Dataset format error"
     },
-    "errors.DAT-ERR-2": {
+    "error.DAT-ERR-2": {
         "other": "No valid Parquet file"
     }
 }
