@@ -60,8 +60,7 @@ func (c *Client) GetRepoFileRaw(ctx context.Context, req gitserver.GetRepoInfoBy
 		} else {
 			err = errorx.ErrGitGetTreeEntryFailed(err, errCtx)
 		}
-		return "", errorx.ErrGitGetTreeEntryFailed(err, errorx.Ctx().
-			Set("ref", req.Ref).Set("path", req.Path))
+		return "", err
 	}
 
 	for {
