@@ -14,7 +14,7 @@ type MemberStore interface {
 	Add(ctx context.Context, orgID, userID int64, role string) error
 	Delete(ctx context.Context, orgID, userID int64, role string) error
 	UserMembers(ctx context.Context, userID int64) ([]Member, error)
-	OrganizationMembers(ctx context.Context, orgID int64, pageSize, page int) ([]Member, int, error)
+	OrganizationMembers(ctx context.Context, orgID int64, role string, pageSize, page int) ([]Member, int, error)
 	UserUUIDsByOrganizationID(ctx context.Context, orgID int64) ([]string, error)
 }
 
@@ -65,7 +65,11 @@ func (s *memberStoreImpl) Add(ctx context.Context, orgID, userID int64, role str
 
 func (s *memberStoreImpl) Delete(ctx context.Context, orgID, userID int64, role string) error {
 	var member Member
-	_, err := s.db.Core.NewDelete().Model(&member).Where("organization_id=? and user_id=? and role=?", orgID, userID, role).Exec(ctx)
+	_, err := s.db.Core.NewDelete().
+		Model(&member).
+		Where("organization_id=? and user_id=? and role=?", orgID, userID, role).
+		ForceDelete().
+		Exec(ctx)
 	return err
 }
 
@@ -75,22 +79,29 @@ func (s *memberStoreImpl) UserMembers(ctx context.Context, userID int64) ([]Memb
 	return members, err
 }
 
-func (s *memberStoreImpl) OrganizationMembers(ctx context.Context, orgID int64, pageSize, page int) ([]Member, int, error) {
+func (s *memberStoreImpl) OrganizationMembers(ctx context.Context, orgID int64, role string, pageSize, page int) ([]Member, int, error) {
 	var members []Member
 	var total int
 	q := s.db.Core.NewSelect().Model((*Member)(nil)).
 		Relation("User").
-		Where("organization_id=?", orgID).
-		Limit(pageSize).
-		Offset((page - 1) * pageSize)
-	err := q.Scan(ctx, &members)
-	if err != nil {
-		return nil, 0, fmt.Errorf("failed to find org members,caused by:%w", err)
+		Join("JOIN users AS u ON u.id = member.user_id").
+		Where("organization_id=?", orgID)
+	if role != "" {
+		q = q.Where("role = ?", role)
 	}
-	total, err = q.Count(ctx)
+
+	total, err := q.Count(ctx)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to count org members,caused by:%w", err)
 	}
+
+	q = q.Limit(pageSize).
+		Offset((page - 1) * pageSize)
+	err = q.Scan(ctx, &members)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to find org members,caused by:%w", err)
+	}
+
 	return members, total, nil
 }
 
