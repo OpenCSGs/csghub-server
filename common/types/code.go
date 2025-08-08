@@ -43,4 +43,5 @@ type Code struct {
 	Readme               string               `json:"readme"`
 	Scores               []WeightScore        `json:"scores"`
 	MultiSource
+	MirrorTaskStatus MirrorTaskStatus `json:"mirror_task_status"`
 }

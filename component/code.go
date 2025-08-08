@@ -287,7 +287,11 @@ func (c *codeComponentImpl) Delete(ctx context.Context, namespace, name, current
 }
 
 func (c *codeComponentImpl) Show(ctx context.Context, namespace, name, currentUser string) (*types.Code, error) {
-	var tags []types.RepoTag
+	var (
+		tags             []types.RepoTag
+		mirrorTaskStatus types.MirrorTaskStatus
+		syncStatus       types.RepositorySyncStatus
+	)
 	code, err := c.codeStore.FindByPath(ctx, namespace, name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find code, error: %w", err)
@@ -325,6 +329,8 @@ func (c *codeComponentImpl) Show(ctx context.Context, namespace, name, currentUs
 		return nil, newError
 	}
 
+	mirrorTaskStatus, syncStatus = c.repoComponent.GetMirrorTaskStatusAndSyncStatus(code.Repository)
+
 	resCode := &types.Code{
 		ID:            code.ID,
 		Name:          code.Repository.Name,
@@ -342,16 +348,17 @@ func (c *codeComponentImpl) Show(ctx context.Context, namespace, name, currentUs
 			Nickname: code.Repository.User.NickName,
 			Email:    code.Repository.User.Email,
 		},
-		Private:    code.Repository.Private,
-		CreatedAt:  code.CreatedAt,
-		UpdatedAt:  code.Repository.UpdatedAt,
-		UserLikes:  likeExists,
-		Source:     code.Repository.Source,
-		SyncStatus: code.Repository.SyncStatus,
-		License:    code.Repository.License,
-		CanWrite:   permission.CanWrite,
-		CanManage:  permission.CanAdmin,
-		Namespace:  ns,
+		Private:          code.Repository.Private,
+		CreatedAt:        code.CreatedAt,
+		UpdatedAt:        code.Repository.UpdatedAt,
+		UserLikes:        likeExists,
+		Source:           code.Repository.Source,
+		SyncStatus:       syncStatus,
+		License:          code.Repository.License,
+		CanWrite:         permission.CanWrite,
+		CanManage:        permission.CanAdmin,
+		Namespace:        ns,
+		MirrorTaskStatus: mirrorTaskStatus,
 	}
 	if permission.CanAdmin {
 		resCode.SensitiveCheckStatus = code.Repository.SensitiveCheckStatus.String()

@@ -181,6 +181,9 @@ func TestDatasetCompnent_Show(t *testing.T) {
 	dc.mocks.components.repo.EXPECT().GetUserRepoPermission(ctx, "user", dataset.Repository).Return(&types.UserRepoPermission{CanRead: true}, nil)
 	dc.mocks.components.repo.EXPECT().GetNameSpaceInfo(ctx, "ns").Return(&types.Namespace{}, nil)
 	dc.mocks.stores.UserLikesMock().EXPECT().IsExist(ctx, "user", int64(2)).Return(true, nil)
+	dc.mocks.components.repo.EXPECT().GetMirrorTaskStatusAndSyncStatus(dataset.Repository).Return(
+		types.MirrorRepoSyncStart, types.SyncStatusInProgress,
+	)
 
 	d, err := dc.Show(ctx, "ns", "n", "user")
 	require.Nil(t, err)
@@ -193,9 +196,11 @@ func TestDatasetCompnent_Show(t *testing.T) {
 			HTTPCloneURL: "/s/.git",
 			SSHCloneURL:  ":s/.git",
 		},
-		User:      types.User{Username: "user"},
-		UserLikes: true,
-		Namespace: &types.Namespace{},
+		User:             types.User{Username: "user"},
+		UserLikes:        true,
+		Namespace:        &types.Namespace{},
+		MirrorTaskStatus: types.MirrorRepoSyncStart,
+		SyncStatus:       types.SyncStatusInProgress,
 	}, d)
 
 }

@@ -939,6 +939,115 @@ func (c *Client) GetRepoAllLfsPointers(ctx context.Context, req gitserver.GetRep
 	return pointers, nil
 }
 
+func (c *Client) GetRepoLfsPointers(ctx context.Context, req gitserver.GetRepoFilesReq) ([]*types.LFSPointer, error) {
+	var pointers []*types.LFSPointer
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
+
+	relativePath, err := c.BuildRelativePath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return nil, err
+	}
+	repository := &gitalypb.Repository{
+		StorageName:  c.config.GitalyServer.Storage,
+		RelativePath: relativePath,
+	}
+
+	if req.GitAlternateObjectDirectoriesRelative != nil {
+		repository.GitAlternateObjectDirectories = req.GitAlternateObjectDirectoriesRelative
+	}
+	if req.GitObjectDirectoryRelative != "" {
+		repository.GitObjectDirectory = req.GitObjectDirectoryRelative
+	}
+
+	pointersReq := &gitalypb.ListLFSPointersRequest{
+		Repository: repository,
+		Revisions:  req.Revisions,
+	}
+
+	allPointersStream, err := c.blobClient.ListLFSPointers(ctx, pointersReq)
+	if err != nil {
+		return nil, err
+	}
+	for {
+		allPointersResp, err := allPointersStream.Recv()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return nil, err
+		}
+		if allPointersResp != nil {
+			for _, pointer := range allPointersResp.LfsPointers {
+				var p types.Pointer
+				p, _ = ReadPointerFromBuffer(pointer.Data)
+				pointers = append(pointers, &types.LFSPointer{
+					Oid:      pointer.Oid,
+					Size:     pointer.Size,
+					FileOid:  string(p.Oid),
+					FileSize: p.Size,
+					Data:     string(pointer.Data),
+				})
+			}
+		}
+	}
+	return pointers, nil
+}
+
+func (c *Client) GetRepoFiles(ctx context.Context, req gitserver.GetRepoFilesReq) ([]*types.File, error) {
+	var files []*types.File
+	ctx, cancel := context.WithTimeout(ctx, time.Second*3)
+	defer cancel()
+
+	relativePath, err := c.BuildRelativePath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return nil, err
+	}
+	repository := &gitalypb.Repository{
+		StorageName:  c.config.GitalyServer.Storage,
+		RelativePath: relativePath,
+	}
+
+	if req.GitAlternateObjectDirectoriesRelative != nil {
+		repository.GitAlternateObjectDirectories = req.GitAlternateObjectDirectoriesRelative
+	}
+	if req.GitObjectDirectoryRelative != "" {
+		repository.GitObjectDirectory = req.GitObjectDirectoryRelative
+	}
+
+	result, err := c.blobClient.ListBlobs(ctx, &gitalypb.ListBlobsRequest{
+		Repository: repository,
+		WithPaths:  true,
+		Revisions:  req.Revisions,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	for {
+		allFilesResp, err := result.Recv()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return nil, err
+		}
+		if allFilesResp != nil {
+			for _, blob := range allFilesResp.Blobs {
+				files = append(files, &types.File{
+					Name: filepath.Base(string(blob.Path)),
+					Path: string(blob.Path),
+					Size: blob.Size,
+					SHA:  string(blob.Oid),
+				})
+			}
+
+		}
+	}
+
+	return files, nil
+}
+
 func (c *Client) CommitFiles(ctx context.Context, req gitserver.CommitFilesReq) error {
 	repoType := fmt.Sprintf("%ss", req.RepoType)
 

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"path"
 	"regexp"
+	"strings"
 	"time"
 
 	pb "gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
@@ -205,6 +206,24 @@ type GitalyAllowedReq struct {
 	UserID       string `json:"user_id"`
 	KeyID        string `json:"key_id"`
 	CheckIP      string `json:"check_ip"`
+	PushOptions  string `json:"push_options"`
+	RelativePath string `json:"relative_path"`
+	GitEnv       GitEnv `json:"git_env"`
+}
+
+func (g *GitalyAllowedReq) GetRepoTypeNamespaceAndName() (RepositoryType, string, string) {
+	paths := strings.Split(g.GlRepository, "/")
+	return RepositoryType(strings.TrimSuffix(paths[0], "s")), paths[1], paths[2]
+}
+
+func (g *GitalyAllowedReq) GetRevision() string {
+	strs := strings.Split(g.Changes, " ")
+	return strs[1]
+}
+
+type GitEnv struct {
+	GitAlternateObjectDirectoriesRelative []string `json:"GIT_ALTERNATE_OBJECT_DIRECTORIES_RELATIVE"`
+	GitObjectDirectoryRelative            string   `json:"GIT_OBJECT_DIRECTORY_RELATIVE"`
 }
 
 type CompleteMultipartUploadReq struct {

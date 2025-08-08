@@ -74,5 +74,7 @@ type GitServer interface {
 	ReceivePack(ctx context.Context, req ReceivePackReq) error
 	CommitFiles(ctx context.Context, req CommitFilesReq) error
 	BuildRelativePath(ctx context.Context, repoType types.RepositoryType, namespace, name string) (string, error)
+	GetRepoLfsPointers(ctx context.Context, req GetRepoFilesReq) ([]*types.LFSPointer, error)
+	GetRepoFiles(ctx context.Context, req GetRepoFilesReq) ([]*types.File, error)
 	UpdateRef(ctx context.Context, req UpdateRefReq) error
 }

@@ -452,12 +452,7 @@ func (c *modelComponentImpl) Show(ctx context.Context, namespace, name, currentU
 		return nil, newError
 	}
 
-	syncStatus = types.SyncStatusPending
-
-	if model.Repository.Mirror.CurrentTask != nil {
-		syncStatus = common.MirrorTaskStatusToRepoStatus(model.Repository.Mirror.CurrentTask.Status)
-		mirrorTaskStatus = model.Repository.Mirror.CurrentTask.Status
-	}
+	mirrorTaskStatus, syncStatus = c.repoComponent.GetMirrorTaskStatusAndSyncStatus(model.Repository)
 
 	resModel := &types.Model{
 		ID:            model.ID,

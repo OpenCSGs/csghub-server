@@ -64,11 +64,12 @@ type MCPServer struct {
 	GithubPath           string               `json:"github_path"` // github path
 	Readme               string               `json:"readme"`
 	MultiSource
-	ProgramLanguage string `json:"program_language"`
-	RunMode         string `json:"run_mode"`
-	InstallDepsCmds string `json:"install_deps_cmds"`
-	BuildCmds       string `json:"build_cmds"`
-	LaunchCmds      string `json:"launch_cmds"`
+	ProgramLanguage  string           `json:"program_language"`
+	RunMode          string           `json:"run_mode"`
+	InstallDepsCmds  string           `json:"install_deps_cmds"`
+	BuildCmds        string           `json:"build_cmds"`
+	LaunchCmds       string           `json:"launch_cmds"`
+	MirrorTaskStatus MirrorTaskStatus `json:"mirror_task_status"`
 }
 
 type MCPPropertyFilter struct {

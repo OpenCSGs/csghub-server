@@ -168,6 +168,7 @@ type RepoComponent interface {
 	IsExists(ctx context.Context, repoType types.RepositoryType, namespace, name string) (bool, error)
 	ValidateYaml(ctx context.Context, req types.ValidateYamlReq) error
 	ParseNDJson(ctx *gin.Context) (*types.CommitFilesReq, error)
+	GetMirrorTaskStatusAndSyncStatus(repo *database.Repository) (types.MirrorTaskStatus, types.RepositorySyncStatus)
 }
 
 func NewRepoComponentImpl(config *config.Config) (*repoComponentImpl, error) {
@@ -3426,4 +3427,25 @@ func (c *repoComponentImpl) ParseNDJson(ctx *gin.Context) (*types.CommitFilesReq
 		return nil, fmt.Errorf("error reading NDJSON: %v", err)
 	}
 	return req, nil
+}
+
+func (c *repoComponentImpl) GetMirrorTaskStatusAndSyncStatus(repo *database.Repository) (types.MirrorTaskStatus, types.RepositorySyncStatus) {
+	var (
+		syncStatus       types.RepositorySyncStatus
+		mirrorTaskStatus types.MirrorTaskStatus
+	)
+	if repo.Mirror.ID != 0 {
+		syncStatus = common.MirrorTaskStatusToRepoStatus(repo.Mirror.Status)
+	}
+
+	if repo.Mirror.CurrentTask != nil {
+		syncStatus = common.MirrorTaskStatusToRepoStatus(repo.Mirror.CurrentTask.Status)
+		mirrorTaskStatus = repo.Mirror.CurrentTask.Status
+	}
+
+	if syncStatus == "" {
+		syncStatus = repo.SyncStatus
+	}
+
+	return mirrorTaskStatus, syncStatus
 }

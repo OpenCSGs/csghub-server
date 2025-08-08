@@ -64,9 +64,29 @@ func TestInternalHandler_SSHAllowed(t *testing.T) {
 		tester := NewInternalTester(t).WithHandleFunc(func(h *InternalHandler) gin.HandlerFunc {
 			return h.SSHAllowed
 		})
+		tester.handler.config.Git.CheckFileSizeEnabled = true
+		tester.mocks.internal.EXPECT().CheckGitCallback(tester.Ctx(), types.GitalyAllowedReq{
+			Protocol:     "https",
+			GlRepository: "models/u/r",
+			Action:       "act",
+			KeyID:        "k",
+			CheckIP:      "ci",
+			Env:          `{"GIT_ALTERNATE_OBJECT_DIRECTORIES_RELATIVE":["objects"],"GIT_OBJECT_DIRECTORY_RELATIVE": "abc"}`,
+			Changes:      "a b main",
+			GitEnv: types.GitEnv{
+				GitAlternateObjectDirectoriesRelative: []string{"objects"},
+				GitObjectDirectoryRelative:            "abc",
+			},
+		}).Return(true, nil)
 
-		tester.WithBody(t, &types.GitalyAllowedReq{
-			Protocol: "https",
+		tester.WithHeader("Content-Type", "application/json").WithBody(t, &types.GitalyAllowedReq{
+			Protocol:     "https",
+			GlRepository: "models/u/r",
+			Action:       "act",
+			KeyID:        "k",
+			CheckIP:      "ci",
+			Env:          `{"GIT_ALTERNATE_OBJECT_DIRECTORIES_RELATIVE":["objects"],"GIT_OBJECT_DIRECTORY_RELATIVE": "abc"}`,
+			Changes:      "a b main",
 		}).Execute()
 
 		tester.ResponseEqSimple(t, 200, gin.H{
@@ -80,23 +100,40 @@ func TestInternalHandler_SSHAllowed(t *testing.T) {
 			return h.SSHAllowed
 		})
 
+		tester.handler.config.Git.CheckFileSizeEnabled = true
 		tester.mocks.internal.EXPECT().SSHAllowed(tester.Ctx(), types.SSHAllowedReq{
 			RepoType:  types.ModelRepo,
 			Namespace: "u",
 			Name:      "r",
 			Action:    "act",
-			Changes:   "c",
+			Changes:   "a b main",
 			KeyID:     "k",
 			Protocol:  "ssh",
 			CheckIP:   "ci",
 		}).Return(&types.SSHAllowedResp{Message: "msg"}, nil)
+
+		tester.mocks.internal.EXPECT().CheckGitCallback(tester.Ctx(), types.GitalyAllowedReq{
+			Protocol:     "ssh",
+			GlRepository: "models/u/r",
+			Action:       "act",
+			KeyID:        "k",
+			CheckIP:      "ci",
+			Env:          `{"GIT_ALTERNATE_OBJECT_DIRECTORIES_RELATIVE":["objects"],"GIT_OBJECT_DIRECTORY_RELATIVE": "abc"}`,
+			Changes:      "a b main",
+			GitEnv: types.GitEnv{
+				GitAlternateObjectDirectoriesRelative: []string{"objects"},
+				GitObjectDirectoryRelative:            "abc",
+			},
+		}).Return(true, nil)
+
 		tester.WithHeader("Content-Type", "application/json").WithBody(t, &types.GitalyAllowedReq{
 			Protocol:     "ssh",
 			GlRepository: "models/u/r",
 			Action:       "act",
 			KeyID:        "k",
-			Changes:      "c",
 			CheckIP:      "ci",
+			Env:          `{"GIT_ALTERNATE_OBJECT_DIRECTORIES_RELATIVE":["objects"],"GIT_OBJECT_DIRECTORY_RELATIVE": "abc"}`,
+			Changes:      "a b main",
 		}).Execute()
 
 		tester.ResponseEqSimple(t, 200, &types.SSHAllowedResp{Message: "msg"})

@@ -353,7 +353,11 @@ func (c *datasetComponentImpl) Delete(ctx context.Context, namespace, name, curr
 }
 
 func (c *datasetComponentImpl) Show(ctx context.Context, namespace, name, currentUser string) (*types.Dataset, error) {
-	var tags []types.RepoTag
+	var (
+		tags             []types.RepoTag
+		syncStatus       types.RepositorySyncStatus
+		mirrorTaskStatus types.MirrorTaskStatus
+	)
 	dataset, err := c.datasetStore.FindByPath(ctx, namespace, name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find dataset, error: %w", err)
@@ -390,6 +394,8 @@ func (c *datasetComponentImpl) Show(ctx context.Context, namespace, name, curren
 		return nil, fmt.Errorf("failed to check for the presence of the user likes, error: %w", err)
 	}
 
+	mirrorTaskStatus, syncStatus = c.repoComponent.GetMirrorTaskStatusAndSyncStatus(dataset.Repository)
+
 	resDataset := &types.Dataset{
 		ID:            dataset.ID,
 		Name:          dataset.Repository.Name,
@@ -413,7 +419,7 @@ func (c *datasetComponentImpl) Show(ctx context.Context, namespace, name, curren
 		UpdatedAt:           dataset.Repository.UpdatedAt,
 		UserLikes:           likeExists,
 		Source:              dataset.Repository.Source,
-		SyncStatus:          dataset.Repository.SyncStatus,
+		SyncStatus:          syncStatus,
 		License:             dataset.Repository.License,
 		MirrorLastUpdatedAt: dataset.Repository.Mirror.LastUpdatedAt,
 		CanWrite:            permission.CanWrite,
@@ -424,6 +430,7 @@ func (c *datasetComponentImpl) Show(ctx context.Context, namespace, name, curren
 			MSPath:  dataset.Repository.MSPath,
 			CSGPath: dataset.Repository.CSGPath,
 		},
+		MirrorTaskStatus: mirrorTaskStatus,
 	}
 	if permission.CanAdmin {
 		resDataset.SensitiveCheckStatus = dataset.Repository.SensitiveCheckStatus.String()
