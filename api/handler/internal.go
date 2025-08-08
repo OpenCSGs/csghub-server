@@ -77,21 +77,23 @@ func (h *InternalHandler) SSHAllowed(ctx *gin.Context) {
 		return
 	}
 
-	err := json.Unmarshal([]byte(rawReq.Env), &gitEnv)
-	if err != nil {
-		slog.Error("Bad request format", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
-		return
-	}
-	rawReq.GitEnv = gitEnv
-	valid, err := h.internal.CheckGitCallback(ctx.Request.Context(), rawReq)
+	if rawReq.Env != "" {
+		err := json.Unmarshal([]byte(rawReq.Env), &gitEnv)
+		if err != nil {
+			slog.Error("Bad request format", "error", err)
+			httpbase.BadRequest(ctx, err.Error())
+			return
+		}
+		rawReq.GitEnv = gitEnv
+		valid, err := h.internal.CheckGitCallback(ctx.Request.Context(), rawReq)
 
-	if !valid {
-		ctx.PureJSON(http.StatusOK, gin.H{
-			"status":  false,
-			"message": err.Error(),
-		})
-		return
+		if !valid {
+			ctx.PureJSON(http.StatusOK, gin.H{
+				"status":  false,
+				"message": err.Error(),
+			})
+			return
+		}
 	}
 
 	if rawReq.Protocol == "ssh" {
