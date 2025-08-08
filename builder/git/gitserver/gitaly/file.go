@@ -60,7 +60,8 @@ func (c *Client) GetRepoFileRaw(ctx context.Context, req gitserver.GetRepoInfoBy
 		} else {
 			err = errorx.ErrGitGetTreeEntryFailed(err, errCtx)
 		}
-		return "", err
+		return "", errorx.ErrGitGetTreeEntryFailed(err, errorx.Ctx().
+			Set("ref", req.Ref).Set("path", req.Path))
 	}
 
 	for {
@@ -111,7 +112,8 @@ func (c *Client) GetRepoFileReader(ctx context.Context, req gitserver.GetRepoInf
 
 	treeEntriesStream, err := c.commitClient.TreeEntry(ctx, treeEntriesReq)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, errorx.ErrGitGetTreeEntryFailed(err, errorx.Ctx().
+			Set("ref", req.Ref).Set("path", req.Path))
 	}
 
 	go func() {
@@ -188,7 +190,7 @@ func (c *Client) CreateRepoFile(req *types.CreateFileReq) (err error) {
 	}
 	userCommitFilesClient, err := c.operationClient.UserCommitFiles(ctx)
 	if err != nil {
-		return err
+		return errorx.ErrGitCommitFilesFailed(err, errorx.Ctx())
 	}
 	repository := &gitalypb.Repository{
 		StorageName:  c.config.GitalyServer.Storage,
@@ -267,19 +269,19 @@ func (c *Client) CreateRepoFile(req *types.CreateFileReq) (err error) {
 	}
 	err = userCommitFilesClient.Send(actions[0])
 	if err != nil {
-		return err
+		return errorx.ErrGitCommitFilesFailed(err, errorx.Ctx())
 	}
 	err = userCommitFilesClient.Send(actions[1])
 	if err != nil {
-		return err
+		return errorx.ErrGitCommitFilesFailed(err, errorx.Ctx())
 	}
 	err = userCommitFilesClient.Send(actions[2])
 	if err != nil {
-		return err
+		return errorx.ErrGitCommitFilesFailed(err, errorx.Ctx())
 	}
 	_, err = userCommitFilesClient.CloseAndRecv()
 	if err != nil {
-		return err
+		return errorx.ErrGitCommitFilesFailed(err, errorx.Ctx())
 	}
 
 	return err
@@ -300,7 +302,7 @@ func (c *Client) UpdateRepoFile(req *types.UpdateFileReq) (err error) {
 	}
 	userCommitFilesClient, err := c.operationClient.UserCommitFiles(ctx)
 	if err != nil {
-		return err
+		return errorx.ErrGitCommitFilesFailed(err, errorx.Ctx())
 	}
 	repository := &gitalypb.Repository{
 		StorageName:  c.config.GitalyServer.Storage,
@@ -387,19 +389,19 @@ func (c *Client) UpdateRepoFile(req *types.UpdateFileReq) (err error) {
 	}
 	err = userCommitFilesClient.Send(actions[0])
 	if err != nil {
-		return err
+		return errorx.ErrGitCommitFilesFailed(err, errorx.Ctx())
 	}
 	err = userCommitFilesClient.Send(actions[1])
 	if err != nil {
-		return err
+		return errorx.ErrGitCommitFilesFailed(err, errorx.Ctx())
 	}
 	err = userCommitFilesClient.Send(actions[2])
 	if err != nil {
-		return err
+		return errorx.ErrGitCommitFilesFailed(err, errorx.Ctx())
 	}
 	_, err = userCommitFilesClient.CloseAndRecv()
 	if err != nil {
-		return err
+		return errorx.ErrGitCommitFilesFailed(err, errorx.Ctx())
 	}
 
 	return err
@@ -420,7 +422,7 @@ func (c *Client) DeleteRepoFile(req *types.DeleteFileReq) (err error) {
 	defer cancel()
 	userCommitFilesClient, err := c.operationClient.UserCommitFiles(ctx)
 	if err != nil {
-		return err
+		return errorx.ErrGitCommitFilesFailed(err, errorx.Ctx())
 	}
 	relativePath, err := c.BuildRelativePath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
@@ -468,15 +470,15 @@ func (c *Client) DeleteRepoFile(req *types.DeleteFileReq) (err error) {
 	}
 	err = userCommitFilesClient.Send(actions[0])
 	if err != nil {
-		return err
+		return errorx.ErrGitCommitFilesFailed(err, errorx.Ctx())
 	}
 	err = userCommitFilesClient.Send(actions[1])
 	if err != nil {
-		return err
+		return errorx.ErrGitCommitFilesFailed(err, errorx.Ctx())
 	}
 	_, err = userCommitFilesClient.CloseAndRecv()
 	if err != nil {
-		return err
+		return errorx.ErrGitCommitFilesFailed(err, errorx.Ctx())
 	}
 
 	return err
@@ -493,7 +495,7 @@ func (c *Client) getBlobInfo(ctx context.Context, repo *gitalypb.Repository, pat
 
 	listBlobsStream, err := c.blobClient.GetBlobs(ctx, listBlobsReq)
 	if err != nil {
-		return nil, err
+		return nil, errorx.ErrGitGetBlobsFailed(err, errorx.Ctx())
 	}
 	oidFiles := map[string][]*types.File{}
 	for {
@@ -557,7 +559,7 @@ func (c *Client) getBlobInfo(ctx context.Context, repo *gitalypb.Repository, pat
 				if err == io.EOF {
 					break
 				}
-				return nil, err
+				return nil, errorx.ErrGitGetBlobsFailed(err, errorx.Ctx())
 			}
 			if lfsResp != nil {
 				pointers := lfsResp.GetLfsPointers()
@@ -614,7 +616,7 @@ func (c *Client) GetRepoFileTree(ctx context.Context, req gitserver.GetRepoInfoB
 	}
 	commitStream, err := c.commitClient.ListLastCommitsForTree(ctx, gitalyReq)
 	if err != nil {
-		return nil, err
+		return nil, errorx.ErrGitListLastCommitsForTreeFailed(err, errorx.Ctx())
 	}
 	for {
 		commitResp, err := commitStream.Recv()
@@ -647,7 +649,7 @@ func (c *Client) GetRepoFileTree(ctx context.Context, req gitserver.GetRepoInfoB
 
 	listBlobsStream, err := c.blobClient.GetBlobs(ctx, listBlobsReq)
 	if err != nil {
-		return nil, err
+		return nil, errorx.ErrGitGetBlobsFailed(err, errorx.Ctx())
 	}
 	for {
 		listBlobResp, err := listBlobsStream.Recv()
@@ -765,7 +767,7 @@ func (c *Client) GetTree(ctx context.Context, req types.GetTreeRequest) (*types.
 
 	treeStream, err := c.commitClient.GetTreeEntries(ctx, gitalyReq)
 	if err != nil {
-		return nil, err
+		return nil, errorx.ErrGitGetTreeEntryFailed(err, errorx.Ctx())
 	}
 	cursor := ""
 	for {
@@ -803,7 +805,7 @@ func (c *Client) GetTree(ctx context.Context, req types.GetTreeRequest) (*types.
 
 	files, err := c.getBlobInfo(ctx, repository, revisionPaths)
 	if err != nil {
-		return nil, err
+		return nil, errorx.ErrGitGetBlobInfoFailed(err, errorx.Ctx())
 	}
 	return &types.GetRepoFileTreeResp{
 		Files:  files,
@@ -843,7 +845,7 @@ func (c *Client) GetLogsTree(ctx context.Context, req types.GetLogsTreeRequest) 
 	}
 	commitStream, err := c.commitClient.ListLastCommitsForTree(ctx, gitalyReq)
 	if err != nil {
-		return nil, err
+		return nil, errorx.ErrGitListLastCommitsForTreeFailed(err, errorx.Ctx())
 	}
 	for {
 		commitResp, err := commitStream.Recv()
@@ -853,7 +855,7 @@ func (c *Client) GetLogsTree(ctx context.Context, req types.GetLogsTreeRequest) 
 			}
 		}
 		if commitResp == nil {
-			return nil, errors.New("bad request")
+			return nil, errorx.ErrGitListLastCommitsForTreeFailed(err, errorx.Ctx())
 		}
 		commits := commitResp.Commits
 		if len(commits) > 0 {
@@ -902,7 +904,7 @@ func (c *Client) GetRepoAllFiles(ctx context.Context, req gitserver.GetRepoAllFi
 
 	allFilesStream, err := c.commitClient.ListFiles(ctx, allFilesReq)
 	if err != nil {
-		return nil, err
+		return nil, errorx.ErrGitListFilesFailed(err, errorx.Ctx())
 	}
 
 	for {
@@ -911,7 +913,7 @@ func (c *Client) GetRepoAllFiles(ctx context.Context, req gitserver.GetRepoAllFi
 			if err == io.EOF {
 				break
 			}
-			return nil, err
+			return nil, errorx.ErrGitListFilesFailed(err, errorx.Ctx())
 		}
 		if allFilesResp != nil {
 			for _, path := range allFilesResp.Paths {
@@ -945,7 +947,7 @@ func (c *Client) GetRepoAllLfsPointers(ctx context.Context, req gitserver.GetRep
 
 	allPointersStream, err := c.blobClient.ListAllLFSPointers(ctx, allPointersReq)
 	if err != nil {
-		return nil, err
+		return nil, errorx.ErrGitGetLfsPointersFailed(err, errorx.Ctx())
 	}
 	for {
 		allPointersResp, err := allPointersStream.Recv()
@@ -953,7 +955,7 @@ func (c *Client) GetRepoAllLfsPointers(ctx context.Context, req gitserver.GetRep
 			if err == io.EOF {
 				break
 			}
-			return nil, err
+			return nil, errorx.ErrGitGetLfsPointersFailed(err, errorx.Ctx())
 		}
 		if allPointersResp != nil {
 			for _, pointer := range allPointersResp.LfsPointers {
@@ -979,7 +981,7 @@ func (c *Client) CommitFiles(ctx context.Context, req gitserver.CommitFilesReq) 
 	defer cancel()
 	userCommitFilesClient, err := c.operationClient.UserCommitFiles(ctx)
 	if err != nil {
-		return err
+		return errorx.ErrGitCommitFilesFailed(err, errorx.Ctx())
 	}
 
 	relativePath, err := c.BuildRelativePath(ctx, req.RepoType, req.Namespace, req.Name)
@@ -1064,12 +1066,12 @@ func (c *Client) CommitFiles(ctx context.Context, req gitserver.CommitFilesReq) 
 	for _, action := range allFileActions {
 		err = userCommitFilesClient.Send(action)
 		if err != nil {
-			return err
+			return errorx.ErrGitCommitFilesFailed(err, errorx.Ctx())
 		}
 	}
 	_, err = userCommitFilesClient.CloseAndRecv()
 	if err != nil {
-		return err
+		return errorx.ErrGitCommitFilesFailed(err, errorx.Ctx())
 	}
 
 	return nil
