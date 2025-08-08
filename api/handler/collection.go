@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
 	"opencsg.com/csghub-server/component"
@@ -137,9 +139,14 @@ func (c *CollectionHandler) GetCollection(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	collection, err := c.collection.GetCollection(ctx.Request.Context(), currentUser, id)
 	if err != nil {
-		slog.Error("Failed to create space", slog.Any("error", err))
-		httpbase.ServerError(ctx, err)
-		return
+		slog.Error("Failed to get collection", slog.Any("error", err))
+		if errors.Is(err, errorx.ErrDatabaseNoRows) {
+			httpbase.NotFoundError(ctx, err)
+			return
+		} else {
+			httpbase.ServerError(ctx, err)
+			return
+		}
 	}
 
 	httpbase.OK(ctx, collection)

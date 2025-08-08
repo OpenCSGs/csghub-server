@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -305,7 +306,11 @@ func (h *SpaceHandler) Run(ctx *gin.Context) {
 	if err != nil {
 		slog.Error("failed to deploy space", slog.String("namespace", namespace),
 			slog.String("name", name), slog.Any("error", err))
-		httpbase.ServerError(ctx, err)
+		if errors.Is(err, errorx.ErrNoEntryFile) {
+			httpbase.BadRequestWithExt(ctx, err)
+		} else {
+			httpbase.ServerError(ctx, err)
+		}
 		return
 	}
 
@@ -336,7 +341,13 @@ func (h *SpaceHandler) Wakeup(ctx *gin.Context) {
 	if err != nil {
 		slog.Error("failed to wakeup space", slog.String("namespace", namespace),
 			slog.String("name", name), slog.Any("error", err))
-		httpbase.ServerError(ctx, errors.New("failed to wakeup space"))
+		if errors.Is(err, sql.ErrNoRows) {
+			httpbase.NotFoundError(ctx, err)
+		} else if errors.Is(err, errorx.ErrNoEntryFile) {
+			httpbase.BadRequestWithExt(ctx, err)
+		} else {
+			httpbase.ServerError(ctx, err)
+		}
 		return
 	}
 
@@ -380,7 +391,13 @@ func (h *SpaceHandler) Stop(ctx *gin.Context) {
 	if err != nil {
 		slog.Error("failed to stop space", slog.String("namespace", namespace),
 			slog.String("name", name), slog.Any("error", err))
-		httpbase.ServerError(ctx, errors.New("failed to stop space"))
+		if errors.Is(err, sql.ErrNoRows) {
+			httpbase.NotFoundError(ctx, err)
+		} else if errors.Is(err, errorx.ErrNoEntryFile) {
+			httpbase.BadRequestWithExt(ctx, err)
+		} else {
+			httpbase.ServerError(ctx, err)
+		}
 		return
 	}
 
