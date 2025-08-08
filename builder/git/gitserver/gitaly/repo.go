@@ -21,6 +21,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
 	"opencsg.com/csghub-server/builder/git/gitserver"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/utils/common"
 )
 
@@ -43,7 +44,7 @@ func (c *Client) RepositoryExists(ctx context.Context, req gitserver.CheckRepoRe
 	})
 
 	if err != nil {
-		return false, err
+		return false, errorx.ErrGitCheckRepositoryExistsFailed(err, errorx.Ctx())
 	}
 	if r == nil {
 		return false, errors.New("empty response for check repository exists")
@@ -70,7 +71,7 @@ func (c *Client) CreateRepo(ctx context.Context, req gitserver.CreateRepoReq) (*
 
 	_, err = c.repoClient.CreateRepository(ctx, gitalyReq)
 	if err != nil {
-		return nil, err
+		return nil, errorx.ErrGitCreateRepositoryFailed(err, errorx.Ctx())
 	}
 
 	repoTypeS := fmt.Sprintf("%ss", string(req.RepoType))
@@ -108,7 +109,7 @@ func (c *Client) DeleteRepo(ctx context.Context, req gitserver.DeleteRepoReq) er
 	}
 	_, err = c.repoClient.RemoveRepository(ctx, gitalyReq)
 	if err != nil {
-		return err
+		return errorx.ErrGitDeleteRepositoryFailed(err, errorx.Ctx())
 	}
 
 	return nil
@@ -129,7 +130,7 @@ func (c *Client) GetRepo(ctx context.Context, req gitserver.GetRepoReq) (*gitser
 	}
 	resp, err := c.refClient.FindDefaultBranchName(ctx, gitalyReq)
 	if err != nil {
-		return nil, err
+		return nil, errorx.ErrGitGetRepositoryFailed(err, errorx.Ctx())
 	}
 
 	return &gitserver.CreateRepoResp{DefaultBranch: string(resp.Name)}, nil

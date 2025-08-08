@@ -8,6 +8,7 @@ import (
 
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 	"opencsg.com/csghub-server/builder/git/gitserver"
+	"opencsg.com/csghub-server/common/errorx"
 )
 
 func (c *Client) CreateMirrorRepo(ctx context.Context, req gitserver.CreateMirrorRepoReq) (int64, error) {
@@ -27,7 +28,7 @@ func (c *Client) CreateMirrorRepo(ctx context.Context, req gitserver.CreateMirro
 
 		resp, err := c.remoteClient.FindRemoteRepository(ctx, remoteCheckReq)
 		if err != nil {
-			return 0, err
+			return 0, errorx.ErrGitCreateMirrorFailed(err, errorx.Ctx())
 		}
 		if !resp.Exists {
 			return 0, fmt.Errorf("invalid clone url")
@@ -94,7 +95,7 @@ func (c *Client) CreateMirrorForExistsRepo(ctx context.Context, req gitserver.Cr
 
 	_, err = c.repoClient.FetchRemote(ctx, fetchRemoteReq)
 	if err != nil {
-		return err
+		return errorx.ErrGitMirrorSyncFailed(err, errorx.Ctx())
 	}
 	return nil
 }
@@ -136,7 +137,7 @@ func (c *Client) MirrorSync(ctx context.Context, req gitserver.MirrorSyncReq) er
 
 	_, err = c.repoClient.FetchRemote(ctx, fetchRemoteReq)
 	if err != nil {
-		return err
+		return errorx.ErrGitMirrorSyncFailed(err, errorx.Ctx())
 	}
 
 	return nil
