@@ -72,7 +72,7 @@ func TestListNotifications(t *testing.T) {
 func TestMarkAsRead(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	nmc := mc.NewMockNotificationComponent(t)
-	req := types.MarkNotificationsAsReadReq{
+	req := types.BatchNotificationOperationReq{
 		MarkAll: true,
 	}
 	nmc.EXPECT().MarkAsRead(context.Background(), "test", req).Return(nil)
@@ -234,4 +234,49 @@ func TestSendMessage_Success(t *testing.T) {
 		t.Errorf("Expected status 200, but got %d, msg %s", w.Code, w.Body.String())
 	}
 	mockNMC.AssertExpectations(t)
+}
+
+func TestMarkAsUnread(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	nmc := mc.NewMockNotificationComponent(t)
+	req := types.BatchNotificationOperationReq{
+		MarkAll: true,
+	}
+	nmc.EXPECT().MarkAsUnread(context.Background(), "test", req).Return(nil)
+	handler := handler.NewNotifierMessageHandlerWithMock(nmc)
+	w := httptest.NewRecorder()
+	body, _ := json.Marshal(req)
+	reqObj, _ := http.NewRequest("PUT", "/notifications/unread", bytes.NewBuffer(body))
+	reqObj.Header.Set("Content-Type", "application/json")
+	ctx, _ := gin.CreateTestContext(w)
+	ctx.Request = reqObj
+	httpbase.SetCurrentUserUUID(ctx, "test")
+	handler.MarkAsUnread(ctx)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected status 200, but got %d, msg %s", w.Code, w.Body.String())
+	}
+}
+
+func TestDeleteNotifications(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	nmc := mc.NewMockNotificationComponent(t)
+	req := types.BatchNotificationOperationReq{
+		MarkAll: true,
+	}
+	nmc.EXPECT().DeleteNotifications(context.Background(), "test", req).Return(nil)
+	handler := handler.NewNotifierMessageHandlerWithMock(nmc)
+
+	w := httptest.NewRecorder()
+	body, _ := json.Marshal(req)
+	reqObj, _ := http.NewRequest("DELETE", "/notifications", bytes.NewBuffer(body))
+	reqObj.Header.Set("Content-Type", "application/json")
+	ctx, _ := gin.CreateTestContext(w)
+	ctx.Request = reqObj
+	httpbase.SetCurrentUserUUID(ctx, "test")
+	handler.DeleteNotifications(ctx)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected status 200, but got %d, msg %s", w.Code, w.Body.String())
+	}
 }

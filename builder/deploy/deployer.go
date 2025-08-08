@@ -900,6 +900,7 @@ func (d *deployer) serviceUpdateConsumerCallback(msg jetstream.Msg) {
 		slog.Warn("fail to get deploy by service name in event consumer", slog.Any("service_name", event.ServiceName))
 		return
 	}
+	oldStatus := deploy.Status
 	if deploy.Status != common.Deleted {
 		deploy.Status = event.Status
 		deploy.Message = event.Message
@@ -913,6 +914,17 @@ func (d *deployer) serviceUpdateConsumerCallback(msg jetstream.Msg) {
 	err = msg.Ack()
 	if err != nil {
 		slog.Warn("fail to ack after processing service message", slog.Any("msg", string(msg.Data())))
+	}
+
+	if event.Status == common.Running && oldStatus != common.Running {
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			err := d.sendNotification(ctx, deploy)
+			if err != nil {
+				slog.Error("failed to send notification", slog.Any("error", err))
+			}
+		}()
 	}
 }
 
@@ -972,6 +984,106 @@ func (d *deployer) startCheckAndUpdateDeploy(ctx context.Context, deploys []data
 				slog.Warn("fail to update deploy status in deployer", slog.Any("error", err))
 			}
 			slog.Info("updated deploy status", slog.Any("deploy_id", deploy.ID), slog.Int("status", newStatus))
+		}
+	}
+}
+
+func (d *deployer) sendNotification(ctx context.Context, deploy *database.Deploy) error {
+	payload := map[string]any{
+		"deploy_name": deploy.DeployName,
+		"deploy_id":   deploy.ID,
+		"git_path":    deploy.GitPath,
+	}
+	// update later after the i18n is ready in the frontend,
+	// then just pass the payload and template id in message
+	template := getNotificationTemplate(payload, int(deploy.Type))
+	payload["deploy_type"] = template.deployType
+	msg := types.NotificationMessage{
+		MsgUUID:          uuid.New().String(),
+		UserUUIDs:        []string{deploy.UserUUID},
+		NotificationType: types.NotificationDeploymentManagement,
+		Title:            template.title,
+		Content:          template.content,
+		CreateAt:         time.Now(),
+		ClickActionURL:   template.url,
+	}
+	msgBytes, err := json.Marshal(msg)
+	if err != nil {
+		return fmt.Errorf("failed to marshal message, err: %w", err)
+	}
+	notificationMsg := types.MessageRequest{
+		Scenario:   types.MessageScenarioInternalNotification,
+		Parameters: string(msgBytes),
+		Priority:   types.MessagePriorityHigh,
+	}
+
+	var sendErr error
+	retryCount := 3
+	for i := range retryCount {
+		if sendErr = d.notificationSvcClient.Send(ctx, &notificationMsg); sendErr == nil {
+			break
+		}
+		if i < retryCount-1 {
+			slog.Warn("failed to send notification, retrying", "notification_msg", notificationMsg, "attempt", i+1, "error", sendErr.Error())
+		}
+	}
+
+	if sendErr != nil {
+		return fmt.Errorf("failed to send notification after %d attempts, err: %w", retryCount, sendErr)
+	}
+
+	return nil
+}
+
+type notificationTemplate struct {
+	title      string
+	content    string
+	url        string
+	deployType string
+}
+
+func getNotificationTemplate(payload map[string]any, deployType int) notificationTemplate {
+	deployName := payload["deploy_name"].(string)
+	gitPath := payload["git_path"].(string)
+	deployID := payload["deploy_id"].(int64)
+
+	switch deployType {
+	case types.SpaceType:
+		return notificationTemplate{
+			title:      fmt.Sprintf("Space %s Deployed Successfully", gitPath),
+			content:    fmt.Sprintf("Your dedicated space instance %s has been deployed and is running successfully.", gitPath),
+			url:        fmt.Sprintf("/spaces/%s", gitPath),
+			deployType: "space",
+		}
+	case types.InferenceType:
+		return notificationTemplate{
+			title:      fmt.Sprintf("Inference %s/%d Deployed Successfully", deployName, deployID),
+			content:    fmt.Sprintf("Your Inference endpoint %s/%d has been deployed and is running successfully.", deployName, deployID),
+			url:        fmt.Sprintf("/endpoints/%s/%s/%d", gitPath, deployName, deployID),
+			deployType: "inference",
+		}
+	case types.FinetuneType:
+		return notificationTemplate{
+			title:   fmt.Sprintf("Finetune %s/%d Deployed Successfully", deployName, deployID),
+			content: fmt.Sprintf("Your Finetune instance %s/%d has been deployed and is running successfully.", deployName, deployID),
+			url:     fmt.Sprintf("/finetune/%s/%s/%d", gitPath, deployName, deployID),
+		}
+	case types.EvaluationType:
+		return notificationTemplate{
+			title:      fmt.Sprintf("Evaluation %s Starts Running", deployName),
+			content:    fmt.Sprintf("Your Evaluation task %s starts running successfully.", deployName),
+			deployType: "evaluation",
+		}
+	case types.ServerlessType:
+		return notificationTemplate{
+			title:      "Serverless Deployed Successfully",
+			content:    "Your Serverless instance has been deployed and is running successfully.",
+			deployType: "serverless",
+		}
+	default:
+		return notificationTemplate{
+			title:   "Instance Deployed Successfully",
+			content: "Your instance has been deployed and is running successfully.",
 		}
 	}
 }

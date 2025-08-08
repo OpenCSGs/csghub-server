@@ -3,24 +3,26 @@ package component
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"time"
 
 	"github.com/google/uuid"
+	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
-	"opencsg.com/csghub-server/mq"
 )
 
 type discussionComponentImpl struct {
-	repoCompo       RepoComponent
-	discussionStore database.DiscussionStore
-	repoStore       database.RepoStore
-	userStore       database.UserStore
-	sysMQ           mq.MessageQueue
+	repoCompo             RepoComponent
+	discussionStore       database.DiscussionStore
+	repoStore             database.RepoStore
+	userStore             database.UserStore
+	notificationSvcClient rpc.NotificationSvcClient
+	config                *config.Config
 }
 
 type DiscussionComponent interface {
@@ -47,8 +49,10 @@ func NewDiscussionComponent(config *config.Config) (DiscussionComponent, error) 
 		discussionStore: ds,
 		repoStore:       rs,
 		userStore:       us,
-		sysMQ:           mq.SystemMQ,
 		repoCompo:       repoCompo,
+		notificationSvcClient: rpc.NewNotificationSvcHttpClient(fmt.Sprintf("%s:%d", config.Notification.Host, config.Notification.Port),
+			rpc.AuthWithApiKey(config.APIToken)),
+		config: config,
 	}, nil
 }
 
@@ -189,6 +193,16 @@ func (c *discussionComponentImpl) CreateDiscussionComment(ctx context.Context, r
 		return nil, fmt.Errorf("failed to find discussion by id '%d': %w", req.CommentableID, err)
 	}
 
+	//TOOD: support other discussionable type, like collection
+	if discussion.DiscussionableType != database.DiscussionableTypeRepo {
+		return nil, fmt.Errorf("discussion '%d' is not a repo discussion", discussion.ID)
+	}
+
+	repo, err := c.checkRepoReadAccess(ctx, discussion.DiscussionableID, req.CurrentUser)
+	if err != nil {
+		return nil, err
+	}
+
 	//get user by username
 	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
 	if err != nil {
@@ -205,18 +219,16 @@ func (c *discussionComponentImpl) CreateDiscussionComment(ctx context.Context, r
 		return nil, fmt.Errorf("failed to create discussion comment: %w", err)
 	}
 
-	if user.UUID != discussion.User.UUID && c.sysMQ != nil {
-		repo, err := c.checkRepoReadAccess(ctx, discussion.DiscussionableID, req.CurrentUser)
-		if err != nil {
-			return nil, err
-		}
-		go func(repoType types.RepositoryType, repoPath string, senderUUID string, userUUIDs []string) {
-			err = c.sendCommentMessage(ctx, repoType, repoPath, senderUUID, userUUIDs)
+	if user.UUID != discussion.User.UUID {
+		go func() {
+			notificationCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			err = c.sendCommentMessage(notificationCtx, repo.RepositoryType, repo.Path, user.UUID, []string{discussion.User.UUID})
 			if err != nil {
-				slog.Error("failed to send comment message", slog.String("repoPath", repoPath), slog.String("repoType", repoPath),
-					slog.String("senderUUID", senderUUID), slog.Any("userUUIDs", userUUIDs), slog.Any("err", err))
+				slog.Error("failed to send comment message", slog.String("repoPath", repo.Path), slog.String("repoType", string(repo.RepositoryType)),
+					slog.String("senderUUID", user.UUID), slog.Any("userUUIDs", []string{discussion.User.UUID}), slog.Any("err", err))
 			}
-		}(repo.RepositoryType, repo.Path, user.UUID, []string{discussion.User.UUID})
+		}()
 	}
 
 	return &types.CreateCommentResponse{
@@ -331,9 +343,28 @@ func (c *discussionComponentImpl) sendCommentMessage(ctx context.Context, repoTy
 		CreateAt:         time.Now(),
 		ClickActionURL:   url,
 	}
-	err := c.sysMQ.PublishSiteInternalMsg(msg)
+	msgBytes, err := json.Marshal(msg)
 	if err != nil {
-		return fmt.Errorf("failed to publish site msg, msg: %+v, err: %w", msg, err)
+		return fmt.Errorf("failed to marshal message, err: %w", err)
+	}
+	notificationMsg := types.MessageRequest{
+		Scenario:   types.MessageScenarioInternalNotification,
+		Parameters: string(msgBytes),
+		Priority:   types.MessagePriorityHigh,
+	}
+
+	var sendErr error
+	retryCount := c.config.Notification.NotificationRetryCount
+	for i := range retryCount {
+		if sendErr = c.notificationSvcClient.Send(ctx, &notificationMsg); sendErr == nil {
+			break
+		}
+		if i < retryCount-1 {
+			slog.Warn("failed to send notification, retrying", "notification_msg", notificationMsg, "attempt", i+1, "error", sendErr.Error())
+		}
+	}
+	if sendErr != nil {
+		return fmt.Errorf("failed to send notification after %d attempts, err: %w", retryCount, sendErr)
 	}
 	return nil
 }

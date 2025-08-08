@@ -13,6 +13,8 @@ type DeployConfig struct {
 	PublicRootDomain        string
 	SSHDomain               string
 	//download lfs object from internal s3 address
-	S3Internal   bool
-	IsMasterHost bool
+	S3Internal           bool
+	IsMasterHost         bool
+	APIToken             string
+	NotificationEndpoint string
 }

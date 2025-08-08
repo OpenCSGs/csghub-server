@@ -10,10 +10,6 @@ import (
 )
 
 const DefaultMessageTTL = 7 * 24 * time.Hour
-
-const TaskStatusPending = "pending"
-const TaskStatusCompleted = "completed"
-
 const MaxErrorMsgLength = 255
 
 type ListNotificationsParams struct {
@@ -35,7 +31,11 @@ type NotificationStore interface {
 
 	GetUnreadCount(ctx context.Context, uid string) (int64, error)
 	MarkAsRead(ctx context.Context, uid string, ids []int64) error
+	MarkAsUnread(ctx context.Context, uid string, ids []int64) error
 	MarkAllAsRead(ctx context.Context, uid string) error
+	MarkAllAsUnread(ctx context.Context, uid string) error
+	DeleteNotifications(ctx context.Context, uid string, ids []int64) error
+	DeleteAllNotifications(ctx context.Context, uid string) error
 	CreateNotificationMessageForUsers(ctx context.Context, msg *NotificationMessage, userUUIDs []string) error
 	IsNotificationMessageExists(ctx context.Context, msgUUID string) (bool, error)
 	CreateNotificationMessage(ctx context.Context, msg *NotificationMessage) error
@@ -168,11 +168,64 @@ func (s *NotificationStoreImpl) MarkAsRead(ctx context.Context, uid string, ids 
 	return nil
 }
 
+func (s *NotificationStoreImpl) MarkAsUnread(ctx context.Context, uid string, ids []int64) error {
+	_, err := s.db.Operator.Core.NewUpdate().
+		Model(&NotificationUserMessage{}).
+		Where("user_uuid =?", uid).
+		Where("id IN (?)", bun.In(ids)).
+		Set("read_at = ?", nil).
+		Exec(ctx)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (s *NotificationStoreImpl) MarkAllAsRead(ctx context.Context, uid string) error {
 	_, err := s.db.Operator.Core.NewUpdate().
 		Model(&NotificationUserMessage{}).
 		Where("user_uuid =?", uid).
+		Where("read_at IS NULL OR read_at = '0001-01-01 00:00:00'").
+		Where("expire_at > ?", time.Now()).
 		Set("read_at = ?", time.Now()).
+		Exec(ctx)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *NotificationStoreImpl) MarkAllAsUnread(ctx context.Context, uid string) error {
+	_, err := s.db.Operator.Core.NewUpdate().
+		Model(&NotificationUserMessage{}).
+		Where("user_uuid =?", uid).
+		Where("read_at IS NOT NULL AND read_at != '0001-01-01 00:00:00'").
+		Where("expire_at > ?", time.Now()).
+		Set("read_at = ?", nil).
+		Exec(ctx)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *NotificationStoreImpl) DeleteNotifications(ctx context.Context, uid string, ids []int64) error {
+	_, err := s.db.Operator.Core.NewDelete().
+		Model(&NotificationUserMessage{}).
+		Where("user_uuid =?", uid).
+		Where("id IN (?)", bun.In(ids)).
+		Exec(ctx)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *NotificationStoreImpl) DeleteAllNotifications(ctx context.Context, uid string) error {
+	_, err := s.db.Operator.Core.NewDelete().
+		Model(&NotificationUserMessage{}).
+		Where("user_uuid =?", uid).
+		Where("expire_at > ?", time.Now()).
 		Exec(ctx)
 	if err != nil {
 		return err
@@ -439,16 +492,18 @@ type NotificationSetting struct {
 }
 
 type NotificationMessage struct {
-	ID               int64  `bun:"column:id,pk,autoincrement"`
-	MsgUUID          string `bun:"column:msg_uuid,notnull,unique"`
-	GroupID          string `bun:"column:group_id"`
-	NotificationType string `bun:"column:notification_type,notnull"`
-	SenderUUID       string `bun:"column:sender_uuid"`
-	Summary          string `bun:"column:summary,notnull"`
-	Title            string `bun:"column:title,notnull"`
-	Content          string `bun:"column:content,notnull"`
-	ActionURL        string `bun:"column:action_url"`
-	Priority         int    `bun:"column:priority,notnull,default:0"`
+	ID               int64          `bun:"column:id,pk,autoincrement"`
+	MsgUUID          string         `bun:"column:msg_uuid,notnull,unique"`
+	GroupID          string         `bun:"column:group_id"`
+	NotificationType string         `bun:"column:notification_type,notnull"`
+	SenderUUID       string         `bun:"column:sender_uuid"`
+	Summary          string         `bun:"column:summary,notnull"`
+	Title            string         `bun:"column:title,notnull"`
+	Content          string         `bun:"column:content,notnull"`
+	Template         string         `bun:"column:template"`
+	Payload          map[string]any `bun:"column:payload,type:jsonb"`
+	ActionURL        string         `bun:"column:action_url"`
+	Priority         int            `bun:"column:priority,notnull,default:0"`
 	times
 }
 
@@ -463,19 +518,21 @@ type NotificationUserMessage struct {
 }
 
 type NotificationUserMessageView struct {
-	ID               int64     `bun:"column:id"`
-	MsgUUID          string    `bun:"column:msg_uuid"`
-	NotificationType string    `bun:"column:notification_type"`
-	SenderUUID       string    `bun:"column:sender_uuid"`
-	Summary          string    `bun:"column:summary"`
-	Title            string    `bun:"column:title"`
-	Content          string    `bun:"column:content"`
-	ActionURL        string    `bun:"column:action_url"`
-	Priority         int       `bun:"column:priority"`
-	UserUUID         string    `bun:"column:user_uuid"`
-	ReadAt           time.Time `bun:"column:read_at"`
-	IsNotified       bool      `bun:"column:is_notified"`
-	ExpireAt         time.Time `bun:"column:expire_at,type:timestamp"`
+	ID               int64          `bun:"column:id"`
+	MsgUUID          string         `bun:"column:msg_uuid"`
+	NotificationType string         `bun:"column:notification_type"`
+	SenderUUID       string         `bun:"column:sender_uuid"`
+	Summary          string         `bun:"column:summary"`
+	Title            string         `bun:"column:title"`
+	Content          string         `bun:"column:content"`
+	Template         string         `bun:"column:template"`
+	Payload          map[string]any `bun:"column:payload,type:jsonb"`
+	ActionURL        string         `bun:"column:action_url"`
+	Priority         int            `bun:"column:priority"`
+	UserUUID         string         `bun:"column:user_uuid"`
+	ReadAt           time.Time      `bun:"column:read_at"`
+	IsNotified       bool           `bun:"column:is_notified"`
+	ExpireAt         time.Time      `bun:"column:expire_at,type:timestamp"`
 	times
 }
 

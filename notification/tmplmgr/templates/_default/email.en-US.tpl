@@ -1,3 +1,7 @@
+{{/* title section */}}
+Notification
+---
+{{/* content section */}}
 <html>
     <p> 
         Notification

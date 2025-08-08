@@ -8,9 +8,11 @@ import (
 
 type NotifyRequest struct {
 	// template variables OR direct message object
-	MessageData any
+	Message any
+	// payload data for template rendering
+	Payload any
 	// template formated output
-	Payload string
+	FormattedData *types.TemplateOutput
 	// target recipients
 	Receiver *Receiver
 	// message priority

@@ -330,6 +330,20 @@ func (c *modelComponentImpl) Create(ctx context.Context, req *types.CreateModelR
 		URL:       model.Repository.Path,
 	}
 
+	go func() {
+		notificationCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		repoNotificationReq := types.RepoNotificationReq{
+			RepoType:  types.ModelRepo,
+			RepoPath:  model.Repository.Path,
+			Operation: types.OperationCreate,
+			UserUUID:  dbRepo.User.UUID,
+		}
+		if err = c.repoComponent.SendAssetManagementMsg(notificationCtx, repoNotificationReq); err != nil {
+			slog.Error("failed to send asset management notification message", slog.Any("req", repoNotificationReq), slog.Any("err", err))
+		}
+	}()
+
 	return resModel, nil
 }
 
@@ -397,7 +411,7 @@ func (c *modelComponentImpl) Delete(ctx context.Context, namespace, name, curren
 		Name:      name,
 		RepoType:  types.ModelRepo,
 	}
-	_, err = c.repoComponent.DeleteRepo(ctx, deleteDatabaseRepoReq)
+	repo, err := c.repoComponent.DeleteRepo(ctx, deleteDatabaseRepoReq)
 	if err != nil {
 		return fmt.Errorf("failed to delete repo of model, error: %w", err)
 	}
@@ -406,6 +420,21 @@ func (c *modelComponentImpl) Delete(ctx context.Context, namespace, name, curren
 	if err != nil {
 		return fmt.Errorf("failed to delete database model, error: %w", err)
 	}
+
+	go func() {
+		notificationCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		repoNotificationReq := types.RepoNotificationReq{
+			RepoType:  types.ModelRepo,
+			RepoPath:  model.Repository.Path,
+			Operation: types.OperationDelete,
+			UserUUID:  repo.User.UUID,
+		}
+		if err = c.repoComponent.SendAssetManagementMsg(notificationCtx, repoNotificationReq); err != nil {
+			slog.Error("failed to send asset management notification message", slog.Any("req", repoNotificationReq), slog.Any("err", err))
+		}
+	}()
+
 	return nil
 }
 

@@ -5,8 +5,10 @@ package component
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/alibabacloud-go/tea/tea"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/types"
@@ -40,8 +42,17 @@ func TestSpaceComponent_Create(t *testing.T) {
 		User: database.User{
 			Username: "user",
 			Email:    "foo@bar.com",
+			UUID:     "user-uuid",
 		},
+		Path: "ns/n",
 	}, nil)
+
+	sc.mocks.components.repo.EXPECT().SendAssetManagementMsg(mock.Anything, types.RepoNotificationReq{
+		RepoType:  types.SpaceRepo,
+		Operation: types.OperationCreate,
+		RepoPath:  "ns/n",
+		UserUUID:  "user-uuid",
+	}).Return(nil)
 
 	sc.mocks.stores.SpaceMock().EXPECT().Create(ctx, database.Space{
 		RepositoryID: 321,
@@ -103,6 +114,7 @@ func TestSpaceComponent_Create(t *testing.T) {
 			Username:      "user",
 		},
 	})
+	time.Sleep(10 * time.Millisecond)
 	require.Nil(t, err)
 
 	require.Equal(t, &types.Space{
@@ -114,6 +126,7 @@ func TestSpaceComponent_Create(t *testing.T) {
 		Secrets:    "sss",
 		Hardware:   `{"memory": "foo"}`,
 		Creator:    "user",
+		Path:       "ns/n",
 	}, space)
 
 }

@@ -2,12 +2,16 @@ package component
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	mockgit "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/git/membership"
+	mockrpc "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rpc"
 	mockdb "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/store/database"
@@ -187,6 +191,10 @@ func TestMemberComponent_AddMember(t *testing.T) {
 	t.Run("add memberfor gitea", func(t *testing.T) {
 		config := &config.Config{}
 		config.GitServer.Type = types.GitServerTypeGitea
+		config.Notification.NotificationRetryCount = 3
+		config.APIToken = "test-api-token"
+		config.Notification.Host = "localhost"
+		config.Notification.Port = 8095
 
 		org := &database.Organization{
 			ID:   1,
@@ -210,6 +218,7 @@ func TestMemberComponent_AddMember(t *testing.T) {
 		mockUserStore.EXPECT().FindByUsername(mock.Anything, user.Username).Return(*user, nil).Once()
 
 		mockMemberStore := mockdb.NewMockMemberStore(t)
+		mockMemberStore.EXPECT().UserUUIDsByOrganizationID(mock.Anything, org.ID).Return([]string{"user0"}, nil).Once()
 		// operator is org admin
 		mockMemberStore.EXPECT().Find(mock.Anything, org.ID, operator.ID).Return(&database.Member{
 			Role: string(membership.RoleAdmin),
@@ -222,23 +231,44 @@ func TestMemberComponent_AddMember(t *testing.T) {
 		mockGitMemberShip := mockgit.NewMockGitMemerShip(t)
 		// add git membership
 		mockGitMemberShip.EXPECT().AddMember(mock.Anything, org.Name, user.Username, membership.RoleAdmin).Return(nil).Once()
+		// add notification rpc mock
+		mockNotificationRpc := mockrpc.NewMockNotificationSvcClient(t)
+		var wg sync.WaitGroup
+		wg.Add(1)
+		mockNotificationRpc.EXPECT().Send(mock.Anything, mock.MatchedBy(func(req *types.MessageRequest) bool {
+			defer wg.Done()
+			if req.Scenario != types.MessageScenarioInternalNotification || req.Priority != types.MessagePriorityHigh {
+				return false
+			}
 
+			var msg types.NotificationMessage
+			if err := json.Unmarshal([]byte(req.Parameters), &msg); err != nil {
+				return false
+			}
+
+			return msg.UserUUIDs[0] == "user0" &&
+				msg.NotificationType == types.NotificationOrganization &&
+				msg.Title == "Organization member change" &&
+				msg.Content == fmt.Sprintf("New member %s joined organization %s.", user.Username, org.Name)
+		})).Return(nil).Once()
 		mc := &memberComponentImpl{
-			orgStore:      mockOrgStore,
-			userStore:     mockUserStore,
-			memberStore:   mockMemberStore,
-			gitMemberShip: mockGitMemberShip,
-			config:        config,
+			orgStore:              mockOrgStore,
+			userStore:             mockUserStore,
+			memberStore:           mockMemberStore,
+			gitMemberShip:         mockGitMemberShip,
+			config:                config,
+			notificationSvcClient: mockNotificationRpc,
 		}
 
 		err := mc.AddMember(context.Background(), org.Name, user.Username, operator.Username, string(membership.RoleAdmin))
 		require.Empty(t, err)
-
+		wg.Wait()
 	})
 
 	t.Run("add member for gitaly", func(t *testing.T) {
 		config := &config.Config{}
 		config.GitServer.Type = types.GitServerTypeGitaly
+		config.Notification.NotificationRetryCount = 3
 
 		org := &database.Organization{
 			ID:   1,
@@ -262,6 +292,7 @@ func TestMemberComponent_AddMember(t *testing.T) {
 		mockUserStore.EXPECT().FindByUsername(mock.Anything, user.Username).Return(*user, nil).Once()
 
 		mockMemberStore := mockdb.NewMockMemberStore(t)
+		mockMemberStore.EXPECT().UserUUIDsByOrganizationID(mock.Anything, org.ID).Return([]string{"user0"}, nil).Once()
 		// operator is org admin
 		mockMemberStore.EXPECT().Find(mock.Anything, org.ID, operator.ID).Return(&database.Member{
 			Role: string(membership.RoleAdmin),
@@ -270,17 +301,41 @@ func TestMemberComponent_AddMember(t *testing.T) {
 		mockMemberStore.EXPECT().Find(mock.Anything, org.ID, user.ID).Return(nil, nil).Once()
 		// add user to org as member of role admin
 		mockMemberStore.EXPECT().Add(mock.Anything, org.ID, user.ID, string(membership.RoleAdmin)).Return(nil).Once()
+		mockNotificationRpc := mockrpc.NewMockNotificationSvcClient(t)
+		var wg sync.WaitGroup
+		wg.Add(1)
+		mockNotificationRpc.EXPECT().
+			Send(mock.Anything, mock.MatchedBy(func(req *types.MessageRequest) bool {
+				defer wg.Done()
+				if req.Scenario != types.MessageScenarioInternalNotification || req.Priority != types.MessagePriorityHigh {
+					return false
+				}
+
+				var msg types.NotificationMessage
+				if err := json.Unmarshal([]byte(req.Parameters), &msg); err != nil {
+					return false
+				}
+
+				res := msg.UserUUIDs[0] == "user0" &&
+					msg.NotificationType == types.NotificationOrganization &&
+					msg.Title == "Organization member change" &&
+					msg.Content == fmt.Sprintf("New member %s joined organization %s.", user.Username, org.Name)
+				return res
+			})).
+			Return(nil).Once()
 
 		mc := &memberComponentImpl{
-			orgStore:      mockOrgStore,
-			userStore:     mockUserStore,
-			memberStore:   mockMemberStore,
-			gitMemberShip: nil,
-			config:        config,
+			orgStore:              mockOrgStore,
+			userStore:             mockUserStore,
+			memberStore:           mockMemberStore,
+			gitMemberShip:         nil,
+			config:                config,
+			notificationSvcClient: mockNotificationRpc,
 		}
 
 		err := mc.AddMember(context.Background(), org.Name, user.Username, operator.Username, string(membership.RoleAdmin))
 		require.Empty(t, err)
+		wg.Wait()
 	})
 
 }
@@ -289,6 +344,7 @@ func TestMemberComponent_Delete(t *testing.T) {
 	t.Run("delete memberfor gitea", func(t *testing.T) {
 		config := &config.Config{}
 		config.GitServer.Type = types.GitServerTypeGitea
+		config.Notification.NotificationRetryCount = 3
 
 		org := &database.Organization{
 			ID:   1,
@@ -312,6 +368,7 @@ func TestMemberComponent_Delete(t *testing.T) {
 		mockUserStore.EXPECT().FindByUsername(mock.Anything, user.Username).Return(*user, nil).Once()
 
 		mockMemberStore := mockdb.NewMockMemberStore(t)
+		mockMemberStore.EXPECT().UserUUIDsByOrganizationID(mock.Anything, org.ID).Return([]string{"user0"}, nil).Once()
 		// operator is org admin
 		mockMemberStore.EXPECT().Find(mock.Anything, org.ID, operator.ID).Return(&database.Member{
 			Role: string(membership.RoleAdmin),
@@ -331,23 +388,46 @@ func TestMemberComponent_Delete(t *testing.T) {
 		mockGitMemberShip := mockgit.NewMockGitMemerShip(t)
 		// add git membership
 		mockGitMemberShip.EXPECT().RemoveMember(mock.Anything, org.Name, user.Username, membership.RoleAdmin).Return(nil).Once()
+		mockNotificationRpc := mockrpc.NewMockNotificationSvcClient(t)
+
+		var wg sync.WaitGroup
+		wg.Add(1)
+		mockNotificationRpc.EXPECT().
+			Send(mock.Anything, mock.MatchedBy(func(req *types.MessageRequest) bool {
+				defer wg.Done()
+				if req.Scenario != types.MessageScenarioInternalNotification || req.Priority != types.MessagePriorityHigh {
+					return false
+				}
+
+				var msg types.NotificationMessage
+				if err := json.Unmarshal([]byte(req.Parameters), &msg); err != nil {
+					return false
+				}
+
+				return msg.NotificationType == types.NotificationOrganization &&
+					msg.Title == "Organization member change" &&
+					msg.Content == fmt.Sprintf("%s left the organization %s.", user.Username, org.Name)
+			})).
+			Return(nil).Once()
 
 		mc := &memberComponentImpl{
-			orgStore:      mockOrgStore,
-			userStore:     mockUserStore,
-			memberStore:   mockMemberStore,
-			gitMemberShip: mockGitMemberShip,
-			config:        config,
+			orgStore:              mockOrgStore,
+			userStore:             mockUserStore,
+			memberStore:           mockMemberStore,
+			gitMemberShip:         mockGitMemberShip,
+			config:                config,
+			notificationSvcClient: mockNotificationRpc,
 		}
 
 		err := mc.Delete(context.Background(), org.Name, user.Username, operator.Username, string(membership.RoleAdmin))
 		require.Empty(t, err)
-
+		wg.Wait()
 	})
 
 	t.Run("delete member for gitaly", func(t *testing.T) {
 		config := &config.Config{}
 		config.GitServer.Type = types.GitServerTypeGitaly
+		config.Notification.NotificationRetryCount = 3
 
 		org := &database.Organization{
 			ID:   1,
@@ -371,6 +451,7 @@ func TestMemberComponent_Delete(t *testing.T) {
 		mockUserStore.EXPECT().FindByUsername(mock.Anything, user.Username).Return(*user, nil).Once()
 
 		mockMemberStore := mockdb.NewMockMemberStore(t)
+		mockMemberStore.EXPECT().UserUUIDsByOrganizationID(mock.Anything, org.ID).Return([]string{"user0"}, nil).Once()
 		// operator is org admin
 		mockMemberStore.EXPECT().Find(mock.Anything, org.ID, operator.ID).Return(&database.Member{
 			Role: string(membership.RoleAdmin),
@@ -386,19 +467,38 @@ func TestMemberComponent_Delete(t *testing.T) {
 		}, nil).Once()
 		//  delete user role
 		mockMemberStore.EXPECT().Delete(mock.Anything, org.ID, user.ID, string(membership.RoleAdmin)).Return(nil).Once()
+		mockNotificationRpc := mockrpc.NewMockNotificationSvcClient(t)
+		var wg sync.WaitGroup
+		wg.Add(1)
+		mockNotificationRpc.EXPECT().Send(mock.Anything, mock.MatchedBy(func(req *types.MessageRequest) bool {
+			defer wg.Done()
+			if req.Scenario != types.MessageScenarioInternalNotification || req.Priority != types.MessagePriorityHigh {
+				return false
+			}
+
+			var msg types.NotificationMessage
+			if err := json.Unmarshal([]byte(req.Parameters), &msg); err != nil {
+				return false
+			}
+
+			return msg.NotificationType == types.NotificationOrganization &&
+				msg.Title == "Organization member change" &&
+				msg.Content == fmt.Sprintf("%s left the organization %s.", user.Username, org.Name)
+		})).Return(nil).Once()
 
 		mc := &memberComponentImpl{
-			orgStore:      mockOrgStore,
-			userStore:     mockUserStore,
-			memberStore:   mockMemberStore,
-			gitMemberShip: nil,
-			config:        config,
+			orgStore:              mockOrgStore,
+			userStore:             mockUserStore,
+			memberStore:           mockMemberStore,
+			gitMemberShip:         nil,
+			config:                config,
+			notificationSvcClient: mockNotificationRpc,
 		}
 
 		err := mc.Delete(context.Background(), org.Name, user.Username, operator.Username, string(membership.RoleAdmin))
 		require.Empty(t, err)
+		wg.Wait()
 	})
-
 }
 
 func TestMemberComponent_OrgMembers(t *testing.T) {

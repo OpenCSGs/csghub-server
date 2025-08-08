@@ -2,6 +2,7 @@ package email
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 
@@ -11,6 +12,7 @@ import (
 	notifychannel "opencsg.com/csghub-server/notification/notifychannel"
 	emailclient "opencsg.com/csghub-server/notification/notifychannel/channel/email/client"
 	emailworkflow "opencsg.com/csghub-server/notification/notifychannel/channel/email/workflow"
+	"opencsg.com/csghub-server/notification/utils"
 	"opencsg.com/csghub-server/notification/workflow"
 )
 
@@ -38,18 +40,25 @@ func (s *EmailChannel) Send(ctx context.Context, req *notifychannel.NotifyReques
 	}
 
 	var emailReq types.EmailReq
-	if content, ok := req.Receiver.GetMetadata("content").(types.NotificationEmailContent); ok {
-		emailReq.Subject = content.Subject
-		emailReq.Attachments = content.Attachments
-		emailReq.Source = content.Source
-		emailReq.ContentType = content.ContentType
+	if req.Message != nil {
+		if extractedEmailReq, ok := req.Message.(types.EmailReq); ok {
+			emailReq = extractedEmailReq
+		} else {
+			slog.Warn("invalid message format, using default email settings", "message", req.Message, "type", fmt.Sprintf("%T", req.Message))
+		}
 	}
-	emailReq.Body = req.Payload
+
+	if req.FormattedData != nil {
+		emailReq.Subject = req.FormattedData.Title
+		emailReq.Body = req.FormattedData.Content
+	}
+
 	if emailReq.ContentType == "" {
 		emailReq.ContentType = types.ContentTypeTextHTML
 	}
-	if emailReq.Subject == "" {
-		emailReq.Subject = "Notification"
+
+	if emailReq.Source == "" {
+		emailReq.Source = types.EmailSourceUser
 	}
 
 	if req.Receiver.IsBroadcast {
@@ -61,14 +70,35 @@ func (s *EmailChannel) Send(ctx context.Context, req *notifychannel.NotifyReques
 }
 
 func (s *EmailChannel) sendEmailToUsers(msg types.EmailReq) error {
-	toList := msg.To
-	for _, to := range toList {
-		msg.To = []string{to}
-		if err := s.emailService.Send(msg); err != nil {
-			slog.Error("failed to send email to user", "error", err)
+	if len(msg.To) == 0 {
+		slog.Error("no emails to send", "email", msg)
+		return nil
+	}
+
+	var failedEmails []string
+	var successCount int
+
+	for i, email := range msg.To {
+		individualReq := msg
+		individualReq.To = []string{email}
+		if err := s.emailService.Send(individualReq); err != nil {
+			slog.Error("failed to send email to user", "error", err, "index", i, "totalEmails", len(msg.To))
+			failedEmails = append(failedEmails, email)
 			continue
 		}
+		successCount++
+		slog.Debug("send email to user successfully", "email", email, "index", i, "totalEmails", len(msg.To))
 	}
+
+	if successCount == 0 && len(failedEmails) > 0 {
+		return utils.NewErrSendMsg(errors.New("failed to send email"), fmt.Sprintf("failed emails: %v", failedEmails))
+	}
+
+	if len(failedEmails) > 0 {
+		slog.Warn("some emails failed to send", "failedCount", len(failedEmails), "successCount", successCount, "failedEmails", failedEmails)
+	}
+
+	slog.Info("send email to users successfully", "successCount", successCount, "failedEmails", failedEmails)
 	return nil
 }
 
@@ -84,7 +114,7 @@ func (s *EmailChannel) broadcastEmail(ctx context.Context, msg types.EmailReq) e
 	}
 	we, err := workflowClient.ExecuteWorkflow(ctx, workflowOptions, emailworkflow.BroadcastEmailWorkflow, msg, s.config.Notification.BroadcastEmailPageSize)
 	if err != nil {
-		return fmt.Errorf("failed to start broadcast email workflow: %w", err)
+		return utils.NewErrSendMsg(err, "failed to start broadcast email workflow")
 	}
 	slog.Info("start broadcast email workflow", slog.Any("workflow id", we.GetID()))
 	return nil

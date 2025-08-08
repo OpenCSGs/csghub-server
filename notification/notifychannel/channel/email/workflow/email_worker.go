@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"fmt"
+	"log/slog"
 
 	temporalActivity "go.temporal.io/sdk/activity"
 	temporalWorker "go.temporal.io/sdk/worker"
@@ -28,7 +29,18 @@ func createBroadcastEmailWorker(config *config.Config, temporalClient temporal.C
 	storage := database.NewNotificationStore()
 	userSvcAddr := fmt.Sprintf("%s:%d", config.User.Host, config.User.Port)
 	userSvcClient := rpc.NewUserSvcHttpClient(userSvcAddr, rpc.AuthWithApiKey(config.APIToken))
-	emailService := emailclient.NewEmailService(config)
+
+	var emailService emailclient.EmailService
+	var err error
+	if config.Notification.DirectMailEnabled {
+		emailService, err = emailclient.NewDirectMailClient(config)
+		if err != nil {
+			slog.Error("failed to create direct mail client", "error", err)
+			return
+		}
+	} else {
+		emailService = emailclient.NewEmailService(config)
+	}
 
 	act := activity.NewBroadcastEmailActivity(storage, userSvcClient, emailService)
 	beWorker := temporalClient.NewWorker(WorkflowBroadcastEmailQueueName, temporalWorker.Options{})

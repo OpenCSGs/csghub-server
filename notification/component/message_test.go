@@ -63,7 +63,7 @@ func TestMarkAsRead(t *testing.T) {
 	nmc := component.NewMockNotificationComponent(db)
 	ctx := context.Background()
 	uid := "test-uuid"
-	req := types.MarkNotificationsAsReadReq{
+	req := types.BatchNotificationOperationReq{
 		MarkAll: false,
 		IDs:     []int64{1, 2, 3},
 	}
@@ -346,4 +346,70 @@ func TestPollNewNotifications_EmptyMessages(t *testing.T) {
 	assert.Len(t, result.Data, 0)
 	// Should have longer poll time when no messages
 	assert.True(t, result.NextPollTime.After(time.Now().Add(30*time.Second)))
+}
+
+func TestMarkAsUnread(t *testing.T) {
+	t.Run("mark as unread", func(t *testing.T) {
+		db := mockdb.NewMockNotificationStore(t)
+		nmc := component.NewMockNotificationComponent(db)
+
+		ctx := context.Background()
+		uid := "test-uuid"
+		req := types.BatchNotificationOperationReq{
+			MarkAll: false,
+			IDs:     []int64{1, 2, 3},
+		}
+		db.EXPECT().MarkAsUnread(ctx, uid, req.IDs).Return(nil)
+
+		err := nmc.MarkAsUnread(ctx, uid, req)
+		assert.NoError(t, err)
+	})
+
+	t.Run("mark all as unread", func(t *testing.T) {
+		db := mockdb.NewMockNotificationStore(t)
+		nmc := component.NewMockNotificationComponent(db)
+
+		ctx := context.Background()
+		uid := "test-uuid"
+		req := types.BatchNotificationOperationReq{
+			MarkAll: true,
+		}
+		db.EXPECT().MarkAllAsUnread(ctx, uid).Return(nil)
+
+		err := nmc.MarkAsUnread(ctx, uid, req)
+		assert.NoError(t, err)
+	})
+}
+
+func TestDeleteNotifications(t *testing.T) {
+	t.Run("delete notifications", func(t *testing.T) {
+		db := mockdb.NewMockNotificationStore(t)
+		nmc := component.NewMockNotificationComponent(db)
+
+		ctx := context.Background()
+		uid := "test-uuid"
+		req := types.BatchNotificationOperationReq{
+			MarkAll: false,
+			IDs:     []int64{1, 2, 3},
+		}
+		db.EXPECT().DeleteNotifications(ctx, uid, req.IDs).Return(nil)
+
+		err := nmc.DeleteNotifications(ctx, uid, req)
+		assert.NoError(t, err)
+	})
+
+	t.Run("delete all notifications", func(t *testing.T) {
+		db := mockdb.NewMockNotificationStore(t)
+		nmc := component.NewMockNotificationComponent(db)
+
+		ctx := context.Background()
+		uid := "test-uuid"
+		req := types.BatchNotificationOperationReq{
+			MarkAll: true,
+		}
+		db.EXPECT().DeleteAllNotifications(ctx, uid).Return(nil)
+
+		err := nmc.DeleteNotifications(ctx, uid, req)
+		assert.NoError(t, err)
+	})
 }

@@ -1,15 +1,16 @@
 package handler
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/notification/component"
 )
@@ -17,7 +18,6 @@ import (
 // NotifierMessageHandler handles notifications related requests
 type NotificationHandler struct {
 	nmc component.NotificationComponent
-	mac component.MailComponent
 }
 
 func NewNotificationHandler(conf *config.Config) (*NotificationHandler, error) {
@@ -26,15 +26,9 @@ func NewNotificationHandler(conf *config.Config) (*NotificationHandler, error) {
 		slog.Error("Failed to create notification component", slog.Any("error", err))
 		return nil, err
 	}
-	mac, err := component.NewMailComponent(conf)
-	if err != nil {
-		slog.Error("Failed to create mail component", slog.Any("error", err))
-		return nil, err
-	}
 
 	return &NotificationHandler{
 		nmc: nmc,
-		mac: mac,
 	}, nil
 }
 
@@ -46,11 +40,10 @@ func NewNotifierMessageHandlerWithMock(nmc component.NotificationComponent) *Not
 }
 
 // GetUnreadCount Get the count of unread notifications
+// @Security ApiKey
 // @Summary Get unread notifications count
 // @Description Retrieve the number of unread notifications
 // @Tags Notifications
-// @Tags         Access token
-// @Param Authorization header string true "Authorization token (Bearer <token>)"
 // @Produce json
 // @Success 200  {object}  types.Response{data=int} "OK"
 // @Failure 400  {object}  types.APIBadRequest "Bad request"
@@ -73,16 +66,15 @@ func (h *NotificationHandler) GetUnreadCount(c *gin.Context) {
 }
 
 // ListNotifications List all notifications
+// @Security ApiKey
 // @Summary List notifications
 // @Description List all notifications with pagination and filtering options
 // @Tags Notifications
-// @Tags         Access token
 // @Param page query int false "Page number" default(1)
 // @Param page_size query int false "Number of items per page" default(10)
 // @Param notification_type query string false "Type of notification"
 // @Param unread_only query bool false "Only return unread notifications" default(false)
 // @Param title query string false "Notification title"
-// @Param Authorization header string true "Authorization token (Bearer <token>)"
 // @Produce json
 // @Success 200  {object}  types.Response{data=types.NotificationsResp} "OK"
 // @Failure 400  {object}  types.APIBadRequest "Bad request"
@@ -92,16 +84,19 @@ func (h *NotificationHandler) GetUnreadCount(c *gin.Context) {
 func (h *NotificationHandler) ListNotifications(c *gin.Context) {
 	var req types.NotificationsRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
-		httpbase.BadRequest(c, err.Error())
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequestWithExt(c, errorx.ReqBodyFormat(err, nil))
 		return
 	}
 
 	if req.Page <= 0 {
-		httpbase.BadRequest(c, "page must be greater than 0")
+		slog.Error("Bad request format, page must be greater than 0", slog.Any("request", req))
+		httpbase.BadRequestWithExt(c, errorx.ReqBodyFormat(errors.New("page must be greater than 0"), nil))
 		return
 	}
 	if req.PageSize <= 0 {
-		httpbase.BadRequest(c, "page_size must be greater than 0")
+		slog.Error("Bad request format, page_size must be greater than 0", slog.Any("request", req))
+		httpbase.BadRequestWithExt(c, errorx.ReqBodyFormat(errors.New("page_size must be greater than 0"), nil))
 		return
 	}
 
@@ -116,6 +111,7 @@ func (h *NotificationHandler) ListNotifications(c *gin.Context) {
 		httpbase.ServerError(c, err)
 		return
 	}
+
 	messages, total, err := h.nmc.ListNotifications(c.Request.Context(), uuid, req)
 	if err != nil {
 		slog.Error("Failed to list notifications", slog.Any("user_uuid", uuid), slog.Any("request", req), slog.Any("error", err))
@@ -133,13 +129,12 @@ func (h *NotificationHandler) ListNotifications(c *gin.Context) {
 }
 
 // MarkAsRead Mark notifications as read
+// @Security ApiKey
 // @Summary Mark notifications as read
 // @Description Mark specified notifications or all notifications as read
 // @Tags Notifications
-// @Tags         Access token
 // @Accept json
-// @Param Authorization header string true "Authorization token (Bearer <token>)"
-// @Param request body types.MarkNotificationsAsReadReq true "Mark as read request"
+// @Param request body types.BatchNotificationOperationReq true "Mark as read request"
 // @Produce json
 // @Success 200  {object}  types.Response{data=nil} "OK"
 // @Failure 400  {object}  types.APIBadRequest "Bad request"
@@ -147,14 +142,17 @@ func (h *NotificationHandler) ListNotifications(c *gin.Context) {
 // @Failure 500  {object}  types.APIInternalServerError "Internal server error"
 // @Router /notifications/read [put]
 func (h *NotificationHandler) MarkAsRead(c *gin.Context) {
-	var req types.MarkNotificationsAsReadReq
+	var req types.BatchNotificationOperationReq
 	if err := c.ShouldBindJSON(&req); err != nil {
-		httpbase.BadRequest(c, err.Error())
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequestWithExt(c, errorx.ReqBodyFormat(err, nil))
 		return
 	}
 
 	if !req.MarkAll && len(req.IDs) == 0 {
-		httpbase.BadRequest(c, "Please provide message_ids or set mark_all to true")
+		slog.Error("Bad request format, ids or mark_all is required", slog.Any("request", req))
+		ext := errorx.Ctx().Set("body", "ids or mark_all")
+		httpbase.BadRequestWithExt(c, errorx.ReqBodyFormat(errors.New("ids or mark_all is required"), ext))
 		return
 	}
 
@@ -168,13 +166,88 @@ func (h *NotificationHandler) MarkAsRead(c *gin.Context) {
 	httpbase.OK(c, nil)
 }
 
+// MarkAsUnread Mark notifications as unread
+// @Security ApiKey
+// @Summary Mark notifications as unread
+// @Description Mark specified notifications or all notifications as unread
+// @Tags Notifications
+// @Accept json
+// @Param request body types.BatchNotificationOperationReq true "Mark as unread request"
+// @Produce json
+// @Success 200  {object}  types.Response{data=nil} "OK"
+// @Failure 400  {object}  types.APIBadRequest "Bad request"
+// @Failure 401  {object}  types.APIUnauthorized "Unauthorized"
+// @Failure 500  {object}  types.APIInternalServerError "Internal server error"
+// @Router /notifications/unread [put]
+func (h *NotificationHandler) MarkAsUnread(c *gin.Context) {
+	var req types.BatchNotificationOperationReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequestWithExt(c, errorx.ReqBodyFormat(err, nil))
+		return
+	}
+
+	if !req.MarkAll && len(req.IDs) == 0 {
+		slog.Error("Bad request format, ids or mark_all is required", slog.Any("request", req))
+		ext := errorx.Ctx().Set("body", "ids or mark_all")
+		httpbase.BadRequestWithExt(c, errorx.ReqBodyFormat(errors.New("ids or mark_all is required"), ext))
+		return
+	}
+
+	err := h.nmc.MarkAsUnread(c.Request.Context(), httpbase.GetCurrentUserUUID(c), req)
+	if err != nil {
+		slog.Error("Failed to mark as unread", slog.Any("user_uuid", httpbase.GetCurrentUserUUID(c)), slog.Any("request", req), slog.Any("error", err))
+		httpbase.ServerError(c, err)
+		return
+	}
+
+	httpbase.OK(c, nil)
+}
+
+// delete notification
+// @Security ApiKey
+// @Summary Delete notification
+// @Description Delete a notification
+// @Tags Notifications
+// @Accept json
+// @Param request body types.BatchNotificationOperationReq true "Delete notifications request"
+// @Produce json
+// @Success 200  {object}  types.Response{data=nil} "OK"
+// @Failure 400  {object}  types.APIBadRequest "Bad request"
+// @Failure 401  {object}  types.APIUnauthorized "Unauthorized"
+// @Failure 500  {object}  types.APIInternalServerError "Internal server error"
+// @Router /notifications [delete]
+func (h *NotificationHandler) DeleteNotifications(c *gin.Context) {
+	var req types.BatchNotificationOperationReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequestWithExt(c, errorx.ReqBodyFormat(err, nil))
+		return
+	}
+
+	if !req.MarkAll && len(req.IDs) == 0 {
+		slog.Error("Bad request format, ids or mark_all is required", slog.Any("request", req))
+		ext := errorx.Ctx().Set("body", "ids or mark_all")
+		httpbase.BadRequestWithExt(c, errorx.ReqBodyFormat(errors.New("ids or mark_all is required"), ext))
+		return
+	}
+
+	err := h.nmc.DeleteNotifications(c.Request.Context(), httpbase.GetCurrentUserUUID(c), req)
+	if err != nil {
+		slog.Error("Failed to delete notification", slog.Any("user_uuid", httpbase.GetCurrentUserUUID(c)), slog.Any("request", req), slog.Any("error", err))
+		httpbase.ServerError(c, err)
+		return
+	}
+
+	httpbase.OK(c, nil)
+}
+
 // UpdateSubscription Update notification settings
+// @Security ApiKey
 // @Summary Update subscription settings
 // @Description Update the user's notification settings
 // @Tags Notifications
-// @Tags         Access token
 // @Accept json
-// @Param Authorization header string true "Authorization token (Bearer <token>)"
 // @Param request body types.UpdateNotificationReq true "Update subscription request"
 // @Produce json
 // @Success 200  {object}  types.Response{data=nil} "OK"
@@ -185,35 +258,41 @@ func (h *NotificationHandler) MarkAsRead(c *gin.Context) {
 func (h *NotificationHandler) UpdateNotificationSetting(c *gin.Context) {
 	var req types.UpdateNotificationReq
 	if err := c.ShouldBindJSON(&req); err != nil {
-		httpbase.BadRequest(c, err.Error())
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequestWithExt(c, errorx.ReqBodyFormat(err, nil))
 		return
 	}
 	if req.IsEmailNotificationEnabled && req.EmailAddress == "" {
-		httpbase.BadRequest(c, "email_address is required when is_email_notification_enabled is true")
+		slog.Error("Bad request format, email_address is required when is_email_notification_enabled is true", slog.Any("request", req))
+		httpbase.BadRequestWithExt(c, errorx.ReqBodyFormat(errors.New("email_address is required when is_email_notification_enabled is true"), nil))
 		return
 	}
 
 	if req.IsSMSNotificationEnabled && req.PhoneNumber == "" {
-		httpbase.BadRequest(c, "phone_number is required when is_sms_notification_enabled is true")
+		slog.Error("Bad request format, phone_number is required when is_sms_notification_enabled is true", slog.Any("request", req))
+		httpbase.BadRequestWithExt(c, errorx.ReqBodyFormat(errors.New("phone_number is required when is_sms_notification_enabled is true"), nil))
 		return
 	}
 
 	location, err := time.LoadLocation(req.Timezone)
 	if err != nil {
-		httpbase.BadRequest(c, "timezone is invalid")
+		slog.Error("Bad request format, timezone is invalid", slog.Any("request", req))
+		httpbase.BadRequestWithExt(c, errorx.ReqBodyFormat(errors.New("timezone is invalid"), nil))
 		return
 	}
 
 	startTime, err := time.ParseInLocation("15:04", req.DoNotDisturbStart, location)
 	if err != nil {
-		httpbase.BadRequest(c, "do_not_disturb_start is invalid, expected format HH:MM")
+		slog.Error("Bad request format, do_not_disturb_start is invalid, expected format HH:MM", slog.Any("request", req))
+		httpbase.BadRequestWithExt(c, errorx.ReqBodyFormat(errors.New("do_not_disturb_start is invalid, expected format HH:MM"), nil))
 		return
 	}
 	req.DoNotDisturbStartTime = time.Date(2000, 1, 1, startTime.Hour(), startTime.Minute(), 0, 0, time.UTC)
 
 	endTime, err := time.ParseInLocation("15:04", req.DoNotDisturbEnd, location)
 	if err != nil {
-		httpbase.BadRequest(c, "do_not_disturb_end is invalid, expected format HH:MM")
+		slog.Error("Bad request format, do_not_disturb_end is invalid, expected format HH:MM", slog.Any("request", req))
+		httpbase.BadRequestWithExt(c, errorx.ReqBodyFormat(errors.New("do_not_disturb_end is invalid, expected format HH:MM"), nil))
 		return
 	}
 	req.DoNotDisturbEndTime = time.Date(2000, 1, 1, endTime.Hour(), endTime.Minute(), 0, 0, time.UTC)
@@ -221,13 +300,15 @@ func (h *NotificationHandler) UpdateNotificationSetting(c *gin.Context) {
 	if len(req.SubNotificationType) > 0 {
 		for _, t := range req.SubNotificationType {
 			if !types.NotificationType(t).IsValid() {
-				httpbase.BadRequest(c, "invalid notification_type")
+				slog.Error("Bad request format, invalid notification_type", slog.Any("request", req))
+				httpbase.BadRequestWithExt(c, errorx.ReqBodyFormat(errors.New("invalid notification_type"), nil))
 				return
 			}
 		}
 	}
 	if req.MessageTTL < 0 {
-		httpbase.BadRequest(c, "message_ttl must be greater 0")
+		slog.Error("Bad request format, message_ttl must be greater 0", slog.Any("request", req))
+		httpbase.BadRequestWithExt(c, errorx.ReqBodyFormat(errors.New("message_ttl must be greater 0"), nil))
 		return
 	}
 
@@ -240,12 +321,11 @@ func (h *NotificationHandler) UpdateNotificationSetting(c *gin.Context) {
 }
 
 // PollNewNotifications godoc
+// @Security ApiKey
 // @Summary Poll new notifications
 // @Description Poll new notifications with a specified limit
 // @Tags Notifications
-// @Tags         Access token
 // @Produce json
-// @Param Authorization header string true "Authorization token (Bearer <token>)"
 // @Param limit path int true "The maximum number of new notifications to poll"
 // @Param timezone query string false "Timezone" default(Asia/Shanghai)
 // @Success 200  {object}  types.Response{data=types.NewNotifications} "OK"
@@ -262,18 +342,21 @@ func (h *NotificationHandler) PollNewNotifications(c *gin.Context) {
 
 	limit, err := strconv.ParseInt(c.Param("limit"), 10, 64)
 	if err != nil || limit <= 0 {
-		httpbase.BadRequest(c, "limit must be a positive integer")
+		slog.Error("Bad request format, limit must be a positive integer", slog.Any("limit", limit), slog.Any("error", err))
+		httpbase.BadRequestWithExt(c, errorx.ReqBodyFormat(errors.New("limit must be a positive integer"), nil))
 		return
 	}
 
 	timezone := c.Query("timezone")
 	if timezone == "" {
-		httpbase.BadRequest(c, "timezone is required")
+		slog.Error("Bad request format, timezone is required", slog.Any("timezone", timezone))
+		httpbase.BadRequestWithExt(c, errorx.ReqBodyFormat(errors.New("timezone is required"), nil))
 		return
 	}
 	location, err := time.LoadLocation(timezone)
 	if err != nil {
-		httpbase.BadRequest(c, "timezone is invalid")
+		slog.Error("Bad request format, timezone is invalid", slog.Any("timezone", timezone), slog.Any("error", err))
+		httpbase.BadRequestWithExt(c, errorx.ReqBodyFormat(errors.New("timezone is invalid"), nil))
 		return
 	}
 
@@ -287,11 +370,10 @@ func (h *NotificationHandler) PollNewNotifications(c *gin.Context) {
 }
 
 // GetNotificationSetting user
+// @Security ApiKey
 // @Summary Get notification settings
 // @Description get settings or default settings
 // @Tags Notifications
-// @Tags         Access token
-// @Param Authorization header string true "Authorization token (Bearer <token>)"
 // @Param timezone query string false "Timezone" default(Asia/Shanghai)
 // @Produce json
 // @Success 200  {object}  types.Response{data=types.NotificationSetting} "OK"
@@ -308,12 +390,14 @@ func (h *NotificationHandler) GetNotificationSetting(c *gin.Context) {
 
 	timezone := c.Query("timezone")
 	if timezone == "" {
-		httpbase.BadRequest(c, "timezone is required")
+		slog.Error("Bad request format, timezone is required", slog.Any("timezone", timezone))
+		httpbase.BadRequestWithExt(c, errorx.ReqBodyFormat(errors.New("timezone is required"), nil))
 		return
 	}
 	location, err := time.LoadLocation(timezone)
 	if err != nil {
-		httpbase.BadRequest(c, "timezone is invalid")
+		slog.Error("Bad request format, timezone is invalid", slog.Any("timezone", timezone), slog.Any("error", err))
+		httpbase.BadRequestWithExt(c, errorx.ReqBodyFormat(errors.New("timezone is invalid"), nil))
 		return
 	}
 
@@ -328,12 +412,11 @@ func (h *NotificationHandler) GetNotificationSetting(c *gin.Context) {
 }
 
 // GetAllMessageTypes get all message types
+// @Security ApiKey
 // @Summary Get all message types []string
 // @Description Get all available message types
 // @Tags Notifications
-// @Tags         Access token
 // @Produce json
-// @Param Authorization header string true "Authorization token (Bearer <token>)"
 // @Success 200  {object}  types.Response{data=[]string} "OK"
 // @Failure 400  {object}  types.APIBadRequest "Bad request"
 // @Failure 401  {object}  types.APIUnauthorized "Unauthorized"
@@ -341,46 +424,6 @@ func (h *NotificationHandler) GetNotificationSetting(c *gin.Context) {
 // @Router /notifications/message-types [get]
 func (h *NotificationHandler) GetAllMessageTypes(c *gin.Context) {
 	httpbase.OK(c, types.NotificationTypeAll())
-}
-
-// CreateMessageTask send message to user
-// @Summary Send a message to a user [only for admin]
-// @Description Send a message to a user
-// @Tags Notifications
-// @Tags         Access token
-// @Accept json
-// @Param Authorization header string true "Authorization token (Bearer <token>)"
-// @Param request body types.NotificationMessage true "Send message request"
-// @Produce json
-// @Success 200  {object}  types.Response{data=nil} "OK"
-// @Failure 400  {object}  types.APIBadRequest "Bad request"
-// @Failure 401  {object}  types.APIUnauthorized "Unauthorized"
-// @Failure 500  {object}  types.APIInternalServerError "Internal server error"
-// @Router /notifications/msg-task [put]
-func (h *NotificationHandler) CreateMessageTask(c *gin.Context) {
-	var req types.NotificationMessage
-	if err := c.ShouldBindJSON(&req); err != nil {
-		httpbase.BadRequest(c, err.Error())
-		return
-	}
-
-	if !req.NotificationType.IsSystem() {
-		httpbase.BadRequest(c, "notification_type must be system")
-		return
-	}
-
-	req.MsgUUID = uuid.New().String()
-	if req.CreateAt.IsZero() {
-		req.CreateAt = time.Now()
-	}
-
-	if err := h.nmc.PublishNotificationMessage(c.Request.Context(), req); err != nil {
-		slog.Error("Failed to publish notification message", slog.Any("request", req), slog.Any("error", err))
-		httpbase.ServerError(c, err)
-		return
-	}
-
-	httpbase.OK(c, nil)
 }
 
 // SendMessage send a message
@@ -399,7 +442,8 @@ func (h *NotificationHandler) CreateMessageTask(c *gin.Context) {
 func (h *NotificationHandler) SendMessage(c *gin.Context) {
 	var req types.MessageRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		httpbase.BadRequest(c, err.Error())
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequestWithExt(c, errorx.ReqBodyFormat(err, nil))
 		return
 	}
 

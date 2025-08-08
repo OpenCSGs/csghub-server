@@ -1,9 +1,0 @@
-<html>
-    <h3> {{ .Title}} </h3>
-    <p>
-        <span>{{ .Summary}}</span>
-    </p>
-    <p>
-        <span>{{ .Content}}</span>
-    </p>
-</html>

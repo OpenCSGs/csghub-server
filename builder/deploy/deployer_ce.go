@@ -12,6 +12,7 @@ import (
 	"opencsg.com/csghub-server/builder/deploy/imagerunner"
 	"opencsg.com/csghub-server/builder/deploy/scheduler"
 	"opencsg.com/csghub-server/builder/event"
+	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -31,6 +32,7 @@ type deployer struct {
 	runtimeFrameworkStore database.RuntimeFrameworksStore
 	deployConfig          DeployConfig
 	userStore             database.UserStore
+	notificationSvcClient rpc.NotificationSvcClient
 }
 
 func newDeployer(s scheduler.Scheduler, ib imagebuilder.Builder, ir imagerunner.Runner, c DeployConfig) (*deployer, error) {
@@ -40,6 +42,7 @@ func newDeployer(s scheduler.Scheduler, ib imagebuilder.Builder, ir imagerunner.
 		slog.Error("fail to generate uuid for inference service name", slog.Any("error", err))
 		return nil, err
 	}
+	nc := rpc.NewNotificationSvcHttpClient(c.NotificationEndpoint, rpc.AuthWithApiKey(c.APIToken))
 	d := &deployer{
 		scheduler:             s,
 		imageBuilder:          ib,
@@ -53,6 +56,7 @@ func newDeployer(s scheduler.Scheduler, ib imagebuilder.Builder, ir imagerunner.
 		runtimeFrameworkStore: database.NewRuntimeFrameworksStore(),
 		deployConfig:          c,
 		userStore:             database.NewUserStore(),
+		notificationSvcClient: nc,
 	}
 
 	d.startJobs()

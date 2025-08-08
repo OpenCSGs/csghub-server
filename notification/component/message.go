@@ -5,49 +5,41 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/nats-io/nats.go/jetstream"
-	"go.temporal.io/sdk/client"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/mq"
-	"opencsg.com/csghub-server/notification/mailer"
-	internalmsgworkflow "opencsg.com/csghub-server/notification/notifychannel/channel/internalmsg/workflow"
 	notifychannelfactory "opencsg.com/csghub-server/notification/notifychannel/factory"
 	scenariomgr "opencsg.com/csghub-server/notification/scenariomgr"
 	"opencsg.com/csghub-server/notification/scenarioregister"
 	"opencsg.com/csghub-server/notification/tmplmgr"
 	"opencsg.com/csghub-server/notification/utils"
-	"opencsg.com/csghub-server/notification/workflow"
 )
 
 type NotificationComponent interface {
 	GetUnreadCount(ctx context.Context, userUUID string) (int64, error)
 	ListNotifications(ctx context.Context, uid string, req types.NotificationsRequest) ([]types.Notifications, int, error)
-	MarkAsRead(ctx context.Context, uid string, req types.MarkNotificationsAsReadReq) error
-	// NotificationsSetting
+	MarkAsRead(ctx context.Context, uid string, req types.BatchNotificationOperationReq) error
+	MarkAsUnread(ctx context.Context, uid string, req types.BatchNotificationOperationReq) error
+	DeleteNotifications(ctx context.Context, uid string, req types.BatchNotificationOperationReq) error
 	NotificationsSetting(ctx context.Context, uid string, req types.UpdateNotificationReq, location *time.Location) error
-	//GET Setting
 	GetNotificationSetting(ctx context.Context, uid string, location *time.Location) (*types.NotificationSetting, error)
-
 	PollNewNotifications(ctx context.Context, userUUID string, limit int, location *time.Location) (*types.NewNotifications, error)
-
 	PublishMessage(ctx context.Context, message types.ScenarioMessage) error
-	PublishNotificationMessage(ctx context.Context, message types.NotificationMessage) error
 }
 
 type notificationComponentImpl struct {
 	conf                          *config.Config
-	consumer                      jetstream.Consumer
 	storage                       database.NotificationStore
-	mailer                        mailer.MailerInterface
 	queue                         mq.MessageQueue
 	highPriorityMessageConsumer   jetstream.Consumer
 	normalPriorityMessageConsumer jetstream.Consumer
+	highPriorityMsgCh             chan jetstream.Msg
+	normalPriorityMsgCh           chan jetstream.Msg
 	messageProcessor              *scenariomgr.MessageProcessor
 }
 
@@ -63,7 +55,6 @@ func NewNotificationComponent(conf *config.Config) (NotificationComponent, error
 	nmc := &notificationComponentImpl{
 		conf:    conf,
 		storage: database.NewNotificationStore(),
-		mailer:  mailer.NewMailer(conf),
 	}
 
 	n, err := mq.GetOrInit(conf)
@@ -73,23 +64,7 @@ func NewNotificationComponent(conf *config.Config) (NotificationComponent, error
 	}
 	nmc.queue = n
 
-	if err = n.BuildSiteInternalMsgStream(); err != nil {
-		slog.Error("failed to build site internal message stream", slog.Any("error", err))
-		return nil, err
-	}
-	consumer, err := n.BuildSiteInternalMsgConsumer()
-	if err != nil {
-		slog.Error("failed to build site internal message consumer", slog.Any("error", err))
-		return nil, err
-	}
-
-	nmc.consumer = consumer
-	if err = nmc.processSiteInternalMessages(); err != nil {
-		slog.Error("failed to start processing site internal messages", slog.Any("error", err))
-		return nil, err
-	}
-
-	if err = n.BuildHighPriorityMsgStream(); err != nil {
+	if err = n.BuildHighPriorityMsgStream(conf); err != nil {
 		slog.Error("failed to build high priority message stream", slog.Any("error", err))
 		return nil, err
 	}
@@ -104,7 +79,7 @@ func NewNotificationComponent(conf *config.Config) (NotificationComponent, error
 		return nil, err
 	}
 
-	if err = n.BuildNormalPriorityMsgStream(); err != nil {
+	if err = n.BuildNormalPriorityMsgStream(conf); err != nil {
 		slog.Error("failed to build normal priority message stream", slog.Any("error", err))
 		return nil, err
 	}
@@ -126,12 +101,26 @@ func NewNotificationComponent(conf *config.Config) (NotificationComponent, error
 	scenarioregister.Register(dataProvider)
 	nmc.messageProcessor = scenariomgr.NewMessageProcessor(conf, templateManager, channelFactory)
 
+	nmc.highPriorityMsgCh = make(chan jetstream.Msg, conf.Notification.HighPriorityMsgBufferSize)
+	nmc.normalPriorityMsgCh = make(chan jetstream.Msg, conf.Notification.NormalPriorityMsgBufferSize)
+	nmc.startMsgDispatcher(conf.Notification.MsgDispatcherCount, nmc.handleScenarioMessage)
 	return nmc, nil
 }
 
 func (c *notificationComponentImpl) processHighPriorityMsg() error {
 	slog.Info("start process high priority message")
-	_, err := c.highPriorityMessageConsumer.Consume(c.handleScenarioMessage)
+	_, err := c.highPriorityMessageConsumer.Consume(func(msg jetstream.Msg) {
+		slog.Debug("received high priority message", slog.String("data", string(msg.Data())))
+		select {
+		case c.highPriorityMsgCh <- msg:
+			slog.Info("added high priority message to dispatcher")
+		default:
+			slog.Error("high priority message channel is full, rejecting message", slog.String("message", string(msg.Data())))
+			if err := msg.Nak(); err != nil {
+				slog.Error("failed to nak message", slog.Any("error", err))
+			}
+		}
+	})
 	if err != nil {
 		slog.Error("failed to consume high priority message", slog.Any("error", err))
 		return err
@@ -141,7 +130,18 @@ func (c *notificationComponentImpl) processHighPriorityMsg() error {
 
 func (c *notificationComponentImpl) processNormalPriorityMsg() error {
 	slog.Info("start process normal priority message")
-	_, err := c.normalPriorityMessageConsumer.Consume(c.handleScenarioMessage)
+	_, err := c.normalPriorityMessageConsumer.Consume(func(msg jetstream.Msg) {
+		slog.Debug("received normal priority message", slog.String("data", string(msg.Data())))
+		select {
+		case c.normalPriorityMsgCh <- msg:
+			slog.Info("added normal priority message to dispatcher")
+		default:
+			slog.Error("normal priority message channel is full, rejecting message", slog.String("message", string(msg.Data())))
+			if err := msg.Nak(); err != nil {
+				slog.Error("failed to nak message", slog.Any("error", err))
+			}
+		}
+	})
 	if err != nil {
 		slog.Error("failed to consume normal priority message", slog.Any("error", err))
 		return err
@@ -149,200 +149,85 @@ func (c *notificationComponentImpl) processNormalPriorityMsg() error {
 	return nil
 }
 
-func (c *notificationComponentImpl) handleScenarioMessage(msg jetstream.Msg) {
+func (c *notificationComponentImpl) startMsgDispatcher(count int, handler func(jetstream.Msg)) {
+	slog.Info("starting message dispatcher", slog.Int("dispatcher_count", count))
+	for i := 0; i < count; i++ {
+		go func(i int) {
+			c.runMsgDispatcher(i, handler)
+		}(i)
+	}
+}
+
+func (c *notificationComponentImpl) runMsgDispatcher(id int, handler func(jetstream.Msg)) {
 	defer func() {
-		if err := msg.Ack(); err != nil {
-			slog.Error("failed to ack message", slog.Any("error", err))
+		if r := recover(); r != nil {
+			slog.Error("message dispatcher panic recovered, will restart", slog.Int("dispatcher_id", id), slog.Any("error", r))
+			go c.runMsgDispatcher(id, handler)
 		}
 	}()
 
+	slog.Info("message dispatcher started", slog.Int("dispatcher_id", id))
+	for {
+		select {
+		case msg := <-c.highPriorityMsgCh:
+			slog.Debug("message dispatcher received high priority message", slog.Int("dispatcher_id", id), slog.String("data", string(msg.Data())))
+			handler(msg)
+		default:
+			select {
+			case msg := <-c.highPriorityMsgCh:
+				slog.Debug("dispatcher handled high priority message", slog.Int("dispatcher_id", id))
+				handler(msg)
+			case msg := <-c.normalPriorityMsgCh:
+				slog.Debug("dispatcher handled normal priority message", slog.Int("dispatcher_id", id))
+				handler(msg)
+			}
+		}
+	}
+}
+
+func (c *notificationComponentImpl) handleScenarioMessage(msg jetstream.Msg) {
 	var message types.ScenarioMessage
 	if err := json.Unmarshal(msg.Data(), &message); err != nil {
 		slog.Error("failed to unmarshal message", slog.Any("data", string(msg.Data())), slog.Any("error", err))
+		if err := msg.Term(); err != nil {
+			slog.Error("failed to term message", slog.Any("error", err))
+		}
 		return
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	done := make(chan error, 1)
 	go func() {
-		slog.Debug("handle message", slog.Any("message", message))
-		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-		defer cancel()
-		if err := c.messageProcessor.ProcessMessage(ctx, message); err != nil {
-			slog.Error("failed to process message", slog.Any("message", message), slog.Any("error", err))
-			return
-		}
-	}()
-}
-
-func (c *notificationComponentImpl) processSiteInternalMessages() error {
-	slog.Info("start processing site internal messages")
-	_, err := c.consumer.Consume(c.handleSiteInternalMessage)
-	if err != nil {
-		slog.Error("failed to consume site internal message", slog.Any("error", err))
-		return err
-	}
-
-	return nil
-}
-
-func (c *notificationComponentImpl) handleSiteInternalMessage(msg jetstream.Msg) {
-	defer func() {
-		if err := msg.Ack(); err != nil {
-			slog.Error("failed to ack message", slog.Any("error", err))
-		}
+		done <- c.messageProcessor.ProcessMessage(ctx, message)
 	}()
 
-	slog.Debug("handle site internal message", slog.Any("data", string(msg.Data())))
-	var message types.NotificationMessage
-	if err := json.Unmarshal(msg.Data(), &message); err != nil {
-		slog.Error("failed to unmarshal site internal message", slog.Any("data", string(msg.Data())), slog.Any("error", err))
-		return
-	}
-
-	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-		defer cancel()
-		err := c.dispatchSiteInternalMessage(ctx, message)
+	select {
+	case err := <-done:
 		if err != nil {
-			slog.Error("failed to create message task", slog.Any("message", message), slog.Any("error", err))
+			slog.Error("failed to handle scenario", slog.Any("scenario", message.Scenario), slog.Any("error", err))
+			if utils.IsErrSendMsg(err) {
+				slog.Info("failed to send message, will retry later", slog.Any("scenario", message.Scenario), slog.String("message id", message.MsgUUID), slog.Any("error", err))
+				if err := msg.Nak(); err != nil {
+					slog.Error("failed to nak message", slog.Any("error", err))
+				}
+				return
+			}
+			if err := msg.Term(); err != nil {
+				slog.Error("failed to term message", slog.Any("scenario", message.Scenario), slog.String("message id", message.MsgUUID), slog.Any("error", err))
+			}
+		} else {
+			slog.Info("scenario handled successfully", slog.Any("scenario", message.Scenario), slog.String("message id", message.MsgUUID))
+			if err := msg.Ack(); err != nil {
+				slog.Error("failed to ack message", slog.Any("scenario", message.Scenario), slog.String("message id", message.MsgUUID), slog.Any("error", err))
+			}
 		}
-	}()
-
-}
-
-func (c *notificationComponentImpl) dispatchSiteInternalMessage(ctx context.Context, message types.NotificationMessage) error {
-	if !message.NotificationType.IsValid() {
-		slog.Error("invalid notification type", slog.Any("notification_type", message.NotificationType))
-		return fmt.Errorf("invalid notification type: %s", message.NotificationType)
-	}
-	if message.MsgUUID == "" {
-		slog.Error("msg_uuid is empty", slog.Any("message", message))
-		return fmt.Errorf("msg_uuid is empty")
-	}
-
-	if message.CreateAt.IsZero() {
-		message.CreateAt = time.Now()
-	}
-
-	siteInternalMessage := &database.NotificationMessage{
-		MsgUUID:          message.MsgUUID,
-		GroupID:          "",
-		NotificationType: message.NotificationType.String(),
-		SenderUUID:       message.SenderUUID,
-		Summary:          message.Summary,
-		Title:            message.Title,
-		Content:          message.Content,
-		ActionURL:        message.ClickActionURL,
-		Priority:         message.Priority,
-	}
-
-	if len(message.UserUUIDs) == 0 {
-		// broadcast site internal message to all users
-		if err := c.broadcastSiteInternalMessage(ctx, siteInternalMessage); err != nil {
-			slog.Error("failed to broadcast site internal message", slog.Any("message id", message.MsgUUID), slog.Any("error", err))
-			return err
+	case <-ctx.Done():
+		slog.Error("scenario handling timeout", slog.Any("scenario", message.Scenario), slog.String("message id", message.MsgUUID), slog.Any("timeout", 30*time.Second))
+		if err := msg.Nak(); err != nil {
+			slog.Error("failed to nak message", slog.Any("scenario", message.Scenario), slog.String("message id", message.MsgUUID), slog.Any("error", err))
 		}
-	} else {
-		// send site internal message to users
-		if err := c.sendSiteInternalMessageToUsers(ctx, siteInternalMessage, message.UserUUIDs); err != nil {
-			slog.Error("failed to send site internal message to users", slog.Any("message id", message.MsgUUID), slog.Any("error", err))
-			return err
-		}
-		slog.Info("send site internal message to users successfully", slog.Any("message id", message.MsgUUID))
-	}
-	// send email to users
-	// TODO: refactor later
-	go c.sendEmail(message.UserUUIDs, message)
-
-	return nil
-}
-
-func (c *notificationComponentImpl) broadcastSiteInternalMessage(ctx context.Context, siteInternalMessage *database.NotificationMessage) error {
-	slog.Info("broadcast site internal message to all users", slog.Any("message id", siteInternalMessage.MsgUUID))
-
-	existed, err := c.storage.IsNotificationMessageExists(ctx, siteInternalMessage.MsgUUID)
-	if err != nil {
-		slog.Error("failed to check if notification message exists", slog.Any("message id", siteInternalMessage.MsgUUID), slog.Any("error", err))
-		return err
-	}
-	if existed {
-		slog.Info("site internal message already exists, skipped", slog.Any("message id", siteInternalMessage.MsgUUID))
-		return nil
-	}
-
-	if err := c.storage.CreateNotificationMessage(ctx, siteInternalMessage); err != nil {
-		slog.Error("failed to create site internal message", slog.Any("message id", siteInternalMessage.MsgUUID), slog.Any("error", err))
-		return err
-	}
-	slog.Info("create site internal message successfully", slog.Any("message id", siteInternalMessage.MsgUUID))
-
-	// start workflow to send site internal message to all users
-	workflowClient := workflow.GetWorkflowClient()
-	if workflowClient == nil {
-		return fmt.Errorf("workflow client is nil")
-	}
-	workflowOptions := client.StartWorkflowOptions{
-		TaskQueue: internalmsgworkflow.WorkflowBroadcastInternalMessageQueueName,
-	}
-	we, err := workflowClient.ExecuteWorkflow(context.Background(), workflowOptions, internalmsgworkflow.BroadcastInternalMessageWorkflow, siteInternalMessage.MsgUUID, c.conf.Notification.BroadcastUserPageSize)
-	if err != nil {
-		slog.Error("failed to start broadcast message workflow", slog.Any("message id", siteInternalMessage.MsgUUID), slog.Any("error", err))
-		return err
-	}
-	slog.Info("start broadcast message workflow", slog.Any("workflow id", we.GetID()), slog.Any("message id", siteInternalMessage.MsgUUID))
-	return nil
-}
-
-func (c *notificationComponentImpl) sendSiteInternalMessageToUsers(ctx context.Context, siteInternalMessage *database.NotificationMessage, users []string) error {
-	if err := c.storage.CreateNotificationMessageForUsers(ctx, siteInternalMessage, users); err != nil {
-		slog.Error("failed to send site internal message for users", slog.Any("message id", siteInternalMessage.MsgUUID), slog.Any("users", strings.Join(users, ",")), slog.Any("error", err))
-		return fmt.Errorf("failed to send site internal message for users: %w", err)
-	}
-	slog.Info("send site internal message for users successfully", slog.Any("message id", siteInternalMessage.MsgUUID), slog.Any("user uuids", users))
-	return nil
-}
-
-func (c *notificationComponentImpl) sendEmail(users []string, msg types.NotificationMessage) {
-	var settings []*database.NotificationSetting
-	var err error
-	if len(users) != 0 {
-		settings, err = c.storage.GetSettingByUserUUIDs(context.Background(), users)
-		if err != nil {
-			slog.Error("failed to get settings", slog.Any("users", users), slog.Any("error", err))
-			return
-		}
-	} else {
-		// all
-		settings, err = c.storage.GetAllSettings(context.Background())
-		if err != nil {
-			slog.Error("failed to get settings", slog.Any("users", users), slog.Any("error", err))
-			return
-		}
-	}
-
-	var userEmails []string
-	for _, setting := range settings {
-		if setting.IsEmailNotificationEnabled {
-			userEmails = append(userEmails, setting.EmailAddress)
-		}
-	}
-
-	if len(userEmails) == 0 {
-		return
-	}
-	body, err := c.mailer.FormatNotifyMsg(msg)
-	if err != nil {
-		slog.Error("failed to format message", slog.Any("error", err))
-		return
-	}
-	emailReq := types.EmailReq{
-		To:          userEmails,
-		Subject:     msg.Title,
-		Body:        body,
-		ContentType: types.ContentTypeTextHTML,
-	}
-	if err := c.mailer.Send(emailReq); err != nil {
-		slog.Error("failed to send email", slog.Any("users emails", userEmails), slog.Any("error", err))
-		return
 	}
 }
 
@@ -412,6 +297,7 @@ func (c *notificationComponentImpl) PollNewNotifications(ctx context.Context, us
 		if setting != nil && !utils.IsStringInArray(item.NotificationType, setting.SubNotificationType) {
 			continue
 		}
+
 		result = append(result, types.Notifications{
 			ID:               item.ID,
 			UserUUID:         item.UserUUID,
@@ -420,6 +306,8 @@ func (c *notificationComponentImpl) PollNewNotifications(ctx context.Context, us
 			Title:            item.Title,
 			Summary:          item.Summary,
 			Content:          item.Content,
+			Template:         item.Template,
+			Payload:          item.Payload,
 			IsRead:           !item.ReadAt.IsZero(),
 			ClickActionURL:   item.ActionURL,
 			CreatedAt:        item.CreatedAt.Unix(),
@@ -462,6 +350,8 @@ func (c *notificationComponentImpl) ListNotifications(ctx context.Context, uid s
 			Title:            item.Title,
 			Summary:          item.Summary,
 			Content:          item.Content,
+			Template:         item.Template,
+			Payload:          item.Payload,
 			IsRead:           !item.ReadAt.IsZero(),
 			ClickActionURL:   item.ActionURL,
 			CreatedAt:        item.CreatedAt.Unix(),
@@ -472,13 +362,31 @@ func (c *notificationComponentImpl) ListNotifications(ctx context.Context, uid s
 	return result, total, nil
 }
 
-func (c *notificationComponentImpl) MarkAsRead(ctx context.Context, uid string, req types.MarkNotificationsAsReadReq) error {
+func (c *notificationComponentImpl) MarkAsRead(ctx context.Context, uid string, req types.BatchNotificationOperationReq) error {
 	if req.MarkAll {
 		return c.storage.MarkAllAsRead(ctx, uid)
 	} else if len(req.IDs) == 0 {
 		return nil
 	}
 	return c.storage.MarkAsRead(ctx, uid, req.IDs)
+}
+
+func (c *notificationComponentImpl) MarkAsUnread(ctx context.Context, uid string, req types.BatchNotificationOperationReq) error {
+	if req.MarkAll {
+		return c.storage.MarkAllAsUnread(ctx, uid)
+	} else if len(req.IDs) == 0 {
+		return nil
+	}
+	return c.storage.MarkAsUnread(ctx, uid, req.IDs)
+}
+
+func (c *notificationComponentImpl) DeleteNotifications(ctx context.Context, uid string, req types.BatchNotificationOperationReq) error {
+	if req.MarkAll {
+		return c.storage.DeleteAllNotifications(ctx, uid)
+	} else if len(req.IDs) == 0 {
+		return nil
+	}
+	return c.storage.DeleteNotifications(ctx, uid, req.IDs)
 }
 
 func (c *notificationComponentImpl) NotificationsSetting(ctx context.Context, uid string, req types.UpdateNotificationReq, location *time.Location) error {
@@ -575,25 +483,17 @@ func (c *notificationComponentImpl) PublishMessage(ctx context.Context, message 
 
 	switch message.Priority {
 	case types.MessagePriorityHigh:
-		slog.Debug("publish message to high priority queue", slog.Any("message id", message.MsgUUID))
+		slog.Info("publish message to high priority queue", slog.Any("message id", message.MsgUUID))
 		if err := c.queue.PublishHighPriorityMsg(message); err != nil {
 			return fmt.Errorf("failed to publish message to high priority queue: %w", err)
 		}
 	case types.MessagePriorityNormal:
-		slog.Debug("publish message to normal priority queue", slog.Any("message id", message.MsgUUID))
+		slog.Info("publish message to normal priority queue", slog.Any("message id", message.MsgUUID))
 		if err := c.queue.PublishNormalPriorityMsg(message); err != nil {
 			return fmt.Errorf("failed to publish message to normal priority queue: %w", err)
 		}
 	default:
 		return fmt.Errorf("unsupported priority: %s", message.Priority)
 	}
-	return nil
-}
-
-func (c *notificationComponentImpl) PublishNotificationMessage(ctx context.Context, message types.NotificationMessage) error {
-	if err := c.queue.PublishSiteInternalMsg(message); err != nil {
-		return fmt.Errorf("failed to publish message to site internal message queue: %w", err)
-	}
-	slog.Info("published notification message to site internal message queue", slog.Any("message id", message.MsgUUID))
 	return nil
 }

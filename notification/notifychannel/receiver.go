@@ -76,3 +76,15 @@ func (r *Receiver) Validate() error {
 
 	return nil
 }
+
+func (r *Receiver) SetLanguage(lang string) {
+	r.SetMetadata("language", lang)
+}
+
+func (r *Receiver) GetLanguage() string {
+	lang := r.GetMetadata("language")
+	if lang == nil {
+		return "en-US"
+	}
+	return lang.(string)
+}

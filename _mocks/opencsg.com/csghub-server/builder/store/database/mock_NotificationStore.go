@@ -273,6 +273,101 @@ func (_c *MockNotificationStore_CreateUserMessages_Call) RunAndReturn(run func(c
 	return _c
 }
 
+// DeleteAllNotifications provides a mock function with given fields: ctx, uid
+func (_m *MockNotificationStore) DeleteAllNotifications(ctx context.Context, uid string) error {
+	ret := _m.Called(ctx, uid)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteAllNotifications")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) error); ok {
+		r0 = rf(ctx, uid)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockNotificationStore_DeleteAllNotifications_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteAllNotifications'
+type MockNotificationStore_DeleteAllNotifications_Call struct {
+	*mock.Call
+}
+
+// DeleteAllNotifications is a helper method to define mock.On call
+//   - ctx context.Context
+//   - uid string
+func (_e *MockNotificationStore_Expecter) DeleteAllNotifications(ctx interface{}, uid interface{}) *MockNotificationStore_DeleteAllNotifications_Call {
+	return &MockNotificationStore_DeleteAllNotifications_Call{Call: _e.mock.On("DeleteAllNotifications", ctx, uid)}
+}
+
+func (_c *MockNotificationStore_DeleteAllNotifications_Call) Run(run func(ctx context.Context, uid string)) *MockNotificationStore_DeleteAllNotifications_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockNotificationStore_DeleteAllNotifications_Call) Return(_a0 error) *MockNotificationStore_DeleteAllNotifications_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockNotificationStore_DeleteAllNotifications_Call) RunAndReturn(run func(context.Context, string) error) *MockNotificationStore_DeleteAllNotifications_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// DeleteNotifications provides a mock function with given fields: ctx, uid, ids
+func (_m *MockNotificationStore) DeleteNotifications(ctx context.Context, uid string, ids []int64) error {
+	ret := _m.Called(ctx, uid, ids)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteNotifications")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, []int64) error); ok {
+		r0 = rf(ctx, uid, ids)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockNotificationStore_DeleteNotifications_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteNotifications'
+type MockNotificationStore_DeleteNotifications_Call struct {
+	*mock.Call
+}
+
+// DeleteNotifications is a helper method to define mock.On call
+//   - ctx context.Context
+//   - uid string
+//   - ids []int64
+func (_e *MockNotificationStore_Expecter) DeleteNotifications(ctx interface{}, uid interface{}, ids interface{}) *MockNotificationStore_DeleteNotifications_Call {
+	return &MockNotificationStore_DeleteNotifications_Call{Call: _e.mock.On("DeleteNotifications", ctx, uid, ids)}
+}
+
+func (_c *MockNotificationStore_DeleteNotifications_Call) Run(run func(ctx context.Context, uid string, ids []int64)) *MockNotificationStore_DeleteNotifications_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].([]int64))
+	})
+	return _c
+}
+
+func (_c *MockNotificationStore_DeleteNotifications_Call) Return(_a0 error) *MockNotificationStore_DeleteNotifications_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockNotificationStore_DeleteNotifications_Call) RunAndReturn(run func(context.Context, string, []int64) error) *MockNotificationStore_DeleteNotifications_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetAllSettings provides a mock function with given fields: ctx
 func (_m *MockNotificationStore) GetAllSettings(ctx context.Context) ([]*database.NotificationSetting, error) {
 	ret := _m.Called(ctx)
@@ -810,6 +905,53 @@ func (_c *MockNotificationStore_MarkAllAsRead_Call) RunAndReturn(run func(contex
 	return _c
 }
 
+// MarkAllAsUnread provides a mock function with given fields: ctx, uid
+func (_m *MockNotificationStore) MarkAllAsUnread(ctx context.Context, uid string) error {
+	ret := _m.Called(ctx, uid)
+
+	if len(ret) == 0 {
+		panic("no return value specified for MarkAllAsUnread")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) error); ok {
+		r0 = rf(ctx, uid)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockNotificationStore_MarkAllAsUnread_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'MarkAllAsUnread'
+type MockNotificationStore_MarkAllAsUnread_Call struct {
+	*mock.Call
+}
+
+// MarkAllAsUnread is a helper method to define mock.On call
+//   - ctx context.Context
+//   - uid string
+func (_e *MockNotificationStore_Expecter) MarkAllAsUnread(ctx interface{}, uid interface{}) *MockNotificationStore_MarkAllAsUnread_Call {
+	return &MockNotificationStore_MarkAllAsUnread_Call{Call: _e.mock.On("MarkAllAsUnread", ctx, uid)}
+}
+
+func (_c *MockNotificationStore_MarkAllAsUnread_Call) Run(run func(ctx context.Context, uid string)) *MockNotificationStore_MarkAllAsUnread_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockNotificationStore_MarkAllAsUnread_Call) Return(_a0 error) *MockNotificationStore_MarkAllAsUnread_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockNotificationStore_MarkAllAsUnread_Call) RunAndReturn(run func(context.Context, string) error) *MockNotificationStore_MarkAllAsUnread_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // MarkAsNotified provides a mock function with given fields: ctx, userUUID, msgUUIDs
 func (_m *MockNotificationStore) MarkAsNotified(ctx context.Context, userUUID string, msgUUIDs []string) error {
 	ret := _m.Called(ctx, userUUID, msgUUIDs)
@@ -902,6 +1044,54 @@ func (_c *MockNotificationStore_MarkAsRead_Call) Return(_a0 error) *MockNotifica
 }
 
 func (_c *MockNotificationStore_MarkAsRead_Call) RunAndReturn(run func(context.Context, string, []int64) error) *MockNotificationStore_MarkAsRead_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// MarkAsUnread provides a mock function with given fields: ctx, uid, ids
+func (_m *MockNotificationStore) MarkAsUnread(ctx context.Context, uid string, ids []int64) error {
+	ret := _m.Called(ctx, uid, ids)
+
+	if len(ret) == 0 {
+		panic("no return value specified for MarkAsUnread")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, []int64) error); ok {
+		r0 = rf(ctx, uid, ids)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockNotificationStore_MarkAsUnread_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'MarkAsUnread'
+type MockNotificationStore_MarkAsUnread_Call struct {
+	*mock.Call
+}
+
+// MarkAsUnread is a helper method to define mock.On call
+//   - ctx context.Context
+//   - uid string
+//   - ids []int64
+func (_e *MockNotificationStore_Expecter) MarkAsUnread(ctx interface{}, uid interface{}, ids interface{}) *MockNotificationStore_MarkAsUnread_Call {
+	return &MockNotificationStore_MarkAsUnread_Call{Call: _e.mock.On("MarkAsUnread", ctx, uid, ids)}
+}
+
+func (_c *MockNotificationStore_MarkAsUnread_Call) Run(run func(ctx context.Context, uid string, ids []int64)) *MockNotificationStore_MarkAsUnread_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].([]int64))
+	})
+	return _c
+}
+
+func (_c *MockNotificationStore_MarkAsUnread_Call) Return(_a0 error) *MockNotificationStore_MarkAsUnread_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockNotificationStore_MarkAsUnread_Call) RunAndReturn(run func(context.Context, string, []int64) error) *MockNotificationStore_MarkAsUnread_Call {
 	_c.Call.Return(run)
 	return _c
 }

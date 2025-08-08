@@ -29,12 +29,13 @@ func NewNotifierRouter(conf *config.Config) (*gin.Engine, error) {
 		notificationsGroup.GET("/count", messageHandler.GetUnreadCount)
 		notificationsGroup.GET("", messageHandler.ListNotifications)
 		notificationsGroup.POST("", messageHandler.SendMessage)
+		notificationsGroup.DELETE("", messageHandler.DeleteNotifications)
 		notificationsGroup.PUT("/read", messageHandler.MarkAsRead)
+		notificationsGroup.PUT("/unread", messageHandler.MarkAsUnread)
 		notificationsGroup.PUT("/setting", messageHandler.UpdateNotificationSetting)
 		notificationsGroup.GET("/setting", messageHandler.GetNotificationSetting)
 		notificationsGroup.GET("/poll/:limit", messageHandler.PollNewNotifications)
 		notificationsGroup.GET("/message-types", messageHandler.GetAllMessageTypes)
-		notificationsGroup.PUT("/msg-task", messageHandler.CreateMessageTask)
 	}
 
 	return r, nil
