@@ -198,13 +198,15 @@ func TestModelComponent_Show(t *testing.T) {
 	ctx := context.TODO()
 	mc := initializeTestModelComponent(ctx, t)
 
-	mc.mocks.stores.ModelMock().EXPECT().FindByPath(ctx, "ns", "n").Return(&database.Model{
+	m := &database.Model{
 		ID:           1,
 		RepositoryID: 123,
 		Repository: &database.Repository{ID: 123, Name: "n", Path: "foo/bar", Metadata: database.Metadata{
 			Architecture: "llama",
 		}, Tags: []database.Tag{{Name: "safetensors", Category: "framework"}}},
-	}, nil)
+	}
+
+	mc.mocks.stores.ModelMock().EXPECT().FindByPath(ctx, "ns", "n").Return(m, nil)
 	mc.mocks.components.repo.EXPECT().GetUserRepoPermission(ctx, "user", &database.Repository{
 		ID:   123,
 		Name: "n",
@@ -217,7 +219,9 @@ func TestModelComponent_Show(t *testing.T) {
 		&types.UserRepoPermission{CanRead: true, CanAdmin: true}, nil,
 	)
 	mc.mocks.components.repo.EXPECT().GetNameSpaceInfo(ctx, "ns").Return(&types.Namespace{Path: "ns"}, nil)
-
+	mc.mocks.components.repo.EXPECT().GetMirrorTaskStatusAndSyncStatus(m.Repository).Return(
+		"", "",
+	)
 	mc.mocks.stores.UserLikesMock().EXPECT().IsExist(ctx, "user", int64(123)).Return(true, nil)
 	mc.mocks.stores.RuntimeArchMock().EXPECT().CheckEngineByArchModelNameAndType(
 		ctx, mock.Anything, "n", "safetensors", types.InferenceType,

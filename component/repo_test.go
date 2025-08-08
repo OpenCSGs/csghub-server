@@ -2486,3 +2486,52 @@ func TestParseNDJson_AllKeyTypes(t *testing.T) {
 	assert.Equal(t, "", result.Files[3].Content)
 	assert.Equal(t, types.CommitActionDelete, result.Files[3].Action)
 }
+
+func TestRepoComponent_GetMirrorTaskStatusAndSyncStatus(t *testing.T) {
+	ctx := context.Background()
+
+	repoComp := initializeTestRepoComponent(ctx, t)
+
+	repo := &database.Repository{
+		ID: 1,
+		Mirror: database.Mirror{
+			ID: 1,
+			CurrentTask: &database.MirrorTask{
+				ID:     1,
+				Status: types.MirrorRepoSyncStart,
+			},
+		},
+	}
+
+	mirrorTaskStatus, syncStatus := repoComp.GetMirrorTaskStatusAndSyncStatus(repo)
+
+	assert.Equal(t, types.MirrorRepoSyncStart, mirrorTaskStatus)
+	assert.Equal(t, types.SyncStatusInProgress, syncStatus)
+
+	repo1 := &database.Repository{
+		ID: 1,
+		Mirror: database.Mirror{
+			ID: 0,
+		},
+		SyncStatus: types.SyncStatusInProgress,
+	}
+
+	mirrorTaskStatus, syncStatus = repoComp.GetMirrorTaskStatusAndSyncStatus(repo1)
+
+	assert.Equal(t, types.MirrorTaskStatus(""), mirrorTaskStatus)
+	assert.Equal(t, types.SyncStatusInProgress, syncStatus)
+
+	repo2 := &database.Repository{
+		ID: 1,
+		Mirror: database.Mirror{
+			ID:     1,
+			Status: types.MirrorLfsSyncFinished,
+		},
+		SyncStatus: types.SyncStatusInProgress,
+	}
+
+	mirrorTaskStatus, syncStatus = repoComp.GetMirrorTaskStatusAndSyncStatus(repo2)
+
+	assert.Equal(t, types.MirrorTaskStatus(""), mirrorTaskStatus)
+	assert.Equal(t, types.SyncStatusCompleted, syncStatus)
+}
