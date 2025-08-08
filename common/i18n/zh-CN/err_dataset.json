@@ -1,0 +1,11 @@
+{
+    "error.DAT-ERR-0": {
+        "other": "未找到数据集卡片"
+    },
+    "error.DAT-ERR-1": {
+        "other": "数据集格式错误"
+    },
+    "error.DAT-ERR-2": {
+        "other": "没有有效的 Parquet 文件"
+    }
+}

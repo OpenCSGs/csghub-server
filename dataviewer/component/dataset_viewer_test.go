@@ -2,12 +2,14 @@ package component
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	dvCom "opencsg.com/csghub-server/dataviewer/common"
 )
@@ -142,6 +144,68 @@ func TestDatasetViewerComponent_Rows(t *testing.T) {
 
 }
 
+func TestDatasetViewerComponent_Rows_NoValidParquetFile(t *testing.T) {
+	ctx := context.TODO()
+	dc := initializeTestDatasetViewerComponent(ctx, t)
+
+	repo := &database.Repository{DefaultBranch: "main"}
+
+	// Mock repository lookup
+	dc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.DatasetRepo, "ns", "repo").Return(
+		repo, nil,
+	)
+
+	// Mock permission check
+	dc.mocks.components.repo.EXPECT().AllowReadAccessRepo(ctx, repo, "user").Return(true, nil)
+
+	// Mock viewer card lookup
+	dc.mocks.stores.ViewerMock().EXPECT().GetViewerByRepoID(ctx, int64(0)).Return(nil, nil)
+
+	// Mock readme.md file content lookup
+	dc.mocks.gitServer.EXPECT().GetRepoFileContents(mock.Anything, gitserver.GetRepoInfoByPathReq{
+		Namespace: "ns",
+		Name:      "repo",
+		Ref:       "main",
+		Path:      types.REPOCARD_FILENAME,
+		RepoType:  types.DatasetRepo,
+	}).Return(&types.File{
+		LfsRelativePath: "a/b",
+		LfsSHA256:       "c5185c4794be2d8a9784d5753c9922db38df478ce11f9ed0b415b7304d896836",
+		Content:         "LS0tCmNvbmZpZ3M6Ci0gY29uZmlnX25hbWU6ICJmb28iCiAgZGF0YV9maWxlczoKICAtIHNwbGl0OiB0cmFpbgogICAgcGF0aDogZm9vLy4qCi0gY29uZmlnX25hbWU6ICJiYXIiCiAgZGF0YV9maWxlczoKICAtIHNwbGl0OiB0cmFpbgpwYXRoOiBiYXIvLioKLS0tCg==",
+	}, nil)
+	dc.mocks.gitServer.EXPECT().GetRepoFileContents(mock.Anything, gitserver.GetRepoInfoByPathReq{
+		Namespace: "ns",
+		Name:      "repo",
+		Ref:       "main",
+		Path:      "foo/.*",
+		RepoType:  types.DatasetRepo,
+	}).Return(nil, errors.New("no file found"))
+	// Mock GetTree to return no files
+	dc.mocks.gitServer.EXPECT().GetTree(mock.Anything, types.GetTreeRequest{
+		Namespace: "ns",
+		Name:      "repo",
+		Ref:       "main",
+		RepoType:  types.DatasetRepo,
+		Limit:     500,
+		Recursive: true,
+	}).Return(&types.GetRepoFileTreeResp{Files: []*types.File{}}, nil)
+
+	resp, err := dc.Rows(ctx, &dvCom.ViewParquetFileReq{
+		Namespace:   "ns",
+		RepoName:    "repo",
+		Branch:      "main",
+		Path:        "foo",
+		Per:         10,
+		Page:        1,
+		CurrentUser: "user",
+	}, types.DataViewerReq{Split: "train", Config: "foo"})
+
+	require.Error(t, err)
+	require.Nil(t, resp)
+
+	require.True(t, errors.Is(err, errorx.ErrNoValidParquetFile))
+}
+
 func TestDatasetViewerComponent_LimitOffsetRowsNoCard(t *testing.T) {
 	ctx := context.TODO()
 	dc := initializeTestDatasetViewerComponent(ctx, t)
@@ -172,7 +236,7 @@ func TestDatasetViewerComponent_LimitOffsetRowsNoCard(t *testing.T) {
 		Ref:       "main",
 		Path:      "foo",
 		RepoType:  types.DatasetRepo,
-		Limit:     500,
+		Limit:     types.MaxFileTreeSize,
 		Recursive: true,
 	}).Return(
 		&types.GetRepoFileTreeResp{Files: []*types.File{
@@ -419,4 +483,60 @@ func TestDatasetViewerComponent_GetCatalog(t *testing.T) {
 		require.Nil(t, err)
 		require.Equal(t, &dvCom.CataLogRespone{Configs: []dvCom.ConfigData{{ConfigName: "default", DataFiles: []dvCom.DataFiles{{Split: "train", Path: []string{"foo/train.parquet"}}}}}, DatasetInfos: []dvCom.DatasetInfo{{ConfigName: "default", Splits: []dvCom.Split{{Name: "train", NumExamples: 100}}}}}, data)
 	})
+}
+
+func TestDatasetViewerComponent_LimitOffsetRows_NoValidParquetFile(t *testing.T) {
+	ctx := context.TODO()
+	dc := initializeTestDatasetViewerComponent(ctx, t)
+
+	repo := &database.Repository{DefaultBranch: "main"}
+
+	// Mock repository lookup
+	dc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.DatasetRepo, "ns", "repo").Return(
+		repo, nil,
+	)
+
+	// Mock permission check
+	dc.mocks.components.repo.EXPECT().AllowReadAccessRepo(ctx, repo, "user").Return(true, nil)
+
+	// Mock viewer card lookup
+	dc.mocks.stores.ViewerMock().EXPECT().GetViewerByRepoID(ctx, int64(0)).Return(nil, nil)
+
+	// Mock readme.md file content lookup
+	dc.mocks.gitServer.EXPECT().GetRepoFileContents(mock.Anything, gitserver.GetRepoInfoByPathReq{
+		Namespace: "ns",
+		Name:      "repo",
+		Ref:       "main",
+		Path:      types.REPOCARD_FILENAME,
+		RepoType:  types.DatasetRepo,
+	}).Return(&types.File{
+		Content: "invalid yaml content",
+	}, nil)
+
+	// Mock GetTree to return no files
+	dc.mocks.gitServer.EXPECT().GetTree(mock.Anything, types.GetTreeRequest{
+		Namespace: "ns",
+		Name:      "repo",
+		Ref:       "main",
+		Path:      "foo",
+		RepoType:  types.DatasetRepo,
+		Limit:     types.MaxFileTreeSize,
+		Recursive: true,
+	}).Return(&types.GetRepoFileTreeResp{Files: []*types.File{}}, nil)
+
+	resp, err := dc.LimitOffsetRows(ctx, &dvCom.ViewParquetFileReq{
+		Namespace:   "ns",
+		RepoName:    "repo",
+		Branch:      "main",
+		Path:        "foo",
+		Per:         10,
+		Page:        1,
+		CurrentUser: "user",
+	}, types.DataViewerReq{Split: "train", Config: "foo"})
+
+	require.Error(t, err)
+	require.Nil(t, resp)
+
+	// Check that error is of type NoValidParquetFile
+	require.True(t, errors.Is(err, errorx.ErrNoValidParquetFile))
 }

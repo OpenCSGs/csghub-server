@@ -126,3 +126,12 @@ func DeleteBranchFailed(err error, ctx context) error {
 		context: ctx,
 	}
 }
+
+func GitFileNotFound(err error, ctx context) error {
+	return CustomError{
+		prefix:  errGitPrefix,
+		code:    gitFileNotFound,
+		err:     err,
+		context: ctx,
+	}
+}
