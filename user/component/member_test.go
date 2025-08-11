@@ -552,3 +552,47 @@ func TestMemberComponent_OrgMembers(t *testing.T) {
 		require.Equal(t, expectedMembers, actualMembers)
 	})
 }
+
+func TestMemberComponent_GetMember(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	orgName := "org1"
+	// annonymous user
+	userName := ""
+
+	mockorg := mockdb.NewMockOrgStore(t)
+	org := database.Organization{
+		ID:   1,
+		Name: "org1",
+	}
+	mockorg.EXPECT().FindByPath(ctx, orgName).Return(org, nil)
+
+	user := database.User{
+		ID: 1,
+	}
+	mockus := mockdb.NewMockUserStore(t)
+	// user not found
+	mockus.EXPECT().FindByUsername(ctx, userName).Return(user, nil)
+
+	mems := mockdb.NewMockMemberStore(t)
+	member := &database.Member{
+		ID:             1,
+		OrganizationID: 1,
+		UserID:         1,
+		Role:           "role_1",
+		User: &database.User{
+			ID: 1, Username: "user1", NickName: "nick1", Avatar: "avatar1", UUID: "uuid1",
+			LastLoginAt: "2020-01-01T00:00:00Z",
+		},
+	}
+	mems.EXPECT().Find(ctx, org.ID, member.UserID).Return(member, nil)
+	mc := &memberComponentImpl{
+		memberStore: mems,
+		orgStore:    mockorg,
+		userStore:   mockus,
+	}
+	m, err := mc.GetMember(ctx, orgName, userName)
+	require.NoError(t, err)
+	require.Equal(t, m.UserID, user.ID)
+}

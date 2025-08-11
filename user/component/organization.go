@@ -8,8 +8,10 @@ import (
 
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
+	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -229,6 +231,37 @@ func (c *organizationComponentImpl) Update(ctx context.Context, req *types.EditO
 	if req.OrgType != nil {
 		org.OrgType = *req.OrgType
 	}
+
+	if req.NewOwner != nil {
+		operator, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get operator user, error: %w", err)
+		}
+		if org.UserID != operator.ID && !operator.CanAdmin() {
+			return nil, errorx.ErrForbiddenMsg("current user does not have permission to edit the organization.")
+		}
+		newOwner, err := c.userStore.FindByUsername(ctx, *req.NewOwner)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get newOwner user, error: %w", err)
+		}
+
+		if newOwner.ID == org.UserID {
+			return nil, fmt.Errorf("new owner is the same as the current owner")
+		}
+
+		member, err := c.msc.GetMember(ctx, req.Name, newOwner.Username)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get member role, error: %w", err)
+		}
+		if member.Role != string(membership.RoleAdmin) {
+			err := c.msc.ChangeMemberRole(ctx, req.Name, newOwner.Username, req.CurrentUser, member.Role, string(membership.RoleAdmin))
+			if err != nil {
+				return nil, fmt.Errorf("failed to change member role, error: %w", err)
+			}
+		}
+		org.UserID = newOwner.ID
+	}
+
 	err = c.orgStore.Update(ctx, &org)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update database organization, error: %w", err)

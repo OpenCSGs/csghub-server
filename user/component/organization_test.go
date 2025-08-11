@@ -130,3 +130,77 @@ func TestOrganizationComponent_Index(t *testing.T) {
 		return true
 	})
 }
+
+func TestOrganizationComponent_Update(t *testing.T) {
+	org := database.Organization{
+		ID:       1,
+		UserID:   1,
+		Name:     "org1",
+		Nickname: "org_nickname",
+		Homepage: "org-homepage.com",
+		Logo:     "org-logo.png",
+		OrgType:  "school",
+		Verified: false,
+	}
+	mockOrgStore := mockdb.NewMockOrgStore(t)
+	mockOrgStore.EXPECT().FindByPath(mock.Anything, "org1").Return(org, nil)
+	mockOrgStore.EXPECT().Update(mock.Anything, mock.Anything).Return(nil)
+
+	mockUserStore := mockdb.NewMockUserStore(t)
+	user1 := database.User{
+		Username: "user1",
+		RoleMask: "",
+		ID:       2,
+	}
+	operator := database.User{
+		Username: "op",
+		ID:       1,
+	}
+	mockUserStore.EXPECT().FindByUsername(mock.Anything, user1.Username).Return(user1, nil)
+	mockUserStore.EXPECT().FindByUsername(mock.Anything, operator.Username).Return(operator, nil)
+
+	mems := mockdb.NewMockMemberStore(t)
+	member := &database.Member{
+		ID:             1,
+		OrganizationID: 1,
+		UserID:         2,
+		Role:           "admin",
+		User: &database.User{
+			ID: 2, Username: "user1", NickName: "nick1", Avatar: "avatar1", UUID: "uuid1",
+			LastLoginAt: "2020-01-01T00:00:00Z",
+		},
+	}
+
+	opMember := &database.Member{
+		ID:             2,
+		OrganizationID: 1,
+		UserID:         1,
+		Role:           "admin",
+		User: &database.User{
+			ID: 1, Username: "op", NickName: "nick1", Avatar: "avatar1", UUID: "uuid1",
+			LastLoginAt: "2020-01-01T00:00:00Z",
+		},
+	}
+	mems.EXPECT().Find(mock.Anything, org.ID, int64(1)).Return(opMember, nil)
+	mems.EXPECT().Find(mock.Anything, org.ID, int64(2)).Return(member, nil)
+
+	mc := &memberComponentImpl{
+		memberStore: mems,
+		userStore:   mockUserStore,
+		orgStore:    mockOrgStore,
+	}
+
+	c := &organizationComponentImpl{
+		orgStore:  mockOrgStore,
+		userStore: mockUserStore,
+		msc:       mc,
+	}
+	returnOrg, err := c.Update(context.Background(), &types.EditOrgReq{
+		Name:        "org1",
+		NewOwner:    &user1.Username,
+		CurrentUser: operator.Username,
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, "org1", returnOrg.Name)
+}

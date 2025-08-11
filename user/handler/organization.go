@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
 	apicomponent "opencsg.com/csghub-server/component"
@@ -209,6 +210,10 @@ func (h *OrganizationHandler) Update(ctx *gin.Context) {
 	req.Name = ctx.Param("namespace")
 	org, err := h.c.Update(ctx, &req)
 	if err != nil {
+		if errors.Is(err, errorx.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
 		slog.Error("Failed to update organizations", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
