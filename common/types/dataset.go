@@ -48,6 +48,7 @@ type Dataset struct {
 	MirrorLastUpdatedAt  time.Time            `json:"mirror_last_updated_at"`
 	URL                  string               `json:"url"`
 	MultiSource
+	MirrorTaskStatus MirrorTaskStatus `json:"mirror_task_status"`
 }
 
 type DataViewerReq struct {

@@ -298,7 +298,11 @@ func (m *mcpServerComponentImpl) updateMCPServerInfo(mcpServer *database.MCPServ
 }
 
 func (m *mcpServerComponentImpl) Show(ctx context.Context, namespace string, name string, currentUser string, needOpWeight, needMultiSync bool) (*types.MCPServer, error) {
-	var tags []types.RepoTag
+	var (
+		tags             []types.RepoTag
+		mirrorTaskStatus types.MirrorTaskStatus
+		syncStatus       types.RepositorySyncStatus
+	)
 	mcpServer, err := m.mcpServerStore.ByPath(ctx, namespace, name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find mcp server %s/%s, error: %w", namespace, name, err)
@@ -336,6 +340,8 @@ func (m *mcpServerComponentImpl) Show(ctx context.Context, namespace string, nam
 		return nil, newError
 	}
 
+	mirrorTaskStatus, syncStatus = m.repoComponent.GetMirrorTaskStatusAndSyncStatus(mcpServer.Repository)
+
 	res := &types.MCPServer{
 		ID:            mcpServer.ID,
 		Name:          mcpServer.Repository.Name,
@@ -358,7 +364,7 @@ func (m *mcpServerComponentImpl) Show(ctx context.Context, namespace string, nam
 		UpdatedAt:     mcpServer.Repository.UpdatedAt,
 		UserLikes:     likeExists,
 		Source:        mcpServer.Repository.Source,
-		SyncStatus:    mcpServer.Repository.SyncStatus,
+		SyncStatus:    syncStatus,
 		License:       mcpServer.Repository.License,
 		CanWrite:      permission.CanWrite,
 		CanManage:     permission.CanAdmin,
@@ -373,11 +379,12 @@ func (m *mcpServerComponentImpl) Show(ctx context.Context, namespace string, nam
 			MSPath:  mcpServer.Repository.MSPath,
 			CSGPath: mcpServer.Repository.CSGPath,
 		},
-		ProgramLanguage: mcpServer.ProgramLanguage,
-		RunMode:         mcpServer.RunMode,
-		InstallDepsCmds: mcpServer.InstallDepsCmds,
-		BuildCmds:       mcpServer.BuildCmds,
-		LaunchCmds:      mcpServer.LaunchCmds,
+		ProgramLanguage:  mcpServer.ProgramLanguage,
+		RunMode:          mcpServer.RunMode,
+		InstallDepsCmds:  mcpServer.InstallDepsCmds,
+		BuildCmds:        mcpServer.BuildCmds,
+		LaunchCmds:       mcpServer.LaunchCmds,
+		MirrorTaskStatus: mirrorTaskStatus,
 	}
 	if permission.CanAdmin {
 		res.SensitiveCheckStatus = mcpServer.Repository.SensitiveCheckStatus.String()

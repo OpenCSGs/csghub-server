@@ -155,6 +155,9 @@ func TestCodeComponent_Show(t *testing.T) {
 	cc.mocks.components.repo.EXPECT().GetUserRepoPermission(ctx, "user", code.Repository).Return(
 		&types.UserRepoPermission{CanRead: true, CanAdmin: true}, nil,
 	)
+	cc.mocks.components.repo.EXPECT().GetMirrorTaskStatusAndSyncStatus(code.Repository).Return(
+		types.MirrorRepoSyncStart, types.SyncStatusInProgress,
+	)
 	cc.mocks.stores.UserLikesMock().EXPECT().IsExist(ctx, "user", int64(11)).Return(true, nil)
 	cc.mocks.components.repo.EXPECT().GetNameSpaceInfo(ctx, "ns").Return(&types.Namespace{}, nil)
 
@@ -173,6 +176,8 @@ func TestCodeComponent_Show(t *testing.T) {
 		CanManage:            true,
 		UserLikes:            true,
 		SensitiveCheckStatus: "Pending",
+		MirrorTaskStatus:     types.MirrorRepoSyncStart,
+		SyncStatus:           types.SyncStatusInProgress,
 	}, data)
 }
 
