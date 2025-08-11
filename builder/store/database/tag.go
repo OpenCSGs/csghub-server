@@ -205,6 +205,8 @@ func (ts *tagStoreImpl) SaveTags(ctx context.Context, tags []*Tag) error {
 }
 
 // SetMetaTags will delete existing tags and create new ones
+//
+// return updated meta tags, exclude exCategories
 func (ts *tagStoreImpl) SetMetaTags(ctx context.Context, repoType types.RepositoryType, namespace, name string, tags []*Tag) (repoTags []*RepositoryTag, err error) {
 	repo := new(Repository)
 	err = ts.db.Operator.Core.NewSelect().Model(repo).
@@ -221,6 +223,7 @@ func (ts *tagStoreImpl) SetMetaTags(ctx context.Context, repoType types.Reposito
 		"framework":         true,
 		"runtime_framework": true,
 		"evaluation":        true,
+		"industry":          true,
 	}
 	for _, tag := range repo.Tags {
 		if !exCategories[tag.Category] {
