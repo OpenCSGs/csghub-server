@@ -37,6 +37,7 @@ type MemberComponent interface {
 	AddMembers(ctx context.Context, orgName string, users []string, operatorName string, role string) error
 	AddMember(ctx context.Context, orgName, userName, operatorName string, role string) error
 	Delete(ctx context.Context, orgName, userName, operatorName string, role string) error
+	GetMember(ctx context.Context, orgName, userName string) (*database.Member, error)
 }
 
 func NewMemberComponent(config *config.Config) (MemberComponent, error) {
@@ -357,4 +358,20 @@ func (c *memberComponentImpl) sendMemberMsg(ctx context.Context, userUUIDs []str
 		return fmt.Errorf("failed to publish site msg, msg: %+v, err: %w", msg, err)
 	}
 	return nil
+}
+
+func (c *memberComponentImpl) GetMember(ctx context.Context, orgName, userName string) (*database.Member, error) {
+	org, err := c.orgStore.FindByPath(ctx, orgName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find org,caused by:%w", err)
+	}
+	user, err := c.userStore.FindByUsername(ctx, userName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find user,caused by:%w", err)
+	}
+	m, err := c.memberStore.Find(ctx, org.ID, user.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find member:%w", err)
+	}
+	return m, err
 }

@@ -52,6 +52,7 @@ type EditOrgReq struct {
 	Logo        *string `json:"logo,omitempty" example:"https://www.example.com/logo.png"`
 	Verified    *bool   `json:"verified" example:"false"`
 	OrgType     *string `json:"org_type" example:"company or school etc"`
+	NewOwner    *string `json:"owner" example:"username"`
 	CurrentUser string  `json:"-"`
 }
 

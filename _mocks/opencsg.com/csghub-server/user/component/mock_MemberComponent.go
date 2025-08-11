@@ -227,6 +227,66 @@ func (_c *MockMemberComponent_Delete_Call) RunAndReturn(run func(context.Context
 	return _c
 }
 
+// GetMember provides a mock function with given fields: ctx, orgName, userName
+func (_m *MockMemberComponent) GetMember(ctx context.Context, orgName string, userName string) (*database.Member, error) {
+	ret := _m.Called(ctx, orgName, userName)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetMember")
+	}
+
+	var r0 *database.Member
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) (*database.Member, error)); ok {
+		return rf(ctx, orgName, userName)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) *database.Member); ok {
+		r0 = rf(ctx, orgName, userName)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.Member)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+		r1 = rf(ctx, orgName, userName)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockMemberComponent_GetMember_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetMember'
+type MockMemberComponent_GetMember_Call struct {
+	*mock.Call
+}
+
+// GetMember is a helper method to define mock.On call
+//   - ctx context.Context
+//   - orgName string
+//   - userName string
+func (_e *MockMemberComponent_Expecter) GetMember(ctx interface{}, orgName interface{}, userName interface{}) *MockMemberComponent_GetMember_Call {
+	return &MockMemberComponent_GetMember_Call{Call: _e.mock.On("GetMember", ctx, orgName, userName)}
+}
+
+func (_c *MockMemberComponent_GetMember_Call) Run(run func(ctx context.Context, orgName string, userName string)) *MockMemberComponent_GetMember_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(string))
+	})
+	return _c
+}
+
+func (_c *MockMemberComponent_GetMember_Call) Return(_a0 *database.Member, _a1 error) *MockMemberComponent_GetMember_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockMemberComponent_GetMember_Call) RunAndReturn(run func(context.Context, string, string) (*database.Member, error)) *MockMemberComponent_GetMember_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetMemberRole provides a mock function with given fields: ctx, orgName, userName
 func (_m *MockMemberComponent) GetMemberRole(ctx context.Context, orgName string, userName string) (membership.Role, error) {
 	ret := _m.Called(ctx, orgName, userName)
