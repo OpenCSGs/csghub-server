@@ -369,6 +369,9 @@ func TestMemberComponent_Delete(t *testing.T) {
 
 		mockMemberStore := mockdb.NewMockMemberStore(t)
 		mockMemberStore.EXPECT().UserUUIDsByOrganizationID(mock.Anything, org.ID).Return([]string{"user0"}, nil).Once()
+		mockMemberStore.EXPECT().
+			OrganizationMembers(context.Background(), int64(1), "", 1, 1).
+			Return(nil, 2, nil)
 		// operator is org admin
 		mockMemberStore.EXPECT().Find(mock.Anything, org.ID, operator.ID).Return(&database.Member{
 			Role: string(membership.RoleAdmin),
@@ -452,6 +455,9 @@ func TestMemberComponent_Delete(t *testing.T) {
 
 		mockMemberStore := mockdb.NewMockMemberStore(t)
 		mockMemberStore.EXPECT().UserUUIDsByOrganizationID(mock.Anything, org.ID).Return([]string{"user0"}, nil).Once()
+		mockMemberStore.EXPECT().
+			OrganizationMembers(context.Background(), int64(1), "", 1, 1).
+			Return(nil, 2, nil)
 		// operator is org admin
 		mockMemberStore.EXPECT().Find(mock.Anything, org.ID, operator.ID).Return(&database.Member{
 			Role: string(membership.RoleAdmin),
@@ -543,7 +549,7 @@ func TestMemberComponent_OrgMembers(t *testing.T) {
 				LastLoginAt: "2020-01-01T00:00:00Z",
 			},
 		})
-		mems.EXPECT().OrganizationMembers(ctx, org.ID, mock.Anything, mock.Anything).Return(members, len(members), nil)
+		mems.EXPECT().OrganizationMembers(ctx, org.ID, "", mock.Anything, mock.Anything).Return(members, len(members), nil)
 
 		mc := &memberComponentImpl{
 			memberStore: mems,
@@ -619,7 +625,7 @@ func TestMemberComponent_OrgMembers(t *testing.T) {
 				LastLoginAt: "2020-01-01T00:00:00Z",
 			},
 		})
-		mems.EXPECT().OrganizationMembers(mock.Anything, org.ID, mock.Anything, mock.Anything).Return(members, len(members), nil)
+		mems.EXPECT().OrganizationMembers(mock.Anything, org.ID, "", mock.Anything, mock.Anything).Return(members, len(members), nil)
 		mems.EXPECT().Find(mock.Anything, org.ID, user.ID).Return(&members[0], nil)
 
 		mc := &memberComponentImpl{

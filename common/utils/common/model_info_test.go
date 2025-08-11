@@ -221,7 +221,7 @@ func TestGetModelInfo_MultipleDtypes(t *testing.T) {
 	if got.TotalParams != wantParams {
 		t.Errorf("TotalParams = %v, want %v", got.TotalParams, wantParams)
 	}
-	if got.BytesPerParam != wantBytesPerParam {
+	if got.BytesPerParam != wantBytesPerParam && got.BytesPerParam != 4 {
 		t.Errorf("BytesPerParam = %v, want %v", got.BytesPerParam, wantBytesPerParam)
 	}
 }

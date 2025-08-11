@@ -1,9 +1,13 @@
 package handler
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
+
+	"opencsg.com/csghub-server/common/errorx"
+	"opencsg.com/csghub-server/common/types"
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
@@ -158,18 +162,15 @@ func (h *MemberHandler) Create(ctx *gin.Context) {
 // @Param        namespace path string true "org name"
 // @Param        username path string true "user name"
 // @Param        current_user query string false "the op user"
-// @Param        body body handler.Delete.removeMemberRequest true "body"
+// @Param        body body types.RemoveMemberRequest true "body"
 // @Success      200  {object}  types.Response{} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /organization/{namespace}/members/{username} [delete]
 func (h *MemberHandler) Delete(ctx *gin.Context) {
-	type removeMemberRequest struct {
-		Role string `json:"role" binding:"required"`
-	}
-	req := new(removeMemberRequest)
-	if err := ctx.ShouldBindJSON(req); err != nil {
-		httpbase.BadRequest(ctx, fmt.Errorf("failed to unmarshal request body,caused by:%w", err).Error())
+	var req types.RemoveMemberRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		httpbase.ServerError(ctx, fmt.Errorf("failed to unmarshal request body,caused by: %w", err))
 		return
 	}
 	currentUser := httpbase.GetCurrentUser(ctx)
@@ -179,10 +180,17 @@ func (h *MemberHandler) Delete(ctx *gin.Context) {
 	if err != nil {
 		slog.ErrorContext(ctx, "delete member fail", slog.Any("error", err),
 			slog.Group("request",
-				slog.String("org", org), slog.String("username", userName), slog.String("role", req.Role), slog.String("op_user", currentUser),
+				slog.String("org", org), slog.String("username", userName),
+				slog.String("role", req.Role), slog.String("op_user", currentUser),
 			),
 		)
-		httpbase.ServerError(ctx, err)
+		if errors.Is(err, errorx.ErrReqParamInvalid) {
+			httpbase.BadRequestWithExt(ctx, err)
+		} else if errors.Is(err, errorx.ErrLastOrgAdmin) {
+			httpbase.ConflictError(ctx, err)
+		} else {
+			httpbase.ServerError(ctx, err)
+		}
 		return
 	}
 
