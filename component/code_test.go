@@ -3,7 +3,9 @@ package component
 import (
 	"context"
 	"testing"
+	"time"
 
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/store/database"
@@ -33,6 +35,14 @@ func TestCodeComponent_Create(t *testing.T) {
 	crq.Readme = generateReadmeData(req.License)
 	crq.RepoType = types.CodeRepo
 	crq.DefaultBranch = "main"
+	cc.mocks.components.repo.EXPECT().
+		SendAssetManagementMsg(mock.Anything, types.RepoNotificationReq{
+			RepoType:  types.CodeRepo,
+			RepoPath:  "",
+			Operation: types.OperationCreate,
+			UserUUID:  "",
+		}).
+		Return(nil)
 	cc.mocks.components.repo.EXPECT().CreateRepo(ctx, crq).Return(
 		nil, dbrepo, nil,
 	)
@@ -61,10 +71,11 @@ func TestCodeComponent_Create(t *testing.T) {
 		NewBranch: "main",
 		Namespace: "ns",
 		Name:      "n",
-		FilePath:  gitattributesFileName,
+		FilePath:  types.GitattributesFileName,
 	}, types.CodeRepo)).Return(nil)
 
 	resp, err := cc.Create(ctx, req)
+	time.Sleep(10 * time.Millisecond)
 	require.Nil(t, err)
 	require.Equal(t, &types.Code{
 		RepositoryID: 1,
@@ -131,16 +142,40 @@ func TestCodeComponent_Delete(t *testing.T) {
 	ctx := context.TODO()
 	cc := initializeTestCodeComponent(ctx, t)
 
-	cc.mocks.stores.CodeMock().EXPECT().FindByPath(ctx, "ns", "n").Return(&database.Code{}, nil)
+	code := &database.Code{
+		ID:           123,
+		RepositoryID: 1,
+		Repository: &database.Repository{
+			ID: 1,
+			User: database.User{
+				UUID: "owner-uuid",
+			},
+			Path: "code-path",
+		},
+	}
+	repo := &database.Repository{
+		ID: 1,
+		User: database.User{
+			UUID: "owner-uuid",
+		},
+	}
+	cc.mocks.stores.CodeMock().EXPECT().FindByPath(ctx, "ns", "n").Return(code, nil)
 	cc.mocks.components.repo.EXPECT().DeleteRepo(ctx, types.DeleteRepoReq{
 		Username:  "user",
 		Namespace: "ns",
 		Name:      "n",
 		RepoType:  types.CodeRepo,
-	}).Return(nil, nil)
-	cc.mocks.stores.CodeMock().EXPECT().Delete(ctx, database.Code{}).Return(nil)
+	}).Return(repo, nil)
 
+	cc.mocks.stores.CodeMock().EXPECT().Delete(ctx, *code).Return(nil)
+	cc.mocks.components.repo.EXPECT().SendAssetManagementMsg(mock.Anything, types.RepoNotificationReq{
+		RepoType:  types.CodeRepo,
+		RepoPath:  "",
+		Operation: types.OperationDelete,
+		UserUUID:  "owner-uuid",
+	}).Return(nil)
 	err := cc.Delete(ctx, "ns", "n", "user")
+	time.Sleep(10 * time.Millisecond)
 	require.Nil(t, err)
 }
 

@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/minio/minio-go/v7"
 	ignore "github.com/sabhiram/go-gitignore"
 	"github.com/spf13/cast"
@@ -86,6 +87,7 @@ type repoComponentImpl struct {
 	lfsMetaObjectStore     database.LfsMetaObjectStore
 	recomStore             database.RecomStore
 	mirrorTaskStore        database.MirrorTaskStore
+	notificationSvcClient  rpc.NotificationSvcClient
 	multiSyncClient        multisync.Client
 }
 
@@ -162,6 +164,7 @@ type RepoComponent interface {
 	GenerateEndpoint(ctx context.Context, deploy *database.Deploy) (string, string)
 	IsAdminRole(user database.User) bool
 	CheckAccountAndResource(ctx context.Context, userName string, clusterID string, orderDetailID int64, resource *database.SpaceResource) error
+	SendAssetManagementMsg(ctx context.Context, req types.RepoNotificationReq) error
 	RemoteDiff(ctx context.Context, req types.GetDiffBetweenCommitsReq) ([]types.RemoteDiffs, error)
 	Preupload(ctx context.Context, req types.PreuploadReq) (*types.PreuploadResp, error)
 	CommitFiles(ctx context.Context, req types.CommitFilesReq) error
@@ -244,6 +247,8 @@ func NewRepoComponent(config *config.Config) (RepoComponent, error) {
 	}
 	apiDomain := config.MultiSync.SaasAPIDomain
 	c.multiSyncClient = multisync.FromOpenCSG(apiDomain, setting.Token)
+	c.notificationSvcClient = rpc.NewNotificationSvcHttpClient(fmt.Sprintf("%s:%d", config.Notification.Host, config.Notification.Port),
+		rpc.AuthWithApiKey(config.APIToken))
 	return c, nil
 }
 
@@ -3294,6 +3299,100 @@ func cleanBase64(input string) string {
 		cleaned += strings.Repeat("=", 4-m)
 	}
 	return cleaned
+}
+
+func (c *repoComponentImpl) SendAssetManagementMsg(ctx context.Context, req types.RepoNotificationReq) error {
+	if req.RepoType == types.UnknownRepo {
+		return fmt.Errorf("unknown repository")
+	}
+	if req.UserUUID == "" {
+		return fmt.Errorf("no user UUID provided")
+	}
+
+	assetName := string(req.RepoType)
+	assetId := req.RepoPath
+
+	var (
+		operation string
+		content   string
+		repoUrl   string
+	)
+
+	switch req.Operation {
+	case types.OperationCreate:
+		operation = "Created"
+		content = fmt.Sprintf("[%s] created successfully.", assetId)
+		repoUrl = GetRepoUrl(req.RepoType, req.RepoPath)
+	case types.OperationDelete:
+		operation = "Deleted"
+		content = fmt.Sprintf("[%s] has been deleted.", assetId)
+	}
+
+	title := fmt.Sprintf("[%s] %s", assetName, operation)
+
+	msg := types.NotificationMessage{
+		MsgUUID:          uuid.New().String(),
+		UserUUIDs:        []string{req.UserUUID},
+		NotificationType: types.NotificationAssetManagement,
+		Title:            title,
+		Content:          content,
+		CreateAt:         time.Now(),
+	}
+
+	if repoUrl != "" {
+		msg.ClickActionURL = repoUrl
+	}
+
+	msgBytes, err := json.Marshal(msg)
+	if err != nil {
+		return fmt.Errorf("failed to marshal message, err: %w", err)
+	}
+
+	notificationMsg := types.MessageRequest{
+		Scenario:   types.MessageScenarioInternalNotification,
+		Parameters: string(msgBytes),
+		Priority:   types.MessagePriorityHigh,
+	}
+
+	var sendErr error
+	retryCount := c.config.Notification.NotificationRetryCount
+	for i := range retryCount {
+		if sendErr = c.notificationSvcClient.Send(ctx, &notificationMsg); sendErr == nil {
+			break
+		}
+		if i < retryCount-1 {
+			slog.Warn("failed to send notification, retrying", "notification_msg", notificationMsg, "attempt", i+1, "error", sendErr.Error())
+		}
+	}
+
+	if sendErr != nil {
+		return fmt.Errorf("failed to send notification after %d attempts, err: %w", retryCount, sendErr)
+	}
+
+	return nil
+}
+
+func GetRepoUrl(repoType types.RepositoryType, repoPath string) string {
+	if repoType == types.UnknownRepo || repoPath == "" {
+		return ""
+	}
+
+	switch repoType {
+	case types.ModelRepo:
+		return fmt.Sprintf("/models/%s", repoPath)
+	case types.DatasetRepo:
+		return fmt.Sprintf("/datasets/%s", repoPath)
+	case types.SpaceRepo:
+		return fmt.Sprintf("/spaces/%s", repoPath)
+	case types.CodeRepo:
+		return fmt.Sprintf("/codes/%s", repoPath)
+	case types.PromptRepo:
+		return fmt.Sprintf("/prompts/%s", repoPath)
+	case types.MCPServerRepo:
+		return fmt.Sprintf("/mcp/servers/%s", repoPath)
+	default:
+		return ""
+	}
 }
 
 // ValidateYaml

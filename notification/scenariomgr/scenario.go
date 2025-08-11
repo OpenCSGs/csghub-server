@@ -9,9 +9,14 @@ import (
 	"opencsg.com/csghub-server/notification/notifychannel"
 )
 
+// NotificationData is the data for a notification
 type NotificationData struct {
-	MessageData any
-	Receiver    *notifychannel.Receiver
+	// message object
+	Message any
+	// payload for template rendering
+	Payload any
+	// target receiver object
+	Receiver *notifychannel.Receiver
 }
 
 type GetDataFunc func(ctx context.Context, conf *config.Config, msg types.ScenarioMessage) (*NotificationData, error)

@@ -3,6 +3,9 @@ package component
 import (
 	"context"
 	"testing"
+	"time"
+
+	"github.com/stretchr/testify/mock"
 
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/git/membership"
@@ -27,6 +30,7 @@ func TestMCPServerComponent_Create(t *testing.T) {
 	}
 
 	user := database.User{
+		UUID:     "user-uuid",
 		Username: "user",
 		Email:    "foo@bar.com",
 	}
@@ -57,6 +61,7 @@ func TestMCPServerComponent_Create(t *testing.T) {
 		Configuration: req.Configuration,
 		Repository:    dbrepo,
 	}).Return(&database.MCPServer{
+		ID:            321,
 		RepositoryID:  dbrepo.ID,
 		Configuration: req.Configuration,
 		Repository:    dbrepo,
@@ -73,8 +78,16 @@ func TestMCPServerComponent_Create(t *testing.T) {
 		Name:      req.Name,
 		FilePath:  types.ReadmeFileName,
 	}, types.MCPServerRepo)).Return(nil)
-
+	mc.mocks.components.repo.EXPECT().
+		SendAssetManagementMsg(mock.Anything, types.RepoNotificationReq{
+			RepoType:  types.MCPServerRepo,
+			Operation: types.OperationCreate,
+			RepoPath:  "test-namespace/test-server",
+			UserUUID:  "user-uuid",
+		}).
+		Return(nil).Once()
 	res, err := mc.Create(ctx, req)
+	time.Sleep(10 * time.Millisecond)
 	require.Nil(t, err)
 	require.NotNil(t, res)
 	require.Equal(t, res.RepositoryID, int64(321))
@@ -96,6 +109,7 @@ func TestMCPServerComponent_Delete(t *testing.T) {
 	}
 
 	user := database.User{
+		UUID:     "user-uuid",
 		Username: "user",
 		Email:    "foo@bar.com",
 	}
@@ -111,6 +125,7 @@ func TestMCPServerComponent_Delete(t *testing.T) {
 	}
 
 	mc.mocks.stores.MCPServerMock().EXPECT().ByPath(ctx, "test-namespace", "test-server").Return(&database.MCPServer{
+		ID:           321,
 		RepositoryID: 123,
 		Repository:   dbrepo,
 	}, nil)
@@ -124,14 +139,22 @@ func TestMCPServerComponent_Delete(t *testing.T) {
 		Namespace: req.Namespace,
 		Name:      req.Name,
 		RepoType:  types.MCPServerRepo,
-	}).Return(nil, nil)
+	}).Return(dbrepo, nil)
 
 	mc.mocks.stores.MCPServerMock().EXPECT().Delete(ctx, database.MCPServer{
+		ID:           321,
 		RepositoryID: 123,
 		Repository:   dbrepo,
 	}).Return(nil)
 
+	mc.mocks.components.repo.EXPECT().SendAssetManagementMsg(mock.Anything, types.RepoNotificationReq{
+		RepoType:  types.MCPServerRepo,
+		Operation: types.OperationDelete,
+		RepoPath:  "test-namespace/test-server",
+		UserUUID:  "user-uuid",
+	}).Return(nil)
 	err := mc.Delete(ctx, req)
+	time.Sleep(10 * time.Millisecond)
 	require.Nil(t, err)
 }
 

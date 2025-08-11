@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"reflect"
 	"time"
 
 	"github.com/google/uuid"
@@ -13,6 +14,7 @@ import (
 	"opencsg.com/csghub-server/common/types"
 	notifychannel "opencsg.com/csghub-server/notification/notifychannel"
 	internalmsgworkflow "opencsg.com/csghub-server/notification/notifychannel/channel/internalmsg/workflow"
+	"opencsg.com/csghub-server/notification/utils"
 	"opencsg.com/csghub-server/notification/workflow"
 )
 
@@ -39,27 +41,20 @@ func (s *InternalMessageChannel) Send(ctx context.Context, req *notifychannel.No
 		return fmt.Errorf("invalid receiver: %w", err)
 	}
 
-	// Try to extract message data from different possible types
 	var msg types.NotificationMessage
-
-	// First try to cast as NotificationMessage
-	if notificationMsg, ok := req.MessageData.(types.NotificationMessage); ok {
-		msg = notificationMsg
-	} else {
-		// If not a NotificationMessage, try to extract from map or other types
-		// that might contain title/subject and content/message
-		title, content := extractMessageFromData(req.MessageData)
-		msg.Title = title
-		msg.Content = content
+	if req.Message != nil {
+		if extractedMsg, ok := req.Message.(types.NotificationMessage); ok {
+			msg = extractedMsg
+		} else {
+			slog.Warn("invalid message format, will try to extract message", "message", req.Message, "type", fmt.Sprintf("%T", req.Message))
+			title, content := extractMessageFromData(req.Message)
+			msg.Title = title
+			msg.Content = content
+		}
 	}
 
-	// Validate that we have the required fields
-	if msg.Title == "" && msg.Summary == "" {
-		return fmt.Errorf("message must contain either title or summary")
-	}
-
-	if msg.Content == "" {
-		return fmt.Errorf("message must contain content")
+	if err := validateMessageContent(msg); err != nil {
+		return err
 	}
 
 	// Set default notification type if not provided
@@ -83,22 +78,21 @@ func (s *InternalMessageChannel) Send(ctx context.Context, req *notifychannel.No
 		Summary:          msg.Summary,
 		Title:            msg.Title,
 		Content:          msg.Content,
+		Template:         msg.Template,
+		Payload:          msg.Payload,
 		ActionURL:        msg.ClickActionURL,
 		Priority:         msg.Priority,
 	}
 
-	// dispatch site internal message
 	if !req.Receiver.IsBroadcast {
 		userUUIDs := req.Receiver.GetUserUUIDs()
 		if err := s.sendInternalMessageToUsers(ctx, siteInternalMessage, userUUIDs); err != nil {
-			return fmt.Errorf("failed to send site internal message to users: %w", err)
+			return utils.NewErrSendMsg(err, fmt.Sprintf("failed to send site internal message %s to users: %v", siteInternalMessage.MsgUUID, userUUIDs))
 		}
-		slog.Info("send site internal message to users successfully", slog.Any("message id", siteInternalMessage.MsgUUID))
 	} else {
 		if err := s.broadcastInternalMessage(ctx, siteInternalMessage); err != nil {
-			return fmt.Errorf("failed to broadcast site internal message: %w", err)
+			return utils.NewErrSendMsg(err, fmt.Sprintf("failed to broadcast site internal message %s", siteInternalMessage.MsgUUID))
 		}
-		slog.Info("broadcast site internal message to all users successfully", slog.Any("message id", siteInternalMessage.MsgUUID))
 	}
 
 	return nil
@@ -132,7 +126,7 @@ func (s *InternalMessageChannel) broadcastInternalMessage(ctx context.Context, m
 	if err != nil {
 		return fmt.Errorf("failed to start broadcast message workflow: %w", err)
 	}
-	slog.Info("start broadcast message workflow", slog.Any("workflow id", we.GetID()), slog.Any("message id", message.MsgUUID))
+	slog.Info("start broadcast message workflow successfully", slog.Any("workflow id", we.GetID()), slog.Any("message id", message.MsgUUID))
 	return nil
 }
 
@@ -144,14 +138,41 @@ func (s *InternalMessageChannel) sendInternalMessageToUsers(ctx context.Context,
 	return nil
 }
 
-// extractMessageFromData attempts to extract title and content from various input types
 func extractMessageFromData(data any) (title, content string) {
-	// Try to extract from map[string]interface{}
-	if dataMap, ok := data.(map[string]interface{}); ok {
-		// Try different field names for title
-		if titleVal, exists := dataMap["title"]; exists {
-			if titleStr, ok := titleVal.(string); ok {
-				title = titleStr
+	v := reflect.ValueOf(data)
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
+	if v.Kind() == reflect.Struct {
+		t := v.Type()
+		for i := 0; i < v.NumField(); i++ {
+			field := v.Field(i)
+			fieldName := t.Field(i).Name
+
+			if (fieldName == "Title" || fieldName == "Subject") && title == "" {
+				if field.Kind() == reflect.String {
+					title = field.String()
+				}
+			}
+
+			if (fieldName == "Content" || fieldName == "Summary") && content == "" {
+				if field.Kind() == reflect.String {
+					content = field.String()
+				}
+			}
+		}
+
+		if title != "" && content != "" {
+			return title, content
+		}
+	}
+
+	if dataMap, ok := data.(map[string]any); ok {
+		if title == "" {
+			if titleVal, exists := dataMap["title"]; exists {
+				if titleStr, ok := titleVal.(string); ok {
+					title = titleStr
+				}
 			}
 		}
 		if title == "" {
@@ -162,10 +183,11 @@ func extractMessageFromData(data any) (title, content string) {
 			}
 		}
 
-		// Try different field names for content
-		if contentVal, exists := dataMap["content"]; exists {
-			if contentStr, ok := contentVal.(string); ok {
-				content = contentStr
+		if content == "" {
+			if contentVal, exists := dataMap["content"]; exists {
+				if contentStr, ok := contentVal.(string); ok {
+					content = contentStr
+				}
 			}
 		}
 
@@ -179,4 +201,21 @@ func extractMessageFromData(data any) (title, content string) {
 	}
 
 	return title, content
+}
+
+func validateMessageContent(msg types.NotificationMessage) error {
+	if msg.Template != "" && len(msg.Payload) > 0 {
+		return nil
+	}
+
+	// When no template and payload, require direct message content
+	if msg.Title == "" {
+		return fmt.Errorf("message must contain title")
+	}
+
+	if msg.Content == "" {
+		return fmt.Errorf("message must contain content")
+	}
+
+	return nil
 }

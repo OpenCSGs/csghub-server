@@ -16,6 +16,69 @@ func TestNewTemplateManager(t *testing.T) {
 	assert.NotNil(t, tm)
 }
 
+func TestTemplateManager_ParseTemplateOutput(t *testing.T) {
+	tm := NewTemplateManager()
+
+	testCases := []struct {
+		name            string
+		input           string
+		expectedTitle   string
+		expectedContent string
+	}{
+		{
+			name:            "valid title and content with separator",
+			input:           "Test Title---Test Content",
+			expectedTitle:   "Test Title",
+			expectedContent: "Test Content",
+		},
+		{
+			name:            "title and content with whitespace",
+			input:           "  Test Title  ---  Test Content  ",
+			expectedTitle:   "Test Title",
+			expectedContent: "Test Content",
+		},
+		{
+			name:            "no separator - entire output as content",
+			input:           "Just some content without separator",
+			expectedTitle:   "",
+			expectedContent: "Just some content without separator",
+		},
+		{
+			name:            "empty input",
+			input:           "",
+			expectedTitle:   "",
+			expectedContent: "",
+		},
+		{
+			name:            "only title with separator",
+			input:           "Test Title---",
+			expectedTitle:   "Test Title",
+			expectedContent: "",
+		},
+		{
+			name:            "only content with separator",
+			input:           "---Test Content",
+			expectedTitle:   "",
+			expectedContent: "Test Content",
+		},
+		{
+			name:            "multiple separators - only first split",
+			input:           "Title---Content---Extra",
+			expectedTitle:   "Title",
+			expectedContent: "Content---Extra",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := tm.parseTemplateOutput(tc.input)
+
+			assert.Equal(t, tc.expectedTitle, result.Title)
+			assert.Equal(t, tc.expectedContent, result.Content)
+		})
+	}
+}
+
 func TestTemplateManager_Format_DefaultEmailTemplate(t *testing.T) {
 	tm := NewTemplateManager()
 
@@ -28,40 +91,36 @@ func TestTemplateManager_Format_DefaultEmailTemplate(t *testing.T) {
 	}
 
 	// Test with a scenario that doesn't exist, should fall back to default
-	result, err := tm.Format("non-existent-scenario", types.MessageChannelEmail, data)
+	result, err := tm.Format("non-existent-scenario", types.MessageChannelEmail, data, "en-US")
 	require.NoError(t, err)
 
 	// Should contain the default email template structure
-	assert.Contains(t, result, "<html>")
-	assert.Contains(t, result, "<p>")
-	assert.Contains(t, result, "Test Title")
-	assert.Contains(t, result, "Test Content")
+	assert.Contains(t, result.Content, "<html>")
+	assert.Contains(t, result.Content, "<p>")
+	assert.Contains(t, result.Content, "Test Title")
+	assert.Contains(t, result.Content, "Test Content")
 }
 
 func TestTemplateManager_Format_InternalNotificationEmailTemplate(t *testing.T) {
 	tm := NewTemplateManager()
 
-	data := struct {
-		Title   string
-		Summary string
-		Content string
-	}{
-		Title:   "Test Title",
-		Summary: "Test Summary",
-		Content: "Test Content",
+	data := map[string]any{
+		"title":   "Test Title",
+		"summary": "Test Summary",
+		"content": "Test Content",
 	}
 
 	// Test with internal-notification scenario
-	result, err := tm.Format(types.MessageScenarioInternalNotification, types.MessageChannelEmail, data)
+	result, err := tm.Format(types.MessageScenarioInternalNotification, types.MessageChannelEmail, data, "en-US")
 	require.NoError(t, err)
 
 	// Should contain the internal-notification email template structure
-	assert.Contains(t, result, "<html>")
-	assert.Contains(t, result, "<h3>")
-	assert.Contains(t, result, "<span>")
-	assert.Contains(t, result, "Test Title")
-	assert.Contains(t, result, "Test Summary")
-	assert.Contains(t, result, "Test Content")
+	assert.Contains(t, result.Content, "<html>")
+	assert.Contains(t, result.Content, "<h3>")
+	assert.Contains(t, result.Content, "<span>")
+	assert.Contains(t, result.Content, "Test Title")
+	assert.Contains(t, result.Content, "Test Summary")
+	assert.Contains(t, result.Content, "Test Content")
 }
 
 func TestTemplateManager_Format_CacheBehavior(t *testing.T) {
@@ -76,14 +135,14 @@ func TestTemplateManager_Format_CacheBehavior(t *testing.T) {
 	}
 
 	// First call - should load from embedded templates
-	result1, err := tm.Format("non-existent-scenario", types.MessageChannelEmail, data)
+	result1, err := tm.Format("non-existent-scenario", types.MessageChannelEmail, data, "en-US")
 	require.NoError(t, err)
-	assert.Contains(t, result1, "Cache Test")
+	assert.Contains(t, result1.Content, "Cache Test")
 
 	// Second call - should use cached template
-	result2, err := tm.Format("non-existent-scenario", types.MessageChannelEmail, data)
+	result2, err := tm.Format("non-existent-scenario", types.MessageChannelEmail, data, "en-US")
 	require.NoError(t, err)
-	assert.Contains(t, result2, "Cache Test")
+	assert.Contains(t, result2.Content, "Cache Test")
 
 	// Results should be identical
 	assert.Equal(t, result1, result2)
@@ -92,28 +151,21 @@ func TestTemplateManager_Format_CacheBehavior(t *testing.T) {
 func TestTemplateManager_Format_ComplexDataStructure(t *testing.T) {
 	tm := NewTemplateManager()
 
-	data := struct {
-		Title     string
-		Summary   string
-		Content   string
-		Timestamp time.Time
-		Count     int
-		Enabled   bool
-	}{
-		Title:     "Complex Test",
-		Summary:   "Complex Summary",
-		Content:   "Complex Content",
-		Timestamp: time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC),
-		Count:     42,
-		Enabled:   true,
+	data := map[string]any{
+		"title":     "Complex Test",
+		"summary":   "Complex Summary",
+		"content":   "Complex Content",
+		"timestamp": time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC),
+		"count":     42,
+		"enabled":   true,
 	}
 
-	result, err := tm.Format(types.MessageScenarioInternalNotification, types.MessageChannelEmail, data)
+	result, err := tm.Format(types.MessageScenarioInternalNotification, types.MessageChannelEmail, data, "en-US")
 	require.NoError(t, err)
 
-	assert.Contains(t, result, "Complex Test")
-	assert.Contains(t, result, "Complex Summary")
-	assert.Contains(t, result, "Complex Content")
+	assert.Contains(t, result.Content, "Complex Test")
+	assert.Contains(t, result.Content, "Complex Summary")
+	assert.Contains(t, result.Content, "Complex Content")
 }
 
 func TestTemplateManager_Format_InvalidChannel(t *testing.T) {
@@ -128,7 +180,7 @@ func TestTemplateManager_Format_InvalidChannel(t *testing.T) {
 	}
 
 	// Test with an invalid channel that doesn't have a default template
-	result, err := tm.Format("non-existent-scenario", "invalid-channel", data)
+	result, err := tm.Format("non-existent-scenario", "invalid-channel", data, "en-US")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "default template file not found")
 	assert.Empty(t, result)
@@ -150,9 +202,9 @@ func TestTemplateManager_Format_ConcurrentAccess(t *testing.T) {
 
 	for i := 0; i < 10; i++ {
 		go func() {
-			result, err := tm.Format("non-existent-scenario", types.MessageChannelEmail, data)
+			result, err := tm.Format("non-existent-scenario", types.MessageChannelEmail, data, "en-US")
 			assert.NoError(t, err)
-			assert.Contains(t, result, "Concurrent Test")
+			assert.Contains(t, result.Content, "Concurrent Test")
 			done <- true
 		}()
 	}
@@ -186,7 +238,7 @@ func TestTemplateManager_LoadDefaultTemplate_NonExistent(t *testing.T) {
 	tm := NewTemplateManager()
 
 	// Test loading a default template that doesn't exist
-	tmpl, err := tm.loadDefaultTemplate("non-existent-channel")
+	tmpl, err := tm.loadDefaultTemplate(types.MessageChannelInternalMessage, "en-US")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "default template file not found")
 	assert.Nil(t, tmpl)
@@ -196,7 +248,7 @@ func TestTemplateManager_LoadDefaultTemplate_Valid(t *testing.T) {
 	tm := NewTemplateManager()
 
 	// Test loading a valid default template
-	tmpl, err := tm.loadDefaultTemplate(types.MessageChannelEmail)
+	tmpl, err := tm.loadDefaultTemplate(types.MessageChannelEmail, "en-US")
 	assert.NoError(t, err)
 	assert.NotNil(t, tmpl)
 
@@ -210,7 +262,7 @@ func TestTemplateManager_LoadDefaultTemplate_Valid(t *testing.T) {
 	}
 
 	// Convert struct to map since the default template expects map data for iteration
-	templateData := tm.convertStructToMap(data)
+	templateData := tm.normalizeTemplateData(data)
 
 	var buf bytes.Buffer
 	err = tmpl.Execute(&buf, templateData)
@@ -223,6 +275,30 @@ func TestTemplateManager_LoadDefaultTemplate_Valid(t *testing.T) {
 	// Should contain each field in its own paragraph with "key: value" format
 	assert.Contains(t, result, "<p>Title: Test Title</p>")
 	assert.Contains(t, result, "<p>Content: Test Content</p>")
+}
+
+func TestTemplateManager_Format_DifferentChannels(t *testing.T) {
+	tm := NewTemplateManager()
+
+	data := struct {
+		Title   string
+		Content string
+	}{
+		Title:   "Channel Test",
+		Content: "Channel Content",
+	}
+
+	// Test different channels with the same scenario
+	channels := []types.MessageChannel{
+		types.MessageChannelEmail,
+	}
+
+	for _, channel := range channels {
+		result, err := tm.Format("non-existent-scenario", channel, data, "en-US")
+		require.NoError(t, err)
+		assert.Contains(t, result.Content, "Channel Test")
+		assert.Contains(t, result.Content, "Channel Content")
+	}
 }
 
 func TestTemplateManager_Format_MemoryEfficiency(t *testing.T) {
@@ -238,9 +314,9 @@ func TestTemplateManager_Format_MemoryEfficiency(t *testing.T) {
 
 	// Call the same template multiple times
 	for i := 0; i < 100; i++ {
-		result, err := tm.Format("non-existent-scenario", types.MessageChannelEmail, data)
+		result, err := tm.Format("non-existent-scenario", types.MessageChannelEmail, data, "en-US")
 		require.NoError(t, err)
-		assert.Contains(t, result, "Memory Test")
+		assert.Contains(t, result.Content, "Memory Test")
 	}
 
 	// The cache should prevent repeated template parsing
@@ -263,46 +339,42 @@ func TestTemplateManager_Format_AnyDataWithDefaultTemplate(t *testing.T) {
 	}
 
 	// Test with default email template (non-existent scenario)
-	result, err := tm.Format("non-existent-scenario", types.MessageChannelEmail, data)
+	result, err := tm.Format("non-existent-scenario", types.MessageChannelEmail, data, "en-US")
 	require.NoError(t, err)
 
 	// Should contain the default email template structure
-	assert.Contains(t, result, "<html>")
-	assert.Contains(t, result, "Notification")
+	assert.Contains(t, result.Content, "<html>")
+	assert.Contains(t, result.Content, "Notification")
 	// Should contain each field in its own paragraph
-	assert.Contains(t, result, "<p>Title: Test Title</p>")
-	assert.Contains(t, result, "<p>Message: This is a test message</p>")
-	assert.Contains(t, result, "<p>Count: 42</p>")
+	assert.Contains(t, result.Content, "<p>Title: Test Title</p>")
+	assert.Contains(t, result.Content, "<p>Message: This is a test message</p>")
+	assert.Contains(t, result.Content, "<p>Count: 42</p>")
 }
 
 func TestTemplateManager_Format_ScenarioSpecificTemplateUsesOriginalData(t *testing.T) {
 	tm := NewTemplateManager()
 
 	// Test with data that has Title, Summary, and Content fields
-	data := struct {
-		Title   string
-		Summary string
-		Content string
-	}{
-		Title:   "Test Title",
-		Summary: "Test Summary",
-		Content: "Test Content",
+	data := map[string]any{
+		"title":   "Test Title",
+		"summary": "Test Summary",
+		"content": "Test Content",
 	}
 
 	// Test with internal-notification scenario (which has a specific template)
-	result, err := tm.Format(types.MessageScenarioInternalNotification, types.MessageChannelEmail, data)
+	result, err := tm.Format(types.MessageScenarioInternalNotification, types.MessageChannelEmail, data, "en-US")
 	require.NoError(t, err)
 
 	// Should contain the scenario-specific template structure
-	assert.Contains(t, result, "<html>")
-	assert.Contains(t, result, "<h3>")
-	assert.Contains(t, result, "<span>")
-	assert.Contains(t, result, "Test Title")
-	assert.Contains(t, result, "Test Summary")
-	assert.Contains(t, result, "Test Content")
+	assert.Contains(t, result.Content, "<html>")
+	assert.Contains(t, result.Content, "<h3>")
+	assert.Contains(t, result.Content, "<span>")
+	assert.Contains(t, result.Content, "Test Title")
+	assert.Contains(t, result.Content, "Test Summary")
+	assert.Contains(t, result.Content, "Test Content")
 
 	// Should NOT contain the default template's "Notification" text
-	assert.NotContains(t, result, "Notification")
+	assert.NotContains(t, result.Content, "Notification")
 }
 
 func TestTemplateManager_ConvertStructToMap(t *testing.T) {
@@ -321,7 +393,7 @@ func TestTemplateManager_ConvertStructToMap(t *testing.T) {
 		Score:  95.5,
 	}
 
-	result := tm.convertStructToMap(data)
+	result := tm.normalizeTemplateData(data)
 
 	// Should contain all struct fields as map keys
 	assert.Equal(t, "John Doe", result["Name"])
@@ -348,9 +420,58 @@ func TestTemplateManager_ConvertStructToMap_NonStruct(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			result := tm.convertStructToMap(tc.data)
+			result := tm.normalizeTemplateData(tc.data)
 			assert.Equal(t, tc.expected, result["Content"])
 			assert.Len(t, result, 1)
+		})
+	}
+}
+
+func TestTemplateManager_Format_AssetManagementEmailTemplate_DifferentLanguages(t *testing.T) {
+	tm := NewTemplateManager()
+
+	testCases := []struct {
+		language        string
+		expectedTitle   string
+		expectedContent string
+	}{
+		{
+			language:        "en-US",
+			expectedTitle:   "[model] Created",
+			expectedContent: "[testuser/awesome-model] created successfully.",
+		},
+		{
+			language:        "zh-CN",
+			expectedTitle:   "[model] 已创建",
+			expectedContent: "[testuser/awesome-model] 创建成功。",
+		},
+		{
+			language:        "zh-HK",
+			expectedTitle:   "[model] 已創建",
+			expectedContent: "[testuser/awesome-model] 創建成功。",
+		},
+	}
+
+	data := map[string]any{
+		"repo_type": types.ModelRepo,
+		"repo_path": "testuser/awesome-model",
+		"operation": types.OperationCreate,
+	}
+
+	for _, tc := range testCases {
+		t.Run("email_language_"+tc.language, func(t *testing.T) {
+			result, err := tm.Format(types.MessageScenarioAssetManagement, types.MessageChannelEmail, data, tc.language)
+			require.NoError(t, err)
+
+			// Should contain the localized title in h3 tag
+			assert.Equal(t, result.Title, tc.expectedTitle)
+
+			// Should contain the localized content in span tag
+			assert.Contains(t, result.Content, tc.expectedContent)
+
+			// Should contain the basic HTML structure
+			assert.Contains(t, result.Content, "<html>")
+			assert.Contains(t, result.Content, "<p>")
 		})
 	}
 }

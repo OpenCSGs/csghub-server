@@ -61,6 +61,7 @@ func TestModelComponent_Create(t *testing.T) {
 	user := database.User{
 		Username: "user",
 		Email:    "foo@bar.com",
+		UUID:     "user-uuid",
 	}
 	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(user, nil)
 
@@ -70,6 +71,7 @@ func TestModelComponent_Create(t *testing.T) {
 		Tags:    []database.Tag{{Name: "t1"}},
 		Name:    "n",
 		License: "MIT",
+		Path:    "ns/n",
 	}
 	mc.mocks.components.repo.EXPECT().CreateRepo(ctx, types.CreateRepoReq{
 		DefaultBranch: "main",
@@ -87,8 +89,17 @@ func TestModelComponent_Create(t *testing.T) {
 		RepositoryID: dbrepo.ID,
 		BaseModel:    "base",
 	}).Return(&database.Model{
+		ID:         999,
 		Repository: dbrepo,
 	}, nil)
+
+	mc.mocks.components.repo.EXPECT().SendAssetManagementMsg(mock.Anything, types.RepoNotificationReq{
+		RepoType:  types.ModelRepo,
+		RepoPath:  "ns/n",
+		Operation: types.OperationCreate,
+		UserUUID:  "user-uuid",
+	}).Return(nil)
+
 	mc.mocks.gitServer.EXPECT().CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
 		Username:  "user",
 		Email:     "foo@bar.com",
@@ -109,7 +120,7 @@ func TestModelComponent_Create(t *testing.T) {
 		NewBranch: "main",
 		Namespace: "ns",
 		Name:      "n",
-		FilePath:  gitattributesFileName,
+		FilePath:  types.GitattributesFileName,
 	}, types.ModelRepo)).Return(nil)
 
 	model, err := mc.Create(ctx, &types.CreateModelReq{
@@ -123,9 +134,11 @@ func TestModelComponent_Create(t *testing.T) {
 			Username:      "user",
 		},
 	})
+	time.Sleep(10 * time.Millisecond)
 	require.Nil(t, err)
 
 	require.Equal(t, &types.Model{
+		ID:      999,
 		License: "MIT",
 		Name:    "n",
 		User: &types.User{
@@ -134,9 +147,11 @@ func TestModelComponent_Create(t *testing.T) {
 		},
 		Tags: []types.RepoTag{{Name: "t1"}},
 		Repository: types.Repository{
-			HTTPCloneURL: "https://foo.com/s/.git",
-			SSHCloneURL:  "test@127.0.0.1:s/.git",
+			HTTPCloneURL: "https://foo.com/s/ns/n.git",
+			SSHCloneURL:  "test@127.0.0.1:s/ns/n.git",
 		},
+		Path: "ns/n",
+		URL:  "ns/n",
 	}, model)
 
 }
@@ -180,18 +195,41 @@ func TestModelComponent_Delete(t *testing.T) {
 	ctx := context.TODO()
 	mc := initializeTestModelComponent(ctx, t)
 
-	mc.mocks.stores.ModelMock().EXPECT().FindByPath(ctx, "ns", "n").Return(&database.Model{ID: 1}, nil)
+	mc.mocks.stores.ModelMock().EXPECT().FindByPath(ctx, "ns", "n").Return(&database.Model{
+		ID: 1,
+		Repository: &database.Repository{
+			ID:   1,
+			Path: "ns/n",
+		},
+	}, nil)
 	mc.mocks.components.repo.EXPECT().DeleteRepo(ctx, types.DeleteRepoReq{
 		Username:  "user",
 		Namespace: "ns",
 		Name:      "n",
 		RepoType:  types.ModelRepo,
-	}).Return(nil, nil)
-	mc.mocks.stores.ModelMock().EXPECT().Delete(ctx, database.Model{ID: 1}).Return(nil)
+	}).Return(&database.Repository{
+		User: database.User{
+			UUID: "user-uuid",
+		},
+		Path: "ns/n",
+	}, nil)
+	mc.mocks.stores.ModelMock().EXPECT().Delete(ctx, database.Model{
+		ID: 1,
+		Repository: &database.Repository{
+			ID:   1,
+			Path: "ns/n",
+		},
+	}).Return(nil)
+	mc.mocks.components.repo.EXPECT().SendAssetManagementMsg(mock.Anything, types.RepoNotificationReq{
+		RepoType:  types.ModelRepo,
+		RepoPath:  "ns/n",
+		Operation: types.OperationDelete,
+		UserUUID:  "user-uuid",
+	}).Return(nil)
 
 	err := mc.Delete(ctx, "ns", "n", "user")
+	time.Sleep(10 * time.Millisecond)
 	require.Nil(t, err)
-
 }
 
 func TestModelComponent_Show(t *testing.T) {
