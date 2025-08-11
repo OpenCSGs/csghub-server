@@ -2,6 +2,7 @@ package component
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -324,77 +326,115 @@ func TestSpaceComponent_Deploy(t *testing.T) {
 	ctx := context.TODO()
 	sc := initializeTestSpaceComponent(ctx, t)
 
-	sc.mocks.stores.SpaceMock().EXPECT().FindByPath(ctx, "ns", "n").Return(&database.Space{
-		ID:         1,
-		Repository: &database.Repository{Path: "foo/bar"},
-		SKU:        "1",
-	}, nil)
 	sc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
 		Username: "user1",
 	}, nil)
-	sc.mocks.stores.SpaceResourceMock().EXPECT().FindByID(ctx, int64(1)).Return(&database.SpaceResource{
-		ID: 1,
-	}, nil)
-	sc.mocks.deployer.EXPECT().Deploy(ctx, types.DeployRepo{
-		SpaceID:       1,
-		Path:          "foo/bar",
-		Annotation:    "{\"hub-deploy-user\":\"user1\",\"hub-res-name\":\"ns/n\",\"hub-res-type\":\"space\"}",
-		ContainerPort: 8080,
-		SKU:           "1",
-	}).Return(123, nil)
+	t.Run("Deploy", func(t *testing.T) {
+		sc.mocks.stores.SpaceMock().EXPECT().FindByPath(ctx, "ns1", "n1").Return(&database.Space{
+			ID:         1,
+			Repository: &database.Repository{Path: "foo1/bar1"},
+			SKU:        "1",
+			HasAppFile: true,
+		}, nil)
+		sc.mocks.stores.SpaceResourceMock().EXPECT().FindByID(ctx, int64(1)).Return(&database.SpaceResource{
+			ID: 1,
+		}, nil)
+		sc.mocks.deployer.EXPECT().Deploy(ctx, types.DeployRepo{
+			SpaceID:       1,
+			Path:          "foo1/bar1",
+			Annotation:    "{\"hub-deploy-user\":\"user1\",\"hub-res-name\":\"ns1/n1\",\"hub-res-type\":\"space\"}",
+			ContainerPort: 8080,
+			SKU:           "1",
+		}).Return(123, nil)
 
-	id, err := sc.Deploy(ctx, "ns", "n", "user")
-	require.Nil(t, err)
-	require.Equal(t, int64(123), id)
-
+		id, err := sc.Deploy(ctx, "ns1", "n1", "user")
+		require.Nil(t, err)
+		require.Equal(t, int64(123), id)
+	})
+	t.Run("DeployWithoutAppFile", func(t *testing.T) {
+		sc.mocks.stores.SpaceMock().EXPECT().FindByPath(ctx, "ns2", "n2").Return(&database.Space{
+			ID:         1,
+			Repository: &database.Repository{Path: "foo2/bar2"},
+			SKU:        "1",
+			HasAppFile: false,
+		}, nil)
+		id, err := sc.Deploy(ctx, "ns2", "n2", "user")
+		require.Equal(t, true, errors.Is(err, errorx.ErrNoEntryFile))
+		require.Equal(t, int64(-1), id)
+	})
 }
 
 func TestSpaceComponent_Wakeup(t *testing.T) {
 	ctx := context.TODO()
 	sc := initializeTestSpaceComponent(ctx, t)
-	sc.mocks.stores.SpaceMock().EXPECT().FindByPath(ctx, "ns", "n").Return(&database.Space{
-		ID: 1,
-	}, nil)
+	t.Run("Wakeup", func(t *testing.T) {
+		sc.mocks.stores.SpaceMock().EXPECT().FindByPath(ctx, "ns", "n").Return(&database.Space{
+			ID:         1,
+			HasAppFile: true,
+		}, nil)
 
-	sc.mocks.stores.DeployTaskMock().EXPECT().GetLatestDeployBySpaceID(ctx, int64(1)).Return(
-		&database.Deploy{SvcName: "svc"}, nil,
-	)
+		sc.mocks.stores.DeployTaskMock().EXPECT().GetLatestDeployBySpaceID(ctx, int64(1)).Return(
+			&database.Deploy{SvcName: "svc"}, nil,
+		)
 
-	sc.mocks.deployer.EXPECT().Wakeup(ctx, types.DeployRepo{
-		SpaceID:   1,
-		Namespace: "ns",
-		Name:      "n",
-		SvcName:   "svc",
-	}).Return(nil)
+		sc.mocks.deployer.EXPECT().Wakeup(ctx, types.DeployRepo{
+			SpaceID:   1,
+			Namespace: "ns",
+			Name:      "n",
+			SvcName:   "svc",
+		}).Return(nil)
 
-	err := sc.Wakeup(ctx, "ns", "n")
-	require.Nil(t, err)
+		err := sc.Wakeup(ctx, "ns", "n")
+		require.Nil(t, err)
+	})
+	t.Run("WakeupWithoutAppFile", func(t *testing.T) {
+		sc.mocks.stores.SpaceMock().EXPECT().FindByPath(ctx, "ns2", "n2").Return(&database.Space{
+			ID:         1,
+			HasAppFile: false,
+		}, nil)
+
+		err := sc.Wakeup(ctx, "ns2", "n2")
+		require.Equal(t, true, errors.Is(err, errorx.ErrNoEntryFile))
+	})
 
 }
 
 func TestSpaceComponent_Stop(t *testing.T) {
 	ctx := context.TODO()
 	sc := initializeTestSpaceComponent(ctx, t)
-	sc.mocks.stores.SpaceMock().EXPECT().FindByPath(ctx, "ns", "n").Return(&database.Space{
-		ID: 1,
-	}, nil)
 
-	sc.mocks.stores.DeployTaskMock().EXPECT().GetLatestDeployBySpaceID(ctx, int64(1)).Return(
-		&database.Deploy{SvcName: "svc", RepoID: 1, UserID: 2, ID: 3}, nil,
-	)
+	t.Run("Stop", func(t *testing.T) {
+		sc.mocks.stores.SpaceMock().EXPECT().FindByPath(ctx, "ns", "n").Return(&database.Space{
+			ID:         1,
+			HasAppFile: true,
+		}, nil)
 
-	sc.mocks.deployer.EXPECT().Stop(ctx, types.DeployRepo{
-		SpaceID:   1,
-		Namespace: "ns",
-		Name:      "n",
-		SvcName:   "svc",
-	}).Return(nil)
-	sc.mocks.stores.DeployTaskMock().EXPECT().StopDeploy(
-		ctx, types.SpaceRepo, int64(1), int64(2), int64(3),
-	).Return(nil)
+		sc.mocks.stores.DeployTaskMock().EXPECT().GetLatestDeployBySpaceID(ctx, int64(1)).Return(
+			&database.Deploy{SvcName: "svc", RepoID: 1, UserID: 2, ID: 3}, nil,
+		)
 
-	err := sc.Stop(ctx, "ns", "n", false)
-	require.Nil(t, err)
+		sc.mocks.deployer.EXPECT().Stop(ctx, types.DeployRepo{
+			SpaceID:   1,
+			Namespace: "ns",
+			Name:      "n",
+			SvcName:   "svc",
+		}).Return(nil)
+		sc.mocks.stores.DeployTaskMock().EXPECT().StopDeploy(
+			ctx, types.SpaceRepo, int64(1), int64(2), int64(3),
+		).Return(nil)
+
+		err := sc.Stop(ctx, "ns", "n", false)
+		require.Nil(t, err)
+	})
+	t.Run("StopWithoutAppFile", func(t *testing.T) {
+		sc.mocks.stores.SpaceMock().EXPECT().FindByPath(ctx, "ns2", "n2").Return(&database.Space{
+			ID:         1,
+			HasAppFile: false,
+		}, nil)
+
+		err := sc.Stop(ctx, "ns2", "n2", false)
+		require.Equal(t, true, errors.Is(err, errorx.ErrNoEntryFile))
+	})
 }
 
 func TestSpaceComponent_FixHasEntryFile(t *testing.T) {

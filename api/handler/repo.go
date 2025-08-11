@@ -1728,11 +1728,12 @@ func (h *RepoHandler) DeployDetail(ctx *gin.Context) {
 		if errors.Is(err, errorx.ErrForbidden) {
 			slog.Info("not allowed to get deploy detail", slog.Any("error", err), slog.Any("req", detailReq))
 			httpbase.ForbiddenError(ctx, err)
-			return
+		} else if errors.Is(err, errorx.ErrDatabaseNoRows) {
+			httpbase.NotFoundError(ctx, err)
+		} else {
+			slog.Error("failed to get deploy detail", slog.Any("error", err), slog.Any("req", detailReq))
+			httpbase.ServerError(ctx, err)
 		}
-
-		slog.Error("failed to get deploy detail", slog.Any("error", err), slog.Any("req", detailReq))
-		httpbase.ServerError(ctx, err)
 		return
 	}
 
@@ -2210,11 +2211,12 @@ func (h *RepoHandler) ServerlessDetail(ctx *gin.Context) {
 			slog.Error("user not allowed to get serverless deploy detail", slog.String("namespace", namespace),
 				slog.String("name", name), slog.Any("username", currentUser), slog.Int64("deploy_id", deployID))
 			httpbase.ForbiddenError(ctx, err)
-			return
+		} else if errors.Is(err, errorx.ErrDatabaseNoRows) {
+			httpbase.NotFoundError(ctx, err)
+		} else {
+			slog.Error("fail to get serverless deploy detail", slog.String("error", err.Error()), slog.Any("namespace", namespace), slog.Any("name", name), slog.Any("deploy id", deployID))
+			httpbase.ServerError(ctx, err)
 		}
-
-		slog.Error("fail to get serverless deploy detail", slog.String("error", err.Error()), slog.Any("namespace", namespace), slog.Any("name", name), slog.Any("deploy id", deployID))
-		httpbase.ServerError(ctx, err)
 		return
 	}
 

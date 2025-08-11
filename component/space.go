@@ -3,6 +3,7 @@ package component
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/url"
@@ -835,6 +836,13 @@ func (c *spaceComponentImpl) Deploy(ctx context.Context, namespace, name, curren
 		slog.Error("can't find space to deploy", slog.Any("error", err), slog.String("namespace", namespace), slog.String("name", name))
 		return -1, err
 	}
+	if !space.HasAppFile {
+		return -1, errorx.NoEntryFile(errors.New("no app file"),
+			errorx.Ctx().
+				Set("path", fmt.Sprintf("%s/%s", namespace, name)),
+		)
+	}
+
 	// found user id
 	user, err := c.userStore.FindByUsername(ctx, currentUser)
 	if err != nil {
@@ -914,6 +922,12 @@ func (c *spaceComponentImpl) Wakeup(ctx context.Context, namespace, name string)
 		slog.Error("can't wakeup space", slog.Any("error", err), slog.String("namespace", namespace), slog.String("name", name))
 		return err
 	}
+	if !s.HasAppFile {
+		return errorx.NoEntryFile(errors.New("no app file"),
+			errorx.Ctx().
+				Set("path", fmt.Sprintf("%s/%s", namespace, name)),
+		)
+	}
 	// get latest Deploy for space
 	deploy, err := c.deployTaskStore.GetLatestDeployBySpaceID(ctx, s.ID)
 	if err != nil {
@@ -933,6 +947,13 @@ func (c *spaceComponentImpl) Stop(ctx context.Context, namespace, name string, d
 		slog.Error("can't stop space", slog.Any("error", err), slog.String("namespace", namespace), slog.String("name", name))
 		return err
 	}
+	if !s.HasAppFile {
+		return errorx.NoEntryFile(errors.New("no app file"),
+			errorx.Ctx().
+				Set("path", fmt.Sprintf("%s/%s", namespace, name)),
+		)
+	}
+
 	err = c.stopSpaceDeploy(ctx, namespace, name, s)
 	if err != nil {
 		return fmt.Errorf("fail stop space %s/%s deploy error: %w", namespace, name, err)
