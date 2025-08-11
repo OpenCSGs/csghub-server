@@ -384,6 +384,26 @@ func TestTagStore_SetMetaTags(t *testing.T) {
 
 	ts := database.NewTagStoreWithDB(db)
 	var tags []*database.Tag
+	_, err = ts.CreateCategory(ctx, database.TagCategory{
+		Name: "industry",
+	})
+	require.Nil(t, err)
+	_, err = ts.CreateCategory(ctx, database.TagCategory{Name: "task"})
+	require.NoError(t, err)
+	tag, err := ts.CreateTag(ctx, database.Tag{
+		Name:     "xxx",
+		Category: "industry",
+		Scope:    types.ModelTagScope,
+		BuiltIn:  true,
+	})
+	require.Nil(t, err)
+	err = ts.UpsertRepoTags(ctx, repo.ID, []int64{}, []int64{tag.ID})
+	require.Nil(t, err)
+
+	getRepoTags, err := rs.Tags(ctx, repo.ID)
+	require.Empty(t, err)
+	require.Len(t, getRepoTags, 1)
+
 	tags = append(tags, &database.Tag{
 		Name:     "tag_" + uuid.NewString(),
 		Category: "task",
@@ -400,6 +420,11 @@ func TestTagStore_SetMetaTags(t *testing.T) {
 		BuiltIn:  true,
 		ShowName: "",
 	})
+	for i, tag := range tags {
+		updateTag, err := ts.CreateTag(ctx, *tag)
+		require.NoError(t, err)
+		tags[i] = updateTag
+	}
 	_, err = ts.SetMetaTags(ctx, types.ModelRepo, userName, repoName, tags)
 	// should report err as framework tag is not allowed
 	require.NotEmpty(t, err)
@@ -408,6 +433,10 @@ func TestTagStore_SetMetaTags(t *testing.T) {
 	repoTags, err := ts.SetMetaTags(ctx, types.ModelRepo, userName, repoName, tags)
 	require.Empty(t, err)
 	require.Len(t, repoTags, 1)
+
+	getRepoTags, err = rs.Tags(ctx, repo.ID)
+	require.Empty(t, err)
+	require.Len(t, getRepoTags, 2)
 }
 
 // TestSetLibraryTag tests the SetLibraryTag method
