@@ -809,10 +809,20 @@ func (w *LfsSyncWorker) multipartUploadWithRetry(
 	}
 
 	// Sort the parts by part number
-	sort.Slice(parts, func(i, j int) bool { return parts[i].PartNumber < parts[j].PartNumber })
+	// sort.Slice(parts, func(i, j int) bool { return parts[i].PartNumber < parts[j].PartNumber })
+
+	var completeCompleteParts []minio.CompletePart
+	for _, part := range result.ObjectParts {
+		completeCompleteParts = append(completeCompleteParts, minio.CompletePart{
+			PartNumber: part.PartNumber,
+			ETag:       part.ETag,
+		})
+	}
+
+	sort.Slice(completeCompleteParts, func(i, j int) bool { return completeCompleteParts[i].PartNumber < completeCompleteParts[j].PartNumber })
 
 	_, err = w.ossCore.CompleteMultipartUpload(
-		ctx, w.config.S3.Bucket, objectKey, uploadID, parts, minio.PutObjectOptions{
+		ctx, w.config.S3.Bucket, objectKey, uploadID, completeCompleteParts, minio.PutObjectOptions{
 			DisableContentSha256: true,
 		},
 	)
