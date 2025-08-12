@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"strconv"
@@ -9,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
 	"opencsg.com/csghub-server/component"
@@ -185,8 +187,14 @@ func (h *DiscussionHandler) ShowDiscussion(ctx *gin.Context) {
 	}
 	d, err := h.discussion.GetDiscussion(ctx.Request.Context(), idInt)
 	if err != nil {
-		slog.Error("Failed to get discussion", "error", err, "id", id)
-		httpbase.ServerError(ctx, fmt.Errorf("failed to get discussion: %w", err))
+		if errors.Is(err, errorx.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
+		} else if errors.Is(err, errorx.ErrDatabaseNoRows) {
+			httpbase.NotFoundError(ctx, err)
+		} else {
+			slog.Error("Failed to get discussion", "error", err, "id", id)
+			httpbase.ServerError(ctx, fmt.Errorf("failed to get discussion: %w", err))
+		}
 		return
 	}
 	httpbase.OK(ctx, d)
@@ -223,8 +231,14 @@ func (h *DiscussionHandler) ListRepoDiscussions(ctx *gin.Context) {
 	req.Name = name
 	resp, err := h.discussion.ListRepoDiscussions(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("Failed to list repo discussions", "error", err, "request", req)
-		httpbase.ServerError(ctx, fmt.Errorf("failed to list repo discussions: %w", err))
+		if errors.Is(err, errorx.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
+		} else if errors.Is(err, errorx.ErrDatabaseNoRows) {
+			httpbase.NotFoundError(ctx, err)
+		} else {
+			slog.Error("Failed to list repo discussions", "error", err, "request", req)
+			httpbase.ServerError(ctx, fmt.Errorf("failed to list repo discussions: %w", err))
+		}
 		return
 	}
 	httpbase.OK(ctx, resp)
@@ -370,8 +384,14 @@ func (h *DiscussionHandler) ListDiscussionComments(ctx *gin.Context) {
 	}
 	comments, err := h.discussion.ListDiscussionComments(ctx.Request.Context(), idInt)
 	if err != nil {
-		slog.Error("Failed to list discussion comments", "error", err, "id", id)
-		httpbase.ServerError(ctx, fmt.Errorf("failed to list discussion comments: %w", err))
+		if errors.Is(err, errorx.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
+		} else if errors.Is(err, errorx.ErrDatabaseNoRows) {
+			httpbase.NotFoundError(ctx, err)
+		} else {
+			slog.Error("Failed to list discussion comments", "error", err, "id", id)
+			httpbase.ServerError(ctx, fmt.Errorf("failed to list discussion comments: %w", err))
+		}
 		return
 	}
 	httpbase.OK(ctx, comments)

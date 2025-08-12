@@ -1,6 +1,10 @@
 package database
 
-import "context"
+import (
+	"context"
+
+	"opencsg.com/csghub-server/common/errorx"
+)
 
 type Discussion struct {
 	ID                 int64  `bun:"id,pk,autoincrement"`
@@ -65,6 +69,7 @@ func NewDiscussionStoreWithDB(db *DB) DiscussionStore {
 func (s *discussionStoreImpl) Create(ctx context.Context, discussion Discussion) (*Discussion, error) {
 	_, err := s.db.Core.NewInsert().Model(&discussion).Exec(ctx)
 	if err != nil {
+		err := errorx.HandleDBError(err, nil)
 		return nil, err
 	}
 	return &discussion, nil
@@ -77,6 +82,8 @@ func (s *discussionStoreImpl) FindByID(ctx context.Context, id int64) (*Discussi
 		Relation("User").
 		Scan(ctx)
 	if err != nil {
+		err := errorx.HandleDBError(err, errorx.Ctx().
+			Set("id", id))
 		return nil, err
 	}
 	return &discussion, nil
@@ -89,6 +96,9 @@ func (s *discussionStoreImpl) FindByDiscussionableID(ctx context.Context, discus
 		Relation("User").
 		Scan(ctx)
 	if err != nil {
+		err := errorx.HandleDBError(err, errorx.Ctx().
+			Set("id", discussionableID).
+			Set("type", discussionableType))
 		return nil, err
 	}
 	return discussions, nil
@@ -97,6 +107,8 @@ func (s *discussionStoreImpl) FindByDiscussionableID(ctx context.Context, discus
 func (s *discussionStoreImpl) UpdateByID(ctx context.Context, id int64, title string) error {
 	_, err := s.db.Core.NewUpdate().Model(&Discussion{}).Set("title = ?", title).Where("id = ?", id).Exec(ctx)
 	if err != nil {
+		err := errorx.HandleDBError(err, errorx.Ctx().
+			Set("id", id))
 		return err
 	}
 	return nil
@@ -105,6 +117,8 @@ func (s *discussionStoreImpl) UpdateByID(ctx context.Context, id int64, title st
 func (s *discussionStoreImpl) DeleteByID(ctx context.Context, id int64) error {
 	_, err := s.db.Core.NewDelete().Model(&Discussion{}).Where("id = ?", id).Exec(ctx)
 	if err != nil {
+		err := errorx.HandleDBError(err, errorx.Ctx().
+			Set("id", id))
 		return err
 	}
 	return nil
@@ -117,6 +131,8 @@ func (s *discussionStoreImpl) FindDiscussionComments(ctx context.Context, discus
 		Where("commentable_type=? AND	commentable_id = ?", CommentableTypeDiscussion, discussionID).
 		Scan(ctx)
 	if err != nil {
+		err := errorx.HandleDBError(err, errorx.Ctx().
+			Set("id", discussionID))
 		return nil, err
 	}
 	return comments, nil
@@ -125,6 +141,7 @@ func (s *discussionStoreImpl) FindDiscussionComments(ctx context.Context, discus
 func (s *discussionStoreImpl) CreateComment(ctx context.Context, comment Comment) (*Comment, error) {
 	_, err := s.db.Core.NewInsert().Model(&comment).Exec(ctx)
 	if err != nil {
+		err := errorx.HandleDBError(err, nil)
 		return nil, err
 	}
 	return &comment, nil
@@ -133,6 +150,7 @@ func (s *discussionStoreImpl) CreateComment(ctx context.Context, comment Comment
 func (s *discussionStoreImpl) UpdateComment(ctx context.Context, id int64, content string) error {
 	_, err := s.db.Core.NewUpdate().Model(&Comment{}).Set("content = ?", content).Where("id = ?", id).Exec(ctx)
 	if err != nil {
+		err := errorx.HandleDBError(err, nil)
 		return err
 	}
 	return nil
@@ -145,6 +163,7 @@ func (s *discussionStoreImpl) FindCommentByID(ctx context.Context, id int64) (*C
 		Relation("User").
 		Scan(ctx)
 	if err != nil {
+		err := errorx.HandleDBError(err, nil)
 		return nil, err
 	}
 	return &comment, nil
@@ -153,6 +172,7 @@ func (s *discussionStoreImpl) FindCommentByID(ctx context.Context, id int64) (*C
 func (s *discussionStoreImpl) DeleteComment(ctx context.Context, id int64) error {
 	_, err := s.db.Core.NewDelete().Model(&Comment{}).Where("id = ?", id).Exec(ctx)
 	if err != nil {
+		err := errorx.HandleDBError(err, nil)
 		return err
 	}
 	return nil
