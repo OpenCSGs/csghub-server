@@ -3,7 +3,7 @@
         "other": "Bad request"
     },
     "error.REQ-ERR-1": {
-        "other": "Request body format error"
+        "other": "Invalid request body format"
     },
     "error.REQ-ERR-2": {
         "other": "Request body cannot be empty"
@@ -11,20 +11,11 @@
     "error.REQ-ERR-3": {
         "other": "Request body too large"
     },
-    "error.REQ-ERR-4": {
-        "other": "Missing required request parameter"
-    },
     "error.REQ-ERR-5": {
         "other": "Duplicate request parameter"
     },
     "error.REQ-ERR-6": {
         "other": "Invalid request parameter"
-    },
-    "error.REQ-ERR-7": {
-        "other": "Request parameter out of range"
-    },
-    "error.REQ-ERR-8": {
-        "other": "Request parameter type error"
     },
     "error.REQ-ERR-9": {
         "other": "Unsupported content type"

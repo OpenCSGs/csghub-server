@@ -31,3 +31,12 @@ swag:
 
 migrate_local:
 	go run cmd/csghub-server/main.go migration migrate --config local.toml
+	
+db_migrate:
+	@go run -tags "$(GO_TAGS)" cmd/csghub-server/main.go migration migrate --config local.toml
+
+db_rollback:
+	@go run -tags "$(GO_TAGS)" cmd/csghub-server/main.go migration rollback --config local.toml
+
+error_doc:
+	@go run cmd/csghub-server/main.go errorx doc-gen

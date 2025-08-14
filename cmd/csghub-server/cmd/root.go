@@ -11,6 +11,7 @@ import (
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/cron"
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/dataviewer"
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/deploy"
+	"opencsg.com/csghub-server/cmd/csghub-server/cmd/errorx"
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/git"
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/logscan"
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/migration"
@@ -72,6 +73,7 @@ func init() {
 		aigateway.Cmd,
 		notification.Cmd,
 		version.Cmd,
+		errorx.Cmd,
 	)
 
 	addCommands()

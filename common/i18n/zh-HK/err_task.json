@@ -1,5 +1,5 @@
 {
     "error.TASK-ERR-0": {
-        "other": "沒有入口檔案"
+        "other": "未找到任務入口檔案"
     }
 }

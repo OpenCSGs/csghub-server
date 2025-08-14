@@ -1,5 +1,5 @@
 {
-    "error.TASK-ERR-0":{
-        "other": "No entry file"
+    "error.TASK-ERR-0": {
+        "other": "Task entry file not found"
     }
 }

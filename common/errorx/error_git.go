@@ -43,30 +43,246 @@ const (
 
 var (
 	// --- GIT-ERR-xxx: Git/Upload, Download, Resource Synchronization ---
+	// git clone operation failed
+	//
+	// Description: The attempt to clone a remote Git repository to the local system failed. This could be due to network issues, incorrect repository URL, or insufficient permissions.
+	//
+	// Description_ZH: 尝试将远程 Git 仓库克隆到本地系统失败。这可能是由于网络问题、不正确的仓库 URL 或权限不足造成的。
+	//
+	// en-US: Failed to clone repository
+	//
+	// zh-CN: 克隆仓库失败
+	//
+	// zh-HK: 克隆儲存庫失敗
 	ErrGitCloneFailed error = CustomError{prefix: errGitPrefix, code: gitCloneFailed}
-	ErrGitPullFailed  error = CustomError{prefix: errGitPrefix, code: gitPullFailed}
-	ErrGitPushFailed  error = CustomError{prefix: errGitPrefix, code: gitPushFailed}
-
-	ErrGitCommitFailed       error = CustomError{prefix: errGitPrefix, code: gitCommitFailed}
-	ErrGitFindCommitFailed   error = CustomError{prefix: errGitPrefix, code: gitFindCommitFailed}
+	// git pull operation failed
+	//
+	// Description: Failed to fetch from and integrate with another repository or a local branch. This can be caused by merge conflicts, network problems, or authentication issues.
+	//
+	// Description_ZH: 从另一个仓库或本地分支获取并集成失败。这可能是由合并冲突、网络问题或身份验证问题引起的。
+	//
+	// en-US: Failed to pull changes from repository
+	//
+	// zh-CN: 从仓库拉取更新失败
+	//
+	// zh-HK: 從儲存庫拉取更新失敗
+	ErrGitPullFailed error = CustomError{prefix: errGitPrefix, code: gitPullFailed}
+	// git push operation failed
+	//
+	// Description: Failed to update remote refs along with associated objects. This might happen if the remote branch has new commits, or due to insufficient push permissions.
+	//
+	// Description_ZH: 更新远程引用及其关联对象失败。如果远程分支有新的提交，或者推送权限不足，可能会发生这种情况。
+	//
+	// en-US: Failed to push changes to repository
+	//
+	// zh-CN: 推送更新到仓库失败
+	//
+	// zh-HK: 推送更新到儲存庫失敗
+	ErrGitPushFailed error = CustomError{prefix: errGitPrefix, code: gitPushFailed}
+	// git commit operation failed
+	//
+	// Description: The attempt to record changes to the repository failed. This could be due to an empty staging area, a pre-commit hook failure, or incorrect user configuration.
+	//
+	// Beschrijving_zh: 尝试将更改记录到仓库失败。这可能是由于暂存区为空、提交前挂钩（pre-commit hook）失败或不正确的用户配置造成的。
+	//
+	// en-US: Failed to commit changes
+	//
+	// zh-CN: 提交更改失败
+	//
+	// zh-HK: 提交變更失敗
+	ErrGitCommitFailed error = CustomError{prefix: errGitPrefix, code: gitCommitFailed}
+	// failed to find a specific git commit
+	//
+	// Description: An error occurred while searching for a specific commit. The commit hash may be malformed or the search operation itself failed.
+	//
+	// Description_ZH: 搜索特定提交时发生错误。提交哈希可能格式错误，或者搜索操作本身失败。
+	//
+	// en-US: Failed to find commit
+	//
+	// zh-CN: 查找提交失败
+	//
+	// zh-HK: 查找提交失敗
+	ErrGitFindCommitFailed error = CustomError{prefix: errGitPrefix, code: gitFindCommitFailed}
+	// failed to count git commits
+	//
+	// Description: An error occurred while trying to count the number of commits in a branch or repository.
+	//
+	// Description_ZH: 尝试统计分支或仓库中的提交数量时发生错误。
+	//
+	// en-US: Failed to count commits
+	//
+	// zh-CN: 统计提交数量失败
+	//
+	// zh-HK: 統計提交數量失敗
 	ErrGitCountCommitsFailed error = CustomError{prefix: errGitPrefix, code: gitCountCommitsFailed}
-	ErrGitCommitNotFound     error = CustomError{prefix: errGitPrefix, code: gitCommitNotFound}
-
+	// the specified git commit does not exist
+	//
+	// Description: The commit referenced by the provided hash or reference could not be found in the repository's history.
+	//
+	// Description_ZH: 在仓库的历史记录中找不到由所提供的哈希或引用指向的提交。
+	//
+	// en-US: Commit not found
+	//
+	// zh-CN: 未找到该提交
+	//
+	// zh-HK: 未找到該提交
+	ErrGitCommitNotFound error = CustomError{prefix: errGitPrefix, code: gitCommitNotFound}
+	// git diff operation failed
+	//
+	// Description: An error occurred while generating a diff between two commits, branches, or files.
+	//
+	// Description_ZH: 在生成两个提交、分支或文件之间的差异时发生错误。
+	//
+	// en-US: Failed to generate diff
+	//
+	// zh-CN: 生成差异对比失败
+	//
+	// zh-HK: 生成差異對比失敗
 	ErrGitDiffFailed error = CustomError{prefix: errGitPrefix, code: gitDiffFailed}
-
-	ErrGitAuthFailed   error = CustomError{prefix: errGitPrefix, code: gitAuthFailed}
+	// git authentication failed
+	//
+	// Description: Authentication with the remote Git server failed. Please check your credentials (e.g., token, SSH key) and permissions.
+	//
+	// Description_ZH: 与远程 Git 服务器的身份验证失败。请检查您的凭据（例如，令牌、SSH 密钥）和权限。
+	//
+	// en-US: Git authentication failed
+	//
+	// zh-CN: Git身份验证失败
+	//
+	// zh-HK: Git身份驗證失敗
+	ErrGitAuthFailed error = CustomError{prefix: errGitPrefix, code: gitAuthFailed}
+	// git repository not found
+	//
+	// Description: The specified remote Git repository could not be found. Please verify the URL and ensure the repository exists and is accessible.
+	//
+	// Description_ZH: 找不到指定的远程 Git 仓库。请验证 URL，并确保仓库存在且可访问。
+	//
+	// en-US: Repository not found
+	//
+	// zh-CN: 仓库未找到
+	//
+	// zh-HK: 儲存庫未找到
 	ErrGitRepoNotFound error = CustomError{prefix: errGitPrefix, code: gitRepoNotFound}
-
-	ErrGitFindBranchFailed   error = CustomError{prefix: errGitPrefix, code: gitFindBranchFailed}
-	ErrGitBranchNotFound     error = CustomError{prefix: errGitPrefix, code: gitBranchNotFound}
+	// failed to find a specific git branch
+	//
+	// Description: An error occurred while searching for a specific branch. The branch name may be malformed or the search operation itself failed.
+	//
+	// Description_ZH: 搜索特定分支时发生错误。分支名称可能格式错误，或者搜索操作本身失败。
+	//
+	// en-US: Failed to find branch
+	//
+	// zh-CN: 查找分支失败
+	//
+	// zh-HK: 查找分支失敗
+	ErrGitFindBranchFailed error = CustomError{prefix: errGitPrefix, code: gitFindBranchFailed}
+	// the specified git branch does not exist
+	//
+	// Description: The specified branch name could not be found in the repository.
+	//
+	// Description_ZH: 在仓库中找不到指定的分支名称。
+	//
+	// en-US: Branch not found
+	//
+	// zh-CN: 未找到该分支
+	//
+	// zh-HK: 未找到該分支
+	ErrGitBranchNotFound error = CustomError{prefix: errGitPrefix, code: gitBranchNotFound}
+	// failed to delete a git branch
+	//
+	// Description: The attempt to delete a local or remote branch failed. This may be due to insufficient permissions or because the branch is protected.
+	//
+	// Description_ZH: 尝试删除本地或远程分支失败。这可能是由于权限不足或该分支受保护。
+	//
+	// en-US: Failed to delete branch
+	//
+	// zh-CN: 删除分支失败
+	//
+	// zh-HK: 刪除分支失敗
 	ErrGitDeleteBranchFailed error = CustomError{prefix: errGitPrefix, code: gitDeleteBranchFailed}
-
-	ErrGitFileNotFound     error = CustomError{prefix: errGitPrefix, code: gitFileNotFound}
-	ErrGitUploadFailed     error = CustomError{prefix: errGitPrefix, code: gitUploadFailed}
-	ErrGitDownloadFailed   error = CustomError{prefix: errGitPrefix, code: gitDownloadFailed}
+	// file not found in the git repository at the specified path or commit
+	//
+	// Description: The requested file could not be found at the specified path within the given branch or commit of the Git repository.
+	//
+	// Description_ZH: 在 Git 仓库的指定分支或提交的指定路径下找不到所请求的文件。
+	//
+	// en-US: File not found in repository
+	//
+	// zh-CN: 在仓库中未找到该文件
+	//
+	// zh-HK: 在儲存庫中未找到該檔案
+	ErrGitFileNotFound error = CustomError{prefix: errGitPrefix, code: gitFileNotFound}
+	// file upload to the git repository failed
+	//
+	// Description: An error occurred while attempting to upload a file to the Git repository.
+	//
+	// Description_ZH: 尝试将文件上传到 Git 仓库时发生错误。
+	//
+	// en-US: File upload failed
+	//
+	// zh-CN: 文件上传失败
+	//
+	// zh-HK: 檔案上傳失敗
+	ErrGitUploadFailed error = CustomError{prefix: errGitPrefix, code: gitUploadFailed}
+	// file download from the git repository failed
+	//
+	// Description: An error occurred while attempting to download a file from the Git repository. Check file path, permissions, and network connectivity.
+	//
+	// Description_ZH: 尝试从 Git 仓库下载文件时发生错误。请检查文件路径、权限和网络连接。
+	//
+	// en-US: File download failed
+	//
+	// zh-CN: 文件下载失败
+	//
+	// zh-HK: 檔案下載失敗
+	ErrGitDownloadFailed error = CustomError{prefix: errGitPrefix, code: gitDownloadFailed}
+	// failed to connect to the git remote server
+	//
+	// Description: A connection to the remote Git server could not be established. Please check your network connection, firewall settings, and the remote server's status.
+	//
+	// Description_ZH: 无法建立到远程 Git 服务器的连接。请检查您的网络连接、防火墙设置以及远程服务器的状态。
+	//
+	// en-US: Failed to connect to Git server
+	//
+	// zh-CN: 连接Git服务器失败
+	//
+	// zh-HK: 連接Git伺服器失敗
 	ErrGitConnectionFailed error = CustomError{prefix: errGitPrefix, code: gitConnectionFailed}
-	ErrGitLfsError         error = CustomError{prefix: errGitPrefix, code: gitLfsError}
-	ErrFileTooLarge        error = CustomError{prefix: errGitPrefix, code: fileTooLarge} // Custom error for file size limit exceeded
+	// an error occurred with git-lfs
+	//
+	// Description: An unspecified error occurred during a Git LFS (Large File Storage) operation. Check LFS configuration and logs for more details.
+	//
+	// Description_ZH: 在 Git LFS（大文件存储）操作期间发生未指定的错误。请检查 LFS 配置和日志以获取更多详细信息。
+	//
+	// en-US: Git LFS operation failed
+	//
+	// zh-CN: Git LFS操作失败
+	//
+	// zh-HK: Git LFS操作失敗
+	ErrGitLfsError error = CustomError{prefix: errGitPrefix, code: gitLfsError}
+	// the file is too large to be processed or uploaded
+	//
+	// Description: The file exceeds the configured maximum size limit for this operation. Consider using Git LFS for large files.
+	//
+	// Description_ZH: 文件大小超出了此操作配置的最大限制。请考虑对大文件使用 Git LFS。
+	//
+	// en-US: File is too large
+	//
+	// zh-CN: 文件过大
+	//
+	// zh-HK: 檔案過大
+	ErrFileTooLarge error = CustomError{prefix: errGitPrefix, code: fileTooLarge} // Custom error for file size limit exceeded
+	// the git service is currently unavailable
+	//
+	// Description: The Git hosting service is temporarily unavailable or unreachable. Please try again later.
+	//
+	// Description_ZH: Git 托管服务暂时不可用或无法访问。请稍后再试。
+	//
+	// en-US: Git service is unavailable
+	//
+	// zh-CN: Git服务不可用
+	//
+	// zh-HK: Git服務不可用
+	ErrServiceUnavaliable error = CustomError{prefix: errGitPrefix, code: gitServiceUnavaliable}
 )
 
 func FindCommitFailed(err error, ctx context) error {

@@ -1,11 +1,11 @@
 {
     "error.DAT-ERR-0": {
-        "other": "未找到數據集卡片"
+        "other": "未找到數據可視化卡片"
     },
     "error.DAT-ERR-1": {
         "other": "數據集格式錯誤"
     },
     "error.DAT-ERR-2": {
-        "other": "沒有有效的 Parquet 檔案"
+        "other": "未找到有效的Parquet檔案"
     }
 }

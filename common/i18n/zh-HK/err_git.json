@@ -1,0 +1,62 @@
+{
+    "error.GIT-ERR-0": {
+        "other": "克隆儲存庫失敗"
+    },
+    "error.GIT-ERR-1": {
+        "other": "從儲存庫拉取更新失敗"
+    },
+    "error.GIT-ERR-10": {
+        "other": "查找分支失敗"
+    },
+    "error.GIT-ERR-11": {
+        "other": "未找到該分支"
+    },
+    "error.GIT-ERR-12": {
+        "other": "刪除分支失敗"
+    },
+    "error.GIT-ERR-13": {
+        "other": "在儲存庫中未找到該檔案"
+    },
+    "error.GIT-ERR-14": {
+        "other": "檔案上傳失敗"
+    },
+    "error.GIT-ERR-15": {
+        "other": "檔案下載失敗"
+    },
+    "error.GIT-ERR-16": {
+        "other": "連接Git伺服器失敗"
+    },
+    "error.GIT-ERR-17": {
+        "other": "Git LFS操作失敗"
+    },
+    "error.GIT-ERR-18": {
+        "other": "檔案過大"
+    },
+    "error.GIT-ERR-2": {
+        "other": "推送更新到儲存庫失敗"
+    },
+    "error.GIT-ERR-3": {
+        "other": "提交變更失敗"
+    },
+    "error.GIT-ERR-32": {
+        "other": "Git服務不可用"
+    },
+    "error.GIT-ERR-4": {
+        "other": "查找提交失敗"
+    },
+    "error.GIT-ERR-5": {
+        "other": "統計提交數量失敗"
+    },
+    "error.GIT-ERR-6": {
+        "other": "未找到該提交"
+    },
+    "error.GIT-ERR-7": {
+        "other": "生成差異對比失敗"
+    },
+    "error.GIT-ERR-8": {
+        "other": "Git身份驗證失敗"
+    },
+    "error.GIT-ERR-9": {
+        "other": "儲存庫未找到"
+    }
+}

@@ -1,0 +1,23 @@
+{
+    "error.SYS-ERR-0": {
+        "other": "服务器内部错误"
+    },
+    "error.SYS-ERR-1": {
+        "other": "远程服务调用失败"
+    },
+    "error.SYS-ERR-2": {
+        "other": "数据库操作失败"
+    },
+    "error.SYS-ERR-3": {
+        "other": "数据库中未找到记录"
+    },
+    "error.SYS-ERR-4": {
+        "other": "键值重复"
+    },
+    "error.SYS-ERR-5": {
+        "other": "未找到LFS服务"
+    },
+    "error.SYS-ERR-6": {
+        "other": "不能移除组织的最后一个管理员"
+    }
+}

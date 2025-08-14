@@ -1,0 +1,23 @@
+{
+    "error.SYS-ERR-0": {
+        "other": "伺服器內部錯誤"
+    },
+    "error.SYS-ERR-1": {
+        "other": "遠程服務調用失敗"
+    },
+    "error.SYS-ERR-2": {
+        "other": "資料庫操作失敗"
+    },
+    "error.SYS-ERR-3": {
+        "other": "資料庫中未找到記錄"
+    },
+    "error.SYS-ERR-4": {
+        "other": "鍵值重複"
+    },
+    "error.SYS-ERR-5": {
+        "other": "未找到LFS服務"
+    },
+    "error.SYS-ERR-6": {
+        "other": "不能移除組織的最後一個管理員"
+    }
+}

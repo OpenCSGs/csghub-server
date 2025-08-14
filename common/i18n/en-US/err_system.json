@@ -1,0 +1,23 @@
+{
+    "error.SYS-ERR-0": {
+        "other": "Internal Server Error"
+    },
+    "error.SYS-ERR-1": {
+        "other": "Remote service call failed"
+    },
+    "error.SYS-ERR-2": {
+        "other": "Database operation failed"
+    },
+    "error.SYS-ERR-3": {
+        "other": "Record not found in database"
+    },
+    "error.SYS-ERR-4": {
+        "other": "Duplicate entry for key"
+    },
+    "error.SYS-ERR-5": {
+        "other": "LFS service not found"
+    },
+    "error.SYS-ERR-6": {
+        "other": "Cannot remove the last administrator of the organization"
+    }
+}
