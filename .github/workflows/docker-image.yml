@@ -40,9 +40,9 @@ jobs:
       id: tag
       run: |
           if [ "${{ github.event_name }}" == "schedule" ] && [ "${{ github.ref }}" == "refs/heads/main" ]; then
-            echo "TAGS=opencsghq/csghub-server:latest,${{ secrets.ACR_REGISTRY }}/opencsg_public/csghub_server:latest" >> $GITHUB_ENV
+            echo "TAGS=opencsghq/csghub-server:latest,${{ secrets.ACR_REGISTRY }}/opencsghq/csghub_server:latest" >> $GITHUB_ENV
           elif [ "${{ github.event_name }}" == "push" ]; then
-            echo "TAGS=opencsghq/csghub-server:${GITHUB_REF_NAME},${{ secrets.ACR_REGISTRY }}/opencsg_public/csghub_server:${GITHUB_REF_NAME}" >> $GITHUB_ENV
+            echo "TAGS=opencsghq/csghub-server:${GITHUB_REF_NAME},${{ secrets.ACR_REGISTRY }}/opencsghq/csghub_server:${GITHUB_REF_NAME}" >> $GITHUB_ENV
           fi
           
     - name: Build and push Docker image
