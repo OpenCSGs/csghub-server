@@ -60,9 +60,9 @@ func (rc *recomComponentImpl) CalculateRecomScore(ctx context.Context, batchSize
 	if batchSize <= 0 {
 		batchSize = 500
 	}
-	batch := 0
+	lastRepoID := int64(0)
 	for {
-		repos, err := rc.repoStore.FindWithBatch(ctx, batchSize, batch)
+		repos, err := rc.repoStore.BatchGet(ctx, lastRepoID, batchSize, nil)
 		if err != nil {
 			return errors.New("error fetching repositories")
 		}
@@ -105,7 +105,10 @@ func (rc *recomComponentImpl) CalculateRecomScore(ctx context.Context, batchSize
 			break
 		}
 
-		batch++
+		// Update lastRepoID to the ID of the last repository in this batch
+		if len(repos) > 0 {
+			lastRepoID = repos[len(repos)-1].ID
+		}
 	}
 
 	return nil

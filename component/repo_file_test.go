@@ -45,7 +45,12 @@ func TestRepoFileComponent_GenRepoFileRecordsBatch(t *testing.T) {
 	ctx := context.TODO()
 	rc := initializeTestRepoFileComponent(ctx, t)
 
-	rc.mocks.stores.RepoMock().EXPECT().BatchGet(ctx, types.ModelRepo, int64(1), 10).Return(
+	pendingStatus := types.SensitiveCheckPending
+	filter := &types.BatchGetFilter{
+		RepoType:             types.ModelRepo,
+		SensitiveCheckStatus: &pendingStatus,
+	}
+	rc.mocks.stores.RepoMock().EXPECT().BatchGet(ctx, int64(1), 10, filter).Return(
 		[]database.Repository{{ID: 1, Path: "foo/bar"}}, nil,
 	)
 
