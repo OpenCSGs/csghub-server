@@ -134,9 +134,9 @@ func (_c *MockRepoStore_BatchCreateRepoTags_Call) RunAndReturn(run func(context.
 	return _c
 }
 
-// BatchGet provides a mock function with given fields: ctx, repoType, lastRepoID, batch
-func (_m *MockRepoStore) BatchGet(ctx context.Context, repoType types.RepositoryType, lastRepoID int64, batch int) ([]database.Repository, error) {
-	ret := _m.Called(ctx, repoType, lastRepoID, batch)
+// BatchGet provides a mock function with given fields: ctx, lastRepoID, batch, filter
+func (_m *MockRepoStore) BatchGet(ctx context.Context, lastRepoID int64, batch int, filter *types.BatchGetFilter) ([]database.Repository, error) {
+	ret := _m.Called(ctx, lastRepoID, batch, filter)
 
 	if len(ret) == 0 {
 		panic("no return value specified for BatchGet")
@@ -144,19 +144,19 @@ func (_m *MockRepoStore) BatchGet(ctx context.Context, repoType types.Repository
 
 	var r0 []database.Repository
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, types.RepositoryType, int64, int) ([]database.Repository, error)); ok {
-		return rf(ctx, repoType, lastRepoID, batch)
+	if rf, ok := ret.Get(0).(func(context.Context, int64, int, *types.BatchGetFilter) ([]database.Repository, error)); ok {
+		return rf(ctx, lastRepoID, batch, filter)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, types.RepositoryType, int64, int) []database.Repository); ok {
-		r0 = rf(ctx, repoType, lastRepoID, batch)
+	if rf, ok := ret.Get(0).(func(context.Context, int64, int, *types.BatchGetFilter) []database.Repository); ok {
+		r0 = rf(ctx, lastRepoID, batch, filter)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]database.Repository)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, types.RepositoryType, int64, int) error); ok {
-		r1 = rf(ctx, repoType, lastRepoID, batch)
+	if rf, ok := ret.Get(1).(func(context.Context, int64, int, *types.BatchGetFilter) error); ok {
+		r1 = rf(ctx, lastRepoID, batch, filter)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -171,16 +171,16 @@ type MockRepoStore_BatchGet_Call struct {
 
 // BatchGet is a helper method to define mock.On call
 //   - ctx context.Context
-//   - repoType types.RepositoryType
 //   - lastRepoID int64
 //   - batch int
-func (_e *MockRepoStore_Expecter) BatchGet(ctx interface{}, repoType interface{}, lastRepoID interface{}, batch interface{}) *MockRepoStore_BatchGet_Call {
-	return &MockRepoStore_BatchGet_Call{Call: _e.mock.On("BatchGet", ctx, repoType, lastRepoID, batch)}
+//   - filter *types.BatchGetFilter
+func (_e *MockRepoStore_Expecter) BatchGet(ctx interface{}, lastRepoID interface{}, batch interface{}, filter interface{}) *MockRepoStore_BatchGet_Call {
+	return &MockRepoStore_BatchGet_Call{Call: _e.mock.On("BatchGet", ctx, lastRepoID, batch, filter)}
 }
 
-func (_c *MockRepoStore_BatchGet_Call) Run(run func(ctx context.Context, repoType types.RepositoryType, lastRepoID int64, batch int)) *MockRepoStore_BatchGet_Call {
+func (_c *MockRepoStore_BatchGet_Call) Run(run func(ctx context.Context, lastRepoID int64, batch int, filter *types.BatchGetFilter)) *MockRepoStore_BatchGet_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(types.RepositoryType), args[2].(int64), args[3].(int))
+		run(args[0].(context.Context), args[1].(int64), args[2].(int), args[3].(*types.BatchGetFilter))
 	})
 	return _c
 }
@@ -190,7 +190,7 @@ func (_c *MockRepoStore_BatchGet_Call) Return(_a0 []database.Repository, _a1 err
 	return _c
 }
 
-func (_c *MockRepoStore_BatchGet_Call) RunAndReturn(run func(context.Context, types.RepositoryType, int64, int) ([]database.Repository, error)) *MockRepoStore_BatchGet_Call {
+func (_c *MockRepoStore_BatchGet_Call) RunAndReturn(run func(context.Context, int64, int, *types.BatchGetFilter) ([]database.Repository, error)) *MockRepoStore_BatchGet_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -253,6 +253,11 @@ type RepoFilter struct {
 	SpaceSDK       string
 }
 
+type BatchGetFilter struct {
+	RepoType             RepositoryType        `json:"repo_type"`
+	SensitiveCheckStatus *SensitiveCheckStatus `json:"sensitive_check_status"`
+}
+
 type TagReq struct {
 	Name     string `json:"name"`
 	Category string `json:"category"`
