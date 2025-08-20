@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/uptrace/bun"
-	"opencsg.com/csghub-server/builder/store/database"
 )
 
 /* tables for recommendations */
@@ -51,7 +50,7 @@ func init() {
 func initRecomWeights(db *bun.DB) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	rw := &database.RecomWeight{
+	rw := &RecomWeight{
 		Name:      "freshness",
 		WeightExp: expFreshness,
 	}
@@ -59,7 +58,7 @@ func initRecomWeights(db *bun.DB) error {
 	if err != nil {
 		return fmt.Errorf("failed to insert freshness recom weight")
 	}
-	rw = &database.RecomWeight{
+	rw = &RecomWeight{
 		Name:      "downloads",
 		WeightExp: expDownloads,
 	}

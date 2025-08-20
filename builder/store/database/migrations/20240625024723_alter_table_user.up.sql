@@ -34,4 +34,16 @@ SELECT rename_column_if_exists('deploys', 'casdoor_uuid', 'user_uuid')
 
 --bun:split
 
+SELECT rename_column_if_exists('account_users', 'user_id', 'user_uuid')
+
+--bun:split
+
+SELECT rename_column_if_exists('account_bills', 'user_id', 'user_uuid')
+
+--bun:split
+
+SELECT rename_column_if_exists('account_statements', 'user_id', 'user_uuid')
+
+--bun:split
+
 ALTER TABLE users ADD COLUMN IF NOT EXISTS "reg_provider" varchar(64) default 'casdoor';

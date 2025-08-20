@@ -1,15 +1,68 @@
 categories:
   - name: task
     scope: model
+    show_name: 任务
+    enabled: true
   - name: license
     scope: model
+    show_name: 许可证
+    enabled: true
   - name: framework
     scope: model
+    show_name: 框架
+    enabled: true
   - name: task
     scope: dataset
+    show_name: 任务
+    enabled: true
   - name: license
     scope: dataset
+    show_name: 许可证
+    enabled: true
   - name: size
     scope: dataset
+    show_name: 大小
+    enabled: false
   - name: evaluation
     scope: dataset
+    enabled: false
+  - name: license
+    scope: code
+    show_name: 许可证
+    enabled: true
+  - name: language
+    scope: model
+    show_name: 语言
+    enabled: true
+  - name: language
+    scope: dataset
+    show_name: 语言
+    enabled: true
+  - name: language
+    scope: code
+    enabled: false
+  - name: language
+    scope: space
+    enabled: false
+  - name: license
+    scope: space
+    enabled: false
+  - name: industry
+    scope: model
+    show_name: 行业
+    enabled: false
+  - name: industry
+    scope: dataset
+    enabled: false
+  - name: industry
+    scope: code
+    enabled: false
+  - name: industry
+    scope: space
+    enabled: false
+  - name: resource
+    scope: model
+    enabled: false
+  - name: runtime_framework
+    scope: model
+    enabled: false

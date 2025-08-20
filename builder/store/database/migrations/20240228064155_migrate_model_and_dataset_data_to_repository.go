@@ -5,7 +5,6 @@ import (
 	"database/sql"
 
 	"github.com/uptrace/bun"
-	"opencsg.com/csghub-server/builder/store/database"
 )
 
 func getModels(ctx context.Context, db bun.Tx) (models []Model, err error) {
@@ -27,7 +26,7 @@ func getDatasets(ctx context.Context, db bun.Tx) (datasets []Dataset, err error)
 func init() {
 	Migrations.MustRegister(func(ctx context.Context, db *bun.DB) error {
 		return db.RunInTx(ctx, &sql.TxOptions{}, func(ctx context.Context, db bun.Tx) (err error) {
-			var repositories []*database.Repository
+			var repositories []*Repository
 			models, err := getModels(ctx, db)
 			if err != nil {
 				return
@@ -60,7 +59,7 @@ func init() {
 
 			_, err = db.NewUpdate().
 				With("_data", values).
-				Model(&database.Repository{}).
+				Model(&Repository{}).
 				TableExpr("_data").
 				Set("nickname = _data.nickname").
 				Set("download_count = _data.download_count").

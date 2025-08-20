@@ -34,4 +34,16 @@ SELECT rename_column_if_exists('deploys', 'user_uuid', 'casdoor_uuid')
 
 --bun:split
 
+SELECT rename_column_if_exists('account_users', 'user_uuid', 'user_id')
+
+--bun:split
+
+SELECT rename_column_if_exists('account_bills', 'user_uuid', 'user_id')
+
+--bun:split
+
+SELECT rename_column_if_exists('account_statements', 'user_uuid', 'user_id')
+
+--bun:split
+
 ALTER TABLE users DROP COLUMN IF EXISTS "reg_provider";

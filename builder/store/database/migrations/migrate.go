@@ -31,7 +31,7 @@ func init() {
 
 // NewMigrator factory of database migrator
 func NewMigrator(db *database.DB) *migrate.Migrator {
-	return migrate.NewMigrator(db.BunDB, Migrations) // nolint: staticcheck
+	return migrate.NewMigrator(db.BunDB, Migrations, migrate.WithMarkAppliedOnSuccess(true)) // nolint: staticcheck
 }
 
 func createTables(ctx context.Context, db *bun.DB, tables ...any) (err error) {
