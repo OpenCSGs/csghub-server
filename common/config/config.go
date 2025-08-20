@@ -39,9 +39,10 @@ type Config struct {
 	}
 
 	Database struct {
-		Driver   string `env:"STARHUB_DATABASE_DRIVER" default:"pg"`
-		DSN      string `env:"STARHUB_DATABASE_DSN" default:"postgresql://postgres:postgres@localhost:5432/starhub_server?sslmode=disable"`
-		TimeZone string `env:"STARHUB_DATABASE_TIMEZONE" default:"Asia/Shanghai"`
+		Driver              string `env:"STARHUB_DATABASE_DRIVER" default:"pg"`
+		DSN                 string `env:"STARHUB_DATABASE_DSN" default:"postgresql://postgres:postgres@localhost:5432/starhub_server?sslmode=disable"`
+		TimeZone            string `env:"STARHUB_DATABASE_TIMEZONE" default:"Asia/Shanghai"`
+		SearchConfiguration string `env:"STARHUB_DATABASE_SEARCH_CONFIGURATION" default:"opencsgchinese"`
 	}
 
 	Redis struct {

@@ -6,7 +6,6 @@ import (
 
 	"github.com/uptrace/bun"
 	"golang.org/x/crypto/ssh"
-	"opencsg.com/csghub-server/builder/store/database"
 )
 
 func init() {
@@ -18,9 +17,9 @@ func init() {
 }
 
 func calculateSSHKeyFingerprint(ctx context.Context, db *bun.DB) error {
-	var sshKeys []database.SSHKey
+	var sshKeys []SSHKey
 	err := db.NewSelect().
-		Model(&database.SSHKey{}).
+		Model(&SSHKey{}).
 		Where("fingerprint_sha256 is NULL").
 		Scan(ctx, &sshKeys)
 	if err != nil {
@@ -46,4 +45,3 @@ func calculateSSHKeyFingerprint(ctx context.Context, db *bun.DB) error {
 
 	return err
 }
-

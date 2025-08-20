@@ -6,13 +6,12 @@ import (
 	"time"
 
 	"github.com/uptrace/bun"
-	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/types"
 )
 
 func init() {
 	Migrations.MustRegister(func(ctx context.Context, db *bun.DB) error {
-		err := createTables(ctx, db, database.RepositoryFile{}, RepositoryFileCheck{})
+		err := createTables(ctx, db, RepositoryFile{}, RepositoryFileCheck{})
 		if err != nil {
 			return fmt.Errorf("create table repository_files: %w", err)
 		}
@@ -41,22 +40,22 @@ func init() {
 
 		return nil
 	}, func(ctx context.Context, db *bun.DB) error {
-		return dropTables(ctx, db, database.RepositoryFile{}, RepositoryFileCheck{})
+		return dropTables(ctx, db, RepositoryFile{}, RepositoryFileCheck{})
 	})
 
 }
 
 type RepositoryFile struct {
-	ID              int64                `bun:",pk,autoincrement" `
-	RepositoryID    int64                `bun:",notnull" `
-	Path            string               `bun:",notnull" `
-	FileType        string               `bun:",notnull" `
-	Size            int64                `bun:",nullzero" `
-	LastModify      time.Time            `bun:",nullzero" `
-	CommitSha       string               `bun:",nullzero" `
-	LfsRelativePath string               `bun:",nullzero" `
-	Branch          string               `bun:",nullzero" `
-	Repository      *database.Repository `bun:"rel:belongs-to,join:repository_id=id"`
+	ID              int64       `bun:",pk,autoincrement" `
+	RepositoryID    int64       `bun:",notnull" `
+	Path            string      `bun:",notnull" `
+	FileType        string      `bun:",notnull" `
+	Size            int64       `bun:",nullzero" `
+	LastModify      time.Time   `bun:",nullzero" `
+	CommitSha       string      `bun:",nullzero" `
+	LfsRelativePath string      `bun:",nullzero" `
+	Branch          string      `bun:",nullzero" `
+	Repository      *Repository `bun:"rel:belongs-to,join:repository_id=id"`
 }
 
 type RepositoryFileCheck struct {

@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/uptrace/bun"
-	"opencsg.com/csghub-server/builder/store/database"
 )
 
 type Deploy struct {
@@ -24,11 +23,22 @@ type Deploy struct {
 	times
 }
 
+type DeployTask struct {
+	ID int64 `bun:",pk,autoincrement" json:"id"`
+	// 0: build, 1: run
+	TaskType int     `bun:",notnull" json:"task_type"`
+	Status   int     `bun:",notnull" json:"status"`
+	Message  string  `bun:",nullzero" json:"message"`
+	DeployID int64   `bun:",notnull" json:"deploy_id"`
+	Deploy   *Deploy `bun:"rel:belongs-to,join:deploy_id=id" json:"deploy"`
+	times
+}
+
 func init() {
 	Migrations.MustRegister(func(ctx context.Context, db *bun.DB) error {
-		_ = dropTables(ctx, db, database.Space{})
-		return createTables(ctx, db, database.Space{}, Deploy{}, database.DeployTask{})
+		_ = dropTables(ctx, db, Space{})
+		return createTables(ctx, db, Space{}, Deploy{}, DeployTask{})
 	}, func(ctx context.Context, db *bun.DB) error {
-		return dropTables(ctx, db, Deploy{}, database.DeployTask{})
+		return dropTables(ctx, db, Deploy{}, DeployTask{})
 	})
 }
