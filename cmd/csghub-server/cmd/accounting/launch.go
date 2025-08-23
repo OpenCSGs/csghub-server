@@ -31,8 +31,10 @@ var launchCmd = &cobra.Command{
 			Dialect: database.DatabaseDialect(cfg.Database.Driver),
 			DSN:     cfg.Database.DSN,
 		}
-		database.InitDB(dbConfig)
-
+		if err := database.InitDB(dbConfig); err != nil {
+			slog.Error("failed to initialize database", slog.Any("error", err))
+			return fmt.Errorf("database initialization failed: %w", err)
+		}
 		mqHandler, err := mq.GetOrInit(cfg)
 		if err != nil {
 			return fmt.Errorf("fail to build message queue handler: %w", err)

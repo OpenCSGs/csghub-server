@@ -25,7 +25,10 @@ var rproxyCmd = &cobra.Command{
 			Dialect: database.DatabaseDialect(cfg.Database.Driver),
 			DSN:     cfg.Database.DSN,
 		}
-		database.InitDB(dbConfig)
+		if err := database.InitDB(dbConfig); err != nil {
+			slog.Error("failed to initialize database", slog.Any("error", err))
+			return fmt.Errorf("database initialization failed: %w", err)
+		}
 		r, err := router.NewRProxyRouter(cfg)
 		if err != nil {
 			return fmt.Errorf("failed to init router: %w", err)

@@ -1,8 +1,9 @@
 package deploy
 
 import (
-	"github.com/spf13/cobra"
 	"log/slog"
+
+	"github.com/spf13/cobra"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/logcollector/router"

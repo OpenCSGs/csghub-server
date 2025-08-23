@@ -2,6 +2,7 @@ package trigger
 
 import (
 	"fmt"
+	"log/slog"
 
 	"github.com/spf13/cobra"
 	"opencsg.com/csghub-server/builder/git"
@@ -32,10 +33,9 @@ var Cmd = &cobra.Command{
 			DSN:     config.Database.DSN,
 		}
 
-		database.InitDB(dbConfig)
-		if err != nil {
-			err = fmt.Errorf("initializing DB connection: %w", err)
-			return
+		if err := database.InitDB(dbConfig); err != nil {
+			slog.Error("failed to initialize database", slog.Any("error", err))
+			return fmt.Errorf("database initialization failed: %w", err)
 		}
 		rs = database.NewRepoStore()
 		gs, err = git.NewGitServer(config)

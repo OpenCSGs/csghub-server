@@ -35,9 +35,8 @@ var updateRepoCmd = &cobra.Command{
 			DSN:     config.Database.DSN,
 		}
 
-		database.InitDB(dbConfig)
-		if err != nil {
-			slog.Error("initializing DB connection", "err", err)
+		if err := database.InitDB(dbConfig); err != nil {
+			slog.Error("failed to initialize database", slog.Any("error", err))
 			return
 		}
 
