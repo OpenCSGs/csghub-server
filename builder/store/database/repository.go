@@ -60,7 +60,7 @@ type RepoStore interface {
 	CountByRepoType(ctx context.Context, repoType types.RepositoryType) (int, error)
 	GetRepoWithoutRuntimeByID(ctx context.Context, rfID int64, paths []string, batchSize, batch int) ([]Repository, error)
 	GetRepoWithRuntimeByID(ctx context.Context, rfID int64, paths []string) ([]Repository, error)
-	BatchGet(ctx context.Context, repoType types.RepositoryType, lastRepoID int64, batch int) ([]Repository, error)
+	BatchGet(ctx context.Context, lastRepoID int64, batch int, filter *types.BatchGetFilter) ([]Repository, error)
 	FindWithBatch(ctx context.Context, batchSize, batch int, repoTypes ...types.RepositoryType) ([]Repository, error)
 	ByUser(ctx context.Context, userID int64) ([]Repository, error)
 	FindByRepoSourceWithBatch(ctx context.Context, repoSource types.RepositorySource, batchSize, batch int) ([]Repository, error)
@@ -619,9 +619,9 @@ func (s *repoStoreImpl) PublicToUser(ctx context.Context, repoType types.Reposit
 	}
 
 	if filter.Sort == "trending" {
-		q.Join("Left Join recom_repo_scores on repository.id = recom_repo_scores.repository_id AND recom_repo_scores.weight_name=?", RecomWeightTotal)
-		q.Join("Left Join recom_op_weights on repository.id = recom_op_weights.repository_id")
-		q.ColumnExpr(`COALESCE(recom_repo_scores.score, 0)+COALESCE(recom_op_weights.weight, 0) AS popularity`)
+		q.Join("LEFT JOIN recom_repo_scores ON repository.id = recom_repo_scores.repository_id")
+		q.Where("recom_repo_scores.weight_name = ?", RecomWeightTotal)
+		q.ColumnExpr(`COALESCE(recom_repo_scores.score, 0) AS popularity`)
 	}
 
 	err = q.Order(sortBy[filter.Sort]).
@@ -857,14 +857,27 @@ func (s *repoStoreImpl) GetRepoWithRuntimeByID(ctx context.Context, rfID int64, 
 	return res, nil
 }
 
-func (s *repoStoreImpl) BatchGet(ctx context.Context, repoType types.RepositoryType, lastRepoID int64, batch int) ([]Repository, error) {
+func (s *repoStoreImpl) BatchGet(ctx context.Context, lastRepoID int64, batch int, filter *types.BatchGetFilter) ([]Repository, error) {
 	var res []Repository
 	q := s.db.Operator.Core.NewSelect().Model(&res)
 	if lastRepoID > 0 {
 		q.Where("id > ?", lastRepoID)
 	}
-	err := q.Where("repository_type = ? and sensitive_check_status = ?", repoType, types.SensitiveCheckPending).
-		Order("id ASC").
+
+	// Apply filters only if filter is provided and fields have meaningful values
+	if filter != nil {
+		// Apply repository type filter only if specified
+		if filter.RepoType != "" {
+			q.Where("repository_type = ?", filter.RepoType)
+		}
+
+		// Apply sensitive check status filter only if specified (pointer is not nil)
+		if filter.SensitiveCheckStatus != nil {
+			q.Where("sensitive_check_status = ?", *filter.SensitiveCheckStatus)
+		}
+	}
+
+	err := q.Order("id ASC").
 		Limit(batch).
 		Scan(ctx)
 	if err != nil {

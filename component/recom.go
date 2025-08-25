@@ -60,9 +60,11 @@ func (rc *recomComponentImpl) CalculateRecomScore(ctx context.Context, batchSize
 	if batchSize <= 0 {
 		batchSize = 500
 	}
-	batch := 0
+	lastRepoID := int64(0)
 	for {
-		repos, err := rc.repoStore.FindWithBatch(ctx, batchSize, batch)
+		ctxTimeout, cancel := context.WithTimeout(ctx, 5*time.Second)
+		repos, err := rc.repoStore.BatchGet(ctxTimeout, lastRepoID, batchSize, nil)
+		cancel()
 		if err != nil {
 			return errors.New("error fetching repositories")
 		}
@@ -70,7 +72,9 @@ func (rc *recomComponentImpl) CalculateRecomScore(ctx context.Context, batchSize
 		for _, repo := range repos {
 			repoIDs = append(repoIDs, repo.ID)
 		}
-		scores, err := rc.recomStore.FindScoreByRepoIDs(ctx, repoIDs)
+		ctxTimeout, cancel = context.WithTimeout(ctx, 5*time.Second)
+		scores, err := rc.recomStore.FindByRepoIDs(ctxTimeout, repoIDs)
+		cancel()
 		if err != nil {
 			return errors.New("error fetching scores of repos")
 		}
@@ -94,7 +98,9 @@ func (rc *recomComponentImpl) CalculateRecomScore(ctx context.Context, batchSize
 			newScores = append(newScores, newRepoScores...)
 		}
 
-		err = rc.recomStore.UpsertScore(ctx, newScores)
+		ctxTimeout, cancel = context.WithTimeout(ctx, 5*time.Second)
+		err = rc.recomStore.UpsertScore(ctxTimeout, newScores)
+		cancel()
 		if err != nil {
 			slog.Error("failed to flush recom score", slog.Any("error", err), slog.Any("repo_ids", repoIDs))
 		} else {
@@ -105,7 +111,10 @@ func (rc *recomComponentImpl) CalculateRecomScore(ctx context.Context, batchSize
 			break
 		}
 
-		batch++
+		// Update lastRepoID to the ID of the last repository in this batch
+		if len(repos) > 0 {
+			lastRepoID = repos[len(repos)-1].ID
+		}
 	}
 
 	return nil
