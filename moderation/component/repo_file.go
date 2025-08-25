@@ -55,7 +55,12 @@ func (c *repoFileComponentImpl) GenRepoFileRecordsBatch(ctx context.Context, rep
 	//TODO: load last repo id from redis cache
 	batch := 10
 	for {
-		repos, err := c.rs.BatchGet(ctx, repoType, lastRepoID, batch)
+		pendingStatus := types.SensitiveCheckPending
+		filter := &types.BatchGetFilter{
+			RepoType:             repoType,
+			SensitiveCheckStatus: &pendingStatus,
+		}
+		repos, err := c.rs.BatchGet(ctx, lastRepoID, batch, filter)
 		if err != nil {
 			return fmt.Errorf("failed to get repos in batch, error: %w", err)
 		}

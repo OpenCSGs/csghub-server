@@ -42,11 +42,11 @@ func TestRecomComponent_CalculateRecomScore(t *testing.T) {
 	repo3 := database.Repository{ID: 3, Path: "foo/bar3"}
 	repo3.UpdatedAt = time.Now().Add(24 * time.Hour)
 	// loop 1
-	rc.mocks.stores.RepoMock().EXPECT().FindWithBatch(ctx, batchSize, 0).Return([]database.Repository{
+	rc.mocks.stores.RepoMock().EXPECT().BatchGet(ctx, int64(0), batchSize, (*types.BatchGetFilter)(nil)).Return([]database.Repository{
 		repo1, repo2,
 	}, nil)
 	// loop 2
-	rc.mocks.stores.RepoMock().EXPECT().FindWithBatch(ctx, batchSize, 1).Return([]database.Repository{
+	rc.mocks.stores.RepoMock().EXPECT().BatchGet(ctx, int64(2), batchSize, (*types.BatchGetFilter)(nil)).Return([]database.Repository{
 		repo3,
 	}, nil)
 

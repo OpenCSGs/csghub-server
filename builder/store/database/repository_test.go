@@ -780,20 +780,90 @@ func TestRepoStore_BatchMethods(t *testing.T) {
 		require.Nil(t, err)
 		rids = append(rids, rn.ID)
 	}
-	rs, err := store.BatchGet(ctx, types.CodeRepo, 0, 10)
+	// Test with pending filter
+	pendingStatus := types.SensitiveCheckPending
+	pendingFilter := &types.BatchGetFilter{
+		RepoType:             types.CodeRepo,
+		SensitiveCheckStatus: &pendingStatus,
+	}
+	rs, err := store.BatchGet(ctx, 0, 10, pendingFilter)
 	require.Nil(t, err)
 	require.Equal(t, len(rs), 3)
 	require.Equal(t, []string{"rp1", "rp2", "rp3"}, names(rs))
 
-	rs, err = store.BatchGet(ctx, types.CodeRepo, rids[1], 10)
+	rs, err = store.BatchGet(ctx, rids[1], 10, pendingFilter)
 	require.Nil(t, err)
 	require.Equal(t, len(rs), 1)
 	require.Equal(t, []string{"rp3"}, names(rs))
 
-	rs, err = store.BatchGet(ctx, types.CodeRepo, 0, 1)
+	rs, err = store.BatchGet(ctx, 0, 1, pendingFilter)
 	require.Nil(t, err)
 	require.Equal(t, len(rs), 1)
 	require.Equal(t, []string{"rp1"}, names(rs))
+
+	// Test with pass filter (should return CodeRepo with Pass status)
+	passStatus := types.SensitiveCheckPass
+	passFilter := &types.BatchGetFilter{
+		RepoType:             types.CodeRepo,
+		SensitiveCheckStatus: &passStatus,
+	}
+	rs, err = store.BatchGet(ctx, 0, 10, passFilter)
+	require.Nil(t, err)
+	require.Equal(t, len(rs), 1) // Should return rp4 which is CodeRepo with Pass status
+	require.Equal(t, []string{"rp4"}, names(rs))
+
+	// Test with different status for DatasetRepo
+	pendingStatus2 := types.SensitiveCheckPending
+	datasetFilter := &types.BatchGetFilter{
+		RepoType:             types.DatasetRepo,
+		SensitiveCheckStatus: &pendingStatus2,
+	}
+	rs, err = store.BatchGet(ctx, 0, 10, datasetFilter)
+	require.Nil(t, err)
+	require.Equal(t, len(rs), 1)
+	require.Equal(t, []string{"rp5"}, names(rs))
+
+	// Test with nil filter (should return all repos)
+	rs, err = store.BatchGet(ctx, 0, 10, nil)
+	require.Nil(t, err)
+	require.Equal(t, len(rs), 5) // Should return all 5 repos
+	require.Equal(t, []string{"rp1", "rp2", "rp3", "rp4", "rp5"}, names(rs))
+
+	// Test with empty filter (should return all repos)
+	emptyFilter := &types.BatchGetFilter{}
+	rs, err = store.BatchGet(ctx, 0, 10, emptyFilter)
+	require.Nil(t, err)
+	require.Equal(t, len(rs), 5) // Should return all 5 repos
+	require.Equal(t, []string{"rp1", "rp2", "rp3", "rp4", "rp5"}, names(rs))
+
+	// Test with only RepoType filter
+	repoTypeOnlyFilter := &types.BatchGetFilter{
+		RepoType: types.CodeRepo,
+	}
+	rs, err = store.BatchGet(ctx, 0, 10, repoTypeOnlyFilter)
+	require.Nil(t, err)
+	require.Equal(t, len(rs), 4) // Should return 4 CodeRepo repos
+	require.Equal(t, []string{"rp1", "rp2", "rp3", "rp4"}, names(rs))
+
+	// Test with only SensitiveCheckStatus filter
+	pendingStatus3 := types.SensitiveCheckPending
+	statusOnlyFilter := &types.BatchGetFilter{
+		SensitiveCheckStatus: &pendingStatus3,
+	}
+	rs, err = store.BatchGet(ctx, 0, 10, statusOnlyFilter)
+	require.Nil(t, err)
+	require.Equal(t, len(rs), 4) // Should return 4 repos with pending status
+	require.Equal(t, []string{"rp1", "rp2", "rp3", "rp5"}, names(rs))
+
+	// Test with SensitiveCheckStatus = 0 (Pending) to ensure 0 is treated as a valid filter value
+	pendingStatusZero := types.SensitiveCheckStatus(0) // Explicitly set to 0 (Pending)
+	statusZeroFilter := &types.BatchGetFilter{
+		SensitiveCheckStatus: &pendingStatusZero,
+	}
+	rs, err = store.BatchGet(ctx, 0, 10, statusZeroFilter)
+	require.Nil(t, err)
+	require.Equal(t, len(rs), 4) // Should return 4 repos with pending status (0)
+	require.Equal(t, []string{"rp1", "rp2", "rp3", "rp5"}, names(rs))
 
 	rs, err = store.FindWithBatch(ctx, 2, 1)
 	require.Nil(t, err)
