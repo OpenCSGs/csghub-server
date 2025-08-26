@@ -1,4 +1,4 @@
-# Error Code Documentation
+# Error Codes
 
 This document lists all the custom error codes defined in the project, categorized by module.
 
@@ -80,7 +80,7 @@ This document lists all the custom error codes defined in the project, categoriz
 
 - **Error Code:** `AUTH-ERR-5`
 - **Error Name:** `invalidAuthHeader`
-- **Description:** The Authorization header is missing or incorrectly formatted. It should typically be in the format 'Bearer {token}'.
+- **Description:** The Authorization header is missing or incorrectly formatted. It should typically be in the format 'Bearer `{token}`'.
 
 ---
 
@@ -402,6 +402,14 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Name:** `gitServiceUnavaliable`
 - **Description:** The Git hosting service is temporarily unavailable or unreachable. Please try again later.
 
+---
+
+### `GIT-ERR-33`
+
+- **Error Code:** `GIT-ERR-33`
+- **Error Name:** `gitCopyRepositoryFailed`
+- **Description:** 
+
 ## Req Errors
 
 ### `REQ-ERR-0`
@@ -504,7 +512,7 @@ This document lists all the custom error codes defined in the project, categoriz
 
 - **Error Code:** `SYS-ERR-2`
 - **Error Name:** `databaseFailure`
-- **Description:** An unhandled or unexpected error occurred during a database operation, such as a lost connection (\`sql.ErrConnDone\`).
+- **Description:** An unhandled or unexpected error occurred during a database operation, such as a lost connection (`sql.ErrConnDone`).
 
 ---
 
@@ -512,7 +520,7 @@ This document lists all the custom error codes defined in the project, categoriz
 
 - **Error Code:** `SYS-ERR-3`
 - **Error Name:** `databaseNoRows`
-- **Description:** A database query that was expected to return at least one row found no matching records. This is a system-level wrapper for \`sql.ErrNoRows\`.
+- **Description:** A database query that was expected to return at least one row found no matching records. This is a system-level wrapper for `sql.ErrNoRows`.
 
 ---
 
@@ -520,7 +528,7 @@ This document lists all the custom error codes defined in the project, categoriz
 
 - **Error Code:** `SYS-ERR-4`
 - **Error Name:** `databaseDuplicateKey`
-- **Description:** An \`INSERT\` or \`UPDATE\` operation failed because it would have created a duplicate value in a column with a unique constraint.
+- **Description:** An `INSERT` or `UPDATE` operation failed because it would have created a duplicate value in a column with a unique constraint.
 
 ---
 

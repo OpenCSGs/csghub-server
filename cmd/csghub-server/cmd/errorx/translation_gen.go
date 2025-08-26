@@ -29,8 +29,13 @@ var docGenCmd = &cobra.Command{
 		})
 		l := slog.New(lh)
 		slog.SetDefault(l)
-
-		docGen()
+		_, currentFilePath, _, ok := runtime.Caller(0)
+		if !ok {
+			slog.Error("Failed to get current path")
+		}
+		currentDir := filepath.Dir(currentFilePath)
+		projectRoot := filepath.Join(currentDir, "..", "..", "..", "..")
+		docGen(projectRoot)
 	},
 }
 
@@ -71,13 +76,7 @@ type MarkdownConfig struct {
 	Lang          string            // "en" or "zh"
 }
 
-func docGen() {
-	_, currentFilePath, _, ok := runtime.Caller(0)
-	if !ok {
-		slog.Error("Failed to get current path")
-	}
-	currentDir := filepath.Dir(currentFilePath)
-	projectRoot := filepath.Join(currentDir, "..", "..", "..", "..")
+func docGen(projectRoot string) {
 	dataDirPath := filepath.Clean(filepath.Join(projectRoot, errorxSourceGlob))
 	// search for Go source files matching the pattern
 	goFiles, err := filepath.Glob(dataDirPath)
@@ -127,7 +126,7 @@ func docGen() {
 	// 1. Configure and generate English documentation
 	enConfig := MarkdownConfig{
 		OutputPath:    filepath.Join(projectRoot, outputMarkdownPath),
-		Title:         "# Error Code Documentation",
+		Title:         "# Error Codes",
 		IntroText:     "This document lists all the custom error codes defined in the project, categorized by module.",
 		ChapterFormat: "## %s Errors",
 		DetailLabels: map[string]string{
@@ -137,15 +136,21 @@ func docGen() {
 		},
 		Lang: "en",
 	}
-	err = generateMarkdownDoc(infosByFile, enConfig)
+	enDoc, err := generateMarkdownDoc(infosByFile, enConfig)
 	if err != nil {
 		slog.Error("Failed to generate English markdown documentation", slog.Any("error", err))
 	}
 
+	if err := os.WriteFile(enConfig.OutputPath, enDoc, 0644); err != nil {
+		slog.Error("Failed to generate English markdown documentation", slog.Any("error", err))
+	}
+
+	slog.Info("Successfully generated markdown documentation", "path", enConfig.OutputPath)
+
 	// 2. Configure and generate Chinese documentation
 	zhConfig := MarkdownConfig{
 		OutputPath:    filepath.Join(projectRoot, outputMarkdownZHPath),
-		Title:         "# 错误码文档",
+		Title:         "# 错误代码",
 		IntroText:     "本文档列出了项目中定义的所有自定义错误码，按模块分类。",
 		ChapterFormat: "## %s 错误",
 		DetailLabels: map[string]string{
@@ -155,10 +160,16 @@ func docGen() {
 		},
 		Lang: "zh",
 	}
-	err = generateMarkdownDoc(infosByFile, zhConfig)
+	zhDoc, err := generateMarkdownDoc(infosByFile, zhConfig)
 	if err != nil {
 		slog.Error("Failed to generate Chinese markdown documentation", slog.Any("error", err))
 	}
+
+	if err := os.WriteFile(zhConfig.OutputPath, zhDoc, 0644); err != nil {
+		slog.Error("Failed to generate Chinese markdown documentation", slog.Any("error", err))
+	}
+
+	slog.Info("Successfully generated markdown documentation", "path", enConfig.OutputPath)
 }
 
 // parseGoSource parses a Go source file to extract error codes and their descriptions.
@@ -318,7 +329,7 @@ func generateTranslationJSONs(infosByFile map[string][]ErrorInfo, outputDir stri
 	return nil
 }
 
-func generateMarkdownDoc(infosByFile map[string][]ErrorInfo, config MarkdownConfig) error {
+func generateMarkdownDoc(infosByFile map[string][]ErrorInfo, config MarkdownConfig) ([]byte, error) {
 	var builder bytes.Buffer
 
 	builder.WriteString(config.Title + "\n\n")
@@ -357,8 +368,8 @@ func generateMarkdownDoc(infosByFile map[string][]ErrorInfo, config MarkdownConf
 				description = info.Description
 			}
 
-			// Sanitize the description
-			description = strings.ReplaceAll(description, "`", "\\`")
+			placeholderRegex := regexp.MustCompile(`\{([a-zA-Z0-9_]+)\}`)
+			description = placeholderRegex.ReplaceAllString(description, "`$0`")
 			builder.WriteString(fmt.Sprintf("- **%s:** %s\n", config.DetailLabels["Description"], description))
 
 			if i < len(infos)-1 {
@@ -368,11 +379,5 @@ func generateMarkdownDoc(infosByFile map[string][]ErrorInfo, config MarkdownConf
 			}
 		}
 	}
-
-	if err := os.WriteFile(config.OutputPath, builder.Bytes(), 0644); err != nil {
-		return fmt.Errorf("failed to write markdown documentation to %s: %w", config.OutputPath, err)
-	}
-
-	slog.Info("Successfully generated markdown documentation", "path", config.OutputPath)
-	return nil
+	return builder.Bytes(), nil
 }
