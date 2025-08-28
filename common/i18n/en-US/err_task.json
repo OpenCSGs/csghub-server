@@ -1,5 +1,11 @@
 {
     "error.TASK-ERR-0": {
         "other": "Task entry file not found"
+    },
+    "error.TASK-ERR-1": {
+        "other": "Multi-host inference is only supported by VLLM and SGLang"
+    },
+    "error.TASK-ERR-2": {
+        "other": "Multi-host inference requires minimum replica count to be greater than zero"
     }
 }

@@ -32,14 +32,56 @@
     "error.GIT-ERR-18": {
         "other": "File is too large"
     },
+    "error.GIT-ERR-19": {
+        "other": "Get git tree entry failed"
+    },
     "error.GIT-ERR-2": {
         "other": "Failed to push changes to repository"
+    },
+    "error.GIT-ERR-20": {
+        "other": "Commit git files failed"
+    },
+    "error.GIT-ERR-21": {
+        "other": "Get git blobs failed"
+    },
+    "error.GIT-ERR-22": {
+        "other": "Get git lfs pointers failed"
+    },
+    "error.GIT-ERR-23": {
+        "other": "Get git tree last commit failed"
+    },
+    "error.GIT-ERR-24": {
+        "other": "Get git blob info failed"
+    },
+    "error.GIT-ERR-25": {
+        "other": "Get git files failed"
+    },
+    "error.GIT-ERR-26": {
+        "other": "Create mirror failed"
+    },
+    "error.GIT-ERR-27": {
+        "other": "Sync mirror failed"
+    },
+    "error.GIT-ERR-28": {
+        "other": "Check repository exists failed"
+    },
+    "error.GIT-ERR-29": {
+        "other": "Create repository failed"
     },
     "error.GIT-ERR-3": {
         "other": "Failed to commit changes"
     },
+    "error.GIT-ERR-30": {
+        "other": "delete repository failed"
+    },
+    "error.GIT-ERR-31": {
+        "other": "get repository failed"
+    },
     "error.GIT-ERR-32": {
         "other": "Git service is unavailable"
+    },
+    "error.GIT-ERR-33": {
+        "other": "copy repository failed"
     },
     "error.GIT-ERR-4": {
         "other": "Failed to find commit"
