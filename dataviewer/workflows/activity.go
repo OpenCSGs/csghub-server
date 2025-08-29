@@ -357,8 +357,7 @@ func (dva *dataViewerActivityImpl) CreateParquetBranch(ctx context.Context, req 
 
 	exists, err := dva.gitServer.RepositoryExists(ctx, checkReq)
 	if err != nil {
-		slog.Error("failed to check base repo", slog.Any("checkReq", checkReq), slog.Any("err", err))
-		return "", fmt.Errorf("failed to check base repo %s/%s, result %v, cause: %w", checkReq.Namespace, checkReq.Name, exists, err)
+		slog.Warn("failed to check base template repo", slog.Any("checkReq", checkReq), slog.Any("err", err))
 	}
 
 	if !exists {
@@ -375,8 +374,8 @@ func (dva *dataViewerActivityImpl) CreateParquetBranch(ctx context.Context, req 
 		}
 		_, err := dva.gitServer.CreateRepo(ctx, gitRepoReq)
 		if err != nil {
-			slog.Error("failed to create base repo", slog.Any("gitRepoReq", gitRepoReq), slog.Any("err", err))
-			return "", fmt.Errorf("failed to create base repo %s/%s, cause: %w", gitRepoReq.Namespace, gitRepoReq.Name, err)
+			slog.Error("failed to create base template repo", slog.Any("gitRepoReq", gitRepoReq), slog.Any("err", err))
+			return "", fmt.Errorf("failed to create base template repo %s/%s, cause: %w", gitRepoReq.Namespace, gitRepoReq.Name, err)
 		}
 
 		baseFileReq := &types.CreateFileReq{
