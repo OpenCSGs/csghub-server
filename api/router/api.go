@@ -496,12 +496,14 @@ func createModelRoutes(config *config.Config,
 	modelHandler *handler.ModelHandler,
 	repoCommonHandler *handler.RepoHandler,
 	monitorHandler *handler.MonitorHandler) {
+	// gin cache
+	memoryStore := persist.NewMemoryStore(2 * time.Minute)
 	// Models routes
 	modelsGroup := apiGroup.Group("/models")
 	modelsGroup.Use(middleware.RepoType(types.ModelRepo), middlewareCollection.Repo.RepoExists)
 	{
 		modelsGroup.POST("", middlewareCollection.Auth.NeedLogin, modelHandler.Create)
-		modelsGroup.GET("", modelHandler.Index)
+		modelsGroup.GET("", cache.Cache(memoryStore, time.Minute, middleware.CacheStrategyTrendingRepos()), modelHandler.Index)
 		modelsGroup.PUT("/:namespace/:name", middlewareCollection.Auth.NeedLogin, modelHandler.Update)
 		modelsGroup.DELETE("/:namespace/:name", middlewareCollection.Auth.NeedLogin, modelHandler.Delete)
 		modelsGroup.GET("/:namespace/:name", modelHandler.Show)

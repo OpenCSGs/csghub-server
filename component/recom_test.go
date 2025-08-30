@@ -42,11 +42,11 @@ func TestRecomComponent_CalculateRecomScore(t *testing.T) {
 	repo3 := database.Repository{ID: 3, Path: "foo/bar3"}
 	repo3.UpdatedAt = time.Now().Add(24 * time.Hour)
 	// loop 1
-	rc.mocks.stores.RepoMock().EXPECT().BatchGet(ctx, int64(0), batchSize, (*types.BatchGetFilter)(nil)).Return([]database.Repository{
+	rc.mocks.stores.RepoMock().EXPECT().BatchGet(mock.Anything, int64(0), batchSize, (*types.BatchGetFilter)(nil)).Return([]database.Repository{
 		repo1, repo2,
 	}, nil)
 	// loop 2
-	rc.mocks.stores.RepoMock().EXPECT().BatchGet(ctx, int64(2), batchSize, (*types.BatchGetFilter)(nil)).Return([]database.Repository{
+	rc.mocks.stores.RepoMock().EXPECT().BatchGet(mock.Anything, int64(2), batchSize, (*types.BatchGetFilter)(nil)).Return([]database.Repository{
 		repo3,
 	}, nil)
 
@@ -77,7 +77,7 @@ func TestRecomComponent_CalculateRecomScore(t *testing.T) {
 	).Return(nil, nil)
 
 	// rc.mocks.stores.RecomMock().EXPECT().UpsertScore(ctx, int64(2), 12.34).Return(nil)
-	rc.mocks.stores.RecomMock().EXPECT().UpsertScore(ctx, mock.Anything).RunAndReturn(
+	rc.mocks.stores.RecomMock().EXPECT().UpsertScore(mock.Anything, mock.Anything).RunAndReturn(
 		func(ctx context.Context, scores []*database.RecomRepoScore) error {
 			// scores to map by repo id
 			scoresMap := make(map[int64][]*database.RecomRepoScore)
