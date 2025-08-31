@@ -1,0 +1,14 @@
+{
+    "error.ACT-ERR-0": {
+        "other": "帳戶餘額不足"
+    },
+    "error.ACT-ERR-1": {
+        "other": "存在一個活動訂閱，不能重複創建"
+    },
+    "error.ACT-ERR-2": {
+        "other": "非法時間單位。必須是以下之一: day, week, month, year"
+    },
+    "error.ACT-ERR-3": {
+        "other": "不在訂閱有效期內"
+    }
+}

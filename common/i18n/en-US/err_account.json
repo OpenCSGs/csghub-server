@@ -1,0 +1,14 @@
+{
+    "error.ACT-ERR-0": {
+        "other": "Insufficient balance"
+    },
+    "error.ACT-ERR-1": {
+        "other": "Exist active subscription"
+    },
+    "error.ACT-ERR-2": {
+        "other": "Invalid unit type. Must be one of the following: day, week, month, year"
+    },
+    "error.ACT-ERR-3": {
+        "other": "Invalid subscription time range"
+    }
+}

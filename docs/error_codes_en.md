@@ -296,7 +296,7 @@ This document lists all the custom error codes defined in the project, categoriz
 
 - **Error Code:** `GIT-ERR-19`
 - **Error Name:** `gitGetTreeEntryFailed`
-- **Description:** Get git tree entry failed. This can be caused by network problems, authentication issues, or the specified tree entry does not exist.
+- **Description:** 
 
 ---
 
@@ -304,7 +304,7 @@ This document lists all the custom error codes defined in the project, categoriz
 
 - **Error Code:** `GIT-ERR-20`
 - **Error Name:** `gitCommitFilesFailed`
-- **Description:** Commit git files failed. This can be caused by network problems, authentication issues, or the specified files do not exist.
+- **Description:** 
 
 ---
 
@@ -312,7 +312,7 @@ This document lists all the custom error codes defined in the project, categoriz
 
 - **Error Code:** `GIT-ERR-21`
 - **Error Name:** `gitGetBlobsFailed`
-- **Description:** Get git blobs failed. This can be caused by network problems, authentication issues, or the specified blobs do not exist.
+- **Description:** 
 
 ---
 
@@ -320,7 +320,7 @@ This document lists all the custom error codes defined in the project, categoriz
 
 - **Error Code:** `GIT-ERR-22`
 - **Error Name:** `gitGetLfsPointersFailed`
-- **Description:** Get git lfs pointers failed. This can be caused by network problems, authentication issues, or the specified lfs pointers do not exist.
+- **Description:** 
 
 ---
 
@@ -328,7 +328,7 @@ This document lists all the custom error codes defined in the project, categoriz
 
 - **Error Code:** `GIT-ERR-23`
 - **Error Name:** `gitListLastCommitsForTreeFailed`
-- **Description:** Get git tree last commit failed. This can be caused by network problems, authentication issues, or the specified tree does not exist.
+- **Description:** 
 
 ---
 
@@ -336,7 +336,7 @@ This document lists all the custom error codes defined in the project, categoriz
 
 - **Error Code:** `GIT-ERR-24`
 - **Error Name:** `gitGetBlobInfoFailed`
-- **Description:** Get git blob info failed. This can be caused by network problems, authentication issues, or the specified blob does not exist.
+- **Description:** 
 
 ---
 
@@ -344,7 +344,7 @@ This document lists all the custom error codes defined in the project, categoriz
 
 - **Error Code:** `GIT-ERR-25`
 - **Error Name:** `gitListFilesFailed`
-- **Description:** Get git files failed. This can be caused by network problems, authentication issues, or the specified files do not exist.
+- **Description:** 
 
 ---
 
@@ -352,7 +352,7 @@ This document lists all the custom error codes defined in the project, categoriz
 
 - **Error Code:** `GIT-ERR-26`
 - **Error Name:** `gitCreateMirrorFailed`
-- **Description:** Create mirror failed. This can be caused by network problems, authentication issues, or the specified repository does not exist.
+- **Description:** 
 
 ---
 
@@ -360,7 +360,7 @@ This document lists all the custom error codes defined in the project, categoriz
 
 - **Error Code:** `GIT-ERR-27`
 - **Error Name:** `gitMirrorSyncFailed`
-- **Description:** Sync mirror failed. This can be caused by network problems, authentication issues, or the specified repository does not exist.
+- **Description:** 
 
 ---
 
@@ -368,7 +368,7 @@ This document lists all the custom error codes defined in the project, categoriz
 
 - **Error Code:** `GIT-ERR-28`
 - **Error Name:** `gitCheckRepositoryExistsFailed`
-- **Description:** Check repository exists failed. This can be caused by network problems, authentication issues, or the specified repository does not exist.
+- **Description:** 
 
 ---
 
@@ -376,7 +376,7 @@ This document lists all the custom error codes defined in the project, categoriz
 
 - **Error Code:** `GIT-ERR-29`
 - **Error Name:** `gitCreateRepositoryFailed`
-- **Description:** Create repository failed. This can be caused by network problems, authentication issues.
+- **Description:** 
 
 ---
 
@@ -384,7 +384,7 @@ This document lists all the custom error codes defined in the project, categoriz
 
 - **Error Code:** `GIT-ERR-30`
 - **Error Name:** `gitDeleteRepositoryFailed`
-- **Description:** delete repository failed. This can be caused by network problems, authentication issues, or the specified repository does not exist.
+- **Description:** 
 
 ---
 
@@ -392,7 +392,7 @@ This document lists all the custom error codes defined in the project, categoriz
 
 - **Error Code:** `GIT-ERR-31`
 - **Error Name:** `gitGetRepositoryFailed`
-- **Description:** get repository failed. This can be caused by network problems, authentication issues, or the specified repository does not exist.
+- **Description:** 
 
 ---
 
@@ -401,14 +401,6 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Code:** `GIT-ERR-32`
 - **Error Name:** `gitServiceUnavaliable`
 - **Description:** The Git hosting service is temporarily unavailable or unreachable. Please try again later.
-
----
-
-### `GIT-ERR-33`
-
-- **Error Code:** `GIT-ERR-33`
-- **Error Name:** `gitCopyRepositoryFailed`
-- **Description:** copy repository failed. This can be caused by network problems, authentication issues, or the specified repository does not exist.
 
 ## Req Errors
 
