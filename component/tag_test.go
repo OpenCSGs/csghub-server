@@ -235,7 +235,7 @@ func TestTagComponent_AllCategories(t *testing.T) {
 
 	categories, err := tc.AllCategories(ctx)
 	require.Nil(t, err)
-	require.Equal(t, []database.TagCategory{}, categories)
+	require.Equal(t, []types.RepoTagCategory{}, categories)
 }
 
 func TestTagComponent_CreateCategory(t *testing.T) {

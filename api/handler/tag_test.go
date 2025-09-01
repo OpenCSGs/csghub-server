@@ -242,8 +242,8 @@ func TestTagHandler_DeleteTag(t *testing.T) {
 }
 
 func TestTagHandler_AllCategories(t *testing.T) {
-	var categories []database.TagCategory
-	categories = append(categories, database.TagCategory{ID: 1, Name: "test1", Scope: types.TagScope("scope")})
+	var categories []types.RepoTagCategory
+	categories = append(categories, types.RepoTagCategory{ID: 1, Name: "test1", Scope: types.TagScope("scope")})
 
 	req := httptest.NewRequest("get", "/tags/categories", nil)
 
@@ -267,7 +267,7 @@ func TestTagHandler_AllCategories(t *testing.T) {
 	require.Nil(t, err)
 
 	require.Equal(t, "", resp.Code)
-	require.Equal(t, "", resp.Msg)
+	require.Equal(t, "OK", resp.Msg)
 	require.NotNil(t, resp.Data)
 }
 

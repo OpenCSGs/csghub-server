@@ -28,6 +28,14 @@ const (
 	EvaluationCategory TagCategory = "evaluation"
 )
 
+type RepoTagCategory struct {
+	ID       int64    `json:"id"`
+	Name     string   `json:"name"`
+	ShowName string   `json:"show_name" i18n:"tag_category.name"`
+	Scope    TagScope `json:"scope"`
+	Enabled  bool     `json:"enabled"`
+}
+
 type CreateTag struct {
 	Name     string `json:"name" binding:"required"`
 	Category string `json:"category" binding:"required"`

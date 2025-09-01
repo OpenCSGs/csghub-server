@@ -1,0 +1,38 @@
+{
+  "tag_category.name.task": {
+    "other": "Task"
+  },
+  "tag_category.name.license": {
+    "other": "License"
+  },
+  "tag_category.name.framework": {
+    "other": "Framework"
+  },
+  "tag_category.name.size": {
+    "other": "Size"
+  },
+  "tag_category.name.evaluation": {
+    "other": "Evaluation"
+  },
+  "tag_category.name.language": {
+    "other": "Language"
+  },
+  "tag_category.name.industry": {
+    "other": "Industry"
+  },
+  "tag_category.name.resource": {
+    "other": "Resource"
+  },
+  "tag_category.name.runtime_framework": {
+    "other": "Runtime Framework"
+  },
+  "tag_category.name.program_language": {
+    "other": "Programming Language"
+  },
+  "tag_category.name.runmode": {
+    "other": "Run Mode"
+  },
+  "tag_category.name.publisher": {
+    "other": "Publisher"
+  }
+}

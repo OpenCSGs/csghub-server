@@ -25,23 +25,23 @@ func (_m *MockTagComponent) EXPECT() *MockTagComponent_Expecter {
 }
 
 // AllCategories provides a mock function with given fields: ctx
-func (_m *MockTagComponent) AllCategories(ctx context.Context) ([]database.TagCategory, error) {
+func (_m *MockTagComponent) AllCategories(ctx context.Context) ([]types.RepoTagCategory, error) {
 	ret := _m.Called(ctx)
 
 	if len(ret) == 0 {
 		panic("no return value specified for AllCategories")
 	}
 
-	var r0 []database.TagCategory
+	var r0 []types.RepoTagCategory
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context) ([]database.TagCategory, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context) ([]types.RepoTagCategory, error)); ok {
 		return rf(ctx)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context) []database.TagCategory); ok {
+	if rf, ok := ret.Get(0).(func(context.Context) []types.RepoTagCategory); ok {
 		r0 = rf(ctx)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]database.TagCategory)
+			r0 = ret.Get(0).([]types.RepoTagCategory)
 		}
 	}
 
@@ -72,12 +72,12 @@ func (_c *MockTagComponent_AllCategories_Call) Run(run func(ctx context.Context)
 	return _c
 }
 
-func (_c *MockTagComponent_AllCategories_Call) Return(_a0 []database.TagCategory, _a1 error) *MockTagComponent_AllCategories_Call {
+func (_c *MockTagComponent_AllCategories_Call) Return(_a0 []types.RepoTagCategory, _a1 error) *MockTagComponent_AllCategories_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockTagComponent_AllCategories_Call) RunAndReturn(run func(context.Context) ([]database.TagCategory, error)) *MockTagComponent_AllCategories_Call {
+func (_c *MockTagComponent_AllCategories_Call) RunAndReturn(run func(context.Context) ([]types.RepoTagCategory, error)) *MockTagComponent_AllCategories_Call {
 	_c.Call.Return(run)
 	return _c
 }
