@@ -1766,7 +1766,6 @@ func TestRepoComponent_Tree(t *testing.T) {
 			actualTree, err := repoComp.Tree(context.Background(), &types.GetFileReq{})
 			require.Nil(t, actualTree)
 			require.ErrorIs(t, err, errorx.ErrForbidden)
-
 		})
 	}
 
@@ -2534,4 +2533,130 @@ func TestRepoComponent_GetMirrorTaskStatusAndSyncStatus(t *testing.T) {
 
 	assert.Equal(t, types.MirrorTaskStatus(""), mirrorTaskStatus)
 	assert.Equal(t, types.SyncStatusCompleted, syncStatus)
+}
+
+func TestRepoComponent_UpdateRepo_PermissionChecks(t *testing.T) {
+	ctx := context.Background()
+	nickname := "new-nickname"
+	description := "new-description"
+
+	// Test cases
+	testCases := []struct {
+		name             string
+		setupMocks       func(repo *testRepoWithMocks, req types.UpdateRepoReq)
+		req              types.UpdateRepoReq
+		expectError      bool
+		expectedErrorMsg string
+	}{
+		{
+			name: "Non-admin fails to change privacy of org repo",
+			req: types.UpdateRepoReq{
+				Username:  "test-user",
+				Namespace: "org-ns",
+				Name:      "test-repo",
+				RepoType:  types.ModelRepo,
+				Private:   tea.Bool(true),
+			},
+			setupMocks: func(repo *testRepoWithMocks, req types.UpdateRepoReq) {
+				repo.mocks.stores.RepoMock().EXPECT().Find(ctx, req.Namespace, string(req.RepoType), req.Name).Return(&database.Repository{}, nil)
+				repo.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, req.Namespace).Return(database.Namespace{NamespaceType: database.OrgNamespace}, nil)
+				repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, req.Username).Return(database.User{Username: "test-user"}, nil)
+				repo.mocks.userSvcClient.EXPECT().GetMemberRole(ctx, req.Namespace, req.Username).Return(membership.RoleWrite, nil)
+			},
+			expectError:      true,
+			expectedErrorMsg: "only admins can change the privacy of an organization repository",
+		},
+		{
+			name: "Non-admin with write access updates org repo successfully without changing privacy",
+			req: types.UpdateRepoReq{
+				Username:    "test-user",
+				Namespace:   "org-ns",
+				Name:        "test-repo",
+				RepoType:    types.ModelRepo,
+				Nickname:    &nickname,
+				Description: &description,
+			},
+			setupMocks: func(repo *testRepoWithMocks, req types.UpdateRepoReq) {
+				repo.mocks.stores.RepoMock().EXPECT().Find(ctx, req.Namespace, string(req.RepoType), req.Name).Return(&database.Repository{}, nil)
+				repo.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, req.Namespace).Return(database.Namespace{NamespaceType: database.OrgNamespace}, nil)
+				repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, req.Username).Return(database.User{Username: "test-user"}, nil)
+				repo.mocks.userSvcClient.EXPECT().GetMemberRole(ctx, req.Namespace, req.Username).Return(membership.RoleWrite, nil)
+				repo.mocks.gitServer.EXPECT().UpdateRepo(ctx, mock.Anything).Return(&gitserver.CreateRepoResp{}, nil)
+				repo.mocks.stores.RepoMock().EXPECT().UpdateRepo(ctx, mock.Anything).Return(&database.Repository{}, nil)
+			},
+			expectError: false,
+		},
+		{
+			name: "Non-admin fails to update org repo without write access",
+			req: types.UpdateRepoReq{
+				Username:  "test-user",
+				Namespace: "org-ns",
+				Name:      "test-repo",
+				RepoType:  types.ModelRepo,
+			},
+			setupMocks: func(repo *testRepoWithMocks, req types.UpdateRepoReq) {
+				repo.mocks.stores.RepoMock().EXPECT().Find(ctx, req.Namespace, string(req.RepoType), req.Name).Return(&database.Repository{}, nil)
+				repo.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, req.Namespace).Return(database.Namespace{NamespaceType: database.OrgNamespace}, nil)
+				repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, req.Username).Return(database.User{Username: "test-user"}, nil)
+				repo.mocks.userSvcClient.EXPECT().GetMemberRole(ctx, req.Namespace, req.Username).Return(membership.RoleRead, nil)
+			},
+			expectError:      true,
+			expectedErrorMsg: "users do not have permission to update repo in this organization",
+		},
+		{
+			name: "Non-admin fails to update another user's repo",
+			req: types.UpdateRepoReq{
+				Username:  "test-user",
+				Namespace: "another-user",
+				Name:      "test-repo",
+				RepoType:  types.ModelRepo,
+			},
+			setupMocks: func(repo *testRepoWithMocks, req types.UpdateRepoReq) {
+				repo.mocks.stores.RepoMock().EXPECT().Find(ctx, req.Namespace, string(req.RepoType), req.Name).Return(&database.Repository{}, nil)
+				repo.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, req.Namespace).Return(database.Namespace{Path: "another-user", NamespaceType: database.UserNamespace}, nil)
+				repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, req.Username).Return(database.User{Username: "test-user"}, nil)
+			},
+			expectError:      true,
+			expectedErrorMsg: "users do not have permission to update repo in this namespace",
+		},
+		{
+			name: "Non-admin updates their own repo to public successfully",
+			req: types.UpdateRepoReq{
+				Username:  "test-user",
+				Namespace: "test-user",
+				Name:      "test-repo",
+				RepoType:  types.ModelRepo,
+				Private:   tea.Bool(false),
+			},
+			setupMocks: func(repo *testRepoWithMocks, req types.UpdateRepoReq) {
+				repo.mocks.stores.RepoMock().EXPECT().Find(ctx, req.Namespace, string(req.RepoType), req.Name).Return(&database.Repository{}, nil)
+				repo.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, req.Namespace).Return(database.Namespace{Path: "test-user", NamespaceType: database.UserNamespace}, nil)
+				repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, req.Username).Return(database.User{Username: "test-user"}, nil)
+				// Mock allowPublic to return true
+				// As allowPublic is a private method, we can't mock it directly.
+				// We assume it returns true for this test case.
+				repo.mocks.gitServer.EXPECT().UpdateRepo(ctx, mock.Anything).Return(&gitserver.CreateRepoResp{}, nil)
+				repo.mocks.stores.RepoMock().EXPECT().UpdateRepo(ctx, mock.Anything).Return(&database.Repository{}, nil)
+			},
+			expectError: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := initializeTestRepoComponent(ctx, t)
+			tc.setupMocks(repo, tc.req)
+
+			_, err := repo.UpdateRepo(ctx, tc.req)
+
+			if tc.expectError {
+				require.Error(t, err)
+				if tc.expectedErrorMsg != "" {
+					require.Contains(t, err.Error(), tc.expectedErrorMsg)
+				}
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
 }
