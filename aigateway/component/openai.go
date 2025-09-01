@@ -116,11 +116,11 @@ func (m *openaiComponentImpl) RecordUsage(c context.Context, userUUID string, mo
 	}
 	slog.Debug("token", slog.Any("usage", usage))
 	var tokenUsageExtra = struct {
-		PromptTokenNum     int64 `json:"prompt_token_num"`
-		CompletionTokenNum int64 `json:"completion_token_num"`
+		PromptTokenNum     string `json:"prompt_token_num"`
+		CompletionTokenNum string `json:"completion_token_num"`
 	}{
-		PromptTokenNum:     usage.PromptTokens,
-		CompletionTokenNum: usage.CompletionTokens,
+		PromptTokenNum:     fmt.Sprintf("%d", usage.PromptTokens),
+		CompletionTokenNum: fmt.Sprintf("%d", usage.CompletionTokens),
 	}
 	extraData, _ := json.Marshal(tokenUsageExtra)
 	event := commontypes.METERING_EVENT{
