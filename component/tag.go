@@ -25,7 +25,7 @@ type TagComponent interface {
 	GetTagByID(ctx context.Context, username string, id int64) (*database.Tag, error)
 	UpdateTag(ctx context.Context, username string, id int64, req types.UpdateTag) (*database.Tag, error)
 	DeleteTag(ctx context.Context, username string, id int64) error
-	AllCategories(ctx context.Context) ([]database.TagCategory, error)
+	AllCategories(ctx context.Context) ([]types.RepoTagCategory, error)
 	CreateCategory(ctx context.Context, username string, req types.CreateCategory) (*database.TagCategory, error)
 	UpdateCategory(ctx context.Context, username string, req types.UpdateCategory, id int64) (*database.TagCategory, error)
 	DeleteCategory(ctx context.Context, username string, id int64) error
@@ -332,8 +332,23 @@ func (c *tagComponentImpl) DeleteTag(ctx context.Context, username string, id in
 	return nil
 }
 
-func (c *tagComponentImpl) AllCategories(ctx context.Context) ([]database.TagCategory, error) {
-	return c.tagStore.AllCategories(ctx, types.TagScope(""))
+func (c *tagComponentImpl) AllCategories(ctx context.Context) ([]types.RepoTagCategory, error) {
+	dbTagCategory, err := c.tagStore.AllCategories(ctx, types.TagScope(""))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get all categories, error: %w", err)
+	}
+
+	categories := []types.RepoTagCategory{}
+	for _, cat := range dbTagCategory {
+		categories = append(categories, types.RepoTagCategory{
+			ID:       cat.ID,
+			Name:     cat.Name,
+			ShowName: cat.Name,
+			Scope:    cat.Scope,
+			Enabled:  cat.Enabled,
+		})
+	}
+	return categories, nil
 }
 
 func (c *tagComponentImpl) CreateCategory(ctx context.Context, username string, req types.CreateCategory) (*database.TagCategory, error) {

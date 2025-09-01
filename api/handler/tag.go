@@ -188,7 +188,7 @@ func (t *TagsHandler) DeleteTag(ctx *gin.Context) {
 // @Tags         Tag
 // @Accept       json
 // @Produce      json
-// @Success      200  {object}  types.ResponseWithTotal{data=[]database.TagCategory} "categores"
+// @Success      200  {object}  types.ResponseWithTotal{data=[]types.RepoTagCategory} "categores"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /tags/categories [get]
@@ -199,10 +199,7 @@ func (t *TagsHandler) AllCategories(ctx *gin.Context) {
 		httpbase.ServerError(ctx, err)
 		return
 	}
-	respData := gin.H{
-		"data": categories,
-	}
-	ctx.JSON(http.StatusOK, respData)
+	httpbase.OK(ctx, categories)
 }
 
 // CreateCategory     godoc

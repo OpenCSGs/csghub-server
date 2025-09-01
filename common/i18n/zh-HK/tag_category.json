@@ -1,0 +1,38 @@
+{
+  "tag_category.name.task": {
+    "other": "任務"
+  },
+  "tag_category.name.license": {
+    "other": "許可證"
+  },
+  "tag_category.name.framework": {
+    "other": "框架"
+  },
+  "tag_category.name.size": {
+    "other": "大小"
+  },
+  "tag_category.name.evaluation": {
+    "other": "評測"
+  },
+  "tag_category.name.language": {
+    "other": "語言"
+  },
+  "tag_category.name.industry": {
+    "other": "行業"
+  },
+  "tag_category.name.resource": {
+    "other": "資源"
+  },
+  "tag_category.name.runtime_framework": {
+    "other": "運行時框架"
+  },
+  "tag_category.name.program_language": {
+    "other": "編程語言"
+  },
+  "tag_category.name.runmode": {
+    "other": "運行模式"
+  },
+  "tag_category.name.publisher": {
+    "other": "發布者"
+  }
+}

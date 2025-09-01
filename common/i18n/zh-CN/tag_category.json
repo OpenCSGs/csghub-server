@@ -1,0 +1,38 @@
+{
+  "tag_category.name.task": {
+    "other": "任务"
+  },
+  "tag_category.name.license": {
+    "other": "许可证"
+  },
+  "tag_category.name.framework": {
+    "other": "框架"
+  },
+  "tag_category.name.size": {
+    "other": "大小"
+  },
+  "tag_category.name.evaluation": {
+    "other": "评测"
+  },
+  "tag_category.name.language": {
+    "other": "语言"
+  },
+  "tag_category.name.industry": {
+    "other": "行业"
+  },
+  "tag_category.name.resource": {
+    "other": "资源"
+  },
+  "tag_category.name.runtime_framework": {
+    "other": "运行时框架"
+  },
+  "tag_category.name.program_language": {
+    "other": "编程语言"
+  },
+  "tag_category.name.runmode": {
+    "other": "运行模式"
+  },
+  "tag_category.name.publisher": {
+    "other": "发布者"
+  }
+}
