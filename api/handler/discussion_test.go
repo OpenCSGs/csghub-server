@@ -5,7 +5,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	mockcomponent "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
+	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/builder/testutil"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -103,40 +105,75 @@ func TestDiscussionHandler_DeleteDiscussion(t *testing.T) {
 }
 
 func TestDiscussionHandler_ShowDiscussion(t *testing.T) {
-	tester := NewDiscussionTester(t).WithHandleFunc(func(h *DiscussionHandler) gin.HandlerFunc {
-		return h.ShowDiscussion
+	t.Run("ok case", func(t *testing.T) {
+		tester := NewDiscussionTester(t).WithHandleFunc(func(h *DiscussionHandler) gin.HandlerFunc {
+			return h.ShowDiscussion
+		})
+
+		tester.mocks.discussion.EXPECT().GetDiscussion(
+			tester.Ctx(), int64(1),
+		).Return(&types.ShowDiscussionResponse{Title: "foo"}, nil)
+		tester.WithUser().WithParam("id", "1").Execute()
+
+		tester.ResponseEq(t, 200, tester.OKText, &types.ShowDiscussionResponse{Title: "foo"})
 	})
 
-	tester.mocks.discussion.EXPECT().GetDiscussion(
-		tester.Ctx(), int64(1),
-	).Return(&types.ShowDiscussionResponse{Title: "foo"}, nil)
-	tester.WithParam("id", "1").Execute()
-
-	tester.ResponseEq(t, 200, tester.OKText, &types.ShowDiscussionResponse{Title: "foo"})
-
+	t.Run("404 case", func(t *testing.T) {
+		tester := NewDiscussionTester(t).WithHandleFunc(func(h *DiscussionHandler) gin.HandlerFunc {
+			return h.ShowDiscussion
+		})
+		tester.mocks.discussion.EXPECT().GetDiscussion(
+			tester.Ctx(), int64(2),
+		).Once().Return(nil, errorx.ErrDatabaseNoRows)
+		tester.WithUser().WithParam("id", "2").Execute()
+		tester.ResponseEqSimple(t, 404, httpbase.R{
+			Code: errorx.ErrDatabaseNoRows.Code(),
+			Msg:  errorx.ErrDatabaseNoRows.Error(),
+		})
+	})
 }
 
 func TestDiscussionHandler_ListRepoDiscussions(t *testing.T) {
-	tester := NewDiscussionTester(t).WithHandleFunc(func(h *DiscussionHandler) gin.HandlerFunc {
-		return h.ListRepoDiscussions
+	t.Run("ok case", func(t *testing.T) {
+		tester := NewDiscussionTester(t).WithHandleFunc(func(h *DiscussionHandler) gin.HandlerFunc {
+			return h.ListRepoDiscussions
+		})
+
+		tester.mocks.discussion.EXPECT().ListRepoDiscussions(
+			tester.Ctx(), types.ListRepoDiscussionRequest{
+				CurrentUser: "u",
+				RepoType:    types.ModelRepo,
+				Namespace:   "u",
+				Name:        "r",
+			},
+		).Return(&types.ListRepoDiscussionResponse{Discussions: []*types.CreateDiscussionResponse{
+			{ID: 1},
+		}}, nil)
+		tester.WithUser().WithParam("repo_type", "models").Execute()
+
+		tester.ResponseEq(t, 200, tester.OKText, &types.ListRepoDiscussionResponse{
+			Discussions: []*types.CreateDiscussionResponse{{ID: 1}},
+		})
 	})
 
-	tester.mocks.discussion.EXPECT().ListRepoDiscussions(
-		tester.Ctx(), types.ListRepoDiscussionRequest{
-			CurrentUser: "u",
-			RepoType:    types.ModelRepo,
-			Namespace:   "u",
-			Name:        "r",
-		},
-	).Return(&types.ListRepoDiscussionResponse{Discussions: []*types.CreateDiscussionResponse{
-		{ID: 1},
-	}}, nil)
-	tester.WithUser().WithParam("repo_type", "models").Execute()
-
-	tester.ResponseEq(t, 200, tester.OKText, &types.ListRepoDiscussionResponse{
-		Discussions: []*types.CreateDiscussionResponse{{ID: 1}},
+	t.Run("404 case", func(t *testing.T) {
+		tester := NewDiscussionTester(t).WithHandleFunc(func(h *DiscussionHandler) gin.HandlerFunc {
+			return h.ListRepoDiscussions
+		})
+		tester.mocks.discussion.EXPECT().ListRepoDiscussions(
+			tester.Ctx(), types.ListRepoDiscussionRequest{
+				CurrentUser: "u",
+				RepoType:    types.ModelRepo,
+				Namespace:   "u",
+				Name:        "r",
+			},
+		).Once().Return(nil, errorx.ErrDatabaseNoRows)
+		tester.WithUser().WithParam("repo_type", "models").Execute()
+		tester.ResponseEqSimple(t, 404, httpbase.R{
+			Code: errorx.ErrDatabaseNoRows.Code(),
+			Msg:  errorx.ErrDatabaseNoRows.Error(),
+		})
 	})
-
 }
 
 func TestDiscussionHandler_CreateDiscussionComment(t *testing.T) {
@@ -196,15 +233,30 @@ func TestDiscussionHandler_DeleteComment(t *testing.T) {
 }
 
 func TestDiscussionHandler_ListDiscussionComments(t *testing.T) {
-	tester := NewDiscussionTester(t).WithHandleFunc(func(h *DiscussionHandler) gin.HandlerFunc {
-		return h.ListDiscussionComments
+	t.Run("ok case", func(t *testing.T) {
+		tester := NewDiscussionTester(t).WithHandleFunc(func(h *DiscussionHandler) gin.HandlerFunc {
+			return h.ListDiscussionComments
+		})
+
+		tester.mocks.discussion.EXPECT().ListDiscussionComments(
+			tester.Ctx(), int64(1),
+		).Return([]*types.DiscussionResponse_Comment{{Content: "foo"}}, nil)
+		tester.WithUser().WithParam("id", "1").Execute()
+
+		tester.ResponseEq(t, 200, tester.OKText, []*types.DiscussionResponse_Comment{{Content: "foo"}})
 	})
 
-	tester.mocks.discussion.EXPECT().ListDiscussionComments(
-		tester.Ctx(), int64(1),
-	).Return([]*types.DiscussionResponse_Comment{{Content: "foo"}}, nil)
-	tester.WithUser().WithParam("id", "1").Execute()
-
-	tester.ResponseEq(t, 200, tester.OKText, []*types.DiscussionResponse_Comment{{Content: "foo"}})
-
+	t.Run("404 case", func(t *testing.T) {
+		tester := NewDiscussionTester(t).WithHandleFunc(func(h *DiscussionHandler) gin.HandlerFunc {
+			return h.ListDiscussionComments
+		})
+		tester.mocks.discussion.EXPECT().ListDiscussionComments(
+			tester.Ctx(), int64(1),
+		).Once().Return(nil, errorx.ErrDatabaseNoRows)
+		tester.WithUser().WithParam("id", "1").Execute()
+		tester.ResponseEqSimple(t, 404, httpbase.R{
+			Code: errorx.ErrDatabaseNoRows.Code(),
+			Msg:  errorx.ErrDatabaseNoRows.Error(),
+		})
+	})
 }

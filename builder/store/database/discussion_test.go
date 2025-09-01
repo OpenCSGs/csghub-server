@@ -2,10 +2,12 @@ package database_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/tests"
 )
 
@@ -47,6 +49,7 @@ func TestDiscussionStore_CRUD(t *testing.T) {
 	require.Nil(t, err)
 	_, err = store.FindByID(ctx, ds.ID)
 	require.NotNil(t, err)
+	require.True(t, errors.Is(err, errorx.ErrDatabaseNoRows))
 
 	_, err = store.CreateComment(ctx, database.Comment{
 		Content: "foobar",
@@ -71,4 +74,5 @@ func TestDiscussionStore_CRUD(t *testing.T) {
 	require.Nil(t, err)
 	_, err = store.FindCommentByID(ctx, cm.ID)
 	require.NotNil(t, err)
+	require.True(t, errors.Is(err, errorx.ErrDatabaseNoRows))
 }
