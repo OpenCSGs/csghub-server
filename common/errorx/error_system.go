@@ -23,6 +23,9 @@ const (
 	lfsNotFound
 
 	lastOrgAdmin
+
+	cannotPromoteSelfToAdmin
+	cannotSetRepoPrivacy
 )
 
 var (
@@ -111,6 +114,30 @@ var (
 	//
 	// zh-HK: 不能移除組織的最後一個管理員
 	ErrLastOrgAdmin = CustomError{prefix: errSysPrefix, code: lastOrgAdmin}
+	// cannot promote yourself to admin
+	//
+	// Description: The requested action to promote yourself to an administrator is prohibited.
+	//
+	// Description_ZH: 禁止将自身提升为管理员。
+	//
+	// en-US: Cannot promote yourself to admin
+	//
+	// zh-CN: 不能将自身提升为管理员
+	//
+	// zh-HK: 不能將自身提升為管理員
+	ErrCannotPromoteSelfToAdmin = CustomError{prefix: errSysPrefix, code: cannotPromoteSelfToAdmin}
+	// cannot change repository privacy
+	//
+	// Description: The requested action to change the privacy setting of a repository is prohibited. Because sensitive check not passed.
+	//
+	// Description_ZH: 用户禁止更改存储库的隐私设置，由于敏感词检测没有通过。
+	//
+	// en-US: Cannot change repository privacy
+	//
+	// zh-CN: 不能更改存储库的隐私
+	//
+	// zh-HK: 不能更改存儲庫的隱私
+	ErrCannotSetRepoPrivacy = CustomError{prefix: errSysPrefix, code: cannotSetRepoPrivacy}
 )
 
 // Used in DB to convert db error to custom error
@@ -185,6 +212,30 @@ func LastOrgAdmin(err error, ctx context) error {
 		prefix:  errSysPrefix,
 		err:     err,
 		code:    lastOrgAdmin,
+		context: ctx,
+	}
+}
+
+func CannotPromoteSelfToAdmin(err error, ctx context) error {
+	if err == nil {
+		return nil
+	}
+	return CustomError{
+		prefix:  errSysPrefix,
+		err:     err,
+		code:    cannotPromoteSelfToAdmin,
+		context: ctx,
+	}
+}
+
+func CannotSetRepoPrivacy(err error, ctx context) error {
+	if err == nil {
+		return nil
+	}
+	return CustomError{
+		prefix:  errSysPrefix,
+		err:     err,
+		code:    cannotSetRepoPrivacy,
 		context: ctx,
 	}
 }
