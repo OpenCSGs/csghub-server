@@ -251,13 +251,13 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 					require.Equal(t, commontypes.TokenNumberType, evt.ValueType)
 					require.Equal(t, int64(150), evt.Value)
 					var tokenUsageExtra struct {
-						PromptTokenNum     int64 `json:"prompt_token_num"`
-						CompletionTokenNum int64 `json:"completion_token_num"`
+						PromptTokenNum     string `json:"prompt_token_num"`
+						CompletionTokenNum string `json:"completion_token_num"`
 					}
 					err = json.Unmarshal([]byte(evt.Extra), &tokenUsageExtra)
 					require.NoError(t, err)
-					require.Equal(t, int64(100), tokenUsageExtra.PromptTokenNum)
-					require.Equal(t, int64(50), tokenUsageExtra.CompletionTokenNum)
+					require.Equal(t, "100", tokenUsageExtra.PromptTokenNum)
+					require.Equal(t, "50", tokenUsageExtra.CompletionTokenNum)
 					return nil
 				})
 			},
@@ -307,13 +307,13 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 					require.Equal(t, commontypes.TokenNumberType, evt.ValueType)
 					require.Equal(t, int64(150), evt.Value)
 					var tokenUsageExtra struct {
-						PromptTokenNum     int64 `json:"prompt_token_num"`
-						CompletionTokenNum int64 `json:"completion_token_num"`
+						PromptTokenNum     string `json:"prompt_token_num"`
+						CompletionTokenNum string `json:"completion_token_num"`
 					}
 					err = json.Unmarshal([]byte(evt.Extra), &tokenUsageExtra)
 					require.NoError(t, err)
-					require.Equal(t, int64(100), tokenUsageExtra.PromptTokenNum)
-					require.Equal(t, int64(50), tokenUsageExtra.CompletionTokenNum)
+					require.Equal(t, "100", tokenUsageExtra.PromptTokenNum)
+					require.Equal(t, "50", tokenUsageExtra.CompletionTokenNum)
 					return nil
 
 				})
