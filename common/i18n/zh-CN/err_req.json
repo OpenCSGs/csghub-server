@@ -1,6 +1,6 @@
 {
     "error.REQ-ERR-0": {
-        "other": "请求格式错误"
+        "other": "错误的请求"
     },
     "error.REQ-ERR-1": {
         "other": "请求体格式错误"
@@ -11,20 +11,11 @@
     "error.REQ-ERR-3": {
         "other": "请求体过大"
     },
-    "error.REQ-ERR-4": {
-        "other": "缺少必需的请求参数"
-    },
     "error.REQ-ERR-5": {
-        "other": "请求参数重复"
+        "other": "重复的请求参数"
     },
     "error.REQ-ERR-6": {
-        "other": "请求参数无效"
-    },
-    "error.REQ-ERR-7": {
-        "other": "请求参数超出范围"
-    },
-    "error.REQ-ERR-8": {
-        "other": "请求参数类型错误"
+        "other": "无效的请求参数"
     },
     "error.REQ-ERR-9": {
         "other": "不支持的内容类型"

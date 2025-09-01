@@ -1,0 +1,62 @@
+{
+    "error.GIT-ERR-0": {
+        "other": "Failed to clone repository"
+    },
+    "error.GIT-ERR-1": {
+        "other": "Failed to pull changes from repository"
+    },
+    "error.GIT-ERR-10": {
+        "other": "Failed to find branch"
+    },
+    "error.GIT-ERR-11": {
+        "other": "Branch not found"
+    },
+    "error.GIT-ERR-12": {
+        "other": "Failed to delete branch"
+    },
+    "error.GIT-ERR-13": {
+        "other": "File not found in repository"
+    },
+    "error.GIT-ERR-14": {
+        "other": "File upload failed"
+    },
+    "error.GIT-ERR-15": {
+        "other": "File download failed"
+    },
+    "error.GIT-ERR-16": {
+        "other": "Failed to connect to Git server"
+    },
+    "error.GIT-ERR-17": {
+        "other": "Git LFS operation failed"
+    },
+    "error.GIT-ERR-18": {
+        "other": "File is too large"
+    },
+    "error.GIT-ERR-2": {
+        "other": "Failed to push changes to repository"
+    },
+    "error.GIT-ERR-3": {
+        "other": "Failed to commit changes"
+    },
+    "error.GIT-ERR-32": {
+        "other": "Git service is unavailable"
+    },
+    "error.GIT-ERR-4": {
+        "other": "Failed to find commit"
+    },
+    "error.GIT-ERR-5": {
+        "other": "Failed to count commits"
+    },
+    "error.GIT-ERR-6": {
+        "other": "Commit not found"
+    },
+    "error.GIT-ERR-7": {
+        "other": "Failed to generate diff"
+    },
+    "error.GIT-ERR-8": {
+        "other": "Git authentication failed"
+    },
+    "error.GIT-ERR-9": {
+        "other": "Repository not found"
+    }
+}

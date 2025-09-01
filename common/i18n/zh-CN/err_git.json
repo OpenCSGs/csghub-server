@@ -1,0 +1,62 @@
+{
+    "error.GIT-ERR-0": {
+        "other": "克隆仓库失败"
+    },
+    "error.GIT-ERR-1": {
+        "other": "从仓库拉取更新失败"
+    },
+    "error.GIT-ERR-10": {
+        "other": "查找分支失败"
+    },
+    "error.GIT-ERR-11": {
+        "other": "未找到该分支"
+    },
+    "error.GIT-ERR-12": {
+        "other": "删除分支失败"
+    },
+    "error.GIT-ERR-13": {
+        "other": "在仓库中未找到该文件"
+    },
+    "error.GIT-ERR-14": {
+        "other": "文件上传失败"
+    },
+    "error.GIT-ERR-15": {
+        "other": "文件下载失败"
+    },
+    "error.GIT-ERR-16": {
+        "other": "连接Git服务器失败"
+    },
+    "error.GIT-ERR-17": {
+        "other": "Git LFS操作失败"
+    },
+    "error.GIT-ERR-18": {
+        "other": "文件过大"
+    },
+    "error.GIT-ERR-2": {
+        "other": "推送更新到仓库失败"
+    },
+    "error.GIT-ERR-3": {
+        "other": "提交更改失败"
+    },
+    "error.GIT-ERR-32": {
+        "other": "Git服务不可用"
+    },
+    "error.GIT-ERR-4": {
+        "other": "查找提交失败"
+    },
+    "error.GIT-ERR-5": {
+        "other": "统计提交数量失败"
+    },
+    "error.GIT-ERR-6": {
+        "other": "未找到该提交"
+    },
+    "error.GIT-ERR-7": {
+        "other": "生成差异对比失败"
+    },
+    "error.GIT-ERR-8": {
+        "other": "Git身份验证失败"
+    },
+    "error.GIT-ERR-9": {
+        "other": "仓库未找到"
+    }
+}

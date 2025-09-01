@@ -1052,12 +1052,10 @@ func (c *modelComponentImpl) Deploy(ctx context.Context, deployReq types.DeployA
 	// only vllm and sglang support multi-host inference
 	if hardware.Replicas > 1 {
 		if frame.FrameName != "vllm" && frame.FrameName != "sglang" {
-			err := fmt.Errorf("only vllm and sglang support multi-host inference")
-			return -1, errorx.InternalServerError(err, nil)
+			return -1, errorx.ErrMultiHostInferenceNotSupported
 		}
 		if req.MinReplica < 1 {
-			err := fmt.Errorf("Multi-host inference only supports a minimum replica count greater than 0")
-			return -1, errorx.InternalServerError(err, nil)
+			return -1, errorx.ErrMultiHostInferenceReplicaCount
 		}
 	}
 

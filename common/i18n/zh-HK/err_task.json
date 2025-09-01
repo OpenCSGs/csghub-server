@@ -1,5 +1,11 @@
 {
     "error.TASK-ERR-0": {
-        "other": "沒有入口檔案"
+        "other": "未找到任務入口檔案"
+    },
+    "error.TASK-ERR-1": {
+        "other": "只支持 vllm 和 sglang 的多主機推理"
+    },
+    "error.TASK-ERR-2": {
+        "other": "多主機推理僅支持大於 0 的最低副本數"
     }
 }

@@ -27,20 +27,89 @@ const (
 
 var (
 	// --- SYS-ERR-xxx: System / Service exceptions ---
-	// Used when marshal error, type convert error
-	ErrInternalServerError error = CustomError{prefix: errSysPrefix, code: internalServerError}
-	// Used in httpClient, then need to convert it to specific error, such as ErrUserServiceFailure
-	ErrRemoteServiceFail = CustomError{prefix: errSysPrefix, code: remoteServiceFail}
-	// Used to instead of sql.ErrConnDone and other unhandled error
-	ErrDatabaseFailure = CustomError{prefix: errSysPrefix, code: databaseFailure}
-	// Used to instead of sql.ErrNoRows
+	// a generic, unexpected server-side error occurred
 	//
-	// Convert it to specific error in component or handler
-	ErrDatabaseNoRows       = CustomError{prefix: errSysPrefix, code: databaseNoRows}
+	// Description: An unexpected condition was encountered on the server that prevented it from fulfilling the request. This is a catch-all for unhandled exceptions, such as marshalling errors or type conversion failures.
+	//
+	// Description_ZH: 服务器上遇到了意外情况，导致无法完成请求。这是一个用于捕获未处理异常的通用错误，例如序列化错误或类型转换失败。
+	//
+	// en-US: Internal Server Error
+	//
+	// zh-CN: 服务器内部错误
+	//
+	// zh-HK: 伺服器內部錯誤
+	ErrInternalServerError error = CustomError{prefix: errSysPrefix, code: internalServerError}
+	// a call to a remote or downstream service failed
+	//
+	// Description: A request to a dependent downstream or external service failed. This is a generic error that should be converted to a more specific error in the calling component.
+	//
+	// Description_ZH: 对下游依赖或外部服务的请求失败。这是一个通用错误，应在调用组件中转换为更具体的错误。
+	//
+	// en-US: Remote service call failed
+	//
+	// zh-CN: 远程服务调用失败
+	//
+	// zh-HK: 遠程服務調用失敗
+	ErrRemoteServiceFail = CustomError{prefix: errSysPrefix, code: remoteServiceFail}
+	// a generic database operation failed
+	//
+	// Description: An unhandled or unexpected error occurred during a database operation, such as a lost connection (`sql.ErrConnDone`).
+	//
+	// Description_ZH: 在数据库操作期间发生了未处理或意外的错误，例如连接丢失（`sql.ErrConnDone`）。
+	//
+	// en-US: Database operation failed
+	//
+	// zh-CN: 数据库操作失败
+	//
+	// zh-HK: 資料庫操作失敗
+	ErrDatabaseFailure = CustomError{prefix: errSysPrefix, code: databaseFailure}
+	// a database query returned no results when one was expected
+	//
+	// Description: A database query that was expected to return at least one row found no matching records. This is a system-level wrapper for `sql.ErrNoRows`.
+	//
+	// Description_ZH: 期望至少返回一行的数据库查询没有找到匹配的记录。这是 `sql.ErrNoRows` 的系统级封装。
+	//
+	// en-US: Record not found in database
+	//
+	// zh-CN: 数据库中未找到记录
+	//
+	// zh-HK: 資料庫中未找到記錄
+	ErrDatabaseNoRows = CustomError{prefix: errSysPrefix, code: databaseNoRows}
+	// a database write operation violated a unique key constraint
+	//
+	// Description: An `INSERT` or `UPDATE` operation failed because it would have created a duplicate value in a column with a unique constraint.
+	//
+	// Description_ZH: `INSERT` 或 `UPDATE` 操作失败，因为它会在具有唯一约束的列中创建重复值。
+	//
+	// en-US: Duplicate entry for key
+	//
+	// zh-CN: 键值重复
+	//
+	// zh-HK: 鍵值重複
 	ErrDatabaseDuplicateKey = CustomError{prefix: errSysPrefix, code: databaseDuplicateKey}
-
+	// the LFS (Large File Storage) service is not configured or found
+	//
+	// Description: The system could not find or connect to the configured LFS service. This indicates a system configuration issue.
+	//
+	// Description_ZH: 系统无法找到或连接到配置的LFS（大文件存储）服务。这表明存在系统配置问题。
+	//
+	// en-US: LFS service not found
+	//
+	// zh-CN: 未找到LFS服务
+	//
+	// zh-HK: 未找到LFS服務
 	ErrLFSNotFound = CustomError{prefix: errSysPrefix, code: lfsNotFound}
-
+	// cannot remove the last administrator of an organization
+	//
+	// Description: The requested action to remove a user's admin role is prohibited because they are the sole administrator of an organization. This prevents the organization from being locked.
+	//
+	// Description_ZH: 禁止移除用户管理员角色的请求，因为他们是组织的唯一管理员。此举可防止组织被锁定而无法管理。
+	//
+	// en-US: Cannot remove the last administrator of the organization
+	//
+	// zh-CN: 不能移除组织的最后一个管理员
+	//
+	// zh-HK: 不能移除組織的最後一個管理員
 	ErrLastOrgAdmin = CustomError{prefix: errSysPrefix, code: lastOrgAdmin}
 )
 

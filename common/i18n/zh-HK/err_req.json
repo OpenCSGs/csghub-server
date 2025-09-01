@@ -1,6 +1,6 @@
 {
     "error.REQ-ERR-0": {
-        "other": "請求格式錯誤"
+        "other": "錯誤的請求"
     },
     "error.REQ-ERR-1": {
         "other": "請求體格式錯誤"
@@ -11,20 +11,11 @@
     "error.REQ-ERR-3": {
         "other": "請求體過大"
     },
-    "error.REQ-ERR-4": {
-        "other": "缺少必需的請求參數"
-    },
     "error.REQ-ERR-5": {
-        "other": "請求參數重複"
+        "other": "重複的請求參數"
     },
     "error.REQ-ERR-6": {
-        "other": "請求參數無效"
-    },
-    "error.REQ-ERR-7": {
-        "other": "請求參數超出範圍"
-    },
-    "error.REQ-ERR-8": {
-        "other": "請求參數類型錯誤"
+        "other": "無效的請求參數"
     },
     "error.REQ-ERR-9": {
         "other": "不支持的內容類型"
