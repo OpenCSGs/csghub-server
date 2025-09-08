@@ -66,7 +66,7 @@ func TestTagHandler_AllTags(t *testing.T) {
 
 	t.Run("with builtin", func(t *testing.T) {
 		var tags []*types.RepoTag
-		tags = append(tags, &types.RepoTag{ID: 1, Name: "test1"})
+		tags = append(tags, &types.RepoTag{Name: "test1"})
 
 		values := url.Values{}
 		values.Add("category", "task")
