@@ -9,6 +9,6 @@
         "other": "多主機推理僅支持大於 0 的最低副本數"
     },
     "error.TASK-ERR-3": {
-        "other": "不支援多主機 Notebook"
+        "other": "多機模式暫不支持notebook"
     }
 }

@@ -1012,6 +1012,7 @@ func (h *UserHandler) LikesMCPServers(ctx *gin.Context) {
 // @Param        page query int false "page number"
 // @Param        size query int false "page size"
 // @Success      200  {object}  types.ResponseWithTotal{data=[]types.NotebookRes,total=int} "OK"
+// @Success      200  {array}  types.ResponseWithTotal{data=[]types.NotebookRes,total=int} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /user/{username}/notebooks [get]
