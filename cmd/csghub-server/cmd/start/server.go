@@ -127,6 +127,7 @@ var serverCmd = &cobra.Command{
 			SpaceDeployTimeoutInMin: cfg.Space.DeployTimeoutInMin,
 			ModelDeployTimeoutInMin: cfg.Model.DeployTimeoutInMin,
 			ModelDownloadEndpoint:   cfg.Model.DownloadEndpoint,
+			ChargingEnable:          cfg.Accounting.ChargingEnable,
 			PublicRootDomain:        cfg.Space.PublicRootDomain,
 			S3Internal:              s3Internal,
 			RedisLocker:             redisLocker,
