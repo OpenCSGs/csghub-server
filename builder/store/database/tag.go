@@ -97,6 +97,10 @@ func (ts *tagStoreImpl) AllTags(ctx context.Context, filter *types.TagFilter) ([
 		if filter.BuiltIn != nil {
 			q = q.Where("built_in = ?", *filter.BuiltIn)
 		}
+		if filter.Search != "" {
+			searchName := "%" + filter.Search + "%"
+			q = q.Where("name like ? OR show_name like ?", searchName, searchName)
+		}
 	}
 
 	err := q.Scan(ctx, &tags)
@@ -188,7 +192,7 @@ func (ts *tagStoreImpl) AllCategories(ctx context.Context, scope types.TagScope)
 }
 
 func (ts *tagStoreImpl) CreateTag(ctx context.Context, tag Tag) (*Tag, error) {
-	_, err := ts.db.Operator.Core.NewInsert().Model(&tag).Exec(ctx)
+	err := ts.db.Operator.Core.NewInsert().Model(&tag).Scan(ctx, &tag)
 	return &tag, err
 }
 
@@ -205,6 +209,8 @@ func (ts *tagStoreImpl) SaveTags(ctx context.Context, tags []*Tag) error {
 }
 
 // SetMetaTags will delete existing tags and create new ones
+//
+// return updated meta tags, exclude exCategories
 func (ts *tagStoreImpl) SetMetaTags(ctx context.Context, repoType types.RepositoryType, namespace, name string, tags []*Tag) (repoTags []*RepositoryTag, err error) {
 	repo := new(Repository)
 	err = ts.db.Operator.Core.NewSelect().Model(repo).
@@ -221,6 +227,7 @@ func (ts *tagStoreImpl) SetMetaTags(ctx context.Context, repoType types.Reposito
 		"framework":         true,
 		"runtime_framework": true,
 		"evaluation":        true,
+		"industry":          true,
 	}
 	for _, tag := range repo.Tags {
 		if !exCategories[tag.Category] {
@@ -373,7 +380,7 @@ func (ts *tagStoreImpl) FindOrCreate(ctx context.Context, tag Tag) (*Tag, error)
 	var resTag Tag
 	err := ts.db.Operator.Core.NewSelect().
 		Model(&resTag).
-		Where("name = ? and category = ? and built_in = ? and scope = ?", tag.Name, tag.Category, tag.BuiltIn, tag.Scope).
+		Where("name = ? and category = ? and scope = ?", tag.Name, tag.Category, tag.Scope).
 		Scan(ctx)
 	if err == nil {
 		return &resTag, nil

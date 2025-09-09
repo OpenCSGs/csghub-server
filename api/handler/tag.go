@@ -38,6 +38,7 @@ type TagsHandler struct {
 // @Param		 category query string false "category name"
 // @Param		 scope query string false "scope name" Enums(model, dataset, code, space, prompt)
 // @Param		 built_in query bool false "built_in"
+// @Param		 search query string false "search on name and show_name fields"
 // @Success      200  {object}  types.ResponseWithTotal{data=[]types.RepoTag} "tags"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
@@ -61,7 +62,7 @@ func (t *TagsHandler) AllTags(ctx *gin.Context) {
 // CreateTag     godoc
 // @Security     ApiKey
 // @Summary      Create new tag
-// @Description  Create new tag
+// @Description  Create new tag, used for admin
 // @Tags         Tag
 // @Accept       json
 // @Produce      json
@@ -71,14 +72,13 @@ func (t *TagsHandler) AllTags(ctx *gin.Context) {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /tags [post]
 func (t *TagsHandler) CreateTag(ctx *gin.Context) {
-	userName := httpbase.GetCurrentUser(ctx)
 	var req types.CreateTag
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", slog.Any("error", err))
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	tag, err := t.tag.CreateTag(ctx.Request.Context(), userName, req)
+	tag, err := t.tag.CreateTag(ctx.Request.Context(), req)
 	if err != nil {
 		slog.Error("Failed to create tag", slog.Any("req", req), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -90,7 +90,7 @@ func (t *TagsHandler) CreateTag(ctx *gin.Context) {
 // GetTag        godoc
 // @Security     ApiKey
 // @Summary      Get a tag by id
-// @Description  Get a tag by id
+// @Description  Get a tag by id, used for admin
 // @Tags         Tag
 // @Accept       json
 // @Produce      json
@@ -100,14 +100,13 @@ func (t *TagsHandler) CreateTag(ctx *gin.Context) {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /tags/{id} [get]
 func (t *TagsHandler) GetTagByID(ctx *gin.Context) {
-	userName := httpbase.GetCurrentUser(ctx)
 	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
 		slog.Error("Bad request format", slog.Any("error", err))
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	tag, err := t.tag.GetTagByID(ctx.Request.Context(), userName, id)
+	tag, err := t.tag.GetTagByID(ctx.Request.Context(), id)
 	if err != nil {
 		slog.Error("Failed to get tag", slog.Int64("id", id), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -119,7 +118,7 @@ func (t *TagsHandler) GetTagByID(ctx *gin.Context) {
 // UpdateTag     godoc
 // @Security     ApiKey
 // @Summary      Update a tag by id
-// @Description  Update a tag by id
+// @Description  Update a tag by id, used for admin
 // @Tags         Tag
 // @Accept       json
 // @Produce      json
@@ -130,7 +129,6 @@ func (t *TagsHandler) GetTagByID(ctx *gin.Context) {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /tags/{id} [put]
 func (t *TagsHandler) UpdateTag(ctx *gin.Context) {
-	userName := httpbase.GetCurrentUser(ctx)
 	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
 		slog.Error("Bad request format", slog.Any("error", err))
@@ -143,7 +141,7 @@ func (t *TagsHandler) UpdateTag(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	tag, err := t.tag.UpdateTag(ctx.Request.Context(), userName, id, req)
+	tag, err := t.tag.UpdateTag(ctx.Request.Context(), id, req)
 	if err != nil {
 		slog.Error("Failed to update tag", slog.Int64("id", id), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -155,7 +153,7 @@ func (t *TagsHandler) UpdateTag(ctx *gin.Context) {
 // DeleteTag     godoc
 // @Security     ApiKey
 // @Summary      Delete a tag by id
-// @Description  Delete a tag by id
+// @Description  Delete a tag by id, used for admin
 // @Tags         Tag
 // @Accept       json
 // @Produce      json
@@ -165,14 +163,13 @@ func (t *TagsHandler) UpdateTag(ctx *gin.Context) {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /tags/{id} [delete]
 func (t *TagsHandler) DeleteTag(ctx *gin.Context) {
-	userName := httpbase.GetCurrentUser(ctx)
 	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
 		slog.Error("Bad request format", slog.Any("error", err))
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	err = t.tag.DeleteTag(ctx.Request.Context(), userName, id)
+	err = t.tag.DeleteTag(ctx.Request.Context(), id)
 	if err != nil {
 		slog.Error("Failed to delete tag", slog.Int64("id", id), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -205,7 +202,7 @@ func (t *TagsHandler) AllCategories(ctx *gin.Context) {
 // CreateCategory     godoc
 // @Security     ApiKey
 // @Summary      Create new category
-// @Description  Create new category
+// @Description  Create new category, used for admin
 // @Tags         Tag
 // @Accept       json
 // @Produce      json
@@ -215,14 +212,13 @@ func (t *TagsHandler) AllCategories(ctx *gin.Context) {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /tags/categories [post]
 func (t *TagsHandler) CreateCategory(ctx *gin.Context) {
-	userName := httpbase.GetCurrentUser(ctx)
 	var req types.CreateCategory
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", slog.Any("error", err))
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	category, err := t.tag.CreateCategory(ctx.Request.Context(), userName, req)
+	category, err := t.tag.CreateCategory(ctx.Request.Context(), req)
 	if err != nil {
 		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
@@ -238,7 +234,7 @@ func (t *TagsHandler) CreateCategory(ctx *gin.Context) {
 // UpdateCategory     godoc
 // @Security     ApiKey
 // @Summary      Create new category
-// @Description  Create new category
+// @Description  Create new category, used for admin
 // @Tags         Tag
 // @Accept       json
 // @Produce      json
@@ -248,7 +244,6 @@ func (t *TagsHandler) CreateCategory(ctx *gin.Context) {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /tags/categories/id [put]
 func (t *TagsHandler) UpdateCategory(ctx *gin.Context) {
-	userName := httpbase.GetCurrentUser(ctx)
 	var req types.UpdateCategory
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", slog.Any("error", err))
@@ -261,7 +256,7 @@ func (t *TagsHandler) UpdateCategory(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	category, err := t.tag.UpdateCategory(ctx.Request.Context(), userName, req, id)
+	category, err := t.tag.UpdateCategory(ctx.Request.Context(), req, id)
 	if err != nil {
 		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
@@ -277,7 +272,7 @@ func (t *TagsHandler) UpdateCategory(ctx *gin.Context) {
 // DeleteCategory  godoc
 // @Security     ApiKey
 // @Summary      Delete a category by id
-// @Description  Delete a category by id
+// @Description  Delete a category by id, used for admin
 // @Tags         Tag
 // @Accept       json
 // @Produce      json
@@ -286,14 +281,14 @@ func (t *TagsHandler) UpdateCategory(ctx *gin.Context) {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /tags/categories/id [delete]
 func (t *TagsHandler) DeleteCategory(ctx *gin.Context) {
-	userName := httpbase.GetCurrentUser(ctx)
+
 	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
 		slog.Error("Bad request format", slog.Any("error", err))
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	err = t.tag.DeleteCategory(ctx.Request.Context(), userName, id)
+	err = t.tag.DeleteCategory(ctx.Request.Context(), id)
 	if err != nil {
 		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)

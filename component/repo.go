@@ -353,7 +353,13 @@ func (c *repoComponentImpl) UpdateRepo(ctx context.Context, req types.UpdateRepo
 		return nil, errors.New("user does not exist")
 	}
 
-	if !user.CanAdmin() {
+	// Admin users have full permissions.
+	if user.CanAdmin() {
+		if req.Private != nil {
+			repo.Private = *req.Private
+		}
+	} else {
+		// Handle permissions for non-admin users.
 		if namespace.NamespaceType == database.OrgNamespace {
 			canWrite, err := c.CheckCurrentUserPermission(ctx, req.Username, req.Namespace, membership.RoleWrite)
 			if err != nil {
@@ -362,23 +368,30 @@ func (c *repoComponentImpl) UpdateRepo(ctx context.Context, req types.UpdateRepo
 			if !canWrite {
 				return nil, errorx.ErrForbiddenMsg("users do not have permission to update repo in this organization")
 			}
+			// Non-admins cannot change the privacy of an organization's repository.
+			if req.Private != nil {
+				return nil, errorx.ErrForbiddenMsg("only admins can change the privacy of an organization repository")
+			}
 		} else {
+			// This is a user namespace.
 			if namespace.Path != user.Username {
 				return nil, errorx.ErrForbiddenMsg("users do not have permission to update repo in this namespace")
+			}
+			// Users can change the privacy of their own repositories.
+			if req.Private != nil {
+				// Additional check if making the repository public.
+				if !*req.Private {
+					allow, reason := c.allowPublic(repo)
+					if !allow {
+						err := errors.New("cannot change repo to public: " + reason)
+						return nil, errorx.CannotSetRepoPrivacy(err, nil)
+					}
+				}
+				repo.Private = *req.Private
 			}
 		}
 	}
 
-	if req.Private != nil {
-		// try to public a repo
-		if !*req.Private {
-			allow, reason := c.allowPublic(repo)
-			if !allow {
-				return nil, errorx.ErrForbiddenMsg(reason)
-			}
-		}
-		repo.Private = *req.Private
-	}
 	if req.Nickname != nil {
 		repo.Nickname = *req.Nickname
 	}

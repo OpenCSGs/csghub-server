@@ -334,7 +334,7 @@ func (c *multiSyncComponentImpl) createLocalDataset(ctx context.Context, m *type
 				Category: tag.Category,
 				Group:    tag.Group,
 				BuiltIn:  tag.BuiltIn,
-				ShowName: tag.ShowName,
+				I18nKey:  tag.ShowName, // ShowName: tag.ShowName,
 				Scope:    types.DatasetTagScope,
 			}
 			t, err := c.tagStore.FindOrCreate(ctx, dbTag)
@@ -473,7 +473,7 @@ func (c *multiSyncComponentImpl) createLocalModel(ctx context.Context, m *types.
 				Category: tag.Category,
 				Group:    tag.Group,
 				BuiltIn:  tag.BuiltIn,
-				ShowName: tag.ShowName,
+				I18nKey:  tag.ShowName, // ShowName: tag.ShowName,
 				Scope:    types.ModelTagScope,
 			}
 			t, err := c.tagStore.FindOrCreate(ctx, dbTag)
@@ -612,7 +612,7 @@ func (c *multiSyncComponentImpl) createLocalCode(ctx context.Context, m *types.C
 				Category: tag.Category,
 				Group:    tag.Group,
 				BuiltIn:  tag.BuiltIn,
-				ShowName: tag.ShowName,
+				I18nKey:  tag.ShowName, // ShowName: tag.ShowName,
 				Scope:    types.CodeTagScope,
 			}
 			t, err := c.tagStore.FindOrCreate(ctx, dbTag)
@@ -749,7 +749,7 @@ func (c *multiSyncComponentImpl) createLocalPrompt(ctx context.Context, m *types
 				Category: tag.Category,
 				Group:    tag.Group,
 				BuiltIn:  tag.BuiltIn,
-				ShowName: tag.ShowName,
+				I18nKey:  tag.ShowName, // ShowName: tag.ShowName,
 				Scope:    types.CodeTagScope,
 			}
 			t, err := c.tagStore.FindOrCreate(ctx, dbTag)
@@ -886,7 +886,7 @@ func (c *multiSyncComponentImpl) createLocalMCPServer(ctx context.Context, m *ty
 				Category: tag.Category,
 				Group:    tag.Group,
 				BuiltIn:  tag.BuiltIn,
-				ShowName: tag.ShowName,
+				I18nKey:  tag.ShowName, // ShowName: tag.ShowName,
 				Scope:    types.CodeTagScope,
 			}
 			t, err := c.tagStore.FindOrCreate(ctx, dbTag)

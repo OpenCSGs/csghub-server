@@ -193,11 +193,11 @@ func (h *DatasetHandler) Update(ctx *gin.Context) {
 
 	dataset, err := h.dataset.Update(ctx.Request.Context(), req)
 	if err != nil {
+		slog.Error("Failed to update dataset", slog.Any("error", err))
 		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
-		slog.Error("Failed to update dataset", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}

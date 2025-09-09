@@ -66,7 +66,7 @@ func TestTagHandler_AllTags(t *testing.T) {
 
 	t.Run("with builtin", func(t *testing.T) {
 		var tags []*types.RepoTag
-		tags = append(tags, &types.RepoTag{ID: 1, Name: "test1"})
+		tags = append(tags, &types.RepoTag{Name: "test1"})
 
 		values := url.Values{}
 		values.Add("category", "task")
@@ -105,7 +105,6 @@ func TestTagHandler_AllTags(t *testing.T) {
 }
 
 func TestTagHandler_CreateTag(t *testing.T) {
-	username := "testuser"
 	data := types.CreateTag{
 		Name:     "testtag",
 		Scope:    "testscope",
@@ -118,11 +117,10 @@ func TestTagHandler_CreateTag(t *testing.T) {
 
 	hr := httptest.NewRecorder()
 	ginContext, _ := gin.CreateTestContext(hr)
-	ginContext.Set("currentUser", username)
 	ginContext.Request = req
 
 	tagComp := mockcom.NewMockTagComponent(t)
-	tagComp.EXPECT().CreateTag(ginContext.Request.Context(), username, mock.Anything).Return(&database.Tag{ID: 1, Name: "testtag"}, nil)
+	tagComp.EXPECT().CreateTag(ginContext.Request.Context(), mock.Anything).Return(&database.Tag{ID: 1, Name: "testtag"}, nil)
 
 	tagHandler, err := NewTestTagHandler(tagComp)
 	require.Nil(t, err)
@@ -142,18 +140,15 @@ func TestTagHandler_CreateTag(t *testing.T) {
 }
 
 func TestTagHandler_GetTagByID(t *testing.T) {
-	username := "testuser"
-
 	req := httptest.NewRequest("get", "/api/v1/tags/1", nil)
 
 	hr := httptest.NewRecorder()
 	ginContext, _ := gin.CreateTestContext(hr)
-	ginContext.Set("currentUser", username)
 	ginContext.AddParam("id", "1")
 	ginContext.Request = req
 
 	tagComp := mockcom.NewMockTagComponent(t)
-	tagComp.EXPECT().GetTagByID(ginContext.Request.Context(), username, int64(1)).Return(&database.Tag{ID: 1, Name: "test1"}, nil)
+	tagComp.EXPECT().GetTagByID(ginContext.Request.Context(), int64(1)).Return(&database.Tag{ID: 1, Name: "test1"}, nil)
 
 	tagHandler, err := NewTestTagHandler(tagComp)
 	require.Nil(t, err)
@@ -173,7 +168,6 @@ func TestTagHandler_GetTagByID(t *testing.T) {
 }
 
 func TestTagHandler_UpdateTag(t *testing.T) {
-	username := "testuser"
 	data := types.UpdateTag{
 		Name:     "testtag",
 		Scope:    "testscope",
@@ -186,12 +180,11 @@ func TestTagHandler_UpdateTag(t *testing.T) {
 
 	hr := httptest.NewRecorder()
 	ginContext, _ := gin.CreateTestContext(hr)
-	ginContext.Set("currentUser", username)
 	ginContext.AddParam("id", "1")
 	ginContext.Request = req
 
 	tagComp := mockcom.NewMockTagComponent(t)
-	tagComp.EXPECT().UpdateTag(ginContext.Request.Context(), username, int64(1), mock.Anything).Return(&database.Tag{ID: 1, Name: "testtag"}, nil)
+	tagComp.EXPECT().UpdateTag(ginContext.Request.Context(), int64(1), mock.Anything).Return(&database.Tag{ID: 1, Name: "testtag"}, nil)
 
 	tagHandler, err := NewTestTagHandler(tagComp)
 	require.Nil(t, err)
@@ -211,18 +204,15 @@ func TestTagHandler_UpdateTag(t *testing.T) {
 }
 
 func TestTagHandler_DeleteTag(t *testing.T) {
-	username := "testuser"
-
 	req := httptest.NewRequest("delete", "/api/v1/tags/1", nil)
 
 	hr := httptest.NewRecorder()
 	ginContext, _ := gin.CreateTestContext(hr)
-	ginContext.Set("currentUser", username)
 	ginContext.AddParam("id", "1")
 	ginContext.Request = req
 
 	tagComp := mockcom.NewMockTagComponent(t)
-	tagComp.EXPECT().DeleteTag(ginContext.Request.Context(), username, int64(1)).Return(nil)
+	tagComp.EXPECT().DeleteTag(ginContext.Request.Context(), int64(1)).Return(nil)
 
 	tagHandler, err := NewTestTagHandler(tagComp)
 	require.Nil(t, err)
@@ -272,7 +262,6 @@ func TestTagHandler_AllCategories(t *testing.T) {
 }
 
 func TestTagHandler_CreateCategory(t *testing.T) {
-	username := "testuser"
 	data := types.CreateCategory{
 		Name:  "testcate",
 		Scope: "testscope",
@@ -284,11 +273,10 @@ func TestTagHandler_CreateCategory(t *testing.T) {
 
 	hr := httptest.NewRecorder()
 	ginContext, _ := gin.CreateTestContext(hr)
-	ginContext.Set("currentUser", username)
 	ginContext.Request = req
 
 	tagComp := mockcom.NewMockTagComponent(t)
-	tagComp.EXPECT().CreateCategory(ginContext.Request.Context(), username, data).Return(
+	tagComp.EXPECT().CreateCategory(ginContext.Request.Context(), data).Return(
 		&database.TagCategory{ID: 1, Name: "testcate", Scope: types.TagScope("testscope")},
 		nil,
 	)
@@ -311,7 +299,6 @@ func TestTagHandler_CreateCategory(t *testing.T) {
 }
 
 func TestTagHandler_UpdateCategory(t *testing.T) {
-	username := "testuser"
 	data := types.UpdateCategory{
 		Name:  "testcate",
 		Scope: "testscope",
@@ -323,12 +310,11 @@ func TestTagHandler_UpdateCategory(t *testing.T) {
 
 	hr := httptest.NewRecorder()
 	ginContext, _ := gin.CreateTestContext(hr)
-	ginContext.Set("currentUser", username)
 	ginContext.AddParam("id", "1")
 	ginContext.Request = req
 
 	tagComp := mockcom.NewMockTagComponent(t)
-	tagComp.EXPECT().UpdateCategory(ginContext.Request.Context(), username, data, int64(1)).Return(
+	tagComp.EXPECT().UpdateCategory(ginContext.Request.Context(), data, int64(1)).Return(
 		&database.TagCategory{ID: 1, Name: "testcate", Scope: types.TagScope("testscope")},
 		nil,
 	)
@@ -351,18 +337,15 @@ func TestTagHandler_UpdateCategory(t *testing.T) {
 }
 
 func TestTagHandler_DeleteCategory(t *testing.T) {
-	username := "testuser"
-
 	req := httptest.NewRequest("delete", "/tags/categories/1", nil)
 
 	hr := httptest.NewRecorder()
 	ginContext, _ := gin.CreateTestContext(hr)
-	ginContext.Set("currentUser", username)
 	ginContext.AddParam("id", "1")
 	ginContext.Request = req
 
 	tagComp := mockcom.NewMockTagComponent(t)
-	tagComp.EXPECT().DeleteCategory(ginContext.Request.Context(), username, int64(1)).Return(nil)
+	tagComp.EXPECT().DeleteCategory(ginContext.Request.Context(), int64(1)).Return(nil)
 
 	tagHandler, err := NewTestTagHandler(tagComp)
 	require.Nil(t, err)
