@@ -10,10 +10,11 @@ import (
 
 type RedisClient interface {
 	FlushAll(ctx context.Context) error
-	ZAdd(ctx context.Context, key string, z redis.Z) error
+	ZAdd(ctx context.Context, key string, z ...redis.Z) error
 	BZPopMax(ctx context.Context, key string) (*redis.ZWithKey, error)
 	Set(ctx context.Context, key string, value string) error
 	SetEx(ctx context.Context, key string, value string, expiration time.Duration) error
+	SetNX(ctx context.Context, key string, value string, expiration time.Duration) (bool, error)
 	Get(ctx context.Context, key string) (string, error)
 	Del(ctx context.Context, keys ...string) error
 	SAdd(ctx context.Context, key string, members ...interface{}) error
@@ -32,6 +33,9 @@ type RedisClient interface {
 	LPopCount(ctx context.Context, key string, count int) ([]string, error)
 	LPop(ctx context.Context, key string) (string, error)
 	LPush(ctx context.Context, key string, values ...interface{}) error
+	ZCard(ctx context.Context, key string) (int64, error)
+	Exists(ctx context.Context, key string) (int64, error)
+	Expire(ctx context.Context, key string, expiration time.Duration) error
 }
 
 type RedisConfig struct {
@@ -75,12 +79,31 @@ end`
 	return
 }
 
+// NewCacheWithClient is used for testing
+func NewCacheWithClient(ctx context.Context, client *redis.Client) (cache RedisClient) {
+	const releaseLockScript = `
+local value = redis.call("GET", KEYS[1])
+if not value then
+	return -1 -- not locked
+end
+if value == ARGV[1] then
+	return redis.call("DEL",KEYS[1]) -- lock is successfully released
+else
+	return 0 -- lock does not belongs to us
+end`
+	cache = &Cache{
+		core:              client,
+		releaseLockScript: redis.NewScript(releaseLockScript),
+	}
+	return
+}
+
 func (c *Cache) FlushAll(ctx context.Context) error {
 	return c.core.FlushAll(ctx).Err()
 }
 
-func (c *Cache) ZAdd(ctx context.Context, key string, z redis.Z) error {
-	_, err := c.core.ZAdd(ctx, key, z).Result()
+func (c *Cache) ZAdd(ctx context.Context, key string, z ...redis.Z) error {
+	_, err := c.core.ZAdd(ctx, key, z...).Result()
 	return err
 }
 
@@ -94,6 +117,10 @@ func (c *Cache) Set(ctx context.Context, key string, value string) error {
 
 func (c *Cache) SetEx(ctx context.Context, key string, value string, expiration time.Duration) error {
 	return c.core.SetEx(ctx, key, value, expiration).Err()
+}
+
+func (c *Cache) SetNX(ctx context.Context, key string, value string, expiration time.Duration) (bool, error) {
+	return c.core.SetNX(ctx, key, value, expiration).Result()
 }
 
 func (c *Cache) Get(ctx context.Context, key string) (string, error) {
@@ -158,4 +185,16 @@ func (c *Cache) LPop(ctx context.Context, key string) (string, error) {
 
 func (c *Cache) SRem(ctx context.Context, key string, values ...interface{}) error {
 	return c.core.SRem(ctx, key, values...).Err()
+}
+
+func (c *Cache) ZCard(ctx context.Context, key string) (int64, error) {
+	return c.core.ZCard(ctx, key).Result()
+}
+
+func (c *Cache) Exists(ctx context.Context, key string) (int64, error) {
+	return c.core.Exists(ctx, key).Result()
+}
+
+func (c *Cache) Expire(ctx context.Context, key string, expiration time.Duration) error {
+	return c.core.Expire(ctx, key, expiration).Err()
 }

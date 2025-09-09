@@ -25,6 +25,7 @@ const (
 	lastOrgAdmin
 
 	cannotPromoteSelfToAdmin
+
 	cannotSetRepoPrivacy
 )
 

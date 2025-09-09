@@ -538,6 +538,14 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Name:** `lastOrgAdmin`
 - **Description:** The requested action to remove a user's admin role is prohibited because they are the sole administrator of an organization. This prevents the organization from being locked.
 
+---
+
+### `SYS-ERR-7`
+
+- **Error Code:** `SYS-ERR-7`
+- **Error Name:** `cannotPromoteSelfToAdmin`
+- **Description:** The requested action to promote yourself to an administrator is prohibited.
+
 ## Task Errors
 
 ### `TASK-ERR-0`

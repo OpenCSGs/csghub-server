@@ -2,6 +2,7 @@ package component
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -93,12 +94,19 @@ func TestModelComponent_Create(t *testing.T) {
 		Repository: dbrepo,
 	}, nil)
 
-	mc.mocks.components.repo.EXPECT().SendAssetManagementMsg(mock.Anything, types.RepoNotificationReq{
-		RepoType:  types.ModelRepo,
-		RepoPath:  "ns/n",
-		Operation: types.OperationCreate,
-		UserUUID:  "user-uuid",
-	}).Return(nil)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	mc.mocks.components.repo.EXPECT().
+		SendAssetManagementMsg(mock.Anything, mock.MatchedBy(func(req types.RepoNotificationReq) bool {
+			return req.RepoType == types.ModelRepo &&
+				req.Operation == types.OperationCreate &&
+				req.RepoPath == "ns/n" &&
+				req.UserUUID == "user-uuid"
+		})).
+		RunAndReturn(func(ctx context.Context, req types.RepoNotificationReq) error {
+			wg.Done()
+			return nil
+		}).Once()
 
 	mc.mocks.gitServer.EXPECT().CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
 		Username:  "user",
@@ -134,7 +142,6 @@ func TestModelComponent_Create(t *testing.T) {
 			Username:      "user",
 		},
 	})
-	time.Sleep(10 * time.Millisecond)
 	require.Nil(t, err)
 
 	require.Equal(t, &types.Model{
@@ -153,7 +160,7 @@ func TestModelComponent_Create(t *testing.T) {
 		Path: "ns/n",
 		URL:  "ns/n",
 	}, model)
-
+	wg.Wait()
 }
 
 func TestModelComponent_Update(t *testing.T) {
@@ -220,16 +227,24 @@ func TestModelComponent_Delete(t *testing.T) {
 			Path: "ns/n",
 		},
 	}).Return(nil)
-	mc.mocks.components.repo.EXPECT().SendAssetManagementMsg(mock.Anything, types.RepoNotificationReq{
-		RepoType:  types.ModelRepo,
-		RepoPath:  "ns/n",
-		Operation: types.OperationDelete,
-		UserUUID:  "user-uuid",
-	}).Return(nil)
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	mc.mocks.components.repo.EXPECT().
+		SendAssetManagementMsg(mock.Anything, mock.MatchedBy(func(req types.RepoNotificationReq) bool {
+			return req.RepoType == types.ModelRepo &&
+				req.Operation == types.OperationDelete &&
+				req.RepoPath == "ns/n" &&
+				req.UserUUID == "user-uuid"
+		})).
+		RunAndReturn(func(ctx context.Context, req types.RepoNotificationReq) error {
+			wg.Done()
+			return nil
+		}).Once()
 
 	err := mc.Delete(ctx, "ns", "n", "user")
-	time.Sleep(10 * time.Millisecond)
 	require.Nil(t, err)
+	wg.Wait()
 }
 
 func TestModelComponent_Show(t *testing.T) {

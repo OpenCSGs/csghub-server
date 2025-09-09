@@ -157,6 +157,30 @@ func TestCollectionHandler_AddRepoToCollection(t *testing.T) {
 
 }
 
+func TestCollectionHandler_AddRepoToCollectionWithRemarks(t *testing.T) {
+	tester := NewCollectionTester(t).WithHandleFunc(func(h *CollectionHandler) gin.HandlerFunc {
+		return h.AddRepoToCollection
+	})
+	tester.WithUser()
+	tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), &types.UpdateCollectionRepoReq{
+		Remark: "test remark",
+	}).Return(true, nil)
+	tester.mocks.collection.EXPECT().AddReposToCollection(tester.Ctx(), types.UpdateCollectionReposReq{
+		Username: "u",
+		ID:       1,
+		Remarks: map[int64]string{
+			1: "test remark",
+		},
+	}).Return(nil)
+	tester.WithParam("id", "1").WithBody(t, &types.UpdateCollectionReposReq{
+		Remarks: map[int64]string{
+			1: "test remark",
+		},
+	}).Execute()
+
+	tester.ResponseEq(t, 200, tester.OKText, nil)
+}
+
 func TestCollectionHandler_RemoveRepoFromCollection(t *testing.T) {
 	tester := NewCollectionTester(t).WithHandleFunc(func(h *CollectionHandler) gin.HandlerFunc {
 		return h.RemoveRepoFromCollection
@@ -171,4 +195,24 @@ func TestCollectionHandler_RemoveRepoFromCollection(t *testing.T) {
 
 	tester.ResponseEq(t, 200, tester.OKText, nil)
 
+}
+
+func TestCollectionHandler_UpdateCollectionRepo(t *testing.T) {
+	tester := NewCollectionTester(t).WithHandleFunc(func(h *CollectionHandler) gin.HandlerFunc {
+		return h.UpdateCollectionRepo
+	})
+	tester.WithUser()
+
+	tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), &types.UpdateCollectionRepoReq{
+		Remark: "test remark",
+	}).Return(true, nil)
+	tester.mocks.collection.EXPECT().UpdateCollectionRepo(tester.Ctx(), types.UpdateCollectionRepoReq{
+		Username: "u",
+		ID:       1,
+		RepoID:   1,
+		Remark:   "test remark",
+	}).Return(nil)
+	tester.WithParam("id", "1").WithParam("repo_id", "1").WithBody(t, &types.UpdateCollectionRepoReq{Remark: "test remark"}).Execute()
+
+	tester.ResponseEq(t, 200, tester.OKText, nil)
 }

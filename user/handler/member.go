@@ -99,6 +99,13 @@ func (h *MemberHandler) Update(ctx *gin.Context) {
 	userName := ctx.Param("username")
 	err := h.c.ChangeMemberRole(ctx, org, userName, currentUser, req.OldRole, req.NewRole)
 	if err != nil {
+		slog.ErrorContext(ctx, "change member role fail", slog.Any("error", err),
+			slog.Group("request",
+				slog.String("org", org), slog.String("username", userName),
+				slog.String("old_role", req.OldRole), slog.String("new_role", req.NewRole),
+				slog.String("op_user", currentUser),
+			),
+		)
 		httpbase.ServerError(ctx, err)
 		return
 	}

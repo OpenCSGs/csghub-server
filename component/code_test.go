@@ -2,8 +2,8 @@ package component
 
 import (
 	"context"
+	"sync"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -27,7 +27,8 @@ func TestCodeComponent_Create(t *testing.T) {
 	}
 	dbrepo := &database.Repository{
 		ID:   1,
-		User: database.User{Username: "user"},
+		Path: "ns/n",
+		User: database.User{Username: "user", UUID: "user-uuid"},
 		Tags: []database.Tag{{Name: "t1"}},
 	}
 	crq := req.CreateRepoReq
@@ -35,14 +36,20 @@ func TestCodeComponent_Create(t *testing.T) {
 	crq.Readme = generateReadmeData(req.License)
 	crq.RepoType = types.CodeRepo
 	crq.DefaultBranch = "main"
+
+	var wg sync.WaitGroup
+	wg.Add(1)
 	cc.mocks.components.repo.EXPECT().
-		SendAssetManagementMsg(mock.Anything, types.RepoNotificationReq{
-			RepoType:  types.CodeRepo,
-			RepoPath:  "",
-			Operation: types.OperationCreate,
-			UserUUID:  "",
-		}).
-		Return(nil)
+		SendAssetManagementMsg(mock.Anything, mock.MatchedBy(func(req types.RepoNotificationReq) bool {
+			return req.RepoType == types.CodeRepo &&
+				req.Operation == types.OperationCreate &&
+				req.RepoPath == "ns/n" &&
+				req.UserUUID == "user-uuid"
+		})).
+		RunAndReturn(func(ctx context.Context, req types.RepoNotificationReq) error {
+			wg.Done()
+			return nil
+		}).Once()
 	cc.mocks.components.repo.EXPECT().CreateRepo(ctx, crq).Return(
 		nil, dbrepo, nil,
 	)
@@ -75,19 +82,20 @@ func TestCodeComponent_Create(t *testing.T) {
 	}, types.CodeRepo)).Return(nil)
 
 	resp, err := cc.Create(ctx, req)
-	time.Sleep(10 * time.Millisecond)
 	require.Nil(t, err)
 	require.Equal(t, &types.Code{
 		RepositoryID: 1,
 		User: types.User{
 			Username: "user",
 		},
+		Path: "ns/n",
 		Repository: types.Repository{
-			HTTPCloneURL: "/s/.git",
-			SSHCloneURL:  ":s/.git",
+			HTTPCloneURL: "/s/ns/n.git",
+			SSHCloneURL:  ":s/ns/n.git",
 		},
 		Tags: []types.RepoTag{{Name: "t1"}},
 	}, resp)
+	wg.Wait()
 }
 
 func TestCodeComponent_Index(t *testing.T) {
@@ -158,6 +166,7 @@ func TestCodeComponent_Delete(t *testing.T) {
 		User: database.User{
 			UUID: "owner-uuid",
 		},
+		Path: "ns/n",
 	}
 	cc.mocks.stores.CodeMock().EXPECT().FindByPath(ctx, "ns", "n").Return(code, nil)
 	cc.mocks.components.repo.EXPECT().DeleteRepo(ctx, types.DeleteRepoReq{
@@ -168,15 +177,22 @@ func TestCodeComponent_Delete(t *testing.T) {
 	}).Return(repo, nil)
 
 	cc.mocks.stores.CodeMock().EXPECT().Delete(ctx, *code).Return(nil)
-	cc.mocks.components.repo.EXPECT().SendAssetManagementMsg(mock.Anything, types.RepoNotificationReq{
-		RepoType:  types.CodeRepo,
-		RepoPath:  "",
-		Operation: types.OperationDelete,
-		UserUUID:  "owner-uuid",
-	}).Return(nil)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	cc.mocks.components.repo.EXPECT().
+		SendAssetManagementMsg(mock.Anything, mock.MatchedBy(func(req types.RepoNotificationReq) bool {
+			return req.RepoType == types.CodeRepo &&
+				req.Operation == types.OperationDelete &&
+				req.RepoPath == "ns/n" &&
+				req.UserUUID == "owner-uuid"
+		})).
+		RunAndReturn(func(ctx context.Context, req types.RepoNotificationReq) error {
+			wg.Done()
+			return nil
+		}).Once()
 	err := cc.Delete(ctx, "ns", "n", "user")
-	time.Sleep(10 * time.Millisecond)
 	require.Nil(t, err)
+	wg.Wait()
 }
 
 func TestCodeComponent_Show(t *testing.T) {

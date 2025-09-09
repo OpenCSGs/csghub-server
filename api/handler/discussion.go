@@ -21,17 +21,17 @@ type DiscussionHandler struct {
 	sensitive  component.SensitiveComponent
 }
 
-func NewDiscussionHandler(config *config.Config) (*DiscussionHandler, error) {
-	dc, err := component.NewDiscussionComponent(config)
+func NewDiscussionHandler(cfg *config.Config) (*DiscussionHandler, error) {
+	c, err := component.NewDiscussionComponent(cfg)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create sensitive component: %w", err)
+		return nil, fmt.Errorf("failed to create discussion component: %w", err)
 	}
-	sc, err := component.NewSensitiveComponent(config)
+	sc, err := component.NewSensitiveComponent(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create sensitive component: %w", err)
 	}
 	return &DiscussionHandler{
-		discussion: dc,
+		discussion: c,
 		sensitive:  sc,
 	}, nil
 }
@@ -81,6 +81,10 @@ func (h *DiscussionHandler) CreateRepoDiscussion(ctx *gin.Context) {
 	req.Name = name
 	resp, err := h.discussion.CreateRepoDiscussion(ctx.Request.Context(), req)
 	if err != nil {
+		if errors.Is(err, errorx.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
 		slog.Error("Failed to create repo discussion", "error", err, "request", req)
 		httpbase.ServerError(ctx, fmt.Errorf("failed to create repo discussion: %w", err))
 		return
@@ -126,6 +130,10 @@ func (h *DiscussionHandler) UpdateDiscussion(ctx *gin.Context) {
 	req.CurrentUser = currentUser
 	err = h.discussion.UpdateDiscussion(ctx.Request.Context(), req)
 	if err != nil {
+		if errors.Is(err, errorx.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
 		slog.Error("Failed to update discussion", "error", err, "request", req)
 		httpbase.ServerError(ctx, fmt.Errorf("failed to update discussion: %w", err))
 		return
@@ -158,6 +166,10 @@ func (h *DiscussionHandler) DeleteDiscussion(ctx *gin.Context) {
 	}
 	err = h.discussion.DeleteDiscussion(ctx.Request.Context(), currentUser, idInt)
 	if err != nil {
+		if errors.Is(err, errorx.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
 		slog.Error("Failed to delete discussion", "error", err, "id", id)
 		httpbase.ServerError(ctx, fmt.Errorf("failed to delete discussion: %w", err))
 		return
@@ -178,6 +190,7 @@ func (h *DiscussionHandler) DeleteDiscussion(ctx *gin.Context) {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /discussions/{id} [get]
 func (h *DiscussionHandler) ShowDiscussion(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx) // optional, can be empty if not logged in
 	id := ctx.Param("id")
 	idInt, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
@@ -185,7 +198,7 @@ func (h *DiscussionHandler) ShowDiscussion(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	d, err := h.discussion.GetDiscussion(ctx.Request.Context(), idInt)
+	d, err := h.discussion.GetDiscussion(ctx.Request.Context(), currentUser, idInt)
 	if err != nil {
 		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
@@ -271,7 +284,7 @@ func (h *DiscussionHandler) CreateDiscussionComment(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	_, err = h.sensitive.CheckMarkdownContent(ctx.Request.Context(), req.Content)
+	_, err = h.sensitive.CheckRequestV2(ctx.Request.Context(), &req)
 	if err != nil {
 		slog.Error("failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
@@ -318,7 +331,7 @@ func (h *DiscussionHandler) UpdateComment(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	_, err = h.sensitive.CheckMarkdownContent(ctx.Request.Context(), req.Content)
+	_, err = h.sensitive.CheckRequestV2(ctx.Request.Context(), &req)
 	if err != nil {
 		slog.Error("failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
@@ -327,6 +340,10 @@ func (h *DiscussionHandler) UpdateComment(ctx *gin.Context) {
 
 	err = h.discussion.UpdateComment(ctx.Request.Context(), currentUser, idInt, req.Content)
 	if err != nil {
+		if errors.Is(err, errorx.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
 		slog.Error("Failed to update comment", "error", err, "request", req)
 		httpbase.ServerError(ctx, fmt.Errorf("failed to update comment: %w", err))
 		return
@@ -357,6 +374,10 @@ func (h *DiscussionHandler) DeleteComment(ctx *gin.Context) {
 	}
 	err = h.discussion.DeleteComment(ctx.Request.Context(), currentUser, idInt)
 	if err != nil {
+		if errors.Is(err, errorx.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
 		slog.Error("Failed to delete comment", "error", err, "id", id)
 		httpbase.ServerError(ctx, fmt.Errorf("failed to delete comment: %w", err))
 		return
@@ -377,12 +398,14 @@ func (h *DiscussionHandler) DeleteComment(ctx *gin.Context) {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /discussions/{id}/comments [get]
 func (h *DiscussionHandler) ListDiscussionComments(ctx *gin.Context) {
+	// dont check user login state, allow anonymous access
+	currentUser := httpbase.GetCurrentUser(ctx)
 	id := ctx.Param("id")
 	idInt, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
 		httpbase.BadRequest(ctx, fmt.Errorf("invalid discussion id: %w", err).Error())
 	}
-	comments, err := h.discussion.ListDiscussionComments(ctx.Request.Context(), idInt)
+	comments, err := h.discussion.ListDiscussionComments(ctx.Request.Context(), currentUser, idInt)
 	if err != nil {
 		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
