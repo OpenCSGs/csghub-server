@@ -24,8 +24,8 @@ func UserDeletionWorkflow(ctx workflow.Context, user common.User, config *config
 		RetryPolicy:         retryPolicy,
 	}
 
-	ctx = workflow.WithActivityOptions(ctx, options)
-	err := workflow.ExecuteActivity(ctx, activity.DeleteUserAndRelations, user, config).Get(ctx, nil)
+	actCtx := workflow.WithActivityOptions(ctx, options)
+	err := workflow.ExecuteActivity(actCtx, activity.DeleteUserAndRelations, user, config).Get(ctx, nil)
 	if err != nil {
 		logger.Error("failed to delete user and relations", "error", err, "user", user)
 		return err

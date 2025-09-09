@@ -82,7 +82,7 @@ type LFSBatchResponse struct {
 		Oid     string `json:"oid"`
 		Size    int64  `json:"size"`
 		Actions struct {
-			Download struct {
+			Download *struct {
 				Href string `json:"href"`
 			} `json:"download"`
 		} `json:"actions"`

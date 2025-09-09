@@ -253,19 +253,17 @@ func (w *LfsSyncWorker) SyncLfs(ctx context.Context, mt *database.MirrorTask) er
 		return err
 	}
 
-	if len(pointers) == 0 {
-		return nil
-	}
+	if len(pointers) > 0 {
+		pointerGroups := SplitPointersBySizeAndCount(pointers)
+		err = w.downloadAndUploadLFSFiles(ctx, mt, mirror, pointerGroups, repo)
+		if err != nil {
+			slog.Error("fail to download and upload lfs files",
+				slog.Int("workerID", w.id),
+				slog.Any("error", err),
+			)
 
-	pointerGroups := SplitPointersBySizeAndCount(pointers)
-	err = w.downloadAndUploadLFSFiles(ctx, mt, mirror, pointerGroups, repo)
-	if err != nil {
-		slog.Error("fail to download and upload lfs files",
-			slog.Int("workerID", w.id),
-			slog.Any("error", err),
-		)
-
-		return fmt.Errorf("fail to download and upload lfs files: %w", err)
+			return fmt.Errorf("fail to download and upload lfs files: %w", err)
+		}
 	}
 
 	// Get repo last commit
@@ -388,7 +386,15 @@ func (w *LfsSyncWorker) downloadAndUploadLFSFiles(
 		for _, pointer := range pointers {
 			err := w.downloadAndUploadLFSFile(ctx, repo, pointer)
 			if err != nil {
-				return fmt.Errorf("failed to download and upload lfs file: %w", err)
+				slog.Error("failed to download and upload lfs file",
+					slog.Any("error", err),
+					slog.Int("workerID", w.id),
+					slog.Any("error", err),
+					slog.Any("sourceURL", mirror.SourceUrl),
+					slog.Any("repoPath", repo.Path),
+					slog.Any("repoType", repo.RepositoryType),
+					slog.Any("pointer", pointer),
+				)
 			}
 
 			syncedPointerCount++
@@ -1056,10 +1062,18 @@ func (w *LfsSyncWorker) GetLFSDownloadURLs(
 	}
 
 	for _, obj := range batchResp.Objects {
+		var downloadURL string
+		// Some objects may be unreachable or been removed
+		if obj.Actions.Download == nil {
+			slog.Warn("download URL not found for object", slog.Any("obj", obj.Oid))
+			downloadURL = ""
+		} else {
+			downloadURL = obj.Actions.Download.Href
+		}
 		resPointers = append(resPointers, &types.Pointer{
 			Oid:         obj.Oid,
 			Size:        obj.Size,
-			DownloadURL: obj.Actions.Download.Href,
+			DownloadURL: downloadURL,
 		})
 	}
 

@@ -272,13 +272,14 @@ type Config struct {
 
 	Git struct {
 		// Timeout time(seconds) for git operations
-		OperationTimeout      int    `env:"STARHUB_SERVER_GIT_OPERATION_TIMEOUT" default:"300"`
-		SkipLfsFileValidation bool   `env:"STARHUB_SERVER_SKIP_LFS_FILE_VALIDATION" default:"false"`
-		SignatureSecertKey    string `env:"STARHUB_SERVER_GIT_SIGNATURE_SECRET_KEY" default:"s"`
-		MinMultipartSize      int64  `env:"STARHUB_SERVER_GIT_MIN_MULTIPART_SIZE" default:"52428800"`
-		MaxUnLfsFileSize      int64  `env:"STARHUB_SERVER_GIT_MAX_UN_LFS_FILE_SIZE" default:"20971520"`
-		LfsExistsCheck        bool   `env:"STARHUB_SERVER_GIT_LFS_EXISTS_CHECK" default:"true"`
-		CheckFileSizeEnabled  bool   `env:"STARHUB_SERVER_CHECK_FILE_SIZE_ENABLED" default:"true"`
+		OperationTimeout       int    `env:"STARHUB_SERVER_GIT_OPERATION_TIMEOUT" default:"300"`
+		SkipLfsFileValidation  bool   `env:"STARHUB_SERVER_SKIP_LFS_FILE_VALIDATION" default:"false"`
+		SignatureSecertKey     string `env:"STARHUB_SERVER_GIT_SIGNATURE_SECRET_KEY" default:"s"`
+		MinMultipartSize       int64  `env:"STARHUB_SERVER_GIT_MIN_MULTIPART_SIZE" default:"52428800"`
+		MaxUnLfsFileSize       int64  `env:"STARHUB_SERVER_GIT_MAX_UN_LFS_FILE_SIZE" default:"20971520"`
+		LfsExistsCheck         bool   `env:"STARHUB_SERVER_GIT_LFS_EXISTS_CHECK" default:"true"`
+		CheckFileSizeEnabled   bool   `env:"STARHUB_SERVER_CHECK_FILE_SIZE_ENABLED" default:"true"`
+		LimitLfsFileUploadSize bool   `env:"STARHUB_SERVER_GIT_LIMIT_LFS_FILE_UPLOAD_SIZE " default:"true"`
 	}
 
 	AIGateway struct {

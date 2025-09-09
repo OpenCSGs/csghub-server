@@ -13,6 +13,7 @@ import (
 	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/event"
+	"opencsg.com/csghub-server/builder/store/cache"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/store/database/migrations"
 	"opencsg.com/csghub-server/common/config"
@@ -69,23 +70,41 @@ var serverCmd = &cobra.Command{
 		slog.Info("run migration")
 		ctx, cancel := context.WithTimeout(cmd.Context(), 20*time.Second)
 		defer cancel()
-		// migration init
-		err = migrator.Init(ctx)
+
+		locker, err := cache.NewCache(cmd.Context(), cache.RedisConfig{
+			Addr:     cfg.Redis.Endpoint,
+			Username: cfg.Redis.User,
+			Password: cfg.Redis.Password,
+		})
 		if err != nil {
-			slog.Error("failed to init migration", slog.Any("error", err))
-			return fmt.Errorf("failed to init migration: %w", err)
+			return fmt.Errorf("initializing locker: %w", err)
 		}
 
-		// migration migrate
-		group, err := migrator.Migrate(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to migrate: %w", err)
-		}
-		if group.IsZero() {
-			slog.Info("there are no new migrations to run (database is up to date)")
-		}
-		slog.Info(fmt.Sprintf("migrated to %s", group))
+		err = locker.RunWhileLocked(ctx, "migration_migrate", 1*time.Minute, func(ctx context.Context) error {
+			// migration init
+			err = migrator.Init(ctx)
+			if err != nil {
+				slog.Error("failed to init migration", slog.Any("error", err))
+				return fmt.Errorf("failed to init migration: %w", err)
+			}
 
+			// migration migrate
+			group, err := migrator.Migrate(ctx)
+			if err != nil {
+				return fmt.Errorf("failed to migrate: %w", err)
+			}
+			if group.IsZero() {
+				slog.Info("there are no new migrations to run (database is up to date)")
+			}
+			slog.Info(fmt.Sprintf("migrated to %s", group))
+			return nil
+		})
+
+		if err != nil {
+			return fmt.Errorf("failed to run migration: %w", err)
+		}
+
+		slog.Info("init event publisher")
 		err = event.InitEventPublisher(cfg, nil)
 		if err != nil {
 			return fmt.Errorf("fail to initialize message queue, %w", err)

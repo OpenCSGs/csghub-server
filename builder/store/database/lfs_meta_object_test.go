@@ -61,26 +61,26 @@ func TestLfsMetaStore_CRUD(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, 998, int(obj.Size))
 
-	err = store.BulkUpdateOrCreate(ctx, []database.LfsMetaObject{
-		{RepositoryID: 123, Oid: "foobar", Size: 1},
+	err = store.BulkUpdateOrCreate(ctx, int64(456), []database.LfsMetaObject{
+		{RepositoryID: 456, Oid: "foobar", Size: 1},
 		{RepositoryID: 456, Oid: "bar", Size: 2},
-		{RepositoryID: 789, Oid: "barfoo", Size: 3},
+		{RepositoryID: 456, Oid: "barfoo", Size: 3},
 	})
 	require.Nil(t, err)
 
-	obj, err = store.FindByOID(ctx, 123, "foobar")
+	obj, err = store.FindByOID(ctx, 456, "foobar")
 	require.Nil(t, err)
 	require.Equal(t, 1, int(obj.Size))
 	obj, err = store.FindByOID(ctx, 456, "bar")
 	require.Nil(t, err)
 	require.Equal(t, 2, int(obj.Size))
-	obj, err = store.FindByOID(ctx, 789, "barfoo")
+	obj, err = store.FindByOID(ctx, 456, "barfoo")
 	require.Nil(t, err)
 	require.Equal(t, 3, int(obj.Size))
 
-	err = store.RemoveByOid(ctx, "foobar", 123)
+	err = store.RemoveByOid(ctx, "foobar", 456)
 	require.Nil(t, err)
-	_, err = store.FindByOID(ctx, 123, "foobar")
+	_, err = store.FindByOID(ctx, 456, "foobar")
 	require.NotNil(t, err)
 
 }
