@@ -9,7 +9,6 @@ import (
 
 	"github.com/spf13/cobra"
 	"opencsg.com/csghub-server/api/router"
-	"opencsg.com/csghub-server/api/workflow"
 	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/event"
@@ -140,8 +139,7 @@ var serverCmd = &cobra.Command{
 			return fmt.Errorf("failed to init deploy: %w", err)
 		}
 
-		slog.Info("start temporal workflow")
-		err = workflow.StartWorkflow(cfg)
+		slog.Info("start tempo\t\terr = workflow.StartWorkflow(cfg)\nral workflow")
 		if err != nil {
 			return err
 		}
