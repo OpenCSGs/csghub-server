@@ -22,7 +22,7 @@ func BroadcastInternalMessageWorkflow(ctx workflow.Context, messageId string, us
 		RetryPolicy:         retryPolicy,
 	}
 
-	ctx = workflow.WithActivityOptions(ctx, options)
+	actCtx := workflow.WithActivityOptions(ctx, options)
 
 	page := 1
 	morePages := true
@@ -33,7 +33,7 @@ func BroadcastInternalMessageWorkflow(ctx workflow.Context, messageId string, us
 			MessageId: messageId,
 		}
 		var batchResult activity.BatchInsertUserMessageResult
-		err := workflow.ExecuteActivity(ctx, "InsertUserMessageBatchActivity", input).Get(ctx, &batchResult)
+		err := workflow.ExecuteActivity(actCtx, "InsertUserMessageBatchActivity", input).Get(ctx, &batchResult)
 		if err != nil {
 			return fmt.Errorf("failed to insert user messages, error: %w", err)
 		}
@@ -41,7 +41,7 @@ func BroadcastInternalMessageWorkflow(ctx workflow.Context, messageId string, us
 		page++
 
 		if len(batchResult.FailedUserMessages) > 0 {
-			err := workflow.ExecuteActivity(ctx, "LogUserMessageFailuresActivity", batchResult.FailedUserMessages).Get(ctx, nil)
+			err := workflow.ExecuteActivity(actCtx, "LogUserMessageFailuresActivity", batchResult.FailedUserMessages).Get(ctx, nil)
 			if err != nil {
 				return fmt.Errorf("failed to log user message failures, error: %w", err)
 			}

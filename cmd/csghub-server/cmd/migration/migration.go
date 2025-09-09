@@ -1,13 +1,16 @@
 package migration
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/uptrace/bun/migrate"
+	"opencsg.com/csghub-server/builder/store/cache"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/store/database/migrations"
 	"opencsg.com/csghub-server/common/config"
@@ -34,6 +37,7 @@ func init() {
 var (
 	migrator *migrate.Migrator
 	db       *database.DB
+	redis    cache.RedisClient
 )
 
 var Cmd = &cobra.Command{
@@ -64,6 +68,14 @@ var Cmd = &cobra.Command{
 			err = fmt.Errorf("initializing DB connection: %w", err)
 			return
 		}
+		redis, err = cache.NewCache(cmd.Context(), cache.RedisConfig{
+			Addr:     config.Redis.Endpoint,
+			Username: config.Redis.User,
+			Password: config.Redis.Password,
+		})
+		if err != nil {
+			return fmt.Errorf("initializing redis: %w", err)
+		}
 		migrator = migrations.NewMigrator(db)
 
 		return
@@ -82,7 +94,9 @@ var initCmd = &cobra.Command{
 	Use:   "init",
 	Short: "create migration tables",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return migrator.Init(cmd.Context())
+		return redis.RunWhileLocked(cmd.Context(), "migration_init", 1*time.Minute, func(ctx context.Context) error {
+			return migrator.Init(cmd.Context())
+		})
 	},
 }
 
@@ -90,16 +104,18 @@ var migrateCmd = &cobra.Command{
 	Use:   "migrate",
 	Short: "migrate database",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		group, err := migrator.Migrate(cmd.Context())
-		if err != nil {
-			return err
-		}
-		if group.IsZero() {
-			slog.Info("there are no new migrations to run (database is up to date)")
+		return redis.RunWhileLocked(cmd.Context(), "migration_migrate", 1*time.Minute, func(ctx context.Context) error {
+			group, err := migrator.Migrate(cmd.Context())
+			if err != nil {
+				return err
+			}
+			if group.IsZero() {
+				slog.Info("there are no new migrations to run (database is up to date)")
+				return nil
+			}
+			slog.Info(fmt.Sprintf("migrated to %s", group))
 			return nil
-		}
-		slog.Info(fmt.Sprintf("migrated to %s", group))
-		return nil
+		})
 	},
 }
 
@@ -107,16 +123,18 @@ var rollbackCmd = &cobra.Command{
 	Use:   "rollback",
 	Short: "rollback the last migration group",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		group, err := migrator.Rollback(cmd.Context())
-		if err != nil {
-			return err
-		}
-		if group.IsZero() {
-			slog.Info("there are no groups to roll back")
+		return redis.RunWhileLocked(cmd.Context(), "migration_rollback", 1*time.Minute, func(ctx context.Context) error {
+			group, err := migrator.Rollback(cmd.Context())
+			if err != nil {
+				return err
+			}
+			if group.IsZero() {
+				slog.Info("there are no groups to roll back")
+				return nil
+			}
+			slog.Info(fmt.Sprintf("rolled back %s", group))
 			return nil
-		}
-		slog.Info(fmt.Sprintf("rolled back %s", group))
-		return nil
+		})
 	},
 }
 

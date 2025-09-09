@@ -22,17 +22,17 @@ func (_m *MockLfsMetaObjectStore) EXPECT() *MockLfsMetaObjectStore_Expecter {
 	return &MockLfsMetaObjectStore_Expecter{mock: &_m.Mock}
 }
 
-// BulkUpdateOrCreate provides a mock function with given fields: ctx, input
-func (_m *MockLfsMetaObjectStore) BulkUpdateOrCreate(ctx context.Context, input []database.LfsMetaObject) error {
-	ret := _m.Called(ctx, input)
+// BulkUpdateOrCreate provides a mock function with given fields: ctx, repoID, input
+func (_m *MockLfsMetaObjectStore) BulkUpdateOrCreate(ctx context.Context, repoID int64, input []database.LfsMetaObject) error {
+	ret := _m.Called(ctx, repoID, input)
 
 	if len(ret) == 0 {
 		panic("no return value specified for BulkUpdateOrCreate")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, []database.LfsMetaObject) error); ok {
-		r0 = rf(ctx, input)
+	if rf, ok := ret.Get(0).(func(context.Context, int64, []database.LfsMetaObject) error); ok {
+		r0 = rf(ctx, repoID, input)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -47,14 +47,15 @@ type MockLfsMetaObjectStore_BulkUpdateOrCreate_Call struct {
 
 // BulkUpdateOrCreate is a helper method to define mock.On call
 //   - ctx context.Context
+//   - repoID int64
 //   - input []database.LfsMetaObject
-func (_e *MockLfsMetaObjectStore_Expecter) BulkUpdateOrCreate(ctx interface{}, input interface{}) *MockLfsMetaObjectStore_BulkUpdateOrCreate_Call {
-	return &MockLfsMetaObjectStore_BulkUpdateOrCreate_Call{Call: _e.mock.On("BulkUpdateOrCreate", ctx, input)}
+func (_e *MockLfsMetaObjectStore_Expecter) BulkUpdateOrCreate(ctx interface{}, repoID interface{}, input interface{}) *MockLfsMetaObjectStore_BulkUpdateOrCreate_Call {
+	return &MockLfsMetaObjectStore_BulkUpdateOrCreate_Call{Call: _e.mock.On("BulkUpdateOrCreate", ctx, repoID, input)}
 }
 
-func (_c *MockLfsMetaObjectStore_BulkUpdateOrCreate_Call) Run(run func(ctx context.Context, input []database.LfsMetaObject)) *MockLfsMetaObjectStore_BulkUpdateOrCreate_Call {
+func (_c *MockLfsMetaObjectStore_BulkUpdateOrCreate_Call) Run(run func(ctx context.Context, repoID int64, input []database.LfsMetaObject)) *MockLfsMetaObjectStore_BulkUpdateOrCreate_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].([]database.LfsMetaObject))
+		run(args[0].(context.Context), args[1].(int64), args[2].([]database.LfsMetaObject))
 	})
 	return _c
 }
@@ -64,7 +65,7 @@ func (_c *MockLfsMetaObjectStore_BulkUpdateOrCreate_Call) Return(_a0 error) *Moc
 	return _c
 }
 
-func (_c *MockLfsMetaObjectStore_BulkUpdateOrCreate_Call) RunAndReturn(run func(context.Context, []database.LfsMetaObject) error) *MockLfsMetaObjectStore_BulkUpdateOrCreate_Call {
+func (_c *MockLfsMetaObjectStore_BulkUpdateOrCreate_Call) RunAndReturn(run func(context.Context, int64, []database.LfsMetaObject) error) *MockLfsMetaObjectStore_BulkUpdateOrCreate_Call {
 	_c.Call.Return(run)
 	return _c
 }

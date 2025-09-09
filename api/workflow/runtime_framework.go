@@ -22,11 +22,11 @@ func RuntimeFrameworkWorkflow(ctx workflow.Context, req types.RuntimeFrameworkMo
 		RetryPolicy:         retryPolicy,
 	}
 
-	ctx = workflow.WithActivityOptions(ctx, options)
+	actCtx := workflow.WithActivityOptions(ctx, options)
 	if dl, ok := ctx.Deadline(); ok {
 		slog.Info("current time", slog.Any("current_time", time.Now()), slog.Any("deadline", dl))
 	}
-	err := workflow.ExecuteActivity(ctx, activities.RuntimeFrameworkScan, req).Get(ctx, nil)
+	err := workflow.ExecuteActivity(actCtx, activities.RuntimeFrameworkScan, req).Get(ctx, nil)
 	if err != nil {
 		logger.Error("failed to run runtime framework scan activity", "error", err)
 		return err

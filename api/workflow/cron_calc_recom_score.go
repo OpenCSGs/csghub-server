@@ -20,8 +20,8 @@ func CalcRecomScoreWorkflow(ctx workflow.Context) error {
 		RetryPolicy:         retryPolicy,
 	}
 
-	ctx = workflow.WithActivityOptions(ctx, options)
-	err := workflow.ExecuteActivity(ctx, activities.CalcRecomScore).Get(ctx, nil)
+	actCtx := workflow.WithActivityOptions(ctx, options)
+	err := workflow.ExecuteActivity(actCtx, activities.CalcRecomScore).Get(ctx, nil)
 	if err != nil {
 		logger.Error("failed to calc recom score", "error", err)
 		return err

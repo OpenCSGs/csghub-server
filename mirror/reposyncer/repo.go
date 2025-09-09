@@ -375,7 +375,7 @@ func (w *RepoSyncWorker) generateLfsMetaObjects(
 	lfsMetaObjects = removeDuplicateLfsMetaObject(lfsMetaObjects)
 
 	if len(lfsMetaObjects) > 0 {
-		err = w.lfsMetaObjectStore.BulkUpdateOrCreate(ctx, lfsMetaObjects)
+		err = w.lfsMetaObjectStore.BulkUpdateOrCreate(ctx, mirror.Repository.ID, lfsMetaObjects)
 		if err != nil {
 			return 0, fmt.Errorf("failed to bulk update or create lfs meta objects: %w", err)
 		}

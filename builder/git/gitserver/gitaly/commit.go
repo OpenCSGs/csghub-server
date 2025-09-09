@@ -286,7 +286,7 @@ func (c *Client) GetSingleCommit(ctx context.Context, req gitserver.GetRepoLastC
 
 		}
 		if data != nil {
-			diff = data.Data
+			diff = append(diff, data.Data...)
 		}
 	}
 	result.Diff = diff

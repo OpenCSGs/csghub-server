@@ -20,8 +20,8 @@ func SyncAsClientWorkflow(ctx workflow.Context) error {
 		RetryPolicy:         retryPolicy,
 	}
 
-	ctx = workflow.WithActivityOptions(ctx, options)
-	err := workflow.ExecuteActivity(ctx, activities.SyncAsClient).Get(ctx, nil)
+	actCtx := workflow.WithActivityOptions(ctx, options)
+	err := workflow.ExecuteActivity(actCtx, activities.SyncAsClient).Get(ctx, nil)
 	if err != nil {
 		logger.Error("failed to sync as client", "error", err)
 		return err
