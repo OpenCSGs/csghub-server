@@ -326,6 +326,7 @@ type Config struct {
 		NormalPriorityMsgAckWait    int    `env:"STARHUB_SERVER_NOTIFIER_NORMAL_PRIORITY_MSG_ACK_WAIT" default:"60"`
 		HighPriorityMsgMaxDeliver   int    `env:"STARHUB_SERVER_NOTIFIER_HIGH_PRIORITY_MSG_MAX_DELIVER" default:"6"`
 		NormalPriorityMsgMaxDeliver int    `env:"STARHUB_SERVER_NOTIFIER_NORMAL_PRIORITY_MSG_MAX_DELIVER" default:"6"`
+		DeduplicateWindow           int    `env:"STARHUB_SERVER_NOTIFIER_DEDUPLICATE_WINDOW" default:"5"` // 5 seconds
 	}
 
 	Prometheus struct {

@@ -22,6 +22,7 @@ func NotificationTypeAll() []string {
 		string(NotificationSystem),
 		string(NotificationOrganization),
 		string(NotificationAssetManagement),
+		string(NotificationDeploymentManagement),
 	}
 }
 
@@ -32,13 +33,17 @@ func (t NotificationType) String() string {
 func (t NotificationType) IsSystem() bool {
 	return t == NotificationSystem
 }
+
+var validNotificationTypes = map[NotificationType]bool{
+	NotificationSystem:               true,
+	NotificationComment:              true,
+	NotificationOrganization:         true,
+	NotificationAssetManagement:      true,
+	NotificationDeploymentManagement: true,
+}
+
 func (t NotificationType) IsValid() bool {
-	switch t {
-	case NotificationSystem, NotificationComment, NotificationOrganization, NotificationAssetManagement:
-		return true
-	default:
-		return false
-	}
+	return validNotificationTypes[t]
 }
 
 type NotificationMessage struct {

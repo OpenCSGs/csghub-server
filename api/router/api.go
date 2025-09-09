@@ -327,6 +327,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		collections.DELETE("/:id", middlewareCollection.Auth.NeedLogin, collectionHandler.DeleteCollection)
 		collections.POST("/:id/repos", middlewareCollection.Auth.NeedLogin, collectionHandler.AddRepoToCollection)
 		collections.DELETE("/:id/repos", middlewareCollection.Auth.NeedLogin, collectionHandler.RemoveRepoFromCollection)
+		collections.PUT("/:id/repos/:repo_id", middlewareCollection.Auth.NeedLogin, collectionHandler.UpdateCollectionRepo)
 	}
 
 	// cluster infos

@@ -526,6 +526,53 @@ func (_c *MockCollectionComponent_UpdateCollection_Call) RunAndReturn(run func(c
 	return _c
 }
 
+// UpdateCollectionRepo provides a mock function with given fields: ctx, req
+func (_m *MockCollectionComponent) UpdateCollectionRepo(ctx context.Context, req types.UpdateCollectionRepoReq) error {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateCollectionRepo")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.UpdateCollectionRepoReq) error); ok {
+		r0 = rf(ctx, req)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockCollectionComponent_UpdateCollectionRepo_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateCollectionRepo'
+type MockCollectionComponent_UpdateCollectionRepo_Call struct {
+	*mock.Call
+}
+
+// UpdateCollectionRepo is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.UpdateCollectionRepoReq
+func (_e *MockCollectionComponent_Expecter) UpdateCollectionRepo(ctx interface{}, req interface{}) *MockCollectionComponent_UpdateCollectionRepo_Call {
+	return &MockCollectionComponent_UpdateCollectionRepo_Call{Call: _e.mock.On("UpdateCollectionRepo", ctx, req)}
+}
+
+func (_c *MockCollectionComponent_UpdateCollectionRepo_Call) Run(run func(ctx context.Context, req types.UpdateCollectionRepoReq)) *MockCollectionComponent_UpdateCollectionRepo_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.UpdateCollectionRepoReq))
+	})
+	return _c
+}
+
+func (_c *MockCollectionComponent_UpdateCollectionRepo_Call) Return(_a0 error) *MockCollectionComponent_UpdateCollectionRepo_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockCollectionComponent_UpdateCollectionRepo_Call) RunAndReturn(run func(context.Context, types.UpdateCollectionRepoReq) error) *MockCollectionComponent_UpdateCollectionRepo_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // NewMockCollectionComponent creates a new instance of MockCollectionComponent. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewMockCollectionComponent(t interface {

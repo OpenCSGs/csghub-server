@@ -144,6 +144,111 @@ func (_c *MockRedisClient_Del_Call) RunAndReturn(run func(context.Context, ...st
 	return _c
 }
 
+// Exists provides a mock function with given fields: ctx, key
+func (_m *MockRedisClient) Exists(ctx context.Context, key string) (int64, error) {
+	ret := _m.Called(ctx, key)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Exists")
+	}
+
+	var r0 int64
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (int64, error)); ok {
+		return rf(ctx, key)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) int64); ok {
+		r0 = rf(ctx, key)
+	} else {
+		r0 = ret.Get(0).(int64)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, key)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockRedisClient_Exists_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Exists'
+type MockRedisClient_Exists_Call struct {
+	*mock.Call
+}
+
+// Exists is a helper method to define mock.On call
+//   - ctx context.Context
+//   - key string
+func (_e *MockRedisClient_Expecter) Exists(ctx interface{}, key interface{}) *MockRedisClient_Exists_Call {
+	return &MockRedisClient_Exists_Call{Call: _e.mock.On("Exists", ctx, key)}
+}
+
+func (_c *MockRedisClient_Exists_Call) Run(run func(ctx context.Context, key string)) *MockRedisClient_Exists_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockRedisClient_Exists_Call) Return(_a0 int64, _a1 error) *MockRedisClient_Exists_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockRedisClient_Exists_Call) RunAndReturn(run func(context.Context, string) (int64, error)) *MockRedisClient_Exists_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// Expire provides a mock function with given fields: ctx, key, expiration
+func (_m *MockRedisClient) Expire(ctx context.Context, key string, expiration time.Duration) error {
+	ret := _m.Called(ctx, key, expiration)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Expire")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, time.Duration) error); ok {
+		r0 = rf(ctx, key, expiration)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockRedisClient_Expire_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Expire'
+type MockRedisClient_Expire_Call struct {
+	*mock.Call
+}
+
+// Expire is a helper method to define mock.On call
+//   - ctx context.Context
+//   - key string
+//   - expiration time.Duration
+func (_e *MockRedisClient_Expecter) Expire(ctx interface{}, key interface{}, expiration interface{}) *MockRedisClient_Expire_Call {
+	return &MockRedisClient_Expire_Call{Call: _e.mock.On("Expire", ctx, key, expiration)}
+}
+
+func (_c *MockRedisClient_Expire_Call) Run(run func(ctx context.Context, key string, expiration time.Duration)) *MockRedisClient_Expire_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(time.Duration))
+	})
+	return _c
+}
+
+func (_c *MockRedisClient_Expire_Call) Return(_a0 error) *MockRedisClient_Expire_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockRedisClient_Expire_Call) RunAndReturn(run func(context.Context, string, time.Duration) error) *MockRedisClient_Expire_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // FlushAll provides a mock function with given fields: ctx
 func (_m *MockRedisClient) FlushAll(ctx context.Context) error {
 	ret := _m.Called(ctx)
@@ -1086,6 +1191,65 @@ func (_c *MockRedisClient_SetEx_Call) RunAndReturn(run func(context.Context, str
 	return _c
 }
 
+// SetNX provides a mock function with given fields: ctx, key, value, expiration
+func (_m *MockRedisClient) SetNX(ctx context.Context, key string, value string, expiration time.Duration) (bool, error) {
+	ret := _m.Called(ctx, key, value, expiration)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetNX")
+	}
+
+	var r0 bool
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, time.Duration) (bool, error)); ok {
+		return rf(ctx, key, value, expiration)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, time.Duration) bool); ok {
+		r0 = rf(ctx, key, value, expiration)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, time.Duration) error); ok {
+		r1 = rf(ctx, key, value, expiration)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockRedisClient_SetNX_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SetNX'
+type MockRedisClient_SetNX_Call struct {
+	*mock.Call
+}
+
+// SetNX is a helper method to define mock.On call
+//   - ctx context.Context
+//   - key string
+//   - value string
+//   - expiration time.Duration
+func (_e *MockRedisClient_Expecter) SetNX(ctx interface{}, key interface{}, value interface{}, expiration interface{}) *MockRedisClient_SetNX_Call {
+	return &MockRedisClient_SetNX_Call{Call: _e.mock.On("SetNX", ctx, key, value, expiration)}
+}
+
+func (_c *MockRedisClient_SetNX_Call) Run(run func(ctx context.Context, key string, value string, expiration time.Duration)) *MockRedisClient_SetNX_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(time.Duration))
+	})
+	return _c
+}
+
+func (_c *MockRedisClient_SetNX_Call) Return(_a0 bool, _a1 error) *MockRedisClient_SetNX_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockRedisClient_SetNX_Call) RunAndReturn(run func(context.Context, string, string, time.Duration) (bool, error)) *MockRedisClient_SetNX_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // WaitLockToRun provides a mock function with given fields: ctx, resourceName, expiration, fn
 func (_m *MockRedisClient) WaitLockToRun(ctx context.Context, resourceName string, expiration time.Duration, fn func(context.Context) error) error {
 	ret := _m.Called(ctx, resourceName, expiration, fn)
@@ -1136,16 +1300,23 @@ func (_c *MockRedisClient_WaitLockToRun_Call) RunAndReturn(run func(context.Cont
 }
 
 // ZAdd provides a mock function with given fields: ctx, key, z
-func (_m *MockRedisClient) ZAdd(ctx context.Context, key string, z redis.Z) error {
-	ret := _m.Called(ctx, key, z)
+func (_m *MockRedisClient) ZAdd(ctx context.Context, key string, z ...redis.Z) error {
+	_va := make([]interface{}, len(z))
+	for _i := range z {
+		_va[_i] = z[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, key)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ZAdd")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, redis.Z) error); ok {
-		r0 = rf(ctx, key, z)
+	if rf, ok := ret.Get(0).(func(context.Context, string, ...redis.Z) error); ok {
+		r0 = rf(ctx, key, z...)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -1161,14 +1332,21 @@ type MockRedisClient_ZAdd_Call struct {
 // ZAdd is a helper method to define mock.On call
 //   - ctx context.Context
 //   - key string
-//   - z redis.Z
-func (_e *MockRedisClient_Expecter) ZAdd(ctx interface{}, key interface{}, z interface{}) *MockRedisClient_ZAdd_Call {
-	return &MockRedisClient_ZAdd_Call{Call: _e.mock.On("ZAdd", ctx, key, z)}
+//   - z ...redis.Z
+func (_e *MockRedisClient_Expecter) ZAdd(ctx interface{}, key interface{}, z ...interface{}) *MockRedisClient_ZAdd_Call {
+	return &MockRedisClient_ZAdd_Call{Call: _e.mock.On("ZAdd",
+		append([]interface{}{ctx, key}, z...)...)}
 }
 
-func (_c *MockRedisClient_ZAdd_Call) Run(run func(ctx context.Context, key string, z redis.Z)) *MockRedisClient_ZAdd_Call {
+func (_c *MockRedisClient_ZAdd_Call) Run(run func(ctx context.Context, key string, z ...redis.Z)) *MockRedisClient_ZAdd_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(redis.Z))
+		variadicArgs := make([]redis.Z, len(args)-2)
+		for i, a := range args[2:] {
+			if a != nil {
+				variadicArgs[i] = a.(redis.Z)
+			}
+		}
+		run(args[0].(context.Context), args[1].(string), variadicArgs...)
 	})
 	return _c
 }
@@ -1178,7 +1356,64 @@ func (_c *MockRedisClient_ZAdd_Call) Return(_a0 error) *MockRedisClient_ZAdd_Cal
 	return _c
 }
 
-func (_c *MockRedisClient_ZAdd_Call) RunAndReturn(run func(context.Context, string, redis.Z) error) *MockRedisClient_ZAdd_Call {
+func (_c *MockRedisClient_ZAdd_Call) RunAndReturn(run func(context.Context, string, ...redis.Z) error) *MockRedisClient_ZAdd_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ZCard provides a mock function with given fields: ctx, key
+func (_m *MockRedisClient) ZCard(ctx context.Context, key string) (int64, error) {
+	ret := _m.Called(ctx, key)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ZCard")
+	}
+
+	var r0 int64
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (int64, error)); ok {
+		return rf(ctx, key)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) int64); ok {
+		r0 = rf(ctx, key)
+	} else {
+		r0 = ret.Get(0).(int64)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, key)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockRedisClient_ZCard_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ZCard'
+type MockRedisClient_ZCard_Call struct {
+	*mock.Call
+}
+
+// ZCard is a helper method to define mock.On call
+//   - ctx context.Context
+//   - key string
+func (_e *MockRedisClient_Expecter) ZCard(ctx interface{}, key interface{}) *MockRedisClient_ZCard_Call {
+	return &MockRedisClient_ZCard_Call{Call: _e.mock.On("ZCard", ctx, key)}
+}
+
+func (_c *MockRedisClient_ZCard_Call) Run(run func(ctx context.Context, key string)) *MockRedisClient_ZCard_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockRedisClient_ZCard_Call) Return(_a0 int64, _a1 error) *MockRedisClient_ZCard_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockRedisClient_ZCard_Call) RunAndReturn(run func(context.Context, string) (int64, error)) *MockRedisClient_ZCard_Call {
 	_c.Call.Return(run)
 	return _c
 }

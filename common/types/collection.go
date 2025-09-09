@@ -41,13 +41,15 @@ type CollectionRepository struct {
 	CreatedAt      time.Time      `json:"created_at"`
 	UpdatedAt      time.Time      `json:"updated_at"`
 	Status         string         `json:"status,omitempty"`
+	Remark         string         `json:"remark,omitempty"`
 }
 
 type UpdateCollectionReposReq struct {
-	RepoIDs  []int64 `json:"repo_ids"`
-	Username string  `json:"-"`
-	UserID   int64   `json:"-"`
-	ID       int64   `json:"-"` //collection ID
+	RepoIDs  []int64          `json:"repo_ids"`
+	Remarks  map[int64]string `json:"remarks,omitempty" binding:"dive,max=500"`
+	Username string           `json:"-"`
+	UserID   int64            `json:"-"`
+	ID       int64            `json:"-"`
 }
 
 type CreateCollectionReq struct {
@@ -99,4 +101,24 @@ func (r CollectionRepository) NamespaceAndName() (namespace string, name string)
 type CollectionFilter struct {
 	Sort   string
 	Search string
+}
+
+type UpdateCollectionRepoReq struct {
+	Remark   string `json:"remark" binding:"max=500"`
+	Username string `json:"-"`
+	UserID   int64  `json:"-"`
+	ID       int64  `json:"-"`
+	RepoID   int64  `json:"-"`
+}
+
+func (r *UpdateCollectionRepoReq) GetSensitiveFields() []SensitiveField {
+	return []SensitiveField{
+		{
+			Name: "remark",
+			Value: func() string {
+				return r.Remark
+			},
+			Scenario: "comment_detection",
+		},
+	}
 }

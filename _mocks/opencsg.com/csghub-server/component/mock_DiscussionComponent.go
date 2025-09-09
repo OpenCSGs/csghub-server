@@ -236,9 +236,9 @@ func (_c *MockDiscussionComponent_DeleteDiscussion_Call) RunAndReturn(run func(c
 	return _c
 }
 
-// GetDiscussion provides a mock function with given fields: ctx, id
-func (_m *MockDiscussionComponent) GetDiscussion(ctx context.Context, id int64) (*types.ShowDiscussionResponse, error) {
-	ret := _m.Called(ctx, id)
+// GetDiscussion provides a mock function with given fields: ctx, currentUser, id
+func (_m *MockDiscussionComponent) GetDiscussion(ctx context.Context, currentUser string, id int64) (*types.ShowDiscussionResponse, error) {
+	ret := _m.Called(ctx, currentUser, id)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetDiscussion")
@@ -246,19 +246,19 @@ func (_m *MockDiscussionComponent) GetDiscussion(ctx context.Context, id int64) 
 
 	var r0 *types.ShowDiscussionResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, int64) (*types.ShowDiscussionResponse, error)); ok {
-		return rf(ctx, id)
+	if rf, ok := ret.Get(0).(func(context.Context, string, int64) (*types.ShowDiscussionResponse, error)); ok {
+		return rf(ctx, currentUser, id)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, int64) *types.ShowDiscussionResponse); ok {
-		r0 = rf(ctx, id)
+	if rf, ok := ret.Get(0).(func(context.Context, string, int64) *types.ShowDiscussionResponse); ok {
+		r0 = rf(ctx, currentUser, id)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*types.ShowDiscussionResponse)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, int64) error); ok {
-		r1 = rf(ctx, id)
+	if rf, ok := ret.Get(1).(func(context.Context, string, int64) error); ok {
+		r1 = rf(ctx, currentUser, id)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -273,14 +273,15 @@ type MockDiscussionComponent_GetDiscussion_Call struct {
 
 // GetDiscussion is a helper method to define mock.On call
 //   - ctx context.Context
+//   - currentUser string
 //   - id int64
-func (_e *MockDiscussionComponent_Expecter) GetDiscussion(ctx interface{}, id interface{}) *MockDiscussionComponent_GetDiscussion_Call {
-	return &MockDiscussionComponent_GetDiscussion_Call{Call: _e.mock.On("GetDiscussion", ctx, id)}
+func (_e *MockDiscussionComponent_Expecter) GetDiscussion(ctx interface{}, currentUser interface{}, id interface{}) *MockDiscussionComponent_GetDiscussion_Call {
+	return &MockDiscussionComponent_GetDiscussion_Call{Call: _e.mock.On("GetDiscussion", ctx, currentUser, id)}
 }
 
-func (_c *MockDiscussionComponent_GetDiscussion_Call) Run(run func(ctx context.Context, id int64)) *MockDiscussionComponent_GetDiscussion_Call {
+func (_c *MockDiscussionComponent_GetDiscussion_Call) Run(run func(ctx context.Context, currentUser string, id int64)) *MockDiscussionComponent_GetDiscussion_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(int64))
+		run(args[0].(context.Context), args[1].(string), args[2].(int64))
 	})
 	return _c
 }
@@ -290,14 +291,14 @@ func (_c *MockDiscussionComponent_GetDiscussion_Call) Return(_a0 *types.ShowDisc
 	return _c
 }
 
-func (_c *MockDiscussionComponent_GetDiscussion_Call) RunAndReturn(run func(context.Context, int64) (*types.ShowDiscussionResponse, error)) *MockDiscussionComponent_GetDiscussion_Call {
+func (_c *MockDiscussionComponent_GetDiscussion_Call) RunAndReturn(run func(context.Context, string, int64) (*types.ShowDiscussionResponse, error)) *MockDiscussionComponent_GetDiscussion_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// ListDiscussionComments provides a mock function with given fields: ctx, discussionID
-func (_m *MockDiscussionComponent) ListDiscussionComments(ctx context.Context, discussionID int64) ([]*types.DiscussionResponse_Comment, error) {
-	ret := _m.Called(ctx, discussionID)
+// ListDiscussionComments provides a mock function with given fields: ctx, currentUser, discussionID
+func (_m *MockDiscussionComponent) ListDiscussionComments(ctx context.Context, currentUser string, discussionID int64) ([]*types.DiscussionResponse_Comment, error) {
+	ret := _m.Called(ctx, currentUser, discussionID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ListDiscussionComments")
@@ -305,19 +306,19 @@ func (_m *MockDiscussionComponent) ListDiscussionComments(ctx context.Context, d
 
 	var r0 []*types.DiscussionResponse_Comment
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, int64) ([]*types.DiscussionResponse_Comment, error)); ok {
-		return rf(ctx, discussionID)
+	if rf, ok := ret.Get(0).(func(context.Context, string, int64) ([]*types.DiscussionResponse_Comment, error)); ok {
+		return rf(ctx, currentUser, discussionID)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, int64) []*types.DiscussionResponse_Comment); ok {
-		r0 = rf(ctx, discussionID)
+	if rf, ok := ret.Get(0).(func(context.Context, string, int64) []*types.DiscussionResponse_Comment); ok {
+		r0 = rf(ctx, currentUser, discussionID)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]*types.DiscussionResponse_Comment)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, int64) error); ok {
-		r1 = rf(ctx, discussionID)
+	if rf, ok := ret.Get(1).(func(context.Context, string, int64) error); ok {
+		r1 = rf(ctx, currentUser, discussionID)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -332,14 +333,15 @@ type MockDiscussionComponent_ListDiscussionComments_Call struct {
 
 // ListDiscussionComments is a helper method to define mock.On call
 //   - ctx context.Context
+//   - currentUser string
 //   - discussionID int64
-func (_e *MockDiscussionComponent_Expecter) ListDiscussionComments(ctx interface{}, discussionID interface{}) *MockDiscussionComponent_ListDiscussionComments_Call {
-	return &MockDiscussionComponent_ListDiscussionComments_Call{Call: _e.mock.On("ListDiscussionComments", ctx, discussionID)}
+func (_e *MockDiscussionComponent_Expecter) ListDiscussionComments(ctx interface{}, currentUser interface{}, discussionID interface{}) *MockDiscussionComponent_ListDiscussionComments_Call {
+	return &MockDiscussionComponent_ListDiscussionComments_Call{Call: _e.mock.On("ListDiscussionComments", ctx, currentUser, discussionID)}
 }
 
-func (_c *MockDiscussionComponent_ListDiscussionComments_Call) Run(run func(ctx context.Context, discussionID int64)) *MockDiscussionComponent_ListDiscussionComments_Call {
+func (_c *MockDiscussionComponent_ListDiscussionComments_Call) Run(run func(ctx context.Context, currentUser string, discussionID int64)) *MockDiscussionComponent_ListDiscussionComments_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(int64))
+		run(args[0].(context.Context), args[1].(string), args[2].(int64))
 	})
 	return _c
 }
@@ -349,7 +351,7 @@ func (_c *MockDiscussionComponent_ListDiscussionComments_Call) Return(_a0 []*typ
 	return _c
 }
 
-func (_c *MockDiscussionComponent_ListDiscussionComments_Call) RunAndReturn(run func(context.Context, int64) ([]*types.DiscussionResponse_Comment, error)) *MockDiscussionComponent_ListDiscussionComments_Call {
+func (_c *MockDiscussionComponent_ListDiscussionComments_Call) RunAndReturn(run func(context.Context, string, int64) ([]*types.DiscussionResponse_Comment, error)) *MockDiscussionComponent_ListDiscussionComments_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -2,8 +2,8 @@ package component
 
 import (
 	"context"
+	"sync"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/mock"
 
@@ -78,22 +78,28 @@ func TestMCPServerComponent_Create(t *testing.T) {
 		Name:      req.Name,
 		FilePath:  types.ReadmeFileName,
 	}, types.MCPServerRepo)).Return(nil)
+
+	var wg sync.WaitGroup
+	wg.Add(1)
 	mc.mocks.components.repo.EXPECT().
-		SendAssetManagementMsg(mock.Anything, types.RepoNotificationReq{
-			RepoType:  types.MCPServerRepo,
-			Operation: types.OperationCreate,
-			RepoPath:  "test-namespace/test-server",
-			UserUUID:  "user-uuid",
-		}).
-		Return(nil).Once()
+		SendAssetManagementMsg(mock.Anything, mock.MatchedBy(func(req types.RepoNotificationReq) bool {
+			return req.RepoType == types.MCPServerRepo &&
+				req.Operation == types.OperationCreate &&
+				req.RepoPath == "test-namespace/test-server" &&
+				req.UserUUID == "user-uuid"
+		})).
+		RunAndReturn(func(ctx context.Context, req types.RepoNotificationReq) error {
+			wg.Done()
+			return nil
+		}).Once()
 	res, err := mc.Create(ctx, req)
-	time.Sleep(10 * time.Millisecond)
 	require.Nil(t, err)
 	require.NotNil(t, res)
 	require.Equal(t, res.RepositoryID, int64(321))
 	require.Equal(t, res.Name, "test-server")
 	require.Equal(t, res.Nickname, "n")
 	require.Equal(t, res.Path, "test-namespace/test-server")
+	wg.Wait()
 }
 
 func TestMCPServerComponent_Delete(t *testing.T) {
@@ -147,15 +153,22 @@ func TestMCPServerComponent_Delete(t *testing.T) {
 		Repository:   dbrepo,
 	}).Return(nil)
 
-	mc.mocks.components.repo.EXPECT().SendAssetManagementMsg(mock.Anything, types.RepoNotificationReq{
-		RepoType:  types.MCPServerRepo,
-		Operation: types.OperationDelete,
-		RepoPath:  "test-namespace/test-server",
-		UserUUID:  "user-uuid",
-	}).Return(nil)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	mc.mocks.components.repo.EXPECT().
+		SendAssetManagementMsg(mock.Anything, mock.MatchedBy(func(req types.RepoNotificationReq) bool {
+			return req.RepoType == types.MCPServerRepo &&
+				req.Operation == types.OperationDelete &&
+				req.RepoPath == "test-namespace/test-server" &&
+				req.UserUUID == "user-uuid"
+		})).
+		RunAndReturn(func(ctx context.Context, req types.RepoNotificationReq) error {
+			wg.Done()
+			return nil
+		}).Once()
 	err := mc.Delete(ctx, req)
-	time.Sleep(10 * time.Millisecond)
 	require.Nil(t, err)
+	wg.Wait()
 }
 
 func TestMCPServerComponent_Update(t *testing.T) {

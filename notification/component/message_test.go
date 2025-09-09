@@ -1,22 +1,25 @@
-package component_test
+package component
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/mock"
 
 	"github.com/stretchr/testify/assert"
+	mockcache "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/cache"
 	mockdb "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
+	mockmq "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/mq"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
-	"opencsg.com/csghub-server/notification/component"
 )
 
 func TestGetUnreadCount(t *testing.T) {
 	db := mockdb.NewMockNotificationStore(t)
-	nmc := component.NewMockNotificationComponent(db)
+	nmc := NewMockNotificationComponent(nil, db, nil, nil)
 	ctx := context.Background()
 	uid := "test-uuid"
 
@@ -30,7 +33,7 @@ func TestGetUnreadCount(t *testing.T) {
 
 func TestListNotifications(t *testing.T) {
 	db := mockdb.NewMockNotificationStore(t)
-	nmc := component.NewMockNotificationComponent(db)
+	nmc := NewMockNotificationComponent(nil, db, nil, nil)
 
 	ctx := context.Background()
 	uid := "test-uuid"
@@ -60,7 +63,7 @@ func TestListNotifications(t *testing.T) {
 
 func TestMarkAsRead(t *testing.T) {
 	db := mockdb.NewMockNotificationStore(t)
-	nmc := component.NewMockNotificationComponent(db)
+	nmc := NewMockNotificationComponent(nil, db, nil, nil)
 	ctx := context.Background()
 	uid := "test-uuid"
 	req := types.BatchNotificationOperationReq{
@@ -76,7 +79,7 @@ func TestMarkAsRead(t *testing.T) {
 func TestNotificationsSetting(t *testing.T) {
 	t.Run("existing setting should call UpdateSetting", func(t *testing.T) {
 		db := mockdb.NewMockNotificationStore(t)
-		nmc := component.NewMockNotificationComponent(db)
+		nmc := NewMockNotificationComponent(nil, db, nil, nil)
 		location, _ := time.LoadLocation("Asia/Shanghai")
 		ctx := context.Background()
 		uid := "test-uuid"
@@ -107,7 +110,7 @@ func TestNotificationsSetting(t *testing.T) {
 
 	t.Run("new setting should call CreateSetting", func(t *testing.T) {
 		db := mockdb.NewMockNotificationStore(t)
-		nmc := component.NewMockNotificationComponent(db)
+		nmc := NewMockNotificationComponent(nil, db, nil, nil)
 
 		ctx := context.Background()
 		uid := "new-uuid"
@@ -135,7 +138,7 @@ func TestNotificationsSetting(t *testing.T) {
 
 func TestGetNotificationSetting(t *testing.T) {
 	db := mockdb.NewMockNotificationStore(t)
-	nmc := component.NewMockNotificationComponent(db)
+	nmc := NewMockNotificationComponent(nil, db, nil, nil)
 
 	ctx := context.Background()
 	uid := "test-uuid"
@@ -160,7 +163,7 @@ func TestGetNotificationSetting(t *testing.T) {
 
 func TestPollNewNotifications(t *testing.T) {
 	db := mockdb.NewMockNotificationStore(t)
-	nmc := component.NewMockNotificationComponent(db)
+	nmc := NewMockNotificationComponent(nil, db, nil, nil)
 
 	ctx := context.Background()
 	userUUID := "test-uuid"
@@ -217,7 +220,7 @@ func TestPollNewNotifications(t *testing.T) {
 
 func TestPollNewNotifications_DoNotDisturbEnabled(t *testing.T) {
 	db := mockdb.NewMockNotificationStore(t)
-	nmc := component.NewMockNotificationComponent(db)
+	nmc := NewMockNotificationComponent(nil, db, nil, nil)
 
 	ctx := context.Background()
 	userUUID := "test-uuid"
@@ -272,7 +275,7 @@ func TestPollNewNotifications_DoNotDisturbEnabled(t *testing.T) {
 
 func TestPollNewNotifications_NoSetting(t *testing.T) {
 	db := mockdb.NewMockNotificationStore(t)
-	nmc := component.NewMockNotificationComponent(db)
+	nmc := NewMockNotificationComponent(nil, db, nil, nil)
 
 	ctx := context.Background()
 	userUUID := "test-uuid"
@@ -318,7 +321,7 @@ func TestPollNewNotifications_NoSetting(t *testing.T) {
 
 func TestPollNewNotifications_EmptyMessages(t *testing.T) {
 	db := mockdb.NewMockNotificationStore(t)
-	nmc := component.NewMockNotificationComponent(db)
+	nmc := NewMockNotificationComponent(nil, db, nil, nil)
 
 	ctx := context.Background()
 	userUUID := "test-uuid"
@@ -351,7 +354,7 @@ func TestPollNewNotifications_EmptyMessages(t *testing.T) {
 func TestMarkAsUnread(t *testing.T) {
 	t.Run("mark as unread", func(t *testing.T) {
 		db := mockdb.NewMockNotificationStore(t)
-		nmc := component.NewMockNotificationComponent(db)
+		nmc := NewMockNotificationComponent(nil, db, nil, nil)
 
 		ctx := context.Background()
 		uid := "test-uuid"
@@ -367,7 +370,7 @@ func TestMarkAsUnread(t *testing.T) {
 
 	t.Run("mark all as unread", func(t *testing.T) {
 		db := mockdb.NewMockNotificationStore(t)
-		nmc := component.NewMockNotificationComponent(db)
+		nmc := NewMockNotificationComponent(nil, db, nil, nil)
 
 		ctx := context.Background()
 		uid := "test-uuid"
@@ -384,7 +387,7 @@ func TestMarkAsUnread(t *testing.T) {
 func TestDeleteNotifications(t *testing.T) {
 	t.Run("delete notifications", func(t *testing.T) {
 		db := mockdb.NewMockNotificationStore(t)
-		nmc := component.NewMockNotificationComponent(db)
+		nmc := NewMockNotificationComponent(nil, db, nil, nil)
 
 		ctx := context.Background()
 		uid := "test-uuid"
@@ -400,7 +403,7 @@ func TestDeleteNotifications(t *testing.T) {
 
 	t.Run("delete all notifications", func(t *testing.T) {
 		db := mockdb.NewMockNotificationStore(t)
-		nmc := component.NewMockNotificationComponent(db)
+		nmc := NewMockNotificationComponent(nil, db, nil, nil)
 
 		ctx := context.Background()
 		uid := "test-uuid"
@@ -411,5 +414,217 @@ func TestDeleteNotifications(t *testing.T) {
 
 		err := nmc.DeleteNotifications(ctx, uid, req)
 		assert.NoError(t, err)
+	})
+}
+
+func TestPublishMessage(t *testing.T) {
+	t.Run("successful publish high priority message", func(t *testing.T) {
+		config := &config.Config{}
+		config.Notification.DeduplicateWindow = 1
+
+		mq := mockmq.NewMockMessageQueue(t)
+		mq.EXPECT().PublishHighPriorityMsg(mock.Anything).RunAndReturn(func(msg types.ScenarioMessage) error {
+			return nil
+		})
+
+		cache := mockcache.NewMockRedisClient(t)
+		cache.EXPECT().SetNX(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
+
+		db := mockdb.NewMockNotificationStore(t)
+		nmc := NewMockNotificationComponent(config, db, mq, cache)
+
+		ctx := context.Background()
+		msg := types.ScenarioMessage{
+			Scenario:   types.MessageScenarioInternalNotification,
+			Parameters: `{"title":"test","content":"test content"}`,
+			Priority:   types.MessagePriorityHigh,
+		}
+		err := nmc.PublishMessage(ctx, msg)
+		assert.NoError(t, err)
+	})
+
+	t.Run("successful publish normal priority message", func(t *testing.T) {
+		config := &config.Config{}
+		config.Notification.DeduplicateWindow = 1
+
+		mq := mockmq.NewMockMessageQueue(t)
+		mq.EXPECT().PublishNormalPriorityMsg(mock.Anything).RunAndReturn(func(msg types.ScenarioMessage) error {
+			return nil
+		})
+
+		cache := mockcache.NewMockRedisClient(t)
+		cache.EXPECT().SetNX(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
+
+		db := mockdb.NewMockNotificationStore(t)
+		nmc := NewMockNotificationComponent(config, db, mq, cache)
+
+		ctx := context.Background()
+		msg := types.ScenarioMessage{
+			Scenario:   types.MessageScenarioInternalNotification,
+			Parameters: `{"title":"test","content":"test content"}`,
+			Priority:   types.MessagePriorityNormal,
+		}
+		err := nmc.PublishMessage(ctx, msg)
+		assert.NoError(t, err)
+	})
+
+	t.Run("duplicate message should not publish", func(t *testing.T) {
+		config := &config.Config{}
+		config.Notification.DeduplicateWindow = 1
+
+		mq := mockmq.NewMockMessageQueue(t)
+
+		cache := mockcache.NewMockRedisClient(t)
+		cache.EXPECT().SetNX(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(false, nil)
+
+		db := mockdb.NewMockNotificationStore(t)
+		nmc := NewMockNotificationComponent(config, db, mq, cache)
+
+		ctx := context.Background()
+		msg := types.ScenarioMessage{
+			Scenario:   types.MessageScenarioInternalNotification,
+			Parameters: `{"title":"test","content":"test content"}`,
+			Priority:   types.MessagePriorityHigh,
+		}
+		err := nmc.PublishMessage(ctx, msg)
+		assert.NoError(t, err) // Should not error, just not publish
+	})
+
+	t.Run("deduplication error should return error", func(t *testing.T) {
+		config := &config.Config{}
+		config.Notification.DeduplicateWindow = 1
+
+		mq := mockmq.NewMockMessageQueue(t)
+
+		cache := mockcache.NewMockRedisClient(t)
+		cache.EXPECT().SetNX(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(false, errors.New("redis error"))
+
+		db := mockdb.NewMockNotificationStore(t)
+		nmc := NewMockNotificationComponent(config, db, mq, cache)
+
+		ctx := context.Background()
+		msg := types.ScenarioMessage{
+			Scenario:   types.MessageScenarioInternalNotification,
+			Parameters: `{"title":"test","content":"test content"}`,
+			Priority:   types.MessagePriorityHigh,
+		}
+		err := nmc.PublishMessage(ctx, msg)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to check message deduplication")
+	})
+
+	t.Run("unsupported priority should return error", func(t *testing.T) {
+		config := &config.Config{}
+		config.Notification.DeduplicateWindow = 1
+
+		mq := mockmq.NewMockMessageQueue(t)
+
+		cache := mockcache.NewMockRedisClient(t)
+		cache.EXPECT().SetNX(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
+
+		db := mockdb.NewMockNotificationStore(t)
+		nmc := NewMockNotificationComponent(config, db, mq, cache)
+
+		ctx := context.Background()
+		msg := types.ScenarioMessage{
+			Scenario:   types.MessageScenarioInternalNotification,
+			Parameters: `{"title":"test","content":"test content"}`,
+			Priority:   "invalid-priority",
+		}
+		err := nmc.PublishMessage(ctx, msg)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "unsupported priority")
+	})
+
+	t.Run("queue publish error should return error", func(t *testing.T) {
+		config := &config.Config{}
+		config.Notification.DeduplicateWindow = 1
+
+		mq := mockmq.NewMockMessageQueue(t)
+		mq.EXPECT().PublishHighPriorityMsg(mock.Anything).RunAndReturn(func(msg types.ScenarioMessage) error {
+			return errors.New("queue error")
+		})
+
+		cache := mockcache.NewMockRedisClient(t)
+		cache.EXPECT().SetNX(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
+
+		db := mockdb.NewMockNotificationStore(t)
+		nmc := NewMockNotificationComponent(config, db, mq, cache)
+
+		ctx := context.Background()
+		msg := types.ScenarioMessage{
+			Scenario:   types.MessageScenarioInternalNotification,
+			Parameters: `{"title":"test","content":"test content"}`,
+			Priority:   types.MessagePriorityHigh,
+		}
+		err := nmc.PublishMessage(ctx, msg)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to publish message to high priority queue")
+	})
+}
+
+func TestDeDuplicateMessageLogic(t *testing.T) {
+	t.Run("different messages should have different hash keys", func(t *testing.T) {
+		config := &config.Config{}
+		config.Notification.DeduplicateWindow = 1
+
+		mq := mockmq.NewMockMessageQueue(t)
+		mq.EXPECT().PublishHighPriorityMsg(mock.Anything).RunAndReturn(func(msg types.ScenarioMessage) error {
+			return nil
+		}).Times(2)
+
+		cache := mockcache.NewMockRedisClient(t)
+		cache.EXPECT().SetNX(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(true, nil).Times(2)
+
+		db := mockdb.NewMockNotificationStore(t)
+		nmc := NewMockNotificationComponent(config, db, mq, cache)
+
+		ctx := context.Background()
+		msg1 := types.ScenarioMessage{
+			Scenario:   types.MessageScenarioInternalNotification,
+			Parameters: `{"title":"test1","content":"test content 1"}`,
+			Priority:   types.MessagePriorityHigh,
+		}
+		msg2 := types.ScenarioMessage{
+			Scenario:   types.MessageScenarioInternalNotification,
+			Parameters: `{"title":"test2","content":"test content 2"}`,
+			Priority:   types.MessagePriorityHigh,
+		}
+
+		err1 := nmc.PublishMessage(ctx, msg1)
+		err2 := nmc.PublishMessage(ctx, msg2)
+
+		assert.NoError(t, err1)
+		assert.NoError(t, err2)
+	})
+
+	t.Run("same message should be detected as duplicate", func(t *testing.T) {
+		config := &config.Config{}
+		config.Notification.DeduplicateWindow = 1
+
+		mq := mockmq.NewMockMessageQueue(t)
+		mq.EXPECT().PublishHighPriorityMsg(mock.Anything).RunAndReturn(func(msg types.ScenarioMessage) error {
+			return nil
+		}).Once()
+
+		cache := mockcache.NewMockRedisClient(t)
+		cache.EXPECT().SetNX(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(true, nil).Once()
+		cache.EXPECT().SetNX(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Once()
+
+		db := mockdb.NewMockNotificationStore(t)
+		nmc := NewMockNotificationComponent(config, db, mq, cache)
+
+		ctx := context.Background()
+		msg := types.ScenarioMessage{
+			Scenario:   types.MessageScenarioInternalNotification,
+			Parameters: `{"title":"test","content":"test content"}`,
+			Priority:   types.MessagePriorityHigh,
+		}
+
+		err1 := nmc.PublishMessage(ctx, msg)
+		err2 := nmc.PublishMessage(ctx, msg)
+
+		assert.NoError(t, err1)
+		assert.NoError(t, err2)
 	})
 }

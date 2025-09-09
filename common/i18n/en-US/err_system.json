@@ -19,5 +19,8 @@
     },
     "error.SYS-ERR-6": {
         "other": "Cannot remove the last administrator of the organization"
+    },
+    "error.SYS-ERR-7": {
+        "other": "Cannot promote yourself to admin"
     }
 }

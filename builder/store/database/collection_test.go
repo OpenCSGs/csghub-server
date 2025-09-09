@@ -263,3 +263,141 @@ func TestCollectionStore_ByUserLikesOrgs(t *testing.T) {
 	require.Equal(t, 0, total)
 
 }
+
+func TestCollectionStore_GetCollectionRepos(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewCollectionStoreWithDB(db)
+
+	collection := &database.Collection{
+		Name:    "col1",
+		Private: false,
+	}
+	dc, err := store.CreateCollection(ctx, *collection)
+	collection.ID = dc.ID
+	require.Nil(t, err)
+
+	repo := &database.Repository{
+		Path: "foo/bar",
+	}
+	err = db.Core.NewInsert().Model(repo).Scan(ctx, repo)
+	require.Nil(t, err)
+
+	err = store.AddCollectionRepos(ctx, []database.CollectionRepository{
+		{CollectionID: collection.ID, RepositoryID: repo.ID},
+	})
+	require.Nil(t, err)
+
+	repos, err := store.GetCollectionRepos(ctx, collection.ID)
+	require.Nil(t, err)
+	require.Equal(t, 1, len(repos))
+	require.Equal(t, collection.ID, repos[0].CollectionID)
+	require.Equal(t, repo.ID, repos[0].RepositoryID)
+	require.Equal(t, "", repos[0].Remark)
+}
+
+func TestCollectionStore_ByUsername(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewCollectionStoreWithDB(db)
+
+	collection := &database.Collection{
+		Name:     "col1",
+		Private:  false,
+		Username: "user",
+	}
+	dc, err := store.CreateCollection(ctx, *collection)
+	collection.ID = dc.ID
+	require.Nil(t, err)
+
+	repo := &database.Repository{
+		Path: "foo/bar",
+	}
+	err = db.Core.NewInsert().Model(repo).Scan(ctx, repo)
+	require.Nil(t, err)
+
+	err = store.AddCollectionRepos(ctx, []database.CollectionRepository{
+		{CollectionID: collection.ID, RepositoryID: repo.ID},
+	})
+	require.Nil(t, err)
+
+	cs, total, err := store.ByUsername(ctx, "user", 10, 1, false)
+	require.Nil(t, err)
+	require.Equal(t, 1, total)
+	require.Equal(t, collection.ID, cs[0].ID)
+	require.Equal(t, repo.ID, cs[0].Repositories[0].ID)
+	require.Equal(t, "user", cs[0].Username)
+}
+
+func TestCollectionStore_UpdateCollectionRepo(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewCollectionStoreWithDB(db)
+
+	collection := &database.Collection{
+		Name:    "col1",
+		Private: false,
+	}
+	dc, err := store.CreateCollection(ctx, *collection)
+	collection.ID = dc.ID
+	require.Nil(t, err)
+
+	repo := &database.Repository{
+		Path: "foo/bar",
+	}
+	err = db.Core.NewInsert().Model(repo).Scan(ctx, repo)
+	require.Nil(t, err)
+
+	err = store.AddCollectionRepos(ctx, []database.CollectionRepository{
+		{CollectionID: collection.ID, RepositoryID: repo.ID},
+	})
+	require.Nil(t, err)
+
+	t.Run("add remark", func(t *testing.T) {
+		err = store.UpdateCollectionRepo(ctx, database.CollectionRepository{
+			CollectionID: collection.ID,
+			RepositoryID: repo.ID,
+			Remark:       "test remark",
+		})
+		require.Nil(t, err)
+
+		repos, err := store.GetCollectionRepos(ctx, collection.ID)
+		require.Nil(t, err)
+		require.Equal(t, 1, len(repos))
+		require.Equal(t, "test remark", repos[0].Remark)
+	})
+
+	t.Run("update remark", func(t *testing.T) {
+		err = store.UpdateCollectionRepo(ctx, database.CollectionRepository{
+			CollectionID: collection.ID,
+			RepositoryID: repo.ID,
+			Remark:       "test remark 2",
+		})
+		require.Nil(t, err)
+
+		repos, err := store.GetCollectionRepos(ctx, collection.ID)
+		require.Nil(t, err)
+		require.Equal(t, 1, len(repos))
+		require.Equal(t, "test remark 2", repos[0].Remark)
+	})
+
+	t.Run("delete remark", func(t *testing.T) {
+		err = store.UpdateCollectionRepo(ctx, database.CollectionRepository{
+			CollectionID: collection.ID,
+			RepositoryID: repo.ID,
+			Remark:       "",
+		})
+		require.Nil(t, err)
+
+		repos, err := store.GetCollectionRepos(ctx, collection.ID)
+		require.Nil(t, err)
+		require.Equal(t, 1, len(repos))
+		require.Equal(t, "", repos[0].Remark)
+	})
+}

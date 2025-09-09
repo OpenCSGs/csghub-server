@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/tests"
@@ -133,4 +134,25 @@ func TestMemberStore_UserUUIDsByOrganizationID(t *testing.T) {
 	emptyUUIDs, err := memberStore.UserUUIDsByOrganizationID(ctx, 8888)
 	require.NoError(t, err)
 	require.Empty(t, emptyUUIDs)
+}
+
+func TestMemberStore_Update(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewMemberStoreWithDB(db)
+
+	err := store.Add(ctx, 123, 456, "foo")
+	require.Nil(t, err)
+
+	err = store.Update(ctx, 123, 456, "bar")
+	require.Nil(t, err)
+
+	err = store.Update(ctx, 123, 1, "baz")
+	require.NotNil(t, err)
+
+	mem, err := store.Find(ctx, 123, 456)
+	require.Nil(t, err)
+	require.Equal(t, "bar", mem.Role)
 }
