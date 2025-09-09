@@ -20,6 +20,9 @@ type (
 
 		BuildID      string `json:"build_id"`
 		FactoryBuild bool   `json:"factory_build"`
+		ClusterID    string `json:"cluster_id"`
+
+		LastCommitID string `json:"last_commit_id"`
 	}
 	BuildResponse struct {
 		Code    int    `json:"code"`
@@ -32,6 +35,7 @@ type (
 		BuildID   string `json:"build_id"`
 		// for local builder test only
 		CurrentStatus int
+		ClusterID     string `json:"cluster_id"`
 	}
 
 	StatusResponse struct {
@@ -44,6 +48,13 @@ type (
 		OrgName   string `json:"org_name"`
 		SpaceName string `json:"name"`
 		BuildID   string `json:"build_id"`
+		ClusterID string `json:"cluster_id"`
+	}
+
+	StopRequest struct {
+		ClusterID string `json:"cluster_id"`
+		Namespace string `json:"namespace"`
+		Workname  string `json:"workname"`
 	}
 
 	LogsResponse struct {

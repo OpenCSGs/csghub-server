@@ -6,8 +6,6 @@ import (
 
 	"github.com/spf13/cobra"
 	"opencsg.com/csghub-server/api/httpbase"
-	"opencsg.com/csghub-server/builder/event"
-	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/runner/router"
 )
@@ -24,18 +22,9 @@ var startRunnerCmd = &cobra.Command{
 			return err
 		}
 
-		dbConfig := database.DBConfig{
-			Dialect: database.DatabaseDialect(config.Database.Driver),
-			DSN:     config.Database.DSN,
-		}
-		database.InitDB(dbConfig)
-		err = event.InitEventPublisher(config, nil)
-		if err != nil {
-			return fmt.Errorf("fail to initialize message queue, %w", err)
-		}
 		s, err := router.NewHttpServer(cmd.Context(), config)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to create runner server: %w", err)
 		}
 
 		slog.Info("deploy runner is running", slog.Any("port", config.Space.RunnerServerPort))

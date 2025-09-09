@@ -8,6 +8,7 @@ func IsNeedCalculateBill(scene types.SceneType) bool {
 		types.SceneSpace,
 		types.SceneModelFinetune,
 		types.SceneEvaluation,
+		types.SceneModelServerless,
 		types.SceneStarship,
 		types.SceneGuiAgent:
 		return true
@@ -16,7 +17,7 @@ func IsNeedCalculateBill(scene types.SceneType) bool {
 	}
 }
 
-func GetSkuUnitTypeByScene(scene types.SceneType) string {
+func GetSkuUnitTypeByScene(scene types.SceneType) types.SkuUnitType {
 	switch scene {
 	case types.SceneModelInference:
 		return types.UnitMinute
@@ -28,10 +29,14 @@ func GetSkuUnitTypeByScene(scene types.SceneType) string {
 		return types.UnitRepo
 	case types.SceneEvaluation:
 		return types.UnitMinute
+	case types.SceneModelServerless:
+		return types.UnitToken
 	case types.SceneStarship:
 		return types.UnitToken
 	case types.SceneGuiAgent:
 		return types.UnitToken
+	case types.SceneSubscription:
+		return types.UnitMonth
 	default:
 		return types.UnitMinute
 	}
@@ -49,10 +54,30 @@ func GetSKUTypeByScene(scene types.SceneType) types.SKUType {
 		return types.SKUCSGHub
 	case types.SceneEvaluation:
 		return types.SKUCSGHub
+	case types.SceneModelServerless:
+		return types.SKUCSGHub
 	case types.SceneStarship:
 		return types.SKUStarship
 	case types.SceneGuiAgent:
 		return types.SKUStarship
 	}
 	return types.SKUReserve
+}
+
+func IsNeedCheckMeteringInMinute(scene types.SceneType, valueType types.ChargeValueType) bool {
+	switch scene {
+	case types.SceneModelInference,
+		types.SceneSpace,
+		types.SceneModelFinetune,
+		types.SceneEvaluation,
+		types.SceneModelServerless:
+		switch valueType {
+		case types.TokenNumberType:
+			return false
+		default:
+			return true
+		}
+	default:
+		return false
+	}
 }

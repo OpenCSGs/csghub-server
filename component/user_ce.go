@@ -111,3 +111,16 @@ func (c *userComponentImpl) ListInstances(ctx context.Context, req *types.UserRe
 	}
 	return resDeploys, total, nil
 }
+
+func (c *userComponentImpl) CreateUserResource(ctx context.Context, req types.CreateUserResourceReq) error {
+	return fmt.Errorf("not implemented")
+}
+
+func (c *userComponentImpl) DeleteUserResource(ctx context.Context, username string, orderDetailId int64) error {
+	return fmt.Errorf("not implemented")
+}
+
+// GetUserResource
+func (c *userComponentImpl) GetUserResource(ctx context.Context, req types.GetUserResourceReq) ([]types.UserResourcesResp, int, error) {
+	return nil, 0, nil
+}

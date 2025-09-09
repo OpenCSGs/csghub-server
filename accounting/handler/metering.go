@@ -49,7 +49,7 @@ func (mh *MeteringHandler) QueryMeteringStatementByUserID(ctx *gin.Context) {
 		return
 	}
 
-	req := types.ACCT_STATEMENTS_REQ{
+	req := types.ActStatementsReq{
 		UserUUID:     userID,
 		Scene:        scene,
 		InstanceName: instance_name,
@@ -70,4 +70,35 @@ func (mh *MeteringHandler) QueryMeteringStatementByUserID(ctx *gin.Context) {
 		"total": total,
 	}
 	httpbase.OK(ctx, respData)
+}
+
+func (mh *MeteringHandler) QueryMeteringStatByDate(ctx *gin.Context) {
+	scene, err := utils.GetSceneFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request scene format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	startDate := ctx.Query("start_date") // format: '2024-06-12'
+	endDate := ctx.Query("end_date")     // format: '2024-06-12'
+
+	if !utils.ValidateDateTimeFormat(startDate, "2006-01-02") || !utils.ValidateDateTimeFormat(endDate, "2006-01-02") {
+		slog.Error("Bad request date format")
+		httpbase.BadRequest(ctx, "Bad request date format")
+		return
+	}
+
+	req := types.ActStatementsReq{
+		Scene:     scene,
+		StartTime: startDate + " 00:00:00",
+		EndTime:   endDate + " 23:59:59",
+	}
+
+	res, err := mh.amc.GetMeteringStatByDate(ctx, req)
+	if err != nil {
+		slog.Error("fail to query meter stat", slog.Any("req", req), slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	httpbase.OK(ctx, res)
 }

@@ -94,9 +94,9 @@ rproxy_server_port = 8083
 session_secret_key = "secret"
 deploy_timeout_in_min = 30
 gpu_model_label = "aliyun.accelerator/nvidia_name"
-readness_delay_seconds = 120
-readness_period_seconds = 10
-readness_failure_threshold = 3
+readiness_delay_seconds = 120
+readiness_period_seconds = 10
+readiness_failure_threshold = 3
 pypi_index_url = ""
 
 [model]
@@ -178,7 +178,8 @@ otlp_endpoint = "http://localhost:4317"
 otlp_logging = false
 
 [runner]
-image_builder_namespace = "imagebuilder-stg"
+public_domain = "http://localhost:8082"
+image_builder_cluster_id = ""
 image_builder_git_image = "opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/alpine/git:2.36.2"
 image_builder_kaniko_image = "opencsg-registry.cn-beijing.cr.aliyuncs.com/public/kaniko-project-executor:v1.23.2"
 image_builder_job_ttl = 120
@@ -192,6 +193,29 @@ image_builder_status_ttl = 300
 # Uncomment the following line to enable pull images from a private registry without https
 # image_builder_kaniko_args = ["--insecure", "--skip-tls-verify"]
 STARHUB_SERVER_GPU_MODEL_LABEL = '[{"type_label": "aliyun.accelerator/nvidia_name", "capacity_label": "nvidia.com/gpu"}]'
+system_cuda_version = ""
+webhook_endpoint = "http://localhost:8080"
+watch_configmap_name = "spaces-runner-config"
+watch_configmap_key = "STARHUB_SERVER_RUNNER_WEBHOOK_ENDPOINT"
+
+[cluster]
+cluster_id = ""
+spaces_namespace = "spaces"
+resource_quota_namespace = "spaces"
+quota_name = ""
+
+[logcollector]
+port = 8096
+loki_url = "http://localhost:3100"
+watch_ns_interval = 1
+max_concurrent_streams = 1000
+batch_size = 1000
+batch_delay = 3
+drop_msg_timeout = 60
+max_retries = 3
+retry_interval = 1
+health_interval = 5
+line_separator= "\\n"
 
 [git]
 operation_timeout = 300

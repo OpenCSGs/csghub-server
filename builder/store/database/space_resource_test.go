@@ -39,7 +39,7 @@ func TestSpaceResourceStore_CRUD(t *testing.T) {
 	require.Equal(t, 1, len(srs))
 	require.Equal(t, "c1", srs[0].ClusterID)
 
-	srs, err = store.Index(ctx, "c1")
+	srs, _, err = store.Index(ctx, "c1", 50, 1)
 	require.Nil(t, err)
 	require.Equal(t, 1, len(srs))
 	require.Equal(t, "c1", srs[0].ClusterID)

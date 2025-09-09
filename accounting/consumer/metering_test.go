@@ -18,10 +18,15 @@ import (
 	"opencsg.com/csghub-server/mq"
 )
 
-func NewTestConsumerMetering(natHandler mq.MessageQueue, meterComp component.MeteringComponent, config *config.Config) *Metering {
+func NewTestConsumerMetering(
+	natHandler mq.MessageQueue,
+	meterComp component.MeteringComponent,
+	acctEvtComp component.AccountingEventComponent,
+	config *config.Config) *Metering {
 	meter := &Metering{
 		sysMQ:          natHandler,
 		meterComp:      meterComp,
+		acctEvtComp:    acctEvtComp,
 		chargingEnable: config.Accounting.ChargingEnable,
 	}
 	return meter
@@ -37,8 +42,9 @@ func TestConsumerMetering_preReadMsgs(t *testing.T) {
 	mq.EXPECT().BuildDLQStream().Return(nil)
 
 	meterComp := mockacct.NewMockMeteringComponent(t)
+	acctEvtComp := mockacct.NewMockAccountingEventComponent(t)
 
-	meter := NewTestConsumerMetering(mq, meterComp, cfg)
+	meter := NewTestConsumerMetering(mq, meterComp, acctEvtComp, cfg)
 
 	meter.preReadMsgs()
 }
@@ -53,7 +59,9 @@ func TestConsumerMetering_handleReadMsgs(t *testing.T) {
 	mq.EXPECT().FetchMeterEventMessages(5).Return(nil, errors.New("can not get msg"))
 
 	meterComp := mockacct.NewMockMeteringComponent(t)
-	meter := NewTestConsumerMetering(mq, meterComp, cfg)
+	acctEvtComp := mockacct.NewMockAccountingEventComponent(t)
+
+	meter := NewTestConsumerMetering(mq, meterComp, acctEvtComp, cfg)
 
 	done := make(chan bool)
 	go func() {
@@ -70,12 +78,12 @@ func TestConsumerMetering_handleMsgWithRetry(t *testing.T) {
 	cfg.Accounting.ChargingEnable = true
 	require.Nil(t, err)
 
-	var event = types.METERING_EVENT{
+	var event = types.MeteringEvent{
 		Uuid:         uuid.MustParse("e2a0683d-ff52-4caf-915d-1ab052c57322"),
 		UserUUID:     "bd05a582-a185-42d7-bf19-ad8108c4523b",
 		Value:        5000,
 		ValueType:    1,
-		Scene:        22,
+		Scene:        10,
 		OpUID:        "",
 		ResourceID:   "Autohub/gui_agent",
 		ResourceName: "Autohub/gui_agent",
@@ -86,10 +94,10 @@ func TestConsumerMetering_handleMsgWithRetry(t *testing.T) {
 
 	testData := []struct {
 		typeStr   string
-		typeValue int
+		typeValue types.ChargeValueType
 	}{
-		{"token", types.TokenNumberType},
 		{"mintue", types.TimeDurationMinType},
+		{"token", types.TokenNumberType},
 		{"quota", types.QuotaNumberType},
 	}
 
@@ -117,8 +125,14 @@ func TestConsumerMetering_handleMsgWithRetry(t *testing.T) {
 
 			meterComp := mockacct.NewMockMeteringComponent(t)
 			meterComp.EXPECT().SaveMeteringEventRecord(mock.Anything, &event).Return(nil)
+			if event.ValueType != types.TokenNumberType {
+				meterComp.EXPECT().GetMeteringByEventUUID(mock.Anything, event.Uuid).Return(nil, nil)
+				meterComp.EXPECT().FindMeteringByCustomerIDAndRecordAtInMin(mock.Anything, event.CustomerID, event.CreatedAt).Return(nil, nil)
+			}
+			acctEvtComp := mockacct.NewMockAccountingEventComponent(t)
+			acctEvtComp.EXPECT().AddNewAccountingEvent(mock.Anything, &event, false).Return(nil)
 
-			meter := NewTestConsumerMetering(mq, meterComp, cfg)
+			meter := NewTestConsumerMetering(mq, meterComp, acctEvtComp, cfg)
 			meter.handleMsgWithRetry(msg)
 		})
 	}
@@ -135,8 +149,9 @@ func TestConsumerMetering_handleMsgWithRetry(t *testing.T) {
 		mq.EXPECT().PublishMeterDataToDLQ(str).Return(nil)
 
 		meterComp := mockacct.NewMockMeteringComponent(t)
+		acctEvtComp := mockacct.NewMockAccountingEventComponent(t)
 
-		meter := NewTestConsumerMetering(mq, meterComp, cfg)
+		meter := NewTestConsumerMetering(mq, meterComp, acctEvtComp, cfg)
 		meter.handleMsgWithRetry(msg)
 	})
 
@@ -147,12 +162,12 @@ func TestConsumerMetering_handleMsgData(t *testing.T) {
 	cfg.Accounting.ChargingEnable = true
 	require.Nil(t, err)
 
-	var event = types.METERING_EVENT{
+	var event = types.MeteringEvent{
 		Uuid:         uuid.MustParse("e2a0683d-ff52-4caf-915d-1ab052c57322"),
 		UserUUID:     "bd05a582-a185-42d7-bf19-ad8108c4523b",
 		Value:        5000,
-		ValueType:    1,
-		Scene:        22,
+		ValueType:    0,
+		Scene:        10,
 		OpUID:        "",
 		ResourceID:   "Autohub/gui_agent",
 		ResourceName: "Autohub/gui_agent",
@@ -171,8 +186,13 @@ func TestConsumerMetering_handleMsgData(t *testing.T) {
 
 	meterComp := mockacct.NewMockMeteringComponent(t)
 	meterComp.EXPECT().SaveMeteringEventRecord(mock.Anything, &event).Return(nil)
+	meterComp.EXPECT().GetMeteringByEventUUID(mock.Anything, event.Uuid).Return(nil, nil)
+	meterComp.EXPECT().FindMeteringByCustomerIDAndRecordAtInMin(mock.Anything, event.CustomerID, event.CreatedAt).Return(nil, nil)
 
-	meter := NewTestConsumerMetering(mq, meterComp, cfg)
+	acctEvtComp := mockacct.NewMockAccountingEventComponent(t)
+	acctEvtComp.EXPECT().AddNewAccountingEvent(mock.Anything, &event, false).Return(nil)
+
+	meter := NewTestConsumerMetering(mq, meterComp, acctEvtComp, cfg)
 	res, err := meter.handleMsgData(msg)
 	require.Nil(t, err)
 	require.Equal(t, event, *res)
@@ -183,7 +203,7 @@ func TestConsumerMetering_parseMessageData(t *testing.T) {
 	cfg.Accounting.ChargingEnable = true
 	require.Nil(t, err)
 
-	var event = types.METERING_EVENT{
+	var event = types.MeteringEvent{
 		Uuid:         uuid.MustParse("e2a0683d-ff52-4caf-915d-1ab052c57322"),
 		UserUUID:     "bd05a582-a185-42d7-bf19-ad8108c4523b",
 		Value:        5000,
@@ -206,8 +226,9 @@ func TestConsumerMetering_parseMessageData(t *testing.T) {
 	mq := mockmq.NewMockMessageQueue(t)
 
 	meterComp := mockacct.NewMockMeteringComponent(t)
+	acctEvtComp := mockacct.NewMockAccountingEventComponent(t)
 
-	meter := NewTestConsumerMetering(mq, meterComp, cfg)
+	meter := NewTestConsumerMetering(mq, meterComp, acctEvtComp, cfg)
 	res, err := meter.parseMessageData(msg)
 	require.Nil(t, err)
 	require.Equal(t, event, *res)
@@ -218,7 +239,7 @@ func TestConsumerMetering_pubFeeEventWithReTry(t *testing.T) {
 	cfg.Accounting.ChargingEnable = true
 	require.Nil(t, err)
 
-	var event = types.METERING_EVENT{
+	var event = types.MeteringEvent{
 		Uuid:         uuid.MustParse("e2a0683d-ff52-4caf-915d-1ab052c57322"),
 		UserUUID:     "bd05a582-a185-42d7-bf19-ad8108c4523b",
 		Value:        5000,
@@ -234,7 +255,7 @@ func TestConsumerMetering_pubFeeEventWithReTry(t *testing.T) {
 
 	testData := []struct {
 		typeStr   string
-		typeValue int
+		typeValue types.ChargeValueType
 	}{
 		{"token", types.TokenNumberType},
 		{"mintue", types.TimeDurationMinType},
@@ -262,8 +283,9 @@ func TestConsumerMetering_pubFeeEventWithReTry(t *testing.T) {
 			}
 
 			meterComp := mockacct.NewMockMeteringComponent(t)
+			acctEvtComp := mockacct.NewMockAccountingEventComponent(t)
 
-			meter := NewTestConsumerMetering(mq, meterComp, cfg)
+			meter := NewTestConsumerMetering(mq, meterComp, acctEvtComp, cfg)
 			err = meter.pubFeeEventWithReTry(msg, &event, 1)
 			require.Nil(t, err)
 		})
@@ -275,7 +297,7 @@ func TestConsumerMetering_moveMsgToDLQWithReTry(t *testing.T) {
 	cfg.Accounting.ChargingEnable = true
 	require.Nil(t, err)
 
-	var event = types.METERING_EVENT{
+	var event = types.MeteringEvent{
 		Uuid:         uuid.MustParse("e2a0683d-ff52-4caf-915d-1ab052c57322"),
 		UserUUID:     "bd05a582-a185-42d7-bf19-ad8108c4523b",
 		Value:        5000,
@@ -299,8 +321,9 @@ func TestConsumerMetering_moveMsgToDLQWithReTry(t *testing.T) {
 	mq.EXPECT().PublishMeterDataToDLQ(str).Return(nil)
 
 	meterComp := mockacct.NewMockMeteringComponent(t)
+	acctEvtComp := mockacct.NewMockAccountingEventComponent(t)
 
-	meter := NewTestConsumerMetering(mq, meterComp, cfg)
+	meter := NewTestConsumerMetering(mq, meterComp, acctEvtComp, cfg)
 	err = meter.moveMsgToDLQWithReTry(msg, 3)
 	require.Nil(t, err)
 

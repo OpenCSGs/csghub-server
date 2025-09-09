@@ -28,10 +28,10 @@ func NewDataViewerRouter(config *config.Config, tc temporal.Client) (*gin.Engine
 	}
 	r.Use(gin.Recovery())
 	r.Use(middleware.Log(config))
-	needAPIKey := middleware.OnlyAPIKeyAuthenticator(config)
+	//needAPIKey := middleware.OnlyAPIKeyAuthenticator(config)
 
 	//add router for golang pprof
-	debugGroup := r.Group("/debug", needAPIKey)
+	debugGroup := r.Group("/debug")
 	pprof.RouteRegister(debugGroup, "pprof")
 
 	r.Use(middleware.Authenticator(config))

@@ -13,7 +13,26 @@ import (
 )
 
 type AccountingClient interface {
-	ListMeteringsByUserIDAndTime(req types.ACCT_STATEMENTS_REQ) (any, error)
+	QueryAllUsersBalance(per, page int) (any, error)
+	QueryBalanceByUserID(userUUID string) (any, error)
+	ListStatementByUserIDAndTime(req types.ActStatementsReq) (any, error)
+	ListBillsByUserIDAndDate(req types.ActStatementsReq) (any, error)
+	RechargeAccountingUser(userID string, req types.RechargeReq) (any, error)
+	PresentAccountingUser(userID string, req types.ACTIVITY_REQ) (any, error)
+	CreateOrUpdateQuota(currentUser string, req types.AcctQuotaReq) (any, error)
+	GetQuotaByID(currentUser string) (any, error)
+	CreateQuotaStatement(currentUser string, req types.AcctQuotaStatementReq) (any, error)
+	GetQuotaStatement(currentUser string, req types.AcctQuotaStatementReq) (any, error)
+	QueryPricesBySKUType(currentUser string, req types.AcctPriceListReq) (any, error)
+	GetPriceByID(currentUser string, id int64) (any, error)
+	CreatePrice(currentUser string, req types.AcctPriceCreateReq) (any, error)
+	UpdatePrice(currentUser string, req types.AcctPriceCreateReq, id int64) (any, error)
+	DeletePrice(currentUser string, id int64) (any, error)
+	ListMeteringsByUserIDAndTime(req types.ActStatementsReq) (any, error)
+	CreateOrder(currentUser string, req types.AcctOrderCreateReq) (any, error)
+	ListRechargeByUserIDAndTime(req types.AcctRechargeListReq) (any, error)
+	ListRecharges(req types.RechargesIndexReq) (any, error)
+	StatementsIndex(req types.ActStatementsReq) (any, error)
 }
 type accountingClientImpl struct {
 	remote    *url.URL
@@ -34,7 +53,7 @@ func NewAccountingClient(config *config.Config) (*accountingClientImpl, error) {
 	}, nil
 }
 
-func (ac *accountingClientImpl) ListMeteringsByUserIDAndTime(req types.ACCT_STATEMENTS_REQ) (any, error) {
+func (ac *accountingClientImpl) ListMeteringsByUserIDAndTime(req types.ActStatementsReq) (any, error) {
 	subUrlPath := fmt.Sprintf("/metering/%s/statements?current_user=%s&scene=%d&instance_name=%s&start_time=%s&end_time=%s&per=%d&page=%d", req.UserUUID, req.CurrentUser, req.Scene, req.InstanceName, url.QueryEscape(req.StartTime), url.QueryEscape(req.EndTime), req.Per, req.Page)
 	return ac.handleResponse(ac.doRequest(http.MethodGet, subUrlPath, nil))
 }

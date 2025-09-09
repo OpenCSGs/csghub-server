@@ -181,6 +181,18 @@ services:
       - ./casdoor:/starhub-bin/casdoor:r
     networks:
       - my_network
+  loki:
+    image: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/grafana/loki:3.1.0
+    container_name: loki
+    restart: unless-stopped
+    command: "-config.file=/etc/loki/loki-config.yaml -target=all"
+    networks:
+      - my_network
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./data/loki-data:/data
+      - ./loki-config.yaml:/etc/loki/loki-config.yaml
 
 networks:
   my_network:

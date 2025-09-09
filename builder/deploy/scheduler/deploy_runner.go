@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"opencsg.com/csghub-server/component/reporter"
+
 	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/deploy/imagerunner"
 	"opencsg.com/csghub-server/builder/store/database"
@@ -24,12 +26,14 @@ type DeployRunner struct {
 	ir                     imagerunner.Runner
 	store                  database.DeployTaskStore
 	tokenStore             database.AccessTokenStore
+	urs                    database.UserResourcesStore
 	deployStartTime        time.Time
 	deployCfg              common.DeployConfig
 	runtimeFrameworksStore database.RuntimeFrameworksStore
+	logReporter            reporter.LogCollector
 }
 
-func NewDeployRunner(ir imagerunner.Runner, r *RepoInfo, t *database.DeployTask, deployCfg common.DeployConfig) Runner {
+func NewDeployRunner(ir imagerunner.Runner, r *RepoInfo, t *database.DeployTask, deployCfg common.DeployConfig, logReporter reporter.LogCollector) Runner {
 	return &DeployRunner{
 		repo:                   r,
 		task:                   t,
@@ -37,15 +41,17 @@ func NewDeployRunner(ir imagerunner.Runner, r *RepoInfo, t *database.DeployTask,
 		store:                  database.NewDeployTaskStore(),
 		deployStartTime:        time.Now(),
 		tokenStore:             database.NewAccessTokenStore(),
+		urs:                    database.NewUserResourcesStore(),
 		deployCfg:              deployCfg,
 		runtimeFrameworksStore: database.NewRuntimeFrameworksStore(),
+		logReporter:            logReporter,
 	}
-
 }
 
 // Run call k8s image runner service to run a docker image
 func (t *DeployRunner) Run(ctx context.Context) error {
 	slog.Info("run image deploy task", slog.Int64("deplopy_task_id", t.task.ID))
+	t.reporterLog(types.DeployInProgress.String(), types.StepDeploying)
 
 	// keep checking deploy status
 	for {
@@ -54,6 +60,7 @@ func (t *DeployRunner) Run(ctx context.Context) error {
 			if err != nil {
 				return fmt.Errorf("fail to make deploy request: %w", err)
 			}
+			// check if the building sub-task of deploy is finished and waiting until the image is ready to run
 			if req.ImageID == "" {
 				time.Sleep(5 * time.Second)
 				continue
@@ -63,6 +70,18 @@ func (t *DeployRunner) Run(ctx context.Context) error {
 			if err != nil {
 				// TODO:return retryable error
 				return fmt.Errorf("call image runner failed: %w", err)
+			}
+			// record deploy id to user resource if deploy has order id
+			if req.OrderDetailID != 0 {
+				ur, err := t.urs.FindUserResourcesByOrderDetailId(ctx, req.UserID, req.OrderDetailID)
+				if err != nil {
+					return fmt.Errorf("fail to find user resource by order detail id: %w", err)
+				}
+				ur.DeployId = req.DeployID
+				err = t.urs.UpdateDeployId(ctx, ur)
+				if err != nil {
+					return fmt.Errorf("fail to update deploy id for user resource: %w", err)
+				}
 			}
 
 			t.deployInProgress(resp.Message)
@@ -189,6 +208,7 @@ func (t *DeployRunner) deploySuccess() {
 	if err := t.store.UpdateInTx(ctx, []string{"status"}, []string{"status", "message"}, t.task.Deploy, t.task); err != nil {
 		slog.Error("failed to change deploy status to `Startup`", "error", err)
 	}
+	t.reporterLog(types.DeployStarting.String(), types.StepDeployStartUp)
 }
 
 func (t *DeployRunner) deployFailed(msg string) {
@@ -201,6 +221,7 @@ func (t *DeployRunner) deployFailed(msg string) {
 	if err := t.store.UpdateInTx(ctx, []string{"status"}, []string{"status", "message"}, t.task.Deploy, t.task); err != nil {
 		slog.Error("failed to change deploy status to `DeployFailed`", "error", err)
 	}
+	t.reporterLog(types.DeployFailed.String(), types.StepDeployFailed)
 }
 
 func (t *DeployRunner) running(endpoint string) {
@@ -226,6 +247,8 @@ func (t *DeployRunner) runtimeError(msg string) {
 	if err := t.store.UpdateInTx(ctx, []string{"status"}, []string{"status", "message"}, t.task.Deploy, t.task); err != nil {
 		slog.Error("failed to change deploy status to `RunTimeError`", "error", err)
 	}
+	t.reporterLog(fmt.Sprintf("%s error: %s", msg, types.DeployError.String()), types.StepDeployRunTimeError)
+
 }
 
 func (t *DeployRunner) makeDeployRequest() (*types.RunRequest, error) {
@@ -279,26 +302,28 @@ func (t *DeployRunner) makeDeployRequest() (*types.RunRequest, error) {
 	}
 
 	return &types.RunRequest{
-		ID:          targetID,
-		OrgName:     fields[0],
-		RepoName:    fields[1],
-		RepoType:    t.repo.RepoType,
-		UserName:    t.repo.UserName,
-		Annotation:  annoMap,
-		Hardware:    hardware,
-		Env:         envMap,
-		GitPath:     deploy.GitPath,
-		GitRef:      deploy.GitBranch,
-		ImageID:     deploy.ImageID,
-		DeployID:    deploy.ID,
-		MinReplica:  deploy.MinReplica,
-		MaxReplica:  deploy.MaxReplica,
-		Accesstoken: token.Token,
-		ClusterID:   deploy.ClusterID,
-		SvcName:     deploy.SvcName,
-		DeployType:  deploy.Type,
-		UserID:      deploy.UserUUID,
-		Sku:         deploy.SKU,
+		ID:            targetID,
+		OrgName:       fields[0],
+		RepoName:      fields[1],
+		RepoType:      t.repo.RepoType,
+		UserName:      t.repo.UserName,
+		Annotation:    annoMap,
+		Hardware:      hardware,
+		Env:           envMap,
+		GitPath:       deploy.GitPath,
+		GitRef:        deploy.GitBranch,
+		ImageID:       deploy.ImageID,
+		DeployID:      deploy.ID,
+		MinReplica:    deploy.MinReplica,
+		MaxReplica:    deploy.MaxReplica,
+		Accesstoken:   token.Token,
+		ClusterID:     deploy.ClusterID,
+		SvcName:       deploy.SvcName,
+		DeployType:    deploy.Type,
+		UserID:        deploy.UserUUID,
+		Sku:           deploy.SKU,
+		OrderDetailID: deploy.OrderDetailID,
+		TaskId:        t.task.ID,
 	}, nil
 }
 
@@ -324,7 +349,7 @@ func (t *DeployRunner) makeDeployEnv(
 
 	// for space and models
 	envMap["S3_INTERNAL"] = fmt.Sprintf("%v", t.deployCfg.S3Internal)
-	envMap["HTTPCloneURL"] = t.getHttpCloneURLWithToken(t.repo.HTTPCloneURL, token.Token)
+	envMap["HTTPCloneURL"] = t.getHttpCloneURLWithToken(t.repo.HTTPCloneURL, token.User.Username, token.Token)
 	envMap["ACCESS_TOKEN"] = token.Token
 	envMap["REPO_ID"] = t.repo.Path       // "namespace/name"
 	envMap["REVISION"] = deploy.GitBranch // branch
@@ -397,6 +422,7 @@ func (t *DeployRunner) makeDeployEnv(
 }
 
 func (t *DeployRunner) cancelDeploy(ctx context.Context, orgName, repoName, reason string) error {
+	t.reporterLog(types.DeployCancelled.String(), types.StepCancelled)
 	targetID := t.task.Deploy.SpaceID
 	if t.task.Deploy.SpaceID == 0 {
 		// support model deploy with multi-instance
@@ -416,10 +442,28 @@ func (t *DeployRunner) cancelDeploy(ctx context.Context, orgName, repoName, reas
 	return nil
 }
 
-func (t *DeployRunner) getHttpCloneURLWithToken(httpCloneUrl, token string) string {
+func (t *DeployRunner) getHttpCloneURLWithToken(httpCloneUrl, username, token string) string {
 	num := strings.Index(httpCloneUrl, "://")
 	if num > -1 {
-		return fmt.Sprintf("%s%s@%s", httpCloneUrl[0:num+3], token, httpCloneUrl[num+3:])
+		return fmt.Sprintf("%s%s:%s@%s", httpCloneUrl[0:num+3], username, token, httpCloneUrl[num+3:])
 	}
 	return httpCloneUrl
+}
+
+func (t *DeployRunner) reporterLog(msg string, step types.Step) {
+	logEntry := types.LogEntry{
+		Message:  fmt.Sprintf("%s, task statues: %d", msg, t.task.Status),
+		Stage:    types.StageDeploy,
+		Step:     step,
+		DeployID: strconv.FormatInt(t.task.DeployID, 10),
+		Labels: map[string]string{
+			types.LogLabelTypeKey: types.LogLabelDeploy,
+		},
+	}
+	if nil != t.task.Deploy {
+		logEntry.Labels[types.StreamKeyDeployType] = strconv.Itoa(t.task.Deploy.Type)
+		logEntry.Labels[types.StreamKeyDeployTypeID] = strconv.FormatInt(t.task.ID, 10)
+		logEntry.Labels[types.StreamKeyDeployTaskID] = strconv.FormatInt(t.task.ID, 10)
+	}
+	t.logReporter.Report(logEntry)
 }

@@ -3,17 +3,15 @@ package handler
 import (
 	"database/sql"
 	"errors"
-	"fmt"
+	"github.com/gin-gonic/gin"
 	"log/slog"
 	"net/http"
-	"strings"
-
-	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/builder/deploy/cluster"
 	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
+	"opencsg.com/csghub-server/component/reporter"
 	rcommon "opencsg.com/csghub-server/runner/common"
 	"opencsg.com/csghub-server/runner/component"
 	rTypes "opencsg.com/csghub-server/runner/types"
@@ -27,12 +25,10 @@ type K8sHandler struct {
 	serviceComponent   component.ServiceComponent
 }
 
-func NewK8sHandler(config *config.Config, clusterPool *cluster.ClusterPool) (*K8sHandler, error) {
-	domainParts := strings.SplitN(config.Space.InternalRootDomain, ".", 2)
-	serviceComponent := component.NewServiceComponent(config, clusterPool)
-	go serviceComponent.RunInformer()
+func NewK8sHandler(config *config.Config, clusterPool *cluster.ClusterPool, logReporter reporter.LogCollector) (*K8sHandler, error) {
+	serviceComponent := component.NewServiceComponent(config, clusterPool, logReporter)
 	return &K8sHandler{
-		k8sNameSpace:       domainParts[0],
+		k8sNameSpace:       config.Cluster.SpaceNamespace,
 		clusterPool:        clusterPool,
 		env:                config,
 		serviceComponent:   serviceComponent,
@@ -148,7 +144,7 @@ func (s *K8sHandler) ServiceLogs(c *gin.Context) {
 		return
 	}
 	svcName := s.getServiceNameFromRequest(c)
-	podNames, err := s.serviceComponent.GetServicePods(c.Request.Context(), *cluster, svcName, s.k8sNameSpace, 1)
+	podNames, err := s.serviceComponent.GetServicePods(c.Request.Context(), cluster, svcName, s.k8sNameSpace, 1)
 	if err != nil {
 		slog.Error("failed to read image logs, cannot get pods info", slog.Any("error", err), slog.String("svc_name", svcName))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get pods info"})
@@ -158,7 +154,7 @@ func (s *K8sHandler) ServiceLogs(c *gin.Context) {
 	if len(podNames) > 0 {
 		podName = podNames[0]
 	}
-	s.getLogsByPod(c, *cluster, podName, svcName)
+	s.getLogsByPod(c, cluster, podName, svcName)
 }
 
 func (s *K8sHandler) ServiceLogsByPod(c *gin.Context) {
@@ -178,10 +174,10 @@ func (s *K8sHandler) ServiceLogsByPod(c *gin.Context) {
 	}
 	svcName := s.getServiceNameFromRequest(c)
 	podName := s.getPodNameFromRequest(c)
-	s.getLogsByPod(c, *cluster, podName, svcName)
+	s.getLogsByPod(c, cluster, podName, svcName)
 }
 
-func (s *K8sHandler) getLogsByPod(c *gin.Context, cluster cluster.Cluster, podName string, svcName string) {
+func (s *K8sHandler) getLogsByPod(c *gin.Context, cluster *cluster.Cluster, podName string, svcName string) {
 	var (
 		exist bool
 		err   error
@@ -203,7 +199,7 @@ func (s *K8sHandler) getLogsByPod(c *gin.Context, cluster cluster.Cluster, podNa
 	}
 }
 
-func (s *K8sHandler) readPodLogsFromDB(c *gin.Context, cluster cluster.Cluster, podName, svcName string) {
+func (s *K8sHandler) readPodLogsFromDB(c *gin.Context, cluster *cluster.Cluster, podName, svcName string) {
 	slog.Debug("read pod logs from db", slog.Any("namespace", s.k8sNameSpace), slog.Any("pod-name", podName),
 		slog.Any("svcname", svcName), slog.Any("clusterID", cluster.ID))
 	logs, err := s.serviceComponent.GetPodLogsFromDB(c.Request.Context(), cluster, podName, svcName)
@@ -225,11 +221,12 @@ func (s *K8sHandler) readPodLogsFromDB(c *gin.Context, cluster cluster.Cluster, 
 	c.Writer.Flush()
 }
 
-func (s *K8sHandler) readPodLogsFromCluster(c *gin.Context, cluster cluster.Cluster, podName, svcName string) {
+func (s *K8sHandler) readPodLogsFromCluster(c *gin.Context, cluster *cluster.Cluster, podName, svcName string) {
 	slog.Debug("read pod logs from cluster", slog.Any("namespace", s.k8sNameSpace), slog.Any("pod-name", podName),
 		slog.Any("svcname", svcName), slog.Any("clusterID", cluster.ID))
-	ch, message, err := rcommon.GetPodLogStream(c, &cluster, podName, s.k8sNameSpace, rTypes.UserContainerName)
+	ch, message, err := rcommon.GetPodLogStream(c, cluster.Client, podName, s.k8sNameSpace, rTypes.UserContainerName)
 	if err != nil {
+		slog.Error("Failed to open stream", slog.Any("error", err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to open stream"})
 		return
 	}
@@ -277,62 +274,6 @@ func setResponseHeaderForLogs(c *gin.Context) {
 	c.Header("Connection", "keep-alive")
 	c.Header("Transfer-Encoding", "chunked")
 	c.Writer.WriteHeader(http.StatusOK)
-}
-
-func (s *K8sHandler) ServiceStatusAll(c *gin.Context) {
-	allStatus, err := s.serviceComponent.GetAllServiceStatus(c)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	c.JSON(http.StatusOK, allStatus)
-}
-
-func (s *K8sHandler) GetClusterInfo(c *gin.Context) {
-	clusterRes := []types.CluserResponse{}
-	for index := range s.clusterPool.Clusters {
-		cls := s.clusterPool.Clusters[index]
-		cInfo, err := s.clusterPool.ClusterStore.ByClusterConfig(c.Request.Context(), cls.CID)
-		if err != nil {
-			slog.Error("get cluster info failed", slog.Any("error", err))
-			continue
-		}
-		if !cInfo.Enable {
-			continue
-		}
-		clusterInfo := types.CluserResponse{}
-		clusterInfo.Region = cInfo.Region
-		clusterInfo.Zone = cInfo.Zone
-		clusterInfo.Provider = cInfo.Provider
-		clusterInfo.ClusterID = cInfo.ClusterID
-		clusterInfo.ClusterName = fmt.Sprintf("cluster%d", index)
-		clusterRes = append(clusterRes, clusterInfo)
-
-	}
-	c.JSON(http.StatusOK, clusterRes)
-}
-
-func (s *K8sHandler) GetClusterInfoByID(c *gin.Context) {
-	clusterId := c.Params.ByName("id")
-	cInfo, _ := s.clusterPool.ClusterStore.ByClusterID(c.Request.Context(), clusterId)
-	clusterInfo := types.CluserResponse{}
-	clusterInfo.Region = cInfo.Region
-	clusterInfo.Zone = cInfo.Zone
-	clusterInfo.Provider = cInfo.Provider
-	clusterInfo.ClusterID = cInfo.ClusterID
-	clusterInfo.StorageClass = cInfo.StorageClass
-	client, err := s.clusterPool.GetClusterByID(c.Request.Context(), clusterId)
-	if err != nil {
-		slog.Error("fail to get cluster", slog.Any("error", err))
-		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
-		return
-	}
-	nodes, err := cluster.GetNodeResources(client.Client, s.env)
-	if err == nil {
-		clusterInfo.Nodes = nodes
-	}
-
-	c.JSON(http.StatusOK, clusterInfo)
 }
 
 func (s *K8sHandler) getServiceNameFromRequest(c *gin.Context) string {

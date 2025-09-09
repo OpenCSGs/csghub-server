@@ -57,14 +57,6 @@ func (r *LocalRunner) Status(ctx context.Context, req *types.StatusRequest) (*ty
 	}, nil
 }
 
-func (r *LocalRunner) StatusAll(ctx context.Context) (map[string]types.StatusResponse, error) {
-	status := make(map[string]types.StatusResponse)
-	status["gradio-test-app"] = types.StatusResponse{Code: 21}
-	status["gradio-test-app-v1-0"] = types.StatusResponse{Code: 20}
-	status["image-123"] = types.StatusResponse{Code: 25}
-	return status, nil
-}
-
 func (r *LocalRunner) Logs(ctx context.Context, req *types.LogsRequest) (<-chan string, error) {
 	output := make(chan string, 1)
 	output <- "test build log"

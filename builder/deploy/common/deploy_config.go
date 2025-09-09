@@ -1,6 +1,10 @@
 package common
 
-import "time"
+import (
+	"time"
+
+	"opencsg.com/csghub-server/builder/redis"
+)
 
 type DeployConfig struct {
 	ImageBuilderURL         string
@@ -10,11 +14,13 @@ type DeployConfig struct {
 	SpaceDeployTimeoutInMin int
 	ModelDeployTimeoutInMin int
 	ModelDownloadEndpoint   string
+	ChargingEnable          bool
 	PublicRootDomain        string
-	SSHDomain               string
+	RedisLocker             *redis.DistributedLocker
+	UniqueServiceName       string
 	//download lfs object from internal s3 address
-	S3Internal           bool
-	IsMasterHost         bool
-	APIToken             string
-	NotificationEndpoint string
+	S3Internal         bool
+	APIToken           string
+	APIKey             string
+	HeartBeatTimeInSec int
 }

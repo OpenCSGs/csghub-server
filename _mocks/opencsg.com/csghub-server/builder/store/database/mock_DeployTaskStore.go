@@ -627,12 +627,12 @@ func (_c *MockDeployTaskStore_GetNewTaskFirst_Call) RunAndReturn(run func(contex
 	return _c
 }
 
-// GetRunningInferenceAndFinetuneByUserID provides a mock function with given fields: ctx, userID
-func (_m *MockDeployTaskStore) GetRunningInferenceAndFinetuneByUserID(ctx context.Context, userID int64) ([]database.Deploy, error) {
+// GetRunningDeployByUserID provides a mock function with given fields: ctx, userID
+func (_m *MockDeployTaskStore) GetRunningDeployByUserID(ctx context.Context, userID int64) ([]database.Deploy, error) {
 	ret := _m.Called(ctx, userID)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetRunningInferenceAndFinetuneByUserID")
+		panic("no return value specified for GetRunningDeployByUserID")
 	}
 
 	var r0 []database.Deploy
@@ -657,31 +657,31 @@ func (_m *MockDeployTaskStore) GetRunningInferenceAndFinetuneByUserID(ctx contex
 	return r0, r1
 }
 
-// MockDeployTaskStore_GetRunningInferenceAndFinetuneByUserID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetRunningInferenceAndFinetuneByUserID'
-type MockDeployTaskStore_GetRunningInferenceAndFinetuneByUserID_Call struct {
+// MockDeployTaskStore_GetRunningDeployByUserID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetRunningDeployByUserID'
+type MockDeployTaskStore_GetRunningDeployByUserID_Call struct {
 	*mock.Call
 }
 
-// GetRunningInferenceAndFinetuneByUserID is a helper method to define mock.On call
+// GetRunningDeployByUserID is a helper method to define mock.On call
 //   - ctx context.Context
 //   - userID int64
-func (_e *MockDeployTaskStore_Expecter) GetRunningInferenceAndFinetuneByUserID(ctx interface{}, userID interface{}) *MockDeployTaskStore_GetRunningInferenceAndFinetuneByUserID_Call {
-	return &MockDeployTaskStore_GetRunningInferenceAndFinetuneByUserID_Call{Call: _e.mock.On("GetRunningInferenceAndFinetuneByUserID", ctx, userID)}
+func (_e *MockDeployTaskStore_Expecter) GetRunningDeployByUserID(ctx interface{}, userID interface{}) *MockDeployTaskStore_GetRunningDeployByUserID_Call {
+	return &MockDeployTaskStore_GetRunningDeployByUserID_Call{Call: _e.mock.On("GetRunningDeployByUserID", ctx, userID)}
 }
 
-func (_c *MockDeployTaskStore_GetRunningInferenceAndFinetuneByUserID_Call) Run(run func(ctx context.Context, userID int64)) *MockDeployTaskStore_GetRunningInferenceAndFinetuneByUserID_Call {
+func (_c *MockDeployTaskStore_GetRunningDeployByUserID_Call) Run(run func(ctx context.Context, userID int64)) *MockDeployTaskStore_GetRunningDeployByUserID_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(context.Context), args[1].(int64))
 	})
 	return _c
 }
 
-func (_c *MockDeployTaskStore_GetRunningInferenceAndFinetuneByUserID_Call) Return(_a0 []database.Deploy, _a1 error) *MockDeployTaskStore_GetRunningInferenceAndFinetuneByUserID_Call {
+func (_c *MockDeployTaskStore_GetRunningDeployByUserID_Call) Return(_a0 []database.Deploy, _a1 error) *MockDeployTaskStore_GetRunningDeployByUserID_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockDeployTaskStore_GetRunningInferenceAndFinetuneByUserID_Call) RunAndReturn(run func(context.Context, int64) ([]database.Deploy, error)) *MockDeployTaskStore_GetRunningInferenceAndFinetuneByUserID_Call {
+func (_c *MockDeployTaskStore_GetRunningDeployByUserID_Call) RunAndReturn(run func(context.Context, int64) ([]database.Deploy, error)) *MockDeployTaskStore_GetRunningDeployByUserID_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -871,6 +871,64 @@ func (_c *MockDeployTaskStore_ListAllDeploys_Call) RunAndReturn(run func(context
 	return _c
 }
 
+// ListAllRunningDeploys provides a mock function with given fields: ctx
+func (_m *MockDeployTaskStore) ListAllRunningDeploys(ctx context.Context) ([]database.Deploy, error) {
+	ret := _m.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListAllRunningDeploys")
+	}
+
+	var r0 []database.Deploy
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context) ([]database.Deploy, error)); ok {
+		return rf(ctx)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context) []database.Deploy); ok {
+		r0 = rf(ctx)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.Deploy)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockDeployTaskStore_ListAllRunningDeploys_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListAllRunningDeploys'
+type MockDeployTaskStore_ListAllRunningDeploys_Call struct {
+	*mock.Call
+}
+
+// ListAllRunningDeploys is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *MockDeployTaskStore_Expecter) ListAllRunningDeploys(ctx interface{}) *MockDeployTaskStore_ListAllRunningDeploys_Call {
+	return &MockDeployTaskStore_ListAllRunningDeploys_Call{Call: _e.mock.On("ListAllRunningDeploys", ctx)}
+}
+
+func (_c *MockDeployTaskStore_ListAllRunningDeploys_Call) Run(run func(ctx context.Context)) *MockDeployTaskStore_ListAllRunningDeploys_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context))
+	})
+	return _c
+}
+
+func (_c *MockDeployTaskStore_ListAllRunningDeploys_Call) Return(_a0 []database.Deploy, _a1 error) *MockDeployTaskStore_ListAllRunningDeploys_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockDeployTaskStore_ListAllRunningDeploys_Call) RunAndReturn(run func(context.Context) ([]database.Deploy, error)) *MockDeployTaskStore_ListAllRunningDeploys_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ListDeploy provides a mock function with given fields: ctx, repoType, repoID, userID
 func (_m *MockDeployTaskStore) ListDeploy(ctx context.Context, repoType types.RepositoryType, repoID int64, userID int64) ([]database.Deploy, error) {
 	ret := _m.Called(ctx, repoType, repoID, userID)
@@ -928,6 +986,72 @@ func (_c *MockDeployTaskStore_ListDeploy_Call) Return(_a0 []database.Deploy, _a1
 }
 
 func (_c *MockDeployTaskStore_ListDeploy_Call) RunAndReturn(run func(context.Context, types.RepositoryType, int64, int64) ([]database.Deploy, error)) *MockDeployTaskStore_ListDeploy_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ListDeployByType provides a mock function with given fields: ctx, req
+func (_m *MockDeployTaskStore) ListDeployByType(ctx context.Context, req types.DeployReq) ([]database.Deploy, int, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListDeployByType")
+	}
+
+	var r0 []database.Deploy
+	var r1 int
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.DeployReq) ([]database.Deploy, int, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.DeployReq) []database.Deploy); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.Deploy)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.DeployReq) int); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, types.DeployReq) error); ok {
+		r2 = rf(ctx, req)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockDeployTaskStore_ListDeployByType_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListDeployByType'
+type MockDeployTaskStore_ListDeployByType_Call struct {
+	*mock.Call
+}
+
+// ListDeployByType is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.DeployReq
+func (_e *MockDeployTaskStore_Expecter) ListDeployByType(ctx interface{}, req interface{}) *MockDeployTaskStore_ListDeployByType_Call {
+	return &MockDeployTaskStore_ListDeployByType_Call{Call: _e.mock.On("ListDeployByType", ctx, req)}
+}
+
+func (_c *MockDeployTaskStore_ListDeployByType_Call) Run(run func(ctx context.Context, req types.DeployReq)) *MockDeployTaskStore_ListDeployByType_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.DeployReq))
+	})
+	return _c
+}
+
+func (_c *MockDeployTaskStore_ListDeployByType_Call) Return(_a0 []database.Deploy, _a1 int, _a2 error) *MockDeployTaskStore_ListDeployByType_Call {
+	_c.Call.Return(_a0, _a1, _a2)
+	return _c
+}
+
+func (_c *MockDeployTaskStore_ListDeployByType_Call) RunAndReturn(run func(context.Context, types.DeployReq) ([]database.Deploy, int, error)) *MockDeployTaskStore_ListDeployByType_Call {
 	_c.Call.Return(run)
 	return _c
 }

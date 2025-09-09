@@ -7,6 +7,7 @@ import (
 
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/builder/git/membership"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -16,6 +17,7 @@ type UserSvcClient interface {
 	GetUserInfo(ctx context.Context, userName, visitorName string) (*User, error)
 	GetOrCreateFirstAvaiTokens(ctx context.Context, userName, visitorName, app, tokenName string) (string, error)
 	VerifyByAccessToken(ctx context.Context, token string) (*types.CheckAccessTokenResp, error)
+	GetUserByName(ctx context.Context, userName string) (*types.User, error)
 	FindByUUIDs(ctx context.Context, uuids []string) (map[string]*types.User, error)
 	GetUserUUIDs(ctx context.Context, per, page int) ([]string, int, error)
 	GetEmails(ctx context.Context, per, page int) ([]string, int, error)
@@ -45,7 +47,7 @@ func (c *UserSvcHttpClient) GetMemberRole(ctx context.Context, orgName, userName
 
 	role, ok := r.Data.(string)
 	if !ok {
-		return membership.RoleUnknown, fmt.Errorf("failed to convert r.Data '%v' to membership.Role", r.Data)
+		return membership.RoleUnknown, fmt.Errorf("failed to convert r.Data '%v' to membership.Role, err:%w", r.Data, errorx.ErrInternalServerError)
 	}
 	return membership.Role(role), nil
 }
@@ -96,6 +98,18 @@ func (c *UserSvcHttpClient) VerifyByAccessToken(ctx context.Context, token strin
 	}
 
 	return r.Data.(*types.CheckAccessTokenResp), nil
+}
+
+func (c *UserSvcHttpClient) GetUserByName(ctx context.Context, userName string) (*types.User, error) {
+	url := fmt.Sprintf("/api/v1/user/%s", userName)
+	var r httpbase.R
+	r.Data = &types.User{}
+	err := c.hc.Get(ctx, url, &r)
+	if err != nil {
+		return nil, fmt.Errorf("failed get user by username: %w", err)
+	}
+
+	return r.Data.(*types.User), nil
 }
 
 func (c *UserSvcHttpClient) FindByUUIDs(ctx context.Context, uuids []string) (map[string]*types.User, error) {

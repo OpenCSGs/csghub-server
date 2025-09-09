@@ -5,10 +5,13 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/middleware"
 	"opencsg.com/csghub-server/builder/deploy/cluster"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/types"
+	"opencsg.com/csghub-server/component/reporter"
 	"opencsg.com/csghub-server/runner/handler"
 )
 
@@ -17,15 +20,25 @@ func NewHttpServer(ctx context.Context, config *config.Config) (*gin.Engine, err
 	r.Use(gin.Recovery())
 	r.Use(middleware.Log(config))
 
-	clusterPool, err := cluster.NewClusterPool()
-	if err != nil {
-		slog.Error("falied to build kubeconfig", "error", err)
-		return nil, fmt.Errorf("failed to build kubeconfig,%w", err)
-	}
+	needAPIKey := middleware.NeedAPIKey(config)
 
-	k8sHandler, err := handler.NewK8sHandler(config, clusterPool)
+	//add router for golang pprof
+	debugGroup := r.Group("/debug", needAPIKey)
+	pprof.RouteRegister(debugGroup, "pprof")
+
+	clusterPool, err := cluster.NewClusterPool(config)
 	if err != nil {
-		return nil, fmt.Errorf("failed to build NewHttpServer,%w", err)
+		slog.Error("failed to build cluster pool by auto detect environment", slog.Any("error", err))
+		return nil, fmt.Errorf("failed to build cluster pool by auto detect environment error: %w", err)
+	}
+	logReporter, err := reporter.NewAndStartLogCollector(ctx, config, types.ClientTypeRunner)
+	if err != nil {
+		return nil, fmt.Errorf("failed to start logReporter error: %w", err)
+	}
+	// runner apis
+	k8sHandler, err := handler.NewK8sHandler(config, clusterPool, logReporter)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build NewK8sHandler error: %w", err)
 	}
 	apiGroup := r.Group("/api/v1")
 	service := apiGroup.Group("/service")
@@ -37,23 +50,26 @@ func NewHttpServer(ctx context.Context, config *config.Config) (*gin.Engine, err
 		service.GET("/:service/logs", k8sHandler.ServiceLogs)
 		service.GET("/:service/logs/:pod_name", k8sHandler.ServiceLogsByPod)
 		service.GET("/:service/info", k8sHandler.GetServiceInfo)
-		service.GET("/status-all", k8sHandler.ServiceStatusAll)
 		service.GET("/:service/get", k8sHandler.GetServiceByName)
 		service.GET("/:service/replica", k8sHandler.GetReplica)
 		service.DELETE("/:service/purge", k8sHandler.PurgeService)
+	}
 
+	// cluster api
+	clusterHandler, err := handler.NewClusterHandler(config, clusterPool)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build NewClusterHandler error: %w", err)
 	}
 	cluster := apiGroup.Group("/cluster")
 	{
-		cluster.GET("", k8sHandler.GetClusterInfo)
-		cluster.GET("/:id", k8sHandler.GetClusterInfoByID)
-		cluster.PUT("/:id", k8sHandler.UpdateCluster)
-	}
-	argoHandler, err := handler.NewArgoHandler(config, clusterPool)
-	if err != nil {
-		return nil, fmt.Errorf("failed to build NewHttpServer,%w", err)
+		cluster.GET("/:id", clusterHandler.GetClusterInfoByID)
 	}
 
+	// argo for evaluation
+	argoHandler, err := handler.NewArgoHandler(config, clusterPool, logReporter)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build NewArgoHandler error: %w", err)
+	}
 	workflows := apiGroup.Group("/workflows")
 	{
 		workflows.POST("", argoHandler.CreateWorkflow)
@@ -62,16 +78,15 @@ func NewHttpServer(ctx context.Context, config *config.Config) (*gin.Engine, err
 		workflows.GET("/:id", argoHandler.GetWorkflow)
 	}
 
-	imagebuilderHandler, err := handler.NewImagebuilderHandler(ctx, config, clusterPool)
+	// image builder
+	imagebuilderHandler, err := handler.NewImagebuilderHandler(ctx, config, clusterPool, logReporter)
 	if err != nil {
-		return nil, fmt.Errorf("failed to build NewHttpServer,%w", err)
+		return nil, fmt.Errorf("failed to build NewImagebuilderHandler error: %w", err)
 	}
-
 	imagebuilderGroup := apiGroup.Group("/imagebuilder")
 	{
 		imagebuilderGroup.POST("/builder", imagebuilderHandler.Build)
-		imagebuilderGroup.GET("/:namespace/:name/status", imagebuilderHandler.Status)
-		imagebuilderGroup.GET("/:namespace/:name/logs", imagebuilderHandler.Logs)
+		imagebuilderGroup.PUT("/stop", imagebuilderHandler.Stop)
 	}
 
 	return r, nil

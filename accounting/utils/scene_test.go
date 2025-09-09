@@ -14,6 +14,7 @@ func TestScene_IsNeedCalculateBill(t *testing.T) {
 		types.SceneSpace,
 		types.SceneModelFinetune,
 		types.SceneEvaluation,
+		types.SceneModelServerless,
 		types.SceneStarship,
 		types.SceneGuiAgent,
 	}
@@ -41,14 +42,15 @@ func TestScene_IsNeedCalculateBill(t *testing.T) {
 
 func TestScene_GetSkuUnitTypeByScene(t *testing.T) {
 
-	scenes := map[types.SceneType]string{
-		types.SceneModelInference: types.UnitMinute,
-		types.SceneSpace:          types.UnitMinute,
-		types.SceneModelFinetune:  types.UnitMinute,
-		types.SceneMultiSync:      types.UnitRepo,
-		types.SceneEvaluation:     types.UnitMinute,
-		types.SceneStarship:       types.UnitToken,
-		types.SceneGuiAgent:       types.UnitToken,
+	scenes := map[types.SceneType]types.SkuUnitType{
+		types.SceneModelInference:  types.UnitMinute,
+		types.SceneSpace:           types.UnitMinute,
+		types.SceneModelFinetune:   types.UnitMinute,
+		types.SceneMultiSync:       types.UnitRepo,
+		types.SceneEvaluation:      types.UnitMinute,
+		types.SceneModelServerless: types.UnitToken,
+		types.SceneStarship:        types.UnitToken,
+		types.SceneGuiAgent:        types.UnitToken,
 	}
 
 	for scene, unit := range scenes {
@@ -59,13 +61,14 @@ func TestScene_GetSkuUnitTypeByScene(t *testing.T) {
 
 func TestScene_GetSKUTypeByScene(t *testing.T) {
 	scenes := map[types.SceneType]types.SKUType{
-		types.SceneModelInference: types.SKUCSGHub,
-		types.SceneSpace:          types.SKUCSGHub,
-		types.SceneModelFinetune:  types.SKUCSGHub,
-		types.SceneMultiSync:      types.SKUCSGHub,
-		types.SceneEvaluation:     types.SKUCSGHub,
-		types.SceneStarship:       types.SKUStarship,
-		types.SceneGuiAgent:       types.SKUStarship,
+		types.SceneModelInference:  types.SKUCSGHub,
+		types.SceneSpace:           types.SKUCSGHub,
+		types.SceneModelFinetune:   types.SKUCSGHub,
+		types.SceneMultiSync:       types.SKUCSGHub,
+		types.SceneEvaluation:      types.SKUCSGHub,
+		types.SceneModelServerless: types.SKUCSGHub,
+		types.SceneStarship:        types.SKUStarship,
+		types.SceneGuiAgent:        types.SKUStarship,
 	}
 
 	for scene, skuType := range scenes {

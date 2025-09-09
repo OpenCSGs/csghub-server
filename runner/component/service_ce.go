@@ -11,7 +11,7 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
-func (s *serviceComponentImpl) RunServiceMultiHost(ctx context.Context, req types.SVCRequest) error {
+func (s *serviceComponentImpl) runServiceMultiHost(ctx context.Context, req types.SVCRequest) error {
 	return fmt.Errorf("multi-host inference is not supported")
 }
 

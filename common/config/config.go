@@ -22,7 +22,8 @@ type Config struct {
 	EnableHTTPS bool   `env:"STARHUB_SERVER_ENABLE_HTTPS" default:"false"`
 	DocsHost    string `env:"STARHUB_SERVER_SERVER_DOCS_HOST" default:"http://localhost:6636"`
 	//the master host
-	IsMasterHost bool `env:"STARHUB_SERVER_IS_MASTER_HOST" default:"true"`
+	IsMasterHost      bool   `env:"STARHUB_SERVER_IS_MASTER_HOST" default:"true"`
+	UniqueServiceName string `env:"STARHUB_SERVER_UNIQUE_SERVICE_NAME" default:""`
 
 	APIServer struct {
 		Port         int    `env:"STARHUB_SERVER_SERVER_PORT" default:"8080"`
@@ -165,15 +166,16 @@ type Config struct {
 	}
 
 	Nats struct {
-		URL                      string `env:"OPENCSG_ACCOUNTING_NATS_URL, default=nats://account:g98dc5FA8v4J7ck90w@natsmaster:4222"`
-		MsgFetchTimeoutInSEC     int    `env:"OPENCSG_ACCOUNTING_MSG_FETCH_TIMEOUTINSEC, default=5"`
-		MeterRequestSubject      string `env:"OPENCSG_ACCOUNTING_METER_EVENT_SUBJECT, default=accounting.metering.>"`
-		MeterDurationSendSubject string `env:"STARHUB_SERVER_METER_DURATION_SEND_SUBJECT, default=accounting.metering.duration"`
-		MeterTokenSendSubject    string `env:"STARHUB_SERVER_METER_TOKEN_SEND_SUBJECT, default=accounting.metering.token"`
-		MeterQuotaSendSubject    string `env:"STARHUB_SERVER_METER_QUOTA_SEND_SUBJECT, default=accounting.metering.quota"`
-		ServiceUpdateSubject     string `env:"STARHUB_SERVER_DEPLOY_SERVICE_SUBJECT, default=deploy.service.update"`
-		HighPriorityMsgSubject   string `env:"STARHUB_SERVER_HIGH_PRIORITY_MSG_SUBJECT, default=notification.message.high"`
-		NormalPriorityMsgSubject string `env:"STARHUB_SERVER_NORMAL_PRIORITY_MSG_SUBJECT, default=notification.message.normal"`
+		URL                  string `env:"OPENCSG_ACCOUNTING_NATS_URL" default:"nats://account:g98dc5FA8v4J7ck90w@natsmaster:4222"`
+		MsgFetchTimeoutInSEC int    `env:"OPENCSG_ACCOUNTING_MSG_FETCH_TIMEOUTINSEC" default:"5"`
+	}
+
+	Kafka struct {
+		Servers string `env:"OPENCSG_SERVERS_KAFKA_SERVERS" default:""`
+	}
+
+	MQ struct {
+		WebHookEventRunnerSubject string `env:"OPENCSG_SERVER_WEBHOOK_RUNNER_SUBJECT" default:"webhook.event.runner"`
 	}
 
 	Accounting struct {
@@ -226,9 +228,6 @@ type Config struct {
 	}
 
 	Argo struct {
-		Namespace string `env:"STARHUB_SERVER_ARGO_NAMESPACE" default:"workflows"`
-		// NamespaceQuota is used to create evaluation with free of charge
-		QuotaNamespace string `env:"STARHUB_SERVER_ARGO_QUOTA_NAMESPACE" default:"workflows-quota"`
 		QuotaGPUNumber string `env:"STARHUB_SERVER_ARGO_QUOTA_GPU_NUMBER" default:"1"`
 		//job will be deleted after JobTTL seconds once the jobs was done
 		JobTTL             int    `env:"STARHUB_SERVER_ARGO_TTL" default:"120"`
@@ -285,14 +284,43 @@ type Config struct {
 		Port int `env:"OPENCSG_AIGATEWAY_PORT" default:"8094"`
 	}
 
+	// K8S Cluster Configuration for Runner and Logcollectior
+	Cluster struct {
+		ClusterID              string `env:"STARHUB_SERVER_CLUSTER_ID" default:""`
+		SpaceNamespace         string `env:"STARHUB_SERVER_CLUSTER_SPACES_NAMESPACE" default:"spaces"`
+		ResourceQuotaNamespace string `env:"STARHUB_SERVER_CLUSTER_RESOURCE_QUOTA_NAMESPACE" default:"spaces"`
+		QuotaName              string `env:"STARHUB_SERVER_CLUSTER_QUOTA_NAM" default:""`
+	}
+
 	Runner struct {
-		ImageBuilderClusterID   string   `env:"STARHUB_SERVER_RUNNER_IMAGE_BUILDER_CLUSTER_ID" default:""`
-		ImageBuilderNamespace   string   `env:"STARHUB_SERVER_RUNNER_IMAGE_BUILDER_NAMESPACE" default:"imagebuilder"`
+		PublicDomain            string   `env:"STARHUB_SERVER_RUNNER_PUBLIC_DOMAIN" default:"http://localhost:8082"`
 		ImageBuilderGitImage    string   `env:"STARHUB_SERVER_RUNNER_IMAGE_BUILDER_GIT_IMAGE" default:"opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/alpine/git:2.36.2"`
 		ImageBuilderKanikoImage string   `env:"STARHUB_SERVER_RUNNER_IMAGE_BUILDER_KANIKO_IMAGE" default:"opencsg-registry.cn-beijing.cr.aliyuncs.com/public/kaniko-project-executor:v1.23.2"`
 		ImageBuilderJobTTL      int      `env:"STARHUB_SERVER_RUNNER_IMAGE_BUILDER_JOB_TTL" default:"120"`
 		ImageBuilderStatusTTL   int      `env:"STARHUB_SERVER_RUNNER_IMAGE_BUILDER_STATUS_TTL" default:"300"`
 		ImageBuilderKanikoArgs  []string `env:"STARHUB_SERVER_RUNNER_IMAGE_BUILDER_KANIKO_ARGS"`
+		SystemCUDAVersion       string   `env:"STARHUB_SERVER_RUNNER_SYSTEM_CUDA_VERSION" default:""`
+		// csghub server webhook endpoint
+		WebHookEndpoint       string `env:"STARHUB_SERVER_RUNNER_WEBHOOK_ENDPOINT" default:"http://localhost:8080"`
+		WatchConfigmapName    string `env:"STARHUB_SERVER_RUNNER_WATCH_CONFIGMAP_NAME" default:"spaces-runner-config"`
+		WatchConfigmapKey     string `env:"STARHUB_SERVER_RUNNER_WATCH_CONFIGMAP_KEY" default:"STARHUB_SERVER_RUNNER_WEBHOOK_ENDPOINT"`
+		HearBeatIntervalInSec int    `env:"STARHUB_SERVER_RUNNER_HEARTBEAT_INTERVAL_IN_SEC" default:"300"`
+	}
+
+	LogCollector struct {
+		Port                 int    `env:"STARHUB_SERVER_LOGCOLLECTOR_PORT" default:"8096"`
+		LokiURL              string `env:"STARHUB_SERVER_LOGCOLLECTOR_LOKI_URL" default:"http://localhost:3100"`
+		WatchNSInterval      int    `env:"STARHUB_SERVER_LOGCOLLECTOR_WATCH_NS_INTERVAL" default:"3"`
+		MaxConcurrentStreams int    `env:"STARHUB_SERVER_LOGCOLLECTOR_MAX_CONCURRENT_STREAMS" default:"1000"`
+		BatchSize            int    `env:"STARHUB_SERVER_LOGCOLLECTOR_BATCH_SIZE" default:"100"`
+		BatchDelay           int    `env:"STARHUB_SERVER_LOGCOLLECTOR_BATCH_DELAY" default:"3"`
+		DropMsgTimeout       int    `env:"STARHUB_SERVER_LOGCOLLECTOR_DROP_MSG_TIMEOUT" default:"60"`
+		MaxRetries           int    `env:"STARHUB_SERVER_LOGCOLLECTOR_MAX_RETRIES" default:"3"`
+		RetryInterval        int    `env:"STARHUB_SERVER_LOGCOLLECTOR_RETRY_INTERVAL" default:"1"`
+		HeathInterval        int    `env:"STARHUB_SERVER_LOGCOLLECTOR_HEALTH_INTERVAL" default:"5"`
+		AcceptLabelPrefix    string `env:"STARHUB_SERVER_LOGCOLLECTOR_ACCESPT_LABEL_PREFIX" default:"csghub_"`
+		// the separator of log lines, default is "\\n" by client formats, "\n" sse auto newline
+		LineSeparator string `env:"STARHUB_SERVER_LOGCOLLECTOR_LINE_SEPARATOR" default:"\\n"`
 	}
 
 	RepoTemplate struct {

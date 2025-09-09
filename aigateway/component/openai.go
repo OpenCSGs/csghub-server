@@ -123,7 +123,7 @@ func (m *openaiComponentImpl) RecordUsage(c context.Context, userUUID string, mo
 		CompletionTokenNum: fmt.Sprintf("%d", usage.CompletionTokens),
 	}
 	extraData, _ := json.Marshal(tokenUsageExtra)
-	event := commontypes.METERING_EVENT{
+	event := commontypes.MeteringEvent{
 		Uuid:         uuid.New(),
 		UserUUID:     userUUID,
 		Value:        usage.TotalTokens,

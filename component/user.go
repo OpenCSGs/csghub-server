@@ -36,6 +36,10 @@ type UserComponent interface {
 	ListDeploys(ctx context.Context, repoType types.RepositoryType, req *types.DeployReq) ([]types.DeployRepo, int, error)
 	ListInstances(ctx context.Context, req *types.UserRepoReq) ([]types.DeployRepo, int, error)
 	ListServerless(ctx context.Context, req types.DeployReq) ([]types.DeployRepo, int, error)
+	CreateUserResource(ctx context.Context, req types.CreateUserResourceReq) error
+	DeleteUserResource(ctx context.Context, username string, orderDetailId int64) error
+	// GetUserResource
+	GetUserResource(ctx context.Context, req types.GetUserResourceReq) ([]types.UserResourcesResp, int, error)
 	GetUserByName(ctx context.Context, userName string) (*database.User, error)
 	Prompts(ctx context.Context, req *types.UserPromptsReq) ([]types.PromptRes, int, error)
 	Evaluations(ctx context.Context, req *types.UserEvaluationReq) ([]types.ArgoWorkFlowRes, int, error)
@@ -52,6 +56,8 @@ func NewUserComponent(config *config.Config) (UserComponent, error) {
 	c.spaceStore = database.NewSpaceStore()
 	c.namespaceStore = database.NewNamespaceStore()
 	c.collectionStore = database.NewCollectionStore()
+	c.spaceResourceStore = database.NewSpaceResourceStore()
+	c.userResourcesStore = database.NewUserResourcesStore()
 	var err error
 	c.spaceComponent, err = NewSpaceComponent(config)
 	if err != nil {
@@ -63,6 +69,7 @@ func NewUserComponent(config *config.Config) (UserComponent, error) {
 		newError := fmt.Errorf("failed to create git server,error:%w", err)
 		return nil, newError
 	}
+
 	c.repoComponent, err = NewRepoComponentImpl(config)
 	if err != nil {
 		newError := fmt.Errorf("failed to create repo component,error:%w", err)
@@ -98,6 +105,8 @@ type userComponentImpl struct {
 	deployTaskStore     database.DeployTaskStore
 	collectionStore     database.CollectionStore
 	accountingComponent AccountingComponent
+	spaceResourceStore  database.SpaceResourceStore
+	userResourcesStore  database.UserResourcesStore
 	promptStore         database.PromptStore
 	workflowStore       database.ArgoWorkFlowStore
 	mcpServerStore      database.MCPServerStore
@@ -649,13 +658,38 @@ func (c *userComponentImpl) Evaluations(ctx context.Context, req *types.UserEval
 		return nil, 0, newError
 	}
 
-	res, err := c.deployer.ListEvaluations(ctx, req.CurrentUser, req.PageSize, req.Page)
+	evaluations, total, err := c.workflowStore.FindByUsername(ctx, req.CurrentUser, req.PageSize, req.Page)
+
 	if err != nil {
 		newError := fmt.Errorf("failed to get user evaluations,error:%w", err)
 		slog.Error(newError.Error())
 		return nil, 0, newError
 	}
-	return res.List, res.Total, nil
+	var res []types.ArgoWorkFlowRes
+	for _, evaluation := range evaluations {
+		res = append(res, types.ArgoWorkFlowRes{
+			ID:           evaluation.ID,
+			RepoIds:      evaluation.RepoIds,
+			RepoType:     evaluation.RepoType,
+			TaskName:     evaluation.TaskName,
+			Username:     evaluation.Username,
+			TaskId:       evaluation.TaskId,
+			Status:       evaluation.Status,
+			TaskType:     evaluation.TaskType,
+			TaskDesc:     evaluation.TaskDesc,
+			Datasets:     evaluation.Datasets,
+			ResourceId:   evaluation.ResourceId,
+			ResourceName: evaluation.ResourceName,
+			Reason:       evaluation.Reason,
+			SubmitTime:   evaluation.SubmitTime,
+			StartTime:    evaluation.StartTime,
+			EndTime:      evaluation.EndTime,
+			DownloadURL:  evaluation.DownloadURL,
+			ResultURL:    evaluation.ResultURL,
+			Image:        evaluation.Image,
+		})
+	}
+	return res, total, nil
 }
 
 func (c *userComponentImpl) MCPServers(ctx context.Context, req *types.UserMCPsReq) ([]types.MCPServer, int, error) {

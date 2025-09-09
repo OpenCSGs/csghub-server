@@ -8,18 +8,19 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"opencsg.com/csghub-server/builder/deploy/cluster"
+	//"opencsg.com/csghub-server/builder/deploy/cluster"
+	"k8s.io/client-go/kubernetes"
 )
 
-func GetPodLog(ctx context.Context, cluster *cluster.Cluster, podName string, namespace string, container string) ([]byte, error) {
-	logs, err := cluster.Client.CoreV1().Pods(namespace).GetLogs(podName, &corev1.PodLogOptions{
+func GetPodLog(ctx context.Context, client kubernetes.Interface, podName string, namespace string, container string) ([]byte, error) {
+	logs, err := client.CoreV1().Pods(namespace).GetLogs(podName, &corev1.PodLogOptions{
 		Container: container,
 	}).DoRaw(ctx)
 	return logs, err
 }
 
-func GetPod(ctx context.Context, cluster *cluster.Cluster, podName string, namespace string) (*corev1.Pod, error) {
-	pod, err := cluster.Client.CoreV1().Pods(namespace).Get(ctx, podName, metav1.GetOptions{})
+func GetPod(ctx context.Context, client kubernetes.Interface, podName string, namespace string) (*corev1.Pod, error) {
+	pod, err := client.CoreV1().Pods(namespace).Get(ctx, podName, metav1.GetOptions{})
 	if err != nil {
 		slog.Error("fail to get pod ", slog.Any("error", err), slog.String("pod name", podName))
 		return nil, err
@@ -28,15 +29,15 @@ func GetPod(ctx context.Context, cluster *cluster.Cluster, podName string, names
 	return pod, nil
 }
 
-func GetPodLogStream(ctx context.Context, cluster *cluster.Cluster, podName string, namespace string, container string) (chan []byte, string, error) {
+func GetPodLogStream(ctx context.Context, client kubernetes.Interface, podName string, namespace string, container string) (chan []byte, string, error) {
 
-	pod, err := GetPod(ctx, cluster, podName, namespace)
+	pod, err := GetPod(ctx, client, podName, namespace)
 	if err != nil {
 		return nil, "", err
 	}
 
 	cName := GetContainerName(pod, container)
-	logs := cluster.Client.CoreV1().Pods(namespace).GetLogs(podName, &corev1.PodLogOptions{
+	logs := client.CoreV1().Pods(namespace).GetLogs(podName, &corev1.PodLogOptions{
 		Container: cName,
 		Follow:    true,
 	})

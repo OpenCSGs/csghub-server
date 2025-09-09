@@ -32,3 +32,9 @@ type Organization struct {
 	Verified bool   `json:"verified"`
 	UserID   int64  `json:"user_id,omitempty"`
 }
+
+type PaymentResponse struct {
+	PaymentUUID string `json:"payment_uuid"`
+	OrderNo     string `json:"order_no"`
+	CodeUrl     string `json:"code_url"`
+}

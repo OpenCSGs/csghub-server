@@ -8,14 +8,17 @@ import (
 	"testing"
 	"time"
 
+	mockReporter "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component/reporter"
+	mockSender "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component/reporter/sender"
+
 	"github.com/bwmarrin/snowflake"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	mockacct "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/accounting"
 	mockbuilder "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/deploy/imagebuilder"
 	mockrunner "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/deploy/imagerunner"
 	mockScheduler "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/deploy/scheduler"
 	mockdb "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
-
 	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/deploy/scheduler"
 	"opencsg.com/csghub-server/builder/store/database"
@@ -30,6 +33,7 @@ type testDepolyerWithMocks struct {
 		scheduler *mockScheduler.MockScheduler
 		builder   *mockbuilder.MockBuilder
 		runner    *mockrunner.MockRunner
+		acctClent *mockacct.MockAccountingClient
 	}
 }
 
@@ -41,6 +45,7 @@ func TestDeployer_GenerateUniqueSvcName(t *testing.T) {
 	node, _ := snowflake.NewNode(1)
 	d := &deployer{
 		snowflakeNode: node,
+		logReporter:   mockReporter.NewMockLogCollector(t),
 	}
 
 	dr.Type = types.SpaceType
@@ -205,11 +210,15 @@ func TestDeployer_Deploy(t *testing.T) {
 
 		node, _ := snowflake.NewNode(1)
 
+		reporter := mockReporter.NewMockLogCollector(t)
 		d := &deployer{
 			snowflakeNode:   node,
 			deployTaskStore: mockTaskStore,
 			scheduler:       mockSch,
+			logReporter:     reporter,
 		}
+
+		reporter.EXPECT().Report(mock.Anything)
 
 		_, err := d.Deploy(context.TODO(), dr)
 		// wait for scheduler.Queue to be called
@@ -385,28 +394,47 @@ func TestDeployer_Logs(t *testing.T) {
 			Type:     types.InferenceType,
 		}
 		deploy := &database.Deploy{
-			Status:  common.Running,
-			SvcName: "svc",
+			Status:    common.Running,
+			SvcName:   "svc",
+			ClusterID: "111",
 		}
 
 		mockDeployTaskStore := mockdb.NewMockDeployTaskStore(t)
 		mockDeployTaskStore.EXPECT().GetLatestDeployBySpaceID(mock.Anything, dr.SpaceID).
 			Return(deploy, nil)
 
-		mockRunner := mockrunner.NewMockRunner(t)
-		mockRunner.EXPECT().Logs(mock.Anything, mock.Anything).Return(nil, nil)
 		mockBuilder := mockbuilder.NewMockBuilder(t)
-		mockBuilder.EXPECT().Logs(mock.Anything, mock.Anything).Return(nil, nil)
+		logReporter := mockReporter.NewMockLogCollector(t)
+		sender := mockSender.NewMockLogSender(t)
+
+		mockDeployTaskStore.EXPECT().GetLatestDeployBySpaceID(mock.Anything, dr.DeployID).
+			Return(deploy, nil)
+
+		buildTask := &database.DeployTask{
+			ID: 1,
+		}
+		runTask := &database.DeployTask{
+			ID: 2,
+		}
+		tasks := []*database.DeployTask{
+			buildTask,
+			runTask,
+		}
+		mockDeployTaskStore.EXPECT().GetDeployTasksOfDeploy(mock.Anything, deploy.ID).
+			Return(tasks, nil)
+
+		ch := make(chan string)
+		sender.EXPECT().StreamAllLogs(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(ch, nil)
 		d := &deployer{
 			deployTaskStore: mockDeployTaskStore,
-			imageRunner:     mockRunner,
 			imageBuilder:    mockBuilder,
+			logReporter:     logReporter,
+			lokiClient:      sender,
 		}
 
 		lreader, err := d.Logs(context.TODO(), dr)
 		require.Nil(t, err)
 		require.NotNil(t, lreader)
-
 	})
 }
 
@@ -537,21 +565,31 @@ func TestDeployer_GetReplica(t *testing.T) {
 
 func TestDeployer_InstanceLogs(t *testing.T) {
 	dr := types.DeployRepo{
-		SpaceID:  0,
-		DeployID: 1,
-		UserUUID: "1",
-		Path:     "namespace/name",
-		Type:     types.InferenceType,
+		SpaceID:   0,
+		DeployID:  1,
+		UserUUID:  "1",
+		Path:      "namespace/name",
+		Type:      types.InferenceType,
+		ClusterID: "test",
 	}
 
-	mockRunner := mockrunner.NewMockRunner(t)
-	runLog := make(chan string)
-	defer close(runLog)
-	mockRunner.EXPECT().InstanceLogs(mock.Anything, mock.Anything).
-		Return(runLog, nil)
+	deploy := &database.Deploy{
+		Status:    common.Running,
+		SvcName:   "svc",
+		ClusterID: "test",
+	}
 
+	mockDeployTaskStore := mockdb.NewMockDeployTaskStore(t)
+	mockDeployTaskStore.EXPECT().GetLatestDeployBySpaceID(mock.Anything, dr.SpaceID).
+		Return(deploy, nil)
+
+	sender := mockSender.NewMockLogSender(t)
+
+	ch := make(chan string)
+	sender.EXPECT().StreamAllLogs(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(ch, nil)
 	d := &deployer{
-		imageRunner: mockRunner,
+		deployTaskStore: mockDeployTaskStore,
+		lokiClient:      sender,
 	}
 	lreader, err := d.InstanceLogs(context.TODO(), dr)
 	require.Nil(t, err)
@@ -735,18 +773,6 @@ func TestDeployer_SubmitEvaluation(t *testing.T) {
 	require.Equal(t, &types.ArgoWorkFlowRes{ID: 1}, resp)
 }
 
-func TestDeployer_ListEvaluations(t *testing.T) {
-	tester := newTestDeployer(t)
-	ctx := context.TODO()
-
-	tester.mocks.runner.EXPECT().ListWorkFlows(ctx, "user", 10, 1).Return(
-		&types.ArgoWorkFlowListRes{Total: 100}, nil,
-	)
-	r, err := tester.ListEvaluations(ctx, "user", 10, 1)
-	require.NoError(t, err)
-	require.Equal(t, &types.ArgoWorkFlowListRes{Total: 100}, r)
-}
-
 func TestDeployer_GetEvaluation(t *testing.T) {
 	tester := newTestDeployer(t)
 	ctx := context.TODO()
@@ -757,4 +783,104 @@ func TestDeployer_GetEvaluation(t *testing.T) {
 	r, err := tester.GetEvaluation(ctx, types.EvaluationGetReq{})
 	require.NoError(t, err)
 	require.Equal(t, &types.ArgoWorkFlowRes{ID: 100}, r)
+}
+
+func TestDeployer_getClusterMap(t *testing.T) {
+	clusterStore := mockdb.NewMockClusterInfoStore(t)
+	clusterStore.EXPECT().List(mock.Anything).Return([]database.ClusterInfo{
+		{
+			ClusterID: "cluster1",
+		},
+		{
+			ClusterID: "cluster2",
+		},
+	}, nil)
+
+	d := &deployer{
+		clusterStore: clusterStore,
+	}
+
+	res := d.getClusterMap()
+	require.Equal(t, map[string]database.ClusterInfo{
+		"cluster1": {
+			ClusterID: "cluster1",
+		},
+		"cluster2": {
+			ClusterID: "cluster2",
+		},
+	}, res)
+}
+
+func TestDeployer_CheckHeartbeatTimeout(t *testing.T) {
+	ctx := context.TODO()
+	t.Run("should return true when a cluster times out", func(t *testing.T) {
+		clusterStore := mockdb.NewMockClusterInfoStore(t)
+		cc := &deployer{
+			clusterStore: clusterStore,
+		}
+		clusters := []database.ClusterInfo{
+			{
+				ClusterID: "c1_timed_out",
+				Status:    types.ClusterStatusRunning,
+			},
+			{
+				ClusterID: "c2_active",
+				Status:    types.ClusterStatusRunning,
+			},
+		}
+		clusters[0].UpdatedAt = time.Now().Add(-10 * time.Minute)
+		clusters[1].UpdatedAt = time.Now()
+		clusterStore.EXPECT().ByClusterID(ctx, clusters[0].ClusterID).Once().Return(clusters[0], nil)
+		clusterStore.EXPECT().ByClusterID(ctx, clusters[1].ClusterID).Once().Return(clusters[1], nil)
+		cc.deployConfig.HeartBeatTimeInSec = 5 // seconds
+
+		timedOut, err := cc.CheckHeartbeatTimeout(ctx, "c1_timed_out")
+		require.NoError(t, err)
+		require.True(t, timedOut)
+
+		timedOut, err = cc.CheckHeartbeatTimeout(ctx, "c2_active")
+		require.NoError(t, err)
+		require.False(t, timedOut)
+	})
+
+	t.Run("should return false when no cluster times out", func(t *testing.T) {
+		clusterStore := mockdb.NewMockClusterInfoStore(t)
+		cc := &deployer{
+			clusterStore: clusterStore,
+		}
+		clusters := []database.ClusterInfo{
+			{
+				ClusterID: "c1_active",
+				Status:    types.ClusterStatusRunning,
+			},
+			{
+				ClusterID: "c2_active",
+				Status:    types.ClusterStatusRunning,
+			},
+			{
+				ClusterID: "c3_unavailable",
+				Status:    types.ClusterStatusUnavailable,
+			},
+		}
+
+		clusters[0].UpdatedAt = time.Now().Add(-1 * time.Minute)
+		clusters[1].UpdatedAt = time.Now()
+		clusters[2].UpdatedAt = time.Now().Add(-20 * time.Minute) // Should be timeout
+
+		clusterStore.EXPECT().ByClusterID(ctx, clusters[0].ClusterID).Once().Return(clusters[0], nil)
+		clusterStore.EXPECT().ByClusterID(ctx, clusters[1].ClusterID).Once().Return(clusters[1], nil)
+		clusterStore.EXPECT().ByClusterID(ctx, clusters[2].ClusterID).Once().Return(clusters[2], nil)
+		cc.deployConfig.HeartBeatTimeInSec = 5 * 60 // seconds
+		timedOut, err := cc.CheckHeartbeatTimeout(ctx, "c1_active")
+		require.NoError(t, err)
+		require.False(t, timedOut)
+
+		timedOut, err = cc.CheckHeartbeatTimeout(ctx, "c2_active")
+		require.NoError(t, err)
+		require.False(t, timedOut)
+
+		timedOut, err = cc.CheckHeartbeatTimeout(ctx, "c3_unavailable")
+		require.NoError(t, err)
+		require.True(t, timedOut)
+	})
 }

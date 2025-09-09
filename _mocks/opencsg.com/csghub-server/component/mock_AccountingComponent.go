@@ -6,6 +6,8 @@ import (
 	context "context"
 
 	mock "github.com/stretchr/testify/mock"
+	database "opencsg.com/csghub-server/builder/store/database"
+
 	types "opencsg.com/csghub-server/common/types"
 )
 
@@ -22,8 +24,538 @@ func (_m *MockAccountingComponent) EXPECT() *MockAccountingComponent_Expecter {
 	return &MockAccountingComponent_Expecter{mock: &_m.Mock}
 }
 
+// CreateOrUpdateQuota provides a mock function with given fields: currentUser, req
+func (_m *MockAccountingComponent) CreateOrUpdateQuota(currentUser string, req types.AcctQuotaReq) (interface{}, error) {
+	ret := _m.Called(currentUser, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateOrUpdateQuota")
+	}
+
+	var r0 interface{}
+	var r1 error
+	if rf, ok := ret.Get(0).(func(string, types.AcctQuotaReq) (interface{}, error)); ok {
+		return rf(currentUser, req)
+	}
+	if rf, ok := ret.Get(0).(func(string, types.AcctQuotaReq) interface{}); ok {
+		r0 = rf(currentUser, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(interface{})
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(string, types.AcctQuotaReq) error); ok {
+		r1 = rf(currentUser, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountingComponent_CreateOrUpdateQuota_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateOrUpdateQuota'
+type MockAccountingComponent_CreateOrUpdateQuota_Call struct {
+	*mock.Call
+}
+
+// CreateOrUpdateQuota is a helper method to define mock.On call
+//   - currentUser string
+//   - req types.AcctQuotaReq
+func (_e *MockAccountingComponent_Expecter) CreateOrUpdateQuota(currentUser interface{}, req interface{}) *MockAccountingComponent_CreateOrUpdateQuota_Call {
+	return &MockAccountingComponent_CreateOrUpdateQuota_Call{Call: _e.mock.On("CreateOrUpdateQuota", currentUser, req)}
+}
+
+func (_c *MockAccountingComponent_CreateOrUpdateQuota_Call) Run(run func(currentUser string, req types.AcctQuotaReq)) *MockAccountingComponent_CreateOrUpdateQuota_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(string), args[1].(types.AcctQuotaReq))
+	})
+	return _c
+}
+
+func (_c *MockAccountingComponent_CreateOrUpdateQuota_Call) Return(_a0 interface{}, _a1 error) *MockAccountingComponent_CreateOrUpdateQuota_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountingComponent_CreateOrUpdateQuota_Call) RunAndReturn(run func(string, types.AcctQuotaReq) (interface{}, error)) *MockAccountingComponent_CreateOrUpdateQuota_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// CreateOrder provides a mock function with given fields: currentUser, req
+func (_m *MockAccountingComponent) CreateOrder(currentUser string, req types.AcctOrderCreateReq) (*database.AccountOrder, error) {
+	ret := _m.Called(currentUser, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateOrder")
+	}
+
+	var r0 *database.AccountOrder
+	var r1 error
+	if rf, ok := ret.Get(0).(func(string, types.AcctOrderCreateReq) (*database.AccountOrder, error)); ok {
+		return rf(currentUser, req)
+	}
+	if rf, ok := ret.Get(0).(func(string, types.AcctOrderCreateReq) *database.AccountOrder); ok {
+		r0 = rf(currentUser, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.AccountOrder)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(string, types.AcctOrderCreateReq) error); ok {
+		r1 = rf(currentUser, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountingComponent_CreateOrder_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateOrder'
+type MockAccountingComponent_CreateOrder_Call struct {
+	*mock.Call
+}
+
+// CreateOrder is a helper method to define mock.On call
+//   - currentUser string
+//   - req types.AcctOrderCreateReq
+func (_e *MockAccountingComponent_Expecter) CreateOrder(currentUser interface{}, req interface{}) *MockAccountingComponent_CreateOrder_Call {
+	return &MockAccountingComponent_CreateOrder_Call{Call: _e.mock.On("CreateOrder", currentUser, req)}
+}
+
+func (_c *MockAccountingComponent_CreateOrder_Call) Run(run func(currentUser string, req types.AcctOrderCreateReq)) *MockAccountingComponent_CreateOrder_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(string), args[1].(types.AcctOrderCreateReq))
+	})
+	return _c
+}
+
+func (_c *MockAccountingComponent_CreateOrder_Call) Return(_a0 *database.AccountOrder, _a1 error) *MockAccountingComponent_CreateOrder_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountingComponent_CreateOrder_Call) RunAndReturn(run func(string, types.AcctOrderCreateReq) (*database.AccountOrder, error)) *MockAccountingComponent_CreateOrder_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// CreatePrice provides a mock function with given fields: currentUser, req
+func (_m *MockAccountingComponent) CreatePrice(currentUser string, req types.AcctPriceCreateReq) (interface{}, error) {
+	ret := _m.Called(currentUser, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreatePrice")
+	}
+
+	var r0 interface{}
+	var r1 error
+	if rf, ok := ret.Get(0).(func(string, types.AcctPriceCreateReq) (interface{}, error)); ok {
+		return rf(currentUser, req)
+	}
+	if rf, ok := ret.Get(0).(func(string, types.AcctPriceCreateReq) interface{}); ok {
+		r0 = rf(currentUser, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(interface{})
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(string, types.AcctPriceCreateReq) error); ok {
+		r1 = rf(currentUser, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountingComponent_CreatePrice_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreatePrice'
+type MockAccountingComponent_CreatePrice_Call struct {
+	*mock.Call
+}
+
+// CreatePrice is a helper method to define mock.On call
+//   - currentUser string
+//   - req types.AcctPriceCreateReq
+func (_e *MockAccountingComponent_Expecter) CreatePrice(currentUser interface{}, req interface{}) *MockAccountingComponent_CreatePrice_Call {
+	return &MockAccountingComponent_CreatePrice_Call{Call: _e.mock.On("CreatePrice", currentUser, req)}
+}
+
+func (_c *MockAccountingComponent_CreatePrice_Call) Run(run func(currentUser string, req types.AcctPriceCreateReq)) *MockAccountingComponent_CreatePrice_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(string), args[1].(types.AcctPriceCreateReq))
+	})
+	return _c
+}
+
+func (_c *MockAccountingComponent_CreatePrice_Call) Return(_a0 interface{}, _a1 error) *MockAccountingComponent_CreatePrice_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountingComponent_CreatePrice_Call) RunAndReturn(run func(string, types.AcctPriceCreateReq) (interface{}, error)) *MockAccountingComponent_CreatePrice_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// CreateQuotaStatement provides a mock function with given fields: currentUser, req
+func (_m *MockAccountingComponent) CreateQuotaStatement(currentUser string, req types.AcctQuotaStatementReq) (interface{}, error) {
+	ret := _m.Called(currentUser, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateQuotaStatement")
+	}
+
+	var r0 interface{}
+	var r1 error
+	if rf, ok := ret.Get(0).(func(string, types.AcctQuotaStatementReq) (interface{}, error)); ok {
+		return rf(currentUser, req)
+	}
+	if rf, ok := ret.Get(0).(func(string, types.AcctQuotaStatementReq) interface{}); ok {
+		r0 = rf(currentUser, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(interface{})
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(string, types.AcctQuotaStatementReq) error); ok {
+		r1 = rf(currentUser, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountingComponent_CreateQuotaStatement_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateQuotaStatement'
+type MockAccountingComponent_CreateQuotaStatement_Call struct {
+	*mock.Call
+}
+
+// CreateQuotaStatement is a helper method to define mock.On call
+//   - currentUser string
+//   - req types.AcctQuotaStatementReq
+func (_e *MockAccountingComponent_Expecter) CreateQuotaStatement(currentUser interface{}, req interface{}) *MockAccountingComponent_CreateQuotaStatement_Call {
+	return &MockAccountingComponent_CreateQuotaStatement_Call{Call: _e.mock.On("CreateQuotaStatement", currentUser, req)}
+}
+
+func (_c *MockAccountingComponent_CreateQuotaStatement_Call) Run(run func(currentUser string, req types.AcctQuotaStatementReq)) *MockAccountingComponent_CreateQuotaStatement_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(string), args[1].(types.AcctQuotaStatementReq))
+	})
+	return _c
+}
+
+func (_c *MockAccountingComponent_CreateQuotaStatement_Call) Return(_a0 interface{}, _a1 error) *MockAccountingComponent_CreateQuotaStatement_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountingComponent_CreateQuotaStatement_Call) RunAndReturn(run func(string, types.AcctQuotaStatementReq) (interface{}, error)) *MockAccountingComponent_CreateQuotaStatement_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// DeletePrice provides a mock function with given fields: currentUser, id
+func (_m *MockAccountingComponent) DeletePrice(currentUser string, id int64) (interface{}, error) {
+	ret := _m.Called(currentUser, id)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeletePrice")
+	}
+
+	var r0 interface{}
+	var r1 error
+	if rf, ok := ret.Get(0).(func(string, int64) (interface{}, error)); ok {
+		return rf(currentUser, id)
+	}
+	if rf, ok := ret.Get(0).(func(string, int64) interface{}); ok {
+		r0 = rf(currentUser, id)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(interface{})
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(string, int64) error); ok {
+		r1 = rf(currentUser, id)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountingComponent_DeletePrice_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeletePrice'
+type MockAccountingComponent_DeletePrice_Call struct {
+	*mock.Call
+}
+
+// DeletePrice is a helper method to define mock.On call
+//   - currentUser string
+//   - id int64
+func (_e *MockAccountingComponent_Expecter) DeletePrice(currentUser interface{}, id interface{}) *MockAccountingComponent_DeletePrice_Call {
+	return &MockAccountingComponent_DeletePrice_Call{Call: _e.mock.On("DeletePrice", currentUser, id)}
+}
+
+func (_c *MockAccountingComponent_DeletePrice_Call) Run(run func(currentUser string, id int64)) *MockAccountingComponent_DeletePrice_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(string), args[1].(int64))
+	})
+	return _c
+}
+
+func (_c *MockAccountingComponent_DeletePrice_Call) Return(_a0 interface{}, _a1 error) *MockAccountingComponent_DeletePrice_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountingComponent_DeletePrice_Call) RunAndReturn(run func(string, int64) (interface{}, error)) *MockAccountingComponent_DeletePrice_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetPriceByID provides a mock function with given fields: currentUser, id
+func (_m *MockAccountingComponent) GetPriceByID(currentUser string, id int64) (interface{}, error) {
+	ret := _m.Called(currentUser, id)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetPriceByID")
+	}
+
+	var r0 interface{}
+	var r1 error
+	if rf, ok := ret.Get(0).(func(string, int64) (interface{}, error)); ok {
+		return rf(currentUser, id)
+	}
+	if rf, ok := ret.Get(0).(func(string, int64) interface{}); ok {
+		r0 = rf(currentUser, id)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(interface{})
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(string, int64) error); ok {
+		r1 = rf(currentUser, id)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountingComponent_GetPriceByID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetPriceByID'
+type MockAccountingComponent_GetPriceByID_Call struct {
+	*mock.Call
+}
+
+// GetPriceByID is a helper method to define mock.On call
+//   - currentUser string
+//   - id int64
+func (_e *MockAccountingComponent_Expecter) GetPriceByID(currentUser interface{}, id interface{}) *MockAccountingComponent_GetPriceByID_Call {
+	return &MockAccountingComponent_GetPriceByID_Call{Call: _e.mock.On("GetPriceByID", currentUser, id)}
+}
+
+func (_c *MockAccountingComponent_GetPriceByID_Call) Run(run func(currentUser string, id int64)) *MockAccountingComponent_GetPriceByID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(string), args[1].(int64))
+	})
+	return _c
+}
+
+func (_c *MockAccountingComponent_GetPriceByID_Call) Return(_a0 interface{}, _a1 error) *MockAccountingComponent_GetPriceByID_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountingComponent_GetPriceByID_Call) RunAndReturn(run func(string, int64) (interface{}, error)) *MockAccountingComponent_GetPriceByID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetQuotaByID provides a mock function with given fields: currentUser
+func (_m *MockAccountingComponent) GetQuotaByID(currentUser string) (interface{}, error) {
+	ret := _m.Called(currentUser)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetQuotaByID")
+	}
+
+	var r0 interface{}
+	var r1 error
+	if rf, ok := ret.Get(0).(func(string) (interface{}, error)); ok {
+		return rf(currentUser)
+	}
+	if rf, ok := ret.Get(0).(func(string) interface{}); ok {
+		r0 = rf(currentUser)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(interface{})
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(string) error); ok {
+		r1 = rf(currentUser)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountingComponent_GetQuotaByID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetQuotaByID'
+type MockAccountingComponent_GetQuotaByID_Call struct {
+	*mock.Call
+}
+
+// GetQuotaByID is a helper method to define mock.On call
+//   - currentUser string
+func (_e *MockAccountingComponent_Expecter) GetQuotaByID(currentUser interface{}) *MockAccountingComponent_GetQuotaByID_Call {
+	return &MockAccountingComponent_GetQuotaByID_Call{Call: _e.mock.On("GetQuotaByID", currentUser)}
+}
+
+func (_c *MockAccountingComponent_GetQuotaByID_Call) Run(run func(currentUser string)) *MockAccountingComponent_GetQuotaByID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(string))
+	})
+	return _c
+}
+
+func (_c *MockAccountingComponent_GetQuotaByID_Call) Return(_a0 interface{}, _a1 error) *MockAccountingComponent_GetQuotaByID_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountingComponent_GetQuotaByID_Call) RunAndReturn(run func(string) (interface{}, error)) *MockAccountingComponent_GetQuotaByID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetQuotaStatement provides a mock function with given fields: currentUser, req
+func (_m *MockAccountingComponent) GetQuotaStatement(currentUser string, req types.AcctQuotaStatementReq) (interface{}, error) {
+	ret := _m.Called(currentUser, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetQuotaStatement")
+	}
+
+	var r0 interface{}
+	var r1 error
+	if rf, ok := ret.Get(0).(func(string, types.AcctQuotaStatementReq) (interface{}, error)); ok {
+		return rf(currentUser, req)
+	}
+	if rf, ok := ret.Get(0).(func(string, types.AcctQuotaStatementReq) interface{}); ok {
+		r0 = rf(currentUser, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(interface{})
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(string, types.AcctQuotaStatementReq) error); ok {
+		r1 = rf(currentUser, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountingComponent_GetQuotaStatement_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetQuotaStatement'
+type MockAccountingComponent_GetQuotaStatement_Call struct {
+	*mock.Call
+}
+
+// GetQuotaStatement is a helper method to define mock.On call
+//   - currentUser string
+//   - req types.AcctQuotaStatementReq
+func (_e *MockAccountingComponent_Expecter) GetQuotaStatement(currentUser interface{}, req interface{}) *MockAccountingComponent_GetQuotaStatement_Call {
+	return &MockAccountingComponent_GetQuotaStatement_Call{Call: _e.mock.On("GetQuotaStatement", currentUser, req)}
+}
+
+func (_c *MockAccountingComponent_GetQuotaStatement_Call) Run(run func(currentUser string, req types.AcctQuotaStatementReq)) *MockAccountingComponent_GetQuotaStatement_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(string), args[1].(types.AcctQuotaStatementReq))
+	})
+	return _c
+}
+
+func (_c *MockAccountingComponent_GetQuotaStatement_Call) Return(_a0 interface{}, _a1 error) *MockAccountingComponent_GetQuotaStatement_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountingComponent_GetQuotaStatement_Call) RunAndReturn(run func(string, types.AcctQuotaStatementReq) (interface{}, error)) *MockAccountingComponent_GetQuotaStatement_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ListBillsByUserIDAndDate provides a mock function with given fields: ctx, req
+func (_m *MockAccountingComponent) ListBillsByUserIDAndDate(ctx context.Context, req types.ActStatementsReq) (interface{}, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListBillsByUserIDAndDate")
+	}
+
+	var r0 interface{}
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.ActStatementsReq) (interface{}, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.ActStatementsReq) interface{}); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(interface{})
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.ActStatementsReq) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountingComponent_ListBillsByUserIDAndDate_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListBillsByUserIDAndDate'
+type MockAccountingComponent_ListBillsByUserIDAndDate_Call struct {
+	*mock.Call
+}
+
+// ListBillsByUserIDAndDate is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.ActStatementsReq
+func (_e *MockAccountingComponent_Expecter) ListBillsByUserIDAndDate(ctx interface{}, req interface{}) *MockAccountingComponent_ListBillsByUserIDAndDate_Call {
+	return &MockAccountingComponent_ListBillsByUserIDAndDate_Call{Call: _e.mock.On("ListBillsByUserIDAndDate", ctx, req)}
+}
+
+func (_c *MockAccountingComponent_ListBillsByUserIDAndDate_Call) Run(run func(ctx context.Context, req types.ActStatementsReq)) *MockAccountingComponent_ListBillsByUserIDAndDate_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.ActStatementsReq))
+	})
+	return _c
+}
+
+func (_c *MockAccountingComponent_ListBillsByUserIDAndDate_Call) Return(_a0 interface{}, _a1 error) *MockAccountingComponent_ListBillsByUserIDAndDate_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountingComponent_ListBillsByUserIDAndDate_Call) RunAndReturn(run func(context.Context, types.ActStatementsReq) (interface{}, error)) *MockAccountingComponent_ListBillsByUserIDAndDate_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ListMeteringsByUserIDAndTime provides a mock function with given fields: ctx, req
-func (_m *MockAccountingComponent) ListMeteringsByUserIDAndTime(ctx context.Context, req types.ACCT_STATEMENTS_REQ) (interface{}, error) {
+func (_m *MockAccountingComponent) ListMeteringsByUserIDAndTime(ctx context.Context, req types.ActStatementsReq) (interface{}, error) {
 	ret := _m.Called(ctx, req)
 
 	if len(ret) == 0 {
@@ -32,10 +564,10 @@ func (_m *MockAccountingComponent) ListMeteringsByUserIDAndTime(ctx context.Cont
 
 	var r0 interface{}
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, types.ACCT_STATEMENTS_REQ) (interface{}, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, types.ActStatementsReq) (interface{}, error)); ok {
 		return rf(ctx, req)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, types.ACCT_STATEMENTS_REQ) interface{}); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, types.ActStatementsReq) interface{}); ok {
 		r0 = rf(ctx, req)
 	} else {
 		if ret.Get(0) != nil {
@@ -43,7 +575,7 @@ func (_m *MockAccountingComponent) ListMeteringsByUserIDAndTime(ctx context.Cont
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, types.ACCT_STATEMENTS_REQ) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, types.ActStatementsReq) error); ok {
 		r1 = rf(ctx, req)
 	} else {
 		r1 = ret.Error(1)
@@ -59,14 +591,14 @@ type MockAccountingComponent_ListMeteringsByUserIDAndTime_Call struct {
 
 // ListMeteringsByUserIDAndTime is a helper method to define mock.On call
 //   - ctx context.Context
-//   - req types.ACCT_STATEMENTS_REQ
+//   - req types.ActStatementsReq
 func (_e *MockAccountingComponent_Expecter) ListMeteringsByUserIDAndTime(ctx interface{}, req interface{}) *MockAccountingComponent_ListMeteringsByUserIDAndTime_Call {
 	return &MockAccountingComponent_ListMeteringsByUserIDAndTime_Call{Call: _e.mock.On("ListMeteringsByUserIDAndTime", ctx, req)}
 }
 
-func (_c *MockAccountingComponent_ListMeteringsByUserIDAndTime_Call) Run(run func(ctx context.Context, req types.ACCT_STATEMENTS_REQ)) *MockAccountingComponent_ListMeteringsByUserIDAndTime_Call {
+func (_c *MockAccountingComponent_ListMeteringsByUserIDAndTime_Call) Run(run func(ctx context.Context, req types.ActStatementsReq)) *MockAccountingComponent_ListMeteringsByUserIDAndTime_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(types.ACCT_STATEMENTS_REQ))
+		run(args[0].(context.Context), args[1].(types.ActStatementsReq))
 	})
 	return _c
 }
@@ -76,7 +608,661 @@ func (_c *MockAccountingComponent_ListMeteringsByUserIDAndTime_Call) Return(_a0 
 	return _c
 }
 
-func (_c *MockAccountingComponent_ListMeteringsByUserIDAndTime_Call) RunAndReturn(run func(context.Context, types.ACCT_STATEMENTS_REQ) (interface{}, error)) *MockAccountingComponent_ListMeteringsByUserIDAndTime_Call {
+func (_c *MockAccountingComponent_ListMeteringsByUserIDAndTime_Call) RunAndReturn(run func(context.Context, types.ActStatementsReq) (interface{}, error)) *MockAccountingComponent_ListMeteringsByUserIDAndTime_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ListRechargeByUserIDAndTime provides a mock function with given fields: ctx, req
+func (_m *MockAccountingComponent) ListRechargeByUserIDAndTime(ctx context.Context, req types.AcctRechargeListReq) (interface{}, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListRechargeByUserIDAndTime")
+	}
+
+	var r0 interface{}
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.AcctRechargeListReq) (interface{}, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.AcctRechargeListReq) interface{}); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(interface{})
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.AcctRechargeListReq) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountingComponent_ListRechargeByUserIDAndTime_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListRechargeByUserIDAndTime'
+type MockAccountingComponent_ListRechargeByUserIDAndTime_Call struct {
+	*mock.Call
+}
+
+// ListRechargeByUserIDAndTime is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.AcctRechargeListReq
+func (_e *MockAccountingComponent_Expecter) ListRechargeByUserIDAndTime(ctx interface{}, req interface{}) *MockAccountingComponent_ListRechargeByUserIDAndTime_Call {
+	return &MockAccountingComponent_ListRechargeByUserIDAndTime_Call{Call: _e.mock.On("ListRechargeByUserIDAndTime", ctx, req)}
+}
+
+func (_c *MockAccountingComponent_ListRechargeByUserIDAndTime_Call) Run(run func(ctx context.Context, req types.AcctRechargeListReq)) *MockAccountingComponent_ListRechargeByUserIDAndTime_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.AcctRechargeListReq))
+	})
+	return _c
+}
+
+func (_c *MockAccountingComponent_ListRechargeByUserIDAndTime_Call) Return(_a0 interface{}, _a1 error) *MockAccountingComponent_ListRechargeByUserIDAndTime_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountingComponent_ListRechargeByUserIDAndTime_Call) RunAndReturn(run func(context.Context, types.AcctRechargeListReq) (interface{}, error)) *MockAccountingComponent_ListRechargeByUserIDAndTime_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ListStatementByUserIDAndTime provides a mock function with given fields: ctx, req
+func (_m *MockAccountingComponent) ListStatementByUserIDAndTime(ctx context.Context, req types.ActStatementsReq) (interface{}, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListStatementByUserIDAndTime")
+	}
+
+	var r0 interface{}
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.ActStatementsReq) (interface{}, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.ActStatementsReq) interface{}); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(interface{})
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.ActStatementsReq) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountingComponent_ListStatementByUserIDAndTime_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListStatementByUserIDAndTime'
+type MockAccountingComponent_ListStatementByUserIDAndTime_Call struct {
+	*mock.Call
+}
+
+// ListStatementByUserIDAndTime is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.ActStatementsReq
+func (_e *MockAccountingComponent_Expecter) ListStatementByUserIDAndTime(ctx interface{}, req interface{}) *MockAccountingComponent_ListStatementByUserIDAndTime_Call {
+	return &MockAccountingComponent_ListStatementByUserIDAndTime_Call{Call: _e.mock.On("ListStatementByUserIDAndTime", ctx, req)}
+}
+
+func (_c *MockAccountingComponent_ListStatementByUserIDAndTime_Call) Run(run func(ctx context.Context, req types.ActStatementsReq)) *MockAccountingComponent_ListStatementByUserIDAndTime_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.ActStatementsReq))
+	})
+	return _c
+}
+
+func (_c *MockAccountingComponent_ListStatementByUserIDAndTime_Call) Return(_a0 interface{}, _a1 error) *MockAccountingComponent_ListStatementByUserIDAndTime_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountingComponent_ListStatementByUserIDAndTime_Call) RunAndReturn(run func(context.Context, types.ActStatementsReq) (interface{}, error)) *MockAccountingComponent_ListStatementByUserIDAndTime_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// QueryAllUsersBalance provides a mock function with given fields: ctx, per, page
+func (_m *MockAccountingComponent) QueryAllUsersBalance(ctx context.Context, per int, page int) (interface{}, error) {
+	ret := _m.Called(ctx, per, page)
+
+	if len(ret) == 0 {
+		panic("no return value specified for QueryAllUsersBalance")
+	}
+
+	var r0 interface{}
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, int, int) (interface{}, error)); ok {
+		return rf(ctx, per, page)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, int, int) interface{}); ok {
+		r0 = rf(ctx, per, page)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(interface{})
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, int, int) error); ok {
+		r1 = rf(ctx, per, page)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountingComponent_QueryAllUsersBalance_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'QueryAllUsersBalance'
+type MockAccountingComponent_QueryAllUsersBalance_Call struct {
+	*mock.Call
+}
+
+// QueryAllUsersBalance is a helper method to define mock.On call
+//   - ctx context.Context
+//   - per int
+//   - page int
+func (_e *MockAccountingComponent_Expecter) QueryAllUsersBalance(ctx interface{}, per interface{}, page interface{}) *MockAccountingComponent_QueryAllUsersBalance_Call {
+	return &MockAccountingComponent_QueryAllUsersBalance_Call{Call: _e.mock.On("QueryAllUsersBalance", ctx, per, page)}
+}
+
+func (_c *MockAccountingComponent_QueryAllUsersBalance_Call) Run(run func(ctx context.Context, per int, page int)) *MockAccountingComponent_QueryAllUsersBalance_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int), args[2].(int))
+	})
+	return _c
+}
+
+func (_c *MockAccountingComponent_QueryAllUsersBalance_Call) Return(_a0 interface{}, _a1 error) *MockAccountingComponent_QueryAllUsersBalance_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountingComponent_QueryAllUsersBalance_Call) RunAndReturn(run func(context.Context, int, int) (interface{}, error)) *MockAccountingComponent_QueryAllUsersBalance_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// QueryBalanceByUserID provides a mock function with given fields: ctx, currentUser, userUUID
+func (_m *MockAccountingComponent) QueryBalanceByUserID(ctx context.Context, currentUser string, userUUID string) (interface{}, error) {
+	ret := _m.Called(ctx, currentUser, userUUID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for QueryBalanceByUserID")
+	}
+
+	var r0 interface{}
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) (interface{}, error)); ok {
+		return rf(ctx, currentUser, userUUID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) interface{}); ok {
+		r0 = rf(ctx, currentUser, userUUID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(interface{})
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+		r1 = rf(ctx, currentUser, userUUID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountingComponent_QueryBalanceByUserID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'QueryBalanceByUserID'
+type MockAccountingComponent_QueryBalanceByUserID_Call struct {
+	*mock.Call
+}
+
+// QueryBalanceByUserID is a helper method to define mock.On call
+//   - ctx context.Context
+//   - currentUser string
+//   - userUUID string
+func (_e *MockAccountingComponent_Expecter) QueryBalanceByUserID(ctx interface{}, currentUser interface{}, userUUID interface{}) *MockAccountingComponent_QueryBalanceByUserID_Call {
+	return &MockAccountingComponent_QueryBalanceByUserID_Call{Call: _e.mock.On("QueryBalanceByUserID", ctx, currentUser, userUUID)}
+}
+
+func (_c *MockAccountingComponent_QueryBalanceByUserID_Call) Run(run func(ctx context.Context, currentUser string, userUUID string)) *MockAccountingComponent_QueryBalanceByUserID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(string))
+	})
+	return _c
+}
+
+func (_c *MockAccountingComponent_QueryBalanceByUserID_Call) Return(_a0 interface{}, _a1 error) *MockAccountingComponent_QueryBalanceByUserID_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountingComponent_QueryBalanceByUserID_Call) RunAndReturn(run func(context.Context, string, string) (interface{}, error)) *MockAccountingComponent_QueryBalanceByUserID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// QueryBalanceByUserIDInternal provides a mock function with given fields: ctx, currentUser
+func (_m *MockAccountingComponent) QueryBalanceByUserIDInternal(ctx context.Context, currentUser string) (*database.AccountUser, error) {
+	ret := _m.Called(ctx, currentUser)
+
+	if len(ret) == 0 {
+		panic("no return value specified for QueryBalanceByUserIDInternal")
+	}
+
+	var r0 *database.AccountUser
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*database.AccountUser, error)); ok {
+		return rf(ctx, currentUser)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *database.AccountUser); ok {
+		r0 = rf(ctx, currentUser)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.AccountUser)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, currentUser)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountingComponent_QueryBalanceByUserIDInternal_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'QueryBalanceByUserIDInternal'
+type MockAccountingComponent_QueryBalanceByUserIDInternal_Call struct {
+	*mock.Call
+}
+
+// QueryBalanceByUserIDInternal is a helper method to define mock.On call
+//   - ctx context.Context
+//   - currentUser string
+func (_e *MockAccountingComponent_Expecter) QueryBalanceByUserIDInternal(ctx interface{}, currentUser interface{}) *MockAccountingComponent_QueryBalanceByUserIDInternal_Call {
+	return &MockAccountingComponent_QueryBalanceByUserIDInternal_Call{Call: _e.mock.On("QueryBalanceByUserIDInternal", ctx, currentUser)}
+}
+
+func (_c *MockAccountingComponent_QueryBalanceByUserIDInternal_Call) Run(run func(ctx context.Context, currentUser string)) *MockAccountingComponent_QueryBalanceByUserIDInternal_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockAccountingComponent_QueryBalanceByUserIDInternal_Call) Return(_a0 *database.AccountUser, _a1 error) *MockAccountingComponent_QueryBalanceByUserIDInternal_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountingComponent_QueryBalanceByUserIDInternal_Call) RunAndReturn(run func(context.Context, string) (*database.AccountUser, error)) *MockAccountingComponent_QueryBalanceByUserIDInternal_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// QueryPricesBySKUType provides a mock function with given fields: currentUser, req
+func (_m *MockAccountingComponent) QueryPricesBySKUType(currentUser string, req types.AcctPriceListReq) (*database.PriceResp, error) {
+	ret := _m.Called(currentUser, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for QueryPricesBySKUType")
+	}
+
+	var r0 *database.PriceResp
+	var r1 error
+	if rf, ok := ret.Get(0).(func(string, types.AcctPriceListReq) (*database.PriceResp, error)); ok {
+		return rf(currentUser, req)
+	}
+	if rf, ok := ret.Get(0).(func(string, types.AcctPriceListReq) *database.PriceResp); ok {
+		r0 = rf(currentUser, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.PriceResp)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(string, types.AcctPriceListReq) error); ok {
+		r1 = rf(currentUser, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountingComponent_QueryPricesBySKUType_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'QueryPricesBySKUType'
+type MockAccountingComponent_QueryPricesBySKUType_Call struct {
+	*mock.Call
+}
+
+// QueryPricesBySKUType is a helper method to define mock.On call
+//   - currentUser string
+//   - req types.AcctPriceListReq
+func (_e *MockAccountingComponent_Expecter) QueryPricesBySKUType(currentUser interface{}, req interface{}) *MockAccountingComponent_QueryPricesBySKUType_Call {
+	return &MockAccountingComponent_QueryPricesBySKUType_Call{Call: _e.mock.On("QueryPricesBySKUType", currentUser, req)}
+}
+
+func (_c *MockAccountingComponent_QueryPricesBySKUType_Call) Run(run func(currentUser string, req types.AcctPriceListReq)) *MockAccountingComponent_QueryPricesBySKUType_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(string), args[1].(types.AcctPriceListReq))
+	})
+	return _c
+}
+
+func (_c *MockAccountingComponent_QueryPricesBySKUType_Call) Return(_a0 *database.PriceResp, _a1 error) *MockAccountingComponent_QueryPricesBySKUType_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountingComponent_QueryPricesBySKUType_Call) RunAndReturn(run func(string, types.AcctPriceListReq) (*database.PriceResp, error)) *MockAccountingComponent_QueryPricesBySKUType_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// RechargeAccountingUser provides a mock function with given fields: ctx, userUUID, req
+func (_m *MockAccountingComponent) RechargeAccountingUser(ctx context.Context, userUUID string, req types.RechargeReq) (interface{}, error) {
+	ret := _m.Called(ctx, userUUID, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RechargeAccountingUser")
+	}
+
+	var r0 interface{}
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, types.RechargeReq) (interface{}, error)); ok {
+		return rf(ctx, userUUID, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, types.RechargeReq) interface{}); ok {
+		r0 = rf(ctx, userUUID, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(interface{})
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, types.RechargeReq) error); ok {
+		r1 = rf(ctx, userUUID, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountingComponent_RechargeAccountingUser_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RechargeAccountingUser'
+type MockAccountingComponent_RechargeAccountingUser_Call struct {
+	*mock.Call
+}
+
+// RechargeAccountingUser is a helper method to define mock.On call
+//   - ctx context.Context
+//   - userUUID string
+//   - req types.RechargeReq
+func (_e *MockAccountingComponent_Expecter) RechargeAccountingUser(ctx interface{}, userUUID interface{}, req interface{}) *MockAccountingComponent_RechargeAccountingUser_Call {
+	return &MockAccountingComponent_RechargeAccountingUser_Call{Call: _e.mock.On("RechargeAccountingUser", ctx, userUUID, req)}
+}
+
+func (_c *MockAccountingComponent_RechargeAccountingUser_Call) Run(run func(ctx context.Context, userUUID string, req types.RechargeReq)) *MockAccountingComponent_RechargeAccountingUser_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(types.RechargeReq))
+	})
+	return _c
+}
+
+func (_c *MockAccountingComponent_RechargeAccountingUser_Call) Return(_a0 interface{}, _a1 error) *MockAccountingComponent_RechargeAccountingUser_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountingComponent_RechargeAccountingUser_Call) RunAndReturn(run func(context.Context, string, types.RechargeReq) (interface{}, error)) *MockAccountingComponent_RechargeAccountingUser_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// RechargesIndex provides a mock function with given fields: ctx, req
+func (_m *MockAccountingComponent) RechargesIndex(ctx context.Context, req types.RechargesIndexReq) ([]*types.RechargeIndexResp, int, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RechargesIndex")
+	}
+
+	var r0 []*types.RechargeIndexResp
+	var r1 int
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.RechargesIndexReq) ([]*types.RechargeIndexResp, int, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.RechargesIndexReq) []*types.RechargeIndexResp); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*types.RechargeIndexResp)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.RechargesIndexReq) int); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, types.RechargesIndexReq) error); ok {
+		r2 = rf(ctx, req)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockAccountingComponent_RechargesIndex_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RechargesIndex'
+type MockAccountingComponent_RechargesIndex_Call struct {
+	*mock.Call
+}
+
+// RechargesIndex is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.RechargesIndexReq
+func (_e *MockAccountingComponent_Expecter) RechargesIndex(ctx interface{}, req interface{}) *MockAccountingComponent_RechargesIndex_Call {
+	return &MockAccountingComponent_RechargesIndex_Call{Call: _e.mock.On("RechargesIndex", ctx, req)}
+}
+
+func (_c *MockAccountingComponent_RechargesIndex_Call) Run(run func(ctx context.Context, req types.RechargesIndexReq)) *MockAccountingComponent_RechargesIndex_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.RechargesIndexReq))
+	})
+	return _c
+}
+
+func (_c *MockAccountingComponent_RechargesIndex_Call) Return(_a0 []*types.RechargeIndexResp, _a1 int, _a2 error) *MockAccountingComponent_RechargesIndex_Call {
+	_c.Call.Return(_a0, _a1, _a2)
+	return _c
+}
+
+func (_c *MockAccountingComponent_RechargesIndex_Call) RunAndReturn(run func(context.Context, types.RechargesIndexReq) ([]*types.RechargeIndexResp, int, error)) *MockAccountingComponent_RechargesIndex_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// StatementsIndex provides a mock function with given fields: ctx, req
+func (_m *MockAccountingComponent) StatementsIndex(ctx context.Context, req types.ActStatementsReq) ([]types.AcctStatementsRes, int, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for StatementsIndex")
+	}
+
+	var r0 []types.AcctStatementsRes
+	var r1 int
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.ActStatementsReq) ([]types.AcctStatementsRes, int, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.ActStatementsReq) []types.AcctStatementsRes); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]types.AcctStatementsRes)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.ActStatementsReq) int); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, types.ActStatementsReq) error); ok {
+		r2 = rf(ctx, req)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockAccountingComponent_StatementsIndex_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'StatementsIndex'
+type MockAccountingComponent_StatementsIndex_Call struct {
+	*mock.Call
+}
+
+// StatementsIndex is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.ActStatementsReq
+func (_e *MockAccountingComponent_Expecter) StatementsIndex(ctx interface{}, req interface{}) *MockAccountingComponent_StatementsIndex_Call {
+	return &MockAccountingComponent_StatementsIndex_Call{Call: _e.mock.On("StatementsIndex", ctx, req)}
+}
+
+func (_c *MockAccountingComponent_StatementsIndex_Call) Run(run func(ctx context.Context, req types.ActStatementsReq)) *MockAccountingComponent_StatementsIndex_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.ActStatementsReq))
+	})
+	return _c
+}
+
+func (_c *MockAccountingComponent_StatementsIndex_Call) Return(_a0 []types.AcctStatementsRes, _a1 int, _a2 error) *MockAccountingComponent_StatementsIndex_Call {
+	_c.Call.Return(_a0, _a1, _a2)
+	return _c
+}
+
+func (_c *MockAccountingComponent_StatementsIndex_Call) RunAndReturn(run func(context.Context, types.ActStatementsReq) ([]types.AcctStatementsRes, int, error)) *MockAccountingComponent_StatementsIndex_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// UpdatePrice provides a mock function with given fields: currentUser, req, id
+func (_m *MockAccountingComponent) UpdatePrice(currentUser string, req types.AcctPriceCreateReq, id int64) (interface{}, error) {
+	ret := _m.Called(currentUser, req, id)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdatePrice")
+	}
+
+	var r0 interface{}
+	var r1 error
+	if rf, ok := ret.Get(0).(func(string, types.AcctPriceCreateReq, int64) (interface{}, error)); ok {
+		return rf(currentUser, req, id)
+	}
+	if rf, ok := ret.Get(0).(func(string, types.AcctPriceCreateReq, int64) interface{}); ok {
+		r0 = rf(currentUser, req, id)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(interface{})
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(string, types.AcctPriceCreateReq, int64) error); ok {
+		r1 = rf(currentUser, req, id)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountingComponent_UpdatePrice_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdatePrice'
+type MockAccountingComponent_UpdatePrice_Call struct {
+	*mock.Call
+}
+
+// UpdatePrice is a helper method to define mock.On call
+//   - currentUser string
+//   - req types.AcctPriceCreateReq
+//   - id int64
+func (_e *MockAccountingComponent_Expecter) UpdatePrice(currentUser interface{}, req interface{}, id interface{}) *MockAccountingComponent_UpdatePrice_Call {
+	return &MockAccountingComponent_UpdatePrice_Call{Call: _e.mock.On("UpdatePrice", currentUser, req, id)}
+}
+
+func (_c *MockAccountingComponent_UpdatePrice_Call) Run(run func(currentUser string, req types.AcctPriceCreateReq, id int64)) *MockAccountingComponent_UpdatePrice_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(string), args[1].(types.AcctPriceCreateReq), args[2].(int64))
+	})
+	return _c
+}
+
+func (_c *MockAccountingComponent_UpdatePrice_Call) Return(_a0 interface{}, _a1 error) *MockAccountingComponent_UpdatePrice_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountingComponent_UpdatePrice_Call) RunAndReturn(run func(string, types.AcctPriceCreateReq, int64) (interface{}, error)) *MockAccountingComponent_UpdatePrice_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// WeeklyRecharges provides a mock function with given fields: ctx
+func (_m *MockAccountingComponent) WeeklyRecharges(ctx context.Context) error {
+	ret := _m.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for WeeklyRecharges")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context) error); ok {
+		r0 = rf(ctx)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockAccountingComponent_WeeklyRecharges_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'WeeklyRecharges'
+type MockAccountingComponent_WeeklyRecharges_Call struct {
+	*mock.Call
+}
+
+// WeeklyRecharges is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *MockAccountingComponent_Expecter) WeeklyRecharges(ctx interface{}) *MockAccountingComponent_WeeklyRecharges_Call {
+	return &MockAccountingComponent_WeeklyRecharges_Call{Call: _e.mock.On("WeeklyRecharges", ctx)}
+}
+
+func (_c *MockAccountingComponent_WeeklyRecharges_Call) Run(run func(ctx context.Context)) *MockAccountingComponent_WeeklyRecharges_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context))
+	})
+	return _c
+}
+
+func (_c *MockAccountingComponent_WeeklyRecharges_Call) Return(_a0 error) *MockAccountingComponent_WeeklyRecharges_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockAccountingComponent_WeeklyRecharges_Call) RunAndReturn(run func(context.Context) error) *MockAccountingComponent_WeeklyRecharges_Call {
 	_c.Call.Return(run)
 	return _c
 }

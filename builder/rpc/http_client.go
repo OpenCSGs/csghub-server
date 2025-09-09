@@ -9,7 +9,9 @@ import (
 	"net/url"
 	"strings"
 
+	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 )
 
 func NewHttpClient(endpoint string, opts ...RequestOption) *HttpClient {
@@ -58,20 +60,30 @@ func (c *HttpClient) Get(ctx context.Context, path string, outObj interface{}) e
 	path = fmt.Sprintf("%s%s", c.endpoint, path)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, path, nil)
 	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
+		return fmt.Errorf("failed to create request: %w", errorx.ErrInternalServerError)
 	}
 	for _, opt := range c.authOpts {
 		opt.Set(req)
 	}
 	resp, err := c.hc.Do(req)
 	if err != nil {
-		return fmt.Errorf("failed to do http request, path:%s, err:%w", path, err)
+		return fmt.Errorf("failed to do GET request, path:%s, err:%w", path, errorx.ErrInternalServerError)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
+		var errResp httpbase.R
+		jsonErr := json.NewDecoder(resp.Body).Decode(&errResp)
+		if jsonErr == nil {
+			customErr := errorx.ParseError(errResp.Msg, errorx.ErrRemoteServiceFail, errResp.Context)
+			return customErr
+		}
 		return fmt.Errorf("failed to get response, path:%s, status:%d", path, resp.StatusCode)
 	}
-	return json.NewDecoder(resp.Body).Decode(outObj)
+	err = json.NewDecoder(resp.Body).Decode(outObj)
+	if err != nil {
+		return fmt.Errorf("failed to decode resp body in HttpClient.Get, err:%w", errorx.ErrInternalServerError)
+	}
+	return nil
 }
 
 func (c *HttpClient) Post(ctx context.Context, path string, data interface{}, outObj interface{}) error {
@@ -94,7 +106,34 @@ func (c *HttpClient) Post(ctx context.Context, path string, data interface{}, ou
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
+		var errResp httpbase.R
+		jsonErr := json.NewDecoder(resp.Body).Decode(&errResp)
+		if jsonErr == nil {
+			customErr := errorx.ParseError(errResp.Msg, errorx.ErrRemoteServiceFail, errResp.Context)
+			return customErr
+		}
 		return fmt.Errorf("failed to get response, path:%s, status:%d", path, resp.StatusCode)
 	}
 	return json.NewDecoder(resp.Body).Decode(outObj)
+}
+
+func (c *HttpClient) PostResponse(ctx context.Context, path string, data interface{}) (*http.Response, error) {
+	path = fmt.Sprintf("%s%s", c.endpoint, path)
+	// serialize data as http request body
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal data: %w", err)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, path, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	for _, opt := range c.authOpts {
+		opt.Set(req)
+	}
+	resp, err := c.hc.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to do http request, path:%s, err:%w", path, err)
+	}
+	return resp, nil
 }

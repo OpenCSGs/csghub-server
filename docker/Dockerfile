@@ -1,18 +1,25 @@
-FROM opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/csghub_server:base-1.1 AS build-env
+FROM opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/csghub_server:base-3.0-build AS build-env
+ENV GOPROXY=https://goproxy.cn,direct
 WORKDIR /starhub
 COPY . .
-RUN  CGO_ENABLED=1 GOOS=linux go build -ldflags "-X opencsg.com/csghub-server/version.GitRevision=$(git rev-parse --short HEAD) -X opencsg.com/csghub-server/version.StarhubAPIVersion=$CI_COMMIT_TAG"  -v -o /go/bin/starhub ./cmd/csghub-server && \
-     rm -rf /go/pkg && \
-     rm -rf /starhub
 
-FROM opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/csghub_server:base-1.1
+ARG CSGHUB_TAGS
+ARG CI_COMMIT_SHORT_SHA
+ARG IMAGE_TAG
+RUN CGO_ENABLED=1 GOOS=linux go build \
+      -tags="$CSGHUB_TAGS" \
+      -ldflags "-X opencsg.com/csghub-server/version.GitRevision=${CI_COMMIT_SHORT_SHA} -X opencsg.com/csghub-server/version.StarhubAPIVersion=${IMAGE_TAG}" \
+      -v -o /go/bin/starhub ./cmd/csghub-server
+
+FROM opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/csghub_server:base-3.0-runtime
+
 WORKDIR /starhub-bin
 ENV GIN_MODE=release
 COPY --from=build-env /go/bin/starhub .
-COPY scripts/init.sh /starhub-bin/scripts/
 COPY docker/spaces/templates/ /starhub-bin/docker/spaces/templates/
 COPY configs/ /starhub-bin/configs/
-RUN chmod +x /starhub-bin/scripts/init.sh
+COPY common/config/config.toml.example /starhub-bin/config/config.toml
 
 EXPOSE 8080
-ENTRYPOINT ["/starhub-bin/scripts/init.sh"]
+# CMD is args for init.sh
+CMD ["/starhub-bin/starhub", "start", "server", "--config=/starhub-bin/config/config.toml"]

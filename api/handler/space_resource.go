@@ -8,6 +8,7 @@ import (
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
+	"opencsg.com/csghub-server/common/utils/common"
 	"opencsg.com/csghub-server/component"
 )
 
@@ -32,6 +33,8 @@ type SpaceResourceHandler struct {
 // @Tags         SpaceReource
 // @Accept       json
 // @Produce      json
+// @Param        per query int false "per" default(20)
+// @Param        page query int false "per page" default(1)
 // @Param        cluster_id query string false "cluster_id"
 // @Param 		 deploy_type query int false "deploy type(0-space,1-inference,2-finetune,3-serverless,4-evaluation)" Enums(0, 1, 2, 3, 4) default(1)
 // @Success      200  {object}  types.ResponseWithTotal{data=[]types.SpaceResource,total=int} "OK"
@@ -51,14 +54,30 @@ func (h *SpaceResourceHandler) Index(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	spaceResources, err := h.spaceResource.Index(ctx.Request.Context(), clusterId, deployType, "")
+	per, page, err := common.GetPerAndPageFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	currentUser := httpbase.GetCurrentUser(ctx)
+	req := &types.SpaceResourceIndexReq{
+		ClusterID:   clusterId,
+		DeployType:  deployType,
+		CurrentUser: currentUser,
+		PageOpts: types.PageOpts{
+			PageSize: per,
+			Page:     page,
+		},
+	}
+	spaceResources, total, err := h.spaceResource.Index(ctx.Request.Context(), req)
 	if err != nil {
 		slog.Error("Failed to get space resources", slog.String("cluster_id", clusterId), slog.String("deploy_type", deployTypeStr), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
 	slog.Info("Get space resources successfully")
-	httpbase.OK(ctx, spaceResources)
+	httpbase.OKWithTotal(ctx, spaceResources, total)
 }
 
 // CreateSpaceResource godoc

@@ -1,6 +1,7 @@
 package types
 
 type ResourceType string
+type PayMode string
 
 const (
 	ResourceTypeCPU   ResourceType = "cpu"
@@ -10,14 +11,23 @@ const (
 	ResourceTypeGPGPU ResourceType = "gpgpu"
 	ResourceTypeMLU   ResourceType = "mlu"
 	ResourceTypeDCU   ResourceType = "dcu"
+	PayModeFree       PayMode      = "free"
+	PayModeMinute     PayMode      = "minute"
+	PayModeMonth      PayMode      = "month"
+	PayModeYear       PayMode      = "year"
 )
 
 type SpaceResource struct {
-	ID          int64        `json:"id"`
-	Name        string       `json:"name"`
-	Resources   string       `json:"resources"`
-	IsAvailable bool         `json:"is_available"`
-	Type        ResourceType `json:"type"`
+	ID            int64        `json:"id"`
+	Name          string       `json:"name"`
+	ClusterID     string       `json:"cluster_id"`
+	Resources     string       `json:"resources"`
+	Price         float64      `json:"price"`
+	IsAvailable   bool         `json:"is_available"`
+	Type          ResourceType `json:"type"`
+	PayMode       PayMode      `json:"pay_mode"`
+	IsReserved    bool         `json:"is_reserved"`
+	OrderDetailId int64        `json:"order_detail_id"`
 }
 
 type CreateSpaceResourceReq struct {
@@ -30,4 +40,11 @@ type UpdateSpaceResourceReq struct {
 	ID        int64  `json:"-"`
 	Name      string `json:"name"`
 	Resources string `json:"resources"`
+}
+
+type SpaceResourceIndexReq struct {
+	ClusterID   string `json:"cluster_id"`
+	DeployType  int    `json:"deploy_type"`
+	CurrentUser string `json:"current_user"`
+	PageOpts
 }
