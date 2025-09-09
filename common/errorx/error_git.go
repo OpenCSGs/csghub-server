@@ -39,6 +39,8 @@ const (
 	gitDeleteRepositoryFailed
 	gitGetRepositoryFailed
 	gitServiceUnavaliable
+	gitCopyRepositoryFailed
+	gitReplicateRepositoryFailed
 )
 
 var (
@@ -283,6 +285,188 @@ var (
 	//
 	// zh-HK: Git服務不可用
 	ErrServiceUnavaliable error = CustomError{prefix: errGitPrefix, code: gitServiceUnavaliable}
+
+	// get git tree entry failed
+	//
+	// Description: Get git tree entry failed. This can be caused by network problems, authentication issues, or the specified tree entry does not exist.
+	//
+	// Description_ZH: 获取 git tree entry 失败。这可能由网络问题、身份验证问题或指定的 tree entry 不存在引起。
+	//
+	// en-US: Get git tree entry failed
+	//
+	// zh-CN: 获取 git tree entry 失败
+	//
+	// zh-HK: 獲取 git tree entry 失敗
+	ErrGetTreeEntryFailed error = CustomError{prefix: errGitPrefix, code: gitGetTreeEntryFailed}
+
+	// commit git files failed
+	//
+	// Description: Commit git files failed. This can be caused by network problems, authentication issues, or the specified files do not exist.
+	//
+	// Description_ZH: 提交 git 文件失败。这可能由网络问题、身份验证问题或指定的文件不存在引起。
+	//
+	// en-US: Commit git files failed
+	//
+	// zh-CN: 提交 git 文件失败
+	//
+	// zh-HK: 提交 git 文件失敗
+	ErrCommitFilesFailed error = CustomError{prefix: errGitPrefix, code: gitCommitFilesFailed}
+	// get git blobs failed
+	//
+	// Description: Get git blobs failed. This can be caused by network problems, authentication issues, or the specified blobs do not exist.
+	//
+	// Description_ZH: 获取 git blobs 失败。这可能由网络问题、身份验证问题或指定的 blobs 不存在引起。
+	//
+	// en-US: Get git blobs failed
+	//
+	// zh-CN: 获取 git blobs 失败
+	//
+	// zh-HK: 獲取 git blobs 失敗
+	ErrGetBlobsFailed error = CustomError{prefix: errGitPrefix, code: gitGetBlobsFailed}
+	// get git lfs pointers failed
+	//
+	// Description: Get git lfs pointers failed. This can be caused by network problems, authentication issues, or the specified lfs pointers do not exist.
+	//
+	// Description_ZH: 获取 git lfs pointers 失败。这可能由网络问题、身份验证问题或指定的 lfs pointers 不存在引起。
+	//
+	// en-US: Get git lfs pointers failed
+	//
+	// zh-CN: 获取 git lfs pointers 失败
+	//
+	// zh-HK: 獲取 git lfs pointers 失敗
+	ErrGetLfsPointersFailed error = CustomError{prefix: errGitPrefix, code: gitGetLfsPointersFailed}
+	// get git tree last commit failed
+	//
+	// Description: Get git tree last commit failed. This can be caused by network problems, authentication issues, or the specified tree does not exist.
+	//
+	// Description_ZH: 获取 git tree 最后一次提交失败。这可能由网络问题、身份验证问题或指定的 tree 不存在引起。
+	//
+	// en-US: Get git tree last commit failed
+	//
+	// zh-CN: 获取 git tree 最后一次提交失败
+	//
+	// zh-HK: 獲取 git tree 最後一次提交失敗
+	ErrListLastCommitsForTreeFailed error = CustomError{prefix: errGitPrefix, code: gitListLastCommitsForTreeFailed}
+	// get git blob info failed
+	//
+	// Description: Get git blob info failed. This can be caused by network problems, authentication issues, or the specified blob does not exist.
+	//
+	// Description_ZH: 获取 git blob 信息失败。这可能由网络问题、身份验证问题或指定的 blob 不存在引起。
+	//
+	// en-US: Get git blob info failed
+	//
+	// zh-CN: 获取 git blob 信息失败
+	//
+	// zh-HK: 獲取 git blob 信息失敗
+	ErrGetBlobInfoFailed error = CustomError{prefix: errGitPrefix, code: gitGetBlobInfoFailed}
+	// get git files failed
+	//
+	// Description: Get git files failed. This can be caused by network problems, authentication issues, or the specified files do not exist.
+	//
+	// Description_ZH: 获取 git 文件失败。这可能由网络问题、身份验证问题或指定的文件不存在引起。
+	//
+	// en-US: Get git files failed
+	//
+	// zh-CN: 获取 git 文件失败
+	//
+	// zh-HK: 獲取 git 文件失敗
+	ErrListFilesFailed error = CustomError{prefix: errGitPrefix, code: gitListFilesFailed}
+	// create mirror failed
+	//
+	// Description: Create mirror failed. This can be caused by network problems, authentication issues, or the specified repository does not exist.
+	//
+	// Description_ZH: 创建镜像失败。这可能由网络问题、身份验证问题或指定的仓库不存在引起。
+	//
+	// en-US: Create mirror failed
+	//
+	// zh-CN: 创建镜像失败
+	//
+	// zh-HK: 建立鏡像失敗
+	ErrCreateMirrorFailed error = CustomError{prefix: errGitPrefix, code: gitCreateMirrorFailed}
+	// sync mirror failed
+	//
+	// Description: Sync mirror failed. This can be caused by network problems, authentication issues, or the specified repository does not exist.
+	//
+	// Description_ZH: 同步镜像失败。这可能由网络问题、身份验证问题或指定的仓库不存在引起。
+	//
+	// en-US: Sync mirror failed
+	//
+	// zh-CN: 同步镜像失败
+	//
+	// zh-HK: 同步鏡像失敗
+	ErrMirrorSyncFailed error = CustomError{prefix: errGitPrefix, code: gitMirrorSyncFailed}
+	// check repository exists failed
+	//
+	// Description: Check repository exists failed. This can be caused by network problems, authentication issues, or the specified repository does not exist.
+	//
+	// Description_ZH: 检查仓库是否存在失败。这可能由网络问题、身份验证问题或指定的仓库不存在引起。
+	//
+	// en-US: Check repository exists failed
+	//
+	// zh-CN: 检查仓库是否存在失败
+	//
+	// zh-HK: 檢查倉庫是否存在失敗
+	ErrCheckRepositoryExistsFailed error = CustomError{prefix: errGitPrefix, code: gitCheckRepositoryExistsFailed}
+	// create repository failed
+	//
+	// Description: Create repository failed. This can be caused by network problems, authentication issues.
+	//
+	// Description_ZH: 创建仓库失败。这可能由网络问题、身份验证问题引起。
+	//
+	// en-US: Create repository failed
+	//
+	// zh-CN: 创建仓库失败
+	//
+	// zh-HK: 創建倉庫失敗
+	ErrCreateRepositoryFailed error = CustomError{prefix: errGitPrefix, code: gitCreateRepositoryFailed}
+	//  delete repository failed
+	//
+	// Description: delete repository failed. This can be caused by network problems, authentication issues, or the specified repository does not exist.
+	//
+	// Description_ZH: 删除仓库失败。这可能由网络问题、身份验证问题或指定的仓库不存在引起。
+	//
+	// en-US: delete repository failed
+	//
+	// zh-CN: 删除仓库失败
+	//
+	// zh-HK: 刪除倉庫失敗
+	ErrDeleteRepositoryFailed error = CustomError{prefix: errGitPrefix, code: gitDeleteRepositoryFailed}
+	// get repository failed
+	//
+	// Description: get repository failed. This can be caused by network problems, authentication issues, or the specified repository does not exist.
+	//
+	// Description_ZH: 获取仓库失败。这可能由网络问题、身份验证问题或指定的仓库不存在引起。
+	//
+	// en-US: get repository failed
+	//
+	// zh-CN: 获取仓库失败
+	//
+	// zh-HK: 取得倉庫失敗
+	ErrGetRepositoryFailed error = CustomError{prefix: errGitPrefix, code: gitGetRepositoryFailed}
+	// copy repository failed
+	//
+	// Description: copy repository failed. This can be caused by network problems, authentication issues, or the specified repository does not exist.
+	//
+	// Description_ZH: 复制仓库失败。这可能由网络问题、身份验证问题或指定的仓库不存在引起。
+	//
+	// en-US: copy repository failed
+	//
+	// zh-CN: 复制仓库失败
+	//
+	// zh-HK: 複製倉庫失敗
+	ErrCopyRepositoryFailed error = CustomError{prefix: errGitPrefix, code: gitCopyRepositoryFailed}
+	// replicate repository failed
+	//
+	// Description: replicate repository failed. This can be caused by network problems, authentication issues, or the specified repository does not exist.
+	//
+	// Description_ZH: 转移仓库失败。这可能由网络问题、身份验证问题或指定的仓库不存在引起。
+	//
+	// en-US: replicate repository failed
+	//
+	// zh-CN: 转移仓库失败
+	//
+	// zh-HK: 转移倉庫失敗
+	ErrGitReplicateRepositoryFailed error = CustomError{prefix: errGitPrefix, code: gitReplicateRepositoryFailed}
 )
 
 func FindCommitFailed(err error, ctx context) error {
@@ -478,6 +662,15 @@ func ErrGitGetRepositoryFailed(err error, ctx context) error {
 	return CustomError{
 		prefix:  errGitPrefix,
 		code:    gitGetRepositoryFailed,
+		err:     err,
+		context: ctx,
+	}
+}
+
+func ErrGitCopyRepositoryFailed(err error, ctx context) error {
+	return CustomError{
+		prefix:  errGitPrefix,
+		code:    gitCopyRepositoryFailed,
 		err:     err,
 		context: ctx,
 	}

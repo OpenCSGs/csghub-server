@@ -13,7 +13,6 @@ import (
 	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/event"
-	"opencsg.com/csghub-server/builder/redis"
 	"opencsg.com/csghub-server/builder/store/cache"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/store/database/migrations"
@@ -64,11 +63,7 @@ var serverCmd = &cobra.Command{
 			Dialect: database.DatabaseDialect(cfg.Database.Driver),
 			DSN:     cfg.Database.DSN,
 		}
-		slog.Info("init database connection", "dialect", dbConfig.Dialect)
-		if err := database.InitDB(dbConfig); err != nil {
-			slog.Error("failed to initialize database", slog.Any("error", err))
-			return fmt.Errorf("database initialization failed: %w", err)
-		}
+		database.InitDB(dbConfig)
 
 		migrator := migrations.NewMigrator(database.GetDB())
 
@@ -110,15 +105,11 @@ var serverCmd = &cobra.Command{
 		}
 
 		slog.Info("init event publisher")
-		err = event.InitEventPublisher(cfg)
+		err = event.InitEventPublisher(cfg, nil)
 		if err != nil {
 			return fmt.Errorf("fail to initialize message queue, %w", err)
 		}
 		s3Internal := len(cfg.S3.InternalEndpoint) > 0
-		slog.Info("init distributed locker")
-		redisLocker := redis.InitDistributedLocker(cfg)
-
-		slog.Info("init model inference deployer")
 		err = deploy.Init(common.DeployConfig{
 			ImageBuilderURL:         cfg.Space.BuilderEndpoint,
 			ImageRunnerURL:          cfg.Space.RunnerEndpoint,
@@ -127,27 +118,22 @@ var serverCmd = &cobra.Command{
 			SpaceDeployTimeoutInMin: cfg.Space.DeployTimeoutInMin,
 			ModelDeployTimeoutInMin: cfg.Model.DeployTimeoutInMin,
 			ModelDownloadEndpoint:   cfg.Model.DownloadEndpoint,
-			ChargingEnable:          cfg.Accounting.ChargingEnable,
 			PublicRootDomain:        cfg.Space.PublicRootDomain,
 			S3Internal:              s3Internal,
-			RedisLocker:             redisLocker,
-			UniqueServiceName:       cfg.UniqueServiceName,
+			IsMasterHost:            cfg.IsMasterHost,
 			APIToken:                cfg.APIToken,
-			APIKey:                  cfg.APIToken,
-			HeartBeatTimeInSec:      cfg.Runner.HearBeatIntervalInSec,
-		}, cfg)
+			NotificationEndpoint:    fmt.Sprintf("%s:%d", cfg.Notification.Host, cfg.Notification.Port),
+		})
 		if err != nil {
 			return fmt.Errorf("failed to init deploy: %w", err)
 		}
 
-		slog.Info("start temporal workflow")
 		err = workflow.StartWorkflow(cfg)
 		if err != nil {
 			return err
 		}
-
-		slog.Info("start api server")
 		router.RunServer(cfg, enableSwagger)
+
 		return nil
 	},
 }

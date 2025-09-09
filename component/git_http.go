@@ -282,7 +282,7 @@ func (c *gitHTTPComponentImpl) lfsBatchUploadInfo(ctx context.Context, req types
 			Pointer: obj,
 		}
 
-		if largeFileWithoutMultipart(req, obj) {
+		if c.config.Git.LimitLfsFileUploadSize && largeFileWithoutMultipart(req, obj) {
 			resp.Error = &types.ObjectError{
 				Code:    http.StatusUnprocessableEntity,
 				Message: "Please use csghub-sdk to upload files > 5GB.\n",

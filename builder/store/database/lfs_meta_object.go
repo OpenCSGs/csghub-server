@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"time"
+
+	"github.com/uptrace/bun"
 )
 
 type lfsMetaObjectStoreImpl struct {
@@ -16,7 +18,7 @@ type LfsMetaObjectStore interface {
 	Create(ctx context.Context, lfsObj LfsMetaObject) (*LfsMetaObject, error)
 	RemoveByOid(ctx context.Context, oid string, repoID int64) error
 	UpdateOrCreate(ctx context.Context, input LfsMetaObject) (*LfsMetaObject, error)
-	BulkUpdateOrCreate(ctx context.Context, input []LfsMetaObject) error
+	BulkUpdateOrCreate(ctx context.Context, repoID int64, input []LfsMetaObject) error
 }
 
 func NewLfsMetaObjectStore() LfsMetaObjectStore {
@@ -103,14 +105,24 @@ func (s *lfsMetaObjectStoreImpl) UpdateOrCreate(ctx context.Context, input LfsMe
 	return &input, nil
 }
 
-func (s *lfsMetaObjectStoreImpl) BulkUpdateOrCreate(ctx context.Context, input []LfsMetaObject) error {
-	if len(input) == 0 {
-		return nil
-	}
-	_, err := s.db.Core.NewInsert().
-		Model(&input).
-		On("CONFLICT (oid, repository_id) DO UPDATE").
-		Set("size = EXCLUDED.size, updated_at = EXCLUDED.updated_at, existing = EXCLUDED.existing").
-		Exec(ctx)
-	return err
+func (s *lfsMetaObjectStoreImpl) BulkUpdateOrCreate(ctx context.Context, repoID int64, input []LfsMetaObject) error {
+	return s.db.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		// Delete all existing records
+		_, err := tx.NewDelete().
+			Model(&LfsMetaObject{}).
+			Where("repository_id = ?", repoID).
+			Exec(ctx)
+		if err != nil {
+			return err
+		}
+
+		if len(input) == 0 {
+			return nil
+		}
+		// Insert new records
+		_, err = tx.NewInsert().
+			Model(&input).
+			Exec(ctx)
+		return err
+	})
 }

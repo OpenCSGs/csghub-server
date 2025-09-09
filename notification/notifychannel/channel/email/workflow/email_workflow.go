@@ -25,7 +25,7 @@ func BroadcastEmailWorkflow(ctx workflow.Context, emailReq types.EmailReq, email
 		RetryPolicy:         retryPolicy,
 	}
 
-	ctx = workflow.WithActivityOptions(ctx, options)
+	actCtx := workflow.WithActivityOptions(ctx, options)
 
 	// default to get email from user
 	getEmailsActivity := GetEmailFromUserActivity
@@ -42,7 +42,7 @@ func BroadcastEmailWorkflow(ctx workflow.Context, emailReq types.EmailReq, email
 			EmailReq: emailReq,
 		}
 		var batchResult activity.BatchGetEmailResult
-		err := workflow.ExecuteActivity(ctx, getEmailsActivity, input).Get(ctx, &batchResult)
+		err := workflow.ExecuteActivity(actCtx, getEmailsActivity, input).Get(ctx, &batchResult)
 		if err != nil {
 			return fmt.Errorf("failed to get email list, error: %w", err)
 		}
@@ -50,7 +50,7 @@ func BroadcastEmailWorkflow(ctx workflow.Context, emailReq types.EmailReq, email
 		page++
 
 		if len(batchResult.Emails) > 0 {
-			err := workflow.ExecuteActivity(ctx, SendEmailBatchActivity, emailReq, batchResult.Emails).Get(ctx, nil)
+			err := workflow.ExecuteActivity(actCtx, SendEmailBatchActivity, emailReq, batchResult.Emails).Get(ctx, nil)
 			if err != nil {
 				return fmt.Errorf("failed to send email, error: %w", err)
 			}
