@@ -128,34 +128,41 @@ func (_c *MockSpaceResourceComponent_Delete_Call) RunAndReturn(run func(context.
 	return _c
 }
 
-// Index provides a mock function with given fields: ctx, clusterId, deployType, currentUser
-func (_m *MockSpaceResourceComponent) Index(ctx context.Context, clusterId string, deployType int, currentUser string) ([]types.SpaceResource, error) {
-	ret := _m.Called(ctx, clusterId, deployType, currentUser)
+// Index provides a mock function with given fields: ctx, req
+func (_m *MockSpaceResourceComponent) Index(ctx context.Context, req *types.SpaceResourceIndexReq) ([]types.SpaceResource, int, error) {
+	ret := _m.Called(ctx, req)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Index")
 	}
 
 	var r0 []types.SpaceResource
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, int, string) ([]types.SpaceResource, error)); ok {
-		return rf(ctx, clusterId, deployType, currentUser)
+	var r1 int
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, *types.SpaceResourceIndexReq) ([]types.SpaceResource, int, error)); ok {
+		return rf(ctx, req)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, int, string) []types.SpaceResource); ok {
-		r0 = rf(ctx, clusterId, deployType, currentUser)
+	if rf, ok := ret.Get(0).(func(context.Context, *types.SpaceResourceIndexReq) []types.SpaceResource); ok {
+		r0 = rf(ctx, req)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]types.SpaceResource)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, int, string) error); ok {
-		r1 = rf(ctx, clusterId, deployType, currentUser)
+	if rf, ok := ret.Get(1).(func(context.Context, *types.SpaceResourceIndexReq) int); ok {
+		r1 = rf(ctx, req)
 	} else {
-		r1 = ret.Error(1)
+		r1 = ret.Get(1).(int)
 	}
 
-	return r0, r1
+	if rf, ok := ret.Get(2).(func(context.Context, *types.SpaceResourceIndexReq) error); ok {
+		r2 = rf(ctx, req)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
 // MockSpaceResourceComponent_Index_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Index'
@@ -165,26 +172,24 @@ type MockSpaceResourceComponent_Index_Call struct {
 
 // Index is a helper method to define mock.On call
 //   - ctx context.Context
-//   - clusterId string
-//   - deployType int
-//   - currentUser string
-func (_e *MockSpaceResourceComponent_Expecter) Index(ctx interface{}, clusterId interface{}, deployType interface{}, currentUser interface{}) *MockSpaceResourceComponent_Index_Call {
-	return &MockSpaceResourceComponent_Index_Call{Call: _e.mock.On("Index", ctx, clusterId, deployType, currentUser)}
+//   - req *types.SpaceResourceIndexReq
+func (_e *MockSpaceResourceComponent_Expecter) Index(ctx interface{}, req interface{}) *MockSpaceResourceComponent_Index_Call {
+	return &MockSpaceResourceComponent_Index_Call{Call: _e.mock.On("Index", ctx, req)}
 }
 
-func (_c *MockSpaceResourceComponent_Index_Call) Run(run func(ctx context.Context, clusterId string, deployType int, currentUser string)) *MockSpaceResourceComponent_Index_Call {
+func (_c *MockSpaceResourceComponent_Index_Call) Run(run func(ctx context.Context, req *types.SpaceResourceIndexReq)) *MockSpaceResourceComponent_Index_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(int), args[3].(string))
+		run(args[0].(context.Context), args[1].(*types.SpaceResourceIndexReq))
 	})
 	return _c
 }
 
-func (_c *MockSpaceResourceComponent_Index_Call) Return(_a0 []types.SpaceResource, _a1 error) *MockSpaceResourceComponent_Index_Call {
-	_c.Call.Return(_a0, _a1)
+func (_c *MockSpaceResourceComponent_Index_Call) Return(_a0 []types.SpaceResource, _a1 int, _a2 error) *MockSpaceResourceComponent_Index_Call {
+	_c.Call.Return(_a0, _a1, _a2)
 	return _c
 }
 
-func (_c *MockSpaceResourceComponent_Index_Call) RunAndReturn(run func(context.Context, string, int, string) ([]types.SpaceResource, error)) *MockSpaceResourceComponent_Index_Call {
+func (_c *MockSpaceResourceComponent_Index_Call) RunAndReturn(run func(context.Context, *types.SpaceResourceIndexReq) ([]types.SpaceResource, int, error)) *MockSpaceResourceComponent_Index_Call {
 	_c.Call.Return(run)
 	return _c
 }
