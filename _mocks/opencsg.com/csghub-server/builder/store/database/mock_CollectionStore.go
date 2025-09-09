@@ -500,6 +500,65 @@ func (_c *MockCollectionStore_GetCollection_Call) RunAndReturn(run func(context.
 	return _c
 }
 
+// GetCollectionRepos provides a mock function with given fields: ctx, id
+func (_m *MockCollectionStore) GetCollectionRepos(ctx context.Context, id int64) ([]database.CollectionRepository, error) {
+	ret := _m.Called(ctx, id)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetCollectionRepos")
+	}
+
+	var r0 []database.CollectionRepository
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64) ([]database.CollectionRepository, error)); ok {
+		return rf(ctx, id)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, int64) []database.CollectionRepository); ok {
+		r0 = rf(ctx, id)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.CollectionRepository)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, int64) error); ok {
+		r1 = rf(ctx, id)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockCollectionStore_GetCollectionRepos_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetCollectionRepos'
+type MockCollectionStore_GetCollectionRepos_Call struct {
+	*mock.Call
+}
+
+// GetCollectionRepos is a helper method to define mock.On call
+//   - ctx context.Context
+//   - id int64
+func (_e *MockCollectionStore_Expecter) GetCollectionRepos(ctx interface{}, id interface{}) *MockCollectionStore_GetCollectionRepos_Call {
+	return &MockCollectionStore_GetCollectionRepos_Call{Call: _e.mock.On("GetCollectionRepos", ctx, id)}
+}
+
+func (_c *MockCollectionStore_GetCollectionRepos_Call) Run(run func(ctx context.Context, id int64)) *MockCollectionStore_GetCollectionRepos_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64))
+	})
+	return _c
+}
+
+func (_c *MockCollectionStore_GetCollectionRepos_Call) Return(_a0 []database.CollectionRepository, _a1 error) *MockCollectionStore_GetCollectionRepos_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockCollectionStore_GetCollectionRepos_Call) RunAndReturn(run func(context.Context, int64) ([]database.CollectionRepository, error)) *MockCollectionStore_GetCollectionRepos_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetCollections provides a mock function with given fields: ctx, filter, per, page, showPrivate
 func (_m *MockCollectionStore) GetCollections(ctx context.Context, filter *types.CollectionFilter, per int, page int, showPrivate bool) ([]database.Collection, int, error) {
 	ret := _m.Called(ctx, filter, per, page, showPrivate)
@@ -808,6 +867,53 @@ func (_c *MockCollectionStore_UpdateCollection_Call) Return(_a0 *database.Collec
 }
 
 func (_c *MockCollectionStore_UpdateCollection_Call) RunAndReturn(run func(context.Context, database.Collection) (*database.Collection, error)) *MockCollectionStore_UpdateCollection_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// UpdateCollectionRepo provides a mock function with given fields: ctx, crs
+func (_m *MockCollectionStore) UpdateCollectionRepo(ctx context.Context, crs database.CollectionRepository) error {
+	ret := _m.Called(ctx, crs)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateCollectionRepo")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, database.CollectionRepository) error); ok {
+		r0 = rf(ctx, crs)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockCollectionStore_UpdateCollectionRepo_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateCollectionRepo'
+type MockCollectionStore_UpdateCollectionRepo_Call struct {
+	*mock.Call
+}
+
+// UpdateCollectionRepo is a helper method to define mock.On call
+//   - ctx context.Context
+//   - crs database.CollectionRepository
+func (_e *MockCollectionStore_Expecter) UpdateCollectionRepo(ctx interface{}, crs interface{}) *MockCollectionStore_UpdateCollectionRepo_Call {
+	return &MockCollectionStore_UpdateCollectionRepo_Call{Call: _e.mock.On("UpdateCollectionRepo", ctx, crs)}
+}
+
+func (_c *MockCollectionStore_UpdateCollectionRepo_Call) Run(run func(ctx context.Context, crs database.CollectionRepository)) *MockCollectionStore_UpdateCollectionRepo_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(database.CollectionRepository))
+	})
+	return _c
+}
+
+func (_c *MockCollectionStore_UpdateCollectionRepo_Call) Return(_a0 error) *MockCollectionStore_UpdateCollectionRepo_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockCollectionStore_UpdateCollectionRepo_Call) RunAndReturn(run func(context.Context, database.CollectionRepository) error) *MockCollectionStore_UpdateCollectionRepo_Call {
 	_c.Call.Return(run)
 	return _c
 }

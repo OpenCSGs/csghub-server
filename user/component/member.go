@@ -9,14 +9,16 @@ import (
 	"log/slog"
 	"time"
 
+	"opencsg.com/csghub-server/common/errorx"
+
 	"github.com/google/uuid"
+
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
-	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -25,7 +27,6 @@ type memberComponentImpl struct {
 	orgStore              database.OrgStore
 	userStore             database.UserStore
 	gitServer             gitserver.GitServer
-	gitMemberShip         membership.GitMemerShip
 	config                *config.Config
 	notificationSvcClient rpc.NotificationSvcClient
 }
@@ -43,16 +44,9 @@ type MemberComponent interface {
 }
 
 func NewMemberComponent(config *config.Config) (MemberComponent, error) {
-	var gms membership.GitMemerShip
 	gs, err := git.NewGitServer(config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create git server:%w", err)
-	}
-	if config.GitServer.Type == types.GitServerTypeGitea {
-		gms, err = git.NewMemberShip(*config)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create git membership:%w", err)
-		}
 	}
 	notificationSvcClient := rpc.NewNotificationSvcHttpClient(fmt.Sprintf("%s:%d", config.Notification.Host, config.Notification.Port),
 		rpc.AuthWithApiKey(config.APIToken))
@@ -61,7 +55,6 @@ func NewMemberComponent(config *config.Config) (MemberComponent, error) {
 		orgStore:              database.NewOrgStore(),
 		userStore:             database.NewUserStore(),
 		gitServer:             gs,
-		gitMemberShip:         gms,
 		config:                config,
 		notificationSvcClient: notificationSvcClient,
 	}, nil
@@ -116,12 +109,7 @@ func (c *memberComponentImpl) OrgMembers(ctx context.Context, orgName, currentUs
 }
 
 func (c *memberComponentImpl) InitRoles(ctx context.Context, org *database.Organization) error {
-	if c.config.GitServer.Type == types.GitServerTypeGitea {
-		return c.gitMemberShip.AddRoles(ctx, org.Name,
-			[]membership.Role{membership.RoleAdmin, membership.RoleRead, membership.RoleWrite})
-	} else {
-		return nil
-	}
+	return nil
 }
 
 func (c *memberComponentImpl) SetAdmin(ctx context.Context, org *database.Organization, user *database.User) error {
@@ -133,41 +121,83 @@ func (c *memberComponentImpl) SetAdmin(ctx context.Context, org *database.Organi
 		err = fmt.Errorf("failed to create member,caused by:%w", err)
 		return err
 	}
-	if c.config.GitServer.Type == types.GitServerTypeGitea {
-		return c.gitMemberShip.AddMember(ctx, org.Name, user.Username, membership.RoleAdmin)
-	} else {
-		return nil
-	}
+	return nil
 }
 
 func (c *memberComponentImpl) ChangeMemberRole(ctx context.Context, orgName, userName, operatorName, oldRole, newRole string) error {
-	err := c.Delete(ctx, orgName, userName, operatorName, oldRole)
-	if err != nil {
-		return fmt.Errorf("failed to delete old role,error:%w", err)
-	}
-	err = c.AddMember(ctx, orgName, userName, operatorName, newRole)
-	if err != nil {
-		return fmt.Errorf("failed to create new role,error:%w", err)
-	}
+	var (
+		org  database.Organization
+		op   database.User
+		user database.User
+		err  error
+	)
 
-	org, err := c.orgStore.FindByPath(ctx, orgName)
+	org, err = c.orgStore.FindByPath(ctx, orgName)
 	if err != nil {
 		return fmt.Errorf("failed to find org,org:%s,caused by:%w", orgName, err)
 	}
+	op, err = c.userStore.FindByUsername(ctx, operatorName)
+	if err != nil {
+		return fmt.Errorf("failed to find op user,user:%s,caused by:%w", operatorName, err)
+	}
+	opMember, err := c.memberStore.Find(ctx, org.ID, op.ID)
+	if err != nil {
+		return fmt.Errorf("failed to get op user membership,user:%s,caused by:%w", operatorName, err)
+	}
+	user, err = c.userStore.FindByUsername(ctx, userName)
+	if err != nil {
+		return fmt.Errorf("failed to find user,user:%s,caused by:%w", userName, err)
+	}
+
+	if op.ID == user.ID {
+		_, adminCount, err := c.memberStore.OrganizationMembers(ctx, org.ID, string(membership.RoleAdmin), 1, 1)
+		if err != nil {
+			return fmt.Errorf("failed to count admins in org, caused by: %w", err)
+		}
+		if adminCount <= 1 && newRole != string(membership.RoleAdmin) {
+			err := errors.New("cannot revoke the last admin role from organization")
+			return errorx.LastOrgAdmin(err, errorx.Ctx().Set("username", userName))
+		}
+		if newRole == string(membership.RoleAdmin) && oldRole != string(membership.RoleAdmin) {
+			err := errors.New("cannot promote yourself to admin")
+			return errorx.CannotPromoteSelfToAdmin(err, errorx.Ctx().Set("username", userName))
+		}
+	} else {
+		if !c.allowMagnageMember(opMember) {
+			return errorx.ErrForbiddenMsg("operation not allowed, you do not have permission to change the role of other members")
+		}
+	}
+
+	m, err := c.memberStore.Find(ctx, org.ID, user.ID)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return fmt.Errorf("failed to check membership existence,caused by:%w", err)
+	}
+	if m == nil {
+		return fmt.Errorf("user %s is not a member of organization %s", userName, orgName)
+	}
+
+	err = c.memberStore.Update(ctx, org.ID, user.ID, newRole)
+	if err != nil {
+		return fmt.Errorf("failed to update member role,caused by:%w", err)
+	}
+
 	userUUIDs, err := c.memberStore.UserUUIDsByOrganizationID(ctx, org.ID)
 	if err != nil {
 		return fmt.Errorf("failed to get uuids by orgid,error:%w", err)
 	}
 
-	title := "Organization member role change"
-	content := fmt.Sprintf("Changed permission of member %s to %s in organization %s.", userName, newRole, orgName)
-
 	go func() {
 		notificationCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		err = c.sendMemberMsg(notificationCtx, userUUIDs, orgName, title, content)
+		err = c.sendMemberMsg(notificationCtx, types.OrgMemberReq{
+			UserUUIDs: userUUIDs,
+			OrgName:   orgName,
+			Operation: types.OrgMemberOperationUpdate,
+			UserName:  userName,
+			NewRole:   newRole,
+		})
 		if err != nil {
-			slog.Error("failed to send organization permission change.", slog.String("orgName", orgName), slog.String("content", content), slog.Any("err", err))
+			slog.Error("failed to send organization permission change.", slog.String("orgName", orgName), slog.Any("err", err))
 		}
 	}()
 
@@ -190,7 +220,7 @@ func (c *memberComponentImpl) GetMemberRole(ctx context.Context, orgName, userNa
 	}
 	m, err := c.memberStore.Find(ctx, org.ID, user.ID)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return membership.RoleUnknown, fmt.Errorf("failed to check memberhsip existence, caused by:%w", err)
+		return membership.RoleUnknown, fmt.Errorf("failed to check membership existence, caused by:%w", err)
 	}
 	if m == nil {
 		return membership.RoleUnknown, nil
@@ -228,7 +258,7 @@ func (c *memberComponentImpl) AddMembers(ctx context.Context, orgName string, us
 		}
 		m, err := c.memberStore.Find(ctx, org.ID, user.ID)
 		if err != nil && !errors.Is(err, sql.ErrNoRows) {
-			return fmt.Errorf("failed to check memberhsip existence, user:%s,caused by:%w", userName, err)
+			return fmt.Errorf("failed to check membership existence, user:%s,caused by:%w", userName, err)
 		}
 		//skip existing member
 		if m != nil {
@@ -239,31 +269,27 @@ func (c *memberComponentImpl) AddMembers(ctx context.Context, orgName string, us
 			err = fmt.Errorf("failed to create db member, org:%s, user:%s,caused by:%w", orgName, userName, err)
 			return err
 		}
-		if c.config.GitServer.Type == types.GitServerTypeGitea {
-			err = c.gitMemberShip.AddMember(ctx, orgName, userName, c.toGitRole(role))
-			if err != nil {
-				return fmt.Errorf("failed to add git member, org:%s, user:%s caused by:%w", orgName, userName, err)
-			}
-		}
 
 		userUUIDs, err := c.memberStore.UserUUIDsByOrganizationID(ctx, org.ID)
 		if err != nil {
 			return fmt.Errorf("failed to get uuids by orgid,error:%w", err)
 		}
-		title := "Organization member change"
-		content := fmt.Sprintf("New member %s joined organization %s.", userName, orgName)
 
 		if len(userUUIDs) > 0 {
-			go func(orgName, title, content string, userUUIDs []string) {
+			go func(orgName, userName, role string, userUUIDs []string) {
 				notificationCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 				defer cancel()
-				err = c.sendMemberMsg(notificationCtx, userUUIDs, orgName, title, content)
+				err = c.sendMemberMsg(notificationCtx, types.OrgMemberReq{
+					UserUUIDs: userUUIDs,
+					OrgName:   orgName,
+					Operation: types.OrgMemberOperationAdd,
+					UserName:  userName,
+				})
 				if err != nil {
-					slog.Error("failed to send organization member join message", slog.String("orgName", orgName), slog.String("content", content), slog.Any("err", err))
+					slog.Error("failed to send organization member join message", slog.String("orgName", orgName), slog.Any("err", err))
 				}
-			}(orgName, title, content, userUUIDs)
+			}(orgName, userName, role, userUUIDs)
 		}
-
 	}
 
 	return nil
@@ -335,7 +361,7 @@ func (c *memberComponentImpl) Delete(ctx context.Context, orgName, userName, ope
 
 	m, err := c.memberStore.Find(ctx, org.ID, user.ID)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return fmt.Errorf("failed to check memberhsip existence,caused by:%w", err)
+		return fmt.Errorf("failed to check membership existence,caused by:%w", err)
 	}
 	//skip if not a member
 	if m == nil {
@@ -346,30 +372,28 @@ func (c *memberComponentImpl) Delete(ctx context.Context, orgName, userName, ope
 		err = fmt.Errorf("failed to delete member,caused by:%w", err)
 		return err
 	}
-
 	userUUIDs, err := c.memberStore.UserUUIDsByOrganizationID(ctx, org.ID)
 	if err != nil {
 		return fmt.Errorf("failed to get uuids by orgid,error:%w", err)
 	}
-	title := "Organization member change"
-	content := fmt.Sprintf("%s left the organization %s.", userName, orgName)
 
 	if len(userUUIDs) > 0 {
 		go func() {
 			notificationCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
-			err = c.sendMemberMsg(notificationCtx, userUUIDs, orgName, title, content)
+			err = c.sendMemberMsg(notificationCtx, types.OrgMemberReq{
+				UserUUIDs: userUUIDs,
+				OrgName:   orgName,
+				Operation: types.OrgMemberOperationRemove,
+				UserName:  userName,
+			})
 			if err != nil {
 				slog.Error("failed to send organization member leave message", slog.String("orgName", orgName), slog.String("userName", userName), slog.Any("err", err))
 			}
 		}()
 	}
 
-	if c.config.GitServer.Type == types.GitServerTypeGitea {
-		return c.gitMemberShip.RemoveMember(ctx, orgName, userName, c.toGitRole(role))
-	} else {
-		return nil
-	}
+	return nil
 }
 
 func (c *memberComponentImpl) allowMagnageMember(u *database.Member) bool {
@@ -390,23 +414,43 @@ func (c *memberComponentImpl) toGitRole(role string) membership.Role {
 	}
 }
 
-func (c *memberComponentImpl) sendMemberMsg(ctx context.Context, userUUIDs []string, orgName, title, content string) error {
-	url := fmt.Sprintf("/organizations/%s", orgName)
+func (c *memberComponentImpl) GetMember(ctx context.Context, orgName, userName string) (*database.Member, error) {
+	org, err := c.orgStore.FindByPath(ctx, orgName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find org,caused by:%w", err)
+	}
+	user, err := c.userStore.FindByUsername(ctx, userName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find user,caused by:%w", err)
+	}
+	m, err := c.memberStore.Find(ctx, org.ID, user.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find member:%w", err)
+	}
+	return m, err
+}
+
+func (c *memberComponentImpl) sendMemberMsg(ctx context.Context, req types.OrgMemberReq) error {
 	msg := types.NotificationMessage{
 		MsgUUID:          uuid.New().String(),
-		UserUUIDs:        userUUIDs,
+		UserUUIDs:        req.UserUUIDs,
 		NotificationType: types.NotificationOrganization,
-		Title:            title,
-		Content:          content,
 		CreateAt:         time.Now(),
-		ClickActionURL:   url,
+		ClickActionURL:   fmt.Sprintf("/organizations/%s", req.OrgName),
+		Template:         string(types.MessageScenarioOrgMember),
+		Payload: map[string]any{
+			"operation": req.Operation,
+			"user_name": req.UserName,
+			"new_role":  req.NewRole,
+			"org_name":  req.OrgName,
+		},
 	}
 	msgBytes, err := json.Marshal(msg)
 	if err != nil {
 		return fmt.Errorf("failed to marshal message, err: %w", err)
 	}
 	notificationMsg := types.MessageRequest{
-		Scenario:   types.MessageScenarioInternalNotification,
+		Scenario:   types.MessageScenarioOrgMember,
 		Parameters: string(msgBytes),
 		Priority:   types.MessagePriorityHigh,
 	}
@@ -426,20 +470,4 @@ func (c *memberComponentImpl) sendMemberMsg(ctx context.Context, userUUIDs []str
 	}
 
 	return nil
-}
-
-func (c *memberComponentImpl) GetMember(ctx context.Context, orgName, userName string) (*database.Member, error) {
-	org, err := c.orgStore.FindByPath(ctx, orgName)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find org,caused by:%w", err)
-	}
-	user, err := c.userStore.FindByUsername(ctx, userName)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find user,caused by:%w", err)
-	}
-	m, err := c.memberStore.Find(ctx, org.ID, user.ID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find member:%w", err)
-	}
-	return m, err
 }

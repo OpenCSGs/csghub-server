@@ -7,8 +7,10 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/cespare/xxhash/v2"
 	"github.com/google/uuid"
 	"github.com/nats-io/nats.go/jetstream"
+	"opencsg.com/csghub-server/builder/store/cache"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
@@ -41,13 +43,17 @@ type notificationComponentImpl struct {
 	highPriorityMsgCh             chan jetstream.Msg
 	normalPriorityMsgCh           chan jetstream.Msg
 	messageProcessor              *scenariomgr.MessageProcessor
+	redis                         cache.RedisClient
 }
 
 var _ NotificationComponent = (*notificationComponentImpl)(nil)
 
-func NewMockNotificationComponent(storage database.NotificationStore) NotificationComponent {
+func NewMockNotificationComponent(conf *config.Config, storage database.NotificationStore, queue mq.MessageQueue, redis cache.RedisClient) NotificationComponent {
 	return &notificationComponentImpl{
+		conf:    conf,
 		storage: storage,
+		queue:   queue,
+		redis:   redis,
 	}
 }
 
@@ -94,10 +100,21 @@ func NewNotificationComponent(conf *config.Config) (NotificationComponent, error
 		return nil, err
 	}
 
+	redis, err := cache.NewCache(context.Background(), cache.RedisConfig{
+		Addr:     conf.Redis.Endpoint,
+		Username: conf.Redis.User,
+		Password: conf.Redis.Password,
+	})
+	if err != nil {
+		slog.Error("failed to create redis client", slog.Any("error", err))
+		return nil, err
+	}
+	nmc.redis = redis
+
 	channelFactory := notifychannelfactory.NewFactory(conf)
 	templateManager := tmplmgr.NewTemplateManager()
 
-	dataProvider := scenariomgr.NewDataProvider(nmc.storage)
+	dataProvider := scenariomgr.NewDataProvider(nmc.storage, conf)
 	scenarioregister.Register(dataProvider)
 	nmc.messageProcessor = scenariomgr.NewMessageProcessor(conf, templateManager, channelFactory)
 
@@ -208,25 +225,25 @@ func (c *notificationComponentImpl) handleScenarioMessage(msg jetstream.Msg) {
 		if err != nil {
 			slog.Error("failed to handle scenario", slog.Any("scenario", message.Scenario), slog.Any("error", err))
 			if utils.IsErrSendMsg(err) {
-				slog.Info("failed to send message, will retry later", slog.Any("scenario", message.Scenario), slog.String("message id", message.MsgUUID), slog.Any("error", err))
+				slog.Info("failed to send message, will retry later", slog.Any("scenario", message.Scenario), slog.String("msg_uuid", message.MsgUUID), slog.Any("error", err))
 				if err := msg.Nak(); err != nil {
 					slog.Error("failed to nak message", slog.Any("error", err))
 				}
 				return
 			}
 			if err := msg.Term(); err != nil {
-				slog.Error("failed to term message", slog.Any("scenario", message.Scenario), slog.String("message id", message.MsgUUID), slog.Any("error", err))
+				slog.Error("failed to term message", slog.Any("scenario", message.Scenario), slog.String("msg_uuid", message.MsgUUID), slog.Any("error", err))
 			}
 		} else {
-			slog.Info("scenario handled successfully", slog.Any("scenario", message.Scenario), slog.String("message id", message.MsgUUID))
+			slog.Info("scenario had been handled", slog.Any("scenario", message.Scenario), slog.String("msg_uuid", message.MsgUUID))
 			if err := msg.Ack(); err != nil {
-				slog.Error("failed to ack message", slog.Any("scenario", message.Scenario), slog.String("message id", message.MsgUUID), slog.Any("error", err))
+				slog.Error("failed to ack message", slog.Any("scenario", message.Scenario), slog.String("msg_uuid", message.MsgUUID), slog.Any("error", err))
 			}
 		}
 	case <-ctx.Done():
-		slog.Error("scenario handling timeout", slog.Any("scenario", message.Scenario), slog.String("message id", message.MsgUUID), slog.Any("timeout", 30*time.Second))
+		slog.Error("scenario handling timeout", slog.Any("scenario", message.Scenario), slog.String("msg_uuid", message.MsgUUID), slog.Any("timeout", 30*time.Second))
 		if err := msg.Nak(); err != nil {
-			slog.Error("failed to nak message", slog.Any("scenario", message.Scenario), slog.String("message id", message.MsgUUID), slog.Any("error", err))
+			slog.Error("failed to nak message", slog.Any("scenario", message.Scenario), slog.String("msg_uuid", message.MsgUUID), slog.Any("error", err))
 		}
 	}
 }
@@ -478,17 +495,26 @@ func (c *notificationComponentImpl) GetNotificationSetting(ctx context.Context, 
 }
 
 func (c *notificationComponentImpl) PublishMessage(ctx context.Context, message types.ScenarioMessage) error {
+	isDuplicate, err := c.deDuplicateMessage(ctx, message)
+	if err != nil {
+		return fmt.Errorf("failed to check message deduplication: %w", err)
+	}
+	if isDuplicate {
+		slog.Warn("message is duplicate in deduplicate window, will not publish", slog.Any("message", message))
+		return nil
+	}
+
 	message.MsgUUID = uuid.New().String()
 	message.CreatedAt = time.Now()
 
 	switch message.Priority {
 	case types.MessagePriorityHigh:
-		slog.Info("publish message to high priority queue", slog.Any("message id", message.MsgUUID))
+		slog.Info("publish message to high priority queue", slog.Any("msg_uuid", message.MsgUUID))
 		if err := c.queue.PublishHighPriorityMsg(message); err != nil {
 			return fmt.Errorf("failed to publish message to high priority queue: %w", err)
 		}
 	case types.MessagePriorityNormal:
-		slog.Info("publish message to normal priority queue", slog.Any("message id", message.MsgUUID))
+		slog.Info("publish message to normal priority queue", slog.Any("msg_uuid", message.MsgUUID))
 		if err := c.queue.PublishNormalPriorityMsg(message); err != nil {
 			return fmt.Errorf("failed to publish message to normal priority queue: %w", err)
 		}
@@ -496,4 +522,22 @@ func (c *notificationComponentImpl) PublishMessage(ctx context.Context, message 
 		return fmt.Errorf("unsupported priority: %s", message.Priority)
 	}
 	return nil
+}
+
+func (c *notificationComponentImpl) deDuplicateMessage(ctx context.Context, message types.ScenarioMessage) (bool, error) {
+	msg, err := json.Marshal(message)
+	if err != nil {
+		return false, fmt.Errorf("failed to marshal message: %w", err)
+	}
+
+	msgHashKey := fmt.Sprintf("notification:msg_hash_key:%x", xxhash.Sum64(msg))
+	set, err := c.redis.SetNX(ctx, msgHashKey, "", time.Duration(c.conf.Notification.DeduplicateWindow)*time.Second)
+	if err != nil {
+		return false, fmt.Errorf("failed to check/set message hash key: %w", err)
+	}
+	if !set {
+		return true, nil
+	}
+
+	return false, nil
 }

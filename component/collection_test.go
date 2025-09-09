@@ -54,13 +54,24 @@ func TestCollectionComponent_GetCollection(t *testing.T) {
 	cc := initializeTestCollectionComponent(ctx, t)
 
 	repos := []database.Repository{
-		{RepositoryType: types.SpaceRepo, Path: "r1/foo"},
+		{ID: 1, RepositoryType: types.SpaceRepo, Path: "r1/foo"},
 	}
 	cc.mocks.stores.CollectionMock().EXPECT().GetCollection(ctx, int64(1)).Return(
 		&database.Collection{Username: "user", Namespace: "user", Repositories: repos}, nil,
 	)
 	cc.mocks.stores.CollectionMock().EXPECT().GetCollection(ctx, int64(2)).Return(
 		&database.Collection{Namespace: "ns", Repositories: repos}, nil,
+	)
+	// Mock the new GetCollectionRepositoriesWithRemarks method
+	cc.mocks.stores.CollectionMock().EXPECT().GetCollectionRepos(ctx, int64(1)).Return(
+		[]database.CollectionRepository{
+			{RepositoryID: 1, Remark: "Test remark"},
+		}, nil,
+	)
+	cc.mocks.stores.CollectionMock().EXPECT().GetCollectionRepos(ctx, int64(2)).Return(
+		[]database.CollectionRepository{
+			{RepositoryID: 1, Remark: "Another remark"},
+		}, nil,
 	)
 	cc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
 		Username: "user",
@@ -83,7 +94,7 @@ func TestCollectionComponent_GetCollection(t *testing.T) {
 		CanManage: true,
 		Avatar:    "aaa",
 		Repositories: []types.CollectionRepository{
-			{RepositoryType: types.SpaceRepo, Path: "r1/foo", Status: "go"},
+			{ID: 1, RepositoryType: types.SpaceRepo, Path: "r1/foo", Status: "go", Remark: "Test remark"},
 		},
 	}, col)
 	col, err = cc.GetCollection(ctx, "user", 2)
@@ -95,7 +106,7 @@ func TestCollectionComponent_GetCollection(t *testing.T) {
 		CanManage: true,
 		Avatar:    "logo",
 		Repositories: []types.CollectionRepository{
-			{RepositoryType: types.SpaceRepo, Path: "r1/foo", Status: "go"},
+			{ID: 1, RepositoryType: types.SpaceRepo, Path: "r1/foo", Status: "go", Remark: "Another remark"},
 		},
 	}, col)
 }
@@ -176,6 +187,34 @@ func TestCollectionComponent_AddReposToCollection(t *testing.T) {
 
 }
 
+func TestCollectionComponent_AddReposToCollectionWithRemarks(t *testing.T) {
+	ctx := context.TODO()
+	cc := initializeTestCollectionComponent(ctx, t)
+
+	cc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
+		ID:       2,
+		Username: "user",
+	}, nil)
+	cc.mocks.stores.CollectionMock().EXPECT().GetCollection(ctx, int64(1)).Return(
+		&database.Collection{UserID: 2}, nil,
+	)
+	cc.mocks.stores.CollectionMock().EXPECT().AddCollectionRepos(ctx, []database.CollectionRepository{
+		{CollectionID: 1, RepositoryID: 1, Remark: "test remark"},
+		{CollectionID: 1, RepositoryID: 2, Remark: "test remark"},
+	}).Return(nil)
+
+	err := cc.AddReposToCollection(ctx, types.UpdateCollectionReposReq{
+		RepoIDs:  []int64{1, 2},
+		Username: "user",
+		ID:       1,
+		Remarks: map[int64]string{
+			1: "test remark",
+			2: "test remark",
+		},
+	})
+	require.Nil(t, err)
+}
+
 func TestCollectionComponent_RemoveReposFromCollection(t *testing.T) {
 	ctx := context.TODO()
 	cc := initializeTestCollectionComponent(ctx, t)
@@ -217,4 +256,30 @@ func TestCollectionComponent_OrgCollections(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, 100, total)
 	require.Equal(t, []types.Collection{{Name: "col"}}, cols)
+}
+
+func TestCollectionComponent_UpdateCollectionRepo(t *testing.T) {
+	ctx := context.TODO()
+	cc := initializeTestCollectionComponent(ctx, t)
+
+	cc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
+		ID:       2,
+		Username: "user",
+	}, nil)
+	cc.mocks.stores.CollectionMock().EXPECT().GetCollection(ctx, int64(1)).Return(
+		&database.Collection{UserID: 2}, nil,
+	)
+	cc.mocks.stores.CollectionMock().EXPECT().UpdateCollectionRepo(ctx, database.CollectionRepository{
+		CollectionID: 1,
+		RepositoryID: 1,
+		Remark:       "test remark",
+	}).Return(nil)
+
+	err := cc.UpdateCollectionRepo(ctx, types.UpdateCollectionRepoReq{
+		Username: "user",
+		ID:       1,
+		RepoID:   1,
+		Remark:   "test remark",
+	})
+	require.Nil(t, err)
 }

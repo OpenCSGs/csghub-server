@@ -20,7 +20,6 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	"github.com/minio/minio-go/v7"
 	ignore "github.com/sabhiram/go-gitignore"
 	"github.com/spf13/cast"
@@ -464,7 +463,7 @@ func (c *repoComponentImpl) DeleteRepo(ctx context.Context, req types.DeleteRepo
 		slog.Error("fail to delete repo in git ", slog.Any("req", req), slog.String("error", err.Error()))
 		return nil, fmt.Errorf("fail to delete repo in database, error: %w", err)
 	}
-
+	repo.User = user
 	return repo, nil
 }
 
@@ -3309,34 +3308,20 @@ func (c *repoComponentImpl) SendAssetManagementMsg(ctx context.Context, req type
 		return fmt.Errorf("no user UUID provided")
 	}
 
-	assetName := string(req.RepoType)
-	assetId := req.RepoPath
-
-	var (
-		operation string
-		content   string
-		repoUrl   string
-	)
-
-	switch req.Operation {
-	case types.OperationCreate:
-		operation = "Created"
-		content = fmt.Sprintf("[%s] created successfully.", assetId)
+	var repoUrl string
+	if req.Operation == types.OperationCreate {
 		repoUrl = GetRepoUrl(req.RepoType, req.RepoPath)
-	case types.OperationDelete:
-		operation = "Deleted"
-		content = fmt.Sprintf("[%s] has been deleted.", assetId)
 	}
 
-	title := fmt.Sprintf("[%s] %s", assetName, operation)
-
 	msg := types.NotificationMessage{
-		MsgUUID:          uuid.New().String(),
 		UserUUIDs:        []string{req.UserUUID},
 		NotificationType: types.NotificationAssetManagement,
-		Title:            title,
-		Content:          content,
-		CreateAt:         time.Now(),
+		Template:         string(types.MessageScenarioAssetManagement),
+		Payload: map[string]any{
+			"repo_type": req.RepoType,
+			"repo_path": req.RepoPath,
+			"operation": req.Operation,
+		},
 	}
 
 	if repoUrl != "" {
@@ -3349,7 +3334,7 @@ func (c *repoComponentImpl) SendAssetManagementMsg(ctx context.Context, req type
 	}
 
 	notificationMsg := types.MessageRequest{
-		Scenario:   types.MessageScenarioInternalNotification,
+		Scenario:   types.MessageScenarioAssetManagement,
 		Parameters: string(msgBytes),
 		Priority:   types.MessagePriorityHigh,
 	}

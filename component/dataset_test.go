@@ -2,8 +2,8 @@ package component
 
 import (
 	"context"
+	"sync"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -84,15 +84,21 @@ func TestDatasetCompnent_Create(t *testing.T) {
 		}, types.DatasetRepo),
 	).Return(nil)
 
-	dc.mocks.components.repo.EXPECT().SendAssetManagementMsg(mock.Anything, types.RepoNotificationReq{
-		RepoType:  types.DatasetRepo,
-		Operation: types.OperationCreate,
-		RepoPath:  "ns/n",
-		UserUUID:  "user-uuid",
-	}).Return(nil)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	dc.mocks.components.repo.EXPECT().
+		SendAssetManagementMsg(mock.Anything, mock.MatchedBy(func(req types.RepoNotificationReq) bool {
+			return req.RepoType == types.DatasetRepo &&
+				req.Operation == types.OperationCreate &&
+				req.RepoPath == "ns/n" &&
+				req.UserUUID == "user-uuid"
+		})).
+		RunAndReturn(func(ctx context.Context, req types.RepoNotificationReq) error {
+			wg.Done()
+			return nil
+		}).Once()
 
 	resp, err := dc.Create(ctx, req)
-	time.Sleep(10 * time.Millisecond)
 	require.Nil(t, err)
 	require.Equal(t, &types.Dataset{
 		User: types.User{Username: "user"},
@@ -104,7 +110,7 @@ func TestDatasetCompnent_Create(t *testing.T) {
 		Path: "ns/n",
 		URL:  "ns/n",
 	}, resp)
-
+	wg.Wait()
 }
 
 func TestDatasetCompnent_Index(t *testing.T) {
@@ -195,17 +201,23 @@ func TestDatasetCompnent_Delete(t *testing.T) {
 		RepoType:  types.DatasetRepo,
 	}).Return(mockRepo, nil)
 	dc.mocks.stores.DatasetMock().EXPECT().Delete(ctx, *mockDataset).Return(nil)
-	dc.mocks.components.repo.EXPECT().SendAssetManagementMsg(mock.Anything, types.RepoNotificationReq{
-		RepoType:  types.DatasetRepo,
-		Operation: types.OperationDelete,
-		RepoPath:  "ns/n",
-		UserUUID:  "user-uuid",
-	}).Return(nil)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	dc.mocks.components.repo.EXPECT().
+		SendAssetManagementMsg(mock.Anything, mock.MatchedBy(func(req types.RepoNotificationReq) bool {
+			return req.RepoType == types.DatasetRepo &&
+				req.Operation == types.OperationDelete &&
+				req.RepoPath == "ns/n" &&
+				req.UserUUID == "user-uuid"
+		})).
+		RunAndReturn(func(ctx context.Context, req types.RepoNotificationReq) error {
+			wg.Done()
+			return nil
+		}).Once()
 
 	err := dc.Delete(ctx, "ns", "n", "user")
-	time.Sleep(10 * time.Millisecond)
 	require.Nil(t, err)
-
+	wg.Wait()
 }
 
 func TestDatasetCompnent_Show(t *testing.T) {

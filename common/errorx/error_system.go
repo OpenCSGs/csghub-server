@@ -23,6 +23,8 @@ const (
 	lfsNotFound
 
 	lastOrgAdmin
+
+	cannotPromoteSelfToAdmin
 )
 
 var (
@@ -111,6 +113,18 @@ var (
 	//
 	// zh-HK: 不能移除組織的最後一個管理員
 	ErrLastOrgAdmin = CustomError{prefix: errSysPrefix, code: lastOrgAdmin}
+	// cannot promote yourself to admin
+	//
+	// Description: The requested action to promote yourself to an administrator is prohibited.
+	//
+	// Description_ZH: 禁止将自身提升为管理员。
+	//
+	// en-US: Cannot promote yourself to admin
+	//
+	// zh-CN: 不能将自身提升为管理员
+	//
+	// zh-HK: 不能將自身提升為管理員
+	ErrCannotPromoteSelfToAdmin = CustomError{prefix: errSysPrefix, code: cannotPromoteSelfToAdmin}
 )
 
 // Used in DB to convert db error to custom error
@@ -185,6 +199,18 @@ func LastOrgAdmin(err error, ctx context) error {
 		prefix:  errSysPrefix,
 		err:     err,
 		code:    lastOrgAdmin,
+		context: ctx,
+	}
+}
+
+func CannotPromoteSelfToAdmin(err error, ctx context) error {
+	if err == nil {
+		return nil
+	}
+	return CustomError{
+		prefix:  errSysPrefix,
+		err:     err,
+		code:    cannotPromoteSelfToAdmin,
 		context: ctx,
 	}
 }

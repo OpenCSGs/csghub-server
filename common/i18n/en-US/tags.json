@@ -1,0 +1,545 @@
+{
+  "Tag.I18nKey.image-classification": {
+    "other": "image classification"
+  },
+  "Tag.I18nKey.image-segmentation": {
+    "other": "image segmentation"
+  },
+  "Tag.I18nKey.ocr": {
+    "other": "ocr"
+  },
+  "Tag.I18nKey.skin-retouching": {
+    "other": "skin retouching"
+  },
+  "Tag.I18nKey.image-to-image": {
+    "other": "image to image"
+  },
+  "Tag.I18nKey.video-detection": {
+    "other": "video detection"
+  },
+  "Tag.I18nKey.video-segmentation": {
+    "other": "video segmentation"
+  },
+  "Tag.I18nKey.video-generation": {
+    "other": "video generation"
+  },
+  "Tag.I18nKey.video-captioning": {
+    "other": "video captioning"
+  },
+  "Tag.I18nKey.face-detection": {
+    "other": "face detection"
+  },
+  "Tag.I18nKey.face-recognition": {
+    "other": "face recognition"
+  },
+  "Tag.I18nKey.face-image-generation": {
+    "other": "face image generation"
+  },
+  "Tag.I18nKey.image-object-detection": {
+    "other": "image object detection"
+  },
+  "Tag.I18nKey.image-super-resolution": {
+    "other": "image super resolution"
+  },
+  "Tag.I18nKey.action-detection": {
+    "other": "action detection"
+  },
+  "Tag.I18nKey.semantic-segmentation": {
+    "other": "semantic segmentation"
+  },
+  "Tag.I18nKey.word-segmentation": {
+    "other": "word segmentation"
+  },
+  "Tag.I18nKey.named-entity-recognition": {
+    "other": "named entity recognition"
+  },
+  "Tag.I18nKey.part-of-speech": {
+    "other": "part of speech"
+  },
+  "Tag.I18nKey.document-segmentation": {
+    "other": "document segmentation"
+  },
+  "Tag.I18nKey.text-classification": {
+    "other": "text classification"
+  },
+  "Tag.I18nKey.sentiment-classification": {
+    "other": "sentiment classification"
+  },
+  "Tag.I18nKey.nli": {
+    "other": "nli"
+  },
+  "Tag.I18nKey.conversational": {
+    "other": "conversational"
+  },
+  "Tag.I18nKey.translation": {
+    "other": "translation"
+  },
+  "Tag.I18nKey.text-generation": {
+    "other": "text generation"
+  },
+  "Tag.I18nKey.text-summarization": {
+    "other": "text summarization"
+  },
+  "Tag.I18nKey.feature-extraction": {
+    "other": "feature extraction"
+  },
+  "Tag.I18nKey.relation-extraction": {
+    "other": "relation extraction"
+  },
+  "Tag.I18nKey.auto-speech-recognition": {
+    "other": "auto speech recognition"
+  },
+  "Tag.I18nKey.text-to-speech": {
+    "other": "text to speech"
+  },
+  "Tag.I18nKey.audio-classification": {
+    "other": "audio classification"
+  },
+  "Tag.I18nKey.text-to-image": {
+    "other": "text to image"
+  },
+  "Tag.I18nKey.visual-question-answering": {
+    "other": "visual question answering"
+  },
+  "Tag.I18nKey.image-text-retrieval": {
+    "other": "image text retrieval"
+  },
+  "Tag.I18nKey.zero-shot": {
+    "other": "zero shot"
+  },
+  "Tag.I18nKey.token-classification": {
+    "other": "token classification"
+  },
+  "Tag.I18nKey.table-question-answering": {
+    "other": "table question answering"
+  },
+  "Tag.I18nKey.sentence-similarity": {
+    "other": "sentence similarity"
+  },
+  "Tag.I18nKey.fill-mask": {
+    "other": "fill mask"
+  },
+  "Tag.I18nKey.summarization": {
+    "other": "summarization"
+  },
+  "Tag.I18nKey.question-answering": {
+    "other": "question answering"
+  },
+  "Tag.I18nKey.image-to-text": {
+    "other": "image to text"
+  },
+  "Tag.I18nKey.object-detection": {
+    "other": "object detection"
+  },
+  "Tag.I18nKey.image-editing": {
+    "other": "image editing"
+  },
+  "Tag.I18nKey.image-generation": {
+    "other": "image generation"
+  },
+  "Tag.I18nKey.speech-signal-process": {
+    "other": "speech signal process"
+  },
+  "Tag.I18nKey.keyword-spotting": {
+    "other": "keyword spotting"
+  },
+  "Tag.I18nKey.voice-activity-detection": {
+    "other": "voice activity detection"
+  },
+  "Tag.I18nKey.object-tracking": {
+    "other": "object tracking"
+  },
+  "Tag.I18nKey.autonomous-driving": {
+    "other": "autonomous driving"
+  },
+  "Tag.I18nKey.video-super-resolution": {
+    "other": "video super resolution"
+  },
+  "Tag.I18nKey.image-captioning": {
+    "other": "image captioning"
+  },
+  "Tag.I18nKey.visual-grounding": {
+    "other": "visual grounding"
+  },
+  "Tag.I18nKey.biomedicine": {
+    "other": "biomedicine"
+  },
+  "Tag.I18nKey.protein-structure": {
+    "other": "protein structure"
+  },
+  "Tag.I18nKey.apache-2.0": {
+    "other": "Apache-2.0"
+  },
+  "Tag.I18nKey.mit": {
+    "other": "MIT"
+  },
+  "Tag.I18nKey.lgpl": {
+    "other": "LGPL"
+  },
+  "Tag.I18nKey.lgpl-2.1": {
+    "other": "LGPL-2.1"
+  },
+  "Tag.I18nKey.lgpl-3.0": {
+    "other": "LGPL-3.0"
+  },
+  "Tag.I18nKey.gpl": {
+    "other": "GPL"
+  },
+  "Tag.I18nKey.gpl-2.0": {
+    "other": "GPL-2.0"
+  },
+  "Tag.I18nKey.gpl-3.0": {
+    "other": "GPL-3.0"
+  },
+  "Tag.I18nKey.afl-3.0": {
+    "other": "AFL-3.0"
+  },
+  "Tag.I18nKey.ecl-2.0": {
+    "other": "ECL-2.0"
+  },
+  "Tag.I18nKey.cc-by-4.0": {
+    "other": "CC-BY-4.0"
+  },
+  "Tag.I18nKey.cc-by-nc-nd-3.0": {
+    "other": "CC-BY-NC-ND-3.0"
+  },
+  "Tag.I18nKey.cc-by-nc-nd-4.0": {
+    "other": "CC-BY-NC-ND-4.0"
+  },
+  "Tag.I18nKey.creativeml-openrail-m": {
+    "other": "CreativeML OpenRAIL-M"
+  },
+  "Tag.I18nKey.agpl-3.0": {
+    "other": "AGPL-3.0"
+  },
+  "Tag.I18nKey.cc-by-nc-4.0": {
+    "other": "CC-BY-NC-4.0"
+  },
+  "Tag.I18nKey.cc-by-nc-sa-2.0": {
+    "other": "CC-BY-NC-SA-2.0"
+  },
+  "Tag.I18nKey.cc-by-nc-sa-3.0": {
+    "other": "CC-BY-NC-SA-3.0"
+  },
+  "Tag.I18nKey.cc-by-nc-sa-4.0": {
+    "other": "CC-BY-NC-SA-4.0"
+  },
+  "Tag.I18nKey.cc": {
+    "other": "CC"
+  },
+  "Tag.I18nKey.cc0-1.0": {
+    "other": "CC0-1.0"
+  },
+  "Tag.I18nKey.pytorch": {
+    "other": "PyTorch"
+  },
+  "Tag.I18nKey.tensorflow": {
+    "other": "TensorFlow"
+  },
+  "Tag.I18nKey.safetensors": {
+    "other": "SafeTensors"
+  },
+  "Tag.I18nKey.jax": {
+    "other": "JAX"
+  },
+  "Tag.I18nKey.onnx": {
+    "other": "ONNX"
+  },
+  "Tag.I18nKey.paddlepaddle": {
+    "other": "PaddlePaddle"
+  },
+  "Tag.I18nKey.joblib": {
+    "other": "Joblib"
+  },
+  "Tag.I18nKey.gguf": {
+    "other": "GGUF"
+  }, 
+  "Tag.I18nKey.Automotive": {
+    "other": "automotive"
+  },
+  "Tag.I18nKey.Manufacturing": {
+    "other": "manufacturing"
+  },
+  "Tag.I18nKey.Energy": {
+    "other": "energy"
+  },
+  "Tag.I18nKey.Telecommunications and Electronic Information": {
+    "other": "telecommunications and electronic information"
+  },
+  "Tag.I18nKey.Transportation and Logistics": {
+    "other": "transportation and logistics"
+  },
+  "Tag.I18nKey.Construction and Real Estate": {
+    "other": "construction and real estate"
+  },
+  "Tag.I18nKey.Financial Services": {
+    "other": "financial services"
+  },
+  "Tag.I18nKey.Agriculture": {
+    "other": "agriculture"
+  },
+  "Tag.I18nKey.Chemical Industry": {
+    "other": "chemical industry"
+  },
+  "Tag.I18nKey.Environmental Protection": {
+    "other": "environmental protection"
+  },
+  "Tag.I18nKey.Healthcare and Medical Services": {
+    "other": "healthcare and medical services"
+  },
+  "Tag.I18nKey.Education and Training": {
+    "other": "education and training"
+  },
+  "Tag.I18nKey.Food and Beverage": {
+    "other": "food and beverage"
+  },
+  "Tag.I18nKey.Retail and Consumer Goods": {
+    "other": "retail and consumer goods"
+  },
+  "Tag.I18nKey.Tourism and Hospitality": {
+    "other": "tourism and hospitality"
+  },
+  "Tag.I18nKey.Information Technology (IT)": {
+    "other": "information technology (it)"
+  },
+  "Tag.I18nKey.Culture and Entertainment": {
+    "other": "culture and entertainment"
+  },
+  "Tag.I18nKey.Ascend": {
+    "other": "ascend"
+  },
+  "Tag.I18nKey.Vllm": {
+    "other": "vllm"
+  },
+  "Tag.I18nKey.TGI": {
+    "other": "tgi"
+  },
+  "Tag.I18nKey.Mindie": {
+    "other": "mindie"
+  },
+  "Tag.I18nKey.NIM": {
+    "other": "nim"
+  },
+  "Tag.I18nKey.Llama factory": {
+    "other": "llama factory"
+  },
+  "Tag.I18nKey.Swift": {
+    "other": "swift"
+  },
+  "Tag.I18nKey.knowledge": {
+    "other": "knowledge"
+  },
+  "Tag.I18nKey.reasoning": {
+    "other": "reasoning"
+  },
+  "Tag.I18nKey.examination": {
+    "other": "examination"
+  },
+  "Tag.I18nKey.understanding": {
+    "other": "understanding"
+  },
+  "Tag.I18nKey.code": {
+    "other": "code"
+  },
+  "Tag.I18nKey.bias": {
+    "other": "bias"
+  },
+  "Tag.I18nKey.other": {
+    "other": "other"
+  },
+  "Tag.I18nKey.OpenCompass": {
+    "other": "opencompass"
+  },
+  "Tag.I18nKey.lm-evaluation-harness": {
+    "other": "lm-evaluation-harness"
+  },
+  "Tag.I18nKey.Benchmark": {
+    "other": "benchmark"
+  },
+  "Tag.I18nKey.SGLang": {
+    "other": "sglang"
+  },
+  "Tag.I18nKey.Llama.cpp": {
+    "other": "llama.cpp"
+  },
+  "Tag.I18nKey.TEI": {
+    "other": "tei"
+  },
+  "Tag.I18nKey.Ktransformers": {
+    "other": "ktransformers"
+  },
+  "Tag.I18nKey.image-text-to-text": {
+    "other": "image text to text"
+  },
+  "Tag.I18nKey.text-to-video": {
+    "other": "text to video"
+  },
+  "Tag.I18nKey.video-text-to-text": {
+    "other": "video text to text"
+  },
+  "Tag.I18nKey.any-to-any": {
+    "other": "any to any"
+  },
+  "Tag.I18nKey.audio-text-to-text": {
+    "other": "audio text to text"
+  },
+  "Tag.I18nKey.English": {
+    "other": "english"
+  },
+  "Tag.I18nKey.Arabic": {
+    "other": "arabic"
+  },
+  "Tag.I18nKey.German": {
+    "other": "german"
+  },
+  "Tag.I18nKey.Spanish": {
+    "other": "spanish"
+  },
+  "Tag.I18nKey.French": {
+    "other": "french"
+  },
+  "Tag.I18nKey.Italian": {
+    "other": "italian"
+  },
+  "Tag.I18nKey.Dutch": {
+    "other": "dutch"
+  },
+  "Tag.I18nKey.Portuguese": {
+    "other": "portuguese"
+  },
+  "Tag.I18nKey.Russian": {
+    "other": "russian"
+  },
+  "Tag.I18nKey.Japanese": {
+    "other": "japanese"
+  },
+  "Tag.I18nKey.Hindi": {
+    "other": "hindi"
+  },
+  "Tag.I18nKey.Korean": {
+    "other": "korean"
+  },
+  "Tag.I18nKey.Polish": {
+    "other": "polish"
+  },
+  "Tag.I18nKey.Turkish": {
+    "other": "turkish"
+  },
+  "Tag.I18nKey.Swedish": {
+    "other": "swedish"
+  },
+  "Tag.I18nKey.TypeScript": {
+    "other": "typescript"
+  },
+  "Tag.I18nKey.Python": {
+    "other": "python"
+  },
+  "Tag.I18nKey.Go": {
+    "other": "go"
+  },
+  "Tag.I18nKey.Java": {
+    "other": "java"
+  },
+  "Tag.I18nKey.local": {
+    "other": "local"
+  },
+  "Tag.I18nKey.remote": {
+    "other": "remote"
+  },
+  "Tag.I18nKey.hybrid": {
+    "other": "hybrid"
+  },
+  "Tag.I18nKey.official": {
+    "other": "official"
+  },
+  "Tag.I18nKey.claimed": {
+    "other": "claimed"
+  },
+  "Tag.I18nKey.art & culture": {
+    "other": "art culture"
+  },
+  "Tag.I18nKey.browser automation": {
+    "other": "browser automation"
+  },
+  "Tag.I18nKey.cloud platforms": {
+    "other": "cloud platforms"
+  },
+  "Tag.I18nKey.communication": {
+    "other": "communication"
+  },
+  "Tag.I18nKey.customer data platforms": {
+    "other": "customer data platforms"
+  },
+  "Tag.I18nKey.databases": {
+    "other": "databases"
+  },
+  "Tag.I18nKey.developer tools": {
+    "other": "developer tools"
+  },
+  "Tag.I18nKey.file systems": {
+    "other": "file systems"
+  },
+  "Tag.I18nKey.knowledge & memory": {
+    "other": "knowledge & memory"
+  },
+  "Tag.I18nKey.location services": {
+    "other": "location services"
+  },
+  "Tag.I18nKey.marketing": {
+    "other": "marketing"
+  },
+  "Tag.I18nKey.monitoring": {
+    "other": "monitoring"
+  },
+  "Tag.I18nKey.search": {
+    "other": "search"
+  },
+  "Tag.I18nKey.version control": {
+    "other": "version control"
+  },
+  "Tag.I18nKey.finance": {
+    "other": "finance"
+  },
+  "Tag.I18nKey.research & data": {
+    "other": "research & data"
+  },
+  "Tag.I18nKey.social media": {
+    "other": "social media"
+  },
+  "Tag.I18nKey.os automation": {
+    "other": "os automation"
+  },
+  "Tag.I18nKey.note taking": {
+    "other": "note taking"
+  },
+  "Tag.I18nKey.cloud storage": {
+    "other": "cloud storage"
+  },
+  "Tag.I18nKey.e-commerce & retail": {
+    "other": "e-commerce & retail"
+  },
+  "Tag.I18nKey.education & learning tools": {
+    "other": "education & learning tools"
+  },
+  "Tag.I18nKey.customer support": {
+    "other": "customer support"
+  },
+  "Tag.I18nKey.language translation": {
+    "other": "language translation"
+  },
+  "Tag.I18nKey.healthcare": {
+    "other": "healthcare"
+  },
+  "Tag.I18nKey.image & video processing": {
+    "other": "image & video processing"
+  },
+  "Tag.I18nKey.security": {
+    "other": "security"
+  },
+  "Tag.I18nKey.AGPL": {
+    "other": "AGPL"
+  },
+  "Tag.I18nKey.BSD-3-Clause": {
+    "other": "BSD-3-Clause"
+  }
+}

@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/alibabacloud-go/tea/tea"
@@ -17,6 +18,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	mockrpc "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/deploy"
 	deployStatus "opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/git/gitserver"
@@ -2534,4 +2536,29 @@ func TestRepoComponent_GetMirrorTaskStatusAndSyncStatus(t *testing.T) {
 
 	assert.Equal(t, types.MirrorTaskStatus(""), mirrorTaskStatus)
 	assert.Equal(t, types.SyncStatusCompleted, syncStatus)
+}
+
+func TestRepoComponent_SendAssetManagementMsg(t *testing.T) {
+	config := &config.Config{}
+	config.Notification.NotificationRetryCount = 3
+	mockNotificationRpc := mockrpc.NewMockNotificationSvcClient(t)
+	repoComp := &repoComponentImpl{
+		config:                config,
+		notificationSvcClient: mockNotificationRpc,
+	}
+	var wg sync.WaitGroup
+	wg.Add(1)
+	mockNotificationRpc.EXPECT().Send(mock.Anything, mock.MatchedBy(func(req *types.MessageRequest) bool {
+		defer wg.Done()
+		return req.Scenario == types.MessageScenarioAssetManagement
+	})).Return(nil).Once()
+
+	err := repoComp.SendAssetManagementMsg(context.Background(), types.RepoNotificationReq{
+		RepoType:  types.ModelRepo,
+		RepoPath:  "ns/n",
+		Operation: types.OperationCreate,
+		UserUUID:  "user0",
+	})
+	require.Nil(t, err)
+	wg.Wait()
 }

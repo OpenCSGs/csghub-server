@@ -28,6 +28,7 @@ type CollectionComponent interface {
 	AddReposToCollection(ctx context.Context, req types.UpdateCollectionReposReq) error
 	RemoveReposFromCollection(ctx context.Context, req types.UpdateCollectionReposReq) error
 	OrgCollections(ctx context.Context, req *types.OrgCollectionsReq) ([]types.Collection, int, error)
+	UpdateCollectionRepo(ctx context.Context, req types.UpdateCollectionRepoReq) error
 }
 
 func NewCollectionComponent(config *config.Config) (CollectionComponent, error) {
@@ -132,6 +133,17 @@ func (cc *collectionComponentImpl) GetCollection(ctx context.Context, currentUse
 	if err != nil {
 		return nil, err
 	}
+
+	// Get collection repositories with remarks
+	collectionRepos, err := cc.collectionStore.GetCollectionRepos(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get collection repositories, error: %w", err)
+	}
+	repoRemarkMap := make(map[int64]string, len(collectionRepos))
+	for _, cr := range collectionRepos {
+		repoRemarkMap[cr.RepositoryID] = cr.Remark
+	}
+
 	likeExists, err := cc.userLikesStore.IsExistCollection(ctx, currentUser, id)
 	if err != nil {
 		newError := fmt.Errorf("failed to check for the presence of the user likes,error:%w", err)
@@ -145,6 +157,9 @@ func (cc *collectionComponentImpl) GetCollection(ctx context.Context, currentUse
 			namespace, name := repo.NamespaceAndName()
 			_, status, _ := cc.spaceComponent.Status(ctx, namespace, name)
 			newCollection.Repositories[i].Status = status
+		}
+		if remark, exists := repoRemarkMap[repo.ID]; exists {
+			newCollection.Repositories[i].Remark = remark
 		}
 	}
 	newCollection.UserLikes = likeExists
@@ -202,13 +217,29 @@ func (cc *collectionComponentImpl) AddReposToCollection(ctx context.Context, req
 		return fmt.Errorf("no permission to operate this collection: %s", strconv.FormatInt(req.ID, 10))
 	}
 	var collectionRepos []database.CollectionRepository
-	for _, id := range req.RepoIDs {
+	for _, repo := range req.RepoIDs {
+		remark := ""
+		if r, exists := req.Remarks[repo]; exists {
+			remark = r
+		}
 		collectionRepos = append(collectionRepos, database.CollectionRepository{
 			CollectionID: req.ID,
-			RepositoryID: id,
+			RepositoryID: repo,
+			Remark:       remark,
 		})
 	}
-	return cc.collectionStore.AddCollectionRepos(ctx, collectionRepos)
+	err = cc.collectionStore.AddCollectionRepos(ctx, collectionRepos)
+	if err != nil {
+		// Check if the error is a duplicate key constraint violation
+		if strings.Contains(err.Error(), "duplicate key value") {
+			return fmt.Errorf("the repo was already in this collection: %s", strconv.FormatInt(req.ID, 10))
+		}
+		if strings.Contains(err.Error(), "violates foreign key constraint") {
+			return fmt.Errorf("repo not found: %v", req.RepoIDs)
+		}
+		return err
+	}
+	return err
 }
 
 func (cc *collectionComponentImpl) RemoveReposFromCollection(ctx context.Context, req types.UpdateCollectionReposReq) error {
@@ -225,10 +256,10 @@ func (cc *collectionComponentImpl) RemoveReposFromCollection(ctx context.Context
 		return fmt.Errorf("no permission to operate this collection: %s", strconv.FormatInt(req.ID, 10))
 	}
 	var collectionRepos []database.CollectionRepository
-	for _, id := range req.RepoIDs {
+	for _, repo := range req.RepoIDs {
 		collectionRepos = append(collectionRepos, database.CollectionRepository{
 			CollectionID: req.ID,
-			RepositoryID: id,
+			RepositoryID: repo,
 		})
 	}
 	return cc.collectionStore.RemoveCollectionRepos(ctx, collectionRepos)
@@ -303,4 +334,29 @@ func (c *collectionComponentImpl) OrgCollections(ctx context.Context, req *types
 	}
 	return newCollection, total, nil
 
+}
+
+func (cc *collectionComponentImpl) UpdateCollectionRepo(ctx context.Context, req types.UpdateCollectionRepoReq) error {
+	user, err := cc.userStore.FindByUsername(ctx, req.Username)
+	if err != nil {
+		return fmt.Errorf("cannot find user for collection, %w", err)
+	}
+
+	collection, err := cc.collectionStore.GetCollection(ctx, req.ID)
+	if err != nil {
+		return err
+	}
+	if collection.UserID != user.ID {
+		return errorx.ErrForbiddenMsg("no permission to operate this collection")
+	}
+
+	err = cc.collectionStore.UpdateCollectionRepo(ctx, database.CollectionRepository{
+		CollectionID: req.ID,
+		RepositoryID: req.RepoID,
+		Remark:       req.Remark,
+	})
+	if err != nil {
+		return err
+	}
+	return nil
 }

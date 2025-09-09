@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/uptrace/bun"
 	"opencsg.com/csghub-server/common/errorx"
@@ -24,6 +25,7 @@ type CollectionStore interface {
 	DeleteCollection(ctx context.Context, id int64, uid int64) error
 	UpdateCollection(ctx context.Context, collection Collection) (*Collection, error)
 	GetCollection(ctx context.Context, id int64) (*Collection, error)
+	GetCollectionRepos(ctx context.Context, id int64) ([]CollectionRepository, error)
 	ByUserLikes(ctx context.Context, userID int64, per, page int) (collections []Collection, total int, err error)
 	ByUserOrgs(ctx context.Context, namespace string, per, page int, onlyPublic bool) (collections []Collection, total int, err error)
 	// get collections by ids
@@ -32,6 +34,7 @@ type CollectionStore interface {
 	AddCollectionRepos(ctx context.Context, crs []CollectionRepository) error
 	RemoveCollectionRepos(ctx context.Context, crs []CollectionRepository) error
 	ByUsername(ctx context.Context, username string, per, page int, onlyPublic bool) (collections []Collection, total int, err error)
+	UpdateCollectionRepo(ctx context.Context, crs CollectionRepository) error
 }
 
 func NewCollectionStore() CollectionStore {
@@ -58,6 +61,7 @@ type Collection struct {
 	Private      bool         `bun:",notnull" json:"private"`
 	Repositories []Repository `bun:"m2m:collection_repositories,join:Collection=Repository" json:"repositories"`
 	Likes        int64        `bun:",nullzero" json:"likes"`
+	DeletedAt    time.Time    `bun:",soft_delete,nullzero"`
 	times
 }
 
@@ -67,6 +71,8 @@ type CollectionRepository struct {
 	RepositoryID int64       `bun:",pk" json:"repository_id"`
 	Collection   *Collection `bun:"rel:belongs-to,join:collection_id=id"`
 	Repository   *Repository `bun:"rel:belongs-to,join:repository_id=id"`
+	Remark       string      `bun:",type:varchar(500),nullzero" json:"remark"`
+	times
 }
 
 type RankedRepository struct {
@@ -166,7 +172,7 @@ func (cs *collectionStoreImpl) CreateCollection(ctx context.Context, collection 
 
 func (cs *collectionStoreImpl) DeleteCollection(ctx context.Context, id int64, uid int64) error {
 	var collection Collection
-	res, err := cs.db.Operator.Core.NewDelete().Model(&collection).Where("id =?", id).Where("user_id =?", uid).Exec(ctx)
+	res, err := cs.db.Operator.Core.NewDelete().Model(&collection).Where("id =?", id).Where("user_id =?", uid).ForceDelete().Exec(ctx)
 	if err := assertAffectedOneRow(res, err); err != nil {
 		return fmt.Errorf("failed to delete collection in db, error:%w", err)
 	}
@@ -204,7 +210,7 @@ func (cs *collectionStoreImpl) ByUserLikes(ctx context.Context, userID int64, pe
 	query := cs.db.Operator.Core.
 		NewSelect().
 		Model(&collections).
-		Where("collection.id in (select collection_id from user_likes where user_id=?)", userID)
+		Where("collection.id in (select collection_id from user_likes where user_id=? and deleted_at is NULL)", userID)
 
 	query = query.Order("collection.created_at DESC").
 		Limit(per).
@@ -381,4 +387,30 @@ func (cs *collectionStoreImpl) ByUsername(ctx context.Context, username string, 
 		return
 	}
 	return
+}
+
+func (cs *collectionStoreImpl) UpdateCollectionRepo(ctx context.Context, cr CollectionRepository) error {
+	res, err := cs.db.Core.NewUpdate().
+		Model((*CollectionRepository)(nil)).
+		Where("collection_id = ? AND repository_id = ?", cr.CollectionID, cr.RepositoryID).
+		Set("remark = ?", cr.Remark).
+		Set("updated_at = ?", time.Now()).
+		Exec(ctx)
+	if err := assertAffectedOneRow(res, err); err != nil {
+		return errorx.HandleDBError(err, errorx.Ctx().Set("collection_id", cr.CollectionID).Set("repository_id", cr.RepositoryID))
+	}
+	return nil
+}
+
+func (cs *collectionStoreImpl) GetCollectionRepos(ctx context.Context, id int64) ([]CollectionRepository, error) {
+	var collectionRepos []CollectionRepository
+	err := cs.db.Operator.Core.
+		NewSelect().
+		Model(&collectionRepos).
+		Where("collection_id = ?", id).
+		Scan(ctx)
+	if err != nil {
+		return nil, errorx.HandleDBError(err, errorx.Ctx().Set("collection_id", id))
+	}
+	return collectionRepos, nil
 }

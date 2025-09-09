@@ -249,6 +249,55 @@ func (_c *MockMemberStore_OrganizationMembers_Call) RunAndReturn(run func(contex
 	return _c
 }
 
+// Update provides a mock function with given fields: ctx, orgID, userID, role
+func (_m *MockMemberStore) Update(ctx context.Context, orgID int64, userID int64, role string) error {
+	ret := _m.Called(ctx, orgID, userID, role)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Update")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64, int64, string) error); ok {
+		r0 = rf(ctx, orgID, userID, role)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockMemberStore_Update_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Update'
+type MockMemberStore_Update_Call struct {
+	*mock.Call
+}
+
+// Update is a helper method to define mock.On call
+//   - ctx context.Context
+//   - orgID int64
+//   - userID int64
+//   - role string
+func (_e *MockMemberStore_Expecter) Update(ctx interface{}, orgID interface{}, userID interface{}, role interface{}) *MockMemberStore_Update_Call {
+	return &MockMemberStore_Update_Call{Call: _e.mock.On("Update", ctx, orgID, userID, role)}
+}
+
+func (_c *MockMemberStore_Update_Call) Run(run func(ctx context.Context, orgID int64, userID int64, role string)) *MockMemberStore_Update_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64), args[2].(int64), args[3].(string))
+	})
+	return _c
+}
+
+func (_c *MockMemberStore_Update_Call) Return(_a0 error) *MockMemberStore_Update_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockMemberStore_Update_Call) RunAndReturn(run func(context.Context, int64, int64, string) error) *MockMemberStore_Update_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // UserMembers provides a mock function with given fields: ctx, userID
 func (_m *MockMemberStore) UserMembers(ctx context.Context, userID int64) ([]database.Member, error) {
 	ret := _m.Called(ctx, userID)

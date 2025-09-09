@@ -56,8 +56,13 @@ func (c *CollectionHandler) Index(ctx *gin.Context) {
 	filter = getCollectionFilter(ctx, filter)
 	if !slices.Contains(types.CollectionSorts, filter.Sort) {
 		msg := fmt.Sprintf("sort parameter must be one of %v", types.CollectionSorts)
+		err := errorx.ReqParamInvalid(errors.New(msg),
+			errorx.Ctx().
+				Set("param", "sort").
+				Set("provided", filter.Sort).
+				Set("allowed", types.CollectionSorts))
 		slog.Error("Bad request format,", slog.String("error", msg))
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": msg})
+		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 	per, page, err := common.GetPerAndPageFromContext(ctx)
@@ -260,6 +265,22 @@ func (c *CollectionHandler) AddRepoToCollection(ctx *gin.Context) {
 	}
 	req.ID = id
 
+	if len(req.Remarks) > 0 {
+		for repoId, remark := range req.Remarks {
+			_, err = c.sensitive.CheckRequestV2(ctx.Request.Context(), &types.UpdateCollectionRepoReq{
+				Remark: remark,
+			})
+			if err != nil {
+				slog.Error("Failed to check sensitive request",
+					slog.Int64("collection_id", req.ID),
+					slog.Int64("repo_id", repoId),
+					slog.Any("error", err))
+				httpbase.ServerError(ctx, fmt.Errorf("sensitive check failed: %w", err))
+				return
+			}
+		}
+	}
+
 	err = c.collection.AddReposToCollection(ctx.Request.Context(), *req)
 	if err != nil {
 		slog.Error("Failed to create collection", slog.Any("error", err))
@@ -302,6 +323,71 @@ func (c *CollectionHandler) RemoveRepoFromCollection(ctx *gin.Context) {
 	err = c.collection.RemoveReposFromCollection(ctx.Request.Context(), *req)
 	if err != nil {
 		slog.Error("Failed to create collection", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	httpbase.OK(ctx, nil)
+}
+
+// UpdateCollectionRepo godoc
+// @Security     JWT token
+// @Summary      update repo remark
+// @Description  update repo remark
+// @Tags         Collection
+// @Accept       json
+// @Produce      json
+// @Param        body body types.UpdateCollectionRepoReq true "body"
+// @Param        id path string true "id"
+// @Param        repo_id path string true "repo_id"
+// @Success      200  {object}  types.Response{data=nil} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /collections/{id}/repos/{repo_id} [put]
+func (c *CollectionHandler) UpdateCollectionRepo(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	var req *types.UpdateCollectionRepoReq
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequestWithExt(ctx, errorx.ReqBodyFormat(err, nil))
+		return
+	}
+
+	collectionId, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequestWithExt(ctx, errorx.ReqBodyFormat(err, nil))
+		return
+	}
+	req.ID = collectionId
+	repoId, err := strconv.ParseInt(ctx.Param("repo_id"), 10, 64)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequestWithExt(ctx, errorx.ReqBodyFormat(err, nil))
+		return
+	}
+	req.RepoID = repoId
+
+	_, err = c.sensitive.CheckRequestV2(ctx.Request.Context(), &types.UpdateCollectionRepoReq{
+		Remark: req.Remark,
+	})
+	if err != nil {
+		slog.Error("Failed to check sensitive request",
+			slog.Int64("collection_id", collectionId),
+			slog.Int64("repo_id", repoId),
+			slog.Any("error", err))
+		httpbase.ServerError(ctx, fmt.Errorf("sensitive check failed: %w", err))
+		return
+	}
+
+	req.Username = currentUser
+	err = c.collection.UpdateCollectionRepo(ctx.Request.Context(), *req)
+	if err != nil {
+		if errors.Is(err, errorx.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
+		slog.Error("Failed to update repo remark", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}

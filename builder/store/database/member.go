@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"fmt"
+	"time"
 )
 
 type memberStoreImpl struct {
@@ -12,6 +13,7 @@ type memberStoreImpl struct {
 type MemberStore interface {
 	Find(ctx context.Context, orgID, userID int64) (*Member, error)
 	Add(ctx context.Context, orgID, userID int64, role string) error
+	Update(ctx context.Context, orgID, userID int64, role string) error
 	Delete(ctx context.Context, orgID, userID int64, role string) error
 	UserMembers(ctx context.Context, userID int64) ([]Member, error)
 	OrganizationMembers(ctx context.Context, orgID int64, role string, pageSize, page int) ([]Member, int, error)
@@ -38,6 +40,7 @@ type Member struct {
 	Organization   *Organization `bun:"rel:belongs-to,join:organization_id=id" json:"organization"`
 	User           *User         `bun:"rel:belongs-to,join:user_id=id" json:"user"`
 	Role           string        `bun:",notnull" json:"role"`
+	DeletedAt      time.Time     `bun:",soft_delete,nullzero"`
 	times
 }
 
@@ -57,6 +60,17 @@ func (s *memberStoreImpl) Add(ctx context.Context, orgID, userID int64, role str
 		Role:           role,
 	}
 	result, err := s.db.Core.NewInsert().Model(member).Exec(ctx)
+	if err != nil {
+		return err
+	}
+	return assertAffectedOneRow(result, err)
+}
+
+func (s *memberStoreImpl) Update(ctx context.Context, orgID, userID int64, role string) error {
+	result, err := s.db.Core.NewUpdate().Model((*Member)(nil)).
+		Where("organization_id=? and user_id=?", orgID, userID).
+		Set("role=?", role).
+		Exec(ctx)
 	if err != nil {
 		return err
 	}

@@ -6,49 +6,27 @@ import (
 	"testing"
 	"time"
 
+	mockrpc "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rpc"
+
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	mockrpc "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rpc"
 	mockdb "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
 	mockcomp "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
 
 func TestDiscussionComponent_CreateDisucssion(t *testing.T) {
-	mockRepoStore := mockdb.NewMockRepoStore(t)
-	mockUserStore := mockdb.NewMockUserStore(t)
-	mockDiscussionStore := mockdb.NewMockDiscussionStore(t)
-	// new discussionComponentImpl from mock db store
-	comp := &discussionComponentImpl{
-		repoStore:       mockRepoStore,
-		userStore:       mockUserStore,
-		discussionStore: mockDiscussionStore,
-	}
-
 	repo := &database.Repository{
 		ID: 1,
 	}
-	mockRepoStore.EXPECT().FindByPath(mock.Anything, types.ModelRepo, "namespace", "name").Return(repo, nil).Once()
 
 	user := &database.User{
-		ID:       1,
-		Username: "user",
-		Avatar:   "avatar",
+		ID: 1, Username: "user",
+		Avatar: "avatar",
 	}
-	mockUserStore.EXPECT().FindByUsername(mock.Anything, user.Username).Return(*user, nil).Once()
-
-	disc := database.Discussion{
-		Title:              "test discussion",
-		DiscussionableID:   repo.ID,
-		DiscussionableType: database.DiscussionableTypeRepo,
-		UserID:             user.ID,
-	}
-	dbdisc := disc
-	dbdisc.ID = 1
-	dbdisc.CreatedAt = time.Now()
-	mockDiscussionStore.EXPECT().Create(mock.Anything, disc).Return(&dbdisc, nil).Once()
 
 	req := types.CreateRepoDiscussionRequest{
 		Title:       "test discussion",
@@ -57,33 +35,85 @@ func TestDiscussionComponent_CreateDisucssion(t *testing.T) {
 		Name:        "name",
 		CurrentUser: "user",
 	}
-	actualDisc, err := comp.CreateRepoDiscussion(context.TODO(), req)
-	require.Nil(t, err)
 
-	expectedDisc := &types.CreateDiscussionResponse{
-		ID:           1,
-		Title:        "test discussion",
-		CommentCount: 0,
-		CreatedAt:    dbdisc.CreatedAt,
-		User: &types.DiscussionResponse_User{
-			ID:       1,
-			Username: "user",
-			Avatar:   "avatar",
-		},
-	}
-	require.Equal(t, expectedDisc, actualDisc)
+	t.Run("success", func(t *testing.T) {
+		mockRepoStore := mockdb.NewMockRepoStore(t)
+		mockUserStore := mockdb.NewMockUserStore(t)
+		mockDiscussionStore := mockdb.NewMockDiscussionStore(t)
+		mockRepoComponent := mockcomp.NewMockRepoComponent(t)
+		// new discussionComponentImpl from mock db store
+		comp := &discussionComponentImpl{
+			repoStore:       mockRepoStore,
+			userStore:       mockUserStore,
+			discussionStore: mockDiscussionStore,
+			repoCompo:       mockRepoComponent,
+		}
+		mockRepoStore.EXPECT().FindByPath(mock.Anything, types.ModelRepo, "namespace", "name").Return(repo, nil).Once()
+		mockRepoStore.EXPECT().FindById(mock.Anything, repo.ID).Return(repo, nil).Once()
+		mockRepoComponent.EXPECT().AllowReadAccessRepo(mock.Anything, repo, "user").Return(true, nil).Once()
+		mockUserStore.EXPECT().FindByUsername(mock.Anything, user.Username).Return(*user, nil).Once()
 
+		disc := database.Discussion{
+			Title:              "test discussion",
+			DiscussionableID:   repo.ID,
+			DiscussionableType: database.DiscussionableTypeRepo,
+			UserID:             user.ID,
+		}
+		dbdisc := disc
+		dbdisc.ID = 1
+		dbdisc.CreatedAt = time.Now()
+		mockDiscussionStore.EXPECT().Create(mock.Anything, disc).Return(&dbdisc, nil).Once()
+
+		actualDisc, err := comp.CreateRepoDiscussion(context.TODO(), req)
+		require.Nil(t, err)
+
+		expectedDisc := &types.CreateDiscussionResponse{
+			ID:           1,
+			Title:        "test discussion",
+			CommentCount: 0,
+			CreatedAt:    dbdisc.CreatedAt,
+			User: &types.DiscussionResponse_User{
+				ID:       1,
+				Username: "user",
+				Avatar:   "avatar",
+			},
+		}
+		require.Equal(t, expectedDisc, actualDisc)
+	})
+
+	t.Run("forbidden", func(t *testing.T) {
+		mockRepoStore := mockdb.NewMockRepoStore(t)
+		mockUserStore := mockdb.NewMockUserStore(t)
+		mockDiscussionStore := mockdb.NewMockDiscussionStore(t)
+		mockRepoComponent := mockcomp.NewMockRepoComponent(t)
+		// new discussionComponentImpl from mock db store
+		comp := &discussionComponentImpl{
+			repoStore:       mockRepoStore,
+			userStore:       mockUserStore,
+			discussionStore: mockDiscussionStore,
+			repoCompo:       mockRepoComponent,
+		}
+		mockRepoStore.EXPECT().FindByPath(mock.Anything, types.ModelRepo, "namespace", "name").Return(repo, nil).Once()
+		mockRepoStore.EXPECT().FindById(mock.Anything, repo.ID).Return(repo, nil).Once()
+		mockRepoComponent.EXPECT().AllowReadAccessRepo(mock.Anything, repo, "user").Return(false, errorx.ErrForbidden).Once()
+
+		actualDisc, err := comp.CreateRepoDiscussion(context.TODO(), req)
+		require.ErrorIs(t, err, errorx.ErrForbidden)
+		require.Nil(t, actualDisc)
+	})
 }
 
 func TestDiscussionComponent_GetDisussion(t *testing.T) {
 	mockRepoStore := mockdb.NewMockRepoStore(t)
 	mockUserStore := mockdb.NewMockUserStore(t)
 	mockDiscussionStore := mockdb.NewMockDiscussionStore(t)
+	mockRepoComponent := mockcomp.NewMockRepoComponent(t)
 	// new discussionComponentImpl from mock db store
 	comp := &discussionComponentImpl{
 		repoStore:       mockRepoStore,
 		userStore:       mockUserStore,
 		discussionStore: mockDiscussionStore,
+		repoCompo:       mockRepoComponent,
 	}
 
 	disc := database.Discussion{
@@ -99,6 +129,8 @@ func TestDiscussionComponent_GetDisussion(t *testing.T) {
 		},
 	}
 	mockDiscussionStore.EXPECT().FindByID(mock.Anything, int64(1)).Return(&disc, nil).Once()
+	mockRepoStore.EXPECT().FindById(mock.Anything, int64(1)).Return(&database.Repository{ID: 1}, nil).Once()
+	mockRepoComponent.EXPECT().AllowReadAccessRepo(mock.Anything, &database.Repository{ID: 1}, "user").Return(true, nil).Once()
 	comments := []database.Comment{
 		{
 			ID:      1,
@@ -112,7 +144,7 @@ func TestDiscussionComponent_GetDisussion(t *testing.T) {
 	}
 	mockDiscussionStore.EXPECT().FindDiscussionComments(mock.Anything, int64(1)).Return(comments, nil).Once()
 
-	resp, err := comp.GetDiscussion(context.TODO(), int64(1))
+	resp, err := comp.GetDiscussion(context.TODO(), "user", int64(1))
 	require.Nil(t, err)
 	require.NotNil(t, resp)
 	require.Equal(t, int64(1), resp.ID)
@@ -128,11 +160,13 @@ func TestDiscussionComponent_UpdateDisussion(t *testing.T) {
 	mockRepoStore := mockdb.NewMockRepoStore(t)
 	mockUserStore := mockdb.NewMockUserStore(t)
 	mockDiscussionStore := mockdb.NewMockDiscussionStore(t)
+	mockRepoComponent := mockcomp.NewMockRepoComponent(t)
 	// new discussionComponentImpl from mock db store
 	comp := &discussionComponentImpl{
 		repoStore:       mockRepoStore,
 		userStore:       mockUserStore,
 		discussionStore: mockDiscussionStore,
+		repoCompo:       mockRepoComponent,
 	}
 
 	req := types.UpdateDiscussionRequest{
@@ -166,11 +200,13 @@ func TestDiscussionComponent_DeleteDisussion(t *testing.T) {
 	mockRepoStore := mockdb.NewMockRepoStore(t)
 	mockUserStore := mockdb.NewMockUserStore(t)
 	mockDiscussionStore := mockdb.NewMockDiscussionStore(t)
+	mockRepoComponent := mockcomp.NewMockRepoComponent(t)
 	// new discussionComponentImpl from mock db store
 	comp := &discussionComponentImpl{
 		repoStore:       mockRepoStore,
 		userStore:       mockUserStore,
 		discussionStore: mockDiscussionStore,
+		repoCompo:       mockRepoComponent,
 	}
 
 	currentUser := "user"
@@ -199,16 +235,20 @@ func TestDiscussionComponent_ListRepoDiscussions(t *testing.T) {
 	mockRepoStore := mockdb.NewMockRepoStore(t)
 	mockUserStore := mockdb.NewMockUserStore(t)
 	mockDiscussionStore := mockdb.NewMockDiscussionStore(t)
+	mockRepoComponent := mockcomp.NewMockRepoComponent(t)
 	// new discussionComponentImpl from mock db store
 	comp := &discussionComponentImpl{
 		repoStore:       mockRepoStore,
 		userStore:       mockUserStore,
 		discussionStore: mockDiscussionStore,
+		repoCompo:       mockRepoComponent,
 	}
 
 	repo := &database.Repository{
 		ID: 1,
 	}
+	mockRepoStore.EXPECT().FindById(mock.Anything, repo.ID).Return(repo, nil).Once()
+	mockRepoComponent.EXPECT().AllowReadAccessRepo(mock.Anything, repo, "user").Return(true, nil).Once()
 	mockRepoStore.EXPECT().FindByPath(mock.Anything, types.ModelRepo, "namespace", "name").Return(repo, nil).Once()
 
 	var discussions []database.Discussion
@@ -253,10 +293,10 @@ func TestDiscussionComponent_CreateDisussionComment(t *testing.T) {
 	wg.Add(1)
 
 	mockNotificationRpc.EXPECT().
-		Send(mock.Anything, mock.Anything).
-		Run(func(ctx context.Context, msg *types.MessageRequest) {
-			wg.Done()
-		}).
+		Send(mock.Anything, mock.MatchedBy(func(msg *types.MessageRequest) bool {
+			defer wg.Done()
+			return msg.Scenario == types.MessageScenarioDiscussion
+		})).
 		Return(nil).
 		Once()
 
@@ -328,18 +368,19 @@ func TestDiscussionComponent_CreateDisussionComment(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, int64(1), resp.CommentableID)
 	require.Equal(t, "user", resp.User.Username)
-
 }
 
 func TestDiscussionComponent_UpdateComment(t *testing.T) {
 	mockRepoStore := mockdb.NewMockRepoStore(t)
 	mockUserStore := mockdb.NewMockUserStore(t)
 	mockDiscussionStore := mockdb.NewMockDiscussionStore(t)
+	mockRepoComponent := mockcomp.NewMockRepoComponent(t)
 	// new discussionComponentImpl from mock db store
 	comp := &discussionComponentImpl{
 		repoStore:       mockRepoStore,
 		userStore:       mockUserStore,
 		discussionStore: mockDiscussionStore,
+		repoCompo:       mockRepoComponent,
 	}
 
 	req := types.CreateCommentRequest{
@@ -354,7 +395,19 @@ func TestDiscussionComponent_UpdateComment(t *testing.T) {
 		Avatar:   "avatar",
 	}
 	mockUserStore.EXPECT().FindByUsername(mock.Anything, user.Username).Return(*user, nil).Once()
-
+	disc := database.Discussion{
+		ID:                 1,
+		Title:              "test discussion",
+		DiscussionableID:   1,
+		DiscussionableType: database.DiscussionableTypeRepo,
+		UserID:             1,
+		User: &database.User{
+			ID:       1,
+			Username: "user",
+			Avatar:   "avatar",
+		},
+	}
+	mockDiscussionStore.EXPECT().FindByID(mock.Anything, int64(1)).Return(&disc, nil).Once()
 	comment := database.Comment{
 		ID:              1,
 		Content:         req.Content,
@@ -413,11 +466,13 @@ func TestDiscussionComponent_ListDiscussionComments(t *testing.T) {
 	mockRepoStore := mockdb.NewMockRepoStore(t)
 	mockUserStore := mockdb.NewMockUserStore(t)
 	mockDiscussionStore := mockdb.NewMockDiscussionStore(t)
+	mockRepoComponent := mockcomp.NewMockRepoComponent(t)
 	// new discussionComponentImpl from mock db store
 	comp := &discussionComponentImpl{
 		repoStore:       mockRepoStore,
 		userStore:       mockUserStore,
 		discussionStore: mockDiscussionStore,
+		repoCompo:       mockRepoComponent,
 	}
 
 	discussionID := int64(1)
@@ -432,9 +487,19 @@ func TestDiscussionComponent_ListDiscussionComments(t *testing.T) {
 			},
 		},
 	}
+	disc := &database.Discussion{
+		ID:                 1,
+		Title:              "test discussion",
+		DiscussionableID:   1,
+		DiscussionableType: database.DiscussionableTypeRepo,
+		UserID:             1,
+	}
+	mockDiscussionStore.EXPECT().FindByID(mock.Anything, discussionID).Return(disc, nil).Once()
+	mockRepoStore.EXPECT().FindById(mock.Anything, int64(1)).Return(&database.Repository{ID: 1}, nil).Once()
+	mockRepoComponent.EXPECT().AllowReadAccessRepo(mock.Anything, &database.Repository{ID: 1}, "user").Return(true, nil).Once()
 	mockDiscussionStore.EXPECT().FindDiscussionComments(mock.Anything, discussionID).Return(comments, nil).Once()
 
-	resp, err := comp.ListDiscussionComments(context.TODO(), discussionID)
+	resp, err := comp.ListDiscussionComments(context.TODO(), "user", discussionID)
 	require.Nil(t, err)
 	require.Len(t, resp, 1)
 	require.Equal(t, comments[0].Content, resp[0].Content)
