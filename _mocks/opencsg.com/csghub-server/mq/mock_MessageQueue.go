@@ -76,109 +76,6 @@ func (_c *MockMessageQueue_BuildDLQStream_Call) RunAndReturn(run func() error) *
 	return _c
 }
 
-// BuildDeployServiceConsumerWithName provides a mock function with given fields: consumerName
-func (_m *MockMessageQueue) BuildDeployServiceConsumerWithName(consumerName string) (jetstream.Consumer, error) {
-	ret := _m.Called(consumerName)
-
-	if len(ret) == 0 {
-		panic("no return value specified for BuildDeployServiceConsumerWithName")
-	}
-
-	var r0 jetstream.Consumer
-	var r1 error
-	if rf, ok := ret.Get(0).(func(string) (jetstream.Consumer, error)); ok {
-		return rf(consumerName)
-	}
-	if rf, ok := ret.Get(0).(func(string) jetstream.Consumer); ok {
-		r0 = rf(consumerName)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(jetstream.Consumer)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(string) error); ok {
-		r1 = rf(consumerName)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockMessageQueue_BuildDeployServiceConsumerWithName_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BuildDeployServiceConsumerWithName'
-type MockMessageQueue_BuildDeployServiceConsumerWithName_Call struct {
-	*mock.Call
-}
-
-// BuildDeployServiceConsumerWithName is a helper method to define mock.On call
-//   - consumerName string
-func (_e *MockMessageQueue_Expecter) BuildDeployServiceConsumerWithName(consumerName interface{}) *MockMessageQueue_BuildDeployServiceConsumerWithName_Call {
-	return &MockMessageQueue_BuildDeployServiceConsumerWithName_Call{Call: _e.mock.On("BuildDeployServiceConsumerWithName", consumerName)}
-}
-
-func (_c *MockMessageQueue_BuildDeployServiceConsumerWithName_Call) Run(run func(consumerName string)) *MockMessageQueue_BuildDeployServiceConsumerWithName_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string))
-	})
-	return _c
-}
-
-func (_c *MockMessageQueue_BuildDeployServiceConsumerWithName_Call) Return(_a0 jetstream.Consumer, _a1 error) *MockMessageQueue_BuildDeployServiceConsumerWithName_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockMessageQueue_BuildDeployServiceConsumerWithName_Call) RunAndReturn(run func(string) (jetstream.Consumer, error)) *MockMessageQueue_BuildDeployServiceConsumerWithName_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// BuildDeployServiceStream provides a mock function with no fields
-func (_m *MockMessageQueue) BuildDeployServiceStream() error {
-	ret := _m.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for BuildDeployServiceStream")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func() error); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// MockMessageQueue_BuildDeployServiceStream_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BuildDeployServiceStream'
-type MockMessageQueue_BuildDeployServiceStream_Call struct {
-	*mock.Call
-}
-
-// BuildDeployServiceStream is a helper method to define mock.On call
-func (_e *MockMessageQueue_Expecter) BuildDeployServiceStream() *MockMessageQueue_BuildDeployServiceStream_Call {
-	return &MockMessageQueue_BuildDeployServiceStream_Call{Call: _e.mock.On("BuildDeployServiceStream")}
-}
-
-func (_c *MockMessageQueue_BuildDeployServiceStream_Call) Run(run func()) *MockMessageQueue_BuildDeployServiceStream_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *MockMessageQueue_BuildDeployServiceStream_Call) Return(_a0 error) *MockMessageQueue_BuildDeployServiceStream_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *MockMessageQueue_BuildDeployServiceStream_Call) RunAndReturn(run func() error) *MockMessageQueue_BuildDeployServiceStream_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // BuildEventStreamAndConsumer provides a mock function with given fields: cfg, streamCfg, consumerCfg
 func (_m *MockMessageQueue) BuildEventStreamAndConsumer(cfg mq.EventConfig, streamCfg jetstream.StreamConfig, consumerCfg jetstream.ConsumerConfig) (jetstream.Consumer, error) {
 	ret := _m.Called(cfg, streamCfg, consumerCfg)
@@ -235,6 +132,51 @@ func (_c *MockMessageQueue_BuildEventStreamAndConsumer_Call) Return(_a0 jetstrea
 }
 
 func (_c *MockMessageQueue_BuildEventStreamAndConsumer_Call) RunAndReturn(run func(mq.EventConfig, jetstream.StreamConfig, jetstream.ConsumerConfig) (jetstream.Consumer, error)) *MockMessageQueue_BuildEventStreamAndConsumer_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// BuildFeeEventStream provides a mock function with no fields
+func (_m *MockMessageQueue) BuildFeeEventStream() error {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for BuildFeeEventStream")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func() error); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockMessageQueue_BuildFeeEventStream_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BuildFeeEventStream'
+type MockMessageQueue_BuildFeeEventStream_Call struct {
+	*mock.Call
+}
+
+// BuildFeeEventStream is a helper method to define mock.On call
+func (_e *MockMessageQueue_Expecter) BuildFeeEventStream() *MockMessageQueue_BuildFeeEventStream_Call {
+	return &MockMessageQueue_BuildFeeEventStream_Call{Call: _e.mock.On("BuildFeeEventStream")}
+}
+
+func (_c *MockMessageQueue_BuildFeeEventStream_Call) Run(run func()) *MockMessageQueue_BuildFeeEventStream_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockMessageQueue_BuildFeeEventStream_Call) Return(_a0 error) *MockMessageQueue_BuildFeeEventStream_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockMessageQueue_BuildFeeEventStream_Call) RunAndReturn(run func() error) *MockMessageQueue_BuildFeeEventStream_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -490,6 +432,154 @@ func (_c *MockMessageQueue_BuildNormalPriorityMsgStream_Call) RunAndReturn(run f
 	return _c
 }
 
+// BuildOrderConsumerWithName provides a mock function with given fields: consumerName
+func (_m *MockMessageQueue) BuildOrderConsumerWithName(consumerName string) (jetstream.Consumer, error) {
+	ret := _m.Called(consumerName)
+
+	if len(ret) == 0 {
+		panic("no return value specified for BuildOrderConsumerWithName")
+	}
+
+	var r0 jetstream.Consumer
+	var r1 error
+	if rf, ok := ret.Get(0).(func(string) (jetstream.Consumer, error)); ok {
+		return rf(consumerName)
+	}
+	if rf, ok := ret.Get(0).(func(string) jetstream.Consumer); ok {
+		r0 = rf(consumerName)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(jetstream.Consumer)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(string) error); ok {
+		r1 = rf(consumerName)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockMessageQueue_BuildOrderConsumerWithName_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BuildOrderConsumerWithName'
+type MockMessageQueue_BuildOrderConsumerWithName_Call struct {
+	*mock.Call
+}
+
+// BuildOrderConsumerWithName is a helper method to define mock.On call
+//   - consumerName string
+func (_e *MockMessageQueue_Expecter) BuildOrderConsumerWithName(consumerName interface{}) *MockMessageQueue_BuildOrderConsumerWithName_Call {
+	return &MockMessageQueue_BuildOrderConsumerWithName_Call{Call: _e.mock.On("BuildOrderConsumerWithName", consumerName)}
+}
+
+func (_c *MockMessageQueue_BuildOrderConsumerWithName_Call) Run(run func(consumerName string)) *MockMessageQueue_BuildOrderConsumerWithName_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(string))
+	})
+	return _c
+}
+
+func (_c *MockMessageQueue_BuildOrderConsumerWithName_Call) Return(_a0 jetstream.Consumer, _a1 error) *MockMessageQueue_BuildOrderConsumerWithName_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockMessageQueue_BuildOrderConsumerWithName_Call) RunAndReturn(run func(string) (jetstream.Consumer, error)) *MockMessageQueue_BuildOrderConsumerWithName_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// BuildOrderEventStream provides a mock function with no fields
+func (_m *MockMessageQueue) BuildOrderEventStream() error {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for BuildOrderEventStream")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func() error); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockMessageQueue_BuildOrderEventStream_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BuildOrderEventStream'
+type MockMessageQueue_BuildOrderEventStream_Call struct {
+	*mock.Call
+}
+
+// BuildOrderEventStream is a helper method to define mock.On call
+func (_e *MockMessageQueue_Expecter) BuildOrderEventStream() *MockMessageQueue_BuildOrderEventStream_Call {
+	return &MockMessageQueue_BuildOrderEventStream_Call{Call: _e.mock.On("BuildOrderEventStream")}
+}
+
+func (_c *MockMessageQueue_BuildOrderEventStream_Call) Run(run func()) *MockMessageQueue_BuildOrderEventStream_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockMessageQueue_BuildOrderEventStream_Call) Return(_a0 error) *MockMessageQueue_BuildOrderEventStream_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockMessageQueue_BuildOrderEventStream_Call) RunAndReturn(run func() error) *MockMessageQueue_BuildOrderEventStream_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// BuildRechargeEventStream provides a mock function with no fields
+func (_m *MockMessageQueue) BuildRechargeEventStream() error {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for BuildRechargeEventStream")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func() error); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockMessageQueue_BuildRechargeEventStream_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BuildRechargeEventStream'
+type MockMessageQueue_BuildRechargeEventStream_Call struct {
+	*mock.Call
+}
+
+// BuildRechargeEventStream is a helper method to define mock.On call
+func (_e *MockMessageQueue_Expecter) BuildRechargeEventStream() *MockMessageQueue_BuildRechargeEventStream_Call {
+	return &MockMessageQueue_BuildRechargeEventStream_Call{Call: _e.mock.On("BuildRechargeEventStream")}
+}
+
+func (_c *MockMessageQueue_BuildRechargeEventStream_Call) Run(run func()) *MockMessageQueue_BuildRechargeEventStream_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockMessageQueue_BuildRechargeEventStream_Call) Return(_a0 error) *MockMessageQueue_BuildRechargeEventStream_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockMessageQueue_BuildRechargeEventStream_Call) RunAndReturn(run func() error) *MockMessageQueue_BuildRechargeEventStream_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CreateOrUpdateStream provides a mock function with given fields: ctx, streamName, streamCfg
 func (_m *MockMessageQueue) CreateOrUpdateStream(ctx context.Context, streamName string, streamCfg jetstream.StreamConfig) (jetstream.Stream, error) {
 	ret := _m.Called(ctx, streamName, streamCfg)
@@ -550,6 +640,64 @@ func (_c *MockMessageQueue_CreateOrUpdateStream_Call) RunAndReturn(run func(cont
 	return _c
 }
 
+// FetchFeeEventMessages provides a mock function with given fields: batch
+func (_m *MockMessageQueue) FetchFeeEventMessages(batch int) (jetstream.MessageBatch, error) {
+	ret := _m.Called(batch)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FetchFeeEventMessages")
+	}
+
+	var r0 jetstream.MessageBatch
+	var r1 error
+	if rf, ok := ret.Get(0).(func(int) (jetstream.MessageBatch, error)); ok {
+		return rf(batch)
+	}
+	if rf, ok := ret.Get(0).(func(int) jetstream.MessageBatch); ok {
+		r0 = rf(batch)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(jetstream.MessageBatch)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(int) error); ok {
+		r1 = rf(batch)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockMessageQueue_FetchFeeEventMessages_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FetchFeeEventMessages'
+type MockMessageQueue_FetchFeeEventMessages_Call struct {
+	*mock.Call
+}
+
+// FetchFeeEventMessages is a helper method to define mock.On call
+//   - batch int
+func (_e *MockMessageQueue_Expecter) FetchFeeEventMessages(batch interface{}) *MockMessageQueue_FetchFeeEventMessages_Call {
+	return &MockMessageQueue_FetchFeeEventMessages_Call{Call: _e.mock.On("FetchFeeEventMessages", batch)}
+}
+
+func (_c *MockMessageQueue_FetchFeeEventMessages_Call) Run(run func(batch int)) *MockMessageQueue_FetchFeeEventMessages_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(int))
+	})
+	return _c
+}
+
+func (_c *MockMessageQueue_FetchFeeEventMessages_Call) Return(_a0 jetstream.MessageBatch, _a1 error) *MockMessageQueue_FetchFeeEventMessages_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockMessageQueue_FetchFeeEventMessages_Call) RunAndReturn(run func(int) (jetstream.MessageBatch, error)) *MockMessageQueue_FetchFeeEventMessages_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // FetchMeterEventMessages provides a mock function with given fields: batch
 func (_m *MockMessageQueue) FetchMeterEventMessages(batch int) (jetstream.MessageBatch, error) {
 	ret := _m.Called(batch)
@@ -604,6 +752,64 @@ func (_c *MockMessageQueue_FetchMeterEventMessages_Call) Return(_a0 jetstream.Me
 }
 
 func (_c *MockMessageQueue_FetchMeterEventMessages_Call) RunAndReturn(run func(int) (jetstream.MessageBatch, error)) *MockMessageQueue_FetchMeterEventMessages_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// FetchRechargeEventMessages provides a mock function with given fields: batch
+func (_m *MockMessageQueue) FetchRechargeEventMessages(batch int) (jetstream.MessageBatch, error) {
+	ret := _m.Called(batch)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FetchRechargeEventMessages")
+	}
+
+	var r0 jetstream.MessageBatch
+	var r1 error
+	if rf, ok := ret.Get(0).(func(int) (jetstream.MessageBatch, error)); ok {
+		return rf(batch)
+	}
+	if rf, ok := ret.Get(0).(func(int) jetstream.MessageBatch); ok {
+		r0 = rf(batch)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(jetstream.MessageBatch)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(int) error); ok {
+		r1 = rf(batch)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockMessageQueue_FetchRechargeEventMessages_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FetchRechargeEventMessages'
+type MockMessageQueue_FetchRechargeEventMessages_Call struct {
+	*mock.Call
+}
+
+// FetchRechargeEventMessages is a helper method to define mock.On call
+//   - batch int
+func (_e *MockMessageQueue_Expecter) FetchRechargeEventMessages(batch interface{}) *MockMessageQueue_FetchRechargeEventMessages_Call {
+	return &MockMessageQueue_FetchRechargeEventMessages_Call{Call: _e.mock.On("FetchRechargeEventMessages", batch)}
+}
+
+func (_c *MockMessageQueue_FetchRechargeEventMessages_Call) Run(run func(batch int)) *MockMessageQueue_FetchRechargeEventMessages_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(int))
+	})
+	return _c
+}
+
+func (_c *MockMessageQueue_FetchRechargeEventMessages_Call) Return(_a0 jetstream.MessageBatch, _a1 error) *MockMessageQueue_FetchRechargeEventMessages_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockMessageQueue_FetchRechargeEventMessages_Call) RunAndReturn(run func(int) (jetstream.MessageBatch, error)) *MockMessageQueue_FetchRechargeEventMessages_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -747,52 +953,6 @@ func (_c *MockMessageQueue_PublishData_Call) RunAndReturn(run func(string, []byt
 	return _c
 }
 
-// PublishDeployServiceData provides a mock function with given fields: data
-func (_m *MockMessageQueue) PublishDeployServiceData(data []byte) error {
-	ret := _m.Called(data)
-
-	if len(ret) == 0 {
-		panic("no return value specified for PublishDeployServiceData")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func([]byte) error); ok {
-		r0 = rf(data)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// MockMessageQueue_PublishDeployServiceData_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PublishDeployServiceData'
-type MockMessageQueue_PublishDeployServiceData_Call struct {
-	*mock.Call
-}
-
-// PublishDeployServiceData is a helper method to define mock.On call
-//   - data []byte
-func (_e *MockMessageQueue_Expecter) PublishDeployServiceData(data interface{}) *MockMessageQueue_PublishDeployServiceData_Call {
-	return &MockMessageQueue_PublishDeployServiceData_Call{Call: _e.mock.On("PublishDeployServiceData", data)}
-}
-
-func (_c *MockMessageQueue_PublishDeployServiceData_Call) Run(run func(data []byte)) *MockMessageQueue_PublishDeployServiceData_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].([]byte))
-	})
-	return _c
-}
-
-func (_c *MockMessageQueue_PublishDeployServiceData_Call) Return(_a0 error) *MockMessageQueue_PublishDeployServiceData_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *MockMessageQueue_PublishDeployServiceData_Call) RunAndReturn(run func([]byte) error) *MockMessageQueue_PublishDeployServiceData_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // PublishFeeCreditData provides a mock function with given fields: data
 func (_m *MockMessageQueue) PublishFeeCreditData(data []byte) error {
 	ret := _m.Called(data)
@@ -835,6 +995,52 @@ func (_c *MockMessageQueue_PublishFeeCreditData_Call) Return(_a0 error) *MockMes
 }
 
 func (_c *MockMessageQueue_PublishFeeCreditData_Call) RunAndReturn(run func([]byte) error) *MockMessageQueue_PublishFeeCreditData_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// PublishFeeDataToDLQ provides a mock function with given fields: data
+func (_m *MockMessageQueue) PublishFeeDataToDLQ(data []byte) error {
+	ret := _m.Called(data)
+
+	if len(ret) == 0 {
+		panic("no return value specified for PublishFeeDataToDLQ")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func([]byte) error); ok {
+		r0 = rf(data)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockMessageQueue_PublishFeeDataToDLQ_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PublishFeeDataToDLQ'
+type MockMessageQueue_PublishFeeDataToDLQ_Call struct {
+	*mock.Call
+}
+
+// PublishFeeDataToDLQ is a helper method to define mock.On call
+//   - data []byte
+func (_e *MockMessageQueue_Expecter) PublishFeeDataToDLQ(data interface{}) *MockMessageQueue_PublishFeeDataToDLQ_Call {
+	return &MockMessageQueue_PublishFeeDataToDLQ_Call{Call: _e.mock.On("PublishFeeDataToDLQ", data)}
+}
+
+func (_c *MockMessageQueue_PublishFeeDataToDLQ_Call) Run(run func(data []byte)) *MockMessageQueue_PublishFeeDataToDLQ_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].([]byte))
+	})
+	return _c
+}
+
+func (_c *MockMessageQueue_PublishFeeDataToDLQ_Call) Return(_a0 error) *MockMessageQueue_PublishFeeDataToDLQ_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockMessageQueue_PublishFeeDataToDLQ_Call) RunAndReturn(run func([]byte) error) *MockMessageQueue_PublishFeeDataToDLQ_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1023,52 +1229,6 @@ func (_c *MockMessageQueue_PublishMeterDataToDLQ_Call) RunAndReturn(run func([]b
 	return _c
 }
 
-// PublishMeterDurationData provides a mock function with given fields: data
-func (_m *MockMessageQueue) PublishMeterDurationData(data []byte) error {
-	ret := _m.Called(data)
-
-	if len(ret) == 0 {
-		panic("no return value specified for PublishMeterDurationData")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func([]byte) error); ok {
-		r0 = rf(data)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// MockMessageQueue_PublishMeterDurationData_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PublishMeterDurationData'
-type MockMessageQueue_PublishMeterDurationData_Call struct {
-	*mock.Call
-}
-
-// PublishMeterDurationData is a helper method to define mock.On call
-//   - data []byte
-func (_e *MockMessageQueue_Expecter) PublishMeterDurationData(data interface{}) *MockMessageQueue_PublishMeterDurationData_Call {
-	return &MockMessageQueue_PublishMeterDurationData_Call{Call: _e.mock.On("PublishMeterDurationData", data)}
-}
-
-func (_c *MockMessageQueue_PublishMeterDurationData_Call) Run(run func(data []byte)) *MockMessageQueue_PublishMeterDurationData_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].([]byte))
-	})
-	return _c
-}
-
-func (_c *MockMessageQueue_PublishMeterDurationData_Call) Return(_a0 error) *MockMessageQueue_PublishMeterDurationData_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *MockMessageQueue_PublishMeterDurationData_Call) RunAndReturn(run func([]byte) error) *MockMessageQueue_PublishMeterDurationData_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // PublishNormalPriorityMsg provides a mock function with given fields: msg
 func (_m *MockMessageQueue) PublishNormalPriorityMsg(msg types.ScenarioMessage) error {
 	ret := _m.Called(msg)
@@ -1111,6 +1271,236 @@ func (_c *MockMessageQueue_PublishNormalPriorityMsg_Call) Return(_a0 error) *Moc
 }
 
 func (_c *MockMessageQueue_PublishNormalPriorityMsg_Call) RunAndReturn(run func(types.ScenarioMessage) error) *MockMessageQueue_PublishNormalPriorityMsg_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// PublishNotificationForSubscription provides a mock function with given fields: data
+func (_m *MockMessageQueue) PublishNotificationForSubscription(data []byte) error {
+	ret := _m.Called(data)
+
+	if len(ret) == 0 {
+		panic("no return value specified for PublishNotificationForSubscription")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func([]byte) error); ok {
+		r0 = rf(data)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockMessageQueue_PublishNotificationForSubscription_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PublishNotificationForSubscription'
+type MockMessageQueue_PublishNotificationForSubscription_Call struct {
+	*mock.Call
+}
+
+// PublishNotificationForSubscription is a helper method to define mock.On call
+//   - data []byte
+func (_e *MockMessageQueue_Expecter) PublishNotificationForSubscription(data interface{}) *MockMessageQueue_PublishNotificationForSubscription_Call {
+	return &MockMessageQueue_PublishNotificationForSubscription_Call{Call: _e.mock.On("PublishNotificationForSubscription", data)}
+}
+
+func (_c *MockMessageQueue_PublishNotificationForSubscription_Call) Run(run func(data []byte)) *MockMessageQueue_PublishNotificationForSubscription_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].([]byte))
+	})
+	return _c
+}
+
+func (_c *MockMessageQueue_PublishNotificationForSubscription_Call) Return(_a0 error) *MockMessageQueue_PublishNotificationForSubscription_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockMessageQueue_PublishNotificationForSubscription_Call) RunAndReturn(run func([]byte) error) *MockMessageQueue_PublishNotificationForSubscription_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// PublishOrderExpiredData provides a mock function with given fields: data
+func (_m *MockMessageQueue) PublishOrderExpiredData(data []byte) error {
+	ret := _m.Called(data)
+
+	if len(ret) == 0 {
+		panic("no return value specified for PublishOrderExpiredData")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func([]byte) error); ok {
+		r0 = rf(data)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockMessageQueue_PublishOrderExpiredData_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PublishOrderExpiredData'
+type MockMessageQueue_PublishOrderExpiredData_Call struct {
+	*mock.Call
+}
+
+// PublishOrderExpiredData is a helper method to define mock.On call
+//   - data []byte
+func (_e *MockMessageQueue_Expecter) PublishOrderExpiredData(data interface{}) *MockMessageQueue_PublishOrderExpiredData_Call {
+	return &MockMessageQueue_PublishOrderExpiredData_Call{Call: _e.mock.On("PublishOrderExpiredData", data)}
+}
+
+func (_c *MockMessageQueue_PublishOrderExpiredData_Call) Run(run func(data []byte)) *MockMessageQueue_PublishOrderExpiredData_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].([]byte))
+	})
+	return _c
+}
+
+func (_c *MockMessageQueue_PublishOrderExpiredData_Call) Return(_a0 error) *MockMessageQueue_PublishOrderExpiredData_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockMessageQueue_PublishOrderExpiredData_Call) RunAndReturn(run func([]byte) error) *MockMessageQueue_PublishOrderExpiredData_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// PublishRechargeDataToDLQ provides a mock function with given fields: data
+func (_m *MockMessageQueue) PublishRechargeDataToDLQ(data []byte) error {
+	ret := _m.Called(data)
+
+	if len(ret) == 0 {
+		panic("no return value specified for PublishRechargeDataToDLQ")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func([]byte) error); ok {
+		r0 = rf(data)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockMessageQueue_PublishRechargeDataToDLQ_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PublishRechargeDataToDLQ'
+type MockMessageQueue_PublishRechargeDataToDLQ_Call struct {
+	*mock.Call
+}
+
+// PublishRechargeDataToDLQ is a helper method to define mock.On call
+//   - data []byte
+func (_e *MockMessageQueue_Expecter) PublishRechargeDataToDLQ(data interface{}) *MockMessageQueue_PublishRechargeDataToDLQ_Call {
+	return &MockMessageQueue_PublishRechargeDataToDLQ_Call{Call: _e.mock.On("PublishRechargeDataToDLQ", data)}
+}
+
+func (_c *MockMessageQueue_PublishRechargeDataToDLQ_Call) Run(run func(data []byte)) *MockMessageQueue_PublishRechargeDataToDLQ_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].([]byte))
+	})
+	return _c
+}
+
+func (_c *MockMessageQueue_PublishRechargeDataToDLQ_Call) Return(_a0 error) *MockMessageQueue_PublishRechargeDataToDLQ_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockMessageQueue_PublishRechargeDataToDLQ_Call) RunAndReturn(run func([]byte) error) *MockMessageQueue_PublishRechargeDataToDLQ_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// PublishRechargeDurationData provides a mock function with given fields: data
+func (_m *MockMessageQueue) PublishRechargeDurationData(data []byte) error {
+	ret := _m.Called(data)
+
+	if len(ret) == 0 {
+		panic("no return value specified for PublishRechargeDurationData")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func([]byte) error); ok {
+		r0 = rf(data)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockMessageQueue_PublishRechargeDurationData_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PublishRechargeDurationData'
+type MockMessageQueue_PublishRechargeDurationData_Call struct {
+	*mock.Call
+}
+
+// PublishRechargeDurationData is a helper method to define mock.On call
+//   - data []byte
+func (_e *MockMessageQueue_Expecter) PublishRechargeDurationData(data interface{}) *MockMessageQueue_PublishRechargeDurationData_Call {
+	return &MockMessageQueue_PublishRechargeDurationData_Call{Call: _e.mock.On("PublishRechargeDurationData", data)}
+}
+
+func (_c *MockMessageQueue_PublishRechargeDurationData_Call) Run(run func(data []byte)) *MockMessageQueue_PublishRechargeDurationData_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].([]byte))
+	})
+	return _c
+}
+
+func (_c *MockMessageQueue_PublishRechargeDurationData_Call) Return(_a0 error) *MockMessageQueue_PublishRechargeDurationData_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockMessageQueue_PublishRechargeDurationData_Call) RunAndReturn(run func([]byte) error) *MockMessageQueue_PublishRechargeDurationData_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// PublishSubscriptionData provides a mock function with given fields: data
+func (_m *MockMessageQueue) PublishSubscriptionData(data []byte) error {
+	ret := _m.Called(data)
+
+	if len(ret) == 0 {
+		panic("no return value specified for PublishSubscriptionData")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func([]byte) error); ok {
+		r0 = rf(data)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockMessageQueue_PublishSubscriptionData_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PublishSubscriptionData'
+type MockMessageQueue_PublishSubscriptionData_Call struct {
+	*mock.Call
+}
+
+// PublishSubscriptionData is a helper method to define mock.On call
+//   - data []byte
+func (_e *MockMessageQueue_Expecter) PublishSubscriptionData(data interface{}) *MockMessageQueue_PublishSubscriptionData_Call {
+	return &MockMessageQueue_PublishSubscriptionData_Call{Call: _e.mock.On("PublishSubscriptionData", data)}
+}
+
+func (_c *MockMessageQueue_PublishSubscriptionData_Call) Run(run func(data []byte)) *MockMessageQueue_PublishSubscriptionData_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].([]byte))
+	})
+	return _c
+}
+
+func (_c *MockMessageQueue_PublishSubscriptionData_Call) Return(_a0 error) *MockMessageQueue_PublishSubscriptionData_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockMessageQueue_PublishSubscriptionData_Call) RunAndReturn(run func([]byte) error) *MockMessageQueue_PublishSubscriptionData_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1160,12 +1550,12 @@ func (_c *MockMessageQueue_VerifyDLQStream_Call) RunAndReturn(run func() error) 
 	return _c
 }
 
-// VerifyDeployServiceStream provides a mock function with no fields
-func (_m *MockMessageQueue) VerifyDeployServiceStream() error {
+// VerifyFeeEventStream provides a mock function with no fields
+func (_m *MockMessageQueue) VerifyFeeEventStream() error {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
-		panic("no return value specified for VerifyDeployServiceStream")
+		panic("no return value specified for VerifyFeeEventStream")
 	}
 
 	var r0 error
@@ -1178,29 +1568,29 @@ func (_m *MockMessageQueue) VerifyDeployServiceStream() error {
 	return r0
 }
 
-// MockMessageQueue_VerifyDeployServiceStream_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'VerifyDeployServiceStream'
-type MockMessageQueue_VerifyDeployServiceStream_Call struct {
+// MockMessageQueue_VerifyFeeEventStream_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'VerifyFeeEventStream'
+type MockMessageQueue_VerifyFeeEventStream_Call struct {
 	*mock.Call
 }
 
-// VerifyDeployServiceStream is a helper method to define mock.On call
-func (_e *MockMessageQueue_Expecter) VerifyDeployServiceStream() *MockMessageQueue_VerifyDeployServiceStream_Call {
-	return &MockMessageQueue_VerifyDeployServiceStream_Call{Call: _e.mock.On("VerifyDeployServiceStream")}
+// VerifyFeeEventStream is a helper method to define mock.On call
+func (_e *MockMessageQueue_Expecter) VerifyFeeEventStream() *MockMessageQueue_VerifyFeeEventStream_Call {
+	return &MockMessageQueue_VerifyFeeEventStream_Call{Call: _e.mock.On("VerifyFeeEventStream")}
 }
 
-func (_c *MockMessageQueue_VerifyDeployServiceStream_Call) Run(run func()) *MockMessageQueue_VerifyDeployServiceStream_Call {
+func (_c *MockMessageQueue_VerifyFeeEventStream_Call) Run(run func()) *MockMessageQueue_VerifyFeeEventStream_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run()
 	})
 	return _c
 }
 
-func (_c *MockMessageQueue_VerifyDeployServiceStream_Call) Return(_a0 error) *MockMessageQueue_VerifyDeployServiceStream_Call {
+func (_c *MockMessageQueue_VerifyFeeEventStream_Call) Return(_a0 error) *MockMessageQueue_VerifyFeeEventStream_Call {
 	_c.Call.Return(_a0)
 	return _c
 }
 
-func (_c *MockMessageQueue_VerifyDeployServiceStream_Call) RunAndReturn(run func() error) *MockMessageQueue_VerifyDeployServiceStream_Call {
+func (_c *MockMessageQueue_VerifyFeeEventStream_Call) RunAndReturn(run func() error) *MockMessageQueue_VerifyFeeEventStream_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1246,6 +1636,51 @@ func (_c *MockMessageQueue_VerifyMeteringStream_Call) Return(_a0 error) *MockMes
 }
 
 func (_c *MockMessageQueue_VerifyMeteringStream_Call) RunAndReturn(run func() error) *MockMessageQueue_VerifyMeteringStream_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// VerifyRechargeStream provides a mock function with no fields
+func (_m *MockMessageQueue) VerifyRechargeStream() error {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for VerifyRechargeStream")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func() error); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockMessageQueue_VerifyRechargeStream_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'VerifyRechargeStream'
+type MockMessageQueue_VerifyRechargeStream_Call struct {
+	*mock.Call
+}
+
+// VerifyRechargeStream is a helper method to define mock.On call
+func (_e *MockMessageQueue_Expecter) VerifyRechargeStream() *MockMessageQueue_VerifyRechargeStream_Call {
+	return &MockMessageQueue_VerifyRechargeStream_Call{Call: _e.mock.On("VerifyRechargeStream")}
+}
+
+func (_c *MockMessageQueue_VerifyRechargeStream_Call) Run(run func()) *MockMessageQueue_VerifyRechargeStream_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockMessageQueue_VerifyRechargeStream_Call) Return(_a0 error) *MockMessageQueue_VerifyRechargeStream_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockMessageQueue_VerifyRechargeStream_Call) RunAndReturn(run func() error) *MockMessageQueue_VerifyRechargeStream_Call {
 	_c.Call.Return(run)
 	return _c
 }
