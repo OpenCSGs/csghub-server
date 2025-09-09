@@ -105,7 +105,7 @@ var serverCmd = &cobra.Command{
 		}
 
 		slog.Info("init event publisher")
-		err = event.InitEventPublisher(cfg, nil)
+		err = event.InitEventPublisher(cfg)
 		if err != nil {
 			return fmt.Errorf("fail to initialize message queue, %w", err)
 		}
@@ -120,10 +120,8 @@ var serverCmd = &cobra.Command{
 			ModelDownloadEndpoint:   cfg.Model.DownloadEndpoint,
 			PublicRootDomain:        cfg.Space.PublicRootDomain,
 			S3Internal:              s3Internal,
-			IsMasterHost:            cfg.IsMasterHost,
 			APIToken:                cfg.APIToken,
-			NotificationEndpoint:    fmt.Sprintf("%s:%d", cfg.Notification.Host, cfg.Notification.Port),
-		})
+		}, cfg)
 		if err != nil {
 			return fmt.Errorf("failed to init deploy: %w", err)
 		}
