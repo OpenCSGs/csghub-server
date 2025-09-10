@@ -2564,6 +2564,54 @@ func (_c *MockRepoStore_UpdateRepoFileDownloads_Call) RunAndReturn(run func(cont
 	return _c
 }
 
+// UpdateRepoSensitiveCheckStatus provides a mock function with given fields: ctx, repoID, status
+func (_m *MockRepoStore) UpdateRepoSensitiveCheckStatus(ctx context.Context, repoID int64, status types.SensitiveCheckStatus) error {
+	ret := _m.Called(ctx, repoID, status)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateRepoSensitiveCheckStatus")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64, types.SensitiveCheckStatus) error); ok {
+		r0 = rf(ctx, repoID, status)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockRepoStore_UpdateRepoSensitiveCheckStatus_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateRepoSensitiveCheckStatus'
+type MockRepoStore_UpdateRepoSensitiveCheckStatus_Call struct {
+	*mock.Call
+}
+
+// UpdateRepoSensitiveCheckStatus is a helper method to define mock.On call
+//   - ctx context.Context
+//   - repoID int64
+//   - status types.SensitiveCheckStatus
+func (_e *MockRepoStore_Expecter) UpdateRepoSensitiveCheckStatus(ctx interface{}, repoID interface{}, status interface{}) *MockRepoStore_UpdateRepoSensitiveCheckStatus_Call {
+	return &MockRepoStore_UpdateRepoSensitiveCheckStatus_Call{Call: _e.mock.On("UpdateRepoSensitiveCheckStatus", ctx, repoID, status)}
+}
+
+func (_c *MockRepoStore_UpdateRepoSensitiveCheckStatus_Call) Run(run func(ctx context.Context, repoID int64, status types.SensitiveCheckStatus)) *MockRepoStore_UpdateRepoSensitiveCheckStatus_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64), args[2].(types.SensitiveCheckStatus))
+	})
+	return _c
+}
+
+func (_c *MockRepoStore_UpdateRepoSensitiveCheckStatus_Call) Return(_a0 error) *MockRepoStore_UpdateRepoSensitiveCheckStatus_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockRepoStore_UpdateRepoSensitiveCheckStatus_Call) RunAndReturn(run func(context.Context, int64, types.SensitiveCheckStatus) error) *MockRepoStore_UpdateRepoSensitiveCheckStatus_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // UpdateSourcePath provides a mock function with given fields: ctx, repoID, sourcePath, sourceType
 func (_m *MockRepoStore) UpdateSourcePath(ctx context.Context, repoID int64, sourcePath string, sourceType string) error {
 	ret := _m.Called(ctx, repoID, sourcePath, sourceType)

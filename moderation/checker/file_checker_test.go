@@ -1,6 +1,7 @@
 package checker
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -64,7 +65,7 @@ func TestImageFileChecker_Run(t *testing.T) {
 	reader := strings.NewReader("image content")
 	expectedStatus := types.SensitiveCheckSkip
 	expectedMessage := "skip image file"
-	status, message := checker.Run(reader)
+	status, message := checker.Run(context.Background(), reader)
 	if status != expectedStatus || message != expectedMessage {
 		t.Errorf("Expected (%v, %v), got (%v, %v)", expectedStatus, expectedMessage, status, message)
 	}
@@ -75,7 +76,7 @@ func TestLfsFileChecker_Run(t *testing.T) {
 	reader := strings.NewReader("lfs content")
 	expectedStatus := types.SensitiveCheckSkip
 	expectedMessage := "skip lfs file"
-	status, message := checker.Run(reader)
+	status, message := checker.Run(context.Background(), reader)
 	if status != expectedStatus || message != expectedMessage {
 		t.Errorf("Expected (%v, %v), got (%v, %v)", expectedStatus, expectedMessage, status, message)
 	}
@@ -86,7 +87,7 @@ func TestFolderChecker_Run(t *testing.T) {
 	reader := strings.NewReader("folder content")
 	expectedStatus := types.SensitiveCheckSkip
 	expectedMessage := "skip folder"
-	status, message := checker.Run(reader)
+	status, message := checker.Run(context.Background(), reader)
 	if status != expectedStatus || message != expectedMessage {
 		t.Errorf("Expected (%v, %v), got (%v, %v)", expectedStatus, expectedMessage, status, message)
 	}

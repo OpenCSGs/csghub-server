@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -138,39 +139,29 @@ func TestRepoComponent_UpdateRepoSensitiveCheckStatus(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	repoType := types.DatasetRepo
-	namespace := "test-namespace"
-	name := "test-repo"
-	repo := &database.Repository{
-		ID:                   1,
-		Name:                 name,
-		Path:                 "test-namespace/test-repo",
-		DefaultBranch:        "main",
-		SensitiveCheckStatus: types.SensitiveCheckFail,
-	}
-	mockRepoStore.EXPECT().FindByPath(ctx, repoType, namespace, name).Return(repo, nil)
-	mockRepoStore.EXPECT().UpdateRepo(ctx, *repo).Return(repo, nil)
-	err := repoComp.UpdateRepoSensitiveCheckStatus(ctx, repoType, namespace, name, types.SensitiveCheckFail)
+
+	mockRepoStore.EXPECT().UpdateRepoSensitiveCheckStatus(ctx, int64(1), types.SensitiveCheckFail).Return(nil)
+
+	err := repoComp.UpdateRepoSensitiveCheckStatus(ctx, 1, types.SensitiveCheckFail)
 	require.Nil(t, err)
 }
 
-// unit test for func CheckRepoFiles
 func TestRepoComponent_CheckRepoFiles(t *testing.T) {
 	mockRepoStore := mockdb.NewMockRepoStore(t)
 	mockRepoFileStore := mockdb.NewMockRepoFileStore(t)
 	mockRepoFileCheckStore := mockdb.NewMockRepoFileCheckStore(t)
 	mockGitServer := mockgit.NewMockGitServer(t)
 	repoComp := &repoComponentImpl{
-		rs:   mockRepoStore,
-		rfs:  mockRepoFileStore,
-		rfcs: mockRepoFileCheckStore,
-		git:  mockGitServer,
+		rs:               mockRepoStore,
+		rfs:              mockRepoFileStore,
+		rfcs:             mockRepoFileCheckStore,
+		git:              mockGitServer,
+		concurrencyLimit: 10,
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	repoType := types.DatasetRepo
-	namespace := "test-namespace"
 	name := "test-repo"
 	repo := &database.Repository{
 		ID:                   1,
@@ -180,56 +171,30 @@ func TestRepoComponent_CheckRepoFiles(t *testing.T) {
 		SensitiveCheckStatus: types.SensitiveCheckFail,
 		RepositoryType:       repoType,
 	}
-	mockRepoStore.EXPECT().FindByPath(mock.Anything, repoType, namespace, name).Return(repo, nil).Once()
-	// loop once
-	mockRepoFileStore.EXPECT().BatchGet(mock.Anything, repo.ID, int64(0), int64(1)).Return([]*database.RepositoryFile{
-		{
-			ID:              1,
-			RepositoryID:    1,
-			Path:            "file1.txt",
-			FileType:        "file",
-			Size:            1,
-			LastModify:      time.Now(),
-			CommitSha:       "sha1",
-			LfsRelativePath: "",
-			Branch:          "main",
-			Repository:      repo,
-		},
-	}, nil).Once()
-	//loop twice
-	mockRepoFileStore.EXPECT().BatchGet(mock.Anything, repo.ID, int64(1), int64(1)).Return([]*database.RepositoryFile{
-		{
-			ID:              2,
-			RepositoryID:    1,
-			Path:            "file2.txt",
-			FileType:        "file",
-			Size:            1,
-			LastModify:      time.Now(),
-			CommitSha:       "sha2",
-			LfsRelativePath: "",
-			Branch:          "main",
-			Repository:      repo,
-		},
-	}, nil).Once()
-	//loop third
-	mockRepoFileStore.EXPECT().BatchGet(mock.Anything, repo.ID, int64(2), int64(1)).Return([]*database.RepositoryFile{}, nil).Once()
 
-	mockGitServer.EXPECT().GetRepoFileReader(mock.Anything, gitserver.GetRepoInfoByPathReq{
-		Namespace: namespace,
-		Name:      name,
-		Path:      "file1.txt",
-		RepoType:  repoType,
-		Ref:       "main",
-	}).
-		Return(io.NopCloser(strings.NewReader("test string")), int64(len("test string")), nil).Once()
-	mockGitServer.EXPECT().GetRepoFileReader(mock.Anything, gitserver.GetRepoInfoByPathReq{
-		Namespace: namespace,
-		Name:      name,
-		Path:      "file2.txt",
-		RepoType:  repoType,
-		Ref:       "main",
-	}).
-		Return(io.NopCloser(strings.NewReader("sensitive word")), int64(len("sensitive word")), nil).Once()
+	file1 := &database.RepositoryFile{
+		ID:           1,
+		RepositoryID: 1,
+		Path:         "file1.txt",
+		Repository:   repo,
+	}
+
+	file2 := &database.RepositoryFile{
+		ID:           2,
+		RepositoryID: 1,
+		Path:         "file2.txt",
+		Repository:   repo,
+	}
+	// The first batch returns two files
+	mockRepoFileStore.EXPECT().BatchGet(mock.Anything, repo.ID, int64(0), int64(2)).Once().Return([]*database.RepositoryFile{file1, file2}, nil)
+	mockRepoFileStore.EXPECT().BatchGet(mock.Anything, repo.ID, int64(2), int64(2)).Once().Return(nil, nil)
+	mockGitServer.EXPECT().GetRepoFileReader(mock.Anything, mock.MatchedBy(func(req gitserver.GetRepoInfoByPathReq) bool {
+		return req.Path == "file1.txt"
+	})).Return(io.NopCloser(strings.NewReader("test string")), int64(len("test string")), nil).Once()
+
+	mockGitServer.EXPECT().GetRepoFileReader(mock.Anything, mock.MatchedBy(func(req gitserver.GetRepoInfoByPathReq) bool {
+		return req.Path == "file2.txt"
+	})).Return(io.NopCloser(strings.NewReader("sensitive word")), int64(len("sensitive word")), nil).Once()
 
 	cfg := &config.Config{}
 	cfg.SensitiveCheck.Enable = true
@@ -245,21 +210,38 @@ func TestRepoComponent_CheckRepoFiles(t *testing.T) {
 	repoToUpdate.Private = true
 	mockRepoStore.EXPECT().UpdateRepo(mock.Anything, *repoToUpdate).Return(repoToUpdate, nil).Once()
 
+	// Use a channel to collect results concurrently without depending on call order
+	results := make(chan database.RepositoryFileCheck, 2)
+	var wg sync.WaitGroup
+	wg.Add(2)
 	mockRepoFileCheckStore.EXPECT().Upsert(mock.Anything, mock.Anything).
-		// Return(nil).Twice()
 		RunAndReturn(func(ctx context.Context, rfc database.RepositoryFileCheck) error {
-			if rfc.RepoFileID == 1 {
-				require.True(t, rfc.Status == types.SensitiveCheckPass)
-			}
-
-			if rfc.RepoFileID == 2 {
-				require.True(t, rfc.Status == types.SensitiveCheckFail)
-			}
+			defer wg.Done()
+			results <- rfc
 			return nil
 		}).Twice()
-	err := repoComp.CheckRepoFiles(ctx, repoType, namespace, name, CheckOption{
-		BatchSize:  1,
+
+	err := repoComp.CheckRepoFiles(ctx, repo.ID, CheckOption{
+		BatchSize:  2,
 		ForceCheck: true,
 	})
 	require.Nil(t, err)
+	wg.Wait()
+	close(results)
+	// Assert results from the channel
+	passFound := false
+	failFound := false
+	for rfc := range results {
+		if rfc.RepoFileID == 1 {
+			require.Equal(t, types.SensitiveCheckPass, rfc.Status)
+			passFound = true
+		}
+		if rfc.RepoFileID == 2 {
+			require.Equal(t, types.SensitiveCheckFail, rfc.Status)
+			failFound = true
+		}
+	}
+
+	require.True(t, passFound, "Check for passed file not found")
+	require.True(t, failFound, "Check for failed file not found")
 }

@@ -94,6 +94,19 @@ type RepoStore interface {
 	BatchUpdate(ctx context.Context, repos []*Repository) error
 	FindByRepoTypeAndPaths(ctx context.Context, repoType types.RepositoryType, path []string) ([]Repository, error)
 	FindUnhashedRepos(ctx context.Context, batchSize int, lastID int64) ([]Repository, error)
+	UpdateRepoSensitiveCheckStatus(ctx context.Context, repoID int64, status types.SensitiveCheckStatus) error
+}
+
+func (s *repoStoreImpl) UpdateRepoSensitiveCheckStatus(ctx context.Context, repoID int64, status types.SensitiveCheckStatus) error {
+	_, err := s.db.Operator.Core.NewUpdate().
+		Model(&Repository{}).
+		Set("sensitive_check_status = ?", status).
+		Where("id = ?", repoID).
+		Exec(ctx)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func newRepoStoreInstance(db *DB) RepoStore {

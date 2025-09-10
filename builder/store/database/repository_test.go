@@ -1799,3 +1799,25 @@ func TestRepoStore_PublicToUserWithCacheFailed(t *testing.T) {
 	require.ElementsMatch(t, c.expected, names)
 	require.Equal(t, len(c.expected), count)
 }
+
+func TestRepoStore_UpdateRepoSensitiveCheckStatus(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+	store := database.NewRepoStoreWithDB(db)
+
+	repo, err := store.CreateRepo(ctx, database.Repository{
+		Name:    "repo1",
+		UserID:  123,
+		GitPath: "foos_u/bar",
+	})
+	require.Nil(t, err)
+
+	err = store.UpdateRepoSensitiveCheckStatus(ctx, repo.ID, types.SensitiveCheckPass)
+	require.Nil(t, err)
+
+	rp := &database.Repository{}
+	err = db.Core.NewSelect().Model(rp).Where("id=?", repo.ID).Scan(ctx)
+	require.Nil(t, err)
+	require.Equal(t, types.SensitiveCheckPass, rp.SensitiveCheckStatus)
+}
