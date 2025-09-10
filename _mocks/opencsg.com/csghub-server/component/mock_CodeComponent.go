@@ -130,36 +130,36 @@ func (_c *MockCodeComponent_Delete_Call) RunAndReturn(run func(context.Context, 
 	return _c
 }
 
-// Index provides a mock function with given fields: ctx, filter, per, page, needOpWeight
-func (_m *MockCodeComponent) Index(ctx context.Context, filter *types.RepoFilter, per int, page int, needOpWeight bool) ([]*types.Code, int, error) {
-	ret := _m.Called(ctx, filter, per, page, needOpWeight)
+// Index provides a mock function with given fields: ctx, filter, per, page
+func (_m *MockCodeComponent) Index(ctx context.Context, filter *types.RepoFilter, per int, page int) ([]types.Code, int, error) {
+	ret := _m.Called(ctx, filter, per, page)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Index")
 	}
 
-	var r0 []*types.Code
+	var r0 []types.Code
 	var r1 int
 	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, *types.RepoFilter, int, int, bool) ([]*types.Code, int, error)); ok {
-		return rf(ctx, filter, per, page, needOpWeight)
+	if rf, ok := ret.Get(0).(func(context.Context, *types.RepoFilter, int, int) ([]types.Code, int, error)); ok {
+		return rf(ctx, filter, per, page)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *types.RepoFilter, int, int, bool) []*types.Code); ok {
-		r0 = rf(ctx, filter, per, page, needOpWeight)
+	if rf, ok := ret.Get(0).(func(context.Context, *types.RepoFilter, int, int) []types.Code); ok {
+		r0 = rf(ctx, filter, per, page)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]*types.Code)
+			r0 = ret.Get(0).([]types.Code)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *types.RepoFilter, int, int, bool) int); ok {
-		r1 = rf(ctx, filter, per, page, needOpWeight)
+	if rf, ok := ret.Get(1).(func(context.Context, *types.RepoFilter, int, int) int); ok {
+		r1 = rf(ctx, filter, per, page)
 	} else {
 		r1 = ret.Get(1).(int)
 	}
 
-	if rf, ok := ret.Get(2).(func(context.Context, *types.RepoFilter, int, int, bool) error); ok {
-		r2 = rf(ctx, filter, per, page, needOpWeight)
+	if rf, ok := ret.Get(2).(func(context.Context, *types.RepoFilter, int, int) error); ok {
+		r2 = rf(ctx, filter, per, page)
 	} else {
 		r2 = ret.Error(2)
 	}
@@ -177,24 +177,23 @@ type MockCodeComponent_Index_Call struct {
 //   - filter *types.RepoFilter
 //   - per int
 //   - page int
-//   - needOpWeight bool
-func (_e *MockCodeComponent_Expecter) Index(ctx interface{}, filter interface{}, per interface{}, page interface{}, needOpWeight interface{}) *MockCodeComponent_Index_Call {
-	return &MockCodeComponent_Index_Call{Call: _e.mock.On("Index", ctx, filter, per, page, needOpWeight)}
+func (_e *MockCodeComponent_Expecter) Index(ctx interface{}, filter interface{}, per interface{}, page interface{}) *MockCodeComponent_Index_Call {
+	return &MockCodeComponent_Index_Call{Call: _e.mock.On("Index", ctx, filter, per, page)}
 }
 
-func (_c *MockCodeComponent_Index_Call) Run(run func(ctx context.Context, filter *types.RepoFilter, per int, page int, needOpWeight bool)) *MockCodeComponent_Index_Call {
+func (_c *MockCodeComponent_Index_Call) Run(run func(ctx context.Context, filter *types.RepoFilter, per int, page int)) *MockCodeComponent_Index_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(*types.RepoFilter), args[2].(int), args[3].(int), args[4].(bool))
+		run(args[0].(context.Context), args[1].(*types.RepoFilter), args[2].(int), args[3].(int))
 	})
 	return _c
 }
 
-func (_c *MockCodeComponent_Index_Call) Return(_a0 []*types.Code, _a1 int, _a2 error) *MockCodeComponent_Index_Call {
+func (_c *MockCodeComponent_Index_Call) Return(_a0 []types.Code, _a1 int, _a2 error) *MockCodeComponent_Index_Call {
 	_c.Call.Return(_a0, _a1, _a2)
 	return _c
 }
 
-func (_c *MockCodeComponent_Index_Call) RunAndReturn(run func(context.Context, *types.RepoFilter, int, int, bool) ([]*types.Code, int, error)) *MockCodeComponent_Index_Call {
+func (_c *MockCodeComponent_Index_Call) RunAndReturn(run func(context.Context, *types.RepoFilter, int, int) ([]types.Code, int, error)) *MockCodeComponent_Index_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -326,9 +325,9 @@ func (_c *MockCodeComponent_Relations_Call) RunAndReturn(run func(context.Contex
 	return _c
 }
 
-// Show provides a mock function with given fields: ctx, namespace, name, currentUser, needOpWeight, needMultiSync
-func (_m *MockCodeComponent) Show(ctx context.Context, namespace string, name string, currentUser string, needOpWeight bool, needMultiSync bool) (*types.Code, error) {
-	ret := _m.Called(ctx, namespace, name, currentUser, needOpWeight, needMultiSync)
+// Show provides a mock function with given fields: ctx, namespace, name, currentUser
+func (_m *MockCodeComponent) Show(ctx context.Context, namespace string, name string, currentUser string) (*types.Code, error) {
+	ret := _m.Called(ctx, namespace, name, currentUser)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Show")
@@ -336,19 +335,19 @@ func (_m *MockCodeComponent) Show(ctx context.Context, namespace string, name st
 
 	var r0 *types.Code
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, bool, bool) (*types.Code, error)); ok {
-		return rf(ctx, namespace, name, currentUser, needOpWeight, needMultiSync)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) (*types.Code, error)); ok {
+		return rf(ctx, namespace, name, currentUser)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, bool, bool) *types.Code); ok {
-		r0 = rf(ctx, namespace, name, currentUser, needOpWeight, needMultiSync)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) *types.Code); ok {
+		r0 = rf(ctx, namespace, name, currentUser)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*types.Code)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, bool, bool) error); ok {
-		r1 = rf(ctx, namespace, name, currentUser, needOpWeight, needMultiSync)
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string) error); ok {
+		r1 = rf(ctx, namespace, name, currentUser)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -366,15 +365,13 @@ type MockCodeComponent_Show_Call struct {
 //   - namespace string
 //   - name string
 //   - currentUser string
-//   - needOpWeight bool
-//   - needMultiSync bool
-func (_e *MockCodeComponent_Expecter) Show(ctx interface{}, namespace interface{}, name interface{}, currentUser interface{}, needOpWeight interface{}, needMultiSync interface{}) *MockCodeComponent_Show_Call {
-	return &MockCodeComponent_Show_Call{Call: _e.mock.On("Show", ctx, namespace, name, currentUser, needOpWeight, needMultiSync)}
+func (_e *MockCodeComponent_Expecter) Show(ctx interface{}, namespace interface{}, name interface{}, currentUser interface{}) *MockCodeComponent_Show_Call {
+	return &MockCodeComponent_Show_Call{Call: _e.mock.On("Show", ctx, namespace, name, currentUser)}
 }
 
-func (_c *MockCodeComponent_Show_Call) Run(run func(ctx context.Context, namespace string, name string, currentUser string, needOpWeight bool, needMultiSync bool)) *MockCodeComponent_Show_Call {
+func (_c *MockCodeComponent_Show_Call) Run(run func(ctx context.Context, namespace string, name string, currentUser string)) *MockCodeComponent_Show_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string), args[4].(bool), args[5].(bool))
+		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string))
 	})
 	return _c
 }
@@ -384,7 +381,7 @@ func (_c *MockCodeComponent_Show_Call) Return(_a0 *types.Code, _a1 error) *MockC
 	return _c
 }
 
-func (_c *MockCodeComponent_Show_Call) RunAndReturn(run func(context.Context, string, string, string, bool, bool) (*types.Code, error)) *MockCodeComponent_Show_Call {
+func (_c *MockCodeComponent_Show_Call) RunAndReturn(run func(context.Context, string, string, string) (*types.Code, error)) *MockCodeComponent_Show_Call {
 	_c.Call.Return(run)
 	return _c
 }

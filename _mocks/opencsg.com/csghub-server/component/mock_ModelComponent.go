@@ -1033,9 +1033,9 @@ func (_c *MockModelComponent_SetRuntimeFrameworkModes_Call) RunAndReturn(run fun
 	return _c
 }
 
-// Show provides a mock function with given fields: ctx, namespace, name, currentUser, needOpWeight, needMultiSync
-func (_m *MockModelComponent) Show(ctx context.Context, namespace string, name string, currentUser string, needOpWeight bool, needMultiSync bool) (*types.Model, error) {
-	ret := _m.Called(ctx, namespace, name, currentUser, needOpWeight, needMultiSync)
+// Show provides a mock function with given fields: ctx, namespace, name, currentUser, needOpWeight
+func (_m *MockModelComponent) Show(ctx context.Context, namespace string, name string, currentUser string, needOpWeight bool) (*types.Model, error) {
+	ret := _m.Called(ctx, namespace, name, currentUser, needOpWeight)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Show")
@@ -1043,19 +1043,19 @@ func (_m *MockModelComponent) Show(ctx context.Context, namespace string, name s
 
 	var r0 *types.Model
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, bool, bool) (*types.Model, error)); ok {
-		return rf(ctx, namespace, name, currentUser, needOpWeight, needMultiSync)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, bool) (*types.Model, error)); ok {
+		return rf(ctx, namespace, name, currentUser, needOpWeight)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, bool, bool) *types.Model); ok {
-		r0 = rf(ctx, namespace, name, currentUser, needOpWeight, needMultiSync)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, bool) *types.Model); ok {
+		r0 = rf(ctx, namespace, name, currentUser, needOpWeight)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*types.Model)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, bool, bool) error); ok {
-		r1 = rf(ctx, namespace, name, currentUser, needOpWeight, needMultiSync)
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, bool) error); ok {
+		r1 = rf(ctx, namespace, name, currentUser, needOpWeight)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -1074,14 +1074,13 @@ type MockModelComponent_Show_Call struct {
 //   - name string
 //   - currentUser string
 //   - needOpWeight bool
-//   - needMultiSync bool
-func (_e *MockModelComponent_Expecter) Show(ctx interface{}, namespace interface{}, name interface{}, currentUser interface{}, needOpWeight interface{}, needMultiSync interface{}) *MockModelComponent_Show_Call {
-	return &MockModelComponent_Show_Call{Call: _e.mock.On("Show", ctx, namespace, name, currentUser, needOpWeight, needMultiSync)}
+func (_e *MockModelComponent_Expecter) Show(ctx interface{}, namespace interface{}, name interface{}, currentUser interface{}, needOpWeight interface{}) *MockModelComponent_Show_Call {
+	return &MockModelComponent_Show_Call{Call: _e.mock.On("Show", ctx, namespace, name, currentUser, needOpWeight)}
 }
 
-func (_c *MockModelComponent_Show_Call) Run(run func(ctx context.Context, namespace string, name string, currentUser string, needOpWeight bool, needMultiSync bool)) *MockModelComponent_Show_Call {
+func (_c *MockModelComponent_Show_Call) Run(run func(ctx context.Context, namespace string, name string, currentUser string, needOpWeight bool)) *MockModelComponent_Show_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string), args[4].(bool), args[5].(bool))
+		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string), args[4].(bool))
 	})
 	return _c
 }
@@ -1091,7 +1090,7 @@ func (_c *MockModelComponent_Show_Call) Return(_a0 *types.Model, _a1 error) *Moc
 	return _c
 }
 
-func (_c *MockModelComponent_Show_Call) RunAndReturn(run func(context.Context, string, string, string, bool, bool) (*types.Model, error)) *MockModelComponent_Show_Call {
+func (_c *MockModelComponent_Show_Call) RunAndReturn(run func(context.Context, string, string, string, bool) (*types.Model, error)) *MockModelComponent_Show_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1151,55 +1150,6 @@ func (_c *MockModelComponent_Update_Call) Return(_a0 *types.Model, _a1 error) *M
 }
 
 func (_c *MockModelComponent_Update_Call) RunAndReturn(run func(context.Context, *types.UpdateModelReq) (*types.Model, error)) *MockModelComponent_Update_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// Wakeup provides a mock function with given fields: ctx, namespace, name, id
-func (_m *MockModelComponent) Wakeup(ctx context.Context, namespace string, name string, id int64) error {
-	ret := _m.Called(ctx, namespace, name, id)
-
-	if len(ret) == 0 {
-		panic("no return value specified for Wakeup")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, int64) error); ok {
-		r0 = rf(ctx, namespace, name, id)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// MockModelComponent_Wakeup_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Wakeup'
-type MockModelComponent_Wakeup_Call struct {
-	*mock.Call
-}
-
-// Wakeup is a helper method to define mock.On call
-//   - ctx context.Context
-//   - namespace string
-//   - name string
-//   - id int64
-func (_e *MockModelComponent_Expecter) Wakeup(ctx interface{}, namespace interface{}, name interface{}, id interface{}) *MockModelComponent_Wakeup_Call {
-	return &MockModelComponent_Wakeup_Call{Call: _e.mock.On("Wakeup", ctx, namespace, name, id)}
-}
-
-func (_c *MockModelComponent_Wakeup_Call) Run(run func(ctx context.Context, namespace string, name string, id int64)) *MockModelComponent_Wakeup_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(int64))
-	})
-	return _c
-}
-
-func (_c *MockModelComponent_Wakeup_Call) Return(_a0 error) *MockModelComponent_Wakeup_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *MockModelComponent_Wakeup_Call) RunAndReturn(run func(context.Context, string, string, int64) error) *MockModelComponent_Wakeup_Call {
 	_c.Call.Return(run)
 	return _c
 }

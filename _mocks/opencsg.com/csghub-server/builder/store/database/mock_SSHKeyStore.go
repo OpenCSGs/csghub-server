@@ -81,9 +81,9 @@ func (_c *MockSSHKeyStore_Create_Call) RunAndReturn(run func(context.Context, *d
 	return _c
 }
 
-// Delete provides a mock function with given fields: ctx, id
-func (_m *MockSSHKeyStore) Delete(ctx context.Context, id int64) error {
-	ret := _m.Called(ctx, id)
+// Delete provides a mock function with given fields: ctx, gid
+func (_m *MockSSHKeyStore) Delete(ctx context.Context, gid int64) error {
+	ret := _m.Called(ctx, gid)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Delete")
@@ -91,7 +91,7 @@ func (_m *MockSSHKeyStore) Delete(ctx context.Context, id int64) error {
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func(context.Context, int64) error); ok {
-		r0 = rf(ctx, id)
+		r0 = rf(ctx, gid)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -106,12 +106,12 @@ type MockSSHKeyStore_Delete_Call struct {
 
 // Delete is a helper method to define mock.On call
 //   - ctx context.Context
-//   - id int64
-func (_e *MockSSHKeyStore_Expecter) Delete(ctx interface{}, id interface{}) *MockSSHKeyStore_Delete_Call {
-	return &MockSSHKeyStore_Delete_Call{Call: _e.mock.On("Delete", ctx, id)}
+//   - gid int64
+func (_e *MockSSHKeyStore_Expecter) Delete(ctx interface{}, gid interface{}) *MockSSHKeyStore_Delete_Call {
+	return &MockSSHKeyStore_Delete_Call{Call: _e.mock.On("Delete", ctx, gid)}
 }
 
-func (_c *MockSSHKeyStore_Delete_Call) Run(run func(ctx context.Context, id int64)) *MockSSHKeyStore_Delete_Call {
+func (_c *MockSSHKeyStore_Delete_Call) Run(run func(ctx context.Context, gid int64)) *MockSSHKeyStore_Delete_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(context.Context), args[1].(int64))
 	})

@@ -81,6 +81,63 @@ func (_c *MockSensitiveComponent_CheckImage_Call) RunAndReturn(run func(context.
 	return _c
 }
 
+// CheckMarkdownContent provides a mock function with given fields: ctx, content
+func (_m *MockSensitiveComponent) CheckMarkdownContent(ctx context.Context, content string) (bool, error) {
+	ret := _m.Called(ctx, content)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CheckMarkdownContent")
+	}
+
+	var r0 bool
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (bool, error)); ok {
+		return rf(ctx, content)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) bool); ok {
+		r0 = rf(ctx, content)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, content)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockSensitiveComponent_CheckMarkdownContent_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CheckMarkdownContent'
+type MockSensitiveComponent_CheckMarkdownContent_Call struct {
+	*mock.Call
+}
+
+// CheckMarkdownContent is a helper method to define mock.On call
+//   - ctx context.Context
+//   - content string
+func (_e *MockSensitiveComponent_Expecter) CheckMarkdownContent(ctx interface{}, content interface{}) *MockSensitiveComponent_CheckMarkdownContent_Call {
+	return &MockSensitiveComponent_CheckMarkdownContent_Call{Call: _e.mock.On("CheckMarkdownContent", ctx, content)}
+}
+
+func (_c *MockSensitiveComponent_CheckMarkdownContent_Call) Run(run func(ctx context.Context, content string)) *MockSensitiveComponent_CheckMarkdownContent_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockSensitiveComponent_CheckMarkdownContent_Call) Return(_a0 bool, _a1 error) *MockSensitiveComponent_CheckMarkdownContent_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockSensitiveComponent_CheckMarkdownContent_Call) RunAndReturn(run func(context.Context, string) (bool, error)) *MockSensitiveComponent_CheckMarkdownContent_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CheckRequestV2 provides a mock function with given fields: ctx, req
 func (_m *MockSensitiveComponent) CheckRequestV2(ctx context.Context, req types.SensitiveRequestV2) (bool, error) {
 	ret := _m.Called(ctx, req)
