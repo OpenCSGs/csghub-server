@@ -6816,91 +6816,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/modeltrees/scan": {
-            "post": {
-                "security": [
-                    {
-                        "ApiKey": []
-                    }
-                ],
-                "description": "scan model tree",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Model"
-                ],
-                "summary": "scan model tree",
-                "parameters": [
-                    {
-                        "description": "body",
-                        "name": "body",
-                        "in": "body",
-                        "schema": {
-                            "$ref": "#/definitions/types.ScanModels"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/types.Response"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIBadRequest"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIInternalServerError"
-                        }
-                    }
-                }
-            }
-        },
-        "/modeltrees/{namespace}/{name}/lineage": {
-            "get": {
-                "description": "get model tree",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Model"
-                ],
-                "summary": "Get model tree",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/types.ModelTree"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIBadRequest"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/types.APIInternalServerError"
-                        }
-                    }
-                }
-            }
-        },
         "/namespace/{path}": {
             "get": {
                 "security": [
@@ -26034,46 +25949,6 @@ const docTemplate = `{
                 }
             }
         },
-        "types.ModelNode": {
-            "type": "object",
-            "properties": {
-                "brothers": {
-                    "type": "integer"
-                },
-                "children": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/types.ModelNode"
-                    }
-                },
-                "id": {
-                    "type": "integer"
-                },
-                "path": {
-                    "type": "string"
-                },
-                "relation": {
-                    "$ref": "#/definitions/types.ModelRelation"
-                }
-            }
-        },
-        "types.ModelRelation": {
-            "type": "string",
-            "enum": [
-                "base",
-                "finetune",
-                "adapter",
-                "merge",
-                "quantized"
-            ],
-            "x-enum-varnames": [
-                "RelationBase",
-                "RelationFinetune",
-                "RelationAdapter",
-                "RelationMerge",
-                "RelationQuantized"
-            ]
-        },
         "types.ModelResp": {
             "type": "object",
             "properties": {
@@ -26145,26 +26020,6 @@ const docTemplate = `{
                 },
                 "secure_level": {
                     "type": "integer"
-                }
-            }
-        },
-        "types.ModelTree": {
-            "type": "object",
-            "properties": {
-                "current_node": {
-                    "$ref": "#/definitions/types.ModelNode"
-                },
-                "parent_nodes": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/types.ModelNode"
-                    }
-                },
-                "sub_node_info": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "integer"
-                    }
                 }
             }
         },
@@ -27175,17 +27030,6 @@ const docTemplate = `{
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/types.RuntimeFramework"
-                    }
-                }
-            }
-        },
-        "types.ScanModels": {
-            "type": "object",
-            "properties": {
-                "models": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
                     }
                 }
             }
