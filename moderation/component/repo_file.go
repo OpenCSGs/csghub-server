@@ -32,11 +32,7 @@ func NewRepoFileComponent(conf *config.Config) (RepoFileComponent, error) {
 	c.gs = gs
 	return c, nil
 }
-func (c *repoFileComponentImpl) GenRepoFileRecords(ctx context.Context, repoType types.RepositoryType, namespace, name string) error {
-	repo, err := c.rs.FindByPath(ctx, repoType, namespace, name)
-	if err != nil {
-		return fmt.Errorf("failed to find repo, error: %w", err)
-	}
+func (c *repoFileComponentImpl) GenRepoFileRecords(ctx context.Context, repo *database.Repository) error {
 	return c.createRepoFileRecords(ctx, *repo)
 }
 
@@ -157,37 +153,25 @@ func (c *repoFileComponentImpl) createRepoFileRecords(ctx context.Context, repo 
 	return nil
 }
 
-func (c *repoFileComponentImpl) DetectRepoSensitiveCheckStatus(ctx context.Context, repoType types.RepositoryType, namespace, name string) error {
-	repo, err := c.rs.FindByPath(ctx, repoType, namespace, name)
-	if err != nil {
-		return fmt.Errorf("failed to find repo, error: %w", err)
-	}
-	//TODO:handler other branches
-	branch := repo.DefaultBranch
-
+func (c *repoFileComponentImpl) DetectRepoSensitiveCheckStatus(ctx context.Context, repoId int64, branch string) error {
 	status := types.SensitiveCheckFail
-	exists, err := c.rfs.ExistsSensitiveCheckRecord(ctx, repo.ID, branch, types.SensitiveCheckFail)
+	exists, err := c.rfs.ExistsSensitiveCheckRecord(ctx, repoId, branch, types.SensitiveCheckFail)
 	if err != nil {
 		return fmt.Errorf("failed to check repo file sensitive check record exists, error: %w", err)
 	}
 	if exists {
-		repo.SensitiveCheckStatus = status
-		_, err = c.rs.UpdateRepo(ctx, *repo)
+		err = c.rs.UpdateRepoSensitiveCheckStatus(ctx, repoId, status)
 		return err
 	}
 
 	status = types.SensitiveCheckException
-	exists, err = c.rfs.ExistsSensitiveCheckRecord(ctx, repo.ID, branch, types.SensitiveCheckException)
+	exists, err = c.rfs.ExistsSensitiveCheckRecord(ctx, repoId, branch, types.SensitiveCheckException)
 	if err != nil {
 		return fmt.Errorf("failed to check repo file sensitive check record exists, error: %w", err)
 	}
 	if exists {
-		repo.SensitiveCheckStatus = status
-		_, err = c.rs.UpdateRepo(ctx, *repo)
-		return err
+		return c.rs.UpdateRepoSensitiveCheckStatus(ctx, repoId, status)
 	}
 
-	repo.SensitiveCheckStatus = types.SensitiveCheckPass
-	_, err = c.rs.UpdateRepo(ctx, *repo)
-	return err
+	return c.rs.UpdateRepoSensitiveCheckStatus(ctx, repoId, types.SensitiveCheckPass)
 }

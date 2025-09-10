@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sync"
 	"time"
 
 	"opencsg.com/csghub-server/builder/git"
@@ -17,11 +18,12 @@ import (
 )
 
 type repoComponentImpl struct {
-	checker sensitive.SensitiveChecker
-	rs      database.RepoStore
-	rfs     database.RepoFileStore
-	rfcs    database.RepoFileCheckStore
-	git     gitserver.GitServer
+	checker          sensitive.SensitiveChecker
+	rs               database.RepoStore
+	rfs              database.RepoFileStore
+	rfcs             database.RepoFileCheckStore
+	git              gitserver.GitServer
+	concurrencyLimit int
 }
 
 func NewRepoComponent(cfg *config.Config) (RepoComponent, error) {
@@ -34,7 +36,7 @@ func NewRepoComponent(cfg *config.Config) (RepoComponent, error) {
 	c.rfs = database.NewRepoFileStore()
 	c.rfcs = database.NewRepoFileCheckStore()
 	c.git = gs
-
+	c.concurrencyLimit = cfg.Moderation.RepoFileCheckConcurrency
 	return c, nil
 }
 
@@ -47,27 +49,18 @@ type CheckOption struct {
 	// MaxConcurrent  int
 }
 
-func (c *repoComponentImpl) UpdateRepoSensitiveCheckStatus(ctx context.Context, repoType types.RepositoryType, namespace string, name string, status types.SensitiveCheckStatus) error {
-	repo, err := c.rs.FindByPath(ctx, repoType, namespace, name)
-	if err != nil {
-		return fmt.Errorf("failed to get repo, error: %w", err)
-	}
-
-	repo.SensitiveCheckStatus = status
-	_, err = c.rs.UpdateRepo(ctx, *repo)
-	return err
+func (c *repoComponentImpl) GetRepo(ctx context.Context, repoType types.RepositoryType, namespace string, name string) (*database.Repository, error) {
+	return c.rs.FindByPath(ctx, repoType, namespace, name)
 }
 
-func (c *repoComponentImpl) CheckRepoFiles(ctx context.Context, repoType types.RepositoryType, namespace string, name string, options CheckOption) error {
+func (c *repoComponentImpl) UpdateRepoSensitiveCheckStatus(ctx context.Context, repoId int64, status types.SensitiveCheckStatus) error {
+	return c.rs.UpdateRepoSensitiveCheckStatus(ctx, repoId, status)
+}
+
+func (c *repoComponentImpl) CheckRepoFiles(ctx context.Context, repoID int64, options CheckOption) error {
 	if options.BatchSize == 0 {
 		options.BatchSize = 10
 	}
-	// get repo id
-	repo, err := c.rs.FindByPath(ctx, repoType, namespace, name)
-	if err != nil {
-		return fmt.Errorf("failed to get repo, error: %w", err)
-	}
-	repoID := repo.ID
 	for {
 		var files []*database.RepositoryFile
 		var err error
@@ -81,9 +74,21 @@ func (c *repoComponentImpl) CheckRepoFiles(ctx context.Context, repoType types.R
 			return fmt.Errorf("failed to get repo files,repoID: %d, lastRepoFileID: %d, error: %w", repoID, options.LastRepoFileID, err)
 		}
 
+		// process files in parallel
+		var wg sync.WaitGroup
+		// Limit concurrency to avoid overwhelming system resources.
+		guard := make(chan struct{}, c.concurrencyLimit)
+
 		for _, file := range files {
-			c.processFile(ctx, file)
+			wg.Add(1)
+			guard <- struct{}{} // will block if guard channel is full
+			go func(f *database.RepositoryFile) {
+				defer wg.Done()
+				c.processFile(ctx, f)
+				<-guard // release a spot
+			}(file)
 		}
+		wg.Wait()
 
 		count := len(files)
 		if count < int(options.BatchSize) {
@@ -99,7 +104,7 @@ func (c *repoComponentImpl) CheckRepoFiles(ctx context.Context, repoType types.R
 func (c *repoComponentImpl) processFile(ctx context.Context, file *database.RepositoryFile) {
 	reader := NewRepoFileContentReader(file, c.git)
 	checker := checker.GetFileChecker(file.FileType, file.Path, file.LfsRelativePath)
-	status, msg := checker.Run(reader)
+	status, msg := checker.Run(ctx, reader)
 	if status == types.SensitiveCheckException {
 		slog.Error("failed to check repo file content", slog.Int64("repo_id", file.RepositoryID), slog.Int64("repo_file_id", file.ID), slog.String("file", file.Path),
 			slog.String("err", msg))

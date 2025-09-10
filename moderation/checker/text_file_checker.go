@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/avast/retry-go/v4"
 	"opencsg.com/csghub-server/builder/sensitive"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -21,49 +22,77 @@ func NewTextFileChecker() *TextFileChecker {
 	}
 }
 
-func (c *TextFileChecker) Run(reader io.Reader) (types.SensitiveCheckStatus, string) {
-	//at most 1MB
-	reader = io.LimitReader(reader, 1024*1024)
-	const blockSize = 10 * 9000
-	// const blockSize = 3000
-	var bufs []bytes.Buffer
-	for {
-		buf := bytes.Buffer{}
-		var err error
-		var avaliableSize int64
-		if avaliableSize, err = io.CopyN(&buf, reader, blockSize); err != nil && err != io.EOF {
-			return types.SensitiveCheckException, "failed to read file content"
-		}
-		if avaliableSize > 0 {
-			bufs = append(bufs, buf)
-		}
-		//no more data to read
-		if avaliableSize < blockSize {
-			break
-		}
-	}
-	for _, buf := range bufs {
-		var result *sensitive.CheckResult
-		var err error
-		slog.Debug("check text", slog.String("scenario", string(sensitive.ScenarioCommentDetection)), slog.String("text", buf.String()))
-		//do local check first
-		txt := buf.String()
-		contains := GetLocalWordChecker().ContainsSensitiveWord(txt)
-		if contains {
-			return types.SensitiveCheckFail, "contains sensitive word"
-		}
-		//call remote checker
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		result, err = c.PassTextCheck(ctx, sensitive.ScenarioCommentDetection, txt)
-		cancel()
-		if err != nil {
-			return types.SensitiveCheckException, "call sensitive checker api failed"
-		}
-
-		if result.IsSensitive {
-			return types.SensitiveCheckFail, result.Reason
-		}
+func (c *TextFileChecker) Run(ctx context.Context, reader io.Reader) (types.SensitiveCheckStatus, string) {
+	type result struct {
+		status  types.SensitiveCheckStatus
+		message string
 	}
 
-	return types.SensitiveCheckPass, ""
+	resultCh := make(chan result, 1)
+
+	go func() {
+		//at most 1MB
+		reader = io.LimitReader(reader, 1024*1024)
+		const blockSize = 10 * 9000
+		// const blockSize = 3000
+		var bufs []bytes.Buffer
+		for {
+			buf := bytes.Buffer{}
+			var err error
+			var avaliableSize int64
+			if avaliableSize, err = io.CopyN(&buf, reader, blockSize); err != nil && err != io.EOF {
+				resultCh <- result{types.SensitiveCheckException, "failed to read file content"}
+				return
+			}
+			if avaliableSize > 0 {
+				bufs = append(bufs, buf)
+			}
+			//no more data to read
+			if avaliableSize < blockSize {
+				break
+			}
+		}
+		for _, buf := range bufs {
+			var res *sensitive.CheckResult
+			var err error
+			slog.Debug("check text", slog.String("scenario", string(sensitive.ScenarioCommentDetection)), slog.String("text", buf.String()))
+			//do local check first
+			txt := buf.String()
+			contains := GetLocalWordChecker().ContainsSensitiveWord(txt)
+			if contains {
+				resultCh <- result{types.SensitiveCheckFail, "contains sensitive word"}
+				return
+			}
+			//call remote checker
+			res, err = retry.DoWithData(
+				func() (*sensitive.CheckResult, error) {
+					reqCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+					res, err = c.PassTextCheck(reqCtx, sensitive.ScenarioCommentDetection, txt)
+					cancel()
+					if err != nil {
+						return nil, err
+					}
+					return res, nil
+				}, retry.Attempts(3), retry.DelayType(retry.BackOffDelay), retry.LastErrorOnly(true))
+
+			if err != nil {
+				resultCh <- result{types.SensitiveCheckException, "call sensitive checker api failed"}
+				return
+			}
+
+			if res.IsSensitive {
+				resultCh <- result{types.SensitiveCheckFail, res.Reason}
+				return
+			}
+		}
+
+		resultCh <- result{types.SensitiveCheckPass, ""}
+	}()
+
+	select {
+	case <-ctx.Done():
+		return types.SensitiveCheckException, "context canceled"
+	case res := <-resultCh:
+		return res.status, res.message
+	}
 }

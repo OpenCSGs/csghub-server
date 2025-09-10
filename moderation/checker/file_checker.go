@@ -1,6 +1,7 @@
 package checker
 
 import (
+	"context"
 	"io"
 	"path"
 	"slices"
@@ -16,7 +17,7 @@ var knownTextFileExts = []string{".md", ".txt", ".csv", ".json", ".jsonl", ".htm
 	".cs", ".js", ".ts", ".py", ".php", ".java", ".c", ".cpp", ".go", ".rb", ".sh"}
 
 type FileChecker interface {
-	Run(reader io.Reader) (types.SensitiveCheckStatus, string)
+	Run(ctx context.Context, reader io.Reader) (types.SensitiveCheckStatus, string)
 }
 
 // GetFileChecker returns a FileChecker for a given file based on its type and path.
@@ -66,7 +67,7 @@ func NewImageFileChecker() FileChecker {
 		checker: contentChecker,
 	}
 }
-func (c *ImageFileChecker) Run(io.Reader) (types.SensitiveCheckStatus, string) {
+func (c *ImageFileChecker) Run(context.Context, io.Reader) (types.SensitiveCheckStatus, string) {
 	//TODO:check image in the future
 	return types.SensitiveCheckSkip, "skip image file"
 }
@@ -74,7 +75,7 @@ func (c *ImageFileChecker) Run(io.Reader) (types.SensitiveCheckStatus, string) {
 type LfsFileChecker struct {
 }
 
-func (c *LfsFileChecker) Run(io.Reader) (types.SensitiveCheckStatus, string) {
+func (c *LfsFileChecker) Run(context.Context, io.Reader) (types.SensitiveCheckStatus, string) {
 	// dont need to check lfs file content
 	return types.SensitiveCheckSkip, "skip lfs file"
 }
@@ -82,6 +83,6 @@ func (c *LfsFileChecker) Run(io.Reader) (types.SensitiveCheckStatus, string) {
 type FolderChecker struct {
 }
 
-func (c *FolderChecker) Run(reader io.Reader) (types.SensitiveCheckStatus, string) {
+func (c *FolderChecker) Run(ctx context.Context, reader io.Reader) (types.SensitiveCheckStatus, string) {
 	return types.SensitiveCheckSkip, "skip folder"
 }

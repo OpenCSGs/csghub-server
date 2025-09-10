@@ -3,19 +3,21 @@ package component
 import (
 	"context"
 
+	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/types"
 )
 
 type RepoComponent interface {
-	UpdateRepoSensitiveCheckStatus(ctx context.Context, repoType types.RepositoryType, namespace string, name string, status types.SensitiveCheckStatus) error
-	CheckRepoFiles(ctx context.Context, repoType types.RepositoryType, namespace string, name string, options CheckOption) error
+	GetRepo(ctx context.Context, repoType types.RepositoryType, namespace string, name string) (*database.Repository, error)
+	UpdateRepoSensitiveCheckStatus(ctx context.Context, repoId int64, status types.SensitiveCheckStatus) error
+	CheckRepoFiles(ctx context.Context, repoId int64, options CheckOption) error
 	CheckRequestV2(ctx context.Context, req types.SensitiveRequestV2) (bool, error)
 }
 
 type RepoFileComponent interface {
-	GenRepoFileRecords(ctx context.Context, repoType types.RepositoryType, namespace, name string) error
+	GenRepoFileRecords(ctx context.Context, repo *database.Repository) error
 	GenRepoFileRecordsBatch(ctx context.Context, repoType types.RepositoryType, lastRepoID int64, concurrency int) error
-	DetectRepoSensitiveCheckStatus(ctx context.Context, repoType types.RepositoryType, namespace, name string) error
+	DetectRepoSensitiveCheckStatus(ctx context.Context, repoId int64, branch string) error
 }
 
 type SensitiveWordSetComponent interface {
