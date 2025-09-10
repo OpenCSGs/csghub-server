@@ -7,12 +7,13 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"opencsg.com/csghub-server/component/reporter"
 	"path"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"opencsg.com/csghub-server/component/reporter"
 
 	"github.com/argoproj/argo-workflows/v3/pkg/apis/workflow/v1alpha1"
 	versioned "github.com/argoproj/argo-workflows/v3/pkg/client/clientset/versioned"
@@ -540,48 +541,51 @@ func GetCluster(ctx context.Context, clusterPool *cluster.ClusterPool, clusterID
 }
 
 func (wc *workFlowComponentImpl) setLabels(wf *database.ArgoWorkflow, awf *v1alpha1.Workflow) {
-	awf.ObjectMeta.Labels["Username"] = wf.Username
-	awf.ObjectMeta.Labels["UserUUID"] = wf.UserUUID
-	awf.ObjectMeta.Labels["TaskName"] = wf.TaskName
-	awf.ObjectMeta.Labels["TaskId"] = wf.TaskId
-	awf.ObjectMeta.Labels["TaskType"] = string(wf.TaskType)
-	awf.ObjectMeta.Labels["RepoIds"] = strings.Join(wf.RepoIds, ",")
-	awf.ObjectMeta.Labels["TaskDesc"] = wf.TaskDesc
-	awf.ObjectMeta.Labels["Image"] = wf.Image
-	awf.ObjectMeta.Labels["Datasets"] = strings.Join(wf.Datasets, ",")
-	awf.ObjectMeta.Labels["ResourceId"] = strconv.FormatInt(wf.ResourceId, 10)
-	awf.ObjectMeta.Labels["ResourceName"] = wf.ResourceName
-	awf.ObjectMeta.Labels["ClusterID"] = wf.ClusterID
-	awf.ObjectMeta.Labels["RepoType"] = wf.RepoType
-	awf.ObjectMeta.Labels["Namespace"] = wf.Namespace
+	if awf.ObjectMeta.Annotations == nil {
+		awf.ObjectMeta.Annotations = make(map[string]string)
+	}
+	awf.ObjectMeta.Annotations["Username"] = wf.Username
+	awf.ObjectMeta.Annotations["UserUUID"] = wf.UserUUID
+	awf.ObjectMeta.Annotations["TaskName"] = wf.TaskName
+	awf.ObjectMeta.Annotations["TaskId"] = wf.TaskId
+	awf.ObjectMeta.Annotations["TaskType"] = string(wf.TaskType)
+	awf.ObjectMeta.Annotations["RepoIds"] = strings.Join(wf.RepoIds, ",")
+	awf.ObjectMeta.Annotations["TaskDesc"] = wf.TaskDesc
+	awf.ObjectMeta.Annotations["Image"] = wf.Image
+	awf.ObjectMeta.Annotations["Datasets"] = strings.Join(wf.Datasets, ",")
+	awf.ObjectMeta.Annotations["ResourceId"] = strconv.FormatInt(wf.ResourceId, 10)
+	awf.ObjectMeta.Annotations["ResourceName"] = wf.ResourceName
+	awf.ObjectMeta.Annotations["ClusterID"] = wf.ClusterID
+	awf.ObjectMeta.Annotations["RepoType"] = wf.RepoType
+	awf.ObjectMeta.Annotations["Namespace"] = wf.Namespace
 }
 
 func (wc *workFlowComponentImpl) getWorkflowFromLabels(ctx context.Context, awf *v1alpha1.Workflow) *database.ArgoWorkflow {
 	wf := &database.ArgoWorkflow{}
-	labels := awf.ObjectMeta.Labels
+	annotations := awf.ObjectMeta.Annotations
 	// Basic string fields
-	wf.Username = labels["Username"]
-	wf.UserUUID = labels["UserUUID"]
-	wf.TaskName = labels["TaskName"]
-	wf.TaskId = labels["TaskId"]
-	wf.TaskType = types.TaskType(labels["TaskType"])
-	wf.TaskDesc = labels["TaskDesc"]
-	wf.Image = labels["Image"]
-	wf.ResourceName = labels["ResourceName"]
-	wf.ClusterID = labels["ClusterID"]
-	wf.RepoType = labels["RepoType"]
-	wf.Namespace = labels["Namespace"]
+	wf.Username = annotations["Username"]
+	wf.UserUUID = annotations["UserUUID"]
+	wf.TaskName = annotations["TaskName"]
+	wf.TaskId = annotations["TaskId"]
+	wf.TaskType = types.TaskType(annotations["TaskType"])
+	wf.TaskDesc = annotations["TaskDesc"]
+	wf.Image = annotations["Image"]
+	wf.ResourceName = annotations["ResourceName"]
+	wf.ClusterID = annotations["ClusterID"]
+	wf.RepoType = annotations["RepoType"]
+	wf.Namespace = annotations["Namespace"]
 
 	// String slice fields
-	if repoIdsStr, ok := labels["RepoIds"]; ok && repoIdsStr != "" {
+	if repoIdsStr, ok := annotations["RepoIds"]; ok && repoIdsStr != "" {
 		wf.RepoIds = strings.Split(repoIdsStr, ",")
 	}
-	if datasetsStr, ok := labels["Datasets"]; ok && datasetsStr != "" {
+	if datasetsStr, ok := annotations["Datasets"]; ok && datasetsStr != "" {
 		wf.Datasets = strings.Split(datasetsStr, ",")
 	}
 
 	// Numeric fields
-	if resourceIdStr, ok := labels["ResourceId"]; ok && resourceIdStr != "" {
+	if resourceIdStr, ok := annotations["ResourceId"]; ok && resourceIdStr != "" {
 		resourceId, err := strconv.ParseInt(resourceIdStr, 10, 64)
 		if err == nil {
 			wf.ResourceId = resourceId
