@@ -3,6 +3,7 @@ package handler
 import (
 	"log/slog"
 	"net/http"
+	"opencsg.com/csghub-server/component/reporter"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -22,8 +23,8 @@ type ArgoHandler struct {
 	wfc                component.WorkFlowComponent
 }
 
-func NewArgoHandler(config *config.Config, clusterPool *cluster.ClusterPool) (*ArgoHandler, error) {
-	wfc := component.NewWorkFlowComponent(config, clusterPool)
+func NewArgoHandler(config *config.Config, clusterPool *cluster.ClusterPool, logReporter reporter.LogCollector) (*ArgoHandler, error) {
+	wfc := component.NewWorkFlowComponent(config, clusterPool, logReporter)
 	//watch workflows events
 	go wfc.RunInformer(clusterPool, config)
 	return &ArgoHandler{
@@ -31,7 +32,7 @@ func NewArgoHandler(config *config.Config, clusterPool *cluster.ClusterPool) (*A
 		config:             config,
 		wfc:                wfc,
 		modelDockerRegBase: config.Model.DockerRegBase,
-		workflowNameSpace:  config.Argo.Namespace,
+		workflowNameSpace:  config.Cluster.SpaceNamespace,
 	}, nil
 }
 

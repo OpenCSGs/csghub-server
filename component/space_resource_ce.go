@@ -31,7 +31,7 @@ type spaceResourceComponentImpl struct {
 	accountComponent   AccountingComponent
 }
 
-func (c *spaceResourceComponentImpl) updatePriceInfo(currentUser string, resources []types.SpaceResource) error {
+func (c *spaceResourceComponentImpl) updatePriceInfo(req *types.SpaceResourceIndexReq, resources []types.SpaceResource) error {
 	return nil
 
 }

@@ -3,63 +3,72 @@ package component
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
 	"path"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
+	"opencsg.com/csghub-server/component/reporter"
+
 	v1alpha1 "github.com/argoproj/argo-workflows/v3/pkg/apis/workflow/v1alpha1"
 	"opencsg.com/csghub-server/builder/deploy/cluster"
-	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
+	ctypes "opencsg.com/csghub-server/common/types"
 	embed "opencsg.com/csghub-server/docker/spaces/builder"
 	rcommon "opencsg.com/csghub-server/runner/common"
 	"opencsg.com/csghub-server/runner/types"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/utils/ptr"
 )
 
+const (
+	WORK_META_DATA = "work_meta_data"
+)
+
 var (
-	workCreateStatus   string = "Create"
+	kanikoCachePVC string = "imagebuilder-pvc-kaniko-cache"
+
 	initContainerType  string = "init-repo"
 	buildContainerType string = "build"
-
-	containerStatusUnknown    string = "Unknown"
-	containerStatusWaiting    string = "Waiting"
-	containerStatusRunning    string = "Running"
-	containerStatusTerminated string = "Terminated"
 )
 
 type ImagebuilderComponent interface {
-	Build(ctx context.Context, spaceConfig types.SpaceBuilderConfig) (*types.ImageBuilderWork, error)
-	Status(ctx context.Context, buildId string) (*types.ImageBuilderWork, error)
-	Logs(ctx context.Context, buildId string) (chan []byte, error)
+	Build(ctx context.Context, req ctypes.ImageBuilderRequest) error
+	Stop(ctx context.Context, req ctypes.ImageBuildStopReq) error
 }
 
 type imagebuilderComponentImpl struct {
 	config      *config.Config
 	clusterPool *cluster.ClusterPool
-	db          database.ImageBuilderWorkStore
+	logReporter reporter.LogCollector
 }
 
-func NewImagebuilderComponent(ctx context.Context, config *config.Config, clusterPool *cluster.ClusterPool) (ImagebuilderComponent, error) {
+func NewImagebuilderComponent(ctx context.Context,
+	config *config.Config,
+	clusterPool *cluster.ClusterPool,
+	logReporter reporter.LogCollector) (ImagebuilderComponent, error) {
 	ibc := &imagebuilderComponentImpl{
 		config:      config,
 		clusterPool: clusterPool,
-		db:          database.NewImageBuilderStore(),
+		logReporter: logReporter,
 	}
 
-	if err := ibc.workFlowInit(ctx); err != nil {
+	if err := workFlowInit(ctx, config, clusterPool); err != nil {
 		slog.Error("failed to init workflow", slog.Any("error", err))
 		return nil, err
 	}
-	go ibc.workInformer(ctx)
+
+	go ibc.runInformer(ctx)
 	return ibc, nil
 }
 
@@ -67,165 +76,62 @@ func (ibc *imagebuilderComponentImpl) GetCluster(ctx context.Context, clusterId 
 	return ibc.clusterPool.GetClusterByID(ctx, clusterId)
 }
 
-func (ibc *imagebuilderComponentImpl) Build(ctx context.Context, spaceConfig types.SpaceBuilderConfig) (*types.ImageBuilderWork, error) {
-	namespace := ibc.config.Runner.ImageBuilderNamespace
-	cluster, err := ibc.GetCluster(ctx, ibc.config.Runner.ImageBuilderClusterID)
+func (ibc *imagebuilderComponentImpl) Build(ctx context.Context, req ctypes.ImageBuilderRequest) error {
+	ibc.pushLog(req.DeployId, strconv.FormatInt(req.TaskId, 10), ctypes.StagePreBuild, ctypes.StepInitializing, "start to build image workflow")
+	namespace := ibc.config.Cluster.SpaceNamespace
+	imagePath := path.Join(ibc.config.Space.DockerRegBase, req.LastCommitID)
+	cluster, err := ibc.GetCluster(ctx, req.ClusterID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get cluster by id: %w", err)
+		return fmt.Errorf("failed to get cluster by id: %w", err)
 	}
 
-	imageName := buildImageName(spaceConfig.OrgName, spaceConfig.SpaceName, spaceConfig.BuildId)
-	imagePath := joinImagePath(ibc.config.Space.DockerRegBase, imageName)
-	wft, err := wfTemplateForImageBuilder(
-		ibc.config.Runner.ImageBuilderGitImage,
-		ibc.config.Runner.ImageBuilderKanikoImage,
-		imagePath,
-		spaceConfig,
-		ibc.config.Runner.ImageBuilderKanikoArgs,
-	)
+	cInfo, err := ibc.clusterPool.ClusterStore.ByClusterConfig(ctx, cluster.CID)
+	if err != nil {
+		return fmt.Errorf("failed to get cluster by config: %w", err)
+	}
 
+	if cInfo.StorageClass != "" {
+		err = ibc.newPersistentVolumeClaim(ctx, cluster, kanikoCachePVC)
+		if err != nil {
+			return fmt.Errorf("failed to create pvc: %w", err)
+		}
+	}
+
+	workMeta, err := json.Marshal(req)
+	if err != nil {
+		return fmt.Errorf("failed to marshal imagebuilder work: %w", err)
+	}
+
+	wft, err := wfTemplateForImageBuilder(ibc.config, req, imagePath, cInfo.StorageClass, ibc.generateWorkName(req.OrgName, req.SpaceName, req.DeployId, fmt.Sprintf("%d", req.TaskId)))
 	if err != nil {
 		slog.Error("failed to create imagebuilder workflow template", "err", err)
-		return nil, fmt.Errorf("failed to create imagebuilder workflow template: %w", err)
+		return fmt.Errorf("failed to create imagebuilder workflow template: %w", err)
 	}
 
-	wft.Spec.TTLStrategy = &v1alpha1.TTLStrategy{
-		SecondsAfterSuccess:    ptr.To(int32(ibc.config.Runner.ImageBuilderJobTTL)),
-		SecondsAfterFailure:    ptr.To(int32(ibc.config.Runner.ImageBuilderJobTTL)),
-		SecondsAfterCompletion: ptr.To(int32(ibc.config.Runner.ImageBuilderJobTTL)),
+	wft.Annotations = map[string]string{
+		WORK_META_DATA: string(workMeta),
 	}
 
-	wft.Spec.ImagePullSecrets = []corev1.LocalObjectReference{
-		{
-			Name: ibc.config.Space.ImagePullSecret,
-		},
-	}
-
-	wft.Spec.Volumes = append(wft.Spec.Volumes, corev1.Volume{
-		Name: "docker-config",
-		VolumeSource: corev1.VolumeSource{
-			Secret: &corev1.SecretVolumeSource{
-				SecretName: ibc.config.Space.ImagePullSecret,
-				Items: []corev1.KeyToPath{
-					{
-						Key:  ".dockerconfigjson",
-						Path: "config.json",
-					},
-				},
-			},
-		},
-	})
-	wft.Spec.ServiceAccountName = ibc.config.Argo.ServiceAccountName
-
-	wf, err := cluster.ArgoClient.ArgoprojV1alpha1().Workflows(namespace).Create(ctx, wft, metav1.CreateOptions{})
+	_, err = cluster.ArgoClient.ArgoprojV1alpha1().Workflows(namespace).Create(ctx, wft, metav1.CreateOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("failed to create imagebuilder workflow in argo: %w", err)
+		return fmt.Errorf("failed to create imagebuilder workflow in argo: %w", err)
 	}
 
-	ibm := &database.ImageBuilderWork{
-		WorkName:            wf.Name,
-		WorkStatus:          workCreateStatus,
-		ImagePath:           imageName,
-		BuildId:             types.JointSpaceNameBuildId(spaceConfig.OrgName, spaceConfig.SpaceName, spaceConfig.BuildId),
-		Namespace:           namespace,
-		ClusterID:           ibc.config.Runner.ImageBuilderClusterID,
-		InitContainerStatus: containerStatusUnknown,
-	}
-	if _, err := ibc.db.CreateOrUpdateByBuildID(ctx, ibm); err != nil {
-		return nil, fmt.Errorf("failed to create imagebuilder in db: %w", err)
-	}
-
-	return &types.ImageBuilderWork{
-		WorkName:   ibm.WorkName,
-		WorkStatus: ibm.WorkStatus,
-		Message:    ibm.Message,
-		ImagePath:  ibm.ImagePath,
-		BuildId:    ibm.BuildId,
-	}, nil
+	return nil
 }
 
-func (ibc *imagebuilderComponentImpl) Status(ctx context.Context, buildId string) (*types.ImageBuilderWork, error) {
-	ibw, err := ibc.db.QueryStatusByBuildID(ctx, buildId)
+func (ibc *imagebuilderComponentImpl) Stop(ctx context.Context, req ctypes.ImageBuildStopReq) error {
+	cluster, err := ibc.GetCluster(ctx, req.ClusterID)
 	if err != nil {
-		return nil, err
+		return fmt.Errorf("failed to imagebuilder get cluster by id: %w", err)
 	}
-
-	// check timeout with workflow status at unknown, running, pending
-	if ibw.WorkStatus == string(v1alpha1.WorkflowUnknown) ||
-		ibw.WorkStatus == string(v1alpha1.WorkflowRunning) ||
-		ibw.WorkStatus == string(v1alpha1.WorkflowPending) {
-
-		if time.Since(ibw.CreatedAt) > time.Duration(ibc.config.Runner.ImageBuilderStatusTTL)*time.Second {
-			cluster, err := ibc.GetCluster(ctx, ibw.ClusterID)
-			if err != nil {
-				return nil, fmt.Errorf("failed to imagebuilder get cluster by id: %w", err)
-			}
-			// get workflow status for cluster
-			wf, err := cluster.ArgoClient.ArgoprojV1alpha1().Workflows(ibw.Namespace).Get(ctx, ibw.WorkName, metav1.GetOptions{})
-			if err != nil {
-				return nil, fmt.Errorf("failed to imagebuilder get workflow by name: %w", err)
-
-			}
-			// change status and get logs
-			err = ibc.updateImagebuilderWork(ctx, cluster, wf)
-			if err != nil {
-				if errors.Is(err, sql.ErrNoRows) {
-				} else {
-					slog.Error("failed to imagebuilder update workflow", slog.Any("error", err))
-				}
-			}
-			ibw, err = ibc.db.QueryStatusByBuildID(ctx, ibw.BuildId)
-			if err != nil {
-				return nil, fmt.Errorf("failed to imagebuilder query status by build id: %w", err)
-			}
-		}
-	}
-
-	return &types.ImageBuilderWork{
-		WorkName:   ibw.WorkName,
-		WorkStatus: ibw.WorkStatus,
-		Message:    ibw.Message,
-		ImagePath:  ibw.ImagePath,
-		BuildId:    ibw.BuildId,
-	}, nil
+	wfName := ibc.generateWorkName(req.OrgName, req.SpaceName, req.DeployId, req.TaskId)
+	err = cluster.ArgoClient.ArgoprojV1alpha1().Workflows(ibc.config.Cluster.SpaceNamespace).Delete(ctx, wfName, metav1.DeleteOptions{})
+	return err
 }
 
-func (ibc *imagebuilderComponentImpl) Logs(ctx context.Context, buildId string) (chan []byte, error) {
-	ch := make(chan []byte)
-	go func() {
-		defer close(ch)
-		ibw, err := ibc.db.QueryByBuildID(ctx, buildId)
-		if err != nil {
-			ch <- []byte(fmt.Sprintf("failed to query imagebuilder work by work name: error: %s", err.Error()))
-			return
-		}
-
-		if ibw.WorkStatus == string(v1alpha1.WorkflowUnknown) {
-			ch <- []byte(fmt.Sprintf("imagebuilder workflow %s is not running status: %s", ibw.WorkName, ibw.WorkStatus))
-			return
-		}
-
-		// get logs from cluster
-		cluster, err := ibc.GetCluster(ctx, ibw.ClusterID)
-		if err != nil {
-			ch <- []byte(fmt.Sprintf("failed to get cluster by id: %s", err.Error()))
-			return
-		}
-
-		initLogs := ibc.getInitContainerLogsStream(ctx, cluster, ibw)
-		for log := range initLogs {
-			ch <- []byte(log)
-		}
-		buildLogs := ibc.getMainContainerLogsStream(ctx, cluster, ibw)
-		for log := range buildLogs {
-			ch <- []byte(log)
-		}
-	}()
-	return ch, nil
-}
-
-func (ibc *imagebuilderComponentImpl) workFlowInit(ctx context.Context) error {
-	namespace := ibc.config.Runner.ImageBuilderNamespace
+func workFlowInit(ctx context.Context, config *config.Config, clusterPool *cluster.ClusterPool) error {
+	namespace := config.Cluster.SpaceNamespace
 
 	fcMap := make(map[string][]byte)
 	for _, cfg := range types.ConfigMapFiles {
@@ -236,7 +142,7 @@ func (ibc *imagebuilderComponentImpl) workFlowInit(ctx context.Context) error {
 		fcMap[cfg.FileName] = data
 	}
 
-	for _, cluster := range ibc.clusterPool.Clusters {
+	for _, cluster := range clusterPool.Clusters {
 		for _, cfg := range types.ConfigMapFiles {
 			data, exists := fcMap[cfg.FileName]
 			if !exists {
@@ -259,12 +165,15 @@ func (ibc *imagebuilderComponentImpl) workFlowInit(ctx context.Context) error {
 	return nil
 }
 
-func (ibc *imagebuilderComponentImpl) workInformer(ctx context.Context) {
-	cluster, err := ibc.GetCluster(ctx, ibc.config.Runner.ImageBuilderClusterID)
-	if err != nil {
-		slog.Error("failed to get cluster for image builder", "clusterID", ibc.config.Runner.ImageBuilderClusterID, "error", err)
-		return
+func (ibc *imagebuilderComponentImpl) runInformer(ctx context.Context) {
+	for _, cls := range ibc.clusterPool.Clusters {
+		go func(cluster *cluster.Cluster) {
+			ibc.workInformer(ctx, cluster)
+		}(cls)
 	}
+}
+
+func (ibc *imagebuilderComponentImpl) workInformer(ctx context.Context, cluster *cluster.Cluster) {
 	labelSelector := "workflow-scope=imagebuilder"
 
 	eventHandler := cache.ResourceEventHandlerFuncs{
@@ -272,15 +181,11 @@ func (ibc *imagebuilderComponentImpl) workInformer(ctx context.Context) {
 			wf := obj.(*v1alpha1.Workflow)
 			err := ibc.updateImagebuilderWork(ctx, cluster, wf)
 			if err != nil && !errors.Is(err, sql.ErrNoRows) {
-				slog.Error("fail to update imagebuilder task", slog.Any("error", err), slog.Any("work_name", wf.Name))
+				slog.Error("fail to add imagebuilder task", slog.Any("error", err), slog.Any("work_name", wf.Name))
 			}
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			newWF := newObj.(*v1alpha1.Workflow)
-			// compare status
-			if newWF.Status.Nodes == nil {
-				return
-			}
 			err := ibc.updateImagebuilderWork(ctx, cluster, newWF)
 			if err != nil && !errors.Is(err, sql.ErrNoRows) {
 				slog.Error("fail to update imagebuilder task", slog.Any("error", err), slog.Any("work_name", newWF.Name))
@@ -288,20 +193,31 @@ func (ibc *imagebuilderComponentImpl) workInformer(ctx context.Context) {
 		},
 		DeleteFunc: func(obj interface{}) {
 			wf := obj.(*v1alpha1.Workflow)
-			slog.Info("delete imagebuilder task", slog.Any("work_name", wf.Name), slog.Any("status", wf.Status.Phase))
+			err := ibc.updateImagebuilderWork(ctx, cluster, wf)
+			if err != nil {
+				slog.Error("fail to delete imagebuilder task", slog.Any("error", err), slog.Any("work_name", wf.Name))
+			}
 		},
 	}
 
-	CreateInfomerFactory(cluster.ArgoClient, ibc.config.Runner.ImageBuilderNamespace, labelSelector, eventHandler)
+	CreateInfomerFactory(cluster.ArgoClient, ibc.config.Cluster.SpaceNamespace, labelSelector, eventHandler)
 }
 
-func wfTemplateForImageBuilder(gitImg, kanikoImg, imageDestination string, params types.SpaceBuilderConfig, kanikoArgs []string) (*v1alpha1.Workflow, error) {
+func wfTemplateForImageBuilder(cfg *config.Config, params ctypes.ImageBuilderRequest, imagePath, storeClass, workName string) (*v1alpha1.Workflow, error) {
+	labels := map[string]string{
+		"workflow-scope":             "imagebuilder",
+		ctypes.LogLabelTypeKey:       ctypes.LogLabelImageBuilder,
+		ctypes.StreamKeyDeployID:     params.DeployId,
+		ctypes.StreamKeyDeployTaskID: strconv.FormatInt(params.TaskId, 10),
+	}
+
 	builderArgs := []string{
 		"--context=/shared/" + params.SpaceName,
-		"--destination=" + imageDestination,
-		"--build-arg=GIT_IMAGE=" + gitImg,
+		"--destination=" + imagePath,
+		"--build-arg=GIT_IMAGE=" + cfg.Runner.ImageBuilderGitImage,
 	}
-	for _, arg := range kanikoArgs {
+
+	for _, arg := range cfg.Runner.ImageBuilderKanikoArgs {
 		if arg == "" || strings.HasPrefix(arg, "--context") || strings.HasPrefix(arg, "--destination") {
 			continue
 		}
@@ -354,14 +270,35 @@ func wfTemplateForImageBuilder(gitImg, kanikoImg, imageDestination string, param
 		MountPath: "/kaniko/.docker",
 	})
 
-	return &v1alpha1.Workflow{
+	if storeClass != "" {
+		builderArgs = append(builderArgs, "--cache=true")
+		builderArgs = append(builderArgs, "--cache-dir=/kaniko-cache")
+
+		specVolumes = append(specVolumes, corev1.Volume{
+			Name: "kaniko-cache",
+			VolumeSource: corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+					ClaimName: kanikoCachePVC,
+				},
+			},
+		})
+
+		containerVolumeMounts = append(containerVolumeMounts, corev1.VolumeMount{
+			Name:      "kaniko-cache",
+			MountPath: "/kaniko-cache",
+		})
+	}
+
+	wfTemplate := &v1alpha1.Workflow{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "imagebuilder-",
-			Labels: map[string]string{
-				"workflow-scope": "imagebuilder",
-			},
+			Name:         workName,
+			Labels:       labels,
 		},
 		Spec: v1alpha1.WorkflowSpec{
+			PodMetadata: &v1alpha1.Metadata{
+				Labels: labels,
+			},
 			Entrypoint: "main",
 			Volumes:    specVolumes,
 			Templates: []v1alpha1.Template{
@@ -384,7 +321,7 @@ func wfTemplateForImageBuilder(gitImg, kanikoImg, imageDestination string, param
 						{
 							Container: corev1.Container{
 								Name:    initContainerType,
-								Image:   gitImg,
+								Image:   cfg.Runner.ImageBuilderGitImage,
 								Command: []string{"sh", "-c"},
 								Args: []string{
 									`sh /builder/config/init.sh  $REPO $REPO_NAME $USER_NAME $SECRET $SPACE_URL $GIT_REF $SDK $PYTHON_VERSION $HARDWARE $DRIVER_VERSION && cp -r $REPO/$REPO_NAME/ /shared`,
@@ -410,65 +347,62 @@ func wfTemplateForImageBuilder(gitImg, kanikoImg, imageDestination string, param
 					},
 					Container: &corev1.Container{
 						Name:         buildContainerType,
-						Image:        kanikoImg,
+						Image:        cfg.Runner.ImageBuilderKanikoImage,
 						Args:         builderArgs,
 						VolumeMounts: containerVolumeMounts,
+						Env: []corev1.EnvVar{
+							{Name: "REPO_NAME", Value: params.SpaceName},
+						},
 					},
 				},
 			},
 		},
-	}, nil
+	}
+
+	wfTemplate.Spec.TTLStrategy = &v1alpha1.TTLStrategy{
+		SecondsAfterSuccess:    ptr.To(int32(cfg.Runner.ImageBuilderJobTTL)),
+		SecondsAfterFailure:    ptr.To(int32(cfg.Runner.ImageBuilderJobTTL)),
+		SecondsAfterCompletion: ptr.To(int32(cfg.Runner.ImageBuilderJobTTL)),
+	}
+
+	wfTemplate.Spec.ImagePullSecrets = []corev1.LocalObjectReference{
+		{
+			Name: cfg.Space.ImagePullSecret,
+		},
+	}
+
+	wfTemplate.Spec.Volumes = append(wfTemplate.Spec.Volumes, corev1.Volume{
+		Name: "docker-config",
+		VolumeSource: corev1.VolumeSource{
+			Secret: &corev1.SecretVolumeSource{
+				SecretName: cfg.Space.ImagePullSecret,
+				Items: []corev1.KeyToPath{
+					{
+						Key:  ".dockerconfigjson",
+						Path: "config.json",
+					},
+				},
+			},
+		},
+	})
+	wfTemplate.Spec.ServiceAccountName = cfg.Argo.ServiceAccountName
+
+	return wfTemplate, nil
 }
 
 func (ibc *imagebuilderComponentImpl) updateImagebuilderWork(ctx context.Context, cluster *cluster.Cluster, wf *v1alpha1.Workflow) error {
-	if wf.Status.Nodes == nil {
-		return nil
-	}
-
-	// get imagebuilder work from db
-	ibw, err := ibc.db.FindByWorkName(ctx, wf.Name)
+	workMeta, err := ibc.workMeataDataFromWF(wf)
 	if err != nil {
-		return fmt.Errorf("failed to get wf [%s] from db: %w", wf.Name, err)
+		return fmt.Errorf("failed to get work meta data from wf: %w", err)
 	}
 
-	podName := ibc.getPodNameFromWorkflow(wf)
-	if ibw.PodName == "" {
-		ibw.PodName = podName
-	}
-
-	if ibw.WorkStatus != string(wf.Status.Phase) {
-		ibw.WorkStatus = string(wf.Status.Phase)
-		ibw.Message = wf.Status.Message
-	}
-
-	// get container status and logs
-	pod, err := cluster.Client.CoreV1().Pods(ibw.Namespace).Get(ctx, ibw.PodName, metav1.GetOptions{})
-	if err != nil {
-		slog.Warn("failed to get pod", "pod", ibw.PodName, "error", err)
-	} else {
-		ibw.InitContainerStatus = getInitContainerStatus(pod, initContainerType)
-		// get logs from cluster
-		if ibw.InitContainerStatus == containerStatusTerminated {
-			logs, err := getContainerLogs(ctx, cluster, pod, initContainerType)
-			if err != nil {
-				slog.Warn("failed to get pod log", "pod", ibw.PodName, "error", err)
-			} else {
-				ibw.InitContainerLog = string(logs)
-			}
-		}
-		if ibw.WorkStatus != string(v1alpha1.WorkflowRunning) && ibw.WorkStatus != string(v1alpha1.WorkflowPending) && ibw.WorkStatus != string(v1alpha1.WorkflowUnknown) {
-			logs, err := getContainerLogs(ctx, cluster, pod, buildContainerType)
-			if err != nil {
-				slog.Warn("failed to get main container logs from cluster", "err:", err.Error())
-			} else {
-				ibw.MainContainerLog = string(logs)
-			}
-		}
-	}
-
-	if _, err = ibc.db.UpdateByWorkName(ctx, ibw); err != nil {
-		return fmt.Errorf("failed to update imagebuilder in db: %w", err)
-	}
+	ibc.addKServiceWithEvent(ctypes.RunnerBuilderChange, ctypes.ImageBuilderEvent{
+		DeployId:   workMeta.DeployId,
+		TaskId:     workMeta.TaskId,
+		Status:     string(wf.Status.Phase),
+		Message:    wf.Status.Message,
+		ImagetPath: workMeta.LastCommitID,
+	})
 
 	return err
 }
@@ -502,172 +436,117 @@ func createOrUpdateConfigMap(ctx context.Context, client kubernetes.Interface, c
 	return nil
 }
 
-func buildImageName(orgName, spaceName, buildId string) string {
-	// Example: opencsg_test-model:1-1678901234
-	timestamp := time.Now().Unix()
-	name := orgName + "_" + spaceName + ":" + buildId + "-" + fmt.Sprintf("%d", timestamp)
-	imageName := strings.ToLower(name)
-	return imageName
-}
-
-func joinImagePath(base, imageName string) string {
-	return path.Join(base, imageName)
-}
-
-func (ibc *imagebuilderComponentImpl) constructPodName(wfName, templateName, nodeID string) string {
-	parts := strings.Split(nodeID, "-")
-	suffix := parts[len(parts)-1]
-	return fmt.Sprintf("%s-%s-%s", wfName, templateName, suffix)
-}
-
-func (ibc *imagebuilderComponentImpl) getPodNameFromWorkflow(wf *v1alpha1.Workflow) string {
-	var podName string
-	// get pod name
-	for _, node := range wf.Status.Nodes {
-		if node.Type == v1alpha1.NodeTypePod {
-			podName = ibc.constructPodName(wf.Name, node.TemplateName, node.ID)
-			break
-		}
+func (ibc *imagebuilderComponentImpl) newPersistentVolumeClaim(ctx context.Context, cluster *cluster.Cluster, pvcName string) error {
+	// Check if it already exists
+	_, err := cluster.Client.CoreV1().PersistentVolumeClaims(ibc.config.Cluster.SpaceNamespace).Get(ctx, pvcName, metav1.GetOptions{})
+	if err == nil {
+		return nil
 	}
 
-	return podName
+	storage, err := resource.ParseQuantity("50Gi")
+	if err != nil {
+		return err
+	}
+
+	pvc := corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      pvcName,
+			Namespace: ibc.config.Cluster.SpaceNamespace,
+		},
+		Spec: corev1.PersistentVolumeClaimSpec{
+			AccessModes: []corev1.PersistentVolumeAccessMode{
+				corev1.ReadWriteMany,
+			},
+			Resources: corev1.VolumeResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceStorage: storage,
+				},
+			},
+			StorageClassName: &cluster.StorageClass,
+		},
+	}
+	_, err = cluster.Client.CoreV1().PersistentVolumeClaims(ibc.config.Cluster.SpaceNamespace).Create(ctx, &pvc, metav1.CreateOptions{})
+	return err
 }
 
-func getInitContainerStatus(pod *corev1.Pod, containerName string) string {
-	var status string = containerStatusUnknown
-	for _, container := range pod.Status.InitContainerStatuses {
-		if container.Name == containerName {
-			if container.State.Waiting != nil {
-				status = containerStatusWaiting
-			}
-			if container.State.Running != nil {
-				status = containerStatusRunning
-			}
-			if container.State.Terminated != nil {
-				status = containerStatusTerminated
-			}
-			break
-		}
-	}
-	return status
-}
-
-func getContainerLogs(ctx context.Context, cluster *cluster.Cluster, pod *corev1.Pod, containerName string) ([]byte, error) {
-	if containerName == initContainerType {
-		return getInitContainerLogs(ctx, cluster, pod)
-	}
-	if containerName == buildContainerType {
-		return getMainContainerLogs(ctx, cluster, pod)
-	}
-	return nil, fmt.Errorf("container type %s not found", containerName)
-}
-
-func getInitContainerLogs(ctx context.Context, cluster *cluster.Cluster, pod *corev1.Pod) ([]byte, error) {
-	logs, err := rcommon.GetPodLog(ctx, cluster, pod.Name, pod.Namespace, "init-repo")
+func (ibc *imagebuilderComponentImpl) workMeataDataFromWF(wf *v1alpha1.Workflow) (*ctypes.ImageBuilderRequest, error) {
+	meta := wf.Annotations[WORK_META_DATA]
+	var workMeta ctypes.ImageBuilderRequest
+	err := json.Unmarshal([]byte(meta), &workMeta)
 	if err != nil {
 		return nil, err
 	}
-
-	return logs, nil
+	return &workMeta, nil
 }
 
-func getMainContainerLogs(ctx context.Context, cluster *cluster.Cluster, pod *corev1.Pod) ([]byte, error) {
-	logs, err := rcommon.GetPodLog(ctx, cluster, pod.Name, pod.Namespace, "main")
-	if err != nil {
-		return nil, err
+func (ibc *imagebuilderComponentImpl) pushLog(deployId string, taskId string, stage ctypes.Stage, step ctypes.Step, log string) {
+	entry := ctypes.LogEntry{
+		Message:  log,
+		Stage:    stage,
+		Step:     step,
+		DeployID: deployId,
+		Labels: map[string]string{
+			ctypes.LogLabelTypeKey:       ctypes.LogLabelImageBuilder,
+			ctypes.StreamKeyDeployID:     deployId,
+			ctypes.StreamKeyDeployTaskID: taskId,
+		},
+		PodInfo: &ctypes.PodInfo{},
+	}
+	ibc.logReporter.Report(entry)
+}
+
+func (ibc *imagebuilderComponentImpl) addKServiceWithEvent(eventType ctypes.WebHookEventType, data ctypes.ImageBuilderEvent) {
+	event := &ctypes.WebHookSendEvent{
+		WebHookHeader: ctypes.WebHookHeader{
+			EventType: eventType,
+			EventTime: time.Now().Unix(),
+			DataType:  ctypes.WebHookDataTypeObject,
+		},
+		Data: data,
 	}
 
-	return logs, nil
-}
-
-func (ibc *imagebuilderComponentImpl) getInitContainerLogsStream(ctx context.Context, cluster *cluster.Cluster, ibw *database.ImageBuilderWork) chan string {
-	ch := make(chan string)
 	go func() {
-		defer close(ch)
-		var err error
-		for {
-			if ibw.WorkStatus == string(v1alpha1.WorkflowUnknown) {
-				ch <- fmt.Sprintf("imagebuilder workflow %s is not running status: %s container init repo status: %s", ibw.WorkName, ibw.WorkStatus, ibw.InitContainerStatus)
-				return
-			}
-
-			if ibw.InitContainerStatus == containerStatusTerminated {
-				ch <- ibw.InitContainerLog
-				return
-			}
-
-			if ibw.InitContainerStatus == containerStatusRunning {
-				logs, msg, err := rcommon.GetPodLogStream(ctx, cluster, ibw.PodName, ibw.Namespace, "init-repo")
-				if err != nil {
-					ch <- fmt.Sprintf("failed to get container init repo logs: %s", err.Error())
-					return
-				}
-				if msg != "" {
-					ch <- msg
-				}
-				for log := range logs {
-					ch <- string(log)
-				}
-				return
-			}
-
-			select {
-			case <-ctx.Done():
-				return
-			case <-time.After(2 * time.Second):
-				ibw, err = ibc.db.QueryStatusByBuildID(ctx, ibw.BuildId)
-				if err != nil {
-					ch <- fmt.Sprintf("failed to get container init repo status: %s", err.Error())
-					return
-				}
-			}
+		err := rcommon.Push(ibc.config.Runner.WebHookEndpoint, ibc.config.APIToken, event)
+		if err != nil {
+			slog.Error("failed to push imagebuilder service status event", slog.Any("error", err))
 		}
 	}()
-	return ch
 }
 
-func (ibc *imagebuilderComponentImpl) getMainContainerLogsStream(ctx context.Context, cluster *cluster.Cluster, ibw *database.ImageBuilderWork) chan string {
-	ch := make(chan string)
-	go func() {
-		defer close(ch)
-		var err error
-		for {
-			if ibw.WorkStatus == string(v1alpha1.WorkflowUnknown) {
-				ch <- fmt.Sprintf("imagebuilder workflow %s is not running status: %s", ibw.WorkName, ibw.WorkStatus)
-				return
-			}
-			if ibw.WorkStatus != string(v1alpha1.WorkflowRunning) && ibw.WorkStatus != string(v1alpha1.WorkflowPending) {
-				ch <- ibw.MainContainerLog
-				return
-			}
+func (ibc *imagebuilderComponentImpl) generateWorkName(orgName, spaceName, deployId, taskID string) string {
+	if orgName == "" {
+		orgName = "default"
+	}
+	if spaceName == "" {
+		spaceName = "default"
+	}
 
-			if ibw.InitContainerStatus == containerStatusTerminated && ibw.WorkStatus == string(v1alpha1.WorkflowRunning) {
-				// get logs from cluster
-				logs, msg, err := rcommon.GetPodLogStream(ctx, cluster, ibw.PodName, ibw.Namespace, "main")
-				if err != nil {
-					ch <- fmt.Sprintf("failed to get container build logs: %s", err.Error())
-					return
-				}
-				if msg != "" {
-					ch <- msg
-				}
-				for log := range logs {
-					ch <- string(log)
-				}
-				return
-			}
+	clean := func(s string) string {
+		// Convert to lowercase
+		s = strings.ToLower(s)
+		// Replace non-allowed characters with hyphens
+		re := regexp.MustCompile(`[^a-z0-9-]`)
+		s = re.ReplaceAllString(s, "-")
+		// Merge consecutive hyphens
+		re = regexp.MustCompile(`-+`)
+		s = re.ReplaceAllString(s, "-")
+		// Remove leading and trailing hyphens
+		return strings.Trim(s, "-")
+	}
 
-			select {
-			case <-ctx.Done():
-				return
-			case <-time.After(2 * time.Second):
-				ibw, err = ibc.db.QueryStatusByBuildID(ctx, ibw.BuildId)
-				if err != nil {
-					ch <- fmt.Sprintf("failed to get container build status: %s", err.Error())
-					return
-				}
-			}
-		}
-	}()
-	return ch
+	orgName = clean(orgName)
+	spaceName = clean(spaceName)
+	if len(orgName) > 8 {
+		orgName = orgName[:8]
+	}
+
+	if len(spaceName) > 8 {
+		spaceName = spaceName[:8]
+	}
+
+	baseName := fmt.Sprintf("sib-%s-%s-%s-%s", orgName, spaceName, deployId, taskID)
+	if len(baseName) > 63 {
+		baseName = baseName[:63]
+	}
+	return baseName
 }

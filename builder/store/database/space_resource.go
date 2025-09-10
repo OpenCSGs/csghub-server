@@ -3,6 +3,8 @@ package database
 import (
 	"context"
 	"fmt"
+
+	"opencsg.com/csghub-server/common/errorx"
 )
 
 type spaceResourceStoreImpl struct {
@@ -10,7 +12,7 @@ type spaceResourceStoreImpl struct {
 }
 
 type SpaceResourceStore interface {
-	Index(ctx context.Context, clusterId string) ([]SpaceResource, error)
+	Index(ctx context.Context, clusterId string, per, page int) ([]SpaceResource, int, error)
 	Create(ctx context.Context, input SpaceResource) (*SpaceResource, error)
 	Update(ctx context.Context, input SpaceResource) (*SpaceResource, error)
 	Delete(ctx context.Context, input SpaceResource) error
@@ -35,13 +37,20 @@ type SpaceResource struct {
 	times
 }
 
-func (s *spaceResourceStoreImpl) Index(ctx context.Context, clusterId string) ([]SpaceResource, error) {
+func (s *spaceResourceStoreImpl) Index(ctx context.Context, clusterId string, per, page int) ([]SpaceResource, int, error) {
 	var result []SpaceResource
-	_, err := s.db.Operator.Core.NewSelect().Model(&result).Where("cluster_id = ?", clusterId).Order("name asc").Exec(ctx, &result)
+	query := s.db.Operator.Core.NewSelect().Model(&result).Where("cluster_id = ?", clusterId)
+	query = query.Order("name asc").
+		Limit(per).
+		Offset((page - 1) * per)
+	err := query.Scan(ctx, &result)
+	err = errorx.HandleDBError(err, nil)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	return result, nil
+	total, err := query.Count(ctx)
+	err = errorx.HandleDBError(err, nil)
+	return result, total, err
 }
 
 func (s *spaceResourceStoreImpl) Create(ctx context.Context, input SpaceResource) (*SpaceResource, error) {

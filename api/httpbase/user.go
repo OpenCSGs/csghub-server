@@ -11,14 +11,16 @@ const (
 	AuthTypeCtxVar          = "authType"
 	CurrentUserQueryVar     = "current_user"
 	CurrentUserUUIDQueryVar = "current_user_uuid"
+	HeaderLanguageKey       = "Accept-Language"
 )
 
 type AuthType string
 
 const (
-	AuthTypeApiKey      AuthType = "ApiKey"
-	AuthTypeJwt         AuthType = "JWT"
-	AuthTypeAccessToken AuthType = "AccessToken"
+	AuthTypeApiKey         AuthType = "ApiKey"
+	AuthTypeJwt            AuthType = "JWT"
+	AuthTypeAccessToken    AuthType = "AccessToken"
+	AuthTypeMultiSyncToken AuthType = "MultiSyncToken"
 )
 
 // GetCurrentUser returns the current user name from the context.
@@ -54,4 +56,8 @@ func GetCurrentUserUUID(ctx *gin.Context) string {
 
 func SetCurrentUserUUID(ctx *gin.Context, userUUID string) {
 	ctx.Set(CurrentUserUUIDCtxVar, userUUID)
+}
+
+func GetCurrentUserLanguage(ctx *gin.Context) string {
+	return ctx.GetHeader(HeaderLanguageKey)
 }

@@ -1,22 +1,23 @@
-FROM golang:1.21.0-bullseye
+FROM opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/debian:bookworm-slim
 
-RUN apt update && apt install -y --no-install-recommends jq cron && \
-    apt clean && rm -rf /var/lib/apt/lists/*
+RUN sed -i 's|http://deb.debian.org/debian|http://mirrors.aliyun.com/debian|g' /etc/apt/sources.list.d/debian.sources && \
+    sed -i 's|http://deb.debian.org/debian-security|http://mirrors.aliyun.com/debian-security|g' /etc/apt/sources.list.d/debian.sources && \
+    apt-get update && apt-get install -y --no-install-recommends \
+    cron \
+    wget \
+    curl \
+    procps \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
-RUN if [ "$(uname -m)" = "x86_64" ]; then \
-        ARCH="linux_amd64"; \
-    elif [ "$(uname -m)" = "aarch64" ]; then \
-        ARCH="linux_arm64"; \
-    else \
-        echo "Unsupported architecture"; exit 1; \
-    fi && \
-    EXTENSION_DIR=~/.duckdb/extensions/v0.9.2/$ARCH && \
-    mkdir -p "$EXTENSION_DIR" && \
-    wget https://extensions.duckdb.org/v0.9.2/$ARCH/httpfs.duckdb_extension.gz -O "$EXTENSION_DIR"/httpfs.duckdb_extension.gz &&  \
-    gunzip "$EXTENSION_DIR"/httpfs.duckdb_extension.gz && \
-    chmod 755 "$EXTENSION_DIR"/httpfs.duckdb_extension && \
-    wget https://extensions.duckdb.org/v0.9.2/$ARCH/json.duckdb_extension.gz -O "$EXTENSION_DIR"/json.duckdb_extension.gz &&  \
-    gunzip "$EXTENSION_DIR"/json.duckdb_extension.gz && \
-    chmod 755 "$EXTENSION_DIR"/json.duckdb_extension
+RUN wget https://opencsg-public-resource.oss-cn-beijing.aliyuncs.com/tools/jq-linux-amd64 -O /usr/bin/jq && \
+    chmod 755 /usr/bin/jq
 
-# BUILDX_NO_DEFAULT_ATTESTATIONdS=1 docker buildx build --platform linux/amd64,linux/arm64 -t opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/csghub_server:base-1.0 -f Dockerfile-base --push .
+RUN mkdir -p ~/.duckdb/extensions/v0.9.2/linux_amd64 && \
+    wget https://opencsg-public-resource.oss-cn-beijing.aliyuncs.com/tools/duckdb/httpfs.duckdb_extension -O ~/.duckdb/extensions/v0.9.2/linux_amd64/httpfs.duckdb_extension && \
+    chmod 755 ~/.duckdb/extensions/v0.9.2/linux_amd64/httpfs.duckdb_extension && \
+    wget https://extensions.duckdb.org/v0.9.2/linux_amd64/json.duckdb_extension.gz -O ~/.duckdb/extensions/v0.9.2/linux_amd64/json.duckdb_extension.gz && \
+    gunzip ~/.duckdb/extensions/v0.9.2/linux_amd64/json.duckdb_extension.gz && \
+    chmod 755 ~/.duckdb/extensions/v0.9.2/linux_amd64/json.duckdb_extension
+
+# docker build -t opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/csghub_server:base-3.0-runtime -f Dockerfile-base .

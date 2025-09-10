@@ -4,6 +4,7 @@ package deploy
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -135,4 +136,120 @@ func TestDeployer_updateEvaluationEnvHardware(t *testing.T) {
 		require.Equal(t, c.value, m[c.key])
 	}
 
+}
+
+func Test_CheckNodeResource(t *testing.T) {
+	baseNode := types.NodeResourceInfo{
+		AvailableCPU: 16,
+		AvailableMem: 8, // 8 GiB
+		AvailableXPU: 2,
+		XPUModel:     "NVIDIA-A100",
+	}
+
+	testCases := []struct {
+		name     string
+		node     types.NodeResourceInfo
+		hardware *types.HardWare
+		want     bool
+	}{
+		{
+			name: "Success - All resources sufficient, including storage",
+			node: baseNode,
+			hardware: &types.HardWare{
+				Cpu:    types.CPU{Num: "8"},
+				Memory: "4Gi",
+				Gpu:    types.Processor{Num: "1", Type: "NVIDIA-A100"},
+			},
+			want: true,
+		},
+		{
+			name: "Success for millivalue - All resources sufficient, including storage",
+			node: baseNode,
+			hardware: &types.HardWare{
+				Cpu:    types.CPU{Num: "800m"},
+				Memory: "4Gi",
+				Gpu:    types.Processor{Num: "1", Type: "NVIDIA-A100"},
+			},
+			want: true,
+		},
+		{
+			name: "Failure - Insufficient Memory",
+			node: baseNode,
+			hardware: &types.HardWare{
+				Memory: "10Gi",
+			},
+			want: false,
+		},
+		{
+			name: "Failure - Mismatched XPU Type",
+			node: baseNode,
+			hardware: &types.HardWare{
+				Gpu: types.Processor{Num: "1", Type: "NVIDIA-V100"},
+			},
+			want: false,
+		},
+		{
+			name: "Failure - Invalid memory format",
+			node: baseNode,
+			hardware: &types.HardWare{
+				Memory: "lots-of-memory",
+			},
+			want: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := checkNodeResource(tc.node, tc.hardware)
+			if got != tc.want {
+				t.Errorf("checkNodeResource() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestDeployer_GetClusterById(t *testing.T) {
+	tester := newTestDeployer(t)
+	t.Run("success", func(t *testing.T) {
+		ctx := context.TODO()
+		tester.mocks.runner.EXPECT().GetClusterById(ctx, "1").Once().Return(&types.ClusterResponse{
+			ClusterID: "1",
+			Region:    "test-region",
+			Zone:      "test-zone",
+			Enable:    true,
+			Nodes: map[string]types.NodeResourceInfo{
+				"1": {
+					AvailableCPU: 1,
+					AvailableMem: 3,
+				},
+				"2": {
+					AvailableCPU: 2,
+					AvailableMem: 5,
+					AvailableXPU: 4,
+				},
+			},
+		}, nil)
+		clusterRes, err := tester.GetClusterById(ctx, "1")
+		require.Nil(t, err)
+		require.Equal(t, float64(3), clusterRes.AvailableCPU)
+		require.Equal(t, float64(8), clusterRes.AvailableMem)
+		require.Equal(t, int64(4), clusterRes.AvailableGPU)
+	})
+	t.Run("empty nodes", func(t *testing.T) {
+		ctx := context.TODO()
+		tester.mocks.runner.EXPECT().GetClusterById(ctx, "1").Once().Return(&types.ClusterResponse{
+			ClusterID: "1",
+			Nodes:     nil,
+		}, nil)
+		clusterRes, err := tester.GetClusterById(ctx, "1")
+		require.Nil(t, err)
+		require.Equal(t, types.ClusterStatusRunning, clusterRes.Status)
+	})
+	t.Run("get cluster failed", func(t *testing.T) {
+		ctx := context.TODO()
+		tester.mocks.runner.EXPECT().GetClusterById(ctx, "1").Once().Return(nil, errors.New("some error"))
+		clusterRes, err := tester.GetClusterById(ctx, "1")
+		require.Nil(t, err)
+		require.Equal(t, types.ClusterStatusUnavailable, clusterRes.Status)
+	})
 }

@@ -75,6 +75,7 @@ const (
 	InitCommitMessage     = "initial commit"
 	ReadmeFileName        = "README.md"
 	GitAttributesFileName = ".gitattributes"
+	Gitignore             = ".gitignore"
 
 	EntryFileAppFile    = "app.py"
 	EntryFileNginx      = "nginx.conf"
@@ -82,6 +83,7 @@ const (
 
 	TextGeneration     PipelineTask    = "text-generation"
 	Text2Image         PipelineTask    = "text-to-image"
+	ImageText2Text     PipelineTask    = "image-text-to-text"
 	FeatureExtraction  PipelineTask    = "feature-extraction"
 	SentenceSimilarity PipelineTask    = "sentence-similarity"
 	TaskAutoDetection  PipelineTask    = "task-auto-detection"
@@ -198,6 +200,7 @@ type DeployRepo struct {
 	UserUUID         string     `json:"user_uuid,omitempty"`
 	SKU              string     `json:"sku,omitempty"`
 	OrderDetailID    int64      `json:"order_detail_id,omitempty"`
+	PayMode          PayMode    `json:"pay_mode,omitempty"`
 	Provider         string     `json:"provider,omitempty"`
 	ResourceType     string     `json:"resource_type,omitempty"`
 	RepoTag          string     `json:"repo_tag,omitempty"`
@@ -236,11 +239,22 @@ type RuntimeFramework struct {
 	Description   string `json:"description"`
 }
 
+type RuntimeFrameworkV2 struct {
+	FrameName    string             `json:"frame_name"`
+	ComputeTypes []string           `json:"compute_types"`
+	Versions     []RuntimeFramework `json:"versions"`
+}
+
 type RuntimeFrameworkModels struct {
 	Models   []string     `json:"models"`
 	ID       int64        `json:"id"`
 	ScanType int          `json:"scan_type"`
 	Task     PipelineTask `json:"task"`
+}
+
+type TreeReq struct {
+	RepoId   int64
+	Relation ModelRelation
 }
 
 type RepoFilter struct {
@@ -249,6 +263,7 @@ type RepoFilter struct {
 	Search         string
 	Source         string
 	Username       string
+	Tree           *TreeReq
 	ListServerless bool
 	SpaceSDK       string
 }
@@ -288,4 +303,37 @@ type RepoNotificationReq struct {
 	RepoPath  string
 	Operation OperationType
 	UserUUID  string
+}
+
+type ChangePathReq struct {
+	RepoType    RepositoryType
+	Namespace   string
+	Name        string
+	NewPath     string `json:"new_path"`
+	CurrentUser string
+}
+
+var validRepositoryTypes = map[RepositoryType]struct{}{
+	ModelRepo:     {},
+	DatasetRepo:   {},
+	SpaceRepo:     {},
+	CodeRepo:      {},
+	PromptRepo:    {},
+	MCPServerRepo: {},
+	TemplateRepo:  {},
+}
+
+func (rt RepositoryType) IsValid() bool {
+	_, exists := validRepositoryTypes[rt]
+	return exists
+}
+
+type ReadLogRequest struct {
+	DeployID     string            `json:"deploy_id"`
+	TaskID       string            `json:"task_id"`
+	TimeLoc      *time.Location    `json:"time_loc"`
+	StartTime    time.Time         `json:"start_time"`
+	EndTime      time.Time         `json:"end_time"`
+	Labels       map[string]string `json:"labels"`
+	InstanceName string            `json:"instance_name"`
 }

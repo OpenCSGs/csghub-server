@@ -176,12 +176,20 @@ func isValidAccessToken(c *gin.Context, userSvcClient rpc.UserSvcClient, token s
 		slog.ErrorContext(c, "verify access token error", slog.Any("error", err))
 		return false
 	}
-	if user != nil && user.Application == types.AccessTokenAppCSGHub {
-		httpbase.SetCurrentUser(c, user.Username)
-		httpbase.SetCurrentUserUUID(c, user.UserUUID)
-		httpbase.SetAccessToken(c, token)
-		httpbase.SetAuthType(c, httpbase.AuthTypeAccessToken)
-		return true
+	if user != nil {
+		if user.Application == types.AccessTokenAppCSGHub {
+			httpbase.SetCurrentUser(c, user.Username)
+			httpbase.SetCurrentUserUUID(c, user.UserUUID)
+			httpbase.SetAccessToken(c, token)
+			httpbase.SetAuthType(c, httpbase.AuthTypeAccessToken)
+			return true
+		} else if user.Application == types.AccessTokenAppMirror {
+			httpbase.SetCurrentUser(c, user.Username)
+			httpbase.SetCurrentUserUUID(c, user.UserUUID)
+			httpbase.SetAccessToken(c, token)
+			httpbase.SetAuthType(c, httpbase.AuthTypeMultiSyncToken)
+			return true
+		}
 	}
 	return false
 }
@@ -204,6 +212,40 @@ func parseJWTToken(signKey, tokenString string) (*types.JWTClaims, error) {
 	}
 	err = fmt.Errorf("JWT token claims not match: %+v", *token)
 	return nil, errorx.InvalidAuthHeader(err, nil)
+}
+
+func NeedAPIKey(config *config.Config) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		apiToken := config.APIToken
+
+		// Get Authorization token
+		authHeader := c.Request.Header.Get("Authorization")
+
+		// Check Authorization Header format
+		if authHeader == "" {
+			slog.Info("missing authorization header", slog.Any("url", c.Request.URL))
+			httpbase.UnauthorizedError(c, errorx.ErrInvalidAuthHeader)
+			c.Abort()
+			return
+		}
+
+		// Get token
+		token := strings.TrimPrefix(authHeader, "Bearer ")
+
+		if token == apiToken {
+			// get current user from query string
+			currentUser := c.Query(httpbase.CurrentUserQueryVar)
+			if len(currentUser) > 0 {
+				httpbase.SetCurrentUser(c, currentUser)
+			}
+		} else {
+			httpbase.UnauthorizedError(c, errorx.ErrNeedAPIKey)
+			c.Abort()
+			return
+		}
+
+		c.Next()
+	}
 }
 
 func OnlyAPIKeyAuthenticator(config *config.Config) gin.HandlerFunc {
@@ -314,10 +356,17 @@ type MiddlewareCollection struct {
 		NeedAdmin gin.HandlerFunc
 		// user must be the owner of the resource
 		UserMatch gin.HandlerFunc
+		// user must have phone verified
+		NeedPhoneVerified gin.HandlerFunc
 	}
 
 	Repo struct {
 		// Check if repo exists
 		RepoExists gin.HandlerFunc
+	}
+
+	License struct {
+		// Check if license is active
+		Check gin.HandlerFunc
 	}
 }

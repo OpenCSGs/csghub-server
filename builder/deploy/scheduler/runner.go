@@ -28,13 +28,14 @@ func (t *sleepTask) Run(ctx context.Context) error {
 }
 func (t *sleepTask) WatchID() int64 { return 0 }
 
-const cancelled = -1
+const Cancelled = -1
 
 const (
-	buildPending    = 0
-	buildInProgress = 1
-	buildFailed     = 2
-	buildSucceed    = 3
+	BuildPending    = 0
+	BuildInQueue    = 5
+	BuildInProgress = 1
+	BuildFailed     = 2
+	BuildSucceed    = 3
 	BuildSkip       = 4 // export for other package
 )
 

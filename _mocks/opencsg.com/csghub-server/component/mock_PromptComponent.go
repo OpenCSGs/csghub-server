@@ -1131,9 +1131,9 @@ func (_c *MockPromptComponent_SetRelationModels_Call) RunAndReturn(run func(cont
 	return _c
 }
 
-// Show provides a mock function with given fields: ctx, namespace, name, currentUser
-func (_m *MockPromptComponent) Show(ctx context.Context, namespace string, name string, currentUser string) (*types.PromptRes, error) {
-	ret := _m.Called(ctx, namespace, name, currentUser)
+// Show provides a mock function with given fields: ctx, namespace, name, currentUser, needOpWeight, needMultiSync
+func (_m *MockPromptComponent) Show(ctx context.Context, namespace string, name string, currentUser string, needOpWeight bool, needMultiSync bool) (*types.PromptRes, error) {
+	ret := _m.Called(ctx, namespace, name, currentUser, needOpWeight, needMultiSync)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Show")
@@ -1141,19 +1141,19 @@ func (_m *MockPromptComponent) Show(ctx context.Context, namespace string, name 
 
 	var r0 *types.PromptRes
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) (*types.PromptRes, error)); ok {
-		return rf(ctx, namespace, name, currentUser)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, bool, bool) (*types.PromptRes, error)); ok {
+		return rf(ctx, namespace, name, currentUser, needOpWeight, needMultiSync)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) *types.PromptRes); ok {
-		r0 = rf(ctx, namespace, name, currentUser)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, bool, bool) *types.PromptRes); ok {
+		r0 = rf(ctx, namespace, name, currentUser, needOpWeight, needMultiSync)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*types.PromptRes)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, string, string) error); ok {
-		r1 = rf(ctx, namespace, name, currentUser)
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, bool, bool) error); ok {
+		r1 = rf(ctx, namespace, name, currentUser, needOpWeight, needMultiSync)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -1171,13 +1171,15 @@ type MockPromptComponent_Show_Call struct {
 //   - namespace string
 //   - name string
 //   - currentUser string
-func (_e *MockPromptComponent_Expecter) Show(ctx interface{}, namespace interface{}, name interface{}, currentUser interface{}) *MockPromptComponent_Show_Call {
-	return &MockPromptComponent_Show_Call{Call: _e.mock.On("Show", ctx, namespace, name, currentUser)}
+//   - needOpWeight bool
+//   - needMultiSync bool
+func (_e *MockPromptComponent_Expecter) Show(ctx interface{}, namespace interface{}, name interface{}, currentUser interface{}, needOpWeight interface{}, needMultiSync interface{}) *MockPromptComponent_Show_Call {
+	return &MockPromptComponent_Show_Call{Call: _e.mock.On("Show", ctx, namespace, name, currentUser, needOpWeight, needMultiSync)}
 }
 
-func (_c *MockPromptComponent_Show_Call) Run(run func(ctx context.Context, namespace string, name string, currentUser string)) *MockPromptComponent_Show_Call {
+func (_c *MockPromptComponent_Show_Call) Run(run func(ctx context.Context, namespace string, name string, currentUser string, needOpWeight bool, needMultiSync bool)) *MockPromptComponent_Show_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string))
+		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string), args[4].(bool), args[5].(bool))
 	})
 	return _c
 }
@@ -1187,7 +1189,7 @@ func (_c *MockPromptComponent_Show_Call) Return(_a0 *types.PromptRes, _a1 error)
 	return _c
 }
 
-func (_c *MockPromptComponent_Show_Call) RunAndReturn(run func(context.Context, string, string, string) (*types.PromptRes, error)) *MockPromptComponent_Show_Call {
+func (_c *MockPromptComponent_Show_Call) RunAndReturn(run func(context.Context, string, string, string, bool, bool) (*types.PromptRes, error)) *MockPromptComponent_Show_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1247,6 +1249,65 @@ func (_c *MockPromptComponent_SubmitMessage_Call) Return(_a0 <-chan string, _a1 
 }
 
 func (_c *MockPromptComponent_SubmitMessage_Call) RunAndReturn(run func(context.Context, types.ConversationReq) (<-chan string, error)) *MockPromptComponent_SubmitMessage_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SummarizeConversationTitle provides a mock function with given fields: ctx, req
+func (_m *MockPromptComponent) SummarizeConversationTitle(ctx context.Context, req types.ConversationTitleReq) (*database.PromptConversation, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SummarizeConversationTitle")
+	}
+
+	var r0 *database.PromptConversation
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.ConversationTitleReq) (*database.PromptConversation, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.ConversationTitleReq) *database.PromptConversation); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.PromptConversation)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.ConversationTitleReq) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockPromptComponent_SummarizeConversationTitle_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SummarizeConversationTitle'
+type MockPromptComponent_SummarizeConversationTitle_Call struct {
+	*mock.Call
+}
+
+// SummarizeConversationTitle is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.ConversationTitleReq
+func (_e *MockPromptComponent_Expecter) SummarizeConversationTitle(ctx interface{}, req interface{}) *MockPromptComponent_SummarizeConversationTitle_Call {
+	return &MockPromptComponent_SummarizeConversationTitle_Call{Call: _e.mock.On("SummarizeConversationTitle", ctx, req)}
+}
+
+func (_c *MockPromptComponent_SummarizeConversationTitle_Call) Run(run func(ctx context.Context, req types.ConversationTitleReq)) *MockPromptComponent_SummarizeConversationTitle_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.ConversationTitleReq))
+	})
+	return _c
+}
+
+func (_c *MockPromptComponent_SummarizeConversationTitle_Call) Return(_a0 *database.PromptConversation, _a1 error) *MockPromptComponent_SummarizeConversationTitle_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockPromptComponent_SummarizeConversationTitle_Call) RunAndReturn(run func(context.Context, types.ConversationTitleReq) (*database.PromptConversation, error)) *MockPromptComponent_SummarizeConversationTitle_Call {
 	_c.Call.Return(run)
 	return _c
 }

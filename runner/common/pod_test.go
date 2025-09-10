@@ -2,21 +2,19 @@ package common
 
 import (
 	"context"
+	"k8s.io/client-go/kubernetes"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"k8s.io/client-go/kubernetes/fake"
-	"opencsg.com/csghub-server/builder/deploy/cluster"
 )
 
 func TestGetPodLogValidation(t *testing.T) {
-	testCluster := &cluster.Cluster{
-		Client: fake.NewSimpleClientset(),
-	}
+	clientset := fake.NewSimpleClientset()
 
 	tests := []struct {
 		name      string
-		cluster   *cluster.Cluster
+		client    kubernetes.Interface
 		podName   string
 		namespace string
 		container string
@@ -24,7 +22,7 @@ func TestGetPodLogValidation(t *testing.T) {
 	}{
 		{
 			name:      "test-pod",
-			cluster:   testCluster,
+			client:    clientset,
 			podName:   "test-pod",
 			namespace: "default",
 			container: "main",
@@ -33,7 +31,7 @@ func TestGetPodLogValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := GetPodLog(context.Background(), tt.cluster, tt.podName, tt.namespace, tt.container)
+			_, err := GetPodLog(context.Background(), tt.client, tt.podName, tt.namespace, tt.container)
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {

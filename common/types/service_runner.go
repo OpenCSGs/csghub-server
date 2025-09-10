@@ -34,6 +34,8 @@ type (
 		DeployType       int    `json:"deploy_type"`
 		UserID           string `json:"user_id"`
 		Sku              string `json:"sku"`
+		OrderDetailID    int64  `json:"order_detail_id"`
+		TaskId           int64  `json:"task_id"`
 	}
 
 	RunResponse struct {
@@ -102,16 +104,6 @@ type (
 		RepoName  string `json:"repo_name"`
 		ClusterID string `json:"cluster_id"`
 		SvcName   string `json:"svc_name"`
-	}
-
-	CluserResponse struct {
-		ClusterID    string                      `json:"cluster_id"`
-		ClusterName  string                      `json:"cluster_name"`
-		Region       string                      `json:"region"`
-		Nodes        map[string]NodeResourceInfo `json:"nodes"`
-		Zone         string                      `json:"zone"`
-		Provider     string                      `json:"provider"`
-		StorageClass string                      `json:"storage_class"`
 	}
 
 	CluserRequest struct {
@@ -188,6 +180,7 @@ type (
 		Sku           string            `json:"sku"`
 		OrderDetailID int64             `json:"order_detail_id"`
 		SvcName       string            `json:"-"`
+		TaskId        int64             `json:"task_id"`
 	}
 
 	EngineArg struct {

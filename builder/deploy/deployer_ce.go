@@ -4,17 +4,24 @@ package deploy
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
+	"math"
 	"strconv"
 
+	"opencsg.com/csghub-server/component/reporter"
+
 	"github.com/bwmarrin/snowflake"
+	"k8s.io/apimachinery/pkg/api/resource"
+	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/deploy/imagebuilder"
 	"opencsg.com/csghub-server/builder/deploy/imagerunner"
 	"opencsg.com/csghub-server/builder/deploy/scheduler"
 	"opencsg.com/csghub-server/builder/event"
-	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
+	"opencsg.com/csghub-server/component/reporter/sender"
 )
 
 type deployer struct {
@@ -30,19 +37,22 @@ type deployer struct {
 	snowflakeNode         *snowflake.Node
 	eventPub              *event.EventPublisher
 	runtimeFrameworkStore database.RuntimeFrameworksStore
-	deployConfig          DeployConfig
+	deployConfig          common.DeployConfig
 	userStore             database.UserStore
-	notificationSvcClient rpc.NotificationSvcClient
+	clusterStore          database.ClusterInfoStore
+	lokiClient            sender.LogSender
+	logReporter           reporter.LogCollector
 }
 
-func newDeployer(s scheduler.Scheduler, ib imagebuilder.Builder, ir imagerunner.Runner, c DeployConfig) (*deployer, error) {
+func newDeployer(s scheduler.Scheduler, ib imagebuilder.Builder, ir imagerunner.Runner, c common.DeployConfig, logReporter reporter.LogCollector, cfg *config.Config) (*deployer, error) {
+
 	store := database.NewDeployTaskStore()
 	node, err := snowflake.NewNode(1)
 	if err != nil || node == nil {
 		slog.Error("fail to generate uuid for inference service name", slog.Any("error", err))
 		return nil, err
 	}
-	nc := rpc.NewNotificationSvcHttpClient(c.NotificationEndpoint, rpc.AuthWithApiKey(c.APIToken))
+
 	d := &deployer{
 		scheduler:             s,
 		imageBuilder:          ib,
@@ -56,7 +66,9 @@ func newDeployer(s scheduler.Scheduler, ib imagebuilder.Builder, ir imagerunner.
 		runtimeFrameworkStore: database.NewRuntimeFrameworksStore(),
 		deployConfig:          c,
 		userStore:             database.NewUserStore(),
-		notificationSvcClient: nc,
+		clusterStore:          database.NewClusterInfoStore(),
+		lokiClient:            logReporter.GetSender(),
+		logReporter:           logReporter,
 	}
 
 	d.startJobs()
@@ -80,41 +92,54 @@ func (d *deployer) releaseUserResourceByOrder(ctx context.Context, dr types.Depl
 }
 
 func (d *deployer) startAccounting() {
-	go d.startAcctFeeing()
-	go d.startServiceConsuming()
+	go d.startAcctMetering()
 }
 
 func checkNodeResource(node types.NodeResourceInfo, hardware *types.HardWare) bool {
+
+	if hardware.Cpu.Num != "" {
+		requestedCPU, err := resource.ParseQuantity(hardware.Cpu.Num)
+		if err != nil {
+			slog.Error("failed to parse hardware cpu num", slog.String("cpu", hardware.Cpu.Num), slog.Any("error", err))
+			return false
+		}
+		cores := float64(requestedCPU.MilliValue()) / 1000.0
+		cpu := math.Round(cores*10) / 10
+		if cpu > node.AvailableCPU {
+			return false
+		}
+	}
+
+	if hardware.Memory != "" {
+		// use resource.ParseQuantity parse "2Gi", "1024M" ...
+		requestedMemory, err := resource.ParseQuantity(hardware.Memory)
+		if err != nil {
+			slog.Error("failed to parse hardware memory", slog.String("memory", hardware.Memory), slog.Any("error", err))
+			return false
+		}
+
+		requestedMemoryGiB := float32(requestedMemory.Value()) / (1024 * 1024 * 1024)
+
+		if requestedMemoryGiB > node.AvailableMem {
+			slog.Warn("insufficient memory resources",
+				slog.Any("requestedGiB", requestedMemoryGiB),
+				slog.Any("availableGiB", node.AvailableMem))
+			return false
+		}
+	}
+
 	if hardware.Gpu.Num != "" {
 		gpu, err := strconv.Atoi(hardware.Gpu.Num)
 		if err != nil {
 			slog.Error("failed to parse hardware gpu ", slog.Any("error", err))
 			return false
 		}
-		cpu, err := strconv.Atoi(hardware.Cpu.Num)
-		if err != nil {
-			slog.Error("failed to parse hardware cpu ", slog.Any("error", err))
+		if gpu > int(node.AvailableXPU) || hardware.Gpu.Type != node.XPUModel {
 			return false
-
 		}
-		if gpu <= int(node.AvailableXPU) && hardware.Gpu.Type == node.XPUModel && cpu <= int(node.AvailableCPU) {
-			return true
-		}
-	} else {
-		return true
 	}
-	return false
-}
 
-func (d *deployer) startJobs() {
-	go func() {
-		err := d.scheduler.Run()
-		if err != nil {
-			slog.Error("run scheduler failed", slog.Any("error", err))
-		}
-	}()
-	go d.startAccounting()
-	go d.startSyncDeployStatus()
+	return true
 }
 
 func (d *deployer) getResources(ctx context.Context, clusterId string, clusterResponse *types.ClusterResponse) ([]types.NodeResourceInfo, error) {
@@ -123,10 +148,12 @@ func (d *deployer) getResources(ctx context.Context, clusterId string, clusterRe
 		resources = append(resources, node)
 	}
 	return resources, nil
-
 }
 
-func startAcctRequestFeeExtra(res types.StatusResponse) string {
+func startAcctRequestFeeExtra(deploy database.Deploy, source string) string {
+	if len(source) > 0 {
+		return fmt.Sprintf("{ \"%s\": \"%s\" }", types.MeterFromSource, source)
+	}
 	return ""
 }
 

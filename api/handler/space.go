@@ -82,14 +82,24 @@ func (h *SpaceHandler) Index(ctx *gin.Context) {
 	repoFilter = getFilterFromContext(ctx, repoFilter)
 	if !slices.Contains(types.Sorts, repoFilter.Sort) {
 		msg := fmt.Sprintf("sort parameter must be one of %v", types.Sorts)
+		err := errorx.ReqParamInvalid(errors.New(msg),
+			errorx.Ctx().
+				Set("param", "sort").
+				Set("provided", repoFilter.Sort).
+				Set("allowed", types.Sorts))
 		slog.Error("Bad request format,", slog.String("error", msg))
-		httpbase.BadRequest(ctx, msg)
+		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 	if repoFilter.Source != "" && !slices.Contains(types.Sources, repoFilter.Source) {
 		msg := fmt.Sprintf("source parameter must be one of %v", types.Sources)
+		err := errorx.ReqParamInvalid(errors.New(msg),
+			errorx.Ctx().
+				Set("param", "source").
+				Set("provided", repoFilter.Source).
+				Set("allowed", types.Sources))
 		slog.Error("Bad request format,", slog.String("error", msg))
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": msg})
+		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 	repoFilter.SpaceSDK = ctx.Query("sdk")
@@ -117,6 +127,7 @@ func (h *SpaceHandler) Index(ctx *gin.Context) {
 // @Param        namespace path string true "namespace"
 // @Param        name path string true "name"
 // @Param        current_user query string true "current_user"
+// @Param        need_op_weight query bool false "need op weight" default(false)
 // @Success      200  {object}  types.Response{data=types.Space} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
@@ -128,7 +139,14 @@ func (h *SpaceHandler) Show(ctx *gin.Context) {
 		return
 	}
 	currentUser := httpbase.GetCurrentUser(ctx)
-	detail, err := h.space.Show(ctx.Request.Context(), namespace, name, currentUser, false)
+
+	qNeedOpWeight := ctx.Query("need_op_weight")
+	needOpWeight, err := strconv.ParseBool(qNeedOpWeight)
+	if err != nil {
+		needOpWeight = false
+	}
+
+	detail, err := h.space.Show(ctx.Request.Context(), namespace, name, currentUser, needOpWeight)
 	if err != nil {
 		if errors.Is(err, errorx.ErrUnauthorized) {
 			httpbase.UnauthorizedError(ctx, err)
@@ -587,6 +605,8 @@ func (h *SpaceHandler) Logs(ctx *gin.Context) {
 	ctx.Writer.WriteHeader(http.StatusOK)
 	ctx.Writer.Flush()
 
+	heartbeatTicker := time.NewTicker(30 * time.Second)
+	defer heartbeatTicker.Stop()
 	for {
 		select {
 		case <-ctx.Request.Context().Done():
@@ -604,6 +624,10 @@ func (h *SpaceHandler) Logs(ctx *gin.Context) {
 				ctx.SSEvent("Container", string(data))
 				ctx.Writer.Flush()
 			}
+		case <-heartbeatTicker.C:
+			// Send a heartbeat event to keep the connection alive
+			ctx.SSEvent("Heartbeat", "keep-alive")
+			ctx.Writer.Flush()
 		default:
 			// Add a small sleep to prevent CPU spinning when no data is available
 			time.Sleep(time.Second)

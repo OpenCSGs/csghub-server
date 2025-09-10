@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	mockbldmq "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/mq"
 	mockdb "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
 	mockmq "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/mq"
 	"opencsg.com/csghub-server/aigateway/token"
@@ -19,6 +20,9 @@ import (
 	mocktoken "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/aigateway/token"
 	"opencsg.com/csghub-server/builder/event"
 	"opencsg.com/csghub-server/builder/store/database"
+
+	bldmq "opencsg.com/csghub-server/builder/mq"
+	"opencsg.com/csghub-server/common/config"
 	commontypes "opencsg.com/csghub-server/common/types"
 )
 
@@ -192,6 +196,9 @@ func TestGetSceneFromSvcType(t *testing.T) {
 }
 
 func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
+	cfg, err := config.LoadConfig()
+	require.Nil(t, err)
+
 	mockUserStore := &mockdb.MockUserStore{}
 	mockDeployStore := &mockdb.MockDeployTaskStore{}
 
@@ -221,10 +228,15 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 			},
 			wantError: false,
 			setupMock: func() {
+
 				mockMQ := mockmq.NewMockMessageQueue(t)
+				mockBLDMQ := mockbldmq.NewMockMessageQueue(t)
+
 				eventPub := &event.EventPublisher{
 					Connector:    mockMQ,
 					SyncInterval: 1,
+					MQ:           mockBLDMQ,
+					Cfg:          cfg,
 				}
 				mockCounter = mocktoken.NewMockCounter(t)
 
@@ -238,9 +250,9 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 					CompletionTokens: 50,
 					TotalTokens:      150,
 				}, nil)
-				mockMQ.EXPECT().VerifyMeteringStream().Return(nil)
-				mockMQ.EXPECT().PublishMeterDurationData(mock.Anything).RunAndReturn(func(data []byte) error {
-					var evt commontypes.METERING_EVENT
+
+				mockBLDMQ.EXPECT().Publish(bldmq.MeterDurationSendSubject, mock.Anything).RunAndReturn(func(topic string, data []byte) error {
+					var evt commontypes.MeteringEvent
 					err := json.Unmarshal(data, &evt)
 					require.NoError(t, err)
 					require.Equal(t, "test-model", evt.ResourceID)
@@ -278,9 +290,13 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 			wantError: false,
 			setupMock: func() {
 				mockMQ := mockmq.NewMockMessageQueue(t)
+				mockBLDMQ := mockbldmq.NewMockMessageQueue(t)
+
 				eventPub := &event.EventPublisher{
 					Connector:    mockMQ,
 					SyncInterval: 1,
+					MQ:           mockBLDMQ,
+					Cfg:          cfg,
 				}
 				mockCounter = mocktoken.NewMockCounter(t)
 
@@ -294,9 +310,9 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 					CompletionTokens: 50,
 					TotalTokens:      150,
 				}, nil)
-				mockMQ.EXPECT().VerifyMeteringStream().Return(nil)
-				mockMQ.EXPECT().PublishMeterDurationData(mock.Anything).RunAndReturn(func(data []byte) error {
-					var evt commontypes.METERING_EVENT
+
+				mockBLDMQ.EXPECT().Publish(bldmq.MeterDurationSendSubject, mock.Anything).RunAndReturn(func(topic string, data []byte) error {
+					var evt commontypes.MeteringEvent
 					err := json.Unmarshal(data, &evt)
 					require.NoError(t, err)
 					require.Equal(t, "test-model", evt.ResourceID)
@@ -330,9 +346,11 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 			wantError: true,
 			setupMock: func() {
 				mockMQ := mockmq.NewMockMessageQueue(t)
+				mockBLDMQ := mockbldmq.NewMockMessageQueue(t)
 				eventPub := &event.EventPublisher{
 					Connector:    mockMQ,
 					SyncInterval: 1,
+					MQ:           mockBLDMQ,
 				}
 				mockCounter = mocktoken.NewMockCounter(t)
 
@@ -360,9 +378,12 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 			wantError: true,
 			setupMock: func() {
 				mockMQ := mockmq.NewMockMessageQueue(t)
+				mockBLDMQ := mockbldmq.NewMockMessageQueue(t)
 				eventPub := &event.EventPublisher{
 					Connector:    mockMQ,
 					SyncInterval: 1,
+					MQ:           mockBLDMQ,
+					Cfg:          cfg,
 				}
 				mockCounter = mocktoken.NewMockCounter(t)
 				comp = &openaiComponentImpl{
@@ -375,8 +396,7 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 					CompletionTokens: 50,
 					TotalTokens:      150,
 				}, nil)
-				mockMQ.EXPECT().VerifyMeteringStream().Return(nil)
-				mockMQ.EXPECT().PublishMeterDurationData(mock.Anything).Return(errors.New("publish error")).Times(3)
+				mockBLDMQ.EXPECT().Publish(bldmq.MeterDurationSendSubject, mock.Anything).Return(errors.New("publish error")).Times(3)
 			},
 		},
 	}

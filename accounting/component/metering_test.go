@@ -3,6 +3,7 @@ package component
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -23,7 +24,7 @@ func TestMeteringComponent_SaveMeteringEventRecord(t *testing.T) {
 	ctx := context.TODO()
 
 	uid := uuid.New()
-	req := types.METERING_EVENT{
+	req := types.MeteringEvent{
 		Uuid:       uid,
 		UserUUID:   "test-user-uuid",
 		Value:      100,
@@ -45,7 +46,7 @@ func TestMeteringComponent_SaveMeteringEventRecord(t *testing.T) {
 		CustomerID:   req.CustomerID,
 		RecordedAt:   req.CreatedAt,
 		Extra:        req.Extra,
-		SkuUnitType:  utils.GetSkuUnitTypeByScene(types.SceneType(req.Scene)),
+		SkuUnitType:  string(utils.GetSkuUnitTypeByScene(types.SceneType(req.Scene))),
 	}
 
 	mockStore := mockdb.NewMockAccountMeteringStore(t)
@@ -61,7 +62,7 @@ func TestMeteringComponent_SaveMeteringEventRecord(t *testing.T) {
 func TestMeteringComponent_ListMeteringByUserIDAndDate(t *testing.T) {
 	ctx := context.TODO()
 
-	req := types.ACCT_STATEMENTS_REQ{
+	req := types.ActStatementsReq{
 		UserUUID:  "test-user-uuid",
 		Scene:     int(types.SceneModelInference),
 		StartTime: "2024-01-01",
@@ -95,7 +96,7 @@ func TestMeteringComponent_ListMeteringByUserIDAndDate(t *testing.T) {
 func TestMeteringComponent_GetMeteringStatByDate(t *testing.T) {
 	ctx := context.TODO()
 
-	req := types.ACCT_STATEMENTS_REQ{}
+	req := types.ActStatementsReq{}
 	data := []map[string]interface{}{}
 
 	mockStore := mockdb.NewMockAccountMeteringStore(t)
@@ -104,6 +105,37 @@ func TestMeteringComponent_GetMeteringStatByDate(t *testing.T) {
 
 	mockComp := NewTestMeteringComponent(mockStore)
 	res, err := mockComp.GetMeteringStatByDate(ctx, req)
+	require.Nil(t, err)
+	require.NotNil(t, res)
+}
+
+func TestMeteringComponent_GetMeteringByEventUUID(t *testing.T) {
+	ctx := context.TODO()
+
+	mockStore := mockdb.NewMockAccountMeteringStore(t)
+
+	uuid := uuid.New()
+
+	mockStore.EXPECT().GetByEventUUID(ctx, uuid).Return(&database.AccountMetering{}, nil)
+
+	mockComp := NewTestMeteringComponent(mockStore)
+	res, err := mockComp.GetMeteringByEventUUID(ctx, uuid)
+	require.Nil(t, err)
+	require.NotNil(t, res)
+}
+
+func TestMeteringComponent_GetMeteringByCustomerIDAndDate(t *testing.T) {
+	ctx := context.TODO()
+
+	mockStore := mockdb.NewMockAccountMeteringStore(t)
+
+	customerid := "test-customer-id"
+	recordedat := time.Now()
+
+	mockStore.EXPECT().FindByCustomerIDAndRecordAtInMin(ctx, customerid, recordedat).Return(&database.AccountMetering{}, nil)
+
+	mockComp := NewTestMeteringComponent(mockStore)
+	res, err := mockComp.FindMeteringByCustomerIDAndRecordAtInMin(ctx, customerid, recordedat)
 	require.Nil(t, err)
 	require.NotNil(t, res)
 }
