@@ -206,6 +206,9 @@ func (c *discussionComponentImpl) ListRepoDiscussions(ctx context.Context, req t
 	}
 	resp := &types.ListRepoDiscussionResponse{}
 	for _, discussion := range discussions {
+		if discussion.User == nil {
+			continue
+		}
 		resp.Discussions = append(resp.Discussions, &types.CreateDiscussionResponse{
 			ID:           discussion.ID,
 			Title:        discussion.Title,
@@ -349,6 +352,9 @@ func (c *discussionComponentImpl) ListDiscussionComments(ctx context.Context, cu
 	}
 	resp := make([]*types.DiscussionResponse_Comment, 0, len(comments))
 	for _, comment := range comments {
+		if comment.User == nil {
+			continue
+		}
 		resp = append(resp, &types.DiscussionResponse_Comment{
 			ID:      comment.ID,
 			Content: comment.Content,

@@ -47,19 +47,23 @@ func NewMemberHandler(config *config.Config) (*MemberHandler, error) {
 func (h *MemberHandler) OrgMembers(ctx *gin.Context) {
 	orgName := ctx.Param("namespace")
 	if orgName == "" {
-		httpbase.BadRequest(ctx, fmt.Errorf("org name is empty").Error())
+		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(errors.New("org name is empty"), nil))
 		return
 	}
 	pageSize, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
+		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 	currentUser := httpbase.GetCurrentUser(ctx)
 	members, total, err := h.c.OrgMembers(ctx.Request.Context(), orgName, currentUser, pageSize, page)
 	if err != nil {
-		httpbase.ServerError(ctx, err)
+		if errors.Is(err, errorx.ErrDatabaseNoRows) {
+			httpbase.NotFoundError(ctx, err)
+		} else {
+			httpbase.ServerError(ctx, err)
+		}
 		return
 	}
 
@@ -91,7 +95,7 @@ func (h *MemberHandler) Update(ctx *gin.Context) {
 	}
 	req := new(updateMemberRequest)
 	if err := ctx.ShouldBindJSON(req); err != nil {
-		httpbase.BadRequest(ctx, fmt.Errorf("failed to unmarshal request body,caused by:%w", err).Error())
+		httpbase.ServerError(ctx, fmt.Errorf("failed to unmarshal request body,caused by: %w", err))
 		return
 	}
 	currentUser := httpbase.GetCurrentUser(ctx)
@@ -135,12 +139,12 @@ func (h *MemberHandler) Create(ctx *gin.Context) {
 	}
 	req := new(addMemberRequest)
 	if err := ctx.ShouldBindJSON(req); err != nil {
-		httpbase.BadRequest(ctx, fmt.Errorf("failed to unmarshal request body,caused by:%w", err).Error())
+		httpbase.ServerError(ctx, fmt.Errorf("failed to unmarshal request body,caused by: %w", err))
 		return
 	}
 	users := strings.Split(req.Users, ",")
 	if len(users) == 0 {
-		httpbase.BadRequest(ctx, fmt.Errorf("user name is empty").Error())
+		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(errors.New("user name is empty"), nil))
 		return
 	}
 	currentUser := httpbase.GetCurrentUser(ctx)
@@ -224,7 +228,11 @@ func (h *MemberHandler) GetMemberRole(ctx *gin.Context) {
 	role, err := h.c.GetMemberRole(ctx.Request.Context(), org, userName)
 	if err != nil {
 		slog.Error("fail to get org member", slog.Any("org", org), slog.Any("member", userName), slog.Any("err", err))
-		httpbase.ServerError(ctx, err)
+		if errors.Is(err, errorx.ErrDatabaseNoRows) {
+			httpbase.NotFoundError(ctx, err)
+		} else {
+			httpbase.ServerError(ctx, err)
+		}
 		return
 	}
 

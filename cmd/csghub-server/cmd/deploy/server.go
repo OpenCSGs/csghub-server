@@ -8,12 +8,13 @@ func init() {
 	Cmd.AddCommand(
 		startBuilderCmd,
 		startRunnerCmd,
+		logCollectorCmd,
 	)
 }
 
 var Cmd = &cobra.Command{
 	Use:   "deploy",
-	Short: "entry point of space builder and runner",
+	Short: "entry point of space builder logcollecor and runner",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) (err error) {
 		// config, err := config.LoadConfig()
 		// if err != nil {

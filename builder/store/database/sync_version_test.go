@@ -11,6 +11,7 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
+
 func TestSyncVersionStore_CRUD(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
@@ -47,6 +48,146 @@ func TestSyncVersionStore_CRUD(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, int64(2), sv.Version)
 
+}
+
+func TestSyncVersionStore_BatchDeleteOthers(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewSyncVersionStoreWithDB(db)
+
+	err := store.Create(ctx, &database.SyncVersion{
+		Version:  1,
+		SourceID: 123,
+		RepoPath: "foo/bar",
+		RepoType: types.ModelRepo,
+	})
+	require.Nil(t, err)
+
+	err = store.Create(ctx, &database.SyncVersion{
+		Version:  2,
+		SourceID: 123,
+		RepoPath: "foo/bar1",
+		RepoType: types.ModelRepo,
+	})
+	require.Nil(t, err)
+
+	err = store.BatchDeleteOthers(ctx, types.ModelRepo, []string{"foo/bar1"})
+
+	require.Nil(t, err)
+
+	var svs []database.SyncVersion
+	err = db.Operator.Core.NewSelect().Model(&svs).Scan(ctx)
+
+	require.Nil(t, err)
+
+	require.Equal(t, 1, len(svs))
+	require.Equal(t, "foo/bar1", svs[0].RepoPath)
+}
+
+func TestSyncVersionStore_FindWithBatch(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewSyncVersionStoreWithDB(db)
+
+	err := store.Create(ctx, &database.SyncVersion{
+		Version:  1,
+		SourceID: 123,
+		RepoPath: "foo/bar",
+		RepoType: types.ModelRepo,
+	})
+	require.Nil(t, err)
+
+	err = store.Create(ctx, &database.SyncVersion{
+		Version:  2,
+		SourceID: 123,
+		RepoPath: "foo/bar1",
+		RepoType: types.ModelRepo,
+	})
+	require.Nil(t, err)
+
+	svs, err := store.FindWithBatch(ctx, types.ModelRepo, 1, 1)
+
+	require.Nil(t, err)
+
+	require.Equal(t, 1, len(svs))
+	require.Equal(t, "foo/bar1", svs[0].RepoPath)
+}
+
+func TestSyncVersionStore_DeleteOldVersions(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewSyncVersionStoreWithDB(db)
+
+	err := store.Create(ctx, &database.SyncVersion{
+		Version:  1,
+		SourceID: 123,
+		RepoPath: "foo/bar1",
+		RepoType: types.ModelRepo,
+	})
+	require.Nil(t, err)
+
+	err = store.Create(ctx, &database.SyncVersion{
+		Version:  2,
+		SourceID: 123,
+		RepoPath: "foo/bar1",
+		RepoType: types.ModelRepo,
+	})
+	require.Nil(t, err)
+
+	err = store.Create(ctx, &database.SyncVersion{
+		Version:  3,
+		SourceID: 123,
+		RepoPath: "foo/bar1",
+		RepoType: types.ModelRepo,
+	})
+	require.Nil(t, err)
+
+	err = store.Create(ctx, &database.SyncVersion{
+		Version:  5,
+		SourceID: 123,
+		RepoPath: "foo/bar2",
+		RepoType: types.DatasetRepo,
+	})
+	require.Nil(t, err)
+
+	err = store.Create(ctx, &database.SyncVersion{
+		Version:  6,
+		SourceID: 123,
+		RepoPath: "foo/bar2",
+		RepoType: types.DatasetRepo,
+	})
+	require.Nil(t, err)
+
+	err = store.Create(ctx, &database.SyncVersion{
+		Version:  7,
+		SourceID: 123,
+		RepoPath: "foo/bar3",
+		RepoType: types.DatasetRepo,
+	})
+	require.Nil(t, err)
+
+	err = store.DeleteOldVersions(ctx)
+
+	require.Nil(t, err)
+
+	var svs []database.SyncVersion
+	err = db.Operator.Core.NewSelect().Model(&svs).Order("version DESC").Scan(ctx)
+
+	require.Nil(t, err)
+
+	require.Equal(t, 3, len(svs))
+	require.Equal(t, "foo/bar3", svs[0].RepoPath)
+	require.Equal(t, int64(7), svs[0].Version)
+	require.Equal(t, "foo/bar2", svs[1].RepoPath)
+	require.Equal(t, int64(6), svs[1].Version)
+	require.Equal(t, "foo/bar1", svs[2].RepoPath)
+	require.Equal(t, int64(3), svs[2].Version)
 }
 
 func TestSyncVersionStore_Complete(t *testing.T) {
@@ -139,10 +280,11 @@ func TestSyncVersionStore_Complete(t *testing.T) {
 	}
 
 	// Verify completion status
-	require.True(t, completedMap["1-repo1-model-100"])    // should be completed (version <= 110)
-	require.True(t, completedMap["1-repo1-model-110"])    // should be completed (version = 110)
-	require.False(t, completedMap["1-repo1-model-120"])   // should NOT be completed (version > 110)
-	require.False(t, completedMap["2-repo1-model-105"])   // should NOT be completed (different source_id)
+	require.True(t, completedMap["1-repo1-model-100"])   // should be completed (version <= 110)
+	require.True(t, completedMap["1-repo1-model-110"])   // should be completed (version = 110)
+	require.False(t, completedMap["1-repo1-model-120"])  // should NOT be completed (version > 110)
+	require.False(t, completedMap["2-repo1-model-105"])  // should NOT be completed (different source_id)
 	require.False(t, completedMap["1-repo1-dataset-115"]) // should NOT be completed (different repo_type)
-	require.False(t, completedMap["1-repo2-model-125"])   // should NOT be completed (different repo_path)
+	require.False(t, completedMap["1-repo2-model-125"])  // should NOT be completed (different repo_path)
 }
+

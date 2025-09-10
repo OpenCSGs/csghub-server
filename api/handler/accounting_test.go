@@ -42,7 +42,7 @@ func TestAccountingHandler_QueryMeteringStatementByUserID(t *testing.T) {
 	tester.WithUser()
 
 	tester.mocks.accounting.EXPECT().ListMeteringsByUserIDAndTime(
-		tester.Ctx(), types.ACCT_STATEMENTS_REQ{
+		tester.Ctx(), types.ActStatementsReq{
 			CurrentUser:  "u",
 			UserUUID:     "1",
 			Scene:        2,

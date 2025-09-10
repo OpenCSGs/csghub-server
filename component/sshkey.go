@@ -46,6 +46,7 @@ func (c *sSHKeyComponentImpl) Create(ctx context.Context, req *types.CreateSSHKe
 	if err != nil {
 		return nil, fmt.Errorf("failed to find user,error:%w", err)
 	}
+
 	nameExistsKey, err := c.sshKeyStore.FindByNameAndUserID(ctx, req.Name, user.ID)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("failed to find if ssh key exists,error:%w", err)
@@ -103,6 +104,7 @@ func (c *sSHKeyComponentImpl) Delete(ctx context.Context, username, name string)
 	if err != nil {
 		return fmt.Errorf("failed to delete git SSH keys,error:%w", err)
 	}
+	// Delete API will force delete the key, not soft delete
 	err = c.sshKeyStore.Delete(ctx, sshKey.ID)
 	if err != nil {
 		return fmt.Errorf("failed to delete database SSH keys,error:%w", err)

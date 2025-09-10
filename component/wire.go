@@ -506,6 +506,38 @@ func initializeTestEventComponent(ctx context.Context, t interface {
 	return &testEventWithMocks{}
 }
 
+type testLicenseWithMocks struct {
+	*licenseComponentImpl
+	mocks *Mocks
+}
+
+func initializeTestLicenseComponent(ctx context.Context, t interface {
+	Cleanup(func())
+	mock.TestingT
+}) *testLicenseWithMocks {
+	wire.Build(
+		MockSuperSet, LicenseComponentSet,
+		wire.Struct(new(testLicenseWithMocks), "*"),
+	)
+	return &testLicenseWithMocks{}
+}
+
+type testImportWithMocks struct {
+	*importComponentImpl
+	mocks *Mocks
+}
+
+func initializeTestImportComponent(ctx context.Context, t interface {
+	Cleanup(func())
+	mock.TestingT
+}) *testImportWithMocks {
+	wire.Build(
+		MockSuperSet, ImportComponentSet,
+		wire.Struct(new(testImportWithMocks), "*"),
+	)
+	return &testImportWithMocks{}
+}
+
 type testSpaceTemplateWithMocks struct {
 	*spaceTemplateComponentImpl
 	mocks *Mocks
@@ -520,6 +552,22 @@ func initializeTestSpaceTemplateComponent(ctx context.Context, t interface {
 		wire.Struct(new(testSpaceTemplateWithMocks), "*"),
 	)
 	return &testSpaceTemplateWithMocks{}
+}
+
+type testRuleWithMocks struct {
+	*ruleComponentImpl
+	mocks *Mocks
+}
+
+func initializeTestRuleComponent(ctx context.Context, t interface {
+	Cleanup(func())
+	mock.TestingT
+}) *testRuleWithMocks {
+	wire.Build(
+		MockSuperSet, RuleComponentSet,
+		wire.Struct(new(testRuleWithMocks), "*"),
+	)
+	return &testRuleWithMocks{}
 }
 
 type testMCPServerWithMocks struct {
@@ -537,3 +585,87 @@ func initializeTestMCPServerComponent(ctx context.Context, t interface {
 	)
 	return &testMCPServerWithMocks{}
 }
+
+type testMCPScannerWithMocks struct {
+	*mcpScannerComponentImpl
+	mocks *Mocks
+}
+
+func initializeTestMCPScannerComponent(ctx context.Context, t interface {
+	Cleanup(func())
+	mock.TestingT
+}) *testMCPScannerWithMocks {
+	wire.Build(
+		MockSuperSet, MCPScannerComponentSet,
+		wire.Struct(new(testMCPScannerWithMocks), "*"),
+	)
+	return &testMCPScannerWithMocks{}
+}
+
+type testStatComponentWithMocks struct {
+	*statComponentImpl
+	mocks *Mocks
+}
+
+func initializeTestStatComponent(ctx context.Context, t interface {
+	Cleanup(func())
+	mock.TestingT
+}) *testStatComponentWithMocks {
+	wire.Build(
+		MockSuperSet,
+		StatComponentTestSet,
+		wire.Struct(new(testStatComponentWithMocks), "*"),
+	)
+	return &testStatComponentWithMocks{}
+}
+
+type testLLMServiceComponentWithMocks struct {
+	*llmServiceComponentImpl
+	mocks *Mocks
+}
+
+func initializeTestLLMServiceComponent(ctx context.Context, t interface {
+	Cleanup(func())
+	mock.TestingT
+}) *testLLMServiceComponentWithMocks {
+	wire.Build(
+		MockSuperSet,
+		LLMServiceComponentTestSet,
+		wire.Struct(new(testLLMServiceComponentWithMocks), "*"),
+	)
+	return &testLLMServiceComponentWithMocks{}
+}
+
+type testMirrorNamespaceMappingWithMocks struct {
+	*mirrorNamespaceMappingComponentImpl
+	mocks *Mocks
+}
+
+type testNotebookWithMocks struct {
+	*notebookComponentImpl
+	mocks *Mocks
+}
+
+func initializeTestNotebookComponent(ctx context.Context, t interface {
+	Cleanup(func())
+	mock.TestingT
+}) *testNotebookWithMocks {
+	wire.Build(
+		MockSuperSet, NotebookComponentSet,
+		wire.Struct(new(testNotebookWithMocks), "*"),
+	)
+	return &testNotebookWithMocks{}
+}
+
+func initializeTestMirrorNamespaceMappingComponent(ctx context.Context, t interface {
+	Cleanup(func())
+	mock.TestingT
+}) *testMirrorNamespaceMappingWithMocks {
+	wire.Build(
+		MockSuperSet, MirrorNamespaceMappingComponentTestSet,
+		wire.Struct(new(testMirrorNamespaceMappingWithMocks), "*"),
+	)
+	return &testMirrorNamespaceMappingWithMocks{}
+}
+
+var MirrorNamespaceMappingComponentTestSet = wire.NewSet(NewTestMirrorNamespaceMappingComponent)

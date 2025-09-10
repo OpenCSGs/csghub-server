@@ -193,3 +193,24 @@ type R struct {
 }
 
 type I18nOptionsMap map[i18n.I18nOptionsKey]string
+
+// Conflict responds with a JSON-formatted error message.
+//
+// Example:
+//
+//	Conflict(c, errors.New("internal server error"))
+func Conflict(c *gin.Context, err error) {
+	err, ok := errorx.GetFirstCustomError(err)
+	if ok {
+		customErr := err.(errorx.CustomError)
+		c.PureJSON(http.StatusConflict, R{
+			Code:    customErr.Code(),
+			Msg:     customErr.Error(),
+			Context: customErr.Context(),
+		})
+		return
+	}
+	c.PureJSON(http.StatusConflict, R{
+		Msg: err.Error(),
+	})
+}

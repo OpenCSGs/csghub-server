@@ -25,10 +25,10 @@ type multiSyncComponentImpl struct {
 	multiSyncStore   database.MultiSyncStore
 	repoStore        database.RepoStore
 	modelStore       database.ModelStore
-	datasetStore     database.DatasetStore
 	codeStore        database.CodeStore
 	promptStore      database.PromptStore
 	mcpStore         database.MCPServerStore
+	datasetStore     database.DatasetStore
 	namespaceStore   database.NamespaceStore
 	userStore        database.UserStore
 	recomStore       database.RecomStore
@@ -36,7 +36,6 @@ type multiSyncComponentImpl struct {
 	tagStore         database.TagStore
 	fileStore        database.FileStore
 	gitServer        gitserver.GitServer
-	config           *config.Config
 }
 
 type MultiSyncComponent interface {
@@ -64,7 +63,6 @@ func NewMultiSyncComponent(config *config.Config) (MultiSyncComponent, error) {
 		promptStore:      database.NewPromptStore(),
 		mcpStore:         database.NewMCPServerStore(),
 		gitServer:        git,
-		config:           config,
 	}, nil
 }
 
@@ -88,10 +86,6 @@ func (c *multiSyncComponentImpl) More(ctx context.Context, cur int64, limit int6
 }
 
 func (c *multiSyncComponentImpl) SyncAsClient(ctx context.Context, sc multisync.Client) error {
-	if !c.config.MultiSync.Enabled {
-		return nil
-	}
-
 	var currentVersion int64
 	v, err := c.multiSyncStore.GetLatest(ctx)
 	if err != nil {

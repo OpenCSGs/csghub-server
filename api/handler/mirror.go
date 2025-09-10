@@ -2,6 +2,7 @@ package handler
 
 import (
 	"log/slog"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
@@ -54,7 +55,9 @@ func (h *MirrorHandler) CreateMirrorRepo(ctx *gin.Context) {
 		httpbase.ServerError(ctx, err)
 		return
 	}
-	slog.Debug("create mirror repo", slog.Any("mirror", m.Repository), slog.Any("req", req))
+	if m != nil {
+		slog.Debug("create mirror repo", slog.Any("mirror", m.Repository), slog.Any("req", req))
+	}
 
 	httpbase.OK(ctx, nil)
 }
@@ -126,4 +129,114 @@ func (h *MirrorHandler) Index(ctx *gin.Context) {
 	}
 
 	httpbase.OK(ctx, respData)
+}
+
+// GetMirrorStatusCounts godoc
+// @Security     ApiKey
+// @Summary      Get mirror status counts
+// @Tags         Mirror
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  types.Response{data=[]types.MirrorStatusCount} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /mirror/statistics [get]
+func (h *MirrorHandler) Statistics(ctx *gin.Context) {
+	statusCounts, err := h.mirror.Statistics(ctx.Request.Context())
+	if err != nil {
+		slog.Error("failed to get mirror statistics", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	httpbase.OK(ctx, statusCounts)
+}
+
+// BatchCreateMirrors godoc
+// @Security     ApiKey
+// @Summary      Batch create mirrors
+// @Tags         Mirror
+// @Accept       json
+// @Produce      json
+// @Param        body body types.BatchCreateMirrorReq true "body"
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /mirror/batch [post]
+func (h *MirrorHandler) BatchCreate(ctx *gin.Context) {
+	var req types.BatchCreateMirrorReq
+	err := ctx.ShouldBindJSON(&req)
+	if err != nil {
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	err = h.mirror.BatchCreate(ctx.Request.Context(), req)
+	if err != nil {
+		slog.Error("failed to bluk create mirrors", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	httpbase.OK(ctx, nil)
+}
+
+// GetMirrorTasks godoc
+// @Security     ApiKey
+// @Summary      Batch create mirrors
+// @Tags         Mirror
+// @Accept       json
+// @Produce      json
+// @Param        count query int false "count" default(10)
+// @Success      200  {object}  types.Response{data=[]types.MirrorListResp} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /mirror/tasks [get]
+func (h *MirrorHandler) Tasks(ctx *gin.Context) {
+	count := ctx.Query("count")
+	if count == "" {
+		count = "10"
+	}
+
+	countInt, err := strconv.ParseInt(count, 10, 64)
+	if err != nil {
+		return
+	}
+	resp, err := h.mirror.ListQueue(ctx.Request.Context(), countInt)
+	if err != nil {
+		slog.Error("failed to get mirror tasks", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	httpbase.OK(ctx, resp)
+}
+
+// DeleteMirrorTasks godoc
+// @Security     ApiKey
+// @Summary      Batch create mirrors
+// @Tags         Mirror
+// @Accept       json
+// @Produce      json
+// @Param        id path int false "id"
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /mirror/:id [delete]
+func (h *MirrorHandler) Delete(ctx *gin.Context) {
+	id := ctx.Param("id")
+	idInt, err := strconv.ParseInt(id, 10, 64)
+	if err != nil {
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	err = h.mirror.Delete(ctx.Request.Context(), idInt)
+	if err != nil {
+		slog.Error("failed to delete mirror tasks", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	httpbase.OK(ctx, nil)
 }

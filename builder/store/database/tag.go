@@ -46,6 +46,7 @@ type TagStore interface {
 	CreateCategory(ctx context.Context, category TagCategory) (*TagCategory, error)
 	UpdateCategory(ctx context.Context, category TagCategory) (*TagCategory, error)
 	DeleteCategory(ctx context.Context, id int64) error
+	CheckTagIDsExist(ctx context.Context, ids []int64) error
 }
 
 func NewTagStore() TagStore {
@@ -471,6 +472,25 @@ func (ts *tagStoreImpl) DeleteCategory(ctx context.Context, id int64) error {
 	_, err := ts.db.Operator.Core.NewDelete().Model(&TagCategory{}).Where("id = ?", id).Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("delete category by id %d, error: %w", id, err)
+	}
+	return nil
+}
+
+func (ts *tagStoreImpl) CheckTagIDsExist(ctx context.Context, ids []int64) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	var existingTags []*Tag
+	err := ts.db.Operator.Core.NewSelect().
+		Model(&existingTags).
+		Where("id IN (?)", bun.In(ids)).
+		Scan(ctx, &existingTags)
+	if err != nil {
+		return fmt.Errorf("failed to check tag IDs existence: %w", err)
+	}
+
+	if len(existingTags) != len(ids) {
+		return fmt.Errorf("some tag do not exist")
 	}
 	return nil
 }

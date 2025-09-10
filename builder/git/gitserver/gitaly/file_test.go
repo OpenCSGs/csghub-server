@@ -1,6 +1,7 @@
 package gitaly
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -131,7 +132,6 @@ func TestGitalyFile_GetRepoFileRaw(t *testing.T) {
 		ID:     1,
 		Hashed: false,
 	}, nil)
-
 	tester.mocks.commitClient.EXPECT().TreeEntry(mock.Anything, &gitalypb.TreeEntryRequest{
 		Repository: &gitalypb.Repository{
 			StorageName:  "st",
@@ -165,7 +165,6 @@ func TestGitalyFile_GetRepoFileReader(t *testing.T) {
 			{Data: []byte("go"), Size: 2},
 		},
 	}
-
 	tester.mocks.repoStore.EXPECT().FindByPath(mock.Anything, types.ModelRepo, "ns", "n").Return(&database.Repository{
 		ID:     1,
 		Hashed: false,
@@ -484,7 +483,7 @@ func TestGitalyFile_DeleteRepoFile(t *testing.T) {
 		Repository: repository,
 		User: &gitalypb.User{
 			GlId:       "user-1",
-			Name:       []byte("user-1"),
+			Name:       []byte("n"),
 			GlUsername: "user-1",
 		},
 		BranchName:       []byte("main"),
@@ -737,6 +736,7 @@ func TestGitalyFile_GetLogsTree(t *testing.T) {
 				StorageName:  "st",
 				RelativePath: "models_ns/n.git",
 			}
+
 			tester.mocks.repoStore.EXPECT().FindByPath(mock.Anything, types.ModelRepo, "ns", "n").Return(&database.Repository{
 				ID:     1,
 				Hashed: false,
@@ -802,7 +802,6 @@ func TestGitalyFile_GetRepoAllFiles(t *testing.T) {
 		ID:     1,
 		Hashed: false,
 	}, nil)
-
 	tester.mocks.commitClient.EXPECT().ListFiles(mock.Anything, &gitalypb.ListFilesRequest{
 		Repository: &gitalypb.Repository{
 			StorageName:  "st",
@@ -834,7 +833,6 @@ func TestGitalyFile_GetRepoAllLfsPointers(t *testing.T) {
 		ID:     1,
 		Hashed: false,
 	}, nil)
-
 	tester.mocks.blobClient.EXPECT().ListAllLFSPointers(mock.Anything, &gitalypb.ListAllLFSPointersRequest{
 		Repository: &gitalypb.Repository{
 			StorageName:  "st",
@@ -857,4 +855,103 @@ func TestGitalyFile_GetRepoAllLfsPointers(t *testing.T) {
 	require.Equal(t, []*types.LFSPointer{
 		{Oid: "o1", Size: 5, Data: "go"},
 	}, data)
+}
+
+func TestGitalyFile_CreateRepoLarge(t *testing.T) {
+	tester := newGitalyTester(t)
+
+	tester.mocks.repoStore.EXPECT().FindByPath(mock.Anything, types.ModelRepo, "ns", "n").Return(&database.Repository{
+		ID:     1,
+		Hashed: false,
+	}, nil)
+	m := &MockGrpcStreamClientFull[
+		*gitalypb.UserCommitFilesRequest, *gitalypb.UserCommitFilesResponse,
+	]{data: []*gitalypb.UserCommitFilesResponse{{}}}
+	tester.mocks.operationClient.EXPECT().UserCommitFiles(mock.Anything).Return(
+		m, nil,
+	)
+	body := bytes.Repeat([]byte{1}, 3<<20)
+	body = append(body, bytes.Repeat([]byte{0}, 1<<10)...)
+	err := tester.CreateRepoFile(&types.CreateFileReq{
+		Username:  "user-1",
+		Namespace: "ns",
+		Name:      "n",
+		Branch:    "main",
+		Message:   "new",
+		FilePath:  "foo",
+		Content:   string(body),
+		RepoType:  types.ModelRepo,
+	})
+	require.NoError(t, err)
+	repository := &gitalypb.Repository{
+		StorageName:  "st",
+		RelativePath: "models_ns/n.git",
+		GlRepository: "models/ns/n",
+	}
+
+	header := &gitalypb.UserCommitFilesRequestHeader{
+		Repository: repository,
+		User: &gitalypb.User{
+			GlId:       "user-1",
+			Name:       []byte("user-1"),
+			GlUsername: "user-1",
+		},
+		BranchName:       []byte("main"),
+		CommitMessage:    []byte("new"),
+		CommitAuthorName: []byte("user-1"),
+		StartRepository:  repository,
+		StartBranchName:  []byte("main"),
+		Timestamp:        timestamppb.New(time.Now()),
+	}
+
+	actions := []*gitalypb.UserCommitFilesRequest{
+		{
+			UserCommitFilesRequestPayload: &gitalypb.UserCommitFilesRequest_Header{
+				Header: header,
+			},
+		},
+		{
+			UserCommitFilesRequestPayload: &gitalypb.UserCommitFilesRequest_Action{
+				Action: &gitalypb.UserCommitFilesAction{
+					UserCommitFilesActionPayload: &gitalypb.UserCommitFilesAction_Header{
+						Header: &gitalypb.UserCommitFilesActionHeader{
+							Action:        gitalypb.UserCommitFilesActionHeader_CREATE,
+							Base64Content: true,
+							FilePath:      []byte("foo"),
+						},
+					},
+				},
+			},
+		},
+		{
+			UserCommitFilesRequestPayload: &gitalypb.UserCommitFilesRequest_Action{
+				Action: &gitalypb.UserCommitFilesAction{
+					UserCommitFilesActionPayload: &gitalypb.UserCommitFilesAction_Content{
+						Content: bytes.Repeat([]byte{1}, 3<<20),
+					},
+				},
+			},
+		},
+		{
+			UserCommitFilesRequestPayload: &gitalypb.UserCommitFilesRequest_Action{
+				Action: &gitalypb.UserCommitFilesAction{
+					UserCommitFilesActionPayload: &gitalypb.UserCommitFilesAction_Content{
+						Content: bytes.Repeat([]byte{0}, 1<<10),
+					},
+				},
+			},
+		},
+	}
+
+	expectedHeader, err := json.Marshal(actions[0])
+	require.NoError(t, err)
+	eh, err := sjson.Delete(string(expectedHeader), "UserCommitFilesRequestPayload.Header.timestamp")
+	require.NoError(t, err)
+	actualHeader, err := json.Marshal(m.sends[0])
+	require.NoError(t, err)
+	ah, err := sjson.Delete(string(actualHeader), "UserCommitFilesRequestPayload.Header.timestamp")
+	require.NoError(t, err)
+	require.JSONEq(t, eh, ah)
+	require.Equal(t, actions[1], m.sends[1])
+	require.Equal(t, actions[2], m.sends[2])
 }

@@ -2,6 +2,8 @@ package database
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -15,9 +17,11 @@ type accountMeteringStoreImpl struct {
 
 type AccountMeteringStore interface {
 	Create(ctx context.Context, input AccountMetering) error
-	ListByUserIDAndTime(ctx context.Context, req types.ACCT_STATEMENTS_REQ) ([]AccountMetering, int, error)
-	GetStatByDate(ctx context.Context, req types.ACCT_STATEMENTS_REQ) ([]map[string]interface{}, error)
+	ListByUserIDAndTime(ctx context.Context, req types.ActStatementsReq) ([]AccountMetering, int, error)
+	GetStatByDate(ctx context.Context, req types.ActStatementsReq) ([]map[string]interface{}, error)
 	ListAllByUserUUID(ctx context.Context, userUUID string) ([]AccountMetering, error)
+	GetByEventUUID(ctx context.Context, eventUUID uuid.UUID) (*AccountMetering, error)
+	FindByCustomerIDAndRecordAtInMin(ctx context.Context, customerID string, recordAt time.Time) (*AccountMetering, error)
 }
 
 func NewAccountMeteringStore() AccountMeteringStore {
@@ -33,20 +37,20 @@ func NewAccountMeteringStoreWithDB(db *DB) AccountMeteringStore {
 }
 
 type AccountMetering struct {
-	ID           int64           `bun:",pk,autoincrement" json:"id"`
-	EventUUID    uuid.UUID       `bun:"type:uuid,notnull" json:"event_uuid"`
-	UserUUID     string          `bun:",notnull" json:"user_uuid"`
-	Value        float64         `bun:",notnull" json:"value"`
-	ValueType    int             `bun:",notnull" json:"value_type"`
-	Scene        types.SceneType `bun:",notnull" json:"scene"`
-	OpUID        string          `json:"op_uid"`
-	ResourceID   string          `bun:",notnull" json:"resource_id"`
-	ResourceName string          `bun:",notnull" json:"resource_name"`
-	CustomerID   string          `json:"customer_id"`
-	RecordedAt   time.Time       `bun:",notnull" json:"recorded_at"`
-	Extra        string          `json:"extra"`
-	CreatedAt    time.Time       `bun:",notnull,default:current_timestamp" json:"created_at"`
-	SkuUnitType  string          `json:"sku_unit_type"`
+	ID           int64                 `bun:",pk,autoincrement" json:"id"`
+	EventUUID    uuid.UUID             `bun:"type:uuid,notnull" json:"event_uuid"`
+	UserUUID     string                `bun:",notnull" json:"user_uuid"`
+	Value        float64               `bun:",notnull" json:"value"`
+	ValueType    types.ChargeValueType `bun:",notnull" json:"value_type"`
+	Scene        types.SceneType       `bun:",notnull" json:"scene"`
+	OpUID        string                `json:"op_uid"`
+	ResourceID   string                `bun:",notnull" json:"resource_id"`
+	ResourceName string                `bun:",notnull" json:"resource_name"`
+	CustomerID   string                `json:"customer_id"`
+	RecordedAt   time.Time             `bun:",notnull" json:"recorded_at"`
+	Extra        string                `json:"extra"`
+	CreatedAt    time.Time             `bun:",notnull,default:current_timestamp" json:"created_at"`
+	SkuUnitType  string                `json:"sku_unit_type"`
 }
 
 func (am *accountMeteringStoreImpl) Create(ctx context.Context, input AccountMetering) error {
@@ -57,7 +61,7 @@ func (am *accountMeteringStoreImpl) Create(ctx context.Context, input AccountMet
 	return nil
 }
 
-func (am *accountMeteringStoreImpl) ListByUserIDAndTime(ctx context.Context, req types.ACCT_STATEMENTS_REQ) ([]AccountMetering, int, error) {
+func (am *accountMeteringStoreImpl) ListByUserIDAndTime(ctx context.Context, req types.ActStatementsReq) ([]AccountMetering, int, error) {
 	var accountMeters []AccountMetering
 	q := am.db.Operator.Core.NewSelect().Model(&accountMeters).Where("user_uuid = ? and scene = ? and customer_id = ? and recorded_at >= ? and recorded_at <= ?", req.UserUUID, req.Scene, req.InstanceName, req.StartTime, req.EndTime)
 
@@ -73,7 +77,7 @@ func (am *accountMeteringStoreImpl) ListByUserIDAndTime(ctx context.Context, req
 	return accountMeters, count, nil
 }
 
-func (am *accountMeteringStoreImpl) GetStatByDate(ctx context.Context, req types.ACCT_STATEMENTS_REQ) ([]map[string]interface{}, error) {
+func (am *accountMeteringStoreImpl) GetStatByDate(ctx context.Context, req types.ActStatementsReq) ([]map[string]interface{}, error) {
 	var meter []AccountMetering
 	var res []map[string]interface{}
 	err := am.db.Operator.Core.NewSelect().Model(&meter).
@@ -105,4 +109,34 @@ func (am *accountMeteringStoreImpl) ListAllByUserUUID(ctx context.Context, userU
 		return nil, fmt.Errorf("failed to list all meters by user uuid: %w", err)
 	}
 	return accountMeters, nil
+}
+
+func (am *accountMeteringStoreImpl) GetByEventUUID(ctx context.Context, eventUUID uuid.UUID) (*AccountMetering, error) {
+	var result AccountMetering
+	_, err := am.db.Core.NewSelect().Model(&result).Where("event_uuid = ?", eventUUID).Exec(ctx, &result)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("select metering by event uuid, error:%w", err)
+	}
+	return &result, nil
+}
+
+func (am *accountMeteringStoreImpl) FindByCustomerIDAndRecordAtInMin(ctx context.Context, customerID string, recordAt time.Time) (*AccountMetering, error) {
+	var result AccountMetering
+	startTime := recordAt.Truncate(time.Minute)
+	endTime := recordAt.Add(time.Minute).Truncate(time.Minute)
+
+	_, err := am.db.Core.NewSelect().Model(&result).
+		Where("customer_id = ?", customerID).
+		Where("recorded_at >= ? and recorded_at < ?", startTime, endTime).
+		Limit(1).Exec(ctx, &result)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("select metering by customer_id and record_at, error:%w", err)
+	}
+	return &result, nil
 }

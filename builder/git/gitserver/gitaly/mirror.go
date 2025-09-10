@@ -28,19 +28,17 @@ func (c *Client) CreateMirrorRepo(ctx context.Context, req gitserver.CreateMirro
 
 		resp, err := c.remoteClient.FindRemoteRepository(ctx, remoteCheckReq)
 		if err != nil {
-			return 0, errorx.ErrGitCreateMirrorFailed(err, errorx.Ctx())
+			return 0, err
 		}
 		if !resp.Exists {
 			return 0, fmt.Errorf("invalid clone url")
 		}
-		authorHeader = base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", req.Username, req.AccessToken)))
 	}
 
 	relativePath, err := c.BuildRelativePath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return 0, err
 	}
-
 	gitalyReq := &gitalypb.CreateRepositoryFromURLRequest{
 		Repository: &gitalypb.Repository{
 			StorageName:  c.config.GitalyServer.Storage,
@@ -49,6 +47,11 @@ func (c *Client) CreateMirrorRepo(ctx context.Context, req gitserver.CreateMirro
 		Url:    req.CloneUrl,
 		Mirror: true,
 	}
+
+	if req.Username != "" && req.AccessToken != "" {
+		authorHeader = base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", req.Username, req.AccessToken)))
+	}
+
 	if req.MirrorToken != "" {
 		gitalyReq.HttpAuthorizationHeader = fmt.Sprintf("X-OPENCSG-Sync-Token%s", req.MirrorToken)
 	} else if authorHeader != "" {
@@ -56,9 +59,10 @@ func (c *Client) CreateMirrorRepo(ctx context.Context, req gitserver.CreateMirro
 	} else {
 		gitalyReq.HttpAuthorizationHeader = ""
 	}
+
 	_, err = c.repoClient.CreateRepositoryFromURL(ctx, gitalyReq)
 	if err != nil {
-		return 0, err
+		return 0, errorx.ErrGitCreateMirrorFailed(err, errorx.Ctx())
 	}
 	return 0, nil
 }
@@ -72,7 +76,6 @@ func (c *Client) CreateMirrorForExistsRepo(ctx context.Context, req gitserver.Cr
 	if err != nil {
 		return err
 	}
-
 	fetchRemoteReq := &gitalypb.FetchRemoteRequest{
 		Repository: &gitalypb.Repository{
 			StorageName:  c.config.GitalyServer.Storage,
@@ -85,12 +88,12 @@ func (c *Client) CreateMirrorForExistsRepo(ctx context.Context, req gitserver.Cr
 		},
 	}
 
-	if req.MirrorToken != "" {
-		fetchRemoteReq.RemoteParams.HttpAuthorizationHeader = fmt.Sprintf("X-OPENCSG-Sync-Token%s", req.MirrorToken)
-	} else if authorHeader != "" {
+	if req.Username != "" && req.AccessToken != "" {
+		authorHeader = base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", req.Username, req.AccessToken)))
+	}
+
+	if authorHeader != "" {
 		fetchRemoteReq.RemoteParams.HttpAuthorizationHeader = authorHeader
-	} else {
-		fetchRemoteReq.RemoteParams.HttpAuthorizationHeader = ""
 	}
 
 	_, err = c.repoClient.FetchRemote(ctx, fetchRemoteReq)
@@ -113,7 +116,6 @@ func (c *Client) MirrorSync(ctx context.Context, req gitserver.MirrorSyncReq) er
 	if err != nil {
 		return err
 	}
-
 	fetchRemoteReq := &gitalypb.FetchRemoteRequest{
 		Repository: &gitalypb.Repository{
 			StorageName:  c.config.GitalyServer.Storage,

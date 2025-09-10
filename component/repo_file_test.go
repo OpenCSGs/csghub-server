@@ -24,7 +24,6 @@ func TestRepoFileComponent_GenRepoFileRecords(t *testing.T) {
 		{Path: "a/b", Type: "dir"},
 		{Path: "foo.go", Type: "go"},
 	}, Cursor: ""}, nil)
-
 	rc.mocks.stores.RepoFileMock().EXPECT().Exists(ctx, database.RepositoryFile{
 		RepositoryID: 1,
 		Path:         "foo.go",
@@ -60,7 +59,6 @@ func TestRepoFileComponent_GenRepoFileRecordsBatch(t *testing.T) {
 		{Path: "a/b", Type: "dir"},
 		{Path: "foo.go", Type: "go"},
 	}, Cursor: ""}, nil)
-
 	rc.mocks.stores.RepoFileMock().EXPECT().Exists(ctx, database.RepositoryFile{
 		RepositoryID: 1,
 		Path:         "foo.go",

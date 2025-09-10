@@ -7,8 +7,10 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"strings"
 	"sync"
+	"time"
 
 	"gopkg.in/yaml.v3"
 	"opencsg.com/csghub-server/builder/git"
@@ -20,7 +22,6 @@ import (
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
-	"opencsg.com/csghub-server/common/utils/common"
 )
 
 var (
@@ -42,6 +43,7 @@ type promptComponentImpl struct {
 	repoComponent     RepoComponent
 	gitServer         gitserver.GitServer
 	namespaceStore    database.NamespaceStore
+	recomStore        database.RecomStore
 	llmClient         *llm.Client
 	maxPromptFS       int64
 }
@@ -62,6 +64,7 @@ type PromptComponent interface {
 	UpdateConversation(ctx context.Context, req types.ConversationTitleReq) (*database.PromptConversation, error)
 	LikeConversationMessage(ctx context.Context, req types.ConversationMessageReq) error
 	HateConversationMessage(ctx context.Context, req types.ConversationMessageReq) error
+	SummarizeConversationTitle(ctx context.Context, req types.ConversationTitleReq) (*database.PromptConversation, error)
 	SetRelationModels(ctx context.Context, req types.RelationModels) error
 	AddRelationModel(ctx context.Context, req types.RelationModel) error
 	DelRelationModel(ctx context.Context, req types.RelationModel) error
@@ -69,7 +72,7 @@ type PromptComponent interface {
 	IndexPromptRepo(ctx context.Context, filter *types.RepoFilter, per, page int) ([]types.PromptRes, int, error)
 	UpdatePromptRepo(ctx context.Context, req *types.UpdatePromptRepoReq) (*types.PromptRes, error)
 	RemoveRepo(ctx context.Context, namespace, name, currentUser string) error
-	Show(ctx context.Context, namespace, name, currentUser string) (*types.PromptRes, error)
+	Show(ctx context.Context, namespace, name, currentUser string, needOpWeight, needMultiSync bool) (*types.PromptRes, error)
 	Relations(ctx context.Context, namespace, name, currentUser string) (*types.Relations, error)
 	OrgPrompts(ctx context.Context, req *types.OrgPromptsReq) ([]types.PromptRes, int, error)
 }
@@ -91,8 +94,8 @@ func NewPromptComponent(cfg *config.Config) (PromptComponent, error) {
 		userLikeStore:     database.NewUserLikesStore(),
 		userSvcClient:     usc,
 		promptConvStore:   database.NewPromptConversationStore(),
-		promptPrefixStore: database.NewPromptPrefixStore(),
-		llmConfigStore:    database.NewLLMConfigStore(),
+		promptPrefixStore: database.NewPromptPrefixStore(cfg),
+		llmConfigStore:    database.NewLLMConfigStore(cfg),
 		promptStore:       database.NewPromptStore(),
 		llmClient:         llm.NewClient(),
 		repoStore:         database.NewRepoStore(),
@@ -100,6 +103,7 @@ func NewPromptComponent(cfg *config.Config) (PromptComponent, error) {
 		gitServer:         gs,
 		maxPromptFS:       cfg.Dataset.PromptMaxJsonlFileSize,
 		namespaceStore:    database.NewNamespaceStore(),
+		recomStore:        database.NewRecomStore(),
 	}, nil
 }
 
@@ -676,7 +680,7 @@ func (c *promptComponentImpl) CreatePromptRepo(ctx context.Context, req *types.C
 		NewBranch: req.DefaultBranch,
 		Namespace: req.Namespace,
 		Name:      req.Name,
-		FilePath:  gitattributesFileName,
+		FilePath:  types.GitattributesFileName,
 	}, types.PromptRepo))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create .gitattributes file, cause: %w", err)
@@ -704,7 +708,6 @@ func (c *promptComponentImpl) CreatePromptRepo(ctx context.Context, req *types.C
 		Downloads:    prompt.Repository.DownloadCount,
 		Path:         prompt.Repository.Path,
 		RepositoryID: prompt.RepositoryID,
-		Repository:   common.BuildCloneInfo(c.config, prompt.Repository),
 		Private:      prompt.Repository.Private,
 		User: types.User{
 			Username: user.Username,
@@ -715,6 +718,20 @@ func (c *promptComponentImpl) CreatePromptRepo(ctx context.Context, req *types.C
 		CreatedAt: prompt.CreatedAt,
 		UpdatedAt: prompt.UpdatedAt,
 	}
+
+	go func() {
+		notificationCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		repoNotificationReq := types.RepoNotificationReq{
+			RepoType:  types.PromptRepo,
+			RepoPath:  prompt.Repository.Path,
+			Operation: types.OperationCreate,
+			UserUUID:  dbRepo.User.UUID,
+		}
+		if err = c.repoComponent.SendAssetManagementMsg(notificationCtx, repoNotificationReq); err != nil {
+			slog.Error("failed to send asset management notification message", slog.Any("req", repoNotificationReq), slog.Any("err", err))
+		}
+	}()
 
 	return resPrompt, nil
 }
@@ -780,7 +797,6 @@ func (c *promptComponentImpl) IndexPromptRepo(ctx context.Context, filter *types
 			Source:       repo.Source,
 			SyncStatus:   repo.SyncStatus,
 			License:      repo.License,
-			Repository:   common.BuildCloneInfo(c.config, prompt.Repository),
 
 			User: types.User{
 				Username: prompt.Repository.User.Username,
@@ -841,7 +857,7 @@ func (c *promptComponentImpl) RemoveRepo(ctx context.Context, namespace, name, c
 		Name:      name,
 		RepoType:  types.PromptRepo,
 	}
-	_, err = c.repoComponent.DeleteRepo(ctx, deleteDatabaseRepoReq)
+	repo, err := c.repoComponent.DeleteRepo(ctx, deleteDatabaseRepoReq)
 	if err != nil {
 		return fmt.Errorf("failed to delete repo of prompt, error: %w", err)
 	}
@@ -850,10 +866,25 @@ func (c *promptComponentImpl) RemoveRepo(ctx context.Context, namespace, name, c
 	if err != nil {
 		return fmt.Errorf("failed to delete database prompt, error: %w", err)
 	}
+
+	go func() {
+		notificationCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		repoNotificationReq := types.RepoNotificationReq{
+			RepoType:  types.PromptRepo,
+			RepoPath:  repo.Path,
+			Operation: types.OperationDelete,
+			UserUUID:  repo.User.UUID,
+		}
+		if err = c.repoComponent.SendAssetManagementMsg(notificationCtx, repoNotificationReq); err != nil {
+			slog.Error("failed to send asset management notification message", slog.Any("req", repoNotificationReq), slog.Any("err", err))
+		}
+	}()
+
 	return nil
 }
 
-func (c *promptComponentImpl) Show(ctx context.Context, namespace, name, currentUser string) (*types.PromptRes, error) {
+func (c *promptComponentImpl) Show(ctx context.Context, namespace, name, currentUser string, needOpWeight, needMultiSync bool) (*types.PromptRes, error) {
 	var tags []types.RepoTag
 	prompt, err := c.promptStore.FindByPath(ctx, namespace, name)
 	if err != nil {
@@ -902,7 +933,6 @@ func (c *promptComponentImpl) Show(ctx context.Context, namespace, name, current
 		Path:          prompt.Repository.Path,
 		RepositoryID:  prompt.Repository.ID,
 		DefaultBranch: prompt.Repository.DefaultBranch,
-		Repository:    common.BuildCloneInfo(c.config, prompt.Repository),
 		Tags:          tags,
 		User: types.User{
 			Username: prompt.Repository.User.Username,
@@ -920,6 +950,28 @@ func (c *promptComponentImpl) Show(ctx context.Context, namespace, name, current
 		CanWrite:   permission.CanWrite,
 		CanManage:  permission.CanAdmin,
 		Namespace:  ns,
+		MultiSource: types.MultiSource{
+			HFPath:  prompt.Repository.HFPath,
+			MSPath:  prompt.Repository.MSPath,
+			CSGPath: prompt.Repository.CSGPath,
+		},
+	}
+	if permission.CanAdmin {
+		resPrompt.SensitiveCheckStatus = prompt.Repository.SensitiveCheckStatus.String()
+	}
+
+	if needOpWeight {
+		c.addOpWeightToPrompts(ctx, []int64{resPrompt.RepositoryID}, []*types.PromptRes{resPrompt})
+	}
+
+	// add recom_scores to prompt
+	if needMultiSync {
+		weightNames := []database.RecomWeightName{database.RecomWeightFreshness,
+			database.RecomWeightDownloads,
+			database.RecomWeightQuality,
+			database.RecomWeightOp,
+			database.RecomWeightTotal}
+		c.addWeightsToPrompt(ctx, resPrompt.RepositoryID, resPrompt, weightNames)
 	}
 
 	return resPrompt, nil
@@ -1001,4 +1053,20 @@ func (c *promptComponentImpl) OrgPrompts(ctx context.Context, req *types.OrgProm
 	}
 
 	return resPrompts, total, nil
+}
+
+func (c *promptComponentImpl) addWeightsToPrompt(ctx context.Context, repoID int64, resPrompt *types.PromptRes, weightNames []database.RecomWeightName) {
+	weights, err := c.recomStore.FindByRepoIDs(ctx, []int64{repoID})
+	if err == nil {
+		resPrompt.Scores = make([]types.WeightScore, 0)
+		for _, weight := range weights {
+			if slices.Contains(weightNames, weight.WeightName) {
+				score := types.WeightScore{
+					WeightName: string(weight.WeightName),
+					Score:      weight.Score,
+				}
+				resPrompt.Scores = append(resPrompt.Scores, score)
+			}
+		}
+	}
 }

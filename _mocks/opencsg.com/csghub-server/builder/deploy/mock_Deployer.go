@@ -26,6 +26,63 @@ func (_m *MockDeployer) EXPECT() *MockDeployer_Expecter {
 	return &MockDeployer_Expecter{mock: &_m.Mock}
 }
 
+// CheckHeartbeatTimeout provides a mock function with given fields: ctx, clusterId
+func (_m *MockDeployer) CheckHeartbeatTimeout(ctx context.Context, clusterId string) (bool, error) {
+	ret := _m.Called(ctx, clusterId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CheckHeartbeatTimeout")
+	}
+
+	var r0 bool
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (bool, error)); ok {
+		return rf(ctx, clusterId)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) bool); ok {
+		r0 = rf(ctx, clusterId)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, clusterId)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockDeployer_CheckHeartbeatTimeout_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CheckHeartbeatTimeout'
+type MockDeployer_CheckHeartbeatTimeout_Call struct {
+	*mock.Call
+}
+
+// CheckHeartbeatTimeout is a helper method to define mock.On call
+//   - ctx context.Context
+//   - clusterId string
+func (_e *MockDeployer_Expecter) CheckHeartbeatTimeout(ctx interface{}, clusterId interface{}) *MockDeployer_CheckHeartbeatTimeout_Call {
+	return &MockDeployer_CheckHeartbeatTimeout_Call{Call: _e.mock.On("CheckHeartbeatTimeout", ctx, clusterId)}
+}
+
+func (_c *MockDeployer_CheckHeartbeatTimeout_Call) Run(run func(ctx context.Context, clusterId string)) *MockDeployer_CheckHeartbeatTimeout_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockDeployer_CheckHeartbeatTimeout_Call) Return(_a0 bool, _a1 error) *MockDeployer_CheckHeartbeatTimeout_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockDeployer_CheckHeartbeatTimeout_Call) RunAndReturn(run func(context.Context, string) (bool, error)) *MockDeployer_CheckHeartbeatTimeout_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CheckResourceAvailable provides a mock function with given fields: ctx, clusterId, orderDetailID, hardWare
 func (_m *MockDeployer) CheckResourceAvailable(ctx context.Context, clusterId string, orderDetailID int64, hardWare *types.HardWare) (bool, error) {
 	ret := _m.Called(ctx, clusterId, orderDetailID, hardWare)
@@ -305,6 +362,65 @@ func (_c *MockDeployer_GetClusterById_Call) RunAndReturn(run func(context.Contex
 	return _c
 }
 
+// GetClusterUsageById provides a mock function with given fields: ctx, clusterId
+func (_m *MockDeployer) GetClusterUsageById(ctx context.Context, clusterId string) (*types.ClusterRes, error) {
+	ret := _m.Called(ctx, clusterId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetClusterUsageById")
+	}
+
+	var r0 *types.ClusterRes
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*types.ClusterRes, error)); ok {
+		return rf(ctx, clusterId)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *types.ClusterRes); ok {
+		r0 = rf(ctx, clusterId)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.ClusterRes)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, clusterId)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockDeployer_GetClusterUsageById_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetClusterUsageById'
+type MockDeployer_GetClusterUsageById_Call struct {
+	*mock.Call
+}
+
+// GetClusterUsageById is a helper method to define mock.On call
+//   - ctx context.Context
+//   - clusterId string
+func (_e *MockDeployer_Expecter) GetClusterUsageById(ctx interface{}, clusterId interface{}) *MockDeployer_GetClusterUsageById_Call {
+	return &MockDeployer_GetClusterUsageById_Call{Call: _e.mock.On("GetClusterUsageById", ctx, clusterId)}
+}
+
+func (_c *MockDeployer_GetClusterUsageById_Call) Run(run func(ctx context.Context, clusterId string)) *MockDeployer_GetClusterUsageById_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockDeployer_GetClusterUsageById_Call) Return(_a0 *types.ClusterRes, _a1 error) *MockDeployer_GetClusterUsageById_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockDeployer_GetClusterUsageById_Call) RunAndReturn(run func(context.Context, string) (*types.ClusterRes, error)) *MockDeployer_GetClusterUsageById_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetEvaluation provides a mock function with given fields: ctx, req
 func (_m *MockDeployer) GetEvaluation(ctx context.Context, req types.EvaluationGetReq) (*types.ArgoWorkFlowRes, error) {
 	ret := _m.Called(ctx, req)
@@ -550,67 +666,6 @@ func (_c *MockDeployer_ListCluster_Call) Return(_a0 []types.ClusterRes, _a1 erro
 }
 
 func (_c *MockDeployer_ListCluster_Call) RunAndReturn(run func(context.Context) ([]types.ClusterRes, error)) *MockDeployer_ListCluster_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// ListEvaluations provides a mock function with given fields: _a0, _a1, _a2, _a3
-func (_m *MockDeployer) ListEvaluations(_a0 context.Context, _a1 string, _a2 int, _a3 int) (*types.ArgoWorkFlowListRes, error) {
-	ret := _m.Called(_a0, _a1, _a2, _a3)
-
-	if len(ret) == 0 {
-		panic("no return value specified for ListEvaluations")
-	}
-
-	var r0 *types.ArgoWorkFlowListRes
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, int, int) (*types.ArgoWorkFlowListRes, error)); ok {
-		return rf(_a0, _a1, _a2, _a3)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, int, int) *types.ArgoWorkFlowListRes); ok {
-		r0 = rf(_a0, _a1, _a2, _a3)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*types.ArgoWorkFlowListRes)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, string, int, int) error); ok {
-		r1 = rf(_a0, _a1, _a2, _a3)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockDeployer_ListEvaluations_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListEvaluations'
-type MockDeployer_ListEvaluations_Call struct {
-	*mock.Call
-}
-
-// ListEvaluations is a helper method to define mock.On call
-//   - _a0 context.Context
-//   - _a1 string
-//   - _a2 int
-//   - _a3 int
-func (_e *MockDeployer_Expecter) ListEvaluations(_a0 interface{}, _a1 interface{}, _a2 interface{}, _a3 interface{}) *MockDeployer_ListEvaluations_Call {
-	return &MockDeployer_ListEvaluations_Call{Call: _e.mock.On("ListEvaluations", _a0, _a1, _a2, _a3)}
-}
-
-func (_c *MockDeployer_ListEvaluations_Call) Run(run func(_a0 context.Context, _a1 string, _a2 int, _a3 int)) *MockDeployer_ListEvaluations_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(int), args[3].(int))
-	})
-	return _c
-}
-
-func (_c *MockDeployer_ListEvaluations_Call) Return(_a0 *types.ArgoWorkFlowListRes, _a1 error) *MockDeployer_ListEvaluations_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockDeployer_ListEvaluations_Call) RunAndReturn(run func(context.Context, string, int, int) (*types.ArgoWorkFlowListRes, error)) *MockDeployer_ListEvaluations_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -885,6 +940,53 @@ func (_c *MockDeployer_Stop_Call) Return(err error) *MockDeployer_Stop_Call {
 }
 
 func (_c *MockDeployer_Stop_Call) RunAndReturn(run func(context.Context, types.DeployRepo) error) *MockDeployer_Stop_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// StopBuild provides a mock function with given fields: ctx, req
+func (_m *MockDeployer) StopBuild(ctx context.Context, req types.ImageBuildStopReq) error {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for StopBuild")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.ImageBuildStopReq) error); ok {
+		r0 = rf(ctx, req)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockDeployer_StopBuild_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'StopBuild'
+type MockDeployer_StopBuild_Call struct {
+	*mock.Call
+}
+
+// StopBuild is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.ImageBuildStopReq
+func (_e *MockDeployer_Expecter) StopBuild(ctx interface{}, req interface{}) *MockDeployer_StopBuild_Call {
+	return &MockDeployer_StopBuild_Call{Call: _e.mock.On("StopBuild", ctx, req)}
+}
+
+func (_c *MockDeployer_StopBuild_Call) Run(run func(ctx context.Context, req types.ImageBuildStopReq)) *MockDeployer_StopBuild_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.ImageBuildStopReq))
+	})
+	return _c
+}
+
+func (_c *MockDeployer_StopBuild_Call) Return(err error) *MockDeployer_StopBuild_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockDeployer_StopBuild_Call) RunAndReturn(run func(context.Context, types.ImageBuildStopReq) error) *MockDeployer_StopBuild_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -10,18 +10,21 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 	"opencsg.com/csghub-server/accounting/component"
+	"opencsg.com/csghub-server/accounting/utils"
+	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/mq"
 )
 
 var (
-	idleDuration = 10 * time.Second
+	meterIdleDuration = 10 * time.Second
 )
 
 type Metering struct {
 	sysMQ          mq.MessageQueue
 	meterComp      component.MeteringComponent
+	acctEvtComp    component.AccountingEventComponent
 	chargingEnable bool
 }
 
@@ -29,6 +32,7 @@ func NewMetering(natHandler mq.MessageQueue, config *config.Config) *Metering {
 	meter := &Metering{
 		sysMQ:          natHandler,
 		meterComp:      component.NewMeteringComponent(),
+		acctEvtComp:    component.NewAccountingEventComponent(),
 		chargingEnable: config.Accounting.ChargingEnable,
 	}
 	return meter
@@ -42,7 +46,7 @@ func (m *Metering) startMetering() {
 	for {
 		m.preReadMsgs()
 		m.handleReadMsgs(10)
-		time.Sleep(2 * idleDuration)
+		time.Sleep(2 * meterIdleDuration)
 	}
 }
 
@@ -111,10 +115,10 @@ func (m *Metering) handleMsgWithRetry(msg jetstream.Msg) {
 	slog.Debug("Meter->received", slog.Any("msg.subject", msg.Subject()), slog.Any("msg.data", strData))
 	// A maximum of 3 attempts
 	var (
-		err error                 = nil
-		evt *types.METERING_EVENT = nil
+		err error                = nil
+		evt *types.MeteringEvent = nil
 	)
-	for j := 0; j < 3; j++ {
+	for range 3 {
 		evt, err = m.handleMsgData(msg)
 		if err == nil {
 			break
@@ -147,13 +151,59 @@ func (m *Metering) handleMsgWithRetry(msg jetstream.Msg) {
 	}
 }
 
-func (m *Metering) handleMsgData(msg jetstream.Msg) (*types.METERING_EVENT, error) {
+func (c *Metering) checkDuplicatedEvent(ctx context.Context, event *types.MeteringEvent) (bool, *database.AccountMetering, error) {
+	meter, err := c.meterComp.GetMeteringByEventUUID(ctx, event.Uuid)
+	if err != nil {
+		return false, nil, fmt.Errorf("failed to get metering by uuid, %v, %w", event.Uuid, err)
+	}
+	if meter != nil {
+		return true, meter, types.ErrDuplicatedMeterByUUID
+	}
+	meter, err = c.meterComp.FindMeteringByCustomerIDAndRecordAtInMin(ctx, event.CustomerID, event.CreatedAt)
+	if err != nil {
+		return false, nil, fmt.Errorf("fail to check existing metering event in minute level, %v, %w", event, err)
+	}
+	if meter != nil {
+		return true, meter, types.ErrDuplicatedMeterInMinute
+	}
+	return false, nil, nil
+}
+
+func (c *Metering) logAndVerifyEvent(ctx context.Context, event *types.MeteringEvent) error {
+	var (
+		existEvent   *database.AccountMetering
+		isDuplicated bool
+		err          error
+	)
+	if utils.IsNeedCheckMeteringInMinute(types.SceneType(event.Scene), event.ValueType) {
+		isDuplicated, existEvent, err = c.checkDuplicatedEvent(ctx, event)
+		if err != nil && !isDuplicated {
+			return fmt.Errorf("check duplicated event, error: %w", err)
+		}
+	}
+	err1 := c.acctEvtComp.AddNewAccountingEvent(ctx, event, isDuplicated)
+	if err1 != nil {
+		return fmt.Errorf("fail to save metering event log, %v, %w", event, err)
+	}
+	if isDuplicated {
+		return fmt.Errorf("duplicated with event uuid %s, error: %w", existEvent.EventUUID, err)
+	}
+	return nil
+}
+
+func (m *Metering) handleMsgData(msg jetstream.Msg) (*types.MeteringEvent, error) {
 	event, err := m.parseMessageData(msg)
 	if err != nil {
 		return nil, err
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+
+	err = m.logAndVerifyEvent(ctx, event)
+	if err != nil {
+		return nil, fmt.Errorf("fail to log and verify event, error: %w", err)
+	}
+
 	err = m.meterComp.SaveMeteringEventRecord(ctx, event)
 	if err != nil {
 		return nil, fmt.Errorf("failed to save meter event, %v, %w", event, err)
@@ -161,9 +211,9 @@ func (m *Metering) handleMsgData(msg jetstream.Msg) (*types.METERING_EVENT, erro
 	return event, nil
 }
 
-func (m *Metering) parseMessageData(msg jetstream.Msg) (*types.METERING_EVENT, error) {
+func (m *Metering) parseMessageData(msg jetstream.Msg) (*types.MeteringEvent, error) {
 	strData := string(msg.Data())
-	evt := types.METERING_EVENT{}
+	evt := types.MeteringEvent{}
 	err := json.Unmarshal(msg.Data(), &evt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal meter event, %v, %w", strData, err)
@@ -171,10 +221,10 @@ func (m *Metering) parseMessageData(msg jetstream.Msg) (*types.METERING_EVENT, e
 	return &evt, nil
 }
 
-func (m *Metering) pubFeeEventWithReTry(msg jetstream.Msg, evt *types.METERING_EVENT, limit int) error {
+func (m *Metering) pubFeeEventWithReTry(msg jetstream.Msg, evt *types.MeteringEvent, limit int) error {
 	// A maximum of five attempts for pub fee event
 	var err error
-	for i := 0; i < limit; i++ {
+	for range limit {
 		switch evt.ValueType {
 		case types.TimeDurationMinType:
 			err = m.sysMQ.PublishFeeCreditData(msg.Data())
@@ -182,6 +232,10 @@ func (m *Metering) pubFeeEventWithReTry(msg jetstream.Msg, evt *types.METERING_E
 			err = m.sysMQ.PublishFeeTokenData(msg.Data())
 		case types.QuotaNumberType:
 			err = m.sysMQ.PublishFeeQuotaData(msg.Data())
+		case types.CountNumberType:
+			err = m.sysMQ.PublishSubscriptionData(msg.Data())
+		default:
+			slog.Warn("unsupported metering event value type", slog.Any("value-type", evt.ValueType))
 		}
 		if err == nil {
 			break

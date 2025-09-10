@@ -26,6 +26,9 @@ func TestInternalComponent_SSHAllowed(t *testing.T) {
 	ic := initializeTestInternalComponent(ctx, t)
 
 	ic.mocks.gitServer.EXPECT().BuildRelativePath(mock.Anything, types.ModelRepo, "ns", "n").Return("models_ns/n.git", nil)
+	ic.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(
+		&database.Repository{ID: 123, Private: true}, nil,
+	)
 
 	ic.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "ns").Return(database.Namespace{
 		ID: 321,
@@ -46,6 +49,7 @@ func TestInternalComponent_SSHAllowed(t *testing.T) {
 
 	req := types.SSHAllowedReq{
 		RepoType:  types.ModelRepo,
+		Changes:   "abc main ref",
 		Namespace: "ns",
 		Name:      "n",
 		KeyID:     "1",
@@ -153,4 +157,41 @@ func TestInternalComponent_LfsAuthenticate(t *testing.T) {
 		RepoPath: "/models/ns/n.git",
 	}, resp)
 
+}
+
+func TestInternalComponent_TriggerDataviewerWorkflow(t *testing.T) {
+	ctx := context.TODO()
+	ic := initializeTestInternalComponent(ctx, t)
+
+	req := types.UpdateViewerReq{
+		Namespace: "ns",
+		Name:      "n",
+		Branch:    "main",
+		RepoType:  types.DatasetRepo,
+	}
+
+	result := &types.WorkFlowInfo{
+		Namespace:  req.Namespace,
+		Name:       req.Name,
+		Branch:     req.Branch,
+		RepoType:   req.RepoType,
+		WorkFlowID: "xxxxx",
+	}
+
+	ic.mocks.dataviewerClient.EXPECT().TriggerWorkflow(mock.Anything, req).Return(result, nil)
+
+	res, err := ic.TriggerDataviewerWorkflow(ctx, req)
+	require.Nil(t, err)
+	require.Equal(t, result, res)
+}
+
+func TestInternalComponent_CheckGitCallback(t *testing.T) {
+	ctx := context.TODO()
+	ic := initializeTestInternalComponent(ctx, t)
+
+	ic.mocks.checker.EXPECT().Check(ctx, mock.Anything).Return(true, nil)
+
+	valid, err := ic.CheckGitCallback(ctx, types.GitalyAllowedReq{})
+	require.Nil(t, err)
+	require.Equal(t, true, valid)
 }

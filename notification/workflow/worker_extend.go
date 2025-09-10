@@ -1,3 +1,5 @@
+//go:build !ee && !saas
+
 package workflow
 
 import (

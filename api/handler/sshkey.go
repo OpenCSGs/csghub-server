@@ -62,8 +62,6 @@ func (h *SSHKeyHandler) Create(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 
 	req.Username = currentUser
-
-	req.Username = ctx.Param("username")
 	sk, err := h.c.Create(ctx.Request.Context(), &req)
 	if err != nil {
 		slog.Error("Failed to create SSH key", slog.Any("error", err))

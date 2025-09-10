@@ -5,24 +5,25 @@ import (
 	"time"
 
 	"github.com/uptrace/bun"
+	"opencsg.com/csghub-server/common/types"
 )
 
 type Organization struct {
 	ID       int64  `bun:",pk,autoincrement" json:"id"`
 	Nickname string `bun:"name,notnull" json:"name"`
 	// unique name of the organization
-	Name         string     `bun:"path,notnull" json:"path"`
-	GitPath      string     `bun:",notnull" json:"git_path"`
-	Description  string     `json:"description"`
-	UserID       int64      `bun:",notnull" json:"user_id"`
-	Homepage     string     `bun:"" json:"homepage,omitempty"`
-	Logo         string     `bun:"" json:"logo,omitempty"`
-	Verified     bool       `bun:"" json:"verified"`
-	OrgType      string     `bun:"" json:"org_type"`
-	User         *User      `bun:"rel:belongs-to,join:user_id=id" json:"user"`
-	NamespaceID  int64      `bun:",notnull" json:"namespace_id"`
-	Namespace    *Namespace `bun:"rel:has-one,join:namespace_id=id" json:"namespace"`
-	VerifyStatus string     `bun:",notnull,default:'none'" json:"verify_status"` // none, pending, approved, rejected
+	Name         string             `bun:"path,notnull" json:"path"`
+	GitPath      string             `bun:",notnull" json:"git_path"`
+	Description  string             `json:"description"`
+	UserID       int64              `bun:",notnull" json:"user_id"`
+	Homepage     string             `bun:"" json:"homepage,omitempty"`
+	Logo         string             `bun:"" json:"logo,omitempty"`
+	Verified     bool               `bun:"" json:"verified"`
+	OrgType      string             `bun:"" json:"org_type"`
+	User         *User              `bun:"rel:belongs-to,join:user_id=id" json:"user"`
+	NamespaceID  int64              `bun:",notnull" json:"namespace_id"`
+	Namespace    *Namespace         `bun:"rel:has-one,join:namespace_id=id" json:"namespace"`
+	VerifyStatus types.VerifyStatus `bun:",notnull,default:'none'" json:"verify_status"` // none, pending, approved, rejected
 	times
 }
 

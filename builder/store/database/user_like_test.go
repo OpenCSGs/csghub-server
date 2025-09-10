@@ -29,6 +29,12 @@ func TestUserLikeStore_Add(t *testing.T) {
 	repo, err := repoStore.FindById(ctx, int64(2))
 	require.Nil(t, err)
 	require.Equal(t, repo.Likes, int64(1))
+	// if duplicate add
+	err = ulikeStore.Add(ctx, 1, 2)
+	require.Nil(t, err)
+	repo, err = repoStore.FindById(ctx, int64(2))
+	require.Nil(t, err)
+	require.Equal(t, repo.Likes, int64(1))
 }
 
 func TestUserLikeStore_LikeCollection(t *testing.T) {
@@ -49,6 +55,12 @@ func TestUserLikeStore_LikeCollection(t *testing.T) {
 	require.Nil(t, err)
 
 	col, err := colStore.FindById(ctx, int64(3))
+	require.Nil(t, err)
+	require.Equal(t, col.Likes, int64(1))
+	// if duplicate add
+	err = ulikeStore.LikeCollection(ctx, 1, 3)
+	require.Nil(t, err)
+	col, err = colStore.FindById(ctx, int64(3))
 	require.Nil(t, err)
 	require.Equal(t, col.Likes, int64(1))
 }
@@ -77,6 +89,13 @@ func TestUserLikeStore_UnlikeCollection(t *testing.T) {
 	col, err := colStore.FindById(ctx, int64(3))
 	require.Nil(t, err)
 	require.Equal(t, col.Likes, int64(1))
+	// if duplicate delete
+	err = ulikeStore.UnLikeCollection(ctx, 1, 3)
+	require.Nil(t, err)
+
+	col, err = colStore.FindById(ctx, int64(3))
+	require.Nil(t, err)
+	require.Equal(t, col.Likes, int64(1))
 }
 
 func TestUserLikeStore_Delete(t *testing.T) {
@@ -101,6 +120,13 @@ func TestUserLikeStore_Delete(t *testing.T) {
 	require.Nil(t, err)
 
 	repo, err := repoStore.FindById(ctx, int64(2))
+	require.Nil(t, err)
+	require.Equal(t, repo.Likes, int64(1))
+	// if duplicate delete
+	err = ulikeStore.Delete(ctx, 1, 2)
+	require.Nil(t, err)
+
+	repo, err = repoStore.FindById(ctx, int64(2))
 	require.Nil(t, err)
 	require.Equal(t, repo.Likes, int64(1))
 }

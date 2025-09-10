@@ -22,5 +22,8 @@
     },
     "error.SYS-ERR-7": {
         "other": "Cannot promote yourself to admin"
+    },
+    "error.SYS-ERR-8": {
+        "other": "Forbid changing repository visibility setting"
     }
 }

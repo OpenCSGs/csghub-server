@@ -128,7 +128,6 @@ func (g *GinTester) ResponseEq(t *testing.T, code int, msg string, expected any)
 	require.NoError(t, err)
 	require.Equal(t, code, g.response.Code, g.response.Body.String())
 	require.JSONEq(t, string(b), g.response.Body.String())
-
 }
 
 func (g *GinTester) ResponseEqSimple(t *testing.T, code int, expected any) {
@@ -140,6 +139,13 @@ func (g *GinTester) ResponseEqSimple(t *testing.T, code int, expected any) {
 	require.Equal(t, code, g.response.Code, g.response.Body.String())
 	require.JSONEq(t, string(b), g.response.Body.String())
 
+}
+
+func (g *GinTester) ResponseEqCode(t *testing.T, code int) {
+	if !g._executed {
+		require.FailNow(t, "call Execute method first")
+	}
+	require.Equal(t, code, g.response.Code)
 }
 
 func (g *GinTester) RequireUser(t *testing.T) {

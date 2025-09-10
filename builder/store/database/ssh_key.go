@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"time"
 )
 
 type sSHKeyStoreImpl struct {
@@ -13,7 +14,7 @@ type SSHKeyStore interface {
 	Create(ctx context.Context, sshKey *SSHKey) (*SSHKey, error)
 	FindByID(ctx context.Context, id int64) (*SSHKey, error)
 	FindByFingerpringSHA256(ctx context.Context, fingerprint string) (*SSHKey, error)
-	Delete(ctx context.Context, gid int64) (err error)
+	Delete(ctx context.Context, id int64) (err error)
 	IsExist(ctx context.Context, username, keyName string) (exists bool, err error)
 	FindByUsernameAndName(ctx context.Context, username, keyName string) (sshKey SSHKey, err error)
 	FindByKeyContent(ctx context.Context, key string) (*SSHKey, error)
@@ -33,13 +34,14 @@ func NewSSHKeyStoreWithDB(db *DB) SSHKeyStore {
 }
 
 type SSHKey struct {
-	ID                int64  `bun:",pk,autoincrement" json:"id"`
-	GitID             int64  `bun:",notnull" json:"git_id"`
-	Name              string `bun:",notnull" json:"name"`
-	Content           string `bun:",notnull" json:"content"`
-	UserID            int64  `bun:",notnull" json:"user_id"`
-	User              *User  `bun:"rel:belongs-to,join:user_id=id" json:"user"`
-	FingerprintSHA256 string `bun:"," json:"fingerprint_sha256"`
+	ID                int64     `bun:",pk,autoincrement" json:"id"`
+	GitID             int64     `bun:",notnull" json:"git_id"`
+	Name              string    `bun:",notnull" json:"name"`
+	Content           string    `bun:",notnull" json:"content"`
+	UserID            int64     `bun:",notnull" json:"user_id"`
+	User              *User     `bun:"rel:belongs-to,join:user_id=id" json:"user"`
+	FingerprintSHA256 string    `bun:"," json:"fingerprint_sha256"`
+	DeletedAt         time.Time `bun:",soft_delete,nullzero"`
 	times
 }
 
@@ -88,12 +90,13 @@ func (s *sSHKeyStoreImpl) FindByFingerpringSHA256(ctx context.Context, fingerpri
 	return &sshKey, err
 }
 
-func (s *sSHKeyStoreImpl) Delete(ctx context.Context, gid int64) (err error) {
+func (s *sSHKeyStoreImpl) Delete(ctx context.Context, id int64) (err error) {
 	var sshKey SSHKey
 	_, err = s.db.Operator.Core.
 		NewDelete().
 		Model(&sshKey).
-		Where("git_id = ?", gid).
+		Where("id = ?", id).
+		ForceDelete().
 		Exec(ctx)
 	return
 }

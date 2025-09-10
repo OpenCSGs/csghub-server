@@ -12,11 +12,39 @@ import (
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rpc"
 	component2 "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
+	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component/callback"
 	"opencsg.com/csghub-server/common/tests"
 	"opencsg.com/csghub-server/component"
 )
 
 // Injectors from wire.go:
+
+func initializeTestSyncVersionGenerator(ctx context.Context, t interface {
+	Cleanup(func())
+	mock.TestingT
+}) *testSyncVersionGeneratorWithMocks {
+	config := component.ProvideTestConfig()
+	mockStores := tests.NewMockStores(t)
+	callbackSyncVersionGeneratorImpl := NewTestSyncVersionGenerator(config, mockStores)
+	mockTagComponent := component2.NewMockTagComponent(t)
+	mockSpaceComponent := component2.NewMockSpaceComponent(t)
+	mockSyncVersionGenerator := callback.NewMockSyncVersionGenerator(t)
+	mockGitServer := gitserver.NewMockGitServer(t)
+	mockRuntimeArchitectureComponent := component2.NewMockRuntimeArchitectureComponent(t)
+	mocks := &Mocks{
+		stores:               mockStores,
+		tagComponent:         mockTagComponent,
+		spaceComponent:       mockSpaceComponent,
+		syncVersionGenerator: mockSyncVersionGenerator,
+		gitServer:            mockGitServer,
+		runtimeArchComponent: mockRuntimeArchitectureComponent,
+	}
+	callbackTestSyncVersionGeneratorWithMocks := &testSyncVersionGeneratorWithMocks{
+		syncVersionGeneratorImpl: callbackSyncVersionGeneratorImpl,
+		mocks:                    mocks,
+	}
+	return callbackTestSyncVersionGeneratorWithMocks
+}
 
 func initializeTestGitCallbackComponent(ctx context.Context, t interface {
 	Cleanup(func())
@@ -27,13 +55,15 @@ func initializeTestGitCallbackComponent(ctx context.Context, t interface {
 	mockGitServer := gitserver.NewMockGitServer(t)
 	mockTagComponent := component2.NewMockTagComponent(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
+	mockSyncVersionGenerator := callback.NewMockSyncVersionGenerator(t)
 	mockRuntimeArchitectureComponent := component2.NewMockRuntimeArchitectureComponent(t)
 	mockSpaceComponent := component2.NewMockSpaceComponent(t)
-	callbackGitCallbackComponentImpl := NewTestGitCallbackComponent(config, mockStores, mockGitServer, mockTagComponent, mockModerationSvcClient, mockRuntimeArchitectureComponent, mockSpaceComponent)
+	callbackGitCallbackComponentImpl := NewTestGitCallbackComponent(config, mockStores, mockGitServer, mockTagComponent, mockModerationSvcClient, mockSyncVersionGenerator, mockRuntimeArchitectureComponent, mockSpaceComponent)
 	mocks := &Mocks{
 		stores:               mockStores,
 		tagComponent:         mockTagComponent,
 		spaceComponent:       mockSpaceComponent,
+		syncVersionGenerator: mockSyncVersionGenerator,
 		gitServer:            mockGitServer,
 		runtimeArchComponent: mockRuntimeArchitectureComponent,
 	}
@@ -45,6 +75,11 @@ func initializeTestGitCallbackComponent(ctx context.Context, t interface {
 }
 
 // wire.go:
+
+type testSyncVersionGeneratorWithMocks struct {
+	*syncVersionGeneratorImpl
+	mocks *Mocks
+}
 
 type testGitCallbackWithMocks struct {
 	*gitCallbackComponentImpl

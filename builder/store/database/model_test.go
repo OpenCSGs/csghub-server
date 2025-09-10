@@ -3,6 +3,7 @@ package database_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/store/database"
@@ -223,5 +224,52 @@ func TestModelStore_UserLikes(t *testing.T) {
 		names = append(names, ds.Repository.Name)
 	}
 	require.Equal(t, []string{"repo1", "repo3"}, names)
+
+}
+
+func TestModelStore_UserLikes_WithSoftDeleted(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewModelStoreWithDB(db)
+
+	repos := []*database.Repository{
+		{Name: "repo1", Path: "p1", GitPath: "p1"},
+		{Name: "repo2", Path: "p2", GitPath: "p2"},
+		{Name: "repo3", Path: "p3", GitPath: "p3"},
+	}
+
+	for _, repo := range repos {
+		err := db.Core.NewInsert().Model(repo).Scan(ctx, repo)
+		require.Nil(t, err)
+		_, err = store.Create(ctx, database.Model{
+			RepositoryID: repo.ID,
+		})
+		require.Nil(t, err)
+
+	}
+
+	_, err := db.Core.NewInsert().Model(&database.UserLike{
+		UserID:    123,
+		RepoID:    repos[0].ID,
+		DeletedAt: time.Now(),
+	}).Exec(ctx)
+	require.Nil(t, err)
+	_, err = db.Core.NewInsert().Model(&database.UserLike{
+		UserID: 123,
+		RepoID: repos[2].ID,
+	}).Exec(ctx)
+	require.Nil(t, err)
+
+	dss, total, err := store.UserLikesModels(ctx, 123, 10, 1)
+	require.Nil(t, err)
+	require.Equal(t, 1, total)
+
+	names := []string{}
+	for _, ds := range dss {
+		names = append(names, ds.Repository.Name)
+	}
+	require.Equal(t, []string{"repo3"}, names)
 
 }

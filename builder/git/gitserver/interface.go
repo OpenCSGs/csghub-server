@@ -25,7 +25,7 @@ type GitServer interface {
 	GetRepo(ctx context.Context, req GetRepoReq) (*CreateRepoResp, error)
 	CreateRepo(ctx context.Context, req CreateRepoReq) (*CreateRepoResp, error)
 	UpdateRepo(ctx context.Context, req UpdateRepoReq) (*CreateRepoResp, error)
-	DeleteRepo(ctx context.Context, req DeleteRepoReq) error
+	DeleteRepo(ctx context.Context, relativePath string) error
 	GetRepoBranches(ctx context.Context, req GetBranchesReq) ([]types.Branch, error)
 	GetRepoBranchByName(ctx context.Context, req GetBranchReq) (*types.Branch, error)
 	DeleteRepoBranch(ctx context.Context, req DeleteBranchReq) error
@@ -46,6 +46,7 @@ type GitServer interface {
 	GetRepoAllFiles(ctx context.Context, req GetRepoAllFilesReq) ([]*types.File, error)
 	GetRepoAllLfsPointers(ctx context.Context, req GetRepoAllFilesReq) ([]*types.LFSPointer, error)
 	GetDiffBetweenTwoCommits(ctx context.Context, req GetDiffBetweenTwoCommitsReq) (*types.GiteaCallbackPushReq, error)
+	GetRepoFiles(ctx context.Context, req GetRepoFilesReq) ([]*types.File, error)
 
 	CreateSSHKey(*types.CreateSSHKeyRequest) (*database.SSHKey, error)
 	// ListSSHKeys(string, int, int) ([]*database.SSHKey, error)
@@ -72,9 +73,10 @@ type GitServer interface {
 	UploadPack(ctx context.Context, req UploadPackReq) error
 	// Handle git push request
 	ReceivePack(ctx context.Context, req ReceivePackReq) error
+
 	CommitFiles(ctx context.Context, req CommitFilesReq) error
 	BuildRelativePath(ctx context.Context, repoType types.RepositoryType, namespace, name string) (string, error)
-	GetRepoLfsPointers(ctx context.Context, req GetRepoFilesReq) ([]*types.LFSPointer, error)
-	GetRepoFiles(ctx context.Context, req GetRepoFilesReq) ([]*types.File, error)
 	UpdateRef(ctx context.Context, req UpdateRefReq) error
+	GetRepoLfsPointers(ctx context.Context, req GetRepoFilesReq) ([]*types.LFSPointer, error)
+	CopyRepository(ctx context.Context, req CopyRepositoryReq) error
 }

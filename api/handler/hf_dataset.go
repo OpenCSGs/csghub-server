@@ -35,6 +35,12 @@ func (h *HFDatasetHandler) DatasetPathsInfo(ctx *gin.Context) {
 		return
 	}
 	ref := ctx.Param("ref")
+
+	mappedBranch := ctx.Param("branch_mapped")
+	if mappedBranch != "" {
+		ref = mappedBranch
+	}
+
 	body, err := ctx.GetRawData()
 	// body: paths=test-00000-of-00001.parquet&expand=True
 	if err != nil {
@@ -76,6 +82,12 @@ func (h *HFDatasetHandler) DatasetTree(ctx *gin.Context) {
 		return
 	}
 	ref := ctx.Param("ref")
+
+	mappedBranch := ctx.Param("branch_mapped")
+	if mappedBranch != "" {
+		ref = mappedBranch
+	}
+
 	currentUser := httpbase.GetCurrentUser(ctx)
 	pathInRepo := ctx.Param("path_in_repo")
 	slog.Debug("get path_in_repo in repo", slog.Any("pathInRepo", pathInRepo))

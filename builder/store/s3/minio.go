@@ -33,6 +33,12 @@ func init() {
 	tracer = otel.Tracer("builder.store.s3")
 }
 
+var bucketLookupMapping = map[string]minio.BucketLookupType{
+	"auto": minio.BucketLookupAuto,
+	"dns":  minio.BucketLookupDNS,
+	"path": minio.BucketLookupPath,
+}
+
 func NewMinioCore(cfg *config.Config) (Core, error) {
 	var bucketLookupType minio.BucketLookupType
 	if val, ok := bucketLookupMapping[cfg.S3.BucketLookup]; ok {
@@ -64,6 +70,7 @@ type MinioClient interface {
 	PresignHeader(ctx context.Context, method, bucketName, objectName string, expires time.Duration, reqParams url.Values, extraHeaders http.Header) (u *url.URL, err error)
 	CopyObject(ctx context.Context, dst minio.CopyDestOptions, src minio.CopySrcOptions) (minio.UploadInfo, error)
 	GetObject(ctx context.Context, bucketName, objectName string, opts minio.GetObjectOptions) (*minio.Object, error)
+	ListObjects(ctx context.Context, bucketName string, opts minio.ListObjectsOptions) <-chan minio.ObjectInfo
 }
 
 type Client interface {
@@ -109,7 +116,6 @@ func uploadAndValidate(ctx context.Context, client MinioClient, bucketName, obje
 	if err != nil {
 		return info, err
 	}
-
 	if strings.HasPrefix(objectName, "repos/") {
 		return info, nil
 	}

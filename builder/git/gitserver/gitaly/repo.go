@@ -35,7 +35,6 @@ func (c *Client) RepositoryExists(ctx context.Context, req gitserver.CheckRepoRe
 	if err != nil {
 		return false, err
 	}
-
 	r, err := c.repoClient.RepositoryExists(ctx, &gitalypb.RepositoryExistsRequest{
 		Repository: &gitalypb.Repository{
 			StorageName:  c.config.GitalyServer.Storage,
@@ -60,7 +59,6 @@ func (c *Client) CreateRepo(ctx context.Context, req gitserver.CreateRepoReq) (*
 	if err != nil {
 		return nil, err
 	}
-
 	gitalyReq := &gitalypb.CreateRepositoryRequest{
 		Repository: &gitalypb.Repository{
 			StorageName:  c.config.GitalyServer.Storage,
@@ -73,7 +71,6 @@ func (c *Client) CreateRepo(ctx context.Context, req gitserver.CreateRepoReq) (*
 	if err != nil {
 		return nil, errorx.ErrGitCreateRepositoryFailed(err, errorx.Ctx())
 	}
-
 	repoTypeS := fmt.Sprintf("%ss", string(req.RepoType))
 
 	return &gitserver.CreateRepoResp{
@@ -94,20 +91,16 @@ func (c *Client) UpdateRepo(ctx context.Context, req gitserver.UpdateRepoReq) (*
 	return nil, nil
 }
 
-func (c *Client) DeleteRepo(ctx context.Context, req gitserver.DeleteRepoReq) error {
+func (c *Client) DeleteRepo(ctx context.Context, relativePath string) error {
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
-	relativePath, err := c.BuildRelativePath(ctx, req.RepoType, req.Namespace, req.Name)
-	if err != nil {
-		return err
-	}
 	gitalyReq := &gitalypb.RemoveRepositoryRequest{
 		Repository: &gitalypb.Repository{
 			StorageName:  c.config.GitalyServer.Storage,
 			RelativePath: relativePath,
 		},
 	}
-	_, err = c.repoClient.RemoveRepository(ctx, gitalyReq)
+	_, err := c.repoClient.RemoveRepository(ctx, gitalyReq)
 	if err != nil {
 		return errorx.ErrGitDeleteRepositoryFailed(err, errorx.Ctx())
 	}
@@ -134,6 +127,64 @@ func (c *Client) GetRepo(ctx context.Context, req gitserver.GetRepoReq) (*gitser
 	}
 
 	return &gitserver.CreateRepoResp{DefaultBranch: string(resp.Name)}, nil
+}
+
+func (c *Client) CopyRepository(ctx context.Context, req gitserver.CopyRepositoryReq) error {
+	var bundleData []byte
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
+	relativePath, err := c.BuildRelativePath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return err
+	}
+
+	sourceRepo := &gitalypb.Repository{
+		StorageName:  c.config.GitalyServer.Storage,
+		RelativePath: relativePath,
+	}
+
+	destRepo := &gitalypb.Repository{
+		StorageName:  c.config.GitalyServer.Storage,
+		RelativePath: req.NewPath,
+	}
+
+	resp, err := c.repoClient.CreateBundle(ctx, &gitalypb.CreateBundleRequest{
+		Repository: sourceRepo,
+	})
+	if err != nil {
+		return errorx.ErrGitCopyRepositoryFailed(err, errorx.Ctx())
+	}
+
+	for {
+		data, err := resp.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return errorx.ErrGitCopyRepositoryFailed(err, errorx.Ctx())
+		}
+		bundleData = append(bundleData, data.GetData()...)
+	}
+
+	client, err := c.repoClient.CreateRepositoryFromBundle(ctx)
+	if err != nil {
+		return errorx.ErrGitCopyRepositoryFailed(err, errorx.Ctx())
+	}
+	err = client.Send(&gitalypb.CreateRepositoryFromBundleRequest{
+		Repository: destRepo,
+		Data:       bundleData,
+	})
+
+	if err != nil {
+		return errorx.ErrGitCopyRepositoryFailed(err, errorx.Ctx())
+	}
+
+	_, err = client.CloseAndRecv()
+	if err != nil {
+		return errorx.ErrGitCopyRepositoryFailed(err, errorx.Ctx())
+	}
+
+	return nil
 }
 
 type ProjectStorageCloneRequest struct {
@@ -258,6 +309,77 @@ func (h *CloneStorageHelper) CloneRepoStorage(ctx context.Context, path string, 
 	if err != nil {
 		return err
 	}
+	return nil
+}
+
+func (h *CloneStorageHelper) TransferRepoBundle(ctx context.Context, fromPath, toPath string, req *ProjectStorageCloneRequest) error {
+	r, err := h.from.RepositoryExists(ctx, &gitalypb.RepositoryExistsRequest{
+		Repository: &gitalypb.Repository{
+			StorageName:  req.CurrentGitalyStorage,
+			RelativePath: fromPath,
+		},
+	})
+	if err != nil {
+		return err
+	}
+	if !r.Exists {
+		return errors.New("repo not exists on current Gitaly instance")
+	}
+
+	r, err = h.to.RepositoryExists(ctx, &gitalypb.RepositoryExistsRequest{
+		Repository: &gitalypb.Repository{
+			StorageName:  req.NewGitalyStorage,
+			RelativePath: toPath,
+		},
+	})
+	if err != nil {
+		return err
+	}
+	if r.Exists {
+		return nil
+	}
+
+	resp, err := h.from.CreateBundle(ctx, &gitalypb.CreateBundleRequest{
+		Repository: &gitalypb.Repository{
+			StorageName:  req.CurrentGitalyStorage,
+			RelativePath: fromPath,
+		},
+	})
+	if err != nil {
+		return errorx.ErrGitCopyRepositoryFailed(err, errorx.Ctx())
+	}
+
+	client, err := h.to.CreateRepositoryFromBundle(ctx)
+	if err != nil {
+		return errorx.ErrGitCopyRepositoryFailed(err, errorx.Ctx())
+	}
+
+	for {
+		data, err := resp.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return errorx.ErrGitCopyRepositoryFailed(err, errorx.Ctx())
+		}
+		err = client.Send(&gitalypb.CreateRepositoryFromBundleRequest{
+			Repository: &gitalypb.Repository{
+				StorageName:  req.NewGitalyStorage,
+				RelativePath: toPath,
+			},
+			Data: data.GetData(),
+		})
+
+		if err != nil {
+			return errorx.ErrGitCopyRepositoryFailed(err, errorx.Ctx())
+		}
+	}
+
+	_, err = client.CloseAndRecv()
+	if err != nil {
+		return errorx.ErrGitCopyRepositoryFailed(err, errorx.Ctx())
+	}
+
 	return nil
 }
 

@@ -338,7 +338,7 @@ func isGGUFModel(repo *database.Repository) bool {
 			return true
 		}
 	}
-	return false
+	return strings.Contains(strings.ToLower(repo.Name), "gguf")
 }
 
 // for text-generation
@@ -419,7 +419,7 @@ func (c *runtimeArchitectureComponentImpl) GetMetadataFromGGUF(ctx context.Conte
 				}
 				metadata := fs.Metadata()
 				var opts []gguf.GGUFRunEstimateOption
-				opts = append(opts, gguf.WithLLaMACppContextSize(int32(8192)))
+				opts = append(opts, gguf.WithLLaMACppContextSize(int32(c.config.Model.MinContextForEstimation)))
 				opts = append(opts, gguf.WithParallelSize(int32(1)))
 				lme := fs.EstimateLLaMACppRun(opts...)
 				emi := lme.SummarizeItem(true, 2*1024*1024, 2*1024*1024)
@@ -427,7 +427,7 @@ func (c *runtimeArchitectureComponentImpl) GetMetadataFromGGUF(ctx context.Conte
 				modelInfo.Architecture = metadata.Architecture
 				quantization := types.Quantization{
 					VERSION: c.GetBitFromFileType(metadata.FileType.String()),
-					TYPE:    metadata.FileType.String(),
+					TYPE:    metadata.FileTypeDescriptor,
 				}
 				if len(emi.VRAMs) > 0 {
 					quantization.MiniGPUMemoryGB = max(float32(emi.VRAMs[0].NonUMA/(1024*1024*1024)), 1)
@@ -657,6 +657,10 @@ func (c *runtimeArchitectureComponentImpl) InitRuntimeFrameworkAndArchitectures(
 	if err != nil {
 		return fmt.Errorf("failed to update inference runtime_framework: %w", err)
 	}
+	err = c.UpdateRuntimeFrameworkByType(ctx, types.NotebookType)
+	if err != nil {
+		return fmt.Errorf("failed to update inference runtime_framework: %w", err)
+	}
 	return nil
 }
 
@@ -677,6 +681,11 @@ func (c *runtimeArchitectureComponentImpl) UpdateRuntimeFrameworkByType(ctx cont
 		}
 	case types.EvaluationType:
 		jsonFiles, err = getJsonfiles("evaluation")
+		if err != nil {
+			return fmt.Errorf("failed to get json files: %w", err)
+		}
+	case types.NotebookType:
+		jsonFiles, err = getJsonfiles("notebook")
 		if err != nil {
 			return fmt.Errorf("failed to get json files: %w", err)
 		}
@@ -796,6 +805,10 @@ func (c *runtimeArchitectureComponentImpl) UpdateRuntimeFrameworkAndArch(ctx con
 				})
 				archMap[name] = true
 			}
+		}
+		if len(archs) == 0 {
+			slog.Warn("no architectures found for runtime_framework", slog.String("engine", engineConfig.EngineName), slog.String("image", image.Image))
+			continue
 		}
 		err = c.runtimeArchStore.BatchAdd(ctx, archs)
 		if err != nil {

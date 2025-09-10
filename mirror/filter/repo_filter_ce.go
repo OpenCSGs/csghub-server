@@ -15,7 +15,7 @@ type RepoFilter struct {
 	cfg         *config.Config
 }
 
-func NewRepoFilter(cfg *config.Config) *RepoFilter {
+func NewRepoFilter(cfg *config.Config) Filter {
 	return &RepoFilter{
 		repoStore:   database.NewRepoStore(),
 		mirrorStore: database.NewMirrorStore(),

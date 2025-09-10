@@ -6,15 +6,33 @@
   "engine_images": [
     {
       "compute_type": "gpu",
-      "image": "opencsghq/vllm:v0.8.5",
-      "driver_version": "12.4",
-      "engine_version": "v0.8.5"
-    },
-    {
-      "compute_type": "gpu",
-      "image": "opencsghq/vllm:v0.8.5-cu121",
-      "driver_version": "12.1",
-      "engine_version": "v0.8.5"
+      "image": "opencsghq/vllm:v0.10.1-cu128",
+      "driver_version": "12.8",
+      "engine_version": "v0.10.1",
+      "extra_archs":[
+        "ArceeForCausalLM",
+        "BailingMoeForCausalLM",
+        "Dots1ForCausalLM",
+        "Ernie4_5_ForCausalLM",
+        "Ernie4_5_MoeForCausalLM",
+        "Exaone4ForCausalLM",
+        "Fairseq2LlamaForCausalLM",
+        "Gemma3nForCausalLM",
+        "Glm4MoeForCausalLM",
+        "GptOssForCausalLM",
+        "GraniteMoeHybridForCausalLM",
+        "HCXVisionForCausalLM",
+        "HunYuanDenseV1ForCausalLM",
+        "HunYuanDenseV1ForCausalLM",
+        "HunYuanMoEV1ForCausalLM",
+        "HunYuanMoEV1ForCausalLM",
+        "Mamba2ForCausalLM",
+        "MBartForConditionalGeneration",
+        "MiMoForCausalLM",
+        "MiMoForCausalLM",
+        "NemotronHForCausalLM",
+        "Phi4FlashForCausalLM"
+      ]
     },
     {
       "compute_type": "gpu",
@@ -28,6 +46,12 @@
         "HunYuanMoEV1ForCausalLM",
         "MiMoForCausalLM"
       ]
+    },
+    {
+      "compute_type": "dcu",
+      "image": "opencsghq/vllm:v0.8.5-dtk25.04",
+      "driver_version": "25.04",
+      "engine_version": "v0.8.5"
     },
     {
       "compute_type": "cpu",
@@ -45,7 +69,7 @@
     },
     {
       "name": "max-model-len",
-      "value": "2048",
+      "value": "8192",
       "format": "--max-model-len %s"
     },
     {
@@ -97,7 +121,8 @@
       "name": "limit-mm-per-prompt",
       "value": "image=5,video=5",
       "format": "--limit-mm-per-prompt %s"
-    }
+    },
+    { "name": "custom-options", "value": "", "format": "%s" }
   ],
   "supported_archs": [
     "AquilaForCausalLM",
@@ -139,12 +164,10 @@
     "InternLM3ForCausalLM",
     "JAISLMHeadModel",
     "JambaForCausalLM",
-    "LlamaModel",
     "LlamaForCausalLM",
     "MambaForCausalLM",
     "MiniCPMForCausalLM",
     "MiniCPM3ForCausalLM",
-    "MistralModel",
     "MistralForCausalLM",
     "MixtralForCausalLM",
     "MPTForCausalLM",
@@ -156,25 +179,21 @@
     "OrionForCausalLM",
     "PhiForCausalLM",
     "Phi3ForCausalLM",
-    "Phi3SmallForCausalLM",
     "PhiMoEForCausalLM",
     "PersimmonForCausalLM",
     "Plamo2ForCausalLM",
     "QWenLMHeadModel",
-    "Qwen2Model",
     "Qwen2ForCausalLM",
     "Qwen2MoeForCausalLM",
     "Qwen3ForCausalLM",
     "Qwen3MoeForCausalLM",
-    "RobertaModel",
-    "RobertaForMaskedLM",
     "StableLmForCausalLM",
     "Starcoder2ForCausalLM",
     "SolarForCausalLM",
     "TeleChat2ForCausalLM",
     "TeleFLMForCausalLM",
     "XverseForCausalLM",
-    "XLMRobertaModel",
+    "MiniMaxM1ForCausalLM",
     "MiniMaxText01ForCausalLM",
     "Zamba2ForCausalLM"
   ]

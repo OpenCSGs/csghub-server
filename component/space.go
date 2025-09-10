@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"opencsg.com/csghub-server/builder/deploy"
+	deployCommon "opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/store/database"
@@ -77,18 +78,9 @@ func (c *spaceComponentImpl) Create(ctx context.Context, req types.CreateSpaceRe
 	if err != nil {
 		return nil, fmt.Errorf("fail to find resource by id, %w", err)
 	}
-	err = c.checkResourcePurchasableForCreate(ctx, req, resource)
+	err = c.repoComponent.CheckAccountAndResource(ctx, req.Username, req.ClusterID, req.OrderDetailID, resource)
 	if err != nil {
-		return nil, err
-	}
-	var hardware types.HardWare
-	err = json.Unmarshal([]byte(resource.Resources), &hardware)
-	if err != nil {
-		return nil, fmt.Errorf("invalid hardware setting, %w", err)
-	}
-	_, err = c.checkResourceAvailable(ctx, req, hardware)
-	if err != nil {
-		return nil, fmt.Errorf("fail to check resource, %w", err)
+		return nil, fmt.Errorf("fail to check resource error: %w", err)
 	}
 
 	var templatePath string
@@ -440,17 +432,20 @@ func (c *spaceComponentImpl) Show(ctx context.Context, namespace, name, currentU
 	spaceStatus, _ := c.status(ctx, space)
 	endpoint := c.getEndpoint(spaceStatus.SvcName, space)
 
-	req := types.DeployRepo{
-		DeployID:  spaceStatus.DeployID,
-		SpaceID:   space.ID,
-		Namespace: namespace,
-		Name:      name,
-		SvcName:   spaceStatus.SvcName,
-		ClusterID: spaceStatus.ClusterID,
-	}
-	_, _, instList, err := c.deployer.GetReplica(ctx, req)
-	if err != nil {
-		slog.Warn("no space deployment replica found", slog.Any("req", req), slog.Any("err", err))
+	instList := []types.Instance{}
+	if spaceStatus.SvcName != "" {
+		req := types.DeployRepo{
+			DeployID:  spaceStatus.DeployID,
+			SpaceID:   space.ID,
+			Namespace: namespace,
+			Name:      name,
+			SvcName:   spaceStatus.SvcName,
+			ClusterID: spaceStatus.ClusterID,
+		}
+		_, _, instList, err = c.deployer.GetReplica(ctx, req)
+		if err != nil {
+			slog.Warn("no space deployment replica found", slog.Any("req", req), slog.Any("err", err))
+		}
 	}
 
 	likeExists, err := c.userLikesStore.IsExist(ctx, currentUser, space.Repository.ID)
@@ -619,6 +614,7 @@ func (c *spaceComponentImpl) Index(ctx context.Context, repoFilter *types.RepoFi
 		}
 		resSpaces = append(resSpaces, &types.Space{
 			Name:          space.Repository.Name,
+			Nickname:      space.Repository.Nickname,
 			Description:   space.Repository.Description,
 			Path:          space.Repository.Path,
 			Sdk:           space.Sdk,
@@ -642,6 +638,9 @@ func (c *spaceComponentImpl) Index(ctx context.Context, repoFilter *types.RepoFi
 				Avatar:   space.Repository.User.Avatar,
 			},
 		})
+	}
+	if needOpWeight {
+		c.addOpWeightToSpaces(ctx, repoIDs, resSpaces)
 	}
 	return resSpaces, total, nil
 }
@@ -884,9 +883,14 @@ func (c *spaceComponentImpl) Deploy(ctx context.Context, namespace, name, curren
 		return -1, fmt.Errorf("invalid space %s/%s resource id %s, error: %w", namespace, name, space.SKU, err)
 	}
 
-	_, err = c.spaceResourceStore.FindByID(ctx, int64(resID))
+	resource, err := c.spaceResourceStore.FindByID(ctx, int64(resID))
 	if err != nil {
 		return -1, fmt.Errorf("fail to find resource by id %d, error: %w", resID, err)
+	}
+
+	err = c.repoComponent.CheckAccountAndResource(ctx, currentUser, resource.ClusterID, 0, resource)
+	if err != nil {
+		return -1, err
 	}
 
 	// put repo-type and namespace/name in annotation
@@ -997,17 +1001,44 @@ func (c *spaceComponentImpl) stopSpaceDeploy(ctx context.Context, namespace, nam
 		slog.Error("can't get space deployment", slog.Any("error", err), slog.Any("space id", s.ID))
 		return fmt.Errorf("can't get space deployment,%w", err)
 	}
-	if deploy == nil {
-		return fmt.Errorf("can't get space deployment")
-	}
 
 	dr := types.DeployRepo{
 		SpaceID:   s.ID,
 		Namespace: namespace,
 		Name:      name,
 		SvcName:   deploy.SvcName,
+		ClusterID: deploy.ClusterID,
 	}
 	dr = c.updateDeployRepoByDeploy(dr, deploy)
+
+	if deploy.Status == deployCommon.Building {
+		deployTasks, err := c.deployTaskStore.GetDeployTasksOfDeploy(ctx, deploy.ID)
+		if err != nil {
+			return fmt.Errorf("can't get space delopyment,%w", err)
+		}
+
+		sort.Slice(deployTasks, func(i, j int) bool {
+			return deployTasks[i].ID > deployTasks[j].ID
+		})
+
+		if len(deployTasks) < 2 {
+			return fmt.Errorf("can't get space delopyment")
+		}
+		buildTask := deployTasks[1]
+
+		req := types.ImageBuildStopReq{
+			OrgName:   namespace,
+			SpaceName: name,
+			DeployId:  fmt.Sprintf("%d", deploy.ID),
+			TaskId:    fmt.Sprintf("%d", buildTask.ID),
+			ClusterID: deploy.ClusterID,
+		}
+
+		err = c.deployer.StopBuild(ctx, req)
+		if err != nil {
+			return fmt.Errorf("can't stop space service build for service '%s', %w", deploy.SvcName, err)
+		}
+	}
 	err = c.deployer.Stop(ctx, dr)
 	if err != nil {
 		return fmt.Errorf("can't stop space service deploy for service '%s', %w", deploy.SvcName, err)

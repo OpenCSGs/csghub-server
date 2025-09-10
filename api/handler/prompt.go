@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"slices"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -96,7 +97,6 @@ func (h *PromptHandler) Index(ctx *gin.Context) {
 		httpbase.ServerError(ctx, err)
 		return
 	}
-
 	httpbase.OKWithTotal(ctx, prompts, total)
 }
 
@@ -122,14 +122,16 @@ func (h *PromptHandler) ListPrompt(ctx *gin.Context) {
 		return
 	}
 
-	detail, err := h.prompt.Show(ctx.Request.Context(), namespace, name, currentUser)
+	detail, err := h.prompt.Show(ctx.Request.Context(), namespace, name, currentUser, false, false)
 	if err != nil {
 		if errors.Is(err, errorx.ErrUnauthorized) {
 			httpbase.UnauthorizedError(ctx, err)
-			return
+		} else if errors.Is(err, errorx.ErrDatabaseNoRows) {
+			httpbase.NotFoundError(ctx, err)
+		} else {
+			slog.Error("Failed to get prompt detail", slog.Any("error", err))
+			httpbase.ServerError(ctx, err)
 		}
-		slog.Error("Failed to get prompt detail", slog.Any("error", err))
-		httpbase.ServerError(ctx, err)
 		return
 	}
 
@@ -141,7 +143,11 @@ func (h *PromptHandler) ListPrompt(ctx *gin.Context) {
 	data, err := h.prompt.ListPrompt(ctx.Request.Context(), req)
 	if err != nil {
 		slog.Error("Failed to list prompts of repo", slog.Any("error", err))
-		httpbase.ServerError(ctx, err)
+		if errors.Is(err, errorx.ErrDatabaseNoRows) {
+			httpbase.NotFoundError(ctx, err)
+		} else {
+			httpbase.ServerError(ctx, err)
+		}
 		return
 	}
 
@@ -150,6 +156,57 @@ func (h *PromptHandler) ListPrompt(ctx *gin.Context) {
 		"prompts": data,
 	}
 	httpbase.OK(ctx, respData)
+}
+
+// GetPrompt    godoc
+// @Security     ApiKey
+// @Summary      Prompt Detail
+// @Description  Prompt Detail
+// @Tags         Prompt
+// @Accept       json
+// @Produce      json
+// @Param	     namespace path  string  true  "namespace"
+// @Param		 name path  string  true  "name"
+// @Param        current_user query string true "current_user"
+// @Param        need_op_weight query bool false "need op weight" default(false)
+// @Param        need_multi_sync query bool false "need multi sync" default(false)
+// @Success      200  {object}  types.Response{data=types.PromptRes} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /prompts_info/{namespace}/{name} [get]
+func (h *PromptHandler) PromptDetail(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequestWithExt(ctx, err)
+		return
+	}
+
+	qNeedOpWeight := ctx.Query("need_op_weight")
+	needOpWeight, err := strconv.ParseBool(qNeedOpWeight)
+	if err != nil {
+		needOpWeight = false
+	}
+
+	qNeedMultiSync := ctx.Query("need_multi_sync")
+	needMultiSync, err := strconv.ParseBool(qNeedMultiSync)
+	if err != nil {
+		needMultiSync = false
+	}
+
+	detail, err := h.prompt.Show(ctx.Request.Context(), namespace, name, currentUser, needOpWeight, needMultiSync)
+	if err != nil {
+		if errors.Is(err, errorx.ErrUnauthorized) {
+			httpbase.UnauthorizedError(ctx, err)
+			return
+		}
+		slog.Error("Failed to get prompt detail", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	httpbase.OK(ctx, detail)
 }
 
 // GetPrompt     godoc
@@ -190,7 +247,11 @@ func (h *PromptHandler) GetPrompt(ctx *gin.Context) {
 	data, err := h.prompt.GetPrompt(ctx.Request.Context(), req)
 	if err != nil {
 		slog.Error("Failed to get prompt of repo", slog.Any("req", req), slog.Any("error", err))
-		httpbase.ServerError(ctx, err)
+		if errors.Is(err, errorx.ErrDatabaseNoRows) || errors.Is(err, errorx.ErrGitFileNotFound) {
+			httpbase.NotFoundError(ctx, err)
+		} else {
+			httpbase.ServerError(ctx, err)
+		}
 		return
 	}
 	httpbase.OK(ctx, data)
@@ -283,13 +344,13 @@ func (h *PromptHandler) UpdatePrompt(ctx *gin.Context) {
 	var body *types.UpdatePromptReq
 	if err := ctx.ShouldBindJSON(&body); err != nil {
 		slog.Error("Bad request prompt format", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
+		httpbase.BadRequestWithExt(ctx, errorx.ReqBodyFormat(err, nil))
 		return
 	}
 	_, err = h.sensitive.CheckRequestV2(ctx.Request.Context(), body)
 	if err != nil {
 		slog.Error("failed to check sensitive request", slog.Any("error", err))
-		httpbase.BadRequestWithExt(ctx, errorx.ReqBodyFormat(err, nil))
+		httpbase.ServerError(ctx, fmt.Errorf("sensitive check failed: %w", err))
 		return
 	}
 
@@ -818,7 +879,7 @@ func (h *PromptHandler) UpdateDownloads(ctx *gin.Context) {
 	date, err := time.Parse("2006-01-02", req.ReqDate)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
-		httpbase.BadRequestWithExt(ctx, err)
+		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(err, nil))
 		return
 	}
 	req.Date = date

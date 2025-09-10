@@ -36,6 +36,17 @@ func GetNamespaceAndNameFromContext(ctx *gin.Context) (namespace string, name st
 	return
 }
 
+func GetNamespaceAndNameFromPath(path string) (namespace string, name string, err error) {
+	parts := strings.Split(path, "/")
+	if len(parts) != 2 {
+		err = errors.New("invalid namespace or name")
+		return
+	}
+	namespace = parts[0]
+	name = parts[1]
+	return
+}
+
 func GetPerAndPageFromContext(ctx *gin.Context) (perInt int, pageInt int, err error) {
 	per := ctx.Query("per")
 	if per == "" {
@@ -47,12 +58,22 @@ func GetPerAndPageFromContext(ctx *gin.Context) (perInt int, pageInt int, err er
 		err = errorx.ReqParamInvalid(err, ext)
 		return
 	}
+	if perInt > 100 || perInt <= 0 {
+		ext := errorx.Ctx().Set("query", "per")
+		err = errorx.ReqParamInvalid(err, ext)
+		return
+	}
 	page := ctx.Query("page")
 	if page == "" {
 		page = "1"
 	}
 	pageInt, err = strconv.Atoi(page)
 	if err != nil {
+		return
+	}
+	if pageInt <= 0 {
+		ext := errorx.Ctx().Set("query", "page")
+		err = errorx.ReqParamInvalid(err, ext)
 		return
 	}
 	return
@@ -120,13 +141,14 @@ func GetValidTimeDuration(ctx *gin.Context) (string, string) {
 	return defaultDuration, defaultRange
 }
 
-func GetNamespaceAndNameFromPath(path string) (namespace string, name string, err error) {
-	parts := strings.Split(path, "/")
-	if len(parts) != 2 {
-		err = errors.New("invalid namespace or name")
-		return
+func RepoTypeFromString(path string) (types.RepositoryType, error) {
+	if !strings.HasSuffix(path, "s") {
+		return types.UnknownRepo, fmt.Errorf("invalid repository type: %s", path)
 	}
-	namespace = parts[0]
-	name = parts[1]
-	return
+	repoType := strings.TrimSuffix(path, "s")
+	t := types.RepositoryType(repoType)
+	if t.IsValid() {
+		return t, nil
+	}
+	return t, fmt.Errorf("invalid repository type: %s", repoType)
 }

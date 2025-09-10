@@ -13,7 +13,7 @@ func TestAccountingComponent_ListMeteringsByUserIDAndTime(t *testing.T) {
 	ctx := context.TODO()
 	ac := initializeTestAccountingComponent(ctx, t)
 
-	req := types.ACCT_STATEMENTS_REQ{
+	req := types.ActStatementsReq{
 		CurrentUser: "user",
 		UserUUID:    "uuid",
 	}

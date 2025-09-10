@@ -154,6 +154,8 @@ type GetRepoInfoByPathReq struct {
 	Path      string               `json:"path"`
 	RepoType  types.RepositoryType `json:"repo_type"`
 	File      bool                 `json:"file"`
+	// limit file size, don't return file content if file size is greater than MaxFileSize
+	MaxFileSize int64 `json:"max_file_size"`
 }
 
 type GetRepoAllFilesReq struct {
@@ -228,6 +230,16 @@ type UploadPackReq struct {
 
 type ReceivePackReq = UploadPackReq
 
+type GetRepoFilesReq struct {
+	Namespace                             string               `json:"namespace"`
+	Name                                  string               `json:"name"`
+	Ref                                   string               `json:"ref"`
+	RepoType                              types.RepositoryType `json:"repo_type"`
+	Revisions                             []string             `json:"revision"`
+	GitObjectDirectoryRelative            string               `json:"git_object_directory_relative"`
+	GitAlternateObjectDirectoriesRelative []string             `json:"git_alternate_object_directories_relative"`
+}
+
 type CommitFilesReq struct {
 	Namespace string               `json:"namespace"`
 	Name      string               `json:"name"`
@@ -262,12 +274,14 @@ type UpdateRefReq struct {
 	NewObjectId string               `json:"new_object_id"`
 }
 
-type GetRepoFilesReq struct {
-	Namespace                             string               `json:"namespace"`
-	Name                                  string               `json:"name"`
-	Ref                                   string               `json:"ref"`
-	RepoType                              types.RepositoryType `json:"repo_type"`
-	Revisions                             []string             `json:"revision"`
-	GitObjectDirectoryRelative            string               `json:"git_object_directory_relative"`
-	GitAlternateObjectDirectoriesRelative []string             `json:"git_alternate_object_directories_relative"`
+type CopyRepositoryReq struct {
+	Namespace string               `json:"namespace"`
+	Name      string               `json:"name"`
+	RepoType  types.RepositoryType `json:"repo_type"`
+	NewPath   string               `json:"new_path"`
+}
+
+type ReplicateRepositoryReq struct {
+	FromRelativePath string `json:"from_relative_path"`
+	ToRelativePath   string `json:"to_relative_path"`
 }

@@ -57,19 +57,29 @@ func (h *GitHTTPHandler) InfoRefs(ctx *gin.Context) {
 	}
 	reader, err := h.gitHttp.InfoRefs(ctx.Request.Context(), req)
 	if err != nil {
+		slog.Error("git http info refs", slog.Any("error", err))
 		if errors.Is(err, errorx.ErrUnauthorized) {
 			ctx.Header("WWW-Authenticate", "Basic realm=opencsg-git")
 			ctx.PureJSON(http.StatusUnauthorized, nil)
 			return
 		}
 
+		var msg string
 		if errors.Is(err, errorx.ErrForbidden) {
-			ctx.PureJSON(http.StatusForbidden, gin.H{
-				"error": "You do not have permission to access this repository.",
-			})
+			msg = "You do not have permission to access this repository."
+		} else if errors.Is(err, errorx.ErrServiceUnavaliable) {
+			msg = "Mirror repository is currently syncing. Please try again later."
+		} else {
+			httpbase.ServerError(ctx, err)
 			return
 		}
-		httpbase.ServerError(ctx, err)
+
+		body := pktLine("# service=git-upload-pack\n") + "0000" + pktLine("ERR "+msg+"\n")
+
+		ctx.Header("Content-Type", "application/x-git-upload-pack-advertisement")
+		ctx.Writer.WriteHeader(http.StatusOK)
+		_, _ = ctx.Writer.Write([]byte(body))
+
 		return
 	}
 
@@ -113,6 +123,7 @@ func (h *GitHTTPHandler) GitUploadPack(ctx *gin.Context) {
 
 	err := h.gitHttp.GitUploadPack(ctx.Request.Context(), req)
 	if err != nil {
+		slog.Error("git http upload pack error", slog.Any("error", err))
 		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
 			return
@@ -123,23 +134,40 @@ func (h *GitHTTPHandler) GitUploadPack(ctx *gin.Context) {
 }
 
 func (h *GitHTTPHandler) GitReceivePack(ctx *gin.Context) {
+	var (
+		contentLength int64
+		err           error
+	)
 	gitProtocol := ctx.GetHeader("Git-Protocol")
+	contentLengthStr := ctx.GetHeader("Content-Length")
+	if contentLengthStr != "" {
+		contentLength, err = strconv.ParseInt(contentLengthStr, 10, 64)
+		if err != nil {
+			ctx.PureJSON(http.StatusBadRequest, gin.H{
+				"error": "invalid Content-Length",
+			})
+			return
+		}
+	}
+
 	req := types.GitUploadPackReq{
-		Namespace:   ctx.GetString("namespace"),
-		Name:        ctx.GetString("name"),
-		RepoType:    types.RepositoryType(ctx.GetString("repo_type")),
-		GitProtocol: gitProtocol,
-		Request:     ctx.Request,
-		Writer:      ctx.Writer,
-		CurrentUser: httpbase.GetCurrentUser(ctx),
+		Namespace:     ctx.GetString("namespace"),
+		Name:          ctx.GetString("name"),
+		RepoType:      types.RepositoryType(ctx.GetString("repo_type")),
+		GitProtocol:   gitProtocol,
+		Request:       ctx.Request,
+		Writer:        ctx.Writer,
+		CurrentUser:   httpbase.GetCurrentUser(ctx),
+		ContentLength: contentLength,
 	}
 	action := getService(ctx.Request)
 
 	ctx.Header("Content-Type", fmt.Sprintf("application/x-%s-result", action))
 	ctx.Header("Cache-Control", "no-cache")
 
-	err := h.gitHttp.GitReceivePack(ctx.Request.Context(), req)
+	err = h.gitHttp.GitReceivePack(ctx.Request.Context(), req)
 	if err != nil {
+		slog.Error("git http upload pack failed", slog.Any("error", err))
 		if errors.Is(err, errorx.ErrContentLengthTooLarge) {
 			ctx.PureJSON(http.StatusBadRequest, gin.H{
 				"error": "File too large. Please track it using Git LFS.",
@@ -178,6 +206,7 @@ func (h *GitHTTPHandler) LfsBatch(ctx *gin.Context) {
 
 	objectResponse, err := h.gitHttp.LFSBatch(ctx.Request.Context(), batchRequest)
 	if err != nil {
+		slog.Error("git http lfs batch error", slog.Any("error", err))
 		httpErr := &errorx.HTTPError{}
 		switch {
 		case errors.Is(err, errorx.ErrUnauthorized):
@@ -220,6 +249,7 @@ func (h *GitHTTPHandler) LfsBatchHF(ctx *gin.Context) {
 
 	objectResponse, err := h.gitHttp.LFSBatch(ctx.Request.Context(), batchRequest)
 	if err != nil {
+		slog.Error("git http lfs batch hf error", slog.Any("error", err))
 		httpErr := &errorx.HTTPError{}
 		switch {
 		case errors.Is(err, errorx.ErrUnauthorized):
@@ -257,8 +287,17 @@ func (h *GitHTTPHandler) LfsUpload(ctx *gin.Context) {
 	uploadRequest.RepoType = types.RepositoryType(ctx.GetString("repo_type"))
 	uploadRequest.CurrentUser = httpbase.GetCurrentUser(ctx)
 
+	if uploadRequest.CurrentUser == "" {
+		httpbase.UnauthorizedError(ctx, errorx.ErrUnauthorized)
+		return
+	}
+
 	err = h.gitHttp.LfsUpload(ctx.Request.Context(), ctx.Request.Body, uploadRequest)
 	if err != nil {
+		slog.Error("Failed to upload lfs file", slog.Any("error", err), slog.String("namespace", uploadRequest.Namespace), slog.String("name", uploadRequest.Name), slog.String("oid", uploadRequest.Oid))
+		if errors.Is(err, errorx.ErrForbidden) {
+			httpbase.UnauthorizedError(ctx, err)
+		}
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -280,11 +319,6 @@ func (h *GitHTTPHandler) LfsDownload(ctx *gin.Context) {
 	downloadRequest.RepoType = types.RepositoryType(ctx.GetString("repo_type"))
 	downloadRequest.CurrentUser = httpbase.GetCurrentUser(ctx)
 	downloadRequest.SaveAs = ctx.Query("save_as")
-
-	s3Internal := ctx.GetHeader("X-OPENCSG-S3-Internal")
-	if s3Internal == "true" {
-		ctx.Set("X-OPENCSG-S3-Internal", true)
-	}
 
 	url, err := h.gitHttp.LfsDownload(ctx.Request.Context(), downloadRequest)
 	if err != nil {
@@ -577,4 +611,8 @@ func (g *gzipResponseWriter) Write(data []byte) (int, error) {
 
 func (g *gzipResponseWriter) WriteString(s string) (int, error) {
 	return g.writer.Write([]byte(s))
+}
+
+func pktLine(s string) string {
+	return fmt.Sprintf("%04x%s", len(s)+4, s)
 }

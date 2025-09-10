@@ -251,7 +251,6 @@ func (m *mcpServerComponentImpl) Delete(ctx context.Context, req *types.UpdateMC
 	}()
 
 	return nil
-
 }
 
 func (m *mcpServerComponentImpl) Update(ctx context.Context, req *types.UpdateMCPServerReq) (*types.MCPServer, error) {
@@ -414,6 +413,7 @@ func (m *mcpServerComponentImpl) Show(ctx context.Context, namespace string, nam
 		InstallDepsCmds:  mcpServer.InstallDepsCmds,
 		BuildCmds:        mcpServer.BuildCmds,
 		LaunchCmds:       mcpServer.LaunchCmds,
+		AvatarURL:        mcpServer.AvatarURL,
 		MirrorTaskStatus: mirrorTaskStatus,
 	}
 	if permission.CanAdmin {
@@ -464,7 +464,10 @@ func (m *mcpServerComponentImpl) Index(ctx context.Context, filter *types.RepoFi
 		if mcpServer == nil {
 			continue
 		}
-		var tags []types.RepoTag
+		var (
+			tags             []types.RepoTag
+			mirrorTaskStatus types.MirrorTaskStatus
+		)
 		for _, tag := range repo.Tags {
 			tags = append(tags, types.RepoTag{
 				Name:      tag.Name,
@@ -477,26 +480,31 @@ func (m *mcpServerComponentImpl) Index(ctx context.Context, filter *types.RepoFi
 				UpdatedAt: tag.UpdatedAt,
 			})
 		}
+		if mcpServer.Repository.Mirror.CurrentTask != nil {
+			mirrorTaskStatus = mcpServer.Repository.Mirror.CurrentTask.Status
+		}
 		resMCPs = append(resMCPs, &types.MCPServer{
-			ID:           mcpServer.ID,
-			Name:         repo.Name,
-			Nickname:     repo.Nickname,
-			Description:  repo.Description,
-			Likes:        repo.Likes,
-			Downloads:    repo.DownloadCount,
-			Path:         repo.Path,
-			RepositoryID: repo.ID,
-			Private:      repo.Private,
-			CreatedAt:    mcpServer.CreatedAt,
-			Tags:         tags,
-			UpdatedAt:    repo.UpdatedAt,
-			Source:       repo.Source,
-			SyncStatus:   repo.SyncStatus,
-			License:      repo.License,
-			Repository:   common.BuildCloneInfo(m.config, mcpServer.Repository),
-			GithubPath:   mcpServer.Repository.GithubPath,
-			ToolsNum:     mcpServer.ToolsNum,
-			StarNum:      repo.StarCount,
+			ID:               mcpServer.ID,
+			Name:             repo.Name,
+			Nickname:         repo.Nickname,
+			Description:      repo.Description,
+			Likes:            repo.Likes,
+			Downloads:        repo.DownloadCount,
+			Path:             repo.Path,
+			RepositoryID:     repo.ID,
+			Private:          repo.Private,
+			CreatedAt:        mcpServer.CreatedAt,
+			Tags:             tags,
+			UpdatedAt:        repo.UpdatedAt,
+			Source:           repo.Source,
+			SyncStatus:       repo.SyncStatus,
+			License:          repo.License,
+			Repository:       common.BuildCloneInfo(m.config, mcpServer.Repository),
+			GithubPath:       mcpServer.Repository.GithubPath,
+			ToolsNum:         mcpServer.ToolsNum,
+			StarNum:          repo.StarCount,
+			AvatarURL:        mcpServer.AvatarURL,
+			MirrorTaskStatus: mirrorTaskStatus,
 		})
 	}
 	if needOpWeight {

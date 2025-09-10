@@ -6,6 +6,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/types"
@@ -31,19 +32,16 @@ func TestModelComponent_Deploy(t *testing.T) {
 	mc.mocks.stores.RuntimeFrameworkMock().EXPECT().FindEnabledByID(ctx, int64(11)).Return(
 		&database.RuntimeFramework{}, nil,
 	)
-	mc.mocks.components.repo.EXPECT().IsAdminRole(database.User{
-		RoleMask: "admin",
-	}).Return(true)
 	mc.mocks.stores.SpaceResourceMock().EXPECT().FindByID(ctx, int64(123)).Return(
 		&database.SpaceResource{
 			ID:        123,
 			Resources: `{"memory": "foo"}`,
+			ClusterID: "cluster",
 		}, nil,
 	)
 
-	mc.mocks.deployer.EXPECT().CheckResourceAvailable(ctx, "cluster", int64(0), &types.HardWare{
-		Memory: "foo",
-	}).Return(true, nil)
+	mc.mocks.components.repo.EXPECT().CheckAccountAndResource(ctx, "user", "cluster", int64(0), mock.Anything).Return(nil)
+
 	mc.mocks.deployer.EXPECT().Deploy(ctx, types.DeployRepo{
 		DeployName: "dp",
 		Path:       "foo",

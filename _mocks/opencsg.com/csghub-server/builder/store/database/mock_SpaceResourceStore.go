@@ -304,34 +304,41 @@ func (_c *MockSpaceResourceStore_FindByName_Call) RunAndReturn(run func(context.
 	return _c
 }
 
-// Index provides a mock function with given fields: ctx, clusterId
-func (_m *MockSpaceResourceStore) Index(ctx context.Context, clusterId string) ([]database.SpaceResource, error) {
-	ret := _m.Called(ctx, clusterId)
+// Index provides a mock function with given fields: ctx, clusterId, per, page
+func (_m *MockSpaceResourceStore) Index(ctx context.Context, clusterId string, per int, page int) ([]database.SpaceResource, int, error) {
+	ret := _m.Called(ctx, clusterId, per, page)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Index")
 	}
 
 	var r0 []database.SpaceResource
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) ([]database.SpaceResource, error)); ok {
-		return rf(ctx, clusterId)
+	var r1 int
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, int, int) ([]database.SpaceResource, int, error)); ok {
+		return rf(ctx, clusterId, per, page)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string) []database.SpaceResource); ok {
-		r0 = rf(ctx, clusterId)
+	if rf, ok := ret.Get(0).(func(context.Context, string, int, int) []database.SpaceResource); ok {
+		r0 = rf(ctx, clusterId, per, page)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]database.SpaceResource)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = rf(ctx, clusterId)
+	if rf, ok := ret.Get(1).(func(context.Context, string, int, int) int); ok {
+		r1 = rf(ctx, clusterId, per, page)
 	} else {
-		r1 = ret.Error(1)
+		r1 = ret.Get(1).(int)
 	}
 
-	return r0, r1
+	if rf, ok := ret.Get(2).(func(context.Context, string, int, int) error); ok {
+		r2 = rf(ctx, clusterId, per, page)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
 // MockSpaceResourceStore_Index_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Index'
@@ -342,23 +349,25 @@ type MockSpaceResourceStore_Index_Call struct {
 // Index is a helper method to define mock.On call
 //   - ctx context.Context
 //   - clusterId string
-func (_e *MockSpaceResourceStore_Expecter) Index(ctx interface{}, clusterId interface{}) *MockSpaceResourceStore_Index_Call {
-	return &MockSpaceResourceStore_Index_Call{Call: _e.mock.On("Index", ctx, clusterId)}
+//   - per int
+//   - page int
+func (_e *MockSpaceResourceStore_Expecter) Index(ctx interface{}, clusterId interface{}, per interface{}, page interface{}) *MockSpaceResourceStore_Index_Call {
+	return &MockSpaceResourceStore_Index_Call{Call: _e.mock.On("Index", ctx, clusterId, per, page)}
 }
 
-func (_c *MockSpaceResourceStore_Index_Call) Run(run func(ctx context.Context, clusterId string)) *MockSpaceResourceStore_Index_Call {
+func (_c *MockSpaceResourceStore_Index_Call) Run(run func(ctx context.Context, clusterId string, per int, page int)) *MockSpaceResourceStore_Index_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string))
+		run(args[0].(context.Context), args[1].(string), args[2].(int), args[3].(int))
 	})
 	return _c
 }
 
-func (_c *MockSpaceResourceStore_Index_Call) Return(_a0 []database.SpaceResource, _a1 error) *MockSpaceResourceStore_Index_Call {
-	_c.Call.Return(_a0, _a1)
+func (_c *MockSpaceResourceStore_Index_Call) Return(_a0 []database.SpaceResource, _a1 int, _a2 error) *MockSpaceResourceStore_Index_Call {
+	_c.Call.Return(_a0, _a1, _a2)
 	return _c
 }
 
-func (_c *MockSpaceResourceStore_Index_Call) RunAndReturn(run func(context.Context, string) ([]database.SpaceResource, error)) *MockSpaceResourceStore_Index_Call {
+func (_c *MockSpaceResourceStore_Index_Call) RunAndReturn(run func(context.Context, string, int, int) ([]database.SpaceResource, int, error)) *MockSpaceResourceStore_Index_Call {
 	_c.Call.Return(run)
 	return _c
 }

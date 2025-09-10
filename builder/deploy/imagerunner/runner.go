@@ -12,7 +12,6 @@ type Runner interface {
 	Stop(context.Context, *types.StopRequest) (*types.StopResponse, error)
 	Purge(context.Context, *types.PurgeRequest) (*types.PurgeResponse, error)
 	Status(context.Context, *types.StatusRequest) (*types.StatusResponse, error)
-	StatusAll(context.Context) (map[string]types.StatusResponse, error)
 	Logs(context.Context, *types.LogsRequest) (<-chan string, error)
 	Exist(context.Context, *types.CheckRequest) (*types.StatusResponse, error)
 	GetReplica(context.Context, *types.StatusRequest) (*types.ReplicaResponse, error)
@@ -21,7 +20,6 @@ type Runner interface {
 	GetClusterById(ctx context.Context, clusterId string) (*types.ClusterResponse, error)
 	UpdateCluster(ctx context.Context, data *types.ClusterRequest) (*types.UpdateClusterResponse, error)
 	SubmitWorkFlow(context.Context, *types.ArgoWorkFlowReq) (*types.ArgoWorkFlowRes, error)
-	ListWorkFlows(context.Context, string, int, int) (*types.ArgoWorkFlowListRes, error)
 	DeleteWorkFlow(context.Context, types.ArgoWorkFlowDeleteReq) (*httpbase.R, error)
 	GetWorkFlow(context.Context, types.ArgoWorkFlowDeleteReq) (*types.ArgoWorkFlowRes, error)
 }

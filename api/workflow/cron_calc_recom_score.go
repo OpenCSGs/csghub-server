@@ -16,7 +16,7 @@ func CalcRecomScoreWorkflow(ctx workflow.Context) error {
 	}
 
 	options := workflow.ActivityOptions{
-		StartToCloseTimeout: time.Hour * 1,
+		StartToCloseTimeout: time.Hour * 2,
 		RetryPolicy:         retryPolicy,
 	}
 
@@ -26,5 +26,6 @@ func CalcRecomScoreWorkflow(ctx workflow.Context) error {
 		logger.Error("failed to calc recom score", "error", err)
 		return err
 	}
+	logger.Info("calc recom score workflow completed")
 	return nil
 }

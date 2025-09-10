@@ -2,6 +2,7 @@ package component
 
 import (
 	"context"
+	mockReporter "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component/reporter"
 	"testing"
 
 	"github.com/argoproj/argo-workflows/v3/pkg/apis/workflow/v1alpha1"
@@ -24,17 +25,20 @@ func TestArgoComponent_CreateWorkflow(t *testing.T) {
 	cis := mockdb.NewMockClusterInfoStore(t)
 	pool.ClusterStore = cis
 	kubeClient := fake.NewSimpleClientset()
-	pool.Clusters = append(pool.Clusters, cluster.Cluster{
+	pool.Clusters = append(pool.Clusters, &cluster.Cluster{
 		CID:           "config",
 		ID:            "test",
 		Client:        kubeClient,
 		KnativeClient: knativefake.NewSimpleClientset(),
 		ArgoClient:    argofake.NewSimpleClientset(),
 	})
+
+	reporter := mockReporter.NewMockLogCollector(t)
 	wfc := workFlowComponentImpl{
 		wf:          argoStore,
 		clusterPool: pool,
 		config:      &config.Config{},
+		logReporter: reporter,
 	}
 	cis.EXPECT().ByClusterID(mock.Anything, "test").Return(database.ClusterInfo{
 		ClusterID:     "test",
@@ -53,6 +57,8 @@ func TestArgoComponent_CreateWorkflow(t *testing.T) {
 		RepoIds:   []string{"test"},
 		Status:    v1alpha1.WorkflowPhase(v1alpha1.NodePending),
 	}, nil)
+	reporter.EXPECT().Report(mock.Anything)
+
 	wf, err := wfc.CreateWorkflow(ctx, types.ArgoWorkFlowReq{
 		ClusterID: "test",
 		RepoType:  string(types.ModelRepo),
@@ -134,7 +140,7 @@ func TestArgoComponent_DeleteWorkflow(t *testing.T) {
 	pool.ClusterStore = cis
 	kubeClient := fake.NewSimpleClientset()
 	argoClient := argofake.NewSimpleClientset()
-	pool.Clusters = append(pool.Clusters, cluster.Cluster{
+	pool.Clusters = append(pool.Clusters, &cluster.Cluster{
 		CID:           "config",
 		ID:            "test",
 		Client:        kubeClient,
@@ -145,6 +151,7 @@ func TestArgoComponent_DeleteWorkflow(t *testing.T) {
 		wf:          argoStore,
 		clusterPool: pool,
 		config:      &config.Config{},
+		logReporter: mockReporter.NewMockLogCollector(t),
 	}
 	cis.EXPECT().ByClusterID(mock.Anything, "test").Return(database.ClusterInfo{
 		ClusterID:     "test",

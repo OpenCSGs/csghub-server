@@ -395,6 +395,55 @@ func TestUserHandler_GetRunServerless(t *testing.T) {
 	})
 }
 
+func TestUserHandler_CreateUserResource(t *testing.T) {
+	tester := NewUserTester(t).WithHandleFunc(func(h *UserHandler) gin.HandlerFunc {
+		return h.CreateUserResource
+	})
+
+	tester.mocks.user.EXPECT().CreateUserResource(tester.Ctx(), types.CreateUserResourceReq{
+		Username:     "u",
+		OrderDetails: []types.AcctOrderDetailReq{{ResourceID: "r", SkuType: types.SKUCSGHub}},
+	}).Return(nil)
+	tester.WithUser().WithParam("username", "u").WithBody(t, &types.CreateUserResourceReq{
+		OrderDetails: []types.AcctOrderDetailReq{{ResourceID: "r"}},
+	}).Execute()
+
+	tester.ResponseEq(t, 200, tester.OKText, nil)
+}
+
+func TestUserHandler_DeleteUserResource(t *testing.T) {
+	tester := NewUserTester(t).WithHandleFunc(func(h *UserHandler) gin.HandlerFunc {
+		return h.DeleteUserResource
+	})
+
+	tester.mocks.user.EXPECT().DeleteUserResource(tester.Ctx(), "u", int64(123)).Return(nil)
+	tester.WithUser().WithParam("username", "u").WithParam("id", "123").Execute()
+
+	tester.ResponseEq(t, 200, tester.OKText, nil)
+}
+
+func TestUserHandler_GetUserResource(t *testing.T) {
+	tester := NewUserTester(t).WithHandleFunc(func(h *UserHandler) gin.HandlerFunc {
+		return h.GetUserResource
+	})
+	tester.WithUser()
+
+	tester.mocks.user.EXPECT().GetUserResource(tester.Ctx(), types.GetUserResourceReq{
+		CurrentUser: "u",
+		PageOpts: types.PageOpts{
+			Page:     1,
+			PageSize: 10,
+		},
+	}).Return([]types.UserResourcesResp{{ID: 123}}, 100, nil)
+	tester.WithParam("username", "u").AddPagination(1, 10).Execute()
+
+	tester.ResponseEqSimple(t, 200, gin.H{
+		"message": "OK",
+		"data":    []types.UserResourcesResp{{ID: 123}},
+		"total":   100,
+	})
+}
+
 func TestUserHandler_Prompts(t *testing.T) {
 	tester := NewUserTester(t).WithHandleFunc(func(h *UserHandler) gin.HandlerFunc {
 		return h.Prompts

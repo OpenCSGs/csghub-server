@@ -5,6 +5,7 @@ package common
 const (
 	Pending = 0
 	// step one: build
+	BuildInQueue = 10
 	Building     = 11
 	BuildFailed  = 12
 	BuildSuccess = 13

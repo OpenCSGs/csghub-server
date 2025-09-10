@@ -23,6 +23,7 @@ import (
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
 	"opencsg.com/csghub-server/component"
+	"opencsg.com/csghub-server/component/validator"
 )
 
 func NewRepoHandler(config *config.Config) (*RepoHandler, error) {
@@ -169,10 +170,6 @@ func (h *RepoHandler) ValidateYaml(ctx *gin.Context) {
 // @Router       /{repo_type}/{namespace}/{name}/raw/{file_path} [post]
 func (h *RepoHandler) CreateFile(ctx *gin.Context) {
 	userName := httpbase.GetCurrentUser(ctx)
-	if userName == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	var req *types.CreateFileReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -223,10 +220,6 @@ func (h *RepoHandler) CreateFile(ctx *gin.Context) {
 // @Router       /{repo_type}/{namespace}/{name}/raw/{file_path} [put]
 func (h *RepoHandler) UpdateFile(ctx *gin.Context) {
 	userName := httpbase.GetCurrentUser(ctx)
-	if userName == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	var req *types.UpdateFileReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
@@ -557,10 +550,6 @@ func (h *RepoHandler) DownloadFile(ctx *gin.Context) {
 		}
 	}
 
-	s3Internal := ctx.GetHeader("X-OPENCSG-S3-Internal")
-	if s3Internal == "true" {
-		ctx.Set("X-OPENCSG-S3-Internal", true)
-	}
 	reader, size, url, err := h.c.DownloadFile(ctx.Request.Context(), req, currentUser)
 	if err != nil {
 		slog.Error("Failed to download repo file", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err), slog.Any("req", req))
@@ -942,10 +931,6 @@ func (h *RepoHandler) IncrDownloads(ctx *gin.Context) {
 
 func (h *RepoHandler) UploadFile(ctx *gin.Context) {
 	userName := httpbase.GetCurrentUser(ctx)
-	if userName == "" {
-		httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
-		return
-	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("Failed to get namespace from context", "error", err)
@@ -1066,6 +1051,7 @@ func (h *RepoHandler) ResolveDownload(ctx *gin.Context) {
 }
 
 func (h *RepoHandler) HeadSDKDownload(ctx *gin.Context) {
+	var repoCommit string
 	currentUser := httpbase.GetCurrentUser(ctx)
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
@@ -1090,7 +1076,7 @@ func (h *RepoHandler) HeadSDKDownload(ctx *gin.Context) {
 		RepoType:  common.RepoTypeFromContext(ctx),
 	}
 
-	file, err := h.c.HeadDownloadFile(ctx.Request.Context(), req, currentUser)
+	file, commit, err := h.c.HeadDownloadFile(ctx.Request.Context(), req, currentUser)
 	if err != nil {
 		if errors.Is(err, errorx.ErrUnauthorized) {
 			slog.Error("permission denied when accessing repo head", slog.String("repo_type", string(req.RepoType)), slog.Any("path", fmt.Sprintf("%s/%s", namespace, name)))
@@ -1108,10 +1094,13 @@ func (h *RepoHandler) HeadSDKDownload(ctx *gin.Context) {
 		httpbase.ServerError(ctx, err)
 		return
 	}
+	if commit != nil {
+		repoCommit = commit.ID
+	}
 
 	slog.Debug("Head download repo file succeed", slog.String("repo_type", string(req.RepoType)), slog.String("name", name), slog.String("path", req.Path), slog.String("ref", req.Ref), slog.Int64("contentLength", file.Size))
 	ctx.Header("Content-Length", strconv.Itoa(int(file.Size)))
-	ctx.Header("X-Repo-Commit", file.SHA)
+	ctx.Header("X-Repo-Commit", repoCommit)
 	ctx.Header("ETag", file.SHA)
 	ctx.Status(http.StatusOK)
 }
@@ -1142,16 +1131,11 @@ func (h *RepoHandler) handleDownload(ctx *gin.Context, isResolve bool) {
 	} else {
 		branch = ctx.Param("branch")
 	}
-
-	s3Internal := ctx.GetHeader("X-OPENCSG-S3-Internal")
-	if s3Internal == "true" {
-		ctx.Set("X-OPENCSG-S3-Internal", true)
-	}
-
 	mappedBranch := ctx.Param("branch_mapped")
 	if mappedBranch != "" {
 		branch = mappedBranch
 	}
+
 	req := &types.GetFileReq{
 		Namespace: namespace,
 		Name:      name,
@@ -1467,7 +1451,7 @@ func (h *RepoHandler) DeleteMirror(ctx *gin.Context) {
 
 // RuntimeFramework godoc
 // @Security     ApiKey
-// @Summary      List repo runtime framework
+// @Summary      [Deprecated: use GET:/{repo_type}/{namespace}/{name}/runtime_framework_v2 instead]
 // @Description  List repo runtime framework
 // @Tags         RuntimeFramework
 // @Accept       json
@@ -1477,7 +1461,7 @@ func (h *RepoHandler) DeleteMirror(ctx *gin.Context) {
 // @Param        name path string true "name"
 // @Param        current_user query string false "current user"
 // @Param 		 deploy_type query int false "deploy_type" Enums(0, 1, 2, 4) default(1)
-// @Success      200  {object}  string "OK"
+// @Success      200  {object}  types.Response{data=[]types.RuntimeFramework} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /{repo_type}/{namespace}/{name}/runtime_framework [get]
@@ -1507,6 +1491,57 @@ func (h *RepoHandler) RuntimeFrameworkList(ctx *gin.Context) {
 		return
 	}
 	response, err := h.c.ListRuntimeFramework(ctx.Request.Context(), repoType, namespace, name, deployType)
+	if err != nil {
+		slog.Error("fail to list runtime framework", slog.String("error", err.Error()))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	httpbase.OK(ctx, response)
+}
+
+// RuntimeFramework godoc
+// @Security     ApiKey
+// @Summary      List repo runtime framework
+// @Description  List repo runtime framework
+// @Tags         RuntimeFramework
+// @Accept       json
+// @Produce      json
+// @Param        repo_type path string true "models,spaces" Enums(models,spaces)
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        current_user query string false "current user"
+// @Param 		 deploy_type query int false "deploy_type" Enums(0, 1, 2, 4) default(1)
+// @Success      200  {object}  types.Response{data=[]types.RuntimeFrameworkV2} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /{repo_type}/{namespace}/{name}/runtime_framework_v2 [get]
+func (h *RepoHandler) RuntimeFrameworkListV2(ctx *gin.Context) {
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	deployTypeStr := ctx.Query("deploy_type")
+	if deployTypeStr == "" {
+		// backward compatibility for inferences
+		deployTypeStr = strconv.Itoa(types.InferenceType)
+	}
+	deployType, err := strconv.Atoi(deployTypeStr)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	slog.Debug("list runtime framework", slog.Any("namespace", namespace), slog.Any("name", name))
+	repoType := common.RepoTypeFromContext(ctx)
+	if repoType == types.UnknownRepo {
+		slog.Error("Bad request of repo type")
+		httpbase.BadRequest(ctx, "Bad request of repo type")
+		return
+	}
+	response, err := h.c.ListRuntimeFrameworkV2(ctx.Request.Context(), repoType, namespace, name, deployType)
 	if err != nil {
 		slog.Error("fail to list runtime framework", slog.String("error", err.Error()))
 		httpbase.ServerError(ctx, err)
@@ -1654,7 +1689,7 @@ func (h *RepoHandler) RuntimeFrameworkDelete(ctx *gin.Context) {
 // @Param        namespace path string true "namespace"
 // @Param        name path string true "name"
 // @Param        current_user query string false "current user"
-// @Success      200  {object}  string "OK"
+// @Success      200  {object}  types.Response{data=[]types.DeployRepo} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /{repo_type}/{namespace}/{name}/run [get]
@@ -1689,7 +1724,7 @@ func (h *RepoHandler) DeployList(ctx *gin.Context) {
 // @Param        name path string true "name"
 // @Param        id path string true "id"
 // @Param        current_user query string false "current user"
-// @Success      200  {object}  string "OK"
+// @Success      200  {object}  types.Response{data=types.DeployRepo} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      401  {object}  types.APIUnauthorized "Permission denied"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
@@ -1819,6 +1854,8 @@ func (h *RepoHandler) DeployInstanceLogs(ctx *gin.Context) {
 	ctx.Writer.WriteHeader(http.StatusOK)
 	ctx.Writer.Flush()
 
+	heartbeatTicker := time.NewTicker(30 * time.Second)
+	defer heartbeatTicker.Stop()
 	for {
 		select {
 		case <-ctx.Request.Context().Done():
@@ -1829,6 +1866,10 @@ func (h *RepoHandler) DeployInstanceLogs(ctx *gin.Context) {
 				ctx.SSEvent("Container", string(data))
 				ctx.Writer.Flush()
 			}
+		case <-heartbeatTicker.C:
+			// Send a heartbeat message
+			ctx.SSEvent("Heartbeat", "keep-alive")
+			ctx.Writer.Flush()
 		default:
 			// Add a small sleep to prevent CPU spinning when no data is available
 			time.Sleep(time.Second * 1)
@@ -2003,6 +2044,43 @@ func (h *RepoHandler) SyncMirror(ctx *gin.Context) {
 	httpbase.OK(ctx, nil)
 }
 
+// GetMirrorProgress godoc
+// @Security     ApiKey
+// @Summary      Get Mirror sync progress
+// @Tags         Repository
+// @Accept       json
+// @Produce      json
+// @Param        repo_type path string true "models,datasets,codes or spaces" Enums(models,datasets,codes,spaces)
+// @Param        namespace path string true "repo owner name"
+// @Param        name path string true "repo name"
+// @Success      200  {object}  types.Response{data=types.LFSSyncProgressResp} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /{repo_type}/{namespace}/{name}/mirror/progress [get]
+func (h *RepoHandler) MirrorProgress(ctx *gin.Context) {
+	repoType := common.RepoTypeFromContext(ctx)
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("failed to get namespace from context", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	currentUser := httpbase.GetCurrentUser(ctx)
+	progress, err := h.c.MirrorProgress(ctx.Request.Context(), repoType, namespace, name, currentUser)
+	if err != nil {
+		if errors.Is(err, errorx.ErrForbidden) {
+			slog.Debug("not allowed to get mirror progress for", slog.String("repo_type", string(repoType)), slog.String("path", fmt.Sprintf("%s/%s", namespace, name)), "error", err)
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
+
+		slog.Error("Failed to get mirror progress for", slog.String("repo_type", string(repoType)), slog.String("path", fmt.Sprintf("%s/%s", namespace, name)), "error", err)
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	httpbase.OK(ctx, progress)
+}
+
 func (h *RepoHandler) testStatus(ctx *gin.Context) {
 	ctx.Writer.Header().Set("Content-Type", "text/event-stream")
 	ctx.Writer.Header().Set("Cache-Control", "no-cache")
@@ -2133,7 +2211,7 @@ func (h *RepoHandler) DeployUpdate(ctx *gin.Context) {
 // @Param        name path string true "name"
 // @Param        current_user query string false "current user"
 // @Param 		 deploy_type query int false "deploy_type" Enums(0, 1, 2) default(1)
-// @Success      200  {object}  string "OK"
+// @Success      200  {object}  types.Response{data=[]types.RuntimeFramework} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /models/runtime_framework [get]
@@ -2177,7 +2255,7 @@ func (h *RepoHandler) RuntimeFrameworkListWithType(ctx *gin.Context) {
 // @Param        name path string true "name"
 // @Param        id path string true "id"
 // @Param        current_user query string false "current user"
-// @Success      200  {object}  string "OK"
+// @Success      200  {object}  types.Response{data=types.DeployRepo} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /models/{namespace}/{name}/serverless/{id} [get]
@@ -2301,6 +2379,8 @@ func (h *RepoHandler) ServerlessLogs(ctx *gin.Context) {
 	ctx.Writer.WriteHeader(http.StatusOK)
 	ctx.Writer.Flush()
 
+	heartbeatTicker := time.NewTicker(30 * time.Second)
+	defer heartbeatTicker.Stop()
 	for {
 		select {
 		case <-ctx.Request.Context().Done():
@@ -2311,6 +2391,10 @@ func (h *RepoHandler) ServerlessLogs(ctx *gin.Context) {
 				ctx.SSEvent("Container", string(data))
 				ctx.Writer.Flush()
 			}
+		case <-heartbeatTicker.C:
+			// Send a heartbeat message
+			ctx.SSEvent("Heartbeat", "keep-alive")
+			ctx.Writer.Flush()
 		default:
 			// Add a small sleep to prevent CPU spinning when no data is available
 			time.Sleep(time.Second * 1)
@@ -2480,6 +2564,115 @@ func (h *RepoHandler) ServerlessUpdate(ctx *gin.Context) {
 	}
 
 	httpbase.OK(ctx, nil)
+}
+
+// GetRemoteTree godoc
+// @Security     ApiKey
+// @Summary      Get file tree
+// @Tags         Repository
+// @Accept       json
+// @Produce      json
+// @Param        repo_type path string true "models,dataset,codes or spaces" Enums(models,datasets,codes,spaces)
+// @Param	     namespace path string true "repo owner name"
+// @Param	     name path string true "repo name"
+// @Param        path path string false "dir to list"
+// @Param        ref path string false "branch or tag"
+// @Param        limit query int false "limit of records return"
+// @Param        cursor query string false "pagination cursor"
+// @Success      200  {object}  types.ResponseWithTotal{data=types.GetRepoFileTreeResp} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /{repo_type}/{namespace}/{name}/refs/{ref}/remote_tree/{path} [get]
+func (h *RepoHandler) RemoteTree(ctx *gin.Context) {
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	currentUser := httpbase.GetCurrentUser(ctx)
+	req := &types.GetTreeRequest{
+		Namespace:   namespace,
+		Name:        name,
+		Path:        ctx.Param("path"),
+		Ref:         ctx.Param("ref"),
+		RepoType:    common.RepoTypeFromContext(ctx),
+		CurrentUser: currentUser,
+		Limit:       cast.ToInt(ctx.Query("limit")),
+		Cursor:      ctx.Query("cursor"),
+	}
+	tree, err := h.c.RemoteTree(ctx.Request.Context(), req)
+	if err != nil {
+		if errors.Is(err, errorx.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
+		slog.Error(
+			"Failed to get remote tree", slog.String("repo_type", string(req.RepoType)),
+			slog.Any("error", err), slog.Any("req", req),
+		)
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	httpbase.OK(ctx, tree)
+}
+
+// GetRepoCommitDiff godoc
+// @Security     ApiKey
+// @Summary      Get commit diff of repository and data field of response need to be decode with base64
+// @Tags         Repository
+// @Accept       json
+// @Produce      json
+// @Param        repo_type path string true "models,datasets,codes or spaces" Enums(models,datasets,codes,spaces)
+// @Param        namespace path string true "repo owner name"
+// @Param        name path string true "repo name"
+// @Param        current_user query string false "current user name"
+// @Param        left_commit_id query string true "previous commit id"
+// @Param        right_commit_id query string false "current commit id"
+// @Success      200  {object}  types.Response{data=[]types.GiteaCallbackPushReq_Commit} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /{repo_type}/{namespace}/{name}/diff [get]
+func (h *RepoHandler) DiffBetweenTwoCommits(ctx *gin.Context) {
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	currentUser := httpbase.GetCurrentUser(ctx)
+	leftCommitId := ctx.Query("left_commit_id")
+	rightCommitId := ctx.Query("right_commit_id")
+
+	if leftCommitId == "" {
+		httpbase.BadRequest(ctx, "left_commit_id is required")
+		return
+	}
+	req := types.GetDiffBetweenCommitsReq{
+		Namespace:     namespace,
+		Name:          name,
+		RepoType:      common.RepoTypeFromContext(ctx),
+		LeftCommitID:  leftCommitId,
+		RightCommitID: rightCommitId,
+		CurrentUser:   currentUser,
+	}
+	diff, err := h.c.DiffBetweenTwoCommits(ctx.Request.Context(), req)
+	if err != nil {
+		slog.Error(
+			"Failed to get repo diff between two commits",
+			slog.String("repo_type", string(req.RepoType)),
+			slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	slog.Debug(
+		"Get repo commit with diff succeed",
+		slog.String("repo_type", string(req.RepoType)),
+		slog.String("name", name),
+		slog.String("left commit id", leftCommitId),
+		slog.String("right commit id", rightCommitId))
+	httpbase.OK(ctx, diff)
 }
 
 // RepoAllFiles      godoc
@@ -2727,4 +2920,69 @@ func (h *RepoHandler) CommitFilesHF(ctx *gin.Context) {
 		"commitUrl": fmt.Sprintf("%s/%s", namespace, name),
 		"commitOid": "",
 	})
+}
+
+// ChangePath    godoc
+// @Security     ApiKey
+// @Summary      Change the namespace of a repository
+// @Tags         Repository
+// @Accept       json
+// @Produce      json
+// @Param        repo_type path string true "models" Enums(models)
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        current_user query string true "current_user"
+// @Param        body body types.ChangePathReq true "deploy setting of inference"
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /admin/{repo_type}/{namespace}/{name}/change_path [post]
+func (h *RepoHandler) ChangePath(ctx *gin.Context) {
+	var (
+		req types.ChangePathReq
+		err error
+	)
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		slog.Error("invalid request body", slog.Any("error", err))
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	req.RepoType, err = common.RepoTypeFromString(ctx.Param("repo_type"))
+	if err != nil {
+		slog.Error("invalid repo type", slog.Any("error", err))
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	err = validator.ValidateRepoPath(req.NewPath)
+	if err != nil {
+		slog.Error("invalid new path", slog.Any("error", err))
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	currentUser := httpbase.GetCurrentUser(ctx)
+
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("invalid request body", slog.Any("error", err))
+		httpbase.BadRequest(ctx, err.Error())
+	}
+	req.Namespace = namespace
+	req.Name = name
+	req.CurrentUser = currentUser
+
+	err = h.c.ChangePath(ctx.Request.Context(), req)
+	if err != nil {
+		if errors.Is(err, errorx.ErrBadRequest) {
+			slog.Error("invalid request", slog.Any("error", err))
+			httpbase.BadRequest(ctx, err.Error())
+			return
+		}
+		slog.Error("failed to commit files", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	httpbase.OK(ctx, nil)
 }

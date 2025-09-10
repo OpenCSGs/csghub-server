@@ -2,10 +2,14 @@ package checker
 
 import (
 	"bufio"
+	"context"
 	"encoding/base64"
+	"log/slog"
 	"strings"
+	"time"
 
 	"opencsg.com/csghub-server/builder/sensitive"
+	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 )
 
@@ -18,10 +22,12 @@ func Init(config *config.Config) {
 	}
 	//init aliyun green checker
 	contentChecker = sensitive.NewAliyunGreenCheckerFromConfig(config)
-	//init local word checker
-	localWordChecker = NewDFA()
 
+	//init default local word checker, to make sure it is not nil
+	localWordChecker = NewDFA()
 	localWordChecker.BuildDFA(getSensitiveWordList(config.Moderation.EncodedSensitiveWords))
+
+	go refreshLocalWordChecker()
 }
 
 // InitWithContentChecker supports custom sensitive checker, this func mostly used in unit test
@@ -74,4 +80,45 @@ func commaSplit(data []byte, atEOF bool) (advance int, token []byte, err error) 
 	// If we haven't found a comma and we're not at EOF,
 	// we need more data
 	return 0, nil, nil
+}
+
+// refreshLocalWordChecker periodically refreshes the local sensitive word checker by
+// loading sensitive words from the database and rebuilding the DFA. It runs in an
+// infinite loop with a delay between iterations. In case of an error while retrieving
+// the word list, it logs the error and retries after a delay.
+func refreshLocalWordChecker() {
+	const interval = 5 * time.Minute
+	wordsetStore := database.NewSensitiveWordSetStore()
+	wordsetFilter := &database.SensitiveWordSetFilter{}
+	wordsetFilter.Enabled(true)
+	for {
+		//load sensitive words from database
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		wordSets, err := wordsetStore.List(ctx, wordsetFilter)
+		cancel()
+		if err != nil {
+			slog.Error("refreshLocalWordChecker failed to load sensitive word list from db", slog.Any("error", err))
+			time.Sleep(interval)
+			continue
+		}
+
+		if len(wordSets) == 0 {
+			slog.Info("refreshLocalWordChecker skip as sensitive word list is empty in db")
+			time.Sleep(interval)
+			continue
+		}
+
+		newChecker := NewDFA()
+		var words []string
+		for _, wordSet := range wordSets {
+			words = append(words, strings.Split(wordSet.WordList, ",")...)
+		}
+
+		newChecker.BuildDFA(words)
+		// update the reference
+		localWordChecker = newChecker
+		slog.Info("refreshLocalWordChecker success", slog.Int("word_count", len(words)), slog.Int("word_set_count", len(wordSets)))
+
+		time.Sleep(interval)
+	}
 }

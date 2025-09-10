@@ -338,3 +338,30 @@ func TestAccessTokenComponentImpl_RefreshToken(t *testing.T) {
 		require.Equal(t, newToken.ExpiredAt, resp.ExpireAt)
 	})
 }
+
+func TestAccessTokenComponentImpl_GetOrCreateFirstAvaiToken(t *testing.T) {
+	t.Run("get existing token", func(t *testing.T) {
+		mockTokens := []database.AccessToken{
+			{
+				Token:       "existing-token",
+				Name:        "first_token",
+				Application: "git",
+				Permission:  "read",
+				User:        &database.User{Username: "user1", UUID: "user-uuid"},
+				ExpiredAt:   time.Now().Add(time.Hour),
+			},
+		}
+
+		mockTokenStore := mockdb.NewMockAccessTokenStore(t)
+		mockTokenStore.EXPECT().FindByUser(mock.Anything, "user1", "git").
+			Return(mockTokens, nil).Once()
+
+		ac := &accessTokenComponentImpl{
+			ts: mockTokenStore,
+		}
+
+		token, err := ac.GetOrCreateFirstAvaiToken(context.Background(), "user1", "git", "first_token")
+		require.NoError(t, err)
+		require.Equal(t, "existing-token", token)
+	})
+}

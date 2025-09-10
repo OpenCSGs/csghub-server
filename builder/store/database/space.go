@@ -163,7 +163,7 @@ func (s *spaceStoreImpl) ByUserLikes(ctx context.Context, userID int64, per, pag
 		NewSelect().
 		Model(&spaces).
 		Relation("Repository.Tags").
-		Where("repository.id in (select repo_id from user_likes where user_id=?)", userID)
+		Where("repository.id in (select repo_id from user_likes where user_id=? and deleted_at is NULL)", userID)
 
 	query = query.Order("space.created_at DESC").
 		Limit(per).

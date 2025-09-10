@@ -4,17 +4,25 @@ import (
 	"time"
 )
 
+const LFSPrefix = "version https://git-lfs.github.com/spec/v1"
+
 type RepoBranchCommit struct {
 	ID string `json:"id"`
 }
 
 type CreateModelReq struct {
-	BaseModel string `json:"base_model"`
+	BaseModel       string `json:"base_model"`
+	ReportURL       string `json:"report_url"`
+	MediumRiskCount int    `json:"medium_risk_count"`
+	HighRiskCount   int    `json:"high_risk_count"`
 	CreateRepoReq
 }
 
 type UpdateModelReq struct {
-	BaseModel *string `json:"base_model"`
+	BaseModel       *string `json:"base_model"`
+	ReportURL       string  `json:"report_url"`
+	MediumRiskCount int     `json:"medium_risk_count"`
+	HighRiskCount   int     `json:"high_risk_count"`
 	UpdateRepoReq
 }
 
@@ -26,6 +34,8 @@ type UpdateRepoReq struct {
 	Nickname    *string        `json:"nickname" example:"model display name"`
 	Description *string        `json:"description"`
 	Private     *bool          `json:"private" example:"false"`
+	// a sign to indicate if the request is from admin
+	Admin string `json:"-"`
 }
 
 // make sure UpdateModelReq implements SensitiveRequest interface
@@ -81,13 +91,14 @@ type CreateRepoReq struct {
 	Namespace     string         `json:"namespace" example:"user_or_org_name"`
 	Name          string         `json:"name" example:"model_name_1"`
 	Nickname      string         `json:"nickname" example:"model display name"`
-	Description   string         `json:"description"`
+	Description   string         `json:"description" binding:"lt=1000"`
 	Private       bool           `json:"private"`
 	Labels        string         `json:"labels" example:""`
-	License       string         `json:"license" example:"MIT"`
+	License       string         `json:"license" example:"MIT" binding:"lt=100"`
 	Readme        string         `json:"readme"`
 	DefaultBranch string         `json:"default_branch" example:"main"`
 	RepoType      RepositoryType `json:"type"`
+	Admin         string         `json:"admin"`
 	ToolCount     int            `json:"tool_count"`
 	StarCount     int            `json:"star_count"`
 }
@@ -220,10 +231,13 @@ const (
 type ModelType string
 
 const (
-	GGUFEntryPoint string    = "GGUF_ENTRY_POINT"
-	GGUF           ModelType = "gguf"
-	Safetensors    ModelType = "safetensors"
-	Unknown        ModelType = "unknown"
+	GGUF        ModelType = "gguf"
+	Safetensors ModelType = "safetensors"
+	Unknown     ModelType = "unknown"
+)
+
+const (
+	GGUFEntryPoint = "GGUF_ENTRY_POINT"
 )
 
 type ModelRunReq struct {
@@ -308,6 +322,7 @@ const (
 	FinetuneType   = 2    // finetune
 	ServerlessType = 3    // serverless
 	EvaluationType = 4    // evaluation
+	NotebookType   = 5    // notebook
 	UnknownType    = -1   // unknown case
 )
 

@@ -4,8 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"net/http"
 	"slices"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
@@ -25,15 +25,21 @@ func NewCodeHandler(config *config.Config) (*CodeHandler, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error creating sensitive component:%w", err)
 	}
+	repo, err := component.NewRepoComponent(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating repo component:%w", err)
+	}
 	return &CodeHandler{
 		code:      tc,
 		sensitive: sc,
+		repo:      repo,
 	}, nil
 }
 
 type CodeHandler struct {
 	code      component.CodeComponent
 	sensitive component.SensitiveComponent
+	repo      component.RepoComponent
 }
 
 // CreateCode   godoc
@@ -96,6 +102,7 @@ func (h *CodeHandler) Create(ctx *gin.Context) {
 // @Param        framework_tag query string false "filter by framework tag"
 // @Param        license_tag query string false "filter by license tag"
 // @Param        language_tag query string false "filter by language tag"
+// @Param        need_op_weight query bool false "need op weight" default(false)
 // @Param        sort query string false "sort by"
 // @Param        source query string false "source" Enums(opencsg, huggingface, local)
 // @Param        per query int false "per" default(20)
@@ -115,21 +122,37 @@ func (h *CodeHandler) Index(ctx *gin.Context) {
 		return
 	}
 	filter = getFilterFromContext(ctx, filter)
-	if !slices.Contains[[]string](types.Sorts, filter.Sort) {
+	if !slices.Contains(types.Sorts, filter.Sort) {
 		msg := fmt.Sprintf("sort parameter must be one of %v", types.Sorts)
+		err := errorx.ReqParamInvalid(errors.New(msg),
+			errorx.Ctx().
+				Set("param", "sort").
+				Set("provided", filter.Sort).
+				Set("allowed", types.Sorts))
 		slog.Error("Bad request format,", slog.String("error", msg))
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": msg})
+		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 
-	if filter.Source != "" && !slices.Contains[[]string](types.Sources, filter.Source) {
+	if filter.Source != "" && !slices.Contains(types.Sources, filter.Source) {
 		msg := fmt.Sprintf("source parameter must be one of %v", types.Sources)
+		err := errorx.ReqParamInvalid(errors.New(msg),
+			errorx.Ctx().
+				Set("param", "source").
+				Set("provided", filter.Source).
+				Set("allowed", types.Sources))
 		slog.Error("Bad request format,", slog.String("error", msg))
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": msg})
+		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 
-	codes, total, err := h.code.Index(ctx.Request.Context(), filter, per, page)
+	qNeedOpWeight := ctx.Query("need_op_weight")
+	needOpWeight, err := strconv.ParseBool(qNeedOpWeight)
+	if err != nil {
+		needOpWeight = false
+	}
+
+	codes, total, err := h.code.Index(ctx.Request.Context(), filter, per, page, needOpWeight)
 	if err != nil {
 		slog.Error("Failed to get codes", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -241,6 +264,8 @@ func (h *CodeHandler) Delete(ctx *gin.Context) {
 // @Param        namespace path string true "namespace"
 // @Param        name path string true "name"
 // @Param        current_user query string true "current_user"
+// @Param        need_op_weight query bool false "need op weight" default(false)
+// @Param        need_multi_sync query bool false "need multi sync" default(false)
 // @Success      200  {object}  types.Response{data=types.Code} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
@@ -253,7 +278,21 @@ func (h *CodeHandler) Show(ctx *gin.Context) {
 		return
 	}
 	currentUser := httpbase.GetCurrentUser(ctx)
-	detail, err := h.code.Show(ctx.Request.Context(), namespace, name, currentUser)
+
+	qNeedOpWeight := ctx.Query("need_op_weight")
+	needOpWeight, err := strconv.ParseBool(qNeedOpWeight)
+	if err != nil {
+		needOpWeight = false
+	}
+
+	qNeedMultiSync := ctx.Query("need_multi_sync")
+	needMultiSync, err := strconv.ParseBool(qNeedMultiSync)
+	if err != nil {
+		slog.Error("bad need_multi_sync params", slog.Any("need_multi_sync", qNeedMultiSync), slog.Any("error", err))
+		needMultiSync = false
+	}
+
+	detail, err := h.code.Show(ctx.Request.Context(), namespace, name, currentUser, needOpWeight, needMultiSync)
 	if err != nil {
 		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)

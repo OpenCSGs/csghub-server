@@ -12,6 +12,12 @@ import (
 	"opencsg.com/csghub-server/component"
 )
 
+var nonPipelineTriggerFiles = []string{
+	types.ReadmeFileName,
+	types.GitAttributesFileName,
+	types.Gitignore,
+}
+
 type spaceDeployWatcher struct {
 	ops []func() error
 	ss  database.SpaceStore
@@ -30,6 +36,10 @@ func WatchSpaceChange(req *types.GiteaCallbackPushReq, ss database.SpaceStore, s
 	if repoType != "spaces" {
 		return watcher
 	}
+	if onlyNonDeployFilesChanged(req.Commits) {
+		return watcher
+	}
+
 	// username = namespace in fullname of gitea
 	watcher.deploy(namespace, repoName, namespace)
 	return watcher
@@ -68,4 +78,27 @@ func (w *spaceDeployWatcher) deploy(namespace string, repoName string, currentUs
 		})
 
 	return w
+}
+
+func isNonDeployTriggerFile(filename string) bool {
+	for _, f := range nonPipelineTriggerFiles {
+		if f == filename {
+			return true
+		}
+	}
+	return false
+}
+
+func onlyNonDeployFilesChanged(commits []types.GiteaCallbackPushReq_Commit) bool {
+	for _, commit := range commits {
+		allFiles := append(append([]string{}, commit.Added...), commit.Modified...)
+		allFiles = append(allFiles, commit.Removed...)
+
+		for _, file := range allFiles {
+			if !isNonDeployTriggerFile(file) {
+				return false
+			}
+		}
+	}
+	return true
 }

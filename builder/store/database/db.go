@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
 	"strings"
 	"time"
 
@@ -55,14 +54,20 @@ func GetDB() *DB {
 	return defaultDB
 }
 
-func InitDB(config DBConfig) {
+// SetDB changes the default db connection globally
+func SetDB(db *DB) {
+	defaultDB = db
+}
+
+func InitDB(config DBConfig) error {
 	bg, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	var err error
 	defaultDB, err = NewDB(bg, config)
 	if err != nil {
-		log.Fatal("failed to initialize database", err.Error())
+		return fmt.Errorf("failed to initialize database error: %w", err)
 	}
+	return nil
 }
 
 // NewDB initializes a DB via config

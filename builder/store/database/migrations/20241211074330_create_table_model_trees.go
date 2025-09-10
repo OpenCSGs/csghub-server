@@ -5,15 +5,16 @@ import (
 	"fmt"
 
 	"github.com/uptrace/bun"
+	"opencsg.com/csghub-server/common/types"
 )
 
 type ModelTree struct {
-	ID           int64  `bun:",pk,autoincrement" json:"id"`
-	SourceRepoID int64  `bun:",notnull" json:"source_repo_id"`
-	SourcePath   string `bun:",notnull" json:"source_path"`
-	TargetRepoID int64  `bun:",notnull" json:"target_repo_id"`
-	TargetPath   string `bun:",notnull" json:"target_path"`
-	Relation     string `bun:",notnull" json:"relation"`
+	ID           int64               `bun:",pk,autoincrement" json:"id"`
+	SourceRepoID int64               `bun:",notnull" json:"source_repo_id"`
+	SourcePath   string              `bun:",notnull" json:"source_path"`
+	TargetRepoID int64               `bun:",notnull" json:"target_repo_id"`
+	TargetPath   string              `bun:",notnull" json:"target_path"`
+	Relation     types.ModelRelation `bun:",notnull" json:"relation"`
 	times
 }
 

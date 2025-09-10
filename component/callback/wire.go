@@ -10,6 +10,22 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
+type testSyncVersionGeneratorWithMocks struct {
+	*syncVersionGeneratorImpl
+	mocks *Mocks
+}
+
+func initializeTestSyncVersionGenerator(ctx context.Context, t interface {
+	Cleanup(func())
+	mock.TestingT
+}) *testSyncVersionGeneratorWithMocks {
+	wire.Build(
+		MockCallbackSuperSet, SyncVersionGeneratorSet,
+		wire.Struct(new(testSyncVersionGeneratorWithMocks), "*"),
+	)
+	return &testSyncVersionGeneratorWithMocks{}
+}
+
 type testGitCallbackWithMocks struct {
 	*gitCallbackComponentImpl
 	mocks *Mocks

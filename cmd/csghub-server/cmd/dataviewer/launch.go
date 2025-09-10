@@ -34,7 +34,10 @@ var launchCmd = &cobra.Command{
 			Dialect: database.DatabaseDialect(cfg.Database.Driver),
 			DSN:     cfg.Database.DSN,
 		}
-		database.InitDB(dbConfig)
+		if err := database.InitDB(dbConfig); err != nil {
+			slog.Error("failed to initialize database", slog.Any("error", err))
+			return fmt.Errorf("database initialization failed: %w", err)
+		}
 
 		stopOtel, err := instrumentation.SetupOTelSDK(context.Background(), cfg, "dataviewer-api")
 		if err != nil {

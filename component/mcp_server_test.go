@@ -256,13 +256,13 @@ func TestMCPServerComponent_Show(t *testing.T) {
 	mc.mocks.components.repo.EXPECT().GetUserRepoPermission(ctx, "user", dbrepo).Return(&types.UserRepoPermission{
 		CanRead: true,
 	}, nil)
+	mc.mocks.components.repo.EXPECT().GetMirrorTaskStatusAndSyncStatus(dbrepo).Return(
+		types.MirrorRepoSyncStart, types.SyncStatusInProgress,
+	)
 
 	mc.mocks.components.repo.EXPECT().GetNameSpaceInfo(ctx, "ns").Return(&types.Namespace{}, nil)
 
 	mc.mocks.stores.UserLikesMock().EXPECT().IsExist(ctx, "user", dbrepo.ID).Return(false, nil)
-	mc.mocks.components.repo.EXPECT().GetMirrorTaskStatusAndSyncStatus(dbrepo).Return(
-		types.MirrorRepoSyncStart, types.SyncStatusInProgress,
-	)
 
 	res, err := mc.Show(ctx, "ns", "n", "user", false, false)
 	require.Nil(t, err)

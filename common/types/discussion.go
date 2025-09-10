@@ -94,7 +94,7 @@ type ListRepoDiscussionResponse struct {
 }
 
 type CreateCommentRequest struct {
-	Content         string `json:"content" binding:"required,min=1,max=10000"`
+	Content         string `json:"content" binding:"required"`
 	CommentableID   int64  `json:"commentable_id"`
 	CommentableType string `json:"commentable_type"`
 	CurrentUser     string `json:"-"`
@@ -125,7 +125,7 @@ type CreateCommentResponse struct {
 
 type UpdateCommentRequest struct {
 	ID      int64  `json:"-"`
-	Content string `json:"content" binding:"required,min=1,max=10000"`
+	Content string `json:"content" binding:"required"`
 }
 
 // UpdateCommentRequest implements SensitiveRequestV2

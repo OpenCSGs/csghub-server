@@ -1,0 +1,8 @@
+{
+  "cluster.status.running": {
+    "other": "运行中"
+  },
+   "cluster.status.unavailable": {
+     "other": "Unavailable"
+  }
+}

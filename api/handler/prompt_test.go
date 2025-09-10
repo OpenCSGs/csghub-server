@@ -11,6 +11,7 @@ import (
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/testutil"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -92,35 +93,89 @@ func TestPromptHandler_Index(t *testing.T) {
 }
 
 func TestPromptHandler_ListPrompt(t *testing.T) {
-	tester := NewPromptTester(t).WithHandleFunc(func(h *PromptHandler) gin.HandlerFunc {
-		return h.ListPrompt
+	t.Run("ok case", func(t *testing.T) {
+
+		tester := NewPromptTester(t).WithHandleFunc(func(h *PromptHandler) gin.HandlerFunc {
+			return h.ListPrompt
+		})
+
+		tester.WithUser()
+		tester.mocks.prompt.EXPECT().Show(tester.Ctx(), "u", "r", "u", false, false).Return(&types.PromptRes{Name: "p"}, nil)
+		tester.mocks.prompt.EXPECT().ListPrompt(tester.Ctx(), types.PromptReq{
+			Namespace: "u", Name: "r", CurrentUser: "u",
+		}).Return([]types.PromptOutput{{FilePath: "fp"}}, nil)
+		tester.Execute()
+
+		tester.ResponseEq(t, 200, tester.OKText, gin.H{
+			"detail":  &types.PromptRes{Name: "p"},
+			"prompts": []types.PromptOutput{{FilePath: "fp"}},
+		})
 	})
 
-	tester.WithUser()
-	tester.mocks.prompt.EXPECT().Show(tester.Ctx(), "u", "r", "u").Return(&types.PromptRes{Name: "p"}, nil)
-	tester.mocks.prompt.EXPECT().ListPrompt(tester.Ctx(), types.PromptReq{
-		Namespace: "u", Name: "r", CurrentUser: "u",
-	}).Return([]types.PromptOutput{{FilePath: "fp"}}, nil)
-	tester.Execute()
+	t.Run("404 case for show", func(t *testing.T) {
+		tester := NewPromptTester(t).WithHandleFunc(func(h *PromptHandler) gin.HandlerFunc {
+			return h.ListPrompt
+		})
 
-	tester.ResponseEq(t, 200, tester.OKText, gin.H{
-		"detail":  &types.PromptRes{Name: "p"},
-		"prompts": []types.PromptOutput{{FilePath: "fp"}},
+		tester.WithUser()
+		tester.mocks.prompt.EXPECT().Show(tester.Ctx(), "u", "r", "u", false, false).Return(nil, errorx.ErrDatabaseNoRows)
+		tester.Execute()
+
+		tester.ResponseEqSimple(t, 404, httpbase.R{
+			Code: errorx.ErrDatabaseNoRows.Code(),
+			Msg:  errorx.ErrDatabaseNoRows.Error(),
+		})
+	})
+	t.Run("404 case for list prompt", func(t *testing.T) {
+		tester := NewPromptTester(t).WithHandleFunc(func(h *PromptHandler) gin.HandlerFunc {
+			return h.ListPrompt
+		})
+
+		tester.WithUser()
+		tester.mocks.prompt.EXPECT().Show(tester.Ctx(), "u", "r", "u", false, false).Return(&types.PromptRes{Name: "p"}, nil)
+		tester.mocks.prompt.EXPECT().ListPrompt(tester.Ctx(), types.PromptReq{
+			Namespace: "u", Name: "r", CurrentUser: "u",
+		}).Return(nil, errorx.ErrDatabaseNoRows)
+		tester.Execute()
+
+		tester.ResponseEqSimple(t, 404, httpbase.R{
+			Code: errorx.ErrDatabaseNoRows.Code(),
+			Msg:  errorx.ErrDatabaseNoRows.Error(),
+		})
 	})
 }
 
 func TestPromptHandler_GetPrompt(t *testing.T) {
-	tester := NewPromptTester(t).WithHandleFunc(func(h *PromptHandler) gin.HandlerFunc {
-		return h.GetPrompt
+	t.Run("ok case", func(t *testing.T) {
+		tester := NewPromptTester(t).WithHandleFunc(func(h *PromptHandler) gin.HandlerFunc {
+			return h.GetPrompt
+		})
+
+		tester.WithUser().WithParam("file_path", "fp")
+		tester.mocks.prompt.EXPECT().GetPrompt(tester.Ctx(), types.PromptReq{
+			Namespace: "u", Name: "r", CurrentUser: "u", Path: "fp",
+		}).Return(&types.PromptOutput{FilePath: "fp"}, nil)
+		tester.Execute()
+
+		tester.ResponseEq(t, 200, tester.OKText, &types.PromptOutput{FilePath: "fp"})
+	})
+	t.Run("404 case", func(t *testing.T) {
+		tester := NewPromptTester(t).WithHandleFunc(func(h *PromptHandler) gin.HandlerFunc {
+			return h.GetPrompt
+		})
+
+		tester.WithUser().WithParam("file_path", "fp")
+		tester.mocks.prompt.EXPECT().GetPrompt(tester.Ctx(), types.PromptReq{
+			Namespace: "u", Name: "r", CurrentUser: "u", Path: "fp",
+		}).Return(nil, errorx.ErrGitFileNotFound)
+		tester.Execute()
+
+		tester.ResponseEqSimple(t, 404, httpbase.R{
+			Code: errorx.ErrGitFileNotFound.(errorx.CustomError).Code(),
+			Msg:  errorx.ErrGitFileNotFound.Error(),
+		})
 	})
 
-	tester.WithUser().WithParam("file_path", "fp")
-	tester.mocks.prompt.EXPECT().GetPrompt(tester.Ctx(), types.PromptReq{
-		Namespace: "u", Name: "r", CurrentUser: "u", Path: "fp",
-	}).Return(&types.PromptOutput{FilePath: "fp"}, nil)
-	tester.Execute()
-
-	tester.ResponseEq(t, 200, tester.OKText, &types.PromptOutput{FilePath: "fp"})
 }
 
 func TestPromptHandler_CreatePrompt(t *testing.T) {

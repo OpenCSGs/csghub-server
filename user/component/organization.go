@@ -18,7 +18,7 @@ import (
 type OrganizationComponent interface {
 	FixOrgData(ctx context.Context, org *database.Organization) (*database.Organization, error)
 	Create(ctx context.Context, req *types.CreateOrgReq) (*types.Organization, error)
-	Index(ctx context.Context, username, search string, per, page int) ([]types.Organization, int, error)
+	Index(ctx context.Context, username, search string, per, page int, orgType, verifyStatus string) ([]types.Organization, int, error)
 	Get(ctx context.Context, orgName string) (*types.Organization, error)
 	Delete(ctx context.Context, req *types.DeleteOrgReq) error
 	Update(ctx context.Context, req *types.EditOrgReq) (*database.Organization, error)
@@ -127,7 +127,7 @@ func (c *organizationComponentImpl) Create(ctx context.Context, req *types.Creat
 	return org, err
 }
 
-func (c *organizationComponentImpl) Index(ctx context.Context, username, search string, per, page int) ([]types.Organization, int, error) {
+func (c *organizationComponentImpl) Index(ctx context.Context, username, search string, per, page int, orgType, verifyStatus string) ([]types.Organization, int, error) {
 	var (
 		err    error
 		total  int
@@ -139,7 +139,7 @@ func (c *organizationComponentImpl) Index(ctx context.Context, username, search 
 		return nil, 0, fmt.Errorf("failed to find user, error: %w", err)
 	}
 	if u.CanAdmin() {
-		dborgs, total, err = c.orgStore.Search(ctx, search, per, page)
+		dborgs, total, err = c.orgStore.Search(ctx, search, per, page, orgType, verifyStatus)
 		if err != nil {
 			return nil, 0, fmt.Errorf("failed to get organizations for admin user, error: %w", err)
 		}
@@ -152,12 +152,13 @@ func (c *organizationComponentImpl) Index(ctx context.Context, username, search 
 	var orgs []types.Organization
 	for _, dborg := range dborgs {
 		org := types.Organization{
-			Name:     dborg.Name,
-			Nickname: dborg.Nickname,
-			Homepage: dborg.Homepage,
-			Logo:     dborg.Logo,
-			OrgType:  dborg.OrgType,
-			Verified: dborg.Verified,
+			Name:         dborg.Name,
+			Nickname:     dborg.Nickname,
+			Homepage:     dborg.Homepage,
+			Logo:         dborg.Logo,
+			OrgType:      dborg.OrgType,
+			Verified:     dborg.Verified,
+			VerifyStatus: string(dborg.VerifyStatus),
 		}
 		orgs = append(orgs, org)
 	}
@@ -238,7 +239,7 @@ func (c *organizationComponentImpl) Update(ctx context.Context, req *types.EditO
 			return nil, fmt.Errorf("failed to get operator user, error: %w", err)
 		}
 		if org.UserID != operator.ID && !operator.CanAdmin() {
-			return nil, errorx.ErrForbiddenMsg("current user does not have permission to edit the organization.")
+			return nil, errorx.ErrForbiddenMsg("current user does not have permission to edit the organization, ")
 		}
 		newOwner, err := c.userStore.FindByUsername(ctx, *req.NewOwner)
 		if err != nil {

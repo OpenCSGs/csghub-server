@@ -94,3 +94,17 @@ func TestMirrorHandler_Index(t *testing.T) {
 		"total": 100,
 	})
 }
+
+func TestMirrorHandler_Statistics(t *testing.T) {
+	tester := NewMirrorTester(t).WithHandleFunc(func(h *MirrorHandler) gin.HandlerFunc {
+		return h.Statistics
+	})
+	tester.WithUser()
+
+	tester.mocks.mirror.EXPECT().Statistics(tester.Ctx()).Return(
+		[]types.MirrorStatusCount{{Count: 5}}, nil,
+	)
+	tester.Execute()
+
+	tester.ResponseEq(t, 200, tester.OKText, []types.MirrorStatusCount{{Count: 5}})
+}

@@ -119,7 +119,7 @@ func (w *repoRelationWatcher) toRepoIDsFromReadme(namespace, repoName, repoType,
 			paths = append(paths, fmt.Sprintf("%s%s", "mcpservers_", mcpServerItem))
 		}
 	}
-
+	slog.Info("git call back update relations", slog.Any("from_repo_type", repoType), slog.String("from_repo", fmt.Sprintf("%s/%s", namespace, repoName)), slog.Any("to_repos", paths))
 	if len(paths) > 0 {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		toRepos, err := w.rs.FindByGitPaths(ctx, paths, database.Columns("id"))

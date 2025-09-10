@@ -129,15 +129,11 @@ func IsValidName(name string) (bool, error) {
 
 func hasRepeatSpecialCharacter(s string) bool {
 	for i := 0; i < len(s)-1; i++ {
-		if isSpecialChar(s[i]) && isSpecialChar(s[i+1]) {
+		if strings.Contains("-_.", string(s[i])) && s[i] == s[i+1] {
 			return true
 		}
 	}
 	return false
-}
-
-func isSpecialChar(c byte) bool {
-	return c == '-' || c == '_' || c == '.'
 }
 
 func validate(name string) error {
@@ -199,7 +195,7 @@ func GetSourceTypeAndPathFromURL(url string) (string, string, error) {
 	path = strings.Join(strs[len(strs)-2:], "/")
 	if strings.Contains(url, "huggingface.co/") {
 		sourceType = enum.HFSource
-	} else if strings.Contains(url, "www.modelscope.cn") {
+	} else if strings.Contains(url, "www.modelscope.cn/") {
 		sourceType = enum.MSSource
 	} else if strings.Contains(url, "opencsg.com/") {
 		sourceType = enum.CSGSource

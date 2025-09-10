@@ -23,12 +23,13 @@
     }
   ],
   "engine_args": [
-    { "name": "ctx-size", "value": "4096", "format": "-c %s" },
+    { "name": "ctx-size", "value": "8192", "format": "-c %s" },
     { "name": "parallel", "value": "1", "format": "-np %s" },
     { "name": "batch-size", "value": "2048", "format": "-b %s" },
     { "name": "predict", "value": "-1", "format": "-n %s" },
     { "name": "threads", "value": "-1", "format": "-t %s" },
-    { "name": "gpu-layers", "value": "-1", "format": "-ngl %s" }
+    { "name": "gpu-layers", "value": "-1", "format": "-ngl %s" },
+    { "name": "custom-options", "value": "", "format": "%s" }
   ],
   "supported_archs": [
     "llama",

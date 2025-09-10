@@ -8,6 +8,7 @@ import (
 
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
+	bldmq "opencsg.com/csghub-server/builder/mq"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -21,47 +22,65 @@ type EventConfig struct {
 
 type DLQEventConfig struct {
 	EventConfig
-	MeterSubjectName string // subject of meter dlq
+	FeeSubjectName      string // subject of fee dlq
+	MeterSubjectName    string // subject of meter dlq
+	RechargeSubjectName string // subject of recharge dlq
 }
 
 type RequestSubject struct {
-	fee           string // fee charging subject
-	token         string // token subject
-	quota         string // quota subject
-	duration      string // duration subject
-	deployService string // service update subject
+	fee             string // fee charging subject
+	token           string // token subject
+	quota           string // quota subject
+	subscription    string // subscription subject
+	orderExpired    string // subject name for pub notification of order expired
+	rechargeSucceed string //
+	subChange       string // subject name for subscription change
 }
 
 var (
 	nats_connect_timeout time.Duration = 2 * time.Second  // second
 	nats_reconnect_wait  time.Duration = 10 * time.Second // second
 
-	dlqCfg EventConfig = EventConfig{
-		StreamName:   "accountingDlqStream", // DLQ
-		ConsumerName: "accountingDlqDurableConsumer",
+	feeCfg = EventConfig{
+		StreamName:   bldmq.AccountingEventGroup.StreamName, // fee request
+		ConsumerName: bldmq.AccountingEventGroup.ConsumerName,
 	}
 
-	dlq DLQEventConfig = DLQEventConfig{
-		EventConfig:      dlqCfg,
-		MeterSubjectName: "accounting.dlq.meter",
+	dlqCfg = EventConfig{
+		StreamName:   bldmq.AccountingDlqGroup.StreamName, // DLQ
+		ConsumerName: bldmq.AccountingDlqGroup.ConsumerName,
 	}
 
-	meterCfg EventConfig = EventConfig{
-		StreamName:   "meteringEventStream", // metering request
-		ConsumerName: "metertingServerDurableConsumer",
+	dlq = DLQEventConfig{
+		EventConfig:         dlqCfg,
+		FeeSubjectName:      bldmq.DLQFeeSubject,
+		MeterSubjectName:    bldmq.DLQMeterSubject,
+		RechargeSubjectName: bldmq.DLQRechargeSubject,
 	}
-	svcCfg = EventConfig{
-		StreamName:   "deployServiceUpdateStream", // order
-		ConsumerName: "deployServiceUpdateConsumer",
+
+	meterCfg = EventConfig{
+		StreamName:   bldmq.MeteringEventGroup.StreamName, // metering request
+		ConsumerName: bldmq.MeteringEventGroup.ConsumerName,
 	}
+
+	orderCfg = EventConfig{
+		StreamName:   bldmq.AccountingOrderGroup.StreamName, // order
+		ConsumerName: bldmq.AccountingOrderGroup.ConsumerName,
+	}
+
+	rechargeCfg = EventConfig{
+		StreamName:   bldmq.RechargeGroup.StreamName,
+		ConsumerName: bldmq.RechargeGroup.ConsumerName,
+	}
+
 	highPriorityMsgCfg = EventConfig{
-		StreamName:   "highPriorityMsgStream",
-		ConsumerName: "highPriorityMsgConsumer",
+		StreamName:   bldmq.HighPriorityMsgGroup.StreamName,
+		ConsumerName: bldmq.HighPriorityMsgGroup.ConsumerName,
 	}
 
 	normalPriorityMsgCfg = EventConfig{
-		StreamName:   "normalPriorityMsgStream",
-		ConsumerName: "normalPriorityMsgConsumer",
+		StreamName:   bldmq.NormalPriorityMsgGroup.StreamName,
+		ConsumerName: bldmq.NormalPriorityMsgGroup.ConsumerName,
 	}
 )
 
@@ -70,15 +89,23 @@ type NatsHandler struct {
 
 	msgFetchTimeoutInSec int
 	feeReqSub            RequestSubject
-	meterReqSub          RequestSubject
-	serviceReqSub        RequestSubject
+	orderReqSub          RequestSubject
+	rechargeReqSub       RequestSubject
+	feeEvtCfg            jetstream.StreamConfig
+	feeConsumerCfg       jetstream.ConsumerConfig
 	dlqEvtCfg            jetstream.StreamConfig
-	svcEvtCfg            jetstream.StreamConfig
 	meterEvtCfg          jetstream.StreamConfig
 	meterConsumerCfg     jetstream.ConsumerConfig
+	orderEvtCfg          jetstream.StreamConfig
+	orderConsumerCfg     jetstream.ConsumerConfig
+	rechargeEvtCfg       jetstream.StreamConfig
+	rechargeConsumerCfg  jetstream.ConsumerConfig
 
 	js                   jetstream.JetStream
+	feeJsc               jetstream.Consumer
 	meterJsc             jetstream.Consumer
+	orderJsc             jetstream.Consumer
+	rechargeJsc          jetstream.Consumer
 	highPriorityMsgJsc   jetstream.Consumer
 	normalPriorityMsgJsc jetstream.Consumer
 
@@ -109,29 +136,46 @@ func NewNats(config *config.Config) (*NatsHandler, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	dlqEC, _ := initStreamAndConsumerConfig(dlqCfg, []string{dlq.MeterSubjectName})
-	meterEC, meterCC := initStreamAndConsumerConfig(meterCfg, []string{config.Nats.MeterRequestSubject})
-	svcEC, _ := initStreamAndConsumerConfig(svcCfg, []string{config.Nats.ServiceUpdateSubject})
-
-	highPriorityMsgEvtCfg, highPriorityMsgConsumerCfg := initStreamAndConsumerConfig(highPriorityMsgCfg, []string{config.Nats.HighPriorityMsgSubject})
-	normalPriorityMsgEvtCfg, normalPriorityMsgConsumerCfg := initStreamAndConsumerConfig(normalPriorityMsgCfg, []string{config.Nats.NormalPriorityMsgSubject})
+	feeEC, feeCC := initStreamAndConsumerConfig(feeCfg,
+		[]string{bldmq.FeeRequestSubject})
+	dlqEC, _ := initStreamAndConsumerConfig(dlqCfg,
+		[]string{dlq.FeeSubjectName, dlq.MeterSubjectName, dlq.RechargeSubjectName})
+	meterEC, meterCC := initStreamAndConsumerConfig(meterCfg,
+		[]string{bldmq.MeterRequestSubject})
+	orderEC, orderCC := initStreamAndConsumerConfig(orderCfg,
+		[]string{bldmq.OrderExpiredSubject})
+	rechargeEC, rechargeCC := initStreamAndConsumerConfig(rechargeCfg,
+		[]string{bldmq.RechargeSucceedSubject})
+	highPriorityMsgEvtCfg, highPriorityMsgConsumerCfg := initStreamAndConsumerConfig(highPriorityMsgCfg,
+		[]string{bldmq.HighPriorityMsgSubject})
+	normalPriorityMsgEvtCfg, normalPriorityMsgConsumerCfg := initStreamAndConsumerConfig(normalPriorityMsgCfg,
+		[]string{bldmq.NormalPriorityMsgSubject})
 
 	return &NatsHandler{
 		conn:                 nc,
 		msgFetchTimeoutInSec: config.Nats.MsgFetchTimeoutInSEC,
-		meterReqSub: RequestSubject{
-			duration: config.Nats.MeterDurationSendSubject,
-			token:    config.Nats.MeterTokenSendSubject,
-			quota:    config.Nats.MeterQuotaSendSubject,
+		feeReqSub: RequestSubject{
+			fee:          bldmq.FeeSendSubject,
+			token:        bldmq.TokenSendSubject,
+			quota:        bldmq.QuotaSendSubject,
+			subscription: bldmq.SubscriptionSendSubject,
+			subChange:    bldmq.NotifySubChangeSubject,
 		},
-		serviceReqSub: RequestSubject{
-			deployService: config.Nats.ServiceUpdateSubject,
+		orderReqSub: RequestSubject{
+			orderExpired: bldmq.OrderExpiredSubject,
 		},
+		rechargeReqSub: RequestSubject{
+			rechargeSucceed: bldmq.RechargeSucceedSubject,
+		},
+		feeEvtCfg:                    feeEC,
+		feeConsumerCfg:               feeCC,
 		dlqEvtCfg:                    dlqEC,
 		meterEvtCfg:                  meterEC,
 		meterConsumerCfg:             meterCC,
-		svcEvtCfg:                    svcEC,
+		orderEvtCfg:                  orderEC,
+		orderConsumerCfg:             orderCC,
+		rechargeEvtCfg:               rechargeEC,
+		rechargeConsumerCfg:          rechargeCC,
 		highPriorityMsgEvtCfg:        highPriorityMsgEvtCfg,
 		highPriorityMsgConsumerCfg:   highPriorityMsgConsumerCfg,
 		normalPriorityMsgEvtCfg:      normalPriorityMsgEvtCfg,
@@ -185,12 +229,39 @@ func (nh *NatsHandler) BuildEventStreamAndConsumer(cfg EventConfig, streamCfg je
 	return jsc, nil
 }
 
+func (nh *NatsHandler) BuildFeeEventStream() error {
+	jsc, err := nh.BuildEventStreamAndConsumer(feeCfg, nh.feeEvtCfg, nh.feeConsumerCfg)
+	if err != nil {
+		return err
+	}
+	nh.feeJsc = jsc
+	return nil
+}
+
 func (nh *NatsHandler) BuildMeterEventStream() error {
 	jsc, err := nh.BuildEventStreamAndConsumer(meterCfg, nh.meterEvtCfg, nh.meterConsumerCfg)
 	if err != nil {
 		return err
 	}
 	nh.meterJsc = jsc
+	return nil
+}
+
+func (nh *NatsHandler) BuildRechargeEventStream() error {
+	jsc, err := nh.BuildEventStreamAndConsumer(rechargeCfg, nh.rechargeEvtCfg, nh.rechargeConsumerCfg)
+	if err != nil {
+		return err
+	}
+	nh.rechargeJsc = jsc
+	return nil
+}
+
+func (nh *NatsHandler) BuildOrderEventStream() error {
+	jsc, err := nh.BuildEventStreamAndConsumer(orderCfg, nh.orderEvtCfg, nh.orderConsumerCfg)
+	if err != nil {
+		return err
+	}
+	nh.orderJsc = jsc
 	return nil
 }
 
@@ -205,8 +276,18 @@ func (nh *NatsHandler) BuildDLQStream() error {
 	return err
 }
 
+func (nh *NatsHandler) FetchFeeEventMessages(batch int) (jetstream.MessageBatch, error) {
+	msgs, err := nh.feeJsc.Fetch(batch, jetstream.FetchMaxWait(time.Duration(nh.msgFetchTimeoutInSec)*time.Second))
+	return msgs, err
+}
+
 func (nh *NatsHandler) FetchMeterEventMessages(batch int) (jetstream.MessageBatch, error) {
 	msgs, err := nh.meterJsc.Fetch(batch, jetstream.FetchMaxWait(time.Duration(nh.msgFetchTimeoutInSec)*time.Second))
+	return msgs, err
+}
+
+func (nh *NatsHandler) FetchRechargeEventMessages(batch int) (jetstream.MessageBatch, error) {
+	msgs, err := nh.rechargeJsc.Fetch(batch, jetstream.FetchMaxWait(time.Duration(nh.msgFetchTimeoutInSec)*time.Second))
 	return msgs, err
 }
 
@@ -217,8 +298,16 @@ func (nh *NatsHandler) VerifyStreamByName(streamName string) error {
 	return err
 }
 
+func (nh *NatsHandler) VerifyFeeEventStream() error {
+	return nh.VerifyStreamByName(feeCfg.StreamName)
+}
+
 func (nh *NatsHandler) VerifyMeteringStream() error {
 	return nh.VerifyStreamByName(meterCfg.StreamName)
+}
+
+func (nh *NatsHandler) VerifyRechargeStream() error {
+	return nh.VerifyStreamByName(rechargeCfg.StreamName)
 }
 
 func (nh *NatsHandler) VerifyDLQStream() error {
@@ -232,12 +321,8 @@ func (nh *NatsHandler) PublishData(subject string, data []byte) error {
 	return err
 }
 
-func (nh *NatsHandler) PublishMeterDataToDLQ(data []byte) error {
-	return nh.PublishData(dlq.MeterSubjectName, data)
-}
-
-func (nh *NatsHandler) PublishMeterDurationData(data []byte) error {
-	return nh.PublishData(nh.meterReqSub.duration, data)
+func (nh *NatsHandler) PublishNotificationForSubscription(data []byte) error {
+	return nh.PublishData(nh.feeReqSub.subChange, data)
 }
 
 func (nh *NatsHandler) PublishFeeCreditData(data []byte) error {
@@ -252,30 +337,36 @@ func (nh *NatsHandler) PublishFeeQuotaData(data []byte) error {
 	return nh.PublishData(nh.feeReqSub.quota, data)
 }
 
-func (nh *NatsHandler) BuildDeployServiceStream() error {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	err := nh.GetJetStream()
-	if err != nil {
-		return err
-	}
-	_, err = nh.CreateOrUpdateStream(ctx, svcCfg.StreamName, nh.svcEvtCfg)
-	return err
+func (nh *NatsHandler) PublishFeeDataToDLQ(data []byte) error {
+	return nh.PublishData(dlq.FeeSubjectName, data)
 }
 
-func (nh *NatsHandler) VerifyDeployServiceStream() error {
-	return nh.VerifyStreamByName(svcCfg.StreamName)
-}
-func (nh *NatsHandler) PublishDeployServiceData(data []byte) error {
-	return nh.PublishData(nh.serviceReqSub.deployService, data)
+func (nh *NatsHandler) PublishMeterDataToDLQ(data []byte) error {
+	return nh.PublishData(dlq.MeterSubjectName, data)
 }
 
-func (nh *NatsHandler) BuildDeployServiceConsumerWithName(consumerName string) (jetstream.Consumer, error) {
+func (nh *NatsHandler) PublishRechargeDataToDLQ(data []byte) error {
+	return nh.PublishData(dlq.RechargeSubjectName, data)
+}
+
+func (nh *NatsHandler) PublishRechargeDurationData(data []byte) error {
+	return nh.PublishData(nh.rechargeReqSub.rechargeSucceed, data)
+}
+
+func (nh *NatsHandler) PublishOrderExpiredData(data []byte) error {
+	return nh.PublishData(nh.orderReqSub.orderExpired, data)
+}
+
+func (nh *NatsHandler) PublishSubscriptionData(data []byte) error {
+	return nh.PublishData(nh.feeReqSub.subscription, data)
+}
+
+func (nh *NatsHandler) BuildOrderConsumerWithName(consumerName string) (jetstream.Consumer, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	ec := EventConfig{StreamName: svcCfg.StreamName, ConsumerName: consumerName}
-	_, conCfg := initStreamAndConsumerConfig(ec, []string{nh.serviceReqSub.deployService})
-	consumer, err := nh.js.CreateOrUpdateConsumer(ctx, svcCfg.StreamName, conCfg)
+	ec := EventConfig{StreamName: orderCfg.StreamName, ConsumerName: consumerName}
+	_, conCfg := initStreamAndConsumerConfig(ec, []string{nh.orderReqSub.orderExpired})
+	consumer, err := nh.js.CreateOrUpdateConsumer(ctx, orderCfg.StreamName, conCfg)
 	return consumer, err
 }
 

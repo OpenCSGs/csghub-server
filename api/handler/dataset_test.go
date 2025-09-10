@@ -7,7 +7,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 	mockcomponent "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
+	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/testutil"
+	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -32,6 +34,7 @@ func NewDatasetTester(t *testing.T) *DatasetTester {
 		dataset:   tester.mocks.dataset,
 		sensitive: tester.mocks.sensitive,
 		repo:      tester.mocks.repo,
+		config:    &config.Config{},
 	}
 	tester.WithParam("namespace", "u")
 	tester.WithParam("name", "r")
@@ -66,20 +69,29 @@ func TestDatasetHandler_Index(t *testing.T) {
 					Search: "foo",
 					Sort:   c.sort,
 					Source: c.source,
-				}, 10, 1).Return([]types.Dataset{
-					{Name: "cc"},
+				}, 10, 1, true).Return([]*types.Dataset{{
+					Name: "cc",
+					Scores: []types.WeightScore{{
+						WeightName: string(database.RecomWeightOp),
+						Score:      100},
+					}},
 				}, 100, nil)
+
 			}
 
 			tester.AddPagination(1, 10).WithQuery("search", "foo").
 				WithQuery("sort", c.sort).
-				WithQuery("source", c.source).Execute()
+				WithQuery("source", c.source).
+				WithQuery("need_op_weight", "true").Execute()
 
 			if c.error {
 				require.Equal(t, 400, tester.Response().Code)
 			} else {
 				tester.ResponseEqSimple(t, 200, gin.H{
-					"data":  []types.Dataset{{Name: "cc"}},
+					"data": []types.Dataset{{Name: "cc", Scores: []types.WeightScore{{
+						WeightName: string(database.RecomWeightOp),
+						Score:      100},
+					}}},
 					"total": 100,
 					"msg":   "OK",
 				})
@@ -168,7 +180,7 @@ func TestDatasetHandler_Show(t *testing.T) {
 			return h.Show
 		})
 
-		tester.mocks.dataset.EXPECT().Show(tester.Ctx(), "u-other", "r", "u").Return(nil, errorx.ErrForbidden)
+		tester.mocks.dataset.EXPECT().Show(tester.Ctx(), "u-other", "r", "u", false, false).Return(nil, errorx.ErrForbidden)
 		tester.WithParam("namespace", "u-other").WithParam("name", "r")
 		tester.WithUser().Execute()
 
@@ -180,7 +192,7 @@ func TestDatasetHandler_Show(t *testing.T) {
 			return h.Show
 		})
 
-		tester.mocks.dataset.EXPECT().Show(tester.Ctx(), "u", "r", "u").Return(&types.Dataset{
+		tester.mocks.dataset.EXPECT().Show(tester.Ctx(), "u", "r", "u", false, false).Return(&types.Dataset{
 			Name: "d",
 		}, nil)
 		tester.WithUser().Execute()

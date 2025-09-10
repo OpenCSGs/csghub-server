@@ -149,6 +149,56 @@ func (_c *MockClient_GetObject_Call) RunAndReturn(run func(context.Context, stri
 	return _c
 }
 
+// ListObjects provides a mock function with given fields: ctx, bucketName, opts
+func (_m *MockClient) ListObjects(ctx context.Context, bucketName string, opts minio.ListObjectsOptions) <-chan minio.ObjectInfo {
+	ret := _m.Called(ctx, bucketName, opts)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListObjects")
+	}
+
+	var r0 <-chan minio.ObjectInfo
+	if rf, ok := ret.Get(0).(func(context.Context, string, minio.ListObjectsOptions) <-chan minio.ObjectInfo); ok {
+		r0 = rf(ctx, bucketName, opts)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(<-chan minio.ObjectInfo)
+		}
+	}
+
+	return r0
+}
+
+// MockClient_ListObjects_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListObjects'
+type MockClient_ListObjects_Call struct {
+	*mock.Call
+}
+
+// ListObjects is a helper method to define mock.On call
+//   - ctx context.Context
+//   - bucketName string
+//   - opts minio.ListObjectsOptions
+func (_e *MockClient_Expecter) ListObjects(ctx interface{}, bucketName interface{}, opts interface{}) *MockClient_ListObjects_Call {
+	return &MockClient_ListObjects_Call{Call: _e.mock.On("ListObjects", ctx, bucketName, opts)}
+}
+
+func (_c *MockClient_ListObjects_Call) Run(run func(ctx context.Context, bucketName string, opts minio.ListObjectsOptions)) *MockClient_ListObjects_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(minio.ListObjectsOptions))
+	})
+	return _c
+}
+
+func (_c *MockClient_ListObjects_Call) Return(_a0 <-chan minio.ObjectInfo) *MockClient_ListObjects_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockClient_ListObjects_Call) RunAndReturn(run func(context.Context, string, minio.ListObjectsOptions) <-chan minio.ObjectInfo) *MockClient_ListObjects_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // PresignHeader provides a mock function with given fields: ctx, method, bucketName, objectName, expires, reqParams, extraHeaders
 func (_m *MockClient) PresignHeader(ctx context.Context, method string, bucketName string, objectName string, expires time.Duration, reqParams url.Values, extraHeaders http.Header) (*url.URL, error) {
 	ret := _m.Called(ctx, method, bucketName, objectName, expires, reqParams, extraHeaders)

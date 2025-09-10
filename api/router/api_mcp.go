@@ -25,8 +25,10 @@ func CreateMCPServerRoutes(
 		mcpGroup.PUT("/:namespace/:name", middlewareCollection.Auth.NeedLogin, mcpServerHandler.Update)
 		mcpGroup.POST("/:namespace/:name/deploys", middlewareCollection.Auth.NeedLogin, mcpServerHandler.Deploy)
 	}
+
 	{
 		// repo common handler functions
+		mcpGroup.GET("/:namespace/:name/all_files", repoCommonHandler.AllFiles)
 		mcpGroup.GET("/:namespace/:name/branches", repoCommonHandler.Branches)
 		mcpGroup.GET("/:namespace/:name/tags", repoCommonHandler.Tags)
 		mcpGroup.POST("/:namespace/:name/preupload/:revision", repoCommonHandler.Preupload)
@@ -34,9 +36,11 @@ func CreateMCPServerRoutes(
 		mcpGroup.GET("/:namespace/:name/last_commit", repoCommonHandler.LastCommit)
 		mcpGroup.GET("/:namespace/:name/commit/:commit_id", repoCommonHandler.CommitWithDiff)
 		mcpGroup.POST("/:namespace/:name/commit/:revision", repoCommonHandler.CommitFiles)
+		mcpGroup.GET("/:namespace/:name/diff", repoCommonHandler.DiffBetweenTwoCommits)
 		mcpGroup.GET("/:namespace/:name/remote_diff", repoCommonHandler.RemoteDiff)
 		mcpGroup.GET("/:namespace/:name/tree", repoCommonHandler.Tree)
 		mcpGroup.GET("/:namespace/:name/refs/:ref/tree/*path", repoCommonHandler.TreeV2)
+		mcpGroup.GET("/:namespace/:name/refs/:ref/remote_tree/*path", repoCommonHandler.RemoteTree)
 		mcpGroup.GET("/:namespace/:name/refs/:ref/logs_tree/*path", repoCommonHandler.LogsTree)
 		mcpGroup.GET("/:namespace/:name/commits", repoCommonHandler.Commits)
 		mcpGroup.POST("/:namespace/:name/raw/*file_path", middlewareCollection.Auth.NeedLogin, repoCommonHandler.CreateFile)
@@ -52,5 +56,6 @@ func CreateMCPServerRoutes(
 		mcpGroup.GET("/:namespace/:name/mirror", middlewareCollection.Auth.NeedLogin, repoCommonHandler.GetMirror)
 		mcpGroup.POST("/:namespace/:name/mirror_from_saas", middlewareCollection.Auth.NeedLogin, repoCommonHandler.MirrorFromSaas)
 		mcpGroup.POST("/:namespace/:name/mirror/sync", middlewareCollection.Auth.NeedLogin, repoCommonHandler.SyncMirror)
+		mcpGroup.GET("/:namespace/:name/mirror/progress", middlewareCollection.Auth.NeedLogin, repoCommonHandler.MirrorProgress)
 	}
 }

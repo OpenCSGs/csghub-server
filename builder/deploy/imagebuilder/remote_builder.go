@@ -1,7 +1,6 @@
 package imagebuilder
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -10,104 +9,72 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+
+	"opencsg.com/csghub-server/builder/deploy/common"
+	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/errorx"
+	"opencsg.com/csghub-server/common/types"
 )
 
 var _ Builder = (*RemoteBuilder)(nil)
 
 type RemoteBuilder struct {
-	remote *url.URL
-	client *http.Client
+	remote       *url.URL
+	client       *http.Client
+	config       common.DeployConfig
+	clusterStore database.ClusterInfoStore
 }
 
-func NewRemoteBuilder(remoteURL string) (*RemoteBuilder, error) {
+func NewRemoteBuilder(remoteURL string, c common.DeployConfig) (*RemoteBuilder, error) {
 	parsedURL, err := url.Parse(remoteURL)
 	if err != nil {
 		return nil, err
 	}
+	clusterStore := database.NewClusterInfoStore()
 	return &RemoteBuilder{
-		remote: parsedURL,
-		client: http.DefaultClient,
+		remote:       parsedURL,
+		client:       http.DefaultClient,
+		config:       c,
+		clusterStore: clusterStore,
 	}, nil
 }
 
-func (h *RemoteBuilder) Build(ctx context.Context, req *BuildRequest) (*BuildResponse, error) {
-	rel := &url.URL{Path: "/api/v1/imagebuilder/builder"}
-	u := h.remote.ResolveReference(rel)
-	response, err := h.doRequest(http.MethodPost, u.String(), req)
+func (h *RemoteBuilder) Build(ctx context.Context, req *types.ImageBuilderRequest) error {
+	//test
+	remote, err := h.GetRemoteRunnerHost(ctx, req.ClusterID)
 	if err != nil {
-		return nil, err
+		return err
+	}
+	u := fmt.Sprintf("%s/api/v1/imagebuilder/builder", remote)
+	response, err := h.doRequest(ctx, http.MethodPost, u, req)
+	if err != nil {
+		return err
 	}
 	defer response.Body.Close()
 
-	var buildResponse BuildResponse
-	if err := json.NewDecoder(response.Body).Decode(&buildResponse); err != nil {
-		return nil, err
+	if response.StatusCode != http.StatusOK {
+		return errorx.RemoteSvcFail(fmt.Errorf("failed to build image, status code: %d", response.StatusCode), errorx.Ctx().Set("cluster_id", req.ClusterID).Set("code", response.StatusCode))
 	}
 
-	return &buildResponse, nil
+	return nil
 }
 
-func (h *RemoteBuilder) Status(ctx context.Context, req *StatusRequest) (*StatusResponse, error) {
-	u := fmt.Sprintf("%s/api/v1/imagebuilder/%s/%s/status?build_id=%s", h.remote, req.OrgName, req.SpaceName, req.BuildID)
-	response, err := h.doRequest(http.MethodGet, u, req)
+func (h *RemoteBuilder) Stop(ctx context.Context, req types.ImageBuildStopReq) error {
+	u := fmt.Sprintf("%s/api/v1/imagebuilder/stop", h.remote)
+	response, err := h.doRequest(ctx, http.MethodPut, u, req)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer response.Body.Close()
-
-	var result map[string]int = make(map[string]int)
-	if err := json.NewDecoder(response.Body).Decode(&result); err != nil {
-		return nil, err
-	}
-	var imageID string
-	var code int
-	for k, v := range result {
-		imageID = k
-		code = v
-		break
+	if response.StatusCode != http.StatusOK {
+		return errorx.RemoteSvcFail(fmt.Errorf("failed to stop image, status code: %d", response.StatusCode), errorx.Ctx().Set("cluster_id", req.ClusterID).Set("code", response.StatusCode))
 	}
 
-	var statusResponse StatusResponse
-	statusResponse.ImageID = imageID
-	statusResponse.Code = code
-	return &statusResponse, nil
-}
-
-func (h *RemoteBuilder) Logs(ctx context.Context, req *LogsRequest) (<-chan string, error) {
-	u := fmt.Sprintf("%s/api/v1/imagebuilder/%s/%s/logs?build_id=%s", h.remote, req.OrgName, req.SpaceName, req.BuildID)
-
-	rc, err := h.doStreamRequest(ctx, http.MethodGet, u, req)
-	if err != nil {
-		return nil, err
-	}
-
-	return h.readToChannel(rc), nil
-}
-
-func (h *RemoteBuilder) readToChannel(rc io.ReadCloser) <-chan string {
-	output := make(chan string, 2)
-	scanner := bufio.NewScanner(rc) // Use Scanner to split by line
-
-	go func() {
-		defer func() {
-			rc.Close()
-			close(output)
-		}()
-		for scanner.Scan() {
-			line := scanner.Text()
-			output <- line
-		}
-		if err := scanner.Err(); err != nil {
-			slog.Error("remote builder log read failed", slog.Any("error", err))
-			return
-		}
-	}()
-
-	return output
+	return nil
 }
 
 // Helper method to execute the actual HTTP request and read the response.
-func (h *RemoteBuilder) doRequest(method, url string, data interface{}) (*http.Response, error) {
+func (h *RemoteBuilder) doRequest(ctx context.Context, method, url string, data interface{}) (*http.Response, error) {
 	var buf io.Reader
 	if data != nil {
 		jsonData, err := json.Marshal(data)
@@ -117,11 +84,12 @@ func (h *RemoteBuilder) doRequest(method, url string, data interface{}) (*http.R
 		buf = bytes.NewBuffer(jsonData)
 	}
 
-	req, err := http.NewRequest(method, url, buf)
+	req, err := http.NewRequestWithContext(ctx, method, url, buf)
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+h.config.APIKey)
 
 	resp, err := h.client.Do(req)
 	if err != nil {
@@ -140,32 +108,19 @@ func (h *RemoteBuilder) doRequest(method, url string, data interface{}) (*http.R
 	return resp, nil
 }
 
-func (h *RemoteBuilder) doStreamRequest(ctx context.Context, method, url string, data interface{}) (io.ReadCloser, error) {
-	var buf io.Reader
-	if data != nil {
-		jsonData, err := json.Marshal(data)
-		if err != nil {
-			return nil, err
-		}
-		buf = bytes.NewBuffer(jsonData)
+// get remote runner host
+func (h *RemoteBuilder) GetRemoteRunnerHost(ctx context.Context, clusterID string) (string, error) {
+	if clusterID == "" {
+		// use default remote
+		return h.remote.Scheme + "://" + h.remote.Host, nil
 	}
-
-	req, err := http.NewRequestWithContext(ctx, method, url, buf)
+	cluster, err := h.clusterStore.ByClusterID(ctx, clusterID)
 	if err != nil {
-		return nil, err
+		slog.Error("failed to get cluster info from db in image builder", slog.String("cluster_id", clusterID), slog.Any("error", err))
+		return "", err
 	}
-	req.Header.Set("Content-Type", "application/json")
-	// req.Header.Set("Accept", "text/event-stream")
-	req.Header.Set("Connection", "keep-alive")
-
-	resp, err := h.client.Do(req)
-	if err != nil {
-		return nil, err
+	if cluster.Mode == types.ConnectModeInCluster {
+		return cluster.Endpoint, nil
 	}
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("unexpected http status code:%d", resp.StatusCode)
-	}
-
-	return resp.Body, nil
+	return h.remote.Scheme + "://" + h.remote.Host, nil
 }

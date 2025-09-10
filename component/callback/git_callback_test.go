@@ -39,6 +39,9 @@ func TestGitCallbackComponent_WatchSpaceChange(t *testing.T) {
 		Repository: types.GiteaCallbackPushReq_Repository{
 			FullName: "spaces_b/c/d",
 		},
+		Commits: []types.GiteaCallbackPushReq_Commit{
+			{Modified: []string{types.ReadmeFileName, "main.py"}},
+		},
 	})
 	require.Nil(t, err)
 }
@@ -68,6 +71,20 @@ func TestGitCallbackComponent_WatchRepoRelation(t *testing.T) {
 			{Modified: []string{types.ReadmeFileName}},
 		},
 	})
+	require.Nil(t, err)
+}
+
+func TestGitCallbackComponent_GenSyncVersion(t *testing.T) {
+	ctx := context.TODO()
+	gc := initializeTestGitCallbackComponent(context.TODO(), t)
+
+	req := &types.GiteaCallbackPushReq{}
+	gc.mocks.syncVersionGenerator.EXPECT().GenSyncVersion(req).Return(nil).Once()
+
+	err := gc.GenSyncVersion(ctx, req)
+	require.Nil(t, err)
+	req.Repository.Private = true
+	err = gc.GenSyncVersion(ctx, req)
 	require.Nil(t, err)
 }
 

@@ -32,9 +32,9 @@ var generateLfsMetaObjectsCmd = &cobra.Command{
 			DSN:     config.Database.DSN,
 		}
 
-		database.InitDB(dbConfig)
-		if err != nil {
-			return fmt.Errorf("initializing DB connection: %w", err)
+		if err := database.InitDB(dbConfig); err != nil {
+			slog.Error("failed to initialize database", slog.Any("error", err))
+			return fmt.Errorf("database initialization failed: %w", err)
 		}
 		ctx := context.WithValue(cmd.Context(), "config", config)
 		cmd.SetContext(ctx)

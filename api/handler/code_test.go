@@ -52,6 +52,7 @@ func TestCodeHandler_Create(t *testing.T) {
 	tester.WithBody(t, req).Execute()
 
 	tester.ResponseEqSimple(t, 200, httpbase.R{Msg: "OK", Data: &types.Code{Name: "c"}})
+
 }
 
 func TestCodeHandler_Index(t *testing.T) {
@@ -78,14 +79,15 @@ func TestCodeHandler_Index(t *testing.T) {
 					Search: "foo",
 					Sort:   c.sort,
 					Source: c.source,
-				}, 10, 1).Return([]types.Code{
+				}, 10, 1, true).Return([]*types.Code{
 					{Name: "cc"},
 				}, 100, nil)
 			}
 
 			tester.AddPagination(1, 10).WithQuery("search", "foo").
 				WithQuery("sort", c.sort).
-				WithQuery("source", c.source).Execute()
+				WithQuery("source", c.source).
+				WithQuery("need_op_weight", "true").Execute()
 
 			if c.error {
 				require.Equal(t, 400, tester.Response().Code)
@@ -135,7 +137,7 @@ func TestCodeHandler_Show(t *testing.T) {
 		return cp.Show
 	})
 
-	tester.mocks.code.EXPECT().Show(tester.Ctx(), "u", "r", "u").Return(&types.Code{Name: "c"}, nil)
+	tester.mocks.code.EXPECT().Show(tester.Ctx(), "u", "r", "u", false, false).Return(&types.Code{Name: "c"}, nil)
 	tester.WithUser().Execute()
 	tester.ResponseEq(t, 200, tester.OKText, &types.Code{Name: "c"})
 }

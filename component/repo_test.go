@@ -73,10 +73,8 @@ func TestRepoComponent_CreateRepo(t *testing.T) {
 		RepositoryType: types.ModelRepo,
 	}
 	repo.mocks.stores.RepoMock().EXPECT().CreateRepo(ctx, *dbrepo).Return(dbrepo, nil)
-
 	dbrepo.GitPath = "@hashed_repos/a6/65/a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3"
 	repo.mocks.stores.RepoMock().EXPECT().UpdateRepo(ctx, mock.Anything).Return(dbrepo, nil)
-
 	r1, r2, err := repo.CreateRepo(ctx, types.CreateRepoReq{
 		Username:      "user",
 		Namespace:     "ns",
@@ -184,12 +182,9 @@ func TestRepoComponent_DeleteRepo(t *testing.T) {
 	}
 	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(dbuser, nil)
 	repo.mocks.stores.RepoMock().EXPECT().CleanRelationsByRepoID(ctx, dbrepo.ID).Return(nil)
+	repo.mocks.stores.MirrorMock().EXPECT().FindByRepoID(ctx, dbrepo.ID).Return(nil, nil)
 
-	repo.mocks.gitServer.EXPECT().DeleteRepo(ctx, gitserver.DeleteRepoReq{
-		Namespace: "ns",
-		Name:      "n",
-		RepoType:  types.ModelRepo,
-	}).Return(nil)
+	repo.mocks.gitServer.EXPECT().DeleteRepo(ctx, "models_ns/n.git").Return(nil)
 
 	repo.mocks.stores.RepoMock().EXPECT().DeleteRepo(ctx, *dbrepo).Return(nil)
 
@@ -659,7 +654,7 @@ func TestRepoComponent_DownloadFile(t *testing.T) {
 				reqParams := make(url.Values)
 				reqParams.Set("response-content-disposition", fmt.Sprintf("attachment;filename=%s", "zzz"))
 				repo.mocks.s3Client.EXPECT().PresignedGetObject(
-					ctx, repo.lfsBucket, "lfs/pa/th", ossFileExpire, reqParams,
+					ctx, repo.lfsBucket, "lfs/pa/th", types.OssFileExpire, reqParams,
 				).Return(&url.URL{Path: "foobar"}, nil)
 			} else {
 				repo.mocks.gitServer.EXPECT().GetRepoFileReader(ctx, gitserver.GetRepoInfoByPathReq{
@@ -805,6 +800,45 @@ func TestRepoComponent_IsLFS(t *testing.T) {
 
 }
 
+func TestRepoComponent_HeadDownloadFile(t *testing.T) {
+	ctx := context.TODO()
+	repo := initializeTestRepoComponent(ctx, t)
+
+	mockedRepo := &database.Repository{Source: types.HuggingfaceSource, Private: false}
+	repo.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(
+		mockedRepo, nil,
+	)
+
+	file := &types.File{Name: "zzz"}
+	repo.mocks.gitServer.EXPECT().GetRepoFileContents(ctx, gitserver.GetRepoInfoByPathReq{
+		Namespace: "ns",
+		Name:      "n",
+		Ref:       "main",
+		Path:      "path",
+		RepoType:  types.ModelRepo,
+	}).Return(file, nil)
+
+	commit := &types.Commit{Message: "zzz"}
+	repo.mocks.gitServer.EXPECT().GetRepoLastCommit(ctx, gitserver.GetRepoLastCommitReq{
+		Namespace: "ns",
+		Name:      "n",
+		Ref:       "main",
+		RepoType:  types.ModelRepo,
+	}).Return(commit, nil)
+
+	f, c, e := repo.HeadDownloadFile(ctx, &types.GetFileReq{
+		Namespace: "ns",
+		Name:      "n",
+		Ref:       "main",
+		Path:      "path",
+		RepoType:  types.ModelRepo,
+	}, "user")
+	require.Nil(t, e)
+	require.Equal(t, file, f)
+	require.Equal(t, commit, c)
+
+}
+
 func TestRepoComponent_SDKDownloadFile(t *testing.T) {
 	for _, lfs := range []bool{false, true} {
 		t.Run(fmt.Sprintf("is lfs: %v", lfs), func(t *testing.T) {
@@ -829,7 +863,7 @@ func TestRepoComponent_SDKDownloadFile(t *testing.T) {
 				reqParams := make(url.Values)
 				reqParams.Set("response-content-disposition", fmt.Sprintf("attachment;filename=%s", "zzz"))
 				repo.mocks.s3Client.EXPECT().PresignedGetObject(
-					ctx, repo.lfsBucket, "lfs/12/34/56", ossFileExpire, reqParams,
+					ctx, repo.lfsBucket, "lfs/12/34/56", types.OssFileExpire, reqParams,
 				).Return(&url.URL{Path: "foobar"}, nil)
 			} else {
 				repo.mocks.gitServer.EXPECT().GetRepoFileReader(ctx, gitserver.GetRepoInfoByPathReq{
@@ -866,6 +900,122 @@ func TestRepoComponent_SDKDownloadFile(t *testing.T) {
 
 }
 
+func TestRepoComponent_CreateMirror(t *testing.T) {
+	cases := []struct {
+		saas bool
+	}{
+		{false},
+		{true},
+	}
+
+	for _, c := range cases {
+		t.Run(fmt.Sprintf("%+v", c), func(t *testing.T) {
+			ctx := context.TODO()
+			repo := initializeTestRepoComponent(ctx, t)
+
+			repo.config.Saas = c.saas
+
+			mockedRepo := &database.Repository{ID: 123, Path: "ns/n", RepositoryType: types.ModelRepo}
+			repo.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(
+				mockedRepo, nil,
+			)
+			mockUserRepoAdminPermission(ctx, repo.mocks.stores, "user")
+
+			repo.mocks.stores.MirrorMock().EXPECT().IsExist(ctx, int64(123)).Return(false, nil)
+			repo.mocks.stores.MirrorSourceMock().EXPECT().Get(ctx, int64(321)).Return(&database.MirrorSource{}, nil)
+
+			mirror := &database.Mirror{
+				SourceUrl:      "su",
+				MirrorSourceID: 321,
+				Username:       "user",
+				AccessToken:    "ak",
+				RepositoryID:   123,
+				Repository:     mockedRepo,
+				LocalRepoPath:  "_model_ns_n",
+				Priority:       types.ASAPMirrorPriority,
+			}
+
+			rmi := *mirror
+			rmi.ID = 321
+			rmi.Priority = types.HighMirrorPriority
+
+			repo.mocks.stores.MirrorMock().EXPECT().Create(ctx, mirror).Return(&rmi, nil)
+			repo.mocks.stores.MirrorMock().EXPECT().Update(ctx, mock.Anything).Return(nil)
+			repo.mocks.stores.MirrorTaskMock().EXPECT().Create(ctx, mock.Anything).Return(database.MirrorTask{}, nil)
+
+			rm, err := repo.CreateMirror(ctx, types.CreateMirrorReq{
+				SourceUrl:      "su",
+				Username:       "user",
+				CurrentUser:    "user",
+				AccessToken:    "ak",
+				Namespace:      "ns",
+				Name:           "n",
+				RepoType:       types.ModelRepo,
+				MirrorSourceID: 321,
+			})
+			require.Nil(t, err)
+			require.Equal(t, rmi, *rm)
+		})
+	}
+}
+
+func TestRepoComponent_MirrorFromSaas(t *testing.T) {
+	cases := []struct {
+		mirror bool
+	}{
+		{false},
+		{true},
+	}
+
+	for _, c := range cases {
+		t.Run(fmt.Sprintf("%+v", c), func(t *testing.T) {
+			ctx := context.TODO()
+			repo := initializeTestRepoComponent(ctx, t)
+
+			mockedRepo := &database.Repository{ID: 123, Path: "ns/n", RepositoryType: types.ModelRepo}
+			mirror := &database.Mirror{
+				SourceUrl:      "/models/ns/n.git",
+				Username:       "user",
+				RepositoryID:   123,
+				SourceRepoPath: "ns/n",
+				Repository:     mockedRepo,
+			}
+			if c.mirror {
+				repo.mocks.stores.MirrorMock().EXPECT().FindByRepoID(ctx, int64(123)).Return(mirror, nil)
+			} else {
+				repo.mocks.stores.MirrorMock().EXPECT().FindByRepoID(ctx, int64(123)).Return(nil, sql.ErrNoRows)
+				repo.mocks.stores.SyncVersionMock().EXPECT().FindByRepoTypeAndPath(ctx, "ns/n", types.ModelRepo).Return(&database.SyncVersion{SourceID: types.SyncVersionSourceHF}, nil)
+				repo.mocks.gitServer.EXPECT().CreateMirrorRepo(ctx, gitserver.CreateMirrorRepoReq{
+					Namespace:   "ns",
+					Name:        "n",
+					CloneUrl:    "/models/ns/n.git",
+					Private:     false,
+					MirrorToken: "foo",
+					RepoType:    types.ModelRepo,
+				}).Return(0, nil)
+				repo.mocks.stores.MirrorMock().EXPECT().Create(ctx, mirror).Return(&database.Mirror{
+					ID:       1,
+					Priority: types.ASAPMirrorPriority,
+				}, nil)
+
+				repo.mocks.stores.SyncClientSettingMock().EXPECT().First(ctx).Return(&database.SyncClientSetting{Token: "foo"}, nil)
+			}
+
+			repo.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(
+				mockedRepo, nil,
+			)
+
+			mockedRepo.SyncStatus = types.SyncStatusPending
+
+			repo.mocks.stores.RepoMock().EXPECT().UpdateRepo(ctx, *mockedRepo).Return(nil, nil)
+			repo.mocks.stores.MirrorTaskMock().EXPECT().CancelOtherTasksAndCreate(ctx, mock.Anything).Return(database.MirrorTask{}, nil)
+
+			err := repo.MirrorFromSaas(ctx, "ns", "n", "user", types.ModelRepo)
+			require.Nil(t, err)
+		})
+	}
+}
+
 func TestRepoComponent_GetMirror(t *testing.T) {
 	ctx := context.TODO()
 	repo := initializeTestRepoComponent(ctx, t)
@@ -874,8 +1024,9 @@ func TestRepoComponent_GetMirror(t *testing.T) {
 	repo.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(&database.Repository{
 		ID: 123,
 	}, nil)
-	m := &database.Mirror{ID: 123}
-	repo.mocks.stores.MirrorMock().EXPECT().FindByRepoID(ctx, int64(123)).Return(m, nil)
+	dm := &database.Mirror{ID: 11, SourceUrl: "test", Repository: &database.Repository{Path: "test/abc", RepositoryType: types.ModelRepo}}
+	m := &types.Mirror{ID: 11, SourceUrl: "test", LocalRepoPath: "models/test/abc"}
+	repo.mocks.stores.MirrorMock().EXPECT().FindByRepoID(ctx, int64(123)).Return(dm, nil)
 	mm, err := repo.GetMirror(ctx, types.GetMirrorReq{
 		Namespace:   "ns",
 		Name:        "n",
@@ -1138,13 +1289,17 @@ func TestRepoComponent_DeleteDeploy(t *testing.T) {
 	repo.mocks.deployer.EXPECT().Purge(ctx, dr).Return(nil)
 	repo.mocks.deployer.EXPECT().Exist(ctx, dr).Return(false, nil)
 	repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(3)).Return(&database.Deploy{
-		RepoID:    1,
-		UserUUID:  "uuid",
-		ClusterID: "cluster",
+		RepoID:        1,
+		UserUUID:      "uuid",
+		OrderDetailID: 11,
+		ClusterID:     "cluster",
 	}, nil)
 	repo.mocks.stores.DeployTaskMock().EXPECT().DeleteDeploy(
 		ctx, types.ModelRepo, int64(1), int64(0), int64(3),
 	).Return(nil)
+	ur := &database.UserResources{}
+	repo.mocks.stores.UserResourcesMock().EXPECT().FindUserResourcesByOrderDetailId(ctx, "uuid", int64(11)).Return(ur, nil)
+	repo.mocks.stores.UserResourcesMock().EXPECT().UpdateDeployId(ctx, ur).Return(nil)
 
 	err := repo.DeleteDeploy(ctx, types.DeployActReq{
 		RepoType:    types.ModelRepo,
@@ -1221,12 +1376,13 @@ func TestRepoComponent_DeployInstanceLogs(t *testing.T) {
 	repo := initializeTestRepoComponent(ctx, t)
 	mockUserRepoAdminPermission(ctx, repo.mocks.stores, "user")
 	repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(123)).Return(&database.Deploy{
-		ID:        123,
-		RepoID:    1,
-		UserUUID:  "uuid",
-		ClusterID: "cluster",
-		SvcName:   "svc",
-		Status:    deployStatus.Running,
+		ID:            123,
+		RepoID:        1,
+		UserUUID:      "uuid",
+		OrderDetailID: 11,
+		ClusterID:     "cluster",
+		SvcName:       "svc",
+		Status:        deployStatus.Running,
 	}, nil)
 
 	m := &deploy.MultiLogReader{}
@@ -1416,6 +1572,46 @@ func TestRepoComponent_SyncMirror(t *testing.T) {
 	require.Nil(t, err)
 }
 
+func TestRepoComponent_MirrorProgress(t *testing.T) {
+	ctx := context.TODO()
+	repo := initializeTestRepoComponent(ctx, t)
+	mockUserRepoAdminPermission(ctx, repo.mocks.stores, "user")
+	repo.config.Mirror.PartSize = 100
+
+	mirror := &database.Mirror{
+		ID:             321,
+		SourceUrl:      "/models/ns/n.git",
+		Username:       "user",
+		RepositoryID:   123,
+		SourceRepoPath: "ns/n",
+	}
+
+	repo.mocks.stores.MirrorMock().EXPECT().FindByRepoID(ctx, int64(123)).Return(mirror, nil)
+	mockedRepo := &database.Repository{ID: 123, RepositoryType: types.ModelRepo, Path: "foo"}
+	repo.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(
+		mockedRepo, nil,
+	)
+
+	lfss := []database.LfsMetaObject{
+		{Oid: "o1", Size: 100},
+	}
+	repo.mocks.stores.LfsMetaObjectMock().EXPECT().FindByRepoID(ctx, int64(123)).Return(lfss, nil)
+	repo.mocks.cache.EXPECT().GetLfsSyncFileProgress(ctx, "models/foo", "o1", "100").Return(12, nil)
+
+	resp, err := repo.MirrorProgress(ctx, types.ModelRepo, "ns", "n", "user")
+	require.Nil(t, err)
+	require.Equal(t, types.LFSSyncProgressResp{
+		Progress: []types.SingleLFSProgress{{
+			Oid:      "o1",
+			Progress: 12,
+			Size:     100,
+		}},
+		Total: 1,
+		Done:  0,
+	}, resp)
+
+}
+
 func TestRepoComponent_Branches(t *testing.T) {
 	ctx := context.TODO()
 	repo := initializeTestRepoComponent(ctx, t)
@@ -1505,7 +1701,39 @@ func TestRepoComponent_UpdateTags(t *testing.T) {
 
 }
 
-func TestRepoComponent_CheckCurrentUserPermission(t *testing.T) {
+func TestRepoComponent_GetFilePreviewCode(t *testing.T) {
+	ctx := context.TODO()
+	c := initializeTestRepoComponent(ctx, t)
+
+	// Test case 1: file content is text
+	txtContent := "Hello, World!"
+	expected1 := types.FilePreviewCodeNormal
+	result1 := c.getFilePreviewCode([]byte(txtContent))
+	assert.Equal(t, expected1, result1)
+
+	// Test case 2: file content is not text
+	pngFileHeader := []byte{0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a} // PNG file header
+	expected2 := types.FilePreviewCodeNotText
+	result2 := c.getFilePreviewCode(pngFileHeader)
+	assert.Equal(t, expected2, result2)
+}
+
+// test for adjustMaxFileSize
+func TestRepoComponent_AdjustMaxFileSize(t *testing.T) {
+	ctx := context.TODO()
+	c := initializeTestRepoComponent(ctx, t)
+	maxFileSize := int64(0)
+	expected := int64(100 * 9000)
+	result := c.adjustMaxFileSize(maxFileSize)
+	assert.Equal(t, expected, result)
+
+	expected = int64(100 * 9000)
+	maxFileSize = expected + 1
+	result = c.adjustMaxFileSize(maxFileSize)
+	assert.Equal(t, expected, result)
+}
+
+func TestRepoComponent_checkCurrentUserPermission(t *testing.T) {
 
 	t.Run("can read self-owned", func(t *testing.T) {
 		ctx := context.TODO()
@@ -2141,36 +2369,137 @@ func TestRepoComponent_LogsTreeRemote(t *testing.T) {
 	require.Equal(t, []*types.CommitForTree{{Message: "m1"}, {Message: "m2"}}, commits)
 }
 
-func TestRepoComponent_RemoteDiff(t *testing.T) {
+func TestRepoComponent_FixRepoSource(t *testing.T) {
 	ctx := context.TODO()
 	repoComp := initializeTestRepoComponent(ctx, t)
 
-	req := types.RemoteDiffReq{
-		Namespace:    "test-namespace",
-		Name:         "test-repo",
-		RepoType:     types.ModelRepo,
-		LeftCommitID: "left-commit-id",
-	}
+	user := database.User{}
+	user.Username = "user_name"
 
-	resp := []types.RemoteDiffs{
-		{
-			Added:    []string{"file1"},
-			Removed:  []string{"file2"},
-			Modified: []string{"file3"},
+	ns := database.Namespace{}
+	ns.NamespaceType = "user"
+	ns.Path = "user_name"
+
+	repo := &database.Repository{
+		ID:      1,
+		Private: true,
+		User:    user,
+		Path:    fmt.Sprintf("%s/%s", ns.Path, "repo_name"),
+		Source:  types.OpenCSGSource,
+		Mirror: database.Mirror{
+			ID:        1,
+			SourceUrl: "https://opencsg.com/abc/def.git",
 		},
 	}
+	repoComp.mocks.stores.RepoMock().EXPECT().FindMirrorReposWithBatch(mock.Anything, 1000, 1).Return([]database.Repository{*repo}, nil)
+	repoComp.mocks.stores.RepoMock().EXPECT().FindMirrorReposWithBatch(mock.Anything, 1000, 2).Return([]database.Repository{}, nil)
+	repoComp.mocks.stores.RepoMock().EXPECT().BulkUpdateSourcePath(mock.Anything, mock.Anything).Return(nil)
 
-	repoComp.mocks.multiSyncClient.EXPECT().Diff(ctx, req).Return(resp, nil)
-
-	req1 := types.GetDiffBetweenCommitsReq{
-		Namespace:    "test-namespace",
-		Name:         "test-repo",
-		RepoType:     types.ModelRepo,
-		LeftCommitID: "left-commit-id",
-	}
-	res, err := repoComp.RemoteDiff(ctx, req1)
+	err := repoComp.FixRepoSource(ctx)
 	require.Nil(t, err)
-	assert.Equal(t, resp, res)
+}
+
+func TestRepoComponent_RemoteTree(t *testing.T) {
+	ctx := context.TODO()
+	repoComp := initializeTestRepoComponent(ctx, t)
+
+	user := database.User{}
+	user.Username = "user_name"
+	repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username).Return(user, nil)
+
+	ns := database.Namespace{}
+	ns.NamespaceType = "user"
+	ns.Path = "user_name"
+	repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(mock.Anything, ns.Path).Return(ns, nil)
+
+	repo := &database.Repository{
+		ID:      1,
+		Private: true,
+		User:    user,
+		Path:    fmt.Sprintf("%s/%s", ns.Path, "repo_name"),
+		Source:  types.OpenCSGSource,
+	}
+	repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(mock.Anything, types.ModelRepo, ns.Path, repo.Name).Return(repo, nil)
+	repoComp.mocks.stores.FileMock().EXPECT().FindByParentPath(
+		ctx, int64(1), "go", &types.OffsetPagination{Limit: 1, Offset: 0},
+	).Return([]database.File{{Name: "f1"}}, nil)
+	repoComp.mocks.stores.FileMock().EXPECT().FindByParentPath(
+		ctx, int64(1), "go", &types.OffsetPagination{Limit: 1, Offset: 1},
+	).Return([]database.File{{Name: "f2"}}, nil)
+	repoComp.mocks.stores.FileMock().EXPECT().FindByParentPath(
+		ctx, int64(1), "go", &types.OffsetPagination{Limit: 1, Offset: 2},
+	).Return([]database.File{}, nil)
+
+	req := &types.GetTreeRequest{
+		Namespace:   ns.Path,
+		Name:        repo.Name,
+		Path:        "go",
+		RepoType:    types.ModelRepo,
+		CurrentUser: user.Username,
+		Limit:       1,
+	}
+
+	files := []*types.File{}
+	for {
+		tree, err := repoComp.RemoteTree(ctx, req)
+		require.Nil(t, err)
+		req.Cursor = tree.Cursor
+		files = append(files, tree.Files...)
+		if tree.Cursor == "" {
+			break
+		}
+	}
+	require.Equal(t, []*types.File{{Name: "f1"}, {Name: "f2"}}, files)
+}
+
+func TestRepoComponent_DiffBetweenTwoCommits(t *testing.T) {
+	ctx := context.TODO()
+	repoComp := initializeTestRepoComponent(ctx, t)
+
+	user := database.User{}
+	user.Username = "user_name"
+	repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username).Return(user, nil)
+
+	ns := database.Namespace{}
+	ns.NamespaceType = "user"
+	ns.Path = "user_name"
+	repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(mock.Anything, ns.Path).Return(ns, nil)
+
+	repo := &database.Repository{
+		ID:      1,
+		Private: true,
+		User:    user,
+		Path:    fmt.Sprintf("%s/%s", ns.Path, "repo_name"),
+		Source:  types.OpenCSGSource,
+	}
+	repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(mock.Anything, types.ModelRepo, ns.Path, repo.Name).Return(repo, nil)
+	commit := &types.Commit{ID: "zzz"}
+	repoComp.mocks.gitServer.EXPECT().GetRepoLastCommit(mock.Anything, mock.Anything).Return(commit, nil)
+	repoComp.mocks.gitServer.EXPECT().GetDiffBetweenTwoCommits(mock.Anything, mock.Anything).Return(&types.GiteaCallbackPushReq{
+		Commits: []types.GiteaCallbackPushReq_Commit{
+			{
+				Added:    []string{"go"},
+				Modified: []string{"add"},
+				Removed:  []string{"abc"},
+			},
+		},
+	}, nil)
+
+	diff, err := repoComp.DiffBetweenTwoCommits(ctx, types.GetDiffBetweenCommitsReq{
+		Namespace:    ns.Path,
+		Name:         repo.Name,
+		RepoType:     types.ModelRepo,
+		LeftCommitID: "aaa",
+		CurrentUser:  user.Username,
+	})
+	require.Equal(t, nil, err)
+	require.Equal(t, []types.GiteaCallbackPushReq_Commit{
+		{
+			Added:    []string{"go"},
+			Modified: []string{"add"},
+			Removed:  []string{"abc"},
+		},
+	}, diff)
 }
 
 func TestRepoComponent_Preupload(t *testing.T) {
@@ -2488,6 +2817,240 @@ func TestParseNDJson_AllKeyTypes(t *testing.T) {
 	assert.Equal(t, types.CommitActionDelete, result.Files[3].Action)
 }
 
+func TestGetRepoUrl(t *testing.T) {
+	tests := []struct {
+		name     string
+		repoType types.RepositoryType
+		repoPath string
+		expected string
+	}{
+		{
+			name:     "Model repository",
+			repoType: types.ModelRepo,
+			repoPath: "namespace/model",
+			expected: "/models/namespace/model",
+		},
+		{
+			name:     "Dataset repository",
+			repoType: types.DatasetRepo,
+			repoPath: "namespace/dataset",
+			expected: "/datasets/namespace/dataset",
+		},
+		{
+			name:     "Space repository",
+			repoType: types.SpaceRepo,
+			repoPath: "namespace/space",
+			expected: "/spaces/namespace/space",
+		},
+		{
+			name:     "Code repository",
+			repoType: types.CodeRepo,
+			repoPath: "team/code",
+			expected: "/codes/team/code",
+		},
+		{
+			name:     "Prompt repository",
+			repoType: types.PromptRepo,
+			repoPath: "namespace/prompt",
+			expected: "/prompts/namespace/prompt",
+		},
+		{
+			name:     "MCP Server repository",
+			repoType: types.MCPServerRepo,
+			repoPath: "namespace/mcpserver",
+			expected: "/mcp/servers/namespace/mcpserver",
+		},
+		{
+			name:     "Unknown repository type",
+			repoType: types.UnknownRepo,
+			repoPath: "namespace/repo",
+			expected: "",
+		},
+		{
+			name:     "Empty repo path",
+			repoType: types.ModelRepo,
+			repoPath: "",
+			expected: "",
+		},
+		{
+			name:     "Empty repo type string",
+			repoType: "",
+			repoPath: "user/repo",
+			expected: "",
+		},
+		{
+			name:     "Invalid repo type",
+			repoType: "invalid",
+			repoPath: "user/repo",
+			expected: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := GetRepoUrl(tt.repoType, tt.repoPath)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestRepoComponent_IsSyncing(t *testing.T) {
+	ctx := context.Background()
+
+	repoComp := initializeTestRepoComponent(ctx, t)
+
+	repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "namespace", "name").
+		Return(&database.Repository{ID: 1}, nil)
+
+	repoComp.mocks.stores.MirrorMock().EXPECT().FindByRepoID(ctx, int64(1)).Return(
+		&database.Mirror{
+			ID: 1,
+			CurrentTask: &database.MirrorTask{
+				ID:     1,
+				Status: types.MirrorRepoSyncStart,
+			},
+		}, nil,
+	).Once()
+
+	syncing, err := repoComp.IsSyncing(ctx, types.ModelRepo, "namespace", "name")
+
+	require.Nil(t, err)
+	assert.True(t, syncing)
+
+	repoComp.mocks.stores.MirrorMock().EXPECT().FindByRepoID(ctx, int64(1)).Return(nil, sql.ErrNoRows).Once()
+
+	syncing, err = repoComp.IsSyncing(ctx, types.ModelRepo, "namespace", "name")
+
+	require.Nil(t, err)
+	assert.False(t, syncing)
+}
+
+func TestRepoComponent_ChangePath(t *testing.T) {
+	ctx := context.Background()
+
+	repoComp := initializeTestRepoComponent(ctx, t)
+
+	repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "namespace", "name").
+		Return(&database.Repository{ID: 1}, nil)
+
+	repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "new", "path").
+		Return(nil, sql.ErrNoRows)
+
+	// repoComp.mocks.gitServer.EXPECT().CopyRepository(
+	// 	ctx,
+	// 	gitserver.CopyRepositoryReq{
+	// 		RepoType:  types.ModelRepo,
+	// 		Namespace: "namespace",
+	// 		Name:      "name",
+	// 		NewPath:   "@hashed_repos/6b/86/6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b.git",
+	// 	}).Return(nil)
+
+	err := repoComp.ChangePath(ctx, types.ChangePathReq{
+		RepoType:  types.ModelRepo,
+		Namespace: "namespace",
+		Name:      "name",
+		NewPath:   "new/path",
+	})
+
+	require.NotNil(t, err)
+}
+
+func TestRepoComponent_ChangePath_RepoHashed(t *testing.T) {
+	ctx := context.Background()
+
+	repoComp := initializeTestRepoComponent(ctx, t)
+
+	repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "namespace", "name").
+		Return(&database.Repository{ID: 1, Hashed: true}, nil)
+
+	repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "new", "path").
+		Return(nil, sql.ErrNoRows)
+
+	repoComp.mocks.stores.RepoMock().EXPECT().UpdateRepo(ctx, database.Repository{
+		ID:      1,
+		Path:    "new/path",
+		GitPath: "models_new/path",
+		Hashed:  true,
+	}).Return(nil, nil)
+
+	err := repoComp.ChangePath(ctx, types.ChangePathReq{
+		RepoType:  types.ModelRepo,
+		Namespace: "namespace",
+		Name:      "name",
+		NewPath:   "new/path",
+	})
+
+	require.Nil(t, err)
+}
+
+func TestRepoComponent_ChangePath_NewNamespaceExists(t *testing.T) {
+	ctx := context.Background()
+
+	repoComp := initializeTestRepoComponent(ctx, t)
+
+	repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "namespace", "name").
+		Return(&database.Repository{ID: 1}, nil)
+
+	repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "new", "path").
+		Return(&database.Repository{ID: 2}, nil)
+
+	err := repoComp.ChangePath(ctx, types.ChangePathReq{
+		RepoType:  types.ModelRepo,
+		Namespace: "namespace",
+		Name:      "name",
+		NewPath:   "new/path",
+	})
+
+	require.NotNil(t, err)
+}
+
+func TestRepoComponent_BatchMigrateRepoToHashedPath_AutoFalse(t *testing.T) {
+	ctx := context.Background()
+
+	repoComp := initializeTestRepoComponent(ctx, t)
+	repoComp.config.Git.RepoDataMigrateEnable = true
+
+	repoComp.mocks.stores.RepoMock().EXPECT().FindUnhashedRepos(ctx, 10, int64(0)).
+		Return([]database.Repository{{
+			ID:             1,
+			Hashed:         false,
+			Path:           "namespace/name",
+			RepositoryType: types.ModelRepo,
+		}}, nil)
+	repoComp.mocks.stores.RepoMock().EXPECT().UpdateRepo(ctx, database.Repository{
+		ID:             1,
+		Path:           "namespace/name",
+		RepositoryType: types.ModelRepo,
+		Hashed:         true,
+	}).Return(&database.Repository{}, nil)
+
+	repoComp.mocks.gitServer.EXPECT().CopyRepository(ctx, gitserver.CopyRepositoryReq{
+		Namespace: "namespace",
+		Name:      "name",
+		RepoType:  types.ModelRepo,
+		NewPath:   "@hashed_repos/6b/86/6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b.git",
+	}).Return(nil)
+
+	lastID, err := repoComp.BatchMigrateRepoToHashedPath(ctx, false, 10, 0)
+
+	require.Nil(t, err)
+	require.Equal(t, int64(1), lastID)
+}
+
+func TestRepoComponent_BatchMigrateRepoToHashedPath_AutoTrue(t *testing.T) {
+	ctx := context.Background()
+
+	repoComp := initializeTestRepoComponent(ctx, t)
+	repoComp.config.Git.RepoDataMigrateEnable = true
+
+	repoComp.mocks.stores.RepoMock().EXPECT().FindUnhashedRepos(ctx, 1, int64(0)).
+		Return([]database.Repository{}, nil).Once()
+
+	_, err := repoComp.BatchMigrateRepoToHashedPath(ctx, true, 1, 0)
+
+	require.Nil(t, err)
+}
+
 func TestRepoComponent_GetMirrorTaskStatusAndSyncStatus(t *testing.T) {
 	ctx := context.Background()
 
@@ -2535,31 +3098,6 @@ func TestRepoComponent_GetMirrorTaskStatusAndSyncStatus(t *testing.T) {
 
 	assert.Equal(t, types.MirrorTaskStatus(""), mirrorTaskStatus)
 	assert.Equal(t, types.SyncStatusCompleted, syncStatus)
-}
-
-func TestRepoComponent_SendAssetManagementMsg(t *testing.T) {
-	config := &config.Config{}
-	config.Notification.NotificationRetryCount = 3
-	mockNotificationRpc := mockrpc.NewMockNotificationSvcClient(t)
-	repoComp := &repoComponentImpl{
-		config:                config,
-		notificationSvcClient: mockNotificationRpc,
-	}
-	var wg sync.WaitGroup
-	wg.Add(1)
-	mockNotificationRpc.EXPECT().Send(mock.Anything, mock.MatchedBy(func(req *types.MessageRequest) bool {
-		defer wg.Done()
-		return req.Scenario == types.MessageScenarioAssetManagement
-	})).Return(nil).Once()
-
-	err := repoComp.SendAssetManagementMsg(context.Background(), types.RepoNotificationReq{
-		RepoType:  types.ModelRepo,
-		RepoPath:  "ns/n",
-		Operation: types.OperationCreate,
-		UserUUID:  "user0",
-	})
-	require.Nil(t, err)
-	wg.Wait()
 }
 
 func TestRepoComponent_UpdateRepo_PermissionChecks(t *testing.T) {
@@ -2686,4 +3224,29 @@ func TestRepoComponent_UpdateRepo_PermissionChecks(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRepoComponent_SendAssetManagementMsg(t *testing.T) {
+	config := &config.Config{}
+	config.Notification.NotificationRetryCount = 3
+	mockNotificationRpc := mockrpc.NewMockNotificationSvcClient(t)
+	repoComp := &repoComponentImpl{
+		config:                config,
+		notificationSvcClient: mockNotificationRpc,
+	}
+	var wg sync.WaitGroup
+	wg.Add(1)
+	mockNotificationRpc.EXPECT().Send(mock.Anything, mock.MatchedBy(func(req *types.MessageRequest) bool {
+		defer wg.Done()
+		return req.Scenario == types.MessageScenarioAssetManagement
+	})).Return(nil).Once()
+
+	err := repoComp.SendAssetManagementMsg(context.Background(), types.RepoNotificationReq{
+		RepoType:  types.ModelRepo,
+		RepoPath:  "ns/n",
+		Operation: types.OperationCreate,
+		UserUUID:  "user0",
+	})
+	require.Nil(t, err)
+	wg.Wait()
 }

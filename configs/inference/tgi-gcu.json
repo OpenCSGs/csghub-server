@@ -1,0 +1,21 @@
+{
+  "engine_name": "tgi-gcu",
+  "enabled": 1,
+  "container_port": 8000,
+  "model_format": "safetensors",
+  "engine_images": [
+    {
+      "compute_type": "gcu",
+      "image": "opencsghq/tgi-gcu:tgi_25.02.22.1",
+      "driver_version": "25.02",
+      "engine_version": "3.2.1"
+    }
+  ],
+  "supported_models": [
+    "DeepSeek-R1-Distill-Qwen-1.5B",
+    "DeepSeek-R1-Distill-Qwen-7B",
+    "DeepSeek-R1-Distill-Qwen-14B",
+    "DeepSeek-R1-Distill-Qwen-32B",
+    "DeepSeek-R1-Distill-Llama-70B"
+  ]
+}

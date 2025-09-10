@@ -83,10 +83,8 @@ func (c *Client) UpdateRepo(ctx context.Context, req gitserver.UpdateRepoReq) (*
 	return resp, nil
 }
 
-func (c *Client) DeleteRepo(ctx context.Context, req gitserver.DeleteRepoReq) error {
-	giteaNamespace := common.WithPrefix(req.Namespace, repoPrefixByType(req.RepoType))
-	_, err := c.giteaClient.DeleteRepo(giteaNamespace, req.Name)
-	return err
+func (c *Client) DeleteRepo(ctx context.Context, path string) error {
+	return nil
 }
 
 func (c *Client) GetRepo(ctx context.Context, req gitserver.GetRepoReq) (*gitserver.CreateRepoResp, error) {
@@ -113,4 +111,8 @@ func (c *Client) GetRepo(ctx context.Context, req gitserver.GetRepoReq) (*gitser
 	}
 
 	return resp, nil
+}
+
+func (c *Client) CopyRepository(ctx context.Context, req gitserver.CopyRepositoryReq) error {
+	return nil
 }

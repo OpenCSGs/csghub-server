@@ -140,6 +140,65 @@ func (_c *MockImageBuilderWorkStore_CreateOrUpdateByBuildID_Call) RunAndReturn(r
 	return _c
 }
 
+// FindByImagePath provides a mock function with given fields: ctx, imagePath
+func (_m *MockImageBuilderWorkStore) FindByImagePath(ctx context.Context, imagePath string) (*database.ImageBuilderWork, error) {
+	ret := _m.Called(ctx, imagePath)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FindByImagePath")
+	}
+
+	var r0 *database.ImageBuilderWork
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*database.ImageBuilderWork, error)); ok {
+		return rf(ctx, imagePath)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *database.ImageBuilderWork); ok {
+		r0 = rf(ctx, imagePath)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.ImageBuilderWork)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, imagePath)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockImageBuilderWorkStore_FindByImagePath_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindByImagePath'
+type MockImageBuilderWorkStore_FindByImagePath_Call struct {
+	*mock.Call
+}
+
+// FindByImagePath is a helper method to define mock.On call
+//   - ctx context.Context
+//   - imagePath string
+func (_e *MockImageBuilderWorkStore_Expecter) FindByImagePath(ctx interface{}, imagePath interface{}) *MockImageBuilderWorkStore_FindByImagePath_Call {
+	return &MockImageBuilderWorkStore_FindByImagePath_Call{Call: _e.mock.On("FindByImagePath", ctx, imagePath)}
+}
+
+func (_c *MockImageBuilderWorkStore_FindByImagePath_Call) Run(run func(ctx context.Context, imagePath string)) *MockImageBuilderWorkStore_FindByImagePath_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockImageBuilderWorkStore_FindByImagePath_Call) Return(_a0 *database.ImageBuilderWork, _a1 error) *MockImageBuilderWorkStore_FindByImagePath_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockImageBuilderWorkStore_FindByImagePath_Call) RunAndReturn(run func(context.Context, string) (*database.ImageBuilderWork, error)) *MockImageBuilderWorkStore_FindByImagePath_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // FindByWorkName provides a mock function with given fields: ctx, workName
 func (_m *MockImageBuilderWorkStore) FindByWorkName(ctx context.Context, workName string) (*database.ImageBuilderWork, error) {
 	ret := _m.Called(ctx, workName)

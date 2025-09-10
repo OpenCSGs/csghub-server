@@ -272,9 +272,7 @@ func TestModelComponent_Show(t *testing.T) {
 		&types.UserRepoPermission{CanRead: true, CanAdmin: true}, nil,
 	)
 	mc.mocks.components.repo.EXPECT().GetNameSpaceInfo(ctx, "ns").Return(&types.Namespace{Path: "ns"}, nil)
-	mc.mocks.components.repo.EXPECT().GetMirrorTaskStatusAndSyncStatus(m.Repository).Return(
-		"", "",
-	)
+
 	mc.mocks.stores.UserLikesMock().EXPECT().IsExist(ctx, "user", int64(123)).Return(true, nil)
 	mc.mocks.stores.RuntimeArchMock().EXPECT().CheckEngineByArchModelNameAndType(
 		ctx, mock.Anything, "n", "safetensors", types.InferenceType,
@@ -292,7 +290,11 @@ func TestModelComponent_Show(t *testing.T) {
 		{ID: 4, RepositoryID: 2, WeightName: database.RecomWeightQuality, Score: 80},
 	}, nil)*/
 
-	model, err := mc.Show(ctx, "ns", "n", "user", false)
+	mc.mocks.components.repo.EXPECT().GetMirrorTaskStatusAndSyncStatus(m.Repository).Return(
+		"", "",
+	)
+
+	model, err := mc.Show(ctx, "ns", "n", "user", false, false)
 	require.Nil(t, err)
 	require.Equal(t, &types.Model{
 		ID:                   1,
@@ -316,6 +318,233 @@ func TestModelComponent_Show(t *testing.T) {
 		EnableFinetune:   true,
 		EnableEvaluation: true,
 		WidgetType:       types.ModelWidgetTypeGeneration,
+		/*Scores: []types.WeightScore{{
+			WeightName: string(database.RecomWeightTotal),
+			Score:      100,
+		}, {
+			WeightName: string(database.RecomWeightDownloads),
+			Score:      40,
+		}, {
+			WeightName: string(database.RecomWeightFreshness),
+			Score:      50,
+		}, {
+			WeightName: string(database.RecomWeightQuality),
+			Score:      80,
+		}},*/
+	}, model)
+}
+
+func TestModelComponent_Show_Syncing(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestModelComponent(ctx, t)
+
+	repository := &database.Repository{
+		ID:   123,
+		Name: "n",
+		Path: "foo/bar",
+		Metadata: database.Metadata{
+			Architecture: "llama",
+		},
+		Tags: []database.Tag{{Name: "safetensors", Category: "framework"}},
+		Mirror: database.Mirror{
+			ID: 1,
+			CurrentTask: &database.MirrorTask{
+				Status: types.MirrorRepoSyncStart,
+			},
+		},
+	}
+
+	mc.mocks.stores.ModelMock().EXPECT().FindByPath(ctx, "ns", "n").Return(&database.Model{
+		ID:           1,
+		RepositoryID: 123,
+		Repository:   repository,
+	}, nil)
+	mc.mocks.components.repo.EXPECT().GetUserRepoPermission(ctx, "user", repository).Return(
+		&types.UserRepoPermission{CanRead: true, CanAdmin: true}, nil,
+	)
+	mc.mocks.components.repo.EXPECT().GetNameSpaceInfo(ctx, "ns").Return(&types.Namespace{Path: "ns"}, nil)
+
+	mc.mocks.components.repo.EXPECT().GetMirrorTaskStatusAndSyncStatus(repository).Return(
+		types.MirrorRepoSyncStart, types.SyncStatusInProgress,
+	)
+	mc.mocks.stores.UserLikesMock().EXPECT().IsExist(ctx, "user", int64(123)).Return(true, nil)
+	mc.mocks.stores.RuntimeArchMock().EXPECT().CheckEngineByArchModelNameAndType(
+		ctx, mock.Anything, "n", "safetensors", types.InferenceType,
+	).Return(true, nil)
+	mc.mocks.stores.RuntimeArchMock().EXPECT().CheckEngineByArchModelNameAndType(
+		ctx, mock.Anything, "n", "safetensors", types.FinetuneType,
+	).Return(true, nil)
+	mc.mocks.stores.RuntimeArchMock().EXPECT().CheckEngineByArchModelNameAndType(
+		ctx, mock.Anything, "n", "safetensors", types.EvaluationType,
+	).Return(true, nil)
+
+	model, err := mc.Show(ctx, "ns", "n", "user", false, false)
+	require.Nil(t, err)
+	require.Equal(t, &types.Model{
+		ID:                   1,
+		Name:                 "n",
+		Namespace:            &types.Namespace{Path: "ns"},
+		UserLikes:            true,
+		RepositoryID:         123,
+		CanManage:            true,
+		User:                 &types.User{},
+		Path:                 "foo/bar",
+		SensitiveCheckStatus: "Pending",
+		Repository: types.Repository{
+			HTTPCloneURL: "https://foo.com/s/foo/bar.git",
+			SSHCloneURL:  "test@127.0.0.1:s/foo/bar.git",
+		},
+		Metadata: types.Metadata{
+			Architecture: "llama",
+		},
+		Tags:             []types.RepoTag{{Name: "safetensors", Category: "framework"}},
+		EnableInference:  true,
+		EnableFinetune:   true,
+		EnableEvaluation: true,
+		WidgetType:       types.ModelWidgetTypeGeneration,
+		SyncStatus:       types.SyncStatusInProgress,
+		MirrorTaskStatus: types.MirrorRepoSyncStart,
+	}, model)
+}
+
+func TestModelComponent_Show_Mirror(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestModelComponent(ctx, t)
+
+	repository := &database.Repository{
+		ID:   123,
+		Name: "n",
+		Path: "foo/bar",
+		Metadata: database.Metadata{
+			Architecture: "llama",
+		},
+		Tags: []database.Tag{{Name: "safetensors", Category: "framework"}},
+		Mirror: database.Mirror{
+			ID:     1,
+			Status: types.MirrorRepoSyncStart,
+		},
+	}
+
+	mc.mocks.stores.ModelMock().EXPECT().FindByPath(ctx, "ns", "n").Return(&database.Model{
+		ID:           1,
+		RepositoryID: 123,
+		Repository:   repository,
+	}, nil)
+	mc.mocks.components.repo.EXPECT().GetUserRepoPermission(ctx, "user", repository).Return(
+		&types.UserRepoPermission{CanRead: true, CanAdmin: true}, nil,
+	)
+	mc.mocks.components.repo.EXPECT().GetNameSpaceInfo(ctx, "ns").Return(&types.Namespace{Path: "ns"}, nil)
+
+	mc.mocks.components.repo.EXPECT().GetMirrorTaskStatusAndSyncStatus(repository).Return(
+		"", types.SyncStatusInProgress,
+	)
+	mc.mocks.stores.UserLikesMock().EXPECT().IsExist(ctx, "user", int64(123)).Return(true, nil)
+	mc.mocks.stores.RuntimeArchMock().EXPECT().CheckEngineByArchModelNameAndType(
+		ctx, mock.Anything, "n", "safetensors", types.InferenceType,
+	).Return(true, nil)
+	mc.mocks.stores.RuntimeArchMock().EXPECT().CheckEngineByArchModelNameAndType(
+		ctx, mock.Anything, "n", "safetensors", types.FinetuneType,
+	).Return(true, nil)
+	mc.mocks.stores.RuntimeArchMock().EXPECT().CheckEngineByArchModelNameAndType(
+		ctx, mock.Anything, "n", "safetensors", types.EvaluationType,
+	).Return(true, nil)
+
+	model, err := mc.Show(ctx, "ns", "n", "user", false, false)
+	require.Nil(t, err)
+	require.Equal(t, &types.Model{
+		ID:                   1,
+		Name:                 "n",
+		Namespace:            &types.Namespace{Path: "ns"},
+		UserLikes:            true,
+		RepositoryID:         123,
+		CanManage:            true,
+		User:                 &types.User{},
+		Path:                 "foo/bar",
+		SensitiveCheckStatus: "Pending",
+		Repository: types.Repository{
+			HTTPCloneURL: "https://foo.com/s/foo/bar.git",
+			SSHCloneURL:  "test@127.0.0.1:s/foo/bar.git",
+		},
+		Metadata: types.Metadata{
+			Architecture: "llama",
+		},
+		Tags:             []types.RepoTag{{Name: "safetensors", Category: "framework"}},
+		EnableInference:  true,
+		EnableFinetune:   true,
+		EnableEvaluation: true,
+		WidgetType:       types.ModelWidgetTypeGeneration,
+		SyncStatus:       types.SyncStatusInProgress,
+	}, model)
+}
+
+func TestModelComponent_Show_Repository(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestModelComponent(ctx, t)
+
+	repository := &database.Repository{
+		ID:   123,
+		Name: "n",
+		Path: "foo/bar",
+		Metadata: database.Metadata{
+			Architecture: "llama",
+		},
+		Tags: []database.Tag{{Name: "safetensors", Category: "framework"}},
+		Mirror: database.Mirror{
+			ID: 0,
+		},
+		SyncStatus: types.SyncStatusPending,
+	}
+
+	mc.mocks.stores.ModelMock().EXPECT().FindByPath(ctx, "ns", "n").Return(&database.Model{
+		ID:           1,
+		RepositoryID: 123,
+		Repository:   repository,
+	}, nil)
+	mc.mocks.components.repo.EXPECT().GetUserRepoPermission(ctx, "user", repository).Return(
+		&types.UserRepoPermission{CanRead: true, CanAdmin: true}, nil,
+	)
+
+	mc.mocks.components.repo.EXPECT().GetMirrorTaskStatusAndSyncStatus(repository).Return(
+		"", types.SyncStatusPending,
+	)
+	mc.mocks.components.repo.EXPECT().GetNameSpaceInfo(ctx, "ns").Return(&types.Namespace{Path: "ns"}, nil)
+
+	mc.mocks.stores.UserLikesMock().EXPECT().IsExist(ctx, "user", int64(123)).Return(true, nil)
+	mc.mocks.stores.RuntimeArchMock().EXPECT().CheckEngineByArchModelNameAndType(
+		ctx, mock.Anything, "n", "safetensors", types.InferenceType,
+	).Return(true, nil)
+	mc.mocks.stores.RuntimeArchMock().EXPECT().CheckEngineByArchModelNameAndType(
+		ctx, mock.Anything, "n", "safetensors", types.FinetuneType,
+	).Return(true, nil)
+	mc.mocks.stores.RuntimeArchMock().EXPECT().CheckEngineByArchModelNameAndType(
+		ctx, mock.Anything, "n", "safetensors", types.EvaluationType,
+	).Return(true, nil)
+
+	model, err := mc.Show(ctx, "ns", "n", "user", false, false)
+	require.Nil(t, err)
+	require.Equal(t, &types.Model{
+		ID:                   1,
+		Name:                 "n",
+		Namespace:            &types.Namespace{Path: "ns"},
+		UserLikes:            true,
+		RepositoryID:         123,
+		CanManage:            true,
+		User:                 &types.User{},
+		Path:                 "foo/bar",
+		SensitiveCheckStatus: "Pending",
+		Repository: types.Repository{
+			HTTPCloneURL: "https://foo.com/s/foo/bar.git",
+			SSHCloneURL:  "test@127.0.0.1:s/foo/bar.git",
+		},
+		Metadata: types.Metadata{
+			Architecture: "llama",
+		},
+		Tags:             []types.RepoTag{{Name: "safetensors", Category: "framework"}},
+		EnableInference:  true,
+		EnableFinetune:   true,
+		EnableEvaluation: true,
+		WidgetType:       types.ModelWidgetTypeGeneration,
+		SyncStatus:       types.SyncStatusPending,
 	}, model)
 }
 
@@ -664,5 +893,26 @@ func TestModelComponent_OrgModels(t *testing.T) {
 			RepositoryID: 1,
 		},
 	}, data)
+
+}
+
+func TestModelComponent_Wakeup(t *testing.T) {
+	ctx := context.TODO()
+	sc := initializeTestModelComponent(ctx, t)
+	sc.mocks.stores.ModelMock().EXPECT().FindByPath(ctx, "ns", "n").Return(nil, nil)
+
+	sc.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(1)).Return(
+		&database.Deploy{SvcName: "svc"}, nil,
+	)
+
+	sc.mocks.deployer.EXPECT().Wakeup(ctx, types.DeployRepo{
+		DeployID:  1,
+		Namespace: "ns",
+		Name:      "n",
+		SvcName:   "svc",
+	}).Return(nil)
+
+	err := sc.Wakeup(ctx, "ns", "n", 1)
+	require.Nil(t, err)
 
 }

@@ -5,26 +5,22 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/types"
 )
 
-// func TestRecomComponent_SetOpWeight(t *testing.T) {
-// 	ctx := context.TODO()
-// 	rc := initializeTestRecomComponent(ctx, t)
+func TestRecomComponent_SetOpWeight(t *testing.T) {
+	ctx := context.TODO()
+	rc := initializeTestRecomComponent(ctx, t)
 
-// 	rc.mocks.stores.RepoMock().EXPECT().FindById(ctx, int64(1)).Return(&database.Repository{}, nil)
-// 	rc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
-// 		RoleMask: "admin",
-// 	}, nil)
-// 	rc.mocks.stores.RecomMock().EXPECT().UpsetOpWeights(ctx, int64(1), int64(100)).Return(nil)
+	rc.mocks.stores.RepoMock().EXPECT().FindById(ctx, int64(1)).Return(&database.Repository{}, nil)
+	rc.mocks.stores.RecomMock().EXPECT().UpsetOpWeights(ctx, int64(1), int64(100)).Return(nil)
 
-// 	err := rc.SetOpWeight(ctx, 1, 100)
-// 	require.Nil(t, err)
-// }
+	err := rc.SetOpWeight(ctx, 1, 100)
+	require.Nil(t, err)
+}
 
 func TestRecomComponent_CalculateRecomScore(t *testing.T) {
 	const batchSize = 2
@@ -42,11 +38,11 @@ func TestRecomComponent_CalculateRecomScore(t *testing.T) {
 	repo3 := database.Repository{ID: 3, Path: "foo/bar3"}
 	repo3.UpdatedAt = time.Now().Add(24 * time.Hour)
 	// loop 1
-	rc.mocks.stores.RepoMock().EXPECT().BatchGet(ctx, int64(0), batchSize, (*types.BatchGetFilter)(nil)).Return([]database.Repository{
+	rc.mocks.stores.RepoMock().EXPECT().BatchGet(mock.Anything, int64(0), batchSize, (*types.BatchGetFilter)(nil)).Return([]database.Repository{
 		repo1, repo2,
 	}, nil)
 	// loop 2
-	rc.mocks.stores.RepoMock().EXPECT().BatchGet(ctx, int64(2), batchSize, (*types.BatchGetFilter)(nil)).Return([]database.Repository{
+	rc.mocks.stores.RepoMock().EXPECT().BatchGet(mock.Anything, int64(2), batchSize, (*types.BatchGetFilter)(nil)).Return([]database.Repository{
 		repo3,
 	}, nil)
 
@@ -54,7 +50,7 @@ func TestRecomComponent_CalculateRecomScore(t *testing.T) {
 	repo1FreshnessScore.UpdatedAt = time.Now()
 	repo1QualityScore := database.RecomRepoScore{RepositoryID: 1, Score: 300, WeightName: database.RecomWeightQuality}
 	repo1QualityScore.UpdatedAt = time.Now()
-	rc.mocks.stores.RecomMock().EXPECT().FindScoreByRepoIDs(mock.Anything, []int64{1, 2}).Return(
+	rc.mocks.stores.RecomMock().EXPECT().FindByRepoIDs(mock.Anything, []int64{1, 2}).Return(
 		[]*database.RecomRepoScore{
 			&repo1FreshnessScore,
 			&repo1QualityScore,
@@ -62,7 +58,7 @@ func TestRecomComponent_CalculateRecomScore(t *testing.T) {
 	)
 	repo3Score := database.RecomRepoScore{RepositoryID: 3, Score: 12.34, WeightName: "freshness"}
 	repo3Score.UpdatedAt = time.Now()
-	rc.mocks.stores.RecomMock().EXPECT().FindScoreByRepoIDs(mock.Anything, []int64{3}).Return(
+	rc.mocks.stores.RecomMock().EXPECT().FindByRepoIDs(mock.Anything, []int64{3}).Return(
 		[]*database.RecomRepoScore{
 			&repo3Score,
 		}, nil,
@@ -77,7 +73,7 @@ func TestRecomComponent_CalculateRecomScore(t *testing.T) {
 	).Return(nil, nil)
 
 	// rc.mocks.stores.RecomMock().EXPECT().UpsertScore(ctx, int64(2), 12.34).Return(nil)
-	rc.mocks.stores.RecomMock().EXPECT().UpsertScore(ctx, mock.Anything).RunAndReturn(
+	rc.mocks.stores.RecomMock().EXPECT().UpsertScore(mock.Anything, mock.Anything).RunAndReturn(
 		func(ctx context.Context, scores []*database.RecomRepoScore) error {
 			// scores to map by repo id
 			scoresMap := make(map[int64][]*database.RecomRepoScore)
@@ -100,62 +96,38 @@ func TestRecomComponent_CalculateRecomScore(t *testing.T) {
 			return nil
 		},
 	)
+	// rc.mocks.stores.RecomMock().EXPECT().UpsertScore(ctx, int64(3), 12.34).Return(nil)
 
 	err := rc.CalculateRecomScore(ctx, batchSize)
 	require.NoError(t, err)
 }
 
-func TestRecomComponent_CalculateTotalScore(t *testing.T) {
+func TestRecomComponent_calcFreshnessScore(t *testing.T) {
 	ctx := context.TODO()
 	rc := initializeTestRecomComponent(ctx, t)
-
-	/*rc.mocks.gitServer.EXPECT().GetTree(
-		mock.Anything, types.GetTreeRequest{Namespace: "foo", Name: "bar", Limit: 500, Recursive: true},
-	).Return(nil, nil)*/
 
 	// Test case 1: repository created 24 hours ago
 	repo1 := &database.Repository{Path: "foo/bar"}
 	repo1.CreatedAt = time.Now().Add(-24 * time.Hour)
-	weights1 := map[database.RecomWeightName]string{
-		database.RecomWeightFreshness: expFreshness,
-	}
-	oldScore1 := map[database.RecomWeightName]*database.RecomRepoScore{}
-	score1, err := rc.calcTotalScore(ctx, repo1, weights1, oldScore1)
-	assert.Nil(t, err, "calcTotalScore error")
-	for _, score := range score1 {
-		if score.WeightName == database.RecomWeightTotal && (score.Score > 100 || score.Score < 98) {
-			t.Errorf("Expected score1 should in range [98,100], got: %v", score1)
-		}
+	score1 := rc.calcFreshnessScore(repo1.CreatedAt, expFreshness)
+	if score1 > 100 || score1 < 98 {
+		t.Errorf("Expected score1 should in range [98,100], got: %f", score1)
 	}
 
 	// Test case 2: repository created 48 hours ago
 	repo2 := &database.Repository{Path: "foo/bar"}
 	repo2.CreatedAt = time.Now().Add(-50 * time.Hour)
-	weights2 := map[database.RecomWeightName]string{
-		database.RecomWeightFreshness: expFreshness,
-	}
-	oldScore2 := map[database.RecomWeightName]*database.RecomRepoScore{}
-	score2, err := rc.calcTotalScore(ctx, repo2, weights2, oldScore2)
-	assert.Nil(t, err, "calcTotalScore error")
-	for _, score := range score2 {
-		if score.WeightName == database.RecomWeightTotal && (score.Score > 98.0 || score.Score < 60.0) {
-			t.Errorf("Expected score1 should in range [60,98), got: %v", score2)
-		}
+	score2 := rc.calcFreshnessScore(repo2.CreatedAt, expFreshness)
+	if score2 > 98.0 || score2 < 60.0 {
+		t.Errorf("Expected score1 should in range [60,98), got: %f", score2)
 	}
 
 	// Test case 3: repository created 168 hours ago
 	repo3 := &database.Repository{Path: "foo/bar"}
 	repo3.CreatedAt = time.Now().Add(-168 * time.Hour)
-	weights3 := map[database.RecomWeightName]string{
-		database.RecomWeightFreshness: expFreshness,
-	}
-	oldScore3 := map[database.RecomWeightName]*database.RecomRepoScore{}
-	score3, err := rc.calcTotalScore(ctx, repo3, weights3, oldScore3)
-	assert.Nil(t, err, "calcTotalScore error")
-	for _, score := range score3 {
-		if score.WeightName == database.RecomWeightTotal && (score.Score < 0 || score.Score > 60) {
-			t.Errorf("Expected score1 should in range [0,60), got: %v", score3)
-		}
+	score3 := rc.calcFreshnessScore(repo3.CreatedAt, expFreshness)
+	if score3 < 0 || score3 > 60 {
+		t.Errorf("Expected score1 should in range [0,60), got: %f", score2)
 	}
 }
 

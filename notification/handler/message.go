@@ -32,13 +32,6 @@ func NewNotificationHandler(conf *config.Config) (*NotificationHandler, error) {
 	}, nil
 }
 
-// _mock for test
-func NewNotifierMessageHandlerWithMock(nmc component.NotificationComponent) *NotificationHandler {
-	return &NotificationHandler{
-		nmc: nmc,
-	}
-}
-
 // GetUnreadCount Get the count of unread notifications
 // @Security ApiKey
 // @Summary Get unread notifications count

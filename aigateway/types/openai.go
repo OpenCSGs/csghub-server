@@ -26,9 +26,3 @@ type ModelList struct {
 	Object string  `json:"object"`
 	Data   []Model `json:"data"`
 }
-
-// ChatMessage represents a chat message
-type ChatMessage struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
-}

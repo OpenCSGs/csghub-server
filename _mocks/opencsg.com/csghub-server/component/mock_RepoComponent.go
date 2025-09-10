@@ -565,6 +565,65 @@ func (_c *MockRepoComponent_AllowWriteAccess_Call) RunAndReturn(run func(context
 	return _c
 }
 
+// BatchMigrateRepoToHashedPath provides a mock function with given fields: ctx, auto, batchSize, lastID
+func (_m *MockRepoComponent) BatchMigrateRepoToHashedPath(ctx context.Context, auto bool, batchSize int, lastID int64) (int64, error) {
+	ret := _m.Called(ctx, auto, batchSize, lastID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for BatchMigrateRepoToHashedPath")
+	}
+
+	var r0 int64
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, bool, int, int64) (int64, error)); ok {
+		return rf(ctx, auto, batchSize, lastID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, bool, int, int64) int64); ok {
+		r0 = rf(ctx, auto, batchSize, lastID)
+	} else {
+		r0 = ret.Get(0).(int64)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, bool, int, int64) error); ok {
+		r1 = rf(ctx, auto, batchSize, lastID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockRepoComponent_BatchMigrateRepoToHashedPath_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BatchMigrateRepoToHashedPath'
+type MockRepoComponent_BatchMigrateRepoToHashedPath_Call struct {
+	*mock.Call
+}
+
+// BatchMigrateRepoToHashedPath is a helper method to define mock.On call
+//   - ctx context.Context
+//   - auto bool
+//   - batchSize int
+//   - lastID int64
+func (_e *MockRepoComponent_Expecter) BatchMigrateRepoToHashedPath(ctx interface{}, auto interface{}, batchSize interface{}, lastID interface{}) *MockRepoComponent_BatchMigrateRepoToHashedPath_Call {
+	return &MockRepoComponent_BatchMigrateRepoToHashedPath_Call{Call: _e.mock.On("BatchMigrateRepoToHashedPath", ctx, auto, batchSize, lastID)}
+}
+
+func (_c *MockRepoComponent_BatchMigrateRepoToHashedPath_Call) Run(run func(ctx context.Context, auto bool, batchSize int, lastID int64)) *MockRepoComponent_BatchMigrateRepoToHashedPath_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(bool), args[2].(int), args[3].(int64))
+	})
+	return _c
+}
+
+func (_c *MockRepoComponent_BatchMigrateRepoToHashedPath_Call) Return(_a0 int64, _a1 error) *MockRepoComponent_BatchMigrateRepoToHashedPath_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockRepoComponent_BatchMigrateRepoToHashedPath_Call) RunAndReturn(run func(context.Context, bool, int, int64) (int64, error)) *MockRepoComponent_BatchMigrateRepoToHashedPath_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Branches provides a mock function with given fields: ctx, req
 func (_m *MockRepoComponent) Branches(ctx context.Context, req *types.GetBranchesReq) ([]types.Branch, error) {
 	ret := _m.Called(ctx, req)
@@ -620,6 +679,53 @@ func (_c *MockRepoComponent_Branches_Call) Return(_a0 []types.Branch, _a1 error)
 }
 
 func (_c *MockRepoComponent_Branches_Call) RunAndReturn(run func(context.Context, *types.GetBranchesReq) ([]types.Branch, error)) *MockRepoComponent_Branches_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ChangePath provides a mock function with given fields: ctx, req
+func (_m *MockRepoComponent) ChangePath(ctx context.Context, req types.ChangePathReq) error {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ChangePath")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.ChangePathReq) error); ok {
+		r0 = rf(ctx, req)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockRepoComponent_ChangePath_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ChangePath'
+type MockRepoComponent_ChangePath_Call struct {
+	*mock.Call
+}
+
+// ChangePath is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.ChangePathReq
+func (_e *MockRepoComponent_Expecter) ChangePath(ctx interface{}, req interface{}) *MockRepoComponent_ChangePath_Call {
+	return &MockRepoComponent_ChangePath_Call{Call: _e.mock.On("ChangePath", ctx, req)}
+}
+
+func (_c *MockRepoComponent_ChangePath_Call) Run(run func(ctx context.Context, req types.ChangePathReq)) *MockRepoComponent_ChangePath_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.ChangePathReq))
+	})
+	return _c
+}
+
+func (_c *MockRepoComponent_ChangePath_Call) Return(_a0 error) *MockRepoComponent_ChangePath_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockRepoComponent_ChangePath_Call) RunAndReturn(run func(context.Context, types.ChangePathReq) error) *MockRepoComponent_ChangePath_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -729,6 +835,74 @@ func (_c *MockRepoComponent_CheckCurrentUserPermission_Call) Return(_a0 bool, _a
 }
 
 func (_c *MockRepoComponent_CheckCurrentUserPermission_Call) RunAndReturn(run func(context.Context, string, string, membership.Role) (bool, error)) *MockRepoComponent_CheckCurrentUserPermission_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// CheckDeployPermissionForUser provides a mock function with given fields: ctx, deployReq
+func (_m *MockRepoComponent) CheckDeployPermissionForUser(ctx context.Context, deployReq types.DeployActReq) (*database.User, *database.Deploy, error) {
+	ret := _m.Called(ctx, deployReq)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CheckDeployPermissionForUser")
+	}
+
+	var r0 *database.User
+	var r1 *database.Deploy
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.DeployActReq) (*database.User, *database.Deploy, error)); ok {
+		return rf(ctx, deployReq)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.DeployActReq) *database.User); ok {
+		r0 = rf(ctx, deployReq)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.User)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.DeployActReq) *database.Deploy); ok {
+		r1 = rf(ctx, deployReq)
+	} else {
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(*database.Deploy)
+		}
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, types.DeployActReq) error); ok {
+		r2 = rf(ctx, deployReq)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockRepoComponent_CheckDeployPermissionForUser_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CheckDeployPermissionForUser'
+type MockRepoComponent_CheckDeployPermissionForUser_Call struct {
+	*mock.Call
+}
+
+// CheckDeployPermissionForUser is a helper method to define mock.On call
+//   - ctx context.Context
+//   - deployReq types.DeployActReq
+func (_e *MockRepoComponent_Expecter) CheckDeployPermissionForUser(ctx interface{}, deployReq interface{}) *MockRepoComponent_CheckDeployPermissionForUser_Call {
+	return &MockRepoComponent_CheckDeployPermissionForUser_Call{Call: _e.mock.On("CheckDeployPermissionForUser", ctx, deployReq)}
+}
+
+func (_c *MockRepoComponent_CheckDeployPermissionForUser_Call) Run(run func(ctx context.Context, deployReq types.DeployActReq)) *MockRepoComponent_CheckDeployPermissionForUser_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.DeployActReq))
+	})
+	return _c
+}
+
+func (_c *MockRepoComponent_CheckDeployPermissionForUser_Call) Return(_a0 *database.User, _a1 *database.Deploy, _a2 error) *MockRepoComponent_CheckDeployPermissionForUser_Call {
+	_c.Call.Return(_a0, _a1, _a2)
+	return _c
+}
+
+func (_c *MockRepoComponent_CheckDeployPermissionForUser_Call) RunAndReturn(run func(context.Context, types.DeployActReq) (*database.User, *database.Deploy, error)) *MockRepoComponent_CheckDeployPermissionForUser_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1673,6 +1847,65 @@ func (_c *MockRepoComponent_DeployUpdate_Call) RunAndReturn(run func(context.Con
 	return _c
 }
 
+// DiffBetweenTwoCommits provides a mock function with given fields: ctx, req
+func (_m *MockRepoComponent) DiffBetweenTwoCommits(ctx context.Context, req types.GetDiffBetweenCommitsReq) ([]types.GiteaCallbackPushReq_Commit, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DiffBetweenTwoCommits")
+	}
+
+	var r0 []types.GiteaCallbackPushReq_Commit
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.GetDiffBetweenCommitsReq) ([]types.GiteaCallbackPushReq_Commit, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.GetDiffBetweenCommitsReq) []types.GiteaCallbackPushReq_Commit); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]types.GiteaCallbackPushReq_Commit)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.GetDiffBetweenCommitsReq) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockRepoComponent_DiffBetweenTwoCommits_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DiffBetweenTwoCommits'
+type MockRepoComponent_DiffBetweenTwoCommits_Call struct {
+	*mock.Call
+}
+
+// DiffBetweenTwoCommits is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.GetDiffBetweenCommitsReq
+func (_e *MockRepoComponent_Expecter) DiffBetweenTwoCommits(ctx interface{}, req interface{}) *MockRepoComponent_DiffBetweenTwoCommits_Call {
+	return &MockRepoComponent_DiffBetweenTwoCommits_Call{Call: _e.mock.On("DiffBetweenTwoCommits", ctx, req)}
+}
+
+func (_c *MockRepoComponent_DiffBetweenTwoCommits_Call) Run(run func(ctx context.Context, req types.GetDiffBetweenCommitsReq)) *MockRepoComponent_DiffBetweenTwoCommits_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.GetDiffBetweenCommitsReq))
+	})
+	return _c
+}
+
+func (_c *MockRepoComponent_DiffBetweenTwoCommits_Call) Return(_a0 []types.GiteaCallbackPushReq_Commit, _a1 error) *MockRepoComponent_DiffBetweenTwoCommits_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockRepoComponent_DiffBetweenTwoCommits_Call) RunAndReturn(run func(context.Context, types.GetDiffBetweenCommitsReq) ([]types.GiteaCallbackPushReq_Commit, error)) *MockRepoComponent_DiffBetweenTwoCommits_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // DownloadFile provides a mock function with given fields: ctx, req, userName
 func (_m *MockRepoComponent) DownloadFile(ctx context.Context, req *types.GetFileReq, userName string) (io.ReadCloser, int64, string, error) {
 	ret := _m.Called(ctx, req, userName)
@@ -1863,6 +2096,52 @@ func (_c *MockRepoComponent_FileRaw_Call) RunAndReturn(run func(context.Context,
 	return _c
 }
 
+// FixRepoSource provides a mock function with given fields: ctx
+func (_m *MockRepoComponent) FixRepoSource(ctx context.Context) error {
+	ret := _m.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FixRepoSource")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context) error); ok {
+		r0 = rf(ctx)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockRepoComponent_FixRepoSource_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FixRepoSource'
+type MockRepoComponent_FixRepoSource_Call struct {
+	*mock.Call
+}
+
+// FixRepoSource is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *MockRepoComponent_Expecter) FixRepoSource(ctx interface{}) *MockRepoComponent_FixRepoSource_Call {
+	return &MockRepoComponent_FixRepoSource_Call{Call: _e.mock.On("FixRepoSource", ctx)}
+}
+
+func (_c *MockRepoComponent_FixRepoSource_Call) Run(run func(ctx context.Context)) *MockRepoComponent_FixRepoSource_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context))
+	})
+	return _c
+}
+
+func (_c *MockRepoComponent_FixRepoSource_Call) Return(_a0 error) *MockRepoComponent_FixRepoSource_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockRepoComponent_FixRepoSource_Call) RunAndReturn(run func(context.Context) error) *MockRepoComponent_FixRepoSource_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GenerateEndpoint provides a mock function with given fields: ctx, _a1
 func (_m *MockRepoComponent) GenerateEndpoint(ctx context.Context, _a1 *database.Deploy) (string, string) {
 	ret := _m.Called(ctx, _a1)
@@ -2039,23 +2318,23 @@ func (_c *MockRepoComponent_GetDeployBySvcName_Call) RunAndReturn(run func(conte
 }
 
 // GetMirror provides a mock function with given fields: ctx, req
-func (_m *MockRepoComponent) GetMirror(ctx context.Context, req types.GetMirrorReq) (*database.Mirror, error) {
+func (_m *MockRepoComponent) GetMirror(ctx context.Context, req types.GetMirrorReq) (*types.Mirror, error) {
 	ret := _m.Called(ctx, req)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetMirror")
 	}
 
-	var r0 *database.Mirror
+	var r0 *types.Mirror
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, types.GetMirrorReq) (*database.Mirror, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, types.GetMirrorReq) (*types.Mirror, error)); ok {
 		return rf(ctx, req)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, types.GetMirrorReq) *database.Mirror); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, types.GetMirrorReq) *types.Mirror); ok {
 		r0 = rf(ctx, req)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*database.Mirror)
+			r0 = ret.Get(0).(*types.Mirror)
 		}
 	}
 
@@ -2087,12 +2366,12 @@ func (_c *MockRepoComponent_GetMirror_Call) Run(run func(ctx context.Context, re
 	return _c
 }
 
-func (_c *MockRepoComponent_GetMirror_Call) Return(_a0 *database.Mirror, _a1 error) *MockRepoComponent_GetMirror_Call {
+func (_c *MockRepoComponent_GetMirror_Call) Return(_a0 *types.Mirror, _a1 error) *MockRepoComponent_GetMirror_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockRepoComponent_GetMirror_Call) RunAndReturn(run func(context.Context, types.GetMirrorReq) (*database.Mirror, error)) *MockRepoComponent_GetMirror_Call {
+func (_c *MockRepoComponent_GetMirror_Call) RunAndReturn(run func(context.Context, types.GetMirrorReq) (*types.Mirror, error)) *MockRepoComponent_GetMirror_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -2273,7 +2552,7 @@ func (_c *MockRepoComponent_GetUserRepoPermission_Call) RunAndReturn(run func(co
 }
 
 // HeadDownloadFile provides a mock function with given fields: ctx, req, userName
-func (_m *MockRepoComponent) HeadDownloadFile(ctx context.Context, req *types.GetFileReq, userName string) (*types.File, error) {
+func (_m *MockRepoComponent) HeadDownloadFile(ctx context.Context, req *types.GetFileReq, userName string) (*types.File, *types.Commit, error) {
 	ret := _m.Called(ctx, req, userName)
 
 	if len(ret) == 0 {
@@ -2281,8 +2560,9 @@ func (_m *MockRepoComponent) HeadDownloadFile(ctx context.Context, req *types.Ge
 	}
 
 	var r0 *types.File
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *types.GetFileReq, string) (*types.File, error)); ok {
+	var r1 *types.Commit
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, *types.GetFileReq, string) (*types.File, *types.Commit, error)); ok {
 		return rf(ctx, req, userName)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, *types.GetFileReq, string) *types.File); ok {
@@ -2293,13 +2573,21 @@ func (_m *MockRepoComponent) HeadDownloadFile(ctx context.Context, req *types.Ge
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *types.GetFileReq, string) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *types.GetFileReq, string) *types.Commit); ok {
 		r1 = rf(ctx, req, userName)
 	} else {
-		r1 = ret.Error(1)
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(*types.Commit)
+		}
 	}
 
-	return r0, r1
+	if rf, ok := ret.Get(2).(func(context.Context, *types.GetFileReq, string) error); ok {
+		r2 = rf(ctx, req, userName)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
 // MockRepoComponent_HeadDownloadFile_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'HeadDownloadFile'
@@ -2322,12 +2610,12 @@ func (_c *MockRepoComponent_HeadDownloadFile_Call) Run(run func(ctx context.Cont
 	return _c
 }
 
-func (_c *MockRepoComponent_HeadDownloadFile_Call) Return(_a0 *types.File, _a1 error) *MockRepoComponent_HeadDownloadFile_Call {
-	_c.Call.Return(_a0, _a1)
+func (_c *MockRepoComponent_HeadDownloadFile_Call) Return(_a0 *types.File, _a1 *types.Commit, _a2 error) *MockRepoComponent_HeadDownloadFile_Call {
+	_c.Call.Return(_a0, _a1, _a2)
 	return _c
 }
 
-func (_c *MockRepoComponent_HeadDownloadFile_Call) RunAndReturn(run func(context.Context, *types.GetFileReq, string) (*types.File, error)) *MockRepoComponent_HeadDownloadFile_Call {
+func (_c *MockRepoComponent_HeadDownloadFile_Call) RunAndReturn(run func(context.Context, *types.GetFileReq, string) (*types.File, *types.Commit, error)) *MockRepoComponent_HeadDownloadFile_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -2623,6 +2911,65 @@ func (_c *MockRepoComponent_IsLfs_Call) RunAndReturn(run func(context.Context, *
 	return _c
 }
 
+// IsSyncing provides a mock function with given fields: ctx, repoType, namespace, name
+func (_m *MockRepoComponent) IsSyncing(ctx context.Context, repoType types.RepositoryType, namespace string, name string) (bool, error) {
+	ret := _m.Called(ctx, repoType, namespace, name)
+
+	if len(ret) == 0 {
+		panic("no return value specified for IsSyncing")
+	}
+
+	var r0 bool
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.RepositoryType, string, string) (bool, error)); ok {
+		return rf(ctx, repoType, namespace, name)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.RepositoryType, string, string) bool); ok {
+		r0 = rf(ctx, repoType, namespace, name)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.RepositoryType, string, string) error); ok {
+		r1 = rf(ctx, repoType, namespace, name)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockRepoComponent_IsSyncing_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'IsSyncing'
+type MockRepoComponent_IsSyncing_Call struct {
+	*mock.Call
+}
+
+// IsSyncing is a helper method to define mock.On call
+//   - ctx context.Context
+//   - repoType types.RepositoryType
+//   - namespace string
+//   - name string
+func (_e *MockRepoComponent_Expecter) IsSyncing(ctx interface{}, repoType interface{}, namespace interface{}, name interface{}) *MockRepoComponent_IsSyncing_Call {
+	return &MockRepoComponent_IsSyncing_Call{Call: _e.mock.On("IsSyncing", ctx, repoType, namespace, name)}
+}
+
+func (_c *MockRepoComponent_IsSyncing_Call) Run(run func(ctx context.Context, repoType types.RepositoryType, namespace string, name string)) *MockRepoComponent_IsSyncing_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.RepositoryType), args[2].(string), args[3].(string))
+	})
+	return _c
+}
+
+func (_c *MockRepoComponent_IsSyncing_Call) Return(_a0 bool, _a1 error) *MockRepoComponent_IsSyncing_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockRepoComponent_IsSyncing_Call) RunAndReturn(run func(context.Context, types.RepositoryType, string, string) (bool, error)) *MockRepoComponent_IsSyncing_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // LastCommit provides a mock function with given fields: ctx, req
 func (_m *MockRepoComponent) LastCommit(ctx context.Context, req *types.GetCommitsReq) (*types.Commit, error) {
 	ret := _m.Called(ctx, req)
@@ -2806,6 +3153,68 @@ func (_c *MockRepoComponent_ListRuntimeFramework_Call) RunAndReturn(run func(con
 	return _c
 }
 
+// ListRuntimeFrameworkV2 provides a mock function with given fields: ctx, repoType, namespace, name, deployType
+func (_m *MockRepoComponent) ListRuntimeFrameworkV2(ctx context.Context, repoType types.RepositoryType, namespace string, name string, deployType int) ([]types.RuntimeFrameworkV2, error) {
+	ret := _m.Called(ctx, repoType, namespace, name, deployType)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListRuntimeFrameworkV2")
+	}
+
+	var r0 []types.RuntimeFrameworkV2
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.RepositoryType, string, string, int) ([]types.RuntimeFrameworkV2, error)); ok {
+		return rf(ctx, repoType, namespace, name, deployType)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.RepositoryType, string, string, int) []types.RuntimeFrameworkV2); ok {
+		r0 = rf(ctx, repoType, namespace, name, deployType)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]types.RuntimeFrameworkV2)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.RepositoryType, string, string, int) error); ok {
+		r1 = rf(ctx, repoType, namespace, name, deployType)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockRepoComponent_ListRuntimeFrameworkV2_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListRuntimeFrameworkV2'
+type MockRepoComponent_ListRuntimeFrameworkV2_Call struct {
+	*mock.Call
+}
+
+// ListRuntimeFrameworkV2 is a helper method to define mock.On call
+//   - ctx context.Context
+//   - repoType types.RepositoryType
+//   - namespace string
+//   - name string
+//   - deployType int
+func (_e *MockRepoComponent_Expecter) ListRuntimeFrameworkV2(ctx interface{}, repoType interface{}, namespace interface{}, name interface{}, deployType interface{}) *MockRepoComponent_ListRuntimeFrameworkV2_Call {
+	return &MockRepoComponent_ListRuntimeFrameworkV2_Call{Call: _e.mock.On("ListRuntimeFrameworkV2", ctx, repoType, namespace, name, deployType)}
+}
+
+func (_c *MockRepoComponent_ListRuntimeFrameworkV2_Call) Run(run func(ctx context.Context, repoType types.RepositoryType, namespace string, name string, deployType int)) *MockRepoComponent_ListRuntimeFrameworkV2_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.RepositoryType), args[2].(string), args[3].(string), args[4].(int))
+	})
+	return _c
+}
+
+func (_c *MockRepoComponent_ListRuntimeFrameworkV2_Call) Return(_a0 []types.RuntimeFrameworkV2, _a1 error) *MockRepoComponent_ListRuntimeFrameworkV2_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockRepoComponent_ListRuntimeFrameworkV2_Call) RunAndReturn(run func(context.Context, types.RepositoryType, string, string, int) ([]types.RuntimeFrameworkV2, error)) *MockRepoComponent_ListRuntimeFrameworkV2_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ListRuntimeFrameworkWithType provides a mock function with given fields: ctx, deployType
 func (_m *MockRepoComponent) ListRuntimeFrameworkWithType(ctx context.Context, deployType int) ([]types.RuntimeFramework, error) {
 	ret := _m.Called(ctx, deployType)
@@ -2970,6 +3379,66 @@ func (_c *MockRepoComponent_MirrorFromSaas_Call) Return(_a0 error) *MockRepoComp
 }
 
 func (_c *MockRepoComponent_MirrorFromSaas_Call) RunAndReturn(run func(context.Context, string, string, string, types.RepositoryType) error) *MockRepoComponent_MirrorFromSaas_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// MirrorProgress provides a mock function with given fields: ctx, repoType, namespace, name, currentUser
+func (_m *MockRepoComponent) MirrorProgress(ctx context.Context, repoType types.RepositoryType, namespace string, name string, currentUser string) (types.LFSSyncProgressResp, error) {
+	ret := _m.Called(ctx, repoType, namespace, name, currentUser)
+
+	if len(ret) == 0 {
+		panic("no return value specified for MirrorProgress")
+	}
+
+	var r0 types.LFSSyncProgressResp
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.RepositoryType, string, string, string) (types.LFSSyncProgressResp, error)); ok {
+		return rf(ctx, repoType, namespace, name, currentUser)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.RepositoryType, string, string, string) types.LFSSyncProgressResp); ok {
+		r0 = rf(ctx, repoType, namespace, name, currentUser)
+	} else {
+		r0 = ret.Get(0).(types.LFSSyncProgressResp)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.RepositoryType, string, string, string) error); ok {
+		r1 = rf(ctx, repoType, namespace, name, currentUser)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockRepoComponent_MirrorProgress_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'MirrorProgress'
+type MockRepoComponent_MirrorProgress_Call struct {
+	*mock.Call
+}
+
+// MirrorProgress is a helper method to define mock.On call
+//   - ctx context.Context
+//   - repoType types.RepositoryType
+//   - namespace string
+//   - name string
+//   - currentUser string
+func (_e *MockRepoComponent_Expecter) MirrorProgress(ctx interface{}, repoType interface{}, namespace interface{}, name interface{}, currentUser interface{}) *MockRepoComponent_MirrorProgress_Call {
+	return &MockRepoComponent_MirrorProgress_Call{Call: _e.mock.On("MirrorProgress", ctx, repoType, namespace, name, currentUser)}
+}
+
+func (_c *MockRepoComponent_MirrorProgress_Call) Run(run func(ctx context.Context, repoType types.RepositoryType, namespace string, name string, currentUser string)) *MockRepoComponent_MirrorProgress_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.RepositoryType), args[2].(string), args[3].(string), args[4].(string))
+	})
+	return _c
+}
+
+func (_c *MockRepoComponent_MirrorProgress_Call) Return(_a0 types.LFSSyncProgressResp, _a1 error) *MockRepoComponent_MirrorProgress_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockRepoComponent_MirrorProgress_Call) RunAndReturn(run func(context.Context, types.RepositoryType, string, string, string) (types.LFSSyncProgressResp, error)) *MockRepoComponent_MirrorProgress_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -3276,6 +3745,65 @@ func (_c *MockRepoComponent_RemoteDiff_Call) Return(_a0 []types.RemoteDiffs, _a1
 }
 
 func (_c *MockRepoComponent_RemoteDiff_Call) RunAndReturn(run func(context.Context, types.GetDiffBetweenCommitsReq) ([]types.RemoteDiffs, error)) *MockRepoComponent_RemoteDiff_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// RemoteTree provides a mock function with given fields: ctx, req
+func (_m *MockRepoComponent) RemoteTree(ctx context.Context, req *types.GetTreeRequest) (*types.GetRepoFileTreeResp, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RemoteTree")
+	}
+
+	var r0 *types.GetRepoFileTreeResp
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *types.GetTreeRequest) (*types.GetRepoFileTreeResp, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *types.GetTreeRequest) *types.GetRepoFileTreeResp); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.GetRepoFileTreeResp)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *types.GetTreeRequest) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockRepoComponent_RemoteTree_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RemoteTree'
+type MockRepoComponent_RemoteTree_Call struct {
+	*mock.Call
+}
+
+// RemoteTree is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req *types.GetTreeRequest
+func (_e *MockRepoComponent_Expecter) RemoteTree(ctx interface{}, req interface{}) *MockRepoComponent_RemoteTree_Call {
+	return &MockRepoComponent_RemoteTree_Call{Call: _e.mock.On("RemoteTree", ctx, req)}
+}
+
+func (_c *MockRepoComponent_RemoteTree_Call) Run(run func(ctx context.Context, req *types.GetTreeRequest)) *MockRepoComponent_RemoteTree_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*types.GetTreeRequest))
+	})
+	return _c
+}
+
+func (_c *MockRepoComponent_RemoteTree_Call) Return(_a0 *types.GetRepoFileTreeResp, _a1 error) *MockRepoComponent_RemoteTree_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockRepoComponent_RemoteTree_Call) RunAndReturn(run func(context.Context, *types.GetTreeRequest) (*types.GetRepoFileTreeResp, error)) *MockRepoComponent_RemoteTree_Call {
 	_c.Call.Return(run)
 	return _c
 }

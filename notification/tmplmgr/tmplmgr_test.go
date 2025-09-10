@@ -101,6 +101,29 @@ func TestTemplateManager_Format_DefaultEmailTemplate(t *testing.T) {
 	assert.Contains(t, result.Content, "Test Content")
 }
 
+func TestTemplateManager_Format_DefaultFeishuTemplate(t *testing.T) {
+	tm := NewTemplateManager()
+
+	data := struct {
+		Title   string
+		Content string
+	}{
+		Title:   "Test Title",
+		Content: "Test Content",
+	}
+
+	// Test with a scenario that doesn't exist, should fall back to default
+	result, err := tm.Format("non-existent-scenario", types.MessageChannelLark, data, "zh-CN")
+	require.NoError(t, err)
+
+	// Should contain the default feishu template structure
+	assert.Contains(t, result.Content, `"zh_cn"`)
+	assert.Contains(t, result.Content, `"title"`)
+	assert.Contains(t, result.Content, `"content"`)
+	assert.Contains(t, result.Content, "Test Title")
+	assert.Contains(t, result.Content, "Test Content")
+}
+
 func TestTemplateManager_Format_InternalNotificationEmailTemplate(t *testing.T) {
 	tm := NewTemplateManager()
 
@@ -121,6 +144,35 @@ func TestTemplateManager_Format_InternalNotificationEmailTemplate(t *testing.T) 
 	assert.Contains(t, result.Content, "Test Title")
 	assert.Contains(t, result.Content, "Test Summary")
 	assert.Contains(t, result.Content, "Test Content")
+}
+
+func TestTemplateManager_Format_RepoSyncFeishuTemplate(t *testing.T) {
+	tm := NewTemplateManager()
+
+	data := struct {
+		Title     string
+		RemoteURL string
+		LocalURL  string
+		SyncTime  string
+	}{
+		Title:     "Repo Sync Complete",
+		RemoteURL: "https://github.com/test/repo",
+		LocalURL:  "https://localhost/test/repo",
+		SyncTime:  "2024-01-01 12:00:00",
+	}
+
+	// Test with repo-sync scenario
+	result, err := tm.Format(types.MessageScenarioRepoSync, types.MessageChannelLark, data, "zh-CN")
+	require.NoError(t, err)
+
+	// Should contain the repo-sync feishu template structure
+	assert.Contains(t, result.Content, `"zh_cn"`)
+	assert.Contains(t, result.Content, `"title"`)
+	assert.Contains(t, result.Content, `"content"`)
+	assert.Contains(t, result.Content, "Repo Sync Complete")
+	assert.Contains(t, result.Content, "https://github.com/test/repo")
+	assert.Contains(t, result.Content, "https://localhost/test/repo")
+	assert.Contains(t, result.Content, "2024-01-01 12:00:00")
 }
 
 func TestTemplateManager_Format_CacheBehavior(t *testing.T) {
@@ -291,6 +343,7 @@ func TestTemplateManager_Format_DifferentChannels(t *testing.T) {
 	// Test different channels with the same scenario
 	channels := []types.MessageChannel{
 		types.MessageChannelEmail,
+		types.MessageChannelLark,
 	}
 
 	for _, channel := range channels {
@@ -349,6 +402,34 @@ func TestTemplateManager_Format_AnyDataWithDefaultTemplate(t *testing.T) {
 	assert.Contains(t, result.Content, "<p>Title: Test Title</p>")
 	assert.Contains(t, result.Content, "<p>Message: This is a test message</p>")
 	assert.Contains(t, result.Content, "<p>Count: 42</p>")
+}
+
+func TestTemplateManager_Format_AnyDataWithDefaultFeishuTemplate(t *testing.T) {
+	tm := NewTemplateManager()
+
+	// Test with any data structure
+	data := struct {
+		Title   string
+		Message string
+		Count   int
+	}{
+		Title:   "Test Title",
+		Message: "This is a test message",
+		Count:   42,
+	}
+
+	// Test with default feishu template (non-existent scenario)
+	result, err := tm.Format("non-existent-scenario", types.MessageChannelLark, data, "en-US")
+	require.NoError(t, err)
+
+	// Should contain the default feishu template structure
+	assert.Contains(t, result.Content, `"en_us"`)
+	assert.Contains(t, result.Content, `"title": "Notification"`)
+	assert.Contains(t, result.Content, `"content"`)
+	// Should contain each field on its own line
+	assert.Contains(t, result.Content, `"text": "Title: Test Title\n"`)
+	assert.Contains(t, result.Content, `"text": "Message: This is a test message\n"`)
+	assert.Contains(t, result.Content, `"text": "Count: 42\n"`)
 }
 
 func TestTemplateManager_Format_ScenarioSpecificTemplateUsesOriginalData(t *testing.T) {

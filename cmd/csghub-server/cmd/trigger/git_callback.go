@@ -86,6 +86,7 @@ var gitCallbackCmd = &cobra.Command{
 			req.Repository.FullName = repo.GitPath
 			req.Commits = append(req.Commits, types.GiteaCallbackPushReq_Commit{})
 			req.Commits[0].Added = append(req.Commits[0].Added, filePaths...)
+
 			//start workflow to handle push request
 			workflowClient := temporal.GetClient()
 			workflowOptions := client.StartWorkflowOptions{

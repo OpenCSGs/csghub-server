@@ -7,23 +7,34 @@ import (
 	mock_deploy "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/deploy"
 	mock_git "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/git/gitserver"
 	mock_mirror "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/git/mirrorserver"
+	mock_importer "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/importer"
 	mock_multisync "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/multisync"
 	mock_preader "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/parquet"
 	mock_rpc "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rpc"
+	mock_rsa "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rsa"
 	mock_s3 "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/s3"
 	mock_component "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
+	mock_checker "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component/checker"
+	mock_cache "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/mirror/cache"
+	"opencsg.com/csghub-server/component/checker"
+
 	"opencsg.com/csghub-server/builder/accounting"
-	"opencsg.com/csghub-server/builder/dataviewer"
 	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/git/mirrorserver"
+	"opencsg.com/csghub-server/builder/importer"
 	"opencsg.com/csghub-server/builder/llm"
 	"opencsg.com/csghub-server/builder/multisync"
 	"opencsg.com/csghub-server/builder/parquet"
+
+	// "opencsg.com/csghub-server/builder/parquet"
+	"opencsg.com/csghub-server/builder/dataviewer"
 	"opencsg.com/csghub-server/builder/rpc"
+	"opencsg.com/csghub-server/builder/rsa"
 	"opencsg.com/csghub-server/builder/store/s3"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/tests"
+	"opencsg.com/csghub-server/mirror/cache"
 )
 
 type mockedComponents struct {
@@ -52,6 +63,8 @@ var MockedComponentSet = wire.NewSet(
 	wire.Bind(new(RuntimeArchitectureComponent), new(*mock_component.MockRuntimeArchitectureComponent)),
 	mock_component.NewMockSensitiveComponent,
 	wire.Bind(new(SensitiveComponent), new(*mock_component.MockSensitiveComponent)),
+	mock_component.NewMockImportComponent,
+	wire.Bind(new(ImportComponent), new(*mock_component.MockImportComponent)),
 	mock_component.NewMockSpaceTemplateComponent,
 	wire.Bind(new(SpaceTemplateComponent), new(*mock_component.MockSpaceTemplateComponent)),
 	mock_component.NewMockMCPServerComponent,
@@ -73,19 +86,29 @@ var MockedS3Set = wire.NewSet(
 	wire.Bind(new(s3.Client), new(*mock_s3.MockClient)),
 )
 
-var MockedDeployerSet = wire.NewSet(
-	mock_deploy.NewMockDeployer,
-	wire.Bind(new(deploy.Deployer), new(*mock_deploy.MockDeployer)),
-)
-
-var MockedMirrorServerSet = wire.NewSet(
-	mock_mirror.NewMockMirrorServer,
-	wire.Bind(new(mirrorserver.MirrorServer), new(*mock_mirror.MockMirrorServer)),
+var MockedS3CoreSet = wire.NewSet(
+	mock_s3.NewMockCore,
+	wire.Bind(new(s3.Core), new(*mock_s3.MockCore)),
 )
 
 var MockedMultiSyncClientSet = wire.NewSet(
 	mock_multisync.NewMockClient,
 	wire.Bind(new(multisync.Client), new(*mock_multisync.MockClient)),
+)
+
+var MockedDeployerSet = wire.NewSet(
+	mock_deploy.NewMockDeployer,
+	wire.Bind(new(deploy.Deployer), new(*mock_deploy.MockDeployer)),
+)
+
+var MockedCacheSet = wire.NewSet(
+	mock_cache.NewMockCache,
+	wire.Bind(new(cache.Cache), new(*mock_cache.MockCache)),
+)
+
+var MockedMirrorServerSet = wire.NewSet(
+	mock_mirror.NewMockMirrorServer,
+	wire.Bind(new(mirrorserver.MirrorServer), new(*mock_mirror.MockMirrorServer)),
 )
 
 var MockedAccountingClientSet = wire.NewSet(
@@ -108,9 +131,19 @@ var MockedDataviewerClientSet = wire.NewSet(
 	wire.Bind(new(dataviewer.DataviewerClient), new(*mock_dataviewer_client.MockDataviewerClient)),
 )
 
-var MockedS3CoreSet = wire.NewSet(
-	mock_s3.NewMockCore,
-	wire.Bind(new(s3.Core), new(*mock_s3.MockCore)),
+var MockedRsaReader = wire.NewSet(
+	mock_rsa.NewMockKeysReader,
+	wire.Bind(new(rsa.KeysReader), new(*mock_rsa.MockKeysReader)),
+)
+
+var MockedImporterSet = wire.NewSet(
+	mock_importer.NewMockImporter,
+	wire.Bind(new(importer.Importer), new(*mock_importer.MockImporter)),
+)
+
+var MockedCheckerSet = wire.NewSet(
+	mock_checker.NewMockGitCallbackChecker,
+	wire.Bind(new(checker.GitCallbackChecker), new(*mock_checker.MockGitCallbackChecker)),
 )
 
 type Mocks struct {
@@ -121,12 +154,16 @@ type Mocks struct {
 	s3Client         *mock_s3.MockClient
 	mirrorServer     *mock_mirror.MockMirrorServer
 	deployer         *mock_deploy.MockDeployer
+	cache            *mock_cache.MockCache
 	accountingClient *mock_accounting.MockAccountingClient
 	preader          *mock_preader.MockReader
 	moderationClient *mock_rpc.MockModerationSvcClient
+	rsaReader        *mock_rsa.MockKeysReader
+	importer         *mock_importer.MockImporter
 	dataviewerClient *mock_dataviewer_client.MockDataviewerClient
 	multiSyncClient  *mock_multisync.MockClient
 	s3Core           *mock_s3.MockCore
+	checker          *mock_checker.MockGitCallbackChecker
 }
 
 var AllMockSet = wire.NewSet(
@@ -140,12 +177,12 @@ func ProvideTestConfig() *config.Config {
 
 var MockSuperSet = wire.NewSet(
 	MockedComponentSet, AllMockSet, MockedStoreSet, MockedGitServerSet, MockedUserSvcSet,
-	MockedS3Set, MockedS3CoreSet, MockedMultiSyncClientSet, MockedDeployerSet, ProvideTestConfig, MockedMirrorServerSet,
-	MockedAccountingClientSet, MockedParquetReaderSet,
-	MockedModerationSvcClientSet, MockedDataviewerClientSet,
+	MockedS3Set, MockedS3CoreSet, MockedMultiSyncClientSet, MockedDeployerSet, MockedCacheSet, ProvideTestConfig, MockedMirrorServerSet,
+	MockedAccountingClientSet, MockedParquetReaderSet, MockedCheckerSet,
+	MockedModerationSvcClientSet, MockedRsaReader, MockedImporterSet, MockedDataviewerClientSet,
 )
 
-func NewTestRepoComponent(config *config.Config, stores *tests.MockStores, rpcUser rpc.UserSvcClient, gitServer gitserver.GitServer, tagComponent TagComponent, s3Client s3.Client, deployer deploy.Deployer, accountingComponent AccountingComponent, mirrorServer mirrorserver.MirrorServer, multiSyncClient multisync.Client) *repoComponentImpl {
+func NewTestRepoComponent(config *config.Config, stores *tests.MockStores, rpcUser rpc.UserSvcClient, gitServer gitserver.GitServer, tagComponent TagComponent, s3Client s3.Client, deployer deploy.Deployer, cache cache.Cache, accountingComponent AccountingComponent, mirrorServer mirrorserver.MirrorServer, multiSyncClient multisync.Client) *repoComponentImpl {
 	return &repoComponentImpl{
 		userStore:              stores.User,
 		repoStore:              stores.Repo,
@@ -165,11 +202,13 @@ func NewTestRepoComponent(config *config.Config, stores *tests.MockStores, rpcUs
 		runtimeFrameworksStore: stores.RuntimeFramework,
 		deployTaskStore:        stores.DeployTask,
 		deployer:               deployer,
+		userResourcesStore:     stores.UserResources,
+		clusterInfoStore:       stores.ClusterInfo,
+		syncCache:              cache,
 		accountingComponent:    accountingComponent,
 		spaceResourceStore:     stores.SpaceResource,
 		mirrorServer:           mirrorServer,
 		fileStore:              stores.File,
-		clusterInfoStore:       stores.ClusterInfo,
 		multiSyncClient:        multiSyncClient,
 		mirrorTaskStore:        stores.MirrorTaskStore,
 	}
@@ -220,10 +259,13 @@ func NewTestUserComponent(
 		deployer:            deployer,
 		userLikeStore:       stores.UserLikes,
 		repoStore:           stores.Repo,
+		deployTaskStore:     stores.DeployTask,
 		collectionStore:     stores.Collection,
 		accountingComponent: accountingComponent,
+		spaceResourceStore:  stores.SpaceResource,
+		userResourcesStore:  stores.UserResources,
 		promptStore:         stores.Prompt,
-		deployTaskStore:     stores.DeployTask,
+		workflowStore:       stores.Workflow,
 		mcpServerStore:      stores.MCPServerStore,
 	}
 }
@@ -273,9 +315,9 @@ var ModelComponentSet = wire.NewSet(NewTestModelComponent)
 
 func NewTestAccountingComponent(stores *tests.MockStores, accountingClient accounting.AccountingClient) *accountingComponentImpl {
 	return &accountingComponentImpl{
-		acctountingClient: accountingClient,
-		userStore:         stores.User,
-		deployTaskStore:   stores.DeployTask,
+		accountingClient: accountingClient,
+		userStore:        stores.User,
+		deployTaskStore:  stores.DeployTask,
 	}
 }
 
@@ -301,6 +343,7 @@ func NewTestGitHTTPComponent(
 		lfsMetaObjectStore: stores.LfsMetaObject,
 		lfsLockStore:       stores.LfsLock,
 		s3Core:             s3Core,
+		mirrorStore:        stores.Mirror,
 	}
 }
 
@@ -335,21 +378,22 @@ var RuntimeArchComponentSet = wire.NewSet(NewTestRuntimeArchitectureComponent)
 
 func NewTestMirrorComponent(config *config.Config, stores *tests.MockStores, mirrorServer mirrorserver.MirrorServer, repoComponent RepoComponent, gitServer gitserver.GitServer, s3Client s3.Client) *mirrorComponentImpl {
 	return &mirrorComponentImpl{
-		tokenStore:        stores.GitServerAccessToken,
-		mirrorServer:      mirrorServer,
-		repoComp:          repoComponent,
-		git:               gitServer,
-		s3Client:          s3Client,
-		modelStore:        stores.Model,
-		datasetStore:      stores.Dataset,
-		codeStore:         stores.Code,
-		repoStore:         stores.Repo,
-		mirrorStore:       stores.Mirror,
-		mirrorSourceStore: stores.MirrorSource,
-		namespaceStore:    stores.Namespace,
-		userStore:         stores.User,
-		config:            config,
-		mirrorTaskStore:   stores.MirrorTaskStore,
+		tokenStore:                  stores.GitServerAccessToken,
+		mirrorServer:                mirrorServer,
+		repoComp:                    repoComponent,
+		git:                         gitServer,
+		s3Client:                    s3Client,
+		modelStore:                  stores.Model,
+		datasetStore:                stores.Dataset,
+		codeStore:                   stores.Code,
+		repoStore:                   stores.Repo,
+		mirrorStore:                 stores.Mirror,
+		mirrorSourceStore:           stores.MirrorSource,
+		namespaceStore:              stores.Namespace,
+		userStore:                   stores.User,
+		config:                      config,
+		mirrorTaskStore:             stores.MirrorTaskStore,
+		mirrorNamespaceMappingStore: stores.MirrorNamespaceMapping,
 	}
 }
 
@@ -390,6 +434,7 @@ func NewTestDatasetComponent(config *config.Config, stores *tests.MockStores, re
 		gitServer:          gitServer,
 		userLikesStore:     stores.UserLikes,
 		userSvcClient:      userSvcClient,
+		recomStore:         stores.Recom,
 	}
 }
 
@@ -404,6 +449,7 @@ func NewTestCodeComponent(config *config.Config, stores *tests.MockStores, repoC
 		userLikesStore: stores.UserLikes,
 		gitServer:      gitServer,
 		userSvcClient:  userSvcClient,
+		recomStore:     stores.Recom,
 	}
 }
 
@@ -422,14 +468,13 @@ func NewTestMultiSyncComponent(config *config.Config, stores *tests.MockStores, 
 		tagStore:         stores.Tag,
 		fileStore:        stores.File,
 		gitServer:        gitServer,
-		config:           config,
 	}
 }
 
 var MultiSyncComponentSet = wire.NewSet(NewTestMultiSyncComponent)
 
-func NewTestInternalComponent(config *config.Config, stores *tests.MockStores, repoComponent RepoComponent, gitServer gitserver.GitServer) *internalComponentImpl {
-	return &internalComponentImpl{
+func NewTestInternalComponent(config *config.Config, stores *tests.MockStores, repoComponent RepoComponent, gitServer gitserver.GitServer, dvClient dataviewer.DataviewerClient, checker checker.GitCallbackChecker) *internalComponentImpl {
+	i := &internalComponentImpl{
 		config:         config,
 		sshKeyStore:    stores.SSH,
 		repoStore:      stores.Repo,
@@ -437,7 +482,10 @@ func NewTestInternalComponent(config *config.Config, stores *tests.MockStores, r
 		namespaceStore: stores.Namespace,
 		repoComponent:  repoComponent,
 		gitServer:      gitServer,
+		dataviewer:     dvClient,
 	}
+	i.callbackCheckers = append(i.callbackCheckers, checker)
+	return i
 }
 
 var InternalComponentSet = wire.NewSet(NewTestInternalComponent)
@@ -467,6 +515,7 @@ var TagComponentSet = wire.NewSet(NewTestTagComponent)
 func NewTestRecomComponent(config *config.Config, stores *tests.MockStores, gitServer gitserver.GitServer) *recomComponentImpl {
 	return &recomComponentImpl{
 		recomStore: stores.Recom,
+		userStore:  stores.User,
 		repoStore:  stores.Repo,
 		gitServer:  gitServer,
 	}
@@ -492,15 +541,16 @@ func NewTestTelemetryComponent(config *config.Config, stores *tests.MockStores) 
 
 var TelemetryComponentSet = wire.NewSet(NewTestTelemetryComponent)
 
-func NewTestClusterComponent(config *config.Config, deployer deploy.Deployer) *clusterComponentImpl {
+func NewTestClusterComponent(config *config.Config, deployer deploy.Deployer, stores *tests.MockStores) *clusterComponentImpl {
 	return &clusterComponentImpl{
-		deployer: deployer,
+		deployer:     deployer,
+		clusterStore: stores.ClusterInfo,
 	}
 }
 
 var ClusterComponentSet = wire.NewSet(NewTestClusterComponent)
 
-func NewTestEvaluationComponent(config *config.Config, stores *tests.MockStores, deployer deploy.Deployer, accountingComponent AccountingComponent) *evaluationComponentImpl {
+func NewTestEvaluationComponent(config *config.Config, stores *tests.MockStores, deployer deploy.Deployer, accountingComponent AccountingComponent, repoComponent RepoComponent) *evaluationComponentImpl {
 	return &evaluationComponentImpl{
 		deployer:              deployer,
 		userStore:             stores.User,
@@ -513,6 +563,7 @@ func NewTestEvaluationComponent(config *config.Config, stores *tests.MockStores,
 		runtimeFrameworkStore: stores.RuntimeFramework,
 		config:                config,
 		accountingComponent:   accountingComponent,
+		repoComponent:         repoComponent,
 	}
 }
 
@@ -585,6 +636,33 @@ func NewTestEventComponent(config *config.Config, stores *tests.MockStores) *eve
 
 var EventComponentSet = wire.NewSet(NewTestEventComponent)
 
+func NewTestLicenseComponent(config *config.Config, stores *tests.MockStores, keysReader rsa.KeysReader) *licenseComponentImpl {
+	return &licenseComponentImpl{
+		publicKeyFile:  "publickey.pem",
+		privateKeyFile: "privatekey.pem",
+		userStore:      stores.User,
+		licenseStore:   stores.License,
+		keysReader:     keysReader,
+	}
+}
+
+var LicenseComponentSet = wire.NewSet(NewTestLicenseComponent)
+
+func NewTestImportComponent(config *config.Config, stores *tests.MockStores, repoComponent RepoComponent, importer importer.Importer) *importComponentImpl {
+	return &importComponentImpl{
+		userStore:         stores.User,
+		mirrorStore:       stores.Mirror,
+		repoStore:         stores.Repo,
+		codeStore:         stores.Code,
+		importer:          importer,
+		mirrorSourceStore: stores.MirrorSource,
+		repoComponent:     repoComponent,
+		mirrorTaskStore:   stores.MirrorTaskStore,
+	}
+}
+
+var ImportComponentSet = wire.NewSet(NewTestImportComponent)
+
 func NewTestSpaceTemplateComponent(config *config.Config, stores *tests.MockStores) *spaceTemplateComponentImpl {
 	return &spaceTemplateComponentImpl{
 		spaceTemplateStore: stores.SpaceTemplate,
@@ -592,6 +670,14 @@ func NewTestSpaceTemplateComponent(config *config.Config, stores *tests.MockStor
 }
 
 var SpaceTemplateComponentSet = wire.NewSet(NewTestSpaceTemplateComponent)
+
+func NewTestRuleComponent(config *config.Config, stores *tests.MockStores) *ruleComponentImpl {
+	return &ruleComponentImpl{
+		ruleStore: stores.RuleStore,
+	}
+}
+
+var RuleComponentSet = wire.NewSet(NewTestRuleComponent)
 
 func NewTestMCPServerComponent(config *config.Config, stores *tests.MockStores, rpcUser rpc.UserSvcClient, repoComponent RepoComponent, gitServer gitserver.GitServer) *mcpServerComponentImpl {
 	return &mcpServerComponentImpl{
@@ -607,3 +693,49 @@ func NewTestMCPServerComponent(config *config.Config, stores *tests.MockStores, 
 }
 
 var MCPServerComponentSet = wire.NewSet(NewTestMCPServerComponent)
+
+func NewTestMCPScannerComponent(config *config.Config, stores *tests.MockStores, gitServer gitserver.GitServer) *mcpScannerComponentImpl {
+	return &mcpScannerComponentImpl{
+		llmConfigStore: stores.LLMConfig,
+		promptStore:    stores.PromptPrefix,
+		gitServer:      gitServer,
+	}
+}
+
+var MCPScannerComponentSet = wire.NewSet(NewTestMCPScannerComponent)
+
+func NewTestStatComponent(config *config.Config, stores *tests.MockStores, rpcUser rpc.UserSvcClient, repoComponent RepoComponent, gitServer gitserver.GitServer) *statComponentImpl {
+	return &statComponentImpl{
+		config:          config,
+		statSnapStore:   stores.StatSnapStore,
+		deployTaskStore: stores.DeployTask,
+	}
+}
+
+var StatComponentTestSet = wire.NewSet(NewTestStatComponent)
+
+func NewTestLLMServiceComponent(config *config.Config, stores *tests.MockStores) *llmServiceComponentImpl {
+	return &llmServiceComponentImpl{
+		llmConfigStore:    stores.LLMConfig,
+		promptPrefixStore: stores.PromptPrefix,
+	}
+}
+
+var LLMServiceComponentTestSet = wire.NewSet(NewTestLLMServiceComponent)
+
+func NewTestNotebookComponent(
+	stores *tests.MockStores,
+	repoComponent RepoComponent,
+	deployer deploy.Deployer,
+) *notebookComponentImpl {
+	return &notebookComponentImpl{
+		userStore:              stores.User,
+		repoComponent:          repoComponent,
+		deployer:               deployer,
+		deployTaskStore:        stores.DeployTask,
+		spaceResourceStore:     stores.SpaceResource,
+		runtimeFrameworksStore: stores.RuntimeFramework,
+	}
+}
+
+var NotebookComponentSet = wire.NewSet(NewTestNotebookComponent)

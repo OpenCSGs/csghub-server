@@ -13,6 +13,7 @@ import (
 	"path"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/sha256-simd"
@@ -43,8 +44,16 @@ func TestGitHTTPComponent_InfoRefs(t *testing.T) {
 			gc.mocks.stores.RepoMock().EXPECT().FindByPath(
 				ctx, types.ModelRepo, "ns", "n",
 			).Return(&database.Repository{
+				ID:      1,
 				Private: c.private,
 			}, nil)
+
+			gc.mocks.stores.MirrorMock().EXPECT().FindByRepoID(ctx, int64(1)).Return(&database.Mirror{
+				CurrentTask: &database.MirrorTask{
+					Status: types.MirrorLfsSyncFinished,
+				},
+			}, nil)
+
 			if c.rpc == "git-receive-pack" {
 				gc.mocks.components.repo.EXPECT().AllowWriteAccess(ctx, types.ModelRepo, "ns", "n", "user").Return(true, nil)
 			}
@@ -79,11 +88,20 @@ func TestGitHTTPComponent_GitUploadPack(t *testing.T) {
 	ctx := context.TODO()
 	gc := initializeTestGitHTTPComponent(ctx, t)
 
+	repo := &database.Repository{
+		Private: true,
+	}
+
 	gc.mocks.stores.RepoMock().EXPECT().FindByPath(
 		ctx, types.ModelRepo, "ns", "n",
-	).Return(&database.Repository{
-		Private: true,
-	}, nil)
+	).Return(repo, nil)
+
+	gc.mocks.stores.RepoMock().EXPECT().UpdateRepoCloneDownloads(
+		ctx, repo, mock.MatchedBy(func(t time.Time) bool {
+			now := time.Now()
+			return t.After(now.Add(-2*time.Second)) && t.Before(now.Add(2*time.Second))
+		}), int64(1),
+	).Return(nil)
 	gc.mocks.components.repo.EXPECT().AllowReadAccess(ctx, types.ModelRepo, "ns", "n", "user").Return(true, nil)
 	gc.mocks.gitServer.EXPECT().UploadPack(ctx, gitserver.UploadPackReq{
 		Namespace: "ns",
@@ -436,6 +454,7 @@ func TestGitHTTPComponent_LfsUpload(t *testing.T) {
 					ctx, "",
 					"lfs/a3/f8/e1b4f77bb24e508906c6972f81928f0d926e6daef1b29d12e348b8a3547e",
 					rc, int64(100)).Return(minio.UploadInfo{Size: 100}, nil)
+
 			}
 
 			err := gc.LfsUpload(ctx, rc, types.UploadRequest{
@@ -500,7 +519,6 @@ func TestGitHTTPComponent_LfsVerify(t *testing.T) {
 	}
 
 	gc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(repo, nil)
-
 	gc.mocks.s3Client.EXPECT().StatObject(ctx, "", "lfs/a3/f8/e1b4f77bb24e508906c6972f81928f0d926e6daef1b29d12e348b8a3547e", minio.StatObjectOptions{
 		Checksum: true,
 	}).Return(

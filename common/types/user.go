@@ -1,6 +1,9 @@
 package types
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 type CreateUserRequest struct {
 	// Display name of the user
@@ -21,10 +24,12 @@ type UpdateUserRequest struct {
 	// Display name of the user
 	Nickname *string `json:"name,omitempty"`
 	// the login name
-	Username string  `json:"-"`
-	Email    *string `json:"email,omitempty" binding:"omitnil,email"`
-	Phone    *string `json:"phone,omitempty"`
-	UUID     *string `json:"-"`
+	Username              string  `json:"-"`
+	Email                 *string `json:"email,omitempty" binding:"omitnil,email"`
+	EmailVerificationCode *string `json:"email_verification_code,omitempty"`
+	Phone                 *string `json:"phone,omitempty"`
+	PhoneArea             *string `json:"phone_area,omitempty"`
+	UUID                  *string `json:"-"`
 	// should be updated by admin
 	Roles    *[]string `json:"roles,omitempty" example:"[super_user, admin, personal_user]"`
 	Avatar   *string   `json:"avatar,omitempty"`
@@ -34,7 +39,8 @@ type UpdateUserRequest struct {
 	//if use want to change username, this should be the only field to send in request body
 	NewUserName *string `json:"new_username,omitempty"`
 
-	OpUser string `json:"-"` // the user who perform this action, used for audit and permission check
+	OpUser string  `json:"-"` // the user who perform this action, used for audit and permission check
+	TagIDs []int64 `json:"tag_ids,omitempty"`
 }
 
 var _ SensitiveRequestV2 = (*UpdateUserRequest)(nil)
@@ -168,6 +174,7 @@ type User struct {
 	Username          string         `json:"username"`
 	Nickname          string         `json:"nickname"`
 	Phone             string         `json:"phone,omitempty"`
+	PhoneArea         string         `json:"phone_area,omitempty"`
 	Email             string         `json:"email,omitempty"`
 	UUID              string         `json:"uuid,omitempty"`
 	Avatar            string         `json:"avatar,omitempty"`
@@ -177,6 +184,10 @@ type User struct {
 	LastLoginAt       string         `json:"last_login_at,omitempty"`
 	Orgs              []Organization `json:"orgs,omitempty"`
 	CanChangeUserName bool           `json:"can_change_username,omitempty"`
+	VerifyStatus      string         `json:"verify_status,omitempty"`
+	Labels            []string       `json:"labels,omitempty"`
+	CreatedAt         time.Time      `json:"created_at"`
+	Tags              []RepoTag      `json:"tags,omitempty"`
 }
 
 type UserLikesRequest struct {
@@ -221,4 +232,62 @@ type UserRepoPermission struct {
 	CanRead  bool `json:"can_read"`
 	CanWrite bool `json:"can_write"`
 	CanAdmin bool `json:"can_admin"`
+}
+
+type VerifyStatus string
+
+const (
+	VerifyStatusPending  VerifyStatus = "pending"
+	VerifyStatusApproved VerifyStatus = "approved"
+	VerifyStatusRejected VerifyStatus = "rejected"
+)
+
+type UserVerifyReq struct {
+	UUID        string       `json:"id" binding:"required"`
+	RealName    string       `json:"real_name" binding:"required"`
+	IDCardFront string       `json:"id_card_front" binding:"required"`
+	IDCardBack  string       `json:"id_card_back" binding:"required"`
+	Username    string       `json:"username"`
+	Status      VerifyStatus `json:"status"`
+}
+
+type UserVerifyStatusReq struct {
+	Status VerifyStatus `json:"status" binding:"required"` // approved,  rejected
+	Reason string       `json:"reason"`
+}
+
+type UserLabelsRequest struct {
+	Labels []string `json:"labels"`
+	UUID   string   `json:"id" binding:"required"`
+	OpUser string   `json:"-"`
+}
+
+var ValidLabels = map[string]bool{
+	"basic":     true,
+	"advanced":  true,
+	"vip":       true,
+	"blacklist": true,
+}
+
+func ParseLabels(rawLabels []string) []string {
+	labelSet := make(map[string]struct{})
+	var result []string
+
+	for _, label := range rawLabels {
+		label = strings.ToLower(strings.TrimSpace(label))
+		if label == "" {
+			continue
+		}
+		if _, exists := labelSet[label]; !exists {
+			labelSet[label] = struct{}{}
+			result = append(result, label)
+		}
+	}
+
+	return result
+}
+
+type CloseAccountReq struct {
+	Repository bool `json:"repository"`
+	Discussion bool `json:"discussion"`
 }

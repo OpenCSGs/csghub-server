@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/mock"
+
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/git/membership"
@@ -137,10 +138,10 @@ func TestDatasetCompnent_Index(t *testing.T) {
 		},
 	}, nil)
 
-	data, total, err := dc.Index(ctx, filter, 10, 1)
+	data, total, err := dc.Index(ctx, filter, 10, 1, false)
 	require.Nil(t, err)
 	require.Equal(t, 100, total)
-	require.Equal(t, []types.Dataset{
+	require.Equal(t, []*types.Dataset{
 		{ID: 12, RepositoryID: 1, Repository: types.Repository{
 			HTTPCloneURL: "/s/.git",
 			SSHCloneURL:  ":s/.git",
@@ -150,7 +151,8 @@ func TestDatasetCompnent_Index(t *testing.T) {
 		{ID: 11, RepositoryID: 2, Repository: types.Repository{
 			HTTPCloneURL: "/s/.git",
 			SSHCloneURL:  ":s/.git",
-		}, User: types.User{Username: "user2"}},
+		}, User: types.User{Username: "user2"},
+		},
 	}, data)
 
 }
@@ -242,8 +244,13 @@ func TestDatasetCompnent_Show(t *testing.T) {
 	dc.mocks.components.repo.EXPECT().GetMirrorTaskStatusAndSyncStatus(dataset.Repository).Return(
 		types.MirrorRepoSyncStart, types.SyncStatusInProgress,
 	)
-
-	d, err := dc.Show(ctx, "ns", "n", "user")
+	/*dc.mocks.stores.RecomMock().EXPECT().FindByRepoIDs(ctx, []int64{2}).Return([]*database.RecomRepoScore{
+		{ID: 1, RepositoryID: 2, WeightName: database.RecomWeightTotal, Score: 100},
+		{ID: 2, RepositoryID: 2, WeightName: database.RecomWeightDownloads, Score: 40},
+		{ID: 3, RepositoryID: 2, WeightName: database.RecomWeightFreshness, Score: 50},
+		{ID: 4, RepositoryID: 2, WeightName: database.RecomWeightQuality, Score: 80},
+	}, nil)*/
+	d, err := dc.Show(ctx, "ns", "n", "user", false, false)
 	require.Nil(t, err)
 	require.Equal(t, &types.Dataset{
 		ID:           1,
@@ -259,8 +266,112 @@ func TestDatasetCompnent_Show(t *testing.T) {
 		Namespace:        &types.Namespace{},
 		MirrorTaskStatus: types.MirrorRepoSyncStart,
 		SyncStatus:       types.SyncStatusInProgress,
+		/*Scores: []types.WeightScore{{
+			WeightName: string(database.RecomWeightTotal),
+			Score:      100,
+		}, {
+			WeightName: string(database.RecomWeightDownloads),
+			Score:      40,
+		}, {
+			WeightName: string(database.RecomWeightFreshness),
+			Score:      50,
+		}, {
+			WeightName: string(database.RecomWeightQuality),
+			Score:      80,
+		},
+		},*/
 	}, d)
 
+}
+
+func TestDatasetCompnent_Show_Mirror(t *testing.T) {
+	ctx := context.TODO()
+	dc := initializeTestDatasetComponent(ctx, t)
+
+	dataset := &database.Dataset{
+		ID: 1,
+		Repository: &database.Repository{
+			ID:   2,
+			Name: "n",
+			Tags: []database.Tag{{Name: "t1"}},
+			User: database.User{
+				Username: "user",
+			},
+			Mirror: database.Mirror{
+				ID:     1,
+				Status: types.MirrorLfsSyncFinished,
+			},
+		},
+	}
+	dc.mocks.stores.DatasetMock().EXPECT().FindByPath(ctx, "ns", "n").Return(dataset, nil)
+	dc.mocks.components.repo.EXPECT().GetUserRepoPermission(ctx, "user", dataset.Repository).Return(&types.UserRepoPermission{CanRead: true}, nil)
+	dc.mocks.components.repo.EXPECT().GetNameSpaceInfo(ctx, "ns").Return(&types.Namespace{}, nil)
+	dc.mocks.stores.UserLikesMock().EXPECT().IsExist(ctx, "user", int64(2)).Return(true, nil)
+
+	dc.mocks.components.repo.EXPECT().GetMirrorTaskStatusAndSyncStatus(dataset.Repository).Return(
+		"", types.SyncStatusCompleted,
+	)
+	d, err := dc.Show(ctx, "ns", "n", "user", false, false)
+	require.Nil(t, err)
+	require.Equal(t, &types.Dataset{
+		ID:           1,
+		Name:         "n",
+		RepositoryID: 2,
+		Tags:         []types.RepoTag{{Name: "t1"}},
+		Repository: types.Repository{
+			HTTPCloneURL: "/s/.git",
+			SSHCloneURL:  ":s/.git",
+		},
+		User:       types.User{Username: "user"},
+		UserLikes:  true,
+		Namespace:  &types.Namespace{},
+		SyncStatus: types.SyncStatusCompleted,
+	}, d)
+}
+
+func TestDatasetCompnent_Show_Repository(t *testing.T) {
+	ctx := context.TODO()
+	dc := initializeTestDatasetComponent(ctx, t)
+
+	dataset := &database.Dataset{
+		ID: 1,
+		Repository: &database.Repository{
+			ID:   2,
+			Name: "n",
+			Tags: []database.Tag{{Name: "t1"}},
+			User: database.User{
+				Username: "user",
+			},
+			Mirror: database.Mirror{
+				ID: 0,
+			},
+			SyncStatus: types.SyncStatusPending,
+		},
+	}
+	dc.mocks.stores.DatasetMock().EXPECT().FindByPath(ctx, "ns", "n").Return(dataset, nil)
+	dc.mocks.components.repo.EXPECT().GetUserRepoPermission(ctx, "user", dataset.Repository).Return(&types.UserRepoPermission{CanRead: true}, nil)
+	dc.mocks.components.repo.EXPECT().GetNameSpaceInfo(ctx, "ns").Return(&types.Namespace{}, nil)
+	dc.mocks.stores.UserLikesMock().EXPECT().IsExist(ctx, "user", int64(2)).Return(true, nil)
+	dc.mocks.components.repo.EXPECT().GetMirrorTaskStatusAndSyncStatus(dataset.Repository).Return(
+		"", types.SyncStatusPending,
+	)
+
+	d, err := dc.Show(ctx, "ns", "n", "user", false, false)
+	require.Nil(t, err)
+	require.Equal(t, &types.Dataset{
+		ID:           1,
+		Name:         "n",
+		RepositoryID: 2,
+		Tags:         []types.RepoTag{{Name: "t1"}},
+		Repository: types.Repository{
+			HTTPCloneURL: "/s/.git",
+			SSHCloneURL:  ":s/.git",
+		},
+		User:       types.User{Username: "user"},
+		UserLikes:  true,
+		Namespace:  &types.Namespace{},
+		SyncStatus: types.SyncStatusPending,
+	}, d)
 }
 
 func TestDatasetCompnent_Relations(t *testing.T) {

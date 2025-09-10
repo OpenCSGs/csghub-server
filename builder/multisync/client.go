@@ -104,7 +104,7 @@ func (c *commonClient) ReadMeData(ctx context.Context, v types.SyncVersion) (str
 	var res types.ReadMeResponse
 	err := c.rpcClent.Get(ctx, url, &res)
 	if err != nil {
-		return "", fmt.Errorf("failed to get dataset info, cause: %w", err)
+		return "", fmt.Errorf("failed to get readme data, cause: %w", err)
 	}
 	return res.Data, nil
 }

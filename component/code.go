@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"slices"
 	"time"
 
 	"opencsg.com/csghub-server/builder/git"
@@ -21,10 +22,10 @@ const codeGitattributesContent = modelGitattributesContent
 
 type CodeComponent interface {
 	Create(ctx context.Context, req *types.CreateCodeReq) (*types.Code, error)
-	Index(ctx context.Context, filter *types.RepoFilter, per, page int) ([]types.Code, int, error)
+	Index(ctx context.Context, filter *types.RepoFilter, per, page int, needOpWeight bool) ([]*types.Code, int, error)
 	Update(ctx context.Context, req *types.UpdateCodeReq) (*types.Code, error)
 	Delete(ctx context.Context, namespace, name, currentUser string) error
-	Show(ctx context.Context, namespace, name, currentUser string) (*types.Code, error)
+	Show(ctx context.Context, namespace, name, currentUser string, needOpWeight bool, needMultiSync bool) (*types.Code, error)
 	Relations(ctx context.Context, namespace, name, currentUser string) (*types.Relations, error)
 	OrgCodes(ctx context.Context, req *types.OrgCodesReq) ([]types.Code, int, error)
 }
@@ -38,6 +39,7 @@ func NewCodeComponent(config *config.Config) (CodeComponent, error) {
 	}
 	c.codeStore = database.NewCodeStore()
 	c.repoStore = database.NewRepoStore()
+	c.recomStore = database.NewRecomStore()
 	gs, err := git.NewGitServer(config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create git server, error: %w", err)
@@ -58,6 +60,7 @@ type codeComponentImpl struct {
 	userLikesStore database.UserLikesStore
 	gitServer      gitserver.GitServer
 	userSvcClient  rpc.UserSvcClient
+	recomStore     database.RecomStore
 }
 
 func (c *codeComponentImpl) Create(ctx context.Context, req *types.CreateCodeReq) (*types.Code, error) {
@@ -120,7 +123,7 @@ func (c *codeComponentImpl) Create(ctx context.Context, req *types.CreateCodeReq
 		NewBranch: req.DefaultBranch,
 		Namespace: req.Namespace,
 		Name:      req.Name,
-		FilePath:  gitattributesFileName,
+		FilePath:  types.GitattributesFileName,
 	}, types.CodeRepo))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create .gitattributes file, cause: %w", err)
@@ -177,10 +180,10 @@ func (c *codeComponentImpl) Create(ctx context.Context, req *types.CreateCodeReq
 	return resCode, nil
 }
 
-func (c *codeComponentImpl) Index(ctx context.Context, filter *types.RepoFilter, per, page int) ([]types.Code, int, error) {
+func (c *codeComponentImpl) Index(ctx context.Context, filter *types.RepoFilter, per, page int, needOpWeight bool) ([]*types.Code, int, error) {
 	var (
 		err      error
-		resCodes []types.Code
+		resCodes []*types.Code
 	)
 	repos, total, err := c.repoComponent.PublicToUser(ctx, types.CodeRepo, filter.Username, filter, per, page)
 	if err != nil {
@@ -203,11 +206,13 @@ func (c *codeComponentImpl) Index(ctx context.Context, filter *types.RepoFilter,
 		for _, c := range codes {
 			if c.RepositoryID == repo.ID {
 				code = &c
-				code.Repository = repo
 				break
 			}
 		}
-		var tags []types.RepoTag
+		var (
+			tags             []types.RepoTag
+			mirrorTaskStatus types.MirrorTaskStatus
+		)
 		for _, tag := range repo.Tags {
 			tags = append(tags, types.RepoTag{
 				Name:      tag.Name,
@@ -220,23 +225,31 @@ func (c *codeComponentImpl) Index(ctx context.Context, filter *types.RepoFilter,
 				UpdatedAt: tag.UpdatedAt,
 			})
 		}
-		resCodes = append(resCodes, types.Code{
-			ID:           code.ID,
-			Name:         repo.Name,
-			Nickname:     repo.Nickname,
-			Description:  repo.Description,
-			Likes:        repo.Likes,
-			Downloads:    repo.DownloadCount,
-			Path:         repo.Path,
-			RepositoryID: repo.ID,
-			Private:      repo.Private,
-			CreatedAt:    code.CreatedAt,
-			UpdatedAt:    repo.UpdatedAt,
-			Tags:         tags,
-			Source:       repo.Source,
-			SyncStatus:   repo.SyncStatus,
-			License:      repo.License,
+		if code.Repository.Mirror.CurrentTask != nil {
+			mirrorTaskStatus = code.Repository.Mirror.CurrentTask.Status
+		}
+		resCodes = append(resCodes, &types.Code{
+			ID:               code.ID,
+			Name:             repo.Name,
+			Nickname:         repo.Nickname,
+			Description:      repo.Description,
+			Likes:            repo.Likes,
+			Downloads:        repo.DownloadCount,
+			Path:             repo.Path,
+			RepositoryID:     repo.ID,
+			Private:          repo.Private,
+			CreatedAt:        code.CreatedAt,
+			UpdatedAt:        repo.UpdatedAt,
+			Tags:             tags,
+			Source:           repo.Source,
+			SyncStatus:       repo.SyncStatus,
+			License:          repo.License,
+			MirrorTaskStatus: mirrorTaskStatus,
 		})
+	}
+	slog.Info("code.index")
+	if needOpWeight {
+		c.addOpWeightToCodes(ctx, repoIDs, resCodes)
 	}
 
 	return resCodes, total, nil
@@ -316,7 +329,7 @@ func (c *codeComponentImpl) Delete(ctx context.Context, namespace, name, current
 	return nil
 }
 
-func (c *codeComponentImpl) Show(ctx context.Context, namespace, name, currentUser string) (*types.Code, error) {
+func (c *codeComponentImpl) Show(ctx context.Context, namespace, name, currentUser string, needOpWeight bool, needMultiSync bool) (*types.Code, error) {
 	var (
 		tags             []types.RepoTag
 		mirrorTaskStatus types.MirrorTaskStatus
@@ -378,22 +391,39 @@ func (c *codeComponentImpl) Show(ctx context.Context, namespace, name, currentUs
 			Nickname: code.Repository.User.NickName,
 			Email:    code.Repository.User.Email,
 		},
-		Private:          code.Repository.Private,
-		CreatedAt:        code.CreatedAt,
-		UpdatedAt:        code.Repository.UpdatedAt,
-		UserLikes:        likeExists,
-		Source:           code.Repository.Source,
-		SyncStatus:       syncStatus,
-		License:          code.Repository.License,
-		CanWrite:         permission.CanWrite,
-		CanManage:        permission.CanAdmin,
-		Namespace:        ns,
+		Private:    code.Repository.Private,
+		CreatedAt:  code.CreatedAt,
+		UpdatedAt:  code.Repository.UpdatedAt,
+		UserLikes:  likeExists,
+		Source:     code.Repository.Source,
+		SyncStatus: syncStatus,
+		License:    code.Repository.License,
+		CanWrite:   permission.CanWrite,
+		CanManage:  permission.CanAdmin,
+		Namespace:  ns,
+		MultiSource: types.MultiSource{
+			HFPath:  code.Repository.HFPath,
+			MSPath:  code.Repository.MSPath,
+			CSGPath: code.Repository.CSGPath,
+		},
 		MirrorTaskStatus: mirrorTaskStatus,
+		//RecomOpWeight: ,
 	}
 	if permission.CanAdmin {
 		resCode.SensitiveCheckStatus = code.Repository.SensitiveCheckStatus.String()
 	}
+	if needOpWeight {
+		c.addOpWeightToCodes(ctx, []int64{resCode.RepositoryID}, []*types.Code{resCode})
+	}
 
+	if needMultiSync {
+		weightNames := []database.RecomWeightName{database.RecomWeightFreshness,
+			database.RecomWeightDownloads,
+			database.RecomWeightQuality,
+			database.RecomWeightOp,
+			database.RecomWeightTotal}
+		c.addWeightsToCode(ctx, resCode.RepositoryID, resCode, weightNames)
+	}
 	return resCode, nil
 }
 
@@ -471,4 +501,20 @@ func (c *codeComponentImpl) OrgCodes(ctx context.Context, req *types.OrgCodesReq
 	}
 
 	return resCodes, total, nil
+}
+
+func (c *codeComponentImpl) addWeightsToCode(ctx context.Context, repoID int64, resCode *types.Code, weightNames []database.RecomWeightName) {
+	weights, err := c.recomStore.FindByRepoIDs(ctx, []int64{repoID})
+	if err == nil {
+		resCode.Scores = make([]types.WeightScore, 0)
+		for _, weight := range weights {
+			if slices.Contains(weightNames, weight.WeightName) {
+				score := types.WeightScore{
+					WeightName: string(weight.WeightName),
+					Score:      weight.Score,
+				}
+				resCode.Scores = append(resCode.Scores, score)
+			}
+		}
+	}
 }

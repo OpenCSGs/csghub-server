@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/uptrace/bun"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -19,22 +20,25 @@ type MirrorStore interface {
 	IsRepoExist(ctx context.Context, repoType types.RepositoryType, namespace, name string) (exists bool, err error)
 	FindByRepoID(ctx context.Context, repoID int64) (*Mirror, error)
 	FindByID(ctx context.Context, ID int64) (*Mirror, error)
+	FindByIDs(ctx context.Context, IDs []int64) ([]Mirror, error)
 	FindByRepoPath(ctx context.Context, repoType types.RepositoryType, namespace, name string) (*Mirror, error)
 	FindWithMapping(ctx context.Context, repoType types.RepositoryType, namespace, name string, mapping types.Mapping) (*Repository, error)
 	Create(ctx context.Context, mirror *Mirror) (*Mirror, error)
-	WithPagination(ctx context.Context) ([]Mirror, error)
-	WithPaginationWithRepository(ctx context.Context) ([]Mirror, error)
 	NoPushMirror(ctx context.Context) ([]Mirror, error)
 	PushedMirror(ctx context.Context) ([]Mirror, error)
 	Update(ctx context.Context, mirror *Mirror) (err error)
-	Delete(ctx context.Context, mirror *Mirror) (err error)
 	Unfinished(ctx context.Context) ([]Mirror, error)
 	Finished(ctx context.Context) ([]Mirror, error)
 	ToSyncRepo(ctx context.Context) ([]Mirror, error)
 	ToSyncLfs(ctx context.Context) ([]Mirror, error)
-	IndexWithPagination(ctx context.Context, per, page int, search string) (mirrors []Mirror, count int, err error)
+	IndexWithPagination(ctx context.Context, per, page int, search string, hasRepo bool) (mirrors []Mirror, count int, err error)
 	StatusCount(ctx context.Context) ([]MirrorStatusCount, error)
 	UpdateMirrorAndRepository(ctx context.Context, mirror *Mirror, repo *Repository) error
+	FindBySourceURLs(ctx context.Context, sourceURLs []string) ([]Mirror, error)
+	BatchUpdate(ctx context.Context, mirrors []Mirror) error
+	BatchCreate(ctx context.Context, mirrors []Mirror) error
+	ToBeScheduled(ctx context.Context) ([]Mirror, error)
+	Delete(ctx context.Context, mirror *Mirror) error
 	Recover(ctx context.Context) error
 }
 
@@ -70,11 +74,14 @@ type Mirror struct {
 	LocalRepoPath          string                 `bun:",nullzero" json:"local_repo_path"`
 	LastMessage            string                 `bun:",nullzero" json:"last_message"`
 	MirrorTaskID           int64                  `bun:",nullzero" json:"mirror_task_id"`
+	MirrorTasks            []*MirrorTask          `bun:"rel:has-many,join:mirror_task_id=id" json:"mirror_task"`
 	PushMirrorCreated      bool                   `bun:",nullzero,default:false" json:"push_mirror_created"`
 	Status                 types.MirrorTaskStatus `bun:",nullzero" json:"status"`
 	Progress               int8                   `bun:",nullzero" json:"progress"`
 	NextExecutionTimestamp time.Time              `bun:",nullzero" json:"next_execution_timestamp"`
 	Priority               types.MirrorPriority   `bun:"mirror_priority,notnull,default:0" json:"priority"`
+	RetryCount             int                    `bun:",nullzero" json:"retry_count"`
+	RemoteUpdatedAt        time.Time              `bun:",nullzero" json:"remote_updated_at"`
 	CurrentTaskID          int64                  `bun:",nullzero" json:"current_task_id"`
 	CurrentTask            *MirrorTask            `bun:"rel:has-one,join:current_task_id=id" json:"current_task"`
 
@@ -121,6 +128,8 @@ func (s *mirrorStoreImpl) FindByRepoID(ctx context.Context, repoID int64) (*Mirr
 	var mirror Mirror
 	err := s.db.Operator.Core.NewSelect().
 		Model(&mirror).
+		Relation("CurrentTask").
+		Relation("Repository").
 		Where("repository_id=?", repoID).
 		Scan(ctx)
 	if err != nil {
@@ -140,6 +149,19 @@ func (s *mirrorStoreImpl) FindByID(ctx context.Context, ID int64) (*Mirror, erro
 		return nil, err
 	}
 	return &mirror, nil
+}
+
+func (s *mirrorStoreImpl) FindByIDs(ctx context.Context, IDs []int64) ([]Mirror, error) {
+	var mirrors []Mirror
+	err := s.db.Operator.Core.NewSelect().
+		Model(&mirrors).
+		Relation("Repository").
+		Where("mirror.id in (?)", bun.In(IDs)).
+		Scan(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return mirrors, nil
 }
 
 func (s *mirrorStoreImpl) FindByRepoPath(ctx context.Context, repoType types.RepositoryType, namespace, name string) (*Mirror, error) {
@@ -189,29 +211,6 @@ func (s *mirrorStoreImpl) Create(ctx context.Context, mirror *Mirror) (*Mirror, 
 	return mirror, nil
 }
 
-func (s *mirrorStoreImpl) WithPagination(ctx context.Context) ([]Mirror, error) {
-	var mirrors []Mirror
-	err := s.db.Operator.Core.NewSelect().
-		Model(&mirrors).
-		Scan(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return mirrors, nil
-}
-
-func (s *mirrorStoreImpl) WithPaginationWithRepository(ctx context.Context) ([]Mirror, error) {
-	var mirrors []Mirror
-	err := s.db.Operator.Core.NewSelect().
-		Model(&mirrors).
-		Relation("Repository").
-		Scan(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return mirrors, nil
-}
-
 func (s *mirrorStoreImpl) NoPushMirror(ctx context.Context) ([]Mirror, error) {
 	var mirrors []Mirror
 	err := s.db.Operator.Core.NewSelect().
@@ -248,12 +247,31 @@ func (s *mirrorStoreImpl) Update(ctx context.Context, mirror *Mirror) (err error
 }
 
 func (s *mirrorStoreImpl) Delete(ctx context.Context, mirror *Mirror) (err error) {
-	_, err = s.db.Operator.Core.
-		NewDelete().
-		Model(mirror).
-		WherePK().
-		Exec(ctx)
-	return
+	err = s.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		_, err = s.db.Operator.Core.
+			NewDelete().
+			Model(mirror).
+			WherePK().
+			Exec(ctx)
+		if err != nil {
+			return err
+		}
+
+		_, err = s.db.Operator.Core.
+			NewDelete().
+			Model(&MirrorTask{}).
+			Where("mirror_id = ?", mirror.ID).
+			Exec(ctx)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return errorx.HandleDBError(err, nil)
+	}
+
+	return nil
 }
 
 func (s *mirrorStoreImpl) Unfinished(ctx context.Context) ([]Mirror, error) {
@@ -314,7 +332,7 @@ func (s *mirrorStoreImpl) ToSyncLfs(ctx context.Context) ([]Mirror, error) {
 	return mirrors, nil
 }
 
-func (s *mirrorStoreImpl) IndexWithPagination(ctx context.Context, per, page int, search string) (mirrors []Mirror, count int, err error) {
+func (s *mirrorStoreImpl) IndexWithPagination(ctx context.Context, per, page int, search string, hasRepo bool) (mirrors []Mirror, count int, err error) {
 	q := s.db.Operator.Core.NewSelect().
 		Model(&mirrors).
 		Relation("Repository").
@@ -322,8 +340,12 @@ func (s *mirrorStoreImpl) IndexWithPagination(ctx context.Context, per, page int
 		Relation("CurrentTask").
 		Order("id desc")
 
+	if hasRepo {
+		q = q.Where("repository.id is not null")
+	}
 	if search != "" {
-		q = q.Where("LOWER(mirror.source_url) like ? or LOWER(mirror.local_repo_path) like ?",
+		q = q.Where("LOWER(repository.path) like ? or LOWER(mirror.source_url) like ? or LOWER(mirror.local_repo_path) like ?",
+			fmt.Sprintf("%%%s%%", strings.ToLower(search)),
 			fmt.Sprintf("%%%s%%", strings.ToLower(search)),
 			fmt.Sprintf("%%%s%%", strings.ToLower(search)),
 		)
@@ -367,6 +389,46 @@ func (s *mirrorStoreImpl) UpdateMirrorAndRepository(ctx context.Context, mirror 
 		return nil
 	})
 	return err
+}
+
+func (s *mirrorStoreImpl) FindBySourceURLs(ctx context.Context, sourceURLs []string) ([]Mirror, error) {
+	var mirrors []Mirror
+	_, err := s.db.Operator.Core.NewSelect().
+		Model(&mirrors).
+		Where("source_url in (?)", bun.In(sourceURLs)).
+		Exec(ctx, &mirrors)
+	return mirrors, err
+}
+
+func (s *mirrorStoreImpl) BatchUpdate(ctx context.Context, mirrors []Mirror) error {
+	_, err := s.db.Operator.Core.NewUpdate().
+		Model(&mirrors).
+		Column("remote_updated_at", "mirror_priority").
+		Bulk().
+		Exec(ctx)
+	return err
+}
+
+func (s *mirrorStoreImpl) BatchCreate(ctx context.Context, mirrors []Mirror) error {
+	_, err := s.db.Operator.Core.NewInsert().
+		Model(&mirrors).
+		Exec(ctx)
+	return err
+}
+
+func (s *mirrorStoreImpl) ToBeScheduled(ctx context.Context) ([]Mirror, error) {
+	var mirrors []Mirror
+	err := s.db.Operator.Core.NewSelect().
+		Model(&mirrors).
+		Relation("MirrorTasks").
+		Where(
+			"mirror.remote_updated_at > mirror.updated_at",
+		).
+		Distinct().
+		Order("mirror_priority desc").
+		Limit(100).
+		Scan(ctx)
+	return mirrors, err
 }
 
 func (s *mirrorStoreImpl) Recover(ctx context.Context) error {

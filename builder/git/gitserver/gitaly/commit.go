@@ -190,7 +190,6 @@ func (c *Client) GetSingleCommit(ctx context.Context, req gitserver.GetRepoLastC
 				SHA: id,
 			})
 		}
-
 	} else {
 		return nil, errorx.CommitNotFound(errorx.Ctx().
 			Set("repo_type", req.RepoType).
@@ -397,6 +396,7 @@ func (c *Client) GetDiffBetweenTwoCommits(ctx context.Context, req gitserver.Get
 
 	if findCommitResp != nil {
 		callback.HeadCommit = types.GiteaCallbackPushReq_HeadCommit{
+			Id:             findCommitResp.Commit.Id,
 			Timestamp:      findCommitResp.Commit.Committer.Date.AsTime().Format(time.RFC3339),
 			Message:        string(findCommitResp.Commit.Subject),
 			LastModifyTime: findCommitResp.Commit.Committer.Date.AsTime(),

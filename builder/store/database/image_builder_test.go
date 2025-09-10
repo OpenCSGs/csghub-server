@@ -51,4 +51,7 @@ func TestImagebuilderStore_CRUD(t *testing.T) {
 	require.NoError(t, err)                                     // Verify that there is no error
 	require.Equal(t, newWork.WorkStatus, statusWork.WorkStatus) // Verify work status by build ID
 
+	foundWork, err = imd.FindByImagePath(ctx, newWork.ImagePath)
+	require.NoError(t, err)                                  // Verify that there is no error
+	require.Equal(t, newWork.ImagePath, foundWork.ImagePath) // Validate image path
 }

@@ -144,7 +144,7 @@ func TestModelHandler_Show(t *testing.T) {
 	})
 
 	tester.WithUser()
-	tester.mocks.model.EXPECT().Show(tester.Ctx(), "u", "r", "u", false).Return(&types.Model{
+	tester.mocks.model.EXPECT().Show(tester.Ctx(), "u", "r", "u", false, false).Return(&types.Model{
 		Name: "m",
 	}, nil)
 	tester.Execute()
@@ -240,6 +240,8 @@ func TestModelHandler_DeployDedicated(t *testing.T) {
 		})
 		tester.WithUser()
 
+		tester.mocks.repo.EXPECT().IsSyncing(tester.Ctx(), types.ModelRepo, "u", "r").Return(false, nil)
+
 		tester.mocks.repo.EXPECT().AllowReadAccess(tester.Ctx(), types.ModelRepo, "u", "r", "u").Return(true, nil)
 		tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), &types.ModelRunReq{
 			DeployName: "test",
@@ -264,6 +266,8 @@ func TestModelHandler_DeployDedicated(t *testing.T) {
 		})
 		tester.WithUser()
 
+		tester.mocks.repo.EXPECT().IsSyncing(tester.Ctx(), types.ModelRepo, "u", "r").Return(false, nil)
+
 		tester.mocks.repo.EXPECT().AllowReadAccess(tester.Ctx(), types.ModelRepo, "u", "r", "u").Return(true, nil)
 		tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), &types.ModelRunReq{
 			MinReplica: 1,
@@ -284,6 +288,8 @@ func TestModelHandler_DeployDedicated(t *testing.T) {
 			return h.DeployDedicated
 		})
 		tester.WithUser()
+
+		tester.mocks.repo.EXPECT().IsSyncing(tester.Ctx(), types.ModelRepo, "u", "r").Return(false, nil)
 
 		tester.mocks.repo.EXPECT().AllowReadAccess(tester.Ctx(), types.ModelRepo, "u", "r", "u").Return(true, nil)
 		tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), &types.ModelRunReq{
@@ -310,6 +316,8 @@ func TestModelHandler_DeployDedicated(t *testing.T) {
 		})
 		tester.WithUser()
 
+		tester.mocks.repo.EXPECT().IsSyncing(tester.Ctx(), types.ModelRepo, "u", "r").Return(false, nil)
+
 		tester.mocks.repo.EXPECT().AllowReadAccess(tester.Ctx(), types.ModelRepo, "u", "r", "u").Return(true, nil)
 		tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), &types.ModelRunReq{
 			DeployName: "test",
@@ -335,7 +343,10 @@ func TestModelHandler_FinetuneCreate(t *testing.T) {
 		})
 		tester.WithUser()
 
-		tester.mocks.repo.EXPECT().AllowAdminAccess(tester.Ctx(), types.ModelRepo, "u", "r", "u").Return(true, nil)
+		tester.mocks.repo.EXPECT().IsSyncing(tester.Ctx(), types.ModelRepo, "u", "r").Return(false, nil)
+
+		tester.mocks.repo.EXPECT().AllowReadAccess(tester.Ctx(), types.ModelRepo, "u", "r", "u").Return(true, nil)
+
 		tester.mocks.model.EXPECT().Deploy(tester.Ctx(), types.DeployActReq{
 			Namespace:   "u",
 			Name:        "r",
@@ -353,7 +364,9 @@ func TestModelHandler_FinetuneCreate(t *testing.T) {
 		})
 		tester.WithUser()
 
-		tester.mocks.repo.EXPECT().AllowAdminAccess(tester.Ctx(), types.ModelRepo, "u", "r", "u").Return(true, nil)
+		tester.mocks.repo.EXPECT().IsSyncing(tester.Ctx(), types.ModelRepo, "u", "r").Return(false, nil)
+
+		tester.mocks.repo.EXPECT().AllowReadAccess(tester.Ctx(), types.ModelRepo, "u", "r", "u").Return(true, nil)
 		tester.WithBody(t, &types.ModelRunReq{MinReplica: 1, MaxReplica: 2, Revision: "main"}).Execute()
 
 		tester.ResponseEqSimple(t, http.StatusBadRequest, httpbase.R{

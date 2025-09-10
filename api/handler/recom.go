@@ -32,6 +32,7 @@ func NewRecomHandler(cfg *config.Config) (*RecomHandler, error) {
 // @Accept       json
 // @Produce      json
 // @Param        body  body handler.SetOpWeight.SetOpWeightReq true "json request body"
+// @Param 		 current_user query string true "current user"
 // @Success      200  {object}  types.Response{} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"

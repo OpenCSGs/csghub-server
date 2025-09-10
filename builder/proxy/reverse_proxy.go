@@ -9,23 +9,27 @@ import (
 	"github.com/openai/openai-go"
 )
 
-type ReverseProxy struct {
+type ReverseProxy interface {
+	ServeHTTP(w http.ResponseWriter, r *http.Request, api string)
+}
+
+type reverseProxyImpl struct {
 	target *url.URL
 }
 
 var DefaultResponseStreamContentType openai.ChatCompletionChunk
 
-func NewReverseProxy(target string) (*ReverseProxy, error) {
+func NewReverseProxy(target string) (ReverseProxy, error) {
 	url, err := url.Parse(target)
 	if err != nil {
 		return nil, err
 	}
-	return &ReverseProxy{
+	return &reverseProxyImpl{
 		target: url,
 	}, nil
 }
 
-func (rp *ReverseProxy) ServeHTTP(w http.ResponseWriter, r *http.Request, api string) {
+func (rp *reverseProxyImpl) ServeHTTP(w http.ResponseWriter, r *http.Request, api string) {
 	defer func() {
 		if r := recover(); r != nil {
 			slog.Debug("Connection to target server interrupted", slog.Any("error", r))

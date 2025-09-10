@@ -31,7 +31,7 @@ func TestAccountMeteringStore_Create(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, "foo", amn.UserUUID)
 	require.Equal(t, 12.34, amn.Value)
-	require.Equal(t, 1, amn.ValueType)
+	require.Equal(t, types.ChargeValueType(1), amn.ValueType)
 	require.Equal(t, "abc", amn.ResourceName)
 }
 
@@ -101,7 +101,7 @@ func TestAccountMeteringStore_ListByUserIDAndTime(t *testing.T) {
 		require.Nil(t, err)
 	}
 
-	ams, total, err := store.ListByUserIDAndTime(ctx, types.ACCT_STATEMENTS_REQ{
+	ams, total, err := store.ListByUserIDAndTime(ctx, types.ActStatementsReq{
 		UserUUID:     "foo",
 		Scene:        2,
 		InstanceName: "bar",
@@ -185,7 +185,7 @@ func TestAccountMeteringStore_GetStatByDate(t *testing.T) {
 		require.Nil(t, err)
 	}
 
-	data, err := store.GetStatByDate(ctx, types.ACCT_STATEMENTS_REQ{
+	data, err := store.GetStatByDate(ctx, types.ActStatementsReq{
 		UserUUID:     "foo",
 		Scene:        2,
 		InstanceName: "bar",
@@ -239,4 +239,51 @@ func TestAccountMeteringStore_ListAllByUserUUID(t *testing.T) {
 	data, err := store.ListAllByUserUUID(ctx, "foo")
 	require.Nil(t, err)
 	require.Equal(t, 3, len(data))
+}
+
+func TestAccountMeteringStore_GetByEventUUID(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewAccountMeteringStoreWithDB(db)
+
+	am := database.AccountMetering{
+		UserUUID: "foo", Value: 12.34, ValueType: 1,
+		ResourceName: "r1", Scene: types.ScenePayOrder, CustomerID: "bar",
+		EventUUID: uuid.New(),
+	}
+
+	err := store.Create(ctx, am)
+	require.Nil(t, err)
+
+	data, err := store.GetByEventUUID(ctx, am.EventUUID)
+	require.Nil(t, err)
+	require.Equal(t, am.UserUUID, data.UserUUID)
+	require.Equal(t, am.Value, data.Value)
+}
+
+func TestAccountMeteringStore_FindByCustomerIDAndRecordAtInMin(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewAccountMeteringStoreWithDB(db)
+
+	ctime := time.Now()
+
+	am := database.AccountMetering{
+		UserUUID: "foo", Value: 12.34, ValueType: 1,
+		ResourceName: "r1", Scene: types.ScenePayOrder, CustomerID: "bar",
+		EventUUID: uuid.New(), RecordedAt: ctime,
+	}
+
+	err := store.Create(ctx, am)
+	require.Nil(t, err)
+
+	data, err := store.FindByCustomerIDAndRecordAtInMin(ctx, am.CustomerID, time.Now())
+	require.Nil(t, err)
+	require.NotNil(t, data)
+	require.Equal(t, am.UserUUID, data.UserUUID)
+	require.Equal(t, am.Value, data.Value)
 }

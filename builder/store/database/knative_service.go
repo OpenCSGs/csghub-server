@@ -49,6 +49,7 @@ type KnativeService struct {
 	DeployType     int                    `bun:"," json:"deploy_type"`
 	DeploySKU      string                 `bun:"," json:"deploy_sku"`
 	OrderDetailID  int64                  `bun:"," json:"order_detail_id"`
+	TaskID         int64                  `bun:"," json:"task_id"`
 	times
 }
 

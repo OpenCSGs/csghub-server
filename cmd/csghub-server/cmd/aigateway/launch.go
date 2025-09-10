@@ -30,8 +30,11 @@ var cmdLaunch = &cobra.Command{
 			Dialect: database.DatabaseDialect(cfg.Database.Driver),
 			DSN:     cfg.Database.DSN,
 		}
-		database.InitDB(dbConfig)
-		err = event.InitEventPublisher(cfg, nil)
+		if err := database.InitDB(dbConfig); err != nil {
+			slog.Error("failed to initialize database", slog.Any("error", err))
+			return fmt.Errorf("database initialization failed: %w", err)
+		}
+		err = event.InitEventPublisher(cfg)
 		if err != nil {
 			return fmt.Errorf("fail to initialize message queue, %w", err)
 		}

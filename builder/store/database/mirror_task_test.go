@@ -82,7 +82,7 @@ func TestMirrorTaskStore_GetHighestPriority(t *testing.T) {
 	_, err = store.Create(ctx, database.MirrorTask{
 		MirrorID: 1,
 		Status:   types.MirrorQueued,
-		Priority: types.HighMirrorPriority,
+		Priority: types.ASAPMirrorPriority,
 	})
 	require.Nil(t, err)
 
@@ -97,7 +97,7 @@ func TestMirrorTaskStore_GetHighestPriority(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, int64(1), mt.MirrorID)
 	require.Equal(t, types.MirrorRepoSyncStart, mt.Status)
-	require.Equal(t, types.HighMirrorPriority, mt.Priority)
+	require.Equal(t, types.ASAPMirrorPriority, mt.Priority)
 }
 
 func TestMirrorTaskStore_SetMirrorCurrentTaskID(t *testing.T) {

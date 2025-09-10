@@ -12,14 +12,11 @@ type recomStoreImpl struct {
 }
 
 type RecomStore interface {
-	// Index returns repos in descend order of score.
-	Index(ctx context.Context, page, pageSize int) ([]*RecomRepoScore, error)
 	// Upsert recom repo score
 	UpsertScore(ctx context.Context, scores []*RecomRepoScore) error
 	LoadWeights(ctx context.Context) ([]*RecomWeight, error)
 	LoadRepoOpWeights(ctx context.Context, repoIDs []int64) (map[int64]int, error)
 	UpsetOpWeights(ctx context.Context, repoID, weight int64) error
-	FindScoreByRepoIDs(ctx context.Context, repoIDs []int64) ([]*RecomRepoScore, error)
 	FindByRepoIDs(ctx context.Context, repoIDs []int64) ([]*RecomRepoScore, error)
 }
 
@@ -33,16 +30,6 @@ func NewRecomStoreWithDB(db *DB) RecomStore {
 	return &recomStoreImpl{
 		db: db,
 	}
-}
-
-// Index returns repos in descend order of score.
-func (s *recomStoreImpl) Index(ctx context.Context, page, pageSize int) ([]*RecomRepoScore, error) {
-	items := make([]*RecomRepoScore, 0)
-	err := s.db.Operator.Core.NewSelect().Model(&RecomRepoScore{}).
-		Order("score desc").
-		Offset(page*pageSize).Limit(pageSize).
-		Scan(ctx, &items)
-	return items, err
 }
 
 // Upsert recom repo score
@@ -77,25 +64,51 @@ func (s *recomStoreImpl) LoadRepoOpWeights(ctx context.Context, repoIDs []int64)
 }
 
 func (s *recomStoreImpl) UpsetOpWeights(ctx context.Context, repoID, weight int64) error {
-	_, err := s.db.Core.NewInsert().
-		Model(&RecomOpWeight{
-			RepositoryID: repoID,
-			Weight:       int(weight),
-		}).
-		On("CONFLICT (repository_id) DO UPDATE").
-		Exec(ctx)
-	return err
-}
-
-// FindScoreByRepoIDs implements RecomStore.
-func (s *recomStoreImpl) FindScoreByRepoIDs(ctx context.Context, repoIDs []int64) ([]*RecomRepoScore, error) {
 	items := make([]*RecomRepoScore, 0)
 	err := s.db.Operator.Core.NewSelect().Model(&RecomRepoScore{}).
-		Where("repository_id IN (?)", bun.In(repoIDs)).
+		Where("repository_id = ?", repoID).
 		Scan(ctx, &items)
-	return items, err
+	if err != nil {
+		return fmt.Errorf("failed to load recom repo scores: %w", err)
+	}
+
+	var opScore, totalScore *RecomRepoScore
+	var total float64
+	for _, item := range items {
+		if item.WeightName == RecomWeightOp {
+			opScore = item
+			opScore.Score = float64(weight)
+		} else if item.WeightName == RecomWeightTotal {
+			totalScore = item
+			totalScore.Score = 0.0 // reset total
+		}
+
+		total += item.Score
+	}
+
+	if opScore == nil {
+		items = append(items, &RecomRepoScore{
+			RepositoryID: repoID,
+			WeightName:   RecomWeightOp,
+			Score:        float64(weight),
+		})
+		total += float64(weight)
+	}
+	if totalScore == nil {
+		totalScore = &RecomRepoScore{
+			RepositoryID: repoID,
+			WeightName:   RecomWeightTotal,
+			Score:        total,
+		}
+		items = append(items, totalScore)
+	} else {
+		totalScore.Score = total
+	}
+
+	return s.UpsertScore(ctx, items)
 }
 
+// FindByRepoIDs implements RecomStore.
 func (s *recomStoreImpl) FindByRepoIDs(ctx context.Context, repoIDs []int64) ([]*RecomRepoScore, error) {
 	items := make([]*RecomRepoScore, 0)
 	err := s.db.Operator.Core.NewSelect().Model(&RecomRepoScore{}).

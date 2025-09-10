@@ -52,7 +52,7 @@ func NewInternalComponent(config *config.Config) (InternalComponent, error) {
 	c.namespaceStore = database.NewNamespaceStore()
 	c.dataviewer = dataviewer.NewDataviewerClient(config)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create data viewer client, error:%w", err)
 	}
 	git, err := git.NewGitServer(config)
 	if err != nil {
@@ -223,7 +223,6 @@ func (c *internalComponentImpl) TriggerDataviewerWorkflow(ctx context.Context, r
 	}
 	return res, nil
 }
-
 func (c *internalComponentImpl) CheckGitCallback(ctx context.Context, req types.GitalyAllowedReq) (bool, error) {
 	for _, checker := range c.callbackCheckers {
 		allowed, err := checker.Check(ctx, req)

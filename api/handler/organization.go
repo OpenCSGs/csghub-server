@@ -85,7 +85,7 @@ func (h *OrganizationHandler) Models(ctx *gin.Context) {
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
+		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 	req.Page = page
@@ -130,7 +130,7 @@ func (h *OrganizationHandler) Datasets(ctx *gin.Context) {
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
+		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 	req.Page = page
@@ -174,7 +174,7 @@ func (h *OrganizationHandler) Codes(ctx *gin.Context) {
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
+		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 	req.Page = page
@@ -218,7 +218,7 @@ func (h *OrganizationHandler) Spaces(ctx *gin.Context) {
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
+		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 	req.Page = page
@@ -262,7 +262,7 @@ func (h *OrganizationHandler) Collections(ctx *gin.Context) {
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
+		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 	req.Page = page
@@ -305,7 +305,7 @@ func (h *OrganizationHandler) Prompts(ctx *gin.Context) {
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
+		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 	req.Page = page
@@ -348,7 +348,7 @@ func (h *OrganizationHandler) MCPServers(ctx *gin.Context) {
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
+		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 	req.Page = page

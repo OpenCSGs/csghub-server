@@ -92,7 +92,7 @@ func (ah *AccountingHandler) QueryMeteringStatementByUserID(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, "Bad request datetime format")
 		return
 	}
-	req := types.ACCT_STATEMENTS_REQ{
+	req := types.ActStatementsReq{
 		CurrentUser:  currentUser,
 		UserUUID:     userUUID,
 		Scene:        scene,

@@ -58,7 +58,9 @@ func (s *datasetStoreImpl) ByRepoIDs(ctx context.Context, repoIDs []int64) (data
 		Model(&datasets).
 		Relation("Repository").
 		Relation("Repository.User").
-		Where("repository_id in (?)", bun.In(repoIDs))
+		Relation("Repository.Mirror").
+		Relation("Repository.Mirror.CurrentTask").
+		Where("dataset.repository_id in (?)", bun.In(repoIDs))
 	err = q.Scan(ctx)
 	return
 }
@@ -108,7 +110,7 @@ func (s *datasetStoreImpl) UserLikesDatasets(ctx context.Context, userID int64, 
 		Model(&datasets).
 		Relation("Repository.Tags").
 		Relation("Repository.User").
-		Where("repository.id in (select repo_id from user_likes where user_id=?)", userID)
+		Where("repository.id in (select repo_id from user_likes where user_id=? and deleted_at is NULL)", userID)
 
 	query = query.Order("dataset.created_at DESC").
 		Limit(per).

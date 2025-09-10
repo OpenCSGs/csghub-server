@@ -208,6 +208,10 @@ const (
 	MessageScenarioOrgVerify            MessageScenario = "org-verify"
 	MessageScenarioOrgMember            MessageScenario = "org-member"
 	MessageScenarioDiscussion           MessageScenario = "discussion"
+	MessageScenarioRecharge             MessageScenario = "recharge"
+	MessageScenarioLowBalance           MessageScenario = "low-balance"
+	MessageScenarioRechargeSuccess      MessageScenario = "recharge-success"
+	MessageScenarioWeeklyRecharges      MessageScenario = "weekly-recharges"
 	MessageScenarioDeployment           MessageScenario = "deployment"
 )
 
@@ -297,4 +301,19 @@ type EmailVerifyCodeNotificationReq struct {
 type TemplateOutput struct {
 	Title   string
 	Content string
+}
+
+type EmailRechargeSuccessNotification struct {
+	Email      string `json:"email"`
+	UserUUID   string `json:"user_uuid"`
+	Amount     string `json:"amount"`
+	Currency   string `json:"currency"`
+	PayChannel string `json:"pay_channel"`
+}
+
+type EmailWeeklyRechargesNotification struct {
+	Email     string `json:"email"`
+	FileData  string `json:"file_data"`
+	StartDate string `json:"start_date"`
+	EndDate   string `json:"end_date"`
 }

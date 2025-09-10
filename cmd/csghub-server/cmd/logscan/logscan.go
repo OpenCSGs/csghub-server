@@ -3,6 +3,7 @@ package logscan
 import (
 	"bufio"
 	"fmt"
+	"log/slog"
 	"os"
 	"regexp"
 	"strings"
@@ -40,10 +41,9 @@ var Cmd = &cobra.Command{
 			DSN:     config.Database.DSN,
 		}
 
-		database.InitDB(dbConfig)
-		if err != nil {
-			err = fmt.Errorf("initializing DB connection: %w", err)
-			return
+		if err := database.InitDB(dbConfig); err != nil {
+			slog.Error("failed to initialize database", slog.Any("error", err))
+			return fmt.Errorf("database initialization failed: %w", err)
 		}
 		repoStore = database.NewRepoStore()
 		return

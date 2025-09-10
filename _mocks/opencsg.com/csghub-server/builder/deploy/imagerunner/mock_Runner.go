@@ -437,67 +437,6 @@ func (_c *MockRunner_ListCluster_Call) RunAndReturn(run func(context.Context) ([
 	return _c
 }
 
-// ListWorkFlows provides a mock function with given fields: _a0, _a1, _a2, _a3
-func (_m *MockRunner) ListWorkFlows(_a0 context.Context, _a1 string, _a2 int, _a3 int) (*types.ArgoWorkFlowListRes, error) {
-	ret := _m.Called(_a0, _a1, _a2, _a3)
-
-	if len(ret) == 0 {
-		panic("no return value specified for ListWorkFlows")
-	}
-
-	var r0 *types.ArgoWorkFlowListRes
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, int, int) (*types.ArgoWorkFlowListRes, error)); ok {
-		return rf(_a0, _a1, _a2, _a3)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, int, int) *types.ArgoWorkFlowListRes); ok {
-		r0 = rf(_a0, _a1, _a2, _a3)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*types.ArgoWorkFlowListRes)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, string, int, int) error); ok {
-		r1 = rf(_a0, _a1, _a2, _a3)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockRunner_ListWorkFlows_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListWorkFlows'
-type MockRunner_ListWorkFlows_Call struct {
-	*mock.Call
-}
-
-// ListWorkFlows is a helper method to define mock.On call
-//   - _a0 context.Context
-//   - _a1 string
-//   - _a2 int
-//   - _a3 int
-func (_e *MockRunner_Expecter) ListWorkFlows(_a0 interface{}, _a1 interface{}, _a2 interface{}, _a3 interface{}) *MockRunner_ListWorkFlows_Call {
-	return &MockRunner_ListWorkFlows_Call{Call: _e.mock.On("ListWorkFlows", _a0, _a1, _a2, _a3)}
-}
-
-func (_c *MockRunner_ListWorkFlows_Call) Run(run func(_a0 context.Context, _a1 string, _a2 int, _a3 int)) *MockRunner_ListWorkFlows_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(int), args[3].(int))
-	})
-	return _c
-}
-
-func (_c *MockRunner_ListWorkFlows_Call) Return(_a0 *types.ArgoWorkFlowListRes, _a1 error) *MockRunner_ListWorkFlows_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockRunner_ListWorkFlows_Call) RunAndReturn(run func(context.Context, string, int, int) (*types.ArgoWorkFlowListRes, error)) *MockRunner_ListWorkFlows_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // Logs provides a mock function with given fields: _a0, _a1
 func (_m *MockRunner) Logs(_a0 context.Context, _a1 *types.LogsRequest) (<-chan string, error) {
 	ret := _m.Called(_a0, _a1)
@@ -730,64 +669,6 @@ func (_c *MockRunner_Status_Call) Return(_a0 *types.StatusResponse, _a1 error) *
 }
 
 func (_c *MockRunner_Status_Call) RunAndReturn(run func(context.Context, *types.StatusRequest) (*types.StatusResponse, error)) *MockRunner_Status_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// StatusAll provides a mock function with given fields: _a0
-func (_m *MockRunner) StatusAll(_a0 context.Context) (map[string]types.StatusResponse, error) {
-	ret := _m.Called(_a0)
-
-	if len(ret) == 0 {
-		panic("no return value specified for StatusAll")
-	}
-
-	var r0 map[string]types.StatusResponse
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context) (map[string]types.StatusResponse, error)); ok {
-		return rf(_a0)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context) map[string]types.StatusResponse); ok {
-		r0 = rf(_a0)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(map[string]types.StatusResponse)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
-		r1 = rf(_a0)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockRunner_StatusAll_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'StatusAll'
-type MockRunner_StatusAll_Call struct {
-	*mock.Call
-}
-
-// StatusAll is a helper method to define mock.On call
-//   - _a0 context.Context
-func (_e *MockRunner_Expecter) StatusAll(_a0 interface{}) *MockRunner_StatusAll_Call {
-	return &MockRunner_StatusAll_Call{Call: _e.mock.On("StatusAll", _a0)}
-}
-
-func (_c *MockRunner_StatusAll_Call) Run(run func(_a0 context.Context)) *MockRunner_StatusAll_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context))
-	})
-	return _c
-}
-
-func (_c *MockRunner_StatusAll_Call) Return(_a0 map[string]types.StatusResponse, _a1 error) *MockRunner_StatusAll_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockRunner_StatusAll_Call) RunAndReturn(run func(context.Context) (map[string]types.StatusResponse, error)) *MockRunner_StatusAll_Call {
 	_c.Call.Return(run)
 	return _c
 }

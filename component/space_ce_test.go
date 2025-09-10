@@ -1,11 +1,11 @@
-//go:build !saas
+//go:build !ee && !saas
 
 package component
 
 import (
 	"context"
+	"sync"
 	"testing"
-	"time"
 
 	"github.com/alibabacloud-go/tea/tea"
 	"github.com/stretchr/testify/mock"
@@ -24,10 +24,7 @@ func TestSpaceComponent_Create(t *testing.T) {
 		Resources: `{"memory": "foo"}`,
 	}, nil)
 
-	sc.mocks.deployer.EXPECT().CheckResourceAvailable(ctx, "cluster", int64(0), &types.HardWare{
-		Memory: "foo",
-	}).Return(true, nil)
-
+	sc.mocks.components.repo.EXPECT().CheckAccountAndResource(ctx, "user", "cluster", int64(0), mock.Anything).Return(nil)
 	sc.mocks.components.repo.EXPECT().CreateRepo(ctx, types.CreateRepoReq{
 		DefaultBranch: "main",
 		Readme:        generateReadmeData("MIT"),
@@ -47,12 +44,17 @@ func TestSpaceComponent_Create(t *testing.T) {
 		Path: "ns/n",
 	}, nil)
 
-	sc.mocks.components.repo.EXPECT().SendAssetManagementMsg(mock.Anything, types.RepoNotificationReq{
-		RepoType:  types.SpaceRepo,
-		Operation: types.OperationCreate,
-		RepoPath:  "ns/n",
-		UserUUID:  "user-uuid",
-	}).Return(nil)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	sc.mocks.components.repo.EXPECT().SendAssetManagementMsg(mock.Anything, mock.MatchedBy(func(req types.RepoNotificationReq) bool {
+		return req.RepoType == types.SpaceRepo &&
+			req.Operation == types.OperationCreate &&
+			req.RepoPath == "ns/n" &&
+			req.UserUUID == "user-uuid"
+	})).RunAndReturn(func(ctx context.Context, req types.RepoNotificationReq) error {
+		wg.Done()
+		return nil
+	}).Once()
 
 	sc.mocks.stores.SpaceMock().EXPECT().Create(ctx, database.Space{
 		RepositoryID: 321,
@@ -84,7 +86,7 @@ func TestSpaceComponent_Create(t *testing.T) {
 		NewBranch: "main",
 		Namespace: "ns",
 		Name:      "n",
-		FilePath:  gitattributesFileName,
+		FilePath:  types.GitattributesFileName,
 	}, types.SpaceRepo)).Return(nil)
 	sc.mocks.gitServer.EXPECT().CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
 		Username:  "user",
@@ -114,7 +116,6 @@ func TestSpaceComponent_Create(t *testing.T) {
 			Username:      "user",
 		},
 	})
-	time.Sleep(10 * time.Millisecond)
 	require.Nil(t, err)
 
 	require.Equal(t, &types.Space{
@@ -128,7 +129,7 @@ func TestSpaceComponent_Create(t *testing.T) {
 		Creator:    "user",
 		Path:       "ns/n",
 	}, space)
-
+	wg.Wait()
 }
 
 func TestSpaceComponent_Update(t *testing.T) {

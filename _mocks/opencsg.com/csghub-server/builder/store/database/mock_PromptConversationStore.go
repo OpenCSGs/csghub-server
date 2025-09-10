@@ -176,6 +176,66 @@ func (_c *MockPromptConversationStore_FindConversationsByUserID_Call) RunAndRetu
 	return _c
 }
 
+// GetByUUID provides a mock function with given fields: ctx, uuid, hasDetail
+func (_m *MockPromptConversationStore) GetByUUID(ctx context.Context, uuid string, hasDetail bool) (*database.PromptConversation, error) {
+	ret := _m.Called(ctx, uuid, hasDetail)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetByUUID")
+	}
+
+	var r0 *database.PromptConversation
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, bool) (*database.PromptConversation, error)); ok {
+		return rf(ctx, uuid, hasDetail)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, bool) *database.PromptConversation); ok {
+		r0 = rf(ctx, uuid, hasDetail)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.PromptConversation)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, bool) error); ok {
+		r1 = rf(ctx, uuid, hasDetail)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockPromptConversationStore_GetByUUID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetByUUID'
+type MockPromptConversationStore_GetByUUID_Call struct {
+	*mock.Call
+}
+
+// GetByUUID is a helper method to define mock.On call
+//   - ctx context.Context
+//   - uuid string
+//   - hasDetail bool
+func (_e *MockPromptConversationStore_Expecter) GetByUUID(ctx interface{}, uuid interface{}, hasDetail interface{}) *MockPromptConversationStore_GetByUUID_Call {
+	return &MockPromptConversationStore_GetByUUID_Call{Call: _e.mock.On("GetByUUID", ctx, uuid, hasDetail)}
+}
+
+func (_c *MockPromptConversationStore_GetByUUID_Call) Run(run func(ctx context.Context, uuid string, hasDetail bool)) *MockPromptConversationStore_GetByUUID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(bool))
+	})
+	return _c
+}
+
+func (_c *MockPromptConversationStore_GetByUUID_Call) Return(_a0 *database.PromptConversation, _a1 error) *MockPromptConversationStore_GetByUUID_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockPromptConversationStore_GetByUUID_Call) RunAndReturn(run func(context.Context, string, bool) (*database.PromptConversation, error)) *MockPromptConversationStore_GetByUUID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetConversationByID provides a mock function with given fields: ctx, userID, uuid, hasDetail
 func (_m *MockPromptConversationStore) GetConversationByID(ctx context.Context, userID int64, uuid string, hasDetail bool) (*database.PromptConversation, error) {
 	ret := _m.Called(ctx, userID, uuid, hasDetail)

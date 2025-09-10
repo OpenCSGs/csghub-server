@@ -14,8 +14,8 @@ func TestLibraryTag(t *testing.T) {
 		{name: "case insensitive", args: args{filePath: "Pytorch_model.Bin"}, want: "pytorch"},
 
 		{name: "pytorch", args: args{filePath: "pytorch_model.bin"}, want: "pytorch"},
-		{name: "pytorch", args: args{filePath: "model.pt"}, want: "pytorch"},
 		{name: "pytorch", args: args{filePath: "pytorch_model_001.bin"}, want: "pytorch"},
+		{name: "pytorch", args: args{filePath: "model.pt"}, want: "pytorch"},
 		{name: "not pytorch", args: args{filePath: "1-pytorch_model_001.bin"}, want: ""},
 		{name: "not pytorch", args: args{filePath: "pytorch_model-bin"}, want: ""},
 

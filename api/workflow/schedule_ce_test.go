@@ -1,8 +1,9 @@
-//go:build !saas
+//go:build !ee && !saas
 
 package workflow_test
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
@@ -12,13 +13,25 @@ import (
 )
 
 func TestSchedule_CalcRecomScoreWorkflow(t *testing.T) {
-	tester, err := newWorkflowTester(t)
-	require.NoError(t, err)
+	t.Run("normal", func(t *testing.T) {
+		tester, err := newWorkflowTester(t)
+		require.NoError(t, err)
 
-	tester.mocks.recom.EXPECT().CalculateRecomScore(mock.Anything, 0).Return(nil)
-	tester.scheduler.Execute("calc-recom-score-schedule", tester.cronEnv)
-	require.True(t, tester.cronEnv.IsWorkflowCompleted())
-	require.NoError(t, tester.cronEnv.GetWorkflowError())
+		tester.mocks.recom.EXPECT().CalculateRecomScore(mock.Anything, 0).Return(nil)
+		tester.scheduler.Execute("calc-recom-score-schedule", tester.cronEnv)
+		require.True(t, tester.cronEnv.IsWorkflowCompleted())
+		require.NoError(t, tester.cronEnv.GetWorkflowError())
+	})
+
+	t.Run("error", func(t *testing.T) {
+		tester, err := newWorkflowTester(t)
+		require.NoError(t, err)
+
+		tester.mocks.recom.EXPECT().CalculateRecomScore(mock.Anything, 0).Return(errors.New("error"))
+		tester.scheduler.Execute("calc-recom-score-schedule", tester.cronEnv)
+		require.True(t, tester.cronEnv.IsWorkflowCompleted())
+		require.Error(t, tester.cronEnv.GetWorkflowError())
+	})
 }
 
 func TestSchedule_SyncAsClient(t *testing.T) {

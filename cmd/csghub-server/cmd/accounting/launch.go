@@ -8,8 +8,10 @@ import (
 	"opencsg.com/csghub-server/accounting/consumer"
 	"opencsg.com/csghub-server/accounting/router"
 	"opencsg.com/csghub-server/api/httpbase"
+	bldmq "opencsg.com/csghub-server/builder/mq"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/i18n"
 	"opencsg.com/csghub-server/mq"
 )
 
@@ -31,18 +33,33 @@ var launchCmd = &cobra.Command{
 			Dialect: database.DatabaseDialect(cfg.Database.Driver),
 			DSN:     cfg.Database.DSN,
 		}
-		database.InitDB(dbConfig)
+		if err := database.InitDB(dbConfig); err != nil {
+			slog.Error("failed to initialize database", slog.Any("error", err))
+			return fmt.Errorf("database initialization failed: %w", err)
+		}
 
 		mqHandler, err := mq.GetOrInit(cfg)
 		if err != nil {
 			return fmt.Errorf("fail to build message queue handler: %w", err)
 		}
 
+		mqFactory, err := bldmq.GetOrInitMessageQueueFactory(cfg)
+		if err != nil {
+			return fmt.Errorf("failed to creating message queue factory: %w", err)
+		}
+
 		// Do metering
 		meter := consumer.NewMetering(mqHandler, cfg)
 		meter.Run()
 
-		r, err := router.NewAccountRouter(cfg)
+		err = createAdvancedConsumer(cfg, mqHandler, mqFactory)
+		if err != nil {
+			return fmt.Errorf("failed to create advanced consumer: %w", err)
+		}
+
+		i18n.InitLocalizersFromEmbedFile()
+
+		r, err := router.NewAccountRouter(cfg, mqHandler)
 		if err != nil {
 			return fmt.Errorf("failed to init router: %w", err)
 		}

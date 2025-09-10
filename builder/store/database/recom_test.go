@@ -2,6 +2,7 @@ package database_test
 
 import (
 	"context"
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -20,7 +21,7 @@ func TestRecomStore_All(t *testing.T) {
 		{RepositoryID: 123, WeightName: database.RecomWeightFreshness, Score: 1},
 	})
 	require.Nil(t, err)
-	repoScore, err := store.FindScoreByRepoIDs(ctx, []int64{123})
+	repoScore, err := store.FindByRepoIDs(ctx, []int64{123})
 	require.Nil(t, err)
 	require.Equal(t, float64(1), repoScore[0].Score)
 
@@ -37,7 +38,11 @@ func TestRecomStore_All(t *testing.T) {
 	})
 	require.Nil(t, err)
 
-	scores, err := store.FindScoreByRepoIDs(ctx, []int64{123, 456, 789})
+	m, err := store.LoadRepoOpWeights(ctx, []int64{789})
+	require.Nil(t, err)
+	require.Equal(t, m, map[int64]int{789: 300})
+
+	scores, err := store.FindByRepoIDs(ctx, []int64{123, 456, 789})
 	require.Nil(t, err)
 	require.Equal(t, 4, len(scores))
 	var scoresToCompare []*database.RecomRepoScore
@@ -60,8 +65,86 @@ func TestRecomStore_All(t *testing.T) {
 	require.Equal(t, 3, len(ws))
 	names := []database.RecomWeightName{}
 	for _, w := range ws {
-		names = append(names, database.RecomWeightName(w.Name))
+		names = append(names, w.Name)
 	}
 	require.ElementsMatch(t, []database.RecomWeightName{"freshness", "downloads", "w1"}, names)
+}
 
+func TestRecomStore_UpsetOpWeights(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewRecomStoreWithDB(db)
+
+	t.Run("op not exists", func(t *testing.T) {
+
+		err := store.UpsertScore(ctx, []*database.RecomRepoScore{
+			{RepositoryID: 123, WeightName: database.RecomWeightFreshness, Score: 1},
+			// {RepositoryID: 123, WeightName: database.RecomWeightOp, Score: 300},
+		})
+		require.Nil(t, err)
+
+		err = store.UpsetOpWeights(ctx, 123, 300)
+		require.Nil(t, err)
+
+		repoScores, err := store.FindByRepoIDs(ctx, []int64{123})
+		require.Nil(t, err)
+		require.Len(t, repoScores, 3)
+		ok := slices.ContainsFunc(repoScores, func(rs *database.RecomRepoScore) bool {
+			return rs.WeightName == database.RecomWeightOp && rs.Score == 300
+		})
+		require.True(t, ok)
+		ok = slices.ContainsFunc(repoScores, func(rs *database.RecomRepoScore) bool {
+			return rs.WeightName == database.RecomWeightTotal && rs.Score == 301
+		})
+		require.True(t, ok)
+	})
+
+	t.Run("op exists", func(t *testing.T) {
+		err := store.UpsertScore(ctx, []*database.RecomRepoScore{
+			{RepositoryID: 456, WeightName: database.RecomWeightFreshness, Score: 1},
+			{RepositoryID: 456, WeightName: database.RecomWeightOp, Score: 300},
+		})
+		require.Nil(t, err)
+
+		err = store.UpsetOpWeights(ctx, 456, 400)
+		require.Nil(t, err)
+
+		repoScores, err := store.FindByRepoIDs(ctx, []int64{456})
+		require.Nil(t, err)
+		require.Len(t, repoScores, 3)
+		ok := slices.ContainsFunc(repoScores, func(rs *database.RecomRepoScore) bool {
+			return rs.WeightName == database.RecomWeightOp && rs.Score == 400
+		})
+		require.True(t, ok)
+		ok = slices.ContainsFunc(repoScores, func(rs *database.RecomRepoScore) bool {
+			return rs.WeightName == database.RecomWeightTotal && rs.Score == 401
+		})
+		require.True(t, ok)
+	})
+
+	t.Run("total exists", func(t *testing.T) {
+		err := store.UpsertScore(ctx, []*database.RecomRepoScore{
+			{RepositoryID: 789, WeightName: database.RecomWeightFreshness, Score: 1},
+			{RepositoryID: 789, WeightName: database.RecomWeightOp, Score: 300},
+			{RepositoryID: 789, WeightName: database.RecomWeightTotal, Score: 301},
+		})
+		require.Nil(t, err)
+
+		err = store.UpsetOpWeights(ctx, 789, 400)
+		require.Nil(t, err)
+
+		repoScores, err := store.FindByRepoIDs(ctx, []int64{789})
+		require.Nil(t, err)
+		require.Len(t, repoScores, 3)
+		ok := slices.ContainsFunc(repoScores, func(rs *database.RecomRepoScore) bool {
+			return rs.WeightName == database.RecomWeightOp && rs.Score == 400
+		})
+		require.True(t, ok)
+		ok = slices.ContainsFunc(repoScores, func(rs *database.RecomRepoScore) bool {
+			return rs.WeightName == database.RecomWeightTotal && rs.Score == 401
+		})
+		require.True(t, ok)
+	})
 }

@@ -15,7 +15,7 @@ import (
 )
 
 type DataflowProxyHandler struct {
-	rp   *proxy.ReverseProxy
+	rp   proxy.ReverseProxy
 	user component.UserComponent
 	usc  rpc.UserSvcClient
 }

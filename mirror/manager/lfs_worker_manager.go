@@ -28,25 +28,27 @@ var expectedMirrorTaskStatus = []types.MirrorTaskStatus{
 func InitManger(cfg *config.Config) error {
 	once.Do(func() {
 		manager = &Manager{
-			workerNumber:    cfg.Mirror.WorkerNumber,
-			taskChan:        make(chan database.MirrorTask),
-			mirrorTaskStore: database.NewMirrorTaskStore(),
-			config:          cfg,
-			conChan:         make(chan int, cfg.Mirror.WorkerNumber),
-			workers:         make(map[int]*Worker),
+			workerNumber:     cfg.Mirror.WorkerNumber,
+			taskChan:         make(chan database.MirrorTask),
+			priorityTaskChan: make(chan database.MirrorTask),
+			mirrorTaskStore:  database.NewMirrorTaskStore(),
+			config:           cfg,
+			conChan:          make(chan int, cfg.Mirror.WorkerNumber),
+			workers:          make(map[int]*Worker),
 		}
 	})
 	return err
 }
 
 type Manager struct {
-	config          *config.Config
-	taskChan        chan database.MirrorTask
-	workerNumber    int
-	workers         map[int]*Worker
-	mu              sync.Mutex
-	mirrorTaskStore database.MirrorTaskStore
-	conChan         chan int
+	config           *config.Config
+	taskChan         chan database.MirrorTask
+	priorityTaskChan chan database.MirrorTask
+	workerNumber     int
+	workers          map[int]*Worker
+	mu               sync.Mutex
+	mirrorTaskStore  database.MirrorTaskStore
+	conChan          chan int
 }
 
 type Worker struct {
@@ -102,17 +104,20 @@ func (m *Manager) StopWorkerByMirrorID(mirrorID int64) (bool, error) {
 }
 
 func (m *Manager) ReRun(id int, mt *database.MirrorTask) error {
-	m.mu.Lock()
 	if id == 0 {
 		id = 1
 	}
-	defer m.mu.Unlock()
+
+	m.mu.Lock()
 	if worker, ok := m.workers[id]; ok {
 		worker.cancel()
 		delete(m.workers, id)
 	}
+	m.mu.Unlock()
 
-	go m.startWorker(id, mt)
+	go func() {
+		m.priorityTaskChan <- *mt
+	}()
 
 	return nil
 }
@@ -125,8 +130,12 @@ func (m *Manager) Start() {
 	go m.dispatcher()
 
 	for id := range m.conChan {
-		mt := <-m.taskChan
-		go m.startWorker(id, &mt)
+		select {
+		case mt := <-m.priorityTaskChan:
+			go m.startWorker(id, &mt)
+		case mt := <-m.taskChan:
+			go m.startWorker(id, &mt)
+		}
 	}
 }
 

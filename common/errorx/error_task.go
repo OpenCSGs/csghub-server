@@ -6,6 +6,7 @@ const (
 	noEntryFile = iota
 	multiHostInferenceNotSupported
 	multiHostInferenceReplicaCount
+	multiHostNotebookNotSupported
 )
 
 var (
@@ -33,6 +34,7 @@ var (
 	//
 	// zh-HK: 只支持 vllm 和 sglang 的多主機推理
 	ErrMultiHostInferenceNotSupported = CustomError{prefix: errTaskPrefix, code: multiHostInferenceNotSupported}
+	ErrMultiHostNotebookNotSupported  = CustomError{prefix: errTaskPrefix, code: multiHostNotebookNotSupported}
 	// multi-host inference only supports a minimum replica count greater than 0
 	//
 	// Description: For multi-host inference configuration, the minimum number of replicas must be greater than zero to ensure proper service operation.

@@ -2,6 +2,8 @@ package imagebuilder
 
 import (
 	"context"
+
+	"opencsg.com/csghub-server/common/types"
 )
 
 var _ Builder = (*LocalBuilder)(nil)
@@ -13,26 +15,13 @@ func NewLocalBuilder() *LocalBuilder {
 }
 
 // Build implements Builder.Build
-func (*LocalBuilder) Build(ctx context.Context, req *BuildRequest) (*BuildResponse, error) {
-	response := &BuildResponse{}
+func (*LocalBuilder) Build(ctx context.Context, req *types.ImageBuilderRequest) error {
 
-	return response, nil
+	return nil
 }
 
-// Logs implements Builder.Logs
-func (*LocalBuilder) Logs(ctx context.Context, req *LogsRequest) (<-chan string, error) {
-	output := make(chan string, 1)
-	output <- "test build log"
-	return output, nil
-}
-
-// Status implements Builder.Status
-func (*LocalBuilder) Status(ctx context.Context, req *StatusRequest) (*StatusResponse, error) {
-	responses := &StatusResponse{
-		// Code:    req.CurrentStatus + 1,
-		Code:    3,
-		Message: "build completed",
-		ImageID: "gradio-test-app:v1.0",
-	}
-	return responses, nil
+// Stop implements Builder.Stop
+func (*LocalBuilder) Stop(ctx context.Context, req types.ImageBuildStopReq) error {
+	// Simulate stopping the build process
+	return nil
 }

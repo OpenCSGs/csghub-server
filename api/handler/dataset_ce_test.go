@@ -15,6 +15,7 @@ func TestDatasetHandler_Create(t *testing.T) {
 		tester := NewDatasetTester(t).WithHandleFunc(func(h *DatasetHandler) gin.HandlerFunc {
 			return h.Create
 		})
+		tester.handler.config.Dataset.AllowCreatePublicDataset = false
 		tester.WithUser()
 
 		tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), &types.CreateDatasetReq{
@@ -39,6 +40,7 @@ func TestDatasetHandler_Create(t *testing.T) {
 		tester := NewDatasetTester(t).WithHandleFunc(func(h *DatasetHandler) gin.HandlerFunc {
 			return h.Create
 		})
+		tester.handler.config.Dataset.AllowCreatePublicDataset = true
 		tester.WithUser()
 
 		tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), &types.CreateDatasetReq{

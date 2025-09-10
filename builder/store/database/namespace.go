@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"time"
 )
 
 // Define the NamespaceStore interface
@@ -36,6 +37,7 @@ type Namespace struct {
 	User          User          `bun:"rel:belongs-to,join:user_id=id" json:"user"`
 	NamespaceType NamespaceType `bun:",notnull" json:"namespace_type"`
 	Mirrored      bool          `bun:",notnull" json:"mirrored"`
+	DeletedAt     time.Time     `bun:",soft_delete,nullzero"`
 	times
 }
 

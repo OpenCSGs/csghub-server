@@ -3,7 +3,6 @@ package component
 import (
 	"context"
 	"fmt"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -26,9 +25,8 @@ func NewTestMonitorComponent(cfg *config.Config,
 	repoStore database.RepoStore,
 	deployer deployer.Deployer,
 ) (MonitorComponent, error) {
-	domainParts := strings.SplitN(cfg.Space.InternalRootDomain, ".", 2)
 	return &monitorComponentImpl{
-		k8sNameSpace:    domainParts[0],
+		k8sNameSpace:    cfg.Cluster.SpaceNamespace,
 		client:          client,
 		userSvcClient:   usc,
 		deployTaskStore: deployTaskStore,

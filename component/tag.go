@@ -201,7 +201,10 @@ func (c *tagComponentImpl) UpdateLibraryTags(ctx context.Context, tagScope types
 func (c *tagComponentImpl) UpdateRepoTagsByCategory(ctx context.Context, tagScope types.TagScope, repoID int64, category string, tagNames []string) error {
 	filter := &types.TagFilter{
 		Scopes:     []types.TagScope{tagScope},
-		Categories: []string{category},
+		Categories: []string{},
+	}
+	if category != "" {
+		filter.Categories = append(filter.Categories, category)
 	}
 	allTags, err := c.tagStore.AllTags(ctx, filter)
 	if err != nil {

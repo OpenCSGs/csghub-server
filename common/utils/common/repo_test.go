@@ -132,7 +132,7 @@ func TestBuildCloneInfo(t *testing.T) {
 					APIServer: struct {
 						Port         int    `env:"STARHUB_SERVER_SERVER_PORT" default:"8080"`
 						PublicDomain string `env:"STARHUB_SERVER_PUBLIC_DOMAIN" default:"http://localhost:8080"`
-						SSHDomain    string `env:"STARHUB_SERVER_SSH_DOMAIN" default:"git@localhost:2222"`
+						SSHDomain    string `env:"STARHUB_SERVER_SSH_DOMAIN" default:"ssh://git@localhost:2222"`
 					}{
 						Port:         8080,
 						PublicDomain: "https://opencsg.com",
@@ -156,7 +156,7 @@ func TestBuildCloneInfo(t *testing.T) {
 					APIServer: struct {
 						Port         int    `env:"STARHUB_SERVER_SERVER_PORT" default:"8080"`
 						PublicDomain string `env:"STARHUB_SERVER_PUBLIC_DOMAIN" default:"http://localhost:8080"`
-						SSHDomain    string `env:"STARHUB_SERVER_SSH_DOMAIN" default:"git@localhost:2222"`
+						SSHDomain    string `env:"STARHUB_SERVER_SSH_DOMAIN" default:"ssh://git@localhost:2222"`
 					}{
 						Port:         8080,
 						PublicDomain: "https://opencsg.com",
@@ -180,7 +180,7 @@ func TestBuildCloneInfo(t *testing.T) {
 					APIServer: struct {
 						Port         int    `env:"STARHUB_SERVER_SERVER_PORT" default:"8080"`
 						PublicDomain string `env:"STARHUB_SERVER_PUBLIC_DOMAIN" default:"http://localhost:8080"`
-						SSHDomain    string `env:"STARHUB_SERVER_SSH_DOMAIN" default:"git@localhost:2222"`
+						SSHDomain    string `env:"STARHUB_SERVER_SSH_DOMAIN" default:"ssh://git@localhost:2222"`
 					}{
 						Port:         8080,
 						PublicDomain: "https://opencsg.com",
@@ -204,7 +204,7 @@ func TestBuildCloneInfo(t *testing.T) {
 					APIServer: struct {
 						Port         int    `env:"STARHUB_SERVER_SERVER_PORT" default:"8080"`
 						PublicDomain string `env:"STARHUB_SERVER_PUBLIC_DOMAIN" default:"http://localhost:8080"`
-						SSHDomain    string `env:"STARHUB_SERVER_SSH_DOMAIN" default:"git@localhost:2222"`
+						SSHDomain    string `env:"STARHUB_SERVER_SSH_DOMAIN" default:"ssh://git@localhost:2222"`
 					}{
 						Port:         8080,
 						PublicDomain: "https://opencsg.com",
@@ -246,8 +246,6 @@ func TestIsValidName(t *testing.T) {
 		{name: "Test IsValidName when name is invalid", args: args{name: "abc/def"}, want: false},
 		{name: "Test IsValidName when name is invalid", args: args{name: "abc def"}, want: false},
 		{name: "Test IsValidName when name is invalid", args: args{name: "abc__def"}, want: false},
-		{name: "Test IsValidName when name is invalid", args: args{name: "abc_-def"}, want: false},
-		{name: "Test IsValidName when name is invalid", args: args{name: "abc.-def"}, want: false},
 		{name: "Test IsValidName when name is invalid", args: args{name: "a"}, want: false},
 		{name: "Test IsValidName when name is invalid", args: args{name: "abc..def"}, want: false},
 		{name: "Test IsValidName when name is invalid", args: args{name: "--def"}, want: false},
@@ -255,7 +253,7 @@ func TestIsValidName(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got, _ := IsValidName(tt.args.name); got != tt.want {
-				t.Errorf("IsValidName(%q) = %v, want %v", tt.args, got, tt.want)
+				t.Errorf("IsValidName() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -275,10 +273,10 @@ func TestGetSourceTypeAndPathFromURL(t *testing.T) {
 		{name: "Test GetSourceTypeAndPathFromURL when url is opencsg", args: args{url: "https://opencsg.com/models/abc/def.git"}, want: "opencsg", want1: "abc/def", wantErr: false},
 		{name: "Test GetSourceTypeAndPathFromURL when url is huggingface", args: args{url: "https://huggingface.co/aaa/bbb.git"}, want: "huggingface", want1: "aaa/bbb", wantErr: false},
 		{name: "Test GetSourceTypeAndPathFromURL when url is modelscope", args: args{url: "https://www.modelscope.cn/models/ccc/ddd.git"}, want: "modelscope", want1: "ccc/ddd", wantErr: false},
-		{name: "Test GetSourceTypeAndPathFromURL when url is unknown", args: args{url: "https://aaa.cn/models/ccc/ddd.git"}, want: "", want1: "", wantErr: true},
 		{name: "Test GetSourceTypeAndPathFromURL when url is opencsg", args: args{url: "https://user:token@opencsg.com/models/abc/def.git"}, want: "opencsg", want1: "abc/def", wantErr: false},
 		{name: "Test GetSourceTypeAndPathFromURL when url is huggingface", args: args{url: "https://user:token@huggingface.co/aaa/bbb.git"}, want: "huggingface", want1: "aaa/bbb", wantErr: false},
 		{name: "Test GetSourceTypeAndPathFromURL when url is modelscope", args: args{url: "https://user:token@www.modelscope.cn/models/ccc/ddd.git"}, want: "modelscope", want1: "ccc/ddd", wantErr: false},
+		{name: "Test GetSourceTypeAndPathFromURL when url is unknown", args: args{url: "https://aaa.cn/models/ccc/ddd.git"}, want: "", want1: "", wantErr: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

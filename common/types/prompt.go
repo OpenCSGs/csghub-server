@@ -6,6 +6,13 @@ import (
 	"opencsg.com/csghub-server/builder/sensitive"
 )
 
+type PromptPrefixKind string
+
+const (
+	PromptActionOptimize  PromptPrefixKind = "optimize"
+	PromptActionSummarize PromptPrefixKind = "summarize"
+)
+
 type PromptReq struct {
 	Namespace   string `json:"namespace"`
 	Name        string `json:"name"`
@@ -81,31 +88,32 @@ type UpdatePromptRepoReq struct {
 }
 
 type PromptRes struct {
-	ID            int64                `json:"id,omitempty"`
-	Name          string               `json:"name"`
-	Nickname      string               `json:"nickname"`
-	Description   string               `json:"description"`
-	Likes         int64                `json:"likes"`
-	Downloads     int64                `json:"downloads"`
-	Path          string               `json:"path"`
-	RepositoryID  int64                `json:"repository_id"`
-	Repository    Repository           `json:"repository"`
-	Private       bool                 `json:"private"`
-	User          User                 `json:"user"`
-	Tags          []RepoTag            `json:"tags"`
-	Readme        string               `json:"readme"`
-	DefaultBranch string               `json:"default_branch"`
-	CreatedAt     time.Time            `json:"created_at"`
-	UpdatedAt     time.Time            `json:"updated_at"`
-	UserLikes     bool                 `json:"user_likes"`
-	Source        RepositorySource     `json:"source"`
-	SyncStatus    RepositorySyncStatus `json:"sync_status"`
-	License       string               `json:"license"`
-	CanWrite      bool                 `json:"can_write"`
-	CanManage     bool                 `json:"can_manage"`
-	Namespace     *Namespace           `json:"namespace"`
-	RecomOpWeight int                  `json:"recom_op_weight,omitempty"`
-	Scores        []WeightScore        `json:"scores"`
+	ID                   int64                `json:"id,omitempty"`
+	Name                 string               `json:"name"`
+	Nickname             string               `json:"nickname"`
+	Description          string               `json:"description"`
+	Likes                int64                `json:"likes"`
+	Downloads            int64                `json:"downloads"`
+	Path                 string               `json:"path"`
+	RepositoryID         int64                `json:"repository_id"`
+	Repository           Repository           `json:"repository"`
+	Private              bool                 `json:"private"`
+	User                 User                 `json:"user"`
+	Tags                 []RepoTag            `json:"tags"`
+	Readme               string               `json:"readme"`
+	DefaultBranch        string               `json:"default_branch"`
+	CreatedAt            time.Time            `json:"created_at"`
+	UpdatedAt            time.Time            `json:"updated_at"`
+	UserLikes            bool                 `json:"user_likes"`
+	Source               RepositorySource     `json:"source"`
+	SyncStatus           RepositorySyncStatus `json:"sync_status"`
+	License              string               `json:"license"`
+	CanWrite             bool                 `json:"can_write"`
+	CanManage            bool                 `json:"can_manage"`
+	Namespace            *Namespace           `json:"namespace"`
+	SensitiveCheckStatus string               `json:"sensitive_check_status"`
+	RecomOpWeight        int                  `json:"recom_op_weight,omitempty"`
+	Scores               []WeightScore        `json:"scores"`
 	MultiSource
 }
 

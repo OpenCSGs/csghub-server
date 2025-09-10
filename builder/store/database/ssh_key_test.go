@@ -57,7 +57,7 @@ func TestSSHKeyStore_CRUD(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, int64(123), sh.GitID)
 
-	err = store.Delete(ctx, 123)
+	err = store.Delete(ctx, sh.ID)
 	require.Nil(t, err)
 	_, err = store.FindByID(ctx, sh.ID)
 	require.NotNil(t, err)

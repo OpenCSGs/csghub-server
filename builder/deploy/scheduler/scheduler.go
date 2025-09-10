@@ -4,13 +4,20 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"log/slog"
+	"strconv"
 	"sync"
 	"time"
+
+	"opencsg.com/csghub-server/component/reporter"
 
 	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/deploy/imagebuilder"
 	"opencsg.com/csghub-server/builder/deploy/imagerunner"
+	"opencsg.com/csghub-server/builder/git"
+	"opencsg.com/csghub-server/builder/git/gitserver"
+	"opencsg.com/csghub-server/builder/redis"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
@@ -36,12 +43,15 @@ type FIFOScheduler struct {
 	ib                  imagebuilder.Builder
 	ir                  imagerunner.Runner
 
-	nextLock  *sync.Mutex
-	deployCfg common.DeployConfig
-	config    *config.Config
+	nextLock    *sync.Mutex
+	deployCfg   common.DeployConfig
+	config      *config.Config
+	redisLocker *redis.DistributedLocker
+	logReporter reporter.LogCollector
+	git         gitserver.GitServer
 }
 
-func NewFIFOScheduler(ib imagebuilder.Builder, ir imagerunner.Runner, confg common.DeployConfig) Scheduler {
+func NewFIFOScheduler(ib imagebuilder.Builder, ir imagerunner.Runner, c common.DeployConfig, logReporter reporter.LogCollector) (Scheduler, error) {
 	s := &FIFOScheduler{}
 	// TODO:allow config
 	s.timeout = 30 * time.Minute
@@ -56,10 +66,22 @@ func NewFIFOScheduler(ib imagebuilder.Builder, ir imagerunner.Runner, confg comm
 	s.ib = ib
 	s.ir = ir
 	s.nextLock = &sync.Mutex{}
-	s.deployCfg = confg
+	s.deployCfg = c
 	//TODO: avoid load config, use config from params
 	s.config, _ = config.LoadConfig()
-	return s
+	s.redisLocker = c.RedisLocker
+	s.logReporter = logReporter
+
+	gc, err := git.NewGitServer(s.config)
+	if err != nil {
+		newError := fmt.Errorf("fail to create git server,error:%w", err)
+		slog.Error(newError.Error())
+		return nil, newError
+	}
+
+	s.git = gc
+
+	return s, nil
 }
 
 // Run will load tasks and run them currently
@@ -104,15 +126,36 @@ func (rs *FIFOScheduler) Queue(deployTaskID int64) error {
 
 // run next task
 func (rs *FIFOScheduler) next() (Runner, error) {
-	rs.nextLock.Lock()
-	slog.Debug("FIFOScheduler try to get next task", slog.Any("last", rs.last))
-	defer rs.nextLock.Unlock()
-
 	var (
 		deployTask *database.DeployTask
 		t          Runner
 		err        error
 	)
+	// get lock here to prevent concurrent access to the same task
+	errLock := rs.redisLocker.GetDeployTaskSchedulerLock()
+	if errLock != nil && errors.Is(errLock, redis.ErrLockAcquire) {
+		slog.Debug("skip schedule deploy task due to fail getting lock", slog.Any("error", errLock))
+		t = &sleepTask{
+			du: 5 * time.Second,
+		}
+		rs.tasks <- t
+		return t, nil
+	}
+	defer func() {
+		if errLock != nil {
+			slog.Warn("fail to getting lock in deploy task scheduler", slog.Any("error", errLock))
+		} else {
+			ok, err := rs.redisLocker.ReleaseDeployTaskSchedulerLock()
+			if !ok || err != nil {
+				slog.Error("failed to release deploy task scheduler lock", slog.Any("success", ok), slog.Any("error", err))
+			}
+		}
+	}()
+
+	rs.nextLock.Lock()
+	slog.Debug("FIFOScheduler try to get next task", slog.Any("last", rs.last))
+	defer rs.nextLock.Unlock()
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if rs.last == nil {
@@ -172,13 +215,16 @@ func (rs *FIFOScheduler) next() (Runner, error) {
 			repo.SpaceID = 0
 			repo.RepoType = string(types.ModelRepo)
 		}
+	} else {
+		// for no repo case, e.g. notebook deploy
+		repo.Path = "/"
 	}
 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			slog.Warn("cancel deploy task as repo not found", slog.Any("deploy_task", deployTask))
 			// mark task as cancelled
-			deployTask.Status = cancelled
+			deployTask.Status = Cancelled
 			deployTask.Message = "repo not found"
 			err = rs.store.UpdateDeployTask(ctx, deployTask)
 			if err != nil {
@@ -194,9 +240,13 @@ func (rs *FIFOScheduler) next() (Runner, error) {
 	}
 	// for build task
 	if deployTask.TaskType == 0 {
-		t = NewBuildRunner(rs.ib, &repo, deployTask)
+		t, err = NewBuildRunner(rs.git, rs.ib, &repo, deployTask, rs.logReporter, rs.config.Runner.HearBeatIntervalInSec)
+		if err != nil {
+			slog.Error("failed to create build runner", slog.Any("error", err))
+			return nil, err
+		}
 	} else {
-		t = NewDeployRunner(rs.ir, &repo, deployTask, rs.deployCfg)
+		t = NewDeployRunner(rs.ir, &repo, deployTask, rs.deployCfg, rs.logReporter)
 	}
 
 	rs.last = deployTask
@@ -222,13 +272,13 @@ func (rs *FIFOScheduler) failDeployFollowingTasks(deploytaskID int64, reason str
 	for _, dp := range dps {
 		// fail current task
 		if dp.ID == t.ID {
-			dp.Status = buildFailed
+			dp.Status = BuildFailed
 			dp.Message = reason
 			continue
 		}
 		// tasks after current task
 		if dp.ID > t.ID {
-			dp.Status = cancelled
+			dp.Status = Cancelled
 			dp.Message = "cancel as previous task failed"
 		} else {
 			dp.Status = deployFailed
@@ -248,6 +298,17 @@ func (rs *FIFOScheduler) failDeployFollowingTasks(deploytaskID int64, reason str
 	}
 	deploy.Status = common.DeployFailed
 	deploy.Message = reason
+	rs.logReporter.Report(types.LogEntry{
+		Message:  fmt.Sprintf("%s, task status: %d", reason, deploy.Status),
+		Stage:    types.StageDeploy,
+		Step:     types.StepDeployFailed,
+		DeployID: strconv.FormatInt(t.DeployID, 10),
+		Labels: map[string]string{
+			types.LogLabelTypeKey:       types.LogLabelDeploy,
+			types.StreamKeyDeployType:   strconv.Itoa(deploy.Type),
+			types.StreamKeyDeployTaskID: strconv.FormatInt(deploytaskID, 10),
+		},
+	})
 	if err := rs.store.UpdateDeploy(ctx, deploy); err != nil {
 		slog.Error("failed update deploy status to `DeployFailed`", slog.Int64("deploy_id", t.DeployID), "error", err)
 		return

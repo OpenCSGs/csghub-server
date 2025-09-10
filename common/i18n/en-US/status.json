@@ -1,0 +1,8 @@
+{
+  "cluster.status.running": {
+    "other": "Running"
+  },
+  "cluster.status.unavailable": {
+     "other": "Unavailable"
+  }
+}

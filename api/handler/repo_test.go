@@ -619,13 +619,14 @@ func TestRepoHandler_HeadSDKDownload(t *testing.T) {
 			SaveAs:    "foo",
 			RepoType:  types.ModelRepo,
 		}, "u",
-	).Return(&types.File{Size: 100, SHA: "def"}, nil)
+	).Return(&types.File{Size: 100, SHA: "def"}, &types.Commit{ID: "abc"}, nil)
 
 	tester.Execute()
 	require.Equal(t, 200, tester.Response().Code)
 	headers := tester.Response().Header()
 	require.Equal(t, "100", headers.Get("Content-Length"))
-	require.Equal(t, "def", headers.Get("X-Repo-Commit"))
+	require.Equal(t, "abc", headers.Get("X-Repo-Commit"))
+	require.Equal(t, "def", headers.Get("ETag"))
 }
 
 func TestRepoHandler_CommitWithDiff(t *testing.T) {
@@ -719,10 +720,10 @@ func TestRepoHandler_GetMirror(t *testing.T) {
 			RepoType:    types.ModelRepo,
 			CurrentUser: "u",
 		},
-	).Return(&database.Mirror{ID: 11}, nil)
+	).Return(&types.Mirror{ID: 11, SourceUrl: "test"}, nil)
 
 	tester.Execute()
-	tester.ResponseEq(t, 200, tester.OKText, &database.Mirror{ID: 11})
+	tester.ResponseEq(t, 200, tester.OKText, &types.Mirror{ID: 11, SourceUrl: "test"})
 }
 
 func TestRepoHandler_UpdateMirror(t *testing.T) {
@@ -983,6 +984,161 @@ func TestRepoHandler_SyncMirror(t *testing.T) {
 	tester.ResponseEq(t, 200, tester.OKText, nil)
 }
 
+func TestRepoHandler_MirrorProgress(t *testing.T) {
+	tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+		return rp.MirrorProgress
+	})
+	tester.WithUser()
+
+	tester.WithKV("repo_type", types.ModelRepo)
+	tester.WithParam("id", "1")
+	tester.mocks.repo.EXPECT().MirrorProgress(
+		tester.Ctx(), types.ModelRepo, "u", "r", "u",
+	).Return(types.LFSSyncProgressResp{Progress: []types.SingleLFSProgress{{Oid: "o1"}}}, nil)
+
+	tester.Execute()
+	tester.ResponseEq(
+		t, 200, tester.OKText, types.LFSSyncProgressResp{Progress: []types.SingleLFSProgress{{Oid: "o1"}}},
+	)
+}
+
+func TestRepoHandler_CreateRepo(t *testing.T) {
+	tests := []struct {
+		name           string
+		setupRequest   func() *types.CreateRepoReq
+		setupMocks     func(*RepoTester)
+		expectedStatus int
+		expectedError  string
+		checkResponse  func(*testing.T, *RepoTester)
+	}{
+		{
+			name: "successful model repo creation",
+			setupRequest: func() *types.CreateRepoReq {
+				return &types.CreateRepoReq{
+					Name:        "test-model",
+					Nickname:    "Test Model",
+					Description: "A test model repository",
+					Private:     false,
+					RepoType:    types.ModelRepo,
+					License:     "MIT",
+				}
+			},
+			setupMocks: func(tester *RepoTester) {
+				expectedModelReq := &types.CreateModelReq{
+					CreateRepoReq: types.CreateRepoReq{
+						Name:        "test-model",
+						Nickname:    "Test Model",
+						Description: "A test model repository",
+						Private:     false,
+						RepoType:    types.ModelRepo,
+						License:     "MIT",
+						Username:    "u",
+						Namespace:   "u",
+					},
+				}
+				expectedResponse := &types.Model{
+					ID:          1,
+					Name:        "test-model",
+					Nickname:    "Test Model",
+					Description: "A test model repository",
+					Private:     false,
+					Path:        "u/test-model",
+				}
+				tester.mocks.model.EXPECT().Create(
+					tester.Ctx(), expectedModelReq,
+				).Return(expectedResponse, nil)
+			},
+			expectedStatus: http.StatusOK,
+			checkResponse: func(t *testing.T, tester *RepoTester) {
+				var response struct {
+					Code int    `json:"code"`
+					URL  string `json:"url"`
+				}
+				err := json.Unmarshal(tester.Response().Body.Bytes(), &response)
+				require.NoError(t, err)
+				require.Equal(t, 0, response.Code)
+				require.NotNil(t, response.URL)
+			},
+		},
+		{
+			name: "successful dataset repo creation",
+			setupRequest: func() *types.CreateRepoReq {
+				return &types.CreateRepoReq{
+					Name:        "test-dataset",
+					Nickname:    "Test Dataset",
+					Description: "A test dataset repository",
+					Private:     true,
+					RepoType:    types.DatasetRepo,
+					License:     "Apache-2.0",
+				}
+			},
+			setupMocks: func(tester *RepoTester) {
+				expectedDatasetReq := &types.CreateDatasetReq{
+					CreateRepoReq: types.CreateRepoReq{
+						Name:        "test-dataset",
+						Nickname:    "Test Dataset",
+						Description: "A test dataset repository",
+						Private:     true,
+						RepoType:    types.DatasetRepo,
+						License:     "Apache-2.0",
+						Username:    "u",
+						Namespace:   "u",
+					},
+				}
+				expectedResponse := &types.Dataset{
+					ID:          2,
+					Name:        "test-dataset",
+					Nickname:    "Test Dataset",
+					Description: "A test dataset repository",
+					Private:     true,
+					Path:        "u/test-dataset",
+				}
+				tester.mocks.dataset.EXPECT().Create(
+					tester.Ctx(), expectedDatasetReq,
+				).Return(expectedResponse, nil)
+			},
+			expectedStatus: http.StatusOK,
+			checkResponse: func(t *testing.T, tester *RepoTester) {
+				var response struct {
+					Code int    `json:"code"`
+					URL  string `json:"url"`
+				}
+				err := json.Unmarshal(tester.Response().Body.Bytes(), &response)
+				require.NoError(t, err)
+				require.Equal(t, 0, response.Code)
+				require.NotNil(t, response.URL)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+				return rp.CreateRepo
+			})
+			tester.WithUser()
+
+			// Setup mocks
+			tt.setupMocks(tester)
+
+			// Setup request body
+			req := tt.setupRequest()
+			tester.WithBody(t, req)
+
+			// Execute request
+			tester.Execute()
+
+			// Check status code
+			require.Equal(t, tt.expectedStatus, tester.Response().Code)
+
+			// Run additional response checks
+			if tt.checkResponse != nil {
+				tt.checkResponse(t, tester)
+			}
+		})
+	}
+}
+
 func TestRepoHandler_DeployUpdate(t *testing.T) {
 	t.Run("not admin", func(t *testing.T) {
 
@@ -1241,6 +1397,31 @@ func TestRepoHandler_LogsTree(t *testing.T) {
 	)
 }
 
+func TestRepoHandler_RemoteTree(t *testing.T) {
+
+	tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+		return rp.RemoteTree
+	})
+	tester.mocks.repo.EXPECT().RemoteTree(mock.Anything, &types.GetTreeRequest{
+		Namespace:   "u",
+		Name:        "r",
+		Path:        "foo",
+		Ref:         "main",
+		RepoType:    types.ModelRepo,
+		CurrentUser: "u",
+		Limit:       5,
+		Cursor:      "cc",
+	}).Return(
+		&types.GetRepoFileTreeResp{Files: []*types.File{{Name: "f1"}}}, nil,
+	).Once()
+	tester.WithParam("path", "foo").WithParam("ref", "main").WithQuery("limit", "5")
+	tester.WithKV("repo_type", types.ModelRepo).WithUser().WithQuery("cursor", "cc").Execute()
+
+	tester.ResponseEq(
+		t, 200, tester.OKText, &types.GetRepoFileTreeResp{Files: []*types.File{{Name: "f1"}}},
+	)
+}
+
 func TestRepoHandler_RemoteDiff(t *testing.T) {
 	tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
 		return rp.RemoteDiff
@@ -1345,41 +1526,4 @@ func TestRepoHandler_CommitFiles(t *testing.T) {
 	tester.ResponseEq(
 		t, 200, tester.OKText, nil,
 	)
-}
-
-func TestRepoHandler_AllFiles(t *testing.T) {
-	t.Run("forbidden", func(t *testing.T) {
-		tester := NewRepoTester(t).WithHandleFunc(func(h *RepoHandler) gin.HandlerFunc {
-			return h.AllFiles
-		})
-
-		tester.mocks.repo.EXPECT().AllFiles(tester.Ctx(), types.GetAllFilesReq{
-			Namespace:   "u-other",
-			Name:        "r",
-			RepoType:    types.DatasetRepo,
-			CurrentUser: "u",
-		}).Return(nil, errorx.ErrForbidden)
-		tester.WithParam("namespace", "u-other").WithParam("name", "r")
-		tester.Gctx().Set("repo_type", types.DatasetRepo)
-		tester.WithUser().Execute()
-
-		require.Equal(t, 403, tester.Response().Code)
-	})
-
-	t.Run("normal", func(t *testing.T) {
-		tester := NewRepoTester(t).WithHandleFunc(func(h *RepoHandler) gin.HandlerFunc {
-			return h.AllFiles
-		})
-
-		tester.mocks.repo.EXPECT().AllFiles(tester.Ctx(), types.GetAllFilesReq{
-			Namespace:   "u",
-			Name:        "r",
-			RepoType:    types.DatasetRepo,
-			CurrentUser: "u",
-		}).Return([]*types.File{{Name: "f"}}, nil)
-		tester.Gctx().Set("repo_type", types.DatasetRepo)
-		tester.WithUser().Execute()
-
-		tester.ResponseEq(t, 200, tester.OKText, []*types.File{{Name: "f"}})
-	})
 }

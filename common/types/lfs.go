@@ -105,3 +105,15 @@ type LFSBatchObject struct {
 	Oid  string `json:"oid"`
 	Size int64  `json:"size"`
 }
+
+type LFSSyncProgressResp struct {
+	Progress []SingleLFSProgress `json:"progress"`
+	Total    int                 `json:"total"`
+	Done     int                 `json:"done"`
+}
+
+type SingleLFSProgress struct {
+	Oid      string `json:"oid"`
+	Progress int    `json:"progress"`
+	Size     int64  `json:"size"`
+}

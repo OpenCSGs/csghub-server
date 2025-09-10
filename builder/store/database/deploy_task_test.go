@@ -277,7 +277,7 @@ func TestDeployTaskStore_UpdateInTx(t *testing.T) {
 
 }
 
-func TestDeployTaskStore_GetRunningInferenceAndFinetuneByUserID(t *testing.T) {
+func TestDeployTaskStore_GetRunningDeployByUserID(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
 	ctx := context.TODO()
@@ -297,13 +297,13 @@ func TestDeployTaskStore_GetRunningInferenceAndFinetuneByUserID(t *testing.T) {
 		require.Nil(t, err)
 	}
 
-	dps, err := store.GetRunningInferenceAndFinetuneByUserID(ctx, 123)
+	dps, err := store.GetRunningDeployByUserID(ctx, 123)
 	require.Nil(t, err)
 	names := []string{}
 	for _, dp := range dps {
 		names = append(names, dp.DeployName)
 	}
-	require.ElementsMatch(t, []string{"d1", "d3"}, names)
+	require.ElementsMatch(t, []string{"d1", "d2", "d3"}, names)
 
 }
 
@@ -514,4 +514,109 @@ func TestDeployTaskStore_ListAllDeploys(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, total, 4)
 
+}
+
+func TestDeployTaskStore_ListAllRunningDeploys(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewDeployTaskStoreWithDB(db)
+
+	deploys := []database.Deploy{
+		{UserID: 111, Type: 1, Status: common.Running, DeployName: "running1"},
+		{UserID: 111, Type: 2, Status: common.Stopped, DeployName: "stopped1"},
+		{UserID: 222, Type: 1, Status: common.Running, DeployName: "running2"},
+		{UserID: 222, Type: 2, Status: common.Deploying, DeployName: "deploy1"},
+	}
+
+	for _, dp := range deploys {
+		err := store.CreateDeploy(ctx, &dp)
+		require.Nil(t, err)
+	}
+
+	// Only test running ones
+	result, err := store.ListAllRunningDeploys(ctx)
+	require.Nil(t, err)
+
+	names := []string{}
+	for _, dp := range result {
+		names = append(names, dp.DeployName)
+	}
+
+	// Only expect running deploys
+	require.ElementsMatch(t, []string{"running1", "running2"}, names)
+}
+
+func TestDeployTaskStore_ListDeployBytype(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewDeployTaskStoreWithDB(db)
+
+	deploys := []database.Deploy{
+		{UserID: 111, Type: 1, Status: common.Running, DeployName: "running1"},
+		{UserID: 111, Type: 2, Status: common.Stopped, DeployName: "stopped1"},
+		{UserID: 222, Type: 1, Status: common.Running, DeployName: "running2"},
+		{UserID: 222, Type: 2, Status: common.Deploying, DeployName: "deploy1"},
+	}
+
+	for _, dp := range deploys {
+		err := store.CreateDeploy(ctx, &dp)
+		require.Nil(t, err)
+	}
+
+	// Only test running ones
+	var req types.DeployReq
+	req.Page = 1
+	req.PageSize = 10
+	result, _, err := store.ListDeployByType(ctx, req)
+	require.Nil(t, err)
+	require.Equal(t, 4, len(result))
+	req.Status = []int{common.Running}
+	result, _, err = store.ListDeployByType(ctx, req)
+	require.Nil(t, err)
+	require.Equal(t, 2, len(result))
+}
+func TestDeployTaskStore_DeleteDeployByID(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+	store := database.NewDeployTaskStoreWithDB(db)
+
+	// Create a deploy for user 100
+	deploy := &database.Deploy{
+		DeployName: "delete-by-id",
+		SvcName:    "svc-delete",
+		RepoID:     1001,
+		UserID:     100,
+		SpaceID:    0,
+		Type:       types.ServerlessType,
+		Status:     common.Running,
+	}
+	err := store.CreateDeploy(ctx, deploy)
+	require.Nil(t, err)
+
+	// Fetch the deploy to get its ID
+	got, err := store.GetDeployBySvcName(ctx, "svc-delete")
+	require.Nil(t, err)
+	require.Equal(t, "delete-by-id", got.DeployName)
+
+	// Delete the deploy by ID and userID
+	err = store.DeleteDeployByID(ctx, 100, got.ID)
+	require.Nil(t, err)
+
+	// The status should now be Deleted
+	got, err = store.GetDeployByID(ctx, got.ID)
+	require.Nil(t, err)
+	require.Equal(t, common.Deleted, got.Status)
+
+	// Try deleting with wrong userID, should get error
+	err = store.DeleteDeployByID(ctx, 999, got.ID)
+	require.NotNil(t, err)
+
+	// Try deleting a non-existent deploy
+	err = store.DeleteDeployByID(ctx, 100, 999999)
+	require.NotNil(t, err)
 }

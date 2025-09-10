@@ -1,17 +1,19 @@
 package component
 
 import (
-	"github.com/google/wire"
 	"go.opentelemetry.io/otel"
 	mock_accounting "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/accounting"
 	mock_deploy "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/deploy"
 	mock_git "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/git/gitserver"
 	mock_mirror "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/git/mirrorserver"
+	mock_importer "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/importer"
 	mock_preader "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/parquet"
 	mock_rpc "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rpc"
 	mock_rsa "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rsa"
 	mock_s3 "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/s3"
+
 	mock_component "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
+	mock_cache "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/mirror/cache"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/parquet"
 	"opencsg.com/csghub-server/common/config"
@@ -28,10 +30,6 @@ type mockedComponents struct {
 	sensitive           *mock_component.MockSensitiveComponent
 }
 
-var MockedStoreSet = wire.NewSet(
-	tests.NewMockStores,
-)
-
 type Mocks struct {
 	stores            *tests.MockStores
 	components        *mockedComponents
@@ -40,11 +38,13 @@ type Mocks struct {
 	s3Client          *mock_s3.MockClient
 	mirrorServer      *mock_mirror.MockMirrorServer
 	deployer          *mock_deploy.MockDeployer
+	cache             *mock_cache.MockCache
 	accountingClient  *mock_accounting.MockAccountingClient
 	preader           *mock_preader.MockReader
 	limitOffsetReader *mock_preader.MockLimitOffsetCountReader
 	moderationClient  *mock_rpc.MockModerationSvcClient
 	rsaReader         *mock_rsa.MockKeysReader
+	importer          *mock_importer.MockImporter
 }
 
 func ProvideTestConfig() *config.Config {
@@ -63,5 +63,3 @@ func NewTestDatasetViewerComponent(stores *tests.MockStores, cfg *config.Config,
 		tracer:                 otel.Tracer("dataset-viewer"),
 	}
 }
-
-var DatasetViewerComponentSet = wire.NewSet(NewTestDatasetViewerComponent)

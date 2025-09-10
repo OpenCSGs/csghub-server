@@ -9,6 +9,7 @@ import (
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/types/telemetry"
+	"opencsg.com/csghub-server/version"
 )
 
 type telemetryComponentImpl struct {
@@ -68,7 +69,7 @@ func (tc *telemetryComponentImpl) GenUsageData(ctx context.Context) (telemetry.U
 	}
 	usage.UUID = uuid.String()
 	usage.RecordedAt = time.Now()
-	usage.Version = ""
+	usage.Version = fmt.Sprintf("%s-%s", version.StarhubAPIVersion, version.GitRevision)
 	usage.InstallationType = ""
 	usage.ActiveUserCount, err = tc.getUserCnt(ctx)
 	if err != nil {

@@ -72,6 +72,7 @@ func TestSpaceHandler_Index(t *testing.T) {
 				}, 10, 1, true).Return([]*types.Space{
 					{Name: "cc"},
 				}, 100, nil)
+
 			}
 
 			tester.AddPagination(1, 10).WithQuery("search", "foo").

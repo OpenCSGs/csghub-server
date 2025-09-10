@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/mock"
+
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/store/database"
@@ -111,16 +112,16 @@ func TestCodeComponent_Index(t *testing.T) {
 		repos, 100, nil,
 	)
 	cc.mocks.stores.CodeMock().EXPECT().ByRepoIDs(ctx, []int64{1, 2}).Return([]database.Code{
-		{ID: 11, RepositoryID: 2},
-		{ID: 12, RepositoryID: 1},
+		{ID: 11, RepositoryID: 2, Repository: &database.Repository{ID: 2, Name: "r2", Mirror: database.Mirror{}}},
+		{ID: 12, RepositoryID: 1, Repository: &database.Repository{ID: 2, Name: "r2", Mirror: database.Mirror{}}},
 	}, nil)
 
-	data, total, err := cc.Index(ctx, filter, 10, 1)
+	data, total, err := cc.Index(ctx, filter, 10, 1, false)
 	require.Nil(t, err)
 	require.Equal(t, 100, total)
-	require.Equal(t, []types.Code{
-		{ID: 12, RepositoryID: 1, Name: "r1", Tags: []types.RepoTag{{Name: "t1"}}},
-		{ID: 11, RepositoryID: 2, Name: "r2"},
+	require.Equal(t, []*types.Code{
+		{ID: 12, RepositoryID: 1, Name: "r1", Tags: []types.RepoTag{{Name: "t1"}}, RecomOpWeight: 0},
+		{ID: 11, RepositoryID: 2, Name: "r2", RecomOpWeight: 0},
 	}, data)
 }
 
@@ -206,13 +207,13 @@ func TestCodeComponent_Show(t *testing.T) {
 	cc.mocks.components.repo.EXPECT().GetUserRepoPermission(ctx, "user", code.Repository).Return(
 		&types.UserRepoPermission{CanRead: true, CanAdmin: true}, nil,
 	)
-	cc.mocks.components.repo.EXPECT().GetMirrorTaskStatusAndSyncStatus(code.Repository).Return(
-		types.MirrorRepoSyncStart, types.SyncStatusInProgress,
-	)
 	cc.mocks.stores.UserLikesMock().EXPECT().IsExist(ctx, "user", int64(11)).Return(true, nil)
 	cc.mocks.components.repo.EXPECT().GetNameSpaceInfo(ctx, "ns").Return(&types.Namespace{}, nil)
 
-	data, err := cc.Show(ctx, "ns", "n", "user")
+	cc.mocks.components.repo.EXPECT().GetMirrorTaskStatusAndSyncStatus(code.Repository).Return(
+		types.MirrorRepoSyncStart, types.SyncStatusInProgress,
+	)
+	data, err := cc.Show(ctx, "ns", "n", "user", false, false)
 	require.Nil(t, err)
 	require.Equal(t, &types.Code{
 		ID: 1,

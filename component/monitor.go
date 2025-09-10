@@ -33,12 +33,11 @@ type monitorComponentImpl struct {
 }
 
 func NewMonitorComponent(cfg *config.Config) (MonitorComponent, error) {
-	domainParts := strings.SplitN(cfg.Space.InternalRootDomain, ".", 2)
 	client := prometheus.NewPrometheusClient(cfg)
 	usc := rpc.NewUserSvcHttpClient(fmt.Sprintf("%s:%d", cfg.User.Host, cfg.User.Port),
 		rpc.AuthWithApiKey(cfg.APIToken))
 	return &monitorComponentImpl{
-		k8sNameSpace:    domainParts[0],
+		k8sNameSpace:    cfg.Cluster.SpaceNamespace,
 		client:          client,
 		userSvcClient:   usc,
 		deployTaskStore: database.NewDeployTaskStore(),

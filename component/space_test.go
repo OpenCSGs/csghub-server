@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -137,13 +137,14 @@ func TestSpaceComponent_Index(t *testing.T) {
 		}, nil,
 	)
 
-	data, total, err := sc.Index(ctx, &types.RepoFilter{Sort: "z", Username: "user"}, 10, 1, true)
+	data, total, err := sc.Index(ctx, &types.RepoFilter{Sort: "z", Username: "user"}, 10, 1, false)
 	require.Nil(t, err)
 	require.Equal(t, 100, total)
 	require.Equal(t, []*types.Space{
 		{
 			RepositoryID: 123, Name: "r1", Tags: []types.RepoTag{{Name: "t1"}},
-			Status: "NoAppFile",
+			Status:        "NoAppFile",
+			RecomOpWeight: 0,
 			User: &types.User{
 				Nickname: "nickname",
 				Avatar:   "avatar",
@@ -151,7 +152,8 @@ func TestSpaceComponent_Index(t *testing.T) {
 		},
 		{
 			RepositoryID: 124, Name: "r2", Tags: []types.RepoTag{{Name: "t2"}},
-			Status: "NoAppFile",
+			Status:        "NoAppFile",
+			RecomOpWeight: 0,
 			User: &types.User{
 				Nickname: "nickname",
 				Avatar:   "avatar",
@@ -313,28 +315,39 @@ func TestSpaceComponent_Delete(t *testing.T) {
 			ID:     4,
 		}, nil,
 	)
-	sc.mocks.deployer.EXPECT().Stop(mock.Anything, types.DeployRepo{
-		SpaceID:   1,
-		Namespace: "ns",
-		Name:      "n",
-	}).Return(nil)
+	var wgstop sync.WaitGroup
+	wgstop.Add(1)
+	sc.mocks.deployer.EXPECT().Stop(mock.Anything, mock.MatchedBy(func(req types.DeployRepo) bool {
+		return req.SpaceID == 1 &&
+			req.Namespace == "ns" &&
+			req.Name == "n"
+	})).
+		RunAndReturn(func(ctx context.Context, req types.DeployRepo) error {
+			wgstop.Done()
+			return nil
+		}).Once()
 	sc.mocks.stores.DeployTaskMock().EXPECT().StopDeploy(
 		mock.Anything, types.SpaceRepo, int64(2), int64(3), int64(4),
 	).Return(nil)
 
-	sc.mocks.components.repo.EXPECT().SendAssetManagementMsg(mock.Anything, types.RepoNotificationReq{
-		RepoType:  types.SpaceRepo,
-		Operation: types.OperationDelete,
-		RepoPath:  "ns/n",
-		UserUUID:  "user-uuid",
-	}).Return(nil)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	sc.mocks.components.repo.EXPECT().
+		SendAssetManagementMsg(mock.Anything, mock.MatchedBy(func(req types.RepoNotificationReq) bool {
+			return req.RepoType == types.SpaceRepo &&
+				req.Operation == types.OperationDelete &&
+				req.RepoPath == "ns/n" &&
+				req.UserUUID == "user-uuid"
+		})).
+		RunAndReturn(func(ctx context.Context, req types.RepoNotificationReq) error {
+			wg.Done()
+			return nil
+		}).Once()
 
 	err := sc.Delete(ctx, "ns", "n", "user")
-
-	time.Sleep(500 * time.Millisecond)
-
 	require.Nil(t, err)
-
+	wg.Wait()
+	wgstop.Wait()
 }
 
 func TestSpaceComponent_Deploy(t *testing.T) {
@@ -354,6 +367,9 @@ func TestSpaceComponent_Deploy(t *testing.T) {
 		sc.mocks.stores.SpaceResourceMock().EXPECT().FindByID(ctx, int64(1)).Return(&database.SpaceResource{
 			ID: 1,
 		}, nil)
+		sc.mocks.components.repo.EXPECT().CheckAccountAndResource(ctx, "user", "", int64(0), &database.SpaceResource{
+			ID: 1,
+		}).Return(nil)
 		sc.mocks.deployer.EXPECT().Deploy(ctx, types.DeployRepo{
 			SpaceID:       1,
 			Path:          "foo1/bar1",

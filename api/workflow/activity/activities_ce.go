@@ -15,13 +15,14 @@ type stores struct {
 }
 
 type Activities struct {
-	config     *config.Config
-	callback   callback.GitCallbackComponent
-	recom      component.RecomComponent
-	gitServer  gitserver.GitServer
-	multisync  component.MultiSyncComponent
-	rftScanner component.RuntimeArchitectureComponent
-	stores     stores
+	config        *config.Config
+	callback      callback.GitCallbackComponent
+	recom         component.RecomComponent
+	gitServer     gitserver.GitServer
+	multisync     component.MultiSyncComponent
+	rftScanner    component.RuntimeArchitectureComponent
+	repoComponent component.RepoComponent
+	stores        stores
 }
 
 func NewActivities(
@@ -32,18 +33,20 @@ func NewActivities(
 	multisync component.MultiSyncComponent,
 	syncClientSetting database.SyncClientSettingStore,
 	rftScanner component.RuntimeArchitectureComponent,
+	repoComponent component.RepoComponent,
 ) *Activities {
 	stores := stores{
 		syncClientSetting: syncClientSetting,
 	}
 
 	return &Activities{
-		config:     cfg,
-		callback:   callback,
-		recom:      recom,
-		gitServer:  gitServer,
-		multisync:  multisync,
-		stores:     stores,
-		rftScanner: rftScanner,
+		config:        cfg,
+		callback:      callback,
+		recom:         recom,
+		gitServer:     gitServer,
+		multisync:     multisync,
+		stores:        stores,
+		rftScanner:    rftScanner,
+		repoComponent: repoComponent,
 	}
 }

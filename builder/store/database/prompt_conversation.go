@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/uptrace/bun"
 )
@@ -17,7 +18,8 @@ type PromptConversation struct {
 	ConversationID string `bun:",notnull" json:"conversation_id"`
 	Title          string `bun:",notnull" json:"title"`
 	times
-	Messages []PromptConversationMessage `bun:"rel:has-many,join:conversation_id=conversation_id" json:"messages"`
+	Messages  []PromptConversationMessage `bun:"rel:has-many,join:conversation_id=conversation_id" json:"messages"`
+	DeletedAt time.Time                   `bun:",soft_delete,nullzero"`
 }
 
 type PromptConversationMessage struct {
@@ -39,6 +41,7 @@ type PromptConversationStore interface {
 	DeleteConversationsByID(ctx context.Context, userID int64, uuid string) error
 	LikeMessageByID(ctx context.Context, id int64) error
 	HateMessageByID(ctx context.Context, id int64) error
+	GetByUUID(ctx context.Context, uuid string, hasDetail bool) (*PromptConversation, error)
 }
 
 func NewPromptConversationStore() PromptConversationStore {
@@ -102,13 +105,13 @@ func (p *promptConversationStoreImpl) GetConversationByID(ctx context.Context, u
 
 func (p *promptConversationStoreImpl) DeleteConversationsByID(ctx context.Context, userID int64, uuid string) error {
 	err := p.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		res, err := tx.NewDelete().Model(&PromptConversation{}).Where("user_id = ? and conversation_id = ?", userID, uuid).Exec(ctx)
+		res, err := tx.NewDelete().Model(&PromptConversation{}).Where("user_id = ? and conversation_id = ?", userID, uuid).ForceDelete().Exec(ctx)
 		err = assertAffectedOneRow(res, err)
 		if err != nil {
 			return fmt.Errorf("delete conversation by userid %d, %s, error: %w", userID, uuid, err)
 		}
 
-		_, err = tx.NewDelete().Model(&PromptConversationMessage{}).Where("conversation_id = ?", uuid).Exec(ctx)
+		_, err = tx.NewDelete().Model(&PromptConversationMessage{}).Where("conversation_id = ?", uuid).ForceDelete().Exec(ctx)
 		if err != nil {
 			return fmt.Errorf("delete conversation message by uuid, %s, error:%w", uuid, err)
 		}
@@ -133,4 +136,17 @@ func (p *promptConversationStoreImpl) HateMessageByID(ctx context.Context, id in
 	}
 	err = assertAffectedOneRow(res, err)
 	return err
+}
+
+func (p *promptConversationStoreImpl) GetByUUID(ctx context.Context, uuid string, hasDetail bool) (*PromptConversation, error) {
+	var conversation PromptConversation
+	q := p.db.Operator.Core.NewSelect().Model(&conversation)
+	if hasDetail {
+		q = q.Relation("Messages")
+	}
+	err := q.Where("conversation_id = ?", uuid).Order("id desc").Scan(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("select user conversation uuid %s, error: %w", uuid, err)
+	}
+	return &conversation, nil
 }

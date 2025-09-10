@@ -5,7 +5,9 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -97,6 +99,7 @@ func TestPromptComponent_CheckPermission(t *testing.T) {
 	}, nil).Once()
 	pc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "foo", "ns", membership.RoleWrite).Return(true, nil).Once()
 	_, err = pc.checkPromptRepoPermission(ctx, req)
+	time.Sleep(20 * time.Millisecond)
 	require.Nil(t, err)
 }
 
@@ -111,6 +114,7 @@ func TestPromptComponent_CreatePrompt(t *testing.T) {
 				NamespaceType: database.OrgNamespace,
 			}, nil).Once()
 			pc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "foo").Return(database.User{
+				UUID:     "user-uuid",
 				RoleMask: "foo-admin",
 				Email:    "foo@bar.com",
 			}, nil).Once()
@@ -250,6 +254,7 @@ func TestPromptComponent_DeletePrompt(t *testing.T) {
 		NamespaceType: database.OrgNamespace,
 	}, nil).Once()
 	pc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "foo").Return(database.User{
+		UUID:     "user-uuid",
 		RoleMask: "foo-admin",
 		Email:    "foo@bar.com",
 	}, nil).Once()
@@ -266,7 +271,6 @@ func TestPromptComponent_DeletePrompt(t *testing.T) {
 		Email:       "foo@bar.com",
 		Message:     fmt.Sprintf("delete prompt %s", "TEST.jsonl"),
 	}).Return(&types.DeleteFileResp{}, nil).Once()
-
 	err := pc.DeletePrompt(ctx, types.PromptReq{
 		Namespace:   "ns",
 		Name:        "n",
@@ -489,8 +493,11 @@ func TestPromptComponent_CreatePromptRepo(t *testing.T) {
 	pc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "foo").Return(database.User{
 		ID:       123,
 		Email:    "foo@bar.com",
+		Username: "foo",
 		RoleMask: "foo-admin",
 	}, nil).Once()
+
+	pc.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "ns").Return(database.Namespace{}, nil).Once()
 
 	req := types.CreateRepoReq{
 		Username:      "foo",
@@ -503,9 +510,17 @@ func TestPromptComponent_CreatePromptRepo(t *testing.T) {
 		DefaultBranch: "main",
 		RepoType:      types.PromptRepo,
 	}
-	pc.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, "ns").Return(database.Namespace{}, nil).Once()
-	dbRepo := &database.Repository{}
+	dbRepo := &database.Repository{
+		ID: 1,
+		User: database.User{
+			UUID:     "user-uuid",
+			Username: "foo",
+			Email:    "foo@bar.com",
+		},
+		Path: "ns/n",
+	}
 	pc.mocks.components.repo.EXPECT().CreateRepo(ctx, req).Return(&gitserver.CreateRepoResp{}, dbRepo, nil)
+
 	dbPrompt := database.Prompt{
 		Repository:   dbRepo,
 		RepositoryID: dbRepo.ID,
@@ -517,10 +532,13 @@ func TestPromptComponent_CreatePromptRepo(t *testing.T) {
 				{Name: "t1"},
 				{Name: "t2"},
 			},
+			Path: "ns/n",
 		},
+		RepositoryID: dbRepo.ID,
 	}, nil)
-	// create readme
+
 	pc.mocks.gitServer.EXPECT().CreateRepoFile(&types.CreateFileReq{
+		Username:  "foo",
 		Email:     "foo@bar.com",
 		Message:   "initial commit",
 		Branch:    "main",
@@ -531,8 +549,9 @@ func TestPromptComponent_CreatePromptRepo(t *testing.T) {
 		Name:      "n",
 		RepoType:  types.PromptRepo,
 	}).Return(nil).Once()
-	// create .gitattributes
+
 	pc.mocks.gitServer.EXPECT().CreateRepoFile(&types.CreateFileReq{
+		Username:  "foo",
 		Email:     "foo@bar.com",
 		Message:   "initial commit",
 		Branch:    "main",
@@ -543,6 +562,20 @@ func TestPromptComponent_CreatePromptRepo(t *testing.T) {
 		Name:      "n",
 		RepoType:  types.PromptRepo,
 	}).Return(nil).Once()
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	pc.mocks.components.repo.EXPECT().
+		SendAssetManagementMsg(mock.Anything, mock.MatchedBy(func(req types.RepoNotificationReq) bool {
+			return req.RepoType == types.PromptRepo &&
+				req.Operation == types.OperationCreate &&
+				req.RepoPath == "ns/n" &&
+				req.UserUUID == "user-uuid"
+		})).
+		RunAndReturn(func(ctx context.Context, req types.RepoNotificationReq) error {
+			wg.Done()
+			return nil
+		}).Once()
 
 	res, err := pc.CreatePromptRepo(ctx, &types.CreatePromptRepoReq{
 		CreateRepoReq: types.CreateRepoReq{
@@ -555,20 +588,26 @@ func TestPromptComponent_CreatePromptRepo(t *testing.T) {
 		},
 	})
 	require.Nil(t, err)
+
 	expected := types.PromptRes{
-		Name: "r1",
+		Name:         "r1",
+		RepositoryID: 1,
 		Repository: types.Repository{
-			HTTPCloneURL: "https://foo.com/s/.git",
-			SSHCloneURL:  "test@127.0.0.1:s/.git",
+			HTTPCloneURL: "",
+			SSHCloneURL:  "",
 		},
-		User: types.User{Email: "foo@bar.com"},
+		User: types.User{
+			Email:    "foo@bar.com",
+			Username: "foo",
+		},
 		Tags: []types.RepoTag{
 			{Name: "t1"},
 			{Name: "t2"},
 		},
+		Path: "ns/n",
 	}
 	require.Equal(t, expected, *res)
-
+	wg.Wait()
 }
 
 func TestPromptComponent_IndexPromptRepo(t *testing.T) {
@@ -594,20 +633,20 @@ func TestPromptComponent_IndexPromptRepo(t *testing.T) {
 		{
 			RepositoryID: 1,
 			ID:           5, Name: "rp1", Repository: types.Repository{
-				HTTPCloneURL: "https://foo.com/s/.git",
-				SSHCloneURL:  "test@127.0.0.1:s/.git",
+				HTTPCloneURL: "",
+				SSHCloneURL:  "",
 			}},
 		{
 			RepositoryID: 2,
 			ID:           6, Name: "rp2", Repository: types.Repository{
-				HTTPCloneURL: "https://foo.com/s/.git",
-				SSHCloneURL:  "test@127.0.0.1:s/.git",
+				HTTPCloneURL: "",
+				SSHCloneURL:  "",
 			}},
 		{
 			RepositoryID: 3,
 			ID:           4, Name: "rp3", Repository: types.Repository{
-				HTTPCloneURL: "https://foo.com/s/.git",
-				SSHCloneURL:  "test@127.0.0.1:s/.git",
+				HTTPCloneURL: "",
+				SSHCloneURL:  "",
 			}, Tags: []types.RepoTag{{Name: "t1"}, {Name: "t2"}}},
 	}, results)
 
@@ -636,23 +675,48 @@ func TestPromptComponent_UpdatePromptRepo(t *testing.T) {
 
 }
 
-func TestPromptComponent_RemovetRepo(t *testing.T) {
+func TestPromptComponent_RemoveRepo(t *testing.T) {
 	ctx := context.TODO()
 	pc := initializeTestPromptComponent(ctx, t)
 
-	mockedPrompt := &database.Prompt{}
+	mockedPrompt := &database.Prompt{
+		ID: 1,
+		Repository: &database.Repository{
+			ID:   1,
+			Path: "ns/n",
+		},
+	}
+
+	mockedRepo := &database.Repository{
+		Path: "ns/n",
+		User: database.User{
+			UUID: "owner-uuid",
+		},
+	}
 	pc.mocks.stores.PromptMock().EXPECT().FindByPath(ctx, "ns", "n").Return(mockedPrompt, nil).Once()
 	pc.mocks.components.repo.EXPECT().DeleteRepo(ctx, types.DeleteRepoReq{
 		Username:  "foo",
 		Namespace: "ns",
 		Name:      "n",
 		RepoType:  types.PromptRepo,
-	}).Return(nil, nil).Once()
+	}).Return(mockedRepo, nil).Once()
 	pc.mocks.stores.PromptMock().EXPECT().Delete(ctx, *mockedPrompt).Return(nil).Once()
-
+	var wg sync.WaitGroup
+	wg.Add(1)
+	pc.mocks.components.repo.EXPECT().
+		SendAssetManagementMsg(mock.Anything, mock.MatchedBy(func(req types.RepoNotificationReq) bool {
+			return req.RepoType == types.PromptRepo &&
+				req.Operation == types.OperationDelete &&
+				req.RepoPath == "ns/n" &&
+				req.UserUUID == "owner-uuid"
+		})).
+		RunAndReturn(func(ctx context.Context, req types.RepoNotificationReq) error {
+			wg.Done()
+			return nil
+		}).Once()
 	err := pc.RemoveRepo(ctx, "ns", "n", "foo")
 	require.Nil(t, err)
-
+	wg.Wait()
 }
 
 func TestPromptComponent_Show(t *testing.T) {
@@ -672,13 +736,13 @@ func TestPromptComponent_Show(t *testing.T) {
 	pc.mocks.components.repo.EXPECT().GetNameSpaceInfo(ctx, "ns").Return(&types.Namespace{}, nil).Once()
 	pc.mocks.stores.UserLikesMock().EXPECT().IsExist(ctx, "foo", int64(123)).Return(true, nil).Once()
 
-	res, err := pc.Show(ctx, "ns", "n", "foo")
+	res, err := pc.Show(ctx, "ns", "n", "foo", false, false)
 	require.Nil(t, err)
 	require.Equal(t, types.PromptRes{
 		RepositoryID: 123,
 		Repository: types.Repository{
-			HTTPCloneURL: "https://foo.com/s/.git",
-			SSHCloneURL:  "test@127.0.0.1:s/.git",
+			HTTPCloneURL: "",
+			SSHCloneURL:  "",
 		},
 		Tags:      []types.RepoTag{{Name: "t1"}},
 		UserLikes: true,

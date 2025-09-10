@@ -203,6 +203,53 @@ func (_c *MockUserComponent_Collections_Call) RunAndReturn(run func(context.Cont
 	return _c
 }
 
+// CreateUserResource provides a mock function with given fields: ctx, req
+func (_m *MockUserComponent) CreateUserResource(ctx context.Context, req types.CreateUserResourceReq) error {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateUserResource")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.CreateUserResourceReq) error); ok {
+		r0 = rf(ctx, req)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockUserComponent_CreateUserResource_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateUserResource'
+type MockUserComponent_CreateUserResource_Call struct {
+	*mock.Call
+}
+
+// CreateUserResource is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.CreateUserResourceReq
+func (_e *MockUserComponent_Expecter) CreateUserResource(ctx interface{}, req interface{}) *MockUserComponent_CreateUserResource_Call {
+	return &MockUserComponent_CreateUserResource_Call{Call: _e.mock.On("CreateUserResource", ctx, req)}
+}
+
+func (_c *MockUserComponent_CreateUserResource_Call) Run(run func(ctx context.Context, req types.CreateUserResourceReq)) *MockUserComponent_CreateUserResource_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.CreateUserResourceReq))
+	})
+	return _c
+}
+
+func (_c *MockUserComponent_CreateUserResource_Call) Return(_a0 error) *MockUserComponent_CreateUserResource_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockUserComponent_CreateUserResource_Call) RunAndReturn(run func(context.Context, types.CreateUserResourceReq) error) *MockUserComponent_CreateUserResource_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Datasets provides a mock function with given fields: ctx, req
 func (_m *MockUserComponent) Datasets(ctx context.Context, req *types.UserDatasetsReq) ([]types.Dataset, int, error) {
 	ret := _m.Called(ctx, req)
@@ -312,6 +359,54 @@ func (_c *MockUserComponent_DeleteLikes_Call) Return(_a0 error) *MockUserCompone
 }
 
 func (_c *MockUserComponent_DeleteLikes_Call) RunAndReturn(run func(context.Context, *types.UserLikesRequest) error) *MockUserComponent_DeleteLikes_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// DeleteUserResource provides a mock function with given fields: ctx, username, orderDetailId
+func (_m *MockUserComponent) DeleteUserResource(ctx context.Context, username string, orderDetailId int64) error {
+	ret := _m.Called(ctx, username, orderDetailId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteUserResource")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, int64) error); ok {
+		r0 = rf(ctx, username, orderDetailId)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockUserComponent_DeleteUserResource_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteUserResource'
+type MockUserComponent_DeleteUserResource_Call struct {
+	*mock.Call
+}
+
+// DeleteUserResource is a helper method to define mock.On call
+//   - ctx context.Context
+//   - username string
+//   - orderDetailId int64
+func (_e *MockUserComponent_Expecter) DeleteUserResource(ctx interface{}, username interface{}, orderDetailId interface{}) *MockUserComponent_DeleteUserResource_Call {
+	return &MockUserComponent_DeleteUserResource_Call{Call: _e.mock.On("DeleteUserResource", ctx, username, orderDetailId)}
+}
+
+func (_c *MockUserComponent_DeleteUserResource_Call) Run(run func(ctx context.Context, username string, orderDetailId int64)) *MockUserComponent_DeleteUserResource_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(int64))
+	})
+	return _c
+}
+
+func (_c *MockUserComponent_DeleteUserResource_Call) Return(_a0 error) *MockUserComponent_DeleteUserResource_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockUserComponent_DeleteUserResource_Call) RunAndReturn(run func(context.Context, string, int64) error) *MockUserComponent_DeleteUserResource_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -437,6 +532,72 @@ func (_c *MockUserComponent_GetUserByName_Call) Return(_a0 *database.User, _a1 e
 }
 
 func (_c *MockUserComponent_GetUserByName_Call) RunAndReturn(run func(context.Context, string) (*database.User, error)) *MockUserComponent_GetUserByName_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetUserResource provides a mock function with given fields: ctx, req
+func (_m *MockUserComponent) GetUserResource(ctx context.Context, req types.GetUserResourceReq) ([]types.UserResourcesResp, int, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetUserResource")
+	}
+
+	var r0 []types.UserResourcesResp
+	var r1 int
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.GetUserResourceReq) ([]types.UserResourcesResp, int, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.GetUserResourceReq) []types.UserResourcesResp); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]types.UserResourcesResp)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.GetUserResourceReq) int); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, types.GetUserResourceReq) error); ok {
+		r2 = rf(ctx, req)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockUserComponent_GetUserResource_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetUserResource'
+type MockUserComponent_GetUserResource_Call struct {
+	*mock.Call
+}
+
+// GetUserResource is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.GetUserResourceReq
+func (_e *MockUserComponent_Expecter) GetUserResource(ctx interface{}, req interface{}) *MockUserComponent_GetUserResource_Call {
+	return &MockUserComponent_GetUserResource_Call{Call: _e.mock.On("GetUserResource", ctx, req)}
+}
+
+func (_c *MockUserComponent_GetUserResource_Call) Run(run func(ctx context.Context, req types.GetUserResourceReq)) *MockUserComponent_GetUserResource_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.GetUserResourceReq))
+	})
+	return _c
+}
+
+func (_c *MockUserComponent_GetUserResource_Call) Return(_a0 []types.UserResourcesResp, _a1 int, _a2 error) *MockUserComponent_GetUserResource_Call {
+	_c.Call.Return(_a0, _a1, _a2)
+	return _c
+}
+
+func (_c *MockUserComponent_GetUserResource_Call) RunAndReturn(run func(context.Context, types.GetUserResourceReq) ([]types.UserResourcesResp, int, error)) *MockUserComponent_GetUserResource_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1013,6 +1174,72 @@ func (_c *MockUserComponent_ListInstances_Call) Return(_a0 []types.DeployRepo, _
 }
 
 func (_c *MockUserComponent_ListInstances_Call) RunAndReturn(run func(context.Context, *types.UserRepoReq) ([]types.DeployRepo, int, error)) *MockUserComponent_ListInstances_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ListNotebooks provides a mock function with given fields: ctx, req
+func (_m *MockUserComponent) ListNotebooks(ctx context.Context, req *types.DeployReq) ([]types.NotebookRes, int, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListNotebooks")
+	}
+
+	var r0 []types.NotebookRes
+	var r1 int
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, *types.DeployReq) ([]types.NotebookRes, int, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *types.DeployReq) []types.NotebookRes); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]types.NotebookRes)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *types.DeployReq) int); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, *types.DeployReq) error); ok {
+		r2 = rf(ctx, req)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockUserComponent_ListNotebooks_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListNotebooks'
+type MockUserComponent_ListNotebooks_Call struct {
+	*mock.Call
+}
+
+// ListNotebooks is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req *types.DeployReq
+func (_e *MockUserComponent_Expecter) ListNotebooks(ctx interface{}, req interface{}) *MockUserComponent_ListNotebooks_Call {
+	return &MockUserComponent_ListNotebooks_Call{Call: _e.mock.On("ListNotebooks", ctx, req)}
+}
+
+func (_c *MockUserComponent_ListNotebooks_Call) Run(run func(ctx context.Context, req *types.DeployReq)) *MockUserComponent_ListNotebooks_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*types.DeployReq))
+	})
+	return _c
+}
+
+func (_c *MockUserComponent_ListNotebooks_Call) Return(_a0 []types.NotebookRes, _a1 int, _a2 error) *MockUserComponent_ListNotebooks_Call {
+	_c.Call.Return(_a0, _a1, _a2)
+	return _c
+}
+
+func (_c *MockUserComponent_ListNotebooks_Call) RunAndReturn(run func(context.Context, *types.DeployReq) ([]types.NotebookRes, int, error)) *MockUserComponent_ListNotebooks_Call {
 	_c.Call.Return(run)
 	return _c
 }

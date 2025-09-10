@@ -22,5 +22,8 @@
     },
     "error.SYS-ERR-7": {
         "other": "不能將自身提升為管理員"
+    },
+    "error.SYS-ERR-8": {
+        "other": "禁止更改存儲庫的可见性設置"
     }
 }

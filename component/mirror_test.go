@@ -37,7 +37,11 @@ func TestMirrorComponent_CreateMirrorRepo(t *testing.T) {
 			}
 
 			repo := &database.Repository{ID: 10}
-
+			mc.mocks.stores.RepoMock().EXPECT().FindByMirrorSourceURL(
+				ctx, "https://github.com/foo/bar.git",
+			).Return(
+				nil, nil,
+			)
 			mc.mocks.stores.RepoMock().EXPECT().FindByPath(
 				ctx, req.RepoType, "AIWizards", "sn",
 			).Return(
@@ -48,6 +52,9 @@ func TestMirrorComponent_CreateMirrorRepo(t *testing.T) {
 			).Return(
 				nil, sql.ErrNoRows,
 			)
+			mc.mocks.stores.MirrorNamespaceMappingMock().EXPECT().FindBySourceNamespace(context.Background(), "sns").Return(&database.MirrorNamespaceMapping{
+				TargetNamespace: "AIWizards",
+			}, nil)
 			mc.mocks.stores.NamespaceMock().EXPECT().FindByPath(
 				ctx, "AIWizards",
 			).Return(database.Namespace{
@@ -90,7 +97,7 @@ func TestMirrorComponent_CreateMirrorRepo(t *testing.T) {
 			mc.mocks.stores.RepoMock().EXPECT().UpdateSourcePath(ctx, repo1.ID, "foo/bar", "github").Return(nil)
 			reqMirror := &database.Mirror{
 				ID:        1,
-				Priority:  types.HighMirrorPriority,
+				Priority:  types.ASAPMirrorPriority,
 				SourceUrl: "https://github.com/foo/bar.git",
 			}
 			localRepoPath := ""
@@ -107,7 +114,7 @@ func TestMirrorComponent_CreateMirrorRepo(t *testing.T) {
 				Username:       "sns",
 				SourceRepoPath: "sns/sn",
 				LocalRepoPath:  localRepoPath,
-				Priority:       types.HighMirrorPriority,
+				Priority:       types.ASAPMirrorPriority,
 				SourceUrl:      "https://github.com/foo/bar.git",
 				Repository:     &database.Repository{ID: 11},
 				RepositoryID:   11,
@@ -134,7 +141,7 @@ func TestMirrorComponent_Repos(t *testing.T) {
 	ctx := context.TODO()
 	mc := initializeTestMirrorComponent(ctx, t)
 
-	mc.mocks.stores.MirrorMock().EXPECT().IndexWithPagination(ctx, 10, 1, "").Return([]database.Mirror{
+	mc.mocks.stores.MirrorMock().EXPECT().IndexWithPagination(ctx, 10, 1, "", true).Return([]database.Mirror{
 		{
 			CurrentTask: &database.MirrorTask{Progress: 100, Status: types.MirrorLfsSyncFinished},
 			Progress:    100,
@@ -154,7 +161,7 @@ func TestMirrorComponent_Index(t *testing.T) {
 	ctx := context.TODO()
 	mc := initializeTestMirrorComponent(ctx, t)
 
-	mc.mocks.stores.MirrorMock().EXPECT().IndexWithPagination(ctx, 10, 1, "foo").Return(
+	mc.mocks.stores.MirrorMock().EXPECT().IndexWithPagination(ctx, 10, 1, "foo", false).Return(
 		[]database.Mirror{{CurrentTask: &database.MirrorTask{Status: types.MirrorLfsSyncFinished}, Username: "user", LastMessage: "msg", Repository: &database.Repository{}}}, 100, nil,
 	)
 
