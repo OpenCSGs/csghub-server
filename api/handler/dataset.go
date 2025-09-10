@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"slices"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
@@ -28,11 +29,11 @@ func NewDatasetHandler(config *config.Config) (*DatasetHandler, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error creating repo component:%w", err)
 	}
-
 	return &DatasetHandler{
 		dataset:   tc,
 		sensitive: sc,
 		repo:      repo,
+		config:    config,
 	}, nil
 }
 
@@ -40,6 +41,7 @@ type DatasetHandler struct {
 	dataset   component.DatasetComponent
 	sensitive component.SensitiveComponent
 	repo      component.RepoComponent
+	config    *config.Config
 }
 
 // CreateDataset   godoc
@@ -140,7 +142,12 @@ func (h *DatasetHandler) Index(ctx *gin.Context) {
 		return
 	}
 
-	datasets, total, err := h.dataset.Index(ctx.Request.Context(), filter, per, page)
+	qNeedOpWeight := ctx.Query("need_op_weight")
+	needOpWeight, err := strconv.ParseBool(qNeedOpWeight)
+	if err != nil {
+		needOpWeight = false
+	}
+	datasets, total, err := h.dataset.Index(ctx.Request.Context(), filter, per, page, needOpWeight)
 	if err != nil {
 		slog.Error("Failed to get datasets", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -252,6 +259,8 @@ func (h *DatasetHandler) Delete(ctx *gin.Context) {
 // @Param        namespace path string true "namespace"
 // @Param        name path string true "name"
 // @Param        current_user query string true "current_user"
+// @Param        need_op_weight query bool false "need op weight" default(false)
+// @Param        need_multi_sync query bool false "need multi sync" default(false)
 // @Success      200  {object}  types.Response{data=types.Dataset} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
@@ -264,7 +273,18 @@ func (h *DatasetHandler) Show(ctx *gin.Context) {
 		return
 	}
 	currentUser := httpbase.GetCurrentUser(ctx)
-	detail, err := h.dataset.Show(ctx.Request.Context(), namespace, name, currentUser)
+
+	qNeedOpWeight := ctx.Query("need_op_weight")
+	needOpWeight, err := strconv.ParseBool(qNeedOpWeight)
+	if err != nil {
+		needOpWeight = false
+	}
+	qNeedMultiSync := ctx.Query("need_multi_sync")
+	needMultiSync, err := strconv.ParseBool(qNeedMultiSync)
+	if err != nil {
+		needMultiSync = false
+	}
+	detail, err := h.dataset.Show(ctx.Request.Context(), namespace, name, currentUser, needOpWeight, needMultiSync)
 	if err != nil {
 		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
@@ -322,4 +342,8 @@ func getFilterFromContext(ctx *gin.Context, filter *types.RepoFilter) *types.Rep
 	}
 	filter.Source = ctx.Query("source")
 	return filter
+}
+
+func (h *DatasetHandler) allowCreatePublic() bool {
+	return h.config.Dataset.AllowCreatePublicDataset
 }

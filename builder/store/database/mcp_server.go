@@ -21,6 +21,7 @@ type MCPServer struct {
 	InstallDepsCmds string      `bun:",nullzero" json:"install_deps_cmds"`
 	BuildCmds       string      `bun:",nullzero" json:"build_cmds"`
 	LaunchCmds      string      `bun:",nullzero" json:"launch_cmds"` // {"local": "cmd1", "remote": "cmd2"}
+	AvatarURL       string      `bun:",nullzero" json:"avatar_url"`
 	times
 }
 
@@ -73,7 +74,9 @@ func (m *mcpServerStoreImpl) ByRepoIDs(ctx context.Context, repoIDs []int64) ([]
 	err := m.db.Operator.Core.NewSelect().
 		Model(&mcps).
 		Relation("Repository").
-		Where("repository_id in (?)", bun.In(repoIDs)).
+		Relation("Repository.Mirror").
+		Relation("Repository.Mirror.CurrentTask").
+		Where("mcp_server.repository_id in (?)", bun.In(repoIDs)).
 		Scan(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("select mcp servers by repo ids error: %w", err)
@@ -268,7 +271,7 @@ func (m *mcpServerStoreImpl) UserLikes(ctx context.Context, userID int64, per, p
 	var mcps []MCPServer
 	query := m.db.Operator.Core.NewSelect().Model(&mcps).
 		Relation("Repository").
-		Where("repository.id in (select repo_id from user_likes where user_id=?)", userID)
+		Where("repository.id in (select repo_id from user_likes where user_id=? and deleted_at is NULL)", userID)
 
 	query = query.Order("mcp_server.id DESC").Limit(per).Offset((page - 1) * per)
 

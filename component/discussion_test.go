@@ -264,6 +264,14 @@ func TestDiscussionComponent_ListRepoDiscussions(t *testing.T) {
 			Avatar:   "avatar",
 		},
 	})
+	discussions = append(discussions, database.Discussion{
+		ID:                 2,
+		Title:              "test discussion 2",
+		DiscussionableID:   1,
+		DiscussionableType: database.DiscussionableTypeRepo,
+		UserID:             2,
+		User:               nil,
+	})
 	mockDiscussionStore.EXPECT().FindByDiscussionableID(mock.Anything, database.DiscussionableTypeRepo, repo.ID).Return(discussions, nil).Once()
 
 	resp, err := comp.ListRepoDiscussions(context.TODO(), types.ListRepoDiscussionRequest{
@@ -274,6 +282,7 @@ func TestDiscussionComponent_ListRepoDiscussions(t *testing.T) {
 	})
 	require.Nil(t, err)
 	require.Len(t, resp.Discussions, 1)
+	require.Equal(t, "test discussion", resp.Discussions[0].Title)
 
 }
 
@@ -485,6 +494,11 @@ func TestDiscussionComponent_ListDiscussionComments(t *testing.T) {
 				Username: "user",
 				Avatar:   "avatar",
 			},
+		},
+		{
+			ID:      2,
+			Content: "test comment",
+			User:    nil,
 		},
 	}
 	disc := &database.Discussion{

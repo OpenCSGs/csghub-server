@@ -174,6 +174,7 @@ func (d *deployer) buildDeploy(ctx context.Context, dr types.DeployRepo) (*datab
 	slog.Debug("do deployer.buildDeploy", slog.Any("dr", dr), slog.Any("deploy", deploy))
 	if deploy == nil {
 		// create new deploy for model inference and no latest deploy of space
+		// create new deploy for note book
 		deploy, err = d.dedicatedDeploy(ctx, dr)
 	}
 

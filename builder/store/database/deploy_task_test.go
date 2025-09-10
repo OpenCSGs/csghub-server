@@ -579,3 +579,44 @@ func TestDeployTaskStore_ListDeployBytype(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, 2, len(result))
 }
+func TestDeployTaskStore_DeleteDeployByID(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+	store := database.NewDeployTaskStoreWithDB(db)
+
+	// Create a deploy for user 100
+	deploy := &database.Deploy{
+		DeployName: "delete-by-id",
+		SvcName:    "svc-delete",
+		RepoID:     1001,
+		UserID:     100,
+		SpaceID:    0,
+		Type:       types.ServerlessType,
+		Status:     common.Running,
+	}
+	err := store.CreateDeploy(ctx, deploy)
+	require.Nil(t, err)
+
+	// Fetch the deploy to get its ID
+	got, err := store.GetDeployBySvcName(ctx, "svc-delete")
+	require.Nil(t, err)
+	require.Equal(t, "delete-by-id", got.DeployName)
+
+	// Delete the deploy by ID and userID
+	err = store.DeleteDeployByID(ctx, 100, got.ID)
+	require.Nil(t, err)
+
+	// The status should now be Deleted
+	got, err = store.GetDeployByID(ctx, got.ID)
+	require.Nil(t, err)
+	require.Equal(t, common.Deleted, got.Status)
+
+	// Try deleting with wrong userID, should get error
+	err = store.DeleteDeployByID(ctx, 999, got.ID)
+	require.NotNil(t, err)
+
+	// Try deleting a non-existent deploy
+	err = store.DeleteDeployByID(ctx, 100, 999999)
+	require.NotNil(t, err)
+}

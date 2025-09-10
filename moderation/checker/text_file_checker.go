@@ -48,7 +48,7 @@ func (c *TextFileChecker) Run(reader io.Reader) (types.SensitiveCheckStatus, str
 		slog.Debug("check text", slog.String("scenario", string(sensitive.ScenarioCommentDetection)), slog.String("text", buf.String()))
 		//do local check first
 		txt := buf.String()
-		contains := localWordChecker.ContainsSensitiveWord(txt)
+		contains := GetLocalWordChecker().ContainsSensitiveWord(txt)
 		if contains {
 			return types.SensitiveCheckFail, "contains sensitive word"
 		}

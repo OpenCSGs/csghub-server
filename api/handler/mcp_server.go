@@ -19,6 +19,7 @@ import (
 type MCPServerHandler struct {
 	mcpComp   component.MCPServerComponent
 	sensitive component.SensitiveComponent
+	repo      component.RepoComponent
 }
 
 func NewMCPServerHandler(config *config.Config) (*MCPServerHandler, error) {
@@ -30,9 +31,14 @@ func NewMCPServerHandler(config *config.Config) (*MCPServerHandler, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error creating sensitive component:%w", err)
 	}
+	repo, err := component.NewRepoComponent(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating repo component:%w", err)
+	}
 	return &MCPServerHandler{
 		mcpComp:   mc,
 		sensitive: sc,
+		repo:      repo,
 	}, nil
 }
 

@@ -1,9 +1,12 @@
 package handler
 
 import (
+	"errors"
 	"log/slog"
 	"net/http"
 	"strconv"
+
+	"opencsg.com/csghub-server/common/errorx"
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
@@ -44,7 +47,7 @@ func (h *UserHandler) Datasets(ctx *gin.Context) {
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format of page and per", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
+		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 
@@ -85,7 +88,7 @@ func (h *UserHandler) Models(ctx *gin.Context) {
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format of page and per", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
+		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 
@@ -127,7 +130,7 @@ func (h *UserHandler) Codes(ctx *gin.Context) {
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format of page and per", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
+		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 
@@ -169,7 +172,7 @@ func (h *UserHandler) Spaces(ctx *gin.Context) {
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format of page and per", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
+		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 	req.SDK = ctx.Query("sdk")
@@ -240,7 +243,7 @@ func (h *UserHandler) LikesCollections(ctx *gin.Context) {
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format of page and per", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
+		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 
@@ -279,7 +282,7 @@ func (h *UserHandler) UserCollections(ctx *gin.Context) {
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format of page and per", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
+		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 
@@ -412,7 +415,7 @@ func (h *UserHandler) LikesSpaces(ctx *gin.Context) {
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format of page and per", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
+		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 
@@ -455,7 +458,7 @@ func (h *UserHandler) LikesCodes(ctx *gin.Context) {
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format of page and per", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
+		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 
@@ -498,7 +501,7 @@ func (h *UserHandler) LikesModels(ctx *gin.Context) {
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format of page and per", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
+		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 
@@ -541,7 +544,7 @@ func (h *UserHandler) LikesDatasets(ctx *gin.Context) {
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format of page and per", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
+		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 
@@ -608,20 +611,20 @@ func (h *UserHandler) GetRunDeploys(ctx *gin.Context) {
 	deployType, err := strconv.Atoi(deployTypeStr)
 	if err != nil {
 		slog.Error("Bad request deploy type format", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
+		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format of page and per", slog.Any("error", err))
-		httpbase.BadRequest(ctx, err.Error())
+		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 	repoType := common.RepoTypeFromParam(ctx)
 	if repoType != types.ModelRepo && repoType != types.SpaceRepo {
 		slog.Error("Invalid repo type", slog.Any("repo_type", repoType))
-		httpbase.BadRequest(ctx, "Invalid repo type")
+		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(errors.New("Invalid repo type"), nil))
 		return
 	}
 
@@ -667,7 +670,7 @@ func (h *UserHandler) GetFinetuneInstances(ctx *gin.Context) {
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format of page and per", slog.Any("error", err))
-		httpbase.BadRequest(ctx, err.Error())
+		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 
@@ -709,7 +712,7 @@ func (h *UserHandler) GetRunServerless(ctx *gin.Context) {
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format of page and per", slog.Any("error", err))
-		httpbase.BadRequest(ctx, err.Error())
+		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 
@@ -722,6 +725,107 @@ func (h *UserHandler) GetRunServerless(ctx *gin.Context) {
 	ds, total, err := h.user.ListServerless(ctx.Request.Context(), req)
 	if err != nil {
 		slog.Error("Failed to get serverless list", slog.Any("error", err), slog.Any("req", req))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	respData := gin.H{
+		"message": "OK",
+		"data":    ds,
+		"total":   total,
+	}
+	ctx.JSON(http.StatusOK, respData)
+}
+
+// CreateUserResource godoc
+// @Security     ApiKey
+// @Summary      create order for user's resource
+// @Description  create order for user's resource
+// @Tags         User
+// @Accept       json
+// @Produce      json
+// @Param        body body types.CreateUserResourceReq true "create order request"
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /user/{username}/order/resource [post]
+func (h *UserHandler) CreateUserResource(ctx *gin.Context) {
+	var req types.CreateUserResourceReq
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequestWithExt(ctx, err)
+		return
+	}
+	for i := range req.OrderDetails {
+		req.OrderDetails[i].SkuType = types.SKUCSGHub
+	}
+	req.Username = ctx.Param("username")
+	err := h.user.CreateUserResource(ctx.Request.Context(), req)
+	if err != nil {
+		slog.Error("failed to create order for user's resource", slog.Any("error", err), slog.Any("req", req))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	httpbase.OK(ctx, nil)
+}
+
+// DeleteUserResource godoc
+// @Security     ApiKey
+// @Summary      delete user's resource by order detail id
+// @Description  delete user's resource by order detail id
+// @Tags         User
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /user/{username}/order/resources/{id} [delete]
+func (h *UserHandler) DeleteUserResource(ctx *gin.Context) {
+	username := ctx.Param("username")
+	orderDetailIdstr := ctx.Param("id")
+	orderDetailId, err := strconv.ParseInt(orderDetailIdstr, 10, 64)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequestWithExt(ctx, err)
+		return
+	}
+	err = h.user.DeleteUserResource(ctx.Request.Context(), username, orderDetailId)
+	if err != nil {
+		slog.Error("failed to create order for user's resource", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	httpbase.OK(ctx, nil)
+}
+
+// GetUserResource godoc
+// @Security     ApiKey
+// @Summary      get user's resource
+// @Description  get user's resource
+// @Tags         User
+// @Accept       json
+// @Produce      json
+// @Param        per query int false "per" default(20)
+// @Param        page query int false "per page" default(1)
+// @Success      200  {object}  types.ResponseWithTotal{data=[]types.UserResourcesResp,total=int} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /user/{username}/order/resources [get]
+func (h *UserHandler) GetUserResource(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	username := ctx.Param("username")
+	per, page, err := common.GetPerAndPageFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format of page and per", slog.Any("error", err))
+		httpbase.BadRequestWithExt(ctx, err)
+		return
+	}
+	var req types.GetUserResourceReq
+	req.CurrentUser = currentUser
+	req.Page = page
+	req.PageSize = per
+	ds, total, err := h.user.GetUserResource(ctx.Request.Context(), req)
+	if err != nil {
+		slog.Error("failed to get user's resource", slog.Any("error", err), slog.Any("username", username))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -752,7 +856,7 @@ func (h *UserHandler) Prompts(ctx *gin.Context) {
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format of page and per", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
+		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 
@@ -794,7 +898,7 @@ func (h *UserHandler) GetEvaluations(ctx *gin.Context) {
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format of page and per", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
+		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 
@@ -835,7 +939,7 @@ func (h *UserHandler) MCPServers(ctx *gin.Context) {
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format of page and per", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
+		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 
@@ -876,7 +980,7 @@ func (h *UserHandler) LikesMCPServers(ctx *gin.Context) {
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
 		slog.Error("Bad request format of page and per", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
+		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 
@@ -896,5 +1000,41 @@ func (h *UserHandler) LikesMCPServers(ctx *gin.Context) {
 		"total": total,
 	}
 
+	httpbase.OK(ctx, respData)
+}
+
+// GetUserNotebooks godoc
+// @Summary      get user's notebooks
+// @Description  get user's notebooks
+// @Tags         User
+// @Accept       json
+// @Produce      json
+// @Param        page query int false "page number"
+// @Param        size query int false "page size"
+// @Success      200  {array}  types.ResponseWithTotal{data=[]types.NotebookRes,total=int} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /user/{username}/notebooks [get]
+func (h *UserHandler) GetUserNotebooks(ctx *gin.Context) {
+	per, page, err := common.GetPerAndPageFromContext(ctx)
+	if err != nil {
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	currentUser := httpbase.GetCurrentUser(ctx)
+	var req types.DeployReq
+	req.CurrentUser = currentUser
+	req.Page = page
+	req.PageSize = per
+	req.DeployType = types.NotebookType
+	notebooks, total, err := h.user.ListNotebooks(ctx.Request.Context(), &req)
+	if err != nil {
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	respData := gin.H{
+		"data":  notebooks,
+		"total": total,
+	}
 	httpbase.OK(ctx, respData)
 }

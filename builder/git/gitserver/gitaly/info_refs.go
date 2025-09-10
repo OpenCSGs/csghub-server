@@ -22,7 +22,6 @@ func (c *Client) InfoRefsResponse(ctx context.Context, req gitserver.InfoRefsReq
 	if err != nil {
 		return nil, err
 	}
-
 	rpcRequest := &gitalypb.InfoRefsRequest{
 		Repository: &gitalypb.Repository{
 			StorageName:  c.config.GitalyServer.Storage,
@@ -76,7 +75,6 @@ func (c *Client) UploadPack(ctx context.Context, req gitserver.UploadPackReq) er
 	if err != nil {
 		return err
 	}
-
 	rpcRequest := &gitalypb.PostUploadPackWithSidechannelRequest{
 		Repository: &gitalypb.Repository{
 			StorageName:  c.config.GitalyServer.Storage,
@@ -108,7 +106,6 @@ func (c *Client) ReceivePack(ctx context.Context, req gitserver.ReceivePackReq) 
 	if err != nil {
 		return err
 	}
-
 	rpcRequest := &gitalypb.PostReceivePackRequest{
 		Repository: &gitalypb.Repository{
 			GlRepository: glRepository,

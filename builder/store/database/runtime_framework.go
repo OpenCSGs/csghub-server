@@ -140,7 +140,10 @@ func (rf *runtimeFrameworksStoreImpl) ListByArchsNameAndType(ctx context.Context
 		Relation("RuntimeFramework", func(q *bun.SelectQuery) *bun.SelectQuery {
 			return q.Where("model_format = ?", format).Where("type = ?", deployType)
 		}).
-		Where("architecture_name in (?) or model_name=?", bun.In(archs), name).Exec(ctx, &result)
+		Where("architecture_name in (?) or model_name=?", bun.In(archs), name).
+		OrderExpr("runtime_framework.id DESC").
+		Exec(ctx, &result)
+
 	if err != nil {
 		return nil, fmt.Errorf("error happened while getting runtime architecture, %w", err)
 	}

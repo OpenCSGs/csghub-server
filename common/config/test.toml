@@ -1,4 +1,8 @@
 instance_id = "bar"
+lbs_service_key = ""
 
 [api_server]
 port = 4321
+
+[mirror_server]
+enable = false

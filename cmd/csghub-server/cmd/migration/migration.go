@@ -68,6 +68,7 @@ var Cmd = &cobra.Command{
 			err = fmt.Errorf("initializing DB connection: %w", err)
 			return
 		}
+
 		redis, err = cache.NewCache(cmd.Context(), cache.RedisConfig{
 			Addr:     config.Redis.Endpoint,
 			Username: config.Redis.User,
@@ -76,6 +77,7 @@ var Cmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("initializing redis: %w", err)
 		}
+
 		migrator = migrations.NewMigrator(db)
 
 		return

@@ -156,7 +156,7 @@ func (s *serviceComponentImpl) generateService(ctx context.Context, cluster *clu
 	annotations[KeyOrderDetailID] = strconv.FormatInt(request.OrderDetailID, 10)
 
 	containerImg := request.ImageID
-	if request.RepoType == string(types.ModelRepo) {
+	if request.RepoType == string(types.ModelRepo) || request.DeployType == types.NotebookType {
 		// choose registry
 		// add prefix if image is not full path
 		if strings.Count(containerImg, "/") == 1 {

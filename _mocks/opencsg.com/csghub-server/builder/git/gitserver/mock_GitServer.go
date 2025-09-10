@@ -134,6 +134,53 @@ func (_c *MockGitServer_CommitFiles_Call) RunAndReturn(run func(context.Context,
 	return _c
 }
 
+// CopyRepository provides a mock function with given fields: ctx, req
+func (_m *MockGitServer) CopyRepository(ctx context.Context, req gitserver.CopyRepositoryReq) error {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CopyRepository")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, gitserver.CopyRepositoryReq) error); ok {
+		r0 = rf(ctx, req)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockGitServer_CopyRepository_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CopyRepository'
+type MockGitServer_CopyRepository_Call struct {
+	*mock.Call
+}
+
+// CopyRepository is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req gitserver.CopyRepositoryReq
+func (_e *MockGitServer_Expecter) CopyRepository(ctx interface{}, req interface{}) *MockGitServer_CopyRepository_Call {
+	return &MockGitServer_CopyRepository_Call{Call: _e.mock.On("CopyRepository", ctx, req)}
+}
+
+func (_c *MockGitServer_CopyRepository_Call) Run(run func(ctx context.Context, req gitserver.CopyRepositoryReq)) *MockGitServer_CopyRepository_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(gitserver.CopyRepositoryReq))
+	})
+	return _c
+}
+
+func (_c *MockGitServer_CopyRepository_Call) Return(_a0 error) *MockGitServer_CopyRepository_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockGitServer_CopyRepository_Call) RunAndReturn(run func(context.Context, gitserver.CopyRepositoryReq) error) *MockGitServer_CopyRepository_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CreateMirrorRepo provides a mock function with given fields: ctx, req
 func (_m *MockGitServer) CreateMirrorRepo(ctx context.Context, req gitserver.CreateMirrorRepoReq) (int64, error) {
 	ret := _m.Called(ctx, req)
@@ -575,17 +622,17 @@ func (_c *MockGitServer_DeleteOrganization_Call) RunAndReturn(run func(string) e
 	return _c
 }
 
-// DeleteRepo provides a mock function with given fields: ctx, req
-func (_m *MockGitServer) DeleteRepo(ctx context.Context, req gitserver.DeleteRepoReq) error {
-	ret := _m.Called(ctx, req)
+// DeleteRepo provides a mock function with given fields: ctx, relativePath
+func (_m *MockGitServer) DeleteRepo(ctx context.Context, relativePath string) error {
+	ret := _m.Called(ctx, relativePath)
 
 	if len(ret) == 0 {
 		panic("no return value specified for DeleteRepo")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, gitserver.DeleteRepoReq) error); ok {
-		r0 = rf(ctx, req)
+	if rf, ok := ret.Get(0).(func(context.Context, string) error); ok {
+		r0 = rf(ctx, relativePath)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -600,14 +647,14 @@ type MockGitServer_DeleteRepo_Call struct {
 
 // DeleteRepo is a helper method to define mock.On call
 //   - ctx context.Context
-//   - req gitserver.DeleteRepoReq
-func (_e *MockGitServer_Expecter) DeleteRepo(ctx interface{}, req interface{}) *MockGitServer_DeleteRepo_Call {
-	return &MockGitServer_DeleteRepo_Call{Call: _e.mock.On("DeleteRepo", ctx, req)}
+//   - relativePath string
+func (_e *MockGitServer_Expecter) DeleteRepo(ctx interface{}, relativePath interface{}) *MockGitServer_DeleteRepo_Call {
+	return &MockGitServer_DeleteRepo_Call{Call: _e.mock.On("DeleteRepo", ctx, relativePath)}
 }
 
-func (_c *MockGitServer_DeleteRepo_Call) Run(run func(ctx context.Context, req gitserver.DeleteRepoReq)) *MockGitServer_DeleteRepo_Call {
+func (_c *MockGitServer_DeleteRepo_Call) Run(run func(ctx context.Context, relativePath string)) *MockGitServer_DeleteRepo_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(gitserver.DeleteRepoReq))
+		run(args[0].(context.Context), args[1].(string))
 	})
 	return _c
 }
@@ -617,7 +664,7 @@ func (_c *MockGitServer_DeleteRepo_Call) Return(_a0 error) *MockGitServer_Delete
 	return _c
 }
 
-func (_c *MockGitServer_DeleteRepo_Call) RunAndReturn(run func(context.Context, gitserver.DeleteRepoReq) error) *MockGitServer_DeleteRepo_Call {
+func (_c *MockGitServer_DeleteRepo_Call) RunAndReturn(run func(context.Context, string) error) *MockGitServer_DeleteRepo_Call {
 	_c.Call.Return(run)
 	return _c
 }

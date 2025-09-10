@@ -36,10 +36,11 @@ func (h *JWTHandler) Create(ctx *gin.Context) {
 	var req types.CreateJWTReq
 	if err := ctx.ShouldBind(&req); err != nil {
 		slog.Error("Bad request format", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
+		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 
+	slog.Info("Create JWT token", "req", req)
 	claims, signed, err := h.c.GenerateToken(ctx.Request.Context(), req)
 	if err != nil {
 		slog.Error("failed to generate JWT token", slog.Any("error", err))

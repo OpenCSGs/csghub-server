@@ -19,12 +19,6 @@ type repoFileComponentImpl struct {
 	gs  gitserver.GitServer
 }
 
-type RepoFileComponent interface {
-	GenRepoFileRecords(ctx context.Context, repoType types.RepositoryType, namespace, name string) error
-	GenRepoFileRecordsBatch(ctx context.Context, repoType types.RepositoryType, lastRepoID int64, concurrency int) error
-	DetectRepoSensitiveCheckStatus(ctx context.Context, repoType types.RepositoryType, namespace, name string) error
-}
-
 func NewRepoFileComponent(conf *config.Config) (RepoFileComponent, error) {
 	c := &repoFileComponentImpl{
 		rfs: database.NewRepoFileStore(),
@@ -99,7 +93,6 @@ func (c *repoFileComponentImpl) createRepoFileRecords(ctx context.Context, repo 
 		files  []*types.File
 		cursor string
 	)
-
 	for {
 		resp, err := c.gs.GetTree(ctx, types.GetTreeRequest{
 			Namespace: namespace,
@@ -114,10 +107,10 @@ func (c *repoFileComponentImpl) createRepoFileRecords(ctx context.Context, repo 
 			break
 		}
 
-		cursor = resp.Cursor
 		if err != nil {
 			return fmt.Errorf("failed to get repo %s/%s/%s file tree,%w", repo.RepositoryType, namespace, name, err)
 		}
+		cursor = resp.Cursor
 
 		for _, file := range resp.Files {
 			if file.Type == "dir" {

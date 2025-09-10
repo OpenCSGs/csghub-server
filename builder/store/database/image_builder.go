@@ -18,6 +18,7 @@ type ImageBuilderWorkStore interface {
 	QueryStatusByBuildID(ctx context.Context, buildId string) (*ImageBuilderWork, error)
 	QueryByBuildID(ctx context.Context, buildId string) (*ImageBuilderWork, error)
 	UpdateByWorkName(ctx context.Context, work *ImageBuilderWork) (*ImageBuilderWork, error)
+	FindByImagePath(ctx context.Context, imagePath string) (*ImageBuilderWork, error)
 }
 
 func NewImageBuilderStore() ImageBuilderWorkStore {
@@ -89,6 +90,15 @@ func (i *imageBuilderWorkStoreImpl) QueryStatusByBuildID(ctx context.Context, bu
 func (i *imageBuilderWorkStoreImpl) QueryByBuildID(ctx context.Context, buildId string) (*ImageBuilderWork, error) {
 	ibw := ImageBuilderWork{}
 	err := i.db.Operator.Core.NewSelect().Model(&ibw).Where("build_id = ?", buildId).Scan(ctx, &ibw)
+	if err != nil {
+		return nil, err
+	}
+	return &ibw, nil
+}
+
+func (i *imageBuilderWorkStoreImpl) FindByImagePath(ctx context.Context, imagePath string) (*ImageBuilderWork, error) {
+	ibw := ImageBuilderWork{}
+	err := i.db.Operator.Core.NewSelect().Model(&ibw).Where("image_path = ?", imagePath).Scan(ctx, &ibw)
 	if err != nil {
 		return nil, err
 	}

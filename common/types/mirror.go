@@ -1,6 +1,8 @@
 package types
 
-import "time"
+import (
+	"time"
+)
 
 type CreateMirrorReq struct {
 	Namespace       string         `json:"namespace"`
@@ -70,6 +72,29 @@ type CreateMirrorRepoReq struct {
 	License           string `json:"license"`
 	SyncLfs           bool   `json:"sync_lfs"`
 	CurrentUser       string `json:"current_user"`
+
+	//MCP only
+	MCPServerAttributes MCPServerAttributes `json:"mcp_server_attributes"`
+}
+
+type MCPServerAttributes struct {
+	StarCount     int       `json:"star_count"`
+	Tools         []MCPTool `json:"tools"`
+	Configuration MCPSchema `json:"configuration"`
+	AvatarURL     string    `json:"avatar_url"`
+}
+
+type BatchCreateMirrorReq struct {
+	Mirrors []MirrorReq `json:"mirrors"`
+}
+
+type MirrorReq struct {
+	SourceURL     string         `json:"source_url" binding:"required"`
+	SourceID      int64          `json:"mirror_source_id" binding:"required"`
+	RepoType      RepositoryType `json:"repo_type" binding:"required"`
+	DefaultBranch string         `json:"branch" binding:"required"`
+	Priority      int8           `json:"priority"`
+	UpdatedAt     time.Time      `json:"updated_at"`
 }
 
 type MirrorRepo struct {
@@ -116,12 +141,22 @@ const (
 type MirrorPriority int
 
 const (
-	HighMirrorPriority   MirrorPriority = 3
-	MediumMirrorPriority MirrorPriority = 2
+	ASAPMirrorPriority   MirrorPriority = 12
+	P11MirrorPriority    MirrorPriority = 11
+	HighMirrorPriority   MirrorPriority = 10
+	P9MirrorPriority     MirrorPriority = 9
+	P8MirrorPriority     MirrorPriority = 8
+	P7MirrorPriority     MirrorPriority = 7
+	MediumMirrorPriority MirrorPriority = 6
+	P5MirrorPriority     MirrorPriority = 5
+	P4MirrorPriority     MirrorPriority = 4
+	P3MirrorPriority     MirrorPriority = 3
+	P2MirrorPriority     MirrorPriority = 2
 	LowMirrorPriority    MirrorPriority = 1
 )
 
 type Mirror struct {
+	ID           int64        `json:"id"`
 	SourceUrl    string       `json:"source_url"`
 	MirrorSource MirrorSource `json:"mirror_source"`
 	//source user name
@@ -138,6 +173,8 @@ type Mirror struct {
 	LastMessage     string           `json:"last_message"`
 	Status          MirrorTaskStatus `json:"status"`
 	Progress        int8             `json:"progress"`
+	CreatedAt       time.Time        `json:"created_at"`
+	UpdatedAt       time.Time        `json:"updated_at"`
 }
 
 type MirrorSource struct {
@@ -160,4 +197,26 @@ type MirrorTask struct {
 	SourceUrl string `json:"source_url"`
 	Priority  int    `json:"priority"`
 	RepoPath  string `json:"repo_path"`
+}
+
+type SyncInfo struct {
+	RemoteURL string         `json:"remote_url"`
+	LocalURL  string         `json:"local_url"`
+	Status    string         `json:"status"`
+	RepoType  RepositoryType `json:"repo_type"`
+	Path      string         `json:"path"`
+	Size      int64          `json:"size"`
+}
+
+type CreateMirrorNamespaceMappingReq struct {
+	SourceNamespace string `json:"source_namespace"`
+	TargetNamespace string `json:"target_namespace"`
+	Enabled         *bool  `json:"enabled"`
+}
+
+type UpdateMirrorNamespaceMappingReq struct {
+	SourceNamespace *string `json:"source_namespace"`
+	TargetNamespace *string `json:"target_namespace"`
+	Enabled         *bool   `json:"enabled"`
+	ID              int64   `json:"id"`
 }

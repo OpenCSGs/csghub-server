@@ -2,7 +2,6 @@ package scenariomgr
 
 import (
 	"fmt"
-
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"

@@ -44,11 +44,14 @@ func NewModelStoreWithDB(db *DB) ModelStore {
 }
 
 type Model struct {
-	ID            int64       `bun:",pk,autoincrement" json:"id"`
-	RepositoryID  int64       `bun:",notnull" json:"repository_id"`
-	Repository    *Repository `bun:"rel:belongs-to,join:repository_id=id" json:"repository"`
-	LastUpdatedAt time.Time   `bun:",notnull" json:"last_updated_at"`
-	BaseModel     string      `bun:"," json:"base_model"`
+	ID              int64       `bun:",pk,autoincrement" json:"id"`
+	RepositoryID    int64       `bun:",notnull" json:"repository_id"`
+	Repository      *Repository `bun:"rel:belongs-to,join:repository_id=id" json:"repository"`
+	LastUpdatedAt   time.Time   `bun:",notnull" json:"last_updated_at"`
+	BaseModel       string      `bun:"," json:"base_model"`
+	ReportURL       string      `bun:"," json:"report_url"`
+	MediumRiskCount int         `bun:"," json:"medium_risk_count"`
+	HighRiskCount   int         `bun:"," json:"high_risk_count"`
 	times
 }
 
@@ -56,7 +59,9 @@ func (s *modelStoreImpl) ByRepoIDs(ctx context.Context, repoIDs []int64) (models
 	err = s.db.Operator.Core.NewSelect().
 		Model(&models).
 		Relation("Repository").
-		Where("repository_id in (?)", bun.In(repoIDs)).
+		Relation("Repository.Mirror").
+		Relation("Repository.Mirror.CurrentTask").
+		Where("model.repository_id in (?)", bun.In(repoIDs)).
 		Scan(ctx)
 	err = errorx.HandleDBError(err, nil)
 	return
@@ -115,7 +120,7 @@ func (s *modelStoreImpl) UserLikesModels(ctx context.Context, userID int64, per,
 		Model(&models).
 		Relation("Repository.Tags").
 		Relation("Repository.User").
-		Where("repository.id in (select repo_id from user_likes where user_id=?)", userID)
+		Where("repository.id in (select repo_id from user_likes where user_id=? and deleted_at is NULL)", userID)
 
 	query = query.Order("model.created_at DESC").
 		Limit(per).

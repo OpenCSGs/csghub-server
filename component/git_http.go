@@ -40,6 +40,7 @@ type gitHTTPComponentImpl struct {
 	repoStore          database.RepoStore
 	userStore          database.UserStore
 	repoComponent      RepoComponent
+	mirrorStore        database.MirrorStore
 }
 
 type GitHTTPComponent interface {
@@ -86,6 +87,7 @@ func NewGitHTTPComponent(config *config.Config) (GitHTTPComponent, error) {
 	c.repoStore = database.NewRepoStore()
 	c.lfsLockStore = database.NewLfsLockStore()
 	c.userStore = database.NewUserStore()
+	c.mirrorStore = database.NewMirrorStore()
 	c.repoComponent, err = NewRepoComponentImpl(config)
 	if err != nil {
 		return nil, err
@@ -97,6 +99,17 @@ func (c *gitHTTPComponentImpl) InfoRefs(ctx context.Context, req types.InfoRefsR
 	repo, err := c.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find repo, error: %w", err)
+	}
+
+	m, err := c.mirrorStore.FindByRepoID(ctx, repo.ID)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return nil, fmt.Errorf("failed to find mirror, error: %w", err)
+	}
+
+	if m != nil && m.CurrentTask != nil {
+		if m.CurrentTask.Status == types.MirrorRepoSyncStart {
+			return nil, errorx.ErrServiceUnavaliable
+		}
 	}
 
 	if req.Rpc == "git-receive-pack" {
@@ -145,6 +158,11 @@ func (c *gitHTTPComponentImpl) GitUploadPack(ctx context.Context, req types.GitU
 			return errorx.ErrForbidden
 		}
 	}
+	err = c.repoStore.UpdateRepoCloneDownloads(ctx, repo, time.Now(), 1)
+	if err != nil {
+		slog.Error("failed to update repo clone download count", slog.Any("error", err))
+	}
+
 	err = c.gitServer.UploadPack(ctx, gitserver.UploadPackReq{
 		Namespace:   req.Namespace,
 		Name:        req.Name,
@@ -158,6 +176,9 @@ func (c *gitHTTPComponentImpl) GitUploadPack(ctx context.Context, req types.GitU
 }
 
 func (c *gitHTTPComponentImpl) GitReceivePack(ctx context.Context, req types.GitReceivePackReq) error {
+	if req.ContentLength > c.config.Git.MaxUnLfsFileSize*10 {
+		return errorx.ErrContentLengthTooLarge
+	}
 	_, err := c.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return fmt.Errorf("failed to find repo, error: %w", err)
@@ -281,7 +302,6 @@ func (c *gitHTTPComponentImpl) lfsBatchUploadInfo(ctx context.Context, req types
 			Actions: map[string]*types.Link{},
 			Pointer: obj,
 		}
-
 		if c.config.Git.LimitLfsFileUploadSize && largeFileWithoutMultipart(req, obj) {
 			resp.Error = &types.ObjectError{
 				Code:    http.StatusUnprocessableEntity,
@@ -421,6 +441,7 @@ func (c *gitHTTPComponentImpl) LfsUpload(ctx context.Context, body io.ReadCloser
 
 	objectKey := common.BuildLfsPath(repo.ID, pointer.Oid, repo.Migrated)
 	_, err = c.s3Client.StatObject(ctx, c.config.S3.Bucket, objectKey, minio.StatObjectOptions{})
+	minioExist := false
 	if err != nil {
 		if !noSuchKey(err) {
 			return err
@@ -439,19 +460,22 @@ func (c *gitHTTPComponentImpl) LfsUpload(ctx context.Context, body io.ReadCloser
 		if size != pointer.Size || checksum != pointer.Oid {
 			return errors.New("invalid lfs size or oid")
 		}
-		return nil
+		minioExist = true
 	}
 
-	_, err = c.s3Client.UploadAndValidate(
-		ctx,
-		c.config.S3.Bucket,
-		objectKey,
-		body,
-		req.Size,
-	)
-	if err != nil {
-		return err
+	if !minioExist {
+		_, err = c.s3Client.UploadAndValidate(
+			ctx,
+			c.config.S3.Bucket,
+			objectKey,
+			body,
+			req.Size,
+		)
+		if err != nil {
+			return err
+		}
 	}
+
 	return err
 }
 
@@ -757,29 +781,6 @@ func (c *gitHTTPComponentImpl) buildVerifyLink(req types.BatchRequest) string {
 	return c.config.APIServer.PublicDomain + "/" + path.Join(fmt.Sprintf("%ss", req.RepoType), url.PathEscape(req.Namespace), url.PathEscape(req.Name+".git"), "info/lfs/verify")
 }
 
-func buildLFSLockList(lfsLocks []database.LfsLock) *types.LFSLockList {
-	if len(lfsLocks) == 0 {
-		return &types.LFSLockList{
-			Locks: []*types.LFSLock{},
-		}
-	}
-
-	var locks []*types.LFSLock
-	for _, l := range lfsLocks {
-		locks = append(locks, &types.LFSLock{
-			ID:       strconv.FormatInt(l.ID, 10),
-			Path:     l.Path,
-			LockedAt: l.CreatedAt,
-			Owner: &types.LFSLockOwner{
-				Name: l.User.Username,
-			},
-		})
-	}
-	return &types.LFSLockList{
-		Locks: locks,
-	}
-}
-
 func (c *gitHTTPComponentImpl) buildMultipartUploadLink(ctx context.Context, req types.BatchRequest, pointer types.Pointer, header map[string]any) (*types.Link, error) {
 	var (
 		resp     types.Link
@@ -878,6 +879,29 @@ func (c *gitHTTPComponentImpl) isValidCompleteUploadSignature(objectKey, uploadI
 	expectedSign := hex.EncodeToString(mac.Sum(nil))
 
 	return hmac.Equal([]byte(expectedSign), []byte(providedSign))
+}
+
+func buildLFSLockList(lfsLocks []database.LfsLock) *types.LFSLockList {
+	if len(lfsLocks) == 0 {
+		return &types.LFSLockList{
+			Locks: []*types.LFSLock{},
+		}
+	}
+
+	var locks []*types.LFSLock
+	for _, l := range lfsLocks {
+		locks = append(locks, &types.LFSLock{
+			ID:       strconv.FormatInt(l.ID, 10),
+			Path:     l.Path,
+			LockedAt: l.CreatedAt,
+			Owner: &types.LFSLockOwner{
+				Name: l.User.Username,
+			},
+		})
+	}
+	return &types.LFSLockList{
+		Locks: locks,
+	}
 }
 
 func largeFileWithoutMultipart(req types.BatchRequest, pointer types.Pointer) bool {

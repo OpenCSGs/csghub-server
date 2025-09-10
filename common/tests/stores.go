@@ -7,52 +7,59 @@ import (
 )
 
 type MockStores struct {
-	User                 database.UserStore
-	UserLikes            database.UserLikesStore
-	Repo                 database.RepoStore
-	RepoRelation         database.RepoRelationsStore
-	Model                database.ModelStore
-	SpaceResource        database.SpaceResourceStore
-	Tag                  database.TagStore
-	TagRule              database.TagRuleStore
-	Dataset              database.DatasetStore
-	PromptConversation   database.PromptConversationStore
-	PromptPrefix         database.PromptPrefixStore
-	LLMConfig            database.LLMConfigStore
-	Prompt               database.PromptStore
-	Namespace            database.NamespaceStore
-	LfsMetaObject        database.LfsMetaObjectStore
-	LfsLock              database.LfsLockStore
-	Mirror               database.MirrorStore
-	MirrorSource         database.MirrorSourceStore
-	AccessToken          database.AccessTokenStore
-	SyncVersion          database.SyncVersionStore
-	SyncClientSetting    database.SyncClientSettingStore
-	RuntimeFramework     database.RuntimeFrameworksStore
-	DeployTask           database.DeployTaskStore
-	ClusterInfo          database.ClusterInfoStore
-	Code                 database.CodeStore
-	Collection           database.CollectionStore
-	Space                database.SpaceStore
-	SpaceSdk             database.SpaceSdkStore
-	Recom                database.RecomStore
-	RepoRuntimeFramework database.RepositoriesRuntimeFrameworkStore
-	Discussion           database.DiscussionStore
-	RuntimeArch          database.RuntimeArchitecturesStore
-	ResourceModel        database.ResourceModelStore
-	GitServerAccessToken database.GitServerAccessTokenStore
-	Org                  database.OrgStore
-	MultiSync            database.MultiSyncStore
-	File                 database.FileStore
-	SSH                  database.SSHKeyStore
-	Telemetry            database.TelemetryStore
-	RepoFile             database.RepoFileStore
-	Event                database.EventStore
-	Broadcast            database.BroadcastStore
-	ViewerStore          database.DataviewerStore
-	SpaceTemplate        database.SpaceTemplateStore
-	MCPServerStore       database.MCPServerStore
-	MirrorTaskStore      database.MirrorTaskStore
+	User                   database.UserStore
+	UserLikes              database.UserLikesStore
+	Repo                   database.RepoStore
+	RepoRelation           database.RepoRelationsStore
+	Model                  database.ModelStore
+	SpaceResource          database.SpaceResourceStore
+	Tag                    database.TagStore
+	TagRule                database.TagRuleStore
+	Dataset                database.DatasetStore
+	PromptConversation     database.PromptConversationStore
+	PromptPrefix           database.PromptPrefixStore
+	LLMConfig              database.LLMConfigStore
+	Prompt                 database.PromptStore
+	Namespace              database.NamespaceStore
+	LfsMetaObject          database.LfsMetaObjectStore
+	LfsLock                database.LfsLockStore
+	Mirror                 database.MirrorStore
+	MirrorSource           database.MirrorSourceStore
+	AccessToken            database.AccessTokenStore
+	SyncVersion            database.SyncVersionStore
+	SyncClientSetting      database.SyncClientSettingStore
+	RuntimeFramework       database.RuntimeFrameworksStore
+	DeployTask             database.DeployTaskStore
+	UserResources          database.UserResourcesStore
+	ClusterInfo            database.ClusterInfoStore
+	Code                   database.CodeStore
+	Collection             database.CollectionStore
+	Workflow               database.ArgoWorkFlowStore
+	Space                  database.SpaceStore
+	SpaceSdk               database.SpaceSdkStore
+	Recom                  database.RecomStore
+	RepoRuntimeFramework   database.RepositoriesRuntimeFrameworkStore
+	Discussion             database.DiscussionStore
+	RuntimeArch            database.RuntimeArchitecturesStore
+	ResourceModel          database.ResourceModelStore
+	GitServerAccessToken   database.GitServerAccessTokenStore
+	Org                    database.OrgStore
+	MultiSync              database.MultiSyncStore
+	File                   database.FileStore
+	SSH                    database.SSHKeyStore
+	Telemetry              database.TelemetryStore
+	RepoFile               database.RepoFileStore
+	Event                  database.EventStore
+	License                database.LicenseStore
+	AccountSyncQuota       database.AccountSyncQuotaStore
+	Broadcast              database.BroadcastStore
+	ViewerStore            database.DataviewerStore
+	SpaceTemplate          database.SpaceTemplateStore
+	RuleStore              database.RuleStore
+	MCPServerStore         database.MCPServerStore
+	StatSnapStore          database.StatSnapStore
+	MirrorTaskStore        database.MirrorTaskStore
+	MirrorNamespaceMapping database.MirrorNamespaceMappingStore
 }
 
 func NewMockStores(t interface {
@@ -60,52 +67,59 @@ func NewMockStores(t interface {
 	mock.TestingT
 }) *MockStores {
 	return &MockStores{
-		User:                 mockdb.NewMockUserStore(t),
-		UserLikes:            mockdb.NewMockUserLikesStore(t),
-		Repo:                 mockdb.NewMockRepoStore(t),
-		RepoRelation:         mockdb.NewMockRepoRelationsStore(t),
-		Model:                mockdb.NewMockModelStore(t),
-		SpaceResource:        mockdb.NewMockSpaceResourceStore(t),
-		Tag:                  mockdb.NewMockTagStore(t),
-		Dataset:              mockdb.NewMockDatasetStore(t),
-		PromptConversation:   mockdb.NewMockPromptConversationStore(t),
-		PromptPrefix:         mockdb.NewMockPromptPrefixStore(t),
-		LLMConfig:            mockdb.NewMockLLMConfigStore(t),
-		Prompt:               mockdb.NewMockPromptStore(t),
-		Namespace:            mockdb.NewMockNamespaceStore(t),
-		LfsMetaObject:        mockdb.NewMockLfsMetaObjectStore(t),
-		LfsLock:              mockdb.NewMockLfsLockStore(t),
-		Mirror:               mockdb.NewMockMirrorStore(t),
-		MirrorSource:         mockdb.NewMockMirrorSourceStore(t),
-		AccessToken:          mockdb.NewMockAccessTokenStore(t),
-		SyncVersion:          mockdb.NewMockSyncVersionStore(t),
-		SyncClientSetting:    mockdb.NewMockSyncClientSettingStore(t),
-		RuntimeFramework:     mockdb.NewMockRuntimeFrameworksStore(t),
-		DeployTask:           mockdb.NewMockDeployTaskStore(t),
-		ClusterInfo:          mockdb.NewMockClusterInfoStore(t),
-		Code:                 mockdb.NewMockCodeStore(t),
-		Collection:           mockdb.NewMockCollectionStore(t),
-		Space:                mockdb.NewMockSpaceStore(t),
-		SpaceSdk:             mockdb.NewMockSpaceSdkStore(t),
-		Recom:                mockdb.NewMockRecomStore(t),
-		RepoRuntimeFramework: mockdb.NewMockRepositoriesRuntimeFrameworkStore(t),
-		Discussion:           mockdb.NewMockDiscussionStore(t),
-		RuntimeArch:          mockdb.NewMockRuntimeArchitecturesStore(t),
-		ResourceModel:        mockdb.NewMockResourceModelStore(t),
-		GitServerAccessToken: mockdb.NewMockGitServerAccessTokenStore(t),
-		Org:                  mockdb.NewMockOrgStore(t),
-		MultiSync:            mockdb.NewMockMultiSyncStore(t),
-		File:                 mockdb.NewMockFileStore(t),
-		SSH:                  mockdb.NewMockSSHKeyStore(t),
-		Telemetry:            mockdb.NewMockTelemetryStore(t),
-		RepoFile:             mockdb.NewMockRepoFileStore(t),
-		Event:                mockdb.NewMockEventStore(t),
-		TagRule:              mockdb.NewMockTagRuleStore(t),
-		ViewerStore:          mockdb.NewMockDataviewerStore(t),
-		Broadcast:            mockdb.NewMockBroadcastStore(t),
-		SpaceTemplate:        mockdb.NewMockSpaceTemplateStore(t),
-		MCPServerStore:       mockdb.NewMockMCPServerStore(t),
-		MirrorTaskStore:      mockdb.NewMockMirrorTaskStore(t),
+		User:                   mockdb.NewMockUserStore(t),
+		UserLikes:              mockdb.NewMockUserLikesStore(t),
+		Repo:                   mockdb.NewMockRepoStore(t),
+		RepoRelation:           mockdb.NewMockRepoRelationsStore(t),
+		Model:                  mockdb.NewMockModelStore(t),
+		SpaceResource:          mockdb.NewMockSpaceResourceStore(t),
+		Tag:                    mockdb.NewMockTagStore(t),
+		Dataset:                mockdb.NewMockDatasetStore(t),
+		PromptConversation:     mockdb.NewMockPromptConversationStore(t),
+		PromptPrefix:           mockdb.NewMockPromptPrefixStore(t),
+		LLMConfig:              mockdb.NewMockLLMConfigStore(t),
+		Prompt:                 mockdb.NewMockPromptStore(t),
+		Namespace:              mockdb.NewMockNamespaceStore(t),
+		LfsMetaObject:          mockdb.NewMockLfsMetaObjectStore(t),
+		LfsLock:                mockdb.NewMockLfsLockStore(t),
+		Mirror:                 mockdb.NewMockMirrorStore(t),
+		MirrorSource:           mockdb.NewMockMirrorSourceStore(t),
+		AccessToken:            mockdb.NewMockAccessTokenStore(t),
+		SyncVersion:            mockdb.NewMockSyncVersionStore(t),
+		SyncClientSetting:      mockdb.NewMockSyncClientSettingStore(t),
+		RuntimeFramework:       mockdb.NewMockRuntimeFrameworksStore(t),
+		DeployTask:             mockdb.NewMockDeployTaskStore(t),
+		UserResources:          mockdb.NewMockUserResourcesStore(t),
+		ClusterInfo:            mockdb.NewMockClusterInfoStore(t),
+		Code:                   mockdb.NewMockCodeStore(t),
+		Collection:             mockdb.NewMockCollectionStore(t),
+		Workflow:               mockdb.NewMockArgoWorkFlowStore(t),
+		Space:                  mockdb.NewMockSpaceStore(t),
+		SpaceSdk:               mockdb.NewMockSpaceSdkStore(t),
+		Recom:                  mockdb.NewMockRecomStore(t),
+		RepoRuntimeFramework:   mockdb.NewMockRepositoriesRuntimeFrameworkStore(t),
+		Discussion:             mockdb.NewMockDiscussionStore(t),
+		RuntimeArch:            mockdb.NewMockRuntimeArchitecturesStore(t),
+		ResourceModel:          mockdb.NewMockResourceModelStore(t),
+		GitServerAccessToken:   mockdb.NewMockGitServerAccessTokenStore(t),
+		Org:                    mockdb.NewMockOrgStore(t),
+		MultiSync:              mockdb.NewMockMultiSyncStore(t),
+		File:                   mockdb.NewMockFileStore(t),
+		SSH:                    mockdb.NewMockSSHKeyStore(t),
+		Telemetry:              mockdb.NewMockTelemetryStore(t),
+		RepoFile:               mockdb.NewMockRepoFileStore(t),
+		Event:                  mockdb.NewMockEventStore(t),
+		License:                mockdb.NewMockLicenseStore(t),
+		TagRule:                mockdb.NewMockTagRuleStore(t),
+		AccountSyncQuota:       mockdb.NewMockAccountSyncQuotaStore(t),
+		Broadcast:              mockdb.NewMockBroadcastStore(t),
+		ViewerStore:            mockdb.NewMockDataviewerStore(t),
+		SpaceTemplate:          mockdb.NewMockSpaceTemplateStore(t),
+		RuleStore:              mockdb.NewMockRuleStore(t),
+		MCPServerStore:         mockdb.NewMockMCPServerStore(t),
+		StatSnapStore:          mockdb.NewMockStatSnapStore(t),
+		MirrorTaskStore:        mockdb.NewMockMirrorTaskStore(t),
+		MirrorNamespaceMapping: mockdb.NewMockMirrorNamespaceMappingStore(t),
 	}
 }
 
@@ -205,6 +219,10 @@ func (s *MockStores) DeployTaskMock() *mockdb.MockDeployTaskStore {
 	return s.DeployTask.(*mockdb.MockDeployTaskStore)
 }
 
+func (s *MockStores) UserResourcesMock() *mockdb.MockUserResourcesStore {
+	return s.UserResources.(*mockdb.MockUserResourcesStore)
+}
+
 func (s *MockStores) ClusterInfoMock() *mockdb.MockClusterInfoStore {
 	return s.ClusterInfo.(*mockdb.MockClusterInfoStore)
 }
@@ -215,6 +233,10 @@ func (s *MockStores) CodeMock() *mockdb.MockCodeStore {
 
 func (s *MockStores) CollectionMock() *mockdb.MockCollectionStore {
 	return s.Collection.(*mockdb.MockCollectionStore)
+}
+
+func (s *MockStores) WorkflowMock() *mockdb.MockArgoWorkFlowStore {
+	return s.Workflow.(*mockdb.MockArgoWorkFlowStore)
 }
 
 func (s *MockStores) SpaceMock() *mockdb.MockSpaceStore {
@@ -277,6 +299,14 @@ func (s *MockStores) EventMock() *mockdb.MockEventStore {
 	return s.Event.(*mockdb.MockEventStore)
 }
 
+func (s *MockStores) LicenseMock() *mockdb.MockLicenseStore {
+	return s.License.(*mockdb.MockLicenseStore)
+}
+
+func (s *MockStores) AccountSyncQuotaMock() *mockdb.MockAccountSyncQuotaStore {
+	return s.AccountSyncQuota.(*mockdb.MockAccountSyncQuotaStore)
+}
+
 func (s *MockStores) BroadcastMock() *mockdb.MockBroadcastStore {
 	return s.Broadcast.(*mockdb.MockBroadcastStore)
 }
@@ -285,10 +315,22 @@ func (s *MockStores) SpaceTemplateMock() *mockdb.MockSpaceTemplateStore {
 	return s.SpaceTemplate.(*mockdb.MockSpaceTemplateStore)
 }
 
+func (s *MockStores) RuleMock() *mockdb.MockRuleStore {
+	return s.RuleStore.(*mockdb.MockRuleStore)
+}
+
 func (s *MockStores) MCPServerMock() *mockdb.MockMCPServerStore {
 	return s.MCPServerStore.(*mockdb.MockMCPServerStore)
 }
 
+func (s *MockStores) StatMock() *mockdb.MockStatSnapStore {
+	return s.StatSnapStore.(*mockdb.MockStatSnapStore)
+}
+
 func (s *MockStores) MirrorTaskMock() *mockdb.MockMirrorTaskStore {
 	return s.MirrorTaskStore.(*mockdb.MockMirrorTaskStore)
+}
+
+func (s *MockStores) MirrorNamespaceMappingMock() *mockdb.MockMirrorNamespaceMappingStore {
+	return s.MirrorNamespaceMapping.(*mockdb.MockMirrorNamespaceMappingStore)
 }

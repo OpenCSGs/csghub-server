@@ -407,6 +407,9 @@ func (t *DeployRunner) makeDeployEnv(
 		envMap["JUPYTER_ENABLE_LAB"] = "yes"
 		envMap["TERM"] = "xterm-256color"
 	}
+	if deploy.Type == types.NotebookType {
+		envMap["port"] = strconv.Itoa(deploy.ContainerPort)
+	}
 
 	if t.deployCfg.PublicRootDomain == "" {
 		if deploy.Type == types.FinetuneType {

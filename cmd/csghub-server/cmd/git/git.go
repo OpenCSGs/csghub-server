@@ -7,6 +7,7 @@ import (
 func init() {
 	Cmd.AddCommand(generateLfsMetaObjectsCmd)
 	Cmd.AddCommand(cloneProjectStorageCmd)
+	Cmd.AddCommand(replicateRepositoryCmd)
 }
 
 var Cmd = &cobra.Command{

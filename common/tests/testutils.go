@@ -11,6 +11,7 @@ import (
 
 	"github.com/DATA-DOG/go-txdb"
 	"github.com/google/uuid"
+	redisclient "github.com/redis/go-redis/v9"
 	"github.com/spf13/cast"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
@@ -109,7 +110,7 @@ func InitTestDB() *database.DB {
 		testcontainers.WithWaitStrategy(
 			wait.ForLog("database system is ready to accept connections").
 				WithOccurrence(2).
-				WithStartupTimeout(5*time.Second)))
+				WithStartupTimeout(60*time.Second)))
 	if err != nil {
 		panic(err)
 	}
@@ -188,7 +189,7 @@ func InitTransactionTestDB() *database.DB {
 		testcontainers.WithWaitStrategy(
 			wait.ForLog("database system is ready to accept connections").
 				WithOccurrence(2).
-				WithStartupTimeout(5*time.Second)))
+				WithStartupTimeout(60*time.Second)))
 	if err != nil {
 		panic(err)
 	}
@@ -253,4 +254,46 @@ func CheckZhparser(ctx context.Context, db *bun.DB, driver string) (bool, error)
 		return true, nil
 	}
 	return false, nil
+}
+
+// InitTestRedis initializes a test Redis instance using testcontainers
+// Must call `defer client.Close()` in the test
+func InitTestRedis() *redisclient.Client {
+	ctx := context.TODO()
+
+	req := testcontainers.ContainerRequest{
+		Image:        "opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/redis:7.2.5",
+		ExposedPorts: []string{"6379/tcp"},
+		WaitingFor:   wait.ForLog("* Ready to accept connections"),
+	}
+
+	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
+		ContainerRequest: req,
+		Started:          true,
+	})
+	if err != nil {
+		panic(err)
+	}
+
+	mappedPort, err := container.MappedPort(ctx, "6379")
+	if err != nil {
+		panic(err)
+	}
+
+	hostIP, err := container.Host(ctx)
+	if err != nil {
+		panic(err)
+	}
+
+	client := redisclient.NewClient(&redisclient.Options{
+		Addr: fmt.Sprintf("%s:%s", hostIP, mappedPort.Port()),
+		DB:   0,
+	})
+
+	err = client.Ping(ctx).Err()
+	if err != nil {
+		panic(fmt.Errorf("pinging Redis: %w", err))
+	}
+
+	return client
 }

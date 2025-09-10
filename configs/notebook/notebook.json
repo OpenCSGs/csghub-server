@@ -1,0 +1,25 @@
+{
+  "engine_name": "notebook",
+  "enabled": 1,
+  "container_port": 8000,
+  "description": "a tool for writing and running code, visualizing data, and documenting your work",
+  "engine_images": [
+    {
+      "compute_type": "gpu",
+      "image": "opencsghq/notebook:ubuntu-24.04-cuda11.8-py313-torch2.7.1",
+      "driver_version": "11.8",
+      "engine_version": "4.2.4"
+    },
+    {
+      "compute_type": "gpu",
+      "image": "opencsghq/notebook:ubuntu-24.04-cuda12.8-py313-torch2.8.0",
+      "driver_version": "12.8",
+      "engine_version": "4.2.4"
+    },
+    {
+      "compute_type": "cpu",
+      "image": "opencsghq/notebook:ubuntu-22.04-py311-torch2.3.1",
+      "engine_version": "4.2.4"
+    }
+  ]
+}

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -62,14 +63,13 @@ saved_model/**/* filter=lfs diff=lfs merge=lfs -text
 *.pdparams filter=lfs diff=lfs merge=lfs -text
 *.joblib filter=lfs diff=lfs merge=lfs -text
 `
-const LFSPrefix = "version https://git-lfs.github.com/spec/v1"
 
 type ModelComponent interface {
 	Index(ctx context.Context, filter *types.RepoFilter, per, page int, needOpWeight bool) ([]*types.Model, int, error)
 	Create(ctx context.Context, req *types.CreateModelReq) (*types.Model, error)
 	Update(ctx context.Context, req *types.UpdateModelReq) (*types.Model, error)
 	Delete(ctx context.Context, namespace, name, currentUser string) error
-	Show(ctx context.Context, namespace, name, currentUser string, needOpWeight bool) (*types.Model, error)
+	Show(ctx context.Context, namespace, name, currentUser string, needOpWeight, needMultiSync bool) (*types.Model, error)
 	GetServerless(ctx context.Context, namespace, name, currentUser string) (*types.DeployRepo, error)
 	SDKModelInfo(ctx context.Context, namespace, name, ref, currentUser string, blobs bool) (*types.SDKModelInfo, error)
 	Relations(ctx context.Context, namespace, name, currentUser string) (*types.Relations, error)
@@ -78,6 +78,7 @@ type ModelComponent interface {
 	DelRelationDataset(ctx context.Context, req types.RelationDataset) error
 	// create model deploy as inference/serverless
 	Deploy(ctx context.Context, deployReq types.DeployActReq, req types.ModelRunReq) (int64, error)
+	Wakeup(ctx context.Context, namespace, name string, id int64) error
 	ListModelsByRuntimeFrameworkID(ctx context.Context, currentUser string, per, page int, id int64, deployType int) ([]types.Model, int, error)
 	ListAllByRuntimeFramework(ctx context.Context, currentUser string) ([]database.RuntimeFramework, error)
 	SetRuntimeFrameworkModes(ctx context.Context, deployType int, id int64, paths []string) ([]string, error)
@@ -180,7 +181,10 @@ func (c *modelComponentImpl) Index(ctx context.Context, filter *types.RepoFilter
 		if model == nil {
 			continue
 		}
-		var tags []types.RepoTag
+		var (
+			tags             []types.RepoTag
+			mirrorTaskStatus types.MirrorTaskStatus
+		)
 		for _, tag := range repo.Tags {
 			tags = append(tags, types.RepoTag{
 				Name:      tag.Name,
@@ -192,6 +196,9 @@ func (c *modelComponentImpl) Index(ctx context.Context, filter *types.RepoFilter
 				CreatedAt: tag.CreatedAt,
 				UpdatedAt: tag.UpdatedAt,
 			})
+		}
+		if model.Repository.Mirror.CurrentTask != nil {
+			mirrorTaskStatus = model.Repository.Mirror.CurrentTask.Status
 		}
 		resModels = append(resModels, &types.Model{
 			ID:           model.ID,
@@ -215,6 +222,10 @@ func (c *modelComponentImpl) Index(ctx context.Context, filter *types.RepoFilter
 				MSPath:  model.Repository.MSPath,
 				CSGPath: model.Repository.CSGPath,
 			},
+			ReportURL:        model.ReportURL,
+			MediumRiskCount:  model.MediumRiskCount,
+			HighRiskCount:    model.HighRiskCount,
+			MirrorTaskStatus: mirrorTaskStatus,
 		})
 	}
 	if needOpWeight {
@@ -251,9 +262,12 @@ func (c *modelComponentImpl) Create(ctx context.Context, req *types.CreateModelR
 	}
 
 	dbModel := database.Model{
-		Repository:   dbRepo,
-		RepositoryID: dbRepo.ID,
-		BaseModel:    req.BaseModel,
+		Repository:      dbRepo,
+		RepositoryID:    dbRepo.ID,
+		BaseModel:       req.BaseModel,
+		ReportURL:       req.ReportURL,
+		MediumRiskCount: req.MediumRiskCount,
+		HighRiskCount:   req.HighRiskCount,
 	}
 
 	model, err := c.modelStore.Create(ctx, dbModel)
@@ -322,12 +336,15 @@ func (c *modelComponentImpl) Create(ctx context.Context, req *types.CreateModelR
 			Nickname: user.NickName,
 			Email:    user.Email,
 		},
-		Tags:      tags,
-		CreatedAt: model.CreatedAt,
-		UpdatedAt: model.UpdatedAt,
-		BaseModel: model.BaseModel,
-		License:   model.Repository.License,
-		URL:       model.Repository.Path,
+		Tags:            tags,
+		CreatedAt:       model.CreatedAt,
+		UpdatedAt:       model.UpdatedAt,
+		BaseModel:       model.BaseModel,
+		License:         model.Repository.License,
+		ReportURL:       model.ReportURL,
+		MediumRiskCount: model.MediumRiskCount,
+		HighRiskCount:   model.HighRiskCount,
+		URL:             model.Repository.Path,
 	}
 
 	go func() {
@@ -377,23 +394,30 @@ func (c *modelComponentImpl) Update(ctx context.Context, req *types.UpdateModelR
 	if req.BaseModel != nil {
 		model.BaseModel = *req.BaseModel
 	}
+	model.ReportURL = req.ReportURL
+	model.MediumRiskCount = req.MediumRiskCount
+	model.HighRiskCount = req.HighRiskCount
+
 	model, err = c.modelStore.Update(ctx, *model)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update database model, error: %w", err)
 	}
 	resModel := &types.Model{
-		ID:           model.ID,
-		Name:         dbRepo.Name,
-		Nickname:     dbRepo.Nickname,
-		Description:  dbRepo.Description,
-		Likes:        dbRepo.Likes,
-		Downloads:    dbRepo.DownloadCount,
-		Path:         dbRepo.Path,
-		RepositoryID: dbRepo.ID,
-		Private:      dbRepo.Private,
-		CreatedAt:    model.CreatedAt,
-		UpdatedAt:    model.UpdatedAt,
-		BaseModel:    model.BaseModel,
+		ID:              model.ID,
+		Name:            dbRepo.Name,
+		Nickname:        dbRepo.Nickname,
+		Description:     dbRepo.Description,
+		Likes:           dbRepo.Likes,
+		Downloads:       dbRepo.DownloadCount,
+		Path:            dbRepo.Path,
+		RepositoryID:    dbRepo.ID,
+		Private:         dbRepo.Private,
+		CreatedAt:       model.CreatedAt,
+		UpdatedAt:       model.UpdatedAt,
+		BaseModel:       model.BaseModel,
+		ReportURL:       model.ReportURL,
+		MediumRiskCount: model.MediumRiskCount,
+		HighRiskCount:   model.HighRiskCount,
 	}
 
 	return resModel, nil
@@ -438,7 +462,7 @@ func (c *modelComponentImpl) Delete(ctx context.Context, namespace, name, curren
 	return nil
 }
 
-func (c *modelComponentImpl) Show(ctx context.Context, namespace, name, currentUser string, needOpWeight bool) (*types.Model, error) {
+func (c *modelComponentImpl) Show(ctx context.Context, namespace, name, currentUser string, needOpWeight, needMultiSync bool) (*types.Model, error) {
 	var (
 		tags             []types.RepoTag
 		syncStatus       types.RepositorySyncStatus
@@ -530,6 +554,9 @@ func (c *modelComponentImpl) Show(ctx context.Context, namespace, name, currentU
 			MSPath:  model.Repository.MSPath,
 			CSGPath: model.Repository.CSGPath,
 		},
+		ReportURL:        model.ReportURL,
+		MediumRiskCount:  model.MediumRiskCount,
+		HighRiskCount:    model.HighRiskCount,
 		MirrorTaskStatus: mirrorTaskStatus,
 	}
 	// admin user or owner can see the sensitive check status
@@ -538,6 +565,15 @@ func (c *modelComponentImpl) Show(ctx context.Context, namespace, name, currentU
 	}
 	if needOpWeight {
 		c.addOpWeightToModel(ctx, []int64{model.RepositoryID}, []*types.Model{resModel})
+	}
+	// add recom_scores to model
+	if needMultiSync {
+		weightNames := []database.RecomWeightName{database.RecomWeightFreshness,
+			database.RecomWeightDownloads,
+			database.RecomWeightQuality,
+			database.RecomWeightOp,
+			database.RecomWeightTotal}
+		c.addWeightsToModel(ctx, resModel.RepositoryID, resModel, weightNames)
 	}
 
 	modelFormat := model.Repository.Format()
@@ -849,6 +885,7 @@ func (c *modelComponentImpl) DelRelationDataset(ctx context.Context, req types.R
 	if err != nil {
 		return fmt.Errorf("user does not exist, %w", err)
 	}
+
 	_, err = c.repoStore.FindByPath(ctx, types.ModelRepo, req.Namespace, req.Name)
 	if err != nil {
 		return fmt.Errorf("failed to find model, error: %w", err)
@@ -1004,23 +1041,9 @@ func (c *modelComponentImpl) Deploy(ctx context.Context, deployReq types.DeployA
 		return -1, fmt.Errorf("cannot find user for deploy model, %w", err)
 	}
 
-	if deployReq.DeployType == types.ServerlessType {
-		// Check if the user is an admin
-		isAdmin := c.repoComponent.IsAdminRole(user)
-		if !isAdmin {
-			return -1, errorx.ErrForbiddenMsg("need admin permission for Serverless deploy")
-		}
-	}
-
 	frame, err := c.runtimeFrameworksStore.FindEnabledByID(ctx, req.RuntimeFrameworkID)
 	if err != nil {
 		return -1, fmt.Errorf("cannot find available runtime framework, %w", err)
-	}
-	//check entrypoint for llama.cpp
-	if frame.FrameName == string(types.LlamaCpp) {
-		if req.Entrypoint == "" {
-			return -1, fmt.Errorf("entrypoint is required for llama.cpp")
-		}
 	}
 
 	varStr, err := c.buildVariables(req, frame)
@@ -1043,6 +1066,16 @@ func (c *modelComponentImpl) Deploy(ctx context.Context, deployReq types.DeployA
 		return -1, fmt.Errorf("cannot find resource, %w", err)
 	}
 
+	req.ClusterID = resource.ClusterID
+
+	// resource available only if err is nil, err message should contain
+	// the reason why resource is unavailable
+	err = c.repoComponent.CheckAccountAndResource(ctx, deployReq.CurrentUser, req.ClusterID, req.OrderDetailID, resource)
+	if err != nil {
+		return -1, err
+	}
+
+	// choose image
 	var hardware types.HardWare
 	err = json.Unmarshal([]byte(resource.Resources), &hardware)
 	if err != nil {
@@ -1057,13 +1090,6 @@ func (c *modelComponentImpl) Deploy(ctx context.Context, deployReq types.DeployA
 		if req.MinReplica < 1 {
 			return -1, errorx.ErrMultiHostInferenceReplicaCount
 		}
-	}
-
-	// resource available only if err is nil, err message should contain
-	// the reason why resource is unavailable
-	_, err = c.deployer.CheckResourceAvailable(ctx, req.ClusterID, req.OrderDetailID, &hardware)
-	if err != nil {
-		return -1, err
 	}
 
 	// create deploy for model
@@ -1095,6 +1121,25 @@ func (c *modelComponentImpl) Deploy(ctx context.Context, deployReq types.DeployA
 	}
 	dp = modelRunUpdateDeployRepo(dp, req)
 	return c.deployer.Deploy(ctx, dp)
+}
+
+func (c *modelComponentImpl) Wakeup(ctx context.Context, namespace, name string, deployId int64) error {
+	_, err := c.modelStore.FindByPath(ctx, namespace, name)
+	if err != nil {
+		slog.Error("can't wakeup inference", slog.Any("error", err), slog.String("namespace", namespace), slog.String("name", name))
+		return err
+	}
+	// get Deploy for inference
+	deploy, err := c.deployTaskStore.GetDeployByID(ctx, deployId)
+	if err != nil {
+		return fmt.Errorf("can't get inference delopyment,%w", err)
+	}
+	return c.deployer.Wakeup(ctx, types.DeployRepo{
+		DeployID:  deployId,
+		Namespace: namespace,
+		Name:      name,
+		SvcName:   deploy.SvcName,
+	})
 }
 
 func (c *modelComponentImpl) buildVariables(req types.ModelRunReq, frame *database.RuntimeFramework) (string, error) {
@@ -1344,6 +1389,25 @@ func GetBuiltInTaskFromTags(tags []database.Tag) string {
 		if tag.Name == string(types.FeatureExtraction) || tag.Name == string(types.SentenceSimilarity) {
 			return string(types.FeatureExtraction)
 		}
+		if tag.Name == string(types.ImageText2Text) {
+			return tag.Name
+		}
 	}
 	return string(types.TextGeneration)
+}
+
+func (c *modelComponentImpl) addWeightsToModel(ctx context.Context, repoID int64, resModel *types.Model, weightNames []database.RecomWeightName) {
+	weights, err := c.recomStore.FindByRepoIDs(ctx, []int64{repoID})
+	if err == nil {
+		resModel.Scores = make([]types.WeightScore, 0)
+		for _, weight := range weights {
+			if slices.Contains(weightNames, weight.WeightName) {
+				score := types.WeightScore{
+					WeightName: string(weight.WeightName),
+					Score:      weight.Score,
+				}
+				resModel.Scores = append(resModel.Scores, score)
+			}
+		}
+	}
 }

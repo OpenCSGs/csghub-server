@@ -8,6 +8,9 @@ import (
 )
 
 func (a *Activities) SyncAsClient(ctx context.Context) error {
+	if a.config.Saas {
+		return nil
+	}
 	setting, err := a.stores.syncClientSetting.First(ctx)
 	if err != nil {
 		slog.Error("failed to find sync client setting", "error", err)

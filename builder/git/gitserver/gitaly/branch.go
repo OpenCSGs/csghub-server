@@ -27,6 +27,7 @@ func (c *Client) GetRepoBranches(ctx context.Context, req gitserver.GetBranchesR
 		},
 	}
 	stream, err := c.refClient.FindAllBranches(ctx, branchesReq)
+
 	if err != nil {
 		return nil, err
 	}

@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"time"
 )
 
 type lfsLockStoreImpl struct {
@@ -35,6 +36,7 @@ type LfsLock struct {
 	UserID       int64      `bun:",notnull" json:"user_id"`
 	User         User       `bun:"rel:belongs-to,join:user_id=id" json:"user"`
 	Path         string     `bun:",notnull" json:"path"`
+	DeletedAt    time.Time  `bun:",soft_delete,nullzero"`
 	times
 }
 
@@ -95,6 +97,7 @@ func (s *lfsLockStoreImpl) RemoveByID(ctx context.Context, ID int64) error {
 	_, err := s.db.Operator.Core.NewDelete().
 		Model(&LfsLock{}).
 		Where("id = ?", ID).
+		ForceDelete().
 		Exec(ctx)
 
 	return err

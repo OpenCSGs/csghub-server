@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -22,6 +23,7 @@ import (
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/git/gitserver/gitaly"
+	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/store/s3"
 	"opencsg.com/csghub-server/builder/temporal"
@@ -31,18 +33,24 @@ import (
 	"opencsg.com/csghub-server/component"
 	"opencsg.com/csghub-server/mirror/cache"
 	"opencsg.com/csghub-server/mirror/filter"
+	"opencsg.com/csghub-server/mirror/hook"
+	"opencsg.com/csghub-server/mirror/reposyncer"
 )
 
-type repoPathKey string
+type (
+	repoPathKey      string
+	sourceUrlKey     string
+	defaultBranchKey string
+)
 
 var (
-	rk             repoPathKey = "repoPath"
-	maxRetries     int         = 3
-	MaxGroupSize   int64       = 10 * 1024 * 1024 * 1024 // 10GB
-	MaxGroupCount  int         = 15
-	maxPartNum     int         = 1000
-	lfsConcurrency             = 5
-	lfsPartSize                = 100
+	rk            repoPathKey      = "repoPath"
+	suk           sourceUrlKey     = "sourceUrl"
+	dbk           defaultBranchKey = "defaultBranch"
+	maxRetries    int              = 3
+	MaxGroupSize  int64            = 10 * 1024 * 1024 * 1024 // 10GB
+	MaxGroupCount int              = 15
+	maxPartNum    int              = 1000
 )
 
 type LfsSyncWorker struct {
@@ -58,10 +66,12 @@ type LfsSyncWorker struct {
 	syncCache          cache.Cache
 	mu                 sync.Mutex
 	httpClient         *http.Client
+	msgSender          hook.MessageSender
 	recomComponent     component.RecomComponent
 	ctx                context.Context
-	repoFilter         *filter.RepoFilter
+	repoFilter         filter.Filter
 	git                gitserver.GitServer
+	workflowClient     temporal.Client
 }
 
 func NewLfsSyncWorker(config *config.Config, id int) (*LfsSyncWorker, error) {
@@ -107,6 +117,13 @@ func NewLfsSyncWorker(config *config.Config, id int) (*LfsSyncWorker, error) {
 		}
 	}
 
+	msgSender := hook.NewMessageSender(
+		fmt.Sprintf("%s:%d", config.Notification.Host, config.Notification.Port),
+		rpc.AuthWithApiKey(config.APIToken),
+		rpc.WithJSONHeader(),
+	)
+	w.msgSender = msgSender
+
 	recomComponent, err := component.NewRecomComponent(config)
 	if err != nil {
 		return nil, fmt.Errorf("fail to create recom component")
@@ -119,6 +136,7 @@ func NewLfsSyncWorker(config *config.Config, id int) (*LfsSyncWorker, error) {
 		slog.Error(newError.Error())
 		return nil, newError
 	}
+	w.workflowClient = temporal.GetClient()
 
 	return w, nil
 }
@@ -161,8 +179,53 @@ func (w *LfsSyncWorker) Run(mt *database.MirrorTask) {
 		return
 	}
 
+	shouldSync, message, err := w.repoFilter.ShouldSync(w.ctx, mirror.RepositoryID)
+	if err != nil {
+		slog.Error("fail to check if repo should sync",
+			slog.Int("workerId", w.id),
+			slog.Any("error", err),
+		)
+		return
+	}
+
+	if !shouldSync {
+		err := w.sendMessage(w.ctx, mirror, types.MirrorRepoTooLarge)
+		if err != nil {
+			slog.Info("fail to send notice message",
+				slog.Int("workerID", w.id),
+				slog.Any("error", err),
+			)
+		}
+		slog.Info("repo should not sync, lower the priority",
+			slog.Any("message", message),
+			slog.Int("workerID", w.id),
+			slog.Any("repoID", mirror.RepositoryID),
+		)
+
+		mt.Priority = types.LowMirrorPriority
+		mt.Mirror.Priority = types.LowMirrorPriority
+		_, err = w.mirrorTaskStore.Update(w.ctx, *mt)
+		if err != nil {
+			slog.Error("fail to update mirror task",
+				slog.Int("workerID", w.id),
+				slog.Any("error", err),
+			)
+		}
+
+		err = w.mirrorStore.Update(w.ctx, mt.Mirror)
+		if err != nil {
+			slog.Error("fail to update mirror",
+				slog.Int("workerID", w.id),
+				slog.Any("error", err),
+			)
+		}
+		return
+	}
+
 	repoPath := fmt.Sprintf("%ss/%s", mirror.Repository.RepositoryType, mirror.Repository.Path)
 	w.ctx = context.WithValue(w.ctx, rk, repoPath)
+	w.ctx = context.WithValue(w.ctx, suk, mirror.SourceUrl)
+	w.ctx = context.WithValue(w.ctx, dbk, mirror.Repository.DefaultBranch)
 
 	err = w.SyncLfs(w.ctx, mt)
 	if err != nil {
@@ -215,6 +278,15 @@ func (w *LfsSyncWorker) Run(mt *database.MirrorTask) {
 		return
 	}
 
+	err = w.sendMessage(ctx, mirror, mt.Status)
+	if err != nil {
+		slog.Error("fail to send message",
+			slog.Int("workerID", w.id),
+			slog.Any("error", err),
+			slog.Any("repoPath", repoPath),
+		)
+	}
+
 	err = w.recomComponent.SetOpWeight(w.ctx, mirror.RepositoryID, int64(100*mt.Priority))
 	if err != nil {
 		slog.Error("fail to set op weight",
@@ -244,7 +316,17 @@ func (w *LfsSyncWorker) SyncLfs(ctx context.Context, mt *database.MirrorTask) er
 		slog.Any("repoPath", repoPath),
 	)
 
-	pointers, err := w.getSyncPointers(ctx, mt)
+	// Send message
+	err := w.sendMessage(ctx, mt.Mirror, types.MirrorLfsSyncStart)
+	if err != nil {
+		slog.Error("failed to send notice message",
+			slog.Int("workerID", w.id),
+			slog.Any("error", err),
+			slog.Any("repo_path", repoPath),
+		)
+	}
+
+	pointers, err = w.getSyncPointers(ctx, mt)
 	if err != nil {
 		slog.Error("fail to get sync pointers",
 			slog.Int("workerID", w.id),
@@ -355,6 +437,44 @@ func (w *LfsSyncWorker) getSyncPointers(
 	return pointers, nil
 }
 
+func (w *LfsSyncWorker) sendMessage(ctx context.Context, mirror *database.Mirror, status types.MirrorTaskStatus) error {
+	statusToSend := reposyncer.MirrorStatusToMessageTypeMapping[status]
+	if statusToSend == "" {
+		return nil
+	}
+
+	syncInfo := types.SyncInfo{
+		RemoteURL: mirror.SourceUrl,
+		LocalURL: fmt.Sprintf(
+			"%s/%ss/%s",
+			w.config.Frontend.URL,
+			mirror.Repository.RepositoryType,
+			mirror.Repository.Path,
+		),
+		RepoType: mirror.Repository.RepositoryType,
+		Path:     mirror.Repository.Path,
+		Status:   statusToSend,
+		Size:     mirror.Repository.LFSObjectsSize,
+	}
+	byteInfo, _ := json.Marshal(syncInfo)
+	message := types.MessageRequest{
+		Scenario:   types.MessageScenarioRepoSync,
+		Parameters: string(byteInfo),
+		Priority:   types.MessagePriorityNormal,
+	}
+	resp, err := w.msgSender.Send(ctx, message)
+	if err != nil {
+		return err
+	}
+	slog.Info(
+		"send message",
+		slog.Int("workerID", w.id),
+		slog.Any("response", resp),
+		slog.Any("syncInfo", syncInfo),
+	)
+	return nil
+}
+
 func (w *LfsSyncWorker) downloadAndUploadLFSFiles(
 	ctx context.Context,
 	mt *database.MirrorTask,
@@ -460,13 +580,13 @@ func (w *LfsSyncWorker) downloadAndUploadLFSFile(
 		)
 	}
 
-	partSize := int64(lfsPartSize * 1024 * 1024)
+	partSize := int64(w.config.Mirror.PartSize * 1024 * 1024)
 	if pointer.Size/partSize > int64(maxPartNum) {
 		partSize = pointer.Size / int64(maxPartNum)
 	}
 	repoPath := ctx.Value(rk).(string)
 
-	uploadID, err = w.syncCache.GetUploadID(ctx, repoPath, pointer.Oid)
+	uploadID, err = w.syncCache.GetUploadID(ctx, repoPath, pointer.Oid, strconv.Itoa(w.config.Mirror.PartSize))
 	if err != nil {
 		slog.Error(
 			"failed to get upload id from cache",
@@ -497,7 +617,7 @@ func (w *LfsSyncWorker) downloadAndUploadLFSFile(
 			return fmt.Errorf("failed to create new multipart upload: %w", err)
 		}
 
-		err = w.syncCache.CacheUploadID(ctx, repoPath, pointer.Oid, uploadID)
+		err = w.syncCache.CacheUploadID(ctx, repoPath, pointer.Oid, uploadID, strconv.Itoa(w.config.Mirror.PartSize))
 		if err != nil {
 			slog.Error(
 				"failed to cache upload id",
@@ -513,7 +633,7 @@ func (w *LfsSyncWorker) downloadAndUploadLFSFile(
 		partSize,
 		uploadID,
 		objectKey,
-		lfsConcurrency,
+		w.config.Mirror.LfsConcurrency,
 		pointer,
 	)
 	if err != nil {
@@ -542,7 +662,7 @@ func (w *LfsSyncWorker) downloadAndUploadLFSFile(
 			slog.Any("actualSize", info.Size),
 			slog.Any("repoPath", repoPath),
 		)
-		err := w.syncCache.DeleteUploadID(ctx, repoPath, pointer.Oid)
+		err := w.syncCache.DeleteUploadID(ctx, repoPath, pointer.Oid, strconv.Itoa(w.config.Mirror.PartSize))
 		if err != nil {
 			slog.Error(
 				"failed to delete upload id",
@@ -555,7 +675,7 @@ func (w *LfsSyncWorker) downloadAndUploadLFSFile(
 		}
 
 		// delete the object if upload failed
-		err = w.syncCache.DeleteLfsPartCache(ctx, repoPath, pointer.Oid)
+		err = w.syncCache.DeleteLfsPartCache(ctx, repoPath, pointer.Oid, strconv.Itoa(w.config.Mirror.PartSize))
 		if err != nil {
 			slog.Error(
 				"failed to delete lfs part cache",
@@ -567,7 +687,7 @@ func (w *LfsSyncWorker) downloadAndUploadLFSFile(
 		}
 
 		// Reset lfs upload progress
-		err = w.syncCache.CacheLfsSyncFileProgress(ctx, repoPath, pointer.Oid, 0)
+		err = w.syncCache.CacheLfsSyncFileProgress(ctx, repoPath, pointer.Oid, strconv.Itoa(w.config.Mirror.PartSize), 0)
 		if err != nil {
 			slog.Error(
 				"failed to reset lfs upload progress",
@@ -610,7 +730,7 @@ func (w *LfsSyncWorker) downloadAndUploadLFSFile(
 	}
 
 	// delete all cache if upload success
-	err = w.syncCache.DeleteAllCache(ctx, repoPath, pointer.Oid)
+	err = w.syncCache.DeleteAllCache(ctx, repoPath, pointer.Oid, strconv.Itoa(w.config.Mirror.PartSize))
 	if err != nil {
 		slog.Error(
 			"failed to delete all cache",
@@ -650,6 +770,52 @@ func (w *LfsSyncWorker) multipartUploadWithRetry(
 	partNumber0 := 1
 	totalParts := int(math.Ceil(float64(totalSize) / float64(partSize)))
 
+	uploadedParts, err := w.ossCore.ListObjectParts(ctx, w.config.S3.Bucket, objectKey, uploadID, 0, 0)
+	if err != nil {
+		slog.Error(
+			"failed to list object parts",
+			slog.Int("workerID", w.id),
+			slog.Any("repoPath", repoPath),
+			slog.Any("objectKey", objectKey),
+			slog.Any("uploadID", uploadID),
+			slog.Any("oid", pointer.Oid),
+			slog.Any("err", err),
+		)
+		return fmt.Errorf("failed to list object parts: %w", err)
+	}
+
+	// If the length of uploadedParts is more than totalParts, it means that the upload went wrong
+	// and we need to abort the upload
+	if len(uploadedParts.ObjectParts) > totalParts {
+		err := w.ossCore.AbortMultipartUpload(ctx, w.config.S3.Bucket, objectKey, uploadID)
+		if err != nil {
+			slog.Error(
+				"failed to abort multipart upload",
+				slog.Int("workerID", w.id),
+				slog.Any("repoPath", repoPath),
+				slog.Any("objectKey", objectKey),
+				slog.Any("uploadID", uploadID),
+				slog.Any("oid", pointer.Oid),
+				slog.Any("err", err),
+			)
+			return fmt.Errorf("failed to abort multipart upload: %w", err)
+		}
+	}
+
+	// Refresh cache progress
+	progress := float64(len(uploadedParts.ObjectParts)) / float64(totalParts) * 100
+	err = w.syncCache.CacheLfsSyncFileProgress(ctx, repoPath, pointer.Oid, strconv.Itoa(w.config.Mirror.PartSize), int(progress))
+	if err != nil {
+		slog.Error(
+			"failed to cache progress",
+			slog.Int("workerID", w.id),
+			slog.Any("repoPath", repoPath),
+			slog.Any("objectKey", objectKey),
+			slog.Any("oid", pointer.Oid),
+			slog.Any("err", err),
+		)
+	}
+
 	for offset0 := int64(0); offset0 < totalSize; offset0 += partSize {
 		select {
 		case <-ctx.Done():
@@ -670,7 +836,7 @@ func (w *LfsSyncWorker) multipartUploadWithRetry(
 				}
 
 				synced, _ := w.syncCache.IsLfsPartSynced(
-					ctx, repoPath, pointer.Oid, partNumber,
+					ctx, repoPath, pointer.Oid, strconv.Itoa(w.config.Mirror.PartSize), partNumber,
 				)
 				if synced {
 					return nil
@@ -688,7 +854,7 @@ func (w *LfsSyncWorker) multipartUploadWithRetry(
 				)
 
 				part, err := w.downloadAndUploadPartWithRetry(
-					ctx, downloadURL, uploadID, objectKey, partNumber, offset, end)
+					ctx, uploadID, objectKey, partNumber, offset, end, pointer)
 				if err != nil {
 					slog.Error(
 						"failed to upload part",
@@ -720,7 +886,7 @@ func (w *LfsSyncWorker) multipartUploadWithRetry(
 				)
 
 				// Cache the part uploaded
-				err = w.syncCache.CacheLfsSyncAddPart(ctx, repoPath, pointer.Oid, partNumber)
+				err = w.syncCache.CacheLfsSyncAddPart(ctx, repoPath, pointer.Oid, strconv.Itoa(w.config.Mirror.PartSize), partNumber)
 				if err != nil {
 					slog.Error(
 						"failed to add part to cache",
@@ -734,7 +900,7 @@ func (w *LfsSyncWorker) multipartUploadWithRetry(
 				}
 
 				// Count progress
-				uploadedPartCount, err := w.syncCache.LfsPartSyncedCount(ctx, repoPath, pointer.Oid)
+				uploadedPartCount, err := w.syncCache.LfsPartSyncedCount(ctx, repoPath, pointer.Oid, strconv.Itoa(w.config.Mirror.PartSize))
 				if err != nil {
 					slog.Error(
 						"failed to count uploaded parts",
@@ -746,7 +912,7 @@ func (w *LfsSyncWorker) multipartUploadWithRetry(
 					)
 				}
 				progress := float64(uploadedPartCount) / float64(totalParts) * 100
-				err = w.syncCache.CacheLfsSyncFileProgress(ctx, repoPath, pointer.Oid, int(progress))
+				err = w.syncCache.CacheLfsSyncFileProgress(ctx, repoPath, pointer.Oid, strconv.Itoa(w.config.Mirror.PartSize), int(progress))
 				if err != nil {
 					slog.Error(
 						"failed to cache progress",
@@ -763,7 +929,7 @@ func (w *LfsSyncWorker) multipartUploadWithRetry(
 			partNumber0++
 		}
 	}
-	err := eg.Wait()
+	err = eg.Wait()
 	if err != nil {
 		slog.Error(
 			"failed to download and upload lfs file",
@@ -790,6 +956,22 @@ func (w *LfsSyncWorker) multipartUploadWithRetry(
 	}
 
 	if len(result.ObjectParts) != totalParts {
+		// If the number of parts in OSS is more than the parts we caculated, should delete the uploadID and retry the upload
+		if len(result.ObjectParts) > totalParts {
+			err := w.syncCache.DeleteUploadID(ctx, repoPath, pointer.Oid, strconv.Itoa(w.config.Mirror.PartSize))
+			if err != nil {
+				slog.Error(
+					"failed to delete upload id",
+					slog.Int("workerID", w.id),
+					slog.Any("error", err),
+					slog.Any("repoPath", repoPath),
+					slog.Any("uploadID", uploadID),
+					slog.Any("oid", pointer.Oid),
+				)
+			}
+			return fmt.Errorf("upload more parts than expected, expected: %d, got: %d",
+				totalParts, len(result.ObjectParts))
+		}
 		partNumberMapping := make(map[int]struct{})
 		for _, part := range result.ObjectParts {
 			partNumberMapping[part.PartNumber] = struct{}{}
@@ -798,7 +980,7 @@ func (w *LfsSyncWorker) multipartUploadWithRetry(
 			_, ok := partNumberMapping[partNumber]
 			if !ok {
 				slog.Error("part number missing", slog.Any("partNumber", partNumber), slog.Any("oid", pointer.Oid))
-				err := w.syncCache.DeleteSpecificLfsPartCache(ctx, repoPath, pointer.Oid, partNumber)
+				err := w.syncCache.DeleteSpecificLfsPartCache(ctx, repoPath, pointer.Oid, strconv.Itoa(w.config.Mirror.PartSize), partNumber)
 				if err != nil {
 					slog.Error(
 						"failed to delete specific lfs part cache",
@@ -814,7 +996,7 @@ func (w *LfsSyncWorker) multipartUploadWithRetry(
 		return fmt.Errorf("not all parts uploaded, %d/%d", len(result.ObjectParts), totalParts)
 	}
 
-	// Sort the parts by part number
+	// // Sort the parts by part number
 	// sort.Slice(parts, func(i, j int) bool { return parts[i].PartNumber < parts[j].PartNumber })
 
 	var completeCompleteParts []minio.CompletePart
@@ -826,7 +1008,6 @@ func (w *LfsSyncWorker) multipartUploadWithRetry(
 	}
 
 	sort.Slice(completeCompleteParts, func(i, j int) bool { return completeCompleteParts[i].PartNumber < completeCompleteParts[j].PartNumber })
-
 	_, err = w.ossCore.CompleteMultipartUpload(
 		ctx, w.config.S3.Bucket, objectKey, uploadID, completeCompleteParts, minio.PutObjectOptions{
 			DisableContentSha256: true,
@@ -857,10 +1038,11 @@ func (w *LfsSyncWorker) multipartUploadWithRetry(
 
 func (w *LfsSyncWorker) downloadAndUploadPartWithRetry(
 	ctx context.Context,
-	downloadURL, uploadID, objectKey string,
+	uploadID, objectKey string,
 	partNumber int,
 	start int64,
 	end int64,
+	pointer *types.Pointer,
 ) (minio.ObjectPart, error) {
 	var (
 		part    minio.ObjectPart
@@ -868,6 +1050,10 @@ func (w *LfsSyncWorker) downloadAndUploadPartWithRetry(
 	)
 	repoPath := ctx.Value(rk).(string)
 	for attempt := 1; attempt <= maxRetries; attempt++ {
+		downloadURL := pointer.DownloadURL
+		if downloadURL == "" {
+			return part, fmt.Errorf("downloadURL is empty")
+		}
 		slog.Info(
 			"downloading range",
 			slog.Int("workerID", w.id),
@@ -890,6 +1076,16 @@ func (w *LfsSyncWorker) downloadAndUploadPartWithRetry(
 				slog.Any("attempt", attempt),
 				slog.Any("error", err),
 			)
+			if resp.StatusCode == http.StatusForbidden {
+				sourceURL := ctx.Value(suk).(string)
+				defaultBranch := ctx.Value(dbk).(string)
+				pointers, err := w.GetLFSDownloadURLs(ctx, sourceURL, defaultBranch, []*types.Pointer{pointer})
+				if err != nil {
+					return part, fmt.Errorf("failed to get download URLs: %w", err)
+				}
+				pointer = pointers[0]
+				continue
+			}
 			return part, fmt.Errorf("failed to download range: %w", err)
 		}
 
@@ -983,6 +1179,10 @@ func (w *LfsSyncWorker) CheckIfLFSFileExists(
 ) (bool, error) {
 	_, err := w.ossClient.StatObject(ctx, w.config.S3.Bucket, objectKey, minio.StatObjectOptions{})
 	if err != nil {
+		// Check if it's a "not found" error
+		if strings.Contains(err.Error(), "NoSuchKey") || strings.Contains(err.Error(), "not found") {
+			return false, nil
+		}
 		return false, err
 	}
 	return true, nil
@@ -1118,12 +1318,12 @@ func (w *LfsSyncWorker) triggerGitCallback(
 	callback.Ref = branch
 
 	//start workflow to handle push request
-	workflowClient := temporal.GetClient()
+
 	workflowOptions := client.StartWorkflowOptions{
 		TaskQueue: workflow.HandlePushQueueName,
 	}
 
-	we, err := workflowClient.ExecuteWorkflow(
+	_, err = w.workflowClient.ExecuteWorkflow(
 		ctx, workflowOptions, workflow.HandlePushWorkflow, callback,
 	)
 	if err != nil {
@@ -1133,7 +1333,7 @@ func (w *LfsSyncWorker) triggerGitCallback(
 	slog.Info(
 		"start handle push workflow",
 		slog.Any("workerID", w.id),
-		slog.String("workflowID", we.GetID()),
+		// slog.String("workflowID", we.GetID()),
 		slog.Any("req", callback),
 		slog.Any("repoType", repo.RepositoryType),
 		slog.Any("repoPath", repo.Path))

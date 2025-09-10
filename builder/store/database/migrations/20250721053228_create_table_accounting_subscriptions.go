@@ -10,38 +10,38 @@ import (
 )
 
 type AccountSubscription struct {
-	ID              int64         `bun:",pk,autoincrement" json:"id"`
-	UserUUID        string        `bun:",notnull" json:"user_uuid"`
-	SkuType         types.SKUType `bun:",notnull" json:"sku_type"`
-	PriceID         int64         `bun:",notnull" json:"price_id"`
-	ResourceID      string        `bun:",notnull" json:"resource_id"`
-	Status          string        `bun:",notnull" json:"status"`
-	ActionUser      string        `bun:",notnull" json:"action_user"`
-	StartAt         time.Time     `bun:",notnull" json:"start_at"`
-	EndAt           time.Time     `bun:",nullzero" json:"end_at"`
-	LastBillID      int64         `bun:",notnull,unique" json:"last_bill_id"`
-	LastPeriodStart time.Time     `bun:",notnull" json:"last_period_start"`
-	LastPeriodEnd   time.Time     `bun:",notnull" json:"last_period_end"`
-	AmountPaidTotal float64       `bun:",notnull" json:"amount_paid_total"`
-	AmountPaidCount int64         `bun:",notnull" json:"amount_paid_count"`
-	NextPriceID     int64         `bun:",nullzero" json:"next_price_id"`
-	NextResourceID  string        `bun:",nullzero" json:"next_resource_id"`
+	ID              int64                    `bun:",pk,autoincrement" json:"id"`
+	UserUUID        string                   `bun:",notnull" json:"user_uuid"`
+	SkuType         types.SKUType            `bun:",notnull" json:"sku_type"`
+	PriceID         int64                    `bun:",notnull" json:"price_id"`
+	ResourceID      string                   `bun:",notnull" json:"resource_id"`
+	Status          types.SubscriptionStatus `bun:",notnull" json:"status"`
+	ActionUser      string                   `bun:",notnull" json:"action_user"`
+	StartAt         time.Time                `bun:",notnull" json:"start_at"`
+	EndAt           time.Time                `bun:",nullzero" json:"end_at"`
+	LastBillID      int64                    `bun:",notnull,unique" json:"last_bill_id"`
+	LastPeriodStart time.Time                `bun:",notnull" json:"last_period_start"`
+	LastPeriodEnd   time.Time                `bun:",notnull" json:"last_period_end"`
+	AmountPaidTotal float64                  `bun:",notnull" json:"amount_paid_total"`
+	AmountPaidCount int64                    `bun:",notnull" json:"amount_paid_count"`
+	NextPriceID     int64                    `bun:",nullzero" json:"next_price_id"`
+	NextResourceID  string                   `bun:",nullzero" json:"next_resource_id"`
 	times
 }
 
 type AccountSubscriptionBill struct {
-	ID          int64     `bun:",pk,autoincrement" json:"id"`
-	SubID       int64     `bun:",notnull" json:"sub_id"`
-	EventUUID   string    `bun:",notnull,unique" json:"event_uuid"`
-	UserUUID    string    `bun:",notnull" json:"user_uuid"`
-	AmountPaid  float64   `bun:",notnull" json:"amount_paid"`
-	Status      string    `bun:",notnull" json:"status"`
-	Reason      string    `bun:",notnull" json:"reason"`
-	PeriodStart time.Time `bun:",notnull" json:"period_start"`
-	PeriodEnd   time.Time `bun:",notnull" json:"period_end"`
-	PriceID     int64     `bun:",notnull" json:"price_id"`
-	ResourceID  string    `bun:",notnull" json:"resource_id"`
-	Explain     string    `bun:",nullzero" json:"explain"`
+	ID          int64                `bun:",pk,autoincrement" json:"id"`
+	SubID       int64                `bun:",notnull" json:"sub_id"`
+	EventUUID   string               `bun:",notnull,unique" json:"event_uuid"`
+	UserUUID    string               `bun:",notnull" json:"user_uuid"`
+	AmountPaid  float64              `bun:",notnull" json:"amount_paid"`
+	Status      types.BillingStatus  `bun:",notnull" json:"status"`
+	Reason      types.BillingReasion `bun:",notnull" json:"reason"`
+	PeriodStart time.Time            `bun:",notnull" json:"period_start"`
+	PeriodEnd   time.Time            `bun:",notnull" json:"period_end"`
+	PriceID     int64                `bun:",notnull" json:"price_id"`
+	ResourceID  string               `bun:",notnull" json:"resource_id"`
+	Explain     string               `bun:",nullzero" json:"explain"`
 	times
 }
 

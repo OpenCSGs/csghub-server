@@ -3,6 +3,7 @@ package database_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/store/database"
@@ -98,6 +99,12 @@ func TestCodeStore_UserLikesCodes(t *testing.T) {
 	})
 	require.Nil(t, err)
 
+	repo3, err := database.NewRepoStoreWithDB(db).CreateRepo(ctx, database.Repository{
+		Path:    "foo/bar3",
+		GitPath: "p3",
+	})
+	require.Nil(t, err)
+
 	_, err = store.Create(ctx, database.Code{
 		RepositoryID: repo1.ID,
 	})
@@ -106,9 +113,19 @@ func TestCodeStore_UserLikesCodes(t *testing.T) {
 		RepositoryID: repo2.ID,
 	})
 	require.Nil(t, err)
+	_, err = store.Create(ctx, database.Code{
+		RepositoryID: repo3.ID,
+	})
+	require.Nil(t, err)
 	_, err = db.Core.NewInsert().Model(&database.UserLike{
 		UserID: 123,
 		RepoID: repo2.ID,
+	}).Exec(ctx)
+	require.Nil(t, err)
+	_, err = db.Core.NewInsert().Model(&database.UserLike{
+		UserID:    123,
+		RepoID:    repo3.ID,
+		DeletedAt: time.Now(),
 	}).Exec(ctx)
 	require.Nil(t, err)
 
@@ -117,25 +134,4 @@ func TestCodeStore_UserLikesCodes(t *testing.T) {
 	require.Equal(t, 1, total)
 	require.Equal(t, repo2.ID, cs[0].RepositoryID)
 
-}
-
-func TestCodeStore_CreateIfNotExist(t *testing.T) {
-	db := tests.InitTestDB()
-	defer db.Close()
-	ctx := context.TODO()
-
-	cs := database.NewCodeStoreWithDB(db)
-	c, err := cs.CreateIfNotExist(ctx, database.Code{
-		ID:           1,
-		RepositoryID: 1,
-	})
-	require.Nil(t, err)
-	require.Equal(t, c.ID, int64(1))
-
-	c, err = cs.CreateIfNotExist(ctx, database.Code{
-		ID:           1,
-		RepositoryID: 1,
-	})
-	require.Nil(t, err)
-	require.Equal(t, c.ID, int64(1))
 }

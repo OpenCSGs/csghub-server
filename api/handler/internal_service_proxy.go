@@ -9,7 +9,7 @@ import (
 )
 
 type InternalServiceProxyHandler struct {
-	rp *proxy.ReverseProxy
+	rp proxy.ReverseProxy
 }
 
 func NewInternalServiceProxyHandler(remoteEndpoint string) (*InternalServiceProxyHandler, error) {

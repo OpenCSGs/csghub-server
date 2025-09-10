@@ -93,3 +93,28 @@ func TestPromptConversationStore_CRUD(t *testing.T) {
 	_, err = store.GetConversationByID(ctx, 123, "cv", false)
 	require.NotNil(t, err)
 }
+
+func TestPromptConversationStore_GetByUUID(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewPromptConversationStoreWithDB(db)
+	msg := &database.PromptConversationMessage{
+		ConversationID: "cv",
+		Content:        "msg",
+	}
+	err := db.Core.NewInsert().Model(msg).Scan(ctx, msg)
+	require.Nil(t, err)
+
+	err = store.CreateConversation(ctx, database.PromptConversation{
+		UserID:         123,
+		ConversationID: "cv",
+		Title:          "foo",
+	})
+	require.Nil(t, err)
+
+	conversation, err := store.GetByUUID(ctx, "cv", true)
+	require.Nil(t, err)
+	require.Equal(t, 1, len(conversation.Messages))
+}

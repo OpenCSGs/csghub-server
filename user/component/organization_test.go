@@ -100,7 +100,7 @@ func TestOrganizationComponent_Index(t *testing.T) {
 		orgStore:  mockOrgStore,
 		userStore: mockUserStore,
 	}
-	expectedOrgs, total, err := c.Index(context.Background(), "user1", "", 10, 0)
+	expectedOrgs, total, err := c.Index(context.Background(), "user1", "", 10, 0, "", "")
 
 	require.NoError(t, err)
 	require.Len(t, expectedOrgs, 2)

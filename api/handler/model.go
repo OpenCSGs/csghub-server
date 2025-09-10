@@ -31,7 +31,6 @@ func NewModelHandler(config *config.Config) (*ModelHandler, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error creating repo component:%w", err)
 	}
-
 	return &ModelHandler{
 		model:     uc,
 		sensitive: sc,
@@ -66,6 +65,8 @@ type ModelHandler struct {
 // @Param        source query string false "source" Enums(opencsg, huggingface, local)
 // @Param        per query int false "per" default(20)
 // @Param        page query int false "per page" default(1)
+// @Param        model_tree query string false "example: base_model:finetune:1"
+// @Param        list_serverless query bool false "list serverless" default(false)
 // @Success      200  {object}  types.ResponseWithTotal{data=[]types.Model,total=int} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
@@ -73,6 +74,13 @@ type ModelHandler struct {
 func (h *ModelHandler) Index(ctx *gin.Context) {
 	filter := new(types.RepoFilter)
 	filter.Tags = parseTagReqs(ctx)
+	tree, err := parseTreeReqs(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequestWithExt(ctx, err)
+		return
+	}
+	filter.Tree = tree
 	filter.Username = httpbase.GetCurrentUser(ctx)
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
@@ -83,20 +91,39 @@ func (h *ModelHandler) Index(ctx *gin.Context) {
 	filter = getFilterFromContext(ctx, filter)
 	if !slices.Contains(types.Sorts, filter.Sort) {
 		msg := fmt.Sprintf("sort parameter must be one of %v", types.Sorts)
+		err := errorx.ReqParamInvalid(errors.New(msg),
+			errorx.Ctx().
+				Set("param", "sort").
+				Set("provided", filter.Sort).
+				Set("allowed", types.Sorts))
 		slog.Error("Bad request format,", slog.String("error", msg))
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": msg})
+		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 
 	if filter.Source != "" && !slices.Contains(types.Sources, filter.Source) {
 		msg := fmt.Sprintf("source parameter must be one of %v", types.Sources)
+		err := errorx.ReqParamInvalid(errors.New(msg),
+			errorx.Ctx().
+				Set("param", "source").
+				Set("provided", filter.Source).
+				Set("allowed", types.Sources))
 		slog.Error("Bad request format,", slog.String("error", msg))
-		ctx.JSON(http.StatusBadRequest, gin.H{"message": msg})
+		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 
-	models, total, err := h.model.Index(ctx.Request.Context(), filter, per, page, false)
-
+	qNeedOpWeight := ctx.Query("need_op_weight")
+	needOpWeight, err := strconv.ParseBool(qNeedOpWeight)
+	if err != nil {
+		needOpWeight = false
+	}
+	listServerlessQ := ctx.Query("list_serverless")
+	if listServerlessQ != "" {
+		listServerless, _ := strconv.ParseBool(listServerlessQ)
+		filter.ListServerless = listServerless
+	}
+	models, total, err := h.model.Index(ctx.Request.Context(), filter, per, page, needOpWeight)
 	if err != nil {
 		slog.Error("Failed to get models", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -132,7 +159,7 @@ func (h *ModelHandler) Create(ctx *gin.Context) {
 	_, err := h.sensitive.CheckRequestV2(ctx.Request.Context(), req)
 	if err != nil {
 		slog.Error("failed to check sensitive request", slog.Any("error", err))
-		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
+		httpbase.ServerError(ctx, fmt.Errorf("sensitive check failed: %w", err))
 		return
 	}
 
@@ -179,7 +206,7 @@ func (h *ModelHandler) Update(ctx *gin.Context) {
 	_, err := h.sensitive.CheckRequestV2(ctx.Request.Context(), req)
 	if err != nil {
 		slog.Error("failed to check sensitive request", slog.Any("error", err))
-		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
+		httpbase.ServerError(ctx, fmt.Errorf("sensitive check failed: %w", err))
 		return
 	}
 
@@ -254,6 +281,8 @@ func (h *ModelHandler) Delete(ctx *gin.Context) {
 // @Param        namespace path string true "namespace"
 // @Param        name path string true "name"
 // @Param        current_user query string true "current_user"
+// @Param        need_op_weight query bool false "need op weight" default(false)
+// @Param        need_multi_sync query bool false "need multi sync" default(false)
 // @Success      200  {object}  types.Response{data=types.Model} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
@@ -266,8 +295,17 @@ func (h *ModelHandler) Show(ctx *gin.Context) {
 		return
 	}
 	currentUser := httpbase.GetCurrentUser(ctx)
-	detail, err := h.model.Show(ctx.Request.Context(), namespace, name, currentUser, false)
-
+	qNeedOpWeight := ctx.Query("need_op_weight")
+	needOpWeight, err := strconv.ParseBool(qNeedOpWeight)
+	if err != nil {
+		needOpWeight = false
+	}
+	qNeedMultiSync := ctx.Query("need_multi_sync")
+	needMultiSync, err := strconv.ParseBool(qNeedMultiSync)
+	if err != nil {
+		needMultiSync = false
+	}
+	detail, err := h.model.Show(ctx.Request.Context(), namespace, name, currentUser, needOpWeight, needMultiSync)
 	if err != nil {
 		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
@@ -489,6 +527,29 @@ func (h *ModelHandler) DelDatasetRelation(ctx *gin.Context) {
 	httpbase.OK(ctx, nil)
 }
 
+// model_tree: base_model:finetune:1
+func parseTreeReqs(ctx *gin.Context) (*types.TreeReq, error) {
+	modelTreeQuery := ctx.Query("model_tree")
+	if modelTreeQuery == "" {
+		return nil, nil
+	}
+	modelTreeQuerys := strings.Split(modelTreeQuery, ":")
+	var tree = &types.TreeReq{}
+	if len(modelTreeQuerys) == 3 {
+		repoID, err := strconv.ParseInt(modelTreeQuerys[2], 10, 64)
+		if err != nil {
+			err = errorx.ReqParamInvalid(err, errorx.Ctx().Set("query", "model_tree"))
+			return nil, fmt.Errorf("failed to parse model tree: %w", err)
+		}
+		tree.Relation = types.ModelRelation(modelTreeQuerys[1])
+		tree.RepoId = repoID
+		return tree, nil
+	} else {
+		err := errorx.ReqParamInvalid(errors.New("invalid model_tree param"), errorx.Ctx().Set("query", "model_tree"))
+		return nil, fmt.Errorf("failed to parse model tree: %w", err)
+	}
+}
+
 func parseTagReqs(ctx *gin.Context) (tags []types.TagReq) {
 	tagCategories := ctx.QueryArray("tag_category")
 	tagNames := ctx.QueryArray("tag_name")
@@ -570,10 +631,23 @@ func convertFilePathFromRoute(path string) string {
 // @Router       /models/{namespace}/{name}/run [post]
 func (h *ModelHandler) DeployDedicated(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
+
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("failed to get namespace from context", "error", err)
 		httpbase.BadRequestWithExt(ctx, err)
+		return
+	}
+
+	syncing, err := h.repo.IsSyncing(ctx.Request.Context(), types.ModelRepo, namespace, name)
+	if err != nil {
+		slog.Error("failed to check if model is syncing", "error", err)
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	if syncing {
+		slog.Error("model is syncing", "error", err)
+		httpbase.Conflict(ctx, errors.New("model is syncing, please try again later"))
 		return
 	}
 
@@ -604,11 +678,16 @@ func (h *ModelHandler) DeployDedicated(ctx *gin.Context) {
 		httpbase.BadRequestWithExt(ctx, errorx.ReqBodyFormat(err, ext))
 		return
 	}
+	// for reserved resource,no scaling
+	if req.OrderDetailID != 0 {
+		req.MinReplica = 1
+		req.MaxReplica = 1
+	}
 
 	_, err = h.sensitive.CheckRequestV2(ctx.Request.Context(), &req)
 	if err != nil {
 		slog.Error("failed to check sensitive request", slog.Any("error", err))
-		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
+		httpbase.ServerError(ctx, fmt.Errorf("sensitive check failed: %w", err))
 		return
 	}
 
@@ -673,7 +752,19 @@ func (h *ModelHandler) FinetuneCreate(ctx *gin.Context) {
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
-	allow, err := h.repo.AllowAdminAccess(ctx.Request.Context(), types.ModelRepo, namespace, name, currentUser)
+	syncing, err := h.repo.IsSyncing(ctx.Request.Context(), types.ModelRepo, namespace, name)
+	if err != nil {
+		slog.Error("failed to check if model is syncing", "error", err)
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	if syncing {
+		slog.Error("model is syncing", "error", err)
+		httpbase.Conflict(ctx, errors.New("model is syncing, please try again later"))
+		return
+	}
+
+	allow, err := h.repo.AllowReadAccess(ctx.Request.Context(), types.ModelRepo, namespace, name, currentUser)
 	if err != nil {
 		slog.Error("failed to check user permission", "error", err)
 		httpbase.ServerError(ctx, errors.New("failed to check user permission"))
@@ -702,6 +793,7 @@ func (h *ModelHandler) FinetuneCreate(ctx *gin.Context) {
 		MaxReplica:         1,
 		SecureLevel:        2,
 		Revision:           req.Revision,
+		OrderDetailID:      req.OrderDetailID,
 	}
 
 	ftReq := types.DeployActReq{
@@ -963,6 +1055,49 @@ func (h *ModelHandler) DeployStart(ctx *gin.Context) {
 		}
 		slog.Error("Failed to start inference", slog.Any("error", err), slog.Any("req", startReq))
 		httpbase.ServerError(ctx, err)
+		return
+	}
+	httpbase.OK(ctx, nil)
+}
+
+// StartDeploy   godoc
+// @Security     ApiKey
+// @Summary      Wake up a model inference
+// @Description  Wake up  a model inference
+// @Tags         Model
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        id path int true "deploy id"
+// @Param        current_user query string false "current user"
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /models/{namespace}/{name}/run/{id}/wakeup [put]
+func (h *ModelHandler) DeployWakeup(ctx *gin.Context) {
+	var (
+		id  int64
+		err error
+	)
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequestWithExt(ctx, err)
+		return
+	}
+	id, err = strconv.ParseInt(ctx.Param("id"), 10, 64)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		err = errorx.ReqParamInvalid(err, errorx.Ctx().Set("param", "id"))
+		httpbase.BadRequestWithExt(ctx, err)
+		return
+	}
+	err = h.model.Wakeup(ctx.Request.Context(), namespace, name, id)
+	if err != nil {
+		slog.Error("failed to wakeup inference", slog.String("namespace", namespace),
+			slog.String("name", name), slog.Any("error", err))
+		httpbase.ServerError(ctx, errors.New("failed to wakeup inference"))
 		return
 	}
 	httpbase.OK(ctx, nil)
@@ -1440,7 +1575,7 @@ func (h *ModelHandler) RemoveServerless(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("failed to get namespace from context", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
+		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 

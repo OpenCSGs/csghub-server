@@ -21,6 +21,13 @@ func (a *Activities) WatchRepoRelation(ctx context.Context, req *types.GiteaCall
 	return a.callback.WatchRepoRelation(ctx, req)
 }
 
+func (a *Activities) GenSyncVersion(ctx context.Context, req *types.GiteaCallbackPushReq) error {
+	logger := activity.GetLogger(ctx)
+	logger.Info("generate sync version start", "req", req)
+	a.callback.SetRepoVisibility(true)
+	return a.callback.GenSyncVersion(ctx, req)
+}
+
 func (a *Activities) SetRepoUpdateTime(ctx context.Context, req *types.GiteaCallbackPushReq) error {
 	logger := activity.GetLogger(ctx)
 	logger.Info("set repo update time start", "req", req)
@@ -40,4 +47,10 @@ func (a *Activities) SensitiveCheck(ctx context.Context, req *types.GiteaCallbac
 	logger.Info("sensitive check start", "req", req)
 	a.callback.SetRepoVisibility(true)
 	return a.callback.SensitiveCheck(ctx, req)
+}
+
+func (a *Activities) MCPScan(ctx context.Context, req *types.GiteaCallbackPushReq) error {
+	logger := activity.GetLogger(ctx)
+	logger.Info("mcp scan start", "req", req)
+	return a.callback.MCPScan(ctx, req)
 }

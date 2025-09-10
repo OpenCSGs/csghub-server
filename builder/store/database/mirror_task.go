@@ -64,12 +64,13 @@ type MirrorTaskWithFSM struct {
 }
 
 const (
-	MirrorContinue = "continue"
-	MirrorFail     = "fail"
-	MirrorSuccess  = "success"
-	MirrorRetry    = "retry"
-	MirrorCancel   = "cancel"
-	MirrorFatal    = "fatal"
+	MirrorContinue    = "continue"
+	MirrorFail        = "fail"
+	MirrorSuccess     = "success"
+	MirrorRetry       = "retry"
+	MirrorCancel      = "cancel"
+	MirrorFatal       = "fatal"
+	MirrorNoLfsToSync = "no_lfs_to_sync"
 )
 
 func NewMirrorTaskWithFSM(mt *MirrorTask) MirrorTaskWithFSM {
@@ -85,6 +86,13 @@ func NewMirrorTaskWithFSM(mt *MirrorTask) MirrorTaskWithFSM {
 						string(types.MirrorQueued),
 					},
 					Dst: string(types.MirrorRepoSyncStart),
+				},
+				{
+					Name: MirrorNoLfsToSync,
+					Src: []string{
+						string(types.MirrorRepoSyncStart),
+					},
+					Dst: string(types.MirrorLfsSyncFinished),
 				},
 				{
 					Name: MirrorContinue,

@@ -27,6 +27,7 @@ type evaluationComponentImpl struct {
 	runtimeFrameworkStore database.RuntimeFrameworksStore
 	config                *config.Config
 	accountingComponent   AccountingComponent
+	repoComponent         RepoComponent
 }
 
 type EvaluationComponent interface {
@@ -51,6 +52,10 @@ func NewEvaluationComponent(config *config.Config) (EvaluationComponent, error) 
 	ac, err := NewAccountingComponent(config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create accounting component, %w", err)
+	}
+	c.repoComponent, err = NewRepoComponent(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create repo component, %w", err)
 	}
 	c.accountingComponent = ac
 	return c, nil
@@ -111,6 +116,11 @@ func (c *evaluationComponentImpl) CreateEvaluation(ctx context.Context, req type
 		}
 		if frame.ComputeType != string(types.ResourceTypeCPU) && !common.ContainsGraphicResource(hardware) {
 			return nil, fmt.Errorf("evaluation requires graphics card resources")
+		}
+		// check resource available
+		err = c.repoComponent.CheckAccountAndResource(ctx, req.Username, resource.ClusterID, 0, resource)
+		if err != nil {
+			return nil, err
 		}
 		req.ClusterID = resource.ClusterID
 		req.ResourceName = resource.Name

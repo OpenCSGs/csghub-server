@@ -36,13 +36,14 @@ type InfoRefsReq struct {
 }
 
 type GitUploadPackReq struct {
-	Namespace   string              `json:"namespace"`
-	Name        string              `json:"name"`
-	RepoType    RepositoryType      `json:"repo_type"`
-	GitProtocol string              `json:"git_protocol"`
-	Request     *http.Request       `json:"request"`
-	Writer      http.ResponseWriter `json:"writer"`
-	CurrentUser string              `json:"current_user"`
+	Namespace     string              `json:"namespace"`
+	Name          string              `json:"name"`
+	RepoType      RepositoryType      `json:"repo_type"`
+	GitProtocol   string              `json:"git_protocol"`
+	Request       *http.Request       `json:"request"`
+	Writer        http.ResponseWriter `json:"writer"`
+	CurrentUser   string              `json:"current_user"`
+	ContentLength int64               `json:"content-length"`
 }
 
 type GitReceivePackReq = GitUploadPackReq

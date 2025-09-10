@@ -118,6 +118,8 @@ type GetFileReq struct {
 	SaveAs      string `json:"save_as"`
 	RepoType    RepositoryType
 	CurrentUser string `json:"current_user"`
+	// limit file size, don't return file content if file size is greater than MaxFileSize
+	MaxFileSize int64 `json:"max_file_size"`
 }
 
 type GetTreeRequest struct {

@@ -37,6 +37,13 @@ func HandlePushWorkflow(ctx workflow.Context, req *types.GiteaCallbackPushReq) e
 		return err
 	}
 
+	// Generate sync versions
+	err = workflow.ExecuteActivity(actCtx, activities.GenSyncVersion, req).Get(ctx, nil)
+	if err != nil {
+		logger.Error("failed to generate sync versions", "error", err, "req", req)
+		return err
+	}
+
 	// Set repo update time
 	err = workflow.ExecuteActivity(actCtx, activities.SetRepoUpdateTime, req).Get(ctx, nil)
 	if err != nil {
@@ -55,6 +62,20 @@ func HandlePushWorkflow(ctx workflow.Context, req *types.GiteaCallbackPushReq) e
 	err = workflow.ExecuteActivity(actCtx, activities.SensitiveCheck, req).Get(ctx, nil)
 	if err != nil {
 		logger.Error("failed to sensitive check", "error", err, "req", req)
+		return err
+	}
+
+	// Model tree ingestion
+	err = workflow.ExecuteActivity(actCtx, activities.UpdateModelTree, req).Get(ctx, nil)
+	if err != nil {
+		logger.Error("failed to update model tree", "error", err, "req", req)
+		return err
+	}
+
+	// MCP scan
+	err = workflow.ExecuteActivity(actCtx, activities.MCPScan, req).Get(ctx, nil)
+	if err != nil {
+		logger.Error("failed to do mcp scan", "error", err, "req", req)
 		return err
 	}
 

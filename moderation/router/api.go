@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/middleware"
 	"opencsg.com/csghub-server/common/config"
@@ -14,6 +15,13 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 	r := gin.New()
 	r.Use(gin.Recovery())
 	r.Use(middleware.Log(config))
+
+	needAPIKey := middleware.NeedAPIKey(config)
+
+	//add router for golang pprof
+	debugGroup := r.Group("/debug", needAPIKey)
+	pprof.RouteRegister(debugGroup, "pprof")
+
 	// r.Use(middleware.Authenticator(config))
 
 	apiV1Group := r.Group("/api/v1")
@@ -34,6 +42,11 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 	apiV1Group.POST("/image", sc.Image)
 	apiV1Group.POST("/llmresp", sc.LlmResp)
 	apiV1Group.POST("/llmprompt", sc.LlmPrompt)
+
+	adminGroup := apiV1Group.Group("/admin")
+
+	// route: /admin/*
+	createAdminRoutes(adminGroup)
 
 	return r, nil
 }

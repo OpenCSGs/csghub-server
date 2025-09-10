@@ -54,10 +54,15 @@ func StartWorkflow(cfg *config.Config) error {
 	if err != nil {
 		return err
 	}
+	repoComponent, err := component.NewRepoComponent(cfg)
+	if err != nil {
+		return err
+	}
+
 	return StartWorkflowDI(
 		cfg, gitcallback, recom,
 		gitserver, multisync, database.NewSyncClientSettingStore(), client,
-		rftScanner,
+		rftScanner, repoComponent,
 	)
 }
 
@@ -70,9 +75,10 @@ func StartWorkflowDI(
 	syncClientSetting database.SyncClientSettingStore,
 	temporalClient temporal.Client,
 	rftScanner component.RuntimeArchitectureComponent,
+	repoComponent component.RepoComponent,
 ) error {
 	worker := temporalClient.NewWorker(HandlePushQueueName, worker.Options{})
-	act := activity.NewActivities(cfg, callback, recom, gitServer, multisync, syncClientSetting, rftScanner)
+	act := activity.NewActivities(cfg, callback, recom, gitServer, multisync, syncClientSetting, rftScanner, repoComponent)
 	worker.RegisterActivity(act)
 
 	worker.RegisterWorkflow(HandlePushWorkflow)

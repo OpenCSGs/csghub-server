@@ -39,24 +39,26 @@ type Deploy struct {
 	RepoID     int64       `json:"repo_id"`
 	Repository *Repository `bun:"rel:belongs-to,join:repo_id=id" json:"repository,omitempty"`
 	// model running engine vllm or TGI
-	RuntimeFramework string             `bun:",nullzero" json:"runtime_framework"`
-	ContainerPort    int                `json:"container_port"`
-	Annotation       string             `bun:",nullzero" json:"annotation"`
-	MinReplica       int                `json:"min_replica"`
-	MaxReplica       int                `json:"max_replica"`
-	SvcName          string             `json:"svc_name"`
-	Endpoint         string             `json:"endpoint"`
-	ClusterID        string             `json:"cluster_id"`
-	SecureLevel      int                `json:"secure_level"`         // 1-public, 2-private, 3-extension in future
-	Type             int                `json:"type"`                 // 0-space, 1-inference, 2-finetune, 3-serverless
-	Task             types.PipelineTask `bun:",nullzero" json:"task"` //text-generation,text-to-image
-	UserUUID         string             `bun:"," json:"user_uuid"`
-	SKU              string             `bun:"," json:"sku"`
-	OrderDetailID    int64              `bun:"," json:"order_detail_id"`
-	EngineArgs       string             `bun:"," json:"engine_args"`
-	Variables        string             `bun:",nullzero" json:"variables"`
-	Message          string             `bun:",nullzero" json:"message"`
-	Reason           string             `bun:",nullzero" json:"reason"`
+	RuntimeFramework string `bun:",nullzero" json:"runtime_framework"`
+	ContainerPort    int    `json:"container_port"`
+	Annotation       string `bun:",nullzero" json:"annotation"`
+	MinReplica       int    `json:"min_replica"`
+	MaxReplica       int    `json:"max_replica"`
+	SvcName          string `json:"svc_name"`
+	Endpoint         string `json:"endpoint"`
+	ClusterID        string `json:"cluster_id"`
+	// 1-public, 2-private, 3-extension in future
+	SecureLevel int `json:"secure_level"`
+	// 0-space, 1-inference, 2-finetune, 3-serverless, 4-evaluation, 5-notebook
+	Type          int                `json:"type"`
+	Task          types.PipelineTask `bun:",nullzero" json:"task"` //text-generation,text-to-image
+	UserUUID      string             `bun:"," json:"user_uuid"`
+	SKU           string             `bun:"," json:"sku"`
+	OrderDetailID int64              `bun:"," json:"order_detail_id"`
+	EngineArgs    string             `bun:"," json:"engine_args"`
+	Variables     string             `bun:",nullzero" json:"variables"`
+	Message       string             `bun:",nullzero" json:"message"`
+	Reason        string             `bun:",nullzero" json:"reason"`
 	times
 }
 
@@ -92,11 +94,13 @@ type DeployTaskStore interface {
 	ListDeployByType(ctx context.Context, req types.DeployReq) ([]Deploy, int, error)
 	DeleteDeploy(ctx context.Context, repoType types.RepositoryType, repoID, userID int64, deployID int64) error
 	DeleteDeployNow(ctx context.Context, deployID int64) error
+	DeleteDeployByID(ctx context.Context, userID int64, deployID int64) error
 	ListDeployByUserID(ctx context.Context, userID int64, req *types.DeployReq) ([]Deploy, int, error)
 	ListInstancesByUserID(ctx context.Context, userID int64, per, page int) ([]Deploy, int, error)
 	GetDeployByID(ctx context.Context, deployID int64) (*Deploy, error)
 	GetDeployBySvcName(ctx context.Context, svcName string) (*Deploy, error)
 	StopDeploy(ctx context.Context, repoType types.RepositoryType, repoID, userID int64, deployID int64) error
+	StopDeployByID(ctx context.Context, userID int64, deployID int64) error
 	GetServerlessDeployByRepID(ctx context.Context, repoID int64) (*Deploy, error)
 	ListServerless(ctx context.Context, req types.DeployReq) ([]Deploy, int, error)
 	GetRunningDeployByUserID(ctx context.Context, userID int64) ([]Deploy, error)
@@ -264,11 +268,20 @@ func (s *deployTaskStoreImpl) DeleteDeploy(ctx context.Context, repoType types.R
 	return err
 }
 
+func (s *deployTaskStoreImpl) DeleteDeployByID(ctx context.Context, userID int64, deployID int64) error {
+	// only delete the deploy of specific repo was triggered by current login user
+	res, err := s.db.BunDB.Exec("Update deploys set status = ? where id = ? and user_id = ?", common.Deleted, deployID, userID)
+	err = assertAffectedOneRow(res, err)
+	err = errorx.HandleDBError(err, nil)
+	return err
+}
+
 func (s *deployTaskStoreImpl) ListDeployByUserID(ctx context.Context, userID int64, req *types.DeployReq) ([]Deploy, int, error) {
 	var result []Deploy
 	query := s.db.Operator.Core.NewSelect().Model(&result).Where("user_id = ? and type = ?", userID, req.DeployType)
+	query = query.Where("status != ?", common.Deleted)
 	if req.RepoType == types.ModelRepo {
-		query = query.Where("model_id > 0 and status != ? ", common.Deleted)
+		query = query.Where("model_id > 0")
 	}
 	query = query.Order("id desc")
 	if req.RepoType == types.SpaceRepo {
@@ -325,6 +338,13 @@ func (s *deployTaskStoreImpl) GetDeployBySvcName(ctx context.Context, svcName st
 func (s *deployTaskStoreImpl) StopDeploy(ctx context.Context, repoType types.RepositoryType, repoID, userID int64, deployID int64) error {
 	// only stop the deploy of specific repo was triggered by current login user
 	res, err := s.db.BunDB.Exec("Update deploys set status=?,updated_at=current_timestamp where id = ? and repo_id = ? and user_id = ?", common.Stopped, deployID, repoID, userID)
+	err = assertAffectedOneRow(res, err)
+	err = errorx.HandleDBError(err, nil)
+	return err
+}
+func (s *deployTaskStoreImpl) StopDeployByID(ctx context.Context, userID int64, deployID int64) error {
+	// only stop the deploy of specific repo was triggered by current login user
+	res, err := s.db.BunDB.Exec("Update deploys set status=?,updated_at=current_timestamp where id = ? and user_id = ?", common.Stopped, deployID, userID)
 	err = assertAffectedOneRow(res, err)
 	err = errorx.HandleDBError(err, nil)
 	return err

@@ -63,6 +63,7 @@ func TestTagStore_AllTags(t *testing.T) {
 		Group:    "Group One",
 		Scope:    types.ModelTagScope,
 	}
+
 	modelTag, err := ts.CreateTag(ctx, tag)
 	require.Empty(t, err)
 
@@ -837,4 +838,18 @@ func TestTagStore_Category_CURD(t *testing.T) {
 	categories, err = ts.AllCategories(ctx, "")
 	require.Empty(t, err)
 	require.Equal(t, total, len(categories))
+}
+
+func TestTagStore_CheckTagIDsExist(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	ts := database.NewTagStoreWithDB(db)
+
+	tagIDs := []int64{1, 2, 3}
+	err := ts.CheckTagIDsExist(ctx, tagIDs)
+	require.Empty(t, err)
 }

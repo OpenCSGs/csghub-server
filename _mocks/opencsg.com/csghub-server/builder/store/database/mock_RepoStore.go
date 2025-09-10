@@ -5,11 +5,8 @@ package database
 import (
 	context "context"
 
-	bun "github.com/uptrace/bun"
-
-	database "opencsg.com/csghub-server/builder/store/database"
-
 	mock "github.com/stretchr/testify/mock"
+	database "opencsg.com/csghub-server/builder/store/database"
 
 	time "time"
 
@@ -195,6 +192,53 @@ func (_c *MockRepoStore_BatchGet_Call) RunAndReturn(run func(context.Context, in
 	return _c
 }
 
+// BatchUpdate provides a mock function with given fields: ctx, repos
+func (_m *MockRepoStore) BatchUpdate(ctx context.Context, repos []*database.Repository) error {
+	ret := _m.Called(ctx, repos)
+
+	if len(ret) == 0 {
+		panic("no return value specified for BatchUpdate")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, []*database.Repository) error); ok {
+		r0 = rf(ctx, repos)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockRepoStore_BatchUpdate_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BatchUpdate'
+type MockRepoStore_BatchUpdate_Call struct {
+	*mock.Call
+}
+
+// BatchUpdate is a helper method to define mock.On call
+//   - ctx context.Context
+//   - repos []*database.Repository
+func (_e *MockRepoStore_Expecter) BatchUpdate(ctx interface{}, repos interface{}) *MockRepoStore_BatchUpdate_Call {
+	return &MockRepoStore_BatchUpdate_Call{Call: _e.mock.On("BatchUpdate", ctx, repos)}
+}
+
+func (_c *MockRepoStore_BatchUpdate_Call) Run(run func(ctx context.Context, repos []*database.Repository)) *MockRepoStore_BatchUpdate_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].([]*database.Repository))
+	})
+	return _c
+}
+
+func (_c *MockRepoStore_BatchUpdate_Call) Return(_a0 error) *MockRepoStore_BatchUpdate_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockRepoStore_BatchUpdate_Call) RunAndReturn(run func(context.Context, []*database.Repository) error) *MockRepoStore_BatchUpdate_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // BulkUpdateSourcePath provides a mock function with given fields: ctx, repos
 func (_m *MockRepoStore) BulkUpdateSourcePath(ctx context.Context, repos []*database.Repository) error {
 	ret := _m.Called(ctx, repos)
@@ -242,9 +286,9 @@ func (_c *MockRepoStore_BulkUpdateSourcePath_Call) RunAndReturn(run func(context
 	return _c
 }
 
-// ByUser provides a mock function with given fields: ctx, userID
-func (_m *MockRepoStore) ByUser(ctx context.Context, userID int64) ([]database.Repository, error) {
-	ret := _m.Called(ctx, userID)
+// ByUser provides a mock function with given fields: ctx, userID, batchSize, batch
+func (_m *MockRepoStore) ByUser(ctx context.Context, userID int64, batchSize int, batch int) ([]database.Repository, error) {
+	ret := _m.Called(ctx, userID, batchSize, batch)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ByUser")
@@ -252,19 +296,19 @@ func (_m *MockRepoStore) ByUser(ctx context.Context, userID int64) ([]database.R
 
 	var r0 []database.Repository
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, int64) ([]database.Repository, error)); ok {
-		return rf(ctx, userID)
+	if rf, ok := ret.Get(0).(func(context.Context, int64, int, int) ([]database.Repository, error)); ok {
+		return rf(ctx, userID, batchSize, batch)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, int64) []database.Repository); ok {
-		r0 = rf(ctx, userID)
+	if rf, ok := ret.Get(0).(func(context.Context, int64, int, int) []database.Repository); ok {
+		r0 = rf(ctx, userID, batchSize, batch)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]database.Repository)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, int64) error); ok {
-		r1 = rf(ctx, userID)
+	if rf, ok := ret.Get(1).(func(context.Context, int64, int, int) error); ok {
+		r1 = rf(ctx, userID, batchSize, batch)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -280,13 +324,15 @@ type MockRepoStore_ByUser_Call struct {
 // ByUser is a helper method to define mock.On call
 //   - ctx context.Context
 //   - userID int64
-func (_e *MockRepoStore_Expecter) ByUser(ctx interface{}, userID interface{}) *MockRepoStore_ByUser_Call {
-	return &MockRepoStore_ByUser_Call{Call: _e.mock.On("ByUser", ctx, userID)}
+//   - batchSize int
+//   - batch int
+func (_e *MockRepoStore_Expecter) ByUser(ctx interface{}, userID interface{}, batchSize interface{}, batch interface{}) *MockRepoStore_ByUser_Call {
+	return &MockRepoStore_ByUser_Call{Call: _e.mock.On("ByUser", ctx, userID, batchSize, batch)}
 }
 
-func (_c *MockRepoStore_ByUser_Call) Run(run func(ctx context.Context, userID int64)) *MockRepoStore_ByUser_Call {
+func (_c *MockRepoStore_ByUser_Call) Run(run func(ctx context.Context, userID int64, batchSize int, batch int)) *MockRepoStore_ByUser_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(int64))
+		run(args[0].(context.Context), args[1].(int64), args[2].(int), args[3].(int))
 	})
 	return _c
 }
@@ -296,7 +342,7 @@ func (_c *MockRepoStore_ByUser_Call) Return(_a0 []database.Repository, _a1 error
 	return _c
 }
 
-func (_c *MockRepoStore_ByUser_Call) RunAndReturn(run func(context.Context, int64) ([]database.Repository, error)) *MockRepoStore_ByUser_Call {
+func (_c *MockRepoStore_ByUser_Call) RunAndReturn(run func(context.Context, int64, int, int) ([]database.Repository, error)) *MockRepoStore_ByUser_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -460,66 +506,6 @@ func (_c *MockRepoStore_CreateRepo_Call) Return(_a0 *database.Repository, _a1 er
 }
 
 func (_c *MockRepoStore_CreateRepo_Call) RunAndReturn(run func(context.Context, database.Repository) (*database.Repository, error)) *MockRepoStore_CreateRepo_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// CreateRepoTx provides a mock function with given fields: ctx, tx, input
-func (_m *MockRepoStore) CreateRepoTx(ctx context.Context, tx bun.Tx, input database.Repository) (*database.Repository, error) {
-	ret := _m.Called(ctx, tx, input)
-
-	if len(ret) == 0 {
-		panic("no return value specified for CreateRepoTx")
-	}
-
-	var r0 *database.Repository
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, bun.Tx, database.Repository) (*database.Repository, error)); ok {
-		return rf(ctx, tx, input)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, bun.Tx, database.Repository) *database.Repository); ok {
-		r0 = rf(ctx, tx, input)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*database.Repository)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, bun.Tx, database.Repository) error); ok {
-		r1 = rf(ctx, tx, input)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockRepoStore_CreateRepoTx_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateRepoTx'
-type MockRepoStore_CreateRepoTx_Call struct {
-	*mock.Call
-}
-
-// CreateRepoTx is a helper method to define mock.On call
-//   - ctx context.Context
-//   - tx bun.Tx
-//   - input database.Repository
-func (_e *MockRepoStore_Expecter) CreateRepoTx(ctx interface{}, tx interface{}, input interface{}) *MockRepoStore_CreateRepoTx_Call {
-	return &MockRepoStore_CreateRepoTx_Call{Call: _e.mock.On("CreateRepoTx", ctx, tx, input)}
-}
-
-func (_c *MockRepoStore_CreateRepoTx_Call) Run(run func(ctx context.Context, tx bun.Tx, input database.Repository)) *MockRepoStore_CreateRepoTx_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(bun.Tx), args[2].(database.Repository))
-	})
-	return _c
-}
-
-func (_c *MockRepoStore_CreateRepoTx_Call) Return(_a0 *database.Repository, _a1 error) *MockRepoStore_CreateRepoTx_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockRepoStore_CreateRepoTx_Call) RunAndReturn(run func(context.Context, bun.Tx, database.Repository) (*database.Repository, error)) *MockRepoStore_CreateRepoTx_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1051,6 +1037,65 @@ func (_c *MockRepoStore_FindByIds_Call) RunAndReturn(run func(context.Context, [
 	return _c
 }
 
+// FindByMirrorSourceURL provides a mock function with given fields: ctx, sourceURL
+func (_m *MockRepoStore) FindByMirrorSourceURL(ctx context.Context, sourceURL string) (*database.Repository, error) {
+	ret := _m.Called(ctx, sourceURL)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FindByMirrorSourceURL")
+	}
+
+	var r0 *database.Repository
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*database.Repository, error)); ok {
+		return rf(ctx, sourceURL)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *database.Repository); ok {
+		r0 = rf(ctx, sourceURL)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.Repository)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, sourceURL)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockRepoStore_FindByMirrorSourceURL_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindByMirrorSourceURL'
+type MockRepoStore_FindByMirrorSourceURL_Call struct {
+	*mock.Call
+}
+
+// FindByMirrorSourceURL is a helper method to define mock.On call
+//   - ctx context.Context
+//   - sourceURL string
+func (_e *MockRepoStore_Expecter) FindByMirrorSourceURL(ctx interface{}, sourceURL interface{}) *MockRepoStore_FindByMirrorSourceURL_Call {
+	return &MockRepoStore_FindByMirrorSourceURL_Call{Call: _e.mock.On("FindByMirrorSourceURL", ctx, sourceURL)}
+}
+
+func (_c *MockRepoStore_FindByMirrorSourceURL_Call) Run(run func(ctx context.Context, sourceURL string)) *MockRepoStore_FindByMirrorSourceURL_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockRepoStore_FindByMirrorSourceURL_Call) Return(_a0 *database.Repository, _a1 error) *MockRepoStore_FindByMirrorSourceURL_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockRepoStore_FindByMirrorSourceURL_Call) RunAndReturn(run func(context.Context, string) (*database.Repository, error)) *MockRepoStore_FindByMirrorSourceURL_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // FindByPath provides a mock function with given fields: ctx, repoType, namespace, name
 func (_m *MockRepoStore) FindByPath(ctx context.Context, repoType types.RepositoryType, namespace string, name string) (*database.Repository, error) {
 	ret := _m.Called(ctx, repoType, namespace, name)
@@ -1173,6 +1218,186 @@ func (_c *MockRepoStore_FindByRepoSourceWithBatch_Call) RunAndReturn(run func(co
 	return _c
 }
 
+// FindByRepoTypeAndPaths provides a mock function with given fields: ctx, repoType, path
+func (_m *MockRepoStore) FindByRepoTypeAndPaths(ctx context.Context, repoType types.RepositoryType, path []string) ([]database.Repository, error) {
+	ret := _m.Called(ctx, repoType, path)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FindByRepoTypeAndPaths")
+	}
+
+	var r0 []database.Repository
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.RepositoryType, []string) ([]database.Repository, error)); ok {
+		return rf(ctx, repoType, path)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.RepositoryType, []string) []database.Repository); ok {
+		r0 = rf(ctx, repoType, path)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.Repository)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.RepositoryType, []string) error); ok {
+		r1 = rf(ctx, repoType, path)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockRepoStore_FindByRepoTypeAndPaths_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindByRepoTypeAndPaths'
+type MockRepoStore_FindByRepoTypeAndPaths_Call struct {
+	*mock.Call
+}
+
+// FindByRepoTypeAndPaths is a helper method to define mock.On call
+//   - ctx context.Context
+//   - repoType types.RepositoryType
+//   - path []string
+func (_e *MockRepoStore_Expecter) FindByRepoTypeAndPaths(ctx interface{}, repoType interface{}, path interface{}) *MockRepoStore_FindByRepoTypeAndPaths_Call {
+	return &MockRepoStore_FindByRepoTypeAndPaths_Call{Call: _e.mock.On("FindByRepoTypeAndPaths", ctx, repoType, path)}
+}
+
+func (_c *MockRepoStore_FindByRepoTypeAndPaths_Call) Run(run func(ctx context.Context, repoType types.RepositoryType, path []string)) *MockRepoStore_FindByRepoTypeAndPaths_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.RepositoryType), args[2].([]string))
+	})
+	return _c
+}
+
+func (_c *MockRepoStore_FindByRepoTypeAndPaths_Call) Return(_a0 []database.Repository, _a1 error) *MockRepoStore_FindByRepoTypeAndPaths_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockRepoStore_FindByRepoTypeAndPaths_Call) RunAndReturn(run func(context.Context, types.RepositoryType, []string) ([]database.Repository, error)) *MockRepoStore_FindByRepoTypeAndPaths_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// FindMirrorFinishedPrivateModelRepo provides a mock function with given fields: ctx
+func (_m *MockRepoStore) FindMirrorFinishedPrivateModelRepo(ctx context.Context) ([]*database.Repository, error) {
+	ret := _m.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FindMirrorFinishedPrivateModelRepo")
+	}
+
+	var r0 []*database.Repository
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context) ([]*database.Repository, error)); ok {
+		return rf(ctx)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context) []*database.Repository); ok {
+		r0 = rf(ctx)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*database.Repository)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockRepoStore_FindMirrorFinishedPrivateModelRepo_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindMirrorFinishedPrivateModelRepo'
+type MockRepoStore_FindMirrorFinishedPrivateModelRepo_Call struct {
+	*mock.Call
+}
+
+// FindMirrorFinishedPrivateModelRepo is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *MockRepoStore_Expecter) FindMirrorFinishedPrivateModelRepo(ctx interface{}) *MockRepoStore_FindMirrorFinishedPrivateModelRepo_Call {
+	return &MockRepoStore_FindMirrorFinishedPrivateModelRepo_Call{Call: _e.mock.On("FindMirrorFinishedPrivateModelRepo", ctx)}
+}
+
+func (_c *MockRepoStore_FindMirrorFinishedPrivateModelRepo_Call) Run(run func(ctx context.Context)) *MockRepoStore_FindMirrorFinishedPrivateModelRepo_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context))
+	})
+	return _c
+}
+
+func (_c *MockRepoStore_FindMirrorFinishedPrivateModelRepo_Call) Return(_a0 []*database.Repository, _a1 error) *MockRepoStore_FindMirrorFinishedPrivateModelRepo_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockRepoStore_FindMirrorFinishedPrivateModelRepo_Call) RunAndReturn(run func(context.Context) ([]*database.Repository, error)) *MockRepoStore_FindMirrorFinishedPrivateModelRepo_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// FindMirrorReposByUserAndSource provides a mock function with given fields: ctx, userID, source, batchSize, batch
+func (_m *MockRepoStore) FindMirrorReposByUserAndSource(ctx context.Context, userID int64, source string, batchSize int, batch int) ([]database.Repository, error) {
+	ret := _m.Called(ctx, userID, source, batchSize, batch)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FindMirrorReposByUserAndSource")
+	}
+
+	var r0 []database.Repository
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64, string, int, int) ([]database.Repository, error)); ok {
+		return rf(ctx, userID, source, batchSize, batch)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, int64, string, int, int) []database.Repository); ok {
+		r0 = rf(ctx, userID, source, batchSize, batch)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.Repository)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, int64, string, int, int) error); ok {
+		r1 = rf(ctx, userID, source, batchSize, batch)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockRepoStore_FindMirrorReposByUserAndSource_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindMirrorReposByUserAndSource'
+type MockRepoStore_FindMirrorReposByUserAndSource_Call struct {
+	*mock.Call
+}
+
+// FindMirrorReposByUserAndSource is a helper method to define mock.On call
+//   - ctx context.Context
+//   - userID int64
+//   - source string
+//   - batchSize int
+//   - batch int
+func (_e *MockRepoStore_Expecter) FindMirrorReposByUserAndSource(ctx interface{}, userID interface{}, source interface{}, batchSize interface{}, batch interface{}) *MockRepoStore_FindMirrorReposByUserAndSource_Call {
+	return &MockRepoStore_FindMirrorReposByUserAndSource_Call{Call: _e.mock.On("FindMirrorReposByUserAndSource", ctx, userID, source, batchSize, batch)}
+}
+
+func (_c *MockRepoStore_FindMirrorReposByUserAndSource_Call) Run(run func(ctx context.Context, userID int64, source string, batchSize int, batch int)) *MockRepoStore_FindMirrorReposByUserAndSource_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64), args[2].(string), args[3].(int), args[4].(int))
+	})
+	return _c
+}
+
+func (_c *MockRepoStore_FindMirrorReposByUserAndSource_Call) Return(_a0 []database.Repository, _a1 error) *MockRepoStore_FindMirrorReposByUserAndSource_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockRepoStore_FindMirrorReposByUserAndSource_Call) RunAndReturn(run func(context.Context, int64, string, int, int) ([]database.Repository, error)) *MockRepoStore_FindMirrorReposByUserAndSource_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // FindMirrorReposWithBatch provides a mock function with given fields: ctx, batchSize, batch
 func (_m *MockRepoStore) FindMirrorReposWithBatch(ctx context.Context, batchSize int, batch int) ([]database.Repository, error) {
 	ret := _m.Called(ctx, batchSize, batch)
@@ -1229,6 +1454,66 @@ func (_c *MockRepoStore_FindMirrorReposWithBatch_Call) Return(_a0 []database.Rep
 }
 
 func (_c *MockRepoStore_FindMirrorReposWithBatch_Call) RunAndReturn(run func(context.Context, int, int) ([]database.Repository, error)) *MockRepoStore_FindMirrorReposWithBatch_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// FindUnhashedRepos provides a mock function with given fields: ctx, batchSize, lastID
+func (_m *MockRepoStore) FindUnhashedRepos(ctx context.Context, batchSize int, lastID int64) ([]database.Repository, error) {
+	ret := _m.Called(ctx, batchSize, lastID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FindUnhashedRepos")
+	}
+
+	var r0 []database.Repository
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, int, int64) ([]database.Repository, error)); ok {
+		return rf(ctx, batchSize, lastID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, int, int64) []database.Repository); ok {
+		r0 = rf(ctx, batchSize, lastID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.Repository)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, int, int64) error); ok {
+		r1 = rf(ctx, batchSize, lastID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockRepoStore_FindUnhashedRepos_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindUnhashedRepos'
+type MockRepoStore_FindUnhashedRepos_Call struct {
+	*mock.Call
+}
+
+// FindUnhashedRepos is a helper method to define mock.On call
+//   - ctx context.Context
+//   - batchSize int
+//   - lastID int64
+func (_e *MockRepoStore_Expecter) FindUnhashedRepos(ctx interface{}, batchSize interface{}, lastID interface{}) *MockRepoStore_FindUnhashedRepos_Call {
+	return &MockRepoStore_FindUnhashedRepos_Call{Call: _e.mock.On("FindUnhashedRepos", ctx, batchSize, lastID)}
+}
+
+func (_c *MockRepoStore_FindUnhashedRepos_Call) Run(run func(ctx context.Context, batchSize int, lastID int64)) *MockRepoStore_FindUnhashedRepos_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int), args[2].(int64))
+	})
+	return _c
+}
+
+func (_c *MockRepoStore_FindUnhashedRepos_Call) Return(_a0 []database.Repository, _a1 error) *MockRepoStore_FindUnhashedRepos_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockRepoStore_FindUnhashedRepos_Call) RunAndReturn(run func(context.Context, int, int64) ([]database.Repository, error)) *MockRepoStore_FindUnhashedRepos_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1304,6 +1589,67 @@ func (_c *MockRepoStore_FindWithBatch_Call) Return(_a0 []database.Repository, _a
 }
 
 func (_c *MockRepoStore_FindWithBatch_Call) RunAndReturn(run func(context.Context, int, int, ...types.RepositoryType) ([]database.Repository, error)) *MockRepoStore_FindWithBatch_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// FindWithMirror provides a mock function with given fields: ctx, repoType, owner, repoName
+func (_m *MockRepoStore) FindWithMirror(ctx context.Context, repoType types.RepositoryType, owner string, repoName string) (*database.Repository, error) {
+	ret := _m.Called(ctx, repoType, owner, repoName)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FindWithMirror")
+	}
+
+	var r0 *database.Repository
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.RepositoryType, string, string) (*database.Repository, error)); ok {
+		return rf(ctx, repoType, owner, repoName)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.RepositoryType, string, string) *database.Repository); ok {
+		r0 = rf(ctx, repoType, owner, repoName)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.Repository)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.RepositoryType, string, string) error); ok {
+		r1 = rf(ctx, repoType, owner, repoName)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockRepoStore_FindWithMirror_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindWithMirror'
+type MockRepoStore_FindWithMirror_Call struct {
+	*mock.Call
+}
+
+// FindWithMirror is a helper method to define mock.On call
+//   - ctx context.Context
+//   - repoType types.RepositoryType
+//   - owner string
+//   - repoName string
+func (_e *MockRepoStore_Expecter) FindWithMirror(ctx interface{}, repoType interface{}, owner interface{}, repoName interface{}) *MockRepoStore_FindWithMirror_Call {
+	return &MockRepoStore_FindWithMirror_Call{Call: _e.mock.On("FindWithMirror", ctx, repoType, owner, repoName)}
+}
+
+func (_c *MockRepoStore_FindWithMirror_Call) Run(run func(ctx context.Context, repoType types.RepositoryType, owner string, repoName string)) *MockRepoStore_FindWithMirror_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.RepositoryType), args[2].(string), args[3].(string))
+	})
+	return _c
+}
+
+func (_c *MockRepoStore_FindWithMirror_Call) Return(_a0 *database.Repository, _a1 error) *MockRepoStore_FindWithMirror_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockRepoStore_FindWithMirror_Call) RunAndReturn(run func(context.Context, types.RepositoryType, string, string) (*database.Repository, error)) *MockRepoStore_FindWithMirror_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1628,6 +1974,53 @@ func (_c *MockRepoStore_PublicToUser_Call) Return(repos []*database.Repository, 
 }
 
 func (_c *MockRepoStore_PublicToUser_Call) RunAndReturn(run func(context.Context, types.RepositoryType, []int64, *types.RepoFilter, int, int, bool) ([]*database.Repository, int, error)) *MockRepoStore_PublicToUser_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// RefreshLFSObjectsSize provides a mock function with given fields: ctx, id
+func (_m *MockRepoStore) RefreshLFSObjectsSize(ctx context.Context, id int64) error {
+	ret := _m.Called(ctx, id)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RefreshLFSObjectsSize")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64) error); ok {
+		r0 = rf(ctx, id)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockRepoStore_RefreshLFSObjectsSize_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RefreshLFSObjectsSize'
+type MockRepoStore_RefreshLFSObjectsSize_Call struct {
+	*mock.Call
+}
+
+// RefreshLFSObjectsSize is a helper method to define mock.On call
+//   - ctx context.Context
+//   - id int64
+func (_e *MockRepoStore_Expecter) RefreshLFSObjectsSize(ctx interface{}, id interface{}) *MockRepoStore_RefreshLFSObjectsSize_Call {
+	return &MockRepoStore_RefreshLFSObjectsSize_Call{Call: _e.mock.On("RefreshLFSObjectsSize", ctx, id)}
+}
+
+func (_c *MockRepoStore_RefreshLFSObjectsSize_Call) Run(run func(ctx context.Context, id int64)) *MockRepoStore_RefreshLFSObjectsSize_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64))
+	})
+	return _c
+}
+
+func (_c *MockRepoStore_RefreshLFSObjectsSize_Call) Return(_a0 error) *MockRepoStore_RefreshLFSObjectsSize_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockRepoStore_RefreshLFSObjectsSize_Call) RunAndReturn(run func(context.Context, int64) error) *MockRepoStore_RefreshLFSObjectsSize_Call {
 	_c.Call.Return(run)
 	return _c
 }

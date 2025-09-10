@@ -45,6 +45,7 @@ type UserComponent interface {
 	Evaluations(ctx context.Context, req *types.UserEvaluationReq) ([]types.ArgoWorkFlowRes, int, error)
 	MCPServers(ctx context.Context, req *types.UserMCPsReq) ([]types.MCPServer, int, error)
 	LikesMCPServers(ctx context.Context, req *types.UserMCPsReq) ([]types.MCPServer, int, error)
+	ListNotebooks(ctx context.Context, req *types.DeployReq) ([]types.NotebookRes, int, error)
 }
 
 func NewUserComponent(config *config.Config) (UserComponent, error) {

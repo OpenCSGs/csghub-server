@@ -1,14 +1,15 @@
 package router
 
 import (
-	"errors"
 	"fmt"
 	"log/slog"
 
+	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/api/middleware"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/user/handler"
 )
 
@@ -16,6 +17,11 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 	r := gin.New()
 	r.Use(gin.Recovery())
 	r.Use(middleware.Log(config))
+	needAPIKey := middleware.NeedAPIKey(config)
+	//add router for golang pprof
+	debugGroup := r.Group("/debug", needAPIKey)
+	pprof.RouteRegister(debugGroup, "pprof")
+
 	r.Use(middleware.Authenticator(config))
 
 	userHandler, err := handler.NewUserHandler(config)
@@ -45,12 +51,8 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 	jwtGroup := apiV1Group.Group("/jwt")
 	userGroup := apiV1Group.Group("/user")
 	tokenGroup := apiV1Group.Group("/token")
-
-	internalGroup := apiV1Group.Group("/internal")
+	internalGroup := apiV1Group.Group("/internal", needAPIKey)
 	internalUserGroup := internalGroup.Group("/user")
-
-	needAPIKey := middleware.OnlyAPIKeyAuthenticator(config)
-	internalUserGroup.Use(needAPIKey)
 
 	jwtHandler, err := handler.NewJWTHandler(config)
 	if err != nil {
@@ -63,6 +65,10 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 		apiV1Group.GET("/callback/casdoor", userHandler.Casdoor)
 		//user
 		userGroup.GET("/:username", userHandler.Get)
+		userGroup.DELETE("/:username", userHandler.Delete)
+		// find user by uuids
+		apiV1Group.GET("/users/by-uuids", userHandler.FindByUUIDs)
+		userGroup.DELETE("/:username/close_account", userHandler.CloseAccount)
 		// org and members
 		apiV1Group.GET("/organizations", orgHandler.Index)
 		apiV1Group.GET("/organization/:namespace", orgHandler.Get)
@@ -80,6 +86,7 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 		// check token info
 		tokenGroup.GET("/:token_value", needAPIKey, acHandler.Get)
 		userGroup.GET("/user_uuids", needAPIKey, userHandler.GetUserUUIDs)
+
 		internalUserGroup.GET("/emails", userHandler.GetEmailsInternal)
 	}
 
@@ -92,12 +99,22 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 		// user self or admin
 		userGroup.PUT("/:id", mustLogin(), userHandler.Update)
 		//TODO:
-		userGroup.DELETE("/:username", userHandler.Delete)
+		// userGroup.DELETE("/:username", userMatch, userHandler.Delete)
 		// get user's all tokens
 		userGroup.GET("/:username/tokens", userMatch, acHandler.GetUserTokens)
+		userGroup.GET("/:username/tokens/first", userMatch, acHandler.GetOrCreateFirstAvaiTokens)
 		// get user list
 		apiV1Group.GET("/users", mustLogin(), userHandler.Index)
-
+		// user labels
+		userGroup.PUT("/labels", mustLogin(), userHandler.UpdateUserLabels)
+		// get user's email addresses
+		userGroup.GET("/emails", mustLogin(), userHandler.GetEmails)
+	}
+	// routers for user verify
+	{
+		userGroup.POST("/verify", mustLogin(), userHandler.CreateVerify)
+		userGroup.PUT("/verify/:id", mustLogin(), userHandler.UpdateVerify)
+		userGroup.GET("/verify/:id", mustLogin(), userHandler.GetVerify)
 	}
 	// routers for organizations
 	{
@@ -112,11 +129,25 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 		apiV1Group.PUT("/organization/:namespace/members/:username", memberCtrl.Update)
 		apiV1Group.DELETE("/organization/:namespace/members/:username", memberCtrl.Delete)
 	}
+	// routers for organization verify
+	{
+		apiV1Group.POST("/organization/verify", mustLogin(), orgHandler.CreateVerify)
+		apiV1Group.PUT("/organization/verify/:id", mustLogin(), orgHandler.UpdateVerify)
+		apiV1Group.GET("/organization/verify/:namespace", orgHandler.GetVerify)
+	}
 	// routers for access tokens
 	{
 		tokenGroup.POST("/:app/:token_name", acHandler.CreateAppToken)
 		tokenGroup.PUT("/:app/:token_name", acHandler.Refresh)
 		tokenGroup.DELETE("/:app/:token_name", acHandler.DeleteAppToken)
+	}
+
+	{
+		userGroup.POST("/email-verification-code/:email", mustLogin(), userHandler.GenerateVerificationCodeAndSendEmail)
+	}
+
+	{
+		userGroup.POST("/tags", mustLogin(), userHandler.ResetUserTags)
 	}
 
 	return r, nil
@@ -126,14 +157,14 @@ func userMatch() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		currentUser := httpbase.GetCurrentUser(ctx)
 		if currentUser == "" {
-			httpbase.UnauthorizedError(ctx, errors.New("unknown user, please login first"))
+			httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 			ctx.Abort()
 			return
 		}
 
 		userName := ctx.Param("username")
 		if userName != currentUser {
-			httpbase.UnauthorizedError(ctx, errors.New("user not match, try to query user account not owned"))
+			httpbase.UnauthorizedError(ctx, errorx.ErrUserNotMatch)
 			slog.Error("user not match, try to query user account not owned", "currentUser", currentUser, "userName", userName)
 			ctx.Abort()
 			return
@@ -145,7 +176,7 @@ func mustLogin() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		currentUser := httpbase.GetCurrentUser(ctx)
 		if currentUser == "" {
-			httpbase.UnauthorizedError(ctx, errors.New("unknown user, please login first"))
+			httpbase.UnauthorizedError(ctx, errorx.ErrUserNotFound)
 			ctx.Abort()
 			return
 		}

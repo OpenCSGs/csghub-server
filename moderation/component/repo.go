@@ -24,12 +24,6 @@ type repoComponentImpl struct {
 	git     gitserver.GitServer
 }
 
-type RepoComponent interface {
-	UpdateRepoSensitiveCheckStatus(ctx context.Context, repoType types.RepositoryType, namespace string, name string, status types.SensitiveCheckStatus) error
-	CheckRepoFiles(ctx context.Context, repoType types.RepositoryType, namespace string, name string, options CheckOption) error
-	CheckRequestV2(ctx context.Context, req types.SensitiveRequestV2) (bool, error)
-}
-
 func NewRepoComponent(cfg *config.Config) (RepoComponent, error) {
 	c := &repoComponentImpl{checker: sensitive.NewAliyunGreenCheckerFromConfig(cfg)}
 	gs, err := git.NewGitServer(cfg)

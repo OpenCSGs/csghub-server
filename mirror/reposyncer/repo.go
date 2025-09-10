@@ -3,6 +3,7 @@ package reposyncer
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -12,15 +13,18 @@ import (
 	"time"
 
 	"go.temporal.io/sdk/client"
+	"golang.org/x/time/rate"
 	"opencsg.com/csghub-server/api/workflow"
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/git/gitserver/gitaly"
+	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/temporal"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
+	"opencsg.com/csghub-server/mirror/hook"
 )
 
 var MirrorStatusToMessageTypeMapping = map[types.MirrorTaskStatus]string{
@@ -47,6 +51,8 @@ type RepoSyncWorker struct {
 	syncClientSettingStore database.SyncClientSettingStore
 	git                    gitserver.GitServer
 	config                 *config.Config
+	ratelimiter            *rate.Limiter
+	msgSender              hook.MessageSender
 }
 
 func NewRepoSyncWorker(config *config.Config, numWorkers int) (*RepoSyncWorker, error) {
@@ -68,7 +74,16 @@ func NewRepoSyncWorker(config *config.Config, numWorkers int) (*RepoSyncWorker, 
 	w.config = config
 	w.tasks = make(chan database.MirrorTask)
 	w.numWorkers = numWorkers
-
+	w.ratelimiter = rate.NewLimiter(
+		rate.Limit(config.Mirror.RateLimit),
+		config.Mirror.RateBucketCapacity,
+	)
+	msgSender := hook.NewMessageSender(
+		fmt.Sprintf("%s:%d", config.Notification.Host, config.Notification.Port),
+		rpc.AuthWithApiKey(config.APIToken),
+		rpc.WithJSONHeader(),
+	)
+	w.msgSender = msgSender
 	return w, nil
 }
 
@@ -117,6 +132,12 @@ func (w *RepoSyncWorker) worker(workerID int) {
 	}()
 	slog.Info("worker start", slog.Any("workerID", workerID))
 	for {
+		err := w.ratelimiter.Wait(context.Background())
+		if err != nil {
+			slog.Error("Error waiting for rate limiter:", slog.Any("error", err))
+			continue
+		}
+
 		task := <-w.tasks
 
 		if task.ID != 0 {
@@ -153,7 +174,11 @@ func (w *RepoSyncWorker) handleTask(
 		statusAction = string(database.MirrorFail)
 		slog.Error("failed to sync repo", slog.Any("error", err))
 	} else {
-		statusAction = string(database.MirrorSuccess)
+		if mt.Progress == 100 {
+			statusAction = string(database.MirrorNoLfsToSync)
+		} else {
+			statusAction = string(database.MirrorSuccess)
+		}
 	}
 
 	mtFSM := database.NewMirrorTaskWithFSM(mt)
@@ -183,6 +208,12 @@ func (w *RepoSyncWorker) SyncRepo(
 	// Check if repository is not present
 	if mirror.Repository == nil {
 		return mt, fmt.Errorf("mirror repository is nil")
+	}
+
+	// Send Message
+	err := w.sendMessage(ctx, mirror, types.MirrorRepoSyncStart)
+	if err != nil {
+		slog.Error("failed to send notice message", slog.Any("error", err))
 	}
 
 	namespace, name, err := common.GetNamespaceAndNameFromPath(mirror.Repository.Path)
@@ -218,7 +249,7 @@ func (w *RepoSyncWorker) SyncRepo(
 		AccessToken: mirror.AccessToken,
 		RepoType:    mirror.Repository.RepositoryType,
 	}
-	if mirror.Repository.IsOpenCSGRepo() {
+	if mirror.Repository.IsOpenCSGRepo() && !w.config.Saas {
 		syncClientSetting, err := w.syncClientSettingStore.First(ctx)
 		if err != nil {
 			return mt, fmt.Errorf("failed to find sync client setting, error: %w", err)
@@ -372,6 +403,7 @@ func (w *RepoSyncWorker) generateLfsMetaObjects(
 			lfsObjectsSize += lfsPointer.FileSize
 		}
 	}
+	mirror.Repository.LFSObjectsSize = lfsObjectsSize
 	lfsMetaObjects = removeDuplicateLfsMetaObject(lfsMetaObjects)
 
 	if len(lfsMetaObjects) > 0 {
@@ -483,6 +515,43 @@ func (w *RepoSyncWorker) updateMirrorAndRepositoryStatus(
 	if err != nil {
 		return fmt.Errorf("failed to update mirror and repository: %w", err)
 	}
+	return nil
+}
+
+func (w *RepoSyncWorker) sendMessage(
+	ctx context.Context,
+	mirror *database.Mirror,
+	status types.MirrorTaskStatus,
+) error {
+	statusToSend := MirrorStatusToMessageTypeMapping[status]
+	if statusToSend == "" {
+		return nil
+	}
+
+	syncInfo := types.SyncInfo{
+		RemoteURL: mirror.SourceUrl,
+		LocalURL: fmt.Sprintf(
+			"%s/%ss/%s",
+			w.config.Frontend.URL,
+			mirror.Repository.RepositoryType,
+			mirror.Repository.Path,
+		),
+		RepoType: mirror.Repository.RepositoryType,
+		Path:     mirror.Repository.Path,
+		Status:   statusToSend,
+	}
+	byteInfo, _ := json.Marshal(syncInfo)
+	message := types.MessageRequest{
+		Scenario:   types.MessageScenarioRepoSync,
+		Parameters: string(byteInfo),
+		Priority:   types.MessagePriorityNormal,
+	}
+
+	resp, err := w.msgSender.Send(ctx, message)
+	if err != nil {
+		return err
+	}
+	slog.Info("send message", slog.Any("response", resp))
 	return nil
 }
 

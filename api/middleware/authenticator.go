@@ -248,40 +248,6 @@ func NeedAPIKey(config *config.Config) gin.HandlerFunc {
 	}
 }
 
-func OnlyAPIKeyAuthenticator(config *config.Config) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		apiToken := config.APIToken
-
-		// Get Authorization token
-		authHeader := c.Request.Header.Get("Authorization")
-
-		// Check Authorization Header format
-		if authHeader == "" {
-			slog.Info("missing authorization header", slog.Any("url", c.Request.URL))
-			httpbase.UnauthorizedError(c, errorx.ErrInvalidAuthHeader)
-			c.Abort()
-			return
-		}
-
-		// Get token
-		token := strings.TrimPrefix(authHeader, "Bearer ")
-
-		if token == apiToken {
-			// get current user from query string
-			currentUser := c.Query(httpbase.CurrentUserQueryVar)
-			if len(currentUser) > 0 {
-				httpbase.SetCurrentUser(c, currentUser)
-			}
-		} else {
-			httpbase.UnauthorizedError(c, errorx.ErrNeedAPIKey)
-			c.Abort()
-			return
-		}
-
-		c.Next()
-	}
-}
-
 func MustLogin() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		currentUser := httpbase.GetCurrentUser(ctx)

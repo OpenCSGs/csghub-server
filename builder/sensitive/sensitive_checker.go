@@ -19,9 +19,8 @@ const (
 
 // for image
 const (
-	ScenarioImageProfileCheck   Scenario = "profilePhotoCheck"
-	ScenarioImageBaseLineCheck  Scenario = "baselineCheck"
-	ScenarioImagePostImageCheck Scenario = "postImageCheck"
+	ScenarioImageProfileCheck  Scenario = "profilePhotoCheck"
+	ScenarioImageBaseLineCheck Scenario = "baselineCheck"
 )
 
 func (s Scenario) FromString(scenario string) (Scenario, bool) {
@@ -36,8 +35,6 @@ func (s Scenario) FromString(scenario string) (Scenario, bool) {
 		return ScenarioImageProfileCheck, true
 	case "baselineCheck":
 		return ScenarioImageBaseLineCheck, true
-	case "postImageCheck":
-		return ScenarioImagePostImageCheck, true
 	case "llm_response_moderation":
 		return ScenarioLLMResModeration, true
 	case "llm_query_moderation":

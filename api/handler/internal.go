@@ -42,8 +42,26 @@ type InternalHandler struct {
 	emptyRepoPath  string
 }
 
+type allowedRequest struct {
+	Action       string `json:"action,omitempty"`
+	GLRepository string `json:"gl_repository,omitempty"`
+	Project      string `json:"project,omitempty"`
+	Changes      string `json:"changes,omitempty"`
+	Protocol     string `json:"protocol,omitempty"`
+	Env          string `json:"env,omitempty"`
+	Username     string `json:"username,omitempty"`
+	KeyID        string `json:"key_id,omitempty"`
+	UserID       string `json:"user_id,omitempty"`
+}
+
 // TODO: add prmission check
 func (h *InternalHandler) Allowed(ctx *gin.Context) {
+	var req allowedRequest
+	if err := ctx.ShouldBind(&req); err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
 	allowed, err := h.internal.Allowed(ctx.Request.Context())
 	if err != nil {
 		httpbase.ServerError(ctx, err)
@@ -123,6 +141,33 @@ func (h *InternalHandler) SSHAllowed(ctx *gin.Context) {
 		})
 	}
 }
+
+// func (h *InternalHandler) PreReceive(ctx *gin.Context) {
+// 	body, _ := io.ReadAll(ctx.Request.Body)
+// 	strBody := string(body)
+// 	fmt.Printf(strBody)
+
+// 	var (
+// 		// req    types.SSHAllowedReq
+// 		rawReq types.GitalyAllowedReq
+// 	)
+// 	if err := ctx.ShouldBind(&rawReq); err != nil {
+// 		slog.Error("Bad request format", "error", err)
+// 		httpbase.BadRequest(ctx, err.Error())
+// 		return
+// 	}
+// 	// req.RepoType, req.Namespace, req.Name = getRepoInfoFronClonePath(rawReq.GlRepository)
+
+// 	// resp, err := h.c.SSHAllowed(ctx, req)
+// 	// if err != nil {
+// 	// 	httpbase.ServerError(ctx, err)
+// 	// 	return
+// 	// }
+// 	ctx.PureJSON(http.StatusOK, gin.H{
+// 		"status":  true,
+// 		"message": "allowed",
+// 	})
+// }
 
 func (h *InternalHandler) LfsAuthenticate(ctx *gin.Context) {
 	var req types.LfsAuthenticateReq

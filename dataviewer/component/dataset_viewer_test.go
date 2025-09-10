@@ -113,6 +113,7 @@ func TestDatasetViewerComponent_Rows(t *testing.T) {
 	}, true).Return([]string{"a", "b"}, []string{"c", "d"}, [][]interface{}{
 		{1, 2, 3},
 	}, nil)
+
 	dc.mocks.gitServer.EXPECT().GetTree(
 		mock.Anything, types.GetTreeRequest{Namespace: "ns", Name: "repo", Ref: "main", Limit: 500, RepoType: "dataset", Recursive: true},
 	).Return(&types.GetRepoFileTreeResp{Files: []*types.File{

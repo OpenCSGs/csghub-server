@@ -24,6 +24,100 @@ func (_m *MockMirrorStore) EXPECT() *MockMirrorStore_Expecter {
 	return &MockMirrorStore_Expecter{mock: &_m.Mock}
 }
 
+// BatchCreate provides a mock function with given fields: ctx, mirrors
+func (_m *MockMirrorStore) BatchCreate(ctx context.Context, mirrors []database.Mirror) error {
+	ret := _m.Called(ctx, mirrors)
+
+	if len(ret) == 0 {
+		panic("no return value specified for BatchCreate")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, []database.Mirror) error); ok {
+		r0 = rf(ctx, mirrors)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockMirrorStore_BatchCreate_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BatchCreate'
+type MockMirrorStore_BatchCreate_Call struct {
+	*mock.Call
+}
+
+// BatchCreate is a helper method to define mock.On call
+//   - ctx context.Context
+//   - mirrors []database.Mirror
+func (_e *MockMirrorStore_Expecter) BatchCreate(ctx interface{}, mirrors interface{}) *MockMirrorStore_BatchCreate_Call {
+	return &MockMirrorStore_BatchCreate_Call{Call: _e.mock.On("BatchCreate", ctx, mirrors)}
+}
+
+func (_c *MockMirrorStore_BatchCreate_Call) Run(run func(ctx context.Context, mirrors []database.Mirror)) *MockMirrorStore_BatchCreate_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].([]database.Mirror))
+	})
+	return _c
+}
+
+func (_c *MockMirrorStore_BatchCreate_Call) Return(_a0 error) *MockMirrorStore_BatchCreate_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockMirrorStore_BatchCreate_Call) RunAndReturn(run func(context.Context, []database.Mirror) error) *MockMirrorStore_BatchCreate_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// BatchUpdate provides a mock function with given fields: ctx, mirrors
+func (_m *MockMirrorStore) BatchUpdate(ctx context.Context, mirrors []database.Mirror) error {
+	ret := _m.Called(ctx, mirrors)
+
+	if len(ret) == 0 {
+		panic("no return value specified for BatchUpdate")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, []database.Mirror) error); ok {
+		r0 = rf(ctx, mirrors)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockMirrorStore_BatchUpdate_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BatchUpdate'
+type MockMirrorStore_BatchUpdate_Call struct {
+	*mock.Call
+}
+
+// BatchUpdate is a helper method to define mock.On call
+//   - ctx context.Context
+//   - mirrors []database.Mirror
+func (_e *MockMirrorStore_Expecter) BatchUpdate(ctx interface{}, mirrors interface{}) *MockMirrorStore_BatchUpdate_Call {
+	return &MockMirrorStore_BatchUpdate_Call{Call: _e.mock.On("BatchUpdate", ctx, mirrors)}
+}
+
+func (_c *MockMirrorStore_BatchUpdate_Call) Run(run func(ctx context.Context, mirrors []database.Mirror)) *MockMirrorStore_BatchUpdate_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].([]database.Mirror))
+	})
+	return _c
+}
+
+func (_c *MockMirrorStore_BatchUpdate_Call) Return(_a0 error) *MockMirrorStore_BatchUpdate_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockMirrorStore_BatchUpdate_Call) RunAndReturn(run func(context.Context, []database.Mirror) error) *MockMirrorStore_BatchUpdate_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Create provides a mock function with given fields: ctx, mirror
 func (_m *MockMirrorStore) Create(ctx context.Context, mirror *database.Mirror) (*database.Mirror, error) {
 	ret := _m.Called(ctx, mirror)
@@ -120,8 +214,8 @@ func (_c *MockMirrorStore_Delete_Call) Run(run func(ctx context.Context, mirror 
 	return _c
 }
 
-func (_c *MockMirrorStore_Delete_Call) Return(err error) *MockMirrorStore_Delete_Call {
-	_c.Call.Return(err)
+func (_c *MockMirrorStore_Delete_Call) Return(_a0 error) *MockMirrorStore_Delete_Call {
+	_c.Call.Return(_a0)
 	return _c
 }
 
@@ -185,6 +279,65 @@ func (_c *MockMirrorStore_FindByID_Call) Return(_a0 *database.Mirror, _a1 error)
 }
 
 func (_c *MockMirrorStore_FindByID_Call) RunAndReturn(run func(context.Context, int64) (*database.Mirror, error)) *MockMirrorStore_FindByID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// FindByIDs provides a mock function with given fields: ctx, IDs
+func (_m *MockMirrorStore) FindByIDs(ctx context.Context, IDs []int64) ([]database.Mirror, error) {
+	ret := _m.Called(ctx, IDs)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FindByIDs")
+	}
+
+	var r0 []database.Mirror
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, []int64) ([]database.Mirror, error)); ok {
+		return rf(ctx, IDs)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, []int64) []database.Mirror); ok {
+		r0 = rf(ctx, IDs)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.Mirror)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, []int64) error); ok {
+		r1 = rf(ctx, IDs)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockMirrorStore_FindByIDs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindByIDs'
+type MockMirrorStore_FindByIDs_Call struct {
+	*mock.Call
+}
+
+// FindByIDs is a helper method to define mock.On call
+//   - ctx context.Context
+//   - IDs []int64
+func (_e *MockMirrorStore_Expecter) FindByIDs(ctx interface{}, IDs interface{}) *MockMirrorStore_FindByIDs_Call {
+	return &MockMirrorStore_FindByIDs_Call{Call: _e.mock.On("FindByIDs", ctx, IDs)}
+}
+
+func (_c *MockMirrorStore_FindByIDs_Call) Run(run func(ctx context.Context, IDs []int64)) *MockMirrorStore_FindByIDs_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].([]int64))
+	})
+	return _c
+}
+
+func (_c *MockMirrorStore_FindByIDs_Call) Return(_a0 []database.Mirror, _a1 error) *MockMirrorStore_FindByIDs_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockMirrorStore_FindByIDs_Call) RunAndReturn(run func(context.Context, []int64) ([]database.Mirror, error)) *MockMirrorStore_FindByIDs_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -309,6 +462,65 @@ func (_c *MockMirrorStore_FindByRepoPath_Call) RunAndReturn(run func(context.Con
 	return _c
 }
 
+// FindBySourceURLs provides a mock function with given fields: ctx, sourceURLs
+func (_m *MockMirrorStore) FindBySourceURLs(ctx context.Context, sourceURLs []string) ([]database.Mirror, error) {
+	ret := _m.Called(ctx, sourceURLs)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FindBySourceURLs")
+	}
+
+	var r0 []database.Mirror
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, []string) ([]database.Mirror, error)); ok {
+		return rf(ctx, sourceURLs)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, []string) []database.Mirror); ok {
+		r0 = rf(ctx, sourceURLs)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.Mirror)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, []string) error); ok {
+		r1 = rf(ctx, sourceURLs)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockMirrorStore_FindBySourceURLs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindBySourceURLs'
+type MockMirrorStore_FindBySourceURLs_Call struct {
+	*mock.Call
+}
+
+// FindBySourceURLs is a helper method to define mock.On call
+//   - ctx context.Context
+//   - sourceURLs []string
+func (_e *MockMirrorStore_Expecter) FindBySourceURLs(ctx interface{}, sourceURLs interface{}) *MockMirrorStore_FindBySourceURLs_Call {
+	return &MockMirrorStore_FindBySourceURLs_Call{Call: _e.mock.On("FindBySourceURLs", ctx, sourceURLs)}
+}
+
+func (_c *MockMirrorStore_FindBySourceURLs_Call) Run(run func(ctx context.Context, sourceURLs []string)) *MockMirrorStore_FindBySourceURLs_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].([]string))
+	})
+	return _c
+}
+
+func (_c *MockMirrorStore_FindBySourceURLs_Call) Return(_a0 []database.Mirror, _a1 error) *MockMirrorStore_FindBySourceURLs_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockMirrorStore_FindBySourceURLs_Call) RunAndReturn(run func(context.Context, []string) ([]database.Mirror, error)) *MockMirrorStore_FindBySourceURLs_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // FindWithMapping provides a mock function with given fields: ctx, repoType, namespace, name, mapping
 func (_m *MockMirrorStore) FindWithMapping(ctx context.Context, repoType types.RepositoryType, namespace string, name string, mapping types.Mapping) (*database.Repository, error) {
 	ret := _m.Called(ctx, repoType, namespace, name, mapping)
@@ -429,9 +641,9 @@ func (_c *MockMirrorStore_Finished_Call) RunAndReturn(run func(context.Context) 
 	return _c
 }
 
-// IndexWithPagination provides a mock function with given fields: ctx, per, page, search
-func (_m *MockMirrorStore) IndexWithPagination(ctx context.Context, per int, page int, search string) ([]database.Mirror, int, error) {
-	ret := _m.Called(ctx, per, page, search)
+// IndexWithPagination provides a mock function with given fields: ctx, per, page, search, hasRepo
+func (_m *MockMirrorStore) IndexWithPagination(ctx context.Context, per int, page int, search string, hasRepo bool) ([]database.Mirror, int, error) {
+	ret := _m.Called(ctx, per, page, search, hasRepo)
 
 	if len(ret) == 0 {
 		panic("no return value specified for IndexWithPagination")
@@ -440,25 +652,25 @@ func (_m *MockMirrorStore) IndexWithPagination(ctx context.Context, per int, pag
 	var r0 []database.Mirror
 	var r1 int
 	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, int, int, string) ([]database.Mirror, int, error)); ok {
-		return rf(ctx, per, page, search)
+	if rf, ok := ret.Get(0).(func(context.Context, int, int, string, bool) ([]database.Mirror, int, error)); ok {
+		return rf(ctx, per, page, search, hasRepo)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, int, int, string) []database.Mirror); ok {
-		r0 = rf(ctx, per, page, search)
+	if rf, ok := ret.Get(0).(func(context.Context, int, int, string, bool) []database.Mirror); ok {
+		r0 = rf(ctx, per, page, search, hasRepo)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]database.Mirror)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, int, int, string) int); ok {
-		r1 = rf(ctx, per, page, search)
+	if rf, ok := ret.Get(1).(func(context.Context, int, int, string, bool) int); ok {
+		r1 = rf(ctx, per, page, search, hasRepo)
 	} else {
 		r1 = ret.Get(1).(int)
 	}
 
-	if rf, ok := ret.Get(2).(func(context.Context, int, int, string) error); ok {
-		r2 = rf(ctx, per, page, search)
+	if rf, ok := ret.Get(2).(func(context.Context, int, int, string, bool) error); ok {
+		r2 = rf(ctx, per, page, search, hasRepo)
 	} else {
 		r2 = ret.Error(2)
 	}
@@ -476,13 +688,14 @@ type MockMirrorStore_IndexWithPagination_Call struct {
 //   - per int
 //   - page int
 //   - search string
-func (_e *MockMirrorStore_Expecter) IndexWithPagination(ctx interface{}, per interface{}, page interface{}, search interface{}) *MockMirrorStore_IndexWithPagination_Call {
-	return &MockMirrorStore_IndexWithPagination_Call{Call: _e.mock.On("IndexWithPagination", ctx, per, page, search)}
+//   - hasRepo bool
+func (_e *MockMirrorStore_Expecter) IndexWithPagination(ctx interface{}, per interface{}, page interface{}, search interface{}, hasRepo interface{}) *MockMirrorStore_IndexWithPagination_Call {
+	return &MockMirrorStore_IndexWithPagination_Call{Call: _e.mock.On("IndexWithPagination", ctx, per, page, search, hasRepo)}
 }
 
-func (_c *MockMirrorStore_IndexWithPagination_Call) Run(run func(ctx context.Context, per int, page int, search string)) *MockMirrorStore_IndexWithPagination_Call {
+func (_c *MockMirrorStore_IndexWithPagination_Call) Run(run func(ctx context.Context, per int, page int, search string, hasRepo bool)) *MockMirrorStore_IndexWithPagination_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(int), args[2].(int), args[3].(string))
+		run(args[0].(context.Context), args[1].(int), args[2].(int), args[3].(string), args[4].(bool))
 	})
 	return _c
 }
@@ -492,7 +705,7 @@ func (_c *MockMirrorStore_IndexWithPagination_Call) Return(mirrors []database.Mi
 	return _c
 }
 
-func (_c *MockMirrorStore_IndexWithPagination_Call) RunAndReturn(run func(context.Context, int, int, string) ([]database.Mirror, int, error)) *MockMirrorStore_IndexWithPagination_Call {
+func (_c *MockMirrorStore_IndexWithPagination_Call) RunAndReturn(run func(context.Context, int, int, string, bool) ([]database.Mirror, int, error)) *MockMirrorStore_IndexWithPagination_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -833,6 +1046,64 @@ func (_c *MockMirrorStore_StatusCount_Call) RunAndReturn(run func(context.Contex
 	return _c
 }
 
+// ToBeScheduled provides a mock function with given fields: ctx
+func (_m *MockMirrorStore) ToBeScheduled(ctx context.Context) ([]database.Mirror, error) {
+	ret := _m.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ToBeScheduled")
+	}
+
+	var r0 []database.Mirror
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context) ([]database.Mirror, error)); ok {
+		return rf(ctx)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context) []database.Mirror); ok {
+		r0 = rf(ctx)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.Mirror)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockMirrorStore_ToBeScheduled_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ToBeScheduled'
+type MockMirrorStore_ToBeScheduled_Call struct {
+	*mock.Call
+}
+
+// ToBeScheduled is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *MockMirrorStore_Expecter) ToBeScheduled(ctx interface{}) *MockMirrorStore_ToBeScheduled_Call {
+	return &MockMirrorStore_ToBeScheduled_Call{Call: _e.mock.On("ToBeScheduled", ctx)}
+}
+
+func (_c *MockMirrorStore_ToBeScheduled_Call) Run(run func(ctx context.Context)) *MockMirrorStore_ToBeScheduled_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context))
+	})
+	return _c
+}
+
+func (_c *MockMirrorStore_ToBeScheduled_Call) Return(_a0 []database.Mirror, _a1 error) *MockMirrorStore_ToBeScheduled_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockMirrorStore_ToBeScheduled_Call) RunAndReturn(run func(context.Context) ([]database.Mirror, error)) *MockMirrorStore_ToBeScheduled_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ToSyncLfs provides a mock function with given fields: ctx
 func (_m *MockMirrorStore) ToSyncLfs(ctx context.Context) ([]database.Mirror, error) {
 	ret := _m.Called(ctx)
@@ -1098,122 +1369,6 @@ func (_c *MockMirrorStore_UpdateMirrorAndRepository_Call) Return(_a0 error) *Moc
 }
 
 func (_c *MockMirrorStore_UpdateMirrorAndRepository_Call) RunAndReturn(run func(context.Context, *database.Mirror, *database.Repository) error) *MockMirrorStore_UpdateMirrorAndRepository_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// WithPagination provides a mock function with given fields: ctx
-func (_m *MockMirrorStore) WithPagination(ctx context.Context) ([]database.Mirror, error) {
-	ret := _m.Called(ctx)
-
-	if len(ret) == 0 {
-		panic("no return value specified for WithPagination")
-	}
-
-	var r0 []database.Mirror
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context) ([]database.Mirror, error)); ok {
-		return rf(ctx)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context) []database.Mirror); ok {
-		r0 = rf(ctx)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]database.Mirror)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
-		r1 = rf(ctx)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockMirrorStore_WithPagination_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'WithPagination'
-type MockMirrorStore_WithPagination_Call struct {
-	*mock.Call
-}
-
-// WithPagination is a helper method to define mock.On call
-//   - ctx context.Context
-func (_e *MockMirrorStore_Expecter) WithPagination(ctx interface{}) *MockMirrorStore_WithPagination_Call {
-	return &MockMirrorStore_WithPagination_Call{Call: _e.mock.On("WithPagination", ctx)}
-}
-
-func (_c *MockMirrorStore_WithPagination_Call) Run(run func(ctx context.Context)) *MockMirrorStore_WithPagination_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context))
-	})
-	return _c
-}
-
-func (_c *MockMirrorStore_WithPagination_Call) Return(_a0 []database.Mirror, _a1 error) *MockMirrorStore_WithPagination_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockMirrorStore_WithPagination_Call) RunAndReturn(run func(context.Context) ([]database.Mirror, error)) *MockMirrorStore_WithPagination_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// WithPaginationWithRepository provides a mock function with given fields: ctx
-func (_m *MockMirrorStore) WithPaginationWithRepository(ctx context.Context) ([]database.Mirror, error) {
-	ret := _m.Called(ctx)
-
-	if len(ret) == 0 {
-		panic("no return value specified for WithPaginationWithRepository")
-	}
-
-	var r0 []database.Mirror
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context) ([]database.Mirror, error)); ok {
-		return rf(ctx)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context) []database.Mirror); ok {
-		r0 = rf(ctx)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]database.Mirror)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
-		r1 = rf(ctx)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockMirrorStore_WithPaginationWithRepository_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'WithPaginationWithRepository'
-type MockMirrorStore_WithPaginationWithRepository_Call struct {
-	*mock.Call
-}
-
-// WithPaginationWithRepository is a helper method to define mock.On call
-//   - ctx context.Context
-func (_e *MockMirrorStore_Expecter) WithPaginationWithRepository(ctx interface{}) *MockMirrorStore_WithPaginationWithRepository_Call {
-	return &MockMirrorStore_WithPaginationWithRepository_Call{Call: _e.mock.On("WithPaginationWithRepository", ctx)}
-}
-
-func (_c *MockMirrorStore_WithPaginationWithRepository_Call) Run(run func(ctx context.Context)) *MockMirrorStore_WithPaginationWithRepository_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context))
-	})
-	return _c
-}
-
-func (_c *MockMirrorStore_WithPaginationWithRepository_Call) Return(_a0 []database.Mirror, _a1 error) *MockMirrorStore_WithPaginationWithRepository_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockMirrorStore_WithPaginationWithRepository_Call) RunAndReturn(run func(context.Context) ([]database.Mirror, error)) *MockMirrorStore_WithPaginationWithRepository_Call {
 	_c.Call.Return(run)
 	return _c
 }

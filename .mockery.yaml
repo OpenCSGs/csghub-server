@@ -1,6 +1,6 @@
 with-expecter: true
 dir: "_mocks/{{.PackagePath}}"
-# new from v2.49.0, for more detail please refer to:
+# new from v2.53.0, for more detail please refer to:
 # https://github.com/vektra/mockery/commit/13fc60740a1eab3fc705fcc131a4b9a6eacfd0fe#diff-4bc8f03915f15ecf2cb9965592fcf933bb06986003613b5633a8dea7962c31a9R40
 resolve-type-alias: false
 packages:

@@ -1,6 +1,8 @@
 package types
 
-import "time"
+import (
+	"time"
+)
 
 type MCPPropertyKind string
 
@@ -69,6 +71,7 @@ type MCPServer struct {
 	InstallDepsCmds  string           `json:"install_deps_cmds"`
 	BuildCmds        string           `json:"build_cmds"`
 	LaunchCmds       string           `json:"launch_cmds"`
+	AvatarURL        string           `json:"avatar_url"`
 	MirrorTaskStatus MirrorTaskStatus `json:"mirror_task_status"`
 }
 

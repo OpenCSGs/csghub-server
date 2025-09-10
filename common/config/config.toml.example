@@ -1,8 +1,11 @@
 saas = false
+oversea = false
 instance_id = ""
 enable_swagger = false
 enable_https = false
 api_token = "f3a7b9c1d6e5f8e2a1b5d4f9e6a2b8d7c3a4e2b1d9f6e7a8d2c5a7b4c1e3f5b8a1d4f9b7d6e2f8a5d3b1e7f9c6a8b2d1e4f7d5b6e9f2a4b3c8e1d7f995hd82hf"
+lbs_service_key = "123456"
+city_to_cdn_domain = {}
 docs_host = "http://localhost:6636"
 
 [api_server]
@@ -15,11 +18,14 @@ url = "http://localhost:8085"
 token = ""
 port = 8085
 session_secret_key = "mirror"
+proxy_url = ""
 worker_number = 5
+part_size = 100
+lfs_concurrency = 5
 
 [database]
 driver = "pg"
-dsn = "postgresql://postgres:postgres@localhost:5432/starhub_server?sslmode=disable"
+dsn = "postgresql://postgres:postgres@localhost:5433/starhub_server?sslmode=disable"
 timezone = "Asia/Shanghai"
 
 [redis]
@@ -34,7 +40,7 @@ sentinel_endpoint = ""
 
 [git_server]
 url = "http://localhost:3000"
-type = "gitea"
+type = "gitaly"
 host = "http://localhost:3000"
 secret_key = "619c849c49e03754454ccd4cda79a209ce0b30b3"
 username = "root"
@@ -42,16 +48,16 @@ password = "password123"
 timeout_sec = 5
 
 [gitaly_server]
-address = "tcp://localhost:9999"
-storge = "default"
+address = "tcp://gitaly:8075"
+storage = "default"
 token = "abc123secret"
 jwt_secret = "signing-key"
 
 [mirror_server]
-enable = false
-url = "http://localhost:3001"
+enable = true
+url = "http://localhost:3000"
 type = "gitea"
-host = "http://localhost:3001"
+host = "http://localhost:3000"
 secret_key = "619c849c49e03754454ccd4cda79a209ce0b30b3"
 username = "root"
 password = "password123"
@@ -60,21 +66,19 @@ password = "password123"
 url = "https://opencsg.com"
 
 [s3]
-ssl = false
-access_key_id = ""
-access_key_secret = ""
+access_key_id = "H0xkbJj7e86gv2tJYucv"
+access_key_secret = "KNmbQNkgxUYwKarIPHeKXAWWgrjTp4fPt0PykXsG"
 region = ""
 endpoint = "localhost:9000"
-internal_endpoint = ""
 bucket = "opencsg-test"
 enable_ssl = false
+public_bucket = "opencsg-public-resource"
 
 [sensitive_check]
 enable = false
 access_key_id = ""
 access_key_secret = ""
 region = ""
-max_image_count = 10
 endpoint = "oss-cn-beijing.aliyuncs.com"
 enable_ssl = true
 
@@ -106,6 +110,10 @@ docker_reg_base = "opencsg-registry.cn-beijing.cr.aliyuncs.com/public/"
 nim_docker_secret_name = "ngc-secret"
 nim_ngc_secret_name = "nvidia-nim-secrets"
 
+[search]
+repo_search_cache_ttl = 300
+repo_search_limit = 2000
+
 [event]
 sync_interval = 1
 
@@ -118,12 +126,8 @@ organization_name = "opencsg"
 application_name = "opencsg"
 
 [nats]
-url = "nats://account:g98dc5FA8v4J7ck90w@natsmaster:4222"
+url = "nats://natsadmin:AkxjzcHaK4uRqInuPRLeoUYYV5xYKIWv3jlzCehgoe@127.0.0.1:4222"
 msg_fetch_timeout_in_sec = 5
-meter_request_subject = "accounting.metering.>"
-meter_duration_send_subject = "accounting.metering.duration"
-meter_token_send_subject = "accounting.metering.token"
-meter_quota_send_subject = "accounting.metering.quota"
 
 [accounting]
 host = "http://localhost"
@@ -134,21 +138,27 @@ charging_enable = false
 host = "http://localhost"
 port = 8088
 signin_success_redirect_url = "http://localhost:3000/server/callback"
+codesouler_vscode_redirect_url = "http://127.0.0.1:37678/callback"
+codesouler_jetbrains_redirect_url = "http://127.0.0.1:37679/callback"
 
 [multi_sync]
-saas_api_domain = "https://hub.opencsg.com"
-saas_sync_domain = "https://sync.opencsg.com"
-enabled = true
+saasApiDomain = "https://hub.opencsg.com"
+saasSyncDomain = "https://sync.opencsg.com"
+defaultRepoCountLimit = 10
+defaultSpeedLimit = 1024
+defaultTrafficLimit = 1024
+# Uncomment and set if the multi-sync feature is enabled
+# enabled = false
+refresh_account_sync_quota_cron_expression = "0 0 * * *"
 
 [telemetry]
 enable = true
-report_url = "http://hub.opencsg.com/api/v1/telemetry"
-
-[auto_clean]
-instance = false
+reportUrl = "http://hub.opencsg.com/api/v1/telemetry"
 
 [dataset]
-prompt_max_jsonl_file_size = 1048576
+promptMaxJsonlFileSize = 1048576  # 1MB
+# default true
+allowCreatePublicDataset = true
 
 [dataflow]
 host = "http://127.0.0.1"
@@ -157,21 +167,24 @@ port = 8000
 [moderation]
 host = "http://localhost"
 port = 8089
-encoded_sensitive_words = "5Lmg6L+R5bmzLHhpamlucGluZw=="
+encodedSensitiveWords = "5Lmg6L+R5bmzLHhpamlucGluZw=="
 
 [workflow]
 endpoint = "localhost:7233"
-execution_timeout = 43200
-task_timeout = 43200
 
 [cron_job]
 sync_as_client_cron_expression = "0 * * * *"
 calc_recom_score_cron_expression = "0 1 * * *"
+mirror_cron_expression = "* * * * *"
+public_model_repo_cron_expression = "* * * * *"
+glama_crawl_cron_expression = "0 1 * * *"
+
+[dataviewer]
+host = "http://localhost"
+port = 8093
 
 [proxy]
 hosts = ["opencsg.com", "sync.opencsg.com"]
-url = ""
-enable = false
 
 [instrumentation]
 otlp_endpoint = "http://localhost:4317"
@@ -218,13 +231,25 @@ health_interval = 5
 line_separator= "\\n"
 
 [git]
-operation_timeout = 300
+operation_timeout = 10
+check_file_size_enabled = true
+max_un_lfs_file_size = 20971520
 skip_lfs_file_validation = false
 
-[repo_template]
-empty_repo_type = "template"
-empty_name_space = "emptynamespace"
-empty_repo_name = "emptyreponame"
+[integration]
+github_token = ""
+github_api_base_url = "https://api.github.com"
+
+[notification]
+port = 8095
+host = "http://localhost"
+mailer_host = ""
+mailer_port = 465
+mailer_username = ""
+mailer_password = ""
+direct_mail_enabled = false
+direct_mail_access_key_id = ""
+direct_mail_access_key_secret = ""
 
 [prometheus]
 api_address = "http://prometheus.opencsg.com/api/v1/query"

@@ -1,4 +1,4 @@
-//go:build !saas
+//go:build !saas && !ee
 
 package component
 
@@ -44,5 +44,11 @@ func NewTestSpaceResourceComponent(config *config.Config, stores *tests.MockStor
 		deployer:           deployer,
 		userStore:          stores.User,
 		accountComponent:   accountComponent,
+	}
+}
+
+func NewTestMirrorNamespaceMappingComponent(config *config.Config, stores *tests.MockStores) *mirrorNamespaceMappingComponentImpl {
+	return &mirrorNamespaceMappingComponentImpl{
+		mirrorNamespaceMappingStore: stores.MirrorNamespaceMapping,
 	}
 }

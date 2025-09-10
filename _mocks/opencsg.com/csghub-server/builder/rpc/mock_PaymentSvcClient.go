@@ -4,11 +4,12 @@ package rpc
 
 import (
 	context "context"
-	"google.golang.org/genproto/googleapis/type/money"
 
 	consts "opencsg.com/csghub-server/common/utils/payment/consts"
 
 	mock "github.com/stretchr/testify/mock"
+
+	money "opencsg.com/csghub-server/common/utils/money"
 
 	rpc "opencsg.com/csghub-server/builder/rpc"
 )

@@ -20,3 +20,11 @@ type PostReceiveReq struct {
 	Identifier   string `json:"identifier"`
 }
 
+type CheckIfFileOversizeReq struct {
+	Namespace                             string         `json:"namespace"`
+	Name                                  string         `json:"name"`
+	RepoType                              RepositoryType `json:"repo_type"`
+	Revision                              string         `json:"revision"`
+	GitObjectDirectoryRelative            string         `json:"git_object_directory_relative"`
+	GitAlternateObjectDirectoriesRelative []string       `json:"git_alternate_object_directories_relative"`
+}

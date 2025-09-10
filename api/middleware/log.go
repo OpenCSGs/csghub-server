@@ -1,7 +1,9 @@
 package middleware
 
 import (
+	"context"
 	"log/slog"
+	"net/http"
 	"os"
 	"time"
 
@@ -25,7 +27,15 @@ func Log(config *config.Config) gin.HandlerFunc {
 
 	l := slog.New(slogmulti.Fanout(handlers...))
 	return func(ctx *gin.Context) {
+		if ctx.Request.URL.Path == "/healthz" && ctx.Request.Method == http.MethodHead {
+			ctx.Next()
+			return
+		}
+
 		startTime := time.Now()
+		ctx.Set("clientIP", ctx.ClientIP())
+		reqCtx := context.WithValue(ctx.Request.Context(), "clientIP", ctx.ClientIP())
+		ctx.Request = ctx.Request.WithContext(reqCtx)
 
 		ctx.Next()
 

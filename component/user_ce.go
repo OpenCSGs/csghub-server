@@ -124,3 +124,40 @@ func (c *userComponentImpl) DeleteUserResource(ctx context.Context, username str
 func (c *userComponentImpl) GetUserResource(ctx context.Context, req types.GetUserResourceReq) ([]types.UserResourcesResp, int, error) {
 	return nil, 0, nil
 }
+
+func (c *userComponentImpl) ListNotebooks(ctx context.Context, req *types.DeployReq) ([]types.NotebookRes, int, error) {
+	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
+	if err != nil {
+		return nil, 0, fmt.Errorf("cannot find user for notebook list, %w", err)
+	}
+	deploys, total, err := c.deployTaskStore.ListDeployByUserID(ctx, user.ID, req)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to get user notebooks with error:%w", err)
+	}
+	var res []types.NotebookRes
+	for _, deploy := range deploys {
+		image := deploy.ImageID
+		imagePairs := strings.Split(image, ":")
+		imageVersion := "latest"
+		if len(imagePairs) == 2 {
+			imageVersion = imagePairs[1]
+		}
+		resource := ""
+		var hardware types.HardWare
+		_ = json.Unmarshal([]byte(deploy.Hardware), &hardware)
+		resource, _ = common.GetResourceAndType(hardware)
+		res = append(res, types.NotebookRes{
+			ID:                      deploy.ID,
+			DeployName:              deploy.DeployName,
+			Status:                  deployStatusCodeToString(deploy.Status),
+			CreatedAt:               deploy.CreatedAt,
+			UpdatedAt:               deploy.UpdatedAt,
+			RuntimeFramework:        deploy.RuntimeFramework,
+			RuntimeFrameworkVersion: imageVersion,
+			PayMode:                 types.PayModeFree,
+			ClusterID:               deploy.ClusterID,
+			ResourceName:            resource,
+		})
+	}
+	return res, total, nil
+}

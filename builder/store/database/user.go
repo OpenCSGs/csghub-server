@@ -2,17 +2,20 @@ package database
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/uptrace/bun"
 	"opencsg.com/csghub-server/common/errorx"
+	"opencsg.com/csghub-server/common/types"
 )
 
 // Define the UserStore interface
 type UserStore interface {
 	Index(ctx context.Context) ([]User, error)
-	IndexWithSearch(ctx context.Context, search string, per, page int) ([]User, int, error)
+	IndexWithSearch(ctx context.Context, search, verifyStatus string, labels []string, per, page int) ([]User, int, error)
 	FindByUsername(ctx context.Context, username string) (User, error)
 	FindByEmail(ctx context.Context, email string) (User, error)
 	// Update write the user data back to db. odlUserName should not be empty if username changed
@@ -23,8 +26,15 @@ type UserStore interface {
 	IsExistByUUID(ctx context.Context, uuid string) (bool, error)
 	FindByGitAccessToken(ctx context.Context, token string) (*User, error)
 	FindByUUID(ctx context.Context, uuid string) (*User, error)
-	DeleteUserAndRelations(ctx context.Context, input User) error
+	DeleteUserAndRelations(ctx context.Context, input User, req types.CloseAccountReq) error
 	CountUsers(ctx context.Context) (int, error)
+	UpdateVerifyStatus(ctx context.Context, uuid string, status types.VerifyStatus) error
+	UpdateLabels(ctx context.Context, uuid string, labels []string) error
+	FindByUUIDs(ctx context.Context, uuids []string) ([]*User, error)
+	SoftDeleteUserAndRelations(ctx context.Context, input User, req types.CloseAccountReq) (err error)
+	IndexWithDeleted(ctx context.Context) (users []User, err error)
+	FindByUsernameWithDeleted(ctx context.Context, username string) (User, error)
+	IsExistWithDeleted(ctx context.Context, username string) (bool, error)
 	GetEmails(ctx context.Context, per, page int) ([]string, int, error)
 	GetUserUUIDs(ctx context.Context, per, page int) ([]string, int, error)
 }
@@ -66,6 +76,7 @@ type User struct {
 	Gender          string `bun:"," json:"gender"`
 	RoleMask        string `bun:"," json:"role_mask"`
 	Phone           string `bun:"," json:"phone"`
+	PhoneArea       string `bun:"," json:"phone_area"`
 	PhoneVerified   bool   `bun:"," json:"phone_verified"`
 	EmailVerified   bool   `bun:"," json:"email_verified"`
 	LastLoginAt     string `bun:"," json:"last_login_at"`
@@ -86,6 +97,12 @@ type User struct {
 	// GitToken        string `bun:"," json:"git_token"`
 	// StarhubSynced   bool   `bun:"," json:"starhub_synced"`
 	// GitTokenName string `bun:"," json:"git_token_name"`
+
+	VerifyStatus types.VerifyStatus `bun:",notnull,default:'none'" json:"verify_status"` // none, pending, approved, rejected
+	Labels       []string           `bun:",type:jsonb" json:"labels"`
+	DeletedAt    time.Time          `bun:",soft_delete,nullzero"`
+	RetainData   string             `bun:",nullzero" json:"retain_data"`
+	Tags         []UserTag          `bun:"rel:has-many,join:id=user_id" json:"tags"`
 
 	times
 }
@@ -112,12 +129,22 @@ func (s *UserStoreImpl) Index(ctx context.Context) (users []User, err error) {
 	return users, errorx.HandleDBError(err, nil)
 }
 
-func (s *UserStoreImpl) IndexWithSearch(ctx context.Context, search string, per, page int) (users []User, count int, err error) {
+func (s *UserStoreImpl) IndexWithSearch(ctx context.Context, search, verifyStatus string, labels []string, per, page int) (users []User, count int, err error) {
 	search = strings.ToLower(search)
 	query := s.db.Operator.Core.NewSelect().
 		Model(&users)
 	if search != "" {
 		query.Where("LOWER(username) like ? OR LOWER(email) like ?", fmt.Sprintf("%%%s%%", search), fmt.Sprintf("%%%s%%", search))
+	}
+	if verifyStatus != "" {
+		query.Where("verify_status = ?", verifyStatus)
+	}
+	if len(labels) != 0 {
+		labelsJSON, err := json.Marshal(labels)
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to marshal labels: %w, %w", err, errorx.ErrInternalServerError)
+		}
+		query.Where("labels @> ?", string(labelsJSON))
 	}
 	count, err = query.Count(ctx)
 	if err != nil {
@@ -130,8 +157,11 @@ func (s *UserStoreImpl) IndexWithSearch(ctx context.Context, search string, per,
 
 func (s *UserStoreImpl) FindByUsername(ctx context.Context, username string) (user User, err error) {
 	user.Username = username
-	err = s.db.Operator.Core.NewSelect().Model(&user).Where("username = ?", username).Scan(ctx)
-	return user, errorx.HandleDBError(err, errorx.Ctx().Set("username", username))
+	err = s.db.Operator.Core.NewSelect().
+		Model(&user).
+		Where("username = ?", username).
+		Scan(ctx)
+	return user, errorx.HandleDBError(err, map[string]interface{}{"username": username})
 }
 
 func (s *UserStoreImpl) FindByEmail(ctx context.Context, email string) (user User, err error) {
@@ -143,7 +173,8 @@ func (s *UserStoreImpl) FindByEmail(ctx context.Context, email string) (user Use
 func (s *UserStoreImpl) FindByID(ctx context.Context, id int) (user User, err error) {
 	user.ID = int64(id)
 	err = s.db.Operator.Core.NewSelect().Model(&user).WherePK().Scan(ctx)
-	return user, errorx.HandleDBError(err, nil)
+	err = errorx.HandleDBError(err, nil)
+	return
 }
 
 func (s *UserStoreImpl) Update(ctx context.Context, user *User, oldUserName string) (err error) {
@@ -220,6 +251,16 @@ func (s *UserStoreImpl) IsExist(ctx context.Context, username string) (exists bo
 	return exists, errorx.HandleDBError(err, nil)
 }
 
+func (s *UserStoreImpl) IsExistWithDeleted(ctx context.Context, username string) (exists bool, err error) {
+	exists, err = s.db.Operator.Core.
+		NewSelect().
+		Model((*User)(nil)).
+		WhereAllWithDeleted().
+		Where("username =?", username).
+		Exists(ctx)
+	return exists, errorx.HandleDBError(err, nil)
+}
+
 func (s *UserStoreImpl) IsExistByUUID(ctx context.Context, uuid string) (exists bool, err error) {
 	exists, err = s.db.Operator.Core.
 		NewSelect().
@@ -248,7 +289,10 @@ func (s *UserStoreImpl) FindByGitAccessToken(ctx context.Context, token string) 
 
 func (s *UserStoreImpl) FindByUUID(ctx context.Context, uuid string) (*User, error) {
 	var user User
-	err := s.db.Operator.Core.NewSelect().Model(&user).Where("uuid = ?", uuid).Scan(ctx)
+	err := s.db.Operator.Core.NewSelect().
+		Model(&user).
+		Where("uuid = ?", uuid).
+		Scan(ctx)
 	if err != nil {
 		return nil, errorx.HandleDBError(err, nil)
 	}
@@ -263,8 +307,8 @@ func (s *UserStoreImpl) GetActiveUserCount(ctx context.Context) (int, error) {
 	return count, errorx.HandleDBError(err, nil)
 }
 
-func (s *UserStoreImpl) DeleteUserAndRelations(ctx context.Context, input User) (err error) {
-	exists, err := s.IsExist(ctx, input.Username)
+func (s *UserStoreImpl) DeleteUserAndRelations(ctx context.Context, input User, req types.CloseAccountReq) (err error) {
+	exists, err := s.IsExistWithDeleted(ctx, input.Username)
 	if err != nil {
 		return fmt.Errorf("error checking if user exists: %v", err)
 	}
@@ -274,68 +318,87 @@ func (s *UserStoreImpl) DeleteUserAndRelations(ctx context.Context, input User) 
 
 	err = s.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		// Delete user
-		if err = assertAffectedOneRow(tx.NewDelete().Model(&input).Where("id = ?", input.ID).Exec(ctx)); err != nil {
+		if err = assertAffectedOneRow(tx.NewDelete().Model(&input).Where("id = ?", input.ID).ForceDelete().Exec(ctx)); err != nil {
 			return fmt.Errorf("failed to delete user %d: %v", input.ID, err)
 		}
-		// Get user's repository_ids
-		var repoIDs []int64
-		if err := s.db.Operator.Core.NewSelect().Column("id").Model(&Repository{}).Where("user_id = ?", input.ID).Scan(ctx, &repoIDs); err != nil {
-			return fmt.Errorf("failed to get user repo ids: %v", err)
+
+		if !req.Repository {
+			// Get user's repository_ids
+			var repoIDs []int64
+			if err := s.db.Operator.Core.NewSelect().Column("id").Model(&Repository{}).Where("user_id = ?", input.ID).Scan(ctx, &repoIDs); err != nil {
+				return fmt.Errorf("failed to get user repo ids: %v", err)
+			}
+			// Delete user's model
+			if _, err := tx.NewDelete().Model(&Model{}).Where("repository_id IN (?)", bun.In(repoIDs)).ForceDelete().Exec(ctx); err != nil {
+				return fmt.Errorf("failed to delete user models for user ID %d: %v", input.ID, err)
+			}
+			// Delete user's dataset
+			if _, err := tx.NewDelete().Model(&Dataset{}).Where("repository_id IN (?)", bun.In(repoIDs)).ForceDelete().Exec(ctx); err != nil {
+				return fmt.Errorf("failed to delete user datasets for user ID %d: %v", input.ID, err)
+			}
+			// Delete user's code
+			if _, err := tx.NewDelete().Model(&Code{}).Where("repository_id IN (?)", bun.In(repoIDs)).ForceDelete().Exec(ctx); err != nil {
+				return fmt.Errorf("failed to delete user codes for user ID %d: %v", input.ID, err)
+			}
+			// Delete user's space
+			if _, err := tx.NewDelete().Model(&Space{}).Where("repository_id IN (?)", bun.In(repoIDs)).ForceDelete().Exec(ctx); err != nil {
+				return fmt.Errorf("failed to delete user spaces for user ID %d: %v", input.ID, err)
+			}
+			// Delete user's namespace
+			if _, err := tx.NewDelete().Model(&Namespace{}).Where("user_id = ?", input.ID).ForceDelete().Exec(ctx); err != nil {
+				return fmt.Errorf("failed to delete user namespace for user ID %d:  %v", input.ID, err)
+			}
+			// Delete user's prompts
+			if _, err := tx.NewDelete().Model(&Prompt{}).Where("repository_id IN  (?)", bun.In(repoIDs)).ForceDelete().Exec(ctx); err != nil {
+				return fmt.Errorf("failed to delete user prompts for user ID  %d:  %v", input.ID, err)
+			}
+			// Delete user's repositories runtime frameworks
+			if _, err := tx.NewDelete().Model(&RepositoriesRuntimeFramework{}).Where("repo_id IN (?)", bun.In(repoIDs)).ForceDelete().Exec(ctx); err != nil {
+				return fmt.Errorf("failed to delete user repositories runtime frameworks for user ID %d:  %v", input.ID, err)
+			}
+			// Delete user's mcp servers
+			if _, err := tx.NewDelete().Model(&MCPServer{}).Where("repository_id IN (?)", bun.In(repoIDs)).ForceDelete().Exec(ctx); err != nil {
+				return fmt.Errorf("failed to delete user mcp servers for user ID %d:  %v", input.ID, err)
+			}
+			// Delete user's repo
+			if _, err = tx.NewDelete().Model(&Repository{}).Where("user_id = ?", input.ID).ForceDelete().Exec(ctx); err != nil {
+				return fmt.Errorf("failed to delete user repos for user ID %d: %v", input.ID, err)
+			}
 		}
-		// Delete user's model
-		if _, err := tx.NewDelete().Model(&Model{}).Where("repository_id IN (?)", bun.In(repoIDs)).Exec(ctx); err != nil {
-			return fmt.Errorf("failed to delete user models for user ID %d: %v", input.ID, err)
-		}
-		// Delete user's dataset
-		if _, err := tx.NewDelete().Model(&Dataset{}).Where("repository_id IN (?)", bun.In(repoIDs)).Exec(ctx); err != nil {
-			return fmt.Errorf("failed to delete user datasets for user ID %d: %v", input.ID, err)
-		}
-		// Delete user's code
-		if _, err := tx.NewDelete().Model(&Code{}).Where("repository_id IN (?)", bun.In(repoIDs)).Exec(ctx); err != nil {
-			return fmt.Errorf("failed to delete user codes for user ID %d: %v", input.ID, err)
-		}
-		// Delete user's space
-		if _, err := tx.NewDelete().Model(&Space{}).Where("repository_id IN (?)", bun.In(repoIDs)).Exec(ctx); err != nil {
-			return fmt.Errorf("failed to delete user spaces for user ID %d: %v", input.ID, err)
-		}
-		// Delete user's namespace
-		if _, err := tx.NewDelete().Model(&Namespace{}).Where("user_id = ?", input.ID).Exec(ctx); err != nil {
-			return fmt.Errorf("failed to delete user namespace for user ID %d:  %v", input.ID, err)
-		}
-		// Delete user's prompts
-		if _, err := tx.NewDelete().Model(&Prompt{}).Where("repository_id IN  (?)", bun.In(repoIDs)).Exec(ctx); err != nil {
-			return fmt.Errorf("failed to delete user prompts for user ID  %d:  %v", input.ID, err)
-		}
-		// Delete user's repositories runtime frameworks
-		if _, err := tx.NewDelete().Model(&RepositoriesRuntimeFramework{}).Where("repo_id IN (?)", bun.In(repoIDs)).Exec(ctx); err != nil {
-			return fmt.Errorf("failed to delete user repositories runtime frameworks for user ID %d:  %v", input.ID, err)
-		}
-		// Delete user's repo
-		if _, err = tx.NewDelete().Model(&Repository{}).Where("user_id = ?", input.ID).Exec(ctx); err != nil {
-			return fmt.Errorf("failed to delete user repos for user ID %d: %v", input.ID, err)
+
+		if !req.Discussion {
+			// Delete user's discussions
+			if _, err := tx.NewDelete().Model(&Discussion{}).Where("user_id = ?", input.ID).ForceDelete().Exec(ctx); err != nil {
+				return fmt.Errorf("failed to delete user discussions for user ID %d: %v", input.ID, err)
+			}
+
+			// Delete user's comments
+			if _, err := tx.NewDelete().Model(&Comment{}).Where("user_id = ?", input.ID).ForceDelete().Exec(ctx); err != nil {
+				return fmt.Errorf("failed to delete user discussions for user ID %d: %v", input.ID, err)
+			}
 		}
 		// Delete user's access token
-		if _, err := tx.NewDelete().Model(&AccessToken{}).Where("user_id = ?", input.ID).Exec(ctx); err != nil {
+		if _, err := tx.NewDelete().Model(&AccessToken{}).Where("user_id = ?", input.ID).ForceDelete().Exec(ctx); err != nil {
 			return fmt.Errorf("failed to delete user access tokens for user ID %d: %v", input.ID, err)
 		}
-		// Delete user's organization
-		if _, err := tx.NewDelete().Model(&Organization{}).Where("user_id = ?", input.ID).Exec(ctx); err != nil {
-			return fmt.Errorf("failed to delete user organizations for user ID %d: %v", input.ID, err)
-		}
 		// Delete user's member
-		if _, err := tx.NewDelete().Model(&Member{}).Where("user_id = ?", input.ID).Exec(ctx); err != nil {
+		if _, err := tx.NewDelete().Model(&Member{}).Where("user_id = ?", input.ID).ForceDelete().Exec(ctx); err != nil {
 			return fmt.Errorf("failed to delete user members for user ID %d: %v", input.ID, err)
 		}
+		// Delete user's account_sync_quota
+		if _, err := tx.NewDelete().Model(&AccountSyncQuota{}).Where("user_id = ?", input.ID).ForceDelete().Exec(ctx); err != nil {
+			return fmt.Errorf("failed to delete user account sync quotas for user ID %d: %v", input.ID, err)
+		}
 		// Delete user's ssh keys
-		if _, err := tx.NewDelete().Model(&SSHKey{}).Where("user_id = ?", input.ID).Exec(ctx); err != nil {
+		if _, err := tx.NewDelete().Model(&SSHKey{}).Where("user_id = ?", input.ID).ForceDelete().Exec(ctx); err != nil {
 			return fmt.Errorf("failed to delete user ssh keys for user ID %d: %v", input.ID, err)
 		}
 		// Delete user's user likes
-		if _, err := tx.NewDelete().Model(&UserLike{}).Where("user_id = ?", input.ID).Exec(ctx); err != nil {
+		if _, err := tx.NewDelete().Model(&UserLike{}).Where("user_id = ?", input.ID).ForceDelete().Exec(ctx); err != nil {
 			return fmt.Errorf("failed to delete user likes for user ID %d: %v", input.ID, err)
 		}
 		// Delete user's prompt conversations
-		if _, err := tx.NewDelete().Model(&PromptConversation{}).Where("user_id = ?", input.ID).Exec(ctx); err != nil {
+		if _, err := tx.NewDelete().Model(&PromptConversation{}).Where("user_id = ?", input.ID).ForceDelete().Exec(ctx); err != nil {
 			return fmt.Errorf("failed to delete user prompt conversations for user ID %d:  %v", input.ID, err)
 		}
 
@@ -354,6 +417,138 @@ func (s *UserStoreImpl) CountUsers(ctx context.Context) (int, error) {
 	return count, nil
 }
 
+func (s *UserStoreImpl) UpdateVerifyStatus(ctx context.Context, uuid string, status types.VerifyStatus) error {
+	_, err := s.db.Operator.Core.
+		NewUpdate().
+		Model(&User{}).
+		Set("verify_status = ?", status).
+		Where("uuid = ?", uuid).
+		Exec(ctx)
+	return errorx.HandleDBError(err, nil)
+}
+
+func (s *UserStoreImpl) UpdateLabels(ctx context.Context, uuid string, labels []string) error {
+	err := assertAffectedOneRow(s.db.Operator.Core.NewUpdate().
+		Model((*User)(nil)).
+		Where("uuid = ?", uuid).
+		Set("labels = ?", labels).
+		Exec(ctx))
+
+	return errorx.HandleDBError(err, nil)
+}
+
+func (s *UserStoreImpl) FindByUUIDs(ctx context.Context, uuids []string) ([]*User, error) {
+	var users []*User
+	if len(uuids) == 0 {
+		return users, nil
+	}
+
+	err := s.db.Operator.Core.NewSelect().
+		Model(&users).
+		Where("uuid IN (?)", bun.In(uuids)).
+		Scan(ctx)
+	if err != nil {
+		return nil, errorx.HandleDBError(err, nil)
+	}
+
+	return users, nil
+}
+
+func (s *UserStoreImpl) IndexWithDeleted(ctx context.Context) (users []User, err error) {
+	err = s.db.Operator.Core.NewSelect().Model(&users).WhereAllWithDeleted().Scan(ctx, &users)
+	err = errorx.HandleDBError(err, nil)
+	return
+}
+
+func (s *UserStoreImpl) SoftDeleteUserAndRelations(ctx context.Context, input User, req types.CloseAccountReq) (err error) {
+	exists, err := s.IsExist(ctx, input.Username)
+	if err != nil {
+		return fmt.Errorf("error checking if user exists: %w", err)
+	}
+	if !exists {
+		return errorx.ErrDatabaseNoRows
+	}
+	err = s.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		// Update ueser retain data
+		mReq, err := json.Marshal(req)
+		if err != nil {
+			return fmt.Errorf("failed to marshal close account request: %w", err)
+		}
+		if err = assertAffectedOneRow(tx.NewUpdate().Model(&input).Where("id = ?", input.ID).Set("retain_data = ?", string(mReq)).Exec(ctx)); err != nil {
+			return fmt.Errorf("failed to update user retain_data: %w", err)
+		}
+
+		// Delete user
+		if err = assertAffectedOneRow(tx.NewDelete().Model(&input).Where("id = ?", input.ID).Exec(ctx)); err != nil {
+			return fmt.Errorf("failed to delete user %d: %v", input.ID, err)
+		}
+
+		if req.Repository {
+			// Get user's repository_ids
+			var repoIDs []int64
+			if err := s.db.Operator.Core.NewSelect().Column("id").Model(&Repository{}).Where("user_id = ?", input.ID).Scan(ctx, &repoIDs); err != nil {
+				return fmt.Errorf("failed to get user repo ids: %v", err)
+			}
+			// Delete user's repo
+			if _, err = tx.NewDelete().Model(&Repository{}).Where("user_id = ?", input.ID).Exec(ctx); err != nil {
+				return fmt.Errorf("failed to delete user repos for user ID %d: %v", input.ID, err)
+			}
+		}
+
+		if req.Discussion {
+			// Delete user's discussions
+			if _, err := tx.NewDelete().Model(&Discussion{}).Where("user_id = ?", input.ID).Exec(ctx); err != nil {
+				return fmt.Errorf("failed to delete user discussions for user ID %d: %v", input.ID, err)
+			}
+
+			// Delete user's comments
+			if _, err := tx.NewDelete().Model(&Comment{}).Where("user_id = ?", input.ID).Exec(ctx); err != nil {
+				return fmt.Errorf("failed to delete user discussions for user ID %d: %v", input.ID, err)
+			}
+		}
+
+		// Delete user's lfs locks
+		if _, err := tx.NewDelete().Model(&LfsLock{}).Where("user_id = ?", input.ID).Exec(ctx); err != nil {
+			return fmt.Errorf("failed to delete user lfs locks for user ID %d:  %v", input.ID, err)
+		}
+
+		// Delete user's namespace
+		if _, err := tx.NewDelete().Model(&Namespace{}).Where("user_id = ?", input.ID).Exec(ctx); err != nil {
+			return fmt.Errorf("failed to delete user namespaces for user ID %d:  %v", input.ID, err)
+		}
+
+		// Delete user's access token
+		if _, err := tx.NewDelete().Model(&AccessToken{}).Where("user_id = ?", input.ID).Exec(ctx); err != nil {
+			return fmt.Errorf("failed to delete user access tokens for user ID %d: %v", input.ID, err)
+		}
+
+		// Delete user's member
+		if _, err := tx.NewDelete().Model(&Member{}).Where("user_id = ?", input.ID).Exec(ctx); err != nil {
+			return fmt.Errorf("failed to delete user members for user ID %d: %v", input.ID, err)
+		}
+
+		// Delete user's ssh keys
+		if _, err := tx.NewDelete().Model(&SSHKey{}).Where("user_id = ?", input.ID).Exec(ctx); err != nil {
+			return fmt.Errorf("failed to delete user ssh keys for user ID %d: %v", input.ID, err)
+		}
+		// Delete user's user likes
+		if _, err := tx.NewDelete().Model(&UserLike{}).Where("user_id = ?", input.ID).Exec(ctx); err != nil {
+			return fmt.Errorf("failed to delete user likes for user ID %d: %v", input.ID, err)
+		}
+		return nil
+	})
+
+	return errorx.HandleDBError(err, nil)
+}
+
+func (s *UserStoreImpl) FindByUsernameWithDeleted(ctx context.Context, username string) (user User, err error) {
+	user.Username = username
+	err = s.db.Operator.Core.NewSelect().Model(&user).WhereAllWithDeleted().Where("username = ?", username).Scan(ctx)
+	err = errorx.HandleDBError(err, nil)
+	return
+}
+
+// GetEmails retrieves all user emails from the database.
 func (s *UserStoreImpl) GetEmails(ctx context.Context, per, page int) (emails []string, count int, err error) {
 	query := s.db.Operator.Core.NewSelect().
 		Model((*User)(nil)).
@@ -366,6 +561,7 @@ func (s *UserStoreImpl) GetEmails(ctx context.Context, per, page int) (emails []
 	query = query.Order("id ASC").Limit(per).Offset((page - 1) * per)
 	err = query.Scan(ctx, &emails)
 	if err != nil {
+		err = errorx.HandleDBError(err, nil)
 		return nil, 0, fmt.Errorf("failed to get user emails: %w", err)
 	}
 	return
@@ -378,12 +574,12 @@ func (s *UserStoreImpl) GetUserUUIDs(ctx context.Context, per, page int) (uuids 
 		Where("uuid IS NOT NULL AND uuid != ''")
 	count, err = query.Count(ctx)
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to count user uuids: %w", err)
+		return nil, 0, errorx.HandleDBError(err, nil)
 	}
 	query = query.Order("id ASC").Limit(per).Offset((page - 1) * per)
 	err = query.Scan(ctx, &uuids)
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to get user uuids: %w", err)
+		return nil, 0, errorx.HandleDBError(err, nil)
 	}
 	return uuids, count, nil
 }

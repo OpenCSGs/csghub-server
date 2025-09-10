@@ -33,7 +33,7 @@ type Space struct {
 	Secrets       string `bun:",notnull" json:"secrets"`
 	HasAppFile    bool   `bun:"," json:"has_app_file"`
 	SKU           string `bun:"," json:"sku"`
-	OrderDetailID int64  `bun:"," json:"order_detail_id"`
+	OrderDetailID int64  `json:"order_detail_id"`
 	Variables     string `bun:",nullzero" json:"variables"`
 	ClusterID     string `bun:",nullzero" json:"cluster_id"`
 	times
@@ -43,6 +43,7 @@ type Space struct {
 
 // RecomWeight are recommendation weight settings
 type RecomWeight struct {
+	// like freshess, downloads, etc
 	Name RecomWeightName `bun:",pk" json:"name"`
 	//the expression to calculate weight
 	WeightExp string `bun:",notnull" json:"weight_exp" `

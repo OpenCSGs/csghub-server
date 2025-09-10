@@ -1,4 +1,4 @@
-//go:build !saas
+//go:build !ee && !saas
 
 package workflow
 
@@ -12,6 +12,7 @@ import (
 	"opencsg.com/csghub-server/api/workflow/activity"
 	"opencsg.com/csghub-server/builder/temporal"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/types"
 )
 
 func RegisterCronJobs(config *config.Config, temporalClient temporal.Client) error {
@@ -31,7 +32,7 @@ func RegisterCronJobs(config *config.Config, temporalClient temporal.Client) err
 			Args:      []interface{}{},
 		},
 	})
-	if err != nil && err.Error() != AlreadyScheduledMessage {
+	if err != nil && err.Error() != types.AlreadyScheduledMessage {
 		return fmt.Errorf("unable to create schedule, error:%w", err)
 	}
 
@@ -48,7 +49,7 @@ func RegisterCronJobs(config *config.Config, temporalClient temporal.Client) err
 			Args:      []interface{}{},
 		},
 	})
-	if err != nil && err.Error() != AlreadyScheduledMessage {
+	if err != nil && err.Error() != types.AlreadyScheduledMessage {
 		return fmt.Errorf("unable to create schedule, error:%w", err)
 	}
 
@@ -62,5 +63,4 @@ func RegisterCronWorker(config *config.Config, temporalClient temporal.Client, a
 
 	wfWorker.RegisterWorkflow(SyncAsClientWorkflow)
 	wfWorker.RegisterWorkflow(CalcRecomScoreWorkflow)
-
 }

@@ -3,6 +3,7 @@ package database_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/store/database"
@@ -187,6 +188,7 @@ func TestDatasetStore_UserLikesDatasets(t *testing.T) {
 		{Name: "repo1", Path: "p1", GitPath: "p1"},
 		{Name: "repo2", Path: "p2", GitPath: "p2"},
 		{Name: "repo3", Path: "p3", GitPath: "p3"},
+		{Name: "repo4", Path: "p4", GitPath: "p4"},
 	}
 
 	for _, repo := range repos {
@@ -207,6 +209,12 @@ func TestDatasetStore_UserLikesDatasets(t *testing.T) {
 	_, err = db.Core.NewInsert().Model(&database.UserLike{
 		UserID: 123,
 		RepoID: repos[2].ID,
+	}).Exec(ctx)
+	require.Nil(t, err)
+	_, err = db.Core.NewInsert().Model(&database.UserLike{
+		UserID:    123,
+		RepoID:    repos[3].ID,
+		DeletedAt: time.Now(),
 	}).Exec(ctx)
 	require.Nil(t, err)
 

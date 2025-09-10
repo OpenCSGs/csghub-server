@@ -122,6 +122,7 @@ type Space struct {
 	CanManage            bool                 `json:"can_manage"`
 	Namespace            *Namespace           `json:"namespace"`
 	SensitiveCheckStatus string               `json:"sensitive_check_status"`
+	RecomOpWeight        int                  `json:"recom_op_weight,omitempty"`
 	DeployID             int64                `json:"deploy_id,omitempty"`
 	Instances            []Instance           `json:"instances,omitempty"`
 	ClusterID            string               `json:"cluster_id"`

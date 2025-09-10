@@ -12,11 +12,13 @@ import (
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/git/mirrorserver"
+	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/importer"
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/parquet"
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rsa"
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/s3"
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
+	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/mirror/cache"
 	"opencsg.com/csghub-server/common/tests"
 )
 
@@ -48,9 +50,11 @@ func initializeTestDatasetViewerComponent(ctx context.Context, t interface {
 	mockClient := s3.NewMockClient(t)
 	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
 	mockDeployer := deploy.NewMockDeployer(t)
+	mockCache := cache.NewMockCache(t)
 	mockAccountingClient := accounting.NewMockAccountingClient(t)
 	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
 	mockKeysReader := rsa.NewMockKeysReader(t)
+	mockImporter := importer.NewMockImporter(t)
 	mocks := &Mocks{
 		stores:            mockStores,
 		components:        componentMockedComponents,
@@ -59,11 +63,13 @@ func initializeTestDatasetViewerComponent(ctx context.Context, t interface {
 		s3Client:          mockClient,
 		mirrorServer:      mockMirrorServer,
 		deployer:          mockDeployer,
+		cache:             mockCache,
 		accountingClient:  mockAccountingClient,
 		preader:           mockReader,
 		limitOffsetReader: mockLimitOffsetReader,
 		moderationClient:  mockModerationSvcClient,
 		rsaReader:         mockKeysReader,
+		importer:          mockImporter,
 	}
 	componentTestDatasetViewerWithMocks := &testDatasetViewerWithMocks{
 		datasetViewerComponentImpl: componentDatasetViewerComponentImpl,

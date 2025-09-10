@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"slices"
 	"time"
 
 	"opencsg.com/csghub-server/builder/git"
@@ -17,18 +18,12 @@ import (
 	"opencsg.com/csghub-server/common/utils/common"
 )
 
-const (
-	initCommitMessage     = "initial commit"
-	ossFileExpire         = 259200 * time.Second
-	gitattributesFileName = ".gitattributes"
-)
-
 type DatasetComponent interface {
 	Create(ctx context.Context, req *types.CreateDatasetReq) (*types.Dataset, error)
-	Index(ctx context.Context, filter *types.RepoFilter, per, page int) ([]types.Dataset, int, error)
+	Index(ctx context.Context, filter *types.RepoFilter, per, page int, needOpWeight bool) ([]*types.Dataset, int, error)
 	Update(ctx context.Context, req *types.UpdateDatasetReq) (*types.Dataset, error)
 	Delete(ctx context.Context, namespace, name, currentUser string) error
-	Show(ctx context.Context, namespace, name, currentUser string) (*types.Dataset, error)
+	Show(ctx context.Context, namespace, name, currentUser string, needOpWeight, needMultiSync bool) (*types.Dataset, error)
 	Relations(ctx context.Context, namespace, name, currentUser string) (*types.Relations, error)
 	OrgDatasets(ctx context.Context, req *types.OrgDatasetsReq) ([]types.Dataset, int, error)
 }
@@ -41,6 +36,7 @@ func NewDatasetComponent(config *config.Config) (DatasetComponent, error) {
 	c.namespaceStore = database.NewNamespaceStore()
 	c.userStore = database.NewUserStore()
 	c.userLikesStore = database.NewUserLikesStore()
+	c.recomStore = database.NewRecomStore()
 	var err error
 	c.repoComponent, err = NewRepoComponentImpl(config)
 	if err != nil {
@@ -73,6 +69,7 @@ type datasetComponentImpl struct {
 	gitServer          gitserver.GitServer
 	userLikesStore     database.UserLikesStore
 	userSvcClient      rpc.UserSvcClient
+	recomStore         database.RecomStore
 }
 
 func (c *datasetComponentImpl) Create(ctx context.Context, req *types.CreateDatasetReq) (*types.Dataset, error) {
@@ -160,7 +157,7 @@ func (c *datasetComponentImpl) Create(ctx context.Context, req *types.CreateData
 		NewBranch: req.DefaultBranch,
 		Namespace: req.Namespace,
 		Name:      req.Name,
-		FilePath:  gitattributesFileName,
+		FilePath:  types.GitattributesFileName,
 	}, types.DatasetRepo))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create .gitattributes file, cause: %w", err)
@@ -226,14 +223,14 @@ license: ` + license + `
 	`
 }
 
-func (c *datasetComponentImpl) Index(ctx context.Context, filter *types.RepoFilter, per, page int) ([]types.Dataset, int, error) {
-	return c.commonIndex(ctx, filter, per, page)
+func (c *datasetComponentImpl) Index(ctx context.Context, filter *types.RepoFilter, per, page int, needOpWeight bool) ([]*types.Dataset, int, error) {
+	return c.commonIndex(ctx, filter, per, page, needOpWeight)
 }
 
-func (c *datasetComponentImpl) commonIndex(ctx context.Context, filter *types.RepoFilter, per, page int) ([]types.Dataset, int, error) {
+func (c *datasetComponentImpl) commonIndex(ctx context.Context, filter *types.RepoFilter, per, page int, needOpWeight bool) ([]*types.Dataset, int, error) {
 	var (
 		err         error
-		resDatasets []types.Dataset
+		resDatasets []*types.Dataset
 	)
 	repos, total, err := c.repoComponent.PublicToUser(ctx, types.DatasetRepo, filter.Username, filter, per, page)
 	if err != nil {
@@ -260,7 +257,10 @@ func (c *datasetComponentImpl) commonIndex(ctx context.Context, filter *types.Re
 		if dataset == nil {
 			continue
 		}
-		var tags []types.RepoTag
+		var (
+			tags             []types.RepoTag
+			mirrorTaskStatus types.MirrorTaskStatus
+		)
 		for _, tag := range repo.Tags {
 			tags = append(tags, types.RepoTag{
 				Name:      tag.Name,
@@ -273,7 +273,10 @@ func (c *datasetComponentImpl) commonIndex(ctx context.Context, filter *types.Re
 				UpdatedAt: tag.UpdatedAt,
 			})
 		}
-		resDatasets = append(resDatasets, types.Dataset{
+		if dataset.Repository.Mirror.CurrentTask != nil {
+			mirrorTaskStatus = dataset.Repository.Mirror.CurrentTask.Status
+		}
+		resDatasets = append(resDatasets, &types.Dataset{
 			ID:           dataset.ID,
 			Name:         repo.Name,
 			Nickname:     repo.Nickname,
@@ -301,7 +304,11 @@ func (c *datasetComponentImpl) commonIndex(ctx context.Context, filter *types.Re
 				MSPath:  dataset.Repository.MSPath,
 				CSGPath: dataset.Repository.CSGPath,
 			},
+			MirrorTaskStatus: mirrorTaskStatus,
 		})
+	}
+	if needOpWeight {
+		c.addOpWeightToDataset(ctx, repoIDs, resDatasets)
 	}
 
 	return resDatasets, total, nil
@@ -381,7 +388,7 @@ func (c *datasetComponentImpl) Delete(ctx context.Context, namespace, name, curr
 	return nil
 }
 
-func (c *datasetComponentImpl) Show(ctx context.Context, namespace, name, currentUser string) (*types.Dataset, error) {
+func (c *datasetComponentImpl) Show(ctx context.Context, namespace, name, currentUser string, needOpWeight, needMultiSync bool) (*types.Dataset, error) {
 	var (
 		tags             []types.RepoTag
 		syncStatus       types.RepositorySyncStatus
@@ -465,6 +472,20 @@ func (c *datasetComponentImpl) Show(ctx context.Context, namespace, name, curren
 		resDataset.SensitiveCheckStatus = dataset.Repository.SensitiveCheckStatus.String()
 	}
 
+	if needOpWeight {
+		c.addOpWeightToDataset(ctx, []int64{resDataset.RepositoryID}, []*types.Dataset{resDataset})
+	}
+
+	// add recom_scores to model
+	if needMultiSync {
+		weightNames := []database.RecomWeightName{database.RecomWeightFreshness,
+			database.RecomWeightDownloads,
+			database.RecomWeightQuality,
+			database.RecomWeightOp,
+			database.RecomWeightTotal}
+		c.addWeightsToDataset(ctx, resDataset.RepositoryID, resDataset, weightNames)
+	}
+
 	return resDataset, nil
 }
 
@@ -540,4 +561,20 @@ func (c *datasetComponentImpl) OrgDatasets(ctx context.Context, req *types.OrgDa
 	}
 
 	return resDatasets, total, nil
+}
+
+func (c *datasetComponentImpl) addWeightsToDataset(ctx context.Context, repoID int64, resDatasets *types.Dataset, weightNames []database.RecomWeightName) {
+	weights, err := c.recomStore.FindByRepoIDs(ctx, []int64{repoID})
+	if err == nil {
+		resDatasets.Scores = make([]types.WeightScore, 0)
+		for _, weight := range weights {
+			if slices.Contains(weightNames, weight.WeightName) {
+				score := types.WeightScore{
+					WeightName: string(weight.WeightName),
+					Score:      weight.Score,
+				}
+				resDatasets.Scores = append(resDatasets.Scores, score)
+			}
+		}
+	}
 }

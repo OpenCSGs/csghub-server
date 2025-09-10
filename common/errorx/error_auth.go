@@ -17,6 +17,7 @@ const (
 	userNotMatch
 	needUUID
 	needAPIKey
+	userPhoneNotVerified
 )
 
 var (
@@ -151,6 +152,18 @@ var (
 	//
 	// zh-HK: 需要API密鑰
 	ErrNeedAPIKey error = CustomError{prefix: errAuthPrefix, code: needAPIKey} // need api key in request header or body to identify user account
+	// user phone number not verified
+	//
+	// Description: Your phone number has not been verified yet. Please verify your phone number before making any requests.
+	//
+	// Description_ZH: 您的电话号码尚未验证。请在进行任何请求之前验证您的电话号码。
+	//
+	// en-US: Phone number not verified
+	//
+	// zh-CN: 电话号码未验证
+	//
+	// zh-HK: 電話號碼未驗證
+	ErrUserPhoneNotVerified error = CustomError{prefix: errAuthPrefix, code: userPhoneNotVerified}
 )
 
 /*

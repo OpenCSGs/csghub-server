@@ -48,6 +48,7 @@ type Dataset struct {
 	MirrorLastUpdatedAt  time.Time            `json:"mirror_last_updated_at"`
 	URL                  string               `json:"url"`
 	MultiSource
+	RecomOpWeight    int              `json:"recom_op_weight,omitempty"`
 	MirrorTaskStatus MirrorTaskStatus `json:"mirror_task_status"`
 }
 

@@ -25,8 +25,7 @@ const (
 	lastOrgAdmin
 
 	cannotPromoteSelfToAdmin
-
-	cannotSetRepoPrivacy
+	cannotSetRepoVisibility
 )
 
 var (
@@ -127,18 +126,18 @@ var (
 	//
 	// zh-HK: 不能將自身提升為管理員
 	ErrCannotPromoteSelfToAdmin = CustomError{prefix: errSysPrefix, code: cannotPromoteSelfToAdmin}
-	// cannot change repository privacy
+	// Forbid changing repository visibility setting
 	//
-	// Description: The requested action to change the privacy setting of a repository is prohibited. Because sensitive check not passed.
+	// Description: The requested action to change the visibility setting of a repository is prohibited. Because sensitive check not passed.
 	//
-	// Description_ZH: 用户禁止更改存储库的隐私设置，由于敏感词检测没有通过。
+	// Description_ZH: 禁止用户更改存储库的可见性设置，由于敏感词检测没有通过。
 	//
-	// en-US: Cannot change repository privacy
+	// en-US: Forbid changing repository visibility setting
 	//
-	// zh-CN: 不能更改存储库的隐私
+	// zh-CN: 禁止更改存储库的可见性设置
 	//
-	// zh-HK: 不能更改存儲庫的隱私
-	ErrCannotSetRepoPrivacy = CustomError{prefix: errSysPrefix, code: cannotSetRepoPrivacy}
+	// zh-HK: 禁止更改存儲庫的可见性設置
+	ErrCannotSetRepoVisibility = CustomError{prefix: errSysPrefix, code: cannotSetRepoVisibility}
 )
 
 // Used in DB to convert db error to custom error
@@ -163,6 +162,19 @@ func HandleDBError(err error, ctx map[string]interface{}) error {
 		customErr.code = int(databaseFailure)
 		return customErr
 	}
+}
+
+func DuplicateKey(err error, ctx context) error {
+	if err == nil {
+		return nil
+	}
+	customErr := CustomError{
+		prefix:  errSysPrefix,
+		context: ctx,
+		err:     err,
+		code:    int(databaseDuplicateKey),
+	}
+	return customErr
 }
 
 func InternalServerError(err error, ctx context) error {
@@ -229,14 +241,14 @@ func CannotPromoteSelfToAdmin(err error, ctx context) error {
 	}
 }
 
-func CannotSetRepoPrivacy(err error, ctx context) error {
+func CannotSetRepoVisibility(err error, ctx context) error {
 	if err == nil {
 		return nil
 	}
 	return CustomError{
 		prefix:  errSysPrefix,
 		err:     err,
-		code:    cannotSetRepoPrivacy,
+		code:    cannotSetRepoVisibility,
 		context: ctx,
 	}
 }

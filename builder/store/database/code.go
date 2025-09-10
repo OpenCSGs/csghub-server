@@ -48,7 +48,10 @@ type Code struct {
 func (s *codeStoreImpl) ByRepoIDs(ctx context.Context, repoIDs []int64) (codes []Code, err error) {
 	err = s.db.Operator.Core.NewSelect().
 		Model(&codes).
-		Where("repository_id in (?)", bun.In(repoIDs)).
+		Relation("Repository").
+		Relation("Repository.Mirror").
+		Relation("Repository.Mirror.CurrentTask").
+		Where("code.repository_id in (?)", bun.In(repoIDs)).
 		Scan(ctx)
 
 	return
@@ -100,7 +103,7 @@ func (s *codeStoreImpl) UserLikesCodes(ctx context.Context, userID int64, per, p
 		Model(&codes).
 		Relation("Repository.Tags").
 		Relation("Repository.User").
-		Where("repository.id in (select repo_id from user_likes where user_id=?)", userID)
+		Where("repository.id in (select repo_id from user_likes where user_id=? and deleted_at is NULL)", userID)
 
 	query = query.Order("code.created_at DESC").
 		Limit(per).

@@ -1178,6 +1178,72 @@ func (_c *MockUserComponent_ListInstances_Call) RunAndReturn(run func(context.Co
 	return _c
 }
 
+// ListNotebooks provides a mock function with given fields: ctx, req
+func (_m *MockUserComponent) ListNotebooks(ctx context.Context, req *types.DeployReq) ([]types.NotebookRes, int, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListNotebooks")
+	}
+
+	var r0 []types.NotebookRes
+	var r1 int
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, *types.DeployReq) ([]types.NotebookRes, int, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *types.DeployReq) []types.NotebookRes); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]types.NotebookRes)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *types.DeployReq) int); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, *types.DeployReq) error); ok {
+		r2 = rf(ctx, req)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockUserComponent_ListNotebooks_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListNotebooks'
+type MockUserComponent_ListNotebooks_Call struct {
+	*mock.Call
+}
+
+// ListNotebooks is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req *types.DeployReq
+func (_e *MockUserComponent_Expecter) ListNotebooks(ctx interface{}, req interface{}) *MockUserComponent_ListNotebooks_Call {
+	return &MockUserComponent_ListNotebooks_Call{Call: _e.mock.On("ListNotebooks", ctx, req)}
+}
+
+func (_c *MockUserComponent_ListNotebooks_Call) Run(run func(ctx context.Context, req *types.DeployReq)) *MockUserComponent_ListNotebooks_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*types.DeployReq))
+	})
+	return _c
+}
+
+func (_c *MockUserComponent_ListNotebooks_Call) Return(_a0 []types.NotebookRes, _a1 int, _a2 error) *MockUserComponent_ListNotebooks_Call {
+	_c.Call.Return(_a0, _a1, _a2)
+	return _c
+}
+
+func (_c *MockUserComponent_ListNotebooks_Call) RunAndReturn(run func(context.Context, *types.DeployReq) ([]types.NotebookRes, int, error)) *MockUserComponent_ListNotebooks_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ListServerless provides a mock function with given fields: ctx, req
 func (_m *MockUserComponent) ListServerless(ctx context.Context, req types.DeployReq) ([]types.DeployRepo, int, error) {
 	ret := _m.Called(ctx, req)

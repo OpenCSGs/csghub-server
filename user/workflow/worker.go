@@ -25,6 +25,8 @@ func StartWorker(config *config.Config) error {
 	wfWorker = worker.New(wfClient, WorkflowUserDeletionQueueName, worker.Options{})
 	wfWorker.RegisterWorkflow(UserDeletionWorkflow)
 	wfWorker.RegisterActivity(activity.DeleteUserAndRelations)
+	wfWorker.RegisterWorkflow(UserSoftDeletionWorkflow)
+	wfWorker.RegisterActivity(activity.SoftDeleteUserAndRelations)
 
 	return wfWorker.Start()
 }

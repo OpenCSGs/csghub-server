@@ -2,28 +2,31 @@ package database
 
 import (
 	"context"
+	"time"
 
 	"opencsg.com/csghub-server/common/errorx"
 )
 
 type Discussion struct {
-	ID                 int64  `bun:"id,pk,autoincrement"`
-	UserID             int64  `bun:"user_id,notnull"`
-	User               *User  `bun:"rel:belongs-to,join:user_id=id"`
-	Title              string `bun:"title,notnull"`
-	DiscussionableID   int64  `bun:"discussionable_id,notnull"`
-	DiscussionableType string `bun:"discussionable_type,notnull"`
-	CommentCount       int64  `bun:"comment_count,notnull,default:0"`
+	ID                 int64     `bun:"id,pk,autoincrement"`
+	UserID             int64     `bun:"user_id,notnull"`
+	User               *User     `bun:"rel:belongs-to,join:user_id=id"`
+	Title              string    `bun:"title,notnull"`
+	DiscussionableID   int64     `bun:"discussionable_id,notnull"`
+	DiscussionableType string    `bun:"discussionable_type,notnull"`
+	CommentCount       int64     `bun:"comment_count,notnull,default:0"`
+	DeletedAt          time.Time `bun:",soft_delete,nullzero"`
 	times
 }
 
 type Comment struct {
-	ID              int64  `bun:"id,pk,autoincrement"`
-	Content         string `bun:"content"`
-	CommentableType string `bun:"commentable_type,notnull"`
-	CommentableID   int64  `bun:"commentable_id,notnull"`
-	UserID          int64  `bun:"user_id,notnull"`
-	User            *User  `bun:"rel:belongs-to,join:user_id=id"`
+	ID              int64     `bun:"id,pk,autoincrement"`
+	Content         string    `bun:"content"`
+	CommentableType string    `bun:"commentable_type,notnull"`
+	CommentableID   int64     `bun:"commentable_id,notnull"`
+	UserID          int64     `bun:"user_id,notnull"`
+	User            *User     `bun:"rel:belongs-to,join:user_id=id"`
+	DeletedAt       time.Time `bun:",soft_delete,nullzero"`
 	times
 }
 
@@ -115,7 +118,7 @@ func (s *discussionStoreImpl) UpdateByID(ctx context.Context, id int64, title st
 }
 
 func (s *discussionStoreImpl) DeleteByID(ctx context.Context, id int64) error {
-	_, err := s.db.Core.NewDelete().Model(&Discussion{}).Where("id = ?", id).Exec(ctx)
+	_, err := s.db.Core.NewDelete().Model(&Discussion{}).Where("id = ?", id).ForceDelete().Exec(ctx)
 	if err != nil {
 		err := errorx.HandleDBError(err, errorx.Ctx().
 			Set("id", id))
@@ -170,7 +173,7 @@ func (s *discussionStoreImpl) FindCommentByID(ctx context.Context, id int64) (*C
 }
 
 func (s *discussionStoreImpl) DeleteComment(ctx context.Context, id int64) error {
-	_, err := s.db.Core.NewDelete().Model(&Comment{}).Where("id = ?", id).Exec(ctx)
+	_, err := s.db.Core.NewDelete().Model(&Comment{}).Where("id = ?", id).ForceDelete().Exec(ctx)
 	if err != nil {
 		err := errorx.HandleDBError(err, nil)
 		return err

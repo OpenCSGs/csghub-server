@@ -1,4 +1,4 @@
-//go:build !saas
+//go:build !saas && !ee
 
 package component
 
@@ -40,6 +40,7 @@ func NewSpaceComponent(config *config.Config) (SpaceComponent, error) {
 		rpc.AuthWithApiKey(config.APIToken))
 
 	c.deployTaskStore = database.NewDeployTaskStore()
+	c.recomStore = database.NewRecomStore()
 	c.git, err = git.NewGitServer(config)
 	if err != nil {
 		return nil, err
@@ -64,19 +65,12 @@ type spaceComponentImpl struct {
 	config              *config.Config
 	userSvcClient       rpc.UserSvcClient
 	deployTaskStore     database.DeployTaskStore
+	recomStore          database.RecomStore
 	templateStore       database.SpaceTemplateStore
-}
-
-func (c *spaceComponentImpl) checkResourcePurchasableForCreate(ctx context.Context, req types.CreateSpaceReq, resource *database.SpaceResource) error {
-	return nil
 }
 
 func (c *spaceComponentImpl) checkResourcePurchasableForUpdate(ctx context.Context, req types.UpdateSpaceReq, resource *database.SpaceResource) error {
 	return nil
-}
-
-func (c *spaceComponentImpl) checkResourceAvailable(ctx context.Context, req types.CreateSpaceReq, hardware types.HardWare) (bool, error) {
-	return c.deployer.CheckResourceAvailable(ctx, req.ClusterID, 0, &hardware)
 }
 
 func (c *spaceComponentImpl) updateSpaceByReq(space database.Space, req types.CreateSpaceReq) database.Space {

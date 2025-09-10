@@ -1,4 +1,4 @@
-package handler_test
+package handler
 
 import (
 	"bytes"
@@ -13,17 +13,24 @@ import (
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/common/types"
-	"opencsg.com/csghub-server/notification/handler"
+	"opencsg.com/csghub-server/notification/component"
 
 	mc "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/notification/component"
 )
+
+// _mock for test
+func NewNotifierMessageHandlerWithMock(nmc component.NotificationComponent) *NotificationHandler {
+	return &NotificationHandler{
+		nmc: nmc,
+	}
+}
 
 // TestGetUnreadCount tests the GetUnreadCount handler function.
 func TestGetUnreadCount(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	nmc := mc.NewMockNotificationComponent(t)
 	nmc.EXPECT().GetUnreadCount(context.Background(), "test").Return(10, nil)
-	handler := handler.NewNotifierMessageHandlerWithMock(nmc)
+	handler := NewNotifierMessageHandlerWithMock(nmc)
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest("GET", "/notifications/unread", nil)
 	ctx, _ := gin.CreateTestContext(w)
@@ -52,7 +59,7 @@ func TestListNotifications(t *testing.T) {
 	}
 	nmc.EXPECT().ListNotifications(context.Background(), "test", req).Return([]types.Notifications{}, 0, nil)
 	nmc.EXPECT().GetUnreadCount(context.Background(), "test").Return(0, nil)
-	handler := handler.NewNotifierMessageHandlerWithMock(nmc)
+	handler := NewNotifierMessageHandlerWithMock(nmc)
 	w := httptest.NewRecorder()
 	reqObj, _ := http.NewRequest("GET", fmt.Sprintf("/notifications?page=%d&page_size=%d", req.Page, req.PageSize), nil)
 	ctx, _ := gin.CreateTestContext(w)
@@ -76,7 +83,7 @@ func TestMarkAsRead(t *testing.T) {
 		MarkAll: true,
 	}
 	nmc.EXPECT().MarkAsRead(context.Background(), "test", req).Return(nil)
-	handler := handler.NewNotifierMessageHandlerWithMock(nmc)
+	handler := NewNotifierMessageHandlerWithMock(nmc)
 	w := httptest.NewRecorder()
 	body, _ := json.Marshal(req)
 	reqObj, _ := http.NewRequest("PUT", "/notifications/count", bytes.NewBuffer(body))
@@ -116,7 +123,7 @@ func TestUpdateNotificationSetting(t *testing.T) {
 	expectedReq.DoNotDisturbEndTime = time.Date(2000, 1, 1, endTime.Hour(), endTime.Minute(), 0, 0, time.UTC)
 
 	nmc.EXPECT().NotificationsSetting(context.Background(), "test", expectedReq, location).Return(nil)
-	handler := handler.NewNotifierMessageHandlerWithMock(nmc)
+	handler := NewNotifierMessageHandlerWithMock(nmc)
 	w := httptest.NewRecorder()
 	body, _ := json.Marshal(req)
 	reqObj, _ := http.NewRequest("PUT", "/notifications/setting", bytes.NewBuffer(body))
@@ -137,7 +144,7 @@ func TestPollNewNotifications(t *testing.T) {
 	t.Logf("Testing with limit: %d", limit)
 	location, _ := time.LoadLocation("Asia/Shanghai")
 	nmc.EXPECT().PollNewNotifications(context.Background(), "test", limit, location).Return(&types.NewNotifications{}, nil)
-	handler := handler.NewNotifierMessageHandlerWithMock(nmc)
+	handler := NewNotifierMessageHandlerWithMock(nmc)
 
 	router := gin.Default()
 	router.Use(func(ctx *gin.Context) {
@@ -168,7 +175,7 @@ func TestGetNotificationSetting(t *testing.T) {
 	nmc := mc.NewMockNotificationComponent(t)
 	location, _ := time.LoadLocation("Asia/Shanghai")
 	nmc.EXPECT().GetNotificationSetting(context.Background(), "test", location).Return(&types.NotificationSetting{}, nil)
-	handler := handler.NewNotifierMessageHandlerWithMock(nmc)
+	handler := NewNotifierMessageHandlerWithMock(nmc)
 	w := httptest.NewRecorder()
 	reqObj, _ := http.NewRequest("GET", "/notifications/setting?timezone=Asia/Shanghai", nil)
 	ctx, _ := gin.CreateTestContext(w)
@@ -187,7 +194,7 @@ func TestGetNotificationSetting(t *testing.T) {
 
 func TestGetAllMessageTypes(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	handler := handler.NewNotifierMessageHandlerWithMock(mc.NewMockNotificationComponent(t))
+	handler := NewNotifierMessageHandlerWithMock(mc.NewMockNotificationComponent(t))
 	w := httptest.NewRecorder()
 	reqObj, _ := http.NewRequest("GET", "/notifications/message-types", nil)
 	ctx, _ := gin.CreateTestContext(w)
@@ -208,7 +215,7 @@ func TestSendMessage_Success(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	mockNMC := mc.NewMockNotificationComponent(t)
-	handler := handler.NewNotifierMessageHandlerWithMock(mockNMC)
+	handler := NewNotifierMessageHandlerWithMock(mockNMC)
 
 	reqBody := types.MessageRequest{
 		Scenario:   "test_scenario",
@@ -243,7 +250,7 @@ func TestMarkAsUnread(t *testing.T) {
 		MarkAll: true,
 	}
 	nmc.EXPECT().MarkAsUnread(context.Background(), "test", req).Return(nil)
-	handler := handler.NewNotifierMessageHandlerWithMock(nmc)
+	handler := NewNotifierMessageHandlerWithMock(nmc)
 	w := httptest.NewRecorder()
 	body, _ := json.Marshal(req)
 	reqObj, _ := http.NewRequest("PUT", "/notifications/unread", bytes.NewBuffer(body))
@@ -265,7 +272,7 @@ func TestDeleteNotifications(t *testing.T) {
 		MarkAll: true,
 	}
 	nmc.EXPECT().DeleteNotifications(context.Background(), "test", req).Return(nil)
-	handler := handler.NewNotifierMessageHandlerWithMock(nmc)
+	handler := NewNotifierMessageHandlerWithMock(nmc)
 
 	w := httptest.NewRecorder()
 	body, _ := json.Marshal(req)

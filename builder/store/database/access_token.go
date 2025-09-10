@@ -51,6 +51,7 @@ type AccessToken struct {
 	Permission  string               `bun:"," json:"permission"`
 	IsActive    bool                 `bun:",default:true" json:"is_active"`
 	ExpiredAt   time.Time            `bun:",nullzero" json:"expired_at"`
+	DeletedAt   time.Time            `bun:",soft_delete,nullzero"`
 	times
 }
 
@@ -118,6 +119,7 @@ func (s *accessTokenStoreImpl) Delete(ctx context.Context, username, tkName, app
 		Where("access_token.user_id = u.id").
 		Where("u.username = ?", username).
 		Where("access_token.name = ? and app = ?", tkName, app).
+		ForceDelete().
 		Exec(ctx)
 	return
 }

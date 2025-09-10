@@ -303,14 +303,14 @@ func (c *Client) GetLogsTree(ctx context.Context, req types.GetLogsTreeRequest) 
 	return &types.LogsTreeResp{Commits: commits}, nil
 }
 
+func (c *Client) GetRepoFiles(ctx context.Context, req gitserver.GetRepoFilesReq) ([]*types.File, error) {
+	return nil, nil
+}
+
 func (c *Client) CommitFiles(ctx context.Context, req gitserver.CommitFilesReq) error {
 	return nil
 }
 
 func (c *Client) GetRepoLfsPointers(ctx context.Context, req gitserver.GetRepoFilesReq) ([]*types.LFSPointer, error) {
-	return nil, nil
-}
-
-func (c *Client) GetRepoFiles(ctx context.Context, req gitserver.GetRepoFilesReq) ([]*types.File, error) {
 	return nil, nil
 }

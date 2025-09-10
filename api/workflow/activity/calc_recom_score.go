@@ -5,5 +5,5 @@ import (
 )
 
 func (a *Activities) CalcRecomScore(ctx context.Context) error {
-	return a.recom.CalculateRecomScore(context.Background(), 0)
+	return a.recom.CalculateRecomScore(ctx, 0)
 }

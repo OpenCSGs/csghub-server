@@ -2,6 +2,7 @@ package component
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"opencsg.com/csghub-server/builder/accounting"
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/store/database"
@@ -24,14 +26,21 @@ type AccessTokenComponent interface {
 	Check(ctx context.Context, req *types.CheckAccessTokenReq) (types.CheckAccessTokenResp, error)
 	GetTokens(ctx context.Context, username, app string) ([]types.CheckAccessTokenResp, error)
 	RefreshToken(ctx context.Context, userName, tokenName, app string, newExpiredAt time.Time) (types.CheckAccessTokenResp, error)
+	GetOrCreateFirstAvaiToken(ctx context.Context, userName, app, tokenName string) (string, error)
 }
 
 func NewAccessTokenComponent(config *config.Config) (AccessTokenComponent, error) {
+	var err error
+	ac, err := accounting.NewAccountingClient(config)
+	if err != nil {
+		return nil, fmt.Errorf("fail to create accounting clent,error:%w", err)
+	}
 	c := &accessTokenComponentImpl{}
 	c.ts = database.NewAccessTokenStore()
 	c.us = database.NewUserStore()
-	var err error
 	c.gs, err = git.NewGitServer(config)
+	c.acctClient = ac
+	c.config = config
 	if err != nil {
 		newError := fmt.Errorf("fail to create git server,error:%w", err)
 		slog.Error(newError.Error())
@@ -41,9 +50,11 @@ func NewAccessTokenComponent(config *config.Config) (AccessTokenComponent, error
 }
 
 type accessTokenComponentImpl struct {
-	ts database.AccessTokenStore
-	us database.UserStore
-	gs gitserver.GitServer
+	ts         database.AccessTokenStore
+	us         database.UserStore
+	gs         gitserver.GitServer
+	acctClient accounting.AccountingClient
+	config     *config.Config
 }
 
 func (c *accessTokenComponentImpl) Create(ctx context.Context, req *types.CreateUserTokenRequest) (*database.AccessToken, error) {
@@ -96,9 +107,27 @@ func (c *accessTokenComponentImpl) Create(ctx context.Context, req *types.Create
 	if req.ExpiredAt.After(time.Now()) {
 		token.ExpiredAt = req.ExpiredAt
 	}
-	err = c.ts.Create(ctx, token)
+
+	err = c.createUserToken(ctx, token, user)
 	if err != nil {
 		return nil, fmt.Errorf("fail to create database user access token,error:%w", err)
+	}
+
+	if req.Application == types.AccessTokenAppMirror {
+		quota, err := c.acctClient.GetQuotaByID(req.Username)
+		if err != nil {
+			return nil, fmt.Errorf("fail to get quota by username,error:%w", err)
+		}
+		if quota == nil {
+			_, err := c.acctClient.CreateOrUpdateQuota(req.Username, types.AcctQuotaReq{
+				RepoCountLimit: c.config.MultiSync.DefaultRepoCountLimit,
+				SpeedLimit:     c.config.MultiSync.DefaultSpeedLimit,
+				TrafficLimit:   c.config.MultiSync.DefaultTrafficLimit,
+			})
+			if err != nil {
+				return nil, fmt.Errorf("fail to create quota for new mirror token,error:%w", err)
+			}
+		}
 	}
 
 	return token, nil
@@ -153,7 +182,7 @@ func (c *accessTokenComponentImpl) Check(ctx context.Context, req *types.CheckAc
 func (c *accessTokenComponentImpl) GetTokens(ctx context.Context, username, app string) ([]types.CheckAccessTokenResp, error) {
 	var resps []types.CheckAccessTokenResp
 	tokens, err := c.ts.FindByUser(ctx, username, app)
-	if err != nil {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("failed to find database user access token,error:%w", err)
 	}
 
@@ -220,4 +249,63 @@ func (c *accessTokenComponentImpl) RefreshToken(ctx context.Context, userName, t
 	resp.ExpireAt = newToken.ExpiredAt
 
 	return resp, nil
+}
+
+func (c *accessTokenComponentImpl) GetOrCreateFirstAvaiToken(ctx context.Context, userName, app, tokenName string) (string, error) {
+	tokens, err := c.GetTokens(ctx, userName, app)
+	if err != nil {
+		return "", fmt.Errorf("failed to select user %s access %s tokens, error:%w", userName, app, err)
+	}
+	if len(tokens) > 0 {
+		return tokens[0].Token, nil
+	}
+
+	req := types.CreateUserTokenRequest{
+		Username:    userName,
+		TokenName:   tokenName,
+		Application: types.AccessTokenApp(app),
+		Permission:  "",
+	}
+
+	token, err := c.Create(ctx, &req)
+	if err != nil {
+		return "", fmt.Errorf("failed to create user %s access %s token, error:%w", userName, app, err)
+	}
+
+	return token.Token, nil
+}
+
+func (c *accessTokenComponentImpl) createUserToken(ctx context.Context, newToken *database.AccessToken, user database.User) error {
+	err := c.ts.Create(ctx, newToken)
+	if err != nil {
+		return fmt.Errorf("fail to create user %s new %s token, error: %w", user.Username, newToken.Application, err)
+	}
+
+	if newToken.Application == types.AccessTokenAppStarship {
+		// charge 100 credit for create starship token by call accounting service
+		err = c.presentForNewAccessToken(user)
+		if err != nil {
+			slog.Error("fail to charge for new starship user with retry 3 times", slog.Any("user.uuid", user.UUID), slog.Any("err", err))
+		}
+	}
+
+	return nil
+}
+
+func (c *accessTokenComponentImpl) presentForNewAccessToken(user database.User) error {
+	var err error
+	req := types.ACTIVITY_REQ{
+		ID:     types.StarShipNewUser.ID,
+		Value:  types.StarShipNewUser.Value,
+		OpUID:  user.Username,
+		OpDesc: types.StarShipNewUser.OpDesc,
+	}
+	// retry 3 time
+	for i := 0; i < 3; i++ {
+		_, err = c.acctClient.PresentAccountingUser(user.UUID, req)
+		if err == nil {
+			return nil
+		}
+	}
+	return err
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/builder/proxy"
+	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
@@ -22,6 +23,7 @@ type RProxyHandler struct {
 	SpaceRootDomain string
 	spaceComp       component.SpaceComponent
 	repoComp        component.RepoComponent
+	modSvcClient    rpc.ModerationSvcClient
 }
 
 func NewRProxyHandler(config *config.Config) (*RProxyHandler, error) {
@@ -34,14 +36,25 @@ func NewRProxyHandler(config *config.Config) (*RProxyHandler, error) {
 		return nil, fmt.Errorf("failed to create repo component,%w", err)
 	}
 
+	var modSvcClient rpc.ModerationSvcClient
+	if config.SensitiveCheck.Enable {
+		modSvcClient = rpc.NewModerationSvcHttpClient(fmt.Sprintf("%s:%d", config.Moderation.Host, config.Moderation.Port))
+	}
+
 	return &RProxyHandler{
 		SpaceRootDomain: config.Space.InternalRootDomain,
 		spaceComp:       spaceComp,
 		repoComp:        repoComp,
+		modSvcClient:    modSvcClient,
 	}, nil
 }
 
 func (r *RProxyHandler) Proxy(ctx *gin.Context) {
+	if ctx.Request.URL.Path == "/healthz" {
+		ctx.Status(http.StatusOK)
+		return
+	}
+
 	slog.Debug("http request proxy", slog.Any("request", ctx.Request.URL), slog.Any("header", ctx.Request.Header))
 	appSvcName := r.GetSrvName(ctx)
 
@@ -74,6 +87,7 @@ func (r *RProxyHandler) Proxy(ctx *gin.Context) {
 		}
 		slog.Debug("proxy target", slog.Any("target", target))
 		rp, _ := proxy.NewReverseProxy(target)
+
 		if deploy.Type == types.InferenceType || deploy.Type == types.ServerlessType {
 			//for infernece,no need context path
 			contextPath := fmt.Sprintf("/%s/%s", "endpoint", appSvcName)

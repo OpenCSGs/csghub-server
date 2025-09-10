@@ -215,6 +215,9 @@ func (rs *FIFOScheduler) next() (Runner, error) {
 			repo.SpaceID = 0
 			repo.RepoType = string(types.ModelRepo)
 		}
+	} else {
+		// for no repo case, e.g. notebook deploy
+		repo.Path = "/"
 	}
 
 	if err != nil {

@@ -4,9 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"time"
-
 	"github.com/uptrace/bun"
+	"opencsg.com/csghub-server/common/utils/payment/consts"
+	"time"
 )
 
 type Payment struct {
@@ -23,7 +23,7 @@ type Payment struct {
 	OrderNo string `bun:",notnull,skipupdate" json:"order_no"`
 
 	// Payment channel.
-	Channel string `bun:",notnull,skipupdate" json:"channel"`
+	Channel consts.PaymentChannel `bun:",notnull,skipupdate" json:"channel"`
 
 	// Transformed into a QR code for frontend scanning payment scenarios.
 	CodeUrl string `bun:",skipupdate" json:"code_url"`

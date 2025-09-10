@@ -24,9 +24,11 @@ type GitCallbackComponent interface {
 	SetRepoVisibility(yes bool)
 	WatchSpaceChange(ctx context.Context, req *types.GiteaCallbackPushReq) error
 	WatchRepoRelation(ctx context.Context, req *types.GiteaCallbackPushReq) error
+	GenSyncVersion(ctx context.Context, req *types.GiteaCallbackPushReq) error
 	SetRepoUpdateTime(ctx context.Context, req *types.GiteaCallbackPushReq) error
 	UpdateRepoInfos(ctx context.Context, req *types.GiteaCallbackPushReq) error
 	SensitiveCheck(ctx context.Context, req *types.GiteaCallbackPushReq) error
+	MCPScan(ctx context.Context, req *types.GiteaCallbackPushReq) error
 }
 
 type gitCallbackComponentImpl struct {
@@ -41,12 +43,17 @@ type gitCallbackComponentImpl struct {
 	repoStore                 database.RepoStore
 	repoRelationStore         database.RepoRelationsStore
 	mirrorStore               database.MirrorStore
+	syncVersionGenerator      SyncVersionGenerator
 	repoRuntimeFrameworkStore database.RepositoriesRuntimeFrameworkStore
 	runtimeArchComponent      component.RuntimeArchitectureComponent
 	runtimeArchStore          database.RuntimeArchitecturesStore
 	runtimeFrameworkStore     database.RuntimeFrameworksStore
 	tagStore                  database.TagStore
 	tagRuleStore              database.TagRuleStore
+	llmConfigStore            database.LLMConfigStore
+	promptPrefixStore         database.PromptPrefixStore
+	mcpScanResultStore        database.MCPScanResultStore
+	mcpScanner                component.MCPScannerComponent
 	// set visibility if file content is sensitive
 	setRepoVisibility bool
 	maxPromptFS       int64
@@ -73,6 +80,7 @@ func NewGitCallback(config *config.Config) (*gitCallbackComponentImpl, error) {
 	if err != nil {
 		return nil, err
 	}
+	svGen := NewSyncVersionGenerator()
 	rrf := database.NewRepositoriesRuntimeFramework()
 	rac, err := component.NewRuntimeArchitectureComponent(config)
 	if err != nil {
@@ -85,6 +93,10 @@ func NewGitCallback(config *config.Config) (*gitCallbackComponentImpl, error) {
 		modSvcClient = rpc.NewModerationSvcHttpClient(fmt.Sprintf("%s:%d", config.Moderation.Host, config.Moderation.Port))
 	}
 	dt := database.NewTagRuleStore()
+	llmConfigStore := database.NewLLMConfigStore(config)
+	promptPrefixStore := database.NewPromptPrefixStore(config)
+	mcpScanResultStore := database.NewMCPScanResultStore()
+	mcpScanner := component.NewMCPScannerComponent(config)
 	return &gitCallbackComponentImpl{
 		config:                    config,
 		gitServer:                 gs,
@@ -97,6 +109,7 @@ func NewGitCallback(config *config.Config) (*gitCallbackComponentImpl, error) {
 		repoRelationStore:         rrs,
 		mirrorStore:               mirrorStore,
 		modSvcClient:              modSvcClient,
+		syncVersionGenerator:      svGen,
 		repoRuntimeFrameworkStore: rrf,
 		runtimeArchComponent:      rac,
 		runtimeArchStore:          ras,
@@ -104,6 +117,10 @@ func NewGitCallback(config *config.Config) (*gitCallbackComponentImpl, error) {
 		tagStore:                  ts,
 		tagRuleStore:              dt,
 		maxPromptFS:               config.Dataset.PromptMaxJsonlFileSize,
+		llmConfigStore:            llmConfigStore,
+		promptPrefixStore:         promptPrefixStore,
+		mcpScanResultStore:        mcpScanResultStore,
+		mcpScanner:                mcpScanner,
 	}, nil
 }
 
@@ -130,6 +147,17 @@ func (c *gitCallbackComponentImpl) WatchRepoRelation(ctx context.Context, req *t
 	return nil
 }
 
+func (c *gitCallbackComponentImpl) GenSyncVersion(ctx context.Context, req *types.GiteaCallbackPushReq) error {
+	if !req.Repository.Private {
+		err := c.syncVersionGenerator.GenSyncVersion(req)
+		if err != nil {
+			slog.Error("generate sync version failed", slog.Any("error", err))
+			return err
+		}
+	}
+	return nil
+}
+
 func (c *gitCallbackComponentImpl) SetRepoUpdateTime(ctx context.Context, req *types.GiteaCallbackPushReq) error {
 	// split req.Repository.FullName by '/'
 	splits := strings.Split(req.Repository.FullName, "/")
@@ -148,7 +176,7 @@ func (c *gitCallbackComponentImpl) SetRepoUpdateTime(ctx context.Context, req *t
 		updated, err := time.Parse(time.RFC3339, req.HeadCommit.Timestamp)
 		if err != nil {
 			slog.Error("Error parsing time:", slog.Any("error", err), slog.String("timestamp", req.HeadCommit.Timestamp))
-			updated = time.Now()
+			updated = time.Now() // set updated to current time if parsing fails
 		}
 		err = c.repoStore.SetUpdateTimeByPath(ctx, adjustedRepoType, namespace, repoName, updated)
 		if err != nil {
@@ -190,6 +218,10 @@ func (c *gitCallbackComponentImpl) UpdateRepoInfos(ctx context.Context, req *typ
 		err = errors.Join(err, c.removeFiles(ctx, repoType, namespace, repoName, ref, commit.Removed))
 		err = errors.Join(err, c.addFiles(ctx, repoType, namespace, repoName, ref, commit.Added))
 	}
+	err = c.updateDescriptionFromReadme(ctx, repoType, namespace, repoName, ref)
+	if err != nil {
+		return err
+	}
 
 	return err
 }
@@ -215,22 +247,20 @@ func (c *gitCallbackComponentImpl) SensitiveCheck(ctx context.Context, req *type
 
 // modifyFiles method handles modified files, skip if not modify README.md
 func (c *gitCallbackComponentImpl) modifyFiles(ctx context.Context, repoType, namespace, repoName, ref string, fileNames []string) error {
-	// update model runtime
-	c.updateRepoRelations(ctx, repoType, namespace, repoName, ref, false, fileNames)
-
-	for _, fileName := range fileNames {
-		slog.Debug("modify file", slog.String("file", fileName))
-		// only care about readme file under root directory
-		if fileName != types.ReadmeFileName {
-			continue
-		}
-		content, err := c.getFileRaw(repoType, namespace, repoName, ref, fileName)
+	//update repo tags firstly
+	if slices.Contains(fileNames, types.ReadmeFileName) {
+		content, err := c.getFileRaw(repoType, namespace, repoName, ref, types.ReadmeFileName)
 		if err != nil {
 			return err
 		}
 		// should be only one README.md
-		return c.updateMetaTags(ctx, repoType, namespace, repoName, ref, content)
+		err = c.updateMetaTags(ctx, repoType, namespace, repoName, ref, content)
+		if err != nil {
+			slog.Error("failed to update meta tags", slog.String("content", content))
+		}
 	}
+	// update model runtime
+	c.updateRepoRelations(ctx, repoType, namespace, repoName, ref, false, fileNames)
 	return nil
 }
 
@@ -508,11 +538,11 @@ func getTagScopeByRepoType(repoType string) (types.TagScope, error) {
 		tagScope = types.PromptTagScope
 	case fmt.Sprintf("%ss", types.MCPServerRepo):
 		tagScope = types.MCPTagScope
+	case fmt.Sprintf("%ss", types.CodeRepo):
+		tagScope = types.CodeTagScope
 	default:
 		return types.UnknownScope, fmt.Errorf("get tag scope by invalid repo type %s", repoType)
-		// TODO: support code and space
-		// case CodeRepoType:
-		// 	tagScope = types.CodeTagScope
+		// TODO: support space
 		// case SpaceRepoType:
 		// 	tagScope = types.SpaceTagScope
 	}

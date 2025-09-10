@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/store/database"
@@ -237,6 +238,12 @@ func TestCollectionStore_ByUserLikesOrgs(t *testing.T) {
 	_, err = db.Core.NewInsert().Model(&database.UserLike{
 		UserID:       123,
 		CollectionID: collections[3].ID,
+	}).Exec(ctx)
+	require.Nil(t, err)
+	_, err = db.Core.NewInsert().Model(&database.UserLike{
+		UserID:       123,
+		CollectionID: collections[1].ID,
+		DeletedAt:    time.Now(),
 	}).Exec(ctx)
 	require.Nil(t, err)
 

@@ -49,3 +49,6 @@ func (c *promptComponentImpl) HateConversationMessage(ctx context.Context, req t
 func (c *promptComponentImpl) SummarizeConversationTitle(ctx context.Context, req types.ConversationTitleReq) (*database.PromptConversation, error) {
 	return nil, nil
 }
+
+func (c *promptComponentImpl) addOpWeightToPrompts(ctx context.Context, repoIDs []int64, resPrompts []*types.PromptRes) {
+}

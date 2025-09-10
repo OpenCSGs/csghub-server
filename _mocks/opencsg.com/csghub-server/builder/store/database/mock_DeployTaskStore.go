@@ -168,6 +168,54 @@ func (_c *MockDeployTaskStore_DeleteDeploy_Call) RunAndReturn(run func(context.C
 	return _c
 }
 
+// DeleteDeployByID provides a mock function with given fields: ctx, userID, deployID
+func (_m *MockDeployTaskStore) DeleteDeployByID(ctx context.Context, userID int64, deployID int64) error {
+	ret := _m.Called(ctx, userID, deployID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteDeployByID")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64, int64) error); ok {
+		r0 = rf(ctx, userID, deployID)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockDeployTaskStore_DeleteDeployByID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteDeployByID'
+type MockDeployTaskStore_DeleteDeployByID_Call struct {
+	*mock.Call
+}
+
+// DeleteDeployByID is a helper method to define mock.On call
+//   - ctx context.Context
+//   - userID int64
+//   - deployID int64
+func (_e *MockDeployTaskStore_Expecter) DeleteDeployByID(ctx interface{}, userID interface{}, deployID interface{}) *MockDeployTaskStore_DeleteDeployByID_Call {
+	return &MockDeployTaskStore_DeleteDeployByID_Call{Call: _e.mock.On("DeleteDeployByID", ctx, userID, deployID)}
+}
+
+func (_c *MockDeployTaskStore_DeleteDeployByID_Call) Run(run func(ctx context.Context, userID int64, deployID int64)) *MockDeployTaskStore_DeleteDeployByID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64), args[2].(int64))
+	})
+	return _c
+}
+
+func (_c *MockDeployTaskStore_DeleteDeployByID_Call) Return(_a0 error) *MockDeployTaskStore_DeleteDeployByID_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockDeployTaskStore_DeleteDeployByID_Call) RunAndReturn(run func(context.Context, int64, int64) error) *MockDeployTaskStore_DeleteDeployByID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // DeleteDeployNow provides a mock function with given fields: ctx, deployID
 func (_m *MockDeployTaskStore) DeleteDeployNow(ctx context.Context, deployID int64) error {
 	ret := _m.Called(ctx, deployID)
@@ -1362,6 +1410,54 @@ func (_c *MockDeployTaskStore_StopDeploy_Call) Return(_a0 error) *MockDeployTask
 }
 
 func (_c *MockDeployTaskStore_StopDeploy_Call) RunAndReturn(run func(context.Context, types.RepositoryType, int64, int64, int64) error) *MockDeployTaskStore_StopDeploy_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// StopDeployByID provides a mock function with given fields: ctx, userID, deployID
+func (_m *MockDeployTaskStore) StopDeployByID(ctx context.Context, userID int64, deployID int64) error {
+	ret := _m.Called(ctx, userID, deployID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for StopDeployByID")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64, int64) error); ok {
+		r0 = rf(ctx, userID, deployID)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockDeployTaskStore_StopDeployByID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'StopDeployByID'
+type MockDeployTaskStore_StopDeployByID_Call struct {
+	*mock.Call
+}
+
+// StopDeployByID is a helper method to define mock.On call
+//   - ctx context.Context
+//   - userID int64
+//   - deployID int64
+func (_e *MockDeployTaskStore_Expecter) StopDeployByID(ctx interface{}, userID interface{}, deployID interface{}) *MockDeployTaskStore_StopDeployByID_Call {
+	return &MockDeployTaskStore_StopDeployByID_Call{Call: _e.mock.On("StopDeployByID", ctx, userID, deployID)}
+}
+
+func (_c *MockDeployTaskStore_StopDeployByID_Call) Run(run func(ctx context.Context, userID int64, deployID int64)) *MockDeployTaskStore_StopDeployByID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64), args[2].(int64))
+	})
+	return _c
+}
+
+func (_c *MockDeployTaskStore_StopDeployByID_Call) Return(_a0 error) *MockDeployTaskStore_StopDeployByID_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockDeployTaskStore_StopDeployByID_Call) RunAndReturn(run func(context.Context, int64, int64) error) *MockDeployTaskStore_StopDeployByID_Call {
 	_c.Call.Return(run)
 	return _c
 }

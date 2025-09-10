@@ -3,6 +3,7 @@ package database_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/store/database"
@@ -190,6 +191,7 @@ func TestMCPServerStore_UserLikes(t *testing.T) {
 		{Name: "repo1", Path: "p1", GitPath: "p1"},
 		{Name: "repo2", Path: "p2", GitPath: "p2"},
 		{Name: "repo3", Path: "p3", GitPath: "p3"},
+		{Name: "repo4", Path: "p4", GitPath: "p4"},
 	}
 
 	for _, repo := range repos {
@@ -213,6 +215,12 @@ func TestMCPServerStore_UserLikes(t *testing.T) {
 		RepoID: repos[2].ID,
 	}).Exec(ctx)
 	require.Nil(t, err)
+	_, err = db.Core.NewInsert().Model(&database.UserLike{
+		UserID:    123,
+		RepoID:    repos[3].ID,
+		DeletedAt: time.Now(),
+	}).Exec(ctx)
+	require.Nil(t, err)
 
 	mcps, total, err := store.UserLikes(ctx, 123, 10, 1)
 	require.Nil(t, err)
@@ -225,25 +233,4 @@ func TestMCPServerStore_UserLikes(t *testing.T) {
 	}
 	require.Equal(t, []string{"repo3", "repo1"}, names)
 
-}
-
-func TestMCPServerStore_CreateIfNotExist(t *testing.T) {
-	db := tests.InitTestDB()
-	defer db.Close()
-	ctx := context.TODO()
-
-	ms := database.NewMCPServerStoreWithDB(db)
-	m, err := ms.CreateIfNotExist(ctx, database.MCPServer{
-		ID:           1,
-		RepositoryID: 1,
-	})
-	require.Nil(t, err)
-	require.Equal(t, m.ID, int64(1))
-
-	m, err = ms.CreateIfNotExist(ctx, database.MCPServer{
-		ID:           1,
-		RepositoryID: 1,
-	})
-	require.Nil(t, err)
-	require.Equal(t, m.ID, int64(1))
 }

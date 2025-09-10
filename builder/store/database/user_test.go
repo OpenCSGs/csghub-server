@@ -120,6 +120,7 @@ func TestUserStore_IndexWithSearch(t *testing.T) {
 		GitID:    3321,
 		Username: "u-foo",
 		UUID:     "1",
+		Labels:   []string{"vip", "basic"},
 	}, &database.Namespace{Path: "1"})
 	require.Nil(t, err)
 
@@ -142,18 +143,20 @@ func TestUserStore_IndexWithSearch(t *testing.T) {
 	cases := []struct {
 		per      int
 		page     int
+		labels   []string
 		total    int
 		expected []int64
 	}{
-		{10, 1, 2, []int64{3321, 3322}},
-		{1, 1, 2, []int64{3321}},
-		{1, 2, 2, []int64{3322}},
+		{10, 1, []string{}, 2, []int64{3321, 3322}},
+		{1, 1, []string{}, 2, []int64{3321}},
+		{1, 2, []string{}, 2, []int64{3322}},
+		{10, 1, []string{"vip"}, 1, []int64{3321}},
 	}
 
 	for _, c := range cases {
 		t.Run(fmt.Sprintf("page %d, per %d", c.page, c.per), func(t *testing.T) {
 
-			users, count, err := userStore.IndexWithSearch(ctx, "foo", c.per, c.page)
+			users, count, err := userStore.IndexWithSearch(ctx, "foo", "", c.labels, c.per, c.page)
 			require.Nil(t, err)
 			require.Equal(t, c.total, count)
 
@@ -334,4 +337,106 @@ func TestUserStore_Update(t *testing.T) {
 	namepsace, err = ns.FindByPath(ctx, "u-foo-changed")
 	require.NoError(t, err)
 	require.Equal(t, namepsace.UserID, user3.ID)
+}
+
+func TestUserStore_UpdateLabels(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	us := database.NewUserStoreWithDB(db)
+	uuid := uuid.New().String()
+
+	err := us.Create(ctx, &database.User{
+		GitID:    10001,
+		UUID:     uuid,
+		Username: "label-user",
+	}, &database.Namespace{Path: "label-user"})
+	require.NoError(t, err)
+
+	newLabels := []string{"vip", "advanced"}
+	err = us.UpdateLabels(ctx, uuid, newLabels)
+	require.NoError(t, err)
+
+	labelsUser, err := us.FindByUUID(ctx, uuid)
+	require.NoError(t, err)
+	require.ElementsMatch(t, newLabels, labelsUser.Labels)
+
+	err = us.UpdateLabels(ctx, uuid, []string{})
+	require.NoError(t, err)
+
+	labelsUserEmpty, err := us.FindByUUID(ctx, uuid)
+	require.NoError(t, err)
+	require.Empty(t, labelsUserEmpty.Labels)
+
+	uuids := []string{uuid, "not_uuid"}
+	users, err := us.FindByUUIDs(ctx, uuids)
+	require.Nil(t, err)
+	require.Equal(t, 1, len(users))
+}
+
+func TestGetUserTags(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	uts := database.NewUserTagStoreWithDB(db)
+	us := database.NewUserStoreWithDB(db)
+	ts := database.NewTagStoreWithDB(db)
+
+	tags := []*database.Tag{
+		{
+			Name:     "tag-1",
+			Category: "category-1",
+			Group:    "group-1",
+		},
+		{
+			Name:     "tag-2",
+			Category: "category-2",
+			Group:    "group-2",
+		},
+		{
+			Name:     "tag-3",
+			Category: "category-3",
+			Group:    "group-3",
+		},
+	}
+
+	err := ts.SaveTags(ctx, tags)
+	require.Nil(t, err)
+
+	tags, err = ts.AllTags(ctx, nil)
+	require.Nil(t, err)
+	user := &database.User{
+		GitID:    10001,
+		UUID:     "1",
+		Username: "u-foo",
+	}
+
+	err = us.Create(
+		ctx,
+		user,
+		&database.Namespace{Path: "u-foo"},
+	)
+	require.Nil(t, err)
+
+	dbUser, err := us.FindByUUID(ctx, user.UUID)
+	require.Nil(t, err)
+
+	tagIDs := make([]int64, 0, len(tags))
+	for _, tag := range tags {
+		tagIDs = append(tagIDs, tag.ID)
+	}
+
+	err = uts.ResetUserTags(ctx, dbUser.ID, tagIDs)
+	require.Nil(t, err)
+
+	tags, err = uts.GetUserTags(ctx, dbUser.ID)
+	require.Nil(t, err)
+	require.Equal(t, len(tags), len(tagIDs))
+	for _, tag := range tags {
+		require.Contains(t, tagIDs, tag.ID)
+	}
 }
