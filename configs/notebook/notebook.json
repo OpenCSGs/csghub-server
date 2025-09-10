@@ -17,6 +17,12 @@
       "engine_version": "4.2.4"
     },
     {
+      "compute_type": "gpu",
+      "image": "opencsghq/notebook:ubuntu-22.04-cuda12.3-py311-tensorflow2.20.0",
+      "driver_version": "12.3",
+      "engine_version": "4.2.5"
+    },
+    {
       "compute_type": "cpu",
       "image": "opencsghq/notebook:ubuntu-22.04-py311-torch2.3.1",
       "engine_version": "4.2.4"

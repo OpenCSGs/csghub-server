@@ -102,7 +102,7 @@ func (c *notebookComponentImpl) CreateNotebook(ctx context.Context, req *types.C
 		RuntimeFramework: frame.FrameName,
 		ContainerPort:    frame.ContainerPort,
 		ImageID:          frame.FrameImage,
-		MinReplica:       1,
+		MinReplica:       req.MinReplica,
 		MaxReplica:       1,
 		Annotation:       string(annoStr),
 		ClusterID:        resource.ClusterID,

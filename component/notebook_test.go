@@ -30,7 +30,7 @@ func TestNotebookComponentImpl_CreateNotebook(t *testing.T) {
 		RuntimeFramework: "rf1",
 		UserID:           1,
 		Annotation:       `{"hub-deploy-user":"testuser"}`,
-		MinReplica:       1,
+		MinReplica:       0,
 		MaxReplica:       1,
 		SecureLevel:      2,
 	}).Return(int64(123), nil)

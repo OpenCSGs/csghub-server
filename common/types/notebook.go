@@ -6,6 +6,7 @@ type CreateNotebookReq struct {
 	CurrentUser        string `json:"currentUser"`
 	DeployName         string `json:"deploy_name"`
 	ResourceID         int64  `json:"resource_id"`
+	MinReplica         int    `json:"min_replica" validate:"min=0"`
 	RuntimeFrameworkID int64  `json:"runtime_framework_id"`
 	OrderDetailID      int64  `json:"order_detail_id"`
 }

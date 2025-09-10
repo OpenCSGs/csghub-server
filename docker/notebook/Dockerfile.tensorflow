@@ -1,0 +1,22 @@
+FROM tensorflow/tensorflow:2.20.0-gpu-jupyter
+LABEL maintainer="xzgan@opencsg.com"
+
+RUN apt-get update && apt-get -y install vim dumb-init \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+RUN pip config set global.index-url https://mirrors.aliyun.com/pypi/simple && \
+ pip install --no-cache-dir csghub-sdk
+
+RUN mkdir -p /root/.jupyter/lab/user-settings/@jupyterlab/apputils-extension && \
+	echo '{"theme":"JupyterLab Dark"}' > /root/.jupyter/lab/user-settings/@jupyterlab/apputils-extension/themes.jupyterlab-settings && \
+	mkdir -p /root/.jupyter/lab/user-settings/@jupyterlab/notebook-extension && \
+	echo '{"codeCellConfig":{"lineNumbers":true }}' > /root/.jupyter/lab/user-settings/@jupyterlab/notebook-extension/tracker.jupyterlab-settings
+
+SHELL ["/bin/bash", "-c"]
+
+ENV SHELL=/bin/bash
+USER root
+WORKDIR /workspace/
+
+ENTRYPOINT ["/usr/bin/dumb-init", "--"]
+CMD ["bash", "-c", "jupyter-lab --ip=0.0.0.0 --port=8000 --no-browser --allow-root --NotebookApp.token=''"]
