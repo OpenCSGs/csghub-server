@@ -119,14 +119,8 @@ packages:
   opencsg.com/csghub-server/accounting/component:
     config:
     interfaces:
-      AccountingUserComponent:
-      AccountingStatementComponent:
-      AccountingBillComponent:
-      AccountingPresentComponent:
       MeteringComponent:
       AccountingEventComponent:
-      AccountingPriceComponent:
-      AccountingOrderComponent:
   opencsg.com/csghub-server/builder/accounting:
     config:
     interfaces:
@@ -198,4 +192,3 @@ packages:
     config:
     interfaces:
       NotificationComponent:
-      MailComponent:
