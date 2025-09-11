@@ -2,6 +2,7 @@ package component
 
 import (
 	"context"
+	"database/sql"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
@@ -329,9 +330,10 @@ func TestServiceComponent_GetServicePodWithStatus(t *testing.T) {
 
 func TestServiceComponent_GetServiceByName(t *testing.T) {
 	kss := mockdb.NewMockKnativeServiceStore(t)
+	clss := mockdb.NewMockClusterInfoStore(t)
 	ctx := context.TODO()
 	pool := &cluster.ClusterPool{}
-	pool.ClusterStore = mockdb.NewMockClusterInfoStore(t)
+	pool.ClusterStore = clss
 	kubeClient := fake.NewSimpleClientset()
 	pool.Clusters = append(pool.Clusters, &cluster.Cluster{
 		CID:           "config",
@@ -380,6 +382,12 @@ func TestServiceComponent_GetServiceByName(t *testing.T) {
 		ID:   1,
 		Code: common.Running,
 	}, nil)
+
+	clss.EXPECT().ByClusterID(mock.Anything, "test").Return(database.ClusterInfo{
+		ClusterConfig: "config",
+		ClusterID:     "test",
+	}, nil)
+
 	resp, err := sc.GetServiceByName(ctx, "test", "test")
 	require.Nil(t, err)
 	require.Equal(t, "test", resp.ServiceName)
@@ -725,4 +733,67 @@ func TestServiceComponent_GetPodLogsFromDB(t *testing.T) {
 	res, err := sc.GetPodLogsFromDB(ctx, pool.Clusters[0], "pod1", "svc")
 	require.Nil(t, err)
 	require.Equal(t, "", res)
+}
+
+func TestServiceComponent_GetServiceByNameFromK8s(t *testing.T) {
+	kss := mockdb.NewMockKnativeServiceStore(t)
+	clss := mockdb.NewMockClusterInfoStore(t)
+	ctx := context.TODO()
+	pool := &cluster.ClusterPool{}
+	pool.ClusterStore = clss
+
+	kubeClient := fake.NewSimpleClientset()
+	pool.Clusters = append(pool.Clusters, &cluster.Cluster{
+		CID:           "config",
+		ID:            "test",
+		Client:        kubeClient,
+		KnativeClient: knativefake.NewSimpleClientset(),
+	})
+	sc := &serviceComponentImpl{
+		k8sNameSpace:       "test",
+		env:                &config.Config{},
+		spaceDockerRegBase: "http://test.com",
+		modelDockerRegBase: "http://test.com",
+		imagePullSecret:    "test",
+		serviceStore:       kss,
+		clusterPool:        pool,
+		logReporter:        mockReporter.NewMockLogCollector(t),
+	}
+	req := types.SVCRequest{
+		ImageID:    "test",
+		DeployID:   1,
+		DeployType: types.InferenceType,
+		RepoType:   string(types.ModelRepo),
+		MinReplica: 1,
+		MaxReplica: 1,
+		UserID:     "test",
+		Sku:        "1",
+		SvcName:    "test",
+		Hardware: types.HardWare{
+			Gpu: types.Processor{
+				Num:  "1",
+				Type: "A10",
+			},
+			Memory: "16Gi",
+		},
+		Env: map[string]string{
+			"test": "test",
+			"port": "8000",
+		},
+		Annotation: map[string]string{},
+	}
+	kss.EXPECT().Add(mock.Anything, mock.Anything).Return(nil)
+	err := sc.RunService(ctx, req)
+	require.Nil(t, err)
+	kss.EXPECT().Get(ctx, "test", "test").Return(nil, sql.ErrNoRows)
+
+	clss.EXPECT().ByClusterID(mock.Anything, "test").Return(database.ClusterInfo{
+		ClusterConfig: "config",
+		ClusterID:     "test",
+	}, nil)
+
+	resp, err := sc.GetServiceByName(ctx, "test", "test")
+	require.Nil(t, err)
+	require.Equal(t, "test", resp.ServiceName)
+	require.Equal(t, common.Deploying, resp.Code)
 }

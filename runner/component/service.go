@@ -2,6 +2,7 @@ package component
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -880,7 +881,7 @@ func (s *serviceComponentImpl) getServiceStatus(ctx context.Context, ks v1.Servi
 	resp.Message = instInfo.Message
 	resp.Instances = instInfo.Instances
 	resp.Reason = instInfo.Reason
-	return resp, err
+	return resp, nil
 }
 
 func isUserContainerActive(instList []types.Instance) bool {
@@ -931,34 +932,63 @@ func (s *serviceComponentImpl) GetServicePods(ctx context.Context, cluster *clus
 	return podNames, nil
 }
 
+func (s *serviceComponentImpl) getServiceActualStatus(ctx context.Context, cluster *cluster.Cluster,
+	svcName string, clusterId string) (*types.StatusResponse, error) {
+	// check if the ksvc exists because k8s event is delayed when query deploy status
+	svc, err := cluster.KnativeClient.ServingV1().Services(s.k8sNameSpace).Get(ctx, svcName, metav1.GetOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("get actual status failed, error: %w", err)
+	}
+	status, err := s.getServiceStatus(ctx, *svc, clusterId)
+	return &status, err
+}
+
 // GetServiceStatus
 func (s *serviceComponentImpl) GetServiceByName(ctx context.Context, svcName, clusterId string) (*types.StatusResponse, error) {
+	var (
+		cluster *cluster.Cluster
+		err     error
+	)
+
 	if clusterId == "" {
 		// use default value
-		cluster, err := s.clusterPool.GetClusterByID(ctx, "")
+		cluster, err = s.clusterPool.GetClusterByID(ctx, "")
 		if err != nil {
-			return nil, fmt.Errorf("fail to get cluster ,error: %v ", err)
+			return nil, fmt.Errorf("fail to get default cluster, error: %w", err)
 		}
 		clusterId = cluster.ID
+	} else {
+		cluster, err = s.clusterPool.GetClusterByID(ctx, clusterId)
+		if err != nil {
+			return nil, fmt.Errorf("fail to get cluster %s, error: %w", clusterId, err)
+		}
 	}
 	svc, err := s.serviceStore.Get(ctx, svcName, clusterId)
-	if err != nil {
-		return nil, err
+	if err == nil {
+		resp := &types.StatusResponse{
+			DeployID:      svc.DeployID,
+			UserID:        svc.UserUUID,
+			DeployType:    svc.DeployType,
+			ServiceName:   svc.Name,
+			DeploySku:     svc.DeploySKU,
+			OrderDetailID: svc.OrderDetailID,
+			Endpoint:      svc.Endpoint,
+			Code:          svc.Code,
+			Instances:     svc.Instances,
+			Replica:       len(svc.Instances),
+		}
+		return resp, nil
 	}
-	resp := &types.StatusResponse{
-		DeployID:      svc.DeployID,
-		UserID:        svc.UserUUID,
-		DeployType:    svc.DeployType,
-		ServiceName:   svc.Name,
-		DeploySku:     svc.DeploySKU,
-		OrderDetailID: svc.OrderDetailID,
-		Endpoint:      svc.Endpoint,
-		Code:          svc.Code,
-		Instances:     svc.Instances,
-		Replica:       len(svc.Instances),
-	}
-	return resp, nil
 
+	if errors.Is(err, sql.ErrNoRows) {
+		// negative case
+		status, err1 := s.getServiceActualStatus(ctx, cluster, svcName, clusterId)
+		if err1 == nil {
+			status.ServiceName = svcName
+			return status, nil
+		}
+	}
+	return nil, err
 }
 
 func (s *serviceComponentImpl) RunService(ctx context.Context, req types.SVCRequest) error {
@@ -1334,6 +1364,7 @@ func (s *serviceComponentImpl) pushEvent(eventType types.WebHookEventType, svcSt
 		},
 		Data: svcStatuEvent,
 	}
+	slog.Debug("push deploy event", slog.Any("event", svcStatuEvent))
 	go func() {
 		err := rcommon.Push(s.env.Runner.WebHookEndpoint, s.env.APIToken, event)
 		if err != nil {
