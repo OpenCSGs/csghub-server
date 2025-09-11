@@ -120,6 +120,7 @@ func (t *DeployRunner) Run(ctx context.Context) error {
 			t.deployFailed(fmt.Sprintf("cancel by new deploy:%d", resp.DeployID))
 			return nil
 		}
+		slog.Debug("[deploy_runner_get_status]", slog.Any("resp", resp))
 		switch resp.Code {
 		case common.Deploying:
 			isCancel, reason := t.shouldForceCancelDeploy(fields[0], fields[1], resp)
@@ -151,9 +152,9 @@ func (t *DeployRunner) Run(ctx context.Context) error {
 
 			return fmt.Errorf("runtime error, resp msg:%s", resp.Message)
 		default:
-			slog.Error("unknown image status", slog.String("repo_name", t.repo.Name), slog.Any("deplopy_task_id", t.task.ID),
+			slog.Error("unknown deploy status", slog.String("repo_name", t.repo.Name), slog.Any("deplopy_task_id", t.task.ID),
 				slog.Int("status", resp.Code))
-			return fmt.Errorf("unknown image status, resp msg:%s", resp.Message)
+			return fmt.Errorf("unknown deploy status, resp-code: %d, resp-msg: %s", resp.Code, resp.Message)
 		}
 	}
 }
