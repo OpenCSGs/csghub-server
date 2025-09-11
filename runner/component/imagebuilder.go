@@ -24,6 +24,7 @@ import (
 	"opencsg.com/csghub-server/runner/types"
 
 	corev1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -102,7 +103,9 @@ func (ibc *imagebuilderComponentImpl) Build(ctx context.Context, req ctypes.Imag
 		return fmt.Errorf("failed to marshal imagebuilder work: %w", err)
 	}
 
-	wft, err := wfTemplateForImageBuilder(ibc.config, req, imagePath, cInfo.StorageClass, ibc.generateWorkName(req.OrgName, req.SpaceName, req.DeployId, fmt.Sprintf("%d", req.TaskId)))
+	createWorkflowName := ibc.generateWorkName(req.OrgName, req.SpaceName, req.DeployId, fmt.Sprintf("%d", req.TaskId))
+
+	wft, err := wfTemplateForImageBuilder(ibc.config, req, imagePath, cInfo.StorageClass, createWorkflowName)
 	if err != nil {
 		slog.Error("failed to create imagebuilder workflow template", "err", err)
 		return fmt.Errorf("failed to create imagebuilder workflow template: %w", err)
@@ -112,9 +115,43 @@ func (ibc *imagebuilderComponentImpl) Build(ctx context.Context, req ctypes.Imag
 		WORK_META_DATA: string(workMeta),
 	}
 
+	// clear old workflow if exist with same name
+	err = ibc.checkAndRemoveExistingWorkflow(ctx, cluster, namespace, createWorkflowName)
+	if err != nil {
+		return fmt.Errorf("failed to check and remove existing workflow %s/%s: %w", namespace, createWorkflowName, err)
+	}
+
+	// create new workflow for image builder
 	_, err = cluster.ArgoClient.ArgoprojV1alpha1().Workflows(namespace).Create(ctx, wft, metav1.CreateOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to create imagebuilder workflow in argo: %w", err)
+		return fmt.Errorf("failed to create imagebuilder workflow %s/%s in argo: %w", namespace, createWorkflowName, err)
+	}
+
+	return nil
+}
+
+func (ibc *imagebuilderComponentImpl) checkAndRemoveExistingWorkflow(ctx context.Context, cluster *cluster.Cluster,
+	namespace, createWorkflowName string) error {
+	checkWft, err := cluster.ArgoClient.ArgoprojV1alpha1().Workflows(namespace).Get(ctx, createWorkflowName, metav1.GetOptions{})
+	slog.Debug("get workflow for space image build", slog.Any("checkWft", checkWft), slog.Any("error", err))
+	if err != nil {
+		if statusErr, ok := err.(*k8serrors.StatusError); ok {
+			//{Status: "Failure", Message: "workflows.argoproj.io \"xxxx\" not found", Reason: "NotFound", Code: 404}}
+			if statusErr.Status().Code == 404 {
+				// no old workflow found
+				return nil
+			}
+		}
+		return fmt.Errorf("failed to check if workflow exist by name %s/%s, error: %w", namespace, createWorkflowName, err)
+	}
+
+	if checkWft != nil {
+		// remove existing workflow
+		err = cluster.ArgoClient.ArgoprojV1alpha1().Workflows(namespace).Delete(ctx, createWorkflowName, metav1.DeleteOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to clean up the existing workflow %s/%s for create new one, error: %w", namespace, createWorkflowName, err)
+		}
+		time.Sleep(time.Second * 2)
 	}
 
 	return nil

@@ -57,7 +57,7 @@ func (h *imagebuilderExecutorImpl) ProcessEvent(ctx context.Context, event *type
 	case types.RunnerBuilderChange:
 		task, err := h.store.GetDeployTask(ctx, data.TaskId)
 		if err != nil {
-			return fmt.Errorf("failed to get deploy task: %w", err)
+			return fmt.Errorf("failed to get deploy task by task id %d to update builder deploy status, error: %w", data.TaskId, err)
 		}
 
 		if event.EventTime < task.UpdatedAt.Unix() {
