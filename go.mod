@@ -7,6 +7,7 @@ require (
 	github.com/OpenCSGs/gitea-go-sdk/gitea v0.0.0-20240618091626-54fa52f1cec6
 	github.com/alibabacloud-go/darabonba-openapi/v2 v2.1.8
 	github.com/alibabacloud-go/dm-20151123/v2 v2.4.0
+	github.com/alibabacloud-go/dysmsapi-20170525/v5 v5.1.2
 	github.com/alibabacloud-go/green-20220302/v2 v2.20.0
 	github.com/alibabacloud-go/tea v1.3.9
 	github.com/aliyun/alibaba-cloud-sdk-go v1.62.648
@@ -38,7 +39,11 @@ require (
 	github.com/nicksnyder/go-i18n/v2 v2.6.0
 	github.com/openai/openai-go/v3 v3.8.1
 	github.com/parquet-go/parquet-go v0.24.0
+<<<<<<< HEAD
 	github.com/prometheus/client_golang v1.21.1
+=======
+	github.com/patrickmn/go-cache v2.1.0+incompatible
+>>>>>>> 0003cf1a (update user's phone number using sms verify code in backend)
 	github.com/redis/go-redis/v9 v9.5.5
 	github.com/sabhiram/go-gitignore v0.0.0-20210923224102-525f6e181f06
 	github.com/samber/slog-multi v1.3.3

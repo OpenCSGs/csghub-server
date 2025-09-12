@@ -27,8 +27,6 @@ type UpdateUserRequest struct {
 	Username              string  `json:"-"`
 	Email                 *string `json:"email,omitempty" binding:"omitnil,email"`
 	EmailVerificationCode *string `json:"email_verification_code,omitempty"`
-	Phone                 *string `json:"phone,omitempty"`
-	PhoneArea             *string `json:"phone_area,omitempty"`
 	UUID                  *string `json:"-"`
 	// should be updated by admin
 	Roles    *[]string `json:"roles,omitempty" example:"[super_user, admin, personal_user]"`
@@ -41,6 +39,21 @@ type UpdateUserRequest struct {
 
 	OpUser string  `json:"-"` // the user who perform this action, used for audit and permission check
 	TagIDs []int64 `json:"tag_ids,omitempty"`
+}
+
+type SendSMSCodeRequest struct {
+	PhoneArea string `json:"phone_area" binding:"required"`
+	Phone     string `json:"phone" binding:"required"`
+}
+
+type SendSMSCodeResponse struct {
+	ExpiredAt time.Time `json:"expired_at"`
+}
+
+type UpdateUserPhoneRequest struct {
+	Phone            *string `json:"phone" binding:"required"`
+	PhoneArea        *string `json:"phone_area,omitempty"`
+	VerificationCode *string `json:"verification_code" binding:"required,len=6"`
 }
 
 var _ SensitiveRequestV2 = (*UpdateUserRequest)(nil)

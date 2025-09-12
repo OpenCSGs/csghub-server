@@ -15,8 +15,9 @@ type Receiver struct {
 
 // common recipient keys
 const (
-	RecipientKeyUserUUIDs  = "user_uuids"
-	RecipientKeyUserEmails = "user_emails"
+	RecipientKeyUserUUIDs        = "user_uuids"
+	RecipientKeyUserEmails       = "user_emails"
+	RecipientKeyUserPhoneNumbers = "user_phone_numbers"
 )
 
 func (r *Receiver) GetUserUUIDs() []string {
@@ -25,6 +26,10 @@ func (r *Receiver) GetUserUUIDs() []string {
 
 func (r *Receiver) GetUserEmails() []string {
 	return r.Recipients[RecipientKeyUserEmails]
+}
+
+func (r *Receiver) GetUserPhoneNumbers() []string {
+	return r.Recipients[RecipientKeyUserPhoneNumbers]
 }
 
 func (r *Receiver) GetRecipients(recipientType string) []string {

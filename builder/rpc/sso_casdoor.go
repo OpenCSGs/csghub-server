@@ -45,6 +45,9 @@ func (c *casdoorClientImpl) UpdateUserInfo(ctx context.Context, userInfo *SSOUpd
 	if userInfo.Phone != "" {
 		casu.Phone = userInfo.Phone
 	}
+	if userInfo.PhoneArea != "" {
+		casu.CountryCode = userInfo.PhoneArea
+	}
 
 	// casdoor update user api don't allow empty display name, so we set it
 	if casu.DisplayName == "" {

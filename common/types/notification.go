@@ -197,6 +197,29 @@ type LarkMessage struct {
 	Size      int       `json:"size"`
 }
 
+<<<<<<< HEAD
+=======
+type MessageScenario string
+
+const (
+	MessageScenarioRepoSync             MessageScenario = "repo-sync"
+	MessageScenarioInternalNotification MessageScenario = "internal-notification"
+	MessageScenarioEmailVerifyCode      MessageScenario = "email-verify-code"
+	MessageScenarioSMSVerifyCode        MessageScenario = "sms-verify-code"
+	MessageScenarioAssetManagement      MessageScenario = "asset-management"
+	MessageScenarioUserVerify           MessageScenario = "user-verify"
+	MessageScenarioOrgVerify            MessageScenario = "org-verify"
+	MessageScenarioOrgMember            MessageScenario = "org-member"
+	MessageScenarioDiscussion           MessageScenario = "discussion"
+	MessageScenarioRecharge             MessageScenario = "recharge"
+	MessageScenarioLowBalance           MessageScenario = "low-balance"
+	MessageScenarioRechargeSuccess      MessageScenario = "recharge-success"
+	MessageScenarioWeeklyRecharges      MessageScenario = "weekly-recharges"
+	MessageScenarioDeployment           MessageScenario = "deployment"
+	MessageScenarioNegativeBalance      MessageScenario = "negative-balance"
+)
+
+>>>>>>> 0003cf1a (update user's phone number using sms verify code in backend)
 type MessageChannel string
 
 const (

@@ -2,11 +2,14 @@ package component
 
 import (
 	"context"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	mockgit "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/git/gitserver"
+	mockrpc "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rpc"
+	mockcache "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/cache"
 	mockdb "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
@@ -143,5 +146,115 @@ func TestUserComponent_Delete(t *testing.T) {
 	uc.config.GitServer.Type = types.GitServerTypeGitaly
 
 	err := uc.Delete(context.TODO(), "user1", "user2")
+	require.Nil(t, err)
+}
+
+func TestUserComponent_SendSMSCode(t *testing.T) {
+	mockUserStore := mockdb.NewMockUserStore(t)
+	mockNotificationSvcClient := mockrpc.NewMockNotificationSvcClient(t)
+	mockUserStore.EXPECT().FindByUUID(mock.Anything, "user1").Return(&database.User{
+		ID: 1,
+	}, nil)
+	mockNotificationSvcClient.EXPECT().Send(mock.Anything, mock.MatchedBy(func(req *types.MessageRequest) bool {
+		return req.Scenario == types.MessageScenarioSMSVerifyCode
+	})).Return(nil)
+
+	cache := mockcache.NewMockRedisClient(t)
+	cache.EXPECT().SetNX(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
+
+	config := &config.Config{}
+	config.Notification.SMSTemplateCodeForVerifyCodeOversea = "test"
+	config.Notification.SMSTemplateCodeForVerifyCodeCN = "test"
+	config.Notification.SMSSign = "test"
+
+	uc := &userComponentImpl{
+		userStore:       mockUserStore,
+		notificationSvc: mockNotificationSvcClient,
+		cache:           cache,
+		config:          config,
+	}
+	resp, err := uc.SendSMSCode(context.TODO(), "user1", types.SendSMSCodeRequest{
+		Phone:     "12345678901",
+		PhoneArea: "+86",
+	})
+	require.Nil(t, err)
+	require.NotNil(t, resp)
+	require.NotNil(t, resp.ExpiredAt)
+}
+
+func TestUserComponent_UpdatePhone(t *testing.T) {
+	var code = "123456"
+	var phone = "12345678901"
+	var phoneArea = "+86"
+
+	mockUserStore := mockdb.NewMockUserStore(t)
+	mockUserStore.EXPECT().FindByUUID(mock.Anything, "user1").Return(&database.User{
+		ID:          int64(1),
+		Phone:       "12345678902",
+		PhoneArea:   "+86",
+		RegProvider: "casdoor",
+	}, nil)
+	mockUserStore.EXPECT().UpdatePhone(mock.Anything, int64(1), "12345678901", "+86").Return(nil)
+
+	cache := mockcache.NewMockRedisClient(t)
+	cache.EXPECT().Del(mock.Anything, mock.Anything).Return(nil)
+	cache.EXPECT().Get(mock.Anything, mock.Anything).Return("123456", nil)
+
+	ssomock := mockrpc.NewMockSSOInterface(t)
+	ssomock.EXPECT().IsExistByPhone(mock.Anything, phone).Return(false, nil)
+	ssomock.EXPECT().UpdateUserInfo(mock.Anything, mock.Anything).Return(nil)
+
+	config := &config.Config{}
+	config.SSOType = "casdoor"
+
+	uc := &userComponentImpl{
+		userStore: mockUserStore,
+		cache:     cache,
+		sso:       ssomock,
+		config:    config,
+	}
+	req := &types.UpdateUserPhoneRequest{
+		Phone:            &phone,
+		PhoneArea:        &phoneArea,
+		VerificationCode: &code,
+	}
+	err := uc.UpdatePhone(context.TODO(), "user1", *req)
+	require.Nil(t, err)
+}
+
+// test update UpdateByUUID
+func TestUserComponent_UpdateByUUID_UpdateUserName(t *testing.T) {
+	mockUserStore := mockdb.NewMockUserStore(t)
+	mockUserStore.EXPECT().FindByUUID(mock.Anything, "user1").Return(&database.User{
+		ID:                1,
+		UUID:              "user1",
+		Username:          "user1",
+		CanChangeUserName: true,
+		RegProvider:       "casdoor",
+	}, nil)
+	mockUserStore.EXPECT().FindByUsername(mock.Anything, "new_user1").Return(database.User{}, nil)
+	mockUserStore.EXPECT().Update(mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
+	ssomock := mockrpc.NewMockSSOInterface(t)
+	ssomock.EXPECT().UpdateUserInfo(mock.Anything, mock.Anything).Return(nil)
+	ssomock.EXPECT().IsExistByName(mock.Anything, "new_user1").Return(false, nil)
+
+	config := &config.Config{}
+	config.SSOType = "casdoor"
+
+	once := sync.Once{}
+	uc := &userComponentImpl{
+		userStore: mockUserStore,
+		sso:       ssomock,
+		config:    config,
+		once:      &once,
+	}
+	var userUUID = "user1"
+	var newUserName = "new_user1"
+	err := uc.UpdateByUUID(context.TODO(), &types.UpdateUserRequest{
+		UUID:        &userUUID,
+		OpUser:      "user1",
+		NewUserName: &newUserName,
+	})
 	require.Nil(t, err)
 }

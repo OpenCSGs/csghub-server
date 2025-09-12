@@ -8,11 +8,14 @@ import (
 	"fmt"
 	"log/slog"
 	"math/rand"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/bwmarrin/snowflake"
+	"github.com/cespare/xxhash/v2"
 	"github.com/google/uuid"
+	"github.com/redis/go-redis/v9"
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/rpc"
@@ -22,9 +25,16 @@ import (
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/types/enum"
+
+	"github.com/avast/retry-go/v4"
 )
 
 const GitalyRepoNotFoundErr = "rpc error: code = NotFound desc = repository does not exist"
+
+const (
+	SMSCodeCachePrefix = "sms:code"
+	SMSCodeCacheTTL    = 1 * time.Minute
+)
 
 type userComponentImpl struct {
 	userStore database.UserStore
@@ -92,6 +102,8 @@ type UserComponent interface {
 	GetUserUUIDs(ctx context.Context, per, page int) ([]string, int, error)
 	GenerateVerificationCodeAndSendEmail(ctx context.Context, uid, email string) error
 	ResetUserTags(ctx context.Context, uid string, tagIDs []int64) error
+	SendSMSCode(ctx context.Context, uid string, req types.SendSMSCodeRequest) (*types.SendSMSCodeResponse, error)
+	UpdatePhone(ctx context.Context, uid string, req types.UpdateUserPhoneRequest) error
 }
 
 func NewUserComponent(config *config.Config) (UserComponent, error) {
@@ -273,11 +285,6 @@ func (c *userComponentImpl) UpdateByUUID(ctx context.Context, req *types.UpdateU
 
 	}
 
-	if req.Phone != nil && user.Phone != *req.Phone {
-		if can, reason := c.canChangePhone(ctx, *user, opUser, *req.Phone); !can {
-			return errors.New(reason)
-		}
-	}
 	if len(req.TagIDs) != 0 {
 		if err := c.ResetUserTags(ctx, uuid, req.TagIDs); err != nil {
 			return fmt.Errorf("failed to reset user tags,error:%w", err)
@@ -292,9 +299,6 @@ func (c *userComponentImpl) UpdateByUUID(ctx context.Context, req *types.UpdateU
 
 		if req.Email != nil {
 			params.Email = *req.Email
-		}
-		if req.Phone != nil {
-			params.Phone = *req.Phone
 		}
 		if req.NewUserName != nil {
 			params.Name = *req.NewUserName
@@ -323,7 +327,6 @@ func (c *userComponentImpl) UpdateByUUID(ctx context.Context, req *types.UpdateU
 				Name:   oldUser.Username,
 				Email:  oldUser.Email,
 				Gender: oldUser.Gender,
-				Phone:  oldUser.Phone,
 			}
 			err := c.sso.UpdateUserInfo(ctx, &params)
 			if err != nil {
@@ -409,37 +412,6 @@ func (c *userComponentImpl) canChangeEmail(ctx context.Context, user, opuser dat
 	return true, ""
 }
 
-func (c *userComponentImpl) canChangePhone(ctx context.Context, user database.User, opUser database.User, newPhone string) (bool, string) {
-	if opUser.ID != user.ID {
-		return false, "phone can only be changed by the user itself"
-	}
-	// if user.RegProvider != "casdoor" {
-	// 	return true, ""
-	// }
-	// check phone existence in casdoor
-	// casu, err := c.casc.GetUserByPhone(newPhone)
-	// if err != nil {
-	// 	return false, "failed to check new phone existence in casdoor"
-	// }
-	// if casu != nil && casu.Id != user.UUID {
-	// 	return false, "new phone already exists in casdoor"
-	// }
-
-	if !c.IsSSOUser(user.RegProvider) {
-		return true, ""
-	}
-
-	exist, err := c.sso.IsExistByPhone(ctx, newPhone)
-	if err != nil {
-		return false, "failed to check new phone existence in casdoor"
-	}
-	if exist {
-		return false, "new phone already exists in casdoor"
-	}
-
-	return true, ""
-}
-
 // Depricated: only useful for gitea, will be removed in the future
 // user registry with wechat does not have email, so git user is not created after signin
 // when user set email, a git user needs to be created
@@ -493,12 +465,6 @@ func (c *userComponentImpl) setChangedProps(oldUser *database.User, req *types.U
 	}
 	if req.Homepage != nil {
 		user.Homepage = *req.Homepage
-	}
-	if req.Phone != nil {
-		user.Phone = *req.Phone
-	}
-	if req.PhoneArea != nil {
-		user.PhoneArea = *req.PhoneArea
 	}
 	if req.Nickname != nil {
 		user.NickName = *req.Nickname
@@ -1179,6 +1145,194 @@ func (c *userComponentImpl) ResetUserTags(ctx context.Context, uid string, tagID
 
 	if err := c.uts.ResetUserTags(ctx, user.ID, tagIDs); err != nil {
 		return err
+	}
+	return nil
+}
+
+func getSMSCodeCacheKey(uid, phoneArea, phone string) (string, error) {
+	h := xxhash.New()
+	_, err := fmt.Fprintf(h, "%s:%s", phoneArea, phone)
+	if err != nil {
+		slog.Error("failed to write phone area and phone to hash", "error", err)
+		return "", errorx.ErrInternalServerError
+	}
+	return fmt.Sprintf("%s:%s:%x", SMSCodeCachePrefix, uid, h.Sum64()), nil
+}
+
+func (c *userComponentImpl) SendSMSCode(ctx context.Context, uid string, req types.SendSMSCodeRequest) (*types.SendSMSCodeResponse, error) {
+	user, err := c.userStore.FindByUUID(ctx, uid)
+	if err != nil {
+		return nil, err
+	}
+	if user == nil {
+		return nil, errorx.ErrUserNotFound
+	}
+
+	key, err := getSMSCodeCacheKey(uid, req.PhoneArea, req.Phone)
+	if err != nil {
+		return nil, err
+	}
+	code := fmt.Sprintf("%06d", rand.Intn(1000000))
+	set, err := c.cache.SetNX(ctx, key, code, SMSCodeCacheTTL)
+	if err != nil {
+		slog.Error("failed to set sms code cache", "error", err)
+		return nil, errorx.ErrInternalServerError
+	}
+	if !set {
+		return nil, errorx.ErrForbidSendPhoneVerifyCodeFrequently
+	}
+	expiredAt := time.Now().Add(SMSCodeCacheTTL)
+
+	var templateCode string
+	if req.PhoneArea == "+86" || req.PhoneArea == "86" {
+		templateCode = c.config.Notification.SMSTemplateCodeForVerifyCodeCN
+	} else {
+		templateCode = c.config.Notification.SMSTemplateCodeForVerifyCodeOversea
+		// refer to sms client doc, the phone area should not have '+' prefix when send sms code to overseas,
+		req.PhoneArea = strings.TrimPrefix(req.PhoneArea, "+")
+	}
+	msg := types.SMSReq{
+		PhoneNumbers:  []string{fmt.Sprintf("%s%s", req.PhoneArea, req.Phone)},
+		SignName:      c.config.Notification.SMSSign,
+		TemplateCode:  templateCode,
+		TemplateParam: fmt.Sprintf("{\"code\":\"%s\"}", code),
+	}
+
+	msgBytes, err := json.Marshal(msg)
+	if err != nil {
+		slog.Error("failed to marshal sms code notification message", "error", err)
+		return nil, errorx.ErrInternalServerError
+	}
+	notificationMsg := types.MessageRequest{
+		Scenario:   types.MessageScenarioSMSVerifyCode,
+		Parameters: string(msgBytes),
+		Priority:   types.MessagePriorityHigh,
+	}
+
+	err = retry.Do(func() error {
+		return c.notificationSvc.Send(ctx, &notificationMsg)
+	}, retry.Attempts(3))
+	if err != nil {
+		slog.Error("failed to send sms code", "error", err)
+		return nil, errorx.ErrFailedSendPhoneVerifyCode
+	}
+
+	return &types.SendSMSCodeResponse{
+		ExpiredAt: expiredAt,
+	}, nil
+}
+
+func (c *userComponentImpl) UpdatePhone(ctx context.Context, uid string, req types.UpdateUserPhoneRequest) error {
+	user, err := c.userStore.FindByUUID(ctx, uid)
+	if err != nil {
+		return err
+	}
+	if user == nil {
+		return errorx.ErrUserNotFound
+	}
+
+	var oldUser = *user
+
+	if *req.Phone == "" {
+		return errorx.ErrNeedPhone
+	}
+
+	if user.Phone == *req.Phone {
+		return errorx.ErrNeedDifferentPhone
+	}
+
+	can, err := c.canChangePhone(ctx, user, *req.Phone)
+	if err != nil {
+		return err
+	}
+	if !can {
+		return errorx.ErrForbidChangePhone
+	}
+
+	var phoneArea = user.PhoneArea
+	if req.PhoneArea != nil && user.PhoneArea != *req.PhoneArea {
+		phoneArea = *req.PhoneArea
+	}
+
+	err = c.verifySMSCode(ctx, uid, phoneArea, *req.Phone, *req.VerificationCode)
+	if err != nil {
+		return err
+	}
+
+	if c.IsSSOUser(user.RegProvider) {
+		params := rpc.SSOUpdateUserInfo{
+			UUID:      user.UUID,
+			Phone:     *req.Phone,
+			PhoneArea: phoneArea,
+		}
+		err := c.sso.UpdateUserInfo(ctx, &params)
+		if err != nil {
+			slog.Error("failed to update user's phone in sso, uuid:'%s',error:%w", user.UUID, err)
+			return err
+		}
+	}
+
+	dbErr := c.userStore.UpdatePhone(ctx, user.ID, *req.Phone, phoneArea)
+	if dbErr != nil {
+		slog.Error("failed to update user's phone in db, uuid:'%s',error:%w", user.UUID, dbErr)
+		// rollback sso user phone change in sso
+		params := rpc.SSOUpdateUserInfo{
+			UUID:      user.UUID,
+			Phone:     oldUser.Phone,
+			PhoneArea: oldUser.PhoneArea,
+		}
+		err := c.sso.UpdateUserInfo(ctx, &params)
+		if err != nil {
+			slog.Error("failed to rollback sso user phone change in sso, uuid:'%s',error:%w", user.UUID, err)
+			return err
+		}
+		return errorx.ErrFailedToUpdatePhone
+	}
+
+	return nil
+}
+
+func (c *userComponentImpl) canChangePhone(ctx context.Context, user *database.User, newPhone string) (bool, error) {
+	if !c.IsSSOUser(user.RegProvider) {
+		return true, nil
+	}
+
+	exist, err := c.sso.IsExistByPhone(ctx, newPhone)
+	if err != nil {
+		slog.Error("failed to check new phone existence in sso", "error", err)
+		return false, err
+	}
+
+	if exist {
+		return false, errorx.ErrPhoneAlreadyExistsInSSO
+	}
+
+	return true, nil
+}
+
+func (c *userComponentImpl) verifySMSCode(ctx context.Context, uid, phoneArea, phone, smsCode string) error {
+	key, err := getSMSCodeCacheKey(uid, phoneArea, phone)
+	if err != nil {
+		slog.Error("failed to get sms code cache key", "error", err)
+		return errorx.ErrInternalServerError
+	}
+
+	code, err := c.cache.Get(ctx, key)
+	if err != nil {
+		if err == redis.Nil {
+			return errorx.ErrPhoneVerifyCodeExpiredOrNotFound
+		}
+		slog.Error("failed to get sms code cache", "error", err)
+		return errorx.ErrInternalServerError
+	}
+
+	if code != smsCode {
+		return errorx.ErrPhoneVerifyCodeInvalid
+	}
+
+	if err := c.cache.Del(ctx, key); err != nil {
+		slog.Error("failed to delete sms code cache", "error", err)
+		return errorx.ErrInternalServerError
 	}
 	return nil
 }

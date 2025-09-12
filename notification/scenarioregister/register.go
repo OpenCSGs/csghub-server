@@ -5,6 +5,7 @@ import (
 	"opencsg.com/csghub-server/notification/scenariomgr"
 	"opencsg.com/csghub-server/notification/scenariomgr/scenario/emailverifycode"
 	"opencsg.com/csghub-server/notification/scenariomgr/scenario/internalnotification"
+	"opencsg.com/csghub-server/notification/scenariomgr/scenario/smsverifycode"
 )
 
 func Register(d *scenariomgr.DataProvider) {
@@ -99,6 +100,16 @@ func Register(d *scenariomgr.DataProvider) {
 		ChannelGetDataFunc: map[types.MessageChannel]scenariomgr.GetDataFunc{
 			types.MessageChannelInternalMessage: internalnotification.GetSiteInternalMessageData,
 			types.MessageChannelEmail:           internalnotification.GetEmailDataFunc(d.GetNotificationStorage()),
+		},
+	})
+
+	// register sms verify code scenario
+	scenariomgr.RegisterScenario(types.MessageScenarioSMSVerifyCode, &scenariomgr.ScenarioDefinition{
+		Channels: []types.MessageChannel{
+			types.MessageChannelSMS,
+		},
+		ChannelGetDataFunc: map[types.MessageChannel]scenariomgr.GetDataFunc{
+			types.MessageChannelSMS: smsverifycode.GetSMSData,
 		},
 	})
 

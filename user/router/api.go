@@ -144,6 +144,8 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 
 	{
 		userGroup.POST("/email-verification-code/:email", mustLogin(), userHandler.GenerateVerificationCodeAndSendEmail)
+		userGroup.POST("/sms-code", mustLogin(), userHandler.SendSMSCode)
+		userGroup.PUT("/phone", mustLogin(), userHandler.UpdatePhone)
 	}
 
 	{

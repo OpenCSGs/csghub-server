@@ -1,0 +1,29 @@
+{
+    "error.USER-ERR-0": {
+        "other": "需要電話號碼"
+    },
+    "error.USER-ERR-1": {
+        "other": "新電話號碼必須與當前電話號碼不同"
+    },
+    "error.USER-ERR-2": {
+        "other": "新電話號碼已經存在於sso服務中"
+    },
+    "error.USER-ERR-3": {
+        "other": "禁止更改電話號碼"
+    },
+    "error.USER-ERR-4": {
+        "other": "更新電話號碼失敗"
+    },
+    "error.USER-ERR-5": {
+        "other": "禁止頻繁發送手機驗證碼"
+    },
+    "error.USER-ERR-6": {
+        "other": "發送手機驗證碼失敗"
+    },
+    "error.USER-ERR-7": {
+        "other": "手機驗證碼已過期或不存在"
+    },
+    "error.USER-ERR-8": {
+        "other": "手機驗證碼無效"
+    }
+}

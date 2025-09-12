@@ -1,9 +1,11 @@
 package handler
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -283,4 +285,46 @@ func TestUserHandler_Casdoor(t *testing.T) {
 		assert.Contains(t, w.Header().Get("Location"), "error_code=500")
 		mockUserComp.AssertExpectations(t)
 	})
+}
+
+// test send sms code
+func TestUserHandler_SendSMSCode(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockUserComponent := component.NewMockUserComponent(t)
+	mockUserComponent.EXPECT().SendSMSCode(mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
+
+	handler := UserHandler{
+		c: mockUserComponent,
+	}
+
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	ctx.Set(httpbase.CurrentUserUUIDCtxVar, "test-user-uuid")
+	ctx.Request, _ = http.NewRequest(http.MethodPost, "/user/sms-code", nil)
+	ctx.Request.Header.Set("Content-Type", "application/json")
+	ctx.Request.Body = io.NopCloser(bytes.NewBuffer([]byte(`{"phone": "12345678901", "phone_area": "+86"}`)))
+	handler.SendSMSCode(ctx)
+	assert.Equal(t, http.StatusOK, w.Code)
+}
+
+// test update phone
+func TestUserHandler_UpdatePhone(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockUserComponent := component.NewMockUserComponent(t)
+	mockUserComponent.EXPECT().UpdatePhone(mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
+	handler := UserHandler{
+		c: mockUserComponent,
+	}
+
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	ctx.Set(httpbase.CurrentUserUUIDCtxVar, "test-user-uuid")
+	ctx.Request, _ = http.NewRequest(http.MethodPut, "/user/phone", nil)
+	ctx.Request.Header.Set("Content-Type", "application/json")
+	ctx.Request.Body = io.NopCloser(bytes.NewBuffer([]byte(`{"phone": "12345678901", "phone_area": "+86", "verification_code": "123456"}`)))
+	handler.UpdatePhone(ctx)
+	assert.Equal(t, http.StatusOK, w.Code)
 }

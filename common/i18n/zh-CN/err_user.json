@@ -1,0 +1,29 @@
+{
+    "error.USER-ERR-0": {
+        "other": "需要提供电话号码"
+    },
+    "error.USER-ERR-1": {
+        "other": "新电话号码必须与当前电话号码不同"
+    },
+    "error.USER-ERR-2": {
+        "other": "新电话号码已经存在于sso服务中"
+    },
+    "error.USER-ERR-3": {
+        "other": "禁止更改电话号码"
+    },
+    "error.USER-ERR-4": {
+        "other": "更新电话号码失败"
+    },
+    "error.USER-ERR-5": {
+        "other": "禁止频繁发送手机验证码"
+    },
+    "error.USER-ERR-6": {
+        "other": "发送手机验证码失败"
+    },
+    "error.USER-ERR-7": {
+        "other": "手机验证码已过期或不存在"
+    },
+    "error.USER-ERR-8": {
+        "other": "手机验证码无效"
+    }
+}

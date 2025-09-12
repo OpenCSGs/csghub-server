@@ -62,9 +62,10 @@ type SSOUserInfo struct {
 }
 
 type SSOUpdateUserInfo struct {
-	UUID   string
-	Name   string
-	Email  string
-	Gender string
-	Phone  string
+	UUID      string
+	Name      string
+	Email     string
+	Gender    string
+	Phone     string
+	PhoneArea string
 }

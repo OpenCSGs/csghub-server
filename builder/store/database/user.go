@@ -37,6 +37,7 @@ type UserStore interface {
 	IsExistWithDeleted(ctx context.Context, username string) (bool, error)
 	GetEmails(ctx context.Context, per, page int) ([]string, int, error)
 	GetUserUUIDs(ctx context.Context, per, page int) ([]string, int, error)
+	UpdatePhone(ctx context.Context, userID int64, phone string, phoneArea string) error
 }
 
 // Implement the UserStore interface in UserStoreImpl
@@ -582,4 +583,15 @@ func (s *UserStoreImpl) GetUserUUIDs(ctx context.Context, per, page int) (uuids 
 		return nil, 0, errorx.HandleDBError(err, nil)
 	}
 	return uuids, count, nil
+}
+
+func (s *UserStoreImpl) UpdatePhone(ctx context.Context, userID int64, phone string, phoneArea string) error {
+	_, err := s.db.Operator.Core.
+		NewUpdate().
+		Model(&User{}).
+		Set("phone = ?", phone).
+		Set("phone_area = ?", phoneArea).
+		Where("id = ?", userID).
+		Exec(ctx)
+	return errorx.HandleDBError(err, nil)
 }

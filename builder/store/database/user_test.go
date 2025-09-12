@@ -440,3 +440,34 @@ func TestGetUserTags(t *testing.T) {
 		require.Contains(t, tagIDs, tag.ID)
 	}
 }
+
+// test update phone
+func TestUserStore_UpdatePhone(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	us := database.NewUserStoreWithDB(db)
+	err := us.Create(ctx, &database.User{
+		GitID:     10001,
+		UUID:      "1",
+		Username:  "u-foo",
+		Phone:     "12345678901",
+		PhoneArea: "",
+	}, &database.Namespace{Path: "u-foo"})
+	require.NoError(t, err)
+
+	user, err := us.FindByUUID(ctx, "1")
+	require.NoError(t, err)
+	require.Equal(t, "12345678901", user.Phone)
+	require.Equal(t, "", user.PhoneArea)
+
+	err = us.UpdatePhone(ctx, user.ID, "12345678902", "+86")
+	require.NoError(t, err)
+
+	user, err = us.FindByUUID(ctx, "1")
+	require.NoError(t, err)
+	require.Equal(t, "12345678902", user.Phone)
+	require.Equal(t, "+86", user.PhoneArea)
+}

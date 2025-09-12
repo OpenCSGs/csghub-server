@@ -434,6 +434,7 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Name:** `gitReplicateRepositoryFailed`
 - **Description:** replicate repository failed. This can be caused by network problems, authentication issues, or the specified repository does not exist.
 
+<<<<<<< HEAD
 ## Invitation Errors
 
 ### `INVITATION-ERR-0`
@@ -458,6 +459,8 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Name:** `userAlreadyHasInvitationCode`
 - **Description:** The invitation code already exists.
 
+=======
+>>>>>>> 0003cf1a (update user's phone number using sms verify code in backend)
 ## License Errors
 
 ### `LICENSE-ERR-0`
@@ -696,6 +699,7 @@ This document lists all the custom error codes defined in the project, categoriz
 
 - **Error Code:** `TASK-ERR-3`
 - **Error Name:** `multiHostNotebookNotSupported`
+<<<<<<< HEAD
 - **Description:** The multi-host notebook feature (running notebook tasks across multiple hosts) is not supported.
 
 ---
@@ -713,6 +717,9 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Code:** `TASK-ERR-5`
 - **Error Name:** `clusterUnavailable`
 - **Description:** The cluster is currently unavailable, either due to maintenance or other reasons. This error occurs when the cluster is not ready to accept new tasks.
+=======
+- **Description:** 
+>>>>>>> 0003cf1a (update user's phone number using sms verify code in backend)
 
 ## User Errors
 
@@ -786,6 +793,7 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Name:** `phoneVerifyCodeInvalid`
 - **Description:** Phone verify code is invalid.
 
+<<<<<<< HEAD
 ---
 
 ### `USER-ERR-9`
@@ -826,3 +834,5 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Name:** `emailExists`
 - **Description:** The email address provided already exists in the system.
 
+=======
+>>>>>>> 0003cf1a (update user's phone number using sms verify code in backend)

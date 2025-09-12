@@ -797,3 +797,63 @@ func (e *UserHandler) ResetUserTags(ctx *gin.Context) {
 
 	httpbase.OK(ctx, nil)
 }
+
+// SendSmsCode godoc
+// @Security     ApiKey
+// @Summary      generate sms verification code and send it by sms
+// @Description  generate sms verification code and send it by sms
+// @Tags         User
+// @Accept       json
+// @Produce      json
+// @Param        body body types.SendSMSCodeRequest true "SendSMSCodeRequest"
+// @Success      200  {object}  types.Response{data=types.SendSMSCodeResponse} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /user/sms-code [post]
+func (e *UserHandler) SendSMSCode(ctx *gin.Context) {
+	currentUserUUID := httpbase.GetCurrentUserUUID(ctx)
+	var req types.SendSMSCodeRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		slog.Error("SendSMSCodeRequest failed", slog.Any("err", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	resp, err := e.c.SendSMSCode(ctx, currentUserUUID, req)
+	if err != nil {
+		slog.Error("SendSMSCode failed", slog.Any("err", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	httpbase.OK(ctx, resp)
+}
+
+// UpdatePhone godoc
+// @Security     ApiKey
+// @Summary      Update current user phone
+// @Description  Update current user phone
+// @Tags         User
+// @Accept       json
+// @Produce      json
+// @Param        body body types.UpdateUserPhoneRequest true "UpdateUserPhoneRequest"
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /user/phone [put]
+func (e *UserHandler) UpdatePhone(ctx *gin.Context) {
+	currentUserUUID := httpbase.GetCurrentUserUUID(ctx)
+	var req types.UpdateUserPhoneRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		slog.Error("failed to update user's phone", slog.Any("err", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	err := e.c.UpdatePhone(ctx, currentUserUUID, req)
+	if err != nil {
+		slog.Error("failed to update user's phone", slog.Any("err", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	httpbase.OK(ctx, nil)
+}

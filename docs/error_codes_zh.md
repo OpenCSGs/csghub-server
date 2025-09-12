@@ -434,6 +434,7 @@
 - **错误名:** `gitReplicateRepositoryFailed`
 - **描述:** 转移仓库失败。这可能由网络问题、身份验证问题或指定的仓库不存在引起。
 
+<<<<<<< HEAD
 ## Invitation 错误
 
 ### `INVITATION-ERR-0`
@@ -458,6 +459,8 @@
 - **错误名:** `userAlreadyHasInvitationCode`
 - **描述:** 邀请码已存在。
 
+=======
+>>>>>>> 0003cf1a (update user's phone number using sms verify code in backend)
 ## License 错误
 
 ### `LICENSE-ERR-0`
@@ -696,6 +699,7 @@
 
 - **错误代码:** `TASK-ERR-3`
 - **错误名:** `multiHostNotebookNotSupported`
+<<<<<<< HEAD
 - **描述:** 多主机 Notebook 功能（在多个主机上运行 Notebook 任务）不被支持。请改用单主机 Notebook 执行。
 
 ---
@@ -713,6 +717,9 @@
 - **错误代码:** `TASK-ERR-5`
 - **错误名:** `clusterUnavailable`
 - **描述:** 集群当前不可用，可能是由于维护或其他原因。当集群未准备好接受新任务时，会出现此错误。
+=======
+- **描述:** 
+>>>>>>> 0003cf1a (update user's phone number using sms verify code in backend)
 
 ## User 错误
 
@@ -786,6 +793,7 @@
 - **错误名:** `phoneVerifyCodeInvalid`
 - **描述:** 手机验证码无效。
 
+<<<<<<< HEAD
 ---
 
 ### `USER-ERR-9`
@@ -826,3 +834,5 @@
 - **错误名:** `emailExists`
 - **描述:** 提供的电子邮件地址已存在于系统中。
 
+=======
+>>>>>>> 0003cf1a (update user's phone number using sms verify code in backend)
