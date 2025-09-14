@@ -818,6 +818,7 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Name:** `invalidPhoneNumber`
 - **Description:** Invalid phone number.
 
+<<<<<<< HEAD
 ---
 
 ### `USER-ERR-12`
@@ -836,3 +837,5 @@ This document lists all the custom error codes defined in the project, categoriz
 
 =======
 >>>>>>> 0003cf1a (update user's phone number using sms verify code in backend)
+=======
+>>>>>>> de87547e (fix casdoor phone verify code login issue after updated phone in csghub.)

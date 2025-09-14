@@ -55,6 +55,7 @@ type SSOUserInfo struct {
 	RegProvider    string
 	Gender         string
 	Phone          string
+	PhoneArea      string
 	LastSigninTime string
 	Avatar         string
 	Homepage       string

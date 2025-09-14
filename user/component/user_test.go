@@ -174,7 +174,7 @@ func TestUserComponent_SendSMSCode(t *testing.T) {
 		config:          config,
 	}
 	resp, err := uc.SendSMSCode(context.TODO(), "user1", types.SendSMSCodeRequest{
-		Phone:     "12345678901",
+		Phone:     "13626487789",
 		PhoneArea: "+86",
 	})
 	require.Nil(t, err)
@@ -182,19 +182,36 @@ func TestUserComponent_SendSMSCode(t *testing.T) {
 	require.NotNil(t, resp.ExpiredAt)
 }
 
+func TestUserComponent_SendSMSCode_InvalidPhoneNumber(t *testing.T) {
+	mockUserStore := mockdb.NewMockUserStore(t)
+	mockUserStore.EXPECT().FindByUUID(mock.Anything, "user1").Return(&database.User{
+		ID: 1,
+	}, nil)
+
+	uc := &userComponentImpl{
+		userStore: mockUserStore,
+	}
+	resp, err := uc.SendSMSCode(context.TODO(), "user1", types.SendSMSCodeRequest{
+		Phone:     "66668877",
+		PhoneArea: "+86",
+	})
+	require.NotNil(t, err)
+	require.Nil(t, resp)
+}
+
 func TestUserComponent_UpdatePhone(t *testing.T) {
 	var code = "123456"
-	var phone = "12345678901"
+	var phone = "13626487789"
 	var phoneArea = "+86"
 
 	mockUserStore := mockdb.NewMockUserStore(t)
 	mockUserStore.EXPECT().FindByUUID(mock.Anything, "user1").Return(&database.User{
 		ID:          int64(1),
-		Phone:       "12345678902",
+		Phone:       "13626487711",
 		PhoneArea:   "+86",
 		RegProvider: "casdoor",
 	}, nil)
-	mockUserStore.EXPECT().UpdatePhone(mock.Anything, int64(1), "12345678901", "+86").Return(nil)
+	mockUserStore.EXPECT().UpdatePhone(mock.Anything, int64(1), "13626487789", "+86").Return(nil)
 
 	cache := mockcache.NewMockRedisClient(t)
 	cache.EXPECT().Del(mock.Anything, mock.Anything).Return(nil)

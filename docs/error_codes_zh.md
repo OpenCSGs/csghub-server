@@ -818,6 +818,7 @@
 - **错误名:** `invalidPhoneNumber`
 - **描述:** 无效的电话号码。
 
+<<<<<<< HEAD
 ---
 
 ### `USER-ERR-12`
@@ -836,3 +837,5 @@
 
 =======
 >>>>>>> 0003cf1a (update user's phone number using sms verify code in backend)
+=======
+>>>>>>> de87547e (fix casdoor phone verify code login issue after updated phone in csghub.)

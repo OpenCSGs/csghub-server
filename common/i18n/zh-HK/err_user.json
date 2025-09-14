@@ -5,6 +5,15 @@
     "error.USER-ERR-1": {
         "other": "新電話號碼必須與當前電話號碼不同"
     },
+<<<<<<< HEAD
+=======
+    "error.USER-ERR-10": {
+        "other": "驗證碼長度必須為6"
+    },
+    "error.USER-ERR-11": {
+        "other": "無效的電話號碼"
+    },
+>>>>>>> de87547e (fix casdoor phone verify code login issue after updated phone in csghub.)
     "error.USER-ERR-2": {
         "other": "新電話號碼已經存在於sso服務中"
     },

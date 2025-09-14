@@ -4,10 +4,16 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+<<<<<<< HEAD
+=======
+	"net/url"
+	"strings"
+>>>>>>> de87547e (fix casdoor phone verify code login issue after updated phone in csghub.)
 
 	"github.com/casdoor/casdoor-go-sdk/casdoorsdk"
 	"golang.org/x/oauth2"
 	"opencsg.com/csghub-server/common/errorx"
+	"opencsg.com/csghub-server/common/utils/common"
 )
 
 type casdoorClientImpl struct {
@@ -42,11 +48,21 @@ func (c *casdoorClientImpl) UpdateUserInfo(ctx context.Context, userInfo *SSOUpd
 	if userInfo.Email != "" {
 		casu.Email = userInfo.Email
 	}
+
 	if userInfo.Phone != "" {
 		casu.Phone = userInfo.Phone
 	}
+
 	if userInfo.PhoneArea != "" {
-		casu.CountryCode = userInfo.PhoneArea
+		if !strings.HasPrefix(userInfo.PhoneArea, "+") {
+			userInfo.PhoneArea = "+" + userInfo.PhoneArea
+		}
+		countryCode, err := common.GetCountryCodeByPhoneArea(casu.Phone, userInfo.PhoneArea)
+		if err != nil {
+			slog.Error("failed to get country code by phone area", "phone area", userInfo.PhoneArea, "error", err)
+			return fmt.Errorf("failed to get country code by phone area:%s", userInfo.PhoneArea)
+		}
+		casu.CountryCode = countryCode
 	}
 
 	// casdoor update user api don't allow empty display name, so we set it
@@ -78,6 +94,15 @@ func (c *casdoorClientImpl) GetUserInfo(ctx context.Context, accessToken string)
 		)
 	}
 
+	var phoneArea string
+	if claims.User.Phone != "" && claims.User.CountryCode != "" {
+		phoneArea, err = common.GetPhoneAreaByCountryCode(claims.User.Phone, claims.User.CountryCode)
+		if err != nil {
+			// since phone area(stored in db) isn't invoked in csghub side currently, we just print the warning log
+			slog.Warn("failed to get phone area by country code", "name", claims.User.Name, "error", err)
+		}
+	}
+
 	return &SSOUserInfo{
 		WeChat:         claims.WeChat,
 		Name:           claims.User.Name,
@@ -86,6 +111,7 @@ func (c *casdoorClientImpl) GetUserInfo(ctx context.Context, accessToken string)
 		RegProvider:    SSOTypeCasdoor,
 		Gender:         claims.User.Gender,
 		Phone:          claims.User.Phone,
+		PhoneArea:      phoneArea,
 		LastSigninTime: claims.User.LastSigninTime,
 		Avatar:         claims.User.Avatar,
 		Homepage:       claims.User.Homepage,

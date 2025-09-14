@@ -190,6 +190,7 @@ require (
 	github.com/nats-io/nuid v1.0.1 // indirect
 	github.com/ncruces/go-strftime v0.1.9 // indirect
 	github.com/nexus-rpc/sdk-go v0.3.0 // indirect
+	github.com/nyaruka/phonenumbers v1.6.5 // indirect
 	github.com/oklog/ulid/v2 v2.0.2 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/olivere/elastic/v7 v7.0.32 // indirect
@@ -272,7 +273,11 @@ require (
 	github.com/alibabacloud-go/openapi-util v0.1.1 // indirect
 	github.com/alibabacloud-go/tea-utils/v2 v2.0.7
 	github.com/aliyun/credentials-go v1.4.5
+<<<<<<< HEAD
 	github.com/argoproj/argo-workflows/v3 v3.6.12
+=======
+	github.com/argoproj/argo-workflows/v3 v3.5.13
+>>>>>>> de87547e (fix casdoor phone verify code login issue after updated phone in csghub.)
 	github.com/blendle/zapdriver v1.3.1 // indirect
 	github.com/bwmarrin/snowflake v0.3.0
 	github.com/bytedance/sonic v1.12.5 // indirect

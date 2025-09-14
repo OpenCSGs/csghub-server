@@ -25,6 +25,7 @@ import (
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/types/enum"
+	"opencsg.com/csghub-server/common/utils/common"
 
 	"github.com/avast/retry-go/v4"
 )
@@ -209,6 +210,7 @@ func (c *userComponentImpl) createFromSSOUser(ctx context.Context, cu *rpc.SSOUs
 		Gender:      cu.Gender,
 		// RoleMask:        "", //will be updated when admin set user role
 		Phone:           cu.Phone,
+		PhoneArea:       cu.PhoneArea,
 		PhoneVerified:   false,
 		EmailVerified:   false,
 		LastLoginAt:     cu.LastSigninTime,
@@ -1168,6 +1170,20 @@ func (c *userComponentImpl) SendSMSCode(ctx context.Context, uid string, req typ
 		return nil, errorx.ErrUserNotFound
 	}
 
+	if !strings.HasPrefix(req.PhoneArea, "+") {
+		req.PhoneArea = fmt.Sprintf("+%s", req.PhoneArea)
+	}
+
+	isValid, err := common.IsValidNumber(req.Phone, req.PhoneArea)
+	if err != nil {
+		slog.Error("failed to check if phone number is valid", "error", err)
+		return nil, errorx.ErrInternalServerError
+	}
+	if !isValid {
+		slog.Error("phone number is invalid")
+		return nil, errorx.ErrInvalidPhoneNumber
+	}
+
 	key, err := getSMSCodeCacheKey(uid, req.PhoneArea, req.Phone)
 	if err != nil {
 		return nil, err
@@ -1184,12 +1200,10 @@ func (c *userComponentImpl) SendSMSCode(ctx context.Context, uid string, req typ
 	expiredAt := time.Now().Add(SMSCodeCacheTTL)
 
 	var templateCode string
-	if req.PhoneArea == "+86" || req.PhoneArea == "86" {
+	if req.PhoneArea == "+86" {
 		templateCode = c.config.Notification.SMSTemplateCodeForVerifyCodeCN
 	} else {
 		templateCode = c.config.Notification.SMSTemplateCodeForVerifyCodeOversea
-		// refer to sms client doc, the phone area should not have '+' prefix when send sms code to overseas,
-		req.PhoneArea = strings.TrimPrefix(req.PhoneArea, "+")
 	}
 	msg := types.SMSReq{
 		PhoneNumbers:  []string{fmt.Sprintf("%s%s", req.PhoneArea, req.Phone)},
@@ -1250,8 +1264,13 @@ func (c *userComponentImpl) UpdatePhone(ctx context.Context, uid string, req typ
 	}
 
 	var phoneArea = user.PhoneArea
-	if req.PhoneArea != nil && user.PhoneArea != *req.PhoneArea {
-		phoneArea = *req.PhoneArea
+	if req.PhoneArea != nil {
+		if !strings.HasPrefix(*req.PhoneArea, "+") {
+			*req.PhoneArea = fmt.Sprintf("+%s", *req.PhoneArea)
+		}
+		if user.PhoneArea != *req.PhoneArea {
+			phoneArea = *req.PhoneArea
+		}
 	}
 
 	err = c.verifySMSCode(ctx, uid, phoneArea, *req.Phone, *req.VerificationCode)

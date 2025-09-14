@@ -39,6 +39,10 @@ func NewAliyunSMSClient(config *config.Config) (SMSService, error) {
 }
 
 func (c *AliyunSMSClient) Send(req types.SMSReq) error {
+	// refer to sms client doc, the phone area should not have '+' prefix when send sms code to overseas,
+	for i, phoneNumber := range req.PhoneNumbers {
+		req.PhoneNumbers[i] = strings.TrimPrefix(phoneNumber, "+")
+	}
 	phoneNumbers := strings.Join(req.PhoneNumbers, ",")
 	smsReq := &dysmsapi20170525.SendSmsRequest{
 		PhoneNumbers:  tea.String(phoneNumbers),
