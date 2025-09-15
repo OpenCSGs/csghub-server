@@ -1429,6 +1429,52 @@ func (_c *MockRepoComponent_DeleteMirror_Call) RunAndReturn(run func(context.Con
 	return _c
 }
 
+// DeletePendingDeletion provides a mock function with given fields: ctx
+func (_m *MockRepoComponent) DeletePendingDeletion(ctx context.Context) error {
+	ret := _m.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeletePendingDeletion")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context) error); ok {
+		r0 = rf(ctx)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockRepoComponent_DeletePendingDeletion_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeletePendingDeletion'
+type MockRepoComponent_DeletePendingDeletion_Call struct {
+	*mock.Call
+}
+
+// DeletePendingDeletion is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *MockRepoComponent_Expecter) DeletePendingDeletion(ctx interface{}) *MockRepoComponent_DeletePendingDeletion_Call {
+	return &MockRepoComponent_DeletePendingDeletion_Call{Call: _e.mock.On("DeletePendingDeletion", ctx)}
+}
+
+func (_c *MockRepoComponent_DeletePendingDeletion_Call) Run(run func(ctx context.Context)) *MockRepoComponent_DeletePendingDeletion_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context))
+	})
+	return _c
+}
+
+func (_c *MockRepoComponent_DeletePendingDeletion_Call) Return(_a0 error) *MockRepoComponent_DeletePendingDeletion_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockRepoComponent_DeletePendingDeletion_Call) RunAndReturn(run func(context.Context) error) *MockRepoComponent_DeletePendingDeletion_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // DeleteRepo provides a mock function with given fields: ctx, req
 func (_m *MockRepoComponent) DeleteRepo(ctx context.Context, req types.DeleteRepoReq) (*database.Repository, error) {
 	ret := _m.Called(ctx, req)

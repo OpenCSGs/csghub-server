@@ -109,6 +109,7 @@ func NewRepoComponent(config *config.Config) (RepoComponent, error) {
 		rpc.AuthWithApiKey(config.APIToken))
 	c.mirrorSvcClient = rpc.NewMirrorSvcClient(fmt.Sprintf("%s:%d", config.LfsSync.Host, config.LfsSync.Port),
 		rpc.AuthWithApiKey(config.APIToken))
+	c.pendingDeletion = database.NewPendingDeletionStore()
 	return c, nil
 }
 
