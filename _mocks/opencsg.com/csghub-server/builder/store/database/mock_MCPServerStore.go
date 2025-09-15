@@ -517,6 +517,54 @@ func (_c *MockMCPServerStore_CreateIfNotExist_Call) RunAndReturn(run func(contex
 	return _c
 }
 
+// CreateSpaceAndRepoForDeploy provides a mock function with given fields: ctx, inputRepo, inputSpace
+func (_m *MockMCPServerStore) CreateSpaceAndRepoForDeploy(ctx context.Context, inputRepo *database.Repository, inputSpace *database.Space) error {
+	ret := _m.Called(ctx, inputRepo, inputSpace)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateSpaceAndRepoForDeploy")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, *database.Repository, *database.Space) error); ok {
+		r0 = rf(ctx, inputRepo, inputSpace)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockMCPServerStore_CreateSpaceAndRepoForDeploy_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateSpaceAndRepoForDeploy'
+type MockMCPServerStore_CreateSpaceAndRepoForDeploy_Call struct {
+	*mock.Call
+}
+
+// CreateSpaceAndRepoForDeploy is a helper method to define mock.On call
+//   - ctx context.Context
+//   - inputRepo *database.Repository
+//   - inputSpace *database.Space
+func (_e *MockMCPServerStore_Expecter) CreateSpaceAndRepoForDeploy(ctx interface{}, inputRepo interface{}, inputSpace interface{}) *MockMCPServerStore_CreateSpaceAndRepoForDeploy_Call {
+	return &MockMCPServerStore_CreateSpaceAndRepoForDeploy_Call{Call: _e.mock.On("CreateSpaceAndRepoForDeploy", ctx, inputRepo, inputSpace)}
+}
+
+func (_c *MockMCPServerStore_CreateSpaceAndRepoForDeploy_Call) Run(run func(ctx context.Context, inputRepo *database.Repository, inputSpace *database.Space)) *MockMCPServerStore_CreateSpaceAndRepoForDeploy_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*database.Repository), args[2].(*database.Space))
+	})
+	return _c
+}
+
+func (_c *MockMCPServerStore_CreateSpaceAndRepoForDeploy_Call) Return(_a0 error) *MockMCPServerStore_CreateSpaceAndRepoForDeploy_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockMCPServerStore_CreateSpaceAndRepoForDeploy_Call) RunAndReturn(run func(context.Context, *database.Repository, *database.Space) error) *MockMCPServerStore_CreateSpaceAndRepoForDeploy_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Delete provides a mock function with given fields: ctx, input
 func (_m *MockMCPServerStore) Delete(ctx context.Context, input database.MCPServer) error {
 	ret := _m.Called(ctx, input)
@@ -654,6 +702,54 @@ func (_c *MockMCPServerStore_DeleteProperty_Call) Return(_a0 error) *MockMCPServ
 }
 
 func (_c *MockMCPServerStore_DeleteProperty_Call) RunAndReturn(run func(context.Context, database.MCPServerProperty) error) *MockMCPServerStore_DeleteProperty_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// DeleteSpaceAndRepoForDeploy provides a mock function with given fields: ctx, spaceID, repoID
+func (_m *MockMCPServerStore) DeleteSpaceAndRepoForDeploy(ctx context.Context, spaceID int64, repoID int64) error {
+	ret := _m.Called(ctx, spaceID, repoID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteSpaceAndRepoForDeploy")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64, int64) error); ok {
+		r0 = rf(ctx, spaceID, repoID)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockMCPServerStore_DeleteSpaceAndRepoForDeploy_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteSpaceAndRepoForDeploy'
+type MockMCPServerStore_DeleteSpaceAndRepoForDeploy_Call struct {
+	*mock.Call
+}
+
+// DeleteSpaceAndRepoForDeploy is a helper method to define mock.On call
+//   - ctx context.Context
+//   - spaceID int64
+//   - repoID int64
+func (_e *MockMCPServerStore_Expecter) DeleteSpaceAndRepoForDeploy(ctx interface{}, spaceID interface{}, repoID interface{}) *MockMCPServerStore_DeleteSpaceAndRepoForDeploy_Call {
+	return &MockMCPServerStore_DeleteSpaceAndRepoForDeploy_Call{Call: _e.mock.On("DeleteSpaceAndRepoForDeploy", ctx, spaceID, repoID)}
+}
+
+func (_c *MockMCPServerStore_DeleteSpaceAndRepoForDeploy_Call) Run(run func(ctx context.Context, spaceID int64, repoID int64)) *MockMCPServerStore_DeleteSpaceAndRepoForDeploy_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64), args[2].(int64))
+	})
+	return _c
+}
+
+func (_c *MockMCPServerStore_DeleteSpaceAndRepoForDeploy_Call) Return(_a0 error) *MockMCPServerStore_DeleteSpaceAndRepoForDeploy_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockMCPServerStore_DeleteSpaceAndRepoForDeploy_Call) RunAndReturn(run func(context.Context, int64, int64) error) *MockMCPServerStore_DeleteSpaceAndRepoForDeploy_Call {
 	_c.Call.Return(run)
 	return _c
 }

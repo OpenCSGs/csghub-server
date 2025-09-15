@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -655,35 +654,34 @@ func (m *mcpServerComponentImpl) Deploy(ctx context.Context, req *types.DeployMC
 
 	permission, err := m.repoComponent.GetUserRepoPermission(ctx, req.CurrentUser, mcpServer.Repository)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get user %s permission for repo %s/%s, error: %w",
+		return nil, fmt.Errorf("failed to get user %s permission for mcp server %s/%s, error: %w",
 			req.CurrentUser, req.MCPRepo.Namespace, req.MCPRepo.Name, err)
 	}
 	if !permission.CanRead {
 		return nil, errorx.ErrForbidden
 	}
 
-	token, err := m.tokenStore.GetUserGitToken(ctx, req.CurrentUser)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get user %s git access token, error: %w", req.CurrentUser, err)
-	}
-
 	resource, err := m.spaceResourceStore.FindByID(ctx, req.ResourceID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find space resource by id %d for deploy mcp server, %w", req.ResourceID, err)
+		return nil, fmt.Errorf("failed to find space resource by id %d for deploy mcp server %s/%s, error: %w",
+			req.ResourceID, req.MCPRepo.Namespace, req.MCPRepo.Name, err)
 	}
 	err = m.repoComponent.CheckAccountAndResource(ctx, req.CurrentUser, req.ClusterID, 0, resource)
 	if err != nil {
-		return nil, fmt.Errorf("failed to verify resource %s is available for MCP server deployment, %w", resource.Name, err)
+		return nil, fmt.Errorf("failed to verify resource %s is available for deploy mcp server %s/%s, error: %w",
+			resource.Name, req.MCPRepo.Namespace, req.MCPRepo.Name, err)
 	}
 
 	namespace, err := m.namespaceStore.FindByPath(ctx, req.Namespace)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find namespace %s, error: %w", req.Namespace, err)
+		return nil, fmt.Errorf("failed to find namespace %s for deploy mcp server %s/%s, error: %w",
+			req.Namespace, req.MCPRepo.Namespace, req.MCPRepo.Name, err)
 	}
 
 	user, err := m.userSvcClient.GetUserInfo(ctx, req.CurrentUser, req.CurrentUser)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get user %s info for deploy mcp server, error: %w", req.CurrentUser, err)
+		return nil, fmt.Errorf("failed to get user %s info for deploy mcp server %s/%s, error: %w",
+			req.CurrentUser, req.MCPRepo.Namespace, req.MCPRepo.Name, err)
 	}
 
 	if user.Email == "" {
@@ -717,7 +715,7 @@ func (m *mcpServerComponentImpl) Deploy(ctx context.Context, req *types.DeployMC
 	req.RepoType = types.SpaceRepo
 	req.License = mcpServer.Repository.License
 
-	dbRepoReq := database.Repository{
+	dbRepo := database.Repository{
 		UserID:         user.ID,
 		Path:           path.Join(req.Namespace, req.Name),
 		GitPath:        common.BuildRelativePath(fmt.Sprintf("%ss", string(req.RepoType)), req.Namespace, req.Name),
@@ -728,15 +726,10 @@ func (m *mcpServerComponentImpl) Deploy(ctx context.Context, req *types.DeployMC
 		License:        req.License,
 		DefaultBranch:  req.DefaultBranch,
 		RepositoryType: req.RepoType,
-	}
-	dbRepo, err := m.repoStore.CreateRepo(ctx, dbRepoReq)
-	if err != nil {
-		return nil, fmt.Errorf("fail to create space repo %s/%s to deploy mcp server %s/%s, %w",
-			req.Namespace, req.Name, req.MCPRepo.Namespace, req.MCPRepo.Name, err)
+		Hashed:         true,
 	}
 
 	dbSpace := database.Space{
-		RepositoryID:  dbRepo.ID,
 		Sdk:           types.MCPSERVER.Name,
 		SdkVersion:    "",
 		CoverImageUrl: req.CoverImageUrl,
@@ -749,45 +742,53 @@ func (m *mcpServerComponentImpl) Deploy(ctx context.Context, req *types.DeployMC
 		ClusterID:     req.ClusterID,
 	}
 
-	resSpace, err := m.spaceStore.Create(ctx, dbSpace)
+	err = m.mcpServerStore.CreateSpaceAndRepoForDeploy(ctx, &dbRepo, &dbSpace)
 	if err != nil {
-		return nil, fmt.Errorf("fail to create space %s/%s to deploy mcp server %s/%s, error: %w",
+		return nil, fmt.Errorf("failed to create mcp space and repo %s/%s to deploy mcp server %s/%s, %w",
 			req.Namespace, req.Name, req.MCPRepo.Namespace, req.MCPRepo.Name, err)
 	}
 
-	cloneURL, err := getSourceRepoCloneURL(m.config.APIServer.PublicDomain, req.CurrentUser, token.Token, mcpServer.Repository.Path)
+	cloneReq := gitserver.CopyRepositoryReq{
+		RepoType:  types.MCPServerRepo,                       // clone from repo type
+		Namespace: req.MCPRepo.Namespace,                     // clone from mcp server repo namespace
+		Name:      req.MCPRepo.Name,                          // clone from mcp server repo name
+		NewPath:   common.BuildHashedRelativePath(dbRepo.ID), // new repo path
+	}
+	slog.Info("generate hashedPath for cloned repo", slog.Any("cloneReq", cloneReq))
+	err = m.gitServer.CopyRepository(ctx, cloneReq)
 	if err != nil {
-		return nil, fmt.Errorf("fail to get source repo clone url for mcp server %s/%s, error: %w",
-			req.MCPRepo.Namespace, req.MCPRepo.Name, err)
+		delErr := m.mcpServerStore.DeleteSpaceAndRepoForDeploy(ctx, dbSpace.ID, dbRepo.ID)
+		if delErr != nil {
+			slog.Error("failed to delete created space and repo after failed to clone mcp server files",
+				slog.Any("req", req), slog.Any("delErr", delErr))
+		}
+		return nil, fmt.Errorf("failed to clone mcp server %s/%s files to mcp space %s/%s with repo id %d, error: %w",
+			req.MCPRepo.Namespace, req.MCPRepo.Name, req.Namespace, req.Name, dbRepo.ID, err)
 	}
-	slog.Debug("clone mcp server repo to space repo", slog.Any("cloneURL", cloneURL))
-	cloneReq := gitserver.CreateMirrorRepoReq{
-		RepoType:  req.RepoType,  // copy to repo type
-		Namespace: req.Namespace, // copy to space namespace
-		Name:      req.Name,      // copy to space repo name
-		CloneUrl:  cloneURL,
-	}
-	taskId, err := m.gitServer.CreateMirrorRepo(ctx, cloneReq)
-	if err != nil {
-		return nil, fmt.Errorf("fail to clone mcp server %s/%s to space %s/%s, error: %w",
-			req.MCPRepo.Namespace, req.MCPRepo.Name, req.Namespace, req.Name, err)
-	}
-
-	slog.Debug("mirror space repo from mcp server repo", slog.Any("req", req), slog.Any("taskId", taskId),
-		slog.Any("cloneReq", cloneReq), slog.Any("req", req), slog.Any("error", err))
 
 	err = m.updateSpaceMetaTag(req, user)
 	if err != nil {
-		slog.Warn("fail to set mcpserver tag for space", slog.Any("req", req), slog.Any("user", user.Username), slog.Any("error", err))
+		slog.Warn("failed to set mcpserver tag for mcp space", slog.Any("req", req), slog.Any("user", user.Username), slog.Any("error", err))
 	}
 
 	err = m.createDeployDefaultFiles(req, mcpServer, user)
 	if err != nil {
-		return nil, fmt.Errorf("fail to create default files for space %s/%s, error: %w", req.Namespace, req.Name, err)
+		slog.Info("failed to delete git repo for new mcp space", slog.Any("dbRepo.GitalyPath()", dbRepo.GitalyPath()))
+		delGit := m.gitServer.DeleteRepo(ctx, dbRepo.GitalyPath())
+		if delGit != nil {
+			slog.Error("failed to delete git repo after failed to create default files for mcp space",
+				slog.Any("req", req), slog.Any("delGit", delGit))
+		}
+		delErr := m.mcpServerStore.DeleteSpaceAndRepoForDeploy(ctx, dbSpace.ID, dbRepo.ID)
+		if delErr != nil {
+			slog.Error("failed to delete created space and repo after failed to create default files for mcp space",
+				slog.Any("req", req), slog.Any("delErr", delErr))
+		}
+		return nil, fmt.Errorf("failed to create default files for mcp space %s/%s, error: %w", req.Namespace, req.Name, err)
 	}
 
 	space := &types.Space{
-		ID:            resSpace.ID,
+		ID:            dbSpace.ID,
 		Creator:       req.CurrentUser,
 		License:       req.License,
 		RepositoryID:  dbRepo.ID,
@@ -795,33 +796,15 @@ func (m *mcpServerComponentImpl) Deploy(ctx context.Context, req *types.DeployMC
 		Private:       dbRepo.Private,
 		Name:          dbRepo.Name,
 		Nickname:      dbRepo.Nickname,
-		Sdk:           resSpace.Sdk,
-		SdkVersion:    resSpace.SdkVersion,
-		Env:           resSpace.Env,
+		Sdk:           dbSpace.Sdk,
+		SdkVersion:    dbSpace.SdkVersion,
+		Env:           dbSpace.Env,
 		Hardware:      resource.Resources,
-		CoverImageUrl: resSpace.CoverImageUrl,
-		SKU:           resSpace.SKU,
-		CreatedAt:     resSpace.CreatedAt,
+		CoverImageUrl: dbSpace.CoverImageUrl,
+		SKU:           dbSpace.SKU,
+		CreatedAt:     dbSpace.CreatedAt,
 	}
 	return space, nil
-}
-
-func getSourceRepoCloneURL(address, userName, token, repoPath string) (string, error) {
-	u, err := url.Parse(address)
-	if err != nil {
-		return "", fmt.Errorf("invalid clone url prefix, error: %w", err)
-	}
-	credential := fmt.Sprintf("%s:%s", userName, token)
-
-	cloneURL := fmt.Sprintf("%s://%s@%s:%s/%ss/%s.git",
-		u.Scheme,
-		credential,
-		u.Hostname(),
-		u.Port(),
-		types.MCPServerRepo,
-		repoPath)
-
-	return cloneURL, nil
 }
 
 func (m *mcpServerComponentImpl) createDeployDefaultFiles(req *types.DeployMCPServerReq,

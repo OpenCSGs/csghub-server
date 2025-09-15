@@ -4,6 +4,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
@@ -366,4 +367,9 @@ func TestSafeBuildLfsPath(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestBuildHashedRelativePath(t *testing.T) {
+	res := BuildHashedRelativePath(1)
+	require.Equal(t, "@hashed_repos/6b/86/6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b.git", res)
 }

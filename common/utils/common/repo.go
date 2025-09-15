@@ -222,9 +222,13 @@ func BuildLfsPath(repoID int64, oid string, migrated bool) string {
 	return lfsPath
 }
 
-func BuildHashedRelativePath(repoID int64) string {
+func buildHashedRelativePath(repoID int64) string {
 	sha256Path := SHA256(strconv.FormatInt(repoID, 10))
 	return fmt.Sprintf("%s/%s/%s/%s", HashedRepoPathPrefix, sha256Path[0:2], sha256Path[2:4], sha256Path)
+}
+
+func BuildHashedRelativePath(repoID int64) string {
+	return buildHashedRelativePath(repoID) + ".git"
 }
 
 func SafeBuildLfsPath(repoID int64, oid, lfsRelativePath string, migrated bool) string {
