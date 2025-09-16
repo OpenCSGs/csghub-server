@@ -44,7 +44,7 @@ func (h *GitCallbackHandler) Handle(c *gin.Context) {
 func (h *GitCallbackHandler) handlePush(c *gin.Context) {
 	var req types.GiteaCallbackPushReq
 	if err := c.ShouldBindJSON(&req); err != nil {
-		slog.Error("Bad gitea callback request format", "error", err)
+		slog.Error("[git_callback] Bad git callback request format", slog.Any("error", err))
 		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
 		return
 	}
@@ -58,11 +58,11 @@ func (h *GitCallbackHandler) handlePush(c *gin.Context) {
 		c, workflowOptions, workflow.HandlePushWorkflow, &req,
 	)
 	if err != nil {
-		slog.Error("failed to handle git push callback", slog.Any("error", err), slog.Any("repo_path", req.Repository.FullName))
+		slog.Error("[git_callback] failed to handle git push callback", slog.Any("error", err), slog.Any("repo_path", req.Repository.FullName))
 		httpbase.ServerError(c, err)
 		return
 	}
 
-	slog.Info("start handle push workflow", slog.String("workflow_id", we.GetID()), slog.Any("repo_path", req.Repository.FullName), slog.String("run_id", we.GetRunID()), slog.Any("req", &req))
+	slog.Info("[git_callback] start handle push workflow", slog.String("workflow_id", we.GetID()), slog.Any("repo_path", req.Repository.FullName), slog.String("run_id", we.GetRunID()), slog.Any("req", &req))
 	httpbase.OK(c, nil)
 }
