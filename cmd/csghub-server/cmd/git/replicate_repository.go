@@ -121,5 +121,5 @@ var replicateRepositoryCmd = &cobra.Command{
 }
 
 func hashedRepoRelativePath(repo database.Repository) string {
-	return common.BuildHashedRelativePath(repo.ID) + ".git"
+	return common.BuildHashedRelativePath(repo.ID)
 }

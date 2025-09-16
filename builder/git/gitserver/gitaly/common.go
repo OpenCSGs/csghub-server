@@ -15,7 +15,7 @@ func (c *Client) BuildRelativePath(ctx context.Context, repoType types.Repositor
 			return "", fmt.Errorf("failed to find repository: %w", err)
 		}
 		if repo.Hashed {
-			return common.BuildHashedRelativePath(repo.ID) + ".git", nil
+			return common.BuildHashedRelativePath(repo.ID), nil
 		}
 	}
 	repoTypeS := fmt.Sprintf("%ss", string(repoType))

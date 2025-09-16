@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	"github.com/stretchr/testify/require"
+	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
@@ -382,4 +383,51 @@ func TestMCPServerComponent_OrgMCPServers(t *testing.T) {
 		})
 
 	}
+}
+
+func TestMCPServerComponent_updateSpaceMetaTag(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestMCPServerComponent(ctx, t)
+
+	user := &rpc.User{
+		Username: "user",
+		Roles:    []string{"admin"},
+	}
+
+	req := &types.DeployMCPServerReq{
+		CreateRepoReq: types.CreateRepoReq{
+			Username:  "user",
+			Namespace: "test-namespace",
+			Name:      "test-server",
+			RepoType:  types.SpaceRepo,
+		},
+	}
+
+	getFileContentReq := gitserver.GetRepoInfoByPathReq{
+		Namespace: req.Namespace,
+		Name:      req.Name,
+		Ref:       req.DefaultBranch,
+		Path:      types.REPOCARD_FILENAME,
+		RepoType:  types.SpaceRepo,
+	}
+
+	updateReq := &types.UpdateFileReq{
+		Username:  req.Username,
+		Branch:    types.MainBranch,
+		Message:   "update mcp server tag",
+		FilePath:  types.REPOCARD_FILENAME,
+		RepoType:  types.SpaceRepo,
+		Namespace: req.Namespace,
+		Name:      req.Name,
+		Content:   "LS0tCm1jcHNlcnZlcnM6CiAgICAtIC8KCi0tLQo=",
+	}
+
+	mc.mocks.gitServer.EXPECT().GetRepoFileContents(mock.Anything, getFileContentReq).Return(&types.File{
+		Content: "",
+	}, nil)
+
+	mc.mocks.gitServer.EXPECT().UpdateRepoFile(updateReq).Return(nil)
+
+	err := mc.updateSpaceMetaTag(req, user)
+	require.Nil(t, err)
 }

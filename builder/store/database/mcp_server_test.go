@@ -234,3 +234,26 @@ func TestMCPServerStore_UserLikes(t *testing.T) {
 	require.Equal(t, []string{"repo3", "repo1"}, names)
 
 }
+
+func TestMCPServerStore_CreateAndDeleteSpaceAndRepoForDeploy(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewMCPServerStoreWithDB(db)
+
+	repo := &database.Repository{
+		Name: "repo1",
+		Path: "p1",
+	}
+
+	space := &database.Space{
+		Sdk: "mcp_server",
+	}
+
+	err := store.CreateSpaceAndRepoForDeploy(ctx, repo, space)
+	require.Nil(t, err)
+
+	err = store.DeleteSpaceAndRepoForDeploy(ctx, space.ID, repo.ID)
+	require.Nil(t, err)
+}

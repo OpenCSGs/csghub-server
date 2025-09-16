@@ -6,6 +6,7 @@ import (
 	"log/slog"
 
 	"github.com/uptrace/bun"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -51,6 +52,8 @@ type MCPServerStore interface {
 	ByOrgPath(ctx context.Context, namespace string, per, page int, onlyPublic bool) ([]MCPServer, int, error)
 	UserLikes(ctx context.Context, userID int64, per, page int) ([]MCPServer, int, error)
 	CreateIfNotExist(ctx context.Context, input MCPServer) (*MCPServer, error)
+	CreateSpaceAndRepoForDeploy(ctx context.Context, inputRepo *Repository, inputSpace *Space) error
+	DeleteSpaceAndRepoForDeploy(ctx context.Context, spaceID int64, repoID int64) error
 }
 
 type mcpServerStoreImpl struct {
@@ -303,4 +306,39 @@ func (m *mcpServerStoreImpl) CreateIfNotExist(ctx context.Context, input MCPServ
 	}
 
 	return &input, nil
+}
+
+func (m *mcpServerStoreImpl) CreateSpaceAndRepoForDeploy(ctx context.Context, inputRepo *Repository, inputSpace *Space) error {
+	err := m.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		if err := assertAffectedOneRow(tx.NewInsert().Model(inputRepo).Exec(ctx)); err != nil {
+			return errorx.HandleDBError(err, errorx.Ctx().Set("insert_repo_path", inputRepo.Path).Set("type", inputRepo.RepositoryType))
+		}
+
+		inputSpace.RepositoryID = inputRepo.ID
+
+		if err := assertAffectedOneRow(tx.NewInsert().Model(inputSpace).Exec(ctx)); err != nil {
+			return errorx.HandleDBError(err, errorx.Ctx().Set("insert_mcp_space", ""))
+		}
+
+		return nil
+	})
+
+	return err
+}
+
+func (m *mcpServerStoreImpl) DeleteSpaceAndRepoForDeploy(ctx context.Context, spaceID int64, repoID int64) error {
+	err := m.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+
+		if err := assertAffectedOneRow(tx.NewDelete().Model(&Space{}).Where("id = ?", spaceID).ForceDelete().Exec(ctx)); err != nil {
+			return errorx.HandleDBError(err, errorx.Ctx().Set("delete_mcp_space_id", spaceID))
+		}
+
+		if err := assertAffectedOneRow(tx.NewDelete().Model(&Repository{}).Where("id = ?", repoID).ForceDelete().Exec(ctx)); err != nil {
+			return errorx.HandleDBError(err, errorx.Ctx().Set("delete_repo_id", repoID))
+		}
+
+		return nil
+	})
+
+	return err
 }

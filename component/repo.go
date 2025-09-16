@@ -3971,7 +3971,7 @@ func (c *repoComponentImpl) BatchMigrateRepoToHashedPath(ctx context.Context, au
 }
 
 func (c *repoComponentImpl) migrateRepoToHashedPath(ctx context.Context, repo *database.Repository) error {
-	newPath := common.BuildHashedRelativePath(repo.ID) + ".git"
+	newPath := common.BuildHashedRelativePath(repo.ID)
 	namespace, name := repo.NamespaceAndName()
 	err := c.git.CopyRepository(ctx, gitserver.CopyRepositoryReq{
 		Namespace: namespace,

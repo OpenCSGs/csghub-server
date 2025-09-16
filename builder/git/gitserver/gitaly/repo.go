@@ -130,7 +130,6 @@ func (c *Client) GetRepo(ctx context.Context, req gitserver.GetRepoReq) (*gitser
 }
 
 func (c *Client) CopyRepository(ctx context.Context, req gitserver.CopyRepositoryReq) error {
-	var bundleData []byte
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
 	relativePath, err := c.BuildRelativePath(ctx, req.RepoType, req.Namespace, req.Name)
@@ -155,6 +154,11 @@ func (c *Client) CopyRepository(ctx context.Context, req gitserver.CopyRepositor
 		return errorx.ErrGitCopyRepositoryFailed(err, errorx.Ctx())
 	}
 
+	client, err := c.repoClient.CreateRepositoryFromBundle(ctx)
+	if err != nil {
+		return errorx.ErrGitCopyRepositoryFailed(err, errorx.Ctx())
+	}
+
 	for {
 		data, err := resp.Recv()
 		if err == io.EOF {
@@ -163,20 +167,15 @@ func (c *Client) CopyRepository(ctx context.Context, req gitserver.CopyRepositor
 		if err != nil {
 			return errorx.ErrGitCopyRepositoryFailed(err, errorx.Ctx())
 		}
-		bundleData = append(bundleData, data.GetData()...)
-	}
 
-	client, err := c.repoClient.CreateRepositoryFromBundle(ctx)
-	if err != nil {
-		return errorx.ErrGitCopyRepositoryFailed(err, errorx.Ctx())
-	}
-	err = client.Send(&gitalypb.CreateRepositoryFromBundleRequest{
-		Repository: destRepo,
-		Data:       bundleData,
-	})
+		err = client.Send(&gitalypb.CreateRepositoryFromBundleRequest{
+			Repository: destRepo,
+			Data:       data.GetData(),
+		})
 
-	if err != nil {
-		return errorx.ErrGitCopyRepositoryFailed(err, errorx.Ctx())
+		if err != nil {
+			return errorx.ErrGitCopyRepositoryFailed(err, errorx.Ctx())
+		}
 	}
 
 	_, err = client.CloseAndRecv()
