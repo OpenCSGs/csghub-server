@@ -1,3 +1,5 @@
+//go:build saas
+
 package migrations
 
 import (
@@ -5,18 +7,9 @@ import (
 	"fmt"
 
 	"github.com/uptrace/bun"
-	"opencsg.com/csghub-server/common/config"
 )
 
 func init() {
-	config, err := config.LoadConfig()
-	if err != nil {
-		fmt.Println("Failed to load config: ", err)
-		return
-	}
-	if !config.Saas {
-		return
-	}
 	Migrations.MustRegister(func(ctx context.Context, db *bun.DB) error {
 		var users []User
 		err := db.NewSelect().

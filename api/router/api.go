@@ -11,16 +11,17 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
-	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 	"opencsg.com/csghub-server/api/handler"
 	"opencsg.com/csghub-server/api/handler/callback"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/api/middleware"
 	"opencsg.com/csghub-server/builder/instrumentation"
 	bldmq "opencsg.com/csghub-server/builder/mq"
+	bldprometheus "opencsg.com/csghub-server/builder/prometheus"
 	"opencsg.com/csghub-server/builder/temporal"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/i18n"
@@ -28,7 +29,7 @@ import (
 )
 
 func RunServer(config *config.Config, enableSwagger bool) {
-	stopOtel, err := instrumentation.SetupOTelSDK(context.Background(), config, "csghub-api")
+	stopOtel, err := instrumentation.SetupOTelSDK(context.Background(), config, instrumentation.Server)
 	if err != nil {
 		panic(err)
 	}
@@ -55,18 +56,13 @@ func RunServer(config *config.Config, enableSwagger bool) {
 
 func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	r := gin.New()
-	if config.Instrumentation.OTLPEndpoint != "" {
-		r.Use(otelgin.Middleware("csghub-server"))
-	}
-
+	middleware.SetInfraMiddleware(r, config, instrumentation.Server)
 	r.Use(cors.New(cors.Config{
 		AllowCredentials: true,
 		AllowHeaders:     []string{"*"},
 		AllowMethods:     []string{"*"},
 		AllowAllOrigins:  true,
 	}))
-	r.Use(gin.Recovery())
-	r.Use(middleware.Log(config))
 	r.Use(middleware.XOpenCSGHeader())
 	r.Use(middleware.ModifyAcceptLanguageMiddleware())
 	middlewareCollection := middleware.MiddlewareCollection{}
@@ -81,6 +77,9 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	//add router for golang pprof
 	debugGroup := r.Group("/debug", middlewareCollection.Auth.NeedAPIKey)
 	pprof.RouteRegister(debugGroup, "pprof")
+	//add router for prometheus metrics
+	bldprometheus.InitMetrics()
+	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
 	mqFactory, err := bldmq.GetOrInitMessageQueueFactory(config)
 	if err != nil {
@@ -127,8 +126,6 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 
 	}
 
-	healthHandler := handler.NewHealthHandler()
-	r.HEAD("/healthz", healthHandler.Healthz)
 	sdkGroup := r.Group("")
 	sdkGroup.Use(middleware.Authenticator(config))
 
@@ -933,6 +930,8 @@ func createUserRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware
 		apiGroup.GET("/user/verify/:id", middlewareCollection.Auth.NeedLogin, userProxyHandler.ProxyToApi("/api/v1/user/verify/%s", "id"))
 		apiGroup.DELETE("/user/:username/close_account", userProxyHandler.Proxy)
 		apiGroup.POST("/user/email-verification-code/:email", middlewareCollection.Auth.NeedLogin, userProxyHandler.Proxy)
+		apiGroup.POST("/user/sms-code", middlewareCollection.Auth.NeedLogin, userProxyHandler.Proxy)
+		apiGroup.PUT("/user/phone", middlewareCollection.Auth.NeedLogin, userProxyHandler.Proxy)
 	}
 
 	{

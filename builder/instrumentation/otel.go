@@ -3,6 +3,8 @@ package instrumentation
 import (
 	"context"
 	"errors"
+	"github.com/gin-gonic/gin"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 	"log/slog"
 	"net/url"
 	"time"
@@ -177,4 +179,11 @@ func SetupOTelSDK(ctx context.Context, config *config.Config, serviceName string
 	}
 
 	return shutdown, nil
+}
+
+// SetupOtelMiddleware sets up the otelgin middleware for the gin engine.
+func SetupOtelMiddleware(r *gin.Engine, config *config.Config, serviceName string) {
+	if config.Instrumentation.OTLPEndpoint != "" {
+		r.Use(otelgin.Middleware(serviceName))
+	}
 }

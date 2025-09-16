@@ -3,7 +3,6 @@ package middleware
 import (
 	"context"
 	"log/slog"
-	"net/http"
 	"os"
 	"time"
 
@@ -12,6 +11,7 @@ import (
 	"go.opentelemetry.io/contrib/bridges/otelslog"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/utils/trace"
 )
 
 func Log(config *config.Config) gin.HandlerFunc {
@@ -27,7 +27,7 @@ func Log(config *config.Config) gin.HandlerFunc {
 
 	l := slog.New(slogmulti.Fanout(handlers...))
 	return func(ctx *gin.Context) {
-		if ctx.Request.URL.Path == "/healthz" && ctx.Request.Method == http.MethodHead {
+		if ctx.Request.URL.Path == "/healthz" {
 			ctx.Next()
 			return
 		}
@@ -36,6 +36,7 @@ func Log(config *config.Config) gin.HandlerFunc {
 		ctx.Set("clientIP", ctx.ClientIP())
 		reqCtx := context.WithValue(ctx.Request.Context(), "clientIP", ctx.ClientIP())
 		ctx.Request = ctx.Request.WithContext(reqCtx)
+		traceID := trace.GetOrGenTraceID(ctx)
 
 		ctx.Next()
 
@@ -48,6 +49,7 @@ func Log(config *config.Config) gin.HandlerFunc {
 			slog.Any("auth_type", httpbase.GetAuthType(ctx)),
 			slog.String("url", ctx.Request.URL.RequestURI()),
 			slog.String("full_path", ctx.FullPath()),
+			slog.String("trace_id", traceID),
 		)
 	}
 }

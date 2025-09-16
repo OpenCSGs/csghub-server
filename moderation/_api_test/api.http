@@ -1,5 +1,5 @@
 ### health check
-GET http://localhost:8089/api/v1/healthz HTTP/1.1
+GET http://localhost:8089/healthz HTTP/1.1
 
 ### check whole repo sensitivity
 POST http://localhost:8089/api/v1/repo
