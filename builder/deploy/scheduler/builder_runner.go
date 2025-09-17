@@ -177,7 +177,8 @@ func (t *BuilderRunner) buildFailed(msg string) {
 		return
 	}
 	if deploy.Status != common.Building {
-		slog.Warn("deploy status is not building, skip setting build failed status")
+		slog.Warn("deploy status is not building, skip setting build failed status in builder_runner",
+			slog.Any("deploy_id", deploy.ID), slog.Any("deploy_status", deploy.Status))
 		return
 	}
 
