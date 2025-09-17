@@ -60,6 +60,11 @@ func (h *imagebuilderExecutorImpl) ProcessEvent(ctx context.Context, event *type
 			return fmt.Errorf("failed to get deploy task by task id %d to update builder deploy status, error: %w", data.TaskId, err)
 		}
 
+		if task.Deploy == nil {
+			slog.Warn("deploy does not exist and system will skip updating builder deploy status", slog.Any("task_id", data.TaskId))
+			return nil
+		}
+
 		if event.EventTime < task.UpdatedAt.Unix() {
 			return nil
 		}
