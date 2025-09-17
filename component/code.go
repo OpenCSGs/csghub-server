@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"path"
 	"slices"
 	"time"
 
@@ -82,6 +83,16 @@ func (c *codeComponentImpl) Create(ctx context.Context, req *types.CreateCodeReq
 	req.RepoType = types.CodeRepo
 	req.Readme = generateReadmeData(req.License)
 	req.Nickname = nickname
+	req.CommitFiles = []types.CommitFile{
+		{
+			Content: req.Readme,
+			Path:    types.ReadmeFileName,
+		},
+		{
+			Content: codeGitattributesContent,
+			Path:    types.GitattributesFileName,
+		},
+	}
 	_, dbRepo, err := c.repoComponent.CreateRepo(ctx, req.CreateRepoReq)
 	if err != nil {
 		return nil, err
@@ -92,41 +103,10 @@ func (c *codeComponentImpl) Create(ctx context.Context, req *types.CreateCodeReq
 		RepositoryID: dbRepo.ID,
 	}
 
-	code, err := c.codeStore.Create(ctx, dbCode)
+	repoPath := path.Join(req.Namespace, req.Name)
+	code, err := c.codeStore.CreateAndUpdateRepoPath(ctx, dbCode, repoPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create database code, cause: %w", err)
-	}
-
-	// Create README.md file
-	err = c.gitServer.CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
-		Username:  dbRepo.User.Username,
-		Email:     dbRepo.User.Email,
-		Message:   types.InitCommitMessage,
-		Branch:    req.DefaultBranch,
-		Content:   req.Readme,
-		NewBranch: req.DefaultBranch,
-		Namespace: req.Namespace,
-		Name:      req.Name,
-		FilePath:  types.ReadmeFileName,
-	}, types.CodeRepo))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create README.md file, cause: %w", err)
-	}
-
-	// Create .gitattributes file
-	err = c.gitServer.CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
-		Username:  dbRepo.User.Username,
-		Email:     dbRepo.User.Email,
-		Message:   types.InitCommitMessage,
-		Branch:    req.DefaultBranch,
-		Content:   codeGitattributesContent,
-		NewBranch: req.DefaultBranch,
-		Namespace: req.Namespace,
-		Name:      req.Name,
-		FilePath:  types.GitattributesFileName,
-	}, types.CodeRepo))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create .gitattributes file, cause: %w", err)
 	}
 
 	for _, tag := range code.Repository.Tags {

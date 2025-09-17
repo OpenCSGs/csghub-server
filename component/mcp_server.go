@@ -97,6 +97,12 @@ func (m *mcpServerComponentImpl) Create(ctx context.Context, req *types.CreateMC
 	req.RepoType = types.MCPServerRepo
 	req.Readme = generateReadmeData(req.License)
 	req.Nickname = nickname
+	req.CommitFiles = []types.CommitFile{
+		{
+			Content: req.Readme,
+			Path:    types.ReadmeFileName,
+		},
+	}
 	_, dbRepo, err := m.repoComponent.CreateRepo(ctx, req.CreateRepoReq)
 	if err != nil {
 		return nil, fmt.Errorf("fail to create mcp repo cause: %w", err)
@@ -108,14 +114,10 @@ func (m *mcpServerComponentImpl) Create(ctx context.Context, req *types.CreateMC
 		Repository:    dbRepo,
 	}
 
-	mcpServer, err := m.mcpServerStore.Create(ctx, input)
+	repoPath := path.Join(req.Namespace, req.Name)
+	mcpServer, err := m.mcpServerStore.CreateAndUpdateRepoPath(ctx, input, repoPath)
 	if err != nil {
 		return nil, fmt.Errorf("fail to create mcp server cause: %w", err)
-	}
-
-	err = m.createMCPServerRepoFiles(req, dbRepo)
-	if err != nil {
-		return nil, fmt.Errorf("fail to create mcp server repo files cause: %w", err)
 	}
 
 	for _, tag := range mcpServer.Repository.Tags {
@@ -167,41 +169,6 @@ func (m *mcpServerComponentImpl) Create(ctx context.Context, req *types.CreateMC
 	}()
 
 	return res, nil
-}
-
-func (m *mcpServerComponentImpl) createMCPServerRepoFiles(req *types.CreateMCPServerReq, dbRepo *database.Repository) error {
-	// Create README.md file
-	err := m.gitServer.CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
-		Username:  dbRepo.User.Username,
-		Email:     dbRepo.User.Email,
-		Message:   types.InitCommitMessage,
-		Branch:    req.DefaultBranch,
-		Content:   req.Readme,
-		NewBranch: req.DefaultBranch,
-		Namespace: req.Namespace,
-		Name:      req.Name,
-		FilePath:  types.ReadmeFileName,
-	}, types.MCPServerRepo))
-	if err != nil {
-		return fmt.Errorf("failed to create mcp server repo README.md file, cause: %w", err)
-	}
-
-	// Create .gitattributes file
-	// err = m.gitServer.CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
-	// 	Username:  dbRepo.User.Username,
-	// 	Email:     dbRepo.User.Email,
-	// 	Message:   types.InitCommitMessage,
-	// 	Branch:    req.DefaultBranch,
-	// 	Content:   codeGitattributesContent,
-	// 	NewBranch: req.DefaultBranch,
-	// 	Namespace: req.Namespace,
-	// 	Name:      req.Name,
-	// 	FilePath:  types.GitattributesFileName,
-	// }, types.MCPServerRepo))
-	// if err != nil {
-	// 	return fmt.Errorf("failed to create mcp server repo .gitattributes file, cause: %w", err)
-	// }
-	return nil
 }
 
 func (m *mcpServerComponentImpl) Delete(ctx context.Context, req *types.UpdateMCPServerReq) error {

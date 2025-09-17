@@ -258,3 +258,25 @@ func TestDatasetStore_FindWithOriginalPath(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, "repo2", m2.Repository.Name)
 }
+
+func TestDatasetStore_CreateAndUpdateRepoPath(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewDatasetStoreWithDB(db)
+
+	repo := &database.Repository{
+		Name: "repo1",
+		Path: "p1",
+	}
+	err := db.Core.NewInsert().Model(repo).Scan(ctx, repo)
+	require.Nil(t, err)
+
+	dataset, err := store.CreateAndUpdateRepoPath(ctx, database.Dataset{
+		RepositoryID: repo.ID,
+	}, "p2")
+
+	require.Nil(t, err)
+	require.Equal(t, "p2", dataset.Repository.Path)
+}

@@ -56,7 +56,7 @@ func TestSpaceComponent_Create(t *testing.T) {
 		return nil
 	}).Once()
 
-	sc.mocks.stores.SpaceMock().EXPECT().Create(ctx, database.Space{
+	sc.mocks.stores.SpaceMock().EXPECT().CreateAndUpdateRepoPath(ctx, database.Space{
 		RepositoryID: 321,
 		Sdk:          types.STREAMLIT.Name,
 		SdkVersion:   "v1",
@@ -65,7 +65,7 @@ func TestSpaceComponent_Create(t *testing.T) {
 		Secrets:      "sss",
 		SKU:          "1",
 		ClusterID:    "cluster",
-	}).Return(&database.Space{}, nil)
+	}, "ns/n").Return(&database.Space{}, nil)
 	sc.mocks.gitServer.EXPECT().CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
 		Username:  "user",
 		Email:     "foo@bar.com",

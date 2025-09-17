@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -112,7 +113,8 @@ func (c *spaceComponentImpl) Create(ctx context.Context, req types.CreateSpaceRe
 	}
 	dbSpace = c.updateSpaceByReq(dbSpace, req)
 
-	resSpace, err := c.spaceStore.Create(ctx, dbSpace)
+	repoPath := path.Join(req.Namespace, req.Name)
+	resSpace, err := c.spaceStore.CreateAndUpdateRepoPath(ctx, dbSpace, repoPath)
 	if err != nil {
 		slog.Error("fail to create space in db", slog.Any("req", req), slog.String("error", err.Error()))
 		return nil, fmt.Errorf("fail to create space in db, error: %w", err)

@@ -83,13 +83,23 @@ func TestModelComponent_Create(t *testing.T) {
 		Nickname:      "n",
 		RepoType:      types.ModelRepo,
 		Username:      "user",
+		CommitFiles: []types.CommitFile{
+			{
+				Content: generateReadmeData("MIT"),
+				Path:    types.ReadmeFileName,
+			},
+			{
+				Content: modelGitattributesContent,
+				Path:    types.GitattributesFileName,
+			},
+		},
 	}).Return(nil, dbrepo, nil)
 
-	mc.mocks.stores.ModelMock().EXPECT().Create(ctx, database.Model{
+	mc.mocks.stores.ModelMock().EXPECT().CreateAndUpdateRepoPath(ctx, database.Model{
 		Repository:   dbrepo,
 		RepositoryID: dbrepo.ID,
 		BaseModel:    "base",
-	}).Return(&database.Model{
+	}, "ns/n").Return(&database.Model{
 		ID:         999,
 		Repository: dbrepo,
 	}, nil)
@@ -107,29 +117,6 @@ func TestModelComponent_Create(t *testing.T) {
 			wg.Done()
 			return nil
 		}).Once()
-
-	mc.mocks.gitServer.EXPECT().CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
-		Username:  "user",
-		Email:     "foo@bar.com",
-		Message:   types.InitCommitMessage,
-		Branch:    "main",
-		Content:   generateReadmeData("MIT"),
-		NewBranch: "main",
-		Namespace: "ns",
-		Name:      "n",
-		FilePath:  types.ReadmeFileName,
-	}, types.ModelRepo)).Return(nil)
-	mc.mocks.gitServer.EXPECT().CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
-		Username:  "user",
-		Email:     "foo@bar.com",
-		Message:   types.InitCommitMessage,
-		Branch:    "main",
-		Content:   spaceGitattributesContent,
-		NewBranch: "main",
-		Namespace: "ns",
-		Name:      "n",
-		FilePath:  types.GitattributesFileName,
-	}, types.ModelRepo)).Return(nil)
 
 	model, err := mc.Create(ctx, &types.CreateModelReq{
 		BaseModel: "base",

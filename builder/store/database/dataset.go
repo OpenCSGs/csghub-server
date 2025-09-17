@@ -8,6 +8,7 @@ import (
 
 	"github.com/uptrace/bun"
 	"opencsg.com/csghub-server/common/errorx"
+	"opencsg.com/csghub-server/common/types"
 )
 
 var sortBy = map[string]string{
@@ -35,6 +36,7 @@ type DatasetStore interface {
 	FindByOriginPath(ctx context.Context, path string) (dataset *Dataset, err error)
 	ListByPath(ctx context.Context, paths []string) ([]Dataset, error)
 	CreateIfNotExist(ctx context.Context, input Dataset) (*Dataset, error)
+	CreateAndUpdateRepoPath(ctx context.Context, input Dataset, path string) (*Dataset, error)
 }
 
 func NewDatasetStore() DatasetStore {
@@ -263,4 +265,21 @@ func (s *datasetStoreImpl) CreateIfNotExist(ctx context.Context, input Dataset) 
 	}
 
 	return &input, nil
+}
+
+func (s *datasetStoreImpl) CreateAndUpdateRepoPath(ctx context.Context, input Dataset, path string) (*Dataset, error) {
+	err := s.db.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		var repo Repository
+		_, err := tx.NewInsert().Model(&input).Exec(ctx, &input)
+		if err != nil {
+			return fmt.Errorf("failed to create dataset: %w", err)
+		}
+		repo, err = updateRepoPath(ctx, tx, types.DatasetRepo, path, input.RepositoryID)
+		if err != nil {
+			return fmt.Errorf("failed to update repository path: %w", err)
+		}
+		input.Repository = &repo
+		return nil
+	})
+	return &input, err
 }

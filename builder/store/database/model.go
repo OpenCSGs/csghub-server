@@ -29,6 +29,7 @@ type ModelStore interface {
 	ListByPath(ctx context.Context, paths []string) ([]Model, error)
 	ByID(ctx context.Context, id int64) (*Model, error)
 	CreateIfNotExist(ctx context.Context, input Model) (*Model, error)
+	CreateAndUpdateRepoPath(ctx context.Context, input Model, path string) (*Model, error)
 }
 
 func NewModelStore() ModelStore {
@@ -300,4 +301,36 @@ func (s *modelStoreImpl) CreateIfNotExist(ctx context.Context, input Model) (*Mo
 	}
 
 	return &input, nil
+}
+
+func (s *modelStoreImpl) CreateAndUpdateRepoPath(ctx context.Context, input Model, path string) (*Model, error) {
+	err := s.db.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		var repo Repository
+		_, err := tx.NewInsert().Model(&input).Exec(ctx, &input)
+		if err != nil {
+			return fmt.Errorf("failed to create model: %w", err)
+		}
+		repo, err = updateRepoPath(ctx, tx, types.ModelRepo, path, input.RepositoryID)
+		if err != nil {
+			return fmt.Errorf("failed to update repository path: %w", err)
+		}
+		input.Repository = &repo
+		return nil
+	})
+	return &input, err
+}
+
+func updateRepoPath(ctx context.Context, tx bun.Tx, repoType types.RepositoryType, repoPath string, repoID int64) (Repository, error) {
+	var repo Repository
+	err := tx.NewUpdate().
+		Model(&Repository{}).
+		Set("path = ?", repoPath).
+		Set("git_path = ?", fmt.Sprintf("%ss_%s", repoType, repoPath)).
+		Where("id = ?", repoID).
+		Returning("*", &repo).
+		Scan(ctx, &repo)
+	if err != nil {
+		return repo, fmt.Errorf("failed to update repository path: %w", err)
+	}
+	return repo, nil
 }

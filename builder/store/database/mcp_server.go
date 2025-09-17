@@ -54,6 +54,7 @@ type MCPServerStore interface {
 	CreateIfNotExist(ctx context.Context, input MCPServer) (*MCPServer, error)
 	CreateSpaceAndRepoForDeploy(ctx context.Context, inputRepo *Repository, inputSpace *Space) error
 	DeleteSpaceAndRepoForDeploy(ctx context.Context, spaceID int64, repoID int64) error
+	CreateAndUpdateRepoPath(ctx context.Context, input MCPServer, path string) (*MCPServer, error)
 }
 
 type mcpServerStoreImpl struct {
@@ -341,4 +342,21 @@ func (m *mcpServerStoreImpl) DeleteSpaceAndRepoForDeploy(ctx context.Context, sp
 	})
 
 	return err
+}
+
+func (s *mcpServerStoreImpl) CreateAndUpdateRepoPath(ctx context.Context, input MCPServer, path string) (*MCPServer, error) {
+	err := s.db.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		var repo Repository
+		_, err := tx.NewInsert().Model(&input).Exec(ctx, &input)
+		if err != nil {
+			return fmt.Errorf("failed to create mcpserver: %w", err)
+		}
+		repo, err = updateRepoPath(ctx, tx, types.MCPServerRepo, path, input.RepositoryID)
+		if err != nil {
+			return fmt.Errorf("failed to update repository path: %w", err)
+		}
+		input.Repository = &repo
+		return nil
+	})
+	return &input, err
 }

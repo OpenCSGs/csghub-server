@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"path"
 	"slices"
 	"time"
 
@@ -116,6 +117,17 @@ func (c *datasetComponentImpl) Create(ctx context.Context, req *types.CreateData
 	req.RepoType = types.DatasetRepo
 	req.Readme = generateReadmeData(req.License)
 	req.Nickname = nickname
+
+	req.CommitFiles = []types.CommitFile{
+		{
+			Content: req.Readme,
+			Path:    types.ReadmeFileName,
+		},
+		{
+			Content: types.DatasetGitattributesContent,
+			Path:    types.GitattributesFileName,
+		},
+	}
 	_, dbRepo, err := c.repoComponent.CreateRepo(ctx, req.CreateRepoReq)
 	if err != nil {
 		return nil, err
@@ -126,41 +138,10 @@ func (c *datasetComponentImpl) Create(ctx context.Context, req *types.CreateData
 		RepositoryID: dbRepo.ID,
 	}
 
-	dataset, err := c.datasetStore.Create(ctx, dbDataset)
+	repoPath := path.Join(req.Namespace, req.Name)
+	dataset, err := c.datasetStore.CreateAndUpdateRepoPath(ctx, dbDataset, repoPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create database dataset, cause: %w", err)
-	}
-
-	// Create README.md file
-	err = c.gitServer.CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
-		Username:  user.Username,
-		Email:     user.Email,
-		Message:   types.InitCommitMessage,
-		Branch:    req.DefaultBranch,
-		Content:   req.Readme,
-		NewBranch: req.DefaultBranch,
-		Namespace: req.Namespace,
-		Name:      req.Name,
-		FilePath:  types.ReadmeFileName,
-	}, types.DatasetRepo))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create README.md file, cause: %w", err)
-	}
-
-	// Create .gitattributes file
-	err = c.gitServer.CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
-		Username:  user.Username,
-		Email:     user.Email,
-		Message:   types.InitCommitMessage,
-		Branch:    req.DefaultBranch,
-		Content:   types.DatasetGitattributesContent,
-		NewBranch: req.DefaultBranch,
-		Namespace: req.Namespace,
-		Name:      req.Name,
-		FilePath:  types.GitattributesFileName,
-	}, types.DatasetRepo))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create .gitattributes file, cause: %w", err)
 	}
 
 	for _, tag := range dataset.Repository.Tags {

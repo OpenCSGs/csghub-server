@@ -464,6 +464,66 @@ func (_c *MockSpaceStore_Create_Call) RunAndReturn(run func(context.Context, dat
 	return _c
 }
 
+// CreateAndUpdateRepoPath provides a mock function with given fields: ctx, input, path
+func (_m *MockSpaceStore) CreateAndUpdateRepoPath(ctx context.Context, input database.Space, path string) (*database.Space, error) {
+	ret := _m.Called(ctx, input, path)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateAndUpdateRepoPath")
+	}
+
+	var r0 *database.Space
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, database.Space, string) (*database.Space, error)); ok {
+		return rf(ctx, input, path)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, database.Space, string) *database.Space); ok {
+		r0 = rf(ctx, input, path)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.Space)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, database.Space, string) error); ok {
+		r1 = rf(ctx, input, path)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockSpaceStore_CreateAndUpdateRepoPath_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateAndUpdateRepoPath'
+type MockSpaceStore_CreateAndUpdateRepoPath_Call struct {
+	*mock.Call
+}
+
+// CreateAndUpdateRepoPath is a helper method to define mock.On call
+//   - ctx context.Context
+//   - input database.Space
+//   - path string
+func (_e *MockSpaceStore_Expecter) CreateAndUpdateRepoPath(ctx interface{}, input interface{}, path interface{}) *MockSpaceStore_CreateAndUpdateRepoPath_Call {
+	return &MockSpaceStore_CreateAndUpdateRepoPath_Call{Call: _e.mock.On("CreateAndUpdateRepoPath", ctx, input, path)}
+}
+
+func (_c *MockSpaceStore_CreateAndUpdateRepoPath_Call) Run(run func(ctx context.Context, input database.Space, path string)) *MockSpaceStore_CreateAndUpdateRepoPath_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(database.Space), args[2].(string))
+	})
+	return _c
+}
+
+func (_c *MockSpaceStore_CreateAndUpdateRepoPath_Call) Return(_a0 *database.Space, _a1 error) *MockSpaceStore_CreateAndUpdateRepoPath_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockSpaceStore_CreateAndUpdateRepoPath_Call) RunAndReturn(run func(context.Context, database.Space, string) (*database.Space, error)) *MockSpaceStore_CreateAndUpdateRepoPath_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Delete provides a mock function with given fields: ctx, input
 func (_m *MockSpaceStore) Delete(ctx context.Context, input database.Space) error {
 	ret := _m.Called(ctx, input)

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"path"
 	"slices"
 	"strconv"
 	"strings"
@@ -256,6 +257,16 @@ func (c *modelComponentImpl) Create(ctx context.Context, req *types.CreateModelR
 	req.Nickname = nickname
 	req.RepoType = types.ModelRepo
 	req.Readme = generateReadmeData(req.License)
+	req.CommitFiles = []types.CommitFile{
+		{
+			Content: req.Readme,
+			Path:    types.ReadmeFileName,
+		},
+		{
+			Content: modelGitattributesContent,
+			Path:    types.GitattributesFileName,
+		},
+	}
 	_, dbRepo, err := c.repoComponent.CreateRepo(ctx, req.CreateRepoReq)
 	if err != nil {
 		return nil, err
@@ -269,42 +280,11 @@ func (c *modelComponentImpl) Create(ctx context.Context, req *types.CreateModelR
 		MediumRiskCount: req.MediumRiskCount,
 		HighRiskCount:   req.HighRiskCount,
 	}
+	repoPath := path.Join(req.Namespace, req.Name)
 
-	model, err := c.modelStore.Create(ctx, dbModel)
+	model, err := c.modelStore.CreateAndUpdateRepoPath(ctx, dbModel, repoPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create database model, cause: %w", err)
-	}
-
-	// Create README.md file
-	err = c.gitServer.CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
-		Username:  user.Username,
-		Email:     user.Email,
-		Message:   types.InitCommitMessage,
-		Branch:    req.DefaultBranch,
-		Content:   req.Readme,
-		NewBranch: req.DefaultBranch,
-		Namespace: req.Namespace,
-		Name:      req.Name,
-		FilePath:  types.ReadmeFileName,
-	}, types.ModelRepo))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create README.md file, cause: %w", err)
-	}
-
-	// Create .gitattributes file
-	err = c.gitServer.CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
-		Username:  user.Username,
-		Email:     user.Email,
-		Message:   types.InitCommitMessage,
-		Branch:    req.DefaultBranch,
-		Content:   modelGitattributesContent,
-		NewBranch: req.DefaultBranch,
-		Namespace: req.Namespace,
-		Name:      req.Name,
-		FilePath:  types.GitattributesFileName,
-	}, types.ModelRepo))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create .gitattributes file, cause: %w", err)
 	}
 
 	for _, tag := range model.Repository.Tags {

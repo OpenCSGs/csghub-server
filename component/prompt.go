@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"path"
 	"slices"
 	"strings"
 	"sync"
@@ -639,6 +640,17 @@ func (c *promptComponentImpl) CreatePromptRepo(ctx context.Context, req *types.C
 	req.RepoType = types.PromptRepo
 	req.Readme = generateReadmeData(req.License)
 	req.Nickname = nickname
+
+	req.CommitFiles = []types.CommitFile{
+		{
+			Content: req.Readme,
+			Path:    types.ReadmeFileName,
+		},
+		{
+			Content: types.DatasetGitattributesContent,
+			Path:    types.GitattributesFileName,
+		},
+	}
 	_, dbRepo, err := c.repoComponent.CreateRepo(ctx, req.CreateRepoReq)
 	if err != nil {
 		return nil, err
@@ -649,41 +661,10 @@ func (c *promptComponentImpl) CreatePromptRepo(ctx context.Context, req *types.C
 		RepositoryID: dbRepo.ID,
 	}
 
-	prompt, err := c.promptStore.Create(ctx, dbPrompt)
+	repoPath := path.Join(req.Namespace, req.Name)
+	prompt, err := c.promptStore.CreateAndUpdateRepoPath(ctx, dbPrompt, repoPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create database prompt, cause: %w", err)
-	}
-
-	// Create README.md file
-	err = c.gitServer.CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
-		Username:  user.Username,
-		Email:     user.Email,
-		Message:   types.InitCommitMessage,
-		Branch:    req.DefaultBranch,
-		Content:   req.Readme,
-		NewBranch: req.DefaultBranch,
-		Namespace: req.Namespace,
-		Name:      req.Name,
-		FilePath:  types.ReadmeFileName,
-	}, types.PromptRepo))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create prompt repo README.md file, cause: %w", err)
-	}
-
-	// Create .gitattributes file
-	err = c.gitServer.CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
-		Username:  user.Username,
-		Email:     user.Email,
-		Message:   types.InitCommitMessage,
-		Branch:    req.DefaultBranch,
-		Content:   types.DatasetGitattributesContent,
-		NewBranch: req.DefaultBranch,
-		Namespace: req.Namespace,
-		Name:      req.Name,
-		FilePath:  types.GitattributesFileName,
-	}, types.PromptRepo))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create .gitattributes file, cause: %w", err)
 	}
 
 	for _, tag := range prompt.Repository.Tags {

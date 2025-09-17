@@ -101,6 +101,7 @@ type CreateRepoReq struct {
 	Admin         string         `json:"admin"`
 	ToolCount     int            `json:"tool_count"`
 	StarCount     int            `json:"star_count"`
+	CommitFiles   []CommitFile   `json:"commit_files"`
 }
 
 // make sure CreateRepoReq implements SensitiveRequest

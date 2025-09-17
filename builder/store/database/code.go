@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/uptrace/bun"
+	"opencsg.com/csghub-server/common/types"
 )
 
 type codeStoreImpl struct {
@@ -27,6 +28,7 @@ type CodeStore interface {
 	Delete(ctx context.Context, input Code) error
 	ListByPath(ctx context.Context, paths []string) ([]Code, error)
 	CreateIfNotExist(ctx context.Context, input Code) (*Code, error)
+	CreateAndUpdateRepoPath(ctx context.Context, input Code, path string) (*Code, error)
 }
 
 func NewCodeStore() CodeStore {
@@ -225,4 +227,21 @@ func (s *codeStoreImpl) CreateIfNotExist(ctx context.Context, input Code) (*Code
 	}
 
 	return &input, nil
+}
+
+func (s *codeStoreImpl) CreateAndUpdateRepoPath(ctx context.Context, input Code, path string) (*Code, error) {
+	err := s.db.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		var repo Repository
+		_, err := tx.NewInsert().Model(&input).Exec(ctx, &input)
+		if err != nil {
+			return fmt.Errorf("failed to create code: %w", err)
+		}
+		repo, err = updateRepoPath(ctx, tx, types.CodeRepo, path, input.RepositoryID)
+		if err != nil {
+			return fmt.Errorf("failed to update repository path: %w", err)
+		}
+		input.Repository = &repo
+		return nil
+	})
+	return &input, err
 }

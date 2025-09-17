@@ -135,3 +135,25 @@ func TestCodeStore_UserLikesCodes(t *testing.T) {
 	require.Equal(t, repo2.ID, cs[0].RepositoryID)
 
 }
+
+func TestCodeStore_CreateAndUpdateRepoPath(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewCodeStoreWithDB(db)
+
+	repo := &database.Repository{
+		Name: "repo1",
+		Path: "p1",
+	}
+	err := db.Core.NewInsert().Model(repo).Scan(ctx, repo)
+	require.Nil(t, err)
+
+	code, err := store.CreateAndUpdateRepoPath(ctx, database.Code{
+		RepositoryID: repo.ID,
+	}, "p2")
+
+	require.Nil(t, err)
+	require.Equal(t, "p2", code.Repository.Path)
+}
