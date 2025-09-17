@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"reflect"
+	"sync"
 
 	"github.com/google/uuid"
 	"github.com/mcuadros/go-defaults"
@@ -166,7 +167,7 @@ type Config struct {
 		DockerRegBase           string `env:"STARHUB_SERVER_MODEL_DOCKER_REG_BASE" default:"opencsg-registry.cn-beijing.cr.aliyuncs.com"`
 		NimDockerSecretName     string `env:"STARHUB_SERVER_MODEL_NIM_DOCKER_SECRET_NAME" default:"ngc-secret"`
 		NimNGCSecretName        string `env:"STARHUB_SERVER_MODEL_NIM_NGC_SECRET_NAME" default:"nvidia-nim-secrets"`
-		MinContextForEstimation int    `env:"STARHUB_SERVER_MODEL_MIN_CONTEXT_FOR_ESTIMATION" default:"8192"`
+		MinContextForEstimation int    `env:"STARHUB_SERVER_MODEL_MIN_CONTEXT_FOR_ESTIMATION" default:"2048"`
 		MinContextForFinetune   int    `env:"STARHUB_SERVER_MODEL_MIN_CONTEXT_FOR_FINETUNE" default:"512"`
 	}
 
@@ -259,7 +260,8 @@ type Config struct {
 		Host string `env:"OPENCSG_MODERATION_SERVER_HOST" default:"http://localhost"`
 		Port int    `env:"OPENCSG_MODERATION_SERVER_PORT" default:"8089"`
 		// comma splitted, and base64 encoded
-		EncodedSensitiveWords string `env:"OPENCSG_MODERATION_SERVER_ENCODED_SENSITIVE_WORDS" default:"5Lmg6L+R5bmzLHhpamlucGluZw=="`
+		EncodedSensitiveWords    string `env:"OPENCSG_MODERATION_SERVER_ENCODED_SENSITIVE_WORDS" default:"5Lmg6L+R5bmzLHhpamlucGluZw=="`
+		RepoFileCheckConcurrency int    `env:"OPENCSG_MODERATION_SERVER_REPO_FILE_CHECK_CONCURRENCY" default:"10"`
 	}
 
 	WorkFLow struct {
@@ -327,6 +329,7 @@ type Config struct {
 		SendWeeklyRechargesMailCronExpression    string `env:"STARHUB_SERVER_CRON_JOB_MAKE_WEEKLY_RECHARGES_CRON_EXPRESSION" default:"0 0 * * 1"`
 		IncreaseMultisyncRepoLimitCronExpression string `env:"STARHUB_SERVER_CRON_JOB_INCREASE_MULTISYNC_REPO_LIMIT_CRON_EXPRESSION" default:"0 0 * * *"`
 		MigrateRepoPathCronExpression            string `env:"STARHUB_SERVER_CRON_JOB_MIGRATE_REPO_PATH_CRON_EXPRESSION" default:"* 16-20 * * *"`
+		DeletePendingDeletionCronExpression      string `env:"STARHUB_SERVER_CRON_JOB_DELETE_PENDING_DELETION_CRON_EXPRESSION" default:"0 16-20 * * *"`
 	}
 
 	Agent struct {
@@ -358,9 +361,9 @@ type Config struct {
 	}
 
 	Instrumentation struct {
-		OTLPEndpoint string `env:"OPENCSG_TRACING_OTLP_ENDPOINT"`
+		OTLPEndpoint string `env:"OPENCSG_TRACING_OTLP_ENDPOINT" default:""`
 		//Note: don't enable it unless you have no other way to collect service logs. It will leads to very high CPU usage.
-		OTLPLogging bool `env:"OPENCSG_TRACING_OTLP_LOGGING"`
+		OTLPLogging bool `env:"OPENCSG_TRACING_OTLP_LOGGING" default:"false"`
 	}
 
 	Git struct {
@@ -399,31 +402,36 @@ type Config struct {
 	}
 
 	Notification struct {
-		Port                        int    `env:"STARHUB_SERVER_NOTIFIER_PORT" default:"8095"`
-		Host                        string `env:"STARHUB_SERVER_NOTIFIER_HOST" default:"http://localhost"`
-		MailerHost                  string `env:"STARHUB_SERVER_MAILER_HOST" default:"smtp.qiye.aliyun.com"`
-		MailerPort                  int    `env:"STARHUB_SERVER_MAILER_PORT" default:"465"`
-		MailerUsername              string `env:"STARHUB_SERVER_MAILER_USERNAME" default:""`
-		MailerPassword              string `env:"STARHUB_SERVER_MAILER_PASSWORD" default:""`
-		DirectMailEnabled           bool   `env:"STARHUB_SERVER_DIRECT_MAIL_ENABLED" default:"false"`
-		DirectMailAccessKeyID       string `env:"STARHUB_SERVER_DIRECT_MAIL_ACCESS_KEY_ID" default:""`
-		DirectMailAccessKeySecret   string `env:"STARHUB_SERVER_DIRECT_MAIL_ACCESS_KEY_SECRET" default:""`
-		DirectMailEndpoint          string `env:"STARHUB_SERVER_DIRECT_MAIL_ENDPOINT" default:"dm.aliyuncs.com"`
-		DirectMailRegionId          string `env:"STARHUB_SERVER_DIRECT_MAIL_REGION_ID" default:"cn-hangzhou"`
-		MailerRechargeAdmin         string `env:"STARHUB_SERVER_MAILER_RECHARGE_ADMIN" default:"contact@opencsg.com"`
-		MailerWeeklyRechargesMail   string `env:"STARHUB_SERVER_MAILER_WEEKLY_RECHARGES_MAIL" default:"reconcile@opencsg.com"`
-		RepoSyncTimezone            string `env:"STARHUB_SERVER_REPO_SYNC_TIMEZONE" default:"Asia/Shanghai"`
-		NotificationRetryCount      int    `env:"STARHUB_SERVER_NOTIFIER_NOTIFICATION_RETRY_COUNT" default:"3"`
-		BroadcastUserPageSize       int    `env:"STARHUB_SERVER_NOTIFIER_BROADCAST_USER_PAGE_SIZE" default:"100"`
-		BroadcastEmailPageSize      int    `env:"STARHUB_SERVER_NOTIFIER_BROADCAST_EMAIL_PAGE_SIZE" default:"100"`
-		MsgDispatcherCount          int    `env:"STARHUB_SERVER_NOTIFIER_MSG_DISPATCHER_COUNT" default:"20"`
-		HighPriorityMsgBufferSize   int    `env:"STARHUB_SERVER_NOTIFIER_HIGH_PRIORITY_MSG_BUFFER_SIZE" default:"100"`
-		NormalPriorityMsgBufferSize int    `env:"STARHUB_SERVER_NOTIFIER_NORMAL_PRIORITY_MSG_BUFFER_SIZE" default:"50"`
-		HighPriorityMsgAckWait      int    `env:"STARHUB_SERVER_NOTIFIER_HIGH_PRIORITY_MSG_ACK_WAIT" default:"60"`
-		NormalPriorityMsgAckWait    int    `env:"STARHUB_SERVER_NOTIFIER_NORMAL_PRIORITY_MSG_ACK_WAIT" default:"60"`
-		HighPriorityMsgMaxDeliver   int    `env:"STARHUB_SERVER_NOTIFIER_HIGH_PRIORITY_MSG_MAX_DELIVER" default:"6"`
-		NormalPriorityMsgMaxDeliver int    `env:"STARHUB_SERVER_NOTIFIER_NORMAL_PRIORITY_MSG_MAX_DELIVER" default:"6"`
-		DeduplicateWindow           int    `env:"STARHUB_SERVER_NOTIFIER_DEDUPLICATE_WINDOW" default:"5"` // 5 seconds
+		Port                                int    `env:"STARHUB_SERVER_NOTIFIER_PORT" default:"8095"`
+		Host                                string `env:"STARHUB_SERVER_NOTIFIER_HOST" default:"http://localhost"`
+		MailerHost                          string `env:"STARHUB_SERVER_MAILER_HOST" default:"smtp.qiye.aliyun.com"`
+		MailerPort                          int    `env:"STARHUB_SERVER_MAILER_PORT" default:"465"`
+		MailerUsername                      string `env:"STARHUB_SERVER_MAILER_USERNAME" default:""`
+		MailerPassword                      string `env:"STARHUB_SERVER_MAILER_PASSWORD" default:""`
+		DirectMailEnabled                   bool   `env:"STARHUB_SERVER_DIRECT_MAIL_ENABLED" default:"false"`
+		DirectMailAccessKeyID               string `env:"STARHUB_SERVER_DIRECT_MAIL_ACCESS_KEY_ID" default:""`
+		DirectMailAccessKeySecret           string `env:"STARHUB_SERVER_DIRECT_MAIL_ACCESS_KEY_SECRET" default:""`
+		DirectMailEndpoint                  string `env:"STARHUB_SERVER_DIRECT_MAIL_ENDPOINT" default:"dm.aliyuncs.com"`
+		DirectMailRegionId                  string `env:"STARHUB_SERVER_DIRECT_MAIL_REGION_ID" default:"cn-hangzhou"`
+		MailerRechargeAdmin                 string `env:"STARHUB_SERVER_MAILER_RECHARGE_ADMIN" default:"contact@opencsg.com"`
+		MailerWeeklyRechargesMail           string `env:"STARHUB_SERVER_MAILER_WEEKLY_RECHARGES_MAIL" default:"reconcile@opencsg.com"`
+		RepoSyncTimezone                    string `env:"STARHUB_SERVER_REPO_SYNC_TIMEZONE" default:"Asia/Shanghai"`
+		NotificationRetryCount              int    `env:"STARHUB_SERVER_NOTIFIER_NOTIFICATION_RETRY_COUNT" default:"3"`
+		BroadcastUserPageSize               int    `env:"STARHUB_SERVER_NOTIFIER_BROADCAST_USER_PAGE_SIZE" default:"100"`
+		BroadcastEmailPageSize              int    `env:"STARHUB_SERVER_NOTIFIER_BROADCAST_EMAIL_PAGE_SIZE" default:"100"`
+		MsgDispatcherCount                  int    `env:"STARHUB_SERVER_NOTIFIER_MSG_DISPATCHER_COUNT" default:"20"`
+		HighPriorityMsgBufferSize           int    `env:"STARHUB_SERVER_NOTIFIER_HIGH_PRIORITY_MSG_BUFFER_SIZE" default:"100"`
+		NormalPriorityMsgBufferSize         int    `env:"STARHUB_SERVER_NOTIFIER_NORMAL_PRIORITY_MSG_BUFFER_SIZE" default:"50"`
+		HighPriorityMsgAckWait              int    `env:"STARHUB_SERVER_NOTIFIER_HIGH_PRIORITY_MSG_ACK_WAIT" default:"60"`
+		NormalPriorityMsgAckWait            int    `env:"STARHUB_SERVER_NOTIFIER_NORMAL_PRIORITY_MSG_ACK_WAIT" default:"60"`
+		HighPriorityMsgMaxDeliver           int    `env:"STARHUB_SERVER_NOTIFIER_HIGH_PRIORITY_MSG_MAX_DELIVER" default:"6"`
+		NormalPriorityMsgMaxDeliver         int    `env:"STARHUB_SERVER_NOTIFIER_NORMAL_PRIORITY_MSG_MAX_DELIVER" default:"6"`
+		DeduplicateWindow                   int    `env:"STARHUB_SERVER_NOTIFIER_DEDUPLICATE_WINDOW" default:"5"` // 5 seconds
+		SMSSign                             string `env:"STARHUB_SERVER_NOTIFIER_SMS_SIGN" default:""`
+		SMSAccessKeyID                      string `env:"STARHUB_SERVER_NOTIFIER_SMS_ACCESS_KEY_ID" default:""`
+		SMSAccessKeySecret                  string `env:"STARHUB_SERVER_NOTIFIER_SMS_ACCESS_KEY_SECRET" default:""`
+		SMSTemplateCodeForVerifyCodeCN      string `env:"STARHUB_SERVER_NOTIFIER_SMS_TEMPLATE_CODE_FOR_VERIFY_CODE_CN" default:""`
+		SMSTemplateCodeForVerifyCodeOversea string `env:"STARHUB_SERVER_NOTIFIER_SMS_TEMPLATE_CODE_FOR_VERIFY_CODE_OVERSEA" default:""`
 	}
 
 	Prometheus struct {
@@ -444,10 +452,11 @@ type Config struct {
 	// K8S Cluster Configuration for Runner and Logcollectior
 	Cluster struct {
 		ClusterID      string `env:"STARHUB_SERVER_CLUSTER_ID" default:""`
+		Region         string `env:"STARHUB_SERVER_CLUSTER_REGION" default:"region-0"`
 		SpaceNamespace string `env:"STARHUB_SERVER_CLUSTER_SPACES_NAMESPACE" default:"spaces"`
 		// for free saas users, limits resources
 		ResourceQuotaNamespace string `env:"STARHUB_SERVER_CLUSTER_RESOURCE_QUOTA_NAMESPACE" default:"spaces"`
-		QuotaName              string `env:"STARHUB_SERVER_CLUSTER_QUOTA_NAM" default:""`
+		QuotaName              string `env:"STARHUB_SERVER_CLUSTER_QUOTA_NAME" default:""`
 	}
 
 	Runner struct {
@@ -459,24 +468,27 @@ type Config struct {
 		ImageBuilderKanikoArgs  []string `env:"STARHUB_SERVER_RUNNER_IMAGE_BUILDER_KANIKO_ARGS"`
 		SystemCUDAVersion       string   `env:"STARHUB_SERVER_RUNNER_SYSTEM_CUDA_VERSION" default:""`
 		// csghub server webhook endpoint
-		WebHookEndpoint       string `env:"STARHUB_SERVER_RUNNER_WEBHOOK_ENDPOINT" default:"http://localhost:8080"`
-		WatchConfigmapName    string `env:"STARHUB_SERVER_RUNNER_WATCH_CONFIGMAP_NAME" default:"spaces-runner-config"`
-		WatchConfigmapKey     string `env:"STARHUB_SERVER_RUNNER_WATCH_CONFIGMAP_KEY" default:"STARHUB_SERVER_RUNNER_WEBHOOK_ENDPOINT"`
-		HearBeatIntervalInSec int    `env:"STARHUB_SERVER_RUNNER_HEARTBEAT_INTERVAL_IN_SEC" default:"300"`
+		WebHookEndpoint             string `env:"STARHUB_SERVER_RUNNER_WEBHOOK_ENDPOINT" default:"http://localhost:8080"`
+		WatchConfigmapName          string `env:"STARHUB_SERVER_RUNNER_WATCH_CONFIGMAP_NAME" default:"spaces-runner-config"`
+		WatchConfigmapKey           string `env:"STARHUB_SERVER_RUNNER_WATCH_CONFIGMAP_KEY" default:"STARHUB_SERVER_RUNNER_WEBHOOK_ENDPOINT"`
+		WatchConfigmapIntervalInSec int    `env:"STARHUB_SERVER_RUNNER_WATCH_CONFIGMAP_INTERVAL_IN_SEC" default:"60"`
+		HearBeatIntervalInSec       int    `env:"STARHUB_SERVER_RUNNER_HEARTBEAT_INTERVAL_IN_SEC" default:"300"`
+		RunnerNamespace             string `env:"STARHUB_SERVER_CLUSTER_RUNNER_NAMESPACE" default:"csghub"`
 	}
 
 	LogCollector struct {
 		Port                 int    `env:"STARHUB_SERVER_LOGCOLLECTOR_PORT" default:"8096"`
 		LokiURL              string `env:"STARHUB_SERVER_LOGCOLLECTOR_LOKI_URL" default:"http://localhost:3100"`
 		WatchNSInterval      int    `env:"STARHUB_SERVER_LOGCOLLECTOR_WATCH_NS_INTERVAL" default:"3"`
+		StreamCD             int    `env:"STARHUB_SERVER_LOGCOLLECTOR_STREAM_CD" default:"5"`
 		MaxConcurrentStreams int    `env:"STARHUB_SERVER_LOGCOLLECTOR_MAX_CONCURRENT_STREAMS" default:"1000"`
 		BatchSize            int    `env:"STARHUB_SERVER_LOGCOLLECTOR_BATCH_SIZE" default:"100"`
 		BatchDelay           int    `env:"STARHUB_SERVER_LOGCOLLECTOR_BATCH_DELAY" default:"3"`
 		DropMsgTimeout       int    `env:"STARHUB_SERVER_LOGCOLLECTOR_DROP_MSG_TIMEOUT" default:"60"`
 		MaxRetries           int    `env:"STARHUB_SERVER_LOGCOLLECTOR_MAX_RETRIES" default:"3"`
 		RetryInterval        int    `env:"STARHUB_SERVER_LOGCOLLECTOR_RETRY_INTERVAL" default:"1"`
-		HeathInterval        int    `env:"STARHUB_SERVER_LOGCOLLECTOR_HEALTH_INTERVAL" default:"5"`
-		AcceptLabelPrefix    string `env:"STARHUB_SERVER_LOGCOLLECTOR_ACCESPT_LABEL_PREFIX" default:"csghub_"`
+		HealthInterval       int    `env:"STARHUB_SERVER_LOGCOLLECTOR_HEALTH_INTERVAL" default:"5"`
+		AcceptLabelPrefix    string `env:"STARHUB_SERVER_LOGCOLLECTOR_ACCEPT_LABEL_PREFIX" default:"csghub_"`
 		// the separator of log lines, default is "\\n" by client formats, "\n" sse auto newline
 		LineSeparator string `env:"STARHUB_SERVER_LOGCOLLECTOR_LINE_SEPARATOR" default:"\\n"`
 	}
@@ -492,16 +504,15 @@ func SetConfigFile(file string) {
 	configFile = file
 }
 
-// var globalConfig *Config
-// var globalConfigError error
-// var once sync.Once
+var globalConfig *Config
+var globalConfigError error
+var once sync.Once
 
 func LoadConfig() (*Config, error) {
-	return loadConfig()
-	// once.Do(func() {
-	// 	globalConfig, globalConfigError = loadConfig()
-	// })
-	// return globalConfig, globalConfigError
+	once.Do(func() {
+		globalConfig, globalConfigError = loadConfig()
+	})
+	return globalConfig, globalConfigError
 }
 
 func loadConfig() (*Config, error) {
