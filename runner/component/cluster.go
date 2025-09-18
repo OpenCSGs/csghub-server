@@ -83,8 +83,7 @@ func (s *clusterComponentImpl) initCluster() {
 			configmapWatch, err := rcommon.NewConfigmapWatcher(
 				watcher.cluster.Client,
 				watcher,
-				s.env.Cluster.SpaceNamespace,
-				s.env.Runner.WatchConfigmapName)
+				s.env)
 			if err != nil {
 				slog.Error("failed to create configmap watcher", slog.String("cluster", c.CID), slog.Any("error", err))
 				return

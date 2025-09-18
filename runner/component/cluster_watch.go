@@ -59,11 +59,11 @@ func (w *clusterWatcher) pushClusterChangeEvent(configmapData map[string]string)
 	data := types.ClusterEvent{
 		ClusterID:        w.cluster.ID,
 		ClusterConfig:    types.DefaultClusterCongfig,
-		Region:           w.cluster.Region,
 		Mode:             w.cluster.ConnectMode,
 		StorageClass:     w.cluster.StorageClass,
 		NetworkInterface: w.cluster.NetworkInterface,
 		Status:           types.ClusterStatusRunning,
+		Region:           configmapData["STARHUB_SERVER_CLUSTER_REGION"],
 		Endpoint:         configmapData["STARHUB_SERVER_RUNNER_PUBLIC_DOMAIN"],
 	}
 	event := &types.WebHookSendEvent{
