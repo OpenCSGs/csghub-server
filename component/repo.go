@@ -1388,7 +1388,7 @@ func (c *repoComponentImpl) IsLfs(ctx context.Context, req *types.GetFileReq) (b
 	}
 	content, err := c.git.GetRepoFileRaw(ctx, getFileRawReq)
 	if err != nil {
-		if err.Error() == ErrNotFoundMessage {
+		if e, ok := err.(errorx.CustomError); ok && e.Is(errorx.ErrGitFileNotFound) {
 			return false, -1, errorx.ErrNotFound
 		}
 		slog.Error("failed to get %s file raw", string(req.RepoType), slog.String("namespace", req.Namespace), slog.String("name", req.Name), slog.String("path", req.Path))

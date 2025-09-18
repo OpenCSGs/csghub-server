@@ -72,8 +72,16 @@ func (c *Client) GetRepoFileRaw(ctx context.Context, req gitserver.GetRepoInfoBy
 		treeEntriesResp, err := treeEntriesStream.Recv()
 		if err != nil {
 			grpcStatus, ok := status.FromError(err)
-			if ok && grpcStatus.Code() == codes.FailedPrecondition && strings.Contains(grpcStatus.Message(), "bigger than the maximum allowed size") {
-				return "", errorx.ErrFileTooLarge
+			if ok {
+				if grpcStatus.Code() == codes.FailedPrecondition && strings.Contains(grpcStatus.Message(), "bigger than the maximum allowed size") {
+					return "", errorx.ErrFileTooLarge
+				}
+				if grpcStatus.Code() == codes.NotFound {
+					errCtx := errorx.Ctx().
+						Set("path", fmt.Sprintf("%s/%s", req.Namespace, req.Name)).
+						Set("branch", req.Ref).Set("path", req.Path)
+					return "", errorx.GitFileNotFound(err, errCtx)
+				}
 			}
 			if err == io.EOF {
 				break
