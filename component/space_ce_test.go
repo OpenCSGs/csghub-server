@@ -4,12 +4,14 @@ package component
 
 import (
 	"context"
+	"encoding/base64"
 	"sync"
 	"testing"
 
 	"github.com/alibabacloud-go/tea/tea"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -66,39 +68,35 @@ func TestSpaceComponent_Create(t *testing.T) {
 		SKU:          "1",
 		ClusterID:    "cluster",
 	}, "ns/n").Return(&database.Space{}, nil)
-	sc.mocks.gitServer.EXPECT().CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
+
+	commitReq := gitserver.CommitFilesReq{
+		Namespace: "ns",
+		Name:      "n",
+		RepoType:  types.SpaceRepo,
+		Revision:  "main",
 		Username:  "user",
 		Email:     "foo@bar.com",
 		Message:   types.InitCommitMessage,
-		Branch:    "main",
-		Content:   generateReadmeData("MIT"),
-		NewBranch: "main",
-		Namespace: "ns",
-		Name:      "n",
-		FilePath:  types.ReadmeFileName,
-	}, types.SpaceRepo)).Return(nil)
-	sc.mocks.gitServer.EXPECT().CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
-		Username:  "user",
-		Email:     "foo@bar.com",
-		Message:   types.InitCommitMessage,
-		Branch:    "main",
-		Content:   spaceGitattributesContent,
-		NewBranch: "main",
-		Namespace: "ns",
-		Name:      "n",
-		FilePath:  types.GitattributesFileName,
-	}, types.SpaceRepo)).Return(nil)
-	sc.mocks.gitServer.EXPECT().CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
-		Username:  "user",
-		Email:     "foo@bar.com",
-		Message:   types.InitCommitMessage,
-		Branch:    "main",
-		Content:   streamlitConfigContent,
-		NewBranch: "main",
-		Namespace: "ns",
-		Name:      "n",
-		FilePath:  streamlitConfig,
-	}, types.SpaceRepo)).Return(nil)
+		Files: []gitserver.CommitFile{
+			{
+				Path:    types.ReadmeFileName,
+				Content: base64.StdEncoding.EncodeToString([]byte(generateReadmeData("MIT"))),
+				Action:  gitserver.CommitActionCreate,
+			},
+			{
+				Path:    types.GitattributesFileName,
+				Content: base64.StdEncoding.EncodeToString([]byte(spaceGitattributesContent)),
+				Action:  gitserver.CommitActionCreate,
+			},
+			{
+				Path:    streamlitConfig,
+				Content: base64.StdEncoding.EncodeToString([]byte(streamlitConfigContent)),
+				Action:  gitserver.CommitActionCreate,
+			},
+		},
+	}
+
+	sc.mocks.gitServer.EXPECT().CommitFiles(mock.Anything, commitReq).Return(nil)
 
 	space, err := sc.Create(ctx, types.CreateSpaceReq{
 		Sdk:        types.STREAMLIT.Name,

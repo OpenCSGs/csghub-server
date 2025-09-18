@@ -344,21 +344,6 @@ func (c *modelComponentImpl) Create(ctx context.Context, req *types.CreateModelR
 	return resModel, nil
 }
 
-func buildCreateFileReq(p *types.CreateFileParams, repoType types.RepositoryType) *types.CreateFileReq {
-	return &types.CreateFileReq{
-		Username:  p.Username,
-		Email:     p.Email,
-		Message:   p.Message,
-		Branch:    p.Branch,
-		Content:   base64.StdEncoding.EncodeToString([]byte(p.Content)),
-		NewBranch: p.Branch,
-		Namespace: p.Namespace,
-		Name:      p.Name,
-		FilePath:  p.FilePath,
-		RepoType:  repoType,
-	}
-}
-
 func (c *modelComponentImpl) Update(ctx context.Context, req *types.UpdateModelReq) (*types.Model, error) {
 	req.RepoType = types.ModelRepo
 	dbRepo, err := c.repoComponent.UpdateRepo(ctx, req.UpdateRepoReq)
