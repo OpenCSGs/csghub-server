@@ -910,7 +910,7 @@ func TestModelComponent_ListRuntimeFrameworkByType(t *testing.T) {
 
 	mc.mocks.stores.RuntimeFrameworkMock().EXPECT().List(ctx, 1).Return([]database.RuntimeFramework{
 		{
-			ID: 1, FrameName: "foo", FrameVersion: "v1", FrameImage: "i",
+			ID: 1, FrameName: "foo", FrameVersion: "v1", FrameImage: "i:v1",
 			Enabled: 1, ContainerPort: 321, Type: 1,
 		},
 	}, nil)

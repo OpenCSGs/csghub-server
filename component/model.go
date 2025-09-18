@@ -1166,6 +1166,10 @@ func (c *modelComponentImpl) ListAllByRuntimeFramework(ctx context.Context, curr
 		runtimes, err = c.runtimeFrameworksStore.ListAll(ctx)
 	} else {
 		runtimes, err = c.runtimeFrameworksStore.List(ctx, deployType)
+		for i := range runtimes {
+			frameVersion := strings.Split(runtimes[i].FrameImage, ":")[1]
+			runtimes[i].FrameVersion = frameVersion
+		}
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to list runtime frameworks, error: %w", err)

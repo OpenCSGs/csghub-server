@@ -260,15 +260,17 @@ func (c *gitCallbackComponentImpl) modifyFiles(ctx context.Context, repoType, na
 		}
 	}
 	// update model runtime
-	c.updateRepoRelations(ctx, repoType, namespace, repoName, ref, false, fileNames)
-	return nil
+	return c.updateRepoRelations(ctx, repoType, namespace, repoName, ref, false, fileNames)
 }
 
 func (c *gitCallbackComponentImpl) removeFiles(ctx context.Context, repoType, namespace, repoName, ref string, fileNames []string) error {
 	// handle removed files
 	// delete tags
 	// update model runtime
-	c.updateRepoRelations(ctx, repoType, namespace, repoName, ref, true, fileNames)
+	err := c.updateRepoRelations(ctx, repoType, namespace, repoName, ref, true, fileNames)
+	if err != nil {
+		slog.Warn("failed to update repo relations", slog.Any("error", err))
+	}
 
 	for _, fileName := range fileNames {
 		slog.Debug("remove file", slog.String("file", fileName))
@@ -311,8 +313,11 @@ func (c *gitCallbackComponentImpl) addFiles(ctx context.Context, repoType, names
 	}
 	// update tag firstly
 	err := c.updateRepoTags(ctx, repoType, namespace, repoName, ref, fileNames)
+	if err != nil {
+		return err
+	}
 	// update model runtime
-	c.updateRepoRelations(ctx, repoType, namespace, repoName, ref, false, fileNames)
+	err = c.updateRepoRelations(ctx, repoType, namespace, repoName, ref, false, fileNames)
 
 	return err
 }
@@ -401,27 +406,28 @@ func (c *gitCallbackComponentImpl) getFileRaw(repoType, namespace, repoName, ref
 }
 
 // update repo relations
-func (c *gitCallbackComponentImpl) updateRepoRelations(ctx context.Context, repoType, namespace, repoName, ref string, deleteAction bool, fileNames []string) {
+func (c *gitCallbackComponentImpl) updateRepoRelations(ctx context.Context, repoType, namespace, repoName, ref string, deleteAction bool, fileNames []string) error {
 	slog.Debug("update model relation for git callback", slog.Any("namespace", namespace), slog.Any("repoName", repoName), slog.Any("repoType", repoType), slog.Any("branch", ref))
 	if repoType == fmt.Sprintf("%ss", types.ModelRepo) {
-		c.updateModelInfo(ctx, repoType, namespace, repoName, fileNames)
+		return c.updateModelInfo(ctx, repoType, namespace, repoName, fileNames)
 	}
 	if repoType == fmt.Sprintf("%ss", types.DatasetRepo) {
-		c.updateDatasetTags(ctx, namespace, repoName, fileNames)
+		return c.updateDatasetTags(ctx, namespace, repoName, fileNames)
 	}
+	return nil
 }
 
 // update dataset tags for evaluation
-func (c *gitCallbackComponentImpl) updateDatasetTags(ctx context.Context, namespace, repoName string, fileNames []string) {
+func (c *gitCallbackComponentImpl) updateDatasetTags(ctx context.Context, namespace, repoName string, fileNames []string) error {
 	// script dataset repo was not supported so far
 	scriptName := fmt.Sprintf("%s.py", repoName)
 	if slices.Contains(fileNames, scriptName) {
-		return
+		return nil
 	}
 	repo, err := c.repoStore.FindByPath(ctx, types.DatasetRepo, namespace, repoName)
 	if err != nil || repo == nil {
 		slog.Warn("fail to query repo for in callback", slog.Any("namespace", namespace), slog.Any("repoName", repoName), slog.Any("error", err))
-		return
+		return fmt.Errorf("fail to query repo for in callback, cause: %w", err)
 	}
 	// check if it's evaluation dataset
 	evalDataset, err := c.tagRuleStore.FindByRepo(ctx, string(types.EvaluationCategory), namespace, repoName, string(types.DatasetRepo))
@@ -431,17 +437,17 @@ func (c *gitCallbackComponentImpl) updateDatasetTags(ctx context.Context, namesp
 			namespace, name := repo.OriginNamespaceAndName()
 			if namespace == "" || name == "" {
 				slog.Debug("not an evaluation dataset, ignore it", slog.Any("repo id", repo.Path))
-				return
+				return nil
 			}
 			// use mirror namespace and name to find dataset
 			evalDataset, err = c.tagRuleStore.FindByRepo(ctx, string(types.EvaluationCategory), namespace, name, string(types.DatasetRepo))
 			if err != nil {
 				slog.Debug("not an evaluation dataset, ignore it", slog.Any("repo id", repo.Path))
-				return
+				return nil
 			}
 		} else {
 			slog.Error("failed to query evaluation dataset", slog.Any("repo id", repo.Path), slog.Any("error", err))
-			return
+			return fmt.Errorf("failed to query evaluation dataset, cause: %w", err)
 		}
 
 	}
@@ -458,38 +464,40 @@ func (c *gitCallbackComponentImpl) updateDatasetTags(ctx context.Context, namesp
 	if err != nil {
 		slog.Warn("fail to add dataset tag", slog.Any("repoId", repo.ID), slog.Any("tag id", tagIds), slog.Any("error", err))
 	}
-
+	return err
 }
 
 // update model runtime frameworks
-func (c *gitCallbackComponentImpl) updateModelInfo(ctx context.Context, repoType, namespace, repoName string, fileNames []string) {
+func (c *gitCallbackComponentImpl) updateModelInfo(ctx context.Context, repoType, namespace, repoName string, fileNames []string) error {
 	//check file contains
 	if len(fileNames) == 0 {
-		return
+		return nil
 	}
 	repo, err := c.repoStore.FindByPath(ctx, types.ModelRepo, namespace, repoName)
 	if err != nil || repo == nil {
 		slog.Warn("fail to query repo for git callback", slog.Any("namespace", namespace), slog.Any("repoName", repoName), slog.Any("error", err))
-		return
+		return err
 	}
-	c.updateModelMetadata(ctx, fileNames, repo)
+	return c.updateModelMetadata(ctx, fileNames, repo)
 }
 
-func (c *gitCallbackComponentImpl) updateModelMetadata(ctx context.Context, fileNames []string, repo *database.Repository) {
+func (c *gitCallbackComponentImpl) updateModelMetadata(ctx context.Context, fileNames []string, repo *database.Repository) error {
 	// must be model repo and config.json
 	valid := c.isValidForRuntime(fileNames)
 	if !valid {
-		return
+		slog.Warn("ignore model metadata update for the given files", slog.Any("fileNames", fileNames))
+		return nil
 	}
 	modelInfo, err := c.runtimeArchComponent.UpdateModelMetadata(ctx, repo)
 	if err != nil {
 		slog.Warn("fail to update model metadata", slog.Any("error", err), slog.Any("repo path", repo.Path))
-		return
+		return err
 	}
 	err = c.runtimeArchComponent.UpdateRuntimeFrameworkTag(ctx, modelInfo, repo)
 	if err != nil {
 		slog.Warn("fail to update runtime framework tag", slog.Any("error", err), slog.Any("repo path", repo.Path))
 	}
+	return err
 }
 
 // check if the repo is valid for runtime framework
