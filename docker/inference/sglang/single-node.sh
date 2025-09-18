@@ -31,7 +31,11 @@ if [[ -f "$configfile" ]] && [[ ! $ENGINE_ARGS == *"--context-length"* ]]; then
 fi
 tokenizer_config="/workspace/$REPO_ID/tokenizer_config.json"
 if ! grep -q "chat_template" "$tokenizer_config"; then
-    ENGINE_ARGS="$ENGINE_ARGS --chat-template /etc/csghub/chat_template.jinja"
+    if [ -f "/workspace/$REPO_ID/chat_template.jinja" ]; then
+        ENGINE_ARGS="$ENGINE_ARGS --chat-template /workspace/$REPO_ID/chat_template.jinja"
+    else
+        ENGINE_ARGS="$ENGINE_ARGS --chat-template /etc/csghub/chat_template.jinja"
+    fi
 fi
 echo "start running with args: $ENGINE_ARGS"
 python3 -m sglang.launch_server $ENGINE_ARGS

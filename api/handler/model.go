@@ -1280,6 +1280,7 @@ func (h *ModelHandler) FinetuneStart(ctx *gin.Context) {
 // @Accept       json
 // @Produce      json
 // @Param        current_user query string false "current user"
+// @Param 		 deploy_type query int false "deploy_type" Enums(1, 2, 3, 4, 5) default(1)
 // @Success      200  {object}  types.Response{} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
@@ -1287,7 +1288,19 @@ func (h *ModelHandler) FinetuneStart(ctx *gin.Context) {
 func (h *ModelHandler) ListAllRuntimeFramework(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 
-	runtimes, err := h.model.ListAllByRuntimeFramework(ctx.Request.Context(), currentUser)
+	deployTypeStr := ctx.Query("deploy_type")
+	if deployTypeStr == "" {
+		deployTypeStr = "0"
+	}
+	deployType, err := strconv.Atoi(deployTypeStr)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		err = errorx.ReqParamInvalid(err, errorx.Ctx().Set("query", "deploy_type"))
+		httpbase.BadRequestWithExt(ctx, err)
+		return
+	}
+
+	runtimes, err := h.model.ListAllByRuntimeFramework(ctx.Request.Context(), currentUser, deployType)
 	if err != nil {
 		slog.Error("Failed to get runtime frameworks", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)

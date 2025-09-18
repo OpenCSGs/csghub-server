@@ -903,3 +903,41 @@ func TestModelComponent_Wakeup(t *testing.T) {
 	require.Nil(t, err)
 
 }
+
+func TestModelComponent_ListRuntimeFrameworkByType(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestModelComponent(ctx, t)
+
+	mc.mocks.stores.RuntimeFrameworkMock().EXPECT().List(ctx, 1).Return([]database.RuntimeFramework{
+		{
+			ID: 1, FrameName: "foo", FrameVersion: "v1", FrameImage: "i",
+			Enabled: 1, ContainerPort: 321, Type: 1,
+		},
+	}, nil)
+
+	runs, err := mc.ListAllByRuntimeFramework(ctx, "", 1)
+	require.Nil(t, err)
+	require.Equal(t, 1, len(runs))
+
+}
+
+func TestModelComponent_ListALLRuntimeFramework(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestModelComponent(ctx, t)
+
+	mc.mocks.stores.RuntimeFrameworkMock().EXPECT().ListAll(ctx).Return([]database.RuntimeFramework{
+		{
+			ID: 1, FrameName: "foo", FrameVersion: "v1", FrameImage: "i",
+			Enabled: 1, ContainerPort: 321, Type: 1,
+		},
+		{
+			ID: 2, FrameName: "foo1", FrameVersion: "v1", FrameImage: "i",
+			Enabled: 1, ContainerPort: 321, Type: 2,
+		},
+	}, nil)
+
+	runs, err := mc.ListAllByRuntimeFramework(ctx, "", 0)
+	require.Nil(t, err)
+	require.Equal(t, 2, len(runs))
+
+}

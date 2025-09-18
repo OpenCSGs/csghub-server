@@ -81,7 +81,7 @@ type ModelComponent interface {
 	Deploy(ctx context.Context, deployReq types.DeployActReq, req types.ModelRunReq) (int64, error)
 	Wakeup(ctx context.Context, namespace, name string, id int64) error
 	ListModelsByRuntimeFrameworkID(ctx context.Context, currentUser string, per, page int, id int64, deployType int) ([]types.Model, int, error)
-	ListAllByRuntimeFramework(ctx context.Context, currentUser string) ([]database.RuntimeFramework, error)
+	ListAllByRuntimeFramework(ctx context.Context, currentUser string, deployType int) ([]database.RuntimeFramework, error)
 	SetRuntimeFrameworkModes(ctx context.Context, deployType int, id int64, paths []string) ([]string, error)
 	DeleteRuntimeFrameworkModes(ctx context.Context, deployType int, id int64, paths []string) ([]string, error)
 	ListModelsOfRuntimeFrameworks(ctx context.Context, currentUser, search, sort string, per, page int, deployType int) ([]types.Model, int, error)
@@ -1157,12 +1157,19 @@ func (c *modelComponentImpl) ListModelsByRuntimeFrameworkID(ctx context.Context,
 	return resModels, total, nil
 }
 
-func (c *modelComponentImpl) ListAllByRuntimeFramework(ctx context.Context, currentUser string) ([]database.RuntimeFramework, error) {
-	runtimes, err := c.runtimeFrameworksStore.ListAll(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get public model repos,error:%w", err)
+func (c *modelComponentImpl) ListAllByRuntimeFramework(ctx context.Context, currentUser string, deployType int) ([]database.RuntimeFramework, error) {
+	var (
+		runtimes []database.RuntimeFramework
+		err      error
+	)
+	if deployType == 0 {
+		runtimes, err = c.runtimeFrameworksStore.ListAll(ctx)
+	} else {
+		runtimes, err = c.runtimeFrameworksStore.List(ctx, deployType)
 	}
-
+	if err != nil {
+		return nil, fmt.Errorf("failed to list runtime frameworks, error: %w", err)
+	}
 	return runtimes, nil
 }
 

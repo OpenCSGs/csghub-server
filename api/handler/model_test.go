@@ -523,7 +523,7 @@ func TestModelHandler_ListAllRuntimeFramework(t *testing.T) {
 
 	tester.mocks.model.EXPECT().ListAllByRuntimeFramework(
 		tester.Ctx(), "u",
-	).Return([]database.RuntimeFramework{{FrameName: "foo"}}, nil)
+		0).Return([]database.RuntimeFramework{{FrameName: "foo"}}, nil)
 	tester.Execute()
 	tester.ResponseEqSimple(t, 200, gin.H{
 		"data": []database.RuntimeFramework{{FrameName: "foo"}},
