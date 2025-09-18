@@ -6,6 +6,7 @@ import (
 	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/middleware"
+	"opencsg.com/csghub-server/builder/instrumentation"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/logcollector/component"
 	"opencsg.com/csghub-server/logcollector/handler"
@@ -13,8 +14,7 @@ import (
 
 func NewHttpServer(ctx context.Context, config *config.Config) (*gin.Engine, component.LogFactory, error) {
 	r := gin.New()
-	r.Use(gin.Recovery())
-	r.Use(middleware.Log(config))
+	middleware.SetInfraMiddleware(r, config, instrumentation.Logcollector)
 
 	needAPIKey := middleware.NeedAPIKey(config)
 
@@ -39,7 +39,6 @@ func NewHttpServer(ctx context.Context, config *config.Config) (*gin.Engine, com
 	apiGroup := r.Group("/api/v1")
 	logcollectorGroup := apiGroup.Group("/logcollector/")
 	{
-		logcollectorGroup.POST("/health", logCollectorHandler.Health)
 		logcollectorGroup.POST("/stats", logCollectorHandler.GetStats)
 	}
 	return r, logFactory, nil

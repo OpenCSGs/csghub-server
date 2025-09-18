@@ -2,6 +2,7 @@ package common
 
 import (
 	"context"
+	"opencsg.com/csghub-server/common/config"
 	"sync"
 	"testing"
 	"time"
@@ -40,43 +41,53 @@ func (m *mockWebhookEndpointHandler) getCalledWith() []*corev1.ConfigMap {
 func TestNewConfigmapWatcher(t *testing.T) {
 	client := fake.NewSimpleClientset()
 	handler := &mockWebhookEndpointHandler{}
-	namespace := "test-ns"
-	configmapName := "test-cm"
+	config := new(config.Config)
+	config.Runner.RunnerNamespace = "test-ns"
+	config.Runner.WatchConfigmapName = "test-cm"
 
 	t.Run("should return error when client is nil", func(t *testing.T) {
-		_, err := NewConfigmapWatcher(nil, handler, namespace, configmapName)
+		_, err := NewConfigmapWatcher(nil, handler, config)
 		assert.Error(t, err)
 		assert.Equal(t, "client cannot be nil", err.Error())
 	})
 
 	t.Run("should return error when handler is nil", func(t *testing.T) {
-		_, err := NewConfigmapWatcher(client, nil, namespace, configmapName)
+		_, err := NewConfigmapWatcher(client, nil, config)
 		assert.Error(t, err)
 		assert.Equal(t, "handler cannot be nil", err.Error())
 	})
 
 	t.Run("should return error when namespace is empty", func(t *testing.T) {
-		_, err := NewConfigmapWatcher(client, handler, "", configmapName)
+		config.Runner.RunnerNamespace = ""
+		config.Runner.WatchConfigmapName = "test-cm"
+		_, err := NewConfigmapWatcher(client, handler, config)
 		assert.Error(t, err)
 		assert.Equal(t, "namespace cannot be empty", err.Error())
 	})
 
 	t.Run("should return error when configmapName is empty", func(t *testing.T) {
-		_, err := NewConfigmapWatcher(client, handler, namespace, "")
+		config.Runner.RunnerNamespace = "test-ns"
+		config.Runner.WatchConfigmapName = ""
+		_, err := NewConfigmapWatcher(client, handler, config)
 		assert.Error(t, err)
 		assert.Equal(t, "configmapName cannot be empty", err.Error())
 	})
 
 	t.Run("should create a new watcher successfully", func(t *testing.T) {
-		watcher, err := NewConfigmapWatcher(client, handler, namespace, configmapName)
+		config.Runner.RunnerNamespace = "test-ns"
+		config.Runner.WatchConfigmapName = "test-cm"
+		watcher, err := NewConfigmapWatcher(client, handler, config)
 		assert.NoError(t, err)
 		assert.NotNil(t, watcher)
 	})
 }
 
 func TestConfigmapWatcher_Watch(t *testing.T) {
+	config := new(config.Config)
 	namespace := "default"
 	configmapName := "runner-cm"
+	config.Runner.RunnerNamespace = namespace
+	config.Runner.WatchConfigmapName = configmapName
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -88,7 +99,7 @@ func TestConfigmapWatcher_Watch(t *testing.T) {
 		},
 	}
 
-	watcher, err := NewConfigmapWatcher(clientset, handler, namespace, configmapName)
+	watcher, err := NewConfigmapWatcher(clientset, handler, config)
 	require.NoError(t, err)
 
 	go watcher.Watch(ctx)

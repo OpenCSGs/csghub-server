@@ -9,6 +9,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"log/slog"
+	"opencsg.com/csghub-server/common/config"
 	"time"
 )
 
@@ -33,28 +34,27 @@ type configmapWatcher struct {
 func NewConfigmapWatcher(
 	client kubernetes.Interface,
 	handler WebhookEndpointHandler,
-	namespace string,
-	configmapName string) (ConfigmapWatcher, error) {
+	config *config.Config) (ConfigmapWatcher, error) {
 	if client == nil {
 		return nil, fmt.Errorf("client cannot be nil")
 	}
 	if handler == nil {
 		return nil, fmt.Errorf("handler cannot be nil")
 	}
-	if namespace == "" {
+	if config.Runner.RunnerNamespace == "" {
 		return nil, fmt.Errorf("namespace cannot be empty")
 	}
-	if configmapName == "" {
+	if config.Runner.WatchConfigmapName == "" {
 		return nil, fmt.Errorf("configmapName cannot be empty")
 	}
 
 	// Create an informer factory, scoped to the specific namespace and ConfigMap name.
 	factory := informers.NewSharedInformerFactoryWithOptions(
 		client,
-		24*time.Hour,
-		informers.WithNamespace(namespace),
+		time.Duration(config.Runner.WatchConfigmapIntervalInSec)*time.Second,
+		informers.WithNamespace(config.Runner.RunnerNamespace),
 		informers.WithTweakListOptions(func(options *metav1.ListOptions) {
-			options.FieldSelector = "metadata.name=" + configmapName
+			options.FieldSelector = "metadata.name=" + config.Runner.WatchConfigmapName
 		}),
 	)
 
