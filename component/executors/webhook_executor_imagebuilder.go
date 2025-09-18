@@ -78,7 +78,8 @@ func (h *imagebuilderExecutorImpl) ProcessEvent(ctx context.Context, event *type
 			task.Deploy.Status = common.BuildSuccess
 		case string(v1alpha1.WorkflowFailed):
 			if task.Deploy.Status != common.Building {
-				slog.Warn("deploy status is not building, skip setting build failed status")
+				slog.Warn("deploy status is not building, skip setting build failed status in imagebuilderwebhook",
+					slog.Any("task_id", task.ID), slog.Any("deploy_id", task.Deploy.ID), slog.Any("deploy_status", task.Deploy.Status))
 				return nil
 			}
 			status = scheduler.BuildFailed

@@ -17,7 +17,6 @@ def top_models(num: int) -> str:
     for model in data['data']:
         models.append(f"The model {model['path']} has been downloaded {model['downloads']} times.")
     models_str = ','.join(models)
-    # return f"The top {num} models are {models_str}"
     return f"{models_str}"
 
 @mcp.prompt(name="get_prompt", description="Create an query prompt")
@@ -26,4 +25,4 @@ def get_prompt(num: int) -> str:
     return f"Please find the top {num} models by download count."
 
 if __name__ == "__main__":
-    mcp.run(transport='sse')
+    mcp.run(transport='streamable-http')

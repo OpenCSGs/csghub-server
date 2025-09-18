@@ -20,7 +20,6 @@ func NewHttpServer(ctx context.Context, config *config.Config) (*gin.Engine, err
 	middleware.SetInfraMiddleware(r, config, instrumentation.Runner)
 
 	needAPIKey := middleware.NeedAPIKey(config)
-
 	//add router for golang pprof
 	debugGroup := r.Group("/debug", needAPIKey)
 	pprof.RouteRegister(debugGroup, "pprof")

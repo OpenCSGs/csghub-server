@@ -167,7 +167,7 @@ type Config struct {
 		DockerRegBase           string `env:"STARHUB_SERVER_MODEL_DOCKER_REG_BASE" default:"opencsg-registry.cn-beijing.cr.aliyuncs.com"`
 		NimDockerSecretName     string `env:"STARHUB_SERVER_MODEL_NIM_DOCKER_SECRET_NAME" default:"ngc-secret"`
 		NimNGCSecretName        string `env:"STARHUB_SERVER_MODEL_NIM_NGC_SECRET_NAME" default:"nvidia-nim-secrets"`
-		MinContextForEstimation int    `env:"STARHUB_SERVER_MODEL_MIN_CONTEXT_FOR_ESTIMATION" default:"8192"`
+		MinContextForEstimation int    `env:"STARHUB_SERVER_MODEL_MIN_CONTEXT_FOR_ESTIMATION" default:"2048"`
 		MinContextForFinetune   int    `env:"STARHUB_SERVER_MODEL_MIN_CONTEXT_FOR_FINETUNE" default:"512"`
 	}
 
@@ -456,7 +456,7 @@ type Config struct {
 		SpaceNamespace string `env:"STARHUB_SERVER_CLUSTER_SPACES_NAMESPACE" default:"spaces"`
 		// for free saas users, limits resources
 		ResourceQuotaNamespace string `env:"STARHUB_SERVER_CLUSTER_RESOURCE_QUOTA_NAMESPACE" default:"spaces"`
-		QuotaName              string `env:"STARHUB_SERVER_CLUSTER_QUOTA_NAM" default:""`
+		QuotaName              string `env:"STARHUB_SERVER_CLUSTER_QUOTA_NAME" default:""`
 	}
 
 	Runner struct {
@@ -471,7 +471,7 @@ type Config struct {
 		WebHookEndpoint             string `env:"STARHUB_SERVER_RUNNER_WEBHOOK_ENDPOINT" default:"http://localhost:8080"`
 		WatchConfigmapName          string `env:"STARHUB_SERVER_RUNNER_WATCH_CONFIGMAP_NAME" default:"spaces-runner-config"`
 		WatchConfigmapKey           string `env:"STARHUB_SERVER_RUNNER_WATCH_CONFIGMAP_KEY" default:"STARHUB_SERVER_RUNNER_WEBHOOK_ENDPOINT"`
-		WatchConfigmapIntervalInSec int    `env:"STARHUB_SERVER_RUNNER_WATCH_CONFIGMAP_NTERVAL_IN_SEC" default:"60"`
+		WatchConfigmapIntervalInSec int    `env:"STARHUB_SERVER_RUNNER_WATCH_CONFIGMAP_INTERVAL_IN_SEC" default:"60"`
 		HearBeatIntervalInSec       int    `env:"STARHUB_SERVER_RUNNER_HEARTBEAT_INTERVAL_IN_SEC" default:"300"`
 		RunnerNamespace             string `env:"STARHUB_SERVER_CLUSTER_RUNNER_NAMESPACE" default:"csghub"`
 	}
@@ -487,8 +487,8 @@ type Config struct {
 		DropMsgTimeout       int    `env:"STARHUB_SERVER_LOGCOLLECTOR_DROP_MSG_TIMEOUT" default:"60"`
 		MaxRetries           int    `env:"STARHUB_SERVER_LOGCOLLECTOR_MAX_RETRIES" default:"3"`
 		RetryInterval        int    `env:"STARHUB_SERVER_LOGCOLLECTOR_RETRY_INTERVAL" default:"1"`
-		HeathInterval        int    `env:"STARHUB_SERVER_LOGCOLLECTOR_HEALTH_INTERVAL" default:"5"`
-		AcceptLabelPrefix    string `env:"STARHUB_SERVER_LOGCOLLECTOR_ACCESPT_LABEL_PREFIX" default:"csghub_"`
+		HealthInterval       int    `env:"STARHUB_SERVER_LOGCOLLECTOR_HEALTH_INTERVAL" default:"5"`
+		AcceptLabelPrefix    string `env:"STARHUB_SERVER_LOGCOLLECTOR_ACCEPT_LABEL_PREFIX" default:"csghub_"`
 		// the separator of log lines, default is "\\n" by client formats, "\n" sse auto newline
 		LineSeparator string `env:"STARHUB_SERVER_LOGCOLLECTOR_LINE_SEPARATOR" default:"\\n"`
 	}

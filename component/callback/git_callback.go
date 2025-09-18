@@ -132,7 +132,7 @@ func (c *gitCallbackComponentImpl) SetRepoVisibility(yes bool) {
 func (c *gitCallbackComponentImpl) WatchSpaceChange(ctx context.Context, req *types.GiteaCallbackPushReq) error {
 	err := WatchSpaceChange(req, c.spaceStore, c.spaceComponent).Run()
 	if err != nil {
-		slog.Error("watch space change failed", slog.Any("error", err))
+		slog.Error("[git_callback] watch space change failed", slog.Any("error", err))
 		return err
 	}
 	return nil
@@ -141,7 +141,7 @@ func (c *gitCallbackComponentImpl) WatchSpaceChange(ctx context.Context, req *ty
 func (c *gitCallbackComponentImpl) WatchRepoRelation(ctx context.Context, req *types.GiteaCallbackPushReq) error {
 	err := WatchRepoRelation(req, c.repoStore, c.repoRelationStore, c.gitServer).Run()
 	if err != nil {
-		slog.Error("watch repo relation failed", slog.Any("error", err))
+		slog.Error("[git_callback] watch repo relation failed", slog.Any("error", err))
 		return err
 	}
 	return nil

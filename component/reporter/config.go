@@ -17,6 +17,6 @@ func Config(config *config.Config) *ltypes.LogCollectorConfig {
 		DropMsgTimeout:       time.Duration(config.LogCollector.DropMsgTimeout) * time.Second,
 		MaxRetries:           config.LogCollector.MaxRetries,
 		RetryInterval:        time.Duration(config.LogCollector.RetryInterval) * time.Second,
-		HealthCheckInterval:  time.Duration(config.LogCollector.HeathInterval) * time.Second,
+		HealthCheckInterval:  time.Duration(config.LogCollector.HealthInterval) * time.Second,
 	}
 }
