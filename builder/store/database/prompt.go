@@ -7,6 +7,7 @@ import (
 
 	"github.com/uptrace/bun"
 	"opencsg.com/csghub-server/common/errorx"
+	"opencsg.com/csghub-server/common/types"
 )
 
 type Prompt struct {
@@ -30,6 +31,7 @@ type PromptStore interface {
 	ByUsername(ctx context.Context, username string, per, page int, onlyPublic bool) (prompts []Prompt, total int, err error)
 	ByOrgPath(ctx context.Context, namespace string, per, page int, onlyPublic bool) (prompts []Prompt, total int, err error)
 	CreateIfNotExist(ctx context.Context, input Prompt) (*Prompt, error)
+	CreateAndUpdateRepoPath(ctx context.Context, input Prompt, path string) (*Prompt, error)
 }
 
 func NewPromptStoreWithDB(db *DB) PromptStore {
@@ -212,4 +214,21 @@ func (s *promptStoreImpl) CreateIfNotExist(ctx context.Context, input Prompt) (*
 	}
 
 	return &input, nil
+}
+
+func (s *promptStoreImpl) CreateAndUpdateRepoPath(ctx context.Context, input Prompt, path string) (*Prompt, error) {
+	err := s.db.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		var repo Repository
+		_, err := tx.NewInsert().Model(&input).Exec(ctx, &input)
+		if err != nil {
+			return fmt.Errorf("failed to create prompt: %w", err)
+		}
+		repo, err = updateRepoPath(ctx, tx, types.PromptRepo, path, input.RepositoryID)
+		if err != nil {
+			return fmt.Errorf("failed to update repository path: %w", err)
+		}
+		input.Repository = &repo
+		return nil
+	})
+	return &input, err
 }

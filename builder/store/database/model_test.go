@@ -273,3 +273,25 @@ func TestModelStore_UserLikes_WithSoftDeleted(t *testing.T) {
 	require.Equal(t, []string{"repo3"}, names)
 
 }
+
+func TestModelStore_CreateAndUpdateRepoPath(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewModelStoreWithDB(db)
+
+	repo := &database.Repository{
+		Name: "repo1",
+		Path: "p1",
+	}
+	err := db.Core.NewInsert().Model(repo).Scan(ctx, repo)
+	require.Nil(t, err)
+
+	model, err := store.CreateAndUpdateRepoPath(ctx, database.Model{
+		RepositoryID: repo.ID,
+	}, "p2")
+
+	require.Nil(t, err)
+	require.Equal(t, "p2", model.Repository.Path)
+}

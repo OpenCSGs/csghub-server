@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"path"
 	"slices"
 
 	"opencsg.com/csghub-server/builder/git"
@@ -185,6 +186,7 @@ func (c *mirrorComponentImpl) CreateMirrorRepo(ctx context.Context, req types.Cr
 	if err != nil {
 		return nil, fmt.Errorf("failed to create OpenCSG repo, error: %w", err)
 	}
+	repoPath := path.Join(namespace, name)
 
 	if req.RepoType == types.ModelRepo {
 		dbModel := database.Model{
@@ -192,7 +194,7 @@ func (c *mirrorComponentImpl) CreateMirrorRepo(ctx context.Context, req types.Cr
 			RepositoryID: repo.ID,
 		}
 
-		_, err := c.modelStore.Create(ctx, dbModel)
+		_, err := c.modelStore.CreateAndUpdateRepoPath(ctx, dbModel, repoPath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create model, error: %w", err)
 		}
@@ -202,7 +204,7 @@ func (c *mirrorComponentImpl) CreateMirrorRepo(ctx context.Context, req types.Cr
 			RepositoryID: repo.ID,
 		}
 
-		_, err := c.datasetStore.Create(ctx, dbDataset)
+		_, err := c.datasetStore.CreateAndUpdateRepoPath(ctx, dbDataset, repoPath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create dataset, error: %w", err)
 		}
@@ -212,7 +214,7 @@ func (c *mirrorComponentImpl) CreateMirrorRepo(ctx context.Context, req types.Cr
 			RepositoryID: repo.ID,
 		}
 
-		_, err := c.codeStore.Create(ctx, dbCode)
+		_, err := c.codeStore.CreateAndUpdateRepoPath(ctx, dbCode, repoPath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create code, error: %w", err)
 		}
@@ -239,7 +241,7 @@ func (c *mirrorComponentImpl) CreateMirrorRepo(ctx context.Context, req types.Cr
 			AvatarURL:     req.MCPServerAttributes.AvatarURL,
 		}
 
-		mcpServer, err := c.mcpServerStore.Create(ctx, dbMCPServer)
+		mcpServer, err := c.mcpServerStore.CreateAndUpdateRepoPath(ctx, dbMCPServer, repoPath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create mcp server, error: %w", err)
 		}

@@ -257,3 +257,25 @@ func TestMCPServerStore_CreateAndDeleteSpaceAndRepoForDeploy(t *testing.T) {
 	err = store.DeleteSpaceAndRepoForDeploy(ctx, space.ID, repo.ID)
 	require.Nil(t, err)
 }
+
+func TestMCPServerStore_CreateAndUpdateRepoPath(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewMCPServerStoreWithDB(db)
+
+	repo := &database.Repository{
+		Name: "repo1",
+		Path: "p1",
+	}
+	err := db.Core.NewInsert().Model(repo).Scan(ctx, repo)
+	require.Nil(t, err)
+
+	mcp, err := store.CreateAndUpdateRepoPath(ctx, database.MCPServer{
+		RepositoryID: repo.ID,
+	}, "p2")
+
+	require.Nil(t, err)
+	require.Equal(t, "p2", mcp.Repository.Path)
+}

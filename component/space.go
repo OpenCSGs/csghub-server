@@ -2,12 +2,14 @@ package component
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -112,22 +114,24 @@ func (c *spaceComponentImpl) Create(ctx context.Context, req types.CreateSpaceRe
 	}
 	dbSpace = c.updateSpaceByReq(dbSpace, req)
 
-	resSpace, err := c.spaceStore.Create(ctx, dbSpace)
+	repoPath := path.Join(req.Namespace, req.Name)
+	resSpace, err := c.spaceStore.CreateAndUpdateRepoPath(ctx, dbSpace, repoPath)
 	if err != nil {
-		slog.Error("fail to create space in db", slog.Any("req", req), slog.String("error", err.Error()))
-		return nil, fmt.Errorf("fail to create space in db, error: %w", err)
+		slog.Error("failed to create new space in db", slog.Any("req", req), slog.String("error", err.Error()))
+		return nil, fmt.Errorf("failed to create new space in db, error: %w", err)
 	}
+	dbRepo.Path = repoPath
 
-	err = c.createSpaceDefaultFiles(dbRepo, req, templatePath)
+	err = c.createSpaceDefaultFiles(ctx, dbRepo, req, templatePath)
 	if err != nil {
-		slog.Error("fail to create space default files", slog.Any("req", req), slog.Any("error", err))
-		return nil, fmt.Errorf("fail to create space default files, error: %w", err)
+		slog.Error("failed to create new space default files", slog.Any("req", req), slog.Any("error", err))
+		return nil, fmt.Errorf("failed to create new space %s/%s default files, error: %w", req.Namespace, req.Name, err)
 	}
 
 	space := &types.Space{
 		Creator:       req.Username,
 		License:       req.License,
-		Path:          dbRepo.Path,
+		Path:          repoPath,
 		Name:          req.Name,
 		Sdk:           req.Sdk,
 		SdkVersion:    req.SdkVersion,
@@ -149,7 +153,7 @@ func (c *spaceComponentImpl) Create(ctx context.Context, req types.CreateSpaceRe
 		defer cancel()
 		repoNotificationReq := types.RepoNotificationReq{
 			RepoType:  types.SpaceRepo,
-			RepoPath:  dbRepo.Path,
+			RepoPath:  repoPath,
 			Operation: types.OperationCreate,
 			UserUUID:  dbRepo.User.UUID,
 		}
@@ -180,188 +184,124 @@ func (c *spaceComponentImpl) getSpaceDockerTemplatePath(ctx context.Context, req
 	return templatePath, nil
 }
 
-func (c *spaceComponentImpl) createSpaceDefaultFiles(dbRepo *database.Repository, req types.CreateSpaceReq, templatePath string) error {
-	err := c.createSpaceReadmeFile(dbRepo, req)
-	if err != nil {
-		return fmt.Errorf("failed to create space readme file, cause: %w", err)
-	}
+func (c *spaceComponentImpl) createSpaceDefaultFiles(ctx context.Context, dbRepo *database.Repository,
+	req types.CreateSpaceReq, templatePath string) error {
 
-	err = c.createSpaceGitAttibuteFile(dbRepo, req)
-	if err != nil {
-		return fmt.Errorf("failed to create space gitattibute file, cause: %w", err)
-	}
+	var commitFiles []gitserver.CommitFile
+
+	// readme
+	commitFiles = append(commitFiles, gitserver.CommitFile{
+		Content: base64.StdEncoding.EncodeToString([]byte(req.Readme)),
+		Path:    types.ReadmeFileName,
+		Action:  gitserver.CommitActionCreate,
+	})
+
+	// gitattributes
+	commitFiles = append(commitFiles, gitserver.CommitFile{
+		Content: base64.StdEncoding.EncodeToString([]byte(spaceGitattributesContent)),
+		Path:    types.GitattributesFileName,
+		Action:  gitserver.CommitActionCreate,
+	})
 
 	if req.Sdk == types.STREAMLIT.Name {
-		err = c.createSpaceStreamlitFile(dbRepo, req)
-		if err != nil {
-			return fmt.Errorf("failed to create space streamlit file, cause: %w", err)
-		}
+		commitFiles = append(commitFiles, gitserver.CommitFile{
+			Content: base64.StdEncoding.EncodeToString([]byte(streamlitConfigContent)),
+			Path:    streamlitConfig,
+			Action:  gitserver.CommitActionCreate,
+		})
 	}
 
 	if req.Sdk == types.DOCKER.Name && len(templatePath) > 0 {
-		err = c.createSpaceDockerTemplateFile(dbRepo, req, templatePath)
+		dockerFiles, err := c.getSpaceDockerTemplateFiles(dbRepo, req, templatePath)
 		if err != nil {
-			return fmt.Errorf("failed to create space docker template file, cause: %w", err)
+			return fmt.Errorf("failed to list space docker template files, error: %w", err)
 		}
+		commitFiles = append(commitFiles, dockerFiles...)
 	}
 
 	if req.Sdk == types.MCPSERVER.Name {
-		err = c.createSpaceMCPServerTemplateFile(dbRepo, req)
+		mcpFiles, err := c.getSpaceMCPServerTemplateFiles(dbRepo, req)
 		if err != nil {
-			return fmt.Errorf("failed to create space mcp server file, cause: %w", err)
+			return fmt.Errorf("failed to list space mcp server template files, error: %w", err)
 		}
+		commitFiles = append(commitFiles, mcpFiles...)
 	}
 
 	if req.Sdk == types.NGINX.Name {
-		err = c.createSpaceNginxTemplateFile(dbRepo, req)
+		nginxFiles, err := c.getSpaceNginxTemplateFile(dbRepo, req)
 		if err != nil {
-			return fmt.Errorf("failed to create space nginx template file, cause: %w", err)
+			return fmt.Errorf("failed to list space nginx template files, error: %w", err)
 		}
+		commitFiles = append(commitFiles, nginxFiles...)
 	}
-	return nil
-}
 
-func (c *spaceComponentImpl) createSpaceReadmeFile(dbRepo *database.Repository, req types.CreateSpaceReq) error {
-	// Create README.md file
-	err := c.git.CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
+	commitReq := gitserver.CommitFilesReq{
+		Namespace: req.Namespace,
+		Name:      req.Name,
+		RepoType:  types.SpaceRepo,
+		Revision:  req.DefaultBranch,
 		Username:  dbRepo.User.Username,
 		Email:     dbRepo.User.Email,
 		Message:   types.InitCommitMessage,
-		Branch:    req.DefaultBranch,
-		Content:   req.Readme,
-		NewBranch: req.DefaultBranch,
-		Namespace: req.Namespace,
-		Name:      req.Name,
-		FilePath:  types.ReadmeFileName,
-	}, types.SpaceRepo))
+		Files:     commitFiles,
+	}
+
+	err := c.git.CommitFiles(ctx, commitReq)
 	if err != nil {
-		return fmt.Errorf("failed to create %s file, cause: %w", types.ReadmeFileName, err)
+		return fmt.Errorf("failed to commit space files, error: %w", err)
 	}
 	return nil
 }
 
-func (c *spaceComponentImpl) createSpaceGitAttibuteFile(dbRepo *database.Repository, req types.CreateSpaceReq) error {
-	// Create .gitattributes file
-	err := c.git.CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
-		Username:  dbRepo.User.Username,
-		Email:     dbRepo.User.Email,
-		Message:   types.InitCommitMessage,
-		Branch:    req.DefaultBranch,
-		Content:   spaceGitattributesContent,
-		NewBranch: req.DefaultBranch,
-		Namespace: req.Namespace,
-		Name:      req.Name,
-		FilePath:  types.GitattributesFileName,
-	}, types.SpaceRepo))
-	if err != nil {
-		return fmt.Errorf("failed to create %s file, cause: %w", types.GitattributesFileName, err)
-	}
-	return nil
-}
-
-func (c *spaceComponentImpl) createSpaceStreamlitFile(dbRepo *database.Repository, req types.CreateSpaceReq) error {
-	// create .streamlit/config.toml for support cors
-	fileReq := types.CreateFileParams{
-		Username:  dbRepo.User.Username,
-		Email:     dbRepo.User.Email,
-		Message:   types.InitCommitMessage,
-		Branch:    req.DefaultBranch,
-		Content:   streamlitConfigContent,
-		NewBranch: req.DefaultBranch,
-		Namespace: req.Namespace,
-		Name:      req.Name,
-		FilePath:  streamlitConfig,
-	}
-	err := c.git.CreateRepoFile(buildCreateFileReq(&fileReq, types.SpaceRepo))
-	if err != nil {
-		return fmt.Errorf("failed to create %s file for streamlit space, cause: %w", streamlitConfig, err)
-	}
-	return nil
-}
-
-func (c *spaceComponentImpl) createSpaceDockerTemplateFile(dbRepo *database.Repository, req types.CreateSpaceReq, templatePath string) error {
+func (c *spaceComponentImpl) getSpaceDockerTemplateFiles(dbRepo *database.Repository, req types.CreateSpaceReq, templatePath string) ([]gitserver.CommitFile, error) {
 	// create docker template files
 	entries, err := os.ReadDir(templatePath)
 	if err != nil {
-		return fmt.Errorf("failed to list dir %s error: %w", templatePath, err)
+		return nil, fmt.Errorf("failed to list dir %s error: %w", templatePath, err)
 	}
 
-	sort.Slice(entries, func(i, j int) bool {
-		nameI := entries[i].Name()
-		nameJ := entries[j].Name()
-		if nameI == types.EntryFileDockerfile {
-			return false
-		}
-		if nameJ == types.EntryFileDockerfile {
-			return true
-		}
-		return nameI < nameJ
-	})
-
-	err = c.uploadTemplateFiles(entries, req, dbRepo, templatePath)
+	commitFiles, err := c.genTemplateCommitFiles(entries, req, dbRepo, templatePath)
 	if err != nil {
-		return fmt.Errorf("fail to upload space docker template files error: %w", err)
+		return nil, fmt.Errorf("failed to get space docker template files error: %w", err)
 	}
 
-	return nil
+	return commitFiles, nil
 }
 
-func (c *spaceComponentImpl) createSpaceMCPServerTemplateFile(dbRepo *database.Repository, req types.CreateSpaceReq) error {
+func (c *spaceComponentImpl) getSpaceMCPServerTemplateFiles(dbRepo *database.Repository, req types.CreateSpaceReq) ([]gitserver.CommitFile, error) {
 	// create mcp server template files
 	templatePath, err := getSpaceTemplatePath(req.Sdk)
 	if err != nil {
-		return fmt.Errorf("check mcp server template path %s error: %w", templatePath, err)
+		return nil, fmt.Errorf("check mcp server template path %s error: %w", templatePath, err)
 	}
 	entries, err := os.ReadDir(templatePath)
 	if err != nil {
-		return fmt.Errorf("failed to list dir %s error: %w", templatePath, err)
+		return nil, fmt.Errorf("failed to list dir %s error: %w", templatePath, err)
 	}
 
-	sort.Slice(entries, func(i, j int) bool {
-		nameI := entries[i].Name()
-		nameJ := entries[j].Name()
-		if nameI == types.EntryFileAppFile {
-			return false
-		}
-		if nameJ == types.EntryFileAppFile {
-			return true
-		}
-		return nameI < nameJ
-	})
-
-	err = c.uploadTemplateFiles(entries, req, dbRepo, templatePath)
+	commitFiles, err := c.genTemplateCommitFiles(entries, req, dbRepo, templatePath)
 	if err != nil {
-		return fmt.Errorf("fail to upload space mcp server template files error: %w", err)
+		return nil, fmt.Errorf("failed to upload space mcp server template files error: %w", err)
 	}
 
-	return nil
+	return commitFiles, nil
 }
 
-func (c *spaceComponentImpl) createSpaceNginxTemplateFile(dbRepo *database.Repository, req types.CreateSpaceReq) error {
+func (c *spaceComponentImpl) getSpaceNginxTemplateFile(dbRepo *database.Repository, req types.CreateSpaceReq) ([]gitserver.CommitFile, error) {
 	templatePath, err := getSpaceTemplatePath(req.Sdk)
 	if err != nil {
-		return fmt.Errorf("check space nginx template path %s error: %w", templatePath, err)
+		return nil, fmt.Errorf("check space nginx template path %s error: %w", templatePath, err)
 	}
 	entries, err := os.ReadDir(templatePath)
 	if err != nil {
-		return fmt.Errorf("failed to list dir %s error: %w", templatePath, err)
+		return nil, fmt.Errorf("failed to list dir %s error: %w", templatePath, err)
 	}
-	sort.Slice(entries, func(i, j int) bool {
-		nameI := entries[i].Name()
-		nameJ := entries[j].Name()
-		if nameI == types.EntryFileNginx {
-			return false
-		}
-		if nameJ == types.EntryFileNginx {
-			return true
-		}
-		return nameI < nameJ
-	})
-	err = c.uploadTemplateFiles(entries, req, dbRepo, templatePath)
+
+	commitFiles, err := c.genTemplateCommitFiles(entries, req, dbRepo, templatePath)
 	if err != nil {
-		return fmt.Errorf("failed to upload space nginx template files error: %w", err)
+		return nil, fmt.Errorf("failed to upload space nginx template files error: %w", err)
 	}
-	return nil
+	return commitFiles, nil
 }
 
 func getSpaceTemplatePath(subPath string) (string, error) {
@@ -377,36 +317,26 @@ func getSpaceTemplatePath(subPath string) (string, error) {
 	return templatePath, nil
 }
 
-func (c *spaceComponentImpl) uploadTemplateFiles(entries []os.DirEntry, req types.CreateSpaceReq, dbRepo *database.Repository, templatePath string) error {
+func (c *spaceComponentImpl) genTemplateCommitFiles(entries []os.DirEntry, req types.CreateSpaceReq, dbRepo *database.Repository, templatePath string) ([]gitserver.CommitFile, error) {
+	commitFiles := []gitserver.CommitFile{}
 	for _, entry := range entries {
 		if !entry.Type().IsRegular() {
 			continue
 		}
 		fileName := entry.Name()
-		slog.Debug("get file", slog.Any("sdk", req.Sdk), slog.Any("template", req.Template), slog.Any("templatePath", templatePath), slog.Any("fileName", fileName))
 
 		content, err := os.ReadFile(filepath.Join(templatePath, fileName))
 		if err != nil {
-			return fmt.Errorf("failed to read %s/%s file for %s space, cause: %w", templatePath, fileName, req.Sdk, err)
+			return nil, fmt.Errorf("failed to read %s/%s file for %s space, cause: %w", templatePath, fileName, req.Sdk, err)
 		}
 
-		fileReq := types.CreateFileParams{
-			Username:  dbRepo.User.Username,
-			Email:     dbRepo.User.Email,
-			Message:   types.InitCommitMessage,
-			Branch:    req.DefaultBranch,
-			Content:   string(content),
-			NewBranch: req.DefaultBranch,
-			Namespace: req.Namespace,
-			Name:      req.Name,
-			FilePath:  fileName,
-		}
-		err = c.git.CreateRepoFile(buildCreateFileReq(&fileReq, types.SpaceRepo))
-		if err != nil {
-			return fmt.Errorf("failed to create %s file for %s space, cause: %w", fileName, req.Sdk, err)
-		}
+		commitFiles = append(commitFiles, gitserver.CommitFile{
+			Content: base64.StdEncoding.EncodeToString(content),
+			Path:    fileName,
+			Action:  gitserver.CommitActionCreate,
+		})
 	}
-	return nil
+	return commitFiles, nil
 }
 
 func (c *spaceComponentImpl) Show(ctx context.Context, namespace, name, currentUser string, needOpWeight bool) (*types.Space, error) {

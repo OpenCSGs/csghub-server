@@ -242,3 +242,25 @@ func TestSpaceStore_UserLikes(t *testing.T) {
 	require.Equal(t, []string{"repo1", "repo3"}, names)
 
 }
+
+func TestSpaceStore_CreateAndUpdateRepoPath(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewSpaceStoreWithDB(db)
+
+	repo := &database.Repository{
+		Name: "repo1",
+		Path: "p1",
+	}
+	err := db.Core.NewInsert().Model(repo).Scan(ctx, repo)
+	require.Nil(t, err)
+
+	space, err := store.CreateAndUpdateRepoPath(ctx, database.Space{
+		RepositoryID: repo.ID,
+	}, "p2")
+
+	require.Nil(t, err)
+	require.Equal(t, "p2", space.Repository.Path)
+}

@@ -452,6 +452,66 @@ func (_c *MockModelStore_Create_Call) RunAndReturn(run func(context.Context, dat
 	return _c
 }
 
+// CreateAndUpdateRepoPath provides a mock function with given fields: ctx, input, path
+func (_m *MockModelStore) CreateAndUpdateRepoPath(ctx context.Context, input database.Model, path string) (*database.Model, error) {
+	ret := _m.Called(ctx, input, path)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateAndUpdateRepoPath")
+	}
+
+	var r0 *database.Model
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, database.Model, string) (*database.Model, error)); ok {
+		return rf(ctx, input, path)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, database.Model, string) *database.Model); ok {
+		r0 = rf(ctx, input, path)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.Model)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, database.Model, string) error); ok {
+		r1 = rf(ctx, input, path)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockModelStore_CreateAndUpdateRepoPath_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateAndUpdateRepoPath'
+type MockModelStore_CreateAndUpdateRepoPath_Call struct {
+	*mock.Call
+}
+
+// CreateAndUpdateRepoPath is a helper method to define mock.On call
+//   - ctx context.Context
+//   - input database.Model
+//   - path string
+func (_e *MockModelStore_Expecter) CreateAndUpdateRepoPath(ctx interface{}, input interface{}, path interface{}) *MockModelStore_CreateAndUpdateRepoPath_Call {
+	return &MockModelStore_CreateAndUpdateRepoPath_Call{Call: _e.mock.On("CreateAndUpdateRepoPath", ctx, input, path)}
+}
+
+func (_c *MockModelStore_CreateAndUpdateRepoPath_Call) Run(run func(ctx context.Context, input database.Model, path string)) *MockModelStore_CreateAndUpdateRepoPath_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(database.Model), args[2].(string))
+	})
+	return _c
+}
+
+func (_c *MockModelStore_CreateAndUpdateRepoPath_Call) Return(_a0 *database.Model, _a1 error) *MockModelStore_CreateAndUpdateRepoPath_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockModelStore_CreateAndUpdateRepoPath_Call) RunAndReturn(run func(context.Context, database.Model, string) (*database.Model, error)) *MockModelStore_CreateAndUpdateRepoPath_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CreateIfNotExist provides a mock function with given fields: ctx, input
 func (_m *MockModelStore) CreateIfNotExist(ctx context.Context, input database.Model) (*database.Model, error) {
 	ret := _m.Called(ctx, input)

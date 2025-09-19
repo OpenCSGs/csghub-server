@@ -28,6 +28,7 @@ type SpaceStore interface {
 	ByUserLikes(ctx context.Context, userID int64, per, page int) (spaces []Space, total int, err error)
 	ByOrgPath(ctx context.Context, namespace string, per, page int, onlyPublic bool) (spaces []Space, total int, err error)
 	ListByPath(ctx context.Context, paths []string) ([]Space, error)
+	CreateAndUpdateRepoPath(ctx context.Context, input Space, path string) (*Space, error)
 }
 
 func NewSpaceStore() SpaceStore {
@@ -228,4 +229,21 @@ func (s *spaceStoreImpl) ListByPath(ctx context.Context, paths []string) ([]Spac
 
 	spaces = nil
 	return sortedSpaces, nil
+}
+
+func (s *spaceStoreImpl) CreateAndUpdateRepoPath(ctx context.Context, input Space, path string) (*Space, error) {
+	err := s.db.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		var repo Repository
+		_, err := tx.NewInsert().Model(&input).Exec(ctx, &input)
+		if err != nil {
+			return fmt.Errorf("failed to create space: %w", err)
+		}
+		repo, err = updateRepoPath(ctx, tx, types.SpaceRepo, path, input.RepositoryID)
+		if err != nil {
+			return fmt.Errorf("failed to update repository path: %w", err)
+		}
+		input.Repository = &repo
+		return nil
+	})
+	return &input, err
 }

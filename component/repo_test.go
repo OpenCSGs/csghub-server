@@ -48,18 +48,8 @@ func TestRepoComponent_CreateRepo(t *testing.T) {
 		HttpCloneURL:  "http",
 		SshCloneURL:   "ssh",
 	}
-	repo.mocks.gitServer.EXPECT().CreateRepo(ctx, gitserver.CreateRepoReq{
-		Username:      "user",
-		Namespace:     "ns",
-		Name:          "name",
-		Nickname:      "nn",
-		License:       "MIT",
-		DefaultBranch: "main",
-		Readme:        "rr",
-		Private:       true,
-		RepoType:      types.ModelRepo,
-	}).Return(gitrepo, nil)
-
+	repo.mocks.gitServer.EXPECT().CreateRepo(ctx, mock.AnythingOfType("gitserver.CreateRepoReq")).Return(gitrepo, nil)
+	repo.mocks.gitServer.EXPECT().CommitFiles(ctx, mock.AnythingOfType("gitserver.CommitFilesReq")).Return(nil)
 	dbrepo := &database.Repository{
 		UserID:         123,
 		Path:           "ns/name",
@@ -72,9 +62,7 @@ func TestRepoComponent_CreateRepo(t *testing.T) {
 		DefaultBranch:  "main",
 		RepositoryType: types.ModelRepo,
 	}
-	repo.mocks.stores.RepoMock().EXPECT().CreateRepo(ctx, *dbrepo).Return(dbrepo, nil)
-	dbrepo.GitPath = "@hashed_repos/a6/65/a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3"
-	repo.mocks.stores.RepoMock().EXPECT().UpdateRepo(ctx, mock.Anything).Return(dbrepo, nil)
+	repo.mocks.stores.RepoMock().EXPECT().CreateRepo(ctx, mock.AnythingOfType("database.Repository")).Return(dbrepo, nil)
 	r1, r2, err := repo.CreateRepo(ctx, types.CreateRepoReq{
 		Username:      "user",
 		Namespace:     "ns",
@@ -86,6 +74,12 @@ func TestRepoComponent_CreateRepo(t *testing.T) {
 		Private:       true,
 		RepoType:      types.ModelRepo,
 		Description:   "desc",
+		CommitFiles: []types.CommitFile{
+			{
+				Content: "content",
+				Path:    "path",
+			},
+		},
 	})
 	require.Nil(t, err)
 	require.Equal(t, gitrepo, r1)

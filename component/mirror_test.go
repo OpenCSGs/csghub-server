@@ -62,33 +62,23 @@ func TestMirrorComponent_CreateMirrorRepo(t *testing.T) {
 			}, nil)
 
 			repo1 := &database.Repository{ID: 11}
-			mc.mocks.components.repo.EXPECT().CreateRepo(ctx, types.CreateRepoReq{
-				Username:      "user",
-				Namespace:     "AIWizards",
-				Name:          "sns_sn",
-				Nickname:      "sns_sn",
-				Description:   req.Description,
-				Private:       true,
-				License:       req.License,
-				DefaultBranch: req.DefaultBranch,
-				RepoType:      req.RepoType,
-			}).Return(&gitserver.CreateRepoResp{}, repo1, nil)
+			mc.mocks.components.repo.EXPECT().CreateRepo(ctx, mock.AnythingOfType("types.CreateRepoReq")).Return(&gitserver.CreateRepoResp{}, repo1, nil)
 			switch req.RepoType {
 			case types.ModelRepo:
-				mc.mocks.stores.ModelMock().EXPECT().Create(ctx, database.Model{
+				mc.mocks.stores.ModelMock().EXPECT().CreateAndUpdateRepoPath(ctx, database.Model{
 					Repository:   repo1,
 					RepositoryID: repo1.ID,
-				}).Return(nil, nil)
+				}, "AIWizards/sns_sn").Return(nil, nil)
 			case types.DatasetRepo:
-				mc.mocks.stores.DatasetMock().EXPECT().Create(ctx, database.Dataset{
+				mc.mocks.stores.DatasetMock().EXPECT().CreateAndUpdateRepoPath(ctx, database.Dataset{
 					Repository:   repo1,
 					RepositoryID: repo1.ID,
-				}).Return(nil, nil)
+				}, "AIWizards/sns_sn").Return(nil, nil)
 			case types.CodeRepo:
-				mc.mocks.stores.CodeMock().EXPECT().Create(ctx, database.Code{
+				mc.mocks.stores.CodeMock().EXPECT().CreateAndUpdateRepoPath(ctx, database.Code{
 					Repository:   repo1,
 					RepositoryID: repo1.ID,
-				}).Return(nil, nil)
+				}, "AIWizards/sns_sn").Return(nil, nil)
 			}
 
 			mc.mocks.stores.MirrorSourceMock().EXPECT().Get(ctx, int64(0)).Return(

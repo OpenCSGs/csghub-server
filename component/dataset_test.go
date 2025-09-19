@@ -39,14 +39,24 @@ func TestDatasetCompnent_Create(t *testing.T) {
 	rq.Readme = "\n---\nlicense: \n---\n\t"
 	rq.DefaultBranch = "main"
 	rq.Nickname = "n"
+	rq.CommitFiles = []types.CommitFile{
+		{
+			Content: "\n---\nlicense: \n---\n\t",
+			Path:    types.ReadmeFileName,
+		},
+		{
+			Content: types.DatasetGitattributesContent,
+			Path:    types.GitattributesFileName,
+		},
+	}
 
 	dc.mocks.components.repo.EXPECT().CreateRepo(ctx, rq).Return(&gitserver.CreateRepoResp{}, &database.Repository{
 		Tags: []database.Tag{{Name: "t1"}},
 		User: database.User{UUID: "user-uuid"},
 	}, nil)
 
-	dc.mocks.stores.DatasetMock().EXPECT().Create(ctx, mock.Anything).RunAndReturn(
-		func(ctx context.Context, ds database.Dataset) (*database.Dataset, error) {
+	dc.mocks.stores.DatasetMock().EXPECT().CreateAndUpdateRepoPath(ctx, mock.Anything, "ns/n").RunAndReturn(
+		func(ctx context.Context, ds database.Dataset, _ string) (*database.Dataset, error) {
 			require.NotNil(t, ds.Repository)
 			require.Equal(t, "user-uuid", ds.Repository.User.UUID)
 			require.Len(t, ds.Repository.Tags, 1)
@@ -60,30 +70,6 @@ func TestDatasetCompnent_Create(t *testing.T) {
 			}, nil
 		},
 	)
-
-	dc.mocks.gitServer.EXPECT().CreateRepoFile(buildCreateFileReq(
-		&types.CreateFileParams{
-			Username:  "user",
-			Message:   types.InitCommitMessage,
-			Branch:    "main",
-			Content:   "\n---\nlicense: \n---\n\t",
-			Namespace: "ns",
-			Name:      "n",
-			FilePath:  types.ReadmeFileName,
-		}, types.DatasetRepo),
-	).Return(nil)
-
-	dc.mocks.gitServer.EXPECT().CreateRepoFile(buildCreateFileReq(
-		&types.CreateFileParams{
-			Username:  "user",
-			Message:   types.InitCommitMessage,
-			Branch:    "main",
-			Content:   types.DatasetGitattributesContent,
-			Namespace: "ns",
-			Name:      "n",
-			FilePath:  types.GitattributesFileName,
-		}, types.DatasetRepo),
-	).Return(nil)
 
 	var wg sync.WaitGroup
 	wg.Add(1)

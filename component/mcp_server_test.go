@@ -55,30 +55,24 @@ func TestMCPServerComponent_Create(t *testing.T) {
 		Nickname:      "n",
 		RepoType:      types.MCPServerRepo,
 		Username:      "user",
+		CommitFiles: []types.CommitFile{
+			{
+				Content: "\n---\nlicense: MIT\n---\n\t",
+				Path:    types.ReadmeFileName,
+			},
+		},
 	}).Return(nil, dbrepo, nil)
 
-	mc.mocks.stores.MCPServerMock().EXPECT().Create(ctx, database.MCPServer{
+	mc.mocks.stores.MCPServerMock().EXPECT().CreateAndUpdateRepoPath(ctx, database.MCPServer{
 		RepositoryID:  dbrepo.ID,
 		Configuration: req.Configuration,
 		Repository:    dbrepo,
-	}).Return(&database.MCPServer{
+	}, "test-namespace/test-server").Return(&database.MCPServer{
 		ID:            321,
 		RepositoryID:  dbrepo.ID,
 		Configuration: req.Configuration,
 		Repository:    dbrepo,
 	}, nil)
-
-	mc.mocks.gitServer.EXPECT().CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
-		Username:  dbrepo.User.Username,
-		Email:     dbrepo.User.Email,
-		Message:   types.InitCommitMessage,
-		Branch:    req.DefaultBranch,
-		Content:   generateReadmeData("MIT"),
-		NewBranch: req.DefaultBranch,
-		Namespace: req.Namespace,
-		Name:      req.Name,
-		FilePath:  types.ReadmeFileName,
-	}, types.MCPServerRepo)).Return(nil)
 
 	var wg sync.WaitGroup
 	wg.Add(1)

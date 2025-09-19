@@ -37,6 +37,16 @@ func TestCodeComponent_Create(t *testing.T) {
 	crq.Readme = generateReadmeData(req.License)
 	crq.RepoType = types.CodeRepo
 	crq.DefaultBranch = "main"
+	crq.CommitFiles = []types.CommitFile{
+		{
+			Content: crq.Readme,
+			Path:    types.ReadmeFileName,
+		},
+		{
+			Content: codeGitattributesContent,
+			Path:    types.GitattributesFileName,
+		},
+	}
 
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -54,33 +64,13 @@ func TestCodeComponent_Create(t *testing.T) {
 	cc.mocks.components.repo.EXPECT().CreateRepo(ctx, crq).Return(
 		nil, dbrepo, nil,
 	)
-	cc.mocks.stores.CodeMock().EXPECT().Create(ctx, database.Code{
+	cc.mocks.stores.CodeMock().EXPECT().CreateAndUpdateRepoPath(ctx, database.Code{
 		Repository:   dbrepo,
 		RepositoryID: 1,
-	}).Return(&database.Code{
+	}, "ns/n").Return(&database.Code{
 		RepositoryID: 1,
 		Repository:   dbrepo,
 	}, nil)
-	cc.mocks.gitServer.EXPECT().CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
-		Username:  "user",
-		Message:   types.InitCommitMessage,
-		Branch:    "main",
-		Content:   crq.Readme,
-		NewBranch: "main",
-		Namespace: "ns",
-		Name:      "n",
-		FilePath:  types.ReadmeFileName,
-	}, types.CodeRepo)).Return(nil)
-	cc.mocks.gitServer.EXPECT().CreateRepoFile(buildCreateFileReq(&types.CreateFileParams{
-		Username:  "user",
-		Message:   types.InitCommitMessage,
-		Branch:    "main",
-		Content:   codeGitattributesContent,
-		NewBranch: "main",
-		Namespace: "ns",
-		Name:      "n",
-		FilePath:  types.GitattributesFileName,
-	}, types.CodeRepo)).Return(nil)
 
 	resp, err := cc.Create(ctx, req)
 	require.Nil(t, err)

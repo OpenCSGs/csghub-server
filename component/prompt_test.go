@@ -2,7 +2,6 @@ package component
 
 import (
 	"context"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"sync"
@@ -509,6 +508,16 @@ func TestPromptComponent_CreatePromptRepo(t *testing.T) {
 		Readme:        "\n---\nlicense: MIT\n---\n\t",
 		DefaultBranch: "main",
 		RepoType:      types.PromptRepo,
+		CommitFiles: []types.CommitFile{
+			{
+				Content: generateReadmeData("MIT"),
+				Path:    types.ReadmeFileName,
+			},
+			{
+				Content: types.DatasetGitattributesContent,
+				Path:    types.GitattributesFileName,
+			},
+		},
 	}
 	dbRepo := &database.Repository{
 		ID: 1,
@@ -525,7 +534,7 @@ func TestPromptComponent_CreatePromptRepo(t *testing.T) {
 		Repository:   dbRepo,
 		RepositoryID: dbRepo.ID,
 	}
-	pc.mocks.stores.PromptMock().EXPECT().Create(ctx, dbPrompt).Return(&database.Prompt{
+	pc.mocks.stores.PromptMock().EXPECT().CreateAndUpdateRepoPath(ctx, dbPrompt, "ns/n").Return(&database.Prompt{
 		Repository: &database.Repository{
 			Name: "r1",
 			Tags: []database.Tag{
@@ -536,32 +545,6 @@ func TestPromptComponent_CreatePromptRepo(t *testing.T) {
 		},
 		RepositoryID: dbRepo.ID,
 	}, nil)
-
-	pc.mocks.gitServer.EXPECT().CreateRepoFile(&types.CreateFileReq{
-		Username:  "foo",
-		Email:     "foo@bar.com",
-		Message:   "initial commit",
-		Branch:    "main",
-		Content:   "Ci0tLQpsaWNlbnNlOiBNSVQKLS0tCgk=",
-		NewBranch: "main",
-		FilePath:  "README.md",
-		Namespace: "ns",
-		Name:      "n",
-		RepoType:  types.PromptRepo,
-	}).Return(nil).Once()
-
-	pc.mocks.gitServer.EXPECT().CreateRepoFile(&types.CreateFileReq{
-		Username:  "foo",
-		Email:     "foo@bar.com",
-		Message:   "initial commit",
-		Branch:    "main",
-		Content:   base64.StdEncoding.EncodeToString([]byte(types.DatasetGitattributesContent)),
-		NewBranch: "main",
-		FilePath:  ".gitattributes",
-		Namespace: "ns",
-		Name:      "n",
-		RepoType:  types.PromptRepo,
-	}).Return(nil).Once()
 
 	var wg sync.WaitGroup
 	wg.Add(1)

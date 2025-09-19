@@ -295,3 +295,25 @@ func TestPromptStore_ByUserName(t *testing.T) {
 	}
 
 }
+
+func TestPromptStore_CreateAndUpdateRepoPath(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewPromptStoreWithDB(db)
+
+	repo := &database.Repository{
+		Name: "repo1",
+		Path: "p1",
+	}
+	err := db.Core.NewInsert().Model(repo).Scan(ctx, repo)
+	require.Nil(t, err)
+
+	prompt, err := store.CreateAndUpdateRepoPath(ctx, database.Prompt{
+		RepositoryID: repo.ID,
+	}, "p2")
+
+	require.Nil(t, err)
+	require.Equal(t, "p2", prompt.Repository.Path)
+}

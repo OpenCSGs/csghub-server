@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/hashicorp/go-version"
 	"github.com/minio/minio-go/v7"
 	ignore "github.com/sabhiram/go-gitignore"
@@ -238,10 +239,13 @@ func (c *repoComponentImpl) CreateRepo(ctx context.Context, req types.CreateRepo
 		req.DefaultBranch = types.MainBranch
 	}
 
+	temPath := strings.SplitN(uuid.NewString(), "-", 2)
 	dbRepo := database.Repository{
-		UserID:         user.ID,
-		Path:           path.Join(req.Namespace, req.Name),
-		GitPath:        fmt.Sprintf("%ss_%s/%s", string(req.RepoType), req.Namespace, req.Name),
+		UserID: user.ID,
+		//Path:           path.Join(req.Namespace, req.Name),
+		//GitPath:        fmt.Sprintf("%ss_%s/%s", string(req.RepoType), req.Namespace, req.Name),
+		Path:           path.Join(temPath[0], temPath[1]),
+		GitPath:        fmt.Sprintf("%ss_%s/%s", string(req.RepoType), temPath[0], temPath[1]),
 		Name:           req.Name,
 		Nickname:       req.Nickname,
 		Description:    req.Description,
@@ -250,6 +254,7 @@ func (c *repoComponentImpl) CreateRepo(ctx context.Context, req types.CreateRepo
 		DefaultBranch:  req.DefaultBranch,
 		RepositoryType: req.RepoType,
 		StarCount:      req.StarCount,
+		User:           user,
 	}
 	newDBRepo, err := c.repoStore.CreateRepo(ctx, dbRepo)
 	if err != nil {
@@ -258,8 +263,8 @@ func (c *repoComponentImpl) CreateRepo(ctx context.Context, req types.CreateRepo
 
 	gitRepoReq := gitserver.CreateRepoReq{
 		Username:      req.Username,
-		Namespace:     req.Namespace,
-		Name:          req.Name,
+		Namespace:     temPath[0],
+		Name:          temPath[1],
 		Nickname:      req.Nickname,
 		License:       req.License,
 		DefaultBranch: req.DefaultBranch,
@@ -274,14 +279,31 @@ func (c *repoComponentImpl) CreateRepo(ctx context.Context, req types.CreateRepo
 		return nil, nil, fmt.Errorf("fail to create repo in git, error: %w", err)
 	}
 
-	newDBRepo.User = user
-	newDBRepo.GitPath = gitRepo.GitPath
-	resRepo, err := c.repoStore.UpdateRepo(ctx, *newDBRepo)
-	if err != nil {
-		return nil, nil, err
+	if len(req.CommitFiles) > 0 {
+		var gitCommitFiles []gitserver.CommitFile
+		for _, file := range req.CommitFiles {
+			gitCommitFiles = append(gitCommitFiles, gitserver.CommitFile{
+				Content: base64.StdEncoding.EncodeToString([]byte(file.Content)),
+				Path:    file.Path,
+				Action:  gitserver.CommitActionCreate,
+			})
+		}
+		err = c.git.CommitFiles(ctx, gitserver.CommitFilesReq{
+			Namespace: temPath[0],
+			Name:      temPath[1],
+			RepoType:  req.RepoType,
+			Revision:  req.DefaultBranch,
+			Username:  user.Username,
+			Email:     user.Email,
+			Message:   types.InitCommitMessage,
+			Files:     gitCommitFiles,
+		})
+		if err != nil {
+			return gitRepo, newDBRepo, fmt.Errorf("fail to commit files, error: %w", err)
+		}
 	}
 
-	return gitRepo, resRepo, nil
+	return gitRepo, newDBRepo, nil
 }
 
 func (c *repoComponentImpl) UpdateRepo(ctx context.Context, req types.UpdateRepoReq) (*database.Repository, error) {
@@ -4010,4 +4032,8 @@ func (c *repoComponentImpl) GetMirrorTaskStatusAndSyncStatus(repo *database.Repo
 	}
 
 	return mirrorTaskStatus, syncStatus
+}
+
+func (c *repoComponentImpl) RandomPath() []string {
+	return strings.SplitN(uuid.NewString(), "-", 2)
 }
