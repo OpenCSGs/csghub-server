@@ -972,8 +972,15 @@ func (d *deployer) CheckResourceAvailable(ctx context.Context, clusterId string,
 	if err != nil {
 		return false, err
 	}
+
+	if clusterResources.Status == types.ClusterStatusUnavailable {
+		return false, fmt.Errorf("failed to check cluster available resource due to cluster %s status is %s",
+			clusterId, clusterResources.Status)
+	}
+
 	if clusterResources.ResourceStatus != types.StatusUncertain && !CheckResource(clusterResources, hardWare) {
-		return false, fmt.Errorf("required resource is not enough")
+		return false, fmt.Errorf("required resource on cluster %s is not enough with resource status %s",
+			clusterId, clusterResources.ResourceStatus)
 	}
 
 	return true, nil
