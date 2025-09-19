@@ -120,6 +120,7 @@ func (c *spaceComponentImpl) Create(ctx context.Context, req types.CreateSpaceRe
 		slog.Error("failed to create new space in db", slog.Any("req", req), slog.String("error", err.Error()))
 		return nil, fmt.Errorf("failed to create new space in db, error: %w", err)
 	}
+	dbRepo.Path = repoPath
 
 	err = c.createSpaceDefaultFiles(ctx, dbRepo, req, templatePath)
 	if err != nil {
@@ -130,7 +131,7 @@ func (c *spaceComponentImpl) Create(ctx context.Context, req types.CreateSpaceRe
 	space := &types.Space{
 		Creator:       req.Username,
 		License:       req.License,
-		Path:          dbRepo.Path,
+		Path:          repoPath,
 		Name:          req.Name,
 		Sdk:           req.Sdk,
 		SdkVersion:    req.SdkVersion,
@@ -152,7 +153,7 @@ func (c *spaceComponentImpl) Create(ctx context.Context, req types.CreateSpaceRe
 		defer cancel()
 		repoNotificationReq := types.RepoNotificationReq{
 			RepoType:  types.SpaceRepo,
-			RepoPath:  dbRepo.Path,
+			RepoPath:  repoPath,
 			Operation: types.OperationCreate,
 			UserUUID:  dbRepo.User.UUID,
 		}
