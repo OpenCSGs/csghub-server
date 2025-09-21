@@ -39,7 +39,7 @@ type TagsHandler struct {
 // @Param		 scope query string false "scope name" Enums(model, dataset, code, space, prompt)
 // @Param		 built_in query bool false "built_in"
 // @Param		 search query string false "search on name and show_name fields"
-// @Success      200  {object}  types.ResponseWithTotal{data=[]types.RepoTag} "tags"
+// @Success      200  {object}  types.Response{data=[]types.RepoTag} "tags"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /tags [get]
@@ -67,7 +67,7 @@ func (t *TagsHandler) AllTags(ctx *gin.Context) {
 // @Accept       json
 // @Produce      json
 // @Param        body body types.CreateTag true "body"
-// @Success      200  {object}  types.Response{database.Tag} "OK"
+// @Success      200  {object}  types.Response{data=database.Tag} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /tags [post]
@@ -95,7 +95,7 @@ func (t *TagsHandler) CreateTag(ctx *gin.Context) {
 // @Accept       json
 // @Produce      json
 // @Param		 id path  string  true  "id of the tag"
-// @Success      200  {object}  types.Response{database.Tag} "OK"
+// @Success      200  {object}  types.Response{data=database.Tag} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /tags/{id} [get]
@@ -124,7 +124,7 @@ func (t *TagsHandler) GetTagByID(ctx *gin.Context) {
 // @Produce      json
 // @Param		 id path  string  true  "id of the tag"
 // @Param        body body types.UpdateTag true "body"
-// @Success      200  {object}  types.Response{database.Tag} "OK"
+// @Success      200  {object}  types.Response{data=database.Tag} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /tags/{id} [put]
@@ -185,7 +185,7 @@ func (t *TagsHandler) DeleteTag(ctx *gin.Context) {
 // @Tags         Tag
 // @Accept       json
 // @Produce      json
-// @Success      200  {object}  types.ResponseWithTotal{data=[]types.RepoTagCategory} "categores"
+// @Success      200  {object}  types.Response{data=[]types.RepoTagCategory} "categores"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /tags/categories [get]
@@ -207,7 +207,7 @@ func (t *TagsHandler) AllCategories(ctx *gin.Context) {
 // @Accept       json
 // @Produce      json
 // @Param        body body types.CreateCategory true "body"
-// @Success      200  {object}  types.Response{database.TagCategory} "OK"
+// @Success      200  {object}  types.Response{data=database.TagCategory} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /tags/categories [post]
@@ -239,7 +239,7 @@ func (t *TagsHandler) CreateCategory(ctx *gin.Context) {
 // @Accept       json
 // @Produce      json
 // @Param        body body types.UpdateCategory true "body"
-// @Success      200  {object}  types.Response{database.TagCategory} "OK"
+// @Success      200  {object}  types.Response{data=database.TagCategory} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /tags/categories/id [put]
