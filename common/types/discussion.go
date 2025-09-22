@@ -68,11 +68,18 @@ func (req *UpdateDiscussionRequest) GetSensitiveFields() []SensitiveField {
 }
 
 type ShowDiscussionResponse struct {
-	ID           int64                         `json:"id"`
-	Title        string                        `json:"title"`
-	User         *DiscussionResponse_User      `json:"user"`
-	CommentCount int64                         `json:"comment_count"`
-	Comments     []*DiscussionResponse_Comment `json:"comments,omitempty"`
+	ID           int64                    `json:"id"`
+	Title        string                   `json:"title"`
+	User         *DiscussionResponse_User `json:"user"`
+	CommentCount int64                    `json:"comment_count"`
+	Comments     *CommentsWithPagination  `json:"comments,omitempty"`
+}
+
+type CommentsWithPagination struct {
+	Data  []*DiscussionResponse_Comment `json:"data"`
+	Total int                           `json:"total"`
+	Page  int                           `json:"page"`
+	Per   int                           `json:"per"`
 }
 
 type DiscussionResponse_Comment struct {

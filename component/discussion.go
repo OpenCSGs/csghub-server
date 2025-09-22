@@ -46,14 +46,14 @@ func (c *discussionComponentImpl) checkRepoReadAccess(ctx context.Context, repoI
 
 type DiscussionComponent interface {
 	CreateRepoDiscussion(ctx context.Context, req types.CreateRepoDiscussionRequest) (*types.CreateDiscussionResponse, error)
-	GetDiscussion(ctx context.Context, currentUser string, id int64) (*types.ShowDiscussionResponse, error)
+	GetDiscussion(ctx context.Context, currentUser string, id int64, cPer int, cPage int) (*types.ShowDiscussionResponse, error)
 	UpdateDiscussion(ctx context.Context, req types.UpdateDiscussionRequest) error
 	DeleteDiscussion(ctx context.Context, currentUser string, id int64) error
-	ListRepoDiscussions(ctx context.Context, req types.ListRepoDiscussionRequest) (*types.ListRepoDiscussionResponse, error)
+	ListRepoDiscussions(ctx context.Context, req types.ListRepoDiscussionRequest, per int, page int) (*types.ListRepoDiscussionResponse, int, error)
 	CreateDiscussionComment(ctx context.Context, req types.CreateCommentRequest) (*types.CreateCommentResponse, error)
 	UpdateComment(ctx context.Context, currentUser string, id int64, content string) error
 	DeleteComment(ctx context.Context, currentUser string, id int64) error
-	ListDiscussionComments(ctx context.Context, currentUser string, discussionID int64) ([]*types.DiscussionResponse_Comment, error)
+	ListDiscussionComments(ctx context.Context, currentUser string, discussionID int64, per int, page int) ([]*types.DiscussionResponse_Comment, int, error)
 }
 
 func NewDiscussionComponent(config *config.Config) (DiscussionComponent, error) {
@@ -110,7 +110,7 @@ func (c *discussionComponentImpl) CreateRepoDiscussion(ctx context.Context, req 
 	return resp, nil
 }
 
-func (c *discussionComponentImpl) GetDiscussion(ctx context.Context, currentUser string, id int64) (*types.ShowDiscussionResponse, error) {
+func (c *discussionComponentImpl) GetDiscussion(ctx context.Context, currentUser string, id int64, cPer int, cPage int) (*types.ShowDiscussionResponse, error) {
 	discussion, err := c.discussionStore.FindByID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find discussion by id '%d': %w", id, err)
@@ -126,10 +126,24 @@ func (c *discussionComponentImpl) GetDiscussion(ctx context.Context, currentUser
 		return nil, err
 	}
 
-	comments, err := c.discussionStore.FindDiscussionComments(ctx, discussion.ID)
+	comments, total, err := c.discussionStore.FindDiscussionComments(ctx, discussion.ID, cPer, cPage)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, fmt.Errorf("failed to find discussion comments by discussion id '%d': %w", discussion.ID, err)
 	}
+	commentsData := make([]*types.DiscussionResponse_Comment, 0, len(comments))
+	for _, comment := range comments {
+		commentsData = append(commentsData, &types.DiscussionResponse_Comment{
+			ID:      comment.ID,
+			Content: comment.Content,
+			User: &types.DiscussionResponse_User{
+				ID:       comment.User.ID,
+				Username: comment.User.Username,
+				Avatar:   comment.User.Avatar,
+			},
+			CreatedAt: comment.CreatedAt,
+		})
+	}
+
 	resp := &types.ShowDiscussionResponse{
 		ID:    discussion.ID,
 		Title: discussion.Title,
@@ -138,18 +152,14 @@ func (c *discussionComponentImpl) GetDiscussion(ctx context.Context, currentUser
 			Username: discussion.User.Username,
 			Avatar:   discussion.User.Avatar,
 		},
+		Comments: &types.CommentsWithPagination{
+			Data:  commentsData,
+			Total: total,
+			Page:  cPage,
+			Per:   cPer,
+		},
 	}
-	for _, comment := range comments {
-		resp.Comments = append(resp.Comments, &types.DiscussionResponse_Comment{
-			ID:      comment.ID,
-			Content: comment.Content,
-			User: &types.DiscussionResponse_User{
-				ID:       comment.User.ID,
-				Username: comment.User.Username,
-				Avatar:   comment.User.Avatar,
-			},
-		})
-	}
+
 	return resp, nil
 }
 
@@ -189,20 +199,20 @@ func (c *discussionComponentImpl) DeleteDiscussion(ctx context.Context, currentU
 	return nil
 }
 
-func (c *discussionComponentImpl) ListRepoDiscussions(ctx context.Context, req types.ListRepoDiscussionRequest) (*types.ListRepoDiscussionResponse, error) {
+func (c *discussionComponentImpl) ListRepoDiscussions(ctx context.Context, req types.ListRepoDiscussionRequest, per int, page int) (*types.ListRepoDiscussionResponse, int, error) {
 	repo, err := c.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find repo by path '%s/%s/%s': %w", req.RepoType, req.Namespace, req.Name, err)
+		return nil, 0, fmt.Errorf("failed to find repo by path '%s/%s/%s': %w", req.RepoType, req.Namespace, req.Name, err)
 	}
 
 	_, err = c.checkRepoReadAccess(ctx, repo.ID, req.CurrentUser)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
-	discussions, err := c.discussionStore.FindByDiscussionableID(ctx, database.DiscussionableTypeRepo, repo.ID)
+	discussions, total, err := c.discussionStore.FindByDiscussionableID(ctx, database.DiscussionableTypeRepo, repo.ID, per, page)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list repo discussions by repo type '%s', namespace '%s', name '%s': %w", req.RepoType, req.Namespace, req.Name, err)
+		return nil, 0, fmt.Errorf("failed to list repo discussions by repo type '%s', namespace '%s', name '%s': %w", req.RepoType, req.Namespace, req.Name, err)
 	}
 	resp := &types.ListRepoDiscussionResponse{}
 	for _, discussion := range discussions {
@@ -221,7 +231,7 @@ func (c *discussionComponentImpl) ListRepoDiscussions(ctx context.Context, req t
 			},
 		})
 	}
-	return resp, nil
+	return resp, total, nil
 }
 
 func (c *discussionComponentImpl) CreateDiscussionComment(ctx context.Context, req types.CreateCommentRequest) (*types.CreateCommentResponse, error) {
@@ -330,25 +340,25 @@ func (c *discussionComponentImpl) DeleteComment(ctx context.Context, currentUser
 	return nil
 }
 
-func (c *discussionComponentImpl) ListDiscussionComments(ctx context.Context, currentUser string, discussionID int64) ([]*types.DiscussionResponse_Comment, error) {
+func (c *discussionComponentImpl) ListDiscussionComments(ctx context.Context, currentUser string, discussionID int64, per int, page int) ([]*types.DiscussionResponse_Comment, int, error) {
 	// Get discussion by id
 	discussion, err := c.discussionStore.FindByID(ctx, discussionID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find discussion by id '%d': %w", discussionID, err)
+		return nil, 0, fmt.Errorf("failed to find discussion by id '%d': %w", discussionID, err)
 	}
 	//TOOD: support other discussionable type, like collection
 	if discussion.DiscussionableType != database.DiscussionableTypeRepo {
-		return nil, fmt.Errorf("discussion '%d' is not a repo discussion", discussion.ID)
+		return nil, 0, fmt.Errorf("discussion '%d' is not a repo discussion", discussion.ID)
 	}
 	// Get the repository associated with the discussion
 	_, err = c.checkRepoReadAccess(ctx, discussion.DiscussionableID, currentUser)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
-	comments, err := c.discussionStore.FindDiscussionComments(ctx, discussionID)
+	comments, total, err := c.discussionStore.FindDiscussionComments(ctx, discussionID, per, page)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find discussion comments by discussion id '%d': %w", discussionID, err)
+		return nil, 0, fmt.Errorf("failed to find discussion comments by discussion id '%d': %w", discussionID, err)
 	}
 	resp := make([]*types.DiscussionResponse_Comment, 0, len(comments))
 	for _, comment := range comments {
@@ -366,7 +376,7 @@ func (c *discussionComponentImpl) ListDiscussionComments(ctx context.Context, cu
 			CreatedAt: comment.CreatedAt,
 		})
 	}
-	return resp, nil
+	return resp, total, nil
 }
 
 func (c *discussionComponentImpl) sendCommentMessage(ctx context.Context, repoType types.RepositoryType, repoPath string, senderUUID string, userUUIDs []string) error {

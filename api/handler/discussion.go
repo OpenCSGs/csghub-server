@@ -179,12 +179,14 @@ func (h *DiscussionHandler) DeleteDiscussion(ctx *gin.Context) {
 
 // ShowDiscussion godoc
 // @Security     ApiKey
-// @Summary      Show a discussion and its comments
+// @Summary      Show a discussion and its comments with pagination
 // @Description  show a discussion
 // @Tags         Discussion
 // @Accept       json
 // @Produce      json
 // @Param        id path string true "the discussion id"
+// @Param        per query int false "per" default(10)
+// @Param        page query int false "per page" default(1)
 // @Success      200  {object}  types.Response{data=types.ShowDiscussionResponse} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
@@ -198,7 +200,13 @@ func (h *DiscussionHandler) ShowDiscussion(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	d, err := h.discussion.GetDiscussion(ctx.Request.Context(), currentUser, idInt)
+	cPer, cPage, err := common.GetPerAndPageFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	d, err := h.discussion.GetDiscussion(ctx.Request.Context(), currentUser, idInt, cPer, cPage)
 	if err != nil {
 		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
@@ -220,6 +228,8 @@ func (h *DiscussionHandler) ShowDiscussion(ctx *gin.Context) {
 // @Tags         Discussion
 // @Accept       json
 // @Produce      json
+// @Param        per query int false "per" default(10)
+// @Param        page query int false "per page" default(1)
 // @Param        current_user query string false "current user"
 // @Param        repo_type path string true "repository type" Enums(models,datasets,codes,spaces)
 // @Param        namespace path string true "namespace"
@@ -236,13 +246,20 @@ func (h *DiscussionHandler) ListRepoDiscussions(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, fmt.Errorf("failed to get namespace and name from request context: %w", err).Error())
 		return
 	}
+	per, page, err := common.GetPerAndPageFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
 
 	var req types.ListRepoDiscussionRequest
 	req.CurrentUser = currentUser
 	req.RepoType = types.RepositoryType(repoType)
 	req.Namespace = namespace
 	req.Name = name
-	resp, err := h.discussion.ListRepoDiscussions(ctx.Request.Context(), req)
+
+	resp, total, err := h.discussion.ListRepoDiscussions(ctx.Request.Context(), req, per, page)
 	if err != nil {
 		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
@@ -254,7 +271,7 @@ func (h *DiscussionHandler) ListRepoDiscussions(ctx *gin.Context) {
 		}
 		return
 	}
-	httpbase.OK(ctx, resp)
+	httpbase.OKWithTotal(ctx, resp, total)
 }
 
 // CreateDiscussionComment godoc
@@ -393,6 +410,8 @@ func (h *DiscussionHandler) DeleteComment(ctx *gin.Context) {
 // @Accept       json
 // @Produce      json
 // @Param        id path string true "the discussion id"
+// @Param        per query int false "per" default(10)
+// @Param        page query int false "per page" default(1)
 // @Success      200  {object}  types.Response{data=[]types.DiscussionResponse_Comment} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
@@ -405,7 +424,15 @@ func (h *DiscussionHandler) ListDiscussionComments(ctx *gin.Context) {
 	if err != nil {
 		httpbase.BadRequest(ctx, fmt.Errorf("invalid discussion id: %w", err).Error())
 	}
-	comments, err := h.discussion.ListDiscussionComments(ctx.Request.Context(), currentUser, idInt)
+
+	per, page, err := common.GetPerAndPageFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		httpbase.BadRequestWithExt(ctx, err)
+		return
+	}
+
+	comments, total, err := h.discussion.ListDiscussionComments(ctx.Request.Context(), currentUser, idInt, per, page)
 	if err != nil {
 		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
@@ -417,7 +444,7 @@ func (h *DiscussionHandler) ListDiscussionComments(ctx *gin.Context) {
 		}
 		return
 	}
-	httpbase.OK(ctx, comments)
+	httpbase.OKWithTotal(ctx, comments, total)
 }
 
 func (h *DiscussionHandler) getRepoType(ctx *gin.Context) types.RepositoryType {
