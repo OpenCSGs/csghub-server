@@ -55,6 +55,11 @@ func TestNotebookComponentImpl_GetNotebookByID(t *testing.T) {
 		ClusterID:  "1",
 		Status:     23,
 	}
+	nc.mocks.deployer.EXPECT().GetReplica(ctx, types.DeployRepo{
+		ClusterID: "1",
+		SvcName:   "notebook-svc",
+		DeployID:  1,
+	}).Return(1, 2, []types.Instance{{Name: "i1"}}, nil)
 	nc.mocks.components.repo.EXPECT().CheckDeployPermissionForUser(ctx, types.DeployActReq{
 		DeployID:    1,
 		CurrentUser: "user",

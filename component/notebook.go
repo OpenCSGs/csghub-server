@@ -132,6 +132,15 @@ func (c *notebookComponentImpl) GetNotebook(ctx context.Context, req *types.GetN
 	if err != nil {
 		return nil, err
 	}
+	reqReplica := types.DeployRepo{
+		DeployID:  deploy.ID,
+		SvcName:   deploy.SvcName,
+		ClusterID: deploy.ClusterID,
+	}
+	_, _, instList, err := c.deployer.GetReplica(ctx, reqReplica)
+	if err != nil {
+		slog.Warn("fail to get deploy replica", slog.Any("req", req), slog.Any("error", err))
+	}
 	endpoint, _ := c.repoComponent.GenerateEndpoint(ctx, deploy)
 	image := deploy.ImageID
 	imagePairs := strings.Split(image, ":")
@@ -146,6 +155,9 @@ func (c *notebookComponentImpl) GetNotebook(ctx context.Context, req *types.GetN
 		ClusterID:               deploy.ClusterID,
 		Endpoint:                endpoint,
 		ResourceID:              deploy.SKU,
+		MinReplica:              deploy.MinReplica,
+		MaxReplica:              deploy.MaxReplica,
+		Instances:               instList,
 		SvcName:                 deploy.SvcName,
 		RuntimeFramework:        deploy.RuntimeFramework,
 		CreatedAt:               deploy.CreatedAt,
