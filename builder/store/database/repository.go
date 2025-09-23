@@ -715,7 +715,8 @@ func (s *repoStoreImpl) PublicToUser(ctx context.Context, repoType types.Reposit
 	}
 
 	if filter.Sort == "trending" {
-		q.Join("LEFT JOIN recom_repo_scores ON repository.id = recom_repo_scores.repository_id AND recom_repo_scores.weight_name = ?", RecomWeightTotal)
+		q.Join("LEFT JOIN recom_repo_scores ON repository.id = recom_repo_scores.repository_id")
+		q.Where("recom_repo_scores.weight_name = ?", RecomWeightTotal)
 		q.ColumnExpr(`COALESCE(recom_repo_scores.score, 0) AS popularity`)
 	}
 	q.Order(sortBy[filter.Sort])
