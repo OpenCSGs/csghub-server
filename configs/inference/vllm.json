@@ -6,9 +6,9 @@
   "engine_images": [
     {
       "compute_type": "gpu",
-      "image": "opencsghq/vllm:v0.10.1-cu128",
+      "image": "opencsghq/vllm:v0.10.2-cu128",
       "driver_version": "12.8",
-      "engine_version": "v0.10.1",
+      "engine_version": "v0.10.2",
       "extra_archs":[
         "ArceeForCausalLM",
         "BailingMoeForCausalLM",
@@ -25,13 +25,14 @@
         "HunYuanDenseV1ForCausalLM",
         "HunYuanDenseV1ForCausalLM",
         "HunYuanMoEV1ForCausalLM",
-        "HunYuanMoEV1ForCausalLM",
         "Mamba2ForCausalLM",
         "MBartForConditionalGeneration",
         "MiMoForCausalLM",
         "MiMoForCausalLM",
         "NemotronHForCausalLM",
-        "Phi4FlashForCausalLM"
+        "Phi4FlashForCausalLM",
+        "Qwen3NextForCausalLM",
+        "SeedOssForCausalLM"
       ]
     },
     {

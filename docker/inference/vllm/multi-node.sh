@@ -15,6 +15,14 @@ fi
 if [[ ! $ENGINE_ARGS == *"--max-model-len"* ]]; then
     ENGINE_ARGS="$ENGINE_ARGS --max-model-len 9016"
 fi
+tokenizer_config="/workspace/$REPO_ID/tokenizer_config.json"
+if ! grep -q "chat_template" "$tokenizer_config"; then
+    if [ -f "/workspace/$REPO_ID/chat_template.jinja" ]; then
+        ENGINE_ARGS="$ENGINE_ARGS --chat_template /workspace/$REPO_ID/chat_template.jinja"
+    else
+        ENGINE_ARGS="$ENGINE_ARGS --chat_template /etc/csghub/chat_template.jinja"
+    fi
+fi
 echo "ENGINE_ARGS: $ENGINE_ARGS"
 if [ "$LWS_WORKER_INDEX" == "0" ]; then
     /vllm-workspace/examples/online_serving/multi-node-serving.sh leader --ray_cluster_size=$LWS_GROUP_SIZE;python3 -m vllm.entrypoints.openai.api_server $ENGINE_ARGS
