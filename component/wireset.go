@@ -211,6 +211,7 @@ func NewTestRepoComponent(config *config.Config, stores *tests.MockStores, rpcUs
 		fileStore:              stores.File,
 		multiSyncClient:        multiSyncClient,
 		mirrorTaskStore:        stores.MirrorTaskStore,
+		recomStore:             stores.Recom,
 	}
 }
 

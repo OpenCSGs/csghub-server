@@ -261,6 +261,17 @@ func (c *repoComponentImpl) CreateRepo(ctx context.Context, req types.CreateRepo
 		return nil, nil, fmt.Errorf("fail to create database repo, error: %w", err)
 	}
 
+	err = c.recomStore.UpsertScore(ctx, []*database.RecomRepoScore{
+		{
+			RepositoryID: newDBRepo.ID,
+			Score:        0,
+			WeightName:   database.RecomWeightTotal,
+		},
+	})
+	if err != nil {
+		return nil, nil, fmt.Errorf("fail to upsert recom repo score, error: %w", err)
+	}
+
 	gitRepoReq := gitserver.CreateRepoReq{
 		Username:      req.Username,
 		Namespace:     temPath[0],
