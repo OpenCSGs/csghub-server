@@ -389,6 +389,16 @@ func (c *spaceComponentImpl) Show(ctx context.Context, namespace, name, currentU
 	}
 	repository := common.BuildCloneInfo(c.config, space.Repository)
 
+	for _, tag := range space.Repository.Tags {
+		tags = append(tags, types.RepoTag{
+			Name:     tag.Name,
+			Category: tag.Category,
+			Group:    tag.Group,
+			BuiltIn:  tag.BuiltIn,
+			ShowName: tag.I18nKey, //ShowName:  tag.ShowName,
+		})
+	}
+
 	resSpace := &types.Space{
 		ID:            space.ID,
 		Name:          space.Repository.Name,

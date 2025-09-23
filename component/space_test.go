@@ -21,16 +21,15 @@ func TestSpaceComponent_Show(t *testing.T) {
 	ctx := context.TODO()
 	sc := initializeTestSpaceComponent(ctx, t)
 
-	sc.mocks.stores.SpaceMock().EXPECT().FindByPath(ctx, "ns", "n").Return(&database.Space{
+	dbRepo := &database.Repository{ID: 123, Name: "n", Path: "foo/bar", Tags: []database.Tag{{Name: "t1"}}}
+	dbSpace := &database.Space{
 		ID:         1,
-		Repository: &database.Repository{ID: 123, Name: "n", Path: "foo/bar"},
+		Repository: dbRepo,
 		HasAppFile: true,
-	}, nil)
-	sc.mocks.components.repo.EXPECT().GetUserRepoPermission(ctx, "user", &database.Repository{
-		ID:   123,
-		Name: "n",
-		Path: "foo/bar",
-	}).Return(
+	}
+
+	sc.mocks.stores.SpaceMock().EXPECT().FindByPath(ctx, "ns", "n").Return(dbSpace, nil)
+	sc.mocks.components.repo.EXPECT().GetUserRepoPermission(ctx, "user", dbRepo).Return(
 		&types.UserRepoPermission{CanRead: true, CanAdmin: true}, nil,
 	)
 	sc.mocks.components.repo.EXPECT().GetNameSpaceInfo(ctx, "ns").Return(&types.Namespace{Path: "ns"}, nil)
@@ -67,9 +66,11 @@ func TestSpaceComponent_Show(t *testing.T) {
 			HTTPCloneURL: "/s/foo/bar.git",
 			SSHCloneURL:  ":s/foo/bar.git",
 		},
+		Tags:     []types.RepoTag{{Name: "t1"}},
 		Endpoint: "endpoint/svc",
 		SvcName:  "svc",
 	}, space)
+	require.Equal(t, []types.RepoTag{{Name: "t1"}}, space.Tags)
 }
 
 func TestSpaceComponent_Index(t *testing.T) {

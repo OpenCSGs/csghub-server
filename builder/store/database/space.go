@@ -88,6 +88,17 @@ func (s *spaceStoreImpl) FindByPath(ctx context.Context, namespace, name string)
 		return nil, fmt.Errorf("select space by path, error: %w", err)
 	}
 
+	err = s.db.Operator.Core.NewSelect().
+		Model(resSpace.Repository).
+		WherePK().
+		Relation("Tags", func(sq *bun.SelectQuery) *bun.SelectQuery {
+			return sq.Where("repository_tag.count > 0")
+		}).
+		Scan(ctx)
+	err = errorx.HandleDBError(err, errorx.Ctx().
+		Set("path", fmt.Sprintf("%s/%s", namespace, name)),
+	)
+
 	return resSpace, err
 }
 
