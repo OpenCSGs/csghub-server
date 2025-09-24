@@ -5,7 +5,7 @@ FROM python:${PYTHON_VERSION} AS base
 ENV DEBIAN_FRONTEND=noninteractive \
 	TZ=Asia/Shanghai
 
-# Update the package list to use Alibaba Cloud source
+# 更新软件包列表，使用阿里云源
 RUN rm -rf /etc/apt/sources.list.d/debian.sources && \
     echo "deb https://mirrors.aliyun.com/debian/ bookworm main non-free non-free-firmware contrib" > /etc/apt/sources.list && \
     echo "deb https://mirrors.aliyun.com/debian-security/ bookworm-security main" >> /etc/apt/sources.list && \
@@ -37,4 +37,5 @@ RUN pip install --no-cache-dir --default-timeout=60  streamlit==1.33.0 && \
 
 ## install nvm
 RUN git clone --depth=1 https://github.com/nvm-sh/nvm.git /home/user/.nvm
+
 # END Static Part
