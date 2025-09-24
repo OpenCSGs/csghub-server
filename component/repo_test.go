@@ -48,6 +48,7 @@ func TestRepoComponent_CreateRepo(t *testing.T) {
 		HttpCloneURL:  "http",
 		SshCloneURL:   "ssh",
 	}
+	repo.mocks.stores.RecomMock().EXPECT().UpsertScore(ctx, mock.Anything).Return(nil)
 	repo.mocks.gitServer.EXPECT().CreateRepo(ctx, mock.AnythingOfType("gitserver.CreateRepoReq")).Return(gitrepo, nil)
 	repo.mocks.gitServer.EXPECT().CommitFiles(ctx, mock.AnythingOfType("gitserver.CommitFilesReq")).Return(nil)
 	dbrepo := &database.Repository{
