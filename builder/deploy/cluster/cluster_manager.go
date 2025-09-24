@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/argoproj/argo-workflows/v3/pkg/client/clientset/versioned"
 	argo "github.com/argoproj/argo-workflows/v3/pkg/client/clientset/versioned"
 	authorizationv1 "k8s.io/api/authorization/v1"
 	v1 "k8s.io/api/core/v1"
@@ -212,7 +211,7 @@ func buildCluster(kubeconfig *rest.Config, id string, index int, connectMode typ
 		return nil, fmt.Errorf("failed to connect to cluster, %w", err)
 	}
 
-	argoClient, err := versioned.NewForConfig(kubeconfig)
+	argoClient, err := argo.NewForConfig(kubeconfig)
 	if err != nil {
 		return nil, err
 	}
@@ -327,6 +326,9 @@ func (cluster *Cluster) GetResourcesInCluster(config *config.Config) (map[string
 	nodeResourcesMap := make(map[string]types.NodeResourceInfo)
 
 	for _, node := range nodes.Items {
+		if !checkNodeReadiness(node) {
+			continue
+		}
 		totalMem := node.Status.Capacity.Memory().DeepCopy()
 		totalCPU := node.Status.Capacity.Cpu().DeepCopy()
 		allocatableMem := node.Status.Allocatable.Memory().DeepCopy()
@@ -488,4 +490,13 @@ func parseQuantityToInt64(q resource.Quantity) int64 {
 	}
 	value, _ := q.AsInt64()
 	return value
+}
+
+func checkNodeReadiness(node v1.Node) bool {
+	for _, cond := range node.Status.Conditions {
+		if cond.Type == v1.NodeReady && cond.Status == v1.ConditionTrue {
+			return true
+		}
+	}
+	return false
 }
