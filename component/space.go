@@ -817,7 +817,8 @@ func (c *spaceComponentImpl) Deploy(ctx context.Context, namespace, name, curren
 	if err != nil {
 		return -1, fmt.Errorf("fail to find resource by id %d, error: %w", resID, err)
 	}
-
+	slog.Info("deploy space with resource", slog.Any("resource", resource),
+		slog.String("username", currentUser), slog.Any("cluster_id", resource.ClusterID))
 	err = c.repoComponent.CheckAccountAndResource(ctx, currentUser, resource.ClusterID, 0, resource)
 	if err != nil {
 		return -1, err

@@ -987,6 +987,10 @@ func (d *deployer) CheckResourceAvailable(ctx context.Context, clusterId string,
 }
 
 func CheckResource(clusterResources *types.ClusterRes, hardware *types.HardWare) bool {
+	if hardware == nil {
+		slog.Error("hardware is empty for check resource", slog.Any("clusterResources", clusterResources))
+		return false
+	}
 	mem, err := strconv.Atoi(strings.Replace(hardware.Memory, "Gi", "", -1))
 	if err != nil {
 		slog.Error("failed to parse hardware memory ", slog.Any("error", err))
