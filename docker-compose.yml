@@ -1,112 +1,69 @@
-version: "3.8"
-
 services:
+
   postgres:
-    image: "gradescope/postgresql-multiple-databases:14.4"
+    image: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/csghub/postgres:15.10
     environment:
       POSTGRES_USER: "postgres"
       POSTGRES_PASSWORD: "postgres"
-      POSTGRES_MULTIPLE_DATABASES: "starhub_server,gitea,mirror"
+      POSTGRES_MULTIPLE_DATABASES: "starhub_server,mirror"
     ports:
-      - "5433:5432"
+      - "5432:5432"
+    healthcheck:
+      test: pg_isready -U postgres -h 127.0.0.1
+      interval: 5s
     volumes:
-      - ./pgdata:/var/lib/postgresql/data
+      - ./data/pgdata:/var/lib/postgresql/data
     networks:
-      - my_network
+      - my_ce_network
 
   minio:
-    image: "bitnami/minio"
+    image: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/bitnami/minio:2023
     environment:
-      MINIO_ROOT_USER: "minio-root-user-User-123"
-      MINIO_ROOT_PASSWORD: "minio-root-password-User-123"
+      MINIO_ROOT_USER: "admin"
+      MINIO_ROOT_PASSWORD: "Password_123"
       MINIO_SCHEME: "http"
+      MINIO_DEFAULT_BUCKETS: opencsg-server-lfs:public,opencsg-portal-storage:public,loki-data:public
     ports:
       - "9000:9000"
       - "9001:9001"
     volumes:
-      - ./minio_data:/bitnami/minio/data
+      - ./data/minio_data:/bitnami/minio/data
     networks:
-      - my_network
+      - my_ce_network
 
-  gitea:
-    image: "opencsg/csghub-git"
-    depends_on:
-      - postgres
-    environment:
-      - GITEA_DAEMON_USER=git
-      - GITEA_ROOT_URL=$GITEA_ROOT_URL
-      - GITEA_SSH_DOMAIN=$GITEA_SSH_DOMAIN
-      - GITEA_HTTP_PORT=3001
-      - GITEA_ADMIN_USER=root
-      - GITEA_ADMIN_PASSWORD=password123
-      - GITEA_ADMIN_EMAIL=root@opencsg.com
-      - GITEA_DATABASE_TYPE=postgres
-      - GITEA_DATABASE_HOST=postgres
-      - GITEA_DATABASE_PORT_NUMBER=5432
-      - GITEA_DATABASE_NAME=gitea
-      - GITEA_DATABASE_USERNAME=postgres
-      - GITEA_DATABASE_PASSWORD=postgres
-      - GITEA_DATABASE_SSL_MODE=disable
-      - GITEA_APP_NAME=gitea
-      - GITEA_SMTP_ENABLED=false
-      - BITNAMI_DEBUG=true
-      - GITEA_LFS_START_SERVER=true
-      - GITEA_LFS_ROOT_PATH=/bitnami/gitea/data/lfs
-      - GITEA_LFS_STORAGE_TYPE=minio
-      - GITEA_LFS_MINIO_ACCESS_KEY_ID=minio-root-user-User-123
-      - GITEA_LFS_MINIO_SECRET_ACCESS_KEY=minio-root-password-User-123
-      - GITEA_LFS_MINIO_ENDPOINT=minio:9000
-      - GITEA_LFS_MINIO_BUCKET=opencsg-server-lfs
-      - GITEA_LFS_MINIO_LOCATION=beijing
-      - GITEA_LFS_MINIO_USE_SSL=false
-      - GITEA_LFS_SERVE_DIRECT=true
-      - GITEA_SERVICE_DEFAULT_ALLOW_CREATE_ORGANIZATION=true
+  redis:
+    image: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/redis:7.2.5
     ports:
-      - "3001:3001"
-      - "2222:2222"
+      - "6379:6379"
     volumes:
-      - ./gitea:/bitnami/gitea
+      - ./data/redis:/data
     networks:
-      - my_network
-
-  starhub_server:
-    image: "opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/csghub_server:latest"
-    depends_on:
-      - postgres
-      - gitea
+      - my_ce_network
+    healthcheck:
+      test: redis-cli ping
+      interval: 1s
+      timeout: 3s
+      retries: 30
+    
+  gitaly:
+    image: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/gitaly:v16.4.6
+    command:
+      ["bash", "-c", "mkdir -p /home/git/repositories && rm -rf /srv/gitlab-shell/hooks/* && touch /srv/gitlab-shell/.gitlab_shell_secret && exec /usr/bin/env GITALY_CONFIG_FILE=/home/gitaly.config.toml /scripts/process-wrapper"]
     environment:
-      STARHUB_DATABASE_DSN: postgresql://postgres:postgres@postgres:5432/starhub_server?sslmode=disable
-      STARHUB_DATABASE_TIMEZONE: Asia/Shanghai
-      STARHUB_SERVER_GITSERVER_HOST: http://gitea:3001
-      STARHUB_SERVER_GITSERVER_URL: http://gitea:3001
-      STARHUB_SERVER_GITSERVER_USERNAME: root
-      STARHUB_SERVER_GITSERVER_PASSWORD: password123
-      STARHUB_SERVER_GITSERVER_WEBHOOK_URL: http://localhost:8080/api/v1/callback/git
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: starhub_server
-      GITEA_USERNAME: root
-      GITEA_PASSWORD: password123
-      GIN_MODE: release
-      STARHUB_SERVER_API_TOKEN: $STARHUB_SERVER_API_TOKEN
-      STARHUB_SERVER_S3_ACCESS_KEY_ID: $STARHUB_SERVER_S3_ACCESS_KEY_ID
-      STARHUB_SERVER_S3_ACCESS_KEY_SECRET: $STARHUB_SERVER_S3_ACCESS_KEY_SECRET
-      STARHUB_SERVER_S3_REGION: $STARHUB_SERVER_S3_REGION
-      STARHUB_SERVER_S3_BUCKET: $STARHUB_SERVER_S3_BUCKET
-      STARHUB_SERVER_INFERENCE_SERVER_ADDR: $STARHUB_SERVER_INFERENCE_SERVER_ADDR
-      OPENCSG_ACCOUNTING_NATS_URL: nats://natsadmin:vf3jv9SsJBdv3n02n8Kxbvjf@natsmaster:4222
-      OPENCSG_ACCOUNTING_SERVER_HOST: http://account_server
-      OPENCSG_ACCOUNTING_SERVER_PORT: 8086
-      OPENCSG_USER_SERVER_HOST: http://user_server
-      OPENCSG_USER_SERVER_PORT: 8088
-
+      - GITALY_CONFIG_FILE=/home/gitaly.config.toml
+    user: "root"
     ports:
-      - "8080:8080"
+      - '8075:8075'
+    volumes:
+      - ./data/gitaly.config.toml:/home/gitaly.config.toml
+      - ./data/gitaly/git/repositories:/home/git/repositories
+      - ./data/gitaly/git/hooks:/home/git/hooks
+      - ./data/gitaly/log:/var/log/gitaly
     networks:
-      - my_network
+      - my_ce_network
 
   natsmaster:
-    image: "nats:2.10.16"
+    image: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/csghub_nats:2.10.16
     deploy:
       resources:
         limits:
@@ -120,14 +77,137 @@ services:
       - "6222:6222"
       - "8222:8222"
     volumes:
-      - ./nats-server.conf:/nats-server.conf
-      - ./jetstream:/data/jetstream
-    networks:
-      - my_network
+      - ./data/nats-server.conf:/nats-server.conf
+      - ./data/jetstream:/data/jetstream
     restart: always
+    networks:
+      - my_ce_network
+
+  temporal-ce:
+    container_name: temporal-ce
+    depends_on:
+      - postgres
+    environment:
+      - DB=postgres12
+      - DB_PORT=5432
+      - POSTGRES_USER=postgres
+      - POSTGRES_PWD=postgres
+      - DEFAULT_NAMESPACE_RETENTION=7d
+      - POSTGRES_SEEDS=postgres
+    # uncomment to use docker hub
+    # image: temporalio/auto-setup:1.25.1
+    image: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/temporalio/auto-setup:1.25.1
+    networks:
+      - my_ce_network
+    ports:
+      - 7233:7233
+
+  temporal-ui-ce:
+    container_name: temporal-ui-ce
+    depends_on:
+      - temporal-ce
+    environment:
+      - TEMPORAL_ADDRESS=temporal-ce:7233
+      - TEMPORAL_CORS_ORIGINS=http://localhost:3000
+    # uncomment to use docker hub
+    # image: temporalio/ui:2.30.3
+    image: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/temporalio/ui:2.30.3
+    networks:
+      - my_ce_network
+    ports:
+      - 8180:8080
+
+  loki:
+    image: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/grafana/loki:3.1.0
+    container_name: loki
+    restart: unless-stopped
+    command:
+      - "-config.file=/etc/loki/loki-config.yaml"
+    networks:
+      - my_ce_network
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./data/loki-data:/data
+      - ./data/loki-config.yaml:/etc/loki/loki-config.yaml
+
+  starhub_server:
+    image: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/csghub-server:latest
+    depends_on:
+      - postgres
+      - gitaly
+      # - gitlab-shell
+    environment:
+      STARHUB_DATABASE_DSN: postgresql://postgres:postgres@postgres:5432/starhub_server?sslmode=disable
+      GIN_MODE: release
+      STARHUB_SERVER_REDIS_ENDPOINT: redis:6379
+      STARHUB_SERVER_GITSERVER_TYPE: gitaly
+      STARHUB_SERVER_GITALY_SERVER_SOCKET: tcp://gitaly:8075
+      STARHUB_SERVER_GITALY_STORGE: default
+      STARHUB_SERVER_GITALY_TOKEN: abc123secret
+      STARHUB_SERVER_SSH_DOMAIN: ssh://git@$localhost:2222
+      STARHUB_SERVER_SAAS: false
+      STARHUB_SERVER_MIRRORSERVER_ENABLE: false
+      STARHUB_SERVER_S3_ACCESS_KEY_ID: admin
+      STARHUB_SERVER_S3_ACCESS_KEY_SECRET: Password_123
+      STARHUB_SERVER_S3_ENDPOINT: minio:9000 # used to generate download links for lfs files
+      STARHUB_SERVER_S3_INTERNAL_ENDPOINT: minio:9000
+      STARHUB_SERVER_S3_BUCKET: opencsg-server-lfs
+      STARHUB_SERVER_S3_REGION: cn-beijing
+      STARHUB_SERVER_S3_ENABLE_SSL: false
+      STARHUB_SERVER_ENABLE_SWAGGER: false 
+      OPENCSG_ACCOUNTING_NATS_URL: nats://natsadmin:gsSl9c919B8dc5FAcrvT8v4J7ck90w@natsmaster:4222
+      OPENCSG_ACCOUNTING_SERVER_HOST: http://account_server
+      OPENCSG_ACCOUNTING_SERVER_PORT: 8086
+      # user service conenction
+      OPENCSG_USER_SERVER_HOST: http://user_server
+      OPENCSG_USER_SERVER_PORT: 8088
+      # model service conenction
+      OPENCSG_MODERATION_SERVER_HOST: http://moderation_server
+      OPENCSG_MODERATION_SERVER_PORT: 8089
+      OPENCSG_WORKFLOW_SERVER_ENDPOINT: temporal-ce:7233
+      OPENCSG_DATAVIEWER_SERVER_HOST: dataviewer
+      OPENCSG_DATAVIEWER_SERVER_PORT: 8093
+    ports:
+      - "8080:8080"
+    networks:
+      - my_ce_network
+
+  user_server:
+    image: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/csghub-server:latest
+    entrypoint:
+      - /starhub-bin/starhub
+      - user
+      - launch
+    depends_on:
+      - postgres
+    environment:
+      STARHUB_DATABASE_DSN: postgresql://postgres:postgres@postgres:5432/starhub_server?sslmode=disable
+      STARHUB_SERVER_GITSERVER_TYPE: gitaly
+      STARHUB_SERVER_GITALY_SERVER_SOCKET: tcp://gitaly:8075
+      STARHUB_SERVER_GITALY_STORGE: default
+      STARHUB_SERVER_GITALY_TOKEN: abc123secret
+      STARHUB_SERVER_CASDOOR_CLIENT_ID: ${STARHUB_SERVER_CASDOOR_CLIENT_ID}
+      STARHUB_SERVER_CASDOOR_CLIENT_SECRET: ${STARHUB_SERVER_CASDOOR_CLIENT_SECRET}
+      STARHUB_SERVER_CASDOOR_ENDPOINT: ${STARHUB_SERVER_CASDOOR_ENDPOINT}
+      # Update for your local casdoor
+      STARHUB_SERVER_CASDOOR_CERTIFICATE: /starhub-bin/casdoor/casdoor_stg_cert-token_jwt_key.pem
+      STARHUB_SERVER_CASDOOR_ORGANIZATION_NAME: ${STARHUB_SERVER_CASDOOR_ORGANIZATION_NAME}
+      STARHUB_SERVER_CASDOOR_APPLICATION_NAME: ${STARHUB_SERVER_CASDOOR_APPLICATION_NAME}
+      OPENCSG_USER_SERVER_PORT: 8088
+      OPENCSG_USER_SERVER_SIGNIN_SUCCESS_REDIRECT_URL: http://${SERVER_DOMAIN}:${SERVER_PORT}/server/callback
+      OPENCSG_WORKFLOW_SERVER_ENDPOINT: temporal-ce:7233
+      STARHUB_SERVER_REDIS_ENDPOINT: redis:6379
+    ports:
+      - "8088:8088"
+    restart: always
+    networks:
+      - my_ce_network
+    volumes:
+      - ./data/casdoor/:/starhub-bin/casdoor/:r
 
   account_server:
-    image: "opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/csghub_server:latest"
+    image: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/csghub-server:latest
     entrypoint:
       - /starhub-bin/starhub
       - accounting
@@ -136,64 +216,106 @@ services:
       - postgres
       - natsmaster
     environment:
-      STARHUB_SERVER_API_TOKEN: $STARHUB_SERVER_API_TOKEN
       STARHUB_DATABASE_DSN: postgresql://postgres:postgres@postgres:5432/starhub_server?sslmode=disable
       OPENCSG_ACCOUNTING_SERVER_PORT: 8086
-      OPENCSG_ACCOUNTING_NATS_URL: nats://natsadmin:vf3jv9SsJBdv3n02n8Kxbvjf@natsmaster:4222
+      OPENCSG_ACCOUNTING_NATS_URL: nats://natsadmin:gsSl9c919B8dc5FAcrvT8v4J7ck90w@natsmaster:4222
       OPENCSG_ACCOUNTING_MSG_FETCH_TIMEOUTINSEC: 5
       GIN_MODE: release
     ports:
       - "8086:8086"
-    networks:
-      - my_network
     restart: always
-  
-  user_server:
-    image: "opencsg/csghub-server"
+    networks:
+      - my_ce_network
+
+  mirror-repo-sync:
+    image: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/csghub-server:latest
     entrypoint:
       - /starhub-bin/starhub
-      - user
+      - mirror
+      - repo-sync
+    depends_on:
+      - redis
+      - gitaly
+    deploy:
+      mode: replicated
+      resources:
+        limits:
+          cpus: '1'
+          memory: 2048M
+    environment:
+      STARHUB_DATABASE_DSN: postgresql://postgres:postgres@postgres:5432/starhub_server?sslmode=disable
+      STARHUB_DATABASE_TIMEZONE: Asia/Shanghai
+      STARHUB_SERVER_REDIS_ENDPOINT: redis:6379
+      STARHUB_SERVER_GITSERVER_TYPE: gitaly
+      STARHUB_SERVER_GITALY_SERVER_SOCKET: tcp://gitaly:8075
+      STARHUB_SERVER_GITALY_STORGE: default
+      STARHUB_SERVER_GITALY_TOKEN: abc123secret
+      STARHUB_SERVER_GITALY_JWT_SECRET: signing-key
+      # workflow
+      OPENCSG_WORKFLOW_SERVER_ENDPOINT: temporal-ce:7233
+    restart: always
+    networks:
+      - my_ce_network
+
+  mirror-lfs-sync:
+    image: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/csghub-server:latest
+    entrypoint:
+      - /starhub-bin/starhub
+      - mirror
+      - lfs-sync
+    depends_on:
+      - redis
+      - postgres
+    environment:
+      STARHUB_DATABASE_DSN: postgresql://postgres:postgres@postgres:5432/starhub_server?sslmode=disable
+      STARHUB_DATABASE_TIMEZONE: Asia/Shanghai
+      STARHUB_SERVER_REDIS_ENDPOINT: redis:6379
+      STARHUB_SERVER_MIRROR_REMOTE: false
+      STARHUB_SERVER_S3_ACCESS_KEY_ID: admin
+      STARHUB_SERVER_S3_ACCESS_KEY_SECRET: Password_123
+      STARHUB_SERVER_S3_ENDPOINT: minio:9000
+      STARHUB_SERVER_S3_INTERNAL_ENDPOINT: minio:9000
+      STARHUB_SERVER_S3_BUCKET: opencsg-server-lfs
+      STARHUB_SERVER_S3_REGION: cn-beijing
+      STARHUB_SERVER_S3_ENABLE_SSL: false
+      STARHUB_SERVER_MIRRORSERVER_ENABLE: false
+      OPENCSG_WORKFLOW_SERVER_ENDPOINT: temporal-ce:7233
+    restart: always
+    networks:
+      - my_ce_network
+
+  dataviewer:
+    image: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/csghub-server:latest
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+    entrypoint:
+      - /starhub-bin/starhub
+      - dataviewer
       - launch
     depends_on:
       - postgres
-      - gitea
+      - gitaly
     environment:
-      STARHUB_SERVER_API_TOKEN: $STARHUB_SERVER_API_TOKEN
+      OPENCSG_DATAVIEWER_SERVER_PORT: 8093
       STARHUB_DATABASE_DSN: postgresql://postgres:postgres@postgres:5432/starhub_server?sslmode=disable
-      STARHUB_DATABASE_TIMEZONE: Asia/Shanghai
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: starhub_server
-      STARHUB_SERVER_GITSERVER_HOST: http://gitea:3001
-      STARHUB_SERVER_GITSERVER_USERNAME: root
-      STARHUB_SERVER_GITSERVER_PASSWORD: password123
-      STARHUB_SERVER_CASDOOR_CLIENT_ID: $STARHUB_SERVER_CASDOOR_CLIENT_ID
-      STARHUB_SERVER_CASDOOR_CLIENT_SECRET: $STARHUB_SERVER_CASDOOR_CLIENT_SECRET
-      STARHUB_SERVER_CASDOOR_ENDPOINT: $STARHUB_SERVER_CASDOOR_ENDPOINT 
-      STARHUB_SERVER_CASDOOR_CERTIFICATE: /starhub-bin/casdoor/token_jwt_key.pem
-      STARHUB_SERVER_CASDOOR_ORGANIZATION_NAME: OpenCSG
-      STARHUB_SERVER_CASDOOR_APPLICATION_NAME: Portal
-      OPENCSG_USER_SERVER_PORT: 8088
-      OPENCSG_USER_SERVER_SIGNIN_SUCCESS_REDIRECT_URL: $OPENCSG_USER_SERVER_SIGNIN_SUCCESS_REDIRECT_URL
+      STARHUB_SERVER_GITSERVER_TYPE: gitaly
+      STARHUB_SERVER_S3_ACCESS_KEY_ID: admin
+      STARHUB_SERVER_S3_ACCESS_KEY_SECRET: Password_123
+      STARHUB_SERVER_S3_ENDPOINT: localhost:9000
+      STARHUB_SERVER_S3_BUCKET: opencsg-server-lfs
+      STARHUB_SERVER_S3_REGION: cn-beijing
+      STARHUB_SERVER_S3_ENABLE_SSL: false
+      OPENCSG_WORKFLOW_SERVER_ENDPOINT: temporal-ce:7233
+      STARHUB_SERVER_REDIS_ENDPOINT: redis:6379
     ports:
-      - "8088:8088"
-    volumes:
-      - ./casdoor:/starhub-bin/casdoor:r
+      - "8093:8093"
+    restart: always
     networks:
-      - my_network
-  loki:
-    image: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/grafana/loki:3.1.0
-    container_name: loki
-    restart: unless-stopped
-    command: "-config.file=/etc/loki/loki-config.yaml -target=all"
-    networks:
-      - my_network
-    ports:
-      - "3100:3100"
-    volumes:
-      - ./data/loki-data:/data
-      - ./loki-config.yaml:/etc/loki/loki-config.yaml
+      - my_ce_network
 
 networks:
-  my_network:
+  my_ce_network:
     driver: bridge

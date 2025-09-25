@@ -16,7 +16,6 @@ local_only
 cmd/csghub-server/__debug_*
 
 .data
-/data
 */*/_api_test/
 redis/dump.rdb
 run_server_local.sh
