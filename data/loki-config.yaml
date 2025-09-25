@@ -1,0 +1,78 @@
+---
+auth_enabled: false
+
+server:
+  http_listen_address: 0.0.0.0
+  http_listen_port: 3100
+
+memberlist:
+  # join_members: ["read", "write", "backend"]
+  join_members: ["loki"]
+  dead_node_reclaim_time: 30s
+  gossip_to_dead_nodes_time: 15s
+  left_ingesters_timeout: 30s
+  bind_addr: ['0.0.0.0']
+  bind_port: 7946
+  gossip_interval: 2s
+
+schema_config:
+  configs:
+    - from: 2023-01-01
+      store: tsdb
+      object_store: s3
+      schema: v13
+      index:
+        prefix: index_
+        period: 24h
+common:
+  path_prefix: /loki
+  replication_factor: 1
+  compactor_address: http://backend:3100
+  storage:
+    s3:
+      endpoint: minio:9000
+      insecure: true
+      bucketnames: loki-data
+      access_key_id: admin
+      secret_access_key: Password_123
+      s3forcepathstyle: true
+  ring:
+    kvstore:
+      store: memberlist
+ruler:
+  storage:
+    s3:
+      bucketnames: loki-ruler
+
+# compactor:
+#   working_directory: /tmp/compactor
+
+limits_config:
+  # Global limits applied at the distributor.
+  ingestion_rate_mb: 25
+  ingestion_burst_size_mb: 50
+ # Per-stream rate limits to avoid 429 errors from high-volume log sources.
+  # This value is in BYTES per second. We set it to 15MB/s.
+  per_stream_rate_limit: 15728640
+  # This value is in BYTES. We set it to 30MB.
+  per_stream_rate_limit_burst: 31457280
+  max_query_lookback: 168h
+  retention_period: 168h
+  # Increase the number of allowed concurrent tailing requests per tenant.
+  # The default is 10.
+  max_concurrent_tail_requests: 10000
+  # Maximum number of active streams per user.
+  max_streams_per_user: 10000
+
+compactor:
+  working_directory: /tmp/retention
+  delete_request_store: s3
+  retention_enabled: true
+  compaction_interval: 10m
+  retention_delete_delay: 2h
+  retention_delete_worker_count: 150
+
+ingester:
+  chunk_idle_period: 5m
+  chunk_retain_period: 15m
+  max_chunk_age: 30m
