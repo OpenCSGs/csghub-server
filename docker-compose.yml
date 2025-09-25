@@ -5,7 +5,7 @@ services:
     environment:
       POSTGRES_USER: "postgres"
       POSTGRES_PASSWORD: "postgres"
-      POSTGRES_MULTIPLE_DATABASES: "starhub_server,mirror"
+      POSTGRES_MULTIPLE_DATABASES: "starhub_server,csghub_casdoor,temporal,temporal_visibility,mirror"
     ports:
       - "5432:5432"
     healthcheck:
@@ -37,13 +37,13 @@ services:
       - "6379:6379"
     volumes:
       - ./data/redis:/data
-    networks:
-      - my_ce_network
     healthcheck:
       test: redis-cli ping
       interval: 1s
       timeout: 3s
       retries: 30
+    networks:
+      - my_ce_network
     
   gitaly:
     image: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/gitaly:v16.4.6
@@ -83,8 +83,7 @@ services:
     networks:
       - my_ce_network
 
-  temporal-ce:
-    container_name: temporal-ce
+  temporal:
     depends_on:
       - postgres
     environment:
@@ -97,25 +96,24 @@ services:
     # uncomment to use docker hub
     # image: temporalio/auto-setup:1.25.1
     image: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/temporalio/auto-setup:1.25.1
-    networks:
-      - my_ce_network
     ports:
       - 7233:7233
+    networks:
+      - my_ce_network
 
-  temporal-ui-ce:
-    container_name: temporal-ui-ce
+  temporal-ui:
     depends_on:
-      - temporal-ce
+      - temporal
     environment:
-      - TEMPORAL_ADDRESS=temporal-ce:7233
+      - TEMPORAL_ADDRESS=temporal:7233
       - TEMPORAL_CORS_ORIGINS=http://localhost:3000
     # uncomment to use docker hub
     # image: temporalio/ui:2.30.3
     image: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/temporalio/ui:2.30.3
-    networks:
-      - my_ce_network
     ports:
       - 8180:8080
+    networks:
+      - my_ce_network
 
   loki:
     image: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/grafana/loki:3.1.0
@@ -123,53 +121,53 @@ services:
     restart: unless-stopped
     command:
       - "-config.file=/etc/loki/loki-config.yaml"
-    networks:
-      - my_ce_network
     ports:
       - "3100:3100"
     volumes:
       - ./data/loki-data:/data
       - ./data/loki-config.yaml:/etc/loki/loki-config.yaml
+    networks:
+      - my_ce_network
+
+  # default user: root/Root@1234
+  casdoor:
+    image: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/casbin/casdoor:v1.733.0
+    depends_on:
+      postgres:
+        condition: service_healthy
+        restart: true
+    environment:
+      RUNNING_IN_DOCKER: true
+    volumes:
+      - ./data/casdoor/conf:/conf
+    restart: always
+    healthcheck:
+      test: [ "CMD", "nc", "-z", "localhost", "8000" ]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+    networks:
+      - my_ce_network
 
   starhub_server:
     image: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/csghub-server:latest
     depends_on:
       - postgres
       - gitaly
-      # - gitlab-shell
-    environment:
-      STARHUB_DATABASE_DSN: postgresql://postgres:postgres@postgres:5432/starhub_server?sslmode=disable
-      GIN_MODE: release
-      STARHUB_SERVER_REDIS_ENDPOINT: redis:6379
-      STARHUB_SERVER_GITSERVER_TYPE: gitaly
-      STARHUB_SERVER_GITALY_SERVER_SOCKET: tcp://gitaly:8075
-      STARHUB_SERVER_GITALY_STORGE: default
-      STARHUB_SERVER_GITALY_TOKEN: abc123secret
-      STARHUB_SERVER_SSH_DOMAIN: ssh://git@$localhost:2222
-      STARHUB_SERVER_SAAS: false
-      STARHUB_SERVER_MIRRORSERVER_ENABLE: false
-      STARHUB_SERVER_S3_ACCESS_KEY_ID: admin
-      STARHUB_SERVER_S3_ACCESS_KEY_SECRET: Password_123
-      STARHUB_SERVER_S3_ENDPOINT: minio:9000 # used to generate download links for lfs files
-      STARHUB_SERVER_S3_INTERNAL_ENDPOINT: minio:9000
-      STARHUB_SERVER_S3_BUCKET: opencsg-server-lfs
-      STARHUB_SERVER_S3_REGION: cn-beijing
-      STARHUB_SERVER_S3_ENABLE_SSL: false
-      STARHUB_SERVER_ENABLE_SWAGGER: false 
-      OPENCSG_ACCOUNTING_NATS_URL: nats://natsadmin:gsSl9c919B8dc5FAcrvT8v4J7ck90w@natsmaster:4222
-      OPENCSG_ACCOUNTING_SERVER_HOST: http://account_server
-      OPENCSG_ACCOUNTING_SERVER_PORT: 8086
-      # user service conenction
-      OPENCSG_USER_SERVER_HOST: http://user_server
-      OPENCSG_USER_SERVER_PORT: 8088
-      # model service conenction
-      OPENCSG_MODERATION_SERVER_HOST: http://moderation_server
-      OPENCSG_MODERATION_SERVER_PORT: 8089
-      OPENCSG_WORKFLOW_SERVER_ENDPOINT: temporal-ce:7233
-      OPENCSG_DATAVIEWER_SERVER_HOST: dataviewer
-      OPENCSG_DATAVIEWER_SERVER_PORT: 8093
+      - minio
+      - redis
+      - natsmaster
+      - temporal
+      - loki
+    entrypoint:
+      - /starhub-bin/starhub
+      - start
+      - server
+      - "--config=/starhub-bin/config/config.toml"
     ports:
       - "8080:8080"
+    volumes:
+      - ./data/config.toml:/starhub-bin/config/config.toml:r
     networks:
       - my_ce_network
 
@@ -179,32 +177,17 @@ services:
       - /starhub-bin/starhub
       - user
       - launch
+      - "--config=/starhub-bin/config/config.toml"
     depends_on:
       - postgres
-    environment:
-      STARHUB_DATABASE_DSN: postgresql://postgres:postgres@postgres:5432/starhub_server?sslmode=disable
-      STARHUB_SERVER_GITSERVER_TYPE: gitaly
-      STARHUB_SERVER_GITALY_SERVER_SOCKET: tcp://gitaly:8075
-      STARHUB_SERVER_GITALY_STORGE: default
-      STARHUB_SERVER_GITALY_TOKEN: abc123secret
-      STARHUB_SERVER_CASDOOR_CLIENT_ID: ${STARHUB_SERVER_CASDOOR_CLIENT_ID}
-      STARHUB_SERVER_CASDOOR_CLIENT_SECRET: ${STARHUB_SERVER_CASDOOR_CLIENT_SECRET}
-      STARHUB_SERVER_CASDOOR_ENDPOINT: ${STARHUB_SERVER_CASDOOR_ENDPOINT}
-      # Update for your local casdoor
-      STARHUB_SERVER_CASDOOR_CERTIFICATE: /starhub-bin/casdoor/casdoor_stg_cert-token_jwt_key.pem
-      STARHUB_SERVER_CASDOOR_ORGANIZATION_NAME: ${STARHUB_SERVER_CASDOOR_ORGANIZATION_NAME}
-      STARHUB_SERVER_CASDOOR_APPLICATION_NAME: ${STARHUB_SERVER_CASDOOR_APPLICATION_NAME}
-      OPENCSG_USER_SERVER_PORT: 8088
-      OPENCSG_USER_SERVER_SIGNIN_SUCCESS_REDIRECT_URL: http://${SERVER_DOMAIN}:${SERVER_PORT}/server/callback
-      OPENCSG_WORKFLOW_SERVER_ENDPOINT: temporal-ce:7233
-      STARHUB_SERVER_REDIS_ENDPOINT: redis:6379
+      - starhub_server
     ports:
       - "8088:8088"
-    restart: always
-    networks:
-      - my_ce_network
     volumes:
       - ./data/casdoor/:/starhub-bin/casdoor/:r
+      - ./data/config.toml:/starhub-bin/config/config.toml:r
+    networks:
+      - my_ce_network
 
   account_server:
     image: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/csghub-server:latest
@@ -212,75 +195,15 @@ services:
       - /starhub-bin/starhub
       - accounting
       - launch
+      - "--config=/starhub-bin/config/config.toml"
     depends_on:
       - postgres
       - natsmaster
-    environment:
-      STARHUB_DATABASE_DSN: postgresql://postgres:postgres@postgres:5432/starhub_server?sslmode=disable
-      OPENCSG_ACCOUNTING_SERVER_PORT: 8086
-      OPENCSG_ACCOUNTING_NATS_URL: nats://natsadmin:gsSl9c919B8dc5FAcrvT8v4J7ck90w@natsmaster:4222
-      OPENCSG_ACCOUNTING_MSG_FETCH_TIMEOUTINSEC: 5
-      GIN_MODE: release
+      - starhub_server
     ports:
       - "8086:8086"
-    restart: always
-    networks:
-      - my_ce_network
-
-  mirror-repo-sync:
-    image: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/csghub-server:latest
-    entrypoint:
-      - /starhub-bin/starhub
-      - mirror
-      - repo-sync
-    depends_on:
-      - redis
-      - gitaly
-    deploy:
-      mode: replicated
-      resources:
-        limits:
-          cpus: '1'
-          memory: 2048M
-    environment:
-      STARHUB_DATABASE_DSN: postgresql://postgres:postgres@postgres:5432/starhub_server?sslmode=disable
-      STARHUB_DATABASE_TIMEZONE: Asia/Shanghai
-      STARHUB_SERVER_REDIS_ENDPOINT: redis:6379
-      STARHUB_SERVER_GITSERVER_TYPE: gitaly
-      STARHUB_SERVER_GITALY_SERVER_SOCKET: tcp://gitaly:8075
-      STARHUB_SERVER_GITALY_STORGE: default
-      STARHUB_SERVER_GITALY_TOKEN: abc123secret
-      STARHUB_SERVER_GITALY_JWT_SECRET: signing-key
-      # workflow
-      OPENCSG_WORKFLOW_SERVER_ENDPOINT: temporal-ce:7233
-    restart: always
-    networks:
-      - my_ce_network
-
-  mirror-lfs-sync:
-    image: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/csghub-server:latest
-    entrypoint:
-      - /starhub-bin/starhub
-      - mirror
-      - lfs-sync
-    depends_on:
-      - redis
-      - postgres
-    environment:
-      STARHUB_DATABASE_DSN: postgresql://postgres:postgres@postgres:5432/starhub_server?sslmode=disable
-      STARHUB_DATABASE_TIMEZONE: Asia/Shanghai
-      STARHUB_SERVER_REDIS_ENDPOINT: redis:6379
-      STARHUB_SERVER_MIRROR_REMOTE: false
-      STARHUB_SERVER_S3_ACCESS_KEY_ID: admin
-      STARHUB_SERVER_S3_ACCESS_KEY_SECRET: Password_123
-      STARHUB_SERVER_S3_ENDPOINT: minio:9000
-      STARHUB_SERVER_S3_INTERNAL_ENDPOINT: minio:9000
-      STARHUB_SERVER_S3_BUCKET: opencsg-server-lfs
-      STARHUB_SERVER_S3_REGION: cn-beijing
-      STARHUB_SERVER_S3_ENABLE_SSL: false
-      STARHUB_SERVER_MIRRORSERVER_ENABLE: false
-      OPENCSG_WORKFLOW_SERVER_ENDPOINT: temporal-ce:7233
-    restart: always
+    volumes:
+      - ./data/config.toml:/starhub-bin/config/config.toml:r
     networks:
       - my_ce_network
 
@@ -295,26 +218,67 @@ services:
       - /starhub-bin/starhub
       - dataviewer
       - launch
+      - "--config=/starhub-bin/config/config.toml"
     depends_on:
       - postgres
       - gitaly
-    environment:
-      OPENCSG_DATAVIEWER_SERVER_PORT: 8093
-      STARHUB_DATABASE_DSN: postgresql://postgres:postgres@postgres:5432/starhub_server?sslmode=disable
-      STARHUB_SERVER_GITSERVER_TYPE: gitaly
-      STARHUB_SERVER_S3_ACCESS_KEY_ID: admin
-      STARHUB_SERVER_S3_ACCESS_KEY_SECRET: Password_123
-      STARHUB_SERVER_S3_ENDPOINT: localhost:9000
-      STARHUB_SERVER_S3_BUCKET: opencsg-server-lfs
-      STARHUB_SERVER_S3_REGION: cn-beijing
-      STARHUB_SERVER_S3_ENABLE_SSL: false
-      OPENCSG_WORKFLOW_SERVER_ENDPOINT: temporal-ce:7233
-      STARHUB_SERVER_REDIS_ENDPOINT: redis:6379
+      - starhub_server
     ports:
       - "8093:8093"
-    restart: always
+    volumes:
+      - ./data/config.toml:/starhub-bin/config/config.toml:r
     networks:
       - my_ce_network
+
+  notification_server:
+    image: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/csghub-server:latest
+    entrypoint:
+      - /starhub-bin/starhub
+      - notification
+      - launch
+      - --config=/starhub-bin/config/config.toml
+    depends_on:
+      - postgres
+      - starhub_server
+    ports:
+      - "8095:8095"
+    volumes:
+      - ./data/config.toml:/starhub-bin/config/config.toml:r
+    networks:
+      - my_ce_network
+
+  starhub_proxy:
+    image: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/csghub-server:latest
+    entrypoint:
+      - /starhub-bin/starhub
+      - start
+      - rproxy
+      - --config=/starhub-bin/config/config.toml
+    depends_on:
+      - postgres
+      - starhub_server
+    ports:
+      - "8083:8083"
+    volumes:
+      - ./data/config.toml:/starhub-bin/config/config.toml:r
+    networks:
+      - my_ce_network
+
+  # Uncomment starhub_runner when you have Kubernetes config file
+  # starhub_runner:
+  #   image: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/csghub-server:latest
+  #   entrypoint:
+  #     - /starhub-bin/starhub
+  #     - deploy
+  #     - runner
+  #     - --config=/starhub-bin/config/config.toml
+  #   ports:
+  #     - "8082:8082"
+  #   volumes:
+  #     - ./data/kube:/root/.kube:r
+  #     - ./data/config.toml:/starhub-bin/config/config.toml:r
+  #   networks:
+  #     - my_ce_network
 
 networks:
   my_ce_network:

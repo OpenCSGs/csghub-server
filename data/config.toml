@@ -1,0 +1,102 @@
+saas = true
+enable_swagger = true
+city_to_cdn_domain = { "上海市" = "cdn-lfs-sh-1.opencsg.com" }
+server_failure_redirect_url = "https://opencsg.com/errors/server-error"
+
+[api_server]
+port = 8080
+public_domain = "http://opencsg.com"
+
+[database]
+driver = "pg"
+dsn = "postgresql://postgres:postgres@postgres:5432/starhub_server?sslmode=disable&statement_timeout=5000"
+timezone = "Asia/Shanghai"
+
+[redis]
+endpoint = "redis:6379"
+
+[git_server]
+type = "gitaly"
+username = "root"
+password = "password123"
+timeout_sec = 5
+
+[gitaly_server]
+address = "tcp://gitaly:8075"
+storge = "default"
+token = "abc123secret"
+
+[mirror_server]
+enable = false
+
+[frontend]
+url = "https://opencsg.com"
+
+[s3]
+access_key_id = "admin"
+access_key_secret = "Password_123"
+region = "cn-beijing"
+endpoint = "minio:9000"
+bucket = "opencsg-server-lfs"
+enable_ssl = false
+
+[sensitive_check]
+enable = false
+
+[jwt]
+signing_key = "signing-key"
+valid_hour = 24
+
+[space]
+builder_endpoint = "http://starhub_runner:8082"
+runner_endpoint = "http://starhub_runner:8082"
+runner_server_port = 8082
+rproxy_server_port = 8083
+deploy_timeout_in_min = 30
+readness_delay_seconds = 120
+readness_period_seconds = 10
+readness_failure_threshold = 3
+pypi_index_url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+
+[event]
+sync_interval = 1
+
+[casdoor]
+client_id = "7a97bc5168cb75ffc514"
+client_secret = "33bd85106818efd90c57fb35ffc787aabbff6f7a"
+endpoint = "http://casdoor:8000"
+certificate = "/starhub-bin/casdoor/token_jwt_key.pem"
+organization_name = "OpenCSG"
+application_name = "CSGHub"
+
+[nats]
+url = "nats://natsadmin:gsSl9c919B8dc5FAcrvT8v4J7ck90w@natsmaster:4222"
+msg_fetch_timeout_in_sec = 5
+
+[accounting]
+host = "http://account_server"
+port = 8086
+charging_enable = true
+
+[user]
+host = "http://user_server"
+port = 8088
+signin_success_redirect_url = "https://opencsg.com/server/callback"
+
+[dataset]
+promptMaxJsonlFileSize = 1048576  # 1MB
+allowCreatePublicDataset = false
+
+[moderation]
+host = "http://moderation_server"
+port = 8089
+
+[workflow]
+endpoint = "temporal:7233"
+
+[aigateway]
+port = 8094
+
+[dataviewer]
+host = "http://dataviewer"
+port = 8093
