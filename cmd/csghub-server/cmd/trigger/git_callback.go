@@ -41,7 +41,7 @@ var gitCallbackCmd = &cobra.Command{
 			return fmt.Errorf("failed to load config: %w", err)
 		}
 
-		err = workflow.StartWorkflow(config)
+		err = workflow.StartWorkflow(config, false)
 		if err != nil {
 			return err
 		}

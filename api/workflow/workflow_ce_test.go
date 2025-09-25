@@ -53,7 +53,7 @@ func newWorkflowTester(t *testing.T) (*workflowTester, error) {
 	mtc.EXPECT().GetScheduleClient().Return(tester.scheduler)
 
 	err := workflow.StartWorkflowDI(
-		cfg, mcb, mr, mg, mm, tester.mocks.stores.SyncClientSettingMock(), mtc, scanner, mrp,
+		cfg, mcb, mr, mg, mm, tester.mocks.stores.SyncClientSettingMock(), mtc, scanner, mrp, true,
 	)
 
 	if err != nil {

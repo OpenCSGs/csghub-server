@@ -54,7 +54,7 @@ var repoSyncCmd = &cobra.Command{
 			return fmt.Errorf("failed to recover mirrors: %w", err)
 		}
 
-		err = workflow.StartWorkflow(cfg)
+		err = workflow.StartWorkflow(cfg, false)
 		if err != nil {
 			return err
 		}
