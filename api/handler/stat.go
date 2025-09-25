@@ -35,7 +35,7 @@ func NewStatHandler(config *config.Config) (*StatHandler, error) {
 // @Produce      json
 // @Param        target_type query string true "Target type"
 // @Param        date_type   query string true "Date type" Enums(year,month,week,day)
-// @Success      200  {object}  map[string]types.StatSnapshotResp "OK"
+// @Success      200  {object}  types.Response{data=types.StatSnapshotResp} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /stat/snapshot [get]
@@ -76,7 +76,7 @@ func (h *StatHandler) GetStatSnap(ctx *gin.Context) {
 // @Tags         Stat
 // @Accept       json
 // @Produce      json
-// @Success      200  {object}  map[int]types.StatRunningDeploy "OK"
+// @Success      200  {object}  types.Response{data=map[int]types.StatRunningDeploy} "OK"
 // @Failure      401  {object}  types.APIUnauthorized "Unauthorized"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /stat/running-deploys [get]
