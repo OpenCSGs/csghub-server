@@ -12,7 +12,6 @@ local_only
 /jetstream
 .env
 *.sh
-*.toml
 cmd/csghub-server/__debug_*
 
 .data

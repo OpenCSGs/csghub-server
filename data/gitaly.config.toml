@@ -1,0 +1,42 @@
+# Directory containing Gitaly executables.
+bin_dir = "/usr/local/bin"
+
+# Optional if socket_path is set. TCP address for Gitaly to listen on. This is insecure (unencrypted connection).
+listen_addr = "0.0.0.0:9999"
+
+[git]
+use_bundled_binaries = true
+
+[[git.config]]
+key = "http.sslVerify"
+value = "false"
+
+# Optional. Authenticate Gitaly requests using a shared secret.
+# Gitaly rejects requests that do not contain the authentication token in their headers.
+# Authentication is disabled when the token setting is absent or an empty string.
+[auth]
+token = 'abc123secret'
+
+[[storage]]
+# The name of the storage
+name = "default"
+# The path to the storage.
+path = "/home/git/repositories"
+
+# Directory where Gitaly stores extra log files.
+dir = "log"
+
+# Sentry Environment for exception monitoring.
+sentry_environment = ""
+
+# Gitaly must connect to the GitLab application to perform access checks when a user performs a change.
+[gitlab]
+# URL of the GitLab server.
+# Update the following url to point to your csghub server IP or domain name
+url = "http://www.csghub-server.com:8080"
+
+# Secret token used to authenticate with GitLab.
+secret = "signing-key"
+
+[gitlab.http-settings]
+self_signed_cert = false
