@@ -1,4 +1,3 @@
-
 ARG SPACE_NGINX_IMAGE=opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/nginx:latest
 FROM ${SPACE_NGINX_IMAGE}
 WORKDIR /usr/share/nginx/html

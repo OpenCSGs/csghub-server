@@ -1,171 +1,322 @@
-#!/bin/bash
-
-SDK_GRADIO="gradio"
-SDK_STREAMLIT="streamlit"
-SDK_DOCKER="docker"
-SDK_MCPSERVER="mcp_server"
-SDK_NGINX="nginx"
-
-CURRENT_DIR=$(
-   cd "$(dirname "$0")"
-   pwd
-)
-
-# generate .lfs.opencsg.co folder
-gen_lfs_folder(){
-  destfolder=$lfs_folder_name
-
-  mkdir $lfs_folder_name
-
-  attfile=$lfs_folder_name/.gitattributes
-  touch $attfile
-  echo "* filter=lfs diff=lfs merge=lfs -text" >> $attfile
-
-  for file in $(git lfs ls-files | awk {'print $3'}); do
-     echo $file
-     directory=$(dirname "$file")
-     subfolder=$destfolder/$directory
-     mkdir -p $subfolder
-     cp $file $destfolder/$file
-  done
-}
-
-# generate Dockerfile
-gen_dockerfile(){
-  if [[ $sdk == $SDK_DOCKER ]]; then
-    if [[ ! -f "$repo/Dockerfile" ]]; then
-      echo "docker file $repo/Dockerfile does not exist"
-      exit 1
-    fi
-    return 0
-  fi
-
-  file="Dockerfile-python$python_version"
-  
-  if [[ $device == 'gpu' ]]; then
-    #set driver version to 11.8.0 if not set
-    if [[ -z $driver_version ]]; then
-      driver_version="11.8.0"
-    fi
-    file="$file-cuda$driver_version"
-  fi
-
-  if [[ $sdk == $SDK_NGINX ]]; then
-    if [[ ! -f "$repo/nginx.conf" ]]; then
-      echo "nginx conf file $repo/nginx.conf does not exist"
-      exit 1
-    fi
-    file="Dockerfile-nginx"
-  fi
-
-  echo "the Dockerfile is $file"
-
-  sourcefile="$source_dir/$file"
-  echo $sourcefile
-  if [[ -f $sourcefile ]]; then
-      cp $sourcefile  $repo/Dockerfile
-  else
-      echo "docker file $sourcefile does not exist"
-      exit 1
-  fi
-}
-
-gen_start_script(){
-
-app_file="app.py"
-  if [[ $sdk == $SDK_GRADIO || $sdk == $SDK_MCPSERVER ]]; then
-      # echo "#!/bin/sh \n python3 app.py" > $repo/start_entrypoint.sh
-      cat >  $repo/start_entrypoint.sh <<EOF
 #!/bin/sh
 
-python3 $app_file
-EOF
-  elif [[ $sdk == $SDK_STREAMLIT ]]; then
-      # echo "#!/bin/sh \n streamlit run app.py" > $repo/start_entrypoint.sh
-      cat >  $repo/start_entrypoint.sh <<EOF
-#!/bin/sh
+set -euo pipefail
 
-streamlit run $app_file
-EOF
-  elif [[ $sdk == $SDK_DOCKER || $sdk == $SDK_NGINX ]]; then
-      echo "do not create app file for docker and nginx sdk"
-  else 
-      echo "not supported sdk $sdk"
-      exit 1
-  fi 
+readonly SDK_GRADIO="gradio"
+readonly SDK_STREAMLIT="streamlit"
+readonly SDK_DOCKER="docker"
+readonly SDK_MCPSERVER="mcp_server"
+readonly SDK_NGINX="nginx"
+readonly LFS_FOLDER_NAME='.lfs.opencsg.co'
+readonly APP_FILE="app.py"
 
-  if [ -f "$repo/start_entrypoint.sh" ]; then
-    chmod 755 $repo/start_entrypoint.sh
-  fi
+readonly START_TIME=$(date +%s)
+
+log() {
+    local level="$1"
+    local message="$2"
+    local current_time=$(date +%s)
+    local elapsed=$((current_time - START_TIME))
+    local timestamp=$(printf "%04d" $elapsed)
+    # Use tr to convert level to uppercase for better compatibility
+    local level_uppercase=$(echo "$level" | tr '[:lower:]' '[:upper:]')
+    echo "${level_uppercase}[${timestamp}] ${message}"
 }
 
-lfs_folder_name='.lfs.opencsg.co'
+init_workdir() {
+    CURRENT_DIR=$(cd "$(dirname "$0")" && pwd 2>/dev/null)
+    source_dir="${CURRENT_DIR}"
+    log "INFO" "Initialized work directory: ${CURRENT_DIR}"
+}
 
-datafolder=$1
-reponame=$2
-username=$3
-gittoken=$4
-fullrepourl=$5 # must be http or https protocol
-gitref=$6
+parse_arguments() {
+    if [ $# -lt 9 ]; then
+        log "ERROR" "Incorrect number of arguments"
+        log "INFO" "Usage: $0 <datafolder> <reponame> <username> <gittoken> <fullrepourl> <gitref> <sdk> <python_version> <device> <driver_version>"
+        exit 1
+    fi
 
-sdk=$7
-python_version=$8
-device=$9  # cpu or gpu
-driver_version=${10} # cuda version, e.g. 11.8.0
+    datafolder="$1"
+    reponame="$2"
+    username="$3"
+    gittoken="$4"
+    fullrepourl="$5"
+    gitref="$6"
+    sdk="$7"
+    python_version="$8"
+    device="$9"
+    driver_version="${10:-}"
 
-source_dir=$CURRENT_DIR
-echo "the full space clone url is $fullrepourl"
+    if [ "$device" != "cpu" ] && [ "$device" != "gpu" ]; then
+        log "ERROR" "Device type must be 'cpu' or 'gpu', current: $device"
+        exit 1
+    fi
+    log "INFO" "Parsed arguments: datafolder=${datafolder}, reponame=${reponame}, sdk=${sdk}, device=${device}"
+}
 
-if [[ ${fullrepourl:0:5} == "https" ]]; then
-  modified_repourl=$(echo "$fullrepourl" | sed 's/https:\/\///')
-  space_respository="https://"$username":"$gittoken"@"$modified_repourl
-elif [[ ${fullrepourl:0:4} == "http" ]]; then
-  modified_repourl=$(echo "$fullrepourl" | sed 's/http:\/\///')
-  space_respository="http://"$username":"$gittoken"@"$modified_repourl
-else
-  echo "Invalid Git URL format: $fullrepourl"
-  exit 1
-fi
+process_repo_url() {
+    case "$fullrepourl" in
+        https://*)
+            modified_repourl=$(echo "$fullrepourl" | sed 's/https:\/\///')
+            space_respository="https://${username}:${gittoken}@${modified_repourl}"
+            ;;
+        http://*)
+            modified_repourl=$(echo "$fullrepourl" | sed 's/http:\/\///')
+            space_respository="http://${username}:${gittoken}@${modified_repourl}"
+            ;;
+        *)
+            log "ERROR" "Invalid Git URL format: $fullrepourl (must be http/https)"
+            exit 1
+            ;;
+    esac
 
-repo=$datafolder"/$reponame"
-git lfs install
-export GIT_LFS_SKIP_SMUDGE=1
-#git clone https://13581792646:6dbb294fce92283cd352a0dcecef1bca8ec2bf1b@portal.opencsg.com/models/13581792646/testspace.git  $repo
-git clone $space_respository $repo
-cd $repo
-git checkout $gitref
+    repo="${datafolder}/${reponame}"
+}
 
-if [[  ! $? -eq 0  ]]; then
-  echo "failed to clone repo"
-  exit 1
-fi
+clone_repository() {
+    log "INFO" "Starting repository clone: ${reponame} -> ${repo}"
+    
+    if [ -d "$repo" ]; then
+        log "INFO" "Removing existing directory: ${repo}"
+        rm -rf "$repo" || {
+            log "ERROR" "Failed to remove existing directory: ${repo}"
+            exit 1
+        }
+    fi
 
-cd $repo
-# prepare repo
-gen_lfs_folder
-gen_dockerfile
-gen_start_script
+    # log "INFO" "Configured Git LFS (GIT_LFS_SKIP_SMUDGE=1)"
+    # export GIT_LFS_SKIP_SMUDGE=1
 
-if [[ $sdk == $SDK_GRADIO || $sdk == $SDK_STREAMLIT || $sdk == $SDK_MCPSERVER ]]; then
-  requirementsfile="$repo/requirements.txt"
-  if [ ! -f $requirementsfile ]; then
-      touch $requirementsfile
-      echo "requirements.txt is created"
-  fi
+    if ! git clone "$space_respository" "$repo"; then
+        log "ERROR" "Failed to clone repository (check URL/credentials)"
+        exit 1
+    fi
 
-  packagefile="$repo/packages.txt"
-  if [ ! -f $packagefile ]; then
-      touch $packagefile
-      echo "packages.txt is created"
-  fi
+    cd "$repo" || {
+        log "ERROR" "Cannot enter repository directory: ${repo}"
+        exit 1
+    }
+    if ! git checkout "$gitref"; then
+        log "ERROR" "Failed to checkout Git ref: ${gitref} (does it exist?)"
+        exit 1
+    fi
 
-  prerequirementsfile="$repo/pre-requirements.txt"
-  if [ ! -f $prerequirementsfile ]; then
-      touch $prerequirementsfile
-      echo "pre-requirements.txt is created"
-  fi
-fi
+    log "INFO" "Pulling LFS files (this may take time for large files)..."
+    if ! git lfs pull; then
+        log "ERROR" "Failed to pull LFS files. Ensure Git LFS is installed and repository has valid LFS tracking."
+        exit 1
+    fi
 
-echo $space_respository > ./SPACE_REPOSITORY
+    log "INFO" "Successfully cloned repository and checked out ref: ${gitref}"
+}
 
-rm -rf .git
+
+generate_dockerfile() {
+    log "INFO" "Generating Dockerfile for SDK: ${sdk}"
+    
+    if [ "$sdk" = "$SDK_DOCKER" ]; then
+        if [ ! -f "${repo}/Dockerfile" ]; then
+            log "ERROR" "Dockerfile not found at: ${repo}/Dockerfile"
+            exit 1
+        fi
+        log "INFO" "Using existing Dockerfile (SDK_DOCKER)"
+        return 0
+    fi
+
+    local file="Dockerfile-python${python_version}"
+    
+    if [ "$device" = "gpu" ]; then
+        if [ -z "$driver_version" ]; then
+            driver_version="11.8.0"
+            log "INFO" "Using default CUDA driver version: ${driver_version}"
+        fi
+        file="${file}-cuda${driver_version}"
+    fi
+
+    if [ "$sdk" = "$SDK_NGINX" ]; then
+        if [ ! -f "${repo}/nginx.conf" ]; then
+            log "ERROR" "nginx.conf not found at: ${repo}/nginx.conf"
+            exit 1
+        fi
+        file="Dockerfile-nginx"
+    fi
+
+    local sourcefile="${source_dir}/${file}"
+    log "INFO" "Checking Dockerfile source: ${sourcefile}"
+    if [ ! -f "$sourcefile" ]; then
+        log "ERROR" "Dockerfile source not found: ${sourcefile}"
+        exit 1
+    fi
+    if ! cp "$sourcefile" "${repo}/Dockerfile"; then
+        log "ERROR" "Failed to copy Dockerfile to: ${repo}/Dockerfile"
+        exit 1
+    fi
+    log "INFO" "Successfully generated Dockerfile: ${repo}/Dockerfile"
+}
+
+generate_start_script() {
+    log "INFO" "Generating start script for SDK: ${sdk}"
+    local script_path="${repo}/start_entrypoint.sh"
+    
+    case "$sdk" in
+        "$SDK_GRADIO" | "$SDK_MCPSERVER")
+            cat > "$script_path" <<EOF
+#!/bin/sh
+python3 ${APP_FILE}
+EOF
+            ;;
+        "$SDK_STREAMLIT")
+            cat > "$script_path" <<EOF
+#!/bin/sh
+streamlit run ${APP_FILE}
+EOF
+            ;;
+        "$SDK_DOCKER" | "$SDK_NGINX")
+            log "INFO" "No start script needed for SDK: ${sdk}"
+            return 0
+            ;;
+        *)
+            log "ERROR" "Unsupported SDK type: ${sdk}"
+            exit 1
+            ;;
+    esac
+
+    chmod 755 "$script_path" || {
+        log "ERROR" "Failed to set permissions for: ${script_path}"
+        exit 1
+    }
+    log "INFO" "Generated start script: ${script_path}"
+}
+
+generate_dependency_files() {
+    log "INFO" "Checking dependency files for SDK: ${sdk}"
+    
+    if [ "$sdk" != "$SDK_GRADIO" ] && [ "$sdk" != "$SDK_STREAMLIT" ] && [ "$sdk" != "$SDK_MCPSERVER" ]; then
+        log "INFO" "No dependency files needed for SDK: ${sdk}"
+        return 0
+    fi
+
+    local requirementsfile="${repo}/requirements.txt"
+    [ -f "$requirementsfile" ] || touch "$requirementsfile" || {
+        log "ERROR" "Failed to create requirements.txt: ${requirementsfile}"
+        exit 1
+    }
+    
+    local packagefile="${repo}/packages.txt"
+    [ -f "$packagefile" ] || touch "$packagefile" || {
+        log "ERROR" "Failed to create packages.txt: ${packagefile}"
+        exit 1
+    }
+    
+    local prerequirementsfile="${repo}/pre-requirements.txt"
+    [ -f "$prerequirementsfile" ] || touch "$prerequirementsfile" || {
+        log "ERROR" "Failed to create pre-requirements.txt: ${prerequirementsfile}"
+        exit 1
+    }
+    log "INFO" "Ensured dependency files exist (requirements.txt, packages.txt, pre-requirements.txt)"
+}
+
+finalize() {
+    log "INFO" "Finalizing repository setup"
+    
+    echo "$space_respository" > "${repo}/SPACE_REPOSITORY" || {
+        log "ERROR" "Failed to save repository URL to: ${repo}/SPACE_REPOSITORY"
+        exit 1
+    }
+    
+    rm -rf "${repo}/.git" || {
+        log "ERROR" "Failed to clean Git directory: ${repo}/.git"
+        exit 1
+    }
+    
+    log "INFO" "All operations completed successfully"
+}
+
+generate_dockerignore() {
+    log "INFO" "Generating .dockerignore file"
+    local dockerignore_path="${repo}/.dockerignore"
+
+    if [ -f "$dockerignore_path" ]; then
+        local backup="${dockerignore_path}.$(date +%s).bak"
+        mv "$dockerignore_path" "$backup"
+        log "INFO" "Existing .dockerignore backed up to: ${backup}"
+    fi
+
+    cat > "$dockerignore_path" << 'EOF'
+# Git
+.git
+.gitignore
+.gitmodules
+
+.lfs
+*.lfs.*
+
+*.log
+*.tmp
+*.swp
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache
+.coverage
+
+# Virtual environments
+venv/
+env/
+.venv/
+ENV/
+
+# Dependency management
+pip-selfcheck.json
+poetry.lock
+*.egg-info/
+
+# Node.js (unless using Streamlit components)
+node_modules/
+package-lock.json
+
+# IDE and editors
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# Sensitive files
+secrets.txt
+config.local.json
+.env.local
+*.pem
+*.key
+
+# Tests
+tests/
+test/
+__tests__/
+EOF
+
+    if [ $? -eq 0 ]; then
+        log "INFO" "Successfully generated: ${dockerignore_path}"
+    else
+        log "ERROR" "Failed to write .dockerignore file"
+        exit 1
+    fi
+}
+
+main() {
+    init_workdir
+    parse_arguments "$@"
+    process_repo_url
+    clone_repository
+    generate_dockerfile
+    generate_start_script
+    generate_dependency_files
+    generate_dockerignore
+    finalize
+}
+
+main "$@"

@@ -1,71 +1,42 @@
-ARG GIT_IMAGE=opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/alpine/git:2.36.2
-ARG SPACE_BASE_IMAGE=opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/space-base:python3.10
-
-# Download LFS content while building in order to make this step cacheable
-#===== LFS =====
-FROM ${GIT_IMAGE} AS lfs
-WORKDIR /app
-
-COPY --link .lfs.opencsg.co .
-COPY --link ./SPACE_REPOSITORY ./
-RUN git init \
-        && git remote add origin $(cat ./SPACE_REPOSITORY) \
-        && git add --all \
-        && git config user.email "name@mail.com" \
-        && git config user.name "Name" \
-        && git commit -m "lfs" \
-        && git lfs pull \
-        && rm -rf .git .gitattributes
-#===============
+ARG SPACE_BASE_IMAGE=opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/space-base:python3.10-1.0.2
 
 FROM ${SPACE_BASE_IMAGE} AS base
 
+# First handle dependencies to leverage caching
 USER user
-COPY --link --chown=1000 ./ /home/user/app
+WORKDIR /home/user/app
+
+# Copy dependency manifests
+COPY --link --chown=1000 requirements.txt pre-requirements.txt packages.txt ./
 
 USER root
-# User Debian packages
-## Security warning : Potential user code executed as root (build time)
-RUN xargs -r -a ./packages.txt apt-get install -y \
-	&& rm -rf /var/lib/apt/lists/*
-
-USER user
-
-# Pypi source
-ARG PyPI 
-
-RUN if [ -n "${PyPI}" ]; then \
-        pip config set global.index-url ${PyPI}; \
+RUN if [ -s "packages.txt" ]; then \
+        apt-get update && \
+        xargs -r -a packages.txt apt-get install -y && \
+        rm -rf /var/lib/apt/lists/*; \
     else \
-        echo "PyPI is not defined, skipping pip index url setting "; \
+        echo "packages.txt is empty or not found, skipping system package installation"; \
     fi
 
+USER user
+# Set the default domestic source (Alibaba Cloud), users can override it via --build-arg PyPI=xxx
+ARG PyPI=https://mirrors.aliyun.com/pypi/simple/
+RUN if [ -n "$PyPI" ]; then \
+        pip config set global.index-url "${PyPI}" && \
+        # Configure trusted sources (to avoid HTTPS certificate issues)
+        pip config set global.trusted-host $(echo "${PyPI}" | sed -n 's|https\?://\([^/]*\)/.*|\1|p'); \
+    fi
 
-# Pre requirements and  Python packages (e.g. upgrading pip)
-RUN pip install  --default-timeout=60 -r pre-requirements.txt && \
-    pip install  --default-timeout=60  -r requirements.txt
-	
-FROM base as pipfreeze
-RUN pip freeze > /tmp/freeze.txt
+RUN pip install --no-cache-dir --default-timeout=60 -r pre-requirements.txt && \
+    pip install --no-cache-dir --default-timeout=60 -r requirements.txt
 
-FROM base
+COPY --link --chown=1000 ./ ./
 
-# HF_ENDPOINT parameter
 ARG HF_ENDPOINT
-
-COPY --link --chown=1000 --from=lfs /app /home/user/app
-# Warning, if you change something under this line, dont forget to change the PIP_FREEZE_REVERSED_INDEX
-COPY --from=pipfreeze --link --chown=1000 /tmp/freeze.txt .
 ENV PYTHONPATH=$HOME/app \
-	PYTHONUNBUFFERED=1 \
-	#HF_HUB_ENABLE_HF_TRANSFER=1 \  # need hf-transfer python package
-	GRADIO_ALLOW_FLAGGING=never \
-	GRADIO_NUM_PORTS=1 \
-	GRADIO_SERVER_NAME=0.0.0.0 \
-	GRADIO_THEME=huggingface \
-	TQDM_POSITION=-1 \
-	TQDM_MININTERVAL=1 \
-	SYSTEM=spaces \
+    PYTHONUNBUFFERED=1 \
+    GRADIO_ALLOW_FLAGGING=never \
+    GRADIO_SERVER_NAME=0.0.0.0 \
     HF_ENDPOINT=${HF_ENDPOINT}
 
 ENTRYPOINT ["./start_entrypoint.sh"]
