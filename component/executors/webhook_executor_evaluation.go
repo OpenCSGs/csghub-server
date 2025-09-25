@@ -44,6 +44,11 @@ func (h *argoWorkflowExecutorImpl) ProcessEvent(ctx context.Context, event *type
 
 	switch event.EventType {
 	case types.RunnerWorkflowCreate:
+		oldwf, err := h.store.FindByTaskID(ctx, wf.TaskId)
+		if err == nil && oldwf.ID != 0 {
+			// already exists
+			return nil
+		}
 		_, err = h.store.CreateWorkFlow(ctx, wf)
 		if err != nil {
 			return fmt.Errorf("failed to create argo workflow: %w", err)
