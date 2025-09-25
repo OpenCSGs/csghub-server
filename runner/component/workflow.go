@@ -598,11 +598,6 @@ func (wc *workFlowComponentImpl) getWorkflowFromLabels(ctx context.Context, awf 
 }
 
 func (wc *workFlowComponentImpl) addKServiceWithEvent(ctx context.Context, eventType types.WebHookEventType, wf *database.ArgoWorkflow) {
-	data, err := json.Marshal(wf)
-	if err != nil {
-		slog.Error("failed to marshal workflow service create event", slog.Any("error", err))
-		return
-	}
 	event := &types.WebHookSendEvent{
 		WebHookHeader: types.WebHookHeader{
 			EventType: eventType,
@@ -610,7 +605,7 @@ func (wc *workFlowComponentImpl) addKServiceWithEvent(ctx context.Context, event
 			ClusterID: wf.ClusterID,
 			DataType:  types.WebHookDataTypeObject,
 		},
-		Data: data,
+		Data: wf,
 	}
 
 	go func() {

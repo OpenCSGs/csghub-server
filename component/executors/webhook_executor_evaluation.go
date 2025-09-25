@@ -49,7 +49,7 @@ func (h *argoWorkflowExecutorImpl) ProcessEvent(ctx context.Context, event *type
 			return fmt.Errorf("failed to create argo workflow: %w", err)
 		}
 	case types.RunnerWorkflowChange:
-		_, err = h.store.UpdateWorkFlow(ctx, wf)
+		_, err = h.store.UpdateWorkFlowByTaskID(ctx, wf)
 		if err != nil {
 			return fmt.Errorf("failed to update argo workflow: %w", err)
 		}
