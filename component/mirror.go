@@ -265,18 +265,21 @@ func (c *mirrorComponentImpl) CreateMirrorRepo(ctx context.Context, req types.Cr
 		}
 	}
 
-	mirrorSource, err := c.mirrorSourceStore.Get(ctx, req.MirrorSourceID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find mirror Source, error: %w", err)
-	}
 	var mirror database.Mirror
+
+	if req.MirrorSourceID != 0 {
+		mirrorSource, err := c.mirrorSourceStore.Get(ctx, req.MirrorSourceID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to find mirror source, error: %w", err)
+		}
+		mirror.LocalRepoPath = fmt.Sprintf("%s_%s_%s_%s", mirrorSource.SourceName, req.RepoType, req.SourceNamespace, req.SourceName)
+	}
 	// mirror.Interval = req.Interval
 	mirror.SourceUrl = req.SourceGitCloneUrl
 	mirror.MirrorSourceID = req.MirrorSourceID
 	mirror.Username = req.SourceNamespace
 	mirror.RepositoryID = repo.ID
 	mirror.Repository = repo
-	mirror.LocalRepoPath = fmt.Sprintf("%s_%s_%s_%s", mirrorSource.SourceName, req.RepoType, req.SourceNamespace, req.SourceName)
 	mirror.SourceRepoPath = fmt.Sprintf("%s/%s", req.SourceNamespace, req.SourceName)
 	mirror.Priority = types.ASAPMirrorPriority
 

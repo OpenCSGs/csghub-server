@@ -9,7 +9,7 @@ type CreateMirrorReq struct {
 	Name            string         `json:"name"`
 	Interval        string         `json:"interval"`
 	SourceUrl       string         `json:"source_url" binding:"required"`
-	MirrorSourceID  int64          `json:"mirror_source_id" binding:"required"`
+	MirrorSourceID  int64          `json:"mirror_source_id"`
 	Username        string         `json:"username"`
 	AccessToken     string         `json:"password"`
 	PushUrl         string         `json:"push_url"`

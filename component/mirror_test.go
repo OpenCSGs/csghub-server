@@ -34,6 +34,7 @@ func TestMirrorComponent_CreateMirrorRepo(t *testing.T) {
 				RepoType:          c.repoType,
 				CurrentUser:       "user",
 				SourceGitCloneUrl: "https://github.com/foo/bar.git",
+				MirrorSourceID:    1,
 			}
 
 			repo := &database.Repository{ID: 10}
@@ -81,7 +82,7 @@ func TestMirrorComponent_CreateMirrorRepo(t *testing.T) {
 				}, "AIWizards/sns_sn").Return(nil, nil)
 			}
 
-			mc.mocks.stores.MirrorSourceMock().EXPECT().Get(ctx, int64(0)).Return(
+			mc.mocks.stores.MirrorSourceMock().EXPECT().Get(ctx, int64(1)).Return(
 				&database.MirrorSource{}, nil,
 			)
 			mc.mocks.stores.RepoMock().EXPECT().UpdateSourcePath(ctx, repo1.ID, "foo/bar", "github").Return(nil)
@@ -108,6 +109,7 @@ func TestMirrorComponent_CreateMirrorRepo(t *testing.T) {
 				SourceUrl:      "https://github.com/foo/bar.git",
 				Repository:     &database.Repository{ID: 11},
 				RepositoryID:   11,
+				MirrorSourceID: 1,
 			}
 
 			mc.mocks.stores.MirrorMock().EXPECT().Create(ctx, cm).Return(
