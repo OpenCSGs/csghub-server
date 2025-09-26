@@ -6,6 +6,8 @@ import (
 	context "context"
 
 	mock "github.com/stretchr/testify/mock"
+	deploy "opencsg.com/csghub-server/builder/deploy"
+
 	types "opencsg.com/csghub-server/common/types"
 )
 
@@ -187,6 +189,65 @@ func (_c *MockNotebookComponent_GetNotebook_Call) RunAndReturn(run func(context.
 	return _c
 }
 
+// LogsNotebook provides a mock function with given fields: ctx, req
+func (_m *MockNotebookComponent) LogsNotebook(ctx context.Context, req *types.StatusNotebookReq) (*deploy.MultiLogReader, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for LogsNotebook")
+	}
+
+	var r0 *deploy.MultiLogReader
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *types.StatusNotebookReq) (*deploy.MultiLogReader, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *types.StatusNotebookReq) *deploy.MultiLogReader); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*deploy.MultiLogReader)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *types.StatusNotebookReq) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockNotebookComponent_LogsNotebook_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'LogsNotebook'
+type MockNotebookComponent_LogsNotebook_Call struct {
+	*mock.Call
+}
+
+// LogsNotebook is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req *types.StatusNotebookReq
+func (_e *MockNotebookComponent_Expecter) LogsNotebook(ctx interface{}, req interface{}) *MockNotebookComponent_LogsNotebook_Call {
+	return &MockNotebookComponent_LogsNotebook_Call{Call: _e.mock.On("LogsNotebook", ctx, req)}
+}
+
+func (_c *MockNotebookComponent_LogsNotebook_Call) Run(run func(ctx context.Context, req *types.StatusNotebookReq)) *MockNotebookComponent_LogsNotebook_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*types.StatusNotebookReq))
+	})
+	return _c
+}
+
+func (_c *MockNotebookComponent_LogsNotebook_Call) Return(_a0 *deploy.MultiLogReader, _a1 error) *MockNotebookComponent_LogsNotebook_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockNotebookComponent_LogsNotebook_Call) RunAndReturn(run func(context.Context, *types.StatusNotebookReq) (*deploy.MultiLogReader, error)) *MockNotebookComponent_LogsNotebook_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // StartNotebook provides a mock function with given fields: ctx, req
 func (_m *MockNotebookComponent) StartNotebook(ctx context.Context, req *types.StartNotebookReq) error {
 	ret := _m.Called(ctx, req)
@@ -230,6 +291,63 @@ func (_c *MockNotebookComponent_StartNotebook_Call) Return(_a0 error) *MockNoteb
 }
 
 func (_c *MockNotebookComponent_StartNotebook_Call) RunAndReturn(run func(context.Context, *types.StartNotebookReq) error) *MockNotebookComponent_StartNotebook_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// StatusNotebook provides a mock function with given fields: ctx, req
+func (_m *MockNotebookComponent) StatusNotebook(ctx context.Context, req *types.StatusNotebookReq) (string, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for StatusNotebook")
+	}
+
+	var r0 string
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *types.StatusNotebookReq) (string, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *types.StatusNotebookReq) string); ok {
+		r0 = rf(ctx, req)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *types.StatusNotebookReq) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockNotebookComponent_StatusNotebook_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'StatusNotebook'
+type MockNotebookComponent_StatusNotebook_Call struct {
+	*mock.Call
+}
+
+// StatusNotebook is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req *types.StatusNotebookReq
+func (_e *MockNotebookComponent_Expecter) StatusNotebook(ctx interface{}, req interface{}) *MockNotebookComponent_StatusNotebook_Call {
+	return &MockNotebookComponent_StatusNotebook_Call{Call: _e.mock.On("StatusNotebook", ctx, req)}
+}
+
+func (_c *MockNotebookComponent_StatusNotebook_Call) Run(run func(ctx context.Context, req *types.StatusNotebookReq)) *MockNotebookComponent_StatusNotebook_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*types.StatusNotebookReq))
+	})
+	return _c
+}
+
+func (_c *MockNotebookComponent_StatusNotebook_Call) Return(_a0 string, _a1 error) *MockNotebookComponent_StatusNotebook_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockNotebookComponent_StatusNotebook_Call) RunAndReturn(run func(context.Context, *types.StatusNotebookReq) (string, error)) *MockNotebookComponent_StatusNotebook_Call {
 	_c.Call.Return(run)
 	return _c
 }

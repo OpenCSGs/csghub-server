@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	deployer "opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -872,4 +873,57 @@ func TestNotebookComponentImpl_StopNotebook_StopDeployByIDFails(t *testing.T) {
 	})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "fail to stop notebook instance")
+}
+
+func TestNotebookComponentImpl_StatusNotebook(t *testing.T) {
+	ctx := context.TODO()
+	nc := initializeTestNotebookComponent(ctx, t)
+	user := &database.User{ID: 1, Username: "testuser"}
+	deploy := &database.Deploy{
+		ID:        46,
+		SvcName:   "notebook-svc",
+		ClusterID: "1",
+	}
+
+	nc.mocks.components.repo.EXPECT().CheckDeployPermissionForUser(ctx, types.DeployActReq{
+		DeployID:    46,
+		CurrentUser: "testuser",
+	}).Return(user, deploy, nil)
+
+	status, err := nc.StatusNotebook(ctx, &types.StatusNotebookReq{
+		ID:          46,
+		CurrentUser: "testuser",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "Stopped", status)
+}
+
+func TestNotebookComponentImpl_LogsNotebook(t *testing.T) {
+	ctx := context.TODO()
+	nc := initializeTestNotebookComponent(ctx, t)
+	user := &database.User{ID: 1, Username: "testuser"}
+	deploy := &database.Deploy{
+		ID:        47,
+		ClusterID: "1",
+	}
+
+	m := &deployer.MultiLogReader{}
+	nc.mocks.deployer.EXPECT().InstanceLogs(ctx, types.DeployRepo{
+		DeployID:     deploy.ID,
+		SvcName:      deploy.SvcName,
+		InstanceName: "instance-name",
+	}).Return(m, nil)
+
+	nc.mocks.components.repo.EXPECT().CheckDeployPermissionForUser(ctx, types.DeployActReq{
+		DeployID:    47,
+		CurrentUser: "testuser",
+	}).Return(user, deploy, nil)
+
+	reader, err := nc.LogsNotebook(ctx, &types.StatusNotebookReq{
+		ID:           47,
+		CurrentUser:  "testuser",
+		InstanceName: "instance-name",
+	})
+	require.NoError(t, err)
+	require.NotNil(t, reader)
 }

@@ -507,7 +507,7 @@ func (d *deployer) GetReplica(ctx context.Context, dr types.DeployRepo) (int, in
 func (d *deployer) InstanceLogs(ctx context.Context, dr types.DeployRepo) (*MultiLogReader, error) {
 	slog.Debug("get logs for deploy", slog.Any("deploy", dr))
 
-	deploy, err := d.deployTaskStore.GetLatestDeployBySpaceID(ctx, dr.SpaceID)
+	deploy, err := d.deployTaskStore.GetDeployByID(ctx, dr.DeployID)
 	if err != nil {
 		return nil, fmt.Errorf("can't get space delopyment,%w", err)
 	}

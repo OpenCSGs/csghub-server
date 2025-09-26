@@ -823,6 +823,8 @@ func createNotebookRoutes(
 		notebooks.GET("/:id", middlewareCollection.Auth.NeedLogin, notebookHandler.Get)
 		// update notebook
 		notebooks.PUT("/:id", middlewareCollection.Auth.NeedLogin, notebookHandler.Update)
+		notebooks.GET("/:id/status", middlewareCollection.Auth.NeedLogin, notebookHandler.Status)
+		notebooks.GET("/:id/logs/:instance", middlewareCollection.Auth.NeedLogin, notebookHandler.Logs)
 		// stop a notebook
 		notebooks.PUT("/:id/stop", middlewareCollection.Auth.NeedLogin, notebookHandler.Stop)
 		// start a notebook

@@ -44,9 +44,11 @@ type GetNotebookReq = NotebookActionReq
 type DeleteNotebookReq = NotebookActionReq
 type StopNotebookReq = NotebookActionReq
 type StartNotebookReq = NotebookActionReq
+type StatusNotebookReq = UpdateNotebookReq
 
 type UpdateNotebookReq struct {
-	ID          int64  `json:"id"`
-	CurrentUser string `json:"currentUser"`
-	ResourceID  int64  `json:"resource_id"`
+	ID           int64  `json:"id"`
+	CurrentUser  string `json:"currentUser"`
+	ResourceID   int64  `json:"resource_id"`
+	InstanceName string `json:"instance_name"`
 }
