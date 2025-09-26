@@ -25,6 +25,7 @@ type evaluationComponentImpl struct {
 	spaceResourceStore    database.SpaceResourceStore
 	tokenStore            database.AccessTokenStore
 	runtimeFrameworkStore database.RuntimeFrameworksStore
+	workflowStore         database.ArgoWorkFlowStore
 	config                *config.Config
 	accountingComponent   AccountingComponent
 	repoComponent         RepoComponent
@@ -48,6 +49,7 @@ func NewEvaluationComponent(config *config.Config) (EvaluationComponent, error) 
 	c.tokenStore = database.NewAccessTokenStore()
 	c.repoStore = database.NewRepoStore()
 	c.runtimeFrameworkStore = database.NewRuntimeFrameworksStore()
+	c.workflowStore = database.NewArgoWorkFlowStore()
 	c.config = config
 	ac, err := NewAccountingComponent(config)
 	if err != nil {
@@ -188,7 +190,7 @@ func (c *evaluationComponentImpl) DeleteEvaluation(ctx context.Context, req type
 
 // get evaluation result
 func (c *evaluationComponentImpl) GetEvaluation(ctx context.Context, req types.EvaluationGetReq) (*types.EvaluationRes, error) {
-	wf, err := c.deployer.GetEvaluation(ctx, req)
+	wf, err := c.workflowStore.FindByID(ctx, req.ID)
 	if err != nil {
 		return nil, fmt.Errorf("fail to get evaluation result, %w", err)
 	}

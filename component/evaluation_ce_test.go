@@ -144,8 +144,9 @@ func TestEvaluationComponent_GetEvaluation(t *testing.T) {
 	c.config.Argo.QuotaGPUNumber = "1"
 	req := types.EvaluationGetReq{
 		Username: "test",
+		ID:       1,
 	}
-	c.mocks.deployer.EXPECT().GetEvaluation(ctx, req).Return(&types.ArgoWorkFlowRes{
+	c.mocks.stores.WorkflowMock().EXPECT().FindByID(ctx, int64(1)).Return(database.ArgoWorkflow{
 		ID:       1,
 		RepoIds:  []string{"Rowan/hellaswag"},
 		Datasets: []string{"Rowan/hellaswag"},

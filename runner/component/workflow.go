@@ -3,7 +3,6 @@ package component
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -19,7 +18,6 @@ import (
 	versioned "github.com/argoproj/argo-workflows/v3/pkg/client/clientset/versioned"
 	"github.com/argoproj/argo-workflows/v3/pkg/client/informers/externalversions"
 	internalinterfaces "github.com/argoproj/argo-workflows/v3/pkg/client/informers/externalversions/internalinterfaces"
-	"github.com/google/uuid"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -57,7 +55,6 @@ type WorkFlowComponent interface {
 	DeleteWorkflowInargo(ctx context.Context, delete *v1alpha1.Workflow) error
 	FindWorkFlowById(ctx context.Context, id int64) (database.ArgoWorkflow, error)
 	RunInformer(clusterPool *cluster.ClusterPool, config *config.Config)
-	StartAcctRequestFee(wf database.ArgoWorkflow)
 }
 
 func NewWorkFlowComponent(config *config.Config, clusterPool *cluster.ClusterPool, logReporter reporter.LogCollector) WorkFlowComponent {
@@ -161,22 +158,6 @@ func (wc *workFlowComponentImpl) GetWorkflow(ctx context.Context, id int64, user
 
 // Update workflow
 func (wc *workFlowComponentImpl) UpdateWorkflow(ctx context.Context, update *v1alpha1.Workflow, cluster *cluster.Cluster) (*database.ArgoWorkflow, error) {
-	errLock := wc.redisLocker.GetRunnerAcctMeteringLock()
-	if errLock != nil && errors.Is(errLock, redis.ErrLockAcquire) {
-		slog.Warn("skip update workflow metering due to fail getting lock", slog.Any("error", errLock))
-		return nil, nil
-	}
-	defer func() {
-		if errLock != nil {
-			slog.Warn("update workflow metering with fail to getting lock", slog.Any("error", errLock))
-		} else {
-			ok, err := wc.redisLocker.ReleaseRunnerAcctMeteringLock()
-			if err != nil {
-				slog.Error("failed to release workflow acct metering lock", slog.Any("error", err), slog.Any("result", ok))
-			}
-		}
-	}()
-
 	oldwf, err := wc.wf.FindByTaskID(ctx, update.Name)
 	if errors.Is(err, sql.ErrNoRows) {
 		oldwf = *wc.getWorkflowFromLabels(ctx, update)
@@ -207,7 +188,6 @@ func (wc *workFlowComponentImpl) UpdateWorkflow(ctx context.Context, update *v1a
 					result := strings.Split(output.Value.String(), ",")
 					oldwf.ResultURL = result[0]
 					oldwf.DownloadURL = result[1]
-					wc.StartAcctRequestFee(oldwf)
 					break
 				}
 			}
@@ -486,41 +466,6 @@ func CreateInfomerFactory(client versioned.Interface, namespace, labelSelector s
 	if !cache.WaitForCacheSync(stopper, informer.HasSynced) {
 		runtime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
 		return
-	}
-}
-
-func (wc *workFlowComponentImpl) StartAcctRequestFee(wf database.ArgoWorkflow) {
-	if wf.ResourceId == 0 {
-		return
-	}
-	duration := wf.EndTime.Sub(wf.StartTime)
-	minutes := duration.Minutes()
-	if minutes < 1 {
-		return
-	}
-	slog.Info("start to acct request fee", slog.Any("mins", minutes))
-	event := types.MeteringEvent{
-		Uuid:         uuid.New(),
-		UserUUID:     wf.UserUUID,
-		Value:        int64(minutes),
-		ValueType:    types.TimeDurationMinType,
-		Scene:        int(types.SceneEvaluation),
-		OpUID:        "",
-		ResourceID:   strconv.FormatInt(wf.ResourceId, 10),
-		ResourceName: wf.ResourceName,
-		CustomerID:   wf.TaskId,
-		CreatedAt:    time.Now(),
-	}
-	str, err := json.Marshal(event)
-	if err != nil {
-		slog.Error("error marshal metering event", slog.Any("event", event), slog.Any("error", err))
-		return
-	}
-	err = wc.eventPub.PublishMeteringEvent(str)
-	if err != nil {
-		slog.Error("failed to pub metering event", slog.Any("data", string(str)), slog.Any("error", err))
-	} else {
-		slog.Info("pub metering event success", slog.Any("data", string(str)))
 	}
 }
 
