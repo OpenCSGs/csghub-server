@@ -2,19 +2,20 @@ package component
 
 import (
 	"encoding/json"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"io"
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"net/http"
 	"net/http/httptest"
+	"sync"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"opencsg.com/csghub-server/builder/deploy/cluster"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 	rtypes "opencsg.com/csghub-server/runner/types"
-	"sync"
-	"testing"
 )
 
 // Mock for rtypes.SubscribeKeyWithEventPush
@@ -59,9 +60,9 @@ func TestClusterWatcher_WatchCallback(t *testing.T) {
 		{
 			name: "should update endpoint and push event on valid config",
 			configMapData: map[string]string{
-				"STARHUB_SERVER_RUNNER_WEBHOOK_ENDPOINT": server.URL,
-				"check_key":                              "true",
-				"STARHUB_SERVER_RUNNER_PUBLIC_DOMAIN":    server.URL,
+				rtypes.KeyHubServerWebhookEndpoint: server.URL,
+				"check_key":                        "true",
+				rtypes.KeyRunnerExposedEndpont:     server.URL,
 			},
 			initialEndpoint:     server.URL,
 			expectError:         false,
@@ -100,7 +101,6 @@ func TestClusterWatcher_WatchCallback(t *testing.T) {
 
 			cfg := &config.Config{}
 			cfg.Cluster.SpaceNamespace = "spaces"
-			cfg.Runner.WatchConfigmapKey = "STARHUB_SERVER_RUNNER_WEBHOOK_ENDPOINT"
 			watcher := &clusterWatcher{
 				cluster: mockCluster,
 				env:     cfg,

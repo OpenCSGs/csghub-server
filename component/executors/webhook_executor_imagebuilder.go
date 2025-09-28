@@ -46,7 +46,7 @@ func NewImageBuilderExecutor(config *config.Config) (ImageBuilderExecutor, error
 }
 
 func (h *imagebuilderExecutorImpl) ProcessEvent(ctx context.Context, event *types.WebHookRecvEvent) error {
-	slog.Debug("heartbeat event invoked", slog.Any("event", event))
+	slog.Info("image_builder_event_received", slog.Any("event", event))
 	var data types.ImageBuilderEvent
 	err := json.Unmarshal(event.Data, &data)
 	if err != nil {

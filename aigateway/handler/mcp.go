@@ -80,6 +80,6 @@ func (m *MCPProxyHandlerImpl) ProxyToApi(api string) gin.HandlerFunc {
 			httpbase.ServerError(ctx, err)
 			return
 		}
-		rp.ServeHTTP(ctx.Writer, ctx.Request, api)
+		rp.ServeHTTP(ctx.Writer, ctx.Request, api, "")
 	}
 }

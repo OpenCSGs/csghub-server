@@ -40,7 +40,7 @@ func NewClusterExecutor(config *config.Config) (WebHookExecutor, error) {
 }
 
 func (h *clusterExecutorImpl) ProcessEvent(ctx context.Context, event *types.WebHookRecvEvent) error {
-	slog.Debug("new cluster event incoming", slog.Any("event", event))
+	slog.Info("cluster_event_received", slog.Any("event", event))
 	//parse event data to types.ClusterEvent
 	var clusterEvent types.ClusterEvent
 	err := json.Unmarshal(event.Data, &clusterEvent)
@@ -55,7 +55,6 @@ func (h *clusterExecutorImpl) ProcessEvent(ctx context.Context, event *types.Web
 			return fmt.Errorf("failed to add cluster: %w", err)
 		}
 	case types.RunnerClusterUpdate:
-
 		err = h.UpdateCluster(ctx, clusterEvent)
 		if err != nil {
 			return fmt.Errorf("failed to update cluster: %w", err)

@@ -41,7 +41,7 @@ func Test_GetClusterByID(t *testing.T) {
 			return clusterHandler.GetClusterById
 		})
 		tester.mocks.clusterComponent.EXPECT().
-			GetClusterById(context.Background(), "1").
+			GetClusterWithResourceByID(context.Background(), "1").
 			Once().
 			Return(&types.ClusterRes{
 				ResourceStatus: types.StatusUncertain,
@@ -58,7 +58,7 @@ func Test_GetClusterByID(t *testing.T) {
 			return clusterHandler.GetClusterById
 		})
 		tester.mocks.clusterComponent.EXPECT().
-			GetClusterById(context.Background(), "1").
+			GetClusterWithResourceByID(context.Background(), "1").
 			Once().
 			Return(nil, errorx.ErrInternalServerError)
 		tester.WithParam("id", "1").Execute()

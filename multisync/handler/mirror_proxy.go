@@ -53,12 +53,12 @@ func (r *MirrorProxyHandler) Serve(ctx *gin.Context) {
 	}
 
 	rp, _ := proxy.NewReverseProxy(r.gitServerURL)
-	rp.ServeHTTP(ctx.Writer, ctx.Request, ctx.Request.URL.Path)
+	rp.ServeHTTP(ctx.Writer, ctx.Request, ctx.Request.URL.Path, "")
 }
 
 func (r *MirrorProxyHandler) ServeLFS(ctx *gin.Context) {
 	rp, _ := proxy.NewReverseProxy(r.gitServerURL)
-	rp.ServeHTTP(ctx.Writer, ctx.Request, ctx.Request.URL.Path)
+	rp.ServeHTTP(ctx.Writer, ctx.Request, ctx.Request.URL.Path, "")
 }
 
 func getMirrorTokenFromContext(ctx *gin.Context) string {

@@ -26,7 +26,7 @@ func (h *InternalServiceProxyHandler) Proxy(ctx *gin.Context) {
 	slog.Debug("http request", slog.Any("request", ctx.Request.URL), slog.Any("header", ctx.Request.Header))
 
 	// Serve the request using the router
-	h.rp.ServeHTTP(ctx.Writer, ctx.Request, "")
+	h.rp.ServeHTTP(ctx.Writer, ctx.Request, "", "")
 }
 
 // ProxyToApi similar with Proxy, but change the request path
@@ -45,6 +45,6 @@ func (h *InternalServiceProxyHandler) ProxyToApi(api string, originParams ...str
 			}
 			finalApi = fmt.Sprintf(finalApi, params...)
 		}
-		h.rp.ServeHTTP(ctx.Writer, ctx.Request, finalApi)
+		h.rp.ServeHTTP(ctx.Writer, ctx.Request, finalApi, "")
 	}
 }

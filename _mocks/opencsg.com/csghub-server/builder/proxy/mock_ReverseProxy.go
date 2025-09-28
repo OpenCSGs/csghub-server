@@ -21,9 +21,9 @@ func (_m *MockReverseProxy) EXPECT() *MockReverseProxy_Expecter {
 	return &MockReverseProxy_Expecter{mock: &_m.Mock}
 }
 
-// ServeHTTP provides a mock function with given fields: w, r, api
-func (_m *MockReverseProxy) ServeHTTP(w http.ResponseWriter, r *http.Request, api string) {
-	_m.Called(w, r, api)
+// ServeHTTP provides a mock function with given fields: w, r, api, host
+func (_m *MockReverseProxy) ServeHTTP(w http.ResponseWriter, r *http.Request, api string, host string) {
+	_m.Called(w, r, api, host)
 }
 
 // MockReverseProxy_ServeHTTP_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ServeHTTP'
@@ -35,13 +35,14 @@ type MockReverseProxy_ServeHTTP_Call struct {
 //   - w http.ResponseWriter
 //   - r *http.Request
 //   - api string
-func (_e *MockReverseProxy_Expecter) ServeHTTP(w interface{}, r interface{}, api interface{}) *MockReverseProxy_ServeHTTP_Call {
-	return &MockReverseProxy_ServeHTTP_Call{Call: _e.mock.On("ServeHTTP", w, r, api)}
+//   - host string
+func (_e *MockReverseProxy_Expecter) ServeHTTP(w interface{}, r interface{}, api interface{}, host interface{}) *MockReverseProxy_ServeHTTP_Call {
+	return &MockReverseProxy_ServeHTTP_Call{Call: _e.mock.On("ServeHTTP", w, r, api, host)}
 }
 
-func (_c *MockReverseProxy_ServeHTTP_Call) Run(run func(w http.ResponseWriter, r *http.Request, api string)) *MockReverseProxy_ServeHTTP_Call {
+func (_c *MockReverseProxy_ServeHTTP_Call) Run(run func(w http.ResponseWriter, r *http.Request, api string, host string)) *MockReverseProxy_ServeHTTP_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(http.ResponseWriter), args[1].(*http.Request), args[2].(string))
+		run(args[0].(http.ResponseWriter), args[1].(*http.Request), args[2].(string), args[3].(string))
 	})
 	return _c
 }
@@ -51,7 +52,7 @@ func (_c *MockReverseProxy_ServeHTTP_Call) Return() *MockReverseProxy_ServeHTTP_
 	return _c
 }
 
-func (_c *MockReverseProxy_ServeHTTP_Call) RunAndReturn(run func(http.ResponseWriter, *http.Request, string)) *MockReverseProxy_ServeHTTP_Call {
+func (_c *MockReverseProxy_ServeHTTP_Call) RunAndReturn(run func(http.ResponseWriter, *http.Request, string, string)) *MockReverseProxy_ServeHTTP_Call {
 	_c.Run(run)
 	return _c
 }

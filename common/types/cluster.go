@@ -35,9 +35,10 @@ type ClusterEvent struct {
 	Enable           bool          `json:"enable"`
 	StorageClass     string        `json:"storage_class"`
 	Status           ClusterStatus `json:"status"`
-	Endpoint         string        `json:"endpoint"`
+	Endpoint         string        `json:"endpoint"`          // address of remote runner
 	NetworkInterface string        `json:"network_interface"` //used for multi-host, e.g., eth0
 	Mode             ClusterMode   `json:"mode"`              // InCluster | kubeconfig
+	AppEndpoint      string        `json:"app_endpoint"`      // address of space/inference application
 }
 type ClusterRes struct {
 	ClusterID    string             `json:"cluster_id"`

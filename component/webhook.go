@@ -14,6 +14,8 @@ import (
 	"opencsg.com/csghub-server/component/executors"
 )
 
+const WebHookEventRunnerSubject = "webhook.event.runner"
+
 type WebHookComponent interface {
 	HandleWebHook(ctx context.Context, event *types.WebHookRecvEvent) error
 	DispatchWebHookEvent() error
@@ -72,7 +74,7 @@ func (w *webHookComponentImpl) HandleWebHook(ctx context.Context, event *types.W
 		return fmt.Errorf("failed to marshal webhook event error: %w", err)
 	}
 
-	err = w.mq.Publish(w.cfg.MQ.WebHookEventRunnerSubject, buf)
+	err = w.mq.Publish(WebHookEventRunnerSubject, buf)
 	if err != nil {
 		return fmt.Errorf("failed to publish webhook event error: %w", err)
 	}
@@ -82,7 +84,7 @@ func (w *webHookComponentImpl) HandleWebHook(ctx context.Context, event *types.W
 func (w *webHookComponentImpl) DispatchWebHookEvent() error {
 	err := w.mq.Subscribe(bldmq.SubscribeParams{
 		Group:    bldmq.WebhookEventGroup,
-		Topics:   []string{w.cfg.MQ.WebHookEventRunnerSubject},
+		Topics:   []string{WebHookEventRunnerSubject},
 		AutoACK:  true,
 		Callback: w.dispatchMsgWithRetry,
 	})

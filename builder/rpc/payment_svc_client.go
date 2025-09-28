@@ -2,6 +2,8 @@ package rpc
 
 import (
 	"context"
+	"fmt"
+
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/money"
 	"opencsg.com/csghub-server/common/utils/payment/consts"
@@ -50,7 +52,7 @@ func (c *PaymentSvcHttpClient) CreateSimplePayment(
 	resp := &PaymentResponse{}
 	err := c.hc.Post(ctx, url, req, resp)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to invoke simple payment: %w", err)
 	}
 	return resp, nil
 }

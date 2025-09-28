@@ -209,7 +209,6 @@ STARHUB_SERVER_GPU_MODEL_LABEL = '[{"type_label": "aliyun.accelerator/nvidia_nam
 system_cuda_version = ""
 webhook_endpoint = "http://localhost:8080"
 watch_configmap_name = "spaces-runner-config"
-watch_configmap_key = "STARHUB_SERVER_RUNNER_WEBHOOK_ENDPOINT"
 watch_configmap_interval_in_sec = 60
 runner_namespace = "csghub"
 

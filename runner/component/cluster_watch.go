@@ -1,11 +1,13 @@
 package component
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"opencsg.com/csghub-server/builder/deploy/cluster"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
@@ -25,11 +27,11 @@ type clusterWatcher struct {
 }
 
 func (w *clusterWatcher) WatchCallback(cm *v1.ConfigMap) error {
-	webHookEndpoint := cm.Data[w.env.Runner.WatchConfigmapKey]
+	webHookEndpoint := cm.Data[rtypes.KeyHubServerWebhookEndpoint]
 	// Delete WebHookEndpoint or delete entire configmap
 	if len(webHookEndpoint) == 0 {
 		w.SetWebhookEndpoint("")
-		slog.Info("webhook endpoint is cleared", slog.String("cluster", w.cluster.CID))
+		slog.Warn("webhook endpoint is empty and skip update webhook endpoint", slog.String("cluster", w.cluster.CID))
 		return nil
 	}
 	// check endpoint format
@@ -63,8 +65,9 @@ func (w *clusterWatcher) pushClusterChangeEvent(configmapData map[string]string)
 		StorageClass:     w.cluster.StorageClass,
 		NetworkInterface: w.cluster.NetworkInterface,
 		Status:           types.ClusterStatusRunning,
-		Region:           configmapData["STARHUB_SERVER_CLUSTER_REGION"],
-		Endpoint:         configmapData["STARHUB_SERVER_RUNNER_PUBLIC_DOMAIN"],
+		Region:           configmapData[rtypes.KeyRunnerClusterRegion],
+		Endpoint:         configmapData[rtypes.KeyRunnerExposedEndpont],
+		AppEndpoint:      w.getClusterAppEndpoint(configmapData),
 	}
 	event := &types.WebHookSendEvent{
 		WebHookHeader: types.WebHookHeader{
@@ -75,6 +78,7 @@ func (w *clusterWatcher) pushClusterChangeEvent(configmapData map[string]string)
 		},
 		Data: data,
 	}
+	slog.Info("report_event_configmap_update", slog.Any("event", event))
 	go func() {
 		err := rcommon.Push(w.env.Runner.WebHookEndpoint, w.env.APIToken, event)
 		if err != nil {
@@ -90,4 +94,30 @@ func (w *clusterWatcher) SetWebhookEndpoint(endpoint string) {
 
 func (w *clusterWatcher) GetWebhookEndpoint() string {
 	return w.env.Runner.WebHookEndpoint
+}
+
+func (w *clusterWatcher) getClusterAppEndpoint(configmapData map[string]string) string {
+	inputVal := configmapData[rtypes.KeyApplicationEndpoint]
+	if inputVal != "auto" {
+		return inputVal
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	svc, err := w.cluster.Client.CoreV1().Services("kourier-system").Get(ctx, "kourier", metav1.GetOptions{})
+	if err != nil {
+		slog.Warn("failed to get kourier-system/kourier service and use app endpoint input value", slog.Any("error", err))
+		return inputVal
+	}
+
+	ingress := svc.Status.LoadBalancer.Ingress
+
+	if len(ingress) < 1 {
+		slog.Warn("kourier-system/kourier service does not have external IP and use app endpoint input value", slog.Any("ingress", ingress))
+		return inputVal
+	}
+
+	inputVal = fmt.Sprintf("http://%s", ingress[0].IP)
+	return inputVal
 }

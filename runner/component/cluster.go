@@ -69,7 +69,7 @@ func (s *clusterComponentImpl) initCluster() {
 				}
 				err := rcommon.Push(s.env.Runner.WebHookEndpoint, s.env.APIToken, event)
 				if err != nil {
-					slog.Error("failed to push cluster status event during start runner", slog.Any("error", err), slog.Any("event", event))
+					slog.Error("failed to push cluster create event during start runner", slog.Any("error", err), slog.Any("event", event))
 				}
 			}(c)
 		}
@@ -88,7 +88,10 @@ func (s *clusterComponentImpl) initCluster() {
 				slog.Error("failed to create configmap watcher", slog.String("cluster", c.CID), slog.Any("error", err))
 				return
 			}
-			slog.Info("start watching configmap", slog.String("cluster", c.CID), slog.String("namespace", s.env.Cluster.SpaceNamespace), slog.String("configmap", s.env.Runner.WatchConfigmapName))
+			slog.Info("start watching configmap",
+				slog.String("cluster", c.CID), slog.Any("cluster_mode", c.ConnectMode),
+				slog.String("namespace", s.env.Runner.RunnerNamespace),
+				slog.String("configmap_name", s.env.Runner.WatchConfigmapName))
 			configmapWatch.Watch(context.Background())
 		}(c)
 	}

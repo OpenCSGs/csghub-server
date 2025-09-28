@@ -248,7 +248,7 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 	}
 	w.WithLLMTokenCounter(llmTokenCounter)
 
-	rp.ServeHTTP(w, c.Request, "")
+	rp.ServeHTTP(w, c.Request, "", "")
 
 	go func() {
 		err := h.openaiComponent.RecordUsage(c.Request.Context(), userUUID, model, llmTokenCounter)
@@ -340,7 +340,7 @@ func (h *OpenAIHandlerImpl) Embedding(c *gin.Context) {
 	tokenCounter.Input(req.Input)
 	w.WithTokenCounter(tokenCounter)
 	slog.Info("proxy embedding request to model endpoint", "endpoint", endpoint, "user", username, "model_id", modelID)
-	rp.ServeHTTP(w, c.Request, "")
+	rp.ServeHTTP(w, c.Request, "", "")
 	go func() {
 		err := h.openaiComponent.RecordUsage(c.Request.Context(), userUUID, model, tokenCounter)
 		if err != nil {
