@@ -2,8 +2,9 @@ package component
 
 import (
 	"context"
-	mockReporter "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component/reporter"
 	"testing"
+
+	mockReporter "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component/reporter"
 
 	"github.com/argoproj/argo-workflows/v3/pkg/apis/workflow/v1alpha1"
 	argofake "github.com/argoproj/argo-workflows/v3/pkg/client/clientset/versioned/fake"
@@ -153,25 +154,19 @@ func TestArgoComponent_DeleteWorkflow(t *testing.T) {
 		config:      &config.Config{},
 		logReporter: mockReporter.NewMockLogCollector(t),
 	}
+	ctx := context.TODO()
+	req := &types.ArgoWorkFlowDeleteReq{
+		ID:        1,
+		TaskID:    "test",
+		ClusterID: "test",
+		Namespace: "test",
+	}
 	cis.EXPECT().ByClusterID(mock.Anything, "test").Return(database.ClusterInfo{
 		ClusterID:     "test",
 		ClusterConfig: "config",
 		StorageClass:  "test",
 	}, nil)
-	ctx := context.TODO()
-	argoStore.EXPECT().DeleteWorkFlow(ctx, mock.Anything).Return(nil)
-	argoStore.EXPECT().FindByID(ctx, mock.Anything).Return(database.ArgoWorkflow{
-		ID:        1,
-		ClusterID: "test",
-		RepoType:  "test",
-		TaskName:  "test",
-		TaskId:    "test",
-		Username:  "test",
-		UserUUID:  "test",
-		RepoIds:   []string{"test"},
-		Status:    v1alpha1.WorkflowPhase(v1alpha1.NodePending),
-	}, nil)
-	err := wfc.DeleteWorkflow(ctx, 1, "test")
+	err := wfc.DeleteWorkflow(ctx, req)
 	require.Nil(t, err)
 
 }

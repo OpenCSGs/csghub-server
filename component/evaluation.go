@@ -185,6 +185,17 @@ func (c *evaluationComponentImpl) generateDatasetsAndTasks(ctx context.Context, 
 }
 
 func (c *evaluationComponentImpl) DeleteEvaluation(ctx context.Context, req types.ArgoWorkFlowDeleteReq) error {
+	wf, err := c.workflowStore.FindByID(ctx, req.ID)
+	if err != nil {
+		return fmt.Errorf("fail to get evaluation result, %w", err)
+	}
+	req.TaskID = wf.TaskId
+	req.Namespace = wf.Namespace
+	req.ClusterID = wf.ClusterID
+	err = c.workflowStore.DeleteWorkFlow(ctx, req.ID)
+	if err != nil {
+		return fmt.Errorf("fail to delete evaluation result, %w", err)
+	}
 	return c.deployer.DeleteEvaluation(ctx, req)
 }
 

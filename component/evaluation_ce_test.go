@@ -181,9 +181,28 @@ func TestEvaluationComponent_DeleteEvaluation(t *testing.T) {
 	ctx := context.TODO()
 	c := initializeTestEvaluationComponent(ctx, t)
 	c.config.Argo.QuotaGPUNumber = "1"
+
+	c.mocks.stores.WorkflowMock().EXPECT().FindByID(ctx, int64(1)).Return(database.ArgoWorkflow{
+		ID:        1,
+		RepoIds:   []string{"Rowan/hellaswag"},
+		Datasets:  []string{"Rowan/hellaswag"},
+		RepoType:  "model",
+		Username:  "test",
+		TaskName:  "test",
+		TaskId:    "test",
+		TaskType:  "evaluation",
+		Status:    "Succeed",
+		ClusterID: "test",
+		Namespace: "test",
+	}, nil)
 	req := types.EvaluationDelReq{
-		Username: "test",
+		Username:  "test",
+		ID:        1,
+		TaskID:    "test",
+		ClusterID: "test",
+		Namespace: "test",
 	}
+	c.mocks.stores.WorkflowMock().EXPECT().DeleteWorkFlow(ctx, int64(1)).Return(nil)
 	c.mocks.deployer.EXPECT().DeleteEvaluation(ctx, req).Return(nil)
 	err := c.DeleteEvaluation(ctx, req)
 	require.Nil(t, err)

@@ -3,8 +3,9 @@ package handler
 import (
 	"log/slog"
 	"net/http"
-	"opencsg.com/csghub-server/component/reporter"
 	"strconv"
+
+	"opencsg.com/csghub-server/component/reporter"
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
@@ -96,13 +97,7 @@ func (a *ArgoHandler) DeleteWorkflow(ctx *gin.Context) {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	idInt64, err := strconv.ParseInt(id, 10, 64)
-	if err != nil {
-		slog.Error("fail to convert id to int64", slog.Any("error", err), slog.Any("id", id))
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	err = a.wfc.DeleteWorkflow(ctx, idInt64, req.Username)
+	err = a.wfc.DeleteWorkflow(ctx, req)
 	if err != nil {
 		slog.Error("fail to delete workflow", slog.Any("error", err))
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

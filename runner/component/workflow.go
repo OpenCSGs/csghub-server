@@ -50,7 +50,7 @@ type WorkFlowComponent interface {
 	// find workflow by user name
 	FindWorkFlows(ctx context.Context, username string, per, page int) ([]database.ArgoWorkflow, int, error)
 	// generate workflow templates
-	DeleteWorkflow(ctx context.Context, id int64, username string) error
+	DeleteWorkflow(ctx context.Context, req *types.ArgoWorkFlowDeleteReq) error
 	GetWorkflow(ctx context.Context, id int64, username string) (*database.ArgoWorkflow, error)
 	DeleteWorkflowInargo(ctx context.Context, delete *v1alpha1.Workflow) error
 	FindWorkFlowById(ctx context.Context, id int64) (database.ArgoWorkflow, error)
@@ -126,23 +126,16 @@ func (wc *workFlowComponentImpl) CreateWorkflow(ctx context.Context, req types.A
 	return wf, nil
 }
 
-func (wc *workFlowComponentImpl) DeleteWorkflow(ctx context.Context, id int64, username string) error {
-	wf, err := wc.FindWorkFlowById(ctx, id)
-	if err != nil {
-		return fmt.Errorf("failed to get workflow by id: %v", err)
-	}
-	if wf.Username != username {
-		return fmt.Errorf("no permission to delete workflow")
-	}
-	cluster, _, err := GetCluster(ctx, wc.clusterPool, wf.ClusterID)
+func (wc *workFlowComponentImpl) DeleteWorkflow(ctx context.Context, req *types.ArgoWorkFlowDeleteReq) error {
+	cluster, _, err := GetCluster(ctx, wc.clusterPool, req.ClusterID)
 	if err != nil {
 		return fmt.Errorf("failed to get cluster by id: %v", err)
 	}
-	err = cluster.ArgoClient.ArgoprojV1alpha1().Workflows(wf.Namespace).Delete(ctx, wf.TaskId, v1.DeleteOptions{})
+	err = cluster.ArgoClient.ArgoprojV1alpha1().Workflows(req.Namespace).Delete(ctx, req.TaskID, v1.DeleteOptions{})
 	if err != nil {
 		slog.Warn("Error deleting argo workflow", slog.Any("error", err))
 	}
-	return wc.wf.DeleteWorkFlow(ctx, wf.ID)
+	return nil
 }
 
 func (wc *workFlowComponentImpl) GetWorkflow(ctx context.Context, id int64, username string) (*database.ArgoWorkflow, error) {

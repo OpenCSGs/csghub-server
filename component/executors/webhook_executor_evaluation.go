@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/argoproj/argo-workflows/v3/pkg/apis/workflow/v1alpha1"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
@@ -54,6 +55,10 @@ func (h *argoWorkflowExecutorImpl) ProcessEvent(ctx context.Context, event *type
 			return fmt.Errorf("failed to create argo workflow: %w", err)
 		}
 	case types.RunnerWorkflowChange:
+		if wf.Status == v1alpha1.WorkflowError {
+			// unify error
+			wf.Status = v1alpha1.WorkflowFailed
+		}
 		_, err := h.store.UpdateWorkFlowByTaskID(ctx, wf)
 		if err != nil {
 			return fmt.Errorf("failed to update argo workflow: %w", err)
