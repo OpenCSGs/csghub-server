@@ -27,15 +27,18 @@ type UpdateModelReq struct {
 }
 
 type UpdateRepoReq struct {
-	Username    string         `json:"-"`
-	Namespace   string         `json:"-"`
-	Name        string         `json:"-"`
-	RepoType    RepositoryType `json:"-"`
-	Nickname    *string        `json:"nickname" example:"model display name"`
-	Description *string        `json:"description"`
-	Private     *bool          `json:"private" example:"false"`
-	// a sign to indicate if the request is from admin
-	Admin string `json:"-"`
+	Username  string `json:"-"`
+	Namespace string `json:"-"`
+	Name      string `json:"-"`
+	// The type of the repository
+	RepoType RepositoryType `json:"-"`
+	// The new display name of the repository
+	Nickname *string `json:"nickname" example:"model display name"`
+	// The new description for the repository
+	Description *string `json:"description"`
+	// The new visibility of the repository
+	Private *bool  `json:"private" example:"false"`
+	Admin   string `json:"-"`
 }
 
 // make sure UpdateModelReq implements SensitiveRequest interface
@@ -87,21 +90,32 @@ type ModelPredictResp struct {
 }
 
 type CreateRepoReq struct {
-	Username      string         `json:"-" example:"creator_user_name"`
-	Namespace     string         `json:"namespace" example:"user_or_org_name"`
-	Name          string         `json:"name" example:"model_name_1"`
-	Nickname      string         `json:"nickname" example:"model display name"`
-	Description   string         `json:"description" binding:"lt=1000"`
-	Private       bool           `json:"private"`
-	Labels        string         `json:"labels" example:""`
-	License       string         `json:"license" example:"MIT" binding:"lt=100"`
-	Readme        string         `json:"readme"`
-	DefaultBranch string         `json:"default_branch" example:"main"`
-	RepoType      RepositoryType `json:"type"`
-	Admin         string         `json:"admin"`
-	ToolCount     int            `json:"tool_count"`
-	StarCount     int            `json:"star_count"`
-	CommitFiles   []CommitFile   `json:"commit_files"`
+	Username string `json:"-"`
+	// The namespace of the repository, which can be a user or an organization
+	Namespace string `json:"namespace" example:"user_or_org_name"`
+	// The name of the repository
+	Name string `json:"name" example:"model_name_1"`
+	// The display name of the repository
+	Nickname string `json:"nickname" example:"model display name"`
+	// A description for the repository
+	Description string `json:"description" binding:"lt=1000"`
+	// Whether the repository is private
+	Private bool `json:"private"`
+	// The license for the repository
+	License string `json:"license" example:"MIT" binding:"lt=100"`
+	Readme  string `json:"-"`
+	// The default branch of the repository
+	DefaultBranch string `json:"default_branch" example:"main"`
+	// The type of the repository
+	RepoType RepositoryType `json:"type"`
+	// Admin user
+	Admin string `json:"admin"`
+	// Tool count
+	ToolCount int `json:"tool_count"`
+	// Star count
+	StarCount int `json:"star_count"`
+	// Files to commit
+	CommitFiles []CommitFile `json:"commit_files"`
 }
 
 // make sure CreateRepoReq implements SensitiveRequest

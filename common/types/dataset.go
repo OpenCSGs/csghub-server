@@ -12,6 +12,7 @@ type DatasetTagCommit struct {
 
 type CreateDatasetReq struct {
 	CreateRepoReq
+	// The type of the dataset
 	Type int `json:"type"`
 }
 
