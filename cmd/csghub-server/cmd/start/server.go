@@ -141,7 +141,7 @@ var serverCmd = &cobra.Command{
 		}
 
 		slog.Info("start temporal workflow")
-		err = workflow.StartWorkflow(cfg)
+		err = workflow.StartWorkflow(cfg, true)
 		if err != nil {
 			return err
 		}

@@ -45,7 +45,7 @@ var lfsSyncCmd = &cobra.Command{
 		go server.Run()
 
 		slog.Info("start temporal workflow")
-		err = workflow.StartWorkflow(cfg)
+		err = workflow.StartWorkflow(cfg, false)
 		if err != nil {
 			return err
 		}

@@ -23,7 +23,7 @@ const HandlePushQueueName = "workflow_handle_push_queue"
 
 var activities activity.Activities
 
-func StartWorkflow(cfg *config.Config) error {
+func StartWorkflow(cfg *config.Config, registerAsWorker bool) error {
 	gitcallback, err := callback.NewGitCallback(cfg)
 	if err != nil {
 		return err
@@ -62,7 +62,7 @@ func StartWorkflow(cfg *config.Config) error {
 	return StartWorkflowDI(
 		cfg, gitcallback, recom,
 		gitserver, multisync, database.NewSyncClientSettingStore(), client,
-		rftScanner, repoComponent,
+		rftScanner, repoComponent, registerAsWorker,
 	)
 }
 
@@ -76,21 +76,24 @@ func StartWorkflowDI(
 	temporalClient temporal.Client,
 	rftScanner component.RuntimeArchitectureComponent,
 	repoComponent component.RepoComponent,
+	registerAsWorker bool,
 ) error {
-	worker := temporalClient.NewWorker(HandlePushQueueName, worker.Options{})
-	act := activity.NewActivities(cfg, callback, recom, gitServer, multisync, syncClientSetting, rftScanner, repoComponent)
-	worker.RegisterActivity(act)
+	if registerAsWorker {
+		worker := temporalClient.NewWorker(HandlePushQueueName, worker.Options{})
+		act := activity.NewActivities(cfg, callback, recom, gitServer, multisync, syncClientSetting, rftScanner, repoComponent)
+		worker.RegisterActivity(act)
 
-	worker.RegisterWorkflow(HandlePushWorkflow)
-	worker.RegisterWorkflow(RuntimeFrameworkWorkflow)
+		worker.RegisterWorkflow(HandlePushWorkflow)
+		worker.RegisterWorkflow(RuntimeFrameworkWorkflow)
 
-	RegisterCronWorker(cfg, temporalClient, act)
-	err := RegisterCronJobs(cfg, temporalClient)
-	if err != nil {
-		return fmt.Errorf("failed to register cron jobs:  %w", err)
+		RegisterCronWorker(cfg, temporalClient, act)
+		err := RegisterCronJobs(cfg, temporalClient)
+		if err != nil {
+			return fmt.Errorf("failed to register cron jobs:  %w", err)
+		}
 	}
 
-	err = temporalClient.Start()
+	err := temporalClient.Start()
 	if err != nil {
 		return fmt.Errorf("failed to start worker:  %w", err)
 	}
