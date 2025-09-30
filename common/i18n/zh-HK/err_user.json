@@ -11,6 +11,12 @@
     "error.USER-ERR-11": {
         "other": "無效的電話號碼"
     },
+    "error.USER-ERR-12": {
+        "other": "用戶名已存在"
+    },
+    "error.USER-ERR-13": {
+        "other": "電郵已存在"
+    },
     "error.USER-ERR-2": {
         "other": "新電話號碼已經存在於sso服務中"
     },

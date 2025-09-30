@@ -15,6 +15,8 @@ const (
 	verificationCodeRequired
 	verificationCodeLengthInvalid
 	invalidPhoneNumber
+	usernameExists
+	emailExists
 )
 
 var (
@@ -163,4 +165,47 @@ var (
 	//
 	// zh-HK: 無效的電話號碼
 	ErrInvalidPhoneNumber error = CustomError{prefix: errUserPrefix, code: invalidPhoneNumber}
+	// username already exists
+	//
+	// Description: The username provided already exists in the system.
+	//
+	// Description_ZH: 提供的用户名已存在于系统中。
+	//
+	// en-US: Username already exists
+	//
+	// zh-CN: 用户名已存在
+	//
+	// zh-HK: 用戶名已存在
+	ErrUsernameExists error = CustomError{prefix: errUserPrefix, code: usernameExists}
+
+	// email already exists in the system
+	//
+	// Description: The email address provided already exists in the system.
+	//
+	// Description_ZH: 提供的电子邮件地址已存在于系统中。
+	//
+	// en-US: Email already exists
+	//
+	// zh-CN: 邮箱已存在
+	//
+	// zh-HK: 電郵已存在
+	ErrEmailExists error = CustomError{prefix: errUserPrefix, code: emailExists}
 )
+
+// UsernameExists creates a specific error for username conflicts with the conflicting username
+func UsernameExists(username string) error {
+	return CustomError{
+		prefix:  errUserPrefix,
+		code:    usernameExists,
+		context: map[string]interface{}{"username": username},
+	}
+}
+
+// EmailExists creates a specific error for email conflicts with the conflicting email
+func EmailExists(email string) error {
+	return CustomError{
+		prefix:  errUserPrefix,
+		code:    emailExists,
+		context: map[string]interface{}{"email": email},
+	}
+}

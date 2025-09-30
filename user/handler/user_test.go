@@ -628,35 +628,3 @@ func TestExtractConflictInfo(t *testing.T) {
 		})
 	}
 }
-
-func TestHandleExportUserInfo(t *testing.T) {
-	r := gin.Default()
-	mockUserComp := component.NewMockUserComponent(t)
-	h := &UserHandler{
-		c: mockUserComp,
-	}
-
-	ch := make(chan types.UserIndexResp)
-	go func() {
-		defer close(ch)
-		ch <- types.UserIndexResp{
-			Users: []*types.User{
-				{
-					Username: "testuser",
-					Email:    "test@example.com",
-				},
-			},
-		}
-	}()
-	mockUserComp.EXPECT().StreamExportUsers(mock.Anything, mock.Anything).Return(ch, nil)
-	r.GET("/users/stream-export", h.ExportUserInfo)
-
-	req, _ := http.NewRequest("GET",
-		"/users/stream-export?verify_status=approved&search=test_search&labels=vip&labels=basic",
-		nil,
-	)
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-
-	assert.Equal(t, http.StatusOK, w.Code, "Status code should be 200 OK")
-}

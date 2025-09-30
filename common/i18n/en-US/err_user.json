@@ -11,6 +11,12 @@
     "error.USER-ERR-11": {
         "other": "Invalid phone number"
     },
+    "error.USER-ERR-12": {
+        "other": "Username already exists"
+    },
+    "error.USER-ERR-13": {
+        "other": "Email already exists"
+    },
     "error.USER-ERR-2": {
         "other": "New phone number already exists in sso service"
     },

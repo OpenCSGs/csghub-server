@@ -324,6 +324,13 @@ func (h *UserHandler) Casdoor(ctx *gin.Context) {
 	jwtToken, signed, err := h.c.Signin(ctx.Request.Context(), code, state)
 	if err != nil {
 		slog.Error("Failed to signin", slog.Any("error", err), slog.String("code", code), slog.String("state", state))
+		var customErr errorx.CustomError
+		if errors.As(err, &customErr) {
+			if handleConflictCustomError(ctx, customErr, h.signinFailureRedirectURL) {
+				return
+			}
+		}
+
 		errorMsg := url.QueryEscape(fmt.Sprintf("failed to signin: %v", err))
 		errorRedirectURL := fmt.Sprintf("%s?error_code=500&error_message=%s", h.signinFailureRedirectURL, errorMsg)
 		slog.Info("redirecting to error page", slog.String("url", errorRedirectURL))
@@ -912,4 +919,44 @@ func (e *UserHandler) UpdatePhone(ctx *gin.Context) {
 	}
 
 	httpbase.OK(ctx, nil)
+}
+
+func handleConflictCustomError(ctx *gin.Context, customErr errorx.CustomError, redirectURL string) bool {
+	errCode := customErr.Code()
+
+	cField, cValue, ok := extractConflictInfo(customErr)
+	if !ok {
+		return false
+	}
+
+	u, _ := url.Parse(redirectURL)
+	q := u.Query()
+	q.Set("error_code", strconv.Itoa(http.StatusConflict))
+	q.Set("error_message_code", errCode)
+	q.Set("field_name", cField)
+	q.Set("field_value", cValue)
+	u.RawQuery = q.Encode()
+	slog.Info("redirecting to error page with conflict error", slog.String("url", u.String()))
+	ctx.Redirect(http.StatusMovedPermanently, u.String())
+	return true
+}
+
+func extractConflictInfo(customErr errorx.CustomError) (field, value string, ok bool) {
+	errCtx := customErr.Context()
+
+	switch {
+	case customErr.Is(errorx.ErrUsernameExists):
+		if username, exists := errCtx["username"]; exists {
+			if usernameStr, ok := username.(string); ok {
+				return "username", usernameStr, true
+			}
+		}
+	case customErr.Is(errorx.ErrEmailExists):
+		if email, exists := errCtx["email"]; exists {
+			if emailStr, ok := email.(string); ok {
+				return "email", emailStr, true
+			}
+		}
+	}
+	return "", "", false
 }

@@ -164,6 +164,29 @@ func NewUserComponent(config *config.Config) (UserComponent, error) {
 // 	panic("implement me later")
 // }
 
+func (c *userComponentImpl) checkUserConflictsInDB(ctx context.Context, username, email string) error {
+	exists, err := c.userStore.IsExist(ctx, username)
+	if err != nil {
+		return fmt.Errorf("failed to check username existence: %w", err)
+	}
+	if exists {
+		return errorx.UsernameExists(username)
+	}
+
+	// Check email existence if email is provided
+	if email != "" {
+		user, err := c.userStore.FindByEmail(ctx, email)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return fmt.Errorf("failed to check email existence: %w", err)
+		}
+		if user.ID > 0 {
+			return errorx.EmailExists(email)
+		}
+	}
+
+	return nil
+}
+
 func (c *userComponentImpl) createFromSSOUser(ctx context.Context, cu *rpc.SSOUserInfo) (*database.User, error) {
 	var (
 		gsUserResp        *gitserver.CreateUserResponse
@@ -185,6 +208,11 @@ func (c *userComponentImpl) createFromSSOUser(ctx context.Context, cu *rpc.SSOUs
 		userName = cu.Name
 		canChangeUserName = false
 		email = cu.Email
+	}
+
+	// Check for conflicts before proceeding
+	if err := c.checkUserConflictsInDB(ctx, userName, email); err != nil {
+		return nil, err
 	}
 	//skip creating git user if email is empty, it will be created later when user set email
 	if email != "" {

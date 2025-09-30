@@ -11,6 +11,12 @@
     "error.USER-ERR-11": {
         "other": "无效的电话号码"
     },
+    "error.USER-ERR-12": {
+        "other": "用户名已存在"
+    },
+    "error.USER-ERR-13": {
+        "other": "邮箱已存在"
+    },
     "error.USER-ERR-2": {
         "other": "新电话号码已经存在于sso服务中"
     },

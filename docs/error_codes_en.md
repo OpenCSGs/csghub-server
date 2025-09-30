@@ -786,4 +786,7 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Name:** `emailExists`
 - **Description:** The email address provided already exists in the system.
 
+<<<<<<< HEAD
 =======
+=======
+>>>>>>> 6f5ce9bc (update the redirect urls of name and email conflicts when login.)

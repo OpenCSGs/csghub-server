@@ -2,6 +2,8 @@ package component
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"sync"
 	"testing"
 
@@ -438,4 +440,129 @@ func TestUserComponent_UpdateByUUID_UpdateUserName(t *testing.T) {
 		NewUserName: &newUserName,
 	})
 	require.Nil(t, err)
+}
+
+func TestUserComponent_checkUserConflictsInDB(t *testing.T) {
+	tests := []struct {
+		name          string
+		username      string
+		email         string
+		mockSetup     func(*mockdb.MockUserStore)
+		expectedError error
+		expectError   bool
+	}{
+		{
+			name:     "no conflicts - username and email available",
+			username: "newuser",
+			email:    "newuser@example.com",
+			mockSetup: func(mockUserStore *mockdb.MockUserStore) {
+				mockUserStore.EXPECT().IsExist(mock.Anything, "newuser").Return(false, nil)
+				mockUserStore.EXPECT().FindByEmail(mock.Anything, "newuser@example.com").Return(database.User{ID: 0}, sql.ErrNoRows)
+			},
+			expectedError: nil,
+			expectError:   false,
+		},
+		{
+			name:     "no conflicts - username available, no email provided",
+			username: "newuser",
+			email:    "",
+			mockSetup: func(mockUserStore *mockdb.MockUserStore) {
+				mockUserStore.EXPECT().IsExist(mock.Anything, "newuser").Return(false, nil)
+			},
+			expectedError: nil,
+			expectError:   false,
+		},
+		{
+			name:     "username conflict",
+			username: "existinguser",
+			email:    "newuser@example.com",
+			mockSetup: func(mockUserStore *mockdb.MockUserStore) {
+				mockUserStore.EXPECT().IsExist(mock.Anything, "existinguser").Return(true, nil)
+			},
+			expectedError: errorx.UsernameExists("existinguser"),
+			expectError:   true,
+		},
+		{
+			name:     "email conflict",
+			username: "newuser",
+			email:    "existing@example.com",
+			mockSetup: func(mockUserStore *mockdb.MockUserStore) {
+				mockUserStore.EXPECT().IsExist(mock.Anything, "newuser").Return(false, nil)
+				mockUserStore.EXPECT().FindByEmail(mock.Anything, "existing@example.com").Return(database.User{ID: 123}, nil)
+			},
+			expectedError: errorx.EmailExists("existing@example.com"),
+			expectError:   true,
+		},
+		{
+			name:     "username check database error",
+			username: "newuser",
+			email:    "newuser@example.com",
+			mockSetup: func(mockUserStore *mockdb.MockUserStore) {
+				mockUserStore.EXPECT().IsExist(mock.Anything, "newuser").Return(false, errors.New("database connection error"))
+			},
+			expectedError: nil,
+			expectError:   true,
+		},
+		{
+			name:     "email check database error",
+			username: "newuser",
+			email:    "newuser@example.com",
+			mockSetup: func(mockUserStore *mockdb.MockUserStore) {
+				mockUserStore.EXPECT().IsExist(mock.Anything, "newuser").Return(false, nil)
+				mockUserStore.EXPECT().FindByEmail(mock.Anything, "newuser@example.com").Return(database.User{}, errors.New("database connection error"))
+			},
+			expectedError: nil,
+			expectError:   true,
+		},
+		{
+			name:     "email check returns ErrNoRows - no conflict",
+			username: "newuser",
+			email:    "newuser@example.com",
+			mockSetup: func(mockUserStore *mockdb.MockUserStore) {
+				mockUserStore.EXPECT().IsExist(mock.Anything, "newuser").Return(false, nil)
+				mockUserStore.EXPECT().FindByEmail(mock.Anything, "newuser@example.com").Return(database.User{ID: 0}, sql.ErrNoRows)
+			},
+			expectedError: nil,
+			expectError:   false,
+		},
+		{
+			name:     "email check returns user with ID 0 - no conflict",
+			username: "newuser",
+			email:    "newuser@example.com",
+			mockSetup: func(mockUserStore *mockdb.MockUserStore) {
+				mockUserStore.EXPECT().IsExist(mock.Anything, "newuser").Return(false, nil)
+				mockUserStore.EXPECT().FindByEmail(mock.Anything, "newuser@example.com").Return(database.User{ID: 0}, nil)
+			},
+			expectedError: nil,
+			expectError:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockUserStore := mockdb.NewMockUserStore(t)
+			tt.mockSetup(mockUserStore)
+
+			uc := &userComponentImpl{
+				userStore: mockUserStore,
+			}
+
+			err := uc.checkUserConflictsInDB(context.Background(), tt.username, tt.email)
+
+			if tt.expectError {
+				require.Error(t, err)
+				if tt.expectedError != nil {
+					// Check if the error is the expected custom error type
+					var customErr errorx.CustomError
+					if errors.As(err, &customErr) {
+						require.True(t, customErr.Is(tt.expectedError), "Expected error type %v, got %v", tt.expectedError, err)
+					} else {
+						require.Contains(t, err.Error(), "failed to check", "Expected database error message")
+					}
+				}
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
 }

@@ -786,4 +786,7 @@
 - **错误名:** `emailExists`
 - **描述:** 提供的电子邮件地址已存在于系统中。
 
+<<<<<<< HEAD
 =======
+=======
+>>>>>>> 6f5ce9bc (update the redirect urls of name and email conflicts when login.)
