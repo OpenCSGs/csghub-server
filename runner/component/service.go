@@ -33,7 +33,6 @@ import (
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 	rcommon "opencsg.com/csghub-server/runner/common"
-	rTypes "opencsg.com/csghub-server/runner/types"
 )
 
 var (
@@ -673,12 +672,6 @@ func (s *serviceComponentImpl) runPodInformer(stopCh <-chan struct{}, cluster *c
 				err = s.updateServiceInDB(*svc, cluster.ID, new)
 				if err != nil {
 					slog.Error("failed to update service status", slog.Any("service", serviceName), slog.Any("error", err))
-				}
-				if isPodFailed && svc != nil && len(svc.Name) > 0 {
-					err = s.persistPodLogs(*svc, new, podStatus, cluster)
-					if err != nil {
-						slog.Error("failed to persist pod logs", slog.Any("service", serviceName), slog.Any("error", err))
-					}
 				}
 			}
 		},
@@ -1374,36 +1367,6 @@ func (s *serviceComponentImpl) pushEvent(eventType types.WebHookEventType, svcSt
 				slog.Any("error", err))
 		}
 	}()
-}
-
-func (s *serviceComponentImpl) persistPodLogs(svc v1.Service, pod *corev1.Pod, podStatus string, cluster *cluster.Cluster) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	logs, err := rcommon.GetPodLog(ctx, cluster.Client, pod.Name, pod.Namespace, rTypes.UserContainerName)
-	if err != nil {
-		return fmt.Errorf("failed to get svc %s/%s pod %s/%s log, error: %w", svc.Namespace, svc.Name, pod.Namespace, pod.Name, err)
-	}
-	logStr := string(logs)
-	slog.Debug("persist pod log by status changed", slog.Any("clusterID", cluster.ID), slog.Any("namespace", pod.Namespace),
-		slog.Any("svcname", svc.Name), slog.Any("pod-name", pod.Name), slog.Any("log-in-bytes", len(logs)))
-	deploy_ids := svc.Annotations[KeyDeployID]
-	deploy_id, err := strconv.Atoi(deploy_ids)
-	if err != nil {
-		slog.Error("failed to convert deploy id", slog.Any("deploy_id", deploy_ids), slog.Any("error", err))
-	}
-	logData := database.DeployLog{
-		DeployID:         int64(deploy_id),
-		ClusterID:        cluster.ID,
-		SvcName:          svc.Name,
-		PodName:          pod.Name,
-		PodStatus:        podStatus,
-		UserContainerLog: logStr,
-	}
-	_, err = s.deployLogStore.UpdateDeployLogs(ctx, logData)
-	if err != nil {
-		return fmt.Errorf("failed to persist svc %s/%s pod %s/%s log, error: %w", svc.Namespace, svc.Name, pod.Namespace, pod.Name, err)
-	}
-	return nil
 }
 
 func (s *serviceComponentImpl) PodExist(ctx context.Context, cluster *cluster.Cluster, podName string) (bool, error) {

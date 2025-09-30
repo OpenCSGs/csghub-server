@@ -24,9 +24,9 @@ func (_m *MockClusterInfoStore) EXPECT() *MockClusterInfoStore_Expecter {
 	return &MockClusterInfoStore_Expecter{mock: &_m.Mock}
 }
 
-// Add provides a mock function with given fields: ctx, clusterConfig, region
-func (_m *MockClusterInfoStore) Add(ctx context.Context, clusterConfig string, region string) (*database.ClusterInfo, error) {
-	ret := _m.Called(ctx, clusterConfig, region)
+// Add provides a mock function with given fields: ctx, clusterConfig, region, mode
+func (_m *MockClusterInfoStore) Add(ctx context.Context, clusterConfig string, region string, mode types.ClusterMode) (*database.ClusterInfo, error) {
+	ret := _m.Called(ctx, clusterConfig, region, mode)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Add")
@@ -34,19 +34,19 @@ func (_m *MockClusterInfoStore) Add(ctx context.Context, clusterConfig string, r
 
 	var r0 *database.ClusterInfo
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) (*database.ClusterInfo, error)); ok {
-		return rf(ctx, clusterConfig, region)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, types.ClusterMode) (*database.ClusterInfo, error)); ok {
+		return rf(ctx, clusterConfig, region, mode)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) *database.ClusterInfo); ok {
-		r0 = rf(ctx, clusterConfig, region)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, types.ClusterMode) *database.ClusterInfo); ok {
+		r0 = rf(ctx, clusterConfig, region, mode)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*database.ClusterInfo)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
-		r1 = rf(ctx, clusterConfig, region)
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, types.ClusterMode) error); ok {
+		r1 = rf(ctx, clusterConfig, region, mode)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -63,13 +63,14 @@ type MockClusterInfoStore_Add_Call struct {
 //   - ctx context.Context
 //   - clusterConfig string
 //   - region string
-func (_e *MockClusterInfoStore_Expecter) Add(ctx interface{}, clusterConfig interface{}, region interface{}) *MockClusterInfoStore_Add_Call {
-	return &MockClusterInfoStore_Add_Call{Call: _e.mock.On("Add", ctx, clusterConfig, region)}
+//   - mode types.ClusterMode
+func (_e *MockClusterInfoStore_Expecter) Add(ctx interface{}, clusterConfig interface{}, region interface{}, mode interface{}) *MockClusterInfoStore_Add_Call {
+	return &MockClusterInfoStore_Add_Call{Call: _e.mock.On("Add", ctx, clusterConfig, region, mode)}
 }
 
-func (_c *MockClusterInfoStore_Add_Call) Run(run func(ctx context.Context, clusterConfig string, region string)) *MockClusterInfoStore_Add_Call {
+func (_c *MockClusterInfoStore_Add_Call) Run(run func(ctx context.Context, clusterConfig string, region string, mode types.ClusterMode)) *MockClusterInfoStore_Add_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string))
+		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(types.ClusterMode))
 	})
 	return _c
 }
@@ -79,7 +80,7 @@ func (_c *MockClusterInfoStore_Add_Call) Return(_a0 *database.ClusterInfo, _a1 e
 	return _c
 }
 
-func (_c *MockClusterInfoStore_Add_Call) RunAndReturn(run func(context.Context, string, string) (*database.ClusterInfo, error)) *MockClusterInfoStore_Add_Call {
+func (_c *MockClusterInfoStore_Add_Call) RunAndReturn(run func(context.Context, string, string, types.ClusterMode) (*database.ClusterInfo, error)) *MockClusterInfoStore_Add_Call {
 	_c.Call.Return(run)
 	return _c
 }

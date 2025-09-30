@@ -17,7 +17,7 @@ func TestClusterStore_CRUD(t *testing.T) {
 
 	store := database.NewClusterInfoStoreWithDB(db)
 
-	_, err := store.Add(ctx, "foo", "bar")
+	_, err := store.Add(ctx, "foo", "bar", types.ConnectModeKubeConfig)
 	require.Nil(t, err)
 
 	cfg := &database.ClusterInfo{}
@@ -26,7 +26,7 @@ func TestClusterStore_CRUD(t *testing.T) {
 	require.Equal(t, "bar", cfg.Region)
 
 	// already exist, do nothing
-	_, err = store.Add(ctx, "foo", "bar2")
+	_, err = store.Add(ctx, "foo", "bar2", types.ConnectModeKubeConfig)
 	require.Nil(t, err)
 	err = db.Core.NewSelect().Model(cfg).Where("cluster_config=?", "foo").Scan(ctx)
 	require.Nil(t, err)
@@ -65,10 +65,10 @@ func TestClusterStore_Delete(t *testing.T) {
 
 	store := database.NewClusterInfoStoreWithDB(db)
 
-	cls1, err := store.Add(ctx, "foo", "region1")
+	cls1, err := store.Add(ctx, "foo", "region1", types.ConnectModeKubeConfig)
 	require.Nil(t, err)
 
-	cls2, err := store.Add(ctx, "bar", "region2")
+	cls2, err := store.Add(ctx, "bar", "region2", types.ConnectModeKubeConfig)
 	require.Nil(t, err)
 
 	statusEvent := &types.HearBeatEvent{

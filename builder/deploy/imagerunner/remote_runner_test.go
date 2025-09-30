@@ -57,9 +57,9 @@ func TestRemoteRunner_insideCluster_Status(t *testing.T) {
 
 	mockClusterStore := mockdb.NewMockClusterInfoStore(t)
 	mockClusterStore.EXPECT().ByClusterID(context.Background(), req.ClusterID).Return(database.ClusterInfo{
-		ClusterID: req.ClusterID,
-		Mode:      types.ConnectModeInCluster,
-		Endpoint:  "in-cluster-endpoint",
+		ClusterID:      req.ClusterID,
+		Mode:           types.ConnectModeInCluster,
+		RunnerEndpoint: "in-cluster-endpoint",
 	}, nil)
 
 	runner := &RemoteRunner{
@@ -106,9 +106,9 @@ func TestRemoteRunner_outsideCluster_Status(t *testing.T) {
 
 	mockClusterStore := mockdb.NewMockClusterInfoStore(t)
 	mockClusterStore.EXPECT().ByClusterID(context.Background(), req.ClusterID).Return(database.ClusterInfo{
-		ClusterID: req.ClusterID,
-		Mode:      types.ConnectModeKubeConfig,
-		Endpoint:  "kubeconfig-cluster-endpoint",
+		ClusterID:      req.ClusterID,
+		Mode:           types.ConnectModeKubeConfig,
+		RunnerEndpoint: "kubeconfig-cluster-endpoint",
 	}, nil)
 
 	runner := &RemoteRunner{
@@ -149,8 +149,8 @@ func TestRemoteRunner_GetRemoteRunnerHost(t *testing.T) {
 		clusterID := "in-cluster"
 		expectedHost := "http://in-cluster.endpoint"
 		mockClusterStore.EXPECT().ByClusterID(context.Background(), clusterID).Return(database.ClusterInfo{
-			Mode:     types.ConnectModeInCluster,
-			Endpoint: expectedHost,
+			Mode:           types.ConnectModeInCluster,
+			RunnerEndpoint: expectedHost,
 		}, nil).Once()
 
 		host, err := runner.GetRemoteRunnerHost(context.Background(), clusterID)
@@ -217,8 +217,8 @@ func TestRemoteRunner_GetClusterById(t *testing.T) {
 
 	mockClusterStore := mockdb.NewMockClusterInfoStore(t)
 	mockClusterStore.EXPECT().ByClusterID(context.Background(), clusterID).Return(database.ClusterInfo{
-		Mode:     types.ConnectModeInCluster,
-		Endpoint: server.URL,
+		Mode:           types.ConnectModeInCluster,
+		RunnerEndpoint: server.URL,
 	}, nil).Once()
 
 	remoteURL, _ := url.Parse(server.URL)
@@ -248,8 +248,8 @@ func TestRemoteRunner_GetClusterById_ServerError(t *testing.T) {
 
 	mockClusterStore := mockdb.NewMockClusterInfoStore(t)
 	mockClusterStore.EXPECT().ByClusterID(context.Background(), clusterID).Return(database.ClusterInfo{
-		Mode:     types.ConnectModeInCluster,
-		Endpoint: server.URL,
+		Mode:           types.ConnectModeInCluster,
+		RunnerEndpoint: server.URL,
 	}, nil).Once()
 
 	remoteURL, _ := url.Parse(server.URL)

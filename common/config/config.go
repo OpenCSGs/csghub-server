@@ -209,10 +209,6 @@ type Config struct {
 		Servers string `env:"OPENCSG_SERVERS_KAFKA_SERVERS" default:""`
 	}
 
-	MQ struct {
-		WebHookEventRunnerSubject string `env:"OPENCSG_SERVER_WEBHOOK_RUNNER_SUBJECT" default:"webhook.event.runner"`
-	}
-
 	Accounting struct {
 		Host                       string `env:"OPENCSG_ACCOUNTING_SERVER_HOST" default:"http://localhost"`
 		Port                       int    `env:"OPENCSG_ACCOUNTING_SERVER_PORT" default:"8086"`
@@ -468,9 +464,9 @@ type Config struct {
 		ImageBuilderKanikoArgs  []string `env:"STARHUB_SERVER_RUNNER_IMAGE_BUILDER_KANIKO_ARGS"`
 		SystemCUDAVersion       string   `env:"STARHUB_SERVER_RUNNER_SYSTEM_CUDA_VERSION" default:""`
 		// csghub server webhook endpoint
-		WebHookEndpoint             string `env:"STARHUB_SERVER_RUNNER_WEBHOOK_ENDPOINT" default:"http://localhost:8080"`
-		WatchConfigmapName          string `env:"STARHUB_SERVER_RUNNER_WATCH_CONFIGMAP_NAME" default:"spaces-runner-config"`
-		WatchConfigmapKey           string `env:"STARHUB_SERVER_RUNNER_WATCH_CONFIGMAP_KEY" default:"STARHUB_SERVER_RUNNER_WEBHOOK_ENDPOINT"`
+		WebHookEndpoint    string `env:"STARHUB_SERVER_RUNNER_WEBHOOK_ENDPOINT" default:"http://localhost:8080"`
+		WatchConfigmapName string `env:"STARHUB_SERVER_RUNNER_WATCH_CONFIGMAP_NAME" default:"spaces-runner-config"`
+		// WatchConfigmapKey           string `env:"STARHUB_SERVER_RUNNER_WATCH_CONFIGMAP_KEY" default:""`
 		WatchConfigmapIntervalInSec int    `env:"STARHUB_SERVER_RUNNER_WATCH_CONFIGMAP_INTERVAL_IN_SEC" default:"60"`
 		HearBeatIntervalInSec       int    `env:"STARHUB_SERVER_RUNNER_HEARTBEAT_INTERVAL_IN_SEC" default:"300"`
 		RunnerNamespace             string `env:"STARHUB_SERVER_CLUSTER_RUNNER_NAMESPACE" default:"csghub"`

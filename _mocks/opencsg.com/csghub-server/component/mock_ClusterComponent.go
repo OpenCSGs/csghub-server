@@ -6,6 +6,8 @@ import (
 	context "context"
 
 	mock "github.com/stretchr/testify/mock"
+	database "opencsg.com/csghub-server/builder/store/database"
+
 	types "opencsg.com/csghub-server/common/types"
 )
 
@@ -22,24 +24,24 @@ func (_m *MockClusterComponent) EXPECT() *MockClusterComponent_Expecter {
 	return &MockClusterComponent_Expecter{mock: &_m.Mock}
 }
 
-// GetClusterById provides a mock function with given fields: ctx, clusterId
-func (_m *MockClusterComponent) GetClusterById(ctx context.Context, clusterId string) (*types.ClusterRes, error) {
+// GetClusterByID provides a mock function with given fields: ctx, clusterId
+func (_m *MockClusterComponent) GetClusterByID(ctx context.Context, clusterId string) (*database.ClusterInfo, error) {
 	ret := _m.Called(ctx, clusterId)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetClusterById")
+		panic("no return value specified for GetClusterByID")
 	}
 
-	var r0 *types.ClusterRes
+	var r0 *database.ClusterInfo
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) (*types.ClusterRes, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*database.ClusterInfo, error)); ok {
 		return rf(ctx, clusterId)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string) *types.ClusterRes); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string) *database.ClusterInfo); ok {
 		r0 = rf(ctx, clusterId)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*types.ClusterRes)
+			r0 = ret.Get(0).(*database.ClusterInfo)
 		}
 	}
 
@@ -52,31 +54,31 @@ func (_m *MockClusterComponent) GetClusterById(ctx context.Context, clusterId st
 	return r0, r1
 }
 
-// MockClusterComponent_GetClusterById_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetClusterById'
-type MockClusterComponent_GetClusterById_Call struct {
+// MockClusterComponent_GetClusterByID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetClusterByID'
+type MockClusterComponent_GetClusterByID_Call struct {
 	*mock.Call
 }
 
-// GetClusterById is a helper method to define mock.On call
+// GetClusterByID is a helper method to define mock.On call
 //   - ctx context.Context
 //   - clusterId string
-func (_e *MockClusterComponent_Expecter) GetClusterById(ctx interface{}, clusterId interface{}) *MockClusterComponent_GetClusterById_Call {
-	return &MockClusterComponent_GetClusterById_Call{Call: _e.mock.On("GetClusterById", ctx, clusterId)}
+func (_e *MockClusterComponent_Expecter) GetClusterByID(ctx interface{}, clusterId interface{}) *MockClusterComponent_GetClusterByID_Call {
+	return &MockClusterComponent_GetClusterByID_Call{Call: _e.mock.On("GetClusterByID", ctx, clusterId)}
 }
 
-func (_c *MockClusterComponent_GetClusterById_Call) Run(run func(ctx context.Context, clusterId string)) *MockClusterComponent_GetClusterById_Call {
+func (_c *MockClusterComponent_GetClusterByID_Call) Run(run func(ctx context.Context, clusterId string)) *MockClusterComponent_GetClusterByID_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(context.Context), args[1].(string))
 	})
 	return _c
 }
 
-func (_c *MockClusterComponent_GetClusterById_Call) Return(_a0 *types.ClusterRes, _a1 error) *MockClusterComponent_GetClusterById_Call {
+func (_c *MockClusterComponent_GetClusterByID_Call) Return(_a0 *database.ClusterInfo, _a1 error) *MockClusterComponent_GetClusterByID_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockClusterComponent_GetClusterById_Call) RunAndReturn(run func(context.Context, string) (*types.ClusterRes, error)) *MockClusterComponent_GetClusterById_Call {
+func (_c *MockClusterComponent_GetClusterByID_Call) RunAndReturn(run func(context.Context, string) (*database.ClusterInfo, error)) *MockClusterComponent_GetClusterByID_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -135,6 +137,65 @@ func (_c *MockClusterComponent_GetClusterUsages_Call) Return(_a0 []types.Cluster
 }
 
 func (_c *MockClusterComponent_GetClusterUsages_Call) RunAndReturn(run func(context.Context) ([]types.ClusterRes, error)) *MockClusterComponent_GetClusterUsages_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetClusterWithResourceByID provides a mock function with given fields: ctx, clusterId
+func (_m *MockClusterComponent) GetClusterWithResourceByID(ctx context.Context, clusterId string) (*types.ClusterRes, error) {
+	ret := _m.Called(ctx, clusterId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetClusterWithResourceByID")
+	}
+
+	var r0 *types.ClusterRes
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*types.ClusterRes, error)); ok {
+		return rf(ctx, clusterId)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *types.ClusterRes); ok {
+		r0 = rf(ctx, clusterId)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.ClusterRes)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, clusterId)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClusterComponent_GetClusterWithResourceByID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetClusterWithResourceByID'
+type MockClusterComponent_GetClusterWithResourceByID_Call struct {
+	*mock.Call
+}
+
+// GetClusterWithResourceByID is a helper method to define mock.On call
+//   - ctx context.Context
+//   - clusterId string
+func (_e *MockClusterComponent_Expecter) GetClusterWithResourceByID(ctx interface{}, clusterId interface{}) *MockClusterComponent_GetClusterWithResourceByID_Call {
+	return &MockClusterComponent_GetClusterWithResourceByID_Call{Call: _e.mock.On("GetClusterWithResourceByID", ctx, clusterId)}
+}
+
+func (_c *MockClusterComponent_GetClusterWithResourceByID_Call) Run(run func(ctx context.Context, clusterId string)) *MockClusterComponent_GetClusterWithResourceByID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockClusterComponent_GetClusterWithResourceByID_Call) Return(_a0 *types.ClusterRes, _a1 error) *MockClusterComponent_GetClusterWithResourceByID_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClusterComponent_GetClusterWithResourceByID_Call) RunAndReturn(run func(context.Context, string) (*types.ClusterRes, error)) *MockClusterComponent_GetClusterWithResourceByID_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -37,7 +37,7 @@ func NewHeartbeatExecutor(config *config.Config) (HeartbeatExecutor, error) {
 }
 
 func (h *heartbeatExecutorImpl) ProcessEvent(ctx context.Context, event *types.WebHookRecvEvent) error {
-	slog.Info("heartbeat event invoked", slog.Any("event", event))
+	slog.Info("heartbeat_event_received", slog.Any("event", event))
 
 	eventData := &types.HearBeatEvent{}
 

@@ -60,7 +60,7 @@ func (h *ClusterHandler) Index(ctx *gin.Context) {
 // @Router       /cluster/{id} [get]
 func (h *ClusterHandler) GetClusterById(ctx *gin.Context) {
 	id := ctx.Param("id")
-	cluster, err := h.c.GetClusterById(ctx.Request.Context(), id)
+	cluster, err := h.c.GetClusterWithResourceByID(ctx.Request.Context(), id)
 	if err != nil {
 		slog.Error("Failed to get cluster", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)

@@ -120,7 +120,7 @@ func (h *RemoteBuilder) GetRemoteRunnerHost(ctx context.Context, clusterID strin
 		return "", err
 	}
 	if cluster.Mode == types.ConnectModeInCluster {
-		return cluster.Endpoint, nil
+		return cluster.RunnerEndpoint, nil
 	}
 	return h.remote.Scheme + "://" + h.remote.Host, nil
 }

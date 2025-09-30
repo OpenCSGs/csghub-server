@@ -246,7 +246,7 @@ func buildCluster(kubeconfig *rest.Config, id string, index int, connectMode typ
 	region := fmt.Sprintf("region-%d", index)
 	var cluster *database.ClusterInfo
 	if connectMode == types.ConnectModeKubeConfig {
-		cluster, err = clusterStore.Add(ctxTimeout, id, region)
+		cluster, err = clusterStore.Add(ctxTimeout, id, region, types.ConnectModeKubeConfig)
 	} else {
 		region = config.Cluster.Region
 		var clusterID string

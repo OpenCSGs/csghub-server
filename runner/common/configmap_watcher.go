@@ -3,14 +3,15 @@ package common
 import (
 	"context"
 	"fmt"
+	"log/slog"
+	"time"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
-	"log/slog"
 	"opencsg.com/csghub-server/common/config"
-	"time"
 )
 
 // WebhookEndpointHandler defines the interface for handling updates to the webhook endpoint.
@@ -80,7 +81,7 @@ func NewConfigmapWatcher(
 // Watch starts the informer to monitor changes to the runner's ConfigMap.
 // It blocks until the context is cancelled.
 func (cw *configmapWatcher) Watch(ctx context.Context) {
-	slog.Info("Starting ConfigMap informer for runner configuration")
+	slog.Debug("Starting ConfigMap informer for runner configuration")
 
 	// Run the informer in a background goroutine.
 	go cw.informer.Run(ctx.Done())

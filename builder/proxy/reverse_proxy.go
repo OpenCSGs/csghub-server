@@ -10,7 +10,7 @@ import (
 )
 
 type ReverseProxy interface {
-	ServeHTTP(w http.ResponseWriter, r *http.Request, api string)
+	ServeHTTP(w http.ResponseWriter, r *http.Request, api, host string)
 }
 
 type reverseProxyImpl struct {
@@ -29,7 +29,7 @@ func NewReverseProxy(target string) (ReverseProxy, error) {
 	}, nil
 }
 
-func (rp *reverseProxyImpl) ServeHTTP(w http.ResponseWriter, r *http.Request, api string) {
+func (rp *reverseProxyImpl) ServeHTTP(w http.ResponseWriter, r *http.Request, api, host string) {
 	defer func() {
 		if r := recover(); r != nil {
 			slog.Debug("Connection to target server interrupted", slog.Any("error", r))
@@ -46,6 +46,9 @@ func (rp *reverseProxyImpl) ServeHTTP(w http.ResponseWriter, r *http.Request, ap
 		}
 		// dont support br comporession
 		req.Header.Set("Accept-Encoding", "gzip")
+		if len(host) > 0 {
+			req.Header.Set("Host", host)
+		}
 
 		// debug only
 		// {

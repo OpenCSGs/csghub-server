@@ -17,10 +17,11 @@ import (
 
 type ClusterComponent interface {
 	Index(ctx context.Context) ([]types.ClusterRes, error)
-	GetClusterById(ctx context.Context, clusterId string) (*types.ClusterRes, error)
+	GetClusterWithResourceByID(ctx context.Context, clusterId string) (*types.ClusterRes, error)
 	Update(ctx context.Context, data types.ClusterRequest) (*types.ClusterRes, error)
 	GetClusterUsages(ctx context.Context) ([]types.ClusterRes, error)
 	GetDeploys(ctx context.Context, req types.DeployReq) ([]types.DeployRes, int, error)
+	GetClusterByID(ctx context.Context, clusterId string) (*database.ClusterInfo, error)
 }
 
 func NewClusterComponent(config *config.Config) (ClusterComponent, error) {
@@ -64,7 +65,7 @@ func (c *clusterComponentImpl) Index(ctx context.Context) ([]types.ClusterRes, e
 			Provider:     clusterInfo.Provider,
 			StorageClass: clusterInfo.StorageClass,
 			Status:       clusterInfo.Status,
-			Endpoint:     clusterInfo.Endpoint,
+			Endpoint:     clusterInfo.RunnerEndpoint,
 		}
 		clusters = append(clusters, *cluster)
 	}
@@ -166,7 +167,7 @@ func (c *clusterComponentImpl) GetDeploys(ctx context.Context, req types.DeployR
 	return res, total, nil
 }
 
-func (c *clusterComponentImpl) GetClusterById(ctx context.Context, clusterId string) (*types.ClusterRes, error) {
+func (c *clusterComponentImpl) GetClusterWithResourceByID(ctx context.Context, clusterId string) (*types.ClusterRes, error) {
 	clusterInfo, err := c.clusterStore.ByClusterID(ctx, clusterId)
 	if err != nil {
 		return nil, err
@@ -181,7 +182,7 @@ func (c *clusterComponentImpl) GetClusterById(ctx context.Context, clusterId str
 	res.Zone = clusterInfo.Zone
 	res.Provider = clusterInfo.Provider
 	res.Status = clusterInfo.Status
-	res.Endpoint = clusterInfo.Endpoint
+	res.Endpoint = clusterInfo.RunnerEndpoint
 	return res, nil
 }
 
@@ -205,7 +206,7 @@ func (c *clusterComponentImpl) Update(ctx context.Context, data types.ClusterReq
 	clusterRes.Zone = clusterInfo.Zone
 	clusterRes.Provider = clusterInfo.Provider
 	clusterRes.Status = clusterInfo.Status
-	clusterRes.Endpoint = clusterInfo.Endpoint
+	clusterRes.Endpoint = clusterInfo.RunnerEndpoint
 	return &clusterRes, nil
 
 }
@@ -220,4 +221,12 @@ func getClusterRegion(clusterId string, clusterInos []database.ClusterInfo) stri
 		}
 	}
 	return clusterInos[0].Region
+}
+
+func (c *clusterComponentImpl) GetClusterByID(ctx context.Context, clusterId string) (*database.ClusterInfo, error) {
+	clusterInfo, err := c.clusterStore.ByClusterID(ctx, clusterId)
+	if err != nil {
+		return nil, err
+	}
+	return &clusterInfo, nil
 }

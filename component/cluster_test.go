@@ -28,7 +28,7 @@ func TestClusterComponent_Index(t *testing.T) {
 	require.Len(t, data, 2)
 }
 
-func TestClusterComponent_GetClusterById(t *testing.T) {
+func TestClusterComponent_GetClusterWithResourceByID(t *testing.T) {
 	ctx := context.TODO()
 	cc := initializeTestClusterComponent(ctx, t)
 	cc.mocks.stores.ClusterInfoMock().EXPECT().ByClusterID(ctx, "c1").Return(database.ClusterInfo{
@@ -39,7 +39,7 @@ func TestClusterComponent_GetClusterById(t *testing.T) {
 		ClusterID: "c1",
 	}, nil)
 
-	data, err := cc.GetClusterById(ctx, "c1")
+	data, err := cc.GetClusterWithResourceByID(ctx, "c1")
 	require.Nil(t, err)
 	require.Equal(t, "c1", data.ClusterID)
 }
@@ -162,4 +162,17 @@ func TestClusterComponent_GetDeploys(t *testing.T) {
 	require.Equal(t, "cpu=2,memory=4Gi", res[0].Resource)
 	require.Equal(t, 200, res[0].TotalTimeInMin)
 	require.Equal(t, 123, res[0].TotalFeeInCents)
+}
+
+func TestClusterComponent_GetClusterByID(t *testing.T) {
+	ctx := context.TODO()
+	cc := initializeTestClusterComponent(ctx, t)
+	cc.mocks.stores.ClusterInfoMock().EXPECT().ByClusterID(ctx, "c1").Return(database.ClusterInfo{
+		ClusterID: "c1",
+		Status:    "running",
+	}, nil)
+
+	data, err := cc.GetClusterByID(ctx, "c1")
+	require.Nil(t, err)
+	require.Equal(t, "c1", data.ClusterID)
 }

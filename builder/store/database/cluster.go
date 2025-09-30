@@ -17,7 +17,7 @@ type clusterInfoStoreImpl struct {
 }
 
 type ClusterInfoStore interface {
-	Add(ctx context.Context, clusterConfig string, region string) (*ClusterInfo, error)
+	Add(ctx context.Context, clusterConfig string, region string, mode types.ClusterMode) (*ClusterInfo, error)
 	AddByClusterID(ctx context.Context, clusterId string, region string) (*ClusterInfo, error)
 	Update(ctx context.Context, clusterInfo ClusterInfo) error
 	UpdateByClusterID(ctx context.Context, cluster types.ClusterEvent) error
@@ -47,21 +47,32 @@ type ClusterInfo struct {
 	Zone             string              `bun:"," json:"zone"`     //cn-beijing
 	Provider         string              `bun:"," json:"provider"` //ali
 	Enable           bool                `bun:",notnull" json:"enable"`
-	Status           types.ClusterStatus `bun:"," json:"status"`            //running, unavailable
-	Endpoint         string              `bun:"," json:"endpoint"`          //runner in k8s api endpoint
-	NetworkInterface string              `bun:"," json:"network_interface"` //used for multi-host, e.g., eth0
-	Mode             types.ClusterMode   `bun:"," json:"mode"`              //used for multi-host, e.g., host, bridge
+	Status           types.ClusterStatus `bun:"," json:"status"`                  //running, unavailable
+	RunnerEndpoint   string              `bun:"endpoint," json:"runner_endpoint"` //runner in k8s api endpoint
+	NetworkInterface string              `bun:"," json:"network_interface"`       //used for multi-host, e.g., eth0
+	Mode             types.ClusterMode   `bun:"," json:"mode"`                    //used for multi-host, e.g., host, bridge
+	AppEndpoint      string              `bun:"," json:"app_endpoint"`            //runner app endpoint
 	times
 }
 
-func (r *clusterInfoStoreImpl) Add(ctx context.Context, clusterConfig string, region string) (*ClusterInfo, error) {
-	cluster, err := r.ByClusterConfig(ctx, clusterConfig)
+func (r *clusterInfoStoreImpl) Add(ctx context.Context, clusterConfig string, region string, mode types.ClusterMode) (*ClusterInfo, error) {
+	cluster := ClusterInfo{}
+
+	q := r.db.Operator.Core.NewSelect().Model(&cluster).Where("cluster_config = ?", clusterConfig)
+	if mode == types.ConnectModeInCluster {
+		q.Where("mode = ?", mode)
+	} else {
+		q.Where("mode != ?", types.ConnectModeInCluster)
+	}
+	err := q.Scan(ctx)
+
 	if errors.Is(err, sql.ErrNoRows) {
 		cluster = ClusterInfo{
 			ClusterID:     uuid.New().String(),
 			ClusterConfig: clusterConfig,
 			Region:        region,
 			Enable:        true,
+			Mode:          mode,
 		}
 		_, err = r.db.Operator.Core.NewInsert().Model(&cluster).Exec(ctx)
 		if err != nil {
@@ -100,6 +111,18 @@ func (r *clusterInfoStoreImpl) Update(ctx context.Context, clusterInfo ClusterIn
 }
 
 func (r *clusterInfoStoreImpl) UpdateByClusterID(ctx context.Context, event types.ClusterEvent) error {
+	event2clusterFunc := func(event types.ClusterEvent, clusterInfo *ClusterInfo) {
+		clusterInfo.Region = event.Region
+		clusterInfo.ClusterConfig = event.ClusterConfig
+		clusterInfo.Zone = event.Zone
+		clusterInfo.Provider = event.Provider
+		clusterInfo.RunnerEndpoint = event.Endpoint
+		clusterInfo.StorageClass = event.StorageClass
+		clusterInfo.NetworkInterface = event.NetworkInterface
+		clusterInfo.Mode = event.Mode
+		clusterInfo.AppEndpoint = event.AppEndpoint
+	}
+
 	err := r.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		clusterInfo, err := r.ByClusterID(ctx, event.ClusterID)
 		if err == nil {
@@ -107,13 +130,21 @@ func (r *clusterInfoStoreImpl) UpdateByClusterID(ctx context.Context, event type
 			clusterInfo.ClusterConfig = event.ClusterConfig
 			clusterInfo.Zone = event.Zone
 			clusterInfo.Provider = event.Provider
-			clusterInfo.Endpoint = event.Endpoint
+			clusterInfo.RunnerEndpoint = event.Endpoint
 			clusterInfo.StorageClass = event.StorageClass
 			clusterInfo.NetworkInterface = event.NetworkInterface
 			clusterInfo.Mode = event.Mode
+			clusterInfo.AppEndpoint = event.AppEndpoint
 			return assertAffectedOneRow(r.db.Operator.Core.NewUpdate().Model(&clusterInfo).WherePK().Exec(ctx))
+		} else if errors.Is(err, sql.ErrNoRows) {
+			clusterInfo = ClusterInfo{}
+			clusterInfo.ClusterID = event.ClusterID
+			clusterInfo.Enable = true
+			event2clusterFunc(event, &clusterInfo)
+			_, err = tx.NewInsert().Model(&clusterInfo).Exec(ctx)
+			return err
 		}
-		return nil
+		return err
 	})
 	return err
 }

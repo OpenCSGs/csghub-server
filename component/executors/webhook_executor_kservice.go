@@ -53,7 +53,7 @@ func NewKServiceExecutor(config *config.Config) (KServiceExecutor, error) {
 }
 
 func (k *kserviceExecutorImpl) ProcessEvent(ctx context.Context, event *types.WebHookRecvEvent) error {
-	slog.Debug("kservice_event_invoked", slog.Any("event", event))
+	slog.Info("deploy_event_received", slog.Any("event", event))
 
 	kserviceEvent := &types.ServiceEvent{}
 
