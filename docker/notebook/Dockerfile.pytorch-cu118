@@ -24,4 +24,4 @@ RUN mkdir -p /home/jovyan/.jupyter/lab/user-settings/@jupyterlab/apputils-extens
 WORKDIR /workspace/
 
 ENTRYPOINT [ "/usr/bin/dumb-init", "--"]
-CMD ["jupyter-lab","--ip=0.0.0.0", "--port=8000", "--no-browser", "--allow-root", "--NotebookApp.token=''"] 
+CMD ["jupyter-lab","--ip=0.0.0.0", "--port=8000", "--no-browser", "--ServerApp.allow_origin='*'", "--allow-root", "--NotebookApp.token=''"] 
