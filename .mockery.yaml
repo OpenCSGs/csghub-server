@@ -48,6 +48,8 @@ packages:
       NotebookComponent:
       LicenseComponent:
       XnetComponent:
+      CaptchaComponent:
+      AgentComponent:
   opencsg.com/csghub-server/component/reporter:
     config:
     interfaces:
@@ -81,6 +83,13 @@ packages:
       ModerationSvcClient:
       NotificationSvcClient:
       XnetSvcClient:
+      PaymentSvcClient:
+      SSOInterface:
+      AgentHubSvcClient:
+  opencsg.com/csghub-server/builder/llm:
+    config:
+    interfaces:
+      LLMSvcClient:
   opencsg.com/csghub-server/builder/sensitive:
     config:
     interfaces:

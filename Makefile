@@ -3,6 +3,9 @@
 build:
 	go build -o ./bin/csghub-server ./cmd/csghub-server
 
+build:
+	go build -tags "$(GO_TAGS)" -o ./bin/csghub-server ./cmd/csghub-server
+
 test:
 	go test ./...
 
