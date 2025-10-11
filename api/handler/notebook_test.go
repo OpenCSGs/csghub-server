@@ -318,3 +318,45 @@ func TestNotebookHandler_Update_ErrorFromComponent(t *testing.T) {
 	tester.WithBody(t, req).Execute()
 	tester.ResponseEqCode(t, 500)
 }
+
+// Wakeup tests
+
+func TestNotebookHandler_Wakeup_Success(t *testing.T) {
+	tester := NewNotebookHandlerTester(t)
+	tester.WithHandleFunc(func(h *NotebookHandler) gin.HandlerFunc {
+		return h.Wakeup
+	})
+	tester.WithUser()
+	tester.WithParam("id", "123")
+
+	tester.mocks.component.EXPECT().Wakeup(tester.Ctx(), int64(123)).Return(nil)
+
+	tester.Execute()
+	tester.ResponseEq(t, 200, tester.OKText, nil)
+}
+
+func TestNotebookHandler_Wakeup_InvalidID(t *testing.T) {
+	tester := NewNotebookHandlerTester(t)
+	tester.WithHandleFunc(func(h *NotebookHandler) gin.HandlerFunc {
+		return h.Wakeup
+	})
+	tester.WithUser()
+	tester.WithParam("id", "invalid")
+
+	tester.Execute()
+	tester.ResponseEqCode(t, 400)
+}
+
+func TestNotebookHandler_Wakeup_ErrorFromComponent(t *testing.T) {
+	tester := NewNotebookHandlerTester(t)
+	tester.WithHandleFunc(func(h *NotebookHandler) gin.HandlerFunc {
+		return h.Wakeup
+	})
+	tester.WithUser()
+	tester.WithParam("id", "123")
+
+	tester.mocks.component.EXPECT().Wakeup(tester.Ctx(), int64(123)).Return(assert.AnError)
+
+	tester.Execute()
+	tester.ResponseEqCode(t, 500)
+}

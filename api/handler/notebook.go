@@ -163,6 +163,38 @@ func (h *NotebookHandler) Stop(ctx *gin.Context) {
 	httpbase.OK(ctx, nil)
 }
 
+// WakeupNotebook godoc
+// @Summary      Wakeup notebook
+// @Description  Wakeup notebook
+// @Tags         Notebook
+// @Accept       json
+// @Produce      json
+// @Param        id path string true "notebook id"
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /notebooks/{id}/wakeup [put]
+func (h *NotebookHandler) Wakeup(ctx *gin.Context) {
+	var (
+		id  int64
+		err error
+	)
+	id, err = strconv.ParseInt(ctx.Param("id"), 10, 64)
+	if err != nil {
+		slog.Error("Bad request format", "error", err)
+		err = errorx.ReqParamInvalid(err, errorx.Ctx().Set("param", "id"))
+		httpbase.BadRequestWithExt(ctx, err)
+		return
+	}
+	err = h.nc.Wakeup(ctx.Request.Context(), id)
+	if err != nil {
+		slog.Error("failed to wakeup notebook", slog.String("id", string(rune(id))), slog.Any("error", err))
+		httpbase.ServerError(ctx, errors.New("failed to wakeup notebook"))
+		return
+	}
+	httpbase.OK(ctx, nil)
+}
+
 // DeleteNotebook godoc
 // @Summary      Delete notebook
 // @Description  delete notebook

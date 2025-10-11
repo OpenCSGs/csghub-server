@@ -1060,7 +1060,7 @@ func (h *ModelHandler) DeployStart(ctx *gin.Context) {
 	httpbase.OK(ctx, nil)
 }
 
-// StartDeploy   godoc
+// WakeupDeploy   godoc
 // @Security     ApiKey
 // @Summary      Wake up a model inference
 // @Description  Wake up  a model inference

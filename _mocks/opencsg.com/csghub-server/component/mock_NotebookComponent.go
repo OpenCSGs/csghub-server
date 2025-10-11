@@ -446,6 +446,53 @@ func (_c *MockNotebookComponent_UpdateNotebook_Call) RunAndReturn(run func(conte
 	return _c
 }
 
+// Wakeup provides a mock function with given fields: ctx, id
+func (_m *MockNotebookComponent) Wakeup(ctx context.Context, id int64) error {
+	ret := _m.Called(ctx, id)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Wakeup")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64) error); ok {
+		r0 = rf(ctx, id)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockNotebookComponent_Wakeup_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Wakeup'
+type MockNotebookComponent_Wakeup_Call struct {
+	*mock.Call
+}
+
+// Wakeup is a helper method to define mock.On call
+//   - ctx context.Context
+//   - id int64
+func (_e *MockNotebookComponent_Expecter) Wakeup(ctx interface{}, id interface{}) *MockNotebookComponent_Wakeup_Call {
+	return &MockNotebookComponent_Wakeup_Call{Call: _e.mock.On("Wakeup", ctx, id)}
+}
+
+func (_c *MockNotebookComponent_Wakeup_Call) Run(run func(ctx context.Context, id int64)) *MockNotebookComponent_Wakeup_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64))
+	})
+	return _c
+}
+
+func (_c *MockNotebookComponent_Wakeup_Call) Return(_a0 error) *MockNotebookComponent_Wakeup_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockNotebookComponent_Wakeup_Call) RunAndReturn(run func(context.Context, int64) error) *MockNotebookComponent_Wakeup_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // NewMockNotebookComponent creates a new instance of MockNotebookComponent. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewMockNotebookComponent(t interface {

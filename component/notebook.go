@@ -24,6 +24,7 @@ type NotebookComponent interface {
 	UpdateNotebook(ctx context.Context, req *types.UpdateNotebookReq) error
 	StartNotebook(ctx context.Context, req *types.StartNotebookReq) error
 	StopNotebook(ctx context.Context, req *types.StopNotebookReq) error
+	Wakeup(ctx context.Context, id int64) error
 	StatusNotebook(ctx context.Context, req *types.StatusNotebookReq) (string, error)
 	LogsNotebook(ctx context.Context, req *types.StatusNotebookReq) (*deploy.MultiLogReader, error)
 }
@@ -360,4 +361,16 @@ func (c *notebookComponentImpl) StopNotebook(ctx context.Context, req *types.Sto
 		return fmt.Errorf("fail to stop notebook instance, %w", err)
 	}
 	return nil
+}
+
+func (c *notebookComponentImpl) Wakeup(ctx context.Context, deployId int64) error {
+	// get Deploy for inference
+	deploy, err := c.deployTaskStore.GetDeployByID(ctx, deployId)
+	if err != nil {
+		return fmt.Errorf("can't get notebook delopyment,%w", err)
+	}
+	return c.deployer.Wakeup(ctx, types.DeployRepo{
+		DeployID: deployId,
+		SvcName:  deploy.SvcName,
+	})
 }

@@ -836,6 +836,8 @@ func createNotebookRoutes(
 		notebooks.PUT("/:id/stop", middlewareCollection.Auth.NeedLogin, notebookHandler.Stop)
 		// start a notebook
 		notebooks.PUT("/:id/start", middlewareCollection.Auth.NeedLogin, notebookHandler.Start)
+		// wakeup a notebook
+		notebooks.PUT("/:id/wakeup", middlewareCollection.Auth.NeedLogin, notebookHandler.Wakeup)
 		// delete a notebook
 		notebooks.DELETE("/:id", middlewareCollection.Auth.NeedLogin, notebookHandler.Delete)
 	}
