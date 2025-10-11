@@ -7,21 +7,20 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"strings"
 
 	"opencsg.com/csghub-server/common/errorx"
 )
 
 type AgentHubSvcClient interface {
-	CreateAgentInstance(ctx context.Context, req *CreateAgentInstanceRequest) (*CreateAgentInstanceResponse, error)
+	CreateAgentInstance(ctx context.Context, userUUID string, req *CreateAgentInstanceRequest) (*CreateAgentInstanceResponse, error)
 	GetAgentInstances(ctx context.Context, req *GetAgentInstancesRequest) (GetAgentInstancesResponse, error)
 }
 
 type CreateAgentInstanceRequest struct {
-	UserUUID    string `json:"user_uuid"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	Data        string `json:"data"`
-	FolderID    string `json:"folder_id"`
+	Name        string          `json:"name"`
+	Description string          `json:"description"`
+	Data        json.RawMessage `json:"data"`
 }
 
 type CreateAgentInstanceResponse AgentInstance
@@ -49,15 +48,15 @@ type GetAgentInstancesResponse []*AgentInstance
 	}
 */
 type AgentInstance struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	Data        string `json:"data"`
-	HasIO       bool   `json:"hasIO"`
-	CreatedAt   string `json:"created_at"`
-	UpdatedAt   string `json:"updated_at"`
-	UserUUID    string `json:"user_id"` // user uuid
-	FolderID    string `json:"folder_id"`
+	ID          string          `json:"id"`
+	Name        string          `json:"name"`
+	Description string          `json:"description"`
+	Data        json.RawMessage `json:"data"`
+	HasIO       bool            `json:"hasIO"`
+	CreatedAt   string          `json:"created_at"`
+	UpdatedAt   string          `json:"updated_at"`
+	UserUUID    string          `json:"user_id"` // user uuid
+	FolderID    string          `json:"folder_id"`
 }
 
 type AgentHubSvcClientImpl struct {
@@ -67,23 +66,24 @@ type AgentHubSvcClientImpl struct {
 
 func NewAgentHubSvcClientImpl(endpoint string, token string, opts ...RequestOption) AgentHubSvcClient {
 	return &AgentHubSvcClientImpl{
-		hc:    NewHttpClient(endpoint, opts...),
+		hc:    NewHttpClient(strings.TrimSuffix(endpoint, "/"), opts...),
 		token: token,
 	}
 }
 
 // POST /api/v1/opencsg/flows/
-func (c *AgentHubSvcClientImpl) CreateAgentInstance(ctx context.Context, req *CreateAgentInstanceRequest) (*CreateAgentInstanceResponse, error) {
+func (c *AgentHubSvcClientImpl) CreateAgentInstance(ctx context.Context, userUUID string, req *CreateAgentInstanceRequest) (*CreateAgentInstanceResponse, error) {
 	if req == nil {
 		return nil, errorx.BadRequest(errors.New("create agent instance request is nil"), nil)
 	}
 	rpcErrorCtx := map[string]any{
-		"user_uuid": req.UserUUID,
+		"user_uuid": userUUID,
 		"service":   "agenthub",
 		"api":       "/api/v1/opencsg/flows/",
 	}
 	var resp CreateAgentInstanceResponse
 	var buf io.Reader
+
 	jsonData, err := json.Marshal(req)
 	if err != nil {
 		return nil, errorx.InternalServerError(err, rpcErrorCtx)
@@ -95,7 +95,7 @@ func (c *AgentHubSvcClientImpl) CreateAgentInstance(ctx context.Context, req *Cr
 		return nil, errorx.InternalServerError(err, nil)
 	}
 	hreq.Header.Set("Content-Type", "application/json")
-	hreq.Header.Set("user_uuid", req.UserUUID)
+	hreq.Header.Set("user_uuid", userUUID)
 
 	hresp, err := c.hc.Do(hreq)
 	if err != nil {

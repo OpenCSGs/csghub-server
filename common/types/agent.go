@@ -2,11 +2,13 @@ package types
 
 // AgentTemplate represents the template for an agent
 type AgentTemplate struct {
-	ID       int64   `json:"id"`
-	Type     *string `json:"type" binding:"required"`    // Possible values: langflow, agno, code, etc.
-	UserUUID *string `json:"-"`                          // Will be set from HTTP header using httpbase.GetCurrentUserUUID
-	Content  *string `json:"content" binding:"required"` // Used to store the complete content of the template
-	Public   bool    `json:"public"`                     // Whether the template is public
+	ID          int64   `json:"id"`
+	Type        *string `json:"type" binding:"required"`                 // Possible values: langflow, agno, code, etc.
+	UserUUID    *string `json:"-"`                                       // Will be set from HTTP header using httpbase.GetCurrentUserUUID
+	Name        *string `json:"name" binding:"required,max=255"`         // Agent template name
+	Description *string `json:"description" binding:"omitempty,max=500"` // Agent template description
+	Content     *string `json:"content" binding:"required"`              // Used to store the complete content of the template
+	Public      bool    `json:"public"`                                  // Whether the template is public
 }
 
 // AgentInstance represents an instance created from an agent template

@@ -22,9 +22,9 @@ func (_m *MockAgentHubSvcClient) EXPECT() *MockAgentHubSvcClient_Expecter {
 	return &MockAgentHubSvcClient_Expecter{mock: &_m.Mock}
 }
 
-// CreateAgentInstance provides a mock function with given fields: ctx, req
-func (_m *MockAgentHubSvcClient) CreateAgentInstance(ctx context.Context, req *rpc.CreateAgentInstanceRequest) (*rpc.CreateAgentInstanceResponse, error) {
-	ret := _m.Called(ctx, req)
+// CreateAgentInstance provides a mock function with given fields: ctx, userUUID, req
+func (_m *MockAgentHubSvcClient) CreateAgentInstance(ctx context.Context, userUUID string, req *rpc.CreateAgentInstanceRequest) (*rpc.CreateAgentInstanceResponse, error) {
+	ret := _m.Called(ctx, userUUID, req)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CreateAgentInstance")
@@ -32,19 +32,19 @@ func (_m *MockAgentHubSvcClient) CreateAgentInstance(ctx context.Context, req *r
 
 	var r0 *rpc.CreateAgentInstanceResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *rpc.CreateAgentInstanceRequest) (*rpc.CreateAgentInstanceResponse, error)); ok {
-		return rf(ctx, req)
+	if rf, ok := ret.Get(0).(func(context.Context, string, *rpc.CreateAgentInstanceRequest) (*rpc.CreateAgentInstanceResponse, error)); ok {
+		return rf(ctx, userUUID, req)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *rpc.CreateAgentInstanceRequest) *rpc.CreateAgentInstanceResponse); ok {
-		r0 = rf(ctx, req)
+	if rf, ok := ret.Get(0).(func(context.Context, string, *rpc.CreateAgentInstanceRequest) *rpc.CreateAgentInstanceResponse); ok {
+		r0 = rf(ctx, userUUID, req)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*rpc.CreateAgentInstanceResponse)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *rpc.CreateAgentInstanceRequest) error); ok {
-		r1 = rf(ctx, req)
+	if rf, ok := ret.Get(1).(func(context.Context, string, *rpc.CreateAgentInstanceRequest) error); ok {
+		r1 = rf(ctx, userUUID, req)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -59,14 +59,15 @@ type MockAgentHubSvcClient_CreateAgentInstance_Call struct {
 
 // CreateAgentInstance is a helper method to define mock.On call
 //   - ctx context.Context
+//   - userUUID string
 //   - req *rpc.CreateAgentInstanceRequest
-func (_e *MockAgentHubSvcClient_Expecter) CreateAgentInstance(ctx interface{}, req interface{}) *MockAgentHubSvcClient_CreateAgentInstance_Call {
-	return &MockAgentHubSvcClient_CreateAgentInstance_Call{Call: _e.mock.On("CreateAgentInstance", ctx, req)}
+func (_e *MockAgentHubSvcClient_Expecter) CreateAgentInstance(ctx interface{}, userUUID interface{}, req interface{}) *MockAgentHubSvcClient_CreateAgentInstance_Call {
+	return &MockAgentHubSvcClient_CreateAgentInstance_Call{Call: _e.mock.On("CreateAgentInstance", ctx, userUUID, req)}
 }
 
-func (_c *MockAgentHubSvcClient_CreateAgentInstance_Call) Run(run func(ctx context.Context, req *rpc.CreateAgentInstanceRequest)) *MockAgentHubSvcClient_CreateAgentInstance_Call {
+func (_c *MockAgentHubSvcClient_CreateAgentInstance_Call) Run(run func(ctx context.Context, userUUID string, req *rpc.CreateAgentInstanceRequest)) *MockAgentHubSvcClient_CreateAgentInstance_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(*rpc.CreateAgentInstanceRequest))
+		run(args[0].(context.Context), args[1].(string), args[2].(*rpc.CreateAgentInstanceRequest))
 	})
 	return _c
 }
@@ -76,7 +77,7 @@ func (_c *MockAgentHubSvcClient_CreateAgentInstance_Call) Return(_a0 *rpc.Create
 	return _c
 }
 
-func (_c *MockAgentHubSvcClient_CreateAgentInstance_Call) RunAndReturn(run func(context.Context, *rpc.CreateAgentInstanceRequest) (*rpc.CreateAgentInstanceResponse, error)) *MockAgentHubSvcClient_CreateAgentInstance_Call {
+func (_c *MockAgentHubSvcClient_CreateAgentInstance_Call) RunAndReturn(run func(context.Context, string, *rpc.CreateAgentInstanceRequest) (*rpc.CreateAgentInstanceResponse, error)) *MockAgentHubSvcClient_CreateAgentInstance_Call {
 	_c.Call.Return(run)
 	return _c
 }

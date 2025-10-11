@@ -20,10 +20,12 @@ func TestAgentTemplateStore_CRUD(t *testing.T) {
 	// Test Create
 	userUUID := uuid.New().String()
 	template := &database.AgentTemplate{
-		Type:     "langflow",
-		UserUUID: userUUID,
-		Content:  "test template content",
-		Public:   false,
+		Type:        "langflow",
+		UserUUID:    userUUID,
+		Name:        "Test Template",
+		Description: "Test template description",
+		Content:     "test template content",
+		Public:      false,
 	}
 
 	err := store.Create(ctx, template)
@@ -36,6 +38,8 @@ func TestAgentTemplateStore_CRUD(t *testing.T) {
 	require.Equal(t, template.ID, foundTemplate.ID)
 	require.Equal(t, template.Type, foundTemplate.Type)
 	require.Equal(t, template.UserUUID, foundTemplate.UserUUID)
+	require.Equal(t, template.Name, foundTemplate.Name)
+	require.Equal(t, template.Description, foundTemplate.Description)
 	require.Equal(t, template.Content, foundTemplate.Content)
 	require.Equal(t, template.Public, foundTemplate.Public)
 
@@ -46,6 +50,8 @@ func TestAgentTemplateStore_CRUD(t *testing.T) {
 	require.Equal(t, template.ID, templates[0].ID)
 
 	// Test Update
+	template.Name = "Updated Template Name"
+	template.Description = "Updated template description"
 	template.Content = "updated template content"
 	template.Public = true
 	err = store.Update(ctx, template)
@@ -54,6 +60,8 @@ func TestAgentTemplateStore_CRUD(t *testing.T) {
 	// Verify update
 	updatedTemplate, err := store.FindByID(ctx, template.ID)
 	require.NoError(t, err)
+	require.Equal(t, "Updated Template Name", updatedTemplate.Name)
+	require.Equal(t, "Updated template description", updatedTemplate.Description)
 	require.Equal(t, "updated template content", updatedTemplate.Content)
 	require.True(t, updatedTemplate.Public)
 
@@ -78,30 +86,36 @@ func TestAgentTemplateStore_ListByUserUUID_WithPublicTemplates(t *testing.T) {
 
 	// Create private template for user1
 	privateTemplate := &database.AgentTemplate{
-		Type:     "langflow",
-		UserUUID: userUUID1,
-		Content:  "private template",
-		Public:   false,
+		Type:        "langflow",
+		UserUUID:    userUUID1,
+		Name:        "Private Template",
+		Description: "Private template description",
+		Content:     "private template",
+		Public:      false,
 	}
 	err := store.Create(ctx, privateTemplate)
 	require.NoError(t, err)
 
 	// Create public template for user1
 	publicTemplate := &database.AgentTemplate{
-		Type:     "agno",
-		UserUUID: userUUID1,
-		Content:  "public template",
-		Public:   true,
+		Type:        "agno",
+		UserUUID:    userUUID1,
+		Name:        "Public Template",
+		Description: "Public template description",
+		Content:     "public template",
+		Public:      true,
 	}
 	err = store.Create(ctx, publicTemplate)
 	require.NoError(t, err)
 
 	// Create private template for user2
 	user2Template := &database.AgentTemplate{
-		Type:     "code",
-		UserUUID: userUUID2,
-		Content:  "user2 template",
-		Public:   false,
+		Type:        "code",
+		UserUUID:    userUUID2,
+		Name:        "User2 Template",
+		Description: "User2 template description",
+		Content:     "user2 template",
+		Public:      false,
 	}
 	err = store.Create(ctx, user2Template)
 	require.NoError(t, err)
@@ -143,11 +157,13 @@ func TestAgentTemplateStore_Update_NonExistent(t *testing.T) {
 
 	// Test Update with non-existent template
 	nonExistentTemplate := &database.AgentTemplate{
-		ID:       99999,
-		Type:     "langflow",
-		UserUUID: uuid.New().String(),
-		Content:  "test content",
-		Public:   false,
+		ID:          99999,
+		Type:        "langflow",
+		UserUUID:    uuid.New().String(),
+		Name:        "Non-existent Template",
+		Description: "Non-existent template description",
+		Content:     "test content",
+		Public:      false,
 	}
 
 	err := store.Update(ctx, nonExistentTemplate)
