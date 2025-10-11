@@ -545,6 +545,7 @@ func (h *SpaceHandler) status(ctx *gin.Context) {
 // @Param        namespace path string true "namespace"
 // @Param        name path string true "name"
 // @Param        current_user query string true "current_user"
+// @Param        since query string false "since time. Optional values: 10mins, 30mins, 1hour, 6hours, 1day, 2days, 1week"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /spaces/{namespace}/{name}/logs [get]
@@ -553,6 +554,7 @@ func (h *SpaceHandler) Logs(ctx *gin.Context) {
 		h.testLogs(ctx)
 		return
 	}
+	since := ctx.Query("since")
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
 		slog.Error("failed to get namespace from context", "error", err)
@@ -581,7 +583,7 @@ func (h *SpaceHandler) Logs(ctx *gin.Context) {
 	ctx.Writer.Header().Set("Transfer-Encoding", "chunked")
 
 	//user http request context instead of gin context, so that server knows the life cycle of the request
-	logReader, err := h.space.Logs(ctx.Request.Context(), namespace, name)
+	logReader, err := h.space.Logs(ctx.Request.Context(), namespace, name, since)
 	if err != nil {
 		if deadline, ok := ctx.Request.Context().Deadline(); ok {
 			slog.Error("failed to get space logs",
