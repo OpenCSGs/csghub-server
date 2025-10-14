@@ -5,6 +5,9 @@
     "error.AUTH-ERR-1": {
         "other": "用戶未找到，請先登入"
     },
+    "error.AUTH-ERR-10": {
+        "other": "電話號碼未驗證"
+    },
     "error.AUTH-ERR-2": {
         "other": "權限被拒絕"
     },
