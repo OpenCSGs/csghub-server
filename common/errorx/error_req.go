@@ -16,6 +16,7 @@ const (
 	errReqParamTypeError
 
 	errReqContentTypeUnsupported
+	errRateLimitExceeded
 )
 
 var (
@@ -104,6 +105,19 @@ var (
 	//
 	// zh-HK: 不支持的內容類型
 	ErrReqContentTypeUnsupported = CustomError{prefix: errReqPrefix, code: errReqContentTypeUnsupported}
+
+	// request rate limit exceeded, captcha is required
+	//
+	// Description: The user has sent too many requests in a given amount of time. Further requests will be blocked until the rate limit resets or a valid captcha is provided.
+	//
+	// Description_ZH: 用户在给定的时间内发送了太多的请求。在速率限制重置或提供有效的验证码之前，将阻止进一步的请求。
+	//
+	// en-US: Too many requests, captcha is required
+	//
+	// zh-CN: 请求过于频繁，需要验证码
+	//
+	// zh-HK: 請求過於頻繁，需要驗證碼
+	ErrRateLimitExceeded = CustomError{prefix: errReqPrefix, code: errRateLimitExceeded}
 )
 
 func BadRequest(originErr error, ext context) error {
