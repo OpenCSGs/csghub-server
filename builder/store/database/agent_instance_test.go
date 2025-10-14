@@ -27,9 +27,11 @@ func TestAgentInstanceStore_CRUD(t *testing.T) {
 		Public:     false,
 	}
 
-	err := store.Create(ctx, instance)
+	createdInstance, err := store.Create(ctx, instance)
 	require.NoError(t, err)
-	require.NotZero(t, instance.ID)
+	require.NotZero(t, createdInstance.ID)
+	// Update the original instance with the created one for further tests
+	*instance = *createdInstance
 
 	// Test FindByID
 	foundInstance, err := store.FindByID(ctx, instance.ID)
@@ -92,7 +94,7 @@ func TestAgentInstanceStore_ListByUserUUID_WithPublicInstances(t *testing.T) {
 		ContentID:  "private-instance",
 		Public:     false,
 	}
-	err := store.Create(ctx, privateInstance)
+	_, err := store.Create(ctx, privateInstance)
 	require.NoError(t, err)
 
 	// Create public instance for user1
@@ -103,7 +105,7 @@ func TestAgentInstanceStore_ListByUserUUID_WithPublicInstances(t *testing.T) {
 		ContentID:  "public-instance",
 		Public:     true,
 	}
-	err = store.Create(ctx, publicInstance)
+	_, err = store.Create(ctx, publicInstance)
 	require.NoError(t, err)
 
 	// Create private instance for user2
@@ -114,7 +116,7 @@ func TestAgentInstanceStore_ListByUserUUID_WithPublicInstances(t *testing.T) {
 		ContentID:  "user2-instance",
 		Public:     false,
 	}
-	err = store.Create(ctx, user2Instance)
+	_, err = store.Create(ctx, user2Instance)
 	require.NoError(t, err)
 
 	// Test ListByUserUUID for user1 - should return both private and public instances
@@ -147,7 +149,7 @@ func TestAgentInstanceStore_ListByTemplateID_WithPublicInstances(t *testing.T) {
 		ContentID:  "private-instance",
 		Public:     false,
 	}
-	err := store.Create(ctx, privateInstance)
+	_, err := store.Create(ctx, privateInstance)
 	require.NoError(t, err)
 
 	// Create public instance for user1 from template
@@ -158,7 +160,7 @@ func TestAgentInstanceStore_ListByTemplateID_WithPublicInstances(t *testing.T) {
 		ContentID:  "public-instance",
 		Public:     true,
 	}
-	err = store.Create(ctx, publicInstance)
+	_, err = store.Create(ctx, publicInstance)
 	require.NoError(t, err)
 
 	// Create private instance for user2 from different template
@@ -169,7 +171,7 @@ func TestAgentInstanceStore_ListByTemplateID_WithPublicInstances(t *testing.T) {
 		ContentID:  "user2-instance",
 		Public:     false,
 	}
-	err = store.Create(ctx, user2Instance)
+	_, err = store.Create(ctx, user2Instance)
 	require.NoError(t, err)
 
 	// Test ListByTemplateID for user1 - should return both private and public instances from template
@@ -257,7 +259,7 @@ func TestAgentInstanceStore_MultipleInstancesFromSameTemplate(t *testing.T) {
 		ContentID:  "instance-1",
 		Public:     false,
 	}
-	err := store.Create(ctx, instance1)
+	_, err := store.Create(ctx, instance1)
 	require.NoError(t, err)
 
 	instance2 := &database.AgentInstance{
@@ -267,7 +269,7 @@ func TestAgentInstanceStore_MultipleInstancesFromSameTemplate(t *testing.T) {
 		ContentID:  "instance-2",
 		Public:     true,
 	}
-	err = store.Create(ctx, instance2)
+	_, err = store.Create(ctx, instance2)
 	require.NoError(t, err)
 
 	// Test ListByTemplateID - should return both instances

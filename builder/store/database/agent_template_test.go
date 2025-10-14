@@ -28,9 +28,11 @@ func TestAgentTemplateStore_CRUD(t *testing.T) {
 		Public:      false,
 	}
 
-	err := store.Create(ctx, template)
+	createdTemplate, err := store.Create(ctx, template)
 	require.NoError(t, err)
-	require.NotZero(t, template.ID)
+	require.NotZero(t, createdTemplate.ID)
+	// Update the original template with the created one for further tests
+	*template = *createdTemplate
 
 	// Test FindByID
 	foundTemplate, err := store.FindByID(ctx, template.ID)
@@ -93,7 +95,7 @@ func TestAgentTemplateStore_ListByUserUUID_WithPublicTemplates(t *testing.T) {
 		Content:     "private template",
 		Public:      false,
 	}
-	err := store.Create(ctx, privateTemplate)
+	_, err := store.Create(ctx, privateTemplate)
 	require.NoError(t, err)
 
 	// Create public template for user1
@@ -105,7 +107,7 @@ func TestAgentTemplateStore_ListByUserUUID_WithPublicTemplates(t *testing.T) {
 		Content:     "public template",
 		Public:      true,
 	}
-	err = store.Create(ctx, publicTemplate)
+	_, err = store.Create(ctx, publicTemplate)
 	require.NoError(t, err)
 
 	// Create private template for user2
@@ -117,7 +119,7 @@ func TestAgentTemplateStore_ListByUserUUID_WithPublicTemplates(t *testing.T) {
 		Content:     "user2 template",
 		Public:      false,
 	}
-	err = store.Create(ctx, user2Template)
+	_, err = store.Create(ctx, user2Template)
 	require.NoError(t, err)
 
 	// Test ListByUserUUID for user1 - should return both private and public templates

@@ -31,7 +31,7 @@ type AgentInstance struct {
 
 // AgentTemplateStore provides database operations for AgentTemplate
 type AgentTemplateStore interface {
-	Create(ctx context.Context, template *AgentTemplate) error
+	Create(ctx context.Context, template *AgentTemplate) (*AgentTemplate, error)
 	FindByID(ctx context.Context, id int64) (*AgentTemplate, error)
 	ListByUserUUID(ctx context.Context, userUUID string) ([]AgentTemplate, error)
 	Update(ctx context.Context, template *AgentTemplate) error
@@ -40,7 +40,7 @@ type AgentTemplateStore interface {
 
 // AgentInstanceStore provides database operations for AgentInstance
 type AgentInstanceStore interface {
-	Create(ctx context.Context, instance *AgentInstance) error
+	Create(ctx context.Context, instance *AgentInstance) (*AgentInstance, error)
 	FindByID(ctx context.Context, id int64) (*AgentInstance, error)
 	ListByUserUUID(ctx context.Context, userUUID string) ([]AgentInstance, error)
 	ListByTemplateID(ctx context.Context, templateID int64, userUUID string) ([]AgentInstance, error)
@@ -87,15 +87,15 @@ func NewAgentInstanceStoreWithDB(db *DB) AgentInstanceStore {
 }
 
 // Create inserts a new AgentTemplate into the database
-func (s *agentTemplateStoreImpl) Create(ctx context.Context, template *AgentTemplate) error {
+func (s *agentTemplateStoreImpl) Create(ctx context.Context, template *AgentTemplate) (*AgentTemplate, error) {
 	res, err := s.db.Core.NewInsert().Model(template).Exec(ctx, template)
 	if err = assertAffectedOneRow(res, err); err != nil {
-		return errorx.HandleDBError(err, map[string]any{
+		return nil, errorx.HandleDBError(err, map[string]any{
 			"template_type": template.Type,
 			"user_uuid":     template.UserUUID,
 		})
 	}
-	return nil
+	return template, nil
 }
 
 // FindByID retrieves an AgentTemplate by its ID
@@ -145,16 +145,16 @@ func (s *agentTemplateStoreImpl) Delete(ctx context.Context, id int64) error {
 }
 
 // Create inserts a new AgentInstance into the database
-func (s *agentInstanceStoreImpl) Create(ctx context.Context, instance *AgentInstance) error {
+func (s *agentInstanceStoreImpl) Create(ctx context.Context, instance *AgentInstance) (*AgentInstance, error) {
 	res, err := s.db.Core.NewInsert().Model(instance).Exec(ctx, instance)
 	if err = assertAffectedOneRow(res, err); err != nil {
-		return errorx.HandleDBError(err, map[string]any{
+		return nil, errorx.HandleDBError(err, map[string]any{
 			"template_id": instance.TemplateID,
 			"user_uuid":   instance.UserUUID,
 			"content_id":  instance.ContentID,
 		})
 	}
-	return nil
+	return instance, nil
 }
 
 // FindByID retrieves an AgentInstance by its ID

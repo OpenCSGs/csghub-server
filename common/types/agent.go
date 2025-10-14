@@ -21,4 +21,5 @@ type AgentInstance struct {
 	Type        *string `json:"type" binding:"required"`               // Possible values: langflow, agno, code, etc.
 	ContentID   *string `json:"content_id" binding:"omitempty"`        // Used to specify the unique id of the instance resource
 	Public      bool    `json:"public"`                                // Whether the instance is public
+	Editable    bool    `json:"editable"`                              // Whether the instance is editable
 }
