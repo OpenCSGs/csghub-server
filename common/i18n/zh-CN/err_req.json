@@ -5,6 +5,9 @@
     "error.REQ-ERR-1": {
         "other": "请求体格式错误"
     },
+    "error.REQ-ERR-10": {
+        "other": "请求过于频繁，需要验证码"
+    },
     "error.REQ-ERR-2": {
         "other": "请求体不能为空"
     },

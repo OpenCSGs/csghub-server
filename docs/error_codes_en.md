@@ -114,6 +114,14 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Name:** `needAPIKey`
 - **Description:** The request must include an API Key in the header or body for authentication.
 
+---
+
+### `AUTH-ERR-10`
+
+- **Error Code:** `AUTH-ERR-10`
+- **Error Name:** `userPhoneNotVerified`
+- **Description:** Your phone number has not been verified yet. Please verify your phone number before making any requests.
+
 ## Dataset Errors
 
 ### `DAT-ERR-0`
@@ -296,7 +304,7 @@ This document lists all the custom error codes defined in the project, categoriz
 
 - **Error Code:** `GIT-ERR-19`
 - **Error Name:** `gitGetTreeEntryFailed`
-- **Description:** 
+- **Description:** Get git tree entry failed. This can be caused by network problems, authentication issues, or the specified tree entry does not exist.
 
 ---
 
@@ -304,7 +312,7 @@ This document lists all the custom error codes defined in the project, categoriz
 
 - **Error Code:** `GIT-ERR-20`
 - **Error Name:** `gitCommitFilesFailed`
-- **Description:** 
+- **Description:** Commit git files failed. This can be caused by network problems, authentication issues, or the specified files do not exist.
 
 ---
 
@@ -312,7 +320,7 @@ This document lists all the custom error codes defined in the project, categoriz
 
 - **Error Code:** `GIT-ERR-21`
 - **Error Name:** `gitGetBlobsFailed`
-- **Description:** 
+- **Description:** Get git blobs failed. This can be caused by network problems, authentication issues, or the specified blobs do not exist.
 
 ---
 
@@ -320,7 +328,7 @@ This document lists all the custom error codes defined in the project, categoriz
 
 - **Error Code:** `GIT-ERR-22`
 - **Error Name:** `gitGetLfsPointersFailed`
-- **Description:** 
+- **Description:** Get git lfs pointers failed. This can be caused by network problems, authentication issues, or the specified lfs pointers do not exist.
 
 ---
 
@@ -328,7 +336,7 @@ This document lists all the custom error codes defined in the project, categoriz
 
 - **Error Code:** `GIT-ERR-23`
 - **Error Name:** `gitListLastCommitsForTreeFailed`
-- **Description:** 
+- **Description:** Get git tree last commit failed. This can be caused by network problems, authentication issues, or the specified tree does not exist.
 
 ---
 
@@ -336,7 +344,7 @@ This document lists all the custom error codes defined in the project, categoriz
 
 - **Error Code:** `GIT-ERR-24`
 - **Error Name:** `gitGetBlobInfoFailed`
-- **Description:** 
+- **Description:** Get git blob info failed. This can be caused by network problems, authentication issues, or the specified blob does not exist.
 
 ---
 
@@ -344,7 +352,7 @@ This document lists all the custom error codes defined in the project, categoriz
 
 - **Error Code:** `GIT-ERR-25`
 - **Error Name:** `gitListFilesFailed`
-- **Description:** 
+- **Description:** Get git files failed. This can be caused by network problems, authentication issues, or the specified files do not exist.
 
 ---
 
@@ -352,7 +360,7 @@ This document lists all the custom error codes defined in the project, categoriz
 
 - **Error Code:** `GIT-ERR-26`
 - **Error Name:** `gitCreateMirrorFailed`
-- **Description:** 
+- **Description:** Create mirror failed. This can be caused by network problems, authentication issues, or the specified repository does not exist.
 
 ---
 
@@ -360,7 +368,7 @@ This document lists all the custom error codes defined in the project, categoriz
 
 - **Error Code:** `GIT-ERR-27`
 - **Error Name:** `gitMirrorSyncFailed`
-- **Description:** 
+- **Description:** Sync mirror failed. This can be caused by network problems, authentication issues, or the specified repository does not exist.
 
 ---
 
@@ -368,7 +376,7 @@ This document lists all the custom error codes defined in the project, categoriz
 
 - **Error Code:** `GIT-ERR-28`
 - **Error Name:** `gitCheckRepositoryExistsFailed`
-- **Description:** 
+- **Description:** Check repository exists failed. This can be caused by network problems, authentication issues, or the specified repository does not exist.
 
 ---
 
@@ -376,7 +384,7 @@ This document lists all the custom error codes defined in the project, categoriz
 
 - **Error Code:** `GIT-ERR-29`
 - **Error Name:** `gitCreateRepositoryFailed`
-- **Description:** 
+- **Description:** Create repository failed. This can be caused by network problems, authentication issues.
 
 ---
 
@@ -384,7 +392,7 @@ This document lists all the custom error codes defined in the project, categoriz
 
 - **Error Code:** `GIT-ERR-30`
 - **Error Name:** `gitDeleteRepositoryFailed`
-- **Description:** 
+- **Description:** delete repository failed. This can be caused by network problems, authentication issues, or the specified repository does not exist.
 
 ---
 
@@ -392,7 +400,7 @@ This document lists all the custom error codes defined in the project, categoriz
 
 - **Error Code:** `GIT-ERR-31`
 - **Error Name:** `gitGetRepositoryFailed`
-- **Description:** 
+- **Description:** get repository failed. This can be caused by network problems, authentication issues, or the specified repository does not exist.
 
 ---
 
@@ -401,6 +409,30 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Code:** `GIT-ERR-32`
 - **Error Name:** `gitServiceUnavaliable`
 - **Description:** The Git hosting service is temporarily unavailable or unreachable. Please try again later.
+
+---
+
+### `GIT-ERR-33`
+
+- **Error Code:** `GIT-ERR-33`
+- **Error Name:** `gitCopyRepositoryFailed`
+- **Description:** copy repository failed. This can be caused by network problems, authentication issues, or the specified repository does not exist.
+
+---
+
+### `GIT-ERR-34`
+
+- **Error Code:** `GIT-ERR-34`
+- **Error Name:** `gitReplicateRepositoryFailed`
+- **Description:** replicate repository failed. This can be caused by network problems, authentication issues, or the specified repository does not exist.
+
+## License Errors
+
+### `LICENSE-ERR-0`
+
+- **Error Code:** `LICENSE-ERR-0`
+- **Error Name:** `noActiveLicense`
+- **Description:** No active license found for the current system.
 
 ## Req Errors
 
@@ -482,6 +514,14 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Name:** `errReqContentTypeUnsupported`
 - **Description:** The 'Content-Type' of the request is not supported by this endpoint. Please check the API documentation for allowed content types.
 
+---
+
+### `REQ-ERR-10`
+
+- **Error Code:** `REQ-ERR-10`
+- **Error Name:** `errRateLimitExceeded`
+- **Description:** The user has sent too many requests in a given amount of time. Further requests will be blocked until the rate limit resets or a valid captcha is provided.
+
 ## System Errors
 
 ### `SYS-ERR-0`
@@ -546,6 +586,14 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Name:** `cannotPromoteSelfToAdmin`
 - **Description:** The requested action to promote yourself to an administrator is prohibited.
 
+---
+
+### `SYS-ERR-8`
+
+- **Error Code:** `SYS-ERR-8`
+- **Error Name:** `cannotSetRepoVisibility`
+- **Description:** The requested action to change the visibility setting of a repository is prohibited. Because sensitive check not passed.
+
 ## Task Errors
 
 ### `TASK-ERR-0`
@@ -569,4 +617,12 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Code:** `TASK-ERR-2`
 - **Error Name:** `multiHostInferenceReplicaCount`
 - **Description:** For multi-host inference configuration, the minimum number of replicas must be greater than zero to ensure proper service operation.
+
+---
+
+### `TASK-ERR-3`
+
+- **Error Code:** `TASK-ERR-3`
+- **Error Name:** `multiHostNotebookNotSupported`
+- **Description:** The multi-host notebook feature (running notebook tasks across multiple hosts) is not supported.
 

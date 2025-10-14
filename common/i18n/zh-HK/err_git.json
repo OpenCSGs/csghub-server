@@ -83,6 +83,9 @@
     "error.GIT-ERR-33": {
         "other": "複製倉庫失敗"
     },
+    "error.GIT-ERR-34": {
+        "other": "转移倉庫失敗"
+    },
     "error.GIT-ERR-4": {
         "other": "查找提交失敗"
     },

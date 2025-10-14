@@ -34,7 +34,21 @@ var (
 	//
 	// zh-HK: 只支持 vllm 和 sglang 的多主機推理
 	ErrMultiHostInferenceNotSupported = CustomError{prefix: errTaskPrefix, code: multiHostInferenceNotSupported}
-	ErrMultiHostNotebookNotSupported  = CustomError{prefix: errTaskPrefix, code: multiHostNotebookNotSupported}
+	// multi-host notebooks are not supported
+	//
+	// Description: The multi-host notebook feature (running notebook tasks across multiple hosts) is not supported.
+	// Use single-host notebook execution instead. This limitation applies to distributed notebook sessions which require
+	// synchronized kernel/state across hosts and is currently not implemented.
+	//
+	// Description_ZH: 多主机 Notebook 功能（在多个主机上运行 Notebook 任务）不被支持。请改用单主机 Notebook 执行。
+	// 该限制适用于需要在主机间同步内核/状态的分布式 Notebook 会话，目前尚未实现。
+	//
+	// en-US: Multi-host notebook is not supported
+	//
+	// zh-CN: 不支持多主机 Notebook
+	//
+	// zh-HK: 不支援多主機 Notebook
+	ErrMultiHostNotebookNotSupported = CustomError{prefix: errTaskPrefix, code: multiHostNotebookNotSupported}
 	// multi-host inference only supports a minimum replica count greater than 0
 	//
 	// Description: For multi-host inference configuration, the minimum number of replicas must be greater than zero to ensure proper service operation.

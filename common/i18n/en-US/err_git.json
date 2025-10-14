@@ -83,6 +83,9 @@
     "error.GIT-ERR-33": {
         "other": "copy repository failed"
     },
+    "error.GIT-ERR-34": {
+        "other": "replicate repository failed"
+    },
     "error.GIT-ERR-4": {
         "other": "Failed to find commit"
     },

@@ -5,6 +5,9 @@
     "error.REQ-ERR-1": {
         "other": "Invalid request body format"
     },
+    "error.REQ-ERR-10": {
+        "other": "Too many requests, captcha is required"
+    },
     "error.REQ-ERR-2": {
         "other": "Request body cannot be empty"
     },
