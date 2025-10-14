@@ -624,5 +624,5 @@ This document lists all the custom error codes defined in the project, categoriz
 
 - **Error Code:** `TASK-ERR-3`
 - **Error Name:** `multiHostNotebookNotSupported`
-- **Description:** 
+- **Description:** The multi-host notebook feature (running notebook tasks across multiple hosts) is not supported.
 

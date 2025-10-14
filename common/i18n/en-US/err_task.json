@@ -7,5 +7,8 @@
     },
     "error.TASK-ERR-2": {
         "other": "Multi-host inference requires minimum replica count to be greater than zero"
+    },
+    "error.TASK-ERR-3": {
+        "other": "Multi-host notebook is not supported"
     }
 }
