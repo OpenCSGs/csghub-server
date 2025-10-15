@@ -63,6 +63,7 @@ func (h *CSGBotProxyHandler) Proxy(ctx *gin.Context) {
 		return
 	}
 	ctx.Request.Header.Set("user_id", fmt.Sprintf("%d", u.ID))
+	ctx.Request.Header.Set("user_uuid", u.UUID)
 	ctx.Request.Header.Set("user_name", u.Username)
 	ctx.Request.Header.Set("user_token", token)
 	ctx.Request.Header.Set("isadmin", fmt.Sprintf("%t", u.CanAdmin()))
