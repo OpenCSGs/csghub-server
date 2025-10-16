@@ -359,6 +359,65 @@ func (_c *MockSpaceComponent_GetByID_Call) RunAndReturn(run func(context.Context
 	return _c
 }
 
+// GetMCPServiceBySvcName provides a mock function with given fields: ctx, svcName
+func (_m *MockSpaceComponent) GetMCPServiceBySvcName(ctx context.Context, svcName string) (*types.MCPService, error) {
+	ret := _m.Called(ctx, svcName)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetMCPServiceBySvcName")
+	}
+
+	var r0 *types.MCPService
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*types.MCPService, error)); ok {
+		return rf(ctx, svcName)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *types.MCPService); ok {
+		r0 = rf(ctx, svcName)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.MCPService)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, svcName)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockSpaceComponent_GetMCPServiceBySvcName_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetMCPServiceBySvcName'
+type MockSpaceComponent_GetMCPServiceBySvcName_Call struct {
+	*mock.Call
+}
+
+// GetMCPServiceBySvcName is a helper method to define mock.On call
+//   - ctx context.Context
+//   - svcName string
+func (_e *MockSpaceComponent_Expecter) GetMCPServiceBySvcName(ctx interface{}, svcName interface{}) *MockSpaceComponent_GetMCPServiceBySvcName_Call {
+	return &MockSpaceComponent_GetMCPServiceBySvcName_Call{Call: _e.mock.On("GetMCPServiceBySvcName", ctx, svcName)}
+}
+
+func (_c *MockSpaceComponent_GetMCPServiceBySvcName_Call) Run(run func(ctx context.Context, svcName string)) *MockSpaceComponent_GetMCPServiceBySvcName_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockSpaceComponent_GetMCPServiceBySvcName_Call) Return(_a0 *types.MCPService, _a1 error) *MockSpaceComponent_GetMCPServiceBySvcName_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockSpaceComponent_GetMCPServiceBySvcName_Call) RunAndReturn(run func(context.Context, string) (*types.MCPService, error)) *MockSpaceComponent_GetMCPServiceBySvcName_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // HasEntryFile provides a mock function with given fields: ctx, space
 func (_m *MockSpaceComponent) HasEntryFile(ctx context.Context, space *database.Space) bool {
 	ret := _m.Called(ctx, space)

@@ -576,3 +576,69 @@ func TestSpaceComponent_MCPIndex(t *testing.T) {
 	}, data)
 
 }
+
+func TestSpaceComponent_GetMCPServiceBySvcName(t *testing.T) {
+	ctx := context.Background()
+	sc := initializeTestSpaceComponent(ctx, t)
+	svcName := "test-svc"
+
+	deploy := &database.Deploy{
+		ID:      1,
+		SpaceID: 1,
+		SvcName: svcName,
+		Status:  23, // Corresponds to Running
+		RepoID:  1,
+	}
+
+	repo := database.Repository{
+		ID:          1,
+		Name:        "test-space",
+		Path:        "test/test-space",
+		Description: "test description",
+		License:     "mit",
+		Private:     false,
+		User:        database.User{},
+	}
+
+	space := &database.Space{
+		ID:           1,
+		RepositoryID: 1,
+		Repository:   &repo,
+		HasAppFile:   true,
+		Env:          "{}",
+	}
+
+	t.Run("success", func(t *testing.T) {
+		sc.mocks.stores.DeployTaskMock().EXPECT().GetDeployBySvcName(ctx, svcName).Return(deploy, nil).Once()
+		sc.mocks.stores.SpaceMock().EXPECT().ByID(ctx, deploy.SpaceID).Return(space, nil).Once()
+		sc.mocks.stores.DeployTaskMock().EXPECT().GetLatestDeployBySpaceID(ctx, space.ID).Return(deploy, nil).Once()
+
+		mcpService, err := sc.GetMCPServiceBySvcName(ctx, svcName)
+
+		require.NoError(t, err)
+		require.NotNil(t, mcpService)
+		require.Equal(t, space.ID, mcpService.ID)
+		require.Equal(t, "test-space", mcpService.Name)
+		require.Equal(t, "test/test-space", mcpService.Path)
+		require.Equal(t, "test-svc", mcpService.SvcName)
+		require.Equal(t, "Running", mcpService.Status)
+		require.Equal(t, "endpoint/test-svc", mcpService.Endpoint)
+	})
+
+	t.Run("deploy not found", func(t *testing.T) {
+		sc.mocks.stores.DeployTaskMock().EXPECT().GetDeployBySvcName(ctx, svcName).Return(nil, errors.New("not found")).Once()
+
+		_, err := sc.GetMCPServiceBySvcName(ctx, svcName)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "failed to get deploy by svcName")
+	})
+
+	t.Run("space not found", func(t *testing.T) {
+		sc.mocks.stores.DeployTaskMock().EXPECT().GetDeployBySvcName(ctx, svcName).Return(deploy, nil).Once()
+		sc.mocks.stores.SpaceMock().EXPECT().ByID(ctx, deploy.SpaceID).Return(nil, errors.New("not found")).Once()
+
+		_, err := sc.GetMCPServiceBySvcName(ctx, svcName)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "failed to get space by id")
+	})
+}
