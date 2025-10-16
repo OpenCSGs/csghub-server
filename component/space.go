@@ -59,6 +59,7 @@ type SpaceComponent interface {
 	HasEntryFile(ctx context.Context, space *database.Space) bool
 	GetByID(ctx context.Context, spaceID int64) (*database.Space, error)
 	MCPIndex(ctx context.Context, repoFilter *types.RepoFilter, per, page int) ([]*types.MCPService, int, error)
+	GetMCPServiceBySvcName(ctx context.Context, svcName string) (*types.MCPService, error)
 }
 
 func (c *spaceComponentImpl) Create(ctx context.Context, req types.CreateSpaceReq) (*types.Space, error) {
@@ -1186,6 +1187,39 @@ func (c *spaceComponentImpl) MCPIndex(ctx context.Context, repoFilter *types.Rep
 		})
 	}
 	return resSpaces, total, nil
+}
+
+func (c *spaceComponentImpl) GetMCPServiceBySvcName(ctx context.Context, svcName string) (*types.MCPService, error) {
+	deploy, err := c.deployTaskStore.GetDeployBySvcName(ctx, svcName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get deploy by svcName %s, error: %w", svcName, err)
+	}
+
+	space, err := c.spaceStore.ByID(ctx, deploy.SpaceID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get space by id %d, error: %w", deploy.SpaceID, err)
+	}
+
+	spaceStatus, _ := c.status(ctx, space)
+	endpoint := c.getEndpoint(spaceStatus.SvcName, space)
+
+	resSvc := &types.MCPService{
+		ID:           space.ID,
+		Name:         space.Repository.Name,
+		Description:  space.Repository.Description,
+		Path:         space.Repository.Path,
+		Env:          space.Env,
+		License:      space.Repository.License,
+		Private:      space.Repository.Private,
+		CreatedAt:    space.Repository.CreatedAt,
+		UpdatedAt:    space.Repository.UpdatedAt,
+		Status:       spaceStatus.Status,
+		RepositoryID: space.Repository.ID,
+		SvcName:      spaceStatus.SvcName,
+		Endpoint:     endpoint,
+	}
+
+	return resSvc, nil
 }
 
 func (c *spaceComponentImpl) getEndpoint(svcName string, space *database.Space) string {
