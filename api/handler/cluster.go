@@ -1,7 +1,10 @@
 package handler
 
 import (
+	"encoding/csv"
 	"log/slog"
+	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
@@ -133,6 +136,87 @@ func (h *ClusterHandler) GetDeploys(ctx *gin.Context) {
 		return
 	}
 	httpbase.OKWithTotal(ctx, deploys, total)
+}
+
+// GetClusterDeploysReport  godoc
+// @Security     ApiKey
+// @Summary      Export cluster deploys as CSV
+// @Description  Export all cluster deploys (Excel-readable CSV)
+// @Tags         Cluster
+// @Produce      text/csv
+// @Param        status query string false "status" default(all) Enums(all, running, stopped, deployfailed)
+// @Param        search query string false "search" default("")
+// @Success      200  {string}  string "CSV file"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /cluster/deploys_report [get]
+func (h *ClusterHandler) GetDeploysReport(ctx *gin.Context) {
+	var req types.DeployReq
+	req.DeployTypes = []int{types.SpaceType, types.InferenceType, types.FinetuneType}
+	req.Page = 1
+	req.PageSize = 10
+	status := ctx.Query("status")
+	switch status {
+	case "running":
+		req.Status = []int{code.Running}
+	case "stopped":
+		req.Status = []int{code.Stopped}
+	case "deployfailed":
+		req.Status = []int{code.DeployFailed}
+	}
+	req.Query = ctx.Query("search")
+
+	var all []types.DeployRes
+	for {
+		deploys, total, err := h.c.GetDeploys(ctx.Request.Context(), req)
+		if err != nil {
+			slog.Error("Failed to get cluster deploys", slog.Any("error", err))
+			httpbase.ServerError(ctx, err)
+			return
+		}
+		all = append(all, deploys...)
+		if len(all) >= total || len(deploys) == 0 {
+			break
+		}
+		req.Page++
+	}
+
+	filename := "deploys_report.csv"
+	ctx.Header("Content-Type", "text/csv; charset=utf-8")
+	ctx.Header("Content-Disposition", "attachment; filename=\""+filename+"\"")
+	// For some proxies/browsers
+	ctx.Status(http.StatusOK)
+
+	writer := csv.NewWriter(ctx.Writer)
+	_ = writer.Write([]string{
+		"ClusterID",
+		"ClusterRegion",
+		"DeployName",
+		"Username",
+		"Resource",
+		"CreateTime",
+		"Status",
+		"TotalTimeInMin",
+		"TotalFeeInCents",
+	})
+	const timeLayout = "2006-01-02 15:04:05"
+	for _, d := range all {
+		_ = writer.Write([]string{
+			d.ClusterID,
+			d.ClusterRegion,
+			d.DeployName,
+			d.User.Username,
+			d.Resource,
+			d.CreateTime.Local().Format(timeLayout),
+			d.Status,
+			strconv.Itoa(d.TotalTimeInMin),
+			strconv.Itoa(d.TotalFeeInCents),
+		})
+	}
+	writer.Flush()
+	if err := writer.Error(); err != nil {
+		slog.Error("Failed to write csv", slog.Any("error", err))
+	}
 }
 
 func (h *ClusterHandler) Update(ctx *gin.Context) {

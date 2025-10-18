@@ -383,6 +383,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		cluster.GET("", middlewareCollection.Auth.NeedLogin, clusterHandler.Index)
 		cluster.GET("/usage", middlewareCollection.Auth.NeedAdmin, clusterHandler.GetClusterUsage)
 		cluster.GET("/deploys", middlewareCollection.Auth.NeedAdmin, clusterHandler.GetDeploys)
+		cluster.GET("/deploys_report", middlewareCollection.Auth.NeedAdmin, clusterHandler.GetDeploysReport)
 		cluster.GET("/:id", middlewareCollection.Auth.NeedLogin, clusterHandler.GetClusterById)
 		cluster.PUT("/:id", middlewareCollection.Auth.NeedAdmin, clusterHandler.Update)
 	}
