@@ -110,6 +110,8 @@ func Test_GetDeploysReport(t *testing.T) {
 	require.Equal(t, http.StatusOK, resp.Code)
 	require.Contains(t, resp.Header().Get("Content-Type"), "text/csv")
 	require.Contains(t, resp.Header().Get("Content-Disposition"), "deploys_report.csv")
+	require.Contains(t, resp.Header().Get("Cache-Control"), "no-cache")
+	require.Contains(t, resp.Header().Get("Connection"), "keep-alive")
 	body := resp.Body.String()
 	require.Contains(t, body, "ClusterID,ClusterRegion,DeployName,Username,Resource,CreateTime,Status,TotalTimeInMin,TotalFeeInCents")
 	require.Contains(t, body, "alice")

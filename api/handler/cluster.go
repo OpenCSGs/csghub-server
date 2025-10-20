@@ -141,7 +141,7 @@ func (h *ClusterHandler) GetDeploys(ctx *gin.Context) {
 // GetClusterDeploysReport  godoc
 // @Security     ApiKey
 // @Summary      Export cluster deploys as CSV
-// @Description  Export all cluster deploys (Excel-readable CSV)
+// @Description  Export all cluster deploys (Excel-readable CSV) with streaming output
 // @Tags         Cluster
 // @Produce      text/csv
 // @Param        status query string false "status" default(all) Enums(all, running, stopped, deployfailed)
@@ -166,28 +166,16 @@ func (h *ClusterHandler) GetDeploysReport(ctx *gin.Context) {
 	}
 	req.Query = ctx.Query("search")
 
-	var all []types.DeployRes
-	for {
-		deploys, total, err := h.c.GetDeploys(ctx.Request.Context(), req)
-		if err != nil {
-			slog.Error("Failed to get cluster deploys", slog.Any("error", err))
-			httpbase.ServerError(ctx, err)
-			return
-		}
-		all = append(all, deploys...)
-		if len(all) >= total || len(deploys) == 0 {
-			break
-		}
-		req.Page++
-	}
-
 	filename := "deploys_report.csv"
 	ctx.Header("Content-Type", "text/csv; charset=utf-8")
 	ctx.Header("Content-Disposition", "attachment; filename=\""+filename+"\"")
-	// For some proxies/browsers
+	ctx.Header("Cache-Control", "no-cache")
+	ctx.Header("Connection", "keep-alive")
 	ctx.Status(http.StatusOK)
 
 	writer := csv.NewWriter(ctx.Writer)
+	defer writer.Flush()
+
 	_ = writer.Write([]string{
 		"ClusterID",
 		"ClusterRegion",
@@ -199,24 +187,47 @@ func (h *ClusterHandler) GetDeploysReport(ctx *gin.Context) {
 		"TotalTimeInMin",
 		"TotalFeeInCents",
 	})
-	const timeLayout = "2006-01-02 15:04:05"
-	for _, d := range all {
-		_ = writer.Write([]string{
-			d.ClusterID,
-			d.ClusterRegion,
-			d.DeployName,
-			d.User.Username,
-			d.Resource,
-			d.CreateTime.Local().Format(timeLayout),
-			d.Status,
-			strconv.Itoa(d.TotalTimeInMin),
-			strconv.Itoa(d.TotalFeeInCents),
-		})
-	}
 	writer.Flush()
-	if err := writer.Error(); err != nil {
-		slog.Error("Failed to write csv", slog.Any("error", err))
+
+	const timeLayout = "2006-01-02 15:04:05"
+	totalProcessed := 0
+
+	for {
+		deploys, total, err := h.c.GetDeploys(ctx.Request.Context(), req)
+		if err != nil {
+			slog.Error("Failed to get cluster deploys", slog.Any("error", err))
+			httpbase.ServerError(ctx, err)
+			return
+		}
+
+		for _, d := range deploys {
+			_ = writer.Write([]string{
+				d.ClusterID,
+				d.ClusterRegion,
+				d.DeployName,
+				d.User.Username,
+				d.Resource,
+				d.CreateTime.Local().Format(timeLayout),
+				d.Status,
+				strconv.Itoa(d.TotalTimeInMin),
+				strconv.Itoa(d.TotalFeeInCents),
+			})
+			totalProcessed++
+		}
+
+		writer.Flush()
+		if err := writer.Error(); err != nil {
+			slog.Error("Failed to write csv", slog.Any("error", err))
+			return
+		}
+
+		if totalProcessed >= total || len(deploys) == 0 {
+			break
+		}
+		req.Page++
 	}
+
+	slog.Info("CSV export completed", slog.Int("total_processed", totalProcessed))
 }
 
 func (h *ClusterHandler) Update(ctx *gin.Context) {
