@@ -2,8 +2,11 @@ package database
 
 import (
 	"context"
+	"strings"
 
+	"github.com/uptrace/bun"
 	"opencsg.com/csghub-server/common/errorx"
+	"opencsg.com/csghub-server/common/types"
 )
 
 // AgentTemplate represents the template for an agent
@@ -20,12 +23,14 @@ type AgentTemplate struct {
 
 // AgentInstance represents an instance created from an agent template
 type AgentInstance struct {
-	ID         int64  `bun:",pk,autoincrement" json:"id"`
-	TemplateID int64  `bun:"" json:"template_id"`        // Associated with the id in the template table
-	UserUUID   string `bun:",notnull" json:"user_uuid"`  // Associated with the corresponding field in the User table
-	Type       string `bun:",notnull" json:"type"`       // Possible values: langflow, agno, code, etc.
-	ContentID  string `bun:",notnull" json:"content_id"` // Used to specify the unique id of the instance resource
-	Public     bool   `bun:",notnull" json:"public"`     // Whether the instance is public
+	ID          int64  `bun:",pk,autoincrement" json:"id"`
+	TemplateID  int64  `bun:"" json:"template_id"`          // Associated with the id in the template table
+	UserUUID    string `bun:",notnull" json:"user_uuid"`    // Associated with the corresponding field in the User table
+	Type        string `bun:",notnull" json:"type"`         // Possible values: langflow, agno, code, etc.
+	ContentID   string `bun:",notnull" json:"content_id"`   // Used to specify the unique id of the instance resource
+	Public      bool   `bun:",notnull" json:"public"`       // Whether the instance is public
+	Name        string `bun:",nullzero" json:"name"`        // Instance name
+	Description string `bun:",nullzero" json:"description"` // Instance description
 	times
 }
 
@@ -33,7 +38,7 @@ type AgentInstance struct {
 type AgentTemplateStore interface {
 	Create(ctx context.Context, template *AgentTemplate) (*AgentTemplate, error)
 	FindByID(ctx context.Context, id int64) (*AgentTemplate, error)
-	ListByUserUUID(ctx context.Context, userUUID string) ([]AgentTemplate, error)
+	ListByUserUUID(ctx context.Context, userUUID string, filter types.AgentTemplateFilter, per int, page int) ([]AgentTemplate, int, error)
 	Update(ctx context.Context, template *AgentTemplate) error
 	Delete(ctx context.Context, id int64) error
 }
@@ -42,8 +47,8 @@ type AgentTemplateStore interface {
 type AgentInstanceStore interface {
 	Create(ctx context.Context, instance *AgentInstance) (*AgentInstance, error)
 	FindByID(ctx context.Context, id int64) (*AgentInstance, error)
-	ListByUserUUID(ctx context.Context, userUUID string) ([]AgentInstance, error)
-	ListByTemplateID(ctx context.Context, templateID int64, userUUID string) ([]AgentInstance, error)
+	FindByContentID(ctx context.Context, instanceType string, contentID string) (*AgentInstance, error)
+	ListByUserUUID(ctx context.Context, userUUID string, filter types.AgentInstanceFilter, per int, page int) ([]AgentInstance, int, error)
 	Update(ctx context.Context, instance *AgentInstance) error
 	Delete(ctx context.Context, id int64) error
 }
@@ -110,16 +115,41 @@ func (s *agentTemplateStoreImpl) FindByID(ctx context.Context, id int64) (*Agent
 	return template, nil
 }
 
+func (s *agentTemplateStoreImpl) applyAgentTemplateFilters(query *bun.SelectQuery, filter types.AgentTemplateFilter) *bun.SelectQuery {
+	filter.Search = strings.TrimSpace(filter.Search)
+	if filter.Search != "" {
+		searchPattern := "%" + filter.Search + "%"
+		query = query.Where("LOWER(name) LIKE LOWER(?) OR LOWER(description) LIKE LOWER(?)", searchPattern, searchPattern)
+	}
+
+	if filter.Type != "" {
+		query = query.Where("type = ?", filter.Type)
+	}
+
+	return query
+}
+
 // ListByUserUUID retrieves all AgentTemplates for a specific user
-func (s *agentTemplateStoreImpl) ListByUserUUID(ctx context.Context, userUUID string) ([]AgentTemplate, error) {
+func (s *agentTemplateStoreImpl) ListByUserUUID(ctx context.Context, userUUID string, filter types.AgentTemplateFilter, per int, page int) ([]AgentTemplate, int, error) {
 	var templates []AgentTemplate
-	err := s.db.Core.NewSelect().Model(&templates).Where("user_uuid = ? OR public = ?", userUUID, true).Scan(ctx, &templates)
+	query := s.db.Core.NewSelect().Model(&templates).Where("user_uuid = ? OR public = ?", userUUID, true)
+
+	query = s.applyAgentTemplateFilters(query, filter)
+
+	total, err := query.Count(ctx)
 	if err != nil {
-		return nil, errorx.HandleDBError(err, map[string]any{
+		return nil, 0, errorx.HandleDBError(err, map[string]any{
 			"user_uuid": userUUID,
 		})
 	}
-	return templates, nil
+
+	err = query.Order("updated_at DESC").Limit(per).Offset((page-1)*per).Scan(ctx, &templates)
+	if err != nil {
+		return nil, 0, errorx.HandleDBError(err, map[string]any{
+			"user_uuid": userUUID,
+		})
+	}
+	return templates, total, nil
 }
 
 // Update updates an existing AgentTemplate
@@ -169,32 +199,58 @@ func (s *agentInstanceStoreImpl) FindByID(ctx context.Context, id int64) (*Agent
 	return instance, nil
 }
 
-// ListByUserUUID retrieves all AgentInstances for a specific user
-func (s *agentInstanceStoreImpl) ListByUserUUID(ctx context.Context, userUUID string) ([]AgentInstance, error) {
-	var instances []AgentInstance
-	err := s.db.Core.NewSelect().Model(&instances).Where("user_uuid = ? OR public = ?", userUUID, true).Scan(ctx, &instances)
+// FindByContentID retrieves an AgentInstance by its content ID
+func (s *agentInstanceStoreImpl) FindByContentID(ctx context.Context, instanceType string, contentID string) (*AgentInstance, error) {
+	instance := &AgentInstance{}
+	err := s.db.Core.NewSelect().Model(instance).Where("type = ? AND content_id = ?", instanceType, contentID).Limit(1).Scan(ctx, instance)
 	if err != nil {
 		return nil, errorx.HandleDBError(err, map[string]any{
+			"instance_type": instanceType,
+			"content_id":    contentID,
+		})
+	}
+	return instance, nil
+}
+
+func (s *agentInstanceStoreImpl) applyAgentInstanceFilters(query *bun.SelectQuery, filter types.AgentInstanceFilter) *bun.SelectQuery {
+	filter.Search = strings.TrimSpace(filter.Search)
+	if filter.Search != "" {
+		searchPattern := "%" + filter.Search + "%"
+		query = query.Where("LOWER(name) LIKE LOWER(?) OR LOWER(description) LIKE LOWER(?)", searchPattern, searchPattern)
+	}
+
+	if filter.Type != "" {
+		query = query.Where("type = ?", filter.Type)
+	}
+
+	// Apply template ID filter
+	if filter.TemplateID != nil {
+		query = query.Where("template_id = ?", *filter.TemplateID)
+	}
+
+	return query
+}
+
+func (s *agentInstanceStoreImpl) ListByUserUUID(ctx context.Context, userUUID string, filter types.AgentInstanceFilter, per int, page int) ([]AgentInstance, int, error) {
+	var instances []AgentInstance
+	query := s.db.Core.NewSelect().Model(&instances).Where("user_uuid = ? OR public = ?", userUUID, true)
+
+	query = s.applyAgentInstanceFilters(query, filter)
+
+	total, err := query.Count(ctx)
+	if err != nil {
+		return nil, 0, errorx.HandleDBError(err, map[string]any{
 			"user_uuid": userUUID,
 		})
 	}
-	return instances, nil
-}
 
-// ListByTemplateID retrieves all AgentInstances created from a specific template
-func (s *agentInstanceStoreImpl) ListByTemplateID(ctx context.Context, templateID int64, userUUID string) ([]AgentInstance, error) {
-	var instances []AgentInstance
-	err := s.db.Core.NewSelect().Model(&instances).
-		Where("template_id = ?", templateID).
-		Where("user_uuid = ? OR public = ?", userUUID, true).
-		Scan(ctx, &instances)
+	err = query.Order("updated_at DESC").Limit(per).Offset((page-1)*per).Scan(ctx, &instances)
 	if err != nil {
-		return nil, errorx.HandleDBError(err, map[string]any{
-			"template_id": templateID,
-			"user_uuid":   userUUID,
+		return nil, 0, errorx.HandleDBError(err, map[string]any{
+			"user_uuid": userUUID,
 		})
 	}
-	return instances, nil
+	return instances, total, nil
 }
 
 // Update updates an existing AgentInstance

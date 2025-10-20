@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/tests"
+	"opencsg.com/csghub-server/common/types"
 )
 
 func TestAgentTemplateStore_CRUD(t *testing.T) {
@@ -46,9 +47,10 @@ func TestAgentTemplateStore_CRUD(t *testing.T) {
 	require.Equal(t, template.Public, foundTemplate.Public)
 
 	// Test ListByUserUUID
-	templates, err := store.ListByUserUUID(ctx, userUUID)
+	templates, total, err := store.ListByUserUUID(ctx, userUUID, types.AgentTemplateFilter{}, 10, 1)
 	require.NoError(t, err)
 	require.Len(t, templates, 1)
+	require.Equal(t, 1, total)
 	require.Equal(t, template.ID, templates[0].ID)
 
 	// Test Update
@@ -123,14 +125,16 @@ func TestAgentTemplateStore_ListByUserUUID_WithPublicTemplates(t *testing.T) {
 	require.NoError(t, err)
 
 	// Test ListByUserUUID for user1 - should return both private and public templates
-	templates, err := store.ListByUserUUID(ctx, userUUID1)
+	templates, total, err := store.ListByUserUUID(ctx, userUUID1, types.AgentTemplateFilter{}, 10, 1)
 	require.NoError(t, err)
 	require.Len(t, templates, 2)
+	require.Equal(t, 2, total)
 
 	// Test ListByUserUUID for user2 - should return only public template from user1 and private template from user2
-	templates, err = store.ListByUserUUID(ctx, userUUID2)
+	templates, total, err = store.ListByUserUUID(ctx, userUUID2, types.AgentTemplateFilter{}, 10, 1)
 	require.NoError(t, err)
 	require.Len(t, templates, 2) // public template from user1 + private template from user2
+	require.Equal(t, 2, total)
 }
 
 func TestAgentTemplateStore_NotFound(t *testing.T) {
@@ -145,9 +149,10 @@ func TestAgentTemplateStore_NotFound(t *testing.T) {
 	require.Error(t, err)
 
 	// Test ListByUserUUID with non-existent user
-	templates, err := store.ListByUserUUID(ctx, "non-existent-user")
+	templates, total, err := store.ListByUserUUID(ctx, "non-existent-user", types.AgentTemplateFilter{}, 10, 1)
 	require.NoError(t, err)
 	require.Len(t, templates, 0)
+	require.Equal(t, 0, total)
 }
 
 func TestAgentTemplateStore_Update_NonExistent(t *testing.T) {
@@ -182,4 +187,78 @@ func TestAgentTemplateStore_Delete_NonExistent(t *testing.T) {
 	// Test Delete with non-existent ID
 	err := store.Delete(ctx, 99999)
 	require.Error(t, err)
+}
+
+func TestAgentTemplateStore_ListByUserUUID_WithFilters(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewAgentTemplateStoreWithDB(db)
+
+	userUUID := uuid.New().String()
+
+	// Create templates with different types and names
+	template1 := &database.AgentTemplate{
+		Type:        "langflow",
+		UserUUID:    userUUID,
+		Name:        "Langflow Agent",
+		Description: "A langflow agent for automation",
+		Content:     "langflow content",
+		Public:      false,
+	}
+	_, err := store.Create(ctx, template1)
+	require.NoError(t, err)
+
+	template2 := &database.AgentTemplate{
+		Type:        "agno",
+		UserUUID:    userUUID,
+		Name:        "Agno Assistant",
+		Description: "An agno assistant for help",
+		Content:     "agno content",
+		Public:      false,
+	}
+	_, err = store.Create(ctx, template2)
+	require.NoError(t, err)
+
+	template3 := &database.AgentTemplate{
+		Type:        "langflow",
+		UserUUID:    userUUID,
+		Name:        "Another Langflow",
+		Description: "Another langflow agent",
+		Content:     "another langflow content",
+		Public:      false,
+	}
+	_, err = store.Create(ctx, template3)
+	require.NoError(t, err)
+
+	// Test search filter
+	templates, total, err := store.ListByUserUUID(ctx, userUUID, types.AgentTemplateFilter{Search: "Langflow"}, 10, 1)
+	require.NoError(t, err)
+	require.Len(t, templates, 2) // Should find both langflow templates
+	require.Equal(t, 2, total)
+
+	// Test type filter
+	templates, total, err = store.ListByUserUUID(ctx, userUUID, types.AgentTemplateFilter{Type: "agno"}, 10, 1)
+	require.NoError(t, err)
+	require.Len(t, templates, 1) // Should find only the agno template
+	require.Equal(t, 1, total)
+
+	// Test combined filters
+	templates, total, err = store.ListByUserUUID(ctx, userUUID, types.AgentTemplateFilter{Search: "automation", Type: "langflow"}, 10, 1)
+	require.NoError(t, err)
+	require.Len(t, templates, 1) // Should find only "Langflow Agent" (has "automation" in description)
+	require.Equal(t, 1, total)
+
+	// Test pagination
+	templates, total, err = store.ListByUserUUID(ctx, userUUID, types.AgentTemplateFilter{}, 2, 1)
+	require.NoError(t, err)
+	require.Len(t, templates, 2) // Should return only 2 templates due to limit
+	require.Equal(t, 3, total)   // But total should be 3
+
+	// Test second page
+	templates, total, err = store.ListByUserUUID(ctx, userUUID, types.AgentTemplateFilter{}, 2, 2)
+	require.NoError(t, err)
+	require.Len(t, templates, 1) // Should return 1 template on second page
+	require.Equal(t, 3, total)   // Total should still be 3
 }

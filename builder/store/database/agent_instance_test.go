@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/tests"
+	"opencsg.com/csghub-server/common/types"
 )
 
 func TestAgentInstanceStore_CRUD(t *testing.T) {
@@ -44,15 +45,10 @@ func TestAgentInstanceStore_CRUD(t *testing.T) {
 	require.Equal(t, instance.Public, foundInstance.Public)
 
 	// Test ListByUserUUID
-	instances, err := store.ListByUserUUID(ctx, userUUID)
+	instances, total, err := store.ListByUserUUID(ctx, userUUID, types.AgentInstanceFilter{}, 10, 1)
 	require.NoError(t, err)
 	require.Len(t, instances, 1)
-	require.Equal(t, instance.ID, instances[0].ID)
-
-	// Test ListByTemplateID
-	instances, err = store.ListByTemplateID(ctx, instance.TemplateID, userUUID)
-	require.NoError(t, err)
-	require.Len(t, instances, 1)
+	require.Equal(t, 1, total)
 	require.Equal(t, instance.ID, instances[0].ID)
 
 	// Test Update
@@ -120,70 +116,16 @@ func TestAgentInstanceStore_ListByUserUUID_WithPublicInstances(t *testing.T) {
 	require.NoError(t, err)
 
 	// Test ListByUserUUID for user1 - should return both private and public instances
-	instances, err := store.ListByUserUUID(ctx, userUUID1)
+	instances, total, err := store.ListByUserUUID(ctx, userUUID1, types.AgentInstanceFilter{}, 10, 1)
 	require.NoError(t, err)
 	require.Len(t, instances, 2)
+	require.Equal(t, 2, total)
 
 	// Test ListByUserUUID for user2 - should return only public instance from user1 and private instance from user2
-	instances, err = store.ListByUserUUID(ctx, userUUID2)
+	instances, total, err = store.ListByUserUUID(ctx, userUUID2, types.AgentInstanceFilter{}, 10, 1)
 	require.NoError(t, err)
 	require.Len(t, instances, 2) // public instance from user1 + private instance from user2
-}
-
-func TestAgentInstanceStore_ListByTemplateID_WithPublicInstances(t *testing.T) {
-	db := tests.InitTestDB()
-	defer db.Close()
-	ctx := context.TODO()
-
-	store := database.NewAgentInstanceStoreWithDB(db)
-
-	userUUID1 := uuid.New().String()
-	userUUID2 := uuid.New().String()
-	templateID := int64(100)
-
-	// Create private instance for user1 from template
-	privateInstance := &database.AgentInstance{
-		TemplateID: templateID,
-		UserUUID:   userUUID1,
-		Type:       "langflow",
-		ContentID:  "private-instance",
-		Public:     false,
-	}
-	_, err := store.Create(ctx, privateInstance)
-	require.NoError(t, err)
-
-	// Create public instance for user1 from template
-	publicInstance := &database.AgentInstance{
-		TemplateID: templateID,
-		UserUUID:   userUUID1,
-		Type:       "agno",
-		ContentID:  "public-instance",
-		Public:     true,
-	}
-	_, err = store.Create(ctx, publicInstance)
-	require.NoError(t, err)
-
-	// Create private instance for user2 from different template
-	user2Instance := &database.AgentInstance{
-		TemplateID: templateID + 1,
-		UserUUID:   userUUID2,
-		Type:       "code",
-		ContentID:  "user2-instance",
-		Public:     false,
-	}
-	_, err = store.Create(ctx, user2Instance)
-	require.NoError(t, err)
-
-	// Test ListByTemplateID for user1 - should return both private and public instances from template
-	instances, err := store.ListByTemplateID(ctx, templateID, userUUID1)
-	require.NoError(t, err)
-	require.Len(t, instances, 2)
-
-	// Test ListByTemplateID for user2 - should return only public instance from user1
-	instances, err = store.ListByTemplateID(ctx, templateID, userUUID2)
-	require.NoError(t, err)
-	require.Len(t, instances, 1)
-	require.Equal(t, publicInstance.ID, instances[0].ID)
+	require.Equal(t, 2, total)
 }
 
 func TestAgentInstanceStore_NotFound(t *testing.T) {
@@ -198,14 +140,11 @@ func TestAgentInstanceStore_NotFound(t *testing.T) {
 	require.Error(t, err)
 
 	// Test ListByUserUUID with non-existent user
-	instances, err := store.ListByUserUUID(ctx, "non-existent-user")
+	instances, total, err := store.ListByUserUUID(ctx, "non-existent-user", types.AgentInstanceFilter{}, 10, 1)
 	require.NoError(t, err)
 	require.Len(t, instances, 0)
+	require.Equal(t, 0, total)
 
-	// Test ListByTemplateID with non-existent template
-	instances, err = store.ListByTemplateID(ctx, 99999, "non-existent-user")
-	require.NoError(t, err)
-	require.Len(t, instances, 0)
 }
 
 func TestAgentInstanceStore_Update_NonExistent(t *testing.T) {
@@ -272,13 +211,159 @@ func TestAgentInstanceStore_MultipleInstancesFromSameTemplate(t *testing.T) {
 	_, err = store.Create(ctx, instance2)
 	require.NoError(t, err)
 
-	// Test ListByTemplateID - should return both instances
-	instances, err := store.ListByTemplateID(ctx, templateID, userUUID)
-	require.NoError(t, err)
-	require.Len(t, instances, 2)
-
 	// Test ListByUserUUID - should return both instances
-	instances, err = store.ListByUserUUID(ctx, userUUID)
+	instances, total, err := store.ListByUserUUID(ctx, userUUID, types.AgentInstanceFilter{}, 10, 1)
 	require.NoError(t, err)
 	require.Len(t, instances, 2)
+	require.Equal(t, 2, total)
+}
+
+func TestAgentInstanceStore_ListByUserUUID_WithFilters(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewAgentInstanceStoreWithDB(db)
+
+	userUUID := uuid.New().String()
+
+	// Create instances with different types and names
+	instance1 := &database.AgentInstance{
+		TemplateID:  1,
+		UserUUID:    userUUID,
+		Type:        "langflow",
+		ContentID:   "langflow-instance",
+		Name:        "Langflow Agent",
+		Description: "A langflow agent for automation",
+		Public:      false,
+	}
+	_, err := store.Create(ctx, instance1)
+	require.NoError(t, err)
+
+	instance2 := &database.AgentInstance{
+		TemplateID:  2,
+		UserUUID:    userUUID,
+		Type:        "agno",
+		ContentID:   "agno-instance",
+		Name:        "Agno Assistant",
+		Description: "An agno assistant for help",
+		Public:      false,
+	}
+	_, err = store.Create(ctx, instance2)
+	require.NoError(t, err)
+
+	instance3 := &database.AgentInstance{
+		TemplateID:  3,
+		UserUUID:    userUUID,
+		Type:        "langflow",
+		ContentID:   "another-langflow",
+		Name:        "Another Langflow",
+		Description: "Another langflow instance",
+		Public:      false,
+	}
+	_, err = store.Create(ctx, instance3)
+	require.NoError(t, err)
+
+	// Test search filter
+	instances, total, err := store.ListByUserUUID(ctx, userUUID, types.AgentInstanceFilter{Search: "langflow"}, 10, 1)
+	require.NoError(t, err)
+	require.Len(t, instances, 2) // Should find both langflow instances
+	require.Equal(t, 2, total)
+
+	// Test type filter
+	instances, total, err = store.ListByUserUUID(ctx, userUUID, types.AgentInstanceFilter{Type: "agno"}, 10, 1)
+	require.NoError(t, err)
+	require.Len(t, instances, 1) // Should find only agno instance
+	require.Equal(t, 1, total)
+
+	// Test combined filters
+	instances, total, err = store.ListByUserUUID(ctx, userUUID, types.AgentInstanceFilter{Search: "another", Type: "langflow"}, 10, 1)
+	require.NoError(t, err)
+	require.Len(t, instances, 1) // Should find only the "Another Langflow" instance
+	require.Equal(t, 1, total)
+
+	// Test pagination
+	instances, total, err = store.ListByUserUUID(ctx, userUUID, types.AgentInstanceFilter{}, 2, 1)
+	require.NoError(t, err)
+	require.Len(t, instances, 2) // Should return only 2 instances due to limit
+	require.Equal(t, 3, total)   // But total should be 3
+
+	// Test second page
+	instances, total, err = store.ListByUserUUID(ctx, userUUID, types.AgentInstanceFilter{}, 2, 2)
+	require.NoError(t, err)
+	require.Len(t, instances, 1) // Should return 1 instance on second page
+	require.Equal(t, 3, total)   // Total should still be 3
+}
+
+func TestAgentInstanceStore_ListByUserUUID_WithTemplateFilter(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewAgentInstanceStoreWithDB(db)
+
+	userUUID := uuid.New().String()
+	templateID1 := int64(1)
+	templateID2 := int64(2)
+
+	// Create instances with different template IDs
+	instance1 := &database.AgentInstance{
+		TemplateID:  templateID1,
+		UserUUID:    userUUID,
+		Type:        "langflow",
+		ContentID:   "langflow-instance-1",
+		Name:        "Langflow Agent 1",
+		Description: "A langflow agent for automation",
+		Public:      false,
+	}
+	_, err := store.Create(ctx, instance1)
+	require.NoError(t, err)
+
+	instance2 := &database.AgentInstance{
+		TemplateID:  templateID2,
+		UserUUID:    userUUID,
+		Type:        "agno",
+		ContentID:   "agno-instance-1",
+		Name:        "Agno Assistant 1",
+		Description: "An agno assistant for help",
+		Public:      false,
+	}
+	_, err = store.Create(ctx, instance2)
+	require.NoError(t, err)
+
+	instance3 := &database.AgentInstance{
+		TemplateID:  templateID1,
+		UserUUID:    userUUID,
+		Type:        "langflow",
+		ContentID:   "langflow-instance-2",
+		Name:        "Langflow Agent 2",
+		Description: "Another langflow agent",
+		Public:      false,
+	}
+	_, err = store.Create(ctx, instance3)
+	require.NoError(t, err)
+
+	// Test template ID filter
+	instances, total, err := store.ListByUserUUID(ctx, userUUID, types.AgentInstanceFilter{TemplateID: &templateID1}, 10, 1)
+	require.NoError(t, err)
+	require.Len(t, instances, 2) // Should find both instances from template 1
+	require.Equal(t, 2, total)
+
+	// Test template ID filter with different template
+	instances, total, err = store.ListByUserUUID(ctx, userUUID, types.AgentInstanceFilter{TemplateID: &templateID2}, 10, 1)
+	require.NoError(t, err)
+	require.Len(t, instances, 1) // Should find only instance from template 2
+	require.Equal(t, 1, total)
+
+	// Test combined filters (template + type)
+	instances, total, err = store.ListByUserUUID(ctx, userUUID, types.AgentInstanceFilter{TemplateID: &templateID1, Type: "langflow"}, 10, 1)
+	require.NoError(t, err)
+	require.Len(t, instances, 2) // Should find both langflow instances from template 1
+	require.Equal(t, 2, total)
+
+	// Test combined filters (template + search)
+	instances, total, err = store.ListByUserUUID(ctx, userUUID, types.AgentInstanceFilter{TemplateID: &templateID1, Search: "Agent 1"}, 10, 1)
+	require.NoError(t, err)
+	require.Len(t, instances, 1) // Should find only "Langflow Agent 1"
+	require.Equal(t, 1, total)
 }

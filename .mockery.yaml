@@ -218,6 +218,7 @@ packages:
     config:
     interfaces:
       CommonResponseWriter:
+      AgentAdapter:
   opencsg.com/csghub-server/aigateway/token:
     config:
       all: true

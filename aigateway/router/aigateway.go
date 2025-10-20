@@ -35,14 +35,25 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error creating mcp proxy handler :%w", err)
 	}
-	CreateMCPRoute(v1Group, mcpProxy)
+	createMCPRoute(v1Group, mcpProxy)
+	// langflow proxy
+	agentProxy, err := handler.NewAgentProxyHandler(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating agent proxy handler :%w", err)
+	}
+	createAgentRoute(v1Group, agentProxy)
 	return r, nil
 }
 
-func CreateMCPRoute(v1Group *gin.RouterGroup, mcpProxy handler.MCPProxyHandler) {
+func createMCPRoute(v1Group *gin.RouterGroup, mcpProxy handler.MCPProxyHandler) {
 	mcpGroup := v1Group.Group("mcp")
 	mcpGroup.GET("/resources", mcpProxy.Resources)
 
 	// todo: enable mcp server proxy later
 	mcpGroup.Any("/:servicename/*any", mcpProxy.ProxyToApi(""))
+}
+
+func createAgentRoute(v1Group *gin.RouterGroup, agentProxy handler.AgentProxyHandler) {
+	agentGroup := v1Group.Group("/agent", middleware.MustLogin())
+	agentGroup.Any("/:type/*any", agentProxy.ProxyToApi("/api/v1%s", "any"))
 }
