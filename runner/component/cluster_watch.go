@@ -98,6 +98,10 @@ func (w *clusterWatcher) GetWebhookEndpoint() string {
 
 func (w *clusterWatcher) getClusterAppEndpoint(configmapData map[string]string) string {
 	inputVal := configmapData[rtypes.KeyApplicationEndpoint]
+	if len(inputVal) < 1 {
+		slog.Warn("no application endpoint provided in configmap", slog.Any(rtypes.KeyApplicationEndpoint, inputVal))
+	}
+
 	if inputVal != "auto" {
 		return inputVal
 	}
@@ -114,7 +118,12 @@ func (w *clusterWatcher) getClusterAppEndpoint(configmapData map[string]string) 
 	ingress := svc.Status.LoadBalancer.Ingress
 
 	if len(ingress) < 1 {
-		slog.Warn("kourier-system/kourier service does not have external IP and use app endpoint input value", slog.Any("ingress", ingress))
+		slog.Warn("kourier-system/kourier service does not have external IP and try to read clusterIP", slog.Any("ingress", ingress))
+		clusterIP := svc.Spec.ClusterIP
+		if len(clusterIP) > 0 {
+			slog.Info("kourier-system/kourier service does not have external IP and use clusterIP", slog.Any("clusterIP", clusterIP))
+			inputVal = fmt.Sprintf("http://%s", clusterIP)
+		}
 		return inputVal
 	}
 
