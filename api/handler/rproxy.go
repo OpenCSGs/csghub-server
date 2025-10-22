@@ -96,7 +96,7 @@ func (r *RProxyHandler) Proxy(ctx *gin.Context) {
 			return
 		}
 		slog.Info("proxy target", slog.Any("appSvcName", appSvcName), slog.Any("target", target),
-			slog.Any("host", host), slog.Any("apiname", apiname))
+			slog.Any("set-header-host", host), slog.Any("apiname", apiname))
 		rp, _ := proxy.NewReverseProxy(target)
 		if deploy.Type == types.InferenceType || deploy.Type == types.ServerlessType {
 			// no need context path for inference
@@ -129,8 +129,8 @@ func (r *RProxyHandler) checkAccessPermission(ctx *gin.Context, deploy *database
 		}
 		// check space
 		allow, err = r.repoComp.AllowAccessByRepoID(ctx.Request.Context(), deploy.RepoID, username)
-	} else if deploy.ModelID > 0 {
-		// check model inference
+	} else {
+		// check endpoint
 		allow, err = r.repoComp.AllowAccessEndpoint(ctx.Request.Context(), username, deploy)
 	}
 	return allow, err
