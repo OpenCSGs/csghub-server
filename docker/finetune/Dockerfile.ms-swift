@@ -47,7 +47,7 @@ RUN mkdir -p /var/log/supervisord
 COPY swift/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY swift/jupyter_notebook_config.py /root/.jupyter/jupyter_notebook_config.py
 COPY swift/ /etc/csghub/
-RUN chmod +x /etc/csghub/*.sh
+RUN chmod +x /etc/csghub/*.sh /etc/csghub/*.py
 #use dark mode
 RUN mkdir -p /root/.jupyter/lab/user-settings/@jupyterlab/apputils-extension && \
 	    echo '{"theme":"JupyterLab Dark"}' > /root/.jupyter/lab/user-settings/@jupyterlab/apputils-extension/themes.jupyterlab-settings && \

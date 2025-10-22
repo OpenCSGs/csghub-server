@@ -661,6 +661,10 @@ func (c *runtimeArchitectureComponentImpl) InitRuntimeFrameworkAndArchitectures(
 	if err != nil {
 		return fmt.Errorf("failed to update inference runtime_framework: %w", err)
 	}
+	err = c.UpdateRuntimeFrameworkByType(ctx, types.JobType)
+	if err != nil {
+		return fmt.Errorf("failed to update job runtime_framework: %w", err)
+	}
 	return nil
 }
 
@@ -686,6 +690,11 @@ func (c *runtimeArchitectureComponentImpl) UpdateRuntimeFrameworkByType(ctx cont
 		}
 	case types.NotebookType:
 		jsonFiles, err = getJsonfiles("notebook")
+		if err != nil {
+			return fmt.Errorf("failed to get json files: %w", err)
+		}
+	case types.JobType:
+		jsonFiles, err = getJsonfiles("job")
 		if err != nil {
 			return fmt.Errorf("failed to get json files: %w", err)
 		}

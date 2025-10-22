@@ -19,7 +19,7 @@ export_ui_path="/etc/csghub/ms-swift/swift/ui/llm_export/model.py"
 eval_ui_path="/etc/csghub/ms-swift/swift/ui/llm_eval/model.py"
 hub_path="/etc/csghub/ms-swift/swift/hub/hub.py"
 #find model type and template type
-model_template=`python -W ignore /etc/csghub/get_model_info.py $MODEL_NAME`
+model_template=`python /etc/csghub/get_model_info_clean.py $MODEL_NAME`
 echo $model_template
 IFS=',' read -ra item_types <<< $model_template
 model_type=${item_types[0]}

@@ -338,6 +338,7 @@ const (
 	ServerlessType = 3    // serverless
 	EvaluationType = 4    // evaluation
 	NotebookType   = 5    // notebook
+	JobType        = 6    // job
 	UnknownType    = -1   // unknown case
 )
 
