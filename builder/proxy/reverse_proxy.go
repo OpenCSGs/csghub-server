@@ -10,7 +10,7 @@ import (
 )
 
 type ReverseProxy interface {
-	ServeHTTP(w http.ResponseWriter, r *http.Request, api, host string)
+	ServeHTTP(w http.ResponseWriter, r *http.Request, api, svcHost string)
 }
 
 type reverseProxyImpl struct {
@@ -29,7 +29,7 @@ func NewReverseProxy(target string) (ReverseProxy, error) {
 	}, nil
 }
 
-func (rp *reverseProxyImpl) ServeHTTP(w http.ResponseWriter, r *http.Request, api, host string) {
+func (rp *reverseProxyImpl) ServeHTTP(w http.ResponseWriter, r *http.Request, api, svcHost string) {
 	defer func() {
 		if r := recover(); r != nil {
 			slog.Debug("Connection to target server interrupted", slog.Any("error", r))
@@ -37,7 +37,12 @@ func (rp *reverseProxyImpl) ServeHTTP(w http.ResponseWriter, r *http.Request, ap
 	}()
 	proxy := httputil.NewSingleHostReverseProxy(rp.target)
 	proxy.Director = func(req *http.Request) {
-		req.Host = rp.target.Host
+		if len(svcHost) > 0 {
+			slog.Info("update reverse proxy header host", slog.Any("svc-host", svcHost))
+			req.Host = svcHost
+		} else {
+			req.Host = rp.target.Host
+		}
 		req.URL.Host = rp.target.Host
 		req.URL.Scheme = rp.target.Scheme
 		if len(api) > 0 {
@@ -46,9 +51,6 @@ func (rp *reverseProxyImpl) ServeHTTP(w http.ResponseWriter, r *http.Request, ap
 		}
 		// dont support br comporession
 		req.Header.Set("Accept-Encoding", "gzip")
-		if len(host) > 0 {
-			req.Header.Set("Host", host)
-		}
 
 		// debug only
 		// {
