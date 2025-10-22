@@ -9,7 +9,7 @@ import (
 
 type AgentInstanceSession struct {
 	ID         int64  `bun:",pk,autoincrement" json:"id"`
-	UUID       string `bun:",notnull" json:"uuid"`
+	UUID       string `bun:",notnull,unique" json:"uuid"`
 	Name       string `bun:",nullzero" json:"name"`
 	InstanceID int64  `bun:",notnull" json:"instance_id"`
 	UserUUID   string `bun:",notnull" json:"user_uuid"`

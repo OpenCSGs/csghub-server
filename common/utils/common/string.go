@@ -49,3 +49,10 @@ func SHA256(s string) string {
 	hashBytes := hash.Sum(nil)
 	return hex.EncodeToString(hashBytes)
 }
+
+func SafeDeref(p *string) string {
+	if p != nil {
+		return *p
+	}
+	return ""
+}

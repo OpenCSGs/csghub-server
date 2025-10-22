@@ -50,6 +50,7 @@ packages:
       XnetComponent:
       CaptchaComponent:
       AgentComponent:
+      AgentInstanceAdapter:
   opencsg.com/csghub-server/component/reporter:
     config:
     interfaces:

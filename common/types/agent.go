@@ -34,6 +34,7 @@ type AgentInstance struct {
 	ContentID   *string   `json:"content_id" binding:"omitempty"`        // Used to specify the unique id of the instance resource
 	Public      bool      `json:"public"`                                // Whether the instance is public
 	Editable    bool      `json:"editable"`                              // Whether the instance is editable
+	IsRunning   bool      `json:"is_running"`                            // Whether the instance is running
 	CreatedAt   time.Time `json:"created_at"`                            // When the instance was created
 	UpdatedAt   time.Time `json:"updated_at"`                            // When the instance was last updated
 }
@@ -47,6 +48,13 @@ type AgentInstanceFilter struct {
 type UpdateAgentInstanceRequest struct {
 	Name        *string `json:"name,omitempty"`
 	Description *string `json:"description,omitempty"`
+}
+
+type AgentInstanceCreationResult struct {
+	ID          string
+	Name        string
+	Description string
+	Metadata    map[string]any // Additional metadata for the agent instance
 }
 
 // AgentChatRequest represents a chat request to an agent instance
@@ -143,4 +151,26 @@ type LangflowTokenData struct {
 
 type LangflowEndData struct {
 	Result RunLangflowAgentInstanceResponse `json:"result"`
+}
+
+type CodeAgentRequest struct {
+	RequestID     string                    `json:"request_id,omitempty"`               // Session ID (client-provided)
+	Query         string                    `json:"query" binding:"required"`           // The user's query/question
+	MaxLoop       int                       `json:"max_loop" binding:"omitempty,min=1"` // Maximum number of execution loops (default: 1)
+	SearchEngines []string                  `json:"search_engines"`                     // List of search engines to use
+	Stream        bool                      `json:"stream"`                             // Whether to stream the response
+	AgentName     string                    `json:"agent_name" binding:"required"`      // Name of the agent to use
+	StreamMode    *StreamMode               `json:"stream_mode,omitempty"`              // Stream configuration
+	History       []CodeAgentRequestMessage `json:"history,omitempty"`                  // Conversation history
+}
+
+type StreamMode struct {
+	Mode  string `json:"mode" binding:"required"` // Stream mode (e.g., "general")
+	Token int    `json:"token" binding:"min=1"`   // Token-based streaming interval
+	Time  int    `json:"time" binding:"min=1"`    // Time-based streaming interval
+}
+
+type CodeAgentRequestMessage struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
 }

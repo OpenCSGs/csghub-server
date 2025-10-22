@@ -51,9 +51,17 @@ func (a *LangflowAdapter) PrepareResponseWriter(ctx *gin.Context, api string, st
 
 	flowID := path.Base(api)
 	slog.Debug("flowID", "flowID", flowID)
-	sessionUUID, err := a.agentComponent.InitializeSession(ctx, userUUID, "langflow", flowID, &chatReq)
+	sessionUUID, err := a.agentComponent.InitializeSession(ctx, userUUID, "langflow", flowID, &chatReq) // Create session history for langflow agents
 	if err != nil {
 		return nil, fmt.Errorf("initialize session: %w", err)
+	}
+
+	if err := a.agentComponent.RecordSessionHistory(ctx, &types.RecordAgentInstanceSessionHistoryRequest{
+		SessionUUID: sessionUUID,
+		Request:     true,
+		Content:     chatReq.InputValue,
+	}); err != nil {
+		slog.Error("failed to record session history", "session_uuid", sessionUUID, "request", true, "content", chatReq.InputValue, "error", err)
 	}
 
 	chatReq.SessionID = &sessionUUID

@@ -305,6 +305,9 @@ func TestLangflowAdapter_PrepareResponseWriter_RunFlow(t *testing.T) {
 	sessionUUID := "test-session-uuid"
 	mockAgentComponent.On("InitializeSession", mock.Anything, "test-user-uuid", "langflow", "flow-id", mock.AnythingOfType("*types.AgentChatRequest")).Return(sessionUUID, nil)
 
+	// Mock session history recording
+	mockAgentComponent.On("RecordSessionHistory", mock.Anything, mock.AnythingOfType("*types.RecordAgentInstanceSessionHistoryRequest")).Return(nil)
+
 	responseWriter, err := adapter.PrepareResponseWriter(ctx, "/api/v1/opencsg/run/flow-id", true)
 	assert.NoError(t, err)
 	assert.IsType(t, &LangflowResponseWriterWrapper{}, responseWriter)

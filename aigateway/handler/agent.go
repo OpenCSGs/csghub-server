@@ -29,7 +29,7 @@ func NewAgentProxyHandler(config *config.Config) (AgentProxyHandler, error) {
 	}
 	adapters := map[string]AgentAdapter{
 		"langflow": NewLangflowAdapter(config, agentComponent),
-		// "code": NewCodeAdapter(config, agentComponent),
+		"code":     NewCodeAdapter(config, agentComponent),
 		// "agno": NewAgnoAdapter(config, agentComponent),
 	}
 	return &AgentProxyHandlerImpl{
