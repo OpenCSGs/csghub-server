@@ -25,7 +25,9 @@ EXPORT_DIR="${EXPORT_DIR:-/workspace/$LATEST_CKP}"
 # Create the full repository name
 CURRENT_TIME=$(date +%Y%m%d_%H%M%S)
 MODEL_NAME=$(echo "$MODEL_ID" | cut -d'/' -f2)
-REPO_NAME="$MODEL_NAME-finetuned-$CURRENT_TIME"
+#use FINETUNED_MODEL_NAME if provided, otherwise use MODEL_ID
+REPO_NAME_DEFAULT="$MODEL_NAME-finetuned-$CURRENT_TIME"
+REPO_NAME="${FINETUNED_MODEL_NAME:-$REPO_NAME_DEFAULT}"
 FULL_REPO_NAME="$HF_USERNAME/$REPO_NAME"
 
 echo "Export configuration:"
