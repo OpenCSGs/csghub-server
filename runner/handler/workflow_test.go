@@ -43,12 +43,12 @@ func TestWorkflowHandler_DeleteWorkflow(t *testing.T) {
 		return h.DeleteWorkflow
 	})
 
-	tester.mocks.wfComp.EXPECT().DeleteWorkflow(mock.Anything, &types.ArgoWorkFlowDeleteReq{
-		ID: 1,
-	}).Return(nil)
+	tester.mocks.wfComp.EXPECT().DeleteWorkflow(mock.Anything, int64(1), "test").Return(nil)
 
+	tester.WithParam("id", "1")
 	tester.WithBody(t, types.ArgoWorkFlowDeleteReq{
-		ID: 1,
+		ID:       1,
+		Username: "test",
 	})
 
 	tester.Execute()

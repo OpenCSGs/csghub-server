@@ -171,4 +171,6 @@ type ArgoWorkFlowDeleteReq struct {
 	ID        int64  `json:"id"`
 	Username  string `json:"username"`
 	ClusterID string `json:"cluster_id"`
+	TaskID    string `json:"task_id"`
+	Namespace string `json:"namespace"`
 }

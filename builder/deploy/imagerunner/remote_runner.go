@@ -466,7 +466,7 @@ func (h *RemoteRunner) SubmitFinetuneJob(ctx context.Context, req *types.ArgoWor
 	}
 	url := fmt.Sprintf("%s/api/v1/workflows", remote)
 	// Create a new HTTP client with a timeout
-	response, err := h.doRequest(ctx, http.MethodPost, url, req)
+	response, err := h.doRequest(http.MethodPost, url, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to submit finetune job from deployer, %w", err)
 	}

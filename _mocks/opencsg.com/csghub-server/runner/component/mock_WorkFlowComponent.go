@@ -90,17 +90,17 @@ func (_c *MockWorkFlowComponent_CreateWorkflow_Call) RunAndReturn(run func(conte
 	return _c
 }
 
-// DeleteWorkflow provides a mock function with given fields: ctx, req
-func (_m *MockWorkFlowComponent) DeleteWorkflow(ctx context.Context, req *types.ArgoWorkFlowDeleteReq) error {
-	ret := _m.Called(ctx, req)
+// DeleteWorkflow provides a mock function with given fields: ctx, id, username
+func (_m *MockWorkFlowComponent) DeleteWorkflow(ctx context.Context, id int64, username string) error {
+	ret := _m.Called(ctx, id, username)
 
 	if len(ret) == 0 {
 		panic("no return value specified for DeleteWorkflow")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, *types.ArgoWorkFlowDeleteReq) error); ok {
-		r0 = rf(ctx, req)
+	if rf, ok := ret.Get(0).(func(context.Context, int64, string) error); ok {
+		r0 = rf(ctx, id, username)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -115,14 +115,15 @@ type MockWorkFlowComponent_DeleteWorkflow_Call struct {
 
 // DeleteWorkflow is a helper method to define mock.On call
 //   - ctx context.Context
-//   - req *types.ArgoWorkFlowDeleteReq
-func (_e *MockWorkFlowComponent_Expecter) DeleteWorkflow(ctx interface{}, req interface{}) *MockWorkFlowComponent_DeleteWorkflow_Call {
-	return &MockWorkFlowComponent_DeleteWorkflow_Call{Call: _e.mock.On("DeleteWorkflow", ctx, req)}
+//   - id int64
+//   - username string
+func (_e *MockWorkFlowComponent_Expecter) DeleteWorkflow(ctx interface{}, id interface{}, username interface{}) *MockWorkFlowComponent_DeleteWorkflow_Call {
+	return &MockWorkFlowComponent_DeleteWorkflow_Call{Call: _e.mock.On("DeleteWorkflow", ctx, id, username)}
 }
 
-func (_c *MockWorkFlowComponent_DeleteWorkflow_Call) Run(run func(ctx context.Context, req *types.ArgoWorkFlowDeleteReq)) *MockWorkFlowComponent_DeleteWorkflow_Call {
+func (_c *MockWorkFlowComponent_DeleteWorkflow_Call) Run(run func(ctx context.Context, id int64, username string)) *MockWorkFlowComponent_DeleteWorkflow_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(*types.ArgoWorkFlowDeleteReq))
+		run(args[0].(context.Context), args[1].(int64), args[2].(string))
 	})
 	return _c
 }
@@ -132,7 +133,7 @@ func (_c *MockWorkFlowComponent_DeleteWorkflow_Call) Return(_a0 error) *MockWork
 	return _c
 }
 
-func (_c *MockWorkFlowComponent_DeleteWorkflow_Call) RunAndReturn(run func(context.Context, *types.ArgoWorkFlowDeleteReq) error) *MockWorkFlowComponent_DeleteWorkflow_Call {
+func (_c *MockWorkFlowComponent_DeleteWorkflow_Call) RunAndReturn(run func(context.Context, int64, string) error) *MockWorkFlowComponent_DeleteWorkflow_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -400,6 +401,39 @@ func (_c *MockWorkFlowComponent_RunInformer_Call) Return() *MockWorkFlowComponen
 }
 
 func (_c *MockWorkFlowComponent_RunInformer_Call) RunAndReturn(run func(*cluster.ClusterPool, *config.Config)) *MockWorkFlowComponent_RunInformer_Call {
+	_c.Run(run)
+	return _c
+}
+
+// StartAcctRequestFee provides a mock function with given fields: wf
+func (_m *MockWorkFlowComponent) StartAcctRequestFee(wf database.ArgoWorkflow) {
+	_m.Called(wf)
+}
+
+// MockWorkFlowComponent_StartAcctRequestFee_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'StartAcctRequestFee'
+type MockWorkFlowComponent_StartAcctRequestFee_Call struct {
+	*mock.Call
+}
+
+// StartAcctRequestFee is a helper method to define mock.On call
+//   - wf database.ArgoWorkflow
+func (_e *MockWorkFlowComponent_Expecter) StartAcctRequestFee(wf interface{}) *MockWorkFlowComponent_StartAcctRequestFee_Call {
+	return &MockWorkFlowComponent_StartAcctRequestFee_Call{Call: _e.mock.On("StartAcctRequestFee", wf)}
+}
+
+func (_c *MockWorkFlowComponent_StartAcctRequestFee_Call) Run(run func(wf database.ArgoWorkflow)) *MockWorkFlowComponent_StartAcctRequestFee_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(database.ArgoWorkflow))
+	})
+	return _c
+}
+
+func (_c *MockWorkFlowComponent_StartAcctRequestFee_Call) Return() *MockWorkFlowComponent_StartAcctRequestFee_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *MockWorkFlowComponent_StartAcctRequestFee_Call) RunAndReturn(run func(database.ArgoWorkflow)) *MockWorkFlowComponent_StartAcctRequestFee_Call {
 	_c.Run(run)
 	return _c
 }
