@@ -48,7 +48,7 @@ type WorkFlowComponent interface {
 	// Update workflow
 	UpdateWorkflow(ctx context.Context, update *v1alpha1.Workflow, cluster *cluster.Cluster) (*database.ArgoWorkflow, error)
 	// find workflow by user name
-	FindWorkFlows(ctx context.Context, username string, per, page int) ([]database.ArgoWorkflow, int, error)
+	FindWorkFlows(ctx context.Context, username string, taskType types.TaskType, per, page int) ([]database.ArgoWorkflow, int, error)
 	// generate workflow templates
 	DeleteWorkflow(ctx context.Context, req *types.ArgoWorkFlowDeleteReq) error
 	GetWorkflow(ctx context.Context, id int64, username string) (*database.ArgoWorkflow, error)
@@ -98,10 +98,14 @@ func (wc *workFlowComponentImpl) CreateWorkflow(ctx context.Context, req types.A
 		Namespace:    namespace,
 		Status:       v1alpha1.WorkflowPhase(v1alpha1.NodePending),
 	}
+	if req.TaskType == types.TaskTypeFinetune {
+		argowf.ResultURL = req.Username + "/" + req.FinetunedModelName
+	}
 	// create workflow in argo
 	awf := generateWorkflow(req, wc.config)
 	wc.setLabels(argowf, awf)
-
+	slog.Info("create workflow in runner", slog.Any("namespace", namespace), slog.Any("awf.name", awf.Name),
+		slog.Any("result-url", argowf.ResultURL), slog.Any("task-type", argowf.TaskType))
 	_, err = cluster.ArgoClient.ArgoprojV1alpha1().Workflows(namespace).Create(ctx, awf, v1.CreateOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create workflow in argo: %v", err)
@@ -152,6 +156,7 @@ func (wc *workFlowComponentImpl) GetWorkflow(ctx context.Context, id int64, user
 // Update workflow
 func (wc *workFlowComponentImpl) UpdateWorkflow(ctx context.Context, update *v1alpha1.Workflow, cluster *cluster.Cluster) (*database.ArgoWorkflow, error) {
 	oldwf, err := wc.wf.FindByTaskID(ctx, update.Name)
+	slog.Info("get-UpdateWorkflow-from-db", slog.Any("oldwf.TaskId", oldwf.TaskId), slog.Any("result-url", oldwf.ResultURL))
 	if errors.Is(err, sql.ErrNoRows) {
 		oldwf = *wc.getWorkflowFromLabels(ctx, update)
 		wf, err := wc.wf.CreateWorkFlow(ctx, oldwf)
@@ -200,6 +205,7 @@ func (wc *workFlowComponentImpl) UpdateWorkflow(ctx context.Context, update *v1a
 		}
 	}
 
+	slog.Info("UpdateWorkflow-report", slog.Any("name", oldwf.TaskId), slog.Any("result-url", oldwf.ResultURL))
 	wc.addKServiceWithEvent(ctx, types.RunnerWorkflowChange, &oldwf)
 	if lastStatus != oldwf.Status {
 		wc.reportWorFlowLog(types.WorkflowUpdated.String(), &oldwf)
@@ -219,11 +225,11 @@ func (wc *workFlowComponentImpl) DeleteWorkflowInargo(ctx context.Context, delet
 	if wf.Status == v1alpha1.WorkflowPending || wf.Status == v1alpha1.WorkflowRunning {
 		wf.Status = v1alpha1.WorkflowFailed
 		wf.Reason = "deleted by admin"
+		slog.Info("DeleteWorkflowInargo-report", slog.Any("name", wf.TaskId), slog.Any("result-url", wf.ResultURL))
 		_, err = wc.wf.UpdateWorkFlow(ctx, wf)
 		if err != nil {
 			return err
 		}
-
 		wc.addKServiceWithEvent(ctx, types.RunnerWorkflowChange, &wf)
 		return nil
 	}
@@ -235,8 +241,8 @@ func (wc *workFlowComponentImpl) FindWorkFlowById(ctx context.Context, id int64)
 }
 
 // find workflow by user name
-func (wc *workFlowComponentImpl) FindWorkFlows(ctx context.Context, username string, per, page int) ([]database.ArgoWorkflow, int, error) {
-	return wc.wf.FindByUsername(ctx, username, per, page)
+func (wc *workFlowComponentImpl) FindWorkFlows(ctx context.Context, username string, taskType types.TaskType, per, page int) ([]database.ArgoWorkflow, int, error) {
+	return wc.wf.FindByUsername(ctx, username, taskType, per, page)
 }
 
 // create workflow in argo
@@ -287,7 +293,7 @@ func generateWorkflow(req types.ArgoWorkFlowReq, config *config.Config) *v1alpha
 			containerImg = path.Join(config.Space.DockerRegBase, v.Image)
 		}
 
-		templates = append(templates, v1alpha1.Template{
+		temp := v1alpha1.Template{
 			Name: v.Name,
 			//NodeSelector: nodeSelector,
 			Container: &corev1.Container{
@@ -298,7 +304,10 @@ func generateWorkflow(req types.ArgoWorkFlowReq, config *config.Config) *v1alpha
 				Resources:       resources,
 				ImagePullPolicy: corev1.PullAlways,
 			},
-			Outputs: v1alpha1.Outputs{
+		}
+
+		if req.TaskType == types.TaskTypeEvaluation {
+			temp.Outputs = v1alpha1.Outputs{
 				Parameters: []v1alpha1.Parameter{
 					{
 						Name: "result",
@@ -307,8 +316,10 @@ func generateWorkflow(req types.ArgoWorkFlowReq, config *config.Config) *v1alpha
 						},
 					},
 				},
-			},
-		})
+			}
+		}
+
+		templates = append(templates, temp)
 	}
 
 	workflowObject := &v1alpha1.Workflow{
@@ -496,6 +507,9 @@ func (wc *workFlowComponentImpl) setLabels(wf *database.ArgoWorkflow, awf *v1alp
 	awf.ObjectMeta.Annotations["ClusterID"] = wf.ClusterID
 	awf.ObjectMeta.Annotations["RepoType"] = wf.RepoType
 	awf.ObjectMeta.Annotations["Namespace"] = wf.Namespace
+	if wf.TaskType == types.TaskTypeFinetune {
+		awf.ObjectMeta.Annotations["FinetinedModelName"] = wf.ResultURL
+	}
 }
 
 func (wc *workFlowComponentImpl) getWorkflowFromLabels(ctx context.Context, awf *v1alpha1.Workflow) *database.ArgoWorkflow {
@@ -513,6 +527,9 @@ func (wc *workFlowComponentImpl) getWorkflowFromLabels(ctx context.Context, awf 
 	wf.ClusterID = annotations["ClusterID"]
 	wf.RepoType = annotations["RepoType"]
 	wf.Namespace = annotations["Namespace"]
+	if wf.TaskType == types.TaskTypeFinetune {
+		wf.ResultURL = annotations["FinetinedModelName"]
+	}
 
 	// String slice fields
 	if repoIdsStr, ok := annotations["RepoIds"]; ok && repoIdsStr != "" {
@@ -545,7 +562,8 @@ func (wc *workFlowComponentImpl) addKServiceWithEvent(ctx context.Context, event
 		},
 		Data: wf,
 	}
-
+	slog.Info("report-workflow-event", slog.Any("event-type", eventType), slog.Any("name", wf.TaskId),
+		slog.Any("status", wf.Status), slog.Any("result-url", wf.ResultURL))
 	go func() {
 		err := rcommon.Push(wc.config.Runner.WebHookEndpoint, wc.config.APIToken, event)
 		if err != nil {

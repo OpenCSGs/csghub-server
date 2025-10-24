@@ -40,6 +40,7 @@ const (
 	TaskTypeTraining    TaskType = "training"
 	TaskTypeComparison  TaskType = "comparison"
 	TaskTypeLeaderBoard TaskType = "leaderboard"
+	TaskTypeFinetune    TaskType = "finetune"
 )
 
 type EvaluationReq struct {
@@ -83,22 +84,23 @@ type ArgoFlowTemplate struct {
 }
 
 type ArgoWorkFlowReq struct {
-	ClusterID    string             `json:"cluster_id"`
-	RepoType     string             `json:"repo_type"`
-	Templates    []ArgoFlowTemplate `json:"templates,omitempty"`
-	Entrypoint   string             `json:"entrypoint"`
-	Username     string             `json:"username"`
-	TaskName     string             `json:"task_name"`
-	TaskId       string             `json:"task_id"`
-	TaskType     TaskType           `json:"task_type"`
-	RepoIds      []string           `json:"repo_ids"`
-	TaskDesc     string             `json:"task_desc"`
-	Image        string             `json:"image"` // ArgoWorkFlow framework
-	Datasets     []string           `json:"datasets,omitempty"`
-	ResourceId   int64              `json:"resource_id"`
-	ResourceName string             `json:"resource_name"`
-	UserUUID     string             `json:"user_uuid"`
-	ShareMode    bool               `json:"share_mode"`
+	ClusterID          string             `json:"cluster_id"`
+	RepoType           string             `json:"repo_type"`
+	Templates          []ArgoFlowTemplate `json:"templates,omitempty"`
+	Entrypoint         string             `json:"entrypoint"`
+	Username           string             `json:"username"`
+	TaskName           string             `json:"task_name"`
+	TaskId             string             `json:"task_id"`
+	TaskType           TaskType           `json:"task_type"`
+	RepoIds            []string           `json:"repo_ids"`
+	TaskDesc           string             `json:"task_desc"`
+	Image              string             `json:"image"` // ArgoWorkFlow framework
+	Datasets           []string           `json:"datasets,omitempty"`
+	ResourceId         int64              `json:"resource_id"`
+	ResourceName       string             `json:"resource_name"`
+	UserUUID           string             `json:"user_uuid"`
+	ShareMode          bool               `json:"share_mode"`
+	FinetunedModelName string             `json:"finetuned_model_name,omitempty"`
 }
 
 type ArgoWorkFlowListRes struct {
