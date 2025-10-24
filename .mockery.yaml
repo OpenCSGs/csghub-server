@@ -32,6 +32,7 @@ packages:
       MirrorComponent:
       ImportComponent:
       EvaluationComponent:
+      FinetuneComponent:
       RecomComponent:
       MultiSyncComponent:
       ModelTreeComponent:
@@ -192,3 +193,12 @@ packages:
     config:
     interfaces:
       NotificationComponent:
+      MailComponent:
+  opencsg.com/csghub-server/runner/component:
+    config:
+    interfaces:
+      ImagebuilderComponent:
+      WorkFlowComponent:
+  opencsg.com/csghub-server/logcollector/component:
+    config:
+      all: true

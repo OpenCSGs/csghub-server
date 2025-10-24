@@ -16,7 +16,7 @@ type argoWorkFlowStoreImpl struct {
 type ArgoWorkFlowStore interface {
 	FindByID(ctx context.Context, id int64) (WorkFlow ArgoWorkflow, err error)
 	FindByTaskID(ctx context.Context, id string) (WorkFlow ArgoWorkflow, err error)
-	FindByUsername(ctx context.Context, username string, per, page int) (WorkFlows []ArgoWorkflow, total int, err error)
+	FindByUsername(ctx context.Context, username string, taskType types.TaskType, per, page int) (WorkFlows []ArgoWorkflow, total int, err error)
 	CreateWorkFlow(ctx context.Context, workFlow ArgoWorkflow) (*ArgoWorkflow, error)
 	// mainly for update status
 	UpdateWorkFlow(ctx context.Context, workFlow ArgoWorkflow) (*ArgoWorkflow, error)
@@ -78,12 +78,12 @@ func (s *argoWorkFlowStoreImpl) FindByTaskID(ctx context.Context, id string) (Wo
 	return
 }
 
-func (s *argoWorkFlowStoreImpl) FindByUsername(ctx context.Context, username string, per, page int) (WorkFlows []ArgoWorkflow, total int, err error) {
+func (s *argoWorkFlowStoreImpl) FindByUsername(ctx context.Context, username string, taskType types.TaskType, per, page int) (WorkFlows []ArgoWorkflow, total int, err error) {
 	query := s.db.Operator.Core.
 		NewSelect().
 		Model(&WorkFlows).
 		ExcludeColumn("reason").
-		Where("username = ?", username)
+		Where("username = ?", username).Where("task_type = ?", taskType)
 
 	query = query.Order("submit_time DESC").
 		Limit(per).

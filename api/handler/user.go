@@ -1038,3 +1038,44 @@ func (h *UserHandler) GetUserNotebooks(ctx *gin.Context) {
 	}
 	httpbase.OK(ctx, respData)
 }
+
+// GetUserFintunes godoc
+// @Security     ApiKey
+// @Summary      Get user backend fintunes
+// @Description  get user backend fintunes
+// @Tags         User
+// @Accept       json
+// @Produce      json
+// @Param        username path string true "username"
+// @Param        per query int false "per" default(20)
+// @Param        page query int false "per page" default(1)
+// @Success      200  {object}  types.ResponseWithTotal{data=[]types.ArgoWorkFlowRes,total=int} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /user/{username}/finetune/jobs [get]
+func (h *UserHandler) GetUserFinetunes(ctx *gin.Context) {
+	var req types.UserEvaluationReq
+	per, page, err := common.GetPerAndPageFromContext(ctx)
+	if err != nil {
+		slog.Error("Bad request format of page and per", "error", err)
+		httpbase.BadRequestWithExt(ctx, err)
+		return
+	}
+
+	req.Owner = ctx.Param("username")
+	req.CurrentUser = httpbase.GetCurrentUser(ctx)
+	req.Page = page
+	req.PageSize = per
+	ds, total, err := h.user.ListFinetunes(ctx.Request.Context(), &req)
+	if err != nil {
+		slog.Error("Failed to get user backend finetunes", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	respData := gin.H{
+		"data":  ds,
+		"total": total,
+	}
+	ctx.JSON(http.StatusOK, respData)
+}

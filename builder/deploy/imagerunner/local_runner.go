@@ -98,3 +98,7 @@ func (h *LocalRunner) DeleteWorkFlow(ctx context.Context, req types.ArgoWorkFlow
 func (h *LocalRunner) GetWorkFlow(ctx context.Context, req types.EvaluationGetReq) (*types.ArgoWorkFlowRes, error) {
 	return nil, nil
 }
+
+func (h *LocalRunner) SubmitFinetuneJob(ctx context.Context, req *types.ArgoWorkFlowReq) (*types.ArgoWorkFlowRes, error) {
+	return nil, nil
+}

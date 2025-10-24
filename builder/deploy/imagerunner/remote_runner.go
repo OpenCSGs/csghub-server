@@ -458,3 +458,23 @@ func (h *RemoteRunner) GetRemoteRunnerHost(ctx context.Context, clusterID string
 	}
 	return h.remote.Scheme + "://" + h.remote.Host, nil
 }
+
+func (h *RemoteRunner) SubmitFinetuneJob(ctx context.Context, req *types.ArgoWorkFlowReq) (*types.ArgoWorkFlowRes, error) {
+	remote, err := h.GetRemoteRunnerHost(ctx, req.ClusterID)
+	if err != nil {
+		return nil, err
+	}
+	url := fmt.Sprintf("%s/api/v1/workflows", remote)
+	// Create a new HTTP client with a timeout
+	response, err := h.doRequest(ctx, http.MethodPost, url, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to submit finetune job from deployer, %w", err)
+	}
+	defer response.Body.Close()
+
+	var res types.ArgoWorkFlowRes
+	if err := json.NewDecoder(response.Body).Decode(&res); err != nil {
+		return nil, errorx.InternalServerError(err, nil)
+	}
+	return &res, nil
+}
