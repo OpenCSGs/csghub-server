@@ -36,6 +36,7 @@ type Space struct {
 	OrderDetailID int64  `json:"order_detail_id"`
 	Variables     string `bun:",nullzero" json:"variables"`
 	ClusterID     string `bun:",nullzero" json:"cluster_id"`
+	MinReplica    int    `bun:",default:0" json:"min_replica"`
 	times
 }
 

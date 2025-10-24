@@ -111,6 +111,7 @@ func (c *spaceComponentImpl) Create(ctx context.Context, req types.CreateSpaceRe
 		Variables:     req.Variables,
 		Template:      req.Template,
 		ClusterID:     req.ClusterID,
+		MinReplica:    req.MinReplica,
 	}
 	dbSpace = c.updateSpaceByReq(dbSpace, req)
 
@@ -146,6 +147,7 @@ func (c *spaceComponentImpl) Create(ctx context.Context, req types.CreateSpaceRe
 		Status:        "",
 		Private:       req.Private,
 		CreatedAt:     resSpace.CreatedAt,
+		MinReplica:    req.MinReplica,
 	}
 
 	go func() {
@@ -423,6 +425,7 @@ func (c *spaceComponentImpl) Show(ctx context.Context, namespace, name, currentU
 		DeployID:      spaceStatus.DeployID,
 		Instances:     instList,
 		ClusterID:     space.ClusterID,
+		MinReplica:    space.MinReplica,
 	}
 	if permission.CanAdmin {
 		resSpace.SensitiveCheckStatus = space.Repository.SensitiveCheckStatus.String()
@@ -490,6 +493,7 @@ func (c *spaceComponentImpl) Update(ctx context.Context, req *types.UpdateSpaceR
 		Private:       dbRepo.Private,
 		CreatedAt:     dbRepo.CreatedAt,
 		SKU:           space.SKU,
+		MinReplica:    space.MinReplica,
 	}
 
 	return resDataset, nil
@@ -567,6 +571,7 @@ func (c *spaceComponentImpl) Index(ctx context.Context, repoFilter *types.RepoFi
 				Nickname: space.Repository.User.NickName,
 				Avatar:   space.Repository.User.Avatar,
 			},
+			MinReplica: space.MinReplica,
 		})
 	}
 	if needOpWeight {
@@ -611,6 +616,7 @@ func (c *spaceComponentImpl) OrgSpaces(ctx context.Context, req *types.OrgSpaces
 			RepositoryID:  data.Repository.ID,
 			CoverImageUrl: data.CoverImageUrl,
 			Status:        spaceStatus.Status,
+			MinReplica:    data.MinReplica,
 		})
 	}
 
@@ -646,6 +652,7 @@ func (c *spaceComponentImpl) UserSpaces(ctx context.Context, req *types.UserSpac
 			CoverImageUrl: data.CoverImageUrl,
 			Sdk:           data.Sdk,
 			Endpoint:      endpoint,
+			MinReplica:    data.MinReplica,
 		})
 	}
 
@@ -675,6 +682,7 @@ func (c *spaceComponentImpl) UserLikesSpaces(ctx context.Context, req *types.Use
 			Hardware:      data.Hardware,
 			Status:        spaceStatus.Status,
 			CoverImageUrl: data.CoverImageUrl,
+			MinReplica:    data.MinReplica,
 		})
 	}
 
@@ -1112,6 +1120,10 @@ func (c *spaceComponentImpl) mergeUpdateSpaceRequest(ctx context.Context, space 
 
 	if req.ClusterID != nil {
 		space.ClusterID = *req.ClusterID
+	}
+
+	if req.MinReplica != nil {
+		space.MinReplica = *req.MinReplica
 	}
 	return nil
 }

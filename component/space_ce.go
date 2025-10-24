@@ -82,6 +82,7 @@ func (c *spaceComponentImpl) resourceReserved(space *database.Space, req *types.
 }
 
 func (c *spaceComponentImpl) updateDeployRepoBySpace(repo types.DeployRepo, space *database.Space) types.DeployRepo {
+	repo.MinReplica = space.MinReplica
 	return repo
 }
 

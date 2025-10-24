@@ -78,6 +78,7 @@ type CreateSpaceReq struct {
 	ResourceID    int64  `json:"resource_id" binding:"required"`
 	ClusterID     string `json:"cluster_id" binding:"required"`
 	OrderDetailID int64  `json:"order_detail_id"`
+	MinReplica    int    `json:"min_replica" example:"0" binding:"min=0"`
 }
 
 // Space is the domain object for spaces
@@ -126,6 +127,7 @@ type Space struct {
 	DeployID             int64                `json:"deploy_id,omitempty"`
 	Instances            []Instance           `json:"instances,omitempty"`
 	ClusterID            string               `json:"cluster_id"`
+	MinReplica           int                  `json:"min_replica,omitempty"`
 }
 
 type SpaceStatus struct {
@@ -147,4 +149,5 @@ type UpdateSpaceReq struct {
 	Variables     *string `json:"variables"`
 	OrderDetailID int64   `json:"order_detail_id"`
 	ClusterID     *string `json:"cluster_id"`
+	MinReplica    *int    `json:"min_replica" example:"0" binding:"omitempty,min=0"`
 }
