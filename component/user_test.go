@@ -412,7 +412,7 @@ func TestUserComponent_Evaluations(t *testing.T) {
 	uc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(
 		database.User{ID: 1, UUID: "uuid"}, nil,
 	)
-	uc.mocks.stores.WorkflowMock().EXPECT().FindByUsername(ctx, "user", 10, 1).Return([]database.ArgoWorkflow{
+	uc.mocks.stores.WorkflowMock().EXPECT().FindByUsername(ctx, "user", types.TaskTypeEvaluation, 10, 1).Return([]database.ArgoWorkflow{
 		{ID: 1},
 	}, 100, nil)
 	data, total, err := uc.Evaluations(ctx, &types.UserDatasetsReq{
@@ -479,4 +479,26 @@ func TestUserComponent_LikesMCPServers(t *testing.T) {
 		{ID: 1, Name: "foo"},
 	}, data)
 
+}
+
+func TestUserComponent_Finetunes(t *testing.T) {
+	ctx := context.TODO()
+	uc := initializeTestUserComponent(ctx, t)
+	uc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(
+		database.User{ID: 1, UUID: "uuid"}, nil,
+	)
+	uc.mocks.stores.WorkflowMock().EXPECT().FindByUsername(ctx, "user", types.TaskTypeFinetune, 10, 1).Return([]database.ArgoWorkflow{
+		{ID: 1},
+	}, 100, nil)
+	data, total, err := uc.ListFinetunes(ctx, &types.UserDatasetsReq{
+		Owner:       "owner",
+		CurrentUser: "user",
+		PageOpts: types.PageOpts{
+			Page:     1,
+			PageSize: 10,
+		},
+	})
+	require.Nil(t, err)
+	require.Equal(t, 100, total)
+	require.Equal(t, []types.ArgoWorkFlowRes{{ID: 1}}, data)
 }

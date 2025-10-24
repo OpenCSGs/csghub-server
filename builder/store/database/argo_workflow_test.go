@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/tests"
+	"opencsg.com/csghub-server/common/types"
 )
 
 func TestArgoWorkflowStore_CRUD(t *testing.T) {
@@ -23,6 +24,7 @@ func TestArgoWorkflowStore_CRUD(t *testing.T) {
 		Namespace:  "ns",
 		TaskName:   "task",
 		TaskId:     "tid",
+		TaskType:   types.TaskTypeEvaluation,
 		SubmitTime: dt,
 	})
 	require.Nil(t, err)
@@ -56,10 +58,11 @@ func TestArgoWorkflowStore_CRUD(t *testing.T) {
 		Namespace:  "ns",
 		TaskName:   "task2",
 		TaskId:     "tid2",
+		TaskType:   types.TaskTypeEvaluation,
 		SubmitTime: dt.Add(-5 * time.Hour),
 	})
 	require.Nil(t, err)
-	flows, total, err := store.FindByUsername(ctx, "user", 10, 1)
+	flows, total, err := store.FindByUsername(ctx, "user", types.TaskTypeEvaluation, 10, 1)
 	require.Nil(t, err)
 	require.Equal(t, 2, total)
 	names := []string{}

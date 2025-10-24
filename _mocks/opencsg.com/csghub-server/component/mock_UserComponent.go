@@ -1112,6 +1112,72 @@ func (_c *MockUserComponent_ListDeploys_Call) RunAndReturn(run func(context.Cont
 	return _c
 }
 
+// ListFinetunes provides a mock function with given fields: ctx, req
+func (_m *MockUserComponent) ListFinetunes(ctx context.Context, req *types.UserEvaluationReq) ([]types.ArgoWorkFlowRes, int, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListFinetunes")
+	}
+
+	var r0 []types.ArgoWorkFlowRes
+	var r1 int
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, *types.UserEvaluationReq) ([]types.ArgoWorkFlowRes, int, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *types.UserEvaluationReq) []types.ArgoWorkFlowRes); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]types.ArgoWorkFlowRes)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *types.UserEvaluationReq) int); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, *types.UserEvaluationReq) error); ok {
+		r2 = rf(ctx, req)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockUserComponent_ListFinetunes_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListFinetunes'
+type MockUserComponent_ListFinetunes_Call struct {
+	*mock.Call
+}
+
+// ListFinetunes is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req *types.UserEvaluationReq
+func (_e *MockUserComponent_Expecter) ListFinetunes(ctx interface{}, req interface{}) *MockUserComponent_ListFinetunes_Call {
+	return &MockUserComponent_ListFinetunes_Call{Call: _e.mock.On("ListFinetunes", ctx, req)}
+}
+
+func (_c *MockUserComponent_ListFinetunes_Call) Run(run func(ctx context.Context, req *types.UserEvaluationReq)) *MockUserComponent_ListFinetunes_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*types.UserEvaluationReq))
+	})
+	return _c
+}
+
+func (_c *MockUserComponent_ListFinetunes_Call) Return(_a0 []types.ArgoWorkFlowRes, _a1 int, _a2 error) *MockUserComponent_ListFinetunes_Call {
+	_c.Call.Return(_a0, _a1, _a2)
+	return _c
+}
+
+func (_c *MockUserComponent_ListFinetunes_Call) RunAndReturn(run func(context.Context, *types.UserEvaluationReq) ([]types.ArgoWorkFlowRes, int, error)) *MockUserComponent_ListFinetunes_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ListInstances provides a mock function with given fields: ctx, req
 func (_m *MockUserComponent) ListInstances(ctx context.Context, req *types.UserRepoReq) ([]types.DeployRepo, int, error) {
 	ret := _m.Called(ctx, req)

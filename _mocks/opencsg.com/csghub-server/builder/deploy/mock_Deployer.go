@@ -189,6 +189,53 @@ func (_c *MockDeployer_DeleteEvaluation_Call) RunAndReturn(run func(context.Cont
 	return _c
 }
 
+// DeleteFinetuneJob provides a mock function with given fields: ctx, req
+func (_m *MockDeployer) DeleteFinetuneJob(ctx context.Context, req types.ArgoWorkFlowDeleteReq) error {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteFinetuneJob")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.ArgoWorkFlowDeleteReq) error); ok {
+		r0 = rf(ctx, req)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockDeployer_DeleteFinetuneJob_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteFinetuneJob'
+type MockDeployer_DeleteFinetuneJob_Call struct {
+	*mock.Call
+}
+
+// DeleteFinetuneJob is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.ArgoWorkFlowDeleteReq
+func (_e *MockDeployer_Expecter) DeleteFinetuneJob(ctx interface{}, req interface{}) *MockDeployer_DeleteFinetuneJob_Call {
+	return &MockDeployer_DeleteFinetuneJob_Call{Call: _e.mock.On("DeleteFinetuneJob", ctx, req)}
+}
+
+func (_c *MockDeployer_DeleteFinetuneJob_Call) Run(run func(ctx context.Context, req types.ArgoWorkFlowDeleteReq)) *MockDeployer_DeleteFinetuneJob_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.ArgoWorkFlowDeleteReq))
+	})
+	return _c
+}
+
+func (_c *MockDeployer_DeleteFinetuneJob_Call) Return(_a0 error) *MockDeployer_DeleteFinetuneJob_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockDeployer_DeleteFinetuneJob_Call) RunAndReturn(run func(context.Context, types.ArgoWorkFlowDeleteReq) error) *MockDeployer_DeleteFinetuneJob_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Deploy provides a mock function with given fields: ctx, dr
 func (_m *MockDeployer) Deploy(ctx context.Context, dr types.DeployRepo) (int64, error) {
 	ret := _m.Called(ctx, dr)
@@ -1046,6 +1093,65 @@ func (_c *MockDeployer_SubmitEvaluation_Call) Return(_a0 *types.ArgoWorkFlowRes,
 }
 
 func (_c *MockDeployer_SubmitEvaluation_Call) RunAndReturn(run func(context.Context, types.EvaluationReq) (*types.ArgoWorkFlowRes, error)) *MockDeployer_SubmitEvaluation_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SubmitFinetuneJob provides a mock function with given fields: ctx, req
+func (_m *MockDeployer) SubmitFinetuneJob(ctx context.Context, req types.FinetuneReq) (*types.ArgoWorkFlowRes, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SubmitFinetuneJob")
+	}
+
+	var r0 *types.ArgoWorkFlowRes
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.FinetuneReq) (*types.ArgoWorkFlowRes, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.FinetuneReq) *types.ArgoWorkFlowRes); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.ArgoWorkFlowRes)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.FinetuneReq) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockDeployer_SubmitFinetuneJob_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SubmitFinetuneJob'
+type MockDeployer_SubmitFinetuneJob_Call struct {
+	*mock.Call
+}
+
+// SubmitFinetuneJob is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.FinetuneReq
+func (_e *MockDeployer_Expecter) SubmitFinetuneJob(ctx interface{}, req interface{}) *MockDeployer_SubmitFinetuneJob_Call {
+	return &MockDeployer_SubmitFinetuneJob_Call{Call: _e.mock.On("SubmitFinetuneJob", ctx, req)}
+}
+
+func (_c *MockDeployer_SubmitFinetuneJob_Call) Run(run func(ctx context.Context, req types.FinetuneReq)) *MockDeployer_SubmitFinetuneJob_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.FinetuneReq))
+	})
+	return _c
+}
+
+func (_c *MockDeployer_SubmitFinetuneJob_Call) Return(_a0 *types.ArgoWorkFlowRes, _a1 error) *MockDeployer_SubmitFinetuneJob_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockDeployer_SubmitFinetuneJob_Call) RunAndReturn(run func(context.Context, types.FinetuneReq) (*types.ArgoWorkFlowRes, error)) *MockDeployer_SubmitFinetuneJob_Call {
 	_c.Call.Return(run)
 	return _c
 }

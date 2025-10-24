@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
@@ -41,7 +42,10 @@ func (h *argoWorkflowExecutorImpl) ProcessEvent(ctx context.Context, event *type
 	if err != nil {
 		return fmt.Errorf("failed to unmarshal event data: %w", err)
 	}
-
+	slog.Info("webhook_workflow_event", slog.Any("event-type", event.EventType), slog.Any("clusterid", wf.ClusterID),
+		slog.Any("TaskId", wf.TaskId), slog.Any("status", wf.Status),
+		slog.Any("username", wf.Username), slog.Any("useruuid", wf.UserUUID),
+		slog.Any("ResultURL", wf.ResultURL))
 	switch event.EventType {
 	case types.RunnerWorkflowCreate:
 		_, err = h.store.CreateWorkFlow(ctx, wf)

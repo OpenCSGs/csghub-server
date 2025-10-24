@@ -46,6 +46,7 @@ type UserComponent interface {
 	MCPServers(ctx context.Context, req *types.UserMCPsReq) ([]types.MCPServer, int, error)
 	LikesMCPServers(ctx context.Context, req *types.UserMCPsReq) ([]types.MCPServer, int, error)
 	ListNotebooks(ctx context.Context, req *types.DeployReq) ([]types.NotebookRes, int, error)
+	ListFinetunes(ctx context.Context, req *types.UserEvaluationReq) ([]types.ArgoWorkFlowRes, int, error)
 }
 
 func NewUserComponent(config *config.Config) (UserComponent, error) {
@@ -659,7 +660,7 @@ func (c *userComponentImpl) Evaluations(ctx context.Context, req *types.UserEval
 		return nil, 0, newError
 	}
 
-	evaluations, total, err := c.workflowStore.FindByUsername(ctx, req.CurrentUser, req.PageSize, req.Page)
+	evaluations, total, err := c.workflowStore.FindByUsername(ctx, req.CurrentUser, types.TaskTypeEvaluation, req.PageSize, req.Page)
 
 	if err != nil {
 		newError := fmt.Errorf("failed to get user evaluations,error:%w", err)
@@ -777,5 +778,47 @@ func (c *userComponentImpl) LikesMCPServers(ctx context.Context, req *types.User
 		})
 	}
 
+	return res, total, nil
+}
+
+func (c *userComponentImpl) ListFinetunes(ctx context.Context, req *types.UserEvaluationReq) ([]types.ArgoWorkFlowRes, int, error) {
+	_, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
+	if err != nil {
+		newError := fmt.Errorf("failed to check for the presence of the user, error:%w", err)
+		return nil, 0, newError
+	}
+
+	evaluations, total, err := c.workflowStore.FindByUsername(ctx, req.CurrentUser, types.TaskTypeFinetune, req.PageSize, req.Page)
+
+	if err != nil {
+		newError := fmt.Errorf("failed to get user backend fintunes, error:%w", err)
+		slog.Error(newError.Error())
+		return nil, 0, newError
+	}
+
+	var res []types.ArgoWorkFlowRes
+	for _, evaluation := range evaluations {
+		res = append(res, types.ArgoWorkFlowRes{
+			ID:           evaluation.ID,
+			RepoIds:      evaluation.RepoIds,
+			RepoType:     evaluation.RepoType,
+			TaskName:     evaluation.TaskName,
+			Username:     evaluation.Username,
+			TaskId:       evaluation.TaskId,
+			Status:       evaluation.Status,
+			TaskType:     evaluation.TaskType,
+			TaskDesc:     evaluation.TaskDesc,
+			Datasets:     evaluation.Datasets,
+			ResourceId:   evaluation.ResourceId,
+			ResourceName: evaluation.ResourceName,
+			Reason:       evaluation.Reason,
+			SubmitTime:   evaluation.SubmitTime,
+			StartTime:    evaluation.StartTime,
+			EndTime:      evaluation.EndTime,
+			DownloadURL:  evaluation.DownloadURL,
+			ResultURL:    evaluation.ResultURL,
+			Image:        evaluation.Image,
+		})
+	}
 	return res, total, nil
 }
