@@ -261,11 +261,11 @@ func generateWorkflow(req types.ArgoWorkFlowReq, config *config.Config) *v1alpha
 			environments = append(environments, corev1.EnvVar{Name: "ASCEND_VISIBLE_DEVICES", Value: "none"})
 		}
 
-		if v.HardWare.Dcu.ResourceName == "" || v.HardWare.Dcu.Num == "" {
+		if v.HardWare.Gcu.ResourceName == "" || v.HardWare.Gcu.Num == "" {
 			environments = append(environments, corev1.EnvVar{Name: "ENFLAME_VISIBLE_DEVICES", Value: "none"})
 		}
 
-		if v.HardWare.Gcu.ResourceName == "" || v.HardWare.Gcu.Num == "" {
+		if v.HardWare.Dcu.ResourceName == "" || v.HardWare.Dcu.Num == "" {
 			environments = append(environments, corev1.EnvVar{Name: "ROCR_VISIBLE_DEVICES", Value: "none"})
 		}
 
