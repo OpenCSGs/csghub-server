@@ -110,9 +110,17 @@ func (wc *workFlowComponentImpl) CreateWorkflow(ctx context.Context, req types.A
 	if err != nil {
 		return nil, fmt.Errorf("failed to create workflow in argo: %v", err)
 	}
-	wf, err := wc.wf.CreateWorkFlow(ctx, *argowf)
+
+	var wf *database.ArgoWorkflow
+
+	wf, err = wc.wf.CreateWorkFlow(ctx, *argowf)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create workflow in db: %v", err)
+		slog.Error("failed to create workflow in db and verify if workflow exist later", slog.Any("task-id", argowf.TaskId), slog.Any("error", err))
+		wfObj, findErr := wc.wf.FindByTaskID(ctx, argowf.TaskId)
+		if findErr != nil {
+			return nil, fmt.Errorf("failed to check workflow %s in db for create action, error: %w", argowf.TaskId, findErr)
+		}
+		wf = &wfObj
 	}
 
 	wc.addKServiceWithEvent(ctx, types.RunnerWorkflowCreate, argowf)
