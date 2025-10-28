@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
@@ -94,6 +95,9 @@ func (m *MCPProxyHandlerImpl) ProxyToApi(api string) gin.HandlerFunc {
 		}
 		api := ctx.Param("any")
 		target := mcpService.Endpoint
+		if !strings.HasPrefix(target, "https://") && !strings.HasPrefix(target, "http://") {
+			target = "https://" + target
+		}
 		rp, err := proxy.NewReverseProxy(target)
 		if err != nil {
 			slog.Error("fail to create mcp reverse proxy", slog.Any("err", err))
