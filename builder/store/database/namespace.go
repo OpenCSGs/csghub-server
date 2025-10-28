@@ -3,6 +3,8 @@ package database
 import (
 	"context"
 	"time"
+
+	"opencsg.com/csghub-server/common/errorx"
 )
 
 // Define the NamespaceStore interface
@@ -44,6 +46,7 @@ type Namespace struct {
 func (s *NamespaceStoreImpl) FindByPath(ctx context.Context, path string) (namespace Namespace, err error) {
 	namespace.Path = path
 	err = s.db.Operator.Core.NewSelect().Model(&namespace).Relation("User").Where("path = ?", path).Scan(ctx)
+	err = errorx.HandleDBError(err, errorx.Ctx().Set("namespace", path))
 	return
 }
 
