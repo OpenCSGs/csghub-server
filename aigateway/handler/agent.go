@@ -30,7 +30,6 @@ func NewAgentProxyHandler(config *config.Config) (AgentProxyHandler, error) {
 	adapters := map[string]AgentAdapter{
 		"langflow": NewLangflowAdapter(config, agentComponent),
 		"code":     NewCodeAdapter(config, agentComponent),
-		// "agno": NewAgnoAdapter(config, agentComponent),
 	}
 	return &AgentProxyHandlerImpl{
 		config:   config,
@@ -58,7 +57,8 @@ func (h *AgentProxyHandlerImpl) ProxyToApi(api string, originParams ...string) g
 		}
 		rp, err := proxy.NewReverseProxy(host)
 		if err != nil {
-			httpbase.ServerError(ctx, fmt.Errorf("create reverse proxy: %w", err))
+			slog.Error("failed to create reverse proxy", "agent_type", agentType, "host", host, "error", err)
+			httpbase.ServerError(ctx, err)
 			ctx.Abort()
 			return
 		}
@@ -71,23 +71,15 @@ func (h *AgentProxyHandlerImpl) ProxyToApi(api string, originParams ...string) g
 			}
 			finalApi = fmt.Sprintf(finalApi, params...)
 		}
-		slog.Debug("final api", "finalApi", finalApi)
+		slog.Debug("agent proxy request", "agent_type", agentType, "api", finalApi, "request_headers", ctx.Request.Header)
 
-		stream := ctx.Query("stream") == "true"
-		if stream {
-			ctx.Writer.Header().Set("Content-Type", "text/event-stream")
-			ctx.Writer.Header().Set("Cache-Control", "no-cache")
-			ctx.Writer.Header().Set("Connection", "keep-alive")
-		}
-		slog.Debug("stream", "stream", stream)
-
-		w, err := adapter.PrepareResponseWriter(ctx, finalApi, stream)
-		if err != nil {
+		if err := adapter.PrepareProxyContext(ctx, finalApi); err != nil {
+			slog.Error("failed to prepare proxy context", "agent_type", agentType, "api", finalApi, "error", err)
 			httpbase.ServerError(ctx, err)
 			ctx.Abort()
 			return
 		}
 
-		rp.ServeHTTP(w, ctx.Request, finalApi, "")
+		rp.ServeHTTP(ctx.Writer, ctx.Request, finalApi, "")
 	}
 }

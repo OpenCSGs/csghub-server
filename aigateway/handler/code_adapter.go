@@ -4,11 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
@@ -38,41 +38,38 @@ func (a *CodeAdapter) GetHost(ctx context.Context) (string, error) {
 	return host, nil
 }
 
-func (a *CodeAdapter) PrepareResponseWriter(ctx *gin.Context, api string, stream bool) (http.ResponseWriter, error) {
+func (a *CodeAdapter) PrepareProxyContext(ctx *gin.Context, api string) error {
 	currentUserUUID := httpbase.GetCurrentUserUUID(ctx)
 	currentUser := httpbase.GetCurrentUser(ctx)
 
 	token, err := a.usc.GetOrCreateFirstAvaiTokens(ctx.Request.Context(), currentUser, currentUser, string(types.AccessTokenAppGit), "csgbot")
 	if err != nil {
-		httpbase.ServerError(ctx, err)
-		ctx.Abort()
-		return nil, err
+		slog.Error("failed to get or create user first git access token", "agent_type", "code", "user_uuid", currentUserUUID, "api", api, "error", err)
+		return err
 	}
 	if len(token) == 0 {
-		slog.Error("fail to get or create user first git access token", slog.Any("user", currentUser), slog.Any("error", err))
-		httpbase.ServerError(ctx, errors.New("can not get user first available access token"))
-		ctx.Abort()
-		return nil, errors.New("can not get user first available access token")
+		slog.Error("can not get user first available access token", "agent_type", "code", "user_uuid", currentUserUUID, "api", api)
+		return fmt.Errorf("can not get user first available access token")
 	}
+
 	ctx.Request.Header.Set("user_uuid", currentUserUUID)
 	ctx.Request.Header.Set("user_name", currentUser)
 	ctx.Request.Header.Set("user_token", token)
 
-	// For code execution, we might need to handle different types of requests
-	slog.Debug("code adapter preparing response", "api", api, "stream", stream, "userUUID", currentUserUUID, "request headers", ctx.Request.Header)
+	slog.Debug("code adapter preparing proxy context", "agent_type", "code", "api", api, "user_uuid", currentUserUUID, "request_headers", ctx.Request.Header)
 
-	if !(ctx.Request.Method == http.MethodPost && api == "/api/v1/csgbot/codeAgent") {
-		return ctx.Writer, nil
+	if ctx.Request.Method != http.MethodPost || !strings.HasPrefix(api, "/api/v1/csgbot/") {
+		return nil
 	}
 
-	// Handle code agent request
 	var codeReq types.CodeAgentRequest
 	if err := ctx.ShouldBindJSON(&codeReq); err != nil {
-		return nil, fmt.Errorf("parse code agent request: %w", err)
+		slog.Error("failed to parse code agent request", "agent_type", "code", "api", api, "user_uuid", currentUserUUID, "error", err)
+		return fmt.Errorf("parse code agent request: %w", err)
 	}
 
 	if codeReq.Stream {
-		ctx.Writer.Header().Set("Content-Type", "text/event-stream")
+		// ctx.Writer.Header().Set("Content-Type", "text/event-stream") // the response content type is already set by the code agent server
 		ctx.Writer.Header().Set("Cache-Control", "no-cache")
 		ctx.Writer.Header().Set("Connection", "keep-alive")
 	}
@@ -84,9 +81,10 @@ func (a *CodeAdapter) PrepareResponseWriter(ctx *gin.Context, api string, stream
 		Name:        &sessionName,
 		Type:        "code",
 		ContentID:   &codeReq.AgentName,
-	}) // Create session history for code agents
+	})
 	if err != nil {
-		return nil, fmt.Errorf("create code agent session: %w", err)
+		slog.Error("failed to create code agent session", "agent_type", "code", "api", api, "user_uuid", currentUserUUID, "error", err)
+		return fmt.Errorf("create code agent session: %w", err)
 	}
 
 	// Set session ID in the request
@@ -95,7 +93,5 @@ func (a *CodeAdapter) PrepareResponseWriter(ctx *gin.Context, api string, stream
 	ctx.Request.Body = io.NopCloser(bytes.NewReader(data))
 	ctx.Request.ContentLength = int64(len(data))
 
-	slog.Debug("code agent session created", "sessionUUID", sessionUUID, "agentName", codeReq.AgentName)
-
-	return ctx.Writer, nil
+	return nil
 }

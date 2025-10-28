@@ -60,8 +60,8 @@ type AgentInstanceCreationResult struct {
 	Metadata    map[string]any // Additional metadata for the agent instance
 }
 
-// AgentChatRequest represents a chat request to an agent instance
-type AgentChatRequest struct {
+// LangFlowChatRequest represents a chat request to an agent instance
+type LangflowChatRequest struct {
 	SessionID  *string         `json:"session_id,omitempty"`           // Optional session ID (client-provided)
 	InputValue string          `json:"input_value" binding:"required"` // Input value for the agent
 	InputType  string          `json:"input_type" binding:"required"`  // Type of input (e.g., "chat")
@@ -158,40 +158,6 @@ type AgentInstanceSessionResponse struct {
 type AgentStreamEvent struct {
 	Event string          `json:"event"`
 	Data  json.RawMessage `json:"data"`
-}
-
-type RunLangflowAgentInstanceResponse struct {
-	SessionID string            `json:"session_id"`
-	Outputs   []LangflowOutputs `json:"outputs"`
-}
-
-type LangflowOutputs struct {
-	Outputs []LangflowInnerOutput `json:"outputs,omitempty"` // camada extra para stream=true
-	Results *LangflowResults      `json:"results,omitempty"` // stream=false
-}
-
-type LangflowInnerOutput struct {
-	Results *LangflowResults `json:"results,omitempty"`
-}
-
-type LangflowResults struct {
-	Message LangflowMessage `json:"message"`
-}
-
-type LangflowMessage struct {
-	Timestamp  string `json:"timestamp"`
-	Sender     string `json:"sender"`
-	SenderName string `json:"sender_name"`
-	TextKey    string `json:"text_key"`
-	Text       string `json:"text"`
-}
-
-type LangflowTokenData struct {
-	Chunk string `json:"chunk"`
-}
-
-type LangflowEndData struct {
-	Result RunLangflowAgentInstanceResponse `json:"result"`
 }
 
 type CodeAgentRequest struct {

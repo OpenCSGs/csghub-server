@@ -613,15 +613,10 @@ func (c *agentComponentImpl) CreateSession(ctx context.Context, userUUID string,
 	var dbSession *database.AgentInstanceSession
 
 	if newSession {
-		instanceID := int64(0)
-		if req.InstanceID != nil {
-			instanceID = *req.InstanceID
-		}
-
 		session := &database.AgentInstanceSession{
 			UUID:       common.SafeDeref(req.SessionUUID),
 			Name:       common.SafeDeref(req.Name),
-			InstanceID: instanceID,
+			InstanceID: instance.ID,
 			UserUUID:   userUUID,
 			Type:       instance.Type,
 		}

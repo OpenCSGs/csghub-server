@@ -36,7 +36,7 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 		return nil, fmt.Errorf("error creating mcp proxy handler :%w", err)
 	}
 	createMCPRoute(v1Group, mcpProxy)
-	// langflow proxy
+
 	agentProxy, err := handler.NewAgentProxyHandler(config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating agent proxy handler :%w", err)

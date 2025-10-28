@@ -34,24 +34,32 @@ func (a *LangflowAdapter) GetHost(ctx context.Context) (string, error) {
 	return strings.TrimSuffix(a.cfg.Agent.AgentHubServiceHost, "/"), nil
 }
 
-func (a *LangflowAdapter) PrepareResponseWriter(ctx *gin.Context, api string, stream bool) (http.ResponseWriter, error) {
+func (a *LangflowAdapter) PrepareProxyContext(ctx *gin.Context, api string) error {
 	q := ctx.Request.URL.Query()
 	q.Set("token", a.cfg.Agent.AgentHubServiceToken)
 	ctx.Request.URL.RawQuery = q.Encode()
 	userUUID := httpbase.GetCurrentUserUUID(ctx)
 	ctx.Request.Header.Set("user_uuid", userUUID)
 
-	if !(ctx.Request.Method == http.MethodPost && strings.HasPrefix(api, "/api/v1/opencsg/run/")) {
-		return ctx.Writer, nil
+	if ctx.Request.Method != http.MethodPost || !strings.HasPrefix(api, "/api/v1/opencsg/run/") {
+		return nil
 	}
 
-	var chatReq types.AgentChatRequest
-	if err := ctx.ShouldBindJSON(&chatReq); err != nil {
-		return nil, fmt.Errorf("parse request body of run flow request: %w", err)
+	stream := ctx.Query("stream") == "true"
+	if stream {
+		// ctx.Writer.Header().Set("Content-Type", "text/event-stream") // the response content type is already set by the langflow server, but miss no-cache and keep-alive headers
+		ctx.Writer.Header().Set("Cache-Control", "no-cache")
+		ctx.Writer.Header().Set("Connection", "keep-alive")
 	}
 
 	flowID := path.Base(api)
-	slog.Debug("flowID", "flowID", flowID)
+	slog.Debug("langflow adapter preparing proxy context", "api", api, "stream", stream, "flow_id", flowID, "user_uuid", userUUID)
+
+	var chatReq types.LangflowChatRequest
+	if err := ctx.ShouldBindJSON(&chatReq); err != nil {
+		slog.Error("failed to parse request body of run flow request", "api", api, "user_uuid", userUUID, "error", err)
+		return fmt.Errorf("parse request body of run flow request: %w", err)
+	}
 
 	// Create session for langflow agent
 	sessionName := common.TruncString(chatReq.InputValue, 50)
@@ -60,9 +68,10 @@ func (a *LangflowAdapter) PrepareResponseWriter(ctx *gin.Context, api string, st
 		Name:        &sessionName,
 		Type:        "langflow",
 		ContentID:   &flowID,
-	}) // Create session history for langflow agents
+	})
 	if err != nil {
-		return nil, fmt.Errorf("create session: %w", err)
+		slog.Error("failed to create langflow agent session", "agent_type", "langflow", "api", api, "user_uuid", userUUID, "flow_id", flowID, "error", err)
+		return fmt.Errorf("create langflow agent session: %w", err)
 	}
 
 	chatReq.SessionID = &sessionUUID
@@ -70,7 +79,5 @@ func (a *LangflowAdapter) PrepareResponseWriter(ctx *gin.Context, api string, st
 	ctx.Request.Body = io.NopCloser(bytes.NewReader(data))
 	ctx.Request.ContentLength = int64(len(data))
 
-	slog.Debug("session created", "sessionUUID", sessionUUID)
-
-	return NewLangflowResponseWriterWrapper(ctx.Writer, stream, a.agentComponent), nil
+	return nil
 }

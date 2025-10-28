@@ -47,9 +47,8 @@ func TestCodeAgentRequest_Validation(t *testing.T) {
 
 	// Create a test request with missing required fields
 	jsonData := `{
-		"query": "test",
-		"max_loop": 0,
-		"agent_name": ""
+		"query": "",
+		"max_loop": -1
 	}`
 
 	req, _ := http.NewRequest("POST", "/test", bytes.NewBufferString(jsonData))
@@ -136,4 +135,231 @@ func TestCodeAgentRequest_UserProvidedExample(t *testing.T) {
 	assert.Equal(t, true, req.Stream)
 	assert.Equal(t, "FinanceCodeMaster", req.AgentName)
 	assert.Nil(t, req.StreamMode) // Should be nil when not provided
+}
+
+func TestCodeAgentRequest_WithSearchEngines(t *testing.T) {
+	// Test request with search engines
+	jsonData := `{
+		"request_id": "test-123",
+		"query": "test query",
+		"max_loop": 1,
+		"search_engines": ["google", "bing", "duckduckgo"],
+		"stream": false,
+		"agent_name": "TestAgent"
+	}`
+
+	var req types.CodeAgentRequest
+	err := json.Unmarshal([]byte(jsonData), &req)
+	assert.NoError(t, err)
+	assert.Equal(t, "test-123", req.RequestID)
+	assert.Equal(t, "test query", req.Query)
+	assert.Equal(t, 1, req.MaxLoop)
+	assert.Equal(t, []string{"google", "bing", "duckduckgo"}, req.SearchEngines)
+	assert.Equal(t, false, req.Stream)
+	assert.Equal(t, "TestAgent", req.AgentName)
+	assert.Nil(t, req.StreamMode)
+}
+
+func TestCodeAgentRequest_WithHistory(t *testing.T) {
+	// Test request with conversation history
+	jsonData := `{
+		"request_id": "test-123",
+		"query": "test query",
+		"max_loop": 1,
+		"stream": false,
+		"agent_name": "TestAgent",
+		"history": [
+			{
+				"role": "user",
+				"content": "Hello"
+			},
+			{
+				"role": "assistant", 
+				"content": "Hi there!"
+			}
+		]
+	}`
+
+	var req types.CodeAgentRequest
+	err := json.Unmarshal([]byte(jsonData), &req)
+	assert.NoError(t, err)
+	assert.Equal(t, "test-123", req.RequestID)
+	assert.Equal(t, "test query", req.Query)
+	assert.Equal(t, 1, req.MaxLoop)
+	assert.Equal(t, false, req.Stream)
+	assert.Equal(t, "TestAgent", req.AgentName)
+	assert.Len(t, req.History, 2)
+	assert.Equal(t, "user", req.History[0].Role)
+	assert.Equal(t, "Hello", req.History[0].Content)
+	assert.Equal(t, "assistant", req.History[1].Role)
+	assert.Equal(t, "Hi there!", req.History[1].Content)
+	assert.Nil(t, req.StreamMode)
+}
+
+func TestCodeAgentRequest_StreamModeValidation(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	t.Run("valid stream mode", func(t *testing.T) {
+		jsonData := `{
+			"query": "test query",
+			"agent_name": "TestAgent",
+			"stream_mode": {
+				"mode": "general",
+				"token": 5,
+				"time": 10
+			}
+		}`
+
+		req, _ := http.NewRequest("POST", "/test", bytes.NewBufferString(jsonData))
+		req.Header.Set("Content-Type", "application/json")
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = req
+
+		var codeReq types.CodeAgentRequest
+		err := c.ShouldBindJSON(&codeReq)
+
+		assert.NoError(t, err)
+		assert.NotNil(t, codeReq.StreamMode)
+		assert.Equal(t, "general", codeReq.StreamMode.Mode)
+		assert.Equal(t, 5, codeReq.StreamMode.Token)
+		assert.Equal(t, 10, codeReq.StreamMode.Time)
+	})
+
+	t.Run("invalid stream mode - missing required mode", func(t *testing.T) {
+		jsonData := `{
+			"query": "test query",
+			"agent_name": "TestAgent",
+			"stream_mode": {
+				"token": 5,
+				"time": 10
+			}
+		}`
+
+		req, _ := http.NewRequest("POST", "/test", bytes.NewBufferString(jsonData))
+		req.Header.Set("Content-Type", "application/json")
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = req
+
+		var codeReq types.CodeAgentRequest
+		err := c.ShouldBindJSON(&codeReq)
+
+		assert.Error(t, err)
+	})
+
+	t.Run("invalid stream mode - token too small", func(t *testing.T) {
+		jsonData := `{
+			"query": "test query",
+			"agent_name": "TestAgent",
+			"stream_mode": {
+				"mode": "general",
+				"token": 0,
+				"time": 10
+			}
+		}`
+
+		req, _ := http.NewRequest("POST", "/test", bytes.NewBufferString(jsonData))
+		req.Header.Set("Content-Type", "application/json")
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = req
+
+		var codeReq types.CodeAgentRequest
+		err := c.ShouldBindJSON(&codeReq)
+
+		assert.Error(t, err)
+	})
+
+	t.Run("invalid stream mode - time too small", func(t *testing.T) {
+		jsonData := `{
+			"query": "test query",
+			"agent_name": "TestAgent",
+			"stream_mode": {
+				"mode": "general",
+				"token": 5,
+				"time": 0
+			}
+		}`
+
+		req, _ := http.NewRequest("POST", "/test", bytes.NewBufferString(jsonData))
+		req.Header.Set("Content-Type", "application/json")
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = req
+
+		var codeReq types.CodeAgentRequest
+		err := c.ShouldBindJSON(&codeReq)
+
+		assert.Error(t, err)
+	})
+}
+
+func TestCodeAgentRequest_EdgeCases(t *testing.T) {
+	t.Run("empty search engines", func(t *testing.T) {
+		jsonData := `{
+			"query": "test query",
+			"agent_name": "TestAgent",
+			"search_engines": []
+		}`
+
+		var req types.CodeAgentRequest
+		err := json.Unmarshal([]byte(jsonData), &req)
+		assert.NoError(t, err)
+		assert.Empty(t, req.SearchEngines)
+	})
+
+	t.Run("empty history", func(t *testing.T) {
+		jsonData := `{
+			"query": "test query",
+			"agent_name": "TestAgent",
+			"history": []
+		}`
+
+		var req types.CodeAgentRequest
+		err := json.Unmarshal([]byte(jsonData), &req)
+		assert.NoError(t, err)
+		assert.Empty(t, req.History)
+	})
+
+	t.Run("max loop boundary values", func(t *testing.T) {
+		gin.SetMode(gin.TestMode)
+
+		// Test max_loop = 1 (minimum valid value)
+		jsonData := `{
+			"query": "test query",
+			"agent_name": "TestAgent",
+			"max_loop": 1
+		}`
+
+		req, _ := http.NewRequest("POST", "/test", bytes.NewBufferString(jsonData))
+		req.Header.Set("Content-Type", "application/json")
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = req
+
+		var codeReq types.CodeAgentRequest
+		err := c.ShouldBindJSON(&codeReq)
+
+		assert.NoError(t, err)
+		assert.Equal(t, 1, codeReq.MaxLoop)
+	})
+
+	t.Run("max loop zero (should be valid due to omitempty)", func(t *testing.T) {
+		jsonData := `{
+			"query": "test query",
+			"agent_name": "TestAgent",
+			"max_loop": 0
+		}`
+
+		var req types.CodeAgentRequest
+		err := json.Unmarshal([]byte(jsonData), &req)
+		assert.NoError(t, err)
+		assert.Equal(t, 0, req.MaxLoop)
+	})
 }
