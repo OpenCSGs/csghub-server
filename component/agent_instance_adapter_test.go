@@ -366,7 +366,7 @@ func TestCodeAgentInstanceAdapter_IsInstanceRunning(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.mockSetup()
 
-			running, err := adapter.IsInstanceRunning(ctx, userUUID, tt.contentID)
+			running, err := adapter.IsInstanceRunning(ctx, userUUID, tt.contentID, false)
 
 			if tt.expectErr {
 				if err == nil {
@@ -411,7 +411,7 @@ func TestCodeAgentInstanceAdapter_IsInstanceRunning_ContextCancellation(t *testi
 	)
 
 	// With cancelled context, the method should still work and return the mocked result
-	running, err := adapter.IsInstanceRunning(ctx, userUUID, contentID)
+	running, err := adapter.IsInstanceRunning(ctx, userUUID, contentID, false)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}

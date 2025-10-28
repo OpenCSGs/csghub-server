@@ -2,9 +2,12 @@ package database
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 
 	"github.com/uptrace/bun"
 	"opencsg.com/csghub-server/common/errorx"
+	"opencsg.com/csghub-server/common/types"
 )
 
 type AgentInstanceSession struct {
@@ -13,14 +16,16 @@ type AgentInstanceSession struct {
 	Name       string `bun:",nullzero" json:"name"`
 	InstanceID int64  `bun:",notnull" json:"instance_id"`
 	UserUUID   string `bun:",notnull" json:"user_uuid"`
-	Type       string `bun:",notnull" json:"type"` // Possible values: langflow, agno, code, etc.
+	Type       string `bun:",notnull" json:"type"`      // Possible values: langflow, agno, code, etc.
+	LastTurn   int64  `bun:",notnull" json:"last_turn"` // the last turn number of the session, used to prevent race conditions
 	times
 }
 
 type AgentInstanceSessionHistory struct {
 	ID        int64  `bun:",pk,autoincrement" json:"id"`
 	SessionID int64  `bun:",notnull" json:"session_id"`
-	Request   bool   `bun:",notnull" json:"request"` // true: request, false: response
+	Request   bool   `bun:",notnull" json:"request"` // true=request(from user), false=response(from assistant)
+	Turn      int64  `bun:",notnull" json:"turn"`    // use incremental turn number to indicate the response to its request, not just by time
 	Content   string `bun:",type:text" json:"content"`
 	times
 }
@@ -30,6 +35,7 @@ type AgentInstanceSessionStore interface {
 	FindByID(ctx context.Context, id int64) (*AgentInstanceSession, error)
 	FindByUUID(ctx context.Context, uuid string) (*AgentInstanceSession, error)
 	ListByInstanceID(ctx context.Context, instanceID int64) ([]AgentInstanceSession, int, error)
+	List(ctx context.Context, filter types.AgentInstanceSessionFilter, per int, page int) ([]AgentInstanceSession, int, error)
 	Update(ctx context.Context, session *AgentInstanceSession) error
 	Delete(ctx context.Context, id int64) error
 }
@@ -169,16 +175,72 @@ func (s *agentInstanceSessionStoreImpl) Delete(ctx context.Context, id int64) er
 	})
 }
 
-// Create inserts a new AgentInstanceSessionHistory into the database
-func (s *agentInstanceSessionHistoryStoreImpl) Create(ctx context.Context, history *AgentInstanceSessionHistory) error {
-	res, err := s.db.Core.NewInsert().Model(history).Exec(ctx, history)
-	if err = assertAffectedOneRow(res, err); err != nil {
-		return errorx.HandleDBError(err, map[string]any{
-			"session_id": history.SessionID,
-			"operation":  "create_history",
+// List retrieves all AgentInstanceSessions with pagination
+func (s *agentInstanceSessionStoreImpl) List(ctx context.Context, filter types.AgentInstanceSessionFilter, per int, page int) ([]AgentInstanceSession, int, error) {
+	var sessions []AgentInstanceSession
+	query := s.db.Core.NewSelect().Model(&sessions).Order("updated_at DESC")
+	if filter.InstanceID != nil {
+		query = query.Where("instance_id = ?", *filter.InstanceID)
+	}
+
+	// Apply pagination
+	query = query.Limit(per).Offset((page - 1) * per)
+
+	count, err := query.ScanAndCount(ctx, &sessions)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return nil, 0, errorx.HandleDBError(err, map[string]any{
+			"instance_id": *filter.InstanceID,
+			"operation":   "list",
 		})
 	}
-	return nil
+	return sessions, count, nil
+}
+
+// Create inserts a new AgentInstanceSessionHistory into the database
+func (s *agentInstanceSessionHistoryStoreImpl) Create(ctx context.Context, history *AgentInstanceSessionHistory) error {
+	return s.db.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		// get last turn from session
+		var lastTurn int64
+		err := tx.NewSelect().
+			Model((*AgentInstanceSession)(nil)).
+			ColumnExpr("last_turn").
+			Where("id = ?", history.SessionID).
+			For("UPDATE").
+			Scan(ctx, &lastTurn)
+		if err != nil {
+			return errorx.HandleDBError(err, map[string]any{
+				"session_id": history.SessionID,
+				"operation":  "select_last_turn",
+			})
+		}
+
+		if history.Request {
+			history.Turn = lastTurn + 1
+			res, err := tx.NewUpdate().
+				Model((*AgentInstanceSession)(nil)).
+				Set("last_turn = ?", history.Turn).
+				Where("id = ?", history.SessionID).
+				Exec(ctx)
+			if err = assertAffectedOneRow(res, err); err != nil {
+				return errorx.HandleDBError(err, map[string]any{
+					"session_id": history.SessionID,
+					"operation":  "update_last_turn",
+				})
+			}
+		} else {
+			history.Turn = lastTurn
+		}
+
+		res, err := tx.NewInsert().Model(history).Exec(ctx)
+		if err = assertAffectedOneRow(res, err); err != nil {
+			return errorx.HandleDBError(err, map[string]any{
+				"session_id": history.SessionID,
+				"operation":  "insert_history",
+			})
+		}
+
+		return nil
+	})
 }
 
 // FindByID retrieves an AgentInstanceSessionHistory by its ID
@@ -197,8 +259,8 @@ func (s *agentInstanceSessionHistoryStoreImpl) FindByID(ctx context.Context, id 
 // ListBySessionID retrieves all AgentInstanceSessionHistory for a specific session
 func (s *agentInstanceSessionHistoryStoreImpl) ListBySessionID(ctx context.Context, sessionID int64) ([]AgentInstanceSessionHistory, error) {
 	var histories []AgentInstanceSessionHistory
-	err := s.db.Core.NewSelect().Model(&histories).Where("session_id = ?", sessionID).Order("created_at ASC").Scan(ctx, &histories)
-	if err != nil {
+	err := s.db.Core.NewSelect().Model(&histories).Where("session_id = ?", sessionID).Order("turn ASC", "request DESC").Scan(ctx, &histories)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, errorx.HandleDBError(err, map[string]any{
 			"session_id": sessionID,
 			"operation":  "list_by_session_id",

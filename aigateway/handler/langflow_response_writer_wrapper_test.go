@@ -4,11 +4,9 @@ import (
 	"encoding/json"
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	mockcomponent "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -151,11 +149,6 @@ func TestLangflowResponseWriterWrapper_Write_NonStream(t *testing.T) {
 			mockAgentComponent := mockcomponent.NewMockAgentComponent(t)
 			wrapper := NewLangflowResponseWriterWrapper(ctx.Writer, false, mockAgentComponent)
 
-			// Setup mock expectations
-			if tt.expectedCalls > 0 {
-				mockAgentComponent.On("RecordSessionHistory", mock.Anything, mock.AnythingOfType("*types.RecordAgentInstanceSessionHistoryRequest")).Return(nil).Times(tt.expectedCalls)
-			}
-
 			n, err := wrapper.Write(tt.input)
 
 			if tt.expectError {
@@ -223,11 +216,6 @@ func TestLangflowResponseWriterWrapper_Write_Stream(t *testing.T) {
 			mockAgentComponent := mockcomponent.NewMockAgentComponent(t)
 			wrapper := NewLangflowResponseWriterWrapper(ctx.Writer, true, mockAgentComponent)
 
-			// Setup mock expectations
-			if tt.expectedCalls > 0 {
-				mockAgentComponent.On("RecordSessionHistory", mock.Anything, mock.AnythingOfType("*types.RecordAgentInstanceSessionHistoryRequest")).Return(nil).Times(tt.expectedCalls)
-			}
-
 			n, err := wrapper.Write(tt.input)
 
 			assert.NoError(t, err)
@@ -236,35 +224,6 @@ func TestLangflowResponseWriterWrapper_Write_Stream(t *testing.T) {
 			mockAgentComponent.AssertExpectations(t)
 		})
 	}
-}
-
-func TestLangflowResponseWriterWrapper_recordSessionHistory(t *testing.T) {
-	w := httptest.NewRecorder()
-	ctx, _ := gin.CreateTestContext(w)
-	mockAgentComponent := mockcomponent.NewMockAgentComponent(t)
-	wrapper := NewLangflowResponseWriterWrapper(ctx.Writer, false, mockAgentComponent)
-
-	// Test successful recording
-	mockAgentComponent.On("RecordSessionHistory", mock.Anything, mock.AnythingOfType("*types.RecordAgentInstanceSessionHistoryRequest")).Return(nil).Once()
-
-	wrapper.recordSessionHistory("test-session", true, "test message")
-
-	mockAgentComponent.AssertExpectations(t)
-}
-
-func TestLangflowResponseWriterWrapper_recordSessionHistory_Error(t *testing.T) {
-	w := httptest.NewRecorder()
-	ctx, _ := gin.CreateTestContext(w)
-	mockAgentComponent := mockcomponent.NewMockAgentComponent(t)
-	wrapper := NewLangflowResponseWriterWrapper(ctx.Writer, false, mockAgentComponent)
-
-	// Test error handling
-	mockAgentComponent.On("RecordSessionHistory", mock.Anything, mock.AnythingOfType("*types.RecordAgentInstanceSessionHistoryRequest")).Return(assert.AnError).Once()
-
-	// This should not panic or fail the test
-	wrapper.recordSessionHistory("test-session", false, "error message")
-
-	mockAgentComponent.AssertExpectations(t)
 }
 
 func TestExtractLangflowMessage(t *testing.T) {
@@ -340,23 +299,6 @@ func TestLangflowResponseWriterWrapper_WriteInternal(t *testing.T) {
 	assert.Equal(t, "test data", w.Body.String())
 }
 
-func TestLangflowResponseWriterWrapper_ContextTimeout(t *testing.T) {
-	w := httptest.NewRecorder()
-	ctx, _ := gin.CreateTestContext(w)
-	mockAgentComponent := mockcomponent.NewMockAgentComponent(t)
-	wrapper := NewLangflowResponseWriterWrapper(ctx.Writer, false, mockAgentComponent)
-
-	// Test that context timeout is set correctly
-	start := time.Now()
-	mockAgentComponent.On("RecordSessionHistory", mock.Anything, mock.AnythingOfType("*types.RecordAgentInstanceSessionHistoryRequest")).Return(nil).Once()
-
-	wrapper.recordSessionHistory("test-session", true, "test message")
-
-	elapsed := time.Since(start)
-	assert.Less(t, elapsed, 11*time.Second) // Should be less than 11 seconds (10s timeout + buffer)
-	mockAgentComponent.AssertExpectations(t)
-}
-
 func TestLangflowResponseWriterWrapper_StreamWrite_ComplexScenario(t *testing.T) {
 	w := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(w)
@@ -365,8 +307,6 @@ func TestLangflowResponseWriterWrapper_StreamWrite_ComplexScenario(t *testing.T)
 
 	// Simulate a complex streaming scenario
 	streamData := `{"event":"start","data":{"message":"Starting"}}{"event":"token","data":{"chunk":"Hello"}}{"event":"token","data":{"chunk":" World"}}{"event":"end","data":{"result":{"session_id":"session-123","outputs":[{"outputs":[{"results":{"message":{"text":"Hello World"}}}]}]}}}`
-
-	mockAgentComponent.On("RecordSessionHistory", mock.Anything, mock.AnythingOfType("*types.RecordAgentInstanceSessionHistoryRequest")).Return(nil).Once()
 
 	n, err := wrapper.Write([]byte(streamData))
 
@@ -403,8 +343,6 @@ func TestLangflowResponseWriterWrapper_NonStreamWrite_ComplexResponse(t *testing
 			}
 		]
 	}`
-
-	mockAgentComponent.On("RecordSessionHistory", mock.Anything, mock.AnythingOfType("*types.RecordAgentInstanceSessionHistoryRequest")).Return(nil).Once()
 
 	n, err := wrapper.Write([]byte(responseData))
 

@@ -25,24 +25,27 @@ type AgentTemplateFilter struct {
 
 // AgentInstance represents an instance created from an agent template
 type AgentInstance struct {
-	ID          int64     `json:"id"`
-	TemplateID  *int64    `json:"template_id" binding:"omitempty,gte=1"` // Associated with the id in the template table
-	UserUUID    *string   `json:"-"`                                     // Will be set from HTTP header using httpbase.GetCurrentUserUUID
-	Name        *string   `json:"name" binding:"required"`               // Instance name
-	Description *string   `json:"description" binding:"omitempty"`       // Instance description
-	Type        *string   `json:"type" binding:"required"`               // Possible values: langflow, agno, code, etc.
-	ContentID   *string   `json:"content_id" binding:"omitempty"`        // Used to specify the unique id of the instance resource
-	Public      bool      `json:"public"`                                // Whether the instance is public
-	Editable    bool      `json:"editable"`                              // Whether the instance is editable
-	IsRunning   bool      `json:"is_running"`                            // Whether the instance is running
-	CreatedAt   time.Time `json:"created_at"`                            // When the instance was created
-	UpdatedAt   time.Time `json:"updated_at"`                            // When the instance was last updated
+	ID          int64          `json:"id"`
+	TemplateID  *int64         `json:"template_id" binding:"omitempty,gte=1"` // Associated with the id in the template table
+	UserUUID    *string        `json:"-"`                                     // Will be set from HTTP header using httpbase.GetCurrentUserUUID
+	Name        *string        `json:"name" binding:"required"`               // Instance name
+	Description *string        `json:"description" binding:"omitempty"`       // Instance description
+	Type        *string        `json:"type" binding:"required"`               // Possible values: langflow, agno, code, etc.
+	ContentID   *string        `json:"content_id" binding:"omitempty"`        // Used to specify the unique id of the instance resource
+	Public      bool           `json:"public"`                                // Whether the instance is public
+	Editable    bool           `json:"editable"`                              // Whether the instance is editable
+	IsRunning   bool           `json:"is_running"`                            // Whether the instance is running
+	BuiltIn     bool           `json:"built_in"`                              // Whether the instance is built-in
+	Metadata    map[string]any `json:"metadata"`                              // Instance metadata
+	CreatedAt   time.Time      `json:"created_at"`                            // When the instance was created
+	UpdatedAt   time.Time      `json:"updated_at"`                            // When the instance was last updated
 }
 
 type AgentInstanceFilter struct {
 	Search     string
 	Type       string
 	TemplateID *int64 `json:"template_id,omitempty"`
+	BuiltIn    *bool  `json:"built_in"`
 }
 
 type UpdateAgentInstanceRequest struct {
@@ -80,22 +83,35 @@ type AgentChatResponse struct {
 
 // AgentChatSession represents a chat session
 type AgentInstanceSession struct {
-	ID         int64     `json:"id"`
-	UUID       string    `json:"uuid"`
-	Name       string    `json:"name"`
-	Type       string    `json:"type"` // Possible values: langflow, agno, code, etc.
-	InstanceID int64     `json:"instance_id"`
-	UserUUID   string    `json:"user_uuid"`
-	CreatedAt  time.Time `json:"created_at"`
-	UpdatedAt  time.Time `json:"updated_at"`
+	ID          int64     `json:"id"`
+	SessionUUID string    `json:"session_uuid"`
+	Name        string    `json:"name"`
+	Type        string    `json:"type"` // Possible values: langflow, agno, code, etc.
+	InstanceID  int64     `json:"instance_id"`
+	UserUUID    string    `json:"user_uuid"`
+	LastTurn    int64     `json:"last_turn"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+type AgentInstanceSessionFilter struct {
+	InstanceID *int64
 }
 
 type CreateAgentInstanceSessionRequest struct {
-	UUID      string `json:"uuid"`
-	Name      string `json:"name"`
-	Type      string `json:"type"` // Possible values: langflow, agno, code, etc.
-	ContentID string `json:"content_id"`
-	UserUUID  string `json:"user_uuid"`
+	SessionUUID *string `json:"session_uuid,omitempty"`
+	Name        *string `json:"name,omitempty" binding:"omitempty,max=255"`
+	Type        string  `json:"-"` // Possible values: langflow, agno, code, etc.
+	InstanceID  *int64  `json:"-"`
+	ContentID   *string `json:"-"`
+}
+
+type CreateAgentInstanceSessionResponse struct {
+	SessionUUID string `json:"session_uuid"`
+}
+
+type UpdateAgentInstanceSessionRequest struct {
+	Name string `json:"name" binding:"required,max=255"`
 }
 
 type RecordAgentInstanceSessionHistoryRequest struct {
@@ -104,14 +120,39 @@ type RecordAgentInstanceSessionHistoryRequest struct {
 	Content     string `json:"content"`
 }
 
+type CreateSessionHistoryRequest struct {
+	SessionUUID string                  `json:"-"`
+	Messages    []SessionHistoryMessage `json:"messages"`
+}
+
+type SessionHistoryMessage struct {
+	Request bool   `json:"request"` // true: request, false: response
+	Content string `json:"content"` // message content
+}
+
+type CreateSessionHistoryMessage struct {
+	MsgUUID     string `json:"msg_uuid"`
+	SessionID   int64  `json:"session_id"`
+	SessionUUID string `json:"session_uuid"`
+	Request     bool   `json:"request"`
+	Content     string `json:"content"`
+}
+
 // AgentInstanceSessionHistory represents a session history
 type AgentInstanceSessionHistory struct {
-	ID        int64     `json:"id"`
-	SessionID int64     `json:"session_id"`
-	Request   bool      `json:"request"`
-	Content   string    `json:"content"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID          int64     `json:"id"`
+	SessionID   int64     `json:"session_id"`
+	SessionUUID string    `json:"session_uuid"`
+	Request     bool      `json:"request"`
+	Content     string    `json:"content"`
+	Turn        int64     `json:"turn"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+type AgentInstanceSessionResponse struct {
+	SessionUUID string   `json:"session_uuid"`
+	Histories   []string `json:"histories"` // list of history contents
 }
 
 type AgentStreamEvent struct {

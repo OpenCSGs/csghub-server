@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/tests"
+	"opencsg.com/csghub-server/common/types"
 )
 
 func TestAgentInstanceSessionStore_CRUD(t *testing.T) {
@@ -496,4 +497,226 @@ func TestAgentInstanceSessionStore_EmptyFields(t *testing.T) {
 	createdSession2, err := store.Create(ctx, session2)
 	require.NoError(t, err)
 	require.Equal(t, "", createdSession2.Name)
+}
+
+func TestAgentInstanceSessionStore_List_WithPagination(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewAgentInstanceSessionStoreWithDB(db)
+	instanceID := int64(77777)
+
+	// Create multiple sessions for the same instance
+	sessions := []*database.AgentInstanceSession{
+		{
+			UUID:       uuid.New().String(),
+			Name:       "Session 1",
+			InstanceID: instanceID,
+			UserUUID:   uuid.New().String(),
+			Type:       "langflow",
+		},
+		{
+			UUID:       uuid.New().String(),
+			Name:       "Session 2",
+			InstanceID: instanceID,
+			UserUUID:   uuid.New().String(),
+			Type:       "agno",
+		},
+		{
+			UUID:       uuid.New().String(),
+			Name:       "Session 3",
+			InstanceID: instanceID,
+			UserUUID:   uuid.New().String(),
+			Type:       "code",
+		},
+		{
+			UUID:       uuid.New().String(),
+			Name:       "Session 4",
+			InstanceID: instanceID,
+			UserUUID:   uuid.New().String(),
+			Type:       "langflow",
+		},
+		{
+			UUID:       uuid.New().String(),
+			Name:       "Session 5",
+			InstanceID: instanceID,
+			UserUUID:   uuid.New().String(),
+			Type:       "agno",
+		},
+	}
+
+	// Create all sessions
+	for _, session := range sessions {
+		_, err := store.Create(ctx, session)
+		require.NoError(t, err)
+		// Add small delay to ensure different timestamps
+		time.Sleep(1 * time.Millisecond)
+	}
+
+	// Test List with pagination - first page
+	filter := types.AgentInstanceSessionFilter{InstanceID: &instanceID}
+	foundSessions, total, err := store.List(ctx, filter, 2, 1)
+	require.NoError(t, err)
+	require.Equal(t, 5, total)       // Total should be 5
+	require.Len(t, foundSessions, 2) // Should return only 2 sessions due to limit
+
+	// Test List with pagination - second page
+	foundSessions, total, err = store.List(ctx, filter, 2, 2)
+	require.NoError(t, err)
+	require.Equal(t, 5, total)       // Total should still be 5
+	require.Len(t, foundSessions, 2) // Should return 2 sessions
+
+	// Test List with pagination - third page
+	foundSessions, total, err = store.List(ctx, filter, 2, 3)
+	require.NoError(t, err)
+	require.Equal(t, 5, total)       // Total should still be 5
+	require.Len(t, foundSessions, 1) // Should return 1 session (last one)
+
+	// Test List with pagination - page beyond available data
+	foundSessions, total, err = store.List(ctx, filter, 2, 4)
+	require.NoError(t, err)
+	require.Equal(t, 5, total)       // Total should still be 5
+	require.Len(t, foundSessions, 0) // Should return 0 sessions
+
+	// Test List with larger page size
+	foundSessions, total, err = store.List(ctx, filter, 10, 1)
+	require.NoError(t, err)
+	require.Equal(t, 5, total)       // Total should be 5
+	require.Len(t, foundSessions, 5) // Should return all 5 sessions
+
+	// Test List with no filter (should return all sessions)
+	foundSessions, total, err = store.List(ctx, types.AgentInstanceSessionFilter{}, 10, 1)
+	require.NoError(t, err)
+	require.Equal(t, 5, total)       // Total should be 5
+	require.Len(t, foundSessions, 5) // Should return all 5 sessions
+}
+
+func TestAgentInstanceSessionStore_List_WithDifferentInstances(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewAgentInstanceSessionStoreWithDB(db)
+	instanceID1 := int64(11111)
+	instanceID2 := int64(22222)
+
+	// Create sessions for different instances
+	sessions := []*database.AgentInstanceSession{
+		{
+			UUID:       uuid.New().String(),
+			Name:       "Session 1",
+			InstanceID: instanceID1,
+			UserUUID:   uuid.New().String(),
+			Type:       "langflow",
+		},
+		{
+			UUID:       uuid.New().String(),
+			Name:       "Session 2",
+			InstanceID: instanceID1,
+			UserUUID:   uuid.New().String(),
+			Type:       "agno",
+		},
+		{
+			UUID:       uuid.New().String(),
+			Name:       "Session 3",
+			InstanceID: instanceID2,
+			UserUUID:   uuid.New().String(),
+			Type:       "code",
+		},
+	}
+
+	// Create all sessions
+	for _, session := range sessions {
+		_, err := store.Create(ctx, session)
+		require.NoError(t, err)
+	}
+
+	// Test List with instanceID1 filter
+	filter1 := types.AgentInstanceSessionFilter{InstanceID: &instanceID1}
+	foundSessions, total, err := store.List(ctx, filter1, 10, 1)
+	require.NoError(t, err)
+	require.Equal(t, 2, total) // Should find 2 sessions for instanceID1
+	require.Len(t, foundSessions, 2)
+
+	// Test List with instanceID2 filter
+	filter2 := types.AgentInstanceSessionFilter{InstanceID: &instanceID2}
+	foundSessions, total, err = store.List(ctx, filter2, 10, 1)
+	require.NoError(t, err)
+	require.Equal(t, 1, total) // Should find 1 session for instanceID2
+	require.Len(t, foundSessions, 1)
+
+	// Test List with non-existent instance ID
+	nonExistentID := int64(99999)
+	filter3 := types.AgentInstanceSessionFilter{InstanceID: &nonExistentID}
+	foundSessions, total, err = store.List(ctx, filter3, 10, 1)
+	require.NoError(t, err)
+	require.Equal(t, 0, total) // Should find 0 sessions
+	require.Len(t, foundSessions, 0)
+}
+
+func TestAgentInstanceSessionStore_List_Ordering(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewAgentInstanceSessionStoreWithDB(db)
+	instanceID := int64(33333)
+
+	// Create sessions with different timestamps
+	sessions := []*database.AgentInstanceSession{
+		{
+			UUID:       uuid.New().String(),
+			Name:       "Session 1",
+			InstanceID: instanceID,
+			UserUUID:   uuid.New().String(),
+			Type:       "langflow",
+		},
+		{
+			UUID:       uuid.New().String(),
+			Name:       "Session 2",
+			InstanceID: instanceID,
+			UserUUID:   uuid.New().String(),
+			Type:       "agno",
+		},
+		{
+			UUID:       uuid.New().String(),
+			Name:       "Session 3",
+			InstanceID: instanceID,
+			UserUUID:   uuid.New().String(),
+			Type:       "code",
+		},
+	}
+
+	// Create sessions with delays to ensure different timestamps
+	for i, session := range sessions {
+		_, err := store.Create(ctx, session)
+		require.NoError(t, err)
+		if i < len(sessions)-1 {
+			time.Sleep(50 * time.Millisecond) // Ensure different timestamps
+		}
+	}
+
+	// Test List ordering (should be ordered by updated_at DESC)
+	filter := types.AgentInstanceSessionFilter{InstanceID: &instanceID}
+	foundSessions, total, err := store.List(ctx, filter, 10, 1)
+	require.NoError(t, err)
+	require.Equal(t, 3, total)
+	require.Len(t, foundSessions, 3)
+
+	// Verify sessions are ordered by updated_at DESC (most recent first)
+	// We'll verify the ordering exists without making assumptions about exact names
+	require.True(t, foundSessions[0].UpdatedAt.After(foundSessions[1].UpdatedAt) ||
+		foundSessions[0].UpdatedAt.Equal(foundSessions[1].UpdatedAt))
+	require.True(t, foundSessions[1].UpdatedAt.After(foundSessions[2].UpdatedAt) ||
+		foundSessions[1].UpdatedAt.Equal(foundSessions[2].UpdatedAt))
+
+	// Verify all expected sessions are present
+	sessionNames := make(map[string]bool)
+	for _, session := range foundSessions {
+		sessionNames[session.Name] = true
+	}
+	require.True(t, sessionNames["Session 1"])
+	require.True(t, sessionNames["Session 2"])
+	require.True(t, sessionNames["Session 3"])
 }

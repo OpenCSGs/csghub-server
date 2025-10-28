@@ -2,12 +2,10 @@ package handler
 
 import (
 	"bufio"
-	"context"
 	"encoding/json"
 	"log/slog"
 	"net"
 	"net/http"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/common/types"
@@ -115,17 +113,7 @@ func (rw *LangflowResponseWriterWrapper) writeInternal(data []byte) {
 	rw.internalWritter.Flush()
 }
 
-func (rw *LangflowResponseWriterWrapper) recordSessionHistory(sessionUUID string, request bool, content string) {
-	req := &types.RecordAgentInstanceSessionHistoryRequest{
-		SessionUUID: sessionUUID,
-		Request:     request,
-		Content:     content,
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	if err := rw.agentComponent.RecordSessionHistory(ctx, req); err != nil {
-		slog.Error("failed to record session history", slog.String("session_uuid", sessionUUID), slog.Bool("request", request), slog.String("content", content), slog.String("error", err.Error()))
-	}
+func (rw *LangflowResponseWriterWrapper) recordSessionHistory(_ string, _ bool, _ string) {
 }
 
 func extractLangflowMessage(outputs []types.LangflowOutputs) string {

@@ -2,16 +2,22 @@ package component
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/nats-io/nats.go/jetstream"
+	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
+	"opencsg.com/csghub-server/common/utils/common"
+	"opencsg.com/csghub-server/mq"
 )
 
 // AgentComponent defines the interface for agent-related operations
@@ -32,21 +38,28 @@ type AgentComponent interface {
 	DeleteInstance(ctx context.Context, id int64, userUUID string) error
 	DeleteInstanceByContentID(ctx context.Context, userUUID string, instanceType string, instanceContentID string) error
 
-	// Chat operations
-	ListSessionsByInstanceID(ctx context.Context, userUUID string, instanceID int64) ([]*types.AgentInstanceSession, int, error)
-	ListSessionHistories(ctx context.Context, userUUID string, instanceID int64, sessionID int64) ([]*types.AgentInstanceSessionHistory, error)
-	InitializeSession(ctx context.Context, userUUID string, instanceType string, contentID string, req *types.AgentChatRequest) (sessionUUID string, err error)
-	RecordSessionHistory(ctx context.Context, req *types.RecordAgentInstanceSessionHistoryRequest) error
+	// Session operations
+	CreateSession(ctx context.Context, userUUID string, req *types.CreateAgentInstanceSessionRequest) (sessionUUID string, err error)
+	ListSessions(ctx context.Context, userUUID string, filter types.AgentInstanceSessionFilter, per int, page int) ([]*types.AgentInstanceSession, int, error)
+	GetSessionByUUID(ctx context.Context, userUUID string, sessionUUID string, instanceID int64) (*types.AgentInstanceSession, error)
+	DeleteSessionByUUID(ctx context.Context, userUUID string, sessionUUID string, instanceID int64) error
+	UpdateSessionByUUID(ctx context.Context, userUUID string, sessionUUID string, instanceID int64, req *types.UpdateAgentInstanceSessionRequest) error
+	ListSessionHistories(ctx context.Context, userUUID string, sessionUUID string, instanceID int64) ([]*types.AgentInstanceSessionHistory, error)
+	PublishSessionHistoryMsg(ctx context.Context, userUUID string, instanceID int64, req *types.CreateSessionHistoryRequest) error
+	CreateSessionHistory(ctx context.Context, msg *types.CreateSessionHistoryMessage) error
 }
 
 // agentComponentImpl implements the AgentComponent interface
 type agentComponentImpl struct {
-	config              *config.Config
-	templateStore       database.AgentTemplateStore
-	instanceStore       database.AgentInstanceStore
-	sessionStore        database.AgentInstanceSessionStore
-	sessionHistoryStore database.AgentInstanceSessionHistoryStore
-	adapterFactory      *AgentInstanceAdapterFactory
+	config                    *config.Config
+	templateStore             database.AgentTemplateStore
+	instanceStore             database.AgentInstanceStore
+	sessionStore              database.AgentInstanceSessionStore
+	sessionHistoryStore       database.AgentInstanceSessionHistoryStore
+	adapterFactory            *AgentInstanceAdapterFactory
+	queue                     mq.MessageQueue
+	sessionHistoryMsgConsumer jetstream.Consumer
+	notificationSvcClient     rpc.NotificationSvcClient
 }
 
 var _ AgentComponent = (*agentComponentImpl)(nil)
@@ -60,6 +73,31 @@ func NewAgentComponent(config *config.Config) (AgentComponent, error) {
 		sessionStore:        database.NewAgentInstanceSessionStore(),
 		sessionHistoryStore: database.NewAgentInstanceSessionHistoryStore(),
 		adapterFactory:      createAdapterFactory(config),
+	}
+
+	notificationSvcClient := rpc.NewNotificationSvcHttpClientBuilder(fmt.Sprintf("%s:%d", config.Notification.Host, config.Notification.Port),
+		rpc.AuthWithApiKey(config.APIToken)).WithRetry(3).WithDelay(time.Millisecond * 200).Build()
+	c.notificationSvcClient = notificationSvcClient
+
+	n, err := mq.GetOrInit(config)
+	if err != nil {
+		slog.Error("failed to init message queue", slog.Any("error", err))
+		return nil, err
+	}
+	c.queue = n
+	if err := c.queue.BuildAgentSessionHistoryMsgStream(config); err != nil {
+		slog.Error("failed to build agent session history message stream", slog.Any("error", err))
+		return nil, err
+	}
+	consumer, err := c.queue.BuildAgentSessionHistoryMsgConsumer()
+	if err != nil {
+		slog.Error("failed to build agent session history message consumer", slog.Any("error", err))
+		return nil, err
+	}
+	c.sessionHistoryMsgConsumer = consumer
+	if err := c.processSessionHistoryMsg(); err != nil {
+		slog.Error("failed to process session history message", slog.Any("error", err))
+		return nil, err
 	}
 	return c, nil
 }
@@ -321,7 +359,7 @@ func (c *agentComponentImpl) GetInstanceByID(ctx context.Context, id int64, user
 		return nil, fmt.Errorf("unsupported agent type: %s", dbInstance.Type)
 	}
 
-	isRunning, err := adapter.IsInstanceRunning(ctx, userUUID, dbInstance.ContentID)
+	isRunning, err := adapter.IsInstanceRunning(ctx, userUUID, dbInstance.ContentID, dbInstance.BuiltIn)
 	if err != nil {
 		slog.Warn("failed to check if agent instance is running", "instance_type", dbInstance.Type, "content_id", dbInstance.ContentID, "user_uuid", userUUID, "error", err)
 		isRunning = false
@@ -335,10 +373,12 @@ func (c *agentComponentImpl) GetInstanceByID(ctx context.Context, id int64, user
 		Type:        &dbInstance.Type,
 		ContentID:   &dbInstance.ContentID,
 		Public:      dbInstance.Public,
-		Editable:    dbInstance.UserUUID == userUUID, //only the owner can edit the instance
+		Editable:    !dbInstance.BuiltIn && dbInstance.UserUUID == userUUID, //only the owner can edit the instance, built-in instances are not editable
 		Name:        &dbInstance.Name,
 		Description: &dbInstance.Description,
 		IsRunning:   isRunning,
+		BuiltIn:     dbInstance.BuiltIn,
+		Metadata:    dbInstance.Metadata,
 		CreatedAt:   dbInstance.CreatedAt,
 		UpdatedAt:   dbInstance.UpdatedAt,
 	}, nil
@@ -357,10 +397,9 @@ func (c *agentComponentImpl) ListInstancesByUserUUID(ctx context.Context, userUU
 		isRunning := false
 		adapter := c.adapterFactory.GetAdapter(dbInstance.Type)
 		if adapter != nil {
-			isRunning, err = adapter.IsInstanceRunning(ctx, userUUID, dbInstance.ContentID)
+			isRunning, err = adapter.IsInstanceRunning(ctx, userUUID, dbInstance.ContentID, dbInstance.BuiltIn)
 			if err != nil {
 				slog.Warn("failed to check if agent instance is running", "instance_type", dbInstance.Type, "content_id", dbInstance.ContentID, "user_uuid", userUUID, "error", err)
-				isRunning = false
 			}
 		}
 		typesInstances = append(typesInstances, &types.AgentInstance{
@@ -370,10 +409,12 @@ func (c *agentComponentImpl) ListInstancesByUserUUID(ctx context.Context, userUU
 			Type:        &dbInstance.Type,
 			ContentID:   &dbInstance.ContentID,
 			Public:      dbInstance.Public,
-			Editable:    dbInstance.UserUUID == userUUID, //only the owner can edit the instance
+			Editable:    !dbInstance.BuiltIn && dbInstance.UserUUID == userUUID, //only the owner can edit the instance, built-in instances are not editable
 			Name:        &dbInstance.Name,
 			Description: &dbInstance.Description,
 			IsRunning:   isRunning,
+			BuiltIn:     dbInstance.BuiltIn,
+			Metadata:    dbInstance.Metadata,
 			CreatedAt:   dbInstance.CreatedAt,
 			UpdatedAt:   dbInstance.UpdatedAt,
 		})
@@ -466,6 +507,12 @@ func (c *agentComponentImpl) DeleteInstance(ctx context.Context, id int64, userU
 		return errorx.ErrForbidden
 	}
 
+	// forbid to delete built-in instances
+	if existing.BuiltIn {
+		slog.Error("cannot delete built-in instance", "instance_id", id, "user_uuid", userUUID)
+		return fmt.Errorf("cannot delete built-in instance, id: %d", id)
+	}
+
 	// Get the appropriate adapter for the agent type
 	adapter := c.adapterFactory.GetAdapter(existing.Type)
 	if adapter != nil {
@@ -507,73 +554,6 @@ func (c *agentComponentImpl) DeleteInstanceByContentID(ctx context.Context, user
 	return nil
 }
 
-func (c *agentComponentImpl) InitializeSession(ctx context.Context, userUUID string, instanceType string, contentID string, req *types.AgentChatRequest) (sessionUUID string, err error) {
-	if req == nil {
-		return "", fmt.Errorf("chat request is nil")
-	}
-
-	// get instance from database
-	instance, err := c.instanceStore.FindByContentID(ctx, instanceType, contentID)
-	if err != nil {
-		slog.Error("failed to get agent instance by content id", "instance_type", instanceType, "content_id", contentID, "user_uuid", userUUID, "error", err)
-		return "", errorx.HandleDBError(err, map[string]any{
-			"instance_type": instanceType,
-			"content_id":    contentID,
-			"user_uuid":     userUUID,
-		})
-	}
-
-	// check permission
-	if !instance.Public && instance.UserUUID != userUUID {
-		return "", errorx.Forbidden(nil, map[string]any{
-			"instance_type": instanceType,
-			"content_id":    contentID,
-			"user_uuid":     userUUID,
-		})
-	}
-
-	// Generate session ID if not provided by client
-	var newSession bool
-	sessionID := req.SessionID
-	if sessionID == nil || *sessionID == "" {
-		generatedID := uuid.New().String()
-		sessionID = &generatedID
-		newSession = true
-	} else {
-		newSession, err = c.isNewSession(ctx, *sessionID)
-		if err != nil {
-			slog.Error("failed to check if session is new", "session_id", *sessionID, "error", err)
-			return "", fmt.Errorf("failed to check if session is new, error:%w", err)
-		}
-	}
-
-	var dbSession *database.AgentInstanceSession
-
-	if newSession {
-		// create a new session
-		session := &database.AgentInstanceSession{
-			UUID:       *sessionID,
-			Name:       extractSessionName(req.InputValue),
-			InstanceID: instance.ID,
-			UserUUID:   userUUID,
-			Type:       instanceType,
-		}
-		dbSession, err = c.sessionStore.Create(ctx, session)
-		if err != nil {
-			slog.Error("failed to create agent instance session", "session_id", *sessionID, "instance_id", instance.ID, "user_uuid", userUUID, "error", err)
-			return "", fmt.Errorf("failed to create agent instance session, error:%w", err)
-		}
-	} else {
-		dbSession, err = c.sessionStore.FindByUUID(ctx, *sessionID)
-		if err != nil {
-			slog.Error("failed to find agent instance session by uuid", "session_id", *sessionID, "instance_type", instanceType, "content_id", contentID, "user_uuid", userUUID, "error", err)
-			return "", fmt.Errorf("failed to find agent instance session by uuid, error:%w", err)
-		}
-	}
-
-	return dbSession.UUID, nil
-}
-
 // check the session uuid is new
 func (c *agentComponentImpl) isNewSession(ctx context.Context, sessionID string) (bool, error) {
 	_, err := c.sessionStore.FindByUUID(ctx, sessionID)
@@ -587,6 +567,88 @@ func (c *agentComponentImpl) isNewSession(ctx context.Context, sessionID string)
 	return false, nil
 }
 
+func (c *agentComponentImpl) CreateSession(ctx context.Context, userUUID string, req *types.CreateAgentInstanceSessionRequest) (sessionUUID string, err error) {
+	if req == nil {
+		return "", fmt.Errorf("create session request is nil")
+	}
+
+	if req.InstanceID == nil && req.ContentID == nil {
+		return "", fmt.Errorf("instance ID or content ID is required for instance type: %s", req.Type)
+	}
+
+	var instance *database.AgentInstance
+	if req.InstanceID != nil {
+		instance, err = c.instanceStore.FindByID(ctx, *req.InstanceID)
+		if err != nil {
+			return "", fmt.Errorf("failed to find agent instance by ID, error:%w", err)
+		}
+	} else if req.ContentID != nil {
+		instance, err = c.instanceStore.FindByContentID(ctx, req.Type, *req.ContentID)
+		if err != nil {
+			return "", fmt.Errorf("failed to find agent instance by content id and type, error:%w", err)
+		}
+	}
+
+	if instance != nil && !instance.Public && instance.UserUUID != userUUID {
+		return "", errorx.Forbidden(nil, map[string]any{
+			"instance_id":   instance.ID,
+			"instance_type": instance.Type,
+			"content_id":    instance.ContentID,
+			"user_uuid":     userUUID,
+		})
+	}
+
+	var newSession bool
+	if req.SessionUUID == nil || *req.SessionUUID == "" {
+		generatedID := uuid.New().String()
+		req.SessionUUID = &generatedID
+		newSession = true
+	} else {
+		newSession, err = c.isNewSession(ctx, *req.SessionUUID)
+		if err != nil {
+			return "", fmt.Errorf("failed to check if session is new, error:%w", err)
+		}
+	}
+
+	var dbSession *database.AgentInstanceSession
+
+	if newSession {
+		instanceID := int64(0)
+		if req.InstanceID != nil {
+			instanceID = *req.InstanceID
+		}
+
+		session := &database.AgentInstanceSession{
+			UUID:       common.SafeDeref(req.SessionUUID),
+			Name:       common.SafeDeref(req.Name),
+			InstanceID: instanceID,
+			UserUUID:   userUUID,
+			Type:       instance.Type,
+		}
+
+		dbSession, err = c.sessionStore.Create(ctx, session)
+		if err != nil {
+			slog.Error("failed to create agent instance session",
+				"session_id", *req.SessionUUID,
+				"user_uuid", userUUID,
+				"error", err)
+			return "", fmt.Errorf("failed to create agent instance session, error:%w", err)
+		}
+	} else {
+		dbSession, err = c.sessionStore.FindByUUID(ctx, *req.SessionUUID)
+		if err != nil {
+			slog.Error("failed to find agent instance session by uuid",
+				"session_id", *req.SessionUUID,
+				"instance_type", instance.Type,
+				"user_uuid", userUUID,
+				"error", err)
+			return "", fmt.Errorf("failed to find agent instance session by uuid, error:%w", err)
+		}
+	}
+
+	return dbSession.UUID, nil
+}
+
 func extractSessionName(inputValue string) string {
 	name := inputValue
 	if newlineIndex := strings.Index(name, "\n"); newlineIndex != -1 {
@@ -598,8 +660,9 @@ func extractSessionName(inputValue string) string {
 	return name
 }
 
-func (c *agentComponentImpl) ListSessionsByInstanceID(ctx context.Context, userUUID string, instanceID int64) ([]*types.AgentInstanceSession, int, error) {
-	sessions, total, err := c.sessionStore.ListByInstanceID(ctx, instanceID)
+func (c *agentComponentImpl) ListSessions(ctx context.Context, userUUID string, filter types.AgentInstanceSessionFilter, per int, page int) ([]*types.AgentInstanceSession, int, error) {
+
+	sessions, total, err := c.sessionStore.List(ctx, filter, per, page)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -608,22 +671,115 @@ func (c *agentComponentImpl) ListSessionsByInstanceID(ctx context.Context, userU
 	typesSessions := make([]*types.AgentInstanceSession, 0, len(sessions))
 	for _, session := range sessions {
 		typesSessions = append(typesSessions, &types.AgentInstanceSession{
-			ID:         session.ID,
-			UUID:       session.UUID,
-			Name:       session.Name,
-			InstanceID: session.InstanceID,
-			UserUUID:   session.UserUUID,
-			Type:       session.Type,
-			CreatedAt:  session.CreatedAt,
-			UpdatedAt:  session.UpdatedAt,
+			ID:          session.ID,
+			SessionUUID: session.UUID,
+			Name:        session.Name,
+			InstanceID:  session.InstanceID,
+			UserUUID:    session.UserUUID,
+			Type:        session.Type,
+			LastTurn:    session.LastTurn,
+			CreatedAt:   session.CreatedAt,
+			UpdatedAt:   session.UpdatedAt,
 		})
 	}
 	return typesSessions, total, nil
 }
 
-func (c *agentComponentImpl) ListSessionHistories(ctx context.Context, userUUID string, instanceID int64, sessionID int64) ([]*types.AgentInstanceSessionHistory, error) {
-	histories, err := c.sessionHistoryStore.ListBySessionID(ctx, sessionID)
+func (c *agentComponentImpl) GetSessionByUUID(ctx context.Context, userUUID string, sessionUUID string, instanceID int64) (*types.AgentInstanceSession, error) {
+	session, err := c.sessionStore.FindByUUID(ctx, sessionUUID)
 	if err != nil {
+		return nil, err
+	}
+	if session == nil {
+		return nil, fmt.Errorf("agent instance session not found, session_uuid: %s", sessionUUID)
+	}
+	if session.UserUUID != userUUID {
+		return nil, errorx.Forbidden(nil, map[string]any{
+			"session_uuid": sessionUUID,
+			"user_uuid":    userUUID,
+		})
+	}
+	if session.InstanceID != instanceID {
+		return nil, fmt.Errorf("agent instance session does not belong to the specified instance, session_uuid: %s, instance_id: %d, session_instance_id: %d", sessionUUID, instanceID, session.InstanceID)
+	}
+	return &types.AgentInstanceSession{
+		ID:          session.ID,
+		SessionUUID: session.UUID,
+		Name:        session.Name,
+		Type:        session.Type,
+		InstanceID:  session.InstanceID,
+		UserUUID:    session.UserUUID,
+		LastTurn:    session.LastTurn,
+		CreatedAt:   session.CreatedAt,
+		UpdatedAt:   session.UpdatedAt,
+	}, nil
+}
+
+func (c *agentComponentImpl) DeleteSessionByUUID(ctx context.Context, userUUID string, sessionUUID string, instanceID int64) error {
+	session, err := c.sessionStore.FindByUUID(ctx, sessionUUID)
+	if err != nil {
+		return err
+	}
+	if session == nil {
+		return fmt.Errorf("agent instance session not found, session_uuid: %s", sessionUUID)
+	}
+	if session.UserUUID != userUUID {
+		return errorx.Forbidden(nil, map[string]any{
+			"session_uuid": sessionUUID,
+			"user_uuid":    userUUID,
+		})
+	}
+	if session.InstanceID != instanceID {
+		return fmt.Errorf("agent instance session does not belong to the specified instance, session_uuid: %s, instance_id: %d, session_instance_id: %d", sessionUUID, instanceID, session.InstanceID)
+	}
+	return c.sessionStore.Delete(ctx, session.ID)
+}
+
+func (c *agentComponentImpl) UpdateSessionByUUID(ctx context.Context, userUUID string, sessionUUID string, instanceID int64, req *types.UpdateAgentInstanceSessionRequest) error {
+	session, err := c.sessionStore.FindByUUID(ctx, sessionUUID)
+	if err != nil {
+		return err
+	}
+	if session == nil {
+		return fmt.Errorf("agent instance session not found, session_uuid: %s", sessionUUID)
+	}
+	if session.InstanceID != instanceID {
+		return fmt.Errorf("agent instance session does not belong to the specified instance, session_uuid: %s, instance_id: %d, session_instance_id: %d", sessionUUID, instanceID, session.InstanceID)
+	}
+	if session.UserUUID != userUUID {
+		return errorx.Forbidden(nil, map[string]any{
+			"session_uuid": sessionUUID,
+			"user_uuid":    userUUID,
+		})
+	}
+
+	session.Name = req.Name
+
+	return c.sessionStore.Update(ctx, session)
+}
+
+func (c *agentComponentImpl) ListSessionHistories(ctx context.Context, userUUID string, sessionUUID string, instanceID int64) ([]*types.AgentInstanceSessionHistory, error) {
+	session, err := c.sessionStore.FindByUUID(ctx, sessionUUID)
+	if err != nil {
+		slog.Error("failed to find agent instance session by uuid", "session_uuid", sessionUUID, "user_uuid", userUUID, "error", err)
+		return nil, err
+	}
+	if session == nil {
+		return nil, fmt.Errorf("agent instance session not found, session_uuid: %s", sessionUUID)
+	}
+	if session.UserUUID != userUUID {
+		return nil, errorx.Forbidden(nil, map[string]any{
+			"session_uuid": sessionUUID,
+			"user_uuid":    userUUID,
+		})
+	}
+	if session.InstanceID != instanceID {
+		return nil, fmt.Errorf("agent instance session does not belong to the specified instance, session_uuid: %s, instance_id: %d, session_instance_id: %d", sessionUUID, instanceID, session.InstanceID)
+	}
+
+	histories, err := c.sessionHistoryStore.ListBySessionID(ctx, session.ID)
+	if err != nil {
+		slog.Error("failed to list agent instance session histories by session id", "session_id", session.ID, "user_uuid", userUUID, "error", err)
 		return nil, err
 	}
 
@@ -635,6 +791,7 @@ func (c *agentComponentImpl) ListSessionHistories(ctx context.Context, userUUID 
 			SessionID: history.SessionID,
 			Request:   history.Request,
 			Content:   history.Content,
+			Turn:      history.Turn,
 			CreatedAt: history.CreatedAt,
 			UpdatedAt: history.UpdatedAt,
 		})
@@ -642,25 +799,104 @@ func (c *agentComponentImpl) ListSessionHistories(ctx context.Context, userUUID 
 	return typesHistories, nil
 }
 
-func (c *agentComponentImpl) RecordSessionHistory(ctx context.Context, req *types.RecordAgentInstanceSessionHistoryRequest) error {
-	// get session from database by session uuid
+func (c *agentComponentImpl) CreateSessionHistory(ctx context.Context, msg *types.CreateSessionHistoryMessage) error {
+	history := &database.AgentInstanceSessionHistory{
+		SessionID: msg.SessionID,
+		Request:   msg.Request,
+		Content:   msg.Content,
+	}
+
+	if err := c.sessionHistoryStore.Create(ctx, history); err != nil {
+		slog.Error("failed to create agent instance session history", "session_id", msg.SessionID, "request", msg.Request, "msg_uuid", msg.MsgUUID, "content", msg.Content, "error", err)
+		return fmt.Errorf("failed to create agent instance session history, error:%w", err)
+	}
+
+	slog.Info("agent instance session history created", "session_id", msg.SessionID, "request", msg.Request, "msg_uuid", msg.MsgUUID)
+	return nil
+}
+
+func (c *agentComponentImpl) PublishSessionHistoryMsg(ctx context.Context, userUUID string, instanceID int64, req *types.CreateSessionHistoryRequest) error {
+	if req == nil {
+		return fmt.Errorf("create session history request is nil")
+	}
+
 	session, err := c.sessionStore.FindByUUID(ctx, req.SessionUUID)
 	if err != nil {
+		slog.Error("failed to find agent instance session by uuid", "session_uuid", req.SessionUUID, "error", err)
 		return fmt.Errorf("failed to find agent instance session by uuid, error:%w", err)
 	}
+
 	if session == nil {
 		return fmt.Errorf("agent instance session not found, session_uuid: %s", req.SessionUUID)
 	}
 
-	// create a new session history
-	history := &database.AgentInstanceSessionHistory{
-		SessionID: session.ID,
-		Request:   req.Request,
-		Content:   req.Content,
+	if session.UserUUID != userUUID {
+		return errorx.Forbidden(nil, map[string]any{
+			"session_uuid": req.SessionUUID,
+			"user_uuid":    userUUID,
+		})
 	}
-	err = c.sessionHistoryStore.Create(ctx, history)
+
+	if session.InstanceID != instanceID {
+		return fmt.Errorf("agent instance session does not belong to the specified instance, session_uuid: %s, instance_id: %d, session_instance_id: %d", req.SessionUUID, instanceID, session.InstanceID)
+	}
+
+	for _, message := range req.Messages {
+		slog.Debug("publish session history message", "session_uuid", req.SessionUUID, "message", message)
+		msg := types.CreateSessionHistoryMessage{
+			MsgUUID:     uuid.New().String(),
+			SessionID:   session.ID,
+			SessionUUID: req.SessionUUID,
+			Request:     message.Request,
+			Content:     message.Content,
+		}
+		if err := c.queue.PublishAgentSessionHistoryMsg(msg); err != nil {
+			slog.Error("failed to publish session history message", "session_uuid", req.SessionUUID, "message", message, "error", err)
+			return fmt.Errorf("failed to publish session history message, error:%w", err)
+		}
+	}
+
+	return nil
+}
+
+func (c *agentComponentImpl) processSessionHistoryMsg() error {
+	slog.Debug("start processing session history messages")
+
+	_, err := c.sessionHistoryMsgConsumer.Consume(func(msg jetstream.Msg) {
+		defer func() {
+			if r := recover(); r != nil {
+				slog.Error("panic recovered while processing session history message", slog.Any("recover", r))
+				_ = msg.Nak()
+			}
+		}()
+		slog.Debug("received session history message", slog.String("data", string(msg.Data())))
+
+		var history types.CreateSessionHistoryMessage
+		if err := json.Unmarshal(msg.Data(), &history); err != nil {
+			slog.Error("failed to unmarshal session history message", "error", err, "session_uuid", history.SessionUUID, "msg_uuid", history.MsgUUID)
+			_ = msg.Term()
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if err := c.CreateSessionHistory(ctx, &history); err != nil {
+			slog.Error("failed to create session history", "error", err, "session_uuid", history.SessionUUID, "msg_uuid", history.MsgUUID)
+			_ = msg.Nak()
+			return
+		}
+
+		if err := msg.Ack(); err != nil {
+			slog.Error("failed to ack session history message", "error", err, "session_uuid", history.SessionUUID, "msg_uuid", history.MsgUUID)
+			return
+		}
+		slog.Debug("session history message processed and acked", "session_uuid", history.SessionUUID, "msg_uuid", history.MsgUUID)
+	})
+
 	if err != nil {
-		return fmt.Errorf("failed to create agent instance session history, error:%w", err)
+		slog.Error("failed to start consuming session history messages", "error", err)
+		return err
 	}
+
 	return nil
 }

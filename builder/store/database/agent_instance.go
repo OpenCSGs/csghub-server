@@ -23,14 +23,16 @@ type AgentTemplate struct {
 
 // AgentInstance represents an instance created from an agent template
 type AgentInstance struct {
-	ID          int64  `bun:",pk,autoincrement" json:"id"`
-	TemplateID  int64  `bun:"" json:"template_id"`          // Associated with the id in the template table
-	UserUUID    string `bun:",notnull" json:"user_uuid"`    // Associated with the corresponding field in the User table
-	Type        string `bun:",notnull" json:"type"`         // Possible values: langflow, agno, code, etc.
-	ContentID   string `bun:",notnull" json:"content_id"`   // Used to specify the unique id of the instance resource
-	Public      bool   `bun:",notnull" json:"public"`       // Whether the instance is public
-	Name        string `bun:",nullzero" json:"name"`        // Instance name
-	Description string `bun:",nullzero" json:"description"` // Instance description
+	ID          int64          `bun:",pk,autoincrement" json:"id"`
+	TemplateID  int64          `bun:"" json:"template_id"`          // Associated with the id in the template table
+	UserUUID    string         `bun:",notnull" json:"user_uuid"`    // Associated with the corresponding field in the User table
+	Type        string         `bun:",notnull" json:"type"`         // Possible values: langflow, agno, code, etc.
+	ContentID   string         `bun:",notnull" json:"content_id"`   // Used to specify the unique id of the instance resource
+	Public      bool           `bun:",notnull" json:"public"`       // Whether the instance is public
+	Name        string         `bun:",nullzero" json:"name"`        // Instance name
+	Description string         `bun:",nullzero" json:"description"` // Instance description
+	BuiltIn     bool           `bun:",notnull" json:"built_in"`     // Whether the instance is built-in
+	Metadata    map[string]any `bun:",type:jsonb" json:"metadata"`  // Instance metadata
 	times
 }
 
@@ -226,6 +228,10 @@ func (s *agentInstanceStoreImpl) applyAgentInstanceFilters(query *bun.SelectQuer
 	// Apply template ID filter
 	if filter.TemplateID != nil {
 		query = query.Where("template_id = ?", *filter.TemplateID)
+	}
+
+	if filter.BuiltIn != nil {
+		query = query.Where("built_in = ?", *filter.BuiltIn)
 	}
 
 	return query

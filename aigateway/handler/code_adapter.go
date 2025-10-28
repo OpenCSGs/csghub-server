@@ -15,6 +15,7 @@ import (
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
+	"opencsg.com/csghub-server/common/utils/common"
 	"opencsg.com/csghub-server/component"
 )
 
@@ -76,15 +77,16 @@ func (a *CodeAdapter) PrepareResponseWriter(ctx *gin.Context, api string, stream
 		ctx.Writer.Header().Set("Connection", "keep-alive")
 	}
 
-	// Initialize session for code agent
-	sessionUUID, err := a.agentComponent.InitializeSession(ctx, currentUserUUID, "code", codeReq.AgentName, &types.AgentChatRequest{
-		SessionID:  &codeReq.RequestID,
-		InputValue: codeReq.Query,
-		InputType:  "chat",
-		OutputType: "chat",
+	// Create session for code agent
+	sessionName := common.TruncString(codeReq.Query, 50)
+	sessionUUID, err := a.agentComponent.CreateSession(ctx, currentUserUUID, &types.CreateAgentInstanceSessionRequest{
+		SessionUUID: &codeReq.RequestID,
+		Name:        &sessionName,
+		Type:        "code",
+		ContentID:   &codeReq.AgentName,
 	}) // Create session history for code agents
 	if err != nil {
-		return nil, fmt.Errorf("initialize code agent session: %w", err)
+		return nil, fmt.Errorf("create code agent session: %w", err)
 	}
 
 	// Set session ID in the request
@@ -93,7 +95,7 @@ func (a *CodeAdapter) PrepareResponseWriter(ctx *gin.Context, api string, stream
 	ctx.Request.Body = io.NopCloser(bytes.NewReader(data))
 	ctx.Request.ContentLength = int64(len(data))
 
-	slog.Debug("code agent session initialized", "sessionUUID", sessionUUID, "agentName", codeReq.AgentName)
+	slog.Debug("code agent session created", "sessionUUID", sessionUUID, "agentName", codeReq.AgentName)
 
 	return ctx.Writer, nil
 }

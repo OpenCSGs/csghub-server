@@ -15,6 +15,7 @@ import (
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
+	"opencsg.com/csghub-server/common/utils/common"
 	"opencsg.com/csghub-server/component"
 )
 
@@ -51,17 +52,17 @@ func (a *LangflowAdapter) PrepareResponseWriter(ctx *gin.Context, api string, st
 
 	flowID := path.Base(api)
 	slog.Debug("flowID", "flowID", flowID)
-	sessionUUID, err := a.agentComponent.InitializeSession(ctx, userUUID, "langflow", flowID, &chatReq) // Create session history for langflow agents
-	if err != nil {
-		return nil, fmt.Errorf("initialize session: %w", err)
-	}
 
-	if err := a.agentComponent.RecordSessionHistory(ctx, &types.RecordAgentInstanceSessionHistoryRequest{
-		SessionUUID: sessionUUID,
-		Request:     true,
-		Content:     chatReq.InputValue,
-	}); err != nil {
-		slog.Error("failed to record session history", "session_uuid", sessionUUID, "request", true, "content", chatReq.InputValue, "error", err)
+	// Create session for langflow agent
+	sessionName := common.TruncString(chatReq.InputValue, 50)
+	sessionUUID, err := a.agentComponent.CreateSession(ctx, userUUID, &types.CreateAgentInstanceSessionRequest{
+		SessionUUID: chatReq.SessionID,
+		Name:        &sessionName,
+		Type:        "langflow",
+		ContentID:   &flowID,
+	}) // Create session history for langflow agents
+	if err != nil {
+		return nil, fmt.Errorf("create session: %w", err)
 	}
 
 	chatReq.SessionID = &sessionUUID
@@ -69,7 +70,7 @@ func (a *LangflowAdapter) PrepareResponseWriter(ctx *gin.Context, api string, st
 	ctx.Request.Body = io.NopCloser(bytes.NewReader(data))
 	ctx.Request.ContentLength = int64(len(data))
 
-	slog.Debug("session initialized", "sessionUUID", sessionUUID)
+	slog.Debug("session created", "sessionUUID", sessionUUID)
 
 	return NewLangflowResponseWriterWrapper(ctx.Writer, stream, a.agentComponent), nil
 }

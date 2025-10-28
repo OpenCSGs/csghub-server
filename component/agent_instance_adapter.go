@@ -20,7 +20,7 @@ type AgentInstanceAdapter interface {
 	DeleteInstance(ctx context.Context, userUUID string, contentID string) error
 	UpdateInstance(ctx context.Context, userUUID string, instance *types.AgentInstance) error
 	GetInstanceType() string
-	IsInstanceRunning(ctx context.Context, userUUID string, contentID string) (bool, error)
+	IsInstanceRunning(ctx context.Context, userUUID string, contentID string, builtIn bool) (bool, error)
 }
 
 // AgentInstanceAdapterFactory manages agent instance adapters
@@ -103,7 +103,7 @@ func (a *LangflowAgentInstanceAdapter) UpdateInstance(ctx context.Context, userU
 	return nil
 }
 
-func (a *LangflowAgentInstanceAdapter) IsInstanceRunning(ctx context.Context, userUUID string, contentID string) (bool, error) {
+func (a *LangflowAgentInstanceAdapter) IsInstanceRunning(ctx context.Context, userUUID string, contentID string, builtIn bool) (bool, error) {
 	return true, nil
 }
 
@@ -145,7 +145,10 @@ func (a *CodeAgentInstanceAdapter) UpdateInstance(ctx context.Context, userUUID 
 	return nil
 }
 
-func (a *CodeAgentInstanceAdapter) IsInstanceRunning(ctx context.Context, userUUID string, contentID string) (bool, error) {
+func (a *CodeAgentInstanceAdapter) IsInstanceRunning(ctx context.Context, userUUID string, contentID string, builtIn bool) (bool, error) {
+	if builtIn {
+		return true, nil
+	}
 	splitPath := strings.Split(contentID, "/")
 	if len(splitPath) != 2 {
 		return false, fmt.Errorf("invalid contentID: %s", contentID)

@@ -178,9 +178,9 @@ func (_c *MockAgentInstanceAdapter_GetInstanceType_Call) RunAndReturn(run func()
 	return _c
 }
 
-// IsInstanceRunning provides a mock function with given fields: ctx, userUUID, contentID
-func (_m *MockAgentInstanceAdapter) IsInstanceRunning(ctx context.Context, userUUID string, contentID string) (bool, error) {
-	ret := _m.Called(ctx, userUUID, contentID)
+// IsInstanceRunning provides a mock function with given fields: ctx, userUUID, contentID, builtIn
+func (_m *MockAgentInstanceAdapter) IsInstanceRunning(ctx context.Context, userUUID string, contentID string, builtIn bool) (bool, error) {
+	ret := _m.Called(ctx, userUUID, contentID, builtIn)
 
 	if len(ret) == 0 {
 		panic("no return value specified for IsInstanceRunning")
@@ -188,17 +188,17 @@ func (_m *MockAgentInstanceAdapter) IsInstanceRunning(ctx context.Context, userU
 
 	var r0 bool
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) (bool, error)); ok {
-		return rf(ctx, userUUID, contentID)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, bool) (bool, error)); ok {
+		return rf(ctx, userUUID, contentID, builtIn)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) bool); ok {
-		r0 = rf(ctx, userUUID, contentID)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, bool) bool); ok {
+		r0 = rf(ctx, userUUID, contentID, builtIn)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
-		r1 = rf(ctx, userUUID, contentID)
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, bool) error); ok {
+		r1 = rf(ctx, userUUID, contentID, builtIn)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -215,13 +215,14 @@ type MockAgentInstanceAdapter_IsInstanceRunning_Call struct {
 //   - ctx context.Context
 //   - userUUID string
 //   - contentID string
-func (_e *MockAgentInstanceAdapter_Expecter) IsInstanceRunning(ctx interface{}, userUUID interface{}, contentID interface{}) *MockAgentInstanceAdapter_IsInstanceRunning_Call {
-	return &MockAgentInstanceAdapter_IsInstanceRunning_Call{Call: _e.mock.On("IsInstanceRunning", ctx, userUUID, contentID)}
+//   - builtIn bool
+func (_e *MockAgentInstanceAdapter_Expecter) IsInstanceRunning(ctx interface{}, userUUID interface{}, contentID interface{}, builtIn interface{}) *MockAgentInstanceAdapter_IsInstanceRunning_Call {
+	return &MockAgentInstanceAdapter_IsInstanceRunning_Call{Call: _e.mock.On("IsInstanceRunning", ctx, userUUID, contentID, builtIn)}
 }
 
-func (_c *MockAgentInstanceAdapter_IsInstanceRunning_Call) Run(run func(ctx context.Context, userUUID string, contentID string)) *MockAgentInstanceAdapter_IsInstanceRunning_Call {
+func (_c *MockAgentInstanceAdapter_IsInstanceRunning_Call) Run(run func(ctx context.Context, userUUID string, contentID string, builtIn bool)) *MockAgentInstanceAdapter_IsInstanceRunning_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string))
+		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(bool))
 	})
 	return _c
 }
@@ -231,7 +232,7 @@ func (_c *MockAgentInstanceAdapter_IsInstanceRunning_Call) Return(_a0 bool, _a1 
 	return _c
 }
 
-func (_c *MockAgentInstanceAdapter_IsInstanceRunning_Call) RunAndReturn(run func(context.Context, string, string) (bool, error)) *MockAgentInstanceAdapter_IsInstanceRunning_Call {
+func (_c *MockAgentInstanceAdapter_IsInstanceRunning_Call) RunAndReturn(run func(context.Context, string, string, bool) (bool, error)) *MockAgentInstanceAdapter_IsInstanceRunning_Call {
 	_c.Call.Return(run)
 	return _c
 }
