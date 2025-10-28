@@ -1175,7 +1175,6 @@ func (c *spaceComponentImpl) MCPIndex(ctx context.Context, repoFilter *types.Rep
 			Name:         space.Repository.Name,
 			Description:  space.Repository.Description,
 			Path:         space.Repository.Path,
-			Env:          space.Env,
 			License:      space.Repository.License,
 			Private:      space.Repository.Private,
 			CreatedAt:    space.Repository.CreatedAt,
