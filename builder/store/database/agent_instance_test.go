@@ -375,3 +375,142 @@ func TestAgentInstanceStore_ListByUserUUID_WithTemplateFilter(t *testing.T) {
 	require.Len(t, instances, 1) // Should find only "Langflow Agent 1"
 	require.Equal(t, 1, total)
 }
+
+func TestAgentInstanceStore_IsInstanceExistsByContentID(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewAgentInstanceStoreWithDB(db)
+
+	userUUID := uuid.New().String()
+	instanceType := "langflow"
+	contentID := "test-content-123"
+
+	// Test case 1: Instance does not exist
+	exists, err := store.IsInstanceExistsByContentID(ctx, instanceType, contentID)
+	require.NoError(t, err)
+	require.False(t, exists)
+
+	// Test case 2: Create an instance and verify it exists
+	instance := &database.AgentInstance{
+		TemplateID: 123,
+		UserUUID:   userUUID,
+		Type:       instanceType,
+		ContentID:  contentID,
+		Public:     false,
+	}
+
+	createdInstance, err := store.Create(ctx, instance)
+	require.NoError(t, err)
+	require.NotZero(t, createdInstance.ID)
+
+	// Verify the instance exists
+	exists, err = store.IsInstanceExistsByContentID(ctx, instanceType, contentID)
+	require.NoError(t, err)
+	require.True(t, exists)
+
+	// Test case 3: Different type, same content_id
+	exists, err = store.IsInstanceExistsByContentID(ctx, "agno", contentID)
+	require.NoError(t, err)
+	require.False(t, exists)
+
+	// Test case 4: Same type, different content_id
+	exists, err = store.IsInstanceExistsByContentID(ctx, instanceType, "different-content-id")
+	require.NoError(t, err)
+	require.False(t, exists)
+
+	// Test case 5: Both type and content_id different
+	exists, err = store.IsInstanceExistsByContentID(ctx, "agno", "different-content-id")
+	require.NoError(t, err)
+	require.False(t, exists)
+}
+
+func TestAgentInstanceStore_IsInstanceExistsByContentID_MultipleInstances(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewAgentInstanceStoreWithDB(db)
+
+	userUUID := uuid.New().String()
+
+	// Create multiple instances with different types and content IDs
+	instances := []*database.AgentInstance{
+		{
+			TemplateID: 1,
+			UserUUID:   userUUID,
+			Type:       "langflow",
+			ContentID:  "content-1",
+			Public:     false,
+		},
+		{
+			TemplateID: 2,
+			UserUUID:   userUUID,
+			Type:       "agno",
+			ContentID:  "content-2",
+			Public:     false,
+		},
+		{
+			TemplateID: 3,
+			UserUUID:   userUUID,
+			Type:       "langflow",
+			ContentID:  "content-3",
+			Public:     false,
+		},
+	}
+
+	// Create all instances
+	for _, instance := range instances {
+		_, err := store.Create(ctx, instance)
+		require.NoError(t, err)
+	}
+
+	// Test each instance exists
+	for _, instance := range instances {
+		exists, err := store.IsInstanceExistsByContentID(ctx, instance.Type, instance.ContentID)
+		require.NoError(t, err)
+		require.True(t, exists, "Instance with type %s and content_id %s should exist", instance.Type, instance.ContentID)
+	}
+
+	// Test non-existent combinations
+	testCases := []struct {
+		instanceType string
+		contentID    string
+		description  string
+	}{
+		{"langflow", "non-existent", "langflow type with non-existent content_id"},
+		{"agno", "content-1", "agno type with langflow content_id"},
+		{"code", "content-2", "code type with agno content_id"},
+		{"unknown", "content-3", "unknown type with langflow content_id"},
+	}
+
+	for _, tc := range testCases {
+		exists, err := store.IsInstanceExistsByContentID(ctx, tc.instanceType, tc.contentID)
+		require.NoError(t, err)
+		require.False(t, exists, "Should not exist: %s", tc.description)
+	}
+}
+
+func TestAgentInstanceStore_IsInstanceExistsByContentID_EmptyParameters(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewAgentInstanceStoreWithDB(db)
+
+	// Test with empty type
+	exists, err := store.IsInstanceExistsByContentID(ctx, "", "some-content-id")
+	require.NoError(t, err)
+	require.False(t, exists)
+
+	// Test with empty content_id
+	exists, err = store.IsInstanceExistsByContentID(ctx, "langflow", "")
+	require.NoError(t, err)
+	require.False(t, exists)
+
+	// Test with both empty
+	exists, err = store.IsInstanceExistsByContentID(ctx, "", "")
+	require.NoError(t, err)
+	require.False(t, exists)
+}

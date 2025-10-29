@@ -41,6 +41,17 @@ type AgentInstance struct {
 	UpdatedAt   time.Time      `json:"updated_at"`                            // When the instance was last updated
 }
 
+type AgentType string
+
+const (
+	AgentTypeLangflow AgentType = "langflow"
+	AgentTypeCode     AgentType = "code"
+)
+
+func (t AgentType) String() string {
+	return string(t)
+}
+
 type AgentInstanceFilter struct {
 	Search     string
 	Type       string
@@ -180,4 +191,15 @@ type StreamMode struct {
 type CodeAgentRequestMessage struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`
+}
+
+type CodeAgentSyncOperation string
+
+const (
+	CodeAgentSyncOperationUpdate CodeAgentSyncOperation = "update"
+	CodeAgentSyncOperationDelete CodeAgentSyncOperation = "delete"
+)
+
+func (o CodeAgentSyncOperation) String() string {
+	return string(o)
 }

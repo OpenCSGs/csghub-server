@@ -795,6 +795,8 @@ func (c *spaceComponentImpl) Delete(ctx context.Context, namespace, name, curren
 		}
 	}()
 
+	c.syncCodeAgentIfExists(repo.User.UUID, repo.Path, types.CodeAgentSyncOperationDelete)
+
 	return nil
 }
 
@@ -887,7 +889,14 @@ func (c *spaceComponentImpl) Deploy(ctx context.Context, namespace, name, curren
 		ClusterID:     space.ClusterID,
 	}
 	dr = c.updateDeployRepoBySpace(dr, space)
-	return c.deployer.Deploy(ctx, dr)
+
+	deployID, err := c.deployer.Deploy(ctx, dr)
+	if err != nil {
+		return -1, err
+	}
+
+	c.syncCodeAgentIfExists(user.UUID, space.Repository.Path, types.CodeAgentSyncOperationUpdate)
+	return deployID, nil
 }
 
 func (c *spaceComponentImpl) Wakeup(ctx context.Context, namespace, name string) error {
@@ -1262,3 +1271,64 @@ const (
 	RepoStatusDeleted      = "Deleted"
 	SpaceStatusNoNGINXConf = "NoNGINXConf"
 )
+
+// syncCodeAgentIfExists handles agent synchronization for space operations only if the space is a code agent
+func (c *spaceComponentImpl) syncCodeAgentIfExists(userUUID string, repoPath string, operation types.CodeAgentSyncOperation) {
+	go func() {
+		agentCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		exists, err := c.agentComponent.IsInstanceExistsByContentID(agentCtx, types.AgentTypeCode.String(), repoPath)
+		if err != nil {
+			slog.Error("failed to check if code agent instance exists",
+				slog.String("repo_path", repoPath),
+				slog.String("operation", operation.String()),
+				slog.Any("error", err))
+			return
+		}
+
+		if !exists {
+			slog.Info("code agent instance does not exist, skipping sync",
+				slog.String("repo_path", repoPath),
+				slog.String("operation", operation.String()))
+			return
+		}
+
+		switch operation {
+		case types.CodeAgentSyncOperationUpdate:
+			c.handleAgentSyncForUpdate(agentCtx, userUUID, repoPath)
+		case types.CodeAgentSyncOperationDelete:
+			c.handleAgentSyncForDelete(agentCtx, userUUID, repoPath)
+		default:
+			slog.Warn("unknown operation for agent sync",
+				slog.String("operation", operation.String()),
+				slog.String("repo_path", repoPath))
+		}
+	}()
+}
+
+func (c *spaceComponentImpl) handleAgentSyncForUpdate(ctx context.Context, userUUID, repoPath string) {
+	_, err := c.agentComponent.UpdateInstanceByContentID(ctx, userUUID, types.AgentTypeCode.String(), repoPath, types.UpdateAgentInstanceRequest{})
+	if err != nil {
+		slog.Error("failed to update code agent instance in agent server",
+			slog.String("repo_path", repoPath),
+			slog.Any("error", err))
+		return
+	}
+
+	slog.Info("successfully updated code agent instance in agent server",
+		slog.String("repo_path", repoPath))
+}
+
+func (c *spaceComponentImpl) handleAgentSyncForDelete(ctx context.Context, userUUID, repoPath string) {
+	err := c.agentComponent.DeleteInstanceByContentID(ctx, userUUID, types.AgentTypeCode.String(), repoPath)
+	if err != nil {
+		slog.Error("failed to delete code agent instance in agent server",
+			slog.String("repo_path", repoPath),
+			slog.Any("error", err))
+		return
+	}
+
+	slog.Info("successfully deleted code agent instance in agent server",
+		slog.String("repo_path", repoPath))
+}

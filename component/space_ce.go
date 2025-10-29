@@ -46,6 +46,10 @@ func NewSpaceComponent(config *config.Config) (SpaceComponent, error) {
 		return nil, err
 	}
 	c.templateStore = database.NewSpaceTemplateStore()
+	c.agentComponent, err = NewAgentComponentForSpace(config)
+	if err != nil {
+		return nil, err
+	}
 	return c, nil
 }
 
@@ -67,6 +71,7 @@ type spaceComponentImpl struct {
 	deployTaskStore     database.DeployTaskStore
 	recomStore          database.RecomStore
 	templateStore       database.SpaceTemplateStore
+	agentComponent      AgentComponent
 }
 
 func (c *spaceComponentImpl) checkResourcePurchasableForUpdate(ctx context.Context, req types.UpdateSpaceReq, resource *database.SpaceResource) error {

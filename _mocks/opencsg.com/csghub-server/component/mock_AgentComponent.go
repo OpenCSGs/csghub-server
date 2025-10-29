@@ -596,6 +596,64 @@ func (_c *MockAgentComponent_GetTemplateByID_Call) RunAndReturn(run func(context
 	return _c
 }
 
+// IsInstanceExistsByContentID provides a mock function with given fields: ctx, instanceType, instanceContentID
+func (_m *MockAgentComponent) IsInstanceExistsByContentID(ctx context.Context, instanceType string, instanceContentID string) (bool, error) {
+	ret := _m.Called(ctx, instanceType, instanceContentID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for IsInstanceExistsByContentID")
+	}
+
+	var r0 bool
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) (bool, error)); ok {
+		return rf(ctx, instanceType, instanceContentID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) bool); ok {
+		r0 = rf(ctx, instanceType, instanceContentID)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+		r1 = rf(ctx, instanceType, instanceContentID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAgentComponent_IsInstanceExistsByContentID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'IsInstanceExistsByContentID'
+type MockAgentComponent_IsInstanceExistsByContentID_Call struct {
+	*mock.Call
+}
+
+// IsInstanceExistsByContentID is a helper method to define mock.On call
+//   - ctx context.Context
+//   - instanceType string
+//   - instanceContentID string
+func (_e *MockAgentComponent_Expecter) IsInstanceExistsByContentID(ctx interface{}, instanceType interface{}, instanceContentID interface{}) *MockAgentComponent_IsInstanceExistsByContentID_Call {
+	return &MockAgentComponent_IsInstanceExistsByContentID_Call{Call: _e.mock.On("IsInstanceExistsByContentID", ctx, instanceType, instanceContentID)}
+}
+
+func (_c *MockAgentComponent_IsInstanceExistsByContentID_Call) Run(run func(ctx context.Context, instanceType string, instanceContentID string)) *MockAgentComponent_IsInstanceExistsByContentID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(string))
+	})
+	return _c
+}
+
+func (_c *MockAgentComponent_IsInstanceExistsByContentID_Call) Return(_a0 bool, _a1 error) *MockAgentComponent_IsInstanceExistsByContentID_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAgentComponent_IsInstanceExistsByContentID_Call) RunAndReturn(run func(context.Context, string, string) (bool, error)) *MockAgentComponent_IsInstanceExistsByContentID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ListInstancesByUserUUID provides a mock function with given fields: ctx, userUUID, filter, per, page
 func (_m *MockAgentComponent) ListInstancesByUserUUID(ctx context.Context, userUUID string, filter types.AgentInstanceFilter, per int, page int) ([]*types.AgentInstance, int, error) {
 	ret := _m.Called(ctx, userUUID, filter, per, page)

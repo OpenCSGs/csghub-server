@@ -50,6 +50,7 @@ type AgentInstanceStore interface {
 	Create(ctx context.Context, instance *AgentInstance) (*AgentInstance, error)
 	FindByID(ctx context.Context, id int64) (*AgentInstance, error)
 	FindByContentID(ctx context.Context, instanceType string, contentID string) (*AgentInstance, error)
+	IsInstanceExistsByContentID(ctx context.Context, instanceType string, contentID string) (bool, error)
 	ListByUserUUID(ctx context.Context, userUUID string, filter types.AgentInstanceFilter, per int, page int) ([]AgentInstance, int, error)
 	Update(ctx context.Context, instance *AgentInstance) error
 	Delete(ctx context.Context, id int64) error
@@ -212,6 +213,21 @@ func (s *agentInstanceStoreImpl) FindByContentID(ctx context.Context, instanceTy
 		})
 	}
 	return instance, nil
+}
+
+func (s *agentInstanceStoreImpl) IsInstanceExistsByContentID(ctx context.Context, instanceType string, contentID string) (bool, error) {
+	exists, err := s.db.Core.NewSelect().
+		Model((*AgentInstance)(nil)).
+		Where("type = ? AND content_id = ?", instanceType, contentID).
+		Exists(ctx)
+	if err != nil {
+		return false, errorx.HandleDBError(err, map[string]any{
+			"instance_type": instanceType,
+			"content_id":    contentID,
+		})
+	}
+
+	return exists, nil
 }
 
 func (s *agentInstanceStoreImpl) applyAgentInstanceFilters(query *bun.SelectQuery, filter types.AgentInstanceFilter) *bun.SelectQuery {

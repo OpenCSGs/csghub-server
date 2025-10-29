@@ -169,6 +169,7 @@ type Mocks struct {
 	multiSyncClient  *mock_multisync.MockClient
 	s3Core           *mock_s3.MockCore
 	checker          *mock_checker.MockGitCallbackChecker
+	agentComponent   *mock_component.MockAgentComponent
 }
 
 var AllMockSet = wire.NewSet(

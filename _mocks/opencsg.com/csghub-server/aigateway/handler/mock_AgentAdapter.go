@@ -7,8 +7,6 @@ import (
 
 	gin "github.com/gin-gonic/gin"
 
-	http "net/http"
-
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -126,62 +124,49 @@ func (_c *MockAgentAdapter_Name_Call) RunAndReturn(run func() string) *MockAgent
 	return _c
 }
 
-// PrepareResponseWriter provides a mock function with given fields: ctx, api, stream
-func (_m *MockAgentAdapter) PrepareResponseWriter(ctx *gin.Context, api string, stream bool) (http.ResponseWriter, error) {
-	ret := _m.Called(ctx, api, stream)
+// PrepareProxyContext provides a mock function with given fields: ctx, api
+func (_m *MockAgentAdapter) PrepareProxyContext(ctx *gin.Context, api string) error {
+	ret := _m.Called(ctx, api)
 
 	if len(ret) == 0 {
-		panic("no return value specified for PrepareResponseWriter")
+		panic("no return value specified for PrepareProxyContext")
 	}
 
-	var r0 http.ResponseWriter
-	var r1 error
-	if rf, ok := ret.Get(0).(func(*gin.Context, string, bool) (http.ResponseWriter, error)); ok {
-		return rf(ctx, api, stream)
-	}
-	if rf, ok := ret.Get(0).(func(*gin.Context, string, bool) http.ResponseWriter); ok {
-		r0 = rf(ctx, api, stream)
+	var r0 error
+	if rf, ok := ret.Get(0).(func(*gin.Context, string) error); ok {
+		r0 = rf(ctx, api)
 	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(http.ResponseWriter)
-		}
+		r0 = ret.Error(0)
 	}
 
-	if rf, ok := ret.Get(1).(func(*gin.Context, string, bool) error); ok {
-		r1 = rf(ctx, api, stream)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
+	return r0
 }
 
-// MockAgentAdapter_PrepareResponseWriter_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PrepareResponseWriter'
-type MockAgentAdapter_PrepareResponseWriter_Call struct {
+// MockAgentAdapter_PrepareProxyContext_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PrepareProxyContext'
+type MockAgentAdapter_PrepareProxyContext_Call struct {
 	*mock.Call
 }
 
-// PrepareResponseWriter is a helper method to define mock.On call
+// PrepareProxyContext is a helper method to define mock.On call
 //   - ctx *gin.Context
 //   - api string
-//   - stream bool
-func (_e *MockAgentAdapter_Expecter) PrepareResponseWriter(ctx interface{}, api interface{}, stream interface{}) *MockAgentAdapter_PrepareResponseWriter_Call {
-	return &MockAgentAdapter_PrepareResponseWriter_Call{Call: _e.mock.On("PrepareResponseWriter", ctx, api, stream)}
+func (_e *MockAgentAdapter_Expecter) PrepareProxyContext(ctx interface{}, api interface{}) *MockAgentAdapter_PrepareProxyContext_Call {
+	return &MockAgentAdapter_PrepareProxyContext_Call{Call: _e.mock.On("PrepareProxyContext", ctx, api)}
 }
 
-func (_c *MockAgentAdapter_PrepareResponseWriter_Call) Run(run func(ctx *gin.Context, api string, stream bool)) *MockAgentAdapter_PrepareResponseWriter_Call {
+func (_c *MockAgentAdapter_PrepareProxyContext_Call) Run(run func(ctx *gin.Context, api string)) *MockAgentAdapter_PrepareProxyContext_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(*gin.Context), args[1].(string), args[2].(bool))
+		run(args[0].(*gin.Context), args[1].(string))
 	})
 	return _c
 }
 
-func (_c *MockAgentAdapter_PrepareResponseWriter_Call) Return(_a0 http.ResponseWriter, _a1 error) *MockAgentAdapter_PrepareResponseWriter_Call {
-	_c.Call.Return(_a0, _a1)
+func (_c *MockAgentAdapter_PrepareProxyContext_Call) Return(_a0 error) *MockAgentAdapter_PrepareProxyContext_Call {
+	_c.Call.Return(_a0)
 	return _c
 }
 
-func (_c *MockAgentAdapter_PrepareResponseWriter_Call) RunAndReturn(run func(*gin.Context, string, bool) (http.ResponseWriter, error)) *MockAgentAdapter_PrepareResponseWriter_Call {
+func (_c *MockAgentAdapter_PrepareProxyContext_Call) RunAndReturn(run func(*gin.Context, string) error) *MockAgentAdapter_PrepareProxyContext_Call {
 	_c.Call.Return(run)
 	return _c
 }

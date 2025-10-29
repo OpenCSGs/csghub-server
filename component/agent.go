@@ -32,6 +32,7 @@ type AgentComponent interface {
 	// Instance operations
 	CreateInstance(ctx context.Context, instance *types.AgentInstance) error
 	GetInstanceByID(ctx context.Context, id int64, userUUID string) (*types.AgentInstance, error)
+	IsInstanceExistsByContentID(ctx context.Context, instanceType string, instanceContentID string) (bool, error)
 	ListInstancesByUserUUID(ctx context.Context, userUUID string, filter types.AgentInstanceFilter, per int, page int) ([]*types.AgentInstance, int, error)
 	UpdateInstance(ctx context.Context, instance *types.AgentInstance) error
 	UpdateInstanceByContentID(ctx context.Context, userUUID string, instanceType string, instanceContentID string, updateRequest types.UpdateAgentInstanceRequest) (*types.AgentInstance, error)
@@ -99,6 +100,20 @@ func NewAgentComponent(config *config.Config) (AgentComponent, error) {
 		slog.Error("failed to process session history message", slog.Any("error", err))
 		return nil, err
 	}
+	return c, nil
+}
+
+// NewAgentComponentForSpace creates a lightweight AgentComponent for code agent updated and deleted in space component
+func NewAgentComponentForSpace(config *config.Config) (AgentComponent, error) {
+	c := &agentComponentImpl{
+		config:        config,
+		instanceStore: database.NewAgentInstanceStore(),
+	}
+
+	notificationSvcClient := rpc.NewNotificationSvcHttpClientBuilder(fmt.Sprintf("%s:%d", config.Notification.Host, config.Notification.Port),
+		rpc.AuthWithApiKey(config.APIToken)).WithRetry(3).WithDelay(time.Millisecond * 200).Build()
+	c.notificationSvcClient = notificationSvcClient
+
 	return c, nil
 }
 
@@ -382,6 +397,10 @@ func (c *agentComponentImpl) GetInstanceByID(ctx context.Context, id int64, user
 		CreatedAt:   dbInstance.CreatedAt,
 		UpdatedAt:   dbInstance.UpdatedAt,
 	}, nil
+}
+
+func (c *agentComponentImpl) IsInstanceExistsByContentID(ctx context.Context, instanceType string, instanceContentID string) (bool, error) {
+	return c.instanceStore.IsInstanceExistsByContentID(ctx, instanceType, instanceContentID)
 }
 
 // ListInstancesByUserUUID lists all instances for a specific user

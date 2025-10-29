@@ -330,6 +330,12 @@ func TestSpaceComponent_Delete(t *testing.T) {
 		mock.Anything, types.SpaceRepo, int64(2), int64(3), int64(4),
 	).Return(nil)
 
+	// Mock the agent component call for syncCodeAgentIfExists
+	sc.mocks.agentComponent.EXPECT().
+		IsInstanceExistsByContentID(mock.Anything, types.AgentTypeCode.String(), "ns/n").
+		Return(false, nil).
+		Once()
+
 	var wg sync.WaitGroup
 	wg.Add(1)
 	sc.mocks.components.repo.EXPECT().
@@ -377,6 +383,12 @@ func TestSpaceComponent_Deploy(t *testing.T) {
 			ContainerPort: 8080,
 			SKU:           "1",
 		}).Return(123, nil)
+
+		// Mock the agent component call for syncCodeAgentIfExists
+		sc.mocks.agentComponent.EXPECT().
+			IsInstanceExistsByContentID(mock.Anything, types.AgentTypeCode.String(), "foo1/bar1").
+			Return(false, nil).
+			Once()
 
 		id, err := sc.Deploy(ctx, "ns1", "n1", "user")
 		require.Nil(t, err)
@@ -640,5 +652,200 @@ func TestSpaceComponent_GetMCPServiceBySvcName(t *testing.T) {
 		_, err := sc.GetMCPServiceBySvcName(ctx, svcName)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "failed to get space by id")
+	})
+}
+
+func TestSpaceComponent_syncCodeAgentIfExists(t *testing.T) {
+	ctx := context.Background()
+	sc := initializeTestSpaceComponent(ctx, t)
+
+	userUUID := "test-user-uuid"
+	repoPath := "test-namespace/test-repo"
+	operation := types.CodeAgentSyncOperationUpdate
+
+	t.Run("agent instance exists - update operation", func(t *testing.T) {
+		var wg sync.WaitGroup
+		wg.Add(2)
+
+		// Mock the agent component to return that instance exists
+		sc.mocks.agentComponent.EXPECT().
+			IsInstanceExistsByContentID(mock.Anything, types.AgentTypeCode.String(), repoPath).
+			Return(true, nil).
+			Run(func(ctx context.Context, instanceType string, instanceContentID string) {
+				wg.Done()
+			}).
+			Once()
+
+		// Mock the update operation
+		sc.mocks.agentComponent.EXPECT().
+			UpdateInstanceByContentID(mock.Anything, userUUID, types.AgentTypeCode.String(), repoPath, types.UpdateAgentInstanceRequest{}).
+			Return(&types.AgentInstance{}, nil).
+			Run(func(ctx context.Context, userUUID string, instanceType string, instanceContentID string, updateRequest types.UpdateAgentInstanceRequest) {
+				wg.Done()
+			}).
+			Once()
+
+		// Call the function
+		sc.syncCodeAgentIfExists(userUUID, repoPath, operation)
+
+		// Wait for the goroutine to complete
+		wg.Wait()
+	})
+
+	t.Run("agent instance exists - delete operation", func(t *testing.T) {
+		var wg sync.WaitGroup
+		wg.Add(2)
+		operation := types.CodeAgentSyncOperationDelete
+
+		// Mock the agent component to return that instance exists
+		sc.mocks.agentComponent.EXPECT().
+			IsInstanceExistsByContentID(mock.Anything, types.AgentTypeCode.String(), repoPath).
+			Return(true, nil).
+			Run(func(ctx context.Context, instanceType string, instanceContentID string) {
+				wg.Done()
+			}).
+			Once()
+
+		// Mock the delete operation
+		sc.mocks.agentComponent.EXPECT().
+			DeleteInstanceByContentID(mock.Anything, userUUID, types.AgentTypeCode.String(), repoPath).
+			Return(nil).
+			Run(func(ctx context.Context, userUUID string, instanceType string, instanceContentID string) {
+				wg.Done()
+			}).
+			Once()
+
+		// Call the function
+		sc.syncCodeAgentIfExists(userUUID, repoPath, operation)
+
+		// Wait for the goroutine to complete
+		wg.Wait()
+	})
+
+	t.Run("agent instance does not exist", func(t *testing.T) {
+		var wg sync.WaitGroup
+		wg.Add(1)
+
+		// Mock the agent component to return that instance does not exist
+		sc.mocks.agentComponent.EXPECT().
+			IsInstanceExistsByContentID(mock.Anything, types.AgentTypeCode.String(), repoPath).
+			Return(false, nil).
+			Run(func(ctx context.Context, instanceType string, instanceContentID string) {
+				wg.Done()
+			}).
+			Once()
+
+		// Call the function
+		sc.syncCodeAgentIfExists(userUUID, repoPath, operation)
+
+		// Wait for the goroutine to complete
+		wg.Wait()
+	})
+
+	t.Run("error checking if instance exists", func(t *testing.T) {
+		var wg sync.WaitGroup
+		wg.Add(1)
+
+		// Mock the agent component to return an error
+		sc.mocks.agentComponent.EXPECT().
+			IsInstanceExistsByContentID(mock.Anything, types.AgentTypeCode.String(), repoPath).
+			Return(false, errors.New("database error")).
+			Run(func(ctx context.Context, instanceType string, instanceContentID string) {
+				wg.Done()
+			}).
+			Once()
+
+		// Call the function
+		sc.syncCodeAgentIfExists(userUUID, repoPath, operation)
+
+		// Wait for the goroutine to complete
+		wg.Wait()
+	})
+
+	t.Run("unknown operation", func(t *testing.T) {
+		var wg sync.WaitGroup
+		wg.Add(1)
+		unknownOperation := types.CodeAgentSyncOperation("unknown")
+
+		// Mock the agent component to return that instance exists
+		sc.mocks.agentComponent.EXPECT().
+			IsInstanceExistsByContentID(mock.Anything, types.AgentTypeCode.String(), repoPath).
+			Return(true, nil).
+			Run(func(ctx context.Context, instanceType string, instanceContentID string) {
+				wg.Done()
+			}).
+			Once()
+
+		// Call the function
+		sc.syncCodeAgentIfExists(userUUID, repoPath, unknownOperation)
+
+		// Wait for the goroutine to complete
+		wg.Wait()
+	})
+}
+
+func TestSpaceComponent_handleAgentSyncForUpdate(t *testing.T) {
+	ctx := context.Background()
+	sc := initializeTestSpaceComponent(ctx, t)
+
+	userUUID := "test-user-uuid"
+	repoPath := "test-namespace/test-repo"
+
+	t.Run("successful update", func(t *testing.T) {
+		testName := "test-agent"
+		expectedInstance := &types.AgentInstance{
+			ID:   1,
+			Name: &testName,
+		}
+
+		// Mock the update operation
+		sc.mocks.agentComponent.EXPECT().
+			UpdateInstanceByContentID(ctx, userUUID, types.AgentTypeCode.String(), repoPath, types.UpdateAgentInstanceRequest{}).
+			Return(expectedInstance, nil).
+			Once()
+
+		// Call the function
+		sc.handleAgentSyncForUpdate(ctx, userUUID, repoPath)
+	})
+
+	t.Run("update fails", func(t *testing.T) {
+		// Mock the update operation to return an error
+		sc.mocks.agentComponent.EXPECT().
+			UpdateInstanceByContentID(ctx, userUUID, types.AgentTypeCode.String(), repoPath, types.UpdateAgentInstanceRequest{}).
+			Return(nil, errors.New("update failed")).
+			Once()
+
+		// Call the function
+		sc.handleAgentSyncForUpdate(ctx, userUUID, repoPath)
+	})
+}
+
+func TestSpaceComponent_handleAgentSyncForDelete(t *testing.T) {
+	ctx := context.Background()
+	sc := initializeTestSpaceComponent(ctx, t)
+
+	userUUID := "test-user-uuid"
+	repoPath := "test-namespace/test-repo"
+
+	t.Run("successful delete", func(t *testing.T) {
+		// Mock the delete operation
+		sc.mocks.agentComponent.EXPECT().
+			DeleteInstanceByContentID(ctx, userUUID, types.AgentTypeCode.String(), repoPath).
+			Return(nil).
+			Once()
+
+		// Call the function
+		sc.handleAgentSyncForDelete(ctx, userUUID, repoPath)
+	})
+
+	t.Run("delete fails", func(t *testing.T) {
+		// Mock the delete operation to return an error
+		sc.mocks.agentComponent.EXPECT().
+			DeleteInstanceByContentID(ctx, userUUID, types.AgentTypeCode.String(), repoPath).
+			Return(errors.New("delete failed")).
+			Once()
+
+		// Call the function
+		sc.handleAgentSyncForDelete(ctx, userUUID, repoPath)
 	})
 }

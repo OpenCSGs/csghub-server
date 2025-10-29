@@ -225,9 +225,11 @@ func initializeTestSpaceComponent(ctx context.Context, t interface {
 	mockGitServer := gitserver.NewMockGitServer(t)
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockAccountingComponent := component.NewMockAccountingComponent(t)
+	mockAgentComponent := component.NewMockAgentComponent(t)
 	config := ProvideTestConfig()
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
 	componentSpaceComponentImpl := NewTestSpaceComponent(mockStores, mockRepoComponent, mockGitServer, mockDeployer, mockAccountingComponent, config, mockUserSvcClient)
+	componentSpaceComponentImpl.agentComponent = mockAgentComponent
 	mockTagComponent := component.NewMockTagComponent(t)
 	mockSpaceComponent := component.NewMockSpaceComponent(t)
 	mockRuntimeArchitectureComponent := component.NewMockRuntimeArchitectureComponent(t)
@@ -270,6 +272,7 @@ func initializeTestSpaceComponent(ctx context.Context, t interface {
 		multiSyncClient:  multisyncMockClient,
 		s3Core:           mockCore,
 		checker:          mockGitCallbackChecker,
+		agentComponent:   mockAgentComponent,
 	}
 	componentTestSpaceWithMocks := &testSpaceWithMocks{
 		spaceComponentImpl: componentSpaceComponentImpl,
