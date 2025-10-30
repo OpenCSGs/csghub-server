@@ -283,7 +283,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		tokenGroup.PUT("/:app/:token_name", userProxyHandler.ProxyToApi("/api/v1/token/%s/%s", "app", "token_name"))
 		tokenGroup.DELETE("/:app/:token_name", userProxyHandler.ProxyToApi("/api/v1/token/%s/%s", "app", "token_name"))
 		// check token info
-		tokenGroup.GET("/:token_value", middlewareCollection.Auth.NeedAPIKey, userProxyHandler.ProxyToApi("/api/v1/token/%s", "token_value"))
+		tokenGroup.GET("/:token_value", userProxyHandler.ProxyToApi("/api/v1/token/%s", "token_value"))
 	}
 
 	sshKeyHandler, err := handler.NewSSHKeyHandler(config)
