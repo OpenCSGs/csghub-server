@@ -331,10 +331,16 @@ func TestSpaceComponent_Delete(t *testing.T) {
 	).Return(nil)
 
 	// Mock the agent component call for syncCodeAgentIfExists
+	var wgAgent sync.WaitGroup
+	wgAgent.Add(1)
 	sc.mocks.agentComponent.EXPECT().
-		IsInstanceExistsByContentID(mock.Anything, types.AgentTypeCode.String(), "ns/n").
-		Return(false, nil).
-		Once()
+		IsInstanceExistsByContentID(mock.Anything, mock.MatchedBy(func(instanceType string) bool {
+			return instanceType == types.AgentTypeCode.String()
+		}), "ns/n").
+		RunAndReturn(func(ctx context.Context, instanceType string, instanceContentID string) (bool, error) {
+			wgAgent.Done()
+			return false, nil
+		}).Once()
 
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -354,6 +360,7 @@ func TestSpaceComponent_Delete(t *testing.T) {
 	require.Nil(t, err)
 	wg.Wait()
 	wgstop.Wait()
+	wgAgent.Wait()
 }
 
 func TestSpaceComponent_Deploy(t *testing.T) {
@@ -385,14 +392,21 @@ func TestSpaceComponent_Deploy(t *testing.T) {
 		}).Return(123, nil)
 
 		// Mock the agent component call for syncCodeAgentIfExists
+		var wgAgent sync.WaitGroup
+		wgAgent.Add(1)
 		sc.mocks.agentComponent.EXPECT().
-			IsInstanceExistsByContentID(mock.Anything, types.AgentTypeCode.String(), "foo1/bar1").
-			Return(false, nil).
-			Once()
+			IsInstanceExistsByContentID(mock.Anything, mock.MatchedBy(func(instanceType string) bool {
+				return instanceType == types.AgentTypeCode.String()
+			}), "foo1/bar1").
+			RunAndReturn(func(ctx context.Context, instanceType string, instanceContentID string) (bool, error) {
+				wgAgent.Done()
+				return false, nil
+			}).Once()
 
 		id, err := sc.Deploy(ctx, "ns1", "n1", "user")
 		require.Nil(t, err)
 		require.Equal(t, int64(123), id)
+		wgAgent.Wait()
 	})
 	t.Run("DeployWithoutAppFile", func(t *testing.T) {
 		sc.mocks.stores.SpaceMock().EXPECT().FindByPath(ctx, "ns2", "n2").Return(&database.Space{
