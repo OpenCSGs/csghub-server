@@ -147,9 +147,16 @@ func (c *agentComponentImpl) CreateTemplate(ctx context.Context, template *types
 		Type:        *template.Type,
 		UserUUID:    *template.UserUUID,
 		Name:        *template.Name,
-		Description: *template.Description,
-		Content:     *template.Content,
-		Public:      template.Public,
+		Description: common.SafeDeref(template.Description),
+		Content:     common.SafeDeref(template.Content),
+	}
+
+	if template.Public != nil {
+		dbTemplate.Public = *template.Public
+	}
+
+	if template.Metadata != nil {
+		dbTemplate.Metadata = *template.Metadata
 	}
 
 	createdTemplate, err := c.templateStore.Create(ctx, dbTemplate)
@@ -158,6 +165,8 @@ func (c *agentComponentImpl) CreateTemplate(ctx context.Context, template *types
 		return err
 	}
 	template.ID = createdTemplate.ID
+	template.UpdatedAt = createdTemplate.UpdatedAt
+	template.CreatedAt = createdTemplate.CreatedAt
 
 	return nil
 }
@@ -189,7 +198,8 @@ func (c *agentComponentImpl) GetTemplateByID(ctx context.Context, id int64, user
 		Name:        &dbTemplate.Name,
 		Description: &dbTemplate.Description,
 		Content:     &dbTemplate.Content,
-		Public:      dbTemplate.Public,
+		Public:      &dbTemplate.Public,
+		Metadata:    &dbTemplate.Metadata,
 		CreatedAt:   dbTemplate.CreatedAt,
 		UpdatedAt:   dbTemplate.UpdatedAt,
 	}, nil
@@ -215,7 +225,8 @@ func (c *agentComponentImpl) ListTemplatesByUserUUID(ctx context.Context, userUU
 			UserUUID:    &dbTemplate.UserUUID,
 			Name:        &dbTemplate.Name,
 			Description: &dbTemplate.Description,
-			Public:      dbTemplate.Public,
+			Public:      &dbTemplate.Public,
+			Metadata:    &dbTemplate.Metadata,
 			CreatedAt:   dbTemplate.CreatedAt,
 			UpdatedAt:   dbTemplate.UpdatedAt,
 		})
@@ -235,28 +246,37 @@ func (c *agentComponentImpl) UpdateTemplate(ctx context.Context, template *types
 	}
 
 	// Verify the template exists before updating
-	existing, err := c.templateStore.FindByID(ctx, template.ID)
+	dbTemplate, err := c.templateStore.FindByID(ctx, template.ID)
 	if err != nil {
 		return err
 	}
 
 	// Ensure the user can only update their own templates
-	if existing.UserUUID != *template.UserUUID {
+	if dbTemplate.UserUUID != *template.UserUUID {
 		return errorx.Forbidden(nil, map[string]any{
 			"template_id": template.ID,
 			"user_uuid":   *template.UserUUID,
 		})
 	}
 
-	// Convert types.AgentTemplate to database.AgentTemplate
-	dbTemplate := &database.AgentTemplate{
-		ID:          template.ID,
-		Type:        *template.Type,
-		UserUUID:    *template.UserUUID,
-		Name:        *template.Name,
-		Description: *template.Description,
-		Content:     *template.Content,
-		Public:      template.Public,
+	if template.Name != nil {
+		dbTemplate.Name = *template.Name
+	}
+
+	if template.Description != nil {
+		dbTemplate.Description = *template.Description
+	}
+
+	if template.Content != nil {
+		dbTemplate.Content = *template.Content
+	}
+
+	if template.Metadata != nil {
+		dbTemplate.Metadata = *template.Metadata
+	}
+
+	if template.Public != nil {
+		dbTemplate.Public = *template.Public
 	}
 
 	return c.templateStore.Update(ctx, dbTemplate)
@@ -324,6 +344,7 @@ func (c *agentComponentImpl) CreateInstance(ctx context.Context, instance *types
 		Public:      instance.Public,
 		Name:        creationResult.Name,
 		Description: creationResult.Description,
+		Metadata:    creationResult.Metadata,
 	}
 
 	if instance.TemplateID != nil {
@@ -345,6 +366,7 @@ func (c *agentComponentImpl) CreateInstance(ctx context.Context, instance *types
 	instance.ContentID = &createdInstance.ContentID
 	instance.Name = &createdInstance.Name
 	instance.Description = &createdInstance.Description
+	instance.Metadata = createdInstance.Metadata
 	instance.Editable = true
 	instance.CreatedAt = createdInstance.CreatedAt
 	instance.UpdatedAt = createdInstance.UpdatedAt

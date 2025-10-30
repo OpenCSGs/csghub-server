@@ -7,15 +7,16 @@ import (
 
 // AgentTemplate represents the template for an agent
 type AgentTemplate struct {
-	ID          int64     `json:"id"`
-	Type        *string   `json:"type" binding:"required"`                 // Possible values: langflow, agno, code, etc.
-	UserUUID    *string   `json:"-"`                                       // Will be set from HTTP header using httpbase.GetCurrentUserUUID
-	Name        *string   `json:"name" binding:"required,max=255"`         // Agent template name
-	Description *string   `json:"description" binding:"omitempty,max=500"` // Agent template description
-	Content     *string   `json:"content" binding:"required"`              // Used to store the complete content of the template
-	Public      bool      `json:"public"`                                  // Whether the template is public
-	CreatedAt   time.Time `json:"created_at"`                              // When the template was created
-	UpdatedAt   time.Time `json:"updated_at"`                              // When the template was last updated
+	ID          int64           `json:"id"`
+	Type        *string         `json:"type" binding:"required"`                 // Possible values: langflow, agno, code, etc.
+	UserUUID    *string         `json:"-"`                                       // Will be set from HTTP header using httpbase.GetCurrentUserUUID
+	Name        *string         `json:"name" binding:"required,max=255"`         // Agent template name
+	Description *string         `json:"description" binding:"omitempty,max=500"` // Agent template description
+	Content     *string         `json:"content,omitempty"`                       // Used to store the complete content of the template
+	Public      *bool           `json:"public,omitempty"`                        // Whether the template is public
+	Metadata    *map[string]any `json:"metadata,omitempty"`                      // Template metadata
+	CreatedAt   time.Time       `json:"created_at"`                              // When the template was created
+	UpdatedAt   time.Time       `json:"updated_at"`                              // When the template was last updated
 }
 
 type AgentTemplateFilter struct {

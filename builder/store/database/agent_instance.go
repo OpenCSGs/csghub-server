@@ -11,13 +11,14 @@ import (
 
 // AgentTemplate represents the template for an agent
 type AgentTemplate struct {
-	ID          int64  `bun:",pk,autoincrement" json:"id"`
-	Type        string `bun:",notnull" json:"type"`         // Possible values: langflow, agno, code, etc.
-	UserUUID    string `bun:",notnull" json:"user_uuid"`    // Associated with the corresponding field in the User table
-	Name        string `bun:",notnull" json:"name"`         // Agent template name
-	Description string `bun:",nullzero" json:"description"` // Agent template description
-	Content     string `bun:",type:text" json:"content"`    // Used to store the complete content of the template
-	Public      bool   `bun:",notnull" json:"public"`       // Whether the template is public
+	ID          int64          `bun:",pk,autoincrement" json:"id"`
+	Type        string         `bun:",notnull" json:"type"`         // Possible values: langflow, agno, code, etc.
+	UserUUID    string         `bun:",notnull" json:"user_uuid"`    // Associated with the corresponding field in the User table
+	Name        string         `bun:",notnull" json:"name"`         // Agent template name
+	Description string         `bun:",nullzero" json:"description"` // Agent template description
+	Content     string         `bun:",type:text" json:"content"`    // Used to store the complete content of the template
+	Public      bool           `bun:",notnull" json:"public"`       // Whether the template is public
+	Metadata    map[string]any `bun:",type:jsonb" json:"metadata"`  // Template metadata
 	times
 }
 

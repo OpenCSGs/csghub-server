@@ -84,13 +84,22 @@ func (a *LangflowAgentInstanceAdapter) CreateInstance(ctx context.Context, userU
 		Data:        data,
 	})
 	if err != nil {
+		slog.Error("failed to create agent instance in agenthub service", "user_uuid", userUUID, "error", err)
 		return nil, err
+	}
+
+	if template != nil {
+		if instance.Metadata == nil {
+			instance.Metadata = make(map[string]any)
+		}
+		instance.Metadata["template_metadata"] = template.Metadata
 	}
 
 	return &types.AgentInstanceCreationResult{
 		ID:          resp.ID,
 		Name:        resp.Name,
 		Description: resp.Description,
+		Metadata:    instance.Metadata,
 	}, nil
 }
 
