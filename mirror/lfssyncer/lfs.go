@@ -617,7 +617,7 @@ func (w *LfsSyncWorker) downloadAndUploadLFSFile(
 			return fmt.Errorf("failed to create new multipart upload: %w", err)
 		}
 
-		err = w.syncCache.CacheUploadID(ctx, repoPath, pointer.Oid, uploadID, strconv.Itoa(w.config.Mirror.PartSize))
+		err = w.syncCache.CacheUploadID(ctx, repoPath, pointer.Oid, strconv.Itoa(w.config.Mirror.PartSize), uploadID)
 		if err != nil {
 			slog.Error(
 				"failed to cache upload id",

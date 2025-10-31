@@ -60,6 +60,7 @@ func (h *DataflowProxyHandler) Proxy(ctx *gin.Context) {
 	ctx.Request.Header.Set("User-Id", fmt.Sprintf("%d", u.ID))
 	ctx.Request.Header.Set("User-Name", u.Username)
 	ctx.Request.Header.Set("User-Token", token)
+	ctx.Request.Header.Set("User-Email", u.Email)
 	ctx.Request.Header.Set("isadmin", fmt.Sprintf("%t", u.CanAdmin()))
 	// Log the request URL and header
 	slog.Debug("http request", slog.Any("request", ctx.Request.URL), slog.Any("header", ctx.Request.Header))
