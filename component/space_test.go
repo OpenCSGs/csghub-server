@@ -21,16 +21,15 @@ func TestSpaceComponent_Show(t *testing.T) {
 	ctx := context.TODO()
 	sc := initializeTestSpaceComponent(ctx, t)
 
-	sc.mocks.stores.SpaceMock().EXPECT().FindByPath(ctx, "ns", "n").Return(&database.Space{
+	dbRepo := &database.Repository{ID: 123, Name: "n", Path: "foo/bar", Tags: []database.Tag{{Name: "t1"}}}
+	dbSpace := &database.Space{
 		ID:         1,
-		Repository: &database.Repository{ID: 123, Name: "n", Path: "foo/bar"},
+		Repository: dbRepo,
 		HasAppFile: true,
-	}, nil)
-	sc.mocks.components.repo.EXPECT().GetUserRepoPermission(ctx, "user", &database.Repository{
-		ID:   123,
-		Name: "n",
-		Path: "foo/bar",
-	}).Return(
+	}
+
+	sc.mocks.stores.SpaceMock().EXPECT().FindByPath(ctx, "ns", "n").Return(dbSpace, nil)
+	sc.mocks.components.repo.EXPECT().GetUserRepoPermission(ctx, "user", dbRepo).Return(
 		&types.UserRepoPermission{CanRead: true, CanAdmin: true}, nil,
 	)
 	sc.mocks.components.repo.EXPECT().GetNameSpaceInfo(ctx, "ns").Return(&types.Namespace{Path: "ns"}, nil)
@@ -67,9 +66,11 @@ func TestSpaceComponent_Show(t *testing.T) {
 			HTTPCloneURL: "/s/foo/bar.git",
 			SSHCloneURL:  ":s/foo/bar.git",
 		},
+		Tags:     []types.RepoTag{{Name: "t1"}},
 		Endpoint: "endpoint/svc",
 		SvcName:  "svc",
 	}, space)
+	require.Equal(t, []types.RepoTag{{Name: "t1"}}, space.Tags)
 }
 
 func TestSpaceComponent_Index(t *testing.T) {
@@ -522,7 +523,7 @@ func TestSpaceComponent_Logs(t *testing.T) {
 		Name:      "n",
 	}).Return(&deploy.MultiLogReader{}, nil)
 
-	r, err := sc.Logs(ctx, "ns", "n")
+	r, err := sc.Logs(ctx, "ns", "n", "")
 
 	require.Nil(t, err)
 	require.Equal(t, &deploy.MultiLogReader{}, r)
@@ -575,4 +576,70 @@ func TestSpaceComponent_MCPIndex(t *testing.T) {
 		{ID: 12, RepositoryID: 124, Name: "r2", Status: "NoAppFile"},
 	}, data)
 
+}
+
+func TestSpaceComponent_GetMCPServiceBySvcName(t *testing.T) {
+	ctx := context.Background()
+	sc := initializeTestSpaceComponent(ctx, t)
+	svcName := "test-svc"
+
+	deploy := &database.Deploy{
+		ID:      1,
+		SpaceID: 1,
+		SvcName: svcName,
+		Status:  23, // Corresponds to Running
+		RepoID:  1,
+	}
+
+	repo := database.Repository{
+		ID:          1,
+		Name:        "test-space",
+		Path:        "test/test-space",
+		Description: "test description",
+		License:     "mit",
+		Private:     false,
+		User:        database.User{},
+	}
+
+	space := &database.Space{
+		ID:           1,
+		RepositoryID: 1,
+		Repository:   &repo,
+		HasAppFile:   true,
+		Env:          "{}",
+	}
+
+	t.Run("success", func(t *testing.T) {
+		sc.mocks.stores.DeployTaskMock().EXPECT().GetDeployBySvcName(ctx, svcName).Return(deploy, nil).Once()
+		sc.mocks.stores.SpaceMock().EXPECT().ByID(ctx, deploy.SpaceID).Return(space, nil).Once()
+		sc.mocks.stores.DeployTaskMock().EXPECT().GetLatestDeployBySpaceID(ctx, space.ID).Return(deploy, nil).Once()
+
+		mcpService, err := sc.GetMCPServiceBySvcName(ctx, svcName)
+
+		require.NoError(t, err)
+		require.NotNil(t, mcpService)
+		require.Equal(t, space.ID, mcpService.ID)
+		require.Equal(t, "test-space", mcpService.Name)
+		require.Equal(t, "test/test-space", mcpService.Path)
+		require.Equal(t, "test-svc", mcpService.SvcName)
+		require.Equal(t, "Running", mcpService.Status)
+		require.Equal(t, "endpoint/test-svc", mcpService.Endpoint)
+	})
+
+	t.Run("deploy not found", func(t *testing.T) {
+		sc.mocks.stores.DeployTaskMock().EXPECT().GetDeployBySvcName(ctx, svcName).Return(nil, errors.New("not found")).Once()
+
+		_, err := sc.GetMCPServiceBySvcName(ctx, svcName)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "failed to get deploy by svcName")
+	})
+
+	t.Run("space not found", func(t *testing.T) {
+		sc.mocks.stores.DeployTaskMock().EXPECT().GetDeployBySvcName(ctx, svcName).Return(deploy, nil).Once()
+		sc.mocks.stores.SpaceMock().EXPECT().ByID(ctx, deploy.SpaceID).Return(nil, errors.New("not found")).Once()
+
+		_, err := sc.GetMCPServiceBySvcName(ctx, svcName)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "failed to get space by id")
+	})
 }
