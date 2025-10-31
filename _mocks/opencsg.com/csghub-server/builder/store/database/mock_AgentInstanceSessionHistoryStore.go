@@ -175,6 +175,65 @@ func (_c *MockAgentInstanceSessionHistoryStore_FindByID_Call) RunAndReturn(run f
 	return _c
 }
 
+// FindByUUID provides a mock function with given fields: ctx, uuid
+func (_m *MockAgentInstanceSessionHistoryStore) FindByUUID(ctx context.Context, uuid string) (*database.AgentInstanceSessionHistory, error) {
+	ret := _m.Called(ctx, uuid)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FindByUUID")
+	}
+
+	var r0 *database.AgentInstanceSessionHistory
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*database.AgentInstanceSessionHistory, error)); ok {
+		return rf(ctx, uuid)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *database.AgentInstanceSessionHistory); ok {
+		r0 = rf(ctx, uuid)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.AgentInstanceSessionHistory)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, uuid)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAgentInstanceSessionHistoryStore_FindByUUID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindByUUID'
+type MockAgentInstanceSessionHistoryStore_FindByUUID_Call struct {
+	*mock.Call
+}
+
+// FindByUUID is a helper method to define mock.On call
+//   - ctx context.Context
+//   - uuid string
+func (_e *MockAgentInstanceSessionHistoryStore_Expecter) FindByUUID(ctx interface{}, uuid interface{}) *MockAgentInstanceSessionHistoryStore_FindByUUID_Call {
+	return &MockAgentInstanceSessionHistoryStore_FindByUUID_Call{Call: _e.mock.On("FindByUUID", ctx, uuid)}
+}
+
+func (_c *MockAgentInstanceSessionHistoryStore_FindByUUID_Call) Run(run func(ctx context.Context, uuid string)) *MockAgentInstanceSessionHistoryStore_FindByUUID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockAgentInstanceSessionHistoryStore_FindByUUID_Call) Return(_a0 *database.AgentInstanceSessionHistory, _a1 error) *MockAgentInstanceSessionHistoryStore_FindByUUID_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAgentInstanceSessionHistoryStore_FindByUUID_Call) RunAndReturn(run func(context.Context, string) (*database.AgentInstanceSessionHistory, error)) *MockAgentInstanceSessionHistoryStore_FindByUUID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ListBySessionID provides a mock function with given fields: ctx, sessionID
 func (_m *MockAgentInstanceSessionHistoryStore) ListBySessionID(ctx context.Context, sessionID int64) ([]database.AgentInstanceSessionHistory, error) {
 	ret := _m.Called(ctx, sessionID)
@@ -230,6 +289,54 @@ func (_c *MockAgentInstanceSessionHistoryStore_ListBySessionID_Call) Return(_a0 
 }
 
 func (_c *MockAgentInstanceSessionHistoryStore_ListBySessionID_Call) RunAndReturn(run func(context.Context, int64) ([]database.AgentInstanceSessionHistory, error)) *MockAgentInstanceSessionHistoryStore_ListBySessionID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// Rewrite provides a mock function with given fields: ctx, originalMsgUUID, history
+func (_m *MockAgentInstanceSessionHistoryStore) Rewrite(ctx context.Context, originalMsgUUID string, history *database.AgentInstanceSessionHistory) error {
+	ret := _m.Called(ctx, originalMsgUUID, history)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Rewrite")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, *database.AgentInstanceSessionHistory) error); ok {
+		r0 = rf(ctx, originalMsgUUID, history)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockAgentInstanceSessionHistoryStore_Rewrite_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Rewrite'
+type MockAgentInstanceSessionHistoryStore_Rewrite_Call struct {
+	*mock.Call
+}
+
+// Rewrite is a helper method to define mock.On call
+//   - ctx context.Context
+//   - originalMsgUUID string
+//   - history *database.AgentInstanceSessionHistory
+func (_e *MockAgentInstanceSessionHistoryStore_Expecter) Rewrite(ctx interface{}, originalMsgUUID interface{}, history interface{}) *MockAgentInstanceSessionHistoryStore_Rewrite_Call {
+	return &MockAgentInstanceSessionHistoryStore_Rewrite_Call{Call: _e.mock.On("Rewrite", ctx, originalMsgUUID, history)}
+}
+
+func (_c *MockAgentInstanceSessionHistoryStore_Rewrite_Call) Run(run func(ctx context.Context, originalMsgUUID string, history *database.AgentInstanceSessionHistory)) *MockAgentInstanceSessionHistoryStore_Rewrite_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(*database.AgentInstanceSessionHistory))
+	})
+	return _c
+}
+
+func (_c *MockAgentInstanceSessionHistoryStore_Rewrite_Call) Return(_a0 error) *MockAgentInstanceSessionHistoryStore_Rewrite_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockAgentInstanceSessionHistoryStore_Rewrite_Call) RunAndReturn(run func(context.Context, string, *database.AgentInstanceSessionHistory) error) *MockAgentInstanceSessionHistoryStore_Rewrite_Call {
 	_c.Call.Return(run)
 	return _c
 }

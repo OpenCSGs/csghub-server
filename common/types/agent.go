@@ -134,37 +134,85 @@ type RecordAgentInstanceSessionHistoryRequest struct {
 
 type CreateSessionHistoryRequest struct {
 	SessionUUID string                  `json:"-"`
-	Messages    []SessionHistoryMessage `json:"messages"`
+	Messages    []SessionHistoryMessage `json:"messages" binding:"required"`
 }
 
 type SessionHistoryMessage struct {
-	Request bool   `json:"request"` // true: request, false: response
-	Content string `json:"content"` // message content
+	Request bool   `json:"request"`           // true: request, false: response
+	Content string `json:"content,omitempty"` // message content
 }
 
-type CreateSessionHistoryMessage struct {
-	MsgUUID     string `json:"msg_uuid"`
-	SessionID   int64  `json:"session_id"`
-	SessionUUID string `json:"session_uuid"`
-	Request     bool   `json:"request"`
-	Content     string `json:"content"`
+type CreateSessionHistoryResponse struct {
+	MsgUUIDs []string `json:"msg_uuids"`
+}
+
+type SessionHistoryMessageType string
+
+const (
+	SessionHistoryMessageTypeCreate         SessionHistoryMessageType = "create"
+	SessionHistoryMessageTypeUpdateFeedback SessionHistoryMessageType = "update_feedback"
+	SessionHistoryMessageTypeRewrite        SessionHistoryMessageType = "rewrite"
+)
+
+// SessionHistoryMessageEnvelope is a unified message structure for all session history operations
+type SessionHistoryMessageEnvelope struct {
+	// Common fields
+	MessageType SessionHistoryMessageType `json:"message_type"`
+	MsgUUID     string                    `json:"msg_uuid"`
+	SessionID   int64                     `json:"session_id"`
+	SessionUUID string                    `json:"session_uuid"`
+	Request     bool                      `json:"request"` // true: request, false: response
+
+	// Create/Rewrite fields
+	Content     string `json:"content,omitempty"`      // message content
+	IsRewritten *bool  `json:"is_rewritten,omitempty"` // true: rewritten by user's request
+
+	// UpdateFeedback field
+	Feedback *AgentSessionHistoryFeedback `json:"feedback,omitempty"` // feedback: none, like, dislike
+
+	// Rewrite field
+	OriginalMsgUUID string `json:"original_msg_uuid,omitempty"` // original message UUID when rewriting
 }
 
 // AgentInstanceSessionHistory represents a session history
 type AgentInstanceSessionHistory struct {
-	ID          int64     `json:"id"`
-	SessionID   int64     `json:"session_id"`
-	SessionUUID string    `json:"session_uuid"`
-	Request     bool      `json:"request"`
-	Content     string    `json:"content"`
-	Turn        int64     `json:"turn"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID          int64                       `json:"id"`
+	MsgUUID     string                      `json:"msg_uuid"`
+	SessionID   int64                       `json:"session_id"`
+	SessionUUID string                      `json:"session_uuid"`
+	Request     bool                        `json:"request"`
+	Content     string                      `json:"content"`
+	Feedback    AgentSessionHistoryFeedback `json:"feedback"`
+	IsRewritten bool                        `json:"is_rewritten"`
+	CreatedAt   time.Time                   `json:"created_at"`
+	UpdatedAt   time.Time                   `json:"updated_at"`
 }
 
 type AgentInstanceSessionResponse struct {
 	SessionUUID string   `json:"session_uuid"`
 	Histories   []string `json:"histories"` // list of history contents
+}
+
+type AgentSessionHistoryFeedback string
+
+const (
+	AgentSessionHistoryFeedbackNone    AgentSessionHistoryFeedback = "none"
+	AgentSessionHistoryFeedbackLike    AgentSessionHistoryFeedback = "like"
+	AgentSessionHistoryFeedbackDislike AgentSessionHistoryFeedback = "dislike"
+)
+
+type FeedbackSessionHistoryRequest struct {
+	MsgUUID  string                      `json:"-"`
+	Feedback AgentSessionHistoryFeedback `json:"feedback" binding:"required,oneof=none like dislike"`
+}
+
+type RewriteSessionHistoryRequest struct {
+	OriginalMsgUUID string `json:"-"`
+	Content         string `json:"content" binding:"required"`
+}
+
+type RewriteSessionHistoryResponse struct {
+	MsgUUID string `json:"msg_uuid"`
 }
 
 type AgentStreamEvent struct {

@@ -210,6 +210,7 @@ func TestAgentInstanceSessionHistoryStore_CRUD(t *testing.T) {
 
 	// Test Create history
 	history := &database.AgentInstanceSessionHistory{
+		UUID:      uuid.New().String(),
 		SessionID: createdSession.ID,
 		Request:   true,
 		Content:   "Hello, this is a test request",
@@ -276,21 +277,25 @@ func TestAgentInstanceSessionHistoryStore_MultipleHistories(t *testing.T) {
 	// Create multiple history entries
 	histories := []*database.AgentInstanceSessionHistory{
 		{
+			UUID:      uuid.New().String(),
 			SessionID: createdSession.ID,
 			Request:   true,
 			Content:   "User request 1",
 		},
 		{
+			UUID:      uuid.New().String(),
 			SessionID: createdSession.ID,
 			Request:   false,
 			Content:   "Agent response 1",
 		},
 		{
+			UUID:      uuid.New().String(),
 			SessionID: createdSession.ID,
 			Request:   true,
 			Content:   "User request 2",
 		},
 		{
+			UUID:      uuid.New().String(),
 			SessionID: createdSession.ID,
 			Request:   false,
 			Content:   "Agent response 2",
@@ -385,16 +390,19 @@ func TestAgentInstanceSessionStore_DeleteWithHistory(t *testing.T) {
 	// Create multiple history entries
 	histories := []*database.AgentInstanceSessionHistory{
 		{
+			UUID:      uuid.New().String(),
 			SessionID: createdSession.ID,
 			Request:   true,
 			Content:   "User request 1",
 		},
 		{
+			UUID:      uuid.New().String(),
 			SessionID: createdSession.ID,
 			Request:   false,
 			Content:   "Agent response 1",
 		},
 		{
+			UUID:      uuid.New().String(),
 			SessionID: createdSession.ID,
 			Request:   true,
 			Content:   "User request 2",
@@ -719,4 +727,197 @@ func TestAgentInstanceSessionStore_List_Ordering(t *testing.T) {
 	require.True(t, sessionNames["Session 1"])
 	require.True(t, sessionNames["Session 2"])
 	require.True(t, sessionNames["Session 3"])
+}
+
+func TestAgentInstanceSessionHistoryStore_Rewrite(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	sessionStore := database.NewAgentInstanceSessionStoreWithDB(db)
+	historyStore := database.NewAgentInstanceSessionHistoryStoreWithDB(db)
+
+	// Create a session
+	session := &database.AgentInstanceSession{
+		UUID:       uuid.New().String(),
+		Name:       "Test Session",
+		InstanceID: 12345,
+		UserUUID:   uuid.New().String(),
+		Type:       "langflow",
+	}
+
+	createdSession, err := sessionStore.Create(ctx, session)
+	require.NoError(t, err)
+
+	// Create a request history (Request = true)
+	requestHistory := &database.AgentInstanceSessionHistory{
+		UUID:      uuid.New().String(),
+		SessionID: createdSession.ID,
+		Request:   true,
+		Content:   "User request",
+	}
+
+	err = historyStore.Create(ctx, requestHistory)
+	require.NoError(t, err)
+	require.NotZero(t, requestHistory.ID)
+	require.NotZero(t, requestHistory.Turn)
+
+	// Create a response history (Request = false) - this is the one we'll rewrite
+	originalResponseHistory := &database.AgentInstanceSessionHistory{
+		UUID:      uuid.New().String(),
+		SessionID: createdSession.ID,
+		Request:   false,
+		Content:   "Original agent response",
+	}
+
+	err = historyStore.Create(ctx, originalResponseHistory)
+	require.NoError(t, err)
+	require.NotZero(t, originalResponseHistory.ID)
+	require.Equal(t, requestHistory.Turn, originalResponseHistory.Turn) // Should have same turn as request
+	require.False(t, originalResponseHistory.IsRewritten)
+
+	// Create a new history to replace the original response
+	newHistory := &database.AgentInstanceSessionHistory{
+		UUID:      uuid.New().String(),
+		SessionID: createdSession.ID,
+		Request:   false,
+		Content:   "Rewritten agent response",
+	}
+
+	// Call Rewrite
+	err = historyStore.Rewrite(ctx, originalResponseHistory.UUID, newHistory)
+	require.NoError(t, err)
+	require.NotZero(t, newHistory.ID)
+
+	// Verify the original response history is marked as rewritten
+	foundOriginal, err := historyStore.FindByID(ctx, originalResponseHistory.ID)
+	require.NoError(t, err)
+	require.NotNil(t, foundOriginal)
+	require.True(t, foundOriginal.IsRewritten)
+	require.Equal(t, "Original agent response", foundOriginal.Content)
+
+	// Verify the new history is inserted with the same Turn
+	foundNew, err := historyStore.FindByID(ctx, newHistory.ID)
+	require.NoError(t, err)
+	require.NotNil(t, foundNew)
+	require.Equal(t, originalResponseHistory.Turn, foundNew.Turn)
+	require.Equal(t, "Rewritten agent response", foundNew.Content)
+	require.Equal(t, createdSession.ID, foundNew.SessionID)
+	require.False(t, foundNew.Request)     // Should still be a response
+	require.False(t, foundNew.IsRewritten) // New history is not rewritten
+
+	// Verify both histories exist and can be found by UUID
+	foundByOriginalUUID, err := historyStore.FindByUUID(ctx, originalResponseHistory.UUID)
+	require.NoError(t, err)
+	require.True(t, foundByOriginalUUID.IsRewritten)
+
+	foundByNewUUID, err := historyStore.FindByUUID(ctx, newHistory.UUID)
+	require.NoError(t, err)
+	require.Equal(t, newHistory.ID, foundByNewUUID.ID)
+	require.Equal(t, "Rewritten agent response", foundByNewUUID.Content)
+
+	// Verify ListBySessionID excludes rewritten histories
+	histories, err := historyStore.ListBySessionID(ctx, createdSession.ID)
+	require.NoError(t, err)
+	// Should only return non-rewritten histories: request + new response
+	require.Len(t, histories, 2)
+	require.Equal(t, requestHistory.ID, histories[0].ID)
+	require.Equal(t, newHistory.ID, histories[1].ID)
+}
+
+func TestAgentInstanceSessionHistoryStore_Rewrite_ErrorCases(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	sessionStore := database.NewAgentInstanceSessionStoreWithDB(db)
+	historyStore := database.NewAgentInstanceSessionHistoryStoreWithDB(db)
+
+	// Create a session
+	session := &database.AgentInstanceSession{
+		UUID:       uuid.New().String(),
+		Name:       "Test Session",
+		InstanceID: 12345,
+		UserUUID:   uuid.New().String(),
+		Type:       "langflow",
+	}
+
+	createdSession, err := sessionStore.Create(ctx, session)
+	require.NoError(t, err)
+
+	// Create a request history (Request = true)
+	requestHistory := &database.AgentInstanceSessionHistory{
+		UUID:      uuid.New().String(),
+		SessionID: createdSession.ID,
+		Request:   true,
+		Content:   "User request",
+	}
+
+	err = historyStore.Create(ctx, requestHistory)
+	require.NoError(t, err)
+
+	// Test Rewrite with non-existent UUID
+	nonExistentHistory := &database.AgentInstanceSessionHistory{
+		UUID:      uuid.New().String(),
+		SessionID: createdSession.ID,
+		Request:   false,
+		Content:   "New response",
+	}
+
+	err = historyStore.Rewrite(ctx, "non-existent-uuid", nonExistentHistory)
+	require.Error(t, err)
+
+	// Test Rewrite with UUID that has Request = true (should fail because Rewrite only works with Request = false)
+	newHistory := &database.AgentInstanceSessionHistory{
+		UUID:      uuid.New().String(),
+		SessionID: createdSession.ID,
+		Request:   false,
+		Content:   "New response",
+	}
+
+	err = historyStore.Rewrite(ctx, requestHistory.UUID, newHistory)
+	require.Error(t, err) // Should fail because requestHistory has Request = true
+
+	// Test Rewrite with already rewritten history
+	// First create and rewrite a response
+	responseHistory := &database.AgentInstanceSessionHistory{
+		UUID:      uuid.New().String(),
+		SessionID: createdSession.ID,
+		Request:   false,
+		Content:   "Agent response",
+	}
+
+	err = historyStore.Create(ctx, responseHistory)
+	require.NoError(t, err)
+
+	// Rewrite it once
+	firstRewrite := &database.AgentInstanceSessionHistory{
+		UUID:      uuid.New().String(),
+		SessionID: createdSession.ID,
+		Request:   false,
+		Content:   "First rewrite",
+	}
+
+	err = historyStore.Rewrite(ctx, responseHistory.UUID, firstRewrite)
+	require.NoError(t, err)
+
+	// Try to rewrite the already rewritten history (should fail)
+	secondRewrite := &database.AgentInstanceSessionHistory{
+		UUID:      uuid.New().String(),
+		SessionID: createdSession.ID,
+		Request:   false,
+		Content:   "Second rewrite",
+	}
+
+	err = historyStore.Rewrite(ctx, responseHistory.UUID, secondRewrite)
+	require.Error(t, err) // Should fail because original is already rewritten
+
+	// Verify the original history is still marked as rewritten
+	foundResponse, err := historyStore.FindByID(ctx, responseHistory.ID)
+	require.NoError(t, err)
+	require.True(t, foundResponse.IsRewritten)
+
+	// Verify the second rewrite was NOT inserted (since the operation failed)
+	_, err = historyStore.FindByID(ctx, secondRewrite.ID)
+	require.Error(t, err) // Should not exist
 }

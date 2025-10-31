@@ -127,49 +127,63 @@ func (_c *MockAgentComponent_CreateSession_Call) RunAndReturn(run func(context.C
 	return _c
 }
 
-// CreateSessionHistory provides a mock function with given fields: ctx, msg
-func (_m *MockAgentComponent) CreateSessionHistory(ctx context.Context, msg *types.CreateSessionHistoryMessage) error {
-	ret := _m.Called(ctx, msg)
+// CreateSessionHistories provides a mock function with given fields: ctx, userUUID, instanceID, req
+func (_m *MockAgentComponent) CreateSessionHistories(ctx context.Context, userUUID string, instanceID int64, req *types.CreateSessionHistoryRequest) (*types.CreateSessionHistoryResponse, error) {
+	ret := _m.Called(ctx, userUUID, instanceID, req)
 
 	if len(ret) == 0 {
-		panic("no return value specified for CreateSessionHistory")
+		panic("no return value specified for CreateSessionHistories")
 	}
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, *types.CreateSessionHistoryMessage) error); ok {
-		r0 = rf(ctx, msg)
+	var r0 *types.CreateSessionHistoryResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, int64, *types.CreateSessionHistoryRequest) (*types.CreateSessionHistoryResponse, error)); ok {
+		return rf(ctx, userUUID, instanceID, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, int64, *types.CreateSessionHistoryRequest) *types.CreateSessionHistoryResponse); ok {
+		r0 = rf(ctx, userUUID, instanceID, req)
 	} else {
-		r0 = ret.Error(0)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.CreateSessionHistoryResponse)
+		}
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func(context.Context, string, int64, *types.CreateSessionHistoryRequest) error); ok {
+		r1 = rf(ctx, userUUID, instanceID, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
-// MockAgentComponent_CreateSessionHistory_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateSessionHistory'
-type MockAgentComponent_CreateSessionHistory_Call struct {
+// MockAgentComponent_CreateSessionHistories_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateSessionHistories'
+type MockAgentComponent_CreateSessionHistories_Call struct {
 	*mock.Call
 }
 
-// CreateSessionHistory is a helper method to define mock.On call
+// CreateSessionHistories is a helper method to define mock.On call
 //   - ctx context.Context
-//   - msg *types.CreateSessionHistoryMessage
-func (_e *MockAgentComponent_Expecter) CreateSessionHistory(ctx interface{}, msg interface{}) *MockAgentComponent_CreateSessionHistory_Call {
-	return &MockAgentComponent_CreateSessionHistory_Call{Call: _e.mock.On("CreateSessionHistory", ctx, msg)}
+//   - userUUID string
+//   - instanceID int64
+//   - req *types.CreateSessionHistoryRequest
+func (_e *MockAgentComponent_Expecter) CreateSessionHistories(ctx interface{}, userUUID interface{}, instanceID interface{}, req interface{}) *MockAgentComponent_CreateSessionHistories_Call {
+	return &MockAgentComponent_CreateSessionHistories_Call{Call: _e.mock.On("CreateSessionHistories", ctx, userUUID, instanceID, req)}
 }
 
-func (_c *MockAgentComponent_CreateSessionHistory_Call) Run(run func(ctx context.Context, msg *types.CreateSessionHistoryMessage)) *MockAgentComponent_CreateSessionHistory_Call {
+func (_c *MockAgentComponent_CreateSessionHistories_Call) Run(run func(ctx context.Context, userUUID string, instanceID int64, req *types.CreateSessionHistoryRequest)) *MockAgentComponent_CreateSessionHistories_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(*types.CreateSessionHistoryMessage))
+		run(args[0].(context.Context), args[1].(string), args[2].(int64), args[3].(*types.CreateSessionHistoryRequest))
 	})
 	return _c
 }
 
-func (_c *MockAgentComponent_CreateSessionHistory_Call) Return(_a0 error) *MockAgentComponent_CreateSessionHistory_Call {
-	_c.Call.Return(_a0)
+func (_c *MockAgentComponent_CreateSessionHistories_Call) Return(_a0 *types.CreateSessionHistoryResponse, _a1 error) *MockAgentComponent_CreateSessionHistories_Call {
+	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockAgentComponent_CreateSessionHistory_Call) RunAndReturn(run func(context.Context, *types.CreateSessionHistoryMessage) error) *MockAgentComponent_CreateSessionHistory_Call {
+func (_c *MockAgentComponent_CreateSessionHistories_Call) RunAndReturn(run func(context.Context, string, int64, *types.CreateSessionHistoryRequest) (*types.CreateSessionHistoryResponse, error)) *MockAgentComponent_CreateSessionHistories_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -922,51 +936,64 @@ func (_c *MockAgentComponent_ListTemplatesByUserUUID_Call) RunAndReturn(run func
 	return _c
 }
 
-// PublishSessionHistoryMsg provides a mock function with given fields: ctx, userUUID, instanceID, req
-func (_m *MockAgentComponent) PublishSessionHistoryMsg(ctx context.Context, userUUID string, instanceID int64, req *types.CreateSessionHistoryRequest) error {
-	ret := _m.Called(ctx, userUUID, instanceID, req)
+// RewriteSessionHistory provides a mock function with given fields: ctx, userUUID, instanceID, sessionUUID, req
+func (_m *MockAgentComponent) RewriteSessionHistory(ctx context.Context, userUUID string, instanceID int64, sessionUUID string, req *types.RewriteSessionHistoryRequest) (*types.RewriteSessionHistoryResponse, error) {
+	ret := _m.Called(ctx, userUUID, instanceID, sessionUUID, req)
 
 	if len(ret) == 0 {
-		panic("no return value specified for PublishSessionHistoryMsg")
+		panic("no return value specified for RewriteSessionHistory")
 	}
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, int64, *types.CreateSessionHistoryRequest) error); ok {
-		r0 = rf(ctx, userUUID, instanceID, req)
+	var r0 *types.RewriteSessionHistoryResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, int64, string, *types.RewriteSessionHistoryRequest) (*types.RewriteSessionHistoryResponse, error)); ok {
+		return rf(ctx, userUUID, instanceID, sessionUUID, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, int64, string, *types.RewriteSessionHistoryRequest) *types.RewriteSessionHistoryResponse); ok {
+		r0 = rf(ctx, userUUID, instanceID, sessionUUID, req)
 	} else {
-		r0 = ret.Error(0)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.RewriteSessionHistoryResponse)
+		}
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func(context.Context, string, int64, string, *types.RewriteSessionHistoryRequest) error); ok {
+		r1 = rf(ctx, userUUID, instanceID, sessionUUID, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
-// MockAgentComponent_PublishSessionHistoryMsg_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PublishSessionHistoryMsg'
-type MockAgentComponent_PublishSessionHistoryMsg_Call struct {
+// MockAgentComponent_RewriteSessionHistory_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RewriteSessionHistory'
+type MockAgentComponent_RewriteSessionHistory_Call struct {
 	*mock.Call
 }
 
-// PublishSessionHistoryMsg is a helper method to define mock.On call
+// RewriteSessionHistory is a helper method to define mock.On call
 //   - ctx context.Context
 //   - userUUID string
 //   - instanceID int64
-//   - req *types.CreateSessionHistoryRequest
-func (_e *MockAgentComponent_Expecter) PublishSessionHistoryMsg(ctx interface{}, userUUID interface{}, instanceID interface{}, req interface{}) *MockAgentComponent_PublishSessionHistoryMsg_Call {
-	return &MockAgentComponent_PublishSessionHistoryMsg_Call{Call: _e.mock.On("PublishSessionHistoryMsg", ctx, userUUID, instanceID, req)}
+//   - sessionUUID string
+//   - req *types.RewriteSessionHistoryRequest
+func (_e *MockAgentComponent_Expecter) RewriteSessionHistory(ctx interface{}, userUUID interface{}, instanceID interface{}, sessionUUID interface{}, req interface{}) *MockAgentComponent_RewriteSessionHistory_Call {
+	return &MockAgentComponent_RewriteSessionHistory_Call{Call: _e.mock.On("RewriteSessionHistory", ctx, userUUID, instanceID, sessionUUID, req)}
 }
 
-func (_c *MockAgentComponent_PublishSessionHistoryMsg_Call) Run(run func(ctx context.Context, userUUID string, instanceID int64, req *types.CreateSessionHistoryRequest)) *MockAgentComponent_PublishSessionHistoryMsg_Call {
+func (_c *MockAgentComponent_RewriteSessionHistory_Call) Run(run func(ctx context.Context, userUUID string, instanceID int64, sessionUUID string, req *types.RewriteSessionHistoryRequest)) *MockAgentComponent_RewriteSessionHistory_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(int64), args[3].(*types.CreateSessionHistoryRequest))
+		run(args[0].(context.Context), args[1].(string), args[2].(int64), args[3].(string), args[4].(*types.RewriteSessionHistoryRequest))
 	})
 	return _c
 }
 
-func (_c *MockAgentComponent_PublishSessionHistoryMsg_Call) Return(_a0 error) *MockAgentComponent_PublishSessionHistoryMsg_Call {
-	_c.Call.Return(_a0)
+func (_c *MockAgentComponent_RewriteSessionHistory_Call) Return(_a0 *types.RewriteSessionHistoryResponse, _a1 error) *MockAgentComponent_RewriteSessionHistory_Call {
+	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockAgentComponent_PublishSessionHistoryMsg_Call) RunAndReturn(run func(context.Context, string, int64, *types.CreateSessionHistoryRequest) error) *MockAgentComponent_PublishSessionHistoryMsg_Call {
+func (_c *MockAgentComponent_RewriteSessionHistory_Call) RunAndReturn(run func(context.Context, string, int64, string, *types.RewriteSessionHistoryRequest) (*types.RewriteSessionHistoryResponse, error)) *MockAgentComponent_RewriteSessionHistory_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1126,6 +1153,56 @@ func (_c *MockAgentComponent_UpdateSessionByUUID_Call) Return(_a0 error) *MockAg
 }
 
 func (_c *MockAgentComponent_UpdateSessionByUUID_Call) RunAndReturn(run func(context.Context, string, string, int64, *types.UpdateAgentInstanceSessionRequest) error) *MockAgentComponent_UpdateSessionByUUID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// UpdateSessionHistoryFeedback provides a mock function with given fields: ctx, userUUID, instanceID, sessionUUID, req
+func (_m *MockAgentComponent) UpdateSessionHistoryFeedback(ctx context.Context, userUUID string, instanceID int64, sessionUUID string, req *types.FeedbackSessionHistoryRequest) error {
+	ret := _m.Called(ctx, userUUID, instanceID, sessionUUID, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateSessionHistoryFeedback")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, int64, string, *types.FeedbackSessionHistoryRequest) error); ok {
+		r0 = rf(ctx, userUUID, instanceID, sessionUUID, req)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockAgentComponent_UpdateSessionHistoryFeedback_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateSessionHistoryFeedback'
+type MockAgentComponent_UpdateSessionHistoryFeedback_Call struct {
+	*mock.Call
+}
+
+// UpdateSessionHistoryFeedback is a helper method to define mock.On call
+//   - ctx context.Context
+//   - userUUID string
+//   - instanceID int64
+//   - sessionUUID string
+//   - req *types.FeedbackSessionHistoryRequest
+func (_e *MockAgentComponent_Expecter) UpdateSessionHistoryFeedback(ctx interface{}, userUUID interface{}, instanceID interface{}, sessionUUID interface{}, req interface{}) *MockAgentComponent_UpdateSessionHistoryFeedback_Call {
+	return &MockAgentComponent_UpdateSessionHistoryFeedback_Call{Call: _e.mock.On("UpdateSessionHistoryFeedback", ctx, userUUID, instanceID, sessionUUID, req)}
+}
+
+func (_c *MockAgentComponent_UpdateSessionHistoryFeedback_Call) Run(run func(ctx context.Context, userUUID string, instanceID int64, sessionUUID string, req *types.FeedbackSessionHistoryRequest)) *MockAgentComponent_UpdateSessionHistoryFeedback_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(int64), args[3].(string), args[4].(*types.FeedbackSessionHistoryRequest))
+	})
+	return _c
+}
+
+func (_c *MockAgentComponent_UpdateSessionHistoryFeedback_Call) Return(_a0 error) *MockAgentComponent_UpdateSessionHistoryFeedback_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockAgentComponent_UpdateSessionHistoryFeedback_Call) RunAndReturn(run func(context.Context, string, int64, string, *types.FeedbackSessionHistoryRequest) error) *MockAgentComponent_UpdateSessionHistoryFeedback_Call {
 	_c.Call.Return(run)
 	return _c
 }

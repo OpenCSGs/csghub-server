@@ -22,11 +22,14 @@ type AgentInstanceSession struct {
 }
 
 type AgentInstanceSessionHistory struct {
-	ID        int64  `bun:",pk,autoincrement" json:"id"`
-	SessionID int64  `bun:",notnull" json:"session_id"`
-	Request   bool   `bun:",notnull" json:"request"` // true=request(from user), false=response(from assistant)
-	Turn      int64  `bun:",notnull" json:"turn"`    // use incremental turn number to indicate the response to its request, not just by time
-	Content   string `bun:",type:text" json:"content"`
+	ID          int64                             `bun:",pk,autoincrement" json:"id"`
+	UUID        string                            `bun:",notnull,unique" json:"uuid"` // used to identify the history message in the frontend, used to update the history
+	SessionID   int64                             `bun:",notnull" json:"session_id"`
+	Request     bool                              `bun:",notnull" json:"request"` // true=request(from user), false=response(from assistant)
+	Turn        int64                             `bun:",notnull" json:"turn"`    // use incremental turn number to indicate the response to its request, not just by time
+	Content     string                            `bun:",type:text" json:"content"`
+	Feedback    types.AgentSessionHistoryFeedback `bun:",notnull,default:'none'" json:"feedback"` // feedback options: none, like, dislike
+	IsRewritten bool                              `bun:",notnull,default:false" json:"is_rewritten"`
 	times
 }
 
@@ -40,12 +43,24 @@ type AgentInstanceSessionStore interface {
 	Delete(ctx context.Context, id int64) error
 }
 
+type AgentSessionHistoryFeedback struct {
+	ID        int64  `bun:",pk,autoincrement" json:"id"`
+	HistoryID int64  `bun:",notnull" json:"history_id"`
+	UserUUID  string `bun:",notnull" json:"user_uuid"`
+	Liked     bool   `bun:",notnull,default:false" json:"liked"`
+	Disliked  bool   `bun:",notnull,default:false" json:"disliked"`
+	Reason    string `bun:",nullzero" json:"reason"`
+	times
+}
+
 type AgentInstanceSessionHistoryStore interface {
 	Create(ctx context.Context, history *AgentInstanceSessionHistory) error
 	FindByID(ctx context.Context, id int64) (*AgentInstanceSessionHistory, error)
+	FindByUUID(ctx context.Context, uuid string) (*AgentInstanceSessionHistory, error)
 	ListBySessionID(ctx context.Context, sessionID int64) ([]AgentInstanceSessionHistory, error)
 	Update(ctx context.Context, history *AgentInstanceSessionHistory) error
 	Delete(ctx context.Context, id int64) error
+	Rewrite(ctx context.Context, originalMsgUUID string, history *AgentInstanceSessionHistory) error
 }
 
 // agentInstanceSessionStoreImpl is the implementation of AgentInstanceSessionStore
@@ -256,10 +271,23 @@ func (s *agentInstanceSessionHistoryStoreImpl) FindByID(ctx context.Context, id 
 	return history, nil
 }
 
+// FindByUUID retrieves an AgentInstanceSessionHistory by its UUID
+func (s *agentInstanceSessionHistoryStoreImpl) FindByUUID(ctx context.Context, uuid string) (*AgentInstanceSessionHistory, error) {
+	history := &AgentInstanceSessionHistory{}
+	err := s.db.Core.NewSelect().Model(history).Where("uuid = ?", uuid).Scan(ctx, history)
+	if err != nil {
+		return nil, errorx.HandleDBError(err, map[string]any{
+			"history_uuid": uuid,
+			"operation":    "find_by_uuid",
+		})
+	}
+	return history, nil
+}
+
 // ListBySessionID retrieves all AgentInstanceSessionHistory for a specific session
 func (s *agentInstanceSessionHistoryStoreImpl) ListBySessionID(ctx context.Context, sessionID int64) ([]AgentInstanceSessionHistory, error) {
 	var histories []AgentInstanceSessionHistory
-	err := s.db.Core.NewSelect().Model(&histories).Where("session_id = ?", sessionID).Order("turn ASC", "request DESC").Scan(ctx, &histories)
+	err := s.db.Core.NewSelect().Model(&histories).Where("session_id = ?", sessionID).Where("is_rewritten = ?", false).Order("turn ASC", "request DESC").Scan(ctx, &histories)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, errorx.HandleDBError(err, map[string]any{
 			"session_id": sessionID,
@@ -291,4 +319,44 @@ func (s *agentInstanceSessionHistoryStoreImpl) Delete(ctx context.Context, id in
 		})
 	}
 	return nil
+}
+
+// Rewrite rewrites an existing AgentInstanceSessionHistory
+func (s *agentInstanceSessionHistoryStoreImpl) Rewrite(ctx context.Context, originalUUID string, history *AgentInstanceSessionHistory) error {
+	return s.db.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		// select original history for update
+		originalHistory := &AgentInstanceSessionHistory{}
+		err := tx.NewSelect().
+			Model((*AgentInstanceSessionHistory)(nil)).
+			Where("uuid = ?", originalUUID).
+			Where("request = ?", false).
+			Where("is_rewritten = ?", false).
+			For("UPDATE").
+			Scan(ctx, originalHistory)
+		if err != nil {
+			return errorx.HandleDBError(err, map[string]any{
+				"original_uuid": originalUUID,
+				"operation":     "select_original_history_for_update",
+			})
+		}
+
+		originalHistory.IsRewritten = true
+		res, err := tx.NewUpdate().Model(originalHistory).Where("id = ?", originalHistory.ID).Exec(ctx)
+		if err = assertAffectedOneRow(res, err); err != nil {
+			return errorx.HandleDBError(err, map[string]any{
+				"original_uuid": originalUUID,
+				"operation":     "update_original_history",
+			})
+		}
+
+		history.Turn = originalHistory.Turn
+		res, err = tx.NewInsert().Model(history).Exec(ctx)
+		if err = assertAffectedOneRow(res, err); err != nil {
+			return errorx.HandleDBError(err, map[string]any{
+				"history_uuid": history.UUID,
+				"operation":    "insert_history",
+			})
+		}
+		return nil
+	})
 }

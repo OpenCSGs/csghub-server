@@ -46,8 +46,9 @@ type AgentComponent interface {
 	DeleteSessionByUUID(ctx context.Context, userUUID string, sessionUUID string, instanceID int64) error
 	UpdateSessionByUUID(ctx context.Context, userUUID string, sessionUUID string, instanceID int64, req *types.UpdateAgentInstanceSessionRequest) error
 	ListSessionHistories(ctx context.Context, userUUID string, sessionUUID string, instanceID int64) ([]*types.AgentInstanceSessionHistory, error)
-	PublishSessionHistoryMsg(ctx context.Context, userUUID string, instanceID int64, req *types.CreateSessionHistoryRequest) error
-	CreateSessionHistory(ctx context.Context, msg *types.CreateSessionHistoryMessage) error
+	CreateSessionHistories(ctx context.Context, userUUID string, instanceID int64, req *types.CreateSessionHistoryRequest) (*types.CreateSessionHistoryResponse, error)
+	UpdateSessionHistoryFeedback(ctx context.Context, userUUID string, instanceID int64, sessionUUID string, req *types.FeedbackSessionHistoryRequest) error
+	RewriteSessionHistory(ctx context.Context, userUUID string, instanceID int64, sessionUUID string, req *types.RewriteSessionHistoryRequest) (*types.RewriteSessionHistoryResponse, error)
 }
 
 // agentComponentImpl implements the AgentComponent interface
@@ -823,20 +824,37 @@ func (c *agentComponentImpl) ListSessionHistories(ctx context.Context, userUUID 
 	typesHistories := make([]*types.AgentInstanceSessionHistory, 0, len(histories))
 	for _, history := range histories {
 		typesHistories = append(typesHistories, &types.AgentInstanceSessionHistory{
-			ID:        history.ID,
-			SessionID: history.SessionID,
-			Request:   history.Request,
-			Content:   history.Content,
-			Turn:      history.Turn,
-			CreatedAt: history.CreatedAt,
-			UpdatedAt: history.UpdatedAt,
+			ID:          history.ID,
+			MsgUUID:     history.UUID,
+			SessionID:   history.SessionID,
+			SessionUUID: session.UUID,
+			Request:     history.Request,
+			Content:     history.Content,
+			Feedback:    history.Feedback,
+			IsRewritten: history.IsRewritten,
+			CreatedAt:   history.CreatedAt,
+			UpdatedAt:   history.UpdatedAt,
 		})
 	}
 	return typesHistories, nil
 }
 
-func (c *agentComponentImpl) CreateSessionHistory(ctx context.Context, msg *types.CreateSessionHistoryMessage) error {
+func (c *agentComponentImpl) handleSessionHistoryMessage(ctx context.Context, msg *types.SessionHistoryMessageEnvelope) error {
+	switch msg.MessageType {
+	case types.SessionHistoryMessageTypeCreate:
+		return c.handleSessionHistoryCreate(ctx, msg)
+	case types.SessionHistoryMessageTypeUpdateFeedback:
+		return c.handleSessionHistoryUpdateFeedback(ctx, msg)
+	case types.SessionHistoryMessageTypeRewrite:
+		return c.handleSessionHistoryRewrite(ctx, msg)
+	default:
+		return fmt.Errorf("invalid session history message type: %s", msg.MessageType)
+	}
+}
+
+func (c *agentComponentImpl) handleSessionHistoryCreate(ctx context.Context, msg *types.SessionHistoryMessageEnvelope) error {
 	history := &database.AgentInstanceSessionHistory{
+		UUID:      msg.MsgUUID,
 		SessionID: msg.SessionID,
 		Request:   msg.Request,
 		Content:   msg.Content,
@@ -851,48 +869,70 @@ func (c *agentComponentImpl) CreateSessionHistory(ctx context.Context, msg *type
 	return nil
 }
 
-func (c *agentComponentImpl) PublishSessionHistoryMsg(ctx context.Context, userUUID string, instanceID int64, req *types.CreateSessionHistoryRequest) error {
-	if req == nil {
-		return fmt.Errorf("create session history request is nil")
+func (c *agentComponentImpl) handleSessionHistoryUpdateFeedback(ctx context.Context, msg *types.SessionHistoryMessageEnvelope) error {
+	// Find history by UUID
+	history, err := c.sessionHistoryStore.FindByUUID(ctx, msg.MsgUUID)
+	if err != nil {
+		slog.Error("failed to find agent instance session history", "session_id", msg.SessionID, "msg_uuid", msg.MsgUUID, "error", err)
+		return fmt.Errorf("failed to find agent instance session history, error:%w", err)
 	}
 
-	session, err := c.sessionStore.FindByUUID(ctx, req.SessionUUID)
+	if msg.Feedback == nil {
+		slog.Error("feedback is nil", "msg_uuid", msg.MsgUUID)
+		return fmt.Errorf("feedback is nil")
+	}
+
+	history.Feedback = *msg.Feedback
+	if err := c.sessionHistoryStore.Update(ctx, history); err != nil {
+		slog.Error("failed to update agent instance session history feedback", "session_id", msg.SessionID, "msg_uuid", msg.MsgUUID, "feedback", *msg.Feedback, "error", err)
+		return fmt.Errorf("failed to update agent instance session history feedback, error:%w", err)
+	}
+
+	slog.Info("agent instance session history feedback updated", "session_id", msg.SessionID, "msg_uuid", msg.MsgUUID, "feedback", *msg.Feedback)
+	return nil
+}
+
+func (c *agentComponentImpl) handleSessionHistoryRewrite(ctx context.Context, msg *types.SessionHistoryMessageEnvelope) error {
+	history := &database.AgentInstanceSessionHistory{
+		UUID:        msg.MsgUUID,
+		SessionID:   msg.SessionID,
+		Content:     msg.Content,
+		Request:     false,
+		IsRewritten: false,
+	}
+
+	if err := c.sessionHistoryStore.Rewrite(ctx, msg.OriginalMsgUUID, history); err != nil {
+		slog.Error("failed to regenerate agent instance session history", "session_id", msg.SessionID, "request", false, "msg_uuid", msg.MsgUUID, "original_msg_uuid", msg.OriginalMsgUUID, "error", err)
+		return fmt.Errorf("failed to regenerate agent instance session history, error:%w", err)
+	}
+
+	slog.Info("agent instance session history regenerated", "session_id", msg.SessionID, "request", false, "msg_uuid", msg.MsgUUID, "original_msg_uuid", msg.OriginalMsgUUID)
+	return nil
+}
+
+func (c *agentComponentImpl) validateAndGetSession(ctx context.Context, userUUID string, instanceID int64, sessionUUID string) (*database.AgentInstanceSession, error) {
+	session, err := c.sessionStore.FindByUUID(ctx, sessionUUID)
 	if err != nil {
-		slog.Error("failed to find agent instance session by uuid", "session_uuid", req.SessionUUID, "error", err)
-		return fmt.Errorf("failed to find agent instance session by uuid, error:%w", err)
+		slog.Error("failed to find agent instance session by uuid", "session_uuid", sessionUUID, "error", err)
+		return nil, fmt.Errorf("failed to find agent instance session, error:%w", err)
 	}
 
 	if session == nil {
-		return fmt.Errorf("agent instance session not found, session_uuid: %s", req.SessionUUID)
+		return nil, fmt.Errorf("agent instance session not found, session_uuid: %s", sessionUUID)
 	}
 
 	if session.UserUUID != userUUID {
-		return errorx.Forbidden(nil, map[string]any{
-			"session_uuid": req.SessionUUID,
+		return nil, errorx.Forbidden(nil, map[string]any{
+			"session_uuid": sessionUUID,
 			"user_uuid":    userUUID,
 		})
 	}
 
 	if session.InstanceID != instanceID {
-		return fmt.Errorf("agent instance session does not belong to the specified instance, session_uuid: %s, instance_id: %d, session_instance_id: %d", req.SessionUUID, instanceID, session.InstanceID)
+		return nil, fmt.Errorf("agent instance session does not belong to the specified instance, session_uuid: %s, instance_id: %d, session_instance_id: %d", sessionUUID, instanceID, session.InstanceID)
 	}
 
-	for _, message := range req.Messages {
-		slog.Debug("publish session history message", "session_uuid", req.SessionUUID, "message", message)
-		msg := types.CreateSessionHistoryMessage{
-			MsgUUID:     uuid.New().String(),
-			SessionID:   session.ID,
-			SessionUUID: req.SessionUUID,
-			Request:     message.Request,
-			Content:     message.Content,
-		}
-		if err := c.queue.PublishAgentSessionHistoryMsg(msg); err != nil {
-			slog.Error("failed to publish session history message", "session_uuid", req.SessionUUID, "message", message, "error", err)
-			return fmt.Errorf("failed to publish session history message, error:%w", err)
-		}
-	}
-
-	return nil
+	return session, nil
 }
 
 func (c *agentComponentImpl) processSessionHistoryMsg() error {
@@ -907,26 +947,26 @@ func (c *agentComponentImpl) processSessionHistoryMsg() error {
 		}()
 		slog.Debug("received session history message", slog.String("data", string(msg.Data())))
 
-		var history types.CreateSessionHistoryMessage
-		if err := json.Unmarshal(msg.Data(), &history); err != nil {
-			slog.Error("failed to unmarshal session history message", "error", err, "session_uuid", history.SessionUUID, "msg_uuid", history.MsgUUID)
+		var envelope types.SessionHistoryMessageEnvelope
+		if err := json.Unmarshal(msg.Data(), &envelope); err != nil {
+			slog.Error("failed to unmarshal session history message", "error", err, "message_type", envelope.MessageType, "msg_uuid", envelope.MsgUUID)
 			_ = msg.Term()
 			return
 		}
 
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
-		if err := c.CreateSessionHistory(ctx, &history); err != nil {
-			slog.Error("failed to create session history", "error", err, "session_uuid", history.SessionUUID, "msg_uuid", history.MsgUUID)
+		if err := c.handleSessionHistoryMessage(ctx, &envelope); err != nil {
+			slog.Error("failed to handle session history message", "error", err, "message_type", envelope.MessageType, "msg_uuid", envelope.MsgUUID)
 			_ = msg.Nak()
 			return
 		}
 
 		if err := msg.Ack(); err != nil {
-			slog.Error("failed to ack session history message", "error", err, "session_uuid", history.SessionUUID, "msg_uuid", history.MsgUUID)
+			slog.Error("failed to ack session history message", "error", err, "message_type", envelope.MessageType, "msg_uuid", envelope.MsgUUID)
 			return
 		}
-		slog.Debug("session history message processed and acked", "session_uuid", history.SessionUUID, "msg_uuid", history.MsgUUID)
+		slog.Debug("session history message processed and acked", "message_type", envelope.MessageType, "msg_uuid", envelope.MsgUUID)
 	})
 
 	if err != nil {
@@ -935,4 +975,125 @@ func (c *agentComponentImpl) processSessionHistoryMsg() error {
 	}
 
 	return nil
+}
+
+func (c *agentComponentImpl) sendNotificationAsync(userUUID string, scenario types.MessageScenario, instanceType string, instanceName string, clickActionURL string) {
+	go func() {
+		nCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		msg := types.NotificationMessage{
+			UserUUIDs:        []string{userUUID},
+			NotificationType: types.NotificationAssetManagement,
+			Template:         string(scenario),
+			ClickActionURL:   clickActionURL,
+			Payload: map[string]any{
+				"instance_type": instanceType,
+				"instance_name": instanceName,
+			},
+		}
+		msgBytes, err := json.Marshal(msg)
+		if err != nil {
+			slog.Error("failed to marshal agent instance notification message", "scenario", scenario, "user_uuid", userUUID, "error", err)
+			return
+		}
+		notificationMsg := types.MessageRequest{
+			Scenario:   scenario,
+			Parameters: string(msgBytes),
+			Priority:   types.MessagePriorityHigh,
+		}
+		if err := c.notificationSvcClient.Send(nCtx, &notificationMsg); err != nil {
+			slog.Error("failed to send agent instance notification", "scenario", scenario, "user_uuid", userUUID, "error", err)
+			return
+		}
+	}()
+}
+
+func (c *agentComponentImpl) CreateSessionHistories(ctx context.Context, userUUID string, instanceID int64, req *types.CreateSessionHistoryRequest) (*types.CreateSessionHistoryResponse, error) {
+	if req == nil {
+		return nil, fmt.Errorf("create session histories request is nil")
+	}
+
+	session, err := c.validateAndGetSession(ctx, userUUID, instanceID, req.SessionUUID)
+	if err != nil {
+		return nil, err
+	}
+
+	msgUUIDs := make([]string, 0, len(req.Messages))
+	for _, message := range req.Messages {
+		slog.Debug("publish session history message", "session_uuid", req.SessionUUID, "message", message)
+		envelope := types.SessionHistoryMessageEnvelope{
+			MessageType: types.SessionHistoryMessageTypeCreate,
+			MsgUUID:     uuid.New().String(),
+			SessionID:   session.ID,
+			SessionUUID: req.SessionUUID,
+			Request:     message.Request,
+			Content:     message.Content,
+		}
+		if err := c.queue.PublishAgentSessionHistoryMsg(envelope); err != nil {
+			slog.Error("failed to publish session histories message", "session_uuid", req.SessionUUID, "msg_uuid", envelope.MsgUUID, "error", err)
+			return nil, fmt.Errorf("failed to create session histories, error:%w", err)
+		}
+		msgUUIDs = append(msgUUIDs, envelope.MsgUUID)
+	}
+
+	return &types.CreateSessionHistoryResponse{
+		MsgUUIDs: msgUUIDs,
+	}, nil
+}
+
+func (c *agentComponentImpl) UpdateSessionHistoryFeedback(ctx context.Context, userUUID string, instanceID int64, sessionUUID string, req *types.FeedbackSessionHistoryRequest) error {
+	if req == nil {
+		return fmt.Errorf("feedback request is nil")
+	}
+
+	session, err := c.validateAndGetSession(ctx, userUUID, instanceID, sessionUUID)
+	if err != nil {
+		return err
+	}
+
+	envelope := types.SessionHistoryMessageEnvelope{
+		MessageType: types.SessionHistoryMessageTypeUpdateFeedback,
+		MsgUUID:     req.MsgUUID,
+		SessionID:   session.ID,
+		SessionUUID: sessionUUID,
+		Feedback:    &req.Feedback,
+	}
+
+	if err := c.queue.PublishAgentSessionHistoryMsg(envelope); err != nil {
+		slog.Error("failed to publish session history message", "session_uuid", sessionUUID, "msg_uuid", req.MsgUUID, "error", err)
+		return fmt.Errorf("failed to publish session history message, error:%w", err)
+	}
+
+	return nil
+}
+
+func (c *agentComponentImpl) RewriteSessionHistory(ctx context.Context, userUUID string, instanceID int64, sessionUUID string, req *types.RewriteSessionHistoryRequest) (*types.RewriteSessionHistoryResponse, error) {
+	if req == nil {
+		return nil, fmt.Errorf("rewrite session history request is nil")
+	}
+
+	session, err := c.validateAndGetSession(ctx, userUUID, instanceID, sessionUUID)
+	if err != nil {
+		return nil, err
+	}
+
+	envelope := types.SessionHistoryMessageEnvelope{
+		MessageType:     types.SessionHistoryMessageTypeRewrite,
+		OriginalMsgUUID: req.OriginalMsgUUID,
+		MsgUUID:         uuid.New().String(),
+		SessionID:       session.ID,
+		SessionUUID:     sessionUUID,
+		Request:         false,
+		Content:         req.Content,
+	}
+
+	if err := c.queue.PublishAgentSessionHistoryMsg(envelope); err != nil {
+		slog.Error("failed to publish session history message", "session_uuid", sessionUUID, "original_msg_uuid", req.OriginalMsgUUID, "msg_uuid", envelope.MsgUUID, "error", err)
+		return nil, fmt.Errorf("failed to rewrite session history, error:%w", err)
+	}
+
+	return &types.RewriteSessionHistoryResponse{
+		MsgUUID: envelope.MsgUUID,
+	}, nil
 }

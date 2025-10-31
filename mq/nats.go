@@ -449,7 +449,7 @@ func (nh *NatsHandler) BuildAgentSessionHistoryMsgConsumer() (jetstream.Consumer
 	return consumer, err
 }
 
-func (nh *NatsHandler) PublishAgentSessionHistoryMsg(msg types.CreateSessionHistoryMessage) error {
+func (nh *NatsHandler) PublishAgentSessionHistoryMsg(msg types.SessionHistoryMessageEnvelope) error {
 	data, err := json.Marshal(msg)
 	if err != nil {
 		return err

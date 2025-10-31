@@ -1010,7 +1010,7 @@ func (_c *MockMessageQueue_GetJetStream_Call) RunAndReturn(run func() error) *Mo
 }
 
 // PublishAgentSessionHistoryMsg provides a mock function with given fields: msg
-func (_m *MockMessageQueue) PublishAgentSessionHistoryMsg(msg types.CreateSessionHistoryMessage) error {
+func (_m *MockMessageQueue) PublishAgentSessionHistoryMsg(msg types.SessionHistoryMessageEnvelope) error {
 	ret := _m.Called(msg)
 
 	if len(ret) == 0 {
@@ -1018,7 +1018,7 @@ func (_m *MockMessageQueue) PublishAgentSessionHistoryMsg(msg types.CreateSessio
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(types.CreateSessionHistoryMessage) error); ok {
+	if rf, ok := ret.Get(0).(func(types.SessionHistoryMessageEnvelope) error); ok {
 		r0 = rf(msg)
 	} else {
 		r0 = ret.Error(0)
@@ -1033,14 +1033,14 @@ type MockMessageQueue_PublishAgentSessionHistoryMsg_Call struct {
 }
 
 // PublishAgentSessionHistoryMsg is a helper method to define mock.On call
-//   - msg types.CreateSessionHistoryMessage
+//   - msg types.SessionHistoryMessageEnvelope
 func (_e *MockMessageQueue_Expecter) PublishAgentSessionHistoryMsg(msg interface{}) *MockMessageQueue_PublishAgentSessionHistoryMsg_Call {
 	return &MockMessageQueue_PublishAgentSessionHistoryMsg_Call{Call: _e.mock.On("PublishAgentSessionHistoryMsg", msg)}
 }
 
-func (_c *MockMessageQueue_PublishAgentSessionHistoryMsg_Call) Run(run func(msg types.CreateSessionHistoryMessage)) *MockMessageQueue_PublishAgentSessionHistoryMsg_Call {
+func (_c *MockMessageQueue_PublishAgentSessionHistoryMsg_Call) Run(run func(msg types.SessionHistoryMessageEnvelope)) *MockMessageQueue_PublishAgentSessionHistoryMsg_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(types.CreateSessionHistoryMessage))
+		run(args[0].(types.SessionHistoryMessageEnvelope))
 	})
 	return _c
 }
@@ -1050,7 +1050,7 @@ func (_c *MockMessageQueue_PublishAgentSessionHistoryMsg_Call) Return(_a0 error)
 	return _c
 }
 
-func (_c *MockMessageQueue_PublishAgentSessionHistoryMsg_Call) RunAndReturn(run func(types.CreateSessionHistoryMessage) error) *MockMessageQueue_PublishAgentSessionHistoryMsg_Call {
+func (_c *MockMessageQueue_PublishAgentSessionHistoryMsg_Call) RunAndReturn(run func(types.SessionHistoryMessageEnvelope) error) *MockMessageQueue_PublishAgentSessionHistoryMsg_Call {
 	_c.Call.Return(run)
 	return _c
 }

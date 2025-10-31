@@ -48,7 +48,7 @@ type MessageQueue interface {
 	BuildNormalPriorityMsgStream(conf *config.Config) error
 	BuildNormalPriorityMsgConsumer() (jetstream.Consumer, error)
 
-	PublishAgentSessionHistoryMsg(msg types.CreateSessionHistoryMessage) error
+	PublishAgentSessionHistoryMsg(msg types.SessionHistoryMessageEnvelope) error
 	BuildAgentSessionHistoryMsgStream(conf *config.Config) error
 	BuildAgentSessionHistoryMsgConsumer() (jetstream.Consumer, error)
 }
