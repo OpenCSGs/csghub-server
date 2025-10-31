@@ -359,6 +359,65 @@ func (_c *MockSpaceComponent_GetByID_Call) RunAndReturn(run func(context.Context
 	return _c
 }
 
+// GetMCPServiceBySvcName provides a mock function with given fields: ctx, svcName
+func (_m *MockSpaceComponent) GetMCPServiceBySvcName(ctx context.Context, svcName string) (*types.MCPService, error) {
+	ret := _m.Called(ctx, svcName)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetMCPServiceBySvcName")
+	}
+
+	var r0 *types.MCPService
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*types.MCPService, error)); ok {
+		return rf(ctx, svcName)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *types.MCPService); ok {
+		r0 = rf(ctx, svcName)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.MCPService)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, svcName)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockSpaceComponent_GetMCPServiceBySvcName_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetMCPServiceBySvcName'
+type MockSpaceComponent_GetMCPServiceBySvcName_Call struct {
+	*mock.Call
+}
+
+// GetMCPServiceBySvcName is a helper method to define mock.On call
+//   - ctx context.Context
+//   - svcName string
+func (_e *MockSpaceComponent_Expecter) GetMCPServiceBySvcName(ctx interface{}, svcName interface{}) *MockSpaceComponent_GetMCPServiceBySvcName_Call {
+	return &MockSpaceComponent_GetMCPServiceBySvcName_Call{Call: _e.mock.On("GetMCPServiceBySvcName", ctx, svcName)}
+}
+
+func (_c *MockSpaceComponent_GetMCPServiceBySvcName_Call) Run(run func(ctx context.Context, svcName string)) *MockSpaceComponent_GetMCPServiceBySvcName_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockSpaceComponent_GetMCPServiceBySvcName_Call) Return(_a0 *types.MCPService, _a1 error) *MockSpaceComponent_GetMCPServiceBySvcName_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockSpaceComponent_GetMCPServiceBySvcName_Call) RunAndReturn(run func(context.Context, string) (*types.MCPService, error)) *MockSpaceComponent_GetMCPServiceBySvcName_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // HasEntryFile provides a mock function with given fields: ctx, space
 func (_m *MockSpaceComponent) HasEntryFile(ctx context.Context, space *database.Space) bool {
 	ret := _m.Called(ctx, space)
@@ -534,9 +593,9 @@ func (_c *MockSpaceComponent_ListByPath_Call) RunAndReturn(run func(context.Cont
 	return _c
 }
 
-// Logs provides a mock function with given fields: ctx, namespace, name
-func (_m *MockSpaceComponent) Logs(ctx context.Context, namespace string, name string) (*deploy.MultiLogReader, error) {
-	ret := _m.Called(ctx, namespace, name)
+// Logs provides a mock function with given fields: ctx, namespace, name, since
+func (_m *MockSpaceComponent) Logs(ctx context.Context, namespace string, name string, since string) (*deploy.MultiLogReader, error) {
+	ret := _m.Called(ctx, namespace, name, since)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Logs")
@@ -544,19 +603,19 @@ func (_m *MockSpaceComponent) Logs(ctx context.Context, namespace string, name s
 
 	var r0 *deploy.MultiLogReader
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) (*deploy.MultiLogReader, error)); ok {
-		return rf(ctx, namespace, name)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) (*deploy.MultiLogReader, error)); ok {
+		return rf(ctx, namespace, name, since)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) *deploy.MultiLogReader); ok {
-		r0 = rf(ctx, namespace, name)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) *deploy.MultiLogReader); ok {
+		r0 = rf(ctx, namespace, name, since)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*deploy.MultiLogReader)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
-		r1 = rf(ctx, namespace, name)
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string) error); ok {
+		r1 = rf(ctx, namespace, name, since)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -573,13 +632,14 @@ type MockSpaceComponent_Logs_Call struct {
 //   - ctx context.Context
 //   - namespace string
 //   - name string
-func (_e *MockSpaceComponent_Expecter) Logs(ctx interface{}, namespace interface{}, name interface{}) *MockSpaceComponent_Logs_Call {
-	return &MockSpaceComponent_Logs_Call{Call: _e.mock.On("Logs", ctx, namespace, name)}
+//   - since string
+func (_e *MockSpaceComponent_Expecter) Logs(ctx interface{}, namespace interface{}, name interface{}, since interface{}) *MockSpaceComponent_Logs_Call {
+	return &MockSpaceComponent_Logs_Call{Call: _e.mock.On("Logs", ctx, namespace, name, since)}
 }
 
-func (_c *MockSpaceComponent_Logs_Call) Run(run func(ctx context.Context, namespace string, name string)) *MockSpaceComponent_Logs_Call {
+func (_c *MockSpaceComponent_Logs_Call) Run(run func(ctx context.Context, namespace string, name string, since string)) *MockSpaceComponent_Logs_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string))
+		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string))
 	})
 	return _c
 }
@@ -589,7 +649,7 @@ func (_c *MockSpaceComponent_Logs_Call) Return(_a0 *deploy.MultiLogReader, _a1 e
 	return _c
 }
 
-func (_c *MockSpaceComponent_Logs_Call) RunAndReturn(run func(context.Context, string, string) (*deploy.MultiLogReader, error)) *MockSpaceComponent_Logs_Call {
+func (_c *MockSpaceComponent_Logs_Call) RunAndReturn(run func(context.Context, string, string, string) (*deploy.MultiLogReader, error)) *MockSpaceComponent_Logs_Call {
 	_c.Call.Return(run)
 	return _c
 }
