@@ -40,7 +40,6 @@ func NewRemoteBuilder(remoteURL string, c common.DeployConfig) (*RemoteBuilder, 
 }
 
 func (h *RemoteBuilder) Build(ctx context.Context, req *types.ImageBuilderRequest) error {
-	//test
 	remote, err := h.GetRemoteRunnerHost(ctx, req.ClusterID)
 	if err != nil {
 		return err
@@ -60,7 +59,11 @@ func (h *RemoteBuilder) Build(ctx context.Context, req *types.ImageBuilderReques
 }
 
 func (h *RemoteBuilder) Stop(ctx context.Context, req types.ImageBuildStopReq) error {
-	u := fmt.Sprintf("%s/api/v1/imagebuilder/stop", h.remote)
+	remote, err := h.GetRemoteRunnerHost(ctx, req.ClusterID)
+	if err != nil {
+		return err
+	}
+	u := fmt.Sprintf("%s/api/v1/imagebuilder/stop", remote)
 	response, err := h.doRequest(ctx, http.MethodPut, u, req)
 	if err != nil {
 		return err

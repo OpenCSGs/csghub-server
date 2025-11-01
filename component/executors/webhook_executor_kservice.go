@@ -71,6 +71,25 @@ func (k *kserviceExecutorImpl) ProcessEvent(ctx context.Context, event *types.We
 }
 
 func (k *kserviceExecutorImpl) updateDeployStatus(ctx context.Context, event *types.ServiceEvent) error {
+	deployTask, err := k.deployTaskStore.GetDeployTask(ctx, event.TaskID)
+	if err != nil {
+		return fmt.Errorf("failed to get deploy task by task id %d in webhook error: %w", event.TaskID, err)
+	}
+
+	lastTask, err := k.deployTaskStore.GetLastTaskByType(ctx, deployTask.DeployID, deployTask.TaskType)
+	if err != nil {
+		return fmt.Errorf("failed to get last deploy task by deploy id %d in webhook error: %w", deployTask.DeployID, err)
+	}
+
+	if lastTask.ID != deployTask.ID {
+		slog.Warn("skip update deploy status as last task is not current task in webhook",
+			slog.Any("event", event),
+			slog.Int64("last_task_id", lastTask.ID),
+			slog.Any("current_task_id", deployTask.ID),
+		)
+		return nil
+	}
+
 	deploy, err := k.deployTaskStore.GetDeployBySvcName(ctx, event.ServiceName)
 	if errors.Is(err, sql.ErrNoRows) {
 		slog.Warn("skip update deploy status as no deploy found by svc name in webhook",

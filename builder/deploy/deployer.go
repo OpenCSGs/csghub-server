@@ -24,6 +24,10 @@ import (
 	hubcom "opencsg.com/csghub-server/common/utils/common"
 )
 
+type DeployWorkflowFunc func(buildTask, runTask *database.DeployTask)
+
+var DeployWorkflow DeployWorkflowFunc
+
 type Deployer interface {
 	Deploy(ctx context.Context, dr types.DeployRepo) (deployID int64, err error)
 	Status(ctx context.Context, dr types.DeployRepo, needDetails bool) (srvName string, status int, instances []types.Instance, err error)
@@ -227,7 +231,9 @@ func (d *deployer) Deploy(ctx context.Context, dr types.DeployRepo) (int64, erro
 		return -1, fmt.Errorf("create deploy task failed: %w", err)
 	}
 
-	go func() { _ = d.scheduler.Queue(buildTask.ID) }()
+	buildTask.Deploy = deploy
+	runTask.Deploy = deploy
+	go DeployWorkflow(buildTask, runTask)
 
 	d.logReporter.Report(types.LogEntry{
 		Message:  types.PreBuildSubmit.String(),
@@ -762,8 +768,8 @@ func (d *deployer) StartDeploy(ctx context.Context, deploy *database.Deploy) err
 		return fmt.Errorf("create deploy task failed: %w", err)
 	}
 
-	go func() { _ = d.scheduler.Queue(runTask.ID) }()
-
+	runTask.Deploy = deploy
+	go DeployWorkflow(nil, runTask) // runTask is the only task
 	// update resource if it's a order case
 	err = d.updateUserResourceByOrder(ctx, deploy)
 	if err != nil {
@@ -774,12 +780,6 @@ func (d *deployer) StartDeploy(ctx context.Context, deploy *database.Deploy) err
 }
 
 func (d *deployer) startJobs() {
-	go func() {
-		err := d.scheduler.Run()
-		if err != nil {
-			slog.Error("run scheduler failed", slog.Any("error", err))
-		}
-	}()
 	go d.startAccounting()
 }
 

@@ -152,6 +152,7 @@ type Config struct {
 		// secret key for session encryption
 		SessionSecretKey   string `env:"STARHUB_SERVER_SPACE_SESSION_SECRET_KEY" default:"secret"`
 		DeployTimeoutInMin int    `env:"STARHUB_SERVER_SPACE_DEPLOY_TIMEOUT_IN_MINUTES" default:"30"`
+		BuildTimeoutInMin  int    `env:"STARHUB_SERVER_SPACE_BUILD_TIMEOUT_IN_MINUTES" default:"30"`
 		// gpu model label
 		GPUModelLabel             string `env:"STARHUB_SERVER_GPU_MODEL_LABEL"`
 		ReadinessDelaySeconds     int    `env:"STARHUB_SERVER_READINESS_DELAY_SECONDS" default:"120"`

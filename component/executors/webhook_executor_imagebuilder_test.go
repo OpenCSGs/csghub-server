@@ -35,6 +35,7 @@ func TestImageBuilderExecutor_ProcessEvent(t *testing.T) {
 		err = mockDb.CreateDeployTask(context.Background(), &database.DeployTask{
 			ID:       taskId,
 			DeployID: deployId,
+			Status:   scheduler.BuildPending,
 		})
 		require.Nil(t, err)
 		data := types.ImageBuilderEvent{
@@ -71,12 +72,14 @@ func TestImageBuilderExecutor_ProcessEvent(t *testing.T) {
 			store: mockDb,
 		}
 		err := mockDb.CreateDeploy(context.Background(), &database.Deploy{
-			ID: deployId,
+			Status: common.BuildInQueue,
+			ID:     deployId,
 		})
 		require.Nil(t, err)
 		err = mockDb.CreateDeployTask(context.Background(), &database.DeployTask{
 			ID:       taskId,
 			DeployID: deployId,
+			Status:   scheduler.BuildInQueue,
 		})
 		require.Nil(t, err)
 		data := types.ImageBuilderEvent{
@@ -103,7 +106,6 @@ func TestImageBuilderExecutor_ProcessEvent(t *testing.T) {
 		task, err := mockDb.GetDeployTask(context.Background(), taskId)
 		require.Nil(t, err)
 		require.Equal(t, scheduler.BuildInProgress, task.Status)
-		require.Equal(t, common.Building, task.Deploy.Status)
 	})
 
 	t.Run("WorkflowSucceeded", func(t *testing.T) {

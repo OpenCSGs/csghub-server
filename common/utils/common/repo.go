@@ -92,6 +92,13 @@ func BuildCloneInfo(config *config.Config, repository *database.Repository) type
 	}
 }
 
+func BuildCloneInfoByDomain(publicDomain, sshDomain string, repository *database.Repository) types.Repository {
+	return types.Repository{
+		HTTPCloneURL: buildHTTPCloneURL(publicDomain, repository.RepositoryType, repository.Path),
+		SSHCloneURL:  buildSSHCloneURL(sshDomain, repository.RepositoryType, repository.Path),
+	}
+}
+
 func buildHTTPCloneURL(domain string, repoType types.RepositoryType, path string) string {
 	return fmt.Sprintf("%s/%ss/%s.git", strings.TrimSuffix(domain, "/"), repoType, path)
 }

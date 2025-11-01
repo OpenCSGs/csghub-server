@@ -108,6 +108,7 @@ type DeployTaskStore interface {
 	ListAllDeploys(ctx context.Context, req types.DeployReq, isActive bool) ([]Deploy, int, error)
 	RunningVisibleToUser(ctx context.Context, userID int64) ([]Deploy, error)
 	ListAllRunningDeploys(ctx context.Context) ([]Deploy, error)
+	GetLastTaskByType(ctx context.Context, deployID int64, taskType int) (*DeployTask, error)
 }
 
 func NewDeployTaskStore() DeployTaskStore {
@@ -519,4 +520,18 @@ func (s *deployTaskStoreImpl) ListAllRunningDeploys(ctx context.Context) ([]Depl
 		return nil, err
 	}
 	return result, nil
+}
+
+func (s *deployTaskStoreImpl) GetLastTaskByType(ctx context.Context, deployID int64, taskType int) (*DeployTask, error) {
+	var result DeployTask
+	err := s.db.Operator.Core.NewSelect().Model(&result).Relation("Deploy").
+		Where("deploy_id = ? and task_type = ?", deployID, taskType).
+		Order("id DESC").
+		Limit(1).
+		Scan(ctx, &result)
+	err = errorx.HandleDBError(err, nil)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
 }

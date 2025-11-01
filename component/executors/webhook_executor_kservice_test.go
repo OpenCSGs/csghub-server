@@ -39,6 +39,13 @@ func TestWebHookExecutorKService_ProcessEvent(t *testing.T) {
 	}
 
 	dts := mockdb.NewMockDeployTaskStore(t)
+	dts.EXPECT().GetLastTaskByType(ctx, mock.Anything, mock.Anything).Return(&database.DeployTask{
+		ID: int64(1),
+	}, nil)
+
+	dts.EXPECT().GetDeployTask(ctx, mock.Anything).Return(&database.DeployTask{
+		ID: int64(1),
+	}, nil)
 	dts.EXPECT().GetDeployBySvcName(ctx, event.ServiceName).Return(&database.Deploy{
 		ID:      int64(1),
 		SvcName: event.ServiceName,

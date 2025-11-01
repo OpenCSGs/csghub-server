@@ -179,7 +179,7 @@ func TestDeployer_dedicatedDeploy(t *testing.T) {
 }
 
 func TestDeployer_Deploy(t *testing.T) {
-
+	DeployWorkflow = func(buildTask, runTask *database.DeployTask) {}
 	t.Run("use on-demand resource and skip build task", func(t *testing.T) {
 		dr := types.DeployRepo{
 			UserUUID: "1",
@@ -205,16 +205,12 @@ func TestDeployer_Deploy(t *testing.T) {
 		// })
 		mockTaskStore.EXPECT().CreateDeployTask(mock.Anything, &runTask).Return(nil)
 
-		mockSch := mockScheduler.NewMockScheduler(t)
-		mockSch.EXPECT().Queue(mock.Anything).Return(nil)
-
 		node, _ := snowflake.NewNode(1)
 
 		reporter := mockReporter.NewMockLogCollector(t)
 		d := &deployer{
 			snowflakeNode:   node,
 			deployTaskStore: mockTaskStore,
-			scheduler:       mockSch,
 			logReporter:     reporter,
 		}
 

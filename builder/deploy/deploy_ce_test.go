@@ -65,6 +65,7 @@ func TestDeployer_Stop(t *testing.T) {
 }
 
 func TestDeployer_StartDeploy(t *testing.T) {
+	DeployWorkflow = func(buildTask, runTask *database.DeployTask) {}
 	dbdeploy := database.Deploy{
 		ID:       1,
 		UserUUID: "1",
@@ -82,15 +83,11 @@ func TestDeployer_StartDeploy(t *testing.T) {
 	}
 	mockTaskStore.EXPECT().CreateDeployTask(mock.Anything, &buildTask).Return(nil)
 
-	mockSch := mockScheduler.NewMockScheduler(t)
-	mockSch.EXPECT().Queue(mock.Anything).Return(nil)
-
 	node, _ := snowflake.NewNode(1)
 
 	d := &deployer{
 		snowflakeNode:   node,
 		deployTaskStore: mockTaskStore,
-		scheduler:       mockSch,
 	}
 	err := d.StartDeploy(context.TODO(), &dbdeploy)
 
