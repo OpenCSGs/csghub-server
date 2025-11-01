@@ -369,6 +369,65 @@ func (_c *MockArgoWorkFlowStore_UpdateWorkFlow_Call) RunAndReturn(run func(conte
 	return _c
 }
 
+// UpdateWorkFlowByTaskID provides a mock function with given fields: ctx, workFlow
+func (_m *MockArgoWorkFlowStore) UpdateWorkFlowByTaskID(ctx context.Context, workFlow database.ArgoWorkflow) (*database.ArgoWorkflow, error) {
+	ret := _m.Called(ctx, workFlow)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateWorkFlowByTaskID")
+	}
+
+	var r0 *database.ArgoWorkflow
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, database.ArgoWorkflow) (*database.ArgoWorkflow, error)); ok {
+		return rf(ctx, workFlow)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, database.ArgoWorkflow) *database.ArgoWorkflow); ok {
+		r0 = rf(ctx, workFlow)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.ArgoWorkflow)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, database.ArgoWorkflow) error); ok {
+		r1 = rf(ctx, workFlow)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockArgoWorkFlowStore_UpdateWorkFlowByTaskID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateWorkFlowByTaskID'
+type MockArgoWorkFlowStore_UpdateWorkFlowByTaskID_Call struct {
+	*mock.Call
+}
+
+// UpdateWorkFlowByTaskID is a helper method to define mock.On call
+//   - ctx context.Context
+//   - workFlow database.ArgoWorkflow
+func (_e *MockArgoWorkFlowStore_Expecter) UpdateWorkFlowByTaskID(ctx interface{}, workFlow interface{}) *MockArgoWorkFlowStore_UpdateWorkFlowByTaskID_Call {
+	return &MockArgoWorkFlowStore_UpdateWorkFlowByTaskID_Call{Call: _e.mock.On("UpdateWorkFlowByTaskID", ctx, workFlow)}
+}
+
+func (_c *MockArgoWorkFlowStore_UpdateWorkFlowByTaskID_Call) Run(run func(ctx context.Context, workFlow database.ArgoWorkflow)) *MockArgoWorkFlowStore_UpdateWorkFlowByTaskID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(database.ArgoWorkflow))
+	})
+	return _c
+}
+
+func (_c *MockArgoWorkFlowStore_UpdateWorkFlowByTaskID_Call) Return(_a0 *database.ArgoWorkflow, _a1 error) *MockArgoWorkFlowStore_UpdateWorkFlowByTaskID_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockArgoWorkFlowStore_UpdateWorkFlowByTaskID_Call) RunAndReturn(run func(context.Context, database.ArgoWorkflow) (*database.ArgoWorkflow, error)) *MockArgoWorkFlowStore_UpdateWorkFlowByTaskID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // NewMockArgoWorkFlowStore creates a new instance of MockArgoWorkFlowStore. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewMockArgoWorkFlowStore(t interface {

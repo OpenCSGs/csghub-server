@@ -499,6 +499,66 @@ func (_c *MockDeployTaskStore_GetDeployTasksOfDeploy_Call) RunAndReturn(run func
 	return _c
 }
 
+// GetLastTaskByType provides a mock function with given fields: ctx, deployID, taskType
+func (_m *MockDeployTaskStore) GetLastTaskByType(ctx context.Context, deployID int64, taskType int) (*database.DeployTask, error) {
+	ret := _m.Called(ctx, deployID, taskType)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetLastTaskByType")
+	}
+
+	var r0 *database.DeployTask
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64, int) (*database.DeployTask, error)); ok {
+		return rf(ctx, deployID, taskType)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, int64, int) *database.DeployTask); ok {
+		r0 = rf(ctx, deployID, taskType)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.DeployTask)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, int64, int) error); ok {
+		r1 = rf(ctx, deployID, taskType)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockDeployTaskStore_GetLastTaskByType_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetLastTaskByType'
+type MockDeployTaskStore_GetLastTaskByType_Call struct {
+	*mock.Call
+}
+
+// GetLastTaskByType is a helper method to define mock.On call
+//   - ctx context.Context
+//   - deployID int64
+//   - taskType int
+func (_e *MockDeployTaskStore_Expecter) GetLastTaskByType(ctx interface{}, deployID interface{}, taskType interface{}) *MockDeployTaskStore_GetLastTaskByType_Call {
+	return &MockDeployTaskStore_GetLastTaskByType_Call{Call: _e.mock.On("GetLastTaskByType", ctx, deployID, taskType)}
+}
+
+func (_c *MockDeployTaskStore_GetLastTaskByType_Call) Run(run func(ctx context.Context, deployID int64, taskType int)) *MockDeployTaskStore_GetLastTaskByType_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64), args[2].(int))
+	})
+	return _c
+}
+
+func (_c *MockDeployTaskStore_GetLastTaskByType_Call) Return(_a0 *database.DeployTask, _a1 error) *MockDeployTaskStore_GetLastTaskByType_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockDeployTaskStore_GetLastTaskByType_Call) RunAndReturn(run func(context.Context, int64, int) (*database.DeployTask, error)) *MockDeployTaskStore_GetLastTaskByType_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetLatestDeployBySpaceID provides a mock function with given fields: ctx, spaceID
 func (_m *MockDeployTaskStore) GetLatestDeployBySpaceID(ctx context.Context, spaceID int64) (*database.Deploy, error) {
 	ret := _m.Called(ctx, spaceID)

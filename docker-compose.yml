@@ -280,6 +280,19 @@ services:
   #   networks:
   #     - my_ce_network
 
+  temporal_worker:
+    image: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/csghub-server:latest
+    entrypoint:
+      - /starhub-bin/starhub
+      - temporal-worker
+      - launch
+      - --config=/starhub-bin/config/config.toml
+    restart: always
+    volumes:
+      - ./data/config.toml:/starhub-bin/config/config.toml:r
+    networks:
+      - my_ce_network
+      
 networks:
   my_ce_network:
     driver: bridge

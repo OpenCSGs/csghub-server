@@ -135,13 +135,13 @@ var serverCmd = &cobra.Command{
 			APIToken:                cfg.APIToken,
 			APIKey:                  cfg.APIToken,
 			HeartBeatTimeInSec:      cfg.Runner.HearBeatIntervalInSec,
-		}, cfg)
+		}, cfg, true)
 		if err != nil {
 			return fmt.Errorf("failed to init deploy: %w", err)
 		}
 
 		slog.Info("start temporal workflow")
-		err = workflow.StartWorkflow(cfg, true)
+		err = workflow.StartWorkflow(cfg, false)
 		if err != nil {
 			return err
 		}

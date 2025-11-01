@@ -18,6 +18,7 @@ type ArgoWorkFlowStore interface {
 	FindByTaskID(ctx context.Context, id string) (WorkFlow ArgoWorkflow, err error)
 	FindByUsername(ctx context.Context, username string, per, page int) (WorkFlows []ArgoWorkflow, total int, err error)
 	CreateWorkFlow(ctx context.Context, workFlow ArgoWorkflow) (*ArgoWorkflow, error)
+	UpdateWorkFlowByTaskID(ctx context.Context, workFlow ArgoWorkflow) (*ArgoWorkflow, error)
 	// mainly for update status
 	UpdateWorkFlow(ctx context.Context, workFlow ArgoWorkflow) (*ArgoWorkflow, error)
 	// delete workflow by id
@@ -112,6 +113,12 @@ func (s *argoWorkFlowStoreImpl) CreateWorkFlow(ctx context.Context, workFlow Arg
 // mainly for update status
 func (s *argoWorkFlowStoreImpl) UpdateWorkFlow(ctx context.Context, workFlow ArgoWorkflow) (*ArgoWorkflow, error) {
 	_, err := s.db.Core.NewUpdate().Model(&workFlow).WherePK().Exec(ctx)
+	return &workFlow, err
+}
+
+// UpdateWorkFlowByTaskID
+func (s *argoWorkFlowStoreImpl) UpdateWorkFlowByTaskID(ctx context.Context, workFlow ArgoWorkflow) (*ArgoWorkflow, error) {
+	_, err := s.db.Core.NewUpdate().Model(&workFlow).Where("task_id = ?", workFlow.TaskId).Exec(ctx)
 	return &workFlow, err
 }
 
