@@ -21,8 +21,6 @@ type ArgoWorkFlowStore interface {
 	UpdateWorkFlowByTaskID(ctx context.Context, workFlow ArgoWorkflow) (*ArgoWorkflow, error)
 	// mainly for update status
 	UpdateWorkFlow(ctx context.Context, workFlow ArgoWorkflow) (*ArgoWorkflow, error)
-	// UpdateWorkFlowByTaskID
-	UpdateWorkFlowByTaskID(ctx context.Context, workFlow ArgoWorkflow) (*ArgoWorkflow, error)
 	// delete workflow by id
 	DeleteWorkFlow(ctx context.Context, id int64) error
 	ListAllRunningEvaluations(ctx context.Context) (WorkFlows []ArgoWorkflow, err error)
