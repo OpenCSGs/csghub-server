@@ -88,18 +88,16 @@ func (a *LangflowAgentInstanceAdapter) CreateInstance(ctx context.Context, userU
 		return nil, err
 	}
 
+	metadata := make(map[string]any)
 	if template != nil {
-		if instance.Metadata == nil {
-			instance.Metadata = make(map[string]any)
-		}
-		instance.Metadata["template_metadata"] = template.Metadata
+		metadata["template_metadata"] = template.Metadata
 	}
 
 	return &types.AgentInstanceCreationResult{
 		ID:          resp.ID,
 		Name:        resp.Name,
 		Description: resp.Description,
-		Metadata:    instance.Metadata,
+		Metadata:    metadata,
 	}, nil
 }
 

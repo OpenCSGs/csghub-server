@@ -404,6 +404,7 @@ func (nh *NatsHandler) BuildNormalPriorityMsgStream(conf *config.Config) error {
 }
 
 func (nh *NatsHandler) BuildAgentSessionHistoryMsgStream(conf *config.Config) error {
+	nh.agentSessionHistoryMsgConsumerCfg.MaxDeliver = 3
 	jsc, err := nh.BuildEventStreamAndConsumer(agentSessionHistoryMsgCfg, nh.agentSessionHistoryMsgEvtCfg, nh.agentSessionHistoryMsgConsumerCfg)
 	if err != nil {
 		return err

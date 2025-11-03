@@ -184,7 +184,7 @@ func TestCodeAgentInstanceAdapter_UpdateInstance(t *testing.T) {
 				Description: stringPtr("Updated Description"),
 				Type:        stringPtr("code"),
 				ContentID:   stringPtr("test-content-id"),
-				Public:      true,
+				Public:      boolPtr(true),
 				Editable:    true,
 			},
 		},
@@ -648,4 +648,8 @@ func stringPtr(s string) *string {
 
 func int64Ptr(i int64) *int64 {
 	return &i
+}
+
+func boolPtr(b bool) *bool {
+	return &b
 }

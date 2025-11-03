@@ -26,20 +26,20 @@ type AgentTemplateFilter struct {
 
 // AgentInstance represents an instance created from an agent template
 type AgentInstance struct {
-	ID          int64          `json:"id"`
-	TemplateID  *int64         `json:"template_id" binding:"omitempty,gte=1"` // Associated with the id in the template table
-	UserUUID    *string        `json:"-"`                                     // Will be set from HTTP header using httpbase.GetCurrentUserUUID
-	Name        *string        `json:"name" binding:"required"`               // Instance name
-	Description *string        `json:"description" binding:"omitempty"`       // Instance description
-	Type        *string        `json:"type" binding:"required"`               // Possible values: langflow, agno, code, etc.
-	ContentID   *string        `json:"content_id" binding:"omitempty"`        // Used to specify the unique id of the instance resource
-	Public      bool           `json:"public"`                                // Whether the instance is public
-	Editable    bool           `json:"editable"`                              // Whether the instance is editable
-	IsRunning   bool           `json:"is_running"`                            // Whether the instance is running
-	BuiltIn     bool           `json:"built_in"`                              // Whether the instance is built-in
-	Metadata    map[string]any `json:"metadata"`                              // Instance metadata
-	CreatedAt   time.Time      `json:"created_at"`                            // When the instance was created
-	UpdatedAt   time.Time      `json:"updated_at"`                            // When the instance was last updated
+	ID          int64           `json:"id"`
+	TemplateID  *int64          `json:"template_id" binding:"omitempty,gte=1"` // Associated with the id in the template table
+	UserUUID    *string         `json:"-"`                                     // Will be set from HTTP header using httpbase.GetCurrentUserUUID
+	Name        *string         `json:"name"`                                  // Instance name
+	Description *string         `json:"description" binding:"omitempty"`       // Instance description
+	Type        *string         `json:"type"`                                  // Possible values: langflow, agno, code, etc.
+	ContentID   *string         `json:"content_id" binding:"omitempty"`        // Used to specify the unique id of the instance resource
+	Public      *bool           `json:"public"`                                // Whether the instance is public
+	Editable    bool            `json:"editable"`                              // Whether the instance is editable
+	IsRunning   bool            `json:"is_running"`                            // Whether the instance is running
+	BuiltIn     bool            `json:"built_in"`                              // Whether the instance is built-in
+	Metadata    *map[string]any `json:"metadata,omitempty"`                    // Instance metadata
+	CreatedAt   time.Time       `json:"created_at"`                            // When the instance was created
+	UpdatedAt   time.Time       `json:"updated_at"`                            // When the instance was last updated
 }
 
 type AgentType string
@@ -61,8 +61,9 @@ type AgentInstanceFilter struct {
 }
 
 type UpdateAgentInstanceRequest struct {
-	Name        *string `json:"name,omitempty"`
-	Description *string `json:"description,omitempty"`
+	Name        *string         `json:"name,omitempty"`
+	Description *string         `json:"description,omitempty"`
+	Metadata    *map[string]any `json:"metadata,omitempty"`
 }
 
 type AgentInstanceCreationResult struct {

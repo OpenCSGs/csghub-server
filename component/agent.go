@@ -273,7 +273,7 @@ func (c *agentComponentImpl) UpdateTemplate(ctx context.Context, template *types
 	}
 
 	if template.Metadata != nil {
-		dbTemplate.Metadata = *template.Metadata
+		updateMetadata(&dbTemplate.Metadata, template.Metadata)
 	}
 
 	if template.Public != nil {
@@ -342,15 +342,17 @@ func (c *agentComponentImpl) CreateInstance(ctx context.Context, instance *types
 		UserUUID:    *instance.UserUUID,
 		Type:        *instance.Type,
 		ContentID:   creationResult.ID,
-		Public:      instance.Public,
 		Name:        creationResult.Name,
 		Description: creationResult.Description,
+		Public:      *instance.Public,
 		Metadata:    creationResult.Metadata,
 	}
 
 	if instance.TemplateID != nil {
 		dbInstance.TemplateID = *instance.TemplateID
 	}
+
+	updateMetadata(&dbInstance.Metadata, instance.Metadata)
 
 	createdInstance, err := c.instanceStore.Create(ctx, dbInstance)
 	if err != nil {
@@ -367,7 +369,7 @@ func (c *agentComponentImpl) CreateInstance(ctx context.Context, instance *types
 	instance.ContentID = &createdInstance.ContentID
 	instance.Name = &createdInstance.Name
 	instance.Description = &createdInstance.Description
-	instance.Metadata = createdInstance.Metadata
+	instance.Metadata = &dbInstance.Metadata
 	instance.Editable = true
 	instance.CreatedAt = createdInstance.CreatedAt
 	instance.UpdatedAt = createdInstance.UpdatedAt
@@ -410,13 +412,13 @@ func (c *agentComponentImpl) GetInstanceByID(ctx context.Context, id int64, user
 		UserUUID:    &dbInstance.UserUUID,
 		Type:        &dbInstance.Type,
 		ContentID:   &dbInstance.ContentID,
-		Public:      dbInstance.Public,
+		Public:      &dbInstance.Public,
 		Editable:    !dbInstance.BuiltIn && dbInstance.UserUUID == userUUID, //only the owner can edit the instance, built-in instances are not editable
 		Name:        &dbInstance.Name,
 		Description: &dbInstance.Description,
 		IsRunning:   isRunning,
 		BuiltIn:     dbInstance.BuiltIn,
-		Metadata:    dbInstance.Metadata,
+		Metadata:    &dbInstance.Metadata,
 		CreatedAt:   dbInstance.CreatedAt,
 		UpdatedAt:   dbInstance.UpdatedAt,
 	}, nil
@@ -450,19 +452,38 @@ func (c *agentComponentImpl) ListInstancesByUserUUID(ctx context.Context, userUU
 			UserUUID:    &dbInstance.UserUUID,
 			Type:        &dbInstance.Type,
 			ContentID:   &dbInstance.ContentID,
-			Public:      dbInstance.Public,
+			Public:      &dbInstance.Public,
 			Editable:    !dbInstance.BuiltIn && dbInstance.UserUUID == userUUID, //only the owner can edit the instance, built-in instances are not editable
 			Name:        &dbInstance.Name,
 			Description: &dbInstance.Description,
 			IsRunning:   isRunning,
 			BuiltIn:     dbInstance.BuiltIn,
-			Metadata:    dbInstance.Metadata,
+			Metadata:    &dbInstance.Metadata,
 			CreatedAt:   dbInstance.CreatedAt,
 			UpdatedAt:   dbInstance.UpdatedAt,
 		})
 	}
 
 	return typesInstances, total, nil
+}
+
+// updateMetadata updates the target metadata map with values from the update metadata map.
+// If a value in the update metadata is nil, the corresponding key is deleted from the target.
+// If the target metadata is nil, it will be initialized as an empty map.
+func updateMetadata(targetMetadata *map[string]any, updateMetadataMap *map[string]any) {
+	if updateMetadataMap == nil {
+		return
+	}
+	if *targetMetadata == nil {
+		*targetMetadata = make(map[string]any)
+	}
+	for key, value := range *updateMetadataMap {
+		if value == nil {
+			delete(*targetMetadata, key)
+		} else {
+			(*targetMetadata)[key] = value
+		}
+	}
 }
 
 // UpdateInstance updates an existing agent instance
@@ -476,25 +497,37 @@ func (c *agentComponentImpl) UpdateInstance(ctx context.Context, instance *types
 	}
 
 	// Verify the instance exists before updating
-	existing, err := c.instanceStore.FindByID(ctx, instance.ID)
+	dbInstance, err := c.instanceStore.FindByID(ctx, instance.ID)
 	if err != nil {
 		return err
 	}
 
 	// Ensure the user can only update their own instances
-	if existing.UserUUID != *instance.UserUUID {
+	if dbInstance.UserUUID != *instance.UserUUID {
 		return errorx.ErrForbidden
 	}
 
-	// Convert types.AgentInstance to database.AgentInstance
-	dbInstance := &database.AgentInstance{
-		ID:         instance.ID,
-		TemplateID: *instance.TemplateID,
-		UserUUID:   *instance.UserUUID,
-		Type:       *instance.Type,
-		ContentID:  *instance.ContentID,
-		Public:     instance.Public,
+	if instance.Type != nil && *instance.Type != dbInstance.Type {
+		return fmt.Errorf("instance type cannot be updated")
 	}
+
+	if instance.Name != nil {
+		dbInstance.Name = *instance.Name
+	}
+
+	if instance.Description != nil {
+		dbInstance.Description = *instance.Description
+	}
+
+	if instance.ContentID != nil {
+		dbInstance.ContentID = *instance.ContentID
+	}
+
+	if instance.Public != nil {
+		dbInstance.Public = *instance.Public
+	}
+
+	updateMetadata(&dbInstance.Metadata, instance.Metadata)
 
 	return c.instanceStore.Update(ctx, dbInstance)
 }
@@ -524,6 +557,9 @@ func (c *agentComponentImpl) UpdateInstanceByContentID(ctx context.Context, user
 	if updateRequest.Description != nil {
 		instance.Description = *updateRequest.Description
 	}
+
+	updateMetadata(&instance.Metadata, updateRequest.Metadata)
+
 	if err := c.instanceStore.Update(ctx, instance); err != nil {
 		slog.Error("failed to update agent instance", "instance_type", instanceType, "content_id", instanceContentID, "user_uuid", userUUID, "error", err)
 		return nil, err
