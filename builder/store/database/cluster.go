@@ -58,11 +58,15 @@ type ClusterInfo struct {
 func (r *clusterInfoStoreImpl) Add(ctx context.Context, clusterConfig string, region string, mode types.ClusterMode) (*ClusterInfo, error) {
 	cluster := ClusterInfo{}
 
-	q := r.db.Operator.Core.NewSelect().Model(&cluster).Where("cluster_config = ?", clusterConfig)
-	if mode == types.ConnectModeInCluster {
-		q.Where("mode = ?", mode)
+	q := r.db.Operator.Core.NewSelect().Model(&cluster).Where(
+		"cluster_config = ?", clusterConfig)
+	// For backward compatibility: when mode is ConnectModeKubeConfig, also match NULL mode (old data)
+	if mode == types.ConnectModeKubeConfig {
+		q = q.Where("(mode = ? OR mode IS NULL)", mode)
+	} else if mode != "" {
+		q = q.Where("mode = ?", mode)
 	} else {
-		q.Where("mode != ?", types.ConnectModeInCluster)
+		q = q.Where("mode IS NULL OR mode = ''")
 	}
 	err := q.Scan(ctx)
 
@@ -103,7 +107,7 @@ func (r *clusterInfoStoreImpl) Update(ctx context.Context, clusterInfo ClusterIn
 	err := r.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		_, err := r.ByClusterConfig(ctx, clusterInfo.ClusterConfig)
 		if err == nil {
-			return assertAffectedOneRow(r.db.Operator.Core.NewUpdate().Model(&clusterInfo).WherePK().Exec(ctx))
+			return assertAffectedOneRow(tx.NewUpdate().Model(&clusterInfo).WherePK().Exec(ctx))
 		}
 		return nil
 	})
