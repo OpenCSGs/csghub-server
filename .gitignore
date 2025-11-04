@@ -1,26 +1,66 @@
 # Binaries
 bin
+
 .vscode
+.zed
+.idea
+.trae
+
 .DS_Store
 .envrc
-.idea/
-
+.codesouler
 /gitea
 /pgdata
-minio_data
-local_only
-/jetstream
-.env
-*.sh
-cmd/csghub-server/__debug_*
+/keys
+/outputs
 
-.data
+# Logs
+*.log
+logs
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Test coverage
+coverage
+
+# Go coverage
+*.out
+*.test
+
+# Temporary files
+tmp
+*.swp
+*.swo
+*~
+
+.venv
+
+*.pem
+*.key
+*.pub
+*.crt
+
+# Kubernetes files
+*.kubeconfig
+
+# Terraform files
+*.tfstate
+*.tfstate.backup
+.terraform/
+
+# Prometheus
+prometheus.yml
+
+# Loki
+loki-config.yml
+
+/data
 */*/_api_test/
 redis/dump.rdb
-run_server_local.sh
 
 **/loki-data/
 **/tempo-data/
-docs/swagger.json
-docs/swagger.yaml
-docs/docs.go
