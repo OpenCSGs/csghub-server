@@ -1,14 +1,20 @@
 {
     "error.TASK-ERR-0": {
-        "other": "未找到任务入口文件"
+        "other": "任务不存在"
     },
     "error.TASK-ERR-1": {
-        "other": "只支持 vllm 和 sglang 的多主机推理"
+        "other": "任务已存在"
     },
     "error.TASK-ERR-2": {
-        "other": "多主机推理仅支持大于 0 的最低副本数"
+        "other": "任务未运行"
     },
     "error.TASK-ERR-3": {
         "other": "不支持多主机 Notebook"
+    },
+    "error.TASK-ERR-4": {
+        "other": "集群资源不足"
+    },
+    "error.TASK-ERR-5": {
+        "other": "集群当前不可用"
     }
 }
