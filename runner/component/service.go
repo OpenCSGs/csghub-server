@@ -125,11 +125,11 @@ func (s *serviceComponentImpl) generateService(ctx context.Context, cluster *clu
 		environments = append(environments, corev1.EnvVar{Name: "ASCEND_VISIBLE_DEVICES", Value: "none"})
 	}
 
-	if hardware.Dcu.ResourceName == "" || hardware.Dcu.Num == "" {
+	if hardware.Gcu.ResourceName == "" || hardware.Gcu.Num == "" {
 		environments = append(environments, corev1.EnvVar{Name: "ENFLAME_VISIBLE_DEVICES", Value: "none"})
 	}
 
-	if hardware.Gcu.ResourceName == "" || hardware.Gcu.Num == "" {
+	if hardware.Dcu.ResourceName == "" || hardware.Dcu.Num == "" {
 		environments = append(environments, corev1.EnvVar{Name: "ROCR_VISIBLE_DEVICES", Value: "none"})
 		environments = append(environments, corev1.EnvVar{Name: "TOPS_VISIBLE_DEVICES", Value: "none"})
 	}
@@ -178,6 +178,15 @@ func (s *serviceComponentImpl) generateService(ctx context.Context, cluster *clu
 		templateAnnotations["autoscaling.knative.dev/min-scale"] = strconv.Itoa(request.MinReplica)
 		templateAnnotations["autoscaling.knative.dev/max-scale"] = strconv.Itoa(request.MaxReplica)
 		templateAnnotations["serving.knative.dev/progress-deadline"] = fmt.Sprintf("%dm", s.env.Model.DeployTimeoutInMin)
+	} else if request.RepoType == string(types.SpaceRepo) {
+		// auto scaling for spaces (including MCP services)
+		//min replica can not be greather than 1 for spaces
+		if request.MinReplica > 1 {
+			slog.Warn("min replica can not be greather than 1 for spaces, reset to 1")
+			request.MinReplica = 1
+		}
+		templateAnnotations["autoscaling.knative.dev/min-scale"] = strconv.Itoa(request.MinReplica)
+		templateAnnotations["autoscaling.knative.dev/max-scale"] = strconv.Itoa(1)
 	}
 	initialDelaySeconds := 10
 	periodSeconds := 10

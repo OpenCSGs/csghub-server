@@ -475,9 +475,9 @@ func (_c *MockModelComponent_Index_Call) RunAndReturn(run func(context.Context, 
 	return _c
 }
 
-// ListAllByRuntimeFramework provides a mock function with given fields: ctx, currentUser
-func (_m *MockModelComponent) ListAllByRuntimeFramework(ctx context.Context, currentUser string) ([]database.RuntimeFramework, error) {
-	ret := _m.Called(ctx, currentUser)
+// ListAllByRuntimeFramework provides a mock function with given fields: ctx, currentUser, deployType
+func (_m *MockModelComponent) ListAllByRuntimeFramework(ctx context.Context, currentUser string, deployType int) ([]database.RuntimeFramework, error) {
+	ret := _m.Called(ctx, currentUser, deployType)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ListAllByRuntimeFramework")
@@ -485,19 +485,19 @@ func (_m *MockModelComponent) ListAllByRuntimeFramework(ctx context.Context, cur
 
 	var r0 []database.RuntimeFramework
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) ([]database.RuntimeFramework, error)); ok {
-		return rf(ctx, currentUser)
+	if rf, ok := ret.Get(0).(func(context.Context, string, int) ([]database.RuntimeFramework, error)); ok {
+		return rf(ctx, currentUser, deployType)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string) []database.RuntimeFramework); ok {
-		r0 = rf(ctx, currentUser)
+	if rf, ok := ret.Get(0).(func(context.Context, string, int) []database.RuntimeFramework); ok {
+		r0 = rf(ctx, currentUser, deployType)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]database.RuntimeFramework)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = rf(ctx, currentUser)
+	if rf, ok := ret.Get(1).(func(context.Context, string, int) error); ok {
+		r1 = rf(ctx, currentUser, deployType)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -513,13 +513,14 @@ type MockModelComponent_ListAllByRuntimeFramework_Call struct {
 // ListAllByRuntimeFramework is a helper method to define mock.On call
 //   - ctx context.Context
 //   - currentUser string
-func (_e *MockModelComponent_Expecter) ListAllByRuntimeFramework(ctx interface{}, currentUser interface{}) *MockModelComponent_ListAllByRuntimeFramework_Call {
-	return &MockModelComponent_ListAllByRuntimeFramework_Call{Call: _e.mock.On("ListAllByRuntimeFramework", ctx, currentUser)}
+//   - deployType int
+func (_e *MockModelComponent_Expecter) ListAllByRuntimeFramework(ctx interface{}, currentUser interface{}, deployType interface{}) *MockModelComponent_ListAllByRuntimeFramework_Call {
+	return &MockModelComponent_ListAllByRuntimeFramework_Call{Call: _e.mock.On("ListAllByRuntimeFramework", ctx, currentUser, deployType)}
 }
 
-func (_c *MockModelComponent_ListAllByRuntimeFramework_Call) Run(run func(ctx context.Context, currentUser string)) *MockModelComponent_ListAllByRuntimeFramework_Call {
+func (_c *MockModelComponent_ListAllByRuntimeFramework_Call) Run(run func(ctx context.Context, currentUser string, deployType int)) *MockModelComponent_ListAllByRuntimeFramework_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string))
+		run(args[0].(context.Context), args[1].(string), args[2].(int))
 	})
 	return _c
 }
@@ -529,7 +530,7 @@ func (_c *MockModelComponent_ListAllByRuntimeFramework_Call) Return(_a0 []databa
 	return _c
 }
 
-func (_c *MockModelComponent_ListAllByRuntimeFramework_Call) RunAndReturn(run func(context.Context, string) ([]database.RuntimeFramework, error)) *MockModelComponent_ListAllByRuntimeFramework_Call {
+func (_c *MockModelComponent_ListAllByRuntimeFramework_Call) RunAndReturn(run func(context.Context, string, int) ([]database.RuntimeFramework, error)) *MockModelComponent_ListAllByRuntimeFramework_Call {
 	_c.Call.Return(run)
 	return _c
 }

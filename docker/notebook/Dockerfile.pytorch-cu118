@@ -1,0 +1,27 @@
+ARG REGISTRY=quay.io
+ARG OWNER=jupyter
+ARG BASE_IMAGE=$REGISTRY/$OWNER/pytorch-notebook:cuda11-ubuntu-24.04
+FROM $BASE_IMAGE
+
+LABEL maintainer="xzgan@opencsg.com"
+
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
+USER root
+
+RUN apt-get update && apt-get -y install vim dumb-init \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+RUN pip config set global.index-url https://mirrors.aliyun.com/pypi/simple && \
+ pip install --no-cache-dir csghub-sdk
+
+# Set up dark mode by creating JupyterLab settings file
+RUN mkdir -p /home/jovyan/.jupyter/lab/user-settings/@jupyterlab/apputils-extension && \
+	echo '{"theme":"JupyterLab Dark"}' > /home/jovyan/.jupyter/lab/user-settings/@jupyterlab/apputils-extension/themes.jupyterlab-settings && \
+	mkdir -p /home/jovyan/.jupyter/lab/user-settings/@jupyterlab/notebook-extension && \
+	echo '{"codeCellConfig":{"lineNumbers":true }}' > /home/jovyan/.jupyter/lab/user-settings/@jupyterlab/notebook-extension/tracker.jupyterlab-settings
+
+WORKDIR /workspace/
+
+ENTRYPOINT [ "/usr/bin/dumb-init", "--"]
+CMD ["jupyter-lab","--ip=0.0.0.0", "--port=8000", "--no-browser", "--ServerApp.allow_origin='*'", "--allow-root", "--NotebookApp.token=''"] 

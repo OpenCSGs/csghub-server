@@ -1,0 +1,27 @@
+# pull from devel image instead of base
+FROM modelscope-registry.cn-beijing.cr.aliyuncs.com/modelscope-repo/modelscope:ubuntu22.04-cuda12.4.0-py310-torch2.6.0-vllm0.8.5.post1-modelscope1.28.1-swift3.6.4
+# Set bash as the default shell
+ENV SHELL=/bin/bash \
+    JUPYTERHUB_SERVICE_PREFIX=/proxy/ \
+    GRADIO_ROOT_PATH=/proxy/7860/ \
+    TZ=Asia/Shanghai \
+    NCCL_IB_DISABLE=1 NCCL_P2P_DISABLE=1 \
+    HF_HOME=/workspace/.cache \
+    DEBIAN_FRONTEND=noninteractive
+
+# Build with some basic utilities
+RUN apt-get update && apt-get install -y \
+    dumb-init && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir ms-swift==3.7.2
+
+COPY swift/ /etc/csghub/
+RUN chmod +x /etc/csghub/*.sh
+
+
+
+# Create a working directory
+WORKDIR /workspace/
+ENTRYPOINT [ "/usr/bin/dumb-init", "--" ]
+CMD ["/etc/csghub/start-job.sh"]

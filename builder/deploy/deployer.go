@@ -507,7 +507,7 @@ func (d *deployer) GetReplica(ctx context.Context, dr types.DeployRepo) (int, in
 func (d *deployer) InstanceLogs(ctx context.Context, dr types.DeployRepo) (*MultiLogReader, error) {
 	slog.Debug("get logs for deploy", slog.Any("deploy", dr))
 
-	deploy, err := d.deployTaskStore.GetLatestDeployBySpaceID(ctx, dr.SpaceID)
+	deploy, err := d.deployTaskStore.GetDeployByID(ctx, dr.DeployID)
 	if err != nil {
 		return nil, fmt.Errorf("can't get space delopyment,%w", err)
 	}
@@ -852,16 +852,12 @@ func (d *deployer) getClusterMap() map[string]database.ClusterInfo {
 }
 
 func (d *deployer) startAcctMeteringProcess() {
-	ctxTimeout, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctxTimeout, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
 	runningDeploys, err := d.deployTaskStore.ListAllRunningDeploys(ctxTimeout)
 	if err != nil {
 		slog.Error("skip meterting due to fail to get all running deploys in deployer", slog.Any("error", err))
-		return
-	}
-	if len(runningDeploys) < 1 {
-		slog.Debug("no running deploys found in deployer")
 		return
 	}
 	resMap := d.getResourceMap()
@@ -870,6 +866,83 @@ func (d *deployer) startAcctMeteringProcess() {
 	clusterMap := d.getClusterMap()
 	for _, deploy := range runningDeploys {
 		d.startAcctMeteringRequest(resMap, clusterMap, deploy, eventTime)
+	}
+
+	runningEvaluations, err := d.argoWorkflowStore.ListAllRunningEvaluations(ctxTimeout)
+	if err != nil {
+		slog.Error("skip meterting due to fail to get all running evaluations in deployer", slog.Any("error", err))
+		return
+	}
+	for _, evaluation := range runningEvaluations {
+		d.startAcctForEvaluations(clusterMap, evaluation)
+	}
+
+}
+
+func (d *deployer) startAcctForEvaluations(clusterMap map[string]database.ClusterInfo,
+	evaluation database.ArgoWorkflow) {
+	// skip for cluster does not exist
+	cluster, ok := clusterMap[evaluation.ClusterID]
+	if !ok {
+		slog.Warn("skip evaluation metering for no valid cluster found by id",
+			slog.Any("task_id", evaluation.TaskId),
+			slog.Any("cluster_id", evaluation.ClusterID))
+		return
+	}
+
+	// skip metering for cluster is not running
+	if cluster.Status != types.ClusterStatusRunning {
+		slog.Warn("skip evaluation metering for cluster is not running",
+			slog.Any("task_id", evaluation.TaskId),
+			slog.Any("cluster_id", cluster.ClusterID), slog.Any("Region", cluster.Region))
+		return
+	}
+
+	// cluster does not have hearbeat more than 10 mins, ignore it
+	if time.Now().Unix()-cluster.UpdatedAt.Unix() > int64(d.deployConfig.HeartBeatTimeInSec*2) {
+		slog.Warn(fmt.Sprintf("skip evaluation metering for cluster does not have heartbeat more than %d seconds",
+			(d.deployConfig.HeartBeatTimeInSec*2)),
+			slog.Any("task_id", evaluation.TaskId),
+			slog.Any("cluster_id", cluster.ClusterID), slog.Any("Region", cluster.Region),
+			slog.Any("zone", cluster.Zone), slog.Any("provider", cluster.Provider),
+			slog.Any("updated_at", cluster.UpdatedAt))
+		return
+	}
+
+	// skip metering for evaluation does not have heartbeat more than 2 days
+	if time.Now().Unix()-evaluation.StartTime.Unix() > int64(86400*2) {
+		slog.Warn(fmt.Sprintf("skip evaluation metering for cluster does not have heartbeat more than %d seconds",
+			(86400*2)), slog.Any("task_id", evaluation.TaskId))
+		return
+	}
+
+	// ignore deploy without sku resource
+	if evaluation.ResourceId < 1 {
+		return
+	}
+
+	event := types.MeteringEvent{
+		Uuid:         uuid.New(),
+		UserUUID:     evaluation.UserUUID,
+		Value:        int64(d.eventPub.SyncInterval),
+		ValueType:    types.TimeDurationMinType,
+		Scene:        int(types.SceneEvaluation),
+		OpUID:        "",
+		ResourceID:   strconv.FormatInt(evaluation.ResourceId, 10),
+		ResourceName: evaluation.ResourceName,
+		CustomerID:   evaluation.TaskId,
+		CreatedAt:    time.Now(),
+	}
+	str, err := json.Marshal(event)
+	if err != nil {
+		slog.Error("error marshal metering event", slog.Any("event", event), slog.Any("error", err))
+		return
+	}
+	err = d.eventPub.PublishMeteringEvent(str)
+	if err != nil {
+		slog.Error("failed to pub evaluation metering event", slog.Any("data", string(str)), slog.Any("error", err))
+	} else {
+		slog.Info("pub metering evaluation event success", slog.Any("data", string(str)))
 	}
 }
 

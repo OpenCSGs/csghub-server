@@ -383,6 +383,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		cluster.GET("", middlewareCollection.Auth.NeedLogin, clusterHandler.Index)
 		cluster.GET("/usage", middlewareCollection.Auth.NeedAdmin, clusterHandler.GetClusterUsage)
 		cluster.GET("/deploys", middlewareCollection.Auth.NeedAdmin, clusterHandler.GetDeploys)
+		cluster.GET("/deploys_report", middlewareCollection.Auth.NeedAdmin, clusterHandler.GetDeploysReport)
 		cluster.GET("/:id", middlewareCollection.Auth.NeedLogin, clusterHandler.GetClusterById)
 		cluster.PUT("/:id", middlewareCollection.Auth.NeedAdmin, clusterHandler.Update)
 	}
@@ -499,6 +500,13 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		return nil, fmt.Errorf("error creating data flow proxy handler:%w", err)
 	}
 	createDataflowRoutes(apiGroup, dataflowHandler)
+
+	// csgbot proxy
+	csgbotHandler, err := handler.NewCSGBotProxyHandler(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating csgbot proxy handler:%w", err)
+	}
+	createCSGBotRoutes(apiGroup, csgbotHandler)
 
 	err = createAdvancedRoutes(apiGroup, middlewareCollection, config)
 	if err != nil {
@@ -823,10 +831,14 @@ func createNotebookRoutes(
 		notebooks.GET("/:id", middlewareCollection.Auth.NeedLogin, notebookHandler.Get)
 		// update notebook
 		notebooks.PUT("/:id", middlewareCollection.Auth.NeedLogin, notebookHandler.Update)
+		notebooks.GET("/:id/status", middlewareCollection.Auth.NeedLogin, notebookHandler.Status)
+		notebooks.GET("/:id/logs/:instance", middlewareCollection.Auth.NeedLogin, notebookHandler.Logs)
 		// stop a notebook
 		notebooks.PUT("/:id/stop", middlewareCollection.Auth.NeedLogin, notebookHandler.Stop)
 		// start a notebook
 		notebooks.PUT("/:id/start", middlewareCollection.Auth.NeedLogin, notebookHandler.Start)
+		// wakeup a notebook
+		notebooks.PUT("/:id/wakeup", middlewareCollection.Auth.NeedLogin, notebookHandler.Wakeup)
 		// delete a notebook
 		notebooks.DELETE("/:id", middlewareCollection.Auth.NeedLogin, notebookHandler.Delete)
 	}
@@ -1161,6 +1173,11 @@ func createDataflowRoutes(apiGroup *gin.RouterGroup, dataflowHandler *handler.Da
 	dataflowGrp := apiGroup.Group("/dataflow")
 	dataflowGrp.Use(middleware.MustLogin())
 	dataflowGrp.Any("/*any", dataflowHandler.Proxy)
+}
+
+func createCSGBotRoutes(apiGroup *gin.RouterGroup, csgbotHandler *handler.CSGBotProxyHandler) {
+	csgbotGrp := apiGroup.Group("/csgbot")
+	csgbotGrp.Any("/*any", csgbotHandler.Proxy)
 }
 
 func createTagsRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware.MiddlewareCollection, tagHandler *handler.TagsHandler) {

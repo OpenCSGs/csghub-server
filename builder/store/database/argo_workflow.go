@@ -23,6 +23,7 @@ type ArgoWorkFlowStore interface {
 	UpdateWorkFlow(ctx context.Context, workFlow ArgoWorkflow) (*ArgoWorkflow, error)
 	// delete workflow by id
 	DeleteWorkFlow(ctx context.Context, id int64) error
+	ListAllRunningEvaluations(ctx context.Context) (WorkFlows []ArgoWorkflow, err error)
 }
 
 func NewArgoWorkFlowStore() ArgoWorkFlowStore {
@@ -102,6 +103,11 @@ func (s *argoWorkFlowStoreImpl) FindByUsername(ctx context.Context, username str
 }
 
 func (s *argoWorkFlowStoreImpl) CreateWorkFlow(ctx context.Context, workFlow ArgoWorkflow) (*ArgoWorkflow, error) {
+	wf, err := s.FindByTaskID(ctx, workFlow.TaskId)
+	if err == nil && wf.ID != 0 {
+		// already exists
+		return &wf, nil
+	}
 	res, err := s.db.Core.NewInsert().Model(&workFlow).Exec(ctx, &workFlow)
 	if err := assertAffectedOneRow(res, err); err != nil {
 		return nil, fmt.Errorf("failed to save WorkFlow in db, error:%w", err)
@@ -126,4 +132,14 @@ func (s *argoWorkFlowStoreImpl) UpdateWorkFlowByTaskID(ctx context.Context, work
 func (s *argoWorkFlowStoreImpl) DeleteWorkFlow(ctx context.Context, id int64) error {
 	_, err := s.db.Core.NewDelete().Model(&ArgoWorkflow{}).Where("id = ?", id).Exec(ctx)
 	return err
+}
+
+// Status is v1alpha1.WorkflowRunning
+func (s *argoWorkFlowStoreImpl) ListAllRunningEvaluations(ctx context.Context) (WorkFlows []ArgoWorkflow, err error) {
+	err = s.db.Operator.Core.NewSelect().
+		Model(&WorkFlows).
+		Where("status = ?", v1alpha1.WorkflowRunning).
+		Scan(ctx)
+	return
+
 }

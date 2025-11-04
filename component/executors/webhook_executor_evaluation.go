@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/argoproj/argo-workflows/v3/pkg/apis/workflow/v1alpha1"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
@@ -44,15 +45,25 @@ func (h *argoWorkflowExecutorImpl) ProcessEvent(ctx context.Context, event *type
 
 	switch event.EventType {
 	case types.RunnerWorkflowCreate:
+		oldwf, err := h.store.FindByTaskID(ctx, wf.TaskId)
+		if err == nil && oldwf.ID != 0 {
+			// already exists
+			return nil
+		}
 		_, err = h.store.CreateWorkFlow(ctx, wf)
 		if err != nil {
 			return fmt.Errorf("failed to create argo workflow: %w", err)
 		}
 	case types.RunnerWorkflowChange:
-		_, err = h.store.UpdateWorkFlow(ctx, wf)
+		if wf.Status == v1alpha1.WorkflowError {
+			// unify error
+			wf.Status = v1alpha1.WorkflowFailed
+		}
+		_, err := h.store.UpdateWorkFlowByTaskID(ctx, wf)
 		if err != nil {
 			return fmt.Errorf("failed to update argo workflow: %w", err)
 		}
+
 	default:
 		return fmt.Errorf("unknown event type: %s", event.EventType)
 	}

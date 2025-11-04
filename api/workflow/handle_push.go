@@ -52,13 +52,6 @@ func HandlePushWorkflow(ctx workflow.Context, req *types.GiteaCallbackPushReq) e
 		return err
 	}
 
-	// Update repo infos
-	err = workflow.ExecuteActivity(actCtx, activities.UpdateRepoInfos, req).Get(ctx, nil)
-	if err != nil {
-		logger.Error("[git_callback] failed to update repo infos", slog.Any("error", err), slog.Any("req", req))
-		return err
-	}
-
 	// Sensitive check
 	err = workflow.ExecuteActivity(actCtx, activities.SensitiveCheck, req).Get(ctx, nil)
 	if err != nil {
@@ -77,6 +70,13 @@ func HandlePushWorkflow(ctx workflow.Context, req *types.GiteaCallbackPushReq) e
 	err = workflow.ExecuteActivity(actCtx, activities.MCPScan, req).Get(ctx, nil)
 	if err != nil {
 		logger.Error("[git_callback] failed to do mcp scan", slog.Any("error", err), slog.Any("req", req))
+		return err
+	}
+
+	// Update repo infos
+	err = workflow.ExecuteActivity(actCtx, activities.UpdateRepoInfos, req).Get(ctx, nil)
+	if err != nil {
+		logger.Error("[git_callback] failed to update repo infos", slog.Any("error", err), slog.Any("req", req))
 		return err
 	}
 

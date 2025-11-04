@@ -1,4 +1,4 @@
-FROM vllm/vllm-openai:v0.8.5
+FROM vllm/vllm-openai:v0.10.2
 RUN pip config set global.index-url https://mirrors.aliyun.com/pypi/simple
 RUN pip install --no-cache-dir csghub-sdk==0.4.8 ray supervisor
 RUN apt-get update && apt-get install -y supervisor

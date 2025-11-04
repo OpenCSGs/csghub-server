@@ -38,6 +38,28 @@ packages:
       SpaceTemplateComponent:
       MCPServerComponent:
       MonitorComponent:
+      MCPScannerComponent:
+      MCPScannerPlugin:
+      StatComponent:
+      LLMServiceComponent:
+      MonitorComponent:  
+      ClusterComponent:
+      MirrorNamespaceMappingComponent:
+      NotebookComponent:
+      LicenseComponent:
+  opencsg.com/csghub-server/component/reporter:
+    config:
+    interfaces:
+      LogCollector:
+  opencsg.com/csghub-server/component/reporter/sender:
+    config:
+    interfaces:
+      LogSender:
+
+  opencsg.com/csghub-server/component/checker:
+    config:
+    interfaces:
+      GitCallbackChecker:
   opencsg.com/csghub-server/component/callback:
     config:
     interfaces:

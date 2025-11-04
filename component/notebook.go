@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"opencsg.com/csghub-server/builder/deploy"
+	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
@@ -23,6 +24,9 @@ type NotebookComponent interface {
 	UpdateNotebook(ctx context.Context, req *types.UpdateNotebookReq) error
 	StartNotebook(ctx context.Context, req *types.StartNotebookReq) error
 	StopNotebook(ctx context.Context, req *types.StopNotebookReq) error
+	Wakeup(ctx context.Context, id int64) error
+	StatusNotebook(ctx context.Context, req *types.StatusNotebookReq) (string, error)
+	LogsNotebook(ctx context.Context, req *types.StatusNotebookReq) (*deploy.MultiLogReader, error)
 }
 
 func NewNotebookComponent(config *config.Config) (NotebookComponent, error) {
@@ -102,7 +106,7 @@ func (c *notebookComponentImpl) CreateNotebook(ctx context.Context, req *types.C
 		RuntimeFramework: frame.FrameName,
 		ContainerPort:    frame.ContainerPort,
 		ImageID:          frame.FrameImage,
-		MinReplica:       1,
+		MinReplica:       req.MinReplica,
 		MaxReplica:       1,
 		Annotation:       string(annoStr),
 		ClusterID:        resource.ClusterID,
@@ -132,6 +136,15 @@ func (c *notebookComponentImpl) GetNotebook(ctx context.Context, req *types.GetN
 	if err != nil {
 		return nil, err
 	}
+	reqReplica := types.DeployRepo{
+		DeployID:  deploy.ID,
+		SvcName:   deploy.SvcName,
+		ClusterID: deploy.ClusterID,
+	}
+	_, _, instList, err := c.deployer.GetReplica(ctx, reqReplica)
+	if err != nil {
+		slog.Warn("fail to get deploy replica", slog.Any("req", req), slog.Any("error", err))
+	}
 	endpoint, _ := c.repoComponent.GenerateEndpoint(ctx, deploy)
 	image := deploy.ImageID
 	imagePairs := strings.Split(image, ":")
@@ -139,6 +152,10 @@ func (c *notebookComponentImpl) GetNotebook(ctx context.Context, req *types.GetN
 	if len(imagePairs) == 2 {
 		imageVersion = imagePairs[1]
 	}
+	resource := ""
+	var hardware types.HardWare
+	_ = json.Unmarshal([]byte(deploy.Hardware), &hardware)
+	resource, _ = common.GetResourceAndType(hardware)
 	return &types.NotebookRes{
 		ID:                      deploy.ID,
 		DeployName:              deploy.DeployName,
@@ -146,6 +163,10 @@ func (c *notebookComponentImpl) GetNotebook(ctx context.Context, req *types.GetN
 		ClusterID:               deploy.ClusterID,
 		Endpoint:                endpoint,
 		ResourceID:              deploy.SKU,
+		ResourceName:            resource,
+		MinReplica:              deploy.MinReplica,
+		MaxReplica:              deploy.MaxReplica,
+		Instances:               instList,
 		SvcName:                 deploy.SvcName,
 		RuntimeFramework:        deploy.RuntimeFramework,
 		CreatedAt:               deploy.CreatedAt,
@@ -153,6 +174,34 @@ func (c *notebookComponentImpl) GetNotebook(ctx context.Context, req *types.GetN
 		SecureLevel:             deploy.SecureLevel,
 		RuntimeFrameworkVersion: imageVersion,
 	}, nil
+}
+
+// StatusNotebook
+func (c *notebookComponentImpl) StatusNotebook(ctx context.Context, req *types.StatusNotebookReq) (string, error) {
+	deployReq := &types.DeployActReq{
+		DeployID:    req.ID,
+		CurrentUser: req.CurrentUser,
+	}
+	_, deploy, err := c.repoComponent.CheckDeployPermissionForUser(ctx, *deployReq)
+	if err != nil {
+		return "", fmt.Errorf("cannot find notebook for status check, %w", err)
+	}
+	return deployStatusCodeToString(deploy.Status), nil
+}
+
+func (c *notebookComponentImpl) LogsNotebook(ctx context.Context, req *types.StatusNotebookReq) (*deploy.MultiLogReader, error) {
+	deployReq := &types.DeployActReq{
+		DeployID:    req.ID,
+		CurrentUser: req.CurrentUser,
+	}
+	_, deploy, err := c.repoComponent.CheckDeployPermissionForUser(ctx, *deployReq)
+	if err != nil {
+		return nil, fmt.Errorf("cannot find notebook for status check, %w", err)
+	}
+	return c.deployer.InstanceLogs(ctx, types.DeployRepo{
+		DeployID:     deploy.ID,
+		InstanceName: req.InstanceName,
+	})
 }
 
 // DeleteNotebook
@@ -312,4 +361,16 @@ func (c *notebookComponentImpl) StopNotebook(ctx context.Context, req *types.Sto
 		return fmt.Errorf("fail to stop notebook instance, %w", err)
 	}
 	return nil
+}
+
+func (c *notebookComponentImpl) Wakeup(ctx context.Context, deployId int64) error {
+	// get Deploy for inference
+	deploy, err := c.deployTaskStore.GetDeployByID(ctx, deployId)
+	if err != nil {
+		return fmt.Errorf("can't get notebook delopyment,%w", err)
+	}
+	return c.deployer.Wakeup(ctx, types.DeployRepo{
+		DeployID: deployId,
+		SvcName:  deploy.SvcName,
+	})
 }

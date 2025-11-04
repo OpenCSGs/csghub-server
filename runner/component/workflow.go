@@ -3,7 +3,6 @@ package component
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -19,7 +18,6 @@ import (
 	versioned "github.com/argoproj/argo-workflows/v3/pkg/client/clientset/versioned"
 	"github.com/argoproj/argo-workflows/v3/pkg/client/informers/externalversions"
 	internalinterfaces "github.com/argoproj/argo-workflows/v3/pkg/client/informers/externalversions/internalinterfaces"
-	"github.com/google/uuid"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -52,12 +50,11 @@ type WorkFlowComponent interface {
 	// find workflow by user name
 	FindWorkFlows(ctx context.Context, username string, per, page int) ([]database.ArgoWorkflow, int, error)
 	// generate workflow templates
-	DeleteWorkflow(ctx context.Context, id int64, username string) error
+	DeleteWorkflow(ctx context.Context, req *types.ArgoWorkFlowDeleteReq) error
 	GetWorkflow(ctx context.Context, id int64, username string) (*database.ArgoWorkflow, error)
 	DeleteWorkflowInargo(ctx context.Context, delete *v1alpha1.Workflow) error
 	FindWorkFlowById(ctx context.Context, id int64) (database.ArgoWorkflow, error)
 	RunInformer(clusterPool *cluster.ClusterPool, config *config.Config)
-	StartAcctRequestFee(wf database.ArgoWorkflow)
 }
 
 func NewWorkFlowComponent(config *config.Config, clusterPool *cluster.ClusterPool, logReporter reporter.LogCollector) WorkFlowComponent {
@@ -129,23 +126,16 @@ func (wc *workFlowComponentImpl) CreateWorkflow(ctx context.Context, req types.A
 	return wf, nil
 }
 
-func (wc *workFlowComponentImpl) DeleteWorkflow(ctx context.Context, id int64, username string) error {
-	wf, err := wc.FindWorkFlowById(ctx, id)
-	if err != nil {
-		return fmt.Errorf("failed to get workflow by id: %v", err)
-	}
-	if wf.Username != username {
-		return fmt.Errorf("no permission to delete workflow")
-	}
-	cluster, _, err := GetCluster(ctx, wc.clusterPool, wf.ClusterID)
+func (wc *workFlowComponentImpl) DeleteWorkflow(ctx context.Context, req *types.ArgoWorkFlowDeleteReq) error {
+	cluster, _, err := GetCluster(ctx, wc.clusterPool, req.ClusterID)
 	if err != nil {
 		return fmt.Errorf("failed to get cluster by id: %v", err)
 	}
-	err = cluster.ArgoClient.ArgoprojV1alpha1().Workflows(wf.Namespace).Delete(ctx, wf.TaskId, v1.DeleteOptions{})
+	err = cluster.ArgoClient.ArgoprojV1alpha1().Workflows(req.Namespace).Delete(ctx, req.TaskID, v1.DeleteOptions{})
 	if err != nil {
 		slog.Warn("Error deleting argo workflow", slog.Any("error", err))
 	}
-	return wc.wf.DeleteWorkFlow(ctx, wf.ID)
+	return nil
 }
 
 func (wc *workFlowComponentImpl) GetWorkflow(ctx context.Context, id int64, username string) (*database.ArgoWorkflow, error) {
@@ -161,22 +151,6 @@ func (wc *workFlowComponentImpl) GetWorkflow(ctx context.Context, id int64, user
 
 // Update workflow
 func (wc *workFlowComponentImpl) UpdateWorkflow(ctx context.Context, update *v1alpha1.Workflow, cluster *cluster.Cluster) (*database.ArgoWorkflow, error) {
-	errLock := wc.redisLocker.GetRunnerAcctMeteringLock()
-	if errLock != nil && errors.Is(errLock, redis.ErrLockAcquire) {
-		slog.Warn("skip update workflow metering due to fail getting lock", slog.Any("error", errLock))
-		return nil, nil
-	}
-	defer func() {
-		if errLock != nil {
-			slog.Warn("update workflow metering with fail to getting lock", slog.Any("error", errLock))
-		} else {
-			ok, err := wc.redisLocker.ReleaseRunnerAcctMeteringLock()
-			if err != nil {
-				slog.Error("failed to release workflow acct metering lock", slog.Any("error", err), slog.Any("result", ok))
-			}
-		}
-	}()
-
 	oldwf, err := wc.wf.FindByTaskID(ctx, update.Name)
 	if errors.Is(err, sql.ErrNoRows) {
 		oldwf = *wc.getWorkflowFromLabels(ctx, update)
@@ -207,7 +181,6 @@ func (wc *workFlowComponentImpl) UpdateWorkflow(ctx context.Context, update *v1a
 					result := strings.Split(output.Value.String(), ",")
 					oldwf.ResultURL = result[0]
 					oldwf.DownloadURL = result[1]
-					wc.StartAcctRequestFee(oldwf)
 					break
 				}
 			}
@@ -288,11 +261,11 @@ func generateWorkflow(req types.ArgoWorkFlowReq, config *config.Config) *v1alpha
 			environments = append(environments, corev1.EnvVar{Name: "ASCEND_VISIBLE_DEVICES", Value: "none"})
 		}
 
-		if v.HardWare.Dcu.ResourceName == "" || v.HardWare.Dcu.Num == "" {
+		if v.HardWare.Gcu.ResourceName == "" || v.HardWare.Gcu.Num == "" {
 			environments = append(environments, corev1.EnvVar{Name: "ENFLAME_VISIBLE_DEVICES", Value: "none"})
 		}
 
-		if v.HardWare.Gcu.ResourceName == "" || v.HardWare.Gcu.Num == "" {
+		if v.HardWare.Dcu.ResourceName == "" || v.HardWare.Dcu.Num == "" {
 			environments = append(environments, corev1.EnvVar{Name: "ROCR_VISIBLE_DEVICES", Value: "none"})
 		}
 
@@ -489,41 +462,6 @@ func CreateInfomerFactory(client versioned.Interface, namespace, labelSelector s
 	}
 }
 
-func (wc *workFlowComponentImpl) StartAcctRequestFee(wf database.ArgoWorkflow) {
-	if wf.ResourceId == 0 {
-		return
-	}
-	duration := wf.EndTime.Sub(wf.StartTime)
-	minutes := duration.Minutes()
-	if minutes < 1 {
-		return
-	}
-	slog.Info("start to acct request fee", slog.Any("mins", minutes))
-	event := types.MeteringEvent{
-		Uuid:         uuid.New(),
-		UserUUID:     wf.UserUUID,
-		Value:        int64(minutes),
-		ValueType:    types.TimeDurationMinType,
-		Scene:        int(types.SceneEvaluation),
-		OpUID:        "",
-		ResourceID:   strconv.FormatInt(wf.ResourceId, 10),
-		ResourceName: wf.ResourceName,
-		CustomerID:   wf.TaskId,
-		CreatedAt:    time.Now(),
-	}
-	str, err := json.Marshal(event)
-	if err != nil {
-		slog.Error("error marshal metering event", slog.Any("event", event), slog.Any("error", err))
-		return
-	}
-	err = wc.eventPub.PublishMeteringEvent(str)
-	if err != nil {
-		slog.Error("failed to pub metering event", slog.Any("data", string(str)), slog.Any("error", err))
-	} else {
-		slog.Info("pub metering event success", slog.Any("data", string(str)))
-	}
-}
-
 // get cluster
 func GetCluster(ctx context.Context, clusterPool *cluster.ClusterPool, clusterID string) (*cluster.Cluster, string, error) {
 	if clusterID == "" {
@@ -598,11 +536,6 @@ func (wc *workFlowComponentImpl) getWorkflowFromLabels(ctx context.Context, awf 
 }
 
 func (wc *workFlowComponentImpl) addKServiceWithEvent(ctx context.Context, eventType types.WebHookEventType, wf *database.ArgoWorkflow) {
-	data, err := json.Marshal(wf)
-	if err != nil {
-		slog.Error("failed to marshal workflow service create event", slog.Any("error", err))
-		return
-	}
 	event := &types.WebHookSendEvent{
 		WebHookHeader: types.WebHookHeader{
 			EventType: eventType,
@@ -610,7 +543,7 @@ func (wc *workFlowComponentImpl) addKServiceWithEvent(ctx context.Context, event
 			ClusterID: wf.ClusterID,
 			DataType:  types.WebHookDataTypeObject,
 		},
-		Data: data,
+		Data: wf,
 	}
 
 	go func() {

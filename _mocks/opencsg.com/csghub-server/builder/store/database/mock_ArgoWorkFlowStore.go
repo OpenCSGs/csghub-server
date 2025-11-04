@@ -310,6 +310,64 @@ func (_c *MockArgoWorkFlowStore_FindByUsername_Call) RunAndReturn(run func(conte
 	return _c
 }
 
+// ListAllRunningEvaluations provides a mock function with given fields: ctx
+func (_m *MockArgoWorkFlowStore) ListAllRunningEvaluations(ctx context.Context) ([]database.ArgoWorkflow, error) {
+	ret := _m.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListAllRunningEvaluations")
+	}
+
+	var r0 []database.ArgoWorkflow
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context) ([]database.ArgoWorkflow, error)); ok {
+		return rf(ctx)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context) []database.ArgoWorkflow); ok {
+		r0 = rf(ctx)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.ArgoWorkflow)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockArgoWorkFlowStore_ListAllRunningEvaluations_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListAllRunningEvaluations'
+type MockArgoWorkFlowStore_ListAllRunningEvaluations_Call struct {
+	*mock.Call
+}
+
+// ListAllRunningEvaluations is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *MockArgoWorkFlowStore_Expecter) ListAllRunningEvaluations(ctx interface{}) *MockArgoWorkFlowStore_ListAllRunningEvaluations_Call {
+	return &MockArgoWorkFlowStore_ListAllRunningEvaluations_Call{Call: _e.mock.On("ListAllRunningEvaluations", ctx)}
+}
+
+func (_c *MockArgoWorkFlowStore_ListAllRunningEvaluations_Call) Run(run func(ctx context.Context)) *MockArgoWorkFlowStore_ListAllRunningEvaluations_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context))
+	})
+	return _c
+}
+
+func (_c *MockArgoWorkFlowStore_ListAllRunningEvaluations_Call) Return(WorkFlows []database.ArgoWorkflow, err error) *MockArgoWorkFlowStore_ListAllRunningEvaluations_Call {
+	_c.Call.Return(WorkFlows, err)
+	return _c
+}
+
+func (_c *MockArgoWorkFlowStore_ListAllRunningEvaluations_Call) RunAndReturn(run func(context.Context) ([]database.ArgoWorkflow, error)) *MockArgoWorkFlowStore_ListAllRunningEvaluations_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // UpdateWorkFlow provides a mock function with given fields: ctx, workFlow
 func (_m *MockArgoWorkFlowStore) UpdateWorkFlow(ctx context.Context, workFlow database.ArgoWorkflow) (*database.ArgoWorkflow, error) {
 	ret := _m.Called(ctx, workFlow)

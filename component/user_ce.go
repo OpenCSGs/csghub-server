@@ -142,6 +142,12 @@ func (c *userComponentImpl) ListNotebooks(ctx context.Context, req *types.Deploy
 		if len(imagePairs) == 2 {
 			imageVersion = imagePairs[1]
 		}
+		d := &database.Deploy{
+			SvcName:   deploy.SvcName,
+			ClusterID: deploy.ClusterID,
+			Status:    deploy.Status,
+		}
+		endpoint, provider := c.repoComponent.GenerateEndpoint(ctx, d)
 		resource := ""
 		var hardware types.HardWare
 		_ = json.Unmarshal([]byte(deploy.Hardware), &hardware)
@@ -157,6 +163,8 @@ func (c *userComponentImpl) ListNotebooks(ctx context.Context, req *types.Deploy
 			PayMode:                 types.PayModeFree,
 			ClusterID:               deploy.ClusterID,
 			ResourceName:            resource,
+			Endpoint:                endpoint,
+			Provider:                provider,
 		})
 	}
 	return res, total, nil

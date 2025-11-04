@@ -25,6 +25,7 @@ type evaluationComponentImpl struct {
 	spaceResourceStore    database.SpaceResourceStore
 	tokenStore            database.AccessTokenStore
 	runtimeFrameworkStore database.RuntimeFrameworksStore
+	workflowStore         database.ArgoWorkFlowStore
 	config                *config.Config
 	accountingComponent   AccountingComponent
 	repoComponent         RepoComponent
@@ -48,6 +49,7 @@ func NewEvaluationComponent(config *config.Config) (EvaluationComponent, error) 
 	c.tokenStore = database.NewAccessTokenStore()
 	c.repoStore = database.NewRepoStore()
 	c.runtimeFrameworkStore = database.NewRuntimeFrameworksStore()
+	c.workflowStore = database.NewArgoWorkFlowStore()
 	c.config = config
 	ac, err := NewAccountingComponent(config)
 	if err != nil {
@@ -183,12 +185,23 @@ func (c *evaluationComponentImpl) generateDatasetsAndTasks(ctx context.Context, 
 }
 
 func (c *evaluationComponentImpl) DeleteEvaluation(ctx context.Context, req types.ArgoWorkFlowDeleteReq) error {
+	wf, err := c.workflowStore.FindByID(ctx, req.ID)
+	if err != nil {
+		return fmt.Errorf("fail to get evaluation result, %w", err)
+	}
+	req.TaskID = wf.TaskId
+	req.Namespace = wf.Namespace
+	req.ClusterID = wf.ClusterID
+	err = c.workflowStore.DeleteWorkFlow(ctx, req.ID)
+	if err != nil {
+		return fmt.Errorf("fail to delete evaluation result, %w", err)
+	}
 	return c.deployer.DeleteEvaluation(ctx, req)
 }
 
 // get evaluation result
 func (c *evaluationComponentImpl) GetEvaluation(ctx context.Context, req types.EvaluationGetReq) (*types.EvaluationRes, error) {
-	wf, err := c.deployer.GetEvaluation(ctx, req)
+	wf, err := c.workflowStore.FindByID(ctx, req.ID)
 	if err != nil {
 		return nil, fmt.Errorf("fail to get evaluation result, %w", err)
 	}

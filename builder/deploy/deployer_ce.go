@@ -37,6 +37,7 @@ type deployer struct {
 	snowflakeNode         *snowflake.Node
 	eventPub              *event.EventPublisher
 	runtimeFrameworkStore database.RuntimeFrameworksStore
+	argoWorkflowStore     database.ArgoWorkFlowStore
 	deployConfig          common.DeployConfig
 	userStore             database.UserStore
 	clusterStore          database.ClusterInfoStore
@@ -69,6 +70,7 @@ func newDeployer(s scheduler.Scheduler, ib imagebuilder.Builder, ir imagerunner.
 		clusterStore:          database.NewClusterInfoStore(),
 		lokiClient:            logReporter.GetSender(),
 		logReporter:           logReporter,
+		argoWorkflowStore:     database.NewArgoWorkFlowStore(),
 	}
 
 	if startJobs {

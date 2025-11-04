@@ -576,7 +576,7 @@ func TestDeployer_InstanceLogs(t *testing.T) {
 	}
 
 	mockDeployTaskStore := mockdb.NewMockDeployTaskStore(t)
-	mockDeployTaskStore.EXPECT().GetLatestDeployBySpaceID(mock.Anything, dr.SpaceID).
+	mockDeployTaskStore.EXPECT().GetDeployByID(mock.Anything, dr.DeployID).
 		Return(deploy, nil)
 
 	sender := mockSender.NewMockLogSender(t)
