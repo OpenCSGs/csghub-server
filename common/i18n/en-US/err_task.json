@@ -1,14 +1,20 @@
 {
     "error.TASK-ERR-0": {
-        "other": "Task entry file not found"
+        "other": "Task not found"
     },
     "error.TASK-ERR-1": {
-        "other": "Multi-host inference is only supported by VLLM and SGLang"
+        "other": "Task already exists"
     },
     "error.TASK-ERR-2": {
-        "other": "Multi-host inference requires minimum replica count to be greater than zero"
+        "other": "Task is not running"
     },
     "error.TASK-ERR-3": {
         "other": "Multi-host notebook is not supported"
+    },
+    "error.TASK-ERR-4": {
+        "other": "Not enough resource to run the task"
+    },
+    "error.TASK-ERR-5": {
+        "other": "Cluster is unavailable to run the task"
     }
 }
