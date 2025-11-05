@@ -2749,7 +2749,7 @@ func TestGetRepoUrl(t *testing.T) {
 			name:     "Prompt repository",
 			repoType: types.PromptRepo,
 			repoPath: "namespace/prompt",
-			expected: "/prompts/namespace/prompt",
+			expected: "/prompts/library/namespace/prompt",
 		},
 		{
 			name:     "MCP Server repository",
