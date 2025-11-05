@@ -44,7 +44,7 @@ type deployer struct {
 	logReporter           reporter.LogCollector
 }
 
-func newDeployer(s scheduler.Scheduler, ib imagebuilder.Builder, ir imagerunner.Runner, c common.DeployConfig, logReporter reporter.LogCollector, cfg *config.Config) (*deployer, error) {
+func newDeployer(s scheduler.Scheduler, ib imagebuilder.Builder, ir imagerunner.Runner, c common.DeployConfig, logReporter reporter.LogCollector, cfg *config.Config, startJobs bool) (*deployer, error) {
 
 	store := database.NewDeployTaskStore()
 	node, err := snowflake.NewNode(1)
@@ -71,7 +71,9 @@ func newDeployer(s scheduler.Scheduler, ib imagebuilder.Builder, ir imagerunner.
 		logReporter:           logReporter,
 	}
 
-	d.startJobs()
+	if startJobs {
+		d.startJobs()
+	}
 	return d, nil
 }
 

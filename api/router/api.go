@@ -19,9 +19,12 @@ import (
 	"opencsg.com/csghub-server/api/handler/callback"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/api/middleware"
+	"opencsg.com/csghub-server/api/workflow"
+	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/instrumentation"
 	bldmq "opencsg.com/csghub-server/builder/mq"
 	bldprometheus "opencsg.com/csghub-server/builder/prometheus"
+	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/temporal"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/i18n"
@@ -29,6 +32,11 @@ import (
 )
 
 func RunServer(config *config.Config, enableSwagger bool) {
+	deploy.DeployWorkflow = func(buildTask, runTask *database.DeployTask) {
+		if err := workflow.StartNewDeployTaskWithCancelOld(buildTask, runTask); err != nil {
+			slog.Error("start new deploy task failed", slog.Any("error", err))
+		}
+	}
 	stopOtel, err := instrumentation.SetupOTelSDK(context.Background(), config, instrumentation.Server)
 	if err != nil {
 		panic(err)
