@@ -24,6 +24,7 @@ import (
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/user"
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/version"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/cmd/csghub-server/cmd/temporal-worker"
 )
 
 var (
@@ -74,6 +75,7 @@ func init() {
 		notification.Cmd,
 		version.Cmd,
 		errorx.Cmd,
+		temporal_worker.Cmd,
 	)
 
 	addCommands()
