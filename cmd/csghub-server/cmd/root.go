@@ -20,6 +20,7 @@ import (
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/notification"
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/start"
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/sync"
+	temporal_worker "opencsg.com/csghub-server/cmd/csghub-server/cmd/temporal-worker"
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/trigger"
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/user"
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/version"
@@ -74,6 +75,7 @@ func init() {
 		notification.Cmd,
 		version.Cmd,
 		errorx.Cmd,
+		temporal_worker.Cmd,
 	)
 
 	addCommands()

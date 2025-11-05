@@ -28,7 +28,7 @@ import (
 	userworkflow "opencsg.com/csghub-server/user/workflow"
 )
 
-var initVersionWorker = func(cfg *config.Config) error {
+var initVersionWorker = func(_ *config.Config) error {
 	return nil
 }
 
