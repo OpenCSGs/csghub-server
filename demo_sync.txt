@@ -1,0 +1,1 @@
+This is a demo file to show the sync process from starhub server to csghub-server.
