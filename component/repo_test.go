@@ -844,6 +844,7 @@ func TestRepoComponent_SDKDownloadFile(t *testing.T) {
 			repo.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(
 				mockedRepo, nil,
 			)
+			repo.mocks.stores.RepoMock().EXPECT().UpdateRepoFileDownloads(ctx, mockedRepo, mock.Anything, int64(1)).Return(nil)
 
 			if lfs {
 
@@ -2847,7 +2848,7 @@ func TestGetRepoUrl(t *testing.T) {
 			name:     "Prompt repository",
 			repoType: types.PromptRepo,
 			repoPath: "namespace/prompt",
-			expected: "/prompts/namespace/prompt",
+			expected: "/prompts/library/namespace/prompt",
 		},
 		{
 			name:     "MCP Server repository",
