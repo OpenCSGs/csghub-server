@@ -97,6 +97,7 @@ type repoComponentImpl struct {
 	mirrorTaskStore        database.MirrorTaskStore
 	notificationSvcClient  rpc.NotificationSvcClient
 	mirrorSvcClient        rpc.MirrorSvcClient
+	pendingDeletion        database.PendingDeletionStore
 }
 
 type RepoComponent interface {
@@ -166,7 +167,7 @@ type RepoComponent interface {
 	MirrorProgress(ctx context.Context, repoType types.RepositoryType, namespace, name, currentUser string) (types.LFSSyncProgressResp, error)
 	DeployUpdate(ctx context.Context, updateReq types.DeployActReq, req *types.DeployUpdateReq) error
 	DeployStart(ctx context.Context, startReq types.DeployActReq) error
-	AllFiles(ctx context.Context, req types.GetAllFilesReq) ([]*types.File, error)
+	AllFiles(ctx context.Context, req types.GetAllFilesReq) (*types.GetRepoFileTreeResp, error)
 	GetUserRepoPermission(ctx context.Context, userName string, repo *database.Repository) (*types.UserRepoPermission, error)
 	CheckCurrentUserPermission(ctx context.Context, userName string, namespace string, role membership.Role) (bool, error)
 	GetNameSpaceInfo(ctx context.Context, path string) (*types.Namespace, error)
@@ -189,6 +190,7 @@ type RepoComponent interface {
 	BatchMigrateRepoToHashedPath(ctx context.Context, auto bool, batchSize int, lastID int64) (int64, error)
 	GetMirrorTaskStatusAndSyncStatus(repo *database.Repository) (types.MirrorTaskStatus, types.RepositorySyncStatus)
 	CheckDeployPermissionForUser(ctx context.Context, deployReq types.DeployActReq) (*database.User, *database.Deploy, error)
+	DeletePendingDeletion(ctx context.Context) error
 }
 
 func NewRepoComponentImpl(config *config.Config) (*repoComponentImpl, error) {
@@ -1014,7 +1016,7 @@ func (c *repoComponentImpl) DownloadFile(ctx context.Context, req *types.GetFile
 
 	err = c.repoStore.UpdateRepoFileDownloads(ctx, repo, time.Now(), 1)
 	if err != nil {
-		return nil, 0, "", fmt.Errorf("failed to update %s file download count, error: %w", req.RepoType, err)
+		return nil, 0, "", fmt.Errorf("failed to update %s file download count, error: %w", fmt.Sprintf("%s/%s/%s", req.RepoType, req.Namespace, req.Name), err)
 	}
 	if req.Ref == "" {
 		req.Ref = repo.DefaultBranch
@@ -1490,6 +1492,12 @@ func (c *repoComponentImpl) SDKDownloadFile(ctx context.Context, req *types.GetF
 	if !canRead {
 		return nil, 0, "", errorx.ErrForbiddenMsg("users do not have permission to download file in this repo")
 	}
+
+	err = c.repoStore.UpdateRepoFileDownloads(ctx, repo, time.Now(), 1)
+	if err != nil {
+		return nil, 0, "", fmt.Errorf("failed to update %s file download count, error: %w", fmt.Sprintf("%s/%s/%s", req.RepoType, req.Namespace, req.Name), err)
+	}
+
 	if req.Ref == "" {
 		req.Ref = repo.DefaultBranch
 	}
@@ -1900,10 +1908,14 @@ func (c *repoComponentImpl) CreateMirror(ctx context.Context, req types.CreateMi
 	if exists {
 		return nil, fmt.Errorf("mirror already exists")
 	}
-	mirrorSource, err := c.mirrorSourceStore.Get(ctx, req.MirrorSourceID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get mirror source, err: %w, id: %d", err, req.MirrorSourceID)
+	if req.MirrorSourceID != 0 {
+		mirrorSource, err := c.mirrorSourceStore.Get(ctx, req.MirrorSourceID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get mirror source, err: %w, id: %d", err, req.MirrorSourceID)
+		}
+		mirror.LocalRepoPath = fmt.Sprintf("%s_%s_%s_%s", mirrorSource.SourceName, req.RepoType, req.Namespace, req.Name)
 	}
+
 	mirror.Interval = req.Interval
 	mirror.SourceUrl = req.SourceUrl
 	mirror.MirrorSourceID = req.MirrorSourceID
@@ -1911,7 +1923,7 @@ func (c *repoComponentImpl) CreateMirror(ctx context.Context, req types.CreateMi
 	mirror.PushUrl = repo.HTTPCloneURL
 	mirror.AccessToken = req.AccessToken
 	mirror.SourceRepoPath = req.SourceRepoPath
-	mirror.LocalRepoPath = fmt.Sprintf("%s_%s_%s_%s", mirrorSource.SourceName, req.RepoType, req.Namespace, req.Name)
+
 	mirror.RepositoryID = repo.ID
 	mirror.Repository = repo
 
@@ -2652,7 +2664,7 @@ func deployStatusCodeToString(code int) string {
 	var txt string
 	switch code {
 	case 10:
-		txt = SpaceStatusStopped
+		txt = SpaceStatusBuilding // need to change it to queue? This requires UI modification as well
 	case 11:
 		txt = SpaceStatusBuilding
 	case 12:
@@ -2704,6 +2716,7 @@ func (c *repoComponentImpl) DeployInstanceLogs(ctx context.Context, logReq types
 		ClusterID:    deploy.ClusterID,
 		SvcName:      deploy.SvcName,
 		InstanceName: logReq.InstanceName,
+		Since:        logReq.Since,
 	})
 }
 
@@ -3182,7 +3195,7 @@ func (c *repoComponentImpl) DeployStart(ctx context.Context, startReq types.Depl
 	return err
 }
 
-func (c *repoComponentImpl) AllFiles(ctx context.Context, req types.GetAllFilesReq) ([]*types.File, error) {
+func (c *repoComponentImpl) AllFiles(ctx context.Context, req types.GetAllFilesReq) (*types.GetRepoFileTreeResp, error) {
 	repo, err := c.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find repo, error: %w", err)
@@ -3200,12 +3213,20 @@ func (c *repoComponentImpl) AllFiles(ctx context.Context, req types.GetAllFilesR
 			return nil, errorx.ErrForbiddenMsg("users do not have permission to get all files for this repo")
 		}
 	}
-	allFiles, err := getAllFiles(ctx, req.Namespace, req.Name, "", req.RepoType, req.Ref, c.git.GetTree)
+	resp, err := c.git.GetTree(ctx, types.GetTreeRequest{
+		Ref:       req.Ref,
+		RepoType:  req.RepoType,
+		Namespace: req.Namespace,
+		Name:      req.Name,
+		Limit:     req.Limit,
+		Cursor:    req.Cursor,
+		Path:      req.Path,
+	})
 	if err != nil {
 		slog.Error("fail to get all files of repository", slog.Any("repoType", req.RepoType), slog.String("namespace", req.Namespace), slog.String("name", req.Name), slog.String("error", err.Error()))
 		return nil, err
 	}
-	return allFiles, nil
+	return resp, nil
 }
 
 func (c *repoComponentImpl) IsAdminRole(user database.User) bool {
@@ -3757,7 +3778,7 @@ func GetRepoUrl(repoType types.RepositoryType, repoPath string) string {
 	case types.CodeRepo:
 		return fmt.Sprintf("/codes/%s", repoPath)
 	case types.PromptRepo:
-		return fmt.Sprintf("/prompts/%s", repoPath)
+		return fmt.Sprintf("/prompts/library/%s", repoPath)
 	case types.MCPServerRepo:
 		return fmt.Sprintf("/mcp/servers/%s", repoPath)
 	default:
