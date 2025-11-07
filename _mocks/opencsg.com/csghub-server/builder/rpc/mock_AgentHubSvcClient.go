@@ -84,6 +84,54 @@ func (_c *MockAgentHubSvcClient_CreateAgentInstance_Call) RunAndReturn(run func(
 	return _c
 }
 
+// DeleteAgentInstance provides a mock function with given fields: ctx, userUUID, contentID
+func (_m *MockAgentHubSvcClient) DeleteAgentInstance(ctx context.Context, userUUID string, contentID string) error {
+	ret := _m.Called(ctx, userUUID, contentID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteAgentInstance")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
+		r0 = rf(ctx, userUUID, contentID)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockAgentHubSvcClient_DeleteAgentInstance_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteAgentInstance'
+type MockAgentHubSvcClient_DeleteAgentInstance_Call struct {
+	*mock.Call
+}
+
+// DeleteAgentInstance is a helper method to define mock.On call
+//   - ctx context.Context
+//   - userUUID string
+//   - contentID string
+func (_e *MockAgentHubSvcClient_Expecter) DeleteAgentInstance(ctx interface{}, userUUID interface{}, contentID interface{}) *MockAgentHubSvcClient_DeleteAgentInstance_Call {
+	return &MockAgentHubSvcClient_DeleteAgentInstance_Call{Call: _e.mock.On("DeleteAgentInstance", ctx, userUUID, contentID)}
+}
+
+func (_c *MockAgentHubSvcClient_DeleteAgentInstance_Call) Run(run func(ctx context.Context, userUUID string, contentID string)) *MockAgentHubSvcClient_DeleteAgentInstance_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(string))
+	})
+	return _c
+}
+
+func (_c *MockAgentHubSvcClient_DeleteAgentInstance_Call) Return(_a0 error) *MockAgentHubSvcClient_DeleteAgentInstance_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockAgentHubSvcClient_DeleteAgentInstance_Call) RunAndReturn(run func(context.Context, string, string) error) *MockAgentHubSvcClient_DeleteAgentInstance_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetAgentInstances provides a mock function with given fields: ctx, req
 func (_m *MockAgentHubSvcClient) GetAgentInstances(ctx context.Context, req *rpc.GetAgentInstancesRequest) (rpc.GetAgentInstancesResponse, error) {
 	ret := _m.Called(ctx, req)

@@ -9,6 +9,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"opencsg.com/csghub-server/common/errorx"
@@ -17,6 +18,7 @@ import (
 
 type AgentHubSvcClient interface {
 	CreateAgentInstance(ctx context.Context, userUUID string, req *CreateAgentInstanceRequest) (*CreateAgentInstanceResponse, error)
+	DeleteAgentInstance(ctx context.Context, userUUID string, contentID string) error
 	GetAgentInstances(ctx context.Context, req *GetAgentInstancesRequest) (GetAgentInstancesResponse, error)
 	RunAgentInstance(ctx context.Context, userUUID string, contentID string, req *RunAgentInstanceRequest) (*RunAgentInstanceResponse, error)
 	RunAgentInstanceStream(ctx context.Context, userUUID string, contentID string, req *RunAgentInstanceRequest) (<-chan types.AgentStreamEvent, error)
@@ -36,6 +38,15 @@ type GetAgentInstancesRequest struct {
 }
 
 type GetAgentInstancesResponse []*AgentInstance
+
+type DeleteAgentInstanceRequest struct {
+	IDs []string `json:"ids"`
+}
+
+type DeleteAgentInstanceResponse struct {
+	IDs   []string `json:"ids"`
+	Total int      `json:"total"`
+}
 
 type RunAgentInstanceRequest struct {
 	InputValue string          `json:"input_value"`
@@ -211,6 +222,64 @@ func (c *AgentHubSvcClientImpl) GetAgentInstances(ctx context.Context, req *GetA
 		return nil, errorx.InternalServerError(err, rpcErrorCtx)
 	}
 	return resp, nil
+}
+
+// POST /api/v1/opencsg/flows/delete
+func (c *AgentHubSvcClientImpl) DeleteAgentInstance(ctx context.Context, userUUID string, contentID string) error {
+	rpcErrorCtx := map[string]any{
+		"user_uuid": userUUID,
+		"service":   "agenthub",
+		"api":       "/api/v1/opencsg/flows/delete",
+	}
+	var resp DeleteAgentInstanceResponse
+
+	req := DeleteAgentInstanceRequest{
+		IDs: []string{contentID},
+	}
+	jsonData, err := json.Marshal(req)
+	if err != nil {
+		return errorx.InternalServerError(err, rpcErrorCtx)
+	}
+	buf := bytes.NewBuffer(jsonData)
+	path := c.hc.endpoint + "/api/v1/opencsg/flows/delete?token=" + c.token
+	hreq, err := http.NewRequestWithContext(ctx, http.MethodPost, path, buf)
+	if err != nil {
+		return errorx.InternalServerError(err, rpcErrorCtx)
+	}
+
+	hreq.Header.Set("Content-Type", "application/json")
+	hreq.Header.Set("user_uuid", userUUID)
+
+	hresp, err := c.hc.Do(hreq)
+	if err != nil {
+		return errorx.RemoteSvcFail(errors.New("failed to delete agent instance in agenthub"), rpcErrorCtx)
+	}
+	defer hresp.Body.Close()
+
+	if hresp.StatusCode != http.StatusOK {
+		return errorx.RemoteSvcFail(errors.New("failed to delete agent instance in agenthub, status code: "+strconv.Itoa(hresp.StatusCode)), rpcErrorCtx)
+	}
+
+	body, err := io.ReadAll(hresp.Body)
+	if err != nil {
+		return errorx.InternalServerError(err, rpcErrorCtx)
+	}
+	if err := json.Unmarshal(body, &resp); err != nil {
+		return errorx.RemoteSvcFail(errors.New("failed to delete agent instance in agenthub, unmarshal response error: "+err.Error()), rpcErrorCtx)
+	}
+
+	if resp.Total != 1 {
+		return errorx.RemoteSvcFail(errors.New("failed to delete agent instance in agenthub, total: "+strconv.Itoa(resp.Total)), rpcErrorCtx)
+	}
+
+	if len(resp.IDs) == 0 {
+		return errorx.RemoteSvcFail(errors.New("failed to delete agent instance in agenthub, response IDs is empty"), rpcErrorCtx)
+	}
+
+	if resp.IDs[0] != contentID {
+		return errorx.RemoteSvcFail(errors.New("failed to delete agent instance in agenthub, content ID mismatch: "+contentID+" != "+resp.IDs[0]), rpcErrorCtx)
+	}
+	return nil
 }
 
 // POST /api/v1/opencsg/run/{id}?stream=false
