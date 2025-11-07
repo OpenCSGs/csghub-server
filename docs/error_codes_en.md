@@ -426,6 +426,30 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Name:** `gitReplicateRepositoryFailed`
 - **Description:** replicate repository failed. This can be caused by network problems, authentication issues, or the specified repository does not exist.
 
+## Invitation Errors
+
+### `INVITATION-ERR-0`
+
+- **Error Code:** `INVITATION-ERR-0`
+- **Error Name:** `userPhoneNotSet`
+- **Description:** The phone number is not set, cannot create invitation code.
+
+---
+
+### `INVITATION-ERR-1`
+
+- **Error Code:** `INVITATION-ERR-1`
+- **Error Name:** `invitationNotFound`
+- **Description:** The invitation not found.
+
+---
+
+### `INVITATION-ERR-2`
+
+- **Error Code:** `INVITATION-ERR-2`
+- **Error Name:** `userAlreadyHasInvitationCode`
+- **Description:** The invitation code already exists.
+
 ## License Errors
 
 ### `LICENSE-ERR-0`
@@ -433,6 +457,14 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Code:** `LICENSE-ERR-0`
 - **Error Name:** `noActiveLicense`
 - **Description:** No active license found for the current system.
+
+---
+
+### `LICENSE-ERR-1`
+
+- **Error Code:** `LICENSE-ERR-1`
+- **Error Name:** `licenseExpired`
+- **Description:** The license is expired, could not be verified and imported.
 
 ## Req Errors
 
@@ -625,4 +657,132 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Code:** `TASK-ERR-3`
 - **Error Name:** `multiHostNotebookNotSupported`
 - **Description:** The multi-host notebook feature (running notebook tasks across multiple hosts) is not supported.
+
+---
+
+### `TASK-ERR-4`
+
+- **Error Code:** `TASK-ERR-4`
+- **Error Name:** `notEnoughResource`
+- **Description:** The task requires more resources than are available in the cluster. This error occurs when the cluster does not have sufficient capacity to run the task.
+
+---
+
+### `TASK-ERR-5`
+
+- **Error Code:** `TASK-ERR-5`
+- **Error Name:** `clusterUnavailable`
+- **Description:** The cluster is currently unavailable, either due to maintenance or other reasons. This error occurs when the cluster is not ready to accept new tasks.
+
+## User Errors
+
+### `USER-ERR-0`
+
+- **Error Code:** `USER-ERR-0`
+- **Error Name:** `needPhone`
+- **Description:** The request must include a phone number in the header or body to identify the target account.
+
+---
+
+### `USER-ERR-1`
+
+- **Error Code:** `USER-ERR-1`
+- **Error Name:** `needDifferentPhone`
+- **Description:** The new phone number must be different from the current phone number.
+
+---
+
+### `USER-ERR-2`
+
+- **Error Code:** `USER-ERR-2`
+- **Error Name:** `phoneAlreadyExistsInSSO`
+- **Description:** The new phone number already exists in sso service.
+
+---
+
+### `USER-ERR-3`
+
+- **Error Code:** `USER-ERR-3`
+- **Error Name:** `forbidChangePhone`
+- **Description:** The phone number cannot be changed.
+
+---
+
+### `USER-ERR-4`
+
+- **Error Code:** `USER-ERR-4`
+- **Error Name:** `failedToUpdatePhone`
+- **Description:** Failed to update phone number.
+
+---
+
+### `USER-ERR-5`
+
+- **Error Code:** `USER-ERR-5`
+- **Error Name:** `forbidSendPhoneVerifyCodeFrequently`
+- **Description:** Send phone verify code frequently.
+
+---
+
+### `USER-ERR-6`
+
+- **Error Code:** `USER-ERR-6`
+- **Error Name:** `failedSendPhoneVerifyCode`
+- **Description:** Failed to send phone verify code.
+
+---
+
+### `USER-ERR-7`
+
+- **Error Code:** `USER-ERR-7`
+- **Error Name:** `phoneVerifyCodeExpiredOrNotFound`
+- **Description:** Phone verify code expired or not found.
+
+---
+
+### `USER-ERR-8`
+
+- **Error Code:** `USER-ERR-8`
+- **Error Name:** `phoneVerifyCodeInvalid`
+- **Description:** Phone verify code is invalid.
+
+---
+
+### `USER-ERR-9`
+
+- **Error Code:** `USER-ERR-9`
+- **Error Name:** `verificationCodeRequired`
+- **Description:** Verification code can not be empty.
+
+---
+
+### `USER-ERR-10`
+
+- **Error Code:** `USER-ERR-10`
+- **Error Name:** `verificationCodeLengthInvalid`
+- **Description:** Verification code length must be 6.
+
+---
+
+### `USER-ERR-11`
+
+- **Error Code:** `USER-ERR-11`
+- **Error Name:** `invalidPhoneNumber`
+- **Description:** Invalid phone number.
+
+---
+
+### `USER-ERR-12`
+
+- **Error Code:** `USER-ERR-12`
+- **Error Name:** `usernameExists`
+- **Description:** The username provided already exists in the system.
+
+---
+
+### `USER-ERR-13`
+
+- **Error Code:** `USER-ERR-13`
+- **Error Name:** `emailExists`
+- **Description:** The email address provided already exists in the system.
 

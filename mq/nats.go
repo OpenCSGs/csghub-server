@@ -34,7 +34,6 @@ type RequestSubject struct {
 	subscription    string // subscription subject
 	orderExpired    string // subject name for pub notification of order expired
 	rechargeSucceed string //
-	subChange       string // subject name for subscription change
 }
 
 var (
@@ -82,6 +81,11 @@ var (
 		StreamName:   bldmq.NormalPriorityMsgGroup.StreamName,
 		ConsumerName: bldmq.NormalPriorityMsgGroup.ConsumerName,
 	}
+
+	agentSessionHistoryMsgCfg = EventConfig{
+		StreamName:   bldmq.AgentSessionHistoryMsgGroup.StreamName,
+		ConsumerName: bldmq.AgentSessionHistoryMsgGroup.ConsumerName,
+	}
 )
 
 type NatsHandler struct {
@@ -101,18 +105,21 @@ type NatsHandler struct {
 	rechargeEvtCfg       jetstream.StreamConfig
 	rechargeConsumerCfg  jetstream.ConsumerConfig
 
-	js                   jetstream.JetStream
-	feeJsc               jetstream.Consumer
-	meterJsc             jetstream.Consumer
-	orderJsc             jetstream.Consumer
-	rechargeJsc          jetstream.Consumer
-	highPriorityMsgJsc   jetstream.Consumer
-	normalPriorityMsgJsc jetstream.Consumer
+	js                        jetstream.JetStream
+	feeJsc                    jetstream.Consumer
+	meterJsc                  jetstream.Consumer
+	orderJsc                  jetstream.Consumer
+	rechargeJsc               jetstream.Consumer
+	highPriorityMsgJsc        jetstream.Consumer
+	normalPriorityMsgJsc      jetstream.Consumer
+	agentSessionHistoryMsgJsc jetstream.Consumer
 
-	highPriorityMsgEvtCfg        jetstream.StreamConfig
-	highPriorityMsgConsumerCfg   jetstream.ConsumerConfig
-	normalPriorityMsgEvtCfg      jetstream.StreamConfig
-	normalPriorityMsgConsumerCfg jetstream.ConsumerConfig
+	highPriorityMsgEvtCfg             jetstream.StreamConfig
+	highPriorityMsgConsumerCfg        jetstream.ConsumerConfig
+	normalPriorityMsgEvtCfg           jetstream.StreamConfig
+	normalPriorityMsgConsumerCfg      jetstream.ConsumerConfig
+	agentSessionHistoryMsgEvtCfg      jetstream.StreamConfig
+	agentSessionHistoryMsgConsumerCfg jetstream.ConsumerConfig
 }
 
 func initStreamAndConsumerConfig(cfg EventConfig, subjectNames []string) (jetstream.StreamConfig, jetstream.ConsumerConfig) {
@@ -150,7 +157,8 @@ func NewNats(config *config.Config) (*NatsHandler, error) {
 		[]string{bldmq.HighPriorityMsgSubject})
 	normalPriorityMsgEvtCfg, normalPriorityMsgConsumerCfg := initStreamAndConsumerConfig(normalPriorityMsgCfg,
 		[]string{bldmq.NormalPriorityMsgSubject})
-
+	agentSessionHistoryMsgEvtCfg, agentSessionHistoryMsgConsumerCfg := initStreamAndConsumerConfig(agentSessionHistoryMsgCfg,
+		[]string{bldmq.AgentSessionHistoryMsgSubject})
 	return &NatsHandler{
 		conn:                 nc,
 		msgFetchTimeoutInSec: config.Nats.MsgFetchTimeoutInSEC,
@@ -159,7 +167,6 @@ func NewNats(config *config.Config) (*NatsHandler, error) {
 			token:        bldmq.TokenSendSubject,
 			quota:        bldmq.QuotaSendSubject,
 			subscription: bldmq.SubscriptionSendSubject,
-			subChange:    bldmq.NotifySubChangeSubject,
 		},
 		orderReqSub: RequestSubject{
 			orderExpired: bldmq.OrderExpiredSubject,
@@ -167,19 +174,21 @@ func NewNats(config *config.Config) (*NatsHandler, error) {
 		rechargeReqSub: RequestSubject{
 			rechargeSucceed: bldmq.RechargeSucceedSubject,
 		},
-		feeEvtCfg:                    feeEC,
-		feeConsumerCfg:               feeCC,
-		dlqEvtCfg:                    dlqEC,
-		meterEvtCfg:                  meterEC,
-		meterConsumerCfg:             meterCC,
-		orderEvtCfg:                  orderEC,
-		orderConsumerCfg:             orderCC,
-		rechargeEvtCfg:               rechargeEC,
-		rechargeConsumerCfg:          rechargeCC,
-		highPriorityMsgEvtCfg:        highPriorityMsgEvtCfg,
-		highPriorityMsgConsumerCfg:   highPriorityMsgConsumerCfg,
-		normalPriorityMsgEvtCfg:      normalPriorityMsgEvtCfg,
-		normalPriorityMsgConsumerCfg: normalPriorityMsgConsumerCfg,
+		feeEvtCfg:                         feeEC,
+		feeConsumerCfg:                    feeCC,
+		dlqEvtCfg:                         dlqEC,
+		meterEvtCfg:                       meterEC,
+		meterConsumerCfg:                  meterCC,
+		orderEvtCfg:                       orderEC,
+		orderConsumerCfg:                  orderCC,
+		rechargeEvtCfg:                    rechargeEC,
+		rechargeConsumerCfg:               rechargeCC,
+		highPriorityMsgEvtCfg:             highPriorityMsgEvtCfg,
+		highPriorityMsgConsumerCfg:        highPriorityMsgConsumerCfg,
+		normalPriorityMsgEvtCfg:           normalPriorityMsgEvtCfg,
+		normalPriorityMsgConsumerCfg:      normalPriorityMsgConsumerCfg,
+		agentSessionHistoryMsgEvtCfg:      agentSessionHistoryMsgEvtCfg,
+		agentSessionHistoryMsgConsumerCfg: agentSessionHistoryMsgConsumerCfg,
 	}, nil
 }
 
@@ -321,10 +330,6 @@ func (nh *NatsHandler) PublishData(subject string, data []byte) error {
 	return err
 }
 
-func (nh *NatsHandler) PublishNotificationForSubscription(data []byte) error {
-	return nh.PublishData(nh.feeReqSub.subChange, data)
-}
-
 func (nh *NatsHandler) PublishFeeCreditData(data []byte) error {
 	return nh.PublishData(nh.feeReqSub.fee, data)
 }
@@ -392,6 +397,16 @@ func (nh *NatsHandler) BuildNormalPriorityMsgStream(conf *config.Config) error {
 	return nil
 }
 
+func (nh *NatsHandler) BuildAgentSessionHistoryMsgStream(conf *config.Config) error {
+	nh.agentSessionHistoryMsgConsumerCfg.MaxDeliver = 3
+	jsc, err := nh.BuildEventStreamAndConsumer(agentSessionHistoryMsgCfg, nh.agentSessionHistoryMsgEvtCfg, nh.agentSessionHistoryMsgConsumerCfg)
+	if err != nil {
+		return err
+	}
+	nh.agentSessionHistoryMsgJsc = jsc
+	return nil
+}
+
 func (nh *NatsHandler) BuildHighPriorityMsgConsumer() (jetstream.Consumer, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -420,4 +435,19 @@ func (nh *NatsHandler) PublishNormalPriorityMsg(msg types.ScenarioMessage) error
 		return err
 	}
 	return nh.PublishData(nh.normalPriorityMsgEvtCfg.Subjects[0], data)
+}
+
+func (nh *NatsHandler) BuildAgentSessionHistoryMsgConsumer() (jetstream.Consumer, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	consumer, err := nh.js.CreateOrUpdateConsumer(ctx, agentSessionHistoryMsgCfg.StreamName, nh.agentSessionHistoryMsgConsumerCfg)
+	return consumer, err
+}
+
+func (nh *NatsHandler) PublishAgentSessionHistoryMsg(msg types.SessionHistoryMessageEnvelope) error {
+	data, err := json.Marshal(msg)
+	if err != nil {
+		return err
+	}
+	return nh.PublishData(nh.agentSessionHistoryMsgEvtCfg.Subjects[0], data)
 }

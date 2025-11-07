@@ -175,6 +175,20 @@ func TestKServiceExecutor_buildDeployNotification(t *testing.T) {
 		require.Equal(t, payload["git_path"], deploy.GitPath)
 		require.Equal(t, url, "")
 	})
+	t.Run("notebook", func(t *testing.T) {
+		deploy := &database.Deploy{
+			ID:         1,
+			UserUUID:   "user1",
+			DeployName: "deploy1",
+			Type:       types.NotebookType,
+			GitPath:    "ns/n",
+		}
+		payload, url := buildDeployNotification(deploy)
+		require.Equal(t, payload["deploy_name"], deploy.DeployName)
+		require.Equal(t, payload["deploy_id"], deploy.ID)
+		require.Equal(t, payload["git_path"], deploy.GitPath)
+		require.Equal(t, url, fmt.Sprintf("/notebooks/%d", deploy.ID))
+	})
 	t.Run("unknown", func(t *testing.T) {
 		deploy := &database.Deploy{
 			ID:         1,
