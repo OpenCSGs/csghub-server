@@ -81,7 +81,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	middlewareCollection.Auth.NeedPhoneVerified = middleware.NeedPhoneVerified(config)
 	middlewareCollection.Repo.RepoExists = middleware.RepoExists(config)
 	middlewareCollection.License.Check = middleware.CheckLicense(config)
-
+	middlewareCollection.API.RateLimter = middleware.RateLimiter(config, middleware.WithTimeBucketRateLimter(config), middleware.WithIPCheck())
 	//add router for golang pprof
 	debugGroup := r.Group("/debug", middlewareCollection.Auth.NeedAPIKey)
 	pprof.RouteRegister(debugGroup, "pprof")
@@ -283,7 +283,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		tokenGroup.PUT("/:app/:token_name", userProxyHandler.ProxyToApi("/api/v1/token/%s/%s", "app", "token_name"))
 		tokenGroup.DELETE("/:app/:token_name", userProxyHandler.ProxyToApi("/api/v1/token/%s/%s", "app", "token_name"))
 		// check token info
-		tokenGroup.GET("/:token_value", middlewareCollection.Auth.NeedAPIKey, userProxyHandler.ProxyToApi("/api/v1/token/%s", "token_value"))
+		tokenGroup.GET("/:token_value", userProxyHandler.ProxyToApi("/api/v1/token/%s", "token_value"))
 	}
 
 	sshKeyHandler, err := handler.NewSSHKeyHandler(config)
@@ -310,6 +310,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	apiGroup.POST("/jwt/token", middlewareCollection.Auth.NeedAPIKey, userProxyHandler.Proxy)
 	apiGroup.GET("/jwt/:token", middlewareCollection.Auth.NeedAPIKey, userProxyHandler.ProxyToApi("/api/v1/jwt/%s", "token"))
 	apiGroup.GET("/users", userProxyHandler.Proxy)
+	apiGroup.GET("/users/stream-export", middlewareCollection.Auth.NeedAdmin, userProxyHandler.Proxy)
 
 	// callback
 	callbackCtrl, err := callback.NewGitCallbackHandler(config)
@@ -545,6 +546,19 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		return nil, fmt.Errorf("error creating webhook routes: %w", err)
 	}
 
+	// agent
+	agentHandler, err := handler.NewAgentHandler(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating agent handler: %w", err)
+	}
+	createAgentRoutes(apiGroup, middlewareCollection, agentHandler)
+
+	finetuneJobHandler, err := handler.NewFinetuneHandler(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating finetune job handler: %w", err)
+	}
+	createFinetuneRoutes(apiGroup, middlewareCollection, finetuneJobHandler)
+
 	return r, nil
 }
 
@@ -556,6 +570,16 @@ func createEvaluationRoutes(apiGroup *gin.RouterGroup, middlewareCollection midd
 		evaluationsGroup.POST("", evaluationHandler.RunEvaluation)
 		evaluationsGroup.DELETE("/:id", evaluationHandler.DeleteEvaluation)
 		evaluationsGroup.GET("/:id", evaluationHandler.GetEvaluation)
+	}
+}
+
+func createFinetuneRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware.MiddlewareCollection, finetuneJobHandler *handler.FinetuneHandler) {
+	ftGroup := apiGroup.Group("/finetunes")
+	ftGroup.Use(middlewareCollection.Auth.NeedLogin)
+	{
+		ftGroup.POST("", finetuneJobHandler.RunFinetuneJob)
+		ftGroup.GET("/:id", finetuneJobHandler.GetFinetuneJob)
+		ftGroup.DELETE("/:id", finetuneJobHandler.DeleteFinetuneJob)
 	}
 }
 
@@ -571,7 +595,7 @@ func createModelRoutes(config *config.Config,
 	modelsGroup := apiGroup.Group("/models")
 	modelsGroup.Use(middleware.RepoType(types.ModelRepo), middlewareCollection.Repo.RepoExists)
 	{
-		modelsGroup.POST("", middlewareCollection.Auth.NeedPhoneVerified, modelHandler.Create)
+		modelsGroup.POST("", middlewareCollection.Auth.NeedPhoneVerified, middlewareCollection.API.RateLimter, modelHandler.Create)
 		modelsGroup.GET("", cache.Cache(memoryStore, time.Minute, middleware.CacheStrategyTrendingRepos()), modelHandler.Index)
 		modelsGroup.PUT("/:namespace/:name", middlewareCollection.Auth.NeedLogin, modelHandler.Update)
 		modelsGroup.DELETE("/:namespace/:name", middlewareCollection.Auth.NeedLogin, modelHandler.Delete)
@@ -719,7 +743,7 @@ func createDatasetRoutes(
 	// must login
 	datasetsGroup.Use(middleware.RepoType(types.DatasetRepo), middlewareCollection.Repo.RepoExists)
 	{
-		datasetsGroup.POST("", middlewareCollection.Auth.NeedPhoneVerified, dsHandler.Create)
+		datasetsGroup.POST("", middlewareCollection.Auth.NeedPhoneVerified, middlewareCollection.API.RateLimter, dsHandler.Create)
 		datasetsGroup.PUT("/:namespace/:name", middleware.MustLogin(), dsHandler.Update)
 		datasetsGroup.DELETE("/:namespace/:name", middleware.MustLogin(), dsHandler.Delete)
 		datasetsGroup.GET("/:namespace/:name", dsHandler.Show)
@@ -773,7 +797,7 @@ func createCodeRoutes(
 	codesGroup := apiGroup.Group("/codes")
 	codesGroup.Use(middleware.RepoType(types.CodeRepo), middlewareCollection.Repo.RepoExists)
 	{
-		codesGroup.POST("", middlewareCollection.Auth.NeedPhoneVerified, codeHandler.Create)
+		codesGroup.POST("", middlewareCollection.Auth.NeedPhoneVerified, middlewareCollection.API.RateLimter, codeHandler.Create)
 		codesGroup.GET("", codeHandler.Index)
 		codesGroup.PUT("/:namespace/:name", middlewareCollection.Auth.NeedLogin, codeHandler.Update)
 		codesGroup.DELETE("/:namespace/:name", middlewareCollection.Auth.NeedLogin, codeHandler.Delete)
@@ -855,9 +879,9 @@ func createSpaceRoutes(config *config.Config,
 	{
 		// list all spaces
 		spaces.GET("", spaceHandler.Index)
-		spaces.POST("", middlewareCollection.Auth.NeedPhoneVerified, spaceHandler.Create)
+		spaces.POST("", middlewareCollection.Auth.NeedPhoneVerified, middlewareCollection.API.RateLimter, spaceHandler.Create)
 		// show a user or org's space
-		spaces.GET("/:namespace/:name", middlewareCollection.Auth.NeedLogin, spaceHandler.Show)
+		spaces.GET("/:namespace/:name", middlewareCollection.Auth.NeedLogin, middlewareCollection.API.RateLimter, spaceHandler.Show)
 		spaces.PUT("/:namespace/:name", middlewareCollection.Auth.NeedLogin, spaceHandler.Update)
 		spaces.DELETE("/:namespace/:name", middlewareCollection.Auth.NeedLogin, spaceHandler.Delete)
 		// depoly and start running the space
@@ -979,6 +1003,7 @@ func createUserRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware
 	{
 		apiGroup.GET("/user/:username/run/:repo_type", middlewareCollection.Auth.UserMatch, userHandler.GetRunDeploys)
 		apiGroup.GET("/user/:username/finetune/instances", middlewareCollection.Auth.UserMatch, userHandler.GetFinetuneInstances)
+		apiGroup.GET("/user/:username/finetune/jobs", middlewareCollection.Auth.UserMatch, userHandler.GetUserFinetunes)
 		// User evaluations
 		apiGroup.GET("/user/:username/evaluations", middlewareCollection.Auth.UserMatch, userHandler.GetEvaluations)
 		// User notebooks
@@ -1114,14 +1139,14 @@ func createMeteringRoutes(
 }
 
 func createDiscussionRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware.MiddlewareCollection, discussionHandler *handler.DiscussionHandler) {
-	apiGroup.POST("/:repo_type/:namespace/:name/discussions", middlewareCollection.Auth.NeedPhoneVerified, discussionHandler.CreateRepoDiscussion)
+	apiGroup.POST("/:repo_type/:namespace/:name/discussions", middlewareCollection.Auth.NeedPhoneVerified, middlewareCollection.API.RateLimter, discussionHandler.CreateRepoDiscussion)
 	apiGroup.GET("/:repo_type/:namespace/:name/discussions", discussionHandler.ListRepoDiscussions)
 	apiGroup.GET("/discussions/:id", discussionHandler.ShowDiscussion)
-	apiGroup.PUT("/discussions/:id", middlewareCollection.Auth.NeedLogin, discussionHandler.UpdateDiscussion)
+	apiGroup.PUT("/discussions/:id", middlewareCollection.Auth.NeedLogin, middlewareCollection.API.RateLimter, discussionHandler.UpdateDiscussion)
 	apiGroup.DELETE("/discussions/:id", middlewareCollection.Auth.NeedLogin, discussionHandler.DeleteDiscussion)
-	apiGroup.POST("/discussions/:id/comments", middlewareCollection.Auth.NeedPhoneVerified, discussionHandler.CreateDiscussionComment)
-	apiGroup.GET("/discussions/:id/comments", discussionHandler.ListDiscussionComments)
-	apiGroup.PUT("/discussions/:id/comments/:comment_id", middlewareCollection.Auth.NeedLogin, discussionHandler.UpdateComment)
+	apiGroup.POST("/discussions/:id/comments", middlewareCollection.Auth.NeedPhoneVerified, middlewareCollection.API.RateLimter, discussionHandler.CreateDiscussionComment)
+	apiGroup.GET("/discussions/:id/comments", middlewareCollection.API.RateLimter, discussionHandler.ListDiscussionComments)
+	apiGroup.PUT("/discussions/:id/comments/:comment_id", middlewareCollection.Auth.NeedLogin, middlewareCollection.API.RateLimter, discussionHandler.UpdateComment)
 	apiGroup.DELETE("/discussions/:id/comments/:comment_id", middlewareCollection.Auth.NeedLogin, discussionHandler.DeleteComment)
 }
 

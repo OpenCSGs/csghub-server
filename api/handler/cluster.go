@@ -2,9 +2,11 @@ package handler
 
 import (
 	"encoding/csv"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
@@ -28,6 +30,11 @@ func NewClusterHandler(config *config.Config) (*ClusterHandler, error) {
 type ClusterHandler struct {
 	c component.ClusterComponent
 }
+
+const (
+	deployTimeLayout     = "2006-01-02 15:04:05"
+	deployDateOnlyLayout = "2006-01-02"
+)
 
 // Getclusters   godoc
 // @Security     ApiKey
@@ -146,6 +153,8 @@ func (h *ClusterHandler) GetDeploys(ctx *gin.Context) {
 // @Produce      text/csv
 // @Param        status query string false "status" default(all) Enums(all, running, stopped, deployfailed)
 // @Param        search query string false "search" default("")
+// @Param        start_time query string false "filter deploys created after or at this time"
+// @Param        end_time query string false "filter deploys created before or at this time"
 // @Success      200  {string}  string "CSV file"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
@@ -165,6 +174,11 @@ func (h *ClusterHandler) GetDeploysReport(ctx *gin.Context) {
 		req.Status = []int{code.DeployFailed}
 	}
 	req.Query = ctx.Query("search")
+	if err := bindDeployDateRange(ctx, &req); err != nil {
+		slog.Error("Invalid date range for deploy report", slog.Any("error", err))
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
 
 	filename := "deploys_report.csv"
 	ctx.Header("Content-Type", "text/csv; charset=utf-8")
@@ -189,7 +203,6 @@ func (h *ClusterHandler) GetDeploysReport(ctx *gin.Context) {
 	})
 	writer.Flush()
 
-	const timeLayout = "2006-01-02 15:04:05"
 	totalProcessed := 0
 
 	for {
@@ -207,7 +220,7 @@ func (h *ClusterHandler) GetDeploysReport(ctx *gin.Context) {
 				d.DeployName,
 				d.User.Username,
 				d.Resource,
-				d.CreateTime.Local().Format(timeLayout),
+				d.CreateTime.Local().Format(deployTimeLayout),
 				d.Status,
 				strconv.Itoa(d.TotalTimeInMin),
 				strconv.Itoa(d.TotalFeeInCents),
@@ -245,4 +258,44 @@ func (h *ClusterHandler) Update(ctx *gin.Context) {
 		return
 	}
 	httpbase.OK(ctx, result)
+}
+
+func bindDeployDateRange(ctx *gin.Context, req *types.DeployReq) error {
+	startTime := ctx.Query("start_time")
+	endTime := ctx.Query("end_time")
+	if startTime == "" && endTime == "" {
+		return nil
+	}
+	if startTime == "" || endTime == "" {
+		return fmt.Errorf("start_time and end_time must be provided together")
+	}
+	parsedStart, err := parseDeployQueryTime(startTime, false)
+	if err != nil {
+		return err
+	}
+	parsedEnd, err := parseDeployQueryTime(endTime, true)
+	if err != nil {
+		return err
+	}
+	req.StartTime = &parsedStart
+	req.EndTime = &parsedEnd
+	return nil
+}
+
+func parseDeployQueryTime(value string, isEnd bool) (time.Time, error) {
+	layouts := []string{deployTimeLayout, deployDateOnlyLayout}
+	for _, layout := range layouts {
+		parsed, err := time.ParseInLocation(layout, value, time.UTC)
+		if err != nil {
+			continue
+		}
+		if layout == deployDateOnlyLayout {
+			if isEnd {
+				parsed = parsed.Add(24*time.Hour - time.Nanosecond)
+			}
+			return parsed, nil
+		}
+		return parsed, nil
+	}
+	return time.Time{}, fmt.Errorf("invalid datetime format, use '%s' or '%s'", deployTimeLayout, deployDateOnlyLayout)
 }

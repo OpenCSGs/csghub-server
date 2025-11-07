@@ -74,7 +74,13 @@ var cmdLaunch = &cobra.Command{
 			return fmt.Errorf("failed to init deploy: %w", err)
 		}
 
-		slog.Info("starting temporal client")
+		slog.Info("start server temporal workflow")
+		err = serverworkflow.StartWorkflow(cfg, true)
+		if err != nil {
+			return fmt.Errorf("failed to start server workflow, error: %w", err)
+		}
+
+		slog.Info("starting shared temporal client")
 		temporalClient, err := temporal.NewClient(client.Options{
 			HostPort: cfg.WorkFLow.Endpoint,
 			Logger:   log.NewStructuredLogger(slog.Default()),
@@ -83,29 +89,14 @@ var cmdLaunch = &cobra.Command{
 			return fmt.Errorf("unable to create temporal client, error: %w", err)
 		}
 
-		slog.Info("start server temporal workflow")
-		err = serverworkflow.StartWorkflow(cfg, true)
-		if err != nil {
-			return fmt.Errorf("failed to start server workflow, error: %w", err)
-		}
+		slog.Info("register moderation temporal workflow")
+		moderationworkflow.RegisterWorker(temporalClient)
 
-		slog.Info("start moderation temporal workflow")
-		err = moderationworkflow.StartWorker(cfg)
-		if err != nil {
-			return fmt.Errorf("failed to start moderation worker, error: %w", err)
-		}
+		slog.Info("register notification temporal workflow")
+		notificationworkflow.RegisterWorker(cfg, temporalClient)
 
-		slog.Info("start notification temporal workflow")
-		err = notificationworkflow.StartWorkflow(cfg)
-		if err != nil {
-			return fmt.Errorf("failed to start notification worker, error: %w", err)
-		}
-
-		slog.Info("start user temporal workflow")
-		err = userworkflow.StartWorker(cfg)
-		if err != nil {
-			return fmt.Errorf("failed to start user worker, error: %w", err)
-		}
+		slog.Info("register user temporal workflow")
+		userworkflow.RegisterWorker(cfg, temporalClient)
 
 		slog.Info("start deploy temporal workflow")
 		deployCfg := common.BuildDeployConfig(cfg)
