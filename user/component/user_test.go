@@ -2,14 +2,21 @@ package component
 
 import (
 	"context"
+	"database/sql"
+	"errors"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	mockgit "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/git/gitserver"
+	mockrpc "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rpc"
+	mockcache "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/cache"
 	mockdb "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -144,4 +151,614 @@ func TestUserComponent_Delete(t *testing.T) {
 
 	err := uc.Delete(context.TODO(), "user1", "user2")
 	require.Nil(t, err)
+}
+
+func TestUserComponent_SendSMSCode(t *testing.T) {
+	mockUserStore := mockdb.NewMockUserStore(t)
+	mockNotificationSvcClient := mockrpc.NewMockNotificationSvcClient(t)
+	mockUserStore.EXPECT().FindByUUID(mock.Anything, "user1").Return(&database.User{
+		ID: 1,
+	}, nil)
+	mockNotificationSvcClient.EXPECT().Send(mock.Anything, mock.MatchedBy(func(req *types.MessageRequest) bool {
+		return req.Scenario == types.MessageScenarioSMSVerifyCode
+	})).Return(nil)
+
+	cache := mockcache.NewMockRedisClient(t)
+	cache.EXPECT().SetNX(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
+
+	config := &config.Config{}
+	config.Notification.SMSTemplateCodeForVerifyCodeOversea = "test"
+	config.Notification.SMSTemplateCodeForVerifyCodeCN = "test"
+	config.Notification.SMSSign = "test"
+
+	uc := &userComponentImpl{
+		userStore:       mockUserStore,
+		notificationSvc: mockNotificationSvcClient,
+		cache:           cache,
+		config:          config,
+	}
+	resp, err := uc.SendSMSCode(context.TODO(), "user1", types.SendSMSCodeRequest{
+		Phone:     "13626487789",
+		PhoneArea: "+86",
+	})
+	require.Nil(t, err)
+	require.NotNil(t, resp)
+	require.NotNil(t, resp.ExpiredAt)
+}
+
+func TestUserComponent_SendSMSCode_InvalidPhoneNumber(t *testing.T) {
+	mockUserStore := mockdb.NewMockUserStore(t)
+	mockUserStore.EXPECT().FindByUUID(mock.Anything, "user1").Return(&database.User{
+		ID: 1,
+	}, nil)
+
+	uc := &userComponentImpl{
+		userStore: mockUserStore,
+	}
+	resp, err := uc.SendSMSCode(context.TODO(), "user1", types.SendSMSCodeRequest{
+		Phone:     "66668877",
+		PhoneArea: "+86",
+	})
+	require.NotNil(t, err)
+	require.Nil(t, resp)
+}
+
+func TestUserComponent_UpdatePhone(t *testing.T) {
+	var code = "123456"
+	var phone = "13626487789"
+	var phoneArea = "+86"
+
+	mockUserStore := mockdb.NewMockUserStore(t)
+	mockUserStore.EXPECT().FindByUUID(mock.Anything, "user1").Return(&database.User{
+		ID:          int64(1),
+		Phone:       "13626487711",
+		PhoneArea:   "+86",
+		RegProvider: "casdoor",
+	}, nil)
+	mockUserStore.EXPECT().UpdatePhone(mock.Anything, int64(1), "13626487789", "+86").Return(nil)
+
+	cache := mockcache.NewMockRedisClient(t)
+	cache.EXPECT().Del(mock.Anything, mock.Anything).Return(nil)
+	cache.EXPECT().Get(mock.Anything, mock.Anything).Return("123456", nil)
+
+	ssomock := mockrpc.NewMockSSOInterface(t)
+	ssomock.EXPECT().IsExistByPhone(mock.Anything, phone).Return(false, nil)
+	ssomock.EXPECT().UpdateUserInfo(mock.Anything, mock.Anything).Return(nil)
+
+	config := &config.Config{}
+	config.SSOType = "casdoor"
+
+	uc := &userComponentImpl{
+		userStore: mockUserStore,
+		cache:     cache,
+		sso:       ssomock,
+		config:    config,
+	}
+	req := &types.UpdateUserPhoneRequest{
+		Phone:            &phone,
+		PhoneArea:        &phoneArea,
+		VerificationCode: &code,
+	}
+	err := uc.UpdatePhone(context.TODO(), "user1", *req)
+	require.Nil(t, err)
+}
+
+// test update UpdateByUUID
+func TestUserComponent_UpdateByUUID_UpdateUserName(t *testing.T) {
+	mockUserStore := mockdb.NewMockUserStore(t)
+	user := &database.User{
+		ID:                1,
+		UUID:              "user1",
+		Username:          "user1",
+		Phone:             "13626487789",
+		PhoneArea:         "+86",
+		RegProvider:       "casdoor",
+		CanChangeUserName: true,
+	}
+	mockUserStore.EXPECT().FindByUUID(mock.Anything, "user1").Return(user, nil)
+	mockUserStore.EXPECT().FindByUUID(context.TODO(), mock.Anything).Return(user, nil)
+
+	mockUserStore.EXPECT().FindByUsername(mock.Anything, "new_user1").Return(database.User{}, nil)
+	mockUserStore.EXPECT().Update(mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
+	ssomock := mockrpc.NewMockSSOInterface(t)
+	ssomock.EXPECT().UpdateUserInfo(mock.Anything, mock.MatchedBy(func(params *rpc.SSOUpdateUserInfo) bool {
+		return params.UUID == "user1" && params.Name == "new_user1"
+	})).Return(nil)
+	ssomock.EXPECT().IsExistByName(mock.Anything, "new_user1").Return(false, nil)
+
+	mockTagStore := mockdb.NewMockTagStore(t)
+	mockTagStore.EXPECT().CheckTagIDsExist(context.TODO(), mock.Anything).Return(nil)
+
+	mockUserTagStore := mockdb.NewMockUserTagStore(t)
+	mockUserTagStore.EXPECT().ResetUserTags(context.TODO(), mock.Anything, mock.Anything).Return(nil)
+	config := &config.Config{}
+	config.SSOType = "casdoor"
+
+	once := sync.Once{}
+	uc := &userComponentImpl{
+		userStore: mockUserStore,
+		sso:       ssomock,
+		config:    config,
+		once:      &once,
+		ts:        mockTagStore,
+		uts:       mockUserTagStore,
+	}
+	var userUUID = "user1"
+	var newUserName = "new_user1"
+	err := uc.UpdateByUUID(context.TODO(), &types.UpdateUserRequest{
+		UUID:        &userUUID,
+		OpUser:      "user1",
+		NewUserName: &newUserName,
+	})
+	require.Nil(t, err)
+}
+
+func TestUserComponent_UpdateByUUID_UpdateEmail(t *testing.T) {
+	mockUserStore := mockdb.NewMockUserStore(t)
+	user := &database.User{
+		ID:          1,
+		UUID:        "user1",
+		Username:    "user1",
+		Email:       "old@example.com",
+		RegProvider: "casdoor",
+	}
+	mockUserStore.EXPECT().FindByUUID(mock.Anything, "user1").Return(user, nil)
+	mockUserStore.EXPECT().FindByEmail(mock.Anything, "new@example.com").Return(database.User{ID: 0}, sql.ErrNoRows)
+	mockUserStore.EXPECT().Update(mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
+	ssomock := mockrpc.NewMockSSOInterface(t)
+	ssomock.EXPECT().IsExistByEmail(mock.Anything, "new@example.com").Return(false, nil)
+	ssomock.EXPECT().UpdateUserInfo(mock.Anything, mock.MatchedBy(func(params *rpc.SSOUpdateUserInfo) bool {
+		return params.UUID == "user1" && params.Email == "new@example.com"
+	})).Return(nil)
+
+	mockTagStore := mockdb.NewMockTagStore(t)
+	mockTagStore.EXPECT().CheckTagIDsExist(context.TODO(), mock.Anything).Return(nil)
+
+	mockUserTagStore := mockdb.NewMockUserTagStore(t)
+	mockUserTagStore.EXPECT().ResetUserTags(context.TODO(), mock.Anything, mock.Anything).Return(nil)
+
+	mockCache := mockcache.NewMockRedisClient(t)
+	mockCache.EXPECT().Exists(mock.Anything, mock.Anything).Return(int64(1), nil)
+	mockCache.EXPECT().Get(mock.Anything, mock.Anything).Return("123456", nil)
+	mockCache.EXPECT().Del(mock.Anything, mock.Anything).Return(nil)
+
+	config := &config.Config{}
+	config.SSOType = "casdoor"
+
+	once := sync.Once{}
+	uc := &userComponentImpl{
+		userStore: mockUserStore,
+		sso:       ssomock,
+		config:    config,
+		once:      &once,
+		ts:        mockTagStore,
+		uts:       mockUserTagStore,
+		cache:     mockCache,
+	}
+	var userUUID = "user1"
+	var newEmail = "new@example.com"
+	var code = "123456"
+	err := uc.UpdateByUUID(context.TODO(), &types.UpdateUserRequest{
+		UUID:                  &userUUID,
+		OpUser:                "user1",
+		Email:                 &newEmail,
+		EmailVerificationCode: &code,
+	})
+	require.Nil(t, err)
+}
+
+func TestUserComponent_UpdateByUUID_NoSyncWhenUsernameNotChanged(t *testing.T) {
+	mockUserStore := mockdb.NewMockUserStore(t)
+	user := &database.User{
+		ID:          1,
+		UUID:        "user1",
+		Username:    "user1",
+		RegProvider: "casdoor",
+	}
+	mockUserStore.EXPECT().FindByUUID(mock.Anything, "user1").Return(user, nil)
+	mockUserStore.EXPECT().Update(mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
+	ssomock := mockrpc.NewMockSSOInterface(t)
+	// SSO sync should NOT be called when username doesn't change
+
+	mockTagStore := mockdb.NewMockTagStore(t)
+	mockTagStore.EXPECT().CheckTagIDsExist(context.TODO(), mock.Anything).Return(nil)
+
+	mockUserTagStore := mockdb.NewMockUserTagStore(t)
+	mockUserTagStore.EXPECT().ResetUserTags(context.TODO(), mock.Anything, mock.Anything).Return(nil)
+
+	config := &config.Config{}
+	config.SSOType = "casdoor"
+
+	once := sync.Once{}
+	uc := &userComponentImpl{
+		userStore: mockUserStore,
+		sso:       ssomock,
+		config:    config,
+		once:      &once,
+		ts:        mockTagStore,
+		uts:       mockUserTagStore,
+	}
+	var userUUID = "user1"
+	var sameUserName = "user1" // same as current username
+	err := uc.UpdateByUUID(context.TODO(), &types.UpdateUserRequest{
+		UUID:        &userUUID,
+		OpUser:      "user1",
+		NewUserName: &sameUserName,
+	})
+	require.Nil(t, err)
+}
+
+func TestUserComponent_UpdateByUUID_NoSyncWhenEmailNotChanged(t *testing.T) {
+	mockUserStore := mockdb.NewMockUserStore(t)
+	user := &database.User{
+		ID:          1,
+		UUID:        "user1",
+		Username:    "user1",
+		Email:       "user1@example.com",
+		RegProvider: "casdoor",
+	}
+	mockUserStore.EXPECT().FindByUUID(mock.Anything, "user1").Return(user, nil)
+	mockUserStore.EXPECT().Update(mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
+	ssomock := mockrpc.NewMockSSOInterface(t)
+	// SSO sync should NOT be called when email doesn't change
+
+	mockTagStore := mockdb.NewMockTagStore(t)
+	mockTagStore.EXPECT().CheckTagIDsExist(context.TODO(), mock.Anything).Return(nil)
+
+	mockUserTagStore := mockdb.NewMockUserTagStore(t)
+	mockUserTagStore.EXPECT().ResetUserTags(context.TODO(), mock.Anything, mock.Anything).Return(nil)
+
+	config := &config.Config{}
+	config.SSOType = "casdoor"
+
+	once := sync.Once{}
+	uc := &userComponentImpl{
+		userStore: mockUserStore,
+		sso:       ssomock,
+		config:    config,
+		once:      &once,
+		ts:        mockTagStore,
+		uts:       mockUserTagStore,
+	}
+	var userUUID = "user1"
+	var sameEmail = "user1@example.com" // same as current email
+	var code = "123456"
+	err := uc.UpdateByUUID(context.TODO(), &types.UpdateUserRequest{
+		UUID:                  &userUUID,
+		OpUser:                "user1",
+		Email:                 &sameEmail,
+		EmailVerificationCode: &code,
+	})
+	require.Nil(t, err)
+}
+
+func TestUserComponent_UpdateByUUID_NoSyncForNonSSOUser(t *testing.T) {
+	mockUserStore := mockdb.NewMockUserStore(t)
+	user := &database.User{
+		ID:          1,
+		UUID:        "user1",
+		Username:    "user1",
+		Email:       "old@example.com",
+		RegProvider: "default", // non-SSO user
+	}
+	mockUserStore.EXPECT().FindByUUID(mock.Anything, "user1").Return(user, nil)
+	mockUserStore.EXPECT().FindByEmail(mock.Anything, "new@example.com").Return(database.User{ID: 0}, sql.ErrNoRows)
+	mockUserStore.EXPECT().Update(mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
+	ssomock := mockrpc.NewMockSSOInterface(t)
+	// SSO sync should NOT be called for non-SSO users
+
+	mockTagStore := mockdb.NewMockTagStore(t)
+	mockTagStore.EXPECT().CheckTagIDsExist(context.TODO(), mock.Anything).Return(nil)
+
+	mockUserTagStore := mockdb.NewMockUserTagStore(t)
+	mockUserTagStore.EXPECT().ResetUserTags(context.TODO(), mock.Anything, mock.Anything).Return(nil)
+
+	mockCache := mockcache.NewMockRedisClient(t)
+	mockCache.EXPECT().Exists(mock.Anything, mock.Anything).Return(int64(1), nil)
+	mockCache.EXPECT().Get(mock.Anything, mock.Anything).Return("123456", nil)
+	mockCache.EXPECT().Del(mock.Anything, mock.Anything).Return(nil)
+
+	config := &config.Config{}
+	config.SSOType = "casdoor"
+
+	once := sync.Once{}
+	uc := &userComponentImpl{
+		userStore: mockUserStore,
+		sso:       ssomock,
+		config:    config,
+		once:      &once,
+		ts:        mockTagStore,
+		uts:       mockUserTagStore,
+		cache:     mockCache,
+	}
+	var userUUID = "user1"
+	var newEmail = "new@example.com"
+	var code = "123456"
+	err := uc.UpdateByUUID(context.TODO(), &types.UpdateUserRequest{
+		UUID:                  &userUUID,
+		OpUser:                "user1",
+		Email:                 &newEmail,
+		EmailVerificationCode: &code,
+	})
+	require.Nil(t, err)
+}
+
+func TestUserComponent_UpdateByUUID_NoSyncWhenOnlyOtherFieldsChanged(t *testing.T) {
+	mockUserStore := mockdb.NewMockUserStore(t)
+	user := &database.User{
+		ID:          1,
+		UUID:        "user1",
+		Username:    "user1",
+		Email:       "user1@example.com",
+		RegProvider: "casdoor",
+	}
+	mockUserStore.EXPECT().FindByUUID(mock.Anything, "user1").Return(user, nil)
+	mockUserStore.EXPECT().Update(mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
+	ssomock := mockrpc.NewMockSSOInterface(t)
+	// SSO sync should NOT be called when only other fields (like avatar, bio) change
+
+	mockTagStore := mockdb.NewMockTagStore(t)
+	mockTagStore.EXPECT().CheckTagIDsExist(context.TODO(), mock.Anything).Return(nil)
+
+	mockUserTagStore := mockdb.NewMockUserTagStore(t)
+	mockUserTagStore.EXPECT().ResetUserTags(context.TODO(), mock.Anything, mock.Anything).Return(nil)
+
+	config := &config.Config{}
+	config.SSOType = "casdoor"
+
+	once := sync.Once{}
+	uc := &userComponentImpl{
+		userStore: mockUserStore,
+		sso:       ssomock,
+		config:    config,
+		once:      &once,
+		ts:        mockTagStore,
+		uts:       mockUserTagStore,
+	}
+	var userUUID = "user1"
+	var avatar = "https://example.com/avatar.jpg"
+	var bio = "New bio"
+	err := uc.UpdateByUUID(context.TODO(), &types.UpdateUserRequest{
+		UUID:   &userUUID,
+		OpUser: "user1",
+		Avatar: &avatar,
+		Bio:    &bio,
+	})
+	require.Nil(t, err)
+}
+
+func TestUserComponent_UpdateByUUID_RollbackWhenDBUpdateFails(t *testing.T) {
+	mockUserStore := mockdb.NewMockUserStore(t)
+	user := &database.User{
+		ID:          1,
+		UUID:        "user1",
+		Username:    "user1",
+		Email:       "old@example.com",
+		RegProvider: "casdoor",
+	}
+	mockUserStore.EXPECT().FindByUUID(mock.Anything, "user1").Return(user, nil)
+	mockUserStore.EXPECT().FindByEmail(mock.Anything, "new@example.com").Return(database.User{ID: 0}, sql.ErrNoRows)
+	mockUserStore.EXPECT().Update(mock.Anything, mock.Anything, mock.Anything).Return(errors.New("database error"))
+
+	ssomock := mockrpc.NewMockSSOInterface(t)
+	ssomock.EXPECT().IsExistByEmail(mock.Anything, "new@example.com").Return(false, nil)
+	// First SSO update should succeed
+	ssomock.EXPECT().UpdateUserInfo(mock.Anything, mock.MatchedBy(func(params *rpc.SSOUpdateUserInfo) bool {
+		return params.UUID == "user1" && params.Email == "new@example.com"
+	})).Return(nil)
+	// Rollback should be called when DB update fails
+	ssomock.EXPECT().UpdateUserInfo(mock.Anything, mock.MatchedBy(func(params *rpc.SSOUpdateUserInfo) bool {
+		return params.UUID == "user1" && params.Email == "old@example.com" && params.Name == "user1"
+	})).Return(nil)
+
+	mockTagStore := mockdb.NewMockTagStore(t)
+	mockTagStore.EXPECT().CheckTagIDsExist(context.TODO(), mock.Anything).Return(nil)
+
+	mockUserTagStore := mockdb.NewMockUserTagStore(t)
+	mockUserTagStore.EXPECT().ResetUserTags(context.TODO(), mock.Anything, mock.Anything).Return(nil)
+
+	mockCache := mockcache.NewMockRedisClient(t)
+	mockCache.EXPECT().Exists(mock.Anything, mock.Anything).Return(int64(1), nil)
+	mockCache.EXPECT().Get(mock.Anything, mock.Anything).Return("123456", nil)
+	mockCache.EXPECT().Del(mock.Anything, mock.Anything).Return(nil)
+
+	config := &config.Config{}
+	config.SSOType = "casdoor"
+
+	once := sync.Once{}
+	uc := &userComponentImpl{
+		userStore: mockUserStore,
+		sso:       ssomock,
+		config:    config,
+		once:      &once,
+		ts:        mockTagStore,
+		uts:       mockUserTagStore,
+		cache:     mockCache,
+	}
+	var userUUID = "user1"
+	var newEmail = "new@example.com"
+	var code = "123456"
+	err := uc.UpdateByUUID(context.TODO(), &types.UpdateUserRequest{
+		UUID:                  &userUUID,
+		OpUser:                "user1",
+		Email:                 &newEmail,
+		EmailVerificationCode: &code,
+	})
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "failed to update user in db")
+}
+
+func TestUserComponent_UpdateByUUID_NoRollbackWhenNoSync(t *testing.T) {
+	mockUserStore := mockdb.NewMockUserStore(t)
+	user := &database.User{
+		ID:          1,
+		UUID:        "user1",
+		Username:    "user1",
+		Email:       "user1@example.com",
+		RegProvider: "casdoor",
+	}
+	mockUserStore.EXPECT().FindByUUID(mock.Anything, "user1").Return(user, nil)
+	mockUserStore.EXPECT().Update(mock.Anything, mock.Anything, mock.Anything).Return(errors.New("database error"))
+
+	ssomock := mockrpc.NewMockSSOInterface(t)
+	// No SSO sync should be called since no username/email change
+
+	mockTagStore := mockdb.NewMockTagStore(t)
+	mockTagStore.EXPECT().CheckTagIDsExist(context.TODO(), mock.Anything).Return(nil)
+
+	mockUserTagStore := mockdb.NewMockUserTagStore(t)
+	mockUserTagStore.EXPECT().ResetUserTags(context.TODO(), mock.Anything, mock.Anything).Return(nil)
+
+	config := &config.Config{}
+	config.SSOType = "casdoor"
+
+	once := sync.Once{}
+	uc := &userComponentImpl{
+		userStore: mockUserStore,
+		sso:       ssomock,
+		config:    config,
+		once:      &once,
+		ts:        mockTagStore,
+		uts:       mockUserTagStore,
+	}
+	var userUUID = "user1"
+	var avatar = "https://example.com/avatar.jpg"
+	err := uc.UpdateByUUID(context.TODO(), &types.UpdateUserRequest{
+		UUID:   &userUUID,
+		OpUser: "user1",
+		Avatar: &avatar,
+	})
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "failed to update user in db")
+}
+
+func TestUserComponent_checkUserConflictsInDB(t *testing.T) {
+	tests := []struct {
+		name          string
+		username      string
+		email         string
+		mockSetup     func(*mockdb.MockUserStore)
+		expectedError error
+		expectError   bool
+	}{
+		{
+			name:     "no conflicts - username and email available",
+			username: "newuser",
+			email:    "newuser@example.com",
+			mockSetup: func(mockUserStore *mockdb.MockUserStore) {
+				mockUserStore.EXPECT().IsExist(mock.Anything, "newuser").Return(false, nil)
+				mockUserStore.EXPECT().FindByEmail(mock.Anything, "newuser@example.com").Return(database.User{ID: 0}, sql.ErrNoRows)
+			},
+			expectedError: nil,
+			expectError:   false,
+		},
+		{
+			name:     "no conflicts - username available, no email provided",
+			username: "newuser",
+			email:    "",
+			mockSetup: func(mockUserStore *mockdb.MockUserStore) {
+				mockUserStore.EXPECT().IsExist(mock.Anything, "newuser").Return(false, nil)
+			},
+			expectedError: nil,
+			expectError:   false,
+		},
+		{
+			name:     "username conflict",
+			username: "existinguser",
+			email:    "newuser@example.com",
+			mockSetup: func(mockUserStore *mockdb.MockUserStore) {
+				mockUserStore.EXPECT().IsExist(mock.Anything, "existinguser").Return(true, nil)
+			},
+			expectedError: errorx.UsernameExists("existinguser"),
+			expectError:   true,
+		},
+		{
+			name:     "email conflict",
+			username: "newuser",
+			email:    "existing@example.com",
+			mockSetup: func(mockUserStore *mockdb.MockUserStore) {
+				mockUserStore.EXPECT().IsExist(mock.Anything, "newuser").Return(false, nil)
+				mockUserStore.EXPECT().FindByEmail(mock.Anything, "existing@example.com").Return(database.User{ID: 123}, nil)
+			},
+			expectedError: errorx.EmailExists("existing@example.com"),
+			expectError:   true,
+		},
+		{
+			name:     "username check database error",
+			username: "newuser",
+			email:    "newuser@example.com",
+			mockSetup: func(mockUserStore *mockdb.MockUserStore) {
+				mockUserStore.EXPECT().IsExist(mock.Anything, "newuser").Return(false, errors.New("database connection error"))
+			},
+			expectedError: nil,
+			expectError:   true,
+		},
+		{
+			name:     "email check database error",
+			username: "newuser",
+			email:    "newuser@example.com",
+			mockSetup: func(mockUserStore *mockdb.MockUserStore) {
+				mockUserStore.EXPECT().IsExist(mock.Anything, "newuser").Return(false, nil)
+				mockUserStore.EXPECT().FindByEmail(mock.Anything, "newuser@example.com").Return(database.User{}, errors.New("database connection error"))
+			},
+			expectedError: nil,
+			expectError:   true,
+		},
+		{
+			name:     "email check returns ErrNoRows - no conflict",
+			username: "newuser",
+			email:    "newuser@example.com",
+			mockSetup: func(mockUserStore *mockdb.MockUserStore) {
+				mockUserStore.EXPECT().IsExist(mock.Anything, "newuser").Return(false, nil)
+				mockUserStore.EXPECT().FindByEmail(mock.Anything, "newuser@example.com").Return(database.User{ID: 0}, sql.ErrNoRows)
+			},
+			expectedError: nil,
+			expectError:   false,
+		},
+		{
+			name:     "email check returns user with ID 0 - no conflict",
+			username: "newuser",
+			email:    "newuser@example.com",
+			mockSetup: func(mockUserStore *mockdb.MockUserStore) {
+				mockUserStore.EXPECT().IsExist(mock.Anything, "newuser").Return(false, nil)
+				mockUserStore.EXPECT().FindByEmail(mock.Anything, "newuser@example.com").Return(database.User{ID: 0}, nil)
+			},
+			expectedError: nil,
+			expectError:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockUserStore := mockdb.NewMockUserStore(t)
+			tt.mockSetup(mockUserStore)
+
+			uc := &userComponentImpl{
+				userStore: mockUserStore,
+			}
+
+			err := uc.checkUserConflictsInDB(context.Background(), tt.username, tt.email)
+
+			if tt.expectError {
+				require.Error(t, err)
+				if tt.expectedError != nil {
+					// Check if the error is the expected custom error type
+					var customErr errorx.CustomError
+					if errors.As(err, &customErr) {
+						require.True(t, customErr.Is(tt.expectedError), "Expected error type %v, got %v", tt.expectedError, err)
+					} else {
+						require.Contains(t, err.Error(), "failed to check", "Expected database error message")
+					}
+				}
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
 }
