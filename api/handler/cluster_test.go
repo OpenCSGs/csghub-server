@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/mock"
@@ -98,12 +99,25 @@ func Test_GetDeploysReport(t *testing.T) {
 		},
 	}
 
+	start := "2024-01-01 00:00:00"
+	end := "2024-01-31"
+	expectedStart, err := time.ParseInLocation(time.DateTime, start, time.UTC)
+	require.NoError(t, err)
+	endDate, err := time.ParseInLocation("2006-01-02", end, time.UTC)
+	require.NoError(t, err)
+	expectedEnd := endDate.Add(24*time.Hour - time.Nanosecond)
 	tester.mocks.clusterComponent.EXPECT().
 		GetDeploys(context.Background(), mock.Anything).
+		Run(func(_ context.Context, req types.DeployReq) {
+			require.NotNil(t, req.StartTime)
+			require.True(t, req.StartTime.Equal(expectedStart))
+			require.NotNil(t, req.EndTime)
+			require.True(t, req.EndTime.Equal(expectedEnd))
+		}).
 		Once().
 		Return(rows, len(rows), nil)
 
-	tester.Execute()
+	tester.WithQuery("start_time", start).WithQuery("end_time", end).Execute()
 
 	// assert response headers and body
 	resp := tester.Response()
@@ -116,4 +130,22 @@ func Test_GetDeploysReport(t *testing.T) {
 	require.Contains(t, body, "ClusterID,ClusterRegion,DeployName,Username,Resource,CreateTime,Status,TotalTimeInMin,TotalFeeInCents")
 	require.Contains(t, body, "alice")
 	require.Contains(t, body, "bob")
+}
+
+func Test_GetDeploysReport_InvalidDateRange(t *testing.T) {
+	tester := newClusterTester(t).withHandlerFunc(func(clusterHandler *ClusterHandler) gin.HandlerFunc {
+		return clusterHandler.GetDeploysReport
+	})
+
+	tester.WithQuery("start_time", "2024-01-01").Execute()
+	tester.ResponseEqSimple(t, http.StatusBadRequest, httpbase.R{Msg: "start_time and end_time must be provided together"})
+}
+
+func Test_GetDeploysReport_InvalidFormat(t *testing.T) {
+	tester := newClusterTester(t).withHandlerFunc(func(clusterHandler *ClusterHandler) gin.HandlerFunc {
+		return clusterHandler.GetDeploysReport
+	})
+
+	tester.WithQuery("start_time", "invalid").WithQuery("end_time", "2024-01-01").Execute()
+	tester.ResponseEqSimple(t, http.StatusBadRequest, httpbase.R{Msg: "invalid datetime format, use '2006-01-02 15:04:05' or '2006-01-02'"})
 }
