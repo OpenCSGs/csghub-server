@@ -99,10 +99,9 @@ var (
 	SceneEvaluation      SceneType = 14 // model evaluation
 	SceneModelServerless SceneType = 15 // model serverless deploy
 	// starship
-	SceneStarship SceneType = 20 // starship
-	SceneGuiAgent SceneType = 22 // gui agent
-
-	SceneSubscription SceneType = 30 // accounting subscription
+	SceneStarship   SceneType = 20 // starship
+	SceneGuiAgent   SceneType = 22 // gui agent
+	SceneCSGShipSub SceneType = 30 // csgship subscription usage report
 	// unknow
 	SceneUnknow SceneType = 99 // unknow
 )
@@ -137,6 +136,8 @@ type AcctEventReq struct {
 	SkuPriceCurrency string          `json:"sku_price_currency"`
 	Quota            float64         `json:"quota"`
 	SubBillID        int64           `json:"sub_bill_id"`
+	Discount         float64         `json:"discount"`
+	RegularValue     float64         `json:"regular_value"`
 }
 
 // generate charge event from client
@@ -289,6 +290,7 @@ type AcctPriceCreateReq struct {
 	SkuKind          SKUKind     `json:"sku_kind"`
 	Quota            string      `json:"quota"`
 	SkuPriceID       int64       `json:"sku_price_id"`
+	Discount         float64     `json:"discount" binding:"omitempty,min=0,max=1"`
 }
 
 type AcctPriceResp struct {
@@ -422,8 +424,9 @@ type AcctRecharge struct {
 }
 
 type AcctRechargeListResp struct {
-	Data  []AcctRecharge `json:"data"`
-	Total int            `json:"total"`
+	Data       []AcctRecharge `json:"data"`
+	Total      int            `json:"total"`
+	TotalValue float64        `json:"total_value"`
 }
 
 type RechargesIndexReq struct {
@@ -588,3 +591,11 @@ type RechargeStats struct {
 	Count int   `bun:"count"`
 	Sum   int64 `bun:"sum"`
 }
+
+type AccountPresentStatus int
+
+const (
+	AccountPresentStatusInit     AccountPresentStatus = 0
+	AccountPresentStatusUsed     AccountPresentStatus = 1
+	AccountPresentStatusCanceled AccountPresentStatus = 2
+)
