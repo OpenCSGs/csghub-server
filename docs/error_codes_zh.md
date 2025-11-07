@@ -426,6 +426,30 @@
 - **错误名:** `gitReplicateRepositoryFailed`
 - **描述:** 转移仓库失败。这可能由网络问题、身份验证问题或指定的仓库不存在引起。
 
+## Invitation 错误
+
+### `INVITATION-ERR-0`
+
+- **错误代码:** `INVITATION-ERR-0`
+- **错误名:** `userPhoneNotSet`
+- **描述:** 未绑定手机号，不能创建邀请码。
+
+---
+
+### `INVITATION-ERR-1`
+
+- **错误代码:** `INVITATION-ERR-1`
+- **错误名:** `invitationNotFound`
+- **描述:** 邀请码不存在。
+
+---
+
+### `INVITATION-ERR-2`
+
+- **错误代码:** `INVITATION-ERR-2`
+- **错误名:** `userAlreadyHasInvitationCode`
+- **描述:** 邀请码已存在。
+
 ## License 错误
 
 ### `LICENSE-ERR-0`
@@ -433,6 +457,14 @@
 - **错误代码:** `LICENSE-ERR-0`
 - **错误名:** `noActiveLicense`
 - **描述:** 当前系统没有有效的许可证。
+
+---
+
+### `LICENSE-ERR-1`
+
+- **错误代码:** `LICENSE-ERR-1`
+- **错误名:** `licenseExpired`
+- **描述:** 许可证已过期，无法验证和导入。
 
 ## Req 错误
 
@@ -625,4 +657,132 @@
 - **错误代码:** `TASK-ERR-3`
 - **错误名:** `multiHostNotebookNotSupported`
 - **描述:** 多主机 Notebook 功能（在多个主机上运行 Notebook 任务）不被支持。请改用单主机 Notebook 执行。
+
+---
+
+### `TASK-ERR-4`
+
+- **错误代码:** `TASK-ERR-4`
+- **错误名:** `notEnoughResource`
+- **描述:** 任务需要的资源超过了集群可用的资源。当集群资源不足时，会出现此错误。
+
+---
+
+### `TASK-ERR-5`
+
+- **错误代码:** `TASK-ERR-5`
+- **错误名:** `clusterUnavailable`
+- **描述:** 集群当前不可用，可能是由于维护或其他原因。当集群未准备好接受新任务时，会出现此错误。
+
+## User 错误
+
+### `USER-ERR-0`
+
+- **错误代码:** `USER-ERR-0`
+- **错误名:** `needPhone`
+- **描述:** 请求必须在请求头或正文中包含电话号码以识别目标账户。
+
+---
+
+### `USER-ERR-1`
+
+- **错误代码:** `USER-ERR-1`
+- **错误名:** `needDifferentPhone`
+- **描述:** 新电话号码必须与当前电话号码不同。
+
+---
+
+### `USER-ERR-2`
+
+- **错误代码:** `USER-ERR-2`
+- **错误名:** `phoneAlreadyExistsInSSO`
+- **描述:** 新电话号码已经存在于sso服务中。
+
+---
+
+### `USER-ERR-3`
+
+- **错误代码:** `USER-ERR-3`
+- **错误名:** `forbidChangePhone`
+- **描述:** 电话号码不能被更改。
+
+---
+
+### `USER-ERR-4`
+
+- **错误代码:** `USER-ERR-4`
+- **错误名:** `failedToUpdatePhone`
+- **描述:** 更新电话号码失败。
+
+---
+
+### `USER-ERR-5`
+
+- **错误代码:** `USER-ERR-5`
+- **错误名:** `forbidSendPhoneVerifyCodeFrequently`
+- **描述:** 发送手机验证码过于频繁。
+
+---
+
+### `USER-ERR-6`
+
+- **错误代码:** `USER-ERR-6`
+- **错误名:** `failedSendPhoneVerifyCode`
+- **描述:** 发送手机验证码失败。
+
+---
+
+### `USER-ERR-7`
+
+- **错误代码:** `USER-ERR-7`
+- **错误名:** `phoneVerifyCodeExpiredOrNotFound`
+- **描述:** 手机验证码已过期或不存在。
+
+---
+
+### `USER-ERR-8`
+
+- **错误代码:** `USER-ERR-8`
+- **错误名:** `phoneVerifyCodeInvalid`
+- **描述:** 手机验证码无效。
+
+---
+
+### `USER-ERR-9`
+
+- **错误代码:** `USER-ERR-9`
+- **错误名:** `verificationCodeRequired`
+- **描述:** 验证码不能为空。
+
+---
+
+### `USER-ERR-10`
+
+- **错误代码:** `USER-ERR-10`
+- **错误名:** `verificationCodeLengthInvalid`
+- **描述:** 验证码长度必须为6。
+
+---
+
+### `USER-ERR-11`
+
+- **错误代码:** `USER-ERR-11`
+- **错误名:** `invalidPhoneNumber`
+- **描述:** 无效的电话号码。
+
+---
+
+### `USER-ERR-12`
+
+- **错误代码:** `USER-ERR-12`
+- **错误名:** `usernameExists`
+- **描述:** 提供的用户名已存在于系统中。
+
+---
+
+### `USER-ERR-13`
+
+- **错误代码:** `USER-ERR-13`
+- **错误名:** `emailExists`
+- **描述:** 提供的电子邮件地址已存在于系统中。
 
