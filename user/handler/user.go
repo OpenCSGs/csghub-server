@@ -14,6 +14,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"go.temporal.io/sdk/client"
 	"opencsg.com/csghub-server/api/httpbase"
+	"opencsg.com/csghub-server/builder/temporal"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
@@ -216,7 +217,7 @@ func (h *UserHandler) Delete(ctx *gin.Context) {
 	}
 
 	//start workflow to delete user
-	workflowClient := workflow.GetWorkflowClient()
+	workflowClient := temporal.GetClient()
 	workflowOptions := client.StartWorkflowOptions{
 		TaskQueue: workflow.WorkflowUserDeletionQueueName,
 	}
@@ -687,12 +688,11 @@ func (h *UserHandler) CloseAccount(ctx *gin.Context) {
 	}
 	if hasBills {
 		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(errors.New("users who own bills cannot be deleted"), nil))
-
 		return
 	}
 
 	//start workflow to soft delete user
-	workflowClient := workflow.GetWorkflowClient()
+	workflowClient := temporal.GetClient()
 	workflowOptions := client.StartWorkflowOptions{
 		TaskQueue: workflow.WorkflowUserDeletionQueueName,
 	}
