@@ -400,7 +400,14 @@ func (s *deployTaskStoreImpl) ListDeployByType(ctx context.Context, req types.De
 		query = query.Where("deploy_name LIKE ? OR  \"user\".\"username\" LIKE ? OR cluster_id LIKE ?", "%"+req.Query+"%", "%"+req.Query+"%", "%"+req.Query+"%")
 	}
 
-	query = query.Order("created_at DESC").Limit(req.PageSize).Offset((req.Page - 1) * req.PageSize)
+	if req.StartTime != nil {
+		query = query.Where("deploy.created_at >= ?", req.StartTime)
+	}
+	if req.EndTime != nil {
+		query = query.Where("deploy.created_at <= ?", req.EndTime)
+	}
+
+	query = query.Order("deploy.created_at DESC").Limit(req.PageSize).Offset((req.Page - 1) * req.PageSize)
 	_, err := query.Exec(ctx, &result)
 	if err != nil {
 		err = errorx.HandleDBError(err, nil)

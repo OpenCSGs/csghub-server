@@ -1,15 +1,20 @@
 package user
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
+
+	"go.temporal.io/sdk/client"
+	"go.temporal.io/sdk/log"
+	"opencsg.com/csghub-server/builder/instrumentation"
+	"opencsg.com/csghub-server/builder/temporal"
 
 	"github.com/spf13/cobra"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/user/router"
-	"opencsg.com/csghub-server/user/workflow"
 )
 
 var cmdLaunch = &cobra.Command{
@@ -22,6 +27,10 @@ var cmdLaunch = &cobra.Command{
 			return err
 		}
 		slog.Debug("config", slog.Any("data", cfg))
+		stopOtel, err := instrumentation.SetupOTelSDK(context.Background(), cfg, instrumentation.User)
+		if err != nil {
+			panic(err)
+		}
 		// Check APIToken length
 		if len(cfg.APIToken) < 128 {
 			return fmt.Errorf("API token length is less than 128, please check")
@@ -35,9 +44,12 @@ var cmdLaunch = &cobra.Command{
 			return fmt.Errorf("database initialization failed: %w", err)
 		}
 
-		err = workflow.StartWorker(cfg)
+		wfClient, err := temporal.NewClient(client.Options{
+			HostPort: cfg.WorkFLow.Endpoint,
+			Logger:   log.NewStructuredLogger(slog.Default()),
+		}, "csghub-user")
 		if err != nil {
-			return fmt.Errorf("failed to start user workflow worker: %w", err)
+			return fmt.Errorf("unable to create workflow client, error:%w", err)
 		}
 
 		r, err := router.NewRouter(cfg)
@@ -53,8 +65,8 @@ var cmdLaunch = &cobra.Command{
 		)
 		server.Run()
 
-		workflow.StopWorker()
-
+		_ = stopOtel(context.Background())
+		wfClient.Close()
 		return nil
 	},
 }

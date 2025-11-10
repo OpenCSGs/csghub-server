@@ -221,6 +221,12 @@ func (w *RepoSyncWorker) SyncRepo(
 		return mt, fmt.Errorf("failed to get namespace and name from mirror repository path: %w", err)
 	}
 
+	// Check if the repository already exists, if not, create it
+	err = w.ensureRepoExists(ctx, namespace, name, mirror.Repository.DefaultBranch, mirror.Repository.RepositoryType)
+	if err != nil {
+		return mt, fmt.Errorf("failed to ensure repository exists: %w", err)
+	}
+
 	// Get before last commit id
 	commitBefore, _ = w.getRepoLastCommit(
 		ctx,
@@ -429,6 +435,32 @@ func (w *RepoSyncWorker) getAllLfsPointersByRef(
 	})
 }
 
+func (w *RepoSyncWorker) ensureRepoExists(
+	ctx context.Context, namespace, name, branch string,
+	repoType types.RepositoryType,
+) error {
+	exists, err := w.git.RepositoryExists(ctx, gitserver.CheckRepoReq{
+		Namespace: namespace,
+		Name:      name,
+		RepoType:  repoType,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to check repo existence: %w", err)
+	}
+	if !exists {
+		_, err := w.git.CreateRepo(ctx, gitserver.CreateRepoReq{
+			Namespace:     namespace,
+			Name:          name,
+			RepoType:      repoType,
+			DefaultBranch: branch,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to create repo: %w", err)
+		}
+	}
+	return nil
+}
+
 func (w *RepoSyncWorker) getRepoLastCommit(
 	ctx context.Context, namespace, name, branch string,
 	repoType types.RepositoryType,
@@ -468,6 +500,7 @@ func (w *RepoSyncWorker) triggerGitCallback(
 	workflowClient := temporal.GetClient()
 	workflowOptions := client.StartWorkflowOptions{
 		TaskQueue: workflow.HandlePushQueueName,
+		ID:        fmt.Sprintf("mirror-repo-%s-%s-%s-%s", mirror.Repository.RepositoryType, namespace, name, commit.ID),
 	}
 
 	we, err := workflowClient.ExecuteWorkflow(

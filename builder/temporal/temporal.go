@@ -28,9 +28,13 @@ type clientImpl struct {
 	workers []worker.Worker
 }
 
-var _client Client = &clientImpl{}
+var _client = &clientImpl{}
 
 func NewClient(options client.Options, serviceName string) (*clientImpl, error) {
+	if _client.Client != nil {
+		return _client, nil
+	}
+
 	tracingInterceptor, err := opentelemetry.NewTracingInterceptor(opentelemetry.TracerOptions{
 		Tracer: otel.Tracer(serviceName),
 	})
@@ -43,17 +47,14 @@ func NewClient(options client.Options, serviceName string) (*clientImpl, error) 
 	if err != nil {
 		return nil, err
 	}
-	c := _client.(*clientImpl)
-	c.Client = t
+	_client.Client = t
 
-	return c, nil
+	return _client, nil
 }
 
 // used in test only
 func Assign(temporalClient client.Client) {
-	c := _client.(*clientImpl)
-	c.Client = temporalClient
-
+	_client.Client = temporalClient
 }
 
 func (c *clientImpl) NewWorker(queue string, options worker.Options) worker.Registry {
@@ -87,6 +88,9 @@ func (c *clientImpl) Stop() {
 }
 
 func GetClient() Client {
+	if _client.Client == nil {
+		panic("temporal client is not initialized")
+	}
 	return _client
 }
 

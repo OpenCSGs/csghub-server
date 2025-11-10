@@ -1,15 +1,20 @@
 package notification
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
+
+	"go.temporal.io/sdk/client"
+	"go.temporal.io/sdk/log"
+	"opencsg.com/csghub-server/builder/instrumentation"
+	"opencsg.com/csghub-server/builder/temporal"
 
 	"github.com/spf13/cobra"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/notification/router"
-	"opencsg.com/csghub-server/notification/workflow"
 )
 
 var launchCmd = &cobra.Command{
@@ -21,7 +26,10 @@ var launchCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-
+		stopOtel, err := instrumentation.SetupOTelSDK(context.Background(), cfg, instrumentation.Notification)
+		if err != nil {
+			panic(err)
+		}
 		// Check APIToken length
 		if len(cfg.APIToken) < 128 {
 			return fmt.Errorf("API token length is less than 128, please check")
@@ -34,10 +42,12 @@ var launchCmd = &cobra.Command{
 			slog.Error("failed to initialize database", slog.Any("error", err))
 			return fmt.Errorf("database initialization failed: %w", err)
 		}
-
-		err = workflow.StartWorkflow(cfg)
+		workflowClient, err := temporal.NewClient(client.Options{
+			HostPort: cfg.WorkFLow.Endpoint,
+			Logger:   log.NewStructuredLogger(slog.Default()),
+		}, "csghub-notification")
 		if err != nil {
-			slog.Warn("failed to start workflow", slog.Any("error", err))
+			return fmt.Errorf("unable to create workflow client, error: %w", err)
 		}
 
 		r, err := router.NewNotifierRouter(cfg)
@@ -52,6 +62,9 @@ var launchCmd = &cobra.Command{
 			r,
 		)
 		server.Run()
+
+		_ = stopOtel(context.Background())
+		workflowClient.Close()
 
 		return nil
 	},

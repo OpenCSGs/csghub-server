@@ -7,13 +7,13 @@ import (
 	"log/slog"
 
 	"go.temporal.io/sdk/client"
+	"opencsg.com/csghub-server/builder/temporal"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 	notifychannel "opencsg.com/csghub-server/notification/notifychannel"
 	emailclient "opencsg.com/csghub-server/notification/notifychannel/channel/email/client"
 	emailworkflow "opencsg.com/csghub-server/notification/notifychannel/channel/email/workflow"
 	"opencsg.com/csghub-server/notification/utils"
-	"opencsg.com/csghub-server/notification/workflow"
 )
 
 type EmailChannel struct {
@@ -105,10 +105,7 @@ func (s *EmailChannel) sendEmailToUsers(msg types.EmailReq) error {
 func (s *EmailChannel) broadcastEmail(ctx context.Context, msg types.EmailReq) error {
 	slog.Info("broadcast email to all users", "subject", msg.Subject)
 
-	workflowClient := workflow.GetWorkflowClient()
-	if workflowClient == nil {
-		return fmt.Errorf("workflow client is nil")
-	}
+	workflowClient := temporal.GetClient()
 	workflowOptions := client.StartWorkflowOptions{
 		TaskQueue: emailworkflow.WorkflowBroadcastEmailQueueName,
 	}

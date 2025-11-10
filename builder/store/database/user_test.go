@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/tests"
+	"opencsg.com/csghub-server/common/types"
 )
 
 func TestUserStore_Roles(t *testing.T) {
@@ -439,4 +440,84 @@ func TestGetUserTags(t *testing.T) {
 	for _, tag := range tags {
 		require.Contains(t, tagIDs, tag.ID)
 	}
+}
+
+// test update phone
+func TestUserStore_UpdatePhone(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	us := database.NewUserStoreWithDB(db)
+	err := us.Create(ctx, &database.User{
+		GitID:     10001,
+		UUID:      "1",
+		Username:  "u-foo",
+		Phone:     "12345678901",
+		PhoneArea: "",
+	}, &database.Namespace{Path: "u-foo"})
+	require.NoError(t, err)
+
+	user, err := us.FindByUUID(ctx, "1")
+	require.NoError(t, err)
+	require.Equal(t, "12345678901", user.Phone)
+	require.Equal(t, "", user.PhoneArea)
+
+	err = us.UpdatePhone(ctx, user.ID, "12345678902", "+86")
+	require.NoError(t, err)
+
+	user, err = us.FindByUUID(ctx, "1")
+	require.NoError(t, err)
+	require.Equal(t, "12345678902", user.Phone)
+	require.Equal(t, "+86", user.PhoneArea)
+}
+
+func TestUserStore_IndexWithCursor1(t *testing.T) {
+	db := tests.InitTransactionTestDB()
+	defer db.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	us := database.NewUserStoreWithDB(db)
+
+	err := us.Create(ctx, &database.User{
+		GitID:    10001,
+		ID:       1,
+		UUID:     "1",
+		Username: "u-foo",
+	}, &database.Namespace{Path: "u-foo"})
+	require.NoError(t, err)
+
+	err = us.Create(ctx, &database.User{
+		GitID:    10002,
+		ID:       2,
+		UUID:     "2",
+		Username: "u-foo-2",
+	}, &database.Namespace{Path: "u-foo-2"})
+	require.NoError(t, err)
+
+	err = us.Create(ctx, &database.User{
+		GitID:    10003,
+		ID:       3,
+		UUID:     "3",
+		Username: "u-foo-3",
+	}, &database.Namespace{Path: "u-foo-3"})
+	require.NoError(t, err)
+
+	req := types.UserIndexReq{
+		Search: "u-foo",
+		Per:    1,
+	}
+
+	ch, err := us.IndexWithCursor(ctx, req)
+	require.NoError(t, err)
+
+	total := 0
+	for wrapper := range ch {
+		require.NoError(t, wrapper.Err)
+		total += len(wrapper.Users)
+	}
+
+	require.Equal(t, 3, total)
 }

@@ -3,6 +3,7 @@ package database_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/deploy/common"
@@ -567,6 +568,19 @@ func TestDeployTaskStore_ListDeployBytype(t *testing.T) {
 		require.Nil(t, err)
 	}
 
+	now := time.Now().UTC().Truncate(time.Second)
+	older := now.Add(-72 * time.Hour)
+	middle := now.Add(-12 * time.Hour)
+	latest := now.Add(-1 * time.Hour)
+	_, err := db.BunDB.ExecContext(ctx, "UPDATE deploys SET created_at = ?, updated_at = ? WHERE deploy_name = ?", older, older, "running1")
+	require.NoError(t, err)
+	_, err = db.BunDB.ExecContext(ctx, "UPDATE deploys SET created_at = ?, updated_at = ? WHERE deploy_name = ?", older.Add(24*time.Hour), older.Add(24*time.Hour), "stopped1")
+	require.NoError(t, err)
+	_, err = db.BunDB.ExecContext(ctx, "UPDATE deploys SET created_at = ?, updated_at = ? WHERE deploy_name = ?", middle, middle, "running2")
+	require.NoError(t, err)
+	_, err = db.BunDB.ExecContext(ctx, "UPDATE deploys SET created_at = ?, updated_at = ? WHERE deploy_name = ?", latest, latest, "deploy1")
+	require.NoError(t, err)
+
 	// Only test running ones
 	var req types.DeployReq
 	req.Page = 1
@@ -578,6 +592,25 @@ func TestDeployTaskStore_ListDeployBytype(t *testing.T) {
 	result, _, err = store.ListDeployByType(ctx, req)
 	require.Nil(t, err)
 	require.Equal(t, 2, len(result))
+
+	startWindow := now.Add(-24 * time.Hour)
+	req.StartTime = &startWindow
+	endDate, err := time.ParseInLocation("2006-01-02", now.Format("2006-01-02"), time.UTC)
+	require.NoError(t, err)
+	endWindow := endDate.Add(24*time.Hour - time.Nanosecond)
+	req.EndTime = &endWindow
+	result, _, err = store.ListDeployByType(ctx, req)
+	require.Nil(t, err)
+	require.Equal(t, 1, len(result))
+	require.Equal(t, "running2", result[0].DeployName)
+
+	startWindow = now.Add(-5 * time.Hour)
+	req.StartTime = &startWindow
+	endWindow = now
+	req.EndTime = &endWindow
+	result, _, err = store.ListDeployByType(ctx, req)
+	require.Nil(t, err)
+	require.Equal(t, 0, len(result))
 }
 func TestDeployTaskStore_DeleteDeployByID(t *testing.T) {
 	db := tests.InitTestDB()

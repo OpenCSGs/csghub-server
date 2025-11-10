@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"go.temporal.io/sdk/client"
 	"opencsg.com/csghub-server/api/httpbase"
+	"opencsg.com/csghub-server/builder/temporal"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/moderation/component"
@@ -47,10 +48,23 @@ func (h *RepoHandler) FullCheck(c *gin.Context) {
 		return
 	}
 
+	whiteList, err := h.rc.GetNamespaceWhiteList(c.Request.Context())
+	if err != nil {
+		slog.Error("failed to get namespace white list", slog.Any("error", err))
+		httpbase.ServerError(c, err)
+	}
+	for _, rule := range whiteList {
+		if req.Namespace == rule {
+			slog.Info("namespace in white list, skip repo full check", slog.String("namespace", req.Namespace))
+			httpbase.OK(c, nil)
+			return
+		}
+	}
+
 	//start workflow to do full check
-	workflowClient := workflow.GetWorkflowClient()
+	workflowClient := temporal.GetClient()
 	workflowOptions := client.StartWorkflowOptions{
-		TaskQueue: "moderation_repo_full_check_queue",
+		TaskQueue: common.RepoFullCheckQueue,
 	}
 
 	we, err := workflowClient.ExecuteWorkflow(context.Background(), workflowOptions, workflow.RepoFullCheckWorkflow,

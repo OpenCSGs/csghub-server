@@ -1,8 +1,14 @@
 package moderation
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
+
+	"go.temporal.io/sdk/client"
+	"go.temporal.io/sdk/log"
+	"opencsg.com/csghub-server/builder/instrumentation"
+	"opencsg.com/csghub-server/builder/temporal"
 
 	"github.com/spf13/cobra"
 	"opencsg.com/csghub-server/api/httpbase"
@@ -10,7 +16,6 @@ import (
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/moderation/checker"
 	"opencsg.com/csghub-server/moderation/router"
-	"opencsg.com/csghub-server/moderation/workflow"
 )
 
 var cmdLaunch = &cobra.Command{
@@ -23,6 +28,10 @@ var cmdLaunch = &cobra.Command{
 			return err
 		}
 		slog.Debug("config", slog.Any("data", cfg))
+		stopOtel, err := instrumentation.SetupOTelSDK(context.Background(), cfg, instrumentation.Moderation)
+		if err != nil {
+			panic(err)
+		}
 		// Check APIToken length
 		if len(cfg.APIToken) < 128 {
 			return fmt.Errorf("API token length is less than 128, please check")
@@ -36,11 +45,13 @@ var cmdLaunch = &cobra.Command{
 			return fmt.Errorf("database initialization failed: %w", err)
 		}
 		checker.Init(cfg)
-
-		//init async moderation process
-		err = workflow.StartWorker(cfg)
+		slog.Info("starting temporal client")
+		temporalClient, err := temporal.NewClient(client.Options{
+			HostPort: cfg.WorkFLow.Endpoint,
+			Logger:   log.NewStructuredLogger(slog.Default()),
+		}, instrumentation.Moderation)
 		if err != nil {
-			return fmt.Errorf("failed to start workflow worker,%w", err)
+			return fmt.Errorf("unable to create temporal client, error: %w", err)
 		}
 
 		r, err := router.NewRouter(cfg)
@@ -56,8 +67,8 @@ var cmdLaunch = &cobra.Command{
 		)
 		server.Run()
 
-		workflow.StopWorker()
-
+		_ = stopOtel(context.Background())
+		temporalClient.Close()
 		return nil
 	},
 }

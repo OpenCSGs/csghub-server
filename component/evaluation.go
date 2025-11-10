@@ -10,8 +10,10 @@ import (
 
 	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/deploy/common"
+	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -29,6 +31,7 @@ type evaluationComponentImpl struct {
 	config                *config.Config
 	accountingComponent   AccountingComponent
 	repoComponent         RepoComponent
+	userSvcClient         rpc.UserSvcClient
 }
 
 type EvaluationComponent interface {
@@ -60,6 +63,10 @@ func NewEvaluationComponent(config *config.Config) (EvaluationComponent, error) 
 		return nil, fmt.Errorf("failed to create repo component, %w", err)
 	}
 	c.accountingComponent = ac
+	c.userSvcClient = rpc.NewUserSvcHttpClient(
+		fmt.Sprintf("%s:%d", config.User.Host, config.User.Port),
+		rpc.AuthWithApiKey(config.APIToken),
+	)
 	return c, nil
 }
 
@@ -77,6 +84,9 @@ func (c *evaluationComponentImpl) CreateEvaluation(ctx context.Context, req type
 	}
 	for _, modelId := range req.ModelIds {
 		result := strings.Split(modelId, "/")
+		if len(result) != 2 {
+			return nil, fmt.Errorf("invalid model id format: %s", modelId)
+		}
 		m, err := c.modelStore.FindByPath(ctx, result[0], result[1])
 		if err != nil {
 			return nil, fmt.Errorf("cannot find model, %w", err)
@@ -156,8 +166,12 @@ func (c *evaluationComponentImpl) GenerateMirrorRepoIds(ctx context.Context, dat
 	var mirrorRepos []string
 	var revisions []string
 	for _, ds := range datasets {
-		namespace := strings.Split(ds, "/")[0]
-		name := strings.Split(ds, "/")[1]
+		parts := strings.Split(ds, "/")
+		if len(parts) != 2 {
+			return nil, nil, fmt.Errorf("invalid dataset path: %s", ds)
+		}
+		namespace := parts[0]
+		name := parts[1]
 		repo, err := c.repoStore.FindByPath(ctx, types.DatasetRepo, namespace, name)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to find dataset repo, %w", err)
@@ -172,8 +186,12 @@ func (c *evaluationComponentImpl) generateDatasetsAndTasks(ctx context.Context, 
 	var mirrorRepos []string
 	var revisions []string
 	for _, cds := range customDataSets {
-		namespace := strings.Split(cds, "/")[0]
-		name := strings.Split(cds, "/")[1]
+		parts := strings.Split(cds, "/")
+		if len(parts) != 2 {
+			return nil, nil, fmt.Errorf("invalid dataset path: %s", cds)
+		}
+		namespace := parts[0]
+		name := parts[1]
 		repo, err := c.repoStore.FindByPath(ctx, types.DatasetRepo, namespace, name)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to find dataset repo, %w", err)
@@ -204,6 +222,15 @@ func (c *evaluationComponentImpl) GetEvaluation(ctx context.Context, req types.E
 	wf, err := c.workflowStore.FindByID(ctx, req.ID)
 	if err != nil {
 		return nil, fmt.Errorf("fail to get evaluation result, %w", err)
+	}
+	if wf.Username != req.Username {
+		userInfo, err := c.userSvcClient.GetUserByName(ctx, req.Username)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get user info for %s, %w", req.Username, err)
+		}
+		if !userInfo.IsAdmin() {
+			return nil, errorx.ErrForbidden
+		}
 	}
 	var repoTags []types.RepoTags
 	for _, path := range wf.Datasets {

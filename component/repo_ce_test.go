@@ -118,6 +118,111 @@ func TestRepoComponent_DeployStart(t *testing.T) {
 	require.Nil(t, err)
 }
 
+func TestRepoComponent_DeployStart_ExistAndRunning(t *testing.T) {
+	ctx := context.TODO()
+	repo := initializeTestRepoComponent(ctx, t)
+	mockUserRepoAdminPermission(ctx, repo.mocks.stores, "user")
+
+	deploy := &database.Deploy{
+		ID:               1,
+		SpaceID:          2,
+		ModelID:          3,
+		SvcName:          "svc",
+		ClusterID:        "cluster",
+		RuntimeFramework: "fm",
+		SKU:              "111",
+	}
+	repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(1)).Return(deploy, nil)
+
+	repo.mocks.stores.SpaceResourceMock().EXPECT().FindByID(ctx, int64(111)).Return(&database.SpaceResource{
+		ID:        111,
+		Resources: `{ "gpu": { "type": "A10", "num": "1", "resource_name": "nvidia.com/gpu", "labels": { "aliyun.accelerator/nvidia_name": "NVIDIA-A10" } }, "cpu": { "type": "Intel", "num": "12" },  "memory": "46Gi" }`,
+	}, nil)
+
+	repo.mocks.deployer.EXPECT().CheckResourceAvailable(ctx, "cluster", int64(0), mock.Anything).Return(true, nil)
+
+	deployRepo := types.DeployRepo{
+		DeployID:  1,
+		Namespace: "ns",
+		Name:      "n",
+		SvcName:   "svc",
+		ClusterID: "cluster",
+		SpaceID:   2,
+		ModelID:   3,
+	}
+	repo.mocks.deployer.EXPECT().Exist(ctx, deployRepo).Return(true, nil)
+	
+	// status 4 means running
+	repo.mocks.deployer.EXPECT().Status(ctx, deployRepo, false).Return("svc", 4, []types.Instance{}, nil)
+
+	err := repo.DeployStart(ctx, types.DeployActReq{
+		RepoType:     types.ModelRepo,
+		Namespace:    "ns",
+		Name:         "n",
+		CurrentUser:  "user",
+		DeployID:     1,
+		DeployType:   1,
+		InstanceName: "i1",
+	})
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "stop deploy first")
+}
+
+func TestRepoComponent_DeployStart_ExistButNotRunning(t *testing.T) {
+	ctx := context.TODO()
+	repo := initializeTestRepoComponent(ctx, t)
+	mockUserRepoAdminPermission(ctx, repo.mocks.stores, "user")
+
+	deploy := &database.Deploy{
+		ID:               1,
+		SpaceID:          2,
+		ModelID:          3,
+		SvcName:          "svc",
+		ClusterID:        "cluster",
+		RuntimeFramework: "fm",
+		SKU:              "111",
+	}
+	repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(1)).Return(deploy, nil)
+
+	repo.mocks.stores.SpaceResourceMock().EXPECT().FindByID(ctx, int64(111)).Return(&database.SpaceResource{
+		ID:        111,
+		Resources: `{ "gpu": { "type": "A10", "num": "1", "resource_name": "nvidia.com/gpu", "labels": { "aliyun.accelerator/nvidia_name": "NVIDIA-A10" } }, "cpu": { "type": "Intel", "num": "12" },  "memory": "46Gi" }`,
+	}, nil)
+
+	repo.mocks.deployer.EXPECT().CheckResourceAvailable(ctx, "cluster", int64(0), mock.Anything).Return(true, nil)
+
+	deployRepo := types.DeployRepo{
+		DeployID:  1,
+		Namespace: "ns",
+		Name:      "n",
+		SvcName:   "svc",
+		ClusterID: "cluster",
+		SpaceID:   2,
+		ModelID:   3,
+	}
+	repo.mocks.deployer.EXPECT().Exist(ctx, deployRepo).Return(true, nil)
+	
+	// status 2 means failed (not running)
+	repo.mocks.deployer.EXPECT().Status(ctx, deployRepo, false).Return("svc", 2, []types.Instance{}, nil)
+	
+	// should call Stop first
+	repo.mocks.deployer.EXPECT().Stop(ctx, deployRepo).Return(nil)
+	
+	// then start deploy
+	repo.mocks.deployer.EXPECT().StartDeploy(ctx, deploy).Return(nil)
+
+	err := repo.DeployStart(ctx, types.DeployActReq{
+		RepoType:     types.ModelRepo,
+		Namespace:    "ns",
+		Name:         "n",
+		CurrentUser:  "user",
+		DeployID:     1,
+		DeployType:   1,
+		InstanceName: "i1",
+	})
+	require.Nil(t, err)
+}
+
 func TestRepoComponentImpl_Update(t *testing.T) {
 	ctx := context.TODO()
 

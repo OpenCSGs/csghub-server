@@ -952,6 +952,66 @@ func (_c *MockUserComponent_ResetUserTags_Call) RunAndReturn(run func(context.Co
 	return _c
 }
 
+// SendSMSCode provides a mock function with given fields: ctx, uid, req
+func (_m *MockUserComponent) SendSMSCode(ctx context.Context, uid string, req types.SendSMSCodeRequest) (*types.SendSMSCodeResponse, error) {
+	ret := _m.Called(ctx, uid, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SendSMSCode")
+	}
+
+	var r0 *types.SendSMSCodeResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, types.SendSMSCodeRequest) (*types.SendSMSCodeResponse, error)); ok {
+		return rf(ctx, uid, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, types.SendSMSCodeRequest) *types.SendSMSCodeResponse); ok {
+		r0 = rf(ctx, uid, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.SendSMSCodeResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, types.SendSMSCodeRequest) error); ok {
+		r1 = rf(ctx, uid, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockUserComponent_SendSMSCode_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SendSMSCode'
+type MockUserComponent_SendSMSCode_Call struct {
+	*mock.Call
+}
+
+// SendSMSCode is a helper method to define mock.On call
+//   - ctx context.Context
+//   - uid string
+//   - req types.SendSMSCodeRequest
+func (_e *MockUserComponent_Expecter) SendSMSCode(ctx interface{}, uid interface{}, req interface{}) *MockUserComponent_SendSMSCode_Call {
+	return &MockUserComponent_SendSMSCode_Call{Call: _e.mock.On("SendSMSCode", ctx, uid, req)}
+}
+
+func (_c *MockUserComponent_SendSMSCode_Call) Run(run func(ctx context.Context, uid string, req types.SendSMSCodeRequest)) *MockUserComponent_SendSMSCode_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(types.SendSMSCodeRequest))
+	})
+	return _c
+}
+
+func (_c *MockUserComponent_SendSMSCode_Call) Return(_a0 *types.SendSMSCodeResponse, _a1 error) *MockUserComponent_SendSMSCode_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockUserComponent_SendSMSCode_Call) RunAndReturn(run func(context.Context, string, types.SendSMSCodeRequest) (*types.SendSMSCodeResponse, error)) *MockUserComponent_SendSMSCode_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Signin provides a mock function with given fields: ctx, code, state
 func (_m *MockUserComponent) Signin(ctx context.Context, code string, state string) (*types.JWTClaims, string, error) {
 	ret := _m.Called(ctx, code, state)
@@ -1068,6 +1128,65 @@ func (_c *MockUserComponent_SoftDelete_Call) RunAndReturn(run func(context.Conte
 	return _c
 }
 
+// StreamExportUsers provides a mock function with given fields: ctx, req
+func (_m *MockUserComponent) StreamExportUsers(ctx context.Context, req types.UserIndexReq) (chan types.UserIndexResp, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for StreamExportUsers")
+	}
+
+	var r0 chan types.UserIndexResp
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.UserIndexReq) (chan types.UserIndexResp, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.UserIndexReq) chan types.UserIndexResp); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(chan types.UserIndexResp)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.UserIndexReq) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockUserComponent_StreamExportUsers_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'StreamExportUsers'
+type MockUserComponent_StreamExportUsers_Call struct {
+	*mock.Call
+}
+
+// StreamExportUsers is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.UserIndexReq
+func (_e *MockUserComponent_Expecter) StreamExportUsers(ctx interface{}, req interface{}) *MockUserComponent_StreamExportUsers_Call {
+	return &MockUserComponent_StreamExportUsers_Call{Call: _e.mock.On("StreamExportUsers", ctx, req)}
+}
+
+func (_c *MockUserComponent_StreamExportUsers_Call) Run(run func(ctx context.Context, req types.UserIndexReq)) *MockUserComponent_StreamExportUsers_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.UserIndexReq))
+	})
+	return _c
+}
+
+func (_c *MockUserComponent_StreamExportUsers_Call) Return(data chan types.UserIndexResp, err error) *MockUserComponent_StreamExportUsers_Call {
+	_c.Call.Return(data, err)
+	return _c
+}
+
+func (_c *MockUserComponent_StreamExportUsers_Call) RunAndReturn(run func(context.Context, types.UserIndexReq) (chan types.UserIndexResp, error)) *MockUserComponent_StreamExportUsers_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // UpdateByUUID provides a mock function with given fields: ctx, req
 func (_m *MockUserComponent) UpdateByUUID(ctx context.Context, req *types.UpdateUserRequest) error {
 	ret := _m.Called(ctx, req)
@@ -1111,6 +1230,54 @@ func (_c *MockUserComponent_UpdateByUUID_Call) Return(_a0 error) *MockUserCompon
 }
 
 func (_c *MockUserComponent_UpdateByUUID_Call) RunAndReturn(run func(context.Context, *types.UpdateUserRequest) error) *MockUserComponent_UpdateByUUID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// UpdatePhone provides a mock function with given fields: ctx, uid, req
+func (_m *MockUserComponent) UpdatePhone(ctx context.Context, uid string, req types.UpdateUserPhoneRequest) error {
+	ret := _m.Called(ctx, uid, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdatePhone")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, types.UpdateUserPhoneRequest) error); ok {
+		r0 = rf(ctx, uid, req)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockUserComponent_UpdatePhone_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdatePhone'
+type MockUserComponent_UpdatePhone_Call struct {
+	*mock.Call
+}
+
+// UpdatePhone is a helper method to define mock.On call
+//   - ctx context.Context
+//   - uid string
+//   - req types.UpdateUserPhoneRequest
+func (_e *MockUserComponent_Expecter) UpdatePhone(ctx interface{}, uid interface{}, req interface{}) *MockUserComponent_UpdatePhone_Call {
+	return &MockUserComponent_UpdatePhone_Call{Call: _e.mock.On("UpdatePhone", ctx, uid, req)}
+}
+
+func (_c *MockUserComponent_UpdatePhone_Call) Run(run func(ctx context.Context, uid string, req types.UpdateUserPhoneRequest)) *MockUserComponent_UpdatePhone_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(types.UpdateUserPhoneRequest))
+	})
+	return _c
+}
+
+func (_c *MockUserComponent_UpdatePhone_Call) Return(_a0 error) *MockUserComponent_UpdatePhone_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockUserComponent_UpdatePhone_Call) RunAndReturn(run func(context.Context, string, types.UpdateUserPhoneRequest) error) *MockUserComponent_UpdatePhone_Call {
 	_c.Call.Return(run)
 	return _c
 }

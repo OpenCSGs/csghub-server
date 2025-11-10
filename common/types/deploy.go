@@ -1,5 +1,7 @@
 package types
 
+import "time"
+
 type DeployReq struct {
 	CurrentUser string `json:"current_user"`
 	PageOpts
@@ -8,6 +10,8 @@ type DeployReq struct {
 	DeployTypes []int          `json:"deploy_types"`
 	Status      []int          `json:"status"`
 	Query       string         `json:"query"`
+	StartTime   *time.Time     `json:"start_time,omitempty"`
+	EndTime     *time.Time     `json:"end_time,omitempty"`
 }
 
 type ServiceEvent struct {
