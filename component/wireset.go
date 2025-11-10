@@ -164,6 +164,7 @@ type Mocks struct {
 	multiSyncClient  *mock_multisync.MockClient
 	s3Core           *mock_s3.MockCore
 	checker          *mock_checker.MockGitCallbackChecker
+	agentComponent   *mock_component.MockAgentComponent
 }
 
 var AllMockSet = wire.NewSet(
@@ -551,7 +552,14 @@ func NewTestClusterComponent(config *config.Config, deployer deploy.Deployer, st
 
 var ClusterComponentSet = wire.NewSet(NewTestClusterComponent)
 
-func NewTestEvaluationComponent(config *config.Config, stores *tests.MockStores, deployer deploy.Deployer, accountingComponent AccountingComponent, repoComponent RepoComponent) *evaluationComponentImpl {
+func NewTestEvaluationComponent(
+	config *config.Config,
+	stores *tests.MockStores,
+	deployer deploy.Deployer,
+	accountingComponent AccountingComponent,
+	repoComponent RepoComponent,
+	userSvcClient rpc.UserSvcClient,
+) *evaluationComponentImpl {
 	return &evaluationComponentImpl{
 		deployer:              deployer,
 		userStore:             stores.User,
@@ -566,6 +574,7 @@ func NewTestEvaluationComponent(config *config.Config, stores *tests.MockStores,
 		config:                config,
 		accountingComponent:   accountingComponent,
 		repoComponent:         repoComponent,
+		userSvcClient:         userSvcClient,
 	}
 }
 
