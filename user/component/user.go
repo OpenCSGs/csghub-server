@@ -106,6 +106,7 @@ type UserComponent interface {
 	ResetUserTags(ctx context.Context, uid string, tagIDs []int64) error
 	SendSMSCode(ctx context.Context, uid string, req types.SendSMSCodeRequest) (*types.SendSMSCodeResponse, error)
 	UpdatePhone(ctx context.Context, uid string, req types.UpdateUserPhoneRequest) error
+	StreamExportUsers(ctx context.Context, req types.UserIndexReq) (data chan types.UserIndexResp, err error)
 }
 
 func NewUserComponent(config *config.Config) (UserComponent, error) {
@@ -864,6 +865,7 @@ func (c *userComponentImpl) Index(ctx context.Context, visitorName, search, veri
 			user.VerifyStatus = string(dbuser.VerifyStatus)
 			user.Labels = dbuser.Labels
 			user.LastLoginAt = dbuser.LastLoginAt
+			user.CreatedAt = dbuser.CreatedAt
 		}
 
 		respUsers = append(respUsers, user)
@@ -1425,4 +1427,74 @@ func (c *userComponentImpl) verifySMSCode(ctx context.Context, uid, phoneArea, p
 	}
 
 	return nil
+}
+
+func (c *userComponentImpl) StreamExportUsers(ctx context.Context, req types.UserIndexReq) (data chan types.UserIndexResp, err error) {
+	data = make(chan types.UserIndexResp)
+
+	ch, err := c.userStore.IndexWithCursor(ctx, req)
+	if err != nil {
+		slog.Error("failed to query users by cursor",
+			slog.Any("req", req),
+			slog.Any("error", err),
+		)
+		return data, errorx.ErrInternalServerError
+	}
+
+	go func() {
+		defer close(data)
+		for wrapper := range ch {
+			if wrapper.Err != nil {
+				slog.Error("failed to query users by cursor",
+					slog.Any("req", req),
+					slog.Any("error", wrapper.Err),
+				)
+				data <- types.UserIndexResp{Error: wrapper.Err}
+				return
+			}
+			for _, originalUser := range wrapper.Users {
+				var tags []types.RepoTag
+				for _, utag := range originalUser.Tags {
+					tags = append(tags, types.RepoTag{
+						ID:       utag.ID,
+						Name:     utag.Tag.Name,
+						Category: utag.Tag.Category,
+						Group:    utag.Tag.Group,
+						BuiltIn:  utag.Tag.BuiltIn,
+						Scope:    utag.Tag.Scope,
+						I18nKey:  utag.Tag.I18nKey,
+					})
+				}
+				exportUser := &types.User{
+					Username:     originalUser.Username,
+					Nickname:     originalUser.NickName,
+					Avatar:       originalUser.Avatar,
+					Tags:         tags,
+					Email:        originalUser.Email,
+					UUID:         originalUser.UUID,
+					Bio:          originalUser.Bio,
+					Homepage:     originalUser.Homepage,
+					Phone:        originalUser.Phone,
+					PhoneArea:    originalUser.PhoneArea,
+					Roles:        originalUser.Roles(),
+					VerifyStatus: string(originalUser.VerifyStatus),
+					Labels:       originalUser.Labels,
+					LastLoginAt:  originalUser.LastLoginAt,
+					CreatedAt:    originalUser.CreatedAt,
+				}
+
+				select {
+				case <-ctx.Done():
+					slog.Info("stream export canceled while writing data", slog.String("reason", ctx.Err().Error()))
+					data <- types.UserIndexResp{Error: ctx.Err()}
+					return
+				case data <- types.UserIndexResp{Users: []*types.User{exportUser}}:
+				}
+			}
+		}
+
+	}()
+
+	slog.Info("stream export completed successfully")
+	return data, nil
 }
