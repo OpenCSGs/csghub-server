@@ -3169,8 +3169,23 @@ func (c *repoComponentImpl) DeployStart(ctx context.Context, startReq types.Depl
 	}
 
 	if exist {
-		// deploy instance is running
-		return errors.New("stop deploy first")
+		// check deploy status
+		_, status, _, err := c.deployer.Status(ctx, deployRepo, false)
+		if err != nil {
+			return fmt.Errorf("failed to get deploy status, %w", err)
+		}
+
+		// if deploy is in running status, return error
+		const deployStatusRunning = 4
+		if status == deployStatusRunning {
+			return errors.New("stop deploy first")
+		}
+
+		// if deploy exists but not running, stop it first
+		err = c.deployer.Stop(ctx, deployRepo)
+		if err != nil {
+			return fmt.Errorf("failed to stop existing deploy, %w", err)
+		}
 	}
 
 	// start deploy
