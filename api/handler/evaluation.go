@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"strconv"
@@ -8,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/component"
 )
@@ -95,8 +97,13 @@ func (h *EvaluationHandler) GetEvaluation(ctx *gin.Context) {
 	evaluation, err := h.evaluation.GetEvaluation(ctx.Request.Context(), *req)
 	if err != nil {
 		slog.Error("Failed to get evaluation job", slog.Any("error", err))
-		httpbase.ServerError(ctx, err)
-		return
+		if errors.Is(err, errorx.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
+			return
+		} else {
+			httpbase.ServerError(ctx, err)
+			return
+		}
 	}
 	httpbase.OK(ctx, evaluation)
 
