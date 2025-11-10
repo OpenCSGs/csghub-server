@@ -1,6 +1,6 @@
-ARG SPACE_BASE_IMAGE=opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/space-base:python3.10-1.0.2
+ARG SPACE_BASE_IMAGE=opencsg-registry.cn-beijing.cr.aliyuncs.com
 
-FROM ${SPACE_BASE_IMAGE} AS base
+FROM ${SPACE_BASE_IMAGE}/opencsg_public/space-base:python3.10-1.0.3 AS base
 
 # First handle dependencies to leverage caching
 USER user
@@ -21,14 +21,24 @@ RUN if [ -s "packages.txt" ]; then \
 USER user
 # Set the default domestic source (Alibaba Cloud), users can override it via --build-arg PyPI=xxx
 ARG PyPI=https://mirrors.aliyun.com/pypi/simple/
-RUN if [ -n "$PyPI" ]; then \
+ARG ALLOW_INSECURE_PIP=false
+
+RUN rm -rf ~/.pip ~/.config/pip && \
+    if [ -n "$PyPI" ]; then \
         pip config set global.index-url "${PyPI}" && \
-        # Configure trusted sources (to avoid HTTPS certificate issues)
-        pip config set global.trusted-host $(echo "${PyPI}" | sed -n 's|https\?://\([^/]*\)/.*|\1|p'); \
+        TRUSTED_HOST=$(echo "${PyPI}" | sed -n 's|https\?://\([^/]*\)/.*|\1|p') && \
+        if [ -n "$TRUSTED_HOST" ]; then \
+            pip config set global.trusted-host "${TRUSTED_HOST}"; \
+        else \
+            echo "Error: Failed to extract trusted host from ${PyPI}" && exit 1; \
+        fi && \
+        if [[ "$PyPI" == http://* ]] || [ "$ALLOW_INSECURE_PIP" = "true" ]; then \
+            pip config set global.verify-ssl false; \
+        fi; \
     fi
 
-RUN pip install --no-cache-dir --default-timeout=60 -r pre-requirements.txt && \
-    pip install --no-cache-dir --default-timeout=60 -r requirements.txt
+RUN pip install --default-timeout=60 -r pre-requirements.txt && \
+    pip install --default-timeout=60 -r requirements.txt
 
 COPY --link --chown=1000 ./ ./
 
