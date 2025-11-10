@@ -1458,7 +1458,15 @@ func initializeTestEvaluationComponent(ctx context.Context, t interface {
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockAccountingComponent := component.NewMockAccountingComponent(t)
 	mockRepoComponent := component.NewMockRepoComponent(t)
-	componentEvaluationComponentImpl := NewTestEvaluationComponent(config, mockStores, mockDeployer, mockAccountingComponent, mockRepoComponent)
+	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
+	componentEvaluationComponentImpl := NewTestEvaluationComponent(
+		config,
+		mockStores,
+		mockDeployer,
+		mockAccountingComponent,
+		mockRepoComponent,
+		mockUserSvcClient,
+	)
 	mockTagComponent := component.NewMockTagComponent(t)
 	mockSpaceComponent := component.NewMockSpaceComponent(t)
 	mockRuntimeArchitectureComponent := component.NewMockRuntimeArchitectureComponent(t)
@@ -1472,7 +1480,6 @@ func initializeTestEvaluationComponent(ctx context.Context, t interface {
 		sensitive:           mockSensitiveComponent,
 	}
 	mockGitServer := gitserver.NewMockGitServer(t)
-	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
 	mockClient := s3.NewMockClient(t)
 	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
 	mockCache := cache.NewMockCache(t)

@@ -10,8 +10,10 @@ import (
 
 	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/deploy/common"
+	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -29,6 +31,7 @@ type evaluationComponentImpl struct {
 	config                *config.Config
 	accountingComponent   AccountingComponent
 	repoComponent         RepoComponent
+	userSvcClient         rpc.UserSvcClient
 }
 
 type EvaluationComponent interface {
@@ -60,6 +63,10 @@ func NewEvaluationComponent(config *config.Config) (EvaluationComponent, error) 
 		return nil, fmt.Errorf("failed to create repo component, %w", err)
 	}
 	c.accountingComponent = ac
+	c.userSvcClient = rpc.NewUserSvcHttpClient(
+		fmt.Sprintf("%s:%d", config.User.Host, config.User.Port),
+		rpc.AuthWithApiKey(config.APIToken),
+	)
 	return c, nil
 }
 
@@ -204,6 +211,15 @@ func (c *evaluationComponentImpl) GetEvaluation(ctx context.Context, req types.E
 	wf, err := c.workflowStore.FindByID(ctx, req.ID)
 	if err != nil {
 		return nil, fmt.Errorf("fail to get evaluation result, %w", err)
+	}
+	if wf.Username != req.Username {
+		userInfo, err := c.userSvcClient.GetUserByName(ctx, req.Username)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get user info for %s, %w", req.Username, err)
+		}
+		if !userInfo.IsAdmin() {
+			return nil, errorx.ErrForbidden
+		}
 	}
 	var repoTags []types.RepoTags
 	for _, path := range wf.Datasets {

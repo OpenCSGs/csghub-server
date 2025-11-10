@@ -551,7 +551,14 @@ func NewTestClusterComponent(config *config.Config, deployer deploy.Deployer, st
 
 var ClusterComponentSet = wire.NewSet(NewTestClusterComponent)
 
-func NewTestEvaluationComponent(config *config.Config, stores *tests.MockStores, deployer deploy.Deployer, accountingComponent AccountingComponent, repoComponent RepoComponent) *evaluationComponentImpl {
+func NewTestEvaluationComponent(
+	config *config.Config,
+	stores *tests.MockStores,
+	deployer deploy.Deployer,
+	accountingComponent AccountingComponent,
+	repoComponent RepoComponent,
+	userSvcClient rpc.UserSvcClient,
+) *evaluationComponentImpl {
 	return &evaluationComponentImpl{
 		deployer:              deployer,
 		userStore:             stores.User,
@@ -566,6 +573,7 @@ func NewTestEvaluationComponent(config *config.Config, stores *tests.MockStores,
 		config:                config,
 		accountingComponent:   accountingComponent,
 		repoComponent:         repoComponent,
+		userSvcClient:         userSvcClient,
 	}
 }
 

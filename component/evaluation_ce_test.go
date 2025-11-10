@@ -4,12 +4,14 @@ package component
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -175,6 +177,138 @@ func TestEvaluationComponent_GetEvaluation(t *testing.T) {
 	require.NotNil(t, e)
 	require.Equal(t, "test", e.TaskName)
 	require.Nil(t, err)
+}
+
+func TestEvaluationComponent_GetEvaluation_AccessControl(t *testing.T) {
+	t.Run("owner is req user", func(t *testing.T) {
+		ctx := context.TODO()
+		c := initializeTestEvaluationComponent(ctx, t)
+		c.config.Argo.QuotaGPUNumber = "1"
+		req := types.EvaluationGetReq{
+			Username: "test",
+			ID:       1,
+		}
+		c.mocks.stores.WorkflowMock().EXPECT().FindByID(ctx, int64(1)).Return(database.ArgoWorkflow{
+			ID:       1,
+			RepoIds:  []string{"Rowan/hellaswag"},
+			Datasets: []string{"deleted/dataset"},
+			RepoType: "model",
+			Username: "test",
+			TaskName: "test",
+			TaskId:   "test",
+			TaskType: "evaluation",
+			Status:   "Succeed",
+		}, nil)
+		c.mocks.stores.DatasetMock().EXPECT().FindByOriginPath(ctx, "deleted/dataset").Return(nil, sql.ErrNoRows)
+		e, err := c.GetEvaluation(ctx, req)
+		require.NotNil(t, e)
+		require.Equal(t, "test", e.TaskName)
+		require.Nil(t, err)
+		require.Len(t, e.Datasets, 1)
+		require.True(t, e.Datasets[0].Deleted)
+		require.Equal(t, "deleted/dataset", e.Datasets[0].RepoId)
+	})
+	t.Run("owner is different from req user and req user is not admin", func(t *testing.T) {
+		ctx := context.TODO()
+		c := initializeTestEvaluationComponent(ctx, t)
+		c.config.Argo.QuotaGPUNumber = "1"
+		req := types.EvaluationGetReq{
+			Username: "otheruser",
+			ID:       1,
+		}
+		c.mocks.stores.WorkflowMock().EXPECT().FindByID(ctx, int64(1)).Return(database.ArgoWorkflow{
+			ID:       1,
+			RepoIds:  []string{"Rowan/hellaswag"},
+			Datasets: []string{"Rowan/hellaswag"},
+			RepoType: "model",
+			Username: "test",
+			TaskName: "test",
+			TaskId:   "test",
+			TaskType: "evaluation",
+			Status:   "Succeed",
+		}, nil)
+		c.mocks.userSvcClient.EXPECT().GetUserByName(ctx, "otheruser").Return(&types.User{
+			Roles:    []string{"user"},
+			Username: "otheruser",
+			UUID:     "otheruser",
+			ID:       2,
+		}, nil)
+		e, err := c.GetEvaluation(ctx, req)
+		require.Equal(t, err, errorx.ErrForbidden)
+		require.Nil(t, e)
+	})
+	t.Run("owner is different from req user and req user is admin", func(t *testing.T) {
+		ctx := context.TODO()
+		c := initializeTestEvaluationComponent(ctx, t)
+		c.config.Argo.QuotaGPUNumber = "1"
+		req := types.EvaluationGetReq{
+			Username: "otheruser",
+			ID:       1,
+		}
+		c.mocks.stores.WorkflowMock().EXPECT().FindByID(ctx, int64(1)).Return(database.ArgoWorkflow{
+			ID:       1,
+			RepoIds:  []string{"Rowan/hellaswag"},
+			Datasets: []string{"Rowan/hellaswag"},
+			RepoType: "model",
+			Username: "test",
+			TaskName: "test",
+			TaskId:   "test",
+			TaskType: "evaluation",
+			Status:   "Succeed",
+		}, nil)
+		c.mocks.userSvcClient.EXPECT().GetUserByName(ctx, "otheruser").Return(&types.User{
+			Roles:    []string{"admin"},
+			Username: "otheruser",
+			UUID:     "otheruser",
+			ID:       2,
+		}, nil)
+		c.mocks.stores.DatasetMock().EXPECT().FindByOriginPath(ctx, "Rowan/hellaswag").Return(&database.Dataset{
+			Repository: &database.Repository{
+				Path: "Rowan/hellaswag",
+				Tags: []database.Tag{
+					{
+						Name:     "test",
+						Category: "test",
+						Group:    "test",
+						Scope:    "test",
+						BuiltIn:  true,
+					},
+				},
+			},
+		}, nil)
+		e, err := c.GetEvaluation(ctx, req)
+		require.NotNil(t, e)
+		require.Equal(t, "test", e.TaskName)
+		require.Nil(t, err)
+		require.Len(t, e.Datasets, 1)
+		require.False(t, e.Datasets[0].Deleted)
+		require.Equal(t, "Rowan/hellaswag", e.Datasets[0].RepoId)
+	})
+	t.Run("owner is different from req user and get user info fails", func(t *testing.T) {
+		ctx := context.TODO()
+		c := initializeTestEvaluationComponent(ctx, t)
+		c.config.Argo.QuotaGPUNumber = "1"
+		req := types.EvaluationGetReq{
+			Username: "otheruser",
+			ID:       1,
+		}
+		c.mocks.stores.WorkflowMock().EXPECT().FindByID(ctx, int64(1)).Return(database.ArgoWorkflow{
+			ID:       1,
+			RepoIds:  []string{"Rowan/hellaswag"},
+			Datasets: []string{"Rowan/hellaswag"},
+			RepoType: "model",
+			Username: "test",
+			TaskName: "test",
+			TaskId:   "test",
+			TaskType: "evaluation",
+			Status:   "Succeed",
+		}, nil)
+		c.mocks.userSvcClient.EXPECT().GetUserByName(ctx, "otheruser").Return(nil, errorx.ErrRemoteServiceFail)
+		e, err := c.GetEvaluation(ctx, req)
+		require.Nil(t, e)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), errorx.ErrRemoteServiceFail.Error())
+	})
 }
 
 func TestEvaluationComponent_DeleteEvaluation(t *testing.T) {
