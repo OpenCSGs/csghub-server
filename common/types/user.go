@@ -203,6 +203,15 @@ type User struct {
 	Tags              []RepoTag      `json:"tags,omitempty"`
 }
 
+func (u User) IsAdmin() bool {
+	for _, role := range u.Roles {
+		if role == "admin" || role == "super_user" {
+			return true
+		}
+	}
+	return false
+}
+
 type UserLikesRequest struct {
 	Username     string `json:"username"`
 	RepoID       int64  `json:"repo_id"`
