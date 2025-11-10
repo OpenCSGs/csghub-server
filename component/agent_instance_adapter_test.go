@@ -8,6 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	mockrpc "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rpc"
+	mockcomponent "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
@@ -147,17 +149,125 @@ func TestCodeAgentInstanceAdapter_CreateInstance(t *testing.T) {
 
 func TestCodeAgentInstanceAdapter_DeleteInstance(t *testing.T) {
 	ctx := context.TODO()
-	sc := initializeTestSpaceComponent(ctx, t)
 
-	adapter := &CodeAgentInstanceAdapter{
-		spaceComponent: sc,
+	tests := []struct {
+		name          string
+		userUUID      string
+		contentID     string
+		expectErr     bool
+		mockSetup     func(*mockcomponent.MockSpaceComponent, *mockrpc.MockUserSvcClient)
+		expectedError string
+	}{
+		{
+			name:      "successful delete",
+			userUUID:  "test-user-uuid",
+			contentID: "namespace/name",
+			expectErr: false,
+			mockSetup: func(mockSpaceComponent *mockcomponent.MockSpaceComponent, mockUserSvcClient *mockrpc.MockUserSvcClient) {
+				mockUserSvcClient.EXPECT().FindByUUIDs(ctx, []string{"test-user-uuid"}).Return(map[string]*types.User{
+					"test-user-uuid": {
+						Username: "testuser",
+					},
+				}, nil)
+				mockSpaceComponent.EXPECT().Delete(ctx, "namespace", "name", "testuser").Return(nil)
+			},
+		},
+		{
+			name:          "invalid contentID - no slash",
+			userUUID:      "test-user-uuid",
+			contentID:     "invalid",
+			expectErr:     true,
+			expectedError: "invalid contentID: invalid",
+			mockSetup:     func(*mockcomponent.MockSpaceComponent, *mockrpc.MockUserSvcClient) {},
+		},
+		{
+			name:          "invalid contentID - multiple slashes",
+			userUUID:      "test-user-uuid",
+			contentID:     "namespace/name/extra",
+			expectErr:     true,
+			expectedError: "invalid contentID: namespace/name/extra",
+			mockSetup:     func(*mockcomponent.MockSpaceComponent, *mockrpc.MockUserSvcClient) {},
+		},
+		{
+			name:          "invalid contentID - empty",
+			userUUID:      "test-user-uuid",
+			contentID:     "",
+			expectErr:     true,
+			expectedError: "invalid contentID: ",
+			mockSetup:     func(*mockcomponent.MockSpaceComponent, *mockrpc.MockUserSvcClient) {},
+		},
+		{
+			name:      "user not found",
+			userUUID:  "test-user-uuid",
+			contentID: "namespace/name",
+			expectErr: true,
+			mockSetup: func(mockSpaceComponent *mockcomponent.MockSpaceComponent, mockUserSvcClient *mockrpc.MockUserSvcClient) {
+				mockUserSvcClient.EXPECT().FindByUUIDs(ctx, []string{"test-user-uuid"}).Return(map[string]*types.User{}, nil)
+			},
+			expectedError: "user not found: test-user-uuid",
+		},
+		{
+			name:      "user not found - nil user",
+			userUUID:  "test-user-uuid",
+			contentID: "namespace/name",
+			expectErr: true,
+			mockSetup: func(mockSpaceComponent *mockcomponent.MockSpaceComponent, mockUserSvcClient *mockrpc.MockUserSvcClient) {
+				mockUserSvcClient.EXPECT().FindByUUIDs(ctx, []string{"test-user-uuid"}).Return(map[string]*types.User{
+					"test-user-uuid": nil,
+				}, nil)
+			},
+			expectedError: "user not found: test-user-uuid",
+		},
+		{
+			name:      "FindByUUIDs error",
+			userUUID:  "test-user-uuid",
+			contentID: "namespace/name",
+			expectErr: true,
+			mockSetup: func(mockSpaceComponent *mockcomponent.MockSpaceComponent, mockUserSvcClient *mockrpc.MockUserSvcClient) {
+				mockUserSvcClient.EXPECT().FindByUUIDs(ctx, []string{"test-user-uuid"}).Return(nil, fmt.Errorf("service unavailable"))
+			},
+			expectedError: "failed to find user: service unavailable",
+		},
+		{
+			name:      "spaceComponent.Delete error",
+			userUUID:  "test-user-uuid",
+			contentID: "namespace/name",
+			expectErr: true,
+			mockSetup: func(mockSpaceComponent *mockcomponent.MockSpaceComponent, mockUserSvcClient *mockrpc.MockUserSvcClient) {
+				mockUserSvcClient.EXPECT().FindByUUIDs(ctx, []string{"test-user-uuid"}).Return(map[string]*types.User{
+					"test-user-uuid": {
+						Username: "testuser",
+					},
+				}, nil)
+				mockSpaceComponent.EXPECT().Delete(ctx, "namespace", "name", "testuser").Return(fmt.Errorf("delete failed"))
+			},
+			expectedError: "delete failed",
+		},
 	}
-	userUUID := "test-user-uuid"
-	contentID := "test-content-id"
 
-	err := adapter.DeleteInstance(ctx, userUUID, contentID)
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockSpaceComponent := mockcomponent.NewMockSpaceComponent(t)
+			mockUserSvcClient := mockrpc.NewMockUserSvcClient(t)
+
+			adapter := &CodeAgentInstanceAdapter{
+				spaceComponent: mockSpaceComponent,
+				userSvcClient:  mockUserSvcClient,
+			}
+
+			tt.mockSetup(mockSpaceComponent, mockUserSvcClient)
+
+			err := adapter.DeleteInstance(ctx, tt.userUUID, tt.contentID)
+
+			if tt.expectErr {
+				require.Error(t, err)
+				if tt.expectedError != "" {
+					assert.Contains(t, err.Error(), tt.expectedError)
+				}
+			} else {
+				require.NoError(t, err)
+			}
+		})
 	}
 }
 
@@ -247,22 +357,30 @@ func TestCodeAgentInstanceAdapter_CreateInstance_ContextCancellation(t *testing.
 
 func TestCodeAgentInstanceAdapter_DeleteInstance_ContextCancellation(t *testing.T) {
 	ctx := context.TODO()
-	sc := initializeTestSpaceComponent(ctx, t)
+	mockSpaceComponent := mockcomponent.NewMockSpaceComponent(t)
+	mockUserSvcClient := mockrpc.NewMockUserSvcClient(t)
 
 	adapter := &CodeAgentInstanceAdapter{
-		spaceComponent: sc,
+		spaceComponent: mockSpaceComponent,
+		userSvcClient:  mockUserSvcClient,
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	cancel() // Cancel the context immediately
 
 	userUUID := "test-user-uuid"
-	contentID := "test-content-id"
+	contentID := "namespace/name"
 
-	// Even with cancelled context, the method should still work since it doesn't use the context
+	// Mock the calls even with cancelled context
+	mockUserSvcClient.EXPECT().FindByUUIDs(mock.Anything, []string{"test-user-uuid"}).Return(map[string]*types.User{
+		"test-user-uuid": {
+			Username: "testuser",
+		},
+	}, nil)
+	mockSpaceComponent.EXPECT().Delete(mock.Anything, "namespace", "name", "testuser").Return(nil)
+
+	// Even with cancelled context, the method should still work
 	err := adapter.DeleteInstance(ctx, userUUID, contentID)
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 }
 
 func TestCodeAgentInstanceAdapter_UpdateInstance_ContextCancellation(t *testing.T) {
@@ -499,20 +617,55 @@ func TestLangflowAgentInstanceAdapter_CreateInstance(t *testing.T) {
 
 func TestLangflowAgentInstanceAdapter_DeleteInstance(t *testing.T) {
 	ctx := context.Background()
-	userUUID := "test-user-uuid"
-	contentID := "test-content-id"
 
-	config := &config.Config{}
-	config.Agent.AgentHubServiceHost = "localhost:8080"
-	config.Agent.AgentHubServiceToken = "test-token"
-	adapter, err := NewLangflowAgentInstanceAdapter(config)
-	if err != nil {
-		t.Fatalf("Expected no error, got %v", err)
+	tests := []struct {
+		name          string
+		userUUID      string
+		contentID     string
+		expectErr     bool
+		mockSetup     func(*mockrpc.MockAgentHubSvcClient)
+		expectedError string
+	}{
+		{
+			name:      "successful delete",
+			userUUID:  "test-user-uuid",
+			contentID: "test-content-id",
+			expectErr: false,
+			mockSetup: func(mockClient *mockrpc.MockAgentHubSvcClient) {
+				mockClient.EXPECT().DeleteAgentInstance(ctx, "test-user-uuid", "test-content-id").Return(nil)
+			},
+		},
+		{
+			name:      "DeleteAgentInstance error",
+			userUUID:  "test-user-uuid",
+			contentID: "test-content-id",
+			expectErr: true,
+			mockSetup: func(mockClient *mockrpc.MockAgentHubSvcClient) {
+				mockClient.EXPECT().DeleteAgentInstance(ctx, "test-user-uuid", "test-content-id").Return(fmt.Errorf("delete failed"))
+			},
+			expectedError: "delete failed",
+		},
 	}
 
-	// DeleteInstance currently returns nil (commented out implementation)
-	err = adapter.DeleteInstance(ctx, userUUID, contentID)
-	require.NoError(t, err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockClient := mockrpc.NewMockAgentHubSvcClient(t)
+			adapter := NewLangflowAgentInstanceAdapterWithClient(mockClient)
+
+			tt.mockSetup(mockClient)
+
+			err := adapter.DeleteInstance(ctx, tt.userUUID, tt.contentID)
+
+			if tt.expectErr {
+				require.Error(t, err)
+				if tt.expectedError != "" {
+					assert.Contains(t, err.Error(), tt.expectedError)
+				}
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
 }
 
 func TestLangflowAgentInstanceAdapter_UpdateInstance(t *testing.T) {
