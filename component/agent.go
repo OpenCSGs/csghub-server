@@ -593,20 +593,26 @@ func (c *agentComponentImpl) DeleteInstance(ctx context.Context, id int64, userU
 		return fmt.Errorf("cannot delete built-in instance, id: %d", id)
 	}
 
-	// Get the appropriate adapter for the agent type
-	adapter := c.adapterFactory.GetAdapter(existing.Type)
-	if adapter != nil {
-		// Delete the agent instance from the target system
-		if err := adapter.DeleteInstance(ctx, userUUID, existing.ContentID); err != nil {
-			slog.Error("failed to delete agent instance from target system", "user_uuid", userUUID, "agent_type", existing.Type, "content_id", existing.ContentID, "error", err)
-			// Continue with database deletion even if target system deletion fails
-		}
-	} else {
-		slog.Warn("no adapter found for agent type, skipping target system deletion", "agent_type", existing.Type, "content_id", existing.ContentID)
+	// delete from database
+	if err := c.instanceStore.Delete(ctx, id); err != nil {
+		slog.Error("failed to delete agent instance from database", "instance_id", id, "user_uuid", userUUID, "error", err)
+		return err
 	}
 
-	// Delete from database
-	return c.instanceStore.Delete(ctx, id)
+	go func() {
+		cleanCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		adapter := c.adapterFactory.GetAdapter(existing.Type)
+		if adapter != nil {
+			if err := adapter.DeleteInstance(cleanCtx, userUUID, existing.ContentID); err != nil {
+				slog.Error("failed to delete agent instance from target system", "user_uuid", userUUID, "agent_type", existing.Type, "content_id", existing.ContentID, "error", err)
+			}
+		} else {
+			slog.Warn("no adapter found for agent type, skipping target system deletion", "agent_type", existing.Type, "content_id", existing.ContentID)
+		}
+	}()
+
+	return nil
 }
 
 // DeleteInstanceByContentID deletes an agent instance by type and content id
