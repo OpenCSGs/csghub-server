@@ -7,14 +7,14 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 # 更新软件包列表，使用阿里云源
 RUN rm -rf /etc/apt/sources.list.d/debian.sources && \
-    echo "deb https://mirrors.aliyun.com/debian/ bookworm main non-free non-free-firmware contrib" > /etc/apt/sources.list && \
-    echo "deb https://mirrors.aliyun.com/debian-security/ bookworm-security main" >> /etc/apt/sources.list && \
-    echo "deb https://mirrors.aliyun.com/debian/ bookworm-updates main non-free non-free-firmware contrib" >> /etc/apt/sources.list && \
-    echo "deb https://mirrors.aliyun.com/debian/ bookworm-backports main non-free non-free-firmware contrib" >> /etc/apt/sources.list
+    echo "deb https://mirrors.aliyun.com/debian/ trixie main non-free non-free-firmware contrib" > /etc/apt/sources.list && \
+    echo "deb https://mirrors.aliyun.com/debian-security/ trixie-security main" >> /etc/apt/sources.list && \
+    echo "deb https://mirrors.aliyun.com/debian/ trixie-updates main non-free non-free-firmware contrib" >> /etc/apt/sources.list && \
+    echo "deb https://mirrors.aliyun.com/debian/ trixie-backports main non-free non-free-firmware contrib" >> /etc/apt/sources.list
 
 # BEGIN Static Part
-RUN apt-get update && apt-get install -y \
-	git git-lfs ffmpeg libsm6 libxext6 cmake libgl1-mesa-glx && \
+RUN apt-get update && apt-get install -y --no-install-recommends \
+	git git-lfs ffmpeg libsm6 libxext6 cmake libgl1-mesa-dri mesa-utils && \
 	apt-get clean && rm -rf /var/lib/apt/lists/* && \
 	git lfs install
 
@@ -27,13 +27,17 @@ WORKDIR /home/user/app
 
 # change to use domestic pip source
 RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple/ && \
-    pip config set global.extra-index-url "https://mirrors.aliyun.com/pypi/simple/ https://pypi.mirrors.ustc.edu.cn/simple/" && \
-    pip install pip==22.3.1 pydantic==2.10.6
-    # pip install --default-timeout=60 datasets "huggingface-hub>=0.19" "hf-transfer>=0.1.4" "protobuf<4" "click<8.1" "pydantic~=1.0"
+    pip config set global.extra-index-url https://mirrors.aliyun.com/pypi/simple/ && \
+    pip install --no-cache-dir --default-timeout=60 \
+        pip==22.3.1 \
+        pydantic==2.10.6 \
+        streamlit==1.33.0 && \
+    pip install --no-cache-dir --default-timeout=60 \
+        python-dotenv==1.2.1 \
+        coagent-python==0.0.8 \
+        https://git-devops.opencsg.com/opensource/gradio/-/raw/main/gradio-5.1.0-py3-none-any.whl
 
-# install default gradio=5.1.0 and streamlit
-RUN pip install --no-cache-dir --default-timeout=60  streamlit==1.33.0 && \
-    pip install https://git-devops.opencsg.com/opensource/gradio/-/raw/main/gradio-5.1.0-py3-none-any.whl
+    # pip install --default-timeout=60 datasets "huggingface-hub>=0.19" "hf-transfer>=0.1.4" "protobuf<4" "click<8.1" "pydantic~=1.0"
 
 ## install nvm
 RUN git clone --depth=1 https://github.com/nvm-sh/nvm.git /home/user/.nvm
