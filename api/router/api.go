@@ -1145,7 +1145,7 @@ func createDiscussionRoutes(apiGroup *gin.RouterGroup, middlewareCollection midd
 	apiGroup.PUT("/discussions/:id", middlewareCollection.Auth.NeedLogin, middlewareCollection.API.RateLimter, discussionHandler.UpdateDiscussion)
 	apiGroup.DELETE("/discussions/:id", middlewareCollection.Auth.NeedLogin, discussionHandler.DeleteDiscussion)
 	apiGroup.POST("/discussions/:id/comments", middlewareCollection.Auth.NeedPhoneVerified, middlewareCollection.API.RateLimter, discussionHandler.CreateDiscussionComment)
-	apiGroup.GET("/discussions/:id/comments", discussionHandler.ListDiscussionComments)
+	apiGroup.GET("/discussions/:id/comments", middlewareCollection.API.RateLimter, discussionHandler.ListDiscussionComments)
 	apiGroup.PUT("/discussions/:id/comments/:comment_id", middlewareCollection.Auth.NeedLogin, middlewareCollection.API.RateLimter, discussionHandler.UpdateComment)
 	apiGroup.DELETE("/discussions/:id/comments/:comment_id", middlewareCollection.Auth.NeedLogin, discussionHandler.DeleteComment)
 }
