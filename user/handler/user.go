@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -324,6 +325,13 @@ func (h *UserHandler) Casdoor(ctx *gin.Context) {
 	jwtToken, signed, err := h.c.Signin(ctx.Request.Context(), code, state)
 	if err != nil {
 		slog.Error("Failed to signin", slog.Any("error", err), slog.String("code", code), slog.String("state", state))
+		var customErr errorx.CustomError
+		if errors.As(err, &customErr) {
+			if handleConflictCustomError(ctx, customErr, h.signinFailureRedirectURL) {
+				return
+			}
+		}
+
 		errorMsg := url.QueryEscape(fmt.Sprintf("failed to signin: %v", err))
 		errorRedirectURL := fmt.Sprintf("%s?error_code=500&error_message=%s", h.signinFailureRedirectURL, errorMsg)
 		slog.Info("redirecting to error page", slog.String("url", errorRedirectURL))
@@ -796,4 +804,168 @@ func (e *UserHandler) ResetUserTags(ctx *gin.Context) {
 	}
 
 	httpbase.OK(ctx, nil)
+}
+
+// SendSmsCode godoc
+// @Security     ApiKey
+// @Summary      generate sms verification code and send it by sms
+// @Description  generate sms verification code and send it by sms
+// @Tags         User
+// @Accept       json
+// @Produce      json
+// @Param        body body types.SendSMSCodeRequest true "SendSMSCodeRequest"
+// @Success      200  {object}  types.Response{data=types.SendSMSCodeResponse} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /user/sms-code [post]
+func (e *UserHandler) SendSMSCode(ctx *gin.Context) {
+	currentUserUUID := httpbase.GetCurrentUserUUID(ctx)
+	var req types.SendSMSCodeRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		slog.Error("SendSMSCodeRequest failed", slog.Any("err", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	resp, err := e.c.SendSMSCode(ctx, currentUserUUID, req)
+	if err != nil {
+		slog.Error("SendSMSCode failed", slog.Any("err", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	httpbase.OK(ctx, resp)
+}
+
+// UpdatePhone godoc
+// @Security     ApiKey
+// @Summary      Update current user phone
+// @Description  Update current user phone
+// @Tags         User
+// @Accept       json
+// @Produce      json
+// @Param        body body types.UpdateUserPhoneRequest true "UpdateUserPhoneRequest"
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /user/phone [put]
+func (e *UserHandler) UpdatePhone(ctx *gin.Context) {
+	currentUserUUID := httpbase.GetCurrentUserUUID(ctx)
+	var req types.UpdateUserPhoneRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		slog.Error("failed to update user's phone", slog.Any("err", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	err := e.c.UpdatePhone(ctx, currentUserUUID, req)
+	if err != nil {
+		slog.Error("failed to update user's phone", slog.Any("err", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	httpbase.OK(ctx, nil)
+}
+
+func handleConflictCustomError(ctx *gin.Context, customErr errorx.CustomError, redirectURL string) bool {
+	errCode := customErr.Code()
+
+	cField, cValue, ok := extractConflictInfo(customErr)
+	if !ok {
+		return false
+	}
+
+	u, _ := url.Parse(redirectURL)
+	q := u.Query()
+	q.Set("error_code", strconv.Itoa(http.StatusConflict))
+	q.Set("error_message_code", errCode)
+	q.Set("field_name", cField)
+	q.Set("field_value", cValue)
+	u.RawQuery = q.Encode()
+	slog.Info("redirecting to error page with conflict error", slog.String("url", u.String()))
+	ctx.Redirect(http.StatusMovedPermanently, u.String())
+	return true
+}
+
+func extractConflictInfo(customErr errorx.CustomError) (field, value string, ok bool) {
+	errCtx := customErr.Context()
+
+	switch {
+	case customErr.Is(errorx.ErrUsernameExists):
+		if username, exists := errCtx["username"]; exists {
+			if usernameStr, ok := username.(string); ok {
+				return "username", usernameStr, true
+			}
+		}
+	case customErr.Is(errorx.ErrEmailExists):
+		if email, exists := errCtx["email"]; exists {
+			if emailStr, ok := email.(string); ok {
+				return "email", emailStr, true
+			}
+		}
+	}
+	return "", "", false
+}
+
+// ExportUserInfo godoc
+// @Security     ApiKey
+// @Summary      Export users info. Only Admin
+// @Tags         User
+// @Accept       json
+// @Produce      json
+// @Param        verify_status  query  string  false  "Verify status (e.g. 'none', 'pending', 'approved', 'rejected')"
+// @Param        search         query  string  false  "Search keyword (match username/email/phone)"
+// @Param        labels         query  []string  false  "Labels (e.g. vip,basic) - multiple values supported"
+// @Param        cursor         query  int64  false  "Cursor for pagination"
+// @Success      200  "OK - SSE stream: events are 'users' (single user JSON), 'error' (error message), 'end' (completion message)"
+// @Failure      403  {object}  types.APIForbidden   "Forbidden - not admin"
+// @Router       /users/stream-export [get]
+func (h *UserHandler) ExportUserInfo(ctx *gin.Context) {
+	search := ctx.Query("search")
+	_labels := ctx.QueryArray("labels")
+	labels := types.ParseLabels(_labels)
+	verifyStatus := ctx.Query("verify_status")
+
+	req := types.UserIndexReq{
+		Search:       search,
+		VerifyStatus: types.VerifyStatus(verifyStatus),
+		Labels:       labels,
+		Per:          300,
+	}
+
+	ctx.Writer.Header().Set("Content-Type", "text/event-stream")
+	ctx.Writer.Header().Set("Cache-Control", "no-cache")
+	ctx.Writer.Header().Set("Connection", "keep-alive")
+	ctx.Writer.Header().Set("X-Accel-Buffering", "no")
+	ctx.Writer.WriteHeader(http.StatusOK)
+	ctx.Writer.Flush()
+
+	data, err := h.c.StreamExportUsers(ctx.Request.Context(), req)
+	if err != nil {
+		slog.Error("stream export failed in component", slog.Any("error", err), slog.Any("req", req))
+		select {
+		case data <- types.UserIndexResp{Error: err}:
+		case <-ctx.Request.Context().Done():
+		}
+	}
+
+	for resp := range data {
+		if resp.Error != nil {
+			ctx.SSEvent("error", resp.Error.Error())
+			ctx.Writer.Flush()
+			return
+		}
+
+		jsonData, err := json.Marshal(resp.Users)
+		if err != nil {
+			slog.Error("Failed to marshal users", slog.Any("error", err))
+			ctx.SSEvent("error", errorx.ErrInternalServerError.Error())
+			ctx.Writer.Flush()
+			return
+		}
+		ctx.SSEvent("users", string(jsonData))
+		ctx.Writer.Flush()
+	}
+
+	ctx.SSEvent("end", "export completed")
+	ctx.Writer.Flush()
 }
