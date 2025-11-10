@@ -485,7 +485,7 @@ func (h *AgentHandler) UpdateInstance(ctx *gin.Context) {
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      403  {object}  types.APIForbidden "Forbidden"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /agent/instances/by-content-id/{type}/*content_id [put]
+// @Router       /agent/instances/by-content-id/{type}/{content_id} [put]
 func (h *AgentHandler) UpdateInstanceByContentID(ctx *gin.Context) {
 	currentUserUUID := httpbase.GetCurrentUserUUID(ctx)
 	instanceType := ctx.Param("type")
@@ -568,7 +568,7 @@ func (h *AgentHandler) DeleteInstance(ctx *gin.Context) {
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      403  {object}  types.APIForbidden "Forbidden"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /agent/instances/by-content-id/{type}/*content_id [delete]
+// @Router       /agent/instances/by-content-id/{type}/{content_id} [delete]
 func (h *AgentHandler) DeleteInstanceByContentID(ctx *gin.Context) {
 	currentUserUUID := httpbase.GetCurrentUserUUID(ctx)
 	instanceType := ctx.Param("type")
