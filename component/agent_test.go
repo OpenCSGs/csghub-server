@@ -1460,11 +1460,20 @@ func TestAgentComponent_DeleteInstance(t *testing.T) {
 		ac.mocks.instanceStore.EXPECT().FindByID(ctx, instanceID).Return(existingInstance, nil)
 		ac.mocks.instanceStore.EXPECT().Delete(ctx, instanceID).Return(nil)
 
+		var wg sync.WaitGroup
+		wg.Add(1)
+
+		ac.mocks.agenthubSvcClient.EXPECT().DeleteAgentInstance(mock.Anything, userUUID, existingInstance.ContentID).Return(nil).Run(func(ctx context.Context, userUUID string, contentID string) {
+			wg.Done()
+		}).Once()
+
 		// Execute
 		err := ac.DeleteInstance(ctx, instanceID, userUUID)
 
 		// Verify
 		require.NoError(t, err)
+
+		wg.Wait()
 	})
 
 	t.Run("invalid instance ID", func(t *testing.T) {
