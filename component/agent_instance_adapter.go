@@ -102,8 +102,7 @@ func (a *LangflowAgentInstanceAdapter) CreateInstance(ctx context.Context, userU
 }
 
 func (a *LangflowAgentInstanceAdapter) DeleteInstance(ctx context.Context, userUUID string, contentID string) error {
-	// return a.agenthubSvcClient.DeleteAgentInstance(ctx, userUUID, &rpc.DeleteAgentInstanceRequest{ContentID: contentID})
-	return nil
+	return a.agenthubSvcClient.DeleteAgentInstance(ctx, userUUID, contentID)
 }
 
 func (a *LangflowAgentInstanceAdapter) UpdateInstance(ctx context.Context, userUUID string, instance *types.AgentInstance) error {
@@ -117,6 +116,7 @@ func (a *LangflowAgentInstanceAdapter) IsInstanceRunning(ctx context.Context, us
 // CodeAgentInstanceAdapter implements AgentInstanceAdapter for Code instances
 type CodeAgentInstanceAdapter struct {
 	spaceComponent SpaceComponent
+	userSvcClient  rpc.UserSvcClient
 }
 
 func NewCodeAgentInstanceAdapter(config *config.Config) (AgentInstanceAdapter, error) {
@@ -125,7 +125,10 @@ func NewCodeAgentInstanceAdapter(config *config.Config) (AgentInstanceAdapter, e
 		slog.Warn("failed to create space component", "error", err)
 		return nil, fmt.Errorf("failed to create space component: %w", err)
 	}
-	return &CodeAgentInstanceAdapter{spaceComponent: spaceComponent}, nil
+	userSvcClient := rpc.NewUserSvcHttpClient(fmt.Sprintf("%s:%d", config.User.Host, config.User.Port),
+		rpc.AuthWithApiKey(config.APIToken))
+
+	return &CodeAgentInstanceAdapter{spaceComponent: spaceComponent, userSvcClient: userSvcClient}, nil
 }
 
 func (a *CodeAgentInstanceAdapter) GetInstanceType() string {
@@ -144,8 +147,30 @@ func (a *CodeAgentInstanceAdapter) CreateInstance(ctx context.Context, userUUID 
 	}, nil
 }
 
+func parseContentID(contentID string) (namespace, name string, err error) {
+	splitPath := strings.Split(contentID, "/")
+	if len(splitPath) != 2 {
+		return "", "", fmt.Errorf("invalid contentID: %s", contentID)
+	}
+	return splitPath[0], splitPath[1], nil
+}
+
 func (a *CodeAgentInstanceAdapter) DeleteInstance(ctx context.Context, userUUID string, contentID string) error {
-	return nil
+	namespace, name, err := parseContentID(contentID)
+	if err != nil {
+		return err
+	}
+
+	users, err := a.userSvcClient.FindByUUIDs(ctx, []string{userUUID})
+	if err != nil {
+		return fmt.Errorf("failed to find user: %w", err)
+	}
+	if len(users) == 0 || users[userUUID] == nil {
+		return fmt.Errorf("user not found: %s", userUUID)
+	}
+
+	username := users[userUUID].Username
+	return a.spaceComponent.Delete(ctx, namespace, name, username)
 }
 
 func (a *CodeAgentInstanceAdapter) UpdateInstance(ctx context.Context, userUUID string, instance *types.AgentInstance) error {
@@ -156,12 +181,10 @@ func (a *CodeAgentInstanceAdapter) IsInstanceRunning(ctx context.Context, userUU
 	if builtIn {
 		return true, nil
 	}
-	splitPath := strings.Split(contentID, "/")
-	if len(splitPath) != 2 {
-		return false, fmt.Errorf("invalid contentID: %s", contentID)
+	namespace, name, err := parseContentID(contentID)
+	if err != nil {
+		return false, err
 	}
-	namespace := splitPath[0]
-	name := splitPath[1]
 	_, status, err := a.spaceComponent.Status(ctx, namespace, name)
 	if err != nil {
 		return false, fmt.Errorf("failed to get space status: %w", err)
