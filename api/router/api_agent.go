@@ -13,48 +13,47 @@ func createAgentRoutes(
 	agentHandler *handler.AgentHandler,
 ) {
 	agentGroup := apiGroup.Group("/agent")
-	agentGroup.Use(middlewareCollection.Auth.NeedLogin)
 
 	// Template routes
 	templatesGroup := agentGroup.Group("/templates")
 	{
-		templatesGroup.GET("", agentHandler.ListTemplates)
-		templatesGroup.POST("", agentHandler.CreateTemplate)
-		templatesGroup.GET("/:id", agentHandler.GetTemplate)
-		templatesGroup.PUT("/:id", agentHandler.UpdateTemplate)
-		templatesGroup.DELETE("/:id", agentHandler.DeleteTemplate)
+		templatesGroup.GET("", middlewareCollection.Auth.NeedLogin, agentHandler.ListTemplates)
+		templatesGroup.POST("", middlewareCollection.Auth.NeedPhoneVerified, agentHandler.CreateTemplate)
+		templatesGroup.GET("/:id", middlewareCollection.Auth.NeedLogin, agentHandler.GetTemplate)
+		templatesGroup.PUT("/:id", middlewareCollection.Auth.NeedPhoneVerified, agentHandler.UpdateTemplate)
+		templatesGroup.DELETE("/:id", middlewareCollection.Auth.NeedPhoneVerified, agentHandler.DeleteTemplate)
 
 		// Instance routes by template
-		templatesGroup.GET("/:id/instances", agentHandler.ListInstancesByTemplate)
+		templatesGroup.GET("/:id/instances", middlewareCollection.Auth.NeedLogin, agentHandler.ListInstancesByTemplate)
 	}
 
 	// Instance routes
 	instancesGroup := agentGroup.Group("/instances")
 	{
-		instancesGroup.GET("", agentHandler.ListInstances)
-		instancesGroup.POST("", agentHandler.CreateInstance)
-		instancesGroup.GET("/:id", agentHandler.GetInstance)
-		instancesGroup.PUT("/:id", agentHandler.UpdateInstance)
-		instancesGroup.PUT("/by-content-id/:type/*content_id", agentHandler.UpdateInstanceByContentID)
-		instancesGroup.DELETE("/:id", agentHandler.DeleteInstance)
-		instancesGroup.DELETE("/by-content-id/:type/*content_id", agentHandler.DeleteInstanceByContentID)
+		instancesGroup.GET("", middlewareCollection.Auth.NeedLogin, agentHandler.ListInstances)
+		instancesGroup.POST("", middlewareCollection.Auth.NeedPhoneVerified, agentHandler.CreateInstance)
+		instancesGroup.GET("/:id", middlewareCollection.Auth.NeedLogin, agentHandler.GetInstance)
+		instancesGroup.PUT("/:id", middlewareCollection.Auth.NeedPhoneVerified, agentHandler.UpdateInstance)
+		instancesGroup.PUT("/by-content-id/:type/*content_id", middlewareCollection.Auth.NeedPhoneVerified, agentHandler.UpdateInstanceByContentID)
+		instancesGroup.DELETE("/:id", middlewareCollection.Auth.NeedPhoneVerified, agentHandler.DeleteInstance)
+		instancesGroup.DELETE("/by-content-id/:type/*content_id", middlewareCollection.Auth.NeedPhoneVerified, agentHandler.DeleteInstanceByContentID)
 
 		// Session routes (nested under instances)
 		sessionsGroup := instancesGroup.Group("/:id/sessions")
 		{
-			sessionsGroup.GET("", agentHandler.ListSessions)
-			sessionsGroup.POST("", agentHandler.CreateSession)
-			sessionsGroup.GET("/:session_uuid", agentHandler.GetSession)
-			sessionsGroup.DELETE("/:session_uuid", agentHandler.DeleteSession)
-			sessionsGroup.PUT("/:session_uuid", agentHandler.UpdateSession)
+			sessionsGroup.GET("", middlewareCollection.Auth.NeedLogin, agentHandler.ListSessions)
+			sessionsGroup.POST("", middlewareCollection.Auth.NeedPhoneVerified, agentHandler.CreateSession)
+			sessionsGroup.GET("/:session_uuid", middlewareCollection.Auth.NeedLogin, agentHandler.GetSession)
+			sessionsGroup.DELETE("/:session_uuid", middlewareCollection.Auth.NeedPhoneVerified, agentHandler.DeleteSession)
+			sessionsGroup.PUT("/:session_uuid", middlewareCollection.Auth.NeedPhoneVerified, agentHandler.UpdateSession)
 
 			// Session histories routes
 			historiesGroup := sessionsGroup.Group("/:session_uuid/histories")
 			{
-				historiesGroup.POST("", agentHandler.CreateSessionHistory)
-				historiesGroup.GET("", agentHandler.ListSessionHistories)
-				historiesGroup.PUT("/:msg_uuid/feedback", agentHandler.UpdateSessionHistoryFeedback)
-				historiesGroup.PUT("/:msg_uuid/rewrite", agentHandler.RewriteMessage)
+				historiesGroup.POST("", middlewareCollection.Auth.NeedPhoneVerified, agentHandler.CreateSessionHistory)
+				historiesGroup.GET("", middlewareCollection.Auth.NeedLogin, agentHandler.ListSessionHistories)
+				historiesGroup.PUT("/:msg_uuid/feedback", middlewareCollection.Auth.NeedPhoneVerified, agentHandler.UpdateSessionHistoryFeedback)
+				historiesGroup.PUT("/:msg_uuid/rewrite", middlewareCollection.Auth.NeedPhoneVerified, agentHandler.RewriteMessage)
 			}
 		}
 	}
