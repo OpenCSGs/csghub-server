@@ -762,3 +762,41 @@ func TestUserComponent_checkUserConflictsInDB(t *testing.T) {
 		})
 	}
 }
+
+func TestUserComponent_StreamExportUsers(t *testing.T) {
+	ctx := context.Background()
+	req := types.UserIndexReq{
+		Search: "u-foo",
+		Per:    10,
+	}
+
+	data := make(chan database.Wrapper)
+	go func() {
+		defer close(data)
+		data <- database.Wrapper{
+			Users: []database.User{
+				{Username: "u-foo"},
+			},
+		}
+	}()
+	us := mockdb.NewMockUserStore(t)
+	us.EXPECT().IndexWithCursor(mock.Anything, req).Return(data, nil)
+
+	uc := &userComponentImpl{
+		userStore: us,
+	}
+
+	ch, err := uc.StreamExportUsers(ctx, req)
+	require.NoError(t, err)
+
+	total := 0
+	for resp := range ch {
+		require.NoError(t, resp.Error)
+		for _, u := range resp.Users {
+			require.Equal(t, "u-foo", u.Username)
+		}
+		total += len(resp.Users)
+	}
+
+	require.Equal(t, 1, total)
+}
