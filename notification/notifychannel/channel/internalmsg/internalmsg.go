@@ -10,12 +10,12 @@ import (
 	"github.com/google/uuid"
 	"go.temporal.io/sdk/client"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/builder/temporal"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 	notifychannel "opencsg.com/csghub-server/notification/notifychannel"
 	internalmsgworkflow "opencsg.com/csghub-server/notification/notifychannel/channel/internalmsg/workflow"
 	"opencsg.com/csghub-server/notification/utils"
-	"opencsg.com/csghub-server/notification/workflow"
 )
 
 type InternalMessageChannel struct {
@@ -115,10 +115,7 @@ func (s *InternalMessageChannel) broadcastInternalMessage(ctx context.Context, m
 	}
 	slog.Info("create site internal message successfully", slog.Any("message id", message.MsgUUID))
 
-	workflowClient := workflow.GetWorkflowClient()
-	if workflowClient == nil {
-		return fmt.Errorf("workflow client is nil")
-	}
+	workflowClient := temporal.GetClient()
 	workflowOptions := client.StartWorkflowOptions{
 		TaskQueue: internalmsgworkflow.WorkflowBroadcastInternalMessageQueueName,
 	}
