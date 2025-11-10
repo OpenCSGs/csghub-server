@@ -8,6 +8,7 @@ package component
 
 import (
 	"context"
+
 	"github.com/google/wire"
 	"github.com/stretchr/testify/mock"
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/accounting"
@@ -223,9 +224,11 @@ func initializeTestSpaceComponent(ctx context.Context, t interface {
 	mockGitServer := gitserver.NewMockGitServer(t)
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockAccountingComponent := component.NewMockAccountingComponent(t)
+	mockAgentComponent := component.NewMockAgentComponent(t)
 	config := ProvideTestConfig()
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
 	componentSpaceComponentImpl := NewTestSpaceComponent(mockStores, mockRepoComponent, mockGitServer, mockDeployer, mockAccountingComponent, config, mockUserSvcClient)
+	componentSpaceComponentImpl.agentComponent = mockAgentComponent
 	mockTagComponent := component.NewMockTagComponent(t)
 	mockSpaceComponent := component.NewMockSpaceComponent(t)
 	mockRuntimeArchitectureComponent := component.NewMockRuntimeArchitectureComponent(t)
@@ -268,6 +271,7 @@ func initializeTestSpaceComponent(ctx context.Context, t interface {
 		multiSyncClient:  multisyncMockClient,
 		s3Core:           mockCore,
 		checker:          mockGitCallbackChecker,
+		agentComponent:   mockAgentComponent,
 	}
 	componentTestSpaceWithMocks := &testSpaceWithMocks{
 		spaceComponentImpl: componentSpaceComponentImpl,
@@ -1458,7 +1462,15 @@ func initializeTestEvaluationComponent(ctx context.Context, t interface {
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockAccountingComponent := component.NewMockAccountingComponent(t)
 	mockRepoComponent := component.NewMockRepoComponent(t)
-	componentEvaluationComponentImpl := NewTestEvaluationComponent(config, mockStores, mockDeployer, mockAccountingComponent, mockRepoComponent)
+	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
+	componentEvaluationComponentImpl := NewTestEvaluationComponent(
+		config,
+		mockStores,
+		mockDeployer,
+		mockAccountingComponent,
+		mockRepoComponent,
+		mockUserSvcClient,
+	)
 	mockTagComponent := component.NewMockTagComponent(t)
 	mockSpaceComponent := component.NewMockSpaceComponent(t)
 	mockRuntimeArchitectureComponent := component.NewMockRuntimeArchitectureComponent(t)
@@ -1472,7 +1484,6 @@ func initializeTestEvaluationComponent(ctx context.Context, t interface {
 		sensitive:           mockSensitiveComponent,
 	}
 	mockGitServer := gitserver.NewMockGitServer(t)
-	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
 	mockClient := s3.NewMockClient(t)
 	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
 	mockCache := cache.NewMockCache(t)
