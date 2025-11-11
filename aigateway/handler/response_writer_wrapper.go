@@ -146,7 +146,10 @@ func (rw *ResponseWriterWrapper) streamWrite(data []byte) (int, error) {
 				}
 				rw.writeInternal(event.Raw)
 			} else {
-				panic("unsupported chunk struct")
+				slog.Error("Unknown data struct",
+					slog.Any("raw data", event.Raw),
+					slog.Any("unmarshal chunk", chunk))
+				rw.writeInternal(event.Raw)
 			}
 		}
 	}
@@ -182,7 +185,7 @@ func (rw *ResponseWriterWrapper) generateSensitiveRespForContent(curChunk types.
 		Model: curChunk.Model,
 		Choices: []types.ChatCompletionChunkChoice{
 			{
-				Delta: types.ChatCompletionChunkChoicesDelta{
+				Delta: types.ChatCompletionChunkChoiceDelta{
 					Content: "The message includes inappropriate content and has been blocked. We appreciate your understanding and cooperation.",
 				},
 				FinishReason: "sensitive",
@@ -200,7 +203,7 @@ func generateSensitiveRespForPrompt() types.ChatCompletionChunk {
 	newChunk := types.ChatCompletionChunk{
 		Choices: []types.ChatCompletionChunkChoice{
 			{
-				Delta: types.ChatCompletionChunkChoicesDelta{
+				Delta: types.ChatCompletionChunkChoiceDelta{
 					Content: "The prompt includes inappropriate content and has been blocked. We appreciate your understanding and cooperation.",
 				},
 				FinishReason: "sensitive",
@@ -217,7 +220,7 @@ func (rw *ResponseWriterWrapper) generateSensitiveRespForReasoningContent(curChu
 		Model: curChunk.Model,
 		Choices: []types.ChatCompletionChunkChoice{
 			{
-				Delta: types.ChatCompletionChunkChoicesDelta{
+				Delta: types.ChatCompletionChunkChoiceDelta{
 					ReasoningContent: "The message includes inappropriate content and has been blocked. We appreciate your understanding and cooperation.",
 				},
 				FinishReason: "sensitive",

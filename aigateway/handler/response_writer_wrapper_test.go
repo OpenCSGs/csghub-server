@@ -90,3 +90,17 @@ func TestResponseWriterWrapper_StreamWrite_WithWhiteSpace(t *testing.T) {
 		})
 	}
 }
+
+func TestResponseWriterWrapper_ToolCalls_SkipModeration(t *testing.T) {
+	raw := []byte(`data: {"id":"test-id","object":"chat.completion.chunk","created":1700000000,"model":"gpt-4o","choices":[{"index":0,"delta":{"tool_calls":[{"name":"tool_name","arguments":{"arg1":"value1"}}]},"finish_reason":null}]}` + "\n\n")
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	wrapper := NewResponseWriterWrapper(ctx.Writer, true)
+	modSvcClient := rpcmock.NewMockModerationSvcClient(t)
+	wrapper.WithModeration(modSvcClient)
+	n, err := wrapper.Write(raw)
+	assert.NoError(t, err)
+	assert.Equal(t, len(raw), n)
+	assert.Equal(t, w.Body.String(), string(raw))
+	modSvcClient.AssertNotCalled(t, "PassTextCheck")
+}

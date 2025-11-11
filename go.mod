@@ -38,6 +38,7 @@ require (
 	github.com/nyaruka/phonenumbers v1.6.5
 	github.com/openai/openai-go/v3 v3.8.1
 	github.com/oschwald/geoip2-golang/v2 v2.0.0
+	github.com/openai/openai-go/v3 v3.8.1
 	github.com/parquet-go/parquet-go v0.24.0
 	github.com/prometheus/client_golang v1.21.1
 	github.com/redis/go-redis/v9 v9.5.5
