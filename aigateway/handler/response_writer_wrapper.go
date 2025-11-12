@@ -36,6 +36,7 @@ var _ http.Hijacker = (*ResponseWriterWrapper)(nil)
 
 type ResponseWriterWrapper struct {
 	internalWritter    gin.ResponseWriter
+	originHeader       http.Header
 	modSvcClient       rpc.ModerationSvcClient
 	eventStreamDecoder *eventStreamDecoder
 	tokenCounter       *token.ChatTokenCounter
@@ -79,6 +80,8 @@ func (rw *ResponseWriterWrapper) Header() http.Header {
 }
 
 func (rw *ResponseWriterWrapper) WriteHeader(statusCode int) {
+	rw.originHeader = rw.internalWritter.Header().Clone()
+	rw.internalWritter.Header().Del("Content-Encoding")
 	rw.internalWritter.WriteHeader(statusCode)
 }
 
