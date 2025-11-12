@@ -3,6 +3,8 @@ package router
 import (
 	"fmt"
 
+	"opencsg.com/csghub-server/builder/instrumentation"
+
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/aigateway/handler"
 	"opencsg.com/csghub-server/api/middleware"
@@ -11,8 +13,7 @@ import (
 
 func NewRouter(config *config.Config) (*gin.Engine, error) {
 	r := gin.New()
-	r.Use(gin.Recovery())
-	r.Use(middleware.Log(config))
+	middleware.SetInfraMiddleware(r, config, instrumentation.Aigateway)
 	//to access model,fintune with any kind of tokens in auth header
 	r.Use(middleware.Authenticator(config))
 	mustLogin := middleware.MustLogin()
@@ -41,6 +42,5 @@ func CreateMCPRoute(v1Group *gin.RouterGroup, mcpProxy handler.MCPProxyHandler) 
 	mcpGroup.GET("/servers", mcpProxy.List)
 
 	// todo: enable mcp server proxy later
-	// mcpGroup.GET("/:servicename/sse", mcpProxy.ProxyToApi("/sse"))
-	// mcpGroup.Any("/:servicename/messages/", mcpProxy.ProxyToApi("/messages/"))
+	mcpGroup.Any("/:servicename/*any", mcpProxy.ProxyToApi(""))
 }

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -9,6 +10,7 @@ import (
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/builder/proxy"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
 	"opencsg.com/csghub-server/component"
@@ -73,7 +75,25 @@ func (m *MCPProxyHandlerImpl) ProxyToApi(api string) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		svcName := ctx.Param("servicename")
 		slog.Debug("mcp proxy", slog.Any("svcName", svcName))
-		target := ""
+		mcpService, err := m.spaceComp.GetMCPServiceBySvcName(ctx.Request.Context(), svcName)
+		if err != nil {
+			if errors.Is(err, errorx.ErrNotFound) {
+				httpbase.NotFoundError(ctx, fmt.Errorf("mcp service '%s' not found", svcName))
+				return
+			}
+			slog.Error("fail to get mcp space", slog.Any("err", err), slog.String("svcName", svcName))
+			httpbase.ServerError(ctx, err)
+			return
+		}
+
+		if mcpService.Endpoint == "" {
+			err := fmt.Errorf("mcp service '%s' is not running or has no endpoint", svcName)
+			slog.Error("mcp space endpoint is empty", slog.Any("err", err), slog.String("svcName", svcName))
+			httpbase.ServerError(ctx, err)
+			return
+		}
+		api := ctx.Param("any")
+		target := mcpService.Endpoint
 		rp, err := proxy.NewReverseProxy(target)
 		if err != nil {
 			slog.Error("fail to create mcp reverse proxy", slog.Any("err", err))
