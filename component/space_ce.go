@@ -50,6 +50,8 @@ func NewSpaceComponent(config *config.Config) (SpaceComponent, error) {
 	if err != nil {
 		return nil, err
 	}
+	c.csgbotSvcClient = rpc.NewCsgbotSvcHttpClient(fmt.Sprintf("%s:%d", config.CSGBot.Host, config.CSGBot.Port),
+		rpc.AuthWithApiKey(config.APIToken))
 	return c, nil
 }
 
@@ -72,6 +74,7 @@ type spaceComponentImpl struct {
 	recomStore          database.RecomStore
 	templateStore       database.SpaceTemplateStore
 	agentComponent      AgentComponent
+	csgbotSvcClient     rpc.CsgbotSvcClient
 }
 
 func (c *spaceComponentImpl) checkResourcePurchasableForUpdate(ctx context.Context, req types.UpdateSpaceReq, resource *database.SpaceResource) error {

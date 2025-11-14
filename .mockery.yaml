@@ -87,6 +87,7 @@ packages:
       PaymentSvcClient:
       SSOInterface:
       AgentHubSvcClient:
+      CsgbotSvcClient:
   opencsg.com/csghub-server/builder/llm:
     config:
     interfaces:

@@ -155,7 +155,7 @@ func TestCodeAgentInstanceAdapter_DeleteInstance(t *testing.T) {
 		userUUID      string
 		contentID     string
 		expectErr     bool
-		mockSetup     func(*mockcomponent.MockSpaceComponent, *mockrpc.MockUserSvcClient)
+		mockSetup     func(*mockcomponent.MockSpaceComponent, *mockrpc.MockUserSvcClient, *mockrpc.MockCsgbotSvcClient)
 		expectedError string
 	}{
 		{
@@ -163,12 +163,14 @@ func TestCodeAgentInstanceAdapter_DeleteInstance(t *testing.T) {
 			userUUID:  "test-user-uuid",
 			contentID: "namespace/name",
 			expectErr: false,
-			mockSetup: func(mockSpaceComponent *mockcomponent.MockSpaceComponent, mockUserSvcClient *mockrpc.MockUserSvcClient) {
+			mockSetup: func(mockSpaceComponent *mockcomponent.MockSpaceComponent, mockUserSvcClient *mockrpc.MockUserSvcClient, mockCsgbotSvcClient *mockrpc.MockCsgbotSvcClient) {
 				mockUserSvcClient.EXPECT().FindByUUIDs(ctx, []string{"test-user-uuid"}).Return(map[string]*types.User{
 					"test-user-uuid": {
 						Username: "testuser",
 					},
 				}, nil)
+				mockUserSvcClient.EXPECT().GetOrCreateFirstAvaiTokens(ctx, "test-user-uuid", "testuser", string(types.AccessTokenAppGit), "csgbot").Return("test-token", nil)
+				mockCsgbotSvcClient.EXPECT().DeleteWorkspaceFiles(ctx, "test-user-uuid", "testuser", "test-token", "name").Return(nil)
 				mockSpaceComponent.EXPECT().Delete(ctx, "namespace", "name", "testuser").Return(nil)
 			},
 		},
@@ -178,7 +180,7 @@ func TestCodeAgentInstanceAdapter_DeleteInstance(t *testing.T) {
 			contentID:     "invalid",
 			expectErr:     true,
 			expectedError: "invalid contentID: invalid",
-			mockSetup:     func(*mockcomponent.MockSpaceComponent, *mockrpc.MockUserSvcClient) {},
+			mockSetup:     func(*mockcomponent.MockSpaceComponent, *mockrpc.MockUserSvcClient, *mockrpc.MockCsgbotSvcClient) {},
 		},
 		{
 			name:          "invalid contentID - multiple slashes",
@@ -186,7 +188,7 @@ func TestCodeAgentInstanceAdapter_DeleteInstance(t *testing.T) {
 			contentID:     "namespace/name/extra",
 			expectErr:     true,
 			expectedError: "invalid contentID: namespace/name/extra",
-			mockSetup:     func(*mockcomponent.MockSpaceComponent, *mockrpc.MockUserSvcClient) {},
+			mockSetup:     func(*mockcomponent.MockSpaceComponent, *mockrpc.MockUserSvcClient, *mockrpc.MockCsgbotSvcClient) {},
 		},
 		{
 			name:          "invalid contentID - empty",
@@ -194,14 +196,14 @@ func TestCodeAgentInstanceAdapter_DeleteInstance(t *testing.T) {
 			contentID:     "",
 			expectErr:     true,
 			expectedError: "invalid contentID: ",
-			mockSetup:     func(*mockcomponent.MockSpaceComponent, *mockrpc.MockUserSvcClient) {},
+			mockSetup:     func(*mockcomponent.MockSpaceComponent, *mockrpc.MockUserSvcClient, *mockrpc.MockCsgbotSvcClient) {},
 		},
 		{
 			name:      "user not found",
 			userUUID:  "test-user-uuid",
 			contentID: "namespace/name",
 			expectErr: true,
-			mockSetup: func(mockSpaceComponent *mockcomponent.MockSpaceComponent, mockUserSvcClient *mockrpc.MockUserSvcClient) {
+			mockSetup: func(mockSpaceComponent *mockcomponent.MockSpaceComponent, mockUserSvcClient *mockrpc.MockUserSvcClient, mockCsgbotSvcClient *mockrpc.MockCsgbotSvcClient) {
 				mockUserSvcClient.EXPECT().FindByUUIDs(ctx, []string{"test-user-uuid"}).Return(map[string]*types.User{}, nil)
 			},
 			expectedError: "user not found: test-user-uuid",
@@ -211,7 +213,7 @@ func TestCodeAgentInstanceAdapter_DeleteInstance(t *testing.T) {
 			userUUID:  "test-user-uuid",
 			contentID: "namespace/name",
 			expectErr: true,
-			mockSetup: func(mockSpaceComponent *mockcomponent.MockSpaceComponent, mockUserSvcClient *mockrpc.MockUserSvcClient) {
+			mockSetup: func(mockSpaceComponent *mockcomponent.MockSpaceComponent, mockUserSvcClient *mockrpc.MockUserSvcClient, mockCsgbotSvcClient *mockrpc.MockCsgbotSvcClient) {
 				mockUserSvcClient.EXPECT().FindByUUIDs(ctx, []string{"test-user-uuid"}).Return(map[string]*types.User{
 					"test-user-uuid": nil,
 				}, nil)
@@ -223,22 +225,70 @@ func TestCodeAgentInstanceAdapter_DeleteInstance(t *testing.T) {
 			userUUID:  "test-user-uuid",
 			contentID: "namespace/name",
 			expectErr: true,
-			mockSetup: func(mockSpaceComponent *mockcomponent.MockSpaceComponent, mockUserSvcClient *mockrpc.MockUserSvcClient) {
+			mockSetup: func(mockSpaceComponent *mockcomponent.MockSpaceComponent, mockUserSvcClient *mockrpc.MockUserSvcClient, mockCsgbotSvcClient *mockrpc.MockCsgbotSvcClient) {
 				mockUserSvcClient.EXPECT().FindByUUIDs(ctx, []string{"test-user-uuid"}).Return(nil, fmt.Errorf("service unavailable"))
 			},
 			expectedError: "failed to find user: service unavailable",
+		},
+		{
+			name:      "GetOrCreateFirstAvaiTokens error",
+			userUUID:  "test-user-uuid",
+			contentID: "namespace/name",
+			expectErr: false, // deleteWorkspaceFiles errors are logged but don't fail the delete
+			mockSetup: func(mockSpaceComponent *mockcomponent.MockSpaceComponent, mockUserSvcClient *mockrpc.MockUserSvcClient, mockCsgbotSvcClient *mockrpc.MockCsgbotSvcClient) {
+				mockUserSvcClient.EXPECT().FindByUUIDs(ctx, []string{"test-user-uuid"}).Return(map[string]*types.User{
+					"test-user-uuid": {
+						Username: "testuser",
+					},
+				}, nil)
+				mockUserSvcClient.EXPECT().GetOrCreateFirstAvaiTokens(ctx, "test-user-uuid", "testuser", string(types.AccessTokenAppGit), "csgbot").Return("", fmt.Errorf("token error"))
+				mockSpaceComponent.EXPECT().Delete(ctx, "namespace", "name", "testuser").Return(nil)
+			},
+		},
+		{
+			name:      "GetOrCreateFirstAvaiTokens returns empty token",
+			userUUID:  "test-user-uuid",
+			contentID: "namespace/name",
+			expectErr: false, // deleteWorkspaceFiles errors are logged but don't fail the delete
+			mockSetup: func(mockSpaceComponent *mockcomponent.MockSpaceComponent, mockUserSvcClient *mockrpc.MockUserSvcClient, mockCsgbotSvcClient *mockrpc.MockCsgbotSvcClient) {
+				mockUserSvcClient.EXPECT().FindByUUIDs(ctx, []string{"test-user-uuid"}).Return(map[string]*types.User{
+					"test-user-uuid": {
+						Username: "testuser",
+					},
+				}, nil)
+				mockUserSvcClient.EXPECT().GetOrCreateFirstAvaiTokens(ctx, "test-user-uuid", "testuser", string(types.AccessTokenAppGit), "csgbot").Return("", nil)
+				mockSpaceComponent.EXPECT().Delete(ctx, "namespace", "name", "testuser").Return(nil)
+			},
+		},
+		{
+			name:      "DeleteWorkspaceFiles error",
+			userUUID:  "test-user-uuid",
+			contentID: "namespace/name",
+			expectErr: false, // deleteWorkspaceFiles errors are logged but don't fail the delete
+			mockSetup: func(mockSpaceComponent *mockcomponent.MockSpaceComponent, mockUserSvcClient *mockrpc.MockUserSvcClient, mockCsgbotSvcClient *mockrpc.MockCsgbotSvcClient) {
+				mockUserSvcClient.EXPECT().FindByUUIDs(ctx, []string{"test-user-uuid"}).Return(map[string]*types.User{
+					"test-user-uuid": {
+						Username: "testuser",
+					},
+				}, nil)
+				mockUserSvcClient.EXPECT().GetOrCreateFirstAvaiTokens(ctx, "test-user-uuid", "testuser", string(types.AccessTokenAppGit), "csgbot").Return("test-token", nil)
+				mockCsgbotSvcClient.EXPECT().DeleteWorkspaceFiles(ctx, "test-user-uuid", "testuser", "test-token", "name").Return(fmt.Errorf("delete workspace files failed"))
+				mockSpaceComponent.EXPECT().Delete(ctx, "namespace", "name", "testuser").Return(nil)
+			},
 		},
 		{
 			name:      "spaceComponent.Delete error",
 			userUUID:  "test-user-uuid",
 			contentID: "namespace/name",
 			expectErr: true,
-			mockSetup: func(mockSpaceComponent *mockcomponent.MockSpaceComponent, mockUserSvcClient *mockrpc.MockUserSvcClient) {
+			mockSetup: func(mockSpaceComponent *mockcomponent.MockSpaceComponent, mockUserSvcClient *mockrpc.MockUserSvcClient, mockCsgbotSvcClient *mockrpc.MockCsgbotSvcClient) {
 				mockUserSvcClient.EXPECT().FindByUUIDs(ctx, []string{"test-user-uuid"}).Return(map[string]*types.User{
 					"test-user-uuid": {
 						Username: "testuser",
 					},
 				}, nil)
+				mockUserSvcClient.EXPECT().GetOrCreateFirstAvaiTokens(ctx, "test-user-uuid", "testuser", string(types.AccessTokenAppGit), "csgbot").Return("test-token", nil)
+				mockCsgbotSvcClient.EXPECT().DeleteWorkspaceFiles(ctx, "test-user-uuid", "testuser", "test-token", "name").Return(nil)
 				mockSpaceComponent.EXPECT().Delete(ctx, "namespace", "name", "testuser").Return(fmt.Errorf("delete failed"))
 			},
 			expectedError: "delete failed",
@@ -249,13 +299,15 @@ func TestCodeAgentInstanceAdapter_DeleteInstance(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mockSpaceComponent := mockcomponent.NewMockSpaceComponent(t)
 			mockUserSvcClient := mockrpc.NewMockUserSvcClient(t)
+			mockCsgbotSvcClient := mockrpc.NewMockCsgbotSvcClient(t)
 
 			adapter := &CodeAgentInstanceAdapter{
-				spaceComponent: mockSpaceComponent,
-				userSvcClient:  mockUserSvcClient,
+				spaceComponent:  mockSpaceComponent,
+				userSvcClient:   mockUserSvcClient,
+				csgbotSvcClient: mockCsgbotSvcClient,
 			}
 
-			tt.mockSetup(mockSpaceComponent, mockUserSvcClient)
+			tt.mockSetup(mockSpaceComponent, mockUserSvcClient, mockCsgbotSvcClient)
 
 			err := adapter.DeleteInstance(ctx, tt.userUUID, tt.contentID)
 
@@ -359,10 +411,12 @@ func TestCodeAgentInstanceAdapter_DeleteInstance_ContextCancellation(t *testing.
 	ctx := context.TODO()
 	mockSpaceComponent := mockcomponent.NewMockSpaceComponent(t)
 	mockUserSvcClient := mockrpc.NewMockUserSvcClient(t)
+	mockCsgbotSvcClient := mockrpc.NewMockCsgbotSvcClient(t)
 
 	adapter := &CodeAgentInstanceAdapter{
-		spaceComponent: mockSpaceComponent,
-		userSvcClient:  mockUserSvcClient,
+		spaceComponent:  mockSpaceComponent,
+		userSvcClient:   mockUserSvcClient,
+		csgbotSvcClient: mockCsgbotSvcClient,
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	cancel() // Cancel the context immediately
@@ -376,6 +430,8 @@ func TestCodeAgentInstanceAdapter_DeleteInstance_ContextCancellation(t *testing.
 			Username: "testuser",
 		},
 	}, nil)
+	mockUserSvcClient.EXPECT().GetOrCreateFirstAvaiTokens(mock.Anything, "test-user-uuid", "testuser", string(types.AccessTokenAppGit), "csgbot").Return("test-token", nil)
+	mockCsgbotSvcClient.EXPECT().DeleteWorkspaceFiles(mock.Anything, "test-user-uuid", "testuser", "test-token", "name").Return(nil)
 	mockSpaceComponent.EXPECT().Delete(mock.Anything, "namespace", "name", "testuser").Return(nil)
 
 	// Even with cancelled context, the method should still work

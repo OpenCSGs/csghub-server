@@ -9,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	mock_rpc "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/git/membership"
@@ -674,6 +675,7 @@ func TestSpaceComponent_syncCodeAgentIfExists(t *testing.T) {
 	sc := initializeTestSpaceComponent(ctx, t)
 
 	userUUID := "test-user-uuid"
+	username := "test-username"
 	repoPath := "test-namespace/test-repo"
 	operation := types.CodeAgentSyncOperationUpdate
 
@@ -700,7 +702,7 @@ func TestSpaceComponent_syncCodeAgentIfExists(t *testing.T) {
 			Once()
 
 		// Call the function
-		sc.syncCodeAgentIfExists(userUUID, repoPath, operation)
+		sc.syncCodeAgentIfExists(userUUID, username, repoPath, operation)
 
 		// Wait for the goroutine to complete
 		wg.Wait()
@@ -708,14 +710,37 @@ func TestSpaceComponent_syncCodeAgentIfExists(t *testing.T) {
 
 	t.Run("agent instance exists - delete operation", func(t *testing.T) {
 		var wg sync.WaitGroup
-		wg.Add(2)
+		wg.Add(4)
 		operation := types.CodeAgentSyncOperationDelete
+
+		// Create and set mock csgbotSvcClient
+		mockCsgbotSvcClient := mock_rpc.NewMockCsgbotSvcClient(t)
+		sc.csgbotSvcClient = mockCsgbotSvcClient
 
 		// Mock the agent component to return that instance exists
 		sc.mocks.agentComponent.EXPECT().
 			IsInstanceExistsByContentID(mock.Anything, types.AgentTypeCode.String(), repoPath).
 			Return(true, nil).
 			Run(func(ctx context.Context, instanceType string, instanceContentID string) {
+				wg.Done()
+			}).
+			Once()
+
+		// Mock user rpc to get or create token
+		testToken := "test-token"
+		sc.mocks.userSvcClient.EXPECT().
+			GetOrCreateFirstAvaiTokens(mock.Anything, userUUID, username, string(types.AccessTokenAppGit), "csgbot").
+			Return(testToken, nil).
+			Run(func(ctx context.Context, userName string, visitorName string, app string, tokenName string) {
+				wg.Done()
+			}).
+			Once()
+
+		// Mock csgbot rpc to delete workspace files
+		mockCsgbotSvcClient.EXPECT().
+			DeleteWorkspaceFiles(mock.Anything, userUUID, username, testToken, "test-repo").
+			Return(nil).
+			Run(func(ctx context.Context, userUUID string, username string, token string, contentID string) {
 				wg.Done()
 			}).
 			Once()
@@ -730,7 +755,7 @@ func TestSpaceComponent_syncCodeAgentIfExists(t *testing.T) {
 			Once()
 
 		// Call the function
-		sc.syncCodeAgentIfExists(userUUID, repoPath, operation)
+		sc.syncCodeAgentIfExists(userUUID, username, repoPath, operation)
 
 		// Wait for the goroutine to complete
 		wg.Wait()
@@ -750,7 +775,7 @@ func TestSpaceComponent_syncCodeAgentIfExists(t *testing.T) {
 			Once()
 
 		// Call the function
-		sc.syncCodeAgentIfExists(userUUID, repoPath, operation)
+		sc.syncCodeAgentIfExists(userUUID, username, repoPath, operation)
 
 		// Wait for the goroutine to complete
 		wg.Wait()
@@ -770,7 +795,7 @@ func TestSpaceComponent_syncCodeAgentIfExists(t *testing.T) {
 			Once()
 
 		// Call the function
-		sc.syncCodeAgentIfExists(userUUID, repoPath, operation)
+		sc.syncCodeAgentIfExists(userUUID, username, repoPath, operation)
 
 		// Wait for the goroutine to complete
 		wg.Wait()
@@ -791,7 +816,7 @@ func TestSpaceComponent_syncCodeAgentIfExists(t *testing.T) {
 			Once()
 
 		// Call the function
-		sc.syncCodeAgentIfExists(userUUID, repoPath, unknownOperation)
+		sc.syncCodeAgentIfExists(userUUID, username, repoPath, unknownOperation)
 
 		// Wait for the goroutine to complete
 		wg.Wait()
@@ -840,8 +865,26 @@ func TestSpaceComponent_handleAgentSyncForDelete(t *testing.T) {
 
 	userUUID := "test-user-uuid"
 	repoPath := "test-namespace/test-repo"
+	username := "test-username"
 
 	t.Run("successful delete", func(t *testing.T) {
+		// Create and set mock csgbotSvcClient
+		mockCsgbotSvcClient := mock_rpc.NewMockCsgbotSvcClient(t)
+		sc.csgbotSvcClient = mockCsgbotSvcClient
+
+		testToken := "test-token"
+		// Mock user rpc to get or create token
+		sc.mocks.userSvcClient.EXPECT().
+			GetOrCreateFirstAvaiTokens(ctx, userUUID, username, string(types.AccessTokenAppGit), "csgbot").
+			Return(testToken, nil).
+			Once()
+
+		// Mock csgbot rpc to delete workspace files
+		mockCsgbotSvcClient.EXPECT().
+			DeleteWorkspaceFiles(ctx, userUUID, username, testToken, "test-repo").
+			Return(nil).
+			Once()
+
 		// Mock the delete operation
 		sc.mocks.agentComponent.EXPECT().
 			DeleteInstanceByContentID(ctx, userUUID, types.AgentTypeCode.String(), repoPath).
@@ -849,10 +892,27 @@ func TestSpaceComponent_handleAgentSyncForDelete(t *testing.T) {
 			Once()
 
 		// Call the function
-		sc.handleAgentSyncForDelete(ctx, userUUID, repoPath)
+		sc.handleAgentSyncForDelete(ctx, userUUID, username, repoPath)
 	})
 
 	t.Run("delete fails", func(t *testing.T) {
+		// Create and set mock csgbotSvcClient
+		mockCsgbotSvcClient := mock_rpc.NewMockCsgbotSvcClient(t)
+		sc.csgbotSvcClient = mockCsgbotSvcClient
+
+		testToken := "test-token"
+		// Mock user rpc to get or create token
+		sc.mocks.userSvcClient.EXPECT().
+			GetOrCreateFirstAvaiTokens(ctx, userUUID, username, string(types.AccessTokenAppGit), "csgbot").
+			Return(testToken, nil).
+			Once()
+
+		// Mock csgbot rpc to delete workspace files
+		mockCsgbotSvcClient.EXPECT().
+			DeleteWorkspaceFiles(ctx, userUUID, username, testToken, "test-repo").
+			Return(nil).
+			Once()
+
 		// Mock the delete operation to return an error
 		sc.mocks.agentComponent.EXPECT().
 			DeleteInstanceByContentID(ctx, userUUID, types.AgentTypeCode.String(), repoPath).
@@ -860,6 +920,6 @@ func TestSpaceComponent_handleAgentSyncForDelete(t *testing.T) {
 			Once()
 
 		// Call the function
-		sc.handleAgentSyncForDelete(ctx, userUUID, repoPath)
+		sc.handleAgentSyncForDelete(ctx, userUUID, username, repoPath)
 	})
 }

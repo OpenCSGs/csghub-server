@@ -795,7 +795,7 @@ func (c *spaceComponentImpl) Delete(ctx context.Context, namespace, name, curren
 		}
 	}()
 
-	c.syncCodeAgentIfExists(repo.User.UUID, repo.Path, types.CodeAgentSyncOperationDelete)
+	c.syncCodeAgentIfExists(repo.User.UUID, repo.User.Username, repo.Path, types.CodeAgentSyncOperationDelete)
 
 	return nil
 }
@@ -895,7 +895,7 @@ func (c *spaceComponentImpl) Deploy(ctx context.Context, namespace, name, curren
 		return -1, err
 	}
 
-	c.syncCodeAgentIfExists(user.UUID, space.Repository.Path, types.CodeAgentSyncOperationUpdate)
+	c.syncCodeAgentIfExists(user.UUID, user.Username, space.Repository.Path, types.CodeAgentSyncOperationUpdate)
 	return deployID, nil
 }
 
@@ -1273,7 +1273,7 @@ const (
 )
 
 // syncCodeAgentIfExists handles agent synchronization for space operations only if the space is a code agent
-func (c *spaceComponentImpl) syncCodeAgentIfExists(userUUID string, repoPath string, operation types.CodeAgentSyncOperation) {
+func (c *spaceComponentImpl) syncCodeAgentIfExists(userUUID string, username string, repoPath string, operation types.CodeAgentSyncOperation) {
 	go func() {
 		agentCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
@@ -1298,7 +1298,7 @@ func (c *spaceComponentImpl) syncCodeAgentIfExists(userUUID string, repoPath str
 		case types.CodeAgentSyncOperationUpdate:
 			c.handleAgentSyncForUpdate(agentCtx, userUUID, repoPath)
 		case types.CodeAgentSyncOperationDelete:
-			c.handleAgentSyncForDelete(agentCtx, userUUID, repoPath)
+			c.handleAgentSyncForDelete(agentCtx, userUUID, username, repoPath)
 		default:
 			slog.Warn("unknown operation for agent sync",
 				slog.String("operation", operation.String()),
@@ -1320,9 +1320,34 @@ func (c *spaceComponentImpl) handleAgentSyncForUpdate(ctx context.Context, userU
 		slog.String("repo_path", repoPath))
 }
 
-func (c *spaceComponentImpl) handleAgentSyncForDelete(ctx context.Context, userUUID, repoPath string) {
-	err := c.agentComponent.DeleteInstanceByContentID(ctx, userUUID, types.AgentTypeCode.String(), repoPath)
+func (c *spaceComponentImpl) deleteCodeAgentWorkspaceFiles(ctx context.Context, userUUID, username, repoPath string) error {
+	token, err := c.userSvcClient.GetOrCreateFirstAvaiTokens(ctx, userUUID, username, string(types.AccessTokenAppGit), "csgbot")
 	if err != nil {
+		return fmt.Errorf("failed to get or create user first git access token for workspace deletion, error: %w", err)
+	}
+	if len(token) == 0 {
+		return fmt.Errorf("can not get user first available access token for workspace deletion")
+	}
+
+	parts := strings.Split(repoPath, "/")
+	if len(parts) != 2 {
+		return fmt.Errorf("invalid repo path: %s", repoPath)
+	}
+	agentName := parts[1]
+	err = c.csgbotSvcClient.DeleteWorkspaceFiles(ctx, userUUID, username, token, agentName)
+	if err != nil {
+		return fmt.Errorf("failed to delete workspace files for code agent, error: %w", err)
+	}
+
+	return nil
+}
+
+func (c *spaceComponentImpl) handleAgentSyncForDelete(ctx context.Context, userUUID, username, repoPath string) {
+	if err := c.deleteCodeAgentWorkspaceFiles(ctx, userUUID, username, repoPath); err != nil {
+		slog.Warn("failed to delete workspace files for code agent", slog.Any("error", err))
+	}
+
+	if err := c.agentComponent.DeleteInstanceByContentID(ctx, userUUID, types.AgentTypeCode.String(), repoPath); err != nil {
 		slog.Error("failed to delete code agent instance in agent server",
 			slog.String("repo_path", repoPath),
 			slog.Any("error", err))

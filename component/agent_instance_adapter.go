@@ -115,8 +115,9 @@ func (a *LangflowAgentInstanceAdapter) IsInstanceRunning(ctx context.Context, us
 
 // CodeAgentInstanceAdapter implements AgentInstanceAdapter for Code instances
 type CodeAgentInstanceAdapter struct {
-	spaceComponent SpaceComponent
-	userSvcClient  rpc.UserSvcClient
+	spaceComponent  SpaceComponent
+	userSvcClient   rpc.UserSvcClient
+	csgbotSvcClient rpc.CsgbotSvcClient
 }
 
 func NewCodeAgentInstanceAdapter(config *config.Config) (AgentInstanceAdapter, error) {
@@ -127,8 +128,9 @@ func NewCodeAgentInstanceAdapter(config *config.Config) (AgentInstanceAdapter, e
 	}
 	userSvcClient := rpc.NewUserSvcHttpClient(fmt.Sprintf("%s:%d", config.User.Host, config.User.Port),
 		rpc.AuthWithApiKey(config.APIToken))
-
-	return &CodeAgentInstanceAdapter{spaceComponent: spaceComponent, userSvcClient: userSvcClient}, nil
+	csgbotSvcClient := rpc.NewCsgbotSvcHttpClient(fmt.Sprintf("%s:%d", config.CSGBot.Host, config.CSGBot.Port),
+		rpc.AuthWithApiKey(config.APIToken))
+	return &CodeAgentInstanceAdapter{spaceComponent: spaceComponent, userSvcClient: userSvcClient, csgbotSvcClient: csgbotSvcClient}, nil
 }
 
 func (a *CodeAgentInstanceAdapter) GetInstanceType() string {
@@ -170,7 +172,31 @@ func (a *CodeAgentInstanceAdapter) DeleteInstance(ctx context.Context, userUUID 
 	}
 
 	username := users[userUUID].Username
+
+	// Delete workspace files for code agent. Code agent may not create a space, so we need to clean up workspace files explicitly.
+	// Note: If a space exists, workspace files will also be deleted when the space is deleted, but this ensures cleanup even when no space was created.
+	if err := a.deleteWorkspaceFiles(ctx, userUUID, username, name); err != nil {
+		slog.Warn("failed to delete workspace files for code agent", "error", err)
+	}
+
 	return a.spaceComponent.Delete(ctx, namespace, name, username)
+}
+
+func (a *CodeAgentInstanceAdapter) deleteWorkspaceFiles(ctx context.Context, userUUID string, username string, agentName string) error {
+	token, err := a.userSvcClient.GetOrCreateFirstAvaiTokens(ctx, userUUID, username, string(types.AccessTokenAppGit), "csgbot")
+	if err != nil {
+		return fmt.Errorf("failed to get or create access token for csgbot: %w", err)
+	}
+	if len(token) == 0 {
+		return fmt.Errorf("can not get access token for csgbot")
+	}
+
+	err = a.csgbotSvcClient.DeleteWorkspaceFiles(ctx, userUUID, username, token, agentName)
+	if err != nil {
+		return fmt.Errorf("failed to delete workspace files for code agent: %w", err)
+	}
+
+	return nil
 }
 
 func (a *CodeAgentInstanceAdapter) UpdateInstance(ctx context.Context, userUUID string, instance *types.AgentInstance) error {
