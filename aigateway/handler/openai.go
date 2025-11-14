@@ -239,7 +239,16 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 		c.String(http.StatusBadRequest, err.Error())
 		return
 	}
-	chatReq.Model = modelName
+
+	var reqMap map[string]interface{}
+	if err := json.Unmarshal(bodyBytes, &reqMap); err != nil {
+		slog.Error("failed to unmarshal request body to map", "error", err)
+		c.String(http.StatusBadRequest, fmt.Errorf("invalid chat completion request body: %w", err).Error())
+		return
+	}
+	// directly update model field in request map
+	reqMap["model"] = modelName
+
 	if chatReq.Stream {
 		c.Writer.Header().Set("Content-Type", "text/event-stream")
 		if !strings.Contains(model.ImageID, "vllm-cpu") {
@@ -248,8 +257,17 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 			}
 		}
 	}
-	c.Request.Body = io.NopCloser(bytes.NewReader(bodyBytes))
-	c.Request.ContentLength = int64(len(bodyBytes))
+
+	// marshal updated request map back to JSON bytes
+	updatedBodyBytes, err := json.Marshal(reqMap)
+	if err != nil {
+		slog.Error("failed to marshal updated request map", "error", err)
+		c.String(http.StatusInternalServerError, fmt.Errorf("failed to process chat request: %w", err).Error())
+		return
+	}
+
+	c.Request.Body = io.NopCloser(bytes.NewReader(updatedBodyBytes))
+	c.Request.ContentLength = int64(len(updatedBodyBytes))
 	rp, _ := proxy.NewReverseProxy(endpoint)
 	slog.Info("proxy chat request to model endpoint", "endpoint", endpoint, "user", username, "model_name", modelName)
 	w := NewResponseWriterWrapper(c.Writer, chatReq.Stream)
@@ -260,7 +278,12 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 	llmTokenCounter := token.NewLLMTokenCounter(tokenizer)
 	for _, msg := range chatReq.Messages {
 		if h.modSvcClient != nil {
-			result, err := h.modComponent.CheckLLMPrompt(c.Request.Context(), msg.Content, userUUID+modelID)
+			content := msg.GetContent().AsAny()
+			msgContent, ok := content.(*string)
+			if !ok {
+				break
+			}
+			result, err := h.modComponent.CheckLLMPrompt(c.Request.Context(), *msgContent, userUUID+modelID)
 			if err != nil {
 				c.String(http.StatusInternalServerError, fmt.Errorf("failed to call moderation error:%w", err).Error())
 				return
@@ -278,8 +301,8 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 			}
 		}
 		llmTokenCounter.AppendPrompts(types.Message{
-			Role:    msg.Role,
-			Content: msg.Content,
+			Role:    *msg.GetRole(),
+			Content: msg.GetContent().AsAny().(*string),
 		})
 	}
 	w.WithLLMTokenCounter(llmTokenCounter)
