@@ -183,7 +183,7 @@ func (a *CodeAgentInstanceAdapter) DeleteInstance(ctx context.Context, userUUID 
 }
 
 func (a *CodeAgentInstanceAdapter) deleteWorkspaceFiles(ctx context.Context, userUUID string, username string, agentName string) error {
-	token, err := a.userSvcClient.GetOrCreateFirstAvaiTokens(ctx, userUUID, username, string(types.AccessTokenAppGit), "csgbot")
+	token, err := a.userSvcClient.GetOrCreateFirstAvaiTokens(ctx, username, username, string(types.AccessTokenAppGit), "csgbot")
 	if err != nil {
 		return fmt.Errorf("failed to get or create access token for csgbot: %w", err)
 	}

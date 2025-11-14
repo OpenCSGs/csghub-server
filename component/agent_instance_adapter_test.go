@@ -169,7 +169,7 @@ func TestCodeAgentInstanceAdapter_DeleteInstance(t *testing.T) {
 						Username: "testuser",
 					},
 				}, nil)
-				mockUserSvcClient.EXPECT().GetOrCreateFirstAvaiTokens(ctx, "test-user-uuid", "testuser", string(types.AccessTokenAppGit), "csgbot").Return("test-token", nil)
+				mockUserSvcClient.EXPECT().GetOrCreateFirstAvaiTokens(ctx, "testuser", "testuser", string(types.AccessTokenAppGit), "csgbot").Return("test-token", nil)
 				mockCsgbotSvcClient.EXPECT().DeleteWorkspaceFiles(ctx, "test-user-uuid", "testuser", "test-token", "name").Return(nil)
 				mockSpaceComponent.EXPECT().Delete(ctx, "namespace", "name", "testuser").Return(nil)
 			},
@@ -241,7 +241,7 @@ func TestCodeAgentInstanceAdapter_DeleteInstance(t *testing.T) {
 						Username: "testuser",
 					},
 				}, nil)
-				mockUserSvcClient.EXPECT().GetOrCreateFirstAvaiTokens(ctx, "test-user-uuid", "testuser", string(types.AccessTokenAppGit), "csgbot").Return("", fmt.Errorf("token error"))
+				mockUserSvcClient.EXPECT().GetOrCreateFirstAvaiTokens(ctx, "testuser", "testuser", string(types.AccessTokenAppGit), "csgbot").Return("", fmt.Errorf("token error"))
 				mockSpaceComponent.EXPECT().Delete(ctx, "namespace", "name", "testuser").Return(nil)
 			},
 		},
@@ -256,7 +256,7 @@ func TestCodeAgentInstanceAdapter_DeleteInstance(t *testing.T) {
 						Username: "testuser",
 					},
 				}, nil)
-				mockUserSvcClient.EXPECT().GetOrCreateFirstAvaiTokens(ctx, "test-user-uuid", "testuser", string(types.AccessTokenAppGit), "csgbot").Return("", nil)
+				mockUserSvcClient.EXPECT().GetOrCreateFirstAvaiTokens(ctx, "testuser", "testuser", string(types.AccessTokenAppGit), "csgbot").Return("", nil)
 				mockSpaceComponent.EXPECT().Delete(ctx, "namespace", "name", "testuser").Return(nil)
 			},
 		},
@@ -271,7 +271,7 @@ func TestCodeAgentInstanceAdapter_DeleteInstance(t *testing.T) {
 						Username: "testuser",
 					},
 				}, nil)
-				mockUserSvcClient.EXPECT().GetOrCreateFirstAvaiTokens(ctx, "test-user-uuid", "testuser", string(types.AccessTokenAppGit), "csgbot").Return("test-token", nil)
+				mockUserSvcClient.EXPECT().GetOrCreateFirstAvaiTokens(ctx, "testuser", "testuser", string(types.AccessTokenAppGit), "csgbot").Return("test-token", nil)
 				mockCsgbotSvcClient.EXPECT().DeleteWorkspaceFiles(ctx, "test-user-uuid", "testuser", "test-token", "name").Return(fmt.Errorf("delete workspace files failed"))
 				mockSpaceComponent.EXPECT().Delete(ctx, "namespace", "name", "testuser").Return(nil)
 			},
@@ -287,7 +287,7 @@ func TestCodeAgentInstanceAdapter_DeleteInstance(t *testing.T) {
 						Username: "testuser",
 					},
 				}, nil)
-				mockUserSvcClient.EXPECT().GetOrCreateFirstAvaiTokens(ctx, "test-user-uuid", "testuser", string(types.AccessTokenAppGit), "csgbot").Return("test-token", nil)
+				mockUserSvcClient.EXPECT().GetOrCreateFirstAvaiTokens(ctx, "testuser", "testuser", string(types.AccessTokenAppGit), "csgbot").Return("test-token", nil)
 				mockCsgbotSvcClient.EXPECT().DeleteWorkspaceFiles(ctx, "test-user-uuid", "testuser", "test-token", "name").Return(nil)
 				mockSpaceComponent.EXPECT().Delete(ctx, "namespace", "name", "testuser").Return(fmt.Errorf("delete failed"))
 			},
@@ -430,7 +430,7 @@ func TestCodeAgentInstanceAdapter_DeleteInstance_ContextCancellation(t *testing.
 			Username: "testuser",
 		},
 	}, nil)
-	mockUserSvcClient.EXPECT().GetOrCreateFirstAvaiTokens(mock.Anything, "test-user-uuid", "testuser", string(types.AccessTokenAppGit), "csgbot").Return("test-token", nil)
+	mockUserSvcClient.EXPECT().GetOrCreateFirstAvaiTokens(mock.Anything, "testuser", "testuser", string(types.AccessTokenAppGit), "csgbot").Return("test-token", nil)
 	mockCsgbotSvcClient.EXPECT().DeleteWorkspaceFiles(mock.Anything, "test-user-uuid", "testuser", "test-token", "name").Return(nil)
 	mockSpaceComponent.EXPECT().Delete(mock.Anything, "namespace", "name", "testuser").Return(nil)
 

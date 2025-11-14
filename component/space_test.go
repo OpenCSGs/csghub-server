@@ -729,7 +729,7 @@ func TestSpaceComponent_syncCodeAgentIfExists(t *testing.T) {
 		// Mock user rpc to get or create token
 		testToken := "test-token"
 		sc.mocks.userSvcClient.EXPECT().
-			GetOrCreateFirstAvaiTokens(mock.Anything, userUUID, username, string(types.AccessTokenAppGit), "csgbot").
+			GetOrCreateFirstAvaiTokens(mock.Anything, username, username, string(types.AccessTokenAppGit), "csgbot").
 			Return(testToken, nil).
 			Run(func(ctx context.Context, userName string, visitorName string, app string, tokenName string) {
 				wg.Done()
@@ -875,7 +875,7 @@ func TestSpaceComponent_handleAgentSyncForDelete(t *testing.T) {
 		testToken := "test-token"
 		// Mock user rpc to get or create token
 		sc.mocks.userSvcClient.EXPECT().
-			GetOrCreateFirstAvaiTokens(ctx, userUUID, username, string(types.AccessTokenAppGit), "csgbot").
+			GetOrCreateFirstAvaiTokens(ctx, username, username, string(types.AccessTokenAppGit), "csgbot").
 			Return(testToken, nil).
 			Once()
 
@@ -903,7 +903,7 @@ func TestSpaceComponent_handleAgentSyncForDelete(t *testing.T) {
 		testToken := "test-token"
 		// Mock user rpc to get or create token
 		sc.mocks.userSvcClient.EXPECT().
-			GetOrCreateFirstAvaiTokens(ctx, userUUID, username, string(types.AccessTokenAppGit), "csgbot").
+			GetOrCreateFirstAvaiTokens(ctx, username, username, string(types.AccessTokenAppGit), "csgbot").
 			Return(testToken, nil).
 			Once()
 

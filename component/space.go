@@ -1321,7 +1321,7 @@ func (c *spaceComponentImpl) handleAgentSyncForUpdate(ctx context.Context, userU
 }
 
 func (c *spaceComponentImpl) deleteCodeAgentWorkspaceFiles(ctx context.Context, userUUID, username, repoPath string) error {
-	token, err := c.userSvcClient.GetOrCreateFirstAvaiTokens(ctx, userUUID, username, string(types.AccessTokenAppGit), "csgbot")
+	token, err := c.userSvcClient.GetOrCreateFirstAvaiTokens(ctx, username, username, string(types.AccessTokenAppGit), "csgbot")
 	if err != nil {
 		return fmt.Errorf("failed to get or create user first git access token for workspace deletion, error: %w", err)
 	}
