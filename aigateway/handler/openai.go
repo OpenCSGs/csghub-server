@@ -2,6 +2,7 @@ package handler
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -18,6 +19,7 @@ import (
 	"opencsg.com/csghub-server/builder/proxy"
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/sensitive"
+	"opencsg.com/csghub-server/builder/store/cache"
 	"opencsg.com/csghub-server/common/config"
 	apicomp "opencsg.com/csghub-server/component"
 )
@@ -46,14 +48,29 @@ func NewOpenAIHandlerFromConfig(config *config.Config) (OpenAIHandler, error) {
 	if config.SensitiveCheck.Enable {
 		modSvcClient = rpc.NewModerationSvcHttpClient(fmt.Sprintf("%s:%d", config.Moderation.Host, config.Moderation.Port))
 	}
-	return NewOpenAIHandler(modelService, repoComp, modSvcClient), nil
+	cacheClient, err := cache.NewCache(context.Background(), cache.RedisConfig{
+		Addr:     config.Redis.Endpoint,
+		Username: config.Redis.User,
+		Password: config.Redis.Password,
+	})
+	if err != nil {
+		return nil, err
+	}
+	modComponent := component.NewModerationImplWithClient(modSvcClient, cacheClient)
+	return newOpenAIHandler(modelService, repoComp, modSvcClient, modComponent), nil
 }
 
-func NewOpenAIHandler(modelService component.OpenAIComponent, repoComp apicomp.RepoComponent, modSvcClient rpc.ModerationSvcClient) OpenAIHandler {
+func newOpenAIHandler(
+	modelService component.OpenAIComponent,
+	repoComp apicomp.RepoComponent,
+	modSvcClient rpc.ModerationSvcClient,
+	modComponent component.Moderation,
+) *OpenAIHandlerImpl {
 	return &OpenAIHandlerImpl{
 		openaiComponent: modelService,
 		repoComp:        repoComp,
 		modSvcClient:    modSvcClient,
+		modComponent:    modComponent,
 	}
 }
 
@@ -62,6 +79,7 @@ type OpenAIHandlerImpl struct {
 	openaiComponent component.OpenAIComponent
 	repoComp        apicomp.RepoComponent
 	modSvcClient    rpc.ModerationSvcClient
+	modComponent    component.Moderation
 }
 
 // ListModels godoc
@@ -242,7 +260,7 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 	llmTokenCounter := token.NewLLMTokenCounter(tokenizer)
 	for _, msg := range chatReq.Messages {
 		if h.modSvcClient != nil {
-			result, err := h.modSvcClient.PassLLMPromptCheck(c, msg.Content, userUUID+modelID)
+			result, err := h.modComponent.CheckLLMPrompt(c.Request.Context(), msg.Content, userUUID+modelID)
 			if err != nil {
 				c.String(http.StatusInternalServerError, fmt.Errorf("failed to call moderation error:%w", err).Error())
 				return
