@@ -16,7 +16,7 @@ import (
 	"opencsg.com/csghub-server/aigateway/token"
 	"opencsg.com/csghub-server/aigateway/types"
 
-	"github.com/openai/openai-go"
+	"github.com/openai/openai-go/v3"
 	mocktoken "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/aigateway/token"
 	"opencsg.com/csghub-server/builder/event"
 	"opencsg.com/csghub-server/builder/store/database"

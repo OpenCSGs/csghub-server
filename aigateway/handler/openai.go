@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/go-playground/validator/v10"
 	"opencsg.com/csghub-server/aigateway/component"
 	"opencsg.com/csghub-server/aigateway/token"
 	"opencsg.com/csghub-server/aigateway/types"
@@ -161,7 +162,25 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 	username := httpbase.GetCurrentUser(c)
 	userUUID := httpbase.GetCurrentUserUUID(c)
 	chatReq := &ChatCompletionRequest{}
-	if err := c.BindJSON(chatReq); err != nil {
+	bodyBytes, err := io.ReadAll(c.Request.Body)
+	if err != nil {
+		slog.Error("failed to read request body", "error", err.Error())
+		c.String(http.StatusBadRequest, fmt.Errorf("invalid chat compoletion request body:%w", err).Error())
+		return
+	}
+
+	c.Request.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+	c.Request.ContentLength = int64(len(bodyBytes))
+
+	if err := json.Unmarshal(bodyBytes, chatReq); err != nil {
+		slog.Error("failed to parse request body", "error", err.Error())
+		c.String(http.StatusBadRequest, fmt.Errorf("invalid chat compoletion request body:%w", err).Error())
+		return
+	}
+
+	validate := validator.New()
+	err = validate.Struct(chatReq)
+	if err != nil {
 		slog.Error("invalid chat compoletion request body", "error", err.Error())
 		c.String(http.StatusBadRequest, fmt.Errorf("invalid chat compoletion request body:%w", err).Error())
 		return
@@ -211,9 +230,8 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 			}
 		}
 	}
-	data, _ := json.Marshal(chatReq)
-	c.Request.Body = io.NopCloser(bytes.NewReader(data))
-	c.Request.ContentLength = int64(len(data))
+	c.Request.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+	c.Request.ContentLength = int64(len(bodyBytes))
 	rp, _ := proxy.NewReverseProxy(endpoint)
 	slog.Info("proxy chat request to model endpoint", "endpoint", endpoint, "user", username, "model_name", modelName)
 	w := NewResponseWriterWrapper(c.Writer, chatReq.Stream)

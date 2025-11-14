@@ -3,7 +3,7 @@ package token
 import (
 	"errors"
 
-	"github.com/openai/openai-go"
+	"github.com/openai/openai-go/v3"
 )
 
 var _ Counter = (*EmbeddingTokenCounter)(nil)

@@ -5,7 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/openai/openai-go"
+	"github.com/openai/openai-go/v3"
 	"github.com/stretchr/testify/assert"
 	"opencsg.com/csghub-server/aigateway/token"
 )

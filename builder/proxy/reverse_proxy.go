@@ -6,7 +6,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 
-	"github.com/openai/openai-go"
+	"github.com/openai/openai-go/v3"
 )
 
 type ReverseProxy interface {

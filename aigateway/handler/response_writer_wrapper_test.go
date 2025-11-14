@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/openai/openai-go"
+	"github.com/openai/openai-go/v3"
 	"github.com/stretchr/testify/assert"
 	rpcmock "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rpc"
 )
@@ -15,14 +15,14 @@ func TestResponseWriterWrapper_StreamWrite(t *testing.T) {
 	chunk1 := openai.ChatCompletionChunk{
 		ID: "test-id",
 		Choices: []openai.ChatCompletionChunkChoice{
-			{Delta: openai.ChatCompletionChunkChoicesDelta{Content: "  valid content  " + "\t\n"}},
+			{Delta: openai.ChatCompletionChunkChoiceDelta{Content: "  valid content  " + "\t\n"}},
 		},
 	}
 	chunk1JSON, _ := json.Marshal(chunk1)
 	chunk2 := openai.ChatCompletionChunk{
 		ID: "test-id",
 		Choices: []openai.ChatCompletionChunkChoice{
-			{Delta: openai.ChatCompletionChunkChoicesDelta{Content: "    " + "\t\n"}},
+			{Delta: openai.ChatCompletionChunkChoiceDelta{Content: "    " + "\t\n"}},
 		},
 	}
 	chunk2JSON, _ := json.Marshal(chunk2)
@@ -59,7 +59,7 @@ func TestResponseWriterWrapper_StreamWrite_WithWhiteSpace(t *testing.T) {
 	chunk := openai.ChatCompletionChunk{
 		ID: "test-id",
 		Choices: []openai.ChatCompletionChunkChoice{
-			{Delta: openai.ChatCompletionChunkChoicesDelta{Content: "    " + "\t\n"}},
+			{Delta: openai.ChatCompletionChunkChoiceDelta{Content: "    " + "\t\n"}},
 		},
 	}
 	chunkJSON, _ := json.Marshal(chunk)
