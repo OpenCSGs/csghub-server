@@ -16,9 +16,10 @@ type Model struct {
 	SvcName       string `json:"-"` // the internal service name in CSGHub
 	SvcType       int    `json:"-"` // the internal service type like dedicated or serverless in CSGHub
 
-	Hardware         types.HardWare `json:"-"` // the deployed hardware
-	RuntimeFramework string         `json:"-"` // the deployed framework
-	ImageID          string         `json:"-"` // the deployed image
+	Hardware            types.HardWare `json:"-"`                               // the deployed hardware
+	RuntimeFramework    string         `json:"-"`                               // the deployed framework
+	ImageID             string         `json:"-"`                               // the deployed image
+	SupportFunctionCall bool           `json:"support_function_call,omitempty"` // whether the model supports function calling
 }
 
 // ModelList represents the model list response

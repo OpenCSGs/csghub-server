@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -54,16 +55,19 @@ func (m *openaiComponentImpl) GetAvailableModels(c context.Context, userName str
 		if err != nil {
 			slog.Error("get deploy hardware ")
 		}
+		// Check if engine_args contains tool-call-parser parameter
+		supportFunctionCall := strings.Contains(deploy.EngineArgs, "tool-call-parser")
 		m := types.Model{
-			Object:           "model",
-			Created:          deploy.CreatedAt.Unix(),
-			Task:             string(deploy.Task),
-			CSGHubModelID:    deploy.Repository.Path,
-			SvcName:          deploy.SvcName,
-			SvcType:          deploy.Type,
-			Hardware:         hardwareInfo,
-			RuntimeFramework: deploy.RuntimeFramework,
-			ImageID:          deploy.ImageID,
+			Object:              "model",
+			Created:             deploy.CreatedAt.Unix(),
+			Task:                string(deploy.Task),
+			CSGHubModelID:       deploy.Repository.Path,
+			SvcName:             deploy.SvcName,
+			SvcType:             deploy.Type,
+			Hardware:            hardwareInfo,
+			RuntimeFramework:    deploy.RuntimeFramework,
+			ImageID:             deploy.ImageID,
+			SupportFunctionCall: supportFunctionCall,
 		}
 		modelName := ""
 		if deploy.Repository.HFPath != "" {

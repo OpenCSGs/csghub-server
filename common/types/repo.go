@@ -6,11 +6,13 @@ import (
 
 var REPOCARD_FILENAME = "README.md"
 
-type RepositoryType string
-type RepositorySource string
-type RepositorySyncStatus string
-type PipelineTask string
-type InferenceEngine string
+type (
+	RepositoryType       string
+	RepositorySource     string
+	RepositorySyncStatus string
+	PipelineTask         string
+	InferenceEngine      string
+)
 
 type SensitiveCheckStatus int
 
@@ -61,11 +63,11 @@ const (
 	SyncStatusCompleted  RepositorySyncStatus = "completed"
 	SyncStatusCanceled   RepositorySyncStatus = "canceled"
 
-	SensitiveCheckFail      SensitiveCheckStatus = -1 //sensitive content detected
-	SensitiveCheckPending   SensitiveCheckStatus = 0  //default
-	SensitiveCheckPass      SensitiveCheckStatus = 1  //pass
-	SensitiveCheckSkip      SensitiveCheckStatus = 2  //skip
-	SensitiveCheckException SensitiveCheckStatus = 3  //error happen
+	SensitiveCheckFail      SensitiveCheckStatus = -1 // sensitive content detected
+	SensitiveCheckPending   SensitiveCheckStatus = 0  // default
+	SensitiveCheckPass      SensitiveCheckStatus = 1  // pass
+	SensitiveCheckSkip      SensitiveCheckStatus = 2  // skip
+	SensitiveCheckException SensitiveCheckStatus = 3  // error happen
 
 	EndpointPublic  int = 1 // public - anyone can access
 	EndpointPrivate int = 2 // private - access with read permission
@@ -95,8 +97,10 @@ const (
 	MaxFileTreeSize int = 500
 )
 
-var Sorts = []string{"trending", "recently_update", "most_download", "most_favorite", "most_star"}
-var Sources = []string{"opencsg", "huggingface", "local"}
+var (
+	Sorts   = []string{"trending", "recently_update", "most_download", "most_favorite", "most_star"}
+	Sources = []string{"opencsg", "huggingface", "local"}
+)
 
 type RepoRequest struct {
 	Namespace string `json:"namespace"`
@@ -160,56 +164,59 @@ type InstanceInfo struct {
 
 // repo object(cover model/space/code/dataset) for deployer
 type DeployRepo struct {
-	DeployID         int64      `json:"deploy_id,omitempty"`
-	DeployName       string     `json:"deploy_name,omitempty"`
-	SpaceID          int64      `json:"space_id,omitempty"`
-	Path             string     `json:"model_id,omitempty"` // csghub ask for model_id = namespace/name
-	Namespace        string     `json:"namespace,omitempty"`
-	Name             string     `json:"name,omitempty"`
-	Status           string     `json:"status"`
-	GitPath          string     `json:"git_path,omitempty"`
-	GitBranch        string     `json:"git_branch,omitempty"`
-	Sdk              string     `json:"sdk,omitempty"`
-	SdkVersion       string     `json:"sdk_version,omitempty"`
-	Env              string     `json:"env,omitempty"`
-	Secret           string     `json:"secret,omitempty"`
-	Template         string     `json:"template,omitempty"`
-	Hardware         string     `json:"hardware,omitempty"`
-	ImageID          string     `json:"image_id,omitempty"`
-	UserID           int64      `json:"user_id,omitempty"`
-	ModelID          int64      `json:"repo_model_id,omitempty"` // for URM code logic
-	RepoID           int64      `json:"repository_id,omitempty"`
-	RuntimeFramework string     `json:"runtime_framework,omitempty"`
-	ContainerPort    int        `json:"container_port,omitempty"`
-	Annotation       string     `json:"annotation,omitempty"`
-	MinReplica       int        `json:"min_replica,omitempty"`
-	MaxReplica       int        `json:"max_replica,omitempty"`
-	SvcName          string     `json:"svc_name,omitempty"`
-	Endpoint         string     `json:"endpoint,omitempty"`
-	CreatedAt        time.Time  `json:"created_at,omitempty"`
-	UpdatedAt        time.Time  `json:"updated_at,omitempty"`
-	ClusterID        string     `json:"cluster_id,omitempty"`
-	SecureLevel      int        `json:"secure_level,omitempty"`
-	ActualReplica    int        `json:"actual_replica,omitempty"`
-	DesiredReplica   int        `json:"desired_replica,omitempty"`
-	Instances        []Instance `json:"instances,omitempty"`
-	InstanceName     string     `json:"instance_name,omitempty"`
-	Private          bool       `json:"private"`
-	Type             int        `json:"type,omitempty"`
-	ProxyEndpoint    string     `json:"proxy_endpoint,omitempty"`
-	UserUUID         string     `json:"user_uuid,omitempty"`
-	SKU              string     `json:"sku,omitempty"`
-	OrderDetailID    int64      `json:"order_detail_id,omitempty"`
-	PayMode          PayMode    `json:"pay_mode,omitempty"`
-	Provider         string     `json:"provider,omitempty"`
-	ResourceType     string     `json:"resource_type,omitempty"`
-	RepoTag          string     `json:"repo_tag,omitempty"`
-	Task             string     `json:"task,omitempty"`
-	EngineArgs       string     `json:"engine_args,omitempty"`
-	Variables        string     `json:"variables,omitempty"`
-	Entrypoint       string     `json:"entrypoint,omitempty"`
-	Reason           string     `json:"reason,omitempty"`
-	Message          string     `json:"message,omitempty"`
+	DeployID            int64      `json:"deploy_id,omitempty"`
+	DeployName          string     `json:"deploy_name,omitempty"`
+	SpaceID             int64      `json:"space_id,omitempty"`
+	Path                string     `json:"model_id,omitempty"` // csghub ask for model_id = namespace/name
+	Namespace           string     `json:"namespace,omitempty"`
+	Name                string     `json:"name,omitempty"`
+	Status              string     `json:"status"`
+	GitPath             string     `json:"git_path,omitempty"`
+	GitBranch           string     `json:"git_branch,omitempty"`
+	Sdk                 string     `json:"sdk,omitempty"`
+	SdkVersion          string     `json:"sdk_version,omitempty"`
+	Env                 string     `json:"env,omitempty"`
+	Secret              string     `json:"secret,omitempty"`
+	Template            string     `json:"template,omitempty"`
+	Hardware            string     `json:"hardware,omitempty"`
+	ImageID             string     `json:"image_id,omitempty"`
+	UserID              int64      `json:"user_id,omitempty"`
+	ModelID             int64      `json:"repo_model_id,omitempty"` // for URM code logic
+	RepoID              int64      `json:"repository_id,omitempty"`
+	RuntimeFramework    string     `json:"runtime_framework,omitempty"`
+	ContainerPort       int        `json:"container_port,omitempty"`
+	Annotation          string     `json:"annotation,omitempty"`
+	MinReplica          int        `json:"min_replica,omitempty"`
+	MaxReplica          int        `json:"max_replica,omitempty"`
+	SvcName             string     `json:"svc_name,omitempty"`
+	Endpoint            string     `json:"endpoint,omitempty"`
+	CreatedAt           time.Time  `json:"created_at,omitempty"`
+	UpdatedAt           time.Time  `json:"updated_at,omitempty"`
+	ClusterID           string     `json:"cluster_id,omitempty"`
+	SecureLevel         int        `json:"secure_level,omitempty"`
+	ActualReplica       int        `json:"actual_replica,omitempty"`
+	DesiredReplica      int        `json:"desired_replica,omitempty"`
+	Instances           []Instance `json:"instances,omitempty"`
+	InstanceName        string     `json:"instance_name,omitempty"`
+	Private             bool       `json:"private"`
+	Type                int        `json:"type,omitempty"`
+	ProxyEndpoint       string     `json:"proxy_endpoint,omitempty"`
+	UserUUID            string     `json:"user_uuid,omitempty"`
+	SKU                 string     `json:"sku,omitempty"`
+	OrderDetailID       int64      `json:"order_detail_id,omitempty"`
+	PayMode             PayMode    `json:"pay_mode,omitempty"`
+	Provider            string     `json:"provider,omitempty"`
+	ResourceType        string     `json:"resource_type,omitempty"`
+	RepoTag             string     `json:"repo_tag,omitempty"`
+	Task                string     `json:"task,omitempty"`
+	EngineArgs          string     `json:"engine_args,omitempty"`
+	Variables           string     `json:"variables,omitempty"`
+	Entrypoint          string     `json:"entrypoint,omitempty"`
+	Reason              string     `json:"reason,omitempty"`
+	Message             string     `json:"message,omitempty"`
+	SupportFunctionCall bool       `json:"support_function_call,omitempty"`
+
+	Since string `json:"since,omitempty"`
 }
 
 type RuntimeFrameworkReq struct {
