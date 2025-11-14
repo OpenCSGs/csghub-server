@@ -437,13 +437,11 @@ func (c *gitCallbackComponentImpl) updateDatasetTags(ctx context.Context, namesp
 			namespace, name := repo.OriginNamespaceAndName()
 			if namespace == "" || name == "" {
 				slog.Debug("not an evaluation dataset, ignore it", slog.Any("repo id", repo.Path))
-				return nil
 			}
 			// use mirror namespace and name to find dataset
 			evalDataset, err = c.tagRuleStore.FindByRepo(ctx, string(types.EvaluationCategory), namespace, name, string(types.DatasetRepo))
 			if err != nil {
 				slog.Debug("not an evaluation dataset, ignore it", slog.Any("repo id", repo.Path))
-				return nil
 			}
 		} else {
 			slog.Error("failed to query evaluation dataset", slog.Any("repo id", repo.Path), slog.Any("error", err))
@@ -451,13 +449,45 @@ func (c *gitCallbackComponentImpl) updateDatasetTags(ctx context.Context, namesp
 		}
 
 	}
+
+	// check if it's a task dataset (e.g., ms-swift)
+	taskDataset, err := c.tagRuleStore.FindByRepo(ctx, "task", namespace, repoName, string(types.DatasetRepo))
+	slog.Info("taskDataset", slog.Any("taskDataset", taskDataset))
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		slog.Error("failed to query task dataset", slog.Any("repo id", repo.Path), slog.Any("error", err))
+	}
+	// if not found, check with mirror namespace and name
+	if errors.Is(err, sql.ErrNoRows) {
+		mirrorNamespace, mirrorName := repo.OriginNamespaceAndName()
+		if mirrorNamespace != "" && mirrorName != "" {
+			taskDataset, err = c.tagRuleStore.FindByRepo(ctx, "task", mirrorNamespace, mirrorName, string(types.DatasetRepo))
+			if err != nil && !errors.Is(err, sql.ErrNoRows) {
+				slog.Error("failed to query task dataset with mirror path", slog.Any("repo id", repo.Path), slog.Any("error", err))
+			}
+		}
+	}
+
 	tagIds := []int64{}
-	tagIds = append(tagIds, evalDataset.Tag.ID)
-	if evalDataset.RuntimeFramework != "" {
+
+	if evalDataset != nil && evalDataset.RuntimeFramework != "" {
+		tagIds = append(tagIds, evalDataset.Tag.ID)
 		rTag, _ := c.tagStore.FindTag(ctx, evalDataset.RuntimeFramework, string(types.DatasetRepo), "runtime_framework")
 		if rTag != nil {
 			tagIds = append(tagIds, rTag.ID)
 		}
+	}
+	// add task tag if found
+	if taskDataset != nil && taskDataset.Tag.ID > 0 {
+		tagIds = append(tagIds, taskDataset.Tag.ID)
+		if taskDataset.RuntimeFramework != "" {
+			taskRTag, _ := c.tagStore.FindTag(ctx, taskDataset.RuntimeFramework, string(types.DatasetRepo), "runtime_framework")
+			if taskRTag != nil {
+				tagIds = append(tagIds, taskRTag.ID)
+			}
+		}
+	}
+	if len(tagIds) == 0 {
+		return nil
 	}
 
 	err = c.tagStore.UpsertRepoTags(ctx, repo.ID, []int64{}, tagIds)
