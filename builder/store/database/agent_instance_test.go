@@ -47,8 +47,8 @@ func TestAgentInstanceStore_CRUD(t *testing.T) {
 	// Test ListByUserUUID
 	instances, total, err := store.ListByUserUUID(ctx, userUUID, types.AgentInstanceFilter{}, 10, 1)
 	require.NoError(t, err)
-	require.Len(t, instances, 4) // 1 user instance + 3 system instances (all public)
-	require.Equal(t, 4, total)
+	require.Len(t, instances, 5) // 1 user instance + 4 system instances (all public)
+	require.Equal(t, 5, total)
 	// Find our instance in the results
 	found := false
 	for _, inst := range instances {
@@ -126,14 +126,14 @@ func TestAgentInstanceStore_ListByUserUUID_WithPublicInstances(t *testing.T) {
 	// Test ListByUserUUID for user1 - should return both private and public instances
 	instances, total, err := store.ListByUserUUID(ctx, userUUID1, types.AgentInstanceFilter{}, 10, 1)
 	require.NoError(t, err)
-	require.Len(t, instances, 5) // 2 user instances + 3 system instances (all public)
-	require.Equal(t, 5, total)
+	require.Len(t, instances, 6) // 2 user instances + 4 system instances (all public)
+	require.Equal(t, 6, total)
 
 	// Test ListByUserUUID for user2 - should return only public instance from user1 and private instance from user2
 	instances, total, err = store.ListByUserUUID(ctx, userUUID2, types.AgentInstanceFilter{}, 10, 1)
 	require.NoError(t, err)
-	require.Len(t, instances, 5) // public instance from user1 + private instance from user2 + 3 system instances
-	require.Equal(t, 5, total)
+	require.Len(t, instances, 6) // public instance from user1 + private instance from user2 + 4 system instances
+	require.Equal(t, 6, total)
 }
 
 func TestAgentInstanceStore_NotFound(t *testing.T) {
@@ -150,8 +150,8 @@ func TestAgentInstanceStore_NotFound(t *testing.T) {
 	// Test ListByUserUUID with non-existent user
 	instances, total, err := store.ListByUserUUID(ctx, "non-existent-user", types.AgentInstanceFilter{}, 10, 1)
 	require.NoError(t, err)
-	require.Len(t, instances, 3) // Only system instances (all public)
-	require.Equal(t, 3, total)
+	require.Len(t, instances, 4) // Only system instances (all public)
+	require.Equal(t, 4, total)
 
 }
 
@@ -222,8 +222,8 @@ func TestAgentInstanceStore_MultipleInstancesFromSameTemplate(t *testing.T) {
 	// Test ListByUserUUID - should return both instances
 	instances, total, err := store.ListByUserUUID(ctx, userUUID, types.AgentInstanceFilter{}, 10, 1)
 	require.NoError(t, err)
-	require.Len(t, instances, 5) // 2 user instances + 3 system instances (all public)
-	require.Equal(t, 5, total)
+	require.Len(t, instances, 6) // 2 user instances + 4 system instances (all public)
+	require.Equal(t, 6, total)
 }
 
 func TestAgentInstanceStore_ListByUserUUID_WithFilters(t *testing.T) {
@@ -294,13 +294,13 @@ func TestAgentInstanceStore_ListByUserUUID_WithFilters(t *testing.T) {
 	instances, total, err = store.ListByUserUUID(ctx, userUUID, types.AgentInstanceFilter{}, 2, 1)
 	require.NoError(t, err)
 	require.Len(t, instances, 2) // Should return only 2 instances due to limit
-	require.Equal(t, 6, total)   // But total should be 6 (3 user + 3 system)
+	require.Equal(t, 7, total)   // But total should be 7 (3 user + 4 system)
 
 	// Test second page
 	instances, total, err = store.ListByUserUUID(ctx, userUUID, types.AgentInstanceFilter{}, 2, 2)
 	require.NoError(t, err)
 	require.Len(t, instances, 2) // Should return 2 instances on second page
-	require.Equal(t, 6, total)   // Total should still be 6
+	require.Equal(t, 7, total)   // Total should still be 7 (3 user + 4 system)
 }
 
 func TestAgentInstanceStore_ListByUserUUID_WithTemplateFilter(t *testing.T) {
