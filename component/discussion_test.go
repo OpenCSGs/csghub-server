@@ -127,6 +127,7 @@ func TestDiscussionComponent_GetDiscussion(t *testing.T) {
 			Username: "user",
 			Avatar:   "avatar",
 		},
+		CommentCount: 1,
 	}
 	mockDiscussionStore.EXPECT().FindByID(mock.Anything, int64(1)).Return(&disc, nil).Once()
 	mockRepoStore.EXPECT().FindById(mock.Anything, int64(1)).Return(&database.Repository{ID: 1}, nil).Once()
@@ -143,7 +144,7 @@ func TestDiscussionComponent_GetDiscussion(t *testing.T) {
 		},
 	}
 	// Updated to include pagination parameters: per=10, page=1
-	mockDiscussionStore.EXPECT().FindDiscussionComments(mock.Anything, int64(1), 10, 1).Return(comments, 1, nil).Once()
+	mockDiscussionStore.EXPECT().FindDiscussionComments(mock.Anything, int64(1), 10, 1).Return(comments, nil).Once()
 
 	// Updated to include pagination parameters
 	resp, err := comp.GetDiscussion(context.TODO(), "user", int64(1), 10, 1)
@@ -512,17 +513,24 @@ func TestDiscussionComponent_ListDiscussionComments(t *testing.T) {
 		DiscussionableID:   1,
 		DiscussionableType: database.DiscussionableTypeRepo,
 		UserID:             1,
+		CommentCount:       2,
 	}
 	mockDiscussionStore.EXPECT().FindByID(mock.Anything, discussionID).Return(disc, nil).Once()
 	mockRepoStore.EXPECT().FindById(mock.Anything, int64(1)).Return(&database.Repository{ID: 1}, nil).Once()
 	mockRepoComponent.EXPECT().AllowReadAccessRepo(mock.Anything, &database.Repository{ID: 1}, "user").Return(true, nil).Once()
-	mockDiscussionStore.EXPECT().FindDiscussionComments(mock.Anything, discussionID, 10, 1).Return(comments, 1, nil).Once()
+	mockDiscussionStore.EXPECT().FindDiscussionComments(mock.Anything, discussionID, 10, 1).Return(comments, nil).Once()
 
 	resp, total, err := comp.ListDiscussionComments(context.TODO(), "user", discussionID, 10, 1)
 	require.Nil(t, err)
-	require.Len(t, resp, 1)
+	require.Len(t, resp, 2)
 	require.Equal(t, comments[0].Content, resp[0].Content)
-	require.Equal(t, 1, total)
+	require.NotNil(t, resp[0].User)
+	require.Equal(t, "user", resp[0].User.Username)
+	require.Equal(t, comments[1].Content, resp[1].Content)
+	require.NotNil(t, resp[1].User)
+	require.Equal(t, "deleted user", resp[1].User.Username)
+	require.Equal(t, int64(0), resp[1].User.ID)
+	require.Equal(t, 2, total)
 }
 
 func TestCreateRepoDiscussionRequest_GetSensitiveFields(t *testing.T) {

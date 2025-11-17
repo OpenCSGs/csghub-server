@@ -126,20 +126,30 @@ func (c *discussionComponentImpl) GetDiscussion(ctx context.Context, currentUser
 		return nil, err
 	}
 
-	comments, total, err := c.discussionStore.FindDiscussionComments(ctx, discussion.ID, cPer, cPage)
+	comments, err := c.discussionStore.FindDiscussionComments(ctx, discussion.ID, cPer, cPage)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, fmt.Errorf("failed to find discussion comments by discussion id '%d': %w", discussion.ID, err)
 	}
 	commentsData := make([]*types.DiscussionResponse_Comment, 0, len(comments))
 	for _, comment := range comments {
-		commentsData = append(commentsData, &types.DiscussionResponse_Comment{
-			ID:      comment.ID,
-			Content: comment.Content,
-			User: &types.DiscussionResponse_User{
+		var user *types.DiscussionResponse_User
+		if comment.User == nil {
+			user = &types.DiscussionResponse_User{
+				ID:       0,
+				Username: "deleted user",
+				Avatar:   "",
+			}
+		} else {
+			user = &types.DiscussionResponse_User{
 				ID:       comment.User.ID,
 				Username: comment.User.Username,
 				Avatar:   comment.User.Avatar,
-			},
+			}
+		}
+		commentsData = append(commentsData, &types.DiscussionResponse_Comment{
+			ID:        comment.ID,
+			Content:   comment.Content,
+			User:      user,
 			CreatedAt: comment.CreatedAt,
 		})
 	}
@@ -154,7 +164,7 @@ func (c *discussionComponentImpl) GetDiscussion(ctx context.Context, currentUser
 		},
 		Comments: &types.CommentsWithPagination{
 			Data:  commentsData,
-			Total: total,
+			Total: int(discussion.CommentCount),
 			Page:  cPage,
 			Per:   cPer,
 		},
@@ -356,27 +366,34 @@ func (c *discussionComponentImpl) ListDiscussionComments(ctx context.Context, cu
 		return nil, 0, err
 	}
 
-	comments, total, err := c.discussionStore.FindDiscussionComments(ctx, discussionID, per, page)
+	comments, err := c.discussionStore.FindDiscussionComments(ctx, discussionID, per, page)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to find discussion comments by discussion id '%d': %w", discussionID, err)
 	}
 	resp := make([]*types.DiscussionResponse_Comment, 0, len(comments))
 	for _, comment := range comments {
+		var user *types.DiscussionResponse_User
 		if comment.User == nil {
-			continue
-		}
-		resp = append(resp, &types.DiscussionResponse_Comment{
-			ID:      comment.ID,
-			Content: comment.Content,
-			User: &types.DiscussionResponse_User{
+			user = &types.DiscussionResponse_User{
+				ID:       0,
+				Username: "deleted user",
+				Avatar:   "",
+			}
+		} else {
+			user = &types.DiscussionResponse_User{
 				ID:       comment.User.ID,
 				Username: comment.User.Username,
 				Avatar:   comment.User.Avatar,
-			},
+			}
+		}
+		resp = append(resp, &types.DiscussionResponse_Comment{
+			ID:        comment.ID,
+			Content:   comment.Content,
+			User:      user,
 			CreatedAt: comment.CreatedAt,
 		})
 	}
-	return resp, total, nil
+	return resp, int(discussion.CommentCount), nil
 }
 
 func (c *discussionComponentImpl) sendCommentMessage(ctx context.Context, repoType types.RepositoryType, repoPath string, senderUUID string, userUUIDs []string) error {

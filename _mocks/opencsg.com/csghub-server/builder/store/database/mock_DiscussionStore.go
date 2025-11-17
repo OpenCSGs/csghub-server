@@ -422,7 +422,7 @@ func (_c *MockDiscussionStore_FindCommentByID_Call) RunAndReturn(run func(contex
 }
 
 // FindDiscussionComments provides a mock function with given fields: ctx, discussionID, per, page
-func (_m *MockDiscussionStore) FindDiscussionComments(ctx context.Context, discussionID int64, per int, page int) ([]database.Comment, int, error) {
+func (_m *MockDiscussionStore) FindDiscussionComments(ctx context.Context, discussionID int64, per int, page int) ([]database.Comment, error) {
 	ret := _m.Called(ctx, discussionID, per, page)
 
 	if len(ret) == 0 {
@@ -430,9 +430,8 @@ func (_m *MockDiscussionStore) FindDiscussionComments(ctx context.Context, discu
 	}
 
 	var r0 []database.Comment
-	var r1 int
-	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, int64, int, int) ([]database.Comment, int, error)); ok {
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64, int, int) ([]database.Comment, error)); ok {
 		return rf(ctx, discussionID, per, page)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, int64, int, int) []database.Comment); ok {
@@ -443,19 +442,13 @@ func (_m *MockDiscussionStore) FindDiscussionComments(ctx context.Context, discu
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, int64, int, int) int); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, int64, int, int) error); ok {
 		r1 = rf(ctx, discussionID, per, page)
 	} else {
-		r1 = ret.Get(1).(int)
+		r1 = ret.Error(1)
 	}
 
-	if rf, ok := ret.Get(2).(func(context.Context, int64, int, int) error); ok {
-		r2 = rf(ctx, discussionID, per, page)
-	} else {
-		r2 = ret.Error(2)
-	}
-
-	return r0, r1, r2
+	return r0, r1
 }
 
 // MockDiscussionStore_FindDiscussionComments_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindDiscussionComments'
@@ -479,12 +472,12 @@ func (_c *MockDiscussionStore_FindDiscussionComments_Call) Run(run func(ctx cont
 	return _c
 }
 
-func (_c *MockDiscussionStore_FindDiscussionComments_Call) Return(_a0 []database.Comment, _a1 int, _a2 error) *MockDiscussionStore_FindDiscussionComments_Call {
-	_c.Call.Return(_a0, _a1, _a2)
+func (_c *MockDiscussionStore_FindDiscussionComments_Call) Return(_a0 []database.Comment, _a1 error) *MockDiscussionStore_FindDiscussionComments_Call {
+	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockDiscussionStore_FindDiscussionComments_Call) RunAndReturn(run func(context.Context, int64, int, int) ([]database.Comment, int, error)) *MockDiscussionStore_FindDiscussionComments_Call {
+func (_c *MockDiscussionStore_FindDiscussionComments_Call) RunAndReturn(run func(context.Context, int64, int, int) ([]database.Comment, error)) *MockDiscussionStore_FindDiscussionComments_Call {
 	_c.Call.Return(run)
 	return _c
 }

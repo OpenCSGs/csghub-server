@@ -16,7 +16,7 @@ type Discussion struct {
 	DiscussionableID   int64     `bun:"discussionable_id,notnull"`
 	DiscussionableType string    `bun:"discussionable_type,notnull"`
 	CommentCount       int64     `bun:"comment_count,notnull,default:0"`
-	DeletedAt          time.Time `bun:",soft_delete,nullzero"`
+	DeletedAt          time.Time `bun:",nullzero"`
 	times
 }
 
@@ -27,7 +27,7 @@ type Comment struct {
 	CommentableID   int64     `bun:"commentable_id,notnull"`
 	UserID          int64     `bun:"user_id,notnull"`
 	User            *User     `bun:"rel:belongs-to,join:user_id=id"`
-	DeletedAt       time.Time `bun:",soft_delete,nullzero"`
+	DeletedAt       time.Time `bun:",nullzero"`
 	times
 }
 
@@ -51,7 +51,7 @@ type DiscussionStore interface {
 	FindByDiscussionableID(ctx context.Context, discussionableType string, discussionableID int64, per int, page int) ([]Discussion, int, error)
 	UpdateByID(ctx context.Context, id int64, title string) error
 	DeleteByID(ctx context.Context, id int64) error
-	FindDiscussionComments(ctx context.Context, discussionID int64, per int, page int) ([]Comment, int, error)
+	FindDiscussionComments(ctx context.Context, discussionID int64, per int, page int) ([]Comment, error)
 	CreateComment(ctx context.Context, comment Comment) (*Comment, error)
 	UpdateComment(ctx context.Context, id int64, content string) error
 	FindCommentByID(ctx context.Context, id int64) (*Comment, error)
@@ -137,26 +137,21 @@ func (s *discussionStoreImpl) DeleteByID(ctx context.Context, id int64) error {
 	return nil
 }
 
-func (s *discussionStoreImpl) FindDiscussionComments(ctx context.Context, discussionID int64, per int, page int) ([]Comment, int, error) {
+func (s *discussionStoreImpl) FindDiscussionComments(ctx context.Context, discussionID int64, per int, page int) ([]Comment, error) {
 	comments := []Comment{}
-	query := s.db.Core.NewSelect().Model(&comments).
+	err := s.db.Core.NewSelect().Model(&comments).
 		Relation("User").
-		Where("commentable_type=? AND commentable_id = ?", CommentableTypeDiscussion, discussionID).
-		Order("created_at DESC")
-
-	total, err := query.Count(ctx)
+		Where("commentable_type=? AND commentable_id=?", CommentableTypeDiscussion, discussionID).
+		Order("comment.created_at DESC").
+		Limit(per).
+		Offset((page - 1) * per).
+		Scan(ctx)
 	if err != nil {
-		err := errorx.HandleDBError(err, errorx.Ctx().
+		return nil, errorx.HandleDBError(err, errorx.Ctx().
 			Set("id", discussionID))
-		return nil, 0, err
 	}
 
-	if err := query.Limit(per).Offset((page - 1) * per).Scan(ctx); err != nil {
-		err := errorx.HandleDBError(err, errorx.Ctx().
-			Set("id", discussionID))
-		return nil, 0, err
-	}
-	return comments, total, nil
+	return comments, nil
 }
 
 func (s *discussionStoreImpl) CreateComment(ctx context.Context, comment Comment) (*Comment, error) {
