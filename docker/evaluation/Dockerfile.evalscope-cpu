@@ -2,8 +2,10 @@ FROM modelscope-registry.cn-hangzhou.cr.aliyuncs.com/modelscope-repo/modelscope:
 RUN apt-get update && apt-get -y install dumb-init \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 RUN pip install --no-cache-dir minio oss2 csghub-sdk==0.7.2
+RUN pip install -U --no-cache-dir evalscope==1.1.1
 COPY ./evalscope/ /etc/csghub/
-RUN chmod +x /etc/csghub/*.sh
+RUN chmod +x /etc/csghub/*.sh && \
+    chmod +x /etc/csghub/*.py
 WORKDIR /workspace/
 ENV HUGGINGFACE_HUB_CACHE=/workspace/ \
     HF_HUB_ENABLE_HF_TRANSFER=0 \

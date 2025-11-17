@@ -42,6 +42,11 @@ get_subset_and_task() {
 }
 export HF_TOKEN=$ACCESS_TOKEN
 mkdir -p /workspace/data
+
+# Register custom datasets
+echo "Registering custom datasets..."
+python /etc/csghub/register_custom.py
+
 # download datasets
 IFS=',' read -r -a dataset_repos <<< "$DATASET_IDS"
 IFS=',' read -r -a dataset_revisions <<< "$DATASET_REVISIONS"
@@ -127,7 +132,8 @@ for index in "${!model_repos[@]}"; do
     fi
     model_name=`basename $modelID`
     echo "Start evaluating model $model_name, dataset $dataset_tasks"
-    evalscope eval --model /workspace/$modelID  --datasets $dataset_tasks --dataset-args "$dataset_tasks_args" --limit 10
+    # Use wrapper script to ensure custom datasets are registered
+    python /etc/csghub/evalscope_wrapper.py eval --model /workspace/$modelID  --datasets $dataset_tasks --dataset-args "$dataset_tasks_args" --limit 10
     if [ $? -ne 0 ]; then
         echo "Evaluation failed for model $model_name."
         exit 1
