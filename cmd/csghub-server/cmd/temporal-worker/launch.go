@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"opencsg.com/csghub-server/moderation/checker"
 
 	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/deploy/common"
@@ -23,7 +24,6 @@ import (
 	"opencsg.com/csghub-server/builder/temporal"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
-	"opencsg.com/csghub-server/moderation/checker"
 	moderationworkflow "opencsg.com/csghub-server/moderation/workflow"
 	notificationworkflow "opencsg.com/csghub-server/notification/workflow"
 	userworkflow "opencsg.com/csghub-server/user/workflow"
@@ -55,8 +55,11 @@ var cmdLaunch = &cobra.Command{
 			return fmt.Errorf("failed to init database, error: %w", err)
 		}
 
-		slog.Info("init sensitive checker")
-		checker.Init(cfg)
+		if cfg.SensitiveCheck.Enable {
+			slog.Info("init sensitive checker")
+			checker.Init(cfg)
+		}
+
 		slog.Info("init event publisher")
 		err = event.InitEventPublisher(cfg)
 		if err != nil {
