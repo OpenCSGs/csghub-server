@@ -271,6 +271,7 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 	rp, _ := proxy.NewReverseProxy(endpoint)
 	slog.Info("proxy chat request to model endpoint", "endpoint", endpoint, "user", username, "model_name", modelName)
 	w := NewResponseWriterWrapper(c.Writer, chatReq.Stream)
+	defer w.ClearBuffer()
 	if h.modSvcClient != nil {
 		w.WithModeration(h.modSvcClient)
 	}
@@ -290,7 +291,7 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 			}
 			if result.IsSensitive {
 				slog.Debug("sensitive content", slog.String("reason", result.Reason))
-				errorChunk := w.generateSensitiveRespForPrompt()
+				errorChunk := generateSensitiveRespForPrompt()
 				errorChunkJson, _ := json.Marshal(errorChunk)
 				_, err := c.Writer.Write([]byte("data: " + string(errorChunkJson) + "\n\n" + "[DONE]"))
 				if err != nil {
