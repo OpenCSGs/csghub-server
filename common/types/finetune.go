@@ -74,3 +74,11 @@ type FinetuneRes struct {
 	EndTime      time.Time `json:"end_time,omitempty"`
 	ResultURL    string    `json:"result_url"`
 }
+
+type FinetuneLogReq struct {
+	CurrentUser string
+	Since       string
+	ID          int64
+	PodName     string
+	SubmitTime  time.Time
+}

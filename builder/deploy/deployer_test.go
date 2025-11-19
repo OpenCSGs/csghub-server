@@ -21,6 +21,7 @@ import (
 	mockdb "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/deploy/scheduler"
+	"opencsg.com/csghub-server/builder/loki"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/tests"
 	"opencsg.com/csghub-server/common/types"
@@ -1024,4 +1025,51 @@ func TestDeployer_DeleteFinetune(t *testing.T) {
 		ID: 1,
 	})
 	require.NoError(t, err)
+}
+
+func TestDeployer_GetWorkflowLogsInStream(t *testing.T) {
+	now := time.Now()
+	req := types.FinetuneLogReq{
+		CurrentUser: "test-user",
+		PodName:     "pod1",
+		SubmitTime:  now,
+	}
+
+	mockDeployTaskStore := mockdb.NewMockDeployTaskStore(t)
+
+	sender := mockSender.NewMockLogSender(t)
+
+	ch := make(chan string)
+	sender.EXPECT().StreamAllLogs(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(ch, nil)
+	d := &deployer{
+		deployTaskStore: mockDeployTaskStore,
+		lokiClient:      sender,
+	}
+	lreader, err := d.GetWorkflowLogsInStream(context.TODO(), req)
+	require.Nil(t, err)
+	require.Nil(t, lreader.buildLogs)
+	require.NotNil(t, lreader.RunLog())
+}
+
+func TestDeployer_GetWorkflowLogsNonStream(t *testing.T) {
+	now := time.Now()
+	req := types.FinetuneLogReq{
+		CurrentUser: "test-user",
+		PodName:     "pod1",
+		SubmitTime:  now,
+	}
+
+	mockDeployTaskStore := mockdb.NewMockDeployTaskStore(t)
+
+	sender := mockSender.NewMockLogSender(t)
+
+	sender.EXPECT().QueryRange(mock.Anything, mock.Anything).Return(&loki.LokiQueryResponse{}, nil)
+
+	d := &deployer{
+		deployTaskStore: mockDeployTaskStore,
+		lokiClient:      sender,
+	}
+	resp, err := d.GetWorkflowLogsNonStream(context.TODO(), req)
+	require.Nil(t, err)
+	require.NotNil(t, resp)
 }

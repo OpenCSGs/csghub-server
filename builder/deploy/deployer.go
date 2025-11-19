@@ -18,6 +18,7 @@ import (
 	"github.com/google/uuid"
 	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/deploy/scheduler"
+	"opencsg.com/csghub-server/builder/loki"
 	"opencsg.com/csghub-server/builder/redis"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/errorx"
@@ -53,6 +54,8 @@ type Deployer interface {
 	CheckHeartbeatTimeout(ctx context.Context, clusterId string) (bool, error)
 	SubmitFinetuneJob(ctx context.Context, req types.FinetuneReq) (*types.ArgoWorkFlowRes, error)
 	DeleteFinetuneJob(ctx context.Context, req types.ArgoWorkFlowDeleteReq) error
+	GetWorkflowLogsInStream(ctx context.Context, req types.FinetuneLogReq) (*MultiLogReader, error)
+	GetWorkflowLogsNonStream(ctx context.Context, req types.FinetuneLogReq) (*loki.LokiQueryResponse, error)
 }
 
 func (d *deployer) GenerateUniqueSvcName(dr types.DeployRepo) string {
@@ -1259,4 +1262,60 @@ func (d *deployer) DeleteFinetuneJob(ctx context.Context, req types.ArgoWorkFlow
 		return fmt.Errorf("failed delete finetune workflow by runner error: %w", err)
 	}
 	return nil
+}
+
+func (d *deployer) GetWorkflowLogsInStream(ctx context.Context, req types.FinetuneLogReq) (*MultiLogReader, error) {
+	slog.Info("GetWorkflowLogsInStream", slog.Any("req", req))
+	labels := map[string]string{
+		types.StreamKeyInstanceName: req.PodName,
+	}
+
+	var startTime = req.SubmitTime
+	if len(req.Since) > 0 {
+		startTime = parseSinceTime(req.Since)
+	}
+
+	runLog, err := d.readLogsFromLoki(ctx, types.ReadLogRequest{
+		DeployID:  req.PodName,
+		StartTime: startTime,
+		Labels:    labels,
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get workflow job logs error: %w", err)
+	}
+
+	return NewMultiLogReader(nil, runLog), nil
+}
+
+func (d *deployer) GetWorkflowLogsNonStream(ctx context.Context, req types.FinetuneLogReq) (*loki.LokiQueryResponse, error) {
+	labels := map[string]string{
+		types.StreamKeyInstanceName: req.PodName,
+	}
+
+	var queryBuilder strings.Builder
+	queryBuilder.WriteString("{")
+	first := true
+	for k, v := range labels {
+		if !first {
+			queryBuilder.WriteString(",")
+		}
+		queryBuilder.WriteString(fmt.Sprintf(`%s="%s"`, k, v))
+		first = false
+	}
+	queryBuilder.WriteString("}")
+	query := queryBuilder.String()
+
+	var startTime = req.SubmitTime
+	if req.Since != "" {
+		startTime = parseSinceTime(req.Since)
+	}
+
+	params := loki.QueryRangeParams{
+		Query:     query,
+		Start:     startTime,
+		Direction: "forward",
+	}
+
+	return d.lokiClient.QueryRange(ctx, params)
 }

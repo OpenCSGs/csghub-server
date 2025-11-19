@@ -8,6 +8,8 @@ import (
 	deploy "opencsg.com/csghub-server/builder/deploy"
 	database "opencsg.com/csghub-server/builder/store/database"
 
+	loki "opencsg.com/csghub-server/builder/loki"
+
 	mock "github.com/stretchr/testify/mock"
 
 	types "opencsg.com/csghub-server/common/types"
@@ -596,6 +598,124 @@ func (_c *MockDeployer_GetReplica_Call) Return(_a0 int, _a1 int, _a2 []types.Ins
 }
 
 func (_c *MockDeployer_GetReplica_Call) RunAndReturn(run func(context.Context, types.DeployRepo) (int, int, []types.Instance, error)) *MockDeployer_GetReplica_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetWorkflowLogsInStream provides a mock function with given fields: ctx, req
+func (_m *MockDeployer) GetWorkflowLogsInStream(ctx context.Context, req types.FinetuneLogReq) (*deploy.MultiLogReader, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetWorkflowLogsInStream")
+	}
+
+	var r0 *deploy.MultiLogReader
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.FinetuneLogReq) (*deploy.MultiLogReader, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.FinetuneLogReq) *deploy.MultiLogReader); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*deploy.MultiLogReader)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.FinetuneLogReq) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockDeployer_GetWorkflowLogsInStream_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetWorkflowLogsInStream'
+type MockDeployer_GetWorkflowLogsInStream_Call struct {
+	*mock.Call
+}
+
+// GetWorkflowLogsInStream is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.FinetuneLogReq
+func (_e *MockDeployer_Expecter) GetWorkflowLogsInStream(ctx interface{}, req interface{}) *MockDeployer_GetWorkflowLogsInStream_Call {
+	return &MockDeployer_GetWorkflowLogsInStream_Call{Call: _e.mock.On("GetWorkflowLogsInStream", ctx, req)}
+}
+
+func (_c *MockDeployer_GetWorkflowLogsInStream_Call) Run(run func(ctx context.Context, req types.FinetuneLogReq)) *MockDeployer_GetWorkflowLogsInStream_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.FinetuneLogReq))
+	})
+	return _c
+}
+
+func (_c *MockDeployer_GetWorkflowLogsInStream_Call) Return(_a0 *deploy.MultiLogReader, _a1 error) *MockDeployer_GetWorkflowLogsInStream_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockDeployer_GetWorkflowLogsInStream_Call) RunAndReturn(run func(context.Context, types.FinetuneLogReq) (*deploy.MultiLogReader, error)) *MockDeployer_GetWorkflowLogsInStream_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetWorkflowLogsNonStream provides a mock function with given fields: ctx, req
+func (_m *MockDeployer) GetWorkflowLogsNonStream(ctx context.Context, req types.FinetuneLogReq) (*loki.LokiQueryResponse, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetWorkflowLogsNonStream")
+	}
+
+	var r0 *loki.LokiQueryResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.FinetuneLogReq) (*loki.LokiQueryResponse, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.FinetuneLogReq) *loki.LokiQueryResponse); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*loki.LokiQueryResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.FinetuneLogReq) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockDeployer_GetWorkflowLogsNonStream_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetWorkflowLogsNonStream'
+type MockDeployer_GetWorkflowLogsNonStream_Call struct {
+	*mock.Call
+}
+
+// GetWorkflowLogsNonStream is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.FinetuneLogReq
+func (_e *MockDeployer_Expecter) GetWorkflowLogsNonStream(ctx interface{}, req interface{}) *MockDeployer_GetWorkflowLogsNonStream_Call {
+	return &MockDeployer_GetWorkflowLogsNonStream_Call{Call: _e.mock.On("GetWorkflowLogsNonStream", ctx, req)}
+}
+
+func (_c *MockDeployer_GetWorkflowLogsNonStream_Call) Run(run func(ctx context.Context, req types.FinetuneLogReq)) *MockDeployer_GetWorkflowLogsNonStream_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.FinetuneLogReq))
+	})
+	return _c
+}
+
+func (_c *MockDeployer_GetWorkflowLogsNonStream_Call) Return(_a0 *loki.LokiQueryResponse, _a1 error) *MockDeployer_GetWorkflowLogsNonStream_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockDeployer_GetWorkflowLogsNonStream_Call) RunAndReturn(run func(context.Context, types.FinetuneLogReq) (*loki.LokiQueryResponse, error)) *MockDeployer_GetWorkflowLogsNonStream_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -572,6 +572,7 @@ func createFinetuneRoutes(apiGroup *gin.RouterGroup, middlewareCollection middle
 		ftGroup.POST("", finetuneJobHandler.RunFinetuneJob)
 		ftGroup.GET("/:id", finetuneJobHandler.GetFinetuneJob)
 		ftGroup.DELETE("/:id", finetuneJobHandler.DeleteFinetuneJob)
+		ftGroup.GET("/:id/logs", finetuneJobHandler.GetLogs)
 	}
 }
 

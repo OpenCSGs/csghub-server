@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"opencsg.com/csghub-server/builder/loki"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -17,4 +18,5 @@ type LogSender interface {
 	GetLastReportedTimestamp(ctx context.Context) (time.Time, error)
 	// StreamAllLogs streams all logs from the backend
 	StreamAllLogs(ctx context.Context, id string, start time.Time, lables map[string]string, timeLoc *time.Location) (chan string, error)
+	QueryRange(ctx context.Context, params loki.QueryRangeParams) (*loki.LokiQueryResponse, error)
 }

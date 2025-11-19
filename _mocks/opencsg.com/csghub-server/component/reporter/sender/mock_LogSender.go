@@ -6,6 +6,7 @@ import (
 	context "context"
 
 	mock "github.com/stretchr/testify/mock"
+	loki "opencsg.com/csghub-server/builder/loki"
 
 	time "time"
 
@@ -123,6 +124,65 @@ func (_c *MockLogSender_Health_Call) Return(_a0 error) *MockLogSender_Health_Cal
 }
 
 func (_c *MockLogSender_Health_Call) RunAndReturn(run func(context.Context) error) *MockLogSender_Health_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// QueryRange provides a mock function with given fields: ctx, params
+func (_m *MockLogSender) QueryRange(ctx context.Context, params loki.QueryRangeParams) (*loki.LokiQueryResponse, error) {
+	ret := _m.Called(ctx, params)
+
+	if len(ret) == 0 {
+		panic("no return value specified for QueryRange")
+	}
+
+	var r0 *loki.LokiQueryResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, loki.QueryRangeParams) (*loki.LokiQueryResponse, error)); ok {
+		return rf(ctx, params)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, loki.QueryRangeParams) *loki.LokiQueryResponse); ok {
+		r0 = rf(ctx, params)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*loki.LokiQueryResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, loki.QueryRangeParams) error); ok {
+		r1 = rf(ctx, params)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockLogSender_QueryRange_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'QueryRange'
+type MockLogSender_QueryRange_Call struct {
+	*mock.Call
+}
+
+// QueryRange is a helper method to define mock.On call
+//   - ctx context.Context
+//   - params loki.QueryRangeParams
+func (_e *MockLogSender_Expecter) QueryRange(ctx interface{}, params interface{}) *MockLogSender_QueryRange_Call {
+	return &MockLogSender_QueryRange_Call{Call: _e.mock.On("QueryRange", ctx, params)}
+}
+
+func (_c *MockLogSender_QueryRange_Call) Run(run func(ctx context.Context, params loki.QueryRangeParams)) *MockLogSender_QueryRange_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(loki.QueryRangeParams))
+	})
+	return _c
+}
+
+func (_c *MockLogSender_QueryRange_Call) Return(_a0 *loki.LokiQueryResponse, _a1 error) *MockLogSender_QueryRange_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockLogSender_QueryRange_Call) RunAndReturn(run func(context.Context, loki.QueryRangeParams) (*loki.LokiQueryResponse, error)) *MockLogSender_QueryRange_Call {
 	_c.Call.Return(run)
 	return _c
 }

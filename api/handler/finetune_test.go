@@ -100,3 +100,28 @@ func TestFinetuneHandler_Delete(t *testing.T) {
 	tester.ResponseEq(t, 200, tester.OKText, nil)
 
 }
+
+func TestFinetuneHandler_ReadLogNonStream_Success(t *testing.T) {
+	tester := NewFinetuneTester(t).WithHandleFunc(func(h *FinetuneHandler) gin.HandlerFunc {
+		return func(c *gin.Context) {
+			req := types.FinetuneLogReq{
+				CurrentUser: "u",
+				ID:          1,
+				Since:       "1hour",
+			}
+			h.readLogNonStream(c, req)
+		}
+	})
+	tester.WithUser()
+
+	logs := "mock logs content"
+	tester.mocks.finetune.EXPECT().ReadJobLogsNonStream(tester.Ctx(), types.FinetuneLogReq{
+		CurrentUser: "u",
+		ID:          1,
+		Since:       "1hour",
+	}).Return(logs, nil)
+
+	tester.Execute()
+
+	tester.ResponseEq(t, 200, tester.OKText, logs)
+}

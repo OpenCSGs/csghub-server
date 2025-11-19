@@ -5,10 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"opencsg.com/csghub-server/builder/deploy"
+	"opencsg.com/csghub-server/builder/loki"
+	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -26,6 +30,7 @@ type finetuneComponentImpl struct {
 	config                *config.Config
 	accountingComponent   AccountingComponent
 	repoComponent         RepoComponent
+	userSvcClient         rpc.UserSvcClient
 }
 
 type FinetuneComponent interface {
@@ -33,6 +38,9 @@ type FinetuneComponent interface {
 	CreateFinetuneJob(ctx context.Context, req types.FinetuneReq) (*types.ArgoWorkFlowRes, error)
 	GetFinetuneJob(ctx context.Context, req types.FinetineGetReq) (*types.FinetuneRes, error)
 	DeleteFinetuneJob(ctx context.Context, req types.ArgoWorkFlowDeleteReq) error
+	CheckUserPermission(ctx context.Context, req types.FinetuneLogReq) (bool, error)
+	ReadJobLogsNonStream(ctx context.Context, req types.FinetuneLogReq) (string, error)
+	ReadJobLogsInStream(ctx context.Context, req types.FinetuneLogReq) (*deploy.MultiLogReader, error)
 }
 
 func NewFinetuneComponent(config *config.Config) (FinetuneComponent, error) {
@@ -57,6 +65,8 @@ func NewFinetuneComponent(config *config.Config) (FinetuneComponent, error) {
 		return nil, fmt.Errorf("failed to create repo component, %w", err)
 	}
 	c.accountingComponent = ac
+	userSvcAddr := fmt.Sprintf("%s:%d", config.User.Host, config.User.Port)
+	c.userSvcClient = rpc.NewUserSvcHttpClient(userSvcAddr, rpc.AuthWithApiKey(config.APIToken))
 	return c, nil
 }
 
@@ -167,4 +177,70 @@ func (c *finetuneComponentImpl) GetFinetuneJob(ctx context.Context, req types.Fi
 		ResultURL:    wf.ResultURL,
 	}
 	return res, nil
+}
+
+func (c *finetuneComponentImpl) CheckUserPermission(ctx context.Context, req types.FinetuneLogReq) (bool, error) {
+	user, err := c.userSvcClient.GetUserByName(ctx, req.CurrentUser)
+	if err != nil {
+		slog.Error("failed to get user by name", slog.String("error", err.Error()))
+	}
+	if user == nil || user.UUID == "" {
+		return false, nil
+	}
+
+	wf, err := c.workflowStore.FindByID(ctx, req.ID)
+	if err != nil {
+		return false, fmt.Errorf("fail to find finetune workflow by id %d error: %w", req.ID, err)
+	}
+
+	if !user.IsAdmin() && wf.UserUUID != user.UUID {
+		return false, errorx.ErrForbidden
+	}
+
+	return true, nil
+}
+
+func (c *finetuneComponentImpl) ReadJobLogsNonStream(ctx context.Context, req types.FinetuneLogReq) (string, error) {
+	wf, err := c.workflowStore.FindByID(ctx, req.ID)
+	if err != nil {
+		return "", fmt.Errorf("fail to find finetune workflow by id %d error: %w", req.ID, err)
+	}
+
+	req.PodName = wf.TaskId
+	req.SubmitTime = wf.SubmitTime
+
+	lokiResp, err := c.deployer.GetWorkflowLogsNonStream(ctx, req)
+	if err != nil {
+		return "", fmt.Errorf("failed to read finetune job logs, error:%w", err)
+	}
+
+	return c.formatLogs(lokiResp), nil
+}
+
+func (c *finetuneComponentImpl) ReadJobLogsInStream(ctx context.Context, req types.FinetuneLogReq) (*deploy.MultiLogReader, error) {
+	wf, err := c.workflowStore.FindByID(ctx, req.ID)
+	if err != nil {
+		return nil, fmt.Errorf("fail to find finetune workflow by id %d error: %w", req.ID, err)
+	}
+
+	req.PodName = wf.TaskId
+	req.SubmitTime = wf.SubmitTime
+
+	return c.deployer.GetWorkflowLogsInStream(ctx, req)
+}
+
+func (c *finetuneComponentImpl) formatLogs(lokiLog *loki.LokiQueryResponse) string {
+	var bulkLog strings.Builder
+	for _, item := range lokiLog.Data.Result {
+		for _, valuePair := range item.Values {
+			for _, log := range strings.Split(valuePair[1], "\n") {
+				if log == "" {
+					continue
+				}
+				bulkLog.WriteString(log)
+				bulkLog.WriteString(c.config.LogCollector.LineSeparator)
+			}
+		}
+	}
+	return strings.TrimSuffix(bulkLog.String(), c.config.LogCollector.LineSeparator)
 }

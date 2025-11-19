@@ -3,11 +3,14 @@ package component
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/deploy"
+	"opencsg.com/csghub-server/builder/loki"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
@@ -222,4 +225,123 @@ func TestEvaluationComponent_DeleteFinetune(t *testing.T) {
 
 	err := c.DeleteFinetuneJob(ctx, req)
 	require.Nil(t, err)
+}
+
+func TestFinetuneComponent_ReadJobLogsNonStream(t *testing.T) {
+	ctx := context.TODO()
+	cfg := &config.Config{}
+
+	t.Run("find-workflow-logs-success", func(t *testing.T) {
+		mockDeployer := mockdeploy.NewMockDeployer(t)
+		argoStore := mockdb.NewMockArgoWorkFlowStore(t)
+
+		c := NewTestFinetuneComponent(cfg, mockDeployer, nil, nil, nil, nil, nil,
+			nil, nil, nil, argoStore, nil, nil)
+
+		req := types.FinetuneLogReq{
+			ID: 1,
+		}
+
+		argoStore.EXPECT().FindByID(ctx, int64(1)).Return(database.ArgoWorkflow{
+			ID:         1,
+			TaskId:     "test-task",
+			SubmitTime: time.Now(),
+		}, nil)
+
+		expectedLogs := &loki.LokiQueryResponse{}
+		mockDeployer.EXPECT().GetWorkflowLogsNonStream(ctx, mock.Anything).Return(expectedLogs, nil)
+
+		logs, err := c.ReadJobLogsNonStream(ctx, req)
+		require.NoError(t, err)
+		require.Equal(t, "", logs)
+	})
+
+	t.Run("find-workflow-logs-failed", func(t *testing.T) {
+		mockDeployer := mockdeploy.NewMockDeployer(t)
+		argoStore := mockdb.NewMockArgoWorkFlowStore(t)
+
+		c := NewTestFinetuneComponent(cfg, mockDeployer, nil, nil, nil, nil, nil,
+			nil, nil, nil, argoStore, nil, nil)
+
+		req := types.FinetuneLogReq{
+			ID: 1,
+		}
+
+		expectedErr := errors.New("not found")
+		argoStore.EXPECT().FindByID(ctx, int64(1)).Return(database.ArgoWorkflow{}, expectedErr)
+
+		_, err := c.ReadJobLogsNonStream(ctx, req)
+		require.NotNil(t, err)
+	})
+
+	t.Run("get-logs-failed", func(t *testing.T) {
+		mockDeployer := mockdeploy.NewMockDeployer(t)
+		argoStore := mockdb.NewMockArgoWorkFlowStore(t)
+
+		c := NewTestFinetuneComponent(cfg, mockDeployer, nil, nil, nil, nil, nil,
+			nil, nil, nil, argoStore, nil, nil)
+		req := types.FinetuneLogReq{
+			ID: 1,
+		}
+
+		argoStore.EXPECT().FindByID(ctx, int64(1)).Return(database.ArgoWorkflow{
+			ID:         1,
+			TaskId:     "test-task",
+			SubmitTime: time.Now(),
+		}, nil)
+
+		expectedErr := errors.New("failed to get logs")
+		mockDeployer.EXPECT().GetWorkflowLogsNonStream(ctx, mock.Anything).Return(nil, expectedErr)
+
+		_, err := c.ReadJobLogsNonStream(ctx, req)
+		require.NotNil(t, err)
+	})
+}
+
+func TestFinetuneComponent_ReadJobLogsInStream(t *testing.T) {
+	ctx := context.TODO()
+	cfg := &config.Config{}
+
+	t.Run("wf-logs-success", func(t *testing.T) {
+		mockDeployer := mockdeploy.NewMockDeployer(t)
+		argoStore := mockdb.NewMockArgoWorkFlowStore(t)
+
+		c := NewTestFinetuneComponent(cfg, mockDeployer, nil, nil, nil, nil, nil,
+			nil, nil, nil, argoStore, nil, nil)
+
+		req := types.FinetuneLogReq{
+			ID: 1,
+		}
+
+		argoStore.EXPECT().FindByID(ctx, int64(1)).Return(database.ArgoWorkflow{
+			ID:         1,
+			TaskId:     "test-task",
+			SubmitTime: time.Now(),
+		}, nil)
+
+		expectedReader := &deploy.MultiLogReader{}
+		mockDeployer.EXPECT().GetWorkflowLogsInStream(ctx, mock.Anything).Return(expectedReader, nil)
+
+		reader, err := c.ReadJobLogsInStream(ctx, req)
+		require.NoError(t, err)
+		require.Equal(t, expectedReader, reader)
+	})
+
+	t.Run("find workflow failed", func(t *testing.T) {
+		mockDeployer := mockdeploy.NewMockDeployer(t)
+		argoStore := mockdb.NewMockArgoWorkFlowStore(t)
+
+		c := NewTestFinetuneComponent(cfg, mockDeployer, nil, nil, nil, nil, nil,
+			nil, nil, nil, argoStore, nil, nil)
+
+		req := types.FinetuneLogReq{
+			ID: 1,
+		}
+
+		expectedErr := errors.New("not found")
+		argoStore.EXPECT().FindByID(ctx, int64(1)).Return(database.ArgoWorkflow{}, expectedErr)
+
+		_, err := c.ReadJobLogsInStream(ctx, req)
+		require.NotNil(t, err)
+	})
 }

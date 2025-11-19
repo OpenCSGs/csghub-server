@@ -4,10 +4,11 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"opencsg.com/csghub-server/common/config"
 	"strconv"
 	"strings"
 	"time"
+
+	"opencsg.com/csghub-server/common/config"
 
 	"opencsg.com/csghub-server/builder/loki"
 	"opencsg.com/csghub-server/common/types"
@@ -311,4 +312,8 @@ func (c *lokiClient) StreamAllLogs(
 		}
 	}()
 	return ch, nil
+}
+
+func (c *lokiClient) QueryRange(ctx context.Context, params loki.QueryRangeParams) (*loki.LokiQueryResponse, error) {
+	return c.lokiClient.QueryRange(ctx, params)
 }
