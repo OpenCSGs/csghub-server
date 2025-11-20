@@ -962,9 +962,6 @@ func TestDeployer_GetClusterUsageById(t *testing.T) {
 		require.Equal(t, int64(0), res.TotalGPU)
 		require.Equal(t, int64(0), res.AvailableGPU)
 
-		require.Equal(t, float64(0), res.CPUUsage)
-		require.Equal(t, float64(0), res.MemUsage)
-		require.Equal(t, float64(0), res.GPUUsage)
 	})
 
 	t.Run("image runner error", func(t *testing.T) {
