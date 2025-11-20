@@ -76,7 +76,11 @@ func (a *ArgoHandler) ListWorkflows(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	wfs, total, err := a.wfc.FindWorkFlows(ctx, username, per, page)
+	taskType := ctx.Query("taskType")
+	if taskType == "" {
+		taskType = string(types.TaskTypeEvaluation)
+	}
+	wfs, total, err := a.wfc.FindWorkFlows(ctx, username, types.TaskType(taskType), per, page)
 	if err != nil {
 		slog.Error("fail to list workflows", slog.Any("error", err))
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -99,11 +103,11 @@ func (a *ArgoHandler) DeleteWorkflow(ctx *gin.Context) {
 	}
 	err = a.wfc.DeleteWorkflow(ctx, req)
 	if err != nil {
-		slog.Error("fail to delete workflow", slog.Any("error", err))
+		slog.Error("failed to delete workflow", slog.Any("error", err), slog.Any("req", req))
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	slog.Info("Deleted argo workflow successfully", slog.String("id", id))
+	slog.Info("Deleted argo workflow successfully", slog.String("id", id), slog.Any("taskid", req.TaskID))
 	httpbase.OK(ctx, nil)
 }
 

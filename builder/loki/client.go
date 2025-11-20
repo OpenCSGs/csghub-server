@@ -175,7 +175,7 @@ func (c *client) Tail(ctx context.Context, query string, start time.Time) (<-cha
 		params.Add("start", fmt.Sprintf("%d", start.UnixNano()))
 	}
 	u.RawQuery = params.Encode()
-
+	slog.Info("loki-tail", slog.Any("url", u.String()))
 	ch := make(chan *LokiPushRequest)
 	conn, resp, err := websocket.DefaultDialer.Dial(u.String(), nil)
 	if err != nil {

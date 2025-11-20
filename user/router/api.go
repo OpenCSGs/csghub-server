@@ -84,7 +84,7 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 		jwtGroup.POST("/token", needAPIKey, jwtHandler.Create)
 		jwtGroup.GET("/:token", needAPIKey, jwtHandler.Verify)
 		// check token info
-		tokenGroup.GET("/:token_value", needAPIKey, acHandler.Get)
+		tokenGroup.GET("/:token_value", acHandler.Get)
 		userGroup.GET("/user_uuids", needAPIKey, userHandler.GetUserUUIDs)
 
 		internalUserGroup.GET("/emails", userHandler.GetEmailsInternal)

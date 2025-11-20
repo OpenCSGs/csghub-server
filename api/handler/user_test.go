@@ -532,3 +532,25 @@ func TestUserHandler_LikesMCPServers(t *testing.T) {
 		"total": 100,
 	})
 }
+
+func TestUserHandler_GetUserFinetunes(t *testing.T) {
+	tester := NewUserTester(t).WithHandleFunc(func(h *UserHandler) gin.HandlerFunc {
+		return h.GetUserFinetunes
+	})
+	tester.WithUser()
+
+	tester.mocks.user.EXPECT().ListFinetunes(tester.Ctx(), &types.UserEvaluationReq{
+		CurrentUser: "u",
+		Owner:       "u",
+		PageOpts: types.PageOpts{
+			Page:     1,
+			PageSize: 10,
+		},
+	}).Return([]types.ArgoWorkFlowRes{{ID: 123}}, 100, nil)
+	tester.WithParam("username", "u").AddPagination(1, 10).Execute()
+
+	tester.ResponseEqSimple(t, 200, gin.H{
+		"data":  []types.ArgoWorkFlowRes{{ID: 123}},
+		"total": 100,
+	})
+}

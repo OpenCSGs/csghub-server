@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"math"
 	"net/http"
+	"net/url"
 	"sort"
 	"strconv"
 	"strings"
@@ -17,6 +18,7 @@ import (
 	"github.com/google/uuid"
 	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/deploy/scheduler"
+	"opencsg.com/csghub-server/builder/loki"
 	"opencsg.com/csghub-server/builder/redis"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/errorx"
@@ -50,6 +52,10 @@ type Deployer interface {
 	DeleteEvaluation(ctx context.Context, req types.ArgoWorkFlowDeleteReq) error
 	GetEvaluation(ctx context.Context, req types.EvaluationGetReq) (*types.ArgoWorkFlowRes, error)
 	CheckHeartbeatTimeout(ctx context.Context, clusterId string) (bool, error)
+	SubmitFinetuneJob(ctx context.Context, req types.FinetuneReq) (*types.ArgoWorkFlowRes, error)
+	DeleteFinetuneJob(ctx context.Context, req types.ArgoWorkFlowDeleteReq) error
+	GetWorkflowLogsInStream(ctx context.Context, req types.FinetuneLogReq) (*MultiLogReader, error)
+	GetWorkflowLogsNonStream(ctx context.Context, req types.FinetuneLogReq) (*loki.LokiQueryResponse, error)
 }
 
 func (d *deployer) GenerateUniqueSvcName(dr types.DeployRepo) string {
@@ -502,6 +508,27 @@ func (d *deployer) GetReplica(ctx context.Context, dr types.DeployRepo) (int, in
 		return 0, 0, []types.Instance{}, err
 	}
 	return resp.ActualReplica, resp.DesiredReplica, resp.Instances, nil
+}
+
+func parseSinceTime(since string) time.Time {
+	switch since {
+	case "10mins":
+		return time.Now().Add(-10 * time.Minute)
+	case "30mins":
+		return time.Now().Add(-30 * time.Minute)
+	case "1hour":
+		return time.Now().Add(-1 * time.Hour)
+	case "6hours":
+		return time.Now().Add(-6 * time.Hour)
+	case "1day":
+		return time.Now().Add(-24 * time.Hour)
+	case "2days":
+		return time.Now().Add(-48 * time.Hour)
+	case "1week":
+		return time.Now().Add(-7 * 24 * time.Hour)
+	default:
+		return time.Now().Add(-10 * time.Minute)
+	}
 }
 
 func (d *deployer) InstanceLogs(ctx context.Context, dr types.DeployRepo) (*MultiLogReader, error) {
@@ -1191,4 +1218,125 @@ func (d *deployer) CheckHeartbeatTimeout(ctx context.Context, clusterId string) 
 	}
 
 	return false, nil
+}
+
+func (d *deployer) SubmitFinetuneJob(ctx context.Context, req types.FinetuneReq) (*types.ArgoWorkFlowRes, error) {
+	finetunedModelName := ""
+	orgModelNames := strings.Split(req.ModelId, "/")
+	if len(orgModelNames) == 2 {
+		// "Qwen3-0.6B-finetuned-20251023_134013"
+		suffix := time.Now().Format("20060102-150405")
+		finetunedModelName = fmt.Sprintf("%s-finetuned-%s", orgModelNames[1], suffix)
+	}
+
+	env := make(map[string]string)
+	env["MODEL_ID"] = req.ModelId
+	env["DATASET_ID"] = req.DatasetId
+	env["ACCESS_TOKEN"] = req.Token
+	env["HF_TOKEN"] = req.Token
+	env["HF_ENDPOINT"], _ = url.JoinPath(req.DownloadEndpoint, "hf")
+	env["HF_HUB_DOWNLOAD_TIMEOUT"] = "30"
+	env["HF_USERNAME"] = req.Username
+	env["LEARNING_RATE"] = strconv.FormatFloat(req.LearningRate, 'f', -1, 64)
+	env["CUSTOM_ARGS"] = req.CustomeArgs
+	if len(finetunedModelName) > 0 {
+		env["FINETUNED_MODEL_NAME"] = finetunedModelName
+	}
+
+	common.UpdateEvaluationEnvHardware(env, req.Hardware)
+
+	templates := []types.ArgoFlowTemplate{}
+	templates = append(templates, types.ArgoFlowTemplate{
+		Name:     "finetune",
+		Env:      env,
+		HardWare: req.Hardware,
+		Image:    req.Image,
+	},
+	)
+	uniqueFlowName := d.snowflakeNode.Generate().Base36()
+	flowReq := &types.ArgoWorkFlowReq{
+		TaskName:           req.TaskName,
+		TaskId:             uniqueFlowName,
+		TaskType:           req.TaskType,
+		TaskDesc:           req.TaskDesc,
+		Image:              req.Image,
+		Username:           req.Username,
+		UserUUID:           req.UserUUID,
+		Entrypoint:         "finetune",
+		ClusterID:          req.ClusterID,
+		Templates:          templates,
+		RepoType:           req.RepoType,
+		ResourceId:         req.ResourceId,
+		ResourceName:       req.ResourceName,
+		FinetunedModelName: finetunedModelName,
+	}
+	if req.ResourceId == 0 {
+		flowReq.ShareMode = true
+	}
+	slog.Debug("submit finetune workflow request to runner", slog.Any("flowReq", flowReq))
+	return d.imageRunner.SubmitFinetuneJob(ctx, flowReq)
+}
+
+func (d *deployer) DeleteFinetuneJob(ctx context.Context, req types.ArgoWorkFlowDeleteReq) error {
+	_, err := d.imageRunner.DeleteWorkFlow(ctx, req)
+	if err != nil {
+		return fmt.Errorf("failed delete finetune workflow by runner error: %w", err)
+	}
+	return nil
+}
+
+func (d *deployer) GetWorkflowLogsInStream(ctx context.Context, req types.FinetuneLogReq) (*MultiLogReader, error) {
+	slog.Info("GetWorkflowLogsInStream", slog.Any("req", req))
+	labels := map[string]string{
+		types.StreamKeyInstanceName: req.PodName,
+	}
+
+	var startTime = req.SubmitTime
+	if len(req.Since) > 0 {
+		startTime = parseSinceTime(req.Since)
+	}
+
+	runLog, err := d.readLogsFromLoki(ctx, types.ReadLogRequest{
+		DeployID:  req.PodName,
+		StartTime: startTime,
+		Labels:    labels,
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get workflow job logs error: %w", err)
+	}
+
+	return NewMultiLogReader(nil, runLog), nil
+}
+
+func (d *deployer) GetWorkflowLogsNonStream(ctx context.Context, req types.FinetuneLogReq) (*loki.LokiQueryResponse, error) {
+	labels := map[string]string{
+		types.StreamKeyInstanceName: req.PodName,
+	}
+
+	var queryBuilder strings.Builder
+	queryBuilder.WriteString("{")
+	first := true
+	for k, v := range labels {
+		if !first {
+			queryBuilder.WriteString(",")
+		}
+		queryBuilder.WriteString(fmt.Sprintf(`%s="%s"`, k, v))
+		first = false
+	}
+	queryBuilder.WriteString("}")
+	query := queryBuilder.String()
+
+	var startTime = req.SubmitTime
+	if req.Since != "" {
+		startTime = parseSinceTime(req.Since)
+	}
+
+	params := loki.QueryRangeParams{
+		Query:     query,
+		Start:     startTime,
+		Direction: "forward",
+	}
+
+	return d.lokiClient.QueryRange(ctx, params)
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 
 	"github.com/argoproj/argo-workflows/v3/pkg/apis/workflow/v1alpha1"
 	"opencsg.com/csghub-server/builder/store/database"
@@ -42,7 +43,10 @@ func (h *argoWorkflowExecutorImpl) ProcessEvent(ctx context.Context, event *type
 	if err != nil {
 		return fmt.Errorf("failed to unmarshal event data: %w", err)
 	}
-
+	slog.Info("webhook_workflow_event", slog.Any("event-type", event.EventType), slog.Any("clusterid", wf.ClusterID),
+		slog.Any("TaskId", wf.TaskId), slog.Any("status", wf.Status),
+		slog.Any("username", wf.Username), slog.Any("useruuid", wf.UserUUID),
+		slog.Any("ResultURL", wf.ResultURL))
 	switch event.EventType {
 	case types.RunnerWorkflowCreate:
 		oldwf, err := h.store.FindByTaskID(ctx, wf.TaskId)

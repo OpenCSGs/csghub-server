@@ -1,6 +1,6 @@
 ARG SPACE_BASE_IMAGE=opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/space-base:python3.10-1.0.2
 
-FROM ${SPACE_BASE_IMAGE} AS base
+FROM ${SPACE_BASE_IMAGE}/opencsg_public/space-base:python3.10-1.0.3 AS base
 
 # First handle dependencies to leverage caching
 USER user

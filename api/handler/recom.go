@@ -40,7 +40,7 @@ func NewRecomHandler(cfg *config.Config) (*RecomHandler, error) {
 func (h *RecomHandler) SetOpWeight(ctx *gin.Context) {
 	type SetOpWeightReq struct {
 		RepoID int64 `json:"repo_id" binding:"required"`
-		Weight int64 `json:"weight" binding:"required"`
+		Weight int64 `json:"weight"`
 	}
 
 	var req SetOpWeightReq

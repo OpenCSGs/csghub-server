@@ -22,4 +22,5 @@ type Runner interface {
 	SubmitWorkFlow(context.Context, *types.ArgoWorkFlowReq) (*types.ArgoWorkFlowRes, error)
 	DeleteWorkFlow(context.Context, types.ArgoWorkFlowDeleteReq) (*httpbase.R, error)
 	GetWorkFlow(context.Context, types.ArgoWorkFlowDeleteReq) (*types.ArgoWorkFlowRes, error)
+	SubmitFinetuneJob(context.Context, *types.ArgoWorkFlowReq) (*types.ArgoWorkFlowRes, error)
 }

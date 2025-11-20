@@ -283,7 +283,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		tokenGroup.PUT("/:app/:token_name", userProxyHandler.ProxyToApi("/api/v1/token/%s/%s", "app", "token_name"))
 		tokenGroup.DELETE("/:app/:token_name", userProxyHandler.ProxyToApi("/api/v1/token/%s/%s", "app", "token_name"))
 		// check token info
-		tokenGroup.GET("/:token_value", middlewareCollection.Auth.NeedAPIKey, userProxyHandler.ProxyToApi("/api/v1/token/%s", "token_value"))
+		tokenGroup.GET("/:token_value", userProxyHandler.ProxyToApi("/api/v1/token/%s", "token_value"))
 	}
 
 	sshKeyHandler, err := handler.NewSSHKeyHandler(config)
@@ -545,6 +545,12 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		return nil, fmt.Errorf("error creating webhook routes: %w", err)
 	}
 
+	finetuneJobHandler, err := handler.NewFinetuneHandler(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating finetune job handler: %w", err)
+	}
+	createFinetuneRoutes(apiGroup, middlewareCollection, finetuneJobHandler)
+
 	return r, nil
 }
 
@@ -556,6 +562,17 @@ func createEvaluationRoutes(apiGroup *gin.RouterGroup, middlewareCollection midd
 		evaluationsGroup.POST("", evaluationHandler.RunEvaluation)
 		evaluationsGroup.DELETE("/:id", evaluationHandler.DeleteEvaluation)
 		evaluationsGroup.GET("/:id", evaluationHandler.GetEvaluation)
+	}
+}
+
+func createFinetuneRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware.MiddlewareCollection, finetuneJobHandler *handler.FinetuneHandler) {
+	ftGroup := apiGroup.Group("/finetunes")
+	ftGroup.Use(middlewareCollection.Auth.NeedLogin)
+	{
+		ftGroup.POST("", finetuneJobHandler.RunFinetuneJob)
+		ftGroup.GET("/:id", finetuneJobHandler.GetFinetuneJob)
+		ftGroup.DELETE("/:id", finetuneJobHandler.DeleteFinetuneJob)
+		ftGroup.GET("/:id/logs", finetuneJobHandler.GetLogs)
 	}
 }
 
@@ -979,6 +996,7 @@ func createUserRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware
 	{
 		apiGroup.GET("/user/:username/run/:repo_type", middlewareCollection.Auth.UserMatch, userHandler.GetRunDeploys)
 		apiGroup.GET("/user/:username/finetune/instances", middlewareCollection.Auth.UserMatch, userHandler.GetFinetuneInstances)
+		apiGroup.GET("/user/:username/finetune/jobs", middlewareCollection.Auth.UserMatch, userHandler.GetUserFinetunes)
 		// User evaluations
 		apiGroup.GET("/user/:username/evaluations", middlewareCollection.Auth.UserMatch, userHandler.GetEvaluations)
 		// User notebooks
