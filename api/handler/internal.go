@@ -103,14 +103,16 @@ func (h *InternalHandler) SSHAllowed(ctx *gin.Context) {
 			return
 		}
 		rawReq.GitEnv = gitEnv
-		valid, err := h.internal.CheckGitCallback(ctx.Request.Context(), rawReq)
+		if len(gitEnv.GitAlternateObjectDirectoriesRelative) != 0 || gitEnv.GitObjectDirectoryRelative != "" {
+			valid, err := h.internal.CheckGitCallback(ctx.Request.Context(), rawReq)
 
-		if !valid {
-			ctx.PureJSON(http.StatusOK, gin.H{
-				"status":  false,
-				"message": err.Error(),
-			})
-			return
+			if !valid {
+				ctx.PureJSON(http.StatusOK, gin.H{
+					"status":  false,
+					"message": err.Error(),
+				})
+				return
+			}
 		}
 	}
 
