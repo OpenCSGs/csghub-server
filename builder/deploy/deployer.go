@@ -510,6 +510,27 @@ func (d *deployer) GetReplica(ctx context.Context, dr types.DeployRepo) (int, in
 	return resp.ActualReplica, resp.DesiredReplica, resp.Instances, nil
 }
 
+func parseSinceTime(since string) time.Time {
+	switch since {
+	case "10mins":
+		return time.Now().Add(-10 * time.Minute)
+	case "30mins":
+		return time.Now().Add(-30 * time.Minute)
+	case "1hour":
+		return time.Now().Add(-1 * time.Hour)
+	case "6hours":
+		return time.Now().Add(-6 * time.Hour)
+	case "1day":
+		return time.Now().Add(-24 * time.Hour)
+	case "2days":
+		return time.Now().Add(-48 * time.Hour)
+	case "1week":
+		return time.Now().Add(-7 * 24 * time.Hour)
+	default:
+		return time.Now().Add(-10 * time.Minute)
+	}
+}
+
 func (d *deployer) InstanceLogs(ctx context.Context, dr types.DeployRepo) (*MultiLogReader, error) {
 	slog.Debug("get logs for deploy", slog.Any("deploy", dr))
 
