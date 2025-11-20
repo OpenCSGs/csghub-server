@@ -11,9 +11,36 @@ download_model() {
 }
 get_subset_and_task() {
     repo=$1
-    csv_file=$(find $repo -name "*_val.csv" -type f | head -n 1)
-    tsv_file=$(find $repo -name "*.tsv" -type f | head -n 1)
-    jsonl_files=$(find $repo -name "*.jsonl" -type f)
+    # repo is the dataset_id (e.g., xzgan001/civil_comments)
+    # The dataset is downloaded to /workspace/$repo
+    repo_path="/workspace/$repo"
+    
+    # Check if it's a civil_comments dataset (by dataset_id name)
+    # For civil_comments datasets, always use get_task.py to get the registered benchmark name
+    # This ensures compatibility with USE_CUSTOM_DATASETS regardless of file format
+    if echo "$repo" | grep -qi "civil_comments"; then
+        echo "[DEBUG] Detected civil_comments dataset, using get_task.py to get registered benchmark name" >&2
+        rm -rf /tmp/task.txt
+        # Redirect get_task.py output to stderr to prevent it from being captured
+        python /etc/csghub/get_task.py "$repo" >&2
+        if [ -f /tmp/task.txt ]; then
+            repo_task=$(cat /tmp/task.txt)
+            if [ ! -z "$repo_task" ]; then
+                # Return empty subset and the registered task name (output to stdout only)
+                echo "[DEBUG] Found registered benchmark name: $repo_task" >&2
+                echo "|$repo_task"
+                return 0
+            fi
+        fi
+        echo "[ERROR] Failed to get task name for registered civil_comments dataset $repo" >&2
+        echo "[ERROR] Make sure the dataset is registered in custom_datasets.py" >&2
+        exit 1
+    fi
+    
+    # Fall back to original logic for other dataset types
+    csv_file=$(find "$repo_path" -name "*_val.csv" -type f | head -n 1)
+    tsv_file=$(find "$repo_path" -name "*.tsv" -type f | head -n 1)
+    jsonl_files=$(find "$repo_path" -name "*.jsonl" -type f)
     if [ -n "$csv_file" ]; then
         basename=$(basename "$csv_file")
         star_value="${basename%_val.csv}"
@@ -35,13 +62,17 @@ get_subset_and_task() {
         done
         echo  "$subset|general_qa"
     else
-        echo "No valid subset found for $repo"
+        echo "No valid subset found for $repo_path"
         exit 1
     fi
 
 }
 export HF_TOKEN=$ACCESS_TOKEN
 mkdir -p /workspace/data
+
+# Ensure NLTK resources are available for BLEU and other metrics
+echo "Checking NLTK resources..."
+python -c "import nltk; nltk.download('punkt_tab', quiet=True)" 2>&1 || echo "[WARNING] Failed to download NLTK punkt_tab resource"
 
 # Register custom datasets
 echo "Registering custom datasets..."

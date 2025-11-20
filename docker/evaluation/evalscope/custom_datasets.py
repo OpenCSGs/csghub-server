@@ -31,6 +31,11 @@ class CivilCommentsDataAdapter(DefaultDataAdapter):
     - Other optional fields: severe_toxicity, obscene, threat, insult, identity_attack, sexual_explicit
     """
 
+    def __init__(self, *args, **kwargs):
+        """Initialize the adapter, ensuring parent class is properly initialized"""
+        super().__init__(*args, **kwargs)
+        print(f"[DEBUG] CivilCommentsDataAdapter initialized: {type(self).__name__}")
+
     def format_prompt_template(self, sample: Sample) -> str:
         """
         Override to skip additional prompt formatting since we already format in record_to_sample
@@ -53,6 +58,7 @@ class CivilCommentsDataAdapter(DefaultDataAdapter):
         Returns:
             Sample object with the converted data
         """
+        print(f"[DEBUG] CivilCommentsDataAdapter.record_to_sample called with record keys: {list(record.keys())}")
         # Extract text and toxicity label
         text = record.get('text', '')
         toxicity = record.get('toxicity', 0)
@@ -137,6 +143,24 @@ def register_custom_datasets():
                 )
 
                 print(f"[DEBUG] Created BenchmarkMeta: name='{benchmark_name}', dataset_id='{dataset_id}'")
+                print(f"[DEBUG] BenchmarkMeta.data_adapter: {civil_comments_meta.data_adapter}")
+                print(f"[DEBUG] BenchmarkMeta.data_adapter type: {type(civil_comments_meta.data_adapter)}")
+                print(
+                    f"[DEBUG] Is CivilCommentsDataAdapter: {civil_comments_meta.data_adapter is CivilCommentsDataAdapter}")
+                print(
+                    f"[DEBUG] Has record_to_sample method: {hasattr(civil_comments_meta.data_adapter, 'record_to_sample')}")
+                if hasattr(civil_comments_meta.data_adapter, 'record_to_sample'):
+                    import inspect
+                    try:
+                        source = inspect.getsource(civil_comments_meta.data_adapter.record_to_sample)
+                        print(f"[DEBUG] record_to_sample source (first 200 chars): {source[:200]}")
+                    except Exception as e:
+                        print(f"[DEBUG] Could not get source: {e}")
+                        # Check if it's our method by checking the qualname
+                        print(
+                            f"[DEBUG] record_to_sample qualname: {civil_comments_meta.data_adapter.record_to_sample.__qualname__}")
+                        print(
+                            f"[DEBUG] record_to_sample module: {civil_comments_meta.data_adapter.record_to_sample.__module__}")
 
                 # Register benchmark using BENCHMARK_REGISTRY
                 BENCHMARK_REGISTRY[benchmark_name] = civil_comments_meta
