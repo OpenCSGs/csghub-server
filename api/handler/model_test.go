@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	mockcomponent "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
 	"opencsg.com/csghub-server/api/httpbase"
@@ -22,6 +23,7 @@ type ModelTester struct {
 		model     *mockcomponent.MockModelComponent
 		sensitive *mockcomponent.MockSensitiveComponent
 		repo      *mockcomponent.MockRepoComponent
+		agent     *mockcomponent.MockAgentComponent
 	}
 }
 
@@ -30,10 +32,11 @@ func NewModelTester(t *testing.T) *ModelTester {
 	tester.mocks.model = mockcomponent.NewMockModelComponent(t)
 	tester.mocks.sensitive = mockcomponent.NewMockSensitiveComponent(t)
 	tester.mocks.repo = mockcomponent.NewMockRepoComponent(t)
-
+	tester.mocks.agent = mockcomponent.NewMockAgentComponent(t)
 	tester.handler = &ModelHandler{
 		model: tester.mocks.model, sensitive: tester.mocks.sensitive,
-		repo: tester.mocks.repo,
+		repo:           tester.mocks.repo,
+		agentComponent: tester.mocks.agent,
 	}
 	tester.WithParam("name", "r")
 	tester.WithParam("namespace", "u")
@@ -277,6 +280,45 @@ func TestModelHandler_DeployDedicated(t *testing.T) {
 
 		tester.ResponseEq(t, 200, tester.OKText, types.DeployRepo{DeployID: 123})
 	})
+
+	t.Run("success_with_agent", func(t *testing.T) {
+		tester := NewModelTester(t).WithHandleFunc(func(h *ModelHandler) gin.HandlerFunc {
+			return h.DeployDedicated
+		})
+		tester.WithUser()
+
+		tester.mocks.repo.EXPECT().IsSyncing(tester.Ctx(), types.ModelRepo, "u", "r").Return(false, nil)
+
+		tester.mocks.repo.EXPECT().AllowReadAccess(tester.Ctx(), types.ModelRepo, "u", "r", "u").Return(true, nil)
+		tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), &types.ModelRunReq{
+			DeployName: "test",
+			MinReplica: 1,
+			MaxReplica: 2,
+			Revision:   "main",
+			Agent:      "{\"type\":\"code\",\"id\":\"123\",\"request_id\":\"123\"}",
+		}).Return(true, nil)
+		tester.mocks.model.EXPECT().Deploy(tester.Ctx(), types.DeployActReq{
+			Namespace:   "u",
+			Name:        "r",
+			CurrentUser: "u",
+			DeployType:  types.InferenceType,
+		}, types.ModelRunReq{DeployName: "test", MinReplica: 1, MaxReplica: 2, Revision: "main",
+			Agent: "{\"type\":\"code\",\"id\":\"123\",\"request_id\":\"123\"}",
+		}).Return(123, nil)
+
+		tester.mocks.agent.EXPECT().CreateTaskIfInstanceExists(tester.Ctx(), mock.MatchedBy(func(req *types.AgentInstanceTaskReq) bool {
+			return req.TaskID == "123" &&
+				req.Agent == "{\"type\":\"code\",\"id\":\"123\",\"request_id\":\"123\"}" &&
+				req.Type == types.AgentTaskTypeInference &&
+				req.Username == "u"
+		})).Return(nil)
+
+		tester.WithBody(t, &types.ModelRunReq{DeployName: "test", MinReplica: 1, MaxReplica: 2, Revision: "main",
+			Agent: "{\"type\":\"code\",\"id\":\"123\",\"request_id\":\"123\"}"}).Execute()
+
+		tester.ResponseEq(t, 200, tester.OKText, types.DeployRepo{DeployID: 123})
+	})
+
 	t.Run("error_badrequest", func(t *testing.T) {
 		tester := NewModelTester(t).WithHandleFunc(func(h *ModelHandler) gin.HandlerFunc {
 			return h.DeployDedicated

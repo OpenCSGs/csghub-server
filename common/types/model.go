@@ -268,6 +268,7 @@ type ModelRunReq struct {
 	OrderDetailID      int64  `json:"order_detail_id"`
 	Entrypoint         string `json:"entrypoint"` // model file name for gguf model
 	EngineArgs         string `json:"engine_args"`
+	Agent              string `json:"agent"`
 }
 
 var _ SensitiveRequestV2 = (*ModelRunReq)(nil)

@@ -49,6 +49,9 @@ type AgentComponent interface {
 	CreateSessionHistories(ctx context.Context, userUUID string, instanceID int64, req *types.CreateSessionHistoryRequest) (*types.CreateSessionHistoryResponse, error)
 	UpdateSessionHistoryFeedback(ctx context.Context, userUUID string, instanceID int64, sessionUUID string, req *types.FeedbackSessionHistoryRequest) error
 	RewriteSessionHistory(ctx context.Context, userUUID string, instanceID int64, sessionUUID string, req *types.RewriteSessionHistoryRequest) (*types.RewriteSessionHistoryResponse, error)
+
+	// Task operations
+	CreateTaskIfInstanceExists(ctx context.Context, req *types.AgentInstanceTaskReq) error
 }
 
 // agentComponentImpl implements the AgentComponent interface
@@ -58,6 +61,8 @@ type agentComponentImpl struct {
 	instanceStore             database.AgentInstanceStore
 	sessionStore              database.AgentInstanceSessionStore
 	sessionHistoryStore       database.AgentInstanceSessionHistoryStore
+	agentInstanceTaskStore    database.AgentInstanceTaskStore
+	userStore                 database.UserStore
 	adapterFactory            *AgentInstanceAdapterFactory
 	queue                     mq.MessageQueue
 	sessionHistoryMsgConsumer jetstream.Consumer
@@ -69,12 +74,14 @@ var _ AgentComponent = (*agentComponentImpl)(nil)
 // NewAgentComponent creates a new AgentComponent
 func NewAgentComponent(config *config.Config) (AgentComponent, error) {
 	c := &agentComponentImpl{
-		config:              config,
-		templateStore:       database.NewAgentTemplateStore(),
-		instanceStore:       database.NewAgentInstanceStore(),
-		sessionStore:        database.NewAgentInstanceSessionStore(),
-		sessionHistoryStore: database.NewAgentInstanceSessionHistoryStore(),
-		adapterFactory:      createAdapterFactory(config),
+		config:                 config,
+		templateStore:          database.NewAgentTemplateStore(),
+		instanceStore:          database.NewAgentInstanceStore(),
+		sessionStore:           database.NewAgentInstanceSessionStore(),
+		sessionHistoryStore:    database.NewAgentInstanceSessionHistoryStore(),
+		agentInstanceTaskStore: database.NewAgentInstanceTaskStore(),
+		userStore:              database.NewUserStore(),
+		adapterFactory:         createAdapterFactory(config),
 	}
 
 	notificationSvcClient := rpc.NewNotificationSvcHttpClientBuilder(fmt.Sprintf("%s:%d", config.Notification.Host, config.Notification.Port),
@@ -1149,4 +1156,83 @@ func (c *agentComponentImpl) RewriteSessionHistory(ctx context.Context, userUUID
 	return &types.RewriteSessionHistoryResponse{
 		MsgUUID: envelope.MsgUUID,
 	}, nil
+}
+
+// parseAgent parses the agent string to get the agent type and content id
+// agent string is a JSON string, e.g. {"type": "code", "id": "123", "request_id": "123"}
+func parseAgent(agent string) (*types.AgentInfo, error) {
+	var agentInfo types.AgentInfo
+	if err := json.Unmarshal([]byte(agent), &agentInfo); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal agent, error:%w", err)
+	}
+	if agentInfo.Type == "" {
+		return nil, fmt.Errorf("agent type cannot be empty")
+	}
+	if agentInfo.ID == "" {
+		return nil, fmt.Errorf("agent id cannot be empty")
+	}
+	if agentInfo.RequestID == "" {
+		return nil, fmt.Errorf("request id cannot be empty")
+	}
+	return &agentInfo, nil
+}
+
+// CreateTaskIfInstanceExists creates a link between an agent instance and an async task if the instance exists
+func (c *agentComponentImpl) CreateTaskIfInstanceExists(ctx context.Context, req *types.AgentInstanceTaskReq) error {
+	if req == nil {
+		return fmt.Errorf("agent instance task request is nil")
+	}
+
+	agentInfo, err := parseAgent(req.Agent)
+	if err != nil {
+		return fmt.Errorf("failed to parse agent, error:%w", err)
+	}
+
+	if req.TaskID == "" {
+		return fmt.Errorf("task_id cannot be empty")
+	}
+
+	user, err := c.userStore.FindByUsername(ctx, req.Username)
+	if err != nil {
+		return fmt.Errorf("failed to find user by username %s: %w", req.Username, err)
+	}
+
+	instance, err := c.instanceStore.FindByContentID(ctx, agentInfo.Type, agentInfo.ID)
+	if err != nil {
+		return fmt.Errorf("failed to find agent instance with type %s and content_id %s: %w", agentInfo.Type, agentInfo.ID, err)
+	}
+
+	if instance == nil {
+		slog.Info("agent instance not found, skip creating agent instance task", "task_id", req.TaskID, "instance_type", agentInfo.Type, "instance_content_id", agentInfo.ID)
+		return nil
+	}
+
+	if instance.UserUUID != user.UUID && !instance.Public {
+		return fmt.Errorf("agent instance does not belong to the user, instance_type: %s, instance_content_id: %s, user_uuid: %s", agentInfo.Type, agentInfo.ID, user.UUID)
+	}
+
+	_, err = c.sessionStore.FindByUUID(ctx, agentInfo.RequestID)
+	if err != nil {
+		return fmt.Errorf("failed to find session by uuid %s: %w", agentInfo.RequestID, err)
+	}
+
+	task := &database.AgentInstanceTask{
+		InstanceID:  instance.ID,
+		TaskID:      req.TaskID,
+		TaskType:    req.Type,
+		SessionUUID: agentInfo.RequestID,
+		UserUUID:    user.UUID,
+	}
+
+	if _, err = c.agentInstanceTaskStore.Create(ctx, task); err != nil {
+		return fmt.Errorf("failed to create agent instance task: %w", err)
+	}
+
+	slog.Info("successfully created agent instance task",
+		slog.String("instance_type", agentInfo.Type),
+		slog.String("instance_content_id", agentInfo.ID),
+		slog.Int64("instance_id", instance.ID),
+		slog.String("task_id", req.TaskID))
+
+	return nil
 }

@@ -25,15 +25,21 @@ func NewFinetuneHandler(config *config.Config) (*FinetuneHandler, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error creating sensitive component:%w", err)
 	}
+	agentComp, err := component.NewAgentComponent(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating agent component:%w", err)
+	}
 	return &FinetuneHandler{
-		ftComp:    ftComp,
-		sensitive: sc,
+		ftComp:         ftComp,
+		sensitive:      sc,
+		agentComponent: agentComp,
 	}, nil
 }
 
 type FinetuneHandler struct {
-	ftComp    component.FinetuneComponent
-	sensitive component.SensitiveComponent
+	ftComp         component.FinetuneComponent
+	sensitive      component.SensitiveComponent
+	agentComponent component.AgentComponent
 }
 
 // create finetune  godoc
@@ -72,6 +78,23 @@ func (h *FinetuneHandler) RunFinetuneJob(ctx *gin.Context) {
 		httpbase.ServerError(ctx, err)
 		return
 	}
+
+	if req.Agent != "" {
+		if err := h.agentComponent.CreateTaskIfInstanceExists(ctx.Request.Context(), &types.AgentInstanceTaskReq{
+			TaskID:   finetune.TaskId,
+			Agent:    req.Agent,
+			Type:     types.AgentTaskTypeFinetuneJob,
+			Username: currentUser,
+		}); err != nil {
+			slog.Warn("failed to create agent instance task",
+				slog.String("task_id", finetune.TaskId),
+				slog.String("type", types.AgentTaskTypeFinetuneJob.String()),
+				slog.String("agent", req.Agent),
+				slog.Any("error", err),
+			)
+		}
+	}
+
 	httpbase.OK(ctx, finetune)
 }
 

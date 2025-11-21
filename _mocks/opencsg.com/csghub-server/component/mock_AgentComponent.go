@@ -188,6 +188,53 @@ func (_c *MockAgentComponent_CreateSessionHistories_Call) RunAndReturn(run func(
 	return _c
 }
 
+// CreateTaskIfInstanceExists provides a mock function with given fields: ctx, req
+func (_m *MockAgentComponent) CreateTaskIfInstanceExists(ctx context.Context, req *types.AgentInstanceTaskReq) error {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateTaskIfInstanceExists")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, *types.AgentInstanceTaskReq) error); ok {
+		r0 = rf(ctx, req)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockAgentComponent_CreateTaskIfInstanceExists_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateTaskIfInstanceExists'
+type MockAgentComponent_CreateTaskIfInstanceExists_Call struct {
+	*mock.Call
+}
+
+// CreateTaskIfInstanceExists is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req *types.AgentInstanceTaskReq
+func (_e *MockAgentComponent_Expecter) CreateTaskIfInstanceExists(ctx interface{}, req interface{}) *MockAgentComponent_CreateTaskIfInstanceExists_Call {
+	return &MockAgentComponent_CreateTaskIfInstanceExists_Call{Call: _e.mock.On("CreateTaskIfInstanceExists", ctx, req)}
+}
+
+func (_c *MockAgentComponent_CreateTaskIfInstanceExists_Call) Run(run func(ctx context.Context, req *types.AgentInstanceTaskReq)) *MockAgentComponent_CreateTaskIfInstanceExists_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*types.AgentInstanceTaskReq))
+	})
+	return _c
+}
+
+func (_c *MockAgentComponent_CreateTaskIfInstanceExists_Call) Return(_a0 error) *MockAgentComponent_CreateTaskIfInstanceExists_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockAgentComponent_CreateTaskIfInstanceExists_Call) RunAndReturn(run func(context.Context, *types.AgentInstanceTaskReq) error) *MockAgentComponent_CreateTaskIfInstanceExists_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CreateTemplate provides a mock function with given fields: ctx, template
 func (_m *MockAgentComponent) CreateTemplate(ctx context.Context, template *types.AgentTemplate) error {
 	ret := _m.Called(ctx, template)

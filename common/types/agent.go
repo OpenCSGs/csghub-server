@@ -216,6 +216,32 @@ type RewriteSessionHistoryResponse struct {
 	MsgUUID string `json:"msg_uuid"`
 }
 
+type AgentTaskType string
+
+const (
+	AgentTaskTypeFinetuneJob AgentTaskType = "finetuneJob"
+	AgentTaskTypeInference   AgentTaskType = "inference"
+)
+
+func (t AgentTaskType) String() string {
+	return string(t)
+}
+
+// AgentInfo represents the agent information parsed from JSON string
+// e.g. {"type": "code", "id": "123", "request_id": "123"}
+type AgentInfo struct {
+	Type      string `json:"type"`       // Agent type (e.g., "code", "langflow")
+	ID        string `json:"id"`         // Agent content ID
+	RequestID string `json:"request_id"` // request ID (session uuid)
+}
+
+type AgentInstanceTaskReq struct {
+	TaskID   string        `json:"task_id"`  // Task ID from argo_workflows
+	Agent    string        `json:"agent"`    // Agent JSON string, e.g. {"type": "code", "id": "123"}
+	Type     AgentTaskType `json:"type"`     // Agent task type (e.g., "finetune", "inference")
+	Username string        `json:"username"` // Username
+}
+
 type AgentStreamEvent struct {
 	Event string          `json:"event"`
 	Data  json.RawMessage `json:"data"`
