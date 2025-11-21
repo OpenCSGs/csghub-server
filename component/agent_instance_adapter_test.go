@@ -706,7 +706,8 @@ func TestLangflowAgentInstanceAdapter_DeleteInstance(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockClient := mockrpc.NewMockAgentHubSvcClient(t)
-			adapter := NewLangflowAgentInstanceAdapterWithClient(mockClient)
+			config := &config.Config{}
+			adapter := NewLangflowAgentInstanceAdapterWithClient(mockClient, config)
 
 			tt.mockSetup(mockClient)
 

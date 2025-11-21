@@ -178,6 +178,51 @@ func (_c *MockAgentInstanceAdapter_GetInstanceType_Call) RunAndReturn(run func()
 	return _c
 }
 
+// GetQuotaPerUser provides a mock function with no fields
+func (_m *MockAgentInstanceAdapter) GetQuotaPerUser() int {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetQuotaPerUser")
+	}
+
+	var r0 int
+	if rf, ok := ret.Get(0).(func() int); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(int)
+	}
+
+	return r0
+}
+
+// MockAgentInstanceAdapter_GetQuotaPerUser_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetQuotaPerUser'
+type MockAgentInstanceAdapter_GetQuotaPerUser_Call struct {
+	*mock.Call
+}
+
+// GetQuotaPerUser is a helper method to define mock.On call
+func (_e *MockAgentInstanceAdapter_Expecter) GetQuotaPerUser() *MockAgentInstanceAdapter_GetQuotaPerUser_Call {
+	return &MockAgentInstanceAdapter_GetQuotaPerUser_Call{Call: _e.mock.On("GetQuotaPerUser")}
+}
+
+func (_c *MockAgentInstanceAdapter_GetQuotaPerUser_Call) Run(run func()) *MockAgentInstanceAdapter_GetQuotaPerUser_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockAgentInstanceAdapter_GetQuotaPerUser_Call) Return(_a0 int) *MockAgentInstanceAdapter_GetQuotaPerUser_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockAgentInstanceAdapter_GetQuotaPerUser_Call) RunAndReturn(run func() int) *MockAgentInstanceAdapter_GetQuotaPerUser_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // IsInstanceRunning provides a mock function with given fields: ctx, userUUID, contentID, builtIn
 func (_m *MockAgentInstanceAdapter) IsInstanceRunning(ctx context.Context, userUUID string, contentID string, builtIn bool) (bool, error) {
 	ret := _m.Called(ctx, userUUID, contentID, builtIn)

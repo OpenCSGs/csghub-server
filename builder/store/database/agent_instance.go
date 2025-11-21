@@ -55,6 +55,7 @@ type AgentInstanceStore interface {
 	ListByUserUUID(ctx context.Context, userUUID string, filter types.AgentInstanceFilter, per int, page int) ([]AgentInstance, int, error)
 	Update(ctx context.Context, instance *AgentInstance) error
 	Delete(ctx context.Context, id int64) error
+	CountByUserAndType(ctx context.Context, userUUID string, instanceType string) (int, error)
 }
 
 // agentTemplateStoreImpl is the implementation of AgentTemplateStore
@@ -296,4 +297,19 @@ func (s *agentInstanceStoreImpl) Delete(ctx context.Context, id int64) error {
 		})
 	}
 	return nil
+}
+
+// CountByUserAndType returns the count of agent instances for a specific user and type
+func (s *agentInstanceStoreImpl) CountByUserAndType(ctx context.Context, userUUID string, instanceType string) (int, error) {
+	count, err := s.db.Core.NewSelect().
+		Model((*AgentInstance)(nil)).
+		Where("user_uuid = ? AND type = ?", userUUID, instanceType).
+		Count(ctx)
+	if err != nil {
+		return 0, errorx.HandleDBError(err, map[string]any{
+			"user_uuid":     userUUID,
+			"instance_type": instanceType,
+		})
+	}
+	return count, nil
 }

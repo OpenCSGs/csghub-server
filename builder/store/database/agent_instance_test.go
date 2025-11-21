@@ -514,3 +514,110 @@ func TestAgentInstanceStore_IsInstanceExistsByContentID_EmptyParameters(t *testi
 	require.NoError(t, err)
 	require.False(t, exists)
 }
+
+func TestAgentInstanceStore_CountByUserAndType(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewAgentInstanceStoreWithDB(db)
+
+	userUUID1 := uuid.New().String()
+	userUUID2 := uuid.New().String()
+	instanceType1 := "langflow"
+	instanceType2 := "agno"
+
+	// Test case 1: Count with no instances (should return 0)
+	count, err := store.CountByUserAndType(ctx, userUUID1, instanceType1)
+	require.NoError(t, err)
+	require.Equal(t, 0, count)
+
+	// Test case 2: Create instances for user1 with type1
+	instance1 := &database.AgentInstance{
+		TemplateID: 1,
+		UserUUID:   userUUID1,
+		Type:       instanceType1,
+		ContentID:  "content-1",
+		Public:     false,
+	}
+	_, err = store.Create(ctx, instance1)
+	require.NoError(t, err)
+
+	instance2 := &database.AgentInstance{
+		TemplateID: 2,
+		UserUUID:   userUUID1,
+		Type:       instanceType1,
+		ContentID:  "content-2",
+		Public:     false,
+	}
+	_, err = store.Create(ctx, instance2)
+	require.NoError(t, err)
+
+	instance3 := &database.AgentInstance{
+		TemplateID: 3,
+		UserUUID:   userUUID1,
+		Type:       instanceType1,
+		ContentID:  "content-3",
+		Public:     true,
+	}
+	_, err = store.Create(ctx, instance3)
+	require.NoError(t, err)
+
+	// Count should return 3 for user1 with type1
+	count, err = store.CountByUserAndType(ctx, userUUID1, instanceType1)
+	require.NoError(t, err)
+	require.Equal(t, 3, count)
+
+	// Test case 3: Create instances for user1 with type2
+	instance4 := &database.AgentInstance{
+		TemplateID: 4,
+		UserUUID:   userUUID1,
+		Type:       instanceType2,
+		ContentID:  "content-4",
+		Public:     false,
+	}
+	_, err = store.Create(ctx, instance4)
+	require.NoError(t, err)
+
+	// Count for user1 with type1 should still be 3
+	count, err = store.CountByUserAndType(ctx, userUUID1, instanceType1)
+	require.NoError(t, err)
+	require.Equal(t, 3, count)
+
+	// Count for user1 with type2 should be 1
+	count, err = store.CountByUserAndType(ctx, userUUID1, instanceType2)
+	require.NoError(t, err)
+	require.Equal(t, 1, count)
+
+	// Test case 4: Create instances for user2 with type1
+	instance5 := &database.AgentInstance{
+		TemplateID: 5,
+		UserUUID:   userUUID2,
+		Type:       instanceType1,
+		ContentID:  "content-5",
+		Public:     false,
+	}
+	_, err = store.Create(ctx, instance5)
+	require.NoError(t, err)
+
+	// Count for user1 with type1 should still be 3 (not affected by user2's instances)
+	count, err = store.CountByUserAndType(ctx, userUUID1, instanceType1)
+	require.NoError(t, err)
+	require.Equal(t, 3, count)
+
+	// Count for user2 with type1 should be 1
+	count, err = store.CountByUserAndType(ctx, userUUID2, instanceType1)
+	require.NoError(t, err)
+	require.Equal(t, 1, count)
+
+	// Test case 5: Count with non-existent user (should return 0)
+	nonExistentUser := uuid.New().String()
+	count, err = store.CountByUserAndType(ctx, nonExistentUser, instanceType1)
+	require.NoError(t, err)
+	require.Equal(t, 0, count)
+
+	// Test case 6: Count with non-existent type (should return 0)
+	count, err = store.CountByUserAndType(ctx, userUUID1, "non-existent-type")
+	require.NoError(t, err)
+	require.Equal(t, 0, count)
+}

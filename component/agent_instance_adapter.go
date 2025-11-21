@@ -21,6 +21,7 @@ type AgentInstanceAdapter interface {
 	UpdateInstance(ctx context.Context, userUUID string, instance *types.AgentInstance) error
 	GetInstanceType() string
 	IsInstanceRunning(ctx context.Context, userUUID string, contentID string, builtIn bool) (bool, error)
+	GetQuotaPerUser() int
 }
 
 // AgentInstanceAdapterFactory manages agent instance adapters
@@ -51,16 +52,17 @@ func (f *AgentInstanceAdapterFactory) GetSupportedTypes() []string {
 // LangflowAgentInstanceAdapter implements AgentInstanceAdapter for Langflow instances
 type LangflowAgentInstanceAdapter struct {
 	agenthubSvcClient rpc.AgentHubSvcClient
+	config            *config.Config
 }
 
 func NewLangflowAgentInstanceAdapter(config *config.Config) (AgentInstanceAdapter, error) {
 	agenthubSvcClient := rpc.NewAgentHubSvcClientImpl(config.Agent.AgentHubServiceHost, config.Agent.AgentHubServiceToken)
-	return &LangflowAgentInstanceAdapter{agenthubSvcClient: agenthubSvcClient}, nil
+	return &LangflowAgentInstanceAdapter{agenthubSvcClient: agenthubSvcClient, config: config}, nil
 }
 
 // NewLangflowAgentInstanceAdapterWithClient creates a LangflowAgentInstanceAdapter with a custom client (for testing)
-func NewLangflowAgentInstanceAdapterWithClient(client rpc.AgentHubSvcClient) AgentInstanceAdapter {
-	return &LangflowAgentInstanceAdapter{agenthubSvcClient: client}
+func NewLangflowAgentInstanceAdapterWithClient(client rpc.AgentHubSvcClient, config *config.Config) AgentInstanceAdapter {
+	return &LangflowAgentInstanceAdapter{agenthubSvcClient: client, config: config}
 }
 
 func (a *LangflowAgentInstanceAdapter) GetInstanceType() string {
@@ -113,8 +115,13 @@ func (a *LangflowAgentInstanceAdapter) IsInstanceRunning(ctx context.Context, us
 	return true, nil
 }
 
+func (a *LangflowAgentInstanceAdapter) GetQuotaPerUser() int {
+	return a.config.Agent.LangflowInstanceQuotaPerUser
+}
+
 // CodeAgentInstanceAdapter implements AgentInstanceAdapter for Code instances
 type CodeAgentInstanceAdapter struct {
+	config          *config.Config
 	spaceComponent  SpaceComponent
 	userSvcClient   rpc.UserSvcClient
 	csgbotSvcClient rpc.CsgbotSvcClient
@@ -216,4 +223,8 @@ func (a *CodeAgentInstanceAdapter) IsInstanceRunning(ctx context.Context, userUU
 		return false, fmt.Errorf("failed to get space status: %w", err)
 	}
 	return status == SpaceStatusRunning, nil
+}
+
+func (a *CodeAgentInstanceAdapter) GetQuotaPerUser() int {
+	return a.config.Agent.CodeInstanceQuotaPerUser
 }

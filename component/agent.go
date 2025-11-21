@@ -332,6 +332,18 @@ func (c *agentComponentImpl) CreateInstance(ctx context.Context, instance *types
 		return fmt.Errorf("unsupported agent type: %s", *instance.Type)
 	}
 
+	// check quota
+	instanceCount, err := c.instanceStore.CountByUserAndType(ctx, *instance.UserUUID, *instance.Type)
+	if err != nil {
+		slog.Error("failed to get agent instance count", "user_uuid", *instance.UserUUID, "agent_type", *instance.Type, "error", err)
+		return fmt.Errorf("failed to get agent instance count, error:%w", err)
+	}
+	quota := adapter.GetQuotaPerUser()
+	if instanceCount >= quota {
+		slog.Error("agent instance quota exceeded", "user_uuid", *instance.UserUUID, "agent_type", *instance.Type, "instance_count", instanceCount, "quota", quota)
+		return errorx.InstanceQuotaExceeded(nil, errorx.Ctx().Set("agent_type", *instance.Type).Set("instance_count", instanceCount).Set("quota", quota))
+	}
+
 	creationResult, err := adapter.CreateInstance(ctx, *instance.UserUUID, instance, tmpl)
 	if err != nil {
 		slog.Error("failed to create agent instance", "user_uuid", *instance.UserUUID, "agent_type", *instance.Type, "error", err)
@@ -357,7 +369,6 @@ func (c *agentComponentImpl) CreateInstance(ctx context.Context, instance *types
 	createdInstance, err := c.instanceStore.Create(ctx, dbInstance)
 	if err != nil {
 		slog.Error("failed to create agent instance", "user_uuid", *instance.UserUUID, "error", err)
-		//TODO: delete agent instance from target system using adapter
 		if delErr := adapter.DeleteInstance(ctx, *instance.UserUUID, creationResult.ID); delErr != nil {
 			slog.Error("failed to delete agent instance from target system", "user_uuid", *instance.UserUUID, "agent_type", *instance.Type, "content_id", creationResult.ID, "error", delErr)
 		}
