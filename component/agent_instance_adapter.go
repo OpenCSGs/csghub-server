@@ -137,7 +137,7 @@ func NewCodeAgentInstanceAdapter(config *config.Config) (AgentInstanceAdapter, e
 		rpc.AuthWithApiKey(config.APIToken))
 	csgbotSvcClient := rpc.NewCsgbotSvcHttpClient(fmt.Sprintf("%s:%d", config.CSGBot.Host, config.CSGBot.Port),
 		rpc.AuthWithApiKey(config.APIToken))
-	return &CodeAgentInstanceAdapter{spaceComponent: spaceComponent, userSvcClient: userSvcClient, csgbotSvcClient: csgbotSvcClient}, nil
+	return &CodeAgentInstanceAdapter{config: config, spaceComponent: spaceComponent, userSvcClient: userSvcClient, csgbotSvcClient: csgbotSvcClient}, nil
 }
 
 func (a *CodeAgentInstanceAdapter) GetInstanceType() string {
