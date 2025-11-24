@@ -170,10 +170,22 @@ func (m *openaiComponentImpl) getExternalModels(c context.Context) []types.Model
 }
 
 func (m *openaiComponentImpl) saveModelsToCache(models []types.Model) error {
+	modelListWithEndpoint := make([]types.ModelWithEndpoint, 0, len(models))
+	for _, model := range models {
+		modelListWithEndpoint = append(modelListWithEndpoint, types.ModelWithEndpoint{
+			ID:       model.ID,
+			Object:   model.Object,
+			Created:  model.Created,
+			OwnedBy:  model.OwnedBy,
+			Task:     model.Task,
+			Endpoint: model.Endpoint,
+			AuthHead: model.AuthHead,
+		})
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	// Use HSET to store each model as a field in a hash
-	for _, model := range models {
+	for _, model := range modelListWithEndpoint {
 		jsonBytes, err := json.Marshal(model)
 		if err != nil {
 			return fmt.Errorf("failed to marshal model %s to JSON: %w", model.ID, err)
@@ -216,13 +228,22 @@ func (m *openaiComponentImpl) loadModelFromCache(ctx context.Context, modelID st
 	}
 
 	// Unmarshal JSON to model
-	var model types.Model
+	var model types.ModelWithEndpoint
 	err = json.Unmarshal([]byte(modelJSON), &model)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal model %s from JSON: %w", modelID, err)
 	}
 	slog.Debug("model loaded from cache", "modelID", modelID)
-	return &model, nil
+
+	return &types.Model{
+		ID:       model.ID,
+		Object:   model.Object,
+		Created:  model.Created,
+		OwnedBy:  model.OwnedBy,
+		Task:     model.Task,
+		Endpoint: model.Endpoint,
+		AuthHead: model.AuthHead,
+	}, nil
 }
 
 func (m *openaiComponentImpl) GetModelByID(c context.Context, username, modelID string) (*types.Model, error) {

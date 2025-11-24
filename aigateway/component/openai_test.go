@@ -93,7 +93,7 @@ func TestOpenAIComponent_GetAvailableModels(t *testing.T) {
 
 		mockDeployStore.EXPECT().RunningVisibleToUser(mock.Anything, int64(1)).
 			Return(deploys, nil).Once()
-		expectModels := []types.Model{
+		expectModels := []types.ModelWithEndpoint{
 			{
 				ID:       "model1:svc1",
 				OwnedBy:  "testuser",
@@ -184,7 +184,7 @@ func TestOpenAIComponent_GetModelByID(t *testing.T) {
 		deploys[0].CreatedAt = now
 		var wg sync.WaitGroup
 		wg.Add(1)
-		expectModels := []types.Model{
+		expectModels := []types.ModelWithEndpoint{
 			{
 				ID:       "model1:svc1",
 				OwnedBy:  "testuser",
@@ -226,6 +226,49 @@ func TestOpenAIComponent_GetModelByID(t *testing.T) {
 		model, err := comp.GetModelByID(context.Background(), "testuser", "nonexistent:svc")
 		assert.NoError(t, err)
 		assert.Nil(t, model)
+	})
+
+	t.Run("model found", func(t *testing.T) {
+		user := &database.User{
+			ID:       1,
+			Username: "testuser",
+		}
+		mockUserStore.EXPECT().FindByUsername(mock.Anything, "testuser").
+			Return(*user, nil).Once()
+		mockCache.EXPECT().Exists(mock.Anything, modelCacheKey).
+			Return(1, nil).Once()
+
+		now := time.Now()
+		deploys := []database.Deploy{
+			{
+				ID:      1,
+				SvcName: "svc1",
+				Type:    1,
+				Repository: &database.Repository{
+					Path: "model1",
+				},
+				User: &database.User{
+					Username: "testuser",
+				},
+				Endpoint: "endpoint1",
+			},
+		}
+		deploys[0].CreatedAt = now
+		expectModel := types.Model{
+			ID:       "model1:svc1",
+			OwnedBy:  "testuser",
+			Object:   "model",
+			Endpoint: "endpoint1",
+			Created:  deploys[0].CreatedAt.Unix(),
+		}
+		expectJson, _ := json.Marshal(expectModel)
+		mockCache.EXPECT().HGet(mock.Anything, modelCacheKey, expectModel.ID).
+			Return(string(expectJson), nil).Once()
+
+		model, err := comp.GetModelByID(context.Background(), "testuser", "model1:svc1")
+		assert.NoError(t, err)
+		assert.NotNil(t, model)
+		assert.Equal(t, "model1:svc1", model.ID)
 	})
 }
 
@@ -315,7 +358,7 @@ func TestOpenAIComponent_ExtGetAvailableModels_SinglePage(t *testing.T) {
 			Enabled:     true,
 		},
 	}
-	expectModels := []types.Model{
+	expectModels := []types.ModelWithEndpoint{
 		{
 			ID:       "test-model-1",
 			Endpoint: "http://test-endpoint-1.com",
