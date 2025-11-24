@@ -425,7 +425,7 @@ func (s *agentInstanceTaskStoreImpl) GetTaskByID(ctx context.Context, userUUID s
 }
 
 // fetchSourceData fetches source-specific data based on task type
-func (s *agentInstanceTaskStoreImpl) fetchSourceData(ctx context.Context, taskType types.AgentTaskType, taskID string) ([]map[string]any, error) {
+func (s *agentInstanceTaskStoreImpl) fetchSourceData(ctx context.Context, taskType types.AgentTaskType, taskID string) (map[string]any, error) {
 	config, exists := taskSourceMap[taskType]
 	if !exists {
 		return nil, fmt.Errorf("unsupported task type: %s", taskType)
@@ -442,7 +442,7 @@ func (s *agentInstanceTaskStoreImpl) fetchSourceData(ctx context.Context, taskTy
 }
 
 // fetchArgoWorkflowSourceData fetches additional fields from argo_workflows table
-func (s *agentInstanceTaskStoreImpl) fetchArgoWorkflowSourceData(ctx context.Context, taskID string) ([]map[string]any, error) {
+func (s *agentInstanceTaskStoreImpl) fetchArgoWorkflowSourceData(ctx context.Context, taskID string) (map[string]any, error) {
 	type argoWorkflowRow struct {
 		JobID        string    `bun:"id"`
 		TaskDesc     string    `bun:"task_desc"`
@@ -483,32 +483,30 @@ func (s *agentInstanceTaskStoreImpl) fetchArgoWorkflowSourceData(ctx context.Con
 		duration = &dur
 	}
 
-	sourceData := []map[string]any{
-		{
-			"job_id":        row.JobID,
-			"cluster_id":    row.ClusterID,
-			"namespace":     row.Namespace,
-			"repo_ids":      row.RepoIds,
-			"repo_type":     row.RepoType,
-			"reason":        row.Reason,
-			"image":         row.Image,
-			"datasets":      row.Datasets,
-			"resource_id":   row.ResourceId,
-			"resource_name": row.ResourceName,
-			"submit_time":   row.SubmitTime,
-			"start_time":    row.StartTime,
-			"end_time":      row.EndTime,
-			"duration":      duration,
-			"result_url":    row.ResultURL,
-			"download_url":  row.DownloadURL,
-			"failures_url":  row.FailuresURL,
-		},
+	sourceData := map[string]any{
+		"job_id":        row.JobID,
+		"cluster_id":    row.ClusterID,
+		"namespace":     row.Namespace,
+		"repo_ids":      row.RepoIds,
+		"repo_type":     row.RepoType,
+		"reason":        row.Reason,
+		"image":         row.Image,
+		"datasets":      row.Datasets,
+		"resource_id":   row.ResourceId,
+		"resource_name": row.ResourceName,
+		"submit_time":   row.SubmitTime,
+		"start_time":    row.StartTime,
+		"end_time":      row.EndTime,
+		"duration":      duration,
+		"result_url":    row.ResultURL,
+		"download_url":  row.DownloadURL,
+		"failures_url":  row.FailuresURL,
 	}
 	return sourceData, nil
 }
 
 // fetchDeploySourceData fetches additional fields from deploys table
-func (s *agentInstanceTaskStoreImpl) fetchDeploySourceData(ctx context.Context, taskID string) ([]map[string]any, error) {
+func (s *agentInstanceTaskStoreImpl) fetchDeploySourceData(ctx context.Context, taskID string) (map[string]any, error) {
 	var deployID int64
 	_, err := fmt.Sscanf(taskID, "%d", &deployID)
 	if err != nil {
@@ -553,30 +551,28 @@ func (s *agentInstanceTaskStoreImpl) fetchDeploySourceData(ctx context.Context, 
 		return nil, err
 	}
 
-	sourceData := []map[string]any{
-		{
-			"space_id":          row.SpaceID,
-			"git_path":          row.GitPath,
-			"git_branch":        row.GitBranch,
-			"env":               row.Env,
-			"template":          row.Template,
-			"hardware":          row.Hardware,
-			"image_id":          row.ImageID,
-			"runtime_framework": row.RuntimeFramework,
-			"container_port":    row.ContainerPort,
-			"min_replica":       row.MinReplica,
-			"max_replica":       row.MaxReplica,
-			"svc_name":          row.SvcName,
-			"cluster_id":        row.ClusterID,
-			"secure_level":      row.SecureLevel,
-			"task":              row.Task,
-			"sku":               row.SKU,
-			"order_detail_id":   row.OrderDetailID,
-			"engine_args":       row.EngineArgs,
-			"variables":         row.Variables,
-			"reason":            row.Reason,
-			"updated_at":        row.UpdatedAt,
-		},
+	sourceData := map[string]any{
+		"space_id":          row.SpaceID,
+		"git_path":          row.GitPath,
+		"git_branch":        row.GitBranch,
+		"env":               row.Env,
+		"template":          row.Template,
+		"hardware":          row.Hardware,
+		"image_id":          row.ImageID,
+		"runtime_framework": row.RuntimeFramework,
+		"container_port":    row.ContainerPort,
+		"min_replica":       row.MinReplica,
+		"max_replica":       row.MaxReplica,
+		"svc_name":          row.SvcName,
+		"cluster_id":        row.ClusterID,
+		"secure_level":      row.SecureLevel,
+		"task":              row.Task,
+		"sku":               row.SKU,
+		"order_detail_id":   row.OrderDetailID,
+		"engine_args":       row.EngineArgs,
+		"variables":         row.Variables,
+		"reason":            row.Reason,
+		"updated_at":        row.UpdatedAt,
 	}
 
 	return sourceData, nil

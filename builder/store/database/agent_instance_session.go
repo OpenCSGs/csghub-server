@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strings"
 
 	"github.com/uptrace/bun"
 	"opencsg.com/csghub-server/common/errorx"
@@ -193,22 +194,36 @@ func (s *agentInstanceSessionStoreImpl) Delete(ctx context.Context, id int64) er
 // List retrieves all AgentInstanceSessions with pagination
 func (s *agentInstanceSessionStoreImpl) List(ctx context.Context, filter types.AgentInstanceSessionFilter, per int, page int) ([]AgentInstanceSession, int, error) {
 	var sessions []AgentInstanceSession
-	query := s.db.Core.NewSelect().Model(&sessions).Order("updated_at DESC")
+	query := s.db.Core.NewSelect().Model(&sessions)
 	if filter.InstanceID != nil {
 		query = query.Where("instance_id = ?", *filter.InstanceID)
 	}
 
-	// Apply pagination
-	query = query.Limit(per).Offset((page - 1) * per)
+	// Apply search filter
+	filter.Search = strings.TrimSpace(filter.Search)
+	if filter.Search != "" {
+		searchPattern := "%" + filter.Search + "%"
+		query = query.Where("LOWER(name) LIKE LOWER(?)", searchPattern)
+	}
 
-	count, err := query.ScanAndCount(ctx, &sessions)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+	// Count total before pagination
+	total, err := query.Count(ctx)
+	if err != nil {
 		return nil, 0, errorx.HandleDBError(err, map[string]any{
-			"instance_id": *filter.InstanceID,
+			"instance_id": filter.InstanceID,
 			"operation":   "list",
 		})
 	}
-	return sessions, count, nil
+
+	// Apply pagination and scan
+	err = query.Order("updated_at DESC").Limit(per).Offset((page-1)*per).Scan(ctx, &sessions)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return nil, 0, errorx.HandleDBError(err, map[string]any{
+			"instance_id": filter.InstanceID,
+			"operation":   "list",
+		})
+	}
+	return sessions, total, nil
 }
 
 // Create inserts a new AgentInstanceSessionHistory into the database

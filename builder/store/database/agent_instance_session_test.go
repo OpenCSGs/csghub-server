@@ -600,6 +600,98 @@ func TestAgentInstanceSessionStore_List_WithPagination(t *testing.T) {
 	require.Len(t, foundSessions, 5) // Should return all 5 sessions
 }
 
+func TestAgentInstanceSessionStore_List_WithSearch(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewAgentInstanceSessionStoreWithDB(db)
+	instanceID := int64(44444)
+
+	// Create multiple sessions with different names
+	sessions := []*database.AgentInstanceSession{
+		{
+			UUID:       uuid.New().String(),
+			Name:       "Test Session",
+			InstanceID: instanceID,
+			UserUUID:   uuid.New().String(),
+			Type:       "langflow",
+		},
+		{
+			UUID:       uuid.New().String(),
+			Name:       "Another Test",
+			InstanceID: instanceID,
+			UserUUID:   uuid.New().String(),
+			Type:       "agno",
+		},
+		{
+			UUID:       uuid.New().String(),
+			Name:       "Production Session",
+			InstanceID: instanceID,
+			UserUUID:   uuid.New().String(),
+			Type:       "code",
+		},
+		{
+			UUID:       uuid.New().String(),
+			Name:       "Testing Environment",
+			InstanceID: instanceID,
+			UserUUID:   uuid.New().String(),
+			Type:       "langflow",
+		},
+	}
+
+	// Create all sessions
+	for _, session := range sessions {
+		_, err := store.Create(ctx, session)
+		require.NoError(t, err)
+		time.Sleep(1 * time.Millisecond)
+	}
+
+	// Test List with search filter - should find sessions containing "Test"
+	filter := types.AgentInstanceSessionFilter{
+		InstanceID: &instanceID,
+		Search:     "Test",
+	}
+	foundSessions, total, err := store.List(ctx, filter, 10, 1)
+	require.NoError(t, err)
+	require.Equal(t, 3, total) // Should find 3 sessions: "Test Session", "Another Test", "Testing Environment"
+	require.Len(t, foundSessions, 3)
+
+	// Verify all found sessions contain "Test" in their name (case-insensitive)
+	for _, session := range foundSessions {
+		require.Contains(t, session.Name, "Test")
+	}
+
+	// Test List with search filter - case-insensitive search
+	filter.Search = "test"
+	foundSessions, total, err = store.List(ctx, filter, 10, 1)
+	require.NoError(t, err)
+	require.Equal(t, 3, total) // Should still find 3 sessions (case-insensitive)
+	require.Len(t, foundSessions, 3)
+
+	// Test List with search filter - partial match
+	filter.Search = "Production"
+	foundSessions, total, err = store.List(ctx, filter, 10, 1)
+	require.NoError(t, err)
+	require.Equal(t, 1, total) // Should find 1 session: "Production Session"
+	require.Len(t, foundSessions, 1)
+	require.Equal(t, "Production Session", foundSessions[0].Name)
+
+	// Test List with search filter - no matches
+	filter.Search = "NonExistent"
+	foundSessions, total, err = store.List(ctx, filter, 10, 1)
+	require.NoError(t, err)
+	require.Equal(t, 0, total) // Should find 0 sessions
+	require.Len(t, foundSessions, 0)
+
+	// Test List with empty search filter - should return all sessions
+	filter.Search = ""
+	foundSessions, total, err = store.List(ctx, filter, 10, 1)
+	require.NoError(t, err)
+	require.Equal(t, 4, total) // Should return all 4 sessions
+	require.Len(t, foundSessions, 4)
+}
+
 func TestAgentInstanceSessionStore_List_WithDifferentInstances(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()

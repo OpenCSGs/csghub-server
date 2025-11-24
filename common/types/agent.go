@@ -109,6 +109,7 @@ type AgentInstanceSession struct {
 
 type AgentInstanceSessionFilter struct {
 	InstanceID *int64
+	Search     string
 }
 
 type CreateAgentInstanceSessionRequest struct {
@@ -313,20 +314,20 @@ type AgentTaskListItem struct {
 
 // AgentTaskDetail represents detailed task information
 type AgentTaskDetail struct {
-	ID           int64            `json:"id"`
-	TaskID       string           `json:"task_id"`
-	TaskName     string           `json:"task_name"`
-	TaskDesc     string           `json:"task_desc"`
-	TaskType     AgentTaskType    `json:"task_type"`
-	Status       AgentTaskStatus  `json:"status"`
-	InstanceID   int64            `json:"instance_id"`
-	InstanceType string           `json:"instance_type"`
-	InstanceName string           `json:"instance_name"`
-	SessionUUID  string           `json:"session_uuid"`
-	SessionName  string           `json:"session_name"`
-	Username     string           `json:"username"`
-	Backend      string           `json:"backend"`            // Backend system of the task (argo_workflow, deploy)
-	Metadata     []map[string]any `json:"metadata,omitempty"` // Backend-specific fields (argo_workflow or deploy)
-	CreatedAt    time.Time        `json:"created_at"`
-	UpdatedAt    time.Time        `json:"updated_at"`
+	ID           int64           `json:"id"`
+	TaskID       string          `json:"task_id"`
+	TaskName     string          `json:"task_name"`
+	TaskDesc     string          `json:"task_desc"`
+	TaskType     AgentTaskType   `json:"task_type"`
+	Status       AgentTaskStatus `json:"status"`
+	InstanceID   int64           `json:"instance_id"`
+	InstanceType string          `json:"instance_type"`
+	InstanceName string          `json:"instance_name"`
+	SessionUUID  string          `json:"session_uuid"`
+	SessionName  string          `json:"session_name"`
+	Username     string          `json:"username"`
+	Backend      string          `json:"backend"`            // Backend system of the task (argo_workflow, deploy)
+	Metadata     map[string]any  `json:"metadata,omitempty"` // Backend-specific fields (argo_workflow or deploy)
+	CreatedAt    time.Time       `json:"created_at"`
+	UpdatedAt    time.Time       `json:"updated_at"`
 }

@@ -542,7 +542,7 @@ func TestAgentInstanceTaskStore_GetTaskByID(t *testing.T) {
 		require.Equal(t, "testuser", detail.Username)
 		require.Equal(t, "argo_workflow", detail.Backend)
 		require.NotNil(t, detail.Metadata)
-		require.Len(t, detail.Metadata, 1)
+		require.NotEmpty(t, detail.Metadata)
 	})
 
 	t.Run("get inference task detail", func(t *testing.T) {
@@ -593,7 +593,7 @@ func TestAgentInstanceTaskStore_GetTaskByID(t *testing.T) {
 		require.Equal(t, "testuser", detail.Username)
 		require.Equal(t, "deploy", detail.Backend)
 		require.NotNil(t, detail.Metadata)
-		require.Len(t, detail.Metadata, 1)
+		require.NotEmpty(t, detail.Metadata)
 	})
 
 	t.Run("task not found", func(t *testing.T) {
