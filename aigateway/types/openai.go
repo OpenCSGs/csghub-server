@@ -20,6 +20,8 @@ type Model struct {
 	RuntimeFramework    string         `json:"-"`                               // the deployed framework
 	ImageID             string         `json:"-"`                               // the deployed image
 	SupportFunctionCall bool           `json:"support_function_call,omitempty"` // whether the model supports function calling
+
+	AuthHead string `json:"-"` // for external api
 }
 
 // ModelList represents the model list response

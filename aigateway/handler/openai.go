@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -308,7 +309,28 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 	}
 	w.WithLLMTokenCounter(llmTokenCounter)
 
-	rp.ServeHTTP(w, c.Request, "", "")
+	proxyToApi := ""
+	if model.Endpoint != "" {
+		uri, err := url.ParseRequestURI(model.Endpoint)
+		if err != nil {
+			slog.Warn("endpoint has wrong struct ", slog.String("model", modelName))
+		} else {
+			proxyToApi = uri.Path
+		}
+	}
+
+	if model.AuthHead != "" {
+		var authMap map[string]string
+		if err := json.Unmarshal([]byte(model.AuthHead), &authMap); err != nil {
+			slog.Warn("invalid auth head", slog.String("model", modelName))
+		} else {
+			for authKey, authVal := range authMap {
+				c.Request.Header.Set(authKey, authVal)
+			}
+		}
+	}
+
+	rp.ServeHTTP(w, c.Request, proxyToApi, "")
 
 	go func() {
 		err := h.openaiComponent.RecordUsage(c.Request.Context(), userUUID, model, llmTokenCounter)
