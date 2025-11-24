@@ -52,6 +52,8 @@ type AgentComponent interface {
 
 	// Task operations
 	CreateTaskIfInstanceExists(ctx context.Context, req *types.AgentInstanceTaskReq) error
+	ListTasks(ctx context.Context, userUUID string, filter types.AgentTaskFilter, per int, page int) ([]types.AgentTaskListItem, int, error)
+	GetTaskDetail(ctx context.Context, userUUID string, id int64) (*types.AgentTaskDetail, error)
 }
 
 // agentComponentImpl implements the AgentComponent interface
@@ -1211,9 +1213,15 @@ func (c *agentComponentImpl) CreateTaskIfInstanceExists(ctx context.Context, req
 		return fmt.Errorf("agent instance does not belong to the user, instance_type: %s, instance_content_id: %s, user_uuid: %s", agentInfo.Type, agentInfo.ID, user.UUID)
 	}
 
-	_, err = c.sessionStore.FindByUUID(ctx, agentInfo.RequestID)
+	session, err := c.sessionStore.FindByUUID(ctx, agentInfo.RequestID)
 	if err != nil {
 		return fmt.Errorf("failed to find session by uuid %s: %w", agentInfo.RequestID, err)
+	}
+	if session == nil {
+		return fmt.Errorf("agent instance session not found, session_uuid: %s", agentInfo.RequestID)
+	}
+	if session.InstanceID != instance.ID {
+		return fmt.Errorf("agent instance session does not belong to the specified instance, session_uuid: %s, instance_id: %d, session_instance_id: %d", agentInfo.RequestID, instance.ID, session.InstanceID)
 	}
 
 	task := &database.AgentInstanceTask{
@@ -1235,4 +1243,52 @@ func (c *agentComponentImpl) CreateTaskIfInstanceExists(ctx context.Context, req
 		slog.String("task_id", req.TaskID))
 
 	return nil
+}
+
+// ListTasks lists agent tasks with filtering and pagination
+func (c *agentComponentImpl) ListTasks(ctx context.Context, userUUID string, filter types.AgentTaskFilter, per int, page int) ([]types.AgentTaskListItem, int, error) {
+	// If session_uuid is provided, instance_id must also be provided
+	if filter.SessionUUID != "" && filter.InstanceID == nil {
+		return nil, 0, fmt.Errorf("instance_id is required when session_uuid is provided")
+	}
+
+	// If instance_id is provided, verify it belongs to the user
+	if filter.InstanceID != nil {
+		instance, err := c.instanceStore.FindByID(ctx, *filter.InstanceID)
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to find instance: %w", err)
+		}
+		if instance == nil {
+			return nil, 0, fmt.Errorf("instance not found, instance_id: %d", *filter.InstanceID)
+		}
+		// Check permission: instance is public or user UUID matches
+		if !instance.Public && instance.UserUUID != userUUID {
+			return nil, 0, errorx.ErrForbidden
+		}
+	}
+
+	// If session_uuid is provided, verify it belongs to the instance
+	if filter.SessionUUID != "" && filter.InstanceID != nil {
+		_, err := c.validateAndGetSession(ctx, userUUID, *filter.InstanceID, filter.SessionUUID)
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to validate session: %w", err)
+		}
+	}
+
+	tasks, total, err := c.agentInstanceTaskStore.ListTasks(ctx, userUUID, filter, per, page)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to list agent tasks: %w", err)
+	}
+
+	return tasks, total, nil
+}
+
+// GetTaskDetail retrieves a task detail by task ID
+func (c *agentComponentImpl) GetTaskDetail(ctx context.Context, userUUID string, id int64) (*types.AgentTaskDetail, error) {
+	detail, err := c.agentInstanceTaskStore.GetTaskByID(ctx, userUUID, id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get task detail: %w", err)
+	}
+
+	return detail, nil
 }

@@ -279,3 +279,54 @@ const (
 func (o CodeAgentSyncOperation) String() string {
 	return string(o)
 }
+
+// AgentTaskStatus represents the unified task status
+type AgentTaskStatus string
+
+const (
+	AgentTaskStatusInProgress AgentTaskStatus = "in_progress"
+	AgentTaskStatusCompleted  AgentTaskStatus = "completed"
+	AgentTaskStatusFailed     AgentTaskStatus = "failed"
+)
+
+// AgentTaskFilter represents the filter for listing agent tasks
+type AgentTaskFilter struct {
+	Search      string          `json:"search,omitempty"`       // Search by task name
+	TaskType    AgentTaskType   `json:"task_type,omitempty"`    // Filter by task type (finetuneJob, inference)
+	Status      AgentTaskStatus `json:"status,omitempty"`       // Filter by status (in_progress, completed, failed)
+	InstanceID  *int64          `json:"instance_id,omitempty"`  // Filter by instance ID
+	SessionUUID string          `json:"session_uuid,omitempty"` // Filter by session UUID
+}
+
+// AgentTaskListItem represents a task item in the list
+type AgentTaskListItem struct {
+	ID          int64           `json:"id"`
+	TaskID      string          `json:"task_id"`
+	TaskName    string          `json:"task_name"`
+	TaskType    AgentTaskType   `json:"task_type"`
+	TaskStatus  AgentTaskStatus `json:"task_status"`
+	InstanceID  int64           `json:"instance_id"`
+	SessionUUID string          `json:"session_uuid"`
+	UpdatedAt   time.Time       `json:"updated_at"`
+	CreatedAt   time.Time       `json:"created_at"`
+}
+
+// AgentTaskDetail represents detailed task information
+type AgentTaskDetail struct {
+	ID           int64            `json:"id"`
+	TaskID       string           `json:"task_id"`
+	TaskName     string           `json:"task_name"`
+	TaskDesc     string           `json:"task_desc"`
+	TaskType     AgentTaskType    `json:"task_type"`
+	Status       AgentTaskStatus  `json:"status"`
+	InstanceID   int64            `json:"instance_id"`
+	InstanceType string           `json:"instance_type"`
+	InstanceName string           `json:"instance_name"`
+	SessionUUID  string           `json:"session_uuid"`
+	SessionName  string           `json:"session_name"`
+	Username     string           `json:"username"`
+	Backend      string           `json:"backend"`            // Backend system of the task (argo_workflow, deploy)
+	Metadata     []map[string]any `json:"metadata,omitempty"` // Backend-specific fields (argo_workflow or deploy)
+	CreatedAt    time.Time        `json:"created_at"`
+	UpdatedAt    time.Time        `json:"updated_at"`
+}
