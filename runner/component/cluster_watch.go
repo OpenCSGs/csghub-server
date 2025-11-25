@@ -58,11 +58,18 @@ func (w *clusterWatcher) WatchCallback(cm *v1.ConfigMap) error {
 }
 
 func (w *clusterWatcher) pushClusterChangeEvent(configmapData map[string]string) error {
+	storageClass := configmapData[rtypes.KeyStorageClass]
+	if len(storageClass) < 1 && len(w.cluster.StorageClass) > 0 {
+		storageClass = w.cluster.StorageClass
+	} else {
+		w.cluster.StorageClass = storageClass
+		slog.Debug("update cluster storageclass", slog.Any("cluster", w.cluster))
+	}
 	data := types.ClusterEvent{
 		ClusterID:        w.cluster.ID,
 		ClusterConfig:    types.DefaultClusterCongfig,
 		Mode:             w.cluster.ConnectMode,
-		StorageClass:     w.cluster.StorageClass,
+		StorageClass:     storageClass,
 		NetworkInterface: w.cluster.NetworkInterface,
 		Status:           types.ClusterStatusRunning,
 		Region:           configmapData[rtypes.KeyRunnerClusterRegion],
