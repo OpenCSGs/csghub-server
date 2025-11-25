@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/uptrace/bun"
@@ -39,7 +40,7 @@ type AgentInstanceSessionStore interface {
 	FindByID(ctx context.Context, id int64) (*AgentInstanceSession, error)
 	FindByUUID(ctx context.Context, uuid string) (*AgentInstanceSession, error)
 	ListByInstanceID(ctx context.Context, instanceID int64) ([]AgentInstanceSession, int, error)
-	List(ctx context.Context, filter types.AgentInstanceSessionFilter, per int, page int) ([]AgentInstanceSession, int, error)
+	List(ctx context.Context, userUUID string, filter types.AgentInstanceSessionFilter, per int, page int) ([]AgentInstanceSession, int, error)
 	Update(ctx context.Context, session *AgentInstanceSession) error
 	Delete(ctx context.Context, id int64) error
 }
@@ -192,11 +193,15 @@ func (s *agentInstanceSessionStoreImpl) Delete(ctx context.Context, id int64) er
 }
 
 // List retrieves all AgentInstanceSessions with pagination
-func (s *agentInstanceSessionStoreImpl) List(ctx context.Context, filter types.AgentInstanceSessionFilter, per int, page int) ([]AgentInstanceSession, int, error) {
+func (s *agentInstanceSessionStoreImpl) List(ctx context.Context, userUUID string, filter types.AgentInstanceSessionFilter, per int, page int) ([]AgentInstanceSession, int, error) {
 	var sessions []AgentInstanceSession
 	query := s.db.Core.NewSelect().Model(&sessions)
 	if filter.InstanceID != nil {
 		query = query.Where("instance_id = ?", *filter.InstanceID)
+	}
+
+	if userUUID != "" {
+		query = query.Where("user_uuid = ?", userUUID)
 	}
 
 	// Apply search filter
@@ -220,6 +225,7 @@ func (s *agentInstanceSessionStoreImpl) List(ctx context.Context, filter types.A
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, 0, errorx.HandleDBError(err, map[string]any{
 			"instance_id": filter.InstanceID,
+			"user_uuid":   userUUID,
 			"operation":   "list",
 		})
 	}
@@ -229,7 +235,7 @@ func (s *agentInstanceSessionStoreImpl) List(ctx context.Context, filter types.A
 // Create inserts a new AgentInstanceSessionHistory into the database
 func (s *agentInstanceSessionHistoryStoreImpl) Create(ctx context.Context, history *AgentInstanceSessionHistory) error {
 	return s.db.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		// get last turn from session
+		// Lock the session row to prevent concurrent updates
 		var lastTurn int64
 		err := tx.NewSelect().
 			Model((*AgentInstanceSession)(nil)).
@@ -246,7 +252,59 @@ func (s *agentInstanceSessionHistoryStoreImpl) Create(ctx context.Context, histo
 
 		if history.Request {
 			history.Turn = lastTurn + 1
-			res, err := tx.NewUpdate().
+		} else {
+			// For responses, ensure the corresponding request has been processed first.
+			// With multiple consumers on different hosts, messages can arrive out of order.
+			// First check if there's already a response for the current last_turn.
+			responseCount, err := tx.NewSelect().
+				Model((*AgentInstanceSessionHistory)(nil)).
+				Where("session_id = ?", history.SessionID).
+				Where("request = ?", false).
+				Where("turn = ?", lastTurn).
+				Count(ctx)
+			if err != nil {
+				return errorx.HandleDBError(err, map[string]any{
+					"session_id": history.SessionID,
+					"operation":  "check_response_for_turn",
+				})
+			}
+
+			if responseCount > 0 {
+				return fmt.Errorf("response for turn %d already exists, waiting for next request, session_id: %d", lastTurn, history.SessionID)
+			}
+
+			// Then check if there's a request for the current last_turn.
+			// This ensures the response corresponds to a request that has been processed.
+			requestCount, err := tx.NewSelect().
+				Model((*AgentInstanceSessionHistory)(nil)).
+				Where("session_id = ?", history.SessionID).
+				Where("request = ?", true).
+				Where("turn = ?", lastTurn).
+				Count(ctx)
+			if err != nil {
+				return errorx.HandleDBError(err, map[string]any{
+					"session_id": history.SessionID,
+					"operation":  "check_request_for_turn",
+				})
+			}
+
+			if requestCount == 0 {
+				return fmt.Errorf("response arrived before corresponding request for turn %d, session_id: %d", lastTurn, history.SessionID)
+			}
+
+			history.Turn = lastTurn
+		}
+
+		res, err := tx.NewInsert().Model(history).Exec(ctx)
+		if err = assertAffectedOneRow(res, err); err != nil {
+			return errorx.HandleDBError(err, map[string]any{
+				"session_id": history.SessionID,
+				"operation":  "insert_history",
+			})
+		}
+
+		if history.Request {
+			res, err = tx.NewUpdate().
 				Model((*AgentInstanceSession)(nil)).
 				Set("last_turn = ?", history.Turn).
 				Where("id = ?", history.SessionID).
@@ -258,15 +316,18 @@ func (s *agentInstanceSessionHistoryStoreImpl) Create(ctx context.Context, histo
 				})
 			}
 		} else {
-			history.Turn = lastTurn
-		}
-
-		res, err := tx.NewInsert().Model(history).Exec(ctx)
-		if err = assertAffectedOneRow(res, err); err != nil {
-			return errorx.HandleDBError(err, map[string]any{
-				"session_id": history.SessionID,
-				"operation":  "insert_history",
-			})
+			// Update session's updated_at to maintain row lock and avoid concurrency issues
+			res, err = tx.NewUpdate().
+				Model((*AgentInstanceSession)(nil)).
+				Set("updated_at = now()").
+				Where("id = ?", history.SessionID).
+				Exec(ctx)
+			if err = assertAffectedOneRow(res, err); err != nil {
+				return errorx.HandleDBError(err, map[string]any{
+					"session_id": history.SessionID,
+					"operation":  "update_session_updated_at",
+				})
+			}
 		}
 
 		return nil

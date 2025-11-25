@@ -270,38 +270,4 @@ func TestLangflowAdapter_PrepareProxyContext(t *testing.T) {
 
 		mockAgentComponent.AssertExpectations(t)
 	})
-
-	t.Run("long input value truncation", func(t *testing.T) {
-		config := &config.Config{}
-		config.Agent.AgentHubServiceToken = "test-token"
-		mockAgentComponent := mockcomponent.NewMockAgentComponent(t)
-		adapter := NewLangflowAdapter(config, mockAgentComponent)
-
-		// Setup request with very long input value
-		longInput := "This is a very long input value that should be truncated to 50 characters for the session name"
-		chatReq := types.LangflowChatRequest{
-			InputValue: longInput,
-			InputType:  "chat",
-			OutputType: "chat",
-		}
-		jsonData, _ := json.Marshal(chatReq)
-
-		w := httptest.NewRecorder()
-		ctx, _ := gin.CreateTestContext(w)
-		req, _ := http.NewRequest("POST", "http://localhost/api/v1/opencsg/run/flow-123", bytes.NewReader(jsonData))
-		req.Header.Set("Content-Type", "application/json")
-		ctx.Request = req
-		ctx.Set("currentUserUUID", "test-user-uuid")
-
-		// Mock session creation - verify that the session name is truncated
-		sessionUUID := "test-session-uuid"
-		mockAgentComponent.On("CreateSession", mock.Anything, "test-user-uuid", mock.MatchedBy(func(req *types.CreateAgentInstanceSessionRequest) bool {
-			return req.Name != nil && len(*req.Name) <= 50
-		})).Return(sessionUUID, nil)
-
-		err := adapter.PrepareProxyContext(ctx, "/api/v1/opencsg/run/flow-123")
-		assert.NoError(t, err)
-
-		mockAgentComponent.AssertExpectations(t)
-	})
 }

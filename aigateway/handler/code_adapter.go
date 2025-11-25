@@ -75,7 +75,7 @@ func (a *CodeAdapter) PrepareProxyContext(ctx *gin.Context, api string) error {
 	}
 
 	// Create session for code agent
-	sessionName := common.TruncString(codeReq.Query, 50)
+	sessionName := common.TruncStringByRune(codeReq.Query, 255)
 	sessionUUID, err := a.agentComponent.CreateSession(ctx, currentUserUUID, &types.CreateAgentInstanceSessionRequest{
 		SessionUUID: &codeReq.RequestID,
 		Name:        &sessionName,

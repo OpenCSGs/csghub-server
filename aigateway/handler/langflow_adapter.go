@@ -62,7 +62,7 @@ func (a *LangflowAdapter) PrepareProxyContext(ctx *gin.Context, api string) erro
 	}
 
 	// Create session for langflow agent
-	sessionName := common.TruncString(chatReq.InputValue, 50)
+	sessionName := common.TruncStringByRune(chatReq.InputValue, 255)
 	sessionUUID, err := a.agentComponent.CreateSession(ctx, userUUID, &types.CreateAgentInstanceSessionRequest{
 		SessionUUID: chatReq.SessionID,
 		Name:        &sessionName,

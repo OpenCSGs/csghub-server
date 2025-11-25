@@ -760,8 +760,7 @@ func extractSessionName(inputValue string) string {
 }
 
 func (c *agentComponentImpl) ListSessions(ctx context.Context, userUUID string, filter types.AgentInstanceSessionFilter, per int, page int) ([]*types.AgentInstanceSession, int, error) {
-
-	sessions, total, err := c.sessionStore.List(ctx, filter, per, page)
+	sessions, total, err := c.sessionStore.List(ctx, userUUID, filter, per, page)
 	if err != nil {
 		return nil, 0, err
 	}

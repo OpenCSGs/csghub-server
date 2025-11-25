@@ -248,9 +248,9 @@ func (_c *MockAgentInstanceSessionStore_FindByUUID_Call) RunAndReturn(run func(c
 	return _c
 }
 
-// List provides a mock function with given fields: ctx, filter, per, page
-func (_m *MockAgentInstanceSessionStore) List(ctx context.Context, filter types.AgentInstanceSessionFilter, per int, page int) ([]database.AgentInstanceSession, int, error) {
-	ret := _m.Called(ctx, filter, per, page)
+// List provides a mock function with given fields: ctx, userUUID, filter, per, page
+func (_m *MockAgentInstanceSessionStore) List(ctx context.Context, userUUID string, filter types.AgentInstanceSessionFilter, per int, page int) ([]database.AgentInstanceSession, int, error) {
+	ret := _m.Called(ctx, userUUID, filter, per, page)
 
 	if len(ret) == 0 {
 		panic("no return value specified for List")
@@ -259,25 +259,25 @@ func (_m *MockAgentInstanceSessionStore) List(ctx context.Context, filter types.
 	var r0 []database.AgentInstanceSession
 	var r1 int
 	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, types.AgentInstanceSessionFilter, int, int) ([]database.AgentInstanceSession, int, error)); ok {
-		return rf(ctx, filter, per, page)
+	if rf, ok := ret.Get(0).(func(context.Context, string, types.AgentInstanceSessionFilter, int, int) ([]database.AgentInstanceSession, int, error)); ok {
+		return rf(ctx, userUUID, filter, per, page)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, types.AgentInstanceSessionFilter, int, int) []database.AgentInstanceSession); ok {
-		r0 = rf(ctx, filter, per, page)
+	if rf, ok := ret.Get(0).(func(context.Context, string, types.AgentInstanceSessionFilter, int, int) []database.AgentInstanceSession); ok {
+		r0 = rf(ctx, userUUID, filter, per, page)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]database.AgentInstanceSession)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, types.AgentInstanceSessionFilter, int, int) int); ok {
-		r1 = rf(ctx, filter, per, page)
+	if rf, ok := ret.Get(1).(func(context.Context, string, types.AgentInstanceSessionFilter, int, int) int); ok {
+		r1 = rf(ctx, userUUID, filter, per, page)
 	} else {
 		r1 = ret.Get(1).(int)
 	}
 
-	if rf, ok := ret.Get(2).(func(context.Context, types.AgentInstanceSessionFilter, int, int) error); ok {
-		r2 = rf(ctx, filter, per, page)
+	if rf, ok := ret.Get(2).(func(context.Context, string, types.AgentInstanceSessionFilter, int, int) error); ok {
+		r2 = rf(ctx, userUUID, filter, per, page)
 	} else {
 		r2 = ret.Error(2)
 	}
@@ -292,16 +292,17 @@ type MockAgentInstanceSessionStore_List_Call struct {
 
 // List is a helper method to define mock.On call
 //   - ctx context.Context
+//   - userUUID string
 //   - filter types.AgentInstanceSessionFilter
 //   - per int
 //   - page int
-func (_e *MockAgentInstanceSessionStore_Expecter) List(ctx interface{}, filter interface{}, per interface{}, page interface{}) *MockAgentInstanceSessionStore_List_Call {
-	return &MockAgentInstanceSessionStore_List_Call{Call: _e.mock.On("List", ctx, filter, per, page)}
+func (_e *MockAgentInstanceSessionStore_Expecter) List(ctx interface{}, userUUID interface{}, filter interface{}, per interface{}, page interface{}) *MockAgentInstanceSessionStore_List_Call {
+	return &MockAgentInstanceSessionStore_List_Call{Call: _e.mock.On("List", ctx, userUUID, filter, per, page)}
 }
 
-func (_c *MockAgentInstanceSessionStore_List_Call) Run(run func(ctx context.Context, filter types.AgentInstanceSessionFilter, per int, page int)) *MockAgentInstanceSessionStore_List_Call {
+func (_c *MockAgentInstanceSessionStore_List_Call) Run(run func(ctx context.Context, userUUID string, filter types.AgentInstanceSessionFilter, per int, page int)) *MockAgentInstanceSessionStore_List_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(types.AgentInstanceSessionFilter), args[2].(int), args[3].(int))
+		run(args[0].(context.Context), args[1].(string), args[2].(types.AgentInstanceSessionFilter), args[3].(int), args[4].(int))
 	})
 	return _c
 }
@@ -311,7 +312,7 @@ func (_c *MockAgentInstanceSessionStore_List_Call) Return(_a0 []database.AgentIn
 	return _c
 }
 
-func (_c *MockAgentInstanceSessionStore_List_Call) RunAndReturn(run func(context.Context, types.AgentInstanceSessionFilter, int, int) ([]database.AgentInstanceSession, int, error)) *MockAgentInstanceSessionStore_List_Call {
+func (_c *MockAgentInstanceSessionStore_List_Call) RunAndReturn(run func(context.Context, string, types.AgentInstanceSessionFilter, int, int) ([]database.AgentInstanceSession, int, error)) *MockAgentInstanceSessionStore_List_Call {
 	_c.Call.Return(run)
 	return _c
 }
