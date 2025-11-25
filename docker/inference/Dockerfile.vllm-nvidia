@@ -1,0 +1,26 @@
+FROM nvcr.io/nvidia/vllm:25.10-py3
+# Build with some basic utilities
+RUN apt-get update && apt-get install -y \
+    python3-pip apt-utils \
+    wget curl vim \
+    git git-lfs \
+    supervisor \
+    unzip
+
+# alias python='python3'
+RUN pip config set global.index-url https://mirrors.aliyun.com/pypi/simple
+RUN pip install --no-cache-dir csghub-sdk==0.7.6 supervisor
+RUN mkdir -p /var/log/supervisord
+COPY ./supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY ./vllm/ /etc/csghub/
+COPY ./vllm/multi-node-serving.sh /vllm-workspace/examples/online_serving/multi-node-serving.sh
+RUN chmod +x /etc/csghub/*.sh
+RUN chmod +x /vllm-workspace/examples/online_serving/*.sh
+
+WORKDIR /workspace/
+ENV HUGGINGFACE_HUB_CACHE=/workspace/ \
+    HF_HUB_ENABLE_HF_TRANSFER=0
+
+EXPOSE 8000
+
+ENTRYPOINT ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
