@@ -72,6 +72,7 @@ type FinetuneRes struct {
 	SubmitTime   time.Time `json:"submit_time"`
 	StartTime    time.Time `json:"start_time,omitempty"`
 	EndTime      time.Time `json:"end_time,omitempty"`
+	Datasets     []string  `json:"datasets"`
 	ResultURL    string    `json:"result_url"`
 }
 

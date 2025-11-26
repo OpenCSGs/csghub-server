@@ -1265,6 +1265,8 @@ func (d *deployer) SubmitFinetuneJob(ctx context.Context, req types.FinetuneReq)
 		Entrypoint:         "finetune",
 		ClusterID:          req.ClusterID,
 		Templates:          templates,
+		Datasets:           []string{req.DatasetId},
+		RepoIds:            []string{req.ModelId},
 		RepoType:           req.RepoType,
 		ResourceId:         req.ResourceId,
 		ResourceName:       req.ResourceName,

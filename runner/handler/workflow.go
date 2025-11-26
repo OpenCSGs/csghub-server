@@ -62,6 +62,7 @@ func (a *ArgoHandler) CreateWorkflow(ctx *gin.Context) {
 		RepoIds:    wf.RepoIds,
 		RepoType:   wf.RepoType,
 		SubmitTime: wf.SubmitTime,
+		Datasets:   wf.Datasets,
 	}
 
 	ctx.JSON(http.StatusOK, res)
