@@ -62,7 +62,7 @@ func (r *clusterInfoStoreImpl) Add(ctx context.Context, clusterConfig string, re
 		"cluster_config = ?", clusterConfig)
 	// For backward compatibility: when mode is ConnectModeKubeConfig, also match NULL mode (old data)
 	if mode == types.ConnectModeKubeConfig {
-		q = q.Where("(mode = ? OR mode IS NULL)", mode)
+		q = q.Where("(mode = ? OR mode IS NULL OR mode = '')", mode)
 	} else if mode != "" {
 		q = q.Where("mode = ?", mode)
 	} else {

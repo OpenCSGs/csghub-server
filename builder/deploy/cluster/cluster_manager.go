@@ -271,6 +271,7 @@ func buildCluster(kubeconfig *rest.Config, id string, index int, connectMode typ
 		LWSClient:     lwsclient,
 		ConnectMode:   connectMode,
 		Region:        region,
+		StorageClass:  cluster.StorageClass,
 	}
 	return c, nil
 }
@@ -302,7 +303,9 @@ func (p *ClusterPool) GetClusterByID(ctx context.Context, id string) (*Cluster, 
 	}
 	for _, Cluster := range p.Clusters {
 		if Cluster.CID == cfId {
-			Cluster.StorageClass = storageClass
+			if len(Cluster.StorageClass) < 1 && len(storageClass) > 0 {
+				Cluster.StorageClass = storageClass
+			}
 			Cluster.NetworkInterface = networkInterface
 			return Cluster, nil
 		}

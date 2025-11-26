@@ -1007,7 +1007,7 @@ func (s *serviceComponentImpl) runServiceSingleHost(ctx context.Context, req typ
 	if err != nil {
 		return fmt.Errorf("fail to get cluster, error %v ", err)
 	}
-
+	slog.Info("get cluster for run service", slog.Any("cluster", cluster))
 	// check if the ksvc exists
 	_, err = cluster.KnativeClient.ServingV1().Services(s.k8sNameSpace).Get(ctx, req.SvcName, metav1.GetOptions{})
 	if err == nil {
@@ -1046,7 +1046,10 @@ func (s *serviceComponentImpl) runServiceSingleHost(ctx context.Context, req typ
 	// add pvc if possible
 	// space image was built from user's code, model cache dir is hard to control
 	// so no PV cache for space case so far
-	if cluster.StorageClass != "" && req.DeployType != types.SpaceType {
+	slog.Debug("check storageclass for cluster", slog.Any("cluster_id", cluster.ID),
+		slog.Any("storageclass", cluster.StorageClass), slog.Any("svc_name", req.SvcName))
+	if len(cluster.StorageClass) > 0 && req.DeployType != types.SpaceType {
+		slog.Info("using storageclass for cache", slog.Any("cluster_id", cluster.ID), slog.Any("svc_name", req.SvcName))
 		err = s.newPersistentVolumeClaim(pvcName, ctx, cluster, req.Hardware)
 		if err != nil {
 			return fmt.Errorf("failed to create persist volume, %v", err)

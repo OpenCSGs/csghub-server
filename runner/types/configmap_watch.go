@@ -12,6 +12,8 @@ const (
 	KeyRunnerClusterRegion  = "STARHUB_SERVER_CLUSTER_REGION"
 	// application endpoint of cluster with remote runner
 	KeyApplicationEndpoint = "STARHUB_SERVER_RUNNER_APPLICATION_ENDPOINT"
+	// key name of configmap for storage class of PVC
+	KeyStorageClass = "STARHUB_SERVER_RUNNER_STORAGE_CLASS"
 )
 
 var SubscribeKeyWithEventPush = map[string]Validator{
