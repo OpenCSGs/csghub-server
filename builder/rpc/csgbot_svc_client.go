@@ -38,8 +38,8 @@ func (c *CsgbotSvcHttpClientImpl) DeleteWorkspaceFiles(ctx context.Context, user
 	}
 	hreq.Header.Set("Content-Type", "application/json")
 	hreq.Header.Set("user_uuid", userUUID)
-	hreq.Header.Set("username", username)
-	hreq.Header.Set("token", token)
+	hreq.Header.Set("user_name", username)
+	hreq.Header.Set("user_token", token)
 
 	hresp, err := c.hc.Do(hreq)
 	if err != nil {

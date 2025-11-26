@@ -38,8 +38,8 @@ func TestDeleteWorkspaceFiles_Success(t *testing.T) {
 		// Verify headers
 		assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
 		assert.Equal(t, userUUID, r.Header.Get("user_uuid"))
-		assert.Equal(t, username, r.Header.Get("username"))
-		assert.Equal(t, token, r.Header.Get("token"))
+		assert.Equal(t, username, r.Header.Get("user_name"))
+		assert.Equal(t, token, r.Header.Get("user_token"))
 
 		// Return success
 		w.WriteHeader(http.StatusOK)
