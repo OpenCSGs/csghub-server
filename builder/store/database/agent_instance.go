@@ -252,6 +252,10 @@ func (s *agentInstanceStoreImpl) applyAgentInstanceFilters(query *bun.SelectQuer
 		query = query.Where("built_in = ?", *filter.BuiltIn)
 	}
 
+	if filter.Public != nil {
+		query = query.Where("public = ?", *filter.Public)
+	}
+
 	return query
 }
 

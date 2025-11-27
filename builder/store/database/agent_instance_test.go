@@ -376,6 +376,96 @@ func TestAgentInstanceStore_ListByUserUUID_WithTemplateFilter(t *testing.T) {
 	require.Equal(t, 1, total)
 }
 
+func TestAgentInstanceStore_ListByUserUUID_WithPublicFilter(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewAgentInstanceStoreWithDB(db)
+
+	userUUID := uuid.New().String()
+
+	// Create public instance
+	publicInstance := &database.AgentInstance{
+		TemplateID:  1,
+		UserUUID:    userUUID,
+		Type:        "langflow",
+		ContentID:   "public-instance",
+		Name:        "Public Instance",
+		Description: "A public instance",
+		Public:      true,
+	}
+	_, err := store.Create(ctx, publicInstance)
+	require.NoError(t, err)
+
+	// Create private instance
+	privateInstance := &database.AgentInstance{
+		TemplateID:  2,
+		UserUUID:    userUUID,
+		Type:        "agno",
+		ContentID:   "private-instance",
+		Name:        "Private Instance",
+		Description: "A private instance",
+		Public:      false,
+	}
+	_, err = store.Create(ctx, privateInstance)
+	require.NoError(t, err)
+
+	// Test public filter - true
+	publicTrue := true
+	instances, total, err := store.ListByUserUUID(ctx, userUUID, types.AgentInstanceFilter{Public: &publicTrue}, 10, 1)
+	require.NoError(t, err)
+	// Should find public instance + system instances (all public)
+	require.GreaterOrEqual(t, len(instances), 1, "Should find at least the public instance")
+	require.GreaterOrEqual(t, total, 1)
+	// Verify the public instance is in results
+	found := false
+	for _, inst := range instances {
+		if inst.ID == publicInstance.ID {
+			found = true
+			require.True(t, inst.Public, "Instance should be public")
+			break
+		}
+	}
+	require.True(t, found, "Public instance should be found in results")
+
+	// Test public filter - false
+	publicFalse := false
+	instances, total, err = store.ListByUserUUID(ctx, userUUID, types.AgentInstanceFilter{Public: &publicFalse}, 10, 1)
+	require.NoError(t, err)
+	// Should find only private instance (user's own private instance)
+	require.GreaterOrEqual(t, len(instances), 1, "Should find at least the private instance")
+	require.GreaterOrEqual(t, total, 1)
+	// Verify the private instance is in results
+	found = false
+	for _, inst := range instances {
+		if inst.ID == privateInstance.ID {
+			found = true
+			require.False(t, inst.Public, "Instance should be private")
+			break
+		}
+	}
+	require.True(t, found, "Private instance should be found in results")
+
+	// Test combined filters (public + type)
+	publicTrue = true
+	instances, total, err = store.ListByUserUUID(ctx, userUUID, types.AgentInstanceFilter{Public: &publicTrue, Type: "langflow"}, 10, 1)
+	require.NoError(t, err)
+	// Should find public langflow instance
+	require.GreaterOrEqual(t, len(instances), 1)
+	require.GreaterOrEqual(t, total, 1)
+	found = false
+	for _, inst := range instances {
+		if inst.ID == publicInstance.ID {
+			found = true
+			require.True(t, inst.Public)
+			require.Equal(t, "langflow", inst.Type)
+			break
+		}
+	}
+	require.True(t, found, "Public langflow instance should be found in results")
+}
+
 func TestAgentInstanceStore_IsInstanceExistsByContentID(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
