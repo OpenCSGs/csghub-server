@@ -102,5 +102,28 @@ func Register(d *scenariomgr.DataProvider) {
 		},
 	})
 
+	// register agent-instance-updated scenario
+	scenariomgr.RegisterScenario(types.MessageScenarioAgentInstanceUpdated, &scenariomgr.ScenarioDefinition{
+		Channels: []types.MessageChannel{
+			types.MessageChannelInternalMessage,
+			types.MessageChannelEmail,
+		},
+		ChannelGetDataFunc: map[types.MessageChannel]scenariomgr.GetDataFunc{
+			types.MessageChannelInternalMessage: internalnotification.GetSiteInternalMessageData,
+			types.MessageChannelEmail: internalnotification.GetEmailDataFunc(d.GetNotificationStorage()),
+		},
+	})
+
+	// register agent-instance-deleted scenario
+	scenariomgr.RegisterScenario(types.MessageScenarioAgentInstanceDeleted, &scenariomgr.ScenarioDefinition{
+		Channels: []types.MessageChannel{
+			types.MessageChannelInternalMessage,
+			types.MessageChannelEmail,
+		},
+		ChannelGetDataFunc: map[types.MessageChannel]scenariomgr.GetDataFunc{
+			types.MessageChannelInternalMessage: internalnotification.GetSiteInternalMessageData,
+			types.MessageChannelEmail: internalnotification.GetEmailDataFunc(d.GetNotificationStorage()),
+		},
+	})
 	extend(d)
 }

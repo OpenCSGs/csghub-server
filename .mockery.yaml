@@ -47,6 +47,8 @@ packages:
       MirrorNamespaceMappingComponent:
       NotebookComponent:
       LicenseComponent:
+      AgentComponent:
+      AgentInstanceAdapter:
   opencsg.com/csghub-server/component/reporter:
     config:
     interfaces:
@@ -79,6 +81,8 @@ packages:
       UserSvcClient:
       ModerationSvcClient:
       NotificationSvcClient:
+      AgentHubSvcClient:
+      CsgbotSvcClient:
   opencsg.com/csghub-server/builder/sensitive:
     config:
     interfaces:

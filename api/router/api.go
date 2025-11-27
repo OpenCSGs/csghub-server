@@ -545,6 +545,12 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		return nil, fmt.Errorf("error creating webhook routes: %w", err)
 	}
 
+	agentHandler, err := handler.NewAgentHandler(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating agent handler: %w", err)
+	}
+	createAgentRoutes(apiGroup, middlewareCollection, agentHandler)
+
 	finetuneJobHandler, err := handler.NewFinetuneHandler(config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating finetune job handler: %w", err)

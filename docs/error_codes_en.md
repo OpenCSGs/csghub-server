@@ -34,6 +34,14 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Name:** `wrongTimeRange`
 - **Description:** The specified time range is invalid, for example, the start time is after the end time.
 
+## Agent Errors
+
+### `AGENT-ERR-0`
+
+- **Error Code:** `AGENT-ERR-0`
+- **Error Name:** `instanceQuotaExceeded`
+- **Description:** The instance quota exceeded. Includes agent type, instance count, and quota in the error message.
+
 ## Auth Errors
 
 ### `AUTH-ERR-0`

@@ -35,6 +35,20 @@ func TruncString(s string, limit int) string {
 	return string(s1)
 }
 
+func TruncStringByRune(s string, limit int) string {
+	runes := []rune(s)
+	if len(runes) <= limit {
+		return s
+	}
+
+	// Reserve 3 runes for "..."
+	if limit <= 3 {
+		return string(runes[:limit])
+	}
+
+	return string(runes[:limit-3]) + "..."
+}
+
 func MD5Hash(s string) string {
 	hash := md5.New()
 	hash.Write([]byte(s))
@@ -48,4 +62,11 @@ func SHA256(s string) string {
 	hash.Write([]byte(s))
 	hashBytes := hash.Sum(nil)
 	return hex.EncodeToString(hashBytes)
+}
+
+func SafeDeref(p *string) string {
+	if p != nil {
+		return *p
+	}
+	return ""
 }

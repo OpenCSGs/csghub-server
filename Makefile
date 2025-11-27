@@ -1,4 +1,7 @@
-.PHONY: test lint cover mock_wire mock_gen swag migrate_local
+.PHONY: test lint cover mock_wire mock_gen swag migrate_localo
+
+build:
+	go build -o ./bin/csghub-server ./cmd/csghub-server
 
 test:
 	go test ./...
@@ -40,3 +43,6 @@ db_rollback:
 
 error_doc:
 	@go run cmd/csghub-server/main.go errorx doc-gen
+
+notify_gen:
+	@go run cmd/csghub-server/main.go notification notify-gen -l Info

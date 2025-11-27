@@ -76,6 +76,10 @@ var (
 		StreamName:   "webhookEventStream", // webhook event stream name
 		ConsumerName: "webhookEventConsumer",
 	}
+	AgentSessionHistoryMsgGroup = MQGroup{
+		StreamName:   "agentSessionHistoryMsgStream",
+		ConsumerName: "agentSessionHistoryMsgConsumer",
+	}
 )
 
 type MessageMeta struct {

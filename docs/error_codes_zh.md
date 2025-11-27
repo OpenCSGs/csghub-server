@@ -34,6 +34,14 @@
 - **错误名:** `wrongTimeRange`
 - **描述:** 指定的时间范围无效，例如开始时间晚于结束时间。
 
+## Agent 错误
+
+### `AGENT-ERR-0`
+
+- **错误代码:** `AGENT-ERR-0`
+- **错误名:** `instanceQuotaExceeded`
+- **描述:** 实例配额超出。错误消息中包含智能体类型、实例数量和配额。
+
 ## Auth 错误
 
 ### `AUTH-ERR-0`
