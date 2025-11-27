@@ -175,6 +175,7 @@ func (c *finetuneComponentImpl) GetFinetuneJob(ctx context.Context, req types.Fi
 		StartTime:    wf.StartTime,
 		EndTime:      wf.EndTime,
 		ResultURL:    wf.ResultURL,
+		Datasets:     wf.Datasets,
 	}
 	return res, nil
 }
