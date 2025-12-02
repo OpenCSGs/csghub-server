@@ -24,6 +24,7 @@ type RuntimeFrameworksStore interface {
 	FindEnabledByName(ctx context.Context, name string) (*RuntimeFramework, error)
 	FindByFrameName(ctx context.Context, name string) ([]RuntimeFramework, error)
 	FindByFrameImageAndComputeType(ctx context.Context, frameImage, ComputeType string) (*RuntimeFramework, error)
+	FindByImageID(ctx context.Context, imageID string) (*RuntimeFramework, error)
 	ListAll(ctx context.Context) ([]RuntimeFramework, error)
 	ListByIDs(ctx context.Context, ids []int64) ([]RuntimeFramework, error)
 }
@@ -41,18 +42,19 @@ func NewRuntimeFrameworksStoreWithDB(db *DB) RuntimeFrameworksStore {
 }
 
 type RuntimeFramework struct {
-	ID            int64  `bun:",pk,autoincrement" json:"id"`
-	FrameName     string `bun:",notnull" json:"frame_name"`
-	FrameVersion  string `bun:",notnull" json:"frame_version"`
-	FrameImage    string `bun:",notnull" json:"frame_image"`
-	ComputeType   string `bun:",notnull" json:"compute_type"` // cpu, gpu,npu,mlu
-	DriverVersion string `bun:"," json:"driver_version"`      //12.1
-	Description   string `bun:"," json:"description"`
-	Enabled       int64  `bun:",notnull" json:"enabled"`
-	ContainerPort int    `bun:",notnull" json:"container_port"`
-	Type          int    `bun:",notnull" json:"type"` // 0-space, 1-inference, 2-finetune
-	EngineArgs    string `bun:",nullzero" json:"engine_args"`
-	ModelFormat   string `bun:",nullzero" json:"model_format"` // safetensors, gguf, or onnx
+	ID              int64  `bun:",pk,autoincrement" json:"id"`
+	FrameName       string `bun:",notnull" json:"frame_name"`
+	FrameVersion    string `bun:",notnull" json:"frame_version"`
+	FrameImage      string `bun:",notnull" json:"frame_image"`
+	ComputeType     string `bun:",notnull" json:"compute_type"` // cpu, gpu,npu,mlu
+	DriverVersion   string `bun:"," json:"driver_version"`      //12.1
+	Description     string `bun:"," json:"description"`
+	Enabled         int64  `bun:",notnull" json:"enabled"`
+	ContainerPort   int    `bun:",notnull" json:"container_port"`
+	Type            int    `bun:",notnull" json:"type"` // 0-space, 1-inference, 2-finetune
+	EngineArgs      string `bun:",nullzero" json:"engine_args"`
+	ModelFormat     string `bun:",nullzero" json:"model_format"`     // safetensors, gguf, or onnx
+	ToolCallParsers string `bun:",nullzero" json:"tool_call_parsers"` // JSON string mapping architecture to parser
 	times
 }
 
@@ -110,6 +112,12 @@ func (rf *runtimeFrameworksStoreImpl) FindEnabledByID(ctx context.Context, id in
 func (rf *runtimeFrameworksStoreImpl) FindEnabledByName(ctx context.Context, name string) (*RuntimeFramework, error) {
 	var res RuntimeFramework
 	_, err := rf.db.Core.NewSelect().Model(&res).Where("LOWER(frame_name) = LOWER(?)", name).Where("enabled = 1").Exec(ctx, &res)
+	return &res, err
+}
+
+func (rf *runtimeFrameworksStoreImpl) FindByImageID(ctx context.Context, imageID string) (*RuntimeFramework, error) {
+	var res RuntimeFramework
+	_, err := rf.db.Core.NewSelect().Model(&res).Where("frame_image = ?", imageID).Exec(ctx, &res)
 	return &res, err
 }
 

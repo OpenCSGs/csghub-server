@@ -59,6 +59,7 @@ func StartDeployWorker(
 	ms database.ModelStore,
 	rfs database.RuntimeFrameworksStore,
 	urs database.UserResourcesStore,
+	mds database.MetadataStore,
 ) error {
 	w := temporalClient.NewWorker(DeployWorkflowQueue, worker.Options{
 		MaxConcurrentActivityExecutionSize:      cfg.Temporal.MaxConcurrentActivityExecutionSize,
@@ -66,7 +67,7 @@ func StartDeployWorker(
 		MaxConcurrentLocalActivityExecutionSize: cfg.Temporal.MaxConcurrentLocalActivityExecutionSize,
 	})
 	dcfg := common.BuildDeployConfig(cfg)
-	act := activity.NewDeployActivity(dcfg, lr, ib, ir, gs, ds, ts, ss, ms, rfs, urs)
+	act := activity.NewDeployActivity(dcfg, lr, ib, ir, gs, ds, ts, ss, ms, rfs, urs, mds)
 
 	w.RegisterActivity(act)
 	w.RegisterWorkflow(DeployWorkflow)

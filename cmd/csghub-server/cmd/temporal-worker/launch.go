@@ -135,7 +135,8 @@ var cmdLaunch = &cobra.Command{
 		ms := database.NewModelStore()
 		rfs := database.NewRuntimeFrameworksStore()
 		urs := database.NewUserResourcesStore()
-		err = serverworkflow.StartDeployWorker(cmd.Context(), cfg, temporalClient, lr, ib, ir, gitserver, ds, ts, ss, ms, rfs, urs)
+		mds := database.NewMetadataStore()
+		err = serverworkflow.StartDeployWorker(cmd.Context(), cfg, temporalClient, lr, ib, ir, gitserver, ds, ts, ss, ms, rfs, urs, mds)
 		if err != nil {
 			return fmt.Errorf("failed to start deploy worker, error: %w", err)
 		}

@@ -2,6 +2,11 @@ package types
 
 import "time"
 
+const (
+	// EngineArgEnableToolCalling is the engine argument for enabling tool calling
+	EngineArgEnableToolCalling = "--enable-tool-calling"
+)
+
 type DeployReq struct {
 	CurrentUser string `json:"current_user"`
 	PageOpts
