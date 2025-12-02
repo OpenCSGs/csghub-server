@@ -39,11 +39,10 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 	}
 	createMCPRoute(v1Group, mcpProxy)
 
-	agentProxy, err := handler.NewAgentProxyHandler(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creating agent proxy handler :%w", err)
+	if err := extendRoutes(v1Group, middlewareCollection, config); err != nil {
+		return nil, fmt.Errorf("error creating extended routes :%w", err)
 	}
-	createAgentRoute(v1Group, agentProxy, middlewareCollection)
+
 	return r, nil
 }
 
@@ -53,9 +52,4 @@ func createMCPRoute(v1Group *gin.RouterGroup, mcpProxy handler.MCPProxyHandler) 
 
 	// todo: enable mcp server proxy later
 	mcpGroup.Any("/:servicename/*any", mcpProxy.ProxyToApi(""))
-}
-
-func createAgentRoute(v1Group *gin.RouterGroup, agentProxy handler.AgentProxyHandler, middlewareCollection middleware.MiddlewareCollection) {
-	agentGroup := v1Group.Group("/agent", middlewareCollection.Auth.NeedPhoneVerified)
-	agentGroup.Any("/:type/*any", agentProxy.ProxyToApi("/api/v1%s", "any"))
 }

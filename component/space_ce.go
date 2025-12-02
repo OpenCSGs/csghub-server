@@ -46,12 +46,6 @@ func NewSpaceComponent(config *config.Config) (SpaceComponent, error) {
 		return nil, err
 	}
 	c.templateStore = database.NewSpaceTemplateStore()
-	c.agentComponent, err = NewAgentComponentForSpace(config)
-	if err != nil {
-		return nil, err
-	}
-	c.csgbotSvcClient = rpc.NewCsgbotSvcHttpClient(fmt.Sprintf("%s:%d", config.CSGBot.Host, config.CSGBot.Port),
-		rpc.AuthWithApiKey(config.APIToken))
 	return c, nil
 }
 
@@ -73,8 +67,6 @@ type spaceComponentImpl struct {
 	deployTaskStore     database.DeployTaskStore
 	recomStore          database.RecomStore
 	templateStore       database.SpaceTemplateStore
-	agentComponent      AgentComponent
-	csgbotSvcClient     rpc.CsgbotSvcClient
 }
 
 func (c *spaceComponentImpl) checkResourcePurchasableForUpdate(ctx context.Context, req types.UpdateSpaceReq, resource *database.SpaceResource) error {
@@ -99,4 +91,7 @@ func (c *spaceComponentImpl) updateDeployRepoByDeploy(repo types.DeployRepo, dep
 }
 
 func (c *spaceComponentImpl) addOpWeightToSpaces(ctx context.Context, repoIDs []int64, spaces []*types.Space) {
+}
+
+func (c *spaceComponentImpl) syncCodeAgentIfExists(_ string, _ string, _ string, _ types.CodeAgentSyncOperation) {
 }

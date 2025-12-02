@@ -1465,14 +1465,7 @@ func initializeTestEvaluationComponent(ctx context.Context, t interface {
 	mockAccountingComponent := component.NewMockAccountingComponent(t)
 	mockRepoComponent := component.NewMockRepoComponent(t)
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
-	componentEvaluationComponentImpl := NewTestEvaluationComponent(
-		config,
-		mockStores,
-		mockDeployer,
-		mockAccountingComponent,
-		mockRepoComponent,
-		mockUserSvcClient,
-	)
+	componentEvaluationComponentImpl := NewTestEvaluationComponent(config, mockStores, mockDeployer, mockAccountingComponent, mockRepoComponent, mockUserSvcClient)
 	mockTagComponent := component.NewMockTagComponent(t)
 	mockSpaceComponent := component.NewMockSpaceComponent(t)
 	mockRuntimeArchitectureComponent := component.NewMockRuntimeArchitectureComponent(t)

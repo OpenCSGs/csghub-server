@@ -1,10 +1,11 @@
+//go:build !ee && !saas
+
 package handler
 
 import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/stretchr/testify/mock"
 	mockcomponent "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
 	"opencsg.com/csghub-server/builder/testutil"
 	"opencsg.com/csghub-server/common/types"
@@ -16,7 +17,6 @@ type FinetuneTester struct {
 	mocks   struct {
 		finetune  *mockcomponent.MockFinetuneComponent
 		sensitive *mockcomponent.MockSensitiveComponent
-		agent     *mockcomponent.MockAgentComponent
 	}
 }
 
@@ -24,11 +24,9 @@ func NewFinetuneTester(t *testing.T) *FinetuneTester {
 	tester := &FinetuneTester{GinTester: testutil.NewGinTester()}
 	tester.mocks.finetune = mockcomponent.NewMockFinetuneComponent(t)
 	tester.mocks.sensitive = mockcomponent.NewMockSensitiveComponent(t)
-	tester.mocks.agent = mockcomponent.NewMockAgentComponent(t)
 	tester.handler = &FinetuneHandler{
-		ftComp:         tester.mocks.finetune,
-		sensitive:      tester.mocks.sensitive,
-		agentComponent: tester.mocks.agent,
+		ftComp:    tester.mocks.finetune,
+		sensitive: tester.mocks.sensitive,
 	}
 	tester.WithParam("namespace", "u")
 	tester.WithParam("name", "r")
@@ -62,13 +60,6 @@ func TestFinetuneHandler_Run(t *testing.T) {
 		LearningRate:       0.0001,
 		Agent:              "{\"type\":\"code\",\"id\":\"123\",\"request_id\":\"123\"}",
 	}).Return(&types.ArgoWorkFlowRes{ID: 1, TaskId: "task-123"}, nil)
-
-	tester.mocks.agent.EXPECT().CreateTaskIfInstanceExists(tester.Ctx(), mock.MatchedBy(func(req *types.AgentInstanceTaskReq) bool {
-		return req.TaskID == "task-123" &&
-			req.Agent == "{\"type\":\"code\",\"id\":\"123\",\"request_id\":\"123\"}" &&
-			req.Type == types.AgentTaskTypeFinetuneJob &&
-			req.Username == "u"
-	})).Return(nil)
 
 	tester.WithBody(t, &types.FinetuneReq{
 		RuntimeFrameworkId: 1,

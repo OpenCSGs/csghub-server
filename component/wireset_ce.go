@@ -18,6 +18,7 @@ func NewTestSpaceComponent(
 	accountingComponent AccountingComponent,
 	config *config.Config,
 	userSvcClient rpc.UserSvcClient,
+	_ AgentComponent,
 ) *spaceComponentImpl {
 	return &spaceComponentImpl{
 		repoComponent:       repoComponent,

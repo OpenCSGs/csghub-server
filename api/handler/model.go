@@ -11,44 +11,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
-	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
-	"opencsg.com/csghub-server/component"
 )
-
-func NewModelHandler(config *config.Config) (*ModelHandler, error) {
-	uc, err := component.NewModelComponent(config)
-	if err != nil {
-		return nil, err
-	}
-	sc, err := component.NewSensitiveComponent(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creating sensitive component:%w", err)
-	}
-	repo, err := component.NewRepoComponent(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creating repo component:%w", err)
-	}
-	agentComp, err := component.NewAgentComponent(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creating agent component:%w", err)
-	}
-	return &ModelHandler{
-		model:          uc,
-		sensitive:      sc,
-		repo:           repo,
-		agentComponent: agentComp,
-	}, nil
-}
-
-type ModelHandler struct {
-	model          component.ModelComponent
-	repo           component.RepoComponent
-	sensitive      component.SensitiveComponent
-	agentComponent component.AgentComponent
-}
 
 // GetVisiableModels godoc
 // @Security     ApiKey
@@ -744,21 +710,7 @@ func (h *ModelHandler) DeployDedicated(ctx *gin.Context) {
 	slog.Debug("deploy model as inference created", slog.String("namespace", namespace),
 		slog.String("name", name), slog.Int64("deploy_id", deployID))
 
-	if req.Agent != "" {
-		if err := h.agentComponent.CreateTaskIfInstanceExists(ctx.Request.Context(), &types.AgentInstanceTaskReq{
-			TaskID:   fmt.Sprintf("%d", deployID),
-			Agent:    req.Agent,
-			Type:     types.AgentTaskTypeInference,
-			Username: currentUser,
-		}); err != nil {
-			slog.Warn("failed to create agent instance task",
-				slog.String("task_id", fmt.Sprintf("%d", deployID)),
-				slog.String("type", types.AgentTaskTypeInference.String()),
-				slog.String("agent", req.Agent),
-				slog.Any("error", err),
-			)
-		}
-	}
+	h.createAgentInstanceTask(ctx.Request.Context(), req.Agent, fmt.Sprintf("%d", deployID), types.AgentTaskTypeInference, currentUser)
 
 	// return deploy_id
 	response := types.DeployRepo{DeployID: deployID}
