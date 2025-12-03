@@ -96,24 +96,23 @@ func (m *openaiComponentImpl) getCSGHubModels(c context.Context, userName string
 	}
 	var models []types.Model
 	for _, deploy := range runningDeploys {
-		var hardwareInfo commontypes.HardWare
-		err := json.Unmarshal([]byte(deploy.Hardware), &hardwareInfo)
-		if err != nil {
-			slog.Error("get deploy hardware ")
-		}
 		// Check if engine_args contains tool-call-parser parameter
 		supportFunctionCall := strings.Contains(deploy.EngineArgs, "tool-call-parser")
 		m := types.Model{
-			Object:              "model",
-			Created:             deploy.CreatedAt.Unix(),
-			Task:                string(deploy.Task),
-			CSGHubModelID:       deploy.Repository.Path,
-			SvcName:             deploy.SvcName,
-			SvcType:             deploy.Type,
-			Hardware:            hardwareInfo,
-			RuntimeFramework:    deploy.RuntimeFramework,
-			ImageID:             deploy.ImageID,
-			SupportFunctionCall: supportFunctionCall,
+			BaseModel: types.BaseModel{
+				Object:              "model",
+				Created:             deploy.CreatedAt.Unix(),
+				OwnedBy:             deploy.User.Username,
+				SupportFunctionCall: supportFunctionCall,
+				Task:                string(deploy.Task),
+			},
+			InternalModelInfo: types.InternalModelInfo{
+				CSGHubModelID: deploy.Repository.Path,
+				ClusterID:     deploy.ClusterID,
+				SvcName:       deploy.SvcName,
+				SvcType:       deploy.Type,
+				ImageID:       deploy.ImageID,
+			},
 		}
 		modelName := ""
 		if deploy.Repository.HFPath != "" {
@@ -152,11 +151,16 @@ func (m *openaiComponentImpl) getExternalModels(c context.Context) []types.Model
 
 		for _, extModel := range extModels {
 			m := types.Model{
-				Object:   "model",
-				ID:       extModel.ModelName,
-				OwnedBy:  "OpenCSG",
+				BaseModel: types.BaseModel{
+					Object:  "model",
+					ID:      extModel.ModelName,
+					OwnedBy: "OpenCSG",
+				},
 				Endpoint: extModel.ApiEndpoint,
-				AuthHead: extModel.AuthHeader,
+				ExternalModelInfo: types.ExternalModelInfo{
+					Provider: extModel.Provider,
+					AuthHead: extModel.AuthHeader,
+				},
 			}
 			models = append(models, m)
 		}
@@ -170,22 +174,11 @@ func (m *openaiComponentImpl) getExternalModels(c context.Context) []types.Model
 }
 
 func (m *openaiComponentImpl) saveModelsToCache(models []types.Model) error {
-	modelListWithEndpoint := make([]types.ModelWithEndpoint, 0, len(models))
-	for _, model := range models {
-		modelListWithEndpoint = append(modelListWithEndpoint, types.ModelWithEndpoint{
-			ID:       model.ID,
-			Object:   model.Object,
-			Created:  model.Created,
-			OwnedBy:  model.OwnedBy,
-			Task:     model.Task,
-			Endpoint: model.Endpoint,
-			AuthHead: model.AuthHead,
-		})
-	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	// Use HSET to store each model as a field in a hash
-	for _, model := range modelListWithEndpoint {
+	for _, model := range models {
+		model := model.ForInternalUse()
 		jsonBytes, err := json.Marshal(model)
 		if err != nil {
 			return fmt.Errorf("failed to marshal model %s to JSON: %w", model.ID, err)
@@ -228,22 +221,14 @@ func (m *openaiComponentImpl) loadModelFromCache(ctx context.Context, modelID st
 	}
 
 	// Unmarshal JSON to model
-	var model types.ModelWithEndpoint
+	var model types.Model
 	err = json.Unmarshal([]byte(modelJSON), &model)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal model %s from JSON: %w", modelID, err)
 	}
 	slog.Debug("model loaded from cache", "modelID", modelID)
 
-	return &types.Model{
-		ID:       model.ID,
-		Object:   model.Object,
-		Created:  model.Created,
-		OwnedBy:  model.OwnedBy,
-		Task:     model.Task,
-		Endpoint: model.Endpoint,
-		AuthHead: model.AuthHead,
-	}, nil
+	return &model, nil
 }
 
 func (m *openaiComponentImpl) GetModelByID(c context.Context, username, modelID string) (*types.Model, error) {

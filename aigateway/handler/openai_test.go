@@ -67,9 +67,11 @@ func TestOpenAIHandler_ListModels(t *testing.T) {
 		tester, c, w := setupTest(t)
 		models := []types.Model{
 			{
-				ID:      "model1:svc1",
-				Object:  "model",
-				OwnedBy: "testuser",
+				BaseModel: types.BaseModel{
+					ID:      "model1:svc1",
+					Object:  "model",
+					OwnedBy: "testuser",
+				},
 			},
 		}
 		tester.mocks.openAIComp.EXPECT().GetAvailableModels(mock.Anything, "testuser").Return(models, nil)
@@ -90,9 +92,11 @@ func TestOpenAIHandler_GetModel(t *testing.T) {
 	t.Run("model found", func(t *testing.T) {
 		tester, c, w := setupTest(t)
 		model := &types.Model{
-			ID:      "model1:svc1",
-			Object:  "model",
-			OwnedBy: "testuser",
+			BaseModel: types.BaseModel{
+				ID:      "model1:svc1",
+				Object:  "model",
+				OwnedBy: "testuser",
+			},
 		}
 		c.Params = []gin.Param{{Key: "model", Value: "model1:svc1"}}
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1:svc1").Return(model, nil)
@@ -177,9 +181,11 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 		c.Request.Body = io.NopCloser(bytes.NewReader(body))
 
 		model := &types.Model{
-			ID:      "model1:svc1",
-			Object:  "model",
-			OwnedBy: "testuser",
+			BaseModel: types.BaseModel{
+				ID:      "model1:svc1",
+				Object:  "model",
+				OwnedBy: "testuser",
+			},
 		}
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1:svc1").Return(model, nil)
 
@@ -208,9 +214,12 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 		c.Request.Body = io.NopCloser(bytes.NewReader(body))
 
 		model := &types.Model{
-			ID:       "model1:svc1",
-			Object:   "model",
-			OwnedBy:  "testuser",
+			BaseModel: types.BaseModel{
+				ID:      "model1:svc1",
+				Object:  "model",
+				OwnedBy: "testuser",
+			},
+
 			Endpoint: "test-endpoint",
 		}
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1:svc1").Return(model, nil)
@@ -241,9 +250,11 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 		c.Request.Body = io.NopCloser(bytes.NewReader(body))
 
 		model := &types.Model{
-			ID:       "model1:svc1",
-			Object:   "model",
-			OwnedBy:  "testuser",
+			BaseModel: types.BaseModel{
+				ID:      "model1:svc1",
+				Object:  "model",
+				OwnedBy: "testuser",
+			},
 			Endpoint: "test-endpoint",
 		}
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1:svc1").Return(model, nil)
@@ -283,13 +294,15 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 		c.Request.Body = io.NopCloser(bytes.NewReader(body))
 
 		model := &types.Model{
-			ID:       "model1:svc1",
-			Object:   "model",
-			OwnedBy:  "testuser",
+			BaseModel: types.BaseModel{
+				ID:      "model1:svc1",
+				Object:  "model",
+				OwnedBy: "testuser",
+			},
 			Endpoint: "test-endpoint",
 		}
 
-		tokenizer := token.NewTokenizerImpl(model.Endpoint, model.Object, model.ImageID)
+		tokenizer := token.NewTokenizerImpl(model.Endpoint, model.Object, "")
 		llmTokenCounter := token.NewLLMTokenCounter(tokenizer)
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1:svc1").Return(model, nil)
 		var wg sync.WaitGroup
@@ -309,9 +322,11 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 		c.Request.Body = io.NopCloser(bytes.NewReader(body))
 
 		model := &types.Model{
-			ID:       "model1:svc1",
-			Object:   "model",
-			OwnedBy:  "testuser",
+			BaseModel: types.BaseModel{
+				ID:      "model1:svc1",
+				Object:  "model",
+				OwnedBy: "testuser",
+			},
 			Endpoint: "test-endpoint",
 		}
 		tester.mocks.moderationComp.EXPECT().CheckLLMPrompt(mock.Anything, "You are a helpful assistant that can use tools to answer questions and perform tasks.", "testuuid"+model.ID).

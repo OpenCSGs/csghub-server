@@ -93,22 +93,38 @@ func TestOpenAIComponent_GetAvailableModels(t *testing.T) {
 
 		mockDeployStore.EXPECT().RunningVisibleToUser(mock.Anything, int64(1)).
 			Return(deploys, nil).Once()
-		expectModels := []types.ModelWithEndpoint{
+		expectModels := []types.Model{
 			{
-				ID:       "model1:svc1",
-				OwnedBy:  "testuser",
-				Object:   "model",
+				BaseModel: types.BaseModel{
+					ID:      "model1:svc1",
+					OwnedBy: "testuser",
+					Object:  "model",
+					Created: deploys[0].CreatedAt.Unix(),
+					Task:    "text-generation",
+				},
 				Endpoint: "endpoint1",
-				Created:  deploys[0].CreatedAt.Unix(),
-				Task:     "text-generation",
+				InternalModelInfo: types.InternalModelInfo{
+					ClusterID: deploys[0].ClusterID,
+					SvcName:   deploys[0].SvcName,
+					ImageID:   deploys[0].ImageID,
+				},
+				InternalUse: true,
 			},
 			{
-				ID:       "hf-model2:svc2",
-				OwnedBy:  "OpenCSG",
-				Object:   "model",
+				BaseModel: types.BaseModel{
+					ID:      "hf-model2:svc2",
+					OwnedBy: "OpenCSG",
+					Object:  "model",
+					Created: deploys[1].CreatedAt.Unix(),
+					Task:    "text-to-image",
+				},
 				Endpoint: "endpoint2",
-				Created:  deploys[1].CreatedAt.Unix(),
-				Task:     "text-to-image",
+				InternalModelInfo: types.InternalModelInfo{
+					ClusterID: deploys[1].ClusterID,
+					SvcName:   deploys[1].SvcName,
+					ImageID:   deploys[1].ImageID,
+				},
+				InternalUse: true,
 			},
 		}
 		var wg sync.WaitGroup
@@ -184,13 +200,21 @@ func TestOpenAIComponent_GetModelByID(t *testing.T) {
 		deploys[0].CreatedAt = now
 		var wg sync.WaitGroup
 		wg.Add(1)
-		expectModels := []types.ModelWithEndpoint{
+		expectModels := []types.Model{
 			{
-				ID:       "model1:svc1",
-				OwnedBy:  "testuser",
-				Object:   "model",
+				BaseModel: types.BaseModel{
+					ID:      "model1:svc1",
+					OwnedBy: "testuser",
+					Object:  "model",
+					Created: deploys[0].CreatedAt.Unix(),
+				},
 				Endpoint: "endpoint1",
-				Created:  deploys[0].CreatedAt.Unix(),
+				InternalModelInfo: types.InternalModelInfo{
+					ClusterID: deploys[0].ClusterID,
+					SvcName:   deploys[0].SvcName,
+					ImageID:   deploys[0].ImageID,
+				},
+				InternalUse: true,
 			},
 		}
 		for _, model := range expectModels {
@@ -255,11 +279,14 @@ func TestOpenAIComponent_GetModelByID(t *testing.T) {
 		}
 		deploys[0].CreatedAt = now
 		expectModel := types.Model{
-			ID:       "model1:svc1",
-			OwnedBy:  "testuser",
-			Object:   "model",
+			BaseModel: types.BaseModel{
+				ID:      "model1:svc1",
+				OwnedBy: "testuser",
+				Object:  "model",
+				Created: deploys[0].CreatedAt.Unix(),
+				Task:    "text-generation",
+			},
 			Endpoint: "endpoint1",
-			Created:  deploys[0].CreatedAt.Unix(),
 		}
 		expectJson, _ := json.Marshal(expectModel)
 		mockCache.EXPECT().HGet(mock.Anything, modelCacheKey, expectModel.ID).
@@ -354,17 +381,24 @@ func TestOpenAIComponent_ExtGetAvailableModels_SinglePage(t *testing.T) {
 			ModelName:   "test-model-1",
 			ApiEndpoint: "http://test-endpoint-1.com",
 			AuthHeader:  "Bearer test-token-1",
+			Provider:    "OpenAI",
 			Type:        16,
 			Enabled:     true,
 		},
 	}
-	expectModels := []types.ModelWithEndpoint{
+	expectModels := []types.Model{
 		{
-			ID:       "test-model-1",
+			BaseModel: types.BaseModel{
+				ID:      "test-model-1",
+				OwnedBy: "OpenCSG",
+				Object:  "model",
+			},
 			Endpoint: "http://test-endpoint-1.com",
-			AuthHead: "Bearer test-token-1",
-			Object:   "model",
-			OwnedBy:  "OpenCSG",
+			ExternalModelInfo: types.ExternalModelInfo{
+				Provider: "OpenAI",
+				AuthHead: "Bearer test-token-1",
+			},
+			InternalUse: true,
 		},
 	}
 	expectJson, _ := json.Marshal(expectModels[0])
@@ -421,9 +455,11 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 			name:     "successful record - dedicated inference",
 			userUUID: "test-user-uuid",
 			model: &types.Model{
-				CSGHubModelID: "test-model",
-				SvcName:       "test-service",
-				SvcType:       commontypes.InferenceType,
+				InternalModelInfo: types.InternalModelInfo{
+					CSGHubModelID: "test-model",
+					SvcName:       "test-service",
+					SvcType:       commontypes.InferenceType,
+				},
 			},
 			usage: &openai.CompletionUsage{
 				PromptTokens:     100,
@@ -482,9 +518,11 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 			name:     "successful record - serverless inference",
 			userUUID: "test-user-uuid",
 			model: &types.Model{
-				CSGHubModelID: "test-model",
-				SvcName:       "test-service",
-				SvcType:       commontypes.ServerlessType,
+				InternalModelInfo: types.InternalModelInfo{
+					CSGHubModelID: "test-model",
+					SvcName:       "test-service",
+					SvcType:       commontypes.ServerlessType,
+				},
 			},
 			usage: &openai.CompletionUsage{
 				PromptTokens:     100,
@@ -543,9 +581,11 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 			name:     "counter error",
 			userUUID: "test-user-uuid",
 			model: &types.Model{
-				CSGHubModelID: "test-model",
-				SvcName:       "test-service",
-				SvcType:       commontypes.InferenceType,
+				InternalModelInfo: types.InternalModelInfo{
+					CSGHubModelID: "test-model",
+					SvcName:       "test-service",
+					SvcType:       commontypes.InferenceType,
+				},
 			},
 			wantError: true,
 			setupMock: func() {
@@ -570,9 +610,11 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 			name:     "publish error",
 			userUUID: "test-user-uuid",
 			model: &types.Model{
-				CSGHubModelID: "test-model",
-				SvcName:       "test-service",
-				SvcType:       commontypes.InferenceType,
+				InternalModelInfo: types.InternalModelInfo{
+					CSGHubModelID: "test-model",
+					SvcName:       "test-service",
+					SvcType:       commontypes.InferenceType,
+				},
 			},
 			usage: &openai.CompletionUsage{
 				PromptTokens:     100,
