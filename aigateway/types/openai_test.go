@@ -136,3 +136,33 @@ func TestModelListSerialization(t *testing.T) {
 func contains(s, substr string) bool {
 	return strings.Contains(s, substr)
 }
+
+func TestModelUnmarshal(t *testing.T) {
+	// case1: unmarshal ModelList
+	modelListJSON := `{
+		"object": "list",
+		"data": [
+			{
+				"id": "model-1",
+				"object": "model",
+				"created": 1633046400,
+				"owned_by": "test-owner",
+				"task": "text-generation",
+				"support_function_call": true,
+				"endpoint": "http://model-1.com",
+				"internal_use": false
+			}
+		]
+	}`
+
+	var modelList ModelList
+	err := json.Unmarshal([]byte(modelListJSON), &modelList)
+	if err != nil {
+		t.Fatalf("Failed to unmarshal model list: %v", err)
+	}
+
+	// verify that the unmarshaled results are correct
+	if modelList.Object != "list" || len(modelList.Data) != 1 || modelList.Data[0].ID != "model-1" {
+		t.Errorf("Model list unmarshal failed, got: %v", modelList)
+	}
+}

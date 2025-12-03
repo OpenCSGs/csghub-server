@@ -93,6 +93,40 @@ func (m Model) MarshalJSON() ([]byte, error) {
 	}
 }
 
+func (m *Model) UnmarshalJSON(data []byte) error {
+	type internalModelResponse struct {
+		ID                  string `json:"id"`
+		Object              string `json:"object"`
+		Created             int64  `json:"created"`
+		OwnedBy             string `json:"owned_by"`
+		Task                string `json:"task"`
+		SupportFunctionCall bool   `json:"support_function_call,omitempty"`
+		Endpoint            string `json:"endpoint"`
+		ClusterID           string `json:"cluster_id,omitempty"`
+		SvcName             string `json:"svc_name,omitempty"`
+		ImageID             string `json:"image_id,omitempty"`
+		AuthHead            string `json:"auth_head,omitempty"`
+		Provider            string `json:"provider,omitempty"`
+	}
+	var aux internalModelResponse
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+	m.ID = aux.ID
+	m.Object = aux.Object
+	m.Created = aux.Created
+	m.OwnedBy = aux.OwnedBy
+	m.Task = aux.Task
+	m.SupportFunctionCall = aux.SupportFunctionCall
+	m.Endpoint = aux.Endpoint
+	m.ClusterID = aux.ClusterID
+	m.SvcName = aux.SvcName
+	m.ImageID = aux.ImageID
+	m.AuthHead = aux.AuthHead
+	m.Provider = aux.Provider
+	return nil
+}
+
 // ForInternalUse set the model for internal use mode
 func (m *Model) ForInternalUse() *Model {
 	m.InternalUse = true
