@@ -219,6 +219,22 @@ type AcctStatementsRes struct {
 	SkuDesc          string      `json:"sku_desc"`
 }
 
+// AcctStatementsResFiltered is a filtered version of AcctStatementsRes that excludes certain fields
+type AcctStatementsResFiltered struct {
+	ID           int64     `json:"id"`
+	UserUUID     string    `json:"user_id"`
+	Value        float64   `json:"value"`
+	Scene        int       `json:"scene"`
+	InstanceName string    `json:"instance_name"`
+	CreatedAt    time.Time `json:"created_at"`
+	Consumption  float64   `json:"consumption"`
+	UserName     string    `json:"user_name"`
+	SkuID        int64     `json:"sku_id"`
+	SkuType      int       `json:"sku_type"`
+	SkuKind      int       `json:"sku_kind"`
+	SkuDesc      string    `json:"sku_desc"`
+}
+
 type RechargeReq struct {
 	Value float64   `json:"value" binding:"min=1"`
 	OpUID string    `json:"op_uid"`

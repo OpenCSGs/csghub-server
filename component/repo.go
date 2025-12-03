@@ -242,8 +242,8 @@ func (c *repoComponentImpl) CreateRepo(ctx context.Context, req types.CreateRepo
 	temPath := strings.SplitN(uuid.NewString(), "-", 2)
 	dbRepo := database.Repository{
 		UserID: user.ID,
-		//Path:           path.Join(req.Namespace, req.Name),
-		//GitPath:        fmt.Sprintf("%ss_%s/%s", string(req.RepoType), req.Namespace, req.Name),
+		// Path:           path.Join(req.Namespace, req.Name),
+		// GitPath:        fmt.Sprintf("%ss_%s/%s", string(req.RepoType), req.Namespace, req.Name),
 		Path:           path.Join(temPath[0], temPath[1]),
 		GitPath:        fmt.Sprintf("%ss_%s/%s", string(req.RepoType), temPath[0], temPath[1]),
 		Name:           req.Name,
@@ -487,7 +487,7 @@ func (c *repoComponentImpl) PublicToUser(ctx context.Context, repoType types.Rep
 
 		if !isAdmin {
 			repoOwnerIDs = append(repoOwnerIDs, user.ID)
-			//get user's orgs
+			// get user's orgs
 			for _, org := range user.Orgs {
 				repoOwnerIDs = append(repoOwnerIDs, org.UserID)
 			}
@@ -1764,7 +1764,7 @@ func (c *repoComponentImpl) AllowAdminAccess(ctx context.Context, repoType types
 
 func (c *repoComponentImpl) GetUserRepoPermission(ctx context.Context, userName string, repo *database.Repository) (*types.UserRepoPermission, error) {
 	if userName == "" {
-		//anonymous user only has read permission to public repo
+		// anonymous user only has read permission to public repo
 		return &types.UserRepoPermission{CanRead: !repo.Private, CanWrite: false, CanAdmin: false}, nil
 	}
 
@@ -1783,7 +1783,7 @@ func (c *repoComponentImpl) GetUserRepoPermission(ctx context.Context, userName 
 	}
 
 	if ns.NamespaceType == "user" {
-		//owner has full permission
+		// owner has full permission
 		if userName == namespace {
 			return &types.UserRepoPermission{
 				CanRead:  true,
@@ -1791,7 +1791,7 @@ func (c *repoComponentImpl) GetUserRepoPermission(ctx context.Context, userName 
 				CanAdmin: true,
 			}, nil
 		} else {
-			//other user has read permission to pubic repo
+			// other user has read permission to pubic repo
 			return &types.UserRepoPermission{
 				CanRead: !repo.Private, CanWrite: false, CanAdmin: false,
 			}, nil
@@ -2010,7 +2010,6 @@ func (c *repoComponentImpl) MirrorFromSaas(ctx context.Context, namespace, name,
 	mirror.MirrorTaskID = taskId
 
 	m, err = c.mirrorStore.Create(ctx, &mirror)
-
 	if err != nil {
 		return fmt.Errorf("failed to create mirror: %w", err)
 	}
@@ -2224,7 +2223,6 @@ func (c *repoComponentImpl) ListRuntimeFramework(ctx context.Context, repoType t
 			Description:   modelFrame.Description,
 			Type:          modelFrame.Type,
 		})
-
 	}
 	return frameList, nil
 }
@@ -2247,7 +2245,7 @@ func (c *repoComponentImpl) ListRuntimeFrameworkV2(ctx context.Context, repoType
 		if systemDriverVersion != "" && modelFrame.ComputeType == string(types.ResourceTypeGPU) {
 			frameDriverVersion, _ := version.NewVersion(modelFrame.DriverVersion)
 			systemDriverVersion, _ := version.NewVersion(systemDriverVersion)
-			//ignore unsupported driver version
+			// ignore unsupported driver version
 			if frameDriverVersion.GreaterThan(systemDriverVersion) {
 				continue
 			}
@@ -2567,37 +2565,41 @@ func (c *repoComponentImpl) DeployDetail(ctx context.Context, detailReq types.De
 		entrypoint = val
 	}
 
+	// Check if engine_args contains tool-call-parser parameter
+	supportFunctionCall := strings.Contains(deploy.EngineArgs, "tool-call-parser")
+
 	resDeploy := types.DeployRepo{
-		DeployID:         deploy.ID,
-		DeployName:       deploy.DeployName,
-		RepoID:           deploy.RepoID,
-		SvcName:          deploy.SvcName,
-		Status:           deployStatusCodeToString(code),
-		Hardware:         deploy.Hardware,
-		Env:              deploy.Env,
-		RuntimeFramework: deploy.RuntimeFramework,
-		ImageID:          deploy.ImageID,
-		MinReplica:       deploy.MinReplica,
-		MaxReplica:       deploy.MaxReplica,
-		GitBranch:        deploy.GitBranch,
-		ClusterID:        deploy.ClusterID,
-		SecureLevel:      deploy.SecureLevel,
-		CreatedAt:        deploy.CreatedAt,
-		UpdatedAt:        deploy.UpdatedAt,
-		Endpoint:         endpoint,
-		ActualReplica:    actualReplica,
-		DesiredReplica:   desiredReplica,
-		Instances:        instList,
-		Private:          endpointPrivate,
-		Path:             repoPath,
-		ProxyEndpoint:    proxyEndPoint,
-		SKU:              deploy.SKU,
-		Task:             string(deploy.Task),
-		EngineArgs:       deploy.EngineArgs,
-		Variables:        deploy.Variables,
-		Entrypoint:       entrypoint,
-		Reason:           deploy.Reason,
-		Message:          deploy.Message,
+		DeployID:            deploy.ID,
+		DeployName:          deploy.DeployName,
+		RepoID:              deploy.RepoID,
+		SvcName:             deploy.SvcName,
+		Status:              deployStatusCodeToString(code),
+		Hardware:            deploy.Hardware,
+		Env:                 deploy.Env,
+		RuntimeFramework:    deploy.RuntimeFramework,
+		ImageID:             deploy.ImageID,
+		MinReplica:          deploy.MinReplica,
+		MaxReplica:          deploy.MaxReplica,
+		GitBranch:           deploy.GitBranch,
+		ClusterID:           deploy.ClusterID,
+		SecureLevel:         deploy.SecureLevel,
+		CreatedAt:           deploy.CreatedAt,
+		UpdatedAt:           deploy.UpdatedAt,
+		Endpoint:            endpoint,
+		ActualReplica:       actualReplica,
+		DesiredReplica:      desiredReplica,
+		Instances:           instList,
+		Private:             endpointPrivate,
+		Path:                repoPath,
+		ProxyEndpoint:       proxyEndPoint,
+		SKU:                 deploy.SKU,
+		Task:                string(deploy.Task),
+		EngineArgs:          deploy.EngineArgs,
+		Variables:           deploy.Variables,
+		Entrypoint:          entrypoint,
+		Reason:              deploy.Reason,
+		Message:             deploy.Message,
+		SupportFunctionCall: supportFunctionCall,
 	}
 
 	return &resDeploy, nil
@@ -3071,7 +3073,7 @@ func (c *repoComponentImpl) DeployUpdate(ctx context.Context, updateReq types.De
 			if err != nil {
 				return fmt.Errorf("cannot find available runtime framework by name , %w", err)
 			}
-			//update runtime image once user changed cpu to gpu
+			// update runtime image once user changed cpu to gpu
 			req.RuntimeFrameworkID = &frame.ID
 		}
 	}
@@ -3169,8 +3171,23 @@ func (c *repoComponentImpl) DeployStart(ctx context.Context, startReq types.Depl
 	}
 
 	if exist {
-		// deploy instance is running
-		return errors.New("stop deploy first")
+		// check deploy status
+		_, status, _, err := c.deployer.Status(ctx, deployRepo, false)
+		if err != nil {
+			return fmt.Errorf("failed to get deploy status, %w", err)
+		}
+
+		// if deploy is in running status, return error
+		const deployStatusRunning = 4
+		if status == deployStatusRunning {
+			return errors.New("stop deploy first")
+		}
+
+		// if deploy exists but not running, stop it first
+		err = c.deployer.Stop(ctx, deployRepo)
+		if err != nil {
+			return fmt.Errorf("failed to stop existing deploy, %w", err)
+		}
 	}
 
 	// start deploy
@@ -3417,7 +3434,6 @@ func (c *repoComponentImpl) DiffBetweenTwoCommits(ctx context.Context, req types
 		LeftCommitId:  req.LeftCommitID,
 		RightCommitId: rightCommit,
 	})
-
 	if err != nil {
 		return nil, fmt.Errorf("failed to get diff, err: %w", err)
 	}
@@ -3773,7 +3789,7 @@ func (c *repoComponentImpl) ValidateYaml(ctx context.Context, req types.Validate
 	}
 
 	categoryContents := make(map[string]any)
-	//parse yaml string
+	// parse yaml string
 	err := yaml.Unmarshal([]byte(meta), categoryContents)
 	if err != nil {
 		slog.Error("error unmarshall meta for tags", slog.Any("error", err), slog.String("meta", meta))
