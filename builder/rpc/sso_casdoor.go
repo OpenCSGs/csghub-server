@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"net/url"
 
 	"github.com/casdoor/casdoor-go-sdk/casdoorsdk"
 	"golang.org/x/oauth2"
@@ -52,18 +51,14 @@ func (c *casdoorClientImpl) UpdateUserInfo(ctx context.Context, userInfo *SSOUpd
 		casu.DisplayName = casu.Name
 	}
 
-	// get id by user name before changed
-	id := c.casClient.GetId(casu.Name)
-	id = url.QueryEscape(id) // wechat user's name may contain special characters
-	if userInfo.Name != "" {
-		casu.DisplayName = userInfo.Name
-	}
-	_, err = c.casClient.UpdateUserById(id, casu)
+	_, err = c.casClient.UpdateUserByUserId(casu.Owner, casu.Id, casu)
 	if err != nil {
-		slog.Error("UpdateUserById failed from casdoor", "err", err, "id", id, "userInfo", userInfo)
+		slog.Error("UpdateUserById failed from casdoor", "err", err, "id", casu.Id, "userInfo", userInfo)
 		return errorx.RemoteSvcFail(err,
 			errorx.Ctx().Set("service", "casdoor").
-				Set("uuid", userInfo.UUID).Set("id", id),
+				Set("uuid", userInfo.UUID).
+				Set("id", casu.Id).
+				Set("owner", casu.Owner),
 		)
 	}
 
