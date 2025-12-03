@@ -15,7 +15,7 @@ require (
 	github.com/avast/retry-go/v4 v4.6.1
 	github.com/blang/semver/v4 v4.0.0
 	github.com/bmatcuk/doublestar/v4 v4.8.1
-	github.com/casdoor/casdoor-go-sdk v0.41.0
+	github.com/casdoor/casdoor-go-sdk v1.22.0
 	github.com/chenyahui/gin-cache v1.9.0
 	github.com/d5/tengo/v2 v2.17.0
 	github.com/gin-contrib/cors v1.7.0
