@@ -21,6 +21,7 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 	middlewareCollection := middleware.MiddlewareCollection{}
 	middlewareCollection.Auth.NeedLogin = middleware.MustLogin()
 	middlewareCollection.Auth.NeedPhoneVerified = middleware.NeedPhoneVerified(config)
+	middlewareCollection.License.Check = middleware.CheckLicense(config)
 
 	v1Group := r.Group("/v1")
 
