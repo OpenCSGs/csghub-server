@@ -1237,6 +1237,7 @@ func (d *deployer) SubmitFinetuneJob(ctx context.Context, req types.FinetuneReq)
 	env["HF_ENDPOINT"], _ = url.JoinPath(req.DownloadEndpoint, "hf")
 	env["HF_HUB_DOWNLOAD_TIMEOUT"] = "30"
 	env["HF_USERNAME"] = req.Username
+	env["EPOCHS"] = strconv.Itoa(req.Epochs)
 	env["LEARNING_RATE"] = strconv.FormatFloat(req.LearningRate, 'f', -1, 64)
 	env["CUSTOM_ARGS"] = req.CustomeArgs
 	if len(finetunedModelName) > 0 {
