@@ -11,13 +11,15 @@ import (
 
 type teiTokenizerImpl struct {
 	endpoint string
+	host     string
 	model    string
 	hc       llm.LLMSvcClient
 }
 
-func newTEITokenizerImpl(endpoint, model string) Tokenizer {
+func newTEITokenizerImpl(endpoint, host, model string) Tokenizer {
 	return &teiTokenizerImpl{
 		endpoint: endpoint,
+		host:     host,
 		model:    model,
 		hc:       llm.NewClient(),
 	}
@@ -35,7 +37,7 @@ func (tk *teiTokenizerImpl) EmbeddingEncode(message string) (int64, error) {
 		AddSpecialTokens: false,
 		Inputs:           &message,
 	}
-	tokenRespByte, err := tk.hc.Tokenize(ctx, tk.endpoint+path, req)
+	tokenRespByte, err := tk.hc.Tokenize(ctx, tk.endpoint+path, tk.host, req)
 	if err != nil {
 		slog.Error("Call inference model", slog.Any("error", err))
 		return 0, err

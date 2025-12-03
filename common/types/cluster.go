@@ -139,3 +139,11 @@ type HearBeatEvent struct {
 	Running     []string `json:"running"`
 	Unavailable []string `json:"unavailable"`
 }
+
+type EndpointReq struct {
+	ClusterID string
+	Target    string
+	Host      string
+	Endpoint  string
+	SvcName   string
+}

@@ -122,7 +122,7 @@ func (m *openaiComponentImpl) getCSGHubModels(c context.Context, userName string
 		}
 		m.ID = (ModelIDBuilder{}).To(modelName, deploy.SvcName)
 		// change owner of serverless deploys to OpenCSG
-		if deploy.Type == 3 {
+		if deploy.Type == commontypes.ServerlessType {
 			m.OwnedBy = "OpenCSG"
 		} else {
 			m.OwnedBy = deploy.User.Username

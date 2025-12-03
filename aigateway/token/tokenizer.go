@@ -16,18 +16,18 @@ type Tokenizer interface {
 	EmbeddingEncode(string) (int64, error)
 }
 
-func NewTokenizerImpl(endpoint, model, imageID string) Tokenizer {
+func NewTokenizerImpl(endpoint, host, model, imageID string) Tokenizer {
 	switch {
 	case strings.Contains(imageID, "vllm-local"):
-		return newVllmTokenizerImpl(endpoint, model)
+		return newVllmTokenizerImpl(endpoint, host, model)
 	case strings.Contains(imageID, "llama.cpp"):
-		return newLlamacppTokenizerImpl(endpoint, model)
+		return newLlamacppTokenizerImpl(endpoint, host, model)
 	case strings.Contains(imageID, "tgi"):
-		return newTGITokenizerImpl(endpoint, model)
+		return newTGITokenizerImpl(endpoint, host, model)
 	case strings.Contains(imageID, "sglang"):
-		return newSGLangTokenizerImpl(endpoint, model)
+		return newSGLangTokenizerImpl(endpoint, host, model)
 	case strings.Contains(imageID, "tei"):
-		return newTEITokenizerImpl(endpoint, model)
+		return newTEITokenizerImpl(endpoint, host, model)
 	default:
 		return nil
 	}

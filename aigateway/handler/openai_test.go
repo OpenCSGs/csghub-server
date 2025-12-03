@@ -23,6 +23,7 @@ import (
 	"opencsg.com/csghub-server/aigateway/types"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/builder/rpc"
+	"opencsg.com/csghub-server/builder/store/database"
 )
 
 type testerOpenAIHandler struct {
@@ -31,6 +32,7 @@ type testerOpenAIHandler struct {
 		moderationComp *mockcomp.MockModeration
 		repoComp       *apicomp.MockRepoComponent
 		modSvcClient   *rpcmock.MockModerationSvcClient
+		mockClsComp    *apicomp.MockClusterComponent
 	}
 
 	handler *OpenAIHandlerImpl
@@ -41,7 +43,8 @@ func setupTest(t *testing.T) (*testerOpenAIHandler, *gin.Context, *httptest.Resp
 	mockRepo := apicomp.NewMockRepoComponent(t)
 	modSvcClient := rpcmock.NewMockModerationSvcClient(t)
 	mockModeration := mockcomp.NewMockModeration(t)
-	handler := newOpenAIHandler(mockOpenAI, mockRepo, modSvcClient, mockModeration)
+	mockClsComp := apicomp.NewMockClusterComponent(t)
+	handler := newOpenAIHandler(mockOpenAI, mockRepo, modSvcClient, mockModeration, mockClsComp)
 
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
@@ -58,6 +61,7 @@ func setupTest(t *testing.T) (*testerOpenAIHandler, *gin.Context, *httptest.Resp
 	tester.mocks.moderationComp = mockModeration
 	tester.mocks.openAIComp = mockOpenAI
 	tester.mocks.repoComp = mockRepo
+	tester.mocks.mockClsComp = mockClsComp
 	return tester, c, w
 }
 
@@ -186,7 +190,14 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 				Object:  "model",
 				OwnedBy: "testuser",
 			},
+			InternalModelInfo: types.InternalModelInfo{
+				ClusterID: "test-cls",
+				SvcName:   "test-svc",
+			},
 		}
+		tester.mocks.mockClsComp.EXPECT().GetClusterByID(mock.Anything, "test-cls").Return(&database.ClusterInfo{
+			ClusterID: "test-cls",
+		}, nil)
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1:svc1").Return(model, nil)
 
 		tester.handler.Chat(c)
@@ -219,9 +230,15 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 				Object:  "model",
 				OwnedBy: "testuser",
 			},
-
+			InternalModelInfo: types.InternalModelInfo{
+				ClusterID: "test-cls",
+				SvcName:   "test-svc",
+			},
 			Endpoint: "test-endpoint",
 		}
+		tester.mocks.mockClsComp.EXPECT().GetClusterByID(mock.Anything, "test-cls").Return(&database.ClusterInfo{
+			ClusterID: "test-cls",
+		}, nil)
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1:svc1").Return(model, nil)
 		tester.mocks.moderationComp.EXPECT().CheckLLMPrompt(mock.Anything, *chatReq.Messages[0].GetContent().AsAny().(*string), "testuuid"+model.ID).
 			Return(&rpc.CheckResult{IsSensitive: true}, nil)
@@ -255,8 +272,15 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 				Object:  "model",
 				OwnedBy: "testuser",
 			},
+			InternalModelInfo: types.InternalModelInfo{
+				ClusterID: "test-cls",
+				SvcName:   "test-svc",
+			},
 			Endpoint: "test-endpoint",
 		}
+		tester.mocks.mockClsComp.EXPECT().GetClusterByID(mock.Anything, "test-cls").Return(&database.ClusterInfo{
+			ClusterID: "test-cls",
+		}, nil)
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1:svc1").Return(model, nil)
 		tester.mocks.moderationComp.EXPECT().CheckLLMPrompt(mock.Anything, *chatReq.Messages[0].GetContent().AsAny().(*string), "testuuid"+model.ID).
 			Return(nil, errors.New("some error"))
@@ -299,11 +323,18 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 				Object:  "model",
 				OwnedBy: "testuser",
 			},
+			InternalModelInfo: types.InternalModelInfo{
+				ClusterID: "test-cls",
+				SvcName:   "test-svc",
+			},
 			Endpoint: "test-endpoint",
 		}
 
-		tokenizer := token.NewTokenizerImpl(model.Endpoint, model.Object, "")
+		tokenizer := token.NewTokenizerImpl(model.Endpoint, "", model.Object, "")
 		llmTokenCounter := token.NewLLMTokenCounter(tokenizer)
+		tester.mocks.mockClsComp.EXPECT().GetClusterByID(mock.Anything, "test-cls").Return(&database.ClusterInfo{
+			ClusterID: "test-cls",
+		}, nil)
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1:svc1").Return(model, nil)
 		var wg sync.WaitGroup
 		wg.Add(1)
@@ -327,8 +358,15 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 				Object:  "model",
 				OwnedBy: "testuser",
 			},
+			InternalModelInfo: types.InternalModelInfo{
+				ClusterID: "test-cls",
+				SvcName:   "test-svc",
+			},
 			Endpoint: "test-endpoint",
 		}
+		tester.mocks.mockClsComp.EXPECT().GetClusterByID(mock.Anything, "test-cls").Return(&database.ClusterInfo{
+			ClusterID: "test-cls",
+		}, nil)
 		tester.mocks.moderationComp.EXPECT().CheckLLMPrompt(mock.Anything, "You are a helpful assistant that can use tools to answer questions and perform tasks.", "testuuid"+model.ID).
 			Return(&rpc.CheckResult{IsSensitive: true}, nil)
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1:svc1").Return(model, nil)

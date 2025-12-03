@@ -11,13 +11,15 @@ import (
 
 type vllmTokenizerImpl struct {
 	endpoint string
+	host     string
 	model    string
 	hc       llm.LLMSvcClient
 }
 
-func newVllmTokenizerImpl(endpoint, model string) Tokenizer {
+func newVllmTokenizerImpl(endpoint, host, model string) Tokenizer {
 	return &vllmTokenizerImpl{
 		endpoint: endpoint,
+		host:     host,
 		model:    model,
 		hc:       llm.NewClient(),
 	}
@@ -37,7 +39,7 @@ func (tk *vllmTokenizerImpl) Encode(message types.Message) (int64, error) {
 			Model:  tk.model,
 			Prompt: parsedMessage,
 		}
-		tokenRespByte, err := tk.hc.Tokenize(ctx, tk.endpoint+path, req)
+		tokenRespByte, err := tk.hc.Tokenize(ctx, tk.endpoint+path, tk.host, req)
 		if err != nil {
 			slog.Error("Call inference model", slog.Any("error", err))
 			return 0, err
