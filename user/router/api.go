@@ -73,6 +73,9 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 		apiV1Group.GET("/organizations", orgHandler.Index)
 		apiV1Group.GET("/organization/:namespace", orgHandler.Get)
 		apiV1Group.GET("/organization/:namespace/members", memberCtrl.OrgMembers)
+		// public sms code (accessible to both logged-in and anonymous users)
+		userGroup.POST("/public/sms-code", userHandler.SendPublicSMSCode)
+		userGroup.POST("/public/sms-code/verify", userHandler.VerifyPublicSMSCode)
 	}
 
 	//internal only

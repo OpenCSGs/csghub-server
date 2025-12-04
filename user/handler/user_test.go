@@ -1,9 +1,11 @@
 package handler
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -283,4 +285,378 @@ func TestUserHandler_Casdoor(t *testing.T) {
 		assert.Contains(t, w.Header().Get("Location"), "error_code=500")
 		mockUserComp.AssertExpectations(t)
 	})
+}
+
+// test send sms code
+func TestUserHandler_SendSMSCode(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockUserComponent := component.NewMockUserComponent(t)
+	mockUserComponent.EXPECT().SendSMSCode(mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
+
+	handler := UserHandler{
+		c: mockUserComponent,
+	}
+
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	ctx.Set(httpbase.CurrentUserUUIDCtxVar, "test-user-uuid")
+	ctx.Request, _ = http.NewRequest(http.MethodPost, "/user/sms-code", nil)
+	ctx.Request.Header.Set("Content-Type", "application/json")
+	ctx.Request.Body = io.NopCloser(bytes.NewBuffer([]byte(`{"phone": "12345678901", "phone_area": "+86"}`)))
+	handler.SendSMSCode(ctx)
+	assert.Equal(t, http.StatusOK, w.Code)
+}
+
+// test update phone
+func TestUserHandler_UpdatePhone(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockUserComponent := component.NewMockUserComponent(t)
+	mockUserComponent.EXPECT().UpdatePhone(mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
+	handler := UserHandler{
+		c: mockUserComponent,
+	}
+
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	ctx.Set(httpbase.CurrentUserUUIDCtxVar, "test-user-uuid")
+	ctx.Request, _ = http.NewRequest(http.MethodPut, "/user/phone", nil)
+	ctx.Request.Header.Set("Content-Type", "application/json")
+	ctx.Request.Body = io.NopCloser(bytes.NewBuffer([]byte(`{"phone": "12345678901", "phone_area": "+86", "verification_code": "123456"}`)))
+	handler.UpdatePhone(ctx)
+	assert.Equal(t, http.StatusOK, w.Code)
+}
+
+// test send public sms code
+func TestUserHandler_SendPublicSMSCode(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockUserComponent := component.NewMockUserComponent(t)
+	mockResponse := &types.SendSMSCodeResponse{}
+	mockUserComponent.EXPECT().SendPublicSMSCode(mock.Anything, mock.Anything).Return(mockResponse, nil)
+
+	handler := UserHandler{
+		c: mockUserComponent,
+	}
+
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	ctx.Request, _ = http.NewRequest(http.MethodPost, "/user/public/sms-code", nil)
+	ctx.Request.Header.Set("Content-Type", "application/json")
+	ctx.Request.Body = io.NopCloser(bytes.NewBuffer([]byte(`{"scene": "submit-form", "phone": "13626487789", "phone_area": "+86"}`)))
+	handler.SendPublicSMSCode(ctx)
+	assert.Equal(t, http.StatusOK, w.Code)
+}
+
+// test send public sms code with invalid request
+func TestUserHandler_SendPublicSMSCode_InvalidRequest(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockUserComponent := component.NewMockUserComponent(t)
+	handler := UserHandler{
+		c: mockUserComponent,
+	}
+
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	ctx.Request, _ = http.NewRequest(http.MethodPost, "/user/public/sms-code", nil)
+	ctx.Request.Header.Set("Content-Type", "application/json")
+	ctx.Request.Body = io.NopCloser(bytes.NewBuffer([]byte(`{"invalid": "request"}`)))
+	handler.SendPublicSMSCode(ctx)
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+}
+
+// test send public sms code with error
+func TestUserHandler_SendPublicSMSCode_Error(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockUserComponent := component.NewMockUserComponent(t)
+	mockUserComponent.EXPECT().SendPublicSMSCode(mock.Anything, mock.Anything).Return(nil, errorx.ErrInvalidPhoneNumber)
+
+	handler := UserHandler{
+		c: mockUserComponent,
+	}
+
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	ctx.Request, _ = http.NewRequest(http.MethodPost, "/user/public/sms-code", nil)
+	ctx.Request.Header.Set("Content-Type", "application/json")
+	ctx.Request.Body = io.NopCloser(bytes.NewBuffer([]byte(`{"scene": "submit-form", "phone": "13626487789", "phone_area": "+86"}`)))
+	handler.SendPublicSMSCode(ctx)
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+}
+
+// test verify public sms code
+func TestUserHandler_VerifyPublicSMSCode(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockUserComponent := component.NewMockUserComponent(t)
+	mockUserComponent.EXPECT().VerifyPublicSMSCode(mock.Anything, mock.Anything).Return(nil)
+
+	handler := UserHandler{
+		c: mockUserComponent,
+	}
+
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	ctx.Request, _ = http.NewRequest(http.MethodPost, "/user/public/sms-code/verify", nil)
+	ctx.Request.Header.Set("Content-Type", "application/json")
+	ctx.Request.Body = io.NopCloser(bytes.NewBuffer([]byte(`{"scene": "submit-form", "phone": "13626487789", "phone_area": "+86", "verification_code": "123456"}`)))
+	handler.VerifyPublicSMSCode(ctx)
+	assert.Equal(t, http.StatusOK, w.Code)
+}
+
+// test verify public sms code with invalid request
+func TestUserHandler_VerifyPublicSMSCode_InvalidRequest(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockUserComponent := component.NewMockUserComponent(t)
+	handler := UserHandler{
+		c: mockUserComponent,
+	}
+
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	ctx.Request, _ = http.NewRequest(http.MethodPost, "/user/public/sms-code/verify", nil)
+	ctx.Request.Header.Set("Content-Type", "application/json")
+	ctx.Request.Body = io.NopCloser(bytes.NewBuffer([]byte(`{"invalid": "request"}`)))
+	handler.VerifyPublicSMSCode(ctx)
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+}
+
+// test verify public sms code with error
+func TestUserHandler_VerifyPublicSMSCode_Error(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockUserComponent := component.NewMockUserComponent(t)
+	mockUserComponent.EXPECT().VerifyPublicSMSCode(mock.Anything, mock.Anything).Return(errorx.ErrPhoneVerifyCodeInvalid)
+
+	handler := UserHandler{
+		c: mockUserComponent,
+	}
+
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	ctx.Request, _ = http.NewRequest(http.MethodPost, "/user/public/sms-code/verify", nil)
+	ctx.Request.Header.Set("Content-Type", "application/json")
+	ctx.Request.Body = io.NopCloser(bytes.NewBuffer([]byte(`{"scene": "submit-form", "phone": "13626487789", "phone_area": "+86", "verification_code": "123456"}`)))
+	handler.VerifyPublicSMSCode(ctx)
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+}
+
+func TestHandleConflictCustomError(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	tests := []struct {
+		name           string
+		customErr      errorx.CustomError
+		redirectURL    string
+		expectedStatus int
+		expectedURL    string
+		expectRedirect bool
+	}{
+		{
+			name:           "username conflict - successful redirect",
+			customErr:      errorx.UsernameExists("testuser").(errorx.CustomError),
+			redirectURL:    "https://example.com/error",
+			expectedStatus: http.StatusMovedPermanently,
+			expectedURL:    "https://example.com/error?error_code=409&error_message_code=USER-ERR-12&field_name=username&field_value=testuser",
+			expectRedirect: true,
+		},
+		{
+			name:           "email conflict - successful redirect",
+			customErr:      errorx.EmailExists("test@example.com").(errorx.CustomError),
+			redirectURL:    "https://example.com/error",
+			expectedStatus: http.StatusMovedPermanently,
+			expectedURL:    "https://example.com/error?error_code=409&error_message_code=USER-ERR-13&field_name=email&field_value=test%40example.com",
+			expectRedirect: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			ctx, _ := gin.CreateTestContext(w)
+			ctx.Request = httptest.NewRequest("GET", "/test", nil)
+
+			result := handleConflictCustomError(ctx, tt.customErr, tt.redirectURL)
+
+			assert.True(t, result, "handleConflictCustomError should return true for valid conflicts")
+			assert.Equal(t, tt.expectedStatus, w.Code, "HTTP status code should be 301 Moved Permanently")
+
+			assert.Equal(t, tt.expectedURL, w.Header().Get("Location"), "Redirect URL should match expected URL")
+		})
+	}
+}
+
+func TestHandleConflictCustomError_InvalidErrors(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	tests := []struct {
+		name         string
+		customErr    errorx.CustomError
+		redirectURL  string
+		expectReturn bool
+	}{
+		{
+			name:         "non-conflict error - should return false",
+			customErr:    errorx.NewCustomError("USER-ERR", 1, nil, nil), // Some other error
+			redirectURL:  "https://example.com/error",
+			expectReturn: false,
+		},
+		{
+			name:         "username conflict but no username in context",
+			customErr:    errorx.NewCustomError("USER-ERR", 18, nil, map[string]interface{}{}), // UsernameExists but no username
+			redirectURL:  "https://example.com/error",
+			expectReturn: false,
+		},
+		{
+			name:         "email conflict but no email in context",
+			customErr:    errorx.NewCustomError("USER-ERR", 19, nil, map[string]interface{}{}), // EmailExists but no email
+			redirectURL:  "https://example.com/error",
+			expectReturn: false,
+		},
+		{
+			name:         "username conflict but username is not string",
+			customErr:    errorx.NewCustomError("USER-ERR", 18, nil, map[string]interface{}{"username": 123}), // UsernameExists but username is int
+			redirectURL:  "https://example.com/error",
+			expectReturn: false,
+		},
+		{
+			name:         "email conflict but email is not string",
+			customErr:    errorx.NewCustomError("USER-ERR", 19, nil, map[string]interface{}{"email": 123}), // EmailExists but email is int
+			redirectURL:  "https://example.com/error",
+			expectReturn: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			ctx, _ := gin.CreateTestContext(w)
+
+			result := handleConflictCustomError(ctx, tt.customErr, tt.redirectURL)
+
+			assert.Equal(t, tt.expectReturn, result, "handleConflictCustomError should return expected result")
+
+		})
+	}
+}
+
+func TestExtractConflictInfo(t *testing.T) {
+	tests := []struct {
+		name          string
+		customErr     errorx.CustomError
+		expectedField string
+		expectedValue string
+		expectedOk    bool
+	}{
+		{
+			name:          "username conflict with valid username",
+			customErr:     errorx.UsernameExists("testuser").(errorx.CustomError),
+			expectedField: "username",
+			expectedValue: "testuser",
+			expectedOk:    true,
+		},
+		{
+			name:          "email conflict with valid email",
+			customErr:     errorx.EmailExists("test@example.com").(errorx.CustomError),
+			expectedField: "email",
+			expectedValue: "test@example.com",
+			expectedOk:    true,
+		},
+		{
+			name:          "username conflict with special characters",
+			customErr:     errorx.UsernameExists("user@domain.com").(errorx.CustomError),
+			expectedField: "username",
+			expectedValue: "user@domain.com",
+			expectedOk:    true,
+		},
+		{
+			name:          "email conflict with special characters",
+			customErr:     errorx.EmailExists("user+tag@domain.com").(errorx.CustomError),
+			expectedField: "email",
+			expectedValue: "user+tag@domain.com",
+			expectedOk:    true,
+		},
+		{
+			name:          "non-conflict error",
+			customErr:     errorx.NewCustomError("USER-ERR", 1, nil, nil),
+			expectedField: "",
+			expectedValue: "",
+			expectedOk:    false,
+		},
+		{
+			name:          "username conflict but no username in context",
+			customErr:     errorx.NewCustomError("USER-ERR", 18, nil, map[string]interface{}{}),
+			expectedField: "",
+			expectedValue: "",
+			expectedOk:    false,
+		},
+		{
+			name:          "email conflict but no email in context",
+			customErr:     errorx.NewCustomError("USER-ERR", 19, nil, map[string]interface{}{}),
+			expectedField: "",
+			expectedValue: "",
+			expectedOk:    false,
+		},
+		{
+			name:          "username conflict but username is not string",
+			customErr:     errorx.NewCustomError("USER-ERR", 18, nil, map[string]interface{}{"username": 123}),
+			expectedField: "",
+			expectedValue: "",
+			expectedOk:    false,
+		},
+		{
+			name:          "email conflict but email is not string",
+			customErr:     errorx.NewCustomError("USER-ERR", 19, nil, map[string]interface{}{"email": 123}),
+			expectedField: "",
+			expectedValue: "",
+			expectedOk:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			field, value, ok := extractConflictInfo(tt.customErr)
+
+			assert.Equal(t, tt.expectedField, field, "Field should match expected value")
+			assert.Equal(t, tt.expectedValue, value, "Value should match expected value")
+			assert.Equal(t, tt.expectedOk, ok, "Ok should match expected value")
+		})
+	}
+}
+
+func TestHandleExportUserInfo(t *testing.T) {
+	r := gin.Default()
+	mockUserComp := component.NewMockUserComponent(t)
+	h := &UserHandler{
+		c: mockUserComp,
+	}
+
+	ch := make(chan types.UserIndexResp)
+	go func() {
+		defer close(ch)
+		ch <- types.UserIndexResp{
+			Users: []*types.User{
+				{
+					Username: "testuser",
+					Email:    "test@example.com",
+				},
+			},
+		}
+	}()
+	mockUserComp.EXPECT().StreamExportUsers(mock.Anything, mock.Anything).Return(ch, nil)
+	r.GET("/users/stream-export", h.ExportUserInfo)
+
+	req, _ := http.NewRequest("GET",
+		"/users/stream-export?verify_status=approved&search=test_search&labels=vip&labels=basic",
+		nil,
+	)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code, "Status code should be 200 OK")
 }
