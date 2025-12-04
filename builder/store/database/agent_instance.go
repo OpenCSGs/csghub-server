@@ -50,6 +50,7 @@ type AgentTemplateStore interface {
 type AgentInstanceStore interface {
 	Create(ctx context.Context, instance *AgentInstance) (*AgentInstance, error)
 	FindByID(ctx context.Context, id int64) (*AgentInstance, error)
+	FindByIDs(ctx context.Context, ids []int64) ([]AgentInstance, error)
 	FindByContentID(ctx context.Context, instanceType string, contentID string) (*AgentInstance, error)
 	IsInstanceExistsByContentID(ctx context.Context, instanceType string, contentID string) (bool, error)
 	ListByUserUUID(ctx context.Context, userUUID string, filter types.AgentInstanceFilter, per int, page int) ([]AgentInstance, int, error)
@@ -202,6 +203,18 @@ func (s *agentInstanceStoreImpl) FindByID(ctx context.Context, id int64) (*Agent
 		})
 	}
 	return instance, nil
+}
+
+// FindByIDs retrieves AgentInstances by their IDs
+func (s *agentInstanceStoreImpl) FindByIDs(ctx context.Context, ids []int64) ([]AgentInstance, error) {
+	instances := make([]AgentInstance, len(ids))
+	err := s.db.Core.NewSelect().Model(&instances).Where("id IN (?)", bun.In(ids)).Scan(ctx, &instances)
+	if err != nil {
+		return nil, errorx.HandleDBError(err, map[string]any{
+			"instance_ids": ids,
+		})
+	}
+	return instances, nil
 }
 
 // FindByContentID retrieves an AgentInstance by its content ID

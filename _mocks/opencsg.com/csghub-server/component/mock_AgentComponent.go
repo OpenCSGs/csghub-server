@@ -536,6 +536,125 @@ func (_c *MockAgentComponent_GetInstanceByID_Call) RunAndReturn(run func(context
 	return _c
 }
 
+// GetInstancesStatus provides a mock function with given fields: ctx, userUUID, instanceIDs
+func (_m *MockAgentComponent) GetInstancesStatus(ctx context.Context, userUUID string, instanceIDs []int64) ([]types.AgentInstanceStatusResponse, error) {
+	ret := _m.Called(ctx, userUUID, instanceIDs)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetInstancesStatus")
+	}
+
+	var r0 []types.AgentInstanceStatusResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, []int64) ([]types.AgentInstanceStatusResponse, error)); ok {
+		return rf(ctx, userUUID, instanceIDs)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, []int64) []types.AgentInstanceStatusResponse); ok {
+		r0 = rf(ctx, userUUID, instanceIDs)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]types.AgentInstanceStatusResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, []int64) error); ok {
+		r1 = rf(ctx, userUUID, instanceIDs)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAgentComponent_GetInstancesStatus_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetInstancesStatus'
+type MockAgentComponent_GetInstancesStatus_Call struct {
+	*mock.Call
+}
+
+// GetInstancesStatus is a helper method to define mock.On call
+//   - ctx context.Context
+//   - userUUID string
+//   - instanceIDs []int64
+func (_e *MockAgentComponent_Expecter) GetInstancesStatus(ctx interface{}, userUUID interface{}, instanceIDs interface{}) *MockAgentComponent_GetInstancesStatus_Call {
+	return &MockAgentComponent_GetInstancesStatus_Call{Call: _e.mock.On("GetInstancesStatus", ctx, userUUID, instanceIDs)}
+}
+
+func (_c *MockAgentComponent_GetInstancesStatus_Call) Run(run func(ctx context.Context, userUUID string, instanceIDs []int64)) *MockAgentComponent_GetInstancesStatus_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].([]int64))
+	})
+	return _c
+}
+
+func (_c *MockAgentComponent_GetInstancesStatus_Call) Return(_a0 []types.AgentInstanceStatusResponse, _a1 error) *MockAgentComponent_GetInstancesStatus_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAgentComponent_GetInstancesStatus_Call) RunAndReturn(run func(context.Context, string, []int64) ([]types.AgentInstanceStatusResponse, error)) *MockAgentComponent_GetInstancesStatus_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetMonitor provides a mock function with given fields: ctx, monitorID
+func (_m *MockAgentComponent) GetMonitor(ctx context.Context, monitorID string) ([]int64, error) {
+	ret := _m.Called(ctx, monitorID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetMonitor")
+	}
+
+	var r0 []int64
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) ([]int64, error)); ok {
+		return rf(ctx, monitorID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) []int64); ok {
+		r0 = rf(ctx, monitorID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]int64)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, monitorID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAgentComponent_GetMonitor_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetMonitor'
+type MockAgentComponent_GetMonitor_Call struct {
+	*mock.Call
+}
+
+// GetMonitor is a helper method to define mock.On call
+//   - ctx context.Context
+//   - monitorID string
+func (_e *MockAgentComponent_Expecter) GetMonitor(ctx interface{}, monitorID interface{}) *MockAgentComponent_GetMonitor_Call {
+	return &MockAgentComponent_GetMonitor_Call{Call: _e.mock.On("GetMonitor", ctx, monitorID)}
+}
+
+func (_c *MockAgentComponent_GetMonitor_Call) Run(run func(ctx context.Context, monitorID string)) *MockAgentComponent_GetMonitor_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockAgentComponent_GetMonitor_Call) Return(_a0 []int64, _a1 error) *MockAgentComponent_GetMonitor_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAgentComponent_GetMonitor_Call) RunAndReturn(run func(context.Context, string) ([]int64, error)) *MockAgentComponent_GetMonitor_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetSessionByUUID provides a mock function with given fields: ctx, userUUID, sessionUUID, instanceID
 func (_m *MockAgentComponent) GetSessionByUUID(ctx context.Context, userUUID string, sessionUUID string, instanceID int64) (*types.AgentInstanceSession, error) {
 	ret := _m.Called(ctx, userUUID, sessionUUID, instanceID)
@@ -1112,6 +1231,53 @@ func (_c *MockAgentComponent_ListTemplatesByUserUUID_Call) RunAndReturn(run func
 	return _c
 }
 
+// RefreshMonitor provides a mock function with given fields: ctx, monitorID
+func (_m *MockAgentComponent) RefreshMonitor(ctx context.Context, monitorID string) error {
+	ret := _m.Called(ctx, monitorID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RefreshMonitor")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) error); ok {
+		r0 = rf(ctx, monitorID)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockAgentComponent_RefreshMonitor_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RefreshMonitor'
+type MockAgentComponent_RefreshMonitor_Call struct {
+	*mock.Call
+}
+
+// RefreshMonitor is a helper method to define mock.On call
+//   - ctx context.Context
+//   - monitorID string
+func (_e *MockAgentComponent_Expecter) RefreshMonitor(ctx interface{}, monitorID interface{}) *MockAgentComponent_RefreshMonitor_Call {
+	return &MockAgentComponent_RefreshMonitor_Call{Call: _e.mock.On("RefreshMonitor", ctx, monitorID)}
+}
+
+func (_c *MockAgentComponent_RefreshMonitor_Call) Run(run func(ctx context.Context, monitorID string)) *MockAgentComponent_RefreshMonitor_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockAgentComponent_RefreshMonitor_Call) Return(_a0 error) *MockAgentComponent_RefreshMonitor_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockAgentComponent_RefreshMonitor_Call) RunAndReturn(run func(context.Context, string) error) *MockAgentComponent_RefreshMonitor_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // RewriteSessionHistory provides a mock function with given fields: ctx, userUUID, instanceID, sessionUUID, req
 func (_m *MockAgentComponent) RewriteSessionHistory(ctx context.Context, userUUID string, instanceID int64, sessionUUID string, req *types.RewriteSessionHistoryRequest) (*types.RewriteSessionHistoryResponse, error) {
 	ret := _m.Called(ctx, userUUID, instanceID, sessionUUID, req)
@@ -1170,6 +1336,54 @@ func (_c *MockAgentComponent_RewriteSessionHistory_Call) Return(_a0 *types.Rewri
 }
 
 func (_c *MockAgentComponent_RewriteSessionHistory_Call) RunAndReturn(run func(context.Context, string, int64, string, *types.RewriteSessionHistoryRequest) (*types.RewriteSessionHistoryResponse, error)) *MockAgentComponent_RewriteSessionHistory_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SetMonitor provides a mock function with given fields: ctx, userUUID, request
+func (_m *MockAgentComponent) SetMonitor(ctx context.Context, userUUID string, request types.AgentMonitorRequest) error {
+	ret := _m.Called(ctx, userUUID, request)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetMonitor")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, types.AgentMonitorRequest) error); ok {
+		r0 = rf(ctx, userUUID, request)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockAgentComponent_SetMonitor_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SetMonitor'
+type MockAgentComponent_SetMonitor_Call struct {
+	*mock.Call
+}
+
+// SetMonitor is a helper method to define mock.On call
+//   - ctx context.Context
+//   - userUUID string
+//   - request types.AgentMonitorRequest
+func (_e *MockAgentComponent_Expecter) SetMonitor(ctx interface{}, userUUID interface{}, request interface{}) *MockAgentComponent_SetMonitor_Call {
+	return &MockAgentComponent_SetMonitor_Call{Call: _e.mock.On("SetMonitor", ctx, userUUID, request)}
+}
+
+func (_c *MockAgentComponent_SetMonitor_Call) Run(run func(ctx context.Context, userUUID string, request types.AgentMonitorRequest)) *MockAgentComponent_SetMonitor_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(types.AgentMonitorRequest))
+	})
+	return _c
+}
+
+func (_c *MockAgentComponent_SetMonitor_Call) Return(_a0 error) *MockAgentComponent_SetMonitor_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockAgentComponent_SetMonitor_Call) RunAndReturn(run func(context.Context, string, types.AgentMonitorRequest) error) *MockAgentComponent_SetMonitor_Call {
 	_c.Call.Return(run)
 	return _c
 }

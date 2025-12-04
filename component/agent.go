@@ -40,4 +40,10 @@ type AgentComponent interface {
 	CreateTaskIfInstanceExists(ctx context.Context, req *types.AgentInstanceTaskReq) error
 	ListTasks(ctx context.Context, userUUID string, filter types.AgentTaskFilter, per int, page int) ([]types.AgentTaskListItem, int, error)
 	GetTaskDetail(ctx context.Context, userUUID string, id int64) (*types.AgentTaskDetail, error)
+
+	// Status operations
+	GetInstancesStatus(ctx context.Context, userUUID string, instanceIDs []int64) ([]types.AgentInstanceStatusResponse, error)
+	SetMonitor(ctx context.Context, userUUID string, request types.AgentMonitorRequest) error
+	GetMonitor(ctx context.Context, monitorID string) ([]int64, error)
+	RefreshMonitor(ctx context.Context, monitorID string) error
 }

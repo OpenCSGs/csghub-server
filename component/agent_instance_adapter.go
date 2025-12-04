@@ -14,6 +14,7 @@ type AgentInstanceAdapter interface {
 	UpdateInstance(ctx context.Context, userUUID string, instance *types.AgentInstance) error
 	GetInstanceType() string
 	IsInstanceRunning(ctx context.Context, userUUID string, contentID string, builtIn bool) (bool, error)
+	Status(ctx context.Context, userUUID string, contentIDs []string, builtInMap map[string]bool) ([]types.AgentInstanceStatusResult, error)
 	GetQuotaPerUser() int
 }
 

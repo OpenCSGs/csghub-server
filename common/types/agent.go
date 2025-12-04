@@ -282,6 +282,27 @@ func (o CodeAgentSyncOperation) String() string {
 	return string(o)
 }
 
+// AgentInstanceStatusRequest represents a request to get status for an agent instance
+type AgentInstanceStatusRequest struct {
+	Type      string `json:"type" binding:"required"`       // Agent type (e.g., "code", "langflow")
+	ContentID string `json:"content_id" binding:"required"` // Content ID of the instance
+}
+
+// AgentInstanceStatusResponse represents the status response for an agent instance
+type AgentInstanceStatusResponse struct {
+	ID        int64  `json:"id"`               // Instance ID
+	Type      string `json:"type"`             // Agent type
+	ContentID string `json:"content_id"`       // Content ID of the instance
+	Status    string `json:"status,omitempty"` // Full status string (e.g., "Running", "Stopped", "Building", etc.)
+	Error     string `json:"error,omitempty"`  // Error message if status check failed
+}
+
+// AgentInstanceStatusResult represents the status result for a single instance from adapter
+type AgentInstanceStatusResult struct {
+	Status string
+	Error  error
+}
+
 // AgentTaskStatus represents the unified task status
 type AgentTaskStatus string
 
@@ -331,4 +352,9 @@ type AgentTaskDetail struct {
 	Metadata     map[string]any  `json:"metadata,omitempty"` // Backend-specific fields (argo_workflow or deploy)
 	CreatedAt    time.Time       `json:"created_at"`
 	UpdatedAt    time.Time       `json:"updated_at"`
+}
+
+type AgentMonitorRequest struct {
+	MonitorID   string  `json:"monitor_id" binding:"required"`
+	InstanceIDs []int64 `json:"instance_ids" binding:"required"`
 }

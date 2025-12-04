@@ -653,3 +653,100 @@ func TestDeployTaskStore_DeleteDeployByID(t *testing.T) {
 	err = store.DeleteDeployByID(ctx, 100, 999999)
 	require.NotNil(t, err)
 }
+
+func TestDeployTaskStore_GetLatestDeploysBySpaceIDs(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+	store := database.NewDeployTaskStoreWithDB(db)
+
+	// Test with empty spaceIDs
+	result, err := store.GetLatestDeploysBySpaceIDs(ctx, []int64{})
+	require.Nil(t, err)
+	require.NotNil(t, result)
+	require.Equal(t, 0, len(result))
+
+	// Create test data: multiple deploys for different space IDs
+	// Space 100: 3 deploys (should return the latest)
+	// Space 200: 2 deploys (should return the latest)
+	// Space 300: 1 deploy (should return that one)
+	// Space 400: no deploys (should not appear in result)
+
+	now := time.Now().UTC()
+	space100Deploys := []database.Deploy{
+		{SpaceID: 100, DeployName: "space100-old", SvcName: "svc100-1", UserID: 1, RepoID: 1, GitPath: "test", GitBranch: "main", Template: "test", Hardware: "test"},
+		{SpaceID: 100, DeployName: "space100-middle", SvcName: "svc100-2", UserID: 1, RepoID: 1, GitPath: "test", GitBranch: "main", Template: "test", Hardware: "test"},
+		{SpaceID: 100, DeployName: "space100-latest", SvcName: "svc100-3", UserID: 1, RepoID: 1, GitPath: "test", GitBranch: "main", Template: "test", Hardware: "test"},
+	}
+
+	space200Deploys := []database.Deploy{
+		{SpaceID: 200, DeployName: "space200-old", SvcName: "svc200-1", UserID: 1, RepoID: 2, GitPath: "test", GitBranch: "main", Template: "test", Hardware: "test"},
+		{SpaceID: 200, DeployName: "space200-latest", SvcName: "svc200-2", UserID: 1, RepoID: 2, GitPath: "test", GitBranch: "main", Template: "test", Hardware: "test"},
+	}
+
+	space300Deploy := database.Deploy{
+		SpaceID: 300, DeployName: "space300-single", SvcName: "svc300-1", UserID: 1, RepoID: 3, GitPath: "test", GitBranch: "main", Template: "test", Hardware: "test",
+	}
+
+	// Create deploys with different timestamps
+	for i, dp := range space100Deploys {
+		err := store.CreateDeploy(ctx, &dp)
+		require.Nil(t, err)
+		// Set created_at to different times (oldest first)
+		_, err = db.BunDB.ExecContext(ctx, "UPDATE deploys SET created_at = ?, updated_at = ? WHERE id = ?",
+			now.Add(-time.Duration(3-i)*time.Hour), now.Add(-time.Duration(3-i)*time.Hour), dp.ID)
+		require.NoError(t, err)
+	}
+
+	for i, dp := range space200Deploys {
+		err := store.CreateDeploy(ctx, &dp)
+		require.Nil(t, err)
+		// Set created_at to different times (oldest first)
+		_, err = db.BunDB.ExecContext(ctx, "UPDATE deploys SET created_at = ?, updated_at = ? WHERE id = ?",
+			now.Add(-time.Duration(2-i)*time.Hour), now.Add(-time.Duration(2-i)*time.Hour), dp.ID)
+		require.NoError(t, err)
+	}
+
+	err = store.CreateDeploy(ctx, &space300Deploy)
+	require.Nil(t, err)
+
+	// Test: Get latest deploys for space 100, 200, 300, 400
+	spaceIDs := []int64{100, 200, 300, 400}
+	result, err = store.GetLatestDeploysBySpaceIDs(ctx, spaceIDs)
+	require.Nil(t, err)
+	require.NotNil(t, result)
+
+	// Should have 3 results (space 400 has no deploys, so won't appear)
+	require.Equal(t, 3, len(result))
+
+	// Verify space 100 has the latest deploy
+	deploy100, exists := result[100]
+	require.True(t, exists)
+	require.NotNil(t, deploy100)
+	require.Equal(t, "space100-latest", deploy100.DeployName)
+	require.Equal(t, "svc100-3", deploy100.SvcName)
+
+	// Verify space 200 has the latest deploy
+	deploy200, exists := result[200]
+	require.True(t, exists)
+	require.NotNil(t, deploy200)
+	require.Equal(t, "space200-latest", deploy200.DeployName)
+	require.Equal(t, "svc200-2", deploy200.SvcName)
+
+	// Verify space 300 has its deploy
+	deploy300, exists := result[300]
+	require.True(t, exists)
+	require.NotNil(t, deploy300)
+	require.Equal(t, "space300-single", deploy300.DeployName)
+	require.Equal(t, "svc300-1", deploy300.SvcName)
+
+	// Verify space 400 is not in the result (no deploys)
+	_, exists = result[400]
+	require.False(t, exists)
+
+	// Test with only space IDs that don't exist
+	result, err = store.GetLatestDeploysBySpaceIDs(ctx, []int64{999, 998})
+	require.Nil(t, err)
+	require.NotNil(t, result)
+	require.Equal(t, 0, len(result))
+}

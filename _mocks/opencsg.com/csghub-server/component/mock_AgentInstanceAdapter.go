@@ -282,6 +282,67 @@ func (_c *MockAgentInstanceAdapter_IsInstanceRunning_Call) RunAndReturn(run func
 	return _c
 }
 
+// Status provides a mock function with given fields: ctx, userUUID, contentIDs, builtInMap
+func (_m *MockAgentInstanceAdapter) Status(ctx context.Context, userUUID string, contentIDs []string, builtInMap map[string]bool) ([]types.AgentInstanceStatusResult, error) {
+	ret := _m.Called(ctx, userUUID, contentIDs, builtInMap)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Status")
+	}
+
+	var r0 []types.AgentInstanceStatusResult
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, []string, map[string]bool) ([]types.AgentInstanceStatusResult, error)); ok {
+		return rf(ctx, userUUID, contentIDs, builtInMap)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, []string, map[string]bool) []types.AgentInstanceStatusResult); ok {
+		r0 = rf(ctx, userUUID, contentIDs, builtInMap)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]types.AgentInstanceStatusResult)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, []string, map[string]bool) error); ok {
+		r1 = rf(ctx, userUUID, contentIDs, builtInMap)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAgentInstanceAdapter_Status_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Status'
+type MockAgentInstanceAdapter_Status_Call struct {
+	*mock.Call
+}
+
+// Status is a helper method to define mock.On call
+//   - ctx context.Context
+//   - userUUID string
+//   - contentIDs []string
+//   - builtInMap map[string]bool
+func (_e *MockAgentInstanceAdapter_Expecter) Status(ctx interface{}, userUUID interface{}, contentIDs interface{}, builtInMap interface{}) *MockAgentInstanceAdapter_Status_Call {
+	return &MockAgentInstanceAdapter_Status_Call{Call: _e.mock.On("Status", ctx, userUUID, contentIDs, builtInMap)}
+}
+
+func (_c *MockAgentInstanceAdapter_Status_Call) Run(run func(ctx context.Context, userUUID string, contentIDs []string, builtInMap map[string]bool)) *MockAgentInstanceAdapter_Status_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].([]string), args[3].(map[string]bool))
+	})
+	return _c
+}
+
+func (_c *MockAgentInstanceAdapter_Status_Call) Return(_a0 []types.AgentInstanceStatusResult, _a1 error) *MockAgentInstanceAdapter_Status_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAgentInstanceAdapter_Status_Call) RunAndReturn(run func(context.Context, string, []string, map[string]bool) ([]types.AgentInstanceStatusResult, error)) *MockAgentInstanceAdapter_Status_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // UpdateInstance provides a mock function with given fields: ctx, userUUID, instance
 func (_m *MockAgentInstanceAdapter) UpdateInstance(ctx context.Context, userUUID string, instance *types.AgentInstance) error {
 	ret := _m.Called(ctx, userUUID, instance)

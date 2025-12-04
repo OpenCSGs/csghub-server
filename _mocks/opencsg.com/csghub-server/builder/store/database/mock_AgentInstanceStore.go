@@ -307,6 +307,65 @@ func (_c *MockAgentInstanceStore_FindByID_Call) RunAndReturn(run func(context.Co
 	return _c
 }
 
+// FindByIDs provides a mock function with given fields: ctx, ids
+func (_m *MockAgentInstanceStore) FindByIDs(ctx context.Context, ids []int64) ([]database.AgentInstance, error) {
+	ret := _m.Called(ctx, ids)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FindByIDs")
+	}
+
+	var r0 []database.AgentInstance
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, []int64) ([]database.AgentInstance, error)); ok {
+		return rf(ctx, ids)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, []int64) []database.AgentInstance); ok {
+		r0 = rf(ctx, ids)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.AgentInstance)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, []int64) error); ok {
+		r1 = rf(ctx, ids)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAgentInstanceStore_FindByIDs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindByIDs'
+type MockAgentInstanceStore_FindByIDs_Call struct {
+	*mock.Call
+}
+
+// FindByIDs is a helper method to define mock.On call
+//   - ctx context.Context
+//   - ids []int64
+func (_e *MockAgentInstanceStore_Expecter) FindByIDs(ctx interface{}, ids interface{}) *MockAgentInstanceStore_FindByIDs_Call {
+	return &MockAgentInstanceStore_FindByIDs_Call{Call: _e.mock.On("FindByIDs", ctx, ids)}
+}
+
+func (_c *MockAgentInstanceStore_FindByIDs_Call) Run(run func(ctx context.Context, ids []int64)) *MockAgentInstanceStore_FindByIDs_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].([]int64))
+	})
+	return _c
+}
+
+func (_c *MockAgentInstanceStore_FindByIDs_Call) Return(_a0 []database.AgentInstance, _a1 error) *MockAgentInstanceStore_FindByIDs_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAgentInstanceStore_FindByIDs_Call) RunAndReturn(run func(context.Context, []int64) ([]database.AgentInstance, error)) *MockAgentInstanceStore_FindByIDs_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // IsInstanceExistsByContentID provides a mock function with given fields: ctx, instanceType, contentID
 func (_m *MockAgentInstanceStore) IsInstanceExistsByContentID(ctx context.Context, instanceType string, contentID string) (bool, error) {
 	ret := _m.Called(ctx, instanceType, contentID)
