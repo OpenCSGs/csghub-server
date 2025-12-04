@@ -643,3 +643,232 @@ func TestSpaceComponent_GetMCPServiceBySvcName(t *testing.T) {
 		require.Contains(t, err.Error(), "failed to get space by id")
 	})
 }
+
+func TestSpaceComponent_StatusByPaths(t *testing.T) {
+	ctx := context.TODO()
+	sc := initializeTestSpaceComponent(ctx, t)
+
+	t.Run("empty paths", func(t *testing.T) {
+		result, err := sc.StatusByPaths(ctx, []string{})
+		require.Nil(t, err)
+		require.NotNil(t, result)
+		require.Equal(t, 0, len(result))
+	})
+
+	t.Run("space not found", func(t *testing.T) {
+		sc.mocks.stores.SpaceMock().EXPECT().ListByPath(ctx, []string{"nonexistent/space"}).
+			Return([]database.Space{}, nil).Once()
+
+		// When no spaces are found, spaceIDs will be empty, but GetLatestDeploysBySpaceIDs is still called
+		sc.mocks.stores.DeployTaskMock().EXPECT().GetLatestDeploysBySpaceIDs(ctx, []int64{}).
+			Return(map[int64]*database.Deploy{}, nil).Once()
+
+		result, err := sc.StatusByPaths(ctx, []string{"nonexistent/space"})
+		require.Nil(t, err)
+		require.NotNil(t, result)
+		require.Equal(t, 1, len(result))
+		require.Equal(t, SpaceStatusEmpty, result["nonexistent/space"])
+	})
+
+	t.Run("space without HasAppFile - NGINX", func(t *testing.T) {
+		dbRepo := &database.Repository{ID: 1, Path: "ns1/space1"}
+		dbSpace := &database.Space{
+			ID:         1,
+			Repository: dbRepo,
+			HasAppFile: false,
+			Sdk:        types.NGINX.Name,
+		}
+
+		sc.mocks.stores.SpaceMock().EXPECT().ListByPath(ctx, []string{"ns1/space1"}).
+			Return([]database.Space{*dbSpace}, nil).Once()
+
+		// GetLatestDeploysBySpaceIDs is called with all found space IDs, even if they don't have HasAppFile
+		sc.mocks.stores.DeployTaskMock().EXPECT().GetLatestDeploysBySpaceIDs(ctx, []int64{1}).
+			Return(map[int64]*database.Deploy{}, nil).Once()
+
+		result, err := sc.StatusByPaths(ctx, []string{"ns1/space1"})
+		require.Nil(t, err)
+		require.NotNil(t, result)
+		require.Equal(t, 1, len(result))
+		require.Equal(t, SpaceStatusNoNGINXConf, result["ns1/space1"])
+	})
+
+	t.Run("space without HasAppFile - non-NGINX", func(t *testing.T) {
+		dbRepo := &database.Repository{ID: 2, Path: "ns2/space2"}
+		dbSpace := &database.Space{
+			ID:         2,
+			Repository: dbRepo,
+			HasAppFile: false,
+			Sdk:        "streamlit",
+		}
+
+		sc.mocks.stores.SpaceMock().EXPECT().ListByPath(ctx, []string{"ns2/space2"}).
+			Return([]database.Space{*dbSpace}, nil).Once()
+
+		// GetLatestDeploysBySpaceIDs is called with all found space IDs, even if they don't have HasAppFile
+		sc.mocks.stores.DeployTaskMock().EXPECT().GetLatestDeploysBySpaceIDs(ctx, []int64{2}).
+			Return(map[int64]*database.Deploy{}, nil).Once()
+
+		result, err := sc.StatusByPaths(ctx, []string{"ns2/space2"})
+		require.Nil(t, err)
+		require.NotNil(t, result)
+		require.Equal(t, 1, len(result))
+		require.Equal(t, SpaceStatusNoAppFile, result["ns2/space2"])
+	})
+
+	t.Run("space with HasAppFile but no deploy", func(t *testing.T) {
+		dbRepo := &database.Repository{ID: 3, Path: "ns3/space3"}
+		dbSpace := &database.Space{
+			ID:         3,
+			Repository: dbRepo,
+			HasAppFile: true,
+		}
+
+		sc.mocks.stores.SpaceMock().EXPECT().ListByPath(ctx, []string{"ns3/space3"}).
+			Return([]database.Space{*dbSpace}, nil).Once()
+
+		sc.mocks.stores.DeployTaskMock().EXPECT().GetLatestDeploysBySpaceIDs(ctx, []int64{3}).
+			Return(map[int64]*database.Deploy{}, nil).Once()
+
+		result, err := sc.StatusByPaths(ctx, []string{"ns3/space3"})
+		require.Nil(t, err)
+		require.NotNil(t, result)
+		require.Equal(t, 1, len(result))
+		require.Equal(t, SpaceStatusStopped, result["ns3/space3"])
+	})
+
+	t.Run("space with HasAppFile and deploy - Running", func(t *testing.T) {
+		dbRepo := &database.Repository{ID: 4, Path: "ns4/space4"}
+		dbSpace := &database.Space{
+			ID:         4,
+			Repository: dbRepo,
+			HasAppFile: true,
+		}
+
+		deploy := &database.Deploy{
+			ID:     1,
+			Status: 23, // Running
+		}
+
+		sc.mocks.stores.SpaceMock().EXPECT().ListByPath(ctx, []string{"ns4/space4"}).
+			Return([]database.Space{*dbSpace}, nil).Once()
+
+		sc.mocks.stores.DeployTaskMock().EXPECT().GetLatestDeploysBySpaceIDs(ctx, []int64{4}).
+			Return(map[int64]*database.Deploy{4: deploy}, nil).Once()
+
+		result, err := sc.StatusByPaths(ctx, []string{"ns4/space4"})
+		require.Nil(t, err)
+		require.NotNil(t, result)
+		require.Equal(t, 1, len(result))
+		require.Equal(t, SpaceStatusRunning, result["ns4/space4"])
+	})
+
+	t.Run("space with HasAppFile and deploy - Stopped", func(t *testing.T) {
+		dbRepo := &database.Repository{ID: 5, Path: "ns5/space5"}
+		dbSpace := &database.Space{
+			ID:         5,
+			Repository: dbRepo,
+			HasAppFile: true,
+		}
+
+		deploy := &database.Deploy{
+			ID:     2,
+			Status: 26, // Stopped
+		}
+
+		sc.mocks.stores.SpaceMock().EXPECT().ListByPath(ctx, []string{"ns5/space5"}).
+			Return([]database.Space{*dbSpace}, nil).Once()
+
+		sc.mocks.stores.DeployTaskMock().EXPECT().GetLatestDeploysBySpaceIDs(ctx, []int64{5}).
+			Return(map[int64]*database.Deploy{5: deploy}, nil).Once()
+
+		result, err := sc.StatusByPaths(ctx, []string{"ns5/space5"})
+		require.Nil(t, err)
+		require.NotNil(t, result)
+		require.Equal(t, 1, len(result))
+		require.Equal(t, SpaceStatusStopped, result["ns5/space5"])
+	})
+
+	t.Run("multiple spaces with different scenarios", func(t *testing.T) {
+		paths := []string{"ns6/space6", "ns7/space7", "ns8/space8", "ns9/space9"}
+
+		dbRepo6 := &database.Repository{ID: 6, Path: "ns6/space6"}
+		dbSpace6 := &database.Space{
+			ID:         6,
+			Repository: dbRepo6,
+			HasAppFile: false,
+			Sdk:        types.NGINX.Name,
+		}
+
+		dbRepo7 := &database.Repository{ID: 7, Path: "ns7/space7"}
+		dbSpace7 := &database.Space{
+			ID:         7,
+			Repository: dbRepo7,
+			HasAppFile: true,
+		}
+
+		dbRepo8 := &database.Repository{ID: 8, Path: "ns8/space8"}
+		dbSpace8 := &database.Space{
+			ID:         8,
+			Repository: dbRepo8,
+			HasAppFile: true,
+		}
+
+		deploy8 := &database.Deploy{
+			ID:     3,
+			Status: 23, // Running
+		}
+
+		sc.mocks.stores.SpaceMock().EXPECT().ListByPath(ctx, paths).
+			Return([]database.Space{*dbSpace6, *dbSpace7, *dbSpace8}, nil).Once()
+
+		sc.mocks.stores.DeployTaskMock().EXPECT().GetLatestDeploysBySpaceIDs(ctx, []int64{6, 7, 8}).
+			Return(map[int64]*database.Deploy{8: deploy8}, nil).Once()
+
+		result, err := sc.StatusByPaths(ctx, paths)
+		require.Nil(t, err)
+		require.NotNil(t, result)
+		require.Equal(t, 4, len(result))
+
+		// Space 6: no app file, NGINX
+		require.Equal(t, SpaceStatusNoNGINXConf, result["ns6/space6"])
+
+		// Space 7: has app file but no deploy
+		require.Equal(t, SpaceStatusStopped, result["ns7/space7"])
+
+		// Space 8: has app file and running deploy
+		require.Equal(t, SpaceStatusRunning, result["ns8/space8"])
+
+		// Space 9: not found
+		require.Equal(t, SpaceStatusEmpty, result["ns9/space9"])
+	})
+
+	t.Run("ListByPath error", func(t *testing.T) {
+		sc.mocks.stores.SpaceMock().EXPECT().ListByPath(ctx, []string{"error/space"}).
+			Return(nil, errors.New("database error")).Once()
+
+		result, err := sc.StatusByPaths(ctx, []string{"error/space"})
+		require.NotNil(t, err)
+		require.Nil(t, result)
+		require.Contains(t, err.Error(), "failed to find spaces by paths")
+	})
+
+	t.Run("GetLatestDeploysBySpaceIDs error", func(t *testing.T) {
+		dbRepo := &database.Repository{ID: 10, Path: "ns10/space10"}
+		dbSpace := &database.Space{
+			ID:         10,
+			Repository: dbRepo,
+			HasAppFile: true,
+		}
+
+		sc.mocks.stores.SpaceMock().EXPECT().ListByPath(ctx, []string{"ns10/space10"}).
+			Return([]database.Space{*dbSpace}, nil).Once()
+
+		sc.mocks.stores.DeployTaskMock().EXPECT().GetLatestDeploysBySpaceIDs(ctx, []int64{10}).
+			Return(nil, errors.New("deploy query error")).Once()
+
+		result, err := sc.StatusByPaths(ctx, []string{"ns10/space10"})
+		require.NotNil(t, err)
+		require.Nil(t, result)
+	})
+}
