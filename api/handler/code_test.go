@@ -8,7 +8,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 	mockcomponent "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
-	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/builder/testutil"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -19,6 +18,7 @@ type CodeTester struct {
 	mocks   struct {
 		code      *mockcomponent.MockCodeComponent
 		sensitive *mockcomponent.MockSensitiveComponent
+		repo      *mockcomponent.MockRepoComponent
 	}
 }
 
@@ -26,7 +26,12 @@ func NewCodeTester(t *testing.T) *CodeTester {
 	tester := &CodeTester{GinTester: testutil.NewGinTester()}
 	tester.mocks.code = mockcomponent.NewMockCodeComponent(t)
 	tester.mocks.sensitive = mockcomponent.NewMockSensitiveComponent(t)
-	tester.handler = &CodeHandler{code: tester.mocks.code, sensitive: tester.mocks.sensitive}
+	tester.mocks.repo = mockcomponent.NewMockRepoComponent(t)
+	tester.handler = &CodeHandler{
+		code:      tester.mocks.code,
+		sensitive: tester.mocks.sensitive,
+		repo:      tester.mocks.repo,
+	}
 	tester.WithParam("name", "r")
 	tester.WithParam("namespace", "u")
 	return tester
@@ -39,20 +44,33 @@ func (ct *CodeTester) WithHandleFunc(fn func(cp *CodeHandler) gin.HandlerFunc) *
 }
 
 func TestCodeHandler_Create(t *testing.T) {
-	tester := NewCodeTester(t).WithHandleFunc(func(cp *CodeHandler) gin.HandlerFunc {
-		return cp.Create
+	t.Run("create with empty namespace", func(t *testing.T) {
+		tester := NewCodeTester(t).WithHandleFunc(func(h *CodeHandler) gin.HandlerFunc {
+			return h.Create
+		})
+		tester.WithUser()
+
+		req := &types.CreateCodeReq{CreateRepoReq: types.CreateRepoReq{Username: "u"}}
+		expect_req := &types.CreateCodeReq{CreateRepoReq: types.CreateRepoReq{Username: "u", Namespace: "u"}}
+		tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), expect_req).Return(true, nil)
+		tester.mocks.code.EXPECT().Create(tester.Ctx(), expect_req).Return(&types.Code{Name: "c"}, nil)
+		tester.WithBody(t, req).Execute()
+
+		tester.ResponseEq(t, 200, tester.OKText, &types.Code{Name: "c"})
 	})
-	tester.WithUser()
+	t.Run("create for self", func(t *testing.T) {
+		tester := NewCodeTester(t).WithHandleFunc(func(h *CodeHandler) gin.HandlerFunc {
+			return h.Create
+		})
+		tester.WithUser()
 
-	req := &types.CreateCodeReq{CreateRepoReq: types.CreateRepoReq{Name: "c"}}
-	tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), req).Return(true, nil)
-	reqn := *req
-	reqn.Username = "u"
-	tester.mocks.code.EXPECT().Create(tester.Ctx(), &reqn).Return(&types.Code{Name: "c"}, nil)
-	tester.WithBody(t, req).Execute()
+		req := &types.CreateCodeReq{CreateRepoReq: types.CreateRepoReq{Username: "u", Namespace: "u"}}
+		tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), req).Return(true, nil)
+		tester.mocks.code.EXPECT().Create(tester.Ctx(), req).Return(&types.Code{Name: "c"}, nil)
+		tester.WithBody(t, req).Execute()
 
-	tester.ResponseEqSimple(t, 200, httpbase.R{Msg: "OK", Data: &types.Code{Name: "c"}})
-
+		tester.ResponseEq(t, 200, tester.OKText, &types.Code{Name: "c"})
+	})
 }
 
 func TestCodeHandler_Index(t *testing.T) {

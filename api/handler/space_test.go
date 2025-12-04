@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -111,24 +112,64 @@ func TestSpaceHandler_Show(t *testing.T) {
 }
 
 func TestSpaceHandler_Create(t *testing.T) {
-	tester := NewSpaceTester(t).WithHandleFunc(func(h *SpaceHandler) gin.HandlerFunc {
-		return h.Create
+	const currentUser = "u"
+
+	t.Run("create for self", func(t *testing.T) {
+		tester := NewSpaceTester(t).WithHandleFunc(func(h *SpaceHandler) gin.HandlerFunc {
+			return h.Create
+		})
+		tester.WithUser()
+
+		req := types.CreateSpaceReq{
+			CreateRepoReq: types.CreateRepoReq{Namespace: currentUser, Nickname: "nickname"},
+			Sdk:           "gradio",
+			ResourceID:    1,
+			ClusterID:     "cluster",
+		}
+		expect_req := types.CreateSpaceReq{
+			CreateRepoReq: types.CreateRepoReq{Username: currentUser, Namespace: currentUser, Nickname: "nickname"},
+			Sdk:           "gradio",
+			ResourceID:    1,
+			ClusterID:     "cluster",
+		}
+
+		tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), &expect_req).Return(true, nil)
+		tester.mocks.space.EXPECT().Create(tester.Ctx(), expect_req).Return(&types.Space{Name: "m"}, nil)
+
+		tester.WithBody(t, &req).Execute()
+
+		require.Equal(t, http.StatusOK, tester.Response().Code)
+		tester.ResponseEq(t, http.StatusOK, tester.OKText, &types.Space{Name: "m"})
 	})
-	tester.WithUser()
 
-	req := &types.CreateSpaceReq{
-		CreateRepoReq: types.CreateRepoReq{},
-		Sdk:           "gradio",
-		ResourceID:    1,
-		ClusterID:     "cluster",
-	}
-	tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), req).Return(true, nil)
-	reqn := *req
-	reqn.Username = "u"
-	tester.mocks.space.EXPECT().Create(tester.Ctx(), reqn).Return(&types.Space{Name: "m"}, nil)
-	tester.WithBody(t, req).Execute()
+	t.Run("create with empty namespace in req", func(t *testing.T) {
+		tester := NewSpaceTester(t).WithHandleFunc(func(h *SpaceHandler) gin.HandlerFunc {
+			return h.Create
+		})
+		tester.WithUser()
 
-	tester.ResponseEq(t, 200, tester.OKText, &types.Space{Name: "m"})
+		req := types.CreateSpaceReq{
+			CreateRepoReq: types.CreateRepoReq{Nickname: "nickname"},
+			Sdk:           "gradio",
+			ResourceID:    1,
+			ClusterID:     "cluster",
+		}
+
+		expectedReq := types.CreateSpaceReq{
+			CreateRepoReq: types.CreateRepoReq{Username: currentUser, Namespace: currentUser, Nickname: "nickname"},
+			Sdk:           "gradio",
+			ResourceID:    1,
+			ClusterID:     "cluster",
+		}
+
+		tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), &expectedReq).Return(true, nil)
+		tester.mocks.space.EXPECT().Create(tester.Ctx(), expectedReq).Return(&types.Space{Name: "m"}, nil)
+
+		tester.WithBody(t, &req).Execute()
+
+		require.Equal(t, http.StatusOK, tester.Response().Code)
+		tester.ResponseEq(t, http.StatusOK, tester.OKText, &types.Space{Name: "m"})
+	})
 }
 
 func TestSpaceHandler_Update(t *testing.T) {

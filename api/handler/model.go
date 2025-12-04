@@ -156,6 +156,10 @@ func (h *ModelHandler) Create(ctx *gin.Context) {
 	}
 	req.Username = currentUser
 
+	if req.Namespace == "" {
+		req.Namespace = currentUser
+	}
+
 	_, err := h.sensitive.CheckRequestV2(ctx.Request.Context(), req)
 	if err != nil {
 		slog.Error("failed to check sensitive request", slog.Any("error", err))
