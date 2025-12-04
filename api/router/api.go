@@ -969,6 +969,8 @@ func createUserRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware
 		apiGroup.POST("/user/email-verification-code/:email", middlewareCollection.Auth.NeedLogin, userProxyHandler.Proxy)
 		apiGroup.POST("/user/sms-code", middlewareCollection.Auth.NeedLogin, userProxyHandler.Proxy)
 		apiGroup.PUT("/user/phone", middlewareCollection.Auth.NeedLogin, userProxyHandler.Proxy)
+		apiGroup.POST("/user/public/sms-code", userProxyHandler.Proxy)
+		apiGroup.POST("/user/public/sms-code/verify", userProxyHandler.Proxy)
 	}
 
 	{
