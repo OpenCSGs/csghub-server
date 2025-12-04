@@ -197,31 +197,18 @@ type LarkMessage struct {
 	Size      int       `json:"size"`
 }
 
-type MessageScenario string
-
-const (
-	MessageScenarioRepoSync             MessageScenario = "repo-sync"
-	MessageScenarioInternalNotification MessageScenario = "internal-notification"
-	MessageScenarioEmailVerifyCode      MessageScenario = "email-verify-code"
-	MessageScenarioAssetManagement      MessageScenario = "asset-management"
-	MessageScenarioUserVerify           MessageScenario = "user-verify"
-	MessageScenarioOrgVerify            MessageScenario = "org-verify"
-	MessageScenarioOrgMember            MessageScenario = "org-member"
-	MessageScenarioDiscussion           MessageScenario = "discussion"
-	MessageScenarioRecharge             MessageScenario = "recharge"
-	MessageScenarioLowBalance           MessageScenario = "low-balance"
-	MessageScenarioRechargeSuccess      MessageScenario = "recharge-success"
-	MessageScenarioWeeklyRecharges      MessageScenario = "weekly-recharges"
-	MessageScenarioDeployment           MessageScenario = "deployment"
-)
-
 type MessageChannel string
 
 const (
 	MessageChannelLark            MessageChannel = "lark"
 	MessageChannelEmail           MessageChannel = "email"
+	MessageChannelSMS             MessageChannel = "sms"
 	MessageChannelInternalMessage MessageChannel = "internal-message"
 )
+
+func (t MessageChannel) String() string {
+	return string(t)
+}
 
 type MessagePriority string
 
@@ -316,4 +303,11 @@ type EmailWeeklyRechargesNotification struct {
 	FileData  string `json:"file_data"`
 	StartDate string `json:"start_date"`
 	EndDate   string `json:"end_date"`
+}
+
+type SMSReq struct {
+	PhoneNumbers  []string `json:"phone_numbers"`
+	SignName      string   `json:"sign_name"`
+	TemplateCode  string   `json:"template_code"`
+	TemplateParam string   `json:"template_param"`
 }
