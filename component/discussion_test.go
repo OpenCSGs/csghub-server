@@ -103,7 +103,7 @@ func TestDiscussionComponent_CreateDisucssion(t *testing.T) {
 	})
 }
 
-func TestDiscussionComponent_GetDisussion(t *testing.T) {
+func TestDiscussionComponent_GetDiscussion(t *testing.T) {
 	mockRepoStore := mockdb.NewMockRepoStore(t)
 	mockUserStore := mockdb.NewMockUserStore(t)
 	mockDiscussionStore := mockdb.NewMockDiscussionStore(t)
@@ -142,18 +142,23 @@ func TestDiscussionComponent_GetDisussion(t *testing.T) {
 			},
 		},
 	}
-	mockDiscussionStore.EXPECT().FindDiscussionComments(mock.Anything, int64(1)).Return(comments, nil).Once()
+	// Updated to include pagination parameters: per=10, page=1
+	mockDiscussionStore.EXPECT().FindDiscussionComments(mock.Anything, int64(1), 10, 1).Return(comments, 1, nil).Once()
 
-	resp, err := comp.GetDiscussion(context.TODO(), "user", int64(1))
+	// Updated to include pagination parameters
+	resp, err := comp.GetDiscussion(context.TODO(), "user", int64(1), 10, 1)
 	require.Nil(t, err)
 	require.NotNil(t, resp)
 	require.Equal(t, int64(1), resp.ID)
 	require.Equal(t, "test discussion", resp.Title)
-	// require.Equal(t, int64(1), resp.CommentCount)
-	require.Equal(t, "test comment", resp.Comments[0].Content)
-	require.Equal(t, "user", resp.Comments[0].User.Username)
-	require.Equal(t, "avatar", resp.Comments[0].User.Avatar)
-
+	require.NotNil(t, resp.Comments)
+	require.Equal(t, 1, resp.Comments.Total)
+	require.Equal(t, 10, resp.Comments.Per)
+	require.Equal(t, 1, resp.Comments.Page)
+	require.Len(t, resp.Comments.Data, 1)
+	require.Equal(t, "test comment", resp.Comments.Data[0].Content)
+	require.Equal(t, "user", resp.Comments.Data[0].User.Username)
+	require.Equal(t, "avatar", resp.Comments.Data[0].User.Avatar)
 }
 
 func TestDiscussionComponent_UpdateDisussion(t *testing.T) {
@@ -272,14 +277,14 @@ func TestDiscussionComponent_ListRepoDiscussions(t *testing.T) {
 		UserID:             2,
 		User:               nil,
 	})
-	mockDiscussionStore.EXPECT().FindByDiscussionableID(mock.Anything, database.DiscussionableTypeRepo, repo.ID).Return(discussions, nil).Once()
+	mockDiscussionStore.EXPECT().FindByDiscussionableID(mock.Anything, database.DiscussionableTypeRepo, repo.ID, 10, 1).Return(discussions, 1, nil).Once()
 
-	resp, err := comp.ListRepoDiscussions(context.TODO(), types.ListRepoDiscussionRequest{
+	resp, _, err := comp.ListRepoDiscussions(context.TODO(), types.ListRepoDiscussionRequest{
 		RepoType:    types.ModelRepo,
 		Namespace:   "namespace",
 		Name:        "name",
 		CurrentUser: "user",
-	})
+	}, 10, 1)
 	require.Nil(t, err)
 	require.Len(t, resp.Discussions, 1)
 	require.Equal(t, "test discussion", resp.Discussions[0].Title)
@@ -511,13 +516,13 @@ func TestDiscussionComponent_ListDiscussionComments(t *testing.T) {
 	mockDiscussionStore.EXPECT().FindByID(mock.Anything, discussionID).Return(disc, nil).Once()
 	mockRepoStore.EXPECT().FindById(mock.Anything, int64(1)).Return(&database.Repository{ID: 1}, nil).Once()
 	mockRepoComponent.EXPECT().AllowReadAccessRepo(mock.Anything, &database.Repository{ID: 1}, "user").Return(true, nil).Once()
-	mockDiscussionStore.EXPECT().FindDiscussionComments(mock.Anything, discussionID).Return(comments, nil).Once()
+	mockDiscussionStore.EXPECT().FindDiscussionComments(mock.Anything, discussionID, 10, 1).Return(comments, 1, nil).Once()
 
-	resp, err := comp.ListDiscussionComments(context.TODO(), "user", discussionID)
+	resp, total, err := comp.ListDiscussionComments(context.TODO(), "user", discussionID, 10, 1)
 	require.Nil(t, err)
 	require.Len(t, resp, 1)
 	require.Equal(t, comments[0].Content, resp[0].Content)
-
+	require.Equal(t, 1, total)
 }
 
 func TestCreateRepoDiscussionRequest_GetSensitiveFields(t *testing.T) {
