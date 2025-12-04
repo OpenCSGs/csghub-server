@@ -6,8 +6,6 @@ import (
 	http "net/http"
 
 	mock "github.com/stretchr/testify/mock"
-	rpc "opencsg.com/csghub-server/builder/rpc"
-
 	token "opencsg.com/csghub-server/aigateway/token"
 )
 
@@ -164,39 +162,6 @@ func (_c *MockCommonResponseWriter_WithLLMTokenCounter_Call) Return() *MockCommo
 }
 
 func (_c *MockCommonResponseWriter_WithLLMTokenCounter_Call) RunAndReturn(run func(*token.ChatTokenCounter)) *MockCommonResponseWriter_WithLLMTokenCounter_Call {
-	_c.Run(run)
-	return _c
-}
-
-// WithModeration provides a mock function with given fields: _a0
-func (_m *MockCommonResponseWriter) WithModeration(_a0 rpc.ModerationSvcClient) {
-	_m.Called(_a0)
-}
-
-// MockCommonResponseWriter_WithModeration_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'WithModeration'
-type MockCommonResponseWriter_WithModeration_Call struct {
-	*mock.Call
-}
-
-// WithModeration is a helper method to define mock.On call
-//   - _a0 rpc.ModerationSvcClient
-func (_e *MockCommonResponseWriter_Expecter) WithModeration(_a0 interface{}) *MockCommonResponseWriter_WithModeration_Call {
-	return &MockCommonResponseWriter_WithModeration_Call{Call: _e.mock.On("WithModeration", _a0)}
-}
-
-func (_c *MockCommonResponseWriter_WithModeration_Call) Run(run func(_a0 rpc.ModerationSvcClient)) *MockCommonResponseWriter_WithModeration_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(rpc.ModerationSvcClient))
-	})
-	return _c
-}
-
-func (_c *MockCommonResponseWriter_WithModeration_Call) Return() *MockCommonResponseWriter_WithModeration_Call {
-	_c.Call.Return()
-	return _c
-}
-
-func (_c *MockCommonResponseWriter_WithModeration_Call) RunAndReturn(run func(rpc.ModerationSvcClient)) *MockCommonResponseWriter_WithModeration_Call {
 	_c.Run(run)
 	return _c
 }

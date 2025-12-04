@@ -2,13 +2,11 @@ package handler
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"sync"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -19,7 +17,6 @@ import (
 	mockcomp "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/aigateway/component"
 	rpcmock "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rpc"
 	apicomp "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
-	"opencsg.com/csghub-server/aigateway/token"
 	"opencsg.com/csghub-server/aigateway/types"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/builder/rpc"
@@ -240,7 +237,9 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 			ClusterID: "test-cls",
 		}, nil)
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1:svc1").Return(model, nil)
-		tester.mocks.moderationComp.EXPECT().CheckLLMPrompt(mock.Anything, *chatReq.Messages[0].GetContent().AsAny().(*string), "testuuid"+model.ID).
+		expectReq := ChatCompletionRequest{}
+		_ = json.Unmarshal(body, &expectReq)
+		tester.mocks.moderationComp.EXPECT().CheckChatPrompts(mock.Anything, expectReq.Messages, "testuuid:"+model.ID).
 			Return(&rpc.CheckResult{IsSensitive: true}, nil)
 		tester.handler.Chat(c)
 
@@ -282,96 +281,12 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 			ClusterID: "test-cls",
 		}, nil)
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1:svc1").Return(model, nil)
-		tester.mocks.moderationComp.EXPECT().CheckLLMPrompt(mock.Anything, *chatReq.Messages[0].GetContent().AsAny().(*string), "testuuid"+model.ID).
+		expectReq := ChatCompletionRequest{}
+		_ = json.Unmarshal(body, &expectReq)
+		tester.mocks.moderationComp.EXPECT().CheckChatPrompts(mock.Anything, expectReq.Messages, "testuuid:"+model.ID).
 			Return(nil, errors.New("some error"))
 		tester.handler.Chat(c)
 
 		assert.Equal(t, http.StatusInternalServerError, w.Code)
-	})
-	t.Run("llm prompt with unhandled struct", func(t *testing.T) {
-		tester, c, w := setupTest(t)
-		chatReq := ChatCompletionRequest{
-			Model: "model1:svc1",
-			Messages: []openai.ChatCompletionMessageParamUnion{
-				{
-					OfUser: &openai.ChatCompletionUserMessageParam{
-						Content: openai.ChatCompletionUserMessageParamContentUnion{
-							OfArrayOfContentParts: []openai.ChatCompletionContentPartUnionParam{
-								{
-									OfText: &openai.ChatCompletionContentPartTextParam{
-										Text: "hello1",
-									},
-								},
-								{
-									OfText: &openai.ChatCompletionContentPartTextParam{
-										Text: "hello2",
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		}
-		body, _ := json.Marshal(chatReq)
-		c.Request.Method = http.MethodPost
-		c.Request.Body = io.NopCloser(bytes.NewReader(body))
-
-		model := &types.Model{
-			BaseModel: types.BaseModel{
-				ID:      "model1:svc1",
-				Object:  "model",
-				OwnedBy: "testuser",
-			},
-			InternalModelInfo: types.InternalModelInfo{
-				ClusterID: "test-cls",
-				SvcName:   "test-svc",
-			},
-			Endpoint: "test-endpoint",
-		}
-
-		tokenizer := token.NewTokenizerImpl(model.Endpoint, "", model.Object, "")
-		llmTokenCounter := token.NewLLMTokenCounter(tokenizer)
-		tester.mocks.mockClsComp.EXPECT().GetClusterByID(mock.Anything, "test-cls").Return(&database.ClusterInfo{
-			ClusterID: "test-cls",
-		}, nil)
-		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1:svc1").Return(model, nil)
-		var wg sync.WaitGroup
-		wg.Add(1)
-		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, "testuuid", model, llmTokenCounter).Return(nil).Run(func(c context.Context, userUUID string, model *types.Model, tokenCounter token.Counter) {
-			wg.Done()
-		})
-		tester.handler.Chat(c)
-
-		assert.Equal(t, http.StatusOK, w.Code)
-		wg.Wait()
-	})
-	t.Run("llm prompt with unhandled raw json", func(t *testing.T) {
-		tester, c, w := setupTest(t)
-		body := []byte("{\"model\":\"model1:svc1\",\"messages\":[{\"role\":\"system\",\"content\":\"You are a helpful assistant that can use tools to answer questions and perform tasks.\"},{\"role\":\"user\",\"content\":[\"a\",\"b\"]}],\"stream\":true,\"temperature\":0.1}")
-		c.Request.Method = http.MethodPost
-		c.Request.Body = io.NopCloser(bytes.NewReader(body))
-
-		model := &types.Model{
-			BaseModel: types.BaseModel{
-				ID:      "model1:svc1",
-				Object:  "model",
-				OwnedBy: "testuser",
-			},
-			InternalModelInfo: types.InternalModelInfo{
-				ClusterID: "test-cls",
-				SvcName:   "test-svc",
-			},
-			Endpoint: "test-endpoint",
-		}
-		tester.mocks.mockClsComp.EXPECT().GetClusterByID(mock.Anything, "test-cls").Return(&database.ClusterInfo{
-			ClusterID: "test-cls",
-		}, nil)
-		tester.mocks.moderationComp.EXPECT().CheckLLMPrompt(mock.Anything, "You are a helpful assistant that can use tools to answer questions and perform tasks.", "testuuid"+model.ID).
-			Return(&rpc.CheckResult{IsSensitive: true}, nil)
-		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1:svc1").Return(model, nil)
-		tester.handler.Chat(c)
-
-		assert.Equal(t, http.StatusOK, w.Code)
 	})
 }
