@@ -914,6 +914,65 @@ func (_c *MockSpaceComponent_Status_Call) RunAndReturn(run func(context.Context,
 	return _c
 }
 
+// StatusByPaths provides a mock function with given fields: ctx, paths
+func (_m *MockSpaceComponent) StatusByPaths(ctx context.Context, paths []string) (map[string]string, error) {
+	ret := _m.Called(ctx, paths)
+
+	if len(ret) == 0 {
+		panic("no return value specified for StatusByPaths")
+	}
+
+	var r0 map[string]string
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, []string) (map[string]string, error)); ok {
+		return rf(ctx, paths)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, []string) map[string]string); ok {
+		r0 = rf(ctx, paths)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(map[string]string)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, []string) error); ok {
+		r1 = rf(ctx, paths)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockSpaceComponent_StatusByPaths_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'StatusByPaths'
+type MockSpaceComponent_StatusByPaths_Call struct {
+	*mock.Call
+}
+
+// StatusByPaths is a helper method to define mock.On call
+//   - ctx context.Context
+//   - paths []string
+func (_e *MockSpaceComponent_Expecter) StatusByPaths(ctx interface{}, paths interface{}) *MockSpaceComponent_StatusByPaths_Call {
+	return &MockSpaceComponent_StatusByPaths_Call{Call: _e.mock.On("StatusByPaths", ctx, paths)}
+}
+
+func (_c *MockSpaceComponent_StatusByPaths_Call) Run(run func(ctx context.Context, paths []string)) *MockSpaceComponent_StatusByPaths_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].([]string))
+	})
+	return _c
+}
+
+func (_c *MockSpaceComponent_StatusByPaths_Call) Return(_a0 map[string]string, _a1 error) *MockSpaceComponent_StatusByPaths_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockSpaceComponent_StatusByPaths_Call) RunAndReturn(run func(context.Context, []string) (map[string]string, error)) *MockSpaceComponent_StatusByPaths_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Stop provides a mock function with given fields: ctx, namespace, name, deleteSpace
 func (_m *MockSpaceComponent) Stop(ctx context.Context, namespace string, name string, deleteSpace bool) error {
 	ret := _m.Called(ctx, namespace, name, deleteSpace)
