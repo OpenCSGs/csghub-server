@@ -10,7 +10,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/openai/openai-go/v3"
+	"opencsg.com/csghub-server/aigateway/types"
 	"opencsg.com/csghub-server/builder/rpc"
+	"opencsg.com/csghub-server/builder/sensitive"
 	"opencsg.com/csghub-server/builder/store/cache"
 	"opencsg.com/csghub-server/common/config"
 )
@@ -27,7 +30,9 @@ const (
 )
 
 type Moderation interface {
-	CheckLLMPrompt(ctx context.Context, content, key string) (*rpc.CheckResult, error)
+	CheckChatPrompts(ctx context.Context, messages []openai.ChatCompletionMessageParamUnion, uuid string) (*rpc.CheckResult, error)
+	CheckChatStreamResponse(ctx context.Context, chunk types.ChatCompletionChunk, uuid string) (*rpc.CheckResult, error)
+	CheckChatNonStreamResponse(ctx context.Context, completion types.ChatCompletion) (*rpc.CheckResult, error)
 }
 
 type moderationImpl struct {
@@ -151,10 +156,72 @@ func (modImpl *moderationImpl) checkBuffer(
 	return result, nil
 }
 
+// CheckChatPrompts checks if any of the chat messages contain sensitive content.
+// It processes each message, extracts text content, and uses CheckLLMPrompt for validation.
+func (modImpl *moderationImpl) CheckChatPrompts(ctx context.Context, messages []openai.ChatCompletionMessageParamUnion, uuid string) (*rpc.CheckResult, error) {
+	if modImpl.modSvcClient == nil {
+		return &rpc.CheckResult{IsSensitive: false}, nil
+	}
+	// Process each message in the messages array
+	for _, msg := range messages {
+		// Skip system messages as they're typically predefined
+		role := *msg.GetRole()
+
+		// Handle different content types
+		var content string
+		switch rawContent := msg.GetContent().AsAny().(type) {
+		case string:
+			// Direct string content
+			content = rawContent
+		case *string:
+			content = *rawContent
+		case []interface{}:
+			// Array content (e.g., for multi-modal inputs)
+			contentBuilder := strings.Builder{}
+			for _, item := range rawContent {
+				// Try to extract text content from array items
+				if itemMap, ok := item.(map[string]interface{}); ok {
+					if text, exists := itemMap["text"].(string); exists {
+						contentBuilder.WriteString(text)
+						contentBuilder.WriteString(" ")
+					}
+				}
+			}
+			content = contentBuilder.String()
+		default:
+			// Convert to string as fallback
+			contentBytes, _ := json.Marshal(rawContent)
+			content = string(contentBytes)
+		}
+
+		// Skip empty content
+		if strings.TrimSpace(content) == "" {
+			continue
+		}
+
+		// Check if content is sensitive using existing method
+		result, err := modImpl.checkLLMPrompt(ctx, content, uuid)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check message content: %w", err)
+		}
+
+		// If sensitive content found, return immediately
+		if result.IsSensitive {
+			slog.Debug("sensitive content found in chat message",
+				slog.String("role", role),
+				slog.String("reason", result.Reason))
+			return result, nil
+		}
+	}
+
+	// No sensitive content found in any message
+	return &rpc.CheckResult{IsSensitive: false}, nil
+}
+
 // CheckLLMPrompt checks if the prompt is sensitive.
 // For long content, it first checks each chunk individually (with caching).
 // Then, it uses a sliding window to check for sensitive combinations of chunks.
-func (modImpl *moderationImpl) CheckLLMPrompt(ctx context.Context, content, key string) (*rpc.CheckResult, error) {
+func (modImpl *moderationImpl) checkLLMPrompt(ctx context.Context, content, key string) (*rpc.CheckResult, error) {
 	content = strings.ReplaceAll(content, `\\n`, "\n")
 	content = strings.ReplaceAll(content, `\n`, "")
 	if len(content) < maxContentLength {
@@ -173,7 +240,7 @@ func (modImpl *moderationImpl) CheckLLMPrompt(ctx context.Context, content, key 
 			cached, err := modImpl.cacheClient.Get(ctx, cacheKey)
 			if err == nil {
 				var result rpc.CheckResult
-				if err := json.Unmarshal([]byte(cached), &result); err == nil {
+				if err = json.Unmarshal([]byte(cached), &result); err == nil {
 					slog.Debug("moderation check cache hit for chunk", slog.String("chunk", chunk))
 					if result.IsSensitive {
 						return &result, nil
@@ -202,7 +269,7 @@ func (modImpl *moderationImpl) CheckLLMPrompt(ctx context.Context, content, key 
 			cached, err := modImpl.cacheClient.Get(ctx, cacheKey)
 			if err == nil {
 				var result rpc.CheckResult
-				if err := json.Unmarshal([]byte(cached), &result); err == nil {
+				if err = json.Unmarshal([]byte(cached), &result); err == nil {
 					slog.Debug("moderation check cache hit for chunk", slog.String("chunk", chunk))
 					if result.IsSensitive {
 						return &result, nil
@@ -255,4 +322,44 @@ func (modImpl *moderationImpl) CheckLLMPrompt(ctx context.Context, content, key 
 	}
 
 	return &rpc.CheckResult{IsSensitive: false}, nil
+}
+
+func (modImpl *moderationImpl) CheckChatStreamResponse(ctx context.Context, chunk types.ChatCompletionChunk, uuid string) (*rpc.CheckResult, error) {
+	if modImpl.modSvcClient == nil {
+		return &rpc.CheckResult{IsSensitive: false}, nil
+	}
+	if len(chunk.Choices) == 0 {
+		return &rpc.CheckResult{IsSensitive: false}, nil
+	}
+	if chunk.Choices[0].Delta.Content == "" && chunk.Choices[0].Delta.ReasoningContent == "" {
+		return &rpc.CheckResult{IsSensitive: false}, nil
+	}
+
+	var result *rpc.CheckResult = &rpc.CheckResult{IsSensitive: false}
+	var err error
+	if strings.TrimSpace(chunk.Choices[0].Delta.Content) != "" {
+		// moderate on content
+		result, err = modImpl.modSvcClient.PassLLMRespCheck(ctx, chunk.Choices[0].Delta.Content, uuid)
+	} else if strings.TrimSpace(chunk.Choices[0].Delta.ReasoningContent) != "" {
+		// moderate on reasoning content
+		result, err = modImpl.modSvcClient.PassLLMRespCheck(ctx, chunk.Choices[0].Delta.ReasoningContent, uuid)
+	} else {
+		slog.Error("Unknown data struct",
+			slog.Any("raw data", chunk),
+			slog.Any("unmarshal chunk", chunk))
+	}
+	return result, err
+}
+
+func (modImpl *moderationImpl) CheckChatNonStreamResponse(ctx context.Context, completion types.ChatCompletion) (*rpc.CheckResult, error) {
+	if modImpl.modSvcClient == nil {
+		return &rpc.CheckResult{IsSensitive: false}, nil
+	}
+	if len(completion.Choices) == 0 {
+		return &rpc.CheckResult{IsSensitive: false}, nil
+	}
+	if completion.Choices[0].Message.Content == "" {
+		return &rpc.CheckResult{IsSensitive: false}, nil
+	}
+	return modImpl.modSvcClient.PassTextCheck(ctx, string(sensitive.ScenarioChatDetection), completion.Choices[0].Message.Content)
 }
