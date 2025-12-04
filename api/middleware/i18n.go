@@ -94,7 +94,15 @@ func LocalizedErrorMiddleware() gin.HandlerFunc {
 		}
 		code := respObj.Code
 		if errorx.IsValidErrorCode(code) {
-			translatedMsg, ok := i18n.TranslateText(lang, "error."+code, code)
+			var translatedMsg string
+			var ok bool
+			messageID := "error." + code
+			if len(respObj.Context) > 0 {
+				translatedMsg = i18n.TranslateTextWithData(lang, messageID, respObj.Context)
+				ok = translatedMsg != messageID
+			} else {
+				translatedMsg, ok = i18n.TranslateText(lang, messageID, code)
+			}
 			if !ok {
 				slog.Error("can not translate error code",
 					slog.String("url", c.Request.URL.Path),
