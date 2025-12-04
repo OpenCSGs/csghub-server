@@ -70,6 +70,7 @@ func (s *llmServiceComponentImpl) ShowLLMConfig(ctx context.Context, id int64) (
 		AuthHeader:  dbLlmConfig.AuthHeader,
 		Type:        dbLlmConfig.Type,
 		Enabled:     dbLlmConfig.Enabled,
+		Provider:    dbLlmConfig.Provider,
 		CreatedAt:   dbLlmConfig.CreatedAt,
 		UpdatedAt:   dbLlmConfig.UpdatedAt,
 	}

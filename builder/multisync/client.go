@@ -100,7 +100,7 @@ func (c *commonClient) MCPServerInfo(ctx context.Context, v types.SyncVersion) (
 
 func (c *commonClient) ReadMeData(ctx context.Context, v types.SyncVersion) (string, error) {
 	namespace, name, _ := strings.Cut(v.RepoPath, "/")
-	url := fmt.Sprintf("/api/v1/%ss/%s/%s/raw/README.md", v.RepoType, namespace, name)
+	url := fmt.Sprintf("/api/v1/%ss/%s/%s/raw/README.md", repoTypeToURLPath(v.RepoType), namespace, name)
 	var res types.ReadMeResponse
 	err := c.rpcClent.Get(ctx, url, &res)
 	if err != nil {
@@ -111,7 +111,7 @@ func (c *commonClient) ReadMeData(ctx context.Context, v types.SyncVersion) (str
 
 func (c *commonClient) FileList(ctx context.Context, v types.SyncVersion) ([]types.File, error) {
 	namespace, name, _ := strings.Cut(v.RepoPath, "/")
-	url := fmt.Sprintf("/api/v1/%ss/%s/%s/all_files", v.RepoType, namespace, name)
+	url := fmt.Sprintf("/api/v1/%ss/%s/%s/all_files", repoTypeToURLPath(v.RepoType), namespace, name)
 	var res types.AllFilesResponse
 	err := c.rpcClent.Get(ctx, url, &res)
 	if err != nil {
@@ -133,4 +133,11 @@ func (c *commonClient) Diff(ctx context.Context, req types.RemoteDiffReq) ([]typ
 		return nil, fmt.Errorf("failed to get diff list, cause: %w", err)
 	}
 	return res.Data, nil
+}
+
+func repoTypeToURLPath(repoType types.RepositoryType) string {
+	if repoType == types.MCPServerRepo {
+		return "mcp"
+	}
+	return string(repoType)
 }

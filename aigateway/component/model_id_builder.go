@@ -15,8 +15,10 @@ func (b ModelIDBuilder) To(modelName, svcName string) string {
 
 func (b ModelIDBuilder) From(modelID string) (modelName, svcName string, err error) {
 	strs := strings.Split(modelID, ":")
-	if len(strs) != 2 {
-		return "", "", errors.New("invalid model id format, should be in format 'model_name:svc_name'")
+	if len(strs) > 2 {
+		return "", "", errors.New("invalid model id format, should be in format 'model_name:svc_name' or 'model_name'")
+	} else if len(strs) < 2 {
+		return strs[0], "", nil
 	}
 	return strs[0], strs[1], nil
 }

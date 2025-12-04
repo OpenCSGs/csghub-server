@@ -93,17 +93,34 @@ func TestModelHandler_Index(t *testing.T) {
 }
 
 func TestModelHandler_Create(t *testing.T) {
-	tester := NewModelTester(t).WithHandleFunc(func(h *ModelHandler) gin.HandlerFunc {
-		return h.Create
+	t.Run("create with empty namespace", func(t *testing.T) {
+		tester := NewModelTester(t).WithHandleFunc(func(h *ModelHandler) gin.HandlerFunc {
+			return h.Create
+		})
+		tester.WithUser()
+
+		req := &types.CreateModelReq{CreateRepoReq: types.CreateRepoReq{Username: "u"}}
+		expect_req := &types.CreateModelReq{CreateRepoReq: types.CreateRepoReq{Username: "u", Namespace: "u"}}
+		tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), expect_req).Return(true, nil)
+		tester.mocks.model.EXPECT().Create(tester.Ctx(), expect_req).Return(&types.Model{Name: "m"}, nil)
+		tester.WithBody(t, req).Execute()
+
+		tester.ResponseEq(t, 200, tester.OKText, &types.Model{Name: "m"})
 	})
-	tester.WithUser()
+	t.Run("create for self", func(t *testing.T) {
+		tester := NewModelTester(t).WithHandleFunc(func(h *ModelHandler) gin.HandlerFunc {
+			return h.Create
+		})
+		tester.WithUser()
 
-	req := &types.CreateModelReq{CreateRepoReq: types.CreateRepoReq{Username: "u"}}
-	tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), req).Return(true, nil)
-	tester.mocks.model.EXPECT().Create(tester.Ctx(), req).Return(&types.Model{Name: "m"}, nil)
-	tester.WithBody(t, req).Execute()
+		req := &types.CreateModelReq{CreateRepoReq: types.CreateRepoReq{Username: "u", Namespace: "u"}}
+		tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), req).Return(true, nil)
+		tester.mocks.model.EXPECT().Create(tester.Ctx(), req).Return(&types.Model{Name: "m"}, nil)
+		tester.WithBody(t, req).Execute()
 
-	tester.ResponseEq(t, 200, tester.OKText, &types.Model{Name: "m"})
+		tester.ResponseEq(t, 200, tester.OKText, &types.Model{Name: "m"})
+	})
+
 }
 
 func TestModelHandler_Update(t *testing.T) {

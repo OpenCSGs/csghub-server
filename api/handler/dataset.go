@@ -65,6 +65,11 @@ func (h *DatasetHandler) Create(ctx *gin.Context) {
 		httpbase.BadRequestWithExt(ctx, errorx.ReqBodyFormat(err, nil))
 		return
 	}
+
+	if req.Namespace == "" {
+		req.Namespace = currentUser
+	}
+	req.Username = currentUser
 	_, err := h.sensitive.CheckRequestV2(ctx.Request.Context(), req)
 	if err != nil {
 		slog.Error("failed to check sensitive request", slog.Any("error", err))
@@ -75,7 +80,6 @@ func (h *DatasetHandler) Create(ctx *gin.Context) {
 		httpbase.BadRequestWithExt(ctx, errorx.ErrForbiddenMsg("creating public dataset is not allowed"))
 		return
 	}
-	req.Username = currentUser
 
 	dataset, err := h.dataset.Create(ctx.Request.Context(), req)
 	if err != nil {

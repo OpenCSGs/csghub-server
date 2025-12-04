@@ -53,7 +53,7 @@ func (plugin *toolPoisoningPlugin) Check(ctx context.Context, files []*types.Fil
 		if err != nil {
 			return nil, fmt.Errorf("parse llm config header error: %w", err)
 		}
-		resp, err := plugin.llmClient.Chat(ctx, plugin.llmConfig.ApiEndpoint, headers, reqData)
+		resp, err := plugin.llmClient.Chat(ctx, plugin.llmConfig.ApiEndpoint, "", headers, reqData)
 		if err != nil {
 			return nil, err
 		}

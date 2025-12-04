@@ -1,0 +1,5 @@
+{
+    "error.AGENT-ERR-0": {
+        "other": "实例配额超出，智能体类型: {{.agent_type}}, 实例数量: {{.instance_count}}，配额: {{.quota}}"
+    }
+}

@@ -2,14 +2,17 @@ package handler
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/go-playground/validator/v10"
 	"opencsg.com/csghub-server/aigateway/component"
 	"opencsg.com/csghub-server/aigateway/token"
 	"opencsg.com/csghub-server/aigateway/types"
@@ -17,7 +20,9 @@ import (
 	"opencsg.com/csghub-server/builder/proxy"
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/sensitive"
+	"opencsg.com/csghub-server/builder/store/cache"
 	"opencsg.com/csghub-server/common/config"
+	commonType "opencsg.com/csghub-server/common/types"
 	apicomp "opencsg.com/csghub-server/component"
 )
 
@@ -45,14 +50,35 @@ func NewOpenAIHandlerFromConfig(config *config.Config) (OpenAIHandler, error) {
 	if config.SensitiveCheck.Enable {
 		modSvcClient = rpc.NewModerationSvcHttpClient(fmt.Sprintf("%s:%d", config.Moderation.Host, config.Moderation.Port))
 	}
-	return NewOpenAIHandler(modelService, repoComp, modSvcClient), nil
+	cacheClient, err := cache.NewCache(context.Background(), cache.RedisConfig{
+		Addr:     config.Redis.Endpoint,
+		Username: config.Redis.User,
+		Password: config.Redis.Password,
+	})
+	if err != nil {
+		return nil, err
+	}
+	modComponent := component.NewModerationImplWithClient(modSvcClient, cacheClient)
+	clusterComp, err := apicomp.NewClusterComponent(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create cluster component, error: %w", err)
+	}
+	return newOpenAIHandler(modelService, repoComp, modSvcClient, modComponent, clusterComp), nil
 }
 
-func NewOpenAIHandler(modelService component.OpenAIComponent, repoComp apicomp.RepoComponent, modSvcClient rpc.ModerationSvcClient) OpenAIHandler {
+func newOpenAIHandler(
+	modelService component.OpenAIComponent,
+	repoComp apicomp.RepoComponent,
+	modSvcClient rpc.ModerationSvcClient,
+	modComponent component.Moderation,
+	clusterComp apicomp.ClusterComponent,
+) *OpenAIHandlerImpl {
 	return &OpenAIHandlerImpl{
 		openaiComponent: modelService,
 		repoComp:        repoComp,
 		modSvcClient:    modSvcClient,
+		modComponent:    modComponent,
+		clusterComp:     clusterComp,
 	}
 }
 
@@ -61,6 +87,8 @@ type OpenAIHandlerImpl struct {
 	openaiComponent component.OpenAIComponent
 	repoComp        apicomp.RepoComponent
 	modSvcClient    rpc.ModerationSvcClient
+	modComponent    component.Moderation
+	clusterComp     apicomp.ClusterComponent
 }
 
 // ListModels godoc
@@ -161,7 +189,25 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 	username := httpbase.GetCurrentUser(c)
 	userUUID := httpbase.GetCurrentUserUUID(c)
 	chatReq := &ChatCompletionRequest{}
-	if err := c.BindJSON(chatReq); err != nil {
+	bodyBytes, err := io.ReadAll(c.Request.Body)
+	if err != nil {
+		slog.Error("failed to read request body", "error", err.Error())
+		c.String(http.StatusBadRequest, fmt.Errorf("invalid chat compoletion request body:%w", err).Error())
+		return
+	}
+
+	c.Request.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+	c.Request.ContentLength = int64(len(bodyBytes))
+
+	if err := json.Unmarshal(bodyBytes, chatReq); err != nil {
+		slog.Error("failed to parse request body", "error", err.Error())
+		c.String(http.StatusBadRequest, fmt.Errorf("invalid chat compoletion request body:%w", err).Error())
+		return
+	}
+
+	validate := validator.New()
+	err = validate.Struct(chatReq)
+	if err != nil {
 		slog.Error("invalid chat compoletion request body", "error", err.Error())
 		c.String(http.StatusBadRequest, fmt.Errorf("invalid chat compoletion request body:%w", err).Error())
 		return
@@ -184,9 +230,25 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 		return
 	}
 
-	endpoint := model.Endpoint
-	if endpoint == "" {
-		slog.Error("model not running, endpoint is empty", "model_id", modelID)
+	targetReq := commonType.EndpointReq{
+		ClusterID: model.ClusterID,
+		Target:    model.Endpoint,
+		Host:      "",
+		Endpoint:  model.Endpoint,
+		SvcName:   model.SvcName,
+	}
+	target := ""
+	host := ""
+	if len(model.SvcName) > 0 {
+		target, host, err = apicomp.ExtractDeployTargetAndHost(c.Request.Context(), h.clusterComp, targetReq)
+	} else {
+		slog.Debug("external model", slog.Any("model", model))
+		target = model.Endpoint
+	}
+	if err != nil || len(target) < 1 {
+		slog.Error("failed to get model target address", slog.Any("error", err),
+			slog.Any("model", model), slog.Any("targetReq", targetReq), slog.Any("model_id", modelID),
+			slog.Any("target", target), slog.Any("host", host))
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": types.Error{
 				Code:    "model_not_running",
@@ -202,7 +264,16 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 		c.String(http.StatusBadRequest, err.Error())
 		return
 	}
-	chatReq.Model = modelName
+
+	var reqMap map[string]interface{}
+	if err := json.Unmarshal(bodyBytes, &reqMap); err != nil {
+		slog.Error("failed to unmarshal request body to map", "error", err)
+		c.String(http.StatusBadRequest, fmt.Errorf("invalid chat completion request body: %w", err).Error())
+		return
+	}
+	// directly update model field in request map
+	reqMap["model"] = modelName
+
 	if chatReq.Stream {
 		c.Writer.Header().Set("Content-Type", "text/event-stream")
 		if !strings.Contains(model.ImageID, "vllm-cpu") {
@@ -211,27 +282,42 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 			}
 		}
 	}
-	data, _ := json.Marshal(chatReq)
-	c.Request.Body = io.NopCloser(bytes.NewReader(data))
-	c.Request.ContentLength = int64(len(data))
-	rp, _ := proxy.NewReverseProxy(endpoint)
-	slog.Info("proxy chat request to model endpoint", "endpoint", endpoint, "user", username, "model_name", modelName)
+
+	// marshal updated request map back to JSON bytes
+	updatedBodyBytes, err := json.Marshal(reqMap)
+	if err != nil {
+		slog.Error("failed to marshal updated request map", "error", err)
+		c.String(http.StatusInternalServerError, fmt.Errorf("failed to process chat request: %w", err).Error())
+		return
+	}
+
+	c.Request.Body = io.NopCloser(bytes.NewReader(updatedBodyBytes))
+	c.Request.ContentLength = int64(len(updatedBodyBytes))
+	slog.Info("proxy chat request to model target", slog.Any("target", target), slog.Any("host", host),
+		slog.Any("user", username), slog.Any("model_name", modelName))
+	rp, _ := proxy.NewReverseProxy(target)
 	w := NewResponseWriterWrapper(c.Writer, chatReq.Stream)
+	defer w.ClearBuffer()
 	if h.modSvcClient != nil {
 		w.WithModeration(h.modSvcClient)
 	}
-	tokenizer := token.NewTokenizerImpl(endpoint, modelName, model.ImageID)
+	tokenizer := token.NewTokenizerImpl(target, host, modelName, model.ImageID)
 	llmTokenCounter := token.NewLLMTokenCounter(tokenizer)
 	for _, msg := range chatReq.Messages {
 		if h.modSvcClient != nil {
-			result, err := h.modSvcClient.PassLLMPromptCheck(c, msg.Content, userUUID+modelID)
+			content := msg.GetContent().AsAny()
+			msgContent, ok := content.(*string)
+			if !ok {
+				break
+			}
+			result, err := h.modComponent.CheckLLMPrompt(c.Request.Context(), *msgContent, userUUID+modelID)
 			if err != nil {
 				c.String(http.StatusInternalServerError, fmt.Errorf("failed to call moderation error:%w", err).Error())
 				return
 			}
 			if result.IsSensitive {
 				slog.Debug("sensitive content", slog.String("reason", result.Reason))
-				errorChunk := w.generateSensitiveRespForPrompt()
+				errorChunk := generateSensitiveRespForPrompt()
 				errorChunkJson, _ := json.Marshal(errorChunk)
 				_, err := c.Writer.Write([]byte("data: " + string(errorChunkJson) + "\n\n" + "[DONE]"))
 				if err != nil {
@@ -242,13 +328,34 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 			}
 		}
 		llmTokenCounter.AppendPrompts(types.Message{
-			Role:    msg.Role,
-			Content: msg.Content,
+			Role:    *msg.GetRole(),
+			Content: msg.GetContent().AsAny().(*string),
 		})
 	}
 	w.WithLLMTokenCounter(llmTokenCounter)
 
-	rp.ServeHTTP(w, c.Request, "", "")
+	proxyToApi := ""
+	if model.Endpoint != "" {
+		uri, err := url.ParseRequestURI(model.Endpoint)
+		if err != nil {
+			slog.Warn("endpoint has wrong struct ", slog.String("model", modelName))
+		} else {
+			proxyToApi = uri.Path
+		}
+	}
+
+	if model.AuthHead != "" {
+		var authMap map[string]string
+		if err := json.Unmarshal([]byte(model.AuthHead), &authMap); err != nil {
+			slog.Warn("invalid auth head", slog.String("model", modelName))
+		} else {
+			for authKey, authVal := range authMap {
+				c.Request.Header.Set(authKey, authVal)
+			}
+		}
+	}
+
+	rp.ServeHTTP(w, c.Request, proxyToApi, host)
 
 	go func() {
 		err := h.openaiComponent.RecordUsage(c.Request.Context(), userUUID, model, llmTokenCounter)
@@ -298,8 +405,25 @@ func (h *OpenAIHandlerImpl) Embedding(c *gin.Context) {
 			}})
 		return
 	}
-	endpoint := model.Endpoint
-	if endpoint == "" {
+
+	targetReq := commonType.EndpointReq{
+		ClusterID: model.ClusterID,
+		Target:    model.Endpoint,
+		Host:      "",
+		Endpoint:  model.Endpoint,
+		SvcName:   model.SvcName,
+	}
+	target := ""
+	host := ""
+	if len(model.SvcName) > 0 {
+		target, host, err = apicomp.ExtractDeployTargetAndHost(c.Request.Context(), h.clusterComp, targetReq)
+	} else {
+		target = model.Endpoint
+	}
+	if err != nil || len(target) < 1 {
+		slog.Error("failed to get embedding target address", slog.Any("error", err),
+			slog.Any("model", model), slog.Any("targetReq", targetReq), slog.Any("model_id", modelID),
+			slog.Any("target", target), slog.Any("host", host))
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": types.Error{
 				Code:    "model_not_running",
@@ -318,7 +442,9 @@ func (h *OpenAIHandlerImpl) Embedding(c *gin.Context) {
 	data, _ := json.Marshal(req)
 	c.Request.Body = io.NopCloser(bytes.NewReader(data))
 	c.Request.ContentLength = int64(len(data))
-	rp, _ := proxy.NewReverseProxy(endpoint)
+	slog.Info("proxy embedding request to model endpoint", slog.Any("target", target), slog.Any("host", host),
+		slog.Any("user", username), slog.Any("model_id", modelID))
+	rp, _ := proxy.NewReverseProxy(target)
 	w := NewResponseWriterWrapperEmbedding(c.Writer)
 	//TODO: use real tokenizer to count token usag
 	if h.modSvcClient != nil {
@@ -335,12 +461,12 @@ func (h *OpenAIHandlerImpl) Embedding(c *gin.Context) {
 		}
 	}
 
-	tokenizer := token.NewTokenizerImpl(endpoint, modelName, model.ImageID)
+	tokenizer := token.NewTokenizerImpl(target, host, modelName, model.ImageID)
 	tokenCounter := token.NewEmbeddingTokenCounter(tokenizer)
 	tokenCounter.Input(req.Input)
 	w.WithTokenCounter(tokenCounter)
-	slog.Info("proxy embedding request to model endpoint", "endpoint", endpoint, "user", username, "model_id", modelID)
-	rp.ServeHTTP(w, c.Request, "", "")
+
+	rp.ServeHTTP(w, c.Request, "", host)
 	go func() {
 		err := h.openaiComponent.RecordUsage(c.Request.Context(), userUUID, model, tokenCounter)
 		if err != nil {

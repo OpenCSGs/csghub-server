@@ -176,3 +176,44 @@ func TestClusterComponent_GetClusterByID(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, "c1", data.ClusterID)
 }
+
+func TestClusterComponent_ExtractDeployTargetAndHost1(t *testing.T) {
+	ctx := context.TODO()
+	cc := initializeTestClusterComponent(ctx, t)
+	cc.mocks.stores.ClusterInfoMock().EXPECT().ByClusterID(ctx, "c1").Return(database.ClusterInfo{
+		ClusterID: "c1",
+		Status:    "running",
+	}, nil)
+
+	req := types.EndpointReq{
+		ClusterID: "c1",
+		Target:    "t1",
+	}
+
+	endpoint, host, err := ExtractDeployTargetAndHost(ctx, cc, req)
+	require.Nil(t, err)
+	require.Equal(t, "t1", endpoint)
+	require.Equal(t, "", host)
+
+}
+
+func TestClusterComponent_ExtractDeployTargetAndHost2(t *testing.T) {
+	ctx := context.TODO()
+	cc := initializeTestClusterComponent(ctx, t)
+	cc.mocks.stores.ClusterInfoMock().EXPECT().ByClusterID(ctx, "c1").Return(database.ClusterInfo{
+		ClusterID:   "c1",
+		Status:      "running",
+		AppEndpoint: "remote",
+	}, nil)
+
+	req := types.EndpointReq{
+		ClusterID: "c1",
+		Target:    "t1",
+		Endpoint:  "http://127.0.0.1",
+	}
+
+	endpoint, host, err := ExtractDeployTargetAndHost(ctx, cc, req)
+	require.Nil(t, err)
+	require.Equal(t, "remote", endpoint)
+	require.Equal(t, "127.0.0.1", host)
+}

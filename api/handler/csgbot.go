@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
@@ -38,10 +37,6 @@ func NewCSGBotProxyHandler(config *config.Config) (*CSGBotProxyHandler, error) {
 
 // Proxy send request to backend service, without change the request path
 func (h *CSGBotProxyHandler) Proxy(ctx *gin.Context) {
-	if strings.Contains(ctx.Request.URL.Path, "/github") {
-		h.rp.ServeHTTP(ctx.Writer, ctx.Request, "", "")
-		return
-	}
 	currentUser := httpbase.GetCurrentUser(ctx)
 	u, err := h.user.GetUserByName(ctx.Request.Context(), currentUser)
 	if err != nil {

@@ -17,7 +17,6 @@ import (
 	"opencsg.com/csghub-server/aigateway/token"
 	"opencsg.com/csghub-server/aigateway/types"
 	"opencsg.com/csghub-server/builder/rpc"
-	"opencsg.com/csghub-server/builder/sensitive"
 )
 
 type CommonResponseWriter interface {
@@ -25,6 +24,10 @@ type CommonResponseWriter interface {
 	WriteHeader(int)
 	Write([]byte) (int, error)
 	Flush()
+
+	WithModeration(rpc.ModerationSvcClient)
+	WithLLMTokenCounter(*token.ChatTokenCounter)
+	ClearBuffer()
 }
 
 var ErrSensitiveContent = errors.New("sensitive content detected")
@@ -36,7 +39,6 @@ type ResponseWriterWrapper struct {
 	modSvcClient       rpc.ModerationSvcClient
 	eventStreamDecoder *eventStreamDecoder
 	tokenCounter       *token.ChatTokenCounter
-	useStream          bool
 	id                 string
 }
 
@@ -45,12 +47,19 @@ func (rw *ResponseWriterWrapper) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	return rw.internalWritter.Hijack()
 }
 
-func NewResponseWriterWrapper(internalWritter gin.ResponseWriter, useStream bool) *ResponseWriterWrapper {
+func NewResponseWriterWrapper(internalWritter gin.ResponseWriter, useStream bool) CommonResponseWriter {
+	if useStream {
+		return newStreamResponseWriter(internalWritter)
+	} else {
+		return newNonStreamResponseWriter(internalWritter)
+	}
+}
+
+func newStreamResponseWriter(internalWritter gin.ResponseWriter) *ResponseWriterWrapper {
 	id := uuid.New().ID()
 	return &ResponseWriterWrapper{
 		internalWritter:    internalWritter,
 		eventStreamDecoder: &eventStreamDecoder{},
-		useStream:          useStream,
 		id:                 fmt.Sprint(id),
 	}
 }
@@ -63,6 +72,8 @@ func (rw *ResponseWriterWrapper) WithLLMTokenCounter(counter *token.ChatTokenCou
 	rw.tokenCounter = counter
 }
 
+func (rw *ResponseWriterWrapper) ClearBuffer() {}
+
 func (rw *ResponseWriterWrapper) Header() http.Header {
 	return rw.internalWritter.Header()
 }
@@ -72,41 +83,7 @@ func (rw *ResponseWriterWrapper) WriteHeader(statusCode int) {
 }
 
 func (rw *ResponseWriterWrapper) Write(data []byte) (int, error) {
-	if !rw.useStream {
-		return rw.nonStreamWrite(data)
-	}
-
 	return rw.streamWrite(data)
-}
-
-func (rw *ResponseWriterWrapper) nonStreamWrite(data []byte) (int, error) {
-	completion := types.ChatCompletion{}
-	err := json.Unmarshal(data, &completion)
-	if err != nil {
-		slog.Error("ResponseWriterWrapper nonStreamWrite unmarshal ChatCompletion error", slog.Any("err", err))
-	} else {
-		if rw.tokenCounter != nil {
-			rw.tokenCounter.Completion(completion)
-		}
-		// call moderation service
-		content := completion.Choices[0].Message.Content
-		if rw.modSvcClient != nil {
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			result, err := rw.modSvcClient.PassTextCheck(ctx, string(sensitive.ScenarioChatDetection), content)
-			cancel()
-			if err != nil {
-				slog.Error("ResponseWriterWrapper nonStreamWrite failed to call moderation service to check content sensitive", slog.Any("err", err))
-			} else {
-				if result.IsSensitive {
-					slog.Debug("ResponseWriterWrapper nonStreamWrite checkresult is sensitive", slog.Any("content", content), slog.Any("reason", result.Reason))
-					completion.Choices[0].Message.Content = "The message includes inappropriate content and has been blocked. We appreciate your understanding and cooperation."
-					completionJson, _ := json.Marshal(completion)
-					return rw.internalWritter.Write(completionJson)
-				}
-			}
-		}
-	}
-	return rw.internalWritter.Write(data)
 }
 
 func (rw *ResponseWriterWrapper) streamWrite(data []byte) (int, error) {
@@ -169,7 +146,10 @@ func (rw *ResponseWriterWrapper) streamWrite(data []byte) (int, error) {
 				}
 				rw.writeInternal(event.Raw)
 			} else {
-				panic("unsupported chunk struct")
+				slog.Error("Unknown data struct",
+					slog.Any("raw data", event.Raw),
+					slog.Any("unmarshal chunk", chunk))
+				rw.writeInternal(event.Raw)
 			}
 		}
 	}
@@ -205,7 +185,7 @@ func (rw *ResponseWriterWrapper) generateSensitiveRespForContent(curChunk types.
 		Model: curChunk.Model,
 		Choices: []types.ChatCompletionChunkChoice{
 			{
-				Delta: types.ChatCompletionChunkChoicesDelta{
+				Delta: types.ChatCompletionChunkChoiceDelta{
 					Content: "The message includes inappropriate content and has been blocked. We appreciate your understanding and cooperation.",
 				},
 				FinishReason: "sensitive",
@@ -219,11 +199,11 @@ func (rw *ResponseWriterWrapper) generateSensitiveRespForContent(curChunk types.
 	return newChunk
 }
 
-func (rw *ResponseWriterWrapper) generateSensitiveRespForPrompt() types.ChatCompletionChunk {
+func generateSensitiveRespForPrompt() types.ChatCompletionChunk {
 	newChunk := types.ChatCompletionChunk{
 		Choices: []types.ChatCompletionChunkChoice{
 			{
-				Delta: types.ChatCompletionChunkChoicesDelta{
+				Delta: types.ChatCompletionChunkChoiceDelta{
 					Content: "The prompt includes inappropriate content and has been blocked. We appreciate your understanding and cooperation.",
 				},
 				FinishReason: "sensitive",
@@ -240,7 +220,7 @@ func (rw *ResponseWriterWrapper) generateSensitiveRespForReasoningContent(curChu
 		Model: curChunk.Model,
 		Choices: []types.ChatCompletionChunkChoice{
 			{
-				Delta: types.ChatCompletionChunkChoicesDelta{
+				Delta: types.ChatCompletionChunkChoiceDelta{
 					ReasoningContent: "The message includes inappropriate content and has been blocked. We appreciate your understanding and cooperation.",
 				},
 				FinishReason: "sensitive",

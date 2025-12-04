@@ -11,13 +11,15 @@ import (
 
 type tgiTokenizerImpl struct {
 	endpoint string
+	host     string
 	model    string
 	hc       llm.LLMSvcClient
 }
 
-func newTGITokenizerImpl(endpoint, model string) Tokenizer {
+func newTGITokenizerImpl(endpoint, host, model string) Tokenizer {
 	return &tgiTokenizerImpl{
 		endpoint: endpoint,
+		host:     host,
 		model:    model,
 		hc:       llm.NewClient(),
 	}
@@ -36,7 +38,7 @@ func (tk *tgiTokenizerImpl) Encode(message types.Message) (int64, error) {
 		req := &llm.TGITokenizeReq{
 			Inputs: parsedMessage,
 		}
-		tokenRespByte, err := tk.hc.Tokenize(ctx, tk.endpoint+path, req)
+		tokenRespByte, err := tk.hc.Tokenize(ctx, tk.endpoint+path, tk.host, req)
 		if err != nil {
 			slog.Error("Call inference model", slog.Any("error", err))
 			return 0, err

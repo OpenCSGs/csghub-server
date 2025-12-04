@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"net/url"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -168,39 +167,14 @@ func (r *RProxyHandler) getSvcTargetAddress(ctx context.Context, appSvcName stri
 		return target, host, nil
 	}
 
-	cluster, err := r.clusterComp.GetClusterByID(ctx, deploy.ClusterID)
-	if err != nil {
-		return "", "", fmt.Errorf("failed to get cluster by id %s, error: %w", deploy.ClusterID, err)
+	req := types.EndpointReq{
+		ClusterID: deploy.ClusterID,
+		Target:    target,
+		Host:      host,
+		Endpoint:  deploy.Endpoint,
+		SvcName:   appSvcName,
 	}
 
-	if len(cluster.AppEndpoint) < 1 {
-		slog.Warn("app endpoint of cluster is empty", slog.Any("clusterID", cluster.ClusterID))
-		return target, host, nil
-	}
-
-	target = cluster.AppEndpoint
-	if len(deploy.Endpoint) < 1 {
-		return "", "", fmt.Errorf("endpoint of deploy %s is empty", appSvcName)
-	}
-
-	host, err = extractHostFromEndpoint(deploy.Endpoint)
-	if err != nil {
-		return "", "", fmt.Errorf("failed to extract host from endpoint %s, error: %w", deploy.Endpoint, err)
-	}
-
-	return target, host, nil
-}
-
-func extractHostFromEndpoint(endpoint string) (string, error) {
-	// http://u-neo888-test0922-2-lv.spaces.app.internal
-	// extract host from url
-	u, err := url.Parse(endpoint)
-	if err != nil {
-		return "", fmt.Errorf("failed to parse endpoint url %s, error: %w", endpoint, err)
-	}
-	host := u.Hostname()
-	if len(host) < 1 {
-		return "", fmt.Errorf("extract host of endpoint %s is empty", endpoint)
-	}
-	return host, nil
+	target, host, err := component.ExtractDeployTargetAndHost(ctx, r.clusterComp, req)
+	return target, host, err
 }

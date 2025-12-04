@@ -7,6 +7,7 @@ import (
 	"opencsg.com/csghub-server/aigateway/handler"
 	"opencsg.com/csghub-server/api/middleware"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/i18n"
 )
 
 func NewRouter(config *config.Config) (*gin.Engine, error) {
@@ -14,6 +15,8 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 	r.Use(gin.Recovery())
 	r.Use(middleware.Log(config))
 	//to access model,fintune with any kind of tokens in auth header
+	i18n.InitLocalizersFromEmbedFile()
+	r.Use(middleware.ModifyAcceptLanguageMiddleware(), middleware.LocalizedErrorMiddleware())
 	r.Use(middleware.Authenticator(config))
 	mustLogin := middleware.MustLogin()
 

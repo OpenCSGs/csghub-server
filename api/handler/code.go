@@ -63,6 +63,10 @@ func (h *CodeHandler) Create(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
+	req.Username = currentUser
+	if req.Namespace == "" {
+		req.Namespace = currentUser
+	}
 
 	_, err := h.sensitive.CheckRequestV2(ctx.Request.Context(), req)
 	if err != nil {
@@ -70,7 +74,6 @@ func (h *CodeHandler) Create(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
 		return
 	}
-	req.Username = currentUser
 
 	code, err := h.code.Create(ctx.Request.Context(), req)
 	if err != nil {

@@ -6,7 +6,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 
-	"github.com/openai/openai-go"
+	"github.com/openai/openai-go/v3"
 )
 
 type ReverseProxy interface {
@@ -48,6 +48,13 @@ func (rp *reverseProxyImpl) ServeHTTP(w http.ResponseWriter, r *http.Request, ap
 		if len(api) > 0 {
 			// change url to given api
 			req.URL.Path = api
+		}
+
+		targetQuery := rp.target.RawQuery
+		if targetQuery == "" || req.URL.RawQuery == "" {
+			req.URL.RawQuery = targetQuery + req.URL.RawQuery
+		} else {
+			req.URL.RawQuery = targetQuery + "&" + req.URL.RawQuery
 		}
 		// dont support br comporession
 		req.Header.Set("Accept-Encoding", "gzip")

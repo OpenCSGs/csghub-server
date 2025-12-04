@@ -181,13 +181,17 @@ func (h *SpaceHandler) Create(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
+	req.Username = currentUser
+	if req.Namespace == "" {
+		req.Namespace = currentUser
+	}
+
 	_, err := h.sensitive.CheckRequestV2(ctx.Request.Context(), &req)
 	if err != nil {
 		slog.Error("failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
 		return
 	}
-	req.Username = currentUser
 
 	space, err := h.space.Create(ctx.Request.Context(), req)
 	if err != nil {
