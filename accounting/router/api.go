@@ -16,7 +16,7 @@ import (
 func NewAccountRouter(config *config.Config, mqHandler mq.MessageQueue) (*gin.Engine, error) {
 	r := gin.New()
 	r.Use(gin.Recovery())
-	r.Use(middleware.Log(config))
+	r.Use(middleware.Log())
 	needAPIKey := middleware.NeedAPIKey(config)
 	//add router for golang pprof
 	debugGroup := r.Group("/debug", needAPIKey)

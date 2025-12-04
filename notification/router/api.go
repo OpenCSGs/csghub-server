@@ -13,7 +13,7 @@ import (
 func NewNotifierRouter(conf *config.Config) (*gin.Engine, error) {
 	r := gin.New()
 	r.Use(gin.Recovery())
-	r.Use(middleware.Log(conf))
+	r.Use(middleware.Log())
 	needAPIKey := middleware.NeedAPIKey(conf)
 	debugGroup := r.Group("/debug", needAPIKey)
 	pprof.RouteRegister(debugGroup, "pprof")

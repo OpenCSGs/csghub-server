@@ -184,10 +184,11 @@ func ConflictError(c *gin.Context, err error) {
 
 // R is the response envelope
 type R struct {
-	Code  string `json:"code,omitempty"`
-	Msg   string `json:"msg"`
-	Data  any    `json:"data,omitempty"`
-	Total int    `json:"total,omitempty"` // Total number of items, used in paginated responses
+	Code    string `json:"code,omitempty"`
+	Msg     string `json:"msg"`
+	Data    any    `json:"data,omitempty"`
+	Total   int    `json:"total,omitempty"` // Total number of items, used in paginated responses
+	TraceID string `json:"trace_id,omitempty"`
 	// error context msg
 	Context map[string]interface{} `json:"context,omitempty"`
 }
