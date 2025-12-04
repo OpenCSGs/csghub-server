@@ -5,6 +5,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	mockgit "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/git/gitserver"
@@ -236,6 +237,168 @@ func TestUserComponent_UpdatePhone(t *testing.T) {
 		VerificationCode: &code,
 	}
 	err := uc.UpdatePhone(context.TODO(), "user1", *req)
+	require.Nil(t, err)
+}
+
+func TestUserComponent_SendPublicSMSCode(t *testing.T) {
+	mockNotificationSvcClient := mockrpc.NewMockNotificationSvcClient(t)
+	mockNotificationSvcClient.EXPECT().Send(mock.Anything, mock.MatchedBy(func(req *types.MessageRequest) bool {
+		return req.Scenario == types.MessageScenarioSMSVerifyCode
+	})).Return(nil)
+
+	cache := mockcache.NewMockRedisClient(t)
+	cache.EXPECT().SetNX(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
+
+	config := &config.Config{}
+	config.Notification.SMSTemplateCodeForVerifyCodeOversea = "test"
+	config.Notification.SMSTemplateCodeForVerifyCodeCN = "test"
+	config.Notification.SMSSign = "test"
+
+	uc := &userComponentImpl{
+		notificationSvc: mockNotificationSvcClient,
+		cache:           cache,
+		config:          config,
+	}
+	resp, err := uc.SendPublicSMSCode(context.TODO(), types.SendPublicSMSCodeRequest{
+		Scene:     "submit-form",
+		Phone:     "13626487789",
+		PhoneArea: "+86",
+	})
+	require.Nil(t, err)
+	require.NotNil(t, resp)
+	require.NotNil(t, resp.ExpiredAt)
+}
+
+func TestUserComponent_SendPublicSMSCode_InvalidPhoneNumber(t *testing.T) {
+	uc := &userComponentImpl{}
+	resp, err := uc.SendPublicSMSCode(context.TODO(), types.SendPublicSMSCodeRequest{
+		Scene:     "submit-form",
+		Phone:     "66668877",
+		PhoneArea: "+86",
+	})
+	require.NotNil(t, err)
+	require.Nil(t, resp)
+	require.ErrorIs(t, err, errorx.ErrInvalidPhoneNumber)
+}
+
+func TestUserComponent_SendPublicSMSCode_PhoneAreaWithoutPrefix(t *testing.T) {
+	mockNotificationSvcClient := mockrpc.NewMockNotificationSvcClient(t)
+	mockNotificationSvcClient.EXPECT().Send(mock.Anything, mock.MatchedBy(func(req *types.MessageRequest) bool {
+		return req.Scenario == types.MessageScenarioSMSVerifyCode
+	})).Return(nil)
+
+	cache := mockcache.NewMockRedisClient(t)
+	cache.EXPECT().SetNX(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
+
+	config := &config.Config{}
+	config.Notification.SMSTemplateCodeForVerifyCodeOversea = "test"
+	config.Notification.SMSTemplateCodeForVerifyCodeCN = "test"
+	config.Notification.SMSSign = "test"
+
+	uc := &userComponentImpl{
+		notificationSvc: mockNotificationSvcClient,
+		cache:           cache,
+		config:          config,
+	}
+	resp, err := uc.SendPublicSMSCode(context.TODO(), types.SendPublicSMSCodeRequest{
+		Scene:     "submit-form",
+		Phone:     "13626487789",
+		PhoneArea: "86",
+	})
+	require.Nil(t, err)
+	require.NotNil(t, resp)
+	require.NotNil(t, resp.ExpiredAt)
+}
+
+func TestUserComponent_VerifyPublicSMSCode(t *testing.T) {
+	code := "123456"
+	phone := "13626487789"
+	phoneArea := "+86"
+	scene := "submit-form"
+
+	cache := mockcache.NewMockRedisClient(t)
+	cache.EXPECT().Get(mock.Anything, mock.Anything).Return("123456", nil)
+	cache.EXPECT().Del(mock.Anything, mock.Anything).Return(nil)
+
+	uc := &userComponentImpl{
+		cache: cache,
+	}
+	req := types.VerifyPublicSMSCodeRequest{
+		Scene:            scene,
+		Phone:            phone,
+		PhoneArea:        phoneArea,
+		VerificationCode: code,
+	}
+	err := uc.VerifyPublicSMSCode(context.TODO(), req)
+	require.Nil(t, err)
+}
+
+func TestUserComponent_VerifyPublicSMSCode_InvalidCode(t *testing.T) {
+	wrongCode := "654321"
+	phone := "13626487789"
+	phoneArea := "+86"
+	scene := "submit-form"
+
+	cache := mockcache.NewMockRedisClient(t)
+	cache.EXPECT().Get(mock.Anything, mock.Anything).Return("123456", nil)
+
+	uc := &userComponentImpl{
+		cache: cache,
+	}
+	req := types.VerifyPublicSMSCodeRequest{
+		Scene:            scene,
+		Phone:            phone,
+		PhoneArea:        phoneArea,
+		VerificationCode: wrongCode,
+	}
+	err := uc.VerifyPublicSMSCode(context.TODO(), req)
+	require.NotNil(t, err)
+	require.ErrorIs(t, err, errorx.ErrPhoneVerifyCodeInvalid)
+}
+
+func TestUserComponent_VerifyPublicSMSCode_ExpiredCode(t *testing.T) {
+	code := "123456"
+	phone := "13626487789"
+	phoneArea := "+86"
+	scene := "submit-form"
+
+	cache := mockcache.NewMockRedisClient(t)
+	cache.EXPECT().Get(mock.Anything, mock.Anything).Return("", redis.Nil)
+
+	uc := &userComponentImpl{
+		cache: cache,
+	}
+	req := types.VerifyPublicSMSCodeRequest{
+		Scene:            scene,
+		Phone:            phone,
+		PhoneArea:        phoneArea,
+		VerificationCode: code,
+	}
+	err := uc.VerifyPublicSMSCode(context.TODO(), req)
+	require.NotNil(t, err)
+	require.ErrorIs(t, err, errorx.ErrPhoneVerifyCodeExpiredOrNotFound)
+}
+
+func TestUserComponent_VerifyPublicSMSCode_PhoneAreaWithoutPrefix(t *testing.T) {
+	code := "123456"
+	phone := "13626487789"
+	phoneArea := "86"
+	scene := "submit-form"
+
+	cache := mockcache.NewMockRedisClient(t)
+	cache.EXPECT().Get(mock.Anything, mock.Anything).Return("123456", nil)
+	cache.EXPECT().Del(mock.Anything, mock.Anything).Return(nil)
+
+	uc := &userComponentImpl{
+		cache: cache,
+	}
+	req := types.VerifyPublicSMSCodeRequest{
+		Scene:            scene,
+		Phone:            phone,
+		PhoneArea:        phoneArea,
+		VerificationCode: code,
+	}
+	err := uc.VerifyPublicSMSCode(context.TODO(), req)
 	require.Nil(t, err)
 }
 

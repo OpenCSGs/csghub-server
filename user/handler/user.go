@@ -827,6 +827,62 @@ func (e *UserHandler) SendSMSCode(ctx *gin.Context) {
 	httpbase.OK(ctx, resp)
 }
 
+// SendPublicSMSCode godoc
+// @Security     ApiKey
+// @Summary      generate sms verification code and send it by sms (public endpoint)
+// @Description  generate sms verification code and send it by sms with scene parameter. Accessible to both logged-in and anonymous users.
+// @Tags         User
+// @Accept       json
+// @Produce      json
+// @Param        body body types.SendPublicSMSCodeRequest true "SendPublicSMSCodeRequest"
+// @Success      200  {object}  types.Response{data=types.SendSMSCodeResponse} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /user/public/sms-code [post]
+func (e *UserHandler) SendPublicSMSCode(ctx *gin.Context) {
+	var req types.SendPublicSMSCodeRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		slog.Error("SendPublicSMSCodeRequest failed", slog.Any("err", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	resp, err := e.c.SendPublicSMSCode(ctx, req)
+	if err != nil {
+		slog.Error("SendPublicSMSCode failed", slog.Any("err", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	httpbase.OK(ctx, resp)
+}
+
+// VerifyPublicSMSCode godoc
+// @Security     ApiKey
+// @Summary      verify sms verification code (public endpoint)
+// @Description  verify sms verification code with scene parameter. Accessible to both logged-in and anonymous users.
+// @Tags         User
+// @Accept       json
+// @Produce      json
+// @Param        body body types.VerifyPublicSMSCodeRequest true "VerifyPublicSMSCodeRequest"
+// @Success      200  {object}  types.Response{data=nil} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /user/public/sms-code/verify [post]
+func (e *UserHandler) VerifyPublicSMSCode(ctx *gin.Context) {
+	var req types.VerifyPublicSMSCodeRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		slog.Error("VerifyPublicSMSCodeRequest failed", slog.Any("err", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	err := e.c.VerifyPublicSMSCode(ctx, req)
+	if err != nil {
+		slog.Error("VerifyPublicSMSCode failed", slog.Any("err", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	httpbase.OK(ctx, nil)
+}
+
 // UpdatePhone godoc
 // @Security     ApiKey
 // @Summary      Update current user phone

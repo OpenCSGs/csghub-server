@@ -952,6 +952,65 @@ func (_c *MockUserComponent_ResetUserTags_Call) RunAndReturn(run func(context.Co
 	return _c
 }
 
+// SendPublicSMSCode provides a mock function with given fields: ctx, req
+func (_m *MockUserComponent) SendPublicSMSCode(ctx context.Context, req types.SendPublicSMSCodeRequest) (*types.SendSMSCodeResponse, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SendPublicSMSCode")
+	}
+
+	var r0 *types.SendSMSCodeResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.SendPublicSMSCodeRequest) (*types.SendSMSCodeResponse, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.SendPublicSMSCodeRequest) *types.SendSMSCodeResponse); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.SendSMSCodeResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.SendPublicSMSCodeRequest) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockUserComponent_SendPublicSMSCode_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SendPublicSMSCode'
+type MockUserComponent_SendPublicSMSCode_Call struct {
+	*mock.Call
+}
+
+// SendPublicSMSCode is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.SendPublicSMSCodeRequest
+func (_e *MockUserComponent_Expecter) SendPublicSMSCode(ctx interface{}, req interface{}) *MockUserComponent_SendPublicSMSCode_Call {
+	return &MockUserComponent_SendPublicSMSCode_Call{Call: _e.mock.On("SendPublicSMSCode", ctx, req)}
+}
+
+func (_c *MockUserComponent_SendPublicSMSCode_Call) Run(run func(ctx context.Context, req types.SendPublicSMSCodeRequest)) *MockUserComponent_SendPublicSMSCode_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.SendPublicSMSCodeRequest))
+	})
+	return _c
+}
+
+func (_c *MockUserComponent_SendPublicSMSCode_Call) Return(_a0 *types.SendSMSCodeResponse, _a1 error) *MockUserComponent_SendPublicSMSCode_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockUserComponent_SendPublicSMSCode_Call) RunAndReturn(run func(context.Context, types.SendPublicSMSCodeRequest) (*types.SendSMSCodeResponse, error)) *MockUserComponent_SendPublicSMSCode_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // SendSMSCode provides a mock function with given fields: ctx, uid, req
 func (_m *MockUserComponent) SendSMSCode(ctx context.Context, uid string, req types.SendSMSCodeRequest) (*types.SendSMSCodeResponse, error) {
 	ret := _m.Called(ctx, uid, req)
@@ -1266,6 +1325,53 @@ func (_c *MockUserComponent_UpdateUserLabels_Call) Return(_a0 error) *MockUserCo
 }
 
 func (_c *MockUserComponent_UpdateUserLabels_Call) RunAndReturn(run func(context.Context, *types.UserLabelsRequest) error) *MockUserComponent_UpdateUserLabels_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// VerifyPublicSMSCode provides a mock function with given fields: ctx, req
+func (_m *MockUserComponent) VerifyPublicSMSCode(ctx context.Context, req types.VerifyPublicSMSCodeRequest) error {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for VerifyPublicSMSCode")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.VerifyPublicSMSCodeRequest) error); ok {
+		r0 = rf(ctx, req)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockUserComponent_VerifyPublicSMSCode_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'VerifyPublicSMSCode'
+type MockUserComponent_VerifyPublicSMSCode_Call struct {
+	*mock.Call
+}
+
+// VerifyPublicSMSCode is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.VerifyPublicSMSCodeRequest
+func (_e *MockUserComponent_Expecter) VerifyPublicSMSCode(ctx interface{}, req interface{}) *MockUserComponent_VerifyPublicSMSCode_Call {
+	return &MockUserComponent_VerifyPublicSMSCode_Call{Call: _e.mock.On("VerifyPublicSMSCode", ctx, req)}
+}
+
+func (_c *MockUserComponent_VerifyPublicSMSCode_Call) Run(run func(ctx context.Context, req types.VerifyPublicSMSCodeRequest)) *MockUserComponent_VerifyPublicSMSCode_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.VerifyPublicSMSCodeRequest))
+	})
+	return _c
+}
+
+func (_c *MockUserComponent_VerifyPublicSMSCode_Call) Return(_a0 error) *MockUserComponent_VerifyPublicSMSCode_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockUserComponent_VerifyPublicSMSCode_Call) RunAndReturn(run func(context.Context, types.VerifyPublicSMSCodeRequest) error) *MockUserComponent_VerifyPublicSMSCode_Call {
 	_c.Call.Return(run)
 	return _c
 }

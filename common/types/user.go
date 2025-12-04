@@ -50,6 +50,19 @@ type SendSMSCodeResponse struct {
 	ExpiredAt time.Time `json:"expired_at"`
 }
 
+type SendPublicSMSCodeRequest struct {
+	Scene     string `json:"scene" binding:"required"`
+	PhoneArea string `json:"phone_area" binding:"required"`
+	Phone     string `json:"phone" binding:"required"`
+}
+
+type VerifyPublicSMSCodeRequest struct {
+	Scene            string `json:"scene" binding:"required"`
+	Phone            string `json:"phone" binding:"required"`
+	PhoneArea        string `json:"phone_area" binding:"required"`
+	VerificationCode string `json:"verification_code" binding:"required,len=6"`
+}
+
 type UpdateUserPhoneRequest struct {
 	Phone            *string `json:"phone" binding:"required"`
 	PhoneArea        *string `json:"phone_area,omitempty"`
