@@ -12,6 +12,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	mockdb "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/store/database"
@@ -216,7 +217,7 @@ func TestRemoteRunner_GetClusterById(t *testing.T) {
 	defer server.Close()
 
 	mockClusterStore := mockdb.NewMockClusterInfoStore(t)
-	mockClusterStore.EXPECT().ByClusterID(context.Background(), clusterID).Return(database.ClusterInfo{
+	mockClusterStore.EXPECT().ByClusterID(mock.Anything, clusterID).Return(database.ClusterInfo{
 		Mode:           types.ConnectModeInCluster,
 		RunnerEndpoint: server.URL,
 	}, nil).Once()
@@ -247,7 +248,7 @@ func TestRemoteRunner_GetClusterById_ServerError(t *testing.T) {
 	defer server.Close()
 
 	mockClusterStore := mockdb.NewMockClusterInfoStore(t)
-	mockClusterStore.EXPECT().ByClusterID(context.Background(), clusterID).Return(database.ClusterInfo{
+	mockClusterStore.EXPECT().ByClusterID(mock.Anything, clusterID).Return(database.ClusterInfo{
 		Mode:           types.ConnectModeInCluster,
 		RunnerEndpoint: server.URL,
 	}, nil).Once()
@@ -285,7 +286,7 @@ func TestRemoteRunner_GetClusterById_OutsideCluster(t *testing.T) {
 	defer server.Close()
 
 	mockClusterStore := mockdb.NewMockClusterInfoStore(t)
-	mockClusterStore.EXPECT().ByClusterID(context.Background(), clusterID).Return(database.ClusterInfo{
+	mockClusterStore.EXPECT().ByClusterID(mock.Anything, clusterID).Return(database.ClusterInfo{
 		Mode: types.ConnectModeKubeConfig, // Not in-cluster
 	}, nil).Once()
 

@@ -336,12 +336,16 @@ func (h *RemoteRunner) ListCluster(ctx context.Context) ([]types.ClusterResponse
 			Region:    cluster.Region,
 			Zone:      cluster.Zone,
 			Provider:  cluster.Provider,
+			UpdatedAt: cluster.UpdatedAt,
 		})
 	}
 	return resp, nil
 }
 
 func (h *RemoteRunner) GetClusterById(ctx context.Context, clusterId string) (*types.ClusterResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
 	remote, err := h.GetRemoteRunnerHost(ctx, clusterId)
 	if err != nil {
 		return nil, err

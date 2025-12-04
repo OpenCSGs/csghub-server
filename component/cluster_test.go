@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/accounting"
 	mockDeploy "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/deploy"
@@ -70,16 +71,17 @@ func TestClusterComponent_GetClusterUsages(t *testing.T) {
 	// Create cluster component with mock
 	c := &clusterComponentImpl{deployer: mockDeployer}
 
+	ctx := mock.Anything
 	// Test the method
-	mockDeployer.EXPECT().ListCluster(context.Background()).Return([]types.ClusterRes{
+	mockDeployer.EXPECT().ListCluster(ctx).Return([]types.ClusterRes{
 		{ClusterID: "c1"},
 		{ClusterID: "c2"},
 	}, nil)
-	mockDeployer.EXPECT().GetClusterUsageById(context.Background(), "c1").Return(&types.ClusterRes{
+	mockDeployer.EXPECT().GetClusterUsageById(ctx, "c1").Return(&types.ClusterRes{
 		ClusterID: "c1",
 		Status:    types.ClusterStatusRunning,
 	}, nil)
-	mockDeployer.EXPECT().GetClusterUsageById(context.Background(), "c2").Return(&types.ClusterRes{
+	mockDeployer.EXPECT().GetClusterUsageById(ctx, "c2").Return(&types.ClusterRes{
 		ClusterID: "c2",
 		Status:    types.ClusterStatusRunning,
 	}, nil)

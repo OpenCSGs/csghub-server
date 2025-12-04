@@ -574,11 +574,12 @@ func (d *deployer) ListCluster(ctx context.Context) ([]types.ClusterRes, error) 
 			resources = append(resources, node)
 		}
 		result = append(result, types.ClusterRes{
-			ClusterID: c.ClusterID,
-			Region:    c.Region,
-			Zone:      c.Zone,
-			Provider:  c.Provider,
-			Resources: resources,
+			ClusterID:      c.ClusterID,
+			Region:         c.Region,
+			Zone:           c.Zone,
+			Provider:       c.Provider,
+			Resources:      resources,
+			LastUpdateTime: c.UpdatedAt.Unix(),
 		})
 	}
 	return result, err
