@@ -13,7 +13,7 @@ import (
 func NewRouter(config *config.Config) (*gin.Engine, error) {
 	r := gin.New()
 	r.Use(gin.Recovery())
-	r.Use(middleware.Log(config))
+	r.Use(middleware.Log())
 	//to access model,fintune with any kind of tokens in auth header
 	i18n.InitLocalizersFromEmbedFile()
 	r.Use(middleware.ModifyAcceptLanguageMiddleware(), middleware.LocalizedErrorMiddleware())

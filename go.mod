@@ -11,6 +11,7 @@ require (
 	github.com/alibabacloud-go/tea v1.3.9
 	github.com/aliyun/alibaba-cloud-sdk-go v1.62.648
 	github.com/aliyun/aliyun-oss-go-sdk v3.0.2+incompatible
+	github.com/andybalholm/brotli v1.1.0
 	github.com/avast/retry-go/v4 v4.6.1
 	github.com/blang/semver/v4 v4.0.0
 	github.com/bmatcuk/doublestar/v4 v4.8.1
@@ -35,9 +36,6 @@ require (
 	github.com/minio/sha256-simd v1.0.1
 	github.com/naoina/toml v0.1.1
 	github.com/nicksnyder/go-i18n/v2 v2.6.0
-	github.com/nyaruka/phonenumbers v1.6.5
-	github.com/openai/openai-go/v3 v3.8.1
-	github.com/oschwald/geoip2-golang/v2 v2.0.0
 	github.com/openai/openai-go/v3 v3.8.1
 	github.com/parquet-go/parquet-go v0.24.0
 	github.com/prometheus/client_golang v1.21.1
@@ -47,7 +45,7 @@ require (
 	github.com/sethvargo/go-envconfig v1.1.0
 	github.com/spf13/cast v1.7.1
 	github.com/spf13/cobra v1.9.1
-	github.com/stretchr/testify v1.10.0
+	github.com/stretchr/testify v1.11.1
 	github.com/swaggo/files v1.0.1
 	github.com/swaggo/gin-swagger v1.6.0
 	github.com/swaggo/swag v1.16.2
@@ -111,7 +109,6 @@ require (
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric v0.51.0 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.51.0 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
-	github.com/andybalholm/brotli v1.1.0 // indirect
 	github.com/apache/thrift v0.21.0 // indirect
 	github.com/aws/aws-sdk-go v1.55.6 // indirect
 	github.com/beevik/ntp v1.3.1 // indirect
@@ -352,7 +349,7 @@ require (
 	golang.org/x/net v0.38.0 // indirect
 	golang.org/x/oauth2 v0.28.0
 	golang.org/x/sync v0.12.0
-	golang.org/x/sys v0.32.0 // indirect
+	golang.org/x/sys v0.37.0 // indirect
 	golang.org/x/term v0.30.0 // indirect
 	golang.org/x/text v0.23.0
 	golang.org/x/time v0.11.0

@@ -10,7 +10,8 @@ import (
 func SetInfraMiddleware(r *gin.Engine, config *config.Config, serviceName string) {
 	r.Use(Recovery())
 	instrumentation.SetupOtelMiddleware(r, config, serviceName)
-	r.Use(Log(config))
+	r.Use(Log())
+	r.Use(Request())
 
 	// Unified health check
 	// Since readinessProbe cannot send a head request, use the get method
