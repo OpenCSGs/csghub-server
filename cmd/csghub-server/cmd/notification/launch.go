@@ -1,8 +1,10 @@
 package notification
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
+	"opencsg.com/csghub-server/builder/instrumentation"
 
 	"github.com/spf13/cobra"
 	"opencsg.com/csghub-server/api/httpbase"
@@ -21,7 +23,10 @@ var launchCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-
+		stopOtel, err := instrumentation.SetupOTelSDK(context.Background(), cfg, instrumentation.Notification)
+		if err != nil {
+			panic(err)
+		}
 		// Check APIToken length
 		if len(cfg.APIToken) < 128 {
 			return fmt.Errorf("API token length is less than 128, please check")
@@ -52,7 +57,7 @@ var launchCmd = &cobra.Command{
 			r,
 		)
 		server.Run()
-
+		_ = stopOtel(context.Background())
 		return nil
 	},
 }

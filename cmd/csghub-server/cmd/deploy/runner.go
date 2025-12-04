@@ -1,11 +1,13 @@
 package deploy
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 
 	"github.com/spf13/cobra"
 	"opencsg.com/csghub-server/api/httpbase"
+	"opencsg.com/csghub-server/builder/instrumentation"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/runner/router"
 )
@@ -22,6 +24,10 @@ var startRunnerCmd = &cobra.Command{
 			return err
 		}
 
+		stopOtel, err := instrumentation.SetupOTelSDK(context.Background(), config, instrumentation.Runner)
+		if err != nil {
+			panic(err)
+		}
 		s, err := router.NewHttpServer(cmd.Context(), config)
 		if err != nil {
 			return fmt.Errorf("failed to create runner server: %w", err)
@@ -35,6 +41,7 @@ var startRunnerCmd = &cobra.Command{
 			s,
 		)
 		server.Run()
+		_ = stopOtel(context.Background())
 		return nil
 	},
 }

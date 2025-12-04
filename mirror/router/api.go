@@ -4,6 +4,7 @@ import (
 	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/middleware"
+	"opencsg.com/csghub-server/builder/instrumentation"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/mirror/handler"
 )
@@ -11,8 +12,8 @@ import (
 // same router for both repo sync and lfs sync service
 func NewRouter(config *config.Config) (*gin.Engine, error) {
 	r := gin.New()
-	r.Use(gin.Recovery())
-	r.Use(middleware.Log(config))
+	middleware.SetInfraMiddleware(r, config, instrumentation.Mirror)
+
 	needAPIKey := middleware.NeedAPIKey(config)
 	needAdmin := middleware.NeedAdmin(config)
 	authMiddleware := middleware.Authenticator(config)

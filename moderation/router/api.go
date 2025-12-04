@@ -2,6 +2,7 @@ package router
 
 import (
 	"fmt"
+	"net/http"
 	"opencsg.com/csghub-server/builder/instrumentation"
 
 	"github.com/gin-contrib/pprof"
@@ -22,7 +23,12 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 	pprof.RouteRegister(debugGroup, "pprof")
 
 	// r.Use(middleware.Authenticator(config))
+
 	apiV1Group := r.Group("/api/v1")
+	{
+		apiV1Group.GET("/healthz", healthz)
+	}
+
 	mc, err := handler.NewRepoHandler(config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating repo handler:%w", err)
@@ -43,4 +49,8 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 	createAdminRoutes(adminGroup)
 
 	return r, nil
+}
+
+func healthz(ctx *gin.Context) {
+	ctx.Writer.WriteHeader(http.StatusOK)
 }

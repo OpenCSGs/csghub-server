@@ -39,7 +39,7 @@ var launchCmd = &cobra.Command{
 			return fmt.Errorf("database initialization failed: %w", err)
 		}
 
-		stopOtel, err := instrumentation.SetupOTelSDK(context.Background(), cfg, "dataviewer-api")
+		stopOtel, err := instrumentation.SetupOTelSDK(context.Background(), cfg, instrumentation.Dataviewer)
 		if err != nil {
 			panic(err)
 		}

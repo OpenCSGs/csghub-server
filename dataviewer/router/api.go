@@ -2,10 +2,10 @@ package router
 
 import (
 	"fmt"
+	"opencsg.com/csghub-server/builder/instrumentation"
 
 	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
-	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 	"opencsg.com/csghub-server/api/middleware"
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
@@ -23,11 +23,7 @@ type DataViewerService struct {
 
 func NewDataViewerRouter(config *config.Config, tc temporal.Client) (*gin.Engine, error) {
 	r := gin.New()
-	if config.Instrumentation.OTLPEndpoint != "" {
-		r.Use(otelgin.Middleware("csghub-dataviewer"))
-	}
-	r.Use(gin.Recovery())
-	r.Use(middleware.Log(config))
+	middleware.SetInfraMiddleware(r, config, instrumentation.Dataviewer)
 	needAPIKey := middleware.NeedAPIKey(config)
 
 	//add router for golang pprof

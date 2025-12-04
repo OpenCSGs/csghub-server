@@ -117,10 +117,7 @@ func (g *GinTester) ResponseEq(t *testing.T, code int, msg string, expected any)
 	if !g._executed {
 		require.FailNow(t, "call Execute method first")
 	}
-	var r = struct {
-		Msg  string `json:"msg"`
-		Data any    `json:"data,omitempty"`
-	}{
+	var r = httpbase.R{
 		Msg:  msg,
 		Data: expected,
 	}

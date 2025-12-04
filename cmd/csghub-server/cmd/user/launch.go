@@ -1,8 +1,10 @@
 package user
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
+	"opencsg.com/csghub-server/builder/instrumentation"
 
 	"github.com/spf13/cobra"
 	"opencsg.com/csghub-server/api/httpbase"
@@ -22,6 +24,10 @@ var cmdLaunch = &cobra.Command{
 			return err
 		}
 		slog.Debug("config", slog.Any("data", cfg))
+		stopOtel, err := instrumentation.SetupOTelSDK(context.Background(), cfg, instrumentation.User)
+		if err != nil {
+			panic(err)
+		}
 		// Check APIToken length
 		if len(cfg.APIToken) < 128 {
 			return fmt.Errorf("API token length is less than 128, please check")
@@ -54,7 +60,7 @@ var cmdLaunch = &cobra.Command{
 		server.Run()
 
 		workflow.StopWorker()
-
+		_ = stopOtel(context.Background())
 		return nil
 	},
 }

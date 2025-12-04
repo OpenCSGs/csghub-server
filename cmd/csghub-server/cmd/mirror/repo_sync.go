@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"opencsg.com/csghub-server/builder/instrumentation"
 
 	"github.com/spf13/cobra"
 	"opencsg.com/csghub-server/api/httpbase"
@@ -24,7 +25,10 @@ var repoSyncCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-
+		stopOtel, err := instrumentation.SetupOTelSDK(context.Background(), cfg, instrumentation.Mirror)
+		if err != nil {
+			panic(err)
+		}
 		dbConfig := database.DBConfig{
 			Dialect: database.DatabaseDialect(cfg.Database.Driver),
 			DSN:     cfg.Database.DSN,
@@ -67,7 +71,7 @@ var repoSyncCmd = &cobra.Command{
 		repoSyncer.Run()
 
 		temporal.Stop()
-
+		_ = stopOtel(context.Background())
 		return nil
 	},
 }

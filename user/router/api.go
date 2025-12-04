@@ -3,6 +3,7 @@ package router
 import (
 	"fmt"
 	"log/slog"
+	"opencsg.com/csghub-server/builder/instrumentation"
 
 	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
@@ -15,8 +16,7 @@ import (
 
 func NewRouter(config *config.Config) (*gin.Engine, error) {
 	r := gin.New()
-	r.Use(gin.Recovery())
-	r.Use(middleware.Log(config))
+	middleware.SetInfraMiddleware(r, config, instrumentation.User)
 	needAPIKey := middleware.NeedAPIKey(config)
 	//add router for golang pprof
 	debugGroup := r.Group("/debug", needAPIKey)

@@ -3,9 +3,10 @@ package router
 import (
 	"context"
 	"fmt"
+	"log/slog"
+
 	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
-	"log/slog"
 	"opencsg.com/csghub-server/api/middleware"
 	"opencsg.com/csghub-server/builder/deploy/cluster"
 	"opencsg.com/csghub-server/builder/instrumentation"
@@ -17,9 +18,12 @@ import (
 
 func NewHttpServer(ctx context.Context, config *config.Config) (*gin.Engine, error) {
 	r := gin.New()
-	middleware.SetInfraMiddleware(r, config, instrumentation.Runner)
+	r.Use(middleware.Recovery())
+	instrumentation.SetupOtelMiddleware(r, config, instrumentation.Runner)
+	r.Use(middleware.Log(config))
 
 	needAPIKey := middleware.NeedAPIKey(config)
+
 	//add router for golang pprof
 	debugGroup := r.Group("/debug", needAPIKey)
 	pprof.RouteRegister(debugGroup, "pprof")

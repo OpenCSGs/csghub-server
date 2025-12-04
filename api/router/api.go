@@ -19,12 +19,9 @@ import (
 	"opencsg.com/csghub-server/api/handler/callback"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/api/middleware"
-	"opencsg.com/csghub-server/api/workflow"
-	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/instrumentation"
 	bldmq "opencsg.com/csghub-server/builder/mq"
 	bldprometheus "opencsg.com/csghub-server/builder/prometheus"
-	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/temporal"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/i18n"
@@ -32,11 +29,6 @@ import (
 )
 
 func RunServer(config *config.Config, enableSwagger bool) {
-	deploy.DeployWorkflow = func(buildTask, runTask *database.DeployTask) {
-		if err := workflow.StartNewDeployTaskWithCancelOld(buildTask, runTask); err != nil {
-			slog.Error("start new deploy task failed", slog.Any("error", err))
-		}
-	}
 	stopOtel, err := instrumentation.SetupOTelSDK(context.Background(), config, instrumentation.Server)
 	if err != nil {
 		panic(err)
@@ -134,6 +126,8 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 
 	}
 
+	healthHandler := handler.NewHealthHandler()
+	r.HEAD("/healthz", healthHandler.Healthz)
 	sdkGroup := r.Group("")
 	sdkGroup.Use(middleware.Authenticator(config))
 
@@ -283,7 +277,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		tokenGroup.PUT("/:app/:token_name", userProxyHandler.ProxyToApi("/api/v1/token/%s/%s", "app", "token_name"))
 		tokenGroup.DELETE("/:app/:token_name", userProxyHandler.ProxyToApi("/api/v1/token/%s/%s", "app", "token_name"))
 		// check token info
-		tokenGroup.GET("/:token_value", userProxyHandler.ProxyToApi("/api/v1/token/%s", "token_value"))
+		tokenGroup.GET("/:token_value", middlewareCollection.Auth.NeedAPIKey, userProxyHandler.ProxyToApi("/api/v1/token/%s", "token_value"))
 	}
 
 	sshKeyHandler, err := handler.NewSSHKeyHandler(config)
@@ -383,7 +377,6 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		cluster.GET("", middlewareCollection.Auth.NeedLogin, clusterHandler.Index)
 		cluster.GET("/usage", middlewareCollection.Auth.NeedAdmin, clusterHandler.GetClusterUsage)
 		cluster.GET("/deploys", middlewareCollection.Auth.NeedAdmin, clusterHandler.GetDeploys)
-		cluster.GET("/deploys_report", middlewareCollection.Auth.NeedAdmin, clusterHandler.GetDeploysReport)
 		cluster.GET("/:id", middlewareCollection.Auth.NeedLogin, clusterHandler.GetClusterById)
 		cluster.PUT("/:id", middlewareCollection.Auth.NeedAdmin, clusterHandler.Update)
 	}
@@ -501,13 +494,6 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	}
 	createDataflowRoutes(apiGroup, dataflowHandler)
 
-	// csgbot proxy
-	csgbotHandler, err := handler.NewCSGBotProxyHandler(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creating csgbot proxy handler:%w", err)
-	}
-	createCSGBotRoutes(apiGroup, csgbotHandler)
-
 	err = createAdvancedRoutes(apiGroup, middlewareCollection, config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating advance routes:%w", err)
@@ -545,12 +531,6 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		return nil, fmt.Errorf("error creating webhook routes: %w", err)
 	}
 
-	finetuneJobHandler, err := handler.NewFinetuneHandler(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creating finetune job handler: %w", err)
-	}
-	createFinetuneRoutes(apiGroup, middlewareCollection, finetuneJobHandler)
-
 	return r, nil
 }
 
@@ -562,17 +542,6 @@ func createEvaluationRoutes(apiGroup *gin.RouterGroup, middlewareCollection midd
 		evaluationsGroup.POST("", evaluationHandler.RunEvaluation)
 		evaluationsGroup.DELETE("/:id", evaluationHandler.DeleteEvaluation)
 		evaluationsGroup.GET("/:id", evaluationHandler.GetEvaluation)
-	}
-}
-
-func createFinetuneRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware.MiddlewareCollection, finetuneJobHandler *handler.FinetuneHandler) {
-	ftGroup := apiGroup.Group("/finetunes")
-	ftGroup.Use(middlewareCollection.Auth.NeedLogin)
-	{
-		ftGroup.POST("", finetuneJobHandler.RunFinetuneJob)
-		ftGroup.GET("/:id", finetuneJobHandler.GetFinetuneJob)
-		ftGroup.DELETE("/:id", finetuneJobHandler.DeleteFinetuneJob)
-		ftGroup.GET("/:id/logs", finetuneJobHandler.GetLogs)
 	}
 }
 
@@ -848,14 +817,10 @@ func createNotebookRoutes(
 		notebooks.GET("/:id", middlewareCollection.Auth.NeedLogin, notebookHandler.Get)
 		// update notebook
 		notebooks.PUT("/:id", middlewareCollection.Auth.NeedLogin, notebookHandler.Update)
-		notebooks.GET("/:id/status", middlewareCollection.Auth.NeedLogin, notebookHandler.Status)
-		notebooks.GET("/:id/logs/:instance", middlewareCollection.Auth.NeedLogin, notebookHandler.Logs)
 		// stop a notebook
 		notebooks.PUT("/:id/stop", middlewareCollection.Auth.NeedLogin, notebookHandler.Stop)
 		// start a notebook
 		notebooks.PUT("/:id/start", middlewareCollection.Auth.NeedLogin, notebookHandler.Start)
-		// wakeup a notebook
-		notebooks.PUT("/:id/wakeup", middlewareCollection.Auth.NeedLogin, notebookHandler.Wakeup)
 		// delete a notebook
 		notebooks.DELETE("/:id", middlewareCollection.Auth.NeedLogin, notebookHandler.Delete)
 	}
@@ -996,7 +961,6 @@ func createUserRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware
 	{
 		apiGroup.GET("/user/:username/run/:repo_type", middlewareCollection.Auth.UserMatch, userHandler.GetRunDeploys)
 		apiGroup.GET("/user/:username/finetune/instances", middlewareCollection.Auth.UserMatch, userHandler.GetFinetuneInstances)
-		apiGroup.GET("/user/:username/finetune/jobs", middlewareCollection.Auth.UserMatch, userHandler.GetUserFinetunes)
 		// User evaluations
 		apiGroup.GET("/user/:username/evaluations", middlewareCollection.Auth.UserMatch, userHandler.GetEvaluations)
 		// User notebooks
@@ -1191,11 +1155,6 @@ func createDataflowRoutes(apiGroup *gin.RouterGroup, dataflowHandler *handler.Da
 	dataflowGrp := apiGroup.Group("/dataflow")
 	dataflowGrp.Use(middleware.MustLogin())
 	dataflowGrp.Any("/*any", dataflowHandler.Proxy)
-}
-
-func createCSGBotRoutes(apiGroup *gin.RouterGroup, csgbotHandler *handler.CSGBotProxyHandler) {
-	csgbotGrp := apiGroup.Group("/csgbot")
-	csgbotGrp.Any("/*any", csgbotHandler.Proxy)
 }
 
 func createTagsRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware.MiddlewareCollection, tagHandler *handler.TagsHandler) {

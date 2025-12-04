@@ -2,6 +2,7 @@ package router
 
 import (
 	"fmt"
+	"opencsg.com/csghub-server/builder/instrumentation"
 
 	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
@@ -15,8 +16,7 @@ import (
 
 func NewAccountRouter(config *config.Config, mqHandler mq.MessageQueue) (*gin.Engine, error) {
 	r := gin.New()
-	r.Use(gin.Recovery())
-	r.Use(middleware.Log(config))
+	middleware.SetInfraMiddleware(r, config, instrumentation.Account)
 	needAPIKey := middleware.NeedAPIKey(config)
 	//add router for golang pprof
 	debugGroup := r.Group("/debug", needAPIKey)

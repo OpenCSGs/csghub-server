@@ -49,7 +49,7 @@ func (s *K8sHandler) RunService(c *gin.Context) {
 	request.SvcName = svcName
 	err = s.serviceComponent.RunService(c.Request.Context(), *request)
 	if err != nil {
-		slog.Error("fail to run service", slog.Any("error", err), slog.Any("req", request))
+		slog.ErrorContext(c.Request.Context(), "fail to run service", slog.Any("error", err), slog.Any("req", request))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
