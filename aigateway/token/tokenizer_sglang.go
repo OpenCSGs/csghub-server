@@ -7,13 +7,15 @@ import (
 
 type sglangTokenizerImpl struct {
 	endpoint string
+	host     string
 	model    string
 	hc       llm.LLMSvcClient
 }
 
-func newSGLangTokenizerImpl(endpoint, model string) Tokenizer {
+func newSGLangTokenizerImpl(endpoint, host, model string) Tokenizer {
 	return &sglangTokenizerImpl{
 		endpoint: endpoint,
+		host:     host,
 		model:    model,
 		hc:       llm.NewClient(),
 	}

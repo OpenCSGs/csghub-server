@@ -249,6 +249,9 @@ func (c *AliyunGreenChecker) PassLLMCheck(ctx context.Context, scenario Scenario
 		paramMap["sessionId"] = sessionId
 	}
 	if accountId != "" {
+		if text == "" {
+			return &CheckResult{IsSensitive: false}, nil
+		}
 		paramMap["accountId"] = accountId
 	}
 
@@ -275,8 +278,10 @@ func (c *AliyunGreenChecker) PassLLMCheck(ctx context.Context, scenario Scenario
 	}
 
 	if *resp.Body.Code != http.StatusOK {
-		slog.Error("text moderation not success.", slog.Any("resp.Body.code", *resp.Body.Code))
-		return nil, fmt.Errorf("aliyun TextModerationPlusWithOptions text moderation not success")
+		slog.Error("text moderation not success.",
+			slog.Any("resp.Body.code", *resp.Body.Code),
+			slog.String("resp.Body.message", *resp.Body.Message))
+		return nil, fmt.Errorf("aliyun TextModerationPlusWithOptions text moderation not success, error message: %s", *resp.Body.Message)
 	}
 
 	results := resp.Body.Data.Result

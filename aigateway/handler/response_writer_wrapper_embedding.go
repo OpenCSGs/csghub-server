@@ -8,7 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/openai/openai-go"
+	"github.com/openai/openai-go/v3"
 	"opencsg.com/csghub-server/aigateway/token"
 	"opencsg.com/csghub-server/builder/rpc"
 )

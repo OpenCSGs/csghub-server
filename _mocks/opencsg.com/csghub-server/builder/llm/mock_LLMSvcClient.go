@@ -21,9 +21,9 @@ func (_m *MockLLMSvcClient) EXPECT() *MockLLMSvcClient_Expecter {
 	return &MockLLMSvcClient_Expecter{mock: &_m.Mock}
 }
 
-// Tokenize provides a mock function with given fields: ctx, endpoint, req
-func (_m *MockLLMSvcClient) Tokenize(ctx context.Context, endpoint string, req interface{}) ([]byte, error) {
-	ret := _m.Called(ctx, endpoint, req)
+// Tokenize provides a mock function with given fields: ctx, endpoint, host, req
+func (_m *MockLLMSvcClient) Tokenize(ctx context.Context, endpoint string, host string, req interface{}) ([]byte, error) {
+	ret := _m.Called(ctx, endpoint, host, req)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Tokenize")
@@ -31,19 +31,19 @@ func (_m *MockLLMSvcClient) Tokenize(ctx context.Context, endpoint string, req i
 
 	var r0 []byte
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, interface{}) ([]byte, error)); ok {
-		return rf(ctx, endpoint, req)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, interface{}) ([]byte, error)); ok {
+		return rf(ctx, endpoint, host, req)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, interface{}) []byte); ok {
-		r0 = rf(ctx, endpoint, req)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, interface{}) []byte); ok {
+		r0 = rf(ctx, endpoint, host, req)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]byte)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, interface{}) error); ok {
-		r1 = rf(ctx, endpoint, req)
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, interface{}) error); ok {
+		r1 = rf(ctx, endpoint, host, req)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -59,14 +59,15 @@ type MockLLMSvcClient_Tokenize_Call struct {
 // Tokenize is a helper method to define mock.On call
 //   - ctx context.Context
 //   - endpoint string
+//   - host string
 //   - req interface{}
-func (_e *MockLLMSvcClient_Expecter) Tokenize(ctx interface{}, endpoint interface{}, req interface{}) *MockLLMSvcClient_Tokenize_Call {
-	return &MockLLMSvcClient_Tokenize_Call{Call: _e.mock.On("Tokenize", ctx, endpoint, req)}
+func (_e *MockLLMSvcClient_Expecter) Tokenize(ctx interface{}, endpoint interface{}, host interface{}, req interface{}) *MockLLMSvcClient_Tokenize_Call {
+	return &MockLLMSvcClient_Tokenize_Call{Call: _e.mock.On("Tokenize", ctx, endpoint, host, req)}
 }
 
-func (_c *MockLLMSvcClient_Tokenize_Call) Run(run func(ctx context.Context, endpoint string, req interface{})) *MockLLMSvcClient_Tokenize_Call {
+func (_c *MockLLMSvcClient_Tokenize_Call) Run(run func(ctx context.Context, endpoint string, host string, req interface{})) *MockLLMSvcClient_Tokenize_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(interface{}))
+		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(interface{}))
 	})
 	return _c
 }
@@ -76,7 +77,7 @@ func (_c *MockLLMSvcClient_Tokenize_Call) Return(_a0 []byte, _a1 error) *MockLLM
 	return _c
 }
 
-func (_c *MockLLMSvcClient_Tokenize_Call) RunAndReturn(run func(context.Context, string, interface{}) ([]byte, error)) *MockLLMSvcClient_Tokenize_Call {
+func (_c *MockLLMSvcClient_Tokenize_Call) RunAndReturn(run func(context.Context, string, string, interface{}) ([]byte, error)) *MockLLMSvcClient_Tokenize_Call {
 	_c.Call.Return(run)
 	return _c
 }

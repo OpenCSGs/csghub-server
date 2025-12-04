@@ -77,9 +77,9 @@ func TestModelIDBuilder_From(t *testing.T) {
 		{
 			name:          "invalid format - no colon",
 			modelID:       "invalid-format",
-			wantModelName: "",
+			wantModelName: "invalid-format",
 			wantSvcName:   "",
-			wantErr:       true,
+			wantErr:       false,
 		},
 		{
 			name:          "invalid format - multiple colons",

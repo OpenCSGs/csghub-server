@@ -9,6 +9,7 @@ type LLMConfig struct {
 	AuthHeader  string    `json:"auth_header"`
 	Type        int       `json:"type"` // 1: optimization, 2: comparison, 4: summary readme
 	Enabled     bool      `json:"enabled"`
+	Provider    string    `json:"provider"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }

@@ -26,6 +26,8 @@ type RedisClient interface {
 	RunWhileLocked(ctx context.Context, resourceName string, expiration time.Duration, fn func(ctx context.Context) error) error
 	WaitLockToRun(ctx context.Context, resourceName string, expiration time.Duration, fn func(ctx context.Context) error) error
 	HSet(ctx context.Context, key string, field string, value interface{}) error
+	HMSet(ctx context.Context, key string, vals ...interface{}) error
+	HGet(ctx context.Context, key string, field string) (string, error)
 	HGetAll(ctx context.Context, key string) (map[string]string, error)
 	HDel(ctx context.Context, key string, fields ...string) error
 	ZRem(ctx context.Context, key string, value string) error
@@ -36,6 +38,7 @@ type RedisClient interface {
 	ZCard(ctx context.Context, key string) (int64, error)
 	Exists(ctx context.Context, key string) (int64, error)
 	Expire(ctx context.Context, key string, expiration time.Duration) error
+	RunScript(ctx context.Context, scriptStr string, key []string, args ...any) (any, error)
 }
 
 type RedisConfig struct {
@@ -155,6 +158,14 @@ func (c *Cache) HSet(ctx context.Context, key string, field string, value interf
 	return c.core.HSet(ctx, key, field, value).Err()
 }
 
+func (c *Cache) HMSet(ctx context.Context, key string, values ...interface{}) error {
+	return c.core.HSet(ctx, key, values).Err()
+}
+
+func (c *Cache) HGet(ctx context.Context, key string, field string) (string, error) {
+	return c.core.HGet(ctx, key, field).Result()
+}
+
 func (c *Cache) HGetAll(ctx context.Context, key string) (map[string]string, error) {
 	return c.core.HGetAll(ctx, key).Result()
 }
@@ -197,4 +208,13 @@ func (c *Cache) Exists(ctx context.Context, key string) (int64, error) {
 
 func (c *Cache) Expire(ctx context.Context, key string, expiration time.Duration) error {
 	return c.core.Expire(ctx, key, expiration).Err()
+}
+
+func (c *Cache) RunScript(ctx context.Context, scriptStr string, keys []string, args ...any) (any, error) {
+	script := redis.NewScript(scriptStr)
+	res, err := script.Run(ctx, c.core, keys, args...).Result()
+	if err != nil {
+		return 0, err
+	}
+	return res, nil
 }

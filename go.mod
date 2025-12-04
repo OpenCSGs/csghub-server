@@ -35,7 +35,10 @@ require (
 	github.com/minio/sha256-simd v1.0.1
 	github.com/naoina/toml v0.1.1
 	github.com/nicksnyder/go-i18n/v2 v2.6.0
-	github.com/openai/openai-go v0.1.0-alpha.59
+	github.com/nyaruka/phonenumbers v1.6.5
+	github.com/openai/openai-go/v3 v3.8.1
+	github.com/oschwald/geoip2-golang/v2 v2.0.0
+	github.com/openai/openai-go/v3 v3.8.1
 	github.com/parquet-go/parquet-go v0.24.0
 	github.com/prometheus/client_golang v1.21.1
 	github.com/redis/go-redis/v9 v9.5.5

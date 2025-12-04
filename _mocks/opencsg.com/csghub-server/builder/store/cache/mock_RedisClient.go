@@ -414,6 +414,64 @@ func (_c *MockRedisClient_HDel_Call) RunAndReturn(run func(context.Context, stri
 	return _c
 }
 
+// HGet provides a mock function with given fields: ctx, key, field
+func (_m *MockRedisClient) HGet(ctx context.Context, key string, field string) (string, error) {
+	ret := _m.Called(ctx, key, field)
+
+	if len(ret) == 0 {
+		panic("no return value specified for HGet")
+	}
+
+	var r0 string
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) (string, error)); ok {
+		return rf(ctx, key, field)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) string); ok {
+		r0 = rf(ctx, key, field)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+		r1 = rf(ctx, key, field)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockRedisClient_HGet_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'HGet'
+type MockRedisClient_HGet_Call struct {
+	*mock.Call
+}
+
+// HGet is a helper method to define mock.On call
+//   - ctx context.Context
+//   - key string
+//   - field string
+func (_e *MockRedisClient_Expecter) HGet(ctx interface{}, key interface{}, field interface{}) *MockRedisClient_HGet_Call {
+	return &MockRedisClient_HGet_Call{Call: _e.mock.On("HGet", ctx, key, field)}
+}
+
+func (_c *MockRedisClient_HGet_Call) Run(run func(ctx context.Context, key string, field string)) *MockRedisClient_HGet_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(string))
+	})
+	return _c
+}
+
+func (_c *MockRedisClient_HGet_Call) Return(_a0 string, _a1 error) *MockRedisClient_HGet_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockRedisClient_HGet_Call) RunAndReturn(run func(context.Context, string, string) (string, error)) *MockRedisClient_HGet_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // HGetAll provides a mock function with given fields: ctx, key
 func (_m *MockRedisClient) HGetAll(ctx context.Context, key string) (map[string]string, error) {
 	ret := _m.Called(ctx, key)
@@ -469,6 +527,64 @@ func (_c *MockRedisClient_HGetAll_Call) Return(_a0 map[string]string, _a1 error)
 }
 
 func (_c *MockRedisClient_HGetAll_Call) RunAndReturn(run func(context.Context, string) (map[string]string, error)) *MockRedisClient_HGetAll_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// HMSet provides a mock function with given fields: ctx, key, vals
+func (_m *MockRedisClient) HMSet(ctx context.Context, key string, vals ...interface{}) error {
+	var _ca []interface{}
+	_ca = append(_ca, ctx, key)
+	_ca = append(_ca, vals...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for HMSet")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, ...interface{}) error); ok {
+		r0 = rf(ctx, key, vals...)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockRedisClient_HMSet_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'HMSet'
+type MockRedisClient_HMSet_Call struct {
+	*mock.Call
+}
+
+// HMSet is a helper method to define mock.On call
+//   - ctx context.Context
+//   - key string
+//   - vals ...interface{}
+func (_e *MockRedisClient_Expecter) HMSet(ctx interface{}, key interface{}, vals ...interface{}) *MockRedisClient_HMSet_Call {
+	return &MockRedisClient_HMSet_Call{Call: _e.mock.On("HMSet",
+		append([]interface{}{ctx, key}, vals...)...)}
+}
+
+func (_c *MockRedisClient_HMSet_Call) Run(run func(ctx context.Context, key string, vals ...interface{})) *MockRedisClient_HMSet_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		variadicArgs := make([]interface{}, len(args)-2)
+		for i, a := range args[2:] {
+			if a != nil {
+				variadicArgs[i] = a.(interface{})
+			}
+		}
+		run(args[0].(context.Context), args[1].(string), variadicArgs...)
+	})
+	return _c
+}
+
+func (_c *MockRedisClient_HMSet_Call) Return(_a0 error) *MockRedisClient_HMSet_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockRedisClient_HMSet_Call) RunAndReturn(run func(context.Context, string, ...interface{}) error) *MockRedisClient_HMSet_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -751,6 +867,77 @@ func (_c *MockRedisClient_RPush_Call) Return(_a0 error) *MockRedisClient_RPush_C
 }
 
 func (_c *MockRedisClient_RPush_Call) RunAndReturn(run func(context.Context, string, ...interface{}) error) *MockRedisClient_RPush_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// RunScript provides a mock function with given fields: ctx, scriptStr, key, args
+func (_m *MockRedisClient) RunScript(ctx context.Context, scriptStr string, key []string, args ...any) (any, error) {
+	var _ca []interface{}
+	_ca = append(_ca, ctx, scriptStr, key)
+	_ca = append(_ca, args...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RunScript")
+	}
+
+	var r0 any
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, []string, ...any) (any, error)); ok {
+		return rf(ctx, scriptStr, key, args...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, []string, ...any) any); ok {
+		r0 = rf(ctx, scriptStr, key, args...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(any)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, []string, ...any) error); ok {
+		r1 = rf(ctx, scriptStr, key, args...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockRedisClient_RunScript_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RunScript'
+type MockRedisClient_RunScript_Call struct {
+	*mock.Call
+}
+
+// RunScript is a helper method to define mock.On call
+//   - ctx context.Context
+//   - scriptStr string
+//   - key []string
+//   - args ...any
+func (_e *MockRedisClient_Expecter) RunScript(ctx interface{}, scriptStr interface{}, key interface{}, args ...interface{}) *MockRedisClient_RunScript_Call {
+	return &MockRedisClient_RunScript_Call{Call: _e.mock.On("RunScript",
+		append([]interface{}{ctx, scriptStr, key}, args...)...)}
+}
+
+func (_c *MockRedisClient_RunScript_Call) Run(run func(ctx context.Context, scriptStr string, key []string, args ...any)) *MockRedisClient_RunScript_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		variadicArgs := make([]any, len(args)-3)
+		for i, a := range args[3:] {
+			if a != nil {
+				variadicArgs[i] = a.(any)
+			}
+		}
+		run(args[0].(context.Context), args[1].(string), args[2].([]string), variadicArgs...)
+	})
+	return _c
+}
+
+func (_c *MockRedisClient_RunScript_Call) Return(_a0 any, _a1 error) *MockRedisClient_RunScript_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockRedisClient_RunScript_Call) RunAndReturn(run func(context.Context, string, []string, ...any) (any, error)) *MockRedisClient_RunScript_Call {
 	_c.Call.Return(run)
 	return _c
 }

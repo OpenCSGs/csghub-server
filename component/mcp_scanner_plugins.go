@@ -30,7 +30,7 @@ func summaryResult(ctx context.Context, llmClient *llm.Client, llmConfig *databa
 	if err != nil {
 		return nil, fmt.Errorf("parse llm config header error: %w", err)
 	}
-	summaryResult, err := llmClient.Chat(ctx, llmConfig.ApiEndpoint, headers, req)
+	summaryResult, err := llmClient.Chat(ctx, llmConfig.ApiEndpoint, "", headers, req)
 	if err != nil {
 		return nil, err
 	}
