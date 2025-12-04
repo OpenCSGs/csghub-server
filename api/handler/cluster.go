@@ -50,7 +50,7 @@ const (
 func (h *ClusterHandler) Index(ctx *gin.Context) {
 	clusters, err := h.c.Index(ctx.Request.Context())
 	if err != nil {
-		slog.Error("Failed to get cluster list", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get cluster list", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -72,7 +72,7 @@ func (h *ClusterHandler) GetClusterById(ctx *gin.Context) {
 	id := ctx.Param("id")
 	cluster, err := h.c.GetClusterWithResourceByID(ctx.Request.Context(), id)
 	if err != nil {
-		slog.Error("Failed to get cluster", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get cluster", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -93,7 +93,7 @@ func (h *ClusterHandler) GetClusterById(ctx *gin.Context) {
 func (h *ClusterHandler) GetClusterUsage(ctx *gin.Context) {
 	usages, err := h.c.GetClusterUsages(ctx.Request.Context())
 	if err != nil {
-		slog.Error("Failed to get cluster usage", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get cluster usage", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -118,7 +118,7 @@ func (h *ClusterHandler) GetClusterUsage(ctx *gin.Context) {
 func (h *ClusterHandler) GetDeploys(ctx *gin.Context) {
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format of page and per", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format of page and per", slog.Any("error", err))
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
@@ -138,7 +138,7 @@ func (h *ClusterHandler) GetDeploys(ctx *gin.Context) {
 	req.Query = ctx.Query("search")
 	deploys, total, err := h.c.GetDeploys(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("Failed to get cluster deploys", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get cluster deploys", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -175,7 +175,7 @@ func (h *ClusterHandler) GetDeploysReport(ctx *gin.Context) {
 	}
 	req.Query = ctx.Query("search")
 	if err := bindDeployDateRange(ctx, &req); err != nil {
-		slog.Error("Invalid date range for deploy report", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Invalid date range for deploy report", slog.Any("error", err))
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -208,7 +208,7 @@ func (h *ClusterHandler) GetDeploysReport(ctx *gin.Context) {
 	for {
 		deploys, total, err := h.c.GetDeploys(ctx.Request.Context(), req)
 		if err != nil {
-			slog.Error("Failed to get cluster deploys", slog.Any("error", err))
+			slog.ErrorContext(ctx.Request.Context(), "Failed to get cluster deploys", slog.Any("error", err))
 			httpbase.ServerError(ctx, err)
 			return
 		}
@@ -230,7 +230,7 @@ func (h *ClusterHandler) GetDeploysReport(ctx *gin.Context) {
 
 		writer.Flush()
 		if err := writer.Error(); err != nil {
-			slog.Error("Failed to write csv", slog.Any("error", err))
+			slog.ErrorContext(ctx.Request.Context(), "Failed to write csv", slog.Any("error", err))
 			return
 		}
 
@@ -246,14 +246,14 @@ func (h *ClusterHandler) GetDeploysReport(ctx *gin.Context) {
 func (h *ClusterHandler) Update(ctx *gin.Context) {
 	var req types.ClusterRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	req.ClusterID = ctx.Param("id")
 	result, err := h.c.Update(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("Failed to update cluster info", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to update cluster info", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}

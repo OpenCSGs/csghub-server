@@ -59,7 +59,7 @@ func (h *CodeHandler) Create(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	var req *types.CreateCodeReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -70,7 +70,7 @@ func (h *CodeHandler) Create(ctx *gin.Context) {
 
 	_, err := h.sensitive.CheckRequestV2(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("failed to check sensitive request", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
 		return
 	}
@@ -83,7 +83,7 @@ func (h *CodeHandler) Create(ctx *gin.Context) {
 		} else if errors.Is(err, errorx.ErrDatabaseDuplicateKey) {
 			httpbase.BadRequestWithExt(ctx, err)
 		} else {
-			slog.Error("Failed to create code", slog.Any("error", err))
+			slog.ErrorContext(ctx.Request.Context(), "Failed to create code", slog.Any("error", err))
 			httpbase.ServerError(ctx, err)
 		}
 		return
@@ -120,7 +120,7 @@ func (h *CodeHandler) Index(ctx *gin.Context) {
 	filter.Username = httpbase.GetCurrentUser(ctx)
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -132,7 +132,7 @@ func (h *CodeHandler) Index(ctx *gin.Context) {
 				Set("param", "sort").
 				Set("provided", filter.Sort).
 				Set("allowed", types.Sorts))
-		slog.Error("Bad request format,", slog.String("error", msg))
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format,", slog.String("error", msg))
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
@@ -144,7 +144,7 @@ func (h *CodeHandler) Index(ctx *gin.Context) {
 				Set("param", "source").
 				Set("provided", filter.Source).
 				Set("allowed", types.Sources))
-		slog.Error("Bad request format,", slog.String("error", msg))
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format,", slog.String("error", msg))
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
@@ -157,7 +157,7 @@ func (h *CodeHandler) Index(ctx *gin.Context) {
 
 	codes, total, err := h.code.Index(ctx.Request.Context(), filter, per, page, needOpWeight)
 	if err != nil {
-		slog.Error("Failed to get codes", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get codes", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -184,14 +184,14 @@ func (h *CodeHandler) Update(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	var req *types.UpdateCodeReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 
 	_, err := h.sensitive.CheckRequestV2(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("failed to check sensitive request", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
 		return
 	}
@@ -199,7 +199,7 @@ func (h *CodeHandler) Update(ctx *gin.Context) {
 
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -212,7 +212,7 @@ func (h *CodeHandler) Update(ctx *gin.Context) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
-		slog.Error("Failed to update code", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to update code", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -239,7 +239,7 @@ func (h *CodeHandler) Delete(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -249,7 +249,7 @@ func (h *CodeHandler) Delete(ctx *gin.Context) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
-		slog.Error("Failed to delete code", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to delete code", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -276,7 +276,7 @@ func (h *CodeHandler) Delete(ctx *gin.Context) {
 func (h *CodeHandler) Show(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -291,7 +291,7 @@ func (h *CodeHandler) Show(ctx *gin.Context) {
 	qNeedMultiSync := ctx.Query("need_multi_sync")
 	needMultiSync, err := strconv.ParseBool(qNeedMultiSync)
 	if err != nil {
-		slog.Error("bad need_multi_sync params", slog.Any("need_multi_sync", qNeedMultiSync), slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "bad need_multi_sync params", slog.Any("need_multi_sync", qNeedMultiSync), slog.Any("error", err))
 		needMultiSync = false
 	}
 
@@ -301,7 +301,7 @@ func (h *CodeHandler) Show(ctx *gin.Context) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
-		slog.Error("Failed to get code", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get code", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -336,7 +336,7 @@ func (h *CodeHandler) Relations(ctx *gin.Context) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
-		slog.Error("Failed to get code relations", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get code relations", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}

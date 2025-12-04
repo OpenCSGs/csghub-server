@@ -30,7 +30,7 @@ type HFDatasetHandler struct {
 func (h *HFDatasetHandler) DatasetPathsInfo(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format for dataset path info", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format for dataset path info", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -52,7 +52,7 @@ func (h *HFDatasetHandler) DatasetPathsInfo(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	params, err := url.ParseQuery(string(body))
 	if err != nil {
-		slog.Error("error parsing query body", slog.Any("body", string(body)), slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "error parsing query body", slog.Any("body", string(body)), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -68,7 +68,7 @@ func (h *HFDatasetHandler) DatasetPathsInfo(ctx *gin.Context) {
 
 	res, err := h.dc.GetPathsInfo(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("fail to get dataset paths info", slog.Any("req", req), slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "fail to get dataset paths info", slog.Any("req", req), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 	}
 	ctx.PureJSON(http.StatusOK, res)
@@ -77,7 +77,7 @@ func (h *HFDatasetHandler) DatasetPathsInfo(ctx *gin.Context) {
 func (h *HFDatasetHandler) DatasetTree(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format for dataset tree", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format for dataset tree", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -102,7 +102,7 @@ func (h *HFDatasetHandler) DatasetTree(ctx *gin.Context) {
 
 	tree, err := h.dc.GetDatasetTree(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("fail to get dataset tree", slog.Any("req", req), slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "fail to get dataset tree", slog.Any("req", req), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 	}
 	ctx.PureJSON(http.StatusOK, tree)

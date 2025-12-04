@@ -25,7 +25,7 @@ func ModifyAcceptLanguageMiddleware() gin.HandlerFunc {
 		var lang language.Tag
 		tags, _, err := language.ParseAcceptLanguage(acceptLanguage)
 		if err != nil {
-			slog.Error("parse Accept-Language header, LocalizedErrorMiddleware", slog.String("err", err.Error()))
+			slog.ErrorContext(c.Request.Context(), "parse Accept-Language header, LocalizedErrorMiddleware", slog.String("err", err.Error()))
 			lang = language.AmericanEnglish // default to English if parsing fails
 		} else {
 			lang, _, _ = i18n.Matcher.Match(tags...)
@@ -75,17 +75,27 @@ func LocalizedErrorMiddleware() gin.HandlerFunc {
 		lang := c.GetHeader("Accept-Language")
 
 		respBytes := bw.body.Bytes()
+		if len(respBytes) == 0 {
+			_, err := bw.writeInternal(respBytes)
+			if err != nil {
+				slog.ErrorContext(c.Request.Context(), "write original resp with empty body error, LocalizedErrorMiddleware",
+					slog.String("url", c.Request.URL.Path),
+					slog.String("err", err.Error()),
+				)
+			}
+			return
+		}
 		var respObj httpbase.R
 		err := json.Unmarshal(respBytes, &respObj)
 		if err != nil {
-			slog.Error("unmarshal original httpbase.R, LocalizedErrorMiddleware",
+			slog.ErrorContext(c.Request.Context(), "unmarshal original httpbase.R, LocalizedErrorMiddleware",
 				slog.String("url", c.Request.URL.Path),
 				slog.String("err", err.Error()),
 				slog.String("resp", string(respBytes)),
 			)
 			_, err = bw.writeInternal(respBytes)
 			if err != nil {
-				slog.Error("unmarshal original resp failed, write original resp, LocalizedErrorMiddleware",
+				slog.ErrorContext(c.Request.Context(), "unmarshal original resp failed, write original resp, LocalizedErrorMiddleware",
 					slog.String("url", c.Request.URL.Path),
 					slog.String("err", err.Error()),
 				)
@@ -104,7 +114,7 @@ func LocalizedErrorMiddleware() gin.HandlerFunc {
 				translatedMsg, ok = i18n.TranslateText(lang, messageID, code)
 			}
 			if !ok {
-				slog.Error("can not translate error code",
+				slog.ErrorContext(c.Request.Context(), "can not translate error code",
 					slog.String("url", c.Request.URL.Path),
 					slog.String("msg", respObj.Msg),
 					slog.String("code", respObj.Code),
@@ -117,13 +127,13 @@ func LocalizedErrorMiddleware() gin.HandlerFunc {
 
 		updatedBody, err := json.Marshal(respObj)
 		if err != nil {
-			slog.Error("marshal updated httpbase.R",
+			slog.ErrorContext(c.Request.Context(), "marshal updated httpbase.R",
 				slog.String("url", c.Request.URL.Path),
 				slog.String("err", err.Error()),
 			)
 			_, err = bw.writeInternal(respBytes)
 			if err != nil {
-				slog.Error("marshal updated httpbase.R failed, write origin resp, LocalizedErrorMiddleware",
+				slog.ErrorContext(c.Request.Context(), "marshal updated httpbase.R failed, write origin resp, LocalizedErrorMiddleware",
 					slog.String("url", c.Request.URL.Path),
 					slog.String("err", err.Error()),
 				)
@@ -133,7 +143,7 @@ func LocalizedErrorMiddleware() gin.HandlerFunc {
 		bw.ResponseWriter.Header().Set("Content-Length", strconv.Itoa(len(updatedBody)))
 		_, err = bw.writeInternal(updatedBody)
 		if err != nil {
-			slog.Error("write updated httpbase.R, LocalizedErrorMiddleware",
+			slog.ErrorContext(c.Request.Context(), "write updated httpbase.R, LocalizedErrorMiddleware",
 				slog.String("url", c.Request.URL.Path),
 				slog.String("err", err.Error()),
 			)

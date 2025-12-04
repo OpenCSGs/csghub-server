@@ -41,7 +41,7 @@ func (h *MirrorSourceHandler) Create(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	var msReq types.CreateMirrorSourceReq
 	if err := ctx.ShouldBindJSON(&msReq); err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -49,7 +49,7 @@ func (h *MirrorSourceHandler) Create(ctx *gin.Context) {
 	msReq.CurrentUser = currentUser
 	ms, err := h.mirrorSource.Create(ctx.Request.Context(), msReq)
 	if err != nil {
-		slog.Error("Failed to create mirror source", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Failed to create mirror source", "error", err)
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -69,7 +69,7 @@ func (h *MirrorSourceHandler) Create(ctx *gin.Context) {
 func (h *MirrorSourceHandler) Index(ctx *gin.Context) {
 	ms, err := h.mirrorSource.Index(ctx.Request.Context())
 	if err != nil {
-		slog.Error("Failed to get mirror sources", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get mirror sources", "error", err)
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -96,18 +96,18 @@ func (h *MirrorSourceHandler) Update(ctx *gin.Context) {
 	id := ctx.Param("id")
 	if id == "" {
 		err := fmt.Errorf("invalid mirror source id")
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	if err := ctx.ShouldBindJSON(&msReq); err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	msId, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -115,7 +115,7 @@ func (h *MirrorSourceHandler) Update(ctx *gin.Context) {
 	msReq.CurrentUser = currentUser
 	ms, err := h.mirrorSource.Update(ctx.Request.Context(), msReq)
 	if err != nil {
-		slog.Error("Failed to get mirror sources", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get mirror sources", "error", err)
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -138,20 +138,20 @@ func (h *MirrorSourceHandler) Get(ctx *gin.Context) {
 	id := ctx.Param("id")
 	if id == "" {
 		err := fmt.Errorf("invalid mirror source id")
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	msId, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 
 	ms, err := h.mirrorSource.Get(ctx.Request.Context(), msId)
 	if err != nil {
-		slog.Error("Failed to get mirror source", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get mirror source", "error", err)
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -174,20 +174,20 @@ func (h *MirrorSourceHandler) Delete(ctx *gin.Context) {
 	id := ctx.Param("id")
 	if id == "" {
 		err := fmt.Errorf("invalid mirror source id")
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	msId, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 
 	err = h.mirrorSource.Delete(ctx.Request.Context(), msId)
 	if err != nil {
-		slog.Error("Failed to delete mirror source", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Failed to delete mirror source", "error", err)
 		httpbase.ServerError(ctx, err)
 		return
 	}

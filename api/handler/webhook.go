@@ -34,7 +34,7 @@ func (h *WebHookHandler) ReceiveRunnerWebHook(ctx *gin.Context) {
 	var reqEvent types.WebHookRecvEvent
 
 	if err := ctx.ShouldBindJSON(&reqEvent); err != nil {
-		slog.Error("Bad request format for webhook event", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format for webhook event", slog.Any("error", err))
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -43,7 +43,7 @@ func (h *WebHookHandler) ReceiveRunnerWebHook(ctx *gin.Context) {
 
 	err := h.webhookComp.HandleWebHook(ctx.Request.Context(), &reqEvent)
 	if err != nil {
-		slog.Error("Failed to handle webhook event", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to handle webhook event", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}

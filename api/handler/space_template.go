@@ -39,7 +39,7 @@ type SpaceTemplateHandler struct {
 func (h *SpaceTemplateHandler) Index(ctx *gin.Context) {
 	templates, err := h.c.Index(ctx.Request.Context())
 	if err != nil {
-		slog.Error("Failed to get space templates", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get space templates", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -61,13 +61,13 @@ func (h *SpaceTemplateHandler) Index(ctx *gin.Context) {
 func (h *SpaceTemplateHandler) Create(ctx *gin.Context) {
 	var req types.SpaceTemplateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	res, err := h.c.Create(ctx.Request.Context(), &req)
 	if err != nil {
-		slog.Error("Failed to create space template", slog.Any("req", req), slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to create space template", slog.Any("req", req), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -94,13 +94,13 @@ func (h *SpaceTemplateHandler) Update(ctx *gin.Context) {
 	)
 	var req *types.UpdateSpaceTemplateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	id, err = strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -108,7 +108,7 @@ func (h *SpaceTemplateHandler) Update(ctx *gin.Context) {
 
 	res, err := h.c.Update(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("Failed to update space template", slog.Any("req", req), slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to update space template", slog.Any("req", req), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -134,14 +134,14 @@ func (h *SpaceTemplateHandler) Delete(ctx *gin.Context) {
 	)
 	id, err = strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 
 	err = h.c.Delete(ctx.Request.Context(), id)
 	if err != nil {
-		slog.Error("Failed to delete space template", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to delete space template", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -164,7 +164,7 @@ func (h *SpaceTemplateHandler) List(ctx *gin.Context) {
 	templateType := ctx.Param("type")
 	templates, err := h.c.FindAllByType(ctx.Request.Context(), templateType)
 	if err != nil {
-		slog.Error("Failed to list space templates", slog.Any("templateType", templateType), slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to list space templates", slog.Any("templateType", templateType), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}

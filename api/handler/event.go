@@ -40,7 +40,7 @@ func (h *EventHandler) Create(ctx *gin.Context) {
 	}
 
 	if err := h.ec.NewEvents(ctx.Request.Context(), events); err != nil {
-		slog.Error("Failed to create events", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to create events", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}

@@ -17,7 +17,8 @@ func Log() gin.HandlerFunc {
 		}
 
 		startTime := time.Now()
-		traceID := trace.GetOrGenTraceID(ctx)
+		_ = trace.GetOrGenTraceID(ctx)
+
 		ctx.Next()
 
 		latency := time.Since(startTime).Milliseconds()
@@ -29,7 +30,8 @@ func Log() gin.HandlerFunc {
 			slog.Any("auth_type", httpbase.GetAuthType(ctx)),
 			slog.String("url", ctx.Request.URL.RequestURI()),
 			slog.String("full_path", ctx.FullPath()),
-			slog.String("trace_id", traceID),
+			slog.String("req_header_range", ctx.GetHeader("Range")),
+			slog.String("rsp_content_range", ctx.Writer.Header().Get("Content-Range")),
 		)
 	}
 }
