@@ -1,0 +1,89 @@
+## Building Images ##############################################
+.build:
+  image: ${ALI_ACR_REGISTRY}/docker:27.3
+  stage: build
+  variables:
+    DOCKER_HOST: "tcp://docker:2375"
+    DOCKER_TLS_CERTDIR: ""
+    BUILDX_NO_DEFAULT_ATTESTATIONS: 1
+    DOCKERCACHE: "${CI_PROJECT_DIR}/.cache/docker"
+  services:
+    - name: ${ALI_ACR_REGISTRY}/docker:27.3-dind
+      command: ["--feature=containerd-snapshotter", "--experimental"]
+      alias: docker
+  before_script:
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u $CI_REGISTRY_USER $CI_REGISTRY --password-stdin
+    - echo "$ALI_ACR_PASSWORD" | docker login -u $ALI_ACR_USER $ALI_ACR_REGISTRY --password-stdin
+    - |
+      if [ "$BUILD_TAG" != "saas" ]; then
+        echo "$DOCKER_REGISTRY_PASSWORD" | docker login -u $DOCKER_REGISTRY_USER --password-stdin
+      fi
+    - docker run --privileged --rm ${ALI_ACR_REGISTRY}/tonistiigi/binfmt --install all
+    - sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
+    - apk add bash jq
+    - rm -rf .git
+  script:
+    - |
+      cat <<'EOF' | bash -s 
+      # Generate full image
+      echo "IMAGE_TAG=$IMAGE_TAG" >> build.env
+      export IMAGE=${IMAGE_PREFIX}:${IMAGE_TAG}
+      echo "Building ${IMAGE} for platform ${BUILD_PLATFORMS}."
+      
+      if [[ $BUILD_TAG == "saas" ]]; then
+        FLAG=${IMAGE_TAG#*-}
+        BUILD_TAG=$(cat build_saas_version.json | jq -r \
+          --arg flag "$FLAG" \
+          --arg buildTag "saas" \
+          '.[$flag] + [$buildTag] | join(",")')
+      fi
+      
+      BUILD_ARGS=(
+        --provenance false
+        --platform ${BUILD_PLATFORMS}
+        --cache-from type=local,src="$DOCKERCACHE" 
+        --cache-to type=local,dest="$DOCKERCACHE"
+        --build-arg CSGHUB_TAGS="$BUILD_TAG"
+        --build-arg IMAGE_TAG="$IMAGE_TAG"  
+        --build-arg CI_COMMIT_SHORT_SHA="$CI_COMMIT_SHORT_SHA"
+        --file ${DOCKERFILE}
+      )
+      
+      BUILD_TAGS=(
+        --tag ${IMAGE}
+      )
+      
+      if [[ $BUILD_OUTPUT == "false" ]]; then
+        BUILD_TAGS+=(
+          --tag ${IMAGE#*/}
+        )
+      fi
+
+      # If building framework images context should be changed
+      if [[ ! -z $DOCKER_CONTEXT ]]; then
+        cd $DOCKER_CONTEXT
+      fi
+      
+      # Build & Push to ACR default
+      docker buildx build  \
+        ${BUILD_ARGS[@]} \
+        ${BUILD_TAGS[@]} \
+        --push .
+      
+      # If ee with tag, output artifacts for pushing to DockerHub
+      if [[ $BUILD_OUTPUT == "true" ]] && [[ ! -z $IMAGE_TAG ]]; then
+        docker buildx build \
+          ${BUILD_ARGS[@]} \
+          --tag ${IMAGE#*/} \
+          --output type=oci,dest=csghub-server-${IMAGE_TAG}.tar .
+      fi
+      EOF
+  artifacts:
+    reports:
+      dotenv: build.env
+  cache:
+    key: build-cache
+    paths:
+      - .cache
+  tags:
+    - docker
