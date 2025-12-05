@@ -330,9 +330,14 @@ func (d *deployer) Logs(ctx context.Context, dr types.DeployRepo) (*MultiLogRead
 		labels[types.StreamKeyInstanceName] = dr.InstanceName
 	}
 
+	var startTime = deploy.CreatedAt
+	if dr.Since != "" {
+		startTime = parseSinceTime(dr.Since)
+	}
+
 	runLog, err := d.readLogsFromLoki(ctx, types.ReadLogRequest{
 		DeployID:  deployId,
-		StartTime: runTask.CreatedAt,
+		StartTime: startTime,
 		Labels:    labels,
 	})
 	if err != nil {
