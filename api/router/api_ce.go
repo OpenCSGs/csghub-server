@@ -15,3 +15,7 @@ func createAdvancedRoutes(apiGroup *gin.RouterGroup, middlewareCollection middle
 
 func createExtendedUserRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware.MiddlewareCollection, userProxyHandler *handler.InternalServiceProxyHandler) {
 }
+
+func createXnetRoutes(_ *gin.Engine, _ middleware.MiddlewareCollection, _ *config.Config) error {
+	return nil
+}
