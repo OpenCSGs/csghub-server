@@ -12,12 +12,9 @@ const (
 	failedSendPhoneVerifyCode
 	phoneVerifyCodeExpiredOrNotFound
 	phoneVerifyCodeInvalid
-<<<<<<< HEAD
-=======
 	verificationCodeRequired
 	verificationCodeLengthInvalid
 	invalidPhoneNumber
->>>>>>> de87547e (fix casdoor phone verify code login issue after updated phone in csghub.)
 )
 
 var (
@@ -129,8 +126,6 @@ var (
 	//
 	// zh-HK: 手機驗證碼無效
 	ErrPhoneVerifyCodeInvalid error = CustomError{prefix: errUserPrefix, code: phoneVerifyCodeInvalid}
-<<<<<<< HEAD
-=======
 
 	// verification code can not be empty
 	//
@@ -168,5 +163,4 @@ var (
 	//
 	// zh-HK: 無效的電話號碼
 	ErrInvalidPhoneNumber error = CustomError{prefix: errUserPrefix, code: invalidPhoneNumber}
->>>>>>> de87547e (fix casdoor phone verify code login issue after updated phone in csghub.)
 )

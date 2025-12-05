@@ -5,15 +5,12 @@
     "error.USER-ERR-1": {
         "other": "New phone number must be different from current phone number"
     },
-<<<<<<< HEAD
-=======
     "error.USER-ERR-10": {
         "other": "Verification code length must be 6"
     },
     "error.USER-ERR-11": {
         "other": "Invalid phone number"
     },
->>>>>>> de87547e (fix casdoor phone verify code login issue after updated phone in csghub.)
     "error.USER-ERR-2": {
         "other": "New phone number already exists in sso service"
     },

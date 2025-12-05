@@ -328,8 +328,6 @@ func TestUserHandler_UpdatePhone(t *testing.T) {
 	handler.UpdatePhone(ctx)
 	assert.Equal(t, http.StatusOK, w.Code)
 }
-<<<<<<< HEAD
-=======
 
 // test send public sms code
 func TestUserHandler_SendPublicSMSCode(t *testing.T) {
@@ -662,4 +660,3 @@ func TestHandleExportUserInfo(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, w.Code, "Status code should be 200 OK")
 }
->>>>>>> 85fd4128 (provide public sms-code send/verify APIs for both logged-in and anonymous users)

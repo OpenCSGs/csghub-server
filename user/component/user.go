@@ -105,12 +105,8 @@ type UserComponent interface {
 	ResetUserTags(ctx context.Context, uid string, tagIDs []int64) error
 	SendSMSCode(ctx context.Context, uid string, req types.SendSMSCodeRequest) (*types.SendSMSCodeResponse, error)
 	UpdatePhone(ctx context.Context, uid string, req types.UpdateUserPhoneRequest) error
-<<<<<<< HEAD
-=======
 	SendPublicSMSCode(ctx context.Context, req types.SendPublicSMSCodeRequest) (*types.SendSMSCodeResponse, error)
 	VerifyPublicSMSCode(ctx context.Context, req types.VerifyPublicSMSCodeRequest) error
-	StreamExportUsers(ctx context.Context, req types.UserIndexReq) (data chan types.UserIndexResp, err error)
->>>>>>> 85fd4128 (provide public sms-code send/verify APIs for both logged-in and anonymous users)
 }
 
 func NewUserComponent(config *config.Config) (UserComponent, error) {

@@ -4,11 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-<<<<<<< HEAD
-=======
-	"net/url"
 	"strings"
->>>>>>> de87547e (fix casdoor phone verify code login issue after updated phone in csghub.)
 
 	"github.com/casdoor/casdoor-go-sdk/casdoorsdk"
 	"golang.org/x/oauth2"

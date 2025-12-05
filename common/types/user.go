@@ -326,3 +326,14 @@ type CloseAccountReq struct {
 	Repository bool `json:"repository"`
 	Discussion bool `json:"discussion"`
 }
+type UserIndexReq struct {
+	Search       string       `json:"search"`
+	VerifyStatus VerifyStatus `json:"verify_status"`
+	Labels       []string     `json:"labels"`
+	Per          int          `json:"per"`
+}
+
+type UserIndexResp struct {
+	Users []*User `json:"users"`
+	Error error   `json:"error"`
+}

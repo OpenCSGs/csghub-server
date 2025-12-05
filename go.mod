@@ -37,13 +37,10 @@ require (
 	github.com/minio/sha256-simd v1.0.1
 	github.com/naoina/toml v0.1.1
 	github.com/nicksnyder/go-i18n/v2 v2.6.0
+	github.com/nyaruka/phonenumbers v1.6.5
 	github.com/openai/openai-go/v3 v3.8.1
 	github.com/parquet-go/parquet-go v0.24.0
-<<<<<<< HEAD
 	github.com/prometheus/client_golang v1.21.1
-=======
-	github.com/patrickmn/go-cache v2.1.0+incompatible
->>>>>>> 0003cf1a (update user's phone number using sms verify code in backend)
 	github.com/redis/go-redis/v9 v9.5.5
 	github.com/sabhiram/go-gitignore v0.0.0-20210923224102-525f6e181f06
 	github.com/samber/slog-multi v1.3.3
@@ -190,7 +187,6 @@ require (
 	github.com/nats-io/nuid v1.0.1 // indirect
 	github.com/ncruces/go-strftime v0.1.9 // indirect
 	github.com/nexus-rpc/sdk-go v0.3.0 // indirect
-	github.com/nyaruka/phonenumbers v1.6.5 // indirect
 	github.com/oklog/ulid/v2 v2.0.2 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/olivere/elastic/v7 v7.0.32 // indirect
@@ -273,11 +269,7 @@ require (
 	github.com/alibabacloud-go/openapi-util v0.1.1 // indirect
 	github.com/alibabacloud-go/tea-utils/v2 v2.0.7
 	github.com/aliyun/credentials-go v1.4.5
-<<<<<<< HEAD
-	github.com/argoproj/argo-workflows/v3 v3.6.12
-=======
 	github.com/argoproj/argo-workflows/v3 v3.5.13
->>>>>>> de87547e (fix casdoor phone verify code login issue after updated phone in csghub.)
 	github.com/blendle/zapdriver v1.3.1 // indirect
 	github.com/bwmarrin/snowflake v0.3.0
 	github.com/bytedance/sonic v1.12.5 // indirect
