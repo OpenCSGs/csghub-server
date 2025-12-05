@@ -36,6 +36,7 @@ type License struct {
 	Extra      string    `bun:",nullzero" json:"extra"`
 	Remark     string    `bun:",nullzero" json:"remark"`
 	UserUUID   string    `bun:",notnull" json:"user_uuid"`
+	DeletedAt  time.Time `bun:",soft_delete,nullzero" json:"-"`
 	times
 }
 
