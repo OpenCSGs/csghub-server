@@ -91,7 +91,7 @@ func (ibc *imagebuilderComponentImpl) Build(ctx context.Context, req ctypes.Imag
 		return fmt.Errorf("failed to get cluster by config: %w", err)
 	}
 
-	if cInfo.StorageClass != "" {
+	if len(strings.TrimSpace(cInfo.StorageClass)) > 0 {
 		err = ibc.newPersistentVolumeClaim(ctx, cluster, kanikoCachePVC)
 		if err != nil {
 			return fmt.Errorf("failed to create pvc: %w", err)
@@ -475,11 +475,13 @@ func createOrUpdateConfigMap(ctx context.Context, client kubernetes.Interface, c
 
 func (ibc *imagebuilderComponentImpl) newPersistentVolumeClaim(ctx context.Context, cluster *cluster.Cluster, pvcName string) error {
 	// Check if it already exists
+	slog.Info("check pvc for imagebuilder", slog.String("pvc", pvcName), slog.String("storageClass", cluster.StorageClass), slog.Any("storage len", len(cluster.StorageClass)))
 	_, err := cluster.Client.CoreV1().PersistentVolumeClaims(ibc.config.Cluster.SpaceNamespace).Get(ctx, pvcName, metav1.GetOptions{})
 	if err == nil {
 		return nil
 	}
 
+	slog.Info("create pvc for imagebuilder", slog.String("pvc", pvcName), slog.String("storageClass", cluster.StorageClass), slog.Any("storage len", len(cluster.StorageClass)))
 	storage, err := resource.ParseQuantity("50Gi")
 	if err != nil {
 		return err
