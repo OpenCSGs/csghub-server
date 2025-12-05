@@ -442,30 +442,6 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Name:** `noActiveLicense`
 - **Description:** No active license found for the current system.
 
----
-
-### `LICENSE-ERR-1`
-
-- **Error Code:** `LICENSE-ERR-1`
-- **Error Name:** `licenseExpired`
-- **Description:** The license is expired, could not be verified and imported.
-
-## Moderation Errors
-
-### `MOD-ERR-0`
-
-- **Error Code:** `MOD-ERR-0`
-- **Error Name:** `codeNameRequire`
-- **Description:** The request parameter does not match the server requirements, and the server cannot process the request.
-
----
-
-### `MOD-ERR-1`
-
-- **Error Code:** `MOD-ERR-1`
-- **Error Name:** `codeWordRequire`
-- **Description:** The request parameter does not match the server requirements, and the server cannot process the request.
-
 ## Req Errors
 
 ### `REQ-ERR-0`
@@ -553,22 +529,6 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Code:** `REQ-ERR-10`
 - **Error Name:** `errRateLimitExceeded`
 - **Description:** The user has sent too many requests in a given amount of time. Further requests will be blocked until the rate limit resets or a valid captcha is provided.
-
----
-
-### `REQ-ERR-11`
-
-- **Error Code:** `REQ-ERR-11`
-- **Error Name:** `errLimitedIPLocation`
-- **Description:** Requests originating from this IP location are restricted. To proceed, please complete a captcha verification.
-
----
-
-### `REQ-ERR-12`
-
-- **Error Code:** `REQ-ERR-12`
-- **Error Name:** `errCaptchaIncorrect`
-- **Description:** The provided captcha verification failed. Please try again with a valid captcha.
 
 ## System Errors
 
@@ -672,7 +632,7 @@ This document lists all the custom error codes defined in the project, categoriz
 
 - **Error Code:** `TASK-ERR-3`
 - **Error Name:** `multiHostNotebookNotSupported`
-- **Description:** 
+- **Description:** The multi-host notebook feature (running notebook tasks across multiple hosts) is not supported.
 
 ## User Errors
 
@@ -786,7 +746,3 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Name:** `emailExists`
 - **Description:** The email address provided already exists in the system.
 
-<<<<<<< HEAD
-=======
-=======
->>>>>>> 6f5ce9bc (update the redirect urls of name and email conflicts when login.)

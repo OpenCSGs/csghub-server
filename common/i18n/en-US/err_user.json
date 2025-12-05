@@ -37,5 +37,8 @@
     },
     "error.USER-ERR-8": {
         "other": "Phone verify code is invalid"
+    },
+    "error.USER-ERR-9": {
+        "other": "Verification code can not be empty"
     }
 }

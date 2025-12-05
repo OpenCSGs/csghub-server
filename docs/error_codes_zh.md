@@ -442,30 +442,6 @@
 - **错误名:** `noActiveLicense`
 - **描述:** 当前系统没有有效的许可证。
 
----
-
-### `LICENSE-ERR-1`
-
-- **错误代码:** `LICENSE-ERR-1`
-- **错误名:** `licenseExpired`
-- **描述:** 许可证已过期，无法验证和导入。
-
-## Moderation 错误
-
-### `MOD-ERR-0`
-
-- **错误代码:** `MOD-ERR-0`
-- **错误名:** `codeNameRequire`
-- **描述:** 请求参数不匹配, 服务器无法处理该请求。
-
----
-
-### `MOD-ERR-1`
-
-- **错误代码:** `MOD-ERR-1`
-- **错误名:** `codeWordRequire`
-- **描述:** 请求参数不匹配, 服务器无法处理该请求。
-
 ## Req 错误
 
 ### `REQ-ERR-0`
@@ -553,22 +529,6 @@
 - **错误代码:** `REQ-ERR-10`
 - **错误名:** `errRateLimitExceeded`
 - **描述:** 用户在给定的时间内发送了太多的请求。在速率限制重置或提供有效的验证码之前，将阻止进一步的请求。
-
----
-
-### `REQ-ERR-11`
-
-- **错误代码:** `REQ-ERR-11`
-- **错误名:** `errLimitedIPLocation`
-- **描述:** 来自此IP位置的请求受到限制。要继续操作，请完成验证码验证。
-
----
-
-### `REQ-ERR-12`
-
-- **错误代码:** `REQ-ERR-12`
-- **错误名:** `errCaptchaIncorrect`
-- **描述:** 提供的验证码验证失败。请使用有效的验证码重试。
 
 ## System 错误
 
@@ -672,7 +632,7 @@
 
 - **错误代码:** `TASK-ERR-3`
 - **错误名:** `multiHostNotebookNotSupported`
-- **描述:** 
+- **描述:** 多主机 Notebook 功能（在多个主机上运行 Notebook 任务）不被支持。请改用单主机 Notebook 执行。
 
 ## User 错误
 
@@ -786,7 +746,3 @@
 - **错误名:** `emailExists`
 - **描述:** 提供的电子邮件地址已存在于系统中。
 
-<<<<<<< HEAD
-=======
-=======
->>>>>>> 6f5ce9bc (update the redirect urls of name and email conflicts when login.)
