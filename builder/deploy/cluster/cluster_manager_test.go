@@ -130,3 +130,110 @@ func TestGetResourcesInCluster(t *testing.T) {
 	assert.Equal(t, "T4", node1Resources.XPUModel)
 	assert.Equal(t, "nvidia", node1Resources.GPUVendor)
 }
+
+func TestGetGpuTypeAndVendor(t *testing.T) {
+	tests := []struct {
+		name           string
+		vendorType     string
+		label          string
+		wantVendorType string // returns 0
+		wantModel      string // returns 1
+	}{
+		{
+			name:           "hyphen separated",
+			vendorType:     "NVIDIA-GeForce-RTX-3060",
+			label:          "nvidia.com/gpu",
+			wantVendorType: "NVIDIA",
+			wantModel:      "GeForce-RTX-3060",
+		},
+		{
+			name:           "hyphen separated",
+			vendorType:     "NVIDIA-4090",
+			label:          "nvidia.com/gpu",
+			wantVendorType: "NVIDIA",
+			wantModel:      "4090",
+		},
+		{
+			name:           "hyphen separated multi",
+			vendorType:     "NVIDIA-GeForce-RTX-3060-Ti",
+			label:          "nvidia.com/gpu",
+			wantVendorType: "NVIDIA",
+			wantModel:      "GeForce-RTX-3060-Ti",
+		},
+		{
+			name:           "dot separated label",
+			vendorType:     "T4",
+			label:          "nvidia.com/gpu",
+			wantVendorType: "nvidia",
+			wantModel:      "T4",
+		},
+		{
+			name:           "no separator",
+			vendorType:     "T4",
+			label:          "gpu",
+			wantVendorType: "gpu",
+			wantModel:      "T4",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotVendorType, gotModel := getGpuTypeAndVendor(tt.vendorType, tt.label)
+			assert.Equal(t, tt.wantVendorType, gotVendorType)
+			assert.Equal(t, tt.wantModel, gotModel)
+		})
+	}
+}
+
+func TestGetXPULabel(t *testing.T) {
+	tests := []struct {
+		name          string
+		labels        map[string]string
+		config        *config.Config
+		wantCapacity  string
+		wantTypeLabel string
+	}{
+		{
+			name: "nvidia.com/gpu.product label",
+			labels: map[string]string{
+				"nvidia.com/gpu.product": "NVIDIA-GeForce-RTX-3060",
+			},
+			config:        &config.Config{},
+			wantCapacity:  "nvidia.com/gpu",
+			wantTypeLabel: "nvidia.com/gpu.product",
+		},
+		{
+			name: "aliyun.accelerator/nvidia_name label",
+			labels: map[string]string{
+				"aliyun.accelerator/nvidia_name": "T4",
+			},
+			config:        &config.Config{},
+			wantCapacity:  "nvidia.com/gpu",
+			wantTypeLabel: "aliyun.accelerator/nvidia_name",
+		},
+		{
+			name: "nvidia.com/nvidia_name label",
+			labels: map[string]string{
+				"nvidia.com/nvidia_name": "T4",
+			},
+			config:        &config.Config{},
+			wantCapacity:  "nvidia.com/gpu",
+			wantTypeLabel: "nvidia.com/nvidia_name",
+		},
+		{
+			name:          "no matching label",
+			labels:        map[string]string{},
+			config:        &config.Config{},
+			wantCapacity:  "",
+			wantTypeLabel: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotCapacity, gotTypeLabel := getXPULabel(tt.labels, tt.config)
+			assert.Equal(t, tt.wantCapacity, gotCapacity)
+			assert.Equal(t, tt.wantTypeLabel, gotTypeLabel)
+		})
+	}
+}
