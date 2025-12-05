@@ -285,6 +285,22 @@ type EmailVerifyCodeNotificationReq struct {
 	TTL   int64  `json:"ttl"` // in minutes
 }
 
+type RechargeStatus string
+
+const (
+	RechargeStatusCreated   RechargeStatus = "created"
+	RechargeStatusSuccess   RechargeStatus = "succeeded"
+	RechargeStatusClosed    RechargeStatus = "closed"
+	RechargeStatusDeposited RechargeStatus = "deposited"
+)
+
+type RechargeNotificationReq struct {
+	OrderNo  string         `json:"order_no"`
+	Status   RechargeStatus `json:"status"`
+	Amount   int64          `json:"amount"`
+	Currency string         `json:"currency"`
+}
+
 type TemplateOutput struct {
 	Title   string
 	Content string
