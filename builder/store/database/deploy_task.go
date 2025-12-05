@@ -81,6 +81,7 @@ type DeployTaskStore interface {
 	CreateDeploy(ctx context.Context, deploy *Deploy) error
 	UpdateDeploy(ctx context.Context, deploy *Deploy) error
 	GetLatestDeployBySpaceID(ctx context.Context, spaceID int64) (*Deploy, error)
+	GetLatestDeploysBySpaceIDs(ctx context.Context, spaceIDs []int64) (map[int64]*Deploy, error)
 	CreateDeployTask(ctx context.Context, deployTask *DeployTask) error
 	UpdateDeployTask(ctx context.Context, deployTask *DeployTask) error
 	GetDeployTask(ctx context.Context, id int64) (*DeployTask, error)
@@ -136,6 +137,33 @@ func (s *deployTaskStoreImpl) GetLatestDeployBySpaceID(ctx context.Context, spac
 	err := s.db.Core.NewSelect().Model(deploy).Where("space_id = ?", spaceID).Order("created_at DESC").Limit(1).Scan(ctx, deploy)
 	err = errorx.HandleDBError(err, nil)
 	return deploy, err
+}
+
+// GetLatestDeploysBySpaceIDs gets the latest deploy for each space ID in a single query
+func (s *deployTaskStoreImpl) GetLatestDeploysBySpaceIDs(ctx context.Context, spaceIDs []int64) (map[int64]*Deploy, error) {
+	if len(spaceIDs) == 0 {
+		return make(map[int64]*Deploy), nil
+	}
+
+	var deploys []Deploy
+	err := s.db.Core.NewSelect().
+		ColumnExpr("DISTINCT ON (space_id) *").
+		Model(&deploys).
+		Where("space_id IN (?)", bun.In(spaceIDs)).
+		Order("space_id", "created_at DESC").
+		Scan(ctx)
+
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return nil, errorx.HandleDBError(err, nil)
+	}
+
+	result := make(map[int64]*Deploy, len(deploys))
+	for i := range deploys {
+		deploy := &deploys[i]
+		result[deploy.SpaceID] = deploy
+	}
+
+	return result, nil
 }
 
 func (s *deployTaskStoreImpl) CreateDeployTask(ctx context.Context, deployTask *DeployTask) error {
