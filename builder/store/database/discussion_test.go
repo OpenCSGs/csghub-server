@@ -38,21 +38,17 @@ func TestDiscussionStore_CRUD(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, "foo", ds.Title)
 
-	dss, err := store.FindByDiscussionableID(ctx, "zzz", 123)
+	dss, _, err := store.FindByDiscussionableID(ctx, "zzz", 123, 10, 1)
 	require.Nil(t, err)
 	require.Equal(t, 1, len(dss))
-	dss, err = store.FindByDiscussionableID(ctx, "zzz", 456)
+	dss, _, err = store.FindByDiscussionableID(ctx, "zzz", 456, 10, 1)
 	require.Nil(t, err)
 	require.Equal(t, 0, len(dss))
 
-	err = store.DeleteByID(ctx, ds.ID)
-	require.Nil(t, err)
-	_, err = store.FindByID(ctx, ds.ID)
-	require.NotNil(t, err)
-	require.True(t, errors.Is(err, errorx.ErrDatabaseNoRows))
-
 	_, err = store.CreateComment(ctx, database.Comment{
-		Content: "foobar",
+		CommentableID:   ds.ID,
+		CommentableType: database.CommentableTypeDiscussion,
+		Content:         "foobar",
 	})
 	require.Nil(t, err)
 	cm := &database.Comment{}
@@ -73,6 +69,12 @@ func TestDiscussionStore_CRUD(t *testing.T) {
 	err = store.DeleteComment(ctx, cm.ID)
 	require.Nil(t, err)
 	_, err = store.FindCommentByID(ctx, cm.ID)
+	require.NotNil(t, err)
+	require.True(t, errors.Is(err, errorx.ErrDatabaseNoRows))
+
+	err = store.DeleteByID(ctx, ds.ID)
+	require.Nil(t, err)
+	_, err = store.FindByID(ctx, ds.ID)
 	require.NotNil(t, err)
 	require.True(t, errors.Is(err, errorx.ErrDatabaseNoRows))
 }

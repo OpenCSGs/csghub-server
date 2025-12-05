@@ -7,6 +7,7 @@ import (
 func init() {
 	// add subcommands here
 	Cmd.AddCommand(launchCmd)
+	Cmd.AddCommand(notifyGenCmd)
 }
 
 var Cmd = &cobra.Command{

@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/uptrace/bun"
 	"opencsg.com/csghub-server/common/errorx"
 )
 
@@ -15,7 +16,7 @@ type Discussion struct {
 	DiscussionableID   int64     `bun:"discussionable_id,notnull"`
 	DiscussionableType string    `bun:"discussionable_type,notnull"`
 	CommentCount       int64     `bun:"comment_count,notnull,default:0"`
-	DeletedAt          time.Time `bun:",soft_delete,nullzero"`
+	DeletedAt          time.Time `bun:",nullzero"`
 	times
 }
 
@@ -26,7 +27,7 @@ type Comment struct {
 	CommentableID   int64     `bun:"commentable_id,notnull"`
 	UserID          int64     `bun:"user_id,notnull"`
 	User            *User     `bun:"rel:belongs-to,join:user_id=id"`
-	DeletedAt       time.Time `bun:",soft_delete,nullzero"`
+	DeletedAt       time.Time `bun:",nullzero"`
 	times
 }
 
@@ -47,10 +48,10 @@ type discussionStoreImpl struct {
 type DiscussionStore interface {
 	Create(ctx context.Context, discussion Discussion) (*Discussion, error)
 	FindByID(ctx context.Context, id int64) (*Discussion, error)
-	FindByDiscussionableID(ctx context.Context, discussionableType string, discussionableID int64) ([]Discussion, error)
+	FindByDiscussionableID(ctx context.Context, discussionableType string, discussionableID int64, per int, page int) ([]Discussion, int, error)
 	UpdateByID(ctx context.Context, id int64, title string) error
 	DeleteByID(ctx context.Context, id int64) error
-	FindDiscussionComments(ctx context.Context, discussionID int64) ([]Comment, error)
+	FindDiscussionComments(ctx context.Context, discussionID int64, per int, page int) ([]Comment, error)
 	CreateComment(ctx context.Context, comment Comment) (*Comment, error)
 	UpdateComment(ctx context.Context, id int64, content string) error
 	FindCommentByID(ctx context.Context, id int64) (*Comment, error)
@@ -92,19 +93,28 @@ func (s *discussionStoreImpl) FindByID(ctx context.Context, id int64) (*Discussi
 	return &discussion, nil
 }
 
-func (s *discussionStoreImpl) FindByDiscussionableID(ctx context.Context, discussionableType string, discussionableID int64) ([]Discussion, error) {
+func (s *discussionStoreImpl) FindByDiscussionableID(ctx context.Context, discussionableType string, discussionableID int64, per int, page int) ([]Discussion, int, error) {
 	discussions := []Discussion{}
-	err := s.db.Core.NewSelect().Model(&discussions).
+	q := s.db.Core.NewSelect().Model(&discussions).
 		Where("discussionable_type = ? AND discussionable_id = ?", discussionableType, discussionableID).
 		Relation("User").
-		Scan(ctx)
+		Order("created_at DESC")
+
+	total, err := q.Count(ctx)
 	if err != nil {
 		err := errorx.HandleDBError(err, errorx.Ctx().
 			Set("id", discussionableID).
 			Set("type", discussionableType))
-		return nil, err
+		return nil, 0, err
 	}
-	return discussions, nil
+
+	if err := q.Limit(per).Offset((page - 1) * per).Scan(ctx); err != nil {
+		err := errorx.HandleDBError(err, errorx.Ctx().
+			Set("id", discussionableID).
+			Set("type", discussionableType))
+		return nil, 0, err
+	}
+	return discussions, total, nil
 }
 
 func (s *discussionStoreImpl) UpdateByID(ctx context.Context, id int64, title string) error {
@@ -127,24 +137,46 @@ func (s *discussionStoreImpl) DeleteByID(ctx context.Context, id int64) error {
 	return nil
 }
 
-func (s *discussionStoreImpl) FindDiscussionComments(ctx context.Context, discussionID int64) ([]Comment, error) {
+func (s *discussionStoreImpl) FindDiscussionComments(ctx context.Context, discussionID int64, per int, page int) ([]Comment, error) {
 	comments := []Comment{}
 	err := s.db.Core.NewSelect().Model(&comments).
 		Relation("User").
-		Where("commentable_type=? AND	commentable_id = ?", CommentableTypeDiscussion, discussionID).
+		Where("commentable_type=? AND commentable_id=?", CommentableTypeDiscussion, discussionID).
+		Order("comment.created_at DESC").
+		Limit(per).
+		Offset((page - 1) * per).
 		Scan(ctx)
 	if err != nil {
-		err := errorx.HandleDBError(err, errorx.Ctx().
+		return nil, errorx.HandleDBError(err, errorx.Ctx().
 			Set("id", discussionID))
-		return nil, err
 	}
+
 	return comments, nil
 }
 
 func (s *discussionStoreImpl) CreateComment(ctx context.Context, comment Comment) (*Comment, error) {
-	_, err := s.db.Core.NewInsert().Model(&comment).Exec(ctx)
+	err := s.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		_, err := tx.NewInsert().Model(&comment).Exec(ctx)
+		if err != nil {
+			err := errorx.HandleDBError(err, nil)
+			return err
+		}
+
+		discussion := Discussion{}
+		err = tx.NewSelect().Model(&discussion).Where("id = ?", comment.CommentableID).For("UPDATE NOWAIT").Scan(ctx)
+		if err != nil {
+			err := errorx.HandleDBError(err, nil)
+			return err
+		}
+		_, err = tx.NewUpdate().Model(&discussion).Set("comment_count = comment_count + 1").Where("id = ?", comment.CommentableID).Exec(ctx)
+		if err != nil {
+			err := errorx.HandleDBError(err, nil)
+			return err
+		}
+		return nil
+	})
+
 	if err != nil {
-		err := errorx.HandleDBError(err, nil)
 		return nil, err
 	}
 	return &comment, nil
@@ -173,9 +205,38 @@ func (s *discussionStoreImpl) FindCommentByID(ctx context.Context, id int64) (*C
 }
 
 func (s *discussionStoreImpl) DeleteComment(ctx context.Context, id int64) error {
-	_, err := s.db.Core.NewDelete().Model(&Comment{}).Where("id = ?", id).ForceDelete().Exec(ctx)
+	err := s.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		comment := Comment{}
+		err := tx.NewSelect().Model(&comment).Where("id = ?", id).For("UPDATE NOWAIT").Scan(ctx)
+		if err != nil {
+			err := errorx.HandleDBError(err, nil)
+			return err
+		}
+
+		_, err = tx.NewDelete().Model(&Comment{}).Where("id = ?", id).ForceDelete().Exec(ctx)
+		if err != nil {
+			err := errorx.HandleDBError(err, nil)
+			return err
+		}
+
+		discussion := Discussion{}
+		err = tx.NewSelect().Model(&discussion).Where("id = ?", comment.CommentableID).For("UPDATE NOWAIT").Scan(ctx)
+		if err != nil {
+			err := errorx.HandleDBError(err, nil)
+			return err
+		}
+
+		_, err = tx.NewUpdate().Model(&discussion).Set("comment_count = comment_count - 1").Where("id = ?", comment.CommentableID).Exec(ctx)
+		if err != nil {
+			err := errorx.HandleDBError(err, nil)
+			return err
+		}
+		return nil
+	})
+
 	if err != nil {
-		err := errorx.HandleDBError(err, nil)
+		err := errorx.HandleDBError(err, errorx.Ctx().
+			Set("id", id))
 		return err
 	}
 	return nil

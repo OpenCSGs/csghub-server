@@ -112,8 +112,9 @@ func TestDiscussionHandler_ShowDiscussion(t *testing.T) {
 
 		tester.mocks.discussion.EXPECT().GetDiscussion(
 			tester.Ctx(), "u", int64(1),
+			10, 1,
 		).Return(&types.ShowDiscussionResponse{Title: "foo"}, nil)
-		tester.WithUser().WithParam("id", "1").Execute()
+		tester.WithUser().WithParam("id", "1").WithQuery("per", "10").WithQuery("page", "1").Execute()
 
 		tester.ResponseEq(t, 200, tester.OKText, &types.ShowDiscussionResponse{Title: "foo"})
 	})
@@ -124,8 +125,9 @@ func TestDiscussionHandler_ShowDiscussion(t *testing.T) {
 		})
 		tester.mocks.discussion.EXPECT().GetDiscussion(
 			tester.Ctx(), "u", int64(2),
+			10, 1,
 		).Once().Return(nil, errorx.ErrDatabaseNoRows)
-		tester.WithUser().WithParam("id", "2").Execute()
+		tester.WithUser().WithParam("id", "2").WithQuery("per", "10").WithQuery("page", "1").Execute()
 		tester.ResponseEqSimple(t, 404, httpbase.R{
 			Code: errorx.ErrDatabaseNoRows.Code(),
 			Msg:  errorx.ErrDatabaseNoRows.Error(),
@@ -146,13 +148,18 @@ func TestDiscussionHandler_ListRepoDiscussions(t *testing.T) {
 				Namespace:   "u",
 				Name:        "r",
 			},
+			10, 1,
 		).Return(&types.ListRepoDiscussionResponse{Discussions: []*types.CreateDiscussionResponse{
 			{ID: 1},
-		}}, nil)
-		tester.WithUser().WithParam("repo_type", "models").Execute()
+		}}, 1, nil)
+		tester.WithUser().WithParam("repo_type", "models").WithQuery("per", "10").WithQuery("page", "1").Execute()
 
-		tester.ResponseEq(t, 200, tester.OKText, &types.ListRepoDiscussionResponse{
-			Discussions: []*types.CreateDiscussionResponse{{ID: 1}},
+		tester.ResponseEqSimple(t, 200, gin.H{
+			"data": &types.ListRepoDiscussionResponse{Discussions: []*types.CreateDiscussionResponse{
+				{ID: 1},
+			}},
+			"total": 1,
+			"msg":   "OK",
 		})
 	})
 
@@ -167,8 +174,9 @@ func TestDiscussionHandler_ListRepoDiscussions(t *testing.T) {
 				Namespace:   "u",
 				Name:        "r",
 			},
-		).Once().Return(nil, errorx.ErrDatabaseNoRows)
-		tester.WithUser().WithParam("repo_type", "models").Execute()
+			10, 1,
+		).Once().Return(nil, 0, errorx.ErrDatabaseNoRows)
+		tester.WithUser().WithParam("repo_type", "models").WithQuery("per", "10").WithQuery("page", "1").Execute()
 		tester.ResponseEqSimple(t, 404, httpbase.R{
 			Code: errorx.ErrDatabaseNoRows.Code(),
 			Msg:  errorx.ErrDatabaseNoRows.Error(),
@@ -242,11 +250,15 @@ func TestDiscussionHandler_ListDiscussionComments(t *testing.T) {
 		})
 
 		tester.mocks.discussion.EXPECT().ListDiscussionComments(
-			tester.Ctx(), "u", int64(1),
-		).Return([]*types.DiscussionResponse_Comment{{Content: "foo"}}, nil)
-		tester.WithUser().WithParam("id", "1").Execute()
+			tester.Ctx(), "u", int64(1), 10, 1,
+		).Return([]*types.DiscussionResponse_Comment{{Content: "foo"}}, 1, nil)
+		tester.WithUser().WithParam("id", "1").WithQuery("per", "10").WithQuery("page", "1").Execute()
 
-		tester.ResponseEq(t, 200, tester.OKText, []*types.DiscussionResponse_Comment{{Content: "foo"}})
+		tester.ResponseEqSimple(t, 200, gin.H{
+			"data":  []*types.DiscussionResponse_Comment{{Content: "foo"}},
+			"total": 1,
+			"msg":   "OK",
+		})
 	})
 
 	t.Run("404 case", func(t *testing.T) {
@@ -254,9 +266,9 @@ func TestDiscussionHandler_ListDiscussionComments(t *testing.T) {
 			return h.ListDiscussionComments
 		})
 		tester.mocks.discussion.EXPECT().ListDiscussionComments(
-			tester.Ctx(), "u", int64(1),
-		).Once().Return(nil, errorx.ErrDatabaseNoRows)
-		tester.WithUser().WithParam("id", "1").Execute()
+			tester.Ctx(), "u", int64(1), 10, 1,
+		).Once().Return(nil, 0, errorx.ErrDatabaseNoRows)
+		tester.WithUser().WithParam("id", "1").WithQuery("per", "10").WithQuery("page", "1").Execute()
 		tester.ResponseEqSimple(t, 404, httpbase.R{
 			Code: errorx.ErrDatabaseNoRows.Code(),
 			Msg:  errorx.ErrDatabaseNoRows.Error(),
