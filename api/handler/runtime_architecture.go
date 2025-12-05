@@ -63,13 +63,13 @@ func (r *RuntimeArchitectureHandler) ListByRuntimeFrameworkID(ctx *gin.Context) 
 	strID := ctx.Param("id")
 	id, err := strconv.ParseInt(strID, 10, 64)
 	if err != nil {
-		slog.Error("invalid runtime framework ID", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "invalid runtime framework ID", slog.Any("error", err))
 		httpbase.BadRequest(ctx, "invalid runtime framework ID format")
 		return
 	}
 	resp, err := r.runtimeArch.ListByRuntimeFrameworkID(ctx.Request.Context(), id)
 	if err != nil {
-		slog.Error("fail to list runtime architectures", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "fail to list runtime architectures", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -92,21 +92,21 @@ func (r *RuntimeArchitectureHandler) ListByRuntimeFrameworkID(ctx *gin.Context) 
 func (r *RuntimeArchitectureHandler) UpdateArchitecture(ctx *gin.Context) {
 	var req types.RuntimeArchitecture
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 
 	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
-		slog.Error("Bad request runtime framework id format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request runtime framework id format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 
 	res, err := r.runtimeArch.SetArchitectures(ctx.Request.Context(), id, req.Architectures)
 	if err != nil {
-		slog.Error("Failed to set architectures", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to set architectures", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -130,21 +130,21 @@ func (r *RuntimeArchitectureHandler) UpdateArchitecture(ctx *gin.Context) {
 func (r *RuntimeArchitectureHandler) DeleteArchitecture(ctx *gin.Context) {
 	var req types.RuntimeArchitecture
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 
 	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
-		slog.Error("Bad request runtime framework id format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request runtime framework id format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 
 	list, err := r.runtimeArch.DeleteArchitectures(ctx.Request.Context(), id, req.Architectures)
 	if err != nil {
-		slog.Error("Failed to delete architectures", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to delete architectures", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -168,13 +168,13 @@ func (r *RuntimeArchitectureHandler) ScanArchitecture(ctx *gin.Context) {
 
 	scanTypeStr := ctx.Query("scan_type")
 	if scanTypeStr == "" {
-		slog.Error("Bad request scan type")
+		slog.ErrorContext(ctx.Request.Context(), "Bad request scan type")
 		httpbase.BadRequest(ctx, "bad request scan type")
 		return
 	}
 	scanType, err := strconv.Atoi(scanTypeStr)
 	if err != nil {
-		slog.Error("Bad request scan format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request scan format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -190,7 +190,7 @@ func (r *RuntimeArchitectureHandler) ScanArchitecture(ctx *gin.Context) {
 		ctx.Request.Context(), workflowOptions, workflow.RuntimeFrameworkWorkflow, req,
 	)
 	if err != nil {
-		slog.Error("Failed to scan architecture", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to scan architecture", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -213,7 +213,7 @@ func (r *RuntimeArchitectureHandler) ScanArchForSingleModel(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -223,7 +223,7 @@ func (r *RuntimeArchitectureHandler) ScanArchForSingleModel(ctx *gin.Context) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
-		slog.Error("Failed to scan architecture for model", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to scan architecture for model", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}

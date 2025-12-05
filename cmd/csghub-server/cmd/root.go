@@ -3,6 +3,8 @@ package cmd
 import (
 	"fmt"
 	"log/slog"
+	"opencsg.com/csghub-server/cmd/csghub-server/cmd/temporal-worker"
+	"opencsg.com/csghub-server/common/log"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -24,7 +26,6 @@ import (
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/user"
 	"opencsg.com/csghub-server/cmd/csghub-server/cmd/version"
 	"opencsg.com/csghub-server/common/config"
-	"opencsg.com/csghub-server/cmd/csghub-server/cmd/temporal-worker"
 )
 
 var (
@@ -101,7 +102,10 @@ func setupLog(lvl, format string) {
 	default:
 		handler = slog.NewTextHandler(os.Stdout, opt)
 	}
+	// Wrap the default handler with the TraceIDHandler
+	h := &log.ContextHandler{Handler: handler}
+
 	fmt.Printf("init logger, level: %s, format: %s\n", logLevel.String(), format)
-	logger = slog.New(handler)
+	logger = slog.New(h)
 	slog.SetDefault(logger)
 }

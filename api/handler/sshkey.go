@@ -48,14 +48,14 @@ type SSHKeyHandler struct {
 func (h *SSHKeyHandler) Create(ctx *gin.Context) {
 	var req types.CreateSSHKeyRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 
 	_, err := h.sc.CheckRequestV2(ctx.Request.Context(), &req)
 	if err != nil {
-		slog.Error("failed to check sensitive request", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
 		return
 	}
@@ -64,7 +64,7 @@ func (h *SSHKeyHandler) Create(ctx *gin.Context) {
 	req.Username = currentUser
 	sk, err := h.c.Create(ctx.Request.Context(), &req)
 	if err != nil {
-		slog.Error("Failed to create SSH key", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to create SSH key", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -89,13 +89,13 @@ func (h *SSHKeyHandler) Index(ctx *gin.Context) {
 	username := ctx.Param("username")
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	sks, err := h.c.Index(ctx.Request.Context(), username, per, page)
 	if err != nil {
-		slog.Error("Failed to create SSH key", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to create SSH key", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -122,13 +122,13 @@ func (h *SSHKeyHandler) Delete(ctx *gin.Context) {
 	username := ctx.Param("username")
 	if name == "" || username == "" {
 		err := fmt.Errorf("invalid username or key name in url")
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	err := h.c.Delete(ctx.Request.Context(), username, name)
 	if err != nil {
-		slog.Error("Failed to delete SSH key", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to delete SSH key", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}

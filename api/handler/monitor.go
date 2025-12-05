@@ -43,13 +43,13 @@ func NewMonitorHandler(cfg *config.Config) (*MonitorHandler, error) {
 func (h *MonitorHandler) CPUUsage(ctx *gin.Context) {
 	req, err := getRequestParameters(ctx)
 	if err != nil {
-		slog.Error("Failed to get request parameters", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get request parameters", slog.Any("error", err))
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 	resp, err := h.monitor.CPUUsage(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("Failed to get cpu usage", slog.Any("req", req), slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get cpu usage", slog.Any("req", req), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -71,13 +71,13 @@ func (h *MonitorHandler) CPUUsage(ctx *gin.Context) {
 func (h *MonitorHandler) CPUUsageEvaluation(ctx *gin.Context) {
 	req, err := getEvaluationParameters(ctx)
 	if err != nil {
-		slog.Error("Failed to get request parameters", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get request parameters", slog.Any("error", err))
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 	resp, err := h.monitor.CPUUsage(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("Failed to get cpu usage", slog.Any("req", req), slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get cpu usage", slog.Any("req", req), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -101,13 +101,13 @@ func (h *MonitorHandler) CPUUsageEvaluation(ctx *gin.Context) {
 func (h *MonitorHandler) MemoryUsage(ctx *gin.Context) {
 	req, err := getRequestParameters(ctx)
 	if err != nil {
-		slog.Error("Failed to get request parameters", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get request parameters", slog.Any("error", err))
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 	resp, err := h.monitor.MemoryUsage(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("Failed to get memory usage", slog.Any("req", req), slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get memory usage", slog.Any("req", req), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -129,13 +129,13 @@ func (h *MonitorHandler) MemoryUsage(ctx *gin.Context) {
 func (h *MonitorHandler) MemoryUsageEvaluation(ctx *gin.Context) {
 	req, err := getEvaluationParameters(ctx)
 	if err != nil {
-		slog.Error("Failed to get request parameters", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get request parameters", slog.Any("error", err))
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 	resp, err := h.monitor.MemoryUsage(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("Failed to get memory usage", slog.Any("req", req), slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get memory usage", slog.Any("req", req), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -159,13 +159,13 @@ func (h *MonitorHandler) MemoryUsageEvaluation(ctx *gin.Context) {
 func (h *MonitorHandler) RequestCount(ctx *gin.Context) {
 	req, err := getRequestParameters(ctx)
 	if err != nil {
-		slog.Error("Failed to get request parameters", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get request parameters", slog.Any("error", err))
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 	resp, err := h.monitor.RequestCount(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("Failed to get request count", slog.Any("req", req), slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get request count", slog.Any("req", req), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -189,13 +189,13 @@ func (h *MonitorHandler) RequestCount(ctx *gin.Context) {
 func (h *MonitorHandler) RequestLatency(ctx *gin.Context) {
 	req, err := getRequestParameters(ctx)
 	if err != nil {
-		slog.Error("Failed to get request parameters", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get request parameters", slog.Any("error", err))
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 	resp, err := h.monitor.RequestLatency(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("Failed to get request latency", slog.Any("req", req), slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get request latency", slog.Any("req", req), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}

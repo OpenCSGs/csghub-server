@@ -68,7 +68,7 @@ func (r *RProxyHandler) Proxy(ctx *gin.Context) {
 
 	deploy, err := r.repoComp.GetDeployBySvcName(ctx.Request.Context(), appSvcName)
 	if err != nil {
-		slog.Error("failed to get deploy in rproxy", slog.Any("error", err), slog.Any("appSrvName", appSvcName), slog.Any("request", ctx.Request.URL), slog.Any("header", ctx.Request.Header))
+		slog.ErrorContext(ctx.Request.Context(), "failed to get deploy in rproxy", slog.Any("error", err), slog.Any("appSrvName", appSvcName), slog.Any("request", ctx.Request.URL), slog.Any("header", ctx.Request.Header))
 		httpbase.ServerError(ctx, fmt.Errorf("failed to get deploy, %w", err))
 		return
 	}
@@ -81,7 +81,7 @@ func (r *RProxyHandler) Proxy(ctx *gin.Context) {
 			return
 		}
 
-		slog.Error("failed to check user permission", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "failed to check user permission", "error", err)
 		httpbase.ServerError(ctx, fmt.Errorf("failed to check user permission,%w", err))
 		return
 	}
@@ -90,7 +90,7 @@ func (r *RProxyHandler) Proxy(ctx *gin.Context) {
 		apiname := ctx.Param("api")
 		target, host, err := r.getSvcTargetAddress(ctx.Request.Context(), appSvcName, deploy)
 		if err != nil {
-			slog.Error("failed to get svc target address", slog.Any("error", err), slog.Any("appSvcName", appSvcName), slog.Any("request", ctx.Request.URL), slog.Any("header", ctx.Request.Header))
+			slog.ErrorContext(ctx.Request.Context(), "failed to get svc target address", slog.Any("error", err), slog.Any("appSvcName", appSvcName), slog.Any("request", ctx.Request.URL), slog.Any("header", ctx.Request.Header))
 			httpbase.ServerError(ctx, fmt.Errorf("failed to forward request for svc %s, %w", appSvcName, err))
 			return
 		}
@@ -118,12 +118,12 @@ func (r *RProxyHandler) checkAccessPermission(ctx *gin.Context, deploy *database
 	if deploy.SpaceID > 0 {
 		space, err = r.spaceComp.GetByID(ctx.Request.Context(), deploy.SpaceID)
 		if err != nil {
-			slog.Error("failed to get space by id", slog.Any("spaceID", deploy.SpaceID), slog.Any("error", err))
+			slog.ErrorContext(ctx.Request.Context(), "failed to get space by id", slog.Any("spaceID", deploy.SpaceID), slog.Any("error", err))
 			return false, fmt.Errorf("failed to get space, %w", err)
 		}
 		// user must login to visit space except mcp server
 		if space.Sdk != types.MCPSERVER.Name && httpbase.GetAuthType(ctx) != httpbase.AuthTypeJwt {
-			slog.Error("invalid auth type in proxy", slog.Any("AuthType(ctx)", httpbase.GetAuthType(ctx)), slog.Any("URI", ctx.Request.RequestURI))
+			slog.ErrorContext(ctx.Request.Context(), "invalid auth type in proxy", slog.Any("AuthType(ctx)", httpbase.GetAuthType(ctx)), slog.Any("URI", ctx.Request.RequestURI))
 			return false, ErrUnauthorized
 		}
 		// check space

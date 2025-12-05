@@ -60,14 +60,14 @@ func (h *MCPServerHandler) Create(ctx *gin.Context) {
 
 	var req *types.CreateMCPServerReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("Bad request format for create mcp server", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format for create mcp server", "error", err)
 		httpbase.BadRequestWithExt(ctx, errorx.ReqBodyFormat(err, nil))
 		return
 	}
 
 	_, err := h.sensitive.CheckRequestV2(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("failed to check sensitive for mcp create request", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "failed to check sensitive for mcp create request", slog.Any("error", err))
 		httpbase.ServerError(ctx, fmt.Errorf("sensitive check failed: %w", err))
 		return
 	}
@@ -81,7 +81,7 @@ func (h *MCPServerHandler) Create(ctx *gin.Context) {
 		} else if errors.Is(err, errorx.ErrDatabaseDuplicateKey) {
 			httpbase.BadRequestWithExt(ctx, err)
 		} else {
-			slog.Error("failed to create mcp server", slog.Any("req", req), slog.Any("error", err))
+			slog.ErrorContext(ctx.Request.Context(), "failed to create mcp server", slog.Any("req", req), slog.Any("error", err))
 			httpbase.ServerError(ctx, err)
 		}
 		return
@@ -107,7 +107,7 @@ func (h *MCPServerHandler) Delete(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format for remove mcp server", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format for remove mcp server", "error", err)
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
@@ -126,7 +126,7 @@ func (h *MCPServerHandler) Delete(ctx *gin.Context) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
-		slog.Error("failed to delete mcp server", slog.Any("error", err), slog.Any("namespace", namespace), slog.Any("name", name))
+		slog.ErrorContext(ctx.Request.Context(), "failed to delete mcp server", slog.Any("error", err), slog.Any("namespace", namespace), slog.Any("name", name))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -153,14 +153,14 @@ func (h *MCPServerHandler) Update(ctx *gin.Context) {
 
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad mcp server request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad mcp server request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 
 	var req *types.UpdateMCPServerReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("Bad request body format for update mcp server", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request body format for update mcp server", "error", err)
 		httpbase.BadRequestWithExt(ctx, errorx.ReqBodyFormat(err, nil))
 		return
 	}
@@ -171,7 +171,7 @@ func (h *MCPServerHandler) Update(ctx *gin.Context) {
 
 	_, err = h.sensitive.CheckRequestV2(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("failed to check sensitive request for update mcp server", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "failed to check sensitive request for update mcp server", slog.Any("error", err))
 		httpbase.ServerError(ctx, fmt.Errorf("sensitive check failed: %w", err))
 		return
 	}
@@ -182,7 +182,7 @@ func (h *MCPServerHandler) Update(ctx *gin.Context) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
-		slog.Error("failed to update mcp server", slog.Any("error", err), slog.Any("ns", namespace), slog.Any("name", name))
+		slog.ErrorContext(ctx.Request.Context(), "failed to update mcp server", slog.Any("error", err), slog.Any("ns", namespace), slog.Any("name", name))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -209,7 +209,7 @@ func (h *MCPServerHandler) Update(ctx *gin.Context) {
 func (h *MCPServerHandler) Show(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
@@ -233,7 +233,7 @@ func (h *MCPServerHandler) Show(ctx *gin.Context) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
-		slog.Error("failed to get mcp server", slog.Any("error", err), slog.Any("ns", namespace), slog.Any("name", name))
+		slog.ErrorContext(ctx.Request.Context(), "failed to get mcp server", slog.Any("error", err), slog.Any("ns", namespace), slog.Any("name", name))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -267,7 +267,7 @@ func (h *MCPServerHandler) Index(ctx *gin.Context) {
 	filter.Username = httpbase.GetCurrentUser(ctx)
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format for mcp list", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format for mcp list", "error", err)
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
@@ -275,7 +275,7 @@ func (h *MCPServerHandler) Index(ctx *gin.Context) {
 	if !slices.Contains(types.Sorts, filter.Sort) {
 		err = fmt.Errorf("sort parameter must be one of %v", types.Sorts)
 		err = errorx.ReqParamInvalid(err, errorx.Ctx().Set("query", "sort_filter"))
-		slog.Error("check list mcp server filter", slog.Any("filter", filter))
+		slog.ErrorContext(ctx.Request.Context(), "check list mcp server filter", slog.Any("filter", filter))
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
@@ -288,7 +288,7 @@ func (h *MCPServerHandler) Index(ctx *gin.Context) {
 
 	mcps, total, err := h.mcpComp.Index(ctx.Request.Context(), filter, per, page, needOpWeight)
 	if err != nil {
-		slog.Error("failed to get mcp servers", slog.Any("error", err), slog.Any("filter", filter))
+		slog.ErrorContext(ctx.Request.Context(), "failed to get mcp servers", slog.Any("error", err), slog.Any("filter", filter))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -320,7 +320,7 @@ func (h *MCPServerHandler) Properties(ctx *gin.Context) {
 	search := ctx.Query("search")
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format for mcp property list", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format for mcp property list", "error", err)
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
@@ -334,7 +334,7 @@ func (h *MCPServerHandler) Properties(ctx *gin.Context) {
 
 	properties, total, err := h.mcpComp.Properties(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("failed to get mcp tool properties", slog.Any("error", err), slog.Any("req", req))
+		slog.ErrorContext(ctx.Request.Context(), "failed to get mcp tool properties", slog.Any("error", err), slog.Any("req", req))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -366,21 +366,21 @@ func (h *MCPServerHandler) Deploy(ctx *gin.Context) {
 
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad mcp server request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad mcp server request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 
 	var req *types.DeployMCPServerReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("Bad request format for deploy mcp server", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format for deploy mcp server", "error", err)
 		httpbase.BadRequestWithExt(ctx, errorx.ReqBodyFormat(err, nil))
 		return
 	}
 
 	_, err = h.sensitive.CheckRequestV2(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("failed to check sensitive for mcp deploy request", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "failed to check sensitive for mcp deploy request", slog.Any("error", err))
 		httpbase.ServerError(ctx, fmt.Errorf("sensitive check failed: %w", err))
 		return
 	}
@@ -410,7 +410,7 @@ func (h *MCPServerHandler) Deploy(ctx *gin.Context) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
-		slog.Error("failed to deploy mcp server as space", slog.Any("error", err), slog.Any("req", req))
+		slog.ErrorContext(ctx.Request.Context(), "failed to deploy mcp server as space", slog.Any("error", err), slog.Any("req", req))
 		httpbase.ServerError(ctx, err)
 		return
 	}

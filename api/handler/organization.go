@@ -84,7 +84,7 @@ func (h *OrganizationHandler) Models(ctx *gin.Context) {
 
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
@@ -92,7 +92,7 @@ func (h *OrganizationHandler) Models(ctx *gin.Context) {
 	req.PageSize = per
 	models, total, err := h.model.OrgModels(ctx.Request.Context(), &req)
 	if err != nil {
-		slog.Error("Failed to get org models", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get org models", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -129,7 +129,7 @@ func (h *OrganizationHandler) Datasets(ctx *gin.Context) {
 
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
@@ -137,7 +137,7 @@ func (h *OrganizationHandler) Datasets(ctx *gin.Context) {
 	req.PageSize = per
 	datasets, total, err := h.dataset.OrgDatasets(ctx.Request.Context(), &req)
 	if err != nil {
-		slog.Error("Failed to get org datasets", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get org datasets", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -173,7 +173,7 @@ func (h *OrganizationHandler) Codes(ctx *gin.Context) {
 
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
@@ -181,7 +181,7 @@ func (h *OrganizationHandler) Codes(ctx *gin.Context) {
 	req.PageSize = per
 	datasets, total, err := h.code.OrgCodes(ctx.Request.Context(), &req)
 	if err != nil {
-		slog.Error("Failed to get org codes", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get org codes", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -217,7 +217,7 @@ func (h *OrganizationHandler) Spaces(ctx *gin.Context) {
 
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
@@ -225,7 +225,7 @@ func (h *OrganizationHandler) Spaces(ctx *gin.Context) {
 	req.PageSize = per
 	datasets, total, err := h.space.OrgSpaces(ctx.Request.Context(), &req)
 	if err != nil {
-		slog.Error("Failed to get org spaces", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get org spaces", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -261,7 +261,7 @@ func (h *OrganizationHandler) Collections(ctx *gin.Context) {
 
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
@@ -269,7 +269,7 @@ func (h *OrganizationHandler) Collections(ctx *gin.Context) {
 	req.PageSize = per
 	datasets, total, err := h.collection.OrgCollections(ctx.Request.Context(), &req)
 	if err != nil {
-		slog.Error("Failed to get org collections", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get org collections", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -304,7 +304,7 @@ func (h *OrganizationHandler) Prompts(ctx *gin.Context) {
 
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
@@ -312,7 +312,7 @@ func (h *OrganizationHandler) Prompts(ctx *gin.Context) {
 	req.PageSize = per
 	prompts, total, err := h.prompt.OrgPrompts(ctx.Request.Context(), &req)
 	if err != nil {
-		slog.Error("Failed to get org prompts", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get org prompts", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -347,7 +347,7 @@ func (h *OrganizationHandler) MCPServers(ctx *gin.Context) {
 
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
@@ -355,7 +355,7 @@ func (h *OrganizationHandler) MCPServers(ctx *gin.Context) {
 	req.PageSize = per
 	data, total, err := h.mcp.OrgMCPServers(ctx.Request.Context(), &req)
 	if err != nil {
-		slog.Error("Failed to get org mcp servers", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get org mcp servers", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}

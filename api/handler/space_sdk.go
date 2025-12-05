@@ -39,7 +39,7 @@ type SpaceSdkHandler struct {
 func (h *SpaceSdkHandler) Index(ctx *gin.Context) {
 	spaceSdks, err := h.c.Index(ctx.Request.Context())
 	if err != nil {
-		slog.Error("Failed to get space sdks", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get space sdks", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -62,13 +62,13 @@ func (h *SpaceSdkHandler) Index(ctx *gin.Context) {
 func (h *SpaceSdkHandler) Create(ctx *gin.Context) {
 	var req types.CreateSpaceSdkReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	spaceSdk, err := h.c.Create(ctx.Request.Context(), &req)
 	if err != nil {
-		slog.Error("Failed to create space sdk", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to create space sdk", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -96,13 +96,13 @@ func (h *SpaceSdkHandler) Update(ctx *gin.Context) {
 	)
 	var req types.UpdateSpaceSdkReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	id, err = strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -110,7 +110,7 @@ func (h *SpaceSdkHandler) Update(ctx *gin.Context) {
 
 	spaceSdk, err := h.c.Update(ctx.Request.Context(), &req)
 	if err != nil {
-		slog.Error("Failed to update space sdk", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to update space sdk", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -137,14 +137,14 @@ func (h *SpaceSdkHandler) Delete(ctx *gin.Context) {
 	)
 	id, err = strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 
 	err = h.c.Delete(ctx.Request.Context(), id)
 	if err != nil {
-		slog.Error("Failed to delete space sdk", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to delete space sdk", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}

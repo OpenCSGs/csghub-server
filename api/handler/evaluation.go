@@ -52,20 +52,20 @@ func (h *EvaluationHandler) RunEvaluation(ctx *gin.Context) {
 
 	var req types.EvaluationReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	_, err := h.sensitive.CheckRequestV2(ctx.Request.Context(), &req)
 	if err != nil {
-		slog.Error("failed to check sensitive request", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
 		return
 	}
 	req.Username = currentUser
 	evaluation, err := h.evaluation.CreateEvaluation(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("Failed to create evaluation job", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to create evaluation job", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -87,7 +87,7 @@ func (h *EvaluationHandler) GetEvaluation(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -96,7 +96,7 @@ func (h *EvaluationHandler) GetEvaluation(ctx *gin.Context) {
 	req.Username = currentUser
 	evaluation, err := h.evaluation.GetEvaluation(ctx.Request.Context(), *req)
 	if err != nil {
-		slog.Error("Failed to get evaluation job", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get evaluation job", slog.Any("error", err))
 		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
 			return
@@ -124,7 +124,7 @@ func (h *EvaluationHandler) DeleteEvaluation(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -133,7 +133,7 @@ func (h *EvaluationHandler) DeleteEvaluation(ctx *gin.Context) {
 	req.Username = currentUser
 	err = h.evaluation.DeleteEvaluation(ctx.Request.Context(), *req)
 	if err != nil {
-		slog.Error("Failed to delete evaluation job", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to delete evaluation job", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}

@@ -65,7 +65,7 @@ func NewImagebuilderComponent(ctx context.Context,
 	}
 
 	if err := workFlowInit(ctx, config, clusterPool); err != nil {
-		slog.Error("failed to init workflow", slog.Any("error", err))
+		slog.ErrorContext(ctx, "failed to init workflow", slog.Any("error", err))
 		return nil, err
 	}
 
@@ -107,7 +107,7 @@ func (ibc *imagebuilderComponentImpl) Build(ctx context.Context, req ctypes.Imag
 
 	wft, err := wfTemplateForImageBuilder(ibc.config, req, imagePath, cInfo.StorageClass, createWorkflowName)
 	if err != nil {
-		slog.Error("failed to create imagebuilder workflow template", "err", err)
+		slog.ErrorContext(ctx, "failed to create imagebuilder workflow template", "err", err)
 		return fmt.Errorf("failed to create imagebuilder workflow template: %w", err)
 	}
 
@@ -192,7 +192,7 @@ func workFlowInit(ctx context.Context, config *config.Config, clusterPool *clust
 				FileContent: data,
 			}
 			if err := createOrUpdateConfigMap(ctx, cluster.Client, cmd); err != nil {
-				slog.Error(fmt.Sprintf("failed to create %s configmap", cfg.FileName), "err", err)
+				slog.ErrorContext(ctx, fmt.Sprintf("failed to create %s configmap", cfg.FileName), "err", err)
 				continue
 			}
 
@@ -218,21 +218,21 @@ func (ibc *imagebuilderComponentImpl) workInformer(ctx context.Context, cluster 
 			wf := obj.(*v1alpha1.Workflow)
 			err := ibc.updateImagebuilderWork(ctx, cluster, wf)
 			if err != nil && !errors.Is(err, sql.ErrNoRows) {
-				slog.Error("fail to add imagebuilder task", slog.Any("error", err), slog.Any("work_name", wf.Name))
+				slog.ErrorContext(ctx, "fail to add imagebuilder task", slog.Any("error", err), slog.Any("work_name", wf.Name))
 			}
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			newWF := newObj.(*v1alpha1.Workflow)
 			err := ibc.updateImagebuilderWork(ctx, cluster, newWF)
 			if err != nil && !errors.Is(err, sql.ErrNoRows) {
-				slog.Error("fail to update imagebuilder task", slog.Any("error", err), slog.Any("work_name", newWF.Name))
+				slog.ErrorContext(ctx, "fail to update imagebuilder task", slog.Any("error", err), slog.Any("work_name", newWF.Name))
 			}
 		},
 		DeleteFunc: func(obj interface{}) {
 			wf := obj.(*v1alpha1.Workflow)
 			err := ibc.updateImagebuilderWork(ctx, cluster, wf)
 			if err != nil {
-				slog.Error("fail to delete imagebuilder task", slog.Any("error", err), slog.Any("work_name", wf.Name))
+				slog.ErrorContext(ctx, "fail to delete imagebuilder task", slog.Any("error", err), slog.Any("work_name", wf.Name))
 			}
 		},
 	}

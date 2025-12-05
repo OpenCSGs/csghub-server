@@ -13,7 +13,7 @@ func (a *Activities) SyncAsClient(ctx context.Context) error {
 	}
 	setting, err := a.stores.syncClientSetting.First(ctx)
 	if err != nil {
-		slog.Error("failed to find sync client setting", "error", err)
+		slog.ErrorContext(ctx, "failed to find sync client setting", "error", err)
 		return err
 	}
 	apiDomain := a.config.MultiSync.SaasAPIDomain

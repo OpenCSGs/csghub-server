@@ -44,6 +44,7 @@ func NewRepoHandler(config *config.Config) (*RepoHandler, error) {
 		m:                         m,
 		d:                         d,
 		deployStatusCheckInterval: 5 * time.Second,
+		config:                    config,
 	}, nil
 }
 
@@ -52,6 +53,7 @@ type RepoHandler struct {
 	m                         component.ModelComponent
 	d                         component.DatasetComponent
 	deployStatusCheckInterval time.Duration
+	config                    *config.Config
 }
 
 // CreateRepo godoc
@@ -69,7 +71,7 @@ func (h *RepoHandler) CreateRepo(ctx *gin.Context) {
 	userName := httpbase.GetCurrentUser(ctx)
 	var req *types.CreateRepoReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -93,7 +95,7 @@ func (h *RepoHandler) CreateRepo(ctx *gin.Context) {
 				ctx.JSON(http.StatusConflict, resp)
 				return
 			}
-			slog.Error("Failed to create model repo", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err), slog.Any("req", req))
+			slog.ErrorContext(ctx.Request.Context(), "Failed to create model repo", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err), slog.Any("req", req))
 			httpbase.ServerError(ctx, err)
 			return
 		}
@@ -111,14 +113,14 @@ func (h *RepoHandler) CreateRepo(ctx *gin.Context) {
 				ctx.JSON(http.StatusConflict, resp)
 				return
 			}
-			slog.Error("Failed to create dataset repo", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err), slog.Any("req", req))
+			slog.ErrorContext(ctx.Request.Context(), "Failed to create dataset repo", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err), slog.Any("req", req))
 			httpbase.ServerError(ctx, err)
 			return
 		}
 		ctx.JSON(http.StatusOK, resp)
 	default:
 		// Unsupported repo type
-		slog.Error("Unsupported repo type", slog.String("repo_type", string(req.RepoType)))
+		slog.ErrorContext(ctx.Request.Context(), "Unsupported repo type", slog.String("repo_type", string(req.RepoType)))
 		httpbase.BadRequest(ctx, fmt.Sprintf("Unsupported repo type: %s", req.RepoType))
 		return
 	}
@@ -138,14 +140,14 @@ func (h *RepoHandler) CreateRepo(ctx *gin.Context) {
 func (h *RepoHandler) ValidateYaml(ctx *gin.Context) {
 	var req types.ValidateYamlReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 
 	err := h.c.ValidateYaml(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("Failed to validate yaml", slog.Any("error", err), slog.Any("req", req))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to validate yaml", slog.Any("error", err), slog.Any("req", req))
 		ctx.JSON(http.StatusBadRequest, gin.H{"errors": []string{err.Error()}})
 		return
 	}
@@ -172,7 +174,7 @@ func (h *RepoHandler) CreateFile(ctx *gin.Context) {
 	userName := httpbase.GetCurrentUser(ctx)
 	var req *types.CreateFileReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -180,7 +182,7 @@ func (h *RepoHandler) CreateFile(ctx *gin.Context) {
 
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -194,7 +196,7 @@ func (h *RepoHandler) CreateFile(ctx *gin.Context) {
 
 	resp, err := h.c.CreateFile(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("Failed to create repo file", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err), slog.Any("req", req))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to create repo file", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err), slog.Any("req", req))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -222,7 +224,7 @@ func (h *RepoHandler) UpdateFile(ctx *gin.Context) {
 	userName := httpbase.GetCurrentUser(ctx)
 	var req *types.UpdateFileReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -230,7 +232,7 @@ func (h *RepoHandler) UpdateFile(ctx *gin.Context) {
 
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -245,7 +247,7 @@ func (h *RepoHandler) UpdateFile(ctx *gin.Context) {
 
 	resp, err := h.c.UpdateFile(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("Failed to update repo file", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err), slog.Any("req", req))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to update repo file", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err), slog.Any("req", req))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -273,7 +275,7 @@ func (h *RepoHandler) DeleteFile(ctx *gin.Context) {
 	userName := httpbase.GetCurrentUser(ctx)
 	var req *types.DeleteFileReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
@@ -281,7 +283,7 @@ func (h *RepoHandler) DeleteFile(ctx *gin.Context) {
 
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
@@ -298,7 +300,7 @@ func (h *RepoHandler) DeleteFile(ctx *gin.Context) {
 
 	resp, err := h.c.DeleteFile(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("Failed to delete repo file", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err), slog.Any("req", req))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to delete repo file", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err), slog.Any("req", req))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -327,13 +329,13 @@ func (h *RepoHandler) DeleteFile(ctx *gin.Context) {
 func (h *RepoHandler) Commits(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -350,7 +352,7 @@ func (h *RepoHandler) Commits(ctx *gin.Context) {
 	}
 	commits, pageOpt, err := h.c.Commits(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("Failed to get repo commits", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err), slog.Any("req", req))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get repo commits", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err), slog.Any("req", req))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -382,7 +384,7 @@ func (h *RepoHandler) Commits(ctx *gin.Context) {
 func (h *RepoHandler) LastCommit(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -401,7 +403,7 @@ func (h *RepoHandler) LastCommit(ctx *gin.Context) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
-		slog.Error("Failed to get repo last commit", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err), slog.Any("req", req))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get repo last commit", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err), slog.Any("req", req))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -429,7 +431,7 @@ func (h *RepoHandler) LastCommit(ctx *gin.Context) {
 func (h *RepoHandler) FileRaw(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -446,7 +448,12 @@ func (h *RepoHandler) FileRaw(ctx *gin.Context) {
 	}
 	raw, err := h.c.FileRaw(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("Failed to get repo file raw", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err), slog.Any("req", req))
+		if errors.Is(err, errorx.ErrNotFound) {
+			slog.ErrorContext(ctx.Request.Context(), "Repo file not found", slog.String("repo_type", string(req.RepoType)), slog.Any("req", req))
+			httpbase.NotFoundError(ctx, err)
+			return
+		}
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get repo file raw", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err), slog.Any("req", req))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -474,7 +481,7 @@ func (h *RepoHandler) FileRaw(ctx *gin.Context) {
 func (h *RepoHandler) FileInfo(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -491,7 +498,7 @@ func (h *RepoHandler) FileInfo(ctx *gin.Context) {
 	}
 	file, err := h.c.FileInfo(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("Failed to get repo file info", slog.Any("req", req), slog.Any("error", err), slog.Any("req", req))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get repo file info", slog.Any("req", req), slog.Any("error", err), slog.Any("req", req))
 		if errors.Is(err, errorx.ErrGitFileNotFound) || errors.Is(err, errorx.ErrGitCommitNotFound) {
 			httpbase.NotFoundError(ctx, err)
 		} else {
@@ -525,7 +532,7 @@ func (h *RepoHandler) DownloadFile(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -544,7 +551,7 @@ func (h *RepoHandler) DownloadFile(ctx *gin.Context) {
 	if ctx.Query("lfs") != "" {
 		req.Lfs, err = strconv.ParseBool(ctx.Query("lfs"))
 		if err != nil {
-			slog.Error("Bad request format", "error", err)
+			slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 			httpbase.BadRequest(ctx, err.Error())
 			return
 		}
@@ -552,7 +559,7 @@ func (h *RepoHandler) DownloadFile(ctx *gin.Context) {
 
 	reader, size, url, err := h.c.DownloadFile(ctx.Request.Context(), req, currentUser)
 	if err != nil {
-		slog.Error("Failed to download repo file", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err), slog.Any("req", req))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to download repo file", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err), slog.Any("req", req))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -567,7 +574,7 @@ func (h *RepoHandler) DownloadFile(ctx *gin.Context) {
 		ctx.Header("Content-Length", strconv.FormatInt(size, 10))
 		_, err = io.Copy(ctx.Writer, reader)
 		if err != nil {
-			slog.Error("Failed to download repo file", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err), slog.Any("req", req))
+			slog.ErrorContext(ctx.Request.Context(), "Failed to download repo file", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err), slog.Any("req", req))
 			httpbase.ServerError(ctx, err)
 			return
 		}
@@ -592,13 +599,13 @@ func (h *RepoHandler) DownloadFile(ctx *gin.Context) {
 func (h *RepoHandler) Branches(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -613,7 +620,7 @@ func (h *RepoHandler) Branches(ctx *gin.Context) {
 	}
 	branches, err := h.c.Branches(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("Failed to get repo branches", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err), slog.Any("req", req))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get repo branches", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err), slog.Any("req", req))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -639,7 +646,7 @@ func (h *RepoHandler) Branches(ctx *gin.Context) {
 func (h *RepoHandler) Tags(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -652,7 +659,7 @@ func (h *RepoHandler) Tags(ctx *gin.Context) {
 	}
 	tags, err := h.c.Tags(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("Failed to get repo tags", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err), slog.Any("req", req))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get repo tags", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err), slog.Any("req", req))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -681,7 +688,7 @@ func (h *RepoHandler) UpdateTags(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Failed update tags", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Failed update tags", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -694,7 +701,7 @@ func (h *RepoHandler) UpdateTags(ctx *gin.Context) {
 	repoType := common.RepoTypeFromContext(ctx)
 	err = h.c.UpdateTags(ctx.Request.Context(), namespace, name, repoType, category, currentUser, tags)
 	if err != nil {
-		slog.Error("Failed to update tags", slog.String("error", err.Error()), slog.String("category", category), slog.String("repo_type", string(repoType)), slog.String("namespace", namespace), slog.String("name", name))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to update tags", slog.String("error", err.Error()), slog.String("category", category), slog.String("repo_type", string(repoType)), slog.String("namespace", namespace), slog.String("name", name))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -720,7 +727,7 @@ func (h *RepoHandler) UpdateTags(ctx *gin.Context) {
 func (h *RepoHandler) Tree(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -739,7 +746,7 @@ func (h *RepoHandler) Tree(ctx *gin.Context) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
-		slog.Error("Failed to get repo file tree", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err), slog.Any("req", req))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get repo file tree", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err), slog.Any("req", req))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -768,7 +775,7 @@ func (h *RepoHandler) Tree(ctx *gin.Context) {
 func (h *RepoHandler) TreeV2(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -793,7 +800,7 @@ func (h *RepoHandler) TreeV2(ctx *gin.Context) {
 		} else {
 			httpbase.ServerError(ctx, err)
 		}
-		slog.Error("Failed to get tree",
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get tree",
 			slog.String("repo_type", string(req.RepoType)),
 			slog.Any("error", err), slog.Any("req", req),
 		)
@@ -823,7 +830,7 @@ func (h *RepoHandler) TreeV2(ctx *gin.Context) {
 func (h *RepoHandler) LogsTree(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -848,7 +855,7 @@ func (h *RepoHandler) LogsTree(ctx *gin.Context) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
-		slog.Error(
+		slog.ErrorContext(ctx.Request.Context(),
 			"Failed to get logs tree",
 			slog.String("repo_type", string(req.RepoType)), slog.Any("error", err),
 			slog.Any("req", req),
@@ -864,13 +871,13 @@ func (h *RepoHandler) UpdateDownloads(ctx *gin.Context) {
 	var req *types.UpdateDownloadsReq
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -880,7 +887,7 @@ func (h *RepoHandler) UpdateDownloads(ctx *gin.Context) {
 	req.RepoType = common.RepoTypeFromContext(ctx)
 	date, err := time.Parse("2006-01-02", req.ReqDate)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -888,7 +895,7 @@ func (h *RepoHandler) UpdateDownloads(ctx *gin.Context) {
 
 	err = h.c.UpdateDownloads(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("Failed to update repo download count", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err), slog.String("namespace", namespace), slog.String("name", name), slog.Time("date", date), slog.Int64("clone_count", req.CloneCount), slog.Any("req", req))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to update repo download count", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err), slog.String("namespace", namespace), slog.String("name", name), slog.Time("date", date), slog.Int64("clone_count", req.CloneCount), slog.Any("req", req))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -912,7 +919,7 @@ func (h *RepoHandler) UpdateDownloads(ctx *gin.Context) {
 func (h *RepoHandler) IncrDownloads(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -921,7 +928,7 @@ func (h *RepoHandler) IncrDownloads(ctx *gin.Context) {
 
 	err = h.c.IncrDownloads(ctx.Request.Context(), repoType, namespace, name)
 	if err != nil {
-		slog.Error("Failed to increase repo download count", slog.String("repo_type", string(repoType)), slog.Any("error", err), slog.String("namespace", namespace), slog.String("name", name))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to increase repo download count", slog.String("repo_type", string(repoType)), slog.Any("error", err), slog.String("namespace", namespace), slog.String("name", name))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -933,7 +940,7 @@ func (h *RepoHandler) UploadFile(ctx *gin.Context) {
 	userName := httpbase.GetCurrentUser(ctx)
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Failed to get namespace from context", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get namespace from context", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -952,7 +959,7 @@ func (h *RepoHandler) UploadFile(ctx *gin.Context) {
 	for idx, file := range fileList {
 		openedFile, err := file.Open()
 		if err != nil {
-			slog.Error("Error opening uploaded file", "error", err)
+			slog.ErrorContext(ctx.Request.Context(), "Error opening uploaded file", "error", err)
 			httpbase.BadRequest(ctx, err.Error())
 			return
 		}
@@ -960,7 +967,7 @@ func (h *RepoHandler) UploadFile(ctx *gin.Context) {
 		buf.Reset()
 		_, err = io.Copy(&buf, openedFile)
 		if err != nil {
-			slog.Error("Error encodeing uploaded file", "error", err, slog.String("file_name", file.Filename))
+			slog.ErrorContext(ctx.Request.Context(), "Error encodeing uploaded file", "error", err, slog.String("file_name", file.Filename))
 			httpbase.BadRequest(ctx, err.Error())
 			return
 		}
@@ -983,7 +990,7 @@ func (h *RepoHandler) UploadFile(ctx *gin.Context) {
 		}
 		err = h.c.UploadFile(ctx.Request.Context(), upload)
 		if err != nil {
-			slog.Error("Failed to upload repo file", slog.String("repo_type", string(upload.RepoType)), slog.Any("error", err), slog.String("file_path", filePath))
+			slog.ErrorContext(ctx.Request.Context(), "Failed to upload repo file", slog.String("repo_type", string(upload.RepoType)), slog.Any("error", err), slog.String("file_path", filePath))
 			httpbase.ServerError(ctx, err)
 			return
 		}
@@ -997,7 +1004,7 @@ func (h *RepoHandler) SDKListFiles(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -1006,19 +1013,31 @@ func (h *RepoHandler) SDKListFiles(ctx *gin.Context) {
 	if mappedBranch != "" {
 		ref = mappedBranch
 	}
+	expand := ctx.Query("expand")
+	if expand == "xetEnabled" {
+		resp, err := h.c.IsXnetEnabled(ctx.Request.Context(), types.ModelRepo, namespace, name, currentUser)
+		if err != nil {
+			slog.ErrorContext(ctx.Request.Context(), "failed to check if xnetEnabled", slog.Any("error", err))
+			httpbase.ServerError(ctx, err)
+			return
+		}
+		ctx.JSON(http.StatusOK, resp)
+		return
+	}
+
 	files, err := h.c.SDKListFiles(ctx.Request.Context(), common.RepoTypeFromContext(ctx), namespace, name, ref, currentUser)
 	if err != nil {
 		if errors.Is(err, errorx.ErrUnauthorized) {
-			slog.Error("permission denied when accessing repo", slog.String("repo_type", string(common.RepoTypeFromContext(ctx))), slog.Any("path", fmt.Sprintf("%s/%s", namespace, name)))
+			slog.ErrorContext(ctx.Request.Context(), "permission denied when accessing repo", slog.String("repo_type", string(common.RepoTypeFromContext(ctx))), slog.Any("path", fmt.Sprintf("%s/%s", namespace, name)))
 			httpbase.UnauthorizedError(ctx, err)
 			return
 		}
 		if errors.Is(err, errorx.ErrNotFound) {
-			slog.Error("repo not found", slog.String("repo_type", string(common.RepoTypeFromContext(ctx))), slog.Any("path", fmt.Sprintf("%s/%s", namespace, name)))
+			slog.ErrorContext(ctx.Request.Context(), "repo not found", slog.String("repo_type", string(common.RepoTypeFromContext(ctx))), slog.Any("path", fmt.Sprintf("%s/%s", namespace, name)))
 			httpbase.NotFoundError(ctx, err)
 			return
 		}
-		slog.Error("Error listing repo files", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Error listing repo files", "error", err)
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -1055,7 +1074,7 @@ func (h *RepoHandler) HeadSDKDownload(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -1079,18 +1098,18 @@ func (h *RepoHandler) HeadSDKDownload(ctx *gin.Context) {
 	file, commit, err := h.c.HeadDownloadFile(ctx.Request.Context(), req, currentUser)
 	if err != nil {
 		if errors.Is(err, errorx.ErrUnauthorized) {
-			slog.Error("permission denied when accessing repo head", slog.String("repo_type", string(req.RepoType)), slog.Any("path", fmt.Sprintf("%s/%s", namespace, name)))
+			slog.ErrorContext(ctx.Request.Context(), "permission denied when accessing repo head", slog.String("repo_type", string(req.RepoType)), slog.Any("path", fmt.Sprintf("%s/%s", namespace, name)))
 			httpbase.UnauthorizedError(ctx, err)
 			return
 		}
 
 		if errors.Is(err, errorx.ErrNotFound) {
-			slog.Error("repo not found head", slog.String("repo_type", string(common.RepoTypeFromContext(ctx))), slog.Any("path", fmt.Sprintf("%s/%s", namespace, name)))
+			slog.ErrorContext(ctx.Request.Context(), "repo not found head", slog.String("repo_type", string(common.RepoTypeFromContext(ctx))), slog.Any("path", fmt.Sprintf("%s/%s", namespace, name)))
 			httpbase.NotFoundError(ctx, err)
 			return
 		}
 
-		slog.Error("Failed to download repo file head", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to download repo file head", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -1099,10 +1118,18 @@ func (h *RepoHandler) HeadSDKDownload(ctx *gin.Context) {
 	}
 
 	slog.Debug("Head download repo file succeed", slog.String("repo_type", string(req.RepoType)), slog.String("name", name), slog.String("path", req.Path), slog.String("ref", req.Ref), slog.Int64("contentLength", file.Size))
+	if file.Lfs && file.XnetEnabled {
+		ctx.Header("X-Xet-Hash", file.LfsSHA256)
+		ctx.Header("X-Xet-Refresh-Route", h.xetRefreshRoute(namespace, name, branch))
+	}
 	ctx.Header("Content-Length", strconv.Itoa(int(file.Size)))
 	ctx.Header("X-Repo-Commit", repoCommit)
 	ctx.Header("ETag", file.SHA)
 	ctx.Status(http.StatusOK)
+}
+
+func (h *RepoHandler) xetRefreshRoute(namespace, name, ref string) string {
+	return fmt.Sprintf("%s/hf/%s/%s/xet-write-token/%s", h.config.Model.DownloadEndpoint, namespace, name, ref)
 }
 
 func (h *RepoHandler) handleDownload(ctx *gin.Context, isResolve bool) {
@@ -1119,7 +1146,7 @@ func (h *RepoHandler) handleDownload(ctx *gin.Context, isResolve bool) {
 	)
 	namespace, name, err = common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -1149,12 +1176,12 @@ func (h *RepoHandler) handleDownload(ctx *gin.Context, isResolve bool) {
 	lfs, contentLength, err := h.c.IsLfs(ctx.Request.Context(), req)
 	if err != nil {
 		if errors.Is(err, errorx.ErrNotFound) {
-			slog.Error("repo not found", slog.String("repo_type", string(common.RepoTypeFromContext(ctx))), slog.Any("path", fmt.Sprintf("%s/%s", namespace, name)))
+			slog.ErrorContext(ctx.Request.Context(), "repo not found", slog.String("repo_type", string(common.RepoTypeFromContext(ctx))), slog.Any("path", fmt.Sprintf("%s/%s", namespace, name)))
 			httpbase.NotFoundError(ctx, err)
 			return
 		}
 
-		slog.Error("Filed to lfs information", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Filed to lfs information", "error", err)
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -1165,18 +1192,18 @@ func (h *RepoHandler) handleDownload(ctx *gin.Context, isResolve bool) {
 		reader, size, url, err = h.c.SDKDownloadFile(ctx.Request.Context(), req, currentUser)
 		if err != nil {
 			if errors.Is(err, errorx.ErrUnauthorized) {
-				slog.Error("permission denied when accessing repo", slog.String("repo_type", string(req.RepoType)), slog.Any("path", fmt.Sprintf("%s/%s", namespace, name)))
+				slog.ErrorContext(ctx.Request.Context(), "permission denied when accessing repo", slog.String("repo_type", string(req.RepoType)), slog.Any("path", fmt.Sprintf("%s/%s", namespace, name)))
 				httpbase.UnauthorizedError(ctx, err)
 				return
 			}
 
 			if errors.Is(err, errorx.ErrNotFound) {
-				slog.Error("repo not found", slog.String("repo_type", string(common.RepoTypeFromContext(ctx))), slog.Any("path", fmt.Sprintf("%s/%s", namespace, name)))
+				slog.ErrorContext(ctx.Request.Context(), "repo not found", slog.String("repo_type", string(common.RepoTypeFromContext(ctx))), slog.Any("path", fmt.Sprintf("%s/%s", namespace, name)))
 				httpbase.NotFoundError(ctx, err)
 				return
 			}
 
-			slog.Error("Failed to download repo file", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err))
+			slog.ErrorContext(ctx.Request.Context(), "Failed to download repo file", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err))
 			httpbase.ServerError(ctx, err)
 			return
 		}
@@ -1194,7 +1221,7 @@ func (h *RepoHandler) handleDownload(ctx *gin.Context, isResolve bool) {
 			_, err = io.Copy(ctx.Writer, reader)
 		}
 		if err != nil {
-			slog.Error("Failed to download repo file", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err))
+			slog.ErrorContext(ctx.Request.Context(), "Failed to download repo file", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err))
 			httpbase.ServerError(ctx, err)
 			return
 		}
@@ -1219,7 +1246,7 @@ func (h *RepoHandler) handleDownload(ctx *gin.Context, isResolve bool) {
 func (h *RepoHandler) CommitWithDiff(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -1234,7 +1261,7 @@ func (h *RepoHandler) CommitWithDiff(ctx *gin.Context) {
 	}
 	commit, err := h.c.GetCommitWithDiff(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("Failed to get repo with commit diff", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get repo with commit diff", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err))
 		if errors.Is(err, errorx.ErrGitCommitNotFound) {
 			httpbase.NotFoundError(ctx, err)
 		} else {
@@ -1266,18 +1293,18 @@ func (h *RepoHandler) CreateMirror(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	if err = ctx.ShouldBindJSON(&mirrorReq); err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	sourceRepoPath, err := getSourceRepoPathFromSourceUrl(mirrorReq.SourceUrl)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -1288,7 +1315,7 @@ func (h *RepoHandler) CreateMirror(ctx *gin.Context) {
 	mirrorReq.SourceRepoPath = sourceRepoPath
 	mirror, err := h.c.CreateMirror(ctx.Request.Context(), mirrorReq)
 	if err != nil {
-		slog.Error("Failed to create mirror for", slog.String("repo_type", string(mirrorReq.RepoType)), slog.String("path", fmt.Sprintf("%s/%s", mirrorReq.Namespace, mirrorReq.Name)), "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Failed to create mirror for", slog.String("repo_type", string(mirrorReq.RepoType)), slog.String("path", fmt.Sprintf("%s/%s", mirrorReq.Namespace, mirrorReq.Name)), "error", err)
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -1312,7 +1339,7 @@ func (h *RepoHandler) MirrorFromSaas(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -1323,7 +1350,7 @@ func (h *RepoHandler) MirrorFromSaas(ctx *gin.Context) {
 	}
 	err = h.c.MirrorFromSaas(ctx.Request.Context(), namespace, name, currentUser, repoType)
 	if err != nil {
-		slog.Error("Failed to create mirror for", slog.String("repo_type", string(repoType)), slog.String("path", fmt.Sprintf("%s/%s", namespace, name)), "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Failed to create mirror for", slog.String("repo_type", string(repoType)), slog.String("path", fmt.Sprintf("%s/%s", namespace, name)), "error", err)
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -1349,7 +1376,7 @@ func (h *RepoHandler) GetMirror(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -1359,7 +1386,7 @@ func (h *RepoHandler) GetMirror(ctx *gin.Context) {
 	mirrorReq.CurrentUser = currentUser
 	mirror, err := h.c.GetMirror(ctx.Request.Context(), mirrorReq)
 	if err != nil {
-		slog.Error("Failed to get mirror of", slog.String("repo_type", string(mirrorReq.RepoType)), slog.String("path", fmt.Sprintf("%s/%s", mirrorReq.Namespace, mirrorReq.Name)), "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get mirror of", slog.String("repo_type", string(mirrorReq.RepoType)), slog.String("path", fmt.Sprintf("%s/%s", mirrorReq.Namespace, mirrorReq.Name)), "error", err)
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -1385,18 +1412,18 @@ func (h *RepoHandler) UpdateMirror(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	if err = ctx.ShouldBindJSON(&mirrorReq); err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	sourceRepoPath, err := getSourceRepoPathFromSourceUrl(mirrorReq.SourceUrl)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -1407,7 +1434,7 @@ func (h *RepoHandler) UpdateMirror(ctx *gin.Context) {
 	mirrorReq.CurrentUser = currentUser
 	mirror, err := h.c.UpdateMirror(ctx.Request.Context(), mirrorReq)
 	if err != nil {
-		slog.Error("Failed to update mirror for", slog.String("repo_type", string(mirrorReq.RepoType)), slog.String("path", fmt.Sprintf("%s/%s", mirrorReq.Namespace, mirrorReq.Name)), "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Failed to update mirror for", slog.String("repo_type", string(mirrorReq.RepoType)), slog.String("path", fmt.Sprintf("%s/%s", mirrorReq.Namespace, mirrorReq.Name)), "error", err)
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -1432,7 +1459,7 @@ func (h *RepoHandler) DeleteMirror(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -1442,7 +1469,7 @@ func (h *RepoHandler) DeleteMirror(ctx *gin.Context) {
 	mirrorReq.CurrentUser = currentUser
 	err = h.c.DeleteMirror(ctx.Request.Context(), mirrorReq)
 	if err != nil {
-		slog.Error("Failed to delete mirror of", slog.String("repo_type", string(mirrorReq.RepoType)), slog.String("path", fmt.Sprintf("%s/%s", mirrorReq.Namespace, mirrorReq.Name)), "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Failed to delete mirror of", slog.String("repo_type", string(mirrorReq.RepoType)), slog.String("path", fmt.Sprintf("%s/%s", mirrorReq.Namespace, mirrorReq.Name)), "error", err)
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -1468,7 +1495,7 @@ func (h *RepoHandler) DeleteMirror(ctx *gin.Context) {
 func (h *RepoHandler) RuntimeFrameworkList(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -1479,20 +1506,20 @@ func (h *RepoHandler) RuntimeFrameworkList(ctx *gin.Context) {
 	}
 	deployType, err := strconv.Atoi(deployTypeStr)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	slog.Debug("list runtime framework", slog.Any("namespace", namespace), slog.Any("name", name))
 	repoType := common.RepoTypeFromContext(ctx)
 	if repoType == types.UnknownRepo {
-		slog.Error("Bad request of repo type")
+		slog.ErrorContext(ctx.Request.Context(), "Bad request of repo type")
 		httpbase.BadRequest(ctx, "Bad request of repo type")
 		return
 	}
 	response, err := h.c.ListRuntimeFramework(ctx.Request.Context(), repoType, namespace, name, deployType)
 	if err != nil {
-		slog.Error("fail to list runtime framework", slog.String("error", err.Error()))
+		slog.ErrorContext(ctx.Request.Context(), "fail to list runtime framework", slog.String("error", err.Error()))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -1519,7 +1546,7 @@ func (h *RepoHandler) RuntimeFrameworkList(ctx *gin.Context) {
 func (h *RepoHandler) RuntimeFrameworkListV2(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -1530,20 +1557,20 @@ func (h *RepoHandler) RuntimeFrameworkListV2(ctx *gin.Context) {
 	}
 	deployType, err := strconv.Atoi(deployTypeStr)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	slog.Debug("list runtime framework", slog.Any("namespace", namespace), slog.Any("name", name))
 	repoType := common.RepoTypeFromContext(ctx)
 	if repoType == types.UnknownRepo {
-		slog.Error("Bad request of repo type")
+		slog.ErrorContext(ctx.Request.Context(), "Bad request of repo type")
 		httpbase.BadRequest(ctx, "Bad request of repo type")
 		return
 	}
 	response, err := h.c.ListRuntimeFrameworkV2(ctx.Request.Context(), repoType, namespace, name, deployType)
 	if err != nil {
-		slog.Error("fail to list runtime framework", slog.String("error", err.Error()))
+		slog.ErrorContext(ctx.Request.Context(), "fail to list runtime framework", slog.String("error", err.Error()))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -1571,7 +1598,7 @@ func (h *RepoHandler) RuntimeFrameworkCreate(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	var req types.RuntimeFrameworkReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -1582,7 +1609,7 @@ func (h *RepoHandler) RuntimeFrameworkCreate(ctx *gin.Context) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
-		slog.Error("Failed to create runtime framework", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to create runtime framework", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -1610,14 +1637,14 @@ func (h *RepoHandler) RuntimeFrameworkUpdate(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	var req types.RuntimeFrameworkReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	req.CurrentUser = currentUser
 	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
-		slog.Error("Bad request url format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request url format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -1628,7 +1655,7 @@ func (h *RepoHandler) RuntimeFrameworkUpdate(ctx *gin.Context) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
-		slog.Error("Failed to update runtime framework", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to update runtime framework", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -1658,7 +1685,7 @@ func (h *RepoHandler) RuntimeFrameworkDelete(ctx *gin.Context) {
 	)
 	id, err = strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -1671,7 +1698,7 @@ func (h *RepoHandler) RuntimeFrameworkDelete(ctx *gin.Context) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
-		slog.Error("Failed to delete runtime framework", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to delete runtime framework", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -1697,14 +1724,14 @@ func (h *RepoHandler) DeployList(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	repoType := common.RepoTypeFromContext(ctx)
 	response, err := h.c.ListDeploy(ctx.Request.Context(), repoType, namespace, name, currentUser)
 	if err != nil {
-		slog.Error("fail to list deploy", slog.String("error", err.Error()), slog.Any("repotype", repoType), slog.Any("namespace", namespace), slog.Any("name", name))
+		slog.ErrorContext(ctx.Request.Context(), "fail to list deploy", slog.String("error", err.Error()), slog.Any("repotype", repoType), slog.Any("namespace", namespace), slog.Any("name", name))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -1733,14 +1760,14 @@ func (h *RepoHandler) DeployDetail(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	repoType := common.RepoTypeFromContext(ctx)
 	deployID, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -1766,7 +1793,7 @@ func (h *RepoHandler) DeployDetail(ctx *gin.Context) {
 		} else if errors.Is(err, errorx.ErrDatabaseNoRows) {
 			httpbase.NotFoundError(ctx, err)
 		} else {
-			slog.Error("failed to get deploy detail", slog.Any("error", err), slog.Any("req", detailReq))
+			slog.ErrorContext(ctx.Request.Context(), "failed to get deploy detail", slog.Any("error", err), slog.Any("req", detailReq))
 			httpbase.ServerError(ctx, err)
 		}
 		return
@@ -1787,6 +1814,7 @@ func (h *RepoHandler) DeployDetail(ctx *gin.Context) {
 // @Param        id path string true "id"
 // @Param        instance path string true "instance"
 // @Param        current_user query string true "current_user"
+// @Param        since query string false "since time. Optional values: 10mins, 30mins, 1hour, 6hours, 1day, 2days, 1week"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      401  {object}  types.APIUnauthorized "Permission denied"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
@@ -1798,7 +1826,7 @@ func (h *RepoHandler) DeployInstanceLogs(ctx *gin.Context) {
 	}
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("failed to get namespace and name from context", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "failed to get namespace and name from context", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -1807,7 +1835,7 @@ func (h *RepoHandler) DeployInstanceLogs(ctx *gin.Context) {
 	repoType := common.RepoTypeFromContext(ctx)
 	deployID, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -1829,6 +1857,7 @@ func (h *RepoHandler) DeployInstanceLogs(ctx *gin.Context) {
 		DeployID:     deployID,
 		DeployType:   types.InferenceType,
 		InstanceName: instance,
+		Since:        ctx.Query("since"),
 	}
 
 	// user http request context instead of gin context, so that server knows the life cycle of the request
@@ -1840,7 +1869,7 @@ func (h *RepoHandler) DeployInstanceLogs(ctx *gin.Context) {
 			return
 		}
 
-		slog.Error("failed to get instance logs", slog.Any("error", err), slog.Any("req", logReq))
+		slog.ErrorContext(ctx.Request.Context(), "failed to get instance logs", slog.Any("error", err), slog.Any("req", logReq))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -1935,7 +1964,7 @@ func (h *RepoHandler) DeployStatus(ctx *gin.Context) {
 
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("failed to get namespace from context", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "failed to get namespace from context", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -1943,7 +1972,7 @@ func (h *RepoHandler) DeployStatus(ctx *gin.Context) {
 	repoType := common.RepoTypeFromContext(ctx)
 	deployID, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -1966,13 +1995,13 @@ func (h *RepoHandler) DeployStatus(ctx *gin.Context) {
 			return
 		}
 
-		slog.Error("failed to get deploy status", "error", err, "req", statusReq)
+		slog.ErrorContext(ctx.Request.Context(), "failed to get deploy status", "error", err, "req", statusReq)
 		httpbase.ServerError(ctx, err)
 		return
 	}
 
 	if !allow {
-		slog.Error("not allowed to query deploy status", "req", statusReq)
+		slog.ErrorContext(ctx.Request.Context(), "not allowed to query deploy status", "req", statusReq)
 		httpbase.ForbiddenError(ctx, err)
 		return
 	}
@@ -1995,7 +2024,7 @@ func (h *RepoHandler) DeployStatus(ctx *gin.Context) {
 			// user http request context instead of gin context, so that server knows the life cycle of the request
 			status, err := h.c.DeployStatus(ctx.Request.Context(), repoType, namespace, name, deployID)
 			if err != nil {
-				slog.Error("failed to get deploy status", slog.Any("error", err), slog.String("namespace", namespace),
+				slog.ErrorContext(ctx.Request.Context(), "failed to get deploy status", slog.Any("error", err), slog.String("namespace", namespace),
 					slog.String("name", name), slog.Any("deploy_id", deployID))
 				ctx.SSEvent("error", err.Error())
 			} else {
@@ -2024,7 +2053,7 @@ func (h *RepoHandler) SyncMirror(ctx *gin.Context) {
 	repoType := common.RepoTypeFromContext(ctx)
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("failed to get namespace from context", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "failed to get namespace from context", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -2032,12 +2061,12 @@ func (h *RepoHandler) SyncMirror(ctx *gin.Context) {
 	err = h.c.SyncMirror(ctx.Request.Context(), repoType, namespace, name, currentUser)
 	if err != nil {
 		if errors.Is(err, errorx.ErrForbidden) {
-			slog.Error("not allowed to sync mirror", slog.Any("error", err), slog.String("repo_type", string(repoType)), slog.String("path", fmt.Sprintf("%s/%s", namespace, name)))
+			slog.ErrorContext(ctx.Request.Context(), "not allowed to sync mirror", slog.Any("error", err), slog.String("repo_type", string(repoType)), slog.String("path", fmt.Sprintf("%s/%s", namespace, name)))
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
 
-		slog.Error("Failed to sync mirror for", slog.String("repo_type", string(repoType)), slog.String("path", fmt.Sprintf("%s/%s", namespace, name)), "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Failed to sync mirror for", slog.String("repo_type", string(repoType)), slog.String("path", fmt.Sprintf("%s/%s", namespace, name)), "error", err)
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -2061,7 +2090,7 @@ func (h *RepoHandler) MirrorProgress(ctx *gin.Context) {
 	repoType := common.RepoTypeFromContext(ctx)
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("failed to get namespace from context", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "failed to get namespace from context", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -2074,7 +2103,7 @@ func (h *RepoHandler) MirrorProgress(ctx *gin.Context) {
 			return
 		}
 
-		slog.Error("Failed to get mirror progress for", slog.String("repo_type", string(repoType)), slog.String("path", fmt.Sprintf("%s/%s", namespace, name)), "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get mirror progress for", slog.String("repo_type", string(repoType)), slog.String("path", fmt.Sprintf("%s/%s", namespace, name)), "error", err)
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -2133,14 +2162,14 @@ func (h *RepoHandler) DeployUpdate(ctx *gin.Context) {
 
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("failed to get namespace and name from context", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "failed to get namespace and name from context", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 
 	allow, err := h.c.AllowReadAccess(ctx.Request.Context(), types.ModelRepo, namespace, name, currentUser)
 	if err != nil {
-		slog.Error("failed to check user permission", "error", err, slog.Any("currentUser", currentUser), slog.Any("namespace", name), slog.Any("name", name))
+		slog.ErrorContext(ctx.Request.Context(), "failed to check user permission", "error", err, slog.Any("currentUser", currentUser), slog.Any("namespace", name), slog.Any("name", name))
 		httpbase.ServerError(ctx, errors.New("failed to check user permission"))
 		return
 	}
@@ -2154,7 +2183,7 @@ func (h *RepoHandler) DeployUpdate(ctx *gin.Context) {
 
 	var req *types.DeployUpdateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("Bad request format", "error", err, slog.Any("request.body", ctx.Request.Body))
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err, slog.Any("request.body", ctx.Request.Body))
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -2162,7 +2191,7 @@ func (h *RepoHandler) DeployUpdate(ctx *gin.Context) {
 	if req.MinReplica != nil && req.MaxReplica != nil {
 		err = Validate.Struct(req)
 		if err != nil {
-			slog.Error("Bad request setting for deploy", slog.Any("req", *req), slog.Any("err", err))
+			slog.ErrorContext(ctx.Request.Context(), "Bad request setting for deploy", slog.Any("req", *req), slog.Any("err", err))
 			httpbase.BadRequest(ctx, fmt.Sprintf("Bad request setting for deploy, %v", err))
 			return
 		}
@@ -2171,7 +2200,7 @@ func (h *RepoHandler) DeployUpdate(ctx *gin.Context) {
 	repoType := common.RepoTypeFromContext(ctx)
 	deployID, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
-		slog.Error("Bad request format", slog.Any("error", err), slog.Any("id", ctx.Param("id")))
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", slog.Any("error", err), slog.Any("id", ctx.Param("id")))
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -2186,12 +2215,12 @@ func (h *RepoHandler) DeployUpdate(ctx *gin.Context) {
 	err = h.c.DeployUpdate(ctx.Request.Context(), updateReq, req)
 	if err != nil {
 		if errors.Is(err, errorx.ErrForbidden) {
-			slog.Error("user not allowed to update deploy", slog.String("namespace", namespace),
+			slog.ErrorContext(ctx.Request.Context(), "user not allowed to update deploy", slog.String("namespace", namespace),
 				slog.String("name", name), slog.Any("username", currentUser), slog.Int64("deploy_id", deployID))
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
-		slog.Error("failed to update deploy", slog.String("namespace", namespace), slog.String("name", name), slog.Any("username", currentUser), slog.Int64("deploy_id", deployID), slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "failed to update deploy", slog.String("namespace", namespace), slog.String("name", name), slog.Any("username", currentUser), slog.Int64("deploy_id", deployID), slog.Any("error", err))
 		httpbase.ServerError(ctx, fmt.Errorf("failed to update deploy, %w", err))
 		return
 	}
@@ -2223,20 +2252,20 @@ func (h *RepoHandler) RuntimeFrameworkListWithType(ctx *gin.Context) {
 	}
 	deployType, err := strconv.Atoi(deployTypeStr)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 
 	repoType := common.RepoTypeFromContext(ctx)
 	if repoType == types.UnknownRepo {
-		slog.Error("Bad request of repo type")
+		slog.ErrorContext(ctx.Request.Context(), "Bad request of repo type")
 		httpbase.BadRequest(ctx, "Bad request of repo type")
 		return
 	}
 	response, err := h.c.ListRuntimeFrameworkWithType(ctx.Request.Context(), deployType)
 	if err != nil {
-		slog.Error("fail to list runtime framework", slog.String("error", err.Error()))
+		slog.ErrorContext(ctx.Request.Context(), "fail to list runtime framework", slog.String("error", err.Error()))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -2263,13 +2292,13 @@ func (h *RepoHandler) ServerlessDetail(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	deployID, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -2286,13 +2315,13 @@ func (h *RepoHandler) ServerlessDetail(ctx *gin.Context) {
 	response, err := h.c.DeployDetail(ctx.Request.Context(), detailReq)
 	if err != nil {
 		if errors.Is(err, errorx.ErrForbidden) {
-			slog.Error("user not allowed to get serverless deploy detail", slog.String("namespace", namespace),
+			slog.ErrorContext(ctx.Request.Context(), "user not allowed to get serverless deploy detail", slog.String("namespace", namespace),
 				slog.String("name", name), slog.Any("username", currentUser), slog.Int64("deploy_id", deployID))
 			httpbase.ForbiddenError(ctx, err)
 		} else if errors.Is(err, errorx.ErrDatabaseNoRows) {
 			httpbase.NotFoundError(ctx, err)
 		} else {
-			slog.Error("fail to get serverless deploy detail", slog.String("error", err.Error()), slog.Any("namespace", namespace), slog.Any("name", name), slog.Any("deploy id", deployID))
+			slog.ErrorContext(ctx.Request.Context(), "fail to get serverless deploy detail", slog.String("error", err.Error()), slog.Any("namespace", namespace), slog.Any("name", name), slog.Any("deploy id", deployID))
 			httpbase.ServerError(ctx, err)
 		}
 		return
@@ -2313,7 +2342,8 @@ func (h *RepoHandler) ServerlessDetail(ctx *gin.Context) {
 // @Param        id path string true "id"
 // @Param        instance path string true "instance"
 // @Param        current_user query string true "current_user"
-// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Param        since query string false "since time. Optional values: 10mins, 30mins, 1hour, 6hours, 1day, 2days, 1week"
+// @Failure      400  {object}  types.APIBadRequest "Bad request. May occur when the since time format is unsupported"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /models/{namespace}/{name}/serverless/{id}/logs/{instance} [get]
 func (h *RepoHandler) ServerlessLogs(ctx *gin.Context) {
@@ -2321,9 +2351,10 @@ func (h *RepoHandler) ServerlessLogs(ctx *gin.Context) {
 		h.testLogs(ctx)
 		return
 	}
+
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("failed to get namespace and name from context", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "failed to get namespace and name from context", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -2332,7 +2363,7 @@ func (h *RepoHandler) ServerlessLogs(ctx *gin.Context) {
 	repoType := common.RepoTypeFromContext(ctx)
 	deployID, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -2354,18 +2385,19 @@ func (h *RepoHandler) ServerlessLogs(ctx *gin.Context) {
 		DeployID:     deployID,
 		DeployType:   types.ServerlessType,
 		InstanceName: instance,
+		Since:        ctx.Query("since"),
 	}
 
 	// user http request context instead of gin context, so that server knows the life cycle of the request
 	logReader, err := h.c.DeployInstanceLogs(ctx.Request.Context(), logReq)
 	if err != nil {
 		if errors.Is(err, errorx.ErrForbidden) {
-			slog.Error("user not allowed to get serverless deploy logs", slog.Any("logReq", logReq), slog.Any("error", err))
+			slog.ErrorContext(ctx.Request.Context(), "user not allowed to get serverless deploy logs", slog.Any("logReq", logReq), slog.Any("error", err))
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
 
-		slog.Error("Failed to get serverless deploy logs", slog.Any("logReq", logReq), slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get serverless deploy logs", slog.Any("logReq", logReq), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -2425,14 +2457,14 @@ func (h *RepoHandler) ServerlessStatus(ctx *gin.Context) {
 
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("failed to get namespace from context", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "failed to get namespace from context", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 
 	deployID, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -2449,12 +2481,12 @@ func (h *RepoHandler) ServerlessStatus(ctx *gin.Context) {
 	allow, err := h.c.AllowAccessDeploy(ctx.Request.Context(), statusReq)
 	if err != nil {
 		if errors.Is(err, errorx.ErrForbidden) {
-			slog.Error("user not allowed to get serverless deploy status", slog.Any("error", err), slog.Any("req", statusReq))
+			slog.ErrorContext(ctx.Request.Context(), "user not allowed to get serverless deploy status", slog.Any("error", err), slog.Any("req", statusReq))
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
 
-		slog.Error("failed to check user permission", slog.Any("error", err), slog.Any("req", statusReq))
+		slog.ErrorContext(ctx.Request.Context(), "failed to check user permission", slog.Any("error", err), slog.Any("req", statusReq))
 		httpbase.ServerError(ctx, fmt.Errorf("failed to check user permission, %w", err))
 		return
 	}
@@ -2483,7 +2515,7 @@ func (h *RepoHandler) ServerlessStatus(ctx *gin.Context) {
 			// user http request context instead of gin context, so that server knows the life cycle of the request
 			status, err := h.c.DeployStatus(ctx.Request.Context(), types.ModelRepo, namespace, name, deployID)
 			if err != nil {
-				slog.Error("failed to get deploy status", slog.Any("error", err), slog.String("namespace", namespace),
+				slog.ErrorContext(ctx.Request.Context(), "failed to get deploy status", slog.Any("error", err), slog.String("namespace", namespace),
 					slog.String("name", name), slog.Any("deploy_id", deployID))
 				ctx.SSEvent("error", err.Error())
 			} else {
@@ -2515,14 +2547,14 @@ func (h *RepoHandler) ServerlessUpdate(ctx *gin.Context) {
 
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("failed to get namespace and name from context", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "failed to get namespace and name from context", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 
 	var req *types.DeployUpdateReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("Bad request format", "error", err, slog.Any("request.body", ctx.Request.Body))
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err, slog.Any("request.body", ctx.Request.Body))
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -2530,7 +2562,7 @@ func (h *RepoHandler) ServerlessUpdate(ctx *gin.Context) {
 	if req.MinReplica != nil && req.MaxReplica != nil {
 		err = Validate.Struct(req)
 		if err != nil {
-			slog.Error("Bad request setting for serverless", slog.Any("req", *req), slog.Any("err", err))
+			slog.ErrorContext(ctx.Request.Context(), "Bad request setting for serverless", slog.Any("req", *req), slog.Any("err", err))
 			httpbase.BadRequest(ctx, fmt.Sprintf("Bad request setting for serverless, %v", err))
 			return
 		}
@@ -2538,7 +2570,7 @@ func (h *RepoHandler) ServerlessUpdate(ctx *gin.Context) {
 
 	deployID, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
-		slog.Error("Bad request format", slog.Any("error", err), slog.Any("id", ctx.Param("id")))
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", slog.Any("error", err), slog.Any("id", ctx.Param("id")))
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -2558,7 +2590,7 @@ func (h *RepoHandler) ServerlessUpdate(ctx *gin.Context) {
 			return
 		}
 
-		slog.Error("failed to update serverless", slog.Any("error", err), slog.Any("req", updateReq))
+		slog.ErrorContext(ctx.Request.Context(), "failed to update serverless", slog.Any("error", err), slog.Any("req", updateReq))
 		httpbase.ServerError(ctx, fmt.Errorf("failed to update serverless, %w", err))
 		return
 	}
@@ -2586,7 +2618,7 @@ func (h *RepoHandler) ServerlessUpdate(ctx *gin.Context) {
 func (h *RepoHandler) RemoteTree(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -2607,7 +2639,7 @@ func (h *RepoHandler) RemoteTree(ctx *gin.Context) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
-		slog.Error(
+		slog.ErrorContext(ctx.Request.Context(),
 			"Failed to get remote tree", slog.String("repo_type", string(req.RepoType)),
 			slog.Any("error", err), slog.Any("req", req),
 		)
@@ -2637,7 +2669,7 @@ func (h *RepoHandler) RemoteTree(ctx *gin.Context) {
 func (h *RepoHandler) DiffBetweenTwoCommits(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -2659,7 +2691,7 @@ func (h *RepoHandler) DiffBetweenTwoCommits(ctx *gin.Context) {
 	}
 	diff, err := h.c.DiffBetweenTwoCommits(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error(
+		slog.ErrorContext(ctx.Request.Context(),
 			"Failed to get repo diff between two commits",
 			slog.String("repo_type", string(req.RepoType)),
 			slog.Any("error", err))
@@ -2684,14 +2716,14 @@ func (h *RepoHandler) DiffBetweenTwoCommits(ctx *gin.Context) {
 // @Param        namespace path string true "namespace"
 // @Param        name path string true "name"
 // @Param        current_user query string false "current user"
-// @Success      200  {object}  types.Response{data=types.File} "OK"
+// @Success      200  {object}  types.Response{data=[]types.File} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /{repo_type}/{namespace}/{name}/all_files [get]
 func (h *RepoHandler) AllFiles(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -2700,6 +2732,8 @@ func (h *RepoHandler) AllFiles(ctx *gin.Context) {
 	req.Name = name
 	req.RepoType = common.RepoTypeFromContext(ctx)
 	req.CurrentUser = httpbase.GetCurrentUser(ctx)
+	req.Limit = 100
+	req.Cursor = ctx.Query("cursor")
 	detail, err := h.c.AllFiles(ctx.Request.Context(), req)
 	if err != nil {
 		if errors.Is(err, errorx.ErrForbidden) {
@@ -2707,12 +2741,12 @@ func (h *RepoHandler) AllFiles(ctx *gin.Context) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
-		slog.Error("Failed to get repo all files", slog.Any("error", err), slog.Any("req", req))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get repo all files", slog.Any("error", err), slog.Any("req", req))
 		httpbase.ServerError(ctx, err)
 		return
 	}
 
-	httpbase.OK(ctx, detail)
+	httpbase.OK(ctx, detail.Files)
 }
 
 // GetRepoRemoteCommitDiff godoc
@@ -2733,7 +2767,7 @@ func (h *RepoHandler) AllFiles(ctx *gin.Context) {
 func (h *RepoHandler) RemoteDiff(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -2754,7 +2788,7 @@ func (h *RepoHandler) RemoteDiff(ctx *gin.Context) {
 	}
 	diff, err := h.c.RemoteDiff(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error(
+		slog.ErrorContext(ctx.Request.Context(),
 			"Failed to get repo remote diff",
 			slog.String("repo_type", string(req.RepoType)),
 			slog.Any("error", err))
@@ -2834,6 +2868,7 @@ func (h *RepoHandler) PreuploadHF(ctx *gin.Context) {
 
 	resp, err := h.c.Preupload(ctx.Request.Context(), req)
 	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "failed to preupload", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -2860,7 +2895,7 @@ func (h *RepoHandler) PreuploadHF(ctx *gin.Context) {
 func (h *RepoHandler) CommitFiles(ctx *gin.Context) {
 	var req types.CommitFilesReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("invalid request body", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "invalid request body", slog.Any("error", err))
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -2869,7 +2904,7 @@ func (h *RepoHandler) CommitFiles(ctx *gin.Context) {
 
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("invalid request body", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "invalid request body", slog.Any("error", err))
 		httpbase.BadRequest(ctx, err.Error())
 	}
 	req.Namespace = namespace
@@ -2880,7 +2915,7 @@ func (h *RepoHandler) CommitFiles(ctx *gin.Context) {
 
 	err = h.c.CommitFiles(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("failed to commit files", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "failed to commit files", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -2890,7 +2925,7 @@ func (h *RepoHandler) CommitFiles(ctx *gin.Context) {
 func (h *RepoHandler) CommitFilesHF(ctx *gin.Context) {
 	req, err := h.c.ParseNDJson(ctx)
 	if err != nil {
-		slog.Error("invalid request body", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "invalid request body", slog.Any("error", err))
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -2898,7 +2933,7 @@ func (h *RepoHandler) CommitFilesHF(ctx *gin.Context) {
 
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("invalid request body", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "invalid request body", slog.Any("error", err))
 		httpbase.BadRequest(ctx, err.Error())
 	}
 	req.Namespace = namespace
@@ -2912,7 +2947,7 @@ func (h *RepoHandler) CommitFilesHF(ctx *gin.Context) {
 
 	err = h.c.CommitFiles(ctx.Request.Context(), *req)
 	if err != nil {
-		slog.Error("failed to commit files", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "failed to commit files", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -2943,21 +2978,21 @@ func (h *RepoHandler) ChangePath(ctx *gin.Context) {
 		err error
 	)
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("invalid request body", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "invalid request body", slog.Any("error", err))
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 
 	req.RepoType, err = common.RepoTypeFromString(ctx.Param("repo_type"))
 	if err != nil {
-		slog.Error("invalid repo type", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "invalid repo type", slog.Any("error", err))
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 
 	err = validator.ValidateRepoPath(req.NewPath)
 	if err != nil {
-		slog.Error("invalid new path", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "invalid new path", slog.Any("error", err))
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -2966,7 +3001,7 @@ func (h *RepoHandler) ChangePath(ctx *gin.Context) {
 
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("invalid request body", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "invalid request body", slog.Any("error", err))
 		httpbase.BadRequest(ctx, err.Error())
 	}
 	req.Namespace = namespace
@@ -2976,13 +3011,50 @@ func (h *RepoHandler) ChangePath(ctx *gin.Context) {
 	err = h.c.ChangePath(ctx.Request.Context(), req)
 	if err != nil {
 		if errors.Is(err, errorx.ErrBadRequest) {
-			slog.Error("invalid request", slog.Any("error", err))
+			slog.ErrorContext(ctx.Request.Context(), "invalid request", slog.Any("error", err))
 			httpbase.BadRequest(ctx, err.Error())
 			return
 		}
-		slog.Error("failed to commit files", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "failed to commit files", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
 	httpbase.OK(ctx, nil)
+}
+
+// GetRepos godoc
+// @Security     ApiKey
+// @Summary      Get repo paths with search query
+// @Tags         Repository
+// @Accept       json
+// @Produce      json
+// @Param        current_user query string false "current user name"
+// @Param        search query string true "search query"
+// @Param        type query string true "repository type query" enums(model, dataset, code, space, mcpserver)
+// @Success      200  {object}  types.Response{data=[]string} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /admin/repos [get]
+func (h *RepoHandler) GetRepos(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	search := ctx.Query("search")
+	repositoryType := ctx.Query("type")
+	repoType := types.RepositoryType(repositoryType)
+	if repoType == types.UnknownRepo {
+		httpbase.BadRequest(ctx, "Unknown repository type")
+		return
+	}
+
+	repos, err := h.c.GetRepos(ctx.Request.Context(), search, currentUser, repoType)
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(),
+			"Failed to get repos",
+			slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	slog.Debug(
+		"Get repos succeed",
+		slog.String("search", search))
+	httpbase.OK(ctx, repos)
 }

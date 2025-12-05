@@ -35,7 +35,7 @@ func (h *GitCallbackHandler) Handle(c *gin.Context) {
 	case "push":
 		h.handlePush(c)
 	default:
-		slog.Error("Unknown git callback event", "event", event)
+		slog.ErrorContext(c.Request.Context(), "Unknown git callback event", "event", event)
 		httpbase.BadRequest(c, "unknown git callback event:"+event)
 	}
 
@@ -44,7 +44,7 @@ func (h *GitCallbackHandler) Handle(c *gin.Context) {
 func (h *GitCallbackHandler) handlePush(c *gin.Context) {
 	var req types.GiteaCallbackPushReq
 	if err := c.ShouldBindJSON(&req); err != nil {
-		slog.Error("[git_callback] Bad git callback request format", slog.Any("error", err))
+		slog.ErrorContext(c.Request.Context(), "[git_callback] Bad git callback request format", slog.Any("error", err))
 		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
 		return
 	}
@@ -58,7 +58,7 @@ func (h *GitCallbackHandler) handlePush(c *gin.Context) {
 		c, workflowOptions, workflow.HandlePushWorkflow, &req,
 	)
 	if err != nil {
-		slog.Error("[git_callback] failed to handle git push callback", slog.Any("error", err), slog.Any("repo_path", req.Repository.FullName))
+		slog.ErrorContext(c.Request.Context(), "[git_callback] failed to handle git push callback", slog.Any("error", err), slog.Any("repo_path", req.Repository.FullName))
 		httpbase.ServerError(c, err)
 		return
 	}

@@ -52,7 +52,7 @@ func (t *TagsHandler) AllTags(ctx *gin.Context) {
 	}
 	tags, err := t.tag.AllTags(ctx.Request.Context(), filter)
 	if err != nil {
-		slog.Error("Failed to load tags", slog.Any("filter", filter), slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to load tags", slog.Any("filter", filter), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -74,13 +74,13 @@ func (t *TagsHandler) AllTags(ctx *gin.Context) {
 func (t *TagsHandler) CreateTag(ctx *gin.Context) {
 	var req types.CreateTag
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("Bad request format", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", slog.Any("error", err))
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	tag, err := t.tag.CreateTag(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("Failed to create tag", slog.Any("req", req), slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to create tag", slog.Any("req", req), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -102,13 +102,13 @@ func (t *TagsHandler) CreateTag(ctx *gin.Context) {
 func (t *TagsHandler) GetTagByID(ctx *gin.Context) {
 	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
-		slog.Error("Bad request format", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", slog.Any("error", err))
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	tag, err := t.tag.GetTagByID(ctx.Request.Context(), id)
 	if err != nil {
-		slog.Error("Failed to get tag", slog.Int64("id", id), slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get tag", slog.Int64("id", id), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -131,19 +131,19 @@ func (t *TagsHandler) GetTagByID(ctx *gin.Context) {
 func (t *TagsHandler) UpdateTag(ctx *gin.Context) {
 	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
-		slog.Error("Bad request format", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", slog.Any("error", err))
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	var req types.UpdateTag
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("Bad request format", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", slog.Any("error", err))
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	tag, err := t.tag.UpdateTag(ctx.Request.Context(), id, req)
 	if err != nil {
-		slog.Error("Failed to update tag", slog.Int64("id", id), slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to update tag", slog.Int64("id", id), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -165,13 +165,13 @@ func (t *TagsHandler) UpdateTag(ctx *gin.Context) {
 func (t *TagsHandler) DeleteTag(ctx *gin.Context) {
 	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
-		slog.Error("Bad request format", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", slog.Any("error", err))
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	err = t.tag.DeleteTag(ctx.Request.Context(), id)
 	if err != nil {
-		slog.Error("Failed to delete tag", slog.Int64("id", id), slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to delete tag", slog.Int64("id", id), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -192,7 +192,7 @@ func (t *TagsHandler) DeleteTag(ctx *gin.Context) {
 func (t *TagsHandler) AllCategories(ctx *gin.Context) {
 	categories, err := t.tag.AllCategories(ctx.Request.Context())
 	if err != nil {
-		slog.Error("Failed to load categories", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to load categories", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -214,7 +214,7 @@ func (t *TagsHandler) AllCategories(ctx *gin.Context) {
 func (t *TagsHandler) CreateCategory(ctx *gin.Context) {
 	var req types.CreateCategory
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("Bad request format", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", slog.Any("error", err))
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -224,7 +224,7 @@ func (t *TagsHandler) CreateCategory(ctx *gin.Context) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
-		slog.Error("Failed to create category", slog.Any("req", req), slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to create category", slog.Any("req", req), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -246,13 +246,13 @@ func (t *TagsHandler) CreateCategory(ctx *gin.Context) {
 func (t *TagsHandler) UpdateCategory(ctx *gin.Context) {
 	var req types.UpdateCategory
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("Bad request format", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", slog.Any("error", err))
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
-		slog.Error("Bad request format", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", slog.Any("error", err))
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -262,7 +262,7 @@ func (t *TagsHandler) UpdateCategory(ctx *gin.Context) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
-		slog.Error("Failed to update category", slog.Any("req", req), slog.Any("id", id), slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to update category", slog.Any("req", req), slog.Any("id", id), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -284,7 +284,7 @@ func (t *TagsHandler) DeleteCategory(ctx *gin.Context) {
 
 	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
-		slog.Error("Bad request format", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", slog.Any("error", err))
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -294,7 +294,7 @@ func (t *TagsHandler) DeleteCategory(ctx *gin.Context) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
-		slog.Error("Failed to delete category", slog.Any("id", id), slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to delete category", slog.Any("id", id), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}

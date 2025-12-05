@@ -35,7 +35,7 @@ func (h *BroadcastHandler) Index(ctx *gin.Context) {
 	broadcasts, err := h.ec.AllBroadcasts(ctx.Request.Context())
 
 	if err != nil {
-		slog.Error("failed to find broadcasts", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "failed to find broadcasts", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -62,7 +62,7 @@ func (h *BroadcastHandler) Create(ctx *gin.Context) {
 	}
 
 	if err := h.ec.NewBroadcast(ctx.Request.Context(), broadcast); err != nil {
-		slog.Error("Failed to create events", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to create events", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -88,20 +88,20 @@ func (h *BroadcastHandler) Update(ctx *gin.Context) {
 
 	activeBroadcast, err := h.ec.ActiveBroadcast(ctx.Request.Context())
 	if err != nil {
-		slog.Error("Faild to retrieve active broadcasts", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Faild to retrieve active broadcasts", "error", err)
 		httpbase.ServerError(ctx, err)
 		return
 	}
 
 	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 
 	if broadcast.Status == "active" && activeBroadcast != nil && activeBroadcast.ID != id {
-		slog.Error("Bad request format", "error", "Active Broadcast exits")
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", "Active Broadcast exits")
 		httpbase.BadRequest(ctx, "Active Broadcast exits")
 		return
 	}
@@ -111,7 +111,7 @@ func (h *BroadcastHandler) Update(ctx *gin.Context) {
 	_, err = h.ec.UpdateBroadcast(ctx.Request.Context(), broadcast)
 
 	if err != nil {
-		slog.Error("Failed to update Broadcast", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to update Broadcast", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -130,13 +130,13 @@ func (h *BroadcastHandler) Update(ctx *gin.Context) {
 func (h *BroadcastHandler) Show(ctx *gin.Context) {
 	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	broadcast, err := h.ec.GetBroadcast(ctx.Request.Context(), id)
 	if err != nil {
-		slog.Error("Failed to find Broadcast", slog.Any("error", err), "id", id)
+		slog.ErrorContext(ctx.Request.Context(), "Failed to find Broadcast", slog.Any("error", err), "id", id)
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -155,7 +155,7 @@ func (h *BroadcastHandler) Show(ctx *gin.Context) {
 func (h *BroadcastHandler) Active(ctx *gin.Context) {
 	broadcast, err := h.ec.ActiveBroadcast(ctx.Request.Context())
 	if err != nil {
-		slog.Error("Failed to find Broadcast", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to find Broadcast", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
