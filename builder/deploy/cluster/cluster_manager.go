@@ -406,7 +406,7 @@ func GetClusterID(clientset kubernetes.Interface, config *config.Config) (string
 // return the gpu vendor and type
 func getGpuTypeAndVendor(vendorType string, label string) (string, string) {
 	if strings.Contains(vendorType, "-") {
-		gpuModelVendor := strings.Split(vendorType, "-")
+		gpuModelVendor := strings.SplitN(vendorType, "-", 2)
 		return gpuModelVendor[0], gpuModelVendor[1]
 	}
 	if strings.Contains(label, ".") {
@@ -433,6 +433,10 @@ func getXPULabel(labels map[string]string, config *config.Config) (string, strin
 	if _, found := labels["nvidia.com/nvidia_name"]; found {
 		//for k3s cluster
 		return "nvidia.com/gpu", "nvidia.com/nvidia_name"
+	}
+	if _, found := labels["nvidia.com/gpu.product"]; found {
+		//for nvidia gpu product label
+		return "nvidia.com/gpu", "nvidia.com/gpu.product"
 	}
 	if _, found := labels["kubemore_xpu_type"]; found {
 		//for huawei gpu
