@@ -44,6 +44,7 @@ func NewRepoHandler(config *config.Config) (*RepoHandler, error) {
 		m:                         m,
 		d:                         d,
 		deployStatusCheckInterval: 5 * time.Second,
+		config:                    config,
 	}, nil
 }
 
@@ -52,6 +53,7 @@ type RepoHandler struct {
 	m                         component.ModelComponent
 	d                         component.DatasetComponent
 	deployStatusCheckInterval time.Duration
+	config                    *config.Config
 }
 
 // CreateRepo godoc
@@ -1006,6 +1008,18 @@ func (h *RepoHandler) SDKListFiles(ctx *gin.Context) {
 	if mappedBranch != "" {
 		ref = mappedBranch
 	}
+	expand := ctx.Query("expand")
+	if expand == "xetEnabled" {
+		resp, err := h.c.IsXnetEnabled(ctx.Request.Context(), types.ModelRepo, namespace, name, currentUser)
+		if err != nil {
+			slog.Error("failed to check if xnetEnabled", slog.Any("error", err))
+			httpbase.ServerError(ctx, err)
+			return
+		}
+		ctx.JSON(http.StatusOK, resp)
+		return
+	}
+
 	files, err := h.c.SDKListFiles(ctx.Request.Context(), common.RepoTypeFromContext(ctx), namespace, name, ref, currentUser)
 	if err != nil {
 		if errors.Is(err, errorx.ErrUnauthorized) {
@@ -1099,10 +1113,18 @@ func (h *RepoHandler) HeadSDKDownload(ctx *gin.Context) {
 	}
 
 	slog.Debug("Head download repo file succeed", slog.String("repo_type", string(req.RepoType)), slog.String("name", name), slog.String("path", req.Path), slog.String("ref", req.Ref), slog.Int64("contentLength", file.Size))
+	if file.Lfs {
+		ctx.Header("X-Xet-Hash", file.LfsSHA256)
+		ctx.Header("X-Xet-Refresh-Route", h.xetRefreshRoute(namespace, name, branch))
+	}
 	ctx.Header("Content-Length", strconv.Itoa(int(file.Size)))
 	ctx.Header("X-Repo-Commit", repoCommit)
 	ctx.Header("ETag", file.SHA)
 	ctx.Status(http.StatusOK)
+}
+
+func (h *RepoHandler) xetRefreshRoute(namespace, name, ref string) string {
+	return fmt.Sprintf("%s/hf/%s/%s/xet-write-token/%s", h.config.APIServer.PublicDomain, namespace, name, ref)
 }
 
 func (h *RepoHandler) handleDownload(ctx *gin.Context, isResolve bool) {
@@ -2834,6 +2856,7 @@ func (h *RepoHandler) PreuploadHF(ctx *gin.Context) {
 
 	resp, err := h.c.Preupload(ctx.Request.Context(), req)
 	if err != nil {
+		slog.Error("failed to preupload", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}

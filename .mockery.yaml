@@ -47,6 +47,7 @@ packages:
       MirrorNamespaceMappingComponent:
       NotebookComponent:
       LicenseComponent:
+      XnetComponent:
   opencsg.com/csghub-server/component/reporter:
     config:
     interfaces:
@@ -79,6 +80,7 @@ packages:
       UserSvcClient:
       ModerationSvcClient:
       NotificationSvcClient:
+      XnetSvcClient:
   opencsg.com/csghub-server/builder/sensitive:
     config:
     interfaces:

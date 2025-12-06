@@ -341,6 +341,17 @@ func (h *ModelHandler) SDKModelInfo(ctx *gin.Context) {
 		ref = mappedBranch
 	}
 	currentUser := httpbase.GetCurrentUser(ctx)
+	expand := ctx.Query("expand")
+	if expand == "xetEnabled" {
+		resp, err := h.repo.IsXnetEnabled(ctx.Request.Context(), types.ModelRepo, namespace, name, currentUser)
+		if err != nil {
+			slog.Error("failed to check if xnetEnabled", slog.Any("error", err))
+			httpbase.ServerError(ctx, err)
+			return
+		}
+		ctx.JSON(http.StatusOK, resp)
+		return
+	}
 	modelInfo, err := h.model.SDKModelInfo(ctx.Request.Context(), namespace, name, ref, currentUser, blobs)
 	if err != nil {
 		if errors.Is(err, errorx.ErrForbidden) {

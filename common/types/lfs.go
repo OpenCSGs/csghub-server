@@ -117,3 +117,9 @@ type SingleLFSProgress struct {
 	Progress int    `json:"progress"`
 	Size     int64  `json:"size"`
 }
+
+type XnetReq struct {
+	Bucket    string `json:"bucket"`
+	ObjectKey string `json:"object_key"`
+	Size      int64  `json:"size"`
+}

@@ -669,3 +669,19 @@ func initializeTestMirrorNamespaceMappingComponent(ctx context.Context, t interf
 }
 
 var MirrorNamespaceMappingComponentTestSet = wire.NewSet(NewTestMirrorNamespaceMappingComponent)
+
+type testXnetWithMocks struct {
+	*XnetComponentImpl
+	mocks *Mocks
+}
+
+func initializeTestXnetComponent(ctx context.Context, t interface {
+	Cleanup(func())
+	mock.TestingT
+}) *testXnetWithMocks {
+	wire.Build(
+		MockSuperSet, XnetComponentSet,
+		wire.Struct(new(testXnetWithMocks), "*"),
+	)
+	return &testXnetWithMocks{}
+}

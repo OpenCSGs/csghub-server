@@ -40,6 +40,7 @@ type LfsMetaObject struct {
 	RepositoryID int64      `bun:",notnull" json:"repository_id"`
 	Repository   Repository `bun:"rel:belongs-to,join:repository_id=id" json:"repository"`
 	Existing     bool       `bun:",notnull" json:"existing"`
+	XnetUsed     bool       `bun:",notnull" json:"xnet_used"`
 	times
 }
 

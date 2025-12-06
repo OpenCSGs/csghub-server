@@ -191,6 +191,7 @@ type Repository struct {
 	DeletedAt            time.Time                  `bun:",soft_delete,nullzero"`
 	Migrated             bool                       `bun:"," json:"migrated"`
 	Hashed               bool                       `bun:"," json:"hashed"`
+	XnetEnabled          bool                       `bun:"," json:"xnet_enabled"`
 
 	// updated_at timestamp will be updated only if files changed
 	times

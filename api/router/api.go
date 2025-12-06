@@ -513,6 +513,11 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		return nil, fmt.Errorf("error creating advance routes:%w", err)
 	}
 
+	err = createXnetRoutes(r, middlewareCollection, config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating xnet routes:%w", err)
+	}
+
 	// Dataset viewer proxy
 	dataViewerAddr := fmt.Sprintf("%s:%d", config.DataViewer.Host, config.DataViewer.Port)
 	dsViewerHandler, err := handler.NewInternalServiceProxyHandler(dataViewerAddr)

@@ -126,6 +126,11 @@ var MockedModerationSvcClientSet = wire.NewSet(
 	wire.Bind(new(rpc.ModerationSvcClient), new(*mock_rpc.MockModerationSvcClient)),
 )
 
+var MockedXnetSvcClientSet = wire.NewSet(
+	mock_rpc.NewMockXnetSvcClient,
+	wire.Bind(new(rpc.XnetSvcClient), new(*mock_rpc.MockXnetSvcClient)),
+)
+
 var MockedDataviewerClientSet = wire.NewSet(
 	mock_dataviewer_client.NewMockDataviewerClient,
 	wire.Bind(new(dataviewer.DataviewerClient), new(*mock_dataviewer_client.MockDataviewerClient)),
@@ -177,12 +182,12 @@ func ProvideTestConfig() *config.Config {
 
 var MockSuperSet = wire.NewSet(
 	MockedComponentSet, AllMockSet, MockedStoreSet, MockedGitServerSet, MockedUserSvcSet,
-	MockedS3Set, MockedS3CoreSet, MockedMultiSyncClientSet, MockedDeployerSet, MockedCacheSet, ProvideTestConfig, MockedMirrorServerSet,
+	MockedXnetSvcClientSet, MockedS3Set, MockedS3CoreSet, MockedMultiSyncClientSet, MockedDeployerSet, MockedCacheSet, ProvideTestConfig, MockedMirrorServerSet,
 	MockedAccountingClientSet, MockedParquetReaderSet, MockedCheckerSet,
 	MockedModerationSvcClientSet, MockedRsaReader, MockedImporterSet, MockedDataviewerClientSet,
 )
 
-func NewTestRepoComponent(config *config.Config, stores *tests.MockStores, rpcUser rpc.UserSvcClient, gitServer gitserver.GitServer, tagComponent TagComponent, s3Client s3.Client, deployer deploy.Deployer, cache cache.Cache, accountingComponent AccountingComponent, mirrorServer mirrorserver.MirrorServer, multiSyncClient multisync.Client) *repoComponentImpl {
+func NewTestRepoComponent(config *config.Config, stores *tests.MockStores, rpcUser rpc.UserSvcClient, gitServer gitserver.GitServer, tagComponent TagComponent, s3Client s3.Client, deployer deploy.Deployer, cache cache.Cache, accountingComponent AccountingComponent, mirrorServer mirrorserver.MirrorServer, multiSyncClient multisync.Client, xnetClient rpc.XnetSvcClient) *repoComponentImpl {
 	return &repoComponentImpl{
 		userStore:              stores.User,
 		repoStore:              stores.Repo,
@@ -212,6 +217,7 @@ func NewTestRepoComponent(config *config.Config, stores *tests.MockStores, rpcUs
 		multiSyncClient:        multiSyncClient,
 		mirrorTaskStore:        stores.MirrorTaskStore,
 		recomStore:             stores.Recom,
+		xnetClient:             xnetClient,
 	}
 }
 
@@ -331,6 +337,7 @@ func NewTestGitHTTPComponent(
 	gitServer gitserver.GitServer,
 	s3Client s3.Client,
 	s3Core s3.Core,
+	xnetClient rpc.XnetSvcClient,
 ) *gitHTTPComponentImpl {
 	config.APIServer.PublicDomain = "https://foo.com"
 	config.APIServer.SSHDomain = "ssh://test@127.0.0.1"
@@ -345,6 +352,7 @@ func NewTestGitHTTPComponent(
 		lfsLockStore:       stores.LfsLock,
 		s3Core:             s3Core,
 		mirrorStore:        stores.Mirror,
+		xnetClient:         xnetClient,
 	}
 }
 
@@ -749,3 +757,19 @@ func NewTestNotebookComponent(
 }
 
 var NotebookComponentSet = wire.NewSet(NewTestNotebookComponent)
+
+func NewTestXnetComponent(
+	stores *tests.MockStores,
+	xnetClient rpc.XnetSvcClient,
+	repoComp RepoComponent,
+) *XnetComponentImpl {
+	return &XnetComponentImpl{
+		repoStore:      stores.Repo,
+		xnetClient:     xnetClient,
+		userStore:      stores.User,
+		namespaceStore: stores.Namespace,
+		repoComp:       repoComp,
+	}
+}
+
+var XnetComponentSet = wire.NewSet(NewTestXnetComponent)
