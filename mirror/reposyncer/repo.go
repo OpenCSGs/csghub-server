@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"strconv"
 	"strings"
 	"sync"
@@ -53,6 +54,7 @@ type RepoSyncWorker struct {
 	config                 *config.Config
 	ratelimiter            *rate.Limiter
 	msgSender              hook.MessageSender
+	httpClient             *http.Client
 }
 
 func NewRepoSyncWorker(config *config.Config, numWorkers int) (*RepoSyncWorker, error) {
@@ -84,6 +86,9 @@ func NewRepoSyncWorker(config *config.Config, numWorkers int) (*RepoSyncWorker, 
 		rpc.WithJSONHeader(),
 	)
 	w.msgSender = msgSender
+	w.httpClient = &http.Client{
+		Timeout: 5 * time.Second,
+	}
 	return w, nil
 }
 
@@ -173,6 +178,10 @@ func (w *RepoSyncWorker) handleTask(
 		mt.ErrorMessage = err.Error()
 		statusAction = string(database.MirrorFail)
 		slog.Error("failed to sync repo", slog.Any("error", err))
+		sendErr := w.sendMessage(ctx, mt.Mirror, types.MirrorRepoSyncFailed)
+		if sendErr != nil {
+			slog.Error("failed to send notice message", slog.Any("error", sendErr))
+		}
 	} else {
 		if mt.Progress == 100 {
 			statusAction = string(database.MirrorNoLfsToSync)
@@ -221,6 +230,12 @@ func (w *RepoSyncWorker) SyncRepo(
 		return mt, fmt.Errorf("failed to get namespace and name from mirror repository path: %w", err)
 	}
 
+	// Check if the repository already exists, if not, create it
+	err = w.ensureRepoExists(ctx, namespace, name, mirror.Repository.DefaultBranch, mirror.Repository.RepositoryType)
+	if err != nil {
+		return mt, fmt.Errorf("failed to ensure repository exists: %w", err)
+	}
+
 	// Get before last commit id
 	commitBefore, _ = w.getRepoLastCommit(
 		ctx,
@@ -256,6 +271,11 @@ func (w *RepoSyncWorker) SyncRepo(
 		}
 		req.MirrorToken = syncClientSetting.Token
 	}
+
+	if err := w.checkSourceURL(ctx, mirror.SourceUrl); err != nil {
+		return mt, err
+	}
+
 	err = w.git.MirrorSync(ctx, req)
 	if err != nil {
 		return mt, fmt.Errorf("failed to sync mirror repo, error: %w", err)
@@ -429,6 +449,32 @@ func (w *RepoSyncWorker) getAllLfsPointersByRef(
 	})
 }
 
+func (w *RepoSyncWorker) ensureRepoExists(
+	ctx context.Context, namespace, name, branch string,
+	repoType types.RepositoryType,
+) error {
+	exists, err := w.git.RepositoryExists(ctx, gitserver.CheckRepoReq{
+		Namespace: namespace,
+		Name:      name,
+		RepoType:  repoType,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to check repo existence: %w", err)
+	}
+	if !exists {
+		_, err := w.git.CreateRepo(ctx, gitserver.CreateRepoReq{
+			Namespace:     namespace,
+			Name:          name,
+			RepoType:      repoType,
+			DefaultBranch: branch,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to create repo: %w", err)
+		}
+	}
+	return nil
+}
+
 func (w *RepoSyncWorker) getRepoLastCommit(
 	ctx context.Context, namespace, name, branch string,
 	repoType types.RepositoryType,
@@ -468,6 +514,7 @@ func (w *RepoSyncWorker) triggerGitCallback(
 	workflowClient := temporal.GetClient()
 	workflowOptions := client.StartWorkflowOptions{
 		TaskQueue: workflow.HandlePushQueueName,
+		ID:        fmt.Sprintf("mirror-repo-%s-%s-%s-%s", mirror.Repository.RepositoryType, namespace, name, commit.ID),
 	}
 
 	we, err := workflowClient.ExecuteWorkflow(
@@ -568,4 +615,27 @@ func removeDuplicateLfsMetaObject(objects []database.LfsMetaObject) []database.L
 	}
 
 	return uniqueObjects
+}
+
+func (w *RepoSyncWorker) checkSourceURL(ctx context.Context, sourceURL string) error {
+	// Only check huggingface.co URLs
+	if !strings.Contains(sourceURL, types.HUGGINGFACE_HOST) {
+		return nil
+	}
+	checkURL := sourceURL + "/info/refs?service=git-upload-pack"
+	checkReq, err := http.NewRequestWithContext(ctx, http.MethodGet, checkURL, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create check request: %w", err)
+	}
+	checkResp, err := w.httpClient.Do(checkReq)
+	if err != nil {
+		return fmt.Errorf("failed to check source url %s: %w", checkURL, err)
+	}
+	defer checkResp.Body.Close()
+
+	if checkResp.StatusCode != http.StatusOK {
+		return fmt.Errorf("source url %s check failed with status code: %d", checkURL, checkResp.StatusCode)
+	}
+
+	return nil
 }
