@@ -8,6 +8,7 @@ package component
 
 import (
 	"context"
+
 	"github.com/google/wire"
 	"github.com/stretchr/testify/mock"
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/accounting"
@@ -44,7 +45,8 @@ func initializeTestRepoComponent(ctx context.Context, t interface {
 	mockAccountingComponent := component.NewMockAccountingComponent(t)
 	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
 	multisyncMockClient := multisync.NewMockClient(t)
-	componentRepoComponentImpl := NewTestRepoComponent(config, mockStores, mockUserSvcClient, mockGitServer, mockTagComponent, mockClient, mockDeployer, mockCache, mockAccountingComponent, mockMirrorServer, multisyncMockClient)
+	mockXnetClient := rpc.NewMockXnetSvcClient(t)
+	componentRepoComponentImpl := NewTestRepoComponent(config, mockStores, mockUserSvcClient, mockGitServer, mockTagComponent, mockClient, mockDeployer, mockCache, mockAccountingComponent, mockMirrorServer, multisyncMockClient, mockXnetClient)
 	mockRepoComponent := component.NewMockRepoComponent(t)
 	mockSpaceComponent := component.NewMockSpaceComponent(t)
 	mockRuntimeArchitectureComponent := component.NewMockRuntimeArchitectureComponent(t)
@@ -409,7 +411,8 @@ func initializeTestGitHTTPComponent(ctx context.Context, t interface {
 	mockGitServer := gitserver.NewMockGitServer(t)
 	mockClient := s3.NewMockClient(t)
 	mockCore := s3.NewMockCore(t)
-	componentGitHTTPComponentImpl := NewTestGitHTTPComponent(config, mockStores, mockRepoComponent, mockGitServer, mockClient, mockCore)
+	mockXnetClient := rpc.NewMockXnetSvcClient(t)
+	componentGitHTTPComponentImpl := NewTestGitHTTPComponent(config, mockStores, mockRepoComponent, mockGitServer, mockClient, mockCore, mockXnetClient)
 	mockAccountingComponent := component.NewMockAccountingComponent(t)
 	mockTagComponent := component.NewMockTagComponent(t)
 	mockSpaceComponent := component.NewMockSpaceComponent(t)

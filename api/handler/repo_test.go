@@ -22,6 +22,7 @@ import (
 	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/testutil"
+	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -41,7 +42,7 @@ func NewRepoTester(t *testing.T) *RepoTester {
 	tester.mocks.repo = mockcomponent.NewMockRepoComponent(t)
 	tester.mocks.model = mockcomponent.NewMockModelComponent(t)
 	tester.mocks.dataset = mockcomponent.NewMockDatasetComponent(t)
-	tester.handler = &RepoHandler{tester.mocks.repo, tester.mocks.model, tester.mocks.dataset, 0}
+	tester.handler = &RepoHandler{tester.mocks.repo, tester.mocks.model, tester.mocks.dataset, 0, &config.Config{}}
 	tester.WithParam("name", "r")
 	tester.WithParam("namespace", "u")
 	return tester

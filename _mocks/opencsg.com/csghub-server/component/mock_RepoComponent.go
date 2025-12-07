@@ -2970,6 +2970,68 @@ func (_c *MockRepoComponent_IsSyncing_Call) RunAndReturn(run func(context.Contex
 	return _c
 }
 
+// IsXnetEnabled provides a mock function with given fields: ctx, repoType, namespace, name, username
+func (_m *MockRepoComponent) IsXnetEnabled(ctx context.Context, repoType types.RepositoryType, namespace string, name string, username string) (*types.XetEnabled, error) {
+	ret := _m.Called(ctx, repoType, namespace, name, username)
+
+	if len(ret) == 0 {
+		panic("no return value specified for IsXnetEnabled")
+	}
+
+	var r0 *types.XetEnabled
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.RepositoryType, string, string, string) (*types.XetEnabled, error)); ok {
+		return rf(ctx, repoType, namespace, name, username)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.RepositoryType, string, string, string) *types.XetEnabled); ok {
+		r0 = rf(ctx, repoType, namespace, name, username)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.XetEnabled)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.RepositoryType, string, string, string) error); ok {
+		r1 = rf(ctx, repoType, namespace, name, username)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockRepoComponent_IsXnetEnabled_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'IsXnetEnabled'
+type MockRepoComponent_IsXnetEnabled_Call struct {
+	*mock.Call
+}
+
+// IsXnetEnabled is a helper method to define mock.On call
+//   - ctx context.Context
+//   - repoType types.RepositoryType
+//   - namespace string
+//   - name string
+//   - username string
+func (_e *MockRepoComponent_Expecter) IsXnetEnabled(ctx interface{}, repoType interface{}, namespace interface{}, name interface{}, username interface{}) *MockRepoComponent_IsXnetEnabled_Call {
+	return &MockRepoComponent_IsXnetEnabled_Call{Call: _e.mock.On("IsXnetEnabled", ctx, repoType, namespace, name, username)}
+}
+
+func (_c *MockRepoComponent_IsXnetEnabled_Call) Run(run func(ctx context.Context, repoType types.RepositoryType, namespace string, name string, username string)) *MockRepoComponent_IsXnetEnabled_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.RepositoryType), args[2].(string), args[3].(string), args[4].(string))
+	})
+	return _c
+}
+
+func (_c *MockRepoComponent_IsXnetEnabled_Call) Return(_a0 *types.XetEnabled, _a1 error) *MockRepoComponent_IsXnetEnabled_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockRepoComponent_IsXnetEnabled_Call) RunAndReturn(run func(context.Context, types.RepositoryType, string, string, string) (*types.XetEnabled, error)) *MockRepoComponent_IsXnetEnabled_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // LastCommit provides a mock function with given fields: ctx, req
 func (_m *MockRepoComponent) LastCommit(ctx context.Context, req *types.GetCommitsReq) (*types.Commit, error) {
 	ret := _m.Called(ctx, req)
