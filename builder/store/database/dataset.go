@@ -281,5 +281,9 @@ func (s *datasetStoreImpl) CreateAndUpdateRepoPath(ctx context.Context, input Da
 		input.Repository = &repo
 		return nil
 	})
+	err = errorx.HandleDBError(err,
+		errorx.Ctx().
+			Set("repository_id", input.RepositoryID).
+			Set("path", path))
 	return &input, err
 }
