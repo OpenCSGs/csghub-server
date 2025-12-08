@@ -369,7 +369,7 @@ func TestModerationImpl_CheckChatNonStreamResponse(t *testing.T) {
 	})
 }
 
-// TestModerationImpl_CheckLLMPrompt_CacheCheck 测试 moderation.go 中第231-255行的缓存检查逻辑
+// TestModerationImpl_CheckLLMPrompt_CacheCheck tests the cache checking logic in moderation.go
 func TestModerationImpl_CheckLLMPrompt_CacheCheck(t *testing.T) {
 	ctx := context.Background()
 	key := "test-key"
@@ -388,7 +388,7 @@ func TestModerationImpl_CheckLLMPrompt_CacheCheck(t *testing.T) {
 		testContent := sensitiveChunk + ". " + safeContent
 
 		chunkHash := md5.Sum([]byte(sensitiveChunk))
-		cacheKey := moderationCachePrefix + fmt.Sprintf("%x", chunkHash)
+		cacheKey := moderationCachePrpmptPrefix + fmt.Sprintf("%x", chunkHash)
 
 		sensitiveResult := &rpc.CheckResult{IsSensitive: true, Reason: "contains inappropriate content"}
 		resultJSON, _ := json.Marshal(sensitiveResult)
@@ -425,8 +425,8 @@ func TestModerationImpl_CheckLLMPrompt_CacheCheck(t *testing.T) {
 		testContent := testChunk + ". " + strings.Repeat("y", slidingWindowSize*2)
 
 		chunkHash := md5.Sum([]byte(testChunk))
-		cacheKey1 := moderationCachePrefix + fmt.Sprintf("%x", chunkHash)
-		cacheKey2 := moderationCachePrefix + fmt.Sprintf("%x", md5.Sum([]byte(strings.Repeat("y", slidingWindowSize))))
+		cacheKey1 := moderationCachePrpmptPrefix + fmt.Sprintf("%x", chunkHash)
+		cacheKey2 := moderationCachePrpmptPrefix + fmt.Sprintf("%x", md5.Sum([]byte(strings.Repeat("y", slidingWindowSize))))
 
 		mockCacheClient.EXPECT().Get(mock.Anything, cacheKey1).Return("", errors.New("cache error"))
 
