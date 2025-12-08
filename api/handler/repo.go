@@ -1809,6 +1809,7 @@ func (h *RepoHandler) DeployDetail(ctx *gin.Context) {
 // @Param        id path string true "id"
 // @Param        instance path string true "instance"
 // @Param        current_user query string true "current_user"
+// @Param        since query string false "since time. Optional values: 10mins, 30mins, 1hour, 6hours, 1day, 2days, 1week"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      401  {object}  types.APIUnauthorized "Permission denied"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
@@ -2335,7 +2336,8 @@ func (h *RepoHandler) ServerlessDetail(ctx *gin.Context) {
 // @Param        id path string true "id"
 // @Param        instance path string true "instance"
 // @Param        current_user query string true "current_user"
-// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Param        since query string false "since time. Optional values: 10mins, 30mins, 1hour, 6hours, 1day, 2days, 1week"
+// @Failure      400  {object}  types.APIBadRequest "Bad request. May occur when the since time format is unsupported"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /models/{namespace}/{name}/serverless/{id}/logs/{instance} [get]
 func (h *RepoHandler) ServerlessLogs(ctx *gin.Context) {

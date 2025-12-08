@@ -334,7 +334,8 @@ func (h *NotebookHandler) Status(ctx *gin.Context) {
 // @Produce      json
 // @Param        id path string true "notebook id"
 // @Param        instance path string true "notebook instance name"
-// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Param        since query string false "since time. Optional values: 10mins, 30mins, 1hour, 6hours, 1day, 2days, 1week"
+// @Failure      400  {object}  types.APIBadRequest "Bad request. May occur when the since time format is unsupported"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router        /notebooks/{id}/logs/{instance} [get]
 func (h *NotebookHandler) Logs(ctx *gin.Context) {
