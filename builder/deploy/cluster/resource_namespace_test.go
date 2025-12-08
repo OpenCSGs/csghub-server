@@ -236,3 +236,61 @@ func TestGetNameSpaceResourcesQuota(t *testing.T) {
 		})
 	}
 }
+
+func TestGetXPUMem(t *testing.T) {
+	node1 := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "node1",
+			Labels: map[string]string{
+				"nvidia.com/gpu":                 "true",
+				"aliyun.accelerator/nvidia_name": "T4",
+				"aliyun.accelerator/nvidia_mem":  "16GiB",
+			},
+		},
+		Status: v1.NodeStatus{
+			Conditions: []v1.NodeCondition{
+				{Type: v1.NodeReady, Status: v1.ConditionTrue},
+			},
+			Capacity: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("4"),
+				v1.ResourceMemory: resource.MustParse("16Gi"),
+				"nvidia.com/gpu":  resource.MustParse("2"),
+			},
+			Allocatable: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("3"),
+				v1.ResourceMemory: resource.MustParse("14Gi"),
+				"nvidia.com/gpu":  resource.MustParse("2"),
+			},
+		},
+	}
+
+	node2 := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "node2",
+			Labels: map[string]string{
+				"nvidia.com/gpu":                 "true",
+				"aliyun.accelerator/nvidia_name": "NVIDIA-A10",
+				"aliyun.accelerator/nvidia_mem":  "23028MiB",
+			},
+		},
+		Status: v1.NodeStatus{
+			Conditions: []v1.NodeCondition{
+				{Type: v1.NodeReady, Status: v1.ConditionTrue},
+			},
+		},
+	}
+
+	clientset := fake.NewSimpleClientset(node1, node2)
+	cluster := &Cluster{
+		Client: clientset,
+	}
+
+	config := &config.Config{}
+
+	resources, err := cluster.GetResourcesInCluster(config)
+	assert.NoError(t, err)
+	assert.Len(t, resources, 2)
+
+	assert.Equal(t, resources["node1"].XPUMem, "16 GiB")
+	assert.Equal(t, resources["node2"].XPUMem, "22 GiB")
+}
