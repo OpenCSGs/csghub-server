@@ -93,7 +93,9 @@ func TestModelComponent_Create(t *testing.T) {
 				Path:    types.GitattributesFileName,
 			},
 		},
-	}).Return(nil, dbrepo, nil)
+	}).Return(nil, dbrepo, &gitserver.CommitFilesReq{}, nil)
+
+	mc.mocks.gitServer.EXPECT().CommitFiles(ctx, gitserver.CommitFilesReq{}).Return(nil)
 
 	mc.mocks.stores.ModelMock().EXPECT().CreateAndUpdateRepoPath(ctx, database.Model{
 		Repository:   dbrepo,

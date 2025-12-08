@@ -61,7 +61,9 @@ func TestMCPServerComponent_Create(t *testing.T) {
 				Path:    types.ReadmeFileName,
 			},
 		},
-	}).Return(nil, dbrepo, nil)
+	}).Return(nil, dbrepo, &gitserver.CommitFilesReq{}, nil)
+
+	mc.mocks.gitServer.EXPECT().CommitFiles(ctx, gitserver.CommitFilesReq{}).Return(nil)
 
 	mc.mocks.stores.MCPServerMock().EXPECT().CreateAndUpdateRepoPath(ctx, database.MCPServer{
 		RepositoryID:  dbrepo.ID,

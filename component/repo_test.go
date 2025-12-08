@@ -50,7 +50,6 @@ func TestRepoComponent_CreateRepo(t *testing.T) {
 	}
 	repo.mocks.stores.RecomMock().EXPECT().UpsertScore(ctx, mock.Anything).Return(nil)
 	repo.mocks.gitServer.EXPECT().CreateRepo(ctx, mock.AnythingOfType("gitserver.CreateRepoReq")).Return(gitrepo, nil)
-	repo.mocks.gitServer.EXPECT().CommitFiles(ctx, mock.AnythingOfType("gitserver.CommitFilesReq")).Return(nil)
 	dbrepo := &database.Repository{
 		UserID:         123,
 		Path:           "ns/name",
@@ -64,7 +63,7 @@ func TestRepoComponent_CreateRepo(t *testing.T) {
 		RepositoryType: types.ModelRepo,
 	}
 	repo.mocks.stores.RepoMock().EXPECT().CreateRepo(ctx, mock.AnythingOfType("database.Repository")).Return(dbrepo, nil)
-	r1, r2, err := repo.CreateRepo(ctx, types.CreateRepoReq{
+	r1, r2, _, err := repo.CreateRepo(ctx, types.CreateRepoReq{
 		Username:      "user",
 		Namespace:     "ns",
 		Name:          "name",

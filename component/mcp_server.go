@@ -103,7 +103,7 @@ func (m *mcpServerComponentImpl) Create(ctx context.Context, req *types.CreateMC
 			Path:    types.ReadmeFileName,
 		},
 	}
-	_, dbRepo, err := m.repoComponent.CreateRepo(ctx, req.CreateRepoReq)
+	_, dbRepo, commitFilesReq, err := m.repoComponent.CreateRepo(ctx, req.CreateRepoReq)
 	if err != nil {
 		return nil, fmt.Errorf("fail to create mcp repo cause: %w", err)
 	}
@@ -119,6 +119,8 @@ func (m *mcpServerComponentImpl) Create(ctx context.Context, req *types.CreateMC
 	if err != nil {
 		return nil, fmt.Errorf("fail to create mcp server cause: %w", err)
 	}
+
+	_ = m.gitServer.CommitFiles(ctx, *commitFilesReq)
 
 	for _, tag := range mcpServer.Repository.Tags {
 		tags = append(tags, types.RepoTag{

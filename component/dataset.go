@@ -128,7 +128,7 @@ func (c *datasetComponentImpl) Create(ctx context.Context, req *types.CreateData
 			Path:    types.GitattributesFileName,
 		},
 	}
-	_, dbRepo, err := c.repoComponent.CreateRepo(ctx, req.CreateRepoReq)
+	_, dbRepo, commitFilesReq, err := c.repoComponent.CreateRepo(ctx, req.CreateRepoReq)
 	if err != nil {
 		return nil, err
 	}
@@ -143,6 +143,8 @@ func (c *datasetComponentImpl) Create(ctx context.Context, req *types.CreateData
 	if err != nil {
 		return nil, fmt.Errorf("failed to create database dataset, cause: %w", err)
 	}
+
+	_ = c.gitServer.CommitFiles(ctx, *commitFilesReq)
 
 	for _, tag := range dataset.Repository.Tags {
 		tags = append(tags, types.RepoTag{

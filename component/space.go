@@ -94,7 +94,7 @@ func (c *spaceComponentImpl) Create(ctx context.Context, req types.CreateSpaceRe
 		}
 	}
 
-	_, dbRepo, err := c.repoComponent.CreateRepo(ctx, req.CreateRepoReq)
+	_, dbRepo, commitFilesReq, err := c.repoComponent.CreateRepo(ctx, req.CreateRepoReq)
 	if err != nil {
 		return nil, err
 	}
@@ -122,6 +122,7 @@ func (c *spaceComponentImpl) Create(ctx context.Context, req types.CreateSpaceRe
 		slog.Error("failed to create new space in db", slog.Any("req", req), slog.String("error", err.Error()))
 		return nil, fmt.Errorf("failed to create new space in db, error: %w", err)
 	}
+	_ = c.git.CommitFiles(ctx, *commitFilesReq)
 	dbRepo.Path = repoPath
 
 	err = c.createSpaceDefaultFiles(ctx, dbRepo, req, templatePath)

@@ -101,7 +101,7 @@ type repoComponentImpl struct {
 }
 
 type RepoComponent interface {
-	CreateRepo(ctx context.Context, req types.CreateRepoReq) (*gitserver.CreateRepoResp, *database.Repository, error)
+	CreateRepo(ctx context.Context, req types.CreateRepoReq) (*gitserver.CreateRepoResp, *database.Repository, *gitserver.CommitFilesReq, error)
 	UpdateRepo(ctx context.Context, req types.UpdateRepoReq) (*database.Repository, error)
 	DeleteRepo(ctx context.Context, req types.DeleteRepoReq) (*database.Repository, error)
 	// PublicToUser gets visible repos of the given user and user's orgs
@@ -201,39 +201,40 @@ func NewRepoComponentImpl(config *config.Config) (*repoComponentImpl, error) {
 	return r.(*repoComponentImpl), nil
 }
 
-func (c *repoComponentImpl) CreateRepo(ctx context.Context, req types.CreateRepoReq) (*gitserver.CreateRepoResp, *database.Repository, error) {
+func (c *repoComponentImpl) CreateRepo(ctx context.Context, req types.CreateRepoReq) (*gitserver.CreateRepoResp, *database.Repository, *gitserver.CommitFilesReq, error) {
+	var commitFilesReq *gitserver.CommitFilesReq
 	// Name validation
 	valid, err := common.IsValidName(req.Name)
 	if !valid {
-		return nil, nil, fmt.Errorf("repo name is invalid, error: %w", err)
+		return nil, nil, commitFilesReq, fmt.Errorf("repo name is invalid, error: %w", err)
 	}
 
 	namespace, err := c.namespaceStore.FindByPath(ctx, req.Namespace)
 	if err != nil {
-		return nil, nil, errors.New("namespace does not exist")
+		return nil, nil, commitFilesReq, errors.New("namespace does not exist")
 	}
 
 	user, err := c.userStore.FindByUsername(ctx, req.Username)
 	if err != nil {
-		return nil, nil, errors.New("user does not exist")
+		return nil, nil, commitFilesReq, errors.New("user does not exist")
 	}
 
 	if user.Email == "" {
-		return nil, nil, fmt.Errorf("please set your email first")
+		return nil, nil, commitFilesReq, fmt.Errorf("please set your email first")
 	}
 
 	if !user.CanAdmin() {
 		if namespace.NamespaceType == database.OrgNamespace {
 			canWrite, err := c.CheckCurrentUserPermission(ctx, req.Username, req.Namespace, membership.RoleWrite)
 			if err != nil {
-				return nil, nil, err
+				return nil, nil, commitFilesReq, err
 			}
 			if !canWrite {
-				return nil, nil, errorx.ErrForbiddenMsg("users do not have permission to create repo in this organization")
+				return nil, nil, commitFilesReq, errorx.ErrForbiddenMsg("users do not have permission to create repo in this organization")
 			}
 		} else {
 			if namespace.Path != user.Username {
-				return nil, nil, errorx.ErrForbiddenMsg("users do not have permission to create repo in this namespace")
+				return nil, nil, commitFilesReq, errorx.ErrForbiddenMsg("users do not have permission to create repo in this namespace")
 			}
 		}
 	}
@@ -260,7 +261,7 @@ func (c *repoComponentImpl) CreateRepo(ctx context.Context, req types.CreateRepo
 	}
 	newDBRepo, err := c.repoStore.CreateRepo(ctx, dbRepo)
 	if err != nil {
-		return nil, nil, fmt.Errorf("fail to create database repo, error: %w", err)
+		return nil, nil, commitFilesReq, fmt.Errorf("fail to create database repo, error: %w", err)
 	}
 
 	err = c.recomStore.UpsertScore(ctx, []*database.RecomRepoScore{
@@ -271,7 +272,7 @@ func (c *repoComponentImpl) CreateRepo(ctx context.Context, req types.CreateRepo
 		},
 	})
 	if err != nil {
-		return nil, nil, fmt.Errorf("fail to upsert recom repo score, error: %w", err)
+		return nil, nil, commitFilesReq, fmt.Errorf("fail to upsert recom repo score, error: %w", err)
 	}
 
 	gitRepoReq := gitserver.CreateRepoReq{
@@ -289,7 +290,7 @@ func (c *repoComponentImpl) CreateRepo(ctx context.Context, req types.CreateRepo
 	gitRepo, err := c.git.CreateRepo(ctx, gitRepoReq)
 	if err != nil {
 		slog.Error("fail to create repo in git ", slog.Any("req", req), slog.String("error", err.Error()))
-		return nil, nil, fmt.Errorf("fail to create repo in git, error: %w", err)
+		return nil, nil, commitFilesReq, fmt.Errorf("fail to create repo in git, error: %w", err)
 	}
 
 	if len(req.CommitFiles) > 0 {
@@ -301,22 +302,19 @@ func (c *repoComponentImpl) CreateRepo(ctx context.Context, req types.CreateRepo
 				Action:  gitserver.CommitActionCreate,
 			})
 		}
-		err = c.git.CommitFiles(ctx, gitserver.CommitFilesReq{
-			Namespace: temPath[0],
-			Name:      temPath[1],
+		commitFilesReq = &gitserver.CommitFilesReq{
+			Namespace: req.Namespace,
+			Name:      req.Name,
 			RepoType:  req.RepoType,
 			Revision:  req.DefaultBranch,
 			Username:  user.Username,
 			Email:     user.Email,
 			Message:   types.InitCommitMessage,
 			Files:     gitCommitFiles,
-		})
-		if err != nil {
-			return gitRepo, newDBRepo, fmt.Errorf("fail to commit files, error: %w", err)
 		}
 	}
 
-	return gitRepo, newDBRepo, nil
+	return gitRepo, newDBRepo, commitFilesReq, nil
 }
 
 func (c *repoComponentImpl) UpdateRepo(ctx context.Context, req types.UpdateRepoReq) (*database.Repository, error) {
