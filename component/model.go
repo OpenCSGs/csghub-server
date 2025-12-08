@@ -267,7 +267,7 @@ func (c *modelComponentImpl) Create(ctx context.Context, req *types.CreateModelR
 			Path:    types.GitattributesFileName,
 		},
 	}
-	_, dbRepo, err := c.repoComponent.CreateRepo(ctx, req.CreateRepoReq)
+	_, dbRepo, commitFilesReq, err := c.repoComponent.CreateRepo(ctx, req.CreateRepoReq)
 	if err != nil {
 		return nil, err
 	}
@@ -286,6 +286,8 @@ func (c *modelComponentImpl) Create(ctx context.Context, req *types.CreateModelR
 	if err != nil {
 		return nil, fmt.Errorf("failed to create database model, cause: %w", err)
 	}
+
+	_ = c.gitServer.CommitFiles(ctx, *commitFilesReq)
 
 	for _, tag := range model.Repository.Tags {
 		tags = append(tags, types.RepoTag{

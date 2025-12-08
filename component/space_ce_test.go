@@ -44,7 +44,8 @@ func TestSpaceComponent_Create(t *testing.T) {
 			UUID:     "user-uuid",
 		},
 		Path: "ns/n",
-	}, nil)
+	}, &gitserver.CommitFilesReq{}, nil)
+	sc.mocks.gitServer.EXPECT().CommitFiles(ctx, gitserver.CommitFilesReq{}).Return(nil)
 
 	var wg sync.WaitGroup
 	wg.Add(1)

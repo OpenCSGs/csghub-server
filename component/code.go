@@ -93,7 +93,7 @@ func (c *codeComponentImpl) Create(ctx context.Context, req *types.CreateCodeReq
 			Path:    types.GitattributesFileName,
 		},
 	}
-	_, dbRepo, err := c.repoComponent.CreateRepo(ctx, req.CreateRepoReq)
+	_, dbRepo, commitFilesReq, err := c.repoComponent.CreateRepo(ctx, req.CreateRepoReq)
 	if err != nil {
 		return nil, err
 	}
@@ -108,6 +108,8 @@ func (c *codeComponentImpl) Create(ctx context.Context, req *types.CreateCodeReq
 	if err != nil {
 		return nil, fmt.Errorf("failed to create database code, cause: %w", err)
 	}
+
+	_ = c.gitServer.CommitFiles(ctx, *commitFilesReq)
 
 	for _, tag := range code.Repository.Tags {
 		tags = append(tags, types.RepoTag{

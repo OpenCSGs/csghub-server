@@ -167,7 +167,7 @@ func (c *mirrorComponentImpl) CreateMirrorRepo(ctx context.Context, req types.Cr
 	username = dbNamespace.User.Username
 
 	// create repo, create mirror repo
-	_, repo, err = c.repoComp.CreateRepo(ctx, types.CreateRepoReq{
+	_, repo, _, err = c.repoComp.CreateRepo(ctx, types.CreateRepoReq{
 		Username:  username,
 		Namespace: namespace,
 		Name:      name,

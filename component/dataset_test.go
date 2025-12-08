@@ -53,8 +53,9 @@ func TestDatasetCompnent_Create(t *testing.T) {
 	dc.mocks.components.repo.EXPECT().CreateRepo(ctx, rq).Return(&gitserver.CreateRepoResp{}, &database.Repository{
 		Tags: []database.Tag{{Name: "t1"}},
 		User: database.User{UUID: "user-uuid"},
-	}, nil)
+	}, &gitserver.CommitFilesReq{}, nil)
 
+	dc.mocks.gitServer.EXPECT().CommitFiles(ctx, gitserver.CommitFilesReq{}).Return(nil)
 	dc.mocks.stores.DatasetMock().EXPECT().CreateAndUpdateRepoPath(ctx, mock.Anything, "ns/n").RunAndReturn(
 		func(ctx context.Context, ds database.Dataset, _ string) (*database.Dataset, error) {
 			require.NotNil(t, ds.Repository)

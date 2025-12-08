@@ -1141,7 +1141,7 @@ func (_c *MockRepoComponent_CreateMirror_Call) RunAndReturn(run func(context.Con
 }
 
 // CreateRepo provides a mock function with given fields: ctx, req
-func (_m *MockRepoComponent) CreateRepo(ctx context.Context, req types.CreateRepoReq) (*gitserver.CreateRepoResp, *database.Repository, error) {
+func (_m *MockRepoComponent) CreateRepo(ctx context.Context, req types.CreateRepoReq) (*gitserver.CreateRepoResp, *database.Repository, *gitserver.CommitFilesReq, error) {
 	ret := _m.Called(ctx, req)
 
 	if len(ret) == 0 {
@@ -1150,8 +1150,9 @@ func (_m *MockRepoComponent) CreateRepo(ctx context.Context, req types.CreateRep
 
 	var r0 *gitserver.CreateRepoResp
 	var r1 *database.Repository
-	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, types.CreateRepoReq) (*gitserver.CreateRepoResp, *database.Repository, error)); ok {
+	var r2 *gitserver.CommitFilesReq
+	var r3 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.CreateRepoReq) (*gitserver.CreateRepoResp, *database.Repository, *gitserver.CommitFilesReq, error)); ok {
 		return rf(ctx, req)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, types.CreateRepoReq) *gitserver.CreateRepoResp); ok {
@@ -1170,13 +1171,21 @@ func (_m *MockRepoComponent) CreateRepo(ctx context.Context, req types.CreateRep
 		}
 	}
 
-	if rf, ok := ret.Get(2).(func(context.Context, types.CreateRepoReq) error); ok {
+	if rf, ok := ret.Get(2).(func(context.Context, types.CreateRepoReq) *gitserver.CommitFilesReq); ok {
 		r2 = rf(ctx, req)
 	} else {
-		r2 = ret.Error(2)
+		if ret.Get(2) != nil {
+			r2 = ret.Get(2).(*gitserver.CommitFilesReq)
+		}
 	}
 
-	return r0, r1, r2
+	if rf, ok := ret.Get(3).(func(context.Context, types.CreateRepoReq) error); ok {
+		r3 = rf(ctx, req)
+	} else {
+		r3 = ret.Error(3)
+	}
+
+	return r0, r1, r2, r3
 }
 
 // MockRepoComponent_CreateRepo_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateRepo'
@@ -1198,12 +1207,12 @@ func (_c *MockRepoComponent_CreateRepo_Call) Run(run func(ctx context.Context, r
 	return _c
 }
 
-func (_c *MockRepoComponent_CreateRepo_Call) Return(_a0 *gitserver.CreateRepoResp, _a1 *database.Repository, _a2 error) *MockRepoComponent_CreateRepo_Call {
-	_c.Call.Return(_a0, _a1, _a2)
+func (_c *MockRepoComponent_CreateRepo_Call) Return(_a0 *gitserver.CreateRepoResp, _a1 *database.Repository, _a2 *gitserver.CommitFilesReq, _a3 error) *MockRepoComponent_CreateRepo_Call {
+	_c.Call.Return(_a0, _a1, _a2, _a3)
 	return _c
 }
 
-func (_c *MockRepoComponent_CreateRepo_Call) RunAndReturn(run func(context.Context, types.CreateRepoReq) (*gitserver.CreateRepoResp, *database.Repository, error)) *MockRepoComponent_CreateRepo_Call {
+func (_c *MockRepoComponent_CreateRepo_Call) RunAndReturn(run func(context.Context, types.CreateRepoReq) (*gitserver.CreateRepoResp, *database.Repository, *gitserver.CommitFilesReq, error)) *MockRepoComponent_CreateRepo_Call {
 	_c.Call.Return(run)
 	return _c
 }

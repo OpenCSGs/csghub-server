@@ -63,7 +63,7 @@ func TestMirrorComponent_CreateMirrorRepo(t *testing.T) {
 			}, nil)
 
 			repo1 := &database.Repository{ID: 11}
-			mc.mocks.components.repo.EXPECT().CreateRepo(ctx, mock.AnythingOfType("types.CreateRepoReq")).Return(&gitserver.CreateRepoResp{}, repo1, nil)
+			mc.mocks.components.repo.EXPECT().CreateRepo(ctx, mock.AnythingOfType("types.CreateRepoReq")).Return(&gitserver.CreateRepoResp{}, repo1, &gitserver.CommitFilesReq{}, nil)
 			switch req.RepoType {
 			case types.ModelRepo:
 				mc.mocks.stores.ModelMock().EXPECT().CreateAndUpdateRepoPath(ctx, database.Model{

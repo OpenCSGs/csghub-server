@@ -651,7 +651,7 @@ func (c *promptComponentImpl) CreatePromptRepo(ctx context.Context, req *types.C
 			Path:    types.GitattributesFileName,
 		},
 	}
-	_, dbRepo, err := c.repoComponent.CreateRepo(ctx, req.CreateRepoReq)
+	_, dbRepo, commitFilesReq, err := c.repoComponent.CreateRepo(ctx, req.CreateRepoReq)
 	if err != nil {
 		return nil, err
 	}
@@ -666,6 +666,8 @@ func (c *promptComponentImpl) CreatePromptRepo(ctx context.Context, req *types.C
 	if err != nil {
 		return nil, fmt.Errorf("failed to create database prompt, cause: %w", err)
 	}
+
+	_ = c.gitServer.CommitFiles(ctx, *commitFilesReq)
 
 	for _, tag := range prompt.Repository.Tags {
 		tags = append(tags, types.RepoTag{
