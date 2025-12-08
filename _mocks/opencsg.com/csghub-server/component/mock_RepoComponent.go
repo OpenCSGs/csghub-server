@@ -35,23 +35,23 @@ func (_m *MockRepoComponent) EXPECT() *MockRepoComponent_Expecter {
 }
 
 // AllFiles provides a mock function with given fields: ctx, req
-func (_m *MockRepoComponent) AllFiles(ctx context.Context, req types.GetAllFilesReq) ([]*types.File, error) {
+func (_m *MockRepoComponent) AllFiles(ctx context.Context, req types.GetAllFilesReq) (*types.GetRepoFileTreeResp, error) {
 	ret := _m.Called(ctx, req)
 
 	if len(ret) == 0 {
 		panic("no return value specified for AllFiles")
 	}
 
-	var r0 []*types.File
+	var r0 *types.GetRepoFileTreeResp
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, types.GetAllFilesReq) ([]*types.File, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, types.GetAllFilesReq) (*types.GetRepoFileTreeResp, error)); ok {
 		return rf(ctx, req)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, types.GetAllFilesReq) []*types.File); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, types.GetAllFilesReq) *types.GetRepoFileTreeResp); ok {
 		r0 = rf(ctx, req)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]*types.File)
+			r0 = ret.Get(0).(*types.GetRepoFileTreeResp)
 		}
 	}
 
@@ -83,12 +83,12 @@ func (_c *MockRepoComponent_AllFiles_Call) Run(run func(ctx context.Context, req
 	return _c
 }
 
-func (_c *MockRepoComponent_AllFiles_Call) Return(_a0 []*types.File, _a1 error) *MockRepoComponent_AllFiles_Call {
+func (_c *MockRepoComponent_AllFiles_Call) Return(_a0 *types.GetRepoFileTreeResp, _a1 error) *MockRepoComponent_AllFiles_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockRepoComponent_AllFiles_Call) RunAndReturn(run func(context.Context, types.GetAllFilesReq) ([]*types.File, error)) *MockRepoComponent_AllFiles_Call {
+func (_c *MockRepoComponent_AllFiles_Call) RunAndReturn(run func(context.Context, types.GetAllFilesReq) (*types.GetRepoFileTreeResp, error)) *MockRepoComponent_AllFiles_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -2706,7 +2706,7 @@ func (h *RepoHandler) DiffBetweenTwoCommits(ctx *gin.Context) {
 // @Param        namespace path string true "namespace"
 // @Param        name path string true "name"
 // @Param        current_user query string false "current user"
-// @Success      200  {object}  types.Response{data=types.File} "OK"
+// @Success      200  {object}  types.Response{data=[]types.File} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /{repo_type}/{namespace}/{name}/all_files [get]
@@ -2722,6 +2722,8 @@ func (h *RepoHandler) AllFiles(ctx *gin.Context) {
 	req.Name = name
 	req.RepoType = common.RepoTypeFromContext(ctx)
 	req.CurrentUser = httpbase.GetCurrentUser(ctx)
+	req.Limit = 100
+	req.Cursor = ctx.Query("cursor")
 	detail, err := h.c.AllFiles(ctx.Request.Context(), req)
 	if err != nil {
 		if errors.Is(err, errorx.ErrForbidden) {
@@ -2734,7 +2736,7 @@ func (h *RepoHandler) AllFiles(ctx *gin.Context) {
 		return
 	}
 
-	httpbase.OK(ctx, detail)
+	httpbase.OK(ctx, detail.Files)
 }
 
 // GetRepoRemoteCommitDiff godoc

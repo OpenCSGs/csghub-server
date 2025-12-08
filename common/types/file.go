@@ -206,6 +206,9 @@ type GetAllFilesReq struct {
 	RepoType    RepositoryType `json:"repo_type"`
 	CurrentUser string         `json:"current_user"`
 	Ref         string         `json:"ref"`
+	Limit       int            `json:"limit"`
+	Cursor      string         `json:"cursor"`
+	Path        string         `json:"path"`
 }
 
 type LFSPointer struct {
