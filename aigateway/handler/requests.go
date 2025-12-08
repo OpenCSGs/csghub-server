@@ -70,7 +70,7 @@ type ChatMessageHistoryResponse struct {
 
 // EmbeddingRequest represents an embedding request structure
 type EmbeddingRequest struct {
-	Input          string `json:"input"`           // Input text content
-	Model          string `json:"model"`           // Model name used (e.g., "text-embedding-ada-002")
-	EncodingFormat string `json:"encoding_format"` // Encoding format (e.g., "float")
+	Input          string `json:"input"`                     // Input text content
+	Model          string `json:"model"`                     // Model name used (e.g., "text-embedding-ada-002")
+	EncodingFormat string `json:"encoding_format,omitempty"` // Encoding format (e.g., "float")
 }
