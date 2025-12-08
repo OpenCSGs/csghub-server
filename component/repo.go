@@ -167,7 +167,7 @@ type RepoComponent interface {
 	MirrorProgress(ctx context.Context, repoType types.RepositoryType, namespace, name, currentUser string) (types.LFSSyncProgressResp, error)
 	DeployUpdate(ctx context.Context, updateReq types.DeployActReq, req *types.DeployUpdateReq) error
 	DeployStart(ctx context.Context, startReq types.DeployActReq) error
-	AllFiles(ctx context.Context, req types.GetAllFilesReq) ([]*types.File, error)
+	AllFiles(ctx context.Context, req types.GetAllFilesReq) (*types.GetRepoFileTreeResp, error)
 	GetUserRepoPermission(ctx context.Context, userName string, repo *database.Repository) (*types.UserRepoPermission, error)
 	CheckCurrentUserPermission(ctx context.Context, userName string, namespace string, role membership.Role) (bool, error)
 	GetNameSpaceInfo(ctx context.Context, path string) (*types.Namespace, error)
@@ -3201,7 +3201,7 @@ func (c *repoComponentImpl) DeployStart(ctx context.Context, startReq types.Depl
 	return err
 }
 
-func (c *repoComponentImpl) AllFiles(ctx context.Context, req types.GetAllFilesReq) ([]*types.File, error) {
+func (c *repoComponentImpl) AllFiles(ctx context.Context, req types.GetAllFilesReq) (*types.GetRepoFileTreeResp, error) {
 	repo, err := c.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find repo, error: %w", err)
@@ -3219,12 +3219,20 @@ func (c *repoComponentImpl) AllFiles(ctx context.Context, req types.GetAllFilesR
 			return nil, errorx.ErrForbiddenMsg("users do not have permission to get all files for this repo")
 		}
 	}
-	allFiles, err := getAllFiles(ctx, req.Namespace, req.Name, "", req.RepoType, req.Ref, c.git.GetTree)
+	resp, err := c.git.GetTree(ctx, types.GetTreeRequest{
+		Ref:       req.Ref,
+		RepoType:  req.RepoType,
+		Namespace: req.Namespace,
+		Name:      req.Name,
+		Limit:     req.Limit,
+		Cursor:    req.Cursor,
+		Path:      req.Path,
+	})
 	if err != nil {
 		slog.Error("fail to get all files of repository", slog.Any("repoType", req.RepoType), slog.String("namespace", req.Namespace), slog.String("name", req.Name), slog.String("error", err.Error()))
 		return nil, err
 	}
-	return allFiles, nil
+	return resp, nil
 }
 
 func (c *repoComponentImpl) IsAdminRole(user database.User) bool {
