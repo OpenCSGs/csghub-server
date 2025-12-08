@@ -41,6 +41,7 @@ const (
 	gitServiceUnavaliable
 	gitCopyRepositoryFailed
 	gitReplicateRepositoryFailed
+	gitUsingGitInXnetRepository
 )
 
 var (
@@ -467,6 +468,19 @@ var (
 	//
 	// zh-HK: 转移倉庫失敗
 	ErrGitReplicateRepositoryFailed error = CustomError{prefix: errGitPrefix, code: gitReplicateRepositoryFailed}
+	// --- GIT-ERR-xxx: Git/Upload, Download, Resource Synchronization ---
+	// using git in xnet-enabled repository error
+	//
+	// Description: Using git in xnet-enabled repository error. Git operations are not supported in repositories enabled with xnet.
+	//
+	// Description_ZH: 使用 git 操作 xnet 启用的仓库。
+	//
+	// en-US: Using git in xnet-enabled repository error
+	//
+	// zh-CN: 在 xnet 启用的仓库中使用 git 失败
+	//
+	// zh-HK: 在 xnet 啟用的倉庫中使用 git 失敗
+	ErrUsingGitInXnetRepository error = CustomError{prefix: errGitPrefix, code: gitUsingGitInXnetRepository}
 )
 
 func FindCommitFailed(err error, ctx context) error {
