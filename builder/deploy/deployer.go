@@ -641,6 +641,8 @@ func (d *deployer) GetClusterUsageById(ctx context.Context, clusterId string) (*
 		Provider:  resp.Provider,
 		Status:    types.ClusterStatusRunning,
 	}
+	var vendorSet = make(map[string]struct{}, 0)
+	var modelsSet = make(map[string]struct{}, 0)
 	for _, node := range resp.Nodes {
 		res.TotalCPU += node.TotalCPU
 		res.AvailableCPU += node.AvailableCPU
@@ -648,8 +650,30 @@ func (d *deployer) GetClusterUsageById(ctx context.Context, clusterId string) (*
 		res.AvailableMem += float64(node.AvailableMem)
 		res.TotalGPU += node.TotalXPU
 		res.AvailableGPU += node.AvailableXPU
-
+		if node.GPUVendor != "" {
+			vendorSet[node.GPUVendor] = struct{}{}
+			modelsSet[fmt.Sprintf("%s(%s)", node.XPUModel, node.XPUMem)] = struct{}{}
+		}
 	}
+
+	var vendor string
+	for k := range vendorSet {
+		vendor += k + ", "
+	}
+	if vendor != "" {
+		vendor = vendor[:len(vendor)-2]
+	}
+
+	var models string
+	for k := range modelsSet {
+		models += k + ", "
+	}
+	if models != "" {
+		models = models[:len(models)-2]
+	}
+
+	res.XPUVendors = vendor
+	res.XPUModels = models
 	res.AvailableCPU = math.Floor(res.AvailableCPU)
 	res.TotalMem = math.Floor(res.TotalMem)
 	res.AvailableMem = math.Floor(res.AvailableMem)

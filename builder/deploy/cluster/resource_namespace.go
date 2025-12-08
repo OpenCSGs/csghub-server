@@ -39,7 +39,7 @@ func (cluster *Cluster) GetResourceInNamespace(namespace string, quotaName strin
 		available.Sub(usedAmount)
 		return available
 	}
-	xpuCapacityLabel, xpuTypeLabel := getXPULabel(quota.Labels, config)
+	xpuCapacityLabel, xpuTypeLabel, _ := getXPULabel(quota.Labels, config)
 	gpuModelVendor, gpuModel := getGpuTypeAndVendor(quota.Labels[xpuTypeLabel], xpuCapacityLabel)
 	var totalXPU int64 = 0
 	var availableXPU int64 = 0
