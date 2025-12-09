@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -13,6 +14,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"go.temporal.io/sdk/client"
 	"opencsg.com/csghub-server/api/httpbase"
+	"opencsg.com/csghub-server/builder/temporal"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
@@ -174,48 +176,56 @@ func (h *UserHandler) Delete(ctx *gin.Context) {
 	// Check if operator can delete user
 	isServerErr, err := h.c.CheckOperatorAndUser(ctx, operator, userName)
 	if err != nil && isServerErr {
+		slog.Error("Check operator and user failed", slog.String("operator", operator), slog.String("user", userName), slog.Any("err", err))
 		httpbase.ServerError(ctx, fmt.Errorf("user cannot be deleted: %w", err))
 		return
 	}
 	if err != nil && !isServerErr {
-		httpbase.BadRequestWithExt(ctx, err)
+		slog.Error("Bad Request", slog.String("operator", operator), slog.String("user", userName), slog.Any("err", err))
+		httpbase.BadRequestWithExt(ctx, errorx.ErrAdminUserCannotBeDeleted)
 		return
 	}
 
 	// Check if user has organizations
 	hasOrgs, err := h.c.CheckIfUserHasOrgs(ctx, userName)
 	if err != nil {
+		slog.Error("Check if user has organizations failed", slog.String("user", userName), slog.Any("err", err))
 		httpbase.ServerError(ctx, fmt.Errorf("failed to check if user has organzitions, error: %w", err))
 		return
 	}
 	if hasOrgs {
-		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(errors.New("users who own organizations cannot be deleted"), nil))
+		slog.Error("User has organizations", slog.String("user", userName))
+		httpbase.BadRequestWithExt(ctx, errorx.ErrUserHasOrganizations)
 		return
 	}
 	// Check if user has running or building deployments
 	hasDeployments, err := h.c.CheckIfUserHasRunningOrBuildingDeployments(ctx, userName)
 	if err != nil {
+		slog.Error("Check if user has deployments failed", slog.String("user", userName), slog.Any("err", err))
 		httpbase.ServerError(ctx, fmt.Errorf("failed to check if user has deployments, error: %w", err))
 		return
 	}
 	if hasDeployments {
-		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(errors.New("users who own deployments cannot be deleted"), nil))
+		slog.Error("User has deployments", slog.String("user", userName))
+		httpbase.BadRequestWithExt(ctx, errorx.ErrUserHasDeployments)
 		return
 	}
 
 	// Check if user has bills, Saas only
 	hasBills, err := h.c.CheckIfUserHasBills(ctx, userName)
 	if err != nil {
+		slog.Error("Check if user has bills failed", slog.String("user", userName), slog.Any("err", err))
 		httpbase.ServerError(ctx, fmt.Errorf("failed to check if user has bills, error: %w", err))
 		return
 	}
 	if hasBills {
-		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(errors.New("users who own bills cannot be deleted"), nil))
+		slog.Error("User has bills", slog.String("user", userName))
+		httpbase.BadRequestWithExt(ctx, errorx.ErrUserHasBills)
 		return
 	}
 
 	//start workflow to delete user
-	workflowClient := workflow.GetWorkflowClient()
+	workflowClient := temporal.GetClient()
 	workflowOptions := client.StartWorkflowOptions{
 		TaskQueue: workflow.WorkflowUserDeletionQueueName,
 	}
@@ -324,10 +334,17 @@ func (h *UserHandler) Casdoor(ctx *gin.Context) {
 	jwtToken, signed, err := h.c.Signin(ctx.Request.Context(), code, state)
 	if err != nil {
 		slog.Error("Failed to signin", slog.Any("error", err), slog.String("code", code), slog.String("state", state))
+		var customErr errorx.CustomError
+		if errors.As(err, &customErr) {
+			if handleConflictCustomError(ctx, customErr, h.signinFailureRedirectURL) {
+				return
+			}
+		}
+
 		errorMsg := url.QueryEscape(fmt.Sprintf("failed to signin: %v", err))
 		errorRedirectURL := fmt.Sprintf("%s?error_code=500&error_message=%s", h.signinFailureRedirectURL, errorMsg)
 		slog.Info("redirecting to error page", slog.String("url", errorRedirectURL))
-		ctx.Redirect(http.StatusMovedPermanently, errorRedirectURL)
+		ctx.Redirect(http.StatusFound, errorRedirectURL)
 		return
 	}
 
@@ -344,7 +361,7 @@ func (h *UserHandler) Casdoor(ctx *gin.Context) {
 			errorMsg := url.QueryEscape(errMsg)
 			errorRedirectURL := fmt.Sprintf("%s?error_code=500&error_message=%s", h.signinFailureRedirectURL, errorMsg)
 			slog.Info("redirecting to error page", slog.String("url", errorRedirectURL))
-			ctx.Redirect(http.StatusMovedPermanently, errorRedirectURL)
+			ctx.Redirect(http.StatusFound, errorRedirectURL)
 			return
 		}
 		codeSoulerEndpoint := h.codeSoulerVScodeRedirectURL
@@ -366,7 +383,7 @@ func (h *UserHandler) Casdoor(ctx *gin.Context) {
 			errorRedirectURL := fmt.Sprintf("%s?error_code=500&error_message=%s",
 				h.signinFailureRedirectURL, errorMsg)
 			slog.Info("redirecting to error page", slog.String("url", errorRedirectURL))
-			ctx.Redirect(http.StatusMovedPermanently, errorRedirectURL)
+			ctx.Redirect(http.StatusFound, errorRedirectURL)
 			return
 		}
 		// set jwt token in jwt query
@@ -377,7 +394,7 @@ func (h *UserHandler) Casdoor(ctx *gin.Context) {
 	}
 
 	slog.Info("generate login redirect url", slog.Any("targetUrl", targetUrl))
-	ctx.Redirect(http.StatusMovedPermanently, targetUrl)
+	ctx.Redirect(http.StatusFound, targetUrl)
 }
 
 func (h *UserHandler) getStarshipApiKey(ctx *gin.Context, userName, tokenName string) (string, error) {
@@ -679,12 +696,11 @@ func (h *UserHandler) CloseAccount(ctx *gin.Context) {
 	}
 	if hasBills {
 		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(errors.New("users who own bills cannot be deleted"), nil))
-
 		return
 	}
 
 	//start workflow to soft delete user
-	workflowClient := workflow.GetWorkflowClient()
+	workflowClient := temporal.GetClient()
 	workflowOptions := client.StartWorkflowOptions{
 		TaskQueue: workflow.WorkflowUserDeletionQueueName,
 	}
@@ -796,4 +812,224 @@ func (e *UserHandler) ResetUserTags(ctx *gin.Context) {
 	}
 
 	httpbase.OK(ctx, nil)
+}
+
+// SendSmsCode godoc
+// @Security     ApiKey
+// @Summary      generate sms verification code and send it by sms
+// @Description  generate sms verification code and send it by sms
+// @Tags         User
+// @Accept       json
+// @Produce      json
+// @Param        body body types.SendSMSCodeRequest true "SendSMSCodeRequest"
+// @Success      200  {object}  types.Response{data=types.SendSMSCodeResponse} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /user/sms-code [post]
+func (e *UserHandler) SendSMSCode(ctx *gin.Context) {
+	currentUserUUID := httpbase.GetCurrentUserUUID(ctx)
+	var req types.SendSMSCodeRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		slog.Error("SendSMSCodeRequest failed", slog.Any("err", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	resp, err := e.c.SendSMSCode(ctx, currentUserUUID, req)
+	if err != nil {
+		slog.Error("SendSMSCode failed", slog.Any("err", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	httpbase.OK(ctx, resp)
+}
+
+// SendPublicSMSCode godoc
+// @Security     ApiKey
+// @Summary      generate sms verification code and send it by sms (public endpoint)
+// @Description  generate sms verification code and send it by sms with scene parameter. Accessible to both logged-in and anonymous users.
+// @Tags         User
+// @Accept       json
+// @Produce      json
+// @Param        body body types.SendPublicSMSCodeRequest true "SendPublicSMSCodeRequest"
+// @Success      200  {object}  types.Response{data=types.SendSMSCodeResponse} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /user/public/sms-code [post]
+func (e *UserHandler) SendPublicSMSCode(ctx *gin.Context) {
+	var req types.SendPublicSMSCodeRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		slog.Error("SendPublicSMSCodeRequest failed", slog.Any("err", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	resp, err := e.c.SendPublicSMSCode(ctx, req)
+	if err != nil {
+		slog.Error("SendPublicSMSCode failed", slog.Any("err", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	httpbase.OK(ctx, resp)
+}
+
+// VerifyPublicSMSCode godoc
+// @Security     ApiKey
+// @Summary      verify sms verification code (public endpoint)
+// @Description  verify sms verification code with scene parameter. Accessible to both logged-in and anonymous users.
+// @Tags         User
+// @Accept       json
+// @Produce      json
+// @Param        body body types.VerifyPublicSMSCodeRequest true "VerifyPublicSMSCodeRequest"
+// @Success      200  {object}  types.Response{data=nil} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /user/public/sms-code/verify [post]
+func (e *UserHandler) VerifyPublicSMSCode(ctx *gin.Context) {
+	var req types.VerifyPublicSMSCodeRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		slog.Error("VerifyPublicSMSCodeRequest failed", slog.Any("err", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	err := e.c.VerifyPublicSMSCode(ctx, req)
+	if err != nil {
+		slog.Error("VerifyPublicSMSCode failed", slog.Any("err", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	httpbase.OK(ctx, nil)
+}
+
+// UpdatePhone godoc
+// @Security     ApiKey
+// @Summary      Update current user phone
+// @Description  Update current user phone
+// @Tags         User
+// @Accept       json
+// @Produce      json
+// @Param        body body types.UpdateUserPhoneRequest true "UpdateUserPhoneRequest"
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /user/phone [put]
+func (e *UserHandler) UpdatePhone(ctx *gin.Context) {
+	currentUserUUID := httpbase.GetCurrentUserUUID(ctx)
+	var req types.UpdateUserPhoneRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		slog.Error("failed to update user's phone", slog.Any("err", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	err := e.c.UpdatePhone(ctx, currentUserUUID, req)
+	if err != nil {
+		slog.Error("failed to update user's phone", slog.Any("err", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	httpbase.OK(ctx, nil)
+}
+
+func handleConflictCustomError(ctx *gin.Context, customErr errorx.CustomError, redirectURL string) bool {
+	errCode := customErr.Code()
+
+	cField, cValue, ok := extractConflictInfo(customErr)
+	if !ok {
+		return false
+	}
+
+	u, _ := url.Parse(redirectURL)
+	q := u.Query()
+	q.Set("error_code", strconv.Itoa(http.StatusConflict))
+	q.Set("error_message_code", errCode)
+	q.Set("field_name", cField)
+	q.Set("field_value", cValue)
+	u.RawQuery = q.Encode()
+	slog.Info("redirecting to error page with conflict error", slog.String("url", u.String()))
+	ctx.Redirect(http.StatusFound, u.String())
+	return true
+}
+
+func extractConflictInfo(customErr errorx.CustomError) (field, value string, ok bool) {
+	errCtx := customErr.Context()
+
+	switch {
+	case customErr.Is(errorx.ErrUsernameExists):
+		if username, exists := errCtx["username"]; exists {
+			if usernameStr, ok := username.(string); ok {
+				return "username", usernameStr, true
+			}
+		}
+	case customErr.Is(errorx.ErrEmailExists):
+		if email, exists := errCtx["email"]; exists {
+			if emailStr, ok := email.(string); ok {
+				return "email", emailStr, true
+			}
+		}
+	}
+	return "", "", false
+}
+
+// ExportUserInfo godoc
+// @Security     ApiKey
+// @Summary      Export users info. Only Admin
+// @Tags         User
+// @Accept       json
+// @Produce      json
+// @Param        verify_status  query  string  false  "Verify status (e.g. 'none', 'pending', 'approved', 'rejected')"
+// @Param        search         query  string  false  "Search keyword (match username/email/phone)"
+// @Param        labels         query  []string  false  "Labels (e.g. vip,basic) - multiple values supported"
+// @Param        cursor         query  int64  false  "Cursor for pagination"
+// @Success      200  "OK - SSE stream: events are 'users' (single user JSON), 'error' (error message), 'end' (completion message)"
+// @Failure      403  {object}  types.APIForbidden   "Forbidden - not admin"
+// @Router       /users/stream-export [get]
+func (h *UserHandler) ExportUserInfo(ctx *gin.Context) {
+	search := ctx.Query("search")
+	_labels := ctx.QueryArray("labels")
+	labels := types.ParseLabels(_labels)
+	verifyStatus := ctx.Query("verify_status")
+
+	req := types.UserIndexReq{
+		Search:       search,
+		VerifyStatus: types.VerifyStatus(verifyStatus),
+		Labels:       labels,
+		Per:          300,
+	}
+
+	ctx.Writer.Header().Set("Content-Type", "text/event-stream")
+	ctx.Writer.Header().Set("Cache-Control", "no-cache")
+	ctx.Writer.Header().Set("Connection", "keep-alive")
+	ctx.Writer.Header().Set("X-Accel-Buffering", "no")
+	ctx.Writer.WriteHeader(http.StatusOK)
+	ctx.Writer.Flush()
+
+	data, err := h.c.StreamExportUsers(ctx.Request.Context(), req)
+	if err != nil {
+		slog.Error("stream export failed in component", slog.Any("error", err), slog.Any("req", req))
+		select {
+		case data <- types.UserIndexResp{Error: err}:
+		case <-ctx.Request.Context().Done():
+		}
+	}
+
+	for resp := range data {
+		if resp.Error != nil {
+			ctx.SSEvent("error", resp.Error.Error())
+			ctx.Writer.Flush()
+			return
+		}
+
+		jsonData, err := json.Marshal(resp.Users)
+		if err != nil {
+			slog.Error("Failed to marshal users", slog.Any("error", err))
+			ctx.SSEvent("error", errorx.ErrInternalServerError.Error())
+			ctx.Writer.Flush()
+			return
+		}
+		ctx.SSEvent("users", string(jsonData))
+		ctx.Writer.Flush()
+	}
+
+	ctx.SSEvent("end", "export completed")
+	ctx.Writer.Flush()
 }

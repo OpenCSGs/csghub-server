@@ -86,6 +86,9 @@
     "error.GIT-ERR-34": {
         "other": "replicate repository failed"
     },
+    "error.GIT-ERR-35": {
+        "other": "Using git in xnet-enabled repository error"
+    },
     "error.GIT-ERR-4": {
         "other": "Failed to find commit"
     },

@@ -434,6 +434,14 @@
 - **错误名:** `gitReplicateRepositoryFailed`
 - **描述:** 转移仓库失败。这可能由网络问题、身份验证问题或指定的仓库不存在引起。
 
+---
+
+### `GIT-ERR-35`
+
+- **错误代码:** `GIT-ERR-35`
+- **错误名:** `gitUsingGitInXnetRepository`
+- **描述:** 使用 git 操作 xnet 启用的仓库。
+
 ## Invitation 错误
 
 ### `INVITATION-ERR-0`
@@ -825,4 +833,36 @@
 - **错误代码:** `USER-ERR-13`
 - **错误名:** `emailExists`
 - **描述:** 提供的电子邮件地址已存在于系统中。
+
+---
+
+### `USER-ERR-14`
+
+- **错误代码:** `USER-ERR-14`
+- **错误名:** `adminUserCannotBeDeleted`
+- **描述:** 管理员用户不能被删除。
+
+---
+
+### `USER-ERR-15`
+
+- **错误代码:** `USER-ERR-15`
+- **错误名:** `userHasOrganizations`
+- **描述:** 拥有组织的用户不能被删除。
+
+---
+
+### `USER-ERR-16`
+
+- **错误代码:** `USER-ERR-16`
+- **错误名:** `userHasDeployments`
+- **描述:** 拥有部署资源的用户不能被删除。
+
+---
+
+### `USER-ERR-17`
+
+- **错误代码:** `USER-ERR-17`
+- **错误名:** `userHasBills`
+- **描述:** 拥有账单的用户不能被删除。
 

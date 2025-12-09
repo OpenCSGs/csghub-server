@@ -434,6 +434,14 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Name:** `gitReplicateRepositoryFailed`
 - **Description:** replicate repository failed. This can be caused by network problems, authentication issues, or the specified repository does not exist.
 
+---
+
+### `GIT-ERR-35`
+
+- **Error Code:** `GIT-ERR-35`
+- **Error Name:** `gitUsingGitInXnetRepository`
+- **Description:** Using git in xnet-enabled repository error. Git operations are not supported in repositories enabled with xnet.
+
 ## Invitation Errors
 
 ### `INVITATION-ERR-0`
@@ -825,4 +833,36 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Code:** `USER-ERR-13`
 - **Error Name:** `emailExists`
 - **Description:** The email address provided already exists in the system.
+
+---
+
+### `USER-ERR-14`
+
+- **Error Code:** `USER-ERR-14`
+- **Error Name:** `adminUserCannotBeDeleted`
+- **Description:** The admin user cannot be deleted.
+
+---
+
+### `USER-ERR-15`
+
+- **Error Code:** `USER-ERR-15`
+- **Error Name:** `userHasOrganizations`
+- **Description:** The user who owns organizations cannot be deleted.
+
+---
+
+### `USER-ERR-16`
+
+- **Error Code:** `USER-ERR-16`
+- **Error Name:** `userHasDeployments`
+- **Description:** The user who owns deployments cannot be deleted.
+
+---
+
+### `USER-ERR-17`
+
+- **Error Code:** `USER-ERR-17`
+- **Error Name:** `userHasBills`
+- **Description:** The user who owns bills cannot be deleted.
 
