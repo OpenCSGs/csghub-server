@@ -156,7 +156,7 @@ func TestUserStore_IndexWithSearch(t *testing.T) {
 	for _, c := range cases {
 		t.Run(fmt.Sprintf("page %d, per %d", c.page, c.per), func(t *testing.T) {
 
-			users, count, err := userStore.IndexWithSearch(ctx, "foo", "", c.labels, c.per, c.page)
+			users, count, err := userStore.IndexWithSearch(ctx, "foo", "", c.labels, c.per, c.page, false)
 			require.Nil(t, err)
 			require.Equal(t, c.total, count)
 
@@ -168,6 +168,45 @@ func TestUserStore_IndexWithSearch(t *testing.T) {
 		})
 	}
 
+}
+
+func TestUserStore_IndexWithSearchExactMatch(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	userStore := database.NewUserStoreWithDB(db)
+	err := userStore.Create(ctx, &database.User{
+		GitID:    3321,
+		Username: "u-foo",
+		UUID:     "1",
+	}, &database.Namespace{Path: "1"})
+	require.Nil(t, err)
+
+	err = userStore.Create(ctx, &database.User{
+		GitID:    3322,
+		Username: "u-bar",
+		Email:    "efoo@z.com",
+		UUID:     "2",
+	}, &database.Namespace{Path: "2"})
+	require.Nil(t, err)
+
+	err = userStore.Create(ctx, &database.User{
+		GitID:    3323,
+		Username: "u-barz",
+		Email:    "ebar@z.com",
+		UUID:     "3",
+	}, &database.Namespace{Path: "3"})
+	require.Nil(t, err)
+
+	_, count, err := userStore.IndexWithSearch(ctx, "foo", "", []string{}, 10, 1, true)
+	require.Nil(t, err)
+	require.Equal(t, 0, count)
+
+	_, count, err = userStore.IndexWithSearch(ctx, "u-foo", "", []string{}, 10, 1, true)
+	require.Nil(t, err)
+	require.Equal(t, 1, count)
 }
 
 func TestUserStore_CreateUser(t *testing.T) {

@@ -822,9 +822,9 @@ func (_c *MockUserStore_IndexWithDeleted_Call) RunAndReturn(run func(context.Con
 	return _c
 }
 
-// IndexWithSearch provides a mock function with given fields: ctx, search, verifyStatus, labels, per, page
-func (_m *MockUserStore) IndexWithSearch(ctx context.Context, search string, verifyStatus string, labels []string, per int, page int) ([]database.User, int, error) {
-	ret := _m.Called(ctx, search, verifyStatus, labels, per, page)
+// IndexWithSearch provides a mock function with given fields: ctx, search, verifyStatus, labels, per, page, exactMatch
+func (_m *MockUserStore) IndexWithSearch(ctx context.Context, search string, verifyStatus string, labels []string, per int, page int, exactMatch bool) ([]database.User, int, error) {
+	ret := _m.Called(ctx, search, verifyStatus, labels, per, page, exactMatch)
 
 	if len(ret) == 0 {
 		panic("no return value specified for IndexWithSearch")
@@ -833,25 +833,25 @@ func (_m *MockUserStore) IndexWithSearch(ctx context.Context, search string, ver
 	var r0 []database.User
 	var r1 int
 	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, []string, int, int) ([]database.User, int, error)); ok {
-		return rf(ctx, search, verifyStatus, labels, per, page)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, []string, int, int, bool) ([]database.User, int, error)); ok {
+		return rf(ctx, search, verifyStatus, labels, per, page, exactMatch)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, []string, int, int) []database.User); ok {
-		r0 = rf(ctx, search, verifyStatus, labels, per, page)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, []string, int, int, bool) []database.User); ok {
+		r0 = rf(ctx, search, verifyStatus, labels, per, page, exactMatch)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]database.User)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, string, []string, int, int) int); ok {
-		r1 = rf(ctx, search, verifyStatus, labels, per, page)
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, []string, int, int, bool) int); ok {
+		r1 = rf(ctx, search, verifyStatus, labels, per, page, exactMatch)
 	} else {
 		r1 = ret.Get(1).(int)
 	}
 
-	if rf, ok := ret.Get(2).(func(context.Context, string, string, []string, int, int) error); ok {
-		r2 = rf(ctx, search, verifyStatus, labels, per, page)
+	if rf, ok := ret.Get(2).(func(context.Context, string, string, []string, int, int, bool) error); ok {
+		r2 = rf(ctx, search, verifyStatus, labels, per, page, exactMatch)
 	} else {
 		r2 = ret.Error(2)
 	}
@@ -871,13 +871,14 @@ type MockUserStore_IndexWithSearch_Call struct {
 //   - labels []string
 //   - per int
 //   - page int
-func (_e *MockUserStore_Expecter) IndexWithSearch(ctx interface{}, search interface{}, verifyStatus interface{}, labels interface{}, per interface{}, page interface{}) *MockUserStore_IndexWithSearch_Call {
-	return &MockUserStore_IndexWithSearch_Call{Call: _e.mock.On("IndexWithSearch", ctx, search, verifyStatus, labels, per, page)}
+//   - exactMatch bool
+func (_e *MockUserStore_Expecter) IndexWithSearch(ctx interface{}, search interface{}, verifyStatus interface{}, labels interface{}, per interface{}, page interface{}, exactMatch interface{}) *MockUserStore_IndexWithSearch_Call {
+	return &MockUserStore_IndexWithSearch_Call{Call: _e.mock.On("IndexWithSearch", ctx, search, verifyStatus, labels, per, page, exactMatch)}
 }
 
-func (_c *MockUserStore_IndexWithSearch_Call) Run(run func(ctx context.Context, search string, verifyStatus string, labels []string, per int, page int)) *MockUserStore_IndexWithSearch_Call {
+func (_c *MockUserStore_IndexWithSearch_Call) Run(run func(ctx context.Context, search string, verifyStatus string, labels []string, per int, page int, exactMatch bool)) *MockUserStore_IndexWithSearch_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].([]string), args[4].(int), args[5].(int))
+		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].([]string), args[4].(int), args[5].(int), args[6].(bool))
 	})
 	return _c
 }
@@ -887,7 +888,7 @@ func (_c *MockUserStore_IndexWithSearch_Call) Return(_a0 []database.User, _a1 in
 	return _c
 }
 
-func (_c *MockUserStore_IndexWithSearch_Call) RunAndReturn(run func(context.Context, string, string, []string, int, int) ([]database.User, int, error)) *MockUserStore_IndexWithSearch_Call {
+func (_c *MockUserStore_IndexWithSearch_Call) RunAndReturn(run func(context.Context, string, string, []string, int, int, bool) ([]database.User, int, error)) *MockUserStore_IndexWithSearch_Call {
 	_c.Call.Return(run)
 	return _c
 }
