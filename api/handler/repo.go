@@ -1852,6 +1852,7 @@ func (h *RepoHandler) DeployInstanceLogs(ctx *gin.Context) {
 		DeployID:     deployID,
 		DeployType:   types.InferenceType,
 		InstanceName: instance,
+		Since:        ctx.Query("since"),
 	}
 
 	// user http request context instead of gin context, so that server knows the life cycle of the request
@@ -2378,6 +2379,7 @@ func (h *RepoHandler) ServerlessLogs(ctx *gin.Context) {
 		DeployID:     deployID,
 		DeployType:   types.ServerlessType,
 		InstanceName: instance,
+		Since:        ctx.Query("since"),
 	}
 
 	// user http request context instead of gin context, so that server knows the life cycle of the request

@@ -350,6 +350,7 @@ type DeployActReq struct {
 	DeployID     int64          `json:"deploy_id"`
 	DeployType   int            `json:"deploy_type"`
 	InstanceName string         `json:"instance_name"`
+	Since        string         `json:"since,omitempty"`
 }
 
 type DeployUpdateReq struct {
