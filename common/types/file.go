@@ -19,6 +19,7 @@ type File struct {
 	LastCommitSHA   string `json:"last_commit_sha"`
 	// whether file is previewable
 	PreviewCode FilePreviewCode `json:"preview_code,omitempty"`
+	XnetEnabled bool            `json:"xnet_enabled"`
 }
 
 type CreateFileReq struct {
