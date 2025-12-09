@@ -1,173 +1,40 @@
+include:
+  - template: Jobs/Secret-Detection.gitlab-ci.yml
+  - local: .gitlab/ci/*.yml
+
 stages:
-  - lint
-  - swagger
   - test
+  - swagger
   - build
   - deploy
 
 variables:
-  SAST_IMAGE_SUFFIX: "-fips"
-  DOCKER_HOST: "tcp://docker:2375"
-  DOCKER_TLS_CERTDIR: ""
-  GOLANGCI_LINT_CACHE: ${CI_PROJECT_DIR}/.golangci-lint
-  GOMODCACHE: ${CI_PROJECT_DIR}/.cache/go-mod
-  TESTCONTAINERS_HUB_IMAGE_NAME_PREFIX: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public
+  ## Git
+  GIT_DEPTH: 1
+  ## DCS
+  CACHE_SHARED: "true"
+  CACHE_COMPRESSION_LEVEL: "fast"
+  FF_USE_FASTZIP: "true"
+  ## Go env
+  GO111MODULE: "on"
+  GOPROXY: "https://goproxy.cn,direct"
+  GOCACHE: "${CI_PROJECT_DIR}/.cache/go-build"
+  GOMODCACHE: "${CI_PROJECT_DIR}/.cache/go-mod"
+  GOLANGCI_LINT_CACHE: "${CI_PROJECT_DIR}/.cache/golangci-lint"
+  ## Test
+  TESTCONTAINERS_HUB_IMAGE_NAME_PREFIX: "$ALI_ACR_REGISTRY"
   TESTCONTAINERS_RYUK_DISABLED: true
+  # GIN
+  GIN_MODE: "release"
 
-.go-lint-cache:
-  cache:
-    - key: lint-cache
-      paths:
-        - .golangci-lint/
-
-.go-test-cache:
-  cache:
-    - key: mod-cache
-      paths:
-        - .cache/
-
-include:
-  - template: Jobs/Secret-Detection.gitlab-ci.yml
-
-.before_script: &pre
-  image: docker:27.3
-  stage: build
-  services:
-    - name: docker:27.3-dind
-      command: ["--feature=containerd-snapshotter", "--experimental"]
-  variables:
-    BUILDX_NO_DEFAULT_ATTESTATIONS: 1
-  before_script:
-    - echo "$CI_REGISTRY_PASSWORD" | docker login -u $CI_REGISTRY_USER $CI_REGISTRY --password-stdin
-    - docker run --privileged --rm opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/tonistiigi/binfmt --install all
-
-lint-all:
-  image: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/golangci/golangci-lint:latest
-  extends: .go-lint-cache
-  stage: lint
-  interruptible: true
+## Secret Detection ###################################
+secret_detection:
+  extends: .secret-analyzer
+  image: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/secrets:6
+  rules:
+    - if: $SECRET_DETECTION_DISABLED == 'true' || $SECRET_DETECTION_DISABLED == '1'
+      when: never
+    - if: $CI_COMMIT_BRANCH
+  script:
+    - /analyzer run
   needs: []
-  script:
-    - go env -w GO111MODULE=on
-    - go env -w GOPROXY=https://goproxy.cn,direct
-    - golangci-lint run --timeout=15m --build-tags=
-    - golangci-lint run --timeout=10m --build-tags=ee
-    - golangci-lint run --timeout=10m --build-tags=saas
-    - go run linters/gincontext/main.go -tags=
-    - go run linters/gincontext/main.go -tags=ee
-    - go run linters/gincontext/main.go -tags=saas
-
-swagger-gen:
-  stage: swagger
-  interruptible: true
-  image: $CI_REGISTRY_IMAGE/docker-golang:1.24.2
-  needs: []
-  script:
-    - go env -w GO111MODULE=on
-    - go env -w GOPROXY=https://goproxy.cn,direct
-    - go install github.com/swaggo/swag/cmd/swag@latest
-    - make swag
-
-test-all:
-  extends: .go-test-cache
-  stage: test
-  interruptible: true
-  image: $CI_REGISTRY_IMAGE/docker-golang:1.23.3
-  needs: []
-  services:
-    - name: docker:27.3-dind
-  script:
-    - go env -w GO111MODULE=on
-    - go env -w GOPROXY=https://goproxy.cn,direct
-    - go test -tags= ./...
-    - go test -tags=ee ./...
-    - go test -tags=saas ./...
-
-build:stg:amd64:
-  image: docker:27.3
-  stage: build
-  services:
-    - docker:27.3-dind
-  script:
-    - echo "$CI_REGISTRY_PASSWORD" | docker login -u $CI_REGISTRY_USER $CI_REGISTRY --password-stdin
-    - docker build -t ${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA} -t ${CI_REGISTRY_IMAGE}:latest --build-arg CSGHUB_TAGS=saas -f docker/Dockerfile-saas .
-    - docker push ${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA}
-    - docker push ${CI_REGISTRY_IMAGE}:latest
-  rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_BRANCH == $CI_COMMIT_REF_NAME # when commit to main branch
-
-.build:stg:arm64:
-  <<: *pre
-  script:
-    - |
-      docker buildx build --platform linux/arm64 \
-        -t ${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA} \
-        -t ${CI_REGISTRY_IMAGE}:latest \
-        --build-arg CSGHUB_TAGS=saas \
-        -f docker/Dockerfile-saas \
-        --push .
-  rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_BRANCH == $CI_COMMIT_REF_NAME # when commit to main branch
-
-build:prod:amd64:
-  image: docker:27.3
-  stage: build
-  services:
-    - docker:27.3-dind
-  script:
-    - echo "$CI_REGISTRY_PASSWORD" | docker login -u $CI_REGISTRY_USER $CI_REGISTRY --password-stdin
-    - docker build -t ${CI_REGISTRY_IMAGE}:${CI_COMMIT_TAG} -t ${CI_REGISTRY_IMAGE}:latest --build-arg CSGHUB_TAGS=saas -f docker/Dockerfile-saas .
-    - docker push ${CI_REGISTRY_IMAGE}:${CI_COMMIT_TAG}
-    - docker push ${CI_REGISTRY_IMAGE}:latest
-  rules:
-    - if: $CI_COMMIT_TAG
-
-.build:prod:arm64:
-  <<: *pre
-  script:
-    - |
-      docker buildx build --platform linux/arm64 \
-        -t ${CI_REGISTRY_IMAGE}:${CI_COMMIT_TAG} \
-        -t ${CI_REGISTRY_IMAGE}:latest \
-        --build-arg CSGHUB_TAGS=saas \
-        -f docker/Dockerfile-saas \
-        --push .
-  rules:
-    - if: $CI_COMMIT_TAG
-
-# trigger starhub-deploy project(only works for x86_64 arch)
-trigger_deploy_stg1:
-  stage: deploy
-  needs: ["build:stg:amd64"]
-  image: alpine:3.14
-  rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_BRANCH == $CI_COMMIT_REF_NAME
-  script:
-    - |-
-      sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
-      apk add --no-cache curl
-      curl --fail-with-body \
-      --request POST \
-      --form "token=${STARHUB_DEPLOY_TRIGGER_TOKEN}" \
-      --form ref=main \
-      --form "variables[starhub_tag]=${CI_COMMIT_SHORT_SHA}" \
-      --form "variables[ENV_NAME]=stg1" \
-      https://git-devops.opencsg.com/api/v4/projects/58/trigger/pipeline
-
-trigger_deploy_stg2:
-  stage: deploy
-  needs: ["build:stg:amd64"]
-  image: alpine:3.14
-  rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_BRANCH == $CI_COMMIT_REF_NAME
-  script:
-    - |-
-      sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
-      apk add --no-cache curl
-      curl --fail-with-body \
-      --request POST \
-      --form "token=${STARHUB_DEPLOY_TRIGGER_TOKEN}" \
-      --form ref=main \
-      --form "variables[starhub_tag]=${CI_COMMIT_SHORT_SHA}" \
-      --form "variables[ENV_NAME]=stg2" \
-      https://git-devops.opencsg.com/api/v4/projects/58/trigger/pipeline
