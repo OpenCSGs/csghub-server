@@ -79,7 +79,7 @@ type UserComponent interface {
 	CheckIfUserHasOrgs(ctx context.Context, userName string) (bool, error)
 	CheckIfUserHasRunningOrBuildingDeployments(ctx context.Context, userName string) (bool, error)
 	CheckIfUserHasBills(ctx context.Context, userName string) (bool, error)
-	Index(ctx context.Context, visitorName, search, verifyStatus string, labels []string, per, page int) ([]*types.User, int, error)
+	Index(ctx context.Context, visitorName, search, verifyStatus string, labels []string, per, page int, exactMatch bool) ([]*types.User, int, error)
 	Signin(ctx context.Context, code, state string) (*types.JWTClaims, string, error)
 	FixUserData(ctx context.Context, userName string) error
 	UpdateUserLabels(ctx context.Context, req *types.UserLabelsRequest) error
@@ -818,7 +818,7 @@ func (c *userComponentImpl) buildUserInfo(ctx context.Context, dbuser *database.
 	return &u, nil
 }
 
-func (c *userComponentImpl) Index(ctx context.Context, visitorName, search, verifyStatus string, labels []string, per, page int) ([]*types.User, int, error) {
+func (c *userComponentImpl) Index(ctx context.Context, visitorName, search, verifyStatus string, labels []string, per, page int, exactMatch bool) ([]*types.User, int, error) {
 	var (
 		respUsers     []*types.User
 		onlyBasicInfo bool
@@ -830,7 +830,7 @@ func (c *userComponentImpl) Index(ctx context.Context, visitorName, search, veri
 	if !canAdmin {
 		onlyBasicInfo = true
 	}
-	dbusers, count, err := c.userStore.IndexWithSearch(ctx, search, verifyStatus, labels, per, page)
+	dbusers, count, err := c.userStore.IndexWithSearch(ctx, search, verifyStatus, labels, per, page, exactMatch)
 	if err != nil {
 		newError := fmt.Errorf("failed to find user by name in db,error:%w", err)
 		return nil, count, newError

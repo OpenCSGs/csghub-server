@@ -833,9 +833,9 @@ func (_c *MockUserComponent_GetUserUUIDs_Call) RunAndReturn(run func(context.Con
 	return _c
 }
 
-// Index provides a mock function with given fields: ctx, visitorName, search, verifyStatus, labels, per, page
-func (_m *MockUserComponent) Index(ctx context.Context, visitorName string, search string, verifyStatus string, labels []string, per int, page int) ([]*types.User, int, error) {
-	ret := _m.Called(ctx, visitorName, search, verifyStatus, labels, per, page)
+// Index provides a mock function with given fields: ctx, visitorName, search, verifyStatus, labels, per, page, exactMatch
+func (_m *MockUserComponent) Index(ctx context.Context, visitorName string, search string, verifyStatus string, labels []string, per int, page int, exactMatch bool) ([]*types.User, int, error) {
+	ret := _m.Called(ctx, visitorName, search, verifyStatus, labels, per, page, exactMatch)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Index")
@@ -844,25 +844,25 @@ func (_m *MockUserComponent) Index(ctx context.Context, visitorName string, sear
 	var r0 []*types.User
 	var r1 int
 	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, []string, int, int) ([]*types.User, int, error)); ok {
-		return rf(ctx, visitorName, search, verifyStatus, labels, per, page)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, []string, int, int, bool) ([]*types.User, int, error)); ok {
+		return rf(ctx, visitorName, search, verifyStatus, labels, per, page, exactMatch)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, []string, int, int) []*types.User); ok {
-		r0 = rf(ctx, visitorName, search, verifyStatus, labels, per, page)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, []string, int, int, bool) []*types.User); ok {
+		r0 = rf(ctx, visitorName, search, verifyStatus, labels, per, page, exactMatch)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]*types.User)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, []string, int, int) int); ok {
-		r1 = rf(ctx, visitorName, search, verifyStatus, labels, per, page)
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, []string, int, int, bool) int); ok {
+		r1 = rf(ctx, visitorName, search, verifyStatus, labels, per, page, exactMatch)
 	} else {
 		r1 = ret.Get(1).(int)
 	}
 
-	if rf, ok := ret.Get(2).(func(context.Context, string, string, string, []string, int, int) error); ok {
-		r2 = rf(ctx, visitorName, search, verifyStatus, labels, per, page)
+	if rf, ok := ret.Get(2).(func(context.Context, string, string, string, []string, int, int, bool) error); ok {
+		r2 = rf(ctx, visitorName, search, verifyStatus, labels, per, page, exactMatch)
 	} else {
 		r2 = ret.Error(2)
 	}
@@ -883,13 +883,14 @@ type MockUserComponent_Index_Call struct {
 //   - labels []string
 //   - per int
 //   - page int
-func (_e *MockUserComponent_Expecter) Index(ctx interface{}, visitorName interface{}, search interface{}, verifyStatus interface{}, labels interface{}, per interface{}, page interface{}) *MockUserComponent_Index_Call {
-	return &MockUserComponent_Index_Call{Call: _e.mock.On("Index", ctx, visitorName, search, verifyStatus, labels, per, page)}
+//   - exactMatch bool
+func (_e *MockUserComponent_Expecter) Index(ctx interface{}, visitorName interface{}, search interface{}, verifyStatus interface{}, labels interface{}, per interface{}, page interface{}, exactMatch interface{}) *MockUserComponent_Index_Call {
+	return &MockUserComponent_Index_Call{Call: _e.mock.On("Index", ctx, visitorName, search, verifyStatus, labels, per, page, exactMatch)}
 }
 
-func (_c *MockUserComponent_Index_Call) Run(run func(ctx context.Context, visitorName string, search string, verifyStatus string, labels []string, per int, page int)) *MockUserComponent_Index_Call {
+func (_c *MockUserComponent_Index_Call) Run(run func(ctx context.Context, visitorName string, search string, verifyStatus string, labels []string, per int, page int, exactMatch bool)) *MockUserComponent_Index_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string), args[4].([]string), args[5].(int), args[6].(int))
+		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string), args[4].([]string), args[5].(int), args[6].(int), args[7].(bool))
 	})
 	return _c
 }
@@ -899,7 +900,7 @@ func (_c *MockUserComponent_Index_Call) Return(_a0 []*types.User, _a1 int, _a2 e
 	return _c
 }
 
-func (_c *MockUserComponent_Index_Call) RunAndReturn(run func(context.Context, string, string, string, []string, int, int) ([]*types.User, int, error)) *MockUserComponent_Index_Call {
+func (_c *MockUserComponent_Index_Call) RunAndReturn(run func(context.Context, string, string, string, []string, int, int, bool) ([]*types.User, int, error)) *MockUserComponent_Index_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -15,7 +16,7 @@ import (
 // Define the UserStore interface
 type UserStore interface {
 	Index(ctx context.Context) ([]User, error)
-	IndexWithSearch(ctx context.Context, search, verifyStatus string, labels []string, per, page int) ([]User, int, error)
+	IndexWithSearch(ctx context.Context, search, verifyStatus string, labels []string, per, page int, exactMatch bool) ([]User, int, error)
 	FindByUsername(ctx context.Context, username string) (User, error)
 	FindByEmail(ctx context.Context, email string) (User, error)
 	// Update write the user data back to db. odlUserName should not be empty if username changed
@@ -37,6 +38,8 @@ type UserStore interface {
 	IsExistWithDeleted(ctx context.Context, username string) (bool, error)
 	GetEmails(ctx context.Context, per, page int) ([]string, int, error)
 	GetUserUUIDs(ctx context.Context, per, page int) ([]string, int, error)
+	UpdatePhone(ctx context.Context, userID int64, phone string, phoneArea string) error
+	IndexWithCursor(ctx context.Context, req types.UserIndexReq) (ch chan Wrapper, err error)
 }
 
 // Implement the UserStore interface in UserStoreImpl
@@ -107,6 +110,11 @@ type User struct {
 	times
 }
 
+type Wrapper struct {
+	Users []User `json:"users"`
+	Err   error  `json:"error"`
+}
+
 func (u *User) Roles() []string {
 	if len(u.RoleMask) == 0 {
 		return []string{}
@@ -129,12 +137,15 @@ func (s *UserStoreImpl) Index(ctx context.Context) (users []User, err error) {
 	return users, errorx.HandleDBError(err, nil)
 }
 
-func (s *UserStoreImpl) IndexWithSearch(ctx context.Context, search, verifyStatus string, labels []string, per, page int) (users []User, count int, err error) {
-	search = strings.ToLower(search)
+func (s *UserStoreImpl) IndexWithSearch(ctx context.Context, search, verifyStatus string, labels []string, per, page int, exactMatch bool) (users []User, count int, err error) {
 	query := s.db.Operator.Core.NewSelect().
 		Model(&users)
 	if search != "" {
-		query.Where("LOWER(username) like ? OR LOWER(email) like ?", fmt.Sprintf("%%%s%%", search), fmt.Sprintf("%%%s%%", search))
+		if exactMatch {
+			query.Where("LOWER(username) = ? OR LOWER(email) = ? OR phone = ?", strings.ToLower(search), strings.ToLower(search), search)
+		} else {
+			query.Where("LOWER(username) like ? OR LOWER(email) like ? OR phone like ?", fmt.Sprintf("%%%s%%", strings.ToLower(search)), fmt.Sprintf("%%%s%%", strings.ToLower(search)), fmt.Sprintf("%%%s%%", search))
+		}
 	}
 	if verifyStatus != "" {
 		query.Where("verify_status = ?", verifyStatus)
@@ -582,4 +593,92 @@ func (s *UserStoreImpl) GetUserUUIDs(ctx context.Context, per, page int) (uuids 
 		return nil, 0, errorx.HandleDBError(err, nil)
 	}
 	return uuids, count, nil
+}
+
+func (s *UserStoreImpl) UpdatePhone(ctx context.Context, userID int64, phone string, phoneArea string) error {
+	_, err := s.db.Operator.Core.
+		NewUpdate().
+		Model(&User{}).
+		Set("phone = ?", phone).
+		Set("phone_area = ?", phoneArea).
+		Where("id = ?", userID).
+		Exec(ctx)
+	return errorx.HandleDBError(err, nil)
+}
+
+func (s *UserStoreImpl) IndexWithCursor(ctx context.Context, req types.UserIndexReq) (chan Wrapper, error) {
+	batchSize := req.Per
+	if batchSize == 0 {
+		batchSize = 100
+	}
+
+	result := make(chan Wrapper)
+	go func() {
+		defer close(result)
+		err := s.db.RunInTx(ctx, func(ctx context.Context, tx Operator) error {
+			query := tx.Core.NewSelect().Model(&User{})
+			if req.Search != "" {
+				query.Where("LOWER(username) like ? OR LOWER(email) like ? OR phone like ?",
+					fmt.Sprintf("%%%s%%", strings.ToLower(req.Search)),
+					fmt.Sprintf("%%%s%%", strings.ToLower(req.Search)),
+					fmt.Sprintf("%%%s%%", req.Search),
+				)
+			}
+
+			if req.VerifyStatus != "" {
+				query.Where("verify_status = ?", req.VerifyStatus)
+			}
+
+			if len(req.Labels) != 0 {
+				labelsJSON, err := json.Marshal(req.Labels)
+				if err != nil {
+					return fmt.Errorf("failed to marshal labels: %w, %w", err, errorx.ErrInternalServerError)
+				}
+				query.Where("labels @> ?", string(labelsJSON))
+			}
+			query.Order("id ASC")
+
+			sqlStr := query.String()
+			if _, err := tx.Core.ExecContext(ctx, fmt.Sprintf("DECLARE user_cursor CURSOR WITH HOLD FOR %s", sqlStr)); err != nil {
+				slog.Error("failed to declare user cursor", "error", err)
+				return errorx.ErrInternalServerError
+			}
+
+			for {
+				select {
+				case <-ctx.Done():
+					return nil
+				default:
+				}
+				rows, err := tx.Core.QueryContext(ctx, fmt.Sprintf("FETCH FORWARD %d FROM user_cursor", batchSize))
+				if err != nil {
+					return err
+				}
+
+				var batch []User
+				if err := s.db.BunDB.ScanRows(ctx, rows, &batch); err != nil {
+					return err
+				}
+
+				if len(batch) == 0 {
+					break
+				}
+
+				result <- Wrapper{Users: batch}
+			}
+
+			if _, err := tx.Core.ExecContext(ctx, `CLOSE user_cursor`); err != nil {
+				return err
+			}
+
+			return nil
+		})
+
+		if err != nil {
+			slog.Error("failed to index users with cursor", "error", err)
+			result <- Wrapper{Err: err}
+		}
+	}()
+
+	return result, nil
 }
