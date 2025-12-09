@@ -44,5 +44,8 @@ db_rollback:
 error_doc:
 	@go run cmd/csghub-server/main.go errorx doc-gen
 
+error_scan:
+	@go run cmd/csghub-server/main.go errorx scan --dir $(dir) -v
+
 notify_gen:
 	@go run cmd/csghub-server/main.go notification notify-gen -l Info
