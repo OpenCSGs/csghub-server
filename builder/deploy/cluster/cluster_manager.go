@@ -448,10 +448,6 @@ func getXPULabel(labels map[string]string, config *config.Config) (string, strin
 		//for nvidia gpu product label
 		return "nvidia.com/gpu", "nvidia.com/gpu.product", "nvidia.com/gpu.mem"
 	}
-	if _, found := labels["nvidia.com/gpu.product"]; found {
-		//for nvidia gpu product label
-		return "nvidia.com/gpu", "nvidia.com/gpu.product"
-	}
 	if _, found := labels["kubemore_xpu_type"]; found {
 		//for huawei gpu
 		return "huawei.com/Ascend910", "kubemore_xpu_type", "kubemore_xpu_mem"
