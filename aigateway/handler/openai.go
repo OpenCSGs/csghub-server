@@ -47,16 +47,17 @@ func NewOpenAIHandlerFromConfig(config *config.Config) (OpenAIHandler, error) {
 		return nil, err
 	}
 	var modSvcClient rpc.ModerationSvcClient
+	var cacheClient cache.RedisClient
 	if config.SensitiveCheck.Enable {
 		modSvcClient = rpc.NewModerationSvcHttpClient(fmt.Sprintf("%s:%d", config.Moderation.Host, config.Moderation.Port))
-	}
-	cacheClient, err := cache.NewCache(context.Background(), cache.RedisConfig{
-		Addr:     config.Redis.Endpoint,
-		Username: config.Redis.User,
-		Password: config.Redis.Password,
-	})
-	if err != nil {
-		return nil, err
+		cacheClient, err = cache.NewCache(context.Background(), cache.RedisConfig{
+			Addr:     config.Redis.Endpoint,
+			Username: config.Redis.User,
+			Password: config.Redis.Password,
+		})
+		if err != nil {
+			return nil, err
+		}
 	}
 	modComponent := component.NewModerationImplWithClient(modSvcClient, cacheClient)
 	clusterComp, err := apicomp.NewClusterComponent(config)
@@ -199,15 +200,14 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 	c.Request.Body = io.NopCloser(bytes.NewReader(bodyBytes))
 	c.Request.ContentLength = int64(len(bodyBytes))
 
-	if err := json.Unmarshal(bodyBytes, chatReq); err != nil {
+	if err = json.Unmarshal(bodyBytes, chatReq); err != nil {
 		slog.Error("failed to parse request body", "error", err.Error())
 		c.String(http.StatusBadRequest, fmt.Errorf("invalid chat compoletion request body:%w", err).Error())
 		return
 	}
 
 	validate := validator.New()
-	err = validate.Struct(chatReq)
-	if err != nil {
+	if err = validate.Struct(chatReq); err != nil {
 		slog.Error("invalid chat compoletion request body", "error", err.Error())
 		c.String(http.StatusBadRequest, fmt.Errorf("invalid chat compoletion request body:%w", err).Error())
 		return
@@ -266,7 +266,7 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 	}
 
 	var reqMap map[string]interface{}
-	if err := json.Unmarshal(bodyBytes, &reqMap); err != nil {
+	if err = json.Unmarshal(bodyBytes, &reqMap); err != nil {
 		slog.Error("failed to unmarshal request body to map", "error", err)
 		c.String(http.StatusBadRequest, fmt.Errorf("invalid chat completion request body: %w", err).Error())
 		return
@@ -293,40 +293,33 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 
 	c.Request.Body = io.NopCloser(bytes.NewReader(updatedBodyBytes))
 	c.Request.ContentLength = int64(len(updatedBodyBytes))
+	rp, _ := proxy.NewReverseProxy(target)
 	slog.Info("proxy chat request to model target", slog.Any("target", target), slog.Any("host", host),
 		slog.Any("user", username), slog.Any("model_name", modelName))
-	rp, _ := proxy.NewReverseProxy(target)
-	w := NewResponseWriterWrapper(c.Writer, chatReq.Stream)
+	w := NewResponseWriterWrapper(c.Writer, chatReq.Stream, h.modComponent)
 	defer w.ClearBuffer()
-	if h.modSvcClient != nil {
-		w.WithModeration(h.modSvcClient)
-	}
 	tokenizer := token.NewTokenizerImpl(target, host, modelName, model.ImageID)
 	llmTokenCounter := token.NewLLMTokenCounter(tokenizer)
-	for _, msg := range chatReq.Messages {
-		if h.modSvcClient != nil {
-			content := msg.GetContent().AsAny()
-			msgContent, ok := content.(*string)
-			if !ok {
-				break
-			}
-			result, err := h.modComponent.CheckLLMPrompt(c.Request.Context(), *msgContent, userUUID+modelID)
-			if err != nil {
-				c.String(http.StatusInternalServerError, fmt.Errorf("failed to call moderation error:%w", err).Error())
-				return
-			}
-			if result.IsSensitive {
-				slog.Debug("sensitive content", slog.String("reason", result.Reason))
-				errorChunk := generateSensitiveRespForPrompt()
-				errorChunkJson, _ := json.Marshal(errorChunk)
-				_, err := c.Writer.Write([]byte("data: " + string(errorChunkJson) + "\n\n" + "[DONE]"))
-				if err != nil {
-					slog.Error("write into resp error:", slog.String("err", err.Error()))
-				}
-				c.Writer.Flush()
-				return
-			}
+	// Create a combined key using userUUID and modelID for caching and tracking
+	key := fmt.Sprintf("%s:%s", userUUID, modelID)
+	result, err := h.modComponent.CheckChatPrompts(c.Request.Context(), chatReq.Messages, key)
+	if err != nil {
+		c.String(http.StatusInternalServerError, fmt.Errorf("failed to call moderation error:%w", err).Error())
+		return
+	}
+	if result.IsSensitive {
+		slog.Debug("sensitive content", slog.String("reason", result.Reason))
+		errorChunk := generateSensitiveRespForPrompt()
+		errorChunkJson, _ := json.Marshal(errorChunk)
+		_, err := c.Writer.Write([]byte("data: " + string(errorChunkJson) + "\n\n" + "[DONE]"))
+		if err != nil {
+			slog.Error("write into resp error:", slog.String("err", err.Error()))
 		}
+		c.Writer.Flush()
+		return
+	}
+
+	for _, msg := range chatReq.Messages {
 		llmTokenCounter.AppendPrompts(types.Message{
 			Role:    *msg.GetRole(),
 			Content: msg.GetContent().AsAny().(*string),

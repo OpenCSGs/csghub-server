@@ -11,11 +11,10 @@ import (
 	"github.com/openai/openai-go/v3"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	mock_rpc "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rpc"
+	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/aigateway/component"
 	"opencsg.com/csghub-server/aigateway/types"
 	"opencsg.com/csghub-server/builder/compress"
 	"opencsg.com/csghub-server/builder/rpc"
-	"opencsg.com/csghub-server/builder/sensitive"
 )
 
 func TestNonStreamResponseWriter_Write(t *testing.T) {
@@ -25,8 +24,8 @@ func TestNonStreamResponseWriter_Write(t *testing.T) {
 		// Prepare test data
 		w := httptest.NewRecorder()
 		ctx, _ := gin.CreateTestContext(w)
-		nsw := newNonStreamResponseWriter(ctx.Writer)
-
+		modComponent := component.NewMockModeration(t)
+		nsw := newNonStreamResponseWriter(ctx.Writer, modComponent)
 		// Execute write operation
 		data := []byte("Hello, World!")
 		n, err := nsw.Write(data)
@@ -41,7 +40,8 @@ func TestNonStreamResponseWriter_Write(t *testing.T) {
 		w := httptest.NewRecorder()
 		w.Header().Set("Content-Encoding", "")
 		ctx, _ := gin.CreateTestContext(w)
-		nsw := newNonStreamResponseWriter(ctx.Writer)
+		modComponent := component.NewMockModeration(t)
+		nsw := newNonStreamResponseWriter(ctx.Writer, modComponent)
 
 		// Create valid ChatCompletion data
 		completion := types.ChatCompletion{
@@ -55,8 +55,12 @@ func TestNonStreamResponseWriter_Write(t *testing.T) {
 				},
 			},
 		}
-		data, _ := json.Marshal(completion)
 
+		data, _ := json.Marshal(completion)
+		var expectCompletion types.ChatCompletion
+		_ = json.Unmarshal(data, &expectCompletion)
+
+		modComponent.EXPECT().CheckChatNonStreamResponse(mock.Anything, expectCompletion).Return(&rpc.CheckResult{IsSensitive: false}, nil)
 		// Execute write operation
 		n, err := nsw.Write(data)
 
@@ -70,7 +74,8 @@ func TestNonStreamResponseWriter_Write(t *testing.T) {
 		w := httptest.NewRecorder()
 		w.Header().Set("Content-Encoding", "")
 		ctx, _ := gin.CreateTestContext(w)
-		nsw := newNonStreamResponseWriter(ctx.Writer)
+		mockMod := component.NewMockModeration(t)
+		nsw := newNonStreamResponseWriter(ctx.Writer, mockMod)
 
 		// Create valid ChatCompletion data without choices
 		completion := types.ChatCompletion{
@@ -97,11 +102,8 @@ func TestNonStreamResponseWriter_WithModeration(t *testing.T) {
 		w := httptest.NewRecorder()
 		w.Header().Set("Content-Encoding", "")
 		ctx, _ := gin.CreateTestContext(w)
-		nsw := newNonStreamResponseWriter(ctx.Writer)
-
-		// Create mock moderation client
-		mockMod := mock_rpc.NewMockModerationSvcClient(t)
-		nsw.WithModeration(mockMod)
+		mockMod := component.NewMockModeration(t)
+		nsw := newNonStreamResponseWriter(ctx.Writer, mockMod)
 
 		// Create valid ChatCompletion data
 		completion := types.ChatCompletion{
@@ -115,10 +117,12 @@ func TestNonStreamResponseWriter_WithModeration(t *testing.T) {
 				},
 			},
 		}
-		mockMod.EXPECT().PassTextCheck(mock.Anything, string(sensitive.ScenarioChatDetection), completion.Choices[0].Message.Content).
-			Return(&rpc.CheckResult{IsSensitive: true}, nil)
-		data, _ := json.Marshal(completion)
 
+		data, _ := json.Marshal(completion)
+		var expectCompletion types.ChatCompletion
+		_ = json.Unmarshal(data, &expectCompletion)
+		mockMod.EXPECT().CheckChatNonStreamResponse(mock.Anything, expectCompletion).
+			Return(&rpc.CheckResult{IsSensitive: true}, nil)
 		// Execute write operation
 		n, err := nsw.Write(data)
 
@@ -132,11 +136,8 @@ func TestNonStreamResponseWriter_WithModeration(t *testing.T) {
 		w := httptest.NewRecorder()
 		w.Header().Set("Content-Encoding", "")
 		ctx, _ := gin.CreateTestContext(w)
-		nsw := newNonStreamResponseWriter(ctx.Writer)
-
-		// Create mock moderation client
-		mockMod := mock_rpc.NewMockModerationSvcClient(t)
-		nsw.WithModeration(mockMod)
+		mockMod := component.NewMockModeration(t)
+		nsw := newNonStreamResponseWriter(ctx.Writer, mockMod)
 
 		// Create valid ChatCompletion data
 		completion := types.ChatCompletion{
@@ -151,7 +152,9 @@ func TestNonStreamResponseWriter_WithModeration(t *testing.T) {
 			},
 		}
 		data, _ := json.Marshal(completion)
-		mockMod.EXPECT().PassTextCheck(mock.Anything, string(sensitive.ScenarioChatDetection), completion.Choices[0].Message.Content).
+		var expectCompletion types.ChatCompletion
+		_ = json.Unmarshal(data, &expectCompletion)
+		mockMod.EXPECT().CheckChatNonStreamResponse(mock.Anything, expectCompletion).
 			Return(nil, errors.New("some error"))
 
 		// Execute write operation
@@ -171,7 +174,8 @@ func TestNonStreamResponseWriter_compressedData(t *testing.T) {
 		w := httptest.NewRecorder()
 		w.Header().Set("Content-Encoding", "gzip")
 		ctx, _ := gin.CreateTestContext(w)
-		nsw := newNonStreamResponseWriter(ctx.Writer)
+		mockMod := component.NewMockModeration(t)
+		nsw := newNonStreamResponseWriter(ctx.Writer, mockMod)
 
 		// Create valid ChatCompletion data and compress
 		completion := types.ChatCompletion{
@@ -188,7 +192,10 @@ func TestNonStreamResponseWriter_compressedData(t *testing.T) {
 		jsonData, _ := json.Marshal(completion)
 		compressedData, err := compress.Encode("gzip", jsonData)
 		require.NoError(t, err)
-
+		var expectCompletion types.ChatCompletion
+		_ = json.Unmarshal(jsonData, &expectCompletion)
+		mockMod.EXPECT().CheckChatNonStreamResponse(mock.Anything, expectCompletion).
+			Return(&rpc.CheckResult{IsSensitive: false}, nil)
 		// Execute write operation
 		n, err := nsw.Write(compressedData)
 
@@ -202,7 +209,7 @@ func TestNonStreamResponseWriter_compressedData(t *testing.T) {
 		w := httptest.NewRecorder()
 		w.Header().Set("Content-Encoding", "gzip")
 		ctx, _ := gin.CreateTestContext(w)
-		nsw := newNonStreamResponseWriter(ctx.Writer)
+		nsw := newNonStreamResponseWriter(ctx.Writer, component.NewMockModeration(t))
 
 		// Create valid ChatCompletion data and compress
 		completion := types.ChatCompletion{
@@ -231,11 +238,8 @@ func TestNonStreamResponseWriter_compressedData(t *testing.T) {
 		w := httptest.NewRecorder()
 		w.Header().Set("Content-Encoding", "gzip")
 		ctx, _ := gin.CreateTestContext(w)
-		nsw := newNonStreamResponseWriter(ctx.Writer)
-
-		// Create mock moderation client
-		mockMod := mock_rpc.NewMockModerationSvcClient(t)
-		nsw.WithModeration(mockMod)
+		mockMod := component.NewMockModeration(t)
+		nsw := newNonStreamResponseWriter(ctx.Writer, mockMod)
 
 		// Create valid ChatCompletion data and compress
 		completion := types.ChatCompletion{
@@ -252,7 +256,9 @@ func TestNonStreamResponseWriter_compressedData(t *testing.T) {
 		jsonData, _ := json.Marshal(completion)
 		compressedData, err := compress.Encode("gzip", jsonData)
 		require.NoError(t, err)
-		mockMod.EXPECT().PassTextCheck(mock.Anything, string(sensitive.ScenarioChatDetection), completion.Choices[0].Message.Content).
+		var expectCompletion types.ChatCompletion
+		_ = json.Unmarshal(jsonData, &expectCompletion)
+		mockMod.EXPECT().CheckChatNonStreamResponse(mock.Anything, expectCompletion).
 			Return(&rpc.CheckResult{IsSensitive: true}, nil)
 
 		// Execute write operation
@@ -272,7 +278,8 @@ func TestNonStreamResponseWriter_multipleWrites(t *testing.T) {
 		w := httptest.NewRecorder()
 		w.Header().Set("Content-Encoding", "")
 		ctx, _ := gin.CreateTestContext(w)
-		nsw := newNonStreamResponseWriter(ctx.Writer)
+		mockMod := component.NewMockModeration(t)
+		nsw := newNonStreamResponseWriter(ctx.Writer, mockMod)
 
 		// Create valid ChatCompletion data
 		completion := types.ChatCompletion{
@@ -287,6 +294,10 @@ func TestNonStreamResponseWriter_multipleWrites(t *testing.T) {
 			},
 		}
 		data, _ := json.Marshal(completion)
+		var expectCompletion types.ChatCompletion
+		_ = json.Unmarshal(data, &expectCompletion)
+		mockMod.EXPECT().CheckChatNonStreamResponse(mock.Anything, expectCompletion).
+			Return(&rpc.CheckResult{IsSensitive: false}, nil)
 
 		// Execute multiple write operations
 		for i := 0; i < 3; i++ {
@@ -305,7 +316,7 @@ func TestNonStreamResponseWriter_ClearBuffer(t *testing.T) {
 		// Prepare test data
 		w := httptest.NewRecorder()
 		ctx, _ := gin.CreateTestContext(w)
-		nsw := newNonStreamResponseWriter(ctx.Writer)
+		nsw := newNonStreamResponseWriter(ctx.Writer, component.NewMockModeration(t))
 
 		// Write some data without triggering processing
 		data := []byte("incomplete data")
@@ -327,7 +338,7 @@ func TestNonStreamResponseWriter_HeaderAndWriteHeader(t *testing.T) {
 		// Prepare test data
 		w := httptest.NewRecorder()
 		ctx, _ := gin.CreateTestContext(w)
-		nsw := newNonStreamResponseWriter(ctx.Writer)
+		nsw := newNonStreamResponseWriter(ctx.Writer, component.NewMockModeration(t))
 
 		// Test Header method
 		header := nsw.Header()
