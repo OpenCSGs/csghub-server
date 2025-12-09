@@ -93,6 +93,9 @@ func (c *gitHTTPComponentImpl) InfoRefs(ctx context.Context, req types.InfoRefsR
 		if !allowed {
 			return nil, errorx.ErrForbidden
 		}
+		if repo.XnetEnabled {
+			return nil, errorx.ErrUsingGitInXnetRepository
+		}
 	} else {
 		if repo.Private {
 			allowed, err := c.repoComponent.AllowReadAccess(ctx, req.RepoType, req.Namespace, req.Name, req.CurrentUser)
