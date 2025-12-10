@@ -7,12 +7,19 @@ import (
 )
 
 func Request() gin.HandlerFunc {
-	return func(ctx *gin.Context) {
-		ctx.Set("clientIP", ctx.ClientIP())
-		reqCtx := context.WithValue(ctx.Request.Context(), "clientIP", ctx.ClientIP())
-		ctx.Request = ctx.Request.WithContext(reqCtx)
-		traceID := trace.GetOrGenTraceID(ctx)
-		ctx.Writer.Header().Set(trace.HeaderRequestID, traceID)
-		ctx.Next()
+	return func(c *gin.Context) {
+		c.Set("clientIP", c.ClientIP())
+		reqCtx := context.WithValue(c.Request.Context(), "clientIP", c.ClientIP())
+		c.Request = c.Request.WithContext(reqCtx)
+		traceID := trace.GetOrGenTraceID(c)
+		c.Writer.Header().Set(trace.HeaderRequestID, traceID)
+
+		sessionID := c.GetHeader(trace.HeaderXetSessionID)
+		if sessionID != "" {
+			ctx := trace.SetSessionIDInContext(c.Request.Context(), sessionID)
+			c.Request = c.Request.WithContext(ctx)
+		}
+
+		c.Next()
 	}
 }

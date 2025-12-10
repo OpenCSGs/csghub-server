@@ -75,7 +75,7 @@ func (h *SpaceHandler) Index(ctx *gin.Context) {
 	repoFilter.Username = httpbase.GetCurrentUser(ctx)
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -87,7 +87,7 @@ func (h *SpaceHandler) Index(ctx *gin.Context) {
 				Set("param", "sort").
 				Set("provided", repoFilter.Sort).
 				Set("allowed", types.Sorts))
-		slog.Error("Bad request format,", slog.String("error", msg))
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format,", slog.String("error", msg))
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
@@ -98,7 +98,7 @@ func (h *SpaceHandler) Index(ctx *gin.Context) {
 				Set("param", "source").
 				Set("provided", repoFilter.Source).
 				Set("allowed", types.Sources))
-		slog.Error("Bad request format,", slog.String("error", msg))
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format,", slog.String("error", msg))
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
@@ -110,7 +110,7 @@ func (h *SpaceHandler) Index(ctx *gin.Context) {
 	}
 	spaces, total, err := h.space.Index(ctx.Request.Context(), repoFilter, per, page, needOpWeight)
 	if err != nil {
-		slog.Error("Failed to get spaces", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get spaces", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -152,7 +152,7 @@ func (h *SpaceHandler) Show(ctx *gin.Context) {
 			httpbase.UnauthorizedError(ctx, err)
 			return
 		}
-		slog.Error("Failed to get space detail", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get space detail", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -177,7 +177,7 @@ func (h *SpaceHandler) Create(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	var req types.CreateSpaceReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -188,7 +188,7 @@ func (h *SpaceHandler) Create(ctx *gin.Context) {
 
 	_, err := h.sensitive.CheckRequestV2(ctx.Request.Context(), &req)
 	if err != nil {
-		slog.Error("failed to check sensitive request", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
 		return
 	}
@@ -200,7 +200,7 @@ func (h *SpaceHandler) Create(ctx *gin.Context) {
 		} else if errors.Is(err, errorx.ErrDatabaseDuplicateKey) {
 			httpbase.BadRequestWithExt(ctx, err)
 		} else {
-			slog.Error("Failed to create space", slog.Any("error", err))
+			slog.ErrorContext(ctx.Request.Context(), "Failed to create space", slog.Any("error", err))
 			httpbase.ServerError(ctx, err)
 		}
 		return
@@ -227,13 +227,13 @@ func (h *SpaceHandler) Update(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	var req *types.UpdateSpaceReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	_, err := h.sensitive.CheckRequestV2(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("failed to check sensitive request", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
 		return
 	}
@@ -241,7 +241,7 @@ func (h *SpaceHandler) Update(ctx *gin.Context) {
 
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -250,7 +250,7 @@ func (h *SpaceHandler) Update(ctx *gin.Context) {
 
 	space, err := h.space.Update(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("Failed to update space", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to update space", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -277,13 +277,13 @@ func (h *SpaceHandler) Delete(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	err = h.space.Delete(ctx.Request.Context(), namespace, name, currentUser)
 	if err != nil {
-		slog.Error("Failed to delete space", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to delete space", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -308,13 +308,13 @@ func (h *SpaceHandler) Run(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("failed to get namespace from context", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "failed to get namespace from context", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	allow, err := h.repo.AllowAdminAccess(ctx.Request.Context(), types.SpaceRepo, namespace, name, currentUser)
 	if err != nil {
-		slog.Error("failed to check user permission", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "failed to check user permission", "error", err)
 		httpbase.ServerError(ctx, errors.New("failed to check user permission"))
 		return
 	}
@@ -326,7 +326,7 @@ func (h *SpaceHandler) Run(ctx *gin.Context) {
 	}
 	deployID, err := h.space.Deploy(ctx.Request.Context(), namespace, name, currentUser)
 	if err != nil {
-		slog.Error("failed to deploy space", slog.String("namespace", namespace),
+		slog.ErrorContext(ctx.Request.Context(), "failed to deploy space", slog.String("namespace", namespace),
 			slog.String("name", name), slog.Any("error", err))
 		if errors.Is(err, errorx.ErrNoEntryFile) {
 			httpbase.BadRequestWithExt(ctx, err)
@@ -355,13 +355,13 @@ func (h *SpaceHandler) Run(ctx *gin.Context) {
 func (h *SpaceHandler) Wakeup(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("failed to get namespace from context", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "failed to get namespace from context", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	err = h.space.Wakeup(ctx.Request.Context(), namespace, name)
 	if err != nil {
-		slog.Error("failed to wakeup space", slog.String("namespace", namespace),
+		slog.ErrorContext(ctx.Request.Context(), "failed to wakeup space", slog.String("namespace", namespace),
 			slog.String("name", name), slog.Any("error", err))
 		if errors.Is(err, sql.ErrNoRows) {
 			httpbase.NotFoundError(ctx, err)
@@ -392,13 +392,13 @@ func (h *SpaceHandler) Stop(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("failed to get namespace from context", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "failed to get namespace from context", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	allow, err := h.repo.AllowAdminAccess(ctx.Request.Context(), types.SpaceRepo, namespace, name, currentUser)
 	if err != nil {
-		slog.Error("failed to check user permission", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "failed to check user permission", "error", err)
 		httpbase.ServerError(ctx, errors.New("failed to check user permission"))
 		return
 	}
@@ -411,7 +411,7 @@ func (h *SpaceHandler) Stop(ctx *gin.Context) {
 
 	err = h.space.Stop(ctx.Request.Context(), namespace, name, false)
 	if err != nil {
-		slog.Error("failed to stop space", slog.String("namespace", namespace),
+		slog.ErrorContext(ctx.Request.Context(), "failed to stop space", slog.String("namespace", namespace),
 			slog.String("name", name), slog.Any("error", err))
 		if errors.Is(err, sql.ErrNoRows) {
 			httpbase.NotFoundError(ctx, err)
@@ -448,7 +448,7 @@ func (h *SpaceHandler) Status(ctx *gin.Context) {
 
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("failed to get namespace from context", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "failed to get namespace from context", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -456,7 +456,7 @@ func (h *SpaceHandler) Status(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	allow, err := h.repo.AllowReadAccess(ctx.Request.Context(), types.SpaceRepo, namespace, name, currentUser)
 	if err != nil {
-		slog.Error("failed to check user permission", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "failed to check user permission", "error", err)
 		httpbase.ServerError(ctx, errors.New("failed to check user permission"))
 		return
 	}
@@ -489,11 +489,11 @@ func (h *SpaceHandler) Status(ctx *gin.Context) {
 			_, status, err := h.space.Status(ctx.Request.Context(), namespace, name)
 			if err != nil {
 				if deadline, ok := ctx.Request.Context().Deadline(); ok {
-					slog.Error("failed to get space status in stream", slog.Any("error", err),
+					slog.ErrorContext(ctx.Request.Context(), "failed to get space status in stream", slog.Any("error", err),
 						slog.String("namespace", namespace), slog.String("name", name),
 						slog.Any("deadline", time.Until(deadline)))
 				} else {
-					slog.Error("failed to get space status in stream", slog.Any("error", err),
+					slog.ErrorContext(ctx.Request.Context(), "failed to get space status in stream", slog.Any("error", err),
 						slog.String("namespace", namespace), slog.String("name", name))
 				}
 				ctx.SSEvent("error", err.Error())
@@ -557,7 +557,7 @@ func (h *SpaceHandler) Logs(ctx *gin.Context) {
 	since := ctx.Query("since")
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("failed to get namespace from context", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "failed to get namespace from context", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -565,7 +565,7 @@ func (h *SpaceHandler) Logs(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	allow, err := h.repo.AllowReadAccess(ctx.Request.Context(), types.SpaceRepo, namespace, name, currentUser)
 	if err != nil {
-		slog.Error("failed to check user permission", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "failed to check user permission", "error", err)
 		httpbase.ServerError(ctx, errors.New("failed to check user permission"))
 		return
 	}
@@ -586,13 +586,13 @@ func (h *SpaceHandler) Logs(ctx *gin.Context) {
 	logReader, err := h.space.Logs(ctx.Request.Context(), namespace, name, since)
 	if err != nil {
 		if deadline, ok := ctx.Request.Context().Deadline(); ok {
-			slog.Error("failed to get space logs",
+			slog.ErrorContext(ctx.Request.Context(), "failed to get space logs",
 				slog.Any("error", err),
 				slog.String("namespace", namespace), slog.String("name", name),
 				slog.Any("deadline", time.Until(deadline)), slog.Bool("ok", ok),
 			)
 		} else {
-			slog.Error("failed to get space logs",
+			slog.ErrorContext(ctx.Request.Context(), "failed to get space logs",
 				slog.Any("error", err),
 				slog.String("namespace", namespace), slog.String("name", name),
 			)

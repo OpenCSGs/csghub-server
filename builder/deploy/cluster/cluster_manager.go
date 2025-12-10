@@ -12,6 +12,7 @@ import (
 	"time"
 
 	argo "github.com/argoproj/argo-workflows/v3/pkg/client/clientset/versioned"
+	units "github.com/dustin/go-humanize"
 	authorizationv1 "k8s.io/api/authorization/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -338,10 +339,18 @@ func (cluster *Cluster) GetResourcesInCluster(config *config.Config) (map[string
 		allocatableCPU := node.Status.Allocatable.Cpu().DeepCopy()
 		totalXPU := resource.Quantity{}
 		allocatableXPU := resource.Quantity{}
-		xpuCapacityLabel, xpuTypeLabel := getXPULabel(node.Labels, config)
+		xpuCapacityLabel, xpuTypeLabel, xpuMemLabel := getXPULabel(node.Labels, config)
 		if xpuCapacityLabel != "" {
 			totalXPU = node.Status.Capacity[v1.ResourceName(xpuCapacityLabel)]
 			allocatableXPU = node.Status.Allocatable[v1.ResourceName(xpuCapacityLabel)]
+		}
+
+		bigXPUMem := ""
+		if xpuMemLabel != "" {
+			ulimit, err := units.ParseBigBytes(node.Labels[xpuMemLabel])
+			if err == nil {
+				bigXPUMem = units.BigIBytes(ulimit)
+			}
 		}
 
 		gpuModelVendor, gpuModel := getGpuTypeAndVendor(node.Labels[xpuTypeLabel], xpuCapacityLabel)
@@ -357,6 +366,7 @@ func (cluster *Cluster) GetResourcesInCluster(config *config.Config) (map[string
 			AvailableXPU: parseQuantityToInt64(allocatableXPU),
 
 			XPUCapacityLabel: xpuCapacityLabel,
+			XPUMem:           bigXPUMem,
 		}
 	}
 
@@ -417,50 +427,50 @@ func getGpuTypeAndVendor(vendorType string, label string) (string, string) {
 }
 
 // the first label is the xpu capacity label, the second is the gpu model label
-func getXPULabel(labels map[string]string, config *config.Config) (string, string) {
+func getXPULabel(labels map[string]string, config *config.Config) (string, string, string) {
 	if _, found := labels["aliyun.accelerator/nvidia_name"]; found {
 		//for default cluster
-		return "nvidia.com/gpu", "aliyun.accelerator/nvidia_name"
+		return "nvidia.com/gpu", "aliyun.accelerator/nvidia_name", "aliyun.accelerator/nvidia_mem"
 	}
 	if _, found := labels["machine.cluster.vke.volcengine.com/gpu-name"]; found {
 		//for volcano cluster
-		return "nvidia.com/gpu", "machine.cluster.vke.volcengine.com/gpu-name"
+		return "nvidia.com/gpu", "machine.cluster.vke.volcengine.com/gpu-name", "machine.cluster.vke.volcengine.com/gpu-mem"
 	}
 	if _, found := labels["eks.tke.cloud.tencent.com/gpu-type"]; found {
 		//for tencent cluster
-		return "nvidia.com/gpu", "eks.tke.cloud.tencent.com/gpu-type"
+		return "nvidia.com/gpu", "eks.tke.cloud.tencent.com/gpu-type", "eks.tke.cloud.tencent.com/gpu-mem"
 	}
 	if _, found := labels["nvidia.com/nvidia_name"]; found {
 		//for k3s cluster
-		return "nvidia.com/gpu", "nvidia.com/nvidia_name"
+		return "nvidia.com/gpu", "nvidia.com/nvidia_name", "nvidia.com/nvidia_mem"
 	}
 	if _, found := labels["nvidia.com/gpu.product"]; found {
 		//for nvidia gpu product label
-		return "nvidia.com/gpu", "nvidia.com/gpu.product"
+		return "nvidia.com/gpu", "nvidia.com/gpu.product", "nvidia.com/gpu.mem"
 	}
 	if _, found := labels["kubemore_xpu_type"]; found {
 		//for huawei gpu
-		return "huawei.com/Ascend910", "kubemore_xpu_type"
+		return "huawei.com/Ascend910", "kubemore_xpu_type", "kubemore_xpu_mem"
 	}
 	if _, found := labels["huawei.accelerator"]; found {
 		//for huawei gpu
-		return "huawei.com/Ascend910", "huawei.accelerator"
+		return "huawei.com/Ascend910", "huawei.accelerator", "huawei.accelerator.mem"
 	}
 	if _, found := labels["accelerator/huawei-npu"]; found {
 		//for huawei gpu
-		return "huawei.com/Ascend910", "accelerator/huawei-npu"
+		return "huawei.com/Ascend910", "accelerator/huawei-npu", "accelerator/huawei-npu.mem"
 	}
 	if _, found := labels["hygon.com/dcu.name"]; found {
 		//for hy dcu
-		return "hygon.com/dcu", "hygon.com/dcu.name"
+		return "hygon.com/dcu", "hygon.com/dcu.name", "hygon.com/dcu.mem"
 	}
 	if _, found := labels["enflame.com/gcu"]; found {
 		//for enflame gcu
-		return "enflame.com/gcu", "enflame.com/gcu.model"
+		return "enflame.com/gcu", "enflame.com/gcu.model", "enflame.com/gcu.mem"
 	}
 	if _, found := labels["enflame.com/gcu.count"]; found {
 		//for enflame gcu
-		return "enflame.com/gcu.count", "enflame.com/gcu.model"
+		return "enflame.com/gcu.count", "enflame.com/gcu.model", "enflame.com/gcu.mem"
 	}
 	//check custom gpu model label
 	if config.Space.GPUModelLabel != "" {
@@ -468,15 +478,15 @@ func getXPULabel(labels map[string]string, config *config.Config) (string, strin
 		err := json.Unmarshal([]byte(config.Space.GPUModelLabel), &gpuLabels)
 		if err != nil {
 			slog.Error("failed to parse GPUModelLabel", "error", err)
-			return "", ""
+			return "", "", ""
 		}
 		for _, gpuModel := range gpuLabels {
 			if _, found := labels[gpuModel.TypeLabel]; found {
-				return gpuModel.CapacityLabel, gpuModel.TypeLabel
+				return gpuModel.CapacityLabel, gpuModel.TypeLabel, gpuModel.MemLabel
 			}
 		}
 	}
-	return "", ""
+	return "", "", ""
 }
 
 // convert memory in bytes to GB

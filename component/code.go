@@ -191,6 +191,9 @@ func (c *codeComponentImpl) Index(ctx context.Context, filter *types.RepoFilter,
 				break
 			}
 		}
+		if code == nil {
+			continue
+		}
 		var (
 			tags             []types.RepoTag
 			mirrorTaskStatus types.MirrorTaskStatus
@@ -304,7 +307,7 @@ func (c *codeComponentImpl) Delete(ctx context.Context, namespace, name, current
 			UserUUID:  repo.User.UUID,
 		}
 		if err = c.repoComponent.SendAssetManagementMsg(notificationCtx, repoNotificationReq); err != nil {
-			slog.Error("failed to send asset management notification message", slog.Any("req", repoNotificationReq), slog.Any("err", err))
+			slog.ErrorContext(ctx, "failed to send asset management notification message", slog.Any("req", repoNotificationReq), slog.Any("err", err))
 		}
 	}()
 
@@ -453,7 +456,7 @@ func (c *codeComponentImpl) OrgCodes(ctx context.Context, req *types.OrgCodesReq
 		r, err = c.userSvcClient.GetMemberRole(ctx, req.Namespace, req.CurrentUser)
 		// log error, and treat user as unknown role in org
 		if err != nil {
-			slog.Error("faild to get member role",
+			slog.ErrorContext(ctx, "faild to get member role",
 				slog.String("org", req.Namespace), slog.String("user", req.CurrentUser),
 				slog.String("error", err.Error()))
 		}
@@ -462,7 +465,7 @@ func (c *codeComponentImpl) OrgCodes(ctx context.Context, req *types.OrgCodesReq
 	codes, total, err := c.codeStore.ByOrgPath(ctx, req.Namespace, req.PageSize, req.Page, onlyPublic)
 	if err != nil {
 		newError := fmt.Errorf("failed to get org codes,error:%w", err)
-		slog.Error(newError.Error())
+		slog.ErrorContext(ctx, newError.Error())
 		return nil, 0, newError
 	}
 

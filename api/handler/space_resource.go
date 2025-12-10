@@ -50,13 +50,13 @@ func (h *SpaceResourceHandler) Index(ctx *gin.Context) {
 	}
 	deployType, err := strconv.Atoi(deployTypeStr)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -72,7 +72,7 @@ func (h *SpaceResourceHandler) Index(ctx *gin.Context) {
 	}
 	spaceResources, total, err := h.spaceResource.Index(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("Failed to get space resources", slog.String("cluster_id", clusterId), slog.String("deploy_type", deployTypeStr), slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get space resources", slog.String("cluster_id", clusterId), slog.String("deploy_type", deployTypeStr), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -95,13 +95,13 @@ func (h *SpaceResourceHandler) Index(ctx *gin.Context) {
 func (h *SpaceResourceHandler) Create(ctx *gin.Context) {
 	var req types.CreateSpaceResourceReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	spaceResource, err := h.spaceResource.Create(ctx.Request.Context(), &req)
 	if err != nil {
-		slog.Error("Failed to create space resources", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to create space resources", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -129,13 +129,13 @@ func (h *SpaceResourceHandler) Update(ctx *gin.Context) {
 	)
 	var req *types.UpdateSpaceResourceReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	id, err = strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -143,7 +143,7 @@ func (h *SpaceResourceHandler) Update(ctx *gin.Context) {
 
 	spaceResource, err := h.spaceResource.Update(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("Failed to update space resource", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to update space resource", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -170,14 +170,14 @@ func (h *SpaceResourceHandler) Delete(ctx *gin.Context) {
 	)
 	id, err = strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 
 	err = h.spaceResource.Delete(ctx.Request.Context(), id)
 	if err != nil {
-		slog.Error("Failed to delete space resource", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to delete space resource", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}

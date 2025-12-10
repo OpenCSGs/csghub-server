@@ -51,7 +51,7 @@ func (h *MirrorHandler) CreateMirrorRepo(ctx *gin.Context) {
 	req.CurrentUser = currentUser
 	m, err := h.mirror.CreateMirrorRepo(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("failed to create mirror repo", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "failed to create mirror repo", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -77,14 +77,14 @@ func (h *MirrorHandler) CreateMirrorRepo(ctx *gin.Context) {
 func (h *MirrorHandler) Repos(ctx *gin.Context) {
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 
 	repos, total, err := h.mirror.Repos(ctx.Request.Context(), per, page)
 	if err != nil {
-		slog.Error("failed to get mirror repos", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "failed to get mirror repos", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -109,17 +109,23 @@ func (h *MirrorHandler) Repos(ctx *gin.Context) {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /mirrors [get]
 func (h *MirrorHandler) Index(ctx *gin.Context) {
+	var filter types.MirrorFilter
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 
-	search := ctx.Query("search")
-	repos, total, err := h.mirror.Index(ctx.Request.Context(), per, page, search)
+	filter.Search = ctx.Query("search")
+	status := ctx.Query("status")
+	if status != "" {
+		mts := types.MirrorTaskStatus(status)
+		filter.Status = &mts
+	}
+	repos, total, err := h.mirror.Index(ctx.Request.Context(), per, page, filter)
 	if err != nil {
-		slog.Error("failed to get mirror repos", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "failed to get mirror repos", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -144,7 +150,7 @@ func (h *MirrorHandler) Index(ctx *gin.Context) {
 func (h *MirrorHandler) Statistics(ctx *gin.Context) {
 	statusCounts, err := h.mirror.Statistics(ctx.Request.Context())
 	if err != nil {
-		slog.Error("failed to get mirror statistics", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "failed to get mirror statistics", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -173,7 +179,7 @@ func (h *MirrorHandler) BatchCreate(ctx *gin.Context) {
 
 	err = h.mirror.BatchCreate(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("failed to bluk create mirrors", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "failed to bluk create mirrors", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -204,7 +210,7 @@ func (h *MirrorHandler) Tasks(ctx *gin.Context) {
 	}
 	resp, err := h.mirror.ListQueue(ctx.Request.Context(), countInt)
 	if err != nil {
-		slog.Error("failed to get mirror tasks", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "failed to get mirror tasks", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -233,7 +239,7 @@ func (h *MirrorHandler) Delete(ctx *gin.Context) {
 
 	err = h.mirror.Delete(ctx.Request.Context(), idInt)
 	if err != nil {
-		slog.Error("failed to delete mirror tasks", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "failed to delete mirror tasks", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}

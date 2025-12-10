@@ -213,6 +213,7 @@ func TestGitHTTPComponent_Batch(t *testing.T) {
 			operation:      types.LFSBatchUpload,
 			hasWriteAccess: true,
 			resp: &types.BatchResponse{
+				Transfer: "basic",
 				Objects: []*types.ObjectResponse{
 					{
 						Pointer: types.Pointer{Oid: notExistOID, Size: 100},

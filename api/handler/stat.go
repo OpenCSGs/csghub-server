@@ -45,12 +45,12 @@ func (h *StatHandler) GetStatSnap(ctx *gin.Context) {
 	targetType := ctx.Query("target_type")
 	dateType := ctx.Query("date_type")
 	if !types.IsValidStatTargetType(targetType) {
-		slog.Error("Bad request target_type", slog.String("target_type", targetType))
+		slog.ErrorContext(ctx.Request.Context(), "Bad request target_type", slog.String("target_type", targetType))
 		httpbase.BadRequest(ctx, "Bad request target_type")
 		return
 	}
 	if !types.IsValidStatDateType(dateType) {
-		slog.Error("Bad request date_type", slog.String("date_type", dateType))
+		slog.ErrorContext(ctx.Request.Context(), "Bad request date_type", slog.String("date_type", dateType))
 		httpbase.BadRequest(ctx, "Bad request date_type")
 		return
 	}
@@ -59,7 +59,7 @@ func (h *StatHandler) GetStatSnap(ctx *gin.Context) {
 
 	resp, err := h.sc.GetStatSnap(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("Failed to get stat snapshot", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get stat snapshot", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -83,7 +83,7 @@ func (h *StatHandler) GetStatSnap(ctx *gin.Context) {
 func (h *StatHandler) StatRunningDeploys(ctx *gin.Context) {
 	res, err := h.sc.StatRunningDeploys(ctx.Request.Context())
 	if err != nil {
-		slog.Error("failed to stat running deploys", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "failed to stat running deploys", slog.Any("error", err))
 		httpbase.ServerError(ctx, fmt.Errorf("failed to stat running deploys, %w", err))
 		return
 	}

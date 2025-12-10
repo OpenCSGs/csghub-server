@@ -41,7 +41,7 @@ func NewSyncClientSettingHandler(config *config.Config) (*SyncClientSettingHandl
 func (h *SyncClientSettingHandler) Create(ctx *gin.Context) {
 	var req types.CreateSyncClientSettingReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -51,7 +51,7 @@ func (h *SyncClientSettingHandler) Create(ctx *gin.Context) {
 			httpbase.UnauthorizedError(ctx, err)
 			return
 		}
-		slog.Error("Failed to create sync client setting", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Failed to create sync client setting", "error", err)
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -76,7 +76,7 @@ func (h *SyncClientSettingHandler) Show(ctx *gin.Context) {
 			httpbase.UnauthorizedError(ctx, err)
 			return
 		}
-		slog.Error("Failed to find sync client setting", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Failed to find sync client setting", "error", err)
 		httpbase.ServerError(ctx, err)
 		return
 	}

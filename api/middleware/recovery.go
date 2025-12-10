@@ -22,7 +22,7 @@ func Recovery() gin.HandlerFunc {
 				}
 				// Get trace ID
 				traceID := trace.GetTraceIDInGinContext(c)
-				slog.Error("[Recovery from panic]",
+				slog.ErrorContext(c.Request.Context(), "[Recovery from panic]",
 					slog.Time("time", time.Now()),
 					slog.String("trace_id", traceID),
 					slog.String("method", c.Request.Method),

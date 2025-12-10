@@ -61,19 +61,19 @@ func (c *CollectionHandler) Index(ctx *gin.Context) {
 				Set("param", "sort").
 				Set("provided", filter.Sort).
 				Set("allowed", types.CollectionSorts))
-		slog.Error("Bad request format,", slog.String("error", msg))
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format,", slog.String("error", msg))
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	collections, total, err := c.collection.GetCollections(ctx.Request.Context(), filter, per, page)
 	if err != nil {
-		slog.Error("Failed to load collections", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Failed to load collections", "error", err)
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -101,14 +101,14 @@ func (c *CollectionHandler) Create(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	var req *types.CreateCollectionReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 
 	_, err := c.sensitive.CheckRequestV2(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("failed to check sensitive request", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
 		return
 	}
@@ -116,7 +116,7 @@ func (c *CollectionHandler) Create(ctx *gin.Context) {
 	req.Username = currentUser
 	collection, err := c.collection.CreateCollection(ctx.Request.Context(), *req)
 	if err != nil {
-		slog.Error("Failed to create collection", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to create collection", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -137,14 +137,14 @@ func (c *CollectionHandler) Create(ctx *gin.Context) {
 func (c *CollectionHandler) GetCollection(ctx *gin.Context) {
 	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	currentUser := httpbase.GetCurrentUser(ctx)
 	collection, err := c.collection.GetCollection(ctx.Request.Context(), currentUser, id)
 	if err != nil {
-		slog.Error("Failed to get collection", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get collection", slog.Any("error", err))
 		if errors.Is(err, errorx.ErrDatabaseNoRows) {
 			httpbase.NotFoundError(ctx, err)
 			return
@@ -173,21 +173,21 @@ func (c *CollectionHandler) GetCollection(ctx *gin.Context) {
 func (c *CollectionHandler) UpdateCollection(ctx *gin.Context) {
 	var req *types.CreateCollectionReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 
 	_, err := c.sensitive.CheckRequestV2(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("failed to check sensitive request", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
 		return
 	}
 
 	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -196,7 +196,7 @@ func (c *CollectionHandler) UpdateCollection(ctx *gin.Context) {
 
 	collection, err := c.collection.UpdateCollection(ctx.Request.Context(), *req)
 	if err != nil {
-		slog.Error("Failed to create space", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to create space", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -220,14 +220,14 @@ func (c *CollectionHandler) DeleteCollection(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 
 	err = c.collection.DeleteCollection(ctx.Request.Context(), id, currentUser)
 	if err != nil {
-		slog.Error("Failed to delete collection", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to delete collection", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -252,14 +252,14 @@ func (c *CollectionHandler) AddRepoToCollection(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	var req *types.UpdateCollectionReposReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	req.Username = currentUser
 	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -271,7 +271,7 @@ func (c *CollectionHandler) AddRepoToCollection(ctx *gin.Context) {
 				Remark: remark,
 			})
 			if err != nil {
-				slog.Error("Failed to check sensitive request",
+				slog.ErrorContext(ctx.Request.Context(), "Failed to check sensitive request",
 					slog.Int64("collection_id", req.ID),
 					slog.Int64("repo_id", repoId),
 					slog.Any("error", err))
@@ -283,7 +283,7 @@ func (c *CollectionHandler) AddRepoToCollection(ctx *gin.Context) {
 
 	err = c.collection.AddReposToCollection(ctx.Request.Context(), *req)
 	if err != nil {
-		slog.Error("Failed to create collection", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to create collection", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -307,14 +307,14 @@ func (c *CollectionHandler) RemoveRepoFromCollection(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	var req *types.UpdateCollectionReposReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	req.Username = currentUser
 	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -322,7 +322,7 @@ func (c *CollectionHandler) RemoveRepoFromCollection(ctx *gin.Context) {
 
 	err = c.collection.RemoveReposFromCollection(ctx.Request.Context(), *req)
 	if err != nil {
-		slog.Error("Failed to create collection", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to create collection", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -348,21 +348,21 @@ func (c *CollectionHandler) UpdateCollectionRepo(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	var req *types.UpdateCollectionRepoReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, errorx.ReqBodyFormat(err, nil))
 		return
 	}
 
 	collectionId, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, errorx.ReqBodyFormat(err, nil))
 		return
 	}
 	req.ID = collectionId
 	repoId, err := strconv.ParseInt(ctx.Param("repo_id"), 10, 64)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, errorx.ReqBodyFormat(err, nil))
 		return
 	}
@@ -372,7 +372,7 @@ func (c *CollectionHandler) UpdateCollectionRepo(ctx *gin.Context) {
 		Remark: req.Remark,
 	})
 	if err != nil {
-		slog.Error("Failed to check sensitive request",
+		slog.ErrorContext(ctx.Request.Context(), "Failed to check sensitive request",
 			slog.Int64("collection_id", collectionId),
 			slog.Int64("repo_id", repoId),
 			slog.Any("error", err))
@@ -387,7 +387,7 @@ func (c *CollectionHandler) UpdateCollectionRepo(ctx *gin.Context) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
-		slog.Error("Failed to update repo remark", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to update repo remark", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}

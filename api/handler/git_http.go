@@ -57,7 +57,7 @@ func (h *GitHTTPHandler) InfoRefs(ctx *gin.Context) {
 	}
 	reader, err := h.gitHttp.InfoRefs(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("git http info refs", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "git http info refs", slog.Any("error", err))
 		if errors.Is(err, errorx.ErrUnauthorized) {
 			ctx.Header("WWW-Authenticate", "Basic realm=opencsg-git")
 			ctx.PureJSON(http.StatusUnauthorized, nil)
@@ -69,16 +69,14 @@ func (h *GitHTTPHandler) InfoRefs(ctx *gin.Context) {
 			msg = "You do not have permission to access this repository."
 		} else if errors.Is(err, errorx.ErrServiceUnavaliable) {
 			msg = "Mirror repository is currently syncing. Please try again later."
-		} else if errors.Is(err, errorx.ErrUsingGitInXnetRepository) {
-			msg = "Git operations are not supported in Xnet-enabled repositories. For an improved experience and better results, consider using the SDK/CLI."
 		} else {
 			httpbase.ServerError(ctx, err)
 			return
 		}
 
-		body := pktLine("# service="+rpc+"\n") + "0000" + pktLine("ERR "+msg+"\n")
+		body := pktLine("# service=git-upload-pack\n") + "0000" + pktLine("ERR "+msg+"\n")
 
-		ctx.Header("Content-Type", "application/x-"+rpc+"-advertisement")
+		ctx.Header("Content-Type", "application/x-git-upload-pack-advertisement")
 		ctx.Writer.WriteHeader(http.StatusOK)
 		_, _ = ctx.Writer.Write([]byte(body))
 
@@ -125,7 +123,7 @@ func (h *GitHTTPHandler) GitUploadPack(ctx *gin.Context) {
 
 	err := h.gitHttp.GitUploadPack(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("git http upload pack error", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "git http upload pack error", slog.Any("error", err))
 		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
 			return
@@ -169,7 +167,7 @@ func (h *GitHTTPHandler) GitReceivePack(ctx *gin.Context) {
 
 	err = h.gitHttp.GitReceivePack(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("git http upload pack failed", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "git http upload pack failed", slog.Any("error", err))
 		if errors.Is(err, errorx.ErrContentLengthTooLarge) {
 			ctx.PureJSON(http.StatusBadRequest, gin.H{
 				"error": "File too large. Please track it using Git LFS.",
@@ -195,7 +193,7 @@ func (h *GitHTTPHandler) GitReceivePack(ctx *gin.Context) {
 func (h *GitHTTPHandler) LfsBatch(ctx *gin.Context) {
 	var batchRequest types.BatchRequest
 	if err := ctx.ShouldBindJSON(&batchRequest); err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -208,7 +206,7 @@ func (h *GitHTTPHandler) LfsBatch(ctx *gin.Context) {
 
 	objectResponse, err := h.gitHttp.LFSBatch(ctx.Request.Context(), batchRequest)
 	if err != nil {
-		slog.Error("git http lfs batch error", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "git http lfs batch error", slog.Any("error", err))
 		httpErr := &errorx.HTTPError{}
 		switch {
 		case errors.Is(err, errorx.ErrUnauthorized):
@@ -234,7 +232,7 @@ func (h *GitHTTPHandler) LfsBatch(ctx *gin.Context) {
 func (h *GitHTTPHandler) LfsBatchHF(ctx *gin.Context) {
 	var batchRequest types.BatchRequest
 	if err := ctx.ShouldBindJSON(&batchRequest); err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -251,7 +249,7 @@ func (h *GitHTTPHandler) LfsBatchHF(ctx *gin.Context) {
 
 	objectResponse, err := h.gitHttp.LFSBatch(ctx.Request.Context(), batchRequest)
 	if err != nil {
-		slog.Error("git http lfs batch hf error", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "git http lfs batch hf error", slog.Any("error", err))
 		httpErr := &errorx.HTTPError{}
 		switch {
 		case errors.Is(err, errorx.ErrUnauthorized):
@@ -280,7 +278,7 @@ func (h *GitHTTPHandler) LfsUpload(ctx *gin.Context) {
 	uploadRequest.Oid = ctx.Param("oid")
 	uploadRequest.Size, err = strconv.ParseInt(ctx.Param("size"), 10, 64)
 	if err != nil {
-		slog.Error("Invalid lfs file size", slog.String("size", ctx.Param("size")))
+		slog.ErrorContext(ctx.Request.Context(), "Invalid lfs file size", slog.String("size", ctx.Param("size")))
 		httpbase.BadRequest(ctx, fmt.Sprintf("Invalid lfs file size: %s", ctx.Param("size")))
 		return
 	}
@@ -296,7 +294,7 @@ func (h *GitHTTPHandler) LfsUpload(ctx *gin.Context) {
 
 	err = h.gitHttp.LfsUpload(ctx.Request.Context(), ctx.Request.Body, uploadRequest)
 	if err != nil {
-		slog.Error("Failed to upload lfs file", slog.Any("error", err), slog.String("namespace", uploadRequest.Namespace), slog.String("name", uploadRequest.Name), slog.String("oid", uploadRequest.Oid))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to upload lfs file", slog.Any("error", err), slog.String("namespace", uploadRequest.Namespace), slog.String("name", uploadRequest.Name), slog.String("oid", uploadRequest.Oid))
 		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.UnauthorizedError(ctx, err)
 		}
@@ -312,7 +310,7 @@ func (h *GitHTTPHandler) LfsDownload(ctx *gin.Context) {
 	downloadRequest.Oid = ctx.Param("oid")
 	downloadRequest.Size, err = strconv.ParseInt(ctx.Param("size"), 10, 64)
 	if err != nil {
-		slog.Error("Invalid lfs file size", slog.String("size", ctx.Param("size")))
+		slog.ErrorContext(ctx.Request.Context(), "Invalid lfs file size", slog.String("size", ctx.Param("size")))
 		httpbase.BadRequest(ctx, fmt.Sprintf("Invalid lfs file size: %s", ctx.Param("size")))
 		return
 	}
@@ -336,7 +334,7 @@ func (h *GitHTTPHandler) LfsVerify(ctx *gin.Context) {
 		verifyRequest types.VerifyRequest
 	)
 	if err := ctx.ShouldBindJSON(&pointer); err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -348,7 +346,7 @@ func (h *GitHTTPHandler) LfsVerify(ctx *gin.Context) {
 
 	err := h.gitHttp.LfsVerify(ctx.Request.Context(), verifyRequest, pointer)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -370,7 +368,7 @@ func (h *GitHTTPHandler) ListLocks(ctx *gin.Context) {
 	if id != "" {
 		req.ID, err = strconv.ParseInt(id, 10, 64)
 		if err != nil {
-			slog.Error("Bad request format", "error", err)
+			slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 			ctx.PureJSON(http.StatusBadRequest, types.LFSLockError{
 				Message: "unable to delete lock : Invalid request",
 			})
@@ -409,7 +407,7 @@ func (h *GitHTTPHandler) ListLocks(ctx *gin.Context) {
 func (h *GitHTTPHandler) CreateLock(ctx *gin.Context) {
 	var req types.LfsLockReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		ctx.PureJSON(http.StatusBadRequest, types.LFSLockError{
 			Message: "unable to delete lock : Invalid request",
 		})
@@ -445,7 +443,7 @@ func (h *GitHTTPHandler) CreateLock(ctx *gin.Context) {
 			})
 			return
 		}
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		ctx.PureJSON(http.StatusInternalServerError, types.LFSLockError{
 			Message: "unable to delete lock : Internal Server Error",
 		})
@@ -466,7 +464,7 @@ func (h *GitHTTPHandler) CreateLock(ctx *gin.Context) {
 func (h *GitHTTPHandler) VerifyLock(ctx *gin.Context) {
 	var req types.VerifyLFSLockReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		ctx.PureJSON(http.StatusBadRequest, types.LFSLockError{
 			Message: "unable to delete lock : Invalid request",
 		})
@@ -492,7 +490,7 @@ func (h *GitHTTPHandler) VerifyLock(ctx *gin.Context) {
 
 	res, err := h.gitHttp.VerifyLock(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		ctx.PureJSON(http.StatusInternalServerError, types.LFSLockError{
 			Message: "unable to delete lock : Internal Server Error",
 		})
@@ -509,7 +507,7 @@ func (h *GitHTTPHandler) UnLock(ctx *gin.Context) {
 	)
 
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		ctx.PureJSON(http.StatusInternalServerError, types.LFSLockError{
 			Message: "unable to delete lock : Bad request format",
 		})
@@ -517,7 +515,7 @@ func (h *GitHTTPHandler) UnLock(ctx *gin.Context) {
 	}
 	req.ID, err = strconv.ParseInt(ctx.Param("lid"), 10, 64)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		ctx.PureJSON(http.StatusBadRequest, types.LFSLockError{
 			Message: "unable to delete lock : Invalid id",
 		})
@@ -550,7 +548,7 @@ func (h *GitHTTPHandler) UnLock(ctx *gin.Context) {
 			})
 			return
 		}
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		ctx.PureJSON(http.StatusInternalServerError, types.LFSLockError{
 			Message: "unable to delete lock : Internal Server Error",
 		})
@@ -574,20 +572,20 @@ func (h *GitHTTPHandler) CompleteMultipartUpload(ctx *gin.Context) {
 		bodyReq types.CompleteMultipartUploadBody
 	)
 	if err := ctx.ShouldBindQuery(&req); err != nil {
-		slog.Error("invalid request body", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "invalid request body", slog.Any("error", err))
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 
 	if err := ctx.ShouldBindJSON(&bodyReq); err != nil {
-		slog.Error("invalid json body", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "invalid json body", slog.Any("error", err))
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 
 	code, err := h.gitHttp.CompleteMultipartUpload(ctx.Request.Context(), req, bodyReq)
 	if err != nil {
-		slog.Error("failed to complete multipart upload", slog.Any("req", req), slog.Any("bodyReq", bodyReq), slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "failed to complete multipart upload", slog.Any("req", req), slog.Any("bodyReq", bodyReq), slog.Any("error", err))
 		ctx.PureJSON(code, gin.H{
 			"msg": err.Error(),
 		})

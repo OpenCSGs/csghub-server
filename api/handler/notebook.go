@@ -46,7 +46,7 @@ func (h *NotebookHandler) Create(ctx *gin.Context) {
 	var req types.CreateNotebookReq
 	err := ctx.ShouldBindJSON(&req)
 	if err != nil {
-		slog.Error("Failed to bind json", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to bind json", slog.Any("error", err))
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -54,7 +54,7 @@ func (h *NotebookHandler) Create(ctx *gin.Context) {
 	req.CurrentUser = currentUser
 	notebook, err := h.nc.CreateNotebook(ctx.Request.Context(), &req)
 	if err != nil {
-		slog.Error("Failed to create notebook", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to create notebook", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -77,7 +77,7 @@ func (h *NotebookHandler) Get(ctx *gin.Context) {
 
 	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		err := errorx.ReqParamInvalid(err, errorx.Ctx().Set("param", "id"))
 		httpbase.BadRequestWithExt(ctx, err)
 		return
@@ -89,7 +89,7 @@ func (h *NotebookHandler) Get(ctx *gin.Context) {
 
 	notebook, err := h.nc.GetNotebook(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("Failed to get notebook", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get notebook", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -111,7 +111,7 @@ func (h *NotebookHandler) Start(ctx *gin.Context) {
 
 	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		err := errorx.ReqParamInvalid(err, errorx.Ctx().Set("param", "id"))
 		httpbase.BadRequestWithExt(ctx, err)
 		return
@@ -123,7 +123,7 @@ func (h *NotebookHandler) Start(ctx *gin.Context) {
 	}
 	err = h.nc.StartNotebook(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("Failed to start notebook", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to start notebook", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -144,7 +144,7 @@ func (h *NotebookHandler) Start(ctx *gin.Context) {
 func (h *NotebookHandler) Stop(ctx *gin.Context) {
 	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		err := errorx.ReqParamInvalid(err, errorx.Ctx().Set("param", "id"))
 		httpbase.BadRequestWithExt(ctx, err)
 		return
@@ -156,7 +156,7 @@ func (h *NotebookHandler) Stop(ctx *gin.Context) {
 	}
 	err = h.nc.StopNotebook(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("Failed to stop notebook", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to stop notebook", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -181,14 +181,14 @@ func (h *NotebookHandler) Wakeup(ctx *gin.Context) {
 	)
 	id, err = strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		err = errorx.ReqParamInvalid(err, errorx.Ctx().Set("param", "id"))
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 	err = h.nc.Wakeup(ctx.Request.Context(), id)
 	if err != nil {
-		slog.Error("failed to wakeup notebook", slog.String("id", string(rune(id))), slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "failed to wakeup notebook", slog.String("id", string(rune(id))), slog.Any("error", err))
 		httpbase.ServerError(ctx, errors.New("failed to wakeup notebook"))
 		return
 	}
@@ -209,7 +209,7 @@ func (h *NotebookHandler) Wakeup(ctx *gin.Context) {
 func (h *NotebookHandler) Delete(ctx *gin.Context) {
 	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		err := errorx.ReqParamInvalid(err, errorx.Ctx().Set("param", "id"))
 		httpbase.BadRequestWithExt(ctx, err)
 		return
@@ -221,7 +221,7 @@ func (h *NotebookHandler) Delete(ctx *gin.Context) {
 	}
 	err = h.nc.DeleteNotebook(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("Failed to delete notebook", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to delete notebook", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -244,13 +244,13 @@ func (h *NotebookHandler) Update(ctx *gin.Context) {
 	var req types.UpdateNotebookReq
 	err := ctx.ShouldBindJSON(&req)
 	if err != nil {
-		slog.Error("Failed to bind json", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to bind json", slog.Any("error", err))
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		err := errorx.ReqParamInvalid(err, errorx.Ctx().Set("param", "id"))
 		httpbase.BadRequestWithExt(ctx, err)
 		return
@@ -260,7 +260,7 @@ func (h *NotebookHandler) Update(ctx *gin.Context) {
 	req.CurrentUser = currentUser
 	err = h.nc.UpdateNotebook(ctx.Request.Context(), &req)
 	if err != nil {
-		slog.Error("Failed to update notebook", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to update notebook", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -280,7 +280,7 @@ func (h *NotebookHandler) Update(ctx *gin.Context) {
 func (h *NotebookHandler) Status(ctx *gin.Context) {
 	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		err := errorx.ReqParamInvalid(err, errorx.Ctx().Set("param", "id"))
 		httpbase.BadRequestWithExt(ctx, err)
 		return
@@ -310,11 +310,11 @@ func (h *NotebookHandler) Status(ctx *gin.Context) {
 			status, err := h.nc.StatusNotebook(ctx.Request.Context(), req)
 			if err != nil {
 				if deadline, ok := ctx.Request.Context().Deadline(); ok {
-					slog.Error("failed to get notebook status in stream", slog.Any("error", err),
+					slog.ErrorContext(ctx.Request.Context(), "failed to get notebook status in stream", slog.Any("error", err),
 						slog.String("notebook id", strconv.FormatInt(id, 10)),
 						slog.Any("deadline", time.Until(deadline)))
 				} else {
-					slog.Error("failed to get notebook status in stream", slog.Any("error", err),
+					slog.ErrorContext(ctx.Request.Context(), "failed to get notebook status in stream", slog.Any("error", err),
 						slog.String("notebook id", strconv.FormatInt(id, 10)))
 				}
 				ctx.SSEvent("error", err.Error())
@@ -350,7 +350,7 @@ func (h *NotebookHandler) Logs(ctx *gin.Context) {
 
 	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		err := errorx.ReqParamInvalid(err, errorx.Ctx().Set("param", "id"))
 		httpbase.BadRequestWithExt(ctx, err)
 		return
@@ -360,6 +360,7 @@ func (h *NotebookHandler) Logs(ctx *gin.Context) {
 		CurrentUser:  currentUser,
 		ID:           id,
 		InstanceName: instance,
+		Since:        ctx.Query("since"),
 	}
 
 	ctx.Writer.Header().Set("Content-Type", "text/event-stream")
@@ -371,13 +372,13 @@ func (h *NotebookHandler) Logs(ctx *gin.Context) {
 	logReader, err := h.nc.LogsNotebook(ctx.Request.Context(), req)
 	if err != nil {
 		if deadline, ok := ctx.Request.Context().Deadline(); ok {
-			slog.Error("failed to get space logs",
+			slog.ErrorContext(ctx.Request.Context(), "failed to get space logs",
 				slog.Any("error", err),
 				slog.String("notebook id", strconv.FormatInt(id, 10)),
 				slog.Any("deadline", time.Until(deadline)), slog.Bool("ok", ok),
 			)
 		} else {
-			slog.Error("failed to get space logs",
+			slog.ErrorContext(ctx.Request.Context(), "failed to get space logs",
 				slog.Any("error", err),
 				slog.String("notebook id", strconv.FormatInt(id, 10)),
 			)

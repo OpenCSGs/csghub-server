@@ -58,7 +58,7 @@ type allowedRequest struct {
 func (h *InternalHandler) Allowed(ctx *gin.Context) {
 	var req allowedRequest
 	if err := ctx.ShouldBind(&req); err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -81,7 +81,7 @@ func (h *InternalHandler) SSHAllowed(ctx *gin.Context) {
 		gitEnv   types.GitEnv
 	)
 	if err := ctx.ShouldBind(&rawReq); err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -98,7 +98,7 @@ func (h *InternalHandler) SSHAllowed(ctx *gin.Context) {
 	if rawReq.Env != "" {
 		err := json.Unmarshal([]byte(rawReq.Env), &gitEnv)
 		if err != nil {
-			slog.Error("Bad request format", "error", err)
+			slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 			httpbase.BadRequest(ctx, err.Error())
 			return
 		}
@@ -154,7 +154,7 @@ func (h *InternalHandler) SSHAllowed(ctx *gin.Context) {
 // 		rawReq types.GitalyAllowedReq
 // 	)
 // 	if err := ctx.ShouldBind(&rawReq); err != nil {
-// 		slog.Error("Bad request format", "error", err)
+// 		slog.ErrorContext(ctx.Request.Context(),"Bad request format", "error", err)
 // 		httpbase.BadRequest(ctx, err.Error())
 // 		return
 // 	}
@@ -174,7 +174,7 @@ func (h *InternalHandler) SSHAllowed(ctx *gin.Context) {
 func (h *InternalHandler) LfsAuthenticate(ctx *gin.Context) {
 	var req types.LfsAuthenticateReq
 	if err := ctx.ShouldBind(&req); err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -206,7 +206,7 @@ func (h *InternalHandler) PostReceive(ctx *gin.Context) {
 
 	var req types.PostReceiveReq
 	if err := ctx.ShouldBind(&req); err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -234,7 +234,7 @@ func (h *InternalHandler) PostReceive(ctx *gin.Context) {
 	}
 	callback, err := h.internal.GetCommitDiff(ctx.Request.Context(), diffReq)
 	if err != nil {
-		slog.Error("post receive: failed to get commit diff", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "post receive: failed to get commit diff", slog.Any("error", err))
 		if diffReq.RightCommitId == types.NoCommitID {
 			// delete branch action
 			ctx.PureJSON(http.StatusOK, successResp)
@@ -249,13 +249,14 @@ func (h *InternalHandler) PostReceive(ctx *gin.Context) {
 	//start workflow to handle push request
 	workflowOptions := client.StartWorkflowOptions{
 		TaskQueue: workflow.HandlePushQueueName,
+		ID:        fmt.Sprintf("post-receive-%s-%s-%s-%s", types.RepositoryType(strings.TrimSuffix(paths[0], "s")), paths[1], paths[2], strs[1]),
 	}
 
 	we, err := h.temporalClient.ExecuteWorkflow(
 		ctx.Request.Context(), workflowOptions, workflow.HandlePushWorkflow, callback,
 	)
 	if err != nil {
-		slog.Error("failed to handle git push callback", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "failed to handle git push callback", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -281,7 +282,7 @@ func (h *InternalHandler) CallDataViewer(ctx context.Context, namespace, name, b
 	}
 	res, err := h.internal.TriggerDataviewerWorkflow(ctx, req)
 	if err != nil {
-		slog.Error("fail to read dataviewer response", slog.Any("req", req), slog.Any("err", err))
+		slog.ErrorContext(ctx, "fail to read dataviewer response", slog.Any("req", req), slog.Any("err", err))
 		return
 	}
 	slog.Info("dataviewer callback response", slog.Any("req", req), slog.Any("res", res))
@@ -291,7 +292,7 @@ func (h *InternalHandler) GetAuthorizedKeys(ctx *gin.Context) {
 	key := ctx.Query("key")
 	sshKey, err := h.internal.GetAuthorizedKeys(ctx.Request.Context(), key)
 	if err != nil {
-		slog.Error("failed to get authorize keys", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "failed to get authorize keys", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}

@@ -64,9 +64,10 @@ type ClusterRes struct {
 
 	ResourceStatus ResourceStatus `json:"resource_status"`
 
-	LastUpdateTime int64 `json:"last_update_time"`
+	LastUpdateTime int64  `json:"last_update_time"`
+	XPUVendors     string `json:"xpu_vendors"` // NVIDIA, AMD
+	XPUModels      string `json:"xpu_models"`  // A10(32 GB),H100(80 GB)
 }
-
 type DeployRes struct {
 	ClusterID       string    `json:"cluster_id"`
 	ClusterRegion   string    `json:"cluster_region"`
@@ -91,6 +92,7 @@ type NodeResourceInfo struct {
 	AvailableMem     float32 `json:"available_mem"` //in GB
 	XPUCapacityLabel string  `json:"xpu_capacity_label"`
 	ReservedXPU      int64   `json:"reserved_xpu"`
+	XPUMem           string  `json:"xpu_mem"`
 }
 
 type UpdateClusterResponse struct {
@@ -100,6 +102,7 @@ type UpdateClusterResponse struct {
 type GPUModel struct {
 	TypeLabel     string `json:"type_label"`
 	CapacityLabel string `json:"capacity_label"`
+	MemLabel      string `json:"mem_label"`
 }
 
 type ClusterStatus string

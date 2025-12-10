@@ -123,18 +123,25 @@ func LocalizedErrorMiddleware() gin.HandlerFunc {
 			} else {
 				respObj.Msg = fmt.Sprintf("%s: %s", code, translatedMsg)
 			}
-			updatedBody, err := json.Marshal(respObj)
+		}
+
+		updatedBody, err := json.Marshal(respObj)
+		if err != nil {
+			slog.ErrorContext(c.Request.Context(), "marshal updated httpbase.R",
+				slog.String("url", c.Request.URL.Path),
+				slog.String("err", err.Error()),
+			)
+			_, err = bw.writeInternal(respBytes)
 			if err != nil {
-				slog.ErrorContext(c.Request.Context(), "marshal updated httpbase.R",
+				slog.ErrorContext(c.Request.Context(), "marshal updated httpbase.R failed, write origin resp, LocalizedErrorMiddleware",
 					slog.String("url", c.Request.URL.Path),
 					slog.String("err", err.Error()),
 				)
-			} else {
-				bw.ResponseWriter.Header().Set("Content-Length", strconv.Itoa(len(updatedBody)))
-				respBytes = updatedBody
 			}
+			return
 		}
-		_, err = bw.writeInternal(respBytes)
+		bw.ResponseWriter.Header().Set("Content-Length", strconv.Itoa(len(updatedBody)))
+		_, err = bw.writeInternal(updatedBody)
 		if err != nil {
 			slog.ErrorContext(c.Request.Context(), "write updated httpbase.R, LocalizedErrorMiddleware",
 				slog.String("url", c.Request.URL.Path),

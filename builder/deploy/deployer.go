@@ -237,8 +237,10 @@ func (d *deployer) Deploy(ctx context.Context, dr types.DeployRepo) (int64, erro
 		return -1, fmt.Errorf("create deploy task failed: %w", err)
 	}
 
+	// go func() { _ = d.scheduler.Queue(buildTask.ID) }()
 	buildTask.Deploy = deploy
 	runTask.Deploy = deploy
+
 	go DeployWorkflow(buildTask, runTask)
 
 	d.logReporter.Report(types.LogEntry{
@@ -554,9 +556,14 @@ func (d *deployer) InstanceLogs(ctx context.Context, dr types.DeployRepo) (*Mult
 
 	deployId := fmt.Sprintf("%d", deploy.ID)
 
+	var startTime = deploy.CreatedAt
+	if dr.Since != "" {
+		startTime = parseSinceTime(dr.Since)
+	}
+
 	runLog, err := d.readLogsFromLoki(ctx, types.ReadLogRequest{
 		DeployID:  deployId,
-		StartTime: deploy.CreatedAt,
+		StartTime: startTime,
 		Labels:    labels,
 	})
 	if err != nil {
@@ -641,6 +648,8 @@ func (d *deployer) GetClusterUsageById(ctx context.Context, clusterId string) (*
 		Provider:  resp.Provider,
 		Status:    types.ClusterStatusRunning,
 	}
+	var vendorSet = make(map[string]struct{}, 0)
+	var modelsSet = make(map[string]struct{}, 0)
 	for _, node := range resp.Nodes {
 		res.TotalCPU += node.TotalCPU
 		res.AvailableCPU += node.AvailableCPU
@@ -648,15 +657,43 @@ func (d *deployer) GetClusterUsageById(ctx context.Context, clusterId string) (*
 		res.AvailableMem += float64(node.AvailableMem)
 		res.TotalGPU += node.TotalXPU
 		res.AvailableGPU += node.AvailableXPU
-
+		if node.GPUVendor != "" {
+			vendorSet[node.GPUVendor] = struct{}{}
+			modelsSet[fmt.Sprintf("%s(%s)", node.XPUModel, node.XPUMem)] = struct{}{}
+		}
 	}
+
+	var vendor string
+	for k := range vendorSet {
+		vendor += k + ", "
+	}
+	if vendor != "" {
+		vendor = vendor[:len(vendor)-2]
+	}
+
+	var models string
+	for k := range modelsSet {
+		models += k + ", "
+	}
+	if models != "" {
+		models = models[:len(models)-2]
+	}
+
+	res.XPUVendors = vendor
+	res.XPUModels = models
 	res.AvailableCPU = math.Floor(res.AvailableCPU)
 	res.TotalMem = math.Floor(res.TotalMem)
 	res.AvailableMem = math.Floor(res.AvailableMem)
 	res.NodeNumber = len(resp.Nodes)
-	res.CPUUsage = math.Round((res.TotalCPU-res.AvailableCPU)/res.TotalCPU*100) / 100
-	res.MemUsage = math.Round((res.TotalMem-res.AvailableMem)/res.TotalMem*100) / 100
-	res.GPUUsage = math.Round(float64(res.TotalGPU-res.AvailableGPU)/float64(res.TotalGPU)*100) / 100
+	if res.TotalCPU != 0 {
+		res.CPUUsage = math.Round((res.TotalCPU-res.AvailableCPU)/res.TotalCPU*100) / 100
+	}
+	if res.TotalMem != 0 {
+		res.MemUsage = math.Round((res.TotalMem-res.AvailableMem)/res.TotalMem*100) / 100
+	}
+	if res.TotalGPU != 0 {
+		res.GPUUsage = math.Round(float64(res.TotalGPU-res.AvailableGPU)/float64(res.TotalGPU)*100) / 100
+	}
 
 	return &res, err
 }
@@ -801,8 +838,10 @@ func (d *deployer) StartDeploy(ctx context.Context, deploy *database.Deploy) err
 		return fmt.Errorf("create deploy task failed: %w", err)
 	}
 
+	// go func() { _ = d.scheduler.Queue(runTask.ID) }()
 	runTask.Deploy = deploy
 	go DeployWorkflow(nil, runTask) // runTask is the only task
+
 	// update resource if it's a order case
 	err = d.updateUserResourceByOrder(ctx, deploy)
 	if err != nil {
@@ -813,6 +852,12 @@ func (d *deployer) StartDeploy(ctx context.Context, deploy *database.Deploy) err
 }
 
 func (d *deployer) startJobs() {
+	// go func() {
+	// 	err := d.scheduler.Run()
+	// 	if err != nil {
+	// 		slog.Error("run scheduler failed", slog.Any("error", err))
+	// 	}
+	// }()
 	go d.startAccounting()
 }
 
@@ -1080,13 +1125,19 @@ func (d *deployer) CheckResourceAvailable(ctx context.Context, clusterId string,
 	}
 
 	if clusterResources.Status == types.ClusterStatusUnavailable {
-		return false, fmt.Errorf("failed to check cluster available resource due to cluster %s status is %s",
+		err := fmt.Errorf("failed to check cluster available resource due to cluster %s status is %s",
 			clusterId, clusterResources.Status)
+		return false, errorx.ClusterUnavailable(err, errorx.Ctx().
+			Set("cluster ID", clusterId).
+			Set("region", clusterResources.Region))
 	}
 
 	if clusterResources.ResourceStatus != types.StatusUncertain && !CheckResource(clusterResources, hardWare) {
-		return false, fmt.Errorf("required resource on cluster %s is not enough with resource status %s",
+		err := fmt.Errorf("required resource on cluster %s is not enough with resource status %s",
 			clusterId, clusterResources.ResourceStatus)
+		return false, errorx.NotEnoughResource(err, errorx.Ctx().
+			Set("cluster ID", clusterId).
+			Set("region", clusterResources.Region))
 	}
 
 	return true, nil

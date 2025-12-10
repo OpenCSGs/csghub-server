@@ -57,7 +57,7 @@ func (h *DiscussionHandler) CreateRepoDiscussion(ctx *gin.Context) {
 	repoType := h.getRepoType(ctx)
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -70,7 +70,7 @@ func (h *DiscussionHandler) CreateRepoDiscussion(ctx *gin.Context) {
 
 	_, err = h.sensitive.CheckRequestV2(ctx.Request.Context(), &req)
 	if err != nil {
-		slog.Error("failed to check sensitive request", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
 		return
 	}
@@ -85,7 +85,7 @@ func (h *DiscussionHandler) CreateRepoDiscussion(ctx *gin.Context) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
-		slog.Error("Failed to create repo discussion", "error", err, "request", req)
+		slog.ErrorContext(ctx.Request.Context(), "Failed to create repo discussion", "error", err, "request", req)
 		httpbase.ServerError(ctx, fmt.Errorf("failed to create repo discussion: %w", err))
 		return
 	}
@@ -121,7 +121,7 @@ func (h *DiscussionHandler) UpdateDiscussion(ctx *gin.Context) {
 	}
 	_, err = h.sensitive.CheckRequestV2(ctx.Request.Context(), &req)
 	if err != nil {
-		slog.Error("failed to check sensitive request", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
 		return
 	}
@@ -134,7 +134,7 @@ func (h *DiscussionHandler) UpdateDiscussion(ctx *gin.Context) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
-		slog.Error("Failed to update discussion", "error", err, "request", req)
+		slog.ErrorContext(ctx.Request.Context(), "Failed to update discussion", "error", err, "request", req)
 		httpbase.ServerError(ctx, fmt.Errorf("failed to update discussion: %w", err))
 		return
 	}
@@ -160,7 +160,7 @@ func (h *DiscussionHandler) DeleteDiscussion(ctx *gin.Context) {
 	id := ctx.Param("id")
 	idInt, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -170,7 +170,7 @@ func (h *DiscussionHandler) DeleteDiscussion(ctx *gin.Context) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
-		slog.Error("Failed to delete discussion", "error", err, "id", id)
+		slog.ErrorContext(ctx.Request.Context(), "Failed to delete discussion", "error", err, "id", id)
 		httpbase.ServerError(ctx, fmt.Errorf("failed to delete discussion: %w", err))
 		return
 	}
@@ -196,13 +196,13 @@ func (h *DiscussionHandler) ShowDiscussion(ctx *gin.Context) {
 	id := ctx.Param("id")
 	idInt, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	cPer, cPage, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -213,7 +213,7 @@ func (h *DiscussionHandler) ShowDiscussion(ctx *gin.Context) {
 		} else if errors.Is(err, errorx.ErrDatabaseNoRows) {
 			httpbase.NotFoundError(ctx, err)
 		} else {
-			slog.Error("Failed to get discussion", "error", err, "id", id)
+			slog.ErrorContext(ctx.Request.Context(), "Failed to get discussion", "error", err, "id", id)
 			httpbase.ServerError(ctx, fmt.Errorf("failed to get discussion: %w", err))
 		}
 		return
@@ -248,7 +248,7 @@ func (h *DiscussionHandler) ListRepoDiscussions(ctx *gin.Context) {
 	}
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -266,7 +266,7 @@ func (h *DiscussionHandler) ListRepoDiscussions(ctx *gin.Context) {
 		} else if errors.Is(err, errorx.ErrDatabaseNoRows) {
 			httpbase.NotFoundError(ctx, err)
 		} else {
-			slog.Error("Failed to list repo discussions", "error", err, "request", req)
+			slog.ErrorContext(ctx.Request.Context(), "Failed to list repo discussions", "error", err, "request", req)
 			httpbase.ServerError(ctx, fmt.Errorf("failed to list repo discussions: %w", err))
 		}
 		return
@@ -303,7 +303,7 @@ func (h *DiscussionHandler) CreateDiscussionComment(ctx *gin.Context) {
 	}
 	_, err = h.sensitive.CheckRequestV2(ctx.Request.Context(), &req)
 	if err != nil {
-		slog.Error("failed to check sensitive request", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
 		return
 	}
@@ -313,7 +313,7 @@ func (h *DiscussionHandler) CreateDiscussionComment(ctx *gin.Context) {
 
 	resp, err := h.discussion.CreateDiscussionComment(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("Failed to create discussion comment", "error", err, "request", req)
+		slog.ErrorContext(ctx.Request.Context(), "Failed to create discussion comment", "error", err, "request", req)
 		httpbase.ServerError(ctx, fmt.Errorf("failed to create discussion comment: %w", err))
 		return
 	}
@@ -350,7 +350,7 @@ func (h *DiscussionHandler) UpdateComment(ctx *gin.Context) {
 	}
 	_, err = h.sensitive.CheckRequestV2(ctx.Request.Context(), &req)
 	if err != nil {
-		slog.Error("failed to check sensitive request", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
 		return
 	}
@@ -361,7 +361,7 @@ func (h *DiscussionHandler) UpdateComment(ctx *gin.Context) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
-		slog.Error("Failed to update comment", "error", err, "request", req)
+		slog.ErrorContext(ctx.Request.Context(), "Failed to update comment", "error", err, "request", req)
 		httpbase.ServerError(ctx, fmt.Errorf("failed to update comment: %w", err))
 		return
 	}
@@ -395,7 +395,7 @@ func (h *DiscussionHandler) DeleteComment(ctx *gin.Context) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
-		slog.Error("Failed to delete comment", "error", err, "id", id)
+		slog.ErrorContext(ctx.Request.Context(), "Failed to delete comment", "error", err, "id", id)
 		httpbase.ServerError(ctx, fmt.Errorf("failed to delete comment: %w", err))
 		return
 	}
@@ -427,7 +427,7 @@ func (h *DiscussionHandler) ListDiscussionComments(ctx *gin.Context) {
 
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
@@ -439,7 +439,7 @@ func (h *DiscussionHandler) ListDiscussionComments(ctx *gin.Context) {
 		} else if errors.Is(err, errorx.ErrDatabaseNoRows) {
 			httpbase.NotFoundError(ctx, err)
 		} else {
-			slog.Error("Failed to list discussion comments", "error", err, "id", id)
+			slog.ErrorContext(ctx.Request.Context(), "Failed to list discussion comments", "error", err, "id", id)
 			httpbase.ServerError(ctx, fmt.Errorf("failed to list discussion comments: %w", err))
 		}
 		return

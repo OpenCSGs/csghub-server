@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"log/slog"
 
+	"opencsg.com/csghub-server/builder/instrumentation"
+
 	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
@@ -15,8 +17,7 @@ import (
 
 func NewRouter(config *config.Config) (*gin.Engine, error) {
 	r := gin.New()
-	r.Use(gin.Recovery())
-	r.Use(middleware.Log())
+	middleware.SetInfraMiddleware(r, config, instrumentation.User)
 	needAPIKey := middleware.NeedAPIKey(config)
 	//add router for golang pprof
 	debugGroup := r.Group("/debug", needAPIKey)
@@ -73,6 +74,9 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 		apiV1Group.GET("/organizations", orgHandler.Index)
 		apiV1Group.GET("/organization/:namespace", orgHandler.Get)
 		apiV1Group.GET("/organization/:namespace/members", memberCtrl.OrgMembers)
+		// public sms code (accessible to both logged-in and anonymous users)
+		userGroup.POST("/public/sms-code", userHandler.SendPublicSMSCode)
+		userGroup.POST("/public/sms-code/verify", userHandler.VerifyPublicSMSCode)
 	}
 
 	//internal only
@@ -105,6 +109,9 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 		userGroup.GET("/:username/tokens/first", userMatch, acHandler.GetOrCreateFirstAvaiTokens)
 		// get user list
 		apiV1Group.GET("/users", mustLogin(), userHandler.Index)
+		// export user info
+		apiV1Group.GET("/users/stream-export", mustLogin(), userHandler.ExportUserInfo)
+
 		// user labels
 		userGroup.PUT("/labels", mustLogin(), userHandler.UpdateUserLabels)
 		// get user's email addresses
@@ -144,10 +151,19 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 
 	{
 		userGroup.POST("/email-verification-code/:email", mustLogin(), userHandler.GenerateVerificationCodeAndSendEmail)
+		userGroup.POST("/sms-code", mustLogin(), userHandler.SendSMSCode)
+		userGroup.PUT("/phone", mustLogin(), userHandler.UpdatePhone)
 	}
 
 	{
 		userGroup.POST("/tags", mustLogin(), userHandler.ResetUserTags)
+	}
+
+	middlewareCollection := middleware.MiddlewareCollection{}
+	middlewareCollection.Auth.NeedLogin = mustLogin()
+
+	if err := extendRoutes(apiV1Group, middlewareCollection, config); err != nil {
+		return nil, fmt.Errorf("error extending routes:%w", err)
 	}
 
 	return r, nil
@@ -165,7 +181,7 @@ func userMatch() gin.HandlerFunc {
 		userName := ctx.Param("username")
 		if userName != currentUser {
 			httpbase.UnauthorizedError(ctx, errorx.ErrUserNotMatch)
-			slog.Error("user not match, try to query user account not owned", "currentUser", currentUser, "userName", userName)
+			slog.ErrorContext(ctx.Request.Context(), "user not match, try to query user account not owned", "currentUser", currentUser, "userName", userName)
 			ctx.Abort()
 			return
 		}

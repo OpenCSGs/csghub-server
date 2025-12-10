@@ -65,7 +65,7 @@ func NewImagebuilderComponent(ctx context.Context,
 	}
 
 	if err := workFlowInit(ctx, config, clusterPool); err != nil {
-		slog.Error("failed to init workflow", slog.Any("error", err))
+		slog.ErrorContext(ctx, "failed to init workflow", slog.Any("error", err))
 		return nil, err
 	}
 
@@ -80,7 +80,8 @@ func (ibc *imagebuilderComponentImpl) GetCluster(ctx context.Context, clusterId 
 func (ibc *imagebuilderComponentImpl) Build(ctx context.Context, req ctypes.ImageBuilderRequest) error {
 	ibc.pushLog(req.DeployId, strconv.FormatInt(req.TaskId, 10), ctypes.StagePreBuild, ctypes.StepInitializing, "start to build image workflow")
 	namespace := ibc.config.Cluster.SpaceNamespace
-	imagePath := path.Join(ibc.config.Space.DockerRegBase, req.LastCommitID)
+	imageName := buildImageName(req.OrgName, req.SpaceName, req.RepoId, req.LastCommitID)
+	imagePath := path.Join(ibc.config.Space.DockerRegBase, imageName)
 	cluster, err := ibc.GetCluster(ctx, req.ClusterID)
 	if err != nil {
 		return fmt.Errorf("failed to get cluster by id: %w", err)
@@ -91,7 +92,7 @@ func (ibc *imagebuilderComponentImpl) Build(ctx context.Context, req ctypes.Imag
 		return fmt.Errorf("failed to get cluster by config: %w", err)
 	}
 
-	if len(strings.TrimSpace(cInfo.StorageClass)) > 0 {
+	if cInfo.StorageClass != "" {
 		err = ibc.newPersistentVolumeClaim(ctx, cluster, kanikoCachePVC)
 		if err != nil {
 			return fmt.Errorf("failed to create pvc: %w", err)
@@ -107,7 +108,7 @@ func (ibc *imagebuilderComponentImpl) Build(ctx context.Context, req ctypes.Imag
 
 	wft, err := wfTemplateForImageBuilder(ibc.config, req, imagePath, cInfo.StorageClass, createWorkflowName)
 	if err != nil {
-		slog.Error("failed to create imagebuilder workflow template", "err", err)
+		slog.ErrorContext(ctx, "failed to create imagebuilder workflow template", "err", err)
 		return fmt.Errorf("failed to create imagebuilder workflow template: %w", err)
 	}
 
@@ -192,7 +193,7 @@ func workFlowInit(ctx context.Context, config *config.Config, clusterPool *clust
 				FileContent: data,
 			}
 			if err := createOrUpdateConfigMap(ctx, cluster.Client, cmd); err != nil {
-				slog.Error(fmt.Sprintf("failed to create %s configmap", cfg.FileName), "err", err)
+				slog.ErrorContext(ctx, fmt.Sprintf("failed to create %s configmap", cfg.FileName), "err", err)
 				continue
 			}
 
@@ -218,21 +219,21 @@ func (ibc *imagebuilderComponentImpl) workInformer(ctx context.Context, cluster 
 			wf := obj.(*v1alpha1.Workflow)
 			err := ibc.updateImagebuilderWork(ctx, cluster, wf)
 			if err != nil && !errors.Is(err, sql.ErrNoRows) {
-				slog.Error("fail to add imagebuilder task", slog.Any("error", err), slog.Any("work_name", wf.Name))
+				slog.ErrorContext(ctx, "fail to add imagebuilder task", slog.Any("error", err), slog.Any("work_name", wf.Name))
 			}
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			newWF := newObj.(*v1alpha1.Workflow)
 			err := ibc.updateImagebuilderWork(ctx, cluster, newWF)
 			if err != nil && !errors.Is(err, sql.ErrNoRows) {
-				slog.Error("fail to update imagebuilder task", slog.Any("error", err), slog.Any("work_name", newWF.Name))
+				slog.ErrorContext(ctx, "fail to update imagebuilder task", slog.Any("error", err), slog.Any("work_name", newWF.Name))
 			}
 		},
 		DeleteFunc: func(obj interface{}) {
 			wf := obj.(*v1alpha1.Workflow)
 			err := ibc.updateImagebuilderWork(ctx, cluster, wf)
 			if err != nil {
-				slog.Error("fail to delete imagebuilder task", slog.Any("error", err), slog.Any("work_name", wf.Name))
+				slog.ErrorContext(ctx, "fail to delete imagebuilder task", slog.Any("error", err), slog.Any("work_name", wf.Name))
 			}
 		},
 	}
@@ -385,6 +386,7 @@ func wfTemplateForImageBuilder(cfg *config.Config, params ctypes.ImageBuilderReq
 					Container: &corev1.Container{
 						Name:         buildContainerType,
 						Image:        cfg.Runner.ImageBuilderKanikoImage,
+						Command:      []string{"/kaniko/executor"},
 						Args:         builderArgs,
 						VolumeMounts: containerVolumeMounts,
 						Env: []corev1.EnvVar{
@@ -433,12 +435,13 @@ func (ibc *imagebuilderComponentImpl) updateImagebuilderWork(ctx context.Context
 		return fmt.Errorf("failed to get work meta data from wf: %w", err)
 	}
 
+	imageName := buildImageName(workMeta.OrgName, workMeta.SpaceName, workMeta.RepoId, workMeta.LastCommitID)
 	ibc.addKServiceWithEvent(ctypes.RunnerBuilderChange, ctypes.ImageBuilderEvent{
 		DeployId:   workMeta.DeployId,
 		TaskId:     workMeta.TaskId,
 		Status:     string(wf.Status.Phase),
 		Message:    wf.Status.Message,
-		ImagetPath: workMeta.LastCommitID,
+		ImagetPath: imageName,
 	})
 
 	return err
@@ -475,13 +478,11 @@ func createOrUpdateConfigMap(ctx context.Context, client kubernetes.Interface, c
 
 func (ibc *imagebuilderComponentImpl) newPersistentVolumeClaim(ctx context.Context, cluster *cluster.Cluster, pvcName string) error {
 	// Check if it already exists
-	slog.Info("check pvc for imagebuilder", slog.String("pvc", pvcName), slog.String("storageClass", cluster.StorageClass), slog.Any("storage len", len(cluster.StorageClass)))
 	_, err := cluster.Client.CoreV1().PersistentVolumeClaims(ibc.config.Cluster.SpaceNamespace).Get(ctx, pvcName, metav1.GetOptions{})
 	if err == nil {
 		return nil
 	}
 
-	slog.Info("create pvc for imagebuilder", slog.String("pvc", pvcName), slog.String("storageClass", cluster.StorageClass), slog.Any("storage len", len(cluster.StorageClass)))
 	storage, err := resource.ParseQuantity("50Gi")
 	if err != nil {
 		return err
@@ -588,4 +589,11 @@ func (ibc *imagebuilderComponentImpl) generateWorkName(orgName, spaceName, deplo
 		baseName = baseName[:63]
 	}
 	return baseName
+}
+
+func buildImageName(orgName, spaceName string, repoID int64, commitId string) string {
+	if len(commitId) > 10 {
+		commitId = commitId[:10]
+	}
+	return fmt.Sprintf("%s-%s-%d:%s", strings.ToLower(orgName), strings.ToLower(spaceName), repoID, commitId)
 }

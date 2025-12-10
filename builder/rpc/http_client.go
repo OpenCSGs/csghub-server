@@ -19,9 +19,7 @@ import (
 	slogmulti "github.com/samber/slog-multi"
 	"go.opentelemetry.io/contrib/bridges/otelslog"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
-	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/common/config"
-	"opencsg.com/csghub-server/common/errorx"
 )
 
 type HttpDoer interface {
@@ -112,7 +110,7 @@ func (c *HttpClient) Get(ctx context.Context, path string, outObj interface{}) e
 	fullPath := fmt.Sprintf("%s%s", c.endpoint, path)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fullPath, nil)
 	if err != nil {
-		return fmt.Errorf("failed to create request: %w", errorx.ErrInternalServerError)
+		return fmt.Errorf("failed to create request: %w", err)
 	}
 	for _, opt := range c.authOpts {
 		opt.Set(req)
@@ -125,17 +123,11 @@ func (c *HttpClient) Get(ctx context.Context, path string, outObj interface{}) e
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		var errResp httpbase.R
-		jsonErr := json.NewDecoder(resp.Body).Decode(&errResp)
-		if jsonErr == nil {
-			customErr := errorx.ParseError(errResp.Msg, errorx.ErrRemoteServiceFail, errResp.Context)
-			return customErr
-		}
 		return fmt.Errorf("failed to get response, path:%s, status:%d", path, resp.StatusCode)
 	}
 	err = json.NewDecoder(resp.Body).Decode(outObj)
 	if err != nil {
-		return fmt.Errorf("failed to decode resp body in HttpClient.Get, err:%w", errorx.ErrInternalServerError)
+		return fmt.Errorf("failed to decode resp body in HttpClient.Get, err:%w", err)
 	}
 	return nil
 }
@@ -170,19 +162,13 @@ func (c *HttpClient) Post(ctx context.Context, path string, data interface{}, ou
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		var errResp httpbase.R
-		jsonErr := json.NewDecoder(resp.Body).Decode(&errResp)
-		if jsonErr == nil {
-			customErr := errorx.ParseError(errResp.Msg, errorx.ErrRemoteServiceFail, errResp.Context)
-			return customErr
-		}
 		return fmt.Errorf("failed to get response, path:%s, status:%d", path, resp.StatusCode)
 	}
 
 	if outObj != nil {
 		err = json.NewDecoder(resp.Body).Decode(outObj)
 		if err != nil {
-			return fmt.Errorf("failed to decode resp body in HttpClient.Post, err:%w", errorx.ErrInternalServerError)
+			return fmt.Errorf("failed to decode resp body in HttpClient.Post, err:%w", err)
 		}
 	}
 
@@ -192,8 +178,8 @@ func (c *HttpClient) Post(ctx context.Context, path string, data interface{}, ou
 func (c *HttpClient) Do(req *http.Request) (resp *http.Response, err error) {
 	ctx := req.Context()
 	fullPath := req.URL.String()
-	traceID, traceParent, isNew := trace.GetOrGenTraceIDFromContext(ctx)
-	if isNew {
+	traceID, traceParent, _ := trace.GetOrGenTraceIDFromContext(ctx)
+	if traceParent != "" {
 		req.Header.Set(trace.HeaderTraceparent, traceParent)
 	}
 
