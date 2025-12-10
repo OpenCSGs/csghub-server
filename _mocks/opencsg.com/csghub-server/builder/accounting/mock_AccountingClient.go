@@ -782,7 +782,7 @@ func (_c *MockAccountingClient_ListStatementByUserIDAndTime_Call) RunAndReturn(r
 }
 
 // PresentAccountingUser provides a mock function with given fields: userID, req
-func (_m *MockAccountingClient) PresentAccountingUser(userID string, req types.ACTIVITY_REQ) (any, error) {
+func (_m *MockAccountingClient) PresentAccountingUser(userID string, req types.ActivityReq) (any, error) {
 	ret := _m.Called(userID, req)
 
 	if len(ret) == 0 {
@@ -791,10 +791,10 @@ func (_m *MockAccountingClient) PresentAccountingUser(userID string, req types.A
 
 	var r0 any
 	var r1 error
-	if rf, ok := ret.Get(0).(func(string, types.ACTIVITY_REQ) (any, error)); ok {
+	if rf, ok := ret.Get(0).(func(string, types.ActivityReq) (any, error)); ok {
 		return rf(userID, req)
 	}
-	if rf, ok := ret.Get(0).(func(string, types.ACTIVITY_REQ) any); ok {
+	if rf, ok := ret.Get(0).(func(string, types.ActivityReq) any); ok {
 		r0 = rf(userID, req)
 	} else {
 		if ret.Get(0) != nil {
@@ -802,7 +802,7 @@ func (_m *MockAccountingClient) PresentAccountingUser(userID string, req types.A
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(string, types.ACTIVITY_REQ) error); ok {
+	if rf, ok := ret.Get(1).(func(string, types.ActivityReq) error); ok {
 		r1 = rf(userID, req)
 	} else {
 		r1 = ret.Error(1)
@@ -818,14 +818,14 @@ type MockAccountingClient_PresentAccountingUser_Call struct {
 
 // PresentAccountingUser is a helper method to define mock.On call
 //   - userID string
-//   - req types.ACTIVITY_REQ
+//   - req types.ActivityReq
 func (_e *MockAccountingClient_Expecter) PresentAccountingUser(userID interface{}, req interface{}) *MockAccountingClient_PresentAccountingUser_Call {
 	return &MockAccountingClient_PresentAccountingUser_Call{Call: _e.mock.On("PresentAccountingUser", userID, req)}
 }
 
-func (_c *MockAccountingClient_PresentAccountingUser_Call) Run(run func(userID string, req types.ACTIVITY_REQ)) *MockAccountingClient_PresentAccountingUser_Call {
+func (_c *MockAccountingClient_PresentAccountingUser_Call) Run(run func(userID string, req types.ActivityReq)) *MockAccountingClient_PresentAccountingUser_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string), args[1].(types.ACTIVITY_REQ))
+		run(args[0].(string), args[1].(types.ActivityReq))
 	})
 	return _c
 }
@@ -835,7 +835,7 @@ func (_c *MockAccountingClient_PresentAccountingUser_Call) Return(_a0 any, _a1 e
 	return _c
 }
 
-func (_c *MockAccountingClient_PresentAccountingUser_Call) RunAndReturn(run func(string, types.ACTIVITY_REQ) (any, error)) *MockAccountingClient_PresentAccountingUser_Call {
+func (_c *MockAccountingClient_PresentAccountingUser_Call) RunAndReturn(run func(string, types.ActivityReq) (any, error)) *MockAccountingClient_PresentAccountingUser_Call {
 	_c.Call.Return(run)
 	return _c
 }

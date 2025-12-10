@@ -6,33 +6,41 @@
   "engine_images": [
     {
       "compute_type": "gpu",
-      "image": "opencsghq/vllm:v0.10.2-cu128",
+      "image": "opencsghq/vllm:v0.11.0-cu128",
       "driver_version": "12.8",
-      "engine_version": "v0.10.2",
-      "extra_archs":[
+      "engine_version": "v0.11.0",
+      "extra_archs": [
+        "ApertusForCausalLM",
         "ArceeForCausalLM",
         "BailingMoeForCausalLM",
+        "BailingMoeV2ForCausalLM",
         "Dots1ForCausalLM",
-        "Ernie4_5_ForCausalLM",
+        "DotsOCRForCausalLM",
+        "Ernie4_5ForCausalLM",
         "Ernie4_5_MoeForCausalLM",
         "Exaone4ForCausalLM",
         "Fairseq2LlamaForCausalLM",
+        "FalconH1ForCausalLM",
+        "FlexOlmoForCausalLM",
         "Gemma3nForCausalLM",
         "Glm4MoeForCausalLM",
         "GptOssForCausalLM",
         "GraniteMoeHybridForCausalLM",
-        "HCXVisionForCausalLM",
-        "HunYuanDenseV1ForCausalLM",
         "HunYuanDenseV1ForCausalLM",
         "HunYuanMoEV1ForCausalLM",
+        "HCXVisionForCausalLM",
+        "KimiLinearForCausalLM",
+        "Lfm2ForCausalLM",
+        "Lfm2MoeForCausalLM",
         "Mamba2ForCausalLM",
-        "MBartForConditionalGeneration",
         "MiMoForCausalLM",
-        "MiMoForCausalLM",
+        "MiniMaxM2ForCausalLM",
         "NemotronHForCausalLM",
-        "Phi4FlashForCausalLM",
+        "Phi4MMForCausalLM",
         "Qwen3NextForCausalLM",
-        "SeedOssForCausalLM"
+        "SeedOssForCausalLM",
+        "LongcatFlashForCausalLM",
+        "SmolLM3ForCausalLM"
       ]
     },
     {
@@ -40,7 +48,7 @@
       "image": "opencsghq/vllm:v0.9.2-cu118",
       "driver_version": "11.8",
       "engine_version": "v0.9.2",
-      "extra_archs":[
+      "extra_archs": [
         "Ernie4_5_ForCausalLM",
         "Ernie4_5_MoeForCausalLM",
         "HunYuanDenseV1ForCausalLM",
@@ -61,8 +69,16 @@
     }
   ],
   "engine_args": [
-    { "name": "block-size", "value": "128", "format": "--block-size %s" },
-    { "name": "dtype", "value": "auto", "format": "--dtype %s" },
+    {
+      "name": "block-size",
+      "value": "128",
+      "format": "--block-size %s"
+    },
+    {
+      "name": "dtype",
+      "value": "auto",
+      "format": "--dtype %s"
+    },
     {
       "name": "gpu-memory-utilization",
       "value": "0.8",
@@ -78,13 +94,21 @@
       "value": "1",
       "format": "--tensor-parallel-size %s"
     },
-    { "name": "max-num-seqs", "value": "256", "format": "--max-num-seqs %s" },
+    {
+      "name": "max-num-seqs",
+      "value": "256",
+      "format": "--max-num-seqs %s"
+    },
     {
       "name": "scheduling-policy",
       "value": "fcfs",
       "format": "--scheduling-policy %s"
     },
-    { "name": "cpu-offload-gb", "value": "0", "format": "--cpu-offload-gb %s" },
+    {
+      "name": "cpu-offload-gb",
+      "value": "0",
+      "format": "--cpu-offload-gb %s"
+    },
     {
       "name": "pipeline-parallel-size",
       "value": "1",
@@ -95,8 +119,16 @@
       "value": "xgrammar",
       "format": "--guided-decoding-backend %s"
     },
-    { "name": "swap-space", "value": "4", "format": "--swap-space %s" },
-    { "name": "load-format", "value": "auto", "format": "--load-format %s" },
+    {
+      "name": "swap-space",
+      "value": "4",
+      "format": "--swap-space %s"
+    },
+    {
+      "name": "load-format",
+      "value": "auto",
+      "format": "--load-format %s"
+    },
     {
       "name": "max-num-batched-tokens",
       "value": "4096",
@@ -112,18 +144,31 @@
       "value": "enable",
       "format": "--enable-chunked-prefill"
     },
-    { "name": "enforce-eager", "value": "enable", "format": "--enforce-eager" },
+    {
+      "name": "enforce-eager",
+      "value": "enable",
+      "format": "--enforce-eager"
+    },
     {
       "name": "disable-custom-all-reduce",
       "value": "enable",
       "format": "--disable-custom-all-reduce"
     },
     {
+      "name": "enable-tool-calling",
+      "value": "disable",
+      "format": "--enable-auto-tool-choice"
+    },
+    {
       "name": "limit-mm-per-prompt",
       "value": "image=5,video=5",
       "format": "--limit-mm-per-prompt %s"
     },
-    { "name": "custom-options", "value": "", "format": "%s" }
+    {
+      "name": "custom-options",
+      "value": "",
+      "format": "%s"
+    }
   ],
   "supported_archs": [
     "AquilaForCausalLM",
@@ -197,5 +242,35 @@
     "MiniMaxM1ForCausalLM",
     "MiniMaxText01ForCausalLM",
     "Zamba2ForCausalLM"
-  ]
+  ],
+  "tool_call_parsers": {
+    "DeepseekV3ForCausalLM": "deepseek_v3",
+    "DeepseekV31ForCausalLM": "deepseek_v31",
+    "DeepseekR1ForCausalLM": "deepseek_r1",
+    "GraniteForCausalLM": "granite",
+    "HermesForCausalLM": "hermes",
+    "InternLMForCausalLM": "internlm",
+    "InternLM2ForCausalLM": "internlm",
+    "InternLM3ForCausalLM": "internlm",
+    "JambaForCausalLM": "jamba",
+    "LlamaForCausalLM": "pythonic",
+    "PythonicForCausalLM": "pythonic",
+    "ToolACEForCausalLM": "pythonic",
+    "UltravoxForCausalLM": "pythonic",
+    "Llama3ForCausalLM": "llama3_json",
+    "Llama4ForCausalLM": "llama4_json",
+    "MistralForCausalLM": "mistral",
+    "MixtralForCausalLM": "mistral",
+    "Phi4MiniForCausalLM": "phi4_mini_json",
+    "QwenForCausalLM": "hermes",
+    "Qwen2ForCausalLM": "hermes",
+    "Qwen2MoeForCausalLM": "hermes",
+    "Qwen3ForCausalLM": "hermes",
+    "Qwen3MoeForCausalLM": "hermes",
+    "xLAMForCausalLM": "xlam",
+    "MiniMaxM1ForCausalLM": "minimax_m1",
+    "MiniMaxText01ForCausalLM": "minimax_m1",
+    "KimiK2ForCausalLM": "kimi_k2",
+    "HunyuanA13BForCausalLM": "hunyuan_a13b"
+  }
 }

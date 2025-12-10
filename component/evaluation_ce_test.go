@@ -138,6 +138,87 @@ func TestEvaluationComponent_CreateEvaluation(t *testing.T) {
 		require.Equal(t, "test", e.TaskName)
 		require.Nil(t, err)
 	})
+
+	t.Run("create evaluation with invalid model id", func(t *testing.T) {
+		c := initializeTestEvaluationComponent(ctx, t)
+		invalidReq := types.EvaluationReq{
+			TaskName:           "test",
+			ModelIds:           []string{"badmodelid"},
+			Username:           "test",
+			ResourceId:         0,
+			Datasets:           []string{"opencsg/hellaswag"},
+			RuntimeFrameworkId: 1,
+		}
+		c.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, invalidReq.Username).Return(database.User{
+			RoleMask: "admin",
+			Username: invalidReq.Username,
+			UUID:     invalidReq.Username,
+			ID:       1,
+		}, nil).Once()
+		_, err := c.CreateEvaluation(ctx, invalidReq)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "invalid model id format: badmodelid")
+	})
+
+	t.Run("create evaluation with invalid dataset", func(t *testing.T) {
+		c := initializeTestEvaluationComponent(ctx, t)
+		invalidReq := types.EvaluationReq{
+			TaskName:           "test",
+			ModelIds:           []string{"opencsg/wukong"},
+			Username:           "test",
+			ResourceId:         0,
+			Datasets:           []string{"baddataset"},
+			RuntimeFrameworkId: 1,
+		}
+		c.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, invalidReq.Username).Return(database.User{
+			RoleMask: "admin",
+			Username: invalidReq.Username,
+			UUID:     invalidReq.Username,
+			ID:       1,
+		}, nil).Once()
+		c.mocks.stores.ModelMock().EXPECT().FindByPath(ctx, "opencsg", "wukong").Return(
+			&database.Model{
+				ID: 1,
+				Repository: &database.Repository{
+					DefaultBranch: "main",
+				},
+			}, nil,
+		).Once()
+		c.mocks.stores.AccessTokenMock().EXPECT().FindByUID(ctx, int64(1)).Return(&database.AccessToken{Token: "foo"}, nil).Once()
+		_, err := c.CreateEvaluation(ctx, invalidReq)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "failed to generate mirror repo ids")
+	})
+
+	t.Run("create evaluation with invalid custom dataset", func(t *testing.T) {
+		c := initializeTestEvaluationComponent(ctx, t)
+		invalidReq := types.EvaluationReq{
+			TaskName:           "test",
+			ModelIds:           []string{"opencsg/wukong"},
+			Username:           "test",
+			ResourceId:         0,
+			CustomDataSets:     []string{"badcustomdataset"},
+			RuntimeFrameworkId: 1,
+		}
+		c.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, invalidReq.Username).Return(database.User{
+			RoleMask: "admin",
+			Username: invalidReq.Username,
+			UUID:     invalidReq.Username,
+			ID:       1,
+		}, nil).Once()
+		c.mocks.stores.ModelMock().EXPECT().FindByPath(ctx, "opencsg", "wukong").Return(
+			&database.Model{
+				ID: 1,
+				Repository: &database.Repository{
+					DefaultBranch: "main",
+				},
+			}, nil,
+		).Once()
+		c.mocks.stores.AccessTokenMock().EXPECT().FindByUID(ctx, int64(1)).Return(&database.AccessToken{Token: "foo"}, nil).Once()
+		_, err := c.CreateEvaluation(ctx, invalidReq)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "failed to generate mirror repo ids")
+	})
 }
 
 func TestEvaluationComponent_GetEvaluation(t *testing.T) {

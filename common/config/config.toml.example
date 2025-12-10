@@ -231,7 +231,9 @@ drop_msg_timeout = 60
 max_retries = 3
 retry_interval = 1
 health_interval = 5
-line_separator= "\\n"
+line_separator = "\\n"
+max_store_time_day = 7
+query_last_report_timeout = 10
 
 [git]
 operation_timeout = 10

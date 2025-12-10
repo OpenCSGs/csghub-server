@@ -148,6 +148,8 @@ func TestGetRegisterFile(t *testing.T) {
 		expected string
 	}{
 		{"", ""},
+		{"saas", extendRegisterFileSaas},
+		{"ee", extendRegisterFileEE},
 		{"ce", scenarioRegisterFile},
 		{"unknown", ""},
 	}
@@ -303,6 +305,8 @@ func TestRunNotifyGen(t *testing.T) {
 
 	t.Run("getRegisterFile", func(t *testing.T) {
 		assert.Equal(t, "", getRegisterFile(""))
+		assert.Equal(t, extendRegisterFileSaas, getRegisterFile("saas"))
+		assert.Equal(t, extendRegisterFileEE, getRegisterFile("ee"))
 		assert.Equal(t, scenarioRegisterFile, getRegisterFile("ce"))
 	})
 }

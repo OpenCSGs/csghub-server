@@ -59,7 +59,7 @@ type CreateMirrorRepoReq struct {
 	SourceNamespace string `json:"source_namespace" binding:"required"`
 	SourceName      string `json:"source_name" binding:"required"`
 	// source id for HF,github etc
-	MirrorSourceID int64 `json:"mirror_source_id" binding:"required"`
+	MirrorSourceID int64 `json:"mirror_source_id"`
 
 	// repo basic info
 	RepoType RepositoryType `json:"repo_type" binding:"required"`
@@ -219,4 +219,9 @@ type UpdateMirrorNamespaceMappingReq struct {
 	TargetNamespace *string `json:"target_namespace"`
 	Enabled         *bool   `json:"enabled"`
 	ID              int64   `json:"id"`
+}
+
+type MirrorFilter struct {
+	Search string            `json:"search"`
+	Status *MirrorTaskStatus `json:"status"`
 }

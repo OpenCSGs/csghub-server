@@ -8,6 +8,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+var maxTagLength int = 128
+
 // MetaTags parse metadata of README file, return tags found
 func MetaTags(readme string) (map[string][]string, error) {
 	meta := metaText(readme)
@@ -28,11 +30,21 @@ func MetaTags(readme string) (map[string][]string, error) {
 		slog.Debug("tag category map content", slog.String("category", category), slog.Any("content", content))
 		//TODO: define different content parser
 		if tagName, match := content.(string); match {
-			categoryTags[category] = append(categoryTags[category], strings.TrimSpace(tagName))
+			tagName = strings.TrimSpace(tagName)
+			if len(tagName) > maxTagLength {
+				slog.Debug("skip too long tag name", slog.String("name", tagName))
+				continue
+			}
+			categoryTags[category] = append(categoryTags[category], tagName)
 		} else if tagNames, match := content.([]interface{}); match {
 			for _, tagNameValue := range tagNames {
 				if tagName, isString := tagNameValue.(string); isString {
-					categoryTags[category] = append(categoryTags[category], strings.TrimSpace(tagName))
+					tagName = strings.TrimSpace(tagName)
+					if len(tagName) > maxTagLength {
+						slog.Debug("skip too long tag name", slog.String("name", tagName))
+						continue
+					}
+					categoryTags[category] = append(categoryTags[category], tagName)
 				} else {
 					//ignore
 					slog.Warn("ignore unknown tag format", slog.Any("tagNameValue", tagNameValue))

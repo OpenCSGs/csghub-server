@@ -16,21 +16,23 @@ type RepoFileContentReader struct {
 	git         gitserver.GitServer
 	innerReader io.ReadCloser
 	once        *sync.Once
+	closeOnce   *sync.Once
+	closeErr    error
 }
 
 var _ io.ReadCloser = (*RepoFileContentReader)(nil)
 
 func NewRepoFileContentReader(file *database.RepositoryFile, git gitserver.GitServer) *RepoFileContentReader {
 	return &RepoFileContentReader{
-		file: file,
-		git:  git,
-		once: &sync.Once{},
+		file:      file,
+		git:       git,
+		once:      &sync.Once{},
+		closeOnce: &sync.Once{},
 	}
 }
 
 func (c *RepoFileContentReader) Read(p []byte) (n int, err error) {
 	c.lazyInit()
-
 	if c.innerReader == nil {
 		return 0, errors.New("failed to read file content as git file reader not initialized")
 	}
@@ -38,10 +40,12 @@ func (c *RepoFileContentReader) Read(p []byte) (n int, err error) {
 }
 
 func (c *RepoFileContentReader) Close() error {
-	if c.innerReader == nil {
-		return errors.New("failed to close reader as git file reader not initialized")
-	}
-	return c.innerReader.Close()
+	c.closeOnce.Do(func() {
+		if c.innerReader != nil {
+			c.closeErr = c.innerReader.Close()
+		}
+	})
+	return c.closeErr
 }
 
 func (c *RepoFileContentReader) lazyInit() {
@@ -54,7 +58,7 @@ func (c *RepoFileContentReader) lazyInit() {
 			RepoType:  c.file.Repository.RepositoryType,
 			Ref:       c.file.Repository.DefaultBranch,
 		}
-
+		// use context with timeout
 		ctx := context.Background()
 		var err error
 		c.innerReader, _, err = c.git.GetRepoFileReader(ctx, req)

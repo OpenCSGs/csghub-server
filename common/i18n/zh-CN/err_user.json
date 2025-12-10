@@ -1,0 +1,56 @@
+{
+    "error.USER-ERR-0": {
+        "other": "需要提供电话号码"
+    },
+    "error.USER-ERR-1": {
+        "other": "新电话号码必须与当前电话号码不同"
+    },
+    "error.USER-ERR-10": {
+        "other": "验证码长度必须为6"
+    },
+    "error.USER-ERR-11": {
+        "other": "无效的电话号码"
+    },
+    "error.USER-ERR-12": {
+        "other": "用户名已存在"
+    },
+    "error.USER-ERR-13": {
+        "other": "邮箱已存在"
+    },
+    "error.USER-ERR-14": {
+        "other": "管理员用户不能被删除"
+    },
+    "error.USER-ERR-15": {
+        "other": "拥有组织的用户不能被删除"
+    },
+    "error.USER-ERR-16": {
+        "other": "拥有部署资源的用户不能被删除"
+    },
+    "error.USER-ERR-17": {
+        "other": "拥有账单的用户不能被删除"
+    },
+    "error.USER-ERR-2": {
+        "other": "新电话号码已经存在于sso服务中"
+    },
+    "error.USER-ERR-3": {
+        "other": "禁止更改电话号码"
+    },
+    "error.USER-ERR-4": {
+        "other": "更新电话号码失败"
+    },
+    "error.USER-ERR-5": {
+        "other": "禁止频繁发送手机验证码"
+    },
+    "error.USER-ERR-6": {
+        "other": "发送手机验证码失败"
+    },
+    "error.USER-ERR-7": {
+        "other": "手机验证码已过期或不存在"
+    },
+    "error.USER-ERR-8": {
+        "other": "手机验证码无效"
+    },
+    "error.USER-ERR-9": {
+        "other": "验证码不能为空"
+    }
+}

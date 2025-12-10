@@ -37,8 +37,9 @@ type UpdateRepoReq struct {
 	// The new description for the repository
 	Description *string `json:"description"`
 	// The new visibility of the repository
-	Private *bool  `json:"private" example:"false"`
-	Admin   string `json:"-"`
+	Private     *bool  `json:"private" example:"false"`
+	Admin       string `json:"-"`
+	XnetEnabled *bool  `json:"xnet_enabled"`
 }
 
 // make sure UpdateModelReq implements SensitiveRequest interface
@@ -207,6 +208,7 @@ type Model struct {
 	HighRiskCount           int                  `json:"high_risk_count"`
 	URL                     string               `json:"url"`
 	MirrorTaskStatus        MirrorTaskStatus     `json:"mirror_task_status"`
+	XnetEnabled             bool                 `json:"xnet_enabled"`
 	MultiSource
 }
 
@@ -268,6 +270,7 @@ type ModelRunReq struct {
 	OrderDetailID      int64  `json:"order_detail_id"`
 	Entrypoint         string `json:"entrypoint"` // model file name for gguf model
 	EngineArgs         string `json:"engine_args"`
+	Agent              string `json:"agent"`
 }
 
 var _ SensitiveRequestV2 = (*ModelRunReq)(nil)
@@ -350,6 +353,7 @@ type DeployActReq struct {
 	DeployID     int64          `json:"deploy_id"`
 	DeployType   int            `json:"deploy_type"`
 	InstanceName string         `json:"instance_name"`
+	Since        string         `json:"since,omitempty"`
 }
 
 type DeployUpdateReq struct {
@@ -433,17 +437,18 @@ type ModelConfig struct {
 	TorchDtype        string   `json:"torch_dtype"`
 }
 type EngineConfig struct {
-	EngineName      string      `json:"engine_name"`
-	ContainerPort   int         `json:"container_port"`
-	MinVersion      string      `json:"min_version"`
-	ModelFormat     string      `json:"model_format"`
-	EngineImages    []Image     `json:"engine_images"`
-	SupportedArchs  []string    `json:"supported_archs"`
-	SupportedModels []string    `json:"supported_models"`
-	EngineArgs      []EngineArg `json:"engine_args"`
-	Enabled         int64       `json:"enabled"`
-	UpdatedAt       time.Time   `json:"updated_at"`
-	Description     string      `json:"description"`
+	EngineName       string            `json:"engine_name"`
+	ContainerPort    int               `json:"container_port"`
+	MinVersion       string            `json:"min_version"`
+	ModelFormat      string            `json:"model_format"`
+	EngineImages     []Image           `json:"engine_images"`
+	SupportedArchs   []string          `json:"supported_archs"`
+	SupportedModels  []string          `json:"supported_models"`
+	EngineArgs       []EngineArg       `json:"engine_args"`
+	Enabled          int64             `json:"enabled"`
+	UpdatedAt        time.Time         `json:"updated_at"`
+	Description      string            `json:"description"`
+	ToolCallParsers  map[string]string `json:"tool_call_parsers,omitempty"`
 }
 
 type ComputeType string

@@ -50,7 +50,7 @@ type MirrorComponent interface {
 	// CreateMirrorRepo often called by the crawler server to create new repo which will then be mirrored from other sources
 	CreateMirrorRepo(ctx context.Context, req types.CreateMirrorRepoReq) (*database.Mirror, error)
 	Repos(ctx context.Context, per, page int) ([]types.MirrorRepo, int, error)
-	Index(ctx context.Context, per, page int, search string) ([]types.Mirror, int, error)
+	Index(ctx context.Context, per, page int, filter types.MirrorFilter) ([]types.Mirror, int, error)
 	Statistics(ctx context.Context) ([]types.MirrorStatusCount, error)
 	BatchCreate(ctx context.Context, req types.BatchCreateMirrorReq) error
 	Schedule(ctx context.Context) error
@@ -274,12 +274,14 @@ func (c *mirrorComponentImpl) CreateMirrorRepo(ctx context.Context, req types.Cr
 		}
 		mirror.LocalRepoPath = fmt.Sprintf("%s_%s_%s_%s", mirrorSource.SourceName, req.RepoType, req.SourceNamespace, req.SourceName)
 	}
+
 	// mirror.Interval = req.Interval
 	mirror.SourceUrl = req.SourceGitCloneUrl
 	mirror.MirrorSourceID = req.MirrorSourceID
 	mirror.Username = req.SourceNamespace
 	mirror.RepositoryID = repo.ID
 	mirror.Repository = repo
+
 	mirror.SourceRepoPath = fmt.Sprintf("%s/%s", req.SourceNamespace, req.SourceName)
 	mirror.Priority = types.ASAPMirrorPriority
 
@@ -381,7 +383,7 @@ func getAllFiles(ctx context.Context, namespace, repoName, folder string, repoTy
 
 func (c *mirrorComponentImpl) Repos(ctx context.Context, per, page int) ([]types.MirrorRepo, int, error) {
 	var mirrorRepos []types.MirrorRepo
-	mirros, total, err := c.mirrorStore.IndexWithPagination(ctx, per, page, "", true)
+	mirros, total, err := c.mirrorStore.IndexWithPagination(ctx, per, page, types.MirrorFilter{}, true)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to get mirror repositories: %v", err)
 	}
@@ -400,9 +402,9 @@ func (c *mirrorComponentImpl) Repos(ctx context.Context, per, page int) ([]types
 	return mirrorRepos, total, nil
 }
 
-func (c *mirrorComponentImpl) Index(ctx context.Context, per, page int, search string) ([]types.Mirror, int, error) {
+func (c *mirrorComponentImpl) Index(ctx context.Context, per, page int, filter types.MirrorFilter) ([]types.Mirror, int, error) {
 	var mirrorsResp []types.Mirror
-	mirrors, total, err := c.mirrorStore.IndexWithPagination(ctx, per, page, search, false)
+	mirrors, total, err := c.mirrorStore.IndexWithPagination(ctx, per, page, filter, false)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to get mirror mirrors: %v", err)
 	}

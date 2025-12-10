@@ -24,6 +24,53 @@ func (_m *MockSSOInterface) EXPECT() *MockSSOInterface_Expecter {
 	return &MockSSOInterface_Expecter{mock: &_m.Mock}
 }
 
+// CreateInvitation provides a mock function with given fields: ctx, code
+func (_m *MockSSOInterface) CreateInvitation(ctx context.Context, code string) error {
+	ret := _m.Called(ctx, code)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateInvitation")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) error); ok {
+		r0 = rf(ctx, code)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockSSOInterface_CreateInvitation_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateInvitation'
+type MockSSOInterface_CreateInvitation_Call struct {
+	*mock.Call
+}
+
+// CreateInvitation is a helper method to define mock.On call
+//   - ctx context.Context
+//   - code string
+func (_e *MockSSOInterface_Expecter) CreateInvitation(ctx interface{}, code interface{}) *MockSSOInterface_CreateInvitation_Call {
+	return &MockSSOInterface_CreateInvitation_Call{Call: _e.mock.On("CreateInvitation", ctx, code)}
+}
+
+func (_c *MockSSOInterface_CreateInvitation_Call) Run(run func(ctx context.Context, code string)) *MockSSOInterface_CreateInvitation_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockSSOInterface_CreateInvitation_Call) Return(_a0 error) *MockSSOInterface_CreateInvitation_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockSSOInterface_CreateInvitation_Call) RunAndReturn(run func(context.Context, string) error) *MockSSOInterface_CreateInvitation_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // DeleteUser provides a mock function with given fields: ctx, uuid
 func (_m *MockSSOInterface) DeleteUser(ctx context.Context, uuid string) error {
 	ret := _m.Called(ctx, uuid)
@@ -67,6 +114,63 @@ func (_c *MockSSOInterface_DeleteUser_Call) Return(_a0 error) *MockSSOInterface_
 }
 
 func (_c *MockSSOInterface_DeleteUser_Call) RunAndReturn(run func(context.Context, string) error) *MockSSOInterface_DeleteUser_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetInvitationCode provides a mock function with given fields: ctx, userUUID
+func (_m *MockSSOInterface) GetInvitationCode(ctx context.Context, userUUID string) (string, error) {
+	ret := _m.Called(ctx, userUUID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetInvitationCode")
+	}
+
+	var r0 string
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (string, error)); ok {
+		return rf(ctx, userUUID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) string); ok {
+		r0 = rf(ctx, userUUID)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, userUUID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockSSOInterface_GetInvitationCode_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetInvitationCode'
+type MockSSOInterface_GetInvitationCode_Call struct {
+	*mock.Call
+}
+
+// GetInvitationCode is a helper method to define mock.On call
+//   - ctx context.Context
+//   - userUUID string
+func (_e *MockSSOInterface_Expecter) GetInvitationCode(ctx interface{}, userUUID interface{}) *MockSSOInterface_GetInvitationCode_Call {
+	return &MockSSOInterface_GetInvitationCode_Call{Call: _e.mock.On("GetInvitationCode", ctx, userUUID)}
+}
+
+func (_c *MockSSOInterface_GetInvitationCode_Call) Run(run func(ctx context.Context, userUUID string)) *MockSSOInterface_GetInvitationCode_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockSSOInterface_GetInvitationCode_Call) Return(_a0 string, _a1 error) *MockSSOInterface_GetInvitationCode_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockSSOInterface_GetInvitationCode_Call) RunAndReturn(run func(context.Context, string) (string, error)) *MockSSOInterface_GetInvitationCode_Call {
 	_c.Call.Return(run)
 	return _c
 }

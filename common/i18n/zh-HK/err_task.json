@@ -9,6 +9,12 @@
         "other": "多主機推理僅支持大於 0 的最低副本數"
     },
     "error.TASK-ERR-3": {
-        "other": "多機模式暫不支持notebook"
+        "other": "不支援多主機 Notebook"
+    },
+    "error.TASK-ERR-4": {
+        "other": "集群資源不足"
+    },
+    "error.TASK-ERR-5": {
+        "other": "集群當前不可用"
     }
 }

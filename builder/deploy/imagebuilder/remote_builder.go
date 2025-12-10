@@ -11,6 +11,7 @@ import (
 	"net/url"
 
 	"opencsg.com/csghub-server/builder/deploy/common"
+	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
@@ -20,7 +21,7 @@ var _ Builder = (*RemoteBuilder)(nil)
 
 type RemoteBuilder struct {
 	remote       *url.URL
-	client       *http.Client
+	client       rpc.HttpDoer
 	config       common.DeployConfig
 	clusterStore database.ClusterInfoStore
 }
@@ -32,8 +33,9 @@ func NewRemoteBuilder(remoteURL string, c common.DeployConfig) (*RemoteBuilder, 
 	}
 	clusterStore := database.NewClusterInfoStore()
 	return &RemoteBuilder{
-		remote:       parsedURL,
-		client:       http.DefaultClient,
+		remote: parsedURL,
+		//client:       http.DefaultClient,
+		client:       rpc.NewHttpClient(""),
 		config:       c,
 		clusterStore: clusterStore,
 	}, nil

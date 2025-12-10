@@ -23,6 +23,8 @@ type SpaceResource struct {
 	ClusterID     string       `json:"cluster_id"`
 	Resources     string       `json:"resources"`
 	Price         float64      `json:"price"`
+	PriceUnit     int64        `json:"price_unit"`
+	PriceUnitType SkuUnitType  `json:"price_unit_type"`
 	IsAvailable   bool         `json:"is_available"`
 	Type          ResourceType `json:"type"`
 	PayMode       PayMode      `json:"pay_mode"`

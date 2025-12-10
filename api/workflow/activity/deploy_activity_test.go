@@ -153,7 +153,7 @@ func TestActivities_handleDeployError(t *testing.T) {
 	task := &database.DeployTask{
 		Deploy: deploy,
 	}
-
+	tester.mockDeployTaskStore.EXPECT().GetLastTaskByType(mock.Anything, mock.Anything, mock.Anything).Return(task, nil)
 	// Setup expectations
 	tester.mockDeployTaskStore.EXPECT().UpdateInTx(
 		mock.Anything,
@@ -460,6 +460,7 @@ func TestBuildFailed(t *testing.T) {
 		Deploy:   deploy,
 	}
 
+	tester.mockDeployTaskStore.EXPECT().GetLastTaskByType(mock.Anything, mock.Anything, mock.Anything).Return(buildTask, nil)
 	tester.mockDeployTaskStore.EXPECT().GetDeployTask(mock.Anything, mock.Anything).Return(buildTask, nil)
 	tester.mockTokenStore.EXPECT().FindByUID(mock.Anything, mock.Anything).Return(&database.AccessToken{
 		ID:     0,
@@ -516,6 +517,7 @@ func TestDeploy(t *testing.T) {
 		Deploy:   deploy,
 	}
 
+	tester.mockDeployTaskStore.EXPECT().GetLastTaskByType(mock.Anything, mock.Anything, mock.Anything).Return(runTask, nil)
 	tester.mockDeployTaskStore.EXPECT().GetDeployTask(mock.Anything, mock.Anything).Return(runTask, nil)
 	tester.mockTokenStore.EXPECT().FindByUID(mock.Anything, mock.Anything).Return(&database.AccessToken{
 		ID:     0,

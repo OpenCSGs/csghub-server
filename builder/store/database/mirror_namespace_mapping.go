@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"strings"
 
 	"opencsg.com/csghub-server/common/errorx"
 )
@@ -12,7 +13,7 @@ type mirrorNamespaceMappingStoreImpl struct {
 
 type MirrorNamespaceMappingStore interface {
 	Create(ctx context.Context, mirrorNamespaceMapping *MirrorNamespaceMapping) (*MirrorNamespaceMapping, error)
-	Index(ctx context.Context) ([]MirrorNamespaceMapping, error)
+	Index(ctx context.Context, search string) ([]MirrorNamespaceMapping, error)
 	Get(ctx context.Context, id int64) (*MirrorNamespaceMapping, error)
 	FindBySourceNamespace(ctx context.Context, name string) (*MirrorNamespaceMapping, error)
 	Update(ctx context.Context, mirrorNamespaceMapping *MirrorNamespaceMapping) (MirrorNamespaceMapping, error)
@@ -54,11 +55,16 @@ func (s *mirrorNamespaceMappingStoreImpl) Create(ctx context.Context, mirrorName
 	return mirrorNamespaceMapping, nil
 }
 
-func (s *mirrorNamespaceMappingStoreImpl) Index(ctx context.Context) ([]MirrorNamespaceMapping, error) {
+func (s *mirrorNamespaceMappingStoreImpl) Index(ctx context.Context, search string) ([]MirrorNamespaceMapping, error) {
 	var mirrorNamespaceMappings []MirrorNamespaceMapping
-	err := s.db.Operator.Core.NewSelect().
-		Model(&mirrorNamespaceMappings).
-		Order("id desc").
+	query := s.db.Operator.Core.NewSelect().
+		Model(&mirrorNamespaceMappings)
+
+	if search != "" {
+		query = query.Where("LOWER(source_namespace) LIKE ? OR LOWER(target_namespace) LIKE ?", "%"+strings.ToLower(search)+"%", "%"+strings.ToLower(search)+"%")
+	}
+
+	err := query.Order("id desc").
 		Scan(ctx)
 	if err != nil {
 		return nil, errorx.HandleDBError(err, errorx.Ctx())

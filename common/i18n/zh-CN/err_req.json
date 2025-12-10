@@ -8,6 +8,12 @@
     "error.REQ-ERR-10": {
         "other": "请求过于频繁，需要验证码"
     },
+    "error.REQ-ERR-11": {
+        "other": "来自该IP位置的请求受限，需要验证码"
+    },
+    "error.REQ-ERR-12": {
+        "other": "验证码验证失败"
+    },
     "error.REQ-ERR-2": {
         "other": "请求体不能为空"
     },

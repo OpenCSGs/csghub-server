@@ -84,6 +84,9 @@ func (c *evaluationComponentImpl) CreateEvaluation(ctx context.Context, req type
 	}
 	for _, modelId := range req.ModelIds {
 		result := strings.Split(modelId, "/")
+		if len(result) != 2 {
+			return nil, fmt.Errorf("invalid model id format: %s", modelId)
+		}
 		m, err := c.modelStore.FindByPath(ctx, result[0], result[1])
 		if err != nil {
 			return nil, fmt.Errorf("cannot find model, %w", err)
@@ -163,8 +166,12 @@ func (c *evaluationComponentImpl) GenerateMirrorRepoIds(ctx context.Context, dat
 	var mirrorRepos []string
 	var revisions []string
 	for _, ds := range datasets {
-		namespace := strings.Split(ds, "/")[0]
-		name := strings.Split(ds, "/")[1]
+		parts := strings.Split(ds, "/")
+		if len(parts) != 2 {
+			return nil, nil, fmt.Errorf("invalid dataset path: %s", ds)
+		}
+		namespace := parts[0]
+		name := parts[1]
 		repo, err := c.repoStore.FindByPath(ctx, types.DatasetRepo, namespace, name)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to find dataset repo, %w", err)
@@ -179,8 +186,12 @@ func (c *evaluationComponentImpl) generateDatasetsAndTasks(ctx context.Context, 
 	var mirrorRepos []string
 	var revisions []string
 	for _, cds := range customDataSets {
-		namespace := strings.Split(cds, "/")[0]
-		name := strings.Split(cds, "/")[1]
+		parts := strings.Split(cds, "/")
+		if len(parts) != 2 {
+			return nil, nil, fmt.Errorf("invalid dataset path: %s", cds)
+		}
+		namespace := parts[0]
+		name := parts[1]
 		repo, err := c.repoStore.FindByPath(ctx, types.DatasetRepo, namespace, name)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to find dataset repo, %w", err)

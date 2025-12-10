@@ -20,21 +20,18 @@ import (
 type nonStreamResponseWriter struct {
 	internalWritter     gin.ResponseWriter
 	moderationComponent component.Moderation
-	tokenCounter        *token.ChatTokenCounter
+	tokenCounter        token.ChatTokenCounter
 	buffer              bytes.Buffer
 	hasProcessed        bool
 }
 
-func newNonStreamResponseWriter(internalWritter gin.ResponseWriter, moderationComponent component.Moderation) *nonStreamResponseWriter {
+func newNonStreamResponseWriter(internalWritter gin.ResponseWriter, moderationComponent component.Moderation, tokenCounter token.ChatTokenCounter) *nonStreamResponseWriter {
 	return &nonStreamResponseWriter{
 		internalWritter:     internalWritter,
 		moderationComponent: moderationComponent,
+		tokenCounter:        tokenCounter,
 		hasProcessed:        false,
 	}
-}
-
-func (nsw *nonStreamResponseWriter) WithLLMTokenCounter(counter *token.ChatTokenCounter) {
-	nsw.tokenCounter = counter
 }
 
 func (nsw *nonStreamResponseWriter) Header() http.Header {

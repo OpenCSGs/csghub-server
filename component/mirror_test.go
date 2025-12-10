@@ -133,7 +133,7 @@ func TestMirrorComponent_Repos(t *testing.T) {
 	ctx := context.TODO()
 	mc := initializeTestMirrorComponent(ctx, t)
 
-	mc.mocks.stores.MirrorMock().EXPECT().IndexWithPagination(ctx, 10, 1, "", true).Return([]database.Mirror{
+	mc.mocks.stores.MirrorMock().EXPECT().IndexWithPagination(ctx, 10, 1, types.MirrorFilter{Search: ""}, true).Return([]database.Mirror{
 		{
 			CurrentTask: &database.MirrorTask{Progress: 100, Status: types.MirrorLfsSyncFinished},
 			Progress:    100,
@@ -153,11 +153,11 @@ func TestMirrorComponent_Index(t *testing.T) {
 	ctx := context.TODO()
 	mc := initializeTestMirrorComponent(ctx, t)
 
-	mc.mocks.stores.MirrorMock().EXPECT().IndexWithPagination(ctx, 10, 1, "foo", false).Return(
+	mc.mocks.stores.MirrorMock().EXPECT().IndexWithPagination(ctx, 10, 1, types.MirrorFilter{Search: "foo"}, false).Return(
 		[]database.Mirror{{CurrentTask: &database.MirrorTask{Status: types.MirrorLfsSyncFinished}, Username: "user", LastMessage: "msg", Repository: &database.Repository{}}}, 100, nil,
 	)
 
-	data, total, err := mc.Index(ctx, 10, 1, "foo")
+	data, total, err := mc.Index(ctx, 10, 1, types.MirrorFilter{Search: "foo"})
 	require.Nil(t, err)
 	require.Equal(t, 100, total)
 	require.Equal(t, []types.Mirror{

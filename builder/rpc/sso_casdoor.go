@@ -4,10 +4,13 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"math"
+	"strings"
 
 	"github.com/casdoor/casdoor-go-sdk/casdoorsdk"
 	"golang.org/x/oauth2"
 	"opencsg.com/csghub-server/common/errorx"
+	"opencsg.com/csghub-server/common/utils/common"
 )
 
 type casdoorClientImpl struct {
@@ -42,8 +45,21 @@ func (c *casdoorClientImpl) UpdateUserInfo(ctx context.Context, userInfo *SSOUpd
 	if userInfo.Email != "" {
 		casu.Email = userInfo.Email
 	}
+
 	if userInfo.Phone != "" {
 		casu.Phone = userInfo.Phone
+	}
+
+	if userInfo.PhoneArea != "" {
+		if !strings.HasPrefix(userInfo.PhoneArea, "+") {
+			userInfo.PhoneArea = "+" + userInfo.PhoneArea
+		}
+		countryCode, err := common.GetCountryCodeByPhoneArea(casu.Phone, userInfo.PhoneArea)
+		if err != nil {
+			slog.Error("failed to get country code by phone area", "phone area", userInfo.PhoneArea, "error", err)
+			return fmt.Errorf("failed to get country code by phone area:%s", userInfo.PhoneArea)
+		}
+		casu.CountryCode = countryCode
 	}
 
 	// casdoor update user api don't allow empty display name, so we set it
@@ -51,6 +67,9 @@ func (c *casdoorClientImpl) UpdateUserInfo(ctx context.Context, userInfo *SSOUpd
 		casu.DisplayName = casu.Name
 	}
 
+	if userInfo.Name != "" {
+		casu.DisplayName = userInfo.Name
+	}
 	_, err = c.casClient.UpdateUserByUserId(casu.Owner, casu.Id, casu)
 	if err != nil {
 		slog.Error("UpdateUserById failed from casdoor", "err", err, "id", casu.Id, "userInfo", userInfo)
@@ -75,6 +94,15 @@ func (c *casdoorClientImpl) GetUserInfo(ctx context.Context, accessToken string)
 		)
 	}
 
+	var phoneArea string
+	if claims.User.Phone != "" && claims.User.CountryCode != "" {
+		phoneArea, err = common.GetPhoneAreaByCountryCode(claims.User.Phone, claims.User.CountryCode)
+		if err != nil {
+			// since phone area(stored in db) isn't invoked in csghub side currently, we just print the warning log
+			slog.Warn("failed to get phone area by country code", "name", claims.User.Name, "error", err)
+		}
+	}
+
 	return &SSOUserInfo{
 		WeChat:         claims.WeChat,
 		Name:           claims.User.Name,
@@ -83,6 +111,7 @@ func (c *casdoorClientImpl) GetUserInfo(ctx context.Context, accessToken string)
 		RegProvider:    SSOTypeCasdoor,
 		Gender:         claims.User.Gender,
 		Phone:          claims.User.Phone,
+		PhoneArea:      phoneArea,
 		LastSigninTime: claims.User.LastSigninTime,
 		Avatar:         claims.User.Avatar,
 		Homepage:       claims.User.Homepage,
@@ -147,4 +176,43 @@ func (c *casdoorClientImpl) IsExistByPhone(ctx context.Context, phone string) (b
 		)
 	}
 	return user != nil, nil
+}
+
+func (c *casdoorClientImpl) CreateInvitation(ctx context.Context, code string) error {
+	invitation := &casdoorsdk.Invitation{
+		Name:        fmt.Sprintf("invitation-%s", code),
+		Code:        code,
+		Quota:       math.MaxInt32,
+		UsedCount:   0,
+		State:       "Active",
+		Application: c.casClient.ApplicationName,
+		Username:    "",
+		Email:       "",
+		Phone:       "",
+		SignupGroup: "",
+		DefaultCode: code,
+	}
+	_, err := c.casClient.AddInvitation(invitation)
+	if err != nil {
+		return errorx.RemoteSvcFail(err,
+			errorx.Ctx().Set("service", "casdoor").
+				Set("code", code),
+		)
+	}
+	return nil
+}
+
+func (c *casdoorClientImpl) GetInvitationCode(ctx context.Context, userUUID string) (string, error) {
+	user, err := c.casClient.GetUserByUserId(userUUID)
+	if err != nil {
+		return "", errorx.RemoteSvcFail(err,
+			errorx.Ctx().Set("service", "casdoor").
+				Set("name_uuid", userUUID),
+		)
+	}
+	if user == nil {
+		return "", fmt.Errorf("user not found in casdoor by name_uuid:%s", userUUID)
+	}
+
+	return user.InvitationCode, nil
 }

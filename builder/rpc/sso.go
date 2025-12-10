@@ -23,6 +23,8 @@ type SSOInterface interface {
 	IsExistByName(ctx context.Context, name string) (bool, error)
 	IsExistByEmail(ctx context.Context, email string) (bool, error)
 	IsExistByPhone(ctx context.Context, phone string) (bool, error)
+	CreateInvitation(ctx context.Context, code string) error
+	GetInvitationCode(ctx context.Context, userUUID string) (string, error)
 }
 
 func NewSSOClient(config *config.Config) (SSOInterface, error) {
@@ -55,6 +57,7 @@ type SSOUserInfo struct {
 	RegProvider    string
 	Gender         string
 	Phone          string
+	PhoneArea      string
 	LastSigninTime string
 	Avatar         string
 	Homepage       string
@@ -62,9 +65,10 @@ type SSOUserInfo struct {
 }
 
 type SSOUpdateUserInfo struct {
-	UUID   string
-	Name   string
-	Email  string
-	Gender string
-	Phone  string
+	UUID      string
+	Name      string
+	Email     string
+	Gender    string
+	Phone     string
+	PhoneArea string
 }

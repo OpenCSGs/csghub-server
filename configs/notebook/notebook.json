@@ -23,6 +23,12 @@
       "engine_version": "4.2.5"
     },
     {
+      "compute_type": "gpu",
+      "image": "opencsghq/notebook:ubuntu-22.04-cuda12.6-py311-unsloth2025.8.10",
+      "driver_version": "12.6",
+      "engine_version": "2025.8.10"
+    },
+    {
       "compute_type": "cpu",
       "image": "opencsghq/notebook:ubuntu-22.04-py311-torch2.3.1",
       "engine_version": "4.2.4"

@@ -1,5 +1,8 @@
 {
     "error.LICENSE-ERR-0": {
-        "other": "未找到有效的许可证"
+        "other": "未找到有效的许可证。"
+    },
+    "error.LICENSE-ERR-1": {
+        "other": "许可证已过期，无法验证和导入。"
     }
 }

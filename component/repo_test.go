@@ -18,6 +18,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	mockrpc "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/deploy"
 	deployStatus "opencsg.com/csghub-server/builder/deploy/common"
@@ -630,6 +632,40 @@ func TestRepoComponent_FileRaw(t *testing.T) {
 
 }
 
+func TestRepoComponent_FileRawNotFound(t *testing.T) {
+	ctx := context.TODO()
+	repo := initializeTestRepoComponent(ctx, t)
+
+	r := &database.Repository{
+		ID:      123,
+		Private: true,
+		Source:  types.LocalSource,
+		Readme:  "readme1",
+	}
+	repo.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(r, nil)
+	currentUser := "user"
+	mockUserRepoAdminPermission(ctx, repo.mocks.stores, "user")
+
+	repo.mocks.gitServer.EXPECT().GetRepoFileRaw(ctx, gitserver.GetRepoInfoByPathReq{
+		Namespace: "ns",
+		Name:      "n",
+		Ref:       "main",
+		Path:      "not_exists",
+		RepoType:  types.ModelRepo,
+	}).Return("", status.Error(codes.NotFound, "resource not found"))
+
+	_, err := repo.FileRaw(ctx, &types.GetFileReq{
+		Namespace:   "ns",
+		Name:        "n",
+		RepoType:    types.ModelRepo,
+		Ref:         "main",
+		Path:        "not_exists",
+		CurrentUser: currentUser,
+	})
+	require.NotNil(t, err)
+	require.Equal(t, err, errorx.ErrNotFound)
+}
+
 func TestRepoComponent_DownloadFile(t *testing.T) {
 	for _, lfs := range []bool{false, true} {
 		t.Run(fmt.Sprintf("is lfs: %v", lfs), func(t *testing.T) {
@@ -843,6 +879,7 @@ func TestRepoComponent_SDKDownloadFile(t *testing.T) {
 			repo.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(
 				mockedRepo, nil,
 			)
+			repo.mocks.stores.RepoMock().EXPECT().UpdateRepoFileDownloads(ctx, mockedRepo, mock.Anything, int64(1)).Return(nil)
 
 			if lfs {
 
@@ -2846,7 +2883,7 @@ func TestGetRepoUrl(t *testing.T) {
 			name:     "Prompt repository",
 			repoType: types.PromptRepo,
 			repoPath: "namespace/prompt",
-			expected: "/prompts/namespace/prompt",
+			expected: "/prompts/library/namespace/prompt",
 		},
 		{
 			name:     "MCP Server repository",
@@ -3243,4 +3280,17 @@ func TestRepoComponent_SendAssetManagementMsg(t *testing.T) {
 	})
 	require.Nil(t, err)
 	wg.Wait()
+}
+
+func TestRepoComponent_GetRepos(t *testing.T) {
+	ctx := context.Background()
+
+	repoComp := initializeTestRepoComponent(ctx, t)
+
+	repoComp.mocks.stores.RepoMock().EXPECT().GetReposBySearch(ctx, "search", types.ModelRepo, 1, 10).
+		Return([]*database.Repository{{ID: 1, Path: "ns/name"}}, 1, nil).Once()
+	paths, err := repoComp.GetRepos(ctx, "search", "u", types.ModelRepo)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(paths))
+	require.Equal(t, "ns/name", paths[0])
 }

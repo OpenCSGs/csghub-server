@@ -22,7 +22,7 @@ func TestImageBuilderExecutor_ProcessEvent(t *testing.T) {
 	lastCommitID := "812e1575865e1bc394351b38ff16f00737ef0bb5"
 
 	t.Run("WorkflowPending", func(t *testing.T) {
-		db := tests.InitTransactionTestDB()
+		db := tests.InitTestDB()
 		defer db.Close()
 		mockDb := database.NewDeployTaskStoreWithDB(db)
 		executor := imagebuilderExecutorImpl{
@@ -65,7 +65,7 @@ func TestImageBuilderExecutor_ProcessEvent(t *testing.T) {
 	})
 
 	t.Run("WorkflowRunning", func(t *testing.T) {
-		db := tests.InitTransactionTestDB()
+		db := tests.InitTestDB()
 		defer db.Close()
 		mockDb := database.NewDeployTaskStoreWithDB(db)
 		executor := imagebuilderExecutorImpl{
@@ -109,7 +109,7 @@ func TestImageBuilderExecutor_ProcessEvent(t *testing.T) {
 	})
 
 	t.Run("WorkflowSucceeded", func(t *testing.T) {
-		db := tests.InitTransactionTestDB()
+		db := tests.InitTestDB()
 		defer db.Close()
 		mockDb := database.NewDeployTaskStoreWithDB(db)
 		executor := imagebuilderExecutorImpl{
@@ -153,7 +153,7 @@ func TestImageBuilderExecutor_ProcessEvent(t *testing.T) {
 	})
 
 	t.Run("WorkflowFailed", func(t *testing.T) {
-		db := tests.InitTransactionTestDB()
+		db := tests.InitTestDB()
 		defer db.Close()
 		mockDb := database.NewDeployTaskStoreWithDB(db)
 		executor := imagebuilderExecutorImpl{
@@ -197,7 +197,7 @@ func TestImageBuilderExecutor_ProcessEvent(t *testing.T) {
 	})
 
 	t.Run("WorkflowSucceeded not building", func(t *testing.T) {
-		db := tests.InitTransactionTestDB()
+		db := tests.InitTestDB()
 		defer db.Close()
 		mockDb := database.NewDeployTaskStoreWithDB(db)
 		executor := imagebuilderExecutorImpl{
@@ -240,7 +240,7 @@ func TestImageBuilderExecutor_ProcessEvent(t *testing.T) {
 	})
 
 	t.Run("WorkflowFailed not building", func(t *testing.T) {
-		db := tests.InitTransactionTestDB()
+		db := tests.InitTestDB()
 		defer db.Close()
 		mockDb := database.NewDeployTaskStoreWithDB(db)
 		executor := imagebuilderExecutorImpl{

@@ -52,6 +52,7 @@ type DeployActivity struct {
 	ms  database.ModelStore
 	rfs database.RuntimeFrameworksStore
 	urs database.UserResourcesStore
+	mds database.MetadataStore
 }
 
 func NewDeployActivity(
@@ -66,6 +67,7 @@ func NewDeployActivity(
 	ms database.ModelStore,
 	rfs database.RuntimeFrameworksStore,
 	urs database.UserResourcesStore,
+	mds database.MetadataStore,
 ) *DeployActivity {
 	return &DeployActivity{
 		cfg: cfg,
@@ -79,6 +81,7 @@ func NewDeployActivity(
 		ms:  ms,
 		rfs: rfs,
 		urs: urs,
+		mds: mds,
 	}
 }
 
@@ -335,8 +338,20 @@ func (a *DeployActivity) updateDeployTaskStatus(task *database.DeployTask, servi
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(5))
 	defer cancel()
-	if err := a.ds.UpdateInTx(ctx, []string{"status", "svc_name"}, []string{"status", "message"}, task.Deploy, task); err != nil {
-		return err
+
+	lastTask, err := a.ds.GetLastTaskByType(ctx, task.Deploy.ID, task.TaskType)
+	if err != nil {
+		return fmt.Errorf("failed to get last task by type: %w", err)
+	}
+	if lastTask.ID != task.ID {
+		// only update task
+		if err := a.ds.UpdateInTx(ctx, []string{"status", "svc_name"}, []string{"status", "message"}, nil, task); err != nil {
+			return err
+		}
+	} else {
+		if err := a.ds.UpdateInTx(ctx, []string{"status", "svc_name"}, []string{"status", "message"}, task.Deploy, task); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -344,9 +359,20 @@ func (a *DeployActivity) updateDeployTaskStatus(task *database.DeployTask, servi
 func (a *DeployActivity) updateTaskStatus(task *database.DeployTask) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(5))
 	defer cancel()
+	lastTask, err := a.ds.GetLastTaskByType(ctx, task.Deploy.ID, task.TaskType)
+	if err != nil {
+		return fmt.Errorf("failed to get last task by type: %w", err)
+	}
 
-	if err := a.ds.UpdateInTx(ctx, []string{"status"}, []string{"status", "message"}, task.Deploy, task); err != nil {
-		return err
+	if lastTask.ID != task.ID {
+		// only update task
+		if err := a.ds.UpdateInTx(ctx, []string{"status"}, []string{"status", "message"}, nil, task); err != nil {
+			return err
+		}
+	} else {
+		if err := a.ds.UpdateInTx(ctx, []string{"status"}, []string{"status", "message"}, task.Deploy, task); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -492,6 +518,7 @@ func (a *DeployActivity) createBuildRequest(ctx context.Context, task *database.
 		ClusterID:      task.Deploy.ClusterID,
 		LastCommitID:   lastCommit.ID,
 		TaskId:         task.ID,
+		RepoId:         repoInfo.RepoID,
 	}, nil
 }
 
@@ -511,8 +538,9 @@ func (a *DeployActivity) createDeployRequest(ctx context.Context, task *database
 	}
 
 	var engineArgsTemplates []types.EngineArg
+	var toolCallParsers map[string]string
 	if len(deployInfo.RuntimeFramework) > 0 {
-		framework, err := a.rfs.FindEnabledByName(ctx, deployInfo.RuntimeFramework)
+		framework, err := a.rfs.FindByImageID(ctx, deployInfo.ImageID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get runtime framework by name %s: %w", deployInfo.RuntimeFramework, err)
 		}
@@ -520,6 +548,12 @@ func (a *DeployActivity) createDeployRequest(ctx context.Context, task *database
 		if len(trimmedEngineArgs) > 0 {
 			if err := json.Unmarshal([]byte(trimmedEngineArgs), &engineArgsTemplates); err != nil {
 				return nil, fmt.Errorf("failed to unmarshal engine args: %w", err)
+			}
+		}
+		trimmedToolCallParsers := strings.TrimSpace(framework.ToolCallParsers)
+		if len(trimmedToolCallParsers) > 0 {
+			if err := json.Unmarshal([]byte(trimmedToolCallParsers), &toolCallParsers); err != nil {
+				logger.Error("Failed to unmarshal tool call parsers", "error", err)
 			}
 		}
 	}
@@ -536,7 +570,7 @@ func (a *DeployActivity) createDeployRequest(ctx context.Context, task *database
 		return nil, fmt.Errorf("failed to parse deploy hardware: %w", err)
 	}
 
-	envMap := a.makeDeployEnv(ctx, hardware, accessToken, deployInfo, engineArgsTemplates, repoInfo)
+	envMap := a.makeDeployEnv(ctx, hardware, accessToken, deployInfo, engineArgsTemplates, toolCallParsers, repoInfo)
 	targetID := deployInfo.SpaceID
 
 	if deployInfo.SpaceID == 0 && deployInfo.ModelID > 0 {
@@ -609,7 +643,7 @@ func (a *DeployActivity) stopBuild(buildTask *database.DeployTask, repoInfo sche
 }
 
 // makeDeployEnv
-func (a *DeployActivity) makeDeployEnv(ctx context.Context, hardware types.HardWare, accessToken *database.AccessToken, deployInfo *database.Deploy, engineArgsTemplates []types.EngineArg, repoInfo scheduler.RepoInfo) map[string]string {
+func (a *DeployActivity) makeDeployEnv(ctx context.Context, hardware types.HardWare, accessToken *database.AccessToken, deployInfo *database.Deploy, engineArgsTemplates []types.EngineArg, toolCallParsers map[string]string, repoInfo scheduler.RepoInfo) map[string]string {
 	logger := a.getLogger(ctx)
 
 	envMap, err := utilcommon.JsonStrToMap(deployInfo.Env)
@@ -642,13 +676,44 @@ func (a *DeployActivity) makeDeployEnv(ctx context.Context, hardware types.HardW
 		} else {
 			for _, arg := range engineArgsTemplates {
 				if value, ok := argValuesMap[arg.Name]; ok {
-					engineArgs.WriteString(" ")
-					engineArgs.WriteString(fmt.Sprintf(arg.Format, value))
+					if arg.Value != "" && value == arg.Value {
+						continue
+					}
+					// handle boolean value
+					if !strings.Contains(arg.Format, "%") {
+						if value == "false" || value == "0" || value == "" {
+							continue
+						}
+						engineArgs.WriteString(" ")
+						engineArgs.WriteString(arg.Format)
+					} else {
+						engineArgs.WriteString(" ")
+						engineArgs.WriteString(fmt.Sprintf(arg.Format, value))
+					}
 				}
 			}
 		}
-		logger.Debug("makeDeployEnv", "ENGINE_ARGS", engineArgs.String())
-		envMap["ENGINE_ARGS"] = engineArgs.String()
+
+		// Process tool-calling arguments
+		engineArgsStr := engineArgs.String()
+		if strings.Contains(engineArgsStr, "--enable-auto-tool-choice") && len(toolCallParsers) > 0 {
+			modelArch := a.getModelArchitecture(ctx, deployInfo.RepoID)
+			if modelArch != "" {
+				if parser, ok := toolCallParsers[modelArch]; ok {
+					engineArgsStr = strings.Replace(engineArgsStr, "--enable-auto-tool-choice", "--enable-auto-tool-choice --tool-call-parser "+parser, 1)
+					logger.Info("Added tool-call-parser", "architecture", modelArch, "parser", parser)
+				} else {
+					logger.Warn("No tool-call-parser found for architecture, using default openai parser", "architecture", modelArch)
+					engineArgsStr = strings.Replace(engineArgsStr, "--enable-auto-tool-choice", "--enable-auto-tool-choice --tool-call-parser openai", 1)
+				}
+			} else {
+				logger.Warn("Model architecture not found, removing --enable-auto-tool-choice")
+				engineArgsStr = strings.ReplaceAll(engineArgsStr, "--enable-auto-tool-choice", "")
+			}
+		}
+
+		logger.Debug("makeDeployEnv", "ENGINE_ARGS", engineArgsStr)
+		envMap["ENGINE_ARGS"] = engineArgsStr
 	}
 
 	common.UpdateEvaluationEnvHardware(envMap, hardware)
@@ -705,6 +770,25 @@ func (a *DeployActivity) makeDeployEnv(ctx context.Context, hardware types.HardW
 	}
 
 	return envMap
+}
+
+// getModelArchitecture reads the model architecture from metadata
+func (a *DeployActivity) getModelArchitecture(ctx context.Context, repoID int64) string {
+	logger := a.getLogger(ctx)
+
+	// Get metadata from database
+	metadata, err := a.mds.FindByRepoID(ctx, repoID)
+	if err != nil {
+		logger.Warn("Failed to get metadata from database", "error", err, "repo_id", repoID)
+		return ""
+	}
+
+	if metadata.Architecture != "" {
+		return metadata.Architecture
+	}
+
+	logger.Warn("Model architecture not found in metadata", "repo_id", repoID)
+	return ""
 }
 
 // getHttpCloneURLWithToken

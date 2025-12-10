@@ -87,3 +87,43 @@ func TestClusterStore_Delete(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, types.ClusterStatusUnavailable, c2.Status)
 }
+
+func TestClusterStore_UpdateByClusterID(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewClusterInfoStoreWithDB(db)
+
+	// Insert new cluster
+	clusterInfo1 := types.ClusterEvent{
+		ClusterID: "cluster-1",
+		Region:    "region-a",
+		Zone:      "zone-a",
+	}
+	err := store.UpdateByClusterID(ctx, clusterInfo1)
+	require.NoError(t, err)
+
+	// Verify insertion
+	persistedCluster1, err := store.ByClusterID(ctx, "cluster-1")
+	require.NoError(t, err)
+	require.Equal(t, "region-a", persistedCluster1.Region)
+	require.Equal(t, "zone-a", persistedCluster1.Zone)
+	require.True(t, persistedCluster1.Enable)
+
+	// Update existing cluster
+	clusterInfo2 := types.ClusterEvent{
+		ClusterID: "cluster-1",
+		Region:    "region-b",
+		Zone:      "zone-b",
+	}
+	err = store.UpdateByClusterID(ctx, clusterInfo2)
+	require.NoError(t, err)
+
+	// Verify update
+	persistedCluster2, err := store.ByClusterID(ctx, "cluster-1")
+	require.NoError(t, err)
+	require.Equal(t, "region-b", persistedCluster2.Region)
+	require.Equal(t, "zone-b", persistedCluster2.Zone)
+	require.True(t, persistedCluster2.Enable)
+}

@@ -1,6 +1,7 @@
 package tagparser
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -76,4 +77,24 @@ func TestTagParser_MetaTags(t *testing.T) {
 	require.ElementsMatch(
 		t, []string{"100B<n<1T"}, metaTags["size"],
 	)
+}
+
+func TestTagParser_MetaTags_LongTag(t *testing.T) {
+	longTag := strings.Repeat("a", 129)
+	readmeWithLongTag := `
+---
+tags:
+- a-short-tag
+- ` + longTag + `
+- another-short-tag
+---
+# Title
+`
+	metaTags, err := MetaTags(readmeWithLongTag)
+	require.NoError(t, err)
+	require.Contains(t, metaTags, "task")
+	tags := metaTags["task"]
+	require.Len(t, tags, 2)
+	require.ElementsMatch(t, []string{"a-short-tag", "another-short-tag"}, tags)
+	require.NotContains(t, tags, longTag)
 }

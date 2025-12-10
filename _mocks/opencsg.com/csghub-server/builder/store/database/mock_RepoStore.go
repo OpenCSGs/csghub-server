@@ -1776,6 +1776,75 @@ func (_c *MockRepoStore_GetRepoWithoutRuntimeByID_Call) RunAndReturn(run func(co
 	return _c
 }
 
+// GetReposBySearch provides a mock function with given fields: ctx, search, repoType, page, pageSize
+func (_m *MockRepoStore) GetReposBySearch(ctx context.Context, search string, repoType types.RepositoryType, page int, pageSize int) ([]*database.Repository, int, error) {
+	ret := _m.Called(ctx, search, repoType, page, pageSize)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetReposBySearch")
+	}
+
+	var r0 []*database.Repository
+	var r1 int
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, types.RepositoryType, int, int) ([]*database.Repository, int, error)); ok {
+		return rf(ctx, search, repoType, page, pageSize)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, types.RepositoryType, int, int) []*database.Repository); ok {
+		r0 = rf(ctx, search, repoType, page, pageSize)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*database.Repository)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, types.RepositoryType, int, int) int); ok {
+		r1 = rf(ctx, search, repoType, page, pageSize)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, string, types.RepositoryType, int, int) error); ok {
+		r2 = rf(ctx, search, repoType, page, pageSize)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockRepoStore_GetReposBySearch_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetReposBySearch'
+type MockRepoStore_GetReposBySearch_Call struct {
+	*mock.Call
+}
+
+// GetReposBySearch is a helper method to define mock.On call
+//   - ctx context.Context
+//   - search string
+//   - repoType types.RepositoryType
+//   - page int
+//   - pageSize int
+func (_e *MockRepoStore_Expecter) GetReposBySearch(ctx interface{}, search interface{}, repoType interface{}, page interface{}, pageSize interface{}) *MockRepoStore_GetReposBySearch_Call {
+	return &MockRepoStore_GetReposBySearch_Call{Call: _e.mock.On("GetReposBySearch", ctx, search, repoType, page, pageSize)}
+}
+
+func (_c *MockRepoStore_GetReposBySearch_Call) Run(run func(ctx context.Context, search string, repoType types.RepositoryType, page int, pageSize int)) *MockRepoStore_GetReposBySearch_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(types.RepositoryType), args[3].(int), args[4].(int))
+	})
+	return _c
+}
+
+func (_c *MockRepoStore_GetReposBySearch_Call) Return(_a0 []*database.Repository, _a1 int, _a2 error) *MockRepoStore_GetReposBySearch_Call {
+	_c.Call.Return(_a0, _a1, _a2)
+	return _c
+}
+
+func (_c *MockRepoStore_GetReposBySearch_Call) RunAndReturn(run func(context.Context, string, types.RepositoryType, int, int) ([]*database.Repository, int, error)) *MockRepoStore_GetReposBySearch_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // IsMirrorRepo provides a mock function with given fields: ctx, repoType, namespace, name
 func (_m *MockRepoStore) IsMirrorRepo(ctx context.Context, repoType types.RepositoryType, namespace string, name string) (bool, error) {
 	ret := _m.Called(ctx, repoType, namespace, name)

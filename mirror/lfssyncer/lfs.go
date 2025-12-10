@@ -482,6 +482,7 @@ func (w *LfsSyncWorker) downloadAndUploadLFSFiles(
 	pointerGroups [][]*types.Pointer,
 	repo *database.Repository,
 ) error {
+	var finalErr error
 	totalPointerCount := 0
 	syncedPointerCount := 0
 
@@ -506,6 +507,7 @@ func (w *LfsSyncWorker) downloadAndUploadLFSFiles(
 		for _, pointer := range pointers {
 			err := w.downloadAndUploadLFSFile(ctx, repo, pointer)
 			if err != nil {
+				finalErr = err
 				slog.Error("failed to download and upload lfs file",
 					slog.Any("error", err),
 					slog.Int("workerID", w.id),
@@ -525,6 +527,9 @@ func (w *LfsSyncWorker) downloadAndUploadLFSFiles(
 				return fmt.Errorf("failed to update mirror task progress: %w", err)
 			}
 		}
+	}
+	if finalErr != nil {
+		return finalErr
 	}
 
 	return nil
@@ -1076,7 +1081,7 @@ func (w *LfsSyncWorker) downloadAndUploadPartWithRetry(
 				slog.Any("attempt", attempt),
 				slog.Any("error", err),
 			)
-			if resp.StatusCode == http.StatusForbidden {
+			if resp != nil && resp.StatusCode == http.StatusForbidden {
 				sourceURL := ctx.Value(suk).(string)
 				defaultBranch := ctx.Value(dbk).(string)
 				pointers, err := w.GetLFSDownloadURLs(ctx, sourceURL, defaultBranch, []*types.Pointer{pointer})
@@ -1089,7 +1094,9 @@ func (w *LfsSyncWorker) downloadAndUploadPartWithRetry(
 			return part, fmt.Errorf("failed to download range: %w", err)
 		}
 
-		defer resp.Body.Close()
+		if resp != nil {
+			defer resp.Body.Close()
+		}
 
 		slog.Info(
 			"uploading range",
@@ -1163,11 +1170,11 @@ func (w *LfsSyncWorker) downloadRange(
 
 	resp, err := w.httpClient.Do(req)
 	if err != nil {
-		return nil, err
+		return resp, err
 	}
 
 	if resp.StatusCode != http.StatusPartialContent && resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status code %d", resp.StatusCode)
+		return resp, fmt.Errorf("unexpected status code %d", resp.StatusCode)
 	}
 
 	return resp, nil
@@ -1321,6 +1328,7 @@ func (w *LfsSyncWorker) triggerGitCallback(
 
 	workflowOptions := client.StartWorkflowOptions{
 		TaskQueue: workflow.HandlePushQueueName,
+		ID:        fmt.Sprintf("mirror-lfs-%s-%s-%s-%s", repo.RepositoryType, namespace, name, commit.ID),
 	}
 
 	_, err = w.workflowClient.ExecuteWorkflow(

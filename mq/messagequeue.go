@@ -25,7 +25,6 @@ type MessageQueue interface {
 	VerifyMeteringStream() error
 	VerifyDLQStream() error
 	PublishData(subject string, data []byte) error
-	PublishNotificationForSubscription(data []byte) error
 	PublishFeeCreditData(data []byte) error
 	PublishFeeTokenData(data []byte) error
 	PublishFeeQuotaData(data []byte) error
@@ -47,4 +46,8 @@ type MessageQueue interface {
 	PublishNormalPriorityMsg(msg types.ScenarioMessage) error
 	BuildNormalPriorityMsgStream(conf *config.Config) error
 	BuildNormalPriorityMsgConsumer() (jetstream.Consumer, error)
+
+	PublishAgentSessionHistoryMsg(msg types.SessionHistoryMessageEnvelope) error
+	BuildAgentSessionHistoryMsgStream(conf *config.Config) error
+	BuildAgentSessionHistoryMsgConsumer() (jetstream.Consumer, error)
 }

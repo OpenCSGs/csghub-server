@@ -1,0 +1,263 @@
+package errorx
+
+const errUserPrefix = "USER-ERR"
+
+const (
+	needPhone = iota
+	needDifferentPhone
+	phoneAlreadyExistsInSSO
+	forbidChangePhone
+	failedToUpdatePhone
+	forbidSendPhoneVerifyCodeFrequently
+	failedSendPhoneVerifyCode
+	phoneVerifyCodeExpiredOrNotFound
+	phoneVerifyCodeInvalid
+	verificationCodeRequired
+	verificationCodeLengthInvalid
+	invalidPhoneNumber
+	usernameExists
+	emailExists
+	adminUserCannotBeDeleted
+	userHasOrganizations
+	userHasDeployments
+	userHasBills
+)
+
+var (
+	// phone number is required
+	//
+	// Description: The request must include a phone number in the header or body to identify the target account.
+	//
+	// Description_ZH: 请求必须在请求头或正文中包含电话号码以识别目标账户。
+	//
+	// en-US: Phone number is required
+	//
+	// zh-CN: 需要提供电话号码
+	//
+	// zh-HK: 需要電話號碼
+	ErrNeedPhone error = CustomError{prefix: errUserPrefix, code: needPhone}
+	// new phone number must be different from current phone number
+	//
+	// Description: The new phone number must be different from the current phone number.
+	//
+	// Description_ZH: 新电话号码必须与当前电话号码不同。
+	//
+	// en-US: New phone number must be different from current phone number
+	//
+	// zh-CN: 新电话号码必须与当前电话号码不同
+	//
+	// zh-HK: 新電話號碼必須與當前電話號碼不同
+	ErrNeedDifferentPhone error = CustomError{prefix: errUserPrefix, code: needDifferentPhone}
+	// new phone number already exists in sso service
+	//
+	// Description: The new phone number already exists in sso service.
+	//
+	// Description_ZH: 新电话号码已经存在于sso服务中。
+	//
+	// en-US: New phone number already exists in sso service
+	//
+	// zh-CN: 新电话号码已经存在于sso服务中
+	//
+	// zh-HK: 新電話號碼已經存在於sso服務中
+	ErrPhoneAlreadyExistsInSSO error = CustomError{prefix: errUserPrefix, code: phoneAlreadyExistsInSSO}
+	// forbid change phone number
+	//
+	// Description: The phone number cannot be changed.
+	//
+	// Description_ZH: 电话号码不能被更改。
+	//
+	// en-US: Forbid change phone number
+	//
+	// zh-CN: 禁止更改电话号码
+	//
+	// zh-HK: 禁止更改電話號碼
+	ErrForbidChangePhone error = CustomError{prefix: errUserPrefix, code: forbidChangePhone}
+	// failed to update phone number
+	//
+	// Description: Failed to update phone number.
+	//
+	// Description_ZH: 更新电话号码失败。
+	//
+	// en-US: Failed to update phone number
+	//
+	// zh-CN: 更新电话号码失败
+	//
+	// zh-HK: 更新電話號碼失敗
+	ErrFailedToUpdatePhone error = CustomError{prefix: errUserPrefix, code: failedToUpdatePhone}
+	// forbid send phone verify code frequently
+	//
+	// Description: Send phone verify code frequently.
+	//
+	// Description_ZH: 发送手机验证码过于频繁。
+	//
+	// en-US: Forbid send phone verify code frequently
+	//
+	// zh-CN: 禁止频繁发送手机验证码
+	//
+	// zh-HK: 禁止頻繁發送手機驗證碼
+	ErrForbidSendPhoneVerifyCodeFrequently error = CustomError{prefix: errUserPrefix, code: forbidSendPhoneVerifyCodeFrequently}
+	// failed to send phone verify code
+	//
+	// Description: Failed to send phone verify code.
+	//
+	// Description_ZH: 发送手机验证码失败。
+	//
+	// en-US: Failed to send phone verify code
+	//
+	// zh-CN: 发送手机验证码失败
+	//
+	// zh-HK: 發送手機驗證碼失敗
+	ErrFailedSendPhoneVerifyCode error = CustomError{prefix: errUserPrefix, code: failedSendPhoneVerifyCode}
+	// phone verify code expired or not found
+	//
+	// Description: Phone verify code expired or not found.
+	//
+	// Description_ZH: 手机验证码已过期或不存在。
+	//
+	// en-US: Phone verify code expired or not found
+	//
+	// zh-CN: 手机验证码已过期或不存在
+	//
+	// zh-HK: 手機驗證碼已過期或不存在
+	ErrPhoneVerifyCodeExpiredOrNotFound error = CustomError{prefix: errUserPrefix, code: phoneVerifyCodeExpiredOrNotFound}
+	// phone verify code is invalid
+	//
+	// Description: Phone verify code is invalid.
+	//
+	// Description_ZH: 手机验证码无效。
+	//
+	// en-US: Phone verify code is invalid
+	//
+	// zh-CN: 手机验证码无效
+	//
+	// zh-HK: 手機驗證碼無效
+	ErrPhoneVerifyCodeInvalid error = CustomError{prefix: errUserPrefix, code: phoneVerifyCodeInvalid}
+
+	// verification code can not be empty
+	//
+	// Description: Verification code can not be empty.
+	//
+	// Description_ZH: 验证码不能为空。
+	//
+	// en-US: Verification code can not be empty
+	//
+	// zh-CN: 验证码不能为空
+	//
+	// zh-HK: 驗證碼不能為空
+	ErrVerificationCodeRequired error = CustomError{prefix: errUserPrefix, code: verificationCodeRequired}
+	// verification code length must be 6
+	//
+	// Description: Verification code length must be 6.
+	//
+	// Description_ZH: 验证码长度必须为6。
+	//
+	// en-US: Verification code length must be 6
+	//
+	// zh-CN: 验证码长度必须为6
+	//
+	// zh-HK: 驗證碼長度必須為6
+	ErrVerificationCodeLength error = CustomError{prefix: errUserPrefix, code: verificationCodeLengthInvalid}
+	// invalid phone number
+	//
+	// Description: Invalid phone number.
+	//
+	// Description_ZH: 无效的电话号码。
+	//
+	// en-US: Invalid phone number
+	//
+	// zh-CN: 无效的电话号码
+	//
+	// zh-HK: 無效的電話號碼
+	ErrInvalidPhoneNumber error = CustomError{prefix: errUserPrefix, code: invalidPhoneNumber}
+	// username already exists
+	//
+	// Description: The username provided already exists in the system.
+	//
+	// Description_ZH: 提供的用户名已存在于系统中。
+	//
+	// en-US: Username already exists
+	//
+	// zh-CN: 用户名已存在
+	//
+	// zh-HK: 用戶名已存在
+	ErrUsernameExists error = CustomError{prefix: errUserPrefix, code: usernameExists}
+
+	// email already exists in the system
+	//
+	// Description: The email address provided already exists in the system.
+	//
+	// Description_ZH: 提供的电子邮件地址已存在于系统中。
+	//
+	// en-US: Email already exists
+	//
+	// zh-CN: 邮箱已存在
+	//
+	// zh-HK: 電郵已存在
+	ErrEmailExists error = CustomError{prefix: errUserPrefix, code: emailExists}
+	// admin user cannot be deleted
+	//
+	// Description: The admin user cannot be deleted.
+	//
+	// Description_ZH: 管理员用户不能被删除。
+	//
+	// en-US: Admin user cannot be deleted
+	//
+	// zh-CN: 管理员用户不能被删除
+	//
+	// zh-HK: 管理員用戶不能被刪除
+	ErrAdminUserCannotBeDeleted error = CustomError{prefix: errUserPrefix, code: adminUserCannotBeDeleted}
+	// user has organizations can not be deleted
+	//
+	// Description: The user who owns organizations cannot be deleted.
+	//
+	// Description_ZH: 拥有组织的用户不能被删除。
+	//
+	// en-US: User who owns organizations cannot be deleted
+	//
+	// zh-CN: 拥有组织的用户不能被删除
+	//
+	// zh-HK: 擁有組織的用戶不能被刪除
+	ErrUserHasOrganizations error = CustomError{prefix: errUserPrefix, code: userHasOrganizations}
+	// user has deployments can not be deleted
+	//
+	// Description: The user who owns deployments cannot be deleted.
+	//
+	// Description_ZH: 拥有部署资源的用户不能被删除。
+	//
+	// en-US: User who owns deployments cannot be deleted
+	//
+	// zh-CN: 拥有部署资源的用户不能被删除
+	//
+	// zh-HK: 擁有部署資源的用戶不能被刪除
+	ErrUserHasDeployments error = CustomError{prefix: errUserPrefix, code: userHasDeployments}
+	// user has bills can not be deleted
+	//
+	// Description: The user who owns bills cannot be deleted.
+	//
+	// Description_ZH: 拥有账单的用户不能被删除。
+	//
+	// en-US: User who owns bills cannot be deleted
+	//
+	// zh-CN: 拥有账单的用户不能被删除
+	//
+	// zh-HK: 擁有賬單的用戶不能被刪除
+	ErrUserHasBills error = CustomError{prefix: errUserPrefix, code: userHasBills}
+)
+
+// UsernameExists creates a specific error for username conflicts with the conflicting username
+func UsernameExists(username string) error {
+	return CustomError{
+		prefix:  errUserPrefix,
+		code:    usernameExists,
+		context: map[string]interface{}{"username": username},
+	}
+}
+
+// EmailExists creates a specific error for email conflicts with the conflicting email
+func EmailExists(email string) error {
+	return CustomError{
+		prefix:  errUserPrefix,
+		code:    emailExists,
+		context: map[string]interface{}{"email": email},
+	}
+}

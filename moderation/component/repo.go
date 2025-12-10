@@ -22,6 +22,7 @@ type repoComponentImpl struct {
 	rs               database.RepoStore
 	rfs              database.RepoFileStore
 	rfcs             database.RepoFileCheckStore
+	whitelistRule    database.RepositoryFileCheckRuleStore
 	git              gitserver.GitServer
 	concurrencyLimit int
 }
@@ -35,6 +36,7 @@ func NewRepoComponent(cfg *config.Config) (RepoComponent, error) {
 	c.rs = database.NewRepoStore()
 	c.rfs = database.NewRepoFileStore()
 	c.rfcs = database.NewRepoFileCheckStore()
+	c.whitelistRule = database.NewRepositoryFileCheckRuleStore()
 	c.git = gs
 	c.concurrencyLimit = cfg.Moderation.RepoFileCheckConcurrency
 	return c, nil
@@ -103,6 +105,7 @@ func (c *repoComponentImpl) CheckRepoFiles(ctx context.Context, repoID int64, op
 
 func (c *repoComponentImpl) processFile(ctx context.Context, file *database.RepositoryFile) {
 	reader := NewRepoFileContentReader(file, c.git)
+	defer reader.Close()
 	checker := checker.GetFileChecker(file.FileType, file.Path, file.LfsRelativePath)
 	status, msg := checker.Run(ctx, reader)
 	if status == types.SensitiveCheckException {
@@ -163,4 +166,16 @@ func (cc *repoComponentImpl) CheckRequestV2(ctx context.Context, req types.Sensi
 		}
 	}
 	return true, nil
+}
+
+func (c *repoComponentImpl) GetNamespaceWhiteList(ctx context.Context) ([]string, error) {
+	namespaceWhiteList, err := c.whitelistRule.ListByRuleType(ctx, "namespace")
+	if err != nil {
+		return nil, err
+	}
+	patterns := make([]string, len(namespaceWhiteList))
+	for i := range len(namespaceWhiteList) {
+		patterns[i] = namespaceWhiteList[i].Pattern
+	}
+	return patterns, nil
 }

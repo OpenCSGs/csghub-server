@@ -84,3 +84,48 @@ func TestLfsMetaStore_CRUD(t *testing.T) {
 	require.NotNil(t, err)
 
 }
+
+func TestLfsMetaStore_UpdateXnetUsed(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewLfsMetaObjectStoreWithDB(db)
+
+	// Create a test LFS object
+	_, err := store.Create(ctx, database.LfsMetaObject{
+		RepositoryID: 123,
+		Oid:          "test-oid-123",
+		Size:         1024,
+		XnetUsed:     false,
+	})
+	require.Nil(t, err)
+
+	// Verify initial state
+	obj, err := store.FindByOID(ctx, 123, "test-oid-123")
+	require.Nil(t, err)
+	require.Equal(t, "test-oid-123", obj.Oid)
+	require.Equal(t, false, obj.XnetUsed)
+
+	// Update XnetUsed to true
+	err = store.UpdateXnetUsed(ctx, 123, "test-oid-123", true)
+	require.Nil(t, err)
+
+	// Verify update
+	obj, err = store.FindByOID(ctx, 123, "test-oid-123")
+	require.Nil(t, err)
+	require.Equal(t, true, obj.XnetUsed)
+
+	// Update XnetUsed back to false
+	err = store.UpdateXnetUsed(ctx, 123, "test-oid-123", false)
+	require.Nil(t, err)
+
+	// Verify update
+	obj, err = store.FindByOID(ctx, 123, "test-oid-123")
+	require.Nil(t, err)
+	require.Equal(t, false, obj.XnetUsed)
+
+	// Test updating non-existent object (should not error but affect 0 rows)
+	err = store.UpdateXnetUsed(ctx, 999, "non-existent-oid", true)
+	require.Nil(t, err)
+}

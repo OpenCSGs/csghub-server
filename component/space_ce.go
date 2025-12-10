@@ -92,3 +92,6 @@ func (c *spaceComponentImpl) updateDeployRepoByDeploy(repo types.DeployRepo, dep
 
 func (c *spaceComponentImpl) addOpWeightToSpaces(ctx context.Context, repoIDs []int64, spaces []*types.Space) {
 }
+
+func (c *spaceComponentImpl) syncCodeAgentIfExists(_ string, _ string, _ string, _ types.CodeAgentSyncOperation) {
+}

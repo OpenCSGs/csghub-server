@@ -56,6 +56,7 @@ func TestDatasetCompnent_Create(t *testing.T) {
 	}, &gitserver.CommitFilesReq{}, nil)
 
 	dc.mocks.gitServer.EXPECT().CommitFiles(ctx, gitserver.CommitFilesReq{}).Return(nil)
+
 	dc.mocks.stores.DatasetMock().EXPECT().CreateAndUpdateRepoPath(ctx, mock.Anything, "ns/n").RunAndReturn(
 		func(ctx context.Context, ds database.Dataset, _ string) (*database.Dataset, error) {
 			require.NotNil(t, ds.Repository)

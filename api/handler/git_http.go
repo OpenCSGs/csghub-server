@@ -69,14 +69,16 @@ func (h *GitHTTPHandler) InfoRefs(ctx *gin.Context) {
 			msg = "You do not have permission to access this repository."
 		} else if errors.Is(err, errorx.ErrServiceUnavaliable) {
 			msg = "Mirror repository is currently syncing. Please try again later."
+		} else if errors.Is(err, errorx.ErrUsingGitInXnetRepository) {
+			msg = "Git operations are not supported in Xnet-enabled repositories. For an improved experience and better results, consider using the SDK/CLI."
 		} else {
 			httpbase.ServerError(ctx, err)
 			return
 		}
 
-		body := pktLine("# service=git-upload-pack\n") + "0000" + pktLine("ERR "+msg+"\n")
+		body := pktLine("# service="+rpc+"\n") + "0000" + pktLine("ERR "+msg+"\n")
 
-		ctx.Header("Content-Type", "application/x-git-upload-pack-advertisement")
+		ctx.Header("Content-Type", "application/x-"+rpc+"-advertisement")
 		ctx.Writer.WriteHeader(http.StatusOK)
 		_, _ = ctx.Writer.Write([]byte(body))
 

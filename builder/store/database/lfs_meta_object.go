@@ -19,6 +19,7 @@ type LfsMetaObjectStore interface {
 	RemoveByOid(ctx context.Context, oid string, repoID int64) error
 	UpdateOrCreate(ctx context.Context, input LfsMetaObject) (*LfsMetaObject, error)
 	BulkUpdateOrCreate(ctx context.Context, repoID int64, input []LfsMetaObject) error
+	UpdateXnetUsed(ctx context.Context, repoID int64, oid string, xnetUsed bool) error
 }
 
 func NewLfsMetaObjectStore() LfsMetaObjectStore {
@@ -126,4 +127,14 @@ func (s *lfsMetaObjectStoreImpl) BulkUpdateOrCreate(ctx context.Context, repoID 
 			Exec(ctx)
 		return err
 	})
+}
+
+func (s *lfsMetaObjectStoreImpl) UpdateXnetUsed(ctx context.Context, repoID int64, oid string, xnetUsed bool) error {
+	_, err := s.db.Operator.Core.NewUpdate().
+		Model(&LfsMetaObject{}).
+		Set("xnet_used = ?", xnetUsed).
+		Set("updated_at = ?", time.Now()).
+		Where("repository_id = ? AND oid = ?", repoID, oid).
+		Exec(ctx)
+	return err
 }

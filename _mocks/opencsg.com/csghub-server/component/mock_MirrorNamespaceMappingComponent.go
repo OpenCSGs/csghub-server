@@ -189,9 +189,9 @@ func (_c *MockMirrorNamespaceMappingComponent_Get_Call) RunAndReturn(run func(co
 	return _c
 }
 
-// Index provides a mock function with given fields: ctx
-func (_m *MockMirrorNamespaceMappingComponent) Index(ctx context.Context) ([]database.MirrorNamespaceMapping, error) {
-	ret := _m.Called(ctx)
+// Index provides a mock function with given fields: ctx, search
+func (_m *MockMirrorNamespaceMappingComponent) Index(ctx context.Context, search string) ([]database.MirrorNamespaceMapping, error) {
+	ret := _m.Called(ctx, search)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Index")
@@ -199,19 +199,19 @@ func (_m *MockMirrorNamespaceMappingComponent) Index(ctx context.Context) ([]dat
 
 	var r0 []database.MirrorNamespaceMapping
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context) ([]database.MirrorNamespaceMapping, error)); ok {
-		return rf(ctx)
+	if rf, ok := ret.Get(0).(func(context.Context, string) ([]database.MirrorNamespaceMapping, error)); ok {
+		return rf(ctx, search)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context) []database.MirrorNamespaceMapping); ok {
-		r0 = rf(ctx)
+	if rf, ok := ret.Get(0).(func(context.Context, string) []database.MirrorNamespaceMapping); ok {
+		r0 = rf(ctx, search)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]database.MirrorNamespaceMapping)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
-		r1 = rf(ctx)
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, search)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -226,13 +226,14 @@ type MockMirrorNamespaceMappingComponent_Index_Call struct {
 
 // Index is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *MockMirrorNamespaceMappingComponent_Expecter) Index(ctx interface{}) *MockMirrorNamespaceMappingComponent_Index_Call {
-	return &MockMirrorNamespaceMappingComponent_Index_Call{Call: _e.mock.On("Index", ctx)}
+//   - search string
+func (_e *MockMirrorNamespaceMappingComponent_Expecter) Index(ctx interface{}, search interface{}) *MockMirrorNamespaceMappingComponent_Index_Call {
+	return &MockMirrorNamespaceMappingComponent_Index_Call{Call: _e.mock.On("Index", ctx, search)}
 }
 
-func (_c *MockMirrorNamespaceMappingComponent_Index_Call) Run(run func(ctx context.Context)) *MockMirrorNamespaceMappingComponent_Index_Call {
+func (_c *MockMirrorNamespaceMappingComponent_Index_Call) Run(run func(ctx context.Context, search string)) *MockMirrorNamespaceMappingComponent_Index_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context))
+		run(args[0].(context.Context), args[1].(string))
 	})
 	return _c
 }
@@ -242,7 +243,7 @@ func (_c *MockMirrorNamespaceMappingComponent_Index_Call) Return(_a0 []database.
 	return _c
 }
 
-func (_c *MockMirrorNamespaceMappingComponent_Index_Call) RunAndReturn(run func(context.Context) ([]database.MirrorNamespaceMapping, error)) *MockMirrorNamespaceMappingComponent_Index_Call {
+func (_c *MockMirrorNamespaceMappingComponent_Index_Call) RunAndReturn(run func(context.Context, string) ([]database.MirrorNamespaceMapping, error)) *MockMirrorNamespaceMappingComponent_Index_Call {
 	_c.Call.Return(run)
 	return _c
 }

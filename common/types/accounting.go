@@ -20,8 +20,6 @@ const (
 	MeterFromSource    = "from_source"
 	PromptTokenNum     = "prompt_token_num"
 	CompletionTokenNum = "completion_token_num"
-	TotalQuotaCount    = "total_quota_count"
-	SubBillID          = "sub_bill_id"
 )
 
 type OrderStatus int
@@ -101,8 +99,6 @@ var (
 	// starship
 	SceneStarship SceneType = 20 // starship
 	SceneGuiAgent SceneType = 22 // gui agent
-
-	SceneSubscription SceneType = 30 // accounting subscription
 	// unknow
 	SceneUnknow SceneType = 99 // unknow
 )
@@ -113,7 +109,6 @@ var (
 	TimeDurationMinType ChargeValueType = 0
 	TokenNumberType     ChargeValueType = 1
 	QuotaNumberType     ChargeValueType = 2
-	CountNumberType     ChargeValueType = 3
 )
 
 type AcctEventReq struct {
@@ -137,6 +132,8 @@ type AcctEventReq struct {
 	SkuPriceCurrency string          `json:"sku_price_currency"`
 	Quota            float64         `json:"quota"`
 	SubBillID        int64           `json:"sub_bill_id"`
+	Discount         float64         `json:"discount"`
+	RegularValue     float64         `json:"regular_value"`
 }
 
 // generate charge event from client
@@ -305,6 +302,8 @@ type AcctPriceCreateReq struct {
 	SkuKind          SKUKind     `json:"sku_kind"`
 	Quota            string      `json:"quota"`
 	SkuPriceID       int64       `json:"sku_price_id"`
+	Discount         float64     `json:"discount" binding:"omitempty,min=0,max=1"`
+	UseLimitPrice    int64       `json:"use_limit_price"`
 }
 
 type AcctPriceResp struct {
@@ -438,8 +437,9 @@ type AcctRecharge struct {
 }
 
 type AcctRechargeListResp struct {
-	Data  []AcctRecharge `json:"data"`
-	Total int            `json:"total"`
+	Data       []AcctRecharge `json:"data"`
+	Total      int            `json:"total"`
+	TotalValue float64        `json:"total_value"`
 }
 
 type RechargesIndexReq struct {
@@ -604,3 +604,11 @@ type RechargeStats struct {
 	Count int   `bun:"count"`
 	Sum   int64 `bun:"sum"`
 }
+
+type AccountPresentStatus int
+
+const (
+	AccountPresentStatusInit     AccountPresentStatus = 0
+	AccountPresentStatusUsed     AccountPresentStatus = 1
+	AccountPresentStatusCanceled AccountPresentStatus = 2
+)

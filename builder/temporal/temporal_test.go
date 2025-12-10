@@ -32,9 +32,10 @@ func TestTemporalClient(t *testing.T) {
 	ts := temporaltest.NewServer(temporaltest.WithT(t))
 	defer ts.Stop()
 	c := ts.GetDefaultClient()
-
-	tester := &Tester{client: temporal.GetClient()}
 	temporal.Assign(c)
+
+	tc, _ := temporal.NewClient(client.Options{}, "test")
+	tester := &Tester{client: tc}
 
 	worker1 := tester.client.NewWorker("q1", worker.Options{})
 	worker1.RegisterWorkflow(tester.Count)

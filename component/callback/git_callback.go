@@ -80,7 +80,7 @@ func NewGitCallback(config *config.Config) (*gitCallbackComponentImpl, error) {
 	if err != nil {
 		return nil, err
 	}
-	svGen := NewSyncVersionGenerator()
+	svGen := NewSyncVersionGenerator(config)
 	rrf := database.NewRepositoriesRuntimeFramework()
 	rac, err := component.NewRuntimeArchitectureComponent(config)
 	if err != nil {
@@ -578,11 +578,10 @@ func getTagScopeByRepoType(repoType string) (types.TagScope, error) {
 		tagScope = types.MCPTagScope
 	case fmt.Sprintf("%ss", types.CodeRepo):
 		tagScope = types.CodeTagScope
+	case fmt.Sprintf("%ss", types.SpaceRepo):
+		tagScope = types.SpaceTagScope
 	default:
 		return types.UnknownScope, fmt.Errorf("get tag scope by invalid repo type %s", repoType)
-		// TODO: support space
-		// case SpaceRepoType:
-		// 	tagScope = types.SpaceTagScope
 	}
 
 	return tagScope, nil

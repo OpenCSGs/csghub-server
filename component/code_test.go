@@ -65,6 +65,7 @@ func TestCodeComponent_Create(t *testing.T) {
 	cc.mocks.components.repo.EXPECT().CreateRepo(ctx, crq).Return(
 		nil, dbrepo, &gitserver.CommitFilesReq{}, nil,
 	)
+
 	cc.mocks.gitServer.EXPECT().CommitFiles(ctx, gitserver.CommitFilesReq{}).Return(nil)
 	cc.mocks.stores.CodeMock().EXPECT().CreateAndUpdateRepoPath(ctx, database.Code{
 		Repository:   dbrepo,
@@ -99,13 +100,15 @@ func TestCodeComponent_Index(t *testing.T) {
 	repos := []*database.Repository{
 		{ID: 1, Name: "r1", Tags: []database.Tag{{Name: "t1"}}},
 		{ID: 2, Name: "r2"},
+		{ID: 5, Name: "r2"},
 	}
 	cc.mocks.components.repo.EXPECT().PublicToUser(ctx, types.CodeRepo, "user", filter, 10, 1).Return(
 		repos, 100, nil,
 	)
-	cc.mocks.stores.CodeMock().EXPECT().ByRepoIDs(ctx, []int64{1, 2}).Return([]database.Code{
+	cc.mocks.stores.CodeMock().EXPECT().ByRepoIDs(ctx, []int64{1, 2, 5}).Return([]database.Code{
 		{ID: 11, RepositoryID: 2, Repository: &database.Repository{ID: 2, Name: "r2", Mirror: database.Mirror{}}},
 		{ID: 12, RepositoryID: 1, Repository: &database.Repository{ID: 2, Name: "r2", Mirror: database.Mirror{}}},
+		{ID: 13, RepositoryID: 6},
 	}, nil)
 
 	data, total, err := cc.Index(ctx, filter, 10, 1, false)

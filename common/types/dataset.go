@@ -51,6 +51,7 @@ type Dataset struct {
 	MultiSource
 	RecomOpWeight    int              `json:"recom_op_weight,omitempty"`
 	MirrorTaskStatus MirrorTaskStatus `json:"mirror_task_status"`
+	XnetEnabled      bool             `json:"xnet_enabled"`
 }
 
 type DataViewerReq struct {

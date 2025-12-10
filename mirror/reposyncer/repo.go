@@ -2,6 +2,7 @@ package reposyncer
 
 import (
 	"context"
+	"crypto/tls"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -86,8 +87,12 @@ func NewRepoSyncWorker(config *config.Config, numWorkers int) (*RepoSyncWorker, 
 		rpc.WithJSONHeader(),
 	)
 	w.msgSender = msgSender
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: config.MultiSync.HTTPInsecureSkipVerify},
+	}
 	w.httpClient = &http.Client{
-		Timeout: 5 * time.Second,
+		Timeout:   5 * time.Second,
+		Transport: tr,
 	}
 	return w, nil
 }

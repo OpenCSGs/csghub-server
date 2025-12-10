@@ -1,0 +1,8 @@
+{
+    "error.INVITATION-ERR-0": {
+        "other": "未绑定手机号，不能创建邀请码"
+    },
+    "error.INVITATION-ERR-1": {
+        "other": "邀请码不存在"
+    }
+}

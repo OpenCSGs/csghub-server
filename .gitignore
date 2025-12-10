@@ -13,7 +13,7 @@ local_only
 .env
 *.sh
 cmd/csghub-server/__debug_*
-
+common/config/local.toml
 .data
 */*/_api_test/
 redis/dump.rdb

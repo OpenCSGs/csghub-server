@@ -39,7 +39,7 @@ var cmdClearSyncVersion = &cobra.Command{
 
 		syncVersionStore := database.NewSyncVersionStore()
 		repoStore := database.NewRepoStore()
-		repoFilter := filter.NewRepoFilter()
+		repoFilter := filter.NewRepoFilter(nil)
 
 		var (
 			batch          int

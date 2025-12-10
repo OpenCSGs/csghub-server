@@ -18,9 +18,10 @@ type ArgoWorkFlowStore interface {
 	FindByTaskID(ctx context.Context, id string) (WorkFlow ArgoWorkflow, err error)
 	FindByUsername(ctx context.Context, username string, taskType types.TaskType, per, page int) (WorkFlows []ArgoWorkflow, total int, err error)
 	CreateWorkFlow(ctx context.Context, workFlow ArgoWorkflow) (*ArgoWorkflow, error)
-	UpdateWorkFlowByTaskID(ctx context.Context, workFlow ArgoWorkflow) (*ArgoWorkflow, error)
 	// mainly for update status
 	UpdateWorkFlow(ctx context.Context, workFlow ArgoWorkflow) (*ArgoWorkflow, error)
+	// UpdateWorkFlowByTaskID
+	UpdateWorkFlowByTaskID(ctx context.Context, workFlow ArgoWorkflow) (*ArgoWorkflow, error)
 	// delete workflow by id
 	DeleteWorkFlow(ctx context.Context, id int64) error
 	ListAllRunningEvaluations(ctx context.Context) (WorkFlows []ArgoWorkflow, err error)

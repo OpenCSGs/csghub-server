@@ -31,6 +31,7 @@ type DeployRunner struct {
 	deployCfg              common.DeployConfig
 	runtimeFrameworksStore database.RuntimeFrameworksStore
 	logReporter            reporter.LogCollector
+	metadataStore          database.MetadataStore
 }
 
 func NewDeployRunner(ir imagerunner.Runner, r *RepoInfo, t *database.DeployTask, deployCfg common.DeployConfig, logReporter reporter.LogCollector) Runner {
@@ -45,6 +46,7 @@ func NewDeployRunner(ir imagerunner.Runner, r *RepoInfo, t *database.DeployTask,
 		deployCfg:              deployCfg,
 		runtimeFrameworksStore: database.NewRuntimeFrameworksStore(),
 		logReporter:            logReporter,
+		metadataStore:          database.NewMetadataStore(),
 	}
 }
 
@@ -267,6 +269,7 @@ func (t *DeployRunner) makeDeployRequest() (*types.RunRequest, error) {
 	}
 
 	var engineArgsTemplate []types.EngineArg
+	var toolCallParsers map[string]string
 	if len(deploy.RuntimeFramework) > 0 {
 		frame, err := t.runtimeFrameworksStore.FindEnabledByName(ctx, deploy.RuntimeFramework)
 		if err != nil {
@@ -276,6 +279,12 @@ func (t *DeployRunner) makeDeployRequest() (*types.RunRequest, error) {
 			err = json.Unmarshal([]byte(frame.EngineArgs), &engineArgsTemplate)
 			if err != nil {
 				return nil, fmt.Errorf("unmarshal engine args error: %w", err)
+			}
+		}
+		if len(strings.TrimSpace(frame.ToolCallParsers)) > 0 {
+			err = json.Unmarshal([]byte(frame.ToolCallParsers), &toolCallParsers)
+			if err != nil {
+				slog.Error("unmarshal tool call parsers error", slog.Any("error", err))
 			}
 		}
 	}
@@ -294,7 +303,7 @@ func (t *DeployRunner) makeDeployRequest() (*types.RunRequest, error) {
 		return nil, err
 	}
 
-	envMap := t.makeDeployEnv(hardware, token, deploy, engineArgsTemplate)
+	envMap := t.makeDeployEnv(hardware, token, deploy, engineArgsTemplate, toolCallParsers)
 
 	targetID := deploy.SpaceID
 	// deployID is unique for space and model
@@ -333,6 +342,7 @@ func (t *DeployRunner) makeDeployEnv(
 	token *database.AccessToken,
 	deploy *database.Deploy,
 	engineArgsTemplate []types.EngineArg,
+	toolCallParsers map[string]string,
 ) map[string]string {
 	envMap, err := hubcom.JsonStrToMap(deploy.Env)
 	if err != nil {
@@ -366,6 +376,24 @@ func (t *DeployRunner) makeDeployEnv(
 				}
 			}
 		}
+		
+		// Process tool-calling arguments
+		if strings.Contains(ENGINE_ARGS, types.EngineArgEnableToolCalling) && len(toolCallParsers) > 0 {
+			modelArch := t.getModelArchitecture(deploy.RepoID)
+			if modelArch != "" {
+				if parser, ok := toolCallParsers[modelArch]; ok {
+					ENGINE_ARGS = strings.Replace(ENGINE_ARGS, types.EngineArgEnableToolCalling, types.EngineArgEnableToolCalling+" --tool-call-parser "+parser, 1)
+					slog.Info("Added tool-call-parser", slog.String("architecture", modelArch), slog.String("parser", parser))
+				} else {
+					slog.Warn("No tool-call-parser found for architecture, removing "+types.EngineArgEnableToolCalling, slog.String("architecture", modelArch))
+					ENGINE_ARGS = strings.ReplaceAll(ENGINE_ARGS, types.EngineArgEnableToolCalling, "")
+				}
+			} else {
+				slog.Warn("Model architecture not found, removing "+types.EngineArgEnableToolCalling)
+				ENGINE_ARGS = strings.ReplaceAll(ENGINE_ARGS, types.EngineArgEnableToolCalling, "")
+			}
+		}
+		
 		slog.Debug("makeDeployEnv", slog.Any("ENGINE_ARGS", ENGINE_ARGS))
 		envMap["ENGINE_ARGS"] = ENGINE_ARGS
 	}
@@ -470,4 +498,24 @@ func (t *DeployRunner) reporterLog(msg string, step types.Step) {
 		logEntry.Labels[types.StreamKeyDeployTaskID] = strconv.FormatInt(t.task.ID, 10)
 	}
 	t.logReporter.Report(logEntry)
+}
+
+// getModelArchitecture reads the model architecture from metadata
+func (t *DeployRunner) getModelArchitecture(repoID int64) string {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Get metadata from database
+	metadata, err := t.metadataStore.FindByRepoID(ctx, repoID)
+	if err != nil {
+		slog.Warn("Failed to get metadata from database", slog.String("error", err.Error()), slog.Int64("repo_id", repoID))
+		return ""
+	}
+
+	if metadata.Architecture != "" {
+		return metadata.Architecture
+	}
+
+	slog.Warn("Model architecture not found in metadata", slog.Int64("repo_id", repoID))
+	return ""
 }

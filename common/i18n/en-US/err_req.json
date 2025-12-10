@@ -8,6 +8,12 @@
     "error.REQ-ERR-10": {
         "other": "Too many requests, captcha is required"
     },
+    "error.REQ-ERR-11": {
+        "other": "Requests from this IP location are restricted, captcha is required"
+    },
+    "error.REQ-ERR-12": {
+        "other": "Captcha verification failed"
+    },
     "error.REQ-ERR-2": {
         "other": "Request body cannot be empty"
     },

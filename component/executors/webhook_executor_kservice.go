@@ -196,6 +196,9 @@ func buildDeployNotification(deploy *database.Deploy) (payload map[string]any, u
 	case types.ServerlessType:
 		payload["deploy_type"] = "serverless"
 		url = ""
+	case types.NotebookType:
+		payload["deploy_type"] = "notebook"
+		url = fmt.Sprintf("/notebooks/%d", deploy.ID)
 	default:
 		payload = map[string]any{}
 		url = ""

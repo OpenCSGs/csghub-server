@@ -26,7 +26,7 @@ const (
 	// cache ttl
 	cacheTTL = 24 * time.Hour
 	// moderation cache prefix
-	moderationCachePrefix = "moderation:"
+	moderationCachePrpmptPrefix = "moderation:prompt:"
 )
 
 type Moderation interface {
@@ -94,7 +94,7 @@ func splitContentIntoChunksByWindow(content string) []string {
 func (modImpl *moderationImpl) checkSingleChunk(ctx context.Context, content, key string) (*rpc.CheckResult, error) {
 	if modImpl.cacheClient != nil {
 		chunkHash := md5.Sum([]byte(content))
-		cacheKey := moderationCachePrefix + fmt.Sprintf("%x", chunkHash)
+		cacheKey := moderationCachePrpmptPrefix + fmt.Sprintf("%x", chunkHash)
 		cached, err := modImpl.cacheClient.Get(ctx, cacheKey)
 		if err == nil {
 			var result rpc.CheckResult
@@ -112,7 +112,7 @@ func (modImpl *moderationImpl) checkSingleChunk(ctx context.Context, content, ke
 
 	if modImpl.cacheClient != nil {
 		// Cache the result for the single chunk
-		cacheKey := moderationCachePrefix + content
+		cacheKey := moderationCachePrpmptPrefix + content
 		resultBytes, err := json.Marshal(result)
 		if err == nil {
 			err := modImpl.cacheClient.SetEx(ctx, cacheKey, string(resultBytes), cacheTTL)
@@ -143,7 +143,7 @@ func (modImpl *moderationImpl) checkBuffer(
 		// cache each chunk in the current buffer
 		for _, chunk := range currentBufferChunks {
 			chunkHash := md5.Sum([]byte(chunk))
-			cacheKey := moderationCachePrefix + fmt.Sprintf("%x", chunkHash)
+			cacheKey := moderationCachePrpmptPrefix + fmt.Sprintf("%x", chunkHash)
 			resultBytes, err := json.Marshal(result)
 			if err == nil {
 				err := modImpl.cacheClient.SetEx(ctx, cacheKey, string(resultBytes), cacheTTL)
@@ -236,7 +236,7 @@ func (modImpl *moderationImpl) checkLLMPrompt(ctx context.Context, content, key 
 		// Check if chunk is in cache
 		if modImpl.cacheClient != nil {
 			chunkHash := md5.Sum([]byte(chunk))
-			cacheKey := moderationCachePrefix + fmt.Sprintf("%x", chunkHash)
+			cacheKey := moderationCachePrpmptPrefix + fmt.Sprintf("%x", chunkHash)
 			cached, err := modImpl.cacheClient.Get(ctx, cacheKey)
 			if err == nil {
 				var result rpc.CheckResult
@@ -265,7 +265,7 @@ func (modImpl *moderationImpl) checkLLMPrompt(ctx context.Context, content, key 
 	for _, chunk := range unCheckedChunks {
 		if modImpl.cacheClient != nil {
 			chunkHash := md5.Sum([]byte(chunk))
-			cacheKey := moderationCachePrefix + fmt.Sprintf("%x", chunkHash)
+			cacheKey := moderationCachePrpmptPrefix + fmt.Sprintf("%x", chunkHash)
 			cached, err := modImpl.cacheClient.Get(ctx, cacheKey)
 			if err == nil {
 				var result rpc.CheckResult

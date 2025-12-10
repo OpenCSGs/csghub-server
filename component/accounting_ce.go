@@ -5,6 +5,7 @@ package component
 import (
 	"context"
 
+	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -16,7 +17,7 @@ func (ac *accountingComponentImpl) QueryBalanceByUserID(ctx context.Context, cur
 	return nil, nil
 }
 
-func (ac *accountingComponentImpl) QueryBalanceByUserIDInternal(ctx context.Context, currentUser string) (interface{}, error) {
+func (ac *accountingComponentImpl) QueryBalanceByUserIDInternal(ctx context.Context, currentUser string) (*database.AccountUser, error) {
 	return nil, nil
 }
 
@@ -48,7 +49,7 @@ func (ac *accountingComponentImpl) GetQuotaStatement(currentUser string, req typ
 	return nil, nil
 }
 
-func (ac *accountingComponentImpl) QueryPricesBySKUType(currentUser string, req types.AcctPriceListReq) (interface{}, error) {
+func (ac *accountingComponentImpl) QueryPricesBySKUType(currentUser string, req types.AcctPriceListReq) (*database.PriceResp, error) {
 	return nil, nil
 }
 
@@ -68,7 +69,7 @@ func (ac *accountingComponentImpl) DeletePrice(currentUser string, id int64) (in
 	return nil, nil
 }
 
-func (ac *accountingComponentImpl) CreateOrder(currentUser string, req types.AcctOrderCreateReq) (interface{}, error) {
+func (ac *accountingComponentImpl) CreateOrder(currentUser string, req types.AcctOrderCreateReq) (*database.AccountOrder, error) {
 	return nil, nil
 }
 

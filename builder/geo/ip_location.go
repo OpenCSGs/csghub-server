@@ -1,6 +1,7 @@
 package geo
 
 import (
+	"embed"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -10,6 +11,9 @@ import (
 type IPLocator interface {
 	GetIPLocation(ip string) (*IPLocation, error)
 }
+
+//go:embed GeoLite2-City.mmdb
+var geoFS embed.FS
 
 type IPLocation struct {
 	Nation   string `json:"nation"`

@@ -313,7 +313,6 @@ func TestGitalyFile_CreateRepoFile(t *testing.T) {
 		BranchName:       []byte("main"),
 		CommitMessage:    []byte("new"),
 		CommitAuthorName: []byte("name"),
-		StartRepository:  repository,
 		StartBranchName:  []byte("main"),
 		Timestamp:        timestamppb.New(time.Now()),
 	}
@@ -899,7 +898,6 @@ func TestGitalyFile_CreateRepoLarge(t *testing.T) {
 		BranchName:       []byte("main"),
 		CommitMessage:    []byte("new"),
 		CommitAuthorName: []byte("user-1"),
-		StartRepository:  repository,
 		StartBranchName:  []byte("main"),
 		Timestamp:        timestamppb.New(time.Now()),
 	}

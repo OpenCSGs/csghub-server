@@ -83,11 +83,15 @@ func TestDeployer_StartDeploy(t *testing.T) {
 	}
 	mockTaskStore.EXPECT().CreateDeployTask(mock.Anything, &buildTask).Return(nil)
 
+	// mockSch := mockScheduler.NewMockScheduler(t)
+	// mockSch.EXPECT().Queue(mock.Anything).Return(nil)
+
 	node, _ := snowflake.NewNode(1)
 
 	d := &deployer{
 		snowflakeNode:   node,
 		deployTaskStore: mockTaskStore,
+		// scheduler:       mockSch,
 	}
 	err := d.StartDeploy(context.TODO(), &dbdeploy)
 

@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/git/gitserver"
@@ -132,4 +133,54 @@ func TestGitCallbackComponent_SetRepoUpdateTime(t *testing.T) {
 			require.Nil(t, err)
 		})
 	}
+}
+
+func TestGitCallbackComponentImpl_UpdateRepoInfos(t *testing.T) {
+	ctx := mock.Anything
+
+	req := &types.GiteaCallbackPushReq{
+		Ref: "refs/heads/main",
+		Repository: types.GiteaCallbackPushReq_Repository{
+			FullName: "models_namespace/repo",
+		},
+		Commits: []types.GiteaCallbackPushReq_Commit{
+			{
+				Added:    []string{"README.md", "new_file.txt"},
+				Removed:  []string{"old_file.txt"},
+				Modified: []string{"config.json"},
+			},
+		},
+	}
+	repo := &database.Repository{ID: 1, Path: "namespace/repo"}
+
+	t.Run("should update repo infos successfully", func(t *testing.T) {
+		gc := initializeTestGitCallbackComponent(context.Background(), t)
+		// Expectations for modifyFiles
+		gc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "namespace", "repo").Return(repo, nil)
+		modelInfo := &types.ModelInfo{}
+		gc.mocks.runtimeArchComponent.EXPECT().UpdateModelMetadata(ctx, repo).Return(modelInfo, nil)
+		gc.mocks.runtimeArchComponent.EXPECT().UpdateRuntimeFrameworkTag(ctx, modelInfo, repo).Return(nil)
+
+		// Expectations for removeFiles
+		gc.mocks.tagComponent.EXPECT().UpdateLibraryTags(ctx, types.ModelTagScope, "namespace", "repo", "old_file.txt", "").Return(nil)
+
+		// Expectations for addFiles
+		gc.mocks.tagComponent.EXPECT().UpdateLibraryTags(ctx, types.ModelTagScope, "namespace", "repo", "", "new_file.txt").Return(nil)
+
+		getFileRawReq := gitserver.GetRepoInfoByPathReq{
+			Namespace: "namespace",
+			Name:      "repo",
+			Ref:       "refs/heads/main",
+			Path:      "README.md",
+			RepoType:  types.ModelRepo,
+		}
+		gc.mocks.gitServer.EXPECT().GetRepoFileRaw(ctx, getFileRawReq).Return("---\nlicense: apache-2.0\nlanguage:\n  - zh\n---\nreadme content", nil).Once()
+		gc.mocks.tagComponent.EXPECT().UpdateMetaTags(ctx, types.ModelTagScope, "namespace", "repo", "---\nlicense: apache-2.0\nlanguage:\n  - zh\n---\nreadme content").Return(nil, nil)
+		gc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "namespace", "repo").Return(repo, nil)
+		gc.mocks.runtimeArchComponent.EXPECT().UpdateModelMetadata(ctx, repo).Return(modelInfo, nil)
+		gc.mocks.runtimeArchComponent.EXPECT().UpdateRuntimeFrameworkTag(ctx, modelInfo, repo).Return(nil)
+
+		err := gc.UpdateRepoInfos(context.Background(), req)
+		assert.NoError(t, err)
+	})
 }

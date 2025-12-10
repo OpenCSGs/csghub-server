@@ -17,6 +17,8 @@ import (
 const (
 	scenarioDefinitionFile  = "common/types/notification_scenario.go"
 	scenarioRegisterFile    = "notification/scenarioregister/register.go"
+	extendRegisterFileSaas  = "notification/scenarioregister/extend_saas.go"
+	extendRegisterFileEE    = "notification/scenarioregister/extend_ee.go"
 	notificationTemplateDir = "notification/tmplmgr/templates"
 	channelInternalMessage  = "internal-message"
 	channelEmail            = "email"
@@ -369,6 +371,10 @@ func addScenarioRegistration(scenario NotificationScenario) error {
 
 func getRegisterFile(buildTag string) string {
 	switch buildTag {
+	case "ee":
+		return extendRegisterFileEE
+	case "saas":
+		return extendRegisterFileSaas
 	case "ce":
 		return scenarioRegisterFile
 	default:

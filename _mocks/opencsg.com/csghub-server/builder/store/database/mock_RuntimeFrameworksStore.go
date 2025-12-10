@@ -306,6 +306,65 @@ func (_c *MockRuntimeFrameworksStore_FindByID_Call) RunAndReturn(run func(contex
 	return _c
 }
 
+// FindByImageID provides a mock function with given fields: ctx, imageID
+func (_m *MockRuntimeFrameworksStore) FindByImageID(ctx context.Context, imageID string) (*database.RuntimeFramework, error) {
+	ret := _m.Called(ctx, imageID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FindByImageID")
+	}
+
+	var r0 *database.RuntimeFramework
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*database.RuntimeFramework, error)); ok {
+		return rf(ctx, imageID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *database.RuntimeFramework); ok {
+		r0 = rf(ctx, imageID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.RuntimeFramework)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, imageID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockRuntimeFrameworksStore_FindByImageID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindByImageID'
+type MockRuntimeFrameworksStore_FindByImageID_Call struct {
+	*mock.Call
+}
+
+// FindByImageID is a helper method to define mock.On call
+//   - ctx context.Context
+//   - imageID string
+func (_e *MockRuntimeFrameworksStore_Expecter) FindByImageID(ctx interface{}, imageID interface{}) *MockRuntimeFrameworksStore_FindByImageID_Call {
+	return &MockRuntimeFrameworksStore_FindByImageID_Call{Call: _e.mock.On("FindByImageID", ctx, imageID)}
+}
+
+func (_c *MockRuntimeFrameworksStore_FindByImageID_Call) Run(run func(ctx context.Context, imageID string)) *MockRuntimeFrameworksStore_FindByImageID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockRuntimeFrameworksStore_FindByImageID_Call) Return(_a0 *database.RuntimeFramework, _a1 error) *MockRuntimeFrameworksStore_FindByImageID_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockRuntimeFrameworksStore_FindByImageID_Call) RunAndReturn(run func(context.Context, string) (*database.RuntimeFramework, error)) *MockRuntimeFrameworksStore_FindByImageID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // FindEnabledByID provides a mock function with given fields: ctx, id
 func (_m *MockRuntimeFrameworksStore) FindEnabledByID(ctx context.Context, id int64) (*database.RuntimeFramework, error) {
 	ret := _m.Called(ctx, id)

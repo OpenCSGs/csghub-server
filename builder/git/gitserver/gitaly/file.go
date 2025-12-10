@@ -203,6 +203,7 @@ func chunkBytes(data []byte, chunkSize int) [][]byte {
 }
 
 func (c *Client) CreateRepoFile(req *types.CreateFileReq) (err error) {
+	var startRepo *gitalypb.Repository
 	ctx := context.Background()
 	repoType := fmt.Sprintf("%ss", string(req.RepoType))
 	if req.NewBranch == "" {
@@ -225,8 +226,6 @@ func (c *Client) CreateRepoFile(req *types.CreateFileReq) (err error) {
 		RelativePath: relativePath,
 		GlRepository: filepath.Join(repoType, req.Namespace, req.Name),
 	}
-
-	startRepo := repository
 
 	if len(req.StartNamespace) > 0 && len(req.StartName) > 0 {
 		startRepoType := fmt.Sprintf("%ss", string(req.StartRepoType))
@@ -253,9 +252,12 @@ func (c *Client) CreateRepoFile(req *types.CreateFileReq) (err error) {
 		CommitMessage:     []byte(req.Message),
 		CommitAuthorName:  []byte(req.Username),
 		CommitAuthorEmail: []byte(req.Email),
-		// StartRepository:   repository,
-		Timestamp:       timestamppb.New(time.Now()),
-		StartRepository: startRepo,
+		Timestamp:         timestamppb.New(time.Now()),
+	}
+
+	// It seems that we don't need to set start_repository, but keeps it for now
+	if startRepo != nil {
+		header.StartRepository = startRepo
 	}
 
 	if req.Branch != "" {

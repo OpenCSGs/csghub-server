@@ -1,6 +1,7 @@
 package token
 
 import (
+	"context"
 	"errors"
 
 	"github.com/openai/openai-go/v3"
@@ -30,7 +31,7 @@ func (l *EmbeddingTokenCounter) Input(input string) {
 }
 
 // Usage implements LLMTokenCounter.
-func (l *EmbeddingTokenCounter) Usage() (*Usage, error) {
+func (l *EmbeddingTokenCounter) Usage(c context.Context) (*Usage, error) {
 	if l.usage != nil {
 		return &Usage{
 			PromptTokens: l.usage.PromptTokens,

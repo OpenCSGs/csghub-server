@@ -6,6 +6,8 @@ import (
 	context "context"
 
 	mock "github.com/stretchr/testify/mock"
+	database "opencsg.com/csghub-server/builder/store/database"
+
 	types "opencsg.com/csghub-server/common/types"
 )
 
@@ -82,23 +84,23 @@ func (_c *MockAccountingComponent_CreateOrUpdateQuota_Call) RunAndReturn(run fun
 }
 
 // CreateOrder provides a mock function with given fields: currentUser, req
-func (_m *MockAccountingComponent) CreateOrder(currentUser string, req types.AcctOrderCreateReq) (interface{}, error) {
+func (_m *MockAccountingComponent) CreateOrder(currentUser string, req types.AcctOrderCreateReq) (*database.AccountOrder, error) {
 	ret := _m.Called(currentUser, req)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CreateOrder")
 	}
 
-	var r0 interface{}
+	var r0 *database.AccountOrder
 	var r1 error
-	if rf, ok := ret.Get(0).(func(string, types.AcctOrderCreateReq) (interface{}, error)); ok {
+	if rf, ok := ret.Get(0).(func(string, types.AcctOrderCreateReq) (*database.AccountOrder, error)); ok {
 		return rf(currentUser, req)
 	}
-	if rf, ok := ret.Get(0).(func(string, types.AcctOrderCreateReq) interface{}); ok {
+	if rf, ok := ret.Get(0).(func(string, types.AcctOrderCreateReq) *database.AccountOrder); ok {
 		r0 = rf(currentUser, req)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(interface{})
+			r0 = ret.Get(0).(*database.AccountOrder)
 		}
 	}
 
@@ -130,12 +132,12 @@ func (_c *MockAccountingComponent_CreateOrder_Call) Run(run func(currentUser str
 	return _c
 }
 
-func (_c *MockAccountingComponent_CreateOrder_Call) Return(_a0 interface{}, _a1 error) *MockAccountingComponent_CreateOrder_Call {
+func (_c *MockAccountingComponent_CreateOrder_Call) Return(_a0 *database.AccountOrder, _a1 error) *MockAccountingComponent_CreateOrder_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockAccountingComponent_CreateOrder_Call) RunAndReturn(run func(string, types.AcctOrderCreateReq) (interface{}, error)) *MockAccountingComponent_CreateOrder_Call {
+func (_c *MockAccountingComponent_CreateOrder_Call) RunAndReturn(run func(string, types.AcctOrderCreateReq) (*database.AccountOrder, error)) *MockAccountingComponent_CreateOrder_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -850,23 +852,23 @@ func (_c *MockAccountingComponent_QueryBalanceByUserID_Call) RunAndReturn(run fu
 }
 
 // QueryBalanceByUserIDInternal provides a mock function with given fields: ctx, currentUser
-func (_m *MockAccountingComponent) QueryBalanceByUserIDInternal(ctx context.Context, currentUser string) (interface{}, error) {
+func (_m *MockAccountingComponent) QueryBalanceByUserIDInternal(ctx context.Context, currentUser string) (*database.AccountUser, error) {
 	ret := _m.Called(ctx, currentUser)
 
 	if len(ret) == 0 {
 		panic("no return value specified for QueryBalanceByUserIDInternal")
 	}
 
-	var r0 interface{}
+	var r0 *database.AccountUser
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) (interface{}, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*database.AccountUser, error)); ok {
 		return rf(ctx, currentUser)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string) interface{}); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string) *database.AccountUser); ok {
 		r0 = rf(ctx, currentUser)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(interface{})
+			r0 = ret.Get(0).(*database.AccountUser)
 		}
 	}
 
@@ -898,34 +900,34 @@ func (_c *MockAccountingComponent_QueryBalanceByUserIDInternal_Call) Run(run fun
 	return _c
 }
 
-func (_c *MockAccountingComponent_QueryBalanceByUserIDInternal_Call) Return(_a0 interface{}, _a1 error) *MockAccountingComponent_QueryBalanceByUserIDInternal_Call {
+func (_c *MockAccountingComponent_QueryBalanceByUserIDInternal_Call) Return(_a0 *database.AccountUser, _a1 error) *MockAccountingComponent_QueryBalanceByUserIDInternal_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockAccountingComponent_QueryBalanceByUserIDInternal_Call) RunAndReturn(run func(context.Context, string) (interface{}, error)) *MockAccountingComponent_QueryBalanceByUserIDInternal_Call {
+func (_c *MockAccountingComponent_QueryBalanceByUserIDInternal_Call) RunAndReturn(run func(context.Context, string) (*database.AccountUser, error)) *MockAccountingComponent_QueryBalanceByUserIDInternal_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // QueryPricesBySKUType provides a mock function with given fields: currentUser, req
-func (_m *MockAccountingComponent) QueryPricesBySKUType(currentUser string, req types.AcctPriceListReq) (interface{}, error) {
+func (_m *MockAccountingComponent) QueryPricesBySKUType(currentUser string, req types.AcctPriceListReq) (*database.PriceResp, error) {
 	ret := _m.Called(currentUser, req)
 
 	if len(ret) == 0 {
 		panic("no return value specified for QueryPricesBySKUType")
 	}
 
-	var r0 interface{}
+	var r0 *database.PriceResp
 	var r1 error
-	if rf, ok := ret.Get(0).(func(string, types.AcctPriceListReq) (interface{}, error)); ok {
+	if rf, ok := ret.Get(0).(func(string, types.AcctPriceListReq) (*database.PriceResp, error)); ok {
 		return rf(currentUser, req)
 	}
-	if rf, ok := ret.Get(0).(func(string, types.AcctPriceListReq) interface{}); ok {
+	if rf, ok := ret.Get(0).(func(string, types.AcctPriceListReq) *database.PriceResp); ok {
 		r0 = rf(currentUser, req)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(interface{})
+			r0 = ret.Get(0).(*database.PriceResp)
 		}
 	}
 
@@ -957,12 +959,12 @@ func (_c *MockAccountingComponent_QueryPricesBySKUType_Call) Run(run func(curren
 	return _c
 }
 
-func (_c *MockAccountingComponent_QueryPricesBySKUType_Call) Return(_a0 interface{}, _a1 error) *MockAccountingComponent_QueryPricesBySKUType_Call {
+func (_c *MockAccountingComponent_QueryPricesBySKUType_Call) Return(_a0 *database.PriceResp, _a1 error) *MockAccountingComponent_QueryPricesBySKUType_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockAccountingComponent_QueryPricesBySKUType_Call) RunAndReturn(run func(string, types.AcctPriceListReq) (interface{}, error)) *MockAccountingComponent_QueryPricesBySKUType_Call {
+func (_c *MockAccountingComponent_QueryPricesBySKUType_Call) RunAndReturn(run func(string, types.AcctPriceListReq) (*database.PriceResp, error)) *MockAccountingComponent_QueryPricesBySKUType_Call {
 	_c.Call.Return(run)
 	return _c
 }

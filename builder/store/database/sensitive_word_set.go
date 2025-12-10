@@ -29,6 +29,7 @@ type SensitiveWordSetStore interface {
 	Update(ctx context.Context, input SensitiveWordSet) error
 	Delete(ctx context.Context, id int64) error
 	List(ctx context.Context, filter *SensitiveWordSetFilter) ([]SensitiveWordSet, error)
+	GetByName(ctx context.Context, name string) (*SensitiveWordSet, error)
 }
 
 type SensitiveWordSetFilter struct {

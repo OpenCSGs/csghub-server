@@ -116,3 +116,9 @@ type MCPSpaceConfig struct {
 	BuildCmds       string `json:"build_cmds"`
 	LaunchCmds      string `json:"launch_cmds"`
 }
+
+type MCPFilter struct {
+	Username string
+	Per      int
+	Page     int
+}

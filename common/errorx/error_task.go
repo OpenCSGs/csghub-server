@@ -7,6 +7,8 @@ const (
 	multiHostInferenceNotSupported
 	multiHostInferenceReplicaCount
 	multiHostNotebookNotSupported
+	notEnoughResource
+	clusterUnavailable
 )
 
 var (
@@ -48,7 +50,7 @@ var (
 	// zh-CN: 不支持多主机 Notebook
 	//
 	// zh-HK: 不支援多主機 Notebook
-	ErrMultiHostNotebookNotSupported = CustomError{prefix: errTaskPrefix, code: multiHostNotebookNotSupported}
+	ErrMultiHostNotebookNotSupported  = CustomError{prefix: errTaskPrefix, code: multiHostNotebookNotSupported}
 	// multi-host inference only supports a minimum replica count greater than 0
 	//
 	// Description: For multi-host inference configuration, the minimum number of replicas must be greater than zero to ensure proper service operation.
@@ -61,6 +63,30 @@ var (
 	//
 	// zh-HK: 多主機推理僅支持大於 0 的最低副本數
 	ErrMultiHostInferenceReplicaCount = CustomError{prefix: errTaskPrefix, code: multiHostInferenceReplicaCount}
+	// not enough resource to run the task
+	//
+	// Description: The task requires more resources than are available in the cluster. This error occurs when the cluster does not have sufficient capacity to run the task.
+	//
+	// Description_ZH: 任务需要的资源超过了集群可用的资源。当集群资源不足时，会出现此错误。
+	//
+	// en-US: Not enough resource to run the task
+	//
+	// zh-CN: 集群资源不足
+	//
+	// zh-HK: 集群資源不足
+	ErrNotEnoughResource = CustomError{prefix: errTaskPrefix, code: notEnoughResource}
+	// cluster is unavailable to run the task
+	//
+	// Description: The cluster is currently unavailable, either due to maintenance or other reasons. This error occurs when the cluster is not ready to accept new tasks.
+	//
+	// Description_ZH: 集群当前不可用，可能是由于维护或其他原因。当集群未准备好接受新任务时，会出现此错误。
+	//
+	// en-US: Cluster is unavailable to run the task
+	//
+	// zh-CN: 集群当前不可用
+	//
+	// zh-HK: 集群當前不可用
+	ErrClusterUnavailable = CustomError{prefix: errTaskPrefix, code: clusterUnavailable}
 )
 
 func NoEntryFile(err error, ctx context) error {
@@ -69,5 +95,23 @@ func NoEntryFile(err error, ctx context) error {
 		context: ctx,
 		err:     err,
 		code:    noEntryFile,
+	}
+}
+
+func NotEnoughResource(err error, ctx context) error {
+	return CustomError{
+		prefix:  errTaskPrefix,
+		context: ctx,
+		err:     err,
+		code:    notEnoughResource,
+	}
+}
+
+func ClusterUnavailable(err error, ctx context) error {
+	return CustomError{
+		prefix:  errTaskPrefix,
+		context: ctx,
+		err:     err,
+		code:    clusterUnavailable,
 	}
 }

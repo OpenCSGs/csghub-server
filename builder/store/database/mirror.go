@@ -31,7 +31,7 @@ type MirrorStore interface {
 	Finished(ctx context.Context) ([]Mirror, error)
 	ToSyncRepo(ctx context.Context) ([]Mirror, error)
 	ToSyncLfs(ctx context.Context) ([]Mirror, error)
-	IndexWithPagination(ctx context.Context, per, page int, search string, hasRepo bool) (mirrors []Mirror, count int, err error)
+	IndexWithPagination(ctx context.Context, per, page int, filter types.MirrorFilter, hasRepo bool) (mirrors []Mirror, count int, err error)
 	StatusCount(ctx context.Context) ([]MirrorStatusCount, error)
 	UpdateMirrorAndRepository(ctx context.Context, mirror *Mirror, repo *Repository) error
 	FindBySourceURLs(ctx context.Context, sourceURLs []string) ([]Mirror, error)
@@ -332,7 +332,7 @@ func (s *mirrorStoreImpl) ToSyncLfs(ctx context.Context) ([]Mirror, error) {
 	return mirrors, nil
 }
 
-func (s *mirrorStoreImpl) IndexWithPagination(ctx context.Context, per, page int, search string, hasRepo bool) (mirrors []Mirror, count int, err error) {
+func (s *mirrorStoreImpl) IndexWithPagination(ctx context.Context, per, page int, filter types.MirrorFilter, hasRepo bool) (mirrors []Mirror, count int, err error) {
 	q := s.db.Operator.Core.NewSelect().
 		Model(&mirrors).
 		Relation("Repository").
@@ -343,12 +343,15 @@ func (s *mirrorStoreImpl) IndexWithPagination(ctx context.Context, per, page int
 	if hasRepo {
 		q = q.Where("repository.id is not null")
 	}
-	if search != "" {
+	if filter.Search != "" {
 		q = q.Where("LOWER(repository.path) like ? or LOWER(mirror.source_url) like ? or LOWER(mirror.local_repo_path) like ?",
-			fmt.Sprintf("%%%s%%", strings.ToLower(search)),
-			fmt.Sprintf("%%%s%%", strings.ToLower(search)),
-			fmt.Sprintf("%%%s%%", strings.ToLower(search)),
+			fmt.Sprintf("%%%s%%", strings.ToLower(filter.Search)),
+			fmt.Sprintf("%%%s%%", strings.ToLower(filter.Search)),
+			fmt.Sprintf("%%%s%%", strings.ToLower(filter.Search)),
 		)
+	}
+	if filter.Status != nil {
+		q = q.Where("current_task.status = ? or (current_task.status IS NULL and mirror.status = ?)", *filter.Status, *filter.Status)
 	}
 	count, err = q.Count(ctx)
 	if err != nil {

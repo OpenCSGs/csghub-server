@@ -317,6 +317,7 @@ func (s *modelStoreImpl) CreateAndUpdateRepoPath(ctx context.Context, input Mode
 		input.Repository = &repo
 		return nil
 	})
+	err = errorx.HandleDBError(err, errorx.Ctx().Set("path", path).Set("model_name", input.Repository.Name))
 	return &input, err
 }
 

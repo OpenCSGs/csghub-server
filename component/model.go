@@ -525,6 +525,7 @@ func (c *modelComponentImpl) Show(ctx context.Context, namespace, name, currentU
 		MediumRiskCount:  model.MediumRiskCount,
 		HighRiskCount:    model.HighRiskCount,
 		MirrorTaskStatus: mirrorTaskStatus,
+		XnetEnabled:      model.Repository.XnetEnabled,
 	}
 	// admin user or owner can see the sensitive check status
 	if permission.CanAdmin {

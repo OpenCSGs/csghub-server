@@ -196,26 +196,47 @@ func TestMirrorStore_IndexWithPagination(t *testing.T) {
 	ctx := context.TODO()
 
 	store := database.NewMirrorStoreWithDB(db)
+	msStore := database.NewMirrorTaskStoreWithDB(db)
 
 	mirrors := []*database.Mirror{
 		{Interval: "m1", LocalRepoPath: "foo", SourceUrl: "bar"},
 		{Interval: "m2", LocalRepoPath: "bar", SourceUrl: "foo"},
 	}
-	for _, m := range mirrors {
-		_, err := store.Create(ctx, m)
+	var mStatus types.MirrorTaskStatus
+	for i, m := range mirrors {
+		mr, err := store.Create(ctx, m)
+		require.Nil(t, err)
+		if i == 0 {
+			mStatus = types.MirrorRepoSyncStart
+		} else {
+			mStatus = types.MirrorLfsSyncFailed
+		}
+		ct, err := msStore.Create(ctx, database.MirrorTask{
+			MirrorID: mr.ID,
+			Status:   mStatus,
+		})
+		require.Nil(t, err)
+		m.CurrentTaskID = ct.ID
+		err = store.Update(ctx, m)
 		require.Nil(t, err)
 	}
 
-	ms, count, err := store.IndexWithPagination(ctx, 10, 1, "foo", false)
+	ms, count, err := store.IndexWithPagination(ctx, 10, 1, types.MirrorFilter{Search: "foo"}, false)
 	require.Nil(t, err)
 	require.Equal(t, 2, count)
 	// make sure in "DESC" order
 	require.Equal(t, "m2", ms[0].Interval)
 	require.Equal(t, "m1", ms[1].Interval)
 
-	_, count, err = store.IndexWithPagination(ctx, 10, 1, "foo", true)
+	_, count, err = store.IndexWithPagination(ctx, 10, 1, types.MirrorFilter{Search: "foo"}, true)
 	require.Nil(t, err)
 	require.Equal(t, 0, count)
+
+	status := types.MirrorRepoSyncStart
+	ms, count, err = store.IndexWithPagination(ctx, 10, 1, types.MirrorFilter{Status: &status}, false)
+	require.Nil(t, err)
+	require.Equal(t, 1, count)
+	require.Equal(t, "m1", ms[0].Interval)
 }
 
 func TestMirrorStore_StatusCount(t *testing.T) {
@@ -316,7 +337,7 @@ func TestMirrorStore_BatchCreate(t *testing.T) {
 	}
 	err := store.BatchCreate(ctx, mirrors)
 	require.Nil(t, err)
-	ms, count, err := store.IndexWithPagination(ctx, 10, 1, "", false)
+	ms, count, err := store.IndexWithPagination(ctx, 10, 1, types.MirrorFilter{Search: ""}, false)
 	require.Nil(t, err)
 	require.Equal(t, 3, len(ms))
 	require.Equal(t, 3, count)

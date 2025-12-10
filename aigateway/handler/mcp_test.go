@@ -11,36 +11,42 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	gwmockcomp "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/aigateway/component"
 	apicomp "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
+	gwcomp "opencsg.com/csghub-server/aigateway/component"
 	"opencsg.com/csghub-server/api/httpbase"
+	"opencsg.com/csghub-server/builder/store/database"
 	comType "opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/component"
 )
 
-func NewTestMCPProxyHandler(mockSpaceComp component.SpaceComponent) (MCPProxyHandler, error) {
+func NewTestMCPProxyHandler(mockSpaceComp component.SpaceComponent, mockMCPResComp gwcomp.MCPResourceComponent) (MCPProxyHandler, error) {
 	return &MCPProxyHandlerImpl{
-		spaceComp: mockSpaceComp,
+		spaceComp:  mockSpaceComp,
+		mcpResComp: mockMCPResComp,
 	}, nil
 }
 
-func TestOpenAIHandler_List(t *testing.T) {
+func TestMCPHandler_ResourceList(t *testing.T) {
 	mockSpaceComp := apicomp.NewMockSpaceComponent(t)
+	mockMCPResComp := gwmockcomp.NewMockMCPResourceComponent(t)
 
-	handler, err := NewTestMCPProxyHandler(mockSpaceComp)
+	handler, err := NewTestMCPProxyHandler(mockSpaceComp, mockMCPResComp)
 	require.Nil(t, err)
 
-	repoFilter := new(comType.RepoFilter)
-	repoFilter.Username = "testuser"
-	repoFilter.SpaceSDK = comType.MCPSERVER.Name
+	filter := new(comType.MCPFilter)
+	filter.Username = "testuser"
+	filter.Page = 1
+	filter.Per = 10
 
-	mcps := []*comType.MCPService{
+	mcps := []database.MCPResource{
 		{
 			ID:   1,
 			Name: "mcp1",
 		},
 	}
 
-	mockSpaceComp.EXPECT().MCPIndex(mock.Anything, repoFilter, 10, 1).Return(mcps, 1, nil)
+	mockMCPResComp.EXPECT().List(mock.Anything, filter).Return(mcps, 1, nil)
 
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
@@ -52,13 +58,13 @@ func TestOpenAIHandler_List(t *testing.T) {
 	}
 	httpbase.SetCurrentUser(c, "testuser")
 
-	handler.List(c)
+	handler.Resources(c)
 
 	assert.Equal(t, http.StatusOK, w.Code)
 
 	type Resp struct {
-		Total int                   `json:"total"`
-		Data  []*comType.MCPService `json:"data"`
+		Total int                    `json:"total"`
+		Data  []database.MCPResource `json:"data"`
 	}
 	var response Resp
 	err = json.Unmarshal(w.Body.Bytes(), &response)

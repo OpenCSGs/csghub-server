@@ -72,7 +72,6 @@ func newDeployer(s scheduler.Scheduler, ib imagebuilder.Builder, ir imagerunner.
 		logReporter:           logReporter,
 		argoWorkflowStore:     database.NewArgoWorkFlowStore(),
 	}
-
 	if startJobs {
 		d.startJobs()
 	}

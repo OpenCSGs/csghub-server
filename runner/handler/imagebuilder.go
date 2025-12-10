@@ -72,12 +72,14 @@ func (ibh *ImagebuilderHandler) Stop(ctx *gin.Context) {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "bad params imagebuilder request format:" + err.Error()})
 		return
 	}
+	slog.Info("stop image builder", slog.Any("req", req))
 	err := ibh.ibc.Stop(ctx.Request.Context(), req)
 	if err != nil {
 		slog.Error("fail to stop image builder", slog.Any("error", err), slog.Any("deploy_id", req.DeployId))
 		ctx.JSON(http.StatusInternalServerError, err.Error())
 		return
 	}
+	slog.Info("stop image builder success", slog.Any("req", req))
 
 	httpbase.OK(ctx, nil)
 }

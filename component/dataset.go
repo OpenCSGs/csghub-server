@@ -450,6 +450,7 @@ func (c *datasetComponentImpl) Show(ctx context.Context, namespace, name, curren
 			CSGPath: dataset.Repository.CSGPath,
 		},
 		MirrorTaskStatus: mirrorTaskStatus,
+		XnetEnabled:      dataset.Repository.XnetEnabled,
 	}
 	if permission.CanAdmin {
 		resDataset.SensitiveCheckStatus = dataset.Repository.SensitiveCheckStatus.String()

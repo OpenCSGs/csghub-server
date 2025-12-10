@@ -641,9 +641,9 @@ func (_c *MockMirrorStore_Finished_Call) RunAndReturn(run func(context.Context) 
 	return _c
 }
 
-// IndexWithPagination provides a mock function with given fields: ctx, per, page, search, hasRepo
-func (_m *MockMirrorStore) IndexWithPagination(ctx context.Context, per int, page int, search string, hasRepo bool) ([]database.Mirror, int, error) {
-	ret := _m.Called(ctx, per, page, search, hasRepo)
+// IndexWithPagination provides a mock function with given fields: ctx, per, page, filter, hasRepo
+func (_m *MockMirrorStore) IndexWithPagination(ctx context.Context, per int, page int, filter types.MirrorFilter, hasRepo bool) ([]database.Mirror, int, error) {
+	ret := _m.Called(ctx, per, page, filter, hasRepo)
 
 	if len(ret) == 0 {
 		panic("no return value specified for IndexWithPagination")
@@ -652,25 +652,25 @@ func (_m *MockMirrorStore) IndexWithPagination(ctx context.Context, per int, pag
 	var r0 []database.Mirror
 	var r1 int
 	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, int, int, string, bool) ([]database.Mirror, int, error)); ok {
-		return rf(ctx, per, page, search, hasRepo)
+	if rf, ok := ret.Get(0).(func(context.Context, int, int, types.MirrorFilter, bool) ([]database.Mirror, int, error)); ok {
+		return rf(ctx, per, page, filter, hasRepo)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, int, int, string, bool) []database.Mirror); ok {
-		r0 = rf(ctx, per, page, search, hasRepo)
+	if rf, ok := ret.Get(0).(func(context.Context, int, int, types.MirrorFilter, bool) []database.Mirror); ok {
+		r0 = rf(ctx, per, page, filter, hasRepo)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]database.Mirror)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, int, int, string, bool) int); ok {
-		r1 = rf(ctx, per, page, search, hasRepo)
+	if rf, ok := ret.Get(1).(func(context.Context, int, int, types.MirrorFilter, bool) int); ok {
+		r1 = rf(ctx, per, page, filter, hasRepo)
 	} else {
 		r1 = ret.Get(1).(int)
 	}
 
-	if rf, ok := ret.Get(2).(func(context.Context, int, int, string, bool) error); ok {
-		r2 = rf(ctx, per, page, search, hasRepo)
+	if rf, ok := ret.Get(2).(func(context.Context, int, int, types.MirrorFilter, bool) error); ok {
+		r2 = rf(ctx, per, page, filter, hasRepo)
 	} else {
 		r2 = ret.Error(2)
 	}
@@ -687,15 +687,15 @@ type MockMirrorStore_IndexWithPagination_Call struct {
 //   - ctx context.Context
 //   - per int
 //   - page int
-//   - search string
+//   - filter types.MirrorFilter
 //   - hasRepo bool
-func (_e *MockMirrorStore_Expecter) IndexWithPagination(ctx interface{}, per interface{}, page interface{}, search interface{}, hasRepo interface{}) *MockMirrorStore_IndexWithPagination_Call {
-	return &MockMirrorStore_IndexWithPagination_Call{Call: _e.mock.On("IndexWithPagination", ctx, per, page, search, hasRepo)}
+func (_e *MockMirrorStore_Expecter) IndexWithPagination(ctx interface{}, per interface{}, page interface{}, filter interface{}, hasRepo interface{}) *MockMirrorStore_IndexWithPagination_Call {
+	return &MockMirrorStore_IndexWithPagination_Call{Call: _e.mock.On("IndexWithPagination", ctx, per, page, filter, hasRepo)}
 }
 
-func (_c *MockMirrorStore_IndexWithPagination_Call) Run(run func(ctx context.Context, per int, page int, search string, hasRepo bool)) *MockMirrorStore_IndexWithPagination_Call {
+func (_c *MockMirrorStore_IndexWithPagination_Call) Run(run func(ctx context.Context, per int, page int, filter types.MirrorFilter, hasRepo bool)) *MockMirrorStore_IndexWithPagination_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(int), args[2].(int), args[3].(string), args[4].(bool))
+		run(args[0].(context.Context), args[1].(int), args[2].(int), args[3].(types.MirrorFilter), args[4].(bool))
 	})
 	return _c
 }
@@ -705,7 +705,7 @@ func (_c *MockMirrorStore_IndexWithPagination_Call) Return(mirrors []database.Mi
 	return _c
 }
 
-func (_c *MockMirrorStore_IndexWithPagination_Call) RunAndReturn(run func(context.Context, int, int, string, bool) ([]database.Mirror, int, error)) *MockMirrorStore_IndexWithPagination_Call {
+func (_c *MockMirrorStore_IndexWithPagination_Call) RunAndReturn(run func(context.Context, int, int, types.MirrorFilter, bool) ([]database.Mirror, int, error)) *MockMirrorStore_IndexWithPagination_Call {
 	_c.Call.Return(run)
 	return _c
 }

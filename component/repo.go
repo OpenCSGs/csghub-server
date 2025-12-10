@@ -33,6 +33,7 @@ import (
 	"opencsg.com/csghub-server/builder/deploy"
 	deployStatus "opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/git/gitserver"
+	"opencsg.com/csghub-server/builder/git/gitserver/gitaly"
 	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/git/mirrorserver"
 	"opencsg.com/csghub-server/builder/multisync"
@@ -97,6 +98,7 @@ type repoComponentImpl struct {
 	mirrorTaskStore        database.MirrorTaskStore
 	notificationSvcClient  rpc.NotificationSvcClient
 	mirrorSvcClient        rpc.MirrorSvcClient
+	pendingDeletion        database.PendingDeletionStore
 	xnetClient             rpc.XnetSvcClient
 }
 
@@ -190,6 +192,8 @@ type RepoComponent interface {
 	BatchMigrateRepoToHashedPath(ctx context.Context, auto bool, batchSize int, lastID int64) (int64, error)
 	GetMirrorTaskStatusAndSyncStatus(repo *database.Repository) (types.MirrorTaskStatus, types.RepositorySyncStatus)
 	CheckDeployPermissionForUser(ctx context.Context, deployReq types.DeployActReq) (*database.User, *database.Deploy, error)
+	DeletePendingDeletion(ctx context.Context) error
+	GetRepos(ctx context.Context, search, currentUser string, repoType types.RepositoryType) ([]string, error)
 	IsXnetEnabled(ctx context.Context, repoType types.RepositoryType, namespace, name, username string) (*types.XetEnabled, error)
 }
 
@@ -337,6 +341,9 @@ func (c *repoComponentImpl) UpdateRepo(ctx context.Context, req types.UpdateRepo
 	if user.CanAdmin() {
 		if req.Private != nil {
 			repo.Private = *req.Private
+		}
+		if req.XnetEnabled != nil {
+			repo.XnetEnabled = *req.XnetEnabled
 		}
 	} else {
 		// Handle permissions for non-admin users.
@@ -989,6 +996,9 @@ func (c *repoComponentImpl) FileRaw(ctx context.Context, req *types.GetFileReq) 
 	}
 	raw, err := c.git.GetRepoFileRaw(ctx, getFileRawReq)
 	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			return "", errorx.ErrNotFound
+		}
 		return "", fmt.Errorf("failed to get git %s repository file raw, error: %w", req.RepoType, err)
 	}
 	return raw, nil
@@ -1014,7 +1024,7 @@ func (c *repoComponentImpl) DownloadFile(ctx context.Context, req *types.GetFile
 
 	err = c.repoStore.UpdateRepoFileDownloads(ctx, repo, time.Now(), 1)
 	if err != nil {
-		return nil, 0, "", fmt.Errorf("failed to update %s file download count, error: %w", req.RepoType, err)
+		return nil, 0, "", fmt.Errorf("failed to update %s file download count, error: %w", fmt.Sprintf("%s/%s/%s", req.RepoType, req.Namespace, req.Name), err)
 	}
 	if req.Ref == "" {
 		req.Ref = repo.DefaultBranch
@@ -1026,11 +1036,20 @@ func (c *repoComponentImpl) DownloadFile(ctx context.Context, req *types.GetFile
 			// allow rename when download through content-disposition header
 			reqParams.Set("response-content-disposition", fmt.Sprintf("attachment;filename=%s", req.SaveAs))
 		}
-		signedUrl, err := c.s3Client.PresignedGetObject(ctx, c.lfsBucket, objectKey, types.OssFileExpire, reqParams)
-		if err != nil {
-			return nil, 0, downloadUrl, err
+		if repo.XnetEnabled {
+			signedUrl, err := c.xnetClient.PresignedGetObject(ctx, objectKey, types.OssFileExpire, reqParams)
+			if err != nil {
+				return nil, 0, downloadUrl, err
+			}
+			downloadUrl = signedUrl.String()
+		} else {
+			signedUrl, err := c.s3Client.PresignedGetObject(ctx, c.lfsBucket, objectKey, types.OssFileExpire, reqParams)
+			if err != nil {
+				return nil, 0, downloadUrl, err
+			}
+			downloadUrl = signedUrl.String()
 		}
-		return nil, 0, signedUrl.String(), nil
+		return nil, 0, downloadUrl, nil
 	} else {
 		getFileReaderReq := gitserver.GetRepoInfoByPathReq{
 			Namespace: req.Namespace,
@@ -1473,6 +1492,10 @@ func (c *repoComponentImpl) HeadDownloadFile(ctx context.Context, req *types.Get
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get last commit, error: %w", err)
 	}
+
+	if file != nil && repo.XnetEnabled && file.Lfs {
+		file.XnetEnabled = true
+	}
 	return file, lastCommit, nil
 }
 
@@ -1490,6 +1513,12 @@ func (c *repoComponentImpl) SDKDownloadFile(ctx context.Context, req *types.GetF
 	if !canRead {
 		return nil, 0, "", errorx.ErrForbiddenMsg("users do not have permission to download file in this repo")
 	}
+
+	err = c.repoStore.UpdateRepoFileDownloads(ctx, repo, time.Now(), 1)
+	if err != nil {
+		return nil, 0, "", fmt.Errorf("failed to update %s file download count, error: %w", fmt.Sprintf("%s/%s/%s", req.RepoType, req.Namespace, req.Name), err)
+	}
+
 	if req.Ref == "" {
 		req.Ref = repo.DefaultBranch
 	}
@@ -1511,15 +1540,20 @@ func (c *repoComponentImpl) SDKDownloadFile(ctx context.Context, req *types.GetF
 			// allow rename when download through content-disposition header
 			reqParams.Set("response-content-disposition", fmt.Sprintf("attachment;filename=%s", req.SaveAs))
 		}
-		signedUrl, err := c.s3Client.PresignedGetObject(ctx, c.lfsBucket, objectKey, types.OssFileExpire, reqParams)
-		if err != nil {
-			if err.Error() == ErrNotFoundMessage || err.Error() == ErrGetContentsOrList {
-				return nil, 0, downloadUrl, errorx.ErrNotFound
+		if repo.XnetEnabled {
+			signedUrl, err := c.xnetClient.PresignedGetObject(ctx, objectKey, types.OssFileExpire, reqParams)
+			if err != nil {
+				return nil, 0, downloadUrl, err
 			}
-			return nil, 0, downloadUrl, err
+			downloadUrl = signedUrl.String()
+		} else {
+			signedUrl, err := c.s3Client.PresignedGetObject(ctx, c.lfsBucket, objectKey, types.OssFileExpire, reqParams)
+			if err != nil {
+				return nil, 0, downloadUrl, err
+			}
+			downloadUrl = signedUrl.String()
 		}
-		return nil, 0, signedUrl.String(), nil
-
+		return nil, 0, downloadUrl, nil
 	} else {
 		getFileReaderReq := gitserver.GetRepoInfoByPathReq{
 			Namespace: req.Namespace,
@@ -1900,10 +1934,14 @@ func (c *repoComponentImpl) CreateMirror(ctx context.Context, req types.CreateMi
 	if exists {
 		return nil, fmt.Errorf("mirror already exists")
 	}
-	mirrorSource, err := c.mirrorSourceStore.Get(ctx, req.MirrorSourceID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get mirror source, err: %w, id: %d", err, req.MirrorSourceID)
+	if req.MirrorSourceID != 0 {
+		mirrorSource, err := c.mirrorSourceStore.Get(ctx, req.MirrorSourceID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get mirror source, err: %w, id: %d", err, req.MirrorSourceID)
+		}
+		mirror.LocalRepoPath = fmt.Sprintf("%s_%s_%s_%s", mirrorSource.SourceName, req.RepoType, req.Namespace, req.Name)
 	}
+
 	mirror.Interval = req.Interval
 	mirror.SourceUrl = req.SourceUrl
 	mirror.MirrorSourceID = req.MirrorSourceID
@@ -1911,7 +1949,7 @@ func (c *repoComponentImpl) CreateMirror(ctx context.Context, req types.CreateMi
 	mirror.PushUrl = repo.HTTPCloneURL
 	mirror.AccessToken = req.AccessToken
 	mirror.SourceRepoPath = req.SourceRepoPath
-	mirror.LocalRepoPath = fmt.Sprintf("%s_%s_%s_%s", mirrorSource.SourceName, req.RepoType, req.Namespace, req.Name)
+
 	mirror.RepositoryID = repo.ID
 	mirror.Repository = repo
 
@@ -2654,7 +2692,7 @@ func deployStatusCodeToString(code int) string {
 	var txt string
 	switch code {
 	case 10:
-		txt = SpaceStatusStopped
+		txt = SpaceStatusBuilding // need to change it to queue? This requires UI modification as well
 	case 11:
 		txt = SpaceStatusBuilding
 	case 12:
@@ -2706,6 +2744,7 @@ func (c *repoComponentImpl) DeployInstanceLogs(ctx context.Context, logReq types
 		ClusterID:    deploy.ClusterID,
 		SvcName:      deploy.SvcName,
 		InstanceName: logReq.InstanceName,
+		Since:        logReq.Since,
 	})
 }
 
@@ -2799,6 +2838,7 @@ func (c *repoComponentImpl) DeployStop(ctx context.Context, stopReq types.Deploy
 	if err != nil {
 		return fmt.Errorf("fail to check permission for stop deploy, %w", err)
 	}
+
 	// delete service
 	deployRepo := types.DeployRepo{
 		DeployID:      stopReq.DeployID,
@@ -2829,7 +2869,7 @@ func (c *repoComponentImpl) DeployStop(ctx context.Context, stopReq types.Deploy
 	}
 
 	// update database deploy to stopped
-	err = c.deployTaskStore.StopDeploy(ctx, stopReq.RepoType, deploy.RepoID, user.ID, stopReq.DeployID)
+	err = c.deployTaskStore.StopDeploy(ctx, stopReq.RepoType, deploy.RepoID, deploy.UserID, stopReq.DeployID)
 	if err != nil {
 		return fmt.Errorf("fail to stop deploy instance, %w", err)
 	}
@@ -3555,7 +3595,10 @@ func (c *repoComponentImpl) Preupload(ctx context.Context, req types.PreuploadRe
 }
 
 func (c *repoComponentImpl) CommitFiles(ctx context.Context, req types.CommitFilesReq) error {
-	var files []gitserver.CommitFile
+	var (
+		files    []gitserver.CommitFile
+		lfsFiles []types.Pointer
+	)
 	repo, err := c.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return fmt.Errorf("failed to find repo, err: %w", err)
@@ -3603,11 +3646,40 @@ func (c *repoComponentImpl) CommitFiles(ctx context.Context, req types.CommitFil
 		default:
 			return fmt.Errorf("invalid action: %s", file.Action)
 		}
+		cleanedContent := cleanBase64(file.Content)
+
 		files = append(files, gitserver.CommitFile{
 			Path:    file.Path,
-			Content: cleanBase64(file.Content),
+			Content: cleanedContent,
 			Action:  action,
 		})
+		content, err := base64.StdEncoding.DecodeString(cleanedContent)
+		if err != nil {
+			return fmt.Errorf("failed to decode content, err: %w", err)
+		}
+		p, err := gitaly.ReadPointerFromBuffer(content)
+		if err != nil {
+			continue
+		}
+		lfsFiles = append(lfsFiles, p)
+	}
+
+	for _, lfsFile := range lfsFiles {
+		e, err := c.xnetClient.FileExists(ctx, lfsFile.Oid)
+		if err != nil {
+			continue
+		}
+		if e {
+			_, err := c.lfsMetaObjectStore.UpdateOrCreate(ctx, database.LfsMetaObject{
+				Oid:          lfsFile.Oid,
+				Size:         lfsFile.Size,
+				Existing:     true,
+				RepositoryID: repo.ID,
+			})
+			if err != nil {
+				return fmt.Errorf("failed to update or create lfs meta object, err: %w", err)
+			}
+		}
 	}
 
 	err = c.git.CommitFiles(ctx, gitserver.CommitFilesReq{
@@ -3781,7 +3853,7 @@ func GetRepoUrl(repoType types.RepositoryType, repoPath string) string {
 	case types.CodeRepo:
 		return fmt.Sprintf("/codes/%s", repoPath)
 	case types.PromptRepo:
-		return fmt.Sprintf("/prompts/%s", repoPath)
+		return fmt.Sprintf("/prompts/library/%s", repoPath)
 	case types.MCPServerRepo:
 		return fmt.Sprintf("/mcp/servers/%s", repoPath)
 	default:
@@ -4071,4 +4143,16 @@ func (c *repoComponentImpl) GetMirrorTaskStatusAndSyncStatus(repo *database.Repo
 
 func (c *repoComponentImpl) RandomPath() []string {
 	return strings.SplitN(uuid.NewString(), "-", 2)
+}
+
+func (c *repoComponentImpl) GetRepos(ctx context.Context, search, currentUser string, repoType types.RepositoryType) ([]string, error) {
+	var repoPaths []string
+	repos, _, err := c.repoStore.GetReposBySearch(ctx, search, repoType, 1, 10)
+	if err != nil {
+		return repoPaths, fmt.Errorf("failed to get repos, error: %w", err)
+	}
+	for _, repo := range repos {
+		repoPaths = append(repoPaths, repo.Path)
+	}
+	return repoPaths, nil
 }

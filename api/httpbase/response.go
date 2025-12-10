@@ -182,6 +182,22 @@ func ConflictError(c *gin.Context, err error) {
 	c.PureJSON(http.StatusConflict, resp)
 }
 
+func TooManyReqError(c *gin.Context, err error) {
+	err, ok := errorx.GetFirstCustomError(err)
+	if ok {
+		customErr := err.(errorx.CustomError)
+		c.PureJSON(http.StatusTooManyRequests, R{
+			Code:    customErr.Code(),
+			Msg:     customErr.Error(),
+			Context: customErr.Context(),
+		})
+		return
+	}
+	c.PureJSON(http.StatusTooManyRequests, R{
+		Msg: err.Error(),
+	})
+}
+
 // R is the response envelope
 type R struct {
 	Code    string `json:"code,omitempty"`

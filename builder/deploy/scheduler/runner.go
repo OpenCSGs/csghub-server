@@ -32,11 +32,11 @@ const Cancelled = -1
 
 const (
 	BuildPending    = 0
-	BuildInQueue    = 5
 	BuildInProgress = 1
 	BuildFailed     = 2
 	BuildSucceed    = 3
 	BuildSkip       = 4 // export for other package
+	BuildInQueue    = 5
 )
 
 // sub deploy task status

@@ -17,6 +17,8 @@ const (
 
 	errReqContentTypeUnsupported
 	errRateLimitExceeded
+	errLimitedIPLocation
+	errCaptchaIncorrect
 )
 
 var (
@@ -118,6 +120,32 @@ var (
 	//
 	// zh-HK: 請求過於頻繁，需要驗證碼
 	ErrRateLimitExceeded = CustomError{prefix: errReqPrefix, code: errRateLimitExceeded}
+
+	// requests from this IP location are restricted, captcha is required
+	//
+	// Description: Requests originating from this IP location are restricted. To proceed, please complete a captcha verification.
+	//
+	// Description_ZH: 来自此IP位置的请求受到限制。要继续操作，请完成验证码验证。
+	//
+	// en-US: Requests from this IP location are restricted, captcha is required
+	//
+	// zh-CN: 来自该IP位置的请求受限，需要验证码
+	//
+	// zh-HK: 來自該IP位置的請求受限，需要驗證碼
+	ErrLimitedIPLocation = CustomError{prefix: errReqPrefix, code: errLimitedIPLocation}
+
+	// captcha verification failed
+	//
+	// Description: The provided captcha verification failed. Please try again with a valid captcha.
+	//
+	// Description_ZH: 提供的验证码验证失败。请使用有效的验证码重试。
+	//
+	// en-US: Captcha verification failed
+	//
+	// zh-CN: 验证码验证失败
+	//
+	// zh-HK: 驗證碼驗證失敗
+	ErrCaptchaIncorrect = CustomError{prefix: errReqPrefix, code: errCaptchaIncorrect}
 )
 
 func BadRequest(originErr error, ext context) error {

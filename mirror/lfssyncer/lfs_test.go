@@ -922,3 +922,19 @@ func TestLfsSyncWorker_ConcurrentOperations(t *testing.T) {
 	// Worker should still be functional
 	assert.Equal(t, 1, worker.ID())
 }
+
+func TestLfsSyncWorker_DownloadRange_NotFoundError(t *testing.T) {
+	worker, _ := newTestLfsSyncWorker(t, "")
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer server.Close()
+
+	resp, err := worker.downloadRange(server.URL, 0, 10)
+	if resp != nil {
+		resp.Body.Close()
+	}
+
+	assert.Error(t, err)
+}

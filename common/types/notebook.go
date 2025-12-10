@@ -51,4 +51,5 @@ type UpdateNotebookReq struct {
 	CurrentUser  string `json:"currentUser"`
 	ResourceID   int64  `json:"resource_id"`
 	InstanceName string `json:"instance_name"`
+	Since        string `json:"since,omitempty"`
 }

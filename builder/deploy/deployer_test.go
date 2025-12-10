@@ -206,13 +206,17 @@ func TestDeployer_Deploy(t *testing.T) {
 		// })
 		mockTaskStore.EXPECT().CreateDeployTask(mock.Anything, &runTask).Return(nil)
 
+		// mockSch := mockScheduler.NewMockScheduler(t)
+		// mockSch.EXPECT().Queue(mock.Anything).Return(nil)
+
 		node, _ := snowflake.NewNode(1)
 
 		reporter := mockReporter.NewMockLogCollector(t)
 		d := &deployer{
 			snowflakeNode:   node,
 			deployTaskStore: mockTaskStore,
-			logReporter:     reporter,
+			// scheduler:       mockSch,
+			logReporter: reporter,
 		}
 
 		reporter.EXPECT().Report(mock.Anything)
@@ -962,6 +966,9 @@ func TestDeployer_GetClusterUsageById(t *testing.T) {
 		require.Equal(t, int64(0), res.TotalGPU)
 		require.Equal(t, int64(0), res.AvailableGPU)
 
+		require.Equal(t, float64(0), res.CPUUsage)
+		require.Equal(t, float64(0), res.MemUsage)
+		require.Equal(t, float64(0), res.GPUUsage)
 	})
 
 	t.Run("image runner error", func(t *testing.T) {

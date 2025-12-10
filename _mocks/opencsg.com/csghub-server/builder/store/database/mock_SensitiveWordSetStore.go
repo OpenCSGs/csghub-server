@@ -175,6 +175,65 @@ func (_c *MockSensitiveWordSetStore_Get_Call) RunAndReturn(run func(context.Cont
 	return _c
 }
 
+// GetByName provides a mock function with given fields: ctx, name
+func (_m *MockSensitiveWordSetStore) GetByName(ctx context.Context, name string) (*database.SensitiveWordSet, error) {
+	ret := _m.Called(ctx, name)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetByName")
+	}
+
+	var r0 *database.SensitiveWordSet
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*database.SensitiveWordSet, error)); ok {
+		return rf(ctx, name)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *database.SensitiveWordSet); ok {
+		r0 = rf(ctx, name)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.SensitiveWordSet)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, name)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockSensitiveWordSetStore_GetByName_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetByName'
+type MockSensitiveWordSetStore_GetByName_Call struct {
+	*mock.Call
+}
+
+// GetByName is a helper method to define mock.On call
+//   - ctx context.Context
+//   - name string
+func (_e *MockSensitiveWordSetStore_Expecter) GetByName(ctx interface{}, name interface{}) *MockSensitiveWordSetStore_GetByName_Call {
+	return &MockSensitiveWordSetStore_GetByName_Call{Call: _e.mock.On("GetByName", ctx, name)}
+}
+
+func (_c *MockSensitiveWordSetStore_GetByName_Call) Run(run func(ctx context.Context, name string)) *MockSensitiveWordSetStore_GetByName_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockSensitiveWordSetStore_GetByName_Call) Return(_a0 *database.SensitiveWordSet, _a1 error) *MockSensitiveWordSetStore_GetByName_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockSensitiveWordSetStore_GetByName_Call) RunAndReturn(run func(context.Context, string) (*database.SensitiveWordSet, error)) *MockSensitiveWordSetStore_GetByName_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // List provides a mock function with given fields: ctx, filter
 func (_m *MockSensitiveWordSetStore) List(ctx context.Context, filter *database.SensitiveWordSetFilter) ([]database.SensitiveWordSet, error) {
 	ret := _m.Called(ctx, filter)

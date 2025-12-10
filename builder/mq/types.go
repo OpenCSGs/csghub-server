@@ -24,6 +24,10 @@ const (
 
 	HighPriorityMsgSubject   string = "notification.message.high"
 	NormalPriorityMsgSubject string = "notification.message.normal"
+
+	AgentSessionHistoryMsgSubject string = "agent.session.history.message"
+
+	LfsXnetProcessedSubject string = "xnet.lfs.processed"
 )
 
 type MQGroup struct {
@@ -75,6 +79,14 @@ var (
 	WebhookEventGroup = MQGroup{
 		StreamName:   "webhookEventStream", // webhook event stream name
 		ConsumerName: "webhookEventConsumer",
+	}
+	AgentSessionHistoryMsgGroup = MQGroup{
+		StreamName:   "agentSessionHistoryMsgStream",
+		ConsumerName: "agentSessionHistoryMsgConsumer",
+	}
+	LfsXnetProcessedGroup = MQGroup{
+		StreamName:   "lfsXnetProcessedStream",
+		ConsumerName: "lfsXnetProcessedConsumer",
 	}
 )
 

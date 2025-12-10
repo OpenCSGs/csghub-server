@@ -31,6 +31,109 @@ func (_m *MockMessageQueue) EXPECT() *MockMessageQueue_Expecter {
 	return &MockMessageQueue_Expecter{mock: &_m.Mock}
 }
 
+// BuildAgentSessionHistoryMsgConsumer provides a mock function with no fields
+func (_m *MockMessageQueue) BuildAgentSessionHistoryMsgConsumer() (jetstream.Consumer, error) {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for BuildAgentSessionHistoryMsgConsumer")
+	}
+
+	var r0 jetstream.Consumer
+	var r1 error
+	if rf, ok := ret.Get(0).(func() (jetstream.Consumer, error)); ok {
+		return rf()
+	}
+	if rf, ok := ret.Get(0).(func() jetstream.Consumer); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(jetstream.Consumer)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockMessageQueue_BuildAgentSessionHistoryMsgConsumer_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BuildAgentSessionHistoryMsgConsumer'
+type MockMessageQueue_BuildAgentSessionHistoryMsgConsumer_Call struct {
+	*mock.Call
+}
+
+// BuildAgentSessionHistoryMsgConsumer is a helper method to define mock.On call
+func (_e *MockMessageQueue_Expecter) BuildAgentSessionHistoryMsgConsumer() *MockMessageQueue_BuildAgentSessionHistoryMsgConsumer_Call {
+	return &MockMessageQueue_BuildAgentSessionHistoryMsgConsumer_Call{Call: _e.mock.On("BuildAgentSessionHistoryMsgConsumer")}
+}
+
+func (_c *MockMessageQueue_BuildAgentSessionHistoryMsgConsumer_Call) Run(run func()) *MockMessageQueue_BuildAgentSessionHistoryMsgConsumer_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockMessageQueue_BuildAgentSessionHistoryMsgConsumer_Call) Return(_a0 jetstream.Consumer, _a1 error) *MockMessageQueue_BuildAgentSessionHistoryMsgConsumer_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockMessageQueue_BuildAgentSessionHistoryMsgConsumer_Call) RunAndReturn(run func() (jetstream.Consumer, error)) *MockMessageQueue_BuildAgentSessionHistoryMsgConsumer_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// BuildAgentSessionHistoryMsgStream provides a mock function with given fields: conf
+func (_m *MockMessageQueue) BuildAgentSessionHistoryMsgStream(conf *config.Config) error {
+	ret := _m.Called(conf)
+
+	if len(ret) == 0 {
+		panic("no return value specified for BuildAgentSessionHistoryMsgStream")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(*config.Config) error); ok {
+		r0 = rf(conf)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockMessageQueue_BuildAgentSessionHistoryMsgStream_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BuildAgentSessionHistoryMsgStream'
+type MockMessageQueue_BuildAgentSessionHistoryMsgStream_Call struct {
+	*mock.Call
+}
+
+// BuildAgentSessionHistoryMsgStream is a helper method to define mock.On call
+//   - conf *config.Config
+func (_e *MockMessageQueue_Expecter) BuildAgentSessionHistoryMsgStream(conf interface{}) *MockMessageQueue_BuildAgentSessionHistoryMsgStream_Call {
+	return &MockMessageQueue_BuildAgentSessionHistoryMsgStream_Call{Call: _e.mock.On("BuildAgentSessionHistoryMsgStream", conf)}
+}
+
+func (_c *MockMessageQueue_BuildAgentSessionHistoryMsgStream_Call) Run(run func(conf *config.Config)) *MockMessageQueue_BuildAgentSessionHistoryMsgStream_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(*config.Config))
+	})
+	return _c
+}
+
+func (_c *MockMessageQueue_BuildAgentSessionHistoryMsgStream_Call) Return(_a0 error) *MockMessageQueue_BuildAgentSessionHistoryMsgStream_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockMessageQueue_BuildAgentSessionHistoryMsgStream_Call) RunAndReturn(run func(*config.Config) error) *MockMessageQueue_BuildAgentSessionHistoryMsgStream_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // BuildDLQStream provides a mock function with no fields
 func (_m *MockMessageQueue) BuildDLQStream() error {
 	ret := _m.Called()
@@ -906,6 +1009,52 @@ func (_c *MockMessageQueue_GetJetStream_Call) RunAndReturn(run func() error) *Mo
 	return _c
 }
 
+// PublishAgentSessionHistoryMsg provides a mock function with given fields: msg
+func (_m *MockMessageQueue) PublishAgentSessionHistoryMsg(msg types.SessionHistoryMessageEnvelope) error {
+	ret := _m.Called(msg)
+
+	if len(ret) == 0 {
+		panic("no return value specified for PublishAgentSessionHistoryMsg")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(types.SessionHistoryMessageEnvelope) error); ok {
+		r0 = rf(msg)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockMessageQueue_PublishAgentSessionHistoryMsg_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PublishAgentSessionHistoryMsg'
+type MockMessageQueue_PublishAgentSessionHistoryMsg_Call struct {
+	*mock.Call
+}
+
+// PublishAgentSessionHistoryMsg is a helper method to define mock.On call
+//   - msg types.SessionHistoryMessageEnvelope
+func (_e *MockMessageQueue_Expecter) PublishAgentSessionHistoryMsg(msg interface{}) *MockMessageQueue_PublishAgentSessionHistoryMsg_Call {
+	return &MockMessageQueue_PublishAgentSessionHistoryMsg_Call{Call: _e.mock.On("PublishAgentSessionHistoryMsg", msg)}
+}
+
+func (_c *MockMessageQueue_PublishAgentSessionHistoryMsg_Call) Run(run func(msg types.SessionHistoryMessageEnvelope)) *MockMessageQueue_PublishAgentSessionHistoryMsg_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(types.SessionHistoryMessageEnvelope))
+	})
+	return _c
+}
+
+func (_c *MockMessageQueue_PublishAgentSessionHistoryMsg_Call) Return(_a0 error) *MockMessageQueue_PublishAgentSessionHistoryMsg_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockMessageQueue_PublishAgentSessionHistoryMsg_Call) RunAndReturn(run func(types.SessionHistoryMessageEnvelope) error) *MockMessageQueue_PublishAgentSessionHistoryMsg_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // PublishData provides a mock function with given fields: subject, data
 func (_m *MockMessageQueue) PublishData(subject string, data []byte) error {
 	ret := _m.Called(subject, data)
@@ -1271,52 +1420,6 @@ func (_c *MockMessageQueue_PublishNormalPriorityMsg_Call) Return(_a0 error) *Moc
 }
 
 func (_c *MockMessageQueue_PublishNormalPriorityMsg_Call) RunAndReturn(run func(types.ScenarioMessage) error) *MockMessageQueue_PublishNormalPriorityMsg_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// PublishNotificationForSubscription provides a mock function with given fields: data
-func (_m *MockMessageQueue) PublishNotificationForSubscription(data []byte) error {
-	ret := _m.Called(data)
-
-	if len(ret) == 0 {
-		panic("no return value specified for PublishNotificationForSubscription")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func([]byte) error); ok {
-		r0 = rf(data)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// MockMessageQueue_PublishNotificationForSubscription_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PublishNotificationForSubscription'
-type MockMessageQueue_PublishNotificationForSubscription_Call struct {
-	*mock.Call
-}
-
-// PublishNotificationForSubscription is a helper method to define mock.On call
-//   - data []byte
-func (_e *MockMessageQueue_Expecter) PublishNotificationForSubscription(data interface{}) *MockMessageQueue_PublishNotificationForSubscription_Call {
-	return &MockMessageQueue_PublishNotificationForSubscription_Call{Call: _e.mock.On("PublishNotificationForSubscription", data)}
-}
-
-func (_c *MockMessageQueue_PublishNotificationForSubscription_Call) Run(run func(data []byte)) *MockMessageQueue_PublishNotificationForSubscription_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].([]byte))
-	})
-	return _c
-}
-
-func (_c *MockMessageQueue_PublishNotificationForSubscription_Call) Return(_a0 error) *MockMessageQueue_PublishNotificationForSubscription_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *MockMessageQueue_PublishNotificationForSubscription_Call) RunAndReturn(run func([]byte) error) *MockMessageQueue_PublishNotificationForSubscription_Call {
 	_c.Call.Return(run)
 	return _c
 }

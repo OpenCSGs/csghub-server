@@ -1,0 +1,11 @@
+{
+    "error.INVITATION-ERR-0": {
+        "other": "未綁定手機號，不能創建邀請碼"
+    },
+    "error.INVITATION-ERR-1": {
+        "other": "邀請碼不存在"
+    },
+    "error.INVITATION-ERR-2": {
+        "other": "邀請碼已存在"
+    }
+}

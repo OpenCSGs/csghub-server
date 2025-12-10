@@ -355,6 +355,55 @@ func (_c *MockLfsMetaObjectStore_UpdateOrCreate_Call) RunAndReturn(run func(cont
 	return _c
 }
 
+// UpdateXnetUsed provides a mock function with given fields: ctx, repoID, oid, xnetUsed
+func (_m *MockLfsMetaObjectStore) UpdateXnetUsed(ctx context.Context, repoID int64, oid string, xnetUsed bool) error {
+	ret := _m.Called(ctx, repoID, oid, xnetUsed)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateXnetUsed")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64, string, bool) error); ok {
+		r0 = rf(ctx, repoID, oid, xnetUsed)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockLfsMetaObjectStore_UpdateXnetUsed_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateXnetUsed'
+type MockLfsMetaObjectStore_UpdateXnetUsed_Call struct {
+	*mock.Call
+}
+
+// UpdateXnetUsed is a helper method to define mock.On call
+//   - ctx context.Context
+//   - repoID int64
+//   - oid string
+//   - xnetUsed bool
+func (_e *MockLfsMetaObjectStore_Expecter) UpdateXnetUsed(ctx interface{}, repoID interface{}, oid interface{}, xnetUsed interface{}) *MockLfsMetaObjectStore_UpdateXnetUsed_Call {
+	return &MockLfsMetaObjectStore_UpdateXnetUsed_Call{Call: _e.mock.On("UpdateXnetUsed", ctx, repoID, oid, xnetUsed)}
+}
+
+func (_c *MockLfsMetaObjectStore_UpdateXnetUsed_Call) Run(run func(ctx context.Context, repoID int64, oid string, xnetUsed bool)) *MockLfsMetaObjectStore_UpdateXnetUsed_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64), args[2].(string), args[3].(bool))
+	})
+	return _c
+}
+
+func (_c *MockLfsMetaObjectStore_UpdateXnetUsed_Call) Return(_a0 error) *MockLfsMetaObjectStore_UpdateXnetUsed_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockLfsMetaObjectStore_UpdateXnetUsed_Call) RunAndReturn(run func(context.Context, int64, string, bool) error) *MockLfsMetaObjectStore_UpdateXnetUsed_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // NewMockLfsMetaObjectStore creates a new instance of MockLfsMetaObjectStore. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewMockLfsMetaObjectStore(t interface {

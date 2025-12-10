@@ -59,6 +59,7 @@ func StartDeployWorker(
 	ms database.ModelStore,
 	rfs database.RuntimeFrameworksStore,
 	urs database.UserResourcesStore,
+	mds database.MetadataStore,
 ) error {
 	w := temporalClient.NewWorker(DeployWorkflowQueue, worker.Options{
 		MaxConcurrentActivityExecutionSize:      cfg.Temporal.MaxConcurrentActivityExecutionSize,
@@ -66,7 +67,7 @@ func StartDeployWorker(
 		MaxConcurrentLocalActivityExecutionSize: cfg.Temporal.MaxConcurrentLocalActivityExecutionSize,
 	})
 	dcfg := common.BuildDeployConfig(cfg)
-	act := activity.NewDeployActivity(dcfg, lr, ib, ir, gs, ds, ts, ss, ms, rfs, urs)
+	act := activity.NewDeployActivity(dcfg, lr, ib, ir, gs, ds, ts, ss, ms, rfs, urs, mds)
 
 	w.RegisterActivity(act)
 	w.RegisterWorkflow(DeployWorkflow)
@@ -190,6 +191,7 @@ func CancelRunningWorkflow(ctx context.Context, temporalClient client.Client, wo
 		if err := temporalClient.CancelWorkflow(ctx, workflowID, describeResp.WorkflowExecutionInfo.Execution.RunId); err != nil {
 			return false, fmt.Errorf("failed to cancel existing workflow: %w", err)
 		}
+		time.Sleep(2 * time.Second)
 		return true, nil
 	}
 

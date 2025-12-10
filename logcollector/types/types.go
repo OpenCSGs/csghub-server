@@ -58,3 +58,13 @@ type NamespaceStats struct {
 	LogsSent      int64 `json:"logs_sent"`
 	ErrorCount    int64 `json:"error_count"`
 }
+
+// StreamStatus represents the status of a log stream
+type StreamStatus string
+
+const (
+	StreamStatusRunning   StreamStatus = "running"
+	StreamStatusCompleted StreamStatus = "completed"
+	StreamStatusFailed    StreamStatus = "failed"
+	StreamStatusPending   StreamStatus = "pending"
+)

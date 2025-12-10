@@ -26,7 +26,7 @@ func (ac *accountingClientImpl) RechargeAccountingUser(userID string, req types.
 	return nil, nil
 }
 
-func (ac *accountingClientImpl) PresentAccountingUser(userID string, req types.ACTIVITY_REQ) (any, error) {
+func (ac *accountingClientImpl) PresentAccountingUser(userID string, req types.ActivityReq) (any, error) {
 	return nil, nil
 }
 

@@ -2,7 +2,12 @@ package database
 
 import (
 	"context"
+	"database/sql"
+	"errors"
+	"log/slog"
 	"time"
+
+	"opencsg.com/csghub-server/common/errorx"
 )
 
 // implement SensitiveWordSetStore
@@ -26,6 +31,22 @@ func (s *sensitiveWordSetStoreImpl) Get(ctx context.Context, id int64) (*Sensiti
 		Relation("Category").
 		Where("sensitive_word_set.id = ?", id).Scan(ctx)
 	return ws, err
+}
+
+func (s *sensitiveWordSetStoreImpl) GetByName(ctx context.Context, name string) (*SensitiveWordSet, error) {
+	ws := &SensitiveWordSet{}
+	err := s.db.Core.NewSelect().Model(ws).
+		Relation("Category").
+		Where("sensitive_word_set.name = ?", name).Scan(ctx)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+
+		slog.ErrorContext(ctx, "get sensitive word set by name failed", "error", err)
+		return nil, errorx.HandleDBError(err, nil)
+	}
+	return ws, nil
 }
 
 func (s *sensitiveWordSetStoreImpl) List(ctx context.Context, filter *SensitiveWordSetFilter) ([]SensitiveWordSet, error) {

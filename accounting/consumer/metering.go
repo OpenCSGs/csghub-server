@@ -232,8 +232,6 @@ func (m *Metering) pubFeeEventWithReTry(msg jetstream.Msg, evt *types.MeteringEv
 			err = m.sysMQ.PublishFeeTokenData(msg.Data())
 		case types.QuotaNumberType:
 			err = m.sysMQ.PublishFeeQuotaData(msg.Data())
-		case types.CountNumberType:
-			err = m.sysMQ.PublishSubscriptionData(msg.Data())
 		default:
 			slog.Warn("unsupported metering event value type", slog.Any("value-type", evt.ValueType))
 		}

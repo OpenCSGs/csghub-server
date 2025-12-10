@@ -8,6 +8,12 @@
     "error.REQ-ERR-10": {
         "other": "請求過於頻繁，需要驗證碼"
     },
+    "error.REQ-ERR-11": {
+        "other": "來自該IP位置的請求受限，需要驗證碼"
+    },
+    "error.REQ-ERR-12": {
+        "other": "驗證碼驗證失敗"
+    },
     "error.REQ-ERR-2": {
         "other": "請求體不能為空"
     },

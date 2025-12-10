@@ -6,32 +6,40 @@
   "engine_images": [
     {
       "compute_type": "gpu",
-      "image": "opencsghq/sglang:v0.5.3.rc1-cu126",
-      "driver_version": "12.6",
-      "engine_version": "v0.5.3.rc1",
+      "image": "opencsghq/sglang:v0.5.4.post1",
+      "driver_version": "12.9",
+      "engine_version": "v0.5.4",
       "extra_archs": [
         "ArceeForCausalLM",
         "BailingMoeForCausalLM",
+        "BailingMoeV2ForCausalLM",
         "BertForSequenceClassification",
         "BertModel",
+        "ChatGLMForConditionalGeneration",
         "Contriever",
         "Ernie4_5_ForCausalLM",
         "Ernie4_5_MoeForCausalLM",
         "Ernie4_5_MoeForCausalLMMTP",
         "GPT2LMHeadModel",
         "GPTBigCodeForCausalLM",
-        "GptOssForCausalLM",
         "Glm4ForCausalLM",
         "Glm4MoeForCausalLM",
         "Glm4MoeForCausalLMNextN",
         "Glm4vForConditionalGeneration",
         "Glm4vMoeForConditionalGeneration",
+        "GptOssForCausalLM",
+        "GraniteMoeHybridForCausalLM",
         "HunYuanDenseV1ForCausalLM",
         "HunYuanMoEV1ForCausalLM",
         "KimiVLForConditionalGeneration",
-        "VILAForConditionalGeneration",
+        "MiniMaxM2ForCausalLM",
+        "NemotronForCausalLM",
         "Phi4FlashForCausalLM",
-        "Qwen3NextForCausalLM"
+        "Qwen3NextForCausalLM",
+        "SmolLM3ForCausalLM",
+        "SolarForCausalLM",
+        "Starcoder2ForCausalLM",
+        "VILAForConditionalGeneration"
       ]
     },
     {
@@ -57,15 +65,31 @@
       "value": "1024",
       "format": "--chunked-prefill-size %s"
     },
-    { "name": "cpu-offload-gb", "value": "1", "format": "--cpu-offload-gb %s" },
-    { "name": "dp-size", "value": "1", "format": "--dp-size %s" },
+    {
+      "name": "cpu-offload-gb",
+      "value": "1",
+      "format": "--cpu-offload-gb %s"
+    },
+    {
+      "name": "dp-size",
+      "value": "1",
+      "format": "--dp-size %s"
+    },
     {
       "name": "enable-dp-attention",
       "value": "enable",
       "format": "--enable-dp-attention"
     },
-    { "name": "enable-ep-moe", "value": "enable", "format": "--enable-ep-moe" },
-    { "name": "custom-options", "value": "", "format": "%s" }
+    {
+      "name": "enable-ep-moe",
+      "value": "enable",
+      "format": "--enable-ep-moe"
+    },
+    {
+      "name": "custom-options",
+      "value": "",
+      "format": "%s"
+    }
   ],
   "supported_archs": [
     "BaichuanForCausalLM",

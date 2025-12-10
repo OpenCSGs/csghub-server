@@ -201,6 +201,7 @@ func (c *notebookComponentImpl) LogsNotebook(ctx context.Context, req *types.Sta
 	return c.deployer.InstanceLogs(ctx, types.DeployRepo{
 		DeployID:     deploy.ID,
 		InstanceName: req.InstanceName,
+		Since:        req.Since,
 	})
 }
 

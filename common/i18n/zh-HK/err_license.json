@@ -1,5 +1,8 @@
 {
     "error.LICENSE-ERR-0": {
-        "other": "未找到有效的許可證"
+        "other": "未找到有效的許可證。"
+    },
+    "error.LICENSE-ERR-1": {
+        "other": "許可證已過期，無法驗證和導入。"
     }
 }

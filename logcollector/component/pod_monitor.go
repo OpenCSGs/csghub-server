@@ -3,6 +3,7 @@ package component
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"opencsg.com/csghub-server/common/config"
 	"strings"
@@ -18,6 +19,14 @@ import (
 	ltypes "opencsg.com/csghub-server/logcollector/types"
 	rtypes "opencsg.com/csghub-server/runner/types"
 )
+
+// StreamInfo stores information about an active log stream
+type StreamInfo struct {
+	key              string
+	cancel           context.CancelFunc
+	lastStreamedTime *time.Time
+	Status           ltypes.StreamStatus
+}
 
 // PodMonitor monitors pods in specified namespaces and manages log streams
 type PodMonitor struct {
@@ -45,6 +54,7 @@ type PodMonitor struct {
 	statMutex sync.RWMutex
 
 	// Recovery
+	logStreamCD      time.Duration
 	lastReportedTime time.Time
 }
 
@@ -70,6 +80,7 @@ func NewPodMonitor(client kubernetes.Interface, namespaces []string, config *con
 			NamespaceStats: make(map[string]ltypes.NamespaceStats),
 			LastUpdate:     time.Now(),
 		},
+		logStreamCD:      time.Duration(config.LogCollector.StreamCD) * time.Second,
 		lastReportedTime: lastReportedTime,
 	}
 }
@@ -254,18 +265,29 @@ func (pm *PodMonitor) startLogStreams(_ context.Context, pod *corev1.Pod) {
 			key:              streamKey,
 			cancel:           cancel,
 			lastStreamedTime: nil,
+			Status:           ltypes.StreamStatusPending,
 		}
 		pm.streamMutex.Lock()
 		// Cancel previous stream if it exists and update last streamed time
 		if oldStream, exists := pm.activeStreams[streamKey]; exists {
-			// Cancel previous stream if it exists...
-			oldStream.cancel()
-			// ...and carry over its last streamed time to the new stream.
-			if oldStream.lastStreamedTime != nil {
-				newTime := oldStream.lastStreamedTime.Add(1 * time.Nanosecond)
-				streamInfo.lastStreamedTime = &newTime
+			slog.Debug("Stream already running", slog.String("stream", streamKey),
+				slog.Any("pods staues", pod.Status.Phase), slog.Any("stream status", oldStream.Status))
+			if oldStream.Status == ltypes.StreamStatusRunning {
+				pm.streamMutex.Unlock()
+				continue
 			}
 
+			if oldStream.lastStreamedTime != nil {
+				var addDuration time.Duration
+				lastDuration := time.Since(*oldStream.lastStreamedTime)
+				if lastDuration < pm.logStreamCD {
+					addDuration = pm.logStreamCD - lastDuration
+				}
+				newTime := oldStream.lastStreamedTime.Add(addDuration)
+				streamInfo.lastStreamedTime = &newTime
+			}
+			// Cancel previous stream if it exists...
+			oldStream.cancel()
 		}
 		pm.activeStreams[streamKey] = streamInfo
 		pm.streamMutex.Unlock()
@@ -301,18 +323,17 @@ func (pm *PodMonitor) streamPodLogs(ctx context.Context, pod *corev1.Pod, contai
 	defer func() {
 		slog.Debug("Stopped log stream",
 			slog.String("pod", pod.Name),
-			slog.String("container", containerName))
+			slog.String("container", containerName),
+			slog.String("status", string(streamInfo.Status)))
 	}()
 
 	// Determine the start time for fetching logs
 	var sinceTime *metav1.Time
-	podStartTime := pod.Status.StartTime
-
 	if streamInfo.lastStreamedTime != nil {
 		slog.Info("Resuming log stream from last streamed time", "pod", pod.Name,
 			"container", containerName, "since", *streamInfo.lastStreamedTime, "status", pod.Status.Phase)
 		sinceTime = &metav1.Time{Time: *streamInfo.lastStreamedTime}
-	} else if !pm.lastReportedTime.IsZero() && podStartTime != nil && podStartTime.Time.Before(pm.lastReportedTime) {
+	} else if !pm.lastReportedTime.IsZero() && pod.CreationTimestamp.Time.Before(pm.lastReportedTime) {
 		slog.Info("Resuming log stream from last reported time", "pod", pod.Name,
 			"container", containerName, "since", pm.lastReportedTime, "status", pod.Status.Phase)
 		sinceTime = &metav1.Time{Time: pm.lastReportedTime}
@@ -323,7 +344,7 @@ func (pm *PodMonitor) streamPodLogs(ctx context.Context, pod *corev1.Pod, contai
 	}
 
 	// Get log stream using the existing function with correct client
-	logChan, message, err := GetPodLogStream(ctx, pm.client, pod, containerName, sinceTime)
+	logChan, message, err := pm.getPodLogStream(ctx, pm.client, pod, containerName, sinceTime)
 	if err != nil {
 		slog.Warn("Failed to get pod log stream",
 			slog.String("pod", pod.Name),
@@ -348,14 +369,18 @@ func (pm *PodMonitor) streamPodLogs(ctx context.Context, pod *corev1.Pod, contai
 		Phase:         pod.Status.Phase,
 		ContainerName: containerName,
 	}
+
 	// Process log entries
+	streamInfo.Status = ltypes.StreamStatusRunning
 	for {
 		select {
 		case <-ctx.Done():
+			// The context is canceled either when the pod is deleted or the stream is intentionally stopped.
+			streamInfo.Status = ltypes.StreamStatusFailed
 			return
 		case logData, ok := <-logChan:
-
 			if !ok {
+				streamInfo.Status = ltypes.StreamStatusCompleted
 				return
 			}
 
@@ -369,14 +394,75 @@ func (pm *PodMonitor) streamPodLogs(ctx context.Context, pod *corev1.Pod, contai
 
 			select {
 			case pm.logChan <- entry:
-				pm.incrementLogCount(pod.Namespace)
 				now := time.Now()
 				streamInfo.lastStreamedTime = &now
+				pm.incrementLogCount(pod.Namespace)
 			case <-ctx.Done():
+				streamInfo.Status = ltypes.StreamStatusFailed
 				return
 			}
 		}
 	}
+}
+
+// getPodLogStream gets a streaming channel of pod logs
+func (pm *PodMonitor) getPodLogStream(ctx context.Context, client kubernetes.Interface, pod *corev1.Pod, container string, sinceTime *metav1.Time) (chan []byte, string, error) {
+	logOptions := &corev1.PodLogOptions{
+		Container:  container,
+		Follow:     true,
+		Timestamps: true, // Timestamps are useful for debugging and potential future logic
+	}
+
+	if sinceTime != nil {
+		logOptions.SinceTime = sinceTime
+	}
+
+	ch := make(chan []byte, 1000)
+	buf := make([]byte, 32*1024)
+
+	logs := client.CoreV1().Pods(pod.Namespace).GetLogs(pod.Name, logOptions)
+
+	// For streaming log requests, we must disable the client-side timeout.
+	// The underlying http request will be kept alive until the context is cancelled.
+	stream, err := logs.Timeout(0).Stream(ctx)
+	if err != nil {
+		return nil, "", err
+	}
+
+	go func() {
+		defer close(ch)
+		defer func() { _ = stream.Close() }()
+		for {
+			select {
+			case <-ctx.Done():
+				slog.Debug("logs request context done", slog.Any("error", ctx.Err()))
+				return
+			default:
+				n, err := stream.Read(buf)
+				if err != nil {
+					if err == io.EOF {
+						slog.Debug("read pod logs finished normally", slog.Any("error", err), slog.String("pod", pod.Name))
+					} else {
+						slog.Warn("read pod logs finished with error", slog.Any("error", err), slog.String("pod", pod.Name))
+					}
+					return
+				}
+				if n == 0 {
+					time.Sleep(1000 * time.Millisecond)
+					continue
+				}
+
+				if n > 0 {
+					// Make a copy of the buffer to avoid data races
+					data := make([]byte, n)
+					copy(data, buf[:n])
+					ch <- data
+				}
+			}
+		}
+	}()
+
+	return ch, "", nil
 }
 
 // stopPodStreams stops all log streams for a pod
@@ -500,11 +586,4 @@ func (pm *PodMonitor) GetStats() ltypes.CollectorStats {
 	}
 
 	return stats
-}
-
-// StreamInfo stores information about an active log stream
-type StreamInfo struct {
-	key              string
-	cancel           context.CancelFunc
-	lastStreamedTime *time.Time
 }

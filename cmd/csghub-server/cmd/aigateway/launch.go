@@ -1,8 +1,10 @@
 package aigateway
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
+	"opencsg.com/csghub-server/builder/instrumentation"
 
 	"github.com/spf13/cobra"
 	"opencsg.com/csghub-server/aigateway/router"
@@ -34,6 +36,11 @@ var cmdLaunch = &cobra.Command{
 			slog.Error("failed to initialize database", slog.Any("error", err))
 			return fmt.Errorf("database initialization failed: %w", err)
 		}
+		stopOtel, err := instrumentation.SetupOTelSDK(context.Background(), cfg, instrumentation.Aigateway)
+		if err != nil {
+			panic(err)
+		}
+
 		err = event.InitEventPublisher(cfg)
 		if err != nil {
 			return fmt.Errorf("fail to initialize message queue, %w", err)
@@ -51,7 +58,7 @@ var cmdLaunch = &cobra.Command{
 			r,
 		)
 		server.Run()
-
+		_ = stopOtel(context.Background())
 		return nil
 	},
 }

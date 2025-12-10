@@ -18,7 +18,7 @@ type AccountingClient interface {
 	ListStatementByUserIDAndTime(req types.ActStatementsReq) (any, error)
 	ListBillsByUserIDAndDate(req types.ActStatementsReq) (any, error)
 	RechargeAccountingUser(userID string, req types.RechargeReq) (any, error)
-	PresentAccountingUser(userID string, req types.ACTIVITY_REQ) (any, error)
+	PresentAccountingUser(userID string, req types.ActivityReq) (any, error)
 	CreateOrUpdateQuota(currentUser string, req types.AcctQuotaReq) (any, error)
 	GetQuotaByID(currentUser string) (any, error)
 	CreateQuotaStatement(currentUser string, req types.AcctQuotaStatementReq) (any, error)

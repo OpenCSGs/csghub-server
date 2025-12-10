@@ -20,8 +20,8 @@ func CreateMCPServerRoutes(
 		mcpGroup.GET("/tools", mcpServerHandler.Properties)
 		mcpGroup.GET("/:namespace/:name", mcpServerHandler.Show)
 
-		mcpGroup.POST("", middlewareCollection.Auth.NeedLogin, mcpServerHandler.Create)
-		mcpGroup.DELETE("/:namespace/:name", middlewareCollection.Auth.NeedLogin, mcpServerHandler.Delete)
+		mcpGroup.POST("", middlewareCollection.Auth.NeedLogin, middlewareCollection.API.RateLimter, mcpServerHandler.Create)
+		mcpGroup.DELETE("/:namespace/:name", middlewareCollection.Auth.NeedLogin, middlewareCollection.API.IPLimiter, mcpServerHandler.Delete)
 		mcpGroup.PUT("/:namespace/:name", middlewareCollection.Auth.NeedLogin, mcpServerHandler.Update)
 		mcpGroup.POST("/:namespace/:name/deploys", middlewareCollection.Auth.NeedLogin, mcpServerHandler.Deploy)
 	}

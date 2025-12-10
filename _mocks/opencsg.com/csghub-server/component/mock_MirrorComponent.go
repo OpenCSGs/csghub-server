@@ -177,9 +177,9 @@ func (_c *MockMirrorComponent_Delete_Call) RunAndReturn(run func(context.Context
 	return _c
 }
 
-// Index provides a mock function with given fields: ctx, per, page, search
-func (_m *MockMirrorComponent) Index(ctx context.Context, per int, page int, search string) ([]types.Mirror, int, error) {
-	ret := _m.Called(ctx, per, page, search)
+// Index provides a mock function with given fields: ctx, per, page, filter
+func (_m *MockMirrorComponent) Index(ctx context.Context, per int, page int, filter types.MirrorFilter) ([]types.Mirror, int, error) {
+	ret := _m.Called(ctx, per, page, filter)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Index")
@@ -188,25 +188,25 @@ func (_m *MockMirrorComponent) Index(ctx context.Context, per int, page int, sea
 	var r0 []types.Mirror
 	var r1 int
 	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, int, int, string) ([]types.Mirror, int, error)); ok {
-		return rf(ctx, per, page, search)
+	if rf, ok := ret.Get(0).(func(context.Context, int, int, types.MirrorFilter) ([]types.Mirror, int, error)); ok {
+		return rf(ctx, per, page, filter)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, int, int, string) []types.Mirror); ok {
-		r0 = rf(ctx, per, page, search)
+	if rf, ok := ret.Get(0).(func(context.Context, int, int, types.MirrorFilter) []types.Mirror); ok {
+		r0 = rf(ctx, per, page, filter)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]types.Mirror)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, int, int, string) int); ok {
-		r1 = rf(ctx, per, page, search)
+	if rf, ok := ret.Get(1).(func(context.Context, int, int, types.MirrorFilter) int); ok {
+		r1 = rf(ctx, per, page, filter)
 	} else {
 		r1 = ret.Get(1).(int)
 	}
 
-	if rf, ok := ret.Get(2).(func(context.Context, int, int, string) error); ok {
-		r2 = rf(ctx, per, page, search)
+	if rf, ok := ret.Get(2).(func(context.Context, int, int, types.MirrorFilter) error); ok {
+		r2 = rf(ctx, per, page, filter)
 	} else {
 		r2 = ret.Error(2)
 	}
@@ -223,14 +223,14 @@ type MockMirrorComponent_Index_Call struct {
 //   - ctx context.Context
 //   - per int
 //   - page int
-//   - search string
-func (_e *MockMirrorComponent_Expecter) Index(ctx interface{}, per interface{}, page interface{}, search interface{}) *MockMirrorComponent_Index_Call {
-	return &MockMirrorComponent_Index_Call{Call: _e.mock.On("Index", ctx, per, page, search)}
+//   - filter types.MirrorFilter
+func (_e *MockMirrorComponent_Expecter) Index(ctx interface{}, per interface{}, page interface{}, filter interface{}) *MockMirrorComponent_Index_Call {
+	return &MockMirrorComponent_Index_Call{Call: _e.mock.On("Index", ctx, per, page, filter)}
 }
 
-func (_c *MockMirrorComponent_Index_Call) Run(run func(ctx context.Context, per int, page int, search string)) *MockMirrorComponent_Index_Call {
+func (_c *MockMirrorComponent_Index_Call) Run(run func(ctx context.Context, per int, page int, filter types.MirrorFilter)) *MockMirrorComponent_Index_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(int), args[2].(int), args[3].(string))
+		run(args[0].(context.Context), args[1].(int), args[2].(int), args[3].(types.MirrorFilter))
 	})
 	return _c
 }
@@ -240,7 +240,7 @@ func (_c *MockMirrorComponent_Index_Call) Return(_a0 []types.Mirror, _a1 int, _a
 	return _c
 }
 
-func (_c *MockMirrorComponent_Index_Call) RunAndReturn(run func(context.Context, int, int, string) ([]types.Mirror, int, error)) *MockMirrorComponent_Index_Call {
+func (_c *MockMirrorComponent_Index_Call) RunAndReturn(run func(context.Context, int, int, types.MirrorFilter) ([]types.Mirror, int, error)) *MockMirrorComponent_Index_Call {
 	_c.Call.Return(run)
 	return _c
 }

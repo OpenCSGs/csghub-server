@@ -2,6 +2,7 @@ package router
 
 import (
 	"fmt"
+	"opencsg.com/csghub-server/builder/instrumentation"
 
 	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
@@ -9,14 +10,14 @@ import (
 	"github.com/go-playground/validator/v10"
 	"opencsg.com/csghub-server/accounting/handler"
 	"opencsg.com/csghub-server/api/middleware"
+	bldmq "opencsg.com/csghub-server/builder/mq"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/mq"
 )
 
-func NewAccountRouter(config *config.Config, mqHandler mq.MessageQueue) (*gin.Engine, error) {
+func NewAccountRouter(config *config.Config, mqHandler mq.MessageQueue, mqFactory bldmq.MessageQueueFactory) (*gin.Engine, error) {
 	r := gin.New()
-	r.Use(gin.Recovery())
-	r.Use(middleware.Log())
+	middleware.SetInfraMiddleware(r, config, instrumentation.Account)
 	needAPIKey := middleware.NeedAPIKey(config)
 	//add router for golang pprof
 	debugGroup := r.Group("/debug", needAPIKey)
@@ -34,7 +35,7 @@ func NewAccountRouter(config *config.Config, mqHandler mq.MessageQueue) (*gin.En
 		return nil, fmt.Errorf("error creating multi sync handler, error: %w", err)
 	}
 	createMeteringRoutes(apiGroup, meterHandler)
-	err = createAdvancedRoutes(apiGroup, config, mqHandler)
+	err = createAdvancedRoutes(apiGroup, config, mqHandler, mqFactory)
 	if err != nil {
 		return nil, fmt.Errorf("error creating accounting advanced routes, error:%w", err)
 	}

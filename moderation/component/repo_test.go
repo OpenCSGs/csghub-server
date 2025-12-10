@@ -245,3 +245,39 @@ func TestRepoComponent_CheckRepoFiles(t *testing.T) {
 	require.True(t, passFound, "Check for passed file not found")
 	require.True(t, failFound, "Check for failed file not found")
 }
+
+func TestRepoComponent_GetNamespaceWhiteList(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("success", func(t *testing.T) {
+		mockStore := mockdb.NewMockRepositoryFileCheckRuleStore(t)
+		comp := &repoComponentImpl{
+			whitelistRule: mockStore,
+		}
+
+		rules := []database.RepositoryFileCheckRule{
+			{Pattern: "admin"},
+			{Pattern: "test"},
+		}
+
+		mockStore.EXPECT().ListByRuleType(ctx, "namespace").Return(rules, nil).Once()
+
+		patterns, err := comp.GetNamespaceWhiteList(ctx)
+		require.NoError(t, err)
+		require.Equal(t, []string{"admin", "test"}, patterns)
+	})
+
+	t.Run("error from store", func(t *testing.T) {
+		mockStore := mockdb.NewMockRepositoryFileCheckRuleStore(t)
+		comp := &repoComponentImpl{
+			whitelistRule: mockStore,
+		}
+
+		expectedErr := errors.New("database error")
+		mockStore.EXPECT().ListByRuleType(ctx, "namespace").Return(nil, expectedErr).Once()
+
+		patterns, err := comp.GetNamespaceWhiteList(ctx)
+		require.ErrorIs(t, err, expectedErr)
+		require.Nil(t, patterns)
+	})
+}

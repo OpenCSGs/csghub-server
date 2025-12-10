@@ -68,14 +68,27 @@ func TestDeployWorkflowSuccess(t *testing.T) {
 	mockTokenStore := mockdb.NewMockAccessTokenStore(t)
 	mockUrsStore := mockdb.NewMockUserResourcesStore(t)
 	mockRuntimeFrameworks := mockdb.NewMockRuntimeFrameworksStore(t)
+	mockMetadataStore := mockdb.NewMockMetadataStore(t)
 	mockImageBuilder := mockbuilder.NewMockBuilder(t)
 	mockImageRunner := mockrunner.NewMockRunner(t)
 	mockGitServer := mock_git.NewMockGitServer(t)
 	mockLogReporter := mockReporter.NewMockLogCollector(t)
 	mockConfig := &config.Config{}
 	mockDeployCfg := common.BuildDeployConfig(mockConfig)
-	act := activity.NewDeployActivity(mockDeployCfg, mockLogReporter, mockImageBuilder, mockImageRunner, mockGitServer, mockDeployTaskStore, mockTokenStore, mockSpaceStore, mockModelStore, mockRuntimeFrameworks, mockUrsStore)
-	deployActivity = act
+	act := activity.NewDeployActivity(
+		mockDeployCfg,
+		mockLogReporter,
+		mockImageBuilder,
+		mockImageRunner,
+		mockGitServer,
+		mockDeployTaskStore,
+		mockTokenStore,
+		mockSpaceStore,
+		mockModelStore,
+		mockRuntimeFrameworks,
+		mockUrsStore,
+		mockMetadataStore,
+	)
 	env := testSuite.NewTestWorkflowEnvironment()
 	env.RegisterWorkflow(DeployWorkflow)
 	env.RegisterActivity(act)
@@ -133,6 +146,7 @@ func TestDeployWorkflowSuccess(t *testing.T) {
 	mockDeployTaskStore.EXPECT().GetDeployTask(mock.Anything, buildTask.ID).Return(buildTask, nil).Times(1)
 
 	// deploy
+	mockDeployTaskStore.EXPECT().GetLastTaskByType(mock.Anything, mock.Anything, mock.Anything).Return(buildTask, nil).Times(1)
 	mockDeployTaskStore.EXPECT().GetDeployTask(mock.Anything, runTask.ID).Return(runTask, nil).Times(1)
 	mockLogReporter.EXPECT().Report(mock.Anything).Return().Maybe()
 	mockDeployTaskStore.EXPECT().GetDeployByID(mock.Anything, runTask.DeployID).Return(deploy, nil).Times(1)
@@ -161,13 +175,14 @@ func TestDeployWorkflowRetryForBuildErr(t *testing.T) {
 	mockTokenStore := mockdb.NewMockAccessTokenStore(t)
 	mockUrsStore := mockdb.NewMockUserResourcesStore(t)
 	mockRuntimeFrameworks := mockdb.NewMockRuntimeFrameworksStore(t)
+	mockMetadataStore := mockdb.NewMockMetadataStore(t)
 	mockImageBuilder := mockbuilder.NewMockBuilder(t)
 	mockImageRunner := mockrunner.NewMockRunner(t)
 	mockGitServer := mock_git.NewMockGitServer(t)
 	mockLogReporter := mockReporter.NewMockLogCollector(t)
 	mockConfig := &config.Config{}
 	mockDeployCfg := common.BuildDeployConfig(mockConfig)
-	act := activity.NewDeployActivity(mockDeployCfg, mockLogReporter, mockImageBuilder, mockImageRunner, mockGitServer, mockDeployTaskStore, mockTokenStore, mockSpaceStore, mockModelStore, mockRuntimeFrameworks, mockUrsStore)
+	act := activity.NewDeployActivity(mockDeployCfg, mockLogReporter, mockImageBuilder, mockImageRunner, mockGitServer, mockDeployTaskStore, mockTokenStore, mockSpaceStore, mockModelStore, mockRuntimeFrameworks, mockUrsStore, mockMetadataStore)
 	env := testSuite.NewTestWorkflowEnvironment()
 	env.RegisterWorkflow(DeployWorkflow)
 	env.RegisterActivity(act)
@@ -218,6 +233,8 @@ func TestDeployWorkflowRetryForBuildErr(t *testing.T) {
 		User:   &database.User{},
 	}, nil)
 
+	// Mock build task retry
+	mockDeployTaskStore.EXPECT().GetLastTaskByType(mock.Anything, mock.Anything, mock.Anything).Return(buildTask, nil).Times(1)
 	mockDeployTaskStore.EXPECT().GetDeployTask(mock.Anything, buildTask.ID).Return(buildTask, nil).Times(1)
 	mockGitServer.EXPECT().GetRepoLastCommit(mock.Anything, mock.Anything).Return(&types.Commit{
 		ID: "123456",

@@ -294,7 +294,7 @@ func (c *accessTokenComponentImpl) createUserToken(ctx context.Context, newToken
 
 func (c *accessTokenComponentImpl) presentForNewAccessToken(user database.User) error {
 	var err error
-	req := types.ACTIVITY_REQ{
+	req := types.ActivityReq{
 		ID:     types.StarShipNewUser.ID,
 		Value:  types.StarShipNewUser.Value,
 		OpUID:  user.Username,

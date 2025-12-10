@@ -56,7 +56,7 @@ func TestMirrorNamespaceMappingHandler_Index(t *testing.T) {
 	})
 	tester.WithUser()
 
-	tester.mocks.mirrorNamespaceMapping.EXPECT().Index(tester.Ctx()).Return([]database.MirrorNamespaceMapping{{ID: 1}}, nil)
+	tester.mocks.mirrorNamespaceMapping.EXPECT().Index(tester.Ctx(), "").Return([]database.MirrorNamespaceMapping{{ID: 1}}, nil)
 	tester.Execute()
 
 	tester.ResponseEq(t, 200, tester.OKText, []database.MirrorNamespaceMapping{{ID: 1}})

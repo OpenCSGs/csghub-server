@@ -485,7 +485,7 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 					deployStore: mockDeployStore,
 					eventPub:    eventPub,
 				}
-				mockCounter.EXPECT().Usage().Return(&token.Usage{
+				mockCounter.EXPECT().Usage(mock.Anything).Return(&token.Usage{
 					PromptTokens:     100,
 					CompletionTokens: 50,
 					TotalTokens:      150,
@@ -547,7 +547,7 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 					deployStore: mockDeployStore,
 					eventPub:    eventPub,
 				}
-				mockCounter.EXPECT().Usage().Return(&token.Usage{
+				mockCounter.EXPECT().Usage(mock.Anything).Return(&token.Usage{
 					PromptTokens:     100,
 					CompletionTokens: 50,
 					TotalTokens:      150,
@@ -603,7 +603,7 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 					deployStore: mockDeployStore,
 					eventPub:    eventPub,
 				}
-				mockCounter.EXPECT().Usage().Return(nil, errors.New("counter error"))
+				mockCounter.EXPECT().Usage(mock.Anything).Return(nil, errors.New("counter error"))
 			},
 		},
 		{
@@ -637,7 +637,7 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 					deployStore: mockDeployStore,
 					eventPub:    eventPub,
 				}
-				mockCounter.EXPECT().Usage().Return(&token.Usage{
+				mockCounter.EXPECT().Usage(mock.Anything).Return(&token.Usage{
 					PromptTokens:     100,
 					CompletionTokens: 50,
 					TotalTokens:      150,

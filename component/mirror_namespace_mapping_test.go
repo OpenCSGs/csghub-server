@@ -38,11 +38,11 @@ func TestMirrorNamespaceMappingComponent_Get(t *testing.T) {
 func TestMirrorNamespaceMappingComponent_Index(t *testing.T) {
 	ctx := context.TODO()
 	mc := initializeTestMirrorNamespaceMappingComponent(ctx, t)
-	mc.mocks.stores.MirrorNamespaceMappingMock().EXPECT().Index(ctx).Return([]database.MirrorNamespaceMapping{
+	mc.mocks.stores.MirrorNamespaceMappingMock().EXPECT().Index(ctx, "").Return([]database.MirrorNamespaceMapping{
 		{ID: 1},
 	}, nil)
 
-	data, err := mc.Index(ctx)
+	data, err := mc.Index(ctx, "")
 	require.Nil(t, err)
 	require.Equal(t, []database.MirrorNamespaceMapping{
 		{ID: 1},

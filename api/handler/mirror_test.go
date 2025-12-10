@@ -84,7 +84,7 @@ func TestMirrorHandler_Index(t *testing.T) {
 	})
 	tester.WithUser()
 
-	tester.mocks.mirror.EXPECT().Index(tester.Ctx(), 10, 1, "foo").Return(
+	tester.mocks.mirror.EXPECT().Index(tester.Ctx(), 10, 1, types.MirrorFilter{Search: "foo"}).Return(
 		[]types.Mirror{{SourceUrl: "p"}}, 100, nil,
 	)
 	tester.AddPagination(1, 10).WithQuery("search", "foo").Execute()

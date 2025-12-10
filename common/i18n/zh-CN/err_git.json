@@ -86,6 +86,9 @@
     "error.GIT-ERR-34": {
         "other": "转移仓库失败"
     },
+    "error.GIT-ERR-35": {
+        "other": "在 xnet 启用的仓库中使用 git 失败"
+    },
     "error.GIT-ERR-4": {
         "other": "查找提交失败"
     },

@@ -17,7 +17,7 @@ type mirrorNamespaceMappingComponentImpl struct {
 type MirrorNamespaceMappingComponent interface {
 	Create(ctx context.Context, req types.CreateMirrorNamespaceMappingReq) (*database.MirrorNamespaceMapping, error)
 	Get(ctx context.Context, id int64) (*database.MirrorNamespaceMapping, error)
-	Index(ctx context.Context) ([]database.MirrorNamespaceMapping, error)
+	Index(ctx context.Context, search string) ([]database.MirrorNamespaceMapping, error)
 	Update(ctx context.Context, req types.UpdateMirrorNamespaceMappingReq) (*database.MirrorNamespaceMapping, error)
 	Delete(ctx context.Context, id int64) error
 }
@@ -51,8 +51,8 @@ func (c *mirrorNamespaceMappingComponentImpl) Get(ctx context.Context, id int64)
 	return mnm, nil
 }
 
-func (c *mirrorNamespaceMappingComponentImpl) Index(ctx context.Context) ([]database.MirrorNamespaceMapping, error) {
-	mnm, err := c.mirrorNamespaceMappingStore.Index(ctx)
+func (c *mirrorNamespaceMappingComponentImpl) Index(ctx context.Context, search string) ([]database.MirrorNamespaceMapping, error) {
+	mnm, err := c.mirrorNamespaceMappingStore.Index(ctx, search)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get mirror namespace mapping, error: %w", err)
 	}

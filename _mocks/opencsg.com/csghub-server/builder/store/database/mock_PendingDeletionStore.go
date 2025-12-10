@@ -69,29 +69,76 @@ func (_c *MockPendingDeletionStore_Create_Call) RunAndReturn(run func(context.Co
 	return _c
 }
 
-// FindByTableName provides a mock function with given fields: ctx, tableName
-func (_m *MockPendingDeletionStore) FindByTableName(ctx context.Context, tableName string) ([]*database.PendingDeletion, error) {
-	ret := _m.Called(ctx, tableName)
+// Delete provides a mock function with given fields: ctx, pendingDeletion
+func (_m *MockPendingDeletionStore) Delete(ctx context.Context, pendingDeletion *database.PendingDeletion) error {
+	ret := _m.Called(ctx, pendingDeletion)
 
 	if len(ret) == 0 {
-		panic("no return value specified for FindByTableName")
+		panic("no return value specified for Delete")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, *database.PendingDeletion) error); ok {
+		r0 = rf(ctx, pendingDeletion)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockPendingDeletionStore_Delete_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Delete'
+type MockPendingDeletionStore_Delete_Call struct {
+	*mock.Call
+}
+
+// Delete is a helper method to define mock.On call
+//   - ctx context.Context
+//   - pendingDeletion *database.PendingDeletion
+func (_e *MockPendingDeletionStore_Expecter) Delete(ctx interface{}, pendingDeletion interface{}) *MockPendingDeletionStore_Delete_Call {
+	return &MockPendingDeletionStore_Delete_Call{Call: _e.mock.On("Delete", ctx, pendingDeletion)}
+}
+
+func (_c *MockPendingDeletionStore_Delete_Call) Run(run func(ctx context.Context, pendingDeletion *database.PendingDeletion)) *MockPendingDeletionStore_Delete_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*database.PendingDeletion))
+	})
+	return _c
+}
+
+func (_c *MockPendingDeletionStore_Delete_Call) Return(err error) *MockPendingDeletionStore_Delete_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockPendingDeletionStore_Delete_Call) RunAndReturn(run func(context.Context, *database.PendingDeletion) error) *MockPendingDeletionStore_Delete_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// FindByTableNameWithBatch provides a mock function with given fields: ctx, tableName, batchSize, batch
+func (_m *MockPendingDeletionStore) FindByTableNameWithBatch(ctx context.Context, tableName database.PendingDeletionTableName, batchSize int, batch int) ([]*database.PendingDeletion, error) {
+	ret := _m.Called(ctx, tableName, batchSize, batch)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FindByTableNameWithBatch")
 	}
 
 	var r0 []*database.PendingDeletion
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) ([]*database.PendingDeletion, error)); ok {
-		return rf(ctx, tableName)
+	if rf, ok := ret.Get(0).(func(context.Context, database.PendingDeletionTableName, int, int) ([]*database.PendingDeletion, error)); ok {
+		return rf(ctx, tableName, batchSize, batch)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string) []*database.PendingDeletion); ok {
-		r0 = rf(ctx, tableName)
+	if rf, ok := ret.Get(0).(func(context.Context, database.PendingDeletionTableName, int, int) []*database.PendingDeletion); ok {
+		r0 = rf(ctx, tableName, batchSize, batch)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]*database.PendingDeletion)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = rf(ctx, tableName)
+	if rf, ok := ret.Get(1).(func(context.Context, database.PendingDeletionTableName, int, int) error); ok {
+		r1 = rf(ctx, tableName, batchSize, batch)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -99,31 +146,33 @@ func (_m *MockPendingDeletionStore) FindByTableName(ctx context.Context, tableNa
 	return r0, r1
 }
 
-// MockPendingDeletionStore_FindByTableName_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindByTableName'
-type MockPendingDeletionStore_FindByTableName_Call struct {
+// MockPendingDeletionStore_FindByTableNameWithBatch_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindByTableNameWithBatch'
+type MockPendingDeletionStore_FindByTableNameWithBatch_Call struct {
 	*mock.Call
 }
 
-// FindByTableName is a helper method to define mock.On call
+// FindByTableNameWithBatch is a helper method to define mock.On call
 //   - ctx context.Context
-//   - tableName string
-func (_e *MockPendingDeletionStore_Expecter) FindByTableName(ctx interface{}, tableName interface{}) *MockPendingDeletionStore_FindByTableName_Call {
-	return &MockPendingDeletionStore_FindByTableName_Call{Call: _e.mock.On("FindByTableName", ctx, tableName)}
+//   - tableName database.PendingDeletionTableName
+//   - batchSize int
+//   - batch int
+func (_e *MockPendingDeletionStore_Expecter) FindByTableNameWithBatch(ctx interface{}, tableName interface{}, batchSize interface{}, batch interface{}) *MockPendingDeletionStore_FindByTableNameWithBatch_Call {
+	return &MockPendingDeletionStore_FindByTableNameWithBatch_Call{Call: _e.mock.On("FindByTableNameWithBatch", ctx, tableName, batchSize, batch)}
 }
 
-func (_c *MockPendingDeletionStore_FindByTableName_Call) Run(run func(ctx context.Context, tableName string)) *MockPendingDeletionStore_FindByTableName_Call {
+func (_c *MockPendingDeletionStore_FindByTableNameWithBatch_Call) Run(run func(ctx context.Context, tableName database.PendingDeletionTableName, batchSize int, batch int)) *MockPendingDeletionStore_FindByTableNameWithBatch_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string))
+		run(args[0].(context.Context), args[1].(database.PendingDeletionTableName), args[2].(int), args[3].(int))
 	})
 	return _c
 }
 
-func (_c *MockPendingDeletionStore_FindByTableName_Call) Return(pendingDeletions []*database.PendingDeletion, err error) *MockPendingDeletionStore_FindByTableName_Call {
+func (_c *MockPendingDeletionStore_FindByTableNameWithBatch_Call) Return(pendingDeletions []*database.PendingDeletion, err error) *MockPendingDeletionStore_FindByTableNameWithBatch_Call {
 	_c.Call.Return(pendingDeletions, err)
 	return _c
 }
 
-func (_c *MockPendingDeletionStore_FindByTableName_Call) RunAndReturn(run func(context.Context, string) ([]*database.PendingDeletion, error)) *MockPendingDeletionStore_FindByTableName_Call {
+func (_c *MockPendingDeletionStore_FindByTableNameWithBatch_Call) RunAndReturn(run func(context.Context, database.PendingDeletionTableName, int, int) ([]*database.PendingDeletion, error)) *MockPendingDeletionStore_FindByTableNameWithBatch_Call {
 	_c.Call.Return(run)
 	return _c
 }

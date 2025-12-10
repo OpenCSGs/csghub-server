@@ -93,15 +93,11 @@ const (
 // Init a test db, must call `defer db.Close()` in the test
 func InitTestDB() *database.DB {
 	ctx := context.TODO()
+	cname := "csghub_test_" + dbSuffix()
+
 	// reuse the container, so we don't need to recreate the db for each test
 	// https://github.com/testcontainers/testcontainers-go/issues/2726
-	reuse := testcontainers.CustomizeRequestOption(
-		func(req *testcontainers.GenericContainerRequest) error {
-			req.Reuse = true
-			req.Name = "csghub_test_" + dbSuffix()
-			return nil
-		},
-	)
+	reuse := testcontainers.WithReuseByName(cname)
 
 	pc, err := postgres.Run(ctx,
 		pgImage,
@@ -110,7 +106,7 @@ func InitTestDB() *database.DB {
 		testcontainers.WithWaitStrategy(
 			wait.ForLog("database system is ready to accept connections").
 				WithOccurrence(2).
-				WithStartupTimeout(60*time.Second)))
+				WithStartupTimeout(120*time.Second)))
 	if err != nil {
 		panic(err)
 	}
@@ -175,13 +171,7 @@ func InitTransactionTestDB() *database.DB {
 	cname := "csghub_test_tx_" + uuid.New().String()
 	// reuse the container, so we don't need to recreate the db for each test
 	// https://github.com/testcontainers/testcontainers-go/issues/2726
-	reuse := testcontainers.CustomizeRequestOption(
-		func(req *testcontainers.GenericContainerRequest) error {
-			req.Reuse = true
-			req.Name = cname
-			return nil
-		},
-	)
+	reuse := testcontainers.WithReuseByName(cname)
 
 	pc, err := postgres.Run(ctx,
 		pgImage,
@@ -189,7 +179,7 @@ func InitTransactionTestDB() *database.DB {
 		testcontainers.WithWaitStrategy(
 			wait.ForLog("database system is ready to accept connections").
 				WithOccurrence(2).
-				WithStartupTimeout(60*time.Second)))
+				WithStartupTimeout(180*time.Second)))
 	if err != nil {
 		panic(err)
 	}
@@ -261,16 +251,21 @@ func CheckZhparser(ctx context.Context, db *bun.DB, driver string) (bool, error)
 func InitTestRedis() *redisclient.Client {
 	ctx := context.TODO()
 
+	cname := "csghub_test_redis_" + uuid.New().String() // use uuid to avoid conflict with other tests
 	req := testcontainers.ContainerRequest{
 		Image:        "opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/redis:7.2.5",
 		ExposedPorts: []string{"6379/tcp"},
 		WaitingFor:   wait.ForLog("* Ready to accept connections"),
+		Name:         cname,
 	}
 
-	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
+	containerRequest := testcontainers.GenericContainerRequest{
 		ContainerRequest: req,
 		Started:          true,
-	})
+		Reuse:            true, // reuse the container, so we don't need to recreate the redis for each test
+	}
+
+	container, err := testcontainers.GenericContainer(ctx, containerRequest)
 	if err != nil {
 		panic(err)
 	}

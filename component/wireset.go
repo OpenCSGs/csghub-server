@@ -69,6 +69,8 @@ var MockedComponentSet = wire.NewSet(
 	wire.Bind(new(SpaceTemplateComponent), new(*mock_component.MockSpaceTemplateComponent)),
 	mock_component.NewMockMCPServerComponent,
 	wire.Bind(new(MCPServerComponent), new(*mock_component.MockMCPServerComponent)),
+	mock_component.NewMockAgentComponent,
+	wire.Bind(new(AgentComponent), new(*mock_component.MockAgentComponent)),
 )
 
 var MockedGitServerSet = wire.NewSet(
@@ -156,6 +158,7 @@ type Mocks struct {
 	components       *mockedComponents
 	gitServer        *mock_git.MockGitServer
 	userSvcClient    *mock_rpc.MockUserSvcClient
+	xnetClient       *mock_rpc.MockXnetSvcClient
 	s3Client         *mock_s3.MockClient
 	mirrorServer     *mock_mirror.MockMirrorServer
 	deployer         *mock_deploy.MockDeployer
@@ -169,6 +172,7 @@ type Mocks struct {
 	multiSyncClient  *mock_multisync.MockClient
 	s3Core           *mock_s3.MockCore
 	checker          *mock_checker.MockGitCallbackChecker
+	agentComponent   *mock_component.MockAgentComponent
 }
 
 var AllMockSet = wire.NewSet(

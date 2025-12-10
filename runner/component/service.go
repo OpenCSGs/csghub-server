@@ -127,11 +127,11 @@ func (s *serviceComponentImpl) generateService(ctx context.Context, cluster *clu
 
 	if hardware.Gcu.ResourceName == "" || hardware.Gcu.Num == "" {
 		environments = append(environments, corev1.EnvVar{Name: "ENFLAME_VISIBLE_DEVICES", Value: "none"})
+		environments = append(environments, corev1.EnvVar{Name: "TOPS_VISIBLE_DEVICES", Value: "none"})
 	}
 
 	if hardware.Dcu.ResourceName == "" || hardware.Dcu.Num == "" {
 		environments = append(environments, corev1.EnvVar{Name: "ROCR_VISIBLE_DEVICES", Value: "none"})
-		environments = append(environments, corev1.EnvVar{Name: "TOPS_VISIBLE_DEVICES", Value: "none"})
 	}
 
 	if appPort == 0 {
