@@ -38,7 +38,7 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 
 func CreateMCPRoute(v1Group *gin.RouterGroup, mcpProxy handler.MCPProxyHandler) {
 	mcpGroup := v1Group.Group("mcp")
-	mcpGroup.GET("/servers", mcpProxy.List)
+	mcpGroup.GET("/resources", mcpProxy.Resources)
 
 	// todo: enable mcp server proxy later
 	mcpGroup.Any("/:servicename/*any", mcpProxy.ProxyToApi(""))
