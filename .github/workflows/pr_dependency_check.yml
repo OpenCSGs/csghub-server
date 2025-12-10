@@ -1,8 +1,11 @@
 name: PR Dependency Check
 
 on:
-  pull_request_target: 
-    types: [opened, edited, closed, reopened]
+  push:
+    branches: ["*", "*/*"]
+    tags: ["v*"]
+  pull_request:
+    branches: ["*"]
 
 permissions:
   issues: read
