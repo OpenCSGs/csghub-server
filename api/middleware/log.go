@@ -30,8 +30,6 @@ func Log() gin.HandlerFunc {
 			slog.Any("auth_type", httpbase.GetAuthType(ctx)),
 			slog.String("url", ctx.Request.URL.RequestURI()),
 			slog.String("full_path", ctx.FullPath()),
-			slog.String("req_header_range", ctx.GetHeader("Range")),
-			slog.String("rsp_content_range", ctx.Writer.Header().Get("Content-Range")),
 		)
 	}
 }

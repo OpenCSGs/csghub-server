@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -188,4 +189,16 @@ func GetOrGenTraceIDFromContext(ctx context.Context) (traceID, traceParent strin
 	traceParent = fmt.Sprintf("00-%s-%s-01", traceID, spanID)
 
 	return traceID, traceParent, true
+}
+
+// PropagateTrace propagates the trace ID and traceparent to the http header.
+func PropagateTrace(ctx context.Context, header http.Header) string {
+	traceID, traceParent, _ := GetOrGenTraceIDFromContext(ctx)
+	if traceParent != "" {
+		header.Set(HeaderTraceparent, traceParent)
+	}
+	if traceID != "" {
+		header.Set(HeaderRequestID, traceID)
+	}
+	return traceID
 }
