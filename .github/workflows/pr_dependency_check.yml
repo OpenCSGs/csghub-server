@@ -1,9 +1,6 @@
 name: PR Dependency Check
 
 on:
-  push:
-    branches: ["*", "*/*"]
-    tags: ["v*"]
   pull_request:
     branches: ["*"]
 
