@@ -86,7 +86,7 @@ func (m *MCPProxyHandlerImpl) ProxyToApi(api string) gin.HandlerFunc {
 // @Produce      json
 // @Param        per query int false "per" default(50)
 // @Param        page query int false "per page" default(1)
-// @Success      200  {object}  types.ResponseWithTotal{data=[],total=int} "OK"
+// @Success      200  {object}  types.ResponseWithTotal{data=database.MCPResource,total=int} "OK"
 // @Failure      500  {object}  error "Internal server error"
 // @Router       /v1/mcp/resources [get]
 func (m *MCPProxyHandlerImpl) Resources(ctx *gin.Context) {
