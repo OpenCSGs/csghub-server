@@ -1,0 +1,80 @@
+## Generate Assets for Docker Build ##
+.echo:
+  before_script:
+    - |
+      echo "docs.go文件最后修改时间: $(stat -c "%y" docs/docs.go)"
+      echo "docs/docs.go SHA值: $(sha256sum docs/docs.go | cut -d" " -f1)"
+
+## Swagger ############################################
+swagger-gen:
+  stage: swagger
+  image: ${ALI_ACR_REGISTRY}/docker-golang:1.24.6
+  before_script:
+    - !reference [.echo, before_script]
+    - go install github.com/swaggo/swag/cmd/swag@latest
+  script:
+    - make swag
+  interruptible: true
+  artifacts:
+    name: "swagger_docs_${CI_COMMIT_SHORT_SHA}"
+    paths:
+      - docs/
+    expose_as: "API_Documentation"
+    expire_in: 3 days
+    when: on_success
+  rules:
+    - if: $CI_PROJECT_ID == "44" && $CI_COMMIT_TAG =~ /^v(\d+\.\d+.\d+)-..-saas$/
+    - if: $CI_PIPELINE_SOURCE != "schedule" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+
+## Build Asset #######################################
+#.asset:
+#  image: ${ALI_ACR_REGISTRY}/csghub_server:base-1.1
+#  stage: assets
+#  needs: []
+#  before_script:
+#    - !reference [ .echo, before_script ]
+#  script:
+#    - |
+#      CGO_ENABLED=1 GOARCH=$CSGHUB_ARCH GOOS=linux \
+#        go build \
+#          -tags=$CSGHUB_TAGS \
+#          -ldflags "-X opencsg.com/csghub-server/version.GitRevision=$(git rev-parse --short HEAD) \
+#          -X opencsg.com/csghub-server/version.StarhubAPIVersion=$CI_COMMIT_TAG" \
+#          -v \
+#          -o ./starhub ./cmd/csghub-server
+#  artifacts:
+#    paths:
+#      - ./starhub
+#  cache:
+#    key: asset-cache
+#    paths:
+#      - .cache
+#  rules:
+#    - if: $CI_PIPELINE_SOURCE != "schedule"
+
+## Build saas amd64 ###################################
+#build:assets:saas:amd64:
+#  extends: .asset
+#  variables:
+#    CSGHUB_ARCH: "amd64"
+#    CSGHUB_TAGS: "saas"
+#  needs:
+#    - job: swagger-gen
+#      artifacts: true
+#  rules:
+#    - if: $CI_PROJECT_ID == "44" && $CI_COMMIT_TAG =~ /^v(\d+\.\d+.\d+)-..-saas$/
+#    - if: $CI_PIPELINE_SOURCE != "schedule" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+## Build saas amd64 ###################################
+#build:assets:saas:arm64:
+#  extends: .asset
+#  variables:
+#    CSGHUB_ARCH: "arm64"
+#    CSGHUB_TAGS: "saas"
+#  needs:
+#    - job: swagger-gen
+#      artifacts: true
+#  rules:
+#    - if: '$CI_PROJECT_ID == "44" && $CI_COMMIT_TAG =~ /^v(\d+\.\d+.\d+)$/'
+#    - if: $CI_PIPELINE_SOURCE != "schedule" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
