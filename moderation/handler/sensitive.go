@@ -49,17 +49,26 @@ func (h *SensitiveHandler) Image(ctx *gin.Context) {
 		Scenario      sensitive.Scenario `json:"scenario"`
 		OssBucketName string             `json:"oss_bucket_name"`
 		OssObjectName string             `json:"oss_object_name"`
+		ImageURL      string             `json:"image_url"`
 	}
 	var (
 		r   req
 		err error
 	)
 	if err = ctx.ShouldBindJSON(&r); err != nil {
-		slog.Error("Bad request format", slog.String("err", err.Error()))
+		slog.ErrorContext(ctx, "Bad request format", slog.String("err", err.Error()))
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	result, err := h.c.PassImageCheck(ctx, r.Scenario, r.OssBucketName, r.OssObjectName)
+	var result *sensitive.CheckResult
+	if r.ImageURL != "" {
+		result, err = h.c.PassImageURLCheck(ctx, r.Scenario, r.ImageURL)
+	} else if r.OssBucketName != "" && r.OssObjectName != "" {
+		result, err = h.c.PassImageCheck(ctx, r.Scenario, r.OssBucketName, r.OssObjectName)
+	} else {
+		httpbase.BadRequest(ctx, "image_url or oss_bucket_name and oss_object_name are required")
+		return
+	}
 	if err != nil {
 		httpbase.ServerError(ctx, err)
 		return

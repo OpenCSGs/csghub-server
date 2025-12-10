@@ -1,6 +1,6 @@
 with-expecter: true
 dir: "_mocks/{{.PackagePath}}"
-# new from v2.53.0, for more detail please refer to:
+# new from v2.49.0, for more detail please refer to:
 # https://github.com/vektra/mockery/commit/13fc60740a1eab3fc705fcc131a4b9a6eacfd0fe#diff-4bc8f03915f15ecf2cb9965592fcf933bb06986003613b5633a8dea7962c31a9R40
 resolve-type-alias: false
 packages:
@@ -11,6 +11,7 @@ packages:
   opencsg.com/csghub-server/component:
     config:
     interfaces:
+      ApiRateLimit:
       RepoComponent:
       TagComponent:
       AccountingComponent:
@@ -37,16 +38,20 @@ packages:
       MultiSyncComponent:
       ModelTreeComponent:
       SpaceTemplateComponent:
+      RuleComponent:
       MCPServerComponent:
-      MonitorComponent:
       MCPScannerComponent:
       MCPScannerPlugin:
       StatComponent:
-      LLMServiceComponent: 
+      LLMServiceComponent:
+      MonitorComponent:  
       ClusterComponent:
       MirrorNamespaceMappingComponent:
       NotebookComponent:
       LicenseComponent:
+      CaptchaComponent:
+      AgentComponent:
+      AgentInstanceAdapter:
       XnetComponent:
   opencsg.com/csghub-server/component/reporter:
     config:
@@ -71,22 +76,55 @@ packages:
     interfaces:
       MemberComponent:
       OrganizationComponent:
+      JwtComponent:
+      UserComponent:
+      AccessTokenComponent:
+      InvitationComponent:
+  opencsg.com/csghub-server/payment/component:
+    config:
+    interfaces:
+      PaymentComponent:
+      StripeComponent:
+  opencsg.com/csghub-server/moderation/component:
+    interfaces:
+      RepoComponent:
+      SensitiveComponent:
+      SensitiveWordSetComponent:
+  opencsg.com/csghub-server/builder/geo:
+    config:
+      all: True
   opencsg.com/csghub-server/builder/store/database:
     config:
       all: True
+  opencsg.com/csghub-server/builder/store/database/ee:
+    config:
+      all: True
+      mock-build-tags: "saas || ee"
   opencsg.com/csghub-server/builder/rpc:
     config:
     interfaces:
       UserSvcClient:
       ModerationSvcClient:
       NotificationSvcClient:
+      PaymentSvcClient:
+      SSOInterface:
+      AgentHubSvcClient:
       XnetSvcClient:
+      CsgbotSvcClient:
+  opencsg.com/csghub-server/builder/llm:
+    config:
+    interfaces:
+      LLMSvcClient:
   opencsg.com/csghub-server/builder/sensitive:
     config:
     interfaces:
       GreenClient:
       Green2022Client:
       SensitiveChecker:
+  opencsg.com/csghub-server/builder/proxy:
+    config:
+    interfaces:
+      ReverseProxy:
   opencsg.com/csghub-server/builder/git/gitserver:
     config:
     interfaces:
@@ -106,11 +144,24 @@ packages:
   opencsg.com/csghub-server/builder/prometheus:
     config:
     interfaces:
-      PrometheusClient:  
+      PrometheusClient:
+  opencsg.com/csghub-server/builder/mq:
+    config:
+    interfaces:
+      MessageQueueFactory:
+      MessageQueue:
   opencsg.com/csghub-server/mirror/cache:
     config:
     interfaces:
       Cache:
+  opencsg.com/csghub-server/mirror/hook:
+    config:
+    interfaces:
+      MessageSender:
+  opencsg.com/csghub-server/mirror/filter:
+    config:
+    interfaces:
+      Filter:
   opencsg.com/csghub-server/common/types:
     config:
     interfaces:
@@ -143,8 +194,17 @@ packages:
   opencsg.com/csghub-server/accounting/component:
     config:
     interfaces:
+      AccountingUserComponent:
+      AccountingStatementComponent:
+      AccountingBillComponent:
+      AccountingPresentComponent:
       MeteringComponent:
       AccountingEventComponent:
+      AccountingPriceComponent:
+      AccountingOrderComponent:
+      AccountingInvoiceComponent:
+      StripeComponent:
+      SubscriptionComponent:
   opencsg.com/csghub-server/builder/accounting:
     config:
     interfaces:
@@ -162,6 +222,10 @@ packages:
     config:
     interfaces:
       RedisClient:
+  opencsg.com/csghub-server/builder/captcha:
+    config:
+    interfaces:
+      Interface:
   github.com/nats-io/nats.go/jetstream:
     config:
     interfaces:
@@ -209,6 +273,7 @@ packages:
     config:
     interfaces:
       CommonResponseWriter:
+      AgentAdapter:
   opencsg.com/csghub-server/aigateway/token:
     config:
       all: true
