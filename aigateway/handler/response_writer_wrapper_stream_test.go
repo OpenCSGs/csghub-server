@@ -20,7 +20,7 @@ func TestResponseWriterWrapper_NewResponseWriterWrapper(t *testing.T) {
 	w := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(w)
 
-	rw := newStreamResponseWriter(ctx.Writer, component.NewMockModeration(t))
+	rw := newStreamResponseWriter(ctx.Writer, component.NewMockModeration(t), nil)
 	if rw == nil {
 		t.Fatal("NewResponseWriterWrapper should not return nil")
 	}
@@ -38,7 +38,7 @@ func TestResponseWriterWrapper_NewResponseWriterWrapper(t *testing.T) {
 func TestResponseWriterWrapper_Header_WriteHeader_Flush_ClearBuffer(t *testing.T) {
 	w := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(w)
-	rw := newStreamResponseWriter(ctx.Writer, component.NewMockModeration(t))
+	rw := newStreamResponseWriter(ctx.Writer, component.NewMockModeration(t), nil)
 
 	rw.WriteHeader(http.StatusOK)
 	if w.Code != http.StatusOK {
@@ -52,7 +52,7 @@ func TestResponseWriterWrapper_Write_NormalContent(t *testing.T) {
 	w := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(w)
 	mockMod := component.NewMockModeration(t)
-	rw := newStreamResponseWriter(ctx.Writer, mockMod)
+	rw := newStreamResponseWriter(ctx.Writer, mockMod, nil)
 
 	normalChunk := types.ChatCompletionChunk{
 		ID:     "test-id",
@@ -86,7 +86,7 @@ func TestResponseWriterWrapper_Write_NormalContent(t *testing.T) {
 func TestResponseWriterWrapper_Write_DoneMessage(t *testing.T) {
 	w := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(w)
-	rw := newStreamResponseWriter(ctx.Writer, component.NewMockModeration(t))
+	rw := newStreamResponseWriter(ctx.Writer, component.NewMockModeration(t), nil)
 
 	doneData := []byte("data: [DONE]\n\n")
 	_, err := rw.Write(doneData)
@@ -103,7 +103,7 @@ func TestResponseWriterWrapper_Write_SensitiveContent(t *testing.T) {
 	w := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(w)
 	mockMod := component.NewMockModeration(t)
-	rw := newStreamResponseWriter(ctx.Writer, mockMod)
+	rw := newStreamResponseWriter(ctx.Writer, mockMod, nil)
 
 	sensitiveChunk := types.ChatCompletionChunk{
 		ID:     "test-id",
@@ -142,7 +142,7 @@ func TestResponseWriterWrapper_Write_SensitiveReasoningContent(t *testing.T) {
 	w := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(w)
 	mockMod := component.NewMockModeration(t)
-	rw := newStreamResponseWriter(ctx.Writer, mockMod)
+	rw := newStreamResponseWriter(ctx.Writer, mockMod, nil)
 	sensitiveChunk := types.ChatCompletionChunk{
 		ID:     "test-id",
 		Object: "chat.completion.chunk",
@@ -182,7 +182,7 @@ func TestResponseWriterWrapper_Write_ModerationServiceError(t *testing.T) {
 	ctx, _ := gin.CreateTestContext(w)
 	mockMod := component.NewMockModeration(t)
 
-	rw := newStreamResponseWriter(ctx.Writer, mockMod)
+	rw := newStreamResponseWriter(ctx.Writer, mockMod, nil)
 	testChunk := types.ChatCompletionChunk{
 		ID:     "test-id",
 		Object: "chat.completion.chunk",
@@ -216,7 +216,7 @@ func TestResponseWriterWrapper_Write_ModerationServiceError(t *testing.T) {
 func TestResponseWriterWrapper_Write_InvalidJSON(t *testing.T) {
 	w := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(w)
-	rw := newStreamResponseWriter(ctx.Writer, component.NewMockModeration(t))
+	rw := newStreamResponseWriter(ctx.Writer, component.NewMockModeration(t), nil)
 
 	invalidData := []byte("data: invalid json data\n\n")
 

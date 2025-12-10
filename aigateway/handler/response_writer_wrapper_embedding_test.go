@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"net/http/httptest"
 	"testing"
@@ -103,7 +104,7 @@ func TestResponseWriterWrapperEmbedding_Write(t *testing.T) {
 			// Verify token counter if used
 			if tt.withCounter && tt.name != "invalid json data" {
 				counter := wrapper.tokenCounter
-				usage, err := counter.Usage()
+				usage, err := counter.Usage(context.Background())
 				assert.NoError(t, err)
 				assert.Equal(t, tt.response.Usage.TotalTokens, usage.TotalTokens)
 				assert.Equal(t, tt.response.Usage.PromptTokens, usage.PromptTokens)

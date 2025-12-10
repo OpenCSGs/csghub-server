@@ -49,7 +49,7 @@ func TestResponseWriterWrapper_StreamWrite(t *testing.T) {
 			w := httptest.NewRecorder()
 			ctx, _ := gin.CreateTestContext(w)
 			mockMod := component.NewMockModeration(t)
-			wrapper := NewResponseWriterWrapper(ctx.Writer, true, mockMod)
+			wrapper := NewResponseWriterWrapper(ctx.Writer, true, mockMod, nil)
 			// only check response decode, not check moderation
 			mockMod.EXPECT().CheckChatStreamResponse(mock.Anything, mock.Anything, mock.Anything).
 				Return(&rpc.CheckResult{IsSensitive: false}, nil)
@@ -85,7 +85,7 @@ func TestResponseWriterWrapper_StreamWrite_WithWhiteSpace(t *testing.T) {
 			w := httptest.NewRecorder()
 			ctx, _ := gin.CreateTestContext(w)
 			mockMod := component.NewMockModeration(t)
-			wrapper := NewResponseWriterWrapper(ctx.Writer, true, mockMod)
+			wrapper := NewResponseWriterWrapper(ctx.Writer, true, mockMod, nil)
 			// only check response decode, not check moderation
 			mockMod.EXPECT().CheckChatStreamResponse(mock.Anything, mock.Anything, mock.Anything).
 				Return(&rpc.CheckResult{IsSensitive: false}, nil)

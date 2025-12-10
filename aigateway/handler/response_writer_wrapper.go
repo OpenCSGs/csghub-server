@@ -23,8 +23,6 @@ type CommonResponseWriter interface {
 	WriteHeader(int)
 	Write([]byte) (int, error)
 	Flush()
-
-	WithLLMTokenCounter(*token.ChatTokenCounter)
 	ClearBuffer()
 }
 
@@ -36,7 +34,7 @@ type ResponseWriterWrapper struct {
 	internalWritter     gin.ResponseWriter
 	moderationComponent component.Moderation
 	eventStreamDecoder  *eventStreamDecoder
-	tokenCounter        *token.ChatTokenCounter
+	tokenCounter        token.ChatTokenCounter
 	id                  string
 }
 
@@ -45,15 +43,15 @@ func (rw *ResponseWriterWrapper) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	return rw.internalWritter.Hijack()
 }
 
-func NewResponseWriterWrapper(internalWritter gin.ResponseWriter, useStream bool, moderationComponent component.Moderation) CommonResponseWriter {
+func NewResponseWriterWrapper(internalWritter gin.ResponseWriter, useStream bool, moderationComponent component.Moderation, tokenCounter token.ChatTokenCounter) CommonResponseWriter {
 	if useStream {
-		return newStreamResponseWriter(internalWritter, moderationComponent)
+		return newStreamResponseWriter(internalWritter, moderationComponent, tokenCounter)
 	} else {
-		return newNonStreamResponseWriter(internalWritter, moderationComponent)
+		return newNonStreamResponseWriter(internalWritter, moderationComponent, tokenCounter)
 	}
 }
 
-func newStreamResponseWriter(internalWritter gin.ResponseWriter, moderationComponent component.Moderation) *ResponseWriterWrapper {
+func newStreamResponseWriter(internalWritter gin.ResponseWriter, moderationComponent component.Moderation, tokenCounter token.ChatTokenCounter) *ResponseWriterWrapper {
 	id := uuid.New().ID()
 	return &ResponseWriterWrapper{
 		internalWritter:     internalWritter,
@@ -61,10 +59,6 @@ func newStreamResponseWriter(internalWritter gin.ResponseWriter, moderationCompo
 		eventStreamDecoder:  &eventStreamDecoder{},
 		id:                  fmt.Sprint(id),
 	}
-}
-
-func (rw *ResponseWriterWrapper) WithLLMTokenCounter(counter *token.ChatTokenCounter) {
-	rw.tokenCounter = counter
 }
 
 func (rw *ResponseWriterWrapper) ClearBuffer() {}
