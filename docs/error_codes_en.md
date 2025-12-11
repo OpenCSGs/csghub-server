@@ -42,6 +42,14 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Name:** `instanceQuotaExceeded`
 - **Description:** The instance quota exceeded. Includes agent type, instance count, and quota in the error message.
 
+---
+
+### `AGENT-ERR-1`
+
+- **Error Code:** `AGENT-ERR-1`
+- **Error Name:** `instanceNameAlreadyExists`
+- **Description:** You have an instance with the same name.
+
 ## Auth Errors
 
 ### `AUTH-ERR-0`

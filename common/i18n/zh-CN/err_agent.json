@@ -1,5 +1,8 @@
 {
     "error.AGENT-ERR-0": {
         "other": "实例配额超出，智能体类型: {{.agent_type}}, 实例数量: {{.instance_count}}，配额: {{.quota}}"
+    },
+    "error.AGENT-ERR-1": {
+        "other": "您已存在相同名称的实例: {{.instance_name}}"
     }
 }

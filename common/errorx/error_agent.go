@@ -4,6 +4,7 @@ const errAgentPrefix = "AGENT-ERR"
 
 const (
 	instanceQuotaExceeded = iota
+	instanceNameAlreadyExists
 )
 
 var (
@@ -19,6 +20,19 @@ var (
 	//
 	// zh-HK: 實例配額超出，智能體類型: {{.agent_type}}, 實例數量: {{.instance_count}}，配額: {{.quota}}
 	ErrInstanceQuotaExceeded error = CustomError{prefix: errAgentPrefix, code: instanceQuotaExceeded}
+
+	// you have a instance with the same name
+	//
+	// Description: You have an instance with the same name.
+	//
+	// Description_ZH: 您已存在相同名称的实例。
+	//
+	// en-US: You have a instance with the same name: {{.instance_name}}
+	//
+	// zh-CN: 您已存在相同名称的实例: {{.instance_name}}
+	//
+	// zh-HK: 您已存在相同名稱的實例: {{.instance_name}}
+	ErrInstanceNameAlreadyExists error = CustomError{prefix: errAgentPrefix, code: instanceNameAlreadyExists}
 )
 
 func InstanceQuotaExceeded(err error, ctx context) error {
@@ -27,6 +41,16 @@ func InstanceQuotaExceeded(err error, ctx context) error {
 		context: ctx,
 		err:     err,
 		code:    int(instanceQuotaExceeded),
+	}
+	return customErr
+}
+
+func InstanceNameAlreadyExists(err error, ctx context) error {
+	customErr := CustomError{
+		prefix:  errAgentPrefix,
+		context: ctx,
+		err:     err,
+		code:    int(instanceNameAlreadyExists),
 	}
 	return customErr
 }

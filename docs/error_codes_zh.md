@@ -42,6 +42,14 @@
 - **错误名:** `instanceQuotaExceeded`
 - **描述:** 实例配额超出。错误消息中包含智能体类型、实例数量和配额。
 
+---
+
+### `AGENT-ERR-1`
+
+- **错误代码:** `AGENT-ERR-1`
+- **错误名:** `instanceNameAlreadyExists`
+- **描述:** 您已存在相同名称的实例。
+
 ## Auth 错误
 
 ### `AUTH-ERR-0`

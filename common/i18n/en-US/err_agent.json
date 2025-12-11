@@ -1,5 +1,8 @@
 {
     "error.AGENT-ERR-0": {
         "other": "Instance quota exceeded, agent type: {{.agent_type}}, instance count: {{.instance_count}}, quota: {{.quota}}"
+    },
+    "error.AGENT-ERR-1": {
+        "other": "You have a instance with the same name: {{.instance_name}}"
     }
 }
