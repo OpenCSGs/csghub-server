@@ -1,40 +1,49 @@
 package token
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 	"strings"
 
+	"github.com/openai/openai-go/v3"
 	"opencsg.com/csghub-server/aigateway/types"
 )
 
-var _ Counter = (*ChatTokenCounter)(nil)
+var _ Counter = (*chatTokenCounterImpl)(nil)
 
-type ChatTokenCounter struct {
-	prompts    []types.Message
+type ChatTokenCounter interface {
+	AppendPrompts(prompts []openai.ChatCompletionMessageParamUnion)
+	Completion(completion types.ChatCompletion)
+	AppendCompletionChunk(chunk types.ChatCompletionChunk)
+	Usage(c context.Context) (*Usage, error)
+}
+
+type chatTokenCounterImpl struct {
+	prompts    []openai.ChatCompletionMessageParamUnion
 	completion *types.ChatCompletion
 	chunks     []types.ChatCompletionChunk
 	tokenizer  Tokenizer
 }
 
-func (l *ChatTokenCounter) AppendPrompts(prompts ...types.Message) {
+func (l *chatTokenCounterImpl) AppendPrompts(prompts []openai.ChatCompletionMessageParamUnion) {
 	l.prompts = append(l.prompts, prompts...)
 }
 
-func NewLLMTokenCounter(tokenizer Tokenizer) *ChatTokenCounter {
-	return &ChatTokenCounter{
+func NewLLMTokenCounter(tokenizer Tokenizer) ChatTokenCounter {
+	return &chatTokenCounterImpl{
 		completion: nil,
 		tokenizer:  tokenizer,
 	}
 }
 
 // Completion implements LLMTokenCounter.
-func (l *ChatTokenCounter) Completion(completion types.ChatCompletion) {
+func (l *chatTokenCounterImpl) Completion(completion types.ChatCompletion) {
 	l.completion = &completion
 }
 
 // AppendCompletionChunk implements LLMTokenCounter.
-func (l *ChatTokenCounter) AppendCompletionChunk(chunk types.ChatCompletionChunk) {
+func (l *chatTokenCounterImpl) AppendCompletionChunk(chunk types.ChatCompletionChunk) {
 	l.chunks = append(l.chunks, chunk)
 }
 
@@ -56,7 +65,7 @@ func (l *ChatTokenCounter) AppendCompletionChunk(chunk types.ChatCompletionChunk
 */
 
 // Usage implements LLMTokenCounter.
-func (l *ChatTokenCounter) Usage() (*Usage, error) {
+func (l *chatTokenCounterImpl) Usage(c context.Context) (*Usage, error) {
 	if l.completion != nil {
 		return &Usage{
 			PromptTokens:     l.completion.Usage.PromptTokens,
@@ -106,9 +115,62 @@ func (l *ChatTokenCounter) Usage() (*Usage, error) {
 	}
 	// prompt
 	for _, msg := range l.prompts {
+		var content string
+		contentType := msg.GetContent().AsAny()
+
+		switch v := contentType.(type) {
+		case *string:
+			// Handle string content
+			content = *v
+		case *[]openai.ChatCompletionContentPartTextParam:
+			// Handle text content parts array
+			var textContent string
+			for _, part := range *v {
+				textContent += part.Text
+			}
+			content = textContent
+		case *[]openai.ChatCompletionContentPartUnionParam:
+			// Handle mixed content parts array
+			var combinedContent string
+			for _, part := range *v {
+				switch {
+				case part.OfText != nil:
+					if part.GetText() != nil {
+						combinedContent += *part.GetText()
+					}
+				case part.OfImageURL != nil:
+					// For image content, we'll handle it in future
+					slog.WarnContext(c, "image content is not supported yet",
+						slog.Any("part", part))
+				case part.OfInputAudio != nil:
+					// For audio content, we'll handle it in future
+					slog.WarnContext(c, "audio content is not supported yet",
+						slog.Any("part", part))
+				case part.OfFile != nil:
+					// For file content, we'll handle it in future
+					slog.WarnContext(c, "file content is not supported yet",
+						slog.Any("part", part))
+
+				default:
+					// For other content types, we'll handle it in future
+					slog.WarnContext(c, "other content type is not supported yet",
+						slog.Any("part", part))
+				}
+			}
+			content = combinedContent
+		case *[]openai.ChatCompletionAssistantMessageParamContentArrayOfContentPartUnion:
+			// Handle assistant message content parts array
+			slog.WarnContext(c, "assistant message content parts array is not supported yet",
+				slog.Any("msg", msg))
+			content = ""
+		default:
+			// Fallback to empty string if content type is not supported
+			content = ""
+		}
+
 		tmpToken, err := l.tokenizer.Encode(types.Message{
-			Content: msg.Content,
-			Role:    msg.Role,
+			Content: content,
+			Role:    *msg.GetRole(),
 		})
 		if err != nil {
 			slog.Debug("call tokenizer API for prompt", slog.Any("error", err))

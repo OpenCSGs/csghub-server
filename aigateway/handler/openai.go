@@ -19,7 +19,6 @@ import (
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/builder/proxy"
 	"opencsg.com/csghub-server/builder/rpc"
-	"opencsg.com/csghub-server/builder/sensitive"
 	"opencsg.com/csghub-server/builder/store/cache"
 	"opencsg.com/csghub-server/common/config"
 	commonType "opencsg.com/csghub-server/common/types"
@@ -64,32 +63,32 @@ func NewOpenAIHandlerFromConfig(config *config.Config) (OpenAIHandler, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cluster component, error: %w", err)
 	}
-	return newOpenAIHandler(modelService, repoComp, modSvcClient, modComponent, clusterComp), nil
+	return newOpenAIHandler(modelService, repoComp, modComponent, clusterComp, token.NewCounterFactory()), nil
 }
 
 func newOpenAIHandler(
 	modelService component.OpenAIComponent,
 	repoComp apicomp.RepoComponent,
-	modSvcClient rpc.ModerationSvcClient,
 	modComponent component.Moderation,
 	clusterComp apicomp.ClusterComponent,
+	tokenCounterFactory token.CounterFactory,
 ) *OpenAIHandlerImpl {
 	return &OpenAIHandlerImpl{
-		openaiComponent: modelService,
-		repoComp:        repoComp,
-		modSvcClient:    modSvcClient,
-		modComponent:    modComponent,
-		clusterComp:     clusterComp,
+		openaiComponent:     modelService,
+		repoComp:            repoComp,
+		modComponent:        modComponent,
+		clusterComp:         clusterComp,
+		tokenCounterFactory: tokenCounterFactory,
 	}
 }
 
 // OpenAIHandlerImpl implements the OpenAIHandler interface
 type OpenAIHandlerImpl struct {
-	openaiComponent component.OpenAIComponent
-	repoComp        apicomp.RepoComponent
-	modSvcClient    rpc.ModerationSvcClient
-	modComponent    component.Moderation
-	clusterComp     apicomp.ClusterComponent
+	openaiComponent     component.OpenAIComponent
+	repoComp            apicomp.RepoComponent
+	modComponent        component.Moderation
+	clusterComp         apicomp.ClusterComponent
+	tokenCounterFactory token.CounterFactory
 }
 
 // ListModels godoc
@@ -296,10 +295,6 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 	rp, _ := proxy.NewReverseProxy(target)
 	slog.Info("proxy chat request to model target", slog.Any("target", target), slog.Any("host", host),
 		slog.Any("user", username), slog.Any("model_name", modelName))
-	w := NewResponseWriterWrapper(c.Writer, chatReq.Stream, h.modComponent)
-	defer w.ClearBuffer()
-	tokenizer := token.NewTokenizerImpl(target, host, modelName, model.ImageID)
-	llmTokenCounter := token.NewLLMTokenCounter(tokenizer)
 	// Create a combined key using userUUID and modelID for caching and tracking
 	key := fmt.Sprintf("%s:%s", userUUID, modelID)
 	result, err := h.modComponent.CheckChatPrompts(c.Request.Context(), chatReq.Messages, key)
@@ -318,14 +313,16 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 		c.Writer.Flush()
 		return
 	}
+	tokenCounter := h.tokenCounterFactory.NewChat(token.CreateParam{
+		Endpoint: target,
+		Host:     host,
+		Model:    modelName,
+		ImageID:  model.ImageID,
+	})
+	w := NewResponseWriterWrapper(c.Writer, chatReq.Stream, h.modComponent, tokenCounter)
+	defer w.ClearBuffer()
 
-	for _, msg := range chatReq.Messages {
-		llmTokenCounter.AppendPrompts(types.Message{
-			Role:    *msg.GetRole(),
-			Content: msg.GetContent().AsAny().(*string),
-		})
-	}
-	w.WithLLMTokenCounter(llmTokenCounter)
+	tokenCounter.AppendPrompts(chatReq.Messages)
 
 	proxyToApi := ""
 	if model.Endpoint != "" {
@@ -351,7 +348,7 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 	rp.ServeHTTP(w, c.Request, proxyToApi, host)
 
 	go func() {
-		err := h.openaiComponent.RecordUsage(c.Request.Context(), userUUID, model, llmTokenCounter)
+		err := h.openaiComponent.RecordUsage(c.Request.Context(), userUUID, model, tokenCounter)
 		if err != nil {
 			slog.Error("failed to record token usage", "error", err)
 		}
@@ -414,7 +411,7 @@ func (h *OpenAIHandlerImpl) Embedding(c *gin.Context) {
 		target = model.Endpoint
 	}
 	if err != nil || len(target) < 1 {
-		slog.Error("failed to get embedding target address", slog.Any("error", err),
+		slog.ErrorContext(c, "failed to get embedding target address", slog.Any("error", err),
 			slog.Any("model", model), slog.Any("targetReq", targetReq), slog.Any("model_id", modelID),
 			slog.Any("target", target), slog.Any("host", host))
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -427,7 +424,7 @@ func (h *OpenAIHandlerImpl) Embedding(c *gin.Context) {
 	}
 	modelName, _, err := (component.ModelIDBuilder{}).From(modelID)
 	if err != nil {
-		slog.Error("failed to process chat request", "error", err, "model_id", modelID)
+		slog.ErrorContext(c, "failed to process chat request", "error", err, "model_id", modelID)
 		c.String(http.StatusBadRequest, err.Error())
 		return
 	}
@@ -435,35 +432,24 @@ func (h *OpenAIHandlerImpl) Embedding(c *gin.Context) {
 	data, _ := json.Marshal(req)
 	c.Request.Body = io.NopCloser(bytes.NewReader(data))
 	c.Request.ContentLength = int64(len(data))
-	slog.Info("proxy embedding request to model endpoint", slog.Any("target", target), slog.Any("host", host),
+	slog.InfoContext(c, "proxy embedding request to model endpoint", slog.Any("target", target), slog.Any("host", host),
 		slog.Any("user", username), slog.Any("model_id", modelID))
 	rp, _ := proxy.NewReverseProxy(target)
 	w := NewResponseWriterWrapperEmbedding(c.Writer)
-	//TODO: use real tokenizer to count token usag
-	if h.modSvcClient != nil {
-		w.WithModeration(h.modSvcClient)
-		result, err := h.modSvcClient.PassTextCheck(c, string(sensitive.ScenarioChatDetection), req.Input)
-		if err != nil {
-			c.String(http.StatusInternalServerError, fmt.Errorf("failed to call moderation error:%w", err).Error())
-			return
-		}
-		if result.IsSensitive {
-			slog.Debug("sensitive content", slog.String("reason", result.Reason))
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Input data may contain inappropriate content."})
-			return
-		}
-	}
 
-	tokenizer := token.NewTokenizerImpl(target, host, modelName, model.ImageID)
-	tokenCounter := token.NewEmbeddingTokenCounter(tokenizer)
+	tokenCounter := h.tokenCounterFactory.NewEmbedding(token.CreateParam{
+		Endpoint: target,
+		Host:     host,
+		Model:    modelName,
+		ImageID:  model.ImageID,
+	})
 	tokenCounter.Input(req.Input)
-	w.WithTokenCounter(tokenCounter)
 
 	rp.ServeHTTP(w, c.Request, "", host)
 	go func() {
 		err := h.openaiComponent.RecordUsage(c.Request.Context(), userUUID, model, tokenCounter)
 		if err != nil {
-			slog.Error("failed to record embedding token usage", "error", err)
+			slog.ErrorContext(c, "failed to record embedding token usage", "error", err)
 		}
 	}()
 }

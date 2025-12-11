@@ -3,6 +3,8 @@
 package token
 
 import (
+	context "context"
+
 	mock "github.com/stretchr/testify/mock"
 	token "opencsg.com/csghub-server/aigateway/token"
 )
@@ -20,9 +22,9 @@ func (_m *MockCounter) EXPECT() *MockCounter_Expecter {
 	return &MockCounter_Expecter{mock: &_m.Mock}
 }
 
-// Usage provides a mock function with no fields
-func (_m *MockCounter) Usage() (*token.Usage, error) {
-	ret := _m.Called()
+// Usage provides a mock function with given fields: _a0
+func (_m *MockCounter) Usage(_a0 context.Context) (*token.Usage, error) {
+	ret := _m.Called(_a0)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Usage")
@@ -30,19 +32,19 @@ func (_m *MockCounter) Usage() (*token.Usage, error) {
 
 	var r0 *token.Usage
 	var r1 error
-	if rf, ok := ret.Get(0).(func() (*token.Usage, error)); ok {
-		return rf()
+	if rf, ok := ret.Get(0).(func(context.Context) (*token.Usage, error)); ok {
+		return rf(_a0)
 	}
-	if rf, ok := ret.Get(0).(func() *token.Usage); ok {
-		r0 = rf()
+	if rf, ok := ret.Get(0).(func(context.Context) *token.Usage); ok {
+		r0 = rf(_a0)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*token.Usage)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(_a0)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -56,13 +58,14 @@ type MockCounter_Usage_Call struct {
 }
 
 // Usage is a helper method to define mock.On call
-func (_e *MockCounter_Expecter) Usage() *MockCounter_Usage_Call {
-	return &MockCounter_Usage_Call{Call: _e.mock.On("Usage")}
+//   - _a0 context.Context
+func (_e *MockCounter_Expecter) Usage(_a0 interface{}) *MockCounter_Usage_Call {
+	return &MockCounter_Usage_Call{Call: _e.mock.On("Usage", _a0)}
 }
 
-func (_c *MockCounter_Usage_Call) Run(run func()) *MockCounter_Usage_Call {
+func (_c *MockCounter_Usage_Call) Run(run func(_a0 context.Context)) *MockCounter_Usage_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run()
+		run(args[0].(context.Context))
 	})
 	return _c
 }
@@ -72,7 +75,7 @@ func (_c *MockCounter_Usage_Call) Return(_a0 *token.Usage, _a1 error) *MockCount
 	return _c
 }
 
-func (_c *MockCounter_Usage_Call) RunAndReturn(run func() (*token.Usage, error)) *MockCounter_Usage_Call {
+func (_c *MockCounter_Usage_Call) RunAndReturn(run func(context.Context) (*token.Usage, error)) *MockCounter_Usage_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -276,7 +276,7 @@ func getSceneFromSvcType(svcType int) int {
 }
 
 func (m *openaiComponentImpl) RecordUsage(c context.Context, userUUID string, model *types.Model, counter token.Counter) error {
-	usage, err := counter.Usage()
+	usage, err := counter.Usage(c)
 	if err != nil {
 		return fmt.Errorf("failed to get token usage from counter,error:%w", err)
 	}
