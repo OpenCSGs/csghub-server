@@ -8,7 +8,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/openai/openai-go/v3"
 	"github.com/stretchr/testify/assert"
-	rpcmock "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rpc"
+	"github.com/stretchr/testify/mock"
+	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/aigateway/component"
+	"opencsg.com/csghub-server/builder/rpc"
 )
 
 func TestResponseWriterWrapper_StreamWrite(t *testing.T) {
@@ -46,7 +48,11 @@ func TestResponseWriterWrapper_StreamWrite(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			w := httptest.NewRecorder()
 			ctx, _ := gin.CreateTestContext(w)
-			wrapper := NewResponseWriterWrapper(ctx.Writer, true)
+			mockMod := component.NewMockModeration(t)
+			wrapper := NewResponseWriterWrapper(ctx.Writer, true, mockMod)
+			// only check response decode, not check moderation
+			mockMod.EXPECT().CheckChatStreamResponse(mock.Anything, mock.Anything, mock.Anything).
+				Return(&rpc.CheckResult{IsSensitive: false}, nil)
 			n, err := wrapper.Write(tt.inputs)
 			assert.NoError(t, err)
 			assert.Equal(t, len(tt.inputs), n)
@@ -78,29 +84,15 @@ func TestResponseWriterWrapper_StreamWrite_WithWhiteSpace(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			w := httptest.NewRecorder()
 			ctx, _ := gin.CreateTestContext(w)
-			wrapper := NewResponseWriterWrapper(ctx.Writer, true)
-			modSvcClient := rpcmock.NewMockModerationSvcClient(t)
-			wrapper.WithModeration(modSvcClient)
+			mockMod := component.NewMockModeration(t)
+			wrapper := NewResponseWriterWrapper(ctx.Writer, true, mockMod)
+			// only check response decode, not check moderation
+			mockMod.EXPECT().CheckChatStreamResponse(mock.Anything, mock.Anything, mock.Anything).
+				Return(&rpc.CheckResult{IsSensitive: false}, nil)
 			n, err := wrapper.Write(tt.inputs)
 			assert.NoError(t, err)
 			assert.Equal(t, len(tt.inputs), n)
 			assert.Equal(t, w.Body.String(), string(tt.wantResp))
-			// not work: modSvcClient.EXPECT().PassTextCheck(mock.Anything, mock.Anything, mock.Anything).Times(0)
-			modSvcClient.AssertNotCalled(t, "PassTextCheck")
 		})
 	}
-}
-
-func TestResponseWriterWrapper_ToolCalls_SkipModeration(t *testing.T) {
-	raw := []byte(`data: {"id":"test-id","object":"chat.completion.chunk","created":1700000000,"model":"gpt-4o","choices":[{"index":0,"delta":{"tool_calls":[{"name":"tool_name","arguments":{"arg1":"value1"}}]},"finish_reason":null}]}` + "\n\n")
-	w := httptest.NewRecorder()
-	ctx, _ := gin.CreateTestContext(w)
-	wrapper := NewResponseWriterWrapper(ctx.Writer, true)
-	modSvcClient := rpcmock.NewMockModerationSvcClient(t)
-	wrapper.WithModeration(modSvcClient)
-	n, err := wrapper.Write(raw)
-	assert.NoError(t, err)
-	assert.Equal(t, len(raw), n)
-	assert.Equal(t, w.Body.String(), string(raw))
-	modSvcClient.AssertNotCalled(t, "PassTextCheck")
 }

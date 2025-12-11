@@ -330,9 +330,14 @@ func (d *deployer) Logs(ctx context.Context, dr types.DeployRepo) (*MultiLogRead
 		labels[types.StreamKeyInstanceName] = dr.InstanceName
 	}
 
+	var startTime = deploy.CreatedAt
+	if dr.Since != "" {
+		startTime = parseSinceTime(dr.Since)
+	}
+
 	runLog, err := d.readLogsFromLoki(ctx, types.ReadLogRequest{
 		DeployID:  deployId,
-		StartTime: runTask.CreatedAt,
+		StartTime: startTime,
 		Labels:    labels,
 	})
 	if err != nil {
@@ -574,11 +579,12 @@ func (d *deployer) ListCluster(ctx context.Context) ([]types.ClusterRes, error) 
 			resources = append(resources, node)
 		}
 		result = append(result, types.ClusterRes{
-			ClusterID: c.ClusterID,
-			Region:    c.Region,
-			Zone:      c.Zone,
-			Provider:  c.Provider,
-			Resources: resources,
+			ClusterID:      c.ClusterID,
+			Region:         c.Region,
+			Zone:           c.Zone,
+			Provider:       c.Provider,
+			Resources:      resources,
+			LastUpdateTime: c.UpdatedAt.Unix(),
 		})
 	}
 	return result, err

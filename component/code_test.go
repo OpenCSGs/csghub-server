@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	"github.com/stretchr/testify/require"
+	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/types"
@@ -62,8 +63,9 @@ func TestCodeComponent_Create(t *testing.T) {
 			return nil
 		}).Once()
 	cc.mocks.components.repo.EXPECT().CreateRepo(ctx, crq).Return(
-		nil, dbrepo, nil,
+		nil, dbrepo, &gitserver.CommitFilesReq{}, nil,
 	)
+	cc.mocks.gitServer.EXPECT().CommitFiles(ctx, gitserver.CommitFilesReq{}).Return(nil)
 	cc.mocks.stores.CodeMock().EXPECT().CreateAndUpdateRepoPath(ctx, database.Code{
 		Repository:   dbrepo,
 		RepositoryID: 1,

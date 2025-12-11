@@ -4,7 +4,10 @@ import (
 	"time"
 )
 
-var REPOCARD_FILENAME = "README.md"
+var (
+	REPOCARD_FILENAME = "README.md"
+	HUGGINGFACE_HOST  = "huggingface.co"
+)
 
 type (
 	RepositoryType       string

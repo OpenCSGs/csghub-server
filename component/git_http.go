@@ -20,8 +20,8 @@ import (
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/sha256-simd"
-	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
+	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/store/s3"
 	"opencsg.com/csghub-server/common/config"
@@ -41,6 +41,7 @@ type gitHTTPComponentImpl struct {
 	userStore          database.UserStore
 	repoComponent      RepoComponent
 	mirrorStore        database.MirrorStore
+	xnetClient         rpc.XnetSvcClient
 }
 
 type GitHTTPComponent interface {
@@ -64,35 +65,7 @@ const (
 )
 
 func NewGitHTTPComponent(config *config.Config) (GitHTTPComponent, error) {
-	c := &gitHTTPComponentImpl{}
-	c.config = config
-	var err error
-	c.gitServer, err = git.NewGitServer(config)
-	if err != nil {
-		newError := fmt.Errorf("fail to create git server,error:%w", err)
-		slog.Error(newError.Error())
-		return nil, newError
-	}
-	c.s3Client, err = s3.NewMinio(config)
-	if err != nil {
-		newError := fmt.Errorf("fail to init s3 client for code,error:%w", err)
-		slog.Error(newError.Error())
-		return nil, newError
-	}
-	c.s3Core, err = s3.NewMinioCore(config)
-	if err != nil {
-		return nil, err
-	}
-	c.lfsMetaObjectStore = database.NewLfsMetaObjectStore()
-	c.repoStore = database.NewRepoStore()
-	c.lfsLockStore = database.NewLfsLockStore()
-	c.userStore = database.NewUserStore()
-	c.mirrorStore = database.NewMirrorStore()
-	c.repoComponent, err = NewRepoComponentImpl(config)
-	if err != nil {
-		return nil, err
-	}
-	return c, nil
+	return NewGitHTTPComponentImpl(config)
 }
 
 func (c *gitHTTPComponentImpl) InfoRefs(ctx context.Context, req types.InfoRefsReq) (io.Reader, error) {
@@ -119,6 +92,9 @@ func (c *gitHTTPComponentImpl) InfoRefs(ctx context.Context, req types.InfoRefsR
 		}
 		if !allowed {
 			return nil, errorx.ErrForbidden
+		}
+		if repo.XnetEnabled {
+			return nil, errorx.ErrUsingGitInXnetRepository
 		}
 	} else {
 		if repo.Private {

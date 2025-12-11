@@ -44,6 +44,7 @@ func NewRepoHandler(config *config.Config) (*RepoHandler, error) {
 		m:                         m,
 		d:                         d,
 		deployStatusCheckInterval: 5 * time.Second,
+		config:                    config,
 	}, nil
 }
 
@@ -52,6 +53,7 @@ type RepoHandler struct {
 	m                         component.ModelComponent
 	d                         component.DatasetComponent
 	deployStatusCheckInterval time.Duration
+	config                    *config.Config
 }
 
 // CreateRepo godoc
@@ -1006,6 +1008,18 @@ func (h *RepoHandler) SDKListFiles(ctx *gin.Context) {
 	if mappedBranch != "" {
 		ref = mappedBranch
 	}
+	expand := ctx.Query("expand")
+	if expand == "xetEnabled" {
+		resp, err := h.c.IsXnetEnabled(ctx.Request.Context(), types.ModelRepo, namespace, name, currentUser)
+		if err != nil {
+			slog.Error("failed to check if xnetEnabled", slog.Any("error", err))
+			httpbase.ServerError(ctx, err)
+			return
+		}
+		ctx.JSON(http.StatusOK, resp)
+		return
+	}
+
 	files, err := h.c.SDKListFiles(ctx.Request.Context(), common.RepoTypeFromContext(ctx), namespace, name, ref, currentUser)
 	if err != nil {
 		if errors.Is(err, errorx.ErrUnauthorized) {
@@ -1099,10 +1113,18 @@ func (h *RepoHandler) HeadSDKDownload(ctx *gin.Context) {
 	}
 
 	slog.Debug("Head download repo file succeed", slog.String("repo_type", string(req.RepoType)), slog.String("name", name), slog.String("path", req.Path), slog.String("ref", req.Ref), slog.Int64("contentLength", file.Size))
+	if file.Lfs {
+		ctx.Header("X-Xet-Hash", file.LfsSHA256)
+		ctx.Header("X-Xet-Refresh-Route", h.xetRefreshRoute(namespace, name, branch))
+	}
 	ctx.Header("Content-Length", strconv.Itoa(int(file.Size)))
 	ctx.Header("X-Repo-Commit", repoCommit)
 	ctx.Header("ETag", file.SHA)
 	ctx.Status(http.StatusOK)
+}
+
+func (h *RepoHandler) xetRefreshRoute(namespace, name, ref string) string {
+	return fmt.Sprintf("%s/hf/%s/%s/xet-write-token/%s", h.config.APIServer.PublicDomain, namespace, name, ref)
 }
 
 func (h *RepoHandler) handleDownload(ctx *gin.Context, isResolve bool) {
@@ -1787,6 +1809,7 @@ func (h *RepoHandler) DeployDetail(ctx *gin.Context) {
 // @Param        id path string true "id"
 // @Param        instance path string true "instance"
 // @Param        current_user query string true "current_user"
+// @Param        since query string false "since time. Optional values: 10mins, 30mins, 1hour, 6hours, 1day, 2days, 1week"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      401  {object}  types.APIUnauthorized "Permission denied"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
@@ -2313,7 +2336,8 @@ func (h *RepoHandler) ServerlessDetail(ctx *gin.Context) {
 // @Param        id path string true "id"
 // @Param        instance path string true "instance"
 // @Param        current_user query string true "current_user"
-// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Param        since query string false "since time. Optional values: 10mins, 30mins, 1hour, 6hours, 1day, 2days, 1week"
+// @Failure      400  {object}  types.APIBadRequest "Bad request. May occur when the since time format is unsupported"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /models/{namespace}/{name}/serverless/{id}/logs/{instance} [get]
 func (h *RepoHandler) ServerlessLogs(ctx *gin.Context) {
@@ -2684,7 +2708,7 @@ func (h *RepoHandler) DiffBetweenTwoCommits(ctx *gin.Context) {
 // @Param        namespace path string true "namespace"
 // @Param        name path string true "name"
 // @Param        current_user query string false "current user"
-// @Success      200  {object}  types.Response{data=types.File} "OK"
+// @Success      200  {object}  types.Response{data=[]types.File} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /{repo_type}/{namespace}/{name}/all_files [get]
@@ -2700,6 +2724,8 @@ func (h *RepoHandler) AllFiles(ctx *gin.Context) {
 	req.Name = name
 	req.RepoType = common.RepoTypeFromContext(ctx)
 	req.CurrentUser = httpbase.GetCurrentUser(ctx)
+	req.Limit = 100
+	req.Cursor = ctx.Query("cursor")
 	detail, err := h.c.AllFiles(ctx.Request.Context(), req)
 	if err != nil {
 		if errors.Is(err, errorx.ErrForbidden) {
@@ -2712,7 +2738,7 @@ func (h *RepoHandler) AllFiles(ctx *gin.Context) {
 		return
 	}
 
-	httpbase.OK(ctx, detail)
+	httpbase.OK(ctx, detail.Files)
 }
 
 // GetRepoRemoteCommitDiff godoc
@@ -2834,6 +2860,7 @@ func (h *RepoHandler) PreuploadHF(ctx *gin.Context) {
 
 	resp, err := h.c.Preupload(ctx.Request.Context(), req)
 	if err != nil {
+		slog.Error("failed to preupload", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}

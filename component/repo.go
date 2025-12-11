@@ -97,10 +97,11 @@ type repoComponentImpl struct {
 	mirrorTaskStore        database.MirrorTaskStore
 	notificationSvcClient  rpc.NotificationSvcClient
 	mirrorSvcClient        rpc.MirrorSvcClient
+	xnetClient             rpc.XnetSvcClient
 }
 
 type RepoComponent interface {
-	CreateRepo(ctx context.Context, req types.CreateRepoReq) (*gitserver.CreateRepoResp, *database.Repository, error)
+	CreateRepo(ctx context.Context, req types.CreateRepoReq) (*gitserver.CreateRepoResp, *database.Repository, *gitserver.CommitFilesReq, error)
 	UpdateRepo(ctx context.Context, req types.UpdateRepoReq) (*database.Repository, error)
 	DeleteRepo(ctx context.Context, req types.DeleteRepoReq) (*database.Repository, error)
 	// PublicToUser gets visible repos of the given user and user's orgs
@@ -166,7 +167,7 @@ type RepoComponent interface {
 	MirrorProgress(ctx context.Context, repoType types.RepositoryType, namespace, name, currentUser string) (types.LFSSyncProgressResp, error)
 	DeployUpdate(ctx context.Context, updateReq types.DeployActReq, req *types.DeployUpdateReq) error
 	DeployStart(ctx context.Context, startReq types.DeployActReq) error
-	AllFiles(ctx context.Context, req types.GetAllFilesReq) ([]*types.File, error)
+	AllFiles(ctx context.Context, req types.GetAllFilesReq) (*types.GetRepoFileTreeResp, error)
 	GetUserRepoPermission(ctx context.Context, userName string, repo *database.Repository) (*types.UserRepoPermission, error)
 	CheckCurrentUserPermission(ctx context.Context, userName string, namespace string, role membership.Role) (bool, error)
 	GetNameSpaceInfo(ctx context.Context, path string) (*types.Namespace, error)
@@ -189,6 +190,7 @@ type RepoComponent interface {
 	BatchMigrateRepoToHashedPath(ctx context.Context, auto bool, batchSize int, lastID int64) (int64, error)
 	GetMirrorTaskStatusAndSyncStatus(repo *database.Repository) (types.MirrorTaskStatus, types.RepositorySyncStatus)
 	CheckDeployPermissionForUser(ctx context.Context, deployReq types.DeployActReq) (*database.User, *database.Deploy, error)
+	IsXnetEnabled(ctx context.Context, repoType types.RepositoryType, namespace, name, username string) (*types.XetEnabled, error)
 }
 
 func NewRepoComponentImpl(config *config.Config) (*repoComponentImpl, error) {
@@ -199,39 +201,40 @@ func NewRepoComponentImpl(config *config.Config) (*repoComponentImpl, error) {
 	return r.(*repoComponentImpl), nil
 }
 
-func (c *repoComponentImpl) CreateRepo(ctx context.Context, req types.CreateRepoReq) (*gitserver.CreateRepoResp, *database.Repository, error) {
+func (c *repoComponentImpl) CreateRepo(ctx context.Context, req types.CreateRepoReq) (*gitserver.CreateRepoResp, *database.Repository, *gitserver.CommitFilesReq, error) {
+	var commitFilesReq *gitserver.CommitFilesReq
 	// Name validation
 	valid, err := common.IsValidName(req.Name)
 	if !valid {
-		return nil, nil, fmt.Errorf("repo name is invalid, error: %w", err)
+		return nil, nil, commitFilesReq, fmt.Errorf("repo name is invalid, error: %w", err)
 	}
 
 	namespace, err := c.namespaceStore.FindByPath(ctx, req.Namespace)
 	if err != nil {
-		return nil, nil, errors.New("namespace does not exist")
+		return nil, nil, commitFilesReq, errors.New("namespace does not exist")
 	}
 
 	user, err := c.userStore.FindByUsername(ctx, req.Username)
 	if err != nil {
-		return nil, nil, errors.New("user does not exist")
+		return nil, nil, commitFilesReq, errors.New("user does not exist")
 	}
 
 	if user.Email == "" {
-		return nil, nil, fmt.Errorf("please set your email first")
+		return nil, nil, commitFilesReq, fmt.Errorf("please set your email first")
 	}
 
 	if !user.CanAdmin() {
 		if namespace.NamespaceType == database.OrgNamespace {
 			canWrite, err := c.CheckCurrentUserPermission(ctx, req.Username, req.Namespace, membership.RoleWrite)
 			if err != nil {
-				return nil, nil, err
+				return nil, nil, commitFilesReq, err
 			}
 			if !canWrite {
-				return nil, nil, errorx.ErrForbiddenMsg("users do not have permission to create repo in this organization")
+				return nil, nil, commitFilesReq, errorx.ErrForbiddenMsg("users do not have permission to create repo in this organization")
 			}
 		} else {
 			if namespace.Path != user.Username {
-				return nil, nil, errorx.ErrForbiddenMsg("users do not have permission to create repo in this namespace")
+				return nil, nil, commitFilesReq, errorx.ErrForbiddenMsg("users do not have permission to create repo in this namespace")
 			}
 		}
 	}
@@ -258,7 +261,7 @@ func (c *repoComponentImpl) CreateRepo(ctx context.Context, req types.CreateRepo
 	}
 	newDBRepo, err := c.repoStore.CreateRepo(ctx, dbRepo)
 	if err != nil {
-		return nil, nil, fmt.Errorf("fail to create database repo, error: %w", err)
+		return nil, nil, commitFilesReq, fmt.Errorf("fail to create database repo, error: %w", err)
 	}
 
 	err = c.recomStore.UpsertScore(ctx, []*database.RecomRepoScore{
@@ -269,7 +272,7 @@ func (c *repoComponentImpl) CreateRepo(ctx context.Context, req types.CreateRepo
 		},
 	})
 	if err != nil {
-		return nil, nil, fmt.Errorf("fail to upsert recom repo score, error: %w", err)
+		return nil, nil, commitFilesReq, fmt.Errorf("fail to upsert recom repo score, error: %w", err)
 	}
 
 	gitRepoReq := gitserver.CreateRepoReq{
@@ -287,7 +290,7 @@ func (c *repoComponentImpl) CreateRepo(ctx context.Context, req types.CreateRepo
 	gitRepo, err := c.git.CreateRepo(ctx, gitRepoReq)
 	if err != nil {
 		slog.Error("fail to create repo in git ", slog.Any("req", req), slog.String("error", err.Error()))
-		return nil, nil, fmt.Errorf("fail to create repo in git, error: %w", err)
+		return nil, nil, commitFilesReq, fmt.Errorf("fail to create repo in git, error: %w", err)
 	}
 
 	if len(req.CommitFiles) > 0 {
@@ -299,22 +302,19 @@ func (c *repoComponentImpl) CreateRepo(ctx context.Context, req types.CreateRepo
 				Action:  gitserver.CommitActionCreate,
 			})
 		}
-		err = c.git.CommitFiles(ctx, gitserver.CommitFilesReq{
-			Namespace: temPath[0],
-			Name:      temPath[1],
+		commitFilesReq = &gitserver.CommitFilesReq{
+			Namespace: req.Namespace,
+			Name:      req.Name,
 			RepoType:  req.RepoType,
 			Revision:  req.DefaultBranch,
 			Username:  user.Username,
 			Email:     user.Email,
 			Message:   types.InitCommitMessage,
 			Files:     gitCommitFiles,
-		})
-		if err != nil {
-			return gitRepo, newDBRepo, fmt.Errorf("fail to commit files, error: %w", err)
 		}
 	}
 
-	return gitRepo, newDBRepo, nil
+	return gitRepo, newDBRepo, commitFilesReq, nil
 }
 
 func (c *repoComponentImpl) UpdateRepo(ctx context.Context, req types.UpdateRepoReq) (*database.Repository, error) {
@@ -3199,7 +3199,7 @@ func (c *repoComponentImpl) DeployStart(ctx context.Context, startReq types.Depl
 	return err
 }
 
-func (c *repoComponentImpl) AllFiles(ctx context.Context, req types.GetAllFilesReq) ([]*types.File, error) {
+func (c *repoComponentImpl) AllFiles(ctx context.Context, req types.GetAllFilesReq) (*types.GetRepoFileTreeResp, error) {
 	repo, err := c.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find repo, error: %w", err)
@@ -3217,12 +3217,20 @@ func (c *repoComponentImpl) AllFiles(ctx context.Context, req types.GetAllFilesR
 			return nil, errorx.ErrForbiddenMsg("users do not have permission to get all files for this repo")
 		}
 	}
-	allFiles, err := getAllFiles(ctx, req.Namespace, req.Name, "", req.RepoType, req.Ref, c.git.GetTree)
+	resp, err := c.git.GetTree(ctx, types.GetTreeRequest{
+		Ref:       req.Ref,
+		RepoType:  req.RepoType,
+		Namespace: req.Namespace,
+		Name:      req.Name,
+		Limit:     req.Limit,
+		Cursor:    req.Cursor,
+		Path:      req.Path,
+	})
 	if err != nil {
 		slog.Error("fail to get all files of repository", slog.Any("repoType", req.RepoType), slog.String("namespace", req.Namespace), slog.String("name", req.Name), slog.String("error", err.Error()))
 		return nil, err
 	}
-	return allFiles, nil
+	return resp, nil
 }
 
 func (c *repoComponentImpl) IsAdminRole(user database.User) bool {

@@ -13,6 +13,8 @@ type ClusterResponse struct {
 	ClusterName    string         `json:"cluster_name"`
 	StorageClass   string         `json:"storage_class"`
 	ResourceStatus ResourceStatus `json:"resource_status"`
+
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 type ClusterRequest struct {
@@ -61,6 +63,8 @@ type ClusterRes struct {
 	Endpoint     string             `json:"endpoint"`
 
 	ResourceStatus ResourceStatus `json:"resource_status"`
+
+	LastUpdateTime int64 `json:"last_update_time"`
 }
 
 type DeployRes struct {

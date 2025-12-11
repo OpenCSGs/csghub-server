@@ -19,6 +19,7 @@ type File struct {
 	LastCommitSHA   string `json:"last_commit_sha"`
 	// whether file is previewable
 	PreviewCode FilePreviewCode `json:"preview_code,omitempty"`
+	XnetEnabled bool            `json:"xnet_enabled"`
 }
 
 type CreateFileReq struct {
@@ -206,6 +207,9 @@ type GetAllFilesReq struct {
 	RepoType    RepositoryType `json:"repo_type"`
 	CurrentUser string         `json:"current_user"`
 	Ref         string         `json:"ref"`
+	Limit       int            `json:"limit"`
+	Cursor      string         `json:"cursor"`
+	Path        string         `json:"path"`
 }
 
 type LFSPointer struct {

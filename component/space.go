@@ -54,7 +54,7 @@ type SpaceComponent interface {
 	// FixHasEntryFile checks whether git repo has entry point file and update space's HasAppFile property in db
 	FixHasEntryFile(ctx context.Context, s *database.Space) *database.Space
 	Status(ctx context.Context, namespace, name string) (string, string, error)
-	Logs(ctx context.Context, namespace, name string) (*deploy.MultiLogReader, error)
+	Logs(ctx context.Context, namespace, name, since string) (*deploy.MultiLogReader, error)
 	// HasEntryFile checks whether space repo has entry point file to run with
 	HasEntryFile(ctx context.Context, space *database.Space) bool
 	GetByID(ctx context.Context, spaceID int64) (*database.Space, error)
@@ -94,7 +94,7 @@ func (c *spaceComponentImpl) Create(ctx context.Context, req types.CreateSpaceRe
 		}
 	}
 
-	_, dbRepo, err := c.repoComponent.CreateRepo(ctx, req.CreateRepoReq)
+	_, dbRepo, commitFilesReq, err := c.repoComponent.CreateRepo(ctx, req.CreateRepoReq)
 	if err != nil {
 		return nil, err
 	}
@@ -122,6 +122,7 @@ func (c *spaceComponentImpl) Create(ctx context.Context, req types.CreateSpaceRe
 		slog.Error("failed to create new space in db", slog.Any("req", req), slog.String("error", err.Error()))
 		return nil, fmt.Errorf("failed to create new space in db, error: %w", err)
 	}
+	_ = c.git.CommitFiles(ctx, *commitFilesReq)
 	dbRepo.Path = repoPath
 
 	err = c.createSpaceDefaultFiles(ctx, dbRepo, req, templatePath)
@@ -1038,7 +1039,7 @@ func (c *spaceComponentImpl) Status(ctx context.Context, namespace, name string)
 	return spaceStatus.SvcName, spaceStatus.Status, err
 }
 
-func (c *spaceComponentImpl) Logs(ctx context.Context, namespace, name string) (*deploy.MultiLogReader, error) {
+func (c *spaceComponentImpl) Logs(ctx context.Context, namespace, name, since string) (*deploy.MultiLogReader, error) {
 	s, err := c.spaceStore.FindByPath(ctx, namespace, name)
 	if err != nil {
 		return nil, fmt.Errorf("can't find space for logs, error: %w", err)
@@ -1047,6 +1048,7 @@ func (c *spaceComponentImpl) Logs(ctx context.Context, namespace, name string) (
 		SpaceID:   s.ID,
 		Namespace: namespace,
 		Name:      name,
+		Since:     since,
 	})
 }
 

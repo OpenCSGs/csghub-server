@@ -127,3 +127,7 @@ func (c *repoComponentImpl) RemoteDiff(ctx context.Context, req types.GetDiffBet
 		LeftCommitID: req.LeftCommitID,
 	})
 }
+
+func (c *repoComponentImpl) IsXnetEnabled(ctx context.Context, repoType types.RepositoryType, namespace, name, username string) (*types.XetEnabled, error) {
+	return nil, nil
+}

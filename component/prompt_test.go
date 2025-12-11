@@ -528,7 +528,9 @@ func TestPromptComponent_CreatePromptRepo(t *testing.T) {
 		},
 		Path: "ns/n",
 	}
-	pc.mocks.components.repo.EXPECT().CreateRepo(ctx, req).Return(&gitserver.CreateRepoResp{}, dbRepo, nil)
+	pc.mocks.components.repo.EXPECT().CreateRepo(ctx, req).Return(&gitserver.CreateRepoResp{}, dbRepo, &gitserver.CommitFilesReq{}, nil)
+
+	pc.mocks.gitServer.EXPECT().CommitFiles(ctx, gitserver.CommitFilesReq{}).Return(nil)
 
 	dbPrompt := database.Prompt{
 		Repository:   dbRepo,

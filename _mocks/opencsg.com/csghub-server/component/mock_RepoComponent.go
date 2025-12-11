@@ -35,23 +35,23 @@ func (_m *MockRepoComponent) EXPECT() *MockRepoComponent_Expecter {
 }
 
 // AllFiles provides a mock function with given fields: ctx, req
-func (_m *MockRepoComponent) AllFiles(ctx context.Context, req types.GetAllFilesReq) ([]*types.File, error) {
+func (_m *MockRepoComponent) AllFiles(ctx context.Context, req types.GetAllFilesReq) (*types.GetRepoFileTreeResp, error) {
 	ret := _m.Called(ctx, req)
 
 	if len(ret) == 0 {
 		panic("no return value specified for AllFiles")
 	}
 
-	var r0 []*types.File
+	var r0 *types.GetRepoFileTreeResp
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, types.GetAllFilesReq) ([]*types.File, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, types.GetAllFilesReq) (*types.GetRepoFileTreeResp, error)); ok {
 		return rf(ctx, req)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, types.GetAllFilesReq) []*types.File); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, types.GetAllFilesReq) *types.GetRepoFileTreeResp); ok {
 		r0 = rf(ctx, req)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]*types.File)
+			r0 = ret.Get(0).(*types.GetRepoFileTreeResp)
 		}
 	}
 
@@ -83,12 +83,12 @@ func (_c *MockRepoComponent_AllFiles_Call) Run(run func(ctx context.Context, req
 	return _c
 }
 
-func (_c *MockRepoComponent_AllFiles_Call) Return(_a0 []*types.File, _a1 error) *MockRepoComponent_AllFiles_Call {
+func (_c *MockRepoComponent_AllFiles_Call) Return(_a0 *types.GetRepoFileTreeResp, _a1 error) *MockRepoComponent_AllFiles_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockRepoComponent_AllFiles_Call) RunAndReturn(run func(context.Context, types.GetAllFilesReq) ([]*types.File, error)) *MockRepoComponent_AllFiles_Call {
+func (_c *MockRepoComponent_AllFiles_Call) RunAndReturn(run func(context.Context, types.GetAllFilesReq) (*types.GetRepoFileTreeResp, error)) *MockRepoComponent_AllFiles_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1141,7 +1141,7 @@ func (_c *MockRepoComponent_CreateMirror_Call) RunAndReturn(run func(context.Con
 }
 
 // CreateRepo provides a mock function with given fields: ctx, req
-func (_m *MockRepoComponent) CreateRepo(ctx context.Context, req types.CreateRepoReq) (*gitserver.CreateRepoResp, *database.Repository, error) {
+func (_m *MockRepoComponent) CreateRepo(ctx context.Context, req types.CreateRepoReq) (*gitserver.CreateRepoResp, *database.Repository, *gitserver.CommitFilesReq, error) {
 	ret := _m.Called(ctx, req)
 
 	if len(ret) == 0 {
@@ -1150,8 +1150,9 @@ func (_m *MockRepoComponent) CreateRepo(ctx context.Context, req types.CreateRep
 
 	var r0 *gitserver.CreateRepoResp
 	var r1 *database.Repository
-	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, types.CreateRepoReq) (*gitserver.CreateRepoResp, *database.Repository, error)); ok {
+	var r2 *gitserver.CommitFilesReq
+	var r3 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.CreateRepoReq) (*gitserver.CreateRepoResp, *database.Repository, *gitserver.CommitFilesReq, error)); ok {
 		return rf(ctx, req)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, types.CreateRepoReq) *gitserver.CreateRepoResp); ok {
@@ -1170,13 +1171,21 @@ func (_m *MockRepoComponent) CreateRepo(ctx context.Context, req types.CreateRep
 		}
 	}
 
-	if rf, ok := ret.Get(2).(func(context.Context, types.CreateRepoReq) error); ok {
+	if rf, ok := ret.Get(2).(func(context.Context, types.CreateRepoReq) *gitserver.CommitFilesReq); ok {
 		r2 = rf(ctx, req)
 	} else {
-		r2 = ret.Error(2)
+		if ret.Get(2) != nil {
+			r2 = ret.Get(2).(*gitserver.CommitFilesReq)
+		}
 	}
 
-	return r0, r1, r2
+	if rf, ok := ret.Get(3).(func(context.Context, types.CreateRepoReq) error); ok {
+		r3 = rf(ctx, req)
+	} else {
+		r3 = ret.Error(3)
+	}
+
+	return r0, r1, r2, r3
 }
 
 // MockRepoComponent_CreateRepo_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateRepo'
@@ -1198,12 +1207,12 @@ func (_c *MockRepoComponent_CreateRepo_Call) Run(run func(ctx context.Context, r
 	return _c
 }
 
-func (_c *MockRepoComponent_CreateRepo_Call) Return(_a0 *gitserver.CreateRepoResp, _a1 *database.Repository, _a2 error) *MockRepoComponent_CreateRepo_Call {
-	_c.Call.Return(_a0, _a1, _a2)
+func (_c *MockRepoComponent_CreateRepo_Call) Return(_a0 *gitserver.CreateRepoResp, _a1 *database.Repository, _a2 *gitserver.CommitFilesReq, _a3 error) *MockRepoComponent_CreateRepo_Call {
+	_c.Call.Return(_a0, _a1, _a2, _a3)
 	return _c
 }
 
-func (_c *MockRepoComponent_CreateRepo_Call) RunAndReturn(run func(context.Context, types.CreateRepoReq) (*gitserver.CreateRepoResp, *database.Repository, error)) *MockRepoComponent_CreateRepo_Call {
+func (_c *MockRepoComponent_CreateRepo_Call) RunAndReturn(run func(context.Context, types.CreateRepoReq) (*gitserver.CreateRepoResp, *database.Repository, *gitserver.CommitFilesReq, error)) *MockRepoComponent_CreateRepo_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -2966,6 +2975,68 @@ func (_c *MockRepoComponent_IsSyncing_Call) Return(_a0 bool, _a1 error) *MockRep
 }
 
 func (_c *MockRepoComponent_IsSyncing_Call) RunAndReturn(run func(context.Context, types.RepositoryType, string, string) (bool, error)) *MockRepoComponent_IsSyncing_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// IsXnetEnabled provides a mock function with given fields: ctx, repoType, namespace, name, username
+func (_m *MockRepoComponent) IsXnetEnabled(ctx context.Context, repoType types.RepositoryType, namespace string, name string, username string) (*types.XetEnabled, error) {
+	ret := _m.Called(ctx, repoType, namespace, name, username)
+
+	if len(ret) == 0 {
+		panic("no return value specified for IsXnetEnabled")
+	}
+
+	var r0 *types.XetEnabled
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.RepositoryType, string, string, string) (*types.XetEnabled, error)); ok {
+		return rf(ctx, repoType, namespace, name, username)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.RepositoryType, string, string, string) *types.XetEnabled); ok {
+		r0 = rf(ctx, repoType, namespace, name, username)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.XetEnabled)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.RepositoryType, string, string, string) error); ok {
+		r1 = rf(ctx, repoType, namespace, name, username)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockRepoComponent_IsXnetEnabled_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'IsXnetEnabled'
+type MockRepoComponent_IsXnetEnabled_Call struct {
+	*mock.Call
+}
+
+// IsXnetEnabled is a helper method to define mock.On call
+//   - ctx context.Context
+//   - repoType types.RepositoryType
+//   - namespace string
+//   - name string
+//   - username string
+func (_e *MockRepoComponent_Expecter) IsXnetEnabled(ctx interface{}, repoType interface{}, namespace interface{}, name interface{}, username interface{}) *MockRepoComponent_IsXnetEnabled_Call {
+	return &MockRepoComponent_IsXnetEnabled_Call{Call: _e.mock.On("IsXnetEnabled", ctx, repoType, namespace, name, username)}
+}
+
+func (_c *MockRepoComponent_IsXnetEnabled_Call) Run(run func(ctx context.Context, repoType types.RepositoryType, namespace string, name string, username string)) *MockRepoComponent_IsXnetEnabled_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.RepositoryType), args[2].(string), args[3].(string), args[4].(string))
+	})
+	return _c
+}
+
+func (_c *MockRepoComponent_IsXnetEnabled_Call) Return(_a0 *types.XetEnabled, _a1 error) *MockRepoComponent_IsXnetEnabled_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockRepoComponent_IsXnetEnabled_Call) RunAndReturn(run func(context.Context, types.RepositoryType, string, string, string) (*types.XetEnabled, error)) *MockRepoComponent_IsXnetEnabled_Call {
 	_c.Call.Return(run)
 	return _c
 }
