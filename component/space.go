@@ -795,6 +795,8 @@ func (c *spaceComponentImpl) Delete(ctx context.Context, namespace, name, curren
 		}
 	}()
 
+	c.syncCodeAgentIfExists(repo.User.UUID, repo.User.Username, repo.Path, types.CodeAgentSyncOperationDelete)
+
 	return nil
 }
 
@@ -887,7 +889,14 @@ func (c *spaceComponentImpl) Deploy(ctx context.Context, namespace, name, curren
 		ClusterID:     space.ClusterID,
 	}
 	dr = c.updateDeployRepoBySpace(dr, space)
-	return c.deployer.Deploy(ctx, dr)
+
+	deployID, err := c.deployer.Deploy(ctx, dr)
+	if err != nil {
+		return -1, err
+	}
+
+	c.syncCodeAgentIfExists(user.UUID, user.Username, space.Repository.Path, types.CodeAgentSyncOperationUpdate)
+	return deployID, nil
 }
 
 func (c *spaceComponentImpl) Wakeup(ctx context.Context, namespace, name string) error {
