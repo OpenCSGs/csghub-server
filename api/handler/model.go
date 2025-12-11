@@ -11,38 +11,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
-	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
-	"opencsg.com/csghub-server/component"
 )
-
-func NewModelHandler(config *config.Config) (*ModelHandler, error) {
-	uc, err := component.NewModelComponent(config)
-	if err != nil {
-		return nil, err
-	}
-	sc, err := component.NewSensitiveComponent(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creating sensitive component:%w", err)
-	}
-	repo, err := component.NewRepoComponent(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creating repo component:%w", err)
-	}
-	return &ModelHandler{
-		model:     uc,
-		sensitive: sc,
-		repo:      repo,
-	}, nil
-}
-
-type ModelHandler struct {
-	model     component.ModelComponent
-	repo      component.RepoComponent
-	sensitive component.SensitiveComponent
-}
 
 // GetVisiableModels godoc
 // @Security     ApiKey
@@ -842,6 +814,8 @@ func (h *ModelHandler) FinetuneCreate(ctx *gin.Context) {
 
 	slog.Debug("deploy model as instance created", slog.String("namespace", namespace),
 		slog.String("name", name), slog.Int64("deploy_id", deployID))
+
+	h.createAgentInstanceTask(ctx.Request.Context(), req.Agent, fmt.Sprintf("%d", deployID), types.AgentTaskTypeInference, currentUser)
 
 	// return deploy_id
 	response := types.DeployRepo{DeployID: deployID}
