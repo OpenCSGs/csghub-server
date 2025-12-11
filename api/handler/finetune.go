@@ -11,30 +11,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
-	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
-	"opencsg.com/csghub-server/component"
 )
-
-func NewFinetuneHandler(config *config.Config) (*FinetuneHandler, error) {
-	ftComp, err := component.NewFinetuneComponent(config)
-	if err != nil {
-		return nil, err
-	}
-	sc, err := component.NewSensitiveComponent(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creating sensitive component:%w", err)
-	}
-	return &FinetuneHandler{
-		ftComp:    ftComp,
-		sensitive: sc,
-	}, nil
-}
-
-type FinetuneHandler struct {
-	ftComp    component.FinetuneComponent
-	sensitive component.SensitiveComponent
-}
 
 // create finetune  godoc
 // @Security     ApiKey
@@ -72,6 +50,9 @@ func (h *FinetuneHandler) RunFinetuneJob(ctx *gin.Context) {
 		httpbase.ServerError(ctx, err)
 		return
 	}
+
+	h.createAgentInstanceTask(ctx.Request.Context(), req.Agent, finetune.TaskId, currentUser)
+
 	httpbase.OK(ctx, finetune)
 }
 
