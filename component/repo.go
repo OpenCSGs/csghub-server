@@ -190,6 +190,7 @@ type RepoComponent interface {
 	BatchMigrateRepoToHashedPath(ctx context.Context, auto bool, batchSize int, lastID int64) (int64, error)
 	GetMirrorTaskStatusAndSyncStatus(repo *database.Repository) (types.MirrorTaskStatus, types.RepositorySyncStatus)
 	CheckDeployPermissionForUser(ctx context.Context, deployReq types.DeployActReq) (*database.User, *database.Deploy, error)
+	GetRepos(ctx context.Context, search, currentUser string, repoType types.RepositoryType) ([]string, error)
 	IsXnetEnabled(ctx context.Context, repoType types.RepositoryType, namespace, name, username string) (*types.XetEnabled, error)
 }
 
@@ -4072,4 +4073,16 @@ func (c *repoComponentImpl) GetMirrorTaskStatusAndSyncStatus(repo *database.Repo
 
 func (c *repoComponentImpl) RandomPath() []string {
 	return strings.SplitN(uuid.NewString(), "-", 2)
+}
+
+func (c *repoComponentImpl) GetRepos(ctx context.Context, search, currentUser string, repoType types.RepositoryType) ([]string, error) {
+	var repoPaths []string
+	repos, _, err := c.repoStore.GetReposBySearch(ctx, search, repoType, 1, 10)
+	if err != nil {
+		return repoPaths, fmt.Errorf("failed to get repos, error: %w", err)
+	}
+	for _, repo := range repos {
+		repoPaths = append(repoPaths, repo.Path)
+	}
+	return repoPaths, nil
 }

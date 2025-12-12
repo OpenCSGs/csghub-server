@@ -2500,6 +2500,67 @@ func (_c *MockRepoComponent_GetNameSpaceInfo_Call) RunAndReturn(run func(context
 	return _c
 }
 
+// GetRepos provides a mock function with given fields: ctx, search, currentUser, repoType
+func (_m *MockRepoComponent) GetRepos(ctx context.Context, search string, currentUser string, repoType types.RepositoryType) ([]string, error) {
+	ret := _m.Called(ctx, search, currentUser, repoType)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetRepos")
+	}
+
+	var r0 []string
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, types.RepositoryType) ([]string, error)); ok {
+		return rf(ctx, search, currentUser, repoType)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, types.RepositoryType) []string); ok {
+		r0 = rf(ctx, search, currentUser, repoType)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]string)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, types.RepositoryType) error); ok {
+		r1 = rf(ctx, search, currentUser, repoType)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockRepoComponent_GetRepos_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetRepos'
+type MockRepoComponent_GetRepos_Call struct {
+	*mock.Call
+}
+
+// GetRepos is a helper method to define mock.On call
+//   - ctx context.Context
+//   - search string
+//   - currentUser string
+//   - repoType types.RepositoryType
+func (_e *MockRepoComponent_Expecter) GetRepos(ctx interface{}, search interface{}, currentUser interface{}, repoType interface{}) *MockRepoComponent_GetRepos_Call {
+	return &MockRepoComponent_GetRepos_Call{Call: _e.mock.On("GetRepos", ctx, search, currentUser, repoType)}
+}
+
+func (_c *MockRepoComponent_GetRepos_Call) Run(run func(ctx context.Context, search string, currentUser string, repoType types.RepositoryType)) *MockRepoComponent_GetRepos_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(types.RepositoryType))
+	})
+	return _c
+}
+
+func (_c *MockRepoComponent_GetRepos_Call) Return(_a0 []string, _a1 error) *MockRepoComponent_GetRepos_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockRepoComponent_GetRepos_Call) RunAndReturn(run func(context.Context, string, string, types.RepositoryType) ([]string, error)) *MockRepoComponent_GetRepos_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetUserRepoPermission provides a mock function with given fields: ctx, userName, repo
 func (_m *MockRepoComponent) GetUserRepoPermission(ctx context.Context, userName string, repo *database.Repository) (*types.UserRepoPermission, error) {
 	ret := _m.Called(ctx, userName, repo)

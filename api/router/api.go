@@ -188,6 +188,9 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	versionHandler := handler.NewVersionHandler()
 	apiGroup.GET("/version", versionHandler.Version)
 
+	// Admin user get repo path list
+	apiGroup.GET("/repos", middlewareCollection.Auth.NeedAdmin, repoCommonHandler.GetRepos)
+
 	// TODO:use middleware to handle common response
 	//
 	memoryStore := persist.NewMemoryStore(1 * time.Minute)

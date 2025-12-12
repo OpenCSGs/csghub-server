@@ -20,9 +20,9 @@ func (_m *MockCounterFactory) EXPECT() *MockCounterFactory_Expecter {
 	return &MockCounterFactory_Expecter{mock: &_m.Mock}
 }
 
-// NewChat provides a mock function with given fields: config
-func (_m *MockCounterFactory) NewChat(config token.CreateParam) token.ChatTokenCounter {
-	ret := _m.Called(config)
+// NewChat provides a mock function with given fields: param
+func (_m *MockCounterFactory) NewChat(param token.CreateParam) token.ChatTokenCounter {
+	ret := _m.Called(param)
 
 	if len(ret) == 0 {
 		panic("no return value specified for NewChat")
@@ -30,7 +30,7 @@ func (_m *MockCounterFactory) NewChat(config token.CreateParam) token.ChatTokenC
 
 	var r0 token.ChatTokenCounter
 	if rf, ok := ret.Get(0).(func(token.CreateParam) token.ChatTokenCounter); ok {
-		r0 = rf(config)
+		r0 = rf(param)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(token.ChatTokenCounter)
@@ -46,12 +46,12 @@ type MockCounterFactory_NewChat_Call struct {
 }
 
 // NewChat is a helper method to define mock.On call
-//   - config token.Config
-func (_e *MockCounterFactory_Expecter) NewChat(config interface{}) *MockCounterFactory_NewChat_Call {
-	return &MockCounterFactory_NewChat_Call{Call: _e.mock.On("NewChat", config)}
+//   - param token.CreateParam
+func (_e *MockCounterFactory_Expecter) NewChat(param interface{}) *MockCounterFactory_NewChat_Call {
+	return &MockCounterFactory_NewChat_Call{Call: _e.mock.On("NewChat", param)}
 }
 
-func (_c *MockCounterFactory_NewChat_Call) Run(run func(config token.CreateParam)) *MockCounterFactory_NewChat_Call {
+func (_c *MockCounterFactory_NewChat_Call) Run(run func(param token.CreateParam)) *MockCounterFactory_NewChat_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(token.CreateParam))
 	})
@@ -68,9 +68,9 @@ func (_c *MockCounterFactory_NewChat_Call) RunAndReturn(run func(token.CreatePar
 	return _c
 }
 
-// NewEmbedding provides a mock function with given fields: config
-func (_m *MockCounterFactory) NewEmbedding(config token.CreateParam) *token.EmbeddingTokenCounter {
-	ret := _m.Called(config)
+// NewEmbedding provides a mock function with given fields: param
+func (_m *MockCounterFactory) NewEmbedding(param token.CreateParam) *token.EmbeddingTokenCounter {
+	ret := _m.Called(param)
 
 	if len(ret) == 0 {
 		panic("no return value specified for NewEmbedding")
@@ -78,7 +78,7 @@ func (_m *MockCounterFactory) NewEmbedding(config token.CreateParam) *token.Embe
 
 	var r0 *token.EmbeddingTokenCounter
 	if rf, ok := ret.Get(0).(func(token.CreateParam) *token.EmbeddingTokenCounter); ok {
-		r0 = rf(config)
+		r0 = rf(param)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*token.EmbeddingTokenCounter)
@@ -94,12 +94,12 @@ type MockCounterFactory_NewEmbedding_Call struct {
 }
 
 // NewEmbedding is a helper method to define mock.On call
-//   - config token.Config
-func (_e *MockCounterFactory_Expecter) NewEmbedding(config interface{}) *MockCounterFactory_NewEmbedding_Call {
-	return &MockCounterFactory_NewEmbedding_Call{Call: _e.mock.On("NewEmbedding", config)}
+//   - param token.CreateParam
+func (_e *MockCounterFactory_Expecter) NewEmbedding(param interface{}) *MockCounterFactory_NewEmbedding_Call {
+	return &MockCounterFactory_NewEmbedding_Call{Call: _e.mock.On("NewEmbedding", param)}
 }
 
-func (_c *MockCounterFactory_NewEmbedding_Call) Run(run func(config token.CreateParam)) *MockCounterFactory_NewEmbedding_Call {
+func (_c *MockCounterFactory_NewEmbedding_Call) Run(run func(param token.CreateParam)) *MockCounterFactory_NewEmbedding_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(token.CreateParam))
 	})

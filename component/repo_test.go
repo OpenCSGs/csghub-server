@@ -3244,3 +3244,16 @@ func TestRepoComponent_SendAssetManagementMsg(t *testing.T) {
 	require.Nil(t, err)
 	wg.Wait()
 }
+
+func TestRepoComponent_GetRepos(t *testing.T) {
+	ctx := context.Background()
+
+	repoComp := initializeTestRepoComponent(ctx, t)
+
+	repoComp.mocks.stores.RepoMock().EXPECT().GetReposBySearch(ctx, "search", types.ModelRepo, 1, 10).
+		Return([]*database.Repository{{ID: 1, Path: "ns/name"}}, 1, nil).Once()
+	paths, err := repoComp.GetRepos(ctx, "search", "u", types.ModelRepo)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(paths))
+	require.Equal(t, "ns/name", paths[0])
+}

@@ -95,6 +95,7 @@ type RepoStore interface {
 	FindByRepoTypeAndPaths(ctx context.Context, repoType types.RepositoryType, path []string) ([]Repository, error)
 	FindUnhashedRepos(ctx context.Context, batchSize int, lastID int64) ([]Repository, error)
 	UpdateRepoSensitiveCheckStatus(ctx context.Context, repoID int64, status types.SensitiveCheckStatus) error
+	GetReposBySearch(ctx context.Context, search string, repoType types.RepositoryType, page, pageSize int) ([]*Repository, int, error)
 }
 
 func (s *repoStoreImpl) UpdateRepoSensitiveCheckStatus(ctx context.Context, repoID int64, status types.SensitiveCheckStatus) error {
@@ -1394,4 +1395,19 @@ func (s *repoStoreImpl) FindUnhashedRepos(ctx context.Context, batchSize int, la
 		Order("id ASC").
 		Scan(ctx)
 	return res, err
+}
+
+func (s *repoStoreImpl) GetReposBySearch(ctx context.Context, search string, repoType types.RepositoryType, page, pageSize int) ([]*Repository, int, error) {
+	var (
+		res   []*Repository
+		count int
+		err   error
+	)
+	count, err = s.db.Operator.Core.NewSelect().
+		Model(&res).
+		Where("path like ? and repository_type = ?", fmt.Sprintf("%%%s%%", search), repoType).
+		Offset((page - 1) * pageSize).
+		Limit(pageSize).
+		ScanAndCount(ctx)
+	return res, count, err
 }
