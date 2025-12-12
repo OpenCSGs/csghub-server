@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"context"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -38,7 +37,7 @@ func BuildJwtSession(jwtSignKey string) gin.HandlerFunc {
 		sessions.Default(c).Set(httpbase.CurrentUserUUIDCtxVar, claims.UUID)
 		err = sessions.Default(c).Save()
 		if err != nil {
-			slog.Error("fail to save session", slog.Any("error", err))
+			slog.ErrorContext(c.Request.Context(), "fail to save session", slog.Any("error", err))
 			httpbase.UnauthorizedError(c, errorx.InvalidAuthHeader(err, nil))
 			c.Abort()
 			return
@@ -164,14 +163,14 @@ func isValidJWTToken(c *gin.Context, config *config.Config, token string) bool {
 			httpbase.SetAuthType(c, httpbase.AuthTypeJwt)
 			return true
 		} else {
-			slog.Error("verify jwt token error", slog.Any("error", err))
+			slog.ErrorContext(c.Request.Context(), "verify jwt token error", slog.Any("error", err))
 		}
 	}
 	return false
 }
 
 func isValidAccessToken(c *gin.Context, userSvcClient rpc.UserSvcClient, token string) bool {
-	user, err := userSvcClient.VerifyByAccessToken(context.Background(), token)
+	user, err := userSvcClient.VerifyByAccessToken(c.Request.Context(), token)
 	if err != nil {
 		slog.ErrorContext(c, "verify access token error", slog.Any("error", err))
 		return false
@@ -305,7 +304,7 @@ func UserMatch() gin.HandlerFunc {
 		userName := ctx.Param("username")
 		if userName != currentUser {
 			httpbase.UnauthorizedError(ctx, errorx.ErrUserNotMatch)
-			slog.Error("user not match, try to query user account not owned", "currentUser", currentUser, "userName", userName)
+			slog.ErrorContext(ctx.Request.Context(), "user not match, try to query user account not owned", "currentUser", currentUser, "userName", userName)
 			ctx.Abort()
 			return
 		}

@@ -40,14 +40,14 @@ type MirrorNamespaceMappingHandler struct {
 func (h *MirrorNamespaceMappingHandler) Create(ctx *gin.Context) {
 	var msReq types.CreateMirrorNamespaceMappingReq
 	if err := ctx.ShouldBindJSON(&msReq); err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 
 	ms, err := h.mirrorNamespaceMapping.Create(ctx.Request.Context(), msReq)
 	if err != nil {
-		slog.Error("Failed to create mirror namespace mapping", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Failed to create mirror namespace mapping", "error", err)
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -67,7 +67,7 @@ func (h *MirrorNamespaceMappingHandler) Create(ctx *gin.Context) {
 func (h *MirrorNamespaceMappingHandler) Index(ctx *gin.Context) {
 	ms, err := h.mirrorNamespaceMapping.Index(ctx.Request.Context())
 	if err != nil {
-		slog.Error("Failed to get mirror namespace mappings", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get mirror namespace mappings", "error", err)
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -92,25 +92,25 @@ func (h *MirrorNamespaceMappingHandler) Update(ctx *gin.Context) {
 	id := ctx.Param("id")
 	if id == "" {
 		err := fmt.Errorf("invalid mirror namespace mapping id")
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	if err := ctx.ShouldBindJSON(&msReq); err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	msId, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	msReq.ID = msId
 	ms, err := h.mirrorNamespaceMapping.Update(ctx.Request.Context(), msReq)
 	if err != nil {
-		slog.Error("Failed to get mirror namespace mappings", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get mirror namespace mappings", "error", err)
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -133,20 +133,20 @@ func (h *MirrorNamespaceMappingHandler) Get(ctx *gin.Context) {
 	id := ctx.Param("id")
 	if id == "" {
 		err := fmt.Errorf("invalid mirror namespace mapping id")
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	msId, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 
 	ms, err := h.mirrorNamespaceMapping.Get(ctx.Request.Context(), msId)
 	if err != nil {
-		slog.Error("Failed to get mirror namespace mapping", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get mirror namespace mapping", "error", err)
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -169,20 +169,20 @@ func (h *MirrorNamespaceMappingHandler) Delete(ctx *gin.Context) {
 	id := ctx.Param("id")
 	if id == "" {
 		err := fmt.Errorf("invalid mirror namespace mapping id")
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	msId, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 
 	err = h.mirrorNamespaceMapping.Delete(ctx.Request.Context(), msId)
 	if err != nil {
-		slog.Error("Failed to delete mirror namespace mapping", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Failed to delete mirror namespace mapping", "error", err)
 		httpbase.ServerError(ctx, err)
 		return
 	}

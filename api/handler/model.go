@@ -48,7 +48,7 @@ func (h *ModelHandler) Index(ctx *gin.Context) {
 	filter.Tags = parseTagReqs(ctx)
 	tree, err := parseTreeReqs(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
@@ -56,7 +56,7 @@ func (h *ModelHandler) Index(ctx *gin.Context) {
 	filter.Username = httpbase.GetCurrentUser(ctx)
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
@@ -68,7 +68,7 @@ func (h *ModelHandler) Index(ctx *gin.Context) {
 				Set("param", "sort").
 				Set("provided", filter.Sort).
 				Set("allowed", types.Sorts))
-		slog.Error("Bad request format,", slog.String("error", msg))
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format,", slog.String("error", msg))
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
@@ -80,7 +80,7 @@ func (h *ModelHandler) Index(ctx *gin.Context) {
 				Set("param", "source").
 				Set("provided", filter.Source).
 				Set("allowed", types.Sources))
-		slog.Error("Bad request format,", slog.String("error", msg))
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format,", slog.String("error", msg))
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
@@ -97,7 +97,7 @@ func (h *ModelHandler) Index(ctx *gin.Context) {
 	}
 	models, total, err := h.model.Index(ctx.Request.Context(), filter, per, page, needOpWeight)
 	if err != nil {
-		slog.Error("Failed to get models", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get models", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -122,7 +122,7 @@ func (h *ModelHandler) Create(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	var req *types.CreateModelReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, errorx.ReqBodyFormat(err, nil))
 		return
 	}
@@ -134,7 +134,7 @@ func (h *ModelHandler) Create(ctx *gin.Context) {
 
 	_, err := h.sensitive.CheckRequestV2(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("failed to check sensitive request", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "failed to check sensitive request", slog.Any("error", err))
 		httpbase.ServerError(ctx, fmt.Errorf("sensitive check failed: %w", err))
 		return
 	}
@@ -146,7 +146,7 @@ func (h *ModelHandler) Create(ctx *gin.Context) {
 		} else if errors.Is(err, errorx.ErrDatabaseDuplicateKey) {
 			httpbase.BadRequestWithExt(ctx, err)
 		} else {
-			slog.Error("Failed to create model", slog.Any("error", err))
+			slog.ErrorContext(ctx.Request.Context(), "Failed to create model", slog.Any("error", err))
 			httpbase.ServerError(ctx, err)
 		}
 		return
@@ -174,21 +174,21 @@ func (h *ModelHandler) Update(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	var req *types.UpdateModelReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, errorx.ReqBodyFormat(err, nil))
 		return
 	}
 
 	_, err := h.sensitive.CheckRequestV2(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("failed to check sensitive request", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "failed to check sensitive request", slog.Any("error", err))
 		httpbase.ServerError(ctx, fmt.Errorf("sensitive check failed: %w", err))
 		return
 	}
 
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
@@ -202,7 +202,7 @@ func (h *ModelHandler) Update(ctx *gin.Context) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
-		slog.Error("Failed to update model", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to update model", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -229,7 +229,7 @@ func (h *ModelHandler) Delete(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
@@ -239,7 +239,7 @@ func (h *ModelHandler) Delete(ctx *gin.Context) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
-		slog.Error("Failed to delete model", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to delete model", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -266,7 +266,7 @@ func (h *ModelHandler) Delete(ctx *gin.Context) {
 func (h *ModelHandler) Show(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
@@ -287,7 +287,7 @@ func (h *ModelHandler) Show(ctx *gin.Context) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
-		slog.Error("Failed to get model detail", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get model detail", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -299,7 +299,7 @@ func (h *ModelHandler) Show(ctx *gin.Context) {
 func (h *ModelHandler) SDKModelInfo(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
@@ -317,7 +317,7 @@ func (h *ModelHandler) SDKModelInfo(ctx *gin.Context) {
 	if expand == "xetEnabled" {
 		resp, err := h.repo.IsXnetEnabled(ctx.Request.Context(), types.ModelRepo, namespace, name, currentUser)
 		if err != nil {
-			slog.Error("failed to check if xnetEnabled", slog.Any("error", err))
+			slog.ErrorContext(ctx.Request.Context(), "failed to check if xnetEnabled", slog.Any("error", err))
 			httpbase.ServerError(ctx, err)
 			return
 		}
@@ -330,7 +330,7 @@ func (h *ModelHandler) SDKModelInfo(ctx *gin.Context) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
-		slog.Error("Failed to get sdk model info", slog.String("namespace", namespace), slog.String("name", name), slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get sdk model info", slog.String("namespace", namespace), slog.String("name", name), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -354,7 +354,7 @@ func (h *ModelHandler) SDKModelInfo(ctx *gin.Context) {
 func (h *ModelHandler) Relations(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
@@ -365,7 +365,7 @@ func (h *ModelHandler) Relations(ctx *gin.Context) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
-		slog.Error("Failed to get model relations", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get model relations", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -391,7 +391,7 @@ func (h *ModelHandler) SetRelations(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
@@ -399,7 +399,7 @@ func (h *ModelHandler) SetRelations(ctx *gin.Context) {
 	var req types.RelationDatasets
 	err = ctx.ShouldBindJSON(&req)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, errorx.ReqBodyFormat(err, nil))
 		return
 	}
@@ -413,7 +413,7 @@ func (h *ModelHandler) SetRelations(ctx *gin.Context) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
-		slog.Error("Failed to set datasets for model", slog.Any("req", req), slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to set datasets for model", slog.Any("req", req), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -438,7 +438,7 @@ func (h *ModelHandler) AddDatasetRelation(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
@@ -446,7 +446,7 @@ func (h *ModelHandler) AddDatasetRelation(ctx *gin.Context) {
 	var req types.RelationDataset
 	err = ctx.ShouldBindJSON(&req)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, errorx.ReqBodyFormat(err, nil))
 		return
 	}
@@ -460,7 +460,7 @@ func (h *ModelHandler) AddDatasetRelation(ctx *gin.Context) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
-		slog.Error("Failed to add dataset for model", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to add dataset for model", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -485,7 +485,7 @@ func (h *ModelHandler) DelDatasetRelation(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
@@ -493,7 +493,7 @@ func (h *ModelHandler) DelDatasetRelation(ctx *gin.Context) {
 	var req types.RelationDataset
 	err = ctx.ShouldBindJSON(&req)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, errorx.ReqBodyFormat(err, nil))
 		return
 	}
@@ -507,7 +507,7 @@ func (h *ModelHandler) DelDatasetRelation(ctx *gin.Context) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
-		slog.Error("Failed to delete dataset for model", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to delete dataset for model", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -621,26 +621,26 @@ func (h *ModelHandler) DeployDedicated(ctx *gin.Context) {
 
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("failed to get namespace from context", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "failed to get namespace from context", "error", err)
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 
 	syncing, err := h.repo.IsSyncing(ctx.Request.Context(), types.ModelRepo, namespace, name)
 	if err != nil {
-		slog.Error("failed to check if model is syncing", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "failed to check if model is syncing", "error", err)
 		httpbase.ServerError(ctx, err)
 		return
 	}
 	if syncing {
-		slog.Error("model is syncing", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "model is syncing", "error", err)
 		httpbase.Conflict(ctx, errors.New("model is syncing, please try again later"))
 		return
 	}
 
 	allow, err := h.repo.AllowReadAccess(ctx.Request.Context(), types.ModelRepo, namespace, name, currentUser)
 	if err != nil {
-		slog.Error("failed to check user permission", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "failed to check user permission", "error", err)
 		httpbase.ServerError(ctx, errors.New("failed to check user permission"))
 		return
 	}
@@ -654,13 +654,13 @@ func (h *ModelHandler) DeployDedicated(ctx *gin.Context) {
 
 	var req types.ModelRunReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, errorx.ReqBodyFormat(err, nil))
 		return
 	}
 
 	if req.MinReplica < 0 || req.MaxReplica < 0 || req.MinReplica > req.MaxReplica {
-		slog.Error("Bad request setting for replica", slog.Any("MinReplica", req.MinReplica), slog.Any("MaxReplica", req.MaxReplica))
+		slog.ErrorContext(ctx.Request.Context(), "Bad request setting for replica", slog.Any("MinReplica", req.MinReplica), slog.Any("MaxReplica", req.MaxReplica))
 		ext := errorx.Ctx().Set("body", "MinReplica or MaxReplica")
 		httpbase.BadRequestWithExt(ctx, errorx.ReqBodyFormat(err, ext))
 		return
@@ -673,7 +673,7 @@ func (h *ModelHandler) DeployDedicated(ctx *gin.Context) {
 
 	_, err = h.sensitive.CheckRequestV2(ctx.Request.Context(), &req)
 	if err != nil {
-		slog.Error("failed to check sensitive request", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "failed to check sensitive request", slog.Any("error", err))
 		httpbase.ServerError(ctx, fmt.Errorf("sensitive check failed: %w", err))
 		return
 	}
@@ -701,7 +701,7 @@ func (h *ModelHandler) DeployDedicated(ctx *gin.Context) {
 
 	deployID, err := h.model.Deploy(ctx.Request.Context(), epReq, req)
 	if err != nil {
-		slog.Error("failed to deploy model as inference", slog.String("namespace", namespace),
+		slog.ErrorContext(ctx.Request.Context(), "failed to deploy model as inference", slog.String("namespace", namespace),
 			slog.String("name", name), slog.Any("currentUser", currentUser), slog.Any("req", req), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
@@ -709,6 +709,8 @@ func (h *ModelHandler) DeployDedicated(ctx *gin.Context) {
 
 	slog.Debug("deploy model as inference created", slog.String("namespace", namespace),
 		slog.String("name", name), slog.Int64("deploy_id", deployID))
+	h.createAgentInstanceTask(ctx.Request.Context(), req.Agent, fmt.Sprintf("%d", deployID), types.AgentTaskTypeInference, currentUser)
+
 	h.createAgentInstanceTask(ctx.Request.Context(), req.Agent, fmt.Sprintf("%d", deployID), types.AgentTaskTypeInference, currentUser)
 
 	// return deploy_id
@@ -736,25 +738,25 @@ func (h *ModelHandler) FinetuneCreate(ctx *gin.Context) {
 
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("failed to get namespace from context", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "failed to get namespace from context", "error", err)
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 	syncing, err := h.repo.IsSyncing(ctx.Request.Context(), types.ModelRepo, namespace, name)
 	if err != nil {
-		slog.Error("failed to check if model is syncing", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "failed to check if model is syncing", "error", err)
 		httpbase.ServerError(ctx, err)
 		return
 	}
 	if syncing {
-		slog.Error("model is syncing", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "model is syncing", "error", err)
 		httpbase.Conflict(ctx, errors.New("model is syncing, please try again later"))
 		return
 	}
 
 	allow, err := h.repo.AllowReadAccess(ctx.Request.Context(), types.ModelRepo, namespace, name, currentUser)
 	if err != nil {
-		slog.Error("failed to check user permission", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "failed to check user permission", "error", err)
 		httpbase.ServerError(ctx, errors.New("failed to check user permission"))
 		return
 	}
@@ -767,7 +769,7 @@ func (h *ModelHandler) FinetuneCreate(ctx *gin.Context) {
 
 	var req types.InstanceRunReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, errorx.ReqBodyFormat(err, nil))
 		return
 	}
@@ -807,7 +809,7 @@ func (h *ModelHandler) FinetuneCreate(ctx *gin.Context) {
 
 	deployID, err := h.model.Deploy(ctx.Request.Context(), ftReq, *modelReq)
 	if err != nil {
-		slog.Error("failed to deploy model as notebook instance", slog.String("namespace", namespace),
+		slog.ErrorContext(ctx.Request.Context(), "failed to deploy model as notebook instance", slog.String("namespace", namespace),
 			slog.String("name", name), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
@@ -845,13 +847,13 @@ func (h *ModelHandler) DeployDelete(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 	id, err = strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		err := errorx.ReqParamInvalid(err, errorx.Ctx().Set("param", "id"))
 		httpbase.BadRequestWithExt(ctx, err)
 		return
@@ -871,7 +873,7 @@ func (h *ModelHandler) DeployDelete(ctx *gin.Context) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
-		slog.Error("Failed to delete inference", slog.Any("error", err), slog.Any("req", delReq))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to delete inference", slog.Any("error", err), slog.Any("req", delReq))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -901,13 +903,13 @@ func (h *ModelHandler) FinetuneDelete(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 	id, err = strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		err = errorx.ReqParamInvalid(err, errorx.Ctx().Set("param", "id"))
 		httpbase.BadRequestWithExt(ctx, err)
 		return
@@ -924,11 +926,11 @@ func (h *ModelHandler) FinetuneDelete(ctx *gin.Context) {
 	err = h.repo.DeleteDeploy(ctx.Request.Context(), delReq)
 	if err != nil {
 		if errors.Is(err, errorx.ErrForbidden) {
-			slog.Error("not allowed to delete finetune", slog.Any("error", err), slog.Any("req", delReq))
+			slog.ErrorContext(ctx.Request.Context(), "not allowed to delete finetune", slog.Any("error", err), slog.Any("req", delReq))
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
-		slog.Error("Failed to delete finetune", slog.Any("error", err), slog.Any("req", delReq))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to delete finetune", slog.Any("error", err), slog.Any("req", delReq))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -958,13 +960,13 @@ func (h *ModelHandler) DeployStop(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 	id, err = strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		err = errorx.ReqParamInvalid(err, errorx.Ctx().Set("param", "id"))
 		httpbase.BadRequestWithExt(ctx, err)
 		return
@@ -984,7 +986,7 @@ func (h *ModelHandler) DeployStop(ctx *gin.Context) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
-		slog.Error("Failed to stop inference", slog.Any("error", err), slog.Any("req", stopReq))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to stop inference", slog.Any("error", err), slog.Any("req", stopReq))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -1014,7 +1016,7 @@ func (h *ModelHandler) DeployStart(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
@@ -1041,7 +1043,7 @@ func (h *ModelHandler) DeployStart(ctx *gin.Context) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
-		slog.Error("Failed to start inference", slog.Any("error", err), slog.Any("req", startReq))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to start inference", slog.Any("error", err), slog.Any("req", startReq))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -1070,20 +1072,20 @@ func (h *ModelHandler) DeployWakeup(ctx *gin.Context) {
 	)
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 	id, err = strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		err = errorx.ReqParamInvalid(err, errorx.Ctx().Set("param", "id"))
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 	err = h.model.Wakeup(ctx.Request.Context(), namespace, name, id)
 	if err != nil {
-		slog.Error("failed to wakeup inference", slog.String("namespace", namespace),
+		slog.ErrorContext(ctx.Request.Context(), "failed to wakeup inference", slog.String("namespace", namespace),
 			slog.String("name", name), slog.Any("error", err))
 		httpbase.ServerError(ctx, errors.New("failed to wakeup inference"))
 		return
@@ -1116,20 +1118,20 @@ func (h *ModelHandler) ListByRuntimeFrameworkID(ctx *gin.Context) {
 	}
 	deployType, err := strconv.Atoi(deployTypeStr)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		err = errorx.ReqParamInvalid(err, errorx.Ctx().Set("query", "deploy_type"))
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		err = errorx.ReqParamInvalid(err, errorx.Ctx().Set("param", "id"))
 		httpbase.BadRequestWithExt(ctx, err)
 		return
@@ -1137,7 +1139,7 @@ func (h *ModelHandler) ListByRuntimeFrameworkID(ctx *gin.Context) {
 
 	models, total, err := h.model.ListModelsByRuntimeFrameworkID(ctx.Request.Context(), currentUser, per, page, id, deployType)
 	if err != nil {
-		slog.Error("Failed to get models", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get models", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -1171,13 +1173,13 @@ func (h *ModelHandler) FinetuneStop(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 	id, err = strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		err = errorx.ReqParamInvalid(err, errorx.Ctx().Set("param", "id"))
 		httpbase.BadRequestWithExt(ctx, err)
 		return
@@ -1197,7 +1199,7 @@ func (h *ModelHandler) FinetuneStop(ctx *gin.Context) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
-		slog.Error("Failed to stop finetune", slog.Any("req", stopReq), slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to stop finetune", slog.Any("req", stopReq), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -1227,13 +1229,13 @@ func (h *ModelHandler) FinetuneStart(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 	id, err = strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		err = errorx.ReqParamInvalid(err, errorx.Ctx().Set("param", "id"))
 		httpbase.BadRequestWithExt(ctx, err)
 		return
@@ -1253,7 +1255,7 @@ func (h *ModelHandler) FinetuneStart(ctx *gin.Context) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
-		slog.Error("Failed to start finetune", slog.Any("error", err), slog.Any("req", startReq))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to start finetune", slog.Any("error", err), slog.Any("req", startReq))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -1282,7 +1284,7 @@ func (h *ModelHandler) ListAllRuntimeFramework(ctx *gin.Context) {
 	}
 	deployType, err := strconv.Atoi(deployTypeStr)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		err = errorx.ReqParamInvalid(err, errorx.Ctx().Set("query", "deploy_type"))
 		httpbase.BadRequestWithExt(ctx, err)
 		return
@@ -1290,7 +1292,7 @@ func (h *ModelHandler) ListAllRuntimeFramework(ctx *gin.Context) {
 
 	runtimes, err := h.model.ListAllByRuntimeFramework(ctx.Request.Context(), currentUser, deployType)
 	if err != nil {
-		slog.Error("Failed to get runtime frameworks", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get runtime frameworks", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -1319,14 +1321,14 @@ func (h *ModelHandler) ListAllRuntimeFramework(ctx *gin.Context) {
 func (h *ModelHandler) UpdateModelRuntimeFrameworks(ctx *gin.Context) {
 	var req types.RuntimeFrameworkModels
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, errorx.ReqBodyFormat(err, nil))
 		return
 	}
 
 	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		err = errorx.ReqParamInvalid(err, errorx.Ctx().Set("param", "id"))
 		httpbase.BadRequestWithExt(ctx, err)
 		return
@@ -1339,7 +1341,7 @@ func (h *ModelHandler) UpdateModelRuntimeFrameworks(ctx *gin.Context) {
 	}
 	deployType, err := strconv.Atoi(deployTypeStr)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		err = errorx.ReqParamInvalid(err, errorx.Ctx().Set("query", "deploy_type"))
 		httpbase.BadRequestWithExt(ctx, err)
 		return
@@ -1353,7 +1355,7 @@ func (h *ModelHandler) UpdateModelRuntimeFrameworks(ctx *gin.Context) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
-		slog.Error("Failed to set models runtime framework", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to set models runtime framework", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -1379,14 +1381,14 @@ func (h *ModelHandler) UpdateModelRuntimeFrameworks(ctx *gin.Context) {
 func (h *ModelHandler) DeleteModelRuntimeFrameworks(ctx *gin.Context) {
 	var req types.RuntimeFrameworkModels
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, errorx.ReqBodyFormat(err, nil))
 		return
 	}
 
 	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		err = errorx.ReqParamInvalid(err, errorx.Ctx().Set("param", "id"))
 		httpbase.BadRequestWithExt(ctx, err)
 		return
@@ -1399,7 +1401,7 @@ func (h *ModelHandler) DeleteModelRuntimeFrameworks(ctx *gin.Context) {
 	}
 	deployType, err := strconv.Atoi(deployTypeStr)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		err = errorx.ReqParamInvalid(err, errorx.Ctx().Set("query", "deploy_type"))
 		httpbase.BadRequestWithExt(ctx, err)
 		return
@@ -1413,7 +1415,7 @@ func (h *ModelHandler) DeleteModelRuntimeFrameworks(ctx *gin.Context) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
-		slog.Error("Failed to set models runtime framework", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to set models runtime framework", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -1449,21 +1451,21 @@ func (h *ModelHandler) ListModelsOfRuntimeFrameworks(ctx *gin.Context) {
 	}
 	deployType, err := strconv.Atoi(deployTypeStr)
 	if err != nil {
-		slog.Error("Bad request deploy type format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request deploy type format", "error", err)
 		err = errorx.ReqParamInvalid(err, errorx.Ctx().Set("query", "deploy_type"))
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request per and page format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request per and page format", "error", err)
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 
 	models, total, err := h.model.ListModelsOfRuntimeFrameworks(ctx.Request.Context(), currentUser, filter.Search, filter.Sort, per, page, deployType)
 	if err != nil {
-		slog.Error("fail to get models for all runtime frameworks", slog.Any("deployType", deployType), slog.Any("per", per), slog.Any("page", page), slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "fail to get models for all runtime frameworks", slog.Any("deployType", deployType), slog.Any("per", per), slog.Any("page", page), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -1493,20 +1495,20 @@ func (h *ModelHandler) DeployServerless(ctx *gin.Context) {
 
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("failed to get namespace from context", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "failed to get namespace from context", "error", err)
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 
 	var req types.ModelRunReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, errorx.ReqBodyFormat(err, nil))
 		return
 	}
 
 	if req.MinReplica < 0 || req.MaxReplica < 0 || req.MinReplica > req.MaxReplica {
-		slog.Error("Bad request setting for replica", slog.Any("MinReplica", req.MinReplica), slog.Any("MaxReplica", req.MaxReplica))
+		slog.ErrorContext(ctx.Request.Context(), "Bad request setting for replica", slog.Any("MinReplica", req.MinReplica), slog.Any("MaxReplica", req.MaxReplica))
 		ext := errorx.Ctx().Set("body", "MinReplica or MaxReplica")
 		httpbase.BadRequestWithExt(ctx, errorx.ReqBodyFormat(err, ext))
 		return
@@ -1543,7 +1545,7 @@ func (h *ModelHandler) DeployServerless(ctx *gin.Context) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
-		slog.Error("failed to deploy model as serverless", slog.Any("deploy_req", deployReq), slog.Any("run_req", req), slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "failed to deploy model as serverless", slog.Any("deploy_req", deployReq), slog.Any("run_req", req), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -1575,7 +1577,7 @@ func (h *ModelHandler) RemoveServerless(ctx *gin.Context) {
 
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("failed to get namespace from context", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "failed to get namespace from context", "error", err)
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
@@ -1627,13 +1629,13 @@ func (h *ModelHandler) ServerlessStart(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 	id, err = strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		err = errorx.ReqParamInvalid(err, errorx.Ctx().Set("param", "id"))
 		httpbase.BadRequestWithExt(ctx, err)
 		return
@@ -1686,13 +1688,13 @@ func (h *ModelHandler) ServerlessStop(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 	id, err = strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		err = errorx.ReqParamInvalid(err, errorx.Ctx().Set("param", "id"))
 		httpbase.BadRequestWithExt(ctx, err)
 		return
@@ -1709,7 +1711,7 @@ func (h *ModelHandler) ServerlessStop(ctx *gin.Context) {
 
 	err = h.repo.DeployStop(ctx.Request.Context(), stopReq)
 	if err != nil {
-		slog.Error("Failed to stop deploy", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to stop deploy", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -1732,14 +1734,14 @@ func (h *ModelHandler) GetDeployServerless(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("failed to get namespace from context", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "failed to get namespace from context", "error", err)
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 
 	response, err := h.model.GetServerless(ctx.Request.Context(), namespace, name, currentUser)
 	if err != nil {
-		slog.Error("failed to get model serverless endpoint", slog.String("namespace", namespace),
+		slog.ErrorContext(ctx.Request.Context(), "failed to get model serverless endpoint", slog.String("namespace", namespace),
 			slog.String("name", name), slog.Any("currentUser", currentUser), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
@@ -1763,13 +1765,13 @@ func (h *ModelHandler) GetDeployServerless(ctx *gin.Context) {
 func (h *ModelHandler) ListQuantizations(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("failed to get namespace from context", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "failed to get namespace from context", "error", err)
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 	files, err := h.model.ListQuantizations(ctx.Request.Context(), namespace, name)
 	if err != nil {
-		slog.Error("failed to list quantizations", slog.String("namespace", namespace),
+		slog.ErrorContext(ctx.Request.Context(), "failed to list quantizations", slog.String("namespace", namespace),
 			slog.String("name", name), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return

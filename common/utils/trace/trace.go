@@ -13,11 +13,25 @@ import (
 )
 
 const (
-	HeaderRequestID   = "X-Request-ID"
-	HeaderTraceparent = "traceparent"
-	HeaderXB3         = "X-B3-TraceId"
-	HeaderKong        = "X-Kong-Request-Id"
+	HeaderRequestID    = "X-Request-ID"
+	HeaderTraceparent  = "Traceparent"
+	HeaderXB3          = "X-B3-TraceId"
+	HeaderKong         = "X-Kong-Request-Id"
+	HeaderXetSessionID = "X-Xet-Session-Id"
 )
+
+type sessionIDContextKey struct{}
+
+func SetSessionIDInContext(ctx context.Context, sessionID string) context.Context {
+	return context.WithValue(ctx, sessionIDContextKey{}, sessionID)
+}
+
+func GetSessionIDFromContext(ctx context.Context) string {
+	if sessionID, ok := ctx.Value(sessionIDContextKey{}).(string); ok {
+		return sessionID
+	}
+	return ""
+}
 
 // traceContextKey is used as the key for the trace ID in context.Context.
 // Using a private custom type avoids key collisions.
@@ -39,13 +53,29 @@ var (
 // IMPORTANT: It now also injects the trace ID into the request's context.Context.
 func GetOrGenTraceID(c *gin.Context) string {
 	traceID := GetTraceIDInGinContext(c)
+	traceparent := ""
 	if traceID == "" {
-		traceID = uuid.New().String()
+		traceID, traceparent, _ = GetOrGenTraceIDFromContext(c.Request.Context())
 	}
 	// If no trace ID is found in headers, generate a new one
 	c.Set(HeaderRequestID, traceID)
-	reqCtx := setTraceIDInRequestContext(c.Request.Context(), traceID)
+
+	// Ensure trace ID is always available in context.Context via our internal key
+	// This bridges the gap for code that relies on GetTraceIDFromContext's internal key lookup
+	spanCtx := trace.SpanContextFromContext(c.Request.Context())
+
+	// If traceparent is missing (e.g. traceID found in Gin cache), try to reconstruct it from Span
+	if traceparent == "" && spanCtx.HasTraceID() {
+		traceparent = fmt.Sprintf("00-%s-%s-%02x", spanCtx.TraceID().String(), spanCtx.SpanID().String(), spanCtx.TraceFlags())
+	}
+
+	if traceparent == "" {
+		traceparent = fmt.Sprintf("00-%s-00000000-01", traceID)
+	}
+
+	reqCtx := setTraceIDInRequestContext(c.Request.Context(), traceparent)
 	c.Request = c.Request.WithContext(reqCtx)
+
 	return traceID
 }
 
@@ -78,13 +108,21 @@ func GetTraceIDInGinContext(c *gin.Context) string {
 		}
 		if header == HeaderTraceparent {
 			// W3C Trace Context format: version-traceid-spanid-traceflags
-			parts := strings.Split(headerValue, "-")
-			if len(parts) == 4 {
-				return parts[1]
+			traceID := ExtalTraceFromTraceparent(headerValue)
+			if traceID != "" {
+				return traceID
 			}
 			continue
 		}
 		return headerValue
+	}
+	return ""
+}
+
+func ExtalTraceFromTraceparent(traceparent string) string {
+	parts := strings.Split(traceparent, "-")
+	if len(parts) == 4 {
+		return parts[1]
 	}
 	return ""
 }
@@ -94,13 +132,30 @@ func setTraceIDInRequestContext(ctx context.Context, traceID string) context.Con
 	return context.WithValue(ctx, traceContextKey{}, traceID)
 }
 
-// GetOrGenTraceIDFromContext tries to get trace info from otel span, or generates new ones.
-// It returns the traceID, the full traceparent header string, and whether it's newly generated.
-func GetOrGenTraceIDFromContext(ctx context.Context) (traceID, traceParent string, isNew bool) {
+// GetTraceIDFromContext tries to get trace info from the context.
+// It checks for a trace ID in the context value and then from the OpenTelemetry span.
+// It does not generate a new trace ID if one is not found.
+func GetTraceIDFromContext(ctx context.Context) (traceID, traceParent string) {
 	if nil == ctx {
-		return "", "", false
+		return "", ""
 	}
-	// get trace id from otel span
+
+	// 0. Special handling for *gin.Context because its Value() method
+	// might not delegate correctly to Request.Context() for struct keys.
+	if c, ok := ctx.(*gin.Context); ok && c.Request != nil && c.Request.Context() != nil {
+		ctx = c.Request.Context()
+	}
+
+	// 1. Get from ctx traceContextKey
+	values := ctx.Value(traceContextKey{})
+	if values != nil {
+		traceParent, ok := values.(string)
+		if ok {
+			traceID := ExtalTraceFromTraceparent(traceParent)
+			return traceID, traceParent
+		}
+	}
+	// 2. get trace id from otel span
 	spanCtx := trace.SpanContextFromContext(ctx)
 	if spanCtx.HasTraceID() && spanCtx.TraceID().String() != (trace.TraceID{}).String() {
 		traceID = spanCtx.TraceID().String()
@@ -108,8 +163,19 @@ func GetOrGenTraceIDFromContext(ctx context.Context) (traceID, traceParent strin
 		// Ensure spanID is valid before creating traceParent
 		if spanID != (trace.SpanID{}).String() {
 			traceParent = fmt.Sprintf("00-%s-%s-%02x", traceID, spanID, spanCtx.TraceFlags())
-			return traceID, traceParent, false
+			return traceID, traceParent
 		}
+	}
+
+	return "", ""
+}
+
+// GetOrGenTraceIDFromContext tries to get trace info from otel span, or generates new ones.
+// It returns the traceID, the full traceparent header string, and whether it's newly generated.
+func GetOrGenTraceIDFromContext(ctx context.Context) (traceID, traceParent string, isNew bool) {
+	traceID, traceParent = GetTraceIDFromContext(ctx)
+	if traceID != "" {
+		return traceID, traceParent, false
 	}
 
 	// generate a new trace id and span id

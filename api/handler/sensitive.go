@@ -34,7 +34,7 @@ func (h *SensitiveHandler) Text(ctx *gin.Context) {
 		err error
 	)
 	if err = ctx.ShouldBindJSON(&r); err != nil {
-		slog.Error("Bad request format", slog.String("err", err.Error()))
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", slog.String("err", err.Error()))
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -63,7 +63,7 @@ func (h *SensitiveHandler) Image(ctx *gin.Context) {
 		err error
 	)
 	if err = ctx.ShouldBindJSON(&r); err != nil {
-		slog.Error("Bad request format", slog.String("err", err.Error()))
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", slog.String("err", err.Error()))
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}

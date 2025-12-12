@@ -51,7 +51,7 @@ func (h *RecomHandler) SetOpWeight(ctx *gin.Context) {
 
 	err := h.c.SetOpWeight(ctx.Request.Context(), req.RepoID, req.Weight)
 	if err != nil {
-		slog.Error("failed to set op weight", slog.Int64("repo_id", req.RepoID), slog.Int64("weight", req.Weight),
+		slog.ErrorContext(ctx.Request.Context(), "failed to set op weight", slog.Int64("repo_id", req.RepoID), slog.Int64("weight", req.Weight),
 			slog.Any("error", err))
 		httpbase.ServerError(ctx, fmt.Errorf("failed to set op weight for repository %d, err:%w", req.RepoID, err))
 		return

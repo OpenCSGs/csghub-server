@@ -68,13 +68,13 @@ func (ah *AccountingHandler) QueryMeteringStatementByUserID(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 	scene, err := getSceneFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request scene format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request scene format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -83,12 +83,12 @@ func (ah *AccountingHandler) QueryMeteringStatementByUserID(ctx *gin.Context) {
 	startTime := ctx.Query("start_time") // format: '2024-06-12 08:27:22'
 	endTime := ctx.Query("end_time")     // format: '2024-06-12 17:17:22'
 	if len(startTime) < 1 || len(endTime) < 1 || len(userUUID) < 1 {
-		slog.Error("Bad request format")
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format")
 		httpbase.BadRequest(ctx, "Bad request format")
 		return
 	}
 	if !validateDateTimeFormat(startTime, "2006-01-02 15:04:05") || !validateDateTimeFormat(endTime, "2006-01-02 15:04:05") {
-		slog.Error("Bad request datetime format")
+		slog.ErrorContext(ctx.Request.Context(), "Bad request datetime format")
 		httpbase.BadRequest(ctx, "Bad request datetime format")
 		return
 	}
@@ -105,7 +105,7 @@ func (ah *AccountingHandler) QueryMeteringStatementByUserID(ctx *gin.Context) {
 	data, err := ah.accounting.ListMeteringsByUserIDAndTime(ctx.Request.Context(), req)
 	if err != nil {
 		errTip := "fail to query meterings by user"
-		slog.Error(errTip, slog.Any("req", req), slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), errTip, slog.Any("req", req), slog.Any("error", err))
 		httpbase.ServerError(ctx, errors.New(errTip))
 		return
 	}
