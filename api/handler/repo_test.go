@@ -1528,3 +1528,15 @@ func TestRepoHandler_CommitFiles(t *testing.T) {
 		t, 200, tester.OKText, nil,
 	)
 }
+
+func TestRepoHandler_GetRepos(t *testing.T) {
+	tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+		return rp.GetRepos
+	})
+	tester.mocks.repo.EXPECT().GetRepos(mock.Anything, "search", "u", types.ModelRepo).Return([]string{}, nil).Once()
+	tester.WithQuery("type", "model").WithQuery("search", "search").WithUser().Execute()
+
+	tester.ResponseEq(
+		t, 200, tester.OKText, []string{},
+	)
+}

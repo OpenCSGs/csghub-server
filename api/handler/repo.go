@@ -3015,3 +3015,40 @@ func (h *RepoHandler) ChangePath(ctx *gin.Context) {
 	}
 	httpbase.OK(ctx, nil)
 }
+
+// GetRepos godoc
+// @Security     ApiKey
+// @Summary      Get repo paths with search query
+// @Tags         Repository
+// @Accept       json
+// @Produce      json
+// @Param        current_user query string false "current user name"
+// @Param        search query string true "search query"
+// @Param        type query string true "repository type query" enums(model, dataset, code, space, mcpserver)
+// @Success      200  {object}  types.Response{data=[]string} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /repos[get]
+func (h *RepoHandler) GetRepos(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	search := ctx.Query("search")
+	repositoryType := ctx.Query("type")
+	repoType := types.RepositoryType(repositoryType)
+	if repoType == types.UnknownRepo {
+		httpbase.BadRequest(ctx, "Unknown repository type")
+		return
+	}
+
+	repos, err := h.c.GetRepos(ctx.Request.Context(), search, currentUser, repoType)
+	if err != nil {
+		slog.Error(
+			"Failed to get repos",
+			slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	slog.Debug(
+		"Get repos succeed",
+		slog.String("search", search))
+	httpbase.OK(ctx, repos)
+}

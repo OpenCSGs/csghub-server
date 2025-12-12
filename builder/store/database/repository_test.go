@@ -1821,3 +1821,33 @@ func TestRepoStore_UpdateRepoSensitiveCheckStatus(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, types.SensitiveCheckPass, rp.SensitiveCheckStatus)
 }
+
+func TestRepoStore_GetReposBySearch(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	// insert a new repo
+	rs := database.NewRepoStoreWithDB(db)
+	for i := 0; i < 10; i++ {
+		_, err := db.Operator.Core.NewInsert().Model(&database.Repository{
+			UserID:         1,
+			Path:           fmt.Sprintf("%s/%d", "path", i),
+			GitPath:        fmt.Sprintf("datasets_%s/%d", "path", i),
+			Name:           fmt.Sprintf("name_%d", i),
+			DefaultBranch:  "main",
+			Nickname:       "ww",
+			Description:    "ww",
+			Private:        false,
+			RepositoryType: types.DatasetRepo,
+			Source:         "opencsg",
+			Hashed:         false,
+		}).Exec(ctx)
+		require.Nil(t, err)
+	}
+
+	repos, total, err := rs.GetReposBySearch(ctx, "path/1", types.DatasetRepo, 1, 10)
+	require.Nil(t, err)
+	require.NotNil(t, repos)
+	require.Equal(t, 1, total)
+}
