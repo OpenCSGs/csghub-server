@@ -40,13 +40,13 @@ func (th *TelemetryHandler) Usage(ctx *gin.Context) {
 	var usage telemetry.Usage
 	if err := ctx.ShouldBindJSON(&usage); err != nil {
 		newErr := fmt.Errorf("bad request format, %w", err).Error()
-		slog.Error(newErr)
+		slog.ErrorContext(ctx.Request.Context(), newErr)
 		httpbase.BadRequest(ctx, newErr)
 		return
 	}
 	err := th.c.SaveUsageData(ctx.Request.Context(), usage)
 	if err != nil {
-		slog.Error("fail to save usage data", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "fail to save usage data", slog.Any("error", err))
 		httpbase.ServerError(ctx, errors.New("fail to save usage data"))
 		return
 	}

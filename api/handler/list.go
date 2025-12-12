@@ -46,14 +46,14 @@ type ListHandler struct {
 func (h *ListHandler) ListModelsByPath(ctx *gin.Context) {
 	var listTrendingReq types.ListByPathReq
 	if err := ctx.ShouldBindJSON(&listTrendingReq); err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 
 	resp, err := h.c.ListModelsByPath(ctx.Request.Context(), &listTrendingReq)
 	if err != nil {
-		slog.Error("Failed to update dataset", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to update dataset", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -75,14 +75,14 @@ func (h *ListHandler) ListModelsByPath(ctx *gin.Context) {
 func (h *ListHandler) ListDatasetsByPath(ctx *gin.Context) {
 	var listTrendingReq types.ListByPathReq
 	if err := ctx.ShouldBindJSON(&listTrendingReq); err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
 
 	resp, err := h.c.ListDatasetsByPath(ctx.Request.Context(), &listTrendingReq)
 	if err != nil {
-		slog.Error("Failed to update dataset", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to update dataset", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}

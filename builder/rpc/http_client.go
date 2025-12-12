@@ -192,8 +192,8 @@ func (c *HttpClient) Post(ctx context.Context, path string, data interface{}, ou
 func (c *HttpClient) Do(req *http.Request) (resp *http.Response, err error) {
 	ctx := req.Context()
 	fullPath := req.URL.String()
-	traceID, traceParent, isNew := trace.GetOrGenTraceIDFromContext(ctx)
-	if isNew {
+	traceID, traceParent, _ := trace.GetOrGenTraceIDFromContext(ctx)
+	if traceParent != "" {
 		req.Header.Set(trace.HeaderTraceparent, traceParent)
 	}
 

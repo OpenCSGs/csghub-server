@@ -52,7 +52,7 @@ func (h *DataflowProxyHandler) Proxy(ctx *gin.Context) {
 		return
 	}
 	if len(token) == 0 {
-		slog.Error("fail to get or create user first git access token", slog.Any("user", currentUser), slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "fail to get or create user first git access token", slog.Any("user", currentUser), slog.Any("error", err))
 		httpbase.ServerError(ctx, errors.New("can not get user first available access token"))
 		ctx.Abort()
 		return

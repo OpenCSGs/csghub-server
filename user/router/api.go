@@ -165,7 +165,7 @@ func userMatch() gin.HandlerFunc {
 		userName := ctx.Param("username")
 		if userName != currentUser {
 			httpbase.UnauthorizedError(ctx, errorx.ErrUserNotMatch)
-			slog.Error("user not match, try to query user account not owned", "currentUser", currentUser, "userName", userName)
+			slog.ErrorContext(ctx.Request.Context(), "user not match, try to query user account not owned", "currentUser", currentUser, "userName", userName)
 			ctx.Abort()
 			return
 		}

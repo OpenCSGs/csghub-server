@@ -3,6 +3,7 @@ package rpc
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/url"
 
 	"opencsg.com/csghub-server/api/httpbase"
@@ -42,12 +43,18 @@ func (c *UserSvcHttpClient) GetMemberRole(ctx context.Context, orgName, userName
 	r.Data = membership.RoleUnknown
 	err := c.hc.Get(ctx, url, &r)
 	if err != nil {
-		return membership.RoleUnknown, fmt.Errorf("failed to get member role: %w", err)
+		slog.ErrorContext(ctx, "call user service failed", slog.String("error", err.Error()))
+		return membership.RoleUnknown, errorx.RemoteSvcFail(err,
+			errorx.Ctx().
+				Set("service", "user service").
+				Set("action", "get member role").
+				Set("orgName", orgName).
+				Set("userName", userName))
 	}
 
 	role, ok := r.Data.(string)
 	if !ok {
-		return membership.RoleUnknown, fmt.Errorf("failed to convert r.Data '%v' to membership.Role, err:%w", r.Data, errorx.ErrInternalServerError)
+		return membership.RoleUnknown, errorx.InternalServerError(fmt.Errorf("failed to convert r.Data '%v' to membership.Role", r.Data), nil)
 	}
 	return membership.Role(role), nil
 }
@@ -59,7 +66,12 @@ func (c *UserSvcHttpClient) GetNameSpaceInfo(ctx context.Context, path string) (
 	r.Data = &Namespace{}
 	err := c.hc.Get(ctx, url, &r)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get namespace '%s' info: %w", path, err)
+		slog.ErrorContext(ctx, "call user service failed", slog.String("error", err.Error()))
+		return nil, errorx.RemoteSvcFail(err,
+			errorx.Ctx().
+				Set("service", "user service").
+				Set("action", "get namespace info").
+				Set("path", path))
 	}
 
 	return r.Data.(*Namespace), nil
@@ -71,7 +83,13 @@ func (c *UserSvcHttpClient) GetUserInfo(ctx context.Context, userName, visitorNa
 	r.Data = &User{}
 	err := c.hc.Get(ctx, url, &r)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get user '%s' info: %w", userName, err)
+		slog.ErrorContext(ctx, "call user service failed", slog.String("error", err.Error()))
+		return nil, errorx.RemoteSvcFail(err,
+			errorx.Ctx().
+				Set("service", "user service").
+				Set("action", "get user info").
+				Set("userName", userName).
+				Set("visitorName", visitorName))
 	}
 
 	return r.Data.(*User), nil
@@ -83,7 +101,13 @@ func (c *UserSvcHttpClient) GetOrCreateFirstAvaiTokens(ctx context.Context, user
 	r.Data = interface{}("")
 	err := c.hc.Get(ctx, url, &r)
 	if err != nil {
-		return "", fmt.Errorf("failed to get user '%s' token for %s: %w", userName, app, err)
+		slog.ErrorContext(ctx, "call user service failed", slog.String("error", err.Error()))
+		return "", errorx.RemoteSvcFail(err,
+			errorx.Ctx().
+				Set("service", "user service").
+				Set("action", "get or create tokens").
+				Set("userName", userName).
+				Set("app", app))
 	}
 	return r.Data.(string), nil
 }
@@ -94,7 +118,11 @@ func (c *UserSvcHttpClient) VerifyByAccessToken(ctx context.Context, token strin
 	r.Data = &types.CheckAccessTokenResp{}
 	err := c.hc.Get(ctx, url, &r)
 	if err != nil {
-		return nil, fmt.Errorf("failed to verify access token info: %w", err)
+		slog.ErrorContext(ctx, "call user service failed", slog.String("error", err.Error()))
+		return nil, errorx.RemoteSvcFail(err,
+			errorx.Ctx().
+				Set("service", "user service").
+				Set("action", "verify access token"))
 	}
 
 	return r.Data.(*types.CheckAccessTokenResp), nil
@@ -106,7 +134,12 @@ func (c *UserSvcHttpClient) GetUserByName(ctx context.Context, userName string) 
 	r.Data = &types.User{}
 	err := c.hc.Get(ctx, url, &r)
 	if err != nil {
-		return nil, fmt.Errorf("failed get user by username: %w", err)
+		slog.ErrorContext(ctx, "call user service failed", slog.String("error", err.Error()))
+		return nil, errorx.RemoteSvcFail(err,
+			errorx.Ctx().
+				Set("service", "user service").
+				Set("action", "get user by name").
+				Set("userName", userName))
 	}
 
 	return r.Data.(*types.User), nil
@@ -124,7 +157,12 @@ func (c *UserSvcHttpClient) FindByUUIDs(ctx context.Context, uuids []string) (ma
 	}
 	err := c.hc.Get(ctx, url, &resp)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find users by uuids: %w", err)
+		slog.ErrorContext(ctx, "call user service failed", slog.String("error", err.Error()))
+		return nil, errorx.RemoteSvcFail(err,
+			errorx.Ctx().
+				Set("service", "user service").
+				Set("action", "find users by uuids").
+				Set("uuidCount", len(uuids)))
 	}
 	result := make(map[string]*types.User)
 	if resp.Data != nil {
@@ -147,7 +185,13 @@ func (c *UserSvcHttpClient) GetUserUUIDs(ctx context.Context, per, page int) ([]
 	}
 	err := c.hc.Get(ctx, url, &resp)
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to get user uuids: %w", err)
+		slog.ErrorContext(ctx, "call user service failed", slog.String("error", err.Error()))
+		return nil, 0, errorx.RemoteSvcFail(err,
+			errorx.Ctx().
+				Set("service", "user service").
+				Set("action", "get user uuids").
+				Set("per", per).
+				Set("page", page))
 	}
 	return resp.Data.UserUUIDs, resp.Data.Total, nil
 }
@@ -161,7 +205,13 @@ func (c *UserSvcHttpClient) GetEmails(ctx context.Context, per, page int) ([]str
 	}
 	err := c.hc.Get(ctx, url, &resp)
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to get user emails: %w", err)
+		slog.ErrorContext(ctx, "call user service failed", slog.String("error", err.Error()))
+		return nil, 0, errorx.RemoteSvcFail(err,
+			errorx.Ctx().
+				Set("service", "user service").
+				Set("action", "get user emails").
+				Set("per", per).
+				Set("page", page))
 	}
 	return resp.Data, resp.Total, nil
 }

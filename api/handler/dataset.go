@@ -61,7 +61,7 @@ func (h *DatasetHandler) Create(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	var req *types.CreateDatasetReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, errorx.ReqBodyFormat(err, nil))
 		return
 	}
@@ -72,7 +72,7 @@ func (h *DatasetHandler) Create(ctx *gin.Context) {
 	req.Username = currentUser
 	_, err := h.sensitive.CheckRequestV2(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("failed to check sensitive request", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "failed to check sensitive request", slog.Any("error", err))
 		httpbase.ServerError(ctx, fmt.Errorf("sensitive check failed: %w", err))
 		return
 	}
@@ -89,7 +89,7 @@ func (h *DatasetHandler) Create(ctx *gin.Context) {
 		} else if errors.Is(err, errorx.ErrDatabaseDuplicateKey) {
 			httpbase.BadRequestWithExt(ctx, err)
 		} else {
-			slog.Error("Failed to create dataset", slog.Any("error", err))
+			slog.ErrorContext(ctx.Request.Context(), "Failed to create dataset", slog.Any("error", err))
 			httpbase.ServerError(ctx, err)
 		}
 		return
@@ -125,7 +125,7 @@ func (h *DatasetHandler) Index(ctx *gin.Context) {
 	filter.Username = httpbase.GetCurrentUser(ctx)
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
@@ -133,7 +133,7 @@ func (h *DatasetHandler) Index(ctx *gin.Context) {
 	if !slices.Contains(types.Sorts, filter.Sort) {
 		err = fmt.Errorf("sort parameter must be one of %v", types.Sorts)
 		err = errorx.ReqParamInvalid(err, errorx.Ctx().Set("query", "sort_filter"))
-		slog.Error("Bad sort request format,", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Bad sort request format,", slog.Any("error", err))
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
@@ -141,7 +141,7 @@ func (h *DatasetHandler) Index(ctx *gin.Context) {
 	if filter.Source != "" && !slices.Contains(types.Sources, filter.Source) {
 		err = fmt.Errorf("source parameter must be one of %v", types.Sources)
 		err = errorx.ReqParamInvalid(err, errorx.Ctx().Set("query", "source_filter"))
-		slog.Error("Bad source request format,", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Bad source request format,", slog.Any("error", err))
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
@@ -153,7 +153,7 @@ func (h *DatasetHandler) Index(ctx *gin.Context) {
 	}
 	datasets, total, err := h.dataset.Index(ctx.Request.Context(), filter, per, page, needOpWeight)
 	if err != nil {
-		slog.Error("Failed to get datasets", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get datasets", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -180,14 +180,14 @@ func (h *DatasetHandler) Update(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	var req *types.UpdateDatasetReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, errorx.ReqBodyFormat(err, nil))
 		return
 	}
 
 	_, err := h.sensitive.CheckRequestV2(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("failed to check sensitive request", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "failed to check sensitive request", slog.Any("error", err))
 		httpbase.ServerError(ctx, fmt.Errorf("sensitive check failed: %w", err))
 		return
 	}
@@ -195,7 +195,7 @@ func (h *DatasetHandler) Update(ctx *gin.Context) {
 
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
@@ -204,7 +204,7 @@ func (h *DatasetHandler) Update(ctx *gin.Context) {
 
 	dataset, err := h.dataset.Update(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("Failed to update dataset", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to update dataset", slog.Any("error", err))
 		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
 			return
@@ -235,7 +235,7 @@ func (h *DatasetHandler) Delete(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
@@ -245,7 +245,7 @@ func (h *DatasetHandler) Delete(ctx *gin.Context) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
-		slog.Error("Failed to delete dataset", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to delete dataset", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -272,7 +272,7 @@ func (h *DatasetHandler) Delete(ctx *gin.Context) {
 func (h *DatasetHandler) Show(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
@@ -294,7 +294,7 @@ func (h *DatasetHandler) Show(ctx *gin.Context) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
-		slog.Error("Failed to get dataset", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get dataset", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -319,7 +319,7 @@ func (h *DatasetHandler) Show(ctx *gin.Context) {
 func (h *DatasetHandler) Relations(ctx *gin.Context) {
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
@@ -330,7 +330,7 @@ func (h *DatasetHandler) Relations(ctx *gin.Context) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
-		slog.Error("Failed to get dataset relations", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get dataset relations", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
