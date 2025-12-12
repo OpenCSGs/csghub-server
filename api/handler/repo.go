@@ -3028,7 +3028,7 @@ func (h *RepoHandler) ChangePath(ctx *gin.Context) {
 // @Success      200  {object}  types.Response{data=[]string} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /repos[get]
+// @Router       /repos [get]
 func (h *RepoHandler) GetRepos(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	search := ctx.Query("search")

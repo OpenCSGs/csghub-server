@@ -190,6 +190,7 @@ type RepoComponent interface {
 	BatchMigrateRepoToHashedPath(ctx context.Context, auto bool, batchSize int, lastID int64) (int64, error)
 	GetMirrorTaskStatusAndSyncStatus(repo *database.Repository) (types.MirrorTaskStatus, types.RepositorySyncStatus)
 	CheckDeployPermissionForUser(ctx context.Context, deployReq types.DeployActReq) (*database.User, *database.Deploy, error)
+	GetRepos(ctx context.Context, search, currentUser string, repoType types.RepositoryType) ([]string, error)
 	IsXnetEnabled(ctx context.Context, repoType types.RepositoryType, namespace, name, username string) (*types.XetEnabled, error)
 }
 
