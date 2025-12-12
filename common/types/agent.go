@@ -257,6 +257,7 @@ type CodeAgentRequest struct {
 	Stream        bool                      `json:"stream"`                             // Whether to stream the response
 	AgentName     string                    `json:"agent_name" binding:"required"`      // Name of the agent to use
 	StreamMode    *StreamMode               `json:"stream_mode,omitempty"`              // Stream configuration
+	Files         []CodeAgentFile           `json:"files,omitempty"`                    // Files to upload
 	History       []CodeAgentRequestMessage `json:"history,omitempty"`                  // Conversation history
 }
 
@@ -264,6 +265,11 @@ type StreamMode struct {
 	Mode  string `json:"mode" binding:"required"` // Stream mode (e.g., "general")
 	Token int    `json:"token" binding:"min=1"`   // Token-based streaming interval
 	Time  int    `json:"time" binding:"min=1"`    // Time-based streaming interval
+}
+
+type CodeAgentFile struct {
+	URL  string `json:"url"`
+	Name string `json:"name"`
 }
 
 type CodeAgentRequestMessage struct {
