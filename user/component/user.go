@@ -8,11 +8,14 @@ import (
 	"fmt"
 	"log/slog"
 	"math/rand"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/bwmarrin/snowflake"
+	"github.com/cespare/xxhash/v2"
 	"github.com/google/uuid"
+	"github.com/redis/go-redis/v9"
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/rpc"
@@ -22,9 +25,17 @@ import (
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/types/enum"
+	"opencsg.com/csghub-server/common/utils/common"
+
+	"github.com/avast/retry-go/v4"
 )
 
 const GitalyRepoNotFoundErr = "rpc error: code = NotFound desc = repository does not exist"
+
+const (
+	SMSCodeCachePrefix = "sms:code"
+	SMSCodeCacheTTL    = 1 * time.Minute
+)
 
 type userComponentImpl struct {
 	userStore database.UserStore
@@ -38,9 +49,10 @@ type userComponentImpl struct {
 	audit     database.AuditLogStore
 	pdStore   database.PendingDeletionStore
 
-	gs     gitserver.GitServer
-	jwtc   JwtComponent
-	tokenc AccessTokenComponent
+	gs          gitserver.GitServer
+	jwtc        JwtComponent
+	tokenc      AccessTokenComponent
+	invitationc InvitationComponent
 
 	// casc      *casdoorsdk.Client
 	// casConfig *casdoorsdk.AuthConfig
@@ -79,7 +91,7 @@ type UserComponent interface {
 	CheckIfUserHasOrgs(ctx context.Context, userName string) (bool, error)
 	CheckIfUserHasRunningOrBuildingDeployments(ctx context.Context, userName string) (bool, error)
 	CheckIfUserHasBills(ctx context.Context, userName string) (bool, error)
-	Index(ctx context.Context, visitorName, search, verifyStatus string, labels []string, per, page int) ([]*types.User, int, error)
+	Index(ctx context.Context, req types.UserListReq) ([]*types.User, int, error)
 	Signin(ctx context.Context, code, state string) (*types.JWTClaims, string, error)
 	FixUserData(ctx context.Context, userName string) error
 	UpdateUserLabels(ctx context.Context, req *types.UserLabelsRequest) error
@@ -92,6 +104,11 @@ type UserComponent interface {
 	GetUserUUIDs(ctx context.Context, per, page int) ([]string, int, error)
 	GenerateVerificationCodeAndSendEmail(ctx context.Context, uid, email string) error
 	ResetUserTags(ctx context.Context, uid string, tagIDs []int64) error
+	SendSMSCode(ctx context.Context, uid string, req types.SendSMSCodeRequest) (*types.SendSMSCodeResponse, error)
+	UpdatePhone(ctx context.Context, uid string, req types.UpdateUserPhoneRequest) error
+	SendPublicSMSCode(ctx context.Context, req types.SendPublicSMSCodeRequest) (*types.SendSMSCodeResponse, error)
+	VerifyPublicSMSCode(ctx context.Context, req types.VerifyPublicSMSCodeRequest) error
+	StreamExportUsers(ctx context.Context, req types.UserIndexReq) (data chan types.UserIndexResp, err error)
 }
 
 func NewUserComponent(config *config.Config) (UserComponent, error) {
@@ -140,6 +157,11 @@ func NewUserComponent(config *config.Config) (UserComponent, error) {
 
 	c.ts = database.NewTagStore()
 	c.uts = database.NewUserTagStore()
+
+	c.invitationc, err = NewInvitationComponent(c.config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create invitation component, error: %w", err)
+	}
 	return c, nil
 }
 
@@ -148,6 +170,29 @@ func NewUserComponent(config *config.Config) (UserComponent, error) {
 // 	// Panic if the function has not been implemented
 // 	panic("implement me later")
 // }
+
+func (c *userComponentImpl) checkUserConflictsInDB(ctx context.Context, username, email string) error {
+	exists, err := c.userStore.IsExist(ctx, username)
+	if err != nil {
+		return fmt.Errorf("failed to check username existence: %w", err)
+	}
+	if exists {
+		return errorx.UsernameExists(username)
+	}
+
+	// Check email existence if email is provided
+	if email != "" {
+		user, err := c.userStore.FindByEmail(ctx, email)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return fmt.Errorf("failed to check email existence: %w", err)
+		}
+		if user.ID > 0 {
+			return errorx.EmailExists(email)
+		}
+	}
+
+	return nil
+}
 
 func (c *userComponentImpl) createFromSSOUser(ctx context.Context, cu *rpc.SSOUserInfo) (*database.User, error) {
 	var (
@@ -170,6 +215,11 @@ func (c *userComponentImpl) createFromSSOUser(ctx context.Context, cu *rpc.SSOUs
 		userName = cu.Name
 		canChangeUserName = false
 		email = cu.Email
+	}
+
+	// Check for conflicts before proceeding
+	if err := c.checkUserConflictsInDB(ctx, userName, email); err != nil {
+		return nil, err
 	}
 	//skip creating git user if email is empty, it will be created later when user set email
 	if email != "" {
@@ -197,6 +247,7 @@ func (c *userComponentImpl) createFromSSOUser(ctx context.Context, cu *rpc.SSOUs
 		Gender:      cu.Gender,
 		// RoleMask:        "", //will be updated when admin set user role
 		Phone:           cu.Phone,
+		PhoneArea:       cu.PhoneArea,
 		PhoneVerified:   false,
 		EmailVerified:   false,
 		LastLoginAt:     cu.LastSigninTime,
@@ -246,6 +297,8 @@ func (c *userComponentImpl) UpdateByUUID(ctx context.Context, req *types.UpdateU
 	} else {
 		opUser = *user
 	}
+
+	shouldSyncToIAM := false
 	if req.Roles != nil {
 		if can, reason := c.canChangeRole(*user, opUser); !can {
 			return errors.New(reason)
@@ -256,6 +309,7 @@ func (c *userComponentImpl) UpdateByUUID(ctx context.Context, req *types.UpdateU
 		if can, reason := c.canChangeUserName(ctx, *user, opUser, *req.NewUserName); !can {
 			return errors.New(reason)
 		}
+		shouldSyncToIAM = true
 	}
 
 	if req.Email != nil && user.Email != *req.Email {
@@ -270,31 +324,21 @@ func (c *userComponentImpl) UpdateByUUID(ctx context.Context, req *types.UpdateU
 		if err != nil {
 			return err
 		}
-
+		shouldSyncToIAM = true
 	}
 
-	if req.Phone != nil && user.Phone != *req.Phone {
-		if can, reason := c.canChangePhone(ctx, *user, opUser, *req.Phone); !can {
-			return errors.New(reason)
-		}
-	}
-	if len(req.TagIDs) != 0 {
-		if err := c.ResetUserTags(ctx, uuid, req.TagIDs); err != nil {
-			return fmt.Errorf("failed to reset user tags,error:%w", err)
-		}
+	if err := c.ResetUserTags(ctx, uuid, req.TagIDs); err != nil {
+		return fmt.Errorf("failed to reset user tags,error:%w", err)
 	}
 
-	// update user in casdoor first, then update user in db
-	if c.IsSSOUser(user.RegProvider) {
+	// update user in IAM first, then update user in db
+	if shouldSyncToIAM && c.IsSSOUser(user.RegProvider) {
 		var params = rpc.SSOUpdateUserInfo{
 			UUID: uuid,
 		}
 
 		if req.Email != nil {
 			params.Email = *req.Email
-		}
-		if req.Phone != nil {
-			params.Phone = *req.Phone
 		}
 		if req.NewUserName != nil {
 			params.Name = *req.NewUserName
@@ -305,25 +349,16 @@ func (c *userComponentImpl) UpdateByUUID(ctx context.Context, req *types.UpdateU
 			return fmt.Errorf("failed to update user in sso, uuid:'%s',error:%w", user.UUID, err)
 		}
 	}
-	/* dont update git user email anymore, as gitea has been depricated */
 
 	changedUser := c.setChangedProps(user, req)
 	if err := c.userStore.Update(ctx, changedUser, user.Username); err != nil {
-		// rollback casdoor user change
-		// get id by user name before changed
-		// id := c.casc.GetId(oldCasdoorUser.Name)
-		// id = url.QueryEscape(id) // wechat user's name may contain special characters
-		// if _, err := c.casc.UpdateUserById(id, oldCasdoorUser); err != nil {
-		// 	slog.Error("failed to rollback casdoor user change", slog.String("uuid", user.UUID), slog.Any("error", err))
-		// }
-
-		if c.IsSSOUser(user.RegProvider) {
+		// rollback casdoor user change only if SSO update was performed
+		if shouldSyncToIAM && c.IsSSOUser(user.RegProvider) {
 			params := rpc.SSOUpdateUserInfo{
 				UUID:   uuid,
 				Name:   oldUser.Username,
 				Email:  oldUser.Email,
 				Gender: oldUser.Gender,
-				Phone:  oldUser.Phone,
 			}
 			err := c.sso.UpdateUserInfo(ctx, &params)
 			if err != nil {
@@ -409,37 +444,6 @@ func (c *userComponentImpl) canChangeEmail(ctx context.Context, user, opuser dat
 	return true, ""
 }
 
-func (c *userComponentImpl) canChangePhone(ctx context.Context, user database.User, opUser database.User, newPhone string) (bool, string) {
-	if opUser.ID != user.ID {
-		return false, "phone can only be changed by the user itself"
-	}
-	// if user.RegProvider != "casdoor" {
-	// 	return true, ""
-	// }
-	// check phone existence in casdoor
-	// casu, err := c.casc.GetUserByPhone(newPhone)
-	// if err != nil {
-	// 	return false, "failed to check new phone existence in casdoor"
-	// }
-	// if casu != nil && casu.Id != user.UUID {
-	// 	return false, "new phone already exists in casdoor"
-	// }
-
-	if !c.IsSSOUser(user.RegProvider) {
-		return true, ""
-	}
-
-	exist, err := c.sso.IsExistByPhone(ctx, newPhone)
-	if err != nil {
-		return false, "failed to check new phone existence in casdoor"
-	}
-	if exist {
-		return false, "new phone already exists in casdoor"
-	}
-
-	return true, ""
-}
-
 // Depricated: only useful for gitea, will be removed in the future
 // user registry with wechat does not have email, so git user is not created after signin
 // when user set email, a git user needs to be created
@@ -493,12 +497,6 @@ func (c *userComponentImpl) setChangedProps(oldUser *database.User, req *types.U
 	}
 	if req.Homepage != nil {
 		user.Homepage = *req.Homepage
-	}
-	if req.Phone != nil {
-		user.Phone = *req.Phone
-	}
-	if req.PhoneArea != nil {
-		user.PhoneArea = *req.PhoneArea
 	}
 	if req.Nickname != nil {
 		user.NickName = *req.Nickname
@@ -559,7 +557,7 @@ func (c *userComponentImpl) Delete(ctx context.Context, operator, username strin
 					continue
 				}
 				err = c.pdStore.Create(ctx, &database.PendingDeletion{
-					TableName: "repositories",
+					TableName: database.PendingDeletionTableNameRepository,
 					Value:     repo.GitalyPath(),
 				})
 				if err != nil {
@@ -736,14 +734,6 @@ func (c *userComponentImpl) CheckIfUserHasBills(ctx context.Context, userName st
 		return true, nil
 	}
 
-	asqs, err := c.asqs.ListAllByUserID(ctx, user.ID)
-	if err != nil {
-		return false, fmt.Errorf("failed to list all account sync quotas for user %s in db, error: %w", userName, err)
-	}
-	if len(asqs) > 0 {
-		return true, nil
-	}
-
 	aus, err := c.aus.ListAllByUserUUID(ctx, user.UUID)
 	if err != nil {
 		return false, fmt.Errorf("failed to list all account users for user %s in db, error: %w", userName, err)
@@ -818,19 +808,19 @@ func (c *userComponentImpl) buildUserInfo(ctx context.Context, dbuser *database.
 	return &u, nil
 }
 
-func (c *userComponentImpl) Index(ctx context.Context, visitorName, search, verifyStatus string, labels []string, per, page int) ([]*types.User, int, error) {
+func (c *userComponentImpl) Index(ctx context.Context, req types.UserListReq) ([]*types.User, int, error) {
 	var (
 		respUsers     []*types.User
 		onlyBasicInfo bool
 	)
-	canAdmin, err := c.CanAdmin(ctx, visitorName)
+	canAdmin, err := c.CanAdmin(ctx, req.VisitorName)
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to check visitor user permission, visitor: %s, error: %w", visitorName, err)
+		return nil, 0, fmt.Errorf("failed to check visitor user permission, visitor: %s, error: %w", req.VisitorName, err)
 	}
 	if !canAdmin {
 		onlyBasicInfo = true
 	}
-	dbusers, count, err := c.userStore.IndexWithSearch(ctx, search, verifyStatus, labels, per, page)
+	dbusers, count, err := c.userStore.IndexWithSearch(ctx, req)
 	if err != nil {
 		newError := fmt.Errorf("failed to find user by name in db,error:%w", err)
 		return nil, count, newError
@@ -869,6 +859,7 @@ func (c *userComponentImpl) Index(ctx context.Context, visitorName, search, veri
 			user.VerifyStatus = string(dbuser.VerifyStatus)
 			user.Labels = dbuser.Labels
 			user.LastLoginAt = dbuser.LastLoginAt
+			user.CreatedAt = dbuser.CreatedAt
 		}
 
 		respUsers = append(respUsers, user)
@@ -918,6 +909,20 @@ func (c *userComponentImpl) Signin(ctx context.Context, code, state string) (*ty
 				slog.Error("failed to create git user access token", "error", err, "username", dbu.Username)
 			}
 		}(dbu.Username)
+
+		if dbu.Phone != "" {
+			go func() {
+				ctx, cancel := context.WithTimeout(context.Background(), time.Second*60)
+				defer cancel()
+				if err := c.invitationc.AwardCreditToInvitee(ctx, types.AwardCreditToInviteeReq{
+					InviteeUUID: dbu.UUID,
+					InviteeName: dbu.Username,
+					RegisterAt:  dbu.CreatedAt,
+				}); err != nil {
+					slog.Error("failed to award credit to invitee", "error", err, "invitee_uuid", dbu.UUID)
+				}
+			}()
+		}
 	} else {
 		// get user from db for username, as casdoor may have different username
 		dbu, err = c.userStore.FindByUUID(ctx, cu.UUID)
@@ -1142,6 +1147,13 @@ func (c *userComponentImpl) sendVerificationCodeEmail(ctx context.Context, uid, 
 }
 
 func (e *userComponentImpl) VerifyVerificationCode(ctx context.Context, uid, email string, verificationCode string) error {
+	exists, err := e.cache.Exists(ctx, fmt.Sprintf("email_verification_code:%s:%s", uid, email))
+	if err != nil {
+		return err
+	}
+	if exists == 0 {
+		return errors.New("verification code expired or not available")
+	}
 	code, err := e.cache.Get(ctx, fmt.Sprintf("email_verification_code:%s:%s", uid, email))
 	if err != nil {
 		return err
@@ -1181,4 +1193,330 @@ func (c *userComponentImpl) ResetUserTags(ctx context.Context, uid string, tagID
 		return err
 	}
 	return nil
+}
+
+func normalizePhoneArea(phoneArea string) string {
+	if !strings.HasPrefix(phoneArea, "+") {
+		return fmt.Sprintf("+%s", phoneArea)
+	}
+	return phoneArea
+}
+
+func getSMSCodeCacheKey(identifier, phoneArea, phone string) (string, error) {
+	h := xxhash.New()
+	_, err := fmt.Fprintf(h, "%s:%s", phoneArea, phone)
+	if err != nil {
+		slog.Error("failed to write phone area and phone to hash", "error", err)
+		return "", errorx.ErrInternalServerError
+	}
+	return fmt.Sprintf("%s:%s:%x", SMSCodeCachePrefix, identifier, h.Sum64()), nil
+}
+
+func (c *userComponentImpl) SendSMSCode(ctx context.Context, uid string, req types.SendSMSCodeRequest) (*types.SendSMSCodeResponse, error) {
+	user, err := c.userStore.FindByUUID(ctx, uid)
+	if err != nil {
+		return nil, err
+	}
+	if user == nil {
+		return nil, errorx.ErrUserNotFound
+	}
+
+	phoneArea := normalizePhoneArea(req.PhoneArea)
+	key, err := getSMSCodeCacheKey(uid, phoneArea, req.Phone)
+	if err != nil {
+		return nil, err
+	}
+
+	return c.sendAndStoreSMSCode(ctx, phoneArea, req.Phone, key)
+}
+
+func (c *userComponentImpl) sendAndStoreSMSCode(ctx context.Context, phoneArea, phone, cacheKey string) (*types.SendSMSCodeResponse, error) {
+	isValid, err := common.IsValidNumber(phone, phoneArea)
+	if err != nil {
+		slog.Error("failed to check if phone number is valid", "error", err)
+		return nil, errorx.ErrInternalServerError
+	}
+	if !isValid {
+		slog.Error("phone number is invalid")
+		return nil, errorx.ErrInvalidPhoneNumber
+	}
+
+	code := fmt.Sprintf("%06d", rand.Intn(1000000))
+	set, err := c.cache.SetNX(ctx, cacheKey, code, SMSCodeCacheTTL)
+	if err != nil {
+		slog.Error("failed to set sms code cache", "error", err)
+		return nil, errorx.ErrInternalServerError
+	}
+	if !set {
+		return nil, errorx.ErrForbidSendPhoneVerifyCodeFrequently
+	}
+	expiredAt := time.Now().Add(SMSCodeCacheTTL)
+
+	var templateCode string
+	if phoneArea == "+86" {
+		templateCode = c.config.Notification.SMSTemplateCodeForVerifyCodeCN
+	} else {
+		templateCode = c.config.Notification.SMSTemplateCodeForVerifyCodeOversea
+	}
+	msg := types.SMSReq{
+		PhoneNumbers:  []string{fmt.Sprintf("%s%s", phoneArea, phone)},
+		SignName:      c.config.Notification.SMSSign,
+		TemplateCode:  templateCode,
+		TemplateParam: fmt.Sprintf("{\"code\":\"%s\"}", code),
+	}
+
+	msgBytes, err := json.Marshal(msg)
+	if err != nil {
+		slog.Error("failed to marshal sms code notification message", "error", err)
+		return nil, errorx.ErrInternalServerError
+	}
+	notificationMsg := types.MessageRequest{
+		Scenario:   types.MessageScenarioSMSVerifyCode,
+		Parameters: string(msgBytes),
+		Priority:   types.MessagePriorityHigh,
+	}
+
+	err = retry.Do(func() error {
+		return c.notificationSvc.Send(ctx, &notificationMsg)
+	}, retry.Attempts(3))
+	if err != nil {
+		slog.Error("failed to send sms code", "error", err)
+		return nil, errorx.ErrFailedSendPhoneVerifyCode
+	}
+
+	return &types.SendSMSCodeResponse{
+		ExpiredAt: expiredAt,
+	}, nil
+}
+
+func (c *userComponentImpl) UpdatePhone(ctx context.Context, uid string, req types.UpdateUserPhoneRequest) error {
+	user, err := c.userStore.FindByUUID(ctx, uid)
+	if err != nil {
+		return err
+	}
+	if user == nil {
+		return errorx.ErrUserNotFound
+	}
+
+	var oldUser = *user
+
+	if *req.Phone == "" {
+		return errorx.ErrNeedPhone
+	}
+
+	if user.Phone == *req.Phone {
+		return errorx.ErrNeedDifferentPhone
+	}
+
+	if *req.VerificationCode == "" {
+		return errorx.ErrVerificationCodeRequired
+	}
+
+	if len(*req.VerificationCode) != 6 {
+		return errorx.ErrVerificationCodeLength
+	}
+
+	can, err := c.canChangePhone(ctx, user, *req.Phone)
+	if err != nil {
+		return err
+	}
+	if !can {
+		return errorx.ErrForbidChangePhone
+	}
+
+	var phoneArea = user.PhoneArea
+	if req.PhoneArea != nil {
+		normalizedPhoneArea := normalizePhoneArea(*req.PhoneArea)
+		if user.PhoneArea != normalizedPhoneArea {
+			phoneArea = normalizedPhoneArea
+		}
+	}
+
+	key, err := getSMSCodeCacheKey(uid, phoneArea, *req.Phone)
+	if err != nil {
+		slog.Error("failed to get sms code cache key", "error", err)
+		return errorx.ErrInternalServerError
+	}
+
+	err = c.verifySMSCode(ctx, key, *req.VerificationCode)
+	if err != nil {
+		return err
+	}
+
+	if c.IsSSOUser(user.RegProvider) {
+		params := rpc.SSOUpdateUserInfo{
+			UUID:      user.UUID,
+			Phone:     *req.Phone,
+			PhoneArea: phoneArea,
+		}
+		err := c.sso.UpdateUserInfo(ctx, &params)
+		if err != nil {
+			slog.Error("failed to update user's phone in sso, uuid:'%s',error:%w", user.UUID, err)
+			return err
+		}
+	}
+
+	dbErr := c.userStore.UpdatePhone(ctx, user.ID, *req.Phone, phoneArea)
+	if dbErr != nil {
+		slog.Error("failed to update user's phone in db, uuid:'%s',error:%w", user.UUID, dbErr)
+		// rollback sso user phone change in sso
+		params := rpc.SSOUpdateUserInfo{
+			UUID:      user.UUID,
+			Phone:     oldUser.Phone,
+			PhoneArea: oldUser.PhoneArea,
+		}
+		err := c.sso.UpdateUserInfo(ctx, &params)
+		if err != nil {
+			slog.Error("failed to rollback sso user phone change in sso, uuid:'%s',error:%w", user.UUID, err)
+			return err
+		}
+		return errorx.ErrFailedToUpdatePhone
+	}
+
+	if oldUser.Phone == "" {
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second*60)
+			defer cancel()
+			if err := c.invitationc.AwardCreditToInvitee(ctx, types.AwardCreditToInviteeReq{
+				InviteeUUID: oldUser.UUID,
+				InviteeName: oldUser.Username,
+				RegisterAt:  oldUser.CreatedAt,
+			}); err != nil {
+				slog.Error("failed to award credit to invitee", "error", err, "invitee_name", oldUser.Username, "invitee_uuid", oldUser.UUID)
+			}
+		}()
+	}
+
+	return nil
+}
+
+func (c *userComponentImpl) SendPublicSMSCode(ctx context.Context, req types.SendPublicSMSCodeRequest) (*types.SendSMSCodeResponse, error) {
+	phoneArea := normalizePhoneArea(req.PhoneArea)
+	key, err := getSMSCodeCacheKey(req.Scene, phoneArea, req.Phone)
+	if err != nil {
+		return nil, err
+	}
+
+	return c.sendAndStoreSMSCode(ctx, phoneArea, req.Phone, key)
+}
+
+func (c *userComponentImpl) VerifyPublicSMSCode(ctx context.Context, req types.VerifyPublicSMSCodeRequest) error {
+	phoneArea := normalizePhoneArea(req.PhoneArea)
+	key, err := getSMSCodeCacheKey(req.Scene, phoneArea, req.Phone)
+	if err != nil {
+		slog.Error("failed to get sms code cache key", "error", err)
+		return errorx.ErrInternalServerError
+	}
+
+	return c.verifySMSCode(ctx, key, req.VerificationCode)
+}
+
+func (c *userComponentImpl) canChangePhone(ctx context.Context, user *database.User, newPhone string) (bool, error) {
+	if !c.IsSSOUser(user.RegProvider) {
+		return true, nil
+	}
+
+	exist, err := c.sso.IsExistByPhone(ctx, newPhone)
+	if err != nil {
+		slog.Error("failed to check new phone existence in sso", "error", err)
+		return false, err
+	}
+
+	if exist {
+		return false, errorx.ErrPhoneAlreadyExistsInSSO
+	}
+
+	return true, nil
+}
+
+func (c *userComponentImpl) verifySMSCode(ctx context.Context, cacheKey, smsCode string) error {
+	code, err := c.cache.Get(ctx, cacheKey)
+	if err != nil {
+		if err == redis.Nil {
+			return errorx.ErrPhoneVerifyCodeExpiredOrNotFound
+		}
+		slog.Error("failed to get sms code cache", "error", err)
+		return errorx.ErrInternalServerError
+	}
+
+	if code != smsCode {
+		return errorx.ErrPhoneVerifyCodeInvalid
+	}
+
+	if err := c.cache.Del(ctx, cacheKey); err != nil {
+		slog.Error("failed to delete sms code cache", "error", err)
+		return errorx.ErrInternalServerError
+	}
+
+	return nil
+}
+
+func (c *userComponentImpl) StreamExportUsers(ctx context.Context, req types.UserIndexReq) (data chan types.UserIndexResp, err error) {
+	data = make(chan types.UserIndexResp)
+
+	ch, err := c.userStore.IndexWithCursor(ctx, req)
+	if err != nil {
+		slog.Error("failed to query users by cursor",
+			slog.Any("req", req),
+			slog.Any("error", err),
+		)
+		return data, errorx.ErrInternalServerError
+	}
+
+	go func() {
+		defer close(data)
+		for wrapper := range ch {
+			if wrapper.Err != nil {
+				slog.Error("failed to query users by cursor",
+					slog.Any("req", req),
+					slog.Any("error", wrapper.Err),
+				)
+				data <- types.UserIndexResp{Error: wrapper.Err}
+				return
+			}
+			for _, originalUser := range wrapper.Users {
+				var tags []types.RepoTag
+				for _, utag := range originalUser.Tags {
+					tags = append(tags, types.RepoTag{
+						ID:       utag.ID,
+						Name:     utag.Tag.Name,
+						Category: utag.Tag.Category,
+						Group:    utag.Tag.Group,
+						BuiltIn:  utag.Tag.BuiltIn,
+						Scope:    utag.Tag.Scope,
+						I18nKey:  utag.Tag.I18nKey,
+					})
+				}
+				exportUser := &types.User{
+					Username:     originalUser.Username,
+					Nickname:     originalUser.NickName,
+					Avatar:       originalUser.Avatar,
+					Tags:         tags,
+					Email:        originalUser.Email,
+					UUID:         originalUser.UUID,
+					Bio:          originalUser.Bio,
+					Homepage:     originalUser.Homepage,
+					Phone:        originalUser.Phone,
+					PhoneArea:    originalUser.PhoneArea,
+					Roles:        originalUser.Roles(),
+					VerifyStatus: string(originalUser.VerifyStatus),
+					Labels:       originalUser.Labels,
+					LastLoginAt:  originalUser.LastLoginAt,
+					CreatedAt:    originalUser.CreatedAt,
+				}
+
+				select {
+				case <-ctx.Done():
+					slog.Info("stream export canceled while writing data", slog.String("reason", ctx.Err().Error()))
+					data <- types.UserIndexResp{Error: ctx.Err()}
+					return
+				case data <- types.UserIndexResp{Users: []*types.User{exportUser}}:
+				}
+			}
+		}
+
+	}()
+
+	slog.Info("stream export completed successfully")
+	return data, nil
 }
