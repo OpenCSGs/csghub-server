@@ -1,8 +1,8 @@
 {
-  "engine_name": "hf-inference-toolkit",
+  "engine_name": "audio-fish",
   "enabled": 1,
   "container_port": 8000,
-  "model_format": "safetensors",
+  "model_format": "pytorch",
   "engine_images": [
     {
       "compute_type": "gpu",
