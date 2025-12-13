@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/builder/proxy"
+	"opencsg.com/csghub-server/common/utils/trace"
 )
 
 type InternalServiceProxyHandler struct {
@@ -25,6 +26,9 @@ func (h *InternalServiceProxyHandler) Proxy(ctx *gin.Context) {
 	// Log the request URL and header
 	slog.Debug("http request", slog.Any("request", ctx.Request.URL), slog.Any("header", ctx.Request.Header))
 
+	// Propagate trace ID to backend service
+	trace.PropagateTrace(ctx.Request.Context(), ctx.Request.Header)
+
 	// Serve the request using the router
 	h.rp.ServeHTTP(ctx.Writer, ctx.Request, "", "")
 }
@@ -37,6 +41,10 @@ func (h *InternalServiceProxyHandler) Proxy(ctx *gin.Context) {
 func (h *InternalServiceProxyHandler) ProxyToApi(api string, originParams ...string) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		slog.Info("proxy user request", slog.Any("request", ctx.Request.URL), slog.Any("header", ctx.Request.Header))
+
+		// Propagate trace ID to backend service
+		trace.PropagateTrace(ctx.Request.Context(), ctx.Request.Header)
+
 		finalApi := api
 		if len(originParams) > 0 {
 			var params []any
