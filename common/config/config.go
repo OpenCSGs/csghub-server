@@ -235,6 +235,7 @@ type Config struct {
 		DefaultTrafficLimit                   int64  `env:"OPENCSG_SAAS_DEFAULT_TRAFFIC_LIMIT" default:"1024"`
 		Enabled                               bool   `env:"STARHUB_SERVER_MULTI_SYNC_ENABLED" default:"false"`
 		RefreshAccountSyncQuotaCronExpression string `env:"STARHUB_SERVER_MULTI_SYNC_REFRESH_ACCOUNT_SYNC_QUOTA_CRON_EXPRESSION" default:"0 0 * * *"`
+		HTTPInsecureSkipVerify                bool   `env:"STARHUB_SERVER_MULTI_SYNC_HTTP_INSECURE_SKIP_VERIFY" default:"false"`
 	}
 
 	Telemetry struct {
