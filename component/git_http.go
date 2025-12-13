@@ -219,12 +219,23 @@ func (c *gitHTTPComponentImpl) lfsBatchDownloadInfo(ctx context.Context, req typ
 			Pointer: obj,
 		}
 		reqParams := make(url.Values)
-		url, err := c.s3Client.PresignedGetObject(ctx, c.config.S3.Bucket, objectKey, types.OssFileExpire, reqParams)
-		if err != nil {
-			objs = append(objs, &types.ObjectResponse{
-				Error: &types.ObjectError{},
-			})
-			continue
+		var url *url.URL
+		if repo.XnetEnabled {
+			url, err = c.xnetClient.PresignedGetObject(ctx, objectKey, types.OssFileExpire, reqParams)
+			if err != nil {
+				objs = append(objs, &types.ObjectResponse{
+					Error: &types.ObjectError{},
+				})
+				continue
+			}
+		} else {
+			url, err = c.s3Client.PresignedGetObject(ctx, c.config.S3.Bucket, objectKey, types.OssFileExpire, reqParams)
+			if err != nil {
+				objs = append(objs, &types.ObjectResponse{
+					Error: &types.ObjectError{},
+				})
+				continue
+			}
 		}
 		resp.Actions["download"] = &types.Link{Href: url.String(), Header: map[string]any{}}
 		objs = append(objs, resp)
@@ -250,9 +261,20 @@ func (c *gitHTTPComponentImpl) lfsBatchUploadInfo(ctx context.Context, req types
 	}
 
 	useMultipart := slices.Contains(req.Transfers, "multipart")
-
-	if useMultipart {
+	useXnet := false
+	transfer = "basic"
+	if repo.XnetEnabled && slices.Contains(req.Transfers, "xet") {
+		transfer = "xet"
+		useXnet = true
+	} else if useMultipart {
 		transfer = "multipart"
+	}
+
+	if useXnet {
+		header["X-Xet-Cas-Url"] = c.config.Xnet.Endpoint
+		header["X-Xet-Access-Token"] = "nosniff"
+		header["X-Xet-Token-Expiration"] = ""
+		header["X-Xet-Session-Id"] = "1"
 	}
 
 	for _, obj := range req.Objects {
