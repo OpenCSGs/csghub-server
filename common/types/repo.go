@@ -93,6 +93,7 @@ const (
 	SentenceSimilarity PipelineTask    = "sentence-similarity"
 	TaskAutoDetection  PipelineTask    = "task-auto-detection"
 	VideoText2Text     PipelineTask    = "video-text-to-text"
+	TextToSpeech       PipelineTask    = "text-to-speech"
 	LlamaCpp           InferenceEngine = "llama.cpp"
 	TEI                InferenceEngine = "tei"
 	Ktransformers      InferenceEngine = "ktransformers"

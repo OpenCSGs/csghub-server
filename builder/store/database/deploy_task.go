@@ -51,7 +51,7 @@ type Deploy struct {
 	SecureLevel int `json:"secure_level"`
 	// 0-space, 1-inference, 2-finetune, 3-serverless, 4-evaluation, 5-notebook
 	Type          int                `json:"type"`
-	Task          types.PipelineTask `bun:",nullzero" json:"task"` //text-generation,text-to-image
+	Task          types.PipelineTask `bun:",nullzero" json:"task"` //text-generation,text-to-image,text-to-speech
 	UserUUID      string             `bun:"," json:"user_uuid"`
 	SKU           string             `bun:"," json:"sku"`
 	OrderDetailID int64              `bun:"," json:"order_detail_id"`

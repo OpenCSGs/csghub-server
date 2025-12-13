@@ -1,0 +1,20 @@
+{
+  "engine_name": "hf-inference-toolkit",
+  "enabled": 1,
+  "container_port": 8000,
+  "model_format": "safetensors",
+  "engine_images": [
+    {
+      "compute_type": "gpu",
+      "image": "opencsghq/fish-speech:server-cuda",
+      "driver_version": "12.6",
+      "engine_version": "1.5.1"
+    },
+    {
+      "compute_type": "cpu",
+      "image": "opencsghq/fish-speech:server-cpu",
+      "engine_version": "1.5.1"
+    }
+  ],
+  "supported_models": ["openaudio-s1-mini"]
+}

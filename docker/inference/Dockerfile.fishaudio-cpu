@@ -1,0 +1,27 @@
+FROM docker.1ms.run/fishaudio/fish-speech:server-cpu
+USER root
+RUN apt-get update && \
+    apt-get install -y dumb-init && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Switch to the user from base image (fish, UID 1000) to install packages
+# Install directly into the virtual environment to avoid uv sync delays
+USER 1000:1000
+WORKDIR /app
+# Configure pip to use Aliyun mirror and install into the virtual environment
+RUN pip config set global.index-url https://mirrors.aliyun.com/pypi/simple && \
+    uv pip install --no-cache-dir csghub-sdk==0.7.10
+
+USER root
+COPY ./fishaudio/ /etc/csghub/
+RUN chmod +x /etc/csghub/*.sh
+
+WORKDIR /workspace/
+RUN curl -L -o references.tar.gz https://git-devops.opencsg.com/opensource/public_files/-/raw/main/references.tar.gz && \
+    tar -xzf references.tar.gz && \
+    rm references.tar.gz
+ENV HUGGINGFACE_HUB_CACHE=/workspace/ \
+    HF_HUB_ENABLE_HF_TRANSFER=0
+ENV PORT=8000
+EXPOSE 8000
+ENTRYPOINT [ "/usr/bin/dumb-init", "--" ]
+CMD ["/etc/csghub/serve.sh"]
