@@ -1130,7 +1130,11 @@ func (h *RepoHandler) HeadSDKDownload(ctx *gin.Context) {
 }
 
 func (h *RepoHandler) xetRefreshRoute(repoType types.RepositoryType, namespace, name, ref string) string {
+	if repoType == types.ModelRepo {
+		return fmt.Sprintf("%s/hf/%s/%s/xet-write-token/%s", h.config.Model.DownloadEndpoint, namespace, name, ref)
+	}
 	return fmt.Sprintf("%s/hf/%ss/%s/%s/xet-write-token/%s", h.config.Model.DownloadEndpoint, repoType, namespace, name, ref)
+
 }
 
 func (h *RepoHandler) handleDownload(ctx *gin.Context, isResolve bool) {
