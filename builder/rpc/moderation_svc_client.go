@@ -2,15 +2,18 @@ package rpc
 
 import (
 	"context"
+	"log/slog"
 
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/builder/sensitive"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
 
 type ModerationSvcClient interface {
 	PassTextCheck(ctx context.Context, scenario, text string) (*CheckResult, error)
 	PassImageCheck(ctx context.Context, scenario, ossBucketName, ossObjectName string) (*CheckResult, error)
+	PassImageURLCheck(ctx context.Context, scenario, imageURL string) (*CheckResult, error)
 	PassLLMRespCheck(ctx context.Context, text, sessionId string) (*CheckResult, error)
 	PassLLMPromptCheck(ctx context.Context, text, accountId string) (*CheckResult, error)
 	SubmitRepoCheck(ctx context.Context, repoType types.RepositoryType, namespace, name string) error
@@ -46,7 +49,11 @@ func (c *ModerationSvcHttpClient) PassTextCheck(ctx context.Context, scenario, t
 	resp.Data = &CheckResult{}
 	err := c.hc.Post(ctx, path, req, &resp)
 	if err != nil {
-		return nil, err
+		return nil, errorx.RemoteSvcFail(err,
+			errorx.Ctx().
+				Set("service", "moderation service").
+				Set("action", "text check").
+				Set("detail", err.Error()))
 	}
 	return resp.Data.(*CheckResult), nil
 }
@@ -73,7 +80,11 @@ func (c *ModerationSvcHttpClient) PassLLMRespCheck(ctx context.Context, text, se
 	resp.Data = &CheckResult{}
 	err := c.hc.Post(ctx, path, req, &resp)
 	if err != nil {
-		return nil, err
+		slog.Error("call moderation service failed", slog.String("error", err.Error()))
+		return nil, errorx.RemoteSvcFail(err,
+			errorx.Ctx().
+				Set("service", "moderation service").
+				Set("action", "llm response check"))
 	}
 	return resp.Data.(*CheckResult), nil
 }
@@ -95,7 +106,35 @@ func (c *ModerationSvcHttpClient) PassImageCheck(ctx context.Context, scenario, 
 	const path = "/api/v1/image"
 	err := c.hc.Post(ctx, path, req, &resp)
 	if err != nil {
-		return nil, err
+		slog.ErrorContext(ctx, "call moderation service failed", slog.String("error", err.Error()))
+		return nil, errorx.RemoteSvcFail(err,
+			errorx.Ctx().
+				Set("service", "moderation service").
+				Set("action", "image check"))
+	}
+	return resp.Data.(*CheckResult), nil
+}
+
+func (c *ModerationSvcHttpClient) PassImageURLCheck(ctx context.Context, scenario, imageURL string) (*CheckResult, error) {
+	type CheckRequest struct {
+		Scenario string `json:"scenario"`
+		ImageURL string `json:"image_url"`
+	}
+
+	req := &CheckRequest{
+		Scenario: scenario,
+		ImageURL: imageURL,
+	}
+	const path = "/api/v1/image"
+	var resp httpbase.R
+	resp.Data = &CheckResult{}
+	err := c.hc.Post(ctx, path, req, &resp)
+	if err != nil {
+		slog.ErrorContext(ctx, "call moderation service failed", slog.String("error", err.Error()))
+		return nil, errorx.RemoteSvcFail(err,
+			errorx.Ctx().
+				Set("service", "moderation service").
+				Set("action", "image url check"))
 	}
 	return resp.Data.(*CheckResult), nil
 }
@@ -114,7 +153,15 @@ func (c *ModerationSvcHttpClient) SubmitRepoCheck(ctx context.Context, repoType 
 	}
 	const path = "/api/v1/repo"
 	var resp httpbase.R
-	return c.hc.Post(ctx, path, req, &resp)
+	err := c.hc.Post(ctx, path, req, &resp)
+	if err != nil {
+		slog.Error("call moderation service failed", slog.String("error", err.Error()))
+		return errorx.RemoteSvcFail(err,
+			errorx.Ctx().
+				Set("service", "moderation service").
+				Set("action", "submit repo check"))
+	}
+	return nil
 }
 
 func (c *ModerationSvcHttpClient) PassLLMPromptCheck(ctx context.Context, text, accountId string) (*CheckResult, error) {
@@ -138,7 +185,11 @@ func (c *ModerationSvcHttpClient) PassLLMPromptCheck(ctx context.Context, text, 
 	resp.Data = &CheckResult{}
 	err := c.hc.Post(ctx, path, req, &resp)
 	if err != nil {
-		return nil, err
+		slog.Error("call moderation service failed", slog.String("error", err.Error()))
+		return nil, errorx.RemoteSvcFail(err,
+			errorx.Ctx().
+				Set("service", "moderation service").
+				Set("path", path))
 	}
 	return resp.Data.(*CheckResult), nil
 }

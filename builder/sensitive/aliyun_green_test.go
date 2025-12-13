@@ -3,6 +3,7 @@ package sensitive_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"strings"
@@ -28,6 +29,151 @@ func TestSensitiveChecker_SplitTasks(t *testing.T) {
 		t.Logf("task count mismatch, expected: %d, got: %d", int(taskCount), len(tasks))
 		t.FailNow()
 	}
+}
+
+func TestSensitiveChecker_PassImageURLCheck(t *testing.T) {
+	gc := mockgreen.NewMockGreenClient(t)
+	g2c := mockgreen.NewMockGreen2022Client(t)
+	checker := sensitive.NewAliyunChecker(gc, g2c)
+
+	imageURL := "https://example.com/image.jpg"
+
+	t.Run("API call failed", func(t *testing.T) {
+		// Mock the ImageModeration method to return an error
+		g2c.EXPECT().ImageModeration(mock.Anything).Return(nil, errors.New("API call failed")).Once()
+
+		result, err := checker.PassImageURLCheck(context.Background(), sensitive.ScenarioImageBaseLineCheck, imageURL)
+
+		// Verify that an error is returned
+		require.NotNil(t, err)
+		require.Nil(t, result)
+	})
+
+	t.Run("API returns non-200 status code", func(t *testing.T) {
+		// Mock the ImageModeration method to return a non-200 status code
+		g2c.EXPECT().ImageModeration(mock.Anything).Return(&client.ImageModerationResponse{
+			StatusCode: tea.Int32(500),
+			Body: &client.ImageModerationResponseBody{
+				Code: tea.Int32(500),
+				Msg:  tea.String("Internal server error"),
+			},
+		}, nil).Once()
+
+		result, err := checker.PassImageURLCheck(context.Background(), sensitive.ScenarioImageBaseLineCheck, imageURL)
+
+		// Verify that an error is returned
+		require.NotNil(t, err)
+		require.Nil(t, result)
+	})
+
+	t.Run("Image passes check - empty result", func(t *testing.T) {
+		// Mock the ImageModeration method to return an empty result list
+		g2c.EXPECT().ImageModeration(mock.Anything).Return(&client.ImageModerationResponse{
+			StatusCode: tea.Int32(200),
+			Body: &client.ImageModerationResponseBody{
+				Code:      tea.Int32(200),
+				RequestId: tea.String("request_id_1"),
+				Data: &client.ImageModerationResponseBodyData{
+					Result: []*client.ImageModerationResponseBodyDataResult{},
+				},
+			},
+		}, nil).Once()
+
+		result, err := checker.PassImageURLCheck(context.Background(), sensitive.ScenarioImageBaseLineCheck, imageURL)
+
+		// Verify that the image passes the check
+		require.Nil(t, err)
+		require.NotNil(t, result)
+		require.False(t, result.IsSensitive)
+	})
+
+	t.Run("Image passes check - nonLabel result", func(t *testing.T) {
+		// Mock the ImageModeration method to return a nonLabel result
+		g2c.EXPECT().ImageModeration(mock.Anything).Return(&client.ImageModerationResponse{
+			StatusCode: tea.Int32(200),
+			Body: &client.ImageModerationResponseBody{
+				Code:      tea.Int32(200),
+				RequestId: tea.String("request_id_2"),
+				Data: &client.ImageModerationResponseBodyData{
+					Result: []*client.ImageModerationResponseBodyDataResult{
+						{
+							Label:      tea.String("nonLabel"),
+							Confidence: tea.Float32(0.1),
+						},
+					},
+				},
+			},
+		}, nil).Once()
+
+		result, err := checker.PassImageURLCheck(context.Background(), sensitive.ScenarioImageBaseLineCheck, imageURL)
+
+		// Verify that the image passes the check
+		require.Nil(t, err)
+		require.NotNil(t, result)
+		require.False(t, result.IsSensitive)
+	})
+
+	t.Run("Sensitive image detected", func(t *testing.T) {
+		// Mock the ImageModeration method to return a sensitive result
+		g2c.EXPECT().ImageModeration(mock.Anything).Return(&client.ImageModerationResponse{
+			StatusCode: tea.Int32(200),
+			Body: &client.ImageModerationResponseBody{
+				Code:      tea.Int32(200),
+				RequestId: tea.String("request_id_3"),
+				Data: &client.ImageModerationResponseBodyData{
+					Result: []*client.ImageModerationResponseBodyDataResult{
+						{
+							Label:      tea.String("porn"),
+							Confidence: tea.Float32(0.95),
+						},
+					},
+				},
+			},
+		}, nil).Once()
+
+		result, err := checker.PassImageURLCheck(context.Background(), sensitive.ScenarioImageBaseLineCheck, imageURL)
+
+		// Verify that the image is detected as sensitive
+		require.Nil(t, err)
+		require.NotNil(t, result)
+		require.True(t, result.IsSensitive)
+		require.Contains(t, result.Reason, "label:porn")
+		require.Contains(t, result.Reason, "confidence:0.950000")
+		require.Contains(t, result.Reason, "requestId:request_id_3")
+	})
+
+	t.Run("Multiple results with some sensitive", func(t *testing.T) {
+		// Mock the ImageModeration method to return multiple results including a sensitive one
+		g2c.EXPECT().ImageModeration(mock.Anything).Return(&client.ImageModerationResponse{
+			StatusCode: tea.Int32(200),
+			Body: &client.ImageModerationResponseBody{
+				Code:      tea.Int32(200),
+				RequestId: tea.String("request_id_4"),
+				Data: &client.ImageModerationResponseBodyData{
+					Result: []*client.ImageModerationResponseBodyDataResult{
+						{
+							Label:      tea.String("nonLabel"),
+							Confidence: tea.Float32(0.1),
+						},
+						{
+							Label:      tea.String("politics"),
+							Confidence: tea.Float32(0.85),
+						},
+					},
+				},
+			},
+		}, nil).Once()
+
+		result, err := checker.PassImageURLCheck(context.Background(), sensitive.ScenarioImageBaseLineCheck, imageURL)
+
+		// Verify that the sensitive image is detected
+		require.Nil(t, err)
+		require.NotNil(t, result)
+		require.True(t, result.IsSensitive)
+		require.Contains(t, result.Reason, "label:politics")
+		require.Contains(t, result.Reason, "confidence:0.850000")
+		require.Contains(t, result.Reason, "requestId:request_id_4")
+	})
 }
 
 func TestSensitiveChecker_PassLargeTextCheck(t *testing.T) {

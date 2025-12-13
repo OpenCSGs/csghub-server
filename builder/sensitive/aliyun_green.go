@@ -11,9 +11,9 @@ import (
 	"strings"
 
 	openapi "github.com/alibabacloud-go/darabonba-openapi/v2/client"
-	//green20220302 "github.com/alibabacloud-go/green-20220302/client"
 	green20220302 "github.com/alibabacloud-go/green-20220302/v2/client"
 	util "github.com/alibabacloud-go/tea-utils/v2/service"
+	"github.com/google/uuid"
 
 	"github.com/alibabacloud-go/tea/tea"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/green"
@@ -272,15 +272,10 @@ func (c *AliyunGreenChecker) PassLLMCheck(ctx context.Context, scenario Scenario
 	}
 
 	if *resp.StatusCode != http.StatusOK {
-		slog.Error("aliyun TextModerationPlusWithOptions response not success", slog.String("content", text),
-			slog.Any("resp.code", resp.StatusCode))
-		return nil, fmt.Errorf("aliyun TextModerationPlusWithOptions response not success")
+		return nil, fmt.Errorf("aliyun TextModerationPlusWithOptions response not success, http status code: %d", *resp.StatusCode)
 	}
 
 	if *resp.Body.Code != http.StatusOK {
-		slog.Error("text moderation not success.",
-			slog.Any("resp.Body.code", *resp.Body.Code),
-			slog.String("resp.Body.message", *resp.Body.Message))
 		return nil, fmt.Errorf("aliyun TextModerationPlusWithOptions text moderation not success, error message: %s", *resp.Body.Message)
 	}
 
@@ -301,6 +296,40 @@ func (c *AliyunGreenChecker) PassLLMCheck(ctx context.Context, scenario Scenario
 	return &CheckResult{IsSensitive: false}, nil
 }
 
+func (c *AliyunGreenChecker) PassImageURLCheck(ctx context.Context, scenario Scenario, imageURL string) (*CheckResult, error) {
+	serviceParameters, _ := json.Marshal(
+		map[string]interface{}{
+			"imageURL": imageURL,
+			"dataId":   uuid.New(),
+		},
+	)
+	imageModerationRequest := &green20220302.ImageModerationRequest{
+		Service:           tea.String(string(scenario)),
+		ServiceParameters: tea.String(string(serviceParameters)),
+	}
+	resp, err := c.green2022.ImageModeration(imageModerationRequest)
+	if err != nil {
+		return nil, err
+	}
+	if *resp.StatusCode != http.StatusOK || *resp.Body.Code != 200 {
+		return nil, errors.New(tea.StringValue(resp.Body.Msg))
+	}
+	result := resp.Body.Data.Result
+	//pass check
+	if len(result) == 0 || (len(result) == 1 && tea.StringValue(result[0].Label) == "nonLabel") {
+		return &CheckResult{IsSensitive: false}, nil
+	}
+	//sensitive check
+	for _, r := range result {
+		if tea.StringValue(r.Label) != "nonLabel" {
+			slog.InfoContext(ctx, "sensitive image detected", slog.String("imageURL", imageURL), slog.String("label", tea.StringValue(r.Label)),
+				slog.Any("confidence", tea.Float32Value(r.Confidence)), slog.String("aliyun_request_id", *resp.Body.RequestId))
+			return &CheckResult{IsSensitive: true, Reason: fmt.Sprintf("label:%s,confidence:%f,requestId:%s", tea.StringValue(r.Label), tea.Float32Value(r.Confidence), *resp.Body.RequestId)}, nil
+		}
+	}
+	return &CheckResult{IsSensitive: false}, nil
+}
+
 func (c *AliyunGreenChecker) PassImageCheck(ctx context.Context, scenario Scenario, ossBucketName, ossObjectName string) (*CheckResult, error) {
 	serviceParameters, _ := json.Marshal(
 		map[string]interface{}{
@@ -317,22 +346,17 @@ func (c *AliyunGreenChecker) PassImageCheck(ctx context.Context, scenario Scenar
 	}
 	resp, err := c.green2022.ImageModeration(imageModerationRequest)
 	if err != nil {
-		slog.Error("fail to call aliyun ImageModeration", slog.String("ossBucketName", ossBucketName),
-			slog.String("ossObjectName", ossObjectName), slog.Any("error", err))
 		return nil, err
 	}
-	slog.Debug("aliyun ImageModeration return", slog.String("resp", resp.GoString()))
+	slog.DebugContext(ctx, "aliyun ImageModeration return", slog.String("resp", resp.GoString()))
 
 	if *resp.StatusCode != http.StatusOK || *resp.Body.Code != 200 {
-		slog.Error("aliyun ImageModeration return code not 200", slog.String("ossBucketName", ossBucketName),
-			slog.String("ossObjectName", ossObjectName),
-			slog.String("resp", resp.GoString()))
 		return nil, errors.New(tea.StringValue(resp.Body.Msg))
 	}
 
 	result := resp.Body.Data.Result
 	//pass check
-	if len(result) == 0 && tea.StringValue(result[0].Label) == "nonLabel" {
+	if len(result) == 0 || (len(result) == 1 && tea.StringValue(result[0].Label) == "nonLabel") {
 		return &CheckResult{IsSensitive: false}, nil
 	}
 
@@ -348,7 +372,7 @@ func (c *AliyunGreenChecker) PassImageCheck(ctx context.Context, scenario Scenar
 		return &CheckResult{IsSensitive: false}, nil
 	}
 
-	slog.Info("sensitive image detected", slog.String("scenario", string(scenario)), slog.String("ossBucketName", ossBucketName),
+	slog.InfoContext(ctx, "sensitive image detected", slog.String("scenario", string(scenario)), slog.String("ossBucketName", ossBucketName),
 		slog.String("ossObjectName", ossObjectName), slog.Any("labels", labelMap), slog.String("aliyun_request_id", *resp.Body.RequestId))
 	// get all the labels in labelMap and join them with ","
 	labels := []string{}

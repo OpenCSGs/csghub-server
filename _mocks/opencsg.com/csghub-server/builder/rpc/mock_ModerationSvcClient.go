@@ -85,6 +85,66 @@ func (_c *MockModerationSvcClient_PassImageCheck_Call) RunAndReturn(run func(con
 	return _c
 }
 
+// PassImageURLCheck provides a mock function with given fields: ctx, scenario, imageURL
+func (_m *MockModerationSvcClient) PassImageURLCheck(ctx context.Context, scenario string, imageURL string) (*rpc.CheckResult, error) {
+	ret := _m.Called(ctx, scenario, imageURL)
+
+	if len(ret) == 0 {
+		panic("no return value specified for PassImageURLCheck")
+	}
+
+	var r0 *rpc.CheckResult
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) (*rpc.CheckResult, error)); ok {
+		return rf(ctx, scenario, imageURL)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) *rpc.CheckResult); ok {
+		r0 = rf(ctx, scenario, imageURL)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*rpc.CheckResult)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+		r1 = rf(ctx, scenario, imageURL)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockModerationSvcClient_PassImageURLCheck_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PassImageURLCheck'
+type MockModerationSvcClient_PassImageURLCheck_Call struct {
+	*mock.Call
+}
+
+// PassImageURLCheck is a helper method to define mock.On call
+//   - ctx context.Context
+//   - scenario string
+//   - imageURL string
+func (_e *MockModerationSvcClient_Expecter) PassImageURLCheck(ctx interface{}, scenario interface{}, imageURL interface{}) *MockModerationSvcClient_PassImageURLCheck_Call {
+	return &MockModerationSvcClient_PassImageURLCheck_Call{Call: _e.mock.On("PassImageURLCheck", ctx, scenario, imageURL)}
+}
+
+func (_c *MockModerationSvcClient_PassImageURLCheck_Call) Run(run func(ctx context.Context, scenario string, imageURL string)) *MockModerationSvcClient_PassImageURLCheck_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(string))
+	})
+	return _c
+}
+
+func (_c *MockModerationSvcClient_PassImageURLCheck_Call) Return(_a0 *rpc.CheckResult, _a1 error) *MockModerationSvcClient_PassImageURLCheck_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockModerationSvcClient_PassImageURLCheck_Call) RunAndReturn(run func(context.Context, string, string) (*rpc.CheckResult, error)) *MockModerationSvcClient_PassImageURLCheck_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // PassLLMPromptCheck provides a mock function with given fields: ctx, text, accountId
 func (_m *MockModerationSvcClient) PassLLMPromptCheck(ctx context.Context, text string, accountId string) (*rpc.CheckResult, error) {
 	ret := _m.Called(ctx, text, accountId)

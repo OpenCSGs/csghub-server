@@ -47,7 +47,13 @@ func (s Scenario) FromString(scenario string) (Scenario, bool) {
 type SensitiveChecker interface {
 	PassTextCheck(ctx context.Context, scenario Scenario, text string) (*CheckResult, error)
 	PassImageCheck(ctx context.Context, scenario Scenario, ossBucketName, ossObjectName string) (*CheckResult, error)
+	PassImageURLCheck(ctx context.Context, scenario Scenario, imageURL string) (*CheckResult, error)
 	PassLLMCheck(ctx context.Context, scenario Scenario, text string, sessionId string, accountId string) (*CheckResult, error)
+}
+
+type ImageCheckReq struct {
+	OSSBucketName string `json:"oss_bucket_name"`
+	OSSObjectName string `json:"oss_object_name"`
 }
 
 type CheckResult struct {
