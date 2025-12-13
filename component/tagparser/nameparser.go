@@ -36,7 +36,7 @@ func LibraryTag(filePath string) string {
 }
 
 func isPytorch(filename string) bool {
-	return (strings.HasPrefix(filename, "pytorch_model") && strings.HasSuffix(filename, ".bin")) || strings.HasSuffix(filename, ".pt")
+	return (strings.HasPrefix(filename, "pytorch_model") && strings.HasSuffix(filename, ".bin")) || strings.HasSuffix(filename, ".pt") || strings.HasSuffix(filename, ".pth")
 }
 
 func isTensorflow(filename string) bool {
