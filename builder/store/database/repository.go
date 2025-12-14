@@ -250,15 +250,7 @@ func (r Repository) Archs() (archs []string) {
 func (r Repository) Format() string {
 	for _, tag := range r.Tags {
 		if tag.Category == "framework" {
-			if tag.Name == "gguf" {
-				return tag.Name
-			}
-			if tag.Name == "onnx" {
-				return tag.Name
-			}
-			if tag.Name == "safetensors" {
-				return tag.Name
-			}
+			return tag.Name
 		}
 	}
 	//handle some old repo has no gguf tag
