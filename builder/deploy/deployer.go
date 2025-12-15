@@ -995,7 +995,7 @@ func (d *deployer) startAcctForEvaluations(clusterMap map[string]database.Cluste
 	}
 	str, err := json.Marshal(event)
 	if err != nil {
-		slog.Error("error marshal metering event", slog.Any("event", event), slog.Any("error", err))
+		slog.Error("error marshal evaluation metering event", slog.Any("event", event), slog.Any("error", err))
 		return
 	}
 	err = d.eventPub.PublishMeteringEvent(str)
