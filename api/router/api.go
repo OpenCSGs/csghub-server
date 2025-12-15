@@ -1083,6 +1083,17 @@ func createMappingRoutes(
 		{
 			hfdsFileGroup.GET("/:namespace/:name/resolve/:branch/*file_path", middleware.RepoMapping(types.DatasetRepo), repoCommonHandler.SDKDownload)
 			hfdsFileGroup.HEAD("/:namespace/:name/resolve/:branch/*file_path", middleware.RepoMapping(types.DatasetRepo), repoCommonHandler.HeadSDKDownload)
+			dsLfsGroup := hfdsFileGroup.Group("/:namespace/:name/info/lfs")
+			dsLfsGroup.Use(middleware.RepoType(types.DatasetRepo))
+			{
+				dsObjectsGroup := dsLfsGroup.Group("/objects")
+				{
+					dsObjectsGroup.POST("/batch", gitHTTPHandler.LfsBatchHF)
+					dsObjectsGroup.PUT("/:oid/:size", gitHTTPHandler.LfsUpload)
+					dsLfsGroup.GET("/:oid", gitHTTPHandler.LfsDownload)
+				}
+				dsObjectsGroup.POST("/verify", gitHTTPHandler.LfsVerify)
+			}
 		}
 		hfSpaceFileGroup := hfGroup.Group("/spaces")
 		{
