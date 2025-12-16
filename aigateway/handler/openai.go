@@ -12,7 +12,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/go-playground/validator/v10"
+	"github.com/openai/openai-go/v3"
 	"opencsg.com/csghub-server/aigateway/component"
 	"opencsg.com/csghub-server/aigateway/token"
 	"opencsg.com/csghub-server/aigateway/types"
@@ -166,6 +166,9 @@ func (h *OpenAIHandlerImpl) GetModel(c *gin.Context) {
 	c.PureJSON(http.StatusOK, model)
 }
 
+var _ openai.ChatCompletion
+var _ openai.ChatCompletionChunk
+
 // Chat godoc
 // @Security     ApiKey
 // @Summary      Chat with backend model
@@ -174,7 +177,8 @@ func (h *OpenAIHandlerImpl) GetModel(c *gin.Context) {
 // @Accept       json
 // @Produce      json
 // @Param        request body ChatCompletionRequest true "Chat completion request"
-// @Success      200  {object}  ChatCompletionResponse "OK"
+// @Success      200  {object}  openai.ChatCompletion "OK"
+// @Success      200  {object}  openai.ChatCompletionChunk "OK"
 // @Failure      400  {object}  error "Bad request"
 // @Failure      404  {object}  error "Model not found"
 // @Failure      500  {object}  error "Internal server error"
@@ -189,24 +193,7 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 	username := httpbase.GetCurrentUser(c)
 	userUUID := httpbase.GetCurrentUserUUID(c)
 	chatReq := &ChatCompletionRequest{}
-	bodyBytes, err := io.ReadAll(c.Request.Body)
-	if err != nil {
-		slog.Error("failed to read request body", "error", err.Error())
-		c.String(http.StatusBadRequest, fmt.Errorf("invalid chat compoletion request body:%w", err).Error())
-		return
-	}
-
-	c.Request.Body = io.NopCloser(bytes.NewReader(bodyBytes))
-	c.Request.ContentLength = int64(len(bodyBytes))
-
-	if err = json.Unmarshal(bodyBytes, chatReq); err != nil {
-		slog.Error("failed to parse request body", "error", err.Error())
-		c.String(http.StatusBadRequest, fmt.Errorf("invalid chat compoletion request body:%w", err).Error())
-		return
-	}
-
-	validate := validator.New()
-	if err = validate.Struct(chatReq); err != nil {
+	if err := c.BindJSON(chatReq); err != nil {
 		slog.Error("invalid chat compoletion request body", "error", err.Error())
 		c.String(http.StatusBadRequest, fmt.Errorf("invalid chat compoletion request body:%w", err).Error())
 		return
@@ -263,16 +250,7 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 		c.String(http.StatusBadRequest, err.Error())
 		return
 	}
-
-	var reqMap map[string]interface{}
-	if err = json.Unmarshal(bodyBytes, &reqMap); err != nil {
-		slog.Error("failed to unmarshal request body to map", "error", err)
-		c.String(http.StatusBadRequest, fmt.Errorf("invalid chat completion request body: %w", err).Error())
-		return
-	}
-	// directly update model field in request map
-	reqMap["model"] = modelName
-
+	chatReq.Model = modelName
 	if chatReq.Stream {
 		c.Writer.Header().Set("Content-Type", "text/event-stream")
 		if !strings.Contains(model.ImageID, "vllm-cpu") {
@@ -283,13 +261,7 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 	}
 
 	// marshal updated request map back to JSON bytes
-	updatedBodyBytes, err := json.Marshal(reqMap)
-	if err != nil {
-		slog.Error("failed to marshal updated request map", "error", err)
-		c.String(http.StatusInternalServerError, fmt.Errorf("failed to process chat request: %w", err).Error())
-		return
-	}
-
+	updatedBodyBytes, _ := json.Marshal(chatReq)
 	c.Request.Body = io.NopCloser(bytes.NewReader(updatedBodyBytes))
 	c.Request.ContentLength = int64(len(updatedBodyBytes))
 	rp, _ := proxy.NewReverseProxy(target)
