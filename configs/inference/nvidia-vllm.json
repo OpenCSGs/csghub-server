@@ -98,6 +98,11 @@
       "format": "--disable-custom-all-reduce"
     },
     {
+      "name": "enable-tool-calling",
+      "value": "disable",
+      "format": "--enable-auto-tool-choice"
+    },
+    {
       "name": "limit-mm-per-prompt",
       "value": "image=5,video=5",
       "format": "--limit-mm-per-prompt %s"
@@ -204,5 +209,37 @@
     "MiniMaxM1ForCausalLM",
     "MiniMaxText01ForCausalLM",
     "Zamba2ForCausalLM"
-  ]
+  ],
+  "tool_call_parsers": {
+    "DeepseekV3ForCausalLM": "deepseek_v3",
+    "DeepseekV31ForCausalLM": "deepseek_v31",
+    "DeepseekR1ForCausalLM": "deepseek_r1",
+    "GraniteForCausalLM": "granite",
+    "HermesForCausalLM": "hermes",
+    "InternLMForCausalLM": "internlm",
+    "InternLM2ForCausalLM": "internlm",
+    "InternLM3ForCausalLM": "internlm",
+    "JambaForCausalLM": "jamba",
+    "LlamaForCausalLM": "pythonic",
+    "PythonicForCausalLM": "pythonic",
+    "ToolACEForCausalLM": "pythonic",
+    "UltravoxForCausalLM": "pythonic",
+    "Llama3ForCausalLM": "llama3_json",
+    "Llama4ForCausalLM": "llama4_json",
+    "MistralForCausalLM": "mistral",
+    "MixtralForCausalLM": "mistral",
+    "Phi4MiniForCausalLM": "phi4_mini_json",
+    "Phi4FlashForCausalLM": "phi4_mini_json",
+    "QWenLMHeadModel": "hermes",
+    "Qwen2ForCausalLM": "hermes",
+    "Qwen2MoeForCausalLM": "hermes",
+    "Qwen3ForCausalLM": "hermes",
+    "Qwen3MoeForCausalLM": "hermes",
+    "Qwen3NextForCausalLM": "hermes",
+    "xLAMForCausalLM": "xlam",
+    "MiniMaxM1ForCausalLM": "minimax_m1",
+    "MiniMaxText01ForCausalLM": "minimax_m1",
+    "KimiK2ForCausalLM": "kimi_k2",
+    "HunyuanA13BForCausalLM": "hunyuan_a13b"
+  }
 }

@@ -761,6 +761,13 @@ func (c *runtimeArchitectureComponentImpl) UpdateRuntimeFrameworkAndArch(ctx con
 			}
 			rf.EngineArgs = string(args)
 		}
+		if len(engineConfig.ToolCallParsers) > 0 {
+			parsers, err := json.Marshal(engineConfig.ToolCallParsers)
+			if err != nil {
+				return fmt.Errorf("failed to marshal tool call parsers: %w", err)
+			}
+			rf.ToolCallParsers = string(parsers)
+		}
 		rf.Description = engineConfig.Description
 		rf.ModelFormat = engineConfig.ModelFormat
 		rf.Type = engineType
