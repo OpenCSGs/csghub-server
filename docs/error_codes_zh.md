@@ -42,6 +42,22 @@
 - **错误名:** `instanceQuotaExceeded`
 - **描述:** 实例配额超出。错误消息中包含智能体类型、实例数量和配额。
 
+---
+
+### `AGENT-ERR-1`
+
+- **错误代码:** `AGENT-ERR-1`
+- **错误名:** `instanceNameAlreadyExists`
+- **描述:** 您已存在相同名称的实例。
+
+---
+
+### `AGENT-ERR-2`
+
+- **错误代码:** `AGENT-ERR-2`
+- **错误名:** `knowledgeBaseNameAlreadyExists`
+- **描述:** 您已存在相同名称的知识库。
+
 ## Auth 错误
 
 ### `AUTH-ERR-0`
@@ -434,6 +450,14 @@
 - **错误名:** `gitReplicateRepositoryFailed`
 - **描述:** 转移仓库失败。这可能由网络问题、身份验证问题或指定的仓库不存在引起。
 
+---
+
+### `GIT-ERR-35`
+
+- **错误代码:** `GIT-ERR-35`
+- **错误名:** `gitUsingGitInXnetRepository`
+- **描述:** 使用 git 操作 xnet 启用的仓库。
+
 ## Invitation 错误
 
 ### `INVITATION-ERR-0`
@@ -593,6 +617,118 @@
 - **错误代码:** `REQ-ERR-12`
 - **错误名:** `errCaptchaIncorrect`
 - **描述:** 提供的验证码验证失败。请使用有效的验证码重试。
+
+## Runner 错误
+
+### `RUNNER-ERR-0`
+
+- **错误代码:** `RUNNER-ERR-0`
+- **错误名:** `codeRunnerMaxRevisionErr`
+- **描述:** 最大版本数量超过最大弹性副本数
+
+---
+
+### `RUNNER-ERR-1`
+
+- **错误代码:** `RUNNER-ERR-1`
+- **错误名:** `codeRunnerGetMaxScaleFailedErr`
+- **描述:** 获取最大弹性副本数失败
+
+---
+
+### `RUNNER-ERR-2`
+
+- **错误代码:** `RUNNER-ERR-2`
+- **错误名:** `codeRunnerDuplicateRevisionErr`
+- **描述:** 版本实例已存在
+
+---
+
+### `RUNNER-ERR-3`
+
+- **错误代码:** `RUNNER-ERR-3`
+- **错误名:** `codeRevisionNotReadyErr`
+- **描述:** 版本实例未就绪
+
+---
+
+### `RUNNER-ERR-4`
+
+- **错误代码:** `RUNNER-ERR-4`
+- **错误名:** `codeTrafficPercentNotZeroErr`
+- **描述:** 当前版本仍有流量分配（流量占比≠0）
+
+## Serverless 错误
+
+### `SERVERLESS-ERR-0`
+
+- **错误代码:** `SERVERLESS-ERR-0`
+- **错误名:** `codeStrategyTypeErr`
+- **描述:** 请求参数不匹配, 服务器无法处理该请求。
+
+---
+
+### `SERVERLESS-ERR-1`
+
+- **错误代码:** `SERVERLESS-ERR-1`
+- **错误名:** `codeDeployNotFoundErr`
+- **描述:** 部署实例不存在
+
+---
+
+### `SERVERLESS-ERR-2`
+
+- **错误代码:** `SERVERLESS-ERR-2`
+- **错误名:** `codeDeployStatusNotMatchErr`
+- **描述:** 部署实例状态不匹配
+
+---
+
+### `SERVERLESS-ERR-3`
+
+- **错误代码:** `SERVERLESS-ERR-3`
+- **错误名:** `codeDeployMaxReplicaErr`
+- **描述:** 策略部署仅支持最大副本数为1的部署实例
+
+---
+
+### `SERVERLESS-ERR-4`
+
+- **错误代码:** `SERVERLESS-ERR-4`
+- **错误名:** `codeRevisionNotFoundErr`
+- **描述:** 修订版本不存在
+
+---
+
+### `SERVERLESS-ERR-5`
+
+- **错误代码:** `SERVERLESS-ERR-5`
+- **错误名:** `codeInvalidPercentErr`
+- **描述:** 百分比总和不为100
+
+---
+
+### `SERVERLESS-ERR-6`
+
+- **错误代码:** `SERVERLESS-ERR-6`
+- **错误名:** `codeCommitIDEmptyErr`
+- **描述:** commit id 为空
+
+---
+
+### `SERVERLESS-ERR-7`
+
+- **错误代码:** `SERVERLESS-ERR-7`
+- **错误名:** `codeTrafficInvalidErr`
+- **描述:** 流量百分比无效
+
+---
+
+### `SERVERLESS-ERR-8`
+
+- **错误代码:** `SERVERLESS-ERR-8`
+- **错误名:** `codeInvalidCommitIDErr`
+- **描述:** 无效的commitId
 
 ## System 错误
 
@@ -825,4 +961,36 @@
 - **错误代码:** `USER-ERR-13`
 - **错误名:** `emailExists`
 - **描述:** 提供的电子邮件地址已存在于系统中。
+
+---
+
+### `USER-ERR-14`
+
+- **错误代码:** `USER-ERR-14`
+- **错误名:** `adminUserCannotBeDeleted`
+- **描述:** 管理员用户不能被删除。
+
+---
+
+### `USER-ERR-15`
+
+- **错误代码:** `USER-ERR-15`
+- **错误名:** `userHasOrganizations`
+- **描述:** 拥有组织的用户不能被删除。
+
+---
+
+### `USER-ERR-16`
+
+- **错误代码:** `USER-ERR-16`
+- **错误名:** `userHasDeployments`
+- **描述:** 拥有部署资源的用户不能被删除。
+
+---
+
+### `USER-ERR-17`
+
+- **错误代码:** `USER-ERR-17`
+- **错误名:** `userHasBills`
+- **描述:** 拥有账单的用户不能被删除。
 

@@ -42,6 +42,22 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Name:** `instanceQuotaExceeded`
 - **Description:** The instance quota exceeded. Includes agent type, instance count, and quota in the error message.
 
+---
+
+### `AGENT-ERR-1`
+
+- **Error Code:** `AGENT-ERR-1`
+- **Error Name:** `instanceNameAlreadyExists`
+- **Description:** You have an instance with the same name.
+
+---
+
+### `AGENT-ERR-2`
+
+- **Error Code:** `AGENT-ERR-2`
+- **Error Name:** `knowledgeBaseNameAlreadyExists`
+- **Description:** You have a knowledge base with the same name.
+
 ## Auth Errors
 
 ### `AUTH-ERR-0`
@@ -434,6 +450,14 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Name:** `gitReplicateRepositoryFailed`
 - **Description:** replicate repository failed. This can be caused by network problems, authentication issues, or the specified repository does not exist.
 
+---
+
+### `GIT-ERR-35`
+
+- **Error Code:** `GIT-ERR-35`
+- **Error Name:** `gitUsingGitInXnetRepository`
+- **Description:** Using git in xnet-enabled repository error. Git operations are not supported in repositories enabled with xnet.
+
 ## Invitation Errors
 
 ### `INVITATION-ERR-0`
@@ -593,6 +617,118 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Code:** `REQ-ERR-12`
 - **Error Name:** `errCaptchaIncorrect`
 - **Description:** The provided captcha verification failed. Please try again with a valid captcha.
+
+## Runner Errors
+
+### `RUNNER-ERR-0`
+
+- **Error Code:** `RUNNER-ERR-0`
+- **Error Name:** `codeRunnerMaxRevisionErr`
+- **Description:** The max revision number exceeds the max replica number.
+
+---
+
+### `RUNNER-ERR-1`
+
+- **Error Code:** `RUNNER-ERR-1`
+- **Error Name:** `codeRunnerGetMaxScaleFailedErr`
+- **Description:** Failed to get max scale.
+
+---
+
+### `RUNNER-ERR-2`
+
+- **Error Code:** `RUNNER-ERR-2`
+- **Error Name:** `codeRunnerDuplicateRevisionErr`
+- **Description:** The revision with commit already exists.
+
+---
+
+### `RUNNER-ERR-3`
+
+- **Error Code:** `RUNNER-ERR-3`
+- **Error Name:** `codeRevisionNotReadyErr`
+- **Description:** The revision is not ready.
+
+---
+
+### `RUNNER-ERR-4`
+
+- **Error Code:** `RUNNER-ERR-4`
+- **Error Name:** `codeTrafficPercentNotZeroErr`
+- **Description:** The traffic percent is not zero.
+
+## Serverless Errors
+
+### `SERVERLESS-ERR-0`
+
+- **Error Code:** `SERVERLESS-ERR-0`
+- **Error Name:** `codeStrategyTypeErr`
+- **Description:** The request parameter does not match the server requirements, and the server cannot process the request.
+
+---
+
+### `SERVERLESS-ERR-1`
+
+- **Error Code:** `SERVERLESS-ERR-1`
+- **Error Name:** `codeDeployNotFoundErr`
+- **Description:** The deploy not found.
+
+---
+
+### `SERVERLESS-ERR-2`
+
+- **Error Code:** `SERVERLESS-ERR-2`
+- **Error Name:** `codeDeployStatusNotMatchErr`
+- **Description:** The deploy status not match.
+
+---
+
+### `SERVERLESS-ERR-3`
+
+- **Error Code:** `SERVERLESS-ERR-3`
+- **Error Name:** `codeDeployMaxReplicaErr`
+- **Description:** The deploy max replica not match.
+
+---
+
+### `SERVERLESS-ERR-4`
+
+- **Error Code:** `SERVERLESS-ERR-4`
+- **Error Name:** `codeRevisionNotFoundErr`
+- **Description:** The revision not found.
+
+---
+
+### `SERVERLESS-ERR-5`
+
+- **Error Code:** `SERVERLESS-ERR-5`
+- **Error Name:** `codeInvalidPercentErr`
+- **Description:** The percent not match.
+
+---
+
+### `SERVERLESS-ERR-6`
+
+- **Error Code:** `SERVERLESS-ERR-6`
+- **Error Name:** `codeCommitIDEmptyErr`
+- **Description:** The commit id is empty.
+
+---
+
+### `SERVERLESS-ERR-7`
+
+- **Error Code:** `SERVERLESS-ERR-7`
+- **Error Name:** `codeTrafficInvalidErr`
+- **Description:** The traffic percent is invalid.
+
+---
+
+### `SERVERLESS-ERR-8`
+
+- **Error Code:** `SERVERLESS-ERR-8`
+- **Error Name:** `codeInvalidCommitIDErr`
+- **Description:** The commit id is invalid.
 
 ## System Errors
 
@@ -825,4 +961,36 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Code:** `USER-ERR-13`
 - **Error Name:** `emailExists`
 - **Description:** The email address provided already exists in the system.
+
+---
+
+### `USER-ERR-14`
+
+- **Error Code:** `USER-ERR-14`
+- **Error Name:** `adminUserCannotBeDeleted`
+- **Description:** The admin user cannot be deleted.
+
+---
+
+### `USER-ERR-15`
+
+- **Error Code:** `USER-ERR-15`
+- **Error Name:** `userHasOrganizations`
+- **Description:** The user who owns organizations cannot be deleted.
+
+---
+
+### `USER-ERR-16`
+
+- **Error Code:** `USER-ERR-16`
+- **Error Name:** `userHasDeployments`
+- **Description:** The user who owns deployments cannot be deleted.
+
+---
+
+### `USER-ERR-17`
+
+- **Error Code:** `USER-ERR-17`
+- **Error Name:** `userHasBills`
+- **Description:** The user who owns bills cannot be deleted.
 
