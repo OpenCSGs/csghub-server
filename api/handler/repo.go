@@ -795,8 +795,10 @@ func (h *RepoHandler) TreeV2(ctx *gin.Context) {
 		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
 			return
-		} else if errors.Is(err, errorx.ErrGitFileNotFound) || errors.Is(err, errorx.ErrGitCommitNotFound) {
+		} else if errors.Is(err, errorx.ErrGitCommitNotFound) {
 			httpbase.NotFoundError(ctx, err)
+		} else if errors.Is(err, errorx.ErrGitFileNotFound) {
+			// Do nothing, return empty tree
 		} else {
 			httpbase.ServerError(ctx, err)
 		}
