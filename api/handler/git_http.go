@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"opencsg.com/csghub-server/common/utils/common"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -244,7 +245,8 @@ func (h *GitHTTPHandler) LfsBatchHF(ctx *gin.Context) {
 	batchRequest.Namespace = ctx.Param("namespace")
 	batchRequest.Name = ctx.Param("name")
 	batchRequest.Name = strings.ReplaceAll(batchRequest.Name, ".git", "")
-	batchRequest.RepoType = types.RepositoryType(ctx.Param("repo_type"))
+
+	batchRequest.RepoType = common.RepoTypeFromContext(ctx)
 	if batchRequest.RepoType == "" {
 		batchRequest.RepoType = types.ModelRepo
 	}
