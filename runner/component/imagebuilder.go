@@ -80,7 +80,8 @@ func (ibc *imagebuilderComponentImpl) GetCluster(ctx context.Context, clusterId 
 func (ibc *imagebuilderComponentImpl) Build(ctx context.Context, req ctypes.ImageBuilderRequest) error {
 	ibc.pushLog(req.DeployId, strconv.FormatInt(req.TaskId, 10), ctypes.StagePreBuild, ctypes.StepInitializing, "start to build image workflow")
 	namespace := ibc.config.Cluster.SpaceNamespace
-	imagePath := path.Join(ibc.config.Space.DockerRegBase, req.LastCommitID)
+	imageName := buildImageName(req.OrgName, req.SpaceName, req.RepoId, req.LastCommitID)
+	imagePath := path.Join(ibc.config.Space.DockerRegBase, imageName)
 	cluster, err := ibc.GetCluster(ctx, req.ClusterID)
 	if err != nil {
 		return fmt.Errorf("failed to get cluster by id: %w", err)
@@ -433,12 +434,13 @@ func (ibc *imagebuilderComponentImpl) updateImagebuilderWork(ctx context.Context
 		return fmt.Errorf("failed to get work meta data from wf: %w", err)
 	}
 
+	imageName := buildImageName(workMeta.OrgName, workMeta.SpaceName, workMeta.RepoId, workMeta.LastCommitID)
 	ibc.addKServiceWithEvent(ctypes.RunnerBuilderChange, ctypes.ImageBuilderEvent{
 		DeployId:   workMeta.DeployId,
 		TaskId:     workMeta.TaskId,
 		Status:     string(wf.Status.Phase),
 		Message:    wf.Status.Message,
-		ImagetPath: workMeta.LastCommitID,
+		ImagetPath: imageName,
 	})
 
 	return err
@@ -588,4 +590,11 @@ func (ibc *imagebuilderComponentImpl) generateWorkName(orgName, spaceName, deplo
 		baseName = baseName[:63]
 	}
 	return baseName
+}
+
+func buildImageName(orgName, spaceName string, repoID int64, commitId string) string {
+	if len(commitId) > 10 {
+		commitId = commitId[:10]
+	}
+	return fmt.Sprintf("%s/%s-%d:%s", strings.ToLower(orgName), strings.ToLower(spaceName), repoID, commitId)
 }

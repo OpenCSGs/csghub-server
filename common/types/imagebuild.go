@@ -17,6 +17,7 @@ type ImageBuilderRequest struct {
 	LastCommitID   string `json:"last_commit_id"`
 	DeployId       string `json:"deploy_id,omitempty"`
 	TaskId         int64  `json:"task_id,omitempty"`
+	RepoId         int64  `json:"repo_id,omitempty"`
 }
 
 type ImageBuilderEvent struct {
