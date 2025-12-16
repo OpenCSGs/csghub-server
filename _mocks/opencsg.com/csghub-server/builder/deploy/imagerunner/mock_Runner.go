@@ -25,6 +25,102 @@ func (_m *MockRunner) EXPECT() *MockRunner_Expecter {
 	return &MockRunner_Expecter{mock: &_m.Mock}
 }
 
+// CreateRevisions provides a mock function with given fields: _a0, _a1
+func (_m *MockRunner) CreateRevisions(_a0 context.Context, _a1 *types.CreateRevisionReq) error {
+	ret := _m.Called(_a0, _a1)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateRevisions")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, *types.CreateRevisionReq) error); ok {
+		r0 = rf(_a0, _a1)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockRunner_CreateRevisions_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateRevisions'
+type MockRunner_CreateRevisions_Call struct {
+	*mock.Call
+}
+
+// CreateRevisions is a helper method to define mock.On call
+//   - _a0 context.Context
+//   - _a1 *types.CreateRevisionReq
+func (_e *MockRunner_Expecter) CreateRevisions(_a0 interface{}, _a1 interface{}) *MockRunner_CreateRevisions_Call {
+	return &MockRunner_CreateRevisions_Call{Call: _e.mock.On("CreateRevisions", _a0, _a1)}
+}
+
+func (_c *MockRunner_CreateRevisions_Call) Run(run func(_a0 context.Context, _a1 *types.CreateRevisionReq)) *MockRunner_CreateRevisions_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*types.CreateRevisionReq))
+	})
+	return _c
+}
+
+func (_c *MockRunner_CreateRevisions_Call) Return(_a0 error) *MockRunner_CreateRevisions_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockRunner_CreateRevisions_Call) RunAndReturn(run func(context.Context, *types.CreateRevisionReq) error) *MockRunner_CreateRevisions_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// DeleteKsvcVersion provides a mock function with given fields: ctx, clusterID, svcName, commitID
+func (_m *MockRunner) DeleteKsvcVersion(ctx context.Context, clusterID string, svcName string, commitID string) error {
+	ret := _m.Called(ctx, clusterID, svcName, commitID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteKsvcVersion")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) error); ok {
+		r0 = rf(ctx, clusterID, svcName, commitID)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockRunner_DeleteKsvcVersion_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteKsvcVersion'
+type MockRunner_DeleteKsvcVersion_Call struct {
+	*mock.Call
+}
+
+// DeleteKsvcVersion is a helper method to define mock.On call
+//   - ctx context.Context
+//   - clusterID string
+//   - svcName string
+//   - commitID string
+func (_e *MockRunner_Expecter) DeleteKsvcVersion(ctx interface{}, clusterID interface{}, svcName interface{}, commitID interface{}) *MockRunner_DeleteKsvcVersion_Call {
+	return &MockRunner_DeleteKsvcVersion_Call{Call: _e.mock.On("DeleteKsvcVersion", ctx, clusterID, svcName, commitID)}
+}
+
+func (_c *MockRunner_DeleteKsvcVersion_Call) Run(run func(ctx context.Context, clusterID string, svcName string, commitID string)) *MockRunner_DeleteKsvcVersion_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string))
+	})
+	return _c
+}
+
+func (_c *MockRunner_DeleteKsvcVersion_Call) Return(_a0 error) *MockRunner_DeleteKsvcVersion_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockRunner_DeleteKsvcVersion_Call) RunAndReturn(run func(context.Context, string, string, string) error) *MockRunner_DeleteKsvcVersion_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // DeleteWorkFlow provides a mock function with given fields: _a0, _a1
 func (_m *MockRunner) DeleteWorkFlow(_a0 context.Context, _a1 types.ArgoWorkFlowDeleteReq) (*httpbase.R, error) {
 	ret := _m.Called(_a0, _a1)
@@ -437,6 +533,66 @@ func (_c *MockRunner_ListCluster_Call) RunAndReturn(run func(context.Context) ([
 	return _c
 }
 
+// ListKsvcVersions provides a mock function with given fields: ctx, clusterID, svcName
+func (_m *MockRunner) ListKsvcVersions(ctx context.Context, clusterID string, svcName string) ([]types.KsvcRevisionInfo, error) {
+	ret := _m.Called(ctx, clusterID, svcName)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListKsvcVersions")
+	}
+
+	var r0 []types.KsvcRevisionInfo
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) ([]types.KsvcRevisionInfo, error)); ok {
+		return rf(ctx, clusterID, svcName)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) []types.KsvcRevisionInfo); ok {
+		r0 = rf(ctx, clusterID, svcName)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]types.KsvcRevisionInfo)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+		r1 = rf(ctx, clusterID, svcName)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockRunner_ListKsvcVersions_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListKsvcVersions'
+type MockRunner_ListKsvcVersions_Call struct {
+	*mock.Call
+}
+
+// ListKsvcVersions is a helper method to define mock.On call
+//   - ctx context.Context
+//   - clusterID string
+//   - svcName string
+func (_e *MockRunner_Expecter) ListKsvcVersions(ctx interface{}, clusterID interface{}, svcName interface{}) *MockRunner_ListKsvcVersions_Call {
+	return &MockRunner_ListKsvcVersions_Call{Call: _e.mock.On("ListKsvcVersions", ctx, clusterID, svcName)}
+}
+
+func (_c *MockRunner_ListKsvcVersions_Call) Run(run func(ctx context.Context, clusterID string, svcName string)) *MockRunner_ListKsvcVersions_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(string))
+	})
+	return _c
+}
+
+func (_c *MockRunner_ListKsvcVersions_Call) Return(_a0 []types.KsvcRevisionInfo, _a1 error) *MockRunner_ListKsvcVersions_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockRunner_ListKsvcVersions_Call) RunAndReturn(run func(context.Context, string, string) ([]types.KsvcRevisionInfo, error)) *MockRunner_ListKsvcVersions_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Logs provides a mock function with given fields: _a0, _a1
 func (_m *MockRunner) Logs(_a0 context.Context, _a1 *types.LogsRequest) (<-chan string, error) {
 	ret := _m.Called(_a0, _a1)
@@ -610,6 +766,55 @@ func (_c *MockRunner_Run_Call) Return(_a0 *types.RunResponse, _a1 error) *MockRu
 }
 
 func (_c *MockRunner_Run_Call) RunAndReturn(run func(context.Context, *types.RunRequest) (*types.RunResponse, error)) *MockRunner_Run_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SetVersionsTraffic provides a mock function with given fields: ctx, clusterID, svcName, req
+func (_m *MockRunner) SetVersionsTraffic(ctx context.Context, clusterID string, svcName string, req []types.TrafficReq) error {
+	ret := _m.Called(ctx, clusterID, svcName, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetVersionsTraffic")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, []types.TrafficReq) error); ok {
+		r0 = rf(ctx, clusterID, svcName, req)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockRunner_SetVersionsTraffic_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SetVersionsTraffic'
+type MockRunner_SetVersionsTraffic_Call struct {
+	*mock.Call
+}
+
+// SetVersionsTraffic is a helper method to define mock.On call
+//   - ctx context.Context
+//   - clusterID string
+//   - svcName string
+//   - req []types.TrafficReq
+func (_e *MockRunner_Expecter) SetVersionsTraffic(ctx interface{}, clusterID interface{}, svcName interface{}, req interface{}) *MockRunner_SetVersionsTraffic_Call {
+	return &MockRunner_SetVersionsTraffic_Call{Call: _e.mock.On("SetVersionsTraffic", ctx, clusterID, svcName, req)}
+}
+
+func (_c *MockRunner_SetVersionsTraffic_Call) Run(run func(ctx context.Context, clusterID string, svcName string, req []types.TrafficReq)) *MockRunner_SetVersionsTraffic_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].([]types.TrafficReq))
+	})
+	return _c
+}
+
+func (_c *MockRunner_SetVersionsTraffic_Call) Return(_a0 error) *MockRunner_SetVersionsTraffic_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockRunner_SetVersionsTraffic_Call) RunAndReturn(run func(context.Context, string, string, []types.TrafficReq) error) *MockRunner_SetVersionsTraffic_Call {
 	_c.Call.Return(run)
 	return _c
 }

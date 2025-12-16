@@ -594,6 +594,118 @@
 - **错误名:** `errCaptchaIncorrect`
 - **描述:** 提供的验证码验证失败。请使用有效的验证码重试。
 
+## Runner 错误
+
+### `RUNNER-ERR-0`
+
+- **错误代码:** `RUNNER-ERR-0`
+- **错误名:** `codeRunnerMaxRevisionErr`
+- **描述:** 最大版本数量超过最大弹性副本数
+
+---
+
+### `RUNNER-ERR-1`
+
+- **错误代码:** `RUNNER-ERR-1`
+- **错误名:** `codeRunnerGetMaxScaleFailedErr`
+- **描述:** 获取最大弹性副本数失败
+
+---
+
+### `RUNNER-ERR-2`
+
+- **错误代码:** `RUNNER-ERR-2`
+- **错误名:** `codeRunnerDuplicateRevisionErr`
+- **描述:** 版本实例已存在
+
+---
+
+### `RUNNER-ERR-3`
+
+- **错误代码:** `RUNNER-ERR-3`
+- **错误名:** `codeRevisionNotReadyErr`
+- **描述:** 版本实例未就绪
+
+---
+
+### `RUNNER-ERR-4`
+
+- **错误代码:** `RUNNER-ERR-4`
+- **错误名:** `codeTrafficPercentNotZeroErr`
+- **描述:** 当前版本仍有流量分配（流量占比≠0）
+
+## Serverless 错误
+
+### `SERVERLESS-ERR-0`
+
+- **错误代码:** `SERVERLESS-ERR-0`
+- **错误名:** `codeStrategyTypeErr`
+- **描述:** 请求参数不匹配, 服务器无法处理该请求。
+
+---
+
+### `SERVERLESS-ERR-1`
+
+- **错误代码:** `SERVERLESS-ERR-1`
+- **错误名:** `codeDeployNotFoundErr`
+- **描述:** 部署实例不存在
+
+---
+
+### `SERVERLESS-ERR-2`
+
+- **错误代码:** `SERVERLESS-ERR-2`
+- **错误名:** `codeDeployStatusNotMatchErr`
+- **描述:** 部署实例状态不匹配
+
+---
+
+### `SERVERLESS-ERR-3`
+
+- **错误代码:** `SERVERLESS-ERR-3`
+- **错误名:** `codeDeployMaxReplicaErr`
+- **描述:** 策略部署仅支持最大副本数为1的部署实例
+
+---
+
+### `SERVERLESS-ERR-4`
+
+- **错误代码:** `SERVERLESS-ERR-4`
+- **错误名:** `codeRevisionNotFoundErr`
+- **描述:** 修订版本不存在
+
+---
+
+### `SERVERLESS-ERR-5`
+
+- **错误代码:** `SERVERLESS-ERR-5`
+- **错误名:** `codeInvalidPercentErr`
+- **描述:** 百分比总和不为100
+
+---
+
+### `SERVERLESS-ERR-6`
+
+- **错误代码:** `SERVERLESS-ERR-6`
+- **错误名:** `codeCommitIDEmptyErr`
+- **描述:** commit id 为空
+
+---
+
+### `SERVERLESS-ERR-7`
+
+- **错误代码:** `SERVERLESS-ERR-7`
+- **错误名:** `codeTrafficInvalidErr`
+- **描述:** 流量百分比无效
+
+---
+
+### `SERVERLESS-ERR-8`
+
+- **错误代码:** `SERVERLESS-ERR-8`
+- **错误名:** `codeInvalidCommitIDErr`
+- **描述:** 无效的commitId
+
 ## System 错误
 
 ### `SYS-ERR-0`

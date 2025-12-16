@@ -102,3 +102,19 @@ func (h *LocalRunner) GetWorkFlow(ctx context.Context, req types.EvaluationGetRe
 func (h *LocalRunner) SubmitFinetuneJob(ctx context.Context, req *types.ArgoWorkFlowReq) (*types.ArgoWorkFlowRes, error) {
 	return nil, nil
 }
+
+func (h *LocalRunner) SetVersionsTraffic(ctx context.Context, clusterID, svcName string, req []types.TrafficReq) error {
+	return nil
+}
+
+func (h *LocalRunner) CreateRevisions(ctx context.Context, req *types.CreateRevisionReq) error {
+	return nil
+}
+
+func (h *LocalRunner) ListKsvcVersions(ctx context.Context, clusterID, svcName string) ([]types.KsvcRevisionInfo, error) {
+	return nil, nil
+}
+
+func (h *LocalRunner) DeleteKsvcVersion(ctx context.Context, clusterID, svcName, commitID string) error {
+	return nil
+}

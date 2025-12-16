@@ -594,6 +594,118 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Name:** `errCaptchaIncorrect`
 - **Description:** The provided captcha verification failed. Please try again with a valid captcha.
 
+## Runner Errors
+
+### `RUNNER-ERR-0`
+
+- **Error Code:** `RUNNER-ERR-0`
+- **Error Name:** `codeRunnerMaxRevisionErr`
+- **Description:** The max revision number exceeds the max replica number.
+
+---
+
+### `RUNNER-ERR-1`
+
+- **Error Code:** `RUNNER-ERR-1`
+- **Error Name:** `codeRunnerGetMaxScaleFailedErr`
+- **Description:** Failed to get max scale.
+
+---
+
+### `RUNNER-ERR-2`
+
+- **Error Code:** `RUNNER-ERR-2`
+- **Error Name:** `codeRunnerDuplicateRevisionErr`
+- **Description:** The revision with commit already exists.
+
+---
+
+### `RUNNER-ERR-3`
+
+- **Error Code:** `RUNNER-ERR-3`
+- **Error Name:** `codeRevisionNotReadyErr`
+- **Description:** The revision is not ready.
+
+---
+
+### `RUNNER-ERR-4`
+
+- **Error Code:** `RUNNER-ERR-4`
+- **Error Name:** `codeTrafficPercentNotZeroErr`
+- **Description:** The traffic percent is not zero.
+
+## Serverless Errors
+
+### `SERVERLESS-ERR-0`
+
+- **Error Code:** `SERVERLESS-ERR-0`
+- **Error Name:** `codeStrategyTypeErr`
+- **Description:** The request parameter does not match the server requirements, and the server cannot process the request.
+
+---
+
+### `SERVERLESS-ERR-1`
+
+- **Error Code:** `SERVERLESS-ERR-1`
+- **Error Name:** `codeDeployNotFoundErr`
+- **Description:** The deploy not found.
+
+---
+
+### `SERVERLESS-ERR-2`
+
+- **Error Code:** `SERVERLESS-ERR-2`
+- **Error Name:** `codeDeployStatusNotMatchErr`
+- **Description:** The deploy status not match.
+
+---
+
+### `SERVERLESS-ERR-3`
+
+- **Error Code:** `SERVERLESS-ERR-3`
+- **Error Name:** `codeDeployMaxReplicaErr`
+- **Description:** The deploy max replica not match.
+
+---
+
+### `SERVERLESS-ERR-4`
+
+- **Error Code:** `SERVERLESS-ERR-4`
+- **Error Name:** `codeRevisionNotFoundErr`
+- **Description:** The revision not found.
+
+---
+
+### `SERVERLESS-ERR-5`
+
+- **Error Code:** `SERVERLESS-ERR-5`
+- **Error Name:** `codeInvalidPercentErr`
+- **Description:** The percent not match.
+
+---
+
+### `SERVERLESS-ERR-6`
+
+- **Error Code:** `SERVERLESS-ERR-6`
+- **Error Name:** `codeCommitIDEmptyErr`
+- **Description:** The commit id is empty.
+
+---
+
+### `SERVERLESS-ERR-7`
+
+- **Error Code:** `SERVERLESS-ERR-7`
+- **Error Name:** `codeTrafficInvalidErr`
+- **Description:** The traffic percent is invalid.
+
+---
+
+### `SERVERLESS-ERR-8`
+
+- **Error Code:** `SERVERLESS-ERR-8`
+- **Error Name:** `codeInvalidCommitIDErr`
+- **Description:** The commit id is invalid.
+
 ## System Errors
 
 ### `SYS-ERR-0`

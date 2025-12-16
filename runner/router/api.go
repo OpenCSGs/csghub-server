@@ -3,9 +3,10 @@ package router
 import (
 	"context"
 	"fmt"
+	"log/slog"
+
 	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
-	"log/slog"
 	"opencsg.com/csghub-server/api/middleware"
 	"opencsg.com/csghub-server/builder/deploy/cluster"
 	"opencsg.com/csghub-server/builder/instrumentation"
@@ -51,6 +52,10 @@ func NewHttpServer(ctx context.Context, config *config.Config) (*gin.Engine, err
 		service.GET("/:service/get", k8sHandler.GetServiceByName)
 		service.GET("/:service/replica", k8sHandler.GetReplica)
 		service.DELETE("/:service/purge", k8sHandler.PurgeService)
+		service.PUT("/:service/versions/traffic", k8sHandler.SetVersionsTraffic)
+		service.POST("/:service/versions", k8sHandler.CreateRevisions)
+		service.GET("/:service/versions", k8sHandler.ListKsvcVersions)
+		service.DELETE("/:service/versions/:commit_id", k8sHandler.DeleteKsvcVersion)
 	}
 
 	// cluster api

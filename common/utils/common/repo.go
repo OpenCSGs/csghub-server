@@ -248,3 +248,11 @@ func SafeBuildLfsPath(repoID int64, oid, lfsRelativePath string, migrated bool) 
 func MirrorTaskStatusToRepoStatus(mirrorTaskSatus types.MirrorTaskStatus) types.RepositorySyncStatus {
 	return MirrorTaskStatusToRepoStatusMap[mirrorTaskSatus]
 }
+
+func ShortenCommitID7(fullCommitID string) (string, error) {
+	commitID := strings.TrimSpace(strings.ToLower(fullCommitID))
+	if len(commitID) < 7 {
+		return "", errorx.ErrCommitIDEmpty
+	}
+	return commitID[:7], nil
+}

@@ -678,6 +678,10 @@ func createModelRoutes(config *config.Config,
 		modelsDeployGroup.PUT("/:namespace/:name/run/:id/stop", modelHandler.DeployStop)
 		modelsDeployGroup.PUT("/:namespace/:name/run/:id/start", modelHandler.DeployStart)
 		modelsDeployGroup.PUT("/:namespace/:name/run/:id/wakeup", modelHandler.DeployWakeup)
+		modelsDeployGroup.PUT("/:namespace/:name/run/versions/:id/traffic", modelHandler.UpdateInferenceTraffic)
+		modelsDeployGroup.GET("/:namespace/:name/run/versions/:id", modelHandler.ListInferenceVersions)
+		modelsDeployGroup.POST("/:namespace/:name/run/versions/:id", modelHandler.CreateInferenceVersion)
+		modelsDeployGroup.DELETE("/:namespace/:name/run/versions/:id/:commit_id", modelHandler.DeleteInferenceVersion)
 
 		// deploy model as finetune instance
 		modelsDeployGroup.POST("/:namespace/:name/finetune", modelHandler.FinetuneCreate)

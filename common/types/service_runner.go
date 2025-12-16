@@ -2,10 +2,19 @@ package types
 
 import (
 	"io"
+	"time"
 
 	"k8s.io/client-go/kubernetes"
 	knative "knative.dev/serving/pkg/client/clientset/versioned"
 )
+
+// todo  删除
+const (
+	StrategyTypeBlueGreen StrategyType = "blue_green"
+	StrategyTypeCanary    StrategyType = "canary"
+)
+
+type StrategyType string
 
 type (
 	RunRequest struct {
@@ -83,6 +92,15 @@ type (
 		ActualReplica  int        `json:"actual_replica"`
 		DesiredReplica int        `json:"desired_replica"`
 		Reason         string     `json:"reason"`
+
+		Revisions []Revision `json:"revision"`
+	}
+
+	Revision struct {
+		RevisionName   string `json:"revision_name,omitempty"`
+		CommitID       string `json:"commit_id,omitempty"`
+		TrafficPercent int    `json:"traffic_percent,omitempty"`
+		DeployType     string `json:"deploy_type,omitempty"`
 	}
 
 	LogsRequest struct {
@@ -181,11 +199,44 @@ type (
 		OrderDetailID int64             `json:"order_detail_id"`
 		SvcName       string            `json:"-"`
 		TaskId        int64             `json:"task_id"`
+
+		StrategyType string `json:"strategy_type"` // blue_green/canary
 	}
 
 	EngineArg struct {
 		Name   string `json:"name"`
 		Value  string `json:"value"`
 		Format string `json:"format"`
+	}
+
+	TrafficTarget struct {
+		RevisionName string `json:"revision_name,omitempty"`
+		Percent      int64  `json:"percent"`
+	}
+	TrafficReq struct {
+		Commit         string `json:"commit"`
+		TrafficPercent int64  `json:"traffic_percent"`
+	}
+
+	CreateRevisionReq struct {
+		ClusterID      string `json:"cluster_id"`
+		SvcName        string `json:"svc_name"`
+		Commit         string `json:"commit"`
+		InitialTraffic int    `json:"initial_traffic"`
+	}
+
+	CreateRevisionResp struct {
+		Code    int    `json:"code"`
+		Message string `json:"message"`
+	}
+
+	KsvcRevisionInfo struct {
+		RevisionName   string    `json:"revision_name"`
+		Commit         string    `json:"commit"`
+		CreateTime     time.Time `json:"create_time"`
+		IsReady        bool      `json:"is_ready"`
+		TrafficPercent int64     `json:"traffic_percent"`
+		Message        string    `json:"message"`
+		Reason         string    `json:"reason"`
 	}
 )

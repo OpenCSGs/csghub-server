@@ -10,7 +10,9 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"reflect"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -304,5 +306,356 @@ func TestRemoteRunner_GetClusterById_OutsideCluster(t *testing.T) {
 
 	if !reflect.DeepEqual(got, expectedCluster) {
 		t.Errorf("expected cluster %v, got %v", expectedCluster, got)
+	}
+}
+
+func TestRemoteRunner_CreateRevisions_Success(t *testing.T) {
+	req := &types.CreateRevisionReq{
+		ClusterID: "test-cluster",
+		SvcName:   "test-service",
+		Commit:    "abc123",
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/service/test-service/versions" {
+			t.Errorf("expected path /api/v1/service/test-service/versions, got %s", r.URL.Path)
+		}
+		if r.Method != http.MethodPost {
+			t.Errorf("expected method POST, got %s", r.Method)
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	mockClusterStore := mockdb.NewMockClusterInfoStore(t)
+	mockClusterStore.EXPECT().ByClusterID(mock.Anything, req.ClusterID).Return(database.ClusterInfo{
+		Mode:           types.ConnectModeInCluster,
+		RunnerEndpoint: server.URL,
+	}, nil).Once()
+
+	remoteURL, _ := url.Parse(server.URL)
+	runner := &RemoteRunner{
+		remote:       remoteURL,
+		client:       server.Client(),
+		clusterStore: mockClusterStore,
+	}
+
+	err := runner.CreateRevisions(context.Background(), req)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestRemoteRunner_CreateRevisions_ClusterStoreError(t *testing.T) {
+	req := &types.CreateRevisionReq{
+		ClusterID: "test-cluster",
+		SvcName:   "test-service",
+	}
+
+	expectedErr := errors.New("database error")
+	mockClusterStore := mockdb.NewMockClusterInfoStore(t)
+	mockClusterStore.EXPECT().ByClusterID(mock.Anything, req.ClusterID).Return(database.ClusterInfo{}, expectedErr).Once()
+
+	remoteURL, _ := url.Parse("http://default.runner")
+	runner := &RemoteRunner{
+		remote:       remoteURL,
+		client:       &http.Client{},
+		clusterStore: mockClusterStore,
+	}
+
+	err := runner.CreateRevisions(context.Background(), req)
+	if err == nil {
+		t.Fatal("expected an error, but got nil")
+	}
+	if !errors.Is(err, expectedErr) {
+		t.Errorf("expected error %v, got %v", expectedErr, err)
+	}
+}
+
+func TestRemoteRunner_CreateRevisions_HTTPError(t *testing.T) {
+	req := &types.CreateRevisionReq{
+		ClusterID: "test-cluster",
+		SvcName:   "test-service",
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	mockClusterStore := mockdb.NewMockClusterInfoStore(t)
+	mockClusterStore.EXPECT().ByClusterID(mock.Anything, req.ClusterID).Return(database.ClusterInfo{
+		Mode:           types.ConnectModeInCluster,
+		RunnerEndpoint: server.URL,
+	}, nil).Once()
+
+	remoteURL, _ := url.Parse(server.URL)
+	runner := &RemoteRunner{
+		remote:       remoteURL,
+		client:       server.Client(),
+		clusterStore: mockClusterStore,
+	}
+
+	err := runner.CreateRevisions(context.Background(), req)
+	if err == nil {
+		t.Fatal("expected an error, but got nil")
+	}
+}
+
+func TestRemoteRunner_ListKsvcVersions_Success(t *testing.T) {
+	clusterID := "test-cluster"
+	svcName := "test-service"
+	expectedVersions := []types.KsvcRevisionInfo{
+		{
+			RevisionName:   "test-service-00001",
+			Commit:         "abc123",
+			CreateTime:     time.Now().Add(-2 * time.Hour),
+			IsReady:        true,
+			TrafficPercent: 80,
+		},
+		{
+			RevisionName:   "test-service-00002",
+			Commit:         "def456",
+			CreateTime:     time.Now().Add(-1 * time.Hour),
+			IsReady:        true,
+			TrafficPercent: 20,
+		},
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/service/test-service/versions" {
+			t.Errorf("expected path /api/v1/service/test-service/versions, got %s", r.URL.Path)
+		}
+		if r.Method != http.MethodGet {
+			t.Errorf("expected method GET, got %s", r.Method)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		err := json.NewEncoder(w).Encode(expectedVersions)
+		require.Nil(t, err)
+	}))
+	defer server.Close()
+
+	mockClusterStore := mockdb.NewMockClusterInfoStore(t)
+	mockClusterStore.EXPECT().ByClusterID(mock.Anything, clusterID).Return(database.ClusterInfo{
+		Mode:           types.ConnectModeInCluster,
+		RunnerEndpoint: server.URL,
+	}, nil).Once()
+
+	remoteURL, _ := url.Parse(server.URL)
+	runner := &RemoteRunner{
+		remote:       remoteURL,
+		client:       server.Client(),
+		clusterStore: mockClusterStore,
+	}
+
+	_, err := runner.ListKsvcVersions(context.Background(), clusterID, svcName)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+}
+
+func TestRemoteRunner_ListKsvcVersions_ClusterStoreError(t *testing.T) {
+	clusterID := "test-cluster"
+	svcName := "test-service"
+
+	expectedErr := errors.New("database error")
+	mockClusterStore := mockdb.NewMockClusterInfoStore(t)
+	mockClusterStore.EXPECT().ByClusterID(mock.Anything, clusterID).Return(database.ClusterInfo{}, expectedErr).Once()
+
+	remoteURL, _ := url.Parse("http://default.runner")
+	runner := &RemoteRunner{
+		remote:       remoteURL,
+		client:       &http.Client{},
+		clusterStore: mockClusterStore,
+	}
+
+	_, err := runner.ListKsvcVersions(context.Background(), clusterID, svcName)
+	if err == nil {
+		t.Fatal("expected an error, but got nil")
+	}
+	if !errors.Is(err, expectedErr) {
+		t.Errorf("expected error %v, got %v", expectedErr, err)
+	}
+}
+
+func TestRemoteRunner_ListKsvcVersions_HTTPError(t *testing.T) {
+	clusterID := "test-cluster"
+	svcName := "test-service"
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	mockClusterStore := mockdb.NewMockClusterInfoStore(t)
+	mockClusterStore.EXPECT().ByClusterID(mock.Anything, clusterID).Return(database.ClusterInfo{
+		Mode:           types.ConnectModeInCluster,
+		RunnerEndpoint: server.URL,
+	}, nil).Once()
+
+	remoteURL, _ := url.Parse(server.URL)
+	runner := &RemoteRunner{
+		remote:       remoteURL,
+		client:       server.Client(),
+		clusterStore: mockClusterStore,
+	}
+
+	_, err := runner.ListKsvcVersions(context.Background(), clusterID, svcName)
+	if err == nil {
+		t.Fatal("expected an error, but got nil")
+	}
+	if !strings.Contains(err.Error(), "failed to get ksvc versions") {
+		t.Errorf("expected error message to contain 'failed to get ksvc versions', got %v", err)
+	}
+}
+
+func TestRemoteRunner_ListKsvcVersions_JSONError(t *testing.T) {
+	clusterID := "test-cluster"
+	svcName := "test-service"
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, err := w.Write([]byte("invalid json"))
+		require.Nil(t, err)
+	}))
+	defer server.Close()
+
+	mockClusterStore := mockdb.NewMockClusterInfoStore(t)
+	mockClusterStore.EXPECT().ByClusterID(mock.Anything, clusterID).Return(database.ClusterInfo{
+		Mode:           types.ConnectModeInCluster,
+		RunnerEndpoint: server.URL,
+	}, nil).Once()
+
+	remoteURL, _ := url.Parse(server.URL)
+	runner := &RemoteRunner{
+		remote:       remoteURL,
+		client:       server.Client(),
+		clusterStore: mockClusterStore,
+	}
+
+	_, err := runner.ListKsvcVersions(context.Background(), clusterID, svcName)
+	if err == nil {
+		t.Fatal("expected an error, but got nil")
+	}
+}
+
+func TestRemoteRunner_SetVersionsTraffic_Success(t *testing.T) {
+	clusterID := "test-cluster"
+	svcName := "test-service"
+	trafficReqs := []types.TrafficReq{
+		{
+			Commit:         "abc123",
+			TrafficPercent: 80,
+		},
+		{
+			Commit:         "def456",
+			TrafficPercent: 20,
+		},
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/service/test-service/versions/traffic" {
+			t.Errorf("expected path /api/v1/service/test-service/versions/traffic, got %s", r.URL.Path)
+		}
+		if r.Method != http.MethodPut {
+			t.Errorf("expected method PUT, got %s", r.Method)
+		}
+
+		var receivedReqs []types.TrafficReq
+		err := json.NewDecoder(r.Body).Decode(&receivedReqs)
+		require.Nil(t, err)
+
+		if !reflect.DeepEqual(receivedReqs, trafficReqs) {
+			t.Errorf("expected traffic requests %+v, got %+v", trafficReqs, receivedReqs)
+		}
+
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	mockClusterStore := mockdb.NewMockClusterInfoStore(t)
+	mockClusterStore.EXPECT().ByClusterID(mock.Anything, clusterID).Return(database.ClusterInfo{
+		Mode:           types.ConnectModeInCluster,
+		RunnerEndpoint: server.URL,
+	}, nil).Once()
+
+	remoteURL, _ := url.Parse(server.URL)
+	runner := &RemoteRunner{
+		remote:       remoteURL,
+		client:       server.Client(),
+		clusterStore: mockClusterStore,
+	}
+
+	err := runner.SetVersionsTraffic(context.Background(), clusterID, svcName, trafficReqs)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestRemoteRunner_SetVersionsTraffic_ClusterStoreError(t *testing.T) {
+	clusterID := "test-cluster"
+	svcName := "test-service"
+	trafficReqs := []types.TrafficReq{
+		{
+			Commit:         "abc123",
+			TrafficPercent: 80,
+		},
+	}
+
+	expectedErr := errors.New("database error")
+	mockClusterStore := mockdb.NewMockClusterInfoStore(t)
+	mockClusterStore.EXPECT().ByClusterID(mock.Anything, clusterID).Return(database.ClusterInfo{}, expectedErr).Once()
+
+	remoteURL, _ := url.Parse("http://default.runner")
+	runner := &RemoteRunner{
+		remote:       remoteURL,
+		client:       &http.Client{},
+		clusterStore: mockClusterStore,
+	}
+
+	err := runner.SetVersionsTraffic(context.Background(), clusterID, svcName, trafficReqs)
+	if err == nil {
+		t.Fatal("expected an error, but got nil")
+	}
+	if !errors.Is(err, expectedErr) {
+		t.Errorf("expected error %v, got %v", expectedErr, err)
+	}
+}
+
+func TestRemoteRunner_SetVersionsTraffic_HTTPError(t *testing.T) {
+	clusterID := "test-cluster"
+	svcName := "test-service"
+	trafficReqs := []types.TrafficReq{
+		{
+			Commit:         "abc123",
+			TrafficPercent: 100,
+		},
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	mockClusterStore := mockdb.NewMockClusterInfoStore(t)
+	mockClusterStore.EXPECT().ByClusterID(mock.Anything, clusterID).Return(database.ClusterInfo{
+		Mode:           types.ConnectModeInCluster,
+		RunnerEndpoint: server.URL,
+	}, nil).Once()
+
+	remoteURL, _ := url.Parse(server.URL)
+	runner := &RemoteRunner{
+		remote:       remoteURL,
+		client:       server.Client(),
+		clusterStore: mockClusterStore,
+	}
+
+	err := runner.SetVersionsTraffic(context.Background(), clusterID, svcName, trafficReqs)
+	if err == nil {
+		t.Fatal("expected an error, but got nil")
+	}
+	if !strings.Contains(err.Error(), "failed to update traffic") {
+		t.Errorf("expected error message to contain 'failed to update traffic', got %v", err)
 	}
 }

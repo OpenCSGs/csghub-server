@@ -31,7 +31,9 @@ import (
 	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
+	utils "opencsg.com/csghub-server/common/utils/common"
 	rcommon "opencsg.com/csghub-server/runner/common"
 )
 
@@ -47,6 +49,8 @@ var (
 	KeyServiceLabel  string = "serving.knative.dev/service"
 	KeyRunModeLabel  string = "run-mode"
 	ValueMultiHost   string = "multi-host"
+	CommitId         string = "serving.knative.dev/commit_id"
+	RevisionName     string = "serving.knative.dev/revision"
 )
 
 type serviceComponentImpl struct {
@@ -60,6 +64,7 @@ type serviceComponentImpl struct {
 	clusterPool             *cluster.ClusterPool
 	deployLogStore          database.DeployLogStore
 	logReporter             reporter.LogCollector
+	revisionStore           database.KnativeServiceRevisionStore
 }
 
 type ServiceComponent interface {
@@ -72,6 +77,10 @@ type ServiceComponent interface {
 	GetServiceInfo(ctx context.Context, req types.ServiceRequest) (*types.ServiceInfoResponse, error)
 	PodExist(ctx context.Context, cluster *cluster.Cluster, podName string) (bool, error)
 	GetPodLogsFromDB(ctx context.Context, cluster *cluster.Cluster, podName, svcName string) (string, error)
+	SetVersionsTraffic(ctx context.Context, clusterId string, svcName string, req []types.TrafficReq) error
+	CreateRevisions(ctx context.Context, req types.CreateRevisionReq) error
+	ListVersions(ctx context.Context, clusterId string, svcName string) ([]types.KsvcRevisionInfo, error)
+	DeleteKsvcVersion(ctx context.Context, clusterId string, svcName string, commitID string) error
 }
 
 func NewServiceComponent(config *config.Config, clusterPool *cluster.ClusterPool, logReporter reporter.LogCollector) ServiceComponent {
@@ -86,6 +95,7 @@ func NewServiceComponent(config *config.Config, clusterPool *cluster.ClusterPool
 		clusterPool:             clusterPool,
 		deployLogStore:          database.NewDeployLogStore(),
 		logReporter:             logReporter,
+		revisionStore:           database.NewKnativeServiceRevisionStore(),
 	}
 	go sc.runInformer()
 	return sc
@@ -99,10 +109,14 @@ func (s *serviceComponentImpl) generateService(ctx context.Context, cluster *clu
 	hardware := request.Hardware
 	resReq, nodeSelector := GenerateResources(hardware)
 	var err error
+	var revision string
 	if request.Env != nil {
 		// generate env
 		for key, value := range request.Env {
 			environments = append(environments, corev1.EnvVar{Name: key, Value: value})
+			if key == "REVISION" {
+				revision = value
+			}
 		}
 
 		// get app expose port from env with key=port
@@ -154,7 +168,6 @@ func (s *serviceComponentImpl) generateService(ctx context.Context, cluster *clu
 	annotations[KeyUserID] = request.UserID
 	annotations[KeyDeploySKU] = request.Sku
 	annotations[KeyOrderDetailID] = strconv.FormatInt(request.OrderDetailID, 10)
-
 	containerImg := request.ImageID
 	if request.RepoType == string(types.ModelRepo) || request.DeployType == types.NotebookType {
 		// choose registry
@@ -233,6 +246,7 @@ func (s *serviceComponentImpl) generateService(ctx context.Context, cluster *clu
 							types.StreamKeyDeployID:     strconv.FormatInt(request.DeployID, 10),
 							types.StreamKeyDeployType:   strconv.Itoa(request.DeployType),
 							types.StreamKeyDeployTaskID: strconv.FormatInt(request.TaskId, 10),
+							CommitId:                    revision,
 						},
 					},
 					Spec: v1.RevisionSpec{
@@ -269,24 +283,30 @@ func (s *serviceComponentImpl) getNimSecret(ctx context.Context, cluster *cluste
 	return string(secret.Data["NGC_API_KEY"]), nil
 }
 
-func (s *serviceComponentImpl) getServicePodsWithStatus(ctx context.Context, cluster *cluster.Cluster, svcName string, namespace string) (*types.InstanceInfo, error) {
-	labelSelector := fmt.Sprintf("serving.knative.dev/service=%s", svcName)
+func (s *serviceComponentImpl) getServicePodsWithStatus(ctx context.Context, cluster *cluster.Cluster, svcName string, namespace string) (*types.InstanceInfo, []types.Revision, error) {
+	labelSelector := fmt.Sprintf("%s=%s", KeyServiceLabel, svcName)
 	// Get the list of Pods based on the label selector
 	pods, err := cluster.Client.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
 		LabelSelector: labelSelector,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to list pods in getServicePodsWithStatus: %w", err)
+		return nil, nil, fmt.Errorf("failed to list pods in getServicePodsWithStatus: %w", err)
 	}
 	slog.Debug("get pods in getServicePodsWithStatus", slog.Any("svcName", svcName), slog.Any("len(pods.Items)", len(pods.Items)))
 	// Extract the Pod names and status
 	var podInstances []types.Instance
 	var instanceInfo types.InstanceInfo
 	readyCount := 0
+	var revisions []types.Revision
 	for _, pod := range pods.Items {
 		if pod.DeletionTimestamp != nil {
 			continue
 		}
+		revisions = append(revisions, types.Revision{
+			RevisionName: pod.Labels[RevisionName],
+			CommitID:     pod.Labels[CommitId],
+		})
+
 		status := pod.Status.Phase
 		// Check container statuses for failure reasons
 		_, isPodFailed := hasFailedStatus(&pod)
@@ -312,7 +332,8 @@ func (s *serviceComponentImpl) getServicePodsWithStatus(ctx context.Context, clu
 		instanceInfo.Message = *message
 		instanceInfo.Reason = *reason
 	}
-	return &instanceInfo, nil
+
+	return &instanceInfo, revisions, nil
 }
 
 func hasFailedStatus(pod *corev1.Pod) (string, bool) {
@@ -527,13 +548,16 @@ func (s *serviceComponentImpl) runInformer() {
 			defer wg.Done()
 			s.runPodInformer(stopCh, cluster)
 		}(cls)
+		go func(cluster *cluster.Cluster) {
+			defer wg.Done()
+			s.runRevisionInformer(stopCh, cluster)
+		}(cls)
 	}
 	wg.Wait()
 }
 
 // Run service informer, main handle the service changes
 func (s *serviceComponentImpl) runServiceInformer(stopCh <-chan struct{}, cluster *cluster.Cluster) {
-
 	informerFactory := externalversions.NewSharedInformerFactoryWithOptions(
 		cluster.KnativeClient,
 		time.Duration(s.informerSyncPeriodInMin)*time.Minute, //sync every 2 minutes, if network unavailable, it will trigger watcher to reconnect
@@ -777,7 +801,6 @@ func (s *serviceComponentImpl) addServiceInDB(svc v1.Service, clusterID string) 
 		service.DesiredReplica = desiredReplicas
 		service.ActualReplica = int(deployment.Status.Replicas)
 	}
-
 	err = s.addKServiceWithEvent(ctx, service)
 	if err != nil {
 		return fmt.Errorf("failed to add kservice for informer callback error: %w", err)
@@ -802,6 +825,7 @@ func (s *serviceComponentImpl) updateServiceInDB(svc v1.Service, clusterID strin
 	if err != nil {
 		slog.Error("failed to get deployment ", slog.Any("service", svc.Name), slog.Any("error", err))
 	}
+
 	oldService.Endpoint = svc.Status.URL.String()
 	lastStatus := oldService.Status
 	oldService.Status = getReadyCondition(&svc)
@@ -851,7 +875,19 @@ func (s *serviceComponentImpl) getServiceStatus(ctx context.Context, ks v1.Servi
 	if err != nil {
 		return resp, fmt.Errorf("fail to get cluster,error: %v ", err)
 	}
-	instInfo, err := s.getServicePodsWithStatus(ctx, cluster, ks.Name, ks.Namespace)
+	slog.Info("get service condition in getServiceStatus",
+		slog.Any("svc", ks.Name), slog.Any("condition", serviceCondition))
+	if serviceCondition != nil {
+		status, _, err := GetServiceExternalStatus(ctx, cluster, &ks, ks.Namespace)
+		if err != nil {
+			return resp, fmt.Errorf("fail to get service external status, error: %w", err)
+		}
+		slog.Info("get service external status in getServiceStatus",
+			slog.Any("svc", ks.Name), slog.Any("status", status))
+		serviceCondition.Status = status
+	}
+
+	instInfo, revsions, err := s.getServicePodsWithStatus(ctx, cluster, ks.Name, ks.Namespace)
 	if err != nil {
 		return resp, fmt.Errorf("fail to get service pod name list,error: %v ", err)
 	}
@@ -883,6 +919,7 @@ func (s *serviceComponentImpl) getServiceStatus(ctx context.Context, ks v1.Servi
 	resp.Message = instInfo.Message
 	resp.Instances = instInfo.Instances
 	resp.Reason = instInfo.Reason
+	resp.Revisions = revsions
 	return resp, nil
 }
 
@@ -893,16 +930,6 @@ func isUserContainerActive(instList []types.Instance) bool {
 		}
 	}
 	return false
-}
-
-// corev1.ConditionTrue
-func getReadyCondition(service *v1.Service) corev1.ConditionStatus {
-	for _, condition := range service.Status.Conditions {
-		if condition.Type == v1.ServiceConditionReady {
-			return condition.Status
-		}
-	}
-	return corev1.ConditionUnknown
 }
 
 func (s *serviceComponentImpl) GetServicePods(ctx context.Context, cluster *cluster.Cluster, svcName string, namespace string, limit int64) ([]string, error) {
@@ -1433,4 +1460,197 @@ func (s *serviceComponentImpl) reportServiceLog(msg string, ksvc *database.Knati
 		logEntry.PodInfo.Labels = podInfo.Labels
 	}
 	s.logReporter.Report(logEntry)
+}
+
+func (s *serviceComponentImpl) CreateRevisions(ctx context.Context, req types.CreateRevisionReq) error {
+	cluster, err := s.clusterPool.GetClusterByID(ctx, req.ClusterID)
+	if err != nil {
+		return fmt.Errorf("fail to get cluster, error %v ", err)
+	}
+
+	ksvc, err := getServices(ctx, cluster, s.k8sNameSpace, req.SvcName)
+	if err != nil {
+		return err
+	}
+
+	maxScale, ok := ksvc.Spec.Template.Annotations[KeyMaxScale]
+	if !ok {
+		return errorx.ErrRunnerGetMaxScaleFailed
+	}
+	maxScaleInt, err := strconv.Atoi(maxScale)
+	if err != nil {
+		slog.ErrorContext(ctx, "fail to parse max scale %s, error %v ", maxScale, err)
+		return errorx.ErrRunnerGetMaxScaleFailed
+	}
+
+	revisionList, err := getRevisionList(ctx, cluster, s.k8sNameSpace, req.SvcName)
+	if err != nil {
+		slog.ErrorContext(ctx, "fail to list revisions %s, error %v ", req.SvcName, err)
+		return errorx.ErrRunnerGetMaxScaleFailed
+	}
+
+	totalReadyRev := 0
+	duplicateRev := ""
+	for _, rev := range revisionList.Items {
+		if rev.IsReady() {
+			totalReadyRev++
+		}
+		if rev.Labels != nil && rev.Labels[CommitId] == req.Commit {
+			duplicateRev = rev.Name
+			break
+		}
+	}
+
+	// check if max revision number exceeds the max replica number
+	if totalReadyRev >= maxScaleInt {
+		slog.ErrorContext(ctx, "max ready revision number exceeds the max replica number", slog.Any("maxScaleInt", maxScaleInt), slog.Any("totalReadyRev", totalReadyRev))
+		return errorx.ErrRunnerMaxRevision
+	}
+
+	if duplicateRev != "" {
+		slog.InfoContext(ctx, "revision with commit %s already exists (rev: %s), skip deployment", slog.Any("commit", req.Commit), slog.Any("duplicateRev", duplicateRev))
+		return errorx.ErrRunnerDuplicateRevision
+	}
+
+	ksvc.Spec.Template.Spec.GetContainer().Env = append(ksvc.Spec.Template.Spec.GetContainer().Env, corev1.EnvVar{
+		Name:  "REVISION",
+		Value: req.Commit,
+	})
+	ksvc.Spec.Template.Labels[CommitId] = req.Commit
+	// enable automatic revision cleanup (enabled by default, this line makes it explicit)
+	ksvc.Annotations["serving.knative.dev/revisionRetentionPolicy"] = "automatic"
+	// keep maxScaleInt revisions
+	ksvc.Annotations["serving.knative.dev/maxRetainedRevisions"] = ksvc.Spec.Template.Annotations[KeyMaxScale]
+
+	if req.InitialTraffic > 0 {
+		traffic := []v1.TrafficTarget{}
+		if req.InitialTraffic == 100 {
+			traffic = append(traffic, v1.TrafficTarget{
+				Percent: utils.Int64Ptr(int64(req.InitialTraffic)),
+			})
+		} else {
+			remainPercent := int64(100 - req.InitialTraffic)
+			traffic = append(traffic, v1.TrafficTarget{
+				Percent: utils.Int64Ptr(int64(req.InitialTraffic)),
+			})
+
+			revisionName := getKsvcMaxPercentRevisionName(ksvc)
+
+			traffic = append(traffic, v1.TrafficTarget{
+				LatestRevision: utils.BoolPtr(false),
+				Percent:        utils.Int64Ptr(remainPercent),
+				RevisionName:   revisionName,
+			})
+		}
+		ksvc.Spec.Traffic = traffic
+	}
+
+	_, err = cluster.KnativeClient.ServingV1().Services(s.k8sNameSpace).Update(ctx, ksvc, metav1.UpdateOptions{})
+
+	return err
+}
+
+func getKsvcMaxPercentRevisionName(ksvc *v1.Service) string {
+	var maxPercent int64 = 0
+	revisionName := ""
+	for _, t := range ksvc.Spec.Traffic {
+		if t.Percent != nil && *t.Percent > maxPercent && t.RevisionName != "" {
+			maxPercent = *t.Percent
+			revisionName = t.RevisionName
+		}
+	}
+
+	if revisionName != "" {
+		return revisionName
+	}
+
+	return ksvc.Status.LatestReadyRevisionName
+}
+
+func (s *serviceComponentImpl) SetVersionsTraffic(ctx context.Context, clusterId string, svcName string, req []types.TrafficReq) error {
+	cluster, err := s.clusterPool.GetClusterByID(ctx, clusterId)
+	if err != nil {
+		return fmt.Errorf("fail to get cluster, error %v ", err)
+	}
+
+	ksvc, err := getServices(ctx, cluster, s.k8sNameSpace, svcName)
+	if err != nil {
+		return fmt.Errorf("fail to get service %s, error %v ", svcName, err)
+	}
+
+	revisionList, err := getRevisionList(ctx, cluster, s.k8sNameSpace, svcName)
+	if err != nil {
+		return fmt.Errorf("fail to get revisions %s, error %v ", svcName, err)
+	}
+
+	commitToRevisionMap, err := buildCommitRevisionMap(revisionList)
+	if err != nil {
+		return fmt.Errorf("fail to build commit revision map, error %w", err)
+	}
+
+	if err := validateTrafficReqByCommit(ctx, req, commitToRevisionMap); err != nil {
+		slog.ErrorContext(ctx, "invalid traffic req", slog.String("svcName", svcName), slog.Any("error", err))
+		return err
+	}
+
+	trafficTargets, err := buildTrafficTargetsByCommit(ctx, req, commitToRevisionMap)
+	if err != nil {
+		return fmt.Errorf("fail to build traffic targets, error %w", err)
+	}
+	ksvc.Spec.Traffic = trafficTargets
+	_, err = cluster.KnativeClient.ServingV1().Services(s.k8sNameSpace).Update(ctx, ksvc, metav1.UpdateOptions{})
+	if err != nil {
+		return fmt.Errorf("fail to update service %s, error %v ", svcName, err)
+	}
+
+	return nil
+}
+
+func (s *serviceComponentImpl) ListVersions(ctx context.Context, clusterId string, svcName string) ([]types.KsvcRevisionInfo, error) {
+	revisionList, err := s.revisionStore.ListRevisions(ctx, svcName)
+	if err != nil {
+		return nil, fmt.Errorf("fail to get revisions %s, error %v ", svcName, err)
+	}
+
+	var result = []types.KsvcRevisionInfo{}
+	for _, rev := range revisionList {
+		result = append(result, types.KsvcRevisionInfo{
+			RevisionName:   rev.RevisionName,
+			TrafficPercent: rev.TrafficPercent,
+			IsReady:        rev.IsReady,
+			Message:        rev.Message,
+			Reason:         rev.Reason,
+			Commit:         rev.CommitID,
+			CreateTime:     rev.CreateTime,
+		})
+	}
+	return result, nil
+}
+
+func (s *serviceComponentImpl) DeleteKsvcVersion(ctx context.Context, clusterId string, svcName string, commitID string) error {
+	cluster, err := s.clusterPool.GetClusterByID(ctx, clusterId)
+	if err != nil {
+		return fmt.Errorf("fail to get cluster, error %v ", err)
+	}
+
+	rev, err := s.revisionStore.QueryRevision(ctx, svcName, commitID)
+	if err != nil {
+		slog.ErrorContext(ctx, "fail to get revision", slog.String("commitID", commitID), slog.Any("error", err))
+		return err
+	}
+
+	if rev == nil {
+		return errorx.ErrDatabaseNoRows
+	}
+
+	if rev.TrafficPercent > 0 {
+		return errorx.ErrTrafficPercentNotZero
+	}
+
+	err = cluster.KnativeClient.ServingV1().Revisions(s.k8sNameSpace).Delete(ctx, rev.RevisionName, metav1.DeleteOptions{})
+	if err != nil {
+		return fmt.Errorf("fail to delete revision %s, error %v ", rev.RevisionName, err)
+	}
+
+	return nil
 }

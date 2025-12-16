@@ -1,0 +1,17 @@
+{
+    "error.RUNNER-ERR-0": {
+        "other": "最大版本數量超過最大弹性副本數"
+    },
+    "error.RUNNER-ERR-1": {
+        "other": "獲取最大弹性副本數失敗"
+    },
+    "error.RUNNER-ERR-2": {
+        "other": "版本實例已存在"
+    },
+    "error.RUNNER-ERR-3": {
+        "other": "版本實例未就绪"
+    },
+    "error.RUNNER-ERR-4": {
+        "other": "当前版本仍有流量分配（流量占比≠0）"
+    }
+}

@@ -130,6 +130,53 @@ func (_c *MockModelComponent_Create_Call) RunAndReturn(run func(context.Context,
 	return _c
 }
 
+// CreateInferenceVersion provides a mock function with given fields: ctx, req
+func (_m *MockModelComponent) CreateInferenceVersion(ctx context.Context, req types.CreateInferenceVersionReq) error {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateInferenceVersion")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.CreateInferenceVersionReq) error); ok {
+		r0 = rf(ctx, req)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockModelComponent_CreateInferenceVersion_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateInferenceVersion'
+type MockModelComponent_CreateInferenceVersion_Call struct {
+	*mock.Call
+}
+
+// CreateInferenceVersion is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.CreateInferenceVersionReq
+func (_e *MockModelComponent_Expecter) CreateInferenceVersion(ctx interface{}, req interface{}) *MockModelComponent_CreateInferenceVersion_Call {
+	return &MockModelComponent_CreateInferenceVersion_Call{Call: _e.mock.On("CreateInferenceVersion", ctx, req)}
+}
+
+func (_c *MockModelComponent_CreateInferenceVersion_Call) Run(run func(ctx context.Context, req types.CreateInferenceVersionReq)) *MockModelComponent_CreateInferenceVersion_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.CreateInferenceVersionReq))
+	})
+	return _c
+}
+
+func (_c *MockModelComponent_CreateInferenceVersion_Call) Return(_a0 error) *MockModelComponent_CreateInferenceVersion_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockModelComponent_CreateInferenceVersion_Call) RunAndReturn(run func(context.Context, types.CreateInferenceVersionReq) error) *MockModelComponent_CreateInferenceVersion_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // DelRelationDataset provides a mock function with given fields: ctx, req
 func (_m *MockModelComponent) DelRelationDataset(ctx context.Context, req types.RelationDataset) error {
 	ret := _m.Called(ctx, req)
@@ -222,6 +269,54 @@ func (_c *MockModelComponent_Delete_Call) Return(_a0 error) *MockModelComponent_
 }
 
 func (_c *MockModelComponent_Delete_Call) RunAndReturn(run func(context.Context, string, string, string) error) *MockModelComponent_Delete_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// DeleteInferenceVersion provides a mock function with given fields: ctx, id, commitID
+func (_m *MockModelComponent) DeleteInferenceVersion(ctx context.Context, id int64, commitID string) error {
+	ret := _m.Called(ctx, id, commitID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteInferenceVersion")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64, string) error); ok {
+		r0 = rf(ctx, id, commitID)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockModelComponent_DeleteInferenceVersion_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteInferenceVersion'
+type MockModelComponent_DeleteInferenceVersion_Call struct {
+	*mock.Call
+}
+
+// DeleteInferenceVersion is a helper method to define mock.On call
+//   - ctx context.Context
+//   - id int64
+//   - commitID string
+func (_e *MockModelComponent_Expecter) DeleteInferenceVersion(ctx interface{}, id interface{}, commitID interface{}) *MockModelComponent_DeleteInferenceVersion_Call {
+	return &MockModelComponent_DeleteInferenceVersion_Call{Call: _e.mock.On("DeleteInferenceVersion", ctx, id, commitID)}
+}
+
+func (_c *MockModelComponent_DeleteInferenceVersion_Call) Run(run func(ctx context.Context, id int64, commitID string)) *MockModelComponent_DeleteInferenceVersion_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64), args[2].(string))
+	})
+	return _c
+}
+
+func (_c *MockModelComponent_DeleteInferenceVersion_Call) Return(_a0 error) *MockModelComponent_DeleteInferenceVersion_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockModelComponent_DeleteInferenceVersion_Call) RunAndReturn(run func(context.Context, int64, string) error) *MockModelComponent_DeleteInferenceVersion_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -531,6 +626,65 @@ func (_c *MockModelComponent_ListAllByRuntimeFramework_Call) Return(_a0 []databa
 }
 
 func (_c *MockModelComponent_ListAllByRuntimeFramework_Call) RunAndReturn(run func(context.Context, string, int) ([]database.RuntimeFramework, error)) *MockModelComponent_ListAllByRuntimeFramework_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ListInferenceVersions provides a mock function with given fields: ctx, id
+func (_m *MockModelComponent) ListInferenceVersions(ctx context.Context, id int64) ([]types.ListInferenceVersionsResp, error) {
+	ret := _m.Called(ctx, id)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListInferenceVersions")
+	}
+
+	var r0 []types.ListInferenceVersionsResp
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64) ([]types.ListInferenceVersionsResp, error)); ok {
+		return rf(ctx, id)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, int64) []types.ListInferenceVersionsResp); ok {
+		r0 = rf(ctx, id)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]types.ListInferenceVersionsResp)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, int64) error); ok {
+		r1 = rf(ctx, id)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockModelComponent_ListInferenceVersions_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListInferenceVersions'
+type MockModelComponent_ListInferenceVersions_Call struct {
+	*mock.Call
+}
+
+// ListInferenceVersions is a helper method to define mock.On call
+//   - ctx context.Context
+//   - id int64
+func (_e *MockModelComponent_Expecter) ListInferenceVersions(ctx interface{}, id interface{}) *MockModelComponent_ListInferenceVersions_Call {
+	return &MockModelComponent_ListInferenceVersions_Call{Call: _e.mock.On("ListInferenceVersions", ctx, id)}
+}
+
+func (_c *MockModelComponent_ListInferenceVersions_Call) Run(run func(ctx context.Context, id int64)) *MockModelComponent_ListInferenceVersions_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64))
+	})
+	return _c
+}
+
+func (_c *MockModelComponent_ListInferenceVersions_Call) Return(_a0 []types.ListInferenceVersionsResp, _a1 error) *MockModelComponent_ListInferenceVersions_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockModelComponent_ListInferenceVersions_Call) RunAndReturn(run func(context.Context, int64) ([]types.ListInferenceVersionsResp, error)) *MockModelComponent_ListInferenceVersions_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1152,6 +1306,54 @@ func (_c *MockModelComponent_Update_Call) Return(_a0 *types.Model, _a1 error) *M
 }
 
 func (_c *MockModelComponent_Update_Call) RunAndReturn(run func(context.Context, *types.UpdateModelReq) (*types.Model, error)) *MockModelComponent_Update_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// UpdateInferenceVersionTraffic provides a mock function with given fields: ctx, id, req
+func (_m *MockModelComponent) UpdateInferenceVersionTraffic(ctx context.Context, id int64, req []types.UpdateInferenceVersionTrafficReq) error {
+	ret := _m.Called(ctx, id, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateInferenceVersionTraffic")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64, []types.UpdateInferenceVersionTrafficReq) error); ok {
+		r0 = rf(ctx, id, req)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockModelComponent_UpdateInferenceVersionTraffic_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateInferenceVersionTraffic'
+type MockModelComponent_UpdateInferenceVersionTraffic_Call struct {
+	*mock.Call
+}
+
+// UpdateInferenceVersionTraffic is a helper method to define mock.On call
+//   - ctx context.Context
+//   - id int64
+//   - req []types.UpdateInferenceVersionTrafficReq
+func (_e *MockModelComponent_Expecter) UpdateInferenceVersionTraffic(ctx interface{}, id interface{}, req interface{}) *MockModelComponent_UpdateInferenceVersionTraffic_Call {
+	return &MockModelComponent_UpdateInferenceVersionTraffic_Call{Call: _e.mock.On("UpdateInferenceVersionTraffic", ctx, id, req)}
+}
+
+func (_c *MockModelComponent_UpdateInferenceVersionTraffic_Call) Run(run func(ctx context.Context, id int64, req []types.UpdateInferenceVersionTrafficReq)) *MockModelComponent_UpdateInferenceVersionTraffic_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64), args[2].([]types.UpdateInferenceVersionTrafficReq))
+	})
+	return _c
+}
+
+func (_c *MockModelComponent_UpdateInferenceVersionTraffic_Call) Return(_a0 error) *MockModelComponent_UpdateInferenceVersionTraffic_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockModelComponent_UpdateInferenceVersionTraffic_Call) RunAndReturn(run func(context.Context, int64, []types.UpdateInferenceVersionTrafficReq) error) *MockModelComponent_UpdateInferenceVersionTraffic_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -222,6 +222,7 @@ packages:
     interfaces:
       ImagebuilderComponent:
       WorkFlowComponent:
+      ServiceComponent:
   opencsg.com/csghub-server/logcollector/component:
     config:
       all: true

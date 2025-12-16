@@ -258,13 +258,17 @@ func (h *RemoteRunner) doRequest(ctx context.Context, method, url string, data i
 		return nil, errorx.RemoteSvcFail(err, nil)
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		var errData interface{}
-		err := json.NewDecoder(resp.Body).Decode(&errData)
+		var result httpbase.R
+		err := json.NewDecoder(resp.Body).Decode(&result)
 		if err != nil {
 			err := fmt.Errorf("unexpected http status: %d, error: %w", resp.StatusCode, err)
 			return nil, errorx.RemoteSvcFail(err, nil)
 		} else {
-			err := fmt.Errorf("unexpected http status: %d, error: %v", resp.StatusCode, errData)
+			err, ok := errorx.RunnerErrors[result.Code]
+			if ok {
+				return nil, err
+			}
+			err = fmt.Errorf("unexpected http status: %d, error: %w", resp.StatusCode, err)
 			return nil, errorx.RemoteSvcFail(err, nil)
 		}
 	}
@@ -468,7 +472,7 @@ func (h *RemoteRunner) SubmitFinetuneJob(ctx context.Context, req *types.ArgoWor
 	}
 	url := fmt.Sprintf("%s/api/v1/workflows", remote)
 	// Create a new HTTP client with a timeout
-	response, err := h.doRequest(http.MethodPost, url, req)
+	response, err := h.doRequest(ctx, http.MethodPost, url, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to submit finetune job from deployer, %w", err)
 	}
@@ -479,4 +483,67 @@ func (h *RemoteRunner) SubmitFinetuneJob(ctx context.Context, req *types.ArgoWor
 		return nil, errorx.InternalServerError(err, nil)
 	}
 	return &res, nil
+}
+
+func (h *RemoteRunner) CreateRevisions(ctx context.Context, req *types.CreateRevisionReq) error {
+	remote, err := h.GetRemoteRunnerHost(ctx, req.ClusterID)
+	if err != nil {
+		return err
+	}
+	url := fmt.Sprintf("%s/api/v1/service/%s/versions", remote, req.SvcName)
+	response, err := h.doRequest(ctx, http.MethodPost, url, req)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+	return nil
+}
+
+func (h *RemoteRunner) ListKsvcVersions(ctx context.Context, clusterID, svcName string) ([]types.KsvcRevisionInfo, error) {
+	remote, err := h.GetRemoteRunnerHost(ctx, clusterID)
+	if err != nil {
+		return nil, err
+	}
+	url := fmt.Sprintf("%s/api/v1/service/%s/versions?cluster_id=%s", remote, svcName, clusterID)
+	response, err := h.doRequest(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get ksvc versions, %w", err)
+	}
+	defer response.Body.Close()
+
+	var versions []types.KsvcRevisionInfo
+	if err := json.NewDecoder(response.Body).Decode(&versions); err != nil {
+		slog.ErrorContext(ctx, "failed to decode ksvc versions", slog.String("svcName", svcName), slog.String("clusterID", clusterID), slog.Any("error", err))
+		return nil, errorx.InternalServerError(err, nil)
+	}
+
+	return versions, nil
+}
+
+func (h *RemoteRunner) SetVersionsTraffic(ctx context.Context, clusterID, svcName string, req []types.TrafficReq) error {
+	remote, err := h.GetRemoteRunnerHost(ctx, clusterID)
+	if err != nil {
+		return err
+	}
+	url := fmt.Sprintf("%s/api/v1/service/%s/versions/traffic", remote, svcName)
+	response, err := h.doRequest(ctx, http.MethodPut, url, req)
+	if err != nil {
+		return fmt.Errorf("failed to update traffic, %w", err)
+	}
+	defer response.Body.Close()
+	return nil
+}
+
+func (h *RemoteRunner) DeleteKsvcVersion(ctx context.Context, clusterID, svcName, commitID string) error {
+	remote, err := h.GetRemoteRunnerHost(ctx, clusterID)
+	if err != nil {
+		return err
+	}
+	url := fmt.Sprintf("%s/api/v1/service/%s/versions/%s?cluster_id=%s", remote, svcName, commitID, clusterID)
+	response, err := h.doRequest(ctx, http.MethodDelete, url, nil)
+	if err != nil {
+		return fmt.Errorf("failed to delete ksvc version, %w", err)
+	}
+	defer response.Body.Close()
+	return nil
 }

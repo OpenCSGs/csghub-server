@@ -23,4 +23,8 @@ type Runner interface {
 	DeleteWorkFlow(context.Context, types.ArgoWorkFlowDeleteReq) (*httpbase.R, error)
 	GetWorkFlow(context.Context, types.ArgoWorkFlowDeleteReq) (*types.ArgoWorkFlowRes, error)
 	SubmitFinetuneJob(context.Context, *types.ArgoWorkFlowReq) (*types.ArgoWorkFlowRes, error)
+	SetVersionsTraffic(ctx context.Context, clusterID, svcName string, req []types.TrafficReq) error
+	CreateRevisions(context.Context, *types.CreateRevisionReq) error
+	ListKsvcVersions(ctx context.Context, clusterID, svcName string) ([]types.KsvcRevisionInfo, error)
+	DeleteKsvcVersion(ctx context.Context, clusterID, svcName, commitID string) error
 }

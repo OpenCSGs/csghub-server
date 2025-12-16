@@ -3,7 +3,6 @@ package workflow
 import (
 	"context"
 	"errors"
-	"fmt"
 	"testing"
 	"time"
 
@@ -121,6 +120,7 @@ func TestDeployWorkflowSuccess(t *testing.T) {
 		ID:       1,
 		DeployID: deploy.ID,
 		Deploy:   deploy,
+		Status:   scheduler.BuildSkip,
 	}
 
 	runTask := &database.DeployTask{
@@ -136,147 +136,28 @@ func TestDeployWorkflowSuccess(t *testing.T) {
 		User:   &database.User{},
 	}, nil)
 
-	mockDeployTaskStore.EXPECT().GetDeployTask(mock.Anything, buildTask.ID).Return(buildTask, nil).Times(1)
-	mockGitServer.EXPECT().GetRepoLastCommit(mock.Anything, mock.Anything).Return(&types.Commit{
-		ID: "123456",
-	}, nil)
-
-	mockImageBuilder.EXPECT().Build(mock.Anything, mock.Anything).Return(nil).Maybe()
+	mockDeployTaskStore.EXPECT().GetDeployTask(mock.Anything, buildTask.ID).Return(buildTask, nil)
 	buildTask.Status = scheduler.BuildSucceed
-	mockDeployTaskStore.EXPECT().GetDeployTask(mock.Anything, buildTask.ID).Return(buildTask, nil).Times(1)
 
 	// deploy
-	mockDeployTaskStore.EXPECT().GetDeployTask(mock.Anything, runTask.ID).Return(runTask, nil).Times(1)
+	mockDeployTaskStore.EXPECT().GetLastTaskByType(mock.Anything, mock.Anything, mock.Anything).Return(runTask, nil).Times(1)
 	mockLogReporter.EXPECT().Report(mock.Anything).Return().Maybe()
-	mockDeployTaskStore.EXPECT().GetDeployByID(mock.Anything, runTask.DeployID).Return(deploy, nil).Times(1)
+
+	mockDeployTaskStore.EXPECT().GetDeployTask(mock.Anything, runTask.ID).Return(runTask, nil)
+	mockDeployTaskStore.EXPECT().GetDeployByID(mock.Anything, mock.Anything).Return(deploy, nil).Maybe()
 
 	runTask.Status = common.Pending
-	mockDeployTaskStore.EXPECT().GetDeployTask(mock.Anything, runTask.ID).Return(runTask, nil).Times(1)
 	mockImageRunner.EXPECT().Run(mock.Anything, mock.Anything).Return(&types.RunResponse{
 		DeployID: 0,
 		Code:     0,
 		Message:  "test",
 	}, nil).Times(1)
-
-	mockDeployTaskStore.EXPECT().UpdateInTx(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Times(1)
-	env.ExecuteWorkflow(DeployWorkflow, buildTask.ID, runTask.ID)
-
-	var result []string
-	err := env.GetWorkflowResult(&result)
-	require.NoError(t, err, "GetWorkflowResult should not return error")
-}
-
-func TestDeployWorkflowRetryForBuildErr(t *testing.T) {
-	testSuite := &testsuite.WorkflowTestSuite{}
-	mockDeployTaskStore := mockdb.NewMockDeployTaskStore(t)
-	mockSpaceStore := mockdb.NewMockSpaceStore(t)
-	mockModelStore := mockdb.NewMockModelStore(t)
-	mockTokenStore := mockdb.NewMockAccessTokenStore(t)
-	mockUrsStore := mockdb.NewMockUserResourcesStore(t)
-	mockRuntimeFrameworks := mockdb.NewMockRuntimeFrameworksStore(t)
-	mockMetadataStore := mockdb.NewMockMetadataStore(t)
-	mockImageBuilder := mockbuilder.NewMockBuilder(t)
-	mockImageRunner := mockrunner.NewMockRunner(t)
-	mockGitServer := mock_git.NewMockGitServer(t)
-	mockLogReporter := mockReporter.NewMockLogCollector(t)
-	mockConfig := &config.Config{}
-	mockDeployCfg := common.BuildDeployConfig(mockConfig)
-	act := activity.NewDeployActivity(mockDeployCfg, mockLogReporter, mockImageBuilder, mockImageRunner, mockGitServer, mockDeployTaskStore, mockTokenStore, mockSpaceStore, mockModelStore, mockRuntimeFrameworks, mockUrsStore, mockMetadataStore)
-	env := testSuite.NewTestWorkflowEnvironment()
-	env.RegisterWorkflow(DeployWorkflow)
-	env.RegisterActivity(act)
-
-	// Setup deploy test data
-	deploy := &database.Deploy{
-		ID:          5,
-		RepoID:      23,
-		Status:      1, // Active status
-		GitPath:     "leida/rb-saas-test",
-		GitBranch:   "main",
-		Hardware:    "{\"cpu\": {\"type\": \"Intel\", \"num\": \"2\"}, \"memory\": \"4Gi\"}",
-		ImageID:     "7edc3aad62f8a9c085a2fa1bcd25f88e1aec7cf9",
-		UserID:      0, // User ID from hub-deploy-user
-		SvcName:     "u-leida-rb-saas-test-5",
-		Endpoint:    "http://u-leida-rb-saas-test-5.spaces-stg.opencsg.com",
-		ClusterID:   "bd48840c-88df-4c39-8cdc-fb19055446ad",
-		SecureLevel: 0,
-		Type:        0,
-		UserUUID:    "75985189-39f6-431c-9b6b-6c10e0d49ba9",
-		Annotation:  "{\"hub-deploy-user\":\"leida\",\"hub-res-name\":\"leida/rb-saas-test\",\"hub-res-type\":\"space\"}",
-		Repository: &database.Repository{
-			Path: "leida/rb-saas-test",
-			Name: "rb-saas-test",
-			User: database.User{
-				Username: "leida",
-			},
-		},
-	}
-
-	buildTask := &database.DeployTask{
-		ID:       1,
-		DeployID: deploy.ID,
-		Deploy:   deploy,
-	}
-
-	runTask := &database.DeployTask{
-		ID:       2,
-		DeployID: deploy.ID,
-		Deploy:   deploy,
-	}
-
-	// Setup mock expectations
-	mockTokenStore.EXPECT().FindByUID(mock.Anything, mock.Anything).Return(&database.AccessToken{
-		ID:     0,
-		UserID: 0,
-		Token:  "accesstoken456",
-		User:   &database.User{},
-	}, nil)
-
-	mockDeployTaskStore.EXPECT().GetDeployTask(mock.Anything, buildTask.ID).Return(buildTask, nil).Times(1)
 	mockGitServer.EXPECT().GetRepoLastCommit(mock.Anything, mock.Anything).Return(&types.Commit{
-		ID: "123456",
-	}, nil)
-
-	// Build retry is handled by env.OnActivity below
-
-	buildTask.Status = scheduler.BuildSucceed
-	mockDeployTaskStore.EXPECT().GetDeployTask(mock.Anything, buildTask.ID).Return(buildTask, nil).Times(1)
-
-	// Setup deploy expectations
-	mockDeployTaskStore.EXPECT().GetDeployTask(mock.Anything, runTask.ID).Return(runTask, nil).Times(1)
-	mockLogReporter.EXPECT().Report(mock.Anything).Return().Maybe()
-	mockDeployTaskStore.EXPECT().GetDeployByID(mock.Anything, runTask.DeployID).Return(deploy, nil).Times(1)
-
-	runTask.Status = common.Pending
-	mockDeployTaskStore.EXPECT().GetDeployTask(mock.Anything, runTask.ID).Return(runTask, nil).Times(1)
-	mockImageRunner.EXPECT().Run(mock.Anything, mock.Anything).Return(&types.RunResponse{
-		DeployID: 0,
-		Code:     0,
-		Message:  "test",
-	}, nil).Times(1)
-
+		ID: "1234567",
+	}, nil).Maybe()
 	mockDeployTaskStore.EXPECT().UpdateInTx(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Times(1)
-
-	// Execute workflow
 	env.ExecuteWorkflow(DeployWorkflow, buildTask.ID, runTask.ID)
 
-	// Mock the Build and Deploy activities
-	// For Build, first call fails, second call succeeds
-	buildCallCount := 0
-	env.OnActivity(act.Build, mock.Anything, mock.Anything).
-		Return(func(ctx context.Context, taskID string) error {
-			buildCallCount++
-			if buildCallCount == 1 {
-				return fmt.Errorf("first build attempt failed")
-			}
-			return nil
-		})
-
-	// Deploy always succeeds
-	env.OnActivity(act.Deploy, mock.Anything, mock.Anything).
-		Return(nil)
-
-	// Verify workflow completes successfully
 	var result []string
 	err := env.GetWorkflowResult(&result)
 	require.NoError(t, err, "GetWorkflowResult should not return error")

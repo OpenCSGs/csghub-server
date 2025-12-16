@@ -1778,3 +1778,167 @@ func (h *ModelHandler) ListQuantizations(ctx *gin.Context) {
 	}
 	httpbase.OK(ctx, files)
 }
+
+// CreateInferenceVersion      godoc
+// @Security     ApiKey
+// @Summary      create a new inference version
+// @Tags         Model
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        id path int true "id"
+// @Param        req body types.CreateInferenceVersionReq true "req"
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /models/{namespace}/{name}/run/versions/{id} [post]
+func (h *ModelHandler) CreateInferenceVersion(ctx *gin.Context) {
+	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
+		err = errorx.ReqParamInvalid(err, errorx.Ctx().Set("param", "id"))
+		httpbase.BadRequestWithExt(ctx, err)
+		return
+	}
+	if id == 0 {
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
+		err = errorx.ReqParamInvalid(err, errorx.Ctx().Set("param", "id"))
+		httpbase.BadRequestWithExt(ctx, err)
+		return
+	}
+
+	var versionReq types.CreateInferenceVersionReq
+	if err := ctx.ShouldBindJSON(&versionReq); err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "failed to bind json", "error", err)
+		httpbase.BadRequestWithExt(ctx, err)
+		return
+	}
+
+	versionReq.DeployId = id
+	err = h.model.CreateInferenceVersion(ctx.Request.Context(), versionReq)
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "failed to create inference version", "error", err, "req", versionReq)
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	httpbase.OK(ctx, nil)
+}
+
+// ListInferenceVersions      godoc
+// @Security     ApiKey
+// @Summary      list all inference versions
+// @Tags         Model
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        id path int true "id"
+// @Success      200  {object}  types.Response{data=[]types.ListInferenceVersionsResp} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /models/{namespace}/{name}/run/versions/{id} [get]
+func (h *ModelHandler) ListInferenceVersions(ctx *gin.Context) {
+	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
+		err = errorx.ReqParamInvalid(err, errorx.Ctx().Set("param", "id"))
+		httpbase.BadRequestWithExt(ctx, err)
+		return
+	}
+	if id == 0 {
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
+		err = errorx.ReqParamInvalid(err, errorx.Ctx().Set("param", "id"))
+		httpbase.BadRequestWithExt(ctx, err)
+		return
+	}
+
+	versions, err := h.model.ListInferenceVersions(ctx.Request.Context(), id)
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "failed to list inference versions", "error", err)
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	httpbase.OK(ctx, versions)
+}
+
+// UpdateInferenceVersionTraffic      godoc
+// @Security     ApiKey
+// @Summary      update inference version traffic percent
+// @Tags         Model
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        id path int true "id"
+// @Param        req body []types.UpdateInferenceVersionTrafficReq true "req"
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /models/{namespace}/{name}/run/versions/{id}/traffic [put]
+func (h *ModelHandler) UpdateInferenceTraffic(ctx *gin.Context) {
+	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
+		err = errorx.ReqParamInvalid(err, errorx.Ctx().Set("param", "id"))
+		httpbase.BadRequestWithExt(ctx, err)
+		return
+	}
+	if id == 0 {
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
+		err = errorx.ReqParamInvalid(err, errorx.Ctx().Set("param", "id"))
+		httpbase.BadRequestWithExt(ctx, err)
+		return
+	}
+	var trafficReq []types.UpdateInferenceVersionTrafficReq
+	if err := ctx.ShouldBindJSON(&trafficReq); err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "failed to bind json", "error", err)
+		httpbase.BadRequestWithExt(ctx, err)
+		return
+	}
+
+	err = h.model.UpdateInferenceVersionTraffic(ctx.Request.Context(), id, trafficReq)
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "failed to update inference version traffic", "error", err)
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	httpbase.OK(ctx, nil)
+}
+
+// DeleteInferenceVersion      godoc
+// @Security     ApiKey
+// @Summary      delete inference version
+// @Tags         Model
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        id path int true "id"
+// @Param        commit_id path string true "commit_id"
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /models/{namespace}/{name}/run/versions/{id}/{commit_id} [delete]
+func (h *ModelHandler) DeleteInferenceVersion(ctx *gin.Context) {
+	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
+		err = errorx.ReqParamInvalid(err, errorx.Ctx().Set("param", "id"))
+		httpbase.BadRequestWithExt(ctx, err)
+		return
+	}
+	commit_id := ctx.Param("commit_id")
+
+	err = h.model.DeleteInferenceVersion(ctx.Request.Context(), id, commit_id)
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "failed to delete inference version", "error", err)
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	httpbase.OK(ctx, nil)
+}
