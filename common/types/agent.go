@@ -59,6 +59,7 @@ type AgentInstanceFilter struct {
 	TemplateID *int64 `json:"template_id,omitempty"`
 	BuiltIn    *bool  `json:"built_in"`
 	Public     *bool  `json:"public"`
+	Editable   *bool  `json:"editable"`
 }
 
 type UpdateAgentInstanceRequest struct {
