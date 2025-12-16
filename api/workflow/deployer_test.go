@@ -68,14 +68,27 @@ func TestDeployWorkflowSuccess(t *testing.T) {
 	mockTokenStore := mockdb.NewMockAccessTokenStore(t)
 	mockUrsStore := mockdb.NewMockUserResourcesStore(t)
 	mockRuntimeFrameworks := mockdb.NewMockRuntimeFrameworksStore(t)
+	mockMetadataStore := mockdb.NewMockMetadataStore(t)
 	mockImageBuilder := mockbuilder.NewMockBuilder(t)
 	mockImageRunner := mockrunner.NewMockRunner(t)
 	mockGitServer := mock_git.NewMockGitServer(t)
 	mockLogReporter := mockReporter.NewMockLogCollector(t)
 	mockConfig := &config.Config{}
 	mockDeployCfg := common.BuildDeployConfig(mockConfig)
-	act := activity.NewDeployActivity(mockDeployCfg, mockLogReporter, mockImageBuilder, mockImageRunner, mockGitServer, mockDeployTaskStore, mockTokenStore, mockSpaceStore, mockModelStore, mockRuntimeFrameworks, mockUrsStore)
-	deployActivity = act
+	act := activity.NewDeployActivity(
+		mockDeployCfg,
+		mockLogReporter,
+		mockImageBuilder,
+		mockImageRunner,
+		mockGitServer,
+		mockDeployTaskStore,
+		mockTokenStore,
+		mockSpaceStore,
+		mockModelStore,
+		mockRuntimeFrameworks,
+		mockUrsStore,
+		mockMetadataStore,
+	)
 	env := testSuite.NewTestWorkflowEnvironment()
 	env.RegisterWorkflow(DeployWorkflow)
 	env.RegisterActivity(act)
@@ -161,13 +174,14 @@ func TestDeployWorkflowRetryForBuildErr(t *testing.T) {
 	mockTokenStore := mockdb.NewMockAccessTokenStore(t)
 	mockUrsStore := mockdb.NewMockUserResourcesStore(t)
 	mockRuntimeFrameworks := mockdb.NewMockRuntimeFrameworksStore(t)
+	mockMetadataStore := mockdb.NewMockMetadataStore(t)
 	mockImageBuilder := mockbuilder.NewMockBuilder(t)
 	mockImageRunner := mockrunner.NewMockRunner(t)
 	mockGitServer := mock_git.NewMockGitServer(t)
 	mockLogReporter := mockReporter.NewMockLogCollector(t)
 	mockConfig := &config.Config{}
 	mockDeployCfg := common.BuildDeployConfig(mockConfig)
-	act := activity.NewDeployActivity(mockDeployCfg, mockLogReporter, mockImageBuilder, mockImageRunner, mockGitServer, mockDeployTaskStore, mockTokenStore, mockSpaceStore, mockModelStore, mockRuntimeFrameworks, mockUrsStore)
+	act := activity.NewDeployActivity(mockDeployCfg, mockLogReporter, mockImageBuilder, mockImageRunner, mockGitServer, mockDeployTaskStore, mockTokenStore, mockSpaceStore, mockModelStore, mockRuntimeFrameworks, mockUrsStore, mockMetadataStore)
 	env := testSuite.NewTestWorkflowEnvironment()
 	env.RegisterWorkflow(DeployWorkflow)
 	env.RegisterActivity(act)
