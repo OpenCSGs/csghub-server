@@ -23,6 +23,7 @@ func Test_GetValidSceneType(t *testing.T) {
 		types.InferenceType:  types.SceneModelInference,
 		types.FinetuneType:   types.SceneModelFinetune,
 		types.ServerlessType: types.SceneModelServerless,
+		types.NotebookType:   types.SceneModelInference,
 		-1:                   types.SceneUnknow,
 	}
 
