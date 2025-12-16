@@ -458,3 +458,68 @@ const (
 func (p AgentMCPServerIDPrefix) String() string {
 	return string(p)
 }
+
+// AgentKnowledgeBase represents a knowledge base configuration for an agent (API layer)
+type AgentKnowledgeBase struct {
+	ID          int64          `json:"id"`
+	Name        string         `json:"name" binding:"required,max=50"`
+	Description string         `json:"description,omitempty" binding:"omitempty,max=500"`
+	ContentID   string         `json:"content_id"` // Used to specify the unique id of the knowledge base resource
+	Public      bool           `json:"public"`     // Whether the knowledge base is public
+	Metadata    map[string]any `json:"metadata,omitempty"`
+	CreatedAt   time.Time      `json:"created_at"`
+	UpdatedAt   time.Time      `json:"updated_at"`
+	UserUUID    string         `json:"-"`
+}
+
+// CreateAgentKnowledgeBaseReq represents a request to create an agent knowledge base
+type CreateAgentKnowledgeBaseReq struct {
+	Name        string `json:"name" binding:"required,max=50"`
+	Description string `json:"description,omitempty" binding:"omitempty,max=500"`
+	Public      *bool  `json:"public,omitempty"`
+	UserUUID    string `json:"-"`
+}
+
+// AgentKnowledgeBaseFilter represents the filter for listing agent knowledge bases
+type AgentKnowledgeBaseFilter struct {
+	Search   string `json:"search,omitempty"`   // Search term for name field
+	UserUUID string `json:"user_uuido"`         // Filter by user UUID
+	Public   *bool  `json:"public,omitempty"`   // Filter by public status
+	Editable *bool  `json:"editable,omitempty"` // Filter by editable status (true = owned by user, false = not owned by user)
+}
+
+// UpdateAgentKnowledgeBaseRequest represents a request to update an agent knowledge base
+type UpdateAgentKnowledgeBaseRequest struct {
+	Name        *string         `json:"name,omitempty" binding:"omitempty,max=50"`
+	Description *string         `json:"description,omitempty" binding:"omitempty,max=500"`
+	Public      *bool           `json:"public,omitempty"`
+	Metadata    *map[string]any `json:"metadata,omitempty"`
+}
+
+// AgentKnowledgeBaseListItem represents a knowledge base in list responses
+type AgentKnowledgeBaseListItem struct {
+	ID          int64     `json:"id"`
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+	ContentID   string    `json:"content_id"`
+	Public      bool      `json:"public"`
+	Editable    bool      `json:"editable"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+// AgentKnowledgeBaseDetail represents a complete knowledge base with all configuration details
+type AgentKnowledgeBaseDetail struct {
+	ID          int64          `json:"id"`
+	Name        string         `json:"name"`
+	Description string         `json:"description"`
+	UserUUID    string         `json:"user_uuid"`
+	Owner       string         `json:"owner"`
+	Avatar      string         `json:"avatar"`
+	ContentID   string         `json:"content_id"`
+	Public      bool           `json:"public"`
+	Editable    bool           `json:"editable"`
+	Metadata    map[string]any `json:"metadata,omitempty"`
+	CreatedAt   time.Time      `json:"created_at"`
+	UpdatedAt   time.Time      `json:"updated_at"`
+}
