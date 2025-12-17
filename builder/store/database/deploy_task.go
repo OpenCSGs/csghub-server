@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -368,13 +369,21 @@ func (s *deployTaskStoreImpl) ListServerless(ctx context.Context, req types.Depl
 	var result []Deploy
 	query := s.db.Operator.Core.NewSelect().Model(&result).Where("type = ?", req.DeployType)
 	query = query.Where("status != ?", common.Deleted)
-	query = query.Limit(req.PageSize).Offset((req.Page - 1) * req.PageSize)
-	_, err := query.Exec(ctx, &result)
+
+	searchQuery := strings.TrimSpace(req.Query)
+	if searchQuery != "" {
+		searchPattern := "%" + strings.ToLower(searchQuery) + "%"
+		query = query.Where("LOWER(deploy_name) LIKE ? OR LOWER(git_path) LIKE ?", searchPattern, searchPattern)
+	}
+
+	total, err := query.Count(ctx)
 	if err != nil {
 		err = errorx.HandleDBError(err, nil)
 		return nil, 0, err
 	}
-	total, err := query.Count(ctx)
+
+	query = query.Limit(req.PageSize).Offset((req.Page - 1) * req.PageSize)
+	_, err = query.Exec(ctx, &result)
 	if err != nil {
 		err = errorx.HandleDBError(err, nil)
 		return nil, 0, err

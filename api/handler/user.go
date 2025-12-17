@@ -702,6 +702,7 @@ func (h *UserHandler) GetFinetuneInstances(ctx *gin.Context) {
 // @Param        per query int false "per" default(50)
 // @Param        page query int false "page index" default(1)
 // @Param        current_user query string false "current user"
+// @Param        search query string false "search by path or deployname"
 // @Success      200  {object}  types.ResponseWithTotal{data=[]types.DeployRepo,total=int} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
@@ -722,6 +723,7 @@ func (h *UserHandler) GetRunServerless(ctx *gin.Context) {
 	req.PageSize = per
 	req.RepoType = types.ModelRepo
 	req.DeployType = types.ServerlessType
+	req.Query = ctx.Query("search")
 	ds, total, err := h.user.ListServerless(ctx.Request.Context(), req)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Failed to get serverless list", slog.Any("error", err), slog.Any("req", req))

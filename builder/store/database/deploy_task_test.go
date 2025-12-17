@@ -653,3 +653,306 @@ func TestDeployTaskStore_DeleteDeployByID(t *testing.T) {
 	err = store.DeleteDeployByID(ctx, 100, 999999)
 	require.NotNil(t, err)
 }
+
+func TestDeployTaskStore_GetLatestDeploysBySpaceIDs(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+	store := database.NewDeployTaskStoreWithDB(db)
+
+	// Test with empty spaceIDs
+	result, err := store.GetLatestDeploysBySpaceIDs(ctx, []int64{})
+	require.Nil(t, err)
+	require.NotNil(t, result)
+	require.Equal(t, 0, len(result))
+
+	// Create test data: multiple deploys for different space IDs
+	// Space 100: 3 deploys (should return the latest)
+	// Space 200: 2 deploys (should return the latest)
+	// Space 300: 1 deploy (should return that one)
+	// Space 400: no deploys (should not appear in result)
+
+	now := time.Now().UTC()
+	space100Deploys := []database.Deploy{
+		{SpaceID: 100, DeployName: "space100-old", SvcName: "svc100-1", UserID: 1, RepoID: 1, GitPath: "test", GitBranch: "main", Template: "test", Hardware: "test"},
+		{SpaceID: 100, DeployName: "space100-middle", SvcName: "svc100-2", UserID: 1, RepoID: 1, GitPath: "test", GitBranch: "main", Template: "test", Hardware: "test"},
+		{SpaceID: 100, DeployName: "space100-latest", SvcName: "svc100-3", UserID: 1, RepoID: 1, GitPath: "test", GitBranch: "main", Template: "test", Hardware: "test"},
+	}
+
+	space200Deploys := []database.Deploy{
+		{SpaceID: 200, DeployName: "space200-old", SvcName: "svc200-1", UserID: 1, RepoID: 2, GitPath: "test", GitBranch: "main", Template: "test", Hardware: "test"},
+		{SpaceID: 200, DeployName: "space200-latest", SvcName: "svc200-2", UserID: 1, RepoID: 2, GitPath: "test", GitBranch: "main", Template: "test", Hardware: "test"},
+	}
+
+	space300Deploy := database.Deploy{
+		SpaceID: 300, DeployName: "space300-single", SvcName: "svc300-1", UserID: 1, RepoID: 3, GitPath: "test", GitBranch: "main", Template: "test", Hardware: "test",
+	}
+
+	// Create deploys with different timestamps
+	for i, dp := range space100Deploys {
+		err := store.CreateDeploy(ctx, &dp)
+		require.Nil(t, err)
+		// Set created_at to different times (oldest first)
+		_, err = db.BunDB.ExecContext(ctx, "UPDATE deploys SET created_at = ?, updated_at = ? WHERE id = ?",
+			now.Add(-time.Duration(3-i)*time.Hour), now.Add(-time.Duration(3-i)*time.Hour), dp.ID)
+		require.NoError(t, err)
+	}
+
+	for i, dp := range space200Deploys {
+		err := store.CreateDeploy(ctx, &dp)
+		require.Nil(t, err)
+		// Set created_at to different times (oldest first)
+		_, err = db.BunDB.ExecContext(ctx, "UPDATE deploys SET created_at = ?, updated_at = ? WHERE id = ?",
+			now.Add(-time.Duration(2-i)*time.Hour), now.Add(-time.Duration(2-i)*time.Hour), dp.ID)
+		require.NoError(t, err)
+	}
+
+	err = store.CreateDeploy(ctx, &space300Deploy)
+	require.Nil(t, err)
+
+	// Test: Get latest deploys for space 100, 200, 300, 400
+	spaceIDs := []int64{100, 200, 300, 400}
+	result, err = store.GetLatestDeploysBySpaceIDs(ctx, spaceIDs)
+	require.Nil(t, err)
+	require.NotNil(t, result)
+
+	// Should have 3 results (space 400 has no deploys, so won't appear)
+	require.Equal(t, 3, len(result))
+
+	// Verify space 100 has the latest deploy
+	deploy100, exists := result[100]
+	require.True(t, exists)
+	require.NotNil(t, deploy100)
+	require.Equal(t, "space100-latest", deploy100.DeployName)
+	require.Equal(t, "svc100-3", deploy100.SvcName)
+
+	// Verify space 200 has the latest deploy
+	deploy200, exists := result[200]
+	require.True(t, exists)
+	require.NotNil(t, deploy200)
+	require.Equal(t, "space200-latest", deploy200.DeployName)
+	require.Equal(t, "svc200-2", deploy200.SvcName)
+
+	// Verify space 300 has its deploy
+	deploy300, exists := result[300]
+	require.True(t, exists)
+	require.NotNil(t, deploy300)
+	require.Equal(t, "space300-single", deploy300.DeployName)
+	require.Equal(t, "svc300-1", deploy300.SvcName)
+
+	// Verify space 400 is not in the result (no deploys)
+	_, exists = result[400]
+	require.False(t, exists)
+
+	// Test with only space IDs that don't exist
+	result, err = store.GetLatestDeploysBySpaceIDs(ctx, []int64{999, 998})
+	require.Nil(t, err)
+	require.NotNil(t, result)
+	require.Equal(t, 0, len(result))
+}
+
+func TestDeployTaskStore_ListServerless_Search(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewDeployTaskStoreWithDB(db)
+
+	// Create test serverless deploys with different deploy names and git paths
+	deploys := []database.Deploy{
+		{
+			DeployName: "qwen-model-deploy",
+			GitPath:    "models_namespace1/qwen-model",
+			GitBranch:  "main",
+			Template:   "test",
+			Hardware:   "test",
+			Type:       types.ServerlessType,
+			Status:     common.Running,
+			RepoID:     1,
+			UserID:     1,
+			SpaceID:    0,
+			SvcName:    "svc1",
+		},
+		{
+			DeployName: "test-deploy",
+			GitPath:    "models_namespace2/test-model",
+			GitBranch:  "main",
+			Template:   "test",
+			Hardware:   "test",
+			Type:       types.ServerlessType,
+			Status:     common.Running,
+			RepoID:     2,
+			UserID:     1,
+			SpaceID:    0,
+			SvcName:    "svc2",
+		},
+		{
+			DeployName: "QWEN-Deploy-Upper",
+			GitPath:    "models_namespace3/another-model",
+			GitBranch:  "main",
+			Template:   "test",
+			Hardware:   "test",
+			Type:       types.ServerlessType,
+			Status:     common.Running,
+			RepoID:     3,
+			UserID:     1,
+			SpaceID:    0,
+			SvcName:    "svc3",
+		},
+		{
+			DeployName: "other-deploy",
+			GitPath:    "models_namespace4/qwen-other",
+			GitBranch:  "main",
+			Template:   "test",
+			Hardware:   "test",
+			Type:       types.ServerlessType,
+			Status:     common.Running,
+			RepoID:     4,
+			UserID:     1,
+			SpaceID:    0,
+			SvcName:    "svc4",
+		},
+		{
+			DeployName: "deleted-deploy",
+			GitPath:    "models_namespace5/qwen-deleted",
+			GitBranch:  "main",
+			Template:   "test",
+			Hardware:   "test",
+			Type:       types.ServerlessType,
+			Status:     common.Deleted,
+			RepoID:     5,
+			UserID:     1,
+			SpaceID:    0,
+			SvcName:    "svc5",
+		},
+		{
+			DeployName: "non-serverless",
+			GitPath:    "models_namespace6/qwen-non-serverless",
+			GitBranch:  "main",
+			Template:   "test",
+			Hardware:   "test",
+			Type:       types.InferenceType,
+			Status:     common.Running,
+			RepoID:     6,
+			UserID:     1,
+			SpaceID:    0,
+			SvcName:    "svc6",
+		},
+	}
+
+	for _, dp := range deploys {
+		err := store.CreateDeploy(ctx, &dp)
+		require.Nil(t, err)
+	}
+
+	// Test 1: List all serverless (no search)
+	dps, total, err := store.ListServerless(ctx, types.DeployReq{
+		DeployType: types.ServerlessType,
+		PageOpts: types.PageOpts{
+			Page:     1,
+			PageSize: 10,
+		},
+	})
+	require.Nil(t, err)
+	require.Equal(t, 4, total) // 4 serverless deploys (excluding deleted and non-serverless)
+	require.Equal(t, 4, len(dps))
+
+	// Test 2: Search by deploy_name (case-insensitive)
+	dps, total, err = store.ListServerless(ctx, types.DeployReq{
+		DeployType: types.ServerlessType,
+		Query:      "qwen",
+		PageOpts: types.PageOpts{
+			Page:     1,
+			PageSize: 10,
+		},
+	})
+	require.Nil(t, err)
+	require.Equal(t, 3, total) // qwen-model-deploy, QWEN-Deploy-Upper, qwen-other (in git_path)
+	require.Equal(t, 3, len(dps))
+	deployNames := []string{}
+	for _, dp := range dps {
+		deployNames = append(deployNames, dp.DeployName)
+	}
+	require.Contains(t, deployNames, "qwen-model-deploy")
+	require.Contains(t, deployNames, "QWEN-Deploy-Upper")
+	require.Contains(t, deployNames, "other-deploy") // matches git_path
+
+	// Test 3: Search by git_path
+	dps, total, err = store.ListServerless(ctx, types.DeployReq{
+		DeployType: types.ServerlessType,
+		Query:      "namespace2",
+		PageOpts: types.PageOpts{
+			Page:     1,
+			PageSize: 10,
+		},
+	})
+	require.Nil(t, err)
+	require.Equal(t, 1, total)
+	require.Equal(t, 1, len(dps))
+	require.Equal(t, "test-deploy", dps[0].DeployName)
+
+	// Test 4: Search with uppercase (case-insensitive)
+	dps, total, err = store.ListServerless(ctx, types.DeployReq{
+		DeployType: types.ServerlessType,
+		Query:      "QWEN",
+		PageOpts: types.PageOpts{
+			Page:     1,
+			PageSize: 10,
+		},
+	})
+	require.Nil(t, err)
+	require.Equal(t, 3, total) // Should match lowercase and uppercase
+	require.Equal(t, 3, len(dps))
+
+	// Test 5: Search with empty string (should return all)
+	dps, total, err = store.ListServerless(ctx, types.DeployReq{
+		DeployType: types.ServerlessType,
+		Query:      "",
+		PageOpts: types.PageOpts{
+			Page:     1,
+			PageSize: 10,
+		},
+	})
+	require.Nil(t, err)
+	require.Equal(t, 4, total)
+	require.Equal(t, 4, len(dps))
+
+	// Test 6: Search with whitespace (should be trimmed and return all)
+	dps, total, err = store.ListServerless(ctx, types.DeployReq{
+		DeployType: types.ServerlessType,
+		Query:      "   ",
+		PageOpts: types.PageOpts{
+			Page:     1,
+			PageSize: 10,
+		},
+	})
+	require.Nil(t, err)
+	require.Equal(t, 4, total)
+	require.Equal(t, 4, len(dps))
+
+	// Test 7: Search with no matches
+	dps, total, err = store.ListServerless(ctx, types.DeployReq{
+		DeployType: types.ServerlessType,
+		Query:      "nonexistent",
+		PageOpts: types.PageOpts{
+			Page:     1,
+			PageSize: 10,
+		},
+	})
+	require.Nil(t, err)
+	require.Equal(t, 0, total)
+	require.Equal(t, 0, len(dps))
+
+	// Test 8: Search with pagination
+	dps, total, err = store.ListServerless(ctx, types.DeployReq{
+		DeployType: types.ServerlessType,
+		Query:      "qwen",
+		PageOpts: types.PageOpts{
+			Page:     1,
+			PageSize: 2,
+		},
+	})
+	require.Nil(t, err)
+	require.Equal(t, 3, total)    // Total should be 3
+	require.Equal(t, 2, len(dps)) // But only 2 per page
+}
