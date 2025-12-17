@@ -66,3 +66,42 @@ func TestGoReader_All(t *testing.T) {
 	}
 
 }
+
+func TestGoReader_UUID(t *testing.T) {
+	paths := []string{}
+	paths = append(paths, "test_data/uuid.parquet")
+
+	reader := initReader()
+	t.Run("test-uuid-column", func(t *testing.T) {
+		columns, columnTypes, data, total, err := reader.RowsWithCount(
+			context.TODO(),
+			paths,
+			2,
+			0,
+		)
+		require.NoError(t, err)
+		require.Equal(t, []string{"id", "image"}, columns)
+		require.Equal(t, []string{"FIXED_LEN_BYTE_ARRAY", "BYTE_ARRAY"}, columnTypes)
+		require.Equal(t, int64(2), total)
+
+		realData := [][]string{
+			{
+				"0ad08b5c-35ba-4304-9eaa-1afb0554e459",
+				"image.png",
+			},
+			{
+				"1e4fe944-78ef-4fd5-abf5-cb4a4a20ac86",
+				"21000.png",
+			},
+		}
+
+		for idx, row := range data {
+			id := cast.ToString(row[0])
+			name := cast.ToString(row[1])
+			require.Equal(t, realData[idx][0], id)
+			require.Equal(t, realData[idx][1], name)
+		}
+
+	})
+
+}

@@ -1,1 +1,22 @@
-/ @hhwang @zhzhang @dlei @xzgan
+* @hhwang @zhzhang @dlei @james @rbqin @bhqin @Cemeng
+
+/accounting/ @hhwang
+/payment/ @hhwang
+/dataviewer/ @hhwang
+/builder/mq @hhwang
+/builder/parquet @hhwang
+/mq @hhwang
+
+/multisync/ @zhzhang
+/mirror/ @zhzhang
+/builder/git/ @zhzhang
+
+/runner/ @james
+/builder/deploy/ @james
+/api/handler/collection.go @james
+/component/collection.go @james
+
+/user/ @dlei
+/moderation/ @dlei
+
+/logcollector @Cemeng

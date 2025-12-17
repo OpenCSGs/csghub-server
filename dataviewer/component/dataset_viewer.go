@@ -219,10 +219,7 @@ func (c *datasetViewerComponentImpl) LimitOffsetRows(ctx context.Context, req *d
 		)
 	}
 
-	offset := int64(req.Page-1) * int64(req.Per)
-	if offset < 0 {
-		offset = 0
-	}
+	offset := max(int64(req.Page-1)*int64(req.Per), 0)
 	columns, columnTypes, rows, total, err := c.limitOffsetCountReader.RowsWithCount(
 		ctx, paths, int64(req.Per), offset,
 	)

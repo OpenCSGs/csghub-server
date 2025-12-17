@@ -3,6 +3,7 @@ package parquet
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"slices"
 
@@ -250,7 +251,17 @@ func (p *ParquetGoReader) RowsWithCount(ctx context.Context, paths []string, lim
 			}
 			rr := []any{}
 			for _, cell := range row {
-				rr = append(rr, cell.String())
+				if cell.Kind() == parquet.FixedLenByteArray {
+					bytes := cell.ByteArray()
+					if len(bytes) == UUIDLength {
+						uuid := convertUUID(bytes)
+						rr = append(rr, uuid)
+					} else {
+						rr = append(rr, fmt.Sprintf("%x", bytes))
+					}
+				} else {
+					rr = append(rr, cell.String())
+				}
 			}
 			data = append(data, rr)
 		}
