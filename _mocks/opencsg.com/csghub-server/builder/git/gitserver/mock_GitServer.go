@@ -181,6 +181,53 @@ func (_c *MockGitServer_CopyRepository_Call) RunAndReturn(run func(context.Conte
 	return _c
 }
 
+// CreateBranch provides a mock function with given fields: ctx, req
+func (_m *MockGitServer) CreateBranch(ctx context.Context, req gitserver.CreateBranchReq) error {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateBranch")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, gitserver.CreateBranchReq) error); ok {
+		r0 = rf(ctx, req)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockGitServer_CreateBranch_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateBranch'
+type MockGitServer_CreateBranch_Call struct {
+	*mock.Call
+}
+
+// CreateBranch is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req gitserver.CreateBranchReq
+func (_e *MockGitServer_Expecter) CreateBranch(ctx interface{}, req interface{}) *MockGitServer_CreateBranch_Call {
+	return &MockGitServer_CreateBranch_Call{Call: _e.mock.On("CreateBranch", ctx, req)}
+}
+
+func (_c *MockGitServer_CreateBranch_Call) Run(run func(ctx context.Context, req gitserver.CreateBranchReq)) *MockGitServer_CreateBranch_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(gitserver.CreateBranchReq))
+	})
+	return _c
+}
+
+func (_c *MockGitServer_CreateBranch_Call) Return(_a0 error) *MockGitServer_CreateBranch_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockGitServer_CreateBranch_Call) RunAndReturn(run func(context.Context, gitserver.CreateBranchReq) error) *MockGitServer_CreateBranch_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CreateMirrorRepo provides a mock function with given fields: ctx, req
 func (_m *MockGitServer) CreateMirrorRepo(ctx context.Context, req gitserver.CreateMirrorRepoReq) (int64, error) {
 	ret := _m.Called(ctx, req)
