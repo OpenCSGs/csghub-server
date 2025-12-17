@@ -495,6 +495,7 @@ func (a *DeployActivity) createBuildRequest(ctx context.Context, task *database.
 		ClusterID:      task.Deploy.ClusterID,
 		LastCommitID:   lastCommit.ID,
 		TaskId:         task.ID,
+		RepoId:         repoInfo.RepoID,
 	}, nil
 }
 
