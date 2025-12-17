@@ -120,13 +120,13 @@ func (r *duckdbReader) getColumnsAndValues(rows *sql.Rows) ([]string, []string, 
 	)
 	for _, columnType := range colsType {
 		columns = append(columns, columnType.Name())
-		columnsType = append(columnsType, columnType.ScanType().Name())
+		columnsType = append(columnsType, columnType.DatabaseTypeName())
 	}
-	values := make([][]interface{}, 0)
+	values := make([][]any, 0)
 
 	for rows.Next() {
-		fields := make([]interface{}, len(columns))
-		pointers := make([]interface{}, len(columns))
+		fields := make([]any, len(columns))
+		pointers := make([]any, len(columns))
 		for i := range fields {
 			pointers[i] = &fields[i]
 		}
@@ -134,6 +134,14 @@ func (r *duckdbReader) getColumnsAndValues(rows *sql.Rows) ([]string, []string, 
 		if err := rows.Scan(pointers...); err != nil {
 			return nil, nil, nil, fmt.Errorf("failed to scan rows, cause:%w", err)
 			// log.Fatal(err)
+		}
+		for i, field := range fields {
+			if columnsType[i] == UUIDColumnType {
+				if bytes, ok := field.([]byte); ok && len(bytes) == UUIDLength {
+					uuidStr := convertUUID(bytes)
+					fields[i] = uuidStr
+				}
+			}
 		}
 		values = append(values, fields)
 	}

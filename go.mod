@@ -259,6 +259,7 @@ require (
 )
 
 require (
+	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/KyleBanks/depth v1.2.1 // indirect
 	github.com/XSAM/otelsql v0.36.0
 	github.com/alibabacloud-go/alibabacloud-gateway-spi v0.0.5 // indirect
