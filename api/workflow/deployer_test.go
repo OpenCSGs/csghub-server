@@ -140,7 +140,6 @@ func TestDeployWorkflowSuccess(t *testing.T) {
 	buildTask.Status = scheduler.BuildSucceed
 
 	// deploy
-	mockDeployTaskStore.EXPECT().GetLastTaskByType(mock.Anything, mock.Anything, mock.Anything).Return(runTask, nil).Times(1)
 	mockLogReporter.EXPECT().Report(mock.Anything).Return().Maybe()
 
 	mockDeployTaskStore.EXPECT().GetDeployTask(mock.Anything, runTask.ID).Return(runTask, nil)
