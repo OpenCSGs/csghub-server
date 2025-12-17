@@ -62,3 +62,7 @@ func (c *Client) GetRepoBranchByName(ctx context.Context, req gitserver.GetBranc
 func (c *Client) DeleteRepoBranch(ctx context.Context, req gitserver.DeleteBranchReq) error {
 	return nil
 }
+
+func (c *Client) CreateBranch(ctx context.Context, req gitserver.CreateBranchReq) error {
+	return nil
+}

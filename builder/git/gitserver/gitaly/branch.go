@@ -130,3 +130,49 @@ func (c *Client) DeleteRepoBranch(ctx context.Context, req gitserver.DeleteBranc
 
 	return nil
 }
+
+func (c *Client) CreateBranch(ctx context.Context, req gitserver.CreateBranchReq) error {
+	repoType := fmt.Sprintf("%ss", string(req.RepoType))
+	relativePath, err := c.BuildRelativePath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return err
+	}
+	client, err := c.refClient.UpdateReferences(ctx)
+	if err != nil {
+		return err
+	}
+	createBranchReq := &gitalypb.UpdateReferencesRequest{
+		Repository: &gitalypb.Repository{
+			StorageName:  c.config.GitalyServer.Storage,
+			RelativePath: relativePath,
+			GlRepository: filepath.Join(repoType, req.Namespace, req.Name),
+		},
+		Updates: []*gitalypb.UpdateReferencesRequest_Update{
+			{
+				Reference:   []byte("refs/heads/" + req.BranchName),
+				NewObjectId: []byte(req.CommitID),
+			},
+		},
+	}
+
+	err = client.Send(createBranchReq)
+	if err != nil {
+		return errorx.CreateBranchFailed(err, errorx.Ctx().
+			Set("repo_type", req.RepoType).
+			Set("path", relativePath).
+			Set("branch", req.BranchName).
+			Set("commit_id", req.CommitID),
+		)
+	}
+
+	_, err = client.CloseAndRecv()
+	if err != nil {
+		return errorx.CreateBranchFailed(err, errorx.Ctx().
+			Set("repo_type", req.RepoType).
+			Set("path", relativePath).
+			Set("branch", req.BranchName).
+			Set("commit_id", req.CommitID),
+		)
+	}
+	return nil
+}

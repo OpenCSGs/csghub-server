@@ -26,6 +26,7 @@ type GitServer interface {
 	CreateRepo(ctx context.Context, req CreateRepoReq) (*CreateRepoResp, error)
 	UpdateRepo(ctx context.Context, req UpdateRepoReq) (*CreateRepoResp, error)
 	DeleteRepo(ctx context.Context, relativePath string) error
+	CreateBranch(ctx context.Context, req CreateBranchReq) error
 	GetRepoBranches(ctx context.Context, req GetBranchesReq) ([]types.Branch, error)
 	GetRepoBranchByName(ctx context.Context, req GetBranchReq) (*types.Branch, error)
 	DeleteRepoBranch(ctx context.Context, req DeleteBranchReq) error
