@@ -14,7 +14,27 @@ import (
 	"opencsg.com/csghub-server/moderation/workflow/common"
 )
 
+type repoFullCheck struct {
+	repoStore database.RepoStore
+}
+
+func newRepoFullCheck() *repoFullCheck {
+	return &repoFullCheck{
+		repoStore: database.NewRepoStore(),
+	}
+}
+
+func newRepoFullCheckWithDB(repoStore database.RepoStore) *repoFullCheck {
+	return &repoFullCheck{
+		repoStore: repoStore,
+	}
+}
+
 func RepoFullCheckWorkflow(ctx workflow.Context, repo common.Repo, config *config.Config) error {
+	return newRepoFullCheck().Execute(ctx, repo, config)
+}
+
+func (rfc *repoFullCheck) Execute(ctx workflow.Context, repo common.Repo, config *config.Config) error {
 	logger := workflow.GetLogger(ctx)
 
 	retryPolicy := &temporal.RetryPolicy{
@@ -33,7 +53,7 @@ func RepoFullCheckWorkflow(ctx workflow.Context, repo common.Repo, config *confi
 	actCtx := workflow.WithActivityOptions(ctx, options)
 	var err error
 
-	repoStore := database.NewRepoStore()
+	repoStore := rfc.repoStore
 	dbCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	dbRepo, err := repoStore.FindByPath(dbCtx, repo.RepoType, repo.Namespace, repo.Name)
