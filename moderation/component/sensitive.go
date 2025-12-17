@@ -11,6 +11,7 @@ import (
 type SensitiveComponent interface {
 	PassTextCheck(ctx context.Context, scenario sensitive.Scenario, text string) (*sensitive.CheckResult, error)
 	PassImageCheck(ctx context.Context, scenario sensitive.Scenario, ossBucketName, ossObjectName string) (*sensitive.CheckResult, error)
+	PassImageURLCheck(ctx context.Context, scenario sensitive.Scenario, imageURL string) (*sensitive.CheckResult, error)
 	PassStreamCheck(ctx context.Context, scenario sensitive.Scenario, text, id string) (*sensitive.CheckResult, error)
 	PassLLMQueryCheck(ctx context.Context, scenario sensitive.Scenario, text, id string) (*sensitive.CheckResult, error)
 }
@@ -55,4 +56,8 @@ func (c SensitiveComponentImpl) PassStreamCheck(ctx context.Context, scenario se
 
 func (c SensitiveComponentImpl) PassLLMQueryCheck(ctx context.Context, scenario sensitive.Scenario, text, id string) (*sensitive.CheckResult, error) {
 	return c.checker.PassLLMCheck(ctx, scenario, text, "", id)
+}
+
+func (c SensitiveComponentImpl) PassImageURLCheck(ctx context.Context, scenario sensitive.Scenario, imageURL string) (*sensitive.CheckResult, error) {
+	return c.checker.PassImageURLCheck(ctx, scenario, imageURL)
 }
