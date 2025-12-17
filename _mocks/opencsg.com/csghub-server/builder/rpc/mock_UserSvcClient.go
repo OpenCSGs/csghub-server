@@ -388,6 +388,65 @@ func (_c *MockUserSvcClient_GetUserByName_Call) RunAndReturn(run func(context.Co
 	return _c
 }
 
+// GetUserByUUID provides a mock function with given fields: ctx, userUUID
+func (_m *MockUserSvcClient) GetUserByUUID(ctx context.Context, userUUID string) (*types.User, error) {
+	ret := _m.Called(ctx, userUUID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetUserByUUID")
+	}
+
+	var r0 *types.User
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*types.User, error)); ok {
+		return rf(ctx, userUUID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *types.User); ok {
+		r0 = rf(ctx, userUUID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.User)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, userUUID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockUserSvcClient_GetUserByUUID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetUserByUUID'
+type MockUserSvcClient_GetUserByUUID_Call struct {
+	*mock.Call
+}
+
+// GetUserByUUID is a helper method to define mock.On call
+//   - ctx context.Context
+//   - userUUID string
+func (_e *MockUserSvcClient_Expecter) GetUserByUUID(ctx interface{}, userUUID interface{}) *MockUserSvcClient_GetUserByUUID_Call {
+	return &MockUserSvcClient_GetUserByUUID_Call{Call: _e.mock.On("GetUserByUUID", ctx, userUUID)}
+}
+
+func (_c *MockUserSvcClient_GetUserByUUID_Call) Run(run func(ctx context.Context, userUUID string)) *MockUserSvcClient_GetUserByUUID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockUserSvcClient_GetUserByUUID_Call) Return(_a0 *types.User, _a1 error) *MockUserSvcClient_GetUserByUUID_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockUserSvcClient_GetUserByUUID_Call) RunAndReturn(run func(context.Context, string) (*types.User, error)) *MockUserSvcClient_GetUserByUUID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetUserInfo provides a mock function with given fields: ctx, userName, visitorName
 func (_m *MockUserSvcClient) GetUserInfo(ctx context.Context, userName string, visitorName string) (*rpc.User, error) {
 	ret := _m.Called(ctx, userName, visitorName)

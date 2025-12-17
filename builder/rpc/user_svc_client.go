@@ -19,6 +19,7 @@ type UserSvcClient interface {
 	GetOrCreateFirstAvaiTokens(ctx context.Context, userName, visitorName, app, tokenName string) (string, error)
 	VerifyByAccessToken(ctx context.Context, token string) (*types.CheckAccessTokenResp, error)
 	GetUserByName(ctx context.Context, userName string) (*types.User, error)
+	GetUserByUUID(ctx context.Context, userUUID string) (*types.User, error)
 	FindByUUIDs(ctx context.Context, uuids []string) (map[string]*types.User, error)
 	GetUserUUIDs(ctx context.Context, per, page int) ([]string, int, error)
 	GetEmails(ctx context.Context, per, page int) ([]string, int, error)
@@ -142,6 +143,22 @@ func (c *UserSvcHttpClient) GetUserByName(ctx context.Context, userName string) 
 				Set("userName", userName))
 	}
 
+	return r.Data.(*types.User), nil
+}
+
+func (c *UserSvcHttpClient) GetUserByUUID(ctx context.Context, userUUID string) (*types.User, error) {
+	url := fmt.Sprintf("/api/v1/user/%s?type=uuid", userUUID)
+	var r httpbase.R
+	r.Data = &types.User{}
+	err := c.hc.Get(ctx, url, &r)
+	if err != nil {
+		slog.ErrorContext(ctx, "call user service failed", slog.String("error", err.Error()))
+		return nil, errorx.RemoteSvcFail(err,
+			errorx.Ctx().
+				Set("service", "user service").
+				Set("action", "get user by uuid").
+				Set("userUUID", userUUID))
+	}
 	return r.Data.(*types.User), nil
 }
 

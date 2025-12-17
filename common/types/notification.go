@@ -327,3 +327,9 @@ type SMSReq struct {
 	TemplateCode  string   `json:"template_code"`
 	TemplateParam string   `json:"template_param"`
 }
+
+type EmailInvoiceCreatedNotification struct {
+	ReceiverEmail string `json:"receiver_email"`
+	UserUUID      string `json:"user_uuid"`
+	Amount        string `json:"amount"`
+}
