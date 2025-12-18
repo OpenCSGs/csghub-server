@@ -13,6 +13,8 @@ import (
 	"time"
 
 	"opencsg.com/csghub-server/builder/deploy"
+	dcommon "opencsg.com/csghub-server/builder/deploy/common"
+	"opencsg.com/csghub-server/builder/deploy/imagerunner"
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/git/membership"
@@ -87,6 +89,10 @@ type ModelComponent interface {
 	ListModelsOfRuntimeFrameworks(ctx context.Context, currentUser, search, sort string, per, page int, deployType int) ([]types.Model, int, error)
 	OrgModels(ctx context.Context, req *types.OrgModelsReq) ([]types.Model, int, error)
 	ListQuantizations(ctx context.Context, namespace, name string) ([]*types.File, error)
+	CreateInferenceVersion(ctx context.Context, req types.CreateInferenceVersionReq) error
+	ListInferenceVersions(ctx context.Context, id int64) ([]types.ListInferenceVersionsResp, error)
+	UpdateInferenceVersionTraffic(ctx context.Context, id int64, req []types.UpdateInferenceVersionTrafficReq) error
+	DeleteInferenceVersion(ctx context.Context, id int64, commitID string) error
 }
 
 func NewModelComponent(config *config.Config) (ModelComponent, error) {
@@ -124,6 +130,14 @@ func NewModelComponent(config *config.Config) (ModelComponent, error) {
 	c.userSvcClient = rpc.NewUserSvcHttpClient(fmt.Sprintf("%s:%d", config.User.Host, config.User.Port),
 		rpc.AuthWithApiKey(config.APIToken))
 	c.recomStore = database.NewRecomStore()
+
+	dc := dcommon.BuildDeployConfig(config)
+	ir, err := imagerunner.NewRemoteRunner(dc.ImageRunnerURL, dc)
+	if err != nil {
+		panic(fmt.Errorf("failed to create image runner:%w", err))
+	}
+
+	c.imageRunner = ir
 	return c, nil
 }
 
@@ -148,6 +162,7 @@ type modelComponentImpl struct {
 	deployTaskStore           database.DeployTaskStore
 	runtimeFrameworksStore    database.RuntimeFrameworksStore
 	userSvcClient             rpc.UserSvcClient
+	imageRunner               imagerunner.Runner
 }
 
 func (c *modelComponentImpl) Index(ctx context.Context, filter *types.RepoFilter, per, page int, needOpWeight bool) ([]*types.Model, int, error) {
@@ -1391,4 +1406,109 @@ func (c *modelComponentImpl) addWeightsToModel(ctx context.Context, repoID int64
 			}
 		}
 	}
+}
+
+func (c *modelComponentImpl) CreateInferenceVersion(ctx context.Context, req types.CreateInferenceVersionReq) error {
+	deploy, err := c.deployTaskStore.GetDeployByID(ctx, req.DeployId)
+	if err != nil {
+		return errorx.ErrDeployNotFoundErr
+	}
+
+	if deploy.Status != dcommon.Running {
+		return errorx.ErrDeployStatusNotMatchErr
+	}
+
+	if req.InitialTraffic > 100 || req.InitialTraffic < 0 {
+		return errorx.ErrTrafficInvalid
+	}
+
+	if req.CommitID == "" {
+		return errorx.ErrCommitIDEmpty
+	}
+	commitID, err := common.ShortenCommitID7(req.CommitID)
+	if err != nil {
+		return errorx.ErrInvalidCommitID
+	}
+
+	req.CommitID = commitID
+
+	return c.imageRunner.CreateRevisions(ctx, &types.CreateRevisionReq{
+		ClusterID:      deploy.ClusterID,
+		SvcName:        deploy.SvcName,
+		Commit:         req.CommitID,
+		InitialTraffic: req.InitialTraffic,
+	})
+}
+
+func (c *modelComponentImpl) ListInferenceVersions(ctx context.Context, id int64) ([]types.ListInferenceVersionsResp, error) {
+	deploy, err := c.deployTaskStore.GetDeployByID(ctx, id)
+	if err != nil {
+		return nil, errorx.ErrDeployNotFoundErr
+	}
+	var resp = []types.ListInferenceVersionsResp{}
+	if deploy.Status != dcommon.Running {
+		return resp, nil
+	}
+
+	versions, err := c.imageRunner.ListKsvcVersions(ctx, deploy.ClusterID, deploy.SvcName)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, version := range versions {
+		resp = append(resp, types.ListInferenceVersionsResp{
+			Commit:         version.Commit,
+			CreateTime:     version.CreateTime,
+			IsReady:        version.IsReady,
+			TrafficPercent: version.TrafficPercent,
+			RevisionName:   version.RevisionName,
+			Message:        version.Message,
+			Reason:         version.Reason,
+		})
+	}
+
+	return resp, nil
+}
+
+func (c *modelComponentImpl) UpdateInferenceVersionTraffic(ctx context.Context, id int64, req []types.UpdateInferenceVersionTrafficReq) error {
+	deploy, err := c.deployTaskStore.GetDeployByID(ctx, id)
+	if err != nil {
+		return errorx.ErrDeployNotFoundErr
+	}
+
+	if deploy.Status != dcommon.Running {
+		return errorx.ErrDeployStatusNotMatchErr
+	}
+
+	params := []types.TrafficReq{}
+	for _, item := range req {
+		params = append(params, types.TrafficReq{
+			Commit:         item.CommitID,
+			TrafficPercent: item.TrafficPercent,
+		})
+	}
+	err = c.imageRunner.SetVersionsTraffic(ctx, deploy.ClusterID, deploy.SvcName, params)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (c *modelComponentImpl) DeleteInferenceVersion(ctx context.Context, id int64, commitID string) error {
+	deploy, err := c.deployTaskStore.GetDeployByID(ctx, id)
+	if err != nil {
+		return errorx.ErrDeployNotFoundErr
+	}
+
+	if deploy.Status != dcommon.Running {
+		return errorx.ErrDeployStatusNotMatchErr
+	}
+
+	shortCommitId, err := common.ShortenCommitID7(commitID)
+	if err != nil {
+		return errorx.ErrInvalidCommitID
+	}
+
+	return c.imageRunner.DeleteKsvcVersion(ctx, deploy.ClusterID, deploy.SvcName, shortCommitId)
 }

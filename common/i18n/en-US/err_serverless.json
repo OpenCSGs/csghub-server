@@ -1,0 +1,29 @@
+{
+    "error.SERVERLESS-ERR-0": {
+        "other": "The strategy type is not supported."
+    },
+    "error.SERVERLESS-ERR-1": {
+        "other": "The deploy not found."
+    },
+    "error.SERVERLESS-ERR-2": {
+        "other": "The deploy status not match."
+    },
+    "error.SERVERLESS-ERR-3": {
+        "other": "The deploy max replica not match."
+    },
+    "error.SERVERLESS-ERR-4": {
+        "other": "The revision not found."
+    },
+    "error.SERVERLESS-ERR-5": {
+        "other": "The percent not match."
+    },
+    "error.SERVERLESS-ERR-6": {
+        "other": "The commit id is empty."
+    },
+    "error.SERVERLESS-ERR-7": {
+        "other": "The traffic percent is invalid."
+    },
+    "error.SERVERLESS-ERR-8": {
+        "other": "The commit id is invalid."
+    }
+}

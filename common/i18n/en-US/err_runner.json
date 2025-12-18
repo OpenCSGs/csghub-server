@@ -1,0 +1,17 @@
+{
+    "error.RUNNER-ERR-0": {
+        "other": "The max revision number exceeds the max replica number."
+    },
+    "error.RUNNER-ERR-1": {
+        "other": "Failed to get max scale."
+    },
+    "error.RUNNER-ERR-2": {
+        "other": "The revision with commit already exists."
+    },
+    "error.RUNNER-ERR-3": {
+        "other": "The revision is not ready."
+    },
+    "error.RUNNER-ERR-4": {
+        "other": "The traffic percent is not zero."
+    }
+}

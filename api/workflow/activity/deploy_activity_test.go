@@ -539,7 +539,9 @@ func TestDeploy(t *testing.T) {
 		Message:  "",
 	}, nil)
 	tester.mockLogReporter.EXPECT().Report(mock.Anything).Return().Maybe()
-
+	tester.mockGitServer.EXPECT().GetRepoLastCommit(mock.Anything, mock.Anything).Return(&types.Commit{
+		ID: "1234567",
+	}, nil)
 	tester.ctx = context.WithValue(tester.ctx, "test", "test")
 	err := tester.activities.Deploy(tester.ctx, runTask.ID)
 

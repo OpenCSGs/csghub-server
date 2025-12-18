@@ -7,10 +7,12 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/builder/deploy/cluster"
 	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/component/reporter"
 	rcommon "opencsg.com/csghub-server/runner/common"
@@ -419,4 +421,74 @@ func (s *K8sHandler) GetServiceInfo(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, resp)
+}
+
+func (s *K8sHandler) CreateRevisions(c *gin.Context) {
+	var request = &types.CreateRevisionReq{}
+	err := c.BindJSON(request)
+	if err != nil {
+		slog.ErrorContext(c.Request.Context(), "fail to parse input parameters", slog.Any("error", err), slog.Any("req", request))
+		httpbase.BadRequest(c, "Invalid request parameters")
+		return
+	}
+
+	svcName := s.getServiceNameFromRequest(c)
+	request.SvcName = svcName
+	err = s.serviceComponent.CreateRevisions(c.Request.Context(), *request)
+	if err != nil {
+		slog.ErrorContext(c.Request.Context(), "fail to create revisions", slog.Any("error", err), slog.Any("req", request))
+		httpbase.ConflictError(c, err)
+		return
+	}
+	httpbase.OK(c, nil)
+}
+
+func (s *K8sHandler) SetVersionsTraffic(c *gin.Context) {
+	clusterID := c.Query("cluster_id")
+	svcName := s.getServiceNameFromRequest(c)
+	var req []types.TrafficReq
+	err := c.BindJSON(&req)
+	if err != nil {
+		slog.ErrorContext(c.Request.Context(), "fail to parse input parameters", slog.Any("error", err))
+		httpbase.ConflictError(c, errorx.ErrReqBodyFormat)
+		return
+	}
+
+	err = s.serviceComponent.SetVersionsTraffic(c.Request.Context(), clusterID, svcName, req)
+	if err != nil {
+		slog.ErrorContext(c.Request.Context(), "fail to set versions traffic", slog.Any("error", err))
+		httpbase.ConflictError(c, err)
+		return
+	}
+
+	httpbase.OK(c, nil)
+}
+
+func (s *K8sHandler) ListKsvcVersions(c *gin.Context) {
+	clusterID := c.Query("cluster_id")
+	svcName := s.getServiceNameFromRequest(c)
+
+	traffics, err := s.serviceComponent.ListVersions(c.Request.Context(), clusterID, svcName)
+	if err != nil {
+		slog.ErrorContext(c.Request.Context(), "fail to get versions traffic", slog.String("cluster_id", clusterID), slog.String("svc_name", svcName), slog.Any("error", err))
+		httpbase.ConflictError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, traffics)
+}
+
+func (s *K8sHandler) DeleteKsvcVersion(c *gin.Context) {
+	clusterID := c.Query("cluster_id")
+	svcName := c.Params.ByName("service")
+	commitID := c.Params.ByName("commit_id")
+
+	err := s.serviceComponent.DeleteKsvcVersion(c.Request.Context(), clusterID, svcName, commitID)
+	if err != nil {
+		slog.ErrorContext(c.Request.Context(), "fail to delete ksvc version", slog.String("cluster_id", clusterID), slog.String("svc_name", svcName), slog.String("commit_id", commitID), slog.Any("error", err))
+		httpbase.ConflictError(c, err)
+		return
+	}
+
+	httpbase.OK(c, nil)
 }

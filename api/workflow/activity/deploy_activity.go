@@ -20,6 +20,7 @@ import (
 	"opencsg.com/csghub-server/builder/deploy/scheduler"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	utilcommon "opencsg.com/csghub-server/common/utils/common"
 	"opencsg.com/csghub-server/component/reporter"
@@ -547,7 +548,10 @@ func (a *DeployActivity) createDeployRequest(ctx context.Context, task *database
 		return nil, fmt.Errorf("failed to parse deploy hardware: %w", err)
 	}
 
-	envMap := a.makeDeployEnv(ctx, hardware, accessToken, deployInfo, engineArgsTemplates, toolCallParsers, repoInfo)
+	envMap, err := a.makeDeployEnv(ctx, hardware, accessToken, deployInfo, engineArgsTemplates, toolCallParsers, repoInfo)
+	if err != nil {
+		return nil, fmt.Errorf("failed to make deploy env: %w", err)
+	}
 	targetID := deployInfo.SpaceID
 
 	if deployInfo.SpaceID == 0 && deployInfo.ModelID > 0 {
@@ -620,7 +624,7 @@ func (a *DeployActivity) stopBuild(buildTask *database.DeployTask, repoInfo sche
 }
 
 // makeDeployEnv
-func (a *DeployActivity) makeDeployEnv(ctx context.Context, hardware types.HardWare, accessToken *database.AccessToken, deployInfo *database.Deploy, engineArgsTemplates []types.EngineArg, toolCallParsers map[string]string, repoInfo scheduler.RepoInfo) map[string]string {
+func (a *DeployActivity) makeDeployEnv(ctx context.Context, hardware types.HardWare, accessToken *database.AccessToken, deployInfo *database.Deploy, engineArgsTemplates []types.EngineArg, toolCallParsers map[string]string, repoInfo scheduler.RepoInfo) (map[string]string, error) {
 	logger := a.getLogger(ctx)
 
 	envMap, err := utilcommon.JsonStrToMap(deployInfo.Env)
@@ -638,12 +642,27 @@ func (a *DeployActivity) makeDeployEnv(ctx context.Context, hardware types.HardW
 		}
 	}
 
-	//
+	pathParts := strings.Split(repoInfo.Path, "/")
+	commit, err := a.gs.GetRepoLastCommit(ctx, gitserver.GetRepoLastCommitReq{
+		Namespace: pathParts[0],
+		Name:      pathParts[1],
+		Ref:       deployInfo.GitBranch,
+		RepoType:  types.RepositoryType(repoInfo.RepoType),
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	commitID, err := utilcommon.ShortenCommitID7(commit.ID)
+	if err != nil {
+		return nil, errorx.ErrInvalidCommitID
+	}
 	envMap["S3_INTERNAL"] = fmt.Sprintf("%v", a.cfg.S3Internal)
 	envMap["HTTPCloneURL"] = a.getHttpCloneURLWithToken(repoInfo.HTTPCloneURL, accessToken.User.Username, accessToken.Token)
 	envMap["ACCESS_TOKEN"] = accessToken.Token
-	envMap["REPO_ID"] = repoInfo.Path         // "namespace/name"
-	envMap["REVISION"] = deployInfo.GitBranch // branch
+	envMap["REPO_ID"] = repoInfo.Path // "namespace/name"
+	envMap["REVISION"] = commitID     // branch
 
 	if len(engineArgsTemplates) > 0 {
 		var engineArgs strings.Builder
@@ -746,7 +765,7 @@ func (a *DeployActivity) makeDeployEnv(ctx context.Context, hardware types.HardW
 		}
 	}
 
-	return envMap
+	return envMap, nil
 }
 
 // getModelArchitecture reads the model architecture from metadata

@@ -1,0 +1,29 @@
+{
+    "error.SERVERLESS-ERR-0": {
+        "other": "部署策略類型不支持"
+    },
+    "error.SERVERLESS-ERR-1": {
+        "other": "部署實例不存在"
+    },
+    "error.SERVERLESS-ERR-2": {
+        "other": "部署實例狀態不匹配"
+    },
+    "error.SERVERLESS-ERR-3": {
+        "other": "策略部署僅支持最大副本數為1的部署實例"
+    },
+    "error.SERVERLESS-ERR-4": {
+        "other": "修訂版本不存在"
+    },
+    "error.SERVERLESS-ERR-5": {
+        "other": "百分比總和不為100"
+    },
+    "error.SERVERLESS-ERR-6": {
+        "other": "commit id 為空"
+    },
+    "error.SERVERLESS-ERR-7": {
+        "other": "流量百分比無效"
+    },
+    "error.SERVERLESS-ERR-8": {
+        "other": "無效的commitId"
+    }
+}

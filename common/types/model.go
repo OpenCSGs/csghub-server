@@ -435,18 +435,18 @@ type ModelConfig struct {
 	TorchDtype        string   `json:"torch_dtype"`
 }
 type EngineConfig struct {
-	EngineName       string            `json:"engine_name"`
-	ContainerPort    int               `json:"container_port"`
-	MinVersion       string            `json:"min_version"`
-	ModelFormat      string            `json:"model_format"`
-	EngineImages     []Image           `json:"engine_images"`
-	SupportedArchs   []string          `json:"supported_archs"`
-	SupportedModels  []string          `json:"supported_models"`
-	EngineArgs       []EngineArg       `json:"engine_args"`
-	Enabled          int64             `json:"enabled"`
-	UpdatedAt        time.Time         `json:"updated_at"`
-	Description      string            `json:"description"`
-	ToolCallParsers  map[string]string `json:"tool_call_parsers,omitempty"`
+	EngineName      string            `json:"engine_name"`
+	ContainerPort   int               `json:"container_port"`
+	MinVersion      string            `json:"min_version"`
+	ModelFormat     string            `json:"model_format"`
+	EngineImages    []Image           `json:"engine_images"`
+	SupportedArchs  []string          `json:"supported_archs"`
+	SupportedModels []string          `json:"supported_models"`
+	EngineArgs      []EngineArg       `json:"engine_args"`
+	Enabled         int64             `json:"enabled"`
+	UpdatedAt       time.Time         `json:"updated_at"`
+	Description     string            `json:"description"`
+	ToolCallParsers map[string]string `json:"tool_call_parsers,omitempty"`
 }
 
 type ComputeType string
@@ -466,4 +466,26 @@ type Image struct {
 	EngineVersion string      `json:"engine_version"`
 	ExtraArchs    []string    `json:"extra_archs"`
 	ExtraModels   []string    `json:"extra_models"`
+}
+
+type CreateInferenceVersionReq struct {
+	DeployId int64  `json:"-"`
+	CommitID string `json:"commit_id"`
+
+	InitialTraffic int `json:"initial_traffic"`
+}
+
+type ListInferenceVersionsResp struct {
+	Commit         string    `json:"commit"`
+	CreateTime     time.Time `json:"create_time"`
+	IsReady        bool      `json:"is_ready"`
+	TrafficPercent int64     `json:"traffic_percent"`
+	RevisionName   string    `json:"revision_name"`
+	Message        string    `json:"message"`
+	Reason         string    `json:"reason"`
+}
+
+type UpdateInferenceVersionTrafficReq struct {
+	CommitID       string `json:"commit_id" binding:"required"`
+	TrafficPercent int64  `json:"traffic_percent"`
 }

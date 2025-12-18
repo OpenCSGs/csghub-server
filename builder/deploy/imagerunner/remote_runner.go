@@ -14,6 +14,7 @@ import (
 
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/builder/deploy/common"
+	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
@@ -21,12 +22,9 @@ import (
 
 var _ Runner = (*RemoteRunner)(nil)
 
-type httpDoer interface {
-	Do(req *http.Request) (*http.Response, error)
-}
 type RemoteRunner struct {
 	remote       *url.URL
-	client       httpDoer
+	client       rpc.HttpDoer
 	clusterStore database.ClusterInfoStore
 	config       common.DeployConfig
 }
@@ -41,7 +39,7 @@ func NewRemoteRunner(remoteURL string, c common.DeployConfig) (Runner, error) {
 
 	return &RemoteRunner{
 		remote:       parsedURL,
-		client:       http.DefaultClient,
+		client:       rpc.NewHttpClient("").WithRetry(2).WithDelay(time.Second * 1),
 		config:       c,
 		clusterStore: clusterStore,
 	}, nil
@@ -55,7 +53,7 @@ func (h *RemoteRunner) Run(ctx context.Context, req *types.RunRequest) (*types.R
 	slog.Debug("send request", slog.Any("body", req))
 	svcName := req.SvcName
 	u := fmt.Sprintf("%s/api/v1/service/%s/run", remote, svcName)
-	response, err := h.doRequest(http.MethodPost, u, req)
+	response, err := h.doRequest(ctx, http.MethodPost, u, req)
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +78,7 @@ func (h *RemoteRunner) Stop(ctx context.Context, req *types.StopRequest) (*types
 	}
 	svcName := req.SvcName
 	u := fmt.Sprintf("%s/api/v1/service/%s/stop", remote, svcName)
-	response, err := h.doRequest(http.MethodPost, u, req)
+	response, err := h.doRequest(ctx, http.MethodPost, u, req)
 	if err != nil {
 		return nil, err
 	}
@@ -104,7 +102,7 @@ func (h *RemoteRunner) Purge(ctx context.Context, req *types.PurgeRequest) (*typ
 	}
 	svcName := req.SvcName
 	u := fmt.Sprintf("%s/api/v1/service/%s/purge", remote, svcName)
-	response, err := h.doRequest(http.MethodDelete, u, req)
+	response, err := h.doRequest(ctx, http.MethodDelete, u, req)
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +127,7 @@ func (h *RemoteRunner) Status(ctx context.Context, req *types.StatusRequest) (*t
 	svcName := req.SvcName
 	u := fmt.Sprintf("%s/api/v1/service/%s/status", remote, svcName)
 
-	response, err := h.doRequest(http.MethodGet, u, req)
+	response, err := h.doRequest(ctx, http.MethodGet, u, req)
 	if err != nil {
 		return nil, err
 	}
@@ -169,7 +167,7 @@ func (h *RemoteRunner) Exist(ctx context.Context, req *types.CheckRequest) (*typ
 	}
 	svcName := req.SvcName
 	u := fmt.Sprintf("%s/api/v1/service/%s/get", remote, svcName)
-	response, err := h.doRequest(http.MethodGet, u, req)
+	response, err := h.doRequest(ctx, http.MethodGet, u, req)
 	if err != nil {
 		return nil, err
 	}
@@ -193,7 +191,7 @@ func (h *RemoteRunner) GetReplica(ctx context.Context, req *types.StatusRequest)
 	}
 	svcName := req.SvcName
 	u := fmt.Sprintf("%s/api/v1/service/%s/replica", remote, svcName)
-	response, err := h.doRequest(http.MethodGet, u, req)
+	response, err := h.doRequest(ctx, http.MethodGet, u, req)
 	if err != nil {
 		return nil, err
 	}
@@ -238,7 +236,7 @@ func (h *RemoteRunner) readToChannel(rc io.ReadCloser) <-chan string {
 }
 
 // Helper method to execute the actual HTTP request and read the response.
-func (h *RemoteRunner) doRequest(method, url string, data interface{}) (*http.Response, error) {
+func (h *RemoteRunner) doRequest(ctx context.Context, method, url string, data interface{}) (*http.Response, error) {
 	var buf io.Reader
 	if data != nil {
 		jsonData, err := json.Marshal(data)
@@ -248,7 +246,7 @@ func (h *RemoteRunner) doRequest(method, url string, data interface{}) (*http.Re
 		buf = bytes.NewBuffer(jsonData)
 	}
 
-	req, err := http.NewRequest(method, url, buf)
+	req, err := http.NewRequestWithContext(ctx, method, url, buf)
 	if err != nil {
 		return nil, errorx.InternalServerError(err, nil)
 	}
@@ -260,13 +258,17 @@ func (h *RemoteRunner) doRequest(method, url string, data interface{}) (*http.Re
 		return nil, errorx.RemoteSvcFail(err, nil)
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		var errData interface{}
-		err := json.NewDecoder(resp.Body).Decode(&errData)
+		var result httpbase.R
+		err := json.NewDecoder(resp.Body).Decode(&result)
 		if err != nil {
 			err := fmt.Errorf("unexpected http status: %d, error: %w", resp.StatusCode, err)
 			return nil, errorx.RemoteSvcFail(err, nil)
 		} else {
-			err := fmt.Errorf("unexpected http status: %d, error: %v", resp.StatusCode, errData)
+			err, ok := errorx.RunnerErrors[result.Code]
+			if ok {
+				return nil, err
+			}
+			err = fmt.Errorf("unexpected http status: %d, error: %w", resp.StatusCode, err)
 			return nil, errorx.RemoteSvcFail(err, nil)
 		}
 	}
@@ -352,7 +354,7 @@ func (h *RemoteRunner) GetClusterById(ctx context.Context, clusterId string) (*t
 	}
 	url := fmt.Sprintf("%s/api/v1/cluster/%s", remote, clusterId)
 	// Send a GET request to resources runner
-	response, err := h.doRequest(http.MethodGet, url, nil)
+	response, err := h.doRequest(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -371,7 +373,7 @@ func (h *RemoteRunner) UpdateCluster(ctx context.Context, data *types.ClusterReq
 	}
 	url := fmt.Sprintf("%s/api/v1/cluster/%s", remote, data.ClusterID)
 	// Create a new HTTP client with a timeout
-	response, err := h.doRequest(http.MethodPut, url, data)
+	response, err := h.doRequest(ctx, http.MethodPut, url, data)
 	if err != nil {
 		fmt.Printf("Error sending request to k8s cluster: %s\n", err)
 		return nil, fmt.Errorf("failed to update cluster info, %w", err)
@@ -393,7 +395,7 @@ func (h *RemoteRunner) SubmitWorkFlow(ctx context.Context, req *types.ArgoWorkFl
 	}
 	url := fmt.Sprintf("%s/api/v1/workflows", remote)
 	// Create a new HTTP client with a timeout
-	response, err := h.doRequest(http.MethodPost, url, req)
+	response, err := h.doRequest(ctx, http.MethodPost, url, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to submit evaluation job, %w", err)
 	}
@@ -414,7 +416,7 @@ func (h *RemoteRunner) DeleteWorkFlow(ctx context.Context, req types.ArgoWorkFlo
 	}
 	url := fmt.Sprintf("%s/api/v1/workflows/%d", remote, req.ID)
 	// Create a new HTTP client with a timeout
-	response, err := h.doRequest(http.MethodDelete, url, req)
+	response, err := h.doRequest(ctx, http.MethodDelete, url, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to delete evaluation job, %w", err)
 	}
@@ -433,7 +435,7 @@ func (h *RemoteRunner) GetWorkFlow(ctx context.Context, req types.ArgoWorkFlowDe
 		return nil, err
 	}
 	url := fmt.Sprintf("%s/api/v1/workflows/%d", remote, req.ID)
-	response, err := h.doRequest(http.MethodGet, url, req)
+	response, err := h.doRequest(ctx, http.MethodGet, url, req)
 	if err != nil {
 		return nil, err
 	}
@@ -470,7 +472,7 @@ func (h *RemoteRunner) SubmitFinetuneJob(ctx context.Context, req *types.ArgoWor
 	}
 	url := fmt.Sprintf("%s/api/v1/workflows", remote)
 	// Create a new HTTP client with a timeout
-	response, err := h.doRequest(http.MethodPost, url, req)
+	response, err := h.doRequest(ctx, http.MethodPost, url, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to submit finetune job from deployer, %w", err)
 	}
@@ -481,4 +483,67 @@ func (h *RemoteRunner) SubmitFinetuneJob(ctx context.Context, req *types.ArgoWor
 		return nil, errorx.InternalServerError(err, nil)
 	}
 	return &res, nil
+}
+
+func (h *RemoteRunner) CreateRevisions(ctx context.Context, req *types.CreateRevisionReq) error {
+	remote, err := h.GetRemoteRunnerHost(ctx, req.ClusterID)
+	if err != nil {
+		return err
+	}
+	url := fmt.Sprintf("%s/api/v1/service/%s/versions", remote, req.SvcName)
+	response, err := h.doRequest(ctx, http.MethodPost, url, req)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+	return nil
+}
+
+func (h *RemoteRunner) ListKsvcVersions(ctx context.Context, clusterID, svcName string) ([]types.KsvcRevisionInfo, error) {
+	remote, err := h.GetRemoteRunnerHost(ctx, clusterID)
+	if err != nil {
+		return nil, err
+	}
+	url := fmt.Sprintf("%s/api/v1/service/%s/versions?cluster_id=%s", remote, svcName, clusterID)
+	response, err := h.doRequest(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get ksvc versions, %w", err)
+	}
+	defer response.Body.Close()
+
+	var versions []types.KsvcRevisionInfo
+	if err := json.NewDecoder(response.Body).Decode(&versions); err != nil {
+		slog.ErrorContext(ctx, "failed to decode ksvc versions", slog.String("svcName", svcName), slog.String("clusterID", clusterID), slog.Any("error", err))
+		return nil, errorx.InternalServerError(err, nil)
+	}
+
+	return versions, nil
+}
+
+func (h *RemoteRunner) SetVersionsTraffic(ctx context.Context, clusterID, svcName string, req []types.TrafficReq) error {
+	remote, err := h.GetRemoteRunnerHost(ctx, clusterID)
+	if err != nil {
+		return err
+	}
+	url := fmt.Sprintf("%s/api/v1/service/%s/versions/traffic", remote, svcName)
+	response, err := h.doRequest(ctx, http.MethodPut, url, req)
+	if err != nil {
+		return fmt.Errorf("failed to update traffic, %w", err)
+	}
+	defer response.Body.Close()
+	return nil
+}
+
+func (h *RemoteRunner) DeleteKsvcVersion(ctx context.Context, clusterID, svcName, commitID string) error {
+	remote, err := h.GetRemoteRunnerHost(ctx, clusterID)
+	if err != nil {
+		return err
+	}
+	url := fmt.Sprintf("%s/api/v1/service/%s/versions/%s?cluster_id=%s", remote, svcName, commitID, clusterID)
+	response, err := h.doRequest(ctx, http.MethodDelete, url, nil)
+	if err != nil {
+		return fmt.Errorf("failed to delete ksvc version, %w", err)
+	}
+	defer response.Body.Close()
+	return nil
 }
