@@ -407,7 +407,6 @@ func (h *OpenAIHandlerImpl) Embedding(c *gin.Context) {
 	slog.InfoContext(c, "proxy embedding request to model endpoint", slog.Any("target", target), slog.Any("host", host),
 		slog.Any("user", username), slog.Any("model_id", modelID))
 	rp, _ := proxy.NewReverseProxy(target)
-	w := NewResponseWriterWrapperEmbedding(c.Writer)
 
 	tokenCounter := h.tokenCounterFactory.NewEmbedding(token.CreateParam{
 		Endpoint: target,
@@ -415,6 +414,7 @@ func (h *OpenAIHandlerImpl) Embedding(c *gin.Context) {
 		Model:    modelName,
 		ImageID:  model.ImageID,
 	})
+	w := NewResponseWriterWrapperEmbedding(c.Writer, tokenCounter)
 	tokenCounter.Input(req.Input)
 
 	rp.ServeHTTP(w, c.Request, "", host)

@@ -10,27 +10,18 @@ import (
 
 	"github.com/openai/openai-go/v3"
 	"opencsg.com/csghub-server/aigateway/token"
-	"opencsg.com/csghub-server/builder/rpc"
 )
 
 type ResponseWriterWrapperEmbedding struct {
 	internalWritter http.ResponseWriter
-	modSvcClient    rpc.ModerationSvcClient
-	tokenCounter    *token.EmbeddingTokenCounter
+	tokenCounter    token.EmbeddingTokenCounter
 }
 
-func NewResponseWriterWrapperEmbedding(internalWritter http.ResponseWriter) *ResponseWriterWrapperEmbedding {
+func NewResponseWriterWrapperEmbedding(internalWritter http.ResponseWriter, tokenCounter token.EmbeddingTokenCounter) *ResponseWriterWrapperEmbedding {
 	return &ResponseWriterWrapperEmbedding{
 		internalWritter: internalWritter,
+		tokenCounter:    tokenCounter,
 	}
-}
-
-func (rw *ResponseWriterWrapperEmbedding) WithModeration(modSvcClient rpc.ModerationSvcClient) {
-	rw.modSvcClient = modSvcClient
-}
-
-func (rw *ResponseWriterWrapperEmbedding) WithTokenCounter(counter *token.EmbeddingTokenCounter) {
-	rw.tokenCounter = counter
 }
 
 func (rw *ResponseWriterWrapperEmbedding) Header() http.Header {
@@ -66,14 +57,3 @@ func (rw *ResponseWriterWrapperEmbedding) Write(data []byte) (int, error) {
 
 	return rw.internalWritter.Write(data)
 }
-
-//TODO: moderate embedding request and generate sensitive response if needed
-// func (rw *ResponseWriterWrapperEmbedding) generateSensitiveResp(originResp openai.CreateEmbeddingResponse) openai.CreateEmbeddingResponse {
-// 	newResp := openai.CreateEmbeddingResponse{
-// 		Data:   nil,
-// 		Model:  originResp.Model,
-// 		Object: originResp.Object,
-// 		Usage:  originResp.Usage,
-// 	}
-// 	return newResp
-// }
