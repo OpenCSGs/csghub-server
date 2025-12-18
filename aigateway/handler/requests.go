@@ -119,7 +119,78 @@ type StreamOptions struct {
 
 // EmbeddingRequest represents an embedding request structure
 type EmbeddingRequest struct {
-	Input          string `json:"input"`                     // Input text content
-	Model          string `json:"model"`                     // Model name used (e.g., "text-embedding-ada-002")
-	EncodingFormat string `json:"encoding_format,omitempty"` // Encoding format (e.g., "float")
+	openai.EmbeddingNewParams
+	// RawJSON stores all unknown fields during unmarshaling
+	RawJSON json.RawMessage `json:"-"`
+}
+
+func (r *EmbeddingRequest) UnmarshalJSON(data []byte) error {
+	// Create a temporary struct to hold the known fields
+	type TempEmbeddingRequest EmbeddingRequest
+
+	// First, unmarshal into the temporary struct
+	var temp TempEmbeddingRequest
+	if err := json.Unmarshal(data, &temp); err != nil {
+		return err
+	}
+
+	// Then, unmarshal into a map to get all fields
+	var allFields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &allFields); err != nil {
+		return err
+	}
+
+	// Remove known fields from the map
+	delete(allFields, "model")
+	delete(allFields, "input")
+	delete(allFields, "encoding_format")
+
+	// If there are any unknown fields left, marshal them into RawJSON
+	var rawJSON []byte
+	var err error
+	if len(allFields) > 0 {
+		rawJSON, err = json.Marshal(allFields)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Assign the temporary struct to the original and set RawJSON
+	*r = EmbeddingRequest(temp)
+	r.RawJSON = rawJSON
+	return nil
+}
+
+func (r EmbeddingRequest) MarshalJSON() ([]byte, error) {
+	// First, marshal the known fields
+	type TempEmbeddingRequest EmbeddingRequest
+	data, err := json.Marshal(TempEmbeddingRequest(r))
+	if err != nil {
+		return nil, err
+	}
+
+	// If there are no raw JSON fields, just return the known fields
+	if len(r.RawJSON) == 0 {
+		return data, nil
+	}
+
+	// Parse the known fields back into a map
+	var knownFields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &knownFields); err != nil {
+		return nil, err
+	}
+
+	// Parse the raw JSON fields into a map
+	var rawFields map[string]json.RawMessage
+	if err := json.Unmarshal(r.RawJSON, &rawFields); err != nil {
+		return nil, err
+	}
+
+	// Merge the raw fields into the known fields
+	for k, v := range rawFields {
+		knownFields[k] = v
+	}
+
+	// Marshal the merged map back into JSON
+	return json.Marshal(knownFields)
 }

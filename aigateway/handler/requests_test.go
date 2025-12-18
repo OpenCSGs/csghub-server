@@ -162,3 +162,70 @@ func TestChatCompletionRequest_EmptyRawJSON(t *testing.T) {
 	// RawJSON should be empty
 	assert.Empty(t, req4Unmarshaled.RawJSON)
 }
+
+func TestEmbeddingRequest_MarshalUnmarshal(t *testing.T) {
+	// Test case 1: Only known fields
+	req1 := &EmbeddingRequest{
+		EmbeddingNewParams: openai.EmbeddingNewParams{
+			Input: openai.EmbeddingNewParamsInputUnion{
+				OfArrayOfStrings: []string{"Hello, world!"},
+			},
+			Model: "text-embedding-ada-002",
+		},
+	}
+
+	// Marshal to JSON
+	data1, err := json.Marshal(req1)
+	assert.NoError(t, err)
+
+	// Unmarshal back
+	var req1Unmarshaled EmbeddingRequest
+	err = json.Unmarshal(data1, &req1Unmarshaled)
+	assert.NoError(t, err)
+
+	// Verify fields
+	assert.Equal(t, req1.Model, req1Unmarshaled.Model)
+	assert.Equal(t, len(req1.Input.OfArrayOfStrings), len(req1Unmarshaled.Input.OfArrayOfStrings))
+	assert.Empty(t, req1Unmarshaled.RawJSON)
+}
+
+func TestEmbeddingRequest_UnknownFields(t *testing.T) {
+	// Test case 2: With unknown fields
+	jsonWithUnknown := `{
+		"model": "text-embedding-ada-002",
+		"input": ["Hello, world!"],
+		"unknown_field": "unknown_value",
+		"another_unknown": 12345
+	}`
+
+	// Unmarshal
+	var req2 EmbeddingRequest
+	err := json.Unmarshal([]byte(jsonWithUnknown), &req2)
+	assert.NoError(t, err)
+
+	// Verify known fields
+	assert.Equal(t, "text-embedding-ada-002", req2.Model)
+	assert.Equal(t, 1, len(req2.Input.OfArrayOfStrings))
+
+	// Verify unknown fields are stored in RawJSON
+	assert.NotEmpty(t, req2.RawJSON)
+
+	// Marshal back and verify unknown fields are preserved
+	data2, err := json.Marshal(req2)
+	assert.NoError(t, err)
+
+	// Unmarshal into map to check all fields
+	var resultMap map[string]interface{}
+	err = json.Unmarshal(data2, &resultMap)
+	assert.NoError(t, err)
+
+	// Check known fields
+	assert.Equal(t, "text-embedding-ada-002", resultMap["model"])
+	inputArray, ok := resultMap["input"].([]interface{})
+	assert.True(t, ok)
+	assert.Equal(t, "Hello, world!", inputArray[0])
+
+	// Check unknown fields
+	assert.Equal(t, "unknown_value", resultMap["unknown_field"])
+	assert.Equal(t, 12345.0, resultMap["another_unknown"])
+}
