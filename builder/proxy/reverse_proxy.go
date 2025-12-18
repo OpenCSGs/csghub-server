@@ -7,6 +7,7 @@ import (
 	"net/url"
 
 	"github.com/openai/openai-go/v3"
+	"opencsg.com/csghub-server/common/utils/trace"
 )
 
 type ReverseProxy interface {
@@ -74,6 +75,9 @@ func (rp *reverseProxyImpl) ServeHTTP(w http.ResponseWriter, r *http.Request, ap
 		resp.Header.Del("Access-Control-Allow-Headers")
 		resp.Header.Del("Access-Control-Allow-Methods")
 		resp.Header.Del("Access-Control-Allow-Origin")
+		// remove duplicate X-Request-Id header from downstream response
+		// because it is already set by the gateway middleware
+		resp.Header.Del(trace.HeaderRequestID)
 
 		return nil
 	}
