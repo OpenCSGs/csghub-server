@@ -349,8 +349,6 @@ func (c *memberComponentImpl) Delete(ctx context.Context, orgName, userName, ope
 				err := errors.New("cannot remove the last admin from organization")
 				return errorx.LastOrgAdmin(err, errorx.Ctx().Set("username", userName))
 			}
-		} else {
-			return errorx.ErrForbiddenMsg("Non-admin members cannot remove themselves. Please ask an organization admin to perform this action.")
 		}
 	} else {
 		// only admin can delete others
