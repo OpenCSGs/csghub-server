@@ -84,6 +84,7 @@ func (ibc *imagebuilderComponentImpl) Build(ctx context.Context, req ctypes.Imag
 	imagePath := path.Join(ibc.config.Space.DockerRegBase, imageName)
 	cluster, err := ibc.GetCluster(ctx, req.ClusterID)
 	if err != nil {
+		slog.ErrorContext(ctx, "failed to get cluster by id", slog.String("cluster id", req.ClusterID), slog.Any("error", err))
 		return fmt.Errorf("failed to get cluster by id: %w", err)
 	}
 
@@ -134,7 +135,7 @@ func (ibc *imagebuilderComponentImpl) Build(ctx context.Context, req ctypes.Imag
 func (ibc *imagebuilderComponentImpl) checkAndRemoveExistingWorkflow(ctx context.Context, cluster *cluster.Cluster,
 	namespace, createWorkflowName string) error {
 	checkWft, err := cluster.ArgoClient.ArgoprojV1alpha1().Workflows(namespace).Get(ctx, createWorkflowName, metav1.GetOptions{})
-	slog.Debug("get workflow for space image build", slog.Any("checkWft", checkWft), slog.Any("error", err))
+	slog.DebugContext(ctx, "get workflow for space image build", slog.Any("checkWft", checkWft), slog.Any("error", err))
 	if err != nil {
 		if statusErr, ok := err.(*k8serrors.StatusError); ok {
 			//{Status: "Failure", Message: "workflows.argoproj.io \"xxxx\" not found", Reason: "NotFound", Code: 404}}
@@ -477,13 +478,13 @@ func createOrUpdateConfigMap(ctx context.Context, client kubernetes.Interface, c
 
 func (ibc *imagebuilderComponentImpl) newPersistentVolumeClaim(ctx context.Context, cluster *cluster.Cluster, pvcName string) error {
 	// Check if it already exists
-	slog.Info("check pvc for imagebuilder", slog.String("pvc", pvcName), slog.String("storageClass", cluster.StorageClass), slog.Any("storage len", len(cluster.StorageClass)))
+	slog.InfoContext(ctx, "check pvc for imagebuilder", slog.String("pvc", pvcName), slog.String("storageClass", cluster.StorageClass), slog.Any("storage len", len(cluster.StorageClass)))
 	_, err := cluster.Client.CoreV1().PersistentVolumeClaims(ibc.config.Cluster.SpaceNamespace).Get(ctx, pvcName, metav1.GetOptions{})
 	if err == nil {
 		return nil
 	}
 
-	slog.Info("create pvc for imagebuilder", slog.String("pvc", pvcName), slog.String("storageClass", cluster.StorageClass), slog.Any("storage len", len(cluster.StorageClass)))
+	slog.InfoContext(ctx, "create pvc for imagebuilder", slog.String("pvc", pvcName), slog.String("storageClass", cluster.StorageClass), slog.Any("storage len", len(cluster.StorageClass)))
 	storage, err := resource.ParseQuantity("50Gi")
 	if err != nil {
 		return err

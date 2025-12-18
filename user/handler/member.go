@@ -52,7 +52,7 @@ func (h *MemberHandler) OrgMembers(ctx *gin.Context) {
 	}
 	pageSize, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
@@ -227,7 +227,7 @@ func (h *MemberHandler) GetMemberRole(ctx *gin.Context) {
 	// Assuming GetMemberRole returns a role (or similar) and an error
 	role, err := h.c.GetMemberRole(ctx.Request.Context(), org, userName)
 	if err != nil {
-		slog.Error("fail to get org member", slog.Any("org", org), slog.Any("member", userName), slog.Any("err", err))
+		slog.ErrorContext(ctx.Request.Context(), "fail to get org member", slog.Any("org", org), slog.Any("member", userName), slog.Any("err", err))
 		if errors.Is(err, errorx.ErrDatabaseNoRows) {
 			httpbase.NotFoundError(ctx, err)
 		} else {

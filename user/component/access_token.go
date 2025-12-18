@@ -43,7 +43,7 @@ func NewAccessTokenComponent(config *config.Config) (AccessTokenComponent, error
 	c.config = config
 	if err != nil {
 		newError := fmt.Errorf("fail to create git server,error:%w", err)
-		slog.Error(newError.Error())
+		slog.ErrorContext(context.Background(), newError.Error())
 		return nil, newError
 	}
 	return c, nil
@@ -285,7 +285,7 @@ func (c *accessTokenComponentImpl) createUserToken(ctx context.Context, newToken
 		// charge 100 credit for create starship token by call accounting service
 		err = c.presentForNewAccessToken(user)
 		if err != nil {
-			slog.Error("fail to charge for new starship user with retry 3 times", slog.Any("user.uuid", user.UUID), slog.Any("err", err))
+			slog.ErrorContext(ctx, "fail to charge for new starship user with retry 3 times", slog.Any("user.uuid", user.UUID), slog.Any("err", err))
 		}
 	}
 

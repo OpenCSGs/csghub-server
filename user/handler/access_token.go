@@ -4,8 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"opencsg.com/csghub-server/common/errorx"
 	"time"
+
+	"opencsg.com/csghub-server/common/errorx"
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
@@ -57,14 +58,14 @@ func (h *AccessTokenHandler) Create(ctx *gin.Context) {
 	}
 	var req types.CreateUserTokenRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 	var err error
 	_, err = h.sc.CheckRequestV2(ctx, &req)
 	if err != nil {
-		slog.Error("failed to check sensitive request", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "failed to check sensitive request", slog.Any("error", err))
 		httpbase.ServerError(ctx, fmt.Errorf("sensitive check failed: %w", err))
 		return
 	}
@@ -74,13 +75,13 @@ func (h *AccessTokenHandler) Create(ctx *gin.Context) {
 
 	req.Username = ctx.Param("username")
 	if currentUser != req.Username {
-		slog.Error("user can only create its own access token", slog.String("current_user", currentUser), slog.String("username", req.Username))
+		slog.ErrorContext(ctx.Request.Context(), "user can only create its own access token", slog.String("current_user", currentUser), slog.String("username", req.Username))
 		httpbase.UnauthorizedError(ctx, errors.New("user can only create its own access token"))
 		return
 	}
 	token, err := h.c.Create(ctx, &req)
 	if err != nil {
-		slog.Error("Failed to create user access token", slog.String("user_name", req.Username), slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to create user access token", slog.String("user_name", req.Username), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -110,14 +111,14 @@ func (h *AccessTokenHandler) CreateAppToken(ctx *gin.Context) {
 	}
 	var req types.CreateUserTokenRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 	var err error
 	_, err = h.sc.CheckRequestV2(ctx, &req)
 	if err != nil {
-		slog.Error("failed to check sensitive request", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "failed to check sensitive request", slog.Any("error", err))
 		httpbase.ServerError(ctx, fmt.Errorf("sensitive check failed: %w", err))
 		return
 	}
@@ -127,7 +128,7 @@ func (h *AccessTokenHandler) CreateAppToken(ctx *gin.Context) {
 	req.TokenName = ctx.Param("token_name")
 	token, err := h.c.Create(ctx, &req)
 	if err != nil {
-		slog.Error("Failed to create user access token", slog.String("user_name", req.Username), slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to create user access token", slog.String("user_name", req.Username), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -159,19 +160,19 @@ func (h *AccessTokenHandler) Delete(ctx *gin.Context) {
 	var req types.DeleteUserTokenRequest
 	req.Username = ctx.Param("username")
 	if currentUser != req.Username {
-		slog.Error("user can only delete its own access token", slog.String("current_user", currentUser), slog.String("username", req.Username))
+		slog.ErrorContext(ctx.Request.Context(), "user can only delete its own access token", slog.String("current_user", currentUser), slog.String("username", req.Username))
 		httpbase.UnauthorizedError(ctx, errors.New("user can only delete its own access token"))
 		return
 	}
 	req.TokenName = ctx.Param("token_name")
 	err := h.c.Delete(ctx, &req)
 	if err != nil {
-		slog.Error("Failed to delete user access token", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to delete user access token", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
 
-	slog.Info("Delete user access token succeed")
+	slog.InfoContext(ctx.Request.Context(), "Delete user access token succeed")
 	httpbase.OK(ctx, nil)
 }
 
@@ -203,12 +204,12 @@ func (h *AccessTokenHandler) DeleteAppToken(ctx *gin.Context) {
 	}
 	err := h.c.Delete(ctx, &req)
 	if err != nil {
-		slog.Error("Failed to delete user access token", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to delete user access token", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
 
-	slog.Info("Delete user access token succeed")
+	slog.InfoContext(ctx.Request.Context(), "Delete user access token succeed")
 	httpbase.OK(ctx, nil)
 }
 
@@ -240,19 +241,19 @@ func (h *AccessTokenHandler) Refresh(ctx *gin.Context) {
 	if len(paramExpiredAt) > 0 {
 		expiredAt, err = time.Parse(time.RFC3339, paramExpiredAt)
 		if err != nil {
-			slog.Error("Failed to parse expired_at", slog.String("expired_at", paramExpiredAt), slog.Any("error", err))
+			slog.ErrorContext(ctx.Request.Context(), "Failed to parse expired_at", slog.String("expired_at", paramExpiredAt), slog.Any("error", err))
 			httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(errors.New("cannot parse expired_at, please use format RFC3339, like 2006-01-02T15:04:05Z07:00"), nil))
 			return
 		}
 	}
 	resp, err := h.c.RefreshToken(ctx, currentUser, tokenName, app, expiredAt)
 	if err != nil {
-		slog.Error("Failed to refresh user access token", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to refresh user access token", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
 
-	slog.Info("refresh user access token succeed", slog.String("current_user", currentUser),
+	slog.InfoContext(ctx.Request.Context(), "refresh user access token succeed", slog.String("current_user", currentUser),
 		slog.String("app", app), slog.String("token_name", tokenName))
 	httpbase.OK(ctx, resp)
 }
@@ -283,7 +284,7 @@ func (h *AccessTokenHandler) Get(ctx *gin.Context) {
 	req.Application = ctx.Query("app")
 	resp, err := h.c.Check(ctx, &req)
 	if err != nil {
-		slog.Error("Failed to check user access token", slog.Any("error", err), slog.Any("req", req))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to check user access token", slog.Any("error", err), slog.Any("req", req))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -313,7 +314,7 @@ func (h *AccessTokenHandler) GetUserTokens(ctx *gin.Context) {
 	app := ctx.Query("app")
 	resp, err := h.c.GetTokens(ctx, currentUser, app)
 	if err != nil {
-		slog.Error("Failed to get user access tokens", slog.Any("error", err), slog.Any("application", app), slog.String("current_user", currentUser))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get user access tokens", slog.Any("error", err), slog.Any("application", app), slog.String("current_user", currentUser))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -349,7 +350,7 @@ func (h *AccessTokenHandler) GetOrCreateFirstAvaiTokens(ctx *gin.Context) {
 	}
 	resp, err := h.c.GetOrCreateFirstAvaiToken(ctx, currentUser, app, tokenName)
 	if err != nil {
-		slog.Error("Failed to get user access tokens", slog.Any("error", err), slog.Any("application", app), slog.String("current_user", currentUser))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get user access tokens", slog.Any("error", err), slog.Any("application", app), slog.String("current_user", currentUser))
 		httpbase.ServerError(ctx, err)
 		return
 	}

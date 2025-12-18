@@ -1,9 +1,10 @@
 package handler
 
 import (
-	"github.com/gin-gonic/gin"
 	"log/slog"
 	"net/http"
+
+	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/builder/deploy/cluster"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
@@ -36,7 +37,7 @@ func (s *ClusterHandler) GetClusterInfoByID(c *gin.Context) {
 	clusterInfo.StorageClass = cInfo.StorageClass
 	availabilityStatus, resourceAvaliable, err := s.clusterComponent.GetResourceByID(c.Request.Context(), clusterId)
 	if err != nil {
-		slog.Error("fail to get cluster", slog.Any("error", err))
+		slog.ErrorContext(c.Request.Context(), "fail to get cluster", slog.Any("error", err))
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
 	}

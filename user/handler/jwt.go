@@ -35,15 +35,15 @@ type JWTHandler struct {
 func (h *JWTHandler) Create(ctx *gin.Context) {
 	var req types.CreateJWTReq
 	if err := ctx.ShouldBind(&req); err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 
-	slog.Info("Create JWT token", "req", req)
+	slog.InfoContext(ctx.Request.Context(), "Create JWT token", "req", req)
 	claims, signed, err := h.c.GenerateToken(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("failed to generate JWT token", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "failed to generate JWT token", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -72,7 +72,7 @@ func (h *JWTHandler) Verify(ctx *gin.Context) {
 	token := ctx.Param("token")
 	user, err := h.c.ParseToken(ctx.Request.Context(), token)
 	if err != nil {
-		slog.Error("failed to verify JWT token", slog.Any("error", err), slog.String("token", token))
+		slog.ErrorContext(ctx.Request.Context(), "failed to verify JWT token", slog.Any("error", err), slog.String("token", token))
 		httpbase.ServerError(ctx, fmt.Errorf("failed to verify JWT token '%s': %w", token, err))
 		return
 	}

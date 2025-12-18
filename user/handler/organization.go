@@ -59,14 +59,14 @@ func (h *OrganizationHandler) Create(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	var req types.CreateOrgReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 	var err error
 	_, err = h.sc.CheckRequestV2(ctx, &req)
 	if err != nil {
-		slog.Error("failed to check sensitive request", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "failed to check sensitive request", slog.Any("error", err))
 		httpbase.ServerError(ctx, fmt.Errorf("sensitive check failed: %w", err))
 		return
 	}
@@ -74,12 +74,12 @@ func (h *OrganizationHandler) Create(ctx *gin.Context) {
 	req.Username = currentUser
 	org, err := h.c.Create(ctx, &req)
 	if err != nil {
-		slog.Error("Failed to create organization", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to create organization", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
 
-	slog.Info("Create organization succeed", slog.String("org_path", org.Name))
+	slog.InfoContext(ctx.Request.Context(), "Create organization succeed", slog.String("org_path", org.Name))
 	httpbase.OK(ctx, org)
 }
 
@@ -103,7 +103,7 @@ func (h *OrganizationHandler) Get(ctx *gin.Context) {
 	}
 	org, err := h.c.Get(ctx, orgName)
 	if err != nil {
-		slog.Error("Failed to get organization", slog.Any("error", err), slog.String("org_path", orgName))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get organization", slog.Any("error", err), slog.String("org_path", orgName))
 		if errors.Is(err, errorx.ErrDatabaseNoRows) {
 			httpbase.NotFoundError(ctx, err)
 		} else {
@@ -112,7 +112,7 @@ func (h *OrganizationHandler) Get(ctx *gin.Context) {
 		return
 	}
 
-	slog.Info("Get organization succeed", slog.String("org_path", org.Name))
+	slog.InfoContext(ctx.Request.Context(), "Get organization succeed", slog.String("org_path", org.Name))
 	httpbase.OK(ctx, org)
 }
 
@@ -133,13 +133,13 @@ func (h *OrganizationHandler) Index(ctx *gin.Context) {
 	verifyStatus := ctx.Query("verify_status")
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
-		slog.Error("Failed to get per and page", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get per and page", slog.Any("error", err))
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 	orgs, total, err := h.c.Index(ctx, username, search, per, page, orgType, verifyStatus)
 	if err != nil {
-		slog.Error("Failed to get organizations", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get organizations", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -149,7 +149,7 @@ func (h *OrganizationHandler) Index(ctx *gin.Context) {
 		"total": total,
 	}
 
-	slog.Info("Get organizations succeed", slog.String("username", username), slog.String("search", search), slog.Int("per", per), slog.Int("page", page))
+	slog.InfoContext(ctx.Request.Context(), "Get organizations succeed", slog.String("username", username), slog.String("search", search), slog.Int("per", per), slog.Int("page", page))
 	httpbase.OK(ctx, respData)
 }
 
@@ -177,12 +177,12 @@ func (h *OrganizationHandler) Delete(ctx *gin.Context) {
 	req.Name = ctx.Param("namespace")
 	err := h.c.Delete(ctx, &req)
 	if err != nil {
-		slog.Error("Failed to delete organizations", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to delete organizations", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
 
-	slog.Info("Delete organizations succeed", slog.String("org_name", req.Name))
+	slog.InfoContext(ctx.Request.Context(), "Delete organizations succeed", slog.String("org_name", req.Name))
 	httpbase.OK(ctx, nil)
 }
 
@@ -209,14 +209,14 @@ func (h *OrganizationHandler) Update(ctx *gin.Context) {
 
 	var req types.EditOrgReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 	var err error
 	_, err = h.sc.CheckRequestV2(ctx, &req)
 	if err != nil {
-		slog.Error("failed to check sensitive request", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "failed to check sensitive request", slog.Any("error", err))
 		httpbase.ServerError(ctx, fmt.Errorf("sensitive check failed: %w", err))
 		return
 	}
@@ -228,12 +228,12 @@ func (h *OrganizationHandler) Update(ctx *gin.Context) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
-		slog.Error("Failed to update organizations", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to update organizations", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
 
-	slog.Info("Update organizations succeed", slog.String("org_name", org.Nickname))
+	slog.InfoContext(ctx.Request.Context(), "Update organizations succeed", slog.String("org_name", org.Nickname))
 	httpbase.OK(ctx, org)
 }
 
@@ -254,7 +254,7 @@ func (h *OrganizationHandler) CreateVerify(ctx *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	var req types.OrgVerifyReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
@@ -262,12 +262,12 @@ func (h *OrganizationHandler) CreateVerify(ctx *gin.Context) {
 	req.UserUUID = currentUserUUID
 	orgVerify, err := h.ov.Create(ctx, &req)
 	if err != nil {
-		slog.Error("Failed to create organization Verify", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to create organization Verify", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
 
-	slog.Info("Create organization Verify succeed", slog.String("company_name", orgVerify.CompanyName))
+	slog.InfoContext(ctx.Request.Context(), "Create organization Verify succeed", slog.String("company_name", orgVerify.CompanyName))
 	httpbase.OK(ctx, orgVerify)
 }
 
@@ -287,34 +287,34 @@ func (h *OrganizationHandler) CreateVerify(ctx *gin.Context) {
 func (h *OrganizationHandler) UpdateVerify(ctx *gin.Context) {
 	vID, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 	var req types.OrgVerifyStatusReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("Bad request format", "error", err)
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
 	if req.Status != types.VerifyStatusRejected && req.Status != types.VerifyStatusApproved {
-		slog.Error("Bad request format", slog.String("err", "Not allowed status"))
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", slog.String("err", "Not allowed status"))
 		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(errors.New("not allowed status"), nil))
 	}
 
 	if req.Status == types.VerifyStatusRejected && req.Reason == "" {
-		slog.Error("Bad request format", slog.String("err", "rejected need reason"))
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", slog.String("err", "rejected need reason"))
 		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(errors.New("rejected need reason"), nil))
 	}
 
 	orgVerify, err := h.ov.Update(ctx, vID, req.Status, req.Reason)
 	if err != nil {
-		slog.Error("Failed to update organization Verify", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to update organization Verify", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
 
-	slog.Info("update organization Verify succeed", slog.String("company_name", orgVerify.CompanyName))
+	slog.ErrorContext(ctx.Request.Context(), "update organization Verify succeed", slog.String("company_name", orgVerify.CompanyName))
 	httpbase.OK(ctx, orgVerify)
 }
 
@@ -334,7 +334,7 @@ func (h *OrganizationHandler) GetVerify(ctx *gin.Context) {
 	path := ctx.Param("namespace")
 	orgVerify, err := h.ov.Get(ctx, path)
 	if err != nil {
-		slog.Error("Failed to get organization Verify", slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get organization Verify", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}

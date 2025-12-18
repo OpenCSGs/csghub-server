@@ -63,12 +63,12 @@ func (c *organizationComponentImpl) FixOrgData(ctx context.Context, org *databas
 	req.Description = org.Description
 	err := c.gs.FixOrganization(req, *user)
 	if err != nil {
-		slog.Error("fix git org data has error", slog.Any("error", err))
+		slog.ErrorContext(ctx, "fix git org data has error", slog.Any("error", err))
 	}
 	// need to create roles for a new org before adding members
 	err = c.msc.InitRoles(ctx, org)
 	if err != nil {
-		slog.Error("fix organization role has error", slog.String("error", err.Error()))
+		slog.ErrorContext(ctx, "fix organization role has error", slog.String("error", err.Error()))
 	}
 	// org creator defaults to be admin role
 	err = c.msc.SetAdmin(ctx, org, user)
@@ -184,7 +184,7 @@ func (c *organizationComponentImpl) Get(ctx context.Context, orgName string) (*t
 func (c *organizationComponentImpl) Delete(ctx context.Context, req *types.DeleteOrgReq) error {
 	r, err := c.msc.GetMemberRole(ctx, req.Name, req.CurrentUser)
 	if err != nil {
-		slog.Error("faild to get member role",
+		slog.ErrorContext(ctx, "faild to get member role",
 			slog.String("org", req.Name), slog.String("user", req.CurrentUser),
 			slog.String("error", err.Error()))
 	}
@@ -205,7 +205,7 @@ func (c *organizationComponentImpl) Delete(ctx context.Context, req *types.Delet
 func (c *organizationComponentImpl) Update(ctx context.Context, req *types.EditOrgReq) (*database.Organization, error) {
 	r, err := c.msc.GetMemberRole(ctx, req.Name, req.CurrentUser)
 	if err != nil {
-		slog.Error("faild to get member role",
+		slog.ErrorContext(ctx, "faild to get member role",
 			slog.String("org", req.Name), slog.String("user", req.CurrentUser),
 			slog.String("error", err.Error()))
 	}

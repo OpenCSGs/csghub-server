@@ -104,7 +104,7 @@ func (wc *workFlowComponentImpl) CreateWorkflow(ctx context.Context, req types.A
 	// create workflow in argo
 	awf := generateWorkflow(req, wc.config)
 	wc.setLabels(argowf, awf)
-	slog.Info("create workflow in runner", slog.Any("namespace", namespace), slog.Any("awf.name", awf.Name),
+	slog.InfoContext(ctx, "create workflow in runner", slog.Any("namespace", namespace), slog.Any("awf.name", awf.Name),
 		slog.Any("result-url", argowf.ResultURL), slog.Any("task-type", argowf.TaskType))
 	_, err = cluster.ArgoClient.ArgoprojV1alpha1().Workflows(namespace).Create(ctx, awf, v1.CreateOptions{})
 	if err != nil {
@@ -115,7 +115,7 @@ func (wc *workFlowComponentImpl) CreateWorkflow(ctx context.Context, req types.A
 
 	wf, err = wc.wf.CreateWorkFlow(ctx, *argowf)
 	if err != nil {
-		slog.Error("failed to create workflow in db and verify if workflow exist later", slog.Any("task-id", argowf.TaskId), slog.Any("error", err))
+		slog.ErrorContext(ctx, "failed to create workflow in db and verify if workflow exist later", slog.Any("task-id", argowf.TaskId), slog.Any("error", err))
 		wfObj, findErr := wc.wf.FindByTaskID(ctx, argowf.TaskId)
 		if findErr != nil {
 			return nil, fmt.Errorf("failed to check workflow %s in db for create action, error: %w", argowf.TaskId, findErr)
@@ -145,7 +145,7 @@ func (wc *workFlowComponentImpl) DeleteWorkflow(ctx context.Context, req *types.
 	}
 	err = cluster.ArgoClient.ArgoprojV1alpha1().Workflows(req.Namespace).Delete(ctx, req.TaskID, v1.DeleteOptions{})
 	if err != nil {
-		slog.Warn("Error deleting argo workflow", slog.Any("error", err))
+		slog.WarnContext(ctx, "Error deleting argo workflow", slog.Any("error", err))
 	}
 	return nil
 }
@@ -164,12 +164,12 @@ func (wc *workFlowComponentImpl) GetWorkflow(ctx context.Context, id int64, user
 // Update workflow
 func (wc *workFlowComponentImpl) UpdateWorkflow(ctx context.Context, update *v1alpha1.Workflow, cluster *cluster.Cluster) (*database.ArgoWorkflow, error) {
 	oldwf, err := wc.wf.FindByTaskID(ctx, update.Name)
-	slog.Info("get-UpdateWorkflow-from-db", slog.Any("oldwf.TaskId", oldwf.TaskId), slog.Any("result-url", oldwf.ResultURL))
+	slog.InfoContext(ctx, "get-UpdateWorkflow-from-db", slog.Any("oldwf.TaskId", oldwf.TaskId), slog.Any("result-url", oldwf.ResultURL))
 	if errors.Is(err, sql.ErrNoRows) {
 		oldwf = *wc.getWorkflowFromLabels(ctx, update)
 		wf, err := wc.wf.CreateWorkFlow(ctx, oldwf)
 		if err != nil {
-			slog.Error("failed to create workflow in db", slog.Any("error", err))
+			slog.ErrorContext(ctx, "failed to create workflow in db", slog.Any("error", err))
 			return nil, fmt.Errorf("failed to create workflow in db: %v", err)
 		}
 		oldwf = *wf
@@ -203,7 +203,7 @@ func (wc *workFlowComponentImpl) UpdateWorkflow(ctx context.Context, update *v1a
 			//podName := fmt.Sprintf("%s-%s", oldwf.TaskId, oldwf.ClusterID)
 			logs, err := common.GetPodLog(ctx, cluster.Client, update.Name, update.Namespace, "main")
 			if err != nil {
-				slog.Error("failed to get pod log", slog.Any("error", err), slog.Any("pod name", update.Name))
+				slog.ErrorContext(ctx, "failed to get pod log", slog.Any("error", err), slog.Any("pod name", update.Name))
 			} else {
 				if len(logs) > 0 {
 					oldwf.Reason = string(logs)
@@ -213,7 +213,7 @@ func (wc *workFlowComponentImpl) UpdateWorkflow(ctx context.Context, update *v1a
 		}
 	}
 
-	slog.Info("UpdateWorkflow-report", slog.Any("name", oldwf.TaskId), slog.Any("result-url", oldwf.ResultURL))
+	slog.InfoContext(ctx, "UpdateWorkflow-report", slog.Any("name", oldwf.TaskId), slog.Any("result-url", oldwf.ResultURL))
 	wc.addKServiceWithEvent(ctx, types.RunnerWorkflowChange, &oldwf)
 	if lastStatus != oldwf.Status {
 		wc.reportWorFlowLog(types.WorkflowUpdated.String(), &oldwf)
@@ -233,7 +233,7 @@ func (wc *workFlowComponentImpl) DeleteWorkflowInargo(ctx context.Context, delet
 	if wf.Status == v1alpha1.WorkflowPending || wf.Status == v1alpha1.WorkflowRunning {
 		wf.Status = v1alpha1.WorkflowFailed
 		wf.Reason = "deleted by admin"
-		slog.Info("DeleteWorkflowInargo-report", slog.Any("name", wf.TaskId), slog.Any("result-url", wf.ResultURL))
+		slog.InfoContext(ctx, "DeleteWorkflowInargo-report", slog.Any("name", wf.TaskId), slog.Any("result-url", wf.ResultURL))
 		_, err = wc.wf.UpdateWorkFlow(ctx, wf)
 		if err != nil {
 			return err
