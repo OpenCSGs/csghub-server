@@ -176,3 +176,28 @@ func (c *Client) CreateBranch(ctx context.Context, req gitserver.CreateBranchReq
 	}
 	return nil
 }
+
+func (c *Client) SetDefaultBranch(ctx context.Context, req gitserver.SetDefaultBranchReq) error {
+	repoType := fmt.Sprintf("%ss", string(req.RepoType))
+	relativePath, err := c.BuildRelativePath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return err
+	}
+	_, err = c.repoClient.WriteRef(ctx, &gitalypb.WriteRefRequest{
+		Repository: &gitalypb.Repository{
+			StorageName:  c.config.GitalyServer.Storage,
+			RelativePath: relativePath,
+			GlRepository: filepath.Join(repoType, req.Namespace, req.Name),
+		},
+		Ref:      []byte("HEAD"),
+		Revision: []byte("refs/heads/" + req.BranchName),
+	})
+	if err != nil {
+		return errorx.SetDefaultBranchFailed(err, errorx.Ctx().
+			Set("repo_type", req.RepoType).
+			Set("path", relativePath).
+			Set("branch", req.BranchName),
+		)
+	}
+	return nil
+}
