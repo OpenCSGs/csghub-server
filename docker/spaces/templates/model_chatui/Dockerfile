@@ -1,4 +1,6 @@
-FROM opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_space/vllm-cpu-chatui-base:1.0
+ARG SPACE_BASE_IMAGE=opencsg-registry.cn-beijing.cr.aliyuncs.com
+ARG NAMESPACE=opencsghq
+FROM ${SPACE_BASE_IMAGE}/${NAMESPACE}/vllm-cpu-chatui-base:1.0
 
 WORKDIR /workspace/
 
