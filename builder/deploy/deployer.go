@@ -1058,11 +1058,38 @@ func (d *deployer) startAcctMeteringRequest(resMap map[string]string, clusterMap
 		return
 	}
 
+	var hardware types.HardWare
+	if err := json.Unmarshal([]byte(deploy.Hardware), &hardware); err != nil {
+		slog.Error("Deploy hardware is invalid format", "hardware", deploy.Hardware, "deploy_id", deploy.ID)
+		return
+	}
+
+	// Get replica count and multiply value by instance count
+	replicaCount := 1
+	//only check for single node deploy, muti-node don't support replica
+	if hardware.Replicas < 2 {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		// Namespace and Name are not used in GetReplica call chain, only SvcName and ClusterID are needed
+		dr := types.DeployRepo{
+			DeployID:  deploy.ID,
+			SpaceID:   deploy.SpaceID,
+			SvcName:   deploy.SvcName,
+			ClusterID: deploy.ClusterID,
+		}
+		actualReplica, _, _, err := d.GetReplica(ctx, dr)
+		if err != nil {
+			slog.Warn("fail to get deploy replica for metering", slog.Any("deploy_id", deploy.ID), slog.Any("error", err))
+		} else if actualReplica > 0 {
+			replicaCount = actualReplica
+		}
+	}
+
 	extra := startAcctRequestFeeExtra(deploy, d.deployConfig.UniqueServiceName)
 	event := types.MeteringEvent{
 		Uuid:         uuid.New(), //v4
 		UserUUID:     deploy.UserUUID,
-		Value:        int64(d.eventPub.SyncInterval),
+		Value:        int64(d.eventPub.SyncInterval) * int64(replicaCount),
 		ValueType:    types.TimeDurationMinType,
 		Scene:        int(sceneType),
 		OpUID:        "",
