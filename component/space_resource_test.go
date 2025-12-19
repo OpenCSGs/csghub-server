@@ -2,6 +2,7 @@ package component
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -68,4 +69,31 @@ func TestSpaceResourceComponent_Delete(t *testing.T) {
 
 	err := sc.Delete(ctx, 1)
 	require.Nil(t, err)
+}
+
+func TestSpaceResourceComponent_ListHardwareTypes(t *testing.T) {
+	t.Run("list hardware types", func(t *testing.T) {
+		ctx := context.TODO()
+		sc := initializeTestSpaceResourceComponent(ctx, t)
+
+		sc.mocks.stores.SpaceResourceMock().EXPECT().FindAllResourceTypes(ctx, "c1").Return(
+			[]string{"type1", "type2"}, nil,
+		)
+
+		types, err := sc.ListHardwareTypes(ctx, "c1")
+		require.Nil(t, err)
+		require.Equal(t, []string{"type1", "type2"}, types)
+	})
+	t.Run("error listing hardware types", func(t *testing.T) {
+		ctx := context.TODO()
+		sc := initializeTestSpaceResourceComponent(ctx, t)
+		assertError := errors.New("database error")
+		sc.mocks.stores.SpaceResourceMock().EXPECT().FindAllResourceTypes(ctx, "c1").Return(
+			nil, assertError,
+		)
+
+		types, err := sc.ListHardwareTypes(ctx, "c1")
+		require.NotNil(t, err)
+		require.Nil(t, types)
+	})
 }

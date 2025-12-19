@@ -186,6 +186,65 @@ func (_c *MockSpaceResourceStore_FindAll_Call) RunAndReturn(run func(context.Con
 	return _c
 }
 
+// FindAllResourceTypes provides a mock function with given fields: ctx, clusterId
+func (_m *MockSpaceResourceStore) FindAllResourceTypes(ctx context.Context, clusterId string) ([]string, error) {
+	ret := _m.Called(ctx, clusterId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FindAllResourceTypes")
+	}
+
+	var r0 []string
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) ([]string, error)); ok {
+		return rf(ctx, clusterId)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) []string); ok {
+		r0 = rf(ctx, clusterId)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]string)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, clusterId)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockSpaceResourceStore_FindAllResourceTypes_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindAllResourceTypes'
+type MockSpaceResourceStore_FindAllResourceTypes_Call struct {
+	*mock.Call
+}
+
+// FindAllResourceTypes is a helper method to define mock.On call
+//   - ctx context.Context
+//   - clusterId string
+func (_e *MockSpaceResourceStore_Expecter) FindAllResourceTypes(ctx interface{}, clusterId interface{}) *MockSpaceResourceStore_FindAllResourceTypes_Call {
+	return &MockSpaceResourceStore_FindAllResourceTypes_Call{Call: _e.mock.On("FindAllResourceTypes", ctx, clusterId)}
+}
+
+func (_c *MockSpaceResourceStore_FindAllResourceTypes_Call) Run(run func(ctx context.Context, clusterId string)) *MockSpaceResourceStore_FindAllResourceTypes_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockSpaceResourceStore_FindAllResourceTypes_Call) Return(_a0 []string, _a1 error) *MockSpaceResourceStore_FindAllResourceTypes_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockSpaceResourceStore_FindAllResourceTypes_Call) RunAndReturn(run func(context.Context, string) ([]string, error)) *MockSpaceResourceStore_FindAllResourceTypes_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // FindByID provides a mock function with given fields: ctx, id
 func (_m *MockSpaceResourceStore) FindByID(ctx context.Context, id int64) (*database.SpaceResource, error) {
 	ret := _m.Called(ctx, id)

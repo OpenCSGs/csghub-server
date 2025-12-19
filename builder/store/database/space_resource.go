@@ -2,9 +2,11 @@ package database
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"opencsg.com/csghub-server/common/errorx"
+	"opencsg.com/csghub-server/common/types"
 )
 
 type spaceResourceStoreImpl struct {
@@ -19,6 +21,7 @@ type SpaceResourceStore interface {
 	FindByID(ctx context.Context, id int64) (*SpaceResource, error)
 	FindByName(ctx context.Context, name string) (*SpaceResource, error)
 	FindAll(ctx context.Context) ([]SpaceResource, error)
+	FindAllResourceTypes(ctx context.Context, clusterId string) ([]string, error)
 }
 
 func NewSpaceResourceStore() SpaceResourceStore {
@@ -96,4 +99,61 @@ func (s *spaceResourceStoreImpl) FindAll(ctx context.Context) ([]SpaceResource, 
 		return nil, err
 	}
 	return result, nil
+}
+
+func (s *spaceResourceStoreImpl) FindAllResourceTypes(ctx context.Context, clusterId string) ([]string, error) {
+	typeSet := make(map[string]bool)
+	var hardWareTypes []string
+
+	// Use pagination to query resources
+	page := 1
+	per := 100 // Set a reasonable page size
+
+	for {
+		// Get resources for current page
+		resources, _, err := s.Index(ctx, clusterId, per, page)
+		if err != nil {
+			return nil, err
+		}
+
+		// If no resources returned, we've reached the end
+		if len(resources) == 0 {
+			break
+		}
+
+		// Process each resource
+		for _, resource := range resources {
+			var hw types.HardWare
+			if err := json.Unmarshal([]byte(resource.Resources), &hw); err != nil {
+				continue
+			}
+
+			// Extract type from each processor and CPU
+			processors := []types.Processor{
+				hw.Gpu,
+				hw.Npu,
+				hw.Gcu,
+				hw.Mlu,
+				hw.Dcu,
+				hw.GPGpu,
+			}
+
+			for _, p := range processors {
+				if p.Type != "" && !typeSet[p.Type] {
+					typeSet[p.Type] = true
+					hardWareTypes = append(hardWareTypes, p.Type)
+				}
+			}
+
+			if hw.Cpu.Type != "" && !typeSet[hw.Cpu.Type] {
+				typeSet[hw.Cpu.Type] = true
+				hardWareTypes = append(hardWareTypes, hw.Cpu.Type)
+			}
+		}
+
+		// Move to next page
+		page++
+	}
+
+	return hardWareTypes, nil
 }

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -106,4 +107,29 @@ func TestSpaceResourceHandler_Delete(t *testing.T) {
 	tester.WithUser().WithParam("id", "1").Execute()
 
 	tester.ResponseEq(t, 200, tester.OKText, nil)
+}
+
+func TestSpaceResourceHandler_ListHardwareTypes(t *testing.T) {
+	t.Run("200", func(t *testing.T) {
+		tester := NewSpaceResourceTester(t).WithHandleFunc(func(h *SpaceResourceHandler) gin.HandlerFunc {
+			return h.ListHardwareTypes
+		})
+		tester.mocks.spaceResource.EXPECT().ListHardwareTypes(tester.Ctx(), "c1").Return(
+			[]string{"NVIDIA A100", "Intel Xeon"}, nil,
+		)
+		tester.WithQuery("cluster_id", "c1").WithUser().Execute()
+
+		tester.ResponseEq(t, 200, tester.OKText, []string{"NVIDIA A100", "Intel Xeon"})
+	})
+	t.Run("error", func(t *testing.T) {
+		tester := NewSpaceResourceTester(t).WithHandleFunc(func(h *SpaceResourceHandler) gin.HandlerFunc {
+			return h.ListHardwareTypes
+		})
+		tester.mocks.spaceResource.EXPECT().ListHardwareTypes(tester.Ctx(), "c1").Return(
+			nil, errors.New("database error"),
+		)
+		tester.WithQuery("cluster_id", "c1").WithUser().Execute()
+
+		tester.ResponseEq(t, 500, "database error", nil)
+	})
 }
