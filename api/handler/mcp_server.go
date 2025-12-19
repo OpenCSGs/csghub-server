@@ -390,10 +390,6 @@ func (h *MCPServerHandler) Deploy(ctx *gin.Context) {
 	req.MCPRepo.Namespace = namespace
 	req.MCPRepo.Name = name
 
-	if req.DefaultBranch == "" {
-		req.DefaultBranch = types.MainBranch
-	}
-
 	if len(req.Nickname) < 1 {
 		req.Nickname = req.Name
 	}

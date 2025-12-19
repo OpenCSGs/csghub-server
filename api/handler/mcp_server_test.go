@@ -171,7 +171,7 @@ func TestMCPServerHandler_Deploy(t *testing.T) {
 			Namespace:     "u1",
 			Name:          "r1",
 			Nickname:      "r1",
-			DefaultBranch: "main",
+			DefaultBranch: "",
 		},
 		ResourceID: 11,
 		ClusterID:  "ab45d3ba-a2ff-466e-887a-b2e5c0c070c5",
