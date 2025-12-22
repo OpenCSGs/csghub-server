@@ -22,6 +22,7 @@ type SpaceResourceStore interface {
 	FindByName(ctx context.Context, name string) (*SpaceResource, error)
 	FindAll(ctx context.Context) ([]SpaceResource, error)
 	FindAllResourceTypes(ctx context.Context, clusterId string) ([]string, error)
+	FindByHardwareType(ctx context.Context, hardwareType string) ([]SpaceResource, error)
 }
 
 func NewSpaceResourceStore() SpaceResourceStore {
@@ -167,4 +168,15 @@ func (s *spaceResourceStoreImpl) FindAllResourceTypes(ctx context.Context, clust
 	}
 
 	return hardWareTypes, nil
+}
+
+func (s *spaceResourceStoreImpl) FindByHardwareType(ctx context.Context, hardwareType string) ([]SpaceResource, error) {
+	var result []SpaceResource
+	err := s.db.Operator.Core.NewSelect().Model(&result).
+		Where("EXISTS (SELECT 1 FROM jsonb_each(resources::jsonb) WHERE value->>'type' = ?)", hardwareType).
+		Scan(ctx)
+	if err != nil {
+		return nil, errorx.HandleDBError(err, nil)
+	}
+	return result, nil
 }
