@@ -214,7 +214,7 @@ func TestMemberComponent_AddMember(t *testing.T) {
 
 func TestMemberComponent_Delete(t *testing.T) {
 
-	t.Run("delete member", func(t *testing.T) {
+	t.Run("delete admin member", func(t *testing.T) {
 		config := &config.Config{}
 		config.Notification.NotificationRetryCount = 3
 
@@ -248,7 +248,7 @@ func TestMemberComponent_Delete(t *testing.T) {
 		mockMemberStore.EXPECT().Find(mock.Anything, org.ID, operator.ID).Return(&database.Member{
 			Role: string(membership.RoleAdmin),
 		}, nil).Once()
-		// user is already a member
+		// user is already a member with admin role
 		mockMemberStore.EXPECT().Find(mock.Anything, org.ID, user.ID).Return(&database.Member{
 			ID:             1,
 			OrganizationID: org.ID,
@@ -286,6 +286,82 @@ func TestMemberComponent_Delete(t *testing.T) {
 		}
 
 		err := mc.Delete(context.Background(), org.Name, user.Username, operator.Username, string(membership.RoleAdmin))
+		require.Empty(t, err)
+		wg.Wait()
+	})
+
+	t.Run("delete non-admin member", func(t *testing.T) {
+		config := &config.Config{}
+		config.Notification.NotificationRetryCount = 3
+
+		org := &database.Organization{
+			ID:   1,
+			Name: "org1",
+		}
+		user := &database.User{
+			ID:       1,
+			Username: "user1",
+		}
+
+		operator := &database.User{
+			ID:       2,
+			Username: "op",
+		}
+
+		mockOrgStore := mockdb.NewMockOrgStore(t)
+		mockOrgStore.EXPECT().FindByPath(mock.Anything, org.Name).Return(*org, nil).Once()
+
+		mockUserStore := mockdb.NewMockUserStore(t)
+		mockUserStore.EXPECT().FindByUsername(mock.Anything, operator.Username).Return(*operator, nil).Once()
+		mockUserStore.EXPECT().FindByUsername(mock.Anything, user.Username).Return(*user, nil).Once()
+
+		mockMemberStore := mockdb.NewMockMemberStore(t)
+		mockMemberStore.EXPECT().UserUUIDsByOrganizationID(mock.Anything, org.ID).Return([]string{"user0"}, nil).Once()
+		mockMemberStore.EXPECT().
+			OrganizationMembers(context.Background(), int64(1), "", 1, 1).
+			Return(nil, 2, nil)
+		// operator is org admin
+		mockMemberStore.EXPECT().Find(mock.Anything, org.ID, operator.ID).Return(&database.Member{
+			Role: string(membership.RoleAdmin),
+		}, nil).Once()
+		// user is already a member with non-admin role (read role)
+		mockMemberStore.EXPECT().Find(mock.Anything, org.ID, user.ID).Return(&database.Member{
+			ID:             1,
+			OrganizationID: org.ID,
+			UserID:         user.ID,
+			Organization:   org,
+			User:           user,
+			Role:           string(membership.RoleRead),
+		}, nil).Once()
+		// delete user role
+		mockMemberStore.EXPECT().Delete(mock.Anything, org.ID, user.ID, string(membership.RoleRead)).Return(nil).Once()
+		mockNotificationRpc := mockrpc.NewMockNotificationSvcClient(t)
+		var wg sync.WaitGroup
+		wg.Add(1)
+		mockNotificationRpc.EXPECT().Send(mock.Anything, mock.MatchedBy(func(req *types.MessageRequest) bool {
+			defer wg.Done()
+			if req.Scenario != types.MessageScenarioOrgMember || req.Priority != types.MessagePriorityHigh {
+				return false
+			}
+
+			var msg types.NotificationMessage
+			if err := json.Unmarshal([]byte(req.Parameters), &msg); err != nil {
+				return false
+			}
+
+			return msg.NotificationType == types.NotificationOrganization &&
+				msg.Template == string(types.MessageScenarioOrgMember)
+		})).Return(nil).Once()
+
+		mc := &memberComponentImpl{
+			orgStore:              mockOrgStore,
+			userStore:             mockUserStore,
+			memberStore:           mockMemberStore,
+			config:                config,
+			notificationSvcClient: mockNotificationRpc,
+		}
+
+		err := mc.Delete(context.Background(), org.Name, user.Username, operator.Username, string(membership.RoleRead))
 		require.Empty(t, err)
 		wg.Wait()
 	})
