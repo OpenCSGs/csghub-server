@@ -20,6 +20,7 @@ const (
 	gitBranchNotFound
 	gitDeleteBranchFailed
 	gitCreateBranchFailed
+	gitSetDefaultBranchFailed
 	gitFileNotFound
 	gitUploadFailed
 	gitDownloadFailed
@@ -560,6 +561,15 @@ func CreateBranchFailed(err error, ctx context) error {
 	return CustomError{
 		prefix:  errGitPrefix,
 		code:    gitCreateBranchFailed,
+		err:     err,
+		context: ctx,
+	}
+}
+
+func SetDefaultBranchFailed(err error, ctx context) error {
+	return CustomError{
+		prefix:  errGitPrefix,
+		code:    gitSetDefaultBranchFailed,
 		err:     err,
 		context: ctx,
 	}

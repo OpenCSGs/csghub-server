@@ -108,6 +108,13 @@ type CreateBranchReq struct {
 	RepoType   types.RepositoryType `json:"repo_type"`
 }
 
+type SetDefaultBranchReq struct {
+	Namespace  string               `json:"namespace"`
+	Name       string               `json:"name"`
+	BranchName string               `json:"branch_name"`
+	RepoType   types.RepositoryType `json:"repo_type"`
+}
+
 type GetBranchReq struct {
 	Namespace string               `json:"namespace"`
 	Name      string               `json:"name"`

@@ -2399,6 +2399,53 @@ func (_c *MockGitServer_RepositoryExists_Call) RunAndReturn(run func(context.Con
 	return _c
 }
 
+// SetDefaultBranch provides a mock function with given fields: ctx, req
+func (_m *MockGitServer) SetDefaultBranch(ctx context.Context, req gitserver.SetDefaultBranchReq) error {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetDefaultBranch")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, gitserver.SetDefaultBranchReq) error); ok {
+		r0 = rf(ctx, req)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockGitServer_SetDefaultBranch_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SetDefaultBranch'
+type MockGitServer_SetDefaultBranch_Call struct {
+	*mock.Call
+}
+
+// SetDefaultBranch is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req gitserver.SetDefaultBranchReq
+func (_e *MockGitServer_Expecter) SetDefaultBranch(ctx interface{}, req interface{}) *MockGitServer_SetDefaultBranch_Call {
+	return &MockGitServer_SetDefaultBranch_Call{Call: _e.mock.On("SetDefaultBranch", ctx, req)}
+}
+
+func (_c *MockGitServer_SetDefaultBranch_Call) Run(run func(ctx context.Context, req gitserver.SetDefaultBranchReq)) *MockGitServer_SetDefaultBranch_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(gitserver.SetDefaultBranchReq))
+	})
+	return _c
+}
+
+func (_c *MockGitServer_SetDefaultBranch_Call) Return(_a0 error) *MockGitServer_SetDefaultBranch_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockGitServer_SetDefaultBranch_Call) RunAndReturn(run func(context.Context, gitserver.SetDefaultBranchReq) error) *MockGitServer_SetDefaultBranch_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // UpdateOrganization provides a mock function with given fields: _a0, _a1
 func (_m *MockGitServer) UpdateOrganization(_a0 *types.EditOrgReq, _a1 *database.Organization) (*database.Organization, error) {
 	ret := _m.Called(_a0, _a1)
