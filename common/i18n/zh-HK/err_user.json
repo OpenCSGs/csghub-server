@@ -1,0 +1,56 @@
+{
+    "error.USER-ERR-0": {
+        "other": "需要電話號碼"
+    },
+    "error.USER-ERR-1": {
+        "other": "新電話號碼必須與當前電話號碼不同"
+    },
+    "error.USER-ERR-10": {
+        "other": "驗證碼長度必須為6"
+    },
+    "error.USER-ERR-11": {
+        "other": "無效的電話號碼"
+    },
+    "error.USER-ERR-12": {
+        "other": "用戶名已存在"
+    },
+    "error.USER-ERR-13": {
+        "other": "電郵已存在"
+    },
+    "error.USER-ERR-14": {
+        "other": "管理員用戶不能被刪除"
+    },
+    "error.USER-ERR-15": {
+        "other": "擁有組織的用戶不能被刪除"
+    },
+    "error.USER-ERR-16": {
+        "other": "擁有部署資源的用戶不能被刪除"
+    },
+    "error.USER-ERR-17": {
+        "other": "擁有賬單的用戶不能被刪除"
+    },
+    "error.USER-ERR-2": {
+        "other": "新電話號碼已經存在於sso服務中"
+    },
+    "error.USER-ERR-3": {
+        "other": "禁止更改電話號碼"
+    },
+    "error.USER-ERR-4": {
+        "other": "更新電話號碼失敗"
+    },
+    "error.USER-ERR-5": {
+        "other": "禁止頻繁發送手機驗證碼"
+    },
+    "error.USER-ERR-6": {
+        "other": "發送手機驗證碼失敗"
+    },
+    "error.USER-ERR-7": {
+        "other": "手機驗證碼已過期或不存在"
+    },
+    "error.USER-ERR-8": {
+        "other": "手機驗證碼無效"
+    },
+    "error.USER-ERR-9": {
+        "other": "驗證碼不能為空"
+    }
+}

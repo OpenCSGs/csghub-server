@@ -43,6 +43,34 @@ type UpdateUserRequest struct {
 	TagIDs []int64 `json:"tag_ids,omitempty"`
 }
 
+type SendSMSCodeRequest struct {
+	PhoneArea string `json:"phone_area" binding:"required"`
+	Phone     string `json:"phone" binding:"required"`
+}
+
+type SendSMSCodeResponse struct {
+	ExpiredAt time.Time `json:"expired_at"`
+}
+
+type SendPublicSMSCodeRequest struct {
+	Scene     string `json:"scene" binding:"required"`
+	PhoneArea string `json:"phone_area" binding:"required"`
+	Phone     string `json:"phone" binding:"required"`
+}
+
+type VerifyPublicSMSCodeRequest struct {
+	Scene            string `json:"scene" binding:"required"`
+	Phone            string `json:"phone" binding:"required"`
+	PhoneArea        string `json:"phone_area" binding:"required"`
+	VerificationCode string `json:"verification_code" binding:"required,len=6"`
+}
+
+type UpdateUserPhoneRequest struct {
+	Phone            *string `json:"phone" binding:"required"`
+	PhoneArea        *string `json:"phone_area,omitempty"`
+	VerificationCode *string `json:"verification_code" binding:"required"`
+}
+
 var _ SensitiveRequestV2 = (*UpdateUserRequest)(nil)
 
 func (u *UpdateUserRequest) GetSensitiveFields() []SensitiveField {
@@ -299,4 +327,29 @@ func ParseLabels(rawLabels []string) []string {
 type CloseAccountReq struct {
 	Repository bool `json:"repository"`
 	Discussion bool `json:"discussion"`
+}
+
+type UserIndexReq struct {
+	Search       string       `json:"search"`
+	VerifyStatus VerifyStatus `json:"verify_status"`
+	Labels       []string     `json:"labels"`
+	Per          int          `json:"per"`
+	ExactMatch   bool         `json:"exact_match"`
+}
+
+type UserIndexResp struct {
+	Users []*User `json:"users"`
+	Error error   `json:"error"`
+}
+
+type UserListReq struct {
+	VisitorName  string   `json:"visitor_name"`
+	Search       string   `json:"search"`
+	VerifyStatus string   `json:"verify_status"`
+	Labels       []string `json:"labels"`
+	Per          int      `json:"per"`
+	Page         int      `json:"page"`
+	SortBy       string   `json:"sort_by"`
+	SortOrder    string   `json:"sort_order"`
+	ExactMatch   bool     `json:"exact_match"`
 }

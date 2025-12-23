@@ -1,0 +1,56 @@
+{
+    "error.USER-ERR-0": {
+        "other": "Phone number is required"
+    },
+    "error.USER-ERR-1": {
+        "other": "New phone number must be different from current phone number"
+    },
+    "error.USER-ERR-10": {
+        "other": "Verification code length must be 6"
+    },
+    "error.USER-ERR-11": {
+        "other": "Invalid phone number"
+    },
+    "error.USER-ERR-12": {
+        "other": "Username already exists"
+    },
+    "error.USER-ERR-13": {
+        "other": "Email already exists"
+    },
+    "error.USER-ERR-14": {
+        "other": "Admin user cannot be deleted"
+    },
+    "error.USER-ERR-15": {
+        "other": "User who owns organizations cannot be deleted"
+    },
+    "error.USER-ERR-16": {
+        "other": "User who owns deployments cannot be deleted"
+    },
+    "error.USER-ERR-17": {
+        "other": "User who owns bills cannot be deleted"
+    },
+    "error.USER-ERR-2": {
+        "other": "New phone number already exists in sso service"
+    },
+    "error.USER-ERR-3": {
+        "other": "Forbid change phone number"
+    },
+    "error.USER-ERR-4": {
+        "other": "Failed to update phone number"
+    },
+    "error.USER-ERR-5": {
+        "other": "Forbid send phone verify code frequently"
+    },
+    "error.USER-ERR-6": {
+        "other": "Failed to send phone verify code"
+    },
+    "error.USER-ERR-7": {
+        "other": "Phone verify code expired or not found"
+    },
+    "error.USER-ERR-8": {
+        "other": "Phone verify code is invalid"
+    },
+    "error.USER-ERR-9": {
+        "other": "Verification code can not be empty"
+    }
+}

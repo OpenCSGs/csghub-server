@@ -764,6 +764,65 @@ func (_c *MockUserStore_Index_Call) RunAndReturn(run func(context.Context) ([]da
 	return _c
 }
 
+// IndexWithCursor provides a mock function with given fields: ctx, req
+func (_m *MockUserStore) IndexWithCursor(ctx context.Context, req types.UserIndexReq) (chan database.Wrapper, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for IndexWithCursor")
+	}
+
+	var r0 chan database.Wrapper
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.UserIndexReq) (chan database.Wrapper, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.UserIndexReq) chan database.Wrapper); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(chan database.Wrapper)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.UserIndexReq) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockUserStore_IndexWithCursor_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'IndexWithCursor'
+type MockUserStore_IndexWithCursor_Call struct {
+	*mock.Call
+}
+
+// IndexWithCursor is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.UserIndexReq
+func (_e *MockUserStore_Expecter) IndexWithCursor(ctx interface{}, req interface{}) *MockUserStore_IndexWithCursor_Call {
+	return &MockUserStore_IndexWithCursor_Call{Call: _e.mock.On("IndexWithCursor", ctx, req)}
+}
+
+func (_c *MockUserStore_IndexWithCursor_Call) Run(run func(ctx context.Context, req types.UserIndexReq)) *MockUserStore_IndexWithCursor_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.UserIndexReq))
+	})
+	return _c
+}
+
+func (_c *MockUserStore_IndexWithCursor_Call) Return(ch chan database.Wrapper, err error) *MockUserStore_IndexWithCursor_Call {
+	_c.Call.Return(ch, err)
+	return _c
+}
+
+func (_c *MockUserStore_IndexWithCursor_Call) RunAndReturn(run func(context.Context, types.UserIndexReq) (chan database.Wrapper, error)) *MockUserStore_IndexWithCursor_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // IndexWithDeleted provides a mock function with given fields: ctx
 func (_m *MockUserStore) IndexWithDeleted(ctx context.Context) ([]database.User, error) {
 	ret := _m.Called(ctx)
@@ -822,9 +881,9 @@ func (_c *MockUserStore_IndexWithDeleted_Call) RunAndReturn(run func(context.Con
 	return _c
 }
 
-// IndexWithSearch provides a mock function with given fields: ctx, search, verifyStatus, labels, per, page
-func (_m *MockUserStore) IndexWithSearch(ctx context.Context, search string, verifyStatus string, labels []string, per int, page int) ([]database.User, int, error) {
-	ret := _m.Called(ctx, search, verifyStatus, labels, per, page)
+// IndexWithSearch provides a mock function with given fields: ctx, req
+func (_m *MockUserStore) IndexWithSearch(ctx context.Context, req types.UserListReq) ([]database.User, int, error) {
+	ret := _m.Called(ctx, req)
 
 	if len(ret) == 0 {
 		panic("no return value specified for IndexWithSearch")
@@ -833,25 +892,25 @@ func (_m *MockUserStore) IndexWithSearch(ctx context.Context, search string, ver
 	var r0 []database.User
 	var r1 int
 	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, []string, int, int) ([]database.User, int, error)); ok {
-		return rf(ctx, search, verifyStatus, labels, per, page)
+	if rf, ok := ret.Get(0).(func(context.Context, types.UserListReq) ([]database.User, int, error)); ok {
+		return rf(ctx, req)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, []string, int, int) []database.User); ok {
-		r0 = rf(ctx, search, verifyStatus, labels, per, page)
+	if rf, ok := ret.Get(0).(func(context.Context, types.UserListReq) []database.User); ok {
+		r0 = rf(ctx, req)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]database.User)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, string, []string, int, int) int); ok {
-		r1 = rf(ctx, search, verifyStatus, labels, per, page)
+	if rf, ok := ret.Get(1).(func(context.Context, types.UserListReq) int); ok {
+		r1 = rf(ctx, req)
 	} else {
 		r1 = ret.Get(1).(int)
 	}
 
-	if rf, ok := ret.Get(2).(func(context.Context, string, string, []string, int, int) error); ok {
-		r2 = rf(ctx, search, verifyStatus, labels, per, page)
+	if rf, ok := ret.Get(2).(func(context.Context, types.UserListReq) error); ok {
+		r2 = rf(ctx, req)
 	} else {
 		r2 = ret.Error(2)
 	}
@@ -866,18 +925,14 @@ type MockUserStore_IndexWithSearch_Call struct {
 
 // IndexWithSearch is a helper method to define mock.On call
 //   - ctx context.Context
-//   - search string
-//   - verifyStatus string
-//   - labels []string
-//   - per int
-//   - page int
-func (_e *MockUserStore_Expecter) IndexWithSearch(ctx interface{}, search interface{}, verifyStatus interface{}, labels interface{}, per interface{}, page interface{}) *MockUserStore_IndexWithSearch_Call {
-	return &MockUserStore_IndexWithSearch_Call{Call: _e.mock.On("IndexWithSearch", ctx, search, verifyStatus, labels, per, page)}
+//   - req types.UserListReq
+func (_e *MockUserStore_Expecter) IndexWithSearch(ctx interface{}, req interface{}) *MockUserStore_IndexWithSearch_Call {
+	return &MockUserStore_IndexWithSearch_Call{Call: _e.mock.On("IndexWithSearch", ctx, req)}
 }
 
-func (_c *MockUserStore_IndexWithSearch_Call) Run(run func(ctx context.Context, search string, verifyStatus string, labels []string, per int, page int)) *MockUserStore_IndexWithSearch_Call {
+func (_c *MockUserStore_IndexWithSearch_Call) Run(run func(ctx context.Context, req types.UserListReq)) *MockUserStore_IndexWithSearch_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].([]string), args[4].(int), args[5].(int))
+		run(args[0].(context.Context), args[1].(types.UserListReq))
 	})
 	return _c
 }
@@ -887,7 +942,7 @@ func (_c *MockUserStore_IndexWithSearch_Call) Return(_a0 []database.User, _a1 in
 	return _c
 }
 
-func (_c *MockUserStore_IndexWithSearch_Call) RunAndReturn(run func(context.Context, string, string, []string, int, int) ([]database.User, int, error)) *MockUserStore_IndexWithSearch_Call {
+func (_c *MockUserStore_IndexWithSearch_Call) RunAndReturn(run func(context.Context, types.UserListReq) ([]database.User, int, error)) *MockUserStore_IndexWithSearch_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1203,6 +1258,55 @@ func (_c *MockUserStore_UpdateLabels_Call) Return(_a0 error) *MockUserStore_Upda
 }
 
 func (_c *MockUserStore_UpdateLabels_Call) RunAndReturn(run func(context.Context, string, []string) error) *MockUserStore_UpdateLabels_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// UpdatePhone provides a mock function with given fields: ctx, userID, phone, phoneArea
+func (_m *MockUserStore) UpdatePhone(ctx context.Context, userID int64, phone string, phoneArea string) error {
+	ret := _m.Called(ctx, userID, phone, phoneArea)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdatePhone")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64, string, string) error); ok {
+		r0 = rf(ctx, userID, phone, phoneArea)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockUserStore_UpdatePhone_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdatePhone'
+type MockUserStore_UpdatePhone_Call struct {
+	*mock.Call
+}
+
+// UpdatePhone is a helper method to define mock.On call
+//   - ctx context.Context
+//   - userID int64
+//   - phone string
+//   - phoneArea string
+func (_e *MockUserStore_Expecter) UpdatePhone(ctx interface{}, userID interface{}, phone interface{}, phoneArea interface{}) *MockUserStore_UpdatePhone_Call {
+	return &MockUserStore_UpdatePhone_Call{Call: _e.mock.On("UpdatePhone", ctx, userID, phone, phoneArea)}
+}
+
+func (_c *MockUserStore_UpdatePhone_Call) Run(run func(ctx context.Context, userID int64, phone string, phoneArea string)) *MockUserStore_UpdatePhone_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64), args[2].(string), args[3].(string))
+	})
+	return _c
+}
+
+func (_c *MockUserStore_UpdatePhone_Call) Return(_a0 error) *MockUserStore_UpdatePhone_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockUserStore_UpdatePhone_Call) RunAndReturn(run func(context.Context, int64, string, string) error) *MockUserStore_UpdatePhone_Call {
 	_c.Call.Return(run)
 	return _c
 }

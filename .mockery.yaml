@@ -80,6 +80,7 @@ packages:
       UserComponent:
       AccessTokenComponent:
       InvitationComponent:
+      UserPhoneComponent:
   opencsg.com/csghub-server/payment/component:
     config:
     interfaces:

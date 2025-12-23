@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/casdoor/casdoor-go-sdk/casdoorsdk"
 	"golang.org/x/oauth2"
 	"opencsg.com/csghub-server/common/errorx"
+	"opencsg.com/csghub-server/common/utils/common"
 )
 
 type casdoorClientImpl struct {
@@ -44,6 +46,18 @@ func (c *casdoorClientImpl) UpdateUserInfo(ctx context.Context, userInfo *SSOUpd
 	}
 	if userInfo.Phone != "" {
 		casu.Phone = userInfo.Phone
+	}
+
+	if userInfo.PhoneArea != "" {
+		if !strings.HasPrefix(userInfo.PhoneArea, "+") {
+			userInfo.PhoneArea = "+" + userInfo.PhoneArea
+		}
+		countryCode, err := common.GetCountryCodeByPhoneArea(casu.Phone, userInfo.PhoneArea)
+		if err != nil {
+			slog.Error("failed to get country code by phone area", "phone area", userInfo.PhoneArea, "error", err)
+			return fmt.Errorf("failed to get country code by phone area:%s", userInfo.PhoneArea)
+		}
+		casu.CountryCode = countryCode
 	}
 
 	// casdoor update user api don't allow empty display name, so we set it

@@ -263,200 +263,200 @@ This document lists all the custom error codes defined in the project, categoriz
 ### `GIT-ERR-13`
 
 - **Error Code:** `GIT-ERR-13`
-- **Error Name:** `gitFileNotFound`
-- **Description:** The requested file could not be found at the specified path within the given branch or commit of the Git repository.
+- **Error Name:** `gitCreateBranchFailed`
+- **Description:** 
 
 ---
 
 ### `GIT-ERR-14`
 
 - **Error Code:** `GIT-ERR-14`
-- **Error Name:** `gitUploadFailed`
-- **Description:** An error occurred while attempting to upload a file to the Git repository.
+- **Error Name:** `gitSetDefaultBranchFailed`
+- **Description:** 
 
 ---
 
 ### `GIT-ERR-15`
 
 - **Error Code:** `GIT-ERR-15`
-- **Error Name:** `gitDownloadFailed`
-- **Description:** An error occurred while attempting to download a file from the Git repository. Check file path, permissions, and network connectivity.
+- **Error Name:** `gitFileNotFound`
+- **Description:** The requested file could not be found at the specified path within the given branch or commit of the Git repository.
 
 ---
 
 ### `GIT-ERR-16`
 
 - **Error Code:** `GIT-ERR-16`
-- **Error Name:** `gitConnectionFailed`
-- **Description:** A connection to the remote Git server could not be established. Please check your network connection, firewall settings, and the remote server's status.
+- **Error Name:** `gitUploadFailed`
+- **Description:** An error occurred while attempting to upload a file to the Git repository.
 
 ---
 
 ### `GIT-ERR-17`
 
 - **Error Code:** `GIT-ERR-17`
-- **Error Name:** `gitLfsError`
-- **Description:** An unspecified error occurred during a Git LFS (Large File Storage) operation. Check LFS configuration and logs for more details.
+- **Error Name:** `gitDownloadFailed`
+- **Description:** An error occurred while attempting to download a file from the Git repository. Check file path, permissions, and network connectivity.
 
 ---
 
 ### `GIT-ERR-18`
 
 - **Error Code:** `GIT-ERR-18`
-- **Error Name:** `fileTooLarge`
-- **Description:** The file exceeds the configured maximum size limit for this operation. Consider using Git LFS for large files.
+- **Error Name:** `gitConnectionFailed`
+- **Description:** A connection to the remote Git server could not be established. Please check your network connection, firewall settings, and the remote server's status.
 
 ---
 
 ### `GIT-ERR-19`
 
 - **Error Code:** `GIT-ERR-19`
-- **Error Name:** `gitGetTreeEntryFailed`
-- **Description:** Get git tree entry failed. This can be caused by network problems, authentication issues, or the specified tree entry does not exist.
+- **Error Name:** `gitLfsError`
+- **Description:** An unspecified error occurred during a Git LFS (Large File Storage) operation. Check LFS configuration and logs for more details.
 
 ---
 
 ### `GIT-ERR-20`
 
 - **Error Code:** `GIT-ERR-20`
-- **Error Name:** `gitCommitFilesFailed`
-- **Description:** Commit git files failed. This can be caused by network problems, authentication issues, or the specified files do not exist.
+- **Error Name:** `fileTooLarge`
+- **Description:** The file exceeds the configured maximum size limit for this operation. Consider using Git LFS for large files.
 
 ---
 
 ### `GIT-ERR-21`
 
 - **Error Code:** `GIT-ERR-21`
-- **Error Name:** `gitGetBlobsFailed`
-- **Description:** Get git blobs failed. This can be caused by network problems, authentication issues, or the specified blobs do not exist.
+- **Error Name:** `gitGetTreeEntryFailed`
+- **Description:** Get git tree entry failed. This can be caused by network problems, authentication issues, or the specified tree entry does not exist.
 
 ---
 
 ### `GIT-ERR-22`
 
 - **Error Code:** `GIT-ERR-22`
-- **Error Name:** `gitGetLfsPointersFailed`
-- **Description:** Get git lfs pointers failed. This can be caused by network problems, authentication issues, or the specified lfs pointers do not exist.
+- **Error Name:** `gitCommitFilesFailed`
+- **Description:** Commit git files failed. This can be caused by network problems, authentication issues, or the specified files do not exist.
 
 ---
 
 ### `GIT-ERR-23`
 
 - **Error Code:** `GIT-ERR-23`
-- **Error Name:** `gitListLastCommitsForTreeFailed`
-- **Description:** Get git tree last commit failed. This can be caused by network problems, authentication issues, or the specified tree does not exist.
+- **Error Name:** `gitGetBlobsFailed`
+- **Description:** Get git blobs failed. This can be caused by network problems, authentication issues, or the specified blobs do not exist.
 
 ---
 
 ### `GIT-ERR-24`
 
 - **Error Code:** `GIT-ERR-24`
-- **Error Name:** `gitGetBlobInfoFailed`
-- **Description:** Get git blob info failed. This can be caused by network problems, authentication issues, or the specified blob does not exist.
+- **Error Name:** `gitGetLfsPointersFailed`
+- **Description:** Get git lfs pointers failed. This can be caused by network problems, authentication issues, or the specified lfs pointers do not exist.
 
 ---
 
 ### `GIT-ERR-25`
 
 - **Error Code:** `GIT-ERR-25`
-- **Error Name:** `gitListFilesFailed`
-- **Description:** Get git files failed. This can be caused by network problems, authentication issues, or the specified files do not exist.
+- **Error Name:** `gitListLastCommitsForTreeFailed`
+- **Description:** Get git tree last commit failed. This can be caused by network problems, authentication issues, or the specified tree does not exist.
 
 ---
 
 ### `GIT-ERR-26`
 
 - **Error Code:** `GIT-ERR-26`
-- **Error Name:** `gitCreateMirrorFailed`
-- **Description:** Create mirror failed. This can be caused by network problems, authentication issues, or the specified repository does not exist.
+- **Error Name:** `gitGetBlobInfoFailed`
+- **Description:** Get git blob info failed. This can be caused by network problems, authentication issues, or the specified blob does not exist.
 
 ---
 
 ### `GIT-ERR-27`
 
 - **Error Code:** `GIT-ERR-27`
-- **Error Name:** `gitMirrorSyncFailed`
-- **Description:** Sync mirror failed. This can be caused by network problems, authentication issues, or the specified repository does not exist.
+- **Error Name:** `gitListFilesFailed`
+- **Description:** Get git files failed. This can be caused by network problems, authentication issues, or the specified files do not exist.
 
 ---
 
 ### `GIT-ERR-28`
 
 - **Error Code:** `GIT-ERR-28`
-- **Error Name:** `gitCheckRepositoryExistsFailed`
-- **Description:** Check repository exists failed. This can be caused by network problems, authentication issues, or the specified repository does not exist.
+- **Error Name:** `gitCreateMirrorFailed`
+- **Description:** Create mirror failed. This can be caused by network problems, authentication issues, or the specified repository does not exist.
 
 ---
 
 ### `GIT-ERR-29`
 
 - **Error Code:** `GIT-ERR-29`
-- **Error Name:** `gitCreateRepositoryFailed`
-- **Description:** Create repository failed. This can be caused by network problems, authentication issues.
+- **Error Name:** `gitMirrorSyncFailed`
+- **Description:** Sync mirror failed. This can be caused by network problems, authentication issues, or the specified repository does not exist.
 
 ---
 
 ### `GIT-ERR-30`
 
 - **Error Code:** `GIT-ERR-30`
-- **Error Name:** `gitDeleteRepositoryFailed`
-- **Description:** delete repository failed. This can be caused by network problems, authentication issues, or the specified repository does not exist.
+- **Error Name:** `gitCheckRepositoryExistsFailed`
+- **Description:** Check repository exists failed. This can be caused by network problems, authentication issues, or the specified repository does not exist.
 
 ---
 
 ### `GIT-ERR-31`
 
 - **Error Code:** `GIT-ERR-31`
-- **Error Name:** `gitGetRepositoryFailed`
-- **Description:** get repository failed. This can be caused by network problems, authentication issues, or the specified repository does not exist.
+- **Error Name:** `gitCreateRepositoryFailed`
+- **Description:** Create repository failed. This can be caused by network problems, authentication issues.
 
 ---
 
 ### `GIT-ERR-32`
 
 - **Error Code:** `GIT-ERR-32`
-- **Error Name:** `gitServiceUnavaliable`
-- **Description:** The Git hosting service is temporarily unavailable or unreachable. Please try again later.
+- **Error Name:** `gitDeleteRepositoryFailed`
+- **Description:** delete repository failed. This can be caused by network problems, authentication issues, or the specified repository does not exist.
 
 ---
 
 ### `GIT-ERR-33`
 
 - **Error Code:** `GIT-ERR-33`
-- **Error Name:** `gitCopyRepositoryFailed`
-- **Description:** copy repository failed. This can be caused by network problems, authentication issues, or the specified repository does not exist.
+- **Error Name:** `gitGetRepositoryFailed`
+- **Description:** get repository failed. This can be caused by network problems, authentication issues, or the specified repository does not exist.
 
 ---
 
 ### `GIT-ERR-34`
 
 - **Error Code:** `GIT-ERR-34`
+- **Error Name:** `gitServiceUnavaliable`
+- **Description:** The Git hosting service is temporarily unavailable or unreachable. Please try again later.
+
+---
+
+### `GIT-ERR-35`
+
+- **Error Code:** `GIT-ERR-35`
+- **Error Name:** `gitCopyRepositoryFailed`
+- **Description:** copy repository failed. This can be caused by network problems, authentication issues, or the specified repository does not exist.
+
+---
+
+### `GIT-ERR-36`
+
+- **Error Code:** `GIT-ERR-36`
 - **Error Name:** `gitReplicateRepositoryFailed`
 - **Description:** replicate repository failed. This can be caused by network problems, authentication issues, or the specified repository does not exist.
 
-## Invitation Errors
-
-### `INVITATION-ERR-0`
-
-- **Error Code:** `INVITATION-ERR-0`
-- **Error Name:** `userPhoneNotSet`
-- **Description:** The phone number is not set, cannot create invitation code.
-
 ---
 
-### `INVITATION-ERR-1`
+### `GIT-ERR-37`
 
-- **Error Code:** `INVITATION-ERR-1`
-- **Error Name:** `invitationNotFound`
-- **Description:** The invitation not found.
-
----
-
-### `INVITATION-ERR-2`
-
-- **Error Code:** `INVITATION-ERR-2`
-- **Error Name:** `userAlreadyHasInvitationCode`
-- **Description:** The invitation code already exists.
+- **Error Code:** `GIT-ERR-37`
+- **Error Name:** `gitUsingGitInXnetRepository`
+- **Description:** Using git in xnet-enabled repository error. Git operations are not supported in repositories enabled with xnet.
 
 ## License Errors
 
@@ -465,30 +465,6 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Code:** `LICENSE-ERR-0`
 - **Error Name:** `noActiveLicense`
 - **Description:** No active license found for the current system.
-
----
-
-### `LICENSE-ERR-1`
-
-- **Error Code:** `LICENSE-ERR-1`
-- **Error Name:** `licenseExpired`
-- **Description:** The license is expired, could not be verified and imported.
-
-## Moderation Errors
-
-### `MOD-ERR-0`
-
-- **Error Code:** `MOD-ERR-0`
-- **Error Name:** `codeNameRequire`
-- **Description:** The request parameter does not match the server requirements, and the server cannot process the request.
-
----
-
-### `MOD-ERR-1`
-
-- **Error Code:** `MOD-ERR-1`
-- **Error Name:** `codeWordRequire`
-- **Description:** The request parameter does not match the server requirements, and the server cannot process the request.
 
 ## Req Errors
 
@@ -577,22 +553,6 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Code:** `REQ-ERR-10`
 - **Error Name:** `errRateLimitExceeded`
 - **Description:** The user has sent too many requests in a given amount of time. Further requests will be blocked until the rate limit resets or a valid captcha is provided.
-
----
-
-### `REQ-ERR-11`
-
-- **Error Code:** `REQ-ERR-11`
-- **Error Name:** `errLimitedIPLocation`
-- **Description:** Requests originating from this IP location are restricted. To proceed, please complete a captcha verification.
-
----
-
-### `REQ-ERR-12`
-
-- **Error Code:** `REQ-ERR-12`
-- **Error Name:** `errCaptchaIncorrect`
-- **Description:** The provided captcha verification failed. Please try again with a valid captcha.
 
 ## Runner Errors
 
@@ -810,22 +770,6 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Name:** `multiHostNotebookNotSupported`
 - **Description:** The multi-host notebook feature (running notebook tasks across multiple hosts) is not supported.
 
----
-
-### `TASK-ERR-4`
-
-- **Error Code:** `TASK-ERR-4`
-- **Error Name:** `notEnoughResource`
-- **Description:** The task requires more resources than are available in the cluster. This error occurs when the cluster does not have sufficient capacity to run the task.
-
----
-
-### `TASK-ERR-5`
-
-- **Error Code:** `TASK-ERR-5`
-- **Error Name:** `clusterUnavailable`
-- **Description:** The cluster is currently unavailable, either due to maintenance or other reasons. This error occurs when the cluster is not ready to accept new tasks.
-
 ## User Errors
 
 ### `USER-ERR-0`
@@ -937,4 +881,36 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Code:** `USER-ERR-13`
 - **Error Name:** `emailExists`
 - **Description:** The email address provided already exists in the system.
+
+---
+
+### `USER-ERR-14`
+
+- **Error Code:** `USER-ERR-14`
+- **Error Name:** `adminUserCannotBeDeleted`
+- **Description:** The admin user cannot be deleted.
+
+---
+
+### `USER-ERR-15`
+
+- **Error Code:** `USER-ERR-15`
+- **Error Name:** `userHasOrganizations`
+- **Description:** The user who owns organizations cannot be deleted.
+
+---
+
+### `USER-ERR-16`
+
+- **Error Code:** `USER-ERR-16`
+- **Error Name:** `userHasDeployments`
+- **Description:** The user who owns deployments cannot be deleted.
+
+---
+
+### `USER-ERR-17`
+
+- **Error Code:** `USER-ERR-17`
+- **Error Name:** `userHasBills`
+- **Description:** The user who owns bills cannot be deleted.
 

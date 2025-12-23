@@ -14,77 +14,80 @@
     "error.GIT-ERR-12": {
         "other": "Failed to delete branch"
     },
-    "error.GIT-ERR-13": {
+    "error.GIT-ERR-15": {
         "other": "File not found in repository"
     },
-    "error.GIT-ERR-14": {
+    "error.GIT-ERR-16": {
         "other": "File upload failed"
     },
-    "error.GIT-ERR-15": {
+    "error.GIT-ERR-17": {
         "other": "File download failed"
     },
-    "error.GIT-ERR-16": {
+    "error.GIT-ERR-18": {
         "other": "Failed to connect to Git server"
     },
-    "error.GIT-ERR-17": {
-        "other": "Git LFS operation failed"
-    },
-    "error.GIT-ERR-18": {
-        "other": "File is too large"
-    },
     "error.GIT-ERR-19": {
-        "other": "Get git tree entry failed"
+        "other": "Git LFS operation failed"
     },
     "error.GIT-ERR-2": {
         "other": "Failed to push changes to repository"
     },
     "error.GIT-ERR-20": {
-        "other": "Commit git files failed"
+        "other": "File is too large"
     },
     "error.GIT-ERR-21": {
-        "other": "Get git blobs failed"
+        "other": "Get git tree entry failed"
     },
     "error.GIT-ERR-22": {
-        "other": "Get git lfs pointers failed"
+        "other": "Commit git files failed"
     },
     "error.GIT-ERR-23": {
-        "other": "Get git tree last commit failed"
+        "other": "Get git blobs failed"
     },
     "error.GIT-ERR-24": {
-        "other": "Get git blob info failed"
+        "other": "Get git lfs pointers failed"
     },
     "error.GIT-ERR-25": {
-        "other": "Get git files failed"
+        "other": "Get git tree last commit failed"
     },
     "error.GIT-ERR-26": {
-        "other": "Create mirror failed"
+        "other": "Get git blob info failed"
     },
     "error.GIT-ERR-27": {
-        "other": "Sync mirror failed"
+        "other": "Get git files failed"
     },
     "error.GIT-ERR-28": {
-        "other": "Check repository exists failed"
+        "other": "Create mirror failed"
     },
     "error.GIT-ERR-29": {
-        "other": "Create repository failed"
+        "other": "Sync mirror failed"
     },
     "error.GIT-ERR-3": {
         "other": "Failed to commit changes"
     },
     "error.GIT-ERR-30": {
-        "other": "delete repository failed"
+        "other": "Check repository exists failed"
     },
     "error.GIT-ERR-31": {
-        "other": "get repository failed"
+        "other": "Create repository failed"
     },
     "error.GIT-ERR-32": {
-        "other": "Git service is unavailable"
+        "other": "delete repository failed"
     },
     "error.GIT-ERR-33": {
-        "other": "copy repository failed"
+        "other": "get repository failed"
     },
     "error.GIT-ERR-34": {
+        "other": "Git service is unavailable"
+    },
+    "error.GIT-ERR-35": {
+        "other": "copy repository failed"
+    },
+    "error.GIT-ERR-36": {
         "other": "replicate repository failed"
+    },
+    "error.GIT-ERR-37": {
+        "other": "Using git in xnet-enabled repository error"
     },
     "error.GIT-ERR-4": {
         "other": "Failed to find commit"

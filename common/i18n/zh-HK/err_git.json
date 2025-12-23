@@ -14,77 +14,80 @@
     "error.GIT-ERR-12": {
         "other": "刪除分支失敗"
     },
-    "error.GIT-ERR-13": {
+    "error.GIT-ERR-15": {
         "other": "在儲存庫中未找到該檔案"
     },
-    "error.GIT-ERR-14": {
+    "error.GIT-ERR-16": {
         "other": "檔案上傳失敗"
     },
-    "error.GIT-ERR-15": {
+    "error.GIT-ERR-17": {
         "other": "檔案下載失敗"
     },
-    "error.GIT-ERR-16": {
+    "error.GIT-ERR-18": {
         "other": "連接Git伺服器失敗"
     },
-    "error.GIT-ERR-17": {
-        "other": "Git LFS操作失敗"
-    },
-    "error.GIT-ERR-18": {
-        "other": "檔案過大"
-    },
     "error.GIT-ERR-19": {
-        "other": "獲取 git tree entry 失敗"
+        "other": "Git LFS操作失敗"
     },
     "error.GIT-ERR-2": {
         "other": "推送更新到儲存庫失敗"
     },
     "error.GIT-ERR-20": {
-        "other": "提交 git 文件失敗"
+        "other": "檔案過大"
     },
     "error.GIT-ERR-21": {
-        "other": "獲取 git blobs 失敗"
+        "other": "獲取 git tree entry 失敗"
     },
     "error.GIT-ERR-22": {
-        "other": "獲取 git lfs pointers 失敗"
+        "other": "提交 git 文件失敗"
     },
     "error.GIT-ERR-23": {
-        "other": "獲取 git tree 最後一次提交失敗"
+        "other": "獲取 git blobs 失敗"
     },
     "error.GIT-ERR-24": {
-        "other": "獲取 git blob 信息失敗"
+        "other": "獲取 git lfs pointers 失敗"
     },
     "error.GIT-ERR-25": {
-        "other": "獲取 git 文件失敗"
+        "other": "獲取 git tree 最後一次提交失敗"
     },
     "error.GIT-ERR-26": {
-        "other": "建立鏡像失敗"
+        "other": "獲取 git blob 信息失敗"
     },
     "error.GIT-ERR-27": {
-        "other": "同步鏡像失敗"
+        "other": "獲取 git 文件失敗"
     },
     "error.GIT-ERR-28": {
-        "other": "檢查倉庫是否存在失敗"
+        "other": "建立鏡像失敗"
     },
     "error.GIT-ERR-29": {
-        "other": "創建倉庫失敗"
+        "other": "同步鏡像失敗"
     },
     "error.GIT-ERR-3": {
         "other": "提交變更失敗"
     },
     "error.GIT-ERR-30": {
-        "other": "刪除倉庫失敗"
+        "other": "檢查倉庫是否存在失敗"
     },
     "error.GIT-ERR-31": {
-        "other": "取得倉庫失敗"
+        "other": "創建倉庫失敗"
     },
     "error.GIT-ERR-32": {
-        "other": "Git服務不可用"
+        "other": "刪除倉庫失敗"
     },
     "error.GIT-ERR-33": {
-        "other": "複製倉庫失敗"
+        "other": "取得倉庫失敗"
     },
     "error.GIT-ERR-34": {
+        "other": "Git服務不可用"
+    },
+    "error.GIT-ERR-35": {
+        "other": "複製倉庫失敗"
+    },
+    "error.GIT-ERR-36": {
         "other": "转移倉庫失敗"
+    },
+    "error.GIT-ERR-37": {
+        "other": "在 xnet 啟用的倉庫中使用 git 失敗"
     },
     "error.GIT-ERR-4": {
         "other": "查找提交失敗"
