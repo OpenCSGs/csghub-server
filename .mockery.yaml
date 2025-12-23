@@ -282,6 +282,12 @@ packages:
     interfaces:
       NotificationComponent:
       MailComponent:
+  opencsg.com/csghub-server/notification/notifychannel/channel/lark/cache:
+    interfaces:
+      LarkCache:
+  opencsg.com/csghub-server/notification/notifychannel/channel/lark/client:
+    interfaces:
+      LarkService:
   opencsg.com/csghub-server/runner/component:
     config:
     interfaces:

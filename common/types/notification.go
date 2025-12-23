@@ -185,6 +185,24 @@ const (
 	LarkMessageReceiveIDTypeChatID LarkMessageReceiveIDType = "chat_id"
 )
 
+func (t LarkMessageReceiveIDType) String() string {
+	return string(t)
+}
+
+func (t LarkMessageReceiveIDType) IsValid() bool {
+	switch t {
+	case LarkMessageReceiveIDTypeOpenID, LarkMessageReceiveIDTypeChatID:
+		return true
+	default:
+		return false
+	}
+}
+
+type LarkReceiver struct {
+	Type LarkMessageReceiveIDType `json:"type"`
+	ID   string                   `json:"id"`
+}
+
 type LarkMessage struct {
 	Priority      LarkMessagePriority      `json:"priority"`
 	MsgType       LarkMessageType          `json:"msg_type"`

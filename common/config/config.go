@@ -420,6 +420,7 @@ type Config struct {
 		MailerRechargeAdmin                 string `env:"STARHUB_SERVER_MAILER_RECHARGE_ADMIN" default:"contact@opencsg.com"`
 		MailerWeeklyRechargesMail           string `env:"STARHUB_SERVER_MAILER_WEEKLY_RECHARGES_MAIL" default:"reconcile@opencsg.com"`
 		RepoSyncTimezone                    string `env:"STARHUB_SERVER_REPO_SYNC_TIMEZONE" default:"Asia/Shanghai"`
+		RepoSyncChatID                      string `env:"STARHUB_SERVER_REPO_SYNC_CHAT_ID" default:""`
 		NotificationRetryCount              int    `env:"STARHUB_SERVER_NOTIFIER_NOTIFICATION_RETRY_COUNT" default:"3"`
 		BroadcastUserPageSize               int    `env:"STARHUB_SERVER_NOTIFIER_BROADCAST_USER_PAGE_SIZE" default:"100"`
 		BroadcastEmailPageSize              int    `env:"STARHUB_SERVER_NOTIFIER_BROADCAST_EMAIL_PAGE_SIZE" default:"100"`
