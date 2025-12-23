@@ -678,35 +678,6 @@ func TestRepoHandler_CreateMirror(t *testing.T) {
 	tester.ResponseEq(t, 200, tester.OKText, &database.Mirror{ID: 123})
 }
 
-func TestRepoHandler_MirrorFromSaas(t *testing.T) {
-	t.Run("valid", func(t *testing.T) {
-		tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
-			return rp.MirrorFromSaas
-		})
-		tester.WithUser()
-
-		tester.WithParam("namespace", types.OpenCSGPrefix+"repo")
-		tester.WithKV("repo_type", types.ModelRepo)
-		tester.mocks.repo.EXPECT().MirrorFromSaas(
-			tester.Ctx(), "CSG_repo", "r", "u", types.ModelRepo,
-		).Return(nil)
-
-		tester.Execute()
-		tester.ResponseEq(t, 200, tester.OKText, nil)
-	})
-
-	t.Run("invalid", func(t *testing.T) {
-		tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
-			return rp.MirrorFromSaas
-		})
-		tester.WithUser()
-
-		tester.WithKV("repo_type", types.ModelRepo)
-		tester.Execute()
-		tester.ResponseEq(t, 400, "Repo could not be mirrored", nil)
-	})
-}
-
 func TestRepoHandler_GetMirror(t *testing.T) {
 	tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
 		return rp.GetMirror
@@ -983,24 +954,6 @@ func TestRepoHandler_SyncMirror(t *testing.T) {
 
 	tester.Execute()
 	tester.ResponseEq(t, 200, tester.OKText, nil)
-}
-
-func TestRepoHandler_MirrorProgress(t *testing.T) {
-	tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
-		return rp.MirrorProgress
-	})
-	tester.WithUser()
-
-	tester.WithKV("repo_type", types.ModelRepo)
-	tester.WithParam("id", "1")
-	tester.mocks.repo.EXPECT().MirrorProgress(
-		tester.Ctx(), types.ModelRepo, "u", "r", "u",
-	).Return(types.LFSSyncProgressResp{Progress: []types.SingleLFSProgress{{Oid: "o1"}}}, nil)
-
-	tester.Execute()
-	tester.ResponseEq(
-		t, 200, tester.OKText, types.LFSSyncProgressResp{Progress: []types.SingleLFSProgress{{Oid: "o1"}}},
-	)
 }
 
 func TestRepoHandler_CreateRepo(t *testing.T) {

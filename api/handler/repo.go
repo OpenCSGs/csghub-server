@@ -1329,41 +1329,6 @@ func (h *RepoHandler) CreateMirror(ctx *gin.Context) {
 	httpbase.OK(ctx, mirror)
 }
 
-// MirrorFromSaas godoc
-// @Security     ApiKey
-// @Summary      Mirror repo from OpenCSG Saas(only on-premises)
-// @Tags         Repository
-// @Accept       json
-// @Produce      json
-// @Param        repo_type path string true "models,datasets,codes or spaces" Enums(models,datasets,codes,spaces)
-// @Param        namespace path string true "repo owner name"
-// @Param        name path string true "repo name"
-// @Success      200  {object}  types.Response{data=database.Mirror} "OK"
-// @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /{repo_type}/{namespace}/{name}/mirror_from_saas [post]
-func (h *RepoHandler) MirrorFromSaas(ctx *gin.Context) {
-	currentUser := httpbase.GetCurrentUser(ctx)
-	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
-	if err != nil {
-		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
-		return
-	}
-	repoType := common.RepoTypeFromContext(ctx)
-	if !strings.HasPrefix(namespace, types.OpenCSGPrefix) {
-		httpbase.BadRequest(ctx, "Repo could not be mirrored")
-		return
-	}
-	err = h.c.MirrorFromSaas(ctx.Request.Context(), namespace, name, currentUser, repoType)
-	if err != nil {
-		slog.ErrorContext(ctx.Request.Context(), "Failed to create mirror for", slog.String("repo_type", string(repoType)), slog.String("path", fmt.Sprintf("%s/%s", namespace, name)), "error", err)
-		httpbase.ServerError(ctx, err)
-		return
-	}
-	httpbase.OK(ctx, nil)
-}
-
 // GetMirror godoc
 // @Security     ApiKey
 // @Summary      Get a mirror
@@ -2078,43 +2043,6 @@ func (h *RepoHandler) SyncMirror(ctx *gin.Context) {
 		return
 	}
 	httpbase.OK(ctx, nil)
-}
-
-// GetMirrorProgress godoc
-// @Security     ApiKey
-// @Summary      Get Mirror sync progress
-// @Tags         Repository
-// @Accept       json
-// @Produce      json
-// @Param        repo_type path string true "models,datasets,codes or spaces" Enums(models,datasets,codes,spaces)
-// @Param        namespace path string true "repo owner name"
-// @Param        name path string true "repo name"
-// @Success      200  {object}  types.Response{data=types.LFSSyncProgressResp} "OK"
-// @Failure      400  {object}  types.APIBadRequest "Bad request"
-// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /{repo_type}/{namespace}/{name}/mirror/progress [get]
-func (h *RepoHandler) MirrorProgress(ctx *gin.Context) {
-	repoType := common.RepoTypeFromContext(ctx)
-	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
-	if err != nil {
-		slog.ErrorContext(ctx.Request.Context(), "failed to get namespace from context", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
-		return
-	}
-	currentUser := httpbase.GetCurrentUser(ctx)
-	progress, err := h.c.MirrorProgress(ctx.Request.Context(), repoType, namespace, name, currentUser)
-	if err != nil {
-		if errors.Is(err, errorx.ErrForbidden) {
-			slog.Debug("not allowed to get mirror progress for", slog.String("repo_type", string(repoType)), slog.String("path", fmt.Sprintf("%s/%s", namespace, name)), "error", err)
-			httpbase.ForbiddenError(ctx, err)
-			return
-		}
-
-		slog.ErrorContext(ctx.Request.Context(), "Failed to get mirror progress for", slog.String("repo_type", string(repoType)), slog.String("path", fmt.Sprintf("%s/%s", namespace, name)), "error", err)
-		httpbase.ServerError(ctx, err)
-		return
-	}
-	httpbase.OK(ctx, progress)
 }
 
 func (h *RepoHandler) testStatus(ctx *gin.Context) {

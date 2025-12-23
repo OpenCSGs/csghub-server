@@ -953,63 +953,6 @@ func TestRepoComponent_CreateMirror(t *testing.T) {
 	}
 }
 
-func TestRepoComponent_MirrorFromSaas(t *testing.T) {
-	cases := []struct {
-		mirror bool
-	}{
-		{false},
-		{true},
-	}
-
-	for _, c := range cases {
-		t.Run(fmt.Sprintf("%+v", c), func(t *testing.T) {
-			ctx := context.TODO()
-			repo := initializeTestRepoComponent(ctx, t)
-
-			mockedRepo := &database.Repository{ID: 123, Path: "ns/n", RepositoryType: types.ModelRepo}
-			mirror := &database.Mirror{
-				SourceUrl:      "/models/ns/n.git",
-				Username:       "user",
-				RepositoryID:   123,
-				SourceRepoPath: "ns/n",
-				Repository:     mockedRepo,
-			}
-			if c.mirror {
-				repo.mocks.stores.MirrorMock().EXPECT().FindByRepoID(ctx, int64(123)).Return(mirror, nil)
-			} else {
-				repo.mocks.stores.MirrorMock().EXPECT().FindByRepoID(ctx, int64(123)).Return(nil, sql.ErrNoRows)
-				repo.mocks.stores.SyncVersionMock().EXPECT().FindByRepoTypeAndPath(ctx, "ns/n", types.ModelRepo).Return(&database.SyncVersion{SourceID: types.SyncVersionSourceHF}, nil)
-				repo.mocks.gitServer.EXPECT().CreateMirrorRepo(ctx, gitserver.CreateMirrorRepoReq{
-					Namespace:   "ns",
-					Name:        "n",
-					CloneUrl:    "/models/ns/n.git",
-					Private:     false,
-					MirrorToken: "foo",
-					RepoType:    types.ModelRepo,
-				}).Return(0, nil)
-				repo.mocks.stores.MirrorMock().EXPECT().Create(ctx, mirror).Return(&database.Mirror{
-					ID:       1,
-					Priority: types.ASAPMirrorPriority,
-				}, nil)
-
-				repo.mocks.stores.SyncClientSettingMock().EXPECT().First(ctx).Return(&database.SyncClientSetting{Token: "foo"}, nil)
-			}
-
-			repo.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(
-				mockedRepo, nil,
-			)
-
-			mockedRepo.SyncStatus = types.SyncStatusPending
-
-			repo.mocks.stores.RepoMock().EXPECT().UpdateRepo(ctx, *mockedRepo).Return(nil, nil)
-			repo.mocks.stores.MirrorTaskMock().EXPECT().CancelOtherTasksAndCreate(ctx, mock.Anything).Return(database.MirrorTask{}, nil)
-
-			err := repo.MirrorFromSaas(ctx, "ns", "n", "user", types.ModelRepo)
-			require.Nil(t, err)
-		})
-	}
-}
-
 func TestRepoComponent_GetMirror(t *testing.T) {
 	ctx := context.TODO()
 	repo := initializeTestRepoComponent(ctx, t)
@@ -1564,46 +1507,6 @@ func TestRepoComponent_SyncMirror(t *testing.T) {
 
 	err := repo.SyncMirror(ctx, types.ModelRepo, "ns", "n", "user")
 	require.Nil(t, err)
-}
-
-func TestRepoComponent_MirrorProgress(t *testing.T) {
-	ctx := context.TODO()
-	repo := initializeTestRepoComponent(ctx, t)
-	mockUserRepoAdminPermission(ctx, repo.mocks.stores, "user")
-	repo.config.Mirror.PartSize = 100
-
-	mirror := &database.Mirror{
-		ID:             321,
-		SourceUrl:      "/models/ns/n.git",
-		Username:       "user",
-		RepositoryID:   123,
-		SourceRepoPath: "ns/n",
-	}
-
-	repo.mocks.stores.MirrorMock().EXPECT().FindByRepoID(ctx, int64(123)).Return(mirror, nil)
-	mockedRepo := &database.Repository{ID: 123, RepositoryType: types.ModelRepo, Path: "foo"}
-	repo.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(
-		mockedRepo, nil,
-	)
-
-	lfss := []database.LfsMetaObject{
-		{Oid: "o1", Size: 100},
-	}
-	repo.mocks.stores.LfsMetaObjectMock().EXPECT().FindByRepoID(ctx, int64(123)).Return(lfss, nil)
-	repo.mocks.cache.EXPECT().GetLfsSyncFileProgress(ctx, "models/foo", "o1", "100").Return(12, nil)
-
-	resp, err := repo.MirrorProgress(ctx, types.ModelRepo, "ns", "n", "user")
-	require.Nil(t, err)
-	require.Equal(t, types.LFSSyncProgressResp{
-		Progress: []types.SingleLFSProgress{{
-			Oid:      "o1",
-			Progress: 12,
-			Size:     100,
-		}},
-		Total: 1,
-		Done:  0,
-	}, resp)
-
 }
 
 func TestRepoComponent_Branches(t *testing.T) {
