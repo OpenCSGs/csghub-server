@@ -2,6 +2,9 @@ package component
 
 import (
 	"context"
+	"fmt"
+	"path"
+	"strconv"
 	"sync"
 	"testing"
 
@@ -13,6 +16,7 @@ import (
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/types"
+	"opencsg.com/csghub-server/common/utils/common"
 )
 
 func TestMCPServerComponent_Create(t *testing.T) {
@@ -426,4 +430,104 @@ func TestMCPServerComponent_updateSpaceMetaTag(t *testing.T) {
 
 	err := mc.updateSpaceMetaTag(req, user)
 	require.Nil(t, err)
+}
+
+func TestMCPServerComponent_CheckDeployBranch(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestMCPServerComponent(ctx, t)
+
+	req := &types.DeployMCPServerReq{
+		CurrentUser: "user",
+		MCPRepo: types.RepoRequest{
+			Namespace: "ns",
+			Name:      "n",
+		},
+		CreateRepoReq: types.CreateRepoReq{
+			Username:  "user",
+			Namespace: "test-namespace",
+			Name:      "test-server",
+			RepoType:  types.SpaceRepo,
+		},
+		ResourceID: 1,
+		ClusterID:  "cls",
+	}
+
+	dbrepo := &database.Repository{
+		ID:            321,
+		Tags:          []database.Tag{{Name: "t1"}},
+		Name:          "n",
+		License:       "MIT",
+		Nickname:      "n",
+		Path:          "ns/n",
+		DefaultBranch: "master",
+	}
+
+	mc.mocks.stores.MCPServerMock().EXPECT().ByPath(ctx, req.MCPRepo.Namespace, req.MCPRepo.Name).Return(&database.MCPServer{
+		RepositoryID: 123,
+		Repository:   dbrepo,
+	}, nil)
+
+	mc.mocks.components.repo.EXPECT().GetUserRepoPermission(ctx, req.CurrentUser, dbrepo).Return(&types.UserRepoPermission{
+		CanAdmin: true,
+		CanRead:  true,
+	}, nil)
+
+	mc.mocks.stores.SpaceResourceMock().EXPECT().FindByID(ctx, req.ResourceID).Return(&database.SpaceResource{
+		ID: 1,
+	}, nil)
+
+	mc.mocks.components.repo.EXPECT().CheckAccountAndResource(ctx, req.CurrentUser, req.ClusterID, int64(0), &database.SpaceResource{
+		ID: 1,
+	}).Return(nil)
+
+	mc.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, req.Namespace).Return(database.Namespace{
+		ID: 1,
+	}, nil)
+
+	mc.mocks.userSvcClient.EXPECT().GetUserInfo(ctx, req.CurrentUser, req.CurrentUser).Return(&rpc.User{
+		ID:       1,
+		Username: req.CurrentUser,
+		Email:    "email@example.com",
+		Roles:    []string{"admin"},
+	}, nil)
+
+	mc.mocks.stores.MCPServerMock().EXPECT().CreateSpaceAndRepoForDeploy(ctx, &database.Repository{
+		UserID:         int64(1),
+		Path:           path.Join(req.Namespace, req.Name),
+		GitPath:        common.BuildRelativePath(fmt.Sprintf("%ss", string(req.RepoType)), req.Namespace, req.Name),
+		Name:           req.Name,
+		Nickname:       req.Nickname,
+		Description:    req.Description,
+		Private:        req.Private,
+		License:        "MIT",
+		DefaultBranch:  "master",
+		RepositoryType: req.RepoType,
+		Hashed:         true,
+	}, &database.Space{
+		Sdk:           types.MCPSERVER.Name,
+		SdkVersion:    "",
+		CoverImageUrl: req.CoverImageUrl,
+		Env:           "",
+		Hardware:      "",
+		Secrets:       "",
+		Variables:     "",
+		Template:      "",
+		SKU:           strconv.FormatInt(1, 10), // space resource id
+		ClusterID:     req.ClusterID,
+	}).Return(nil)
+
+	mc.mocks.gitServer.EXPECT().CopyRepository(mock.Anything, mock.Anything).Return(nil)
+
+	mc.mocks.gitServer.EXPECT().GetRepoFileContents(mock.Anything, mock.Anything).Return(&types.File{
+		Content: "",
+	}, nil)
+
+	mc.mocks.gitServer.EXPECT().UpdateRepoFile(mock.Anything).Return(nil)
+
+	mc.mocks.gitServer.EXPECT().DeleteRepo(mock.Anything, mock.Anything).Return(nil)
+
+	mc.mocks.stores.MCPServerMock().EXPECT().DeleteSpaceAndRepoForDeploy(mock.Anything, int64(0), int64(0)).Return(nil)
+
+	_, err := mc.Deploy(ctx, req)
+	require.NotNil(t, err)
 }

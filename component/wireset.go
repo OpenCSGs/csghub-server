@@ -699,14 +699,16 @@ var RuleComponentSet = wire.NewSet(NewTestRuleComponent)
 
 func NewTestMCPServerComponent(config *config.Config, stores *tests.MockStores, rpcUser rpc.UserSvcClient, repoComponent RepoComponent, gitServer gitserver.GitServer) *mcpServerComponentImpl {
 	return &mcpServerComponentImpl{
-		config:         config,
-		repoComponent:  repoComponent,
-		repoStore:      stores.Repo,
-		gitServer:      gitServer,
-		userSvcClient:  rpcUser,
-		mcpServerStore: stores.MCPServerStore,
-		userLikesStore: stores.UserLikes,
-		recomStore:     stores.Recom,
+		config:             config,
+		repoComponent:      repoComponent,
+		repoStore:          stores.Repo,
+		gitServer:          gitServer,
+		userSvcClient:      rpcUser,
+		mcpServerStore:     stores.MCPServerStore,
+		userLikesStore:     stores.UserLikes,
+		recomStore:         stores.Recom,
+		spaceResourceStore: stores.SpaceResource,
+		namespaceStore:     stores.Namespace,
 	}
 }
 

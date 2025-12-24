@@ -681,6 +681,7 @@ func (m *mcpServerComponentImpl) Deploy(ctx context.Context, req *types.DeployMC
 		return nil, fmt.Errorf("fail to merge env for deploy mcp server %s/%s, %w", req.MCPRepo.Namespace, req.MCPRepo.Name, err)
 	}
 
+	req.DefaultBranch = mcpServer.Repository.DefaultBranch
 	req.RepoType = types.SpaceRepo
 	req.License = mcpServer.Repository.License
 
@@ -772,6 +773,7 @@ func (m *mcpServerComponentImpl) Deploy(ctx context.Context, req *types.DeployMC
 		CoverImageUrl: dbSpace.CoverImageUrl,
 		SKU:           dbSpace.SKU,
 		CreatedAt:     dbSpace.CreatedAt,
+		DefaultBranch: dbRepo.DefaultBranch,
 	}
 	return space, nil
 }
