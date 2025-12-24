@@ -39,10 +39,11 @@ type userComponentImpl struct {
 	audit     database.AuditLogStore
 	pdStore   database.PendingDeletionStore
 
-	gs         gitserver.GitServer
-	jwtc       JwtComponent
-	tokenc     AccessTokenComponent
-	userPhonec UserPhoneComponent
+	gs          gitserver.GitServer
+	jwtc        JwtComponent
+	tokenc      AccessTokenComponent
+	invitationc InvitationComponent
+	userPhonec  UserPhoneComponent
 
 	// casc      *casdoorsdk.Client
 	// casConfig *casdoorsdk.AuthConfig
@@ -143,6 +144,11 @@ func NewUserComponent(config *config.Config) (UserComponent, error) {
 
 	c.ts = database.NewTagStore()
 	c.uts = database.NewUserTagStore()
+
+	c.invitationc, err = NewInvitationComponent(c.config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create invitation component, error: %w", err)
+	}
 
 	c.userPhonec, err = NewUserPhoneComponent(c.config)
 	if err != nil {
@@ -939,6 +945,19 @@ func (c *userComponentImpl) Signin(ctx context.Context, code, state string) (*ty
 			}
 		}(dbu.Username)
 
+		if dbu.Phone != "" {
+			go func() {
+				ctx, cancel := context.WithTimeout(context.Background(), time.Second*60)
+				defer cancel()
+				if err := c.invitationc.AwardCreditToInvitee(ctx, types.AwardCreditToInviteeReq{
+					InviteeUUID: dbu.UUID,
+					InviteeName: dbu.Username,
+					RegisterAt:  dbu.CreatedAt,
+				}); err != nil {
+					slog.ErrorContext(ctx, "failed to award credit to invitee", "error", err, "invitee_uuid", dbu.UUID)
+				}
+			}()
+		}
 	} else {
 		// get user from db for username, as casdoor may have different username
 		dbu, err = c.userStore.FindByUUID(ctx, cu.UUID)
