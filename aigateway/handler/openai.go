@@ -346,8 +346,15 @@ func (h *OpenAIHandlerImpl) Embedding(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	if req.Input == "" || req.Model == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Model and input cannot be empty"})
+	if req.Model == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Model cannot be empty"})
+		return
+	}
+	if req.Input.OfString.String() == "" &&
+		len(req.Input.OfArrayOfStrings) == 0 &&
+		len(req.Input.OfArrayOfTokenArrays) == 0 &&
+		len(req.Input.OfArrayOfTokens) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Input cannot be empty"})
 		return
 	}
 	modelID := req.Model
@@ -415,7 +422,9 @@ func (h *OpenAIHandlerImpl) Embedding(c *gin.Context) {
 		ImageID:  model.ImageID,
 	})
 	w := NewResponseWriterWrapperEmbedding(c.Writer, tokenCounter)
-	tokenCounter.Input(req.Input)
+	if req.Input.OfString.String() != "" {
+		tokenCounter.Input(req.Input.OfString.Value)
+	}
 
 	rp.ServeHTTP(w, c.Request, "", host)
 	go func() {

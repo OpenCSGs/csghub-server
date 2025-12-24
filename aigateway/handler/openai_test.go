@@ -403,8 +403,12 @@ func TestOpenAIHandler_Embedding(t *testing.T) {
 		tester, c, w := setupTest(t)
 		// Empty Input
 		embeddingReq := EmbeddingRequest{
-			Model: "model1:svc1",
-			Input: "",
+			EmbeddingNewParams: openai.EmbeddingNewParams{
+				Model: "model1:svc1",
+				Input: openai.EmbeddingNewParamsInputUnion{
+					OfArrayOfStrings: []string{},
+				},
+			},
 		}
 		body, _ := json.Marshal(embeddingReq)
 		c.Request.Method = http.MethodPost
@@ -424,8 +428,12 @@ func TestOpenAIHandler_Embedding(t *testing.T) {
 		httpbase.SetCurrentUser(c, "testuser")
 		httpbase.SetCurrentUserUUID(c, "testuuid")
 		embeddingReq = EmbeddingRequest{
-			Model: "",
-			Input: "test input",
+			EmbeddingNewParams: openai.EmbeddingNewParams{
+				Model: "",
+				Input: openai.EmbeddingNewParamsInputUnion{
+					OfArrayOfStrings: []string{"test input"},
+				},
+			},
 		}
 		body, _ = json.Marshal(embeddingReq)
 		c.Request.Body = io.NopCloser(bytes.NewReader(body))
@@ -438,8 +446,12 @@ func TestOpenAIHandler_Embedding(t *testing.T) {
 	t.Run("model not found", func(t *testing.T) {
 		tester, c, w := setupTest(t)
 		embeddingReq := EmbeddingRequest{
-			Model: "nonexistent:svc",
-			Input: "test input",
+			EmbeddingNewParams: openai.EmbeddingNewParams{
+				Model: "nonexistent:svc",
+				Input: openai.EmbeddingNewParamsInputUnion{
+					OfArrayOfStrings: []string{"test input"},
+				},
+			},
 		}
 		body, _ := json.Marshal(embeddingReq)
 		c.Request.Method = http.MethodPost
@@ -455,8 +467,12 @@ func TestOpenAIHandler_Embedding(t *testing.T) {
 	t.Run("get model error", func(t *testing.T) {
 		tester, c, w := setupTest(t)
 		embeddingReq := EmbeddingRequest{
-			Model: "model1:svc1",
-			Input: "test input",
+			EmbeddingNewParams: openai.EmbeddingNewParams{
+				Model: "model1:svc1",
+				Input: openai.EmbeddingNewParamsInputUnion{
+					OfArrayOfStrings: []string{"test input"},
+				},
+			},
 		}
 		body, _ := json.Marshal(embeddingReq)
 		c.Request.Method = http.MethodPost
@@ -472,8 +488,12 @@ func TestOpenAIHandler_Embedding(t *testing.T) {
 	t.Run("model not running", func(t *testing.T) {
 		tester, c, w := setupTest(t)
 		embeddingReq := EmbeddingRequest{
-			Model: "model1:svc1",
-			Input: "test input",
+			EmbeddingNewParams: openai.EmbeddingNewParams{
+				Model: "model1:svc1",
+				Input: openai.EmbeddingNewParamsInputUnion{
+					OfArrayOfStrings: []string{"test input"},
+				},
+			},
 		}
 		body, _ := json.Marshal(embeddingReq)
 		c.Request.Method = http.MethodPost
@@ -503,8 +523,12 @@ func TestOpenAIHandler_Embedding(t *testing.T) {
 	t.Run("model without svc name", func(t *testing.T) {
 		tester, c, _ := setupTest(t)
 		embeddingReq := EmbeddingRequest{
-			Model: "model1",
-			Input: "test input",
+			EmbeddingNewParams: openai.EmbeddingNewParams{
+				Model: "model1",
+				Input: openai.EmbeddingNewParamsInputUnion{
+					OfArrayOfStrings: []string{"test input"},
+				},
+			},
 		}
 		body, _ := json.Marshal(embeddingReq)
 		c.Request.Method = http.MethodPost
