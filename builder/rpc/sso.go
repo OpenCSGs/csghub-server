@@ -55,6 +55,7 @@ type SSOUserInfo struct {
 	RegProvider    string
 	Gender         string
 	Phone          string
+	PhoneArea      string
 	LastSigninTime string
 	Avatar         string
 	Homepage       string
@@ -62,9 +63,10 @@ type SSOUserInfo struct {
 }
 
 type SSOUpdateUserInfo struct {
-	UUID   string
-	Name   string
-	Email  string
-	Gender string
-	Phone  string
+	UUID      string
+	Name      string
+	Email     string
+	Gender    string
+	Phone     string
+	PhoneArea string
 }

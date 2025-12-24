@@ -9,6 +9,6 @@
         "other": "多主机推理仅支持大于 0 的最低副本数"
     },
     "error.TASK-ERR-3": {
-        "other": "多机模式暂不支持notebook"
+        "other": "不支持多主机 Notebook"
     }
 }

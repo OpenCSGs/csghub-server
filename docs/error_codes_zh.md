@@ -263,200 +263,200 @@
 ### `GIT-ERR-13`
 
 - **错误代码:** `GIT-ERR-13`
-- **错误名:** `gitFileNotFound`
-- **描述:** 在 Git 仓库的指定分支或提交的指定路径下找不到所请求的文件。
+- **错误名:** `gitCreateBranchFailed`
+- **描述:** 
 
 ---
 
 ### `GIT-ERR-14`
 
 - **错误代码:** `GIT-ERR-14`
-- **错误名:** `gitUploadFailed`
-- **描述:** 尝试将文件上传到 Git 仓库时发生错误。
+- **错误名:** `gitSetDefaultBranchFailed`
+- **描述:** 
 
 ---
 
 ### `GIT-ERR-15`
 
 - **错误代码:** `GIT-ERR-15`
-- **错误名:** `gitDownloadFailed`
-- **描述:** 尝试从 Git 仓库下载文件时发生错误。请检查文件路径、权限和网络连接。
+- **错误名:** `gitFileNotFound`
+- **描述:** 在 Git 仓库的指定分支或提交的指定路径下找不到所请求的文件。
 
 ---
 
 ### `GIT-ERR-16`
 
 - **错误代码:** `GIT-ERR-16`
-- **错误名:** `gitConnectionFailed`
-- **描述:** 无法建立到远程 Git 服务器的连接。请检查您的网络连接、防火墙设置以及远程服务器的状态。
+- **错误名:** `gitUploadFailed`
+- **描述:** 尝试将文件上传到 Git 仓库时发生错误。
 
 ---
 
 ### `GIT-ERR-17`
 
 - **错误代码:** `GIT-ERR-17`
-- **错误名:** `gitLfsError`
-- **描述:** 在 Git LFS（大文件存储）操作期间发生未指定的错误。请检查 LFS 配置和日志以获取更多详细信息。
+- **错误名:** `gitDownloadFailed`
+- **描述:** 尝试从 Git 仓库下载文件时发生错误。请检查文件路径、权限和网络连接。
 
 ---
 
 ### `GIT-ERR-18`
 
 - **错误代码:** `GIT-ERR-18`
-- **错误名:** `fileTooLarge`
-- **描述:** 文件大小超出了此操作配置的最大限制。请考虑对大文件使用 Git LFS。
+- **错误名:** `gitConnectionFailed`
+- **描述:** 无法建立到远程 Git 服务器的连接。请检查您的网络连接、防火墙设置以及远程服务器的状态。
 
 ---
 
 ### `GIT-ERR-19`
 
 - **错误代码:** `GIT-ERR-19`
-- **错误名:** `gitGetTreeEntryFailed`
-- **描述:** 获取 git tree entry 失败。这可能由网络问题、身份验证问题或指定的 tree entry 不存在引起。
+- **错误名:** `gitLfsError`
+- **描述:** 在 Git LFS（大文件存储）操作期间发生未指定的错误。请检查 LFS 配置和日志以获取更多详细信息。
 
 ---
 
 ### `GIT-ERR-20`
 
 - **错误代码:** `GIT-ERR-20`
-- **错误名:** `gitCommitFilesFailed`
-- **描述:** 提交 git 文件失败。这可能由网络问题、身份验证问题或指定的文件不存在引起。
+- **错误名:** `fileTooLarge`
+- **描述:** 文件大小超出了此操作配置的最大限制。请考虑对大文件使用 Git LFS。
 
 ---
 
 ### `GIT-ERR-21`
 
 - **错误代码:** `GIT-ERR-21`
-- **错误名:** `gitGetBlobsFailed`
-- **描述:** 获取 git blobs 失败。这可能由网络问题、身份验证问题或指定的 blobs 不存在引起。
+- **错误名:** `gitGetTreeEntryFailed`
+- **描述:** 获取 git tree entry 失败。这可能由网络问题、身份验证问题或指定的 tree entry 不存在引起。
 
 ---
 
 ### `GIT-ERR-22`
 
 - **错误代码:** `GIT-ERR-22`
-- **错误名:** `gitGetLfsPointersFailed`
-- **描述:** 获取 git lfs pointers 失败。这可能由网络问题、身份验证问题或指定的 lfs pointers 不存在引起。
+- **错误名:** `gitCommitFilesFailed`
+- **描述:** 提交 git 文件失败。这可能由网络问题、身份验证问题或指定的文件不存在引起。
 
 ---
 
 ### `GIT-ERR-23`
 
 - **错误代码:** `GIT-ERR-23`
-- **错误名:** `gitListLastCommitsForTreeFailed`
-- **描述:** 获取 git tree 最后一次提交失败。这可能由网络问题、身份验证问题或指定的 tree 不存在引起。
+- **错误名:** `gitGetBlobsFailed`
+- **描述:** 获取 git blobs 失败。这可能由网络问题、身份验证问题或指定的 blobs 不存在引起。
 
 ---
 
 ### `GIT-ERR-24`
 
 - **错误代码:** `GIT-ERR-24`
-- **错误名:** `gitGetBlobInfoFailed`
-- **描述:** 获取 git blob 信息失败。这可能由网络问题、身份验证问题或指定的 blob 不存在引起。
+- **错误名:** `gitGetLfsPointersFailed`
+- **描述:** 获取 git lfs pointers 失败。这可能由网络问题、身份验证问题或指定的 lfs pointers 不存在引起。
 
 ---
 
 ### `GIT-ERR-25`
 
 - **错误代码:** `GIT-ERR-25`
-- **错误名:** `gitListFilesFailed`
-- **描述:** 获取 git 文件失败。这可能由网络问题、身份验证问题或指定的文件不存在引起。
+- **错误名:** `gitListLastCommitsForTreeFailed`
+- **描述:** 获取 git tree 最后一次提交失败。这可能由网络问题、身份验证问题或指定的 tree 不存在引起。
 
 ---
 
 ### `GIT-ERR-26`
 
 - **错误代码:** `GIT-ERR-26`
-- **错误名:** `gitCreateMirrorFailed`
-- **描述:** 创建镜像失败。这可能由网络问题、身份验证问题或指定的仓库不存在引起。
+- **错误名:** `gitGetBlobInfoFailed`
+- **描述:** 获取 git blob 信息失败。这可能由网络问题、身份验证问题或指定的 blob 不存在引起。
 
 ---
 
 ### `GIT-ERR-27`
 
 - **错误代码:** `GIT-ERR-27`
-- **错误名:** `gitMirrorSyncFailed`
-- **描述:** 同步镜像失败。这可能由网络问题、身份验证问题或指定的仓库不存在引起。
+- **错误名:** `gitListFilesFailed`
+- **描述:** 获取 git 文件失败。这可能由网络问题、身份验证问题或指定的文件不存在引起。
 
 ---
 
 ### `GIT-ERR-28`
 
 - **错误代码:** `GIT-ERR-28`
-- **错误名:** `gitCheckRepositoryExistsFailed`
-- **描述:** 检查仓库是否存在失败。这可能由网络问题、身份验证问题或指定的仓库不存在引起。
+- **错误名:** `gitCreateMirrorFailed`
+- **描述:** 创建镜像失败。这可能由网络问题、身份验证问题或指定的仓库不存在引起。
 
 ---
 
 ### `GIT-ERR-29`
 
 - **错误代码:** `GIT-ERR-29`
-- **错误名:** `gitCreateRepositoryFailed`
-- **描述:** 创建仓库失败。这可能由网络问题、身份验证问题引起。
+- **错误名:** `gitMirrorSyncFailed`
+- **描述:** 同步镜像失败。这可能由网络问题、身份验证问题或指定的仓库不存在引起。
 
 ---
 
 ### `GIT-ERR-30`
 
 - **错误代码:** `GIT-ERR-30`
-- **错误名:** `gitDeleteRepositoryFailed`
-- **描述:** 删除仓库失败。这可能由网络问题、身份验证问题或指定的仓库不存在引起。
+- **错误名:** `gitCheckRepositoryExistsFailed`
+- **描述:** 检查仓库是否存在失败。这可能由网络问题、身份验证问题或指定的仓库不存在引起。
 
 ---
 
 ### `GIT-ERR-31`
 
 - **错误代码:** `GIT-ERR-31`
-- **错误名:** `gitGetRepositoryFailed`
-- **描述:** 获取仓库失败。这可能由网络问题、身份验证问题或指定的仓库不存在引起。
+- **错误名:** `gitCreateRepositoryFailed`
+- **描述:** 创建仓库失败。这可能由网络问题、身份验证问题引起。
 
 ---
 
 ### `GIT-ERR-32`
 
 - **错误代码:** `GIT-ERR-32`
-- **错误名:** `gitServiceUnavaliable`
-- **描述:** Git 托管服务暂时不可用或无法访问。请稍后再试。
+- **错误名:** `gitDeleteRepositoryFailed`
+- **描述:** 删除仓库失败。这可能由网络问题、身份验证问题或指定的仓库不存在引起。
 
 ---
 
 ### `GIT-ERR-33`
 
 - **错误代码:** `GIT-ERR-33`
-- **错误名:** `gitCopyRepositoryFailed`
-- **描述:** 复制仓库失败。这可能由网络问题、身份验证问题或指定的仓库不存在引起。
+- **错误名:** `gitGetRepositoryFailed`
+- **描述:** 获取仓库失败。这可能由网络问题、身份验证问题或指定的仓库不存在引起。
 
 ---
 
 ### `GIT-ERR-34`
 
 - **错误代码:** `GIT-ERR-34`
+- **错误名:** `gitServiceUnavaliable`
+- **描述:** Git 托管服务暂时不可用或无法访问。请稍后再试。
+
+---
+
+### `GIT-ERR-35`
+
+- **错误代码:** `GIT-ERR-35`
+- **错误名:** `gitCopyRepositoryFailed`
+- **描述:** 复制仓库失败。这可能由网络问题、身份验证问题或指定的仓库不存在引起。
+
+---
+
+### `GIT-ERR-36`
+
+- **错误代码:** `GIT-ERR-36`
 - **错误名:** `gitReplicateRepositoryFailed`
 - **描述:** 转移仓库失败。这可能由网络问题、身份验证问题或指定的仓库不存在引起。
 
-## Invitation 错误
-
-### `INVITATION-ERR-0`
-
-- **错误代码:** `INVITATION-ERR-0`
-- **错误名:** `userPhoneNotSet`
-- **描述:** 未绑定手机号，不能创建邀请码。
-
 ---
 
-### `INVITATION-ERR-1`
+### `GIT-ERR-37`
 
-- **错误代码:** `INVITATION-ERR-1`
-- **错误名:** `invitationNotFound`
-- **描述:** 邀请码不存在。
-
----
-
-### `INVITATION-ERR-2`
-
-- **错误代码:** `INVITATION-ERR-2`
-- **错误名:** `userAlreadyHasInvitationCode`
-- **描述:** 邀请码已存在。
+- **错误代码:** `GIT-ERR-37`
+- **错误名:** `gitUsingGitInXnetRepository`
+- **描述:** 使用 git 操作 xnet 启用的仓库。
 
 ## License 错误
 
@@ -465,30 +465,6 @@
 - **错误代码:** `LICENSE-ERR-0`
 - **错误名:** `noActiveLicense`
 - **描述:** 当前系统没有有效的许可证。
-
----
-
-### `LICENSE-ERR-1`
-
-- **错误代码:** `LICENSE-ERR-1`
-- **错误名:** `licenseExpired`
-- **描述:** 许可证已过期，无法验证和导入。
-
-## Moderation 错误
-
-### `MOD-ERR-0`
-
-- **错误代码:** `MOD-ERR-0`
-- **错误名:** `codeNameRequire`
-- **描述:** 请求参数不匹配, 服务器无法处理该请求。
-
----
-
-### `MOD-ERR-1`
-
-- **错误代码:** `MOD-ERR-1`
-- **错误名:** `codeWordRequire`
-- **描述:** 请求参数不匹配, 服务器无法处理该请求。
 
 ## Req 错误
 
@@ -577,22 +553,6 @@
 - **错误代码:** `REQ-ERR-10`
 - **错误名:** `errRateLimitExceeded`
 - **描述:** 用户在给定的时间内发送了太多的请求。在速率限制重置或提供有效的验证码之前，将阻止进一步的请求。
-
----
-
-### `REQ-ERR-11`
-
-- **错误代码:** `REQ-ERR-11`
-- **错误名:** `errLimitedIPLocation`
-- **描述:** 来自此IP位置的请求受到限制。要继续操作，请完成验证码验证。
-
----
-
-### `REQ-ERR-12`
-
-- **错误代码:** `REQ-ERR-12`
-- **错误名:** `errCaptchaIncorrect`
-- **描述:** 提供的验证码验证失败。请使用有效的验证码重试。
 
 ## Runner 错误
 
@@ -810,22 +770,6 @@
 - **错误名:** `multiHostNotebookNotSupported`
 - **描述:** 多主机 Notebook 功能（在多个主机上运行 Notebook 任务）不被支持。请改用单主机 Notebook 执行。
 
----
-
-### `TASK-ERR-4`
-
-- **错误代码:** `TASK-ERR-4`
-- **错误名:** `notEnoughResource`
-- **描述:** 任务需要的资源超过了集群可用的资源。当集群资源不足时，会出现此错误。
-
----
-
-### `TASK-ERR-5`
-
-- **错误代码:** `TASK-ERR-5`
-- **错误名:** `clusterUnavailable`
-- **描述:** 集群当前不可用，可能是由于维护或其他原因。当集群未准备好接受新任务时，会出现此错误。
-
 ## User 错误
 
 ### `USER-ERR-0`
@@ -937,4 +881,36 @@
 - **错误代码:** `USER-ERR-13`
 - **错误名:** `emailExists`
 - **描述:** 提供的电子邮件地址已存在于系统中。
+
+---
+
+### `USER-ERR-14`
+
+- **错误代码:** `USER-ERR-14`
+- **错误名:** `adminUserCannotBeDeleted`
+- **描述:** 管理员用户不能被删除。
+
+---
+
+### `USER-ERR-15`
+
+- **错误代码:** `USER-ERR-15`
+- **错误名:** `userHasOrganizations`
+- **描述:** 拥有组织的用户不能被删除。
+
+---
+
+### `USER-ERR-16`
+
+- **错误代码:** `USER-ERR-16`
+- **错误名:** `userHasDeployments`
+- **描述:** 拥有部署资源的用户不能被删除。
+
+---
+
+### `USER-ERR-17`
+
+- **错误代码:** `USER-ERR-17`
+- **错误名:** `userHasBills`
+- **描述:** 拥有账单的用户不能被删除。
 
