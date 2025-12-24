@@ -17,6 +17,7 @@ type SpaceResourceComponent interface {
 	Update(ctx context.Context, req *types.UpdateSpaceResourceReq) (*types.SpaceResource, error)
 	Create(ctx context.Context, req *types.CreateSpaceResourceReq) (*types.SpaceResource, error)
 	Delete(ctx context.Context, id int64) error
+	ListHardwareTypes(ctx context.Context, clusterId string) ([]string, error)
 }
 
 func (c *spaceResourceComponentImpl) Index(ctx context.Context, req *types.SpaceResourceIndexReq) ([]types.SpaceResource, int, error) {
@@ -166,4 +167,13 @@ func (c *spaceResourceComponentImpl) Delete(ctx context.Context, id int64) error
 		return err
 	}
 	return nil
+}
+
+func (c *spaceResourceComponentImpl) ListHardwareTypes(ctx context.Context, clusterId string) ([]string, error) {
+	types, err := c.spaceResourceStore.FindAllResourceTypes(ctx, clusterId)
+	if err != nil {
+		slog.Error("error listing hardware types", slog.Any("error", err))
+		return nil, err
+	}
+	return types, nil
 }

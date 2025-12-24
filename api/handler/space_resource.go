@@ -184,3 +184,28 @@ func (h *SpaceResourceHandler) Delete(ctx *gin.Context) {
 	slog.Info("Delete space resource successfully")
 	httpbase.OK(ctx, nil)
 }
+
+// ListHardwareTypes godoc
+// @Security     ApiKey
+// @Summary      List hardware types in a cluster
+// @Description  list hardware types in a cluster
+// @Tags         SpaceReource
+// @Accept       json
+// @Produce      json
+// @Param        cluster_id query string false "cluster_id"
+// @Success      200  {object}  types.Response{data=[]string} "OK"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /space_resources/hardware_types [get]
+
+func (h *SpaceResourceHandler) ListHardwareTypes(ctx *gin.Context) {
+	clusterId := ctx.Query("cluster_id")
+
+	types, err := h.spaceResource.ListHardwareTypes(ctx.Request.Context(), clusterId)
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "Failed to list hardware types", slog.String("cluster_id", clusterId), slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	slog.Info("List hardware types successfully")
+	httpbase.OK(ctx, types)
+}

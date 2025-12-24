@@ -258,6 +258,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		spaceResource.POST("", middlewareCollection.License.Check, middlewareCollection.Auth.NeedAdmin, spaceResourceHandler.Create)
 		spaceResource.PUT("/:id", middlewareCollection.License.Check, middlewareCollection.Auth.NeedAdmin, spaceResourceHandler.Update)
 		spaceResource.DELETE("/:id", middlewareCollection.License.Check, middlewareCollection.Auth.NeedAdmin, spaceResourceHandler.Delete)
+		spaceResource.GET("/hardware_types", spaceResourceHandler.ListHardwareTypes)
 	}
 
 	spaceSdkHandler, err := handler.NewSpaceSdkHandler(config)
