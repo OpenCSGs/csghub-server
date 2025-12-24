@@ -7,31 +7,37 @@ import (
 	"github.com/openai/openai-go/v3"
 )
 
-var _ Counter = (*EmbeddingTokenCounter)(nil)
+var _ Counter = (*EmbeddingTokenCounterImpl)(nil)
 
-type EmbeddingTokenCounter struct {
+type EmbeddingTokenCounter interface {
+	Embedding(resp openai.CreateEmbeddingResponseUsage)
+	Input(input string)
+	Usage(c context.Context) (*Usage, error)
+}
+
+type EmbeddingTokenCounterImpl struct {
 	input     string
 	usage     *openai.CreateEmbeddingResponseUsage
 	tokenizer Tokenizer
 }
 
-func NewEmbeddingTokenCounter(tokenizer Tokenizer) *EmbeddingTokenCounter {
-	return &EmbeddingTokenCounter{
+func NewEmbeddingTokenCounter(tokenizer Tokenizer) EmbeddingTokenCounter {
+	return &EmbeddingTokenCounterImpl{
 		tokenizer: tokenizer,
 	}
 }
 
 // Embedding implements EmbeddingTokenCounter.
-func (l *EmbeddingTokenCounter) Embedding(resp openai.CreateEmbeddingResponseUsage) {
+func (l *EmbeddingTokenCounterImpl) Embedding(resp openai.CreateEmbeddingResponseUsage) {
 	l.usage = &resp
 }
 
-func (l *EmbeddingTokenCounter) Input(input string) {
+func (l *EmbeddingTokenCounterImpl) Input(input string) {
 	l.input = input
 }
 
 // Usage implements LLMTokenCounter.
-func (l *EmbeddingTokenCounter) Usage(c context.Context) (*Usage, error) {
+func (l *EmbeddingTokenCounterImpl) Usage(c context.Context) (*Usage, error) {
 	if l.usage != nil {
 		return &Usage{
 			PromptTokens: l.usage.PromptTokens,

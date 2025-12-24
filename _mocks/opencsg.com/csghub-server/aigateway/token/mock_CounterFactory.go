@@ -69,19 +69,19 @@ func (_c *MockCounterFactory_NewChat_Call) RunAndReturn(run func(token.CreatePar
 }
 
 // NewEmbedding provides a mock function with given fields: param
-func (_m *MockCounterFactory) NewEmbedding(param token.CreateParam) *token.EmbeddingTokenCounter {
+func (_m *MockCounterFactory) NewEmbedding(param token.CreateParam) token.EmbeddingTokenCounter {
 	ret := _m.Called(param)
 
 	if len(ret) == 0 {
 		panic("no return value specified for NewEmbedding")
 	}
 
-	var r0 *token.EmbeddingTokenCounter
-	if rf, ok := ret.Get(0).(func(token.CreateParam) *token.EmbeddingTokenCounter); ok {
+	var r0 token.EmbeddingTokenCounter
+	if rf, ok := ret.Get(0).(func(token.CreateParam) token.EmbeddingTokenCounter); ok {
 		r0 = rf(param)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*token.EmbeddingTokenCounter)
+			r0 = ret.Get(0).(token.EmbeddingTokenCounter)
 		}
 	}
 
@@ -106,12 +106,12 @@ func (_c *MockCounterFactory_NewEmbedding_Call) Run(run func(param token.CreateP
 	return _c
 }
 
-func (_c *MockCounterFactory_NewEmbedding_Call) Return(_a0 *token.EmbeddingTokenCounter) *MockCounterFactory_NewEmbedding_Call {
+func (_c *MockCounterFactory_NewEmbedding_Call) Return(_a0 token.EmbeddingTokenCounter) *MockCounterFactory_NewEmbedding_Call {
 	_c.Call.Return(_a0)
 	return _c
 }
 
-func (_c *MockCounterFactory_NewEmbedding_Call) RunAndReturn(run func(token.CreateParam) *token.EmbeddingTokenCounter) *MockCounterFactory_NewEmbedding_Call {
+func (_c *MockCounterFactory_NewEmbedding_Call) RunAndReturn(run func(token.CreateParam) token.EmbeddingTokenCounter) *MockCounterFactory_NewEmbedding_Call {
 	_c.Call.Return(run)
 	return _c
 }
