@@ -56,6 +56,8 @@ func (s *spaceResourceStoreImpl) Index(ctx context.Context, clusterId string, pe
 func (s *spaceResourceStoreImpl) Create(ctx context.Context, input SpaceResource) (*SpaceResource, error) {
 	res, err := s.db.Core.NewInsert().Model(&input).Exec(ctx, &input)
 	if err := assertAffectedOneRow(res, err); err != nil {
+		err = errorx.HandleDBError(err, errorx.Ctx().
+			Set("resource_name", "input.Name"))
 		return nil, fmt.Errorf("create space resource in tx failed,error:%w", err)
 	}
 
