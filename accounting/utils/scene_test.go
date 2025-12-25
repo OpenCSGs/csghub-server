@@ -76,3 +76,20 @@ func TestScene_GetSKUTypeByScene(t *testing.T) {
 		require.Equal(t, skuType, res)
 	}
 }
+
+func TestAccountUsersStore_IsNeedCheckUserSubscription(t *testing.T) {
+	scenes := map[types.SceneType]bool{
+		types.SceneModelInference:  true,
+		types.SceneSpace:           true,
+		types.SceneModelFinetune:   true,
+		types.SceneEvaluation:      true,
+		types.SceneModelServerless: true,
+		types.SceneGuiAgent:        false,
+		types.SceneStarship:        true,
+	}
+
+	for scene, skuType := range scenes {
+		res := IsNeedCheckUserSubscription(scene)
+		require.Equal(t, skuType, res)
+	}
+}
