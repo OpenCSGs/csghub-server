@@ -20,4 +20,4 @@ RUN mkdir -p ~/.duckdb/extensions/v0.9.2/linux_amd64 && \
     gunzip ~/.duckdb/extensions/v0.9.2/linux_amd64/json.duckdb_extension.gz && \
     chmod 755 ~/.duckdb/extensions/v0.9.2/linux_amd64/json.duckdb_extension
 
-# docker build -t opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/csghub_server:base-3.0-runtime -f Dockerfile-base .
+# docker build -t opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/csghub_server:base-3.0-runtime -f Dockerfile-base-runtime .
