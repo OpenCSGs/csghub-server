@@ -335,7 +335,7 @@ func (modImpl *moderationImpl) CheckChatStreamResponse(ctx context.Context, chun
 		return &rpc.CheckResult{IsSensitive: false}, nil
 	}
 
-	var result *rpc.CheckResult = &rpc.CheckResult{IsSensitive: false}
+	var result = &rpc.CheckResult{IsSensitive: false}
 	var err error
 	if strings.TrimSpace(chunk.Choices[0].Delta.Content) != "" {
 		// moderate on content

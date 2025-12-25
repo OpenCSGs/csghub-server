@@ -153,7 +153,8 @@ func runWorkFlow(sessionCtx workflow.Context, updateWorkflow dvCom.WorkflowUpdat
 
 	var finalCardData dvCom.CardData
 
-	if repoDataType == RepoParquetData {
+	switch repoDataType {
+	case RepoParquetData:
 		err = workflow.ExecuteActivity(sessionCtx, DataViewerActivity.CopyParquetFiles, dvCom.CopyParquetReq{
 			Req:              updateWorkflow.Req,
 			ComputedCardData: computedCardData,
@@ -162,7 +163,7 @@ func runWorkFlow(sessionCtx workflow.Context, updateWorkflow dvCom.WorkflowUpdat
 		if err != nil {
 			return false, fmt.Errorf("run data viewer activity CopyParquetFiles error: %w", err)
 		}
-	} else if repoDataType == RepoJsonData || repoDataType == RepoCsvData {
+	case RepoJsonData, RepoCsvData:
 		var downloadCard dvCom.DownloadCard
 		err = workflow.ExecuteActivity(sessionCtx, DataViewerActivity.DownloadSplitFiles,
 			dvCom.DownloadFileReq{

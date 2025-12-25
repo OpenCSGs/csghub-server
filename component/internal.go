@@ -96,7 +96,8 @@ func (c *internalComponentImpl) SSHAllowed(ctx context.Context, req types.SSHAll
 	if err != nil {
 		return nil, fmt.Errorf("failed to find ssh key by id, err: %v", err)
 	}
-	if req.Action == "git-receive-pack" {
+	switch req.Action {
+	case "git-receive-pack":
 		allowed, err := c.repoComponent.AllowWriteAccess(ctx, req.RepoType, req.Namespace, req.Name, sshKey.User.Username)
 		if err != nil {
 			return nil, errorx.ErrUnauthorized
@@ -104,7 +105,7 @@ func (c *internalComponentImpl) SSHAllowed(ctx context.Context, req types.SSHAll
 		if !allowed {
 			return nil, errorx.ErrForbidden
 		}
-	} else if req.Action == "git-upload-pack" {
+	case "git-upload-pack":
 		if repo.Private {
 			allowed, err := c.repoComponent.AllowReadAccess(ctx, req.RepoType, req.Namespace, req.Name, sshKey.User.Username)
 			if err != nil {

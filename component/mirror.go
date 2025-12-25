@@ -188,7 +188,8 @@ func (c *mirrorComponentImpl) CreateMirrorRepo(ctx context.Context, req types.Cr
 	}
 	repoPath := path.Join(namespace, name)
 
-	if req.RepoType == types.ModelRepo {
+	switch req.RepoType {
+	case types.ModelRepo:
 		dbModel := database.Model{
 			Repository:   repo,
 			RepositoryID: repo.ID,
@@ -198,7 +199,7 @@ func (c *mirrorComponentImpl) CreateMirrorRepo(ctx context.Context, req types.Cr
 		if err != nil {
 			return nil, fmt.Errorf("failed to create model, error: %w", err)
 		}
-	} else if req.RepoType == types.DatasetRepo {
+	case types.DatasetRepo:
 		dbDataset := database.Dataset{
 			Repository:   repo,
 			RepositoryID: repo.ID,
@@ -208,7 +209,7 @@ func (c *mirrorComponentImpl) CreateMirrorRepo(ctx context.Context, req types.Cr
 		if err != nil {
 			return nil, fmt.Errorf("failed to create dataset, error: %w", err)
 		}
-	} else if req.RepoType == types.CodeRepo {
+	case types.CodeRepo:
 		dbCode := database.Code{
 			Repository:   repo,
 			RepositoryID: repo.ID,
@@ -218,7 +219,7 @@ func (c *mirrorComponentImpl) CreateMirrorRepo(ctx context.Context, req types.Cr
 		if err != nil {
 			return nil, fmt.Errorf("failed to create code, error: %w", err)
 		}
-	} else if req.RepoType == types.MCPServerRepo {
+	case types.MCPServerRepo:
 		configuration, err := json.Marshal(req.MCPServerAttributes.Configuration)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal mcp configuration: %w", err)

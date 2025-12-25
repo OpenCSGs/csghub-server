@@ -42,7 +42,7 @@ type MirrorNamespaceMapping struct {
 
 func (s *mirrorNamespaceMappingStoreImpl) Create(ctx context.Context, mirrorNamespaceMapping *MirrorNamespaceMapping) (*MirrorNamespaceMapping, error) {
 	if mirrorNamespaceMapping.Enabled == nil {
-		var enabled bool = true
+		var enabled = true
 		mirrorNamespaceMapping.Enabled = &enabled
 	}
 	err := s.db.Operator.Core.NewInsert().

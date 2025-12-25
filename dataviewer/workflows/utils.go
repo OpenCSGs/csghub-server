@@ -166,7 +166,7 @@ func CopyFileContext(writeFile *os.File, reader io.ReadCloser, limitSize int64) 
 			break
 		}
 		line := scanner.Text()
-		n, err := writer.WriteString(fmt.Sprintln(line))
+		n, err := fmt.Fprintln(writer, line)
 		if err != nil {
 			return copyedBytes, fmt.Errorf("write content by line error: %w", err)
 		}

@@ -1,4 +1,4 @@
-FROM opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/csghub_server:base-3.0-build AS build-env
+FROM opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/csghub_server:base-3.0-build-go1.25.5 AS build-env
 ENV GOPROXY=https://goproxy.cn,direct
 WORKDIR /starhub
 COPY . .

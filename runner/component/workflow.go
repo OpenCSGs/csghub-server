@@ -30,7 +30,6 @@ import (
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/runner/common"
-	rcommon "opencsg.com/csghub-server/runner/common"
 )
 
 type workFlowComponentImpl struct {
@@ -573,7 +572,7 @@ func (wc *workFlowComponentImpl) addKServiceWithEvent(ctx context.Context, event
 	slog.Info("report-workflow-event", slog.Any("event-type", eventType), slog.Any("name", wf.TaskId),
 		slog.Any("status", wf.Status), slog.Any("result-url", wf.ResultURL))
 	go func() {
-		err := rcommon.Push(wc.config.Runner.WebHookEndpoint, wc.config.APIToken, event)
+		err := common.Push(wc.config.Runner.WebHookEndpoint, wc.config.APIToken, event)
 		if err != nil {
 			slog.Error("failed to push workflow service status event", slog.Any("error", err))
 		}
