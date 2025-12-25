@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+
 	"opencsg.com/csghub-server/moderation/checker"
 
 	"opencsg.com/csghub-server/builder/deploy"
@@ -18,7 +19,6 @@ import (
 	"github.com/spf13/cobra"
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/log"
-	"opencsg.com/csghub-server/api/workflow"
 	serverworkflow "opencsg.com/csghub-server/api/workflow"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/temporal"
@@ -67,7 +67,7 @@ var cmdLaunch = &cobra.Command{
 		}
 
 		deploy.DeployWorkflow = func(buildTask, runTask *database.DeployTask) {
-			if err := workflow.StartNewDeployTaskWithCancelOld(buildTask, runTask); err != nil {
+			if err := serverworkflow.StartNewDeployTaskWithCancelOld(buildTask, runTask); err != nil {
 				slog.Error("start new deploy task failed", slog.Any("error", err))
 			}
 		}

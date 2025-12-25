@@ -848,19 +848,20 @@ func (c *spaceComponentImpl) Deploy(ctx context.Context, namespace, name, curren
 	}
 
 	containerPort := types.DefaultContainerPort
-	if space.Sdk == types.GRADIO.Name {
+	switch space.Sdk {
+	case types.GRADIO.Name:
 		containerPort = types.GRADIO.Port
-	} else if space.Sdk == types.STREAMLIT.Name {
+	case types.STREAMLIT.Name:
 		containerPort = types.STREAMLIT.Port
-	} else if space.Sdk == types.NGINX.Name {
+	case types.NGINX.Name:
 		containerPort = types.NGINX.Port
-	} else if space.Sdk == types.DOCKER.Name {
+	case types.DOCKER.Name:
 		template, err := c.templateStore.FindByName(ctx, types.DOCKER.Name, space.Template)
 		if err != nil {
 			return -1, fmt.Errorf("fail to query %s template %s error: %w", types.DOCKER.Name, space.Template, err)
 		}
 		containerPort = template.Port
-	} else if space.Sdk == types.MCPSERVER.Name {
+	case types.MCPSERVER.Name:
 		containerPort = types.MCPSERVER.Port
 	}
 

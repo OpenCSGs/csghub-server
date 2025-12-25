@@ -272,11 +272,12 @@ func (dva *dataViewerActivityImpl) fillUpCardData(card *dvCom.CardData, sortKeys
 
 func (dva *dataViewerActivityImpl) DetermineCardData(ctx context.Context, determineParam dvCom.DetermineCardReq) (*dvCom.CardData, error) {
 	var scopeFiles map[string]*dvCom.RepoFile
-	if determineParam.RepoDataType == RepoParquetData {
+	switch determineParam.RepoDataType {
+	case RepoParquetData:
 		scopeFiles = determineParam.Class.ParquetFiles
-	} else if determineParam.RepoDataType == RepoJsonData {
+	case RepoJsonData:
 		scopeFiles = determineParam.Class.JsonlFiles
-	} else if determineParam.RepoDataType == RepoCsvData {
+	case RepoCsvData:
 		scopeFiles = determineParam.Class.CsvFiles
 	}
 	if len(scopeFiles) < 1 {
@@ -793,9 +794,10 @@ func (dva *dataViewerActivityImpl) ConvertToParquetFiles(ctx context.Context, co
 				}
 			}
 			method := ""
-			if convertReq.RepoDataType == RepoJsonData {
+			switch convertReq.RepoDataType {
+			case RepoJsonData:
 				method = "read_json_auto"
-			} else if convertReq.RepoDataType == RepoCsvData {
+			case RepoCsvData:
 				method = "read_csv_auto"
 			}
 			splitExportPath := fmt.Sprintf("%s/", strings.TrimSuffix(split.ExportPath, "/"))
