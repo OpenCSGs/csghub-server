@@ -52,7 +52,7 @@ func (m *Metering) startMetering() {
 
 func (m *Metering) preReadMsgs() {
 	var err error
-	var i int = 0
+	var i = 0
 	for {
 		i++
 		err = m.sysMQ.BuildMeterEventStream()
@@ -75,10 +75,7 @@ func (m *Metering) preReadMsgs() {
 
 func (m *Metering) handleReadMsgs(failedLimit int) {
 	failReadTime := 0
-	for {
-		if failReadTime >= failedLimit {
-			break
-		}
+	for failReadTime < failedLimit {
 		err := m.sysMQ.VerifyMeteringStream()
 		if err != nil {
 			tip := fmt.Sprintf("fail to verify metering stream for the %d time", (failReadTime + 1))
@@ -232,8 +229,6 @@ func (m *Metering) pubFeeEventWithReTry(msg jetstream.Msg, evt *types.MeteringEv
 			err = m.sysMQ.PublishFeeTokenData(msg.Data())
 		case types.QuotaNumberType:
 			err = m.sysMQ.PublishFeeQuotaData(msg.Data())
-		case types.CountNumberType:
-			err = m.sysMQ.PublishSubscriptionData(msg.Data())
 		default:
 			slog.Warn("unsupported metering event value type", slog.Any("value-type", evt.ValueType))
 		}
