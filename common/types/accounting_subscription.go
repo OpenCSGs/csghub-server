@@ -6,8 +6,6 @@ import (
 	"github.com/google/uuid"
 )
 
-var AccountingSubscriptionQueue = "accounting_subscription_queue"
-
 var (
 	SubscriptionFree = "free"
 )
@@ -39,13 +37,13 @@ const (
 	BillingStatusFailed BillingStatus = "unpaid"
 )
 
-type SubscriptionCreateReq struct {
-	CurrentUser string    `json:"-"`
-	UserUUID    string    `json:"-"`
-	SkuType     SKUType   `json:"sku_type" binding:"required"`
-	ResourceID  string    `json:"resource_id" binding:"required"`
-	SkuUnitType string    `json:"sku_unit_type" binding:"required"`
-	EventUUID   uuid.UUID `json:"-"`
+type SubscriptionUpdateReq struct {
+	CurrentUser string      `json:"-"`
+	UserUUID    string      `json:"-"`
+	EventUUID   uuid.UUID   `json:"-"`
+	SkuType     SKUType     `json:"sku_type" binding:"required,oneof=1 2"`
+	ResourceID  string      `json:"resource_id" binding:"required"`
+	SkuUnitType SkuUnitType `json:"sku_unit_type" binding:"required,oneof=month"`
 }
 
 type SubscriptionResp struct {
@@ -69,15 +67,15 @@ type SubscriptionResp struct {
 }
 
 type SubscriptionListReq struct {
-	CurrentUser   string `json:"-"`
-	UserUUID      string `json:"-"`
-	Status        string `json:"-"`
-	SkuType       int    `json:"-"`
-	StartTime     string `json:"-"`
-	EndTime       string `json:"-"`
-	Per           int    `json:"-"`
-	Page          int    `json:"-"`
-	QueryUserUUID string `json:"-"`
+	CurrentUser   string             `json:"-"`
+	UserUUID      string             `json:"-"`
+	Status        SubscriptionStatus `json:"-"`
+	SkuType       SKUType            `json:"-"`
+	StartTime     string             `json:"-"`
+	EndTime       string             `json:"-"`
+	Per           int                `json:"-"`
+	Page          int                `json:"-"`
+	QueryUserUUID string             `json:"-"`
 }
 
 type SubscriptionAllRes struct {
@@ -88,14 +86,15 @@ type SubscriptionAllRes struct {
 }
 
 type SubscriptionBillListReq struct {
-	CurrentUser   string `json:"-"`
-	UserUUID      string `json:"-"`
-	QueryUserUUID string `json:"-"`
-	Status        string `json:"-"`
-	StartTime     string `json:"-"`
-	EndTime       string `json:"-"`
-	Per           int    `json:"-"`
-	Page          int    `json:"-"`
+	CurrentUser   string        `json:"-"`
+	UserUUID      string        `json:"-"`
+	QueryUserUUID string        `json:"-"`
+	Status        BillingStatus `json:"-"`
+	StartTime     string        `json:"-"`
+	EndTime       string        `json:"-"`
+	Per           int           `json:"-"`
+	Page          int           `json:"-"`
+	SkuType       SKUType       `json:"-"`
 }
 
 type SubscriptionBillResp struct {
@@ -112,6 +111,7 @@ type SubscriptionBillResp struct {
 	ResourceID  string         `json:"resource_id"`
 	Explain     string         `json:"explain"`
 	CreatedAt   time.Time      `json:"created_at"`
+	Discount    float64        `json:"discount"`
 }
 
 type SubscriptionBillAllRes struct {
@@ -125,25 +125,18 @@ type SubscriptionGetReq struct {
 	UserUUID    string    `json:"-"`
 	SubID       int64     `json:"-"`
 	EventUUID   uuid.UUID `json:"-"`
-	SkuType     int       `json:"-"`
-}
-
-type SubscriptionUpdateReq struct {
-	CurrentUser string    `json:"-"`
-	UserUUID    string    `json:"-"`
-	SubID       int64     `json:"-"`
-	SkuType     int       `json:"sku_type" binding:"required"`
-	ResourceID  string    `json:"resource_id" binding:"required"`
-	SkuUnitType string    `json:"sku_unit_type" binding:"required"`
-	EventUUID   uuid.UUID `json:"-"`
+	SkuType     SKUType   `json:"-"`
 }
 
 type SubscriptionStatusResp struct {
 	UserUUID       string              `json:"user_uuid"`
 	SkuType        SKUType             `json:"sku_type"`
 	SubID          int64               `json:"sub_id"`
-	Status         string              `json:"status"`
+	Status         SubscriptionStatus  `json:"status"`
+	PriceID        int64               `json:"price_id"`
 	ResourceID     string              `json:"resource_id"`
+	StartAt        time.Time           `json:"start_at"`
+	EndAt          time.Time           `json:"end_at"`
 	PeriodStart    int64               `json:"period_start"`
 	PeriodEnd      int64               `json:"period_end"`
 	BillID         int64               `json:"bill_id"`
@@ -151,14 +144,16 @@ type SubscriptionStatusResp struct {
 	NextPriceID    int64               `json:"next_price_id"`
 	NextResourceID string              `json:"next_resource_id"`
 	Usage          []SubscriptionUsage `json:"usage"`
+	UpdateAt       time.Time           `json:"update_at"`
 }
 
 type SubscriptionUsage struct {
-	ResourceID   string  `json:"resource_id"`
-	ResourceName string  `json:"resource_name"`
-	CustomerID   string  `json:"customer_id"`
-	Used         float64 `json:"used"`
-	Quota        float64 `json:"quota"`
+	ResourceID   string          `json:"resource_id"`
+	ResourceName string          `json:"resource_name"`
+	CustomerID   string          `json:"customer_id"`
+	Used         float64         `json:"used"`
+	Quota        float64         `json:"quota"`
+	ValueType    ChargeValueType `json:"value_type"`
 }
 
 type SubscriptionBatchStatusReq struct {
@@ -182,7 +177,18 @@ type SubscriptionEvent struct {
 	Uuid         string                  `json:"uuid"`
 	UserUUID     string                  `json:"user_uuid"`
 	CreatedAt    time.Time               `json:"created_at"`
-	ReasonCode   int                     `json:"reason_code"`
+	ReasonCode   ACCTStatus              `json:"reason_code"`
 	ReasonMsg    string                  `json:"reason_msg"`
 	Subscription SubscriptionEventDetail `json:"subscription"`
+}
+
+type SubUsageReq struct {
+	SkuType       SKUType         `json:"sku_type"`
+	UserUUID      string          `json:"user_uuid"`
+	BillID        int64           `json:"bill_id"`
+	ResourceID    string          `json:"resource_id"`
+	ResourceName  string          `json:"resource_name"`
+	CustomerID    string          `json:"customer_id"`
+	ValueType     ChargeValueType `json:"value_type"`
+	UseLimitPrice int64           `json:"use_limit_price"`
 }
