@@ -89,3 +89,5 @@ INSERT INTO public.tags ("name", category, "group", "scope", built_in, show_name
 INSERT INTO public.tags ("name", category, "group", "scope", built_in, show_name, created_at, updated_at) VALUES('Tourism and Hospitality', 'industry', '', 'space', true, '旅游与酒店', '2024-05-16 10:42:12.939', '2024-05-16 10:42:12.939') ON CONFLICT ("name", category, scope) DO NOTHING;
 INSERT INTO public.tags ("name", category, "group", "scope", built_in, show_name, created_at, updated_at) VALUES('Information Technology (IT)', 'industry', '', 'space', true, 'IT信息技术', '2024-05-16 10:42:12.939', '2024-05-16 10:42:12.939') ON CONFLICT ("name", category, scope) DO NOTHING;
 INSERT INTO public.tags ("name", category, "group", "scope", built_in, show_name, created_at, updated_at) VALUES('Culture and Entertainment', 'industry', '', 'space', true, '文化娱乐', '2024-05-16 10:42:12.939', '2024-05-16 10:42:12.939') ON CONFLICT ("name", category, scope) DO NOTHING;
+
+UPDATE tags SET name = LOWER(name) WHERE category = 'industry';
