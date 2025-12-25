@@ -149,6 +149,90 @@ func TestSpaceResourceStore_FindAllResourceTypes_InvalidJSON(t *testing.T) {
 	require.Empty(t, types)
 }
 
+func TestSpaceResourceStore_FindByGPU(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewSpaceResourceStoreWithDB(db)
+	// Create test resources with different GPU types
+	_, err := store.Create(ctx, database.SpaceResource{
+		Name:      "r1",
+		ClusterID: "c1",
+		Resources: `{"gpu": {"type": "A10", "num": "1", "resource_name": "nvidia.com/gpu", "labels": {"aliyun.accelerator/nvidia_name": "NVIDIA-A10"}}, "cpu": {"type": "Intel", "num": "2"}, "memory": "20Gi","replicas":2}`,
+	})
+	require.Nil(t, err)
+
+	_, err = store.Create(ctx, database.SpaceResource{
+		Name:      "r2",
+		ClusterID: "c1",
+		Resources: `{"gpu": {"type": "A100", "num": "1", "resource_name": "nvidia.com/gpu", "labels": {"aliyun.accelerator/nvidia_name": "NVIDIA-A100"}}, "cpu": {"type": "Intel", "num": "4"}, "memory": "40Gi","replicas":1}`,
+	})
+	require.Nil(t, err)
+
+	_, err = store.Create(ctx, database.SpaceResource{
+		Name:      "r3",
+		ClusterID: "c1",
+		Resources: `{"cpu": {"type": "Intel", "num": "8"}, "memory": "60Gi","replicas":1}`, // No GPU
+	})
+	require.Nil(t, err)
+
+	// Test FindByHardwareType with A10
+	results, err := store.FindByHardwareType(ctx, "A10")
+	require.Nil(t, err)
+	require.Equal(t, 1, len(results))
+	require.Equal(t, "r1", results[0].Name)
+
+	// Test FindByHardwareType with A100
+	results, err = store.FindByHardwareType(ctx, "A100")
+	require.Nil(t, err)
+	require.Equal(t, 1, len(results))
+	require.Equal(t, "r2", results[0].Name)
+
+	// Test FindByHardwareType with non-existent GPU type
+	results, err = store.FindByHardwareType(ctx, "H100")
+	require.Nil(t, err)
+	require.Equal(t, 0, len(results))
+
+	// Test FindByHardwareType with different hardware types
+	results, err = store.FindByHardwareType(ctx, "A10")
+	require.Nil(t, err)
+	require.Equal(t, 1, len(results))
+	require.Equal(t, "r1", results[0].Name)
+
+	// Add test resources with other hardware types
+	_, err = store.Create(ctx, database.SpaceResource{
+		Name:      "r4",
+		ClusterID: "c1",
+		Resources: `{"npu": {"type": "Ascend910", "num": "1", "resource_name": "ascend.com/npu", "labels": {"vendor": "Huawei"}}, "cpu": {"type": "Huawei", "num": "8"}, "memory": "64Gi","replicas":1}`,
+	})
+	require.Nil(t, err)
+
+	_, err = store.Create(ctx, database.SpaceResource{
+		Name:      "r5",
+		ClusterID: "c1",
+		Resources: `{"gcu": {"type": "G100", "num": "2", "resource_name": "enflame.com/gcu", "labels": {"vendor": "Enflame"}}, "cpu": {"type": "Intel", "num": "16"}, "memory": "128Gi","replicas":1}`,
+	})
+	require.Nil(t, err)
+
+	// Test FindByHardwareType with NPU
+	results, err = store.FindByHardwareType(ctx, "Ascend910")
+	require.Nil(t, err)
+	require.Equal(t, 1, len(results))
+	require.Equal(t, "r4", results[0].Name)
+
+	// Test FindByHardwareType with GCU
+	results, err = store.FindByHardwareType(ctx, "G100")
+	require.Nil(t, err)
+	require.Equal(t, 1, len(results))
+	require.Equal(t, "r5", results[0].Name)
+
+	// Test FindByHardwareType with non-existent hardware type
+	results, err = store.FindByHardwareType(ctx, "MLU270")
+	require.Nil(t, err)
+	require.Equal(t, 0, len(results))
+}
+
 func TestSpaceResourceStore_Filter(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
