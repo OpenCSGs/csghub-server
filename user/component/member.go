@@ -75,7 +75,7 @@ func (c *memberComponentImpl) OrgMembers(ctx context.Context, orgName, currentUs
 	if err == nil && user.ID > 0 {
 		m, err := c.memberStore.Find(ctx, org.ID, user.ID)
 		if err != nil && !errors.Is(err, sql.ErrNoRows) {
-			slog.Error("failed to find member", "error", err)
+			slog.ErrorContext(ctx, "failed to find member", "error", err)
 		}
 		//if current user belongs to org, show more detail member info
 		if m != nil {
@@ -90,7 +90,7 @@ func (c *memberComponentImpl) OrgMembers(ctx context.Context, orgName, currentUs
 	var members []types.Member
 	for _, dbmember := range dbmembers {
 		if dbmember.User == nil {
-			slog.Warn("member user is nil, skip", "member", dbmember)
+			slog.WarnContext(ctx, "member user is nil, skip", "member", dbmember)
 			continue
 		}
 		m := types.Member{
@@ -197,7 +197,7 @@ func (c *memberComponentImpl) ChangeMemberRole(ctx context.Context, orgName, use
 			NewRole:   newRole,
 		})
 		if err != nil {
-			slog.Error("failed to send organization permission change.", slog.String("orgName", orgName), slog.Any("err", err))
+			slog.ErrorContext(notificationCtx, "failed to send organization permission change.", slog.String("orgName", orgName), slog.Any("err", err))
 		}
 	}()
 
@@ -286,7 +286,7 @@ func (c *memberComponentImpl) AddMembers(ctx context.Context, orgName string, us
 					UserName:  userName,
 				})
 				if err != nil {
-					slog.Error("failed to send organization member join message", slog.String("orgName", orgName), slog.Any("err", err))
+					slog.ErrorContext(notificationCtx, "failed to send organization member join message", slog.String("orgName", orgName), slog.Any("err", err))
 				}
 			}(orgName, userName, role, userUUIDs)
 		}
@@ -386,7 +386,7 @@ func (c *memberComponentImpl) Delete(ctx context.Context, orgName, userName, ope
 				UserName:  userName,
 			})
 			if err != nil {
-				slog.Error("failed to send organization member leave message", slog.String("orgName", orgName), slog.String("userName", userName), slog.Any("err", err))
+				slog.ErrorContext(notificationCtx, "failed to send organization member leave message", slog.String("orgName", orgName), slog.String("userName", userName), slog.Any("err", err))
 			}
 		}()
 	}

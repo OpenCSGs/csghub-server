@@ -26,10 +26,12 @@ func NewImagebuilderHandler(
 	clusterPool *cluster.ClusterPool,
 	logReporter reporter.LogCollector) (*ImagebuilderHandler, error) {
 	if clusterPool == nil || len(clusterPool.Clusters) == 0 {
+		slog.ErrorContext(ctx, "cluster pool is nil")
 		return nil, errors.New("cluster pool is nil")
 	}
 	ibc, err := component.NewImagebuilderComponent(ctx, config, clusterPool, logReporter)
 	if err != nil {
+		slog.ErrorContext(ctx, "fail to create imagebuilder component", slog.Any("error", err))
 		return nil, err
 	}
 	return &ImagebuilderHandler{
@@ -51,13 +53,13 @@ func NewImagebuilderHandler(
 func (ibh *ImagebuilderHandler) Build(ctx *gin.Context) {
 	var req ctypes.ImageBuilderRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("bad params imagebuilder request format", "error", err)
+		slog.ErrorContext(ctx, "bad params imagebuilder request format", slog.Any("error", err))
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "bad params imagebuilder request format:" + err.Error()})
 		return
 	}
 	err := ibh.ibc.Build(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("fail to image builder", slog.Any("error", err), slog.Any("req", req))
+		slog.ErrorContext(ctx, "fail to image builder", slog.Any("error", err), slog.Any("req", req))
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "fail to imagebuilder build:" + err.Error()})
 		return
 	}
@@ -68,16 +70,18 @@ func (ibh *ImagebuilderHandler) Build(ctx *gin.Context) {
 func (ibh *ImagebuilderHandler) Stop(ctx *gin.Context) {
 	var req ctypes.ImageBuildStopReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		slog.Error("bad params imagebuilder request format", "error", err)
+		slog.ErrorContext(ctx, "bad params imagebuilder request format", slog.Any("error", err))
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "bad params imagebuilder request format:" + err.Error()})
 		return
 	}
+	slog.InfoContext(ctx, "stop image builder", slog.Any("req", req))
 	err := ibh.ibc.Stop(ctx.Request.Context(), req)
 	if err != nil {
-		slog.Error("fail to stop image builder", slog.Any("error", err), slog.Any("deploy_id", req.DeployId))
+		slog.ErrorContext(ctx, "fail to stop image builder", slog.Any("error", err), slog.Any("deploy_id", req.DeployId))
 		ctx.JSON(http.StatusInternalServerError, err.Error())
 		return
 	}
+	slog.InfoContext(ctx, "stop image builder success", slog.Any("req", req))
 
 	httpbase.OK(ctx, nil)
 }

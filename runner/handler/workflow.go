@@ -42,13 +42,13 @@ func (a *ArgoHandler) CreateWorkflow(ctx *gin.Context) {
 	var req types.ArgoWorkFlowReq
 	err := ctx.ShouldBindJSON(&req)
 	if err != nil {
-		slog.Error("bad order request format", "error", err)
+		slog.ErrorContext(ctx, "bad order request format", "error", err)
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 	wf, err := a.wfc.CreateWorkflow(ctx, req)
 	if err != nil {
-		slog.Error("fail to create workflow", slog.Any("error", err), slog.Any("req", req))
+		slog.ErrorContext(ctx, "fail to create workflow", slog.Any("error", err), slog.Any("req", req))
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -73,7 +73,7 @@ func (a *ArgoHandler) ListWorkflows(ctx *gin.Context) {
 	username := ctx.Query("username")
 	per, page, err := common.GetPerAndPageFromContext(ctx)
 	if err != nil {
-		slog.Error("Bad request format of page and per", slog.Any("error", err))
+		slog.ErrorContext(ctx, "Bad request format of page and per", slog.Any("error", err))
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
@@ -83,7 +83,7 @@ func (a *ArgoHandler) ListWorkflows(ctx *gin.Context) {
 	}
 	wfs, total, err := a.wfc.FindWorkFlows(ctx, username, types.TaskType(taskType), per, page)
 	if err != nil {
-		slog.Error("fail to list workflows", slog.Any("error", err))
+		slog.ErrorContext(ctx, "fail to list workflows", slog.Any("error", err))
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -98,17 +98,17 @@ func (a *ArgoHandler) DeleteWorkflow(ctx *gin.Context) {
 	var req = &types.ArgoWorkFlowDeleteReq{}
 	err := ctx.BindJSON(req)
 	if err != nil {
-		slog.Error("bad request format", "error", err)
+		slog.ErrorContext(ctx, "bad request format", "error", err)
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 	err = a.wfc.DeleteWorkflow(ctx, req)
 	if err != nil {
-		slog.Error("failed to delete workflow", slog.Any("error", err), slog.Any("req", req))
+		slog.ErrorContext(ctx, "failed to delete workflow", slog.Any("error", err), slog.Any("req", req))
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	slog.Info("Deleted argo workflow successfully", slog.String("id", id), slog.Any("taskid", req.TaskID))
+	slog.InfoContext(ctx, "Deleted argo workflow successfully", slog.String("id", id), slog.Any("taskid", req.TaskID))
 	httpbase.OK(ctx, nil)
 }
 
@@ -117,19 +117,19 @@ func (a *ArgoHandler) GetWorkflow(ctx *gin.Context) {
 	var req = &types.ArgoWorkFlowGetReq{}
 	err := ctx.BindJSON(req)
 	if err != nil {
-		slog.Error("bad request format", "error", err)
+		slog.ErrorContext(ctx, "bad request format", "error", err)
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 	idInt64, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
-		slog.Error("fail to convert id to int64", slog.Any("error", err), slog.Any("id", id))
+		slog.ErrorContext(ctx, "fail to convert id to int64", slog.Any("error", err), slog.Any("id", id))
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 	wf, err := a.wfc.GetWorkflow(ctx, idInt64, req.Username)
 	if err != nil {
-		slog.Error("fail to get workflow", slog.Any("error", err))
+		slog.ErrorContext(ctx, "fail to get workflow", slog.Any("error", err))
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

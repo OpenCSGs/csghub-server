@@ -79,7 +79,7 @@ func (o *OrganizationVerifyComponentImpl) Update(ctx context.Context, id int64, 
 		defer cancel()
 		err = o.sendNotification(notificationCtx, status, orgVerify.UserUUID)
 		if err != nil {
-			slog.Error("failed to send organization verify notification", slog.Any("error", err))
+			slog.ErrorContext(ctx, "failed to send organization verify notification", slog.Any("error", err))
 		}
 	}()
 
@@ -126,7 +126,7 @@ func (o *OrganizationVerifyComponentImpl) sendNotification(ctx context.Context, 
 			break
 		}
 		if i < retryCount-1 {
-			slog.Warn("failed to send notification, retrying", "notification_msg", notificationMsg, "attempt", i+1, "error", sendErr.Error())
+			slog.WarnContext(ctx, "failed to send notification, retrying", "notification_msg", notificationMsg, "attempt", i+1, "error", sendErr.Error())
 		}
 	}
 

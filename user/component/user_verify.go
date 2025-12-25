@@ -73,7 +73,7 @@ func (uv *UserVerifyComponentImpl) Update(ctx context.Context, id int64, status 
 		defer cancel()
 		err = uv.sendNotification(notificationCtx, status, userVerify.UUID)
 		if err != nil {
-			slog.Error("failed to send user verify notification", slog.Any("error", err))
+			slog.ErrorContext(notificationCtx, "failed to send user verify notification", slog.Any("error", err))
 		}
 	}()
 	return userVerify, nil
@@ -121,7 +121,7 @@ func (uv *UserVerifyComponentImpl) sendNotification(ctx context.Context, status 
 			break
 		}
 		if i < retryCount-1 {
-			slog.Warn("failed to send notification, retrying", "notification_msg", notificationMsg, "attempt", i+1, "error", sendErr.Error())
+			slog.WarnContext(ctx, "failed to send notification, retrying", "notification_msg", notificationMsg, "attempt", i+1, "error", sendErr.Error())
 		}
 	}
 
