@@ -27,11 +27,6 @@ import (
 
 const GitalyRepoNotFoundErr = "rpc error: code = NotFound desc = repository does not exist"
 
-const (
-	SMSCodeCachePrefix = "sms:code"
-	SMSCodeCacheTTL    = 1 * time.Minute
-)
-
 type userComponentImpl struct {
 	userStore database.UserStore
 	orgStore  database.OrgStore
@@ -49,6 +44,7 @@ type userComponentImpl struct {
 	tokenc      AccessTokenComponent
 	userPhonec  UserPhoneComponent
 	invitationc InvitationComponent
+	userPhonec  UserPhoneComponent
 
 	// casc      *casdoorsdk.Client
 	// casConfig *casdoorsdk.AuthConfig
