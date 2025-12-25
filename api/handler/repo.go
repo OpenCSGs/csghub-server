@@ -1751,9 +1751,10 @@ func (h *RepoHandler) DeployDetail(ctx *gin.Context) {
 		CurrentUser: currentUser,
 		DeployID:    deployID,
 	}
-	if repoType == types.SpaceRepo {
+	switch repoType {
+	case types.SpaceRepo:
 		detailReq.DeployType = types.SpaceType
-	} else if repoType == types.ModelRepo {
+	case types.ModelRepo:
 		detailReq.DeployType = types.InferenceType
 	}
 
