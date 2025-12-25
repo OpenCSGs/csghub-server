@@ -247,8 +247,6 @@ func (_c *MockSpaceResourceStore_FindAllResourceTypes_Call) RunAndReturn(run fun
 	return _c
 }
 
-<<<<<<< HEAD
-=======
 // FindByHardwareType provides a mock function with given fields: ctx, hardwareType
 func (_m *MockSpaceResourceStore) FindByHardwareType(ctx context.Context, hardwareType string) ([]database.SpaceResource, error) {
 	ret := _m.Called(ctx, hardwareType)
@@ -308,7 +306,6 @@ func (_c *MockSpaceResourceStore_FindByHardwareType_Call) RunAndReturn(run func(
 	return _c
 }
 
->>>>>>> 7b1e66a1 (feat: accounting price list support query hardware type)
 // FindByID provides a mock function with given fields: ctx, id
 func (_m *MockSpaceResourceStore) FindByID(ctx context.Context, id int64) (*database.SpaceResource, error) {
 	ret := _m.Called(ctx, id)
