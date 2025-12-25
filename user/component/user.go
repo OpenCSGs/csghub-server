@@ -44,7 +44,6 @@ type userComponentImpl struct {
 	tokenc      AccessTokenComponent
 	userPhonec  UserPhoneComponent
 	invitationc InvitationComponent
-	userPhonec  UserPhoneComponent
 
 	// casc      *casdoorsdk.Client
 	// casConfig *casdoorsdk.AuthConfig
