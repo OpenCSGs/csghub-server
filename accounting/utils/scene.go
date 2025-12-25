@@ -35,8 +35,6 @@ func GetSkuUnitTypeByScene(scene types.SceneType) types.SkuUnitType {
 		return types.UnitToken
 	case types.SceneGuiAgent:
 		return types.UnitToken
-	case types.SceneSubscription:
-		return types.UnitMonth
 	default:
 		return types.UnitMinute
 	}
@@ -77,6 +75,20 @@ func IsNeedCheckMeteringInMinute(scene types.SceneType, valueType types.ChargeVa
 		default:
 			return true
 		}
+	default:
+		return false
+	}
+}
+
+func IsNeedCheckUserSubscription(scene types.SceneType) bool {
+	switch types.SceneType(scene) {
+	case types.SceneModelInference,
+		types.SceneSpace,
+		types.SceneModelFinetune,
+		types.SceneEvaluation,
+		types.SceneModelServerless,
+		types.SceneStarship:
+		return true
 	default:
 		return false
 	}
