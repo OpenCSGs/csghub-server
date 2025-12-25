@@ -70,6 +70,17 @@ func (h *SpaceResourceHandler) Index(ctx *gin.Context) {
 			Page:     page,
 		},
 	}
+	if ctx.Query("resource_type") != "" {
+		req.ResourceType = types.ResourceType(ctx.Query("resource_type"))
+		if !types.ResourceTypeValid(req.ResourceType) {
+			slog.ErrorContext(ctx.Request.Context(), "Invalid resource type", "resource_type", req.ResourceType)
+			httpbase.BadRequest(ctx, "Invalid resource type")
+			return
+		}
+	}
+	if ctx.Query("hardware_type") != "" {
+		req.HardwareType = ctx.Query("hardware_type")
+	}
 	spaceResources, total, err := h.spaceResource.Index(ctx.Request.Context(), req)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Failed to get space resources", slog.String("cluster_id", clusterId), slog.String("deploy_type", deployTypeStr), slog.Any("error", err))

@@ -14,7 +14,7 @@ type spaceResourceStoreImpl struct {
 }
 
 type SpaceResourceStore interface {
-	Index(ctx context.Context, clusterId string, per, page int) ([]SpaceResource, int, error)
+	Index(ctx context.Context, filter types.SpaceResourceFilter, per, page int) ([]SpaceResource, int, error)
 	Create(ctx context.Context, input SpaceResource) (*SpaceResource, error)
 	Update(ctx context.Context, input SpaceResource) (*SpaceResource, error)
 	Delete(ctx context.Context, input SpaceResource) error
@@ -40,9 +40,18 @@ type SpaceResource struct {
 	times
 }
 
-func (s *spaceResourceStoreImpl) Index(ctx context.Context, clusterId string, per, page int) ([]SpaceResource, int, error) {
+func (s *spaceResourceStoreImpl) Index(ctx context.Context, filter types.SpaceResourceFilter, per, page int) ([]SpaceResource, int, error) {
 	var result []SpaceResource
-	query := s.db.Operator.Core.NewSelect().Model(&result).Where("cluster_id = ?", clusterId)
+	query := s.db.Operator.Core.NewSelect().Model(&result)
+	if filter.ClusterID != "" {
+		query = query.Where("cluster_id = ?", filter.ClusterID)
+	}
+	if filter.HardwareType != "" {
+		query = query.Where("EXISTS (SELECT 1 FROM jsonb_each(resources::jsonb) WHERE value->>'type' = ?)", filter.HardwareType)
+	}
+	if filter.ResourceType != "" {
+		query = query.Where("EXISTS (SELECT 1 FROM jsonb_each(resources::jsonb) WHERE key = ?)", filter.ResourceType)
+	}
 	query = query.Order("name asc").
 		Limit(per).
 		Offset((page - 1) * per)
@@ -106,14 +115,14 @@ func (s *spaceResourceStoreImpl) FindAll(ctx context.Context) ([]SpaceResource, 
 func (s *spaceResourceStoreImpl) FindAllResourceTypes(ctx context.Context, clusterId string) ([]string, error) {
 	typeSet := make(map[string]bool)
 	var hardWareTypes []string
-
+	filter := types.SpaceResourceFilter{ClusterID: clusterId}
 	// Use pagination to query resources
 	page := 1
 	per := 100 // Set a reasonable page size
 
 	for {
 		// Get resources for current page
-		resources, _, err := s.Index(ctx, clusterId, per, page)
+		resources, _, err := s.Index(ctx, filter, per, page)
 		if err != nil {
 			return nil, err
 		}

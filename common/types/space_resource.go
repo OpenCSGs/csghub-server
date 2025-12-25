@@ -17,6 +17,16 @@ const (
 	PayModeYear       PayMode      = "year"
 )
 
+func ResourceTypeValid(resourceType ResourceType) bool {
+	return resourceType == ResourceTypeCPU ||
+		resourceType == ResourceTypeGPU ||
+		resourceType == ResourceTypeNPU ||
+		resourceType == ResourceTypeGCU ||
+		resourceType == ResourceTypeGPGPU ||
+		resourceType == ResourceTypeMLU ||
+		resourceType == ResourceTypeDCU
+}
+
 type SpaceResource struct {
 	ID            int64        `json:"id"`
 	Name          string       `json:"name"`
@@ -43,8 +53,17 @@ type UpdateSpaceResourceReq struct {
 }
 
 type SpaceResourceIndexReq struct {
-	ClusterID   string `json:"cluster_id"`
-	DeployType  int    `json:"deploy_type"`
-	CurrentUser string `json:"current_user"`
+	ClusterID    string       `json:"cluster_id"`
+	DeployType   int          `json:"deploy_type"`
+	CurrentUser  string       `json:"current_user"`
+	ResourceType ResourceType `json:"resource_type"`
+	HardwareType string       `json:"hardware_type"`
+	IsAvailable  bool         `json:"is_available"`
 	PageOpts
+}
+
+type SpaceResourceFilter struct {
+	ClusterID    string       `json:"cluster_id"`
+	ResourceType ResourceType `json:"resource_type"`
+	HardwareType string       `json:"hardware_type"`
 }

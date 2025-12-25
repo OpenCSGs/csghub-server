@@ -50,7 +50,16 @@ func (c *spaceResourceComponentImpl) Index(ctx context.Context, req *types.Space
 	var total int
 	for _, clusterID := range clusterIDs {
 		var singleClusterResult []types.SpaceResource
-		databaseSpaceResources, currentTotal, err := c.spaceResourceStore.Index(ctx, clusterID, req.PageSize, req.Page)
+		dbReq := types.SpaceResourceFilter{
+			ClusterID: clusterID,
+		}
+		if req.HardwareType != "" {
+			dbReq.HardwareType = req.HardwareType
+		}
+		if req.ResourceType != "" {
+			dbReq.ResourceType = req.ResourceType
+		}
+		databaseSpaceResources, currentTotal, err := c.spaceResourceStore.Index(ctx, dbReq, req.PageSize, req.Page)
 		if err != nil {
 			slog.Error("failed to index space resource", slog.String("clusterID", clusterID), slog.Any("error", err))
 			continue

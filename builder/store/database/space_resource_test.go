@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/tests"
+	"opencsg.com/csghub-server/common/types"
 )
 
 func TestSpaceResourceStore_CRUD(t *testing.T) {
@@ -39,7 +40,7 @@ func TestSpaceResourceStore_CRUD(t *testing.T) {
 	require.Equal(t, 1, len(srs))
 	require.Equal(t, "c1", srs[0].ClusterID)
 
-	srs, _, err = store.Index(ctx, "c1", 50, 1)
+	srs, _, err = store.Index(ctx, types.SpaceResourceFilter{ClusterID: "c1"}, 50, 1)
 	require.Nil(t, err)
 	require.Equal(t, 1, len(srs))
 	require.Equal(t, "c1", srs[0].ClusterID)
@@ -146,4 +147,31 @@ func TestSpaceResourceStore_FindAllResourceTypes_InvalidJSON(t *testing.T) {
 	types, err := store.FindAllResourceTypes(ctx, "c1")
 	require.Nil(t, err)
 	require.Empty(t, types)
+}
+
+func TestSpaceResourceStore_Filter(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewSpaceResourceStoreWithDB(db)
+
+	_, err := store.Create(ctx, database.SpaceResource{
+		Name:      "r1",
+		ClusterID: "c1",
+		Resources: `{"cpu": { "type": "Intel","num": "200m"}}`,
+	})
+	require.Nil(t, err)
+	sr := &database.SpaceResource{}
+	err = db.Core.NewSelect().Model(sr).Where("name=?", "r1").Scan(ctx, sr)
+	require.Nil(t, err)
+	require.Equal(t, "c1", sr.ClusterID)
+
+	srs, total, err := store.Index(ctx, types.SpaceResourceFilter{
+		ResourceType: types.ResourceTypeCPU,
+	}, 50, 1)
+	require.Nil(t, err)
+	require.Equal(t, 1, len(srs))
+	require.Equal(t, 1, total)
+	require.Equal(t, "c1", srs[0].ClusterID)
 }

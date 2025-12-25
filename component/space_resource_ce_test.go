@@ -16,7 +16,7 @@ func TestSpaceResourceComponent_Index(t *testing.T) {
 	ctx := context.TODO()
 	sc := initializeTestSpaceResourceComponent(ctx, t)
 
-	sc.mocks.stores.SpaceResourceMock().EXPECT().Index(ctx, "c1", 50, 1).Return(
+	sc.mocks.stores.SpaceResourceMock().EXPECT().Index(ctx, types.SpaceResourceFilter{ClusterID: "c1"}, 50, 1).Return(
 		[]database.SpaceResource{
 			{ID: 1, Name: "sr", Resources: `{"memory": "1000", "gpu": {"num": "5"}}`},
 			{ID: 2, Name: "sr2", Resources: `{"memory": "1000"}`},
@@ -54,7 +54,7 @@ func TestSpaceResourceComponent_Index_With_Status_Filter(t *testing.T) {
 		sc.mocks.deployer.EXPECT().ListCluster(ctx).Return(clusters, nil)
 		sc.mocks.deployer.EXPECT().CheckHeartbeatTimeout(ctx, "cluster1").Once().Return(true, nil)
 		sc.mocks.deployer.EXPECT().CheckHeartbeatTimeout(ctx, "cluster2").Once().Return(false, nil)
-		sc.mocks.stores.SpaceResourceMock().EXPECT().Index(ctx, "cluster2", 50, 1).Return([]database.SpaceResource{}, 0, nil)
+		sc.mocks.stores.SpaceResourceMock().EXPECT().Index(ctx, types.SpaceResourceFilter{ClusterID: "cluster2"}, 50, 1).Return([]database.SpaceResource{}, 0, nil)
 		sc.mocks.deployer.EXPECT().GetClusterById(ctx, "cluster2").Return(&types.ClusterRes{}, nil)
 		req := &types.SpaceResourceIndexReq{
 			CurrentUser: "user1",

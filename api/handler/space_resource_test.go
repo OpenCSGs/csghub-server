@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	mockcomponent "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
+	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/builder/testutil"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -36,26 +37,41 @@ func (t *SpaceResourceTester) WithHandleFunc(fn func(h *SpaceResourceHandler) gi
 }
 
 func TestSpaceResourceHandler_Index(t *testing.T) {
-	tester := NewSpaceResourceTester(t).WithHandleFunc(func(h *SpaceResourceHandler) gin.HandlerFunc {
-		return h.Index
+	t.Run("200", func(t *testing.T) {
+		tester := NewSpaceResourceTester(t).WithHandleFunc(func(h *SpaceResourceHandler) gin.HandlerFunc {
+			return h.Index
+		})
+
+		req := &types.SpaceResourceIndexReq{
+			ClusterID:    "c1",
+			DeployType:   types.InferenceType,
+			CurrentUser:  "u",
+			ResourceType: types.ResourceTypeCPU,
+			HardwareType: "intel",
+			PageOpts: types.PageOpts{
+				PageSize: 50,
+				Page:     1,
+			},
+		}
+
+		tester.mocks.spaceResource.EXPECT().Index(tester.Ctx(), req).Return(
+			[]types.SpaceResource{{Name: "sp"}}, 0, nil,
+		)
+		tester.WithQuery("cluster_id", "c1").WithQuery("deploy_type", "").
+			WithQuery("resource_type", "cpu").WithQuery("hardware_type", "intel").WithUser().Execute()
+
+		tester.ResponseEq(t, 200, tester.OKText, []types.SpaceResource{{Name: "sp"}})
 	})
+	t.Run("invalid resource type", func(t *testing.T) {
+		tester := NewSpaceResourceTester(t).WithHandleFunc(func(h *SpaceResourceHandler) gin.HandlerFunc {
+			return h.Index
+		})
 
-	req := &types.SpaceResourceIndexReq{
-		ClusterID:   "c1",
-		DeployType:  types.InferenceType,
-		CurrentUser: "u",
-		PageOpts: types.PageOpts{
-			PageSize: 50,
-			Page:     1,
-		},
-	}
+		tester.WithQuery("cluster_id", "c1").WithQuery("deploy_type", "").
+			WithQuery("resource_type", "invalid").WithQuery("hardware_type", "intel").WithUser().Execute()
 
-	tester.mocks.spaceResource.EXPECT().Index(tester.Ctx(), req).Return(
-		[]types.SpaceResource{{Name: "sp"}}, 0, nil,
-	)
-	tester.WithQuery("cluster_id", "c1").WithQuery("deploy_type", "").WithUser().Execute()
-
-	tester.ResponseEq(t, 200, tester.OKText, []types.SpaceResource{{Name: "sp"}})
+		tester.ResponseEqSimple(t, 400, httpbase.R{Msg: "Invalid resource type"})
+	})
 }
 
 func TestSpaceResourceHandler_Create(t *testing.T) {
