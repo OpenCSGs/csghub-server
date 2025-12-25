@@ -13,8 +13,8 @@ echo "$OPENCSG_ACR_PASSWORD" | docker login $OPENCSG_ACR -u $OPENCSG_ACR_USERNAM
 export BUILDX_NO_DEFAULT_ATTESTATIONS=1
 export IMAGE_TAG=1.2
 docker buildx build --platform linux/amd64,linux/arm64 \
-  -t ${OPENCSG_ACR}/opencsg_space/csg-nginx:${IMAGE_TAG} \
-  -t ${OPENCSG_ACR}/opencsg_space/csg-nginx:latest \
+  -t ${OPENCSG_ACR}/opencsghq/csg-nginx:${IMAGE_TAG} \
+  -t ${OPENCSG_ACR}/opencsghq/csg-nginx:latest \
   -f Dockerfile.nginx \
   --push .
 ```
