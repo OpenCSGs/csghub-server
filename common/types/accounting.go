@@ -107,6 +107,16 @@ var (
 	SceneUnknow SceneType = 99 // unknow
 )
 
+type TokenUsageType string
+
+var (
+	ExternalInference                  TokenUsageType = "0"
+	CSGHubUserDeployedInference        TokenUsageType = "1"
+	CSGHubOtherDeployedInference       TokenUsageType = "2"
+	CSGHubServerlessInference          TokenUsageType = "3"
+	CSGHubOrganFellowDeployedInference TokenUsageType = "4"
+)
+
 type ChargeValueType int
 
 var (

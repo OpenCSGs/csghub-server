@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/openai/openai-go/v3"
@@ -320,7 +321,9 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 	rp.ServeHTTP(w, c.Request, proxyToApi, host)
 
 	go func() {
-		err := h.openaiComponent.RecordUsage(c.Request.Context(), userUUID, model, tokenCounter)
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		err := h.openaiComponent.RecordUsage(ctx, userUUID, model, tokenCounter)
 		if err != nil {
 			slog.Error("failed to record token usage", "error", err)
 		}
