@@ -71,7 +71,8 @@ const (
 	StreamKeyDeployTypeID = "csghub_deploy_type_id"
 	StreamKeyDeployTaskID = "csghub_deploy_task_id"
 
-	StreamKeyInstanceName = "pod_name"
+	StreamKeyInstanceName   = "pod_name"
+	StreamKeyDeployCommitID = "csghub_deploy_commit_id"
 )
 
 type ReportMsg string

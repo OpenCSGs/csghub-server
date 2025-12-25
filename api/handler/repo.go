@@ -3065,3 +3065,96 @@ func (h *RepoHandler) GetRepos(ctx *gin.Context) {
 		slog.String("search", search))
 	httpbase.OK(ctx, repos)
 }
+
+// GetInferenceLogsByVersion   godoc
+// @Security     ApiKey
+// @Summary      get serverless logs by version (commitid)
+// @Tags         Repository
+// @Accept       json
+// @Produce      json
+// @Param        repo_type path string true "models,spaces" Enums(models,spaces)
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        id path string true "id"
+// @Param        commit_id path string true "commit_id"
+// @Param        current_user query string true "current_user"
+// @Param        since query string false "since time. Optional values: 10mins, 30mins, 1hour, 6hours, 1day, 2days, 1week"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      401  {object}  types.APIUnauthorized "Permission denied"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /{repo_type}/{namespace}/{name}/serverless/{id}/versions/{commit_id} [get]
+func (h *RepoHandler) ServerlessVersionLogs(ctx *gin.Context) {
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "failed to get namespace and name from context", "error", err)
+		httpbase.NotFoundError(ctx, err)
+		return
+	}
+
+	currentUser := httpbase.GetCurrentUser(ctx)
+	repoType := common.RepoTypeFromContext(ctx)
+	deployID, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
+		httpbase.BadRequest(ctx, "Invalid deploy ID format")
+		return
+	}
+	commitID := ctx.Param("commit_id")
+	instance := ctx.Query("instance_name")
+	logReq := types.DeployActReq{
+		RepoType:     repoType,
+		Namespace:    namespace,
+		Name:         name,
+		CurrentUser:  currentUser,
+		DeployID:     deployID,
+		DeployType:   types.ServerlessType,
+		InstanceName: instance,
+		Since:        ctx.Query("since"),
+		CommitID:     commitID,
+	}
+
+	logReader, err := h.c.DeployInstanceLogs(ctx.Request.Context(), logReq)
+	if err != nil {
+		if errors.Is(err, errorx.ErrForbidden) {
+			slog.ErrorContext(ctx.Request.Context(), "user not allowed to get serverless deploy logs", slog.Any("logReq", logReq), slog.Any("error", err))
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
+
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get serverless deploy logs", slog.Any("logReq", logReq), slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	if logReader.RunLog() == nil {
+		httpbase.ServerError(ctx, errors.New("don't find any deploy instance log"))
+		return
+	}
+
+	ctx.Writer.Header().Set("Content-Type", "text/event-stream")
+	ctx.Writer.Header().Set("Cache-Control", "no-cache")
+	ctx.Writer.Header().Set("Connection", "keep-alive")
+	ctx.Writer.Header().Set("Transfer-Encoding", "chunked")
+	ctx.Writer.WriteHeader(http.StatusOK)
+	ctx.Writer.Flush()
+
+	heartbeatTicker := time.NewTicker(30 * time.Second)
+	defer heartbeatTicker.Stop()
+	for {
+		select {
+		case <-ctx.Request.Context().Done():
+			slog.Debug("repo handler logs request context done", slog.Any("error", ctx.Request.Context().Err()))
+			return
+		case data, ok := <-logReader.RunLog():
+			if ok {
+				ctx.SSEvent("Container", string(data))
+				ctx.Writer.Flush()
+			}
+		case <-heartbeatTicker.C:
+			ctx.SSEvent("Heartbeat", "keep-alive")
+			ctx.Writer.Flush()
+		default:
+			time.Sleep(time.Second * 1)
+		}
+	}
+}

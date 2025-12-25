@@ -83,6 +83,201 @@ func TestRepoHandler_CreateFile(t *testing.T) {
 
 }
 
+func TestRepoHandler_ServerlessVersionLogs(t *testing.T) {
+	// Test case: Invalid deploy ID format
+	t.Run("invalid_deploy_id", func(t *testing.T) {
+		tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+			return rp.ServerlessVersionLogs
+		})
+		tester.WithUser()
+
+		// Set invalid deploy ID
+		tester.WithKV("repo_type", types.ModelRepo)
+		tester.WithParam("id", "invalid")
+		tester.WithParam("commit_id", "test-commit-id")
+
+		// Execute request
+		tester.Execute()
+
+		// Verify response
+		require.Equal(t, http.StatusBadRequest, tester.Response().Code)
+		require.Contains(t, tester.Response().Body.String(), "Invalid deploy ID format")
+	})
+
+	// Test case: DeployInstanceLogs returns error
+	t.Run("deploy_instance_logs_error", func(t *testing.T) {
+		tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+			return rp.ServerlessVersionLogs
+		})
+		tester.WithUser()
+
+		// Set valid parameters
+		tester.WithKV("repo_type", types.ModelRepo)
+		tester.WithParam("id", "123")
+		tester.WithParam("commit_id", "test-commit-id")
+
+		// Mock error response
+		expectedDeployID := int64(123)
+		tester.mocks.repo.EXPECT().DeployInstanceLogs(mock.Anything, types.DeployActReq{
+			RepoType:     types.ModelRepo,
+			Namespace:    "u",
+			Name:         "r",
+			CurrentUser:  "u",
+			DeployID:     expectedDeployID,
+			DeployType:   types.ServerlessType,
+			InstanceName: "",
+			Since:        "",
+			CommitID:     "test-commit-id",
+		}).Return(nil, errors.New("internal server error"))
+
+		// Execute request
+		tester.Execute()
+
+		// Verify response
+		require.Equal(t, http.StatusInternalServerError, tester.Response().Code)
+	})
+
+	// Test case: DeployInstanceLogs returns forbidden error
+	t.Run("deploy_instance_logs_forbidden", func(t *testing.T) {
+		tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+			return rp.ServerlessVersionLogs
+		})
+		tester.WithUser()
+
+		// Set valid parameters
+		tester.WithKV("repo_type", types.ModelRepo)
+		tester.WithParam("id", "123")
+		tester.WithParam("commit_id", "test-commit-id")
+
+		// Mock forbidden error response
+		expectedDeployID := int64(123)
+		tester.mocks.repo.EXPECT().DeployInstanceLogs(mock.Anything, types.DeployActReq{
+			RepoType:     types.ModelRepo,
+			Namespace:    "u",
+			Name:         "r",
+			CurrentUser:  "u",
+			DeployID:     expectedDeployID,
+			DeployType:   types.ServerlessType,
+			InstanceName: "",
+			Since:        "",
+			CommitID:     "test-commit-id",
+		}).Return(nil, errorx.ErrForbidden)
+
+		// Execute request
+		tester.Execute()
+
+		// Verify response
+		require.Equal(t, http.StatusForbidden, tester.Response().Code)
+	})
+
+	// Test case: No logs found
+	t.Run("no_logs_found", func(t *testing.T) {
+		tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+			return rp.ServerlessVersionLogs
+		})
+		tester.WithUser()
+
+		// Set valid parameters
+		tester.WithKV("repo_type", types.ModelRepo)
+		tester.WithParam("id", "123")
+		tester.WithParam("commit_id", "test-commit-id")
+
+		// Mock empty logs response
+		expectedDeployID := int64(123)
+		buildLogChan := make(chan string)
+		close(buildLogChan)
+		// Create a MultiLogReader with nil runLogs
+		// Note: We're passing a nil channel directly
+		var nilRunLogChan <-chan string
+		multiLogReader := deploy.NewMultiLogReader(buildLogChan, nilRunLogChan)
+
+		tester.mocks.repo.EXPECT().DeployInstanceLogs(mock.Anything, types.DeployActReq{
+			RepoType:     types.ModelRepo,
+			Namespace:    "u",
+			Name:         "r",
+			CurrentUser:  "u",
+			DeployID:     expectedDeployID,
+			DeployType:   types.ServerlessType,
+			InstanceName: "",
+			Since:        "",
+			CommitID:     "test-commit-id",
+		}).Return(multiLogReader, nil)
+
+		// Execute request
+		tester.Execute()
+
+		// Verify response
+		require.Equal(t, http.StatusInternalServerError, tester.Response().Code)
+		require.Contains(t, tester.Response().Body.String(), "don't find any deploy instance log")
+	})
+
+	// Test case: Normal case with all parameters
+	t.Run("normal_case_all_params", func(t *testing.T) {
+		tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+			return rp.ServerlessVersionLogs
+		})
+		tester.WithUser()
+
+		// Set valid parameters
+		tester.WithKV("repo_type", types.ModelRepo)
+		tester.WithParam("id", "123")
+		tester.WithParam("commit_id", "test-commit-id")
+		tester.WithQuery("instance_name", "instance-1")
+		tester.WithQuery("since", "1h")
+
+		// Mock response with a timeout
+		expectedDeployID := int64(123)
+		buildLogChan := make(chan string)
+		runLogChan := make(chan string)
+
+		// Create multi log reader
+		multiLogReader := deploy.NewMultiLogReader(buildLogChan, runLogChan)
+
+		// Mock the expected call
+		tester.mocks.repo.EXPECT().DeployInstanceLogs(mock.Anything, types.DeployActReq{
+			RepoType:     types.ModelRepo,
+			Namespace:    "u",
+			Name:         "r",
+			CurrentUser:  "u",
+			DeployID:     expectedDeployID,
+			DeployType:   types.ServerlessType,
+			InstanceName: "instance-1",
+			Since:        "1h",
+			CommitID:     "test-commit-id",
+		}).Return(multiLogReader, nil)
+
+		// Set a timeout for the request
+		ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+		defer cancel()
+
+		// Execute request in a goroutine with timeout
+		done := make(chan bool)
+		go func() {
+			tester.Execute()
+			done <- true
+		}()
+
+		// Wait for either the request to complete or the timeout
+		select {
+		case <-done:
+			// Request completed successfully
+		case <-ctx.Done():
+			// Timeout occurred, which is expected for SSE streaming
+		}
+
+		// Verify that the mock was called
+
+		// Close channels to clean up
+		close(buildLogChan)
+		close(runLogChan)
+	})
+}
+
+func TestRepoHandler_ServerlessVersionLogs_SSE(t *testing.T) {
+	// This is a more advanced test that would require capturing SSE events
+	// For simplicity, we'll test the basic functionality in the main test function
+}
+
 func TestRepoHandler_UpdateFile(t *testing.T) {
 	tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
 		return rp.UpdateFile
