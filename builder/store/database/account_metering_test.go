@@ -91,7 +91,7 @@ func TestAccountMeteringStore_ListByUserIDAndTime(t *testing.T) {
 		},
 		{
 			UserUUID: "foo", Value: 12.34, ValueType: 1,
-			ResourceName: "r10", Scene: types.ScenePayOrder, CustomerID: "barz",
+			ResourceName: "r10", Scene: types.ScenePayOrder, CustomerID: "",
 			RecordedAt: dt.Add(-1 * time.Hour), EventUUID: uuid.New(),
 		},
 	}
@@ -115,6 +115,21 @@ func TestAccountMeteringStore_ListByUserIDAndTime(t *testing.T) {
 		names = append(names, am.ResourceName)
 	}
 	require.Equal(t, []string{"r5", "r4", "r3", "r2", "r1"}, names)
+
+	ams, total, err = store.ListByUserIDAndTime(ctx, types.ActStatementsReq{
+		UserUUID:     "foo",
+		Scene:        2,
+		InstanceName: "",
+		StartTime:    dt.Add(-5 * time.Hour).Format(time.RFC3339),
+		EndTime:      dt.Add(5 * time.Hour).Format(time.RFC3339),
+	})
+	require.Nil(t, err)
+	require.Equal(t, 6, total)
+	names = []string{}
+	for _, am := range ams {
+		names = append(names, am.ResourceName)
+	}
+	require.Equal(t, []string{"r10", "r5", "r4", "r3", "r2", "r1"}, names)
 }
 
 func TestAccountMeteringStore_GetStatByDate(t *testing.T) {

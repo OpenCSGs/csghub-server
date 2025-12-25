@@ -63,16 +63,20 @@ func (am *accountMeteringStoreImpl) Create(ctx context.Context, input AccountMet
 
 func (am *accountMeteringStoreImpl) ListByUserIDAndTime(ctx context.Context, req types.ActStatementsReq) ([]AccountMetering, int, error) {
 	var accountMeters []AccountMetering
-	q := am.db.Operator.Core.NewSelect().Model(&accountMeters).Where("user_uuid = ? and scene = ? and customer_id = ? and recorded_at >= ? and recorded_at <= ?", req.UserUUID, req.Scene, req.InstanceName, req.StartTime, req.EndTime)
+	q := am.db.Operator.Core.NewSelect().Model(&accountMeters).Where("user_uuid = ? and scene = ?", req.UserUUID, req.Scene)
+	if len(req.InstanceName) > 0 {
+		q = q.Where("customer_id = ?", req.InstanceName)
+	}
+	q = q.Where("recorded_at >= ? and recorded_at <= ?", req.StartTime, req.EndTime)
 
 	count, err := q.Count(ctx)
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to counting recorders, error: %w", err)
+		return nil, 0, fmt.Errorf("failed to counting metering recorders, error: %w", err)
 	}
 
 	_, err = q.Order("id DESC").Limit(req.Per).Offset((req.Page-1)*req.Per).Exec(ctx, &accountMeters)
 	if err != nil {
-		return nil, 0, fmt.Errorf("list all meters, error: %w", err)
+		return nil, 0, fmt.Errorf("list all metering recorders, error: %w", err)
 	}
 	return accountMeters, count, nil
 }
