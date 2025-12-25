@@ -267,8 +267,10 @@ type StreamMode struct {
 }
 
 type CodeAgentRequestMessage struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+	Role      string         `json:"role"`
+	Content   string         `json:"content"`
+	File      *CodeAgentFile `json:"file,omitempty"`
+	Timestamp time.Time      `json:"timestamp"`
 }
 
 type CodeAgentSyncOperation string
