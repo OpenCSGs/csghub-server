@@ -151,41 +151,9 @@ var MockedCheckerSet = wire.NewSet(
 	wire.Bind(new(checker.GitCallbackChecker), new(*mock_checker.MockGitCallbackChecker)),
 )
 
-type Mocks struct {
-	stores           *tests.MockStores
-	components       *mockedComponents
-	gitServer        *mock_git.MockGitServer
-	userSvcClient    *mock_rpc.MockUserSvcClient
-	s3Client         *mock_s3.MockClient
-	mirrorServer     *mock_mirror.MockMirrorServer
-	deployer         *mock_deploy.MockDeployer
-	cache            *mock_cache.MockCache
-	accountingClient *mock_accounting.MockAccountingClient
-	preader          *mock_preader.MockReader
-	moderationClient *mock_rpc.MockModerationSvcClient
-	rsaReader        *mock_rsa.MockKeysReader
-	importer         *mock_importer.MockImporter
-	dataviewerClient *mock_dataviewer_client.MockDataviewerClient
-	multiSyncClient  *mock_multisync.MockClient
-	s3Core           *mock_s3.MockCore
-	checker          *mock_checker.MockGitCallbackChecker
-}
-
-var AllMockSet = wire.NewSet(
-	wire.Struct(new(mockedComponents), "*"),
-	wire.Struct(new(Mocks), "*"),
-)
-
 func ProvideTestConfig() *config.Config {
 	return &config.Config{}
 }
-
-var MockSuperSet = wire.NewSet(
-	MockedComponentSet, AllMockSet, MockedStoreSet, MockedGitServerSet, MockedUserSvcSet,
-	MockedXnetSvcClientSet, MockedS3Set, MockedS3CoreSet, MockedMultiSyncClientSet, MockedDeployerSet, MockedCacheSet, ProvideTestConfig, MockedMirrorServerSet,
-	MockedAccountingClientSet, MockedParquetReaderSet, MockedCheckerSet,
-	MockedModerationSvcClientSet, MockedRsaReader, MockedImporterSet, MockedDataviewerClientSet,
-)
 
 func NewTestRepoComponent(config *config.Config, stores *tests.MockStores, rpcUser rpc.UserSvcClient, gitServer gitserver.GitServer, tagComponent TagComponent, s3Client s3.Client, deployer deploy.Deployer, cache cache.Cache, accountingComponent AccountingComponent, mirrorServer mirrorserver.MirrorServer, multiSyncClient multisync.Client, xnetClient rpc.XnetSvcClient) *repoComponentImpl {
 	return &repoComponentImpl{
