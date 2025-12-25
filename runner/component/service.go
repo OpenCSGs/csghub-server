@@ -1070,6 +1070,7 @@ func (s *serviceComponentImpl) runServiceSingleHost(ctx context.Context, req typ
 	if req.DeployType == types.InferenceType {
 		pvcName = req.UserID
 	}
+	pvcName = strings.ToLower(pvcName)
 	// add pvc if possible
 	// space image was built from user's code, model cache dir is hard to control
 	// so no PV cache for space case so far
