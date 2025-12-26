@@ -76,11 +76,17 @@ type AgentInstanceCreationResult struct {
 
 // LangFlowChatRequest represents a chat request to an agent instance
 type LangflowChatRequest struct {
-	SessionID  *string         `json:"session_id,omitempty"`           // Optional session ID (client-provided)
-	InputValue string          `json:"input_value" binding:"required"` // Input value for the agent
-	InputType  string          `json:"input_type" binding:"required"`  // Type of input (e.g., "chat")
-	OutputType string          `json:"output_type" binding:"required"` // Type of output (e.g., "chat")
-	Tweaks     json.RawMessage `json:"tweaks,omitempty"`               // Optional parameter tweaks
+	SessionID  *string                   `json:"session_id,omitempty"`           // Optional session ID (client-provided)
+	InputValue string                    `json:"input_value" binding:"required"` // Input value for the agent
+	InputType  string                    `json:"input_type" binding:"required"`  // Type of input (e.g., "chat")
+	OutputType string                    `json:"output_type" binding:"required"` // Type of output (e.g., "chat")
+	Tweaks     json.RawMessage           `json:"tweaks,omitempty"`               // Optional parameter tweaks
+	Files      []LangflowChatRequestFile `json:"files,omitempty"`                // Optional files to upload
+}
+
+type LangflowChatRequestFile struct {
+	URL  string `json:"url"`
+	Name string `json:"name"`
 }
 
 // AgentChatResponse represents the response from an agent chat
