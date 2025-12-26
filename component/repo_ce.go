@@ -4,7 +4,9 @@ package component
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 
@@ -12,12 +14,14 @@ import (
 
 	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/git"
+	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/multisync"
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/store/s3"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
+	"opencsg.com/csghub-server/common/utils/common"
 	"opencsg.com/csghub-server/mirror/cache"
 )
 
@@ -130,4 +134,114 @@ func (c *repoComponentImpl) RemoteDiff(ctx context.Context, req types.GetDiffBet
 
 func (c *repoComponentImpl) IsXnetEnabled(ctx context.Context, repoType types.RepositoryType, namespace, name, username string) (*types.XetEnabled, error) {
 	return nil, nil
+}
+
+func (c *repoComponentImpl) MirrorProgress(ctx context.Context, repoType types.RepositoryType, namespace, name, currentUser string) (types.LFSSyncProgressResp, error) {
+	var progressResp types.LFSSyncProgressResp
+
+	return progressResp, nil
+}
+
+func (c *repoComponentImpl) MirrorFromSaas(ctx context.Context, namespace, name, currentUser string, repoType types.RepositoryType) error {
+	repo, err := c.repoStore.FindByPath(ctx, repoType, namespace, name)
+	if err != nil {
+		return fmt.Errorf("failed to find repo, error: %w", err)
+	}
+	m, err := c.mirrorStore.FindByRepoID(ctx, repo.ID)
+	if err != nil {
+		if !errors.Is(err, sql.ErrNoRows) {
+			return fmt.Errorf("failed to find mirror, error: %w", err)
+		}
+	}
+	if m != nil {
+		err := c.mirrorFromSaasSync(ctx, m, repo, namespace, name, repoType)
+		if err != nil {
+			return fmt.Errorf("failed to trigger mirror sync, error: %w", err)
+		}
+		return nil
+	}
+
+	var mirror database.Mirror
+	syncVersion, err := c.syncVersionStore.FindByRepoTypeAndPath(ctx, repo.PathWithOutPrefix(), repoType)
+	if err != nil {
+		return fmt.Errorf("failed to find sync version, error: %w", err)
+	}
+	mirrorSource := &database.MirrorSource{}
+	if syncVersion.SourceID == types.SyncVersionSourceOpenCSG {
+		mirrorSource.SourceName = types.OpenCSGPrefix
+	} else if syncVersion.SourceID == types.SyncVersionSourceHF {
+		mirrorSource.SourceName = types.HuggingfacePrefix
+	}
+
+	mirrorSource.SourceName = types.OpenCSGPrefix
+	syncClientSetting, err := c.syncClientSettingStore.First(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to find sync client setting, error: %w", err)
+	}
+
+	sourceUrl := common.TrimPrefixCloneURLBySourceID(c.config.MultiSync.SaasSyncDomain, string(repoType), namespace, name, syncVersion.SourceID)
+	mirror.SourceUrl = sourceUrl
+	mirror.MirrorSourceID = mirrorSource.ID
+	mirror.RepositoryID = repo.ID
+	mirror.Repository = repo
+	mirror.Username = currentUser
+	mirror.AccessToken = c.config.Mirror.Token
+	mirror.SourceRepoPath = fmt.Sprintf("%s/%s", namespace, name)
+
+	taskId, err := c.git.CreateMirrorRepo(ctx, gitserver.CreateMirrorRepoReq{
+		Namespace:   namespace,
+		Name:        name,
+		CloneUrl:    mirror.SourceUrl,
+		RepoType:    repoType,
+		MirrorToken: syncClientSetting.Token,
+		Private:     false,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create mirror repo in git: %w", err)
+	}
+
+	mirror.MirrorTaskID = taskId
+
+	m, err = c.mirrorStore.Create(ctx, &mirror)
+	if err != nil {
+		return fmt.Errorf("failed to create mirror: %w", err)
+	}
+
+	mt := database.MirrorTask{
+		MirrorID: m.ID,
+		Priority: m.Priority,
+		Status:   types.MirrorQueued,
+	}
+	_, err = c.mirrorTaskStore.CancelOtherTasksAndCreate(ctx, mt)
+	if err != nil {
+		return fmt.Errorf("failed to create mirror task: %w", err)
+	}
+
+	repo.SyncStatus = types.SyncStatusPending
+
+	_, err = c.repoStore.UpdateRepo(ctx, *repo)
+	if err != nil {
+		return fmt.Errorf("failed to update repo sync status: %w", err)
+	}
+	return nil
+}
+
+func (c *repoComponentImpl) mirrorFromSaasSync(ctx context.Context, mirror *database.Mirror, repo *database.Repository, namespace, name string, repoType types.RepositoryType) error {
+	var err error
+	mt := database.MirrorTask{
+		MirrorID: mirror.ID,
+		Priority: mirror.Priority,
+		Status:   types.MirrorQueued,
+	}
+	_, err = c.mirrorTaskStore.CancelOtherTasksAndCreate(ctx, mt)
+	if err != nil {
+		return fmt.Errorf("failed to create mirror task: %w", err)
+	}
+
+	_, err = c.repoStore.UpdateRepo(ctx, *repo)
+	if err != nil {
+		return fmt.Errorf("failed to update repo sync status: %w", err)
+	}
+
+	return nil
 }
