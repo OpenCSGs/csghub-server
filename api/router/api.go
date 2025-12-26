@@ -81,10 +81,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	middlewareCollection.Auth.NeedPhoneVerified = middleware.NeedPhoneVerified(config)
 	middlewareCollection.Repo.RepoExists = middleware.RepoExists(config)
 	middlewareCollection.License.Check = middleware.CheckLicense(config)
-	middlewareCollection.API.Captcha = middleware.NewCaptcha(config).Handle
-	rateLimitMiddleware := middleware.RateLimiter(config, middleware.WithTimeBucketRateLimter(config), middleware.WithIPCheck())
-	middlewareCollection.API.IPLimiter = middleware.IPLocationCheck(config)
-	middlewareCollection.API.RateLimter = rateLimitMiddleware
+
 	//add router for golang pprof
 	debugGroup := r.Group("/debug", middlewareCollection.Auth.NeedAPIKey)
 	pprof.RouteRegister(debugGroup, "pprof")
@@ -186,7 +183,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 
 	r.Use(middleware.LocalizedErrorMiddleware())
 	r.Use(middleware.Authenticator(config))
-	r.Use(middlewareCollection.API.IPLimiter, middlewareCollection.API.RateLimter, middlewareCollection.API.Captcha)
+	useAdvancedMiddleware(r, config)
 	apiGroup := r.Group("/api/v1")
 
 	versionHandler := handler.NewVersionHandler()
