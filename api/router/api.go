@@ -183,13 +183,11 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 
 	r.Use(middleware.LocalizedErrorMiddleware())
 	r.Use(middleware.Authenticator(config))
+	useAdvancedMiddleware(r, config)
 	apiGroup := r.Group("/api/v1")
 
 	versionHandler := handler.NewVersionHandler()
 	apiGroup.GET("/version", versionHandler.Version)
-
-	// Admin user get repo path list
-	apiGroup.GET("/repos", middlewareCollection.Auth.NeedAdmin, repoCommonHandler.GetRepos)
 
 	// TODO:use middleware to handle common response
 	//
@@ -314,6 +312,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	apiGroup.POST("/jwt/token", middlewareCollection.Auth.NeedAPIKey, userProxyHandler.Proxy)
 	apiGroup.GET("/jwt/:token", middlewareCollection.Auth.NeedAPIKey, userProxyHandler.ProxyToApi("/api/v1/jwt/%s", "token"))
 	apiGroup.GET("/users", userProxyHandler.Proxy)
+	apiGroup.GET("/users/stream-export", middlewareCollection.Auth.NeedAdmin, userProxyHandler.Proxy)
 
 	// callback
 	callbackCtrl, err := callback.NewGitCallbackHandler(config)
@@ -403,6 +402,9 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	adminGroup.Use(middleware.NeedAdmin(config))
 
 	adminGroup.POST("/:repo_type/:namespace/:name/change_path", repoCommonHandler.ChangePath)
+
+	// Admin user get repo path list
+	adminGroup.GET("/repos", repoCommonHandler.GetRepos)
 
 	// routes for broadcast
 	broadcastHandler, err := handler.NewBroadcastHandler()
@@ -745,7 +747,6 @@ func createDatasetRoutes(
 ) {
 	// gin cache
 	memoryStore := persist.NewMemoryStore(2 * time.Minute)
-
 	datasetsGroup := apiGroup.Group("/datasets")
 	// allow access without login
 	datasetsGroup.GET("", dsHandler.Index)
@@ -761,7 +762,7 @@ func createDatasetRoutes(
 		datasetsGroup.GET("/:namespace/:name/tags", middleware.MustLogin(), repoCommonHandler.Tags)
 		datasetsGroup.POST("/:namespace/:name/preupload/:revision", middlewareCollection.Auth.NeedPhoneVerified, repoCommonHandler.Preupload)
 		// update tags of a certain category
-		datasetsGroup.GET("/:namespace/:name/all_files", cache.Cache(memoryStore, time.Minute*2, middleware.CacheRepoInfo()), middleware.MustLogin(), repoCommonHandler.AllFiles)
+		datasetsGroup.GET("/:namespace/:name/all_files", middleware.MustLogin(), cache.Cache(memoryStore, time.Minute*2, middleware.CacheRepoInfo()), repoCommonHandler.AllFiles)
 		datasetsGroup.POST("/:namespace/:name/tags/:category", middleware.MustLogin(), repoCommonHandler.UpdateTags)
 		datasetsGroup.GET("/:namespace/:name/last_commit", repoCommonHandler.LastCommit)
 		datasetsGroup.GET("/:namespace/:name/commit/:commit_id", middleware.MustLogin(), repoCommonHandler.CommitWithDiff)
@@ -774,7 +775,7 @@ func createDatasetRoutes(
 		datasetsGroup.GET("/:namespace/:name/refs/:ref/logs_tree/*path", middleware.MustLogin(), repoCommonHandler.LogsTree)
 		datasetsGroup.GET("/:namespace/:name/commits", middleware.MustLogin(), repoCommonHandler.Commits)
 		datasetsGroup.POST("/:namespace/:name/raw/*file_path", middlewareCollection.Auth.NeedPhoneVerified, repoCommonHandler.CreateFile)
-		datasetsGroup.GET("/:namespace/:name/raw/*file_path", cache.Cache(memoryStore, time.Minute*2, middleware.CacheRepoInfo()), middleware.MustLogin(), repoCommonHandler.FileRaw)
+		datasetsGroup.GET("/:namespace/:name/raw/*file_path", middleware.MustLogin(), cache.Cache(memoryStore, time.Minute*2, middleware.CacheRepoInfo()), repoCommonHandler.FileRaw)
 		datasetsGroup.GET("/:namespace/:name/blob/*file_path", repoCommonHandler.FileInfo)
 		datasetsGroup.GET("/:namespace/:name/download/*file_path", middleware.MustLogin(), repoCommonHandler.DownloadFile)
 		datasetsGroup.GET("/:namespace/:name/resolve/*file_path", middleware.MustLogin(), repoCommonHandler.ResolveDownload)
@@ -1125,6 +1126,8 @@ func createMappingRoutes(
 				hfDSAPIGroup.POST("/:namespace/:name/paths-info/:ref", middleware.RepoMapping(types.DatasetRepo), hfdsHandler.DatasetPathsInfo)
 				hfDSAPIGroup.GET("/:namespace/:name/tree/:ref/*path_in_repo", middleware.RepoMapping(types.DatasetRepo), hfdsHandler.DatasetTree)
 				hfDSAPIGroup.GET("/:namespace/:name/resolve/:ref/.huggingface.yaml", middleware.RepoMapping(types.DatasetRepo), hfdsHandler.HandleHFYaml)
+				hfDSAPIGroup.POST("/:namespace/:name/preupload/:revision", middleware.RepoMapping(types.DatasetRepo), repoCommonHandler.PreuploadHF)
+				hfDSAPIGroup.POST("/:namespace/:name/commit/:revision", middleware.RepoMapping(types.DatasetRepo), repoCommonHandler.CommitFilesHF)
 			}
 			hfSpaceAPIGroup := hfAPIGroup.Group("/spaces")
 			{

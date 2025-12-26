@@ -31,6 +31,7 @@ type Config struct {
 	CityToCdnDomain          map[string]string `env:"STARHUB_SERVER_CITY_TO_CDN_DOMAIN" default:""`
 	UniqueServiceName        string            `env:"STARHUB_SERVER_UNIQUE_SERVICE_NAME" default:""`
 	ServerFailureRedirectURL string            `env:"STARHUB_SERVER_FAIL_REDIRECT_URL" default:"http://localhost:3000/errors/server-error"`
+	NeedPhoneVerify          bool              `env:"STARHUB_SERVER_NEED_PHONE_VERIFY" default:"false"`
 
 	APIServer struct {
 		Port         int    `env:"STARHUB_SERVER_SERVER_PORT" default:"8080"`
@@ -211,11 +212,12 @@ type Config struct {
 	}
 
 	Accounting struct {
-		Host                       string `env:"OPENCSG_ACCOUNTING_SERVER_HOST" default:"http://localhost"`
-		Port                       int    `env:"OPENCSG_ACCOUNTING_SERVER_PORT" default:"8086"`
-		ChargingEnable             bool   `env:"OPENCSG_ACCOUNTING_CHARGING_ENABLE" default:"false"`
-		SubscriptionCronExpression string `env:"OPENCSG_ACCOUNTING_SUBSCRIPTION_CRON_EXPRESSION" default:"*/5 * * * *"`
-		ThresholdOfStopDeploy      int    `env:"OPENCSG_ACCOUNTING_THRESHOLD_OF_STOP_DEPLOY" default:"5000"`
+		Host                         string `env:"OPENCSG_ACCOUNTING_SERVER_HOST" default:"http://localhost"`
+		Port                         int    `env:"OPENCSG_ACCOUNTING_SERVER_PORT" default:"8086"`
+		ChargingEnable               bool   `env:"OPENCSG_ACCOUNTING_CHARGING_ENABLE" default:"false"`
+		SubscriptionCronExpression   string `env:"OPENCSG_ACCOUNTING_SUBSCRIPTION_CRON_EXPRESSION" default:"*/5 * * * *"`
+		ExpiredPresentCronExpression string `env:"OPENCSG_ACCOUNTING_EXPIRED_PRESENT_CRON_EXPRESSION" default:"0 0 * * *"`
+		ThresholdOfStopDeploy        int    `env:"OPENCSG_ACCOUNTING_THRESHOLD_OF_STOP_DEPLOY" default:"5000"`
 	}
 
 	User struct {
@@ -334,12 +336,15 @@ type Config struct {
 		IncreaseMultisyncRepoLimitCronExpression string `env:"STARHUB_SERVER_CRON_JOB_INCREASE_MULTISYNC_REPO_LIMIT_CRON_EXPRESSION" default:"0 0 * * *"`
 		MigrateRepoPathCronExpression            string `env:"STARHUB_SERVER_CRON_JOB_MIGRATE_REPO_PATH_CRON_EXPRESSION" default:"* 16-20 * * *"`
 		DeletePendingDeletionCronExpression      string `env:"STARHUB_SERVER_CRON_JOB_DELETE_PENDING_DELETION_CRON_EXPRESSION" default:"0 16-20 * * *"`
+		ReleaseInvitationCreditCronExpression    string `env:"STARHUB_SERVER_CRON_JOB_RELEASE_INVITATION_CREDIT_CRON_EXPRESSION" default:"0 0 5 * *"`
 	}
 
 	Agent struct {
-		AutoHubServiceHost   string `env:"OPENCSG_AGENT_AUTOHUB_SERVICE_HOST" default:"http://internal.opencsg-stg.com:8190"`
-		AgentHubServiceHost  string `env:"OPENCSG_AGENT_AGENTHUB_SERVICE_HOST" default:""`
-		AgentHubServiceToken string `env:"OPENCSG_AGENT_AGENTHUB_SERVICE_TOKEN" default:""`
+		AutoHubServiceHost           string `env:"OPENCSG_AGENT_AUTOHUB_SERVICE_HOST" default:"http://internal.opencsg-stg.com:8190"`
+		AgentHubServiceHost          string `env:"OPENCSG_AGENT_AGENTHUB_SERVICE_HOST" default:""`
+		AgentHubServiceToken         string `env:"OPENCSG_AGENT_AGENTHUB_SERVICE_TOKEN" default:""`
+		CodeInstanceQuotaPerUser     int    `env:"STARHUB_SERVER_AGENT_CODE_INSTANCE_QUOTA_PER_USER" default:"5"`
+		LangflowInstanceQuotaPerUser int    `env:"STARHUB_SERVER_AGENT_LANGFLOW_INSTANCE_QUOTA_PER_USER" default:"5"`
 	}
 
 	DataViewer struct {
@@ -419,6 +424,7 @@ type Config struct {
 		DirectMailRegionId                  string `env:"STARHUB_SERVER_DIRECT_MAIL_REGION_ID" default:"cn-hangzhou"`
 		MailerRechargeAdmin                 string `env:"STARHUB_SERVER_MAILER_RECHARGE_ADMIN" default:"contact@opencsg.com"`
 		MailerWeeklyRechargesMail           string `env:"STARHUB_SERVER_MAILER_WEEKLY_RECHARGES_MAIL" default:"reconcile@opencsg.com"`
+		EmailInvoiceCreatedReceiver         string `env:"STARHUB_SERVER_EMAIL_INVOICE_CREATED_RECEIVER" default:"contact@opencsg.com"`
 		RepoSyncTimezone                    string `env:"STARHUB_SERVER_REPO_SYNC_TIMEZONE" default:"Asia/Shanghai"`
 		NotificationRetryCount              int    `env:"STARHUB_SERVER_NOTIFIER_NOTIFICATION_RETRY_COUNT" default:"3"`
 		BroadcastUserPageSize               int    `env:"STARHUB_SERVER_NOTIFIER_BROADCAST_USER_PAGE_SIZE" default:"100"`
@@ -494,13 +500,34 @@ type Config struct {
 		HealthInterval       int    `env:"STARHUB_SERVER_LOGCOLLECTOR_HEALTH_INTERVAL" default:"5"`
 		AcceptLabelPrefix    string `env:"STARHUB_SERVER_LOGCOLLECTOR_ACCEPT_LABEL_PREFIX" default:"csghub_"`
 		// the separator of log lines, default is "\\n" by client formats, "\n" sse auto newline
-		LineSeparator string `env:"STARHUB_SERVER_LOGCOLLECTOR_LINE_SEPARATOR" default:"\\n"`
+		LineSeparator          string `env:"STARHUB_SERVER_LOGCOLLECTOR_LINE_SEPARATOR" default:"\\n"`
+		MaxStoreTimeDay        int    `env:"STARHUB_SERVER_LOGCOLLECTOR_MAX_STORE_TIME_DAY" default:"7"`
+		QueryLastReportTimeout int    `env:"STARHUB_SERVER_LOGCOLLECTOR_QUERY_LAST_REPORT_TIMEOUT" default:"10"`
 	}
 
 	Temporal struct {
 		MaxConcurrentActivityExecutionSize      int `env:"OPENCSG_TEMPORAL_MAX_CONCURRENT_ACTIVITY_EXECUTION_SIZE" default:"5"`
 		MaxConcurrentLocalActivityExecutionSize int `env:"OPENCSG_TEMPORAL_MAX_CONCURRENT_LOCAL_ACTIVITY_EXECUTION_SIZE" default:"10"`
 		MaxConcurrentWorkflowTaskExecutionSize  int `env:"OPENCSG_TEMPORAL_MAX_CONCURRENT_WORKFLOW_TASK_EXECUTION_SIZE" default:"50"`
+	}
+
+	APIRateLimiter struct {
+		Enable bool  `env:"STARHUB_SERVER_API_RATE_LIMITER_ENABLE" default:"false"`
+		Limit  int64 `env:"STARHUB_SERVER_API_RATE_LIMITER_LIMIT" default:"10"`
+		Window int64 `env:"STARHUB_SERVER_API_RATE_LIMITER_WINDOW" default:"60"`
+	}
+
+	APILocationCheck struct {
+		Enable    bool     `env:"STARHUB_SERVER_API_LOCATION_CHECK_ENABLE" default:"false"`
+		WhiteList []string `env:"STARHUB_SERVER_API_LOCATION_CHECK_WHITE_LIST" default:"[China,Hong Kong,Singapore]"`
+	}
+
+	Captcha struct {
+		ExceptionPaths []string `env:"STARHUB_SERVER_CAPTCHA_EXCEPTION_PATHS" default:"[/api/v1/broadcasts,/api/v1/notifications]"`
+	}
+
+	GeoIP struct {
+		DBFile string `env:"STARHUB_SERVER_GEOIP_DB_FILE" default:"/starhub-bin/GeoLite2-Country.mmdb"`
 	}
 
 	Xnet struct {

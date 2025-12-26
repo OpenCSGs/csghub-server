@@ -9,6 +9,8 @@ import (
 	"opencsg.com/csghub-server/common/config"
 )
 
+func useAdvancedMiddleware(r *gin.Engine, config *config.Config) {}
+
 func createAdvancedRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware.MiddlewareCollection, config *config.Config) error {
 	return nil
 }
