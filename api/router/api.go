@@ -1346,7 +1346,7 @@ func createWebHookRoutes(apiGroup *gin.RouterGroup, middlewareCollection middlew
 	{
 		webhookGrp := apiGroup.Group("/webhook")
 		runnerHookGrp := webhookGrp.Group("/runner")
-		runnerHookGrp.POST("", middlewareCollection.Auth.NeedAPIKey, webhookHandler.ReceiveRunnerWebHook)
+		runnerHookGrp.POST("", middlewareCollection.Auth.NeedAPIKey, middleware.WebhookMetrics(), webhookHandler.ReceiveRunnerWebHook)
 	}
 	return nil
 }
