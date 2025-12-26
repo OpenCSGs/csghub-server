@@ -33,3 +33,7 @@ func getCacheStrategyTrendingReposByRequest(c *gin.Context) (bool, cache.Strateg
 		CacheDuration: 2 * time.Minute,
 	}
 }
+
+func CacheRepoInfo() cache.Option {
+	return cache.WithCacheStrategyByRequest(getCacheStrategyRepoInfoByRequest)
+}

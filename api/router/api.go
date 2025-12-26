@@ -601,7 +601,7 @@ func createModelRoutes(config *config.Config,
 		modelsGroup.GET("", cache.Cache(memoryStore, time.Minute, middleware.CacheStrategyTrendingRepos()), modelHandler.Index)
 		modelsGroup.PUT("/:namespace/:name", middlewareCollection.Auth.NeedLogin, modelHandler.Update)
 		modelsGroup.DELETE("/:namespace/:name", middlewareCollection.Auth.NeedLogin, modelHandler.Delete)
-		modelsGroup.GET("/:namespace/:name", modelHandler.Show)
+		modelsGroup.GET("/:namespace/:name", cache.Cache(memoryStore, time.Minute*2, middleware.CacheRepoInfo()), modelHandler.Show)
 		modelsGroup.GET("/:namespace/:name/relations", modelHandler.Relations)
 		modelsGroup.PUT("/:namespace/:name/relations", middlewareCollection.Auth.NeedAdmin, modelHandler.SetRelations)
 		modelsGroup.POST("/:namespace/:name/relations/dataset", middlewareCollection.Auth.NeedPhoneVerified, modelHandler.AddDatasetRelation)
@@ -615,7 +615,7 @@ func createModelRoutes(config *config.Config,
 		modelsGroup.GET("/:namespace/:name/tags", repoCommonHandler.Tags)
 		modelsGroup.POST("/:namespace/:name/preupload/:revision", middlewareCollection.Auth.NeedPhoneVerified, repoCommonHandler.Preupload)
 		// update tags of a certain category
-		modelsGroup.GET("/:namespace/:name/all_files", repoCommonHandler.AllFiles)
+		modelsGroup.GET("/:namespace/:name/all_files", cache.Cache(memoryStore, time.Minute*2, middleware.CacheRepoInfo()), repoCommonHandler.AllFiles)
 		modelsGroup.POST("/:namespace/:name/tags/:category", middlewareCollection.Auth.NeedPhoneVerified, repoCommonHandler.UpdateTags)
 		modelsGroup.GET("/:namespace/:name/last_commit", repoCommonHandler.LastCommit)
 		modelsGroup.GET("/:namespace/:name/commit/:commit_id", repoCommonHandler.CommitWithDiff)
@@ -627,7 +627,7 @@ func createModelRoutes(config *config.Config,
 		modelsGroup.GET("/:namespace/:name/refs/:ref/remote_tree/*path", repoCommonHandler.RemoteTree)
 		modelsGroup.GET("/:namespace/:name/refs/:ref/logs_tree/*path", repoCommonHandler.LogsTree)
 		modelsGroup.GET("/:namespace/:name/commits", repoCommonHandler.Commits)
-		modelsGroup.GET("/:namespace/:name/raw/*file_path", repoCommonHandler.FileRaw)
+		modelsGroup.GET("/:namespace/:name/raw/*file_path", cache.Cache(memoryStore, time.Minute*2, middleware.CacheRepoInfo()), repoCommonHandler.FileRaw)
 		modelsGroup.GET("/:namespace/:name/blob/*file_path", repoCommonHandler.FileInfo)
 		// The DownloadFile method differs from the SDKDownload interface in a few ways
 
@@ -743,6 +743,9 @@ func createDatasetRoutes(
 	dsHandler *handler.DatasetHandler,
 	repoCommonHandler *handler.RepoHandler,
 ) {
+	// gin cache
+	memoryStore := persist.NewMemoryStore(2 * time.Minute)
+
 	datasetsGroup := apiGroup.Group("/datasets")
 	// allow access without login
 	datasetsGroup.GET("", dsHandler.Index)
@@ -752,13 +755,13 @@ func createDatasetRoutes(
 		datasetsGroup.POST("", middlewareCollection.Auth.NeedPhoneVerified, dsHandler.Create)
 		datasetsGroup.PUT("/:namespace/:name", middleware.MustLogin(), dsHandler.Update)
 		datasetsGroup.DELETE("/:namespace/:name", middleware.MustLogin(), dsHandler.Delete)
-		datasetsGroup.GET("/:namespace/:name", dsHandler.Show)
+		datasetsGroup.GET("/:namespace/:name", cache.Cache(memoryStore, time.Minute*2, middleware.CacheRepoInfo()), dsHandler.Show)
 		datasetsGroup.GET("/:namespace/:name/relations", middleware.MustLogin(), dsHandler.Relations)
 		datasetsGroup.GET("/:namespace/:name/branches", middleware.MustLogin(), repoCommonHandler.Branches)
 		datasetsGroup.GET("/:namespace/:name/tags", middleware.MustLogin(), repoCommonHandler.Tags)
 		datasetsGroup.POST("/:namespace/:name/preupload/:revision", middlewareCollection.Auth.NeedPhoneVerified, repoCommonHandler.Preupload)
 		// update tags of a certain category
-		datasetsGroup.GET("/:namespace/:name/all_files", middleware.MustLogin(), repoCommonHandler.AllFiles)
+		datasetsGroup.GET("/:namespace/:name/all_files", cache.Cache(memoryStore, time.Minute*2, middleware.CacheRepoInfo()), middleware.MustLogin(), repoCommonHandler.AllFiles)
 		datasetsGroup.POST("/:namespace/:name/tags/:category", middleware.MustLogin(), repoCommonHandler.UpdateTags)
 		datasetsGroup.GET("/:namespace/:name/last_commit", repoCommonHandler.LastCommit)
 		datasetsGroup.GET("/:namespace/:name/commit/:commit_id", middleware.MustLogin(), repoCommonHandler.CommitWithDiff)
@@ -771,7 +774,7 @@ func createDatasetRoutes(
 		datasetsGroup.GET("/:namespace/:name/refs/:ref/logs_tree/*path", middleware.MustLogin(), repoCommonHandler.LogsTree)
 		datasetsGroup.GET("/:namespace/:name/commits", middleware.MustLogin(), repoCommonHandler.Commits)
 		datasetsGroup.POST("/:namespace/:name/raw/*file_path", middlewareCollection.Auth.NeedPhoneVerified, repoCommonHandler.CreateFile)
-		datasetsGroup.GET("/:namespace/:name/raw/*file_path", middleware.MustLogin(), repoCommonHandler.FileRaw)
+		datasetsGroup.GET("/:namespace/:name/raw/*file_path", cache.Cache(memoryStore, time.Minute*2, middleware.CacheRepoInfo()), middleware.MustLogin(), repoCommonHandler.FileRaw)
 		datasetsGroup.GET("/:namespace/:name/blob/*file_path", repoCommonHandler.FileInfo)
 		datasetsGroup.GET("/:namespace/:name/download/*file_path", middleware.MustLogin(), repoCommonHandler.DownloadFile)
 		datasetsGroup.GET("/:namespace/:name/resolve/*file_path", middleware.MustLogin(), repoCommonHandler.ResolveDownload)
