@@ -694,6 +694,8 @@ func createModelRoutes(config *config.Config,
 		modelsDeployGroup.PUT("/:namespace/:name/finetune/:id/start", modelHandler.FinetuneStart)
 		// delete a finetune instance
 		modelsDeployGroup.DELETE("/:namespace/:name/finetune/:id", modelHandler.FinetuneDelete)
+		// get finetune instance logs
+		modelsDeployGroup.GET("/:namespace/:name/finetune/:id/logs/:instance", repoCommonHandler.FinetuneInstanceLogs)
 	}
 
 	modelsMonitorGroup := modelsGroup.Group("")
