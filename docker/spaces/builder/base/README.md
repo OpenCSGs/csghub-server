@@ -37,8 +37,8 @@ export BUILDX_NO_DEFAULT_ATTESTATIONS=1
 docker buildx build \
   --provenance false \
   --platform linux/amd64,linux/arm64 \
-  -f Dockerfile-python3.10-base \
-  -t opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/space-base:python3.10-1.0.3 \
+  -f docker/spaces/builder/base/Dockerfile-python3.10-base \
+  -t opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/space-base:python3.10-1.0.4 \
   --push .
 
 ## Python with cuda
@@ -47,8 +47,8 @@ export BUILDX_NO_DEFAULT_ATTESTATIONS=1
 docker buildx build \
   --provenance false \
   --platform linux/amd64,linux/arm64 \
-  -f Dockerfile-python3.10-cuda11.8.0-base \
-  -t opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/space-base:python3.10-cuda11.8.0-1.0.3 \
+  -f docker/spaces/builder/base/Dockerfile-python3.10-cuda11.8.0-base \
+  -t opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/space-base:python3.10-cuda11.8.0-1.0.4 \
   --push .
 
 export DOCKER_BUILDKIT=1
@@ -56,7 +56,7 @@ export BUILDX_NO_DEFAULT_ATTESTATIONS=1
 docker buildx build \
   --provenance false \
   --platform linux/amd64,linux/arm64 \
-  -f Dockerfile-python3.10-cuda12.1.0-base \
-  -t opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/space-base:python3.10-cuda12.1.0-1.0.3 \
+  -f docker/spaces/builder/base/Dockerfile-python3.10-cuda12.1.0-base \
+  -t opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/space-base:python3.10-cuda12.1.0-1.0.4 \
   --push .
 ```
