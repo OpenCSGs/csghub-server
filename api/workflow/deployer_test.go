@@ -15,7 +15,6 @@ import (
 	"go.temporal.io/sdk/testsuite"
 	"opencsg.com/csghub-server/api/workflow/activity"
 	"opencsg.com/csghub-server/builder/deploy/common"
-	"opencsg.com/csghub-server/builder/deploy/scheduler"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
@@ -120,7 +119,7 @@ func TestDeployWorkflowSuccess(t *testing.T) {
 		ID:       1,
 		DeployID: deploy.ID,
 		Deploy:   deploy,
-		Status:   scheduler.BuildSkip,
+		Status:   common.TaskStatusBuildSkip,
 	}
 
 	runTask := &database.DeployTask{
@@ -137,7 +136,7 @@ func TestDeployWorkflowSuccess(t *testing.T) {
 	}, nil)
 
 	mockDeployTaskStore.EXPECT().GetDeployTask(mock.Anything, buildTask.ID).Return(buildTask, nil)
-	buildTask.Status = scheduler.BuildSucceed
+	buildTask.Status = common.TaskStatusBuildSucceed
 
 	// deploy
 	mockLogReporter.EXPECT().Report(mock.Anything).Return().Maybe()

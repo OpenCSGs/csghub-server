@@ -17,7 +17,6 @@ import (
 
 	"github.com/google/uuid"
 	"opencsg.com/csghub-server/builder/deploy/common"
-	"opencsg.com/csghub-server/builder/deploy/scheduler"
 	"opencsg.com/csghub-server/builder/loki"
 	"opencsg.com/csghub-server/builder/redis"
 	"opencsg.com/csghub-server/builder/store/database"
@@ -214,7 +213,7 @@ func (d *deployer) Deploy(ctx context.Context, dr types.DeployRepo) (int64, erro
 	imgStrLen := len(strings.Trim(deploy.ImageID, " "))
 	slog.Debug("do deployer.Deploy check image", slog.Any("deploy.ImageID", deploy.ImageID), slog.Any("imgStrLen", imgStrLen))
 	if imgStrLen > 0 {
-		bldTaskStatus = scheduler.BuildSkip
+		bldTaskStatus = common.TaskStatusBuildSkip
 		bldTaskMsg = "Skip"
 	}
 	slog.Debug("create build task", slog.Any("bldTaskStatus", bldTaskStatus), slog.Any("bldTaskMsg", bldTaskMsg))

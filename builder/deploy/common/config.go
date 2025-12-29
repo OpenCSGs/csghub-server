@@ -1,4 +1,4 @@
-package scheduler
+package common
 
 type Config struct {
 	ImageBuilderURL string `json:"image_builder_url"`

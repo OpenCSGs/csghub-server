@@ -17,7 +17,6 @@ import (
 	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/deploy/imagebuilder"
 	"opencsg.com/csghub-server/builder/deploy/imagerunner"
-	"opencsg.com/csghub-server/builder/deploy/scheduler"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/errorx"
@@ -32,12 +31,12 @@ const (
 )
 
 const (
-	DeployStatusPending      = 0
-	DeployStatusDeploying    = 1
-	DeployStatusFailed       = 2
-	DeployStatusStartUp      = 3
-	DeployStatusRunning      = 4
-	DeployStatusRunTimeError = 5
+	DeployStatusPending      = common.TaskStatusDeployPending
+	DeployStatusDeploying    = common.TaskStatusDeploying
+	DeployStatusFailed       = common.TaskStatusDeployFailed
+	DeployStatusStartUp      = common.TaskStatusDeployStartUp
+	DeployStatusRunning      = common.TaskStatusDeployRunning
+	DeployStatusRunTimeError = common.TaskStatusDeployRunTimeError
 )
 
 type DeployActivity struct {
@@ -145,7 +144,7 @@ func (a *DeployActivity) Build(ctx context.Context, taskId int64) error {
 	if err != nil {
 		return fmt.Errorf("failed to get deploy task: %w", err)
 	}
-	if task.Status == scheduler.BuildSkip {
+	if task.Status == common.TaskStatusBuildSkip {
 		return nil
 	}
 	repoInfo, err := a.getRepositoryInfo(ctx, task)
@@ -173,7 +172,7 @@ func (a *DeployActivity) getLogger(ctx context.Context) log.Logger {
 }
 
 // pollBuildStatus
-func (a *DeployActivity) pollBuildStatus(ctx context.Context, task *database.DeployTask, repoInfo scheduler.RepoInfo, buildRequest *types.ImageBuilderRequest) error {
+func (a *DeployActivity) pollBuildStatus(ctx context.Context, task *database.DeployTask, repoInfo common.RepoInfo, buildRequest *types.ImageBuilderRequest) error {
 	continueLoop, err := a.checkBuildStatus(ctx, task, buildRequest)
 	if err != nil {
 		return err
@@ -219,23 +218,28 @@ func (a *DeployActivity) checkBuildStatus(ctx context.Context, task *database.De
 	}
 
 	switch {
-	case updatedTask.Status == scheduler.BuildPending:
+	case updatedTask.Status == common.TaskStatusBuildPending:
 		if err := a.ib.Build(ctx, buildRequest); err != nil {
 			if herr := a.handleBuildError(task, err); herr != nil {
+				a.getLogger(ctx).Error("Build failed", "task_id", task.ID, "error", err)
 				return false, herr
 			}
 
+			a.getLogger(ctx).Error("Build failed", "task_id", task.ID, "error", err)
 			a.reportLog(types.BuildFailed.String()+": \n"+err.Error(), types.StepBuildFailed, task)
 			return false, fmt.Errorf("build failed: %w", err)
 		}
 		if err := a.handleBuildTaskToBuildInQueue(task); err != nil {
+			a.getLogger(ctx).Error("Failed to handle build task to build in queue", "task_id", task.ID, "error", err)
 			return false, err
 		}
 		a.reportLog(types.BuildInProgress.String(), types.StepBuildInProgress, task)
 		return true, nil
-	case updatedTask.Status == scheduler.BuildFailed:
+	case updatedTask.Status == common.TaskStatusBuildFailed:
+		a.getLogger(ctx).Info("Build task failed", "task_id", task.ID, "status", updatedTask.Status)
 		return false, fmt.Errorf("build task failed: %s", updatedTask.Message)
-	case updatedTask.Status == scheduler.BuildSucceed:
+	case updatedTask.Status == common.TaskStatusBuildSucceed:
+		a.getLogger(ctx).Info("Build task succeed", "task_id", task.ID, "status", updatedTask.Status)
 		return false, nil
 	case a.isTaskTimedOut(updatedTask):
 		a.reportLog("build task timeout", types.StepBuildFailed, task)
@@ -264,8 +268,8 @@ func (a *DeployActivity) isTaskTimedOut(task *database.DeployTask) bool {
 }
 
 // getRepositoryInfo
-func (a *DeployActivity) getRepositoryInfo(ctx context.Context, task *database.DeployTask) (scheduler.RepoInfo, error) {
-	var repoInfo scheduler.RepoInfo
+func (a *DeployActivity) getRepositoryInfo(ctx context.Context, task *database.DeployTask) (common.RepoInfo, error) {
+	var repoInfo common.RepoInfo
 
 	if task.Deploy.SpaceID > 0 {
 		space, err := a.ss.ByID(ctx, task.Deploy.SpaceID)
@@ -288,10 +292,10 @@ func (a *DeployActivity) getRepositoryInfo(ctx context.Context, task *database.D
 }
 
 // createSpaceRepoInfo
-func (a *DeployActivity) createSpaceRepoInfo(space *database.Space, deployID int64) scheduler.RepoInfo {
+func (a *DeployActivity) createSpaceRepoInfo(space *database.Space, deployID int64) common.RepoInfo {
 	cloneInfo := utilcommon.BuildCloneInfoByDomain(a.cfg.PublicDomain, a.cfg.SSHDomain, space.Repository)
 
-	return scheduler.RepoInfo{
+	return common.RepoInfo{
 		Path:          space.Repository.Path,
 		Name:          space.Repository.Name,
 		Sdk:           space.Sdk,
@@ -308,8 +312,8 @@ func (a *DeployActivity) createSpaceRepoInfo(space *database.Space, deployID int
 }
 
 // createModelRepoInfo
-func (a *DeployActivity) createModelRepoInfo(model *database.Model, deployID int64) scheduler.RepoInfo {
-	return scheduler.RepoInfo{
+func (a *DeployActivity) createModelRepoInfo(model *database.Model, deployID int64) common.RepoInfo {
+	return common.RepoInfo{
 		Path:     model.Repository.Path,
 		Name:     model.Repository.Name,
 		ModelID:  model.ID,
@@ -358,7 +362,7 @@ func (a *DeployActivity) updateTaskStatus(task *database.DeployTask) error {
 
 // handleRepositoryNotFound
 func (a *DeployActivity) handleRepositoryNotFound(task *database.DeployTask) error {
-	task.Status = scheduler.BuildFailed
+	task.Status = common.TaskStatusBuildFailed
 	task.Message = "repository not found, please check the repository path"
 	task.Deploy.Status = common.BuildFailed
 	if err := a.updateTaskStatus(task); err != nil {
@@ -370,7 +374,7 @@ func (a *DeployActivity) handleRepositoryNotFound(task *database.DeployTask) err
 func (a *DeployActivity) handleBuildCancelled(task *database.DeployTask) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(5))
 	defer cancel()
-	task.Status = scheduler.Cancelled
+	task.Status = common.TaskStatusCancelled
 	task.Message = "Cancelled"
 	if err := a.ds.UpdateDeployTask(ctx, task); err != nil {
 		return fmt.Errorf("handleBuildCancelled failed to update deploy task status: %w", err)
@@ -380,7 +384,7 @@ func (a *DeployActivity) handleBuildCancelled(task *database.DeployTask) error {
 }
 
 func (a *DeployActivity) handleBuildTaskTimeout(task *database.DeployTask) error {
-	task.Status = scheduler.BuildFailed
+	task.Status = common.TaskStatusBuildFailed
 	task.Message = "build task timeout"
 	task.Deploy.Status = common.BuildFailed
 
@@ -393,7 +397,7 @@ func (a *DeployActivity) handleBuildTaskTimeout(task *database.DeployTask) error
 
 // handleBuildError
 func (a *DeployActivity) handleBuildError(task *database.DeployTask, err error) error {
-	task.Status = scheduler.BuildFailed
+	task.Status = common.TaskStatusBuildFailed
 	task.Message = fmt.Sprintf("build task failed: %s", err.Error())
 	task.Deploy.Status = common.BuildFailed
 
@@ -405,7 +409,7 @@ func (a *DeployActivity) handleBuildError(task *database.DeployTask, err error) 
 
 // updateTaskStatusToBuildInQueue
 func (a *DeployActivity) handleBuildTaskToBuildInQueue(task *database.DeployTask) error {
-	task.Status = scheduler.BuildInQueue
+	task.Status = common.TaskStatusBuildInQueue
 	task.Message = "build in queue"
 	task.Deploy.Status = common.BuildInQueue
 
@@ -455,7 +459,7 @@ func (a *DeployActivity) reportLog(message string, step types.Step, task *databa
 }
 
 // createBuildRequest
-func (a *DeployActivity) createBuildRequest(ctx context.Context, task *database.DeployTask, repoInfo scheduler.RepoInfo) (*types.ImageBuilderRequest, error) {
+func (a *DeployActivity) createBuildRequest(ctx context.Context, task *database.DeployTask, repoInfo common.RepoInfo) (*types.ImageBuilderRequest, error) {
 	accessToken, err := a.ts.FindByUID(ctx, task.Deploy.UserID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get git access token: %w", err)
@@ -501,7 +505,7 @@ func (a *DeployActivity) createBuildRequest(ctx context.Context, task *database.
 }
 
 // createDeployRequest
-func (a *DeployActivity) createDeployRequest(ctx context.Context, task *database.DeployTask, repoInfo scheduler.RepoInfo) (*types.RunRequest, error) {
+func (a *DeployActivity) createDeployRequest(ctx context.Context, task *database.DeployTask, repoInfo common.RepoInfo) (*types.RunRequest, error) {
 	logger := a.getLogger(ctx)
 
 	accessToken, err := a.ts.FindByUID(ctx, task.Deploy.UserID)
@@ -584,7 +588,7 @@ func (a *DeployActivity) createDeployRequest(ctx context.Context, task *database
 	}, nil
 }
 
-func (a *DeployActivity) determineSDKVersion(repoInfo scheduler.RepoInfo) string {
+func (a *DeployActivity) determineSDKVersion(repoInfo common.RepoInfo) string {
 	if repoInfo.SdkVersion != "" {
 		return repoInfo.SdkVersion
 	}
@@ -606,7 +610,7 @@ func (a *DeployActivity) parseHardware(input string) string {
 	return "cpu"
 }
 
-func (a *DeployActivity) stopBuild(buildTask *database.DeployTask, repoInfo scheduler.RepoInfo) {
+func (a *DeployActivity) stopBuild(buildTask *database.DeployTask, repoInfo common.RepoInfo) {
 	stopCtx, stopCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer stopCancel()
 	paths := strings.Split(repoInfo.Path, "/")
@@ -624,7 +628,7 @@ func (a *DeployActivity) stopBuild(buildTask *database.DeployTask, repoInfo sche
 }
 
 // makeDeployEnv
-func (a *DeployActivity) makeDeployEnv(ctx context.Context, hardware types.HardWare, accessToken *database.AccessToken, deployInfo *database.Deploy, engineArgsTemplates []types.EngineArg, toolCallParsers map[string]string, repoInfo scheduler.RepoInfo) (map[string]string, error) {
+func (a *DeployActivity) makeDeployEnv(ctx context.Context, hardware types.HardWare, accessToken *database.AccessToken, deployInfo *database.Deploy, engineArgsTemplates []types.EngineArg, toolCallParsers map[string]string, repoInfo common.RepoInfo) (map[string]string, error) {
 	logger := a.getLogger(ctx)
 
 	envMap, err := utilcommon.JsonStrToMap(deployInfo.Env)

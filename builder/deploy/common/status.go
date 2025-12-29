@@ -1,7 +1,27 @@
 package common
 
 // sub build task status
+const (
+	TaskStatusCancelled       = -1
+	TaskStatusBuildPending    = 0
+	TaskStatusBuildInProgress = 1
+	TaskStatusBuildFailed     = 2
+	TaskStatusBuildSucceed    = 3
+	TaskStatusBuildSkip       = 4 // export for other package
+	TaskStatusBuildInQueue    = 5
+)
 
+// sub deploy task status
+const (
+	TaskStatusDeployPending      = 0
+	TaskStatusDeploying          = 1
+	TaskStatusDeployFailed       = 2
+	TaskStatusDeployStartUp      = 3
+	TaskStatusDeployRunning      = 4
+	TaskStatusDeployRunTimeError = 5
+)
+
+// deploy status
 const (
 	Pending = 0
 	// step one: build

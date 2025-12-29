@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"opencsg.com/csghub-server/builder/deploy/common"
-	"opencsg.com/csghub-server/builder/deploy/scheduler"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
@@ -43,6 +42,7 @@ type testEnv struct {
 
 func setupTest(t *testing.T) *testEnv {
 	ctx := context.Background()
+	ctx = context.WithValue(ctx, "test", "test")
 
 	// Create mock dependencies
 	mockDeployTaskStore := mockdb.NewMockDeployTaskStore(t)
@@ -98,12 +98,12 @@ func TestActivities_determineSDKVersion(t *testing.T) {
 	// Test cases
 	testCases := []struct {
 		name        string
-		repoInfo    scheduler.RepoInfo
+		repoInfo    common.RepoInfo
 		expectedSDK string
 	}{
 		{
 			name: "With explicit SDK version",
-			repoInfo: scheduler.RepoInfo{
+			repoInfo: common.RepoInfo{
 				SdkVersion: "custom-version",
 				Sdk:        "some-other-sdk",
 			},
@@ -111,7 +111,7 @@ func TestActivities_determineSDKVersion(t *testing.T) {
 		},
 		{
 			name: "With GRADIO SDK",
-			repoInfo: scheduler.RepoInfo{
+			repoInfo: common.RepoInfo{
 				SdkVersion: "",
 				Sdk:        types.GRADIO.Name,
 			},
@@ -119,7 +119,7 @@ func TestActivities_determineSDKVersion(t *testing.T) {
 		},
 		{
 			name: "With STREAMLIT SDK",
-			repoInfo: scheduler.RepoInfo{
+			repoInfo: common.RepoInfo{
 				SdkVersion: "",
 				Sdk:        types.STREAMLIT.Name,
 			},
@@ -127,7 +127,7 @@ func TestActivities_determineSDKVersion(t *testing.T) {
 		},
 		{
 			name: "With unknown SDK",
-			repoInfo: scheduler.RepoInfo{
+			repoInfo: common.RepoInfo{
 				SdkVersion: "",
 				Sdk:        "unknown-sdk",
 			},

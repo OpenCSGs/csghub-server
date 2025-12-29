@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 	mockbuilder "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/deploy/imagebuilder"
 	mockrunner "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/deploy/imagerunner"
-	mockScheduler "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/deploy/scheduler"
 	mockdb "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/store/database"
@@ -36,8 +35,6 @@ func newTestDeployer(t *testing.T) *testDepolyerWithMocks {
 		},
 	}
 	s.mocks.stores = mockStores
-	s.mocks.scheduler = mockScheduler.NewMockScheduler(t)
-	s.scheduler = s.mocks.scheduler
 	s.mocks.builder = mockbuilder.NewMockBuilder(t)
 	s.imageBuilder = s.mocks.builder
 	s.mocks.runner = mockrunner.NewMockRunner(t)
