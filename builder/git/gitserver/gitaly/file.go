@@ -610,7 +610,7 @@ func (c *Client) getBlobInfo(ctx context.Context, repo *gitalypb.Repository, pat
 
 func (c *Client) GetRepoFileTree(ctx context.Context, req gitserver.GetRepoInfoByPathReq) ([]*types.File, error) {
 	var files []*types.File
-	ctx, cancel := context.WithTimeout(ctx, time.Second*3)
+	ctx, cancel := context.WithTimeout(ctx, c.treeTimeout)
 	defer cancel()
 
 	req.Path = strings.TrimPrefix(req.Path, "/")
@@ -757,7 +757,7 @@ func (c *Client) GetRepoFileTree(ctx context.Context, req gitserver.GetRepoInfoB
 }
 
 func (c *Client) GetTree(ctx context.Context, req types.GetTreeRequest) (*types.GetRepoFileTreeResp, error) {
-	ctx, cancel := context.WithTimeout(ctx, time.Second*3)
+	ctx, cancel := context.WithTimeout(ctx, c.treeTimeout)
 	defer cancel()
 
 	req.Path = strings.TrimPrefix(req.Path, "/")
@@ -842,7 +842,7 @@ func (c *Client) GetTree(ctx context.Context, req types.GetTreeRequest) (*types.
 
 func (c *Client) GetLogsTree(ctx context.Context, req types.GetLogsTreeRequest) (*types.LogsTreeResp, error) {
 	var resp []*types.CommitForTree
-	ctx, cancel := context.WithTimeout(ctx, time.Second*3)
+	ctx, cancel := context.WithTimeout(ctx, c.treeTimeout)
 	defer cancel()
 
 	req.Path = strings.TrimPrefix(req.Path, "/")
@@ -912,7 +912,7 @@ func (c *Client) GetLogsTree(ctx context.Context, req types.GetLogsTreeRequest) 
 
 func (c *Client) GetRepoAllFiles(ctx context.Context, req gitserver.GetRepoAllFilesReq) ([]*types.File, error) {
 	var files []*types.File
-	ctx, cancel := context.WithTimeout(ctx, time.Second*3)
+	ctx, cancel := context.WithTimeout(ctx, c.treeTimeout)
 	defer cancel()
 
 	relativePath, err := c.BuildRelativePath(ctx, req.RepoType, req.Namespace, req.Name)
@@ -955,7 +955,7 @@ func (c *Client) GetRepoAllFiles(ctx context.Context, req gitserver.GetRepoAllFi
 
 func (c *Client) GetRepoAllLfsPointers(ctx context.Context, req gitserver.GetRepoAllFilesReq) ([]*types.LFSPointer, error) {
 	var pointers []*types.LFSPointer
-	ctx, cancel := context.WithTimeout(ctx, time.Second*3)
+	ctx, cancel := context.WithTimeout(ctx, c.treeTimeout)
 	defer cancel()
 
 	relativePath, err := c.BuildRelativePath(ctx, req.RepoType, req.Namespace, req.Name)

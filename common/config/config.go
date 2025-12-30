@@ -386,6 +386,7 @@ type Config struct {
 		LfsExistsCheck         bool   `env:"STARHUB_SERVER_GIT_LFS_EXISTS_CHECK" default:"true"`
 		RepoDataMigrateEnable  bool   `env:"STARHUB_SERVER_GIT_REPO_DATA_MIGRATE_ENABLE" default:"false"`
 		LimitLfsFileUploadSize bool   `env:"STARHUB_SERVER_GIT_LIMIT_LFS_FILE_UPLOAD_SIZE " default:"true"`
+		TreeOperationTimeout   int    `env:"STARHUB_SERVER_GIT_TREE_OPERATION_TIMEOUT" default:"3"`
 	}
 
 	AIGateway struct {

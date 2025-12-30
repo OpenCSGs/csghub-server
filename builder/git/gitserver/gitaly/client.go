@@ -33,6 +33,7 @@ type Client struct {
 	smartHttpClient     gitalypb.SmartHTTPServiceClient
 	remoteClient        gitalypb.RemoteServiceClient
 	timeout             time.Duration
+	treeTimeout         time.Duration
 	repoStore           database.RepoStore
 }
 
@@ -91,6 +92,7 @@ func NewClient(config *config.Config) (*Client, error) {
 	}
 
 	timeoutTime := time.Duration(config.Git.OperationTimeout) * time.Second
+	treeTimeoutTime := time.Duration(config.Git.TreeOperationTimeout) * time.Second
 	return &Client{
 		config:              config,
 		sidechannelRegistry: sidechannelRegistry,
@@ -104,5 +106,6 @@ func NewClient(config *config.Config) (*Client, error) {
 		remoteClient:        remoteClient,
 		timeout:             timeoutTime,
 		repoStore:           database.NewRepoStore(),
+		treeTimeout:         treeTimeoutTime,
 	}, nil
 }
