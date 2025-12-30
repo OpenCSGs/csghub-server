@@ -1,10 +1,12 @@
-//go:build !saas
+//go:build !saas && !ee
 
 package component
 
 import (
 	"context"
+	"database/sql"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/alibabacloud-go/tea/tea"
@@ -151,7 +153,7 @@ func TestRepoComponent_DeployStart_ExistAndRunning(t *testing.T) {
 		ModelID:   3,
 	}
 	repo.mocks.deployer.EXPECT().Exist(ctx, deployRepo).Return(true, nil)
-	
+
 	// status 4 means running
 	repo.mocks.deployer.EXPECT().Status(ctx, deployRepo, false).Return("svc", 4, []types.Instance{}, nil)
 
@@ -201,13 +203,13 @@ func TestRepoComponent_DeployStart_ExistButNotRunning(t *testing.T) {
 		ModelID:   3,
 	}
 	repo.mocks.deployer.EXPECT().Exist(ctx, deployRepo).Return(true, nil)
-	
+
 	// status 2 means failed (not running)
 	repo.mocks.deployer.EXPECT().Status(ctx, deployRepo, false).Return("svc", 2, []types.Instance{}, nil)
-	
+
 	// should call Stop first
 	repo.mocks.deployer.EXPECT().Stop(ctx, deployRepo).Return(nil)
-	
+
 	// then start deploy
 	repo.mocks.deployer.EXPECT().StartDeploy(ctx, deploy).Return(nil)
 
@@ -575,4 +577,61 @@ func TestRepoComponent_RemoteDiff(t *testing.T) {
 	res, err := repoComp.RemoteDiff(ctx, req1)
 	require.Nil(t, err)
 	assert.Equal(t, resp, res)
+}
+
+func TestRepoComponent_MirrorFromSaas(t *testing.T) {
+	cases := []struct {
+		mirror bool
+	}{
+		{false},
+		{true},
+	}
+
+	for _, c := range cases {
+		t.Run(fmt.Sprintf("%+v", c), func(t *testing.T) {
+			ctx := context.TODO()
+			repo := initializeTestRepoComponent(ctx, t)
+
+			mockedRepo := &database.Repository{ID: 123, Path: "ns/n", RepositoryType: types.ModelRepo}
+			mirror := &database.Mirror{
+				SourceUrl:      "/models/ns/n.git",
+				Username:       "user",
+				RepositoryID:   123,
+				SourceRepoPath: "ns/n",
+				Repository:     mockedRepo,
+			}
+			if c.mirror {
+				repo.mocks.stores.MirrorMock().EXPECT().FindByRepoID(ctx, int64(123)).Return(mirror, nil)
+			} else {
+				repo.mocks.stores.MirrorMock().EXPECT().FindByRepoID(ctx, int64(123)).Return(nil, sql.ErrNoRows)
+				repo.mocks.stores.SyncVersionMock().EXPECT().FindByRepoTypeAndPath(ctx, "ns/n", types.ModelRepo).Return(&database.SyncVersion{SourceID: types.SyncVersionSourceHF}, nil)
+				repo.mocks.gitServer.EXPECT().CreateMirrorRepo(ctx, gitserver.CreateMirrorRepoReq{
+					Namespace:   "ns",
+					Name:        "n",
+					CloneUrl:    "/models/ns/n.git",
+					Private:     false,
+					MirrorToken: "foo",
+					RepoType:    types.ModelRepo,
+				}).Return(0, nil)
+				repo.mocks.stores.MirrorMock().EXPECT().Create(ctx, mirror).Return(&database.Mirror{
+					ID:       1,
+					Priority: types.ASAPMirrorPriority,
+				}, nil)
+
+				repo.mocks.stores.SyncClientSettingMock().EXPECT().First(ctx).Return(&database.SyncClientSetting{Token: "foo"}, nil)
+			}
+
+			repo.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(
+				mockedRepo, nil,
+			)
+
+			mockedRepo.SyncStatus = types.SyncStatusPending
+
+			repo.mocks.stores.RepoMock().EXPECT().UpdateRepo(ctx, *mockedRepo).Return(nil, nil)
+			repo.mocks.stores.MirrorTaskMock().EXPECT().CancelOtherTasksAndCreate(ctx, mock.Anything).Return(database.MirrorTask{}, nil)
+
+			err := repo.MirrorFromSaas(ctx, "ns", "n", "user", types.ModelRepo)
+			require.Nil(t, err)
+		})
+	}
 }

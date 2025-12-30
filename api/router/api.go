@@ -652,12 +652,6 @@ func createModelRoutes(config *config.Config,
 		modelsGroup.PUT("/:namespace/:name/mirror", middlewareCollection.Auth.NeedLogin, repoCommonHandler.UpdateMirror)
 		modelsGroup.DELETE("/:namespace/:name/mirror", middlewareCollection.Auth.NeedLogin, repoCommonHandler.DeleteMirror)
 		modelsGroup.POST("/:namespace/:name/mirror/sync", middlewareCollection.Auth.NeedLogin, repoCommonHandler.SyncMirror)
-		modelsGroup.GET("/:namespace/:name/mirror/progress", middlewareCollection.Auth.NeedLogin, repoCommonHandler.MirrorProgress)
-		// mirror from SaaS, only on-premises available
-		if !config.Saas {
-			modelsGroup.POST("/:namespace/:name/mirror_from_saas", middlewareCollection.Auth.NeedLogin, repoCommonHandler.MirrorFromSaas)
-		}
-
 		// runtime framework
 		modelsGroup.GET("/:namespace/:name/runtime_framework", repoCommonHandler.RuntimeFrameworkList)
 		modelsGroup.GET("/:namespace/:name/runtime_framework_v2", repoCommonHandler.RuntimeFrameworkListV2)
@@ -789,11 +783,6 @@ func createDatasetRoutes(
 		datasetsGroup.PUT("/:namespace/:name/mirror", middleware.MustLogin(), repoCommonHandler.UpdateMirror)
 		datasetsGroup.DELETE("/:namespace/:name/mirror", middleware.MustLogin(), repoCommonHandler.DeleteMirror)
 		datasetsGroup.POST("/:namespace/:name/mirror/sync", middleware.MustLogin(), repoCommonHandler.SyncMirror) // TODO: check license
-		datasetsGroup.GET("/:namespace/:name/mirror/progress", middleware.MustLogin(), repoCommonHandler.MirrorProgress)
-		// mirror from SaaS, only on-premises available
-		if !config.Saas {
-			datasetsGroup.POST("/:namespace/:name/mirror_from_saas", middlewareCollection.Auth.NeedLogin, repoCommonHandler.MirrorFromSaas)
-		}
 	}
 }
 
@@ -845,11 +834,6 @@ func createCodeRoutes(
 		codesGroup.PUT("/:namespace/:name/mirror", middlewareCollection.Auth.NeedLogin, repoCommonHandler.UpdateMirror)
 		codesGroup.DELETE("/:namespace/:name/mirror", middlewareCollection.Auth.NeedLogin, repoCommonHandler.DeleteMirror)
 		codesGroup.POST("/:namespace/:name/mirror/sync", middlewareCollection.Auth.NeedLogin, repoCommonHandler.SyncMirror)
-		codesGroup.GET("/:namespace/:name/mirror/progress", middlewareCollection.Auth.NeedLogin, repoCommonHandler.MirrorProgress)
-		// mirror from SaaS, only on-premises available
-		if !config.Saas {
-			codesGroup.POST("/:namespace/:name/mirror_from_saas", middlewareCollection.Auth.NeedLogin, repoCommonHandler.MirrorFromSaas)
-		}
 	}
 }
 
@@ -938,11 +922,6 @@ func createSpaceRoutes(config *config.Config,
 		spaces.PUT("/:namespace/:name/mirror", middlewareCollection.Auth.NeedLogin, repoCommonHandler.UpdateMirror)
 		spaces.DELETE("/:namespace/:name/mirror", middlewareCollection.Auth.NeedLogin, repoCommonHandler.DeleteMirror)
 		spaces.POST("/:namespace/:name/mirror/sync", middlewareCollection.Auth.NeedLogin, repoCommonHandler.SyncMirror)
-		spaces.GET("/:namespace/:name/mirror/progress", middlewareCollection.Auth.NeedLogin, repoCommonHandler.MirrorProgress)
-		// mirror from SaaS, only on-premises available
-		if !config.Saas {
-			spaces.POST("/:namespace/:name/mirror_from_saas", middlewareCollection.Auth.NeedLogin, repoCommonHandler.MirrorFromSaas)
-		}
 		spaces.GET("/:namespace/:name/run", middlewareCollection.Auth.NeedLogin, repoCommonHandler.DeployList)
 		spaces.GET("/:namespace/:name/run/:id", middlewareCollection.Auth.NeedLogin, repoCommonHandler.DeployDetail)
 		spaces.GET("/:namespace/:name/run/:id/status", middlewareCollection.Auth.NeedLogin, repoCommonHandler.DeployStatus)
@@ -1208,8 +1187,6 @@ func createPromptRoutes(
 		promptGrp.PUT("/:namespace/:name/mirror", middlewareCollection.Auth.NeedLogin, repoCommonHandler.UpdateMirror)
 		promptGrp.DELETE("/:namespace/:name/mirror", middlewareCollection.Auth.NeedLogin, repoCommonHandler.DeleteMirror)
 		promptGrp.POST("/:namespace/:name/mirror/sync", middlewareCollection.Auth.NeedLogin, repoCommonHandler.SyncMirror)
-		promptGrp.GET("/:namespace/:name/mirror/progress", middlewareCollection.Auth.NeedLogin, repoCommonHandler.MirrorProgress)
-		promptGrp.POST("/:namespace/:name/mirror_from_saas", middlewareCollection.Auth.NeedLogin, repoCommonHandler.MirrorFromSaas)
 	}
 	promptInfoGrp := apiGroup.Group("/prompts_info")
 	promptInfoGrp.GET("/:namespace/:name", promptHandler.PromptDetail)
