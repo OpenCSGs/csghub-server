@@ -98,12 +98,12 @@ func TestDeployer_CheckResourceAvailable(t *testing.T) {
 	tester := newTestDeployer(t)
 	ctx := context.TODO()
 
-	tester.mocks.runner.EXPECT().ListCluster(ctx).Return([]types.ClusterResponse{
+	tester.mocks.runner.EXPECT().ListCluster(ctx).Return([]types.ClusterRes{
 		{ClusterID: "c1"},
 	}, nil)
-	tester.mocks.runner.EXPECT().GetClusterById(ctx, "c1").Return(&types.ClusterResponse{
-		Nodes: map[string]types.NodeResourceInfo{
-			"n1": {AvailableMem: 100},
+	tester.mocks.runner.EXPECT().GetClusterById(ctx, "c1").Return(&types.ClusterRes{
+		Resources: []types.NodeResourceInfo{
+			{AvailableMem: 100},
 		},
 	}, nil)
 
@@ -206,17 +206,17 @@ func TestDeployer_GetClusterById(t *testing.T) {
 	tester := newTestDeployer(t)
 	t.Run("success", func(t *testing.T) {
 		ctx := context.TODO()
-		tester.mocks.runner.EXPECT().GetClusterById(ctx, "1").Once().Return(&types.ClusterResponse{
+		tester.mocks.runner.EXPECT().GetClusterById(ctx, "1").Once().Return(&types.ClusterRes{
 			ClusterID: "1",
 			Region:    "test-region",
 			Zone:      "test-zone",
 			Enable:    true,
-			Nodes: map[string]types.NodeResourceInfo{
-				"1": {
+			Resources: []types.NodeResourceInfo{
+				{
 					AvailableCPU: 1,
 					AvailableMem: 3,
 				},
-				"2": {
+				{
 					AvailableCPU: 2,
 					AvailableMem: 5,
 					AvailableXPU: 4,
@@ -231,9 +231,9 @@ func TestDeployer_GetClusterById(t *testing.T) {
 	})
 	t.Run("empty nodes", func(t *testing.T) {
 		ctx := context.TODO()
-		tester.mocks.runner.EXPECT().GetClusterById(ctx, "1").Once().Return(&types.ClusterResponse{
+		tester.mocks.runner.EXPECT().GetClusterById(ctx, "1").Once().Return(&types.ClusterRes{
 			ClusterID: "1",
-			Nodes:     nil,
+			Resources: nil,
 		}, nil)
 		clusterRes, err := tester.GetClusterById(ctx, "1")
 		require.Nil(t, err)

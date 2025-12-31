@@ -240,23 +240,23 @@ func (_c *MockRunner_Exist_Call) RunAndReturn(run func(context.Context, *types.C
 }
 
 // GetClusterById provides a mock function with given fields: ctx, clusterId
-func (_m *MockRunner) GetClusterById(ctx context.Context, clusterId string) (*types.ClusterResponse, error) {
+func (_m *MockRunner) GetClusterById(ctx context.Context, clusterId string) (*types.ClusterRes, error) {
 	ret := _m.Called(ctx, clusterId)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetClusterById")
 	}
 
-	var r0 *types.ClusterResponse
+	var r0 *types.ClusterRes
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) (*types.ClusterResponse, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*types.ClusterRes, error)); ok {
 		return rf(ctx, clusterId)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string) *types.ClusterResponse); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string) *types.ClusterRes); ok {
 		r0 = rf(ctx, clusterId)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*types.ClusterResponse)
+			r0 = ret.Get(0).(*types.ClusterRes)
 		}
 	}
 
@@ -288,12 +288,12 @@ func (_c *MockRunner_GetClusterById_Call) Run(run func(ctx context.Context, clus
 	return _c
 }
 
-func (_c *MockRunner_GetClusterById_Call) Return(_a0 *types.ClusterResponse, _a1 error) *MockRunner_GetClusterById_Call {
+func (_c *MockRunner_GetClusterById_Call) Return(_a0 *types.ClusterRes, _a1 error) *MockRunner_GetClusterById_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockRunner_GetClusterById_Call) RunAndReturn(run func(context.Context, string) (*types.ClusterResponse, error)) *MockRunner_GetClusterById_Call {
+func (_c *MockRunner_GetClusterById_Call) RunAndReturn(run func(context.Context, string) (*types.ClusterRes, error)) *MockRunner_GetClusterById_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -476,23 +476,23 @@ func (_c *MockRunner_InstanceLogs_Call) RunAndReturn(run func(context.Context, *
 }
 
 // ListCluster provides a mock function with given fields: ctx
-func (_m *MockRunner) ListCluster(ctx context.Context) ([]types.ClusterResponse, error) {
+func (_m *MockRunner) ListCluster(ctx context.Context) ([]types.ClusterRes, error) {
 	ret := _m.Called(ctx)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ListCluster")
 	}
 
-	var r0 []types.ClusterResponse
+	var r0 []types.ClusterRes
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context) ([]types.ClusterResponse, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context) ([]types.ClusterRes, error)); ok {
 		return rf(ctx)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context) []types.ClusterResponse); ok {
+	if rf, ok := ret.Get(0).(func(context.Context) []types.ClusterRes); ok {
 		r0 = rf(ctx)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]types.ClusterResponse)
+			r0 = ret.Get(0).([]types.ClusterRes)
 		}
 	}
 
@@ -523,12 +523,12 @@ func (_c *MockRunner_ListCluster_Call) Run(run func(ctx context.Context)) *MockR
 	return _c
 }
 
-func (_c *MockRunner_ListCluster_Call) Return(_a0 []types.ClusterResponse, _a1 error) *MockRunner_ListCluster_Call {
+func (_c *MockRunner_ListCluster_Call) Return(_a0 []types.ClusterRes, _a1 error) *MockRunner_ListCluster_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockRunner_ListCluster_Call) RunAndReturn(run func(context.Context) ([]types.ClusterResponse, error)) *MockRunner_ListCluster_Call {
+func (_c *MockRunner_ListCluster_Call) RunAndReturn(run func(context.Context) ([]types.ClusterRes, error)) *MockRunner_ListCluster_Call {
 	_c.Call.Return(run)
 	return _c
 }

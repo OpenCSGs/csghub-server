@@ -236,8 +236,10 @@ func (d *deployer) Deploy(ctx context.Context, dr types.DeployRepo) (int64, erro
 		return -1, fmt.Errorf("create deploy task failed: %w", err)
 	}
 
+	// go func() { _ = d.scheduler.Queue(buildTask.ID) }()
 	buildTask.Deploy = deploy
 	runTask.Deploy = deploy
+
 	go DeployWorkflow(buildTask, runTask)
 
 	d.logReporter.Report(types.LogEntry{
@@ -556,10 +558,12 @@ func (d *deployer) InstanceLogs(ctx context.Context, dr types.DeployRepo) (*Mult
 	}
 
 	deployId := fmt.Sprintf("%d", deploy.ID)
+
 	var startTime = deploy.CreatedAt
 	if dr.Since != "" {
 		startTime = parseSinceTime(dr.Since)
 	}
+
 	runLog, err := d.readLogsFromLoki(ctx, types.ReadLogRequest{
 		DeployID:  deployId,
 		StartTime: startTime,
@@ -580,17 +584,13 @@ func (d *deployer) ListCluster(ctx context.Context) ([]types.ClusterRes, error) 
 	}
 	var result []types.ClusterRes
 	for _, c := range resp {
-		resources := make([]types.NodeResourceInfo, 0)
-		for _, node := range c.Nodes {
-			resources = append(resources, node)
-		}
 		result = append(result, types.ClusterRes{
 			ClusterID:      c.ClusterID,
 			Region:         c.Region,
 			Zone:           c.Zone,
 			Provider:       c.Provider,
-			Resources:      resources,
-			LastUpdateTime: c.UpdatedAt.Unix(),
+			Resources:      c.Resources,
+			LastUpdateTime: c.LastUpdateTime,
 		})
 	}
 	return result, err
@@ -649,7 +649,7 @@ func (d *deployer) GetClusterUsageById(ctx context.Context, clusterId string) (*
 	}
 	var vendorSet = make(map[string]struct{}, 0)
 	var modelsSet = make(map[string]struct{}, 0)
-	for _, node := range resp.Nodes {
+	for _, node := range resp.Resources {
 		res.TotalCPU += node.TotalCPU
 		res.AvailableCPU += node.AvailableCPU
 		res.TotalMem += float64(node.TotalMem)
@@ -683,10 +683,16 @@ func (d *deployer) GetClusterUsageById(ctx context.Context, clusterId string) (*
 	res.AvailableCPU = math.Floor(res.AvailableCPU)
 	res.TotalMem = math.Floor(res.TotalMem)
 	res.AvailableMem = math.Floor(res.AvailableMem)
-	res.NodeNumber = len(resp.Nodes)
-	res.CPUUsage = math.Round((res.TotalCPU-res.AvailableCPU)/res.TotalCPU*100) / 100
-	res.MemUsage = math.Round((res.TotalMem-res.AvailableMem)/res.TotalMem*100) / 100
-	res.GPUUsage = math.Round(float64(res.TotalGPU-res.AvailableGPU)/float64(res.TotalGPU)*100) / 100
+	res.NodeNumber = len(resp.Resources)
+	if res.TotalCPU != 0 {
+		res.CPUUsage = math.Round((res.TotalCPU-res.AvailableCPU)/res.TotalCPU*100) / 100
+	}
+	if res.TotalMem != 0 {
+		res.MemUsage = math.Round((res.TotalMem-res.AvailableMem)/res.TotalMem*100) / 100
+	}
+	if res.TotalGPU != 0 {
+		res.GPUUsage = math.Round(float64(res.TotalGPU-res.AvailableGPU)/float64(res.TotalGPU)*100) / 100
+	}
 
 	return &res, err
 }
@@ -831,8 +837,10 @@ func (d *deployer) StartDeploy(ctx context.Context, deploy *database.Deploy) err
 		return fmt.Errorf("create deploy task failed: %w", err)
 	}
 
+	// go func() { _ = d.scheduler.Queue(runTask.ID) }()
 	runTask.Deploy = deploy
 	go DeployWorkflow(nil, runTask) // runTask is the only task
+
 	// update resource if it's a order case
 	err = d.updateUserResourceByOrder(ctx, deploy)
 	if err != nil {

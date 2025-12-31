@@ -143,12 +143,8 @@ func checkNodeResource(node types.NodeResourceInfo, hardware *types.HardWare) bo
 	return true
 }
 
-func (d *deployer) getResources(ctx context.Context, clusterId string, clusterResponse *types.ClusterResponse) ([]types.NodeResourceInfo, error) {
-	resources := make([]types.NodeResourceInfo, 0)
-	for _, node := range clusterResponse.Nodes {
-		resources = append(resources, node)
-	}
-	return resources, nil
+func (d *deployer) getResources(ctx context.Context, clusterId string, clusterResponse *types.ClusterRes) ([]types.NodeResourceInfo, error) {
+	return clusterResponse.Resources, nil
 }
 
 func startAcctRequestFeeExtra(deploy database.Deploy, source string) string {

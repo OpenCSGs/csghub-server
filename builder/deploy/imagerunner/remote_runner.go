@@ -322,29 +322,29 @@ func (h *RemoteRunner) InstanceLogs(ctx context.Context, req *types.InstanceLogs
 	return h.readToChannel(rc), nil
 }
 
-func (h *RemoteRunner) ListCluster(ctx context.Context) ([]types.ClusterResponse, error) {
+func (h *RemoteRunner) ListCluster(ctx context.Context) ([]types.ClusterRes, error) {
 	clusters, err := h.clusterStore.List(ctx)
 	if err != nil {
 		slog.Error("failed to list clusters from db", slog.Any("error", err))
 		return nil, err
 	}
-	var resp []types.ClusterResponse
+	var resp []types.ClusterRes
 	for _, cluster := range clusters {
 		if !cluster.Enable {
 			continue
 		}
-		resp = append(resp, types.ClusterResponse{
-			ClusterID: cluster.ClusterID,
-			Region:    cluster.Region,
-			Zone:      cluster.Zone,
-			Provider:  cluster.Provider,
-			UpdatedAt: cluster.UpdatedAt,
+		resp = append(resp, types.ClusterRes{
+			ClusterID:      cluster.ClusterID,
+			Region:         cluster.Region,
+			Zone:           cluster.Zone,
+			Provider:       cluster.Provider,
+			LastUpdateTime: cluster.UpdatedAt.Unix(),
 		})
 	}
 	return resp, nil
 }
 
-func (h *RemoteRunner) GetClusterById(ctx context.Context, clusterId string) (*types.ClusterResponse, error) {
+func (h *RemoteRunner) GetClusterById(ctx context.Context, clusterId string) (*types.ClusterRes, error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
@@ -359,7 +359,7 @@ func (h *RemoteRunner) GetClusterById(ctx context.Context, clusterId string) (*t
 		return nil, err
 	}
 	defer response.Body.Close()
-	var resp types.ClusterResponse
+	var resp types.ClusterRes
 	if err := json.NewDecoder(response.Body).Decode(&resp); err != nil {
 		return nil, errorx.InternalServerError(err, nil)
 	}

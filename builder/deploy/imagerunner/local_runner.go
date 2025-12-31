@@ -71,11 +71,11 @@ func (r *LocalRunner) Purge(ctx context.Context, req *types.PurgeRequest) (*type
 	return nil, nil
 }
 
-func (h *LocalRunner) ListCluster(ctx context.Context) ([]types.ClusterResponse, error) {
+func (h *LocalRunner) ListCluster(ctx context.Context) ([]types.ClusterRes, error) {
 	return nil, nil
 }
 
-func (h *LocalRunner) GetClusterById(ctx context.Context, clusterId string) (*types.ClusterResponse, error) {
+func (h *LocalRunner) GetClusterById(ctx context.Context, clusterId string) (*types.ClusterRes, error) {
 	return nil, nil
 }
 
