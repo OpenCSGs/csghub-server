@@ -14,7 +14,7 @@ import (
 
 func useAdvancedMiddleware(r *gin.Engine, config *config.Config) {}
 
-func createAdvancedRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware.MiddlewareCollection, config *config.Config) error {
+func createAdvancedRoutes(apiGroup *gin.RouterGroup, adminGroup *gin.RouterGroup, middlewareCollection middleware.MiddlewareCollection, config *config.Config) error {
 	repoHandler, err := handler.NewRepoHandler(config)
 	if err != nil {
 		return fmt.Errorf("failed to create repo handler: %w", err)

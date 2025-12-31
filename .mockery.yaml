@@ -10,49 +10,7 @@ packages:
       Reader:
   opencsg.com/csghub-server/component:
     config:
-    interfaces:
-      ApiRateLimit:
-      RepoComponent:
-      TagComponent:
-      AccountingComponent:
-      SpaceComponent:
-      SpaceResourceComponent:
-      RuntimeArchitectureComponent:
-      SensitiveComponent:
-      CodeComponent:
-      PromptComponent:
-      ModelComponent:
-      UserComponent:
-      GitHTTPComponent:
-      DiscussionComponent:
-      DatasetComponent:
-      CollectionComponent:
-      BroadcastComponent:
-      InternalComponent:
-      MirrorSourceComponent:
-      MirrorComponent:
-      ImportComponent:
-      EvaluationComponent:
-      FinetuneComponent:
-      RecomComponent:
-      MultiSyncComponent:
-      ModelTreeComponent:
-      SpaceTemplateComponent:
-      RuleComponent:
-      MCPServerComponent:
-      MCPScannerComponent:
-      MCPScannerPlugin:
-      StatComponent:
-      LLMServiceComponent:
-      MonitorComponent:  
-      ClusterComponent:
-      MirrorNamespaceMappingComponent:
-      NotebookComponent:
-      LicenseComponent:
-      CaptchaComponent:
-      AgentComponent:
-      AgentInstanceAdapter:
-      XnetComponent:
+      all: true
   opencsg.com/csghub-server/component/reporter:
     config:
     interfaces:

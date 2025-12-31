@@ -340,11 +340,9 @@ type Config struct {
 	}
 
 	Agent struct {
-		AutoHubServiceHost           string `env:"OPENCSG_AGENT_AUTOHUB_SERVICE_HOST" default:"http://internal.opencsg-stg.com:8190"`
-		AgentHubServiceHost          string `env:"OPENCSG_AGENT_AGENTHUB_SERVICE_HOST" default:""`
-		AgentHubServiceToken         string `env:"OPENCSG_AGENT_AGENTHUB_SERVICE_TOKEN" default:""`
-		CodeInstanceQuotaPerUser     int    `env:"STARHUB_SERVER_AGENT_CODE_INSTANCE_QUOTA_PER_USER" default:"5"`
-		LangflowInstanceQuotaPerUser int    `env:"STARHUB_SERVER_AGENT_LANGFLOW_INSTANCE_QUOTA_PER_USER" default:"5"`
+		AutoHubServiceHost   string `env:"OPENCSG_AGENT_AUTOHUB_SERVICE_HOST" default:"http://internal.opencsg-stg.com:8190"`
+		AgentHubServiceHost  string `env:"OPENCSG_AGENT_AGENTHUB_SERVICE_HOST" default:""`
+		AgentHubServiceToken string `env:"OPENCSG_AGENT_AGENTHUB_SERVICE_TOKEN" default:""`
 	}
 
 	DataViewer struct {

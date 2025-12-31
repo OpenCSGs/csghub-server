@@ -5,6 +5,27 @@ import (
 	"time"
 )
 
+// AgentConfig represents the agent system configuration
+type AgentConfig struct {
+	ID        int64          `json:"id"`
+	Name      string         `json:"name"`
+	Config    map[string]any `json:"config"`
+	CreatedAt time.Time      `json:"created_at"`
+	UpdatedAt time.Time      `json:"updated_at"`
+}
+
+// CreateAgentConfigReq represents a request to create agent configuration
+type CreateAgentConfigReq struct {
+	Name   string         `json:"name" binding:"required"`
+	Config map[string]any `json:"config" binding:"required"`
+}
+
+// UpdateAgentConfigReq represents a request to update agent configuration
+type UpdateAgentConfigReq struct {
+	Name   *string         `json:"name,omitempty"`
+	Config *map[string]any `json:"config,omitempty"`
+}
+
 // AgentTemplate represents the template for an agent
 type AgentTemplate struct {
 	ID          int64           `json:"id"`
