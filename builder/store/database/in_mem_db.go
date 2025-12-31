@@ -98,6 +98,20 @@ func createIndexes(ctx context.Context, db *bun.DB) error {
 		Index("idx_workflow_user_uuid").
 		Column("username", "task_id").
 		Exec(ctx)
-	return err
+	if err != nil {
+		return err
+	}
 
+	_, err = db.NewCreateIndex().
+		Model((*KnativeServiceRevision)(nil)).
+		Index("idx_knative_service_revision_revision_name").
+		Unique().
+		Column("commit_id").
+		Column("svc_name").
+		IfNotExists().
+		Exec(ctx)
+	if err != nil {
+		return err
+	}
+	return nil
 }
