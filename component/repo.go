@@ -2604,6 +2604,7 @@ func (c *repoComponentImpl) DeployInstanceLogs(ctx context.Context, logReq types
 		SvcName:      deploy.SvcName,
 		InstanceName: logReq.InstanceName,
 		Since:        logReq.Since,
+		CommitID:     logReq.CommitID,
 	})
 }
 

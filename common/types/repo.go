@@ -220,7 +220,8 @@ type DeployRepo struct {
 	Message             string     `json:"message,omitempty"`
 	SupportFunctionCall bool       `json:"support_function_call,omitempty"`
 
-	Since string `json:"since,omitempty"`
+	Since    string `json:"since,omitempty"`
+	CommitID string `json:"commit_id,omitempty"`
 }
 
 type RuntimeFrameworkReq struct {

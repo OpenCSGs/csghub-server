@@ -548,6 +548,10 @@ func (d *deployer) InstanceLogs(ctx context.Context, dr types.DeployRepo) (*Mult
 		types.LogLabelTypeKey:   types.LogLabelDeploy,
 		types.StreamKeyDeployID: fmt.Sprintf("%d", deploy.ID),
 	}
+	if dr.CommitID != "" {
+		labels[types.StreamKeyDeployCommitID] = dr.CommitID
+	}
+
 	if dr.InstanceName != "" {
 		labels[types.StreamKeyInstanceName] = dr.InstanceName
 	}

@@ -49,8 +49,9 @@ var (
 	KeyServiceLabel  string = "serving.knative.dev/service"
 	KeyRunModeLabel  string = "run-mode"
 	ValueMultiHost   string = "multi-host"
-	CommitId         string = "serving.knative.dev/commit_id"
-	RevisionName     string = "serving.knative.dev/revision"
+	// CommitId         string = "serving.knative.dev/commit_id"
+	CommitId            = types.StreamKeyDeployCommitID
+	RevisionName string = "serving.knative.dev/revision"
 )
 
 type serviceComponentImpl struct {
