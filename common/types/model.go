@@ -472,7 +472,7 @@ type CreateInferenceVersionReq struct {
 	DeployId int64  `json:"-"`
 	CommitID string `json:"commit_id"`
 
-	InitialTraffic int `json:"initial_traffic"`
+	TrafficPercent int `json:"traffic_percent"`
 }
 
 type ListInferenceVersionsResp struct {
