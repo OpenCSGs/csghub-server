@@ -8,13 +8,13 @@ import (
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/handler"
 	"opencsg.com/csghub-server/api/middleware"
+	bldmq "opencsg.com/csghub-server/builder/mq"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 )
 
 func useAdvancedMiddleware(r *gin.Engine, config *config.Config) {}
-
-func createAdvancedRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware.MiddlewareCollection, config *config.Config) error {
+func createAdvancedRoutes(apiGroup *gin.RouterGroup, adminGroup *gin.RouterGroup, middlewareCollection middleware.MiddlewareCollection, config *config.Config, mqFactory bldmq.MessageQueueFactory) error {
 	repoHandler, err := handler.NewRepoHandler(config)
 	if err != nil {
 		return fmt.Errorf("failed to create repo handler: %w", err)

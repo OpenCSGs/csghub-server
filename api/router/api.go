@@ -11,6 +11,8 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
+	"github.com/go-playground/validator/v10"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	swaggerFiles "github.com/swaggo/files"
@@ -184,6 +186,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	r.Use(middleware.LocalizedErrorMiddleware())
 	r.Use(middleware.Authenticator(config))
 	useAdvancedMiddleware(r, config)
+	createCustomValidator()
 	apiGroup := r.Group("/api/v1")
 
 	versionHandler := handler.NewVersionHandler()
@@ -514,7 +517,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	}
 	createCSGBotRoutes(apiGroup, csgbotHandler)
 
-	err = createAdvancedRoutes(apiGroup, middlewareCollection, config)
+	err = createAdvancedRoutes(apiGroup, adminGroup, middlewareCollection, config, mqFactory)
 	if err != nil {
 		return nil, fmt.Errorf("error creating advance routes:%w", err)
 	}
@@ -1329,4 +1332,8 @@ func createWebHookRoutes(apiGroup *gin.RouterGroup, middlewareCollection middlew
 		runnerHookGrp.POST("", middlewareCollection.Auth.NeedAPIKey, middleware.WebhookMetrics(), webhookHandler.ReceiveRunnerWebHook)
 	}
 	return nil
+}
+
+func createCustomValidator() {
+	_, _ = binding.Validator.Engine().(*validator.Validate)
 }
