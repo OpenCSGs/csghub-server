@@ -1,6 +1,8 @@
-FROM nvcr.io/nvidia/vllm:25.10-py3
+FROM nvcr.io/nvidia/vllm:25.11-py3
 # Build with some basic utilities
-RUN apt-get update && apt-get install -y \
+RUN sed -i 's|http://archive.ubuntu.com/ubuntu|http://mirrors.aliyun.com/ubuntu|g' /etc/apt/sources.list && \
+    sed -i 's|http://security.ubuntu.com/ubuntu|http://mirrors.aliyun.com/ubuntu|g' /etc/apt/sources.list && \
+    apt-get update && apt-get install -y \
     python3-pip apt-utils \
     wget curl vim \
     git git-lfs \
