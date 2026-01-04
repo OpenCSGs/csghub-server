@@ -12,71 +12,84 @@ echo "$OPENCSG_ACR_PASSWORD" | docker login $OPENCSG_ACR -u $OPENCSG_ACR_USERNAM
 ```bash
 export BUILDX_NO_DEFAULT_ATTESTATIONS=1
 
-# For vllm: opencsg-registry.cn-beijing.cr.aliyuncs.com/public/vllm:v0.8.5
-export IMAGE_TAG=v0.8.5
+# For vllm: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/vllm:v0.8.5
+export IMAGE_TAG=v0.12.0
 docker buildx build --platform linux/amd64,linux/arm64 \
-  -t ${OPENCSG_ACR}/public/vllm:${IMAGE_TAG} \
-  -t ${OPENCSG_ACR}/public/vllm:latest \
+  -t ${OPENCSG_ACR}/opencsghq/vllm:${IMAGE_TAG} \
   -f Dockerfile.vllm \
   --push .
   
-# For vllm cpu only: opencsg-registry.cn-beijing.cr.aliyuncs.com/public/vllm-cpu:2.3
+# For vllm cpu only: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/vllm-cpu:2.3
 export IMAGE_TAG=2.4
 docker buildx build --platform linux/amd64,linux/arm64 \
-  -t ${OPENCSG_ACR}/public/vllm-cpu:${IMAGE_TAG} \
-  -t ${OPENCSG_ACR}/public/vllm-cpu:latest \
+  -t ${OPENCSG_ACR}/opencsghq/vllm-cpu:${IMAGE_TAG} \
+  -t ${OPENCSG_ACR}/opencsghq/vllm-cpu:latest \
   -f Dockerfile.vllm-cpu \
   --push .
 
-# For tgi: opencsg-registry.cn-beijing.cr.aliyuncs.com/public/tgi:3.2
+# For tgi: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/tgi:3.2
 export IMAGE_TAG=3.2
 docker buildx build --platform linux/amd64 \
-  -t ${OPENCSG_ACR}/public/tgi:${IMAGE_TAG} \
-  -t ${OPENCSG_ACR}/public/tgi:latest \
+  -t ${OPENCSG_ACR}/opencsghq/tgi:${IMAGE_TAG} \
+  -t ${OPENCSG_ACR}/opencsghq/tgi:latest \
   -f Dockerfile.tgi \
   --push .
 
-# For sglang: opencsg-registry.cn-beijing.cr.aliyuncs.com/public/sglang:v0.4.6.post1-cu124-srt
-export IMAGE_TAG=v0.4.6.post1-cu124-srt
-docker buildx build --platform linux/amd64 \
-  -t ${OPENCSG_ACR}/public/sglang:${IMAGE_TAG} \
-  -t ${OPENCSG_ACR}/public/sglang:latest \
+# For sglang: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/sglang:v0.5.0rc2-cu126
+export IMAGE_TAG=v0.5.6.post2
+docker buildx build --platform linux/amd64,linux/arm64 \
+  -t ${OPENCSG_ACR}/opencsghq/sglang:${IMAGE_TAG} \
   -f Dockerfile.sglang \
   --push .
 
-# For hf-inference-toolkit: opencsg-registry.cn-beijing.cr.aliyuncs.com/public/hf-inference-toolkit:0.5.3
+# For nvidia-vllm: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/vllm-nvidia:25.11-py3
+export IMAGE_TAG=25.11-py3
+docker buildx build --platform linux/amd64,linux/arm64 \
+   -t ${OPENCSG_ACR}/opencsghq/nvidia-vllm:${IMAGE_TAG} \
+  -f Dockerfile.vllm-nvidia \
+  --push .
+
+# For mindie: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/mindie:2.0-csg-1.0.RC2
+export IMAGE_TAG=2.0-csg-1.0.RC2
+docker buildx build --platform linux/arm64 \
+  -t ${OPENCSG_ACR}/opencsghq/mindie:${IMAGE_TAG} \
+  -t ${OPENCSG_ACR}/opencsghq/mindie:latest \
+  -f Dockerfile.mindie \
+  --push .
+
+# For hf-inference-toolkit: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/hf-inference-toolkit:0.5.3
 export IMAGE_TAG=0.5.3
 docker buildx build --platform linux/amd64,linux/arm64 \
-  -t ${OPENCSG_ACR}/public/hf-inference-toolkit:${IMAGE_TAG} \
-  -t ${OPENCSG_ACR}/public/hf-inference-toolkit:latest \
+  -t ${OPENCSG_ACR}/opencsghq/hf-inference-toolkit:${IMAGE_TAG} \
+  -t ${OPENCSG_ACR}/opencsghq/hf-inference-toolkit:latest \
   -f Dockerfile.hf-inference-toolkit \
   --push .
-# For Text Embeddings Inference: opencsg-registry.cn-beijing.cr.aliyuncs.com/public/tei:cpu-1.6
+# For Text Embeddings Inference: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/tei:cpu-1.6
 export IMAGE_TAG=cpu-1.6
 docker buildx build --platform linux/amd64 \
-  -t ${OPENCSG_ACR}/public/tei:${IMAGE_TAG} \
-  -t ${OPENCSG_ACR}/public/tei:latest \
+  -t ${OPENCSG_ACR}/opencsghq/tei:${IMAGE_TAG} \
+  -t ${OPENCSG_ACR}/opencsghq/tei:latest \
   -f Dockerfile.tei-cpu \
   --push .
-# For Text Embeddings Inference: opencsg-registry.cn-beijing.cr.aliyuncs.com/public/tei:1.6
+# For Text Embeddings Inference: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/tei:1.6
 export IMAGE_TAG=1.6
 docker buildx build --platform linux/amd64 \
-  -t ${OPENCSG_ACR}/public/tei:${IMAGE_TAG} \
-  -t ${OPENCSG_ACR}/public/tei:latest \
+  -t ${OPENCSG_ACR}/opencsghq/tei:${IMAGE_TAG} \
+  -t ${OPENCSG_ACR}/opencsghq/tei:latest \
   -f Dockerfile.tei \
   --push .
-# For Text Llama.cpp Inference: opencsg-registry.cn-beijing.cr.aliyuncs.com/public/llama.cpp:b5215
+# For Text Llama.cpp Inference: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/llama.cpp:b5215
 export IMAGE_TAG=b5215
 docker buildx build --platform linux/amd64 \
-  -t ${OPENCSG_ACR}/public/llama.cpp:${IMAGE_TAG} \
-  -t ${OPENCSG_ACR}/public/llama.cpp:latest \
+  -t ${OPENCSG_ACR}/opencsghq/llama.cpp:${IMAGE_TAG} \
+  -t ${OPENCSG_ACR}/opencsghq/llama.cpp:latest \
   -f Dockerfile.llama.cpp \
   --push .
-# For Text ktransformers Inference: opencsg-registry.cn-beijing.cr.aliyuncs.com/public/ktransformers:0.2.1.post1  
+# For Text ktransformers Inference: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/ktransformers:0.2.1.post1  
 export IMAGE_TAG=0.2.3
 docker build --platform linux/amd64 \
-  -t ${OPENCSG_ACR}/public/ktransformers:${IMAGE_TAG} \
-  -t ${OPENCSG_ACR}/public/ktransformers:latest \
+  -t ${OPENCSG_ACR}/opencsghq/ktransformers:${IMAGE_TAG} \
+  -t ${OPENCSG_ACR}/opencsghq/ktransformers:latest \
   -f Dockerfile.ktransformers \
   --push .
 ```
@@ -91,7 +104,7 @@ docker run -d \
   -e HF_ENDPOINT=https://hub.opencsg.com \
   --gpus device=1 \
   -p 8000:8000 \
-  ${OPENCSG_ACR}/public/vllm-local:2.8
+  ${OPENCSG_ACR}/opencsghq/vllm-local:2.8
 
 # Run TGI
 docker run -d \
@@ -101,7 +114,17 @@ docker run -d \
   -v llm:/workspace \
   --gpus device=7 \
   -p 8000:8000
-  ${OPENCSG_ACR}/public/tgi:2.2
+  ${OPENCSG_ACR}/opencsghq/tgi:2.2
+
+# Run MINDIE
+docker run -d \
+  -e ACCESS_TOKEN=xxx  \
+  -e REPO_ID="xzgan001/csg-wukong-1B" \
+  -e HF_ENDPOINT=https://hub.opencsg.com \
+  -v llm:/workspace \
+  --gpus device=7 \
+  -p 8000:8000
+  ${OPENCSG_ACR}/opencsghq/mindie:1.8-csg-1.0.RC2
 ```
 *Note: HF_ENDPOINT should be use the real csghub address.*
 
@@ -123,7 +146,7 @@ docker run -d \
 ## API to Call Inference
 ```
 curl -H "Content-type: application/json" -X POST -d '{
-  "model": "/data/xzgan/csg-wukong-1B",
+  "model": "OpenCSG/csg-wukong-1B",
   "messages": [
     {
       "role": "system",
@@ -136,7 +159,7 @@ curl -H "Content-type: application/json" -X POST -d '{
   ],
   "stream": true,
   "max_tokens": 20
-}' http://localhost:8000/v1/chat/completions
+}' http://127.0.0.1:8000/v1/chat/completions
 ```
 *Note: VLLM and TGI has the same endpoint and request body.*
 

@@ -1,5 +1,4 @@
-# Pull from devel image instead of base
-FROM nvidia/cuda:12.1.1-devel-ubuntu22.04
+FROM hiyouga/llamafactory:0.9.4
 
 # Set bash as the default shell
 ENV SHELL=/bin/bash \
@@ -22,18 +21,11 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && \
     dpkg-reconfigure -f noninteractive tzdata
 
 # Install the appropriate torch version 
-RUN ln -sf /usr/bin/python3 /usr/bin/python && \
-    pip config set global.index-url https://mirrors.aliyun.com/pypi/simple && \
-    pip install --no-cache-dir jupyterlab numpy==1.26.4 \
-    torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1 \
-    jupyter-server-proxy==4.4.0 fastapi==0.112.2 \
-    gradio-client==1.10.1 pydantic==2.10.6
+RUN pip install --no-cache-dir jupyterlab jupyter-server-proxy==4.4.0 \
+    && pip uninstall -y gradio && pip install --no-cache-dir https://git-devops.opencsg.com/opensource/gradio/-/raw/main/gradio-5.31.0-py3-none-any.whl
 
 # Create a working directory
 WORKDIR /etc/csghub
-
-RUN git clone --depth 1 https://gitee.com/xzgan/LLaMA-Factory.git --branch v0.9.3 --single-branch && cd LLaMA-Factory && \
-    pip install --no-cache-dir -e ".[metrics,deepspeed]"
 
 # Setup supervisord
 COPY llama-factory/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
@@ -42,12 +34,13 @@ COPY llama-factory/ /etc/csghub/
 
 RUN mkdir -p /var/log/supervisord && \
     chmod +x /etc/csghub/*.sh && \
+    chmod +x /etc/csghub/*.py && \
     mkdir -p /root/.jupyter/lab/user-settings/@jupyterlab/apputils-extension && \
 	echo '{"theme":"JupyterLab Dark"}' > /root/.jupyter/lab/user-settings/@jupyterlab/apputils-extension/themes.jupyterlab-settings && \
 	mkdir -p /root/.jupyter/lab/user-settings/@jupyterlab/notebook-extension && \
 	echo '{"codeCellConfig":{"lineNumbers":true }}' > /root/.jupyter/lab/user-settings/@jupyterlab/notebook-extension/tracker.jupyterlab-settings
 
-RUN pip install https://git-devops.opencsg.com/opensource/gradio/-/raw/main/gradio-5.31.0-py3-none-any.whl --force-reinstall --no-deps
+
 
 # Create a working directory
 WORKDIR /workspace/
