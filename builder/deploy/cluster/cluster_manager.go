@@ -45,16 +45,23 @@ type Cluster struct {
 	Region           string
 }
 
-// ClusterPool is a resource pool of cluster information
-type ClusterPool struct {
+// Pool is a resource pool of cluster information
+type pool struct {
 	Clusters     []*Cluster
 	ClusterStore database.ClusterInfoStore
 	Config       *config.Config // Configuration for the cluster pool
 }
 
+type Pool interface {
+	GetCluster() (*Cluster, error)
+	GetClusterByID(ctx context.Context, id string) (*Cluster, error)
+	GetAllCluster() []*Cluster
+	Update(ctx context.Context, cluster *database.ClusterInfo) error
+}
+
 // NewClusterPool initializes and returns a ClusterPool by auto-detecting whether it's running in a cluster or using local kubeconfig files.
-func NewClusterPool(config *config.Config) (*ClusterPool, error) {
-	pool := &ClusterPool{}
+func NewClusterPool(config *config.Config) (Pool, error) {
+	pool := &pool{}
 	pool.Config = config
 
 	// Try in-cluster config first
@@ -77,7 +84,7 @@ func NewClusterPool(config *config.Config) (*ClusterPool, error) {
 	return pool, nil
 }
 
-func tryInClusterConfig(pool *ClusterPool, config *config.Config) error {
+func tryInClusterConfig(pool *pool, config *config.Config) error {
 	slog.Info("Attempting to connect to Kubernetes using in-cluster config")
 	kubeconfig, err := rest.InClusterConfig()
 	if err != nil {
@@ -104,7 +111,7 @@ func tryInClusterConfig(pool *ClusterPool, config *config.Config) error {
 	return fmt.Errorf("failed to build cluster from in-cluster config: %w", err)
 }
 
-func tryKubeconfigFiles(pool *ClusterPool, config *config.Config) error {
+func tryKubeconfigFiles(pool *pool, config *config.Config) error {
 	slog.Info("Attempting to connect to Kubernetes using kubeconfig files from home directory")
 	home := homedir.HomeDir()
 	if home == "" {
@@ -278,7 +285,7 @@ func buildCluster(kubeconfig *rest.Config, id string, index int, connectMode typ
 }
 
 // GetCluster selects the most appropriate cluster to deploy the service to
-func (p *ClusterPool) GetCluster() (*Cluster, error) {
+func (p *pool) GetCluster() (*Cluster, error) {
 	if len(p.Clusters) == 0 {
 		return nil, fmt.Errorf("no available clusters")
 	}
@@ -292,7 +299,7 @@ func (p *ClusterPool) GetCluster() (*Cluster, error) {
 }
 
 // GetClusterByID retrieves a cluster from the pool given its unique ID
-func (p *ClusterPool) GetClusterByID(ctx context.Context, id string) (*Cluster, error) {
+func (p *pool) GetClusterByID(ctx context.Context, id string) (*Cluster, error) {
 	cfId := "config"
 	storageClass := ""
 	networkInterface := "eth0"
@@ -312,6 +319,14 @@ func (p *ClusterPool) GetClusterByID(ctx context.Context, id string) (*Cluster, 
 		}
 	}
 	return nil, fmt.Errorf("cluster with the given ID does not exist")
+}
+
+func (p *pool) GetAllCluster() []*Cluster {
+	return p.Clusters
+}
+
+func (p *pool) Update(ctx context.Context, clusterInfo *database.ClusterInfo) error {
+	return p.ClusterStore.Update(ctx, *clusterInfo)
 }
 
 // GetResourcesInCluster retrieves all node cpu and gpu info

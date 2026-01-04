@@ -3,6 +3,7 @@ package component
 import (
 	"context"
 	"log/slog"
+
 	"opencsg.com/csghub-server/builder/deploy/cluster"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/logcollector/types"
@@ -41,7 +42,8 @@ func NewLogFactory(ctx context.Context, config *config.Config) (LogFactory, erro
 	}
 
 	// The factory "produces" a worker for each cluster.
-	for _, cluster := range clusterPool.Clusters {
+	clusters := clusterPool.GetAllCluster()
+	for _, cluster := range clusters {
 		// Each worker gets its own context, derived from the factory's context.
 		// This allows the factory to stop all workers centrally.
 		worker, err := NewLogCollector(ctx, config, cluster)

@@ -35,7 +35,7 @@ import (
 type workFlowComponentImpl struct {
 	config      *config.Config
 	wf          database.ArgoWorkFlowStore
-	clusterPool *cluster.ClusterPool
+	clusterPool cluster.Pool
 	eventPub    *event.EventPublisher
 	redisLocker *redis.DistributedLocker
 	logReporter reporter.LogCollector
@@ -53,10 +53,10 @@ type WorkFlowComponent interface {
 	GetWorkflow(ctx context.Context, id int64, username string) (*database.ArgoWorkflow, error)
 	DeleteWorkflowInargo(ctx context.Context, delete *v1alpha1.Workflow) error
 	FindWorkFlowById(ctx context.Context, id int64) (database.ArgoWorkflow, error)
-	RunInformer(clusterPool *cluster.ClusterPool, config *config.Config)
+	RunInformer(config *config.Config)
 }
 
-func NewWorkFlowComponent(config *config.Config, clusterPool *cluster.ClusterPool, logReporter reporter.LogCollector) WorkFlowComponent {
+func NewWorkFlowComponent(config *config.Config, clusterPool cluster.Pool, logReporter reporter.LogCollector) WorkFlowComponent {
 	wf := database.NewArgoWorkFlowStore()
 	wc := &workFlowComponentImpl{
 		config:      config,
@@ -76,10 +76,11 @@ func (wc *workFlowComponentImpl) CreateWorkflow(ctx context.Context, req types.A
 	if req.ShareMode {
 		namespace = wc.config.Cluster.ResourceQuotaNamespace
 	}
-	cluster, clusterId, err := GetCluster(ctx, wc.clusterPool, req.ClusterID)
+	cluster, err := wc.clusterPool.GetClusterByID(ctx, req.ClusterID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get cluster by id: %v", err)
 	}
+	clusterId := cluster.ID
 	argowf := &database.ArgoWorkflow{
 		Username:     req.Username,
 		UserUUID:     req.UserUUID,
@@ -138,7 +139,7 @@ func (wc *workFlowComponentImpl) CreateWorkflow(ctx context.Context, req types.A
 }
 
 func (wc *workFlowComponentImpl) DeleteWorkflow(ctx context.Context, req *types.ArgoWorkFlowDeleteReq) error {
-	cluster, _, err := GetCluster(ctx, wc.clusterPool, req.ClusterID)
+	cluster, err := wc.clusterPool.GetClusterByID(ctx, req.ClusterID)
 	if err != nil {
 		return fmt.Errorf("failed to get cluster by id: %v", err)
 	}
@@ -358,12 +359,13 @@ func generateWorkflow(req types.ArgoWorkFlowReq, config *config.Config) *v1alpha
 	return workflowObject
 }
 
-func (wc *workFlowComponentImpl) RunInformer(clusterPool *cluster.ClusterPool, c *config.Config) {
+func (wc *workFlowComponentImpl) RunInformer(c *config.Config) {
 	var wg sync.WaitGroup
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	defer runtime.HandleCrash()
-	for _, cls := range clusterPool.Clusters {
+	clusters := wc.clusterPool.GetAllCluster()
+	for _, cls := range clusters {
 		_, err := cls.Client.Discovery().ServerVersion()
 		if err != nil {
 			slog.Error("cluster is unavailable ", slog.Any("cluster config", cls.CID), slog.Any("error", err))
@@ -478,22 +480,6 @@ func CreateInfomerFactory(client versioned.Interface, namespace, labelSelector s
 		runtime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
 		return
 	}
-}
-
-// get cluster
-func GetCluster(ctx context.Context, clusterPool *cluster.ClusterPool, clusterID string) (*cluster.Cluster, string, error) {
-	if clusterID == "" {
-		clusterInfo, err := clusterPool.ClusterStore.ByClusterConfig(ctx, clusterPool.Clusters[0].CID)
-		if err != nil {
-			return nil, "", fmt.Errorf("failed to get cluster info: %v", err)
-		}
-		return clusterPool.Clusters[0], clusterInfo.ClusterID, nil
-	}
-	cluster, err := clusterPool.GetClusterByID(ctx, clusterID)
-	if err != nil {
-		return nil, clusterID, fmt.Errorf("failed to get cluster by id: %v", err)
-	}
-	return cluster, clusterID, nil
 }
 
 func (wc *workFlowComponentImpl) setLabels(wf *database.ArgoWorkflow, awf *v1alpha1.Workflow) {

@@ -17,17 +17,17 @@ import (
 )
 
 type ArgoHandler struct {
-	clusterPool        *cluster.ClusterPool
+	clusterPool        cluster.Pool
 	workflowNameSpace  string
 	modelDockerRegBase string
 	config             *config.Config
 	wfc                component.WorkFlowComponent
 }
 
-func NewArgoHandler(config *config.Config, clusterPool *cluster.ClusterPool, logReporter reporter.LogCollector) (*ArgoHandler, error) {
+func NewArgoHandler(config *config.Config, clusterPool cluster.Pool, logReporter reporter.LogCollector) (*ArgoHandler, error) {
 	wfc := component.NewWorkFlowComponent(config, clusterPool, logReporter)
 	//watch workflows events
-	go wfc.RunInformer(clusterPool, config)
+	go wfc.RunInformer(config)
 	return &ArgoHandler{
 		clusterPool:        clusterPool,
 		config:             config,

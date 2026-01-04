@@ -21,14 +21,14 @@ import (
 )
 
 type K8sHandler struct {
-	clusterPool        *cluster.ClusterPool
+	clusterPool        cluster.Pool
 	k8sNameSpace       string
 	modelDockerRegBase string
 	env                *config.Config
 	serviceComponent   component.ServiceComponent
 }
 
-func NewK8sHandler(config *config.Config, clusterPool *cluster.ClusterPool, logReporter reporter.LogCollector) (*K8sHandler, error) {
+func NewK8sHandler(config *config.Config, clusterPool cluster.Pool, logReporter reporter.LogCollector) (*K8sHandler, error) {
 	serviceComponent := component.NewServiceComponent(config, clusterPool, logReporter)
 	return &K8sHandler{
 		k8sNameSpace:       config.Cluster.SpaceNamespace,
@@ -365,7 +365,7 @@ func (s *K8sHandler) UpdateCluster(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, resp)
 		return
 	}
-	err = s.clusterPool.ClusterStore.Update(c, *request)
+	err = s.clusterPool.Update(c.Request.Context(), request)
 	if err != nil {
 		slog.ErrorContext(c.Request.Context(), "fail to update cluster", slog.Any("error", err))
 		resp.Code = -1

@@ -62,7 +62,7 @@ type serviceComponentImpl struct {
 	imagePullSecret         string
 	informerSyncPeriodInMin int
 	serviceStore            database.KnativeServiceStore
-	clusterPool             *cluster.ClusterPool
+	clusterPool             cluster.Pool
 	deployLogStore          database.DeployLogStore
 	logReporter             reporter.LogCollector
 	revisionStore           database.KnativeServiceRevisionStore
@@ -84,7 +84,7 @@ type ServiceComponent interface {
 	DeleteKsvcVersion(ctx context.Context, clusterId string, svcName string, commitID string) error
 }
 
-func NewServiceComponent(config *config.Config, clusterPool *cluster.ClusterPool, logReporter reporter.LogCollector) ServiceComponent {
+func NewServiceComponent(config *config.Config, clusterPool cluster.Pool, logReporter reporter.LogCollector) ServiceComponent {
 	sc := &serviceComponentImpl{
 		k8sNameSpace:            config.Cluster.SpaceNamespace,
 		env:                     config,
@@ -534,7 +534,8 @@ func (s *serviceComponentImpl) runInformer() {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	defer runtime.HandleCrash()
-	for _, cls := range s.clusterPool.Clusters {
+	clusters := s.clusterPool.GetAllCluster()
+	for _, cls := range clusters {
 		_, err := cls.Client.Discovery().ServerVersion()
 		if err != nil {
 			slog.Error("cluster is unavailable", slog.Any("cluster config", cls.CID), slog.Any("error", err))

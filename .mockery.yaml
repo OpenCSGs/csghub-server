@@ -180,6 +180,10 @@ packages:
     config:
     interfaces:
       Deployer:
+  opencsg.com/csghub-server/builder/deploy/cluster:
+    config:
+    interfaces:
+      Pool:
   opencsg.com/csghub-server/builder/deploy/scheduler:
     config:
     interfaces:

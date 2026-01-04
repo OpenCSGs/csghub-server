@@ -1,6 +1,8 @@
 package cluster
 
 import (
+	"context"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -8,6 +10,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
+	mockdb "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 )
 
@@ -183,6 +187,122 @@ func TestGetGpuTypeAndVendor(t *testing.T) {
 			assert.Equal(t, tt.wantModel, gotModel)
 		})
 	}
+}
+
+func TestGetCluster(t *testing.T) {
+	t.Run("should return error when no clusters available", func(t *testing.T) {
+		pool := &pool{
+			Clusters: []*Cluster{},
+		}
+
+		cluster, err := pool.GetCluster()
+		assert.Error(t, err)
+		assert.Nil(t, cluster)
+		assert.Contains(t, err.Error(), "no available clusters")
+	})
+
+	t.Run("should return a cluster when clusters are available", func(t *testing.T) {
+		mockClusterStore := mockdb.NewMockClusterInfoStore(t)
+		testCluster := &Cluster{
+			CID:        "test-cluster-1",
+			ID:         "cluster-1",
+			ConfigPath: "/path/to/kubeconfig",
+			Client:     fake.NewSimpleClientset(),
+		}
+
+		pool := &pool{
+			Clusters:     []*Cluster{testCluster},
+			ClusterStore: mockClusterStore,
+		}
+
+		cluster, err := pool.GetCluster()
+		assert.NoError(t, err)
+		assert.NotNil(t, cluster)
+		assert.Equal(t, testCluster.CID, cluster.CID)
+		assert.Equal(t, testCluster.ID, cluster.ID)
+	})
+}
+
+func TestGetClusterByID(t *testing.T) {
+	t.Run("should return error when cluster not found", func(t *testing.T) {
+		mockClusterStore := mockdb.NewMockClusterInfoStore(t)
+
+		pool := &pool{
+			Clusters:     []*Cluster{},
+			ClusterStore: mockClusterStore,
+		}
+		mockClusterStore.EXPECT().ByClusterID(context.Background(), "non-existent-cluster").
+			Return(database.ClusterInfo{}, errors.New("cluster not found"))
+
+		cluster, err := pool.GetClusterByID(context.Background(), "non-existent-cluster")
+		assert.Error(t, err)
+		assert.Nil(t, cluster)
+		assert.Contains(t, err.Error(), "cluster with the given ID does not exist")
+	})
+
+	t.Run("should return cluster when found", func(t *testing.T) {
+		mockClusterStore := mockdb.NewMockClusterInfoStore(t)
+		testCluster := &Cluster{
+			CID:        "test-cluster-1",
+			ID:         "cluster-1",
+			ConfigPath: "/path/to/kubeconfig",
+			Client:     fake.NewSimpleClientset(),
+		}
+
+		pool := &pool{
+			Clusters:     []*Cluster{testCluster},
+			ClusterStore: mockClusterStore,
+		}
+		mockClusterStore.EXPECT().ByClusterID(context.Background(), "cluster-1").
+			Return(database.ClusterInfo{
+				ClusterID:     "cluster-1",
+				ClusterConfig: "test-cluster-1",
+			}, nil)
+
+		cluster, err := pool.GetClusterByID(context.Background(), "cluster-1")
+		assert.NoError(t, err)
+		assert.NotNil(t, cluster)
+		assert.Equal(t, testCluster.CID, cluster.CID)
+		assert.Equal(t, testCluster.ID, cluster.ID)
+	})
+}
+
+func TestGetAllCluster(t *testing.T) {
+	mockClusterStore := mockdb.NewMockClusterInfoStore(t)
+	testCluster := &Cluster{
+		CID:        "test-cluster-1",
+		ID:         "cluster-1",
+		ConfigPath: "/path/to/kubeconfig",
+		Client:     fake.NewSimpleClientset(),
+	}
+
+	pool := &pool{
+		Clusters:     []*Cluster{testCluster},
+		ClusterStore: mockClusterStore,
+	}
+
+	clusters := pool.GetAllCluster()
+	assert.Len(t, clusters, 1)
+	assert.Equal(t, testCluster.CID, clusters[0].CID)
+	assert.Equal(t, testCluster.ID, clusters[0].ID)
+}
+
+func TestUpdateCluster(t *testing.T) {
+	mockClusterStore := mockdb.NewMockClusterInfoStore(t)
+
+	pool := &pool{
+		Clusters:     []*Cluster{},
+		ClusterStore: mockClusterStore,
+	}
+
+	testCluster := &database.ClusterInfo{
+		ClusterID: "cluster-1",
+	}
+
+	mockClusterStore.EXPECT().Update(context.Background(), *testCluster).Return(nil)
+
+	err := pool.Update(context.Background(), testCluster)
+	assert.NoError(t, err)
 }
 
 func TestGetXPULabel(t *testing.T) {
