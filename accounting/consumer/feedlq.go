@@ -36,7 +36,7 @@ func (d *FeeDlq) Run() {
 
 func (d *FeeDlq) preDLQ() {
 	var err error
-	var i int = 0
+	var i = 0
 	for {
 		i++
 		err = d.sysMQ.BuildDLQStream()
@@ -58,7 +58,7 @@ func (d *FeeDlq) moveWithRetry() {
 			break
 		}
 
-		var data []byte = []byte("")
+		var data = []byte("")
 		d.timeOut.Reset(dlqIdleDuration)
 		select {
 		case data = <-d.CH:

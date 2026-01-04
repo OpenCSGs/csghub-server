@@ -1,19 +1,44 @@
+version: "2"
 linters:
-  disable-all: true
+  default: none
   enable:
+    - bodyclose
     - errcheck
-    - gosimple
     - govet
     - ineffassign
+    - misspell
     - staticcheck
     - unused
-
-    - misspell
-    - bodyclose
-
-linters-settings:
-  staticcheck:
-    checks: ["all", "-SA1029"]
-  govet:
-    disable:
-      - composites
+  settings:
+    govet:
+      disable:
+        - composites
+    staticcheck:
+      checks:
+        - all
+        - -SA1029
+        - -ST1003
+        - -ST1005
+        - -ST1016
+        - -QF1003
+        - -QF1001
+        - -QF1008
+        - -ST1008
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

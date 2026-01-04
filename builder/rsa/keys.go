@@ -133,7 +133,7 @@ func VerifyData(reader KeysReader, publicKeyFile, data string) (*types.RSAPayloa
 		return nil, errors.New("invalid data in PEM format")
 	}
 
-	base64Str := strings.Replace(dataStr[len(types.PEMHeader):len(dataStr)-len(types.PEMFooter)], "\n", "", -1)
+	base64Str := strings.ReplaceAll(dataStr[len(types.PEMHeader):len(dataStr)-len(types.PEMFooter)], "\n", "")
 
 	gob.Register(types.RSAPayload{})
 

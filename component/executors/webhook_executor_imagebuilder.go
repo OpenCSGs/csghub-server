@@ -79,7 +79,7 @@ func (h *imagebuilderExecutorImpl) ProcessEvent(ctx context.Context, event *type
 		}
 
 		var status int
-		var message string = data.Message
+		var message = data.Message
 		switch data.Status {
 		case string(v1alpha1.WorkflowRunning):
 			if task.Deploy.Status != common.BuildInQueue {

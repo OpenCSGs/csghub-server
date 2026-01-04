@@ -2442,10 +2442,7 @@ func (c *repoComponentImpl) DeployDetail(ctx context.Context, detailReq types.De
 
 	endpoint, _ := c.GenerateEndpoint(ctx, deploy)
 
-	endpointPrivate := true
-	if deploy.SecureLevel == types.EndpointPublic {
-		endpointPrivate = false
-	}
+	endpointPrivate := deploy.SecureLevel != types.EndpointPublic
 	proxyEndPoint := ""
 	if deploy.Type == types.FinetuneType {
 		proxyEndPoint = endpoint + "/proxy/7860/"
