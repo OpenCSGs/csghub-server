@@ -49,9 +49,9 @@ RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple/ &&
         streamlit==1.33.0 && \
     pip install --no-cache-dir --default-timeout=60 \
         python-dotenv==1.2.1 \
-        coagent-python==0.0.8 \
-        huggingface_hub==0.25.1 \
-        https://git-devops.opencsg.com/opensource/gradio/-/raw/main/gradio-5.1.0-py3-none-any.whl
+        coagent-python==0.1.2 \ 
+        huggingface_hub==0.36.0 \
+        gradio==6.2.0
 
     # pip install datasets "huggingface-hub>=0.19" "hf-transfer>=0.1.4" "protobuf<4" "click<8.1" "pydantic~=1.0"
 
