@@ -134,8 +134,22 @@ func (a *accountPriceStoreImpl) ListBySkuType(ctx context.Context, req types.Acc
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to counting recorder, error: %w", err)
 	}
-	_, err = q.Order("sku_type ASC").Order("sku_kind ASC").Order("resource_id ASC").
-		Order("sku_unit_type ASC").Order("created_at DESC").
+	sortMap := map[string]string{
+		"sku_type":      "ASC",
+		"sku_kind":      "ASC",
+		"resource_id":   "ASC",
+		"sku_unit_type": "ASC",
+		"created_at":    "DESC",
+	}
+
+	if len(req.SortBy) > 0 && len(req.SortOrder) > 0 {
+		sortMap[req.SortBy] = req.SortOrder
+	}
+	_, err = q.Order(fmt.Sprintf("%s %s", "sku_type", sortMap["sku_type"])).
+		Order(fmt.Sprintf("%s %s", "sku_kind", sortMap["sku_kind"])).
+		Order(fmt.Sprintf("%s %s", "resource_id", sortMap["resource_id"])).
+		Order(fmt.Sprintf("%s %s", "sku_unit_type", sortMap["sku_unit_type"])).
+		Order(fmt.Sprintf("%s %s", "created_at", sortMap["created_at"])).
 		Limit(req.Per).Offset((req.Page-1)*req.Per).Exec(ctx, &result)
 	if err != nil {
 		return nil, 0, fmt.Errorf("select prices by type and kind and resource, error: %w", err)

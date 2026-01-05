@@ -1,8 +1,11 @@
 package accounting
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
+
+	"opencsg.com/csghub-server/builder/instrumentation"
 
 	"github.com/spf13/cobra"
 	"opencsg.com/csghub-server/accounting/consumer"
@@ -59,7 +62,12 @@ var launchCmd = &cobra.Command{
 
 		i18n.InitLocalizersFromEmbedFile()
 
-		r, err := router.NewAccountRouter(cfg, mqHandler)
+		stopOtel, err := instrumentation.SetupOTelSDK(context.Background(), cfg, instrumentation.Account)
+		if err != nil {
+			panic(err)
+		}
+
+		r, err := router.NewAccountRouter(cfg, mqHandler, mqFactory)
 		if err != nil {
 			return fmt.Errorf("failed to init router: %w", err)
 		}
@@ -71,7 +79,7 @@ var launchCmd = &cobra.Command{
 			r,
 		)
 		server.Run()
-
+		_ = stopOtel(context.Background())
 		return nil
 	},
 }

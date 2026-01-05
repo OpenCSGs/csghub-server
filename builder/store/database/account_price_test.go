@@ -230,6 +230,52 @@ func TestAccountPriceStore_ListBySkuType(t *testing.T) {
 
 }
 
+func TestAccountPriceStore_ListBySkuType_WithSort(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewAccountPriceStoreWithDB(db)
+
+	prices := []*database.AccountPrice{
+		{
+			SkuType: types.SKUCSGHub, SkuKind: types.SKUPackageAddon, ResourceID: "r1",
+			SkuUnitType: "u", SkuDesc: "a",
+		},
+		{
+			SkuType: types.SKUCSGHub, SkuKind: types.SKUPackageAddon, ResourceID: "r3",
+			SkuUnitType: "u", SkuDesc: "b",
+		},
+		{
+			SkuType: types.SKUCSGHub, SkuKind: types.SKUPackageAddon, ResourceID: "r2",
+			SkuUnitType: "u", SkuDesc: "c",
+		},
+	}
+
+	for _, p := range prices {
+		_, err := store.Create(ctx, *p)
+		require.Nil(t, err)
+	}
+
+	data, count, err := store.ListBySkuType(ctx, types.AcctPriceListDBReq{
+		SkuType:   types.SKUCSGHub,
+		Page:      1,
+		Per:       10,
+		SortBy:    "resource_id",
+		SortOrder: "DESC",
+	})
+	require.Nil(t, err)
+	require.Equal(t, 3, count)
+	require.Equal(t, 3, len(data))
+	require.Equal(t, "b/c/a", func(prices []database.AccountPrice) string {
+		names := []string{}
+		for _, p := range prices {
+			names = append(names, p.SkuDesc)
+		}
+		return strings.Join(names, "/")
+	}(data))
+}
+
 func TestAccountPriceStore_ListByIds(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()

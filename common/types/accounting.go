@@ -369,6 +369,8 @@ type AcctPriceListDBReq struct {
 	SkuType    SKUType  `json:"sku_type"`
 	SkuKind    string   `json:"sku_kind"`
 	ResourceID []string `json:"resource_id"`
+	SortBy     string   `json:"sort_by"`
+	SortOrder  string   `json:"sort_order"`
 	Per        int      `json:"per"`
 	Page       int      `json:"page"`
 }
@@ -377,16 +379,18 @@ type AcctPriceListDBReq struct {
 //
 // in accounting service and starhub server
 type AcctPriceListReq struct {
-	SkuType    SKUType             `json:"sku_type"`
-	SkuKind    string              `json:"sku_kind"`
-	ResourceID []string            `json:"resource_id"`
-	Filter     AcctPriceListFilter `json:"filter"`
-	Per        int                 `json:"per"`
-	Page       int                 `json:"page"`
+	SkuType    SKUType             `json:"sku_type" form:"sku_type"`
+	SkuKind    string              `json:"sku_kind" form:"sku_kind"`
+	ResourceID []string            `json:"resource_id" form:"resource_id"`
+	Filter     AcctPriceListFilter `json:"-"`
+	SortBy     string              `json:"sort_by" form:"sort_by" binding:"omitempty,oneof=resource_id"`
+	SortOrder  string              `json:"sort_order" form:"sort_order" binding:"omitempty,oneof=ASC DESC asc desc"`
+	Per        int                 `json:"per" form:"per,default=50" binding:"min=1,max=100"`
+	Page       int                 `json:"page" form:"page,default=1" binding:"min=1"`
 }
 
 type AcctPriceListFilter struct {
-	HardwareType string `json:"hardware_type"`
+	HardwareType string `json:"hardware_type" form:"hardware_type"`
 }
 
 type AcctRechargeReq struct {
