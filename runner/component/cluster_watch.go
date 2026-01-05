@@ -65,12 +65,19 @@ func (w *clusterWatcher) pushClusterChangeEvent(configmapData map[string]string)
 		w.cluster.StorageClass = storageClass
 		slog.Debug("update cluster storageclass", slog.Any("cluster", w.cluster))
 	}
+	networkInterface := configmapData[rtypes.KeyNetworkInterface]
+	if len(networkInterface) < 1 && len(w.cluster.NetworkInterface) > 0 {
+		networkInterface = w.cluster.NetworkInterface
+	} else if len(networkInterface) > 0 {
+		w.cluster.NetworkInterface = networkInterface
+		slog.Debug("update cluster network interface", slog.Any("cluster", w.cluster), slog.String("network_interface", networkInterface))
+	}
 	data := types.ClusterEvent{
 		ClusterID:        w.cluster.ID,
 		ClusterConfig:    types.DefaultClusterCongfig,
 		Mode:             w.cluster.ConnectMode,
 		StorageClass:     storageClass,
-		NetworkInterface: w.cluster.NetworkInterface,
+		NetworkInterface: networkInterface,
 		Status:           types.ClusterStatusRunning,
 		Region:           configmapData[rtypes.KeyRunnerClusterRegion],
 		Endpoint:         configmapData[rtypes.KeyRunnerExposedEndpont],

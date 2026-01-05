@@ -53,10 +53,12 @@ func (s *clusterComponentImpl) initCluster() {
 		if c.ConnectMode == types.ConnectModeInCluster {
 			go func(c *cluster.Cluster) {
 				data := types.ClusterEvent{
-					ClusterID:     c.ID,
-					ClusterConfig: types.DefaultClusterCongfig,
-					Region:        c.Region,
-					Mode:          c.ConnectMode,
+					ClusterID:        c.ID,
+					ClusterConfig:    types.DefaultClusterCongfig,
+					Region:           c.Region,
+					StorageClass:     c.StorageClass,
+					Mode:             c.ConnectMode,
+					NetworkInterface: c.NetworkInterface,
 				}
 				event := &types.WebHookSendEvent{
 					WebHookHeader: types.WebHookHeader{
