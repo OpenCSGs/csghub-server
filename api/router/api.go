@@ -517,7 +517,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	}
 	createCSGBotRoutes(apiGroup, csgbotHandler)
 
-	err = createAdvancedRoutes(apiGroup, middlewareCollection, config)
+	err = createAdvancedRoutes(apiGroup, adminGroup, middlewareCollection, config, mqFactory)
 	if err != nil {
 		return nil, fmt.Errorf("error creating advance routes:%w", err)
 	}
