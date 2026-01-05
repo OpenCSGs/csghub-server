@@ -198,7 +198,7 @@ func TestRemoteRunner_GetRemoteRunnerHost(t *testing.T) {
 
 func TestRemoteRunner_GetClusterById(t *testing.T) {
 	clusterID := "test-cluster"
-	expectedCluster := &types.ClusterResponse{
+	expectedCluster := &types.ClusterRes{
 		ClusterID: clusterID,
 		Region:    "test-region",
 		Zone:      "test-zone",
@@ -270,7 +270,7 @@ func TestRemoteRunner_GetClusterById_ServerError(t *testing.T) {
 
 func TestRemoteRunner_GetClusterById_OutsideCluster(t *testing.T) {
 	clusterID := "test-cluster"
-	expectedCluster := &types.ClusterResponse{
+	expectedCluster := &types.ClusterRes{
 		ClusterID: clusterID,
 		Region:    "test-region",
 		Zone:      "test-zone",

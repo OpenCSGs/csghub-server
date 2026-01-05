@@ -2,21 +2,6 @@ package types
 
 import "time"
 
-type ClusterResponse struct {
-	ClusterID string                      `json:"cluster_id"`
-	Region    string                      `json:"region"`
-	Zone      string                      `json:"zone"`     //cn-beijing
-	Provider  string                      `json:"provider"` //ali
-	Enable    bool                        `json:"enable"`
-	Nodes     map[string]NodeResourceInfo `json:"nodes"`
-
-	ClusterName    string         `json:"cluster_name"`
-	StorageClass   string         `json:"storage_class"`
-	ResourceStatus ResourceStatus `json:"resource_status"`
-
-	UpdatedAt time.Time `json:"updated_at"`
-}
-
 type ClusterRequest struct {
 	ClusterID     string `json:"cluster_id"`
 	ClusterConfig string `json:"cluster_config"`
@@ -67,6 +52,8 @@ type ClusterRes struct {
 	LastUpdateTime int64  `json:"last_update_time"`
 	XPUVendors     string `json:"xpu_vendors"` // NVIDIA, AMD
 	XPUModels      string `json:"xpu_models"`  // A10(32 GB),H100(80 GB)
+
+	Enable bool `json:"enable"`
 }
 type DeployRes struct {
 	ClusterID       string    `json:"cluster_id"`

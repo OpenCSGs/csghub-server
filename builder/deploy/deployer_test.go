@@ -597,15 +597,15 @@ func TestDeployer_InstanceLogs(t *testing.T) {
 
 func TestDeployer_ListCluster(t *testing.T) {
 
-	clusterResp := []types.ClusterResponse{
+	clusterResp := []types.ClusterRes{
 		{
 			ClusterID: "cluster1",
 			Region:    "us-east-1",
 			Zone:      "us-east-1a",
 			Provider:  "aws",
 			Enable:    false,
-			Nodes: map[string]types.NodeResourceInfo{
-				"node1": {
+			Resources: []types.NodeResourceInfo{
+				{
 					NodeName:         "node1",
 					XPUModel:         "",
 					TotalCPU:         1,
@@ -887,13 +887,13 @@ func TestDeployer_GetClusterUsageById(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		clusterID := "test_cluster"
 		mockRunner := mockrunner.NewMockRunner(t)
-		mockRunner.EXPECT().GetClusterById(mock.Anything, clusterID).Return(&types.ClusterResponse{
+		mockRunner.EXPECT().GetClusterById(mock.Anything, clusterID).Return(&types.ClusterRes{
 			ClusterID: clusterID,
 			Region:    "test_region",
 			Zone:      "test_zone",
 			Provider:  "test_provider",
-			Nodes: map[string]types.NodeResourceInfo{
-				"node1": {
+			Resources: []types.NodeResourceInfo{
+				{
 					TotalCPU:     4,
 					AvailableCPU: 2,
 					TotalMem:     8192,
@@ -901,7 +901,7 @@ func TestDeployer_GetClusterUsageById(t *testing.T) {
 					TotalXPU:     1,
 					AvailableXPU: 0,
 				},
-				"node2": {
+				{
 					TotalCPU:     8,
 					AvailableCPU: 1.5,
 					TotalMem:     16384,
@@ -942,9 +942,9 @@ func TestDeployer_GetClusterUsageById(t *testing.T) {
 	t.Run("no nodes", func(t *testing.T) {
 		clusterID := "test_cluster_no_nodes"
 		mockRunner := mockrunner.NewMockRunner(t)
-		mockRunner.EXPECT().GetClusterById(mock.Anything, clusterID).Return(&types.ClusterResponse{
+		mockRunner.EXPECT().GetClusterById(mock.Anything, clusterID).Return(&types.ClusterRes{
 			ClusterID: clusterID,
-			Nodes:     map[string]types.NodeResourceInfo{},
+			Resources: []types.NodeResourceInfo{},
 		}, nil)
 
 		d := &deployer{

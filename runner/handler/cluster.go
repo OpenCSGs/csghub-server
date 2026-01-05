@@ -29,7 +29,7 @@ func NewClusterHandler(config *config.Config, clusterPool *cluster.ClusterPool) 
 func (s *ClusterHandler) GetClusterInfoByID(c *gin.Context) {
 	clusterId := c.Params.ByName("id")
 	cInfo, _ := s.clusterComponent.ByClusterID(c.Request.Context(), clusterId)
-	clusterInfo := types.ClusterResponse{}
+	clusterInfo := types.ClusterRes{}
 	clusterInfo.Region = cInfo.Region
 	clusterInfo.Zone = cInfo.Zone
 	clusterInfo.Provider = cInfo.Provider
@@ -41,7 +41,9 @@ func (s *ClusterHandler) GetClusterInfoByID(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
 	}
-	clusterInfo.Nodes = resourceAvaliable
+	for _, v := range resourceAvaliable {
+		clusterInfo.Resources = append(clusterInfo.Resources, v)
+	}
 	clusterInfo.ResourceStatus = availabilityStatus
 	c.JSON(http.StatusOK, clusterInfo)
 }
