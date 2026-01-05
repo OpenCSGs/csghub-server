@@ -966,8 +966,10 @@ func (c *userComponentImpl) Signin(ctx context.Context, code, state string) (*ty
 		}
 		// update user login time asynchronously
 		go func() {
+			updateCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), time.Second*5)
+			defer cancel()
 			dbu.LastLoginAt = time.Now().Format("2006-01-02 15:04:05")
-			err := c.userStore.Update(ctx, dbu, "")
+			err := c.userStore.Update(updateCtx, dbu, "")
 			if err != nil {
 				slog.ErrorContext(ctx, "failed to update user login time", "error", err, "username", dbu.Username)
 			}
