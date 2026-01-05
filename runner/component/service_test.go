@@ -972,7 +972,7 @@ func TestServiceComponent_DeleteKsvcVersion(t *testing.T) {
 	}, nil)
 
 	err := sc.DeleteKsvcVersion(ctx, "test", "test-service", "commit1")
-	require.ErrorContains(t, err, "revisions.serving.knative.dev \"test-service-001\" not found")
+	require.Contains(t, err.Error(), "SERVERLESS-ERR-1")
 
 	// Test case 2: Revision not found
 	rss.EXPECT().QueryRevision(ctx, "test-service", "nonexistent").Return(nil, sql.ErrNoRows)
@@ -993,5 +993,5 @@ func TestServiceComponent_DeleteKsvcVersion(t *testing.T) {
 
 	err = sc.DeleteKsvcVersion(ctx, "test", "test-service", "commit2")
 	require.Error(t, err)
-	require.Equal(t, errorx.ErrTrafficPercentNotZero, err)
+	require.Equal(t, errorx.ErrDeployNotFoundErr, err)
 }

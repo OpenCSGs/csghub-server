@@ -525,7 +525,7 @@ func (h *RemoteRunner) SetVersionsTraffic(ctx context.Context, clusterID, svcNam
 	if err != nil {
 		return err
 	}
-	url := fmt.Sprintf("%s/api/v1/service/%s/versions/traffic", remote, svcName)
+	url := fmt.Sprintf("%s/api/v1/service/%s/versions/traffic?cluster_id=%s", remote, svcName, clusterID)
 	response, err := h.doRequest(ctx, http.MethodPut, url, req)
 	if err != nil {
 		return fmt.Errorf("failed to update traffic, %w", err)

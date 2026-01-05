@@ -28,7 +28,7 @@ func TestModelHandler_CreateInferenceVersion_Success(t *testing.T) {
 
 	req := &types.CreateInferenceVersionReq{
 		CommitID:       "test-commit",
-		InitialTraffic: 50,
+		TrafficPercent: 50,
 	}
 	body, _ := json.Marshal(req)
 	w := httptest.NewRecorder()
@@ -52,7 +52,7 @@ func TestModelHandler_CreateInferenceVersion_InvalidID(t *testing.T) {
 
 	req := &types.CreateInferenceVersionReq{
 		CommitID:       "test-commit",
-		InitialTraffic: 50,
+		TrafficPercent: 50,
 	}
 	body, _ := json.Marshal(req)
 	w := httptest.NewRecorder()
@@ -96,7 +96,7 @@ func TestModelHandler_CreateInferenceVersion_ServiceError(t *testing.T) {
 
 	req := &types.CreateInferenceVersionReq{
 		CommitID:       "test-commit",
-		InitialTraffic: 50,
+		TrafficPercent: 50,
 	}
 	body, _ := json.Marshal(req)
 	w := httptest.NewRecorder()

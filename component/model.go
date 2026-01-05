@@ -1418,7 +1418,7 @@ func (c *modelComponentImpl) CreateInferenceVersion(ctx context.Context, req typ
 		return errorx.ErrDeployStatusNotMatchErr
 	}
 
-	if req.InitialTraffic > 100 || req.InitialTraffic < 0 {
+	if req.TrafficPercent > 100 || req.TrafficPercent < 0 {
 		return errorx.ErrTrafficInvalid
 	}
 
@@ -1436,7 +1436,7 @@ func (c *modelComponentImpl) CreateInferenceVersion(ctx context.Context, req typ
 		ClusterID:      deploy.ClusterID,
 		SvcName:        deploy.SvcName,
 		Commit:         req.CommitID,
-		InitialTraffic: req.InitialTraffic,
+		InitialTraffic: req.TrafficPercent,
 	})
 }
 
@@ -1446,9 +1446,6 @@ func (c *modelComponentImpl) ListInferenceVersions(ctx context.Context, id int64
 		return nil, errorx.ErrDeployNotFoundErr
 	}
 	var resp = []types.ListInferenceVersionsResp{}
-	if deploy.Status != dcommon.Running {
-		return resp, nil
-	}
 
 	versions, err := c.imageRunner.ListKsvcVersions(ctx, deploy.ClusterID, deploy.SvcName)
 	if err != nil {

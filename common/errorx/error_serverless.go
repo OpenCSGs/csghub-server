@@ -113,4 +113,15 @@ var (
 	//
 	// zh-HK: 流量百分比無效
 	ErrTrafficInvalid error = CustomError{prefix: errServerlessPrefix, code: codeTrafficInvalidErr}
+
+	//Description: no other valid revision except
+	//
+	//Description_ZH: 没有其他有效修订版本
+	//
+	//en-US: no other valid revision except
+	//
+	//zh-CN: 没有其他有效修订版本
+	//
+	//zh-HK: 沒有其他有效修訂版本
+	ErrNoOtherValidRevision error = CustomError{prefix: errServerlessPrefix, code: codeTrafficInvalidErr}
 )

@@ -824,7 +824,7 @@ func (s *serviceComponentImpl) updateServiceInDB(svc v1.Service, clusterID strin
 	}
 	deployment, err := s.getDeploymentByServiceName(ctx, svc, clusterID)
 	if err != nil {
-		slog.Error("failed to get deployment ", slog.Any("service", svc.Name), slog.Any("error", err))
+		slog.ErrorContext(ctx, "failed to get deployment ", slog.Any("service", svc.Name), slog.Any("error", err))
 	}
 
 	oldService.Endpoint = svc.Status.URL.String()
@@ -874,17 +874,18 @@ func (s *serviceComponentImpl) getServiceStatus(ctx context.Context, ks v1.Servi
 	serviceCondition := ks.Status.GetCondition(v1.ServiceConditionReady)
 	cluster, err := s.clusterPool.GetClusterByID(ctx, clusterID)
 	if err != nil {
+		slog.ErrorContext(ctx, "fail to get cluster", slog.Any("ksvc_name", ks.Name), slog.Any("error", err))
 		return resp, fmt.Errorf("fail to get cluster,error: %v ", err)
 	}
-	slog.Info("get service condition in getServiceStatus",
-		slog.Any("svc", ks.Name), slog.Any("condition", serviceCondition))
+	slog.InfoContext(ctx, "get service condition in getServiceStatus",
+		slog.Any("ksvc_name", ks.Name), slog.Any("condition", serviceCondition))
 	if serviceCondition != nil {
 		status, _, err := GetServiceExternalStatus(ctx, cluster, &ks, ks.Namespace)
 		if err != nil {
 			return resp, fmt.Errorf("fail to get service external status, error: %w", err)
 		}
-		slog.Info("get service external status in getServiceStatus",
-			slog.Any("svc", ks.Name), slog.Any("status", status))
+		slog.InfoContext(ctx, "get service external status in getServiceStatus",
+			slog.Any("ksvc_name", ks.Name), slog.Any("status", status))
 		serviceCondition.Status = status
 	}
 
@@ -902,8 +903,8 @@ func (s *serviceComponentImpl) getServiceStatus(ctx context.Context, ks v1.Servi
 			resp.Code = common.Deploying
 		}
 	case serviceCondition.Status == corev1.ConditionTrue:
-		slog.Debug("get instance info in getServiceStatus for corev1.ConditionTrue",
-			slog.Any("svc", ks.Name), slog.Any("instance info", instInfo))
+		slog.DebugContext(ctx, "get instance info in getServiceStatus for corev1.ConditionTrue",
+			slog.Any("ksvc_name", ks.Name), slog.Any("instance info", instInfo))
 		resp.Code = common.Running
 		if len(instInfo.Instances) == 0 {
 			resp.Code = common.Sleeping
@@ -1467,11 +1468,13 @@ func (s *serviceComponentImpl) reportServiceLog(msg string, ksvc *database.Knati
 func (s *serviceComponentImpl) CreateRevisions(ctx context.Context, req types.CreateRevisionReq) error {
 	cluster, err := s.clusterPool.GetClusterByID(ctx, req.ClusterID)
 	if err != nil {
+		slog.ErrorContext(ctx, "fail to get cluster", slog.String("svcName", req.SvcName), slog.String("clusterID", req.ClusterID), slog.Any("error", err))
 		return fmt.Errorf("fail to get cluster, error %v ", err)
 	}
 
 	ksvc, err := getServices(ctx, cluster, s.k8sNameSpace, req.SvcName)
 	if err != nil {
+		slog.ErrorContext(ctx, "fail to get service", slog.String("svcName", req.SvcName), slog.String("clusterID", req.ClusterID), slog.Any("error", err))
 		return err
 	}
 
@@ -1495,6 +1498,9 @@ func (s *serviceComponentImpl) CreateRevisions(ctx context.Context, req types.Cr
 	duplicateRev := ""
 	for _, rev := range revisionList.Items {
 		if rev.IsReady() {
+			if isRevisionDeleted(&rev) {
+				continue
+			}
 			totalReadyRev++
 		}
 		if rev.Labels != nil && rev.Labels[CommitId] == req.Commit {
@@ -1522,30 +1528,28 @@ func (s *serviceComponentImpl) CreateRevisions(ctx context.Context, req types.Cr
 	// enable automatic revision cleanup (enabled by default, this line makes it explicit)
 	ksvc.Annotations["serving.knative.dev/revisionRetentionPolicy"] = "automatic"
 	// keep maxScaleInt revisions
-	ksvc.Annotations["serving.knative.dev/maxRetainedRevisions"] = ksvc.Spec.Template.Annotations[KeyMaxScale]
+	ksvc.Annotations["serving.knative.dev/maxRetainedRevisions"] = "2"
 
-	if req.InitialTraffic > 0 {
-		traffic := []v1.TrafficTarget{}
-		if req.InitialTraffic == 100 {
-			traffic = append(traffic, v1.TrafficTarget{
-				Percent: utils.Int64Ptr(int64(req.InitialTraffic)),
-			})
-		} else {
-			remainPercent := int64(100 - req.InitialTraffic)
-			traffic = append(traffic, v1.TrafficTarget{
-				Percent: utils.Int64Ptr(int64(req.InitialTraffic)),
-			})
+	traffic := []v1.TrafficTarget{}
+	if req.InitialTraffic == 100 {
+		traffic = append(traffic, v1.TrafficTarget{
+			Percent: utils.Int64Ptr(int64(req.InitialTraffic)),
+		})
+	} else {
+		remainPercent := int64(100 - req.InitialTraffic)
+		traffic = append(traffic, v1.TrafficTarget{
+			Percent: utils.Int64Ptr(int64(req.InitialTraffic)),
+		})
 
-			revisionName := getKsvcMaxPercentRevisionName(ksvc)
+		revisionName := getKsvcMaxPercentRevisionName(ksvc)
 
-			traffic = append(traffic, v1.TrafficTarget{
-				LatestRevision: utils.BoolPtr(false),
-				Percent:        utils.Int64Ptr(remainPercent),
-				RevisionName:   revisionName,
-			})
-		}
-		ksvc.Spec.Traffic = traffic
+		traffic = append(traffic, v1.TrafficTarget{
+			LatestRevision: utils.BoolPtr(false),
+			Percent:        utils.Int64Ptr(remainPercent),
+			RevisionName:   revisionName,
+		})
 	}
+	ksvc.Spec.Traffic = traffic
 
 	_, err = cluster.KnativeClient.ServingV1().Services(s.k8sNameSpace).Update(ctx, ksvc, metav1.UpdateOptions{})
 
@@ -1555,7 +1559,7 @@ func (s *serviceComponentImpl) CreateRevisions(ctx context.Context, req types.Cr
 func getKsvcMaxPercentRevisionName(ksvc *v1.Service) string {
 	var maxPercent int64 = 0
 	revisionName := ""
-	for _, t := range ksvc.Spec.Traffic {
+	for _, t := range ksvc.Status.Traffic {
 		if t.Percent != nil && *t.Percent > maxPercent && t.RevisionName != "" {
 			maxPercent = *t.Percent
 			revisionName = t.RevisionName
@@ -1572,21 +1576,25 @@ func getKsvcMaxPercentRevisionName(ksvc *v1.Service) string {
 func (s *serviceComponentImpl) SetVersionsTraffic(ctx context.Context, clusterId string, svcName string, req []types.TrafficReq) error {
 	cluster, err := s.clusterPool.GetClusterByID(ctx, clusterId)
 	if err != nil {
+		slog.ErrorContext(ctx, "fail to get cluster", slog.String("svcName", svcName), slog.String("clusterID", clusterId), slog.Any("error", err))
 		return fmt.Errorf("fail to get cluster, error %v ", err)
 	}
 
 	ksvc, err := getServices(ctx, cluster, s.k8sNameSpace, svcName)
 	if err != nil {
+		slog.ErrorContext(ctx, "fail to get service", slog.String("svcName", svcName), slog.String("clusterID", clusterId), slog.Any("error", err))
 		return fmt.Errorf("fail to get service %s, error %v ", svcName, err)
 	}
 
 	revisionList, err := getRevisionList(ctx, cluster, s.k8sNameSpace, svcName)
 	if err != nil {
+		slog.ErrorContext(ctx, "fail to get revisions", slog.String("svcName", svcName), slog.String("clusterID", clusterId), slog.Any("error", err))
 		return fmt.Errorf("fail to get revisions %s, error %v ", svcName, err)
 	}
 
 	commitToRevisionMap, err := buildCommitRevisionMap(revisionList)
 	if err != nil {
+		slog.ErrorContext(ctx, "fail to build commit revision map", slog.String("svcName", svcName), slog.String("clusterID", clusterId), slog.Any("error", err))
 		return fmt.Errorf("fail to build commit revision map, error %w", err)
 	}
 
@@ -1597,11 +1605,13 @@ func (s *serviceComponentImpl) SetVersionsTraffic(ctx context.Context, clusterId
 
 	trafficTargets, err := buildTrafficTargetsByCommit(ctx, req, commitToRevisionMap)
 	if err != nil {
+		slog.ErrorContext(ctx, "fail to build traffic targets", slog.String("svcName", svcName), slog.String("clusterID", clusterId), slog.Any("error", err))
 		return fmt.Errorf("fail to build traffic targets, error %w", err)
 	}
 	ksvc.Spec.Traffic = trafficTargets
 	_, err = cluster.KnativeClient.ServingV1().Services(s.k8sNameSpace).Update(ctx, ksvc, metav1.UpdateOptions{})
 	if err != nil {
+		slog.ErrorContext(ctx, "fail to update service", slog.String("svcName", svcName), slog.String("clusterID", clusterId), slog.Any("error", err))
 		return fmt.Errorf("fail to update service %s, error %v ", svcName, err)
 	}
 
@@ -1611,6 +1621,7 @@ func (s *serviceComponentImpl) SetVersionsTraffic(ctx context.Context, clusterId
 func (s *serviceComponentImpl) ListVersions(ctx context.Context, clusterId string, svcName string) ([]types.KsvcRevisionInfo, error) {
 	revisionList, err := s.revisionStore.ListRevisions(ctx, svcName)
 	if err != nil {
+		slog.ErrorContext(ctx, "fail to get revisions", slog.String("svcName", svcName), slog.Any("error", err))
 		return nil, fmt.Errorf("fail to get revisions %s, error %v ", svcName, err)
 	}
 
@@ -1632,27 +1643,67 @@ func (s *serviceComponentImpl) ListVersions(ctx context.Context, clusterId strin
 func (s *serviceComponentImpl) DeleteKsvcVersion(ctx context.Context, clusterId string, svcName string, commitID string) error {
 	cluster, err := s.clusterPool.GetClusterByID(ctx, clusterId)
 	if err != nil {
+		slog.ErrorContext(ctx, "fail to get cluster", slog.String("svcName", svcName), slog.String("clusterID", clusterId), slog.Any("error", err))
 		return fmt.Errorf("fail to get cluster, error %v ", err)
 	}
 
 	rev, err := s.revisionStore.QueryRevision(ctx, svcName, commitID)
 	if err != nil {
-		slog.ErrorContext(ctx, "fail to get revision", slog.String("commitID", commitID), slog.Any("error", err))
+		slog.ErrorContext(ctx, "fail to get revision", slog.String("svcName", svcName), slog.String("commitID", commitID), slog.Any("error", err))
+		return err
+	}
+	ksvc, err := getServices(ctx, cluster, s.k8sNameSpace, svcName)
+	if err != nil {
+		slog.ErrorContext(ctx, "fail to get service", slog.String("svcName", svcName), slog.String("clusterID", clusterId), slog.Any("error", err))
+		return errorx.ErrDeployNotFoundErr
+	}
+
+	hasOtherRevision := false
+	for _, item := range ksvc.Spec.Traffic {
+		if item.RevisionName != rev.RevisionName {
+			hasOtherRevision = true
+			break
+		}
+	}
+
+	if !hasOtherRevision {
+		slog.ErrorContext(ctx, "no other valid revision, can not delete", slog.String("delRevision", rev.RevisionName))
+		return errorx.ErrNoOtherValidRevision
+	}
+
+	newTraffic, isValid := TrafficFixAlgorithm(ksvc.Spec.Traffic, rev.RevisionName)
+	if !isValid {
+		slog.ErrorContext(ctx, "traffic fix failed", slog.String("svcName", svcName))
+		return fmt.Errorf("traffic fix for %s failed", svcName)
+	}
+	ksvc.Spec.Traffic = newTraffic
+	_, err = cluster.KnativeClient.ServingV1().Services(s.k8sNameSpace).Update(ctx, ksvc, metav1.UpdateOptions{})
+	if err != nil {
+		slog.ErrorContext(ctx, "fail to update service", slog.String("svcName", svcName), slog.String("clusterID", clusterId), slog.Any("error", err))
+		return fmt.Errorf("fail to update service %s, error %v ", svcName, err)
+	}
+
+	revision, err := cluster.KnativeClient.
+		ServingV1().
+		Revisions(s.k8sNameSpace).
+		Get(ctx, rev.RevisionName, metav1.GetOptions{})
+	if err != nil {
+		slog.ErrorContext(ctx, "fail to get revision", slog.String("svcName", svcName), slog.String("clusterID", clusterId), slog.Any("error", err))
 		return err
 	}
 
-	if rev == nil {
-		return errorx.ErrDatabaseNoRows
+	if revision.Annotations == nil {
+		revision.Annotations = map[string]string{}
 	}
+	revision.Annotations[RevisionState] = "deleted"
 
-	if rev.TrafficPercent > 0 {
-		return errorx.ErrTrafficPercentNotZero
-	}
-
-	err = cluster.KnativeClient.ServingV1().Revisions(s.k8sNameSpace).Delete(ctx, rev.RevisionName, metav1.DeleteOptions{})
+	_, err = cluster.KnativeClient.
+		ServingV1().
+		Revisions(s.k8sNameSpace).
+		Update(ctx, revision, metav1.UpdateOptions{})
 	if err != nil {
-		return fmt.Errorf("fail to delete revision %s, error %v ", rev.RevisionName, err)
+		slog.ErrorContext(ctx, "fail to update revision", slog.String("svcName", svcName), slog.String("clusterID", clusterId), slog.Any("error", err))
+		return err
 	}
-
 	return nil
 }
