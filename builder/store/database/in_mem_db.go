@@ -39,6 +39,7 @@ func createTables(ctx context.Context, db *bun.DB) error {
 		(*ImageBuilderWork)(nil),
 		(*DeployLog)(nil),
 		(*KnativeService)(nil),
+		(*KnativeServiceRevision)(nil),
 	}
 	for _, table := range tables {
 		_, err := db.NewCreateTable().Model(table).Exec(ctx)
