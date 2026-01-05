@@ -1,2 +1,5 @@
 golang 1.25.5
 mockery 2.53.5
+minikube 1.34.0
+kubectl 1.28.3
+argo 3.6.10

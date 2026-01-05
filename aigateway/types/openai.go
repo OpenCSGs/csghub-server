@@ -144,4 +144,9 @@ func (m *Model) ForExternalResponse() *Model {
 type ModelList struct {
 	Object string  `json:"object"`
 	Data   []Model `json:"data"`
+	// Pagination metadata
+	FirstID    *string `json:"first_id,omitempty"`
+	LastID     *string `json:"last_id,omitempty"`
+	HasMore    bool    `json:"has_more"`
+	TotalCount int     `json:"total_count"`
 }
