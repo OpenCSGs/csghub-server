@@ -21,7 +21,6 @@ import (
 	mockmq "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/mq"
 	mockdb "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/deploy/common"
-	"opencsg.com/csghub-server/builder/deploy/scheduler"
 	"opencsg.com/csghub-server/builder/event"
 	"opencsg.com/csghub-server/builder/loki"
 	"opencsg.com/csghub-server/builder/store/database"
@@ -193,7 +192,7 @@ func TestDeployer_Deploy(t *testing.T) {
 
 		buildTask := database.DeployTask{
 			TaskType: 0,
-			Status:   scheduler.BuildSkip,
+			Status:   common.TaskStatusBuildSkip,
 			Message:  "Skip",
 		}
 		runTask := database.DeployTask{

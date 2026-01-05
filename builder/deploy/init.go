@@ -10,12 +10,10 @@ import (
 	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/deploy/imagebuilder"
 	"opencsg.com/csghub-server/builder/deploy/imagerunner"
-	"opencsg.com/csghub-server/builder/deploy/scheduler"
 	"opencsg.com/csghub-server/common/config"
 )
 
 var (
-	fifoScheduler   scheduler.Scheduler
 	defaultDeployer Deployer
 )
 
@@ -35,12 +33,7 @@ func Init(c common.DeployConfig, config *config.Config, startJobs bool) error {
 		return fmt.Errorf("failed to create log reporter:%w", err)
 	}
 
-	fifoScheduler, err = scheduler.NewFIFOScheduler(ib, ir, c, logReporter)
-	if err != nil {
-		return fmt.Errorf("failed to create scheduler:%w", err)
-	}
-
-	deployer, err := newDeployer(fifoScheduler, ib, ir, c, logReporter, config, startJobs)
+	deployer, err := newDeployer(ib, ir, c, logReporter, config, startJobs)
 	if err != nil {
 		return fmt.Errorf("failed to create deployer:%w", err)
 	}

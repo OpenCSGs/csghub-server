@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"opencsg.com/csghub-server/builder/deploy/common"
-	"opencsg.com/csghub-server/builder/deploy/scheduler"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
@@ -85,14 +84,14 @@ func (h *imagebuilderExecutorImpl) ProcessEvent(ctx context.Context, event *type
 			if task.Deploy.Status != common.BuildInQueue {
 				return nil
 			}
-			status = scheduler.BuildInProgress
+			status = common.TaskStatusBuildInProgress
 			message = "build in progress"
 			task.Deploy.Status = common.Building
 		case string(v1alpha1.WorkflowSucceeded):
 			if task.Deploy.Status != common.Building {
 				return nil
 			}
-			status = scheduler.BuildSucceed
+			status = common.TaskStatusBuildSucceed
 			message = fmt.Sprintf("build success, image path: %s", data.ImagetPath)
 			task.Deploy.ImageID = data.ImagetPath
 			task.Deploy.Status = common.BuildSuccess
@@ -100,27 +99,27 @@ func (h *imagebuilderExecutorImpl) ProcessEvent(ctx context.Context, event *type
 			if task.Deploy.Status != common.Building {
 				return nil
 			}
-			status = scheduler.BuildFailed
+			status = common.TaskStatusBuildFailed
 			task.Deploy.Status = common.BuildFailed
 		case string(v1alpha1.WorkflowError):
 			if task.Deploy.Status != common.Building {
 				return nil
 			}
-			status = scheduler.BuildFailed
+			status = common.TaskStatusBuildFailed
 			task.Deploy.Status = common.BuildFailed
 		default:
 			return nil
 		}
 
-		if task.Status == scheduler.Cancelled {
+		if task.Status == common.TaskStatusCancelled {
 			return nil
 		}
 
-		if task.Status == scheduler.BuildFailed {
+		if task.Status == common.TaskStatusBuildFailed {
 			return nil
 		}
 
-		if task.Status != scheduler.BuildInQueue && status <= task.Status {
+		if task.Status != common.TaskStatusBuildInQueue && status <= task.Status {
 			return nil
 		}
 

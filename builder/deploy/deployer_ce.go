@@ -16,7 +16,6 @@ import (
 	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/deploy/imagebuilder"
 	"opencsg.com/csghub-server/builder/deploy/imagerunner"
-	"opencsg.com/csghub-server/builder/deploy/scheduler"
 	"opencsg.com/csghub-server/builder/event"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
@@ -25,7 +24,6 @@ import (
 )
 
 type deployer struct {
-	scheduler    scheduler.Scheduler
 	imageBuilder imagebuilder.Builder
 	imageRunner  imagerunner.Runner
 
@@ -45,7 +43,7 @@ type deployer struct {
 	logReporter           reporter.LogCollector
 }
 
-func newDeployer(s scheduler.Scheduler, ib imagebuilder.Builder, ir imagerunner.Runner, c common.DeployConfig, logReporter reporter.LogCollector, cfg *config.Config, startJobs bool) (*deployer, error) {
+func newDeployer(ib imagebuilder.Builder, ir imagerunner.Runner, c common.DeployConfig, logReporter reporter.LogCollector, cfg *config.Config, startJobs bool) (*deployer, error) {
 
 	store := database.NewDeployTaskStore()
 	node, err := snowflake.NewNode(1)
@@ -55,7 +53,6 @@ func newDeployer(s scheduler.Scheduler, ib imagebuilder.Builder, ir imagerunner.
 	}
 
 	d := &deployer{
-		scheduler:             s,
 		imageBuilder:          ib,
 		imageRunner:           ir,
 		deployTaskStore:       store,

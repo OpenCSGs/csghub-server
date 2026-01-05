@@ -10,7 +10,6 @@ import (
 	"github.com/argoproj/argo-workflows/v3/pkg/apis/workflow/v1alpha1"
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/deploy/common"
-	"opencsg.com/csghub-server/builder/deploy/scheduler"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/tests"
 	"opencsg.com/csghub-server/common/types"
@@ -35,7 +34,7 @@ func TestImageBuilderExecutor_ProcessEvent(t *testing.T) {
 		err = mockDb.CreateDeployTask(context.Background(), &database.DeployTask{
 			ID:       taskId,
 			DeployID: deployId,
-			Status:   scheduler.BuildPending,
+			Status:   common.TaskStatusBuildPending,
 		})
 		require.Nil(t, err)
 		data := types.ImageBuilderEvent{
@@ -61,7 +60,7 @@ func TestImageBuilderExecutor_ProcessEvent(t *testing.T) {
 
 		task, err := mockDb.GetDeployTask(context.Background(), taskId)
 		require.Nil(t, err)
-		require.Equal(t, scheduler.BuildPending, task.Status)
+		require.Equal(t, common.TaskStatusBuildPending, task.Status)
 	})
 
 	t.Run("WorkflowRunning", func(t *testing.T) {
@@ -79,7 +78,7 @@ func TestImageBuilderExecutor_ProcessEvent(t *testing.T) {
 		err = mockDb.CreateDeployTask(context.Background(), &database.DeployTask{
 			ID:       taskId,
 			DeployID: deployId,
-			Status:   scheduler.BuildInQueue,
+			Status:   common.TaskStatusBuildInQueue,
 		})
 		require.Nil(t, err)
 		data := types.ImageBuilderEvent{
@@ -105,7 +104,7 @@ func TestImageBuilderExecutor_ProcessEvent(t *testing.T) {
 
 		task, err := mockDb.GetDeployTask(context.Background(), taskId)
 		require.Nil(t, err)
-		require.Equal(t, scheduler.BuildInProgress, task.Status)
+		require.Equal(t, common.TaskStatusBuildInProgress, task.Status)
 	})
 
 	t.Run("WorkflowSucceeded", func(t *testing.T) {
@@ -148,7 +147,7 @@ func TestImageBuilderExecutor_ProcessEvent(t *testing.T) {
 
 		task, err := mockDb.GetDeployTask(context.Background(), taskId)
 		require.Nil(t, err)
-		require.Equal(t, scheduler.BuildSucceed, task.Status)
+		require.Equal(t, common.TaskStatusBuildSucceed, task.Status)
 		require.Equal(t, common.BuildSuccess, task.Deploy.Status)
 	})
 
@@ -192,7 +191,7 @@ func TestImageBuilderExecutor_ProcessEvent(t *testing.T) {
 
 		task, err := mockDb.GetDeployTask(context.Background(), taskId)
 		require.Nil(t, err)
-		require.Equal(t, scheduler.BuildFailed, task.Status)
+		require.Equal(t, common.TaskStatusBuildFailed, task.Status)
 		require.Equal(t, common.BuildFailed, task.Deploy.Status)
 	})
 
@@ -235,7 +234,7 @@ func TestImageBuilderExecutor_ProcessEvent(t *testing.T) {
 
 		task, err := mockDb.GetDeployTask(context.Background(), taskId)
 		require.Nil(t, err)
-		require.NotEqual(t, scheduler.BuildSucceed, task.Status)
+		require.NotEqual(t, common.TaskStatusBuildSucceed, task.Status)
 		require.NotEqual(t, common.BuildSuccess, task.Deploy.Status)
 	})
 
@@ -278,7 +277,7 @@ func TestImageBuilderExecutor_ProcessEvent(t *testing.T) {
 
 		task, err := mockDb.GetDeployTask(context.Background(), taskId)
 		require.Nil(t, err)
-		require.NotEqual(t, scheduler.BuildFailed, task.Status)
+		require.NotEqual(t, common.TaskStatusBuildFailed, task.Status)
 		require.NotEqual(t, common.BuildFailed, task.Deploy.Status)
 	})
 
