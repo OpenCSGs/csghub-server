@@ -370,9 +370,9 @@ func (_c *MockWorkFlowComponent_GetWorkflow_Call) RunAndReturn(run func(context.
 	return _c
 }
 
-// RunInformer provides a mock function with given fields: clusterPool, _a1
-func (_m *MockWorkFlowComponent) RunInformer(clusterPool *cluster.ClusterPool, _a1 *config.Config) {
-	_m.Called(clusterPool, _a1)
+// RunInformer provides a mock function with given fields: _a0
+func (_m *MockWorkFlowComponent) RunInformer(_a0 *config.Config) {
+	_m.Called(_a0)
 }
 
 // MockWorkFlowComponent_RunInformer_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RunInformer'
@@ -381,15 +381,14 @@ type MockWorkFlowComponent_RunInformer_Call struct {
 }
 
 // RunInformer is a helper method to define mock.On call
-//   - clusterPool *cluster.ClusterPool
-//   - _a1 *config.Config
-func (_e *MockWorkFlowComponent_Expecter) RunInformer(clusterPool interface{}, _a1 interface{}) *MockWorkFlowComponent_RunInformer_Call {
-	return &MockWorkFlowComponent_RunInformer_Call{Call: _e.mock.On("RunInformer", clusterPool, _a1)}
+//   - _a0 *config.Config
+func (_e *MockWorkFlowComponent_Expecter) RunInformer(_a0 interface{}) *MockWorkFlowComponent_RunInformer_Call {
+	return &MockWorkFlowComponent_RunInformer_Call{Call: _e.mock.On("RunInformer", _a0)}
 }
 
-func (_c *MockWorkFlowComponent_RunInformer_Call) Run(run func(clusterPool *cluster.ClusterPool, _a1 *config.Config)) *MockWorkFlowComponent_RunInformer_Call {
+func (_c *MockWorkFlowComponent_RunInformer_Call) Run(run func(_a0 *config.Config)) *MockWorkFlowComponent_RunInformer_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(*cluster.ClusterPool), args[1].(*config.Config))
+		run(args[0].(*config.Config))
 	})
 	return _c
 }
@@ -399,7 +398,7 @@ func (_c *MockWorkFlowComponent_RunInformer_Call) Return() *MockWorkFlowComponen
 	return _c
 }
 
-func (_c *MockWorkFlowComponent_RunInformer_Call) RunAndReturn(run func(*cluster.ClusterPool, *config.Config)) *MockWorkFlowComponent_RunInformer_Call {
+func (_c *MockWorkFlowComponent_RunInformer_Call) RunAndReturn(run func(*config.Config)) *MockWorkFlowComponent_RunInformer_Call {
 	_c.Run(run)
 	return _c
 }

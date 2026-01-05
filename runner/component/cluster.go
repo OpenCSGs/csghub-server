@@ -22,7 +22,7 @@ type clusterComponentImpl struct {
 	imagePullSecret         string
 	informerSyncPeriodInMin int
 	clusterStore            database.ClusterInfoStore
-	clusterPool             *cluster.ClusterPool
+	clusterPool             cluster.Pool
 }
 
 type ClusterComponent interface {
@@ -30,7 +30,7 @@ type ClusterComponent interface {
 	GetResourceByID(ctx context.Context, clusterId string) (types.ResourceStatus, map[string]types.NodeResourceInfo, error)
 }
 
-func NewClusterComponent(config *config.Config, clusterPool *cluster.ClusterPool) ClusterComponent {
+func NewClusterComponent(config *config.Config, clusterPool cluster.Pool) ClusterComponent {
 	sc := &clusterComponentImpl{
 		k8sNameSpace:            config.Cluster.SpaceNamespace,
 		env:                     config,
@@ -49,7 +49,8 @@ func NewClusterComponent(config *config.Config, clusterPool *cluster.ClusterPool
 // InitCluster init cluster
 func (s *clusterComponentImpl) initCluster() {
 	// send cluster event
-	for _, c := range s.clusterPool.Clusters {
+	clusters := s.clusterPool.GetAllCluster()
+	for _, c := range clusters {
 		if c.ConnectMode == types.ConnectModeInCluster {
 			go func(c *cluster.Cluster) {
 				data := types.ClusterEvent{
@@ -112,7 +113,8 @@ func (c *clusterComponentImpl) GetResourceByID(ctx context.Context, clusterId st
 func (c *clusterComponentImpl) heartBeat() {
 	for {
 		startTime := time.Now().Unix()
-		if len(c.clusterPool.Clusters) > 0 {
+		clusters := c.clusterPool.GetAllCluster()
+		if len(clusters) > 0 {
 			c.pushHeartBeatEvent()
 		}
 		escapedTime := time.Now().Unix() - startTime
@@ -127,7 +129,8 @@ func (c *clusterComponentImpl) pushHeartBeatEvent() {
 		Running:     []string{},
 		Unavailable: []string{},
 	}
-	for _, cluster := range c.clusterPool.Clusters {
+	clusters := c.clusterPool.GetAllCluster()
+	for _, cluster := range clusters {
 		err := c.checkIfClusterAvailable(cluster)
 		if err != nil {
 			slog.Warn("failed to check if cluster is available", slog.Any("error", err), slog.Any("cluster", cluster))

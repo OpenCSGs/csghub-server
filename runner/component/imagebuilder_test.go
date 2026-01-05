@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	mockCluster "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/deploy/cluster"
 	mockReporter "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component/reporter"
 
 	"github.com/argoproj/argo-workflows/v3/pkg/apis/workflow/v1alpha1"
@@ -12,23 +13,13 @@ import (
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
-	mockdb "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/deploy/cluster"
-	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 )
 
 func TestImagebuilderComponent_Build(t *testing.T) {
 	conf := &config.Config{}
-	testClusterInfo := database.ClusterInfo{
-		ClusterID:     "config",
-		ClusterConfig: "config",
-		StorageClass:  "",
-		Region:        "",
-		Zone:          "",
-		Provider:      "",
-	}
 	testCluster := &cluster.Cluster{
 		CID:        "config",
 		ID:         "config",
@@ -36,23 +27,21 @@ func TestImagebuilderComponent_Build(t *testing.T) {
 		ArgoClient: argofake.NewSimpleClientset(),
 	}
 
-	cStore := mockdb.NewMockClusterInfoStore(t)
 	logReporter := mockReporter.NewMockLogCollector(t)
+	pool := mockCluster.NewMockPool(t)
 	ibc := &imagebuilderComponentImpl{
-		clusterPool: &cluster.ClusterPool{
-			Clusters:     []*cluster.Cluster{testCluster},
-			ClusterStore: cStore,
-		},
+		clusterPool: pool,
 		config:      conf,
 		logReporter: logReporter,
 	}
 
 	logReporter.EXPECT().Report(mock.Anything).Return().Once()
 
-	cStore.EXPECT().ByClusterConfig(context.Background(), testCluster.CID).Return(testClusterInfo, nil).Once()
+	pool.EXPECT().GetClusterByID(context.Background(), testCluster.CID).Return(testCluster, nil).Once()
 	// imageStore.EXPECT().CreateOrUpdateByBuildID(context.Background(), mock.Anything).Return(&database.ImageBuilderWork{}, nil).Once()
 	// imageStore.EXPECT().FindByImagePath(context.Background(), mock.Anything).Return(nil, nil).Once()
 	err := ibc.Build(context.Background(), types.ImageBuilderRequest{
+		ClusterID: "config",
 		OrgName:   "test-org",
 		SpaceName: "test-space",
 		DeployId:  "test-build-id",
@@ -70,13 +59,12 @@ func TestImagebuilderComponent_Stop(t *testing.T) {
 		Client:     fake.NewSimpleClientset(),
 		ArgoClient: argofake.NewSimpleClientset(),
 	}
-
+	pool := mockCluster.NewMockPool(t)
 	ibc := &imagebuilderComponentImpl{
-		clusterPool: &cluster.ClusterPool{
-			Clusters: []*cluster.Cluster{testCluster},
-		},
-		config: conf,
+		clusterPool: pool,
+		config:      conf,
 	}
+	pool.EXPECT().GetClusterByID(mock.Anything, "config").Return(testCluster, nil)
 	workName := ibc.generateWorkName("test-org", "test-space", "test-build-id", "test-task-id")
 	_, err := testCluster.ArgoClient.ArgoprojV1alpha1().Workflows("").Create(context.TODO(), &v1alpha1.Workflow{
 		ObjectMeta: metav1.ObjectMeta{
@@ -90,6 +78,7 @@ func TestImagebuilderComponent_Stop(t *testing.T) {
 	require.Nil(t, err)
 
 	err = ibc.Stop(context.Background(), types.ImageBuildStopReq{
+		ClusterID: "config",
 		OrgName:   "test-org",
 		SpaceName: "test-space",
 		DeployId:  "test-build-id",

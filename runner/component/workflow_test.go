@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"k8s.io/client-go/kubernetes/fake"
+	knativefake "knative.dev/serving/pkg/client/clientset/versioned/fake"
 	mockReporter "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component/reporter"
 
 	"github.com/argoproj/argo-workflows/v3/pkg/apis/workflow/v1alpha1"
@@ -11,8 +13,7 @@ import (
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"k8s.io/client-go/kubernetes/fake"
-	knativefake "knative.dev/serving/pkg/client/clientset/versioned/fake"
+	mockCluster "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/deploy/cluster"
 	mockdb "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/deploy/cluster"
 	"opencsg.com/csghub-server/builder/store/database"
@@ -22,17 +23,15 @@ import (
 
 func TestArgoComponent_CreateWorkflow(t *testing.T) {
 	argoStore := mockdb.NewMockArgoWorkFlowStore(t)
-	pool := &cluster.ClusterPool{}
-	cis := mockdb.NewMockClusterInfoStore(t)
-	pool.ClusterStore = cis
+	pool := mockCluster.NewMockPool(t)
 	kubeClient := fake.NewSimpleClientset()
-	pool.Clusters = append(pool.Clusters, &cluster.Cluster{
+	expectCluster := &cluster.Cluster{
 		CID:           "config",
 		ID:            "test",
 		Client:        kubeClient,
 		KnativeClient: knativefake.NewSimpleClientset(),
 		ArgoClient:    argofake.NewSimpleClientset(),
-	})
+	}
 
 	reporter := mockReporter.NewMockLogCollector(t)
 	wfc := workFlowComponentImpl{
@@ -41,11 +40,7 @@ func TestArgoComponent_CreateWorkflow(t *testing.T) {
 		config:      &config.Config{},
 		logReporter: reporter,
 	}
-	cis.EXPECT().ByClusterID(mock.Anything, "test").Return(database.ClusterInfo{
-		ClusterID:     "test",
-		ClusterConfig: "config",
-		StorageClass:  "test",
-	}, nil)
+	pool.EXPECT().GetClusterByID(mock.Anything, "test").Return(expectCluster, nil)
 	ctx := context.TODO()
 	argoStore.EXPECT().CreateWorkFlow(ctx, mock.Anything).Return(&database.ArgoWorkflow{
 		ID:        1,
@@ -136,18 +131,16 @@ func TestArgoComponent_CreateWorkflow(t *testing.T) {
 
 func TestArgoComponent_DeleteWorkflow(t *testing.T) {
 	argoStore := mockdb.NewMockArgoWorkFlowStore(t)
-	pool := &cluster.ClusterPool{}
-	cis := mockdb.NewMockClusterInfoStore(t)
-	pool.ClusterStore = cis
+	pool := mockCluster.NewMockPool(t)
 	kubeClient := fake.NewSimpleClientset()
 	argoClient := argofake.NewSimpleClientset()
-	pool.Clusters = append(pool.Clusters, &cluster.Cluster{
+	expectCluster := &cluster.Cluster{
 		CID:           "config",
 		ID:            "test",
 		Client:        kubeClient,
 		KnativeClient: knativefake.NewSimpleClientset(),
 		ArgoClient:    argoClient,
-	})
+	}
 	wfc := workFlowComponentImpl{
 		wf:          argoStore,
 		clusterPool: pool,
@@ -161,11 +154,7 @@ func TestArgoComponent_DeleteWorkflow(t *testing.T) {
 		ClusterID: "test",
 		Namespace: "test",
 	}
-	cis.EXPECT().ByClusterID(mock.Anything, "test").Return(database.ClusterInfo{
-		ClusterID:     "test",
-		ClusterConfig: "config",
-		StorageClass:  "test",
-	}, nil)
+	pool.EXPECT().GetClusterByID(mock.Anything, "test").Return(expectCluster, nil)
 	err := wfc.DeleteWorkflow(ctx, req)
 	require.Nil(t, err)
 

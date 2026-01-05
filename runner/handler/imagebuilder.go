@@ -23,9 +23,10 @@ type ImagebuilderHandler struct {
 func NewImagebuilderHandler(
 	ctx context.Context,
 	config *config.Config,
-	clusterPool *cluster.ClusterPool,
+	clusterPool cluster.Pool,
 	logReporter reporter.LogCollector) (*ImagebuilderHandler, error) {
-	if clusterPool == nil || len(clusterPool.Clusters) == 0 {
+	clusters := clusterPool.GetAllCluster()
+	if clusterPool == nil || len(clusters) == 0 {
 		slog.ErrorContext(ctx, "cluster pool is nil")
 		return nil, errors.New("cluster pool is nil")
 	}

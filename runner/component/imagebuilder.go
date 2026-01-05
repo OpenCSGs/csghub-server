@@ -50,13 +50,13 @@ type ImagebuilderComponent interface {
 
 type imagebuilderComponentImpl struct {
 	config      *config.Config
-	clusterPool *cluster.ClusterPool
+	clusterPool cluster.Pool
 	logReporter reporter.LogCollector
 }
 
 func NewImagebuilderComponent(ctx context.Context,
 	config *config.Config,
-	clusterPool *cluster.ClusterPool,
+	clusterPool cluster.Pool,
 	logReporter reporter.LogCollector) (ImagebuilderComponent, error) {
 	ibc := &imagebuilderComponentImpl{
 		config:      config,
@@ -88,12 +88,7 @@ func (ibc *imagebuilderComponentImpl) Build(ctx context.Context, req ctypes.Imag
 		return fmt.Errorf("failed to get cluster by id: %w", err)
 	}
 
-	cInfo, err := ibc.clusterPool.ClusterStore.ByClusterConfig(ctx, cluster.CID)
-	if err != nil {
-		return fmt.Errorf("failed to get cluster by config: %w", err)
-	}
-
-	if len(strings.TrimSpace(cInfo.StorageClass)) > 0 {
+	if len(strings.TrimSpace(cluster.StorageClass)) > 0 {
 		err = ibc.newPersistentVolumeClaim(ctx, cluster, kanikoCachePVC)
 		if err != nil {
 			return fmt.Errorf("failed to create pvc: %w", err)
@@ -107,7 +102,7 @@ func (ibc *imagebuilderComponentImpl) Build(ctx context.Context, req ctypes.Imag
 
 	createWorkflowName := ibc.generateWorkName(req.OrgName, req.SpaceName, req.DeployId, fmt.Sprintf("%d", req.TaskId))
 
-	wft, err := wfTemplateForImageBuilder(ibc.config, req, imagePath, cInfo.StorageClass, createWorkflowName)
+	wft, err := wfTemplateForImageBuilder(ibc.config, req, imagePath, cluster.StorageClass, createWorkflowName)
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to create imagebuilder workflow template", "err", err)
 		return fmt.Errorf("failed to create imagebuilder workflow template: %w", err)
@@ -169,7 +164,7 @@ func (ibc *imagebuilderComponentImpl) Stop(ctx context.Context, req ctypes.Image
 	return err
 }
 
-func workFlowInit(ctx context.Context, config *config.Config, clusterPool *cluster.ClusterPool) error {
+func workFlowInit(ctx context.Context, config *config.Config, clusterPool cluster.Pool) error {
 	namespace := config.Cluster.SpaceNamespace
 
 	fcMap := make(map[string][]byte)
@@ -180,8 +175,8 @@ func workFlowInit(ctx context.Context, config *config.Config, clusterPool *clust
 		}
 		fcMap[cfg.FileName] = data
 	}
-
-	for _, cluster := range clusterPool.Clusters {
+	clusters := clusterPool.GetAllCluster()
+	for _, cluster := range clusters {
 		for _, cfg := range types.ConfigMapFiles {
 			data, exists := fcMap[cfg.FileName]
 			if !exists {
@@ -205,7 +200,8 @@ func workFlowInit(ctx context.Context, config *config.Config, clusterPool *clust
 }
 
 func (ibc *imagebuilderComponentImpl) runInformer(ctx context.Context) {
-	for _, cls := range ibc.clusterPool.Clusters {
+	clusters := ibc.clusterPool.GetAllCluster()
+	for _, cls := range clusters {
 		go func(cluster *cluster.Cluster) {
 			ibc.workInformer(ctx, cluster)
 		}(cls)

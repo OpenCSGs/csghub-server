@@ -17,7 +17,7 @@ type ClusterHandler struct {
 	clusterComponent   component.ClusterComponent
 }
 
-func NewClusterHandler(config *config.Config, clusterPool *cluster.ClusterPool) (*ClusterHandler, error) {
+func NewClusterHandler(config *config.Config, clusterPool cluster.Pool) (*ClusterHandler, error) {
 	clusterComponent := component.NewClusterComponent(config, clusterPool)
 	return &ClusterHandler{
 		k8sNameSpace:       config.Cluster.SpaceNamespace,
