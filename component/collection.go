@@ -232,7 +232,7 @@ func (cc *collectionComponentImpl) AddReposToCollection(ctx context.Context, req
 	if err != nil {
 		// Check if the error is a duplicate key constraint violation
 		if strings.Contains(err.Error(), "duplicate key value") {
-			return fmt.Errorf("the repo was already in this collection: %s", strconv.FormatInt(req.ID, 10))
+			return errorx.RepoAlreadyInCollection(err, errorx.Ctx().Set("collection_id", strconv.FormatInt(req.ID, 10)))
 		}
 		if strings.Contains(err.Error(), "violates foreign key constraint") {
 			return fmt.Errorf("repo not found: %v", req.RepoIDs)
