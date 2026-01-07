@@ -54,6 +54,7 @@ type SpaceComponent interface {
 	// FixHasEntryFile checks whether git repo has entry point file and update space's HasAppFile property in db
 	FixHasEntryFile(ctx context.Context, s *database.Space) *database.Space
 	Status(ctx context.Context, namespace, name string) (string, string, error)
+	StatusByPaths(ctx context.Context, paths []string) (map[string]string, error)
 	Logs(ctx context.Context, namespace, name, since string) (*deploy.MultiLogReader, error)
 	// HasEntryFile checks whether space repo has entry point file to run with
 	HasEntryFile(ctx context.Context, space *database.Space) bool
@@ -72,6 +73,14 @@ func (c *spaceComponentImpl) Create(ctx context.Context, req types.CreateSpaceRe
 
 	if req.DefaultBranch == "" {
 		req.DefaultBranch = types.MainBranch
+	}
+
+	if req.Sdk == types.GRADIO.Name && len(req.SdkVersion) < 1 {
+		req.SdkVersion = types.GRADIO.Version
+	}
+
+	if req.Sdk == types.STREAMLIT.Name && len(req.SdkVersion) < 1 {
+		req.SdkVersion = types.STREAMLIT.Version
 	}
 
 	req.Nickname = nickname
@@ -388,6 +397,16 @@ func (c *spaceComponentImpl) Show(ctx context.Context, namespace, name, currentU
 		return nil, newError
 	}
 	repository := common.BuildCloneInfo(c.config, space.Repository)
+
+	for _, tag := range space.Repository.Tags {
+		tags = append(tags, types.RepoTag{
+			Name:     tag.Name,
+			Category: tag.Category,
+			Group:    tag.Group,
+			BuiltIn:  tag.BuiltIn,
+			ShowName: tag.I18nKey, //ShowName:  tag.ShowName,
+		})
+	}
 
 	resSpace := &types.Space{
 		ID:            space.ID,
@@ -1047,6 +1066,64 @@ func (c *spaceComponentImpl) Status(ctx context.Context, namespace, name string)
 	}
 	spaceStatus, err := c.status(ctx, s)
 	return spaceStatus.SvcName, spaceStatus.Status, err
+}
+
+// StatusByPaths queries status for multiple spaces in a single query
+// paths is a slice of space paths in the format "namespace/name"
+// Returns a map where key is the path and value is the status string
+func (c *spaceComponentImpl) StatusByPaths(ctx context.Context, paths []string) (map[string]string, error) {
+	if len(paths) == 0 {
+		return make(map[string]string), nil
+	}
+
+	dbSpaces, err := c.spaceStore.ListByPath(ctx, paths)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find spaces by paths, error: %w", err)
+	}
+
+	pathToDBSpace := make(map[string]*database.Space)
+	spaceIDs := make([]int64, 0, len(dbSpaces))
+	for i := range dbSpaces {
+		space := &dbSpaces[i]
+		path := space.Repository.Path
+		pathToDBSpace[path] = space
+		spaceIDs = append(spaceIDs, space.ID)
+	}
+
+	// Get latest deploys for all spaces in one query
+	deployMap, err := c.deployTaskStore.GetLatestDeploysBySpaceIDs(ctx, spaceIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make(map[string]string)
+	for _, path := range paths {
+		dbSpace, exists := pathToDBSpace[path]
+		if !exists {
+			// Space not found, set status to Empty
+			result[path] = SpaceStatusEmpty
+			continue
+		}
+
+		if !dbSpace.HasAppFile {
+			if dbSpace.Sdk == types.NGINX.Name {
+				result[path] = SpaceStatusNoNGINXConf
+			} else {
+				result[path] = SpaceStatusNoAppFile
+			}
+			continue
+		}
+
+		deploy, hasDeploy := deployMap[dbSpace.ID]
+		if !hasDeploy || deploy == nil {
+			result[path] = SpaceStatusStopped
+			continue
+		}
+
+		result[path] = deployStatusCodeToString(deploy.Status)
+	}
+
+	return result, nil
 }
 
 func (c *spaceComponentImpl) Logs(ctx context.Context, namespace, name, since string) (*deploy.MultiLogReader, error) {

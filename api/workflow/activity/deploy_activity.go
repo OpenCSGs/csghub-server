@@ -470,8 +470,6 @@ func (a *DeployActivity) createBuildRequest(ctx context.Context, task *database.
 		return nil, fmt.Errorf("invalid repository path format: %s", repoInfo.Path)
 	}
 
-	sdkVersion := a.determineSDKVersion(repoInfo)
-
 	lastCommitReq := gitserver.GetRepoLastCommitReq{
 		RepoType:  types.RepositoryType(repoInfo.RepoType),
 		Namespace: pathParts[0],
@@ -490,7 +488,7 @@ func (a *DeployActivity) createBuildRequest(ctx context.Context, task *database.
 		PythonVersion:  "3.10",
 		Sdk:            repoInfo.Sdk,
 		DriverVersion:  repoInfo.DriverVersion,
-		Sdk_version:    sdkVersion,
+		Sdk_version:    repoInfo.SdkVersion,
 		SpaceURL:       repoInfo.HTTPCloneURL,
 		GitRef:         task.Deploy.GitBranch,
 		UserId:         accessToken.User.Username,
@@ -586,21 +584,6 @@ func (a *DeployActivity) createDeployRequest(ctx context.Context, task *database
 		OrderDetailID: deployInfo.OrderDetailID,
 		TaskId:        task.ID,
 	}, nil
-}
-
-func (a *DeployActivity) determineSDKVersion(repoInfo common.RepoInfo) string {
-	if repoInfo.SdkVersion != "" {
-		return repoInfo.SdkVersion
-	}
-
-	switch repoInfo.Sdk {
-	case types.GRADIO.Name:
-		return types.GRADIO.Version
-	case types.STREAMLIT.Name:
-		return types.STREAMLIT.Version
-	default:
-		return ""
-	}
 }
 
 func (a *DeployActivity) parseHardware(input string) string {

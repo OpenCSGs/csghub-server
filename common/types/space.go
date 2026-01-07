@@ -14,7 +14,7 @@ type SDKConfig struct {
 var (
 	GRADIO = SDKConfig{
 		Name:    "gradio",
-		Version: "3.37.0",
+		Version: "6.2.0",
 		Port:    7860,
 		Image:   "",
 	}
