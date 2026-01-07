@@ -245,3 +245,12 @@ func (c *repoComponentImpl) mirrorFromSaasSync(ctx context.Context, mirror *data
 
 	return nil
 }
+
+func (c *repoComponentImpl) MigrateToXnet(ctx context.Context, repoType types.RepositoryType, namespace, name string) error {
+	return nil
+}
+
+func (c *repoComponentImpl) MigrateToXnetProgress(ctx context.Context, repoType types.RepositoryType, namespace, name string) (types.XnetMigrationTaskProgress, error) {
+	var p types.XnetMigrationTaskProgress
+	return p, nil
+}

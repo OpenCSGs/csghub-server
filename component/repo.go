@@ -37,6 +37,7 @@ import (
 	"opencsg.com/csghub-server/builder/git/mirrorserver"
 	"opencsg.com/csghub-server/builder/multisync"
 	"opencsg.com/csghub-server/builder/rpc"
+	storeCache "opencsg.com/csghub-server/builder/store/cache"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/store/s3"
 	"opencsg.com/csghub-server/common/config"
@@ -98,6 +99,9 @@ type repoComponentImpl struct {
 	notificationSvcClient  rpc.NotificationSvcClient
 	mirrorSvcClient        rpc.MirrorSvcClient
 	xnetClient             rpc.XnetSvcClient
+	lfsComponent           LfsComponent
+	lfsCache               storeCache.LfsCache
+	xnetMigrationTaskStore database.XnetMigrationTaskStore
 }
 
 type RepoComponent interface {
@@ -192,6 +196,8 @@ type RepoComponent interface {
 	CheckDeployPermissionForUser(ctx context.Context, deployReq types.DeployActReq) (*database.User, *database.Deploy, error)
 	GetRepos(ctx context.Context, search, currentUser string, repoType types.RepositoryType) ([]string, error)
 	IsXnetEnabled(ctx context.Context, repoType types.RepositoryType, namespace, name, username string) (*types.XetEnabled, error)
+	MigrateToXnet(ctx context.Context, repoType types.RepositoryType, namespace, name string) error
+	MigrateToXnetProgress(ctx context.Context, repoType types.RepositoryType, namespace, name string) (types.XnetMigrationTaskProgress, error)
 }
 
 func NewRepoComponentImpl(config *config.Config) (*repoComponentImpl, error) {

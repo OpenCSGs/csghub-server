@@ -24,6 +24,14 @@ const (
 
 	HighPriorityMsgSubject   string = "notification.message.high"
 	NormalPriorityMsgSubject string = "notification.message.normal"
+
+	AgentSessionHistoryMsgSubject string = "agent.session.history.message"
+
+	LfsXnetProcessedSubject string = "xnet.lfs.processed"
+
+	LfsMigrationSubject string = "xnet.lfs.migrate"
+	LfsProgressSubject  string = "xnet.lfs.progress"
+	LfsResultSubject    string = "xnet.lfs.result"
 )
 
 type MQGroup struct {
@@ -75,6 +83,22 @@ var (
 	WebhookEventGroup = MQGroup{
 		StreamName:   "webhookEventStream", // webhook event stream name
 		ConsumerName: "webhookEventConsumer",
+	}
+	AgentSessionHistoryMsgGroup = MQGroup{
+		StreamName:   "agentSessionHistoryMsgStream",
+		ConsumerName: "agentSessionHistoryMsgConsumer",
+	}
+	LfsXnetResultGroup = MQGroup{
+		StreamName:   "lfsResultStreamClient",
+		ConsumerName: "lfsResultConsumerClient",
+	}
+	LfsXnetProgressGroup = MQGroup{
+		StreamName:   "lfsProgressStreamClient",
+		ConsumerName: "lfsProgressConsumerClient",
+	}
+	LfsXnetMigrateGroup = MQGroup{
+		StreamName:   "lfsMigrationStream",
+		ConsumerName: "lfsMigrationConsumer",
 	}
 )
 
