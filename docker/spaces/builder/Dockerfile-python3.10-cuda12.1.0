@@ -1,6 +1,9 @@
 ARG SPACE_BASE_IMAGE=opencsg-registry.cn-beijing.cr.aliyuncs.com
 ARG NAMESPACE=opencsghq
-FROM ${SPACE_BASE_IMAGE}/${NAMESPACE}/space-base:python3.10-cuda12.1.0-1.0.3 AS base
+ARG SPACE_BASE_TAG=python3.10-cuda12.1.0
+ARG SPACE_BASE_VERSION=1.0.4
+
+FROM ${SPACE_BASE_IMAGE}/${NAMESPACE}/space-base:${SPACE_BASE_TAG}-${SPACE_BASE_VERSION} AS base
 
 USER user
 WORKDIR /home/user/app

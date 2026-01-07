@@ -49,3 +49,19 @@ func SHA256(s string) string {
 	hashBytes := hash.Sum(nil)
 	return hex.EncodeToString(hashBytes)
 }
+
+func SafeDeref(p *string) string {
+	if p != nil {
+		return *p
+	}
+	return ""
+}
+
+// AllocStringPtr returns a pointer to a heap-allocated copy of the string
+// This ensures the string has a stable lifetime and can be safely stored in structs
+func AllocStringPtr(s string) *string {
+	// Allocate on heap explicitly to ensure stable lifetime
+	ptr := new(string)
+	*ptr = s
+	return ptr
+}
