@@ -36,7 +36,7 @@ Folders relative to the root of the repository for each service:
 | Runner | runner |
 | LogCollector | logcollector |
 
-## Examples
+## Function Examples
 
 ### Router
 
@@ -73,6 +73,10 @@ Folders relative to the root of the repository for each service:
 - `runner/handler/service.go` implements runner api to trigger deploy process by call deploy component.
 - `runner/component/service.go` implements runner component to trigger deploy process by call knative api.
 - `docker/spaces/builder/Dockerfile*` are Dockerfile that builds the space image.
+
+### Cluster
+
+- `component/cluster.go` is a component that deals with cluster-related business logic.
 
 ## Code Style & Conventions:
 
