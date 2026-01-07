@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -124,6 +125,132 @@ func TestClusterWatcher_WatchCallback(t *testing.T) {
 
 			// Note: This line will still cause a compilation error if GetWebhookEndpoint is not defined in cluster.Cluster
 			assert.Equal(t, tt.expectedEndpoint, watcher.GetWebhookEndpoint())
+		})
+	}
+}
+
+func TestClusterWatcher_PushClusterChangeEvent(t *testing.T) {
+	// mock http server to receive webhook
+	var receivedEvent types.WebHookSendEvent
+	var mu sync.Mutex
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		defer mu.Unlock()
+		body, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+		err = json.Unmarshal(body, &receivedEvent)
+		require.NoError(t, err)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	tests := []struct {
+		name                     string
+		configmapData            map[string]string
+		initialStorageClass      string
+		initialNetworkInterface  string
+		expectedStorageClass     string
+		expectedNetworkInterface string
+		expectedEventData        types.ClusterEvent
+	}{
+		{
+			name: "should use ConfigMap values for StorageClass and NetworkInterface",
+			configmapData: map[string]string{
+				rtypes.KeyStorageClass:         "fast-ssd",
+				rtypes.KeyNetworkInterface:     "eth1",
+				rtypes.KeyRunnerClusterRegion:  "region-1",
+				rtypes.KeyRunnerExposedEndpont: server.URL,
+			},
+			initialStorageClass:      "slow-ssd",
+			initialNetworkInterface:  "eth0",
+			expectedStorageClass:     "fast-ssd",
+			expectedNetworkInterface: "eth1",
+			expectedEventData: types.ClusterEvent{
+				StorageClass:     "fast-ssd",
+				NetworkInterface: "eth1",
+			},
+		},
+		{
+			name: "should use cluster values when ConfigMap is empty",
+			configmapData: map[string]string{
+				rtypes.KeyRunnerClusterRegion:  "region-1",
+				rtypes.KeyRunnerExposedEndpont: server.URL,
+			},
+			initialStorageClass:      "fast-ssd",
+			initialNetworkInterface:  "eth0",
+			expectedStorageClass:     "fast-ssd",
+			expectedNetworkInterface: "eth0",
+			expectedEventData: types.ClusterEvent{
+				StorageClass:     "fast-ssd",
+				NetworkInterface: "eth0",
+			},
+		},
+		{
+			name: "should update cluster NetworkInterface when ConfigMap has value",
+			configmapData: map[string]string{
+				rtypes.KeyNetworkInterface:     "eth2",
+				rtypes.KeyRunnerClusterRegion:  "region-1",
+				rtypes.KeyRunnerExposedEndpont: server.URL,
+			},
+			initialStorageClass:      "fast-ssd",
+			initialNetworkInterface:  "eth0",
+			expectedStorageClass:     "fast-ssd",
+			expectedNetworkInterface: "eth2",
+			expectedEventData: types.ClusterEvent{
+				StorageClass:     "fast-ssd",
+				NetworkInterface: "eth2",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// reset mock server state
+			mu.Lock()
+			receivedEvent = types.WebHookSendEvent{}
+			mu.Unlock()
+
+			// setup
+			mockCluster := &cluster.Cluster{
+				ID:               "test-cluster",
+				CID:              "test-cluster",
+				ConnectMode:      types.ConnectModeInCluster,
+				Region:           "test-region",
+				StorageClass:     tt.initialStorageClass,
+				NetworkInterface: tt.initialNetworkInterface,
+			}
+
+			cfg := &config.Config{}
+			cfg.Runner.WebHookEndpoint = server.URL
+			cfg.APIToken = "test-token"
+
+			watcher := &clusterWatcher{
+				cluster: mockCluster,
+				env:     cfg,
+			}
+
+			// execute
+			err := watcher.pushClusterChangeEvent(tt.configmapData)
+
+			// assert
+			assert.NoError(t, err)
+			assert.Equal(t, tt.expectedStorageClass, mockCluster.StorageClass)
+			assert.Equal(t, tt.expectedNetworkInterface, mockCluster.NetworkInterface)
+
+			// wait for async webhook call
+			time.Sleep(100 * time.Millisecond)
+
+			// verify event data
+			mu.Lock()
+			if receivedEvent.Data != nil {
+				eventData, ok := receivedEvent.Data.(types.ClusterEvent)
+				if ok {
+					assert.Equal(t, tt.expectedEventData.StorageClass, eventData.StorageClass)
+					assert.Equal(t, tt.expectedEventData.NetworkInterface, eventData.NetworkInterface)
+				}
+			}
+			mu.Unlock()
 		})
 	}
 }
