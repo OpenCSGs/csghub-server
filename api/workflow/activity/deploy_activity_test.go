@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"opencsg.com/csghub-server/builder/deploy/common"
+	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
@@ -91,56 +92,41 @@ func setupTest(t *testing.T) *testEnv {
 	}
 }
 
-// TestActivities_determineSDKVersion tests the determineSDKVersion method
-func TestActivities_determineSDKVersion(t *testing.T) {
+// TestActivities_createBuildRequest tests the createBuildRequest method
+func TestActivities_createBuildRequest(t *testing.T) {
 	tester := setupTest(t)
 
-	// Test cases
-	testCases := []struct {
-		name        string
-		repoInfo    common.RepoInfo
-		expectedSDK string
-	}{
-		{
-			name: "With explicit SDK version",
-			repoInfo: common.RepoInfo{
-				SdkVersion: "custom-version",
-				Sdk:        "some-other-sdk",
-			},
-			expectedSDK: "custom-version",
-		},
-		{
-			name: "With GRADIO SDK",
-			repoInfo: common.RepoInfo{
-				SdkVersion: "",
-				Sdk:        types.GRADIO.Name,
-			},
-			expectedSDK: types.GRADIO.Version,
-		},
-		{
-			name: "With STREAMLIT SDK",
-			repoInfo: common.RepoInfo{
-				SdkVersion: "",
-				Sdk:        types.STREAMLIT.Name,
-			},
-			expectedSDK: types.STREAMLIT.Version,
-		},
-		{
-			name: "With unknown SDK",
-			repoInfo: common.RepoInfo{
-				SdkVersion: "",
-				Sdk:        "unknown-sdk",
-			},
-			expectedSDK: "",
+	task := &database.DeployTask{
+		Deploy: &database.Deploy{
+			UserID: 1,
 		},
 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			sdkVersion := tester.activities.determineSDKVersion(tc.repoInfo)
-			require.Equal(t, tc.expectedSDK, sdkVersion)
-		})
+	repoInfo := common.RepoInfo{
+		Path:       "org/space",
+		SdkVersion: "6.2.0",
 	}
+
+	tester.mockTokenStore.EXPECT().FindByUID(tester.ctx, task.Deploy.UserID).Return(&database.AccessToken{
+		Token: "test-token",
+		User: &database.User{
+			Username: "uname",
+		},
+	}, nil)
+
+	tester.mockGitServer.EXPECT().GetRepoLastCommit(tester.ctx, gitserver.GetRepoLastCommitReq{
+		RepoType:  types.RepositoryType(repoInfo.RepoType),
+		Namespace: "org",
+		Name:      "space",
+		Ref:       task.Deploy.GitBranch,
+	}).Return(&types.Commit{
+		ID: "id",
+	}, nil)
+
+	r, err := tester.activities.createBuildRequest(tester.ctx, task, repoInfo)
+	require.Nil(t, err)
+	require.Equal(t, r.Sdk_version, repoInfo.SdkVersion)
+	require.Equal(t, r.LastCommitID, "id")
 }
 
 // TestActivities_handleDeployError tests the handleDeployError method

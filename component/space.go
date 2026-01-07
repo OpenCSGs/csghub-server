@@ -75,6 +75,14 @@ func (c *spaceComponentImpl) Create(ctx context.Context, req types.CreateSpaceRe
 		req.DefaultBranch = types.MainBranch
 	}
 
+	if req.Sdk == types.GRADIO.Name && len(req.SdkVersion) < 1 {
+		req.SdkVersion = types.GRADIO.Version
+	}
+
+	if req.Sdk == types.STREAMLIT.Name && len(req.SdkVersion) < 1 {
+		req.SdkVersion = types.STREAMLIT.Version
+	}
+
 	req.Nickname = nickname
 	req.RepoType = types.SpaceRepo
 	req.Readme = generateReadmeData(req.License)

@@ -252,6 +252,12 @@ func wfTemplateForImageBuilder(cfg *config.Config, params ctypes.ImageBuilderReq
 		"--build-arg=GIT_IMAGE=" + cfg.Runner.ImageBuilderGitImage,
 	}
 
+	if (params.Sdk == ctypes.GRADIO.Name && params.Sdk_version != ctypes.GRADIO.Version) ||
+		(params.Sdk == ctypes.STREAMLIT.Name && params.Sdk_version != ctypes.STREAMLIT.Version) {
+		// Using old base image 1.0.3 for old spaces, will be removed in the future
+		builderArgs = append(builderArgs, "--build-arg=SPACE_BASE_VERSION=1.0.3")
+	}
+
 	for _, arg := range cfg.Runner.ImageBuilderKanikoArgs {
 		if arg == "" || strings.HasPrefix(arg, "--context") || strings.HasPrefix(arg, "--destination") {
 			continue
