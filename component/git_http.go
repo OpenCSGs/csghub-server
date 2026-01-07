@@ -760,7 +760,7 @@ func (c *gitHTTPComponentImpl) buildUploadLink(ctx context.Context, req types.Ba
 		reqHeader.Add("X-Amz-Checksum-SHA256", encodedOid)
 		reqHeader.Add("X-Amz-Checksum-Algorithm", "SHA256")
 		// u, err := c.s3Client.PresignedPutObject(ctx, c.config.S3.Bucket, common.BuildLfsPath(repo.ID, pointer.Oid, repo.Migrated), types.OssFileExpire)
-		u, err := c.s3Core.PresignHeader(
+		u, err := c.s3Client.PresignHeader(
 			ctx,
 			http.MethodPut,
 			c.config.S3.Bucket,
