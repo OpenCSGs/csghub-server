@@ -26,6 +26,7 @@ import (
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
+	rtypes "opencsg.com/csghub-server/runner/types"
 	lwscli "sigs.k8s.io/lws/client-go/clientset/versioned"
 )
 
@@ -251,6 +252,28 @@ func buildCluster(kubeconfig *rest.Config, id string, index int, connectMode typ
 	}
 	clusterStore := database.NewClusterInfoStore()
 	region := fmt.Sprintf("region-%d", index)
+
+	// Read StorageClass and NetworkInterface from ConfigMap before AddByClusterID
+	storageClass := ""
+	networkInterface := ""
+	if connectMode == types.ConnectModeInCluster && len(config.Runner.RunnerNamespace) > 0 && len(config.Runner.WatchConfigmapName) > 0 {
+		ctxConfigMap, cancelConfigMap := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancelConfigMap()
+		cm, err := client.CoreV1().ConfigMaps(config.Runner.RunnerNamespace).Get(ctxConfigMap, config.Runner.WatchConfigmapName, metav1.GetOptions{})
+		if err == nil && cm != nil {
+			if val, ok := cm.Data[rtypes.KeyStorageClass]; ok && len(val) > 0 {
+				storageClass = val
+				slog.Debug("read storage class from ConfigMap", slog.String("storage_class", storageClass))
+			}
+			if val, ok := cm.Data[rtypes.KeyNetworkInterface]; ok && len(val) > 0 {
+				networkInterface = val
+				slog.Debug("read network interface from ConfigMap", slog.String("network_interface", networkInterface))
+			}
+		} else if err != nil {
+			slog.Debug("failed to read ConfigMap during initialization, will use default values", slog.String("namespace", config.Runner.RunnerNamespace), slog.String("configmap", config.Runner.WatchConfigmapName), slog.Any("error", err))
+		}
+	}
+
 	var cluster *database.ClusterInfo
 	if connectMode == types.ConnectModeKubeConfig {
 		cluster, err = clusterStore.Add(ctxTimeout, id, region, types.ConnectModeKubeConfig)
@@ -270,16 +293,49 @@ func buildCluster(kubeconfig *rest.Config, id string, index int, connectMode typ
 	if !cluster.Enable {
 		return nil, nil
 	}
+
+	// Update StorageClass and NetworkInterface to database if read from ConfigMap
+	if len(storageClass) > 0 || len(networkInterface) > 0 {
+		updateEvent := types.ClusterEvent{
+			ClusterID:        cluster.ClusterID,
+			ClusterConfig:    cluster.ClusterConfig,
+			Region:           cluster.Region,
+			Zone:             cluster.Zone,
+			Provider:         cluster.Provider,
+			StorageClass:     cluster.StorageClass,     // Use existing value as default
+			NetworkInterface: cluster.NetworkInterface, // Use existing value as default
+			Mode:             cluster.Mode,
+			Endpoint:         cluster.RunnerEndpoint,
+			AppEndpoint:      cluster.AppEndpoint,
+		}
+		// Override with values from ConfigMap if available
+		if len(storageClass) > 0 {
+			updateEvent.StorageClass = storageClass
+			cluster.StorageClass = storageClass
+		}
+		if len(networkInterface) > 0 {
+			updateEvent.NetworkInterface = networkInterface
+			cluster.NetworkInterface = networkInterface
+		}
+		err = clusterStore.UpdateByClusterID(ctxTimeout, updateEvent)
+		if err != nil {
+			slog.Warn("failed to update cluster info from ConfigMap", slog.Any("error", err))
+		} else {
+			slog.Info("updated cluster info from ConfigMap", slog.String("storage_class", updateEvent.StorageClass), slog.String("network_interface", updateEvent.NetworkInterface))
+		}
+	}
+
 	c := &Cluster{
-		CID:           id,
-		ID:            cluster.ClusterID,
-		Client:        client,
-		KnativeClient: knativeClient,
-		ArgoClient:    argoClient,
-		LWSClient:     lwsclient,
-		ConnectMode:   connectMode,
-		Region:        region,
-		StorageClass:  cluster.StorageClass,
+		CID:              id,
+		ID:               cluster.ClusterID,
+		Client:           client,
+		KnativeClient:    knativeClient,
+		ArgoClient:       argoClient,
+		LWSClient:        lwsclient,
+		ConnectMode:      connectMode,
+		Region:           region,
+		StorageClass:     cluster.StorageClass,
+		NetworkInterface: cluster.NetworkInterface,
 	}
 	return c, nil
 }

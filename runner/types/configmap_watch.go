@@ -14,6 +14,8 @@ const (
 	KeyApplicationEndpoint = "STARHUB_SERVER_RUNNER_APPLICATION_ENDPOINT"
 	// key name of configmap for storage class of PVC
 	KeyStorageClass = "STARHUB_SERVER_RUNNER_STORAGE_CLASS"
+	// key name of configmap for network interface, e.g., eth0
+	KeyNetworkInterface = "STARHUB_SERVER_RUNNER_NETWORK_INTERFACE"
 )
 
 var SubscribeKeyWithEventPush = map[string]Validator{
