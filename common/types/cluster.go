@@ -65,6 +65,7 @@ type DeployRes struct {
 	Status          string    `json:"status"`
 	TotalTimeInMin  int       `json:"total_time_in_min"`
 	TotalFeeInCents int       `json:"total_fee_in_cents"`
+	SvcName         string    `json:"svc_name"` // service name of the deployment, used for inference endpoint
 }
 
 type NodeResourceInfo struct {

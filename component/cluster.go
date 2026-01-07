@@ -221,6 +221,7 @@ func (c *clusterComponentImpl) GetDeploys(ctx context.Context, req types.DeployR
 			Resource:        deploy.Hardware,
 			TotalTimeInMin:  totalTime,
 			TotalFeeInCents: totalFee,
+			SvcName:         deploy.SvcName,
 		})
 	}
 	return res, total, nil

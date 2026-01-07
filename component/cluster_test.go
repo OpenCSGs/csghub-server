@@ -164,6 +164,7 @@ func TestClusterComponent_GetDeploys(t *testing.T) {
 	require.Equal(t, "cpu=2,memory=4Gi", res[0].Resource)
 	require.Equal(t, 200, res[0].TotalTimeInMin)
 	require.Equal(t, 123, res[0].TotalFeeInCents)
+	require.Equal(t, "service-1", res[0].SvcName)
 }
 
 func TestClusterComponent_GetClusterByID(t *testing.T) {
