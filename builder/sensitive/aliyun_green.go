@@ -280,7 +280,9 @@ func (c *AliyunGreenChecker) PassLLMCheck(ctx context.Context, scenario Scenario
 	}
 
 	results := resp.Body.Data.Result
-	if *resp.Body.Data.RiskLevel == "low" || *resp.Body.Data.RiskLevel == "none" {
+	if *resp.Body.Data.RiskLevel == "low" ||
+		*resp.Body.Data.RiskLevel == "medium" ||
+		*resp.Body.Data.RiskLevel == "none" {
 		return &CheckResult{IsSensitive: false}, nil
 	}
 	// refer to label https://help.aliyun.com/document_detail/2671445.html#section-3t8-ane-efg
