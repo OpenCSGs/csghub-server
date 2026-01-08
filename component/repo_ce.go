@@ -25,6 +25,8 @@ import (
 	"opencsg.com/csghub-server/mirror/cache"
 )
 
+type ExtendRepo struct{}
+
 func NewRepoComponent(config *config.Config) (RepoComponent, error) {
 	c := &repoComponentImpl{}
 	c.namespaceStore = database.NewNamespaceStore()
