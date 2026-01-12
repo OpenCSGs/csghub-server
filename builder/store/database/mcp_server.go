@@ -102,6 +102,8 @@ func (m *mcpServerStoreImpl) ByPath(ctx context.Context, namespace string, name 
 		NewSelect().
 		Model(mcpServer).
 		Relation("Repository.User").
+		Relation("Repository.Mirror").
+		Relation("Repository.Mirror.CurrentTask").
 		Where("repository.path = ?", fmt.Sprintf("%s/%s", namespace, name)).
 		Scan(ctx)
 	if err != nil {
