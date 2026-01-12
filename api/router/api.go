@@ -1092,6 +1092,16 @@ func createMappingRoutes(
 			hfSpaceFileGroup.GET("/:namespace/:name/resolve/:branch/*file_path", middleware.RepoMapping(types.SpaceRepo), repoCommonHandler.SDKDownload)
 			hfSpaceFileGroup.HEAD("/:namespace/:name/resolve/:branch/*file_path", middleware.RepoMapping(types.SpaceRepo), repoCommonHandler.HeadSDKDownload)
 		}
+		hfCodeFileGroup := hfGroup.Group("/codes")
+		{
+			hfCodeFileGroup.GET("/:namespace/:name/resolve/:branch/*file_path", middleware.RepoMapping(types.CodeRepo), repoCommonHandler.SDKDownload)
+			hfCodeFileGroup.HEAD("/:namespace/:name/resolve/:branch/*file_path", middleware.RepoMapping(types.CodeRepo), repoCommonHandler.HeadSDKDownload)
+		}
+		hfMcpserverFileGroup := hfGroup.Group("/mcps")
+		{
+			hfMcpserverFileGroup.GET("/:namespace/:name/resolve/:branch/*file_path", middleware.RepoMapping(types.MCPServerRepo), repoCommonHandler.SDKDownload)
+			hfMcpserverFileGroup.HEAD("/:namespace/:name/resolve/:branch/*file_path", middleware.RepoMapping(types.MCPServerRepo), repoCommonHandler.HeadSDKDownload)
+		}
 		hfAPIGroup := hfGroup.Group("/api")
 		{
 			hfAPIGroup.GET("/whoami-v2", middlewareCollection.Auth.NeedLogin, userHandler.UserPermission)
@@ -1118,6 +1128,16 @@ func createMappingRoutes(
 			{
 				hfSpaceAPIGroup.GET("/:namespace/:name/revision/:ref", middleware.RepoMapping(types.SpaceRepo), repoCommonHandler.SDKListFiles)
 				hfSpaceAPIGroup.GET("/:namespace/:name", middleware.RepoMapping(types.SpaceRepo), repoCommonHandler.SDKListFiles)
+			}
+			hfCodeAPIGroup := hfAPIGroup.Group("/codes")
+			{
+				hfCodeAPIGroup.GET("/:namespace/:name/revision/:ref", middleware.RepoMapping(types.CodeRepo), repoCommonHandler.SDKListFiles)
+				hfCodeAPIGroup.GET("/:namespace/:name", middleware.RepoMapping(types.CodeRepo), repoCommonHandler.SDKListFiles)
+			}
+			hfMcperverAPIGroup := hfAPIGroup.Group("/mcps")
+			{
+				hfMcperverAPIGroup.GET("/:namespace/:name/revision/:ref", middleware.RepoMapping(types.MCPServerRepo), repoCommonHandler.SDKListFiles)
+				hfMcperverAPIGroup.GET("/:namespace/:name", middleware.RepoMapping(types.MCPServerRepo), repoCommonHandler.SDKListFiles)
 			}
 			hfReposAPIGroup := hfAPIGroup.Group("/repos")
 			{
