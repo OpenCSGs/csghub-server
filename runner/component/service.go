@@ -1069,17 +1069,13 @@ func (s *serviceComponentImpl) runServiceSingleHost(ctx context.Context, req typ
 			MountPath: "/dev/shm",
 		})
 	}
-	pvcName := req.SvcName
-	if req.DeployType == types.InferenceType {
-		pvcName = req.UserID
-	}
-	pvcName = strings.ToLower(pvcName)
+	pvcName := strings.ToLower(req.UserID)
 	// add pvc if possible
 	// space image was built from user's code, model cache dir is hard to control
 	// so no PV cache for space case so far
 	slog.Debug("check storageclass for cluster", slog.Any("cluster_id", cluster.ID),
 		slog.Any("storageclass", cluster.StorageClass), slog.Any("svc_name", req.SvcName))
-	if len(cluster.StorageClass) > 0 && req.DeployType != types.SpaceType {
+	if len(cluster.StorageClass) > 0 {
 		slog.Info("using storageclass for cache", slog.Any("cluster_id", cluster.ID), slog.Any("svc_name", req.SvcName))
 		err = s.newPersistentVolumeClaim(pvcName, ctx, cluster, req.Hardware)
 		if err != nil {
