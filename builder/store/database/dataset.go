@@ -179,6 +179,7 @@ func (s *datasetStoreImpl) FindByPath(ctx context.Context, namespace string, rep
 		Model(resDataset).
 		Relation("Repository.User").
 		Relation("Repository.Mirror").
+		Relation("Repository.Mirror.CurrentTask").
 		Where("repository.path =?", fmt.Sprintf("%s/%s", namespace, repoPath)).
 		Scan(ctx)
 	if err != nil {
