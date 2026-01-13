@@ -39,7 +39,9 @@ mock_wire:
 	fi
 
 mock_gen:
-	mockery --tags "$(GO_TAGS)"
+	mockery
+	mockery --tags "saas" --config ".mockery_saas.yaml"
+	mockery --tags "ee" --config ".mockery_ee.yaml"
 
 swag:
 	swag init --pd -d cmd/csghub-server/cmd/start,api/router,api/handler,builder/store/database,common/types,accounting/handler,user/handler,moderation/handler,component,dataviewer/handler,aigateway/handler,aigateway/types,notification/handler -g server.go

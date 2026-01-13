@@ -23,7 +23,7 @@ func (_m *MockSensitiveComponent) EXPECT() *MockSensitiveComponent_Expecter {
 }
 
 // CheckImage provides a mock function with given fields: ctx, scenario, ossBucketName, ossObjectName
-func (_m *MockSensitiveComponent) CheckImage(ctx context.Context, scenario string, ossBucketName string, ossObjectName string) (bool, error) {
+func (_m *MockSensitiveComponent) CheckImage(ctx context.Context, scenario types.SensitiveScenario, ossBucketName string, ossObjectName string) (bool, error) {
 	ret := _m.Called(ctx, scenario, ossBucketName, ossObjectName)
 
 	if len(ret) == 0 {
@@ -32,16 +32,16 @@ func (_m *MockSensitiveComponent) CheckImage(ctx context.Context, scenario strin
 
 	var r0 bool
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) (bool, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, types.SensitiveScenario, string, string) (bool, error)); ok {
 		return rf(ctx, scenario, ossBucketName, ossObjectName)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) bool); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, types.SensitiveScenario, string, string) bool); ok {
 		r0 = rf(ctx, scenario, ossBucketName, ossObjectName)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, string, string) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, types.SensitiveScenario, string, string) error); ok {
 		r1 = rf(ctx, scenario, ossBucketName, ossObjectName)
 	} else {
 		r1 = ret.Error(1)
@@ -57,16 +57,16 @@ type MockSensitiveComponent_CheckImage_Call struct {
 
 // CheckImage is a helper method to define mock.On call
 //   - ctx context.Context
-//   - scenario string
+//   - scenario types.SensitiveScenario
 //   - ossBucketName string
 //   - ossObjectName string
 func (_e *MockSensitiveComponent_Expecter) CheckImage(ctx interface{}, scenario interface{}, ossBucketName interface{}, ossObjectName interface{}) *MockSensitiveComponent_CheckImage_Call {
 	return &MockSensitiveComponent_CheckImage_Call{Call: _e.mock.On("CheckImage", ctx, scenario, ossBucketName, ossObjectName)}
 }
 
-func (_c *MockSensitiveComponent_CheckImage_Call) Run(run func(ctx context.Context, scenario string, ossBucketName string, ossObjectName string)) *MockSensitiveComponent_CheckImage_Call {
+func (_c *MockSensitiveComponent_CheckImage_Call) Run(run func(ctx context.Context, scenario types.SensitiveScenario, ossBucketName string, ossObjectName string)) *MockSensitiveComponent_CheckImage_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string))
+		run(args[0].(context.Context), args[1].(types.SensitiveScenario), args[2].(string), args[3].(string))
 	})
 	return _c
 }
@@ -76,7 +76,7 @@ func (_c *MockSensitiveComponent_CheckImage_Call) Return(_a0 bool, _a1 error) *M
 	return _c
 }
 
-func (_c *MockSensitiveComponent_CheckImage_Call) RunAndReturn(run func(context.Context, string, string, string) (bool, error)) *MockSensitiveComponent_CheckImage_Call {
+func (_c *MockSensitiveComponent_CheckImage_Call) RunAndReturn(run func(context.Context, types.SensitiveScenario, string, string) (bool, error)) *MockSensitiveComponent_CheckImage_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -139,7 +139,7 @@ func (_c *MockSensitiveComponent_CheckRequestV2_Call) RunAndReturn(run func(cont
 }
 
 // CheckText provides a mock function with given fields: ctx, scenario, text
-func (_m *MockSensitiveComponent) CheckText(ctx context.Context, scenario string, text string) (bool, error) {
+func (_m *MockSensitiveComponent) CheckText(ctx context.Context, scenario types.SensitiveScenario, text string) (bool, error) {
 	ret := _m.Called(ctx, scenario, text)
 
 	if len(ret) == 0 {
@@ -148,16 +148,16 @@ func (_m *MockSensitiveComponent) CheckText(ctx context.Context, scenario string
 
 	var r0 bool
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) (bool, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, types.SensitiveScenario, string) (bool, error)); ok {
 		return rf(ctx, scenario, text)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) bool); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, types.SensitiveScenario, string) bool); ok {
 		r0 = rf(ctx, scenario, text)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, types.SensitiveScenario, string) error); ok {
 		r1 = rf(ctx, scenario, text)
 	} else {
 		r1 = ret.Error(1)
@@ -173,15 +173,15 @@ type MockSensitiveComponent_CheckText_Call struct {
 
 // CheckText is a helper method to define mock.On call
 //   - ctx context.Context
-//   - scenario string
+//   - scenario types.SensitiveScenario
 //   - text string
 func (_e *MockSensitiveComponent_Expecter) CheckText(ctx interface{}, scenario interface{}, text interface{}) *MockSensitiveComponent_CheckText_Call {
 	return &MockSensitiveComponent_CheckText_Call{Call: _e.mock.On("CheckText", ctx, scenario, text)}
 }
 
-func (_c *MockSensitiveComponent_CheckText_Call) Run(run func(ctx context.Context, scenario string, text string)) *MockSensitiveComponent_CheckText_Call {
+func (_c *MockSensitiveComponent_CheckText_Call) Run(run func(ctx context.Context, scenario types.SensitiveScenario, text string)) *MockSensitiveComponent_CheckText_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string))
+		run(args[0].(context.Context), args[1].(types.SensitiveScenario), args[2].(string))
 	})
 	return _c
 }
@@ -191,7 +191,7 @@ func (_c *MockSensitiveComponent_CheckText_Call) Return(_a0 bool, _a1 error) *Mo
 	return _c
 }
 
-func (_c *MockSensitiveComponent_CheckText_Call) RunAndReturn(run func(context.Context, string, string) (bool, error)) *MockSensitiveComponent_CheckText_Call {
+func (_c *MockSensitiveComponent_CheckText_Call) RunAndReturn(run func(context.Context, types.SensitiveScenario, string) (bool, error)) *MockSensitiveComponent_CheckText_Call {
 	_c.Call.Return(run)
 	return _c
 }
