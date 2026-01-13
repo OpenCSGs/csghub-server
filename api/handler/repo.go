@@ -2955,7 +2955,7 @@ func (h *RepoHandler) CommitFiles(ctx *gin.Context) {
 	err = h.c.CommitFiles(ctx.Request.Context(), req)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "failed to commit files", slog.Any("error", err))
-		httpbase.ServerError(ctx, err)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	httpbase.OK(ctx, nil)
@@ -2987,7 +2987,7 @@ func (h *RepoHandler) CommitFilesHF(ctx *gin.Context) {
 	err = h.c.CommitFiles(ctx.Request.Context(), *req)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "failed to commit files", slog.Any("error", err))
-		httpbase.ServerError(ctx, err)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	ctx.JSON(http.StatusOK, gin.H{
