@@ -541,7 +541,7 @@ func TestCreateRepoDiscussionRequest_GetSensitiveFields(t *testing.T) {
 	fields := req.GetSensitiveFields()
 	require.Len(t, fields, 1)
 	require.Equal(t, "title", fields[0].Value())
-	require.Equal(t, "comment_detection", fields[0].Scenario)
+	require.Equal(t, types.ScenarioCommentDetection, fields[0].Scenario)
 }
 
 func TestUpdateDiscussionRequest_GetSensitiveFields(t *testing.T) {
@@ -552,7 +552,7 @@ func TestUpdateDiscussionRequest_GetSensitiveFields(t *testing.T) {
 	fields := req.GetSensitiveFields()
 	require.Len(t, fields, 1)
 	require.Equal(t, "title", fields[0].Value())
-	require.Equal(t, "comment_detection", fields[0].Scenario)
+	require.Equal(t, types.ScenarioCommentDetection, fields[0].Scenario)
 }
 func TestCreateCommentRequest_GetSensitiveFields(t *testing.T) {
 
@@ -562,7 +562,7 @@ func TestCreateCommentRequest_GetSensitiveFields(t *testing.T) {
 	fields := req.GetSensitiveFields()
 	require.Len(t, fields, 1)
 	require.Equal(t, "content", fields[0].Value())
-	require.Equal(t, "comment_detection", fields[0].Scenario)
+	require.Equal(t, types.ScenarioCommentDetection, fields[0].Scenario)
 }
 
 func TestUpdateCommentRequest_GetSensitiveFields(t *testing.T) {
@@ -573,5 +573,5 @@ func TestUpdateCommentRequest_GetSensitiveFields(t *testing.T) {
 	fields := req.GetSensitiveFields()
 	require.Len(t, fields, 1)
 	require.Equal(t, "content", fields[0].Value())
-	require.Equal(t, "comment_detection", fields[0].Scenario)
+	require.Equal(t, types.ScenarioCommentDetection, fields[0].Scenario)
 }

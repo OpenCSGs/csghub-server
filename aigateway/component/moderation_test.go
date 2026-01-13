@@ -18,7 +18,7 @@ import (
 	mock_cache "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/cache"
 	"opencsg.com/csghub-server/aigateway/types"
 	"opencsg.com/csghub-server/builder/rpc"
-	"opencsg.com/csghub-server/builder/sensitive"
+	common_types "opencsg.com/csghub-server/common/types"
 )
 
 func TestSplitContentIntoChunksByWindow_Table(t *testing.T) {
@@ -319,7 +319,7 @@ func TestModerationImpl_CheckChatNonStreamResponse(t *testing.T) {
 	ctx := context.Background()
 	t.Run("should_call_PassLLMRespCheck_and_return_sensitive_when_content_is_sensitive", func(t *testing.T) {
 		mockModClient := mock_rpc.NewMockModerationSvcClient(t)
-		mockModClient.EXPECT().PassTextCheck(ctx, string(sensitive.ScenarioChatDetection), "sensitive content").
+		mockModClient.EXPECT().PassTextCheck(ctx, common_types.ScenarioChatDetection, "sensitive content").
 			Return(&rpc.CheckResult{IsSensitive: true, Reason: "inappropriate language"}, nil).Once()
 		modImpl := &moderationImpl{
 			modSvcClient: mockModClient,
@@ -344,7 +344,7 @@ func TestModerationImpl_CheckChatNonStreamResponse(t *testing.T) {
 	})
 	t.Run("should_call_PassLLMRespCheck_and_return_not_sensitive_when_content_is_not_sensitive", func(t *testing.T) {
 		mockModClient := mock_rpc.NewMockModerationSvcClient(t)
-		mockModClient.EXPECT().PassTextCheck(ctx, string(sensitive.ScenarioChatDetection), "not sensitive content").
+		mockModClient.EXPECT().PassTextCheck(ctx, common_types.ScenarioChatDetection, "not sensitive content").
 			Return(&rpc.CheckResult{IsSensitive: false, Reason: "appropriate language"}, nil).Once()
 		modImpl := &moderationImpl{
 			modSvcClient: mockModClient,

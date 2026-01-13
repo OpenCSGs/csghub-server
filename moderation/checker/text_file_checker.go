@@ -55,7 +55,7 @@ func (c *TextFileChecker) Run(ctx context.Context, reader io.Reader) (types.Sens
 		for _, buf := range bufs {
 			var res *sensitive.CheckResult
 			var err error
-			slog.Debug("check text", slog.String("scenario", string(sensitive.ScenarioCommentDetection)), slog.String("text", buf.String()))
+			slog.Debug("check text", slog.String("scenario", string(types.ScenarioCommentDetection)), slog.String("text", buf.String()))
 			//do local check first
 			txt := buf.String()
 			contains := GetLocalWordChecker().ContainsSensitiveWord(txt)
@@ -67,7 +67,7 @@ func (c *TextFileChecker) Run(ctx context.Context, reader io.Reader) (types.Sens
 			res, err = retry.DoWithData(
 				func() (*sensitive.CheckResult, error) {
 					reqCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-					res, err = c.PassTextCheck(reqCtx, sensitive.ScenarioCommentDetection, txt)
+					res, err = c.PassTextCheck(reqCtx, types.ScenarioCommentDetection, txt)
 					cancel()
 					if err != nil {
 						return nil, err

@@ -2,8 +2,6 @@ package types
 
 import (
 	"time"
-
-	"opencsg.com/csghub-server/builder/sensitive"
 )
 
 type PromptPrefixKind string
@@ -152,14 +150,14 @@ func (req *Prompt) GetSensitiveFields() []SensitiveField {
 		Value: func() string {
 			return req.Title
 		},
-		Scenario: string(sensitive.ScenarioCommentDetection),
+		Scenario: ScenarioCommentDetection,
 	})
 	fields = append(fields, SensitiveField{
 		Name: "content",
 		Value: func() string {
 			return req.Content
 		},
-		Scenario: string(sensitive.ScenarioCommentDetection),
+		Scenario: ScenarioCommentDetection,
 	})
 	if len(req.Source) > 0 {
 		fields = append(fields, SensitiveField{
@@ -167,7 +165,7 @@ func (req *Prompt) GetSensitiveFields() []SensitiveField {
 			Value: func() string {
 				return req.Source
 			},
-			Scenario: string(sensitive.ScenarioCommentDetection),
+			Scenario: ScenarioCommentDetection,
 		})
 	}
 	return fields

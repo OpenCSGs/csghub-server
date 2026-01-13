@@ -17,6 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 	mockgreen "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/sensitive"
 	"opencsg.com/csghub-server/builder/sensitive"
+	"opencsg.com/csghub-server/common/types"
 )
 
 func TestSensitiveChecker_SplitTasks(t *testing.T) {
@@ -42,7 +43,7 @@ func TestSensitiveChecker_PassImageURLCheck(t *testing.T) {
 		// Mock the ImageModeration method to return an error
 		g2c.EXPECT().ImageModeration(mock.Anything).Return(nil, errors.New("API call failed")).Once()
 
-		result, err := checker.PassImageURLCheck(context.Background(), sensitive.ScenarioImageBaseLineCheck, imageURL)
+		result, err := checker.PassImageURLCheck(context.Background(), types.ScenarioImageBaseLineCheck, imageURL)
 
 		// Verify that an error is returned
 		require.NotNil(t, err)
@@ -59,7 +60,7 @@ func TestSensitiveChecker_PassImageURLCheck(t *testing.T) {
 			},
 		}, nil).Once()
 
-		result, err := checker.PassImageURLCheck(context.Background(), sensitive.ScenarioImageBaseLineCheck, imageURL)
+		result, err := checker.PassImageURLCheck(context.Background(), types.ScenarioImageBaseLineCheck, imageURL)
 
 		// Verify that an error is returned
 		require.NotNil(t, err)
@@ -79,7 +80,7 @@ func TestSensitiveChecker_PassImageURLCheck(t *testing.T) {
 			},
 		}, nil).Once()
 
-		result, err := checker.PassImageURLCheck(context.Background(), sensitive.ScenarioImageBaseLineCheck, imageURL)
+		result, err := checker.PassImageURLCheck(context.Background(), types.ScenarioImageBaseLineCheck, imageURL)
 
 		// Verify that the image passes the check
 		require.Nil(t, err)
@@ -105,7 +106,7 @@ func TestSensitiveChecker_PassImageURLCheck(t *testing.T) {
 			},
 		}, nil).Once()
 
-		result, err := checker.PassImageURLCheck(context.Background(), sensitive.ScenarioImageBaseLineCheck, imageURL)
+		result, err := checker.PassImageURLCheck(context.Background(), types.ScenarioImageBaseLineCheck, imageURL)
 
 		// Verify that the image passes the check
 		require.Nil(t, err)
@@ -131,7 +132,7 @@ func TestSensitiveChecker_PassImageURLCheck(t *testing.T) {
 			},
 		}, nil).Once()
 
-		result, err := checker.PassImageURLCheck(context.Background(), sensitive.ScenarioImageBaseLineCheck, imageURL)
+		result, err := checker.PassImageURLCheck(context.Background(), types.ScenarioImageBaseLineCheck, imageURL)
 
 		// Verify that the image is detected as sensitive
 		require.Nil(t, err)
@@ -164,7 +165,7 @@ func TestSensitiveChecker_PassImageURLCheck(t *testing.T) {
 			},
 		}, nil).Once()
 
-		result, err := checker.PassImageURLCheck(context.Background(), sensitive.ScenarioImageBaseLineCheck, imageURL)
+		result, err := checker.PassImageURLCheck(context.Background(), types.ScenarioImageBaseLineCheck, imageURL)
 
 		// Verify that the sensitive image is detected
 		require.Nil(t, err)

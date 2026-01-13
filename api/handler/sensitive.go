@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/component"
 )
 
@@ -26,8 +27,8 @@ func NewSensitiveHandler(cfg *config.Config) (*SensitiveHandler, error) {
 
 func (h *SensitiveHandler) Text(ctx *gin.Context) {
 	type req struct {
-		Scenario string `json:"scenario"`
-		Text     string `json:"text"`
+		Scenario types.SensitiveScenario `json:"scenario"`
+		Text     string                  `json:"text"`
 	}
 	var (
 		r   req
@@ -54,9 +55,9 @@ func (h *SensitiveHandler) Text(ctx *gin.Context) {
 
 func (h *SensitiveHandler) Image(ctx *gin.Context) {
 	type req struct {
-		Scenario      string `json:"scenario"`
-		OssBucketName string `json:"oss_bucket_name"`
-		OssObjectName string `json:"oss_object_name"`
+		Scenario      types.SensitiveScenario `json:"scenario"`
+		OssBucketName string                  `json:"oss_bucket_name"`
+		OssObjectName string                  `json:"oss_object_name"`
 	}
 	var (
 		r   req
