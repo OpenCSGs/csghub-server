@@ -884,6 +884,33 @@ func (c *spaceComponentImpl) Deploy(ctx context.Context, namespace, name, curren
 		containerPort = types.MCPSERVER.Port
 	}
 
+	var imageID string
+	if space.Sdk != types.DOCKER.Name {
+		var frame []database.RuntimeFramework
+		var err error
+		if (space.Sdk == types.GRADIO.Name && space.SdkVersion != types.GRADIO.Version) ||
+			(space.Sdk == types.STREAMLIT.Name && space.SdkVersion != types.STREAMLIT.Version) {
+			// Using old base image 1.0.3 for old spaces, will be removed in the future
+			frame, err = c.rfs.FindByFrameNameAndDriverVersion(ctx, "space", "1.0.3", space.DriverVersion)
+			if err != nil {
+				return -1, fmt.Errorf("cannot find available (1.0.3) runtime framework, %w", err)
+			}
+		} else {
+			// 1.0.4
+			frame, err = c.rfs.FindByFrameNameAndDriverVersion(ctx, "space", "1.0.4", space.DriverVersion)
+			if err != nil {
+				return -1, fmt.Errorf("cannot find available (1.0.4) runtime framework, %w", err)
+			}
+		}
+
+		if len(frame) > 0 {
+			sort.Slice(frame, func(i, j int) bool {
+				return frame[i].UpdatedAt.After(frame[j].UpdatedAt)
+			})
+
+			imageID = frame[0].FrameImage
+		}
+	}
 	// create deploy for space
 	dr := types.DeployRepo{
 		SpaceID:       space.ID,
@@ -900,7 +927,7 @@ func (c *spaceComponentImpl) Deploy(ctx context.Context, namespace, name, curren
 		ModelID:       0,
 		UserID:        user.ID,
 		Annotation:    string(annoStr),
-		ImageID:       "",
+		ImageID:       imageID,
 		Type:          types.SpaceType,
 		UserUUID:      user.UUID,
 		SKU:           space.SKU,

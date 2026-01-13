@@ -106,6 +106,9 @@ func (s *serviceComponentImpl) generateService(ctx context.Context, cluster *clu
 	annotations := request.Annotation
 
 	environments := []corev1.EnvVar{}
+	if s.env.Space.PYPIIndexURL != "" {
+		environments = append(environments, corev1.EnvVar{Name: "PIP_INDEX_URL", Value: s.env.Space.PYPIIndexURL})
+	}
 	appPort := 0
 	hardware := request.Hardware
 	resReq, nodeSelector := GenerateResources(hardware)

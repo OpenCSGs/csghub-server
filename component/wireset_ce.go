@@ -35,6 +35,7 @@ func NewTestSpaceComponent(
 		config:              config,
 		userSvcClient:       userSvcClient,
 		deployTaskStore:     stores.DeployTask,
+		rfs:                 stores.RuntimeFramework,
 	}
 }
 

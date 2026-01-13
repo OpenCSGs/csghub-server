@@ -665,6 +665,11 @@ func (c *runtimeArchitectureComponentImpl) InitRuntimeFrameworkAndArchitectures(
 	if err != nil {
 		return fmt.Errorf("failed to update job runtime_framework: %w", err)
 	}
+
+	err = c.UpdateRuntimeFrameworkByType(ctx, types.SpaceType)
+	if err != nil {
+		return fmt.Errorf("failed to update space runtime_framework: %w", err)
+	}
 	return nil
 }
 
@@ -695,6 +700,11 @@ func (c *runtimeArchitectureComponentImpl) UpdateRuntimeFrameworkByType(ctx cont
 		}
 	case types.JobType:
 		jsonFiles, err = getJsonfiles("job")
+		if err != nil {
+			return fmt.Errorf("failed to get json files: %w", err)
+		}
+	case types.SpaceType:
+		jsonFiles, err = getJsonfiles("space")
 		if err != nil {
 			return fmt.Errorf("failed to get json files: %w", err)
 		}

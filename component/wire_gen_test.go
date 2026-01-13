@@ -252,6 +252,7 @@ func initializeTestSpaceComponent(ctx context.Context, t interface {
 	multisyncMockClient := multisync.NewMockClient(t)
 	mockCore := s3.NewMockCore(t)
 	mockGitCallbackChecker := checker.NewMockGitCallbackChecker(t)
+
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,

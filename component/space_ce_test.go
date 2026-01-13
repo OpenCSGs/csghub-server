@@ -5,6 +5,7 @@ package component
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"sync"
 	"testing"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -178,4 +180,111 @@ func TestSpaceComponent_Update(t *testing.T) {
 		SKU:      "12",
 	}, space)
 
+}
+
+func TestSpaceComponent_Deploy(t *testing.T) {
+	ctx := context.TODO()
+	sc := initializeTestSpaceComponent(ctx, t)
+
+	sc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
+		Username: "user1",
+	}, nil)
+	sc.mocks.stores.RuntimeFrameworkMock().EXPECT().FindByFrameNameAndDriverVersion(ctx, mock.Anything, mock.Anything, mock.Anything).Return([]database.RuntimeFramework{}, nil)
+
+	t.Run("Deploy", func(t *testing.T) {
+		sc.mocks.stores.SpaceMock().EXPECT().FindByPath(ctx, "ns1", "n1").Return(&database.Space{
+			ID:         1,
+			Repository: &database.Repository{Path: "foo1/bar1"},
+			SKU:        "1",
+			HasAppFile: true,
+		}, nil)
+		sc.mocks.stores.SpaceResourceMock().EXPECT().FindByID(ctx, int64(1)).Return(&database.SpaceResource{
+			ID: 1,
+		}, nil)
+		sc.mocks.components.repo.EXPECT().CheckAccountAndResource(ctx, "user", "", int64(0), &database.SpaceResource{
+			ID: 1,
+		}).Return(nil)
+		sc.mocks.deployer.EXPECT().Deploy(ctx, types.DeployRepo{
+			SpaceID:       1,
+			Path:          "foo1/bar1",
+			Annotation:    "{\"hub-deploy-user\":\"user1\",\"hub-res-name\":\"ns1/n1\",\"hub-res-type\":\"space\"}",
+			ContainerPort: 8080,
+			SKU:           "1",
+		}).Return(123, nil)
+
+		id, err := sc.Deploy(ctx, "ns1", "n1", "user")
+		require.Nil(t, err)
+		require.Equal(t, int64(123), id)
+	})
+	t.Run("DeployWithoutAppFile", func(t *testing.T) {
+		sc.mocks.stores.SpaceMock().EXPECT().FindByPath(ctx, "ns2", "n2").Return(&database.Space{
+			ID:         1,
+			Repository: &database.Repository{Path: "foo2/bar2"},
+			SKU:        "1",
+			HasAppFile: false,
+		}, nil)
+		id, err := sc.Deploy(ctx, "ns2", "n2", "user")
+		require.Equal(t, true, errors.Is(err, errorx.ErrNoEntryFile))
+		require.Equal(t, int64(-1), id)
+	})
+}
+
+func TestSpaceComponent_Delete(t *testing.T) {
+	ctx := context.TODO()
+	sc := initializeTestSpaceComponent(ctx, t)
+
+	sc.mocks.stores.SpaceMock().EXPECT().FindByPath(mock.Anything, "ns", "n").Return(&database.Space{ID: 1}, nil)
+	sc.mocks.components.repo.EXPECT().DeleteRepo(ctx, types.DeleteRepoReq{
+		Username:  "user",
+		Namespace: "ns",
+		Name:      "n",
+		RepoType:  types.SpaceRepo,
+	}).Return(&database.Repository{
+		User: database.User{
+			UUID: "user-uuid",
+		},
+		Path: "ns/n",
+	}, nil)
+	sc.mocks.stores.SpaceMock().EXPECT().Delete(mock.Anything, database.Space{ID: 1}).Return(nil)
+
+	sc.mocks.stores.DeployTaskMock().EXPECT().GetLatestDeployBySpaceID(mock.Anything, int64(1)).Return(
+		&database.Deploy{
+			RepoID: 2,
+			UserID: 3,
+			ID:     4,
+		}, nil,
+	)
+	var wgstop sync.WaitGroup
+	wgstop.Add(1)
+	sc.mocks.deployer.EXPECT().Stop(mock.Anything, mock.MatchedBy(func(req types.DeployRepo) bool {
+		return req.SpaceID == 1 &&
+			req.Namespace == "ns" &&
+			req.Name == "n"
+	})).
+		RunAndReturn(func(ctx context.Context, req types.DeployRepo) error {
+			wgstop.Done()
+			return nil
+		}).Once()
+	sc.mocks.stores.DeployTaskMock().EXPECT().StopDeploy(
+		mock.Anything, types.SpaceRepo, int64(2), int64(3), int64(4),
+	).Return(nil)
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	sc.mocks.components.repo.EXPECT().
+		SendAssetManagementMsg(mock.Anything, mock.MatchedBy(func(req types.RepoNotificationReq) bool {
+			return req.RepoType == types.SpaceRepo &&
+				req.Operation == types.OperationDelete &&
+				req.RepoPath == "ns/n" &&
+				req.UserUUID == "user-uuid"
+		})).
+		RunAndReturn(func(ctx context.Context, req types.RepoNotificationReq) error {
+			wg.Done()
+			return nil
+		}).Once()
+
+	err := sc.Delete(ctx, "ns", "n", "user")
+	require.Nil(t, err)
+	wg.Wait()
+	wgstop.Wait()
 }

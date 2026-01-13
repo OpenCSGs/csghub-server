@@ -27,6 +27,7 @@ type RuntimeFrameworksStore interface {
 	FindByImageID(ctx context.Context, imageID string) (*RuntimeFramework, error)
 	ListAll(ctx context.Context) ([]RuntimeFramework, error)
 	ListByIDs(ctx context.Context, ids []int64) ([]RuntimeFramework, error)
+	FindByFrameNameAndDriverVersion(ctx context.Context, name, version, driverVersion string) ([]RuntimeFramework, error)
 }
 
 func NewRuntimeFrameworksStore() RuntimeFrameworksStore {
@@ -53,7 +54,7 @@ type RuntimeFramework struct {
 	ContainerPort   int    `bun:",notnull" json:"container_port"`
 	Type            int    `bun:",notnull" json:"type"` // 0-space, 1-inference, 2-finetune
 	EngineArgs      string `bun:",nullzero" json:"engine_args"`
-	ModelFormat     string `bun:",nullzero" json:"model_format"`     // safetensors, gguf, or onnx
+	ModelFormat     string `bun:",nullzero" json:"model_format"`      // safetensors, gguf, or onnx
 	ToolCallParsers string `bun:",nullzero" json:"tool_call_parsers"` // JSON string mapping architecture to parser
 	times
 }
@@ -189,6 +190,15 @@ func (rf *runtimeFrameworksStoreImpl) RemoveRuntimeFrameworkAndArch(ctx context.
 func (rf *runtimeFrameworksStoreImpl) FindByFrameName(ctx context.Context, name string) ([]RuntimeFramework, error) {
 	var result []RuntimeFramework
 	_, err := rf.db.Core.NewSelect().Model(&result).Where("frame_name = ?", name).Exec(ctx, &result)
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func (rf *runtimeFrameworksStoreImpl) FindByFrameNameAndDriverVersion(ctx context.Context, name, version, driverVersion string) ([]RuntimeFramework, error) {
+	var result []RuntimeFramework
+	_, err := rf.db.Core.NewSelect().Model(&result).Where("frame_name = ?", name).Where("driver_version = ?", driverVersion).Where("frame_version = ?", version).Exec(ctx, &result)
 	if err != nil {
 		return nil, err
 	}
