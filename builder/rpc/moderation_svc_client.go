@@ -5,15 +5,14 @@ import (
 	"log/slog"
 
 	"opencsg.com/csghub-server/api/httpbase"
-	"opencsg.com/csghub-server/builder/sensitive"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
 
 type ModerationSvcClient interface {
-	PassTextCheck(ctx context.Context, scenario, text string) (*CheckResult, error)
-	PassImageCheck(ctx context.Context, scenario, ossBucketName, ossObjectName string) (*CheckResult, error)
-	PassImageURLCheck(ctx context.Context, scenario, imageURL string) (*CheckResult, error)
+	PassTextCheck(ctx context.Context, scenario types.SensitiveScenario, text string) (*CheckResult, error)
+	PassImageCheck(ctx context.Context, scenario types.SensitiveScenario, ossBucketName, ossObjectName string) (*CheckResult, error)
+	PassImageURLCheck(ctx context.Context, scenario types.SensitiveScenario, imageURL string) (*CheckResult, error)
 	PassLLMRespCheck(ctx context.Context, text, sessionId string) (*CheckResult, error)
 	PassLLMPromptCheck(ctx context.Context, text, accountId string) (*CheckResult, error)
 	SubmitRepoCheck(ctx context.Context, repoType types.RepositoryType, namespace, name string) error
@@ -34,10 +33,10 @@ func NewModerationSvcHttpClient(endpoint string, opts ...RequestOption) Moderati
 	}
 }
 
-func (c *ModerationSvcHttpClient) PassTextCheck(ctx context.Context, scenario, text string) (*CheckResult, error) {
+func (c *ModerationSvcHttpClient) PassTextCheck(ctx context.Context, scenario types.SensitiveScenario, text string) (*CheckResult, error) {
 	type CheckRequest struct {
-		Scenario string `json:"scenario"`
-		Text     string `json:"text"`
+		Scenario types.SensitiveScenario `json:"scenario"`
+		Text     string                  `json:"text"`
 	}
 
 	req := &CheckRequest{
@@ -69,7 +68,7 @@ func (c *ModerationSvcHttpClient) PassLLMRespCheck(ctx context.Context, text, se
 		ServiceParameters ServiceParameters `json:"ServiceParameters"`
 	}
 	req := &CheckRequest{
-		Service: string(sensitive.ScenarioLLMResModeration),
+		Service: string(types.ScenarioLLMResModeration),
 		ServiceParameters: ServiceParameters{
 			Content:   text,
 			SessionId: sessionId,
@@ -89,11 +88,11 @@ func (c *ModerationSvcHttpClient) PassLLMRespCheck(ctx context.Context, text, se
 	return resp.Data.(*CheckResult), nil
 }
 
-func (c *ModerationSvcHttpClient) PassImageCheck(ctx context.Context, scenario, ossBucketName, ossObjectName string) (*CheckResult, error) {
+func (c *ModerationSvcHttpClient) PassImageCheck(ctx context.Context, scenario types.SensitiveScenario, ossBucketName, ossObjectName string) (*CheckResult, error) {
 	type CheckRequest struct {
-		Scenario      string `json:"scenario"`
-		OssBucketName string `json:"oss_bucket_name"`
-		OssObjectName string `json:"oss_object_name"`
+		Scenario      types.SensitiveScenario `json:"scenario"`
+		OssBucketName string                  `json:"oss_bucket_name"`
+		OssObjectName string                  `json:"oss_object_name"`
 	}
 
 	req := &CheckRequest{
@@ -115,10 +114,10 @@ func (c *ModerationSvcHttpClient) PassImageCheck(ctx context.Context, scenario, 
 	return resp.Data.(*CheckResult), nil
 }
 
-func (c *ModerationSvcHttpClient) PassImageURLCheck(ctx context.Context, scenario, imageURL string) (*CheckResult, error) {
+func (c *ModerationSvcHttpClient) PassImageURLCheck(ctx context.Context, scenario types.SensitiveScenario, imageURL string) (*CheckResult, error) {
 	type CheckRequest struct {
-		Scenario string `json:"scenario"`
-		ImageURL string `json:"image_url"`
+		Scenario types.SensitiveScenario `json:"scenario"`
+		ImageURL string                  `json:"image_url"`
 	}
 
 	req := &CheckRequest{
@@ -174,7 +173,7 @@ func (c *ModerationSvcHttpClient) PassLLMPromptCheck(ctx context.Context, text, 
 		ServiceParameters ServiceParameters `json:"ServiceParameters"`
 	}
 	req := &CheckRequest{
-		Service: string(sensitive.ScenarioLLMQueryModeration),
+		Service: string(types.ScenarioLLMQueryModeration),
 		ServiceParameters: ServiceParameters{
 			Content:   text,
 			SessionId: accountId,

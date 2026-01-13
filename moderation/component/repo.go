@@ -154,7 +154,7 @@ func (c *repoComponentImpl) saveCheckResult(ctx context.Context, file *database.
 func (cc *repoComponentImpl) CheckRequestV2(ctx context.Context, req types.SensitiveRequestV2) (bool, error) {
 	fields := req.GetSensitiveFields()
 	for _, field := range fields {
-		pass, err := cc.checker.PassTextCheck(ctx, sensitive.Scenario(field.Scenario), field.Value())
+		pass, err := cc.checker.PassTextCheck(ctx, field.Scenario, field.Value())
 		if err != nil {
 			slog.Error("fail to check request sensitivity", slog.String("field", field.Name), slog.Any("error", err))
 			return false, fmt.Errorf("fail to check '%s' sensitivity, error: %w", field.Name, err)

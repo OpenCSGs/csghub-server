@@ -36,14 +36,14 @@ func TestRepoComponent_CheckRequestV2(t *testing.T) {
 				Value: func() string {
 					return "chat1"
 				},
-				Scenario: string(sensitive.ScenarioChatDetection),
+				Scenario: types.ScenarioChatDetection,
 			},
 			{
 				Name: "comment",
 				Value: func() string {
 					return "comment1"
 				},
-				Scenario: string(sensitive.ScenarioCommentDetection),
+				Scenario: types.ScenarioCommentDetection,
 			},
 		})
 
@@ -62,22 +62,22 @@ func TestRepoComponent_CheckRequestV2(t *testing.T) {
 				Value: func() string {
 					return "chat1"
 				},
-				Scenario: string(sensitive.ScenarioChatDetection),
+				Scenario: types.ScenarioChatDetection,
 			},
 			{
 				Name: "comment",
 				Value: func() string {
 					return "comment1"
 				},
-				Scenario: string(sensitive.ScenarioCommentDetection),
+				Scenario: types.ScenarioCommentDetection,
 			},
 		}
 		mockSensitiveChecker := mockSensit.NewMockSensitiveChecker(t)
 
-		mockSensitiveChecker.EXPECT().PassTextCheck(context.Background(), sensitive.Scenario(fields[0].Scenario), fields[0].Value()).
+		mockSensitiveChecker.EXPECT().PassTextCheck(context.Background(), fields[0].Scenario, fields[0].Value()).
 			Return(&sensitive.CheckResult{IsSensitive: false}, nil).Once()
 		// not pass
-		mockSensitiveChecker.EXPECT().PassTextCheck(context.Background(), sensitive.Scenario(fields[1].Scenario), fields[1].Value()).
+		mockSensitiveChecker.EXPECT().PassTextCheck(context.Background(), fields[1].Scenario, fields[1].Value()).
 			Return(&sensitive.CheckResult{IsSensitive: true}, nil).Once()
 
 		mockRequest := mocktypes.NewMockSensitiveRequestV2(t)
@@ -99,22 +99,22 @@ func TestRepoComponent_CheckRequestV2(t *testing.T) {
 				Value: func() string {
 					return "chat1"
 				},
-				Scenario: string(sensitive.ScenarioChatDetection),
+				Scenario: types.ScenarioChatDetection,
 			},
 			{
 				Name: "comment",
 				Value: func() string {
 					return "comment1"
 				},
-				Scenario: string(sensitive.ScenarioCommentDetection),
+				Scenario: types.ScenarioCommentDetection,
 			},
 		}
 		mockSensitiveChecker := mockSensit.NewMockSensitiveChecker(t)
 
-		mockSensitiveChecker.EXPECT().PassTextCheck(context.Background(), sensitive.Scenario(fields[0].Scenario), fields[0].Value()).
+		mockSensitiveChecker.EXPECT().PassTextCheck(context.Background(), fields[0].Scenario, fields[0].Value()).
 			Return(&sensitive.CheckResult{IsSensitive: false}, nil).Once()
 		// not pass
-		mockSensitiveChecker.EXPECT().PassTextCheck(context.Background(), sensitive.Scenario(fields[1].Scenario), fields[1].Value()).
+		mockSensitiveChecker.EXPECT().PassTextCheck(context.Background(), fields[1].Scenario, fields[1].Value()).
 			Return(&sensitive.CheckResult{IsSensitive: false}, nil).Once()
 
 		mockRequest := mocktypes.NewMockSensitiveRequestV2(t)
@@ -200,7 +200,7 @@ func TestRepoComponent_CheckRepoFiles(t *testing.T) {
 	cfg.SensitiveCheck.Enable = true
 	cfg.Moderation.EncodedSensitiveWords = `5pWP5oSf6K+NLHNlbnNpdGl2ZXdvcmQ=`
 	mockSensitiveChecker := mockSensit.NewMockSensitiveChecker(t)
-	mockSensitiveChecker.EXPECT().PassTextCheck(mock.Anything, sensitive.ScenarioCommentDetection, "test string").
+	mockSensitiveChecker.EXPECT().PassTextCheck(mock.Anything, types.ScenarioCommentDetection, "test string").
 		Return(&sensitive.CheckResult{IsSensitive: false}, nil).Once()
 	checker.InitWithContentChecker(cfg, mockSensitiveChecker)
 
