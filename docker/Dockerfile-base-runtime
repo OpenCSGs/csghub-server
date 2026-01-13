@@ -1,0 +1,13 @@
+FROM opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/debian:bookworm-slim
+USER root
+
+RUN sed -i 's|http://deb.debian.org/debian|http://mirrors.aliyun.com/debian|g' /etc/apt/sources.list.d/debian.sources && \
+    sed -i 's|http://deb.debian.org/debian-security|http://mirrors.aliyun.com/debian-security|g' /etc/apt/sources.list.d/debian.sources && \
+    apt-get update && apt-get install -y --no-install-recommends cron wget curl procps ca-certificates jq && \
+    rm -rf /var/lib/apt/lists/*
+
+ARG TARGETARCH
+RUN mkdir -p ~/.duckdb/extensions/v0.9.2/linux_${TARGETARCH} && \
+    wget -qO- https://extensions.duckdb.org/v0.9.2/linux_${TARGETARCH}/json.duckdb_extension.gz | gunzip > ~/.duckdb/extensions/v0.9.2/linux_${TARGETARCH}/json.duckdb_extension && \
+    wget -qO- https://extensions.duckdb.org/v0.9.2/linux_${TARGETARCH}/httpfs.duckdb_extension.gz | gunzip > ~/.duckdb/extensions/v0.9.2/linux_${TARGETARCH}/httpfs.duckdb_extension && \
+    chmod 755 ~/.duckdb/extensions/v0.9.2/linux_${TARGETARCH}/*
