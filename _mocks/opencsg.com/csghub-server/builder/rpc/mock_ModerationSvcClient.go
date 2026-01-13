@@ -25,7 +25,7 @@ func (_m *MockModerationSvcClient) EXPECT() *MockModerationSvcClient_Expecter {
 }
 
 // PassImageCheck provides a mock function with given fields: ctx, scenario, ossBucketName, ossObjectName
-func (_m *MockModerationSvcClient) PassImageCheck(ctx context.Context, scenario string, ossBucketName string, ossObjectName string) (*rpc.CheckResult, error) {
+func (_m *MockModerationSvcClient) PassImageCheck(ctx context.Context, scenario types.SensitiveScenario, ossBucketName string, ossObjectName string) (*rpc.CheckResult, error) {
 	ret := _m.Called(ctx, scenario, ossBucketName, ossObjectName)
 
 	if len(ret) == 0 {
@@ -34,10 +34,10 @@ func (_m *MockModerationSvcClient) PassImageCheck(ctx context.Context, scenario 
 
 	var r0 *rpc.CheckResult
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) (*rpc.CheckResult, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, types.SensitiveScenario, string, string) (*rpc.CheckResult, error)); ok {
 		return rf(ctx, scenario, ossBucketName, ossObjectName)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) *rpc.CheckResult); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, types.SensitiveScenario, string, string) *rpc.CheckResult); ok {
 		r0 = rf(ctx, scenario, ossBucketName, ossObjectName)
 	} else {
 		if ret.Get(0) != nil {
@@ -45,7 +45,7 @@ func (_m *MockModerationSvcClient) PassImageCheck(ctx context.Context, scenario 
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, string, string) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, types.SensitiveScenario, string, string) error); ok {
 		r1 = rf(ctx, scenario, ossBucketName, ossObjectName)
 	} else {
 		r1 = ret.Error(1)
@@ -61,16 +61,16 @@ type MockModerationSvcClient_PassImageCheck_Call struct {
 
 // PassImageCheck is a helper method to define mock.On call
 //   - ctx context.Context
-//   - scenario string
+//   - scenario types.SensitiveScenario
 //   - ossBucketName string
 //   - ossObjectName string
 func (_e *MockModerationSvcClient_Expecter) PassImageCheck(ctx interface{}, scenario interface{}, ossBucketName interface{}, ossObjectName interface{}) *MockModerationSvcClient_PassImageCheck_Call {
 	return &MockModerationSvcClient_PassImageCheck_Call{Call: _e.mock.On("PassImageCheck", ctx, scenario, ossBucketName, ossObjectName)}
 }
 
-func (_c *MockModerationSvcClient_PassImageCheck_Call) Run(run func(ctx context.Context, scenario string, ossBucketName string, ossObjectName string)) *MockModerationSvcClient_PassImageCheck_Call {
+func (_c *MockModerationSvcClient_PassImageCheck_Call) Run(run func(ctx context.Context, scenario types.SensitiveScenario, ossBucketName string, ossObjectName string)) *MockModerationSvcClient_PassImageCheck_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string))
+		run(args[0].(context.Context), args[1].(types.SensitiveScenario), args[2].(string), args[3].(string))
 	})
 	return _c
 }
@@ -80,13 +80,13 @@ func (_c *MockModerationSvcClient_PassImageCheck_Call) Return(_a0 *rpc.CheckResu
 	return _c
 }
 
-func (_c *MockModerationSvcClient_PassImageCheck_Call) RunAndReturn(run func(context.Context, string, string, string) (*rpc.CheckResult, error)) *MockModerationSvcClient_PassImageCheck_Call {
+func (_c *MockModerationSvcClient_PassImageCheck_Call) RunAndReturn(run func(context.Context, types.SensitiveScenario, string, string) (*rpc.CheckResult, error)) *MockModerationSvcClient_PassImageCheck_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // PassImageURLCheck provides a mock function with given fields: ctx, scenario, imageURL
-func (_m *MockModerationSvcClient) PassImageURLCheck(ctx context.Context, scenario string, imageURL string) (*rpc.CheckResult, error) {
+func (_m *MockModerationSvcClient) PassImageURLCheck(ctx context.Context, scenario types.SensitiveScenario, imageURL string) (*rpc.CheckResult, error) {
 	ret := _m.Called(ctx, scenario, imageURL)
 
 	if len(ret) == 0 {
@@ -95,10 +95,10 @@ func (_m *MockModerationSvcClient) PassImageURLCheck(ctx context.Context, scenar
 
 	var r0 *rpc.CheckResult
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) (*rpc.CheckResult, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, types.SensitiveScenario, string) (*rpc.CheckResult, error)); ok {
 		return rf(ctx, scenario, imageURL)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) *rpc.CheckResult); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, types.SensitiveScenario, string) *rpc.CheckResult); ok {
 		r0 = rf(ctx, scenario, imageURL)
 	} else {
 		if ret.Get(0) != nil {
@@ -106,7 +106,7 @@ func (_m *MockModerationSvcClient) PassImageURLCheck(ctx context.Context, scenar
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, types.SensitiveScenario, string) error); ok {
 		r1 = rf(ctx, scenario, imageURL)
 	} else {
 		r1 = ret.Error(1)
@@ -122,15 +122,15 @@ type MockModerationSvcClient_PassImageURLCheck_Call struct {
 
 // PassImageURLCheck is a helper method to define mock.On call
 //   - ctx context.Context
-//   - scenario string
+//   - scenario types.SensitiveScenario
 //   - imageURL string
 func (_e *MockModerationSvcClient_Expecter) PassImageURLCheck(ctx interface{}, scenario interface{}, imageURL interface{}) *MockModerationSvcClient_PassImageURLCheck_Call {
 	return &MockModerationSvcClient_PassImageURLCheck_Call{Call: _e.mock.On("PassImageURLCheck", ctx, scenario, imageURL)}
 }
 
-func (_c *MockModerationSvcClient_PassImageURLCheck_Call) Run(run func(ctx context.Context, scenario string, imageURL string)) *MockModerationSvcClient_PassImageURLCheck_Call {
+func (_c *MockModerationSvcClient_PassImageURLCheck_Call) Run(run func(ctx context.Context, scenario types.SensitiveScenario, imageURL string)) *MockModerationSvcClient_PassImageURLCheck_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string))
+		run(args[0].(context.Context), args[1].(types.SensitiveScenario), args[2].(string))
 	})
 	return _c
 }
@@ -140,7 +140,7 @@ func (_c *MockModerationSvcClient_PassImageURLCheck_Call) Return(_a0 *rpc.CheckR
 	return _c
 }
 
-func (_c *MockModerationSvcClient_PassImageURLCheck_Call) RunAndReturn(run func(context.Context, string, string) (*rpc.CheckResult, error)) *MockModerationSvcClient_PassImageURLCheck_Call {
+func (_c *MockModerationSvcClient_PassImageURLCheck_Call) RunAndReturn(run func(context.Context, types.SensitiveScenario, string) (*rpc.CheckResult, error)) *MockModerationSvcClient_PassImageURLCheck_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -266,7 +266,7 @@ func (_c *MockModerationSvcClient_PassLLMRespCheck_Call) RunAndReturn(run func(c
 }
 
 // PassTextCheck provides a mock function with given fields: ctx, scenario, text
-func (_m *MockModerationSvcClient) PassTextCheck(ctx context.Context, scenario string, text string) (*rpc.CheckResult, error) {
+func (_m *MockModerationSvcClient) PassTextCheck(ctx context.Context, scenario types.SensitiveScenario, text string) (*rpc.CheckResult, error) {
 	ret := _m.Called(ctx, scenario, text)
 
 	if len(ret) == 0 {
@@ -275,10 +275,10 @@ func (_m *MockModerationSvcClient) PassTextCheck(ctx context.Context, scenario s
 
 	var r0 *rpc.CheckResult
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) (*rpc.CheckResult, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, types.SensitiveScenario, string) (*rpc.CheckResult, error)); ok {
 		return rf(ctx, scenario, text)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) *rpc.CheckResult); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, types.SensitiveScenario, string) *rpc.CheckResult); ok {
 		r0 = rf(ctx, scenario, text)
 	} else {
 		if ret.Get(0) != nil {
@@ -286,7 +286,7 @@ func (_m *MockModerationSvcClient) PassTextCheck(ctx context.Context, scenario s
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, types.SensitiveScenario, string) error); ok {
 		r1 = rf(ctx, scenario, text)
 	} else {
 		r1 = ret.Error(1)
@@ -302,15 +302,15 @@ type MockModerationSvcClient_PassTextCheck_Call struct {
 
 // PassTextCheck is a helper method to define mock.On call
 //   - ctx context.Context
-//   - scenario string
+//   - scenario types.SensitiveScenario
 //   - text string
 func (_e *MockModerationSvcClient_Expecter) PassTextCheck(ctx interface{}, scenario interface{}, text interface{}) *MockModerationSvcClient_PassTextCheck_Call {
 	return &MockModerationSvcClient_PassTextCheck_Call{Call: _e.mock.On("PassTextCheck", ctx, scenario, text)}
 }
 
-func (_c *MockModerationSvcClient_PassTextCheck_Call) Run(run func(ctx context.Context, scenario string, text string)) *MockModerationSvcClient_PassTextCheck_Call {
+func (_c *MockModerationSvcClient_PassTextCheck_Call) Run(run func(ctx context.Context, scenario types.SensitiveScenario, text string)) *MockModerationSvcClient_PassTextCheck_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string))
+		run(args[0].(context.Context), args[1].(types.SensitiveScenario), args[2].(string))
 	})
 	return _c
 }
@@ -320,7 +320,7 @@ func (_c *MockModerationSvcClient_PassTextCheck_Call) Return(_a0 *rpc.CheckResul
 	return _c
 }
 
-func (_c *MockModerationSvcClient_PassTextCheck_Call) RunAndReturn(run func(context.Context, string, string) (*rpc.CheckResult, error)) *MockModerationSvcClient_PassTextCheck_Call {
+func (_c *MockModerationSvcClient_PassTextCheck_Call) RunAndReturn(run func(context.Context, types.SensitiveScenario, string) (*rpc.CheckResult, error)) *MockModerationSvcClient_PassTextCheck_Call {
 	_c.Call.Return(run)
 	return _c
 }
