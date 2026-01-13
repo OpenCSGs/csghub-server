@@ -221,3 +221,101 @@ func TestRuntimeFrameworksStore_RemoveRuntimeFrameworkAndArch(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, 0, len(archs))
 }
+
+func TestRuntimeFrameworksStore_FindByFrameNameAndDriverVersion(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	rfStore := database.NewRuntimeFrameworksStoreWithDB(db)
+
+	// Add test data with different frame names and driver versions
+	testCases := []database.RuntimeFramework{
+		{
+			ID:            1,
+			FrameName:     "vllm",
+			FrameImage:    "vllm:v1.0",
+			Type:          1,
+			Enabled:       1,
+			DriverVersion: "12.1",
+			ComputeType:   "gpu",
+			FrameVersion:  "1.0.4",
+		},
+		{
+			ID:            2,
+			FrameName:     "vllm",
+			FrameImage:    "vllm:v1.1",
+			Type:          1,
+			Enabled:       1,
+			DriverVersion: "11.8",
+			ComputeType:   "gpu",
+			FrameVersion:  "1.0.4",
+		},
+		{
+			ID:            3,
+			FrameName:     "trtllm",
+			FrameImage:    "trtllm:v1.0",
+			Type:          1,
+			Enabled:       1,
+			DriverVersion: "12.1",
+			ComputeType:   "gpu",
+			FrameVersion:  "1.0.4",
+		},
+		{
+			ID:            4,
+			FrameName:     "vllm",
+			FrameImage:    "vllm:v1.2",
+			Type:          1,
+			Enabled:       1,
+			DriverVersion: "12.1",
+			ComputeType:   "gpu",
+			FrameVersion:  "1.0.4",
+		},
+	}
+
+	for _, tc := range testCases {
+		_, err := rfStore.Add(ctx, tc)
+		require.Nil(t, err)
+	}
+
+	// Test 1: Find by frame name "vllm" and driver version "12.1"
+	result, err := rfStore.FindByFrameNameAndDriverVersion(ctx, "vllm", "1.0.4", "12.1")
+	require.Nil(t, err)
+	require.Equal(t, 2, len(result)) // Should find 2 records (IDs 1 and 4)
+
+	// Verify the found records
+	frameNames := make(map[string]int)
+	driverVersions := make(map[string]int)
+	for _, rf := range result {
+		frameNames[rf.FrameName]++
+		driverVersions[rf.DriverVersion]++
+		require.Equal(t, "vllm", rf.FrameName)
+		require.Equal(t, "12.1", rf.DriverVersion)
+	}
+	require.Equal(t, 2, frameNames["vllm"])
+	require.Equal(t, 2, driverVersions["12.1"])
+
+	// Test 2: Find by frame name "vllm" and driver version "11.8"
+	result, err = rfStore.FindByFrameNameAndDriverVersion(ctx, "vllm", "1.0.4", "11.8")
+	require.Nil(t, err)
+	require.Equal(t, 1, len(result)) // Should find 1 record (ID 2)
+	require.Equal(t, "vllm", result[0].FrameName)
+	require.Equal(t, "11.8", result[0].DriverVersion)
+
+	// Test 3: Find by frame name "trtllm" and driver version "12.1"
+	result, err = rfStore.FindByFrameNameAndDriverVersion(ctx, "trtllm", "1.0.4", "12.1")
+	require.Nil(t, err)
+	require.Equal(t, 1, len(result)) // Should find 1 record (ID 3)
+	require.Equal(t, "trtllm", result[0].FrameName)
+	require.Equal(t, "12.1", result[0].DriverVersion)
+
+	// Test 4: Find by non-existent frame name and driver version combination
+	result, err = rfStore.FindByFrameNameAndDriverVersion(ctx, "non-existent-frame", "1.0.4", "12.1")
+	require.Nil(t, err)
+	require.Equal(t, 0, len(result)) // Should find 0 records
+
+	// Test 5: Find by non-existent driver version
+	result, err = rfStore.FindByFrameNameAndDriverVersion(ctx, "vllm", "1.0.4", "non-existent-version")
+	require.Nil(t, err)
+	require.Equal(t, 0, len(result)) // Should find 0 records
+}
