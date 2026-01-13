@@ -1,5 +1,14 @@
 {
     "error.AGENT-ERR-0": {
         "other": "Instance quota exceeded, agent type: {{.agent_type}}, instance count: {{.instance_count}}, quota: {{.quota}}"
+    },
+    "error.AGENT-ERR-1": {
+        "other": "You have a instance with the same name: {{.instance_name}}"
+    },
+    "error.AGENT-ERR-2": {
+        "other": "You have a knowledge base with the same name: {{.knowledge_base_name}}"
+    },
+    "error.AGENT-ERR-3": {
+        "other": "You have an MCP server with the same name: {{.server_name}}"
     }
 }

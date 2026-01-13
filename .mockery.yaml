@@ -297,3 +297,7 @@ packages:
   opencsg.com/csghub-server/logcollector/component:
     config:
       all: true
+  opencsg.com/csghub-server/builder/mcp:
+    config:
+    interfaces:
+      Client:

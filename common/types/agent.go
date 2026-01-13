@@ -448,6 +448,11 @@ type AgentMCPServerDetail struct {
 	UpdatedAt   time.Time      `json:"updated_at"`
 }
 
+type InspectMCPServerResponse struct {
+	Status       string         `json:"status"`                 // Status: 'connected' or 'error'
+	Capabilities map[string]any `json:"capabilities,omitempty"` // Fetched capabilities (tools, resources, prompts, resource_templates)
+}
+
 type AgentMCPServerIDPrefix string
 
 const (
