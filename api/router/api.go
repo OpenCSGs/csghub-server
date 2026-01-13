@@ -186,7 +186,10 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	r.Use(middleware.LocalizedErrorMiddleware())
 	r.Use(middleware.Authenticator(config))
 	useAdvancedMiddleware(r, config)
-	createCustomValidator()
+	err = createCustomValidator()
+	if err != nil {
+		return nil, fmt.Errorf("error create validator, error: %w", err)
+	}
 	apiGroup := r.Group("/api/v1")
 
 	versionHandler := handler.NewVersionHandler()
@@ -1334,6 +1337,13 @@ func createWebHookRoutes(apiGroup *gin.RouterGroup, middlewareCollection middlew
 	return nil
 }
 
-func createCustomValidator() {
-	_, _ = binding.Validator.Engine().(*validator.Validate)
+func createCustomValidator() error {
+	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
+		if err := v.RegisterValidation("resource_type", types.ResourceTypeValidator); err != nil {
+			return fmt.Errorf("fail to register custom validation functions:%w", err)
+		}
+		return nil // Return nil if no error occurred during registration of custom validation functions
+	} else {
+		return fmt.Errorf("fail to register custom validation functions")
+	}
 }
