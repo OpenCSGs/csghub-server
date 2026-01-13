@@ -1,4 +1,4 @@
-//go:build !saas
+//go:build !saas && !ee
 
 package component
 
@@ -22,7 +22,6 @@ import (
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
-	"opencsg.com/csghub-server/mirror/cache"
 )
 
 type extendRepoImpl struct{}
@@ -93,10 +92,6 @@ func NewRepoComponent(config *config.Config) (RepoComponent, error) {
 	c.userResourcesStore = database.NewUserResourcesStore()
 	c.recomStore = database.NewRecomStore()
 	c.config = config
-	c.syncCache, err = cache.NewCache(context.Background(), config)
-	if err != nil {
-		return nil, fmt.Errorf("initializing redis: %w", err)
-	}
 	syncClientSettingStore := database.NewSyncClientSettingStore()
 	setting, err := syncClientSettingStore.First(context.Background())
 	if err != nil {
@@ -138,16 +133,6 @@ func (c *repoComponentImpl) RemoteDiff(ctx context.Context, req types.GetDiffBet
 		Name:         req.Name,
 		LeftCommitID: req.LeftCommitID,
 	})
-}
-
-func (c *repoComponentImpl) IsXnetEnabled(ctx context.Context, repoType types.RepositoryType, namespace, name, username string) (*types.XetEnabled, error) {
-	return nil, nil
-}
-
-func (c *repoComponentImpl) MirrorProgress(ctx context.Context, repoType types.RepositoryType, namespace, name, currentUser string) (types.LFSSyncProgressResp, error) {
-	var progressResp types.LFSSyncProgressResp
-
-	return progressResp, nil
 }
 
 func (c *repoComponentImpl) MirrorFromSaas(ctx context.Context, namespace, name, currentUser string, repoType types.RepositoryType) error {
