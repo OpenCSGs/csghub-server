@@ -33,6 +33,7 @@ type communityRepoInterface interface {
 
 func NewRepoComponent(config *config.Config) (RepoComponent, error) {
 	c := &repoComponentImpl{}
+	c.extendRepoImpl = extendRepoImpl{}
 	c.namespaceStore = database.NewNamespaceStore()
 	c.userStore = database.NewUserStore()
 	c.orgStore = database.NewOrgStore()
