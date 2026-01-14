@@ -123,3 +123,16 @@ type XnetReq struct {
 	ObjectKey string `json:"object_key"`
 	Size      int64  `json:"size"`
 }
+
+type XnetMigrationTaskProgress struct {
+	LfsProgress     []LfsProgress           `json:"lfs_progress"`
+	Status          XnetMigrationTaskStatus `json:"status"`
+	LastMessage     string                  `json:"last_message"`
+	TotalObjects    int                     `json:"total_objects"`
+	MigratedObjects int                     `json:"migrated_objects"`
+}
+
+type LfsProgress struct {
+	Oid      string `json:"oid"`
+	Progress int    `json:"progress"`
+}
