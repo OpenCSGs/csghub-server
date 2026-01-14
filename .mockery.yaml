@@ -227,6 +227,7 @@ packages:
     config:
     interfaces:
       RedisClient:
+      LfsCache:
   opencsg.com/csghub-server/builder/captcha:
     config:
     interfaces:

@@ -25,6 +25,12 @@ import (
 	"opencsg.com/csghub-server/mirror/cache"
 )
 
+type extendRepoImpl struct{}
+type advancedRepoInterface interface{}
+type communityRepoInterface interface {
+	MirrorFromSaas(ctx context.Context, namespace, name, currentUser string, repoType types.RepositoryType) error
+}
+
 func NewRepoComponent(config *config.Config) (RepoComponent, error) {
 	c := &repoComponentImpl{}
 	c.namespaceStore = database.NewNamespaceStore()

@@ -98,6 +98,7 @@ type repoComponentImpl struct {
 	notificationSvcClient  rpc.NotificationSvcClient
 	mirrorSvcClient        rpc.MirrorSvcClient
 	xnetClient             rpc.XnetSvcClient
+	extendRepoImpl
 }
 
 type RepoComponent interface {
@@ -192,6 +193,8 @@ type RepoComponent interface {
 	CheckDeployPermissionForUser(ctx context.Context, deployReq types.DeployActReq) (*database.User, *database.Deploy, error)
 	GetRepos(ctx context.Context, search, currentUser string, repoType types.RepositoryType) ([]string, error)
 	IsXnetEnabled(ctx context.Context, repoType types.RepositoryType, namespace, name, username string) (*types.XetEnabled, error)
+	advancedRepoInterface
+	communityRepoInterface
 }
 
 func NewRepoComponentImpl(config *config.Config) (*repoComponentImpl, error) {

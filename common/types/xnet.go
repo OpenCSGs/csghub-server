@@ -30,3 +30,12 @@ type XnetDownloadURLResp struct {
 type XetFileExistsResp struct {
 	Exists bool `json:"exists"`
 }
+
+type XnetMigrationTaskStatus string
+
+const (
+	XnetMigrationTaskStatusPending   XnetMigrationTaskStatus = "pending"
+	XnetMigrationTaskStatusRunning   XnetMigrationTaskStatus = "running"
+	XnetMigrationTaskStatusCompleted XnetMigrationTaskStatus = "completed"
+	XnetMigrationTaskStatusFailed    XnetMigrationTaskStatus = "failed"
+)
