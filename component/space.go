@@ -26,6 +26,11 @@ import (
 	"opencsg.com/csghub-server/common/utils/common"
 )
 
+const (
+	// compatible version 1.0.3
+	EngineVersion103 = "1.0.3"
+)
+
 const spaceGitattributesContent = modelGitattributesContent
 
 var (
@@ -131,7 +136,10 @@ func (c *spaceComponentImpl) Create(ctx context.Context, req types.CreateSpaceRe
 		slog.Error("failed to create new space in db", slog.Any("req", req), slog.String("error", err.Error()))
 		return nil, fmt.Errorf("failed to create new space in db, error: %w", err)
 	}
-	_ = c.git.CommitFiles(ctx, *commitFilesReq)
+	if commitFilesReq != nil {
+		_ = c.git.CommitFiles(ctx, *commitFilesReq)
+	}
+
 	dbRepo.Path = repoPath
 
 	err = c.createSpaceDefaultFiles(ctx, dbRepo, req, templatePath)
@@ -884,6 +892,30 @@ func (c *spaceComponentImpl) Deploy(ctx context.Context, namespace, name, curren
 		containerPort = types.MCPSERVER.Port
 	}
 
+	var imageID string
+	if space.Sdk != types.DOCKER.Name {
+		var frame *database.RuntimeFramework
+		var err error
+		// check if using old base  space runtime image 1.0.3 for old spaces
+		if (space.Sdk == types.GRADIO.Name && space.SdkVersion != types.GRADIO.Version) ||
+			(space.Sdk == types.STREAMLIT.Name && space.SdkVersion != types.STREAMLIT.Version) {
+			slog.InfoContext(ctx, "Using old base image 1.0.3 for old spaces")
+			frame, err = c.rfs.FindByFrameNameAndDriverVersion(ctx, "space", EngineVersion103, space.DriverVersion)
+			if err != nil {
+				return -1, fmt.Errorf("cannot find available (%s) runtime framework, %w", EngineVersion103, err)
+			}
+		} else {
+			// use latest base space runtime image
+			frame, err = c.rfs.FindSpaceLatestVersion(ctx, "space", space.DriverVersion)
+			if err != nil {
+				return -1, fmt.Errorf("cannot find available latest space runtime framework, %w", err)
+			}
+		}
+
+		if frame != nil {
+			imageID = frame.FrameImage
+		}
+	}
 	// create deploy for space
 	dr := types.DeployRepo{
 		SpaceID:       space.ID,
@@ -900,7 +932,7 @@ func (c *spaceComponentImpl) Deploy(ctx context.Context, namespace, name, curren
 		ModelID:       0,
 		UserID:        user.ID,
 		Annotation:    string(annoStr),
-		ImageID:       "",
+		ImageID:       imageID,
 		Type:          types.SpaceType,
 		UserUUID:      user.UUID,
 		SKU:           space.SKU,
