@@ -191,7 +191,6 @@ type RepoComponent interface {
 	CheckDeployPermissionForUser(ctx context.Context, deployReq types.DeployActReq) (*database.User, *database.Deploy, error)
 	DeletePendingDeletion(ctx context.Context) error
 	GetRepos(ctx context.Context, search, currentUser string, repoType types.RepositoryType) ([]string, error)
-	IsXnetEnabled(ctx context.Context, repoType types.RepositoryType, namespace, name, username string) (*types.XetEnabled, error)
 	advancedRepoInterface
 	communityRepoInterface
 }
