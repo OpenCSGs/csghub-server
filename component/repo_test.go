@@ -844,6 +844,9 @@ func TestRepoComponent_SDKDownloadFile(t *testing.T) {
 				mockedRepo, nil,
 			)
 
+			// Add expectation for UpdateRepoFileDownloads
+			repo.mocks.stores.RepoMock().EXPECT().UpdateRepoFileDownloads(ctx, mockedRepo, mock.Anything, int64(1)).Return(nil)
+
 			if lfs {
 
 				repo.mocks.gitServer.EXPECT().GetRepoFileContents(ctx, gitserver.GetRepoInfoByPathReq{
