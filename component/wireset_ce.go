@@ -3,6 +3,7 @@
 package component
 
 import (
+	"github.com/google/wire"
 	mock_accounting "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/accounting"
 	mock_dataviewer_client "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/dataviewer"
 	mock_deploy "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/deploy"
@@ -32,7 +33,6 @@ type Mocks struct {
 	components       *mockedComponents
 	gitServer        *mock_git.MockGitServer
 	userSvcClient    *mock_rpc.MockUserSvcClient
-	xnetClient       *mock_rpc.MockXnetSvcClient
 	s3Client         *mock_s3.MockClient
 	mirrorServer     *mock_mirror.MockMirrorServer
 	deployer         *mock_deploy.MockDeployer
@@ -47,6 +47,18 @@ type Mocks struct {
 	s3Core           *mock_s3.MockCore
 	checker          *mock_checker.MockGitCallbackChecker
 }
+
+var AllMockSet = wire.NewSet(
+	wire.Struct(new(mockedComponents), "*"),
+	wire.Struct(new(Mocks), "*"),
+)
+
+var MockSuperSet = wire.NewSet(
+	MockedComponentSet, AllMockSet, MockedStoreSet, MockedGitServerSet, MockedUserSvcSet,
+	MockedXnetSvcClientSet, MockedS3Set, MockedS3CoreSet, MockedMultiSyncClientSet, MockedDeployerSet, MockedCacheSet, ProvideTestConfig, MockedMirrorServerSet,
+	MockedAccountingClientSet, MockedParquetReaderSet, MockedCheckerSet,
+	MockedModerationSvcClientSet, MockedRsaReader, MockedImporterSet, MockedDataviewerClientSet,
+)
 
 func NewTestSpaceComponent(
 	stores *tests.MockStores,
