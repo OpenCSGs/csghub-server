@@ -1002,52 +1002,6 @@ func (h *RepoHandler) UploadFile(ctx *gin.Context) {
 	httpbase.OK(ctx, nil)
 }
 
-func (h *RepoHandler) SDKListFiles(ctx *gin.Context) {
-	currentUser := httpbase.GetCurrentUser(ctx)
-	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
-	if err != nil {
-		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
-		return
-	}
-	ref := ctx.Param("ref")
-	mappedBranch := ctx.Param("branch_mapped")
-	if mappedBranch != "" {
-		ref = mappedBranch
-	}
-	repoType := common.RepoTypeFromContext(ctx)
-	expand := ctx.Query("expand")
-	if expand == "xetEnabled" {
-		resp, err := h.c.IsXnetEnabled(ctx.Request.Context(), repoType, namespace, name, currentUser)
-		if err != nil {
-			slog.ErrorContext(ctx.Request.Context(), "failed to check if xnetEnabled", slog.Any("error", err))
-			httpbase.ServerError(ctx, err)
-			return
-		}
-		ctx.JSON(http.StatusOK, resp)
-		return
-	}
-
-	files, err := h.c.SDKListFiles(ctx.Request.Context(), repoType, namespace, name, ref, currentUser)
-	if err != nil {
-		if errors.Is(err, errorx.ErrUnauthorized) {
-			slog.ErrorContext(ctx.Request.Context(), "permission denied when accessing repo", slog.String("repo_type", string(repoType)), slog.Any("path", fmt.Sprintf("%s/%s", namespace, name)))
-			httpbase.UnauthorizedError(ctx, err)
-			return
-		}
-		if errors.Is(err, errorx.ErrNotFound) {
-			slog.ErrorContext(ctx.Request.Context(), "repo not found", slog.String("repo_type", string(repoType)), slog.Any("path", fmt.Sprintf("%s/%s", namespace, name)))
-			httpbase.NotFoundError(ctx, err)
-			return
-		}
-		slog.ErrorContext(ctx.Request.Context(), "Error listing repo files", "error", err)
-		httpbase.ServerError(ctx, err)
-		return
-	}
-
-	ctx.JSON(http.StatusOK, files)
-}
-
 func (h *RepoHandler) SDKDownload(ctx *gin.Context) {
 	h.handleDownload(ctx, false)
 }

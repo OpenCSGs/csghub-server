@@ -296,48 +296,6 @@ func (h *ModelHandler) Show(ctx *gin.Context) {
 	httpbase.OK(ctx, detail)
 }
 
-func (h *ModelHandler) SDKModelInfo(ctx *gin.Context) {
-	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
-	if err != nil {
-		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
-		httpbase.BadRequestWithExt(ctx, err)
-		return
-	}
-	ref := ctx.Param("ref")
-	blobs, err := strconv.ParseBool(ctx.Query("blobs"))
-	if err != nil {
-		blobs = false
-	}
-	mappedBranch := ctx.Param("branch_mapped")
-	if mappedBranch != "" {
-		ref = mappedBranch
-	}
-	currentUser := httpbase.GetCurrentUser(ctx)
-	expand := ctx.Query("expand")
-	if expand == "xetEnabled" {
-		resp, err := h.repo.IsXnetEnabled(ctx.Request.Context(), types.ModelRepo, namespace, name, currentUser)
-		if err != nil {
-			slog.ErrorContext(ctx.Request.Context(), "failed to check if xnetEnabled", slog.Any("error", err))
-			httpbase.ServerError(ctx, err)
-			return
-		}
-		ctx.JSON(http.StatusOK, resp)
-		return
-	}
-	modelInfo, err := h.model.SDKModelInfo(ctx.Request.Context(), namespace, name, ref, currentUser, blobs)
-	if err != nil {
-		if errors.Is(err, errorx.ErrForbidden) {
-			httpbase.ForbiddenError(ctx, err)
-			return
-		}
-		slog.ErrorContext(ctx.Request.Context(), "Failed to get sdk model info", slog.String("namespace", namespace), slog.String("name", name), slog.Any("error", err))
-		httpbase.ServerError(ctx, err)
-		return
-	}
-
-	ctx.JSON(http.StatusOK, modelInfo)
-}
-
 // ModelRelations      godoc
 // @Security     ApiKey
 // @Summary      Get model related assets

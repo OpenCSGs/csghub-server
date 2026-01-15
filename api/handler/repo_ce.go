@@ -3,12 +3,15 @@
 package handler
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
 )
@@ -46,4 +49,39 @@ func (h *RepoHandler) MirrorFromSaas(ctx *gin.Context) {
 		return
 	}
 	httpbase.OK(ctx, nil)
+}
+
+func (h *RepoHandler) SDKListFiles(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	ref := ctx.Param("ref")
+	mappedBranch := ctx.Param("branch_mapped")
+	if mappedBranch != "" {
+		ref = mappedBranch
+	}
+	repoType := common.RepoTypeFromContext(ctx)
+
+	files, err := h.c.SDKListFiles(ctx.Request.Context(), repoType, namespace, name, ref, currentUser)
+	if err != nil {
+		if errors.Is(err, errorx.ErrUnauthorized) {
+			slog.ErrorContext(ctx.Request.Context(), "permission denied when accessing repo", slog.String("repo_type", string(repoType)), slog.Any("path", fmt.Sprintf("%s/%s", namespace, name)))
+			httpbase.UnauthorizedError(ctx, err)
+			return
+		}
+		if errors.Is(err, errorx.ErrNotFound) {
+			slog.ErrorContext(ctx.Request.Context(), "repo not found", slog.String("repo_type", string(repoType)), slog.Any("path", fmt.Sprintf("%s/%s", namespace, name)))
+			httpbase.NotFoundError(ctx, err)
+			return
+		}
+		slog.ErrorContext(ctx.Request.Context(), "Error listing repo files", "error", err)
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	ctx.JSON(http.StatusOK, files)
 }
