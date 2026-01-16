@@ -313,6 +313,60 @@ func TestMCPServerComponent_Index(t *testing.T) {
 	require.Equal(t, total, 1)
 }
 
+func TestMCPServerComponent_Index_HalfCreatedRepos(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestMCPServerComponent(ctx, t)
+
+	user := database.User{
+		Username: "user",
+		Email:    "foo@bar.com",
+	}
+
+	// Create two repositories, one with complete data and one half-created
+	repo1 := &database.Repository{
+		ID:       321,
+		User:     user,
+		Tags:     []database.Tag{{Name: "t1"}},
+		Name:     "complete-repo",
+		License:  "MIT",
+		Nickname: "complete-repo",
+		Path:     "ns/complete-repo",
+	}
+
+	repo2 := &database.Repository{
+		ID:       322,
+		User:     user,
+		Tags:     []database.Tag{{Name: "t2"}},
+		Name:     "half-created",
+		License:  "MIT",
+		Nickname: "half-created",
+		Path:     "ns/half-created",
+	}
+
+	filter := &types.RepoFilter{
+		Username: "user",
+	}
+
+	// PublicToUser returns both repositories
+	mc.mocks.components.repo.EXPECT().PublicToUser(ctx, types.MCPServerRepo, "user", filter, 10, 1).
+		Return([]*database.Repository{repo1, repo2}, 2, nil)
+
+	// ByRepoIDs returns only 1 MCP server (no MCP server for repo2)
+	mc.mocks.stores.MCPServerMock().EXPECT().ByRepoIDs(ctx, []int64{321, 322}).Return([]database.MCPServer{
+		{
+			RepositoryID: 321,
+			Repository:   repo1,
+		},
+	}, nil)
+
+	res, total, err := mc.Index(ctx, filter, 10, 1, false)
+	require.Nil(t, err)
+	require.NotNil(t, res)
+	require.Equal(t, total, 2)   // Total should match PublicToUser's return value
+	require.Len(t, res, 1)       // But only 1 MCP server should be returned
+}
+
+
 func TestMCPServerComponent_Properties(t *testing.T) {
 	ctx := context.TODO()
 	mc := initializeTestMCPServerComponent(ctx, t)
