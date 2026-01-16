@@ -1,5 +1,17 @@
 {
     "error.AGENT-ERR-0": {
         "other": "實例配額超出，智能體類型: {{.agent_type}}, 實例數量: {{.instance_count}}，配額: {{.quota}}"
+    },
+    "error.AGENT-ERR-1": {
+        "other": "您已存在相同名稱的實例: {{.instance_name}}"
+    },
+    "error.AGENT-ERR-2": {
+        "other": "您已存在相同名稱的知識庫: {{.knowledge_base_name}}"
+    },
+    "error.AGENT-ERR-3": {
+        "other": "您已存在相同名稱的MCP服務器: {{.server_name}}"
+    },
+    "error.AGENT-ERR-4": {
+        "other": "置頂數量超出限制。每種實體類型最多可置頂 5 個項目。"
     }
 }
