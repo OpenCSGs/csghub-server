@@ -247,6 +247,67 @@ func (_c *MockRuntimeFrameworksStore_FindByFrameName_Call) RunAndReturn(run func
 	return _c
 }
 
+// FindByFrameNameAndDriverVersion provides a mock function with given fields: ctx, name, version, driverVersion
+func (_m *MockRuntimeFrameworksStore) FindByFrameNameAndDriverVersion(ctx context.Context, name string, version string, driverVersion string) (*database.RuntimeFramework, error) {
+	ret := _m.Called(ctx, name, version, driverVersion)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FindByFrameNameAndDriverVersion")
+	}
+
+	var r0 *database.RuntimeFramework
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) (*database.RuntimeFramework, error)); ok {
+		return rf(ctx, name, version, driverVersion)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) *database.RuntimeFramework); ok {
+		r0 = rf(ctx, name, version, driverVersion)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.RuntimeFramework)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string) error); ok {
+		r1 = rf(ctx, name, version, driverVersion)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockRuntimeFrameworksStore_FindByFrameNameAndDriverVersion_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindByFrameNameAndDriverVersion'
+type MockRuntimeFrameworksStore_FindByFrameNameAndDriverVersion_Call struct {
+	*mock.Call
+}
+
+// FindByFrameNameAndDriverVersion is a helper method to define mock.On call
+//   - ctx context.Context
+//   - name string
+//   - version string
+//   - driverVersion string
+func (_e *MockRuntimeFrameworksStore_Expecter) FindByFrameNameAndDriverVersion(ctx interface{}, name interface{}, version interface{}, driverVersion interface{}) *MockRuntimeFrameworksStore_FindByFrameNameAndDriverVersion_Call {
+	return &MockRuntimeFrameworksStore_FindByFrameNameAndDriverVersion_Call{Call: _e.mock.On("FindByFrameNameAndDriverVersion", ctx, name, version, driverVersion)}
+}
+
+func (_c *MockRuntimeFrameworksStore_FindByFrameNameAndDriverVersion_Call) Run(run func(ctx context.Context, name string, version string, driverVersion string)) *MockRuntimeFrameworksStore_FindByFrameNameAndDriverVersion_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string))
+	})
+	return _c
+}
+
+func (_c *MockRuntimeFrameworksStore_FindByFrameNameAndDriverVersion_Call) Return(_a0 *database.RuntimeFramework, _a1 error) *MockRuntimeFrameworksStore_FindByFrameNameAndDriverVersion_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockRuntimeFrameworksStore_FindByFrameNameAndDriverVersion_Call) RunAndReturn(run func(context.Context, string, string, string) (*database.RuntimeFramework, error)) *MockRuntimeFrameworksStore_FindByFrameNameAndDriverVersion_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // FindByID provides a mock function with given fields: ctx, id
 func (_m *MockRuntimeFrameworksStore) FindByID(ctx context.Context, id int64) (*database.RuntimeFramework, error) {
 	ret := _m.Called(ctx, id)
@@ -479,6 +540,66 @@ func (_c *MockRuntimeFrameworksStore_FindEnabledByName_Call) Return(_a0 *databas
 }
 
 func (_c *MockRuntimeFrameworksStore_FindEnabledByName_Call) RunAndReturn(run func(context.Context, string) (*database.RuntimeFramework, error)) *MockRuntimeFrameworksStore_FindEnabledByName_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// FindSpaceLatestVersion provides a mock function with given fields: ctx, name, driverVersion
+func (_m *MockRuntimeFrameworksStore) FindSpaceLatestVersion(ctx context.Context, name string, driverVersion string) (*database.RuntimeFramework, error) {
+	ret := _m.Called(ctx, name, driverVersion)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FindSpaceLatestVersion")
+	}
+
+	var r0 *database.RuntimeFramework
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) (*database.RuntimeFramework, error)); ok {
+		return rf(ctx, name, driverVersion)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) *database.RuntimeFramework); ok {
+		r0 = rf(ctx, name, driverVersion)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.RuntimeFramework)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+		r1 = rf(ctx, name, driverVersion)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockRuntimeFrameworksStore_FindSpaceLatestVersion_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindSpaceLatestVersion'
+type MockRuntimeFrameworksStore_FindSpaceLatestVersion_Call struct {
+	*mock.Call
+}
+
+// FindSpaceLatestVersion is a helper method to define mock.On call
+//   - ctx context.Context
+//   - name string
+//   - driverVersion string
+func (_e *MockRuntimeFrameworksStore_Expecter) FindSpaceLatestVersion(ctx interface{}, name interface{}, driverVersion interface{}) *MockRuntimeFrameworksStore_FindSpaceLatestVersion_Call {
+	return &MockRuntimeFrameworksStore_FindSpaceLatestVersion_Call{Call: _e.mock.On("FindSpaceLatestVersion", ctx, name, driverVersion)}
+}
+
+func (_c *MockRuntimeFrameworksStore_FindSpaceLatestVersion_Call) Run(run func(ctx context.Context, name string, driverVersion string)) *MockRuntimeFrameworksStore_FindSpaceLatestVersion_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(string))
+	})
+	return _c
+}
+
+func (_c *MockRuntimeFrameworksStore_FindSpaceLatestVersion_Call) Return(_a0 *database.RuntimeFramework, _a1 error) *MockRuntimeFrameworksStore_FindSpaceLatestVersion_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockRuntimeFrameworksStore_FindSpaceLatestVersion_Call) RunAndReturn(run func(context.Context, string, string) (*database.RuntimeFramework, error)) *MockRuntimeFrameworksStore_FindSpaceLatestVersion_Call {
 	_c.Call.Return(run)
 	return _c
 }
