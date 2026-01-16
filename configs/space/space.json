@@ -1,0 +1,40 @@
+{
+  "engine_name": "space",
+  "enabled": 1,
+  "engine_images": [
+    {
+      "compute_type": "cpu",
+      "image": "space-runtime:python3.10-1.0.6",
+      "engine_version": "1.0.6"
+    },
+    {
+      "compute_type": "gpu",
+      "image": "space-runtime:python3.10-cuda11.8.0-1.0.6",
+      "driver_version": "11.8.0",
+      "engine_version": "1.0.6"
+    },
+    {
+      "compute_type": "gpu",
+      "image": "space-runtime:python3.10-cuda12.1.0-1.0.6",
+      "driver_version": "12.1.0",
+      "engine_version": "1.0.6"
+    },
+    {
+      "compute_type": "cpu",
+      "image": "space-runtime:python3.10-1.0.3",
+      "engine_version": "1.0.3"
+    },
+    {
+      "compute_type": "gpu",
+      "image": "space-runtime:python3.10-cuda11.8.0-1.0.3",
+      "driver_version": "11.8.0",
+      "engine_version": "1.0.3"
+    },
+    {
+      "compute_type": "gpu",
+      "image": "space-runtime:python3.10-cuda12.1.0-1.0.3",
+      "driver_version": "12.1.0",
+      "engine_version": "1.0.3"
+    }
+  ]
+}
