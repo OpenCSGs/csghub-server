@@ -612,7 +612,7 @@ func TestOpenAIComponent_ExtGetAvailableModels_SinglePage(t *testing.T) {
 		{
 			BaseModel: types.BaseModel{
 				ID:      "test-model-1",
-				OwnedBy: "OpenCSG",
+				OwnedBy: "OpenAI",
 				Object:  "model",
 			},
 			Endpoint: "http://test-endpoint-1.com",
