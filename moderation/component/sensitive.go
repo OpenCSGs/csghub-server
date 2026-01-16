@@ -5,15 +5,15 @@ import (
 
 	"opencsg.com/csghub-server/builder/sensitive"
 	"opencsg.com/csghub-server/common/config"
-	"opencsg.com/csghub-server/moderation/checker"
+	"opencsg.com/csghub-server/common/types"
 )
 
 type SensitiveComponent interface {
-	PassTextCheck(ctx context.Context, scenario sensitive.Scenario, text string) (*sensitive.CheckResult, error)
-	PassImageCheck(ctx context.Context, scenario sensitive.Scenario, ossBucketName, ossObjectName string) (*sensitive.CheckResult, error)
-	PassImageURLCheck(ctx context.Context, scenario sensitive.Scenario, imageURL string) (*sensitive.CheckResult, error)
-	PassStreamCheck(ctx context.Context, scenario sensitive.Scenario, text, id string) (*sensitive.CheckResult, error)
-	PassLLMQueryCheck(ctx context.Context, scenario sensitive.Scenario, text, id string) (*sensitive.CheckResult, error)
+	PassTextCheck(ctx context.Context, scenario types.SensitiveScenario, text string) (*sensitive.CheckResult, error)
+	PassImageCheck(ctx context.Context, scenario types.SensitiveScenario, ossBucketName, ossObjectName string) (*sensitive.CheckResult, error)
+	PassImageURLCheck(ctx context.Context, scenario types.SensitiveScenario, imageURL string) (*sensitive.CheckResult, error)
+	PassStreamCheck(ctx context.Context, scenario types.SensitiveScenario, text, id string) (*sensitive.CheckResult, error)
+	PassLLMQueryCheck(ctx context.Context, scenario types.SensitiveScenario, text, id string) (*sensitive.CheckResult, error)
 }
 
 type SensitiveComponentImpl struct {
@@ -27,37 +27,31 @@ func NewSensitiveComponent(checker sensitive.SensitiveChecker) SensitiveComponen
 }
 
 func NewSensitiveComponentFromConfig(config *config.Config) SensitiveComponent {
-	checker := sensitive.NewAliyunGreenCheckerFromConfig(config)
 	return SensitiveComponentImpl{
-		checker: checker,
+		checker: sensitive.NewChainChecker(config,
+			sensitive.WithACAutomaton(sensitive.LoadFromConfig(config)),
+			sensitive.WithMutableACAutomaton(sensitive.LoadFromDB()),
+			sensitive.WithAliYunChecker(),
+		),
 	}
 }
 
-func (c SensitiveComponentImpl) PassTextCheck(ctx context.Context, scenario sensitive.Scenario, text string) (*sensitive.CheckResult, error) {
-	// do local check first
-	localChecker := checker.GetLocalWordChecker()
-	yes := localChecker.ContainsSensitiveWord(text)
-	if yes {
-		return &sensitive.CheckResult{
-			IsSensitive: true,
-		}, nil
-	}
-
+func (c SensitiveComponentImpl) PassTextCheck(ctx context.Context, scenario types.SensitiveScenario, text string) (*sensitive.CheckResult, error) {
 	return c.checker.PassTextCheck(ctx, scenario, text)
 }
 
-func (c SensitiveComponentImpl) PassImageCheck(ctx context.Context, scenario sensitive.Scenario, ossBucketName, ossObjectName string) (*sensitive.CheckResult, error) {
+func (c SensitiveComponentImpl) PassImageCheck(ctx context.Context, scenario types.SensitiveScenario, ossBucketName, ossObjectName string) (*sensitive.CheckResult, error) {
 	return c.checker.PassImageCheck(ctx, scenario, ossBucketName, ossObjectName)
 }
 
-func (c SensitiveComponentImpl) PassStreamCheck(ctx context.Context, scenario sensitive.Scenario, text, id string) (*sensitive.CheckResult, error) {
+func (c SensitiveComponentImpl) PassStreamCheck(ctx context.Context, scenario types.SensitiveScenario, text, id string) (*sensitive.CheckResult, error) {
 	return c.checker.PassLLMCheck(ctx, scenario, text, id, "")
 }
 
-func (c SensitiveComponentImpl) PassLLMQueryCheck(ctx context.Context, scenario sensitive.Scenario, text, id string) (*sensitive.CheckResult, error) {
+func (c SensitiveComponentImpl) PassLLMQueryCheck(ctx context.Context, scenario types.SensitiveScenario, text, id string) (*sensitive.CheckResult, error) {
 	return c.checker.PassLLMCheck(ctx, scenario, text, "", id)
 }
 
-func (c SensitiveComponentImpl) PassImageURLCheck(ctx context.Context, scenario sensitive.Scenario, imageURL string) (*sensitive.CheckResult, error) {
+func (c SensitiveComponentImpl) PassImageURLCheck(ctx context.Context, scenario types.SensitiveScenario, imageURL string) (*sensitive.CheckResult, error) {
 	return c.checker.PassImageURLCheck(ctx, scenario, imageURL)
 }

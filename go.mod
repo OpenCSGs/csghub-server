@@ -17,6 +17,7 @@ require (
 	github.com/bmatcuk/doublestar/v4 v4.8.1
 	github.com/casdoor/casdoor-go-sdk v1.22.0
 	github.com/chenyahui/gin-cache v1.9.0
+	github.com/cloudflare/ahocorasick v0.0.0-20240916140611-054963ec9396
 	github.com/d5/tengo/v2 v2.17.0
 	github.com/gin-contrib/cors v1.7.0
 	github.com/gin-contrib/pprof v1.5.1
