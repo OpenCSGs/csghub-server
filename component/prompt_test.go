@@ -635,6 +635,53 @@ func TestPromptComponent_IndexPromptRepo(t *testing.T) {
 
 }
 
+func TestPromptComponent_IndexPromptRepo_HalfCreatedRepos(t *testing.T) {
+	ctx := context.TODO()
+	pc := initializeTestPromptComponent(ctx, t)
+
+	filter := &types.RepoFilter{Username: "foo"}
+	// PublicToUser returns 4 repositories, but only 3 have corresponding prompts
+	pc.mocks.components.repo.EXPECT().PublicToUser(ctx, types.PromptRepo, "foo", filter, 10, 1).Return([]*database.Repository{
+		{ID: 1, Name: "rp1"}, 
+		{ID: 2, Name: "rp2"},
+		{ID: 3, Name: "rp3", Tags: []database.Tag{{Name: "t1"}}},
+		{ID: 4, Name: "half-created", Tags: []database.Tag{{Name: "t2"}}}, // This is a half-created repo with no prompt
+	}, 4, nil).Once()
+	// ByRepoIDs returns only 3 prompts (no prompt for repo ID 4)
+	pc.mocks.stores.PromptMock().EXPECT().ByRepoIDs(ctx, []int64{1, 2, 3, 4}).Return([]database.Prompt{
+		{ID: 6, RepositoryID: 2, Repository: &database.Repository{}},
+		{ID: 5, RepositoryID: 1, Repository: &database.Repository{}},
+		{ID: 4, RepositoryID: 3, Repository: &database.Repository{}},
+	}, nil).Once()
+
+	results, total, err := pc.IndexPromptRepo(ctx, filter, 10, 1)
+	require.Nil(t, err)
+	require.Equal(t, 4, total) // Total should match PublicToUser's return value
+	require.Len(t, results, 3)  // But only 3 prompts should be returned
+
+	require.Equal(t, []types.PromptRes{
+		{
+			RepositoryID: 1,
+			ID:           5, Name: "rp1", Repository: types.Repository{
+				HTTPCloneURL: "",
+				SSHCloneURL:  "",
+			}},
+		{
+			RepositoryID: 2,
+			ID:           6, Name: "rp2", Repository: types.Repository{
+				HTTPCloneURL: "",
+				SSHCloneURL:  "",
+			}},
+		{
+			RepositoryID: 3,
+			ID:           4, Name: "rp3", Repository: types.Repository{
+				HTTPCloneURL: "",
+				SSHCloneURL:  "",
+			}, Tags: []types.RepoTag{{Name: "t1"}}},
+	}, results)
+
+}
+
 func TestPromptComponent_UpdatePromptRepo(t *testing.T) {
 	ctx := context.TODO()
 	pc := initializeTestPromptComponent(ctx, t)

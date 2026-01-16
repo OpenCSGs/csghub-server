@@ -55,6 +55,50 @@ func TestModelComponent_Index(t *testing.T) {
 
 }
 
+func TestModelComponent_Index_HalfCreatedRepos(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestModelComponent(ctx, t)
+
+	filter := &types.RepoFilter{Username: "user"}
+	// PublicToUser returns 3 repositories, but only 2 have corresponding models
+	mc.mocks.components.repo.EXPECT().PublicToUser(ctx, types.ModelRepo, "user", filter, 10, 1).Return(
+		[]*database.Repository{
+			{ID: 1, Name: "r1", Tags: []database.Tag{{Name: "t1"}}},
+			{ID: 2, Name: "r2", Tags: []database.Tag{{Name: "t2"}}},
+			{ID: 3, Name: "half-created", Tags: []database.Tag{{Name: "t3"}}}, // This is a half-created repo with no model
+		}, 3, nil, // Total should be 3
+	)
+
+	// ByRepoIDs returns only 2 models (no model for repo ID 3)
+	mc.mocks.stores.ModelMock().EXPECT().ByRepoIDs(ctx, []int64{1, 2, 3}).Return([]database.Model{
+		{RepositoryID: 1, ID: 11, Repository: &database.Repository{}},
+		{RepositoryID: 2, ID: 12, Repository: &database.Repository{}},
+	}, nil)
+
+	data, total, err := mc.Index(ctx, filter, 10, 1, false)
+	require.Nil(t, err)
+	require.Equal(t, 3, total) // Total should match PublicToUser's return value
+	require.Len(t, data, 2)    // But only 2 models should be returned
+
+	require.Equal(t, []*types.Model{
+		{
+			ID: 11, Name: "r1", Tags: []types.RepoTag{{Name: "t1"}}, RepositoryID: 1,
+			Repository: types.Repository{
+				HTTPCloneURL: "https://foo.com/s/.git",
+				SSHCloneURL:  "test@127.0.0.1:s/.git",
+			},
+		},
+		{
+			ID: 12, Name: "r2", Tags: []types.RepoTag{{Name: "t2"}}, RepositoryID: 2,
+			Repository: types.Repository{
+				HTTPCloneURL: "https://foo.com/s/.git",
+				SSHCloneURL:  "test@127.0.0.1:s/.git",
+			},
+		},
+	}, data)
+
+}
+
 func TestModelComponent_Create(t *testing.T) {
 	ctx := context.TODO()
 	mc := initializeTestModelComponent(ctx, t)

@@ -189,6 +189,9 @@ func (c *codeComponentImpl) Index(ctx context.Context, filter *types.RepoFilter,
 				break
 			}
 		}
+		if code == nil {
+			continue
+		}
 		var (
 			tags             []types.RepoTag
 			mirrorTaskStatus types.MirrorTaskStatus

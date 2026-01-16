@@ -307,6 +307,11 @@ func TestRepoStore_PublicToUserSimple(t *testing.T) {
 	})
 	require.Empty(t, err)
 	require.NotNil(t, repo)
+	ds := database.NewDatasetStoreWithDB(db)
+	_, err = ds.Create(ctx, database.Dataset{
+		RepositoryID: repo.ID,
+	})
+	require.Empty(t, err)
 
 	ts := database.NewTagStoreWithDB(db)
 	var tags []*database.Tag
@@ -513,6 +518,13 @@ func setupTestRepositories(ctx context.Context, store database.RepoStore, db *da
 	for _, repo := range repos {
 		repo.GitPath = repo.Path
 		rn, err := store.CreateRepo(ctx, *repo)
+		if err != nil {
+			return nil, err
+		}
+		code := database.Code{
+			RepositoryID: rn.ID,
+		}
+		_, err = db.Core.NewInsert().Model(&code).Exec(ctx)
 		if err != nil {
 			return nil, err
 		}
