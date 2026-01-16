@@ -11,7 +11,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"opencsg.com/csghub-server/api/httpbase"
-	"opencsg.com/csghub-server/builder/sensitive"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -114,7 +113,7 @@ func TestModerationSvcHttpClient_PassLLMRespCheck(t *testing.T) {
 		}
 		err := json.NewDecoder(r.Body).Decode(&req)
 		assert.NoError(t, err)
-		assert.Equal(t, string(sensitive.ScenarioLLMResModeration), req.Service)
+		assert.Equal(t, string(types.ScenarioLLMResModeration), req.Service)
 		assert.Equal(t, "test_text", req.ServiceParameters.Content)
 		assert.Equal(t, "test_session", req.ServiceParameters.SessionId)
 

@@ -7,7 +7,6 @@ import (
 	"slices"
 
 	"opencsg.com/csghub-server/builder/rpc"
-	"opencsg.com/csghub-server/builder/sensitive"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
@@ -115,7 +114,7 @@ func (c *tagComponentImpl) UpdateMetaTags(ctx context.Context, tagScope types.Ta
 		// TODO:do tag name sensitive checking in batch
 		// remove sensitive tags by checking tag name of tag to create
 		tagToCreate = slices.DeleteFunc(tagToCreate, func(t *database.Tag) bool {
-			result, err := c.sensitiveChecker.PassTextCheck(ctx, string(sensitive.ScenarioNicknameDetection), t.Name)
+			result, err := c.sensitiveChecker.PassTextCheck(ctx, types.ScenarioNicknameDetection, t.Name)
 			if err != nil {
 				slog.Error("Failed to check tag name sensitivity", slog.String("tag_name", t.Name), slog.Any("error", err))
 				return true
@@ -234,7 +233,7 @@ func (c *tagComponentImpl) UpdateRepoTagsByCategory(ctx context.Context, tagScop
 
 func (c *tagComponentImpl) CreateTag(ctx context.Context, req types.CreateTag) (*database.Tag, error) {
 	if c.sensitiveChecker != nil {
-		result, err := c.sensitiveChecker.PassTextCheck(ctx, string(sensitive.ScenarioNicknameDetection), req.Name)
+		result, err := c.sensitiveChecker.PassTextCheck(ctx, types.ScenarioNicknameDetection, req.Name)
 		if err != nil {
 			return nil, fmt.Errorf("failed to check tag name sensitivity, error: %w", err)
 		}
@@ -270,7 +269,7 @@ func (c *tagComponentImpl) GetTagByID(ctx context.Context, id int64) (*database.
 
 func (c *tagComponentImpl) UpdateTag(ctx context.Context, id int64, req types.UpdateTag) (*database.Tag, error) {
 	if c.sensitiveChecker != nil {
-		result, err := c.sensitiveChecker.PassTextCheck(ctx, string(sensitive.ScenarioNicknameDetection), req.Name)
+		result, err := c.sensitiveChecker.PassTextCheck(ctx, types.ScenarioNicknameDetection, req.Name)
 		if err != nil {
 			return nil, fmt.Errorf("failed to check tag name sensitivity, error: %w", err)
 		}

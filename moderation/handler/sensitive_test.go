@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	mock_sensitive "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/moderation/component"
 	"opencsg.com/csghub-server/builder/sensitive"
+	"opencsg.com/csghub-server/common/types"
 )
 
 func TestSensitiveHandler_Image(t *testing.T) {
@@ -43,7 +44,7 @@ func TestSensitiveHandler_Image(t *testing.T) {
 		// Set mock expectation
 		mockSensitiveComponent.EXPECT().PassImageURLCheck(
 			mock.Anything,
-			sensitive.ScenarioImageProfileCheck,
+			types.ScenarioImageProfileCheck,
 			"https://example.com/image.jpg",
 		).Return(successResult, nil).Once()
 
@@ -77,7 +78,7 @@ func TestSensitiveHandler_Image(t *testing.T) {
 		// Set mock expectation
 		mockSensitiveComponent.EXPECT().PassImageCheck(
 			mock.Anything,
-			sensitive.ScenarioImageBaseLineCheck,
+			types.ScenarioImageBaseLineCheck,
 			"test-bucket",
 			"test-object.jpg",
 		).Return(successResult, nil).Once()
@@ -147,7 +148,7 @@ func TestSensitiveHandler_Image(t *testing.T) {
 		expectedErr := assert.AnError
 		mockSensitiveComponent.EXPECT().PassImageURLCheck(
 			mock.Anything,
-			sensitive.ScenarioImageProfileCheck,
+			types.ScenarioImageProfileCheck,
 			"https://example.com/image.jpg",
 		).Return(nil, expectedErr).Once()
 
@@ -180,7 +181,7 @@ func TestSensitiveHandler_Image(t *testing.T) {
 		// Set mock expectation
 		mockSensitiveComponent.EXPECT().PassImageURLCheck(
 			mock.Anything,
-			sensitive.ScenarioImageProfileCheck,
+			types.ScenarioImageProfileCheck,
 			"https://example.com/sensitive.jpg",
 		).Return(sensitiveResult, nil).Once()
 
@@ -235,7 +236,7 @@ func TestSensitiveHandler_LlmResp(t *testing.T) {
 		// Set mock expectation
 		mockSensitiveComponent.EXPECT().PassStreamCheck(
 			mock.Anything,
-			sensitive.ScenarioLLMResModeration,
+			types.ScenarioLLMResModeration,
 			"This is a safe response",
 			"test-session-123",
 		).Return(successResult, nil).Once()
@@ -289,7 +290,7 @@ func TestSensitiveHandler_LlmResp(t *testing.T) {
 		expectedErr := assert.AnError
 		mockSensitiveComponent.EXPECT().PassStreamCheck(
 			mock.Anything,
-			sensitive.ScenarioLLMResModeration,
+			types.ScenarioLLMResModeration,
 			"This is a test response",
 			"test-session-123",
 		).Return(nil, expectedErr).Once()
@@ -326,7 +327,7 @@ func TestSensitiveHandler_LlmResp(t *testing.T) {
 		// Set mock expectation
 		mockSensitiveComponent.EXPECT().PassStreamCheck(
 			mock.Anything,
-			sensitive.ScenarioLLMResModeration,
+			types.ScenarioLLMResModeration,
 			"This is sensitive content",
 			"test-session-123",
 		).Return(sensitiveResult, nil).Once()
@@ -382,7 +383,7 @@ func TestSensitiveHandler_LlmPrompt(t *testing.T) {
 		// Set mock expectation
 		mockSensitiveComponent.EXPECT().PassLLMQueryCheck(
 			mock.Anything,
-			sensitive.ScenarioLLMQueryModeration,
+			types.ScenarioLLMQueryModeration,
 			"This is a safe prompt",
 			"test-account-123",
 		).Return(successResult, nil).Once()
@@ -436,7 +437,7 @@ func TestSensitiveHandler_LlmPrompt(t *testing.T) {
 		expectedErr := assert.AnError
 		mockSensitiveComponent.EXPECT().PassLLMQueryCheck(
 			mock.Anything,
-			sensitive.ScenarioLLMQueryModeration,
+			types.ScenarioLLMQueryModeration,
 			"This is a test prompt",
 			"test-account-123",
 		).Return(nil, expectedErr).Once()
@@ -473,7 +474,7 @@ func TestSensitiveHandler_LlmPrompt(t *testing.T) {
 		// Set mock expectation
 		mockSensitiveComponent.EXPECT().PassLLMQueryCheck(
 			mock.Anything,
-			sensitive.ScenarioLLMQueryModeration,
+			types.ScenarioLLMQueryModeration,
 			"This is sensitive prompt",
 			"test-account-123",
 		).Return(sensitiveResult, nil).Once()
@@ -518,7 +519,7 @@ func TestSensitiveHandler_Text(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		// Prepare request body
 		reqBody := map[string]interface{}{
-			"scenario": sensitive.ScenarioCommentDetection,
+			"scenario": types.ScenarioCommentDetection,
 			"text":     "This is a safe text content",
 		}
 		reqBodyBytes, _ := json.Marshal(reqBody)
@@ -526,7 +527,7 @@ func TestSensitiveHandler_Text(t *testing.T) {
 		// Set mock expectation
 		mockSensitiveComponent.EXPECT().PassTextCheck(
 			mock.Anything,
-			sensitive.ScenarioCommentDetection,
+			types.ScenarioCommentDetection,
 			"This is a safe text content",
 		).Return(successResult, nil).Once()
 
@@ -567,7 +568,7 @@ func TestSensitiveHandler_Text(t *testing.T) {
 	t.Run("server error from sensitive component", func(t *testing.T) {
 		// Prepare request body
 		reqBody := map[string]interface{}{
-			"scenario": sensitive.ScenarioCommentDetection,
+			"scenario": types.ScenarioCommentDetection,
 			"text":     "This is a test text",
 		}
 		reqBodyBytes, _ := json.Marshal(reqBody)
@@ -576,7 +577,7 @@ func TestSensitiveHandler_Text(t *testing.T) {
 		expectedErr := assert.AnError
 		mockSensitiveComponent.EXPECT().PassTextCheck(
 			mock.Anything,
-			sensitive.ScenarioCommentDetection,
+			types.ScenarioCommentDetection,
 			"This is a test text",
 		).Return(nil, expectedErr).Once()
 
@@ -595,7 +596,7 @@ func TestSensitiveHandler_Text(t *testing.T) {
 	t.Run("sensitive content detected", func(t *testing.T) {
 		// Prepare request body
 		reqBody := map[string]interface{}{
-			"scenario": sensitive.ScenarioCommentDetection,
+			"scenario": types.ScenarioCommentDetection,
 			"text":     "This is sensitive text content",
 		}
 		reqBodyBytes, _ := json.Marshal(reqBody)
@@ -609,7 +610,7 @@ func TestSensitiveHandler_Text(t *testing.T) {
 		// Set mock expectation
 		mockSensitiveComponent.EXPECT().PassTextCheck(
 			mock.Anything,
-			sensitive.ScenarioCommentDetection,
+			types.ScenarioCommentDetection,
 			"This is sensitive text content",
 		).Return(sensitiveResult, nil).Once()
 
