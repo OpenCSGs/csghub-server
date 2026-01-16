@@ -198,10 +198,11 @@ func TestRepoComponent_CheckRepoFiles(t *testing.T) {
 
 	cfg := &config.Config{}
 	cfg.SensitiveCheck.Enable = true
-	cfg.Moderation.EncodedSensitiveWords = `5pWP5oSf6K+NLHNlbnNpdGl2ZXdvcmQ=`
 	mockSensitiveChecker := mockSensit.NewMockSensitiveChecker(t)
 	mockSensitiveChecker.EXPECT().PassTextCheck(mock.Anything, types.ScenarioCommentDetection, "test string").
 		Return(&sensitive.CheckResult{IsSensitive: false}, nil).Once()
+	mockSensitiveChecker.EXPECT().PassTextCheck(mock.Anything, types.ScenarioCommentDetection, "sensitive word").
+		Return(&sensitive.CheckResult{IsSensitive: true}, nil).Once()
 	checker.InitWithContentChecker(cfg, mockSensitiveChecker)
 
 	repoToUpdate := new(database.Repository)

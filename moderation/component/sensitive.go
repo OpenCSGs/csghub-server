@@ -6,7 +6,6 @@ import (
 	"opencsg.com/csghub-server/builder/sensitive"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
-	"opencsg.com/csghub-server/moderation/checker"
 )
 
 type SensitiveComponent interface {
@@ -28,22 +27,16 @@ func NewSensitiveComponent(checker sensitive.SensitiveChecker) SensitiveComponen
 }
 
 func NewSensitiveComponentFromConfig(config *config.Config) SensitiveComponent {
-	checker := sensitive.NewAliyunGreenCheckerFromConfig(config)
 	return SensitiveComponentImpl{
-		checker: checker,
+		checker: sensitive.NewChainChecker(config,
+			sensitive.WithACAutomaton(sensitive.LoadFromConfig(config)),
+			sensitive.WithMutableACAutomaton(sensitive.LoadFromDB()),
+			sensitive.WithAliYunChecker(),
+		),
 	}
 }
 
 func (c SensitiveComponentImpl) PassTextCheck(ctx context.Context, scenario types.SensitiveScenario, text string) (*sensitive.CheckResult, error) {
-	// do local check first
-	localChecker := checker.GetLocalWordChecker()
-	yes := localChecker.ContainsSensitiveWord(text)
-	if yes {
-		return &sensitive.CheckResult{
-			IsSensitive: true,
-		}, nil
-	}
-
 	return c.checker.PassTextCheck(ctx, scenario, text)
 }
 

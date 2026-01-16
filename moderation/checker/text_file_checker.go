@@ -56,13 +56,7 @@ func (c *TextFileChecker) Run(ctx context.Context, reader io.Reader) (types.Sens
 			var res *sensitive.CheckResult
 			var err error
 			slog.Debug("check text", slog.String("scenario", string(types.ScenarioCommentDetection)), slog.String("text", buf.String()))
-			//do local check first
 			txt := buf.String()
-			contains := GetLocalWordChecker().ContainsSensitiveWord(txt)
-			if contains {
-				resultCh <- result{types.SensitiveCheckFail, "contains sensitive word"}
-				return
-			}
 			//call remote checker
 			res, err = retry.DoWithData(
 				func() (*sensitive.CheckResult, error) {
