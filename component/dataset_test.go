@@ -144,6 +144,55 @@ func TestDatasetCompnent_Index(t *testing.T) {
 
 }
 
+func TestDatasetComponent_Index_HalfCreatedRepos(t *testing.T) {
+	ctx := context.TODO()
+	dc := initializeTestDatasetComponent(ctx, t)
+
+	filter := &types.RepoFilter{Username: "user"}
+	// PublicToUser returns 3 repositories, but only 2 have corresponding datasets
+	dc.mocks.components.repo.EXPECT().PublicToUser(ctx, types.DatasetRepo, "user", filter, 10, 1).Return(
+		[]*database.Repository{
+			{ID: 1, Tags: []database.Tag{{Name: "t1"}}},
+			{ID: 2},
+			{ID: 3, Tags: []database.Tag{{Name: "half-created"}}}, // This is a half-created repo with no dataset
+		}, 3, nil, // Total should be 3
+	)
+
+	// ByRepoIDs returns only 2 datasets (no dataset for repo ID 3)
+	dc.mocks.stores.DatasetMock().EXPECT().ByRepoIDs(ctx, []int64{1, 2, 3}).Return([]database.Dataset{
+		{
+			ID: 11, RepositoryID: 2, Repository: &database.Repository{
+				User: database.User{Username: "user2"},
+			},
+		},
+		{
+			ID: 12, RepositoryID: 1, Repository: &database.Repository{
+				User: database.User{Username: "user1"},
+			},
+		},
+	}, nil)
+
+	data, total, err := dc.Index(ctx, filter, 10, 1, false)
+	require.Nil(t, err)
+	require.Equal(t, 3, total) // Total should match PublicToUser's return value
+	require.Len(t, data, 2)     // But only 2 datasets should be returned
+
+	require.Equal(t, []*types.Dataset{
+		{ID: 12, RepositoryID: 1, Repository: types.Repository{
+			HTTPCloneURL: "/s/.git",
+			SSHCloneURL:  ":s/.git",
+		}, User: types.User{Username: "user1"},
+			Tags: []types.RepoTag{{Name: "t1"}},
+		},
+		{ID: 11, RepositoryID: 2, Repository: types.Repository{
+			HTTPCloneURL: "/s/.git",
+			SSHCloneURL:  ":s/.git",
+		}, User: types.User{Username: "user2"},
+		},
+	}, data)
+
+}
+
 func TestDatasetCompnent_Update(t *testing.T) {
 	ctx := context.TODO()
 	dc := initializeTestDatasetComponent(ctx, t)
