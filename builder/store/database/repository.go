@@ -688,7 +688,7 @@ func (s *repoStoreImpl) PublicToUser(ctx context.Context, repoType types.Reposit
 	}
 
 	if len(filter.SpaceSDK) > 0 {
-		q.Join("LEFT JOIN spaces AS spaces ON repository.id = spaces.repository_id").Where("spaces.sdk = ?", filter.SpaceSDK)
+		q.Where("spaces.sdk = ?", filter.SpaceSDK)
 	}
 
 	if len(filter.Tags) > 0 {
