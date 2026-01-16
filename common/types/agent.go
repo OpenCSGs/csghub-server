@@ -5,6 +5,27 @@ import (
 	"time"
 )
 
+// AgentConfig represents the agent system configuration
+type AgentConfig struct {
+	ID        int64          `json:"id"`
+	Name      string         `json:"name"`
+	Config    map[string]any `json:"config"`
+	CreatedAt time.Time      `json:"created_at"`
+	UpdatedAt time.Time      `json:"updated_at"`
+}
+
+// CreateAgentConfigReq represents a request to create agent configuration
+type CreateAgentConfigReq struct {
+	Name   string         `json:"name" binding:"required"`
+	Config map[string]any `json:"config" binding:"required"`
+}
+
+// UpdateAgentConfigReq represents a request to update agent configuration
+type UpdateAgentConfigReq struct {
+	Name   *string         `json:"name,omitempty"`
+	Config *map[string]any `json:"config,omitempty"`
+}
+
 // AgentTemplate represents the template for an agent
 type AgentTemplate struct {
 	ID          int64           `json:"id"`
@@ -15,6 +36,7 @@ type AgentTemplate struct {
 	Content     *string         `json:"content,omitempty"`                       // Used to store the complete content of the template
 	Public      *bool           `json:"public,omitempty"`                        // Whether the template is public
 	Metadata    *map[string]any `json:"metadata,omitempty"`                      // Template metadata
+	IsPinned    bool            `json:"is_pinned"`                               // Whether the template is pinned by the user
 	CreatedAt   time.Time       `json:"created_at"`                              // When the template was created
 	UpdatedAt   time.Time       `json:"updated_at"`                              // When the template was last updated
 }
@@ -37,6 +59,7 @@ type AgentInstance struct {
 	Editable    bool            `json:"editable"`                              // Whether the instance is editable
 	IsRunning   bool            `json:"is_running"`                            // Whether the instance is running
 	BuiltIn     bool            `json:"built_in"`                              // Whether the instance is built-in
+	IsPinned    bool            `json:"is_pinned"`                             // Whether the instance is pinned by the user
 	Metadata    *map[string]any `json:"metadata,omitempty"`                    // Instance metadata
 	CreatedAt   time.Time       `json:"created_at"`                            // When the instance was created
 	UpdatedAt   time.Time       `json:"updated_at"`                            // When the instance was last updated
@@ -59,6 +82,7 @@ type AgentInstanceFilter struct {
 	TemplateID *int64 `json:"template_id,omitempty"`
 	BuiltIn    *bool  `json:"built_in"`
 	Public     *bool  `json:"public"`
+	Editable   *bool  `json:"editable"`
 }
 
 type UpdateAgentInstanceRequest struct {
@@ -76,11 +100,17 @@ type AgentInstanceCreationResult struct {
 
 // LangFlowChatRequest represents a chat request to an agent instance
 type LangflowChatRequest struct {
-	SessionID  *string         `json:"session_id,omitempty"`           // Optional session ID (client-provided)
-	InputValue string          `json:"input_value" binding:"required"` // Input value for the agent
-	InputType  string          `json:"input_type" binding:"required"`  // Type of input (e.g., "chat")
-	OutputType string          `json:"output_type" binding:"required"` // Type of output (e.g., "chat")
-	Tweaks     json.RawMessage `json:"tweaks,omitempty"`               // Optional parameter tweaks
+	SessionID  *string                   `json:"session_id,omitempty"`           // Optional session ID (client-provided)
+	InputValue string                    `json:"input_value" binding:"required"` // Input value for the agent
+	InputType  string                    `json:"input_type" binding:"required"`  // Type of input (e.g., "chat")
+	OutputType string                    `json:"output_type" binding:"required"` // Type of output (e.g., "chat")
+	Tweaks     json.RawMessage           `json:"tweaks,omitempty"`               // Optional parameter tweaks
+	Files      []LangflowChatRequestFile `json:"files,omitempty"`                // Optional files to upload
+}
+
+type LangflowChatRequestFile struct {
+	URL  string `json:"url"`
+	Name string `json:"name"`
 }
 
 // AgentChatResponse represents the response from an agent chat
@@ -257,6 +287,7 @@ type CodeAgentRequest struct {
 	Stream        bool                      `json:"stream"`                             // Whether to stream the response
 	AgentName     string                    `json:"agent_name" binding:"required"`      // Name of the agent to use
 	StreamMode    *StreamMode               `json:"stream_mode,omitempty"`              // Stream configuration
+	Files         []CodeAgentFile           `json:"files,omitempty"`                    // Files to upload
 	History       []CodeAgentRequestMessage `json:"history,omitempty"`                  // Conversation history
 }
 
@@ -266,9 +297,16 @@ type StreamMode struct {
 	Time  int    `json:"time" binding:"min=1"`    // Time-based streaming interval
 }
 
+type CodeAgentFile struct {
+	URL  string `json:"url"`
+	Name string `json:"name"`
+}
+
 type CodeAgentRequestMessage struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+	Role      string         `json:"role"`
+	Content   string         `json:"content"`
+	File      *CodeAgentFile `json:"file,omitempty"`
+	Timestamp time.Time      `json:"timestamp"`
 }
 
 type CodeAgentSyncOperation string
@@ -330,6 +368,22 @@ type AgentTaskListItem struct {
 	TaskStatus  AgentTaskStatus `json:"task_status"`
 	InstanceID  int64           `json:"instance_id"`
 	SessionUUID string          `json:"session_uuid"`
+	IsPinned    bool            `json:"is_pinned"` // Whether the task is pinned by the user
+	PinnedAt    *time.Time      `json:"pinned_at"` // When the task was pinned (from LEFT JOIN)
+	UpdatedAt   time.Time       `json:"updated_at"`
+	CreatedAt   time.Time       `json:"created_at"`
+}
+
+// AgentTaskListItemResponse represents a task item in the API response (without PinnedAt)
+type AgentTaskListItemResponse struct {
+	ID          int64           `json:"id"`
+	TaskID      string          `json:"task_id"`
+	TaskName    string          `json:"task_name"`
+	TaskType    AgentTaskType   `json:"task_type"`
+	TaskStatus  AgentTaskStatus `json:"task_status"`
+	InstanceID  int64           `json:"instance_id"`
+	SessionUUID string          `json:"session_uuid"`
+	IsPinned    bool            `json:"is_pinned"` // Whether the task is pinned by the user
 	UpdatedAt   time.Time       `json:"updated_at"`
 	CreatedAt   time.Time       `json:"created_at"`
 }
@@ -426,6 +480,7 @@ type AgentMCPServerListItem struct {
 	Protocol    string    `json:"protocol,omitempty"`
 	BuiltIn     bool      `json:"built_in"`
 	NeedInstall bool      `json:"need_install"`
+	IsPinned    bool      `json:"is_pinned"` // Whether the MCP server is pinned by the user
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }
@@ -444,8 +499,14 @@ type AgentMCPServerDetail struct {
 	Env         map[string]any `json:"env,omitempty"`
 	BuiltIn     bool           `json:"built_in"`
 	NeedInstall bool           `json:"need_install"`
+	IsPinned    bool           `json:"is_pinned"` // Whether the MCP server is pinned by the user
 	CreatedAt   time.Time      `json:"created_at"`
 	UpdatedAt   time.Time      `json:"updated_at"`
+}
+
+type InspectMCPServerResponse struct {
+	Status       string         `json:"status"`                 // Status: 'connected' or 'error'
+	Capabilities map[string]any `json:"capabilities,omitempty"` // Fetched capabilities (tools, resources, prompts, resource_templates)
 }
 
 type AgentMCPServerIDPrefix string
@@ -457,4 +518,118 @@ const (
 
 func (p AgentMCPServerIDPrefix) String() string {
 	return string(p)
+}
+
+// AgentKnowledgeBase represents a knowledge base configuration for an agent (API layer)
+type AgentKnowledgeBase struct {
+	ID          int64          `json:"id"`
+	Name        string         `json:"name" binding:"required,max=50"`
+	Description string         `json:"description,omitempty" binding:"omitempty,max=500"`
+	ContentID   string         `json:"content_id"` // Used to specify the unique id of the knowledge base resource
+	Public      bool           `json:"public"`     // Whether the knowledge base is public
+	Metadata    map[string]any `json:"metadata,omitempty"`
+	CreatedAt   time.Time      `json:"created_at"`
+	UpdatedAt   time.Time      `json:"updated_at"`
+	UserUUID    string         `json:"-"`
+}
+
+// CreateAgentKnowledgeBaseReq represents a request to create an agent knowledge base
+type CreateAgentKnowledgeBaseReq struct {
+	Name        string `json:"name" binding:"required,max=50"`
+	Description string `json:"description,omitempty" binding:"omitempty,max=500"`
+	Public      *bool  `json:"public,omitempty"`
+	UserUUID    string `json:"-"`
+}
+
+// AgentKnowledgeBaseFilter represents the filter for listing agent knowledge bases
+type AgentKnowledgeBaseFilter struct {
+	Search   string `json:"search,omitempty"`   // Search term for name field
+	UserUUID string `json:"user_uuido"`         // Filter by user UUID
+	Public   *bool  `json:"public,omitempty"`   // Filter by public status
+	Editable *bool  `json:"editable,omitempty"` // Filter by editable status (true = owned by user, false = not owned by user)
+}
+
+// UpdateAgentKnowledgeBaseRequest represents a request to update an agent knowledge base
+type UpdateAgentKnowledgeBaseRequest struct {
+	Name        *string         `json:"name,omitempty" binding:"omitempty,max=50"`
+	Description *string         `json:"description,omitempty" binding:"omitempty,max=500"`
+	Public      *bool           `json:"public,omitempty"`
+	Metadata    *map[string]any `json:"metadata,omitempty"`
+}
+
+// AgentKnowledgeBaseListItem represents a knowledge base in list responses
+type AgentKnowledgeBaseListItem struct {
+	ID          int64     `json:"id"`
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+	ContentID   string    `json:"content_id"`
+	Public      bool      `json:"public"`
+	Editable    bool      `json:"editable"`
+	IsPinned    bool      `json:"is_pinned"` // Whether the knowledge base is pinned by the user
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+// AgentPromptListItem represents a prompt in list responses
+type AgentPromptListItem struct {
+	ID          int64     `json:"id"`
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+	Path        string    `json:"path"`
+	Public      bool      `json:"public"`
+	IsPinned    bool      `json:"is_pinned"` // Whether the prompt is pinned by the user
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+// AgentKnowledgeBaseDetail represents a complete knowledge base with all configuration details
+type AgentKnowledgeBaseDetail struct {
+	ID          int64          `json:"id"`
+	Name        string         `json:"name"`
+	Description string         `json:"description"`
+	UserUUID    string         `json:"user_uuid"`
+	Owner       string         `json:"owner"`
+	Avatar      string         `json:"avatar"`
+	ContentID   string         `json:"content_id"`
+	Public      bool           `json:"public"`
+	Editable    bool           `json:"editable"`
+	IsPinned    bool           `json:"is_pinned"` // Whether the knowledge base is pinned by the user
+	Metadata    map[string]any `json:"metadata,omitempty"`
+	CreatedAt   time.Time      `json:"created_at"`
+	UpdatedAt   time.Time      `json:"updated_at"`
+}
+
+type LangflowTargetType string
+
+const (
+	LangflowTargetTypeInstance LangflowTargetType = "instance"
+	LangflowTargetTypeRAG      LangflowTargetType = "rag"
+)
+
+type LangflowTarget struct {
+	Type LangflowTargetType `json:"type"`
+	ID   string             `json:"id"`
+}
+
+// AgentUserPreferenceEntityType represents the type of entity that can have preferences
+const (
+	AgentUserPreferenceEntityTypeAgentInstance      = "agent_instance"
+	AgentUserPreferenceEntityTypeAgentKnowledgeBase = "agent_knowledge_base"
+	AgentUserPreferenceEntityTypeAgentTemplate      = "agent_template"
+	AgentUserPreferenceEntityTypeAgentMCPServer     = "agent_mcp_server"
+	AgentUserPreferenceEntityTypeAgentTask          = "agent_task"
+	AgentUserPreferenceEntityTypePrompt             = "agent_prompt"
+	AgentUserPreferenceEntityTypeAgentModel         = "agent_model"
+)
+
+// AgentUserPreferenceAction represents the type of preference action
+const (
+	AgentUserPreferenceActionPin = "pin"
+)
+
+// AgentUserPreferenceRequest represents a request to set or remove a preference
+type AgentUserPreferenceRequest struct {
+	EntityType string `json:"entity_type" binding:"required,oneof=agent_instance agent_knowledge_base agent_template agent_mcp_server agent_task agent_prompt agent_model"`
+	EntityID   string `json:"entity_id" binding:"required"`
+	Preference string `json:"preference" binding:"required,oneof=pin"`
 }
