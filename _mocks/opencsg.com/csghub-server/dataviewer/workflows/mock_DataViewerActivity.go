@@ -71,6 +71,39 @@ func (_c *MockDataViewerActivity_BeginViewerJob_Call) RunAndReturn(run func(cont
 	return _c
 }
 
+// CalcStatistics provides a mock function with given fields: cardReq
+func (_m *MockDataViewerActivity) CalcStatistics(cardReq *common.UpdateCardReq) {
+	_m.Called(cardReq)
+}
+
+// MockDataViewerActivity_CalcStatistics_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CalcStatistics'
+type MockDataViewerActivity_CalcStatistics_Call struct {
+	*mock.Call
+}
+
+// CalcStatistics is a helper method to define mock.On call
+//   - cardReq *common.UpdateCardReq
+func (_e *MockDataViewerActivity_Expecter) CalcStatistics(cardReq interface{}) *MockDataViewerActivity_CalcStatistics_Call {
+	return &MockDataViewerActivity_CalcStatistics_Call{Call: _e.mock.On("CalcStatistics", cardReq)}
+}
+
+func (_c *MockDataViewerActivity_CalcStatistics_Call) Run(run func(cardReq *common.UpdateCardReq)) *MockDataViewerActivity_CalcStatistics_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(*common.UpdateCardReq))
+	})
+	return _c
+}
+
+func (_c *MockDataViewerActivity_CalcStatistics_Call) Return() *MockDataViewerActivity_CalcStatistics_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *MockDataViewerActivity_CalcStatistics_Call) RunAndReturn(run func(*common.UpdateCardReq)) *MockDataViewerActivity_CalcStatistics_Call {
+	_c.Run(run)
+	return _c
+}
+
 // CheckIfNeedRebuild provides a mock function with given fields: ctx, checkParam
 func (_m *MockDataViewerActivity) CheckIfNeedRebuild(ctx context.Context, checkParam common.CheckBuildReq) (bool, error) {
 	ret := _m.Called(ctx, checkParam)

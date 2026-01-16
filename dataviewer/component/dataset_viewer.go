@@ -422,11 +422,9 @@ func (c *datasetViewerComponentImpl) getViewerCardData(ctx context.Context, req 
 		newSplits := []dvCom.Split{}
 		for _, split := range info.Splits {
 			if viewerReq != nil && viewerReq.Config == info.ConfigName && viewerReq.Split == split.Name {
-
 				for _, f := range split.Files {
 					objectKey := common.SafeBuildLfsPath(req.RepoID, f.LfsSHA256, f.LfsRelativePath, req.Migrated)
 					parquetObjs = append(parquetObjs, objectKey)
-					// parquetObjs = append(parquetObjs, fmt.Sprintf("lfs/%s", f.LfsRelativePath))
 				}
 			}
 			newSplit := dvCom.Split{
@@ -443,10 +441,13 @@ func (c *datasetViewerComponentImpl) getViewerCardData(ctx context.Context, req 
 	viewerCardData.DatasetInfos = newInfos
 
 	return &dvCom.CataLogRespone{
-		Configs:      viewerCardData.Configs,
-		DatasetInfos: viewerCardData.DatasetInfos,
-		Status:       viewer.DataviewerJob.Status,
-		Logs:         viewer.DataviewerJob.Logs,
+		Configs:         viewerCardData.Configs,
+		DatasetInfos:    viewerCardData.DatasetInfos,
+		Status:          viewer.DataviewerJob.Status,
+		Logs:            viewer.DataviewerJob.Logs,
+		Downloaded_Size: viewerCardData.Downloaded_Size,
+		Converted_Size:  viewerCardData.Converted_Size,
+		Rows_Num:        viewerCardData.Rows_Num,
 	}, parquetObjs, nil
 }
 

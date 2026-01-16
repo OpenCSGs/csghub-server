@@ -288,3 +288,248 @@ func TestActivity_CreateParquetBranch(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, dvCom.ParquetBranch, res)
 }
+
+func TestActivity_CalcStatistics(t *testing.T) {
+	config := &config.Config{}
+	dvstore := mockdb.NewMockDataviewerStore(t)
+	mockGitServer := mockGit.NewMockGitServer(t)
+	s3Client := mockS3.NewMockClient(t)
+
+	dvActivity, err := NewTestDataViewerActivity(config, mockGitServer, s3Client, dvstore)
+	require.Nil(t, err)
+
+	t.Run("basic statistics calculation", func(t *testing.T) {
+		cardReq := &dvCom.UpdateCardReq{
+			FinalCardData: dvCom.CardData{
+				DatasetInfos: []dvCom.DatasetInfo{
+					{
+						ConfigName: "config1",
+						Splits: []dvCom.Split{
+							{
+								Name:        "train",
+								NumExamples: 1000,
+								Files: []dvCom.FileObject{
+									{Size: 1024},
+									{Size: 2048},
+								},
+								Origins: []dvCom.FileObject{
+									{DownloadSize: 4096},
+									{DownloadSize: 8192},
+								},
+							},
+							{
+								Name:        "test",
+								NumExamples: 500,
+								Files: []dvCom.FileObject{
+									{Size: 512},
+								},
+								Origins: []dvCom.FileObject{
+									{DownloadSize: 1024},
+								},
+							},
+						},
+					},
+					{
+						ConfigName: "config2",
+						Splits: []dvCom.Split{
+							{
+								Name:        "validation",
+								NumExamples: 300,
+								Files: []dvCom.FileObject{
+									{Size: 256},
+									{Size: 128},
+								},
+								Origins: []dvCom.FileObject{
+									{DownloadSize: 512},
+									{DownloadSize: 256},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		dvActivity.CalcStatistics(cardReq)
+
+		require.Equal(t, int64(1800), cardReq.FinalCardData.Rows_Num)         // 1000 + 500 + 300
+		require.Equal(t, int64(3968), cardReq.FinalCardData.Converted_Size)   // 1024+2048+512+256+128
+		require.Equal(t, int64(14080), cardReq.FinalCardData.Downloaded_Size) // 4096+8192+1024+512+256
+	})
+
+	t.Run("empty dataset", func(t *testing.T) {
+		cardReq := &dvCom.UpdateCardReq{
+			FinalCardData: dvCom.CardData{
+				DatasetInfos: []dvCom.DatasetInfo{},
+			},
+		}
+
+		dvActivity.CalcStatistics(cardReq)
+
+		require.Equal(t, int64(0), cardReq.FinalCardData.Rows_Num)
+		require.Equal(t, int64(0), cardReq.FinalCardData.Converted_Size)
+		require.Equal(t, int64(0), cardReq.FinalCardData.Downloaded_Size)
+	})
+
+	t.Run("only files without origins", func(t *testing.T) {
+		cardReq := &dvCom.UpdateCardReq{
+			FinalCardData: dvCom.CardData{
+				DatasetInfos: []dvCom.DatasetInfo{
+					{
+						ConfigName: "config1",
+						Splits: []dvCom.Split{
+							{
+								Name:        "train",
+								NumExamples: 100,
+								Files: []dvCom.FileObject{
+									{Size: 1024},
+									{Size: 2048},
+								},
+								Origins: []dvCom.FileObject{},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		dvActivity.CalcStatistics(cardReq)
+
+		require.Equal(t, int64(100), cardReq.FinalCardData.Rows_Num)
+		require.Equal(t, int64(3072), cardReq.FinalCardData.Converted_Size) // 1024+2048
+		require.Equal(t, int64(0), cardReq.FinalCardData.Downloaded_Size)
+	})
+
+	t.Run("only origins without files", func(t *testing.T) {
+		cardReq := &dvCom.UpdateCardReq{
+			FinalCardData: dvCom.CardData{
+				DatasetInfos: []dvCom.DatasetInfo{
+					{
+						ConfigName: "config1",
+						Splits: []dvCom.Split{
+							{
+								Name:        "train",
+								NumExamples: 200,
+								Files:       []dvCom.FileObject{},
+								Origins: []dvCom.FileObject{
+									{DownloadSize: 4096},
+									{DownloadSize: 8192},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		dvActivity.CalcStatistics(cardReq)
+
+		require.Equal(t, int64(200), cardReq.FinalCardData.Rows_Num)
+		require.Equal(t, int64(0), cardReq.FinalCardData.Converted_Size)
+		require.Equal(t, int64(12288), cardReq.FinalCardData.Downloaded_Size)
+	})
+
+	t.Run("large numbers calculation", func(t *testing.T) {
+		cardReq := &dvCom.UpdateCardReq{
+			FinalCardData: dvCom.CardData{
+				DatasetInfos: []dvCom.DatasetInfo{
+					{
+						ConfigName: "large_config",
+						Splits: []dvCom.Split{
+							{
+								Name:        "train",
+								NumExamples: 1000000,
+								Files: []dvCom.FileObject{
+									{Size: 1024 * 1024 * 1024}, // 1GB
+									{Size: 512 * 1024 * 1024},  // 512MB
+								},
+								Origins: []dvCom.FileObject{
+									{DownloadSize: 2 * 1024 * 1024 * 1024}, // 2GB
+									{DownloadSize: 1 * 1024 * 1024 * 1024}, // 1GB
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		dvActivity.CalcStatistics(cardReq)
+
+		expectedConvertedSize := int64(1024*1024*1024 + 512*1024*1024)     // 1GB + 512MB = 1.5GB
+		expectedDownloadSize := int64(2*1024*1024*1024 + 1*1024*1024*1024) // 2GB + 1GB = 3GB
+
+		require.Equal(t, int64(1000000), cardReq.FinalCardData.Rows_Num)
+		require.Equal(t, expectedConvertedSize, cardReq.FinalCardData.Converted_Size)
+		require.Equal(t, expectedDownloadSize, cardReq.FinalCardData.Downloaded_Size)
+	})
+
+	t.Run("complex scenario with multiple configs and splits", func(t *testing.T) {
+		cardReq := &dvCom.UpdateCardReq{
+			FinalCardData: dvCom.CardData{
+				DatasetInfos: []dvCom.DatasetInfo{
+					{
+						ConfigName: "english",
+						Splits: []dvCom.Split{
+							{
+								Name:        "train",
+								NumExamples: 50000,
+								Files: []dvCom.FileObject{
+									{Size: 100 * 1024 * 1024}, // 100MB
+								},
+								Origins: []dvCom.FileObject{
+									{DownloadSize: 200 * 1024 * 1024}, // 200MB
+								},
+							},
+							{
+								Name:        "test",
+								NumExamples: 10000,
+								Files: []dvCom.FileObject{
+									{Size: 20 * 1024 * 1024}, // 20MB
+								},
+								Origins: []dvCom.FileObject{
+									{DownloadSize: 40 * 1024 * 1024}, // 40MB
+								},
+							},
+						},
+					},
+					{
+						ConfigName: "chinese",
+						Splits: []dvCom.Split{
+							{
+								Name:        "train",
+								NumExamples: 80000,
+								Files: []dvCom.FileObject{
+									{Size: 150 * 1024 * 1024}, // 150MB
+								},
+								Origins: []dvCom.FileObject{
+									{DownloadSize: 300 * 1024 * 1024}, // 300MB
+								},
+							},
+							{
+								Name:        "validation",
+								NumExamples: 20000,
+								Files: []dvCom.FileObject{
+									{Size: 30 * 1024 * 1024}, // 30MB
+								},
+								Origins: []dvCom.FileObject{
+									{DownloadSize: 60 * 1024 * 1024}, // 60MB
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		dvActivity.CalcStatistics(cardReq)
+
+		expectedRows := int64(50000 + 10000 + 80000 + 20000)                // 160000
+		expectedConvertedSize := int64((100 + 20 + 150 + 30) * 1024 * 1024) // 300MB
+		expectedDownloadSize := int64((200 + 40 + 300 + 60) * 1024 * 1024)  // 600MB
+
+		require.Equal(t, expectedRows, cardReq.FinalCardData.Rows_Num)
+		require.Equal(t, expectedConvertedSize, cardReq.FinalCardData.Converted_Size)
+		require.Equal(t, expectedDownloadSize, cardReq.FinalCardData.Downloaded_Size)
+	})
+}
