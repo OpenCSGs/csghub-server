@@ -12,14 +12,25 @@ import (
 	mockio "opencsg.com/csghub-server/_mocks/io"
 	mocksens "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/sensitive"
 	"opencsg.com/csghub-server/builder/sensitive"
+	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 )
 
 func TestTextFileChecker_Run(t *testing.T) {
 
 	t.Run("contains sensitive words", func(t *testing.T) {
-		localWordChecker = NewDFA()
-		localWordChecker.BuildDFA(getSensitiveWordList(`5pWP5oSf6K+NLHNlbnNpdGl2ZXdvcmQ=`))
+		mockChecker := mocksens.NewMockSensitiveChecker(t)
+		InitWithContentChecker(&config.Config{SensitiveCheck: struct {
+			Enable          bool   "env:\"STARHUB_SERVER_SENSITIVE_CHECK_ENABLE\" default:\"false\""
+			AccessKeyID     string "env:\"STARHUB_SERVER_SENSITIVE_CHECK_ACCESS_KEY_ID\""
+			AccessKeySecret string "env:\"STARHUB_SERVER_SENSITIVE_CHECK_ACCESS_KEY_SECRET\""
+			Region          string "env:\"STARHUB_SERVER_SENSITIVE_CHECK_REGION\""
+			Endpoint        string "env:\"STARHUB_SERVER_SENSITIVE_CHECK_ENDPOINT\" default:\"oss-cn-beijing.aliyuncs.com\""
+			EnableSSL       bool   "env:\"STARHUB_SERVER_SENSITIVE_CHECK_ENABLE_SSL\" default:\"true\""
+			DictDir         string "env:\"STARHUB_SERVER_SENSITIVE_CHECK_DICT_DIR\" default:\"/starhub-bin/vocabulary\""
+		}{Enable: true}}, mockChecker)
+		mockChecker.EXPECT().PassTextCheck(mock.Anything, types.ScenarioCommentDetection, "This text contains sensitive word.").
+			Return(&sensitive.CheckResult{IsSensitive: true, Reason: "contains sensitive word"}, nil)
 		checker := NewTextFileChecker()
 
 		reader1 := bytes.NewReader([]byte("This text contains sensitive word."))
@@ -31,8 +42,6 @@ func TestTextFileChecker_Run(t *testing.T) {
 		}
 	})
 	t.Run("no sensitive words", func(t *testing.T) {
-		localWordChecker = NewDFA()
-		localWordChecker.BuildDFA(getSensitiveWordList(`5pWP5oSf6K+NLHNlbnNpdGl2ZXdvcmQ=`))
 		mockContentChecker := mocksens.NewMockSensitiveChecker(t)
 		contentChecker = mockContentChecker
 		mockContentChecker.EXPECT().PassTextCheck(mock.Anything, mock.Anything, mock.Anything).Return(&sensitive.CheckResult{
@@ -80,8 +89,6 @@ func TestTextFileChecker_Run(t *testing.T) {
 		}
 	})
 	t.Run("call remote check retry", func(t *testing.T) {
-		localWordChecker = NewDFA()
-		localWordChecker.BuildDFA(getSensitiveWordList(`5pWP5oSf6K+NLHNlbnNpdGl2ZXdvcmQ=`))
 		mockContentChecker := mocksens.NewMockSensitiveChecker(t)
 		contentChecker = mockContentChecker
 		mockContentChecker.EXPECT().PassTextCheck(mock.Anything, mock.Anything, mock.Anything).Once().Return(nil, errors.New("network error"))
@@ -100,8 +107,6 @@ func TestTextFileChecker_Run(t *testing.T) {
 		}
 	})
 	t.Run("call remote check sensitive", func(t *testing.T) {
-		localWordChecker = NewDFA()
-		localWordChecker.BuildDFA(getSensitiveWordList(`5pWP5oSf6K+NLHNlbnNpdGl2ZXdvcmQ=`))
 		mockContentChecker := mocksens.NewMockSensitiveChecker(t)
 		contentChecker = mockContentChecker
 		mockContentChecker.EXPECT().PassTextCheck(mock.Anything, mock.Anything, mock.Anything).Once().Return(&sensitive.CheckResult{
