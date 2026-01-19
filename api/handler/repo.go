@@ -1119,10 +1119,6 @@ func (h *RepoHandler) HeadSDKDownload(ctx *gin.Context) {
 	ctx.Status(http.StatusOK)
 }
 
-func (h *RepoHandler) xetRefreshRoute(namespace, name, ref string) string {
-	return fmt.Sprintf("%s/hf/%s/%s/xet-write-token/%s", h.config.APIServer.PublicDomain, namespace, name, ref)
-}
-
 func (h *RepoHandler) handleDownload(ctx *gin.Context, isResolve bool) {
 	currentUser := httpbase.GetCurrentUser(ctx)
 	var (
