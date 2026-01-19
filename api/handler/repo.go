@@ -1113,10 +1113,6 @@ func (h *RepoHandler) HeadSDKDownload(ctx *gin.Context) {
 	}
 
 	slog.Debug("Head download repo file succeed", slog.String("repo_type", string(req.RepoType)), slog.String("name", name), slog.String("path", req.Path), slog.String("ref", req.Ref), slog.Int64("contentLength", file.Size))
-	if file.Lfs {
-		ctx.Header("X-Xet-Hash", file.LfsSHA256)
-		ctx.Header("X-Xet-Refresh-Route", h.xetRefreshRoute(namespace, name, branch))
-	}
 	ctx.Header("Content-Length", strconv.Itoa(int(file.Size)))
 	ctx.Header("X-Repo-Commit", repoCommit)
 	ctx.Header("ETag", file.SHA)
