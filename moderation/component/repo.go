@@ -22,6 +22,7 @@ type repoComponentImpl struct {
 	rs               database.RepoStore
 	rfs              database.RepoFileStore
 	rfcs             database.RepoFileCheckStore
+	whitelistRule    database.RepositoryFileCheckRuleStore
 	git              gitserver.GitServer
 	concurrencyLimit int
 }
@@ -35,6 +36,7 @@ func NewRepoComponent(cfg *config.Config) (RepoComponent, error) {
 	c.rs = database.NewRepoStore()
 	c.rfs = database.NewRepoFileStore()
 	c.rfcs = database.NewRepoFileCheckStore()
+	c.whitelistRule = database.NewRepositoryFileCheckRuleStore()
 	c.git = gs
 	c.concurrencyLimit = cfg.Moderation.RepoFileCheckConcurrency
 	return c, nil
@@ -152,7 +154,7 @@ func (c *repoComponentImpl) saveCheckResult(ctx context.Context, file *database.
 func (cc *repoComponentImpl) CheckRequestV2(ctx context.Context, req types.SensitiveRequestV2) (bool, error) {
 	fields := req.GetSensitiveFields()
 	for _, field := range fields {
-		pass, err := cc.checker.PassTextCheck(ctx, sensitive.Scenario(field.Scenario), field.Value())
+		pass, err := cc.checker.PassTextCheck(ctx, field.Scenario, field.Value())
 		if err != nil {
 			slog.Error("fail to check request sensitivity", slog.String("field", field.Name), slog.Any("error", err))
 			return false, fmt.Errorf("fail to check '%s' sensitivity, error: %w", field.Name, err)
@@ -163,4 +165,16 @@ func (cc *repoComponentImpl) CheckRequestV2(ctx context.Context, req types.Sensi
 		}
 	}
 	return true, nil
+}
+
+func (c *repoComponentImpl) GetNamespaceWhiteList(ctx context.Context) ([]string, error) {
+	namespaceWhiteList, err := c.whitelistRule.ListByRuleType(ctx, "namespace")
+	if err != nil {
+		return nil, err
+	}
+	patterns := make([]string, len(namespaceWhiteList))
+	for i := range len(namespaceWhiteList) {
+		patterns[i] = namespaceWhiteList[i].Pattern
+	}
+	return patterns, nil
 }

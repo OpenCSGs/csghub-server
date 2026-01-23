@@ -222,131 +222,54 @@ func TestRuntimeFrameworksStore_RemoveRuntimeFrameworkAndArch(t *testing.T) {
 	require.Equal(t, 0, len(archs))
 }
 
-func TestRuntimeFrameworksStore_FindSpaceLatestVersion(t *testing.T) {
-	db := tests.InitTestDB()
-	defer db.Close()
-	ctx := context.TODO()
-	rfStore := database.NewRuntimeFrameworksStoreWithDB(db)
-
-	// Add test data with different frame names and driver versions
-	testCases := []database.RuntimeFramework{
-		// case 1: driver version is empty
-		{
-			FrameName:    "space",
-			FrameImage:   "space_runtime:1.10.1",
-			Enabled:      1,
-			ComputeType:  "gpu",
-			FrameVersion: "1.10.1",
-		},
-
-		{
-			FrameName:    "space",
-			FrameImage:   "space_runtime:1.2.1",
-			Enabled:      1,
-			ComputeType:  "gpu",
-			FrameVersion: "1.2.1",
-		},
-
-		// case 2: driver version is not empty
-		{
-			FrameName:     "space",
-			FrameImage:    "space_runtime_gpu:1.10.1",
-			Enabled:       1,
-			ComputeType:   "gpu",
-			FrameVersion:  "1.10.1",
-			DriverVersion: "12.1",
-		},
-
-		{
-			FrameName:     "space",
-			FrameImage:    "space_runtime_gpu:1.2.1",
-			Enabled:       1,
-			ComputeType:   "gpu",
-			FrameVersion:  "1.2.1",
-			DriverVersion: "12.1",
-		},
-	}
-
-	for _, tc := range testCases {
-		_, err := rfStore.Add(ctx, tc)
-		require.Nil(t, err)
-	}
-	t.Run("FindSpaceLatestVersion_EmptyDriverVersion", func(t *testing.T) {
-		// Test 1: Find latest version for space "space" with driver version "12.1"
-		result, err := rfStore.FindSpaceLatestVersion(ctx, "space", "")
-		require.Nil(t, err)
-		require.Equal(t, "1.10.1", result.FrameVersion) // Should find 2 records (IDs 1 and 4)
-
-	})
-
-	t.Run("FindSpaceLatestVersion", func(t *testing.T) {
-		// Test 2: Find latest version for space "space" with empty driver version
-		result, err := rfStore.FindSpaceLatestVersion(ctx, "space", "12.1")
-		require.Nil(t, err)
-		require.Equal(t, "1.10.1", result.FrameVersion)
-	})
-}
-
 func TestRuntimeFrameworksStore_FindByFrameNameAndDriverVersion(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
 	ctx := context.TODO()
+
 	rfStore := database.NewRuntimeFrameworksStoreWithDB(db)
 
-	// Add test data
+	// Add test data with different frame names and driver versions
 	testCases := []database.RuntimeFramework{
-		// Test case 1: Multiple records with same name and version, different driver versions
 		{
-			FrameName:     "test-framework",
-			FrameVersion:  "1.0.0",
-			FrameImage:    "test-framework:1.0.0-cpu",
-			ComputeType:   "cpu",
-			DriverVersion: "",
+			ID:            1,
+			FrameName:     "vllm",
+			FrameImage:    "vllm:v1.0",
+			Type:          1,
 			Enabled:       1,
-			Type:          0,
-			ContainerPort: 8080,
+			DriverVersion: "12.1",
+			ComputeType:   "gpu",
+			FrameVersion:  "1.0.4",
 		},
 		{
-			FrameName:     "test-framework",
-			FrameVersion:  "1.0.0",
-			FrameImage:    "test-framework:1.0.0-gpu-11.8",
-			ComputeType:   "gpu",
+			ID:            2,
+			FrameName:     "vllm",
+			FrameImage:    "vllm:v1.1",
+			Type:          1,
+			Enabled:       1,
 			DriverVersion: "11.8",
-			Enabled:       1,
-			Type:          0,
-			ContainerPort: 8080,
+			ComputeType:   "gpu",
+			FrameVersion:  "1.0.4",
 		},
 		{
-			FrameName:     "test-framework",
-			FrameVersion:  "1.0.0",
-			FrameImage:    "test-framework:1.0.0-gpu-12.1",
-			ComputeType:   "gpu",
-			DriverVersion: "12.1",
+			ID:            3,
+			FrameName:     "trtllm",
+			FrameImage:    "trtllm:v1.0",
+			Type:          1,
 			Enabled:       1,
-			Type:          0,
-			ContainerPort: 8080,
+			DriverVersion: "12.1",
+			ComputeType:   "gpu",
+			FrameVersion:  "1.0.4",
 		},
-		// Test case 2: Different versions of the same framework
 		{
-			FrameName:     "test-framework",
-			FrameVersion:  "2.0.0",
-			FrameImage:    "test-framework:2.0.0-gpu-12.1",
-			ComputeType:   "gpu",
-			DriverVersion: "12.1",
+			ID:            4,
+			FrameName:     "vllm",
+			FrameImage:    "vllm:v1.2",
+			Type:          1,
 			Enabled:       1,
-			Type:          0,
-			ContainerPort: 8080,
-		},
-		// Test case 3: Different framework
-		{
-			FrameName:     "other-framework",
-			FrameVersion:  "1.0.0",
-			FrameImage:    "other-framework:1.0.0-gpu-12.1",
-			ComputeType:   "gpu",
 			DriverVersion: "12.1",
-			Enabled:       1,
-			Type:          0,
-			ContainerPort: 8080,
+			ComputeType:   "gpu",
+			FrameVersion:  "1.0.4",
 		},
 	}
 
@@ -355,64 +278,44 @@ func TestRuntimeFrameworksStore_FindByFrameNameAndDriverVersion(t *testing.T) {
 		require.Nil(t, err)
 	}
 
-	// Test 1: Find existing record with specific driver version
-	t.Run("FindExistingWithDriverVersion", func(t *testing.T) {
-		result, err := rfStore.FindByFrameNameAndDriverVersion(ctx, "test-framework", "1.0.0", "12.1")
-		require.Nil(t, err)
-		require.NotNil(t, result)
-		require.Equal(t, "test-framework", result.FrameName)
-		require.Equal(t, "1.0.0", result.FrameVersion)
-		require.Equal(t, "12.1", result.DriverVersion)
-		require.Equal(t, "test-framework:1.0.0-gpu-12.1", result.FrameImage)
-	})
+	// Test 1: Find by frame name "vllm" and driver version "12.1"
+	result, err := rfStore.FindByFrameNameAndDriverVersion(ctx, "vllm", "1.0.4", "12.1")
+	require.Nil(t, err)
+	require.Equal(t, 2, len(result)) // Should find 2 records (IDs 1 and 4)
 
-	// Test 2: Find existing record with empty driver version
-	t.Run("FindExistingWithEmptyDriverVersion", func(t *testing.T) {
-		result, err := rfStore.FindByFrameNameAndDriverVersion(ctx, "test-framework", "1.0.0", "")
-		require.Nil(t, err)
-		require.NotNil(t, result)
-		require.Equal(t, "test-framework", result.FrameName)
-		require.Equal(t, "1.0.0", result.FrameVersion)
-		require.Equal(t, "", result.DriverVersion)
-		require.Equal(t, "test-framework:1.0.0-cpu", result.FrameImage)
-	})
+	// Verify the found records
+	frameNames := make(map[string]int)
+	driverVersions := make(map[string]int)
+	for _, rf := range result {
+		frameNames[rf.FrameName]++
+		driverVersions[rf.DriverVersion]++
+		require.Equal(t, "vllm", rf.FrameName)
+		require.Equal(t, "12.1", rf.DriverVersion)
+	}
+	require.Equal(t, 2, frameNames["vllm"])
+	require.Equal(t, 2, driverVersions["12.1"])
 
-	// Test 3: Find non-existing record (wrong version)
-	t.Run("FindNonExistingVersion", func(t *testing.T) {
-		result, err := rfStore.FindByFrameNameAndDriverVersion(ctx, "test-framework", "3.0.0", "12.1")
-		require.Nil(t, err)
-		require.Nil(t, result)
-	})
+	// Test 2: Find by frame name "vllm" and driver version "11.8"
+	result, err = rfStore.FindByFrameNameAndDriverVersion(ctx, "vllm", "1.0.4", "11.8")
+	require.Nil(t, err)
+	require.Equal(t, 1, len(result)) // Should find 1 record (ID 2)
+	require.Equal(t, "vllm", result[0].FrameName)
+	require.Equal(t, "11.8", result[0].DriverVersion)
 
-	// Test 4: Find non-existing record (wrong driver version)
-	t.Run("FindNonExistingDriverVersion", func(t *testing.T) {
-		result, err := rfStore.FindByFrameNameAndDriverVersion(ctx, "test-framework", "1.0.0", "13.0")
-		require.Nil(t, err)
-		require.Nil(t, result)
-	})
+	// Test 3: Find by frame name "trtllm" and driver version "12.1"
+	result, err = rfStore.FindByFrameNameAndDriverVersion(ctx, "trtllm", "1.0.4", "12.1")
+	require.Nil(t, err)
+	require.Equal(t, 1, len(result)) // Should find 1 record (ID 3)
+	require.Equal(t, "trtllm", result[0].FrameName)
+	require.Equal(t, "12.1", result[0].DriverVersion)
 
-	// Test 5: Find non-existing record (wrong framework name)
-	t.Run("FindNonExistingFramework", func(t *testing.T) {
-		result, err := rfStore.FindByFrameNameAndDriverVersion(ctx, "non-existing", "1.0.0", "12.1")
-		require.Nil(t, err)
-		require.Nil(t, result)
-	})
+	// Test 4: Find by non-existent frame name and driver version combination
+	result, err = rfStore.FindByFrameNameAndDriverVersion(ctx, "non-existent-frame", "1.0.4", "12.1")
+	require.Nil(t, err)
+	require.Equal(t, 0, len(result)) // Should find 0 records
 
-	// Test 6: Find existing record with different version
-	t.Run("FindExistingDifferentVersion", func(t *testing.T) {
-		result, err := rfStore.FindByFrameNameAndDriverVersion(ctx, "test-framework", "2.0.0", "12.1")
-		require.Nil(t, err)
-		require.NotNil(t, result)
-		require.Equal(t, "2.0.0", result.FrameVersion)
-		require.Equal(t, "test-framework:2.0.0-gpu-12.1", result.FrameImage)
-	})
-
-	// Test 7: Find existing record with different framework name
-	t.Run("FindExistingDifferentFramework", func(t *testing.T) {
-		result, err := rfStore.FindByFrameNameAndDriverVersion(ctx, "other-framework", "1.0.0", "12.1")
-		require.Nil(t, err)
-		require.NotNil(t, result)
-		require.Equal(t, "other-framework", result.FrameName)
-		require.Equal(t, "other-framework:1.0.0-gpu-12.1", result.FrameImage)
-	})
+	// Test 5: Find by non-existent driver version
+	result, err = rfStore.FindByFrameNameAndDriverVersion(ctx, "vllm", "1.0.4", "non-existent-version")
+	require.Nil(t, err)
+	require.Equal(t, 0, len(result)) // Should find 0 records
 }

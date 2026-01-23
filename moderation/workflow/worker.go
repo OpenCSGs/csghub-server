@@ -43,3 +43,7 @@ func StopWorker() {
 func GetWorkflowClient() client.Client {
 	return wfClient
 }
+
+func SetWorkflowClient(c client.Client) {
+	wfClient = c
+}

@@ -37,8 +37,9 @@ type UpdateRepoReq struct {
 	// The new description for the repository
 	Description *string `json:"description"`
 	// The new visibility of the repository
-	Private *bool  `json:"private" example:"false"`
-	Admin   string `json:"-"`
+	Private     *bool  `json:"private" example:"false"`
+	Admin       string `json:"-"`
+	XnetEnabled *bool  `json:"xnet_enabled"`
 }
 
 // make sure UpdateModelReq implements SensitiveRequest interface

@@ -3,7 +3,6 @@ package component
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log/slog"
 
 	"opencsg.com/csghub-server/builder/deploy"
@@ -21,45 +20,27 @@ type SpaceResourceComponent interface {
 }
 
 func (c *spaceResourceComponentImpl) Index(ctx context.Context, req *types.SpaceResourceIndexReq) ([]types.SpaceResource, int, error) {
-	var clusterIDs []string
-	if req.ClusterID == "" {
-		clusters, err := c.deployer.ListCluster(ctx)
-		if err != nil {
-			return nil, 0, err
+	clusterIDs := []string{}
+	for _, c := range req.ClusterIDs {
+		if c != "" {
+			clusterIDs = append(clusterIDs, c)
 		}
-
-		for _, cluster := range clusters {
-			var timeout bool
-			timeout, err = c.deployer.CheckHeartbeatTimeout(ctx, cluster.ClusterID)
-			if err != nil {
-				slog.Error("failed to check heartbeat timeout", slog.String("cluster", cluster.ClusterID), slog.Any("error", err))
-				continue
-			}
-			if !timeout {
-				clusterIDs = append(clusterIDs, cluster.ClusterID)
-			}
-		}
-		if len(clusterIDs) == 0 {
-			return nil, 0, fmt.Errorf("can not find any running clusters")
-		}
-	} else {
-		clusterIDs = append(clusterIDs, req.ClusterID)
+	}
+	req.ClusterIDs = clusterIDs
+	if len(req.ClusterIDs) == 0 {
+		return nil, 0, nil
 	}
 
 	var result []types.SpaceResource
 	var total int
-	for _, clusterID := range clusterIDs {
+	for _, clusterID := range req.ClusterIDs {
 		var singleClusterResult []types.SpaceResource
 		dbReq := types.SpaceResourceFilter{
-			ClusterID: clusterID,
+			ClusterID:    clusterID,
+			HardwareType: req.HardwareType,
+			ResourceType: req.ResourceType,
 		}
-		if req.HardwareType != "" {
-			dbReq.HardwareType = req.HardwareType
-		}
-		if req.ResourceType != "" {
-			dbReq.ResourceType = req.ResourceType
-		}
-		databaseSpaceResources, currentTotal, err := c.spaceResourceStore.Index(ctx, dbReq, req.PageSize, req.Page)
+		databaseSpaceResources, currentTotal, err := c.spaceResourceStore.Index(ctx, dbReq, req.Per, req.Page)
 		if err != nil {
 			slog.Error("failed to index space resource", slog.String("clusterID", clusterID), slog.Any("error", err))
 			continue
@@ -88,6 +69,11 @@ func (c *spaceResourceComponentImpl) Index(ctx context.Context, req *types.Space
 				continue
 			}
 			resourceType := common.ResourceType(hardware)
+			if req.IsAvailable != nil {
+				if *req.IsAvailable != isAvailable {
+					continue
+				}
+			}
 			singleClusterResult = append(singleClusterResult, types.SpaceResource{
 				ID:          r.ID,
 				ClusterID:   r.ClusterID,
@@ -98,9 +84,7 @@ func (c *spaceResourceComponentImpl) Index(ctx context.Context, req *types.Space
 			})
 		}
 
-		tmpReq := *req
-		tmpReq.ClusterID = clusterID
-		err = c.updatePriceInfo(&tmpReq, singleClusterResult)
+		err = c.updatePriceInfo(req, singleClusterResult)
 		if err != nil {
 			slog.Error("failed to update price info", slog.String("clusterID", clusterID), slog.Any("error", err))
 			continue

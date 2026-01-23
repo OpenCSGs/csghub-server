@@ -894,26 +894,29 @@ func (c *spaceComponentImpl) Deploy(ctx context.Context, namespace, name, curren
 
 	var imageID string
 	if space.Sdk != types.DOCKER.Name {
-		var frame *database.RuntimeFramework
+		var frame []database.RuntimeFramework
 		var err error
-		// check if using old base  space runtime image 1.0.3 for old spaces
 		if (space.Sdk == types.GRADIO.Name && space.SdkVersion != types.GRADIO.Version) ||
 			(space.Sdk == types.STREAMLIT.Name && space.SdkVersion != types.STREAMLIT.Version) {
-			slog.InfoContext(ctx, "Using old base image 1.0.3 for old spaces")
-			frame, err = c.rfs.FindByFrameNameAndDriverVersion(ctx, "space", EngineVersion103, space.DriverVersion)
+			// Using old base image 1.0.3 for old spaces, will be removed in the future
+			frame, err = c.rfs.FindByFrameNameAndDriverVersion(ctx, "space", "1.0.3", space.DriverVersion)
 			if err != nil {
-				return -1, fmt.Errorf("cannot find available (%s) runtime framework, %w", EngineVersion103, err)
+				return -1, fmt.Errorf("cannot find available (1.0.3) runtime framework, %w", err)
 			}
 		} else {
-			// use latest base space runtime image
-			frame, err = c.rfs.FindSpaceLatestVersion(ctx, "space", space.DriverVersion)
+			// 1.0.4
+			frame, err = c.rfs.FindByFrameNameAndDriverVersion(ctx, "space", "1.0.4", space.DriverVersion)
 			if err != nil {
-				return -1, fmt.Errorf("cannot find available latest space runtime framework, %w", err)
+				return -1, fmt.Errorf("cannot find available (1.0.4) runtime framework, %w", err)
 			}
 		}
 
-		if frame != nil {
-			imageID = frame.FrameImage
+		if len(frame) > 0 {
+			sort.Slice(frame, func(i, j int) bool {
+				return frame[i].UpdatedAt.After(frame[j].UpdatedAt)
+			})
+
+			imageID = frame[0].FrameImage
 		}
 	}
 	// create deploy for space

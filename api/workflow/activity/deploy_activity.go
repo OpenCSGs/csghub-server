@@ -706,15 +706,24 @@ func (a *DeployActivity) makeDeployEnv(ctx context.Context, hardware types.HardW
 		switch repoInfo.Sdk {
 		case types.GRADIO.Name:
 			envMap["port"] = strconv.Itoa(types.GRADIO.Port)
+			envMap["SDK"] = types.GRADIO.Name
+			envMap["HF_ENDPOINT"] = a.cfg.ModelDownloadEndpoint
 		case types.STREAMLIT.Name:
 			envMap["port"] = strconv.Itoa(types.STREAMLIT.Port)
+			envMap["SDK"] = types.STREAMLIT.Name
+			envMap["HF_ENDPOINT"] = a.cfg.ModelDownloadEndpoint
 		case types.NGINX.Name:
 			envMap["port"] = strconv.Itoa(types.NGINX.Port)
+			envMap["SDK"] = types.NGINX.Name
+			envMap["HF_ENDPOINT"] = a.cfg.ModelDownloadEndpoint
+		case types.STREAMLIT.Name:
 		case types.DOCKER.Name:
 			envMap["port"] = strconv.Itoa(deployInfo.ContainerPort)
 			envMap["HF_ENDPOINT"] = a.cfg.ModelDownloadEndpoint
 		case types.MCPSERVER.Name:
 			envMap["port"] = strconv.Itoa(types.MCPSERVER.Port)
+			envMap["SDK"] = types.MCPSERVER.Name
+			envMap["HF_ENDPOINT"] = a.cfg.ModelDownloadEndpoint
 		default:
 			envMap["port"] = strconv.Itoa(types.DefaultContainerPort)
 		}

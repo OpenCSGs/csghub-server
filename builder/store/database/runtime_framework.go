@@ -29,8 +29,7 @@ type RuntimeFrameworksStore interface {
 	FindByImageID(ctx context.Context, imageID string) (*RuntimeFramework, error)
 	ListAll(ctx context.Context) ([]RuntimeFramework, error)
 	ListByIDs(ctx context.Context, ids []int64) ([]RuntimeFramework, error)
-	FindByFrameNameAndDriverVersion(ctx context.Context, name, version, driverVersion string) (*RuntimeFramework, error)
-	FindSpaceLatestVersion(ctx context.Context, name, driverVersion string) (*RuntimeFramework, error)
+	FindByFrameNameAndDriverVersion(ctx context.Context, name, version, driverVersion string) ([]RuntimeFramework, error)
 }
 
 func NewRuntimeFrameworksStore() RuntimeFrameworksStore {
@@ -199,40 +198,11 @@ func (rf *runtimeFrameworksStoreImpl) FindByFrameName(ctx context.Context, name 
 	return result, nil
 }
 
-func (rf *runtimeFrameworksStoreImpl) FindByFrameNameAndDriverVersion(ctx context.Context, name, version, driverVersion string) (*RuntimeFramework, error) {
-	var result RuntimeFramework
-	err := rf.db.Core.NewSelect().
-		Model(&result).
-		Where("frame_name = ?", name).
-		Where("frame_version = ?", version).
-		Where("driver_version = ?", driverVersion).
-		Order("created_at DESC").
-		Limit(1).
-		Scan(ctx, &result)
+func (rf *runtimeFrameworksStoreImpl) FindByFrameNameAndDriverVersion(ctx context.Context, name, version, driverVersion string) ([]RuntimeFramework, error) {
+	var result []RuntimeFramework
+	_, err := rf.db.Core.NewSelect().Model(&result).Where("frame_name = ?", name).Where("driver_version = ?", driverVersion).Where("frame_version = ?", version).Exec(ctx, &result)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, nil
-		}
 		return nil, err
 	}
-	return &result, nil
-}
-
-// Sort by version to obtain the largest version
-func (rf *runtimeFrameworksStoreImpl) FindSpaceLatestVersion(ctx context.Context, name, driverVersion string) (*RuntimeFramework, error) {
-	var result RuntimeFramework
-	err := rf.db.Core.NewSelect().
-		Model(&result).
-		Where("frame_name = ?", name).
-		Where("driver_version = ?", driverVersion).
-		OrderExpr("(string_to_array(frame_version, '.')::int[]) DESC").
-		Limit(1).
-		Scan(ctx, &result)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, nil
-		}
-		return nil, err
-	}
-	return &result, nil
+	return result, nil
 }

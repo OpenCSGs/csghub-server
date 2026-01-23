@@ -123,7 +123,7 @@ case "$SDK" in
     "streamlit")
         run_command "uv run streamlit run $app_path" "start streamlit application"
         ;;
-    "mcp_server")
+    "mcpserver")
         run_command "uv run $app_path" "start mcpserver application"
         ;;
     "nginx")
@@ -135,7 +135,7 @@ case "$SDK" in
         run_command "nginx -c $daemon_path -g 'daemon off;'" "start nginx service"
         ;;
     *)
-        echo "ERROR: Unsupported SDK type: $SDK, only gradio/streamlit/mcp_server/nginx are supported!" >&2
+        echo "ERROR: Unsupported SDK type: $SDK, only gradio/streamlit/mcpserver/nginx are supported!" >&2
         exit 1
         ;;
 esac

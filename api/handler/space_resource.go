@@ -8,7 +8,6 @@ import (
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
-	"opencsg.com/csghub-server/common/utils/common"
 	"opencsg.com/csghub-server/component"
 )
 
@@ -17,13 +16,19 @@ func NewSpaceResourceHandler(config *config.Config) (*SpaceResourceHandler, erro
 	if err != nil {
 		return nil, err
 	}
+	cluster, err := component.NewClusterComponent(config)
+	if err != nil {
+		return nil, err
+	}
 	return &SpaceResourceHandler{
 		spaceResource: src,
+		cluster:       cluster,
 	}, nil
 }
 
 type SpaceResourceHandler struct {
 	spaceResource component.SpaceResourceComponent
+	cluster       component.ClusterComponent
 }
 
 // GetSpaceResources godoc
@@ -33,7 +38,7 @@ type SpaceResourceHandler struct {
 // @Tags         SpaceReource
 // @Accept       json
 // @Produce      json
-// @Param        per query int false "per" default(20)
+// @Param        per query int false "page size" default(50)
 // @Param        page query int false "per page" default(1)
 // @Param        cluster_id query string false "cluster_id"
 // @Param 		 deploy_type query int false "deploy type(0-space,1-inference,2-finetune,3-serverless,4-evaluation)" Enums(0, 1, 2, 3, 4) default(1)
@@ -42,48 +47,33 @@ type SpaceResourceHandler struct {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /space_resources [get]
 func (h *SpaceResourceHandler) Index(ctx *gin.Context) {
-	clusterId := ctx.Query("cluster_id")
-	deployTypeStr := ctx.Query("deploy_type")
-	if deployTypeStr == "" {
-		// backward compatibility for inferences
-		deployTypeStr = strconv.Itoa(types.InferenceType)
-	}
-	deployType, err := strconv.Atoi(deployTypeStr)
-	if err != nil {
-		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
+	req := &types.SpaceResourceIndexReq{}
+	if err := ctx.ShouldBindQuery(req); err != nil {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	per, page, err := common.GetPerAndPageFromContext(ctx)
-	if err != nil {
-		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
-		return
-	}
-	currentUser := httpbase.GetCurrentUser(ctx)
-	req := &types.SpaceResourceIndexReq{
-		ClusterID:   clusterId,
-		DeployType:  deployType,
-		CurrentUser: currentUser,
-		PageOpts: types.PageOpts{
-			PageSize: per,
-			Page:     page,
-		},
-	}
-	if ctx.Query("resource_type") != "" {
-		req.ResourceType = types.ResourceType(ctx.Query("resource_type"))
-		if !types.ResourceTypeValid(req.ResourceType) {
-			slog.ErrorContext(ctx.Request.Context(), "Invalid resource type", "resource_type", req.ResourceType)
-			httpbase.BadRequest(ctx, "Invalid resource type")
-			return
+	req.CurrentUser = httpbase.GetCurrentUser(ctx)
+	clusters := []string{}
+	for _, c := range req.ClusterIDs {
+		if c != "" {
+			clusters = append(clusters, c)
 		}
 	}
-	if ctx.Query("hardware_type") != "" {
-		req.HardwareType = ctx.Query("hardware_type")
+	req.ClusterIDs = clusters
+	if len(req.ClusterIDs) == 0 {
+		clusters, err := h.cluster.Index(ctx.Request.Context())
+		if err != nil {
+			httpbase.ServerError(ctx, err)
+			return
+		}
+		req.ClusterIDs = make([]string, len(clusters))
+		for i := range clusters {
+			req.ClusterIDs[i] = clusters[i].ClusterID
+		}
 	}
 	spaceResources, total, err := h.spaceResource.Index(ctx.Request.Context(), req)
 	if err != nil {
-		slog.ErrorContext(ctx.Request.Context(), "Failed to get space resources", slog.String("cluster_id", clusterId), slog.String("deploy_type", deployTypeStr), slog.Any("error", err))
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get space resources", slog.Any("cluster_id", req.ClusterIDs), slog.Any("deploy_type", req.DeployType), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}

@@ -13,9 +13,9 @@ import (
 	"github.com/openai/openai-go/v3"
 	"opencsg.com/csghub-server/aigateway/types"
 	"opencsg.com/csghub-server/builder/rpc"
-	"opencsg.com/csghub-server/builder/sensitive"
 	"opencsg.com/csghub-server/builder/store/cache"
 	"opencsg.com/csghub-server/common/config"
+	commontypes "opencsg.com/csghub-server/common/types"
 )
 
 const (
@@ -361,5 +361,5 @@ func (modImpl *moderationImpl) CheckChatNonStreamResponse(ctx context.Context, c
 	if completion.Choices[0].Message.Content == "" {
 		return &rpc.CheckResult{IsSensitive: false}, nil
 	}
-	return modImpl.modSvcClient.PassTextCheck(ctx, string(sensitive.ScenarioChatDetection), completion.Choices[0].Message.Content)
+	return modImpl.modSvcClient.PassTextCheck(ctx, commontypes.ScenarioChatDetection, completion.Choices[0].Message.Content)
 }
