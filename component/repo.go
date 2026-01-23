@@ -3500,20 +3500,23 @@ func (c *repoComponentImpl) CommitFiles(ctx context.Context, req types.CommitFil
 	}
 
 	for _, lfsFile := range lfsFiles {
-		e, err := c.xnetClient.FileExists(ctx, lfsFile.Oid)
-		if err != nil {
-			continue
-		}
-		if e {
-			_, err := c.lfsMetaObjectStore.UpdateOrCreate(ctx, database.LfsMetaObject{
-				Oid:          lfsFile.Oid,
-				Size:         lfsFile.Size,
-				Existing:     true,
-				RepositoryID: repo.ID,
-			})
-			if err != nil {
-				return fmt.Errorf("failed to update or create lfs meta object, err: %w", err)
+		if repo.XnetEnabled {
+			lfsExistReq := &types.XetFileExistsReq{
+				RepoID:    strconv.FormatInt(repo.ID, 10),
+				ObjectKey: lfsFile.Oid,
 			}
+			if lfsFileExist, err := c.xnetClient.FileExists(ctx, lfsExistReq); err != nil || !lfsFileExist {
+				return fmt.Errorf("failed to request xnet, exist:%t err: %w", lfsFileExist, err)
+			}
+		}
+		_, err := c.lfsMetaObjectStore.UpdateOrCreate(ctx, database.LfsMetaObject{
+			Oid:          lfsFile.Oid,
+			Size:         lfsFile.Size,
+			Existing:     true,
+			RepositoryID: repo.ID,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to update or create lfs meta object, err: %w", err)
 		}
 	}
 
