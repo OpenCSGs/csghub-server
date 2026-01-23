@@ -70,6 +70,63 @@ func (_c *MockLfsMetaObjectStore_BulkUpdateOrCreate_Call) RunAndReturn(run func(
 	return _c
 }
 
+// CheckIfAllMigratedToXnet provides a mock function with given fields: ctx, repoID
+func (_m *MockLfsMetaObjectStore) CheckIfAllMigratedToXnet(ctx context.Context, repoID int64) (bool, error) {
+	ret := _m.Called(ctx, repoID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CheckIfAllMigratedToXnet")
+	}
+
+	var r0 bool
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64) (bool, error)); ok {
+		return rf(ctx, repoID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, int64) bool); ok {
+		r0 = rf(ctx, repoID)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, int64) error); ok {
+		r1 = rf(ctx, repoID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockLfsMetaObjectStore_CheckIfAllMigratedToXnet_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CheckIfAllMigratedToXnet'
+type MockLfsMetaObjectStore_CheckIfAllMigratedToXnet_Call struct {
+	*mock.Call
+}
+
+// CheckIfAllMigratedToXnet is a helper method to define mock.On call
+//   - ctx context.Context
+//   - repoID int64
+func (_e *MockLfsMetaObjectStore_Expecter) CheckIfAllMigratedToXnet(ctx interface{}, repoID interface{}) *MockLfsMetaObjectStore_CheckIfAllMigratedToXnet_Call {
+	return &MockLfsMetaObjectStore_CheckIfAllMigratedToXnet_Call{Call: _e.mock.On("CheckIfAllMigratedToXnet", ctx, repoID)}
+}
+
+func (_c *MockLfsMetaObjectStore_CheckIfAllMigratedToXnet_Call) Run(run func(ctx context.Context, repoID int64)) *MockLfsMetaObjectStore_CheckIfAllMigratedToXnet_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64))
+	})
+	return _c
+}
+
+func (_c *MockLfsMetaObjectStore_CheckIfAllMigratedToXnet_Call) Return(_a0 bool, _a1 error) *MockLfsMetaObjectStore_CheckIfAllMigratedToXnet_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockLfsMetaObjectStore_CheckIfAllMigratedToXnet_Call) RunAndReturn(run func(context.Context, int64) (bool, error)) *MockLfsMetaObjectStore_CheckIfAllMigratedToXnet_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Create provides a mock function with given fields: ctx, lfsObj
 func (_m *MockLfsMetaObjectStore) Create(ctx context.Context, lfsObj database.LfsMetaObject) (*database.LfsMetaObject, error) {
 	ret := _m.Called(ctx, lfsObj)
@@ -351,6 +408,55 @@ func (_c *MockLfsMetaObjectStore_UpdateOrCreate_Call) Return(_a0 *database.LfsMe
 }
 
 func (_c *MockLfsMetaObjectStore_UpdateOrCreate_Call) RunAndReturn(run func(context.Context, database.LfsMetaObject) (*database.LfsMetaObject, error)) *MockLfsMetaObjectStore_UpdateOrCreate_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// UpdateXnetUsed provides a mock function with given fields: ctx, repoID, oid, xnetUsed
+func (_m *MockLfsMetaObjectStore) UpdateXnetUsed(ctx context.Context, repoID int64, oid string, xnetUsed bool) error {
+	ret := _m.Called(ctx, repoID, oid, xnetUsed)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateXnetUsed")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64, string, bool) error); ok {
+		r0 = rf(ctx, repoID, oid, xnetUsed)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockLfsMetaObjectStore_UpdateXnetUsed_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateXnetUsed'
+type MockLfsMetaObjectStore_UpdateXnetUsed_Call struct {
+	*mock.Call
+}
+
+// UpdateXnetUsed is a helper method to define mock.On call
+//   - ctx context.Context
+//   - repoID int64
+//   - oid string
+//   - xnetUsed bool
+func (_e *MockLfsMetaObjectStore_Expecter) UpdateXnetUsed(ctx interface{}, repoID interface{}, oid interface{}, xnetUsed interface{}) *MockLfsMetaObjectStore_UpdateXnetUsed_Call {
+	return &MockLfsMetaObjectStore_UpdateXnetUsed_Call{Call: _e.mock.On("UpdateXnetUsed", ctx, repoID, oid, xnetUsed)}
+}
+
+func (_c *MockLfsMetaObjectStore_UpdateXnetUsed_Call) Run(run func(ctx context.Context, repoID int64, oid string, xnetUsed bool)) *MockLfsMetaObjectStore_UpdateXnetUsed_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64), args[2].(string), args[3].(bool))
+	})
+	return _c
+}
+
+func (_c *MockLfsMetaObjectStore_UpdateXnetUsed_Call) Return(_a0 error) *MockLfsMetaObjectStore_UpdateXnetUsed_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockLfsMetaObjectStore_UpdateXnetUsed_Call) RunAndReturn(run func(context.Context, int64, string, bool) error) *MockLfsMetaObjectStore_UpdateXnetUsed_Call {
 	_c.Call.Return(run)
 	return _c
 }

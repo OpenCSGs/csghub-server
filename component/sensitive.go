@@ -16,8 +16,8 @@ type sensitiveComponentImpl struct {
 }
 
 type SensitiveComponent interface {
-	CheckText(ctx context.Context, scenario, text string) (bool, error)
-	CheckImage(ctx context.Context, scenario, ossBucketName, ossObjectName string) (bool, error)
+	CheckText(ctx context.Context, scenario types.SensitiveScenario, text string) (bool, error)
+	CheckImage(ctx context.Context, scenario types.SensitiveScenario, ossBucketName, ossObjectName string) (bool, error)
 	CheckRequestV2(ctx context.Context, req types.SensitiveRequestV2) (bool, error)
 }
 
@@ -31,7 +31,7 @@ func NewSensitiveComponent(cfg *config.Config) (SensitiveComponent, error) {
 	return c, nil
 }
 
-func (c sensitiveComponentImpl) CheckText(ctx context.Context, scenario, text string) (bool, error) {
+func (c sensitiveComponentImpl) CheckText(ctx context.Context, scenario types.SensitiveScenario, text string) (bool, error) {
 	result, err := c.checker.PassTextCheck(ctx, scenario, text)
 	if err != nil {
 		return false, err
@@ -40,7 +40,7 @@ func (c sensitiveComponentImpl) CheckText(ctx context.Context, scenario, text st
 	return !result.IsSensitive, nil
 }
 
-func (c sensitiveComponentImpl) CheckImage(ctx context.Context, scenario, ossBucketName, ossObjectName string) (bool, error) {
+func (c sensitiveComponentImpl) CheckImage(ctx context.Context, scenario types.SensitiveScenario, ossBucketName, ossObjectName string) (bool, error) {
 	result, err := c.checker.PassImageCheck(ctx, scenario, ossBucketName, ossObjectName)
 	if err != nil {
 		return false, err
@@ -72,11 +72,11 @@ func (c sensitiveComponentImpl) CheckRequestV2(ctx context.Context, req types.Se
 type sensitiveComponentNoOpImpl struct {
 }
 
-func (c *sensitiveComponentNoOpImpl) CheckText(ctx context.Context, scenario, text string) (bool, error) {
+func (c *sensitiveComponentNoOpImpl) CheckText(ctx context.Context, scenario types.SensitiveScenario, text string) (bool, error) {
 	return true, nil
 }
 
-func (c *sensitiveComponentNoOpImpl) CheckImage(ctx context.Context, scenario, ossBucketName, ossObjectName string) (bool, error) {
+func (c *sensitiveComponentNoOpImpl) CheckImage(ctx context.Context, scenario types.SensitiveScenario, ossBucketName, ossObjectName string) (bool, error) {
 	return true, nil
 }
 

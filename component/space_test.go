@@ -164,6 +164,100 @@ func TestSpaceComponent_Index(t *testing.T) {
 
 }
 
+func TestSpaceComponent_Index_HalfCreatedRepos(t *testing.T) {
+	ctx := context.TODO()
+	sc := initializeTestSpaceComponent(ctx, t)
+
+	sc.mocks.components.repo.EXPECT().PublicToUser(
+		ctx, types.SpaceRepo, "user", &types.RepoFilter{Sort: "z", Username: "user"}, 10, 1).Return([]*database.Repository{
+		{
+			ID:   123,
+			Name: "r1",
+			Tags: []database.Tag{{Name: "t1"}},
+			User: database.User{
+				ID:       1,
+				Username: "user",
+				NickName: "nickname",
+				Avatar:   "avatar",
+			},
+		},
+		{
+			ID:   124,
+			Name: "r2",
+			Tags: []database.Tag{{Name: "t2"}},
+			User: database.User{
+				ID:       1,
+				Username: "user",
+				NickName: "nickname",
+				Avatar:   "avatar",
+			},
+		},
+		{
+			ID:   125,
+			Name: "half-created",
+			Tags: []database.Tag{{Name: "t3"}},
+			User: database.User{
+				ID:       1,
+				Username: "user",
+				NickName: "nickname",
+				Avatar:   "avatar",
+			},
+		}, // This is a half-created repo with no space
+	}, 3, nil) // Total should be 3
+
+	sc.mocks.stores.SpaceMock().EXPECT().ByRepoIDs(ctx, []int64{123, 124, 125}).Return(
+		[]database.Space{
+			{ID: 11, RepositoryID: 123, Repository: &database.Repository{
+				ID:   123,
+				Name: "r1",
+				User: database.User{
+					ID:       1,
+					Username: "user",
+					NickName: "nickname",
+					Avatar:   "avatar",
+				},
+			}},
+			{ID: 12, RepositoryID: 124, Repository: &database.Repository{
+				ID:   124,
+				Name: "r2",
+				User: database.User{
+					ID:       1,
+					Username: "user",
+					NickName: "nickname",
+					Avatar:   "avatar",
+				},
+			}},
+		}, nil,
+	)
+
+	data, total, err := sc.Index(ctx, &types.RepoFilter{Sort: "z", Username: "user"}, 10, 1, false)
+	require.Nil(t, err)
+	require.Equal(t, 3, total) // Total should match PublicToUser's return value
+	require.Len(t, data, 2)     // But only 2 spaces should be returned
+
+	require.Equal(t, []*types.Space{
+		{
+			RepositoryID: 123, Name: "r1", Tags: []types.RepoTag{{Name: "t1"}},
+			Status:        "NoAppFile",
+			RecomOpWeight: 0,
+			User: &types.User{
+				Nickname: "nickname",
+				Avatar:   "avatar",
+			},
+		},
+		{
+			RepositoryID: 124, Name: "r2", Tags: []types.RepoTag{{Name: "t2"}},
+			Status:        "NoAppFile",
+			RecomOpWeight: 0,
+			User: &types.User{
+				Nickname: "nickname",
+				Avatar:   "avatar",
+			},
+		},
+	}, data)
+
+}
+
 func TestSpaceComponent_OrgSpaces(t *testing.T) {
 	ctx := context.TODO()
 	sc := initializeTestSpaceComponent(ctx, t)

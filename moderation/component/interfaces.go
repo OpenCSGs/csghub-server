@@ -12,6 +12,7 @@ type RepoComponent interface {
 	UpdateRepoSensitiveCheckStatus(ctx context.Context, repoId int64, status types.SensitiveCheckStatus) error
 	CheckRepoFiles(ctx context.Context, repoId int64, options CheckOption) error
 	CheckRequestV2(ctx context.Context, req types.SensitiveRequestV2) (bool, error)
+	GetNamespaceWhiteList(ctx context.Context) ([]string, error)
 }
 
 type RepoFileComponent interface {

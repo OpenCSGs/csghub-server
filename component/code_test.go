@@ -117,6 +117,37 @@ func TestCodeComponent_Index(t *testing.T) {
 	}, data)
 }
 
+func TestCodeComponent_Index_HalfCreatedRepos(t *testing.T) {
+	ctx := context.TODO()
+	cc := initializeTestCodeComponent(ctx, t)
+
+	filter := &types.RepoFilter{Username: "user"}
+	// PublicToUser returns 3 repositories, but only 2 have corresponding codes
+	cc.mocks.components.repo.EXPECT().PublicToUser(ctx, types.CodeRepo, "user", filter, 10, 1).Return(
+		[]*database.Repository{
+			{ID: 1, Name: "r1", Tags: []database.Tag{{Name: "t1"}}},
+			{ID: 2, Name: "r2"},
+			{ID: 3, Name: "half-created", Tags: []database.Tag{{Name: "t3"}}}, // This is a half-created repo with no code
+		}, 3, nil, // Total should be 3
+	)
+
+	// ByRepoIDs returns only 2 codes (no code for repo ID 3)
+	cc.mocks.stores.CodeMock().EXPECT().ByRepoIDs(ctx, []int64{1, 2, 3}).Return([]database.Code{
+		{ID: 11, RepositoryID: 2, Repository: &database.Repository{ID: 2, Name: "r2", Mirror: database.Mirror{}}},
+		{ID: 12, RepositoryID: 1, Repository: &database.Repository{ID: 1, Name: "r1", Mirror: database.Mirror{}}},
+	}, nil)
+
+	data, total, err := cc.Index(ctx, filter, 10, 1, false)
+	require.Nil(t, err)
+	require.Equal(t, 3, total) // Total should match PublicToUser's return value
+	require.Len(t, data, 2)     // But only 2 codes should be returned
+
+	require.Equal(t, []*types.Code{
+		{ID: 12, RepositoryID: 1, Name: "r1", Tags: []types.RepoTag{{Name: "t1"}}, RecomOpWeight: 0},
+		{ID: 11, RepositoryID: 2, Name: "r2", RecomOpWeight: 0},
+	}, data)
+}
+
 func TestCodeComponent_Update(t *testing.T) {
 	ctx := context.TODO()
 	cc := initializeTestCodeComponent(ctx, t)

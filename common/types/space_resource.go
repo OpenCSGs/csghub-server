@@ -1,5 +1,9 @@
 package types
 
+import (
+	"github.com/go-playground/validator/v10"
+)
+
 type ResourceType string
 type PayMode string
 
@@ -25,6 +29,10 @@ func ResourceTypeValid(resourceType ResourceType) bool {
 		resourceType == ResourceTypeGPGPU ||
 		resourceType == ResourceTypeMLU ||
 		resourceType == ResourceTypeDCU
+}
+
+var ResourceTypeValidator validator.Func = func(fl validator.FieldLevel) bool {
+	return ResourceTypeValid(ResourceType(fl.Field().String()))
 }
 
 type SpaceResource struct {
@@ -53,13 +61,14 @@ type UpdateSpaceResourceReq struct {
 }
 
 type SpaceResourceIndexReq struct {
-	ClusterID    string       `json:"cluster_id"`
-	DeployType   int          `json:"deploy_type"`
-	CurrentUser  string       `json:"current_user"`
-	ResourceType ResourceType `json:"resource_type"`
-	HardwareType string       `json:"hardware_type"`
-	IsAvailable  bool         `json:"is_available"`
-	PageOpts
+	ClusterIDs   []string     `json:"cluster_id" form:"cluster_id"`
+	DeployType   int          `json:"deploy_type" form:"deploy_type" binding:"omitempty"`
+	CurrentUser  string       `json:"current_user" form:"current_user"`
+	ResourceType ResourceType `json:"resource_type" form:"resource_type" binding:"omitempty,resource_type"`
+	HardwareType string       `json:"hardware_type" form:"hardware_type"`
+	IsAvailable  *bool        `json:"is_available" form:"is_available"`
+	Per          int          `json:"per" form:"per,default=50" binding:"min=1,max=100"`
+	Page         int          `json:"page" form:"page,default=1" binding:"min=1"`
 }
 
 type SpaceResourceFilter struct {

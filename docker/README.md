@@ -1,4 +1,4 @@
-# CSGHUB Server Base Images Building 
+# CSGHUB Server Base Images Building
 
 ## Login Container Registry
 ```bash
