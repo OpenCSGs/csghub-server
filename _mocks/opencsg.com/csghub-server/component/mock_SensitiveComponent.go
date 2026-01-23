@@ -57,7 +57,7 @@ type MockSensitiveComponent_CheckImage_Call struct {
 
 // CheckImage is a helper method to define mock.On call
 //   - ctx context.Context
-//   - scenario types.SensitiveScenario
+//   - scenario types.Scenario
 //   - ossBucketName string
 //   - ossObjectName string
 func (_e *MockSensitiveComponent_Expecter) CheckImage(ctx interface{}, scenario interface{}, ossBucketName interface{}, ossObjectName interface{}) *MockSensitiveComponent_CheckImage_Call {
@@ -173,7 +173,7 @@ type MockSensitiveComponent_CheckText_Call struct {
 
 // CheckText is a helper method to define mock.On call
 //   - ctx context.Context
-//   - scenario types.SensitiveScenario
+//   - scenario types.Scenario
 //   - text string
 func (_e *MockSensitiveComponent_Expecter) CheckText(ctx interface{}, scenario interface{}, text interface{}) *MockSensitiveComponent_CheckText_Call {
 	return &MockSensitiveComponent_CheckText_Call{Call: _e.mock.On("CheckText", ctx, scenario, text)}

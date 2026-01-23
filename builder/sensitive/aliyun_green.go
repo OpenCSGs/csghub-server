@@ -18,6 +18,7 @@ import (
 	"github.com/alibabacloud-go/tea/tea"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/green"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/types"
 )
 
 // copy from common/utils/common to avoid cycle import
@@ -180,7 +181,7 @@ func (c *AliyunGreenChecker) PassLargeTextCheck(ctx context.Context, text string
 	return &CheckResult{IsSensitive: false}, nil
 }
 
-func (c *AliyunGreenChecker) PassTextCheck(ctx context.Context, scenario Scenario, text string) (*CheckResult, error) {
+func (c *AliyunGreenChecker) PassTextCheck(ctx context.Context, scenario types.SensitiveScenario, text string) (*CheckResult, error) {
 	if len(text) > smallTextSize {
 		slog.Info("switch to large text check", slog.String("scenario", string(scenario)), slog.Int("size", len(text)))
 		return c.PassLargeTextCheck(ctx, text)
@@ -236,7 +237,7 @@ func (*AliyunGreenChecker) SplitTasks(text string) []map[string]string {
 	return tasks
 }
 
-func (c *AliyunGreenChecker) PassLLMCheck(ctx context.Context, scenario Scenario, text string, sessionId string, accountId string) (*CheckResult, error) {
+func (c *AliyunGreenChecker) PassLLMCheck(ctx context.Context, scenario types.SensitiveScenario, text string, sessionId string, accountId string) (*CheckResult, error) {
 	// Build parameter map
 	paramMap := map[string]interface{}{
 		"content": text,
@@ -298,7 +299,7 @@ func (c *AliyunGreenChecker) PassLLMCheck(ctx context.Context, scenario Scenario
 	return &CheckResult{IsSensitive: false}, nil
 }
 
-func (c *AliyunGreenChecker) PassImageURLCheck(ctx context.Context, scenario Scenario, imageURL string) (*CheckResult, error) {
+func (c *AliyunGreenChecker) PassImageURLCheck(ctx context.Context, scenario types.SensitiveScenario, imageURL string) (*CheckResult, error) {
 	serviceParameters, _ := json.Marshal(
 		map[string]interface{}{
 			"imageURL": imageURL,
@@ -332,7 +333,7 @@ func (c *AliyunGreenChecker) PassImageURLCheck(ctx context.Context, scenario Sce
 	return &CheckResult{IsSensitive: false}, nil
 }
 
-func (c *AliyunGreenChecker) PassImageCheck(ctx context.Context, scenario Scenario, ossBucketName, ossObjectName string) (*CheckResult, error) {
+func (c *AliyunGreenChecker) PassImageCheck(ctx context.Context, scenario types.SensitiveScenario, ossBucketName, ossObjectName string) (*CheckResult, error) {
 	serviceParameters, _ := json.Marshal(
 		map[string]interface{}{
 			"ossRegionId": c.green2022.GetRegionId(),

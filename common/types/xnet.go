@@ -9,6 +9,7 @@ type XnetTokenReq struct {
 	RepoType   RepositoryType `json:"repoType"`
 	Branch     string         `json:"branch"`
 	Username   string         `json:"username"`
+	RepoID     string         `json:"repoID"`
 }
 
 type XnetTokenResp struct {
@@ -27,6 +28,19 @@ type XnetDownloadURLResp struct {
 	URL url.URL `json:"url"`
 }
 
+type XetFileExistsReq struct {
+	ObjectKey string `json:"objectKey"`
+	RepoID    string `json:"repoID"`
+}
 type XetFileExistsResp struct {
 	Exists bool `json:"exists"`
 }
+
+type XnetMigrationTaskStatus string
+
+const (
+	XnetMigrationTaskStatusPending   XnetMigrationTaskStatus = "pending"
+	XnetMigrationTaskStatusRunning   XnetMigrationTaskStatus = "running"
+	XnetMigrationTaskStatusCompleted XnetMigrationTaskStatus = "completed"
+	XnetMigrationTaskStatusFailed    XnetMigrationTaskStatus = "failed"
+)

@@ -1,0 +1,20 @@
+FROM opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/debian:bookworm-slim
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+      ca-certificates curl gnupg netbase wget \
+      git mercurial openssh-client subversion procps \
+      g++ gcc libc6-dev make pkg-config && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /go
+
+ENV GOLANG_VERSION=1.25.5
+ENV GOTOOLCHAIN=local
+ENV GOPATH=/go
+ENV PATH=/go/bin:/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+ARG TARGETARCH
+RUN curl -fsSL https://golang.google.cn/dl/go${GOLANG_VERSION}.linux-${TARGETARCH}.tar.gz | tar -C /usr/local -xz
+
+RUN mkdir -p "$GOPATH/src" "$GOPATH/bin" && \
+    chmod -R 755 "$GOPATH"

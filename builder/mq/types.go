@@ -24,6 +24,12 @@ const (
 
 	HighPriorityMsgSubject   string = "notification.message.high"
 	NormalPriorityMsgSubject string = "notification.message.normal"
+
+	LfsXnetProcessedSubject string = "xnet.lfs.processed"
+
+	LfsMigrationSubject string = "xnet.lfs.migrate"
+	LfsProgressSubject  string = "xnet.lfs.progress"
+	LfsResultSubject    string = "xnet.lfs.result"
 )
 
 type MQGroup struct {

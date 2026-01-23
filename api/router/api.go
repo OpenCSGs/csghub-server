@@ -186,7 +186,10 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	r.Use(middleware.LocalizedErrorMiddleware())
 	r.Use(middleware.Authenticator(config))
 	useAdvancedMiddleware(r, config)
-	createCustomValidator()
+	err = createCustomValidator()
+	if err != nil {
+		return nil, fmt.Errorf("error create validator, error: %w", err)
+	}
 	apiGroup := r.Group("/api/v1")
 
 	versionHandler := handler.NewVersionHandler()
@@ -1092,6 +1095,16 @@ func createMappingRoutes(
 			hfSpaceFileGroup.GET("/:namespace/:name/resolve/:branch/*file_path", middleware.RepoMapping(types.SpaceRepo), repoCommonHandler.SDKDownload)
 			hfSpaceFileGroup.HEAD("/:namespace/:name/resolve/:branch/*file_path", middleware.RepoMapping(types.SpaceRepo), repoCommonHandler.HeadSDKDownload)
 		}
+		hfCodeFileGroup := hfGroup.Group("/codes")
+		{
+			hfCodeFileGroup.GET("/:namespace/:name/resolve/:branch/*file_path", middleware.RepoMapping(types.CodeRepo), repoCommonHandler.SDKDownload)
+			hfCodeFileGroup.HEAD("/:namespace/:name/resolve/:branch/*file_path", middleware.RepoMapping(types.CodeRepo), repoCommonHandler.HeadSDKDownload)
+		}
+		hfMcpserverFileGroup := hfGroup.Group("/mcps")
+		{
+			hfMcpserverFileGroup.GET("/:namespace/:name/resolve/:branch/*file_path", middleware.RepoMapping(types.MCPServerRepo), repoCommonHandler.SDKDownload)
+			hfMcpserverFileGroup.HEAD("/:namespace/:name/resolve/:branch/*file_path", middleware.RepoMapping(types.MCPServerRepo), repoCommonHandler.HeadSDKDownload)
+		}
 		hfAPIGroup := hfGroup.Group("/api")
 		{
 			hfAPIGroup.GET("/whoami-v2", middlewareCollection.Auth.NeedLogin, userHandler.UserPermission)
@@ -1118,6 +1131,16 @@ func createMappingRoutes(
 			{
 				hfSpaceAPIGroup.GET("/:namespace/:name/revision/:ref", middleware.RepoMapping(types.SpaceRepo), repoCommonHandler.SDKListFiles)
 				hfSpaceAPIGroup.GET("/:namespace/:name", middleware.RepoMapping(types.SpaceRepo), repoCommonHandler.SDKListFiles)
+			}
+			hfCodeAPIGroup := hfAPIGroup.Group("/codes")
+			{
+				hfCodeAPIGroup.GET("/:namespace/:name/revision/:ref", middleware.RepoMapping(types.CodeRepo), repoCommonHandler.SDKListFiles)
+				hfCodeAPIGroup.GET("/:namespace/:name", middleware.RepoMapping(types.CodeRepo), repoCommonHandler.SDKListFiles)
+			}
+			hfMcperverAPIGroup := hfAPIGroup.Group("/mcps")
+			{
+				hfMcperverAPIGroup.GET("/:namespace/:name/revision/:ref", middleware.RepoMapping(types.MCPServerRepo), repoCommonHandler.SDKListFiles)
+				hfMcperverAPIGroup.GET("/:namespace/:name", middleware.RepoMapping(types.MCPServerRepo), repoCommonHandler.SDKListFiles)
 			}
 			hfReposAPIGroup := hfAPIGroup.Group("/repos")
 			{
@@ -1334,6 +1357,13 @@ func createWebHookRoutes(apiGroup *gin.RouterGroup, middlewareCollection middlew
 	return nil
 }
 
-func createCustomValidator() {
-	_, _ = binding.Validator.Engine().(*validator.Validate)
+func createCustomValidator() error {
+	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
+		if err := v.RegisterValidation("resource_type", types.ResourceTypeValidator); err != nil {
+			return fmt.Errorf("fail to register custom validation functions:%w", err)
+		}
+		return nil // Return nil if no error occurred during registration of custom validation functions
+	} else {
+		return fmt.Errorf("fail to register custom validation functions")
+	}
 }

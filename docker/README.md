@@ -1,4 +1,4 @@
-# CSGHUB Server Base Images Building 
+# CSGHUB Server Base Images Building
 
 ## Login Container Registry
 ```bash
@@ -9,14 +9,20 @@ echo "$OPENCSG_ACR_PASSWORD" | docker login $OPENCSG_ACR -u $OPENCSG_ACR_USERNAM
 ```
 
 ## Build Multi-Platform Images
+### Runtime Base Image
 ```bash
-export BUILDX_NO_DEFAULT_ATTESTATIONS=1
-export IMAGE_TAG=1.0
-docker buildx build --platform linux/amd64,linux/arm64 \
-  -t ${OPENCSG_ACR}/opencsg_public/csghub_server:base-${IMAGE_TAG} \
-  -t ${OPENCSG_ACR}/opencsg_public/csghub_server:base-latest \
-  -f Dockerfile.nginx \
+export IMAGE_TAG=3.1
+docker buildx build --provenance false --platform linux/amd64,linux/arm64 \
+  -t ${OPENCSG_ACR}/opencsg_public/csghub_server:base-runtime-${IMAGE_TAG} \
+  -f docker/Dockerfile-base-runtime \
   --push .
 ```
-*The above command will create `linux/amd64` and `linux/arm64` images with the tags `base-${IMAGE_TAG}` and `base-latest` at the same time.*
 
+### GOLANG Base Image
+```bash
+export IMAGE_TAG=1.25.5
+docker buildx build --provenance false --platform linux/amd64,linux/arm64 \
+  -t ${OPENCSG_ACR}/opencsg_public/csghub_server:base-build-${IMAGE_TAG} \
+  -f docker/Dockerfile-base-build \
+  --push .
+```
