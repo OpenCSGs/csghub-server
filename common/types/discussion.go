@@ -2,8 +2,6 @@ package types
 
 import (
 	"time"
-
-	"opencsg.com/csghub-server/builder/sensitive"
 )
 
 type CreateRepoDiscussionRequest struct {
@@ -24,7 +22,7 @@ func (req *CreateRepoDiscussionRequest) GetSensitiveFields() []SensitiveField {
 			Value: func() string {
 				return req.Title
 			},
-			Scenario: string(sensitive.ScenarioCommentDetection),
+			Scenario: ScenarioCommentDetection,
 		},
 	}
 }
@@ -62,7 +60,7 @@ func (req *UpdateDiscussionRequest) GetSensitiveFields() []SensitiveField {
 			Value: func() string {
 				return req.Title
 			},
-			Scenario: string(sensitive.ScenarioCommentDetection),
+			Scenario: ScenarioCommentDetection,
 		},
 	}
 }
@@ -117,7 +115,7 @@ func (req *CreateCommentRequest) GetSensitiveFields() []SensitiveField {
 			Value: func() string {
 				return req.Content
 			},
-			Scenario: string(sensitive.ScenarioCommentDetection),
+			Scenario: ScenarioCommentDetection,
 		},
 	}
 }
@@ -145,7 +143,7 @@ func (req *UpdateCommentRequest) GetSensitiveFields() []SensitiveField {
 			Value: func() string {
 				return req.Content
 			},
-			Scenario: string(sensitive.ScenarioCommentDetection),
+			Scenario: ScenarioCommentDetection,
 		},
 	}
 }

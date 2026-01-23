@@ -47,6 +47,19 @@ func (h *RepoHandler) FullCheck(c *gin.Context) {
 		return
 	}
 
+	whiteList, err := h.rc.GetNamespaceWhiteList(c.Request.Context())
+	if err != nil {
+		slog.Error("failed to get namespace white list", slog.Any("error", err))
+		httpbase.ServerError(c, err)
+	}
+	for _, rule := range whiteList {
+		if req.Namespace == rule {
+			slog.Info("namespace in white list, skip repo full check", slog.String("namespace", req.Namespace))
+			httpbase.OK(c, nil)
+			return
+		}
+	}
+
 	//start workflow to do full check
 	workflowClient := workflow.GetWorkflowClient()
 	workflowOptions := client.StartWorkflowOptions{
