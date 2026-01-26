@@ -7,6 +7,7 @@ import (
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/builder/sensitive"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/moderation/component"
 )
 
@@ -22,8 +23,8 @@ func NewSensitiveHandler(cfg *config.Config) (*SensitiveHandler, error) {
 
 func (h *SensitiveHandler) Text(ctx *gin.Context) {
 	type req struct {
-		Scenario sensitive.Scenario `json:"scenario"`
-		Text     string             `json:"text"`
+		Scenario types.SensitiveScenario `json:"scenario"`
+		Text     string                  `json:"text"`
 	}
 	var (
 		r   req
@@ -46,10 +47,10 @@ func (h *SensitiveHandler) Text(ctx *gin.Context) {
 
 func (h *SensitiveHandler) Image(ctx *gin.Context) {
 	type req struct {
-		Scenario      sensitive.Scenario `json:"scenario"`
-		OssBucketName string             `json:"oss_bucket_name"`
-		OssObjectName string             `json:"oss_object_name"`
-		ImageURL      string             `json:"image_url"`
+		Scenario      types.SensitiveScenario `json:"scenario"`
+		OssBucketName string                  `json:"oss_bucket_name"`
+		OssObjectName string                  `json:"oss_object_name"`
+		ImageURL      string                  `json:"image_url"`
 	}
 	var (
 		r   req
@@ -94,7 +95,7 @@ func (h *SensitiveHandler) LlmResp(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	result, err := h.c.PassStreamCheck(ctx, sensitive.ScenarioLLMResModeration, r.ServiceParameters.Content, r.ServiceParameters.SessionId)
+	result, err := h.c.PassStreamCheck(ctx, types.ScenarioLLMResModeration, r.ServiceParameters.Content, r.ServiceParameters.SessionId)
 	if err != nil {
 		httpbase.ServerError(ctx, err)
 		return
@@ -119,7 +120,7 @@ func (h *SensitiveHandler) LlmPrompt(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	result, err := h.c.PassLLMQueryCheck(ctx, sensitive.ScenarioLLMQueryModeration, r.ServiceParameters.Content, r.ServiceParameters.AccountId)
+	result, err := h.c.PassLLMQueryCheck(ctx, types.ScenarioLLMQueryModeration, r.ServiceParameters.Content, r.ServiceParameters.AccountId)
 	if err != nil {
 		httpbase.ServerError(ctx, err)
 		return

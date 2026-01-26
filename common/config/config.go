@@ -129,6 +129,7 @@ type Config struct {
 		Region          string `env:"STARHUB_SERVER_SENSITIVE_CHECK_REGION"`
 		Endpoint        string `env:"STARHUB_SERVER_SENSITIVE_CHECK_ENDPOINT" default:"oss-cn-beijing.aliyuncs.com"`
 		EnableSSL       bool   `env:"STARHUB_SERVER_SENSITIVE_CHECK_ENABLE_SSL" default:"true"`
+		DictDir         string `env:"STARHUB_SERVER_SENSITIVE_CHECK_DICT_DIR" default:"/starhub-bin/vocabulary"`
 	}
 
 	JWT struct {
@@ -263,10 +264,8 @@ type Config struct {
 	}
 
 	Moderation struct {
-		Host string `env:"OPENCSG_MODERATION_SERVER_HOST" default:"http://localhost"`
-		Port int    `env:"OPENCSG_MODERATION_SERVER_PORT" default:"8089"`
-		// comma splitted, and base64 encoded
-		EncodedSensitiveWords    string `env:"OPENCSG_MODERATION_SERVER_ENCODED_SENSITIVE_WORDS" default:"5Lmg6L+R5bmzLHhpamlucGluZw=="`
+		Host                     string `env:"OPENCSG_MODERATION_SERVER_HOST" default:"http://localhost"`
+		Port                     int    `env:"OPENCSG_MODERATION_SERVER_PORT" default:"8089"`
 		RepoFileCheckConcurrency int    `env:"OPENCSG_MODERATION_SERVER_REPO_FILE_CHECK_CONCURRENCY" default:"10"`
 	}
 

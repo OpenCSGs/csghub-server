@@ -4,22 +4,24 @@ import (
 	"context"
 	"errors"
 	"fmt"
-
 	"github.com/minio/minio-go/v7"
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
+	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/store/s3"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
+	"strconv"
 )
 
 type LFSExistsChecker struct {
-	repoStore database.RepoStore
-	gitServer gitserver.GitServer
-	config    *config.Config
-	s3Client  s3.Client
+	repoStore  database.RepoStore
+	gitServer  gitserver.GitServer
+	config     *config.Config
+	s3Client   s3.Client
+	xnetClient rpc.XnetSvcClient
 }
 
 func NewLFSExistsChecker(config *config.Config) (GitCallbackChecker, error) {
@@ -32,10 +34,11 @@ func NewLFSExistsChecker(config *config.Config) (GitCallbackChecker, error) {
 		return nil, err
 	}
 	return &LFSExistsChecker{
-		repoStore: database.NewRepoStore(),
-		gitServer: git,
-		config:    config,
-		s3Client:  ossClient,
+		repoStore:  database.NewRepoStore(),
+		gitServer:  git,
+		config:     config,
+		s3Client:   ossClient,
+		xnetClient: rpc.NewXnetSvcHttpClient(config.Xnet.Endpoint, rpc.AuthWithApiKey(config.Xnet.ApiKey)),
 	}, nil
 
 }
@@ -70,6 +73,16 @@ func (c *LFSExistsChecker) Check(ctx context.Context, req types.GitalyAllowedReq
 	}
 
 	for _, p := range pointers {
+		if repo.XnetEnabled {
+			lfsExistReq := &types.XetFileExistsReq{
+				ObjectKey: p.FileOid,
+				RepoID:    strconv.FormatInt(repo.ID, 10),
+			}
+			if e, err := c.xnetClient.FileExists(ctx, lfsExistReq); nil != err || !e {
+				return false, fmt.Errorf("failed to request xnet, exist:%t err: %w", e, err)
+			}
+			continue
+		}
 		objectKey := common.BuildLfsPath(repo.ID, p.FileOid, repo.Migrated)
 		info, err := c.s3Client.StatObject(ctx, c.config.S3.Bucket, objectKey, minio.StatObjectOptions{})
 		if err != nil {
@@ -79,7 +92,6 @@ func (c *LFSExistsChecker) Check(ctx context.Context, req types.GitalyAllowedReq
 		if p.FileSize != info.Size {
 			return false, fmt.Errorf("lfs object %s size mismatch, expected: %d, got: %d", p.Oid, p.Size, info.Size)
 		}
-
 	}
 	return true, nil
 }

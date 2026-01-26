@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/require"
 	mocktypes "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/builder/rpc"
-	"opencsg.com/csghub-server/builder/sensitive"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -21,7 +20,7 @@ func TestSensitiveComponent_CheckText(t *testing.T) {
 		IsSensitive: false,
 	}, nil)
 
-	success, err := comp.CheckText(context.TODO(), string(sensitive.ScenarioChatDetection), "test")
+	success, err := comp.CheckText(context.TODO(), types.ScenarioChatDetection, "test")
 	require.Nil(t, err)
 	require.True(t, success)
 }
@@ -34,7 +33,7 @@ func TestSensitiveComponent_CheckImage(t *testing.T) {
 		IsSensitive: false,
 	}, nil)
 
-	success, err := comp.CheckImage(context.TODO(), string(sensitive.ScenarioChatDetection), "ossBucketName", "ossObjectName")
+	success, err := comp.CheckImage(context.TODO(), types.ScenarioChatDetection, "ossBucketName", "ossObjectName")
 	require.Nil(t, err)
 	require.True(t, success)
 }
@@ -54,14 +53,14 @@ func TestSensitiveComponent_CheckRequestV2(t *testing.T) {
 			Value: func() string {
 				return "chat1"
 			},
-			Scenario: string(sensitive.ScenarioChatDetection),
+			Scenario: types.ScenarioChatDetection,
 		},
 		{
 			Name: "comment",
 			Value: func() string {
 				return "comment1"
 			},
-			Scenario: string(sensitive.ScenarioCommentDetection),
+			Scenario: types.ScenarioCommentDetection,
 		},
 	})
 	success, err := comp.CheckRequestV2(context.TODO(), mockRequest)
@@ -75,11 +74,11 @@ func TestSensitiveComponent_NoOpImpl(t *testing.T) {
 	c, err := NewSensitiveComponent(cfg)
 	require.Nil(t, err)
 
-	success, err := c.CheckText(context.Background(), string(sensitive.ScenarioChatDetection), "test")
+	success, err := c.CheckText(context.Background(), types.ScenarioChatDetection, "test")
 	require.Nil(t, err)
 	require.True(t, success)
 
-	success, err = c.CheckImage(context.Background(), string(sensitive.ScenarioChatDetection), "test", "test")
+	success, err = c.CheckImage(context.Background(), types.ScenarioChatDetection, "test", "test")
 	require.Nil(t, err)
 	require.True(t, success)
 

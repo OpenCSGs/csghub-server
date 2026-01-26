@@ -42,8 +42,11 @@ type ViewParquetFileResp struct {
 }
 
 type CardData struct {
-	Configs      []ConfigData  `yaml:"configs" json:"configs"`
-	DatasetInfos []DatasetInfo `yaml:"dataset_info" json:"dataset_info"`
+	Configs         []ConfigData  `yaml:"configs" json:"configs"`
+	DatasetInfos    []DatasetInfo `yaml:"dataset_info" json:"dataset_info"`
+	Downloaded_Size int64         `yaml:"downloaded_size" json:"downloaded_size"`
+	Converted_Size  int64         `yaml:"converted_size" json:"converted_size"`
+	Rows_Num        int64         `yaml:"rows_num" json:"rows_num"`
 }
 
 type ConfigData struct {
@@ -126,10 +129,13 @@ type FileObject struct {
 }
 
 type CataLogRespone struct {
-	Configs      []ConfigData  `yaml:"configs" json:"configs"`
-	DatasetInfos []DatasetInfo `yaml:"dataset_info" json:"dataset_info"`
-	Status       int           `yaml:"status" json:"status"`
-	Logs         string        `yaml:"logs" json:"logs"`
+	Configs         []ConfigData  `yaml:"configs" json:"configs"`
+	DatasetInfos    []DatasetInfo `yaml:"dataset_info" json:"dataset_info"`
+	Status          int           `yaml:"status" json:"status"`
+	Logs            string        `yaml:"logs" json:"logs"`
+	Downloaded_Size int64         `yaml:"downloaded_size" json:"downloaded_size"`
+	Converted_Size  int64         `yaml:"converted_size" json:"converted_size"`
+	Rows_Num        int64         `yaml:"rows_num" json:"rows_num"`
 }
 
 type WorkflowUpdateParams struct {

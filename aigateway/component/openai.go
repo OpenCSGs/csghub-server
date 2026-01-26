@@ -104,7 +104,6 @@ func (m *openaiComponentImpl) getCSGHubModels(c context.Context, userName string
 			BaseModel: types.BaseModel{
 				Object:              "model",
 				Created:             deploy.CreatedAt.Unix(),
-				OwnedBy:             deploy.User.Username,
 				SupportFunctionCall: supportFunctionCall,
 				Task:                string(deploy.Task),
 			},
@@ -116,6 +115,11 @@ func (m *openaiComponentImpl) getCSGHubModels(c context.Context, userName string
 				SvcType:       deploy.Type,
 				ImageID:       deploy.ImageID,
 			},
+		}
+		if deploy.Type == commontypes.ServerlessType {
+			m.BaseModel.OwnedBy = "OpenCSG"
+		} else {
+			m.BaseModel.OwnedBy = deploy.User.Username
 		}
 		modelName := ""
 		if deploy.Repository.HFPath != "" {
@@ -157,7 +161,7 @@ func (m *openaiComponentImpl) getExternalModels(c context.Context) []types.Model
 				BaseModel: types.BaseModel{
 					Object:  "model",
 					ID:      extModel.ModelName,
-					OwnedBy: "OpenCSG",
+					OwnedBy: extModel.Provider,
 				},
 				Endpoint: extModel.ApiEndpoint,
 				ExternalModelInfo: types.ExternalModelInfo{
