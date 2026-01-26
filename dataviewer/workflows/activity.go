@@ -45,6 +45,7 @@ type DataViewerActivity interface {
 	UpdateCardData(ctx context.Context, cardReq dvCom.UpdateCardReq) error
 	CleanUp(ctx context.Context, req types.UpdateViewerReq) error
 	UpdateWorkflowStatus(ctx context.Context, status dvCom.UpdateWorkflowStatusReq) error
+	CalcStatistics(cardReq *dvCom.UpdateCardReq)
 }
 
 type dataViewerActivityImpl struct {
@@ -1006,6 +1007,8 @@ func (dva *dataViewerActivityImpl) UpdateCardData(ctx context.Context, cardReq d
 	if err != nil {
 		return fmt.Errorf("get job by workflow id %s for update card, cause: %w", workflowID, err)
 	}
+	// calc statistics
+	dva.CalcStatistics(&cardReq)
 
 	finalCardDataJson, err := json.Marshal(cardReq.FinalCardData)
 	if err != nil {
@@ -1023,6 +1026,26 @@ func (dva *dataViewerActivityImpl) UpdateCardData(ctx context.Context, cardReq d
 		return fmt.Errorf("update job by id %d for update card, cause: %w", job.ID, err)
 	}
 	return nil
+}
+
+func (dva *dataViewerActivityImpl) CalcStatistics(cardReq *dvCom.UpdateCardReq) {
+	var totalExamples int64
+	var totalConvertedSize int64
+	var totalDownloadSize int64
+	for _, config := range cardReq.FinalCardData.DatasetInfos {
+		for _, split := range config.Splits {
+			totalExamples += int64(split.NumExamples)
+			for _, file := range split.Files {
+				totalConvertedSize += file.Size
+			}
+			for _, file := range split.Origins {
+				totalDownloadSize += file.DownloadSize
+			}
+		}
+	}
+	cardReq.FinalCardData.Downloaded_Size = totalDownloadSize
+	cardReq.FinalCardData.Converted_Size = totalConvertedSize
+	cardReq.FinalCardData.Rows_Num = totalExamples
 }
 
 func (dva *dataViewerActivityImpl) CleanUp(ctx context.Context, req types.UpdateViewerReq) error {
