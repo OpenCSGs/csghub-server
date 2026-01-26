@@ -28,7 +28,11 @@ type repoComponentImpl struct {
 }
 
 func NewRepoComponent(cfg *config.Config) (RepoComponent, error) {
-	c := &repoComponentImpl{checker: sensitive.NewAliyunGreenCheckerFromConfig(cfg)}
+	c := &repoComponentImpl{checker: sensitive.NewChainChecker(cfg,
+		sensitive.WithACAutomaton(sensitive.LoadFromConfig(cfg)),
+		sensitive.WithMutableACAutomaton(sensitive.LoadFromDB()),
+		sensitive.WithAliYunChecker(),
+	)}
 	gs, err := git.NewGitServer(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create git server for sensitive component: %w", err)
