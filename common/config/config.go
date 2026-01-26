@@ -269,6 +269,8 @@ type Config struct {
 		RepoFileCheckConcurrency int    `env:"OPENCSG_MODERATION_SERVER_REPO_FILE_CHECK_CONCURRENCY" default:"10"`
 	}
 
+	Memory MemoryConfig
+
 	WorkFLow struct {
 		Endpoint         string `env:"OPENCSG_WORKFLOW_SERVER_ENDPOINT" default:"localhost:7233"`
 		ExecutionTimeout int64  `env:"OPENCSG_WORKFLOW_EXECUTION_TIMEOUT" default:"43200"`
@@ -540,6 +542,18 @@ type Config struct {
 		PartSize                int64 `env:"STARHUB_SERVER_STORAGE_GATEWAY_PART_SIZE" default:"67108864"`              // 64MB
 		EnablePresignedURLProxy bool  `env:"STARHUB_SERVER_STORAGE_GATEWAY_ENABLE_PRESIGNED_URL_PROXY" default:"true"` // Enable presigned URL proxy through gateway
 	}
+}
+
+type MemoryConfig struct {
+	Enable           bool   `env:"OPENCSG_MEMORY_SERVER_ENABLED" default:"true"`
+	Backend          string `env:"OPENCSG_MEMORY_BACKEND" default:"memmachine"`
+	Host             string `env:"OPENCSG_MEMORY_SERVER_HOST" default:"http://memmachine"`
+	Port             int    `env:"OPENCSG_MEMORY_SERVER_PORT" default:"8080"`
+	BasePath         string `env:"OPENCSG_MEMORY_SERVER_BASE_PATH" default:"/api/v2"`
+	ApiKey           string `env:"OPENCSG_MEMORY_SERVER_API_KEY" default:""`
+	TimeoutSeconds   int    `env:"OPENCSG_MEMORY_SERVER_TIMEOUT_SECONDS" default:"10"`
+	RetryCount       int    `env:"OPENCSG_MEMORY_SERVER_RETRY_COUNT" default:"1"`
+	RetryDelayMillis int    `env:"OPENCSG_MEMORY_SERVER_RETRY_DELAY_MILLIS" default:"100"`
 }
 
 func SetConfigFile(file string) {
