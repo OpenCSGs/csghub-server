@@ -31,6 +31,7 @@ import (
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/i18n"
 	"opencsg.com/csghub-server/common/types"
+	"opencsg.com/csghub-server/component"
 )
 
 func RunServer(config *config.Config, enableSwagger bool) {
@@ -505,6 +506,14 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		return nil, fmt.Errorf("error creating prompt handler,%w", err)
 	}
 	createPromptRoutes(apiGroup, middlewareCollection, promptHandler, repoCommonHandler)
+
+	// memory service
+	memoryComp, err := component.NewMemoryComponent(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating memory component,%w", err)
+	}
+	memoryHandler := handler.NewMemoryHandler(memoryComp)
+	createMemoryRoutes(apiGroup, middlewareCollection, memoryHandler)
 
 	// dataflow proxy
 	dataflowHandler, err := handler.NewDataflowProxyHandler(config)
@@ -1225,6 +1234,22 @@ func createDataflowRoutes(apiGroup *gin.RouterGroup, dataflowHandler *handler.Da
 	dataflowGrp := apiGroup.Group("/dataflow")
 	dataflowGrp.Use(middleware.MustLogin())
 	dataflowGrp.Any("/*any", dataflowHandler.Proxy)
+}
+
+func createMemoryRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware.MiddlewareCollection, memoryHandler *handler.MemoryHandler) {
+	memoryGroup := apiGroup.Group("/memory")
+	memoryGroup.Use(middlewareCollection.Auth.NeedLogin)
+	{
+		memoryGroup.POST("/projects", memoryHandler.CreateProject)
+		memoryGroup.POST("/projects/get", memoryHandler.GetProject)
+		memoryGroup.POST("/projects/list", memoryHandler.ListProjects)
+		memoryGroup.POST("/projects/delete", memoryHandler.DeleteProject)
+		memoryGroup.POST("/memories", memoryHandler.AddMemories)
+		memoryGroup.POST("/memories/search", memoryHandler.SearchMemories)
+		memoryGroup.POST("/memories/list", memoryHandler.ListMemories)
+		memoryGroup.POST("/memories/delete", memoryHandler.DeleteMemories)
+		memoryGroup.GET("/health", memoryHandler.Health)
+	}
 }
 
 func createCSGBotRoutes(apiGroup *gin.RouterGroup, csgbotHandler *handler.CSGBotProxyHandler) {
