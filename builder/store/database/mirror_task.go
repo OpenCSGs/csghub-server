@@ -25,6 +25,7 @@ type MirrorTaskStore interface {
 	SetMirrorCurrentTaskID(ctx context.Context, task MirrorTask) error
 	FindByID(ctx context.Context, ID int64) (*MirrorTask, error)
 	ListByStatusWithPriority(ctx context.Context, status []types.MirrorTaskStatus, per, page int) ([]MirrorTask, error)
+	ResetRunningTasks(ctx context.Context, fromStatus types.MirrorTaskStatus, toStatus types.MirrorTaskStatus) (int, error)
 }
 
 func NewMirrorTaskStore() MirrorTaskStore {
@@ -294,4 +295,21 @@ func (m *mirrorTaskStoreImpl) CancelOtherTasksAndCreate(ctx context.Context, tas
 		return nil
 	})
 	return task, errorx.HandleDBError(err, nil)
+}
+
+func (m *mirrorTaskStoreImpl) ResetRunningTasks(ctx context.Context, fromStatus types.MirrorTaskStatus, toStatus types.MirrorTaskStatus) (int, error) {
+	var task MirrorTask
+	result, err := m.db.Operator.Core.NewUpdate().
+		Model(&task).
+		Set("status = ?", toStatus).
+		Where("status = ?", fromStatus).
+		Exec(ctx)
+	if err != nil {
+		return 0, errorx.HandleDBError(err, nil)
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return 0, errorx.HandleDBError(err, nil)
+	}
+	return int(rowsAffected), nil
 }
