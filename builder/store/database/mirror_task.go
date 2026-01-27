@@ -88,6 +88,14 @@ func NewMirrorTaskWithFSM(mt *MirrorTask) MirrorTaskWithFSM {
 					Dst: string(types.MirrorRepoSyncStart),
 				},
 				{
+					Name: MirrorRetry,
+					Src: []string{
+						string(types.MirrorRepoSyncFailed),
+						string(types.MirrorLfsSyncFailed),
+					},
+					Dst: string(types.MirrorQueued),
+				},
+				{
 					Name: MirrorNoLfsToSync,
 					Src: []string{
 						string(types.MirrorRepoSyncStart),

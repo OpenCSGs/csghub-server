@@ -29,6 +29,8 @@ import (
 	"opencsg.com/csghub-server/mirror/hook"
 )
 
+const specificErrorMsg = "rate limit"
+
 var MirrorStatusToMessageTypeMapping = map[types.MirrorTaskStatus]string{
 	types.MirrorRepoSyncStart:   "repo_sync_start",
 	types.MirrorLfsSyncStart:    "lfs_sync_start",
@@ -182,6 +184,14 @@ func (w *RepoSyncWorker) handleTask(
 	if err != nil {
 		mt.ErrorMessage = err.Error()
 		statusAction = string(database.MirrorFail)
+		if strings.Contains(err.Error(), specificErrorMsg) {
+			mt.RetryCount += 1
+			if mt.RetryCount > w.config.Mirror.MaxRetryCount {
+				statusAction = string(database.MirrorFatal)
+			} else {
+				statusAction = string(database.MirrorRetry)
+			}
+		}
 		slog.Error("failed to sync repo", slog.Any("error", err))
 		sendErr := w.sendMessage(ctx, mt.Mirror, types.MirrorRepoSyncFailed)
 		if sendErr != nil {
