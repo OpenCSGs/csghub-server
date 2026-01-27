@@ -38,6 +38,7 @@ type UpdateLLMConfigReq struct {
 	AuthHeader  *string `json:"auth_header"`
 	Type        *int    `json:"type"` // 1: optimization, 2: comparison, 4: summary readme
 	Enabled     *bool   `json:"enabled"`
+	Provider    *string `json:"provider"`
 }
 
 type UpdatePromptPrefixReq struct {
@@ -52,6 +53,7 @@ type CreateLLMConfigReq struct {
 	ApiEndpoint string `json:"api_endpoint"`
 	AuthHeader  string `json:"auth_header"`
 	Type        int    `json:"type"` // 1: optimization, 2: comparison, 4: summary readme
+	Provider    string `json:"provider"`
 	Enabled     bool   `json:"enabled"`
 }
 type CreatePromptPrefixReq struct {
