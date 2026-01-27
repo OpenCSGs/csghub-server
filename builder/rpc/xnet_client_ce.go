@@ -31,3 +31,7 @@ func (c *XnetSvcHttpClient) PresignedGetObject(ctx context.Context, objectKey st
 func (c *XnetSvcHttpClient) FileExists(ctx context.Context, req *types.XetFileExistsReq) (bool, error) {
 	return false, nil
 }
+
+func (c *XnetSvcHttpClient) GetMigrationStats(ctx context.Context) (*types.MigrationStatsResp, error) {
+	return nil, nil
+}
