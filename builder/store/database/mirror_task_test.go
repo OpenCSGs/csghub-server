@@ -132,3 +132,46 @@ func TestMirrorTaskStore_SetMirrorCurrentTaskID(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, mt.ID, m.CurrentTaskID)
 }
+
+func TestMirrorTaskStore_ResetRunningTasks(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewMirrorTaskStoreWithDB(db)
+
+	_, err := store.Create(ctx, database.MirrorTask{
+		MirrorID: 1,
+		Status:   types.MirrorLfsSyncStart,
+		Priority: types.HighMirrorPriority,
+	})
+	require.Nil(t, err)
+
+	_, err = store.Create(ctx, database.MirrorTask{
+		MirrorID: 2,
+		Status:   types.MirrorLfsSyncStart,
+		Priority: types.LowMirrorPriority,
+	})
+	require.Nil(t, err)
+
+	_, err = store.Create(ctx, database.MirrorTask{
+		MirrorID: 3,
+		Status:   types.MirrorQueued,
+		Priority: types.HighMirrorPriority,
+	})
+	require.Nil(t, err)
+
+	count, err := store.ResetRunningTasks(ctx, types.MirrorLfsSyncStart, types.MirrorRepoSyncFinished)
+	require.Nil(t, err)
+	require.Equal(t, 2, count)
+
+	var tasks []database.MirrorTask
+	err = db.Core.NewSelect().Model(&tasks).Where("status = ?", types.MirrorRepoSyncFinished).Scan(ctx)
+	require.Nil(t, err)
+	require.Equal(t, 2, len(tasks))
+
+	var queuedTask database.MirrorTask
+	err = db.Core.NewSelect().Model(&queuedTask).Where("mirror_id = ?", 3).Scan(ctx)
+	require.Nil(t, err)
+	require.Equal(t, types.MirrorQueued, queuedTask.Status)
+}
