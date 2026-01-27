@@ -55,9 +55,11 @@ func TestOpenAIComponent_GetAvailableModels(t *testing.T) {
 		now := time.Now()
 		deploys := []database.Deploy{
 			{
-				ID:      1,
-				SvcName: "svc1",
-				Type:    1,
+				ID:          1,
+				SvcName:     "svc1",
+				Type:        1,
+				UserID:      1,
+				SecureLevel: commontypes.EndpointPublic,
 				Repository: &database.Repository{
 					Path: "model1",
 				},
@@ -68,9 +70,11 @@ func TestOpenAIComponent_GetAvailableModels(t *testing.T) {
 				Task:     "text-generation",
 			},
 			{
-				ID:      2,
-				SvcName: "svc2",
-				Type:    3, // serverless
+				ID:          2,
+				SvcName:     "svc2",
+				Type:        3, // serverless
+				UserID:      1,
+				SecureLevel: commontypes.EndpointPublic,
 				Repository: &database.Repository{
 					HFPath: "hf-model2",
 				},
@@ -94,6 +98,7 @@ func TestOpenAIComponent_GetAvailableModels(t *testing.T) {
 					Object:  "model",
 					Created: deploys[0].CreatedAt.Unix(),
 					Task:    "text-generation",
+					Public:  true,
 				},
 				Endpoint: "endpoint1",
 				InternalModelInfo: types.InternalModelInfo{
@@ -110,6 +115,7 @@ func TestOpenAIComponent_GetAvailableModels(t *testing.T) {
 					Object:  "model",
 					Created: deploys[1].CreatedAt.Unix(),
 					Task:    "text-to-image",
+					Public:  true,
 				},
 				Endpoint: "endpoint2",
 				InternalModelInfo: types.InternalModelInfo{
@@ -125,13 +131,13 @@ func TestOpenAIComponent_GetAvailableModels(t *testing.T) {
 		for _, model := range expectModels {
 			expectJson, _ := json.Marshal(model)
 			mockCache.EXPECT().HSet(mock.Anything, modelCacheKey, model.ID, string(expectJson)).
-				Return(nil)
+				Return(nil).Once()
 		}
 		mockCache.EXPECT().Expire(mock.Anything, modelCacheKey, modelCacheTTL).
 			RunAndReturn(func(ctx context.Context, s string, d time.Duration) error {
 				wg.Done()
 				return nil
-			})
+			}).Once()
 
 		models, err := comp.GetAvailableModels(context.Background(), "testuser")
 		assert.NoError(t, err)
@@ -150,6 +156,82 @@ func TestOpenAIComponent_GetAvailableModels(t *testing.T) {
 		assert.Equal(t, "text-to-image", models[1].Task)
 		wg.Wait()
 	})
+
+	t.Run("inference private should be marked private", func(t *testing.T) {
+		user := &database.User{
+			ID:       1,
+			Username: "testuser",
+			UUID:     "testuser-uuid",
+		}
+		mockUserStore.EXPECT().FindByUsername(mock.Anything, "testuser").
+			Return(*user, nil).Once()
+		mockLLMConfigStore.EXPECT().Index(mock.Anything, 50, 1, mock.Anything).
+			Return([]*database.LLMConfig{}, 0, nil)
+
+		now := time.Now()
+		deploys := []database.Deploy{
+			{
+				ID:          3,
+				SvcName:     "svc3",
+				Type:        commontypes.InferenceType,
+				UserID:      1,
+				SecureLevel: commontypes.EndpointPrivate,
+				Repository: &database.Repository{
+					Path: "model3",
+				},
+				User: &database.User{
+					Username: "testuser",
+				},
+				Endpoint: "endpoint3",
+				Task:     "text-generation",
+			},
+		}
+		deploys[0].CreatedAt = now
+
+		mockDeployStore.EXPECT().RunningVisibleToUser(mock.Anything, int64(1)).
+			Return(deploys, nil).Once()
+
+		expectModels := []types.Model{
+			{
+				BaseModel: types.BaseModel{
+					ID:      "model3:svc3",
+					OwnedBy: "testuser",
+					Object:  "model",
+					Created: deploys[0].CreatedAt.Unix(),
+					Task:    "text-generation",
+					Public:  false,
+				},
+				Endpoint: "endpoint3",
+				InternalModelInfo: types.InternalModelInfo{
+					ClusterID: deploys[0].ClusterID,
+					SvcName:   deploys[0].SvcName,
+					ImageID:   deploys[0].ImageID,
+				},
+				InternalUse: true,
+			},
+		}
+
+		var wg sync.WaitGroup
+		wg.Add(1)
+		for _, model := range expectModels {
+			expectJson, _ := json.Marshal(model)
+			mockCache.EXPECT().HSet(mock.Anything, modelCacheKey, model.ID, string(expectJson)).
+				Return(nil).Once()
+		}
+		mockCache.EXPECT().Expire(mock.Anything, modelCacheKey, modelCacheTTL).
+			RunAndReturn(func(ctx context.Context, s string, d time.Duration) error {
+				wg.Done()
+				return nil
+			}).Once()
+
+		models, err := comp.GetAvailableModels(context.Background(), "testuser")
+		assert.NoError(t, err)
+		assert.Len(t, models, 1)
+		assert.Equal(t, "model3:svc3", models[0].ID)
+		assert.False(t, models[0].Public)
+		wg.Wait()
+	})
+
 }
 
 func TestOpenAIComponent_GetModelByID(t *testing.T) {
@@ -201,6 +283,7 @@ func TestOpenAIComponent_GetModelByID(t *testing.T) {
 					OwnedBy: "testuser",
 					Object:  "model",
 					Created: deploys[0].CreatedAt.Unix(),
+					Public:  true,
 				},
 				Endpoint: "endpoint1",
 				InternalModelInfo: types.InternalModelInfo{
@@ -279,6 +362,7 @@ func TestOpenAIComponent_GetModelByID(t *testing.T) {
 				Object:  "model",
 				Created: deploys[0].CreatedAt.Unix(),
 				Task:    "text-generation",
+				Public:  true,
 			},
 			Endpoint: "endpoint1",
 		}
@@ -355,6 +439,7 @@ func TestOpenAIComponent_ExtGetAvailableModels_SinglePage(t *testing.T) {
 				ID:      "test-model-1",
 				OwnedBy: "OpenAI",
 				Object:  "model",
+				Public:  true,
 			},
 			Endpoint: "http://test-endpoint-1.com",
 			ExternalModelInfo: types.ExternalModelInfo{

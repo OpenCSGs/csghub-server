@@ -5,11 +5,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"sync"
 	"testing"
 
@@ -69,18 +67,20 @@ func setupTest(t *testing.T) (*testerOpenAIHandler, *gin.Context, *httptest.Resp
 
 func TestOpenAIHandler_ListModels(t *testing.T) {
 
-	t.Run("successful case", func(t *testing.T) {
+	t.Run("successful passthrough", func(t *testing.T) {
 		tester, c, w := setupTest(t)
 		models := []types.Model{
-			{
-				BaseModel: types.BaseModel{
-					ID:      "model1:svc1",
-					Object:  "model",
-					OwnedBy: "testuser",
-				},
-			},
+			{BaseModel: types.BaseModel{ID: "model1:svc1", Object: "model", OwnedBy: "testuser", Public: true}},
 		}
-		tester.mocks.openAIComp.EXPECT().GetAvailableModels(mock.Anything, "testuser").Return(models, nil)
+		expect := types.ModelList{
+			Object:     "list",
+			Data:       models,
+			HasMore:    false,
+			TotalCount: 1,
+		}
+		tester.mocks.openAIComp.EXPECT().
+			ListModels(mock.Anything, "testuser", types.ListModelsReq{}).
+			Return(expect, nil).Once()
 
 		tester.handler.ListModels(c)
 
@@ -88,297 +88,41 @@ func TestOpenAIHandler_ListModels(t *testing.T) {
 		var response types.ModelList
 		err := json.Unmarshal(w.Body.Bytes(), &response)
 		assert.NoError(t, err)
-		assert.Equal(t, "list", response.Object)
-		assert.Equal(t, models, response.Data)
+		assert.Equal(t, expect.Object, response.Object)
+		assert.Equal(t, expect.Data, response.Data)
+		assert.Equal(t, expect.TotalCount, response.TotalCount)
 	})
 
-	t.Run("fuzzy search with matching model_id", func(t *testing.T) {
+	t.Run("passes query params to component", func(t *testing.T) {
 		tester, c, w := setupTest(t)
-		models := []types.Model{
-			{
-				BaseModel: types.BaseModel{
-					ID:      "gpt-4:svc1",
-					Object:  "model",
-					OwnedBy: "testuser",
-				},
-			},
-			{
-				BaseModel: types.BaseModel{
-					ID:      "claude-3:svc2",
-					Object:  "model",
-					OwnedBy: "testuser",
-				},
-			},
-		}
-		tester.mocks.openAIComp.EXPECT().GetAvailableModels(mock.Anything, "testuser").Return(models, nil)
 
-		tester.WithQuery("model_id", "gpt")
+		tester.WithQuery("model_id", "gpt").
+			WithQuery("public", "true").
+			WithQuery("per", "2").
+			WithQuery("page", "3")
+
+		tester.mocks.openAIComp.EXPECT().
+			ListModels(mock.Anything, "testuser", types.ListModelsReq{
+				ModelID: "gpt",
+				Public:  "true",
+				Per:     "2",
+				Page:    "3",
+			}).
+			Return(types.ModelList{Object: "list", Data: []types.Model{}, HasMore: false, TotalCount: 0}, nil).Once()
+
 		tester.handler.ListModels(c)
 
 		assert.Equal(t, http.StatusOK, w.Code)
-		var response types.ModelList
-		err := json.Unmarshal(w.Body.Bytes(), &response)
-		assert.NoError(t, err)
-		assert.Equal(t, "list", response.Object)
-		assert.Len(t, response.Data, 1)
-		assert.Equal(t, "gpt-4:svc1", response.Data[0].ID)
 	})
 
-	t.Run("fuzzy search case insensitive", func(t *testing.T) {
+	t.Run("component error", func(t *testing.T) {
 		tester, c, w := setupTest(t)
-		models := []types.Model{
-			{
-				BaseModel: types.BaseModel{
-					ID:      "GPT-4:svc1",
-					Object:  "model",
-					OwnedBy: "testuser",
-				},
-			},
-		}
-		tester.mocks.openAIComp.EXPECT().GetAvailableModels(mock.Anything, "testuser").Return(models, nil)
-
-		c.Request.URL, _ = url.Parse("/v1/models?model_id=gpt")
+		tester.mocks.openAIComp.EXPECT().
+			ListModels(mock.Anything, "testuser", types.ListModelsReq{}).
+			Return(types.ModelList{}, errors.New("boom")).Once()
 
 		tester.handler.ListModels(c)
-
-		assert.Equal(t, http.StatusOK, w.Code)
-		var response types.ModelList
-		err := json.Unmarshal(w.Body.Bytes(), &response)
-		assert.NoError(t, err)
-		assert.Len(t, response.Data, 1)
-		assert.Equal(t, "GPT-4:svc1", response.Data[0].ID)
-	})
-
-	t.Run("fuzzy search with no matches", func(t *testing.T) {
-		tester, c, w := setupTest(t)
-		models := []types.Model{
-			{
-				BaseModel: types.BaseModel{
-					ID:      "gpt-4:svc1",
-					Object:  "model",
-					OwnedBy: "testuser",
-				},
-			},
-		}
-		tester.mocks.openAIComp.EXPECT().GetAvailableModels(mock.Anything, "testuser").Return(models, nil)
-
-		c.Request.URL, _ = url.Parse("/v1/models?model_id=nonexistent")
-
-		tester.handler.ListModels(c)
-
-		assert.Equal(t, http.StatusOK, w.Code)
-		var response types.ModelList
-		err := json.Unmarshal(w.Body.Bytes(), &response)
-		assert.NoError(t, err)
-		assert.Equal(t, "list", response.Object)
-		assert.Len(t, response.Data, 0)
-	})
-
-	t.Run("no search query returns all models", func(t *testing.T) {
-		tester, c, w := setupTest(t)
-		models := []types.Model{
-			{
-				BaseModel: types.BaseModel{
-					ID:      "model1:svc1",
-					Object:  "model",
-					OwnedBy: "testuser",
-				},
-			},
-		}
-		tester.mocks.openAIComp.EXPECT().GetAvailableModels(mock.Anything, "testuser").Return(models, nil)
-
-		c.Request.URL, _ = url.Parse("/v1/models")
-
-		tester.handler.ListModels(c)
-
-		assert.Equal(t, http.StatusOK, w.Code)
-		var response types.ModelList
-		err := json.Unmarshal(w.Body.Bytes(), &response)
-		assert.NoError(t, err)
-		assert.Equal(t, "list", response.Object)
-		assert.Equal(t, models, response.Data)
-	})
-
-	t.Run("pagination with default parameters", func(t *testing.T) {
-		tester, c, w := setupTest(t)
-		models := []types.Model{
-			{BaseModel: types.BaseModel{ID: "model1:svc1", Object: "model", OwnedBy: "testuser"}},
-			{BaseModel: types.BaseModel{ID: "model2:svc2", Object: "model", OwnedBy: "testuser"}},
-			{BaseModel: types.BaseModel{ID: "model3:svc3", Object: "model", OwnedBy: "testuser"}},
-		}
-		tester.mocks.openAIComp.EXPECT().GetAvailableModels(mock.Anything, "testuser").Return(models, nil)
-
-		tester.handler.ListModels(c)
-
-		assert.Equal(t, http.StatusOK, w.Code)
-		var response types.ModelList
-		err := json.Unmarshal(w.Body.Bytes(), &response)
-		assert.NoError(t, err)
-		assert.Equal(t, "list", response.Object)
-		assert.Len(t, response.Data, 3)
-		assert.Equal(t, 3, response.TotalCount)
-		assert.False(t, response.HasMore)
-		assert.Equal(t, "model1:svc1", *response.FirstID)
-		assert.Equal(t, "model3:svc3", *response.LastID)
-	})
-
-	t.Run("pagination with per_page parameter", func(t *testing.T) {
-		tester, c, w := setupTest(t)
-		models := []types.Model{
-			{BaseModel: types.BaseModel{ID: "model1:svc1", Object: "model", OwnedBy: "testuser"}},
-			{BaseModel: types.BaseModel{ID: "model2:svc2", Object: "model", OwnedBy: "testuser"}},
-			{BaseModel: types.BaseModel{ID: "model3:svc3", Object: "model", OwnedBy: "testuser"}},
-			{BaseModel: types.BaseModel{ID: "model4:svc4", Object: "model", OwnedBy: "testuser"}},
-			{BaseModel: types.BaseModel{ID: "model5:svc5", Object: "model", OwnedBy: "testuser"}},
-		}
-		tester.mocks.openAIComp.EXPECT().GetAvailableModels(mock.Anything, "testuser").Return(models, nil)
-
-		tester.WithQuery("per", "2")
-
-		tester.handler.ListModels(c)
-
-		assert.Equal(t, http.StatusOK, w.Code)
-		var response types.ModelList
-		err := json.Unmarshal(w.Body.Bytes(), &response)
-		assert.NoError(t, err)
-		assert.Equal(t, "list", response.Object)
-		assert.Len(t, response.Data, 2)
-		assert.Equal(t, 5, response.TotalCount)
-		assert.True(t, response.HasMore)
-		assert.Equal(t, "model1:svc1", *response.FirstID)
-		assert.Equal(t, "model2:svc2", *response.LastID)
-	})
-
-	t.Run("pagination with page and per_page parameters", func(t *testing.T) {
-		tester, c, w := setupTest(t)
-		models := []types.Model{
-			{BaseModel: types.BaseModel{ID: "model1:svc1", Object: "model", OwnedBy: "testuser"}},
-			{BaseModel: types.BaseModel{ID: "model2:svc2", Object: "model", OwnedBy: "testuser"}},
-			{BaseModel: types.BaseModel{ID: "model3:svc3", Object: "model", OwnedBy: "testuser"}},
-			{BaseModel: types.BaseModel{ID: "model4:svc4", Object: "model", OwnedBy: "testuser"}},
-			{BaseModel: types.BaseModel{ID: "model5:svc5", Object: "model", OwnedBy: "testuser"}},
-		}
-		tester.mocks.openAIComp.EXPECT().GetAvailableModels(mock.Anything, "testuser").Return(models, nil)
-
-		tester.WithQuery("page", "2").WithQuery("per", "2")
-
-		tester.handler.ListModels(c)
-
-		assert.Equal(t, http.StatusOK, w.Code)
-		var response types.ModelList
-		err := json.Unmarshal(w.Body.Bytes(), &response)
-		assert.NoError(t, err)
-		assert.Equal(t, "list", response.Object)
-		assert.Len(t, response.Data, 2)
-		assert.Equal(t, 5, response.TotalCount)
-		assert.True(t, response.HasMore)
-		assert.Equal(t, "model3:svc3", *response.FirstID)
-		assert.Equal(t, "model4:svc4", *response.LastID)
-	})
-
-	t.Run("pagination last page", func(t *testing.T) {
-		tester, c, w := setupTest(t)
-		models := []types.Model{
-			{BaseModel: types.BaseModel{ID: "model1:svc1", Object: "model", OwnedBy: "testuser"}},
-			{BaseModel: types.BaseModel{ID: "model2:svc2", Object: "model", OwnedBy: "testuser"}},
-			{BaseModel: types.BaseModel{ID: "model3:svc3", Object: "model", OwnedBy: "testuser"}},
-			{BaseModel: types.BaseModel{ID: "model4:svc4", Object: "model", OwnedBy: "testuser"}},
-			{BaseModel: types.BaseModel{ID: "model5:svc5", Object: "model", OwnedBy: "testuser"}},
-		}
-		tester.mocks.openAIComp.EXPECT().GetAvailableModels(mock.Anything, "testuser").Return(models, nil)
-
-		tester.WithQuery("page", "3").WithQuery("per", "2")
-
-		tester.handler.ListModels(c)
-
-		assert.Equal(t, http.StatusOK, w.Code)
-		var response types.ModelList
-		err := json.Unmarshal(w.Body.Bytes(), &response)
-		assert.NoError(t, err)
-		assert.Equal(t, "list", response.Object)
-		assert.Len(t, response.Data, 1)
-		assert.Equal(t, 5, response.TotalCount)
-		assert.False(t, response.HasMore)
-		assert.Equal(t, "model5:svc5", *response.FirstID)
-		assert.Equal(t, "model5:svc5", *response.LastID)
-	})
-
-	t.Run("pagination with page beyond available data", func(t *testing.T) {
-		tester, c, w := setupTest(t)
-		models := []types.Model{
-			{BaseModel: types.BaseModel{ID: "model1:svc1", Object: "model", OwnedBy: "testuser"}},
-			{BaseModel: types.BaseModel{ID: "model2:svc2", Object: "model", OwnedBy: "testuser"}},
-		}
-		tester.mocks.openAIComp.EXPECT().GetAvailableModels(mock.Anything, "testuser").Return(models, nil)
-
-		tester.WithQuery("page", "3").WithQuery("per", "2")
-
-		tester.handler.ListModels(c)
-
-		assert.Equal(t, http.StatusOK, w.Code)
-		var response types.ModelList
-		err := json.Unmarshal(w.Body.Bytes(), &response)
-		assert.NoError(t, err)
-		assert.Equal(t, "list", response.Object)
-		assert.Len(t, response.Data, 0)
-		assert.Equal(t, 2, response.TotalCount)
-		assert.False(t, response.HasMore)
-		assert.Nil(t, response.FirstID)
-		assert.Nil(t, response.LastID)
-	})
-
-	t.Run("pagination with per_page limit capped at 100", func(t *testing.T) {
-		tester, c, w := setupTest(t)
-		models := make([]types.Model, 150)
-		for i := 0; i < 150; i++ {
-			models[i] = types.Model{
-				BaseModel: types.BaseModel{
-					ID:      fmt.Sprintf("model%d:svc%d", i+1, i+1),
-					Object:  "model",
-					OwnedBy: "testuser",
-				},
-			}
-		}
-		tester.mocks.openAIComp.EXPECT().GetAvailableModels(mock.Anything, "testuser").Return(models, nil)
-
-		tester.WithQuery("per", "200")
-
-		tester.handler.ListModels(c)
-
-		assert.Equal(t, http.StatusOK, w.Code)
-		var response types.ModelList
-		err := json.Unmarshal(w.Body.Bytes(), &response)
-		assert.NoError(t, err)
-		assert.Equal(t, "list", response.Object)
-		assert.Len(t, response.Data, 100) // Should be capped at 100
-		assert.Equal(t, 150, response.TotalCount)
-		assert.True(t, response.HasMore)
-	})
-
-	t.Run("pagination with search and per_page", func(t *testing.T) {
-		tester, c, w := setupTest(t)
-		models := []types.Model{
-			{BaseModel: types.BaseModel{ID: "gpt-4:svc1", Object: "model", OwnedBy: "testuser"}},
-			{BaseModel: types.BaseModel{ID: "gpt-3.5:svc2", Object: "model", OwnedBy: "testuser"}},
-			{BaseModel: types.BaseModel{ID: "claude-3:svc3", Object: "model", OwnedBy: "testuser"}},
-			{BaseModel: types.BaseModel{ID: "gpt-3.5-turbo:svc4", Object: "model", OwnedBy: "testuser"}},
-		}
-		tester.mocks.openAIComp.EXPECT().GetAvailableModels(mock.Anything, "testuser").Return(models, nil)
-
-		tester.WithQuery("model_id", "gpt").WithQuery("per", "2")
-
-		tester.handler.ListModels(c)
-
-		assert.Equal(t, http.StatusOK, w.Code)
-		var response types.ModelList
-		err := json.Unmarshal(w.Body.Bytes(), &response)
-		assert.NoError(t, err)
-		assert.Equal(t, "list", response.Object)
-		assert.Len(t, response.Data, 2)         // Only gpt models, limited to 2
-		assert.Equal(t, 3, response.TotalCount) // 3 gpt models total
-		assert.True(t, response.HasMore)
-		assert.Equal(t, "gpt-4:svc1", *response.FirstID)
-		assert.Equal(t, "gpt-3.5:svc2", *response.LastID)
+		assert.Equal(t, http.StatusInternalServerError, w.Code)
 	})
 }
 
@@ -393,6 +137,7 @@ func TestOpenAIHandler_ListModels_OpenaiSDK(t *testing.T) {
 				ID:      "gpt-4:svc1",
 				Object:  "model",
 				OwnedBy: "testuser",
+				Public:  true,
 			},
 		},
 		{
@@ -400,12 +145,21 @@ func TestOpenAIHandler_ListModels_OpenaiSDK(t *testing.T) {
 				ID:      "gpt-3.5-turbo:svc2",
 				Object:  "model",
 				OwnedBy: "testuser",
+				Public:  true,
 			},
 		},
 	}
 
 	// Set up mock expectation
-	tester.mocks.openAIComp.EXPECT().GetAvailableModels(mock.Anything, "testuser").Return(models, nil)
+	tester.mocks.openAIComp.EXPECT().
+		ListModels(mock.Anything, "testuser", types.ListModelsReq{}).
+		Return(types.ModelList{
+			Object:     "list",
+			Data:       models,
+			HasMore:    false,
+			TotalCount: len(models),
+		}, nil).
+		Once()
 	// Create gin router
 	gin.SetMode(gin.TestMode)
 	router := gin.New()

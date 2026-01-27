@@ -15,6 +15,7 @@ type BaseModel struct {
 	Task                string `json:"task"`                            // like text-generation, text-to-image etc
 	SupportFunctionCall bool   `json:"support_function_call,omitempty"` // whether the model supports function calling
 	IsPinned            *bool  `json:"is_pinned,omitempty"`             // whether the model is pinned
+	Public              bool   `json:"public"`                          // whether the model is public (false = private, true = public)
 }
 
 // InternalModelInfo represents the internal model fields
@@ -53,6 +54,7 @@ func (m Model) MarshalJSON() ([]byte, error) {
 			OwnedBy             string  `json:"owned_by"`
 			Task                string  `json:"task"`
 			SupportFunctionCall *bool   `json:"support_function_call,omitempty"`
+			Public              bool    `json:"public"`
 			Endpoint            string  `json:"endpoint"`
 			ClusterID           *string `json:"cluster_id,omitempty"`
 			SvcName             *string `json:"svc_name,omitempty"`
@@ -66,6 +68,7 @@ func (m Model) MarshalJSON() ([]byte, error) {
 			Created:  m.Created,
 			OwnedBy:  m.OwnedBy,
 			Task:     m.Task,
+			Public:   m.Public,
 			Endpoint: m.Endpoint,
 		}
 
@@ -103,6 +106,7 @@ func (m *Model) UnmarshalJSON(data []byte) error {
 		OwnedBy             string `json:"owned_by"`
 		Task                string `json:"task"`
 		SupportFunctionCall bool   `json:"support_function_call,omitempty"`
+		Public              bool   `json:"public"`
 		Endpoint            string `json:"endpoint"`
 		ClusterID           string `json:"cluster_id,omitempty"`
 		SvcName             string `json:"svc_name,omitempty"`
@@ -120,6 +124,7 @@ func (m *Model) UnmarshalJSON(data []byte) error {
 	m.OwnedBy = aux.OwnedBy
 	m.Task = aux.Task
 	m.SupportFunctionCall = aux.SupportFunctionCall
+	m.Public = aux.Public
 	m.Endpoint = aux.Endpoint
 	m.ClusterID = aux.ClusterID
 	m.SvcName = aux.SvcName
@@ -150,6 +155,16 @@ type ModelList struct {
 	LastID     *string `json:"last_id,omitempty"`
 	HasMore    bool    `json:"has_more"`
 	TotalCount int     `json:"total_count"`
+}
+
+// ListModelsReq defines query-like parameters for listing models.
+// Fields are passed as strings so the component layer can own parsing,
+// filtering, and pagination behavior consistently.
+type ListModelsReq struct {
+	ModelID string `json:"model_id"`
+	Public  string `json:"public"`
+	Per     string `json:"per"`
+	Page    string `json:"page"`
 }
 
 // UserPreferenceRequest defines the request parameters for UserPreference method

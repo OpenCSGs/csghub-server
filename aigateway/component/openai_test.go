@@ -56,6 +56,56 @@ func TestGetSceneFromSvcType(t *testing.T) {
 	}
 }
 
+func TestFilterAndPaginateModels(t *testing.T) {
+	models := []types.Model{
+		{BaseModel: types.BaseModel{ID: "gpt-4:svc1", Object: "model", OwnedBy: "u1", Public: true}},
+		{BaseModel: types.BaseModel{ID: "gpt-3.5:svc2", Object: "model", OwnedBy: "u1", Public: false}},
+		{BaseModel: types.BaseModel{ID: "claude:svc3", Object: "model", OwnedBy: "u2", Public: true}},
+		{BaseModel: types.BaseModel{ID: "gpt-4o:svc4", Object: "model", OwnedBy: "u3", Public: true}},
+	}
+
+	t.Run("no filters default pagination", func(t *testing.T) {
+		resp := filterAndPaginateModels(models, types.ListModelsReq{})
+		assert.Equal(t, "list", resp.Object)
+		assert.Equal(t, 4, resp.TotalCount)
+		assert.Len(t, resp.Data, 4)
+		assert.False(t, resp.HasMore)
+		require.NotNil(t, resp.FirstID)
+		require.NotNil(t, resp.LastID)
+		assert.Equal(t, "gpt-4:svc1", *resp.FirstID)
+		assert.Equal(t, "gpt-4o:svc4", *resp.LastID)
+	})
+
+	t.Run("fuzzy model_id filter is case-insensitive", func(t *testing.T) {
+		resp := filterAndPaginateModels(models, types.ListModelsReq{ModelID: "GPT"})
+		assert.Equal(t, 3, resp.TotalCount)
+		assert.Len(t, resp.Data, 3)
+	})
+
+	t.Run("public filter parses bool", func(t *testing.T) {
+		resp := filterAndPaginateModels(models, types.ListModelsReq{Public: "false"})
+		assert.Equal(t, 1, resp.TotalCount)
+		require.Len(t, resp.Data, 1)
+		assert.False(t, resp.Data[0].Public)
+		assert.Equal(t, "gpt-3.5:svc2", resp.Data[0].ID)
+	})
+
+	t.Run("invalid public filter is ignored", func(t *testing.T) {
+		resp := filterAndPaginateModels(models, types.ListModelsReq{Public: "notabool"})
+		assert.Equal(t, 4, resp.TotalCount)
+		assert.Len(t, resp.Data, 4)
+	})
+
+	t.Run("pagination per/page applied after filters", func(t *testing.T) {
+		resp := filterAndPaginateModels(models, types.ListModelsReq{ModelID: "gpt", Per: "2", Page: "2"})
+		// gpt matches 3 models; page=2 per=2 yields 1 item
+		assert.Equal(t, 3, resp.TotalCount)
+		assert.Len(t, resp.Data, 1)
+		assert.Equal(t, "gpt-4o:svc4", resp.Data[0].ID)
+		assert.False(t, resp.HasMore)
+	})
+}
+
 func TestOpenAIComponent_checkOrganization(t *testing.T) {
 	mockUserStore := mockdb.NewMockUserStore(t)
 	mockOrgStore := mockdb.NewMockOrgStore(t)
