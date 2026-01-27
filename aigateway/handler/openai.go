@@ -9,7 +9,6 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 	"time"
 
@@ -96,19 +95,27 @@ type OpenAIHandlerImpl struct {
 // ListModels godoc
 // @Security     ApiKey
 // @Summary      List available models
-// @Description  Returns a list of available models, supports fuzzy search by model_id query parameter
+// @Description  Returns a list of available models, supports fuzzy search by model_id query parameter and filtering by public status
 // @Tags         AIGateway
 // @Accept       json
 // @Produce      json
 // @Param        model_id query string false "Model ID for fuzzy search"
+// @Param        public query bool false "Filter by public status (true for public models, false for private models)"
+// @Param        per query int false "Models per page (default 20, max 100)"
+// @Param        page query int false "Page number (1-based, default 1)"
 // @Success      200  {object}  types.ModelList "OK"
 // @Failure      500  {object}  error "Internal server error"
 // @Router       /v1/models [get]
 func (h *OpenAIHandlerImpl) ListModels(c *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(c)
-	models, err := h.openaiComponent.GetAvailableModels(c.Request.Context(), currentUser)
+	resp, err := h.openaiComponent.ListModels(c.Request.Context(), currentUser, types.ListModelsReq{
+		ModelID: c.Query("model_id"),
+		Public:  c.Query("public"),
+		Per:     c.Query("per"),
+		Page:    c.Query("page"),
+	})
 	if err != nil {
-		slog.Error("failed to get available models", "error", err.Error(), "current_user", currentUser)
+		slog.ErrorContext(c.Request.Context(), "failed to get available models", "error", err.Error(), "current_user", currentUser)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": types.Error{
 				Code:    "internal_server_error",
@@ -117,78 +124,7 @@ func (h *OpenAIHandlerImpl) ListModels(c *gin.Context) {
 			}})
 		return
 	}
-
-	// Apply fuzzy search filter if model_id query parameter is provided
-	searchQuery := c.Query("model_id")
-	if searchQuery != "" {
-		filteredModels := make([]types.Model, 0)
-		for _, model := range models {
-			if strings.Contains(strings.ToLower(model.ID), strings.ToLower(searchQuery)) {
-				filteredModels = append(filteredModels, model)
-			}
-		}
-		models = filteredModels
-	}
-
-	// Parse pagination parameters
-	perStr := c.Query("per")
-	pageStr := c.Query("page")
-
-	// Set default values
-	per := 20 // default per page
-	page := 1 // default page (1-based)
-
-	if perStr != "" {
-		if parsedPerPage, err := strconv.Atoi(perStr); err == nil && parsedPerPage > 0 {
-			per = parsedPerPage
-			// Cap the per_page to prevent excessive requests
-			if per > 100 {
-				per = 100
-			}
-		}
-	}
-
-	if pageStr != "" {
-		if parsedPage, err := strconv.Atoi(pageStr); err == nil && parsedPage > 0 {
-			page = parsedPage
-		}
-	}
-
-	totalCount := len(models)
-
-	// Apply pagination
-	offset := (page - 1) * per
-	startIndex := offset
-	if startIndex > totalCount {
-		startIndex = totalCount
-	}
-
-	endIndex := startIndex + per
-	if endIndex > totalCount {
-		endIndex = totalCount
-	}
-
-	paginatedModels := models[startIndex:endIndex]
-
-	// Set pagination metadata
-	var firstID, lastID *string
-	if len(paginatedModels) > 0 {
-		firstID = &paginatedModels[0].ID
-		lastID = &paginatedModels[len(paginatedModels)-1].ID
-	}
-
-	hasMore := endIndex < totalCount
-
-	response := types.ModelList{
-		Object:     "list",
-		Data:       paginatedModels,
-		FirstID:    firstID,
-		LastID:     lastID,
-		HasMore:    hasMore,
-		TotalCount: totalCount,
-	}
-
-	c.PureJSON(http.StatusOK, response)
+	c.PureJSON(http.StatusOK, resp)
 }
 
 // GetModel godoc
