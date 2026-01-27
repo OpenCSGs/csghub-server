@@ -248,6 +248,12 @@ func (r Repository) Archs() (archs []string) {
 	return archs
 }
 func (r Repository) Format() string {
+	// get safetensors first
+	for _, tag := range r.Tags {
+		if tag.Category == "framework" && tag.Name == "safetensors" {
+			return tag.Name
+		}
+	}
 	for _, tag := range r.Tags {
 		if tag.Category == "framework" {
 			return tag.Name
