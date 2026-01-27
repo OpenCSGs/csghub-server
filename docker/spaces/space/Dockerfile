@@ -20,7 +20,7 @@ RUN chown -R user:user /home/user
 USER user
 WORKDIR /home/user/app
 
-RUN pip install --user -i https://pypi.tuna.tsinghua.edu.cn/simple csghub-sdk  gradio streamlit
+RUN pip install --user -i https://pypi.tuna.tsinghua.edu.cn/simple csghub-sdk  gradio streamlit openai==2.2.0 coagent-python==0.1.3
 
 COPY --chown=user:user ./start.sh /home/user/app/
 
