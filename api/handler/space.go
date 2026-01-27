@@ -562,6 +562,8 @@ func (h *SpaceHandler) Logs(ctx *gin.Context) {
 		return
 	}
 
+	instance := ctx.Query("instance")
+
 	currentUser := httpbase.GetCurrentUser(ctx)
 	allow, err := h.repo.AllowReadAccess(ctx.Request.Context(), types.SpaceRepo, namespace, name, currentUser)
 	if err != nil {
@@ -583,7 +585,7 @@ func (h *SpaceHandler) Logs(ctx *gin.Context) {
 	ctx.Writer.Header().Set("Transfer-Encoding", "chunked")
 
 	//user http request context instead of gin context, so that server knows the life cycle of the request
-	logReader, err := h.space.Logs(ctx.Request.Context(), namespace, name, since)
+	logReader, err := h.space.Logs(ctx.Request.Context(), namespace, name, since, instance)
 	if err != nil {
 		if deadline, ok := ctx.Request.Context().Deadline(); ok {
 			slog.ErrorContext(ctx.Request.Context(), "failed to get space logs",
