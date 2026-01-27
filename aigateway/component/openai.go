@@ -16,7 +16,6 @@ import (
 	"opencsg.com/csghub-server/builder/event"
 	"opencsg.com/csghub-server/builder/store/cache"
 	"opencsg.com/csghub-server/builder/store/database"
-	"opencsg.com/csghub-server/common/config"
 	commontypes "opencsg.com/csghub-server/common/types"
 )
 
@@ -39,32 +38,17 @@ type openaiComponentImpl struct {
 	extllmStore database.LLMConfigStore
 
 	modelListCache cache.RedisClient
-}
-
-func NewOpenAIComponentFromConfig(config *config.Config) (OpenAIComponent, error) {
-	cacheClient, err := cache.NewCache(context.Background(), cache.RedisConfig{
-		Addr:     config.Redis.Endpoint,
-		Username: config.Redis.User,
-		Password: config.Redis.Password,
-	})
-	if err != nil {
-		return nil, err
-	}
-	return &openaiComponentImpl{
-		userStore:   database.NewUserStore(),
-		organStore:  database.NewOrgStore(),
-		deployStore: database.NewDeployTaskStore(),
-		eventPub:    &event.DefaultEventPublisher,
-		extllmStore: database.NewLLMConfigStore(config),
-
-		modelListCache: cacheClient,
-	}, nil
+	extendOpenai
 }
 
 // GetAvailableModels returns a list of running models
 func (m *openaiComponentImpl) GetAvailableModels(c context.Context, userName string) ([]types.Model, error) {
 	var models []types.Model
-	csghubModels, err := m.getCSGHubModels(c, userName)
+	user, err := m.userStore.FindByUsername(c, userName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find user by username in db,error:%w", err)
+	}
+	csghubModels, err := m.getCSGHubModels(c, user.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -83,16 +67,22 @@ func (m *openaiComponentImpl) GetAvailableModels(c context.Context, userName str
 		}
 	}(models)
 
+	req := &types.UserPreferenceRequest{
+		UserUUID: user.UUID,
+		Models:   models,
+		Scenario: types.AgenticHubApp,
+	}
+	models, err = m.userPreference(c, req)
+	if err != nil {
+		slog.Warn("failed to apply user preference", "error", err)
+		// Continue with original models if user preference fails
+	}
+
 	return models, nil
 }
 
-func (m *openaiComponentImpl) getCSGHubModels(c context.Context, userName string) ([]types.Model, error) {
-	user, err := m.userStore.FindByUsername(c, userName)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find user by username in db,error:%w", err)
-	}
-
-	runningDeploys, err := m.deployStore.RunningVisibleToUser(c, user.ID)
+func (m *openaiComponentImpl) getCSGHubModels(c context.Context, userID int64) ([]types.Model, error) {
+	runningDeploys, err := m.deployStore.RunningVisibleToUser(c, userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get running models visible to user,error:%w", err)
 	}

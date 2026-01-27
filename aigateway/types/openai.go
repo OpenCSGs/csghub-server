@@ -14,6 +14,7 @@ type BaseModel struct {
 	OwnedBy             string `json:"owned_by"`
 	Task                string `json:"task"`                            // like text-generation, text-to-image etc
 	SupportFunctionCall bool   `json:"support_function_call,omitempty"` // whether the model supports function calling
+	IsPinned            *bool  `json:"is_pinned,omitempty"`             // whether the model is pinned
 }
 
 // InternalModelInfo represents the internal model fields
@@ -150,3 +151,16 @@ type ModelList struct {
 	HasMore    bool    `json:"has_more"`
 	TotalCount int     `json:"total_count"`
 }
+
+// UserPreferenceRequest defines the request parameters for UserPreference method
+type UserPreferenceRequest struct {
+	UserUUID string
+	Scenario string
+	Models   []Model
+}
+
+const OpenCSGAppNameHeader string = "OpenCSG-App-Name"
+
+const (
+	AgenticHubApp = "Agentichub"
+)

@@ -111,6 +111,7 @@ func TestOpenAIHandler_ListModels(t *testing.T) {
 			},
 		}
 		tester.mocks.openAIComp.EXPECT().GetAvailableModels(mock.Anything, "testuser").Return(models, nil)
+
 		tester.WithQuery("model_id", "gpt")
 		tester.handler.ListModels(c)
 
@@ -405,7 +406,6 @@ func TestOpenAIHandler_ListModels_OpenaiSDK(t *testing.T) {
 
 	// Set up mock expectation
 	tester.mocks.openAIComp.EXPECT().GetAvailableModels(mock.Anything, "testuser").Return(models, nil)
-
 	// Create gin router
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
