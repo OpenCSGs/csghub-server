@@ -1,6 +1,5 @@
 #!/bin/bash
 set -euo pipefail 
-export PYTHONPATH="/home/user/.local/lib/python3.10/site-packages:${PYTHONPATH:-}"
 
 get_env_var() {
     local name="$1"
@@ -57,7 +56,7 @@ download_repo() {
     local retry_count=0
     local download_success=false
 
-    local download_cmd="csghub-cli download \
+    local download_cmd=".venv/bin/csghub-cli download \
         ${REPO_ID} \
         --repo-type ${REPO_TYPE} \
         --revision ${REVISION} \
@@ -96,14 +95,10 @@ download_repo() {
 
 download_repo
 
-cd "$DOWNLOAD_DIR"
-
 if [ "$SDK" != "nginx" ]; then
-    run_command "uv venv --clear" "create uv virtual environment"
-
     requirements_path="${DOWNLOAD_DIR}/requirements.txt"
     if [ -f "$requirements_path" ]; then
-        run_command "uv pip install -i $PIP_INDEX_URL -r $requirements_path" "install dependencies from $requirements_path"
+        run_command "uv pip install --no-cache -i $PIP_INDEX_URL -r $requirements_path --python .venv/bin/python " "install dependencies from $requirements_path"
     else
         echo -e "\n[$(date +'%Y-%m-%d %H:%M:%S')] requirements.txt not found, skip installing dependencies."
     fi
@@ -115,16 +110,17 @@ if [ "$SDK" != "nginx" ]; then
     fi
 fi
 
+cd "$DOWNLOAD_DIR"
 echo -e "\n[$(date +'%Y-%m-%d %H:%M:%S')] 🚀 start application (SDK: $SDK)："
 case "$SDK" in
     "gradio")
-        run_command "uv run $app_path" "start gradio application"
+        run_command "$HOME/app/.venv/bin/python $app_path" "start gradio application"
         ;;
     "streamlit")
-        run_command "uv run streamlit run $app_path" "start streamlit application"
+        run_command "$HOME/app/.venv/bin/streamlit run $app_path" "start streamlit application"
         ;;
-    "mcpserver")
-        run_command "uv run $app_path" "start mcpserver application"
+    "mcp_server")
+        run_command "$HOME/app/.venv/bin/python $app_path" "start mcpserver application"
         ;;
     "nginx")
         daemon_path="${DOWNLOAD_DIR}/nginx.conf"
@@ -135,7 +131,7 @@ case "$SDK" in
         run_command "nginx -c $daemon_path -g 'daemon off;'" "start nginx service"
         ;;
     *)
-        echo "ERROR: Unsupported SDK type: $SDK, only gradio/streamlit/mcpserver/nginx are supported!" >&2
+        echo "ERROR: Unsupported SDK type: $SDK, only gradio/streamlit/mcp_server/nginx are supported!" >&2
         exit 1
         ;;
 esac

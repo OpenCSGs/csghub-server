@@ -5,6 +5,7 @@ USER root
 RUN apt update && \
     apt install -y --no-install-recommends \
     curl \
+    vim \
     nginx && \
     pip install --upgrade pip uv --no-cache-dir && \
     apt-get clean autoclean && \
@@ -19,8 +20,9 @@ RUN mkdir -p /var/log/nginx /var/lib/nginx /var/cache/nginx /home/user/app/logs/
 RUN chown -R user:user /home/user
 USER user
 WORKDIR /home/user/app
-
-RUN pip install --user -i https://pypi.tuna.tsinghua.edu.cn/simple csghub-sdk  gradio streamlit openai==2.2.0 coagent-python==0.1.3
+RUN uv venv --clear .venv
+COPY --chown=user:user ./base_requirements.txt /home/user/app/
+RUN uv pip install -i https://pypi.tuna.tsinghua.edu.cn/simple -r base_requirements.txt --python .venv/bin/python
 
 COPY --chown=user:user ./start.sh /home/user/app/
 

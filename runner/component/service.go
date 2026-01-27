@@ -59,6 +59,7 @@ type serviceComponentImpl struct {
 	env                     *config.Config
 	spaceDockerRegBase      string
 	modelDockerRegBase      string
+	publicDockerRegBase     string
 	imagePullSecret         string
 	informerSyncPeriodInMin int
 	serviceStore            database.KnativeServiceStore
@@ -90,6 +91,7 @@ func NewServiceComponent(config *config.Config, clusterPool cluster.Pool, logRep
 		env:                     config,
 		spaceDockerRegBase:      config.Space.DockerRegBase,
 		modelDockerRegBase:      config.Model.DockerRegBase,
+		publicDockerRegBase:     config.Runner.PublicDockerRegBase,
 		imagePullSecret:         config.Space.ImagePullSecret,
 		informerSyncPeriodInMin: config.Space.InformerSyncPeriodInMin,
 		serviceStore:            database.NewKnativeServiceStore(),
@@ -180,8 +182,15 @@ func (s *serviceComponentImpl) generateService(ctx context.Context, cluster *clu
 			containerImg = path.Join(s.modelDockerRegBase, request.ImageID)
 		}
 	} else if request.RepoType == string(types.SpaceRepo) {
-		// choose registry
-		containerImg = path.Join(s.spaceDockerRegBase, request.ImageID)
+		// use space docker reg base if sdk is docker
+		if request.Env != nil && request.Env["SDK"] == "docker" {
+			containerImg = path.Join(s.spaceDockerRegBase, request.ImageID)
+		} else {
+			// add public prefix if image is not full path
+			if strings.Count(containerImg, "/") == 1 {
+				containerImg = path.Join(s.publicDockerRegBase, request.ImageID)
+			}
+		}
 	}
 
 	templateAnnotations := make(map[string]string)
