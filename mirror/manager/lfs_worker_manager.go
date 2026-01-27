@@ -123,6 +123,14 @@ func (m *Manager) ReRun(id int, mt *database.MirrorTask) error {
 }
 
 func (m *Manager) Start() {
+	ctx := context.Background()
+	resetCount, err := m.mirrorTaskStore.ResetRunningTasks(ctx, types.MirrorLfsSyncStart, types.MirrorRepoSyncFinished)
+	if err != nil {
+		slog.Error("failed to reset running tasks", slog.Any("error", err))
+	} else if resetCount > 0 {
+		slog.Info("reset running tasks to repo_synced status", slog.Int("count", resetCount))
+	}
+
 	for i := 1; i <= m.workerNumber; i++ {
 		m.conChan <- i
 	}

@@ -322,27 +322,3 @@ func (m *mirrorTaskStoreImpl) ResetRunningTasks(ctx context.Context, fromStatus 
 	}
 	return int(rowsAffected), nil
 }
-
-func (m *mirrorTaskStoreImpl) UpdateStatusAndRepoSyncStatus(ctx context.Context, task MirrorTask, syncStatus types.RepositorySyncStatus) (MirrorTask, error) {
-	err := m.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		_, err := tx.NewUpdate().
-			Model(&task).
-			WherePK().
-			Exec(ctx)
-		if err != nil {
-			return err
-		}
-
-		_, err = tx.NewUpdate().
-			Model(&Repository{}).
-			Set("sync_status = ?", syncStatus).
-			Where("id = ?", task.Mirror.RepositoryID).
-			Exec(ctx)
-		if err != nil {
-			return err
-		}
-
-		return nil
-	})
-	return task, errorx.HandleDBError(err, nil)
-}
