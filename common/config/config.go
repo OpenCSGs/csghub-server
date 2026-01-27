@@ -482,7 +482,7 @@ type Config struct {
 		WatchConfigmapName string `env:"STARHUB_SERVER_RUNNER_WATCH_CONFIGMAP_NAME" default:"spaces-runner-config"`
 		// WatchConfigmapKey           string `env:"STARHUB_SERVER_RUNNER_WATCH_CONFIGMAP_KEY" default:""`
 		WatchConfigmapIntervalInSec int    `env:"STARHUB_SERVER_RUNNER_WATCH_CONFIGMAP_INTERVAL_IN_SEC" default:"60"`
-		HearBeatIntervalInSec       int    `env:"STARHUB_SERVER_RUNNER_HEARTBEAT_INTERVAL_IN_SEC" default:"300"`
+		HearBeatIntervalInSec       int    `env:"STARHUB_SERVER_RUNNER_HEARTBEAT_INTERVAL_IN_SEC" default:"120"`
 		RunnerNamespace             string `env:"STARHUB_SERVER_CLUSTER_RUNNER_NAMESPACE" default:"csghub"`
 	}
 

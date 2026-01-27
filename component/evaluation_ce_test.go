@@ -49,6 +49,7 @@ func TestEvaluationComponent_CreateEvaluation(t *testing.T) {
 		RepoType: "model",
 		TaskType: "evaluation",
 		Token:    "foo",
+		Nodes:    []types.Node{{Name: "node1", EnableVXPU: false}},
 	}
 	t.Run("create evaluation without resource id", func(t *testing.T) {
 		c := initializeTestEvaluationComponent(ctx, t)
@@ -84,6 +85,13 @@ func TestEvaluationComponent_CreateEvaluation(t *testing.T) {
 			TaskName: "test",
 		}, nil)
 		req.ResourceName = "1 GPU · 4 vCPU · 32Gi"
+
+		c.mocks.stores.ClusterInfoMock().EXPECT().FindNodeByClusterID(ctx, req.ClusterID).Return([]database.ClusterNode{
+			{
+				Name: "node1",
+			},
+		}, nil)
+
 		e, err := c.CreateEvaluation(ctx, req)
 		require.NotNil(t, e)
 		require.Equal(t, "test", e.TaskName)
@@ -133,6 +141,13 @@ func TestEvaluationComponent_CreateEvaluation(t *testing.T) {
 			TaskName: "test",
 		}, nil)
 		req.ResourceName = "1 GPU · 4 vCPU · 32Gi"
+
+		c.mocks.stores.ClusterInfoMock().EXPECT().FindNodeByClusterID(ctx, req.ClusterID).Return([]database.ClusterNode{
+			{
+				Name: "node1",
+			},
+		}, nil)
+
 		e, err := c.CreateEvaluation(ctx, req)
 		require.NotNil(t, e)
 		require.Equal(t, "test", e.TaskName)

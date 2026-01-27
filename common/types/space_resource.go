@@ -67,7 +67,7 @@ type SpaceResourceIndexReq struct {
 	ResourceType ResourceType `json:"resource_type" form:"resource_type" binding:"omitempty,resource_type"`
 	HardwareType string       `json:"hardware_type" form:"hardware_type"`
 	IsAvailable  *bool        `json:"is_available" form:"is_available"`
-	Per          int          `json:"per" form:"per,default=50" binding:"min=1,max=100"`
+	Per          int          `json:"per" form:"per,default=100" binding:"min=1,max=100"`
 	Page         int          `json:"page" form:"page,default=1" binding:"min=1"`
 }
 

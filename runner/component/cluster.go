@@ -15,14 +15,9 @@ import (
 )
 
 type clusterComponentImpl struct {
-	k8sNameSpace            string
-	env                     *config.Config
-	spaceDockerRegBase      string
-	modelDockerRegBase      string
-	imagePullSecret         string
-	informerSyncPeriodInMin int
-	clusterStore            database.ClusterInfoStore
-	clusterPool             cluster.Pool
+	env          *config.Config
+	clusterStore database.ClusterInfoStore
+	clusterPool  cluster.Pool
 }
 
 type ClusterComponent interface {
@@ -32,14 +27,9 @@ type ClusterComponent interface {
 
 func NewClusterComponent(config *config.Config, clusterPool cluster.Pool) ClusterComponent {
 	sc := &clusterComponentImpl{
-		k8sNameSpace:            config.Cluster.SpaceNamespace,
-		env:                     config,
-		spaceDockerRegBase:      config.Space.DockerRegBase,
-		modelDockerRegBase:      config.Model.DockerRegBase,
-		imagePullSecret:         config.Space.ImagePullSecret,
-		informerSyncPeriodInMin: config.Space.InformerSyncPeriodInMin,
-		clusterStore:            database.NewClusterInfoStore(),
-		clusterPool:             clusterPool,
+		env:          config,
+		clusterStore: database.NewClusterInfoStore(),
+		clusterPool:  clusterPool,
 	}
 	go sc.initCluster()
 	go sc.heartBeat()
@@ -127,42 +117,67 @@ func (c *clusterComponentImpl) heartBeat() {
 }
 
 func (c *clusterComponentImpl) pushHeartBeatEvent() {
-	eventData := &types.HearBeatEvent{
-		Running:     []string{},
-		Unavailable: []string{},
-	}
-	clusters := c.clusterPool.GetAllCluster()
-	for _, cluster := range clusters {
-		err := c.checkIfClusterAvailable(cluster)
-		if err != nil {
-			slog.Warn("failed to check if cluster is available", slog.Any("error", err), slog.Any("cluster", cluster))
-			eventData.Unavailable = append(eventData.Unavailable, cluster.ID)
-		} else {
-			eventData.Running = append(eventData.Running, cluster.ID)
-		}
+	ctx, cancel := context.WithTimeout(context.Background(),
+		time.Duration(c.env.Runner.HearBeatIntervalInSec)*time.Second)
+	defer cancel()
 
-	}
+	clusterResArray := c.collectAllClusters(ctx)
+
 	event := &types.WebHookSendEvent{
 		WebHookHeader: types.WebHookHeader{
 			EventType: types.RunnerHeartbeat,
 			EventTime: time.Now().Unix(),
 			DataType:  types.WebHookDataTypeArray,
 		},
-		Data: eventData,
+		Data: clusterResArray,
 	}
+
 	err := rcommon.Push(c.env.Runner.WebHookEndpoint, c.env.APIToken, event)
+	slog.InfoContext(ctx, "push cluster heart beat event", slog.Any("len(clusters)", len(clusterResArray)))
 	if err != nil {
-		slog.Error("failed to report cluster heartbeat event", slog.Any("error", err), slog.Any("event", event),
+		slog.Error("failed to report cluster heartbeat resource event",
+			slog.Any("error", err),
+			slog.Any("event", event),
 			slog.Any("HearBeatIntervalInSec", c.env.Runner.HearBeatIntervalInSec))
 	} else {
 		go rcommon.PushCachedFailedEvents(c.env.Runner.WebHookEndpoint, c.env.APIToken)
 	}
+	slog.DebugContext(ctx, "heartbeat_event_sent", slog.Any("event_body", event.Data))
 }
 
-func (c *clusterComponentImpl) checkIfClusterAvailable(cluster *cluster.Cluster) error {
-	_, err := cluster.Client.Discovery().ServerVersion()
-	if err != nil {
-		return fmt.Errorf("cluster %s is unavailable: %w", cluster.ID, err)
+func (c *clusterComponentImpl) collectAllClusters(ctx context.Context) []*types.ClusterRes {
+	clusters := c.clusterPool.GetAllCluster()
+	clusterResArray := []*types.ClusterRes{}
+	for _, cluster := range clusters {
+		clusterInfo, err := c.collectResourceByID(ctx, cluster.ID)
+		if err != nil {
+			slog.ErrorContext(ctx, "failed to collect cluster resource by clusterId %s, error: %w", cluster.ID, err)
+			continue
+		}
+		clusterResArray = append(clusterResArray, clusterInfo)
 	}
-	return nil
+	return clusterResArray
+}
+
+func (c *clusterComponentImpl) collectResourceByID(ctx context.Context, clusterId string) (*types.ClusterRes, error) {
+	cInfo, err := c.ByClusterID(ctx, clusterId)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get cluster by clusterId %s, error: %w", clusterId, err)
+	}
+	clusterInfo := types.ClusterRes{}
+	clusterInfo.Region = cInfo.Region
+	clusterInfo.Zone = cInfo.Zone
+	clusterInfo.Provider = cInfo.Provider
+	clusterInfo.ClusterID = cInfo.ClusterID
+	clusterInfo.StorageClass = cInfo.StorageClass
+	clusterInfo.Enable = cInfo.Enable
+	availabilityStatus, resourceAvaliable, err := c.GetResourceByID(ctx, clusterId)
+	if err != nil {
+		return nil, fmt.Errorf("failed to collect cluster physical resource by clusterId %s, error: %w", clusterId, err)
+	}
+	for _, v := range resourceAvaliable {
+		clusterInfo.Resources = append(clusterInfo.Resources, v)
+	}
+	clusterInfo.ResourceStatus = availabilityStatus
+	return &clusterInfo, nil
 }

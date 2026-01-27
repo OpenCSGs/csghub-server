@@ -71,6 +71,7 @@ func TestDeployWorkflowSuccess(t *testing.T) {
 	mockImageRunner := mockrunner.NewMockRunner(t)
 	mockGitServer := mock_git.NewMockGitServer(t)
 	mockLogReporter := mockReporter.NewMockLogCollector(t)
+	mockClusterStore := mockdb.NewMockClusterInfoStore(t)
 	mockConfig := &config.Config{}
 	mockDeployCfg := common.BuildDeployConfig(mockConfig)
 	act := activity.NewDeployActivity(
@@ -86,6 +87,7 @@ func TestDeployWorkflowSuccess(t *testing.T) {
 		mockRuntimeFrameworks,
 		mockUrsStore,
 		mockMetadataStore,
+		mockClusterStore,
 	)
 	env := testSuite.NewTestWorkflowEnvironment()
 	env.RegisterWorkflow(DeployWorkflow)
@@ -154,6 +156,13 @@ func TestDeployWorkflowSuccess(t *testing.T) {
 		ID: "1234567",
 	}, nil).Maybe()
 	mockDeployTaskStore.EXPECT().UpdateInTx(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Times(1)
+
+	mockClusterStore.EXPECT().FindNodeByClusterID(mock.Anything, deploy.ClusterID).Return([]database.ClusterNode{
+		{
+			Name: "node1",
+		},
+	}, nil)
+
 	env.ExecuteWorkflow(DeployWorkflow, buildTask.ID, runTask.ID)
 
 	var result []string

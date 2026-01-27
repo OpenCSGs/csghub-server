@@ -12,7 +12,7 @@ import (
 )
 
 type HeartbeatExecutor interface {
-	UpdateClusterStatus(ctx context.Context, eventData *types.HearBeatEvent) error
+	UpdateClusterStatus(ctx context.Context, eventData []*types.ClusterRes) error
 }
 
 type heartbeatExecutorImpl struct {
@@ -37,9 +37,9 @@ func NewHeartbeatExecutor(config *config.Config) (HeartbeatExecutor, error) {
 }
 
 func (h *heartbeatExecutorImpl) ProcessEvent(ctx context.Context, event *types.WebHookRecvEvent) error {
-	slog.Info("heartbeat_event_received", slog.Any("event", event))
+	slog.Info("heartbeat_event_received", slog.Any("event_body_len", len(event.Data)))
 
-	eventData := &types.HearBeatEvent{}
+	eventData := []*types.ClusterRes{}
 
 	err := json.Unmarshal(event.Data, &eventData)
 	if err != nil {
@@ -49,7 +49,8 @@ func (h *heartbeatExecutorImpl) ProcessEvent(ctx context.Context, event *types.W
 	return h.UpdateClusterStatus(ctx, eventData)
 }
 
-func (h *heartbeatExecutorImpl) UpdateClusterStatus(ctx context.Context, eventData *types.HearBeatEvent) error {
+func (h *heartbeatExecutorImpl) UpdateClusterStatus(ctx context.Context, eventData []*types.ClusterRes) error {
+	slog.DebugContext(ctx, "heartbeat_event_received", slog.Any("event_body", eventData))
 	// update cluster status in database
 	err := h.clusterStore.BatchUpdateStatus(ctx, eventData)
 	if err != nil {

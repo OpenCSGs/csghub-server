@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
@@ -24,7 +25,9 @@ type ClusterInfoStore interface {
 	ByClusterID(ctx context.Context, clusterId string) (clusterInfo ClusterInfo, err error)
 	ByClusterConfig(ctx context.Context, clusterConfig string) (clusterInfo ClusterInfo, err error)
 	List(ctx context.Context) ([]ClusterInfo, error)
-	BatchUpdateStatus(ctx context.Context, statusEvent *types.HearBeatEvent) error
+	BatchUpdateStatus(ctx context.Context, statusEvent []*types.ClusterRes) error
+	GetClusterResources(ctx context.Context, clusterID string) (*types.ClusterRes, error)
+	FindNodeByClusterID(ctx context.Context, clusterID string) ([]ClusterNode, error)
 }
 
 func NewClusterInfoStore() ClusterInfoStore {
@@ -40,18 +43,33 @@ func NewClusterInfoStoreWithDB(db *DB) ClusterInfoStore {
 }
 
 type ClusterInfo struct {
-	ClusterID        string              `bun:",pk" json:"cluster_id"`
-	ClusterConfig    string              `bun:",notnull" json:"cluster_config"`
-	StorageClass     string              `bun:"," json:"storage_class"`
-	Region           string              `bun:"," json:"region"`
-	Zone             string              `bun:"," json:"zone"`     //cn-beijing
-	Provider         string              `bun:"," json:"provider"` //ali
-	Enable           bool                `bun:",notnull" json:"enable"`
-	Status           types.ClusterStatus `bun:"," json:"status"`                  //running, unavailable
-	RunnerEndpoint   string              `bun:"endpoint," json:"runner_endpoint"` //runner in k8s api endpoint
-	NetworkInterface string              `bun:"," json:"network_interface"`       //used for multi-host, e.g., eth0
-	Mode             types.ClusterMode   `bun:"," json:"mode"`                    //used for multi-host, e.g., host, bridge
-	AppEndpoint      string              `bun:"," json:"app_endpoint"`            //runner app endpoint
+	ClusterID        string               `bun:",pk" json:"cluster_id"`
+	ClusterConfig    string               `bun:",notnull" json:"cluster_config"`
+	StorageClass     string               `bun:"," json:"storage_class"`
+	Region           string               `bun:"," json:"region"`
+	Zone             string               `bun:"," json:"zone"`     //cn-beijing
+	Provider         string               `bun:"," json:"provider"` //ali
+	Enable           bool                 `bun:",notnull" json:"enable"`
+	Status           types.ClusterStatus  `bun:"," json:"status"`                  //running, unavailable
+	RunnerEndpoint   string               `bun:"endpoint," json:"runner_endpoint"` //runner in k8s api endpoint
+	NetworkInterface string               `bun:"," json:"network_interface"`       //used for multi-host, e.g., eth0
+	Mode             types.ClusterMode    `bun:"," json:"mode"`                    //used for multi-host, e.g., host, bridge
+	AppEndpoint      string               `bun:"," json:"app_endpoint"`            //runner app endpoint
+	ResourceStatus   types.ResourceStatus `bun:"," json:"resource_status"`
+	times
+}
+
+type ClusterNode struct {
+	ID          int64               `bun:",pk,autoincrement" json:"id"`
+	ClusterID   string              `bun:",notnull" json:"cluster_id"`
+	Name        string              `bun:",notnull" json:"name"`
+	Status      string              `bun:",nullzero" json:"status"`
+	Labels      map[string]string   `bun:",type:jsonb,nullzero" json:"labels"`
+	EnableVXPU  bool                `bun:",default:false" json:"enable_vxpu"`
+	ComputeCard string              `bun:",nullzero" json:"compute_card"`
+	Hardware    types.NodeHardware  `bun:",type:jsonb,nullzero" json:"hardware"`
+	Processes   []types.ProcessInfo `bun:",type:jsonb,nullzero" json:"processes"`
+	Exclusive   bool                `bun:",default:false" json:"exclusive"`
 	times
 }
 
@@ -150,6 +168,7 @@ func (r *clusterInfoStoreImpl) UpdateByClusterID(ctx context.Context, event type
 		}
 		return err
 	})
+
 	return err
 }
 
@@ -174,30 +193,53 @@ func (s *clusterInfoStoreImpl) List(ctx context.Context) ([]ClusterInfo, error) 
 	return result, nil
 }
 
-func (s *clusterInfoStoreImpl) BatchUpdateStatus(ctx context.Context, statusEvent *types.HearBeatEvent) error {
+func (s *clusterInfoStoreImpl) BatchUpdateStatus(ctx context.Context, statusEvent []*types.ClusterRes) error {
 	err := s.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 
-		if len(statusEvent.Running) > 0 {
+		for _, cluster := range statusEvent {
 			_, err := tx.NewUpdate().Model(&ClusterInfo{}).
 				Set("Status = ?", types.ClusterStatusRunning).
+				Set("resource_status = ?", cluster.ResourceStatus).
 				Set("updated_at = now()").
-				Where("cluster_id IN (?)", bun.In(statusEvent.Running)).
+				Where("cluster_id = ?", cluster.ClusterID).
 				Exec(ctx)
 
 			if err != nil {
 				return errorx.HandleDBError(err, nil)
 			}
-		}
 
-		if len(statusEvent.Unavailable) > 0 {
-			_, err := tx.NewUpdate().Model(&ClusterInfo{}).
-				Set("Status = ?", types.ClusterStatusUnavailable).
-				Set("updated_at = now()").
-				Where("cluster_id IN (?)", bun.In(statusEvent.Unavailable)).
-				Exec(ctx)
+			for _, nodeRes := range cluster.Resources {
+				node := ClusterNode{
+					ClusterID:   cluster.ClusterID,
+					Name:        nodeRes.NodeName,
+					Status:      nodeRes.NodeStatus,
+					Labels:      nodeRes.Labels,
+					Hardware:    nodeRes.NodeHardware,
+					Processes:   nodeRes.Processes,
+					ComputeCard: "",
+				}
 
-			if err != nil {
-				return errorx.HandleDBError(err, nil)
+				if nodeRes.NodeHardware.TotalXPU > 0 {
+					node.ComputeCard = fmt.Sprintf("%d x %s %s %s",
+						nodeRes.NodeHardware.TotalXPU,
+						nodeRes.NodeHardware.GPUVendor,
+						nodeRes.NodeHardware.XPUModel,
+						nodeRes.NodeHardware.XPUMem)
+				}
+
+				_, err := tx.NewInsert().Model(&node).
+					On("CONFLICT (cluster_id, name) DO UPDATE").
+					Set("status = EXCLUDED.status").
+					Set("labels = EXCLUDED.labels").
+					Set("hardware = EXCLUDED.hardware").
+					Set("processes = EXCLUDED.processes").
+					Set("compute_card = EXCLUDED.compute_card").
+					Set("updated_at = now()").
+					Exec(ctx)
+
+				if err != nil {
+					return errorx.HandleDBError(err, nil)
+				}
 			}
 		}
 
@@ -205,4 +247,51 @@ func (s *clusterInfoStoreImpl) BatchUpdateStatus(ctx context.Context, statusEven
 	})
 
 	return err
+}
+
+func (s *clusterInfoStoreImpl) GetClusterResources(ctx context.Context, clusterID string) (*types.ClusterRes, error) {
+	clusterInfo, err := s.ByClusterID(ctx, clusterID)
+	if err != nil {
+		return nil, errorx.HandleDBError(err, nil)
+	}
+
+	var clusterNodes []ClusterNode
+	err = s.db.Operator.Core.NewSelect().Model(&clusterNodes).Where("cluster_id = ?", clusterID).Scan(ctx)
+	if err != nil {
+		return nil, errorx.HandleDBError(err, nil)
+	}
+
+	resources := make([]types.NodeResourceInfo, 0, len(clusterNodes))
+
+	for _, node := range clusterNodes {
+		resources = append(resources, types.NodeResourceInfo{
+			NodeName:     node.Name,
+			NodeStatus:   node.Status,
+			NodeHardware: node.Hardware,
+			Processes:    node.Processes,
+			EnableVXPU:   node.EnableVXPU,
+		})
+	}
+
+	return &types.ClusterRes{
+		ClusterID:      clusterInfo.ClusterID,
+		Status:         clusterInfo.Status,
+		Region:         clusterInfo.Region,
+		Zone:           clusterInfo.Zone,
+		Provider:       clusterInfo.Provider,
+		StorageClass:   clusterInfo.StorageClass,
+		ResourceStatus: types.ResourceStatus(clusterInfo.ResourceStatus),
+		Enable:         clusterInfo.Enable,
+		NodeNumber:     len(resources),
+		Resources:      resources,
+	}, nil
+}
+
+func (s *clusterInfoStoreImpl) FindNodeByClusterID(ctx context.Context, clusterID string) ([]ClusterNode, error) {
+	var result []ClusterNode
+	err := s.db.Operator.Core.NewSelect().Model(&result).Where("cluster_id = ?", clusterID).Scan(ctx, &result)
+	if err != nil {
+		return nil, errorx.HandleDBError(err, nil)
+	}
+	return result, nil
 }

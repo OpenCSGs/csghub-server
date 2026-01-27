@@ -39,6 +39,7 @@ type testEnv struct {
 	mockLogReporter       *mockReporter.MockLogCollector
 	mockConfig            *config.Config
 	mockDeployCfg         common.DeployConfig
+	mockClusterStore      *mockdb.MockClusterInfoStore
 }
 
 func setupTest(t *testing.T) *testEnv {
@@ -58,6 +59,7 @@ func setupTest(t *testing.T) *testEnv {
 	mockLogReporter := mockReporter.NewMockLogCollector(t)
 	mockConfig := &config.Config{}
 	mockDeployCfg := common.BuildDeployConfig(mockConfig)
+	mockClusterStore := mockdb.NewMockClusterInfoStore(t)
 
 	// Create activities instance
 	activities := &DeployActivity{
@@ -72,6 +74,7 @@ func setupTest(t *testing.T) *testEnv {
 		ms:  mockModelStore,
 		rfs: mockRuntimeFrameworks,
 		urs: mockUrsStore,
+		cls: mockClusterStore,
 	}
 
 	return &testEnv{
@@ -89,6 +92,7 @@ func setupTest(t *testing.T) *testEnv {
 		mockLogReporter:       mockLogReporter,
 		mockConfig:            mockConfig,
 		mockDeployCfg:         mockDeployCfg,
+		mockClusterStore:      mockClusterStore,
 	}
 }
 
@@ -529,6 +533,13 @@ func TestDeploy(t *testing.T) {
 		ID: "1234567",
 	}, nil)
 	tester.ctx = context.WithValue(tester.ctx, "test", "test")
+
+	tester.mockClusterStore.EXPECT().FindNodeByClusterID(mock.Anything, runTask.Deploy.ClusterID).Return([]database.ClusterNode{
+		{
+			Name: "node1",
+		},
+	}, nil)
+
 	err := tester.activities.Deploy(tester.ctx, runTask.ID)
 
 	require.NoError(t, err)

@@ -65,14 +65,17 @@ func (cluster *Cluster) GetResourceInNamespace(namespace string, quotaName strin
 
 	return map[string]types.NodeResourceInfo{
 		"": {
-			TotalCPU:         millicoresToCores(totalCPU.MilliValue()),
-			AvailableCPU:     millicoresToCores(availableCPU.MilliValue()),
-			TotalMem:         getMem(totalMem.Value()),
-			AvailableMem:     getMem(availableMem.Value()),
-			TotalXPU:         totalXPU,
-			AvailableXPU:     availableXPU,
-			XPUCapacityLabel: xpuCapacityLabel,
-			XPUModel:         gpuModel,
-			GPUVendor:        gpuModelVendor,
-		}}, nil
+			NodeHardware: types.NodeHardware{
+				TotalCPU:         millicoresToCores(totalCPU.MilliValue()),
+				AvailableCPU:     millicoresToCores(availableCPU.MilliValue()),
+				TotalMem:         getMem(totalMem.Value()),
+				AvailableMem:     getMem(availableMem.Value()),
+				TotalXPU:         totalXPU,
+				AvailableXPU:     availableXPU,
+				XPUCapacityLabel: xpuCapacityLabel,
+				XPUModel:         gpuModel,
+				GPUVendor:        gpuModelVendor,
+			},
+		},
+	}, nil
 }
