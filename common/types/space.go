@@ -150,4 +150,5 @@ type UpdateSpaceReq struct {
 	OrderDetailID int64   `json:"order_detail_id"`
 	ClusterID     *string `json:"cluster_id"`
 	MinReplica    *int    `json:"min_replica" example:"0" binding:"omitempty,min=0"`
+	DriverVersion *string `json:"driver_version"`
 }

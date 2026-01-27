@@ -11,11 +11,13 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 
+	"golang.org/x/mod/semver"
 	"opencsg.com/csghub-server/builder/deploy"
 	deployCommon "opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/git/gitserver"
@@ -66,6 +68,7 @@ type SpaceComponent interface {
 	GetByID(ctx context.Context, spaceID int64) (*database.Space, error)
 	MCPIndex(ctx context.Context, repoFilter *types.RepoFilter, per, page int) ([]*types.MCPService, int, error)
 	GetMCPServiceBySvcName(ctx context.Context, svcName string) (*types.MCPService, error)
+	GetSupportedCUDAVersions(ctx context.Context, resourceType string) ([]string, error)
 }
 
 func (c *spaceComponentImpl) Create(ctx context.Context, req types.CreateSpaceReq) (*types.Space, error) {
@@ -1237,6 +1240,29 @@ func (c *spaceComponentImpl) mergeUpdateSpaceRequest(ctx context.Context, space 
 		}
 		space.Hardware = resource.Resources
 		space.SKU = strconv.FormatInt(resource.ID, 10)
+
+		var hardware types.HardWare
+		err = json.Unmarshal([]byte(resource.Resources), &hardware)
+		if err != nil {
+			slog.ErrorContext(ctx, "invalid hardware setting", slog.Any("error", err))
+			return fmt.Errorf("invalid hardware setting, %w", err)
+		}
+		_, resourceType := deployCommon.GetResourceAndType(hardware)
+		if resourceType == "" { // only cpu resource
+			space.DriverVersion = ""
+		} else {
+			if req.DriverVersion == nil {
+				// set default value(compatible old version) latest cuda version by resocouurce type
+				frame, err := c.FindSpaceLatestCUDAVersion(ctx, resourceType)
+				if err != nil {
+					return fmt.Errorf("can't find latest cuda version for space resource, resource type:%s, error:%w", resourceType, err)
+				}
+
+				req.DriverVersion = &frame.DriverVersion
+			}
+			space.DriverVersion = *req.DriverVersion
+		}
+
 	}
 
 	if req.Variables != nil {
@@ -1366,6 +1392,54 @@ func (c *spaceComponentImpl) getEndpoint(svcName string, space *database.Space) 
 	}
 
 	return endpoint
+}
+
+// GetSupportedCUDAVersion returns the supported CUDA version based on the input resource type (cpu/gpu/npu, etc.)
+func (c *spaceComponentImpl) GetSupportedCUDAVersions(ctx context.Context, resourceType string) ([]string, error) {
+	frames, err := c.rfs.FindSpaceSupportedCUDAVersions(ctx, resourceType)
+	if err != nil {
+		return nil, err
+	}
+
+	var versions []string
+	for _, frame := range frames {
+		versions = append(versions, frame.DriverVersion)
+	}
+	return versions, nil
+}
+
+func (c *spaceComponentImpl) FindSpaceLatestCUDAVersion(ctx context.Context, computeType string) (*database.RuntimeFramework, error) {
+	frames, err := c.rfs.FindSpaceSupportedCUDAVersions(ctx, computeType)
+	if err != nil {
+		return nil, err
+	}
+	if len(frames) == 0 {
+		return nil, fmt.Errorf("no supported cuda version found for compute type %s", computeType)
+	}
+
+	slices.SortFunc(frames, func(i, j database.RuntimeFramework) int {
+		if i.DriverVersion == "" {
+			return -1
+		}
+		if j.DriverVersion == "" {
+			return 1
+		}
+		iDriverVersion, jDriverVersion := i.DriverVersion, j.DriverVersion
+		// Pre-process: semver package requires version to start with "v", so we add it uniformly
+		if !strings.HasPrefix(iDriverVersion, "v") {
+			iDriverVersion = fmt.Sprintf("v%s", iDriverVersion)
+		}
+		if !strings.HasPrefix(jDriverVersion, "v") {
+			jDriverVersion = fmt.Sprintf("v%s", jDriverVersion)
+		}
+
+		// 1: a > b
+		// 0: a == b
+		// -1: a < b
+		return semver.Compare(iDriverVersion, jDriverVersion)
+	})
+
+	return &frames[len(frames)-1], nil
 }
 
 const (
