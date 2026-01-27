@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"strings"
 	"time"
 
@@ -16,7 +17,6 @@ import (
 	"opencsg.com/csghub-server/builder/event"
 	"opencsg.com/csghub-server/builder/store/cache"
 	"opencsg.com/csghub-server/builder/store/database"
-	"opencsg.com/csghub-server/common/config"
 	commontypes "opencsg.com/csghub-server/common/types"
 )
 
@@ -27,6 +27,7 @@ const (
 
 type OpenAIComponent interface {
 	GetAvailableModels(c context.Context, user string) ([]types.Model, error)
+	ListModels(c context.Context, user string, req types.ListModelsReq) (types.ModelList, error)
 	GetModelByID(c context.Context, username, modelID string) (*types.Model, error)
 	RecordUsage(c context.Context, userUUID string, model *types.Model, tokenCounter token.Counter) error
 }
@@ -39,32 +40,17 @@ type openaiComponentImpl struct {
 	extllmStore database.LLMConfigStore
 
 	modelListCache cache.RedisClient
-}
-
-func NewOpenAIComponentFromConfig(config *config.Config) (OpenAIComponent, error) {
-	cacheClient, err := cache.NewCache(context.Background(), cache.RedisConfig{
-		Addr:     config.Redis.Endpoint,
-		Username: config.Redis.User,
-		Password: config.Redis.Password,
-	})
-	if err != nil {
-		return nil, err
-	}
-	return &openaiComponentImpl{
-		userStore:   database.NewUserStore(),
-		organStore:  database.NewOrgStore(),
-		deployStore: database.NewDeployTaskStore(),
-		eventPub:    &event.DefaultEventPublisher,
-		extllmStore: database.NewLLMConfigStore(config),
-
-		modelListCache: cacheClient,
-	}, nil
+	extendOpenai
 }
 
 // GetAvailableModels returns a list of running models
 func (m *openaiComponentImpl) GetAvailableModels(c context.Context, userName string) ([]types.Model, error) {
 	var models []types.Model
-	csghubModels, err := m.getCSGHubModels(c, userName)
+	user, err := m.userStore.FindByUsername(c, userName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find user by username in db,error:%w", err)
+	}
+	csghubModels, err := m.getCSGHubModels(c, user.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -83,16 +69,104 @@ func (m *openaiComponentImpl) GetAvailableModels(c context.Context, userName str
 		}
 	}(models)
 
+	req := &types.UserPreferenceRequest{
+		UserUUID: user.UUID,
+		Models:   models,
+		Scenario: types.AgenticHubApp,
+	}
+	models, err = m.userPreference(c, req)
+	if err != nil {
+		slog.Warn("failed to apply user preference", "error", err)
+		// Continue with original models if user preference fails
+	}
+
 	return models, nil
 }
 
-func (m *openaiComponentImpl) getCSGHubModels(c context.Context, userName string) ([]types.Model, error) {
-	user, err := m.userStore.FindByUsername(c, userName)
+func (m *openaiComponentImpl) ListModels(c context.Context, userName string, req types.ListModelsReq) (types.ModelList, error) {
+	models, err := m.GetAvailableModels(c, userName)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find user by username in db,error:%w", err)
+		return types.ModelList{}, err
+	}
+	return filterAndPaginateModels(models, req), nil
+}
+
+func filterAndPaginateModels(models []types.Model, req types.ListModelsReq) types.ModelList {
+	// Apply fuzzy search filter if model_id is provided
+	searchQuery := req.ModelID
+	if searchQuery != "" {
+		filtered := make([]types.Model, 0, len(models))
+		sq := strings.ToLower(searchQuery)
+		for _, model := range models {
+			if strings.Contains(strings.ToLower(model.ID), sq) {
+				filtered = append(filtered, model)
+			}
+		}
+		models = filtered
 	}
 
-	runningDeploys, err := m.deployStore.RunningVisibleToUser(c, user.ID)
+	// Apply public filter if provided and parseable
+	if req.Public != "" {
+		if isPublic, err := strconv.ParseBool(req.Public); err == nil {
+			filtered := make([]types.Model, 0, len(models))
+			for _, model := range models {
+				if model.Public == isPublic {
+					filtered = append(filtered, model)
+				}
+			}
+			models = filtered
+		}
+	}
+
+	// Parse pagination parameters (defaults match previous handler behavior)
+	per := 20
+	page := 1
+	if req.Per != "" {
+		if parsedPer, err := strconv.Atoi(req.Per); err == nil && parsedPer > 0 {
+			per = parsedPer
+			if per > 100 {
+				per = 100
+			}
+		}
+	}
+	if req.Page != "" {
+		if parsedPage, err := strconv.Atoi(req.Page); err == nil && parsedPage > 0 {
+			page = parsedPage
+		}
+	}
+
+	totalCount := len(models)
+	offset := (page - 1) * per
+	startIndex := offset
+	if startIndex > totalCount {
+		startIndex = totalCount
+	}
+	endIndex := startIndex + per
+	if endIndex > totalCount {
+		endIndex = totalCount
+	}
+
+	paginated := models[startIndex:endIndex]
+
+	var firstID, lastID *string
+	if len(paginated) > 0 {
+		firstID = &paginated[0].ID
+		lastID = &paginated[len(paginated)-1].ID
+	}
+	hasMore := endIndex < totalCount
+
+	return types.ModelList{
+		Object:     "list",
+		Data:       paginated,
+		FirstID:    firstID,
+		LastID:     lastID,
+		HasMore:    hasMore,
+		TotalCount: totalCount,
+	}
+}
+
+func (m *openaiComponentImpl) getCSGHubModels(c context.Context, userID int64) ([]types.Model, error) {
+	runningDeploys, err := m.deployStore.RunningVisibleToUser(c, userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get running models visible to user,error:%w", err)
 	}
@@ -100,12 +174,18 @@ func (m *openaiComponentImpl) getCSGHubModels(c context.Context, userName string
 	for _, deploy := range runningDeploys {
 		// Check if engine_args contains tool-call-parser parameter
 		supportFunctionCall := strings.Contains(deploy.EngineArgs, "tool-call-parser")
+		// Determine public/private based on deployment type, ownership and secure level.
+		isPublic := true
+		if deploy.Type == commontypes.InferenceType && deploy.SecureLevel == commontypes.EndpointPrivate && deploy.UserID == userID {
+			isPublic = false // private - user's own deployment with private secure level
+		}
 		m := types.Model{
 			BaseModel: types.BaseModel{
 				Object:              "model",
 				Created:             deploy.CreatedAt.Unix(),
 				SupportFunctionCall: supportFunctionCall,
 				Task:                string(deploy.Task),
+				Public:              isPublic,
 			},
 			InternalModelInfo: types.InternalModelInfo{
 				CSGHubModelID: deploy.Repository.Path,
@@ -162,6 +242,7 @@ func (m *openaiComponentImpl) getExternalModels(c context.Context) []types.Model
 					Object:  "model",
 					ID:      extModel.ModelName,
 					OwnedBy: extModel.Provider,
+					Public:  true, // external models are always public
 				},
 				Endpoint: extModel.ApiEndpoint,
 				ExternalModelInfo: types.ExternalModelInfo{

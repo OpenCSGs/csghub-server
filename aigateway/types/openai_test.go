@@ -17,6 +17,7 @@ func TestModelSerialization(t *testing.T) {
 			Task:    "text-generation",
 
 			SupportFunctionCall: true,
+			Public:              true,
 		},
 		InternalModelInfo: InternalModelInfo{
 			CSGHubModelID: "test/repo/path",
@@ -46,8 +47,8 @@ func TestModelSerialization(t *testing.T) {
 			t.Errorf("External response should not contain sensitive fields, got: %s", jsonStr)
 		}
 
-		if !contains(jsonStr, "test-model") || !contains(jsonStr, "model") || !contains(jsonStr, "test-owner") {
-			t.Errorf("External response should contain BaseModel fields, got: %s", jsonStr)
+		if !contains(jsonStr, "test-model") || !contains(jsonStr, "model") || !contains(jsonStr, "test-owner") || !contains(jsonStr, "public") {
+			t.Errorf("External response should contain BaseModel fields including public, got: %s", jsonStr)
 		}
 	})
 
@@ -59,8 +60,8 @@ func TestModelSerialization(t *testing.T) {
 			t.Fatalf("Failed to marshal model in internal use mode: %v", err)
 		}
 		jsonStr := string(jsonData)
-		if !contains(jsonStr, "endpoint") || !contains(jsonStr, "http://test-endpoint.com") || !contains(jsonStr, "test-model") {
-			t.Errorf("Internal response should contain base fields, got: %s", jsonStr)
+		if !contains(jsonStr, "endpoint") || !contains(jsonStr, "http://test-endpoint.com") || !contains(jsonStr, "test-model") || !contains(jsonStr, "public") {
+			t.Errorf("Internal response should contain base fields including public, got: %s", jsonStr)
 		}
 
 		if contains(jsonStr, "internal_model_info") {
@@ -107,6 +108,7 @@ func TestModelListSerialization(t *testing.T) {
 				BaseModel: BaseModel{
 					ID:     "model-1",
 					Object: "model",
+					Public: true,
 				},
 				Endpoint:    "http://model-1.com",
 				InternalUse: false,
@@ -149,6 +151,7 @@ func TestModelUnmarshal(t *testing.T) {
 				"owned_by": "test-owner",
 				"task": "text-generation",
 				"support_function_call": true,
+				"public": true,
 				"endpoint": "http://model-1.com",
 				"internal_use": false
 			}
