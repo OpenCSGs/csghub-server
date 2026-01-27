@@ -332,14 +332,14 @@ func (c *runtimeArchitectureComponentImpl) getRuntimeFrameworks(ctx context.Cont
 }
 
 // check model framework
-func isGGUFModel(repo *database.Repository) bool {
-	for _, tag := range repo.Tags {
-		if tag.Name == "gguf" {
-			return true
-		}
-	}
-	return strings.Contains(strings.ToLower(repo.Name), "gguf")
-}
+// func isGGUFModel(repo *database.Repository) bool {
+// 	for _, tag := range repo.Tags {
+// 		if tag.Name == "gguf" {
+// 			return true
+// 		}
+// 	}
+// 	return strings.Contains(strings.ToLower(repo.Name), "gguf")
+// }
 
 // for text-generation
 func (c *runtimeArchitectureComponentImpl) GetArchitectureFromConfig(ctx context.Context, repo *database.Repository) (*types.ModelConfig, error) {
