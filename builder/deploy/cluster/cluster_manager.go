@@ -8,6 +8,7 @@ import (
 	"math"
 	"math/rand"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -44,6 +45,7 @@ type Cluster struct {
 	NetworkInterface string            // Main network interface, used to rdma, ex: eth0
 	ConnectMode      types.ClusterMode // InCluster | kubeconfig
 	Region           string
+	Nodes            []types.Node
 }
 
 // Pool is a resource pool of cluster information
@@ -400,45 +402,15 @@ func (cluster *Cluster) GetResourcesInCluster(config *config.Config) (map[string
 
 	nodeResourcesMap := make(map[string]types.NodeResourceInfo)
 
+	cluster.Nodes = []types.Node{}
 	for _, node := range nodes.Items {
-		if !checkNodeReadiness(node) {
-			continue
-		}
-		totalMem := node.Status.Capacity.Memory().DeepCopy()
-		totalCPU := node.Status.Capacity.Cpu().DeepCopy()
-		allocatableMem := node.Status.Allocatable.Memory().DeepCopy()
-		allocatableCPU := node.Status.Allocatable.Cpu().DeepCopy()
-		totalXPU := resource.Quantity{}
-		allocatableXPU := resource.Quantity{}
-		xpuCapacityLabel, xpuTypeLabel, xpuMemLabel := getXPULabel(node.Labels, config)
-		if xpuCapacityLabel != "" {
-			totalXPU = node.Status.Capacity[v1.ResourceName(xpuCapacityLabel)]
-			allocatableXPU = node.Status.Allocatable[v1.ResourceName(xpuCapacityLabel)]
-		}
-
-		bigXPUMem := ""
-		if xpuMemLabel != "" {
-			ulimit, err := units.ParseBigBytes(node.Labels[xpuMemLabel])
-			if err == nil {
-				bigXPUMem = units.BigIBytes(ulimit)
-			}
-		}
-
-		gpuModelVendor, gpuModel := getGpuTypeAndVendor(node.Labels[xpuTypeLabel], xpuCapacityLabel)
-		nodeResourcesMap[node.Name] = types.NodeResourceInfo{
-			NodeName:     node.Name,
-			TotalCPU:     millicoresToCores(totalCPU.MilliValue()),
-			AvailableCPU: millicoresToCores(allocatableCPU.MilliValue()),
-			TotalMem:     getMem(totalMem.Value()),
-			AvailableMem: getMem(allocatableMem.Value()),
-			XPUModel:     gpuModel,
-			GPUVendor:    gpuModelVendor,
-			TotalXPU:     parseQuantityToInt64(totalXPU),
-			AvailableXPU: parseQuantityToInt64(allocatableXPU),
-
-			XPUCapacityLabel: xpuCapacityLabel,
-			XPUMem:           bigXPUMem,
-		}
+		nodeName := node.Name
+		nodeInfo := collectNodeResource(node, config)
+		nodeResourcesMap[nodeName] = nodeInfo
+		cluster.Nodes = append(cluster.Nodes, types.Node{
+			Name:       nodeName,
+			EnableVXPU: nodeInfo.EnableVXPU,
+		})
 	}
 
 	for _, pod := range pods.Items {
@@ -451,22 +423,98 @@ func (cluster *Cluster) GetResourcesInCluster(config *config.Config) (map[string
 			continue
 		}
 
-		for _, container := range pod.Spec.Containers {
-			if requestedGPU, hasGPU := container.Resources.Requests[v1.ResourceName(nodeResource.XPUCapacityLabel)]; hasGPU {
-				nodeResource.AvailableXPU -= parseQuantityToInt64(requestedGPU)
-			}
-			if memoryRequest, hasMemory := container.Resources.Requests[v1.ResourceMemory]; hasMemory {
-				nodeResource.AvailableMem -= getMem(memoryRequest.Value())
-			}
-			if cpuRequest, hasCPU := container.Resources.Requests[v1.ResourceCPU]; hasCPU {
-				nodeResource.AvailableCPU -= millicoresToCores(cpuRequest.MilliValue())
-			}
-		}
+		collectNodePodsResource(pod, config, &nodeResource)
 
 		nodeResourcesMap[pod.Spec.NodeName] = nodeResource
 	}
 
 	return nodeResourcesMap, nil
+}
+
+func collectNodeResource(node v1.Node, config *config.Config) types.NodeResourceInfo {
+	ready, status := checkNodeReadiness(node)
+
+	if !ready {
+		return types.NodeResourceInfo{
+			NodeName:   node.Name,
+			NodeStatus: status,
+			Labels:     node.Labels,
+			Processes:  []types.ProcessInfo{},
+		}
+	}
+
+	totalMem := node.Status.Capacity.Memory().DeepCopy()
+	totalCPU := node.Status.Capacity.Cpu().DeepCopy()
+	allocatableMem := node.Status.Allocatable.Memory().DeepCopy()
+	allocatableCPU := node.Status.Allocatable.Cpu().DeepCopy()
+	totalXPU := resource.Quantity{}
+	allocatableXPU := resource.Quantity{}
+	xpuCapacityLabel, xpuTypeLabel, xpuMemLabel := getXPULabel(node.Labels, config)
+	if xpuCapacityLabel != "" {
+		totalXPU = node.Status.Capacity[v1.ResourceName(xpuCapacityLabel)]
+		allocatableXPU = node.Status.Allocatable[v1.ResourceName(xpuCapacityLabel)]
+	}
+
+	bigXPUMem := ""
+	if xpuMemLabel != "" {
+		ulimit, err := units.ParseBigBytes(node.Labels[xpuMemLabel])
+		if err == nil {
+			bigXPUMem = units.BigIBytes(ulimit)
+		}
+	}
+
+	gpuModelVendor, gpuModel := getGpuTypeAndVendor(node.Labels[xpuTypeLabel], xpuCapacityLabel)
+	vXPUs := collectNodeVXPU(node)
+	nodeResourceInfo := types.NodeResourceInfo{
+		NodeName:   node.Name,
+		NodeStatus: status,
+		Labels:     node.Labels,
+		NodeHardware: types.NodeHardware{
+			TotalCPU:         millicoresToCores(totalCPU.MilliValue()),
+			AvailableCPU:     millicoresToCores(allocatableCPU.MilliValue()),
+			TotalMem:         getMem(totalMem.Value()),
+			AvailableMem:     getMem(allocatableMem.Value()),
+			XPUModel:         gpuModel,
+			GPUVendor:        gpuModelVendor,
+			TotalXPU:         parseQuantityToInt64(totalXPU),
+			AvailableXPU:     parseQuantityToInt64(allocatableXPU),
+			XPUCapacityLabel: xpuCapacityLabel,
+			XPUMem:           bigXPUMem,
+			VXPUs:            vXPUs,
+		},
+		Processes:  []types.ProcessInfo{},
+		EnableVXPU: (len(vXPUs) > 0),
+	}
+
+	return nodeResourceInfo
+}
+
+func collectNodePodsResource(pod v1.Pod, config *config.Config, nodeResource *types.NodeResourceInfo) {
+	for _, container := range pod.Spec.Containers {
+		if requestedGPU, hasGPU := container.Resources.Requests[v1.ResourceName(nodeResource.XPUCapacityLabel)]; hasGPU {
+			nodeResource.AvailableXPU -= parseQuantityToInt64(requestedGPU)
+		}
+		if memoryRequest, hasMemory := container.Resources.Requests[v1.ResourceMemory]; hasMemory {
+			nodeResource.AvailableMem -= getMem(memoryRequest.Value())
+		}
+		if cpuRequest, hasCPU := container.Resources.Requests[v1.ResourceCPU]; hasCPU {
+			nodeResource.AvailableCPU -= millicoresToCores(cpuRequest.MilliValue())
+		}
+	}
+
+	if pod.Namespace == config.Cluster.SpaceNamespace {
+		deployIDStr := pod.Labels[types.StreamKeyDeployID]
+		deployID, err := strconv.ParseInt(deployIDStr, 10, 64)
+		if err != nil {
+			slog.Warn("failed to convert csghub_deploy_id in collecting node pod resource")
+		}
+		nodeResource.Processes = append(nodeResource.Processes, types.ProcessInfo{
+			PodName:  pod.Name,
+			DeployID: deployID,
+			SvcName:  pod.Labels[rtypes.KnativeConfigLabelName],
+			VXPUs:    collectPodVXPU(pod),
+		})
+	}
 }
 
 // GetClusterID retrieves the unique ID of the cluster by fetching the UID of the specified namespace.
@@ -548,7 +596,7 @@ func getXPULabel(labels map[string]string, config *config.Config) (string, strin
 		var gpuLabels []types.GPUModel
 		err := json.Unmarshal([]byte(config.Space.GPUModelLabel), &gpuLabels)
 		if err != nil {
-			slog.Error("failed to parse GPUModelLabel", "error", err)
+			slog.Warn("failed to parse custom GPUModelLabel from config", slog.Any("error", err))
 			return "", "", ""
 		}
 		for _, gpuModel := range gpuLabels {
@@ -580,11 +628,16 @@ func parseQuantityToInt64(q resource.Quantity) int64 {
 	return value
 }
 
-func checkNodeReadiness(node v1.Node) bool {
+func checkNodeReadiness(node v1.Node) (bool, string) {
+	isReady := false
+	conditions := []string{}
 	for _, cond := range node.Status.Conditions {
-		if cond.Type == v1.NodeReady && cond.Status == v1.ConditionTrue {
-			return true
+		if cond.Status == v1.ConditionTrue {
+			if cond.Type == v1.NodeReady {
+				isReady = true
+			}
+			conditions = append(conditions, string(cond.Type))
 		}
 	}
-	return false
+	return isReady, strings.Join(conditions, ",")
 }

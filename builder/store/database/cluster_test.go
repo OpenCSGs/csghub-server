@@ -58,7 +58,7 @@ func TestClusterStore_CRUD(t *testing.T) {
 
 }
 
-func TestClusterStore_Delete(t *testing.T) {
+func TestClusterStore_BatchUpdateStatus(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
 	ctx := context.TODO()
@@ -71,9 +71,15 @@ func TestClusterStore_Delete(t *testing.T) {
 	cls2, err := store.Add(ctx, "bar", "region2", types.ConnectModeKubeConfig)
 	require.Nil(t, err)
 
-	statusEvent := &types.HearBeatEvent{
-		Running:     []string{cls1.ClusterID},
-		Unavailable: []string{cls2.ClusterID},
+	statusEvent := []*types.ClusterRes{
+		{
+			ClusterID: cls1.ClusterID,
+			Status:    types.ClusterStatusRunning,
+		},
+		{
+			ClusterID: cls2.ClusterID,
+			Status:    types.ClusterStatusUnavailable,
+		},
 	}
 
 	err = store.BatchUpdateStatus(ctx, statusEvent)
@@ -85,5 +91,5 @@ func TestClusterStore_Delete(t *testing.T) {
 
 	c2, err := store.ByClusterID(ctx, cls2.ClusterID)
 	require.Nil(t, err)
-	require.Equal(t, types.ClusterStatusUnavailable, c2.Status)
+	require.Equal(t, types.ClusterStatusRunning, c2.Status)
 }

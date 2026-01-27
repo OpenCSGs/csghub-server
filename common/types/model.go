@@ -318,6 +318,7 @@ type ModelUpdateRequest struct {
 	Env        map[string]string `json:"env"` // runtime env variables
 	ClusterID  string            `json:"cluster_id"`
 	SvcName    string            `json:"svc_name"`
+	Nodes      []Node            `json:"nodes"`
 }
 
 type ModelUpdateResponse struct {

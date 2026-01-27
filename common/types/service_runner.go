@@ -45,6 +45,12 @@ type (
 		Sku              string `json:"sku"`
 		OrderDetailID    int64  `json:"order_detail_id"`
 		TaskId           int64  `json:"task_id"`
+		Nodes            []Node `json:"nodes"`
+	}
+
+	Node struct {
+		Name       string
+		EnableVXPU bool
 	}
 
 	RunResponse struct {
@@ -199,6 +205,7 @@ type (
 		OrderDetailID int64             `json:"order_detail_id"`
 		SvcName       string            `json:"-"`
 		TaskId        int64             `json:"task_id"`
+		Nodes         []Node            `json:"nodes"`
 
 		StrategyType string `json:"strategy_type"` // blue_green/canary
 	}

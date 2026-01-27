@@ -68,25 +68,52 @@ type DeployRes struct {
 	SvcName         string    `json:"svc_name"` // service name of the deployment, used for inference endpoint
 }
 
-type NodeResourceInfo struct {
-	NodeName         string  `json:"node_name"`
-	XPUModel         string  `json:"xpu_model"`
+type VXPU struct {
+	ID           string `json:"id"`
+	Index        int    `json:"index"`
+	Mem          int64  `json:"mem"` // total mem in MB
+	Parallel     int64  `json:"parallel"`
+	Core         int64  `json:"core"`
+	Type         string `json:"type"`          // e.g., NVIDIA
+	AllocatedMem int64  `json:"allocated_mem"` // allocated mem in MB
+}
+
+type ProcessInfo struct {
+	PodName  string `json:"pod_name"`
+	DeployID int64  `json:"deploy_id"`
+	SvcName  string `json:"svc_name"`
+	VXPUs    []VXPU `json:"vxpus"`
+}
+
+type NodeHardware struct {
 	TotalCPU         float64 `json:"total_cpu"`
 	AvailableCPU     float64 `json:"available_cpu"`
+	TotalMem         float32 `json:"total_mem"`     //in GB
+	AvailableMem     float32 `json:"available_mem"` //in GB
+	XPUModel         string  `json:"xpu_model"`
 	TotalXPU         int64   `json:"total_xpu"`
 	AvailableXPU     int64   `json:"available_xpu"`
 	GPUVendor        string  `json:"gpu_vendor"`
-	TotalMem         float32 `json:"total_mem"`     //in GB
-	AvailableMem     float32 `json:"available_mem"` //in GB
 	XPUCapacityLabel string  `json:"xpu_capacity_label"`
 	ReservedXPU      int64   `json:"reserved_xpu"`
 	XPUMem           string  `json:"xpu_mem"`
+	VXPUs            []VXPU  `json:"vxpus"` // virtual XPU, e.g., vGPU, vTPU, etc.
+}
+
+type NodeResourceInfo struct {
+	NodeName   string `json:"node_name"`
+	NodeStatus string `json:"node_status"`
+	NodeHardware
+	Processes  []ProcessInfo     `json:"processes"` // pods running on the node
+	Labels     map[string]string `json:"labels"`    // labels of the node
+	EnableVXPU bool              `json:"enable_vxpu"`
 }
 
 type UpdateClusterResponse struct {
 	Code    int    `json:"code"`
 	Message string `json:"message"`
 }
+
 type GPUModel struct {
 	TypeLabel     string `json:"type_label"`
 	CapacityLabel string `json:"capacity_label"`
@@ -130,15 +157,22 @@ type ResourceAvailable struct {
 	AvailableXPU    map[string]int64 `json:"available_xpu"`
 }
 
-type HearBeatEvent struct {
-	Running     []string `json:"running"`
-	Unavailable []string `json:"unavailable"`
-}
-
 type EndpointReq struct {
 	ClusterID string
 	Target    string
 	Host      string
 	Endpoint  string
 	SvcName   string
+}
+
+type HAMIGPU struct {
+	ID      string `json:"id"`
+	Index   *int   `json:"index"`
+	Count   int    `json:"count"`
+	DevMem  int    `json:"devmem"`
+	DevCore int    `json:"devcore"`
+	Type    string `json:"type"`
+	Numa    *int   `json:"numa"`
+	Mode    string `json:"mode"`
+	Health  bool   `json:"health"`
 }

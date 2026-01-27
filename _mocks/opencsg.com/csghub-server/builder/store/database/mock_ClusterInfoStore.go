@@ -146,7 +146,7 @@ func (_c *MockClusterInfoStore_AddByClusterID_Call) RunAndReturn(run func(contex
 }
 
 // BatchUpdateStatus provides a mock function with given fields: ctx, statusEvent
-func (_m *MockClusterInfoStore) BatchUpdateStatus(ctx context.Context, statusEvent *types.HearBeatEvent) error {
+func (_m *MockClusterInfoStore) BatchUpdateStatus(ctx context.Context, statusEvent []*types.ClusterRes) error {
 	ret := _m.Called(ctx, statusEvent)
 
 	if len(ret) == 0 {
@@ -154,7 +154,7 @@ func (_m *MockClusterInfoStore) BatchUpdateStatus(ctx context.Context, statusEve
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, *types.HearBeatEvent) error); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, []*types.ClusterRes) error); ok {
 		r0 = rf(ctx, statusEvent)
 	} else {
 		r0 = ret.Error(0)
@@ -170,14 +170,14 @@ type MockClusterInfoStore_BatchUpdateStatus_Call struct {
 
 // BatchUpdateStatus is a helper method to define mock.On call
 //   - ctx context.Context
-//   - statusEvent *types.HearBeatEvent
+//   - statusEvent []*types.ClusterRes
 func (_e *MockClusterInfoStore_Expecter) BatchUpdateStatus(ctx interface{}, statusEvent interface{}) *MockClusterInfoStore_BatchUpdateStatus_Call {
 	return &MockClusterInfoStore_BatchUpdateStatus_Call{Call: _e.mock.On("BatchUpdateStatus", ctx, statusEvent)}
 }
 
-func (_c *MockClusterInfoStore_BatchUpdateStatus_Call) Run(run func(ctx context.Context, statusEvent *types.HearBeatEvent)) *MockClusterInfoStore_BatchUpdateStatus_Call {
+func (_c *MockClusterInfoStore_BatchUpdateStatus_Call) Run(run func(ctx context.Context, statusEvent []*types.ClusterRes)) *MockClusterInfoStore_BatchUpdateStatus_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(*types.HearBeatEvent))
+		run(args[0].(context.Context), args[1].([]*types.ClusterRes))
 	})
 	return _c
 }
@@ -187,7 +187,7 @@ func (_c *MockClusterInfoStore_BatchUpdateStatus_Call) Return(_a0 error) *MockCl
 	return _c
 }
 
-func (_c *MockClusterInfoStore_BatchUpdateStatus_Call) RunAndReturn(run func(context.Context, *types.HearBeatEvent) error) *MockClusterInfoStore_BatchUpdateStatus_Call {
+func (_c *MockClusterInfoStore_BatchUpdateStatus_Call) RunAndReturn(run func(context.Context, []*types.ClusterRes) error) *MockClusterInfoStore_BatchUpdateStatus_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -302,6 +302,124 @@ func (_c *MockClusterInfoStore_ByClusterID_Call) Return(clusterInfo database.Clu
 }
 
 func (_c *MockClusterInfoStore_ByClusterID_Call) RunAndReturn(run func(context.Context, string) (database.ClusterInfo, error)) *MockClusterInfoStore_ByClusterID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// FindNodeByClusterID provides a mock function with given fields: ctx, clusterID
+func (_m *MockClusterInfoStore) FindNodeByClusterID(ctx context.Context, clusterID string) ([]database.ClusterNode, error) {
+	ret := _m.Called(ctx, clusterID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FindNodeByClusterID")
+	}
+
+	var r0 []database.ClusterNode
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) ([]database.ClusterNode, error)); ok {
+		return rf(ctx, clusterID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) []database.ClusterNode); ok {
+		r0 = rf(ctx, clusterID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.ClusterNode)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, clusterID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClusterInfoStore_FindNodeByClusterID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindNodeByClusterID'
+type MockClusterInfoStore_FindNodeByClusterID_Call struct {
+	*mock.Call
+}
+
+// FindNodeByClusterID is a helper method to define mock.On call
+//   - ctx context.Context
+//   - clusterID string
+func (_e *MockClusterInfoStore_Expecter) FindNodeByClusterID(ctx interface{}, clusterID interface{}) *MockClusterInfoStore_FindNodeByClusterID_Call {
+	return &MockClusterInfoStore_FindNodeByClusterID_Call{Call: _e.mock.On("FindNodeByClusterID", ctx, clusterID)}
+}
+
+func (_c *MockClusterInfoStore_FindNodeByClusterID_Call) Run(run func(ctx context.Context, clusterID string)) *MockClusterInfoStore_FindNodeByClusterID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockClusterInfoStore_FindNodeByClusterID_Call) Return(_a0 []database.ClusterNode, _a1 error) *MockClusterInfoStore_FindNodeByClusterID_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClusterInfoStore_FindNodeByClusterID_Call) RunAndReturn(run func(context.Context, string) ([]database.ClusterNode, error)) *MockClusterInfoStore_FindNodeByClusterID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetClusterResources provides a mock function with given fields: ctx, clusterID
+func (_m *MockClusterInfoStore) GetClusterResources(ctx context.Context, clusterID string) (*types.ClusterRes, error) {
+	ret := _m.Called(ctx, clusterID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetClusterResources")
+	}
+
+	var r0 *types.ClusterRes
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*types.ClusterRes, error)); ok {
+		return rf(ctx, clusterID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *types.ClusterRes); ok {
+		r0 = rf(ctx, clusterID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.ClusterRes)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, clusterID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClusterInfoStore_GetClusterResources_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetClusterResources'
+type MockClusterInfoStore_GetClusterResources_Call struct {
+	*mock.Call
+}
+
+// GetClusterResources is a helper method to define mock.On call
+//   - ctx context.Context
+//   - clusterID string
+func (_e *MockClusterInfoStore_Expecter) GetClusterResources(ctx interface{}, clusterID interface{}) *MockClusterInfoStore_GetClusterResources_Call {
+	return &MockClusterInfoStore_GetClusterResources_Call{Call: _e.mock.On("GetClusterResources", ctx, clusterID)}
+}
+
+func (_c *MockClusterInfoStore_GetClusterResources_Call) Run(run func(ctx context.Context, clusterID string)) *MockClusterInfoStore_GetClusterResources_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockClusterInfoStore_GetClusterResources_Call) Return(_a0 *types.ClusterRes, _a1 error) *MockClusterInfoStore_GetClusterResources_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClusterInfoStore_GetClusterResources_Call) RunAndReturn(run func(context.Context, string) (*types.ClusterRes, error)) *MockClusterInfoStore_GetClusterResources_Call {
 	_c.Call.Return(run)
 	return _c
 }

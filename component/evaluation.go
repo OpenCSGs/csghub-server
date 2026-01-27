@@ -32,6 +32,7 @@ type evaluationComponentImpl struct {
 	accountingComponent   AccountingComponent
 	repoComponent         RepoComponent
 	userSvcClient         rpc.UserSvcClient
+	clusterStore          database.ClusterInfoStore
 }
 
 type EvaluationComponent interface {
@@ -67,6 +68,7 @@ func NewEvaluationComponent(config *config.Config) (EvaluationComponent, error) 
 		fmt.Sprintf("%s:%d", config.User.Host, config.User.Port),
 		rpc.AuthWithApiKey(config.APIToken),
 	)
+	c.clusterStore = database.NewClusterInfoStore()
 	return c, nil
 }
 
@@ -145,6 +147,18 @@ func (c *evaluationComponentImpl) CreateEvaluation(ctx context.Context, req type
 		hardware.Memory = "32Gi"
 		resource = fmt.Sprintf("%s%s vCPU · %s", resource, hardware.Cpu.Num, hardware.Memory)
 		req.ResourceName = resource
+	}
+
+	clusterNodes, err := c.clusterStore.FindNodeByClusterID(ctx, req.ClusterID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find nodes by cluster id, clusterID: %s, error: %w", req.ClusterID, err)
+	}
+
+	for _, node := range clusterNodes {
+		req.Nodes = append(req.Nodes, types.Node{
+			Name:       node.Name,
+			EnableVXPU: node.EnableVXPU,
+		})
 	}
 
 	req.Hardware = hardware

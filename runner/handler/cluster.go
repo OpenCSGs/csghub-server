@@ -37,7 +37,7 @@ func (s *ClusterHandler) GetClusterInfoByID(c *gin.Context) {
 	clusterInfo.StorageClass = cInfo.StorageClass
 	availabilityStatus, resourceAvaliable, err := s.clusterComponent.GetResourceByID(c.Request.Context(), clusterId)
 	if err != nil {
-		slog.ErrorContext(c.Request.Context(), "fail to get cluster", slog.Any("error", err))
+		slog.ErrorContext(c.Request.Context(), "failed to get cluster resource", slog.Any("error", err))
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
 	}

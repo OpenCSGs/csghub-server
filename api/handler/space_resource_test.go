@@ -58,7 +58,7 @@ func TestSpaceResourceHandler_Index(t *testing.T) {
 			CurrentUser:  "u",
 			ResourceType: types.ResourceTypeGPU,
 			HardwareType: "A10",
-			Per:          50,
+			Per:          100,
 			Page:         1,
 		}
 
@@ -81,7 +81,7 @@ func TestSpaceResourceHandler_Index(t *testing.T) {
 			CurrentUser:  "u",
 			ResourceType: types.ResourceTypeGPU,
 			HardwareType: "A10",
-			Per:          50,
+			Per:          100,
 			Page:         1,
 		}
 		tester.mocks.cluster.EXPECT().Index(mock.Anything).

@@ -257,7 +257,7 @@ func (wc *workFlowComponentImpl) FindWorkFlows(ctx context.Context, username str
 func generateWorkflow(req types.ArgoWorkFlowReq, config *config.Config) *v1alpha1.Workflow {
 	templates := []v1alpha1.Template{}
 	for _, v := range req.Templates {
-		resReq, _ := GenerateResources(v.HardWare)
+		resReq, _, nodeAffinity := generateResources(v.HardWare, req.Nodes)
 		environments := []corev1.EnvVar{}
 		for key, value := range v.Env {
 			environments = append(environments, corev1.EnvVar{Name: key, Value: value})
@@ -311,6 +311,9 @@ func generateWorkflow(req types.ArgoWorkFlowReq, config *config.Config) *v1alpha
 				Args:            v.Args,
 				Resources:       resources,
 				ImagePullPolicy: corev1.PullAlways,
+			},
+			Affinity: &corev1.Affinity{
+				NodeAffinity: nodeAffinity,
 			},
 		}
 

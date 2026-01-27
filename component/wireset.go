@@ -516,6 +516,7 @@ func NewTestEvaluationComponent(
 		accountingComponent:   accountingComponent,
 		repoComponent:         repoComponent,
 		userSvcClient:         userSvcClient,
+		clusterStore:          stores.ClusterInfo,
 	}
 }
 

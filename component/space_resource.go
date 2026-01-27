@@ -40,7 +40,7 @@ func (c *spaceResourceComponentImpl) Index(ctx context.Context, req *types.Space
 			HardwareType: req.HardwareType,
 			ResourceType: req.ResourceType,
 		}
-		databaseSpaceResources, currentTotal, err := c.spaceResourceStore.Index(ctx, dbReq, req.Per, req.Page)
+		databaseSpaceResources, currentTotal, err := c.spaceResourceStore.Index(ctx, dbReq, 200, 1)
 		if err != nil {
 			slog.Error("failed to index space resource", slog.String("clusterID", clusterID), slog.Any("error", err))
 			continue
@@ -51,29 +51,31 @@ func (c *spaceResourceComponentImpl) Index(ctx context.Context, req *types.Space
 			slog.Error("failed to get cluster by id", slog.String("clusterID", clusterID), slog.Any("error", err))
 			continue
 		}
-
+		slog.InfoContext(ctx, "get space cluster resource", slog.Any("clusterResources", clusterResources))
 		for _, r := range databaseSpaceResources {
 			var isAvailable bool
 			var hardware types.HardWare
 			err := json.Unmarshal([]byte(r.Resources), &hardware)
 			if err != nil {
-				slog.Error("invalid hardware setting", slog.Any("error", err), slog.String("hardware", r.Resources))
+				slog.ErrorContext(ctx, "invalid hardware setting", slog.Any("error", err), slog.String("hardware", r.Resources))
 			} else {
 				isAvailable = deploy.CheckResource(clusterResources, &hardware)
 			}
 			if !c.deployAvailable(req.DeployType, hardware) {
+				// must have gpu for finetune
 				continue
 			}
 			if req.DeployType != types.InferenceType && hardware.Replicas != 0 {
 				// only inference can have multi-node resources
 				continue
 			}
-			resourceType := common.ResourceType(hardware)
 			if req.IsAvailable != nil {
+				// filter by request status
 				if *req.IsAvailable != isAvailable {
 					continue
 				}
 			}
+			resourceType := common.ResourceType(hardware)
 			singleClusterResult = append(singleClusterResult, types.SpaceResource{
 				ID:          r.ID,
 				ClusterID:   r.ClusterID,
@@ -90,11 +92,12 @@ func (c *spaceResourceComponentImpl) Index(ctx context.Context, req *types.Space
 			continue
 		}
 
-		singleClusterResult, err = c.appendUserResources(ctx, req.CurrentUser, clusterID, singleClusterResult)
-		if err != nil {
-			slog.Error("failed to append user resources", slog.String("clusterID", clusterID), slog.Any("error", err))
-			continue
-		}
+		// comment user reserved resource will update later
+		// singleClusterResult, err = c.appendUserResources(ctx, req.CurrentUser, clusterID, singleClusterResult)
+		// if err != nil {
+		// 	slog.Error("failed to append user resources", slog.String("clusterID", clusterID), slog.Any("error", err))
+		// 	continue
+		// }
 		result = append(result, singleClusterResult...)
 		total += currentTotal
 	}

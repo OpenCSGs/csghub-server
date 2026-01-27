@@ -1,9 +1,10 @@
 package types
 
 const (
-	UserContainerName = "user-container"
-	InitRepoName      = "init-repo"
-	MainContainerName = "main"
+	KnativeConfigLabelName = "serving.knative.dev/configuration"
+	UserContainerName      = "user-container"
+	InitRepoName           = "init-repo"
+	MainContainerName      = "main"
 )
 
 var LogTargetContainersMap = map[string]struct{}{

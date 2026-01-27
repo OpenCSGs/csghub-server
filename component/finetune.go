@@ -31,6 +31,7 @@ type finetuneComponentImpl struct {
 	accountingComponent   AccountingComponent
 	repoComponent         RepoComponent
 	userSvcClient         rpc.UserSvcClient
+	clusterStore          database.ClusterInfoStore
 }
 
 type FinetuneComponent interface {
@@ -67,6 +68,7 @@ func NewFinetuneComponent(config *config.Config) (FinetuneComponent, error) {
 	c.accountingComponent = ac
 	userSvcAddr := fmt.Sprintf("%s:%d", config.User.Host, config.User.Port)
 	c.userSvcClient = rpc.NewUserSvcHttpClient(userSvcAddr, rpc.AuthWithApiKey(config.APIToken))
+	c.clusterStore = database.NewClusterInfoStore()
 	return c, nil
 }
 
