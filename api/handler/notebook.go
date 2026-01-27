@@ -341,12 +341,7 @@ func (h *NotebookHandler) Status(ctx *gin.Context) {
 func (h *NotebookHandler) Logs(ctx *gin.Context) {
 
 	currentUser := httpbase.GetCurrentUser(ctx)
-	instance := ctx.Param("instance")
-	if len(instance) < 1 {
-		err := errorx.ReqParamInvalid(errors.New("instance name is required"), errorx.Ctx().Set("param", "id"))
-		httpbase.BadRequestWithExt(ctx, err)
-		return
-	}
+	instance := ctx.Query("instance")
 
 	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {

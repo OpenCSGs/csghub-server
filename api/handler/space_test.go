@@ -288,7 +288,7 @@ func TestSpaceHandler_Logs(t *testing.T) {
 	).Return(true, nil)
 	runlogChan := make(chan string)
 	tester.mocks.space.EXPECT().Logs(
-		mock.Anything, "u", "r", "",
+		mock.Anything, "u", "r", "", "",
 	).Return(deploy.NewMultiLogReader(nil, runlogChan), nil)
 	go func() {
 		runlogChan <- "foo"

@@ -1056,13 +1056,12 @@ func TestRepoHandler_DeployInstanceLogs(t *testing.T) {
 	runlogChan := make(chan string)
 	tester.mocks.repo.EXPECT().DeployInstanceLogs(
 		mock.Anything, types.DeployActReq{
-			RepoType:     types.ModelRepo,
-			Namespace:    "u",
-			Name:         "r",
-			CurrentUser:  "u",
-			DeployID:     1,
-			DeployType:   types.InferenceType,
-			InstanceName: "ii",
+			RepoType:    types.ModelRepo,
+			Namespace:   "u",
+			Name:        "r",
+			CurrentUser: "u",
+			DeployID:    1,
+			DeployType:  types.InferenceType,
 		},
 	).Return(deploy.NewMultiLogReader(nil, runlogChan), nil)
 	cc, cancel := context.WithCancel(tester.Gctx().Request.Context())
@@ -1389,13 +1388,12 @@ func TestRepoHandler_ServerlessLogs(t *testing.T) {
 	runlogChan := make(chan string)
 	tester.mocks.repo.EXPECT().DeployInstanceLogs(
 		mock.Anything, types.DeployActReq{
-			RepoType:     types.ModelRepo,
-			Namespace:    "u",
-			Name:         "r",
-			CurrentUser:  "u",
-			DeployID:     1,
-			DeployType:   types.ServerlessType,
-			InstanceName: "ii",
+			RepoType:    types.ModelRepo,
+			Namespace:   "u",
+			Name:        "r",
+			CurrentUser: "u",
+			DeployID:    1,
+			DeployType:  types.ServerlessType,
 		},
 	).Return(deploy.NewMultiLogReader(nil, runlogChan), nil)
 	cc, cancel := context.WithCancel(tester.Gctx().Request.Context())
