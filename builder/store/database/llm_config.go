@@ -121,7 +121,7 @@ func (s *lLMConfigStoreImpl) Index(ctx context.Context, per, page int, search *t
 	offset := (page - 1) * per
 
 	query := s.db.Operator.Core.NewSelect().Model(&configs).Limit(per).Offset(offset)
-	buildSearchLLMConfigQuery(search, query, s.dbDriver, s.searchConfiguration)
+	buildSearchLLMConfigQuery(search, query)
 	err := query.Scan(ctx)
 	if err != nil {
 		return nil, 0, fmt.Errorf("select batch llm config with search, %w", err)
@@ -147,19 +147,13 @@ func (s *lLMConfigStoreImpl) GetByID(ctx context.Context, id int64) (*LLMConfig,
 func buildSearchLLMConfigQuery(
 	search *types.SearchLLMConfig,
 	q *bun.SelectQuery,
-	dbDriver string, // dbDriver is used to determine the database type for specific query syntax
-	searchConfiguration string, // searchConfiguration is used for full-text search configuration
 ) {
 	// If search option is not provided, skip search filtering
 	if search == nil {
 		return
 	}
 	if search.Keyword != "" {
-		if dbDriver == "pg" {
-			q.Where("llm_config.search_vector @@ websearch_to_tsquery(?, ?)", searchConfiguration, search.Keyword)
-		} else {
-			q.Where("llm_config.model_name = ?", search.Keyword)
-		}
+		q.Where("llm_config.model_name like ?", "%"+search.Keyword+"%")
 	}
 	// Filter by Type if provided
 	if search.Type != nil {
