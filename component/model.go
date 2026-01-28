@@ -130,6 +130,8 @@ func NewModelComponent(config *config.Config) (ModelComponent, error) {
 	c.userSvcClient = rpc.NewUserSvcHttpClient(fmt.Sprintf("%s:%d", config.User.Host, config.User.Port),
 		rpc.AuthWithApiKey(config.APIToken))
 	c.recomStore = database.NewRecomStore()
+	c.xnetMigrationTaskStore = database.NewXnetMigrationTaskStore()
+	c.lfsMetaObjectStore = database.NewLfsMetaObjectStore()
 
 	dc := dcommon.BuildDeployConfig(config)
 	ir, err := imagerunner.NewRemoteRunner(dc.ImageRunnerURL, dc)
@@ -163,6 +165,8 @@ type modelComponentImpl struct {
 	runtimeFrameworksStore    database.RuntimeFrameworksStore
 	userSvcClient             rpc.UserSvcClient
 	imageRunner               imagerunner.Runner
+	xnetMigrationTaskStore    database.XnetMigrationTaskStore
+	lfsMetaObjectStore        database.LfsMetaObjectStore
 }
 
 func (c *modelComponentImpl) Index(ctx context.Context, filter *types.RepoFilter, per, page int, needOpWeight bool) ([]*types.Model, int, error) {
@@ -198,8 +202,9 @@ func (c *modelComponentImpl) Index(ctx context.Context, filter *types.RepoFilter
 			continue
 		}
 		var (
-			tags             []types.RepoTag
-			mirrorTaskStatus types.MirrorTaskStatus
+			tags                []types.RepoTag
+			mirrorTaskStatus    types.MirrorTaskStatus
+			xnetMigrationStatus types.XnetMigrationTaskStatus
 		)
 		for _, tag := range repo.Tags {
 			tags = append(tags, types.RepoTag{
@@ -215,6 +220,16 @@ func (c *modelComponentImpl) Index(ctx context.Context, filter *types.RepoFilter
 		}
 		if model.Repository.Mirror.CurrentTask != nil {
 			mirrorTaskStatus = model.Repository.Mirror.CurrentTask.Status
+		}
+		var xnetMigrationProgress int
+		if model.Repository.CurrentXnetMigrationTaskID != 0 {
+			task, err := c.xnetMigrationTaskStore.GetXnetMigrationTaskByID(ctx, model.Repository.CurrentXnetMigrationTaskID)
+			if err == nil && task != nil {
+				xnetMigrationStatus = task.Status
+				if xnetMigrationStatus == types.XnetMigrationTaskStatusRunning {
+					xnetMigrationProgress = c.getXnetMigrationProgress(ctx, repo)
+				}
+			}
 		}
 		resModels = append(resModels, &types.Model{
 			ID:           model.ID,
@@ -238,10 +253,12 @@ func (c *modelComponentImpl) Index(ctx context.Context, filter *types.RepoFilter
 				MSPath:  model.Repository.MSPath,
 				CSGPath: model.Repository.CSGPath,
 			},
-			ReportURL:        model.ReportURL,
-			MediumRiskCount:  model.MediumRiskCount,
-			HighRiskCount:    model.HighRiskCount,
-			MirrorTaskStatus: mirrorTaskStatus,
+			ReportURL:             model.ReportURL,
+			MediumRiskCount:       model.MediumRiskCount,
+			HighRiskCount:         model.HighRiskCount,
+			MirrorTaskStatus:      mirrorTaskStatus,
+			XnetMigrationStatus:   xnetMigrationStatus,
+			XnetMigrationProgress: xnetMigrationProgress,
 		})
 	}
 	if needOpWeight {
@@ -447,7 +464,6 @@ func (c *modelComponentImpl) Delete(ctx context.Context, namespace, name, curren
 func (c *modelComponentImpl) Show(ctx context.Context, namespace, name, currentUser string, needOpWeight, needMultiSync bool) (*types.Model, error) {
 	var (
 		tags             []types.RepoTag
-		syncStatus       types.RepositorySyncStatus
 		mirrorTaskStatus types.MirrorTaskStatus
 	)
 	model, err := c.modelStore.FindByPath(ctx, namespace, name)
@@ -487,7 +503,19 @@ func (c *modelComponentImpl) Show(ctx context.Context, namespace, name, currentU
 		return nil, newError
 	}
 
-	mirrorTaskStatus, syncStatus = c.repoComponent.GetMirrorTaskStatusAndSyncStatus(model.Repository)
+	mirrorTaskStatus = c.repoComponent.GetMirrorTaskStatus(model.Repository)
+
+	var xnetMigrationStatus types.XnetMigrationTaskStatus
+	var xnetMigrationProgress int
+	if model.Repository.CurrentXnetMigrationTaskID != 0 {
+		task, err := c.xnetMigrationTaskStore.GetXnetMigrationTaskByID(ctx, model.Repository.CurrentXnetMigrationTaskID)
+		if err == nil && task != nil {
+			xnetMigrationStatus = task.Status
+			if task.Status == types.XnetMigrationTaskStatusRunning {
+				xnetMigrationProgress = c.getXnetMigrationProgress(ctx, model.Repository)
+			}
+		}
+	}
 
 	resModel := &types.Model{
 		ID:            model.ID,
@@ -513,7 +541,7 @@ func (c *modelComponentImpl) Show(ctx context.Context, namespace, name, currentU
 		WidgetType:          types.ModelWidgetTypeGeneration,
 		UserLikes:           likeExists,
 		Source:              model.Repository.Source,
-		SyncStatus:          syncStatus,
+		SyncStatus:          model.Repository.SyncStatus,
 		BaseModel:           model.BaseModel,
 		License:             model.Repository.License,
 		MirrorLastUpdatedAt: model.Repository.Mirror.LastUpdatedAt,
@@ -536,10 +564,13 @@ func (c *modelComponentImpl) Show(ctx context.Context, namespace, name, currentU
 			MSPath:  model.Repository.MSPath,
 			CSGPath: model.Repository.CSGPath,
 		},
-		ReportURL:        model.ReportURL,
-		MediumRiskCount:  model.MediumRiskCount,
-		HighRiskCount:    model.HighRiskCount,
-		MirrorTaskStatus: mirrorTaskStatus,
+		ReportURL:             model.ReportURL,
+		MediumRiskCount:       model.MediumRiskCount,
+		HighRiskCount:         model.HighRiskCount,
+		MirrorTaskStatus:      mirrorTaskStatus,
+		XnetEnabled:           model.Repository.XnetEnabled,
+		XnetMigrationStatus:   xnetMigrationStatus,
+		XnetMigrationProgress: xnetMigrationProgress,
 	}
 	// admin user or owner can see the sensitive check status
 	if permission.CanAdmin {
@@ -1066,7 +1097,8 @@ func (c *modelComponentImpl) Deploy(ctx context.Context, deployReq types.DeployA
 
 	// only vllm and sglang support multi-host inference
 	if hardware.Replicas > 1 {
-		if frame.FrameName != "vllm" && frame.FrameName != "sglang" {
+		frameNameLower := strings.ToLower(frame.FrameName)
+		if !strings.Contains(frameNameLower, "vllm") && !strings.Contains(frameNameLower, "sglang") {
 			return -1, errorx.ErrMultiHostInferenceNotSupported
 		}
 		if req.MinReplica < 1 {
