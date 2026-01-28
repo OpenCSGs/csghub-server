@@ -336,14 +336,14 @@ type Config struct {
 		MigrateRepoPathCronExpression            string `env:"STARHUB_SERVER_CRON_JOB_MIGRATE_REPO_PATH_CRON_EXPRESSION" default:"* 16-20 * * *"`
 		DeletePendingDeletionCronExpression      string `env:"STARHUB_SERVER_CRON_JOB_DELETE_PENDING_DELETION_CRON_EXPRESSION" default:"0 16-20 * * *"`
 		ReleaseInvitationCreditCronExpression    string `env:"STARHUB_SERVER_CRON_JOB_RELEASE_INVITATION_CREDIT_CRON_EXPRESSION" default:"0 0 5 * *"`
+		MCPInspectCronExpression                 string `env:"STARHUB_SERVER_CRON_JOB_MCP_INSPECT_CRON_EXPRESSION" default:"*/5 * * * *"`
 	}
 
 	Agent struct {
-		AutoHubServiceHost           string `env:"OPENCSG_AGENT_AUTOHUB_SERVICE_HOST" default:"http://internal.opencsg-stg.com:8190"`
-		AgentHubServiceHost          string `env:"OPENCSG_AGENT_AGENTHUB_SERVICE_HOST" default:""`
-		AgentHubServiceToken         string `env:"OPENCSG_AGENT_AGENTHUB_SERVICE_TOKEN" default:""`
-		CodeInstanceQuotaPerUser     int    `env:"STARHUB_SERVER_AGENT_CODE_INSTANCE_QUOTA_PER_USER" default:"5"`
-		LangflowInstanceQuotaPerUser int    `env:"STARHUB_SERVER_AGENT_LANGFLOW_INSTANCE_QUOTA_PER_USER" default:"5"`
+		AutoHubServiceHost       string `env:"OPENCSG_AGENT_AUTOHUB_SERVICE_HOST" default:"http://internal.opencsg-stg.com:8190"`
+		AgentHubServiceHost      string `env:"OPENCSG_AGENT_AGENTHUB_SERVICE_HOST" default:""`
+		AgentHubServiceToken     string `env:"OPENCSG_AGENT_AGENTHUB_SERVICE_TOKEN" default:""`
+		MCPInspectMaxConcurrency int    `env:"OPENCSG_AGENT_MCP_INSPECT_MAX_CONCURRENCY" default:"50"`
 	}
 
 	DataViewer struct {
@@ -426,6 +426,7 @@ type Config struct {
 		MailerWeeklyRechargesMail           string `env:"STARHUB_SERVER_MAILER_WEEKLY_RECHARGES_MAIL" default:"reconcile@opencsg.com"`
 		EmailInvoiceCreatedReceiver         string `env:"STARHUB_SERVER_EMAIL_INVOICE_CREATED_RECEIVER" default:"contact@opencsg.com"`
 		RepoSyncTimezone                    string `env:"STARHUB_SERVER_REPO_SYNC_TIMEZONE" default:"Asia/Shanghai"`
+		RepoSyncChatID                      string `env:"STARHUB_SERVER_REPO_SYNC_CHAT_ID" default:""`
 		NotificationRetryCount              int    `env:"STARHUB_SERVER_NOTIFIER_NOTIFICATION_RETRY_COUNT" default:"3"`
 		BroadcastUserPageSize               int    `env:"STARHUB_SERVER_NOTIFIER_BROADCAST_USER_PAGE_SIZE" default:"100"`
 		BroadcastEmailPageSize              int    `env:"STARHUB_SERVER_NOTIFIER_BROADCAST_EMAIL_PAGE_SIZE" default:"100"`
@@ -482,8 +483,9 @@ type Config struct {
 		WatchConfigmapName string `env:"STARHUB_SERVER_RUNNER_WATCH_CONFIGMAP_NAME" default:"spaces-runner-config"`
 		// WatchConfigmapKey           string `env:"STARHUB_SERVER_RUNNER_WATCH_CONFIGMAP_KEY" default:""`
 		WatchConfigmapIntervalInSec int    `env:"STARHUB_SERVER_RUNNER_WATCH_CONFIGMAP_INTERVAL_IN_SEC" default:"60"`
-		HearBeatIntervalInSec       int    `env:"STARHUB_SERVER_RUNNER_HEARTBEAT_INTERVAL_IN_SEC" default:"300"`
+		HearBeatIntervalInSec       int    `env:"STARHUB_SERVER_RUNNER_HEARTBEAT_INTERVAL_IN_SEC" default:"120"`
 		RunnerNamespace             string `env:"STARHUB_SERVER_CLUSTER_RUNNER_NAMESPACE" default:"csghub"`
+		PublicDockerRegBase         string `env:"STARHUB_SERVER_RUNNER_PUBLIC_DOCKER_REG_BASE" default:"opencsg-registry.cn-beijing.cr.aliyuncs.com"`
 	}
 
 	LogCollector struct {
