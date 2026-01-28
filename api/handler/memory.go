@@ -10,6 +10,7 @@ import (
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
+	common "opencsg.com/csghub-server/common/utils/common"
 	"opencsg.com/csghub-server/component"
 )
 
@@ -40,7 +41,7 @@ func (h *MemoryHandler) CreateProject(ctx *gin.Context) {
 	resp, err := h.memory.CreateProject(ctx.Request.Context(), &req)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "failed to create memory project", slog.Any("error", err))
-		respondMemoryError(ctx, err)
+		h.respondMemoryError(ctx, err)
 		return
 	}
 	httpbase.OK(ctx, filterProjectResponse(resp))
@@ -63,7 +64,7 @@ func (h *MemoryHandler) GetProject(ctx *gin.Context) {
 	resp, err := h.memory.GetProject(ctx.Request.Context(), &req)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "failed to get memory project", slog.Any("error", err))
-		respondMemoryError(ctx, err)
+		h.respondMemoryError(ctx, err)
 		return
 	}
 	httpbase.OK(ctx, filterProjectResponse(resp))
@@ -73,7 +74,7 @@ func (h *MemoryHandler) ListProjects(ctx *gin.Context) {
 	resp, err := h.memory.ListProjects(ctx.Request.Context())
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "failed to list memory projects", slog.Any("error", err))
-		respondMemoryError(ctx, err)
+		h.respondMemoryError(ctx, err)
 		return
 	}
 	httpbase.OK(ctx, filterProjectListResponse(resp))
@@ -95,7 +96,7 @@ func (h *MemoryHandler) DeleteProject(ctx *gin.Context) {
 	}
 	if err := h.memory.DeleteProject(ctx.Request.Context(), &req); err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "failed to delete memory project", slog.Any("error", err))
-		respondMemoryError(ctx, err)
+		h.respondMemoryError(ctx, err)
 		return
 	}
 	httpbase.OK(ctx, gin.H{"deleted": true})
@@ -141,7 +142,7 @@ func (h *MemoryHandler) AddMemories(ctx *gin.Context) {
 	resp, err := h.memory.AddMemories(ctx.Request.Context(), &req)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "failed to add memories", slog.Any("error", err))
-		respondMemoryError(ctx, err)
+		h.respondMemoryError(ctx, err)
 		return
 	}
 	httpbase.OK(ctx, filterAddMemoriesResponse(resp))
@@ -182,12 +183,28 @@ func (h *MemoryHandler) SearchMemories(ctx *gin.Context) {
 		httpbase.BadRequestWithExt(ctx, errorx.ReqBodyFormat(err, nil))
 		return
 	}
-	if err := validatePagination(req.PageSize, req.PageNum); err != nil {
+	if req.PageSize < 0 || req.PageNum < 0 {
 		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(
-			err,
+			fmt.Errorf("page_size and page_num must be non-negative"),
 			errorx.Ctx().Set("field", "page_size,page_num"),
 		))
 		return
+	}
+	if (req.PageSize > 0 && req.PageNum <= 0) || (req.PageNum > 0 && req.PageSize <= 0) {
+		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(
+			fmt.Errorf("page_size and page_num must be provided together"),
+			errorx.Ctx().Set("field", "page_size,page_num"),
+		))
+		return
+	}
+	if req.PageSize == 0 && req.PageNum == 0 && (ctx.Query("per") != "" || ctx.Query("page") != "") {
+		per, page, err := common.GetPerAndPageFromContext(ctx)
+		if err != nil {
+			httpbase.BadRequestWithExt(ctx, err)
+			return
+		}
+		req.PageSize = per
+		req.PageNum = page
 	}
 	if req.TopK < 0 {
 		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(
@@ -210,10 +227,33 @@ func (h *MemoryHandler) SearchMemories(ctx *gin.Context) {
 		))
 		return
 	}
+	if req.PageSize < 0 || req.PageNum < 0 {
+		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(
+			fmt.Errorf("page_size and page_num must be non-negative"),
+			errorx.Ctx().Set("field", "page_size,page_num"),
+		))
+		return
+	}
+	if (req.PageSize > 0 && req.PageNum <= 0) || (req.PageNum > 0 && req.PageSize <= 0) {
+		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(
+			fmt.Errorf("page_size and page_num must be provided together"),
+			errorx.Ctx().Set("field", "page_size,page_num"),
+		))
+		return
+	}
+	if req.PageSize == 0 && req.PageNum == 0 && (ctx.Query("per") != "" || ctx.Query("page") != "") {
+		per, page, err := common.GetPerAndPageFromContext(ctx)
+		if err != nil {
+			httpbase.BadRequestWithExt(ctx, err)
+			return
+		}
+		req.PageSize = per
+		req.PageNum = page
+	}
 	resp, err := h.memory.SearchMemories(ctx.Request.Context(), &req)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "failed to search memories", slog.Any("error", err))
-		respondMemoryError(ctx, err)
+		h.respondMemoryError(ctx, err)
 		return
 	}
 	httpbase.OK(ctx, filterSearchMemoriesResponse(resp))
@@ -226,12 +266,28 @@ func (h *MemoryHandler) ListMemories(ctx *gin.Context) {
 		httpbase.BadRequestWithExt(ctx, errorx.ReqBodyFormat(err, nil))
 		return
 	}
-	if err := validatePagination(req.PageSize, req.PageNum); err != nil {
+	if req.PageSize < 0 || req.PageNum < 0 {
 		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(
-			err,
+			fmt.Errorf("page_size and page_num must be non-negative"),
 			errorx.Ctx().Set("field", "page_size,page_num"),
 		))
 		return
+	}
+	if (req.PageSize > 0 && req.PageNum <= 0) || (req.PageNum > 0 && req.PageSize <= 0) {
+		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(
+			fmt.Errorf("page_size and page_num must be provided together"),
+			errorx.Ctx().Set("field", "page_size,page_num"),
+		))
+		return
+	}
+	if req.PageSize == 0 && req.PageNum == 0 && (ctx.Query("per") != "" || ctx.Query("page") != "") {
+		per, page, err := common.GetPerAndPageFromContext(ctx)
+		if err != nil {
+			httpbase.BadRequestWithExt(ctx, err)
+			return
+		}
+		req.PageSize = per
+		req.PageNum = page
 	}
 	if err := validateMemoryTypes(req.Types); err != nil {
 		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(
@@ -243,7 +299,7 @@ func (h *MemoryHandler) ListMemories(ctx *gin.Context) {
 	resp, err := h.memory.ListMemories(ctx.Request.Context(), &req)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "failed to list memories", slog.Any("error", err))
-		respondMemoryError(ctx, err)
+		h.respondMemoryError(ctx, err)
 		return
 	}
 	httpbase.OK(ctx, filterListMemoriesResponse(resp))
@@ -265,7 +321,7 @@ func (h *MemoryHandler) DeleteMemories(ctx *gin.Context) {
 	}
 	if err := h.memory.DeleteMemories(ctx.Request.Context(), &req); err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "failed to delete memories", slog.Any("error", err))
-		respondMemoryError(ctx, err)
+		h.respondMemoryError(ctx, err)
 		return
 	}
 	httpbase.OK(ctx, gin.H{"deleted": true})
@@ -275,13 +331,13 @@ func (h *MemoryHandler) Health(ctx *gin.Context) {
 	resp, err := h.memory.Health(ctx.Request.Context())
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "failed to check memory health", slog.Any("error", err))
-		respondMemoryError(ctx, err)
+		h.respondMemoryError(ctx, err)
 		return
 	}
 	httpbase.OK(ctx, resp)
 }
 
-func respondMemoryError(ctx *gin.Context, err error) {
+func (h *MemoryHandler) respondMemoryError(ctx *gin.Context, err error) {
 	if err == nil {
 		return
 	}
@@ -323,16 +379,6 @@ func validateMemoryTypes(typesList []types.MemoryType) error {
 		if t != types.MemoryTypeEpisodic && t != types.MemoryTypeSemantic {
 			return fmt.Errorf("unsupported memory type: %s", t)
 		}
-	}
-	return nil
-}
-
-func validatePagination(pageSize, pageNum int) error {
-	if pageSize < 0 || pageNum < 0 {
-		return fmt.Errorf("page_size and page_num must be non-negative")
-	}
-	if (pageSize > 0 && pageNum <= 0) || (pageNum > 0 && pageSize <= 0) {
-		return fmt.Errorf("page_size and page_num must be provided together")
 	}
 	return nil
 }
