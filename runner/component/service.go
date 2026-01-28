@@ -147,11 +147,11 @@ func (s *serviceComponentImpl) generateService(ctx context.Context, cluster *clu
 
 	if hardware.Gcu.ResourceName == "" || hardware.Gcu.Num == "" {
 		environments = append(environments, corev1.EnvVar{Name: "ENFLAME_VISIBLE_DEVICES", Value: "none"})
+		environments = append(environments, corev1.EnvVar{Name: "TOPS_VISIBLE_DEVICES", Value: "none"})
 	}
 
 	if hardware.Dcu.ResourceName == "" || hardware.Dcu.Num == "" {
 		environments = append(environments, corev1.EnvVar{Name: "ROCR_VISIBLE_DEVICES", Value: "none"})
-		environments = append(environments, corev1.EnvVar{Name: "TOPS_VISIBLE_DEVICES", Value: "none"})
 	}
 
 	if appPort == 0 {
@@ -1253,8 +1253,14 @@ func (s *serviceComponentImpl) UpdateService(ctx context.Context, req types.Mode
 	}
 	srv.Spec.Template.Spec.Containers[0].Resources = resources
 	srv.Spec.Template.Spec.NodeSelector = nodeSelector
-	srv.Spec.Template.Spec.Affinity = &corev1.Affinity{
-		NodeAffinity: nodeAffinity,
+	if nodeAffinity != nil {
+		if srv.Spec.Template.Spec.Affinity != nil {
+			srv.Spec.Template.Spec.Affinity.NodeAffinity = nodeAffinity
+		} else {
+			srv.Spec.Template.Spec.Affinity = &corev1.Affinity{
+				NodeAffinity: nodeAffinity,
+			}
+		}
 	}
 	// Update replica
 	srv.Spec.Template.Annotations["autoscaling.knative.dev/min-scale"] = strconv.Itoa(req.MinReplica)

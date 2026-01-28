@@ -28,24 +28,30 @@ type ClusterEvent struct {
 	AppEndpoint      string        `json:"app_endpoint"`      // address of space/inference application
 }
 type ClusterRes struct {
-	ClusterID    string             `json:"cluster_id"`
-	Status       ClusterStatus      `json:"status" i18n:"cluster.status"` //active, inactive
-	TotalCPU     float64            `json:"total_cpu"`
-	AvailableCPU float64            `json:"available_cpu"`
-	CPUUsage     float64            `json:"cpu_usage"`
-	TotalGPU     int64              `json:"total_gpu"`
-	AvailableGPU int64              `json:"available_gpu"`
-	GPUUsage     float64            `json:"gpu_usage"`
-	TotalMem     float64            `json:"total_mem"`     //in GB
-	AvailableMem float64            `json:"available_mem"` //in GB
-	MemUsage     float64            `json:"mem_usage"`     //in GB
-	NodeNumber   int                `json:"node_number"`
-	Region       string             `json:"region"`
-	Zone         string             `json:"zone"`     //cn-beijing
-	Provider     string             `json:"provider"` //ali
-	Resources    []NodeResourceInfo `json:"resources,omitempty"`
-	StorageClass string             `json:"storage_class"`
-	Endpoint     string             `json:"endpoint"`
+	ClusterID        string             `json:"cluster_id"`
+	Status           ClusterStatus      `json:"status" i18n:"cluster.status"` //active, inactive
+	TotalCPU         float64            `json:"total_cpu"`
+	AvailableCPU     float64            `json:"available_cpu"`
+	CPUUsage         float64            `json:"cpu_usage"`
+	TotalGPU         int64              `json:"total_gpu"`
+	AvailableGPU     int64              `json:"available_gpu"`
+	GPUUsage         float64            `json:"gpu_usage"`
+	TotalMem         float64            `json:"total_mem"`     //in GB
+	AvailableMem     float64            `json:"available_mem"` //in GB
+	MemUsage         float64            `json:"mem_usage"`
+	TotalVXPU        int64              `json:"total_vxpu"`         // total vxpu number
+	UsedVXPUNum      int64              `json:"used_vxpu_num"`      // use vxpu num
+	TotalVXPUMem     int64              `json:"total_vxpu_mem"`     //in MB
+	AvailableVXPUMem int64              `json:"available_vxpu_mem"` //in MB
+	VXPUUsage        float64            `json:"vxpu_usage"`         // vxpu num usage
+	VXPUMemUsage     float64            `json:"vxpu_mem_usage"`     // vxpu mem usage
+	NodeNumber       int                `json:"node_number"`
+	Region           string             `json:"region"`
+	Zone             string             `json:"zone"`     //cn-beijing
+	Provider         string             `json:"provider"` //ali
+	Resources        []NodeResourceInfo `json:"resources,omitempty"`
+	StorageClass     string             `json:"storage_class"`
+	Endpoint         string             `json:"endpoint"`
 
 	ResourceStatus ResourceStatus `json:"resource_status"`
 
@@ -97,7 +103,12 @@ type NodeHardware struct {
 	XPUCapacityLabel string  `json:"xpu_capacity_label"`
 	ReservedXPU      int64   `json:"reserved_xpu"`
 	XPUMem           string  `json:"xpu_mem"`
-	VXPUs            []VXPU  `json:"vxpus"` // virtual XPU, e.g., vGPU, vTPU, etc.
+
+	VXPUs            []VXPU `json:"vxpus"`              // virtual XPU, e.g., vGPU, vTPU, etc.
+	TotalVXPU        int64  `json:"total_vxpu"`         // total vxpu num
+	UsedVXPUNum      int64  `json:"used_vxpu_num"`      // used vxpu num
+	TotalVXPUMem     int64  `json:"total_vxpu_mem"`     // total mem in MB
+	AvailableVXPUMem int64  `json:"available_vxpu_mem"` // available mem in MB
 }
 
 type NodeResourceInfo struct {

@@ -284,6 +284,7 @@ func (s *clusterInfoStoreImpl) GetClusterResources(ctx context.Context, clusterI
 		Enable:         clusterInfo.Enable,
 		NodeNumber:     len(resources),
 		Resources:      resources,
+		LastUpdateTime: clusterInfo.UpdatedAt.Unix(),
 	}, nil
 }
 

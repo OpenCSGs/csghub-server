@@ -317,6 +317,12 @@ func generateWorkflow(req types.ArgoWorkFlowReq, config *config.Config) *v1alpha
 			},
 		}
 
+		if nodeAffinity != nil {
+			temp.Affinity = &corev1.Affinity{
+				NodeAffinity: nodeAffinity,
+			}
+		}
+
 		if req.TaskType == types.TaskTypeEvaluation {
 			temp.Outputs = v1alpha1.Outputs{
 				Parameters: []v1alpha1.Parameter{
