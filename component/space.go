@@ -897,7 +897,7 @@ func (c *spaceComponentImpl) Deploy(ctx context.Context, namespace, name, curren
 
 	var imageID string
 	if space.Sdk != types.DOCKER.Name {
-		var frame []database.RuntimeFramework
+		var frame *database.RuntimeFramework
 		var err error
 		if (space.Sdk == types.GRADIO.Name && space.SdkVersion != types.GRADIO.Version) ||
 			(space.Sdk == types.STREAMLIT.Name && space.SdkVersion != types.STREAMLIT.Version) {
@@ -914,13 +914,10 @@ func (c *spaceComponentImpl) Deploy(ctx context.Context, namespace, name, curren
 			}
 		}
 
-		if len(frame) > 0 {
-			sort.Slice(frame, func(i, j int) bool {
-				return frame[i].UpdatedAt.After(frame[j].UpdatedAt)
-			})
-
-			imageID = frame[0].FrameImage
+		if frame != nil {
+			imageID = frame.FrameImage
 		}
+
 	}
 	// create deploy for space
 	dr := types.DeployRepo{

@@ -248,23 +248,23 @@ func (_c *MockRuntimeFrameworksStore_FindByFrameName_Call) RunAndReturn(run func
 }
 
 // FindByFrameNameAndDriverVersion provides a mock function with given fields: ctx, name, version, driverVersion
-func (_m *MockRuntimeFrameworksStore) FindByFrameNameAndDriverVersion(ctx context.Context, name string, version string, driverVersion string) ([]database.RuntimeFramework, error) {
+func (_m *MockRuntimeFrameworksStore) FindByFrameNameAndDriverVersion(ctx context.Context, name string, version string, driverVersion string) (*database.RuntimeFramework, error) {
 	ret := _m.Called(ctx, name, version, driverVersion)
 
 	if len(ret) == 0 {
 		panic("no return value specified for FindByFrameNameAndDriverVersion")
 	}
 
-	var r0 []database.RuntimeFramework
+	var r0 *database.RuntimeFramework
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) ([]database.RuntimeFramework, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) (*database.RuntimeFramework, error)); ok {
 		return rf(ctx, name, version, driverVersion)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) []database.RuntimeFramework); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) *database.RuntimeFramework); ok {
 		r0 = rf(ctx, name, version, driverVersion)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]database.RuntimeFramework)
+			r0 = ret.Get(0).(*database.RuntimeFramework)
 		}
 	}
 
@@ -298,12 +298,12 @@ func (_c *MockRuntimeFrameworksStore_FindByFrameNameAndDriverVersion_Call) Run(r
 	return _c
 }
 
-func (_c *MockRuntimeFrameworksStore_FindByFrameNameAndDriverVersion_Call) Return(_a0 []database.RuntimeFramework, _a1 error) *MockRuntimeFrameworksStore_FindByFrameNameAndDriverVersion_Call {
+func (_c *MockRuntimeFrameworksStore_FindByFrameNameAndDriverVersion_Call) Return(_a0 *database.RuntimeFramework, _a1 error) *MockRuntimeFrameworksStore_FindByFrameNameAndDriverVersion_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockRuntimeFrameworksStore_FindByFrameNameAndDriverVersion_Call) RunAndReturn(run func(context.Context, string, string, string) ([]database.RuntimeFramework, error)) *MockRuntimeFrameworksStore_FindByFrameNameAndDriverVersion_Call {
+func (_c *MockRuntimeFrameworksStore_FindByFrameNameAndDriverVersion_Call) RunAndReturn(run func(context.Context, string, string, string) (*database.RuntimeFramework, error)) *MockRuntimeFrameworksStore_FindByFrameNameAndDriverVersion_Call {
 	_c.Call.Return(run)
 	return _c
 }

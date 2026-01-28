@@ -61,7 +61,7 @@ type MockSensitiveComponent_PassImageCheck_Call struct {
 
 // PassImageCheck is a helper method to define mock.On call
 //   - ctx context.Context
-//   - scenario types.Scenario
+//   - scenario types.SensitiveScenario
 //   - ossBucketName string
 //   - ossObjectName string
 func (_e *MockSensitiveComponent_Expecter) PassImageCheck(ctx interface{}, scenario interface{}, ossBucketName interface{}, ossObjectName interface{}) *MockSensitiveComponent_PassImageCheck_Call {
@@ -122,7 +122,7 @@ type MockSensitiveComponent_PassImageURLCheck_Call struct {
 
 // PassImageURLCheck is a helper method to define mock.On call
 //   - ctx context.Context
-//   - scenario types.Scenario
+//   - scenario types.SensitiveScenario
 //   - imageURL string
 func (_e *MockSensitiveComponent_Expecter) PassImageURLCheck(ctx interface{}, scenario interface{}, imageURL interface{}) *MockSensitiveComponent_PassImageURLCheck_Call {
 	return &MockSensitiveComponent_PassImageURLCheck_Call{Call: _e.mock.On("PassImageURLCheck", ctx, scenario, imageURL)}
@@ -182,7 +182,7 @@ type MockSensitiveComponent_PassLLMQueryCheck_Call struct {
 
 // PassLLMQueryCheck is a helper method to define mock.On call
 //   - ctx context.Context
-//   - scenario types.Scenario
+//   - scenario types.SensitiveScenario
 //   - text string
 //   - id string
 func (_e *MockSensitiveComponent_Expecter) PassLLMQueryCheck(ctx interface{}, scenario interface{}, text interface{}, id interface{}) *MockSensitiveComponent_PassLLMQueryCheck_Call {
@@ -243,7 +243,7 @@ type MockSensitiveComponent_PassStreamCheck_Call struct {
 
 // PassStreamCheck is a helper method to define mock.On call
 //   - ctx context.Context
-//   - scenario types.Scenario
+//   - scenario types.SensitiveScenario
 //   - text string
 //   - id string
 func (_e *MockSensitiveComponent_Expecter) PassStreamCheck(ctx interface{}, scenario interface{}, text interface{}, id interface{}) *MockSensitiveComponent_PassStreamCheck_Call {
@@ -304,7 +304,7 @@ type MockSensitiveComponent_PassTextCheck_Call struct {
 
 // PassTextCheck is a helper method to define mock.On call
 //   - ctx context.Context
-//   - scenario types.Scenario
+//   - scenario types.SensitiveScenario
 //   - text string
 func (_e *MockSensitiveComponent_Expecter) PassTextCheck(ctx interface{}, scenario interface{}, text interface{}) *MockSensitiveComponent_PassTextCheck_Call {
 	return &MockSensitiveComponent_PassTextCheck_Call{Call: _e.mock.On("PassTextCheck", ctx, scenario, text)}
