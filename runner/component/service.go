@@ -59,6 +59,7 @@ type serviceComponentImpl struct {
 	env                     *config.Config
 	spaceDockerRegBase      string
 	modelDockerRegBase      string
+	publicDockerRegBase     string
 	imagePullSecret         string
 	informerSyncPeriodInMin int
 	serviceStore            database.KnativeServiceStore
@@ -90,6 +91,7 @@ func NewServiceComponent(config *config.Config, clusterPool cluster.Pool, logRep
 		env:                     config,
 		spaceDockerRegBase:      config.Space.DockerRegBase,
 		modelDockerRegBase:      config.Model.DockerRegBase,
+		publicDockerRegBase:     config.Runner.PublicDockerRegBase,
 		imagePullSecret:         config.Space.ImagePullSecret,
 		informerSyncPeriodInMin: config.Space.InformerSyncPeriodInMin,
 		serviceStore:            database.NewKnativeServiceStore(),
@@ -111,7 +113,7 @@ func (s *serviceComponentImpl) generateService(ctx context.Context, cluster *clu
 	}
 	appPort := 0
 	hardware := request.Hardware
-	resReq, nodeSelector := GenerateResources(hardware)
+	resReq, nodeSelector, nodeAffinity := generateResources(hardware, request.Nodes)
 	var err error
 	var revision string
 	if request.Env != nil {
@@ -145,11 +147,11 @@ func (s *serviceComponentImpl) generateService(ctx context.Context, cluster *clu
 
 	if hardware.Gcu.ResourceName == "" || hardware.Gcu.Num == "" {
 		environments = append(environments, corev1.EnvVar{Name: "ENFLAME_VISIBLE_DEVICES", Value: "none"})
+		environments = append(environments, corev1.EnvVar{Name: "TOPS_VISIBLE_DEVICES", Value: "none"})
 	}
 
 	if hardware.Dcu.ResourceName == "" || hardware.Dcu.Num == "" {
 		environments = append(environments, corev1.EnvVar{Name: "ROCR_VISIBLE_DEVICES", Value: "none"})
-		environments = append(environments, corev1.EnvVar{Name: "TOPS_VISIBLE_DEVICES", Value: "none"})
 	}
 
 	if appPort == 0 {
@@ -180,8 +182,15 @@ func (s *serviceComponentImpl) generateService(ctx context.Context, cluster *clu
 			containerImg = path.Join(s.modelDockerRegBase, request.ImageID)
 		}
 	} else if request.RepoType == string(types.SpaceRepo) {
-		// choose registry
-		containerImg = path.Join(s.spaceDockerRegBase, request.ImageID)
+		// use space docker reg base if sdk is docker
+		if request.Env != nil && request.Env["SDK"] == "docker" {
+			containerImg = path.Join(s.spaceDockerRegBase, request.ImageID)
+		} else {
+			// add public prefix if image is not full path
+			if strings.Count(containerImg, "/") == 1 {
+				containerImg = path.Join(s.publicDockerRegBase, request.ImageID)
+			}
+		}
 	}
 
 	templateAnnotations := make(map[string]string)
@@ -273,6 +282,12 @@ func (s *serviceComponentImpl) generateService(ctx context.Context, cluster *clu
 				},
 			},
 		},
+	}
+
+	if nodeAffinity != nil {
+		service.Spec.ConfigurationSpec.Template.Spec.PodSpec.Affinity = &corev1.Affinity{
+			NodeAffinity: nodeAffinity,
+		}
 	}
 	return service, nil
 }
@@ -415,7 +430,7 @@ func getPodError(podList *corev1.PodList) (*string, *string) {
 	return nil, nil
 }
 
-func GenerateResources(hardware types.HardWare) (map[corev1.ResourceName]resource.Quantity, map[string]string) {
+func generateResources(hardware types.HardWare, nodes []types.Node) (map[corev1.ResourceName]resource.Quantity, map[string]string, *corev1.NodeAffinity) {
 	nodeSelector := make(map[string]string)
 	resReq := make(map[corev1.ResourceName]resource.Quantity)
 
@@ -445,14 +460,6 @@ func GenerateResources(hardware types.HardWare) (map[corev1.ResourceName]resourc
 		}
 	}
 
-	// Helper function to parse resource quantities
-	parseResource := func(value string) resource.Quantity {
-		if value == "" {
-			return resource.Quantity{}
-		}
-		return resource.MustParse(value)
-	}
-
 	// Process CPU resources
 	if hardware.Cpu.Num != "" {
 		qty := parseResource(hardware.Cpu.Num)
@@ -471,27 +478,17 @@ func GenerateResources(hardware types.HardWare) (map[corev1.ResourceName]resourc
 		resReq[corev1.ResourceEphemeralStorage] = qty
 	}
 
-	// Process accelerator resources
-	accelerators := []struct {
-		resourceName string
-		num          string
-	}{
-		{hardware.Gpu.ResourceName, hardware.Gpu.Num},
-		{hardware.Npu.ResourceName, hardware.Npu.Num},
-		{hardware.Gcu.ResourceName, hardware.Gcu.Num},
-		{hardware.Mlu.ResourceName, hardware.Mlu.Num},
-		{hardware.Dcu.ResourceName, hardware.Dcu.Num},
-		{hardware.GPGpu.ResourceName, hardware.GPGpu.Num},
-	}
+	nodeAffinity := handleAccelerator(hardware, resReq, nodes)
 
-	for _, acc := range accelerators {
-		if acc.resourceName != "" && acc.num != "" {
-			qty := parseResource(acc.num)
-			resReq[corev1.ResourceName(acc.resourceName)] = qty
-		}
-	}
+	return resReq, nodeSelector, nodeAffinity
+}
 
-	return resReq, nodeSelector
+// Helper function to parse resource quantities
+func parseResource(value string) resource.Quantity {
+	if value == "" {
+		return resource.Quantity{}
+	}
+	return resource.MustParse(value)
 }
 
 // NewPersistentVolumeClaim creates a new k8s PVC with some default values set.
@@ -1106,7 +1103,7 @@ func (s *serviceComponentImpl) runServiceSingleHost(ctx context.Context, req typ
 	if err != nil {
 		return fmt.Errorf("failed to create service, error: %v, req: %v", err, req)
 	}
-	slog.Debug("created ksvc", slog.Any("knative service", service))
+	slog.DebugContext(ctx, "created ksvc", slog.Any("knative service", service))
 	// add a placeholder service
 	req.ClusterID = cluster.ID
 
@@ -1249,13 +1246,22 @@ func (s *serviceComponentImpl) UpdateService(ctx context.Context, req types.Mode
 	}
 	// Update CPU and Memory requests and limits
 	hardware := req.Hardware
-	resReq, nodeSelector := GenerateResources(hardware)
+	resReq, nodeSelector, nodeAffinity := generateResources(hardware, req.Nodes)
 	resources := corev1.ResourceRequirements{
 		Limits:   resReq,
 		Requests: resReq,
 	}
 	srv.Spec.Template.Spec.Containers[0].Resources = resources
 	srv.Spec.Template.Spec.NodeSelector = nodeSelector
+	if nodeAffinity != nil {
+		if srv.Spec.Template.Spec.Affinity != nil {
+			srv.Spec.Template.Spec.Affinity.NodeAffinity = nodeAffinity
+		} else {
+			srv.Spec.Template.Spec.Affinity = &corev1.Affinity{
+				NodeAffinity: nodeAffinity,
+			}
+		}
+	}
 	// Update replica
 	srv.Spec.Template.Annotations["autoscaling.knative.dev/min-scale"] = strconv.Itoa(req.MinReplica)
 	srv.Spec.Template.Annotations["autoscaling.knative.dev/max-scale"] = strconv.Itoa(req.MaxReplica)

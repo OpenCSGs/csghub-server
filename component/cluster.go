@@ -7,10 +7,8 @@ import (
 	"log/slog"
 	"math"
 	"net/url"
-	"sync"
 	"time"
 
-	"golang.org/x/sync/errgroup"
 	"opencsg.com/csghub-server/builder/accounting"
 	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/store/database"
@@ -76,78 +74,41 @@ func (c *clusterComponentImpl) Index(ctx context.Context) ([]types.ClusterRes, e
 }
 
 func (c *clusterComponentImpl) GetClusterUsages(ctx context.Context) ([]types.ClusterRes, error) {
-	clusterList, err := c.deployer.ListCluster(ctx)
+	clusterList, err := c.clusterStore.List(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("list clusters failed: %w", err)
+		slog.ErrorContext(ctx, "failed to list clusters from db", slog.Any("error", err))
+		return nil, err
 	}
 
 	if len(clusterList) == 0 {
 		return []types.ClusterRes{}, nil
 	}
 
-	g, groupCtx := errgroup.WithContext(ctx)
-	g.SetLimit(10)
-	resultMap := make(map[string]*types.ClusterRes, len(clusterList))
-	var mu sync.Mutex
-
-	for i := range clusterList {
-		cluster := clusterList[i]
-		g.Go(func() error {
-			if groupCtx.Err() != nil {
-				mu.Lock()
-				resultMap[cluster.ClusterID] = &types.ClusterRes{
-					ClusterID: cluster.ClusterID,
-					Status:    types.ClusterStatusUnavailable,
-					Region:    cluster.Region,
-					Zone:      cluster.Zone,
-					Provider:  cluster.Provider,
-				}
-				mu.Unlock()
-				return nil
-			}
-			res, err := c.deployer.GetClusterUsageById(groupCtx, cluster.ClusterID)
-			if err != nil {
-				slog.Error("get cluster usage failed",
-					"clusterID", cluster.ClusterID,
-					"error", err)
-				res = &types.ClusterRes{
-					ClusterID: cluster.ClusterID,
-					Status:    types.ClusterStatusUnavailable,
-					Region:    cluster.Region,
-					Zone:      cluster.Zone,
-					Provider:  cluster.Provider,
-					GPUUsage:  0,
-					MemUsage:  0,
-					CPUUsage:  0,
-				}
-			}
-
-			res.LastUpdateTime = cluster.LastUpdateTime
-
-			mu.Lock()
-			resultMap[cluster.ClusterID] = res
-			mu.Unlock()
-			return nil
-		})
-	}
-
-	if err := g.Wait(); err != nil {
-		return nil, err
-	}
-
-	result := make([]types.ClusterRes, 0, len(clusterList))
+	var result []types.ClusterRes
 	for _, cluster := range clusterList {
-		if res, ok := resultMap[cluster.ClusterID]; ok {
-			result = append(result, *res)
-		} else {
+		if !cluster.Enable {
+			continue
+		}
+
+		clusterRes, err := c.deployer.GetClusterUsageById(ctx, cluster.ClusterID)
+		if err != nil {
+			slog.ErrorContext(ctx, "get cluster usage failed",
+				slog.String("clusterID", cluster.ClusterID),
+				slog.Any("error", err))
+
 			result = append(result, types.ClusterRes{
 				ClusterID: cluster.ClusterID,
 				Status:    types.ClusterStatusUnavailable,
 				Region:    cluster.Region,
 				Zone:      cluster.Zone,
 				Provider:  cluster.Provider,
+				GPUUsage:  0,
+				MemUsage:  0,
+				CPUUsage:  0,
 			})
 		}
+
+		result = append(result, *clusterRes)
 	}
 
 	return result, nil
