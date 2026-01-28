@@ -418,6 +418,65 @@ func (_c *MockSpaceComponent_GetMCPServiceBySvcName_Call) RunAndReturn(run func(
 	return _c
 }
 
+// GetSupportedCUDAVersions provides a mock function with given fields: ctx, resourceType
+func (_m *MockSpaceComponent) GetSupportedCUDAVersions(ctx context.Context, resourceType string) ([]string, error) {
+	ret := _m.Called(ctx, resourceType)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetSupportedCUDAVersions")
+	}
+
+	var r0 []string
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) ([]string, error)); ok {
+		return rf(ctx, resourceType)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) []string); ok {
+		r0 = rf(ctx, resourceType)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]string)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, resourceType)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockSpaceComponent_GetSupportedCUDAVersions_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetSupportedCUDAVersions'
+type MockSpaceComponent_GetSupportedCUDAVersions_Call struct {
+	*mock.Call
+}
+
+// GetSupportedCUDAVersions is a helper method to define mock.On call
+//   - ctx context.Context
+//   - resourceType string
+func (_e *MockSpaceComponent_Expecter) GetSupportedCUDAVersions(ctx interface{}, resourceType interface{}) *MockSpaceComponent_GetSupportedCUDAVersions_Call {
+	return &MockSpaceComponent_GetSupportedCUDAVersions_Call{Call: _e.mock.On("GetSupportedCUDAVersions", ctx, resourceType)}
+}
+
+func (_c *MockSpaceComponent_GetSupportedCUDAVersions_Call) Run(run func(ctx context.Context, resourceType string)) *MockSpaceComponent_GetSupportedCUDAVersions_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockSpaceComponent_GetSupportedCUDAVersions_Call) Return(_a0 []string, _a1 error) *MockSpaceComponent_GetSupportedCUDAVersions_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockSpaceComponent_GetSupportedCUDAVersions_Call) RunAndReturn(run func(context.Context, string) ([]string, error)) *MockSpaceComponent_GetSupportedCUDAVersions_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // HasEntryFile provides a mock function with given fields: ctx, space
 func (_m *MockSpaceComponent) HasEntryFile(ctx context.Context, space *database.Space) bool {
 	ret := _m.Called(ctx, space)

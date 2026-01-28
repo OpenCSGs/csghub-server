@@ -641,6 +641,31 @@ func (h *SpaceHandler) Logs(ctx *gin.Context) {
 	}
 }
 
+// @Summary      Get supported CUDA versions
+// @Description  Get supported CUDA versions for a space
+// @Tags         Space
+// @Security     ApiKey
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        resource_type query string true "resource_type"
+// @Success      200  {object}  types.Response{data=[]string} "Success"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /spaces/{namespace}/{name}/cuda-versions/{resource_type} [get]
+func (h *SpaceHandler) GetSupportedCUDAVersions(ctx *gin.Context) {
+	resourceType := ctx.Param("resource_type")
+	versions, err := h.space.GetSupportedCUDAVersions(ctx.Request.Context(), resourceType)
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "failed to get supported cuda versions", "error", err)
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	httpbase.OK(ctx, versions)
+}
+
 func (h *SpaceHandler) testLogs(ctx *gin.Context) {
 	ctx.Writer.Header().Set("Content-Type", "text/event-stream")
 	ctx.Writer.Header().Set("Cache-Control", "no-cache")

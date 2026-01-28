@@ -248,23 +248,23 @@ func (_c *MockRuntimeFrameworksStore_FindByFrameName_Call) RunAndReturn(run func
 }
 
 // FindByFrameNameAndDriverVersion provides a mock function with given fields: ctx, name, version, driverVersion
-func (_m *MockRuntimeFrameworksStore) FindByFrameNameAndDriverVersion(ctx context.Context, name string, version string, driverVersion string) ([]database.RuntimeFramework, error) {
+func (_m *MockRuntimeFrameworksStore) FindByFrameNameAndDriverVersion(ctx context.Context, name string, version string, driverVersion string) (*database.RuntimeFramework, error) {
 	ret := _m.Called(ctx, name, version, driverVersion)
 
 	if len(ret) == 0 {
 		panic("no return value specified for FindByFrameNameAndDriverVersion")
 	}
 
-	var r0 []database.RuntimeFramework
+	var r0 *database.RuntimeFramework
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) ([]database.RuntimeFramework, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) (*database.RuntimeFramework, error)); ok {
 		return rf(ctx, name, version, driverVersion)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) []database.RuntimeFramework); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) *database.RuntimeFramework); ok {
 		r0 = rf(ctx, name, version, driverVersion)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]database.RuntimeFramework)
+			r0 = ret.Get(0).(*database.RuntimeFramework)
 		}
 	}
 
@@ -298,12 +298,12 @@ func (_c *MockRuntimeFrameworksStore_FindByFrameNameAndDriverVersion_Call) Run(r
 	return _c
 }
 
-func (_c *MockRuntimeFrameworksStore_FindByFrameNameAndDriverVersion_Call) Return(_a0 []database.RuntimeFramework, _a1 error) *MockRuntimeFrameworksStore_FindByFrameNameAndDriverVersion_Call {
+func (_c *MockRuntimeFrameworksStore_FindByFrameNameAndDriverVersion_Call) Return(_a0 *database.RuntimeFramework, _a1 error) *MockRuntimeFrameworksStore_FindByFrameNameAndDriverVersion_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockRuntimeFrameworksStore_FindByFrameNameAndDriverVersion_Call) RunAndReturn(run func(context.Context, string, string, string) ([]database.RuntimeFramework, error)) *MockRuntimeFrameworksStore_FindByFrameNameAndDriverVersion_Call {
+func (_c *MockRuntimeFrameworksStore_FindByFrameNameAndDriverVersion_Call) RunAndReturn(run func(context.Context, string, string, string) (*database.RuntimeFramework, error)) *MockRuntimeFrameworksStore_FindByFrameNameAndDriverVersion_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -600,6 +600,65 @@ func (_c *MockRuntimeFrameworksStore_FindSpaceLatestVersion_Call) Return(_a0 *da
 }
 
 func (_c *MockRuntimeFrameworksStore_FindSpaceLatestVersion_Call) RunAndReturn(run func(context.Context, string, string) (*database.RuntimeFramework, error)) *MockRuntimeFrameworksStore_FindSpaceLatestVersion_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// FindSpaceSupportedCUDAVersions provides a mock function with given fields: ctx, computeType
+func (_m *MockRuntimeFrameworksStore) FindSpaceSupportedCUDAVersions(ctx context.Context, computeType string) ([]database.RuntimeFramework, error) {
+	ret := _m.Called(ctx, computeType)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FindSpaceSupportedCUDAVersions")
+	}
+
+	var r0 []database.RuntimeFramework
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) ([]database.RuntimeFramework, error)); ok {
+		return rf(ctx, computeType)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) []database.RuntimeFramework); ok {
+		r0 = rf(ctx, computeType)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.RuntimeFramework)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, computeType)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockRuntimeFrameworksStore_FindSpaceSupportedCUDAVersions_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindSpaceSupportedCUDAVersions'
+type MockRuntimeFrameworksStore_FindSpaceSupportedCUDAVersions_Call struct {
+	*mock.Call
+}
+
+// FindSpaceSupportedCUDAVersions is a helper method to define mock.On call
+//   - ctx context.Context
+//   - computeType string
+func (_e *MockRuntimeFrameworksStore_Expecter) FindSpaceSupportedCUDAVersions(ctx interface{}, computeType interface{}) *MockRuntimeFrameworksStore_FindSpaceSupportedCUDAVersions_Call {
+	return &MockRuntimeFrameworksStore_FindSpaceSupportedCUDAVersions_Call{Call: _e.mock.On("FindSpaceSupportedCUDAVersions", ctx, computeType)}
+}
+
+func (_c *MockRuntimeFrameworksStore_FindSpaceSupportedCUDAVersions_Call) Run(run func(ctx context.Context, computeType string)) *MockRuntimeFrameworksStore_FindSpaceSupportedCUDAVersions_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockRuntimeFrameworksStore_FindSpaceSupportedCUDAVersions_Call) Return(_a0 []database.RuntimeFramework, _a1 error) *MockRuntimeFrameworksStore_FindSpaceSupportedCUDAVersions_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockRuntimeFrameworksStore_FindSpaceSupportedCUDAVersions_Call) RunAndReturn(run func(context.Context, string) ([]database.RuntimeFramework, error)) *MockRuntimeFrameworksStore_FindSpaceSupportedCUDAVersions_Call {
 	_c.Call.Return(run)
 	return _c
 }

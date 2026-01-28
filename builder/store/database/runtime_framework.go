@@ -2,6 +2,8 @@ package database
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 
@@ -27,7 +29,9 @@ type RuntimeFrameworksStore interface {
 	FindByImageID(ctx context.Context, imageID string) (*RuntimeFramework, error)
 	ListAll(ctx context.Context) ([]RuntimeFramework, error)
 	ListByIDs(ctx context.Context, ids []int64) ([]RuntimeFramework, error)
-	FindByFrameNameAndDriverVersion(ctx context.Context, name, version, driverVersion string) ([]RuntimeFramework, error)
+	FindByFrameNameAndDriverVersion(ctx context.Context, name, version, driverVersion string) (*RuntimeFramework, error)
+	FindSpaceLatestVersion(ctx context.Context, name, driverVersion string) (*RuntimeFramework, error)
+	FindSpaceSupportedCUDAVersions(ctx context.Context, computeType string) ([]RuntimeFramework, error)
 }
 
 func NewRuntimeFrameworksStore() RuntimeFrameworksStore {
@@ -196,10 +200,72 @@ func (rf *runtimeFrameworksStoreImpl) FindByFrameName(ctx context.Context, name 
 	return result, nil
 }
 
-func (rf *runtimeFrameworksStoreImpl) FindByFrameNameAndDriverVersion(ctx context.Context, name, version, driverVersion string) ([]RuntimeFramework, error) {
-	var result []RuntimeFramework
-	_, err := rf.db.Core.NewSelect().Model(&result).Where("frame_name = ?", name).Where("driver_version = ?", driverVersion).Where("frame_version = ?", version).Exec(ctx, &result)
+func (rf *runtimeFrameworksStoreImpl) FindByFrameNameAndDriverVersion(ctx context.Context, name, version, driverVersion string) (*RuntimeFramework, error) {
+	var result RuntimeFramework
+	err := rf.db.Core.NewSelect().
+		Model(&result).
+		Where("frame_name = ?", name).
+		Where("frame_version = ?", version).
+		Where("driver_version = ?", driverVersion).
+		Order("created_at DESC").
+		Limit(1).
+		Scan(ctx, &result)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &result, nil
+}
+
+// Sort by version to obtain the largest version
+func (rf *runtimeFrameworksStoreImpl) FindSpaceLatestVersion(ctx context.Context, name, driverVersion string) (*RuntimeFramework, error) {
+	var result RuntimeFramework
+	err := rf.db.Core.NewSelect().
+		Model(&result).
+		Where("frame_name = ?", name).
+		Where("driver_version = ?", driverVersion).
+		OrderExpr("(string_to_array(frame_version, '.')::int[]) DESC").
+		Limit(1).
+		Scan(ctx, &result)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &result, nil
+}
+
+// FindSpaceLatestCUDAVersions returns the supported CUDA versions for the space latest runtime framework
+func (rf *runtimeFrameworksStoreImpl) FindSpaceSupportedCUDAVersions(ctx context.Context, computeType string) ([]RuntimeFramework, error) {
+	var latest RuntimeFramework
+	err := rf.db.Core.NewSelect().
+		Model(&latest).
+		Where("frame_name = ?", "space").
+		Where("compute_type = ?", computeType).
+		OrderExpr("(string_to_array(frame_version, '.')::int[]) DESC").
+		Limit(1).
+		Scan(ctx)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			slog.WarnContext(ctx, "no space framework found for compute type", "compute_type", computeType)
+			return []RuntimeFramework{}, nil
+		}
+		slog.ErrorContext(ctx, "error happened while getting space latest version", "compute_type", computeType, "err", err)
+		return nil, err
+	}
+
+	var result []RuntimeFramework
+	_, err = rf.db.Core.NewSelect().
+		Model(&result).
+		Where("frame_name = ?", "space").
+		Where("frame_version = ?", latest.FrameVersion).
+		Where("compute_type = ?", computeType).
+		Exec(ctx, &result)
+	if err != nil {
+		slog.ErrorContext(ctx, "error happened while getting space supported cuda versions", "compute_type", computeType, "err", err)
 		return nil, err
 	}
 	return result, nil

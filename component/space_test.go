@@ -4,11 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
+	"strings"
 	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/mod/semver"
 	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/git/membership"
@@ -16,6 +19,168 @@ import (
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
+
+func TestSpaceComponent_GetSupportedCUDAVersions(t *testing.T) {
+	// Test case 1: GPU compute type with multiple CUDA versions
+	t.Run("GPUComputeType", func(t *testing.T) {
+		ctx := context.TODO()
+		sc := initializeTestSpaceComponent(ctx, t)
+		// Mock RuntimeFrameworksStore.FindSpaceLatestCUDAVersions to return multiple frameworks
+		mockFrames := []database.RuntimeFramework{
+			{
+				FrameName:     "space",
+				FrameVersion:  "2.0.0",
+				FrameImage:    "space:2.0.0-gpu-11.8",
+				ComputeType:   "gpu",
+				DriverVersion: "11.8",
+			},
+			{
+				FrameName:     "space",
+				FrameVersion:  "2.0.0",
+				FrameImage:    "space:2.0.0-gpu-12.1",
+				ComputeType:   "gpu",
+				DriverVersion: "12.1",
+			},
+			{
+				FrameName:     "space",
+				FrameVersion:  "2.0.0",
+				FrameImage:    "space:2.0.0-gpu-12.2",
+				ComputeType:   "gpu",
+				DriverVersion: "12.2",
+			},
+		}
+
+		// Set up the mock expectation
+		sc.mocks.stores.RuntimeFrameworkMock().EXPECT().FindSpaceSupportedCUDAVersions(ctx, "gpu").Return(mockFrames, nil)
+
+		// Call the method under test
+		versions, err := sc.GetSupportedCUDAVersions(ctx, "gpu")
+
+		// Verify the result
+		require.Nil(t, err)
+		require.NotNil(t, versions)
+		require.Equal(t, 3, len(versions))
+
+	})
+
+	// Test case 2: CPU compute type
+	t.Run("CPUComputeType", func(t *testing.T) {
+		ctx := context.TODO()
+		sc := initializeTestSpaceComponent(ctx, t)
+		// Mock RuntimeFrameworksStore.FindSpaceLatestCUDAVersions to return CPU framework
+		mockFrames := []database.RuntimeFramework{
+			{
+				FrameName:     "space",
+				FrameVersion:  "2.0.0",
+				FrameImage:    "space:2.0.0-cpu",
+				ComputeType:   "cpu",
+				DriverVersion: "",
+			},
+		}
+
+		// Set up the mock expectation
+		sc.mocks.stores.RuntimeFrameworkMock().EXPECT().FindSpaceSupportedCUDAVersions(ctx, "cpu").Return(mockFrames, nil)
+
+		// Call the method under test
+		versions, err := sc.GetSupportedCUDAVersions(ctx, "cpu")
+
+		// Verify the result
+		require.Nil(t, err)
+		require.NotNil(t, versions)
+		require.Equal(t, 1, len(versions))
+	})
+
+	// Test case 3: Empty result
+	t.Run("EmptyResult", func(t *testing.T) {
+		ctx := context.TODO()
+		sc := initializeTestSpaceComponent(ctx, t)
+		// Mock RuntimeFrameworksStore.FindSpaceLatestCUDAVersions to return empty slice
+		mockFrames := []database.RuntimeFramework{}
+
+		// Set up the mock expectation
+		sc.mocks.stores.RuntimeFrameworkMock().EXPECT().FindSpaceSupportedCUDAVersions(ctx, "gpu").Return(mockFrames, nil)
+
+		// Call the method under test
+		versions, err := sc.GetSupportedCUDAVersions(ctx, "gpu")
+
+		// Verify the result
+		require.Nil(t, err)
+		require.Equal(t, 0, len(versions))
+	})
+
+	// Test case 4: Error case
+	t.Run("ErrorCase", func(t *testing.T) {
+		ctx := context.TODO()
+		sc := initializeTestSpaceComponent(ctx, t)
+		// Mock RuntimeFrameworksStore.FindSpaceLatestCUDAVersions to return error
+		errMsg := "database error"
+
+		// Set up the mock expectation
+		sc.mocks.stores.RuntimeFrameworkMock().EXPECT().FindSpaceSupportedCUDAVersions(ctx, "gpu").Return(nil, errors.New(errMsg))
+
+		// Call the method under test
+		versions, err := sc.GetSupportedCUDAVersions(ctx, "gpu")
+
+		// Verify the result
+		require.Nil(t, versions)
+		require.Equal(t, errMsg, err.Error())
+	})
+}
+
+func TestSpacesSupperLatestDriverVersion(t *testing.T) {
+	mockFrames := []database.RuntimeFramework{
+		{
+			FrameName:     "space",
+			FrameVersion:  "2.0.0",
+			FrameImage:    "space:2.0.0-gpu-11.8",
+			ComputeType:   "gpu",
+			DriverVersion: "11.8",
+		},
+		{
+			FrameName:     "space",
+			FrameVersion:  "2.0.0",
+			FrameImage:    "space:2.0.0-gpu-12.2",
+			ComputeType:   "gpu",
+			DriverVersion: "12.1.0",
+		},
+		{
+			FrameName:     "space",
+			FrameVersion:  "2.0.0",
+			FrameImage:    "space:2.0.0-gpu-12.2",
+			ComputeType:   "gpu",
+			DriverVersion: "11.8.1",
+		},
+		{
+			FrameName:     "space",
+			FrameVersion:  "2.0.0",
+			FrameImage:    "space:2.0.0-gpu-12.2",
+			ComputeType:   "gpu",
+			DriverVersion: "10.8.1",
+		},
+	}
+	slices.SortFunc(mockFrames, func(i, j database.RuntimeFramework) int {
+		if i.DriverVersion == "" {
+			return -1
+		}
+		if j.DriverVersion == "" {
+			return 1
+		}
+		iDriverVersion, jDriverVersion := i.DriverVersion, j.DriverVersion
+		// Pre-process: semver package requires version to start with "v", so we add it uniformly
+		if !strings.HasPrefix(iDriverVersion, "v") {
+			iDriverVersion = fmt.Sprintf("v%s", iDriverVersion)
+		}
+		if !strings.HasPrefix(jDriverVersion, "v") {
+			jDriverVersion = fmt.Sprintf("v%s", jDriverVersion)
+		}
+
+		// 1: a > b
+		// 0: a == b
+		// -1: a < b
+		return semver.Compare(iDriverVersion, jDriverVersion)
+	})
+	require.Equal(t, "12.1.0", mockFrames[len(mockFrames)-1].DriverVersion)
+}
 
 func TestSpaceComponent_Show(t *testing.T) {
 	ctx := context.TODO()
@@ -233,7 +398,7 @@ func TestSpaceComponent_Index_HalfCreatedRepos(t *testing.T) {
 	data, total, err := sc.Index(ctx, &types.RepoFilter{Sort: "z", Username: "user"}, 10, 1, false)
 	require.Nil(t, err)
 	require.Equal(t, 3, total) // Total should match PublicToUser's return value
-	require.Len(t, data, 2)     // But only 2 spaces should be returned
+	require.Len(t, data, 2)    // But only 2 spaces should be returned
 
 	require.Equal(t, []*types.Space{
 		{
