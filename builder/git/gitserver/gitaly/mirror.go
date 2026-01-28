@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"io"
+	"strings"
 	"time"
 
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
@@ -108,7 +110,7 @@ func (c *Client) GetMirrorTaskInfo(ctx context.Context, taskId int64) (*gitserve
 }
 
 func (c *Client) MirrorSync(ctx context.Context, req gitserver.MirrorSyncReq) error {
-	var authorHeader string
+	stagingPrefix := "refs/staging"
 	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 
@@ -116,28 +118,77 @@ func (c *Client) MirrorSync(ctx context.Context, req gitserver.MirrorSyncReq) er
 	if err != nil {
 		return err
 	}
+	gitalyRepo := &gitalypb.Repository{
+		StorageName:  c.config.GitalyServer.Storage,
+		RelativePath: relativePath,
+	}
 	fetchRemoteReq := &gitalypb.FetchRemoteRequest{
-		Repository: &gitalypb.Repository{
-			StorageName:  c.config.GitalyServer.Storage,
-			RelativePath: relativePath,
-		},
-		Force:   true,
-		NoPrune: false,
+		Repository: gitalyRepo,
+		Force:      true,
+		NoPrune:    false,
 		RemoteParams: &gitalypb.Remote{
 			Url: req.CloneUrl,
+			MirrorRefmaps: []string{
+				"+refs/*:" + stagingPrefix + "/*",
+			},
 		},
 		CheckTagsChanged: true,
 	}
 
 	if req.MirrorToken != "" {
 		fetchRemoteReq.RemoteParams.HttpAuthorizationHeader = fmt.Sprintf("X-OPENCSG-Sync-Token%s", req.MirrorToken)
-	} else if authorHeader != "" {
-		fetchRemoteReq.RemoteParams.HttpAuthorizationHeader = authorHeader
 	} else {
 		fetchRemoteReq.RemoteParams.HttpAuthorizationHeader = ""
 	}
 
 	_, err = c.repoClient.FetchRemote(ctx, fetchRemoteReq)
+	if err != nil {
+		return errorx.ErrGitMirrorSyncFailed(err, errorx.Ctx())
+	}
+	refsClient, err := c.refClient.ListRefs(ctx, &gitalypb.ListRefsRequest{
+		Repository: gitalyRepo,
+		Patterns:   [][]byte{[]byte(stagingPrefix + "/")},
+	})
+	if err != nil {
+		return errorx.ErrGitMirrorSyncFailed(err, errorx.Ctx())
+	}
+	var refs []*gitalypb.ListRefsResponse_Reference
+	for {
+		resp, err := refsClient.Recv()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return errorx.ErrGitMirrorSyncFailed(err, errorx.Ctx())
+		}
+		if resp == nil {
+			break
+		}
+		refs = append(refs, resp.References...)
+	}
+
+	updateRefClient, err := c.refClient.UpdateReferences(ctx)
+	if err != nil {
+		return errorx.ErrGitMirrorSyncFailed(err, errorx.Ctx())
+	}
+
+	updates := []*gitalypb.UpdateReferencesRequest_Update{}
+
+	for _, r := range refs {
+		localRef := strings.Replace(string(r.Name), stagingPrefix, "refs", 1)
+		updates = append(updates, &gitalypb.UpdateReferencesRequest_Update{
+			Reference:   []byte(localRef),
+			NewObjectId: []byte(r.Target),
+		})
+	}
+	err = updateRefClient.Send(&gitalypb.UpdateReferencesRequest{
+		Repository: gitalyRepo,
+		Updates:    updates,
+	})
+	if err != nil {
+		return errorx.ErrGitMirrorSyncFailed(err, errorx.Ctx())
+	}
+	_, err = updateRefClient.CloseAndRecv()
 	if err != nil {
 		return errorx.ErrGitMirrorSyncFailed(err, errorx.Ctx())
 	}
