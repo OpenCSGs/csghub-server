@@ -318,7 +318,6 @@ func (c *codeComponentImpl) Show(ctx context.Context, namespace, name, currentUs
 	var (
 		tags             []types.RepoTag
 		mirrorTaskStatus types.MirrorTaskStatus
-		syncStatus       types.RepositorySyncStatus
 	)
 	code, err := c.codeStore.FindByPath(ctx, namespace, name)
 	if err != nil {
@@ -357,7 +356,7 @@ func (c *codeComponentImpl) Show(ctx context.Context, namespace, name, currentUs
 		return nil, newError
 	}
 
-	mirrorTaskStatus, syncStatus = c.repoComponent.GetMirrorTaskStatusAndSyncStatus(code.Repository)
+	mirrorTaskStatus = c.repoComponent.GetMirrorTaskStatus(code.Repository)
 
 	resCode := &types.Code{
 		ID:            code.ID,
@@ -381,7 +380,7 @@ func (c *codeComponentImpl) Show(ctx context.Context, namespace, name, currentUs
 		UpdatedAt:  code.Repository.UpdatedAt,
 		UserLikes:  likeExists,
 		Source:     code.Repository.Source,
-		SyncStatus: syncStatus,
+		SyncStatus: code.Repository.SyncStatus,
 		License:    code.Repository.License,
 		CanWrite:   permission.CanWrite,
 		CanManage:  permission.CanAdmin,

@@ -258,9 +258,9 @@ func (suite *LfsSyncWorkerTestSuite) TestRun_ContextCanceled() {
 	suite.mocks.msgSender.EXPECT().Send(mock.Anything, mock.Anything).Return(hook.Response{}, nil)
 	suite.mocks.lfsMetaObjectStore.EXPECT().FindByRepoID(mock.Anything, repo.ID).Return(nil, context.Canceled)
 
-	suite.mocks.mirrorTaskStore.EXPECT().Update(mock.Anything, mock.MatchedBy(func(mt database.MirrorTask) bool {
+	suite.mocks.mirrorTaskStore.EXPECT().UpdateStatusAndRepoSyncStatus(mock.Anything, mock.MatchedBy(func(mt database.MirrorTask) bool {
 		return mt.Status == types.MirrorCanceled
-	})).Return(*task, nil)
+	}), types.SyncStatusCanceled).Return(*task, nil)
 
 	suite.mocks.msgSender.EXPECT().Send(mock.Anything, mock.Anything).Return(hook.Response{}, nil)
 	suite.mocks.recomComponent.EXPECT().SetOpWeight(mock.Anything, mock.Anything, mock.Anything).Return(nil)
@@ -304,9 +304,9 @@ func (suite *LfsSyncWorkerTestSuite) TestRun_Success_NoLfsFiles() {
 	suite.mocks.workflowClient.EXPECT().ExecuteWorkflow(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
 
 	// Final updates
-	suite.mocks.mirrorTaskStore.EXPECT().Update(mock.Anything, mock.MatchedBy(func(mt database.MirrorTask) bool {
+	suite.mocks.mirrorTaskStore.EXPECT().UpdateStatusAndRepoSyncStatus(mock.Anything, mock.MatchedBy(func(mt database.MirrorTask) bool {
 		return mt.Status == types.MirrorRepoSyncFinished && mt.Progress == 100
-	})).Return(*task, nil)
+	}), types.SyncStatusInProgress).Return(*task, nil)
 
 	suite.mocks.msgSender.EXPECT().Send(mock.Anything, mock.MatchedBy(func(req types.MessageRequest) bool {
 		return strings.Contains(req.Parameters, "finished")
@@ -343,10 +343,10 @@ func (suite *LfsSyncWorkerTestSuite) TestRun_SyncLfsError() {
 	suite.mocks.lfsMetaObjectStore.EXPECT().FindByRepoID(mock.Anything, repo.ID).Return(nil, expectedError)
 
 	// Expect failure status update
-	suite.mocks.mirrorTaskStore.EXPECT().Update(mock.Anything, mock.MatchedBy(func(mt database.MirrorTask) bool {
+	suite.mocks.mirrorTaskStore.EXPECT().UpdateStatusAndRepoSyncStatus(mock.Anything, mock.MatchedBy(func(mt database.MirrorTask) bool {
 		return mt.Status == types.MirrorLfsSyncFailed &&
 			strings.Contains(mt.ErrorMessage, expectedError.Error())
-	})).Return(*task, nil)
+	}), types.SyncStatusFailed).Return(*task, nil)
 
 	// Failure message
 	suite.mocks.msgSender.EXPECT().Send(mock.Anything, mock.MatchedBy(func(req types.MessageRequest) bool {
@@ -446,9 +446,9 @@ func (suite *LfsSyncWorkerTestSuite) TestRun_Success_HasLfsFiles() {
 	suite.mocks.workflowClient.EXPECT().ExecuteWorkflow(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
 
 	// Final updates
-	suite.mocks.mirrorTaskStore.EXPECT().Update(mock.Anything, mock.MatchedBy(func(mt database.MirrorTask) bool {
+	suite.mocks.mirrorTaskStore.EXPECT().UpdateStatusAndRepoSyncStatus(mock.Anything, mock.MatchedBy(func(mt database.MirrorTask) bool {
 		return mt.Status == types.MirrorRepoSyncFinished && mt.Progress == 100
-	})).Return(*task, nil)
+	}), types.SyncStatusInProgress).Return(*task, nil)
 
 	suite.mocks.msgSender.EXPECT().Send(mock.Anything, mock.MatchedBy(func(req types.MessageRequest) bool {
 		return strings.Contains(req.Parameters, "finished")

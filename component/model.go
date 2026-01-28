@@ -447,7 +447,6 @@ func (c *modelComponentImpl) Delete(ctx context.Context, namespace, name, curren
 func (c *modelComponentImpl) Show(ctx context.Context, namespace, name, currentUser string, needOpWeight, needMultiSync bool) (*types.Model, error) {
 	var (
 		tags             []types.RepoTag
-		syncStatus       types.RepositorySyncStatus
 		mirrorTaskStatus types.MirrorTaskStatus
 	)
 	model, err := c.modelStore.FindByPath(ctx, namespace, name)
@@ -487,7 +486,7 @@ func (c *modelComponentImpl) Show(ctx context.Context, namespace, name, currentU
 		return nil, newError
 	}
 
-	mirrorTaskStatus, syncStatus = c.repoComponent.GetMirrorTaskStatusAndSyncStatus(model.Repository)
+	mirrorTaskStatus = c.repoComponent.GetMirrorTaskStatus(model.Repository)
 
 	resModel := &types.Model{
 		ID:            model.ID,
@@ -513,7 +512,7 @@ func (c *modelComponentImpl) Show(ctx context.Context, namespace, name, currentU
 		WidgetType:          types.ModelWidgetTypeGeneration,
 		UserLikes:           likeExists,
 		Source:              model.Repository.Source,
-		SyncStatus:          syncStatus,
+		SyncStatus:          model.Repository.SyncStatus,
 		BaseModel:           model.BaseModel,
 		License:             model.Repository.License,
 		MirrorLastUpdatedAt: model.Repository.Mirror.LastUpdatedAt,

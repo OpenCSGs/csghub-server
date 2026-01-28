@@ -374,7 +374,6 @@ func (c *datasetComponentImpl) Delete(ctx context.Context, namespace, name, curr
 func (c *datasetComponentImpl) Show(ctx context.Context, namespace, name, currentUser string, needOpWeight, needMultiSync bool) (*types.Dataset, error) {
 	var (
 		tags             []types.RepoTag
-		syncStatus       types.RepositorySyncStatus
 		mirrorTaskStatus types.MirrorTaskStatus
 	)
 	dataset, err := c.datasetStore.FindByPath(ctx, namespace, name)
@@ -413,7 +412,7 @@ func (c *datasetComponentImpl) Show(ctx context.Context, namespace, name, curren
 		return nil, fmt.Errorf("failed to check for the presence of the user likes, error: %w", err)
 	}
 
-	mirrorTaskStatus, syncStatus = c.repoComponent.GetMirrorTaskStatusAndSyncStatus(dataset.Repository)
+	mirrorTaskStatus = c.repoComponent.GetMirrorTaskStatus(dataset.Repository)
 
 	resDataset := &types.Dataset{
 		ID:            dataset.ID,
@@ -438,7 +437,7 @@ func (c *datasetComponentImpl) Show(ctx context.Context, namespace, name, curren
 		UpdatedAt:           dataset.Repository.UpdatedAt,
 		UserLikes:           likeExists,
 		Source:              dataset.Repository.Source,
-		SyncStatus:          syncStatus,
+		SyncStatus:          dataset.Repository.SyncStatus,
 		License:             dataset.Repository.License,
 		MirrorLastUpdatedAt: dataset.Repository.Mirror.LastUpdatedAt,
 		CanWrite:            permission.CanWrite,

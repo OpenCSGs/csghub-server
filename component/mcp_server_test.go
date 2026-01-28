@@ -240,13 +240,14 @@ func TestMCPServerComponent_Show(t *testing.T) {
 	}
 
 	dbrepo := &database.Repository{
-		ID:       321,
-		User:     user,
-		Tags:     []database.Tag{{Name: "t1"}},
-		Name:     "n",
-		License:  "MIT",
-		Nickname: "n",
-		Path:     "ns/n",
+		ID:         321,
+		User:       user,
+		Tags:       []database.Tag{{Name: "t1"}},
+		Name:       "n",
+		License:    "MIT",
+		Nickname:   "n",
+		Path:       "ns/n",
+		SyncStatus: types.SyncStatusInProgress,
 	}
 
 	mc.mocks.stores.MCPServerMock().EXPECT().ByPath(ctx, "ns", "n").Return(&database.MCPServer{
@@ -257,8 +258,8 @@ func TestMCPServerComponent_Show(t *testing.T) {
 	mc.mocks.components.repo.EXPECT().GetUserRepoPermission(ctx, "user", dbrepo).Return(&types.UserRepoPermission{
 		CanRead: true,
 	}, nil)
-	mc.mocks.components.repo.EXPECT().GetMirrorTaskStatusAndSyncStatus(dbrepo).Return(
-		types.MirrorRepoSyncStart, types.SyncStatusInProgress,
+	mc.mocks.components.repo.EXPECT().GetMirrorTaskStatus(dbrepo).Return(
+		types.MirrorRepoSyncStart,
 	)
 
 	mc.mocks.components.repo.EXPECT().GetNameSpaceInfo(ctx, "ns").Return(&types.Namespace{}, nil)
@@ -362,10 +363,9 @@ func TestMCPServerComponent_Index_HalfCreatedRepos(t *testing.T) {
 	res, total, err := mc.Index(ctx, filter, 10, 1, false)
 	require.Nil(t, err)
 	require.NotNil(t, res)
-	require.Equal(t, total, 2)   // Total should match PublicToUser's return value
-	require.Len(t, res, 1)       // But only 1 MCP server should be returned
+	require.Equal(t, total, 2) // Total should match PublicToUser's return value
+	require.Len(t, res, 1)     // But only 1 MCP server should be returned
 }
-
 
 func TestMCPServerComponent_Properties(t *testing.T) {
 	ctx := context.TODO()

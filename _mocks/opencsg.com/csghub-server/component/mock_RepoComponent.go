@@ -2433,58 +2433,48 @@ func (_c *MockRepoComponent_GetMirror_Call) RunAndReturn(run func(context.Contex
 	return _c
 }
 
-// GetMirrorTaskStatusAndSyncStatus provides a mock function with given fields: repo
-func (_m *MockRepoComponent) GetMirrorTaskStatusAndSyncStatus(repo *database.Repository) (types.MirrorTaskStatus, types.RepositorySyncStatus) {
+// GetMirrorTaskStatus provides a mock function with given fields: repo
+func (_m *MockRepoComponent) GetMirrorTaskStatus(repo *database.Repository) types.MirrorTaskStatus {
 	ret := _m.Called(repo)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetMirrorTaskStatusAndSyncStatus")
+		panic("no return value specified for GetMirrorTaskStatus")
 	}
 
 	var r0 types.MirrorTaskStatus
-	var r1 types.RepositorySyncStatus
-	if rf, ok := ret.Get(0).(func(*database.Repository) (types.MirrorTaskStatus, types.RepositorySyncStatus)); ok {
-		return rf(repo)
-	}
 	if rf, ok := ret.Get(0).(func(*database.Repository) types.MirrorTaskStatus); ok {
 		r0 = rf(repo)
 	} else {
 		r0 = ret.Get(0).(types.MirrorTaskStatus)
 	}
 
-	if rf, ok := ret.Get(1).(func(*database.Repository) types.RepositorySyncStatus); ok {
-		r1 = rf(repo)
-	} else {
-		r1 = ret.Get(1).(types.RepositorySyncStatus)
-	}
-
-	return r0, r1
+	return r0
 }
 
-// MockRepoComponent_GetMirrorTaskStatusAndSyncStatus_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetMirrorTaskStatusAndSyncStatus'
-type MockRepoComponent_GetMirrorTaskStatusAndSyncStatus_Call struct {
+// MockRepoComponent_GetMirrorTaskStatus_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetMirrorTaskStatus'
+type MockRepoComponent_GetMirrorTaskStatus_Call struct {
 	*mock.Call
 }
 
-// GetMirrorTaskStatusAndSyncStatus is a helper method to define mock.On call
+// GetMirrorTaskStatus is a helper method to define mock.On call
 //   - repo *database.Repository
-func (_e *MockRepoComponent_Expecter) GetMirrorTaskStatusAndSyncStatus(repo interface{}) *MockRepoComponent_GetMirrorTaskStatusAndSyncStatus_Call {
-	return &MockRepoComponent_GetMirrorTaskStatusAndSyncStatus_Call{Call: _e.mock.On("GetMirrorTaskStatusAndSyncStatus", repo)}
+func (_e *MockRepoComponent_Expecter) GetMirrorTaskStatus(repo interface{}) *MockRepoComponent_GetMirrorTaskStatus_Call {
+	return &MockRepoComponent_GetMirrorTaskStatus_Call{Call: _e.mock.On("GetMirrorTaskStatus", repo)}
 }
 
-func (_c *MockRepoComponent_GetMirrorTaskStatusAndSyncStatus_Call) Run(run func(repo *database.Repository)) *MockRepoComponent_GetMirrorTaskStatusAndSyncStatus_Call {
+func (_c *MockRepoComponent_GetMirrorTaskStatus_Call) Run(run func(repo *database.Repository)) *MockRepoComponent_GetMirrorTaskStatus_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(*database.Repository))
 	})
 	return _c
 }
 
-func (_c *MockRepoComponent_GetMirrorTaskStatusAndSyncStatus_Call) Return(_a0 types.MirrorTaskStatus, _a1 types.RepositorySyncStatus) *MockRepoComponent_GetMirrorTaskStatusAndSyncStatus_Call {
-	_c.Call.Return(_a0, _a1)
+func (_c *MockRepoComponent_GetMirrorTaskStatus_Call) Return(_a0 types.MirrorTaskStatus) *MockRepoComponent_GetMirrorTaskStatus_Call {
+	_c.Call.Return(_a0)
 	return _c
 }
 
-func (_c *MockRepoComponent_GetMirrorTaskStatusAndSyncStatus_Call) RunAndReturn(run func(*database.Repository) (types.MirrorTaskStatus, types.RepositorySyncStatus)) *MockRepoComponent_GetMirrorTaskStatusAndSyncStatus_Call {
+func (_c *MockRepoComponent_GetMirrorTaskStatus_Call) RunAndReturn(run func(*database.Repository) types.MirrorTaskStatus) *MockRepoComponent_GetMirrorTaskStatus_Call {
 	_c.Call.Return(run)
 	return _c
 }
