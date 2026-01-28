@@ -428,6 +428,13 @@ type UpdateAgentMCPServerRequest struct {
 	Env         *map[string]any `json:"env,omitempty"`
 }
 
+// InspectMCPServerRequest represents a request to inspect an MCP server directly.
+type InspectMCPServerRequest struct {
+	Protocol string         `json:"protocol" binding:"required,oneof=streamable sse"`
+	URL      string         `json:"url" binding:"required"`
+	Headers  map[string]any `json:"headers,omitempty"`
+}
+
 // AgentMCPServerListItem represents an MCP server in list responses
 type AgentMCPServerListItem struct {
 	ID          string    `json:"id"` // String ID (format: "builtin:{id}" or "user:{id}")
