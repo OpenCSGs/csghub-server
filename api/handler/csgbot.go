@@ -11,6 +11,7 @@ import (
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
+	"opencsg.com/csghub-server/common/utils/trace"
 	"opencsg.com/csghub-server/component"
 )
 
@@ -57,11 +58,21 @@ func (h *CSGBotProxyHandler) Proxy(ctx *gin.Context) {
 		ctx.Abort()
 		return
 	}
+	// old csgbot request headers, keep for compatibility for existed code agents
 	ctx.Request.Header.Set("user_id", fmt.Sprintf("%d", u.ID))
 	ctx.Request.Header.Set("user_uuid", u.UUID)
 	ctx.Request.Header.Set("user_name", u.Username)
 	ctx.Request.Header.Set("user_token", token)
 	ctx.Request.Header.Set("isadmin", fmt.Sprintf("%t", u.CanAdmin()))
+
+	// new csgbot request headers
+	ctx.Request.Header.Set(types.CSGBotHeaderUserUUID, u.UUID)
+	ctx.Request.Header.Set(types.CSGBotHeaderUserName, u.Username)
+	ctx.Request.Header.Set(types.CSGBotHeaderUserToken, token)
+	requestID := trace.GetTraceIDInGinContext(ctx)
+	if requestID != "" {
+		ctx.Request.Header.Set(types.CSGBotHeaderRequestID, requestID)
+	}
 	// Log the request URL and header
 	slog.Debug("http request", slog.Any("request", ctx.Request.URL), slog.Any("header", ctx.Request.Header))
 	// Serve the request using the router
