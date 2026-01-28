@@ -38,8 +38,21 @@ type AgentInstance struct {
 	IsRunning   bool            `json:"is_running"`                            // Whether the instance is running
 	BuiltIn     bool            `json:"built_in"`                              // Whether the instance is built-in
 	Metadata    *map[string]any `json:"metadata,omitempty"`                    // Instance metadata
+	Data        json.RawMessage `json:"-"`                                     // Request-only flow data; excluded from responses
 	CreatedAt   time.Time       `json:"created_at"`                            // When the instance was created
 	UpdatedAt   time.Time       `json:"updated_at"`                            // When the instance was last updated
+}
+
+// CreateAgentInstanceRequest represents a request to create an agent instance.
+type CreateAgentInstanceRequest struct {
+	Name        *string         `json:"name"`
+	Description *string         `json:"description,omitempty"`
+	Type        *string         `json:"type"`
+	ContentID   *string         `json:"content_id,omitempty"`
+	Public      *bool           `json:"public"`
+	Metadata    *map[string]any `json:"metadata,omitempty"`
+	TemplateID  *int64          `json:"template_id" binding:"omitempty,gte=1"`
+	Data        json.RawMessage `json:"data,omitempty"`
 }
 
 type AgentType string
