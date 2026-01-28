@@ -111,17 +111,23 @@ func (s *llmServiceComponentImpl) UpdateLLMConfig(ctx context.Context, req *type
 	if req.Enabled != nil {
 		llmConfig.Enabled = *req.Enabled
 	}
-	_, err = s.llmConfigStore.Update(ctx, *llmConfig)
+	if req.Provider != nil {
+		llmConfig.Provider = *req.Provider
+	}
+	updatedConfig, err := s.llmConfigStore.Update(ctx, *llmConfig)
 	if err != nil {
 		return nil, err
 	}
 	resLLMConfig := &types.LLMConfig{
-		ID:          llmConfig.ID,
-		ModelName:   llmConfig.ModelName,
-		ApiEndpoint: llmConfig.ApiEndpoint,
-		AuthHeader:  llmConfig.AuthHeader,
-		Type:        llmConfig.Type,
-		Enabled:     llmConfig.Enabled,
+		ID:          updatedConfig.ID,
+		ModelName:   updatedConfig.ModelName,
+		ApiEndpoint: updatedConfig.ApiEndpoint,
+		AuthHeader:  updatedConfig.AuthHeader,
+		Type:        updatedConfig.Type,
+		Provider:    updatedConfig.Provider,
+		Enabled:     updatedConfig.Enabled,
+		CreatedAt:   updatedConfig.CreatedAt,
+		UpdatedAt:   updatedConfig.UpdatedAt,
 	}
 	return resLLMConfig, nil
 }
@@ -159,6 +165,7 @@ func (s *llmServiceComponentImpl) CreateLLMConfig(ctx context.Context, req *type
 		ApiEndpoint: req.ApiEndpoint,
 		AuthHeader:  req.AuthHeader,
 		Type:        req.Type,
+		Provider:    req.Provider,
 		Enabled:     req.Enabled,
 	}
 	dbRes, err := s.llmConfigStore.Create(ctx, dbLLMConfig)
@@ -167,11 +174,14 @@ func (s *llmServiceComponentImpl) CreateLLMConfig(ctx context.Context, req *type
 	}
 	resLLMConfig := &types.LLMConfig{
 		ID:          dbRes.ID,
-		ModelName:   dbLLMConfig.ModelName,
-		ApiEndpoint: dbLLMConfig.ApiEndpoint,
-		AuthHeader:  dbLLMConfig.AuthHeader,
-		Type:        dbLLMConfig.Type,
-		Enabled:     dbLLMConfig.Enabled,
+		ModelName:   dbRes.ModelName,
+		ApiEndpoint: dbRes.ApiEndpoint,
+		AuthHeader:  dbRes.AuthHeader,
+		Type:        dbRes.Type,
+		Provider:    dbRes.Provider,
+		Enabled:     dbRes.Enabled,
+		CreatedAt:   dbRes.CreatedAt,
+		UpdatedAt:   dbRes.UpdatedAt,
 	}
 	return resLLMConfig, nil
 }
