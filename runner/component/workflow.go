@@ -232,7 +232,7 @@ func (wc *workFlowComponentImpl) DeleteWorkflowInargo(ctx context.Context, delet
 	// for deleted case,check if the workflow did not finish
 	if wf.Status == v1alpha1.WorkflowPending || wf.Status == v1alpha1.WorkflowRunning {
 		wf.Status = v1alpha1.WorkflowFailed
-		wf.Reason = "deleted by admin"
+		wf.Reason = "deleted by system, please check if your required resources are sufficient or if your account has enough credit"
 		slog.InfoContext(ctx, "DeleteWorkflowInargo-report", slog.Any("name", wf.TaskId), slog.Any("result-url", wf.ResultURL))
 		_, err = wc.wf.UpdateWorkFlow(ctx, wf)
 		if err != nil {

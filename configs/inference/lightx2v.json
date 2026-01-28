@@ -1,0 +1,20 @@
+{
+  "engine_name": "lightx2v",
+  "enabled": 1,
+  "container_port": 8000,
+  "model_format": "safetensors",
+  "engine_images": [
+    {
+      "compute_type": "gpu",
+      "image": "opencsghq/lightx2v:26011201-cu128",
+      "driver_version": "12.8",
+      "engine_version": "0.0.1"
+    }
+  ],
+  "supported_models": [
+    "Wan2.2-I2V-A14B",
+    "Wan2.2-I2V-A14B-BF16",
+    "Wan2.2-T2V-A14B",
+    "Wan2.2-T2V-A14B-BF16"
+  ]
+}

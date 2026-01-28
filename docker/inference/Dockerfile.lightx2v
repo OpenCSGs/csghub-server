@@ -1,0 +1,32 @@
+FROM lightx2v/lightx2v:26011201-cu128
+
+LABEL maintainer="opencsg"
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install required dependencies
+RUN sed -i 's|http://archive.ubuntu.com/ubuntu|http://mirrors.aliyun.com/ubuntu|g' /etc/apt/sources.list && \
+    sed -i 's|http://security.ubuntu.com/ubuntu|http://mirrors.aliyun.com/ubuntu|g' /etc/apt/sources.list && \
+    apt-get update && apt-get install -y dumb-init && rm -rf /var/lib/apt/lists/*
+
+# Set pip mirror
+RUN pip config set global.index-url https://mirrors.aliyun.com/pypi/simple
+
+# Install additional packages for video generation
+RUN pip install --no-cache-dir \
+    csghub-sdk==0.7.3  easydict
+WORKDIR /app
+RUN git clone --depth 1 https://gitee.com/xzgan/LightX2V.git && \
+    cd LightX2V && \
+    pip install -e .
+
+# Copy entrypoint and change permissions
+COPY --chmod=0755 ./video-generation/ /etc/csghub/
+
+WORKDIR /workspace/
+ENV HUGGINGFACE_HUB_CACHE=/workspace/ \
+    HF_HUB_ENABLE_HF_TRANSFER=0
+ENV PORT=8000
+EXPOSE 8000
+ENTRYPOINT [ "/usr/bin/dumb-init", "--" ]
+CMD ["/etc/csghub/serve.sh"]

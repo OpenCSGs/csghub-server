@@ -1385,6 +1385,12 @@ func GetBuiltInTaskFromTags(tags []database.Tag) string {
 		if tag.Name == string(types.ImageText2Text) {
 			return tag.Name
 		}
+		if tag.Name == string(types.Text2Video) {
+			return tag.Name
+		}
+		if tag.Name == string(types.Image2Video) {
+			return tag.Name
+		}
 		if tag.Name == string(types.TextToSpeech) {
 			return tag.Name
 		}
