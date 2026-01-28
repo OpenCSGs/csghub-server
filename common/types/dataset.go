@@ -49,8 +49,11 @@ type Dataset struct {
 	MirrorLastUpdatedAt  time.Time            `json:"mirror_last_updated_at"`
 	URL                  string               `json:"url"`
 	MultiSource
-	RecomOpWeight    int              `json:"recom_op_weight,omitempty"`
-	MirrorTaskStatus MirrorTaskStatus `json:"mirror_task_status"`
+	RecomOpWeight         int                     `json:"recom_op_weight,omitempty"`
+	MirrorTaskStatus      MirrorTaskStatus        `json:"mirror_task_status"`
+	XnetEnabled           bool                    `json:"xnet_enabled"`
+	XnetMigrationStatus   XnetMigrationTaskStatus `json:"xnet_migration_status"`
+	XnetMigrationProgress int                     `json:"xnet_migration_progress"`
 }
 
 type DataViewerReq struct {
