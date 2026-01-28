@@ -259,7 +259,8 @@ func (w *LfsSyncWorker) Run(mt *database.MirrorTask) {
 
 		mt.ErrorMessage = fmt.Sprintf("fail to submit event, status: %s, action: %s", mt.Status, action)
 		mt.Status = types.MirrorLfsSyncFailed
-		_, updateErr := w.mirrorTaskStore.Update(w.ctx, *mt)
+		repoSyncStatus := common.MirrorTaskStatusToRepoStatus(mt.Status)
+		_, updateErr := w.mirrorTaskStore.UpdateStatusAndRepoSyncStatus(w.ctx, *mt, repoSyncStatus)
 		if updateErr != nil {
 			slog.Error("fail to update mirror task",
 				slog.Int("workerID", w.id),
@@ -269,7 +270,8 @@ func (w *LfsSyncWorker) Run(mt *database.MirrorTask) {
 		return
 	}
 	mt.Status = types.MirrorTaskStatus(mtFSM.Current())
-	_, err = w.mirrorTaskStore.Update(ctx, *mt)
+	repoSyncStatus := common.MirrorTaskStatusToRepoStatus(mt.Status)
+	_, err = w.mirrorTaskStore.UpdateStatusAndRepoSyncStatus(ctx, *mt, repoSyncStatus)
 	if err != nil {
 		slog.Error("fail to update mirror task",
 			slog.Int("workerID", w.id),

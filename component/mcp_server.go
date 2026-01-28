@@ -298,7 +298,6 @@ func (m *mcpServerComponentImpl) Show(ctx context.Context, namespace string, nam
 	var (
 		tags             []types.RepoTag
 		mirrorTaskStatus types.MirrorTaskStatus
-		syncStatus       types.RepositorySyncStatus
 	)
 	mcpServer, err := m.mcpServerStore.ByPath(ctx, namespace, name)
 	if err != nil {
@@ -337,7 +336,7 @@ func (m *mcpServerComponentImpl) Show(ctx context.Context, namespace string, nam
 		return nil, newError
 	}
 
-	mirrorTaskStatus, syncStatus = m.repoComponent.GetMirrorTaskStatusAndSyncStatus(mcpServer.Repository)
+	mirrorTaskStatus = m.repoComponent.GetMirrorTaskStatus(mcpServer.Repository)
 
 	res := &types.MCPServer{
 		ID:            mcpServer.ID,
@@ -361,7 +360,7 @@ func (m *mcpServerComponentImpl) Show(ctx context.Context, namespace string, nam
 		UpdatedAt:     mcpServer.Repository.UpdatedAt,
 		UserLikes:     likeExists,
 		Source:        mcpServer.Repository.Source,
-		SyncStatus:    syncStatus,
+		SyncStatus:    mcpServer.Repository.SyncStatus,
 		License:       mcpServer.Repository.License,
 		CanWrite:      permission.CanWrite,
 		CanManage:     permission.CanAdmin,
