@@ -676,7 +676,7 @@ func createModelRoutes(config *config.Config,
 		modelsDeployGroup.DELETE("/:namespace/:name/run/:id", modelHandler.DeployDelete)
 		modelsDeployGroup.GET("/:namespace/:name/run/:id", repoCommonHandler.DeployDetail)
 		modelsDeployGroup.GET("/:namespace/:name/run/:id/status", repoCommonHandler.DeployStatus)
-		modelsDeployGroup.GET("/:namespace/:name/run/:id/logs/:instance", repoCommonHandler.DeployInstanceLogs)
+		modelsDeployGroup.GET("/:namespace/:name/run/:id/logs", repoCommonHandler.DeployInstanceLogs)
 		modelsDeployGroup.PUT("/:namespace/:name/run/:id", repoCommonHandler.DeployUpdate)
 		modelsDeployGroup.PUT("/:namespace/:name/run/:id/stop", modelHandler.DeployStop)
 		modelsDeployGroup.PUT("/:namespace/:name/run/:id/start", modelHandler.DeployStart)
@@ -695,7 +695,7 @@ func createModelRoutes(config *config.Config,
 		// delete a finetune instance
 		modelsDeployGroup.DELETE("/:namespace/:name/finetune/:id", modelHandler.FinetuneDelete)
 		// get finetune instance logs
-		modelsDeployGroup.GET("/:namespace/:name/finetune/:id/logs/:instance", repoCommonHandler.FinetuneInstanceLogs)
+		modelsDeployGroup.GET("/:namespace/:name/finetune/:id/logs", repoCommonHandler.FinetuneInstanceLogs)
 	}
 
 	modelsMonitorGroup := modelsGroup.Group("")
@@ -728,7 +728,7 @@ func createModelRoutes(config *config.Config,
 		modelsServerlessGroup.PUT("/:namespace/:name/serverless/:id/stop", middlewareCollection.Auth.NeedAdmin, modelHandler.ServerlessStop)
 		modelsServerlessGroup.GET("/:namespace/:name/serverless/:id", middlewareCollection.Auth.NeedAdmin, repoCommonHandler.ServerlessDetail)
 		modelsServerlessGroup.GET("/:namespace/:name/serverless/:id/status", middlewareCollection.Auth.NeedAdmin, repoCommonHandler.ServerlessStatus)
-		modelsServerlessGroup.GET("/:namespace/:name/serverless/:id/logs/:instance", middlewareCollection.Auth.NeedAdmin, repoCommonHandler.ServerlessLogs)
+		modelsServerlessGroup.GET("/:namespace/:name/serverless/:id/logs", middlewareCollection.Auth.NeedAdmin, repoCommonHandler.ServerlessLogs)
 		modelsServerlessGroup.GET("/:namespace/:name/serverless/:id/versions/:commit_id", middlewareCollection.Auth.NeedAdmin, repoCommonHandler.ServerlessVersionLogs)
 		modelsServerlessGroup.PUT("/:namespace/:name/serverless/:id", middlewareCollection.Auth.NeedAdmin, repoCommonHandler.ServerlessUpdate)
 	}
@@ -859,7 +859,7 @@ func createNotebookRoutes(
 		// update notebook
 		notebooks.PUT("/:id", middlewareCollection.Auth.NeedLogin, notebookHandler.Update)
 		notebooks.GET("/:id/status", middlewareCollection.Auth.NeedLogin, notebookHandler.Status)
-		notebooks.GET("/:id/logs/:instance", middlewareCollection.Auth.NeedLogin, notebookHandler.Logs)
+		notebooks.GET("/:id/logs", middlewareCollection.Auth.NeedLogin, notebookHandler.Logs)
 		// stop a notebook
 		notebooks.PUT("/:id/stop", middlewareCollection.Auth.NeedLogin, notebookHandler.Stop)
 		// start a notebook
@@ -936,7 +936,7 @@ func createSpaceRoutes(config *config.Config,
 		spaces.GET("/:namespace/:name/run", middlewareCollection.Auth.NeedLogin, repoCommonHandler.DeployList)
 		spaces.GET("/:namespace/:name/run/:id", middlewareCollection.Auth.NeedLogin, repoCommonHandler.DeployDetail)
 		spaces.GET("/:namespace/:name/run/:id/status", middlewareCollection.Auth.NeedLogin, repoCommonHandler.DeployStatus)
-		spaces.GET("/:namespace/:name/run/:id/logs/:instance", middlewareCollection.Auth.NeedLogin, repoCommonHandler.DeployInstanceLogs)
+		spaces.GET("/:namespace/:name/run/:id/logs", middlewareCollection.Auth.NeedLogin, repoCommonHandler.DeployInstanceLogs)
 	}
 	spaceMonitorGroup := spaces.Group("")
 	spaceMonitorGroup.Use(middlewareCollection.Auth.NeedLogin)

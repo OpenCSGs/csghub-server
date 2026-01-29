@@ -677,7 +677,7 @@ func TestSpaceComponent_Logs(t *testing.T) {
 		Name:      "n",
 	}).Return(&deploy.MultiLogReader{}, nil)
 
-	r, err := sc.Logs(ctx, "ns", "n", "")
+	r, err := sc.Logs(ctx, "ns", "n", "", "")
 
 	require.Nil(t, err)
 	require.Equal(t, &deploy.MultiLogReader{}, r)

@@ -62,7 +62,7 @@ type SpaceComponent interface {
 	FixHasEntryFile(ctx context.Context, s *database.Space) *database.Space
 	Status(ctx context.Context, namespace, name string) (string, string, error)
 	StatusByPaths(ctx context.Context, paths []string) (map[string]string, error)
-	Logs(ctx context.Context, namespace, name, since string) (*deploy.MultiLogReader, error)
+	Logs(ctx context.Context, namespace, name, since, instance string) (*deploy.MultiLogReader, error)
 	// HasEntryFile checks whether space repo has entry point file to run with
 	HasEntryFile(ctx context.Context, space *database.Space) bool
 	GetByID(ctx context.Context, spaceID int64) (*database.Space, error)
@@ -1161,7 +1161,7 @@ func (c *spaceComponentImpl) StatusByPaths(ctx context.Context, paths []string) 
 	return result, nil
 }
 
-func (c *spaceComponentImpl) Logs(ctx context.Context, namespace, name, since string) (*deploy.MultiLogReader, error) {
+func (c *spaceComponentImpl) Logs(ctx context.Context, namespace, name, since, instance string) (*deploy.MultiLogReader, error) {
 	s, err := c.spaceStore.FindByPath(ctx, namespace, name)
 	if err != nil {
 		return nil, fmt.Errorf("can't find space for logs, error: %w", err)
@@ -1171,6 +1171,7 @@ func (c *spaceComponentImpl) Logs(ctx context.Context, namespace, name, since st
 		Namespace: namespace,
 		Name:      name,
 		Since:     since,
+		Instance:  instance,
 	})
 }
 

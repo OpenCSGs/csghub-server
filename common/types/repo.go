@@ -224,6 +224,7 @@ type DeployRepo struct {
 
 	Since    string `json:"since,omitempty"`
 	CommitID string `json:"commit_id,omitempty"`
+	Instance string `json:"instance,omitempty"`
 }
 
 type RuntimeFrameworkReq struct {
