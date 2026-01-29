@@ -16,6 +16,62 @@ services:
     networks:
       - my_ce_network
 
+  memmachine_postgres:
+    image: docker.io/pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: "memmachine"
+      POSTGRES_USER: "memmachine"
+      POSTGRES_PASSWORD: "memmachine_password"
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: pg_isready -U memmachine -h 127.0.0.1
+      interval: 5s
+    volumes:
+      - ./data/memmachine/pgdata:/var/lib/postgresql/data
+    networks:
+      - my_ce_network
+
+  memmachine_neo4j:
+    image: docker.io/neo4j:5.23-community
+    environment:
+      NEO4J_AUTH: "neo4j/neo4j_password"
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    volumes:
+      - ./data/memmachine/neo4j/data:/data
+      - ./data/memmachine/neo4j/logs:/logs
+      - ./data/memmachine/neo4j/import:/var/lib/neo4j/import
+      - ./data/memmachine/neo4j/plugins:/plugins
+    networks:
+      - my_ce_network
+
+  memmachine:
+    image: memmachine/memmachine:v0.2.3-cpu
+    depends_on:
+      - memmachine_postgres
+      - memmachine_neo4j
+    environment:
+      POSTGRES_HOST: memmachine_postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: "memmachine"
+      POSTGRES_PASSWORD: "memmachine_password"
+      POSTGRES_DB: "memmachine"
+      NEO4J_HOST: memmachine_neo4j
+      NEO4J_PORT: "7687"
+      NEO4J_USER: "neo4j"
+      NEO4J_PASSWORD: "neo4j_password"
+      MEMORY_CONFIG: /app/configuration.yml
+      HOST: 0.0.0.0
+    ports:
+      - "8081:8080"
+    volumes:
+      - ./data/memmachine/configuration.yml:/app/configuration.yml:ro
+      - ./data/memmachine/logs:/tmp/memory_logs
+    networks:
+      - my_ce_network
+
   minio:
     image: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/bitnami/minio:2023
     environment:
@@ -153,6 +209,7 @@ services:
     image: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/csghub-server:latest
     depends_on:
       - postgres
+      - memmachine
       - gitaly
       - minio
       - redis

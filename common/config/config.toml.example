@@ -169,6 +169,16 @@ host = "http://localhost"
 port = 8089
 encodedSensitiveWords = "5Lmg6L+R5bmzLHhpamlucGluZw=="
 
+[memory]
+enabled = false
+host = "http://localhost"
+port = 8085
+base_path = "/api/v2"
+api_key = ""
+timeout_seconds = 10
+retry_count = 1
+retry_delay_millis = 100
+
 [workflow]
 endpoint = "localhost:7233"
 

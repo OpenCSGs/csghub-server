@@ -162,6 +162,24 @@ func NotFoundError(c *gin.Context, err error) {
 	})
 }
 
+// ServiceUnavailableError responds with a JSON-formatted error message and HTTP 503 status code.
+// Used when a dependent downstream service is unavailable.
+func ServiceUnavailableError(c *gin.Context, err error) {
+	err, ok := errorx.GetFirstCustomError(err)
+	if ok {
+		customErr := err.(errorx.CustomError)
+		c.PureJSON(http.StatusServiceUnavailable, R{
+			Code:    customErr.Code(),
+			Msg:     customErr.Error(),
+			Context: customErr.Context(),
+		})
+		return
+	}
+	c.PureJSON(http.StatusServiceUnavailable, R{
+		Msg: err.Error(),
+	})
+}
+
 // ConflictError responds with a JSON-formatted error message and HTTP 409 status code.
 // Used when the request conflicts with the current state of the server.
 //

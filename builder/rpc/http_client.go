@@ -106,6 +106,10 @@ func (c *HttpClient) WithDelay(delay time.Duration) *HttpClient {
 	return c
 }
 
+func (c *HttpClient) SetTimeout(timeout time.Duration) {
+	c.hc.Timeout = timeout
+}
+
 func (c *HttpClient) Get(ctx context.Context, path string, outObj interface{}) error {
 	fullPath := fmt.Sprintf("%s%s", c.endpoint, path)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fullPath, nil)
