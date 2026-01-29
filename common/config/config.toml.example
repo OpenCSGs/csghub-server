@@ -211,7 +211,7 @@ webhook_endpoint = "http://localhost:8080"
 watch_configmap_name = "spaces-runner-config"
 watch_configmap_interval_in_sec = 60
 runner_namespace = "csghub"
-
+public_docker_reg_base = "opencsg-registry.cn-beijing.cr.aliyuncs.com"
 
 [cluster]
 cluster_id = ""
