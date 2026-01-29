@@ -5,9 +5,8 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/cloudflare/ahocorasick"
-
 	"opencsg.com/csghub-server/builder/sensitive/internal"
+	"opencsg.com/csghub-server/builder/sensitive/internal/ahocorasick"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -49,6 +48,8 @@ func NewACAutomation(data *internal.SensitiveWordData) SensitiveChecker {
 func (iac *ACAutomation) PassTextCheck(ctx context.Context, scenario types.SensitiveScenario, text string) (*CheckResult, error) {
 	detectResult := iac.detect(text)
 	if detectResult != nil {
+		slog.InfoContext(ctx, "ACAutomation PassTextCheck detected sensitive word",
+			slog.String("reason", *detectResult.Reason))
 		return &CheckResult{
 			IsSensitive: true,
 			Reason:      *detectResult.Reason,
@@ -85,6 +86,8 @@ func (iac *ACAutomation) PassLLMCheck(ctx context.Context, scenario types.Sensit
 	}
 	detectResult := iac.detect(text)
 	if detectResult != nil {
+		slog.InfoContext(ctx, "ACAutomation PassLLMCheck detected sensitive word",
+			slog.String("reason", *detectResult.Reason))
 		return &CheckResult{
 			IsSensitive: true,
 			Reason:      *detectResult.Reason,
@@ -99,23 +102,47 @@ func (iac *ACAutomation) PassLLMCheck(ctx context.Context, scenario types.Sensit
 func (iac *ACAutomation) detect(text string) *TextModerationResponseData {
 	t := cleanText(strings.ToLower(text))
 
-	hits := iac.matcher.MatchThreadSafe([]byte(t))
+	hits := iac.matcher.MatchThreadSafeWithPos([]byte(t))
 
 	seen := make(map[string]struct{})
 	for _, hit := range hits {
-		if hit < 0 || hit >= len(iac.words) {
+		if hit.Hint < 0 || hit.Hint >= len(iac.words) {
 			continue
 		}
-		word := iac.words[hit]
-		tag := iac.tagMap[hit]
+		word := iac.words[hit.Hint]
+		tag := iac.tagMap[hit.Hint]
 		key := tag + "|" + word
+
+		contextStart := hit.StartPos - 10
+		if contextStart < 0 {
+			contextStart = 0
+		}
+		contextEnd := hit.EndPos + 10
+		if contextEnd > len(t) {
+			contextEnd = len(t)
+		}
+
+		var reasonBuilder strings.Builder
+		reasonBuilder.WriteString(key)
+		reasonBuilder.WriteString("|[text: ")
+		if contextStart > 0 {
+			reasonBuilder.WriteString("...")
+		}
+		reasonBuilder.WriteString(t[contextStart:contextEnd])
+		if contextEnd < len(t) {
+			reasonBuilder.WriteString("...")
+		}
+		reasonBuilder.WriteString("]")
+
+		fullReason := reasonBuilder.String()
+
 		if _, ok := seen[key]; ok {
 			continue
 		}
 		seen[key] = struct{}{}
 		return &TextModerationResponseData{
 			Labels: &tag,
-			Reason: &key,
+			Reason: &fullReason,
 		}
 	}
 	return nil
@@ -132,7 +159,6 @@ func cleanText(text string) string {
 		if r >= 65281 && r <= 65374 {
 			runes[i] = r - 65248
 		}
-		// 全角空格
 		if r == 12288 {
 			runes[i] = ' '
 		}
