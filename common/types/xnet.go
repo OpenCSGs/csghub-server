@@ -44,3 +44,12 @@ const (
 	XnetMigrationTaskStatusCompleted XnetMigrationTaskStatus = "completed"
 	XnetMigrationTaskStatusFailed    XnetMigrationTaskStatus = "failed"
 )
+
+type MigrationStatsResp struct {
+	TotalOriginalSize      int64   `json:"total_original_size"`
+	TotalXnetSize          int64   `json:"total_xnet_size"`
+	TotalStatsSource       string  `json:"total_stats_source"`
+	StorageEfficiencyRatio float64 `json:"storage_efficiency_ratio"`
+	LfsStorageSize         int64   `json:"lfs_storage_size"`
+	LfsObjectCount         int64   `json:"lfs_object_count"`
+}
