@@ -31,13 +31,6 @@ func (h *MemoryHandler) CreateProject(ctx *gin.Context) {
 		httpbase.BadRequestWithExt(ctx, errorx.ReqBodyFormat(err, nil))
 		return
 	}
-	if req.OrgID == "" || req.ProjectID == "" {
-		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(
-			fmt.Errorf("org_id and project_id are required"),
-			errorx.Ctx().Set("field", "org_id,project_id"),
-		))
-		return
-	}
 	resp, err := h.memory.CreateProject(ctx.Request.Context(), &req)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "failed to create memory project", slog.Any("error", err))
@@ -52,13 +45,6 @@ func (h *MemoryHandler) GetProject(ctx *gin.Context) {
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "bad request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, errorx.ReqBodyFormat(err, nil))
-		return
-	}
-	if req.OrgID == "" || req.ProjectID == "" {
-		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(
-			fmt.Errorf("org_id and project_id are required"),
-			errorx.Ctx().Set("field", "org_id,project_id"),
-		))
 		return
 	}
 	resp, err := h.memory.GetProject(ctx.Request.Context(), &req)
@@ -85,13 +71,6 @@ func (h *MemoryHandler) DeleteProject(ctx *gin.Context) {
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "bad request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, errorx.ReqBodyFormat(err, nil))
-		return
-	}
-	if req.OrgID == "" || req.ProjectID == "" {
-		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(
-			fmt.Errorf("org_id and project_id are required"),
-			errorx.Ctx().Set("field", "org_id,project_id"),
-		))
 		return
 	}
 	if err := h.memory.DeleteProject(ctx.Request.Context(), &req); err != nil {
@@ -183,20 +162,6 @@ func (h *MemoryHandler) SearchMemories(ctx *gin.Context) {
 		httpbase.BadRequestWithExt(ctx, errorx.ReqBodyFormat(err, nil))
 		return
 	}
-	if req.PageSize < 0 || req.PageNum < 0 {
-		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(
-			fmt.Errorf("page_size and page_num must be non-negative"),
-			errorx.Ctx().Set("field", "page_size,page_num"),
-		))
-		return
-	}
-	if (req.PageSize > 0 && req.PageNum <= 0) || (req.PageNum > 0 && req.PageSize <= 0) {
-		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(
-			fmt.Errorf("page_size and page_num must be provided together"),
-			errorx.Ctx().Set("field", "page_size,page_num"),
-		))
-		return
-	}
 	if req.PageSize == 0 && req.PageNum == 0 && (ctx.Query("per") != "" || ctx.Query("page") != "") {
 		per, page, err := common.GetPerAndPageFromContext(ctx)
 		if err != nil {
@@ -205,20 +170,6 @@ func (h *MemoryHandler) SearchMemories(ctx *gin.Context) {
 		}
 		req.PageSize = per
 		req.PageNum = page
-	}
-	if req.TopK < 0 {
-		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(
-			fmt.Errorf("top_k must be non-negative"),
-			errorx.Ctx().Set("field", "top_k"),
-		))
-		return
-	}
-	if req.MinSimilarity != nil && (*req.MinSimilarity < 0 || *req.MinSimilarity > 1) {
-		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(
-			fmt.Errorf("min_similarity must be between 0 and 1"),
-			errorx.Ctx().Set("field", "min_similarity"),
-		))
-		return
 	}
 	if err := validateMemoryTypes(req.Types); err != nil {
 		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(
@@ -226,29 +177,6 @@ func (h *MemoryHandler) SearchMemories(ctx *gin.Context) {
 			errorx.Ctx().Set("field", "types"),
 		))
 		return
-	}
-	if req.PageSize < 0 || req.PageNum < 0 {
-		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(
-			fmt.Errorf("page_size and page_num must be non-negative"),
-			errorx.Ctx().Set("field", "page_size,page_num"),
-		))
-		return
-	}
-	if (req.PageSize > 0 && req.PageNum <= 0) || (req.PageNum > 0 && req.PageSize <= 0) {
-		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(
-			fmt.Errorf("page_size and page_num must be provided together"),
-			errorx.Ctx().Set("field", "page_size,page_num"),
-		))
-		return
-	}
-	if req.PageSize == 0 && req.PageNum == 0 && (ctx.Query("per") != "" || ctx.Query("page") != "") {
-		per, page, err := common.GetPerAndPageFromContext(ctx)
-		if err != nil {
-			httpbase.BadRequestWithExt(ctx, err)
-			return
-		}
-		req.PageSize = per
-		req.PageNum = page
 	}
 	resp, err := h.memory.SearchMemories(ctx.Request.Context(), &req)
 	if err != nil {
@@ -264,20 +192,6 @@ func (h *MemoryHandler) ListMemories(ctx *gin.Context) {
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "bad request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, errorx.ReqBodyFormat(err, nil))
-		return
-	}
-	if req.PageSize < 0 || req.PageNum < 0 {
-		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(
-			fmt.Errorf("page_size and page_num must be non-negative"),
-			errorx.Ctx().Set("field", "page_size,page_num"),
-		))
-		return
-	}
-	if (req.PageSize > 0 && req.PageNum <= 0) || (req.PageNum > 0 && req.PageSize <= 0) {
-		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(
-			fmt.Errorf("page_size and page_num must be provided together"),
-			errorx.Ctx().Set("field", "page_size,page_num"),
-		))
 		return
 	}
 	if req.PageSize == 0 && req.PageNum == 0 && (ctx.Query("per") != "" || ctx.Query("page") != "") {
