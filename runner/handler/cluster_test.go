@@ -34,12 +34,14 @@ func TestGetClusterInfoByID_Success(t *testing.T) {
 	}, nil)
 	cluster.EXPECT().GetResourceByID(mock.Anything, "c1").Return(types.StatusClusterWide, map[string]types.NodeResourceInfo{
 		"node1": {
-			TotalCPU:     4,
-			AvailableCPU: 2,
-			TotalMem:     8192,
-			AvailableMem: 4096,
-			TotalXPU:     1,
-			AvailableXPU: 0,
+			NodeHardware: types.NodeHardware{
+				TotalCPU:     4,
+				AvailableCPU: 2,
+				TotalMem:     8192,
+				AvailableMem: 4096,
+				TotalXPU:     1,
+				AvailableXPU: 0,
+			},
 		},
 	}, nil)
 	h.GetClusterInfoByID(c)

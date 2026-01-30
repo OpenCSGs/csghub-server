@@ -143,7 +143,7 @@ func checkNodeResource(node types.NodeResourceInfo, hardware *types.HardWare) bo
 	return true
 }
 
-func (d *deployer) getResources(ctx context.Context, clusterId string, clusterResponse *types.ClusterRes) ([]types.NodeResourceInfo, error) {
+func (d *deployer) calcResources(ctx context.Context, clusterId string, clusterResponse *types.ClusterRes) ([]types.NodeResourceInfo, error) {
 	return clusterResponse.Resources, nil
 }
 

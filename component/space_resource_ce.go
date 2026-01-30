@@ -3,8 +3,6 @@
 package component
 
 import (
-	"context"
-
 	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
@@ -36,9 +34,9 @@ func (c *spaceResourceComponentImpl) updatePriceInfo(req *types.SpaceResourceInd
 
 }
 
-func (c *spaceResourceComponentImpl) appendUserResources(ctx context.Context, currentUser string, clusterID string, resources []types.SpaceResource) ([]types.SpaceResource, error) {
-	return resources, nil
-}
+// func (c *spaceResourceComponentImpl) appendUserResources(ctx context.Context, currentUser string, clusterID string, resources []types.SpaceResource) ([]types.SpaceResource, error) {
+// 	return resources, nil
+// }
 
 func (c *spaceResourceComponentImpl) deployAvailable(deployType int, hardware types.HardWare) bool {
 	if deployType == types.FinetuneType {

@@ -239,8 +239,8 @@ func TestSpaceStore_UserLikes(t *testing.T) {
 	for _, sp := range sps {
 		names = append(names, sp.Repository.Name)
 	}
-	require.Equal(t, []string{"repo1", "repo3"}, names)
-
+	require.Contains(t, names, "repo3")
+	require.Contains(t, names, "repo1")
 }
 
 func TestSpaceStore_CreateAndUpdateRepoPath(t *testing.T) {

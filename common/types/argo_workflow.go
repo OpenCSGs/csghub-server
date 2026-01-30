@@ -66,6 +66,7 @@ type EvaluationReq struct {
 	Revisions          []string `json:"-"`
 	DatasetRevisions   []string `json:"-"`
 	UseCustomDataset   bool     `json:"-"`
+	Nodes              []Node   `json:"-"`
 }
 
 type CustomData struct {
@@ -101,6 +102,7 @@ type ArgoWorkFlowReq struct {
 	UserUUID           string             `json:"user_uuid"`
 	ShareMode          bool               `json:"share_mode"`
 	FinetunedModelName string             `json:"finetuned_model_name,omitempty"`
+	Nodes              []Node             `json:"nodes"`
 }
 
 type ArgoWorkFlowListRes struct {

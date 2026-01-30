@@ -45,7 +45,8 @@ type FinetuneReq struct {
 	ShareMode          bool    `json:"share_mode"`
 	LearningRate       float64 `json:"learning_rate"`
 	CustomeArgs        string  `json:"custom_args"`
-	Agent              string  `json:"agent"`
+	Agent              string  `json:"agent,omitempty"`
+	Nodes              []Node  `json:"-"`
 }
 
 type FinetineGetReq struct {

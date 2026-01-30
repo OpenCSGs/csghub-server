@@ -27,12 +27,9 @@ func TestWebHookExecutorHeartbeat_ProcessEvent(t *testing.T) {
 	cfg, err := config.LoadConfig()
 	require.Nil(t, err)
 
-	eventData := &types.HearBeatEvent{
-		Running: []string{
-			"cluster1",
-		},
-		Unavailable: []string{
-			"cluster2",
+	eventData := []*types.ClusterRes{
+		{
+			ClusterID: "cluster1",
 		},
 	}
 

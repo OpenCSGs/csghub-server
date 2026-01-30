@@ -32,6 +32,7 @@ func newTestDeployer(t *testing.T) *testDepolyerWithMocks {
 			runtimeFrameworkStore: mockStores.RuntimeFramework,
 			userStore:             mockStores.User,
 			snowflakeNode:         node,
+			clusterStore:          mockStores.ClusterInfo,
 		},
 	}
 	s.mocks.stores = mockStores
@@ -101,9 +102,14 @@ func TestDeployer_CheckResourceAvailable(t *testing.T) {
 	tester.mocks.runner.EXPECT().ListCluster(ctx).Return([]types.ClusterRes{
 		{ClusterID: "c1"},
 	}, nil)
-	tester.mocks.runner.EXPECT().GetClusterById(ctx, "c1").Return(&types.ClusterRes{
+
+	tester.mocks.stores.ClusterInfoMock().EXPECT().GetClusterResources(ctx, "c1").Return(&types.ClusterRes{
+		Status:         types.ClusterStatusRunning,
+		ResourceStatus: types.StatusClusterWide,
 		Resources: []types.NodeResourceInfo{
-			{AvailableMem: 100},
+			{
+				NodeHardware: types.NodeHardware{AvailableMem: 100},
+			},
 		},
 	}, nil)
 
@@ -134,10 +140,12 @@ func TestDeployer_updateEvaluationEnvHardware(t *testing.T) {
 
 func Test_CheckNodeResource(t *testing.T) {
 	baseNode := types.NodeResourceInfo{
-		AvailableCPU: 16,
-		AvailableMem: 8, // 8 GiB
-		AvailableXPU: 2,
-		XPUModel:     "NVIDIA-A100",
+		NodeHardware: types.NodeHardware{
+			AvailableCPU: 16,
+			AvailableMem: 8, // 8 GiB
+			AvailableXPU: 2,
+			XPUModel:     "NVIDIA-A100",
+		},
 	}
 
 	testCases := []struct {
@@ -203,35 +211,44 @@ func Test_CheckNodeResource(t *testing.T) {
 }
 
 func TestDeployer_GetClusterById(t *testing.T) {
-	tester := newTestDeployer(t)
+
 	t.Run("success", func(t *testing.T) {
+		tester := newTestDeployer(t)
 		ctx := context.TODO()
-		tester.mocks.runner.EXPECT().GetClusterById(ctx, "1").Once().Return(&types.ClusterRes{
+
+		tester.mocks.stores.ClusterInfoMock().EXPECT().GetClusterResources(ctx, "1").Return(&types.ClusterRes{
 			ClusterID: "1",
 			Region:    "test-region",
 			Zone:      "test-zone",
 			Enable:    true,
 			Resources: []types.NodeResourceInfo{
 				{
-					AvailableCPU: 1,
-					AvailableMem: 3,
+					NodeHardware: types.NodeHardware{
+						AvailableCPU: 1,
+						AvailableMem: 3,
+					},
 				},
 				{
-					AvailableCPU: 2,
-					AvailableMem: 5,
-					AvailableXPU: 4,
+					NodeHardware: types.NodeHardware{
+						AvailableCPU: 2,
+						AvailableMem: 5,
+						AvailableXPU: 4,
+					},
 				},
 			},
 		}, nil)
+
 		clusterRes, err := tester.GetClusterById(ctx, "1")
 		require.Nil(t, err)
 		require.Equal(t, float64(3), clusterRes.AvailableCPU)
 		require.Equal(t, float64(8), clusterRes.AvailableMem)
 		require.Equal(t, int64(4), clusterRes.AvailableGPU)
 	})
+
 	t.Run("empty nodes", func(t *testing.T) {
+		tester := newTestDeployer(t)
 		ctx := context.TODO()
-		tester.mocks.runner.EXPECT().GetClusterById(ctx, "1").Once().Return(&types.ClusterRes{
+		tester.mocks.stores.ClusterInfoMock().EXPECT().GetClusterResources(ctx, "1").Once().Return(&types.ClusterRes{
 			ClusterID: "1",
 			Resources: nil,
 		}, nil)
@@ -239,9 +256,11 @@ func TestDeployer_GetClusterById(t *testing.T) {
 		require.Nil(t, err)
 		require.Equal(t, types.ClusterStatusRunning, clusterRes.Status)
 	})
+
 	t.Run("get cluster failed", func(t *testing.T) {
+		tester := newTestDeployer(t)
 		ctx := context.TODO()
-		tester.mocks.runner.EXPECT().GetClusterById(ctx, "1").Once().Return(nil, errors.New("some error"))
+		tester.mocks.stores.ClusterInfoMock().EXPECT().GetClusterResources(ctx, "1").Return(nil, errors.New("some error"))
 		clusterRes, err := tester.GetClusterById(ctx, "1")
 		require.Nil(t, err)
 		require.Equal(t, types.ClusterStatusUnavailable, clusterRes.Status)

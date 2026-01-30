@@ -8,7 +8,6 @@ package component
 
 import (
 	"context"
-
 	"github.com/google/wire"
 	"github.com/stretchr/testify/mock"
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/accounting"
@@ -252,7 +251,6 @@ func initializeTestSpaceComponent(ctx context.Context, t interface {
 	multisyncMockClient := multisync.NewMockClient(t)
 	mockCore := s3.NewMockCore(t)
 	mockGitCallbackChecker := checker.NewMockGitCallbackChecker(t)
-
 	mocks := &Mocks{
 		stores:           mockStores,
 		components:       componentMockedComponents,

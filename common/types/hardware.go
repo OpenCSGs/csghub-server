@@ -2,10 +2,12 @@ package types
 
 type (
 	Processor struct {
-		Type         string            `json:"type,omitempty"`
-		Num          string            `json:"num,omitempty"`
-		ResourceName string            `json:"resource_name,omitempty"`
-		Labels       map[string]string `json:"labels,omitempty"`
+		Type            string            `json:"type,omitempty"`
+		Num             string            `json:"num,omitempty"`
+		ResourceName    string            `json:"resource_name,omitempty"`
+		Labels          map[string]string `json:"labels,omitempty"`
+		ResourceMemName string            `json:"resource_mem_name,omitempty"`
+		MemSize         string            `json:"mem_size,omitempty"` // MB
 	}
 
 	CPU struct {
