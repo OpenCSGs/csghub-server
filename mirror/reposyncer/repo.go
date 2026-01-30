@@ -206,9 +206,10 @@ func (w *RepoSyncWorker) handleTask(
 		return
 	}
 	mt.Status = types.MirrorTaskStatus(mtFSM.Current())
-	_, err = w.mirrorTaskStore.Update(ctx, *mt)
+	repoSyncStatus := common.MirrorTaskStatusToRepoStatus(mt.Status)
+	_, err = w.mirrorTaskStore.UpdateStatusAndRepoSyncStatus(ctx, *mt, repoSyncStatus)
 	if err != nil {
-		slog.Error("failed to update mirror task status", slog.Any("error", err))
+		slog.Error("failed to update mirror task status and repository status", slog.Any("error", err))
 	}
 }
 

@@ -2948,7 +2948,7 @@ func TestRepoComponent_BatchMigrateRepoToHashedPath_AutoTrue(t *testing.T) {
 	require.Nil(t, err)
 }
 
-func TestRepoComponent_GetMirrorTaskStatusAndSyncStatus(t *testing.T) {
+func TestRepoComponent_GetMirrorTaskStatus(t *testing.T) {
 	ctx := context.Background()
 
 	repoComp := initializeTestRepoComponent(ctx, t)
@@ -2964,10 +2964,9 @@ func TestRepoComponent_GetMirrorTaskStatusAndSyncStatus(t *testing.T) {
 		},
 	}
 
-	mirrorTaskStatus, syncStatus := repoComp.GetMirrorTaskStatusAndSyncStatus(repo)
+	mirrorTaskStatus := repoComp.GetMirrorTaskStatus(repo)
 
 	assert.Equal(t, types.MirrorRepoSyncStart, mirrorTaskStatus)
-	assert.Equal(t, types.SyncStatusInProgress, syncStatus)
 
 	repo1 := &database.Repository{
 		ID: 1,
@@ -2977,10 +2976,9 @@ func TestRepoComponent_GetMirrorTaskStatusAndSyncStatus(t *testing.T) {
 		SyncStatus: types.SyncStatusInProgress,
 	}
 
-	mirrorTaskStatus, syncStatus = repoComp.GetMirrorTaskStatusAndSyncStatus(repo1)
+	mirrorTaskStatus = repoComp.GetMirrorTaskStatus(repo1)
 
 	assert.Equal(t, types.MirrorTaskStatus(""), mirrorTaskStatus)
-	assert.Equal(t, types.SyncStatusInProgress, syncStatus)
 
 	repo2 := &database.Repository{
 		ID: 1,
@@ -2991,10 +2989,9 @@ func TestRepoComponent_GetMirrorTaskStatusAndSyncStatus(t *testing.T) {
 		SyncStatus: types.SyncStatusInProgress,
 	}
 
-	mirrorTaskStatus, syncStatus = repoComp.GetMirrorTaskStatusAndSyncStatus(repo2)
+	mirrorTaskStatus = repoComp.GetMirrorTaskStatus(repo2)
 
 	assert.Equal(t, types.MirrorTaskStatus(""), mirrorTaskStatus)
-	assert.Equal(t, types.SyncStatusCompleted, syncStatus)
 }
 
 func TestRepoComponent_UpdateRepo_PermissionChecks(t *testing.T) {
