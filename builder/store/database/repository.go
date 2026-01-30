@@ -168,32 +168,31 @@ type Repository struct {
 	Labels  string `bun:",nullzero" json:"labels"`
 	License string `bun:",nullzero" json:"license"`
 	// Depreated
-	Readme                     string                     `bun:",nullzero" json:"readme"`
-	DefaultBranch              string                     `bun:",notnull" json:"default_branch"`
-	LfsFiles                   []LfsFile                  `bun:"rel:has-many,join:id=repository_id" json:"-"`
-	Likes                      int64                      `bun:",nullzero" json:"likes"`
-	DownloadCount              int64                      `bun:",nullzero" json:"download_count"`
-	Downloads                  []RepositoryDownload       `bun:"rel:has-many,join:id=repository_id" json:"downloads"`
-	Tags                       []Tag                      `bun:"m2m:repository_tags,join:Repository=Tag" json:"tags"`
-	Metadata                   Metadata                   `bun:"rel:has-one,join:id=repository_id" json:"metadata"`
-	Mirror                     Mirror                     `bun:"rel:has-one,join:id=repository_id" json:"mirror"`
-	RepositoryType             types.RepositoryType       `bun:",notnull" json:"repository_type"`
-	HTTPCloneURL               string                     `bun:",nullzero" json:"http_clone_url"`
-	SSHCloneURL                string                     `bun:",nullzero" json:"ssh_clone_url"`
-	Source                     types.RepositorySource     `bun:",nullzero,default:'local'" json:"source"`
-	SyncStatus                 types.RepositorySyncStatus `bun:",nullzero" json:"sync_status"` // Only used for multi-source sync status
-	SensitiveCheckStatus       types.SensitiveCheckStatus `bun:",default:0" json:"sensitive_check_status"`
-	MSPath                     string                     `bun:",nullzero" json:"ms_path"`
-	CSGPath                    string                     `bun:",nullzero" json:"csg_path"`
-	HFPath                     string                     `bun:",nullzero" json:"hf_path"`
-	GithubPath                 string                     `bun:",nullzero" json:"github_path"`
-	LFSObjectsSize             int64                      `bun:",nullzero" json:"lfs_objects_size"`
-	StarCount                  int                        `bun:",nullzero" json:"star_count"`
-	DeletedAt                  time.Time                  `bun:",soft_delete,nullzero"`
-	Migrated                   bool                       `bun:"," json:"migrated"`
-	Hashed                     bool                       `bun:"," json:"hashed"`
-	XnetEnabled                bool                       `bun:"," json:"xnet_enabled"`
-	CurrentXnetMigrationTaskID int64                      `bun:"," json:"current_xnet_migration_task_id"`
+	Readme               string                     `bun:",nullzero" json:"readme"`
+	DefaultBranch        string                     `bun:",notnull" json:"default_branch"`
+	LfsFiles             []LfsFile                  `bun:"rel:has-many,join:id=repository_id" json:"-"`
+	Likes                int64                      `bun:",nullzero" json:"likes"`
+	DownloadCount        int64                      `bun:",nullzero" json:"download_count"`
+	Downloads            []RepositoryDownload       `bun:"rel:has-many,join:id=repository_id" json:"downloads"`
+	Tags                 []Tag                      `bun:"m2m:repository_tags,join:Repository=Tag" json:"tags"`
+	Metadata             Metadata                   `bun:"rel:has-one,join:id=repository_id" json:"metadata"`
+	Mirror               Mirror                     `bun:"rel:has-one,join:id=repository_id" json:"mirror"`
+	RepositoryType       types.RepositoryType       `bun:",notnull" json:"repository_type"`
+	HTTPCloneURL         string                     `bun:",nullzero" json:"http_clone_url"`
+	SSHCloneURL          string                     `bun:",nullzero" json:"ssh_clone_url"`
+	Source               types.RepositorySource     `bun:",nullzero,default:'local'" json:"source"`
+	SyncStatus           types.RepositorySyncStatus `bun:",nullzero" json:"sync_status"` // Only used for multi-source sync status
+	SensitiveCheckStatus types.SensitiveCheckStatus `bun:",default:0" json:"sensitive_check_status"`
+	MSPath               string                     `bun:",nullzero" json:"ms_path"`
+	CSGPath              string                     `bun:",nullzero" json:"csg_path"`
+	HFPath               string                     `bun:",nullzero" json:"hf_path"`
+	GithubPath           string                     `bun:",nullzero" json:"github_path"`
+	LFSObjectsSize       int64                      `bun:",nullzero" json:"lfs_objects_size"`
+	StarCount            int                        `bun:",nullzero" json:"star_count"`
+	DeletedAt            time.Time                  `bun:",soft_delete,nullzero"`
+	Migrated             bool                       `bun:"," json:"migrated"`
+	Hashed               bool                       `bun:"," json:"hashed"`
+	XnetEnabled          bool                       `bun:"," json:"xnet_enabled"`
 
 	// updated_at timestamp will be updated only if files changed
 	times
