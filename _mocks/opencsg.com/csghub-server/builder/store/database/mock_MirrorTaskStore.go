@@ -421,6 +421,64 @@ func (_c *MockMirrorTaskStore_ListByStatusWithPriority_Call) RunAndReturn(run fu
 	return _c
 }
 
+// ResetRunningTasks provides a mock function with given fields: ctx, fromStatus, toStatus
+func (_m *MockMirrorTaskStore) ResetRunningTasks(ctx context.Context, fromStatus types.MirrorTaskStatus, toStatus types.MirrorTaskStatus) (int, error) {
+	ret := _m.Called(ctx, fromStatus, toStatus)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ResetRunningTasks")
+	}
+
+	var r0 int
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.MirrorTaskStatus, types.MirrorTaskStatus) (int, error)); ok {
+		return rf(ctx, fromStatus, toStatus)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.MirrorTaskStatus, types.MirrorTaskStatus) int); ok {
+		r0 = rf(ctx, fromStatus, toStatus)
+	} else {
+		r0 = ret.Get(0).(int)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.MirrorTaskStatus, types.MirrorTaskStatus) error); ok {
+		r1 = rf(ctx, fromStatus, toStatus)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockMirrorTaskStore_ResetRunningTasks_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ResetRunningTasks'
+type MockMirrorTaskStore_ResetRunningTasks_Call struct {
+	*mock.Call
+}
+
+// ResetRunningTasks is a helper method to define mock.On call
+//   - ctx context.Context
+//   - fromStatus types.MirrorTaskStatus
+//   - toStatus types.MirrorTaskStatus
+func (_e *MockMirrorTaskStore_Expecter) ResetRunningTasks(ctx interface{}, fromStatus interface{}, toStatus interface{}) *MockMirrorTaskStore_ResetRunningTasks_Call {
+	return &MockMirrorTaskStore_ResetRunningTasks_Call{Call: _e.mock.On("ResetRunningTasks", ctx, fromStatus, toStatus)}
+}
+
+func (_c *MockMirrorTaskStore_ResetRunningTasks_Call) Run(run func(ctx context.Context, fromStatus types.MirrorTaskStatus, toStatus types.MirrorTaskStatus)) *MockMirrorTaskStore_ResetRunningTasks_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.MirrorTaskStatus), args[2].(types.MirrorTaskStatus))
+	})
+	return _c
+}
+
+func (_c *MockMirrorTaskStore_ResetRunningTasks_Call) Return(_a0 int, _a1 error) *MockMirrorTaskStore_ResetRunningTasks_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockMirrorTaskStore_ResetRunningTasks_Call) RunAndReturn(run func(context.Context, types.MirrorTaskStatus, types.MirrorTaskStatus) (int, error)) *MockMirrorTaskStore_ResetRunningTasks_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // SetMirrorCurrentTaskID provides a mock function with given fields: ctx, task
 func (_m *MockMirrorTaskStore) SetMirrorCurrentTaskID(ctx context.Context, task database.MirrorTask) error {
 	ret := _m.Called(ctx, task)
