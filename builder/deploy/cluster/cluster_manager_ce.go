@@ -14,3 +14,7 @@ func collectNodeVXPU(node v1.Node) []types.VXPU {
 func collectPodVXPU(pod v1.Pod) []types.VXPU {
 	return []types.VXPU{}
 }
+
+func calcSingleNodeXPUMem(nodeRes *types.NodeResourceInfo) *types.NodeResourceInfo {
+	return nodeRes
+}

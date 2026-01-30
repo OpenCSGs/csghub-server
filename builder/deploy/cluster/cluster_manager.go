@@ -428,6 +428,10 @@ func (cluster *Cluster) GetResourcesInCluster(config *config.Config) (map[string
 		nodeResourcesMap[pod.Spec.NodeName] = nodeResource
 	}
 
+	for k, v := range nodeResourcesMap {
+		nodeResourcesMap[k] = *calcSingleNodeXPUMem(&v)
+	}
+
 	return nodeResourcesMap, nil
 }
 

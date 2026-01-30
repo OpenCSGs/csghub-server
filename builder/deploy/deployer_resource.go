@@ -38,40 +38,66 @@ func (d *deployer) GetClusterById(ctx context.Context, clusterId string) (*types
 		NodeNumber:     len(resources),
 	}
 	for _, node := range result.Resources {
-		result.AvailableCPU += node.AvailableCPU
-		result.AvailableGPU += node.AvailableXPU
-		result.AvailableMem += float64(node.AvailableMem)
-		result.TotalCPU += node.TotalCPU
-		result.TotalMem += float64(node.TotalMem)
-		result.TotalGPU += node.TotalXPU
+		result.TotalCPU += node.TotalCPU                  // cpu
+		result.AvailableCPU += node.AvailableCPU          // available cpu
+		result.TotalMem += float64(node.TotalMem)         // mem
+		result.AvailableMem += float64(node.AvailableMem) // available mem
+		result.TotalGPU += node.TotalXPU                  // xpu number
+		result.AvailableGPU += node.AvailableXPU          // available xpu number
+
+		result.TotalVXPU += node.TotalVXPU               // total vxpu number
+		result.UsedVXPUNum += node.UsedVXPUNum           // used vxpu number
+		result.TotalVXPUMem += node.TotalVXPUMem         // total vxpu mem in MB
+		result.AvailableVXPUMem += node.AvailableVXPUMem // available vxpu mem in MB
 	}
-	result.CPUUsage = (result.TotalCPU - result.AvailableCPU) / result.TotalCPU
-	result.MemUsage = (result.TotalMem - result.AvailableMem) / result.TotalMem
-	result.GPUUsage = float64(result.TotalGPU-result.AvailableGPU) / float64(result.TotalGPU)
+	if result.TotalCPU > 0 {
+		result.CPUUsage = (result.TotalCPU - result.AvailableCPU) / result.TotalCPU
+	}
+	if result.TotalMem > 0 {
+		result.MemUsage = (result.TotalMem - result.AvailableMem) / result.TotalMem
+	}
+	if result.TotalGPU > 0 {
+		result.GPUUsage = float64(result.TotalGPU-result.AvailableGPU) / float64(result.TotalGPU)
+	}
+	if result.TotalVXPU > 0 {
+		result.VXPUUsage = float64(result.UsedVXPUNum) / float64(result.TotalVXPU)
+	}
+	if result.TotalVXPUMem > 0 {
+		result.VXPUMemUsage = float64(result.TotalVXPUMem-result.AvailableVXPUMem) / float64(result.TotalVXPUMem)
+	}
 	return &result, err
 }
 
 func (d *deployer) GetClusterUsageById(ctx context.Context, clusterId string) (*types.ClusterRes, error) {
-	resp, err := d.imageRunner.GetClusterById(ctx, clusterId)
+	cluster, err := d.clusterStore.GetClusterResources(ctx, clusterId)
 	if err != nil {
 		return nil, err
 	}
+
 	res := types.ClusterRes{
-		ClusterID: resp.ClusterID,
-		Region:    resp.Region,
-		Zone:      resp.Zone,
-		Provider:  resp.Provider,
-		Status:    types.ClusterStatusRunning,
+		ClusterID:      cluster.ClusterID,
+		Region:         cluster.Region,
+		Zone:           cluster.Zone,
+		Provider:       cluster.Provider,
+		Status:         cluster.Status,
+		LastUpdateTime: cluster.LastUpdateTime,
+		Enable:         cluster.Enable,
 	}
+
 	var vendorSet = make(map[string]struct{}, 0)
 	var modelsSet = make(map[string]struct{}, 0)
-	for _, node := range resp.Resources {
+
+	for _, node := range cluster.Resources {
 		res.TotalCPU += node.TotalCPU
 		res.AvailableCPU += node.AvailableCPU
 		res.TotalMem += float64(node.TotalMem)
 		res.AvailableMem += float64(node.AvailableMem)
 		res.TotalGPU += node.TotalXPU
 		res.AvailableGPU += node.AvailableXPU
+		res.TotalVXPU += node.TotalVXPU
+		res.UsedVXPUNum += node.UsedVXPUNum
+		res.TotalVXPUMem += node.TotalVXPUMem
+		res.AvailableVXPUMem += node.AvailableVXPUMem
 		if node.GPUVendor != "" {
 			vendorSet[node.GPUVendor] = struct{}{}
 			modelsSet[fmt.Sprintf("%s(%s)", node.XPUModel, node.XPUMem)] = struct{}{}
@@ -96,18 +122,26 @@ func (d *deployer) GetClusterUsageById(ctx context.Context, clusterId string) (*
 
 	res.XPUVendors = vendor
 	res.XPUModels = models
+
 	res.AvailableCPU = math.Floor(res.AvailableCPU)
 	res.TotalMem = math.Floor(res.TotalMem)
 	res.AvailableMem = math.Floor(res.AvailableMem)
-	res.NodeNumber = len(resp.Resources)
-	if res.TotalCPU != 0 {
+	res.NodeNumber = len(cluster.Resources)
+
+	if res.TotalCPU > 0 {
 		res.CPUUsage = math.Round((res.TotalCPU-res.AvailableCPU)/res.TotalCPU*100) / 100
 	}
-	if res.TotalMem != 0 {
+	if res.TotalMem > 0 {
 		res.MemUsage = math.Round((res.TotalMem-res.AvailableMem)/res.TotalMem*100) / 100
 	}
-	if res.TotalGPU != 0 {
+	if res.TotalGPU > 0 {
 		res.GPUUsage = math.Round(float64(res.TotalGPU-res.AvailableGPU)/float64(res.TotalGPU)*100) / 100
+	}
+	if res.TotalVXPU > 0 {
+		res.VXPUUsage = math.Round(float64(res.UsedVXPUNum)/float64(res.TotalVXPU)*100) / 100
+	}
+	if res.TotalVXPUMem > 0 {
+		res.VXPUMemUsage = math.Round(float64(res.TotalVXPUMem-res.AvailableVXPUMem)/float64(res.TotalVXPUMem)*100) / 100
 	}
 
 	return &res, err
