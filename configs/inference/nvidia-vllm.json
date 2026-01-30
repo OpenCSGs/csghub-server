@@ -6,9 +6,9 @@
   "engine_images": [
     {
       "compute_type": "gpu",
-      "image": "opencsghq/nvidia-vllm:25.10-py3",
+      "image": "opencsghq/nvidia-vllm:25.11-py3",
       "driver_version": "13.0",
-      "engine_version": "25.10-py3"
+      "engine_version": "25.11-py3"
     }
   ],
   "engine_args": [

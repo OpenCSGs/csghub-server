@@ -12,11 +12,10 @@ echo "$OPENCSG_ACR_PASSWORD" | docker login $OPENCSG_ACR -u $OPENCSG_ACR_USERNAM
 ```bash
 export BUILDX_NO_DEFAULT_ATTESTATIONS=1
 
-# For vllm: opencsg-registry.cn-beijing.cr.aliyuncs.com/public/vllm:v0.8.5
-export IMAGE_TAG=v0.8.5
+# For vllm: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/vllm:v0.8.5
+export IMAGE_TAG=v0.12.0
 docker buildx build --platform linux/amd64,linux/arm64 \
-  -t ${OPENCSG_ACR}/public/vllm:${IMAGE_TAG} \
-  -t ${OPENCSG_ACR}/public/vllm:latest \
+  -t ${OPENCSG_ACR}/opencsghq/vllm:${IMAGE_TAG} \
   -f Dockerfile.vllm \
   --push .
   
@@ -36,15 +35,29 @@ docker buildx build --platform linux/amd64 \
   -f Dockerfile.tgi \
   --push .
 
-# For sglang: opencsg-registry.cn-beijing.cr.aliyuncs.com/public/sglang:v0.4.6.post1-cu124-srt
-export IMAGE_TAG=v0.4.6.post1-cu124-srt
-docker buildx build --platform linux/amd64 \
-  -t ${OPENCSG_ACR}/public/sglang:${IMAGE_TAG} \
-  -t ${OPENCSG_ACR}/public/sglang:latest \
+# For sglang: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/sglang:v0.5.0rc2-cu126
+export IMAGE_TAG=v0.5.6.post2
+docker buildx build --platform linux/amd64,linux/arm64 \
+  -t ${OPENCSG_ACR}/opencsghq/sglang:${IMAGE_TAG} \
   -f Dockerfile.sglang \
   --push .
 
-# For hf-inference-toolkit: opencsg-registry.cn-beijing.cr.aliyuncs.com/public/hf-inference-toolkit:0.5.3
+# For nvidia-vllm: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/vllm-nvidia:25.11-py3
+export IMAGE_TAG=25.11-py3
+docker buildx build --platform linux/amd64,linux/arm64 \
+   -t ${OPENCSG_ACR}/opencsghq/nvidia-vllm:${IMAGE_TAG} \
+  -f Dockerfile.vllm-nvidia \
+  --push .
+
+# For mindie: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/mindie:2.0-csg-1.0.RC2
+export IMAGE_TAG=2.0-csg-1.0.RC2
+docker buildx build --platform linux/arm64 \
+  -t ${OPENCSG_ACR}/opencsghq/mindie:${IMAGE_TAG} \
+  -t ${OPENCSG_ACR}/opencsghq/mindie:latest \
+  -f Dockerfile.mindie \
+  --push .
+
+# For hf-inference-toolkit: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/hf-inference-toolkit:0.5.3
 export IMAGE_TAG=0.5.3
 docker buildx build --platform linux/amd64,linux/arm64 \
   -t ${OPENCSG_ACR}/public/hf-inference-toolkit:${IMAGE_TAG} \
