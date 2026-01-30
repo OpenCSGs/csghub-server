@@ -273,14 +273,15 @@ type TreeReq struct {
 }
 
 type RepoFilter struct {
-	Tags           []TagReq
-	Sort           string
-	Search         string
-	Source         string
-	Username       string
-	Tree           *TreeReq
-	ListServerless bool
-	SpaceSDK       string
+	Tags                []TagReq
+	Sort                string
+	Search              string
+	Source              string
+	Username            string
+	Tree                *TreeReq
+	ListServerless      bool
+	SpaceSDK            string
+	XnetMigrationStatus *XnetMigrationTaskStatus
 }
 
 type BatchGetFilter struct {

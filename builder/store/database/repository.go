@@ -181,7 +181,7 @@ type Repository struct {
 	HTTPCloneURL               string                     `bun:",nullzero" json:"http_clone_url"`
 	SSHCloneURL                string                     `bun:",nullzero" json:"ssh_clone_url"`
 	Source                     types.RepositorySource     `bun:",nullzero,default:'local'" json:"source"`
-	SyncStatus                 types.RepositorySyncStatus `bun:",nullzero" json:"sync_status"` // Only used for multi-source sync status
+	SyncStatus                 types.RepositorySyncStatus `bun:",nullzero" json:"sync_status"` // Only used for multi-source sync status // Only used for multi-source sync status
 	SensitiveCheckStatus       types.SensitiveCheckStatus `bun:",default:0" json:"sensitive_check_status"`
 	MSPath                     string                     `bun:",nullzero" json:"ms_path"`
 	CSGPath                    string                     `bun:",nullzero" json:"csg_path"`
@@ -194,6 +194,7 @@ type Repository struct {
 	Hashed                     bool                       `bun:"," json:"hashed"`
 	XnetEnabled                bool                       `bun:"," json:"xnet_enabled"`
 	CurrentXnetMigrationTaskID int64                      `bun:"," json:"current_xnet_migration_task_id"`
+	CurrentXnetMigrationTask   *XnetMigrationTask         `bun:"rel:has-one,join:current_xnet_migration_task_id=id" json:"current_xnet_migration_task"`
 
 	// updated_at timestamp will be updated only if files changed
 	times
@@ -701,6 +702,11 @@ func (s *repoStoreImpl) PublicToUser(ctx context.Context, repoType types.Reposit
 		} else {
 			q.Where("repository.source = ?", filter.Source)
 		}
+	}
+
+	if filter.XnetMigrationStatus != nil {
+		q.Join("LEFT JOIN xnet_migration_tasks ON xnet_migration_tasks.id = repository.current_xnet_migration_task_id").
+			Where("xnet_migration_tasks.status = ?", *filter.XnetMigrationStatus)
 	}
 
 	// model tree filter

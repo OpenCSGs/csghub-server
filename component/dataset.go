@@ -55,22 +55,26 @@ func NewDatasetComponent(config *config.Config) (DatasetComponent, error) {
 		rpc.AuthWithApiKey(config.APIToken))
 	c.gitServer = gs
 	c.config = config
+	c.xnetMigrationTaskStore = database.NewXnetMigrationTaskStore()
+	c.lfsMetaObjectStore = database.NewLfsMetaObjectStore()
 	return c, nil
 }
 
 type datasetComponentImpl struct {
-	config             *config.Config
-	repoComponent      RepoComponent
-	tagStore           database.TagStore
-	datasetStore       database.DatasetStore
-	repoStore          database.RepoStore
-	namespaceStore     database.NamespaceStore
-	userStore          database.UserStore
-	sensitiveComponent SensitiveComponent
-	gitServer          gitserver.GitServer
-	userLikesStore     database.UserLikesStore
-	userSvcClient      rpc.UserSvcClient
-	recomStore         database.RecomStore
+	config                 *config.Config
+	repoComponent          RepoComponent
+	tagStore               database.TagStore
+	datasetStore           database.DatasetStore
+	repoStore              database.RepoStore
+	namespaceStore         database.NamespaceStore
+	userStore              database.UserStore
+	sensitiveComponent     SensitiveComponent
+	gitServer              gitserver.GitServer
+	userLikesStore         database.UserLikesStore
+	userSvcClient          rpc.UserSvcClient
+	recomStore             database.RecomStore
+	xnetMigrationTaskStore database.XnetMigrationTaskStore
+	lfsMetaObjectStore     database.LfsMetaObjectStore
 }
 
 func (c *datasetComponentImpl) Create(ctx context.Context, req *types.CreateDatasetReq) (*types.Dataset, error) {
@@ -241,8 +245,9 @@ func (c *datasetComponentImpl) commonIndex(ctx context.Context, filter *types.Re
 			continue
 		}
 		var (
-			tags             []types.RepoTag
-			mirrorTaskStatus types.MirrorTaskStatus
+			tags                []types.RepoTag
+			mirrorTaskStatus    types.MirrorTaskStatus
+			xnetMigrationStatus types.XnetMigrationTaskStatus
 		)
 		for _, tag := range repo.Tags {
 			tags = append(tags, types.RepoTag{
@@ -258,6 +263,16 @@ func (c *datasetComponentImpl) commonIndex(ctx context.Context, filter *types.Re
 		}
 		if dataset.Repository.Mirror.CurrentTask != nil {
 			mirrorTaskStatus = dataset.Repository.Mirror.CurrentTask.Status
+		}
+		var xnetMigrationProgress int
+		if dataset.Repository.CurrentXnetMigrationTaskID != 0 {
+			task, err := c.xnetMigrationTaskStore.GetXnetMigrationTaskByID(ctx, dataset.Repository.CurrentXnetMigrationTaskID)
+			if err == nil && task != nil {
+				xnetMigrationStatus = task.Status
+				if xnetMigrationStatus == types.XnetMigrationTaskStatusRunning {
+					xnetMigrationProgress = c.getXnetMigrationProgress(ctx, repo)
+				}
+			}
 		}
 		resDatasets = append(resDatasets, &types.Dataset{
 			ID:           dataset.ID,
@@ -287,7 +302,9 @@ func (c *datasetComponentImpl) commonIndex(ctx context.Context, filter *types.Re
 				MSPath:  dataset.Repository.MSPath,
 				CSGPath: dataset.Repository.CSGPath,
 			},
-			MirrorTaskStatus: mirrorTaskStatus,
+			MirrorTaskStatus:      mirrorTaskStatus,
+			XnetMigrationStatus:   xnetMigrationStatus,
+			XnetMigrationProgress: xnetMigrationProgress,
 		})
 	}
 	if needOpWeight {
@@ -414,6 +431,18 @@ func (c *datasetComponentImpl) Show(ctx context.Context, namespace, name, curren
 
 	mirrorTaskStatus = c.repoComponent.GetMirrorTaskStatus(dataset.Repository)
 
+	var xnetMigrationStatus types.XnetMigrationTaskStatus
+	var xnetMigrationProgress int
+	if dataset.Repository.CurrentXnetMigrationTaskID != 0 {
+		task, err := c.xnetMigrationTaskStore.GetXnetMigrationTaskByID(ctx, dataset.Repository.CurrentXnetMigrationTaskID)
+		if err == nil && task != nil {
+			xnetMigrationStatus = task.Status
+			if task.Status == types.XnetMigrationTaskStatusRunning {
+				xnetMigrationProgress = c.getXnetMigrationProgress(ctx, dataset.Repository)
+			}
+		}
+	}
+
 	resDataset := &types.Dataset{
 		ID:            dataset.ID,
 		Name:          dataset.Repository.Name,
@@ -448,7 +477,10 @@ func (c *datasetComponentImpl) Show(ctx context.Context, namespace, name, curren
 			MSPath:  dataset.Repository.MSPath,
 			CSGPath: dataset.Repository.CSGPath,
 		},
-		MirrorTaskStatus: mirrorTaskStatus,
+		MirrorTaskStatus:      mirrorTaskStatus,
+		XnetEnabled:           dataset.Repository.XnetEnabled,
+		XnetMigrationStatus:   xnetMigrationStatus,
+		XnetMigrationProgress: xnetMigrationProgress,
 	}
 	if permission.CanAdmin {
 		resDataset.SensitiveCheckStatus = dataset.Repository.SensitiveCheckStatus.String()
