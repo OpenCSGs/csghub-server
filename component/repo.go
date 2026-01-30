@@ -187,7 +187,7 @@ type RepoComponent interface {
 	IsSyncing(ctx context.Context, repoType types.RepositoryType, namespace, name string) (bool, error)
 	ChangePath(ctx context.Context, req types.ChangePathReq) error
 	BatchMigrateRepoToHashedPath(ctx context.Context, auto bool, batchSize int, lastID int64) (int64, error)
-	GetMirrorTaskStatusAndSyncStatus(repo *database.Repository) (types.MirrorTaskStatus, types.RepositorySyncStatus)
+	GetMirrorTaskStatus(repo *database.Repository) types.MirrorTaskStatus
 	CheckDeployPermissionForUser(ctx context.Context, deployReq types.DeployActReq) (*database.User, *database.Deploy, error)
 	DeletePendingDeletion(ctx context.Context) error
 	GetRepos(ctx context.Context, search, currentUser string, repoType types.RepositoryType) ([]string, error)
@@ -3958,25 +3958,16 @@ func (c *repoComponentImpl) migrateRepoToHashedPath(ctx context.Context, repo *d
 	return nil
 }
 
-func (c *repoComponentImpl) GetMirrorTaskStatusAndSyncStatus(repo *database.Repository) (types.MirrorTaskStatus, types.RepositorySyncStatus) {
+func (c *repoComponentImpl) GetMirrorTaskStatus(repo *database.Repository) types.MirrorTaskStatus {
 	var (
-		syncStatus       types.RepositorySyncStatus
 		mirrorTaskStatus types.MirrorTaskStatus
 	)
-	if repo.Mirror.ID != 0 {
-		syncStatus = common.MirrorTaskStatusToRepoStatus(repo.Mirror.Status)
-	}
 
 	if repo.Mirror.CurrentTask != nil {
-		syncStatus = common.MirrorTaskStatusToRepoStatus(repo.Mirror.CurrentTask.Status)
 		mirrorTaskStatus = repo.Mirror.CurrentTask.Status
 	}
 
-	if syncStatus == "" {
-		syncStatus = repo.SyncStatus
-	}
-
-	return mirrorTaskStatus, syncStatus
+	return mirrorTaskStatus
 }
 
 func (c *repoComponentImpl) RandomPath() []string {

@@ -323,8 +323,8 @@ func TestModelComponent_Show(t *testing.T) {
 		{ID: 4, RepositoryID: 2, WeightName: database.RecomWeightQuality, Score: 80},
 	}, nil)*/
 
-	mc.mocks.components.repo.EXPECT().GetMirrorTaskStatusAndSyncStatus(m.Repository).Return(
-		"", "",
+	mc.mocks.components.repo.EXPECT().GetMirrorTaskStatus(m.Repository).Return(
+		"",
 	)
 
 	model, err := mc.Show(ctx, "ns", "n", "user", false, false)
@@ -385,6 +385,7 @@ func TestModelComponent_Show_Syncing(t *testing.T) {
 				Status: types.MirrorRepoSyncStart,
 			},
 		},
+		SyncStatus: types.SyncStatusInProgress,
 	}
 
 	mc.mocks.stores.ModelMock().EXPECT().FindByPath(ctx, "ns", "n").Return(&database.Model{
@@ -397,8 +398,8 @@ func TestModelComponent_Show_Syncing(t *testing.T) {
 	)
 	mc.mocks.components.repo.EXPECT().GetNameSpaceInfo(ctx, "ns").Return(&types.Namespace{Path: "ns"}, nil)
 
-	mc.mocks.components.repo.EXPECT().GetMirrorTaskStatusAndSyncStatus(repository).Return(
-		types.MirrorRepoSyncStart, types.SyncStatusInProgress,
+	mc.mocks.components.repo.EXPECT().GetMirrorTaskStatus(repository).Return(
+		types.MirrorRepoSyncStart,
 	)
 	mc.mocks.stores.UserLikesMock().EXPECT().IsExist(ctx, "user", int64(123)).Return(true, nil)
 	mc.mocks.stores.RuntimeArchMock().EXPECT().CheckEngineByArchModelNameAndType(
@@ -456,6 +457,7 @@ func TestModelComponent_Show_Mirror(t *testing.T) {
 			ID:     1,
 			Status: types.MirrorRepoSyncStart,
 		},
+		SyncStatus: types.SyncStatusInProgress,
 	}
 
 	mc.mocks.stores.ModelMock().EXPECT().FindByPath(ctx, "ns", "n").Return(&database.Model{
@@ -468,8 +470,8 @@ func TestModelComponent_Show_Mirror(t *testing.T) {
 	)
 	mc.mocks.components.repo.EXPECT().GetNameSpaceInfo(ctx, "ns").Return(&types.Namespace{Path: "ns"}, nil)
 
-	mc.mocks.components.repo.EXPECT().GetMirrorTaskStatusAndSyncStatus(repository).Return(
-		"", types.SyncStatusInProgress,
+	mc.mocks.components.repo.EXPECT().GetMirrorTaskStatus(repository).Return(
+		"",
 	)
 	mc.mocks.stores.UserLikesMock().EXPECT().IsExist(ctx, "user", int64(123)).Return(true, nil)
 	mc.mocks.stores.RuntimeArchMock().EXPECT().CheckEngineByArchModelNameAndType(
@@ -537,8 +539,8 @@ func TestModelComponent_Show_Repository(t *testing.T) {
 		&types.UserRepoPermission{CanRead: true, CanAdmin: true}, nil,
 	)
 
-	mc.mocks.components.repo.EXPECT().GetMirrorTaskStatusAndSyncStatus(repository).Return(
-		"", types.SyncStatusPending,
+	mc.mocks.components.repo.EXPECT().GetMirrorTaskStatus(repository).Return(
+		"",
 	)
 	mc.mocks.components.repo.EXPECT().GetNameSpaceInfo(ctx, "ns").Return(&types.Namespace{Path: "ns"}, nil)
 

@@ -421,6 +421,64 @@ func (_c *MockMirrorTaskStore_ListByStatusWithPriority_Call) RunAndReturn(run fu
 	return _c
 }
 
+// ResetRunningTasks provides a mock function with given fields: ctx, fromStatus, toStatus
+func (_m *MockMirrorTaskStore) ResetRunningTasks(ctx context.Context, fromStatus types.MirrorTaskStatus, toStatus types.MirrorTaskStatus) (int, error) {
+	ret := _m.Called(ctx, fromStatus, toStatus)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ResetRunningTasks")
+	}
+
+	var r0 int
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.MirrorTaskStatus, types.MirrorTaskStatus) (int, error)); ok {
+		return rf(ctx, fromStatus, toStatus)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.MirrorTaskStatus, types.MirrorTaskStatus) int); ok {
+		r0 = rf(ctx, fromStatus, toStatus)
+	} else {
+		r0 = ret.Get(0).(int)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.MirrorTaskStatus, types.MirrorTaskStatus) error); ok {
+		r1 = rf(ctx, fromStatus, toStatus)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockMirrorTaskStore_ResetRunningTasks_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ResetRunningTasks'
+type MockMirrorTaskStore_ResetRunningTasks_Call struct {
+	*mock.Call
+}
+
+// ResetRunningTasks is a helper method to define mock.On call
+//   - ctx context.Context
+//   - fromStatus types.MirrorTaskStatus
+//   - toStatus types.MirrorTaskStatus
+func (_e *MockMirrorTaskStore_Expecter) ResetRunningTasks(ctx interface{}, fromStatus interface{}, toStatus interface{}) *MockMirrorTaskStore_ResetRunningTasks_Call {
+	return &MockMirrorTaskStore_ResetRunningTasks_Call{Call: _e.mock.On("ResetRunningTasks", ctx, fromStatus, toStatus)}
+}
+
+func (_c *MockMirrorTaskStore_ResetRunningTasks_Call) Run(run func(ctx context.Context, fromStatus types.MirrorTaskStatus, toStatus types.MirrorTaskStatus)) *MockMirrorTaskStore_ResetRunningTasks_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.MirrorTaskStatus), args[2].(types.MirrorTaskStatus))
+	})
+	return _c
+}
+
+func (_c *MockMirrorTaskStore_ResetRunningTasks_Call) Return(_a0 int, _a1 error) *MockMirrorTaskStore_ResetRunningTasks_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockMirrorTaskStore_ResetRunningTasks_Call) RunAndReturn(run func(context.Context, types.MirrorTaskStatus, types.MirrorTaskStatus) (int, error)) *MockMirrorTaskStore_ResetRunningTasks_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // SetMirrorCurrentTaskID provides a mock function with given fields: ctx, task
 func (_m *MockMirrorTaskStore) SetMirrorCurrentTaskID(ctx context.Context, task database.MirrorTask) error {
 	ret := _m.Called(ctx, task)
@@ -521,6 +579,64 @@ func (_c *MockMirrorTaskStore_Update_Call) Return(_a0 database.MirrorTask, _a1 e
 }
 
 func (_c *MockMirrorTaskStore_Update_Call) RunAndReturn(run func(context.Context, database.MirrorTask) (database.MirrorTask, error)) *MockMirrorTaskStore_Update_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// UpdateStatusAndRepoSyncStatus provides a mock function with given fields: ctx, task, syncStatus
+func (_m *MockMirrorTaskStore) UpdateStatusAndRepoSyncStatus(ctx context.Context, task database.MirrorTask, syncStatus types.RepositorySyncStatus) (database.MirrorTask, error) {
+	ret := _m.Called(ctx, task, syncStatus)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateStatusAndRepoSyncStatus")
+	}
+
+	var r0 database.MirrorTask
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, database.MirrorTask, types.RepositorySyncStatus) (database.MirrorTask, error)); ok {
+		return rf(ctx, task, syncStatus)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, database.MirrorTask, types.RepositorySyncStatus) database.MirrorTask); ok {
+		r0 = rf(ctx, task, syncStatus)
+	} else {
+		r0 = ret.Get(0).(database.MirrorTask)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, database.MirrorTask, types.RepositorySyncStatus) error); ok {
+		r1 = rf(ctx, task, syncStatus)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockMirrorTaskStore_UpdateStatusAndRepoSyncStatus_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateStatusAndRepoSyncStatus'
+type MockMirrorTaskStore_UpdateStatusAndRepoSyncStatus_Call struct {
+	*mock.Call
+}
+
+// UpdateStatusAndRepoSyncStatus is a helper method to define mock.On call
+//   - ctx context.Context
+//   - task database.MirrorTask
+//   - syncStatus types.RepositorySyncStatus
+func (_e *MockMirrorTaskStore_Expecter) UpdateStatusAndRepoSyncStatus(ctx interface{}, task interface{}, syncStatus interface{}) *MockMirrorTaskStore_UpdateStatusAndRepoSyncStatus_Call {
+	return &MockMirrorTaskStore_UpdateStatusAndRepoSyncStatus_Call{Call: _e.mock.On("UpdateStatusAndRepoSyncStatus", ctx, task, syncStatus)}
+}
+
+func (_c *MockMirrorTaskStore_UpdateStatusAndRepoSyncStatus_Call) Run(run func(ctx context.Context, task database.MirrorTask, syncStatus types.RepositorySyncStatus)) *MockMirrorTaskStore_UpdateStatusAndRepoSyncStatus_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(database.MirrorTask), args[2].(types.RepositorySyncStatus))
+	})
+	return _c
+}
+
+func (_c *MockMirrorTaskStore_UpdateStatusAndRepoSyncStatus_Call) Return(_a0 database.MirrorTask, _a1 error) *MockMirrorTaskStore_UpdateStatusAndRepoSyncStatus_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockMirrorTaskStore_UpdateStatusAndRepoSyncStatus_Call) RunAndReturn(run func(context.Context, database.MirrorTask, types.RepositorySyncStatus) (database.MirrorTask, error)) *MockMirrorTaskStore_UpdateStatusAndRepoSyncStatus_Call {
 	_c.Call.Return(run)
 	return _c
 }

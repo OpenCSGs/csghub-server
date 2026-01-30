@@ -175,7 +175,7 @@ func TestDatasetComponent_Index_HalfCreatedRepos(t *testing.T) {
 	data, total, err := dc.Index(ctx, filter, 10, 1, false)
 	require.Nil(t, err)
 	require.Equal(t, 3, total) // Total should match PublicToUser's return value
-	require.Len(t, data, 2)     // But only 2 datasets should be returned
+	require.Len(t, data, 2)    // But only 2 datasets should be returned
 
 	require.Equal(t, []*types.Dataset{
 		{ID: 12, RepositoryID: 1, Repository: types.Repository{
@@ -271,14 +271,15 @@ func TestDatasetCompnent_Show(t *testing.T) {
 			User: database.User{
 				Username: "user",
 			},
+			SyncStatus: types.SyncStatusInProgress,
 		},
 	}
 	dc.mocks.stores.DatasetMock().EXPECT().FindByPath(ctx, "ns", "n").Return(dataset, nil)
 	dc.mocks.components.repo.EXPECT().GetUserRepoPermission(ctx, "user", dataset.Repository).Return(&types.UserRepoPermission{CanRead: true}, nil)
 	dc.mocks.components.repo.EXPECT().GetNameSpaceInfo(ctx, "ns").Return(&types.Namespace{}, nil)
 	dc.mocks.stores.UserLikesMock().EXPECT().IsExist(ctx, "user", int64(2)).Return(true, nil)
-	dc.mocks.components.repo.EXPECT().GetMirrorTaskStatusAndSyncStatus(dataset.Repository).Return(
-		types.MirrorRepoSyncStart, types.SyncStatusInProgress,
+	dc.mocks.components.repo.EXPECT().GetMirrorTaskStatus(dataset.Repository).Return(
+		types.MirrorRepoSyncStart,
 	)
 	/*dc.mocks.stores.RecomMock().EXPECT().FindByRepoIDs(ctx, []int64{2}).Return([]*database.RecomRepoScore{
 		{ID: 1, RepositoryID: 2, WeightName: database.RecomWeightTotal, Score: 100},
@@ -337,6 +338,7 @@ func TestDatasetCompnent_Show_Mirror(t *testing.T) {
 				ID:     1,
 				Status: types.MirrorLfsSyncFinished,
 			},
+			SyncStatus: types.SyncStatusCompleted,
 		},
 	}
 	dc.mocks.stores.DatasetMock().EXPECT().FindByPath(ctx, "ns", "n").Return(dataset, nil)
@@ -344,8 +346,8 @@ func TestDatasetCompnent_Show_Mirror(t *testing.T) {
 	dc.mocks.components.repo.EXPECT().GetNameSpaceInfo(ctx, "ns").Return(&types.Namespace{}, nil)
 	dc.mocks.stores.UserLikesMock().EXPECT().IsExist(ctx, "user", int64(2)).Return(true, nil)
 
-	dc.mocks.components.repo.EXPECT().GetMirrorTaskStatusAndSyncStatus(dataset.Repository).Return(
-		"", types.SyncStatusCompleted,
+	dc.mocks.components.repo.EXPECT().GetMirrorTaskStatus(dataset.Repository).Return(
+		"",
 	)
 	d, err := dc.Show(ctx, "ns", "n", "user", false, false)
 	require.Nil(t, err)
@@ -388,8 +390,8 @@ func TestDatasetCompnent_Show_Repository(t *testing.T) {
 	dc.mocks.components.repo.EXPECT().GetUserRepoPermission(ctx, "user", dataset.Repository).Return(&types.UserRepoPermission{CanRead: true}, nil)
 	dc.mocks.components.repo.EXPECT().GetNameSpaceInfo(ctx, "ns").Return(&types.Namespace{}, nil)
 	dc.mocks.stores.UserLikesMock().EXPECT().IsExist(ctx, "user", int64(2)).Return(true, nil)
-	dc.mocks.components.repo.EXPECT().GetMirrorTaskStatusAndSyncStatus(dataset.Repository).Return(
-		"", types.SyncStatusPending,
+	dc.mocks.components.repo.EXPECT().GetMirrorTaskStatus(dataset.Repository).Return(
+		"",
 	)
 
 	d, err := dc.Show(ctx, "ns", "n", "user", false, false)

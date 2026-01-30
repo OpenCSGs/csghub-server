@@ -140,7 +140,7 @@ func TestCodeComponent_Index_HalfCreatedRepos(t *testing.T) {
 	data, total, err := cc.Index(ctx, filter, 10, 1, false)
 	require.Nil(t, err)
 	require.Equal(t, 3, total) // Total should match PublicToUser's return value
-	require.Len(t, data, 2)     // But only 2 codes should be returned
+	require.Len(t, data, 2)    // But only 2 codes should be returned
 
 	require.Equal(t, []*types.Code{
 		{ID: 12, RepositoryID: 1, Name: "r1", Tags: []types.RepoTag{{Name: "t1"}}, RecomOpWeight: 0},
@@ -224,7 +224,7 @@ func TestCodeComponent_Show(t *testing.T) {
 	cc := initializeTestCodeComponent(ctx, t)
 
 	code := &database.Code{ID: 1, Repository: &database.Repository{
-		ID: 11, Name: "name", User: database.User{Username: "user"},
+		ID: 11, Name: "name", User: database.User{Username: "user"}, SyncStatus: types.SyncStatusInProgress,
 	}}
 	cc.mocks.stores.CodeMock().EXPECT().FindByPath(ctx, "ns", "n").Return(code, nil)
 	cc.mocks.components.repo.EXPECT().GetUserRepoPermission(ctx, "user", code.Repository).Return(
@@ -233,8 +233,8 @@ func TestCodeComponent_Show(t *testing.T) {
 	cc.mocks.stores.UserLikesMock().EXPECT().IsExist(ctx, "user", int64(11)).Return(true, nil)
 	cc.mocks.components.repo.EXPECT().GetNameSpaceInfo(ctx, "ns").Return(&types.Namespace{}, nil)
 
-	cc.mocks.components.repo.EXPECT().GetMirrorTaskStatusAndSyncStatus(code.Repository).Return(
-		types.MirrorRepoSyncStart, types.SyncStatusInProgress,
+	cc.mocks.components.repo.EXPECT().GetMirrorTaskStatus(code.Repository).Return(
+		types.MirrorRepoSyncStart,
 	)
 	data, err := cc.Show(ctx, "ns", "n", "user", false, false)
 	require.Nil(t, err)
