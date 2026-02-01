@@ -63,6 +63,7 @@ type SpaceHandler struct {
 // @Param        sort query string false "sort by"
 // @Param        source query string false "source" Enums(opencsg, huggingface, local)
 // @Param        sdk query string false "filter by space sdk"
+// @Param        status query string false "filter by space status" Enums(Building, BuildingFailed, Deploying, DeployFailed, Running, RuntimeError, Stopped, Sleeping, NoAppFile, NoNGINXConf)
 // @Param        per query int false "per" default(20)
 // @Param        page query int false "per page" default(1)
 // @Success      200  {object}  types.ResponseWithTotal{data=[]types.Space,total=int} "OK"

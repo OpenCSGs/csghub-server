@@ -282,6 +282,7 @@ type RepoFilter struct {
 	ListServerless      bool
 	SpaceSDK            string
 	XnetMigrationStatus *XnetMigrationTaskStatus
+	Status              string
 }
 
 type BatchGetFilter struct {
