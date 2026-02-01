@@ -76,6 +76,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	}))
 	r.Use(middleware.XOpenCSGHeader())
 	r.Use(middleware.ModifyAcceptLanguageMiddleware())
+	r.Use(middleware.RestrictMultiSyncTokenToRead())
 	middlewareCollection := middleware.MiddlewareCollection{}
 	middlewareCollection.Auth.NeedAPIKey = middleware.NeedAPIKey(config)
 	middlewareCollection.Auth.NeedLogin = middleware.MustLogin()
