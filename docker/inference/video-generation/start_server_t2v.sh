@@ -12,7 +12,7 @@ fi
 
 # Start API server with distributed inference service
 if [ "$GPU_NUM" -gt 1 ]; then
-    config_file="wan_moe_t2v_distill_lora_ parallel.json"
+    config_file="wan_moe_t2v_distill_lora_parallel.json"
     sed -i "s/\"\$GPU_NUM\"/$GPU_NUM/g" /etc/csghub/"${config_file}"
     sed -i "s|\$REPO_ID|$REPO_ID|g" /etc/csghub/"${config_file}"
     torchrun --nproc_per_node=$GPU_NUM -m lightx2v.server \

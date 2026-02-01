@@ -2400,7 +2400,7 @@ func (c *repoComponentImpl) DeleteDeploy(ctx context.Context, delReq types.Deplo
 		slog.Warn("fail to check deploy instance exist in remote cluster, will delete deploy instance in database", slog.Any("deploy id", delReq.DeployID), slog.Any("repo", deployRepo.Name))
 	}
 
-	if exist {
+	if exist && err == nil {
 		// fail to delete service
 		return errors.New("fail to delete service")
 	}

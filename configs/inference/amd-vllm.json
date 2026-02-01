@@ -1,0 +1,245 @@
+{
+  "engine_name": "amd-vllm",
+  "enabled": 1,
+  "container_port": 8000,
+  "model_format": "safetensors",
+  "engine_images": [
+    {
+      "compute_type": "gpu",
+      "image": "opencsghq/amd-vllm:rocm7.0.0_vllm_0.11.2_20251210",
+      "driver_version": "7.0",
+      "engine_version": "0.11.2"
+    }
+  ],
+  "engine_args": [
+    {
+      "name": "block-size",
+      "value": "128",
+      "format": "--block-size %s"
+    },
+    {
+      "name": "dtype",
+      "value": "auto",
+      "format": "--dtype %s"
+    },
+    {
+      "name": "gpu-memory-utilization",
+      "value": "0.8",
+      "format": "--gpu-memory-utilization %s"
+    },
+    {
+      "name": "max-model-len",
+      "value": "8192",
+      "format": "--max-model-len %s"
+    },
+    {
+      "name": "tensor-parallel-size",
+      "value": "1",
+      "format": "--tensor-parallel-size %s"
+    },
+    {
+      "name": "max-num-seqs",
+      "value": "256",
+      "format": "--max-num-seqs %s"
+    },
+    {
+      "name": "scheduling-policy",
+      "value": "fcfs",
+      "format": "--scheduling-policy %s"
+    },
+    {
+      "name": "cpu-offload-gb",
+      "value": "0",
+      "format": "--cpu-offload-gb %s"
+    },
+    {
+      "name": "pipeline-parallel-size",
+      "value": "1",
+      "format": "--pipeline-parallel-size %s"
+    },
+    {
+      "name": "guided-decoding-backend",
+      "value": "xgrammar",
+      "format": "--guided-decoding-backend %s"
+    },
+    {
+      "name": "swap-space",
+      "value": "4",
+      "format": "--swap-space %s"
+    },
+    {
+      "name": "load-format",
+      "value": "auto",
+      "format": "--load-format %s"
+    },
+    {
+      "name": "max-num-batched-tokens",
+      "value": "4096",
+      "format": "--max-num-batched-tokens %s"
+    },
+    {
+      "name": "enable-prefix-caching",
+      "value": "enable",
+      "format": "--enable-prefix-caching"
+    },
+    {
+      "name": "enable-chunked-prefill",
+      "value": "enable",
+      "format": "--enable-chunked-prefill"
+    },
+    {
+      "name": "enforce-eager",
+      "value": "enable",
+      "format": "--enforce-eager"
+    },
+    {
+      "name": "disable-custom-all-reduce",
+      "value": "enable",
+      "format": "--disable-custom-all-reduce"
+    },
+    {
+      "name": "enable-tool-calling",
+      "value": "disable",
+      "format": "--enable-auto-tool-choice"
+    },
+    {
+      "name": "limit-mm-per-prompt",
+      "value": "image=5,video=5",
+      "format": "--limit-mm-per-prompt %s"
+    },
+    {
+      "name": "custom-options",
+      "value": "",
+      "format": "%s"
+    }
+  ],
+  "supported_archs": [
+    "ApertusForCausalLM",
+    "AquilaForCausalLM",
+    "ArceeForCausalLM",
+    "ArcticForCausalLM",
+    "BaiChuanForCausalLM",
+    "BailingMoeForCausalLM",
+    "BambaForCausalLM",
+    "BloomForCausalLM",
+    "BartForConditionalGeneration",
+    "MBartForConditionalGeneration",
+    "ChatGLMModel",
+    "ChatGLMForConditionalGeneration",
+    "CohereForCausalLM",
+    "Cohere2ForCausalLM",
+    "DbrxForCausalLM",
+    "DeciLMForCausalLM",
+    "DeepseekForCausalLM",
+    "DeepseekV2ForCausalLM",
+    "DeepseekV3ForCausalLM",
+    "Dots1ForCausalLM",
+    "Ernie4_5ForCausalLM",
+    "Ernie4_5_MoeForCausalLM",
+    "ExaoneForCausalLM",
+    "Exaone4ForCausalLM",
+    "Fairseq2LlamaForCausalLM",
+    "FalconForCausalLM",
+    "FalconMambaForCausalLM",
+    "FalconH1ForCausalLM",
+    "GemmaForCausalLM",
+    "Gemma2ForCausalLM",
+    "Gemma3ForCausalLM",
+    "Gemma3nForCausalLM",
+    "GlmForCausalLM",
+    "Glm4ForCausalLM",
+    "Glm4MoeForCausalLM",
+    "GPT2LMHeadModel",
+    "GPTBigCodeForCausalLM",
+    "GPTJForCausalLM",
+    "GPTNeoXForCausalLM",
+    "GptOssForCausalLM",
+    "GraniteForCausalLM",
+    "GraniteMoeForCausalLM",
+    "GraniteMoeHybridForCausalLM",
+    "GraniteMoeSharedForCausalLM",
+    "GritLM",
+    "Grok1ModelForCausalLM",
+    "HunYuanDenseV1ForCausalLM",
+    "HunYuanMoEV1ForCausalLM",
+    "HCXVisionForCausalLM",
+    "InternLMForCausalLM",
+    "InternLM2ForCausalLM",
+    "InternLM3ForCausalLM",
+    "JAISLMHeadModel",
+    "JambaForCausalLM",
+    "Lfm2ForCausalLM",
+    "LlamaForCausalLM",
+    "MambaForCausalLM",
+    "Mamba2ForCausalLM",
+    "MiMoForCausalLM",
+    "MiniCPMForCausalLM",
+    "MiniCPM3ForCausalLM",
+    "MistralForCausalLM",
+    "MixtralForCausalLM",
+    "MotifForCausalLM",
+    "MPTForCausalLM",
+    "NemotronForCausalLM",
+    "NemotronHForCausalLM",
+    "OLMoForCausalLM",
+    "OLMo2ForCausalLM",
+    "OLMoEForCausalLM",
+    "OPTForCausalLM",
+    "OrionForCausalLM",
+    "PhiForCausalLM",
+    "Phi3ForCausalLM",
+    "PhiMoEForCausalLM",
+    "Phi4FlashForCausalLM",
+    "PersimmonForCausalLM",
+    "Plamo2ForCausalLM",
+    "QWenLMHeadModel",
+    "Qwen2ForCausalLM",
+    "Qwen2MoeForCausalLM",
+    "Qwen3ForCausalLM",
+    "Qwen3MoeForCausalLM",
+    "Qwen3NextForCausalLM",
+    "SeedOssForCausalLM",
+    "StableLmForCausalLM",
+    "Starcoder2ForCausalLM",
+    "SolarForCausalLM",
+    "SmolLM3ForCausalLM",
+    "TeleChat2ForCausalLM",
+    "TeleFLMForCausalLM",
+    "XverseForCausalLM",
+    "MiniMaxM1ForCausalLM",
+    "MiniMaxText01ForCausalLM",
+    "Zamba2ForCausalLM"
+  ],
+  "tool_call_parsers": {
+    "DeepseekV3ForCausalLM": "deepseek_v3",
+    "DeepseekV31ForCausalLM": "deepseek_v31",
+    "DeepseekR1ForCausalLM": "deepseek_r1",
+    "GraniteForCausalLM": "granite",
+    "HermesForCausalLM": "hermes",
+    "InternLMForCausalLM": "internlm",
+    "InternLM2ForCausalLM": "internlm",
+    "InternLM3ForCausalLM": "internlm",
+    "JambaForCausalLM": "jamba",
+    "LlamaForCausalLM": "pythonic",
+    "PythonicForCausalLM": "pythonic",
+    "ToolACEForCausalLM": "pythonic",
+    "UltravoxForCausalLM": "pythonic",
+    "Llama3ForCausalLM": "llama3_json",
+    "Llama4ForCausalLM": "llama4_json",
+    "MistralForCausalLM": "mistral",
+    "MixtralForCausalLM": "mistral",
+    "Phi4MiniForCausalLM": "phi4_mini_json",
+    "Phi4FlashForCausalLM": "phi4_mini_json",
+    "QWenLMHeadModel": "hermes",
+    "Qwen2ForCausalLM": "hermes",
+    "Qwen2MoeForCausalLM": "hermes",
+    "Qwen3ForCausalLM": "hermes",
+    "Qwen3MoeForCausalLM": "hermes",
+    "Qwen3NextForCausalLM": "hermes",
+    "xLAMForCausalLM": "xlam",
+    "MiniMaxM1ForCausalLM": "minimax_m1",
+    "MiniMaxText01ForCausalLM": "minimax_m1",
+    "KimiK2ForCausalLM": "kimi_k2",
+    "HunyuanA13BForCausalLM": "hunyuan_a13b"
+  }
+}
