@@ -103,7 +103,8 @@ func (s *EmailChannel) sendEmailToUsers(msg types.EmailReq) error {
 }
 
 func (s *EmailChannel) broadcastEmail(ctx context.Context, msg types.EmailReq) error {
-	slog.Info("broadcast email to all users", "subject", msg.Subject)
+	// slog.Info("broadcast email to all users", "subject", msg.Subject)
+	slog.InfoContext(ctx, "broadcast email to all users", "subject", msg.Subject)
 
 	workflowClient := workflow.GetWorkflowClient()
 	if workflowClient == nil {
@@ -116,6 +117,6 @@ func (s *EmailChannel) broadcastEmail(ctx context.Context, msg types.EmailReq) e
 	if err != nil {
 		return utils.NewErrSendMsg(err, "failed to start broadcast email workflow")
 	}
-	slog.Info("start broadcast email workflow", slog.Any("workflow id", we.GetID()))
+	slog.InfoContext(ctx, "start broadcast email workflow", slog.Any("workflow id", we.GetID()))
 	return nil
 }

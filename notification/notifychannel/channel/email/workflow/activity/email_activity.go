@@ -68,10 +68,10 @@ func (a *BroadcastEmailActivity) GetEmailFromUserActivity(ctx context.Context, i
 
 func (a *BroadcastEmailActivity) SendEmailBatchActivity(ctx context.Context, emailReq types.EmailReq, emails []string) error {
 	logger := activity.GetLogger(ctx)
-	logger.Debug("broadcast email started", "emailReq", emailReq, "emailCount", len(emails))
+	logger.Info("email batch started", "subject", emailReq.Subject, "from", emailReq.From, "emailCount", len(emails))
 
 	if len(emails) == 0 {
-		logger.Debug("no emails to send")
+		logger.Info("no emails to send")
 		return nil
 	}
 
@@ -90,17 +90,17 @@ func (a *BroadcastEmailActivity) SendEmailBatchActivity(ctx context.Context, ema
 		}
 
 		successCount++
-		logger.Debug("individual email sent successfully", "email", email, "index", i)
+		logger.Info("individual email sent successfully", "email", email, "index", i, "subject", individualReq.Subject)
 	}
 
-	logger.Info("email batch completed", "totalEmails", len(emails), "successCount", successCount, "failedCount", len(failedEmails), "failedEmails", failedEmails)
+	logger.Info("email batch completed", "subject", emailReq.Subject, "from", emailReq.From, "totalEmails", len(emails), "successCount", successCount, "failedCount", len(failedEmails), "failedEmails", failedEmails)
 
 	if successCount == 0 && len(failedEmails) > 0 {
 		return fmt.Errorf("all emails failed to send (%d total): %v", len(failedEmails), failedEmails)
 	}
 
 	if len(failedEmails) > 0 {
-		logger.Warn("some emails failed to send", "failedCount", len(failedEmails), "successCount", successCount, "failedEmails", failedEmails)
+		logger.Warn("some emails failed to send", "subject", emailReq.Subject, "from", emailReq.From, "failedCount", len(failedEmails), "successCount", successCount, "failedEmails", failedEmails)
 	}
 
 	return nil
