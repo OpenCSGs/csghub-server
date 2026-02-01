@@ -11,6 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/mock"
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/aigateway/component"
+	mocktoken "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/aigateway/token"
 	"opencsg.com/csghub-server/aigateway/types"
 	"opencsg.com/csghub-server/builder/rpc"
 )
@@ -20,7 +21,7 @@ func TestResponseWriterWrapper_NewResponseWriterWrapper(t *testing.T) {
 	w := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(w)
 
-	rw := newStreamResponseWriter(ctx.Writer, component.NewMockModeration(t), nil)
+	rw := newStreamResponseWriter(ctx.Writer, component.NewMockModeration(t), mocktoken.NewMockChatTokenCounter(t))
 	if rw == nil {
 		t.Fatal("NewResponseWriterWrapper should not return nil")
 	}
@@ -29,6 +30,9 @@ func TestResponseWriterWrapper_NewResponseWriterWrapper(t *testing.T) {
 	}
 	if rw.eventStreamDecoder == nil {
 		t.Error("eventStreamDecoder should be initialized")
+	}
+	if rw.tokenCounter == nil {
+		t.Error("tokenCounter should be initialized")
 	}
 	if rw.id == "" {
 		t.Error("id should be set")
@@ -227,5 +231,85 @@ func TestResponseWriterWrapper_Write_InvalidJSON(t *testing.T) {
 
 	if !bytes.Contains(w.Body.Bytes(), invalidData) {
 		t.Error("Invalid data should be written when JSON parsing fails")
+	}
+}
+
+func TestResponseWriterWrapper_Write_NilTokenCounter(t *testing.T) {
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	mockMod := component.NewMockModeration(t)
+	rw := newStreamResponseWriter(ctx.Writer, mockMod, nil)
+
+	normalChunk := types.ChatCompletionChunk{
+		ID:     "test-id",
+		Object: "chat.completion.chunk",
+		Model:  "test-model",
+		Choices: []types.ChatCompletionChunkChoice{
+			{
+				Index: 0,
+				Delta: types.ChatCompletionChunkChoiceDelta{
+					Content: "Hello, nil token counter.",
+				},
+			},
+		},
+	}
+
+	chunkJSON, _ := json.Marshal(normalChunk)
+	streamData := []byte("data: " + string(chunkJSON) + "\n\n")
+	expectChunk := types.ChatCompletionChunk{}
+	_ = json.Unmarshal(chunkJSON, &expectChunk)
+	mockMod.EXPECT().CheckChatStreamResponse(mock.Anything, expectChunk, rw.id).
+		Return(&rpc.CheckResult{IsSensitive: false}, nil)
+
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			t.Fatalf("Write should not panic with nil tokenCounter, recovered: %v", recovered)
+		}
+	}()
+
+	_, err := rw.Write(streamData)
+	if err != nil {
+		t.Fatalf("Write should not return error with nil tokenCounter: %v", err)
+	}
+	if !bytes.Contains(w.Body.Bytes(), streamData) {
+		t.Error("Normal content should be written to response with nil tokenCounter")
+	}
+}
+
+func TestResponseWriterWrapper_Write_TokenCounterAppendsChunk(t *testing.T) {
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	mockMod := component.NewMockModeration(t)
+	mockTokenCounter := mocktoken.NewMockChatTokenCounter(t)
+	rw := newStreamResponseWriter(ctx.Writer, mockMod, mockTokenCounter)
+
+	normalChunk := types.ChatCompletionChunk{
+		ID:     "test-id",
+		Object: "chat.completion.chunk",
+		Model:  "test-model",
+		Choices: []types.ChatCompletionChunkChoice{
+			{
+				Index: 0,
+				Delta: types.ChatCompletionChunkChoiceDelta{
+					Content: "Hello, token counter.",
+				},
+			},
+		},
+	}
+
+	chunkJSON, _ := json.Marshal(normalChunk)
+	streamData := []byte("data: " + string(chunkJSON) + "\n\n")
+	expectChunk := types.ChatCompletionChunk{}
+	_ = json.Unmarshal(chunkJSON, &expectChunk)
+	mockTokenCounter.EXPECT().AppendCompletionChunk(expectChunk).Return()
+	mockMod.EXPECT().CheckChatStreamResponse(mock.Anything, expectChunk, rw.id).
+		Return(&rpc.CheckResult{IsSensitive: false}, nil)
+
+	_, err := rw.Write(streamData)
+	if err != nil {
+		t.Fatalf("Write should not return error when tokenCounter is set: %v", err)
+	}
+	if !bytes.Contains(w.Body.Bytes(), streamData) {
+		t.Error("Normal content should be written to response when tokenCounter is set")
 	}
 }
