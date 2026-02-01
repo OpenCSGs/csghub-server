@@ -249,6 +249,7 @@ func NewTestModelComponent(
 		runtimeFrameworksStore:    stores.RuntimeFramework,
 		userSvcClient:             userSvcClient,
 		runtimeArchitecturesStore: stores.RuntimeArch,
+		mirrorStore:               stores.Mirror,
 		lfsMetaObjectStore:        stores.LfsMetaObject,
 	}
 }
