@@ -239,6 +239,32 @@ type AgentInstanceSessionResponse struct {
 	Histories   []string `json:"histories"` // list of history contents
 }
 
+// AgentSessionShareResponse represents the response for creating a shared session.
+type AgentSessionShareResponse struct {
+	ShareUUID string `json:"share_uuid"`
+	ExpiresAt int64  `json:"expires_at"`
+}
+
+// AgentSessionShareTokenResponse represents the response for creating a share token.
+type AgentSessionShareTokenResponse struct {
+	Token string `json:"token"`
+}
+
+// AgentSharedSessionResponse represents the public shared session response.
+type AgentSharedSessionResponse struct {
+	Session   *AgentSharedSession            `json:"session"`
+	Histories []*AgentInstanceSessionHistory `json:"histories"`
+}
+
+// AgentSharedSession represents the minimal shared session view.
+type AgentSharedSession struct {
+	SessionUUID string `json:"session_uuid"`
+	InstanceID  int64  `json:"instance_id"`
+	MaxTurn     int64  `json:"max_turn"`
+	UserUUID    string `json:"user_uuid"`
+	Name        string `json:"name"`
+}
+
 type AgentSessionHistoryFeedback string
 
 const (

@@ -269,8 +269,6 @@ type Config struct {
 		RepoFileCheckConcurrency int    `env:"OPENCSG_MODERATION_SERVER_REPO_FILE_CHECK_CONCURRENCY" default:"10"`
 	}
 
-	Memory MemoryConfig
-
 	WorkFLow struct {
 		Endpoint         string `env:"OPENCSG_WORKFLOW_SERVER_ENDPOINT" default:"localhost:7233"`
 		ExecutionTimeout int64  `env:"OPENCSG_WORKFLOW_EXECUTION_TIMEOUT" default:"43200"`
@@ -338,14 +336,15 @@ type Config struct {
 		MigrateRepoPathCronExpression            string `env:"STARHUB_SERVER_CRON_JOB_MIGRATE_REPO_PATH_CRON_EXPRESSION" default:"* 16-20 * * *"`
 		DeletePendingDeletionCronExpression      string `env:"STARHUB_SERVER_CRON_JOB_DELETE_PENDING_DELETION_CRON_EXPRESSION" default:"0 16-20 * * *"`
 		ReleaseInvitationCreditCronExpression    string `env:"STARHUB_SERVER_CRON_JOB_RELEASE_INVITATION_CREDIT_CRON_EXPRESSION" default:"0 0 5 * *"`
+		MCPInspectCronExpression                 string `env:"STARHUB_SERVER_CRON_JOB_MCP_INSPECT_CRON_EXPRESSION" default:"*/5 * * * *"`
 	}
 
 	Agent struct {
-		AutoHubServiceHost           string `env:"OPENCSG_AGENT_AUTOHUB_SERVICE_HOST" default:"http://internal.opencsg-stg.com:8190"`
-		AgentHubServiceHost          string `env:"OPENCSG_AGENT_AGENTHUB_SERVICE_HOST" default:""`
-		AgentHubServiceToken         string `env:"OPENCSG_AGENT_AGENTHUB_SERVICE_TOKEN" default:""`
-		CodeInstanceQuotaPerUser     int    `env:"STARHUB_SERVER_AGENT_CODE_INSTANCE_QUOTA_PER_USER" default:"5"`
-		LangflowInstanceQuotaPerUser int    `env:"STARHUB_SERVER_AGENT_LANGFLOW_INSTANCE_QUOTA_PER_USER" default:"5"`
+		AutoHubServiceHost        string `env:"OPENCSG_AGENT_AUTOHUB_SERVICE_HOST" default:"http://internal.opencsg-stg.com:8190"`
+		AgentHubServiceHost       string `env:"OPENCSG_AGENT_AGENTHUB_SERVICE_HOST" default:""`
+		AgentHubServiceToken      string `env:"OPENCSG_AGENT_AGENTHUB_SERVICE_TOKEN" default:""`
+		MCPInspectMaxConcurrency  int    `env:"OPENCSG_AGENT_MCP_INSPECT_MAX_CONCURRENCY" default:"50"`
+		ShareSessionTokenValidDay int    `env:"STARHUB_SERVER_AGENT_SHARE_SESSION_TOKEN_VALIDATE_Day" default:"365"` // 1 year
 	}
 
 	DataViewer struct {
@@ -428,6 +427,7 @@ type Config struct {
 		MailerWeeklyRechargesMail           string `env:"STARHUB_SERVER_MAILER_WEEKLY_RECHARGES_MAIL" default:"reconcile@opencsg.com"`
 		EmailInvoiceCreatedReceiver         string `env:"STARHUB_SERVER_EMAIL_INVOICE_CREATED_RECEIVER" default:"contact@opencsg.com"`
 		RepoSyncTimezone                    string `env:"STARHUB_SERVER_REPO_SYNC_TIMEZONE" default:"Asia/Shanghai"`
+		RepoSyncChatID                      string `env:"STARHUB_SERVER_REPO_SYNC_CHAT_ID" default:""`
 		NotificationRetryCount              int    `env:"STARHUB_SERVER_NOTIFIER_NOTIFICATION_RETRY_COUNT" default:"3"`
 		BroadcastUserPageSize               int    `env:"STARHUB_SERVER_NOTIFIER_BROADCAST_USER_PAGE_SIZE" default:"100"`
 		BroadcastEmailPageSize              int    `env:"STARHUB_SERVER_NOTIFIER_BROADCAST_EMAIL_PAGE_SIZE" default:"100"`
@@ -542,18 +542,6 @@ type Config struct {
 		PartSize                int64 `env:"STARHUB_SERVER_STORAGE_GATEWAY_PART_SIZE" default:"67108864"`              // 64MB
 		EnablePresignedURLProxy bool  `env:"STARHUB_SERVER_STORAGE_GATEWAY_ENABLE_PRESIGNED_URL_PROXY" default:"true"` // Enable presigned URL proxy through gateway
 	}
-}
-
-type MemoryConfig struct {
-	Enable           bool   `env:"OPENCSG_MEMORY_SERVER_ENABLED" default:"true"`
-	Backend          string `env:"OPENCSG_MEMORY_BACKEND" default:"memmachine"`
-	Host             string `env:"OPENCSG_MEMORY_SERVER_HOST" default:"http://memmachine"`
-	Port             int    `env:"OPENCSG_MEMORY_SERVER_PORT" default:"8080"`
-	BasePath         string `env:"OPENCSG_MEMORY_SERVER_BASE_PATH" default:"/api/v2"`
-	ApiKey           string `env:"OPENCSG_MEMORY_SERVER_API_KEY" default:""`
-	TimeoutSeconds   int    `env:"OPENCSG_MEMORY_SERVER_TIMEOUT_SECONDS" default:"10"`
-	RetryCount       int    `env:"OPENCSG_MEMORY_SERVER_RETRY_COUNT" default:"1"`
-	RetryDelayMillis int    `env:"OPENCSG_MEMORY_SERVER_RETRY_DELAY_MILLIS" default:"100"`
 }
 
 func SetConfigFile(file string) {

@@ -162,24 +162,6 @@ func NotFoundError(c *gin.Context, err error) {
 	})
 }
 
-// ServiceUnavailableError responds with a JSON-formatted error message and HTTP 503 status code.
-// Used when a dependent downstream service is unavailable.
-func ServiceUnavailableError(c *gin.Context, err error) {
-	err, ok := errorx.GetFirstCustomError(err)
-	if ok {
-		customErr := err.(errorx.CustomError)
-		c.PureJSON(http.StatusServiceUnavailable, R{
-			Code:    customErr.Code(),
-			Msg:     customErr.Error(),
-			Context: customErr.Context(),
-		})
-		return
-	}
-	c.PureJSON(http.StatusServiceUnavailable, R{
-		Msg: err.Error(),
-	})
-}
-
 // ConflictError responds with a JSON-formatted error message and HTTP 409 status code.
 // Used when the request conflicts with the current state of the server.
 //
@@ -198,6 +180,44 @@ func ConflictError(c *gin.Context, err error) {
 		resp.Msg = err.Error()
 	}
 	c.PureJSON(http.StatusConflict, resp)
+}
+
+func TooManyReqError(c *gin.Context, err error) {
+	err, ok := errorx.GetFirstCustomError(err)
+	if ok {
+		customErr := err.(errorx.CustomError)
+		c.PureJSON(http.StatusTooManyRequests, R{
+			Code:    customErr.Code(),
+			Msg:     customErr.Error(),
+			Context: customErr.Context(),
+		})
+		return
+	}
+	c.PureJSON(http.StatusTooManyRequests, R{
+		Msg: err.Error(),
+	})
+}
+
+// 410 GoneError responds with a JSON-formatted error message.
+// Used when the requested resource is no longer available.
+//
+// Example:
+//
+//	GoneError(c, errors.New("token expired"))
+func GoneError(c *gin.Context, err error) {
+	err, ok := errorx.GetFirstCustomError(err)
+	if ok {
+		customErr := err.(errorx.CustomError)
+		c.PureJSON(http.StatusGone, R{
+			Code:    customErr.Code(),
+			Msg:     customErr.Error(),
+			Context: customErr.Context(),
+		})
+		return
+	}
+	c.PureJSON(http.StatusGone, R{
+		Msg: err.Error(),
+	})
 }
 
 // R is the response envelope
