@@ -183,13 +183,11 @@ func (s *serviceComponentImpl) generateService(ctx context.Context, cluster *clu
 		}
 	} else if request.RepoType == string(types.SpaceRepo) {
 		// use space docker reg base if sdk is docker
-		if request.Env != nil && request.Env["SDK"] == "docker" {
+		if request.Env != nil && request.Env["SDK"] == types.DOCKER.Name {
 			containerImg = path.Join(s.spaceDockerRegBase, request.ImageID)
 		} else {
 			// add public prefix if image is not full path
-			if strings.Count(containerImg, "/") == 1 {
-				containerImg = path.Join(s.publicDockerRegBase, request.ImageID)
-			}
+			containerImg = path.Join(s.publicDockerRegBase, request.ImageID)
 		}
 	}
 
