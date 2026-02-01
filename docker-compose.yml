@@ -1,20 +1,18 @@
-services:
+version: "3.8"
 
+services:
   postgres:
-    image: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/csghub/postgres:15.10
+    image: "gradescope/postgresql-multiple-databases:14.4"
     environment:
       POSTGRES_USER: "postgres"
       POSTGRES_PASSWORD: "postgres"
-      POSTGRES_MULTIPLE_DATABASES: "starhub_server,csghub_casdoor,temporal,temporal_visibility,mirror"
+      POSTGRES_MULTIPLE_DATABASES: "starhub_server,gitea,mirror"
     ports:
-      - "5432:5432"
-    healthcheck:
-      test: pg_isready -U postgres -h 127.0.0.1
-      interval: 5s
+      - "5433:5432"
     volumes:
-      - ./data/pgdata:/var/lib/postgresql/data
+      - ./pgdata:/var/lib/postgresql/data
     networks:
-      - my_ce_network
+      - my_network
 
   memmachine_postgres:
     image: docker.io/pgvector/pgvector:pg16
@@ -73,53 +71,109 @@ services:
       - my_ce_network
 
   minio:
-    image: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/bitnami/minio:2023
+    image: "bitnami/minio"
     environment:
-      MINIO_ROOT_USER: "admin"
-      MINIO_ROOT_PASSWORD: "Password_123"
+      MINIO_ROOT_USER: "minio-root-user-User-123"
+      MINIO_ROOT_PASSWORD: "minio-root-password-User-123"
       MINIO_SCHEME: "http"
-      MINIO_DEFAULT_BUCKETS: opencsg-server-lfs:public,opencsg-portal-storage:public,loki-data:public
     ports:
       - "9000:9000"
       - "9001:9001"
     volumes:
-      - ./data/minio_data:/bitnami/minio/data
+      - ./minio_data:/bitnami/minio/data
     networks:
-      - my_ce_network
+      - my_network
 
   redis:
-    image: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/redis:7.2.5
+    image: "redis"
     ports:
       - "6379:6379"
-    volumes:
-      - ./data/redis:/data
-    healthcheck:
-      test: redis-cli ping
-      interval: 1s
-      timeout: 3s
-      retries: 30
     networks:
-      - my_ce_network
-    
-  gitaly:
-    image: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/gitaly:v16.4.6
-    command:
-      ["bash", "-c", "mkdir -p /home/git/repositories && rm -rf /srv/gitlab-shell/hooks/* && touch /srv/gitlab-shell/.gitlab_shell_secret && exec /usr/bin/env GITALY_CONFIG_FILE=/home/gitaly.config.toml /scripts/process-wrapper"]
+      - my_network
+
+  gitea:
+    image: "opencsg/csghub-git"
+    depends_on:
+      - postgres
     environment:
-      - GITALY_CONFIG_FILE=/home/gitaly.config.toml
-    user: "root"
+      - GITEA_DAEMON_USER=git
+      - GITEA_ROOT_URL=$GITEA_ROOT_URL
+      - GITEA_SSH_DOMAIN=$GITEA_SSH_DOMAIN
+      - GITEA_HTTP_PORT=3001
+      - GITEA_ADMIN_USER=root
+      - GITEA_ADMIN_PASSWORD=password123
+      - GITEA_ADMIN_EMAIL=root@opencsg.com
+      - GITEA_DATABASE_TYPE=postgres
+      - GITEA_DATABASE_HOST=postgres
+      - GITEA_DATABASE_PORT_NUMBER=5432
+      - GITEA_DATABASE_NAME=gitea
+      - GITEA_DATABASE_USERNAME=postgres
+      - GITEA_DATABASE_PASSWORD=postgres
+      - GITEA_DATABASE_SSL_MODE=disable
+      - GITEA_APP_NAME=gitea
+      - GITEA_SMTP_ENABLED=false
+      - BITNAMI_DEBUG=true
+      - GITEA_LFS_START_SERVER=true
+      - GITEA_LFS_ROOT_PATH=/bitnami/gitea/data/lfs
+      - GITEA_LFS_STORAGE_TYPE=minio
+      - GITEA_LFS_MINIO_ACCESS_KEY_ID=minio-root-user-User-123
+      - GITEA_LFS_MINIO_SECRET_ACCESS_KEY=minio-root-password-User-123
+      - GITEA_LFS_MINIO_ENDPOINT=minio:9000
+      - GITEA_LFS_MINIO_BUCKET=opencsg-server-lfs
+      - GITEA_LFS_MINIO_LOCATION=beijing
+      - GITEA_LFS_MINIO_USE_SSL=false
+      - GITEA_LFS_SERVE_DIRECT=true
+      - GITEA_SERVICE_DEFAULT_ALLOW_CREATE_ORGANIZATION=true
     ports:
-      - '8075:8075'
+      - "3001:3001"
+      - "2222:2222"
     volumes:
-      - ./data/gitaly.config.toml:/home/gitaly.config.toml
-      - ./data/gitaly/git/repositories:/home/git/repositories
-      - ./data/gitaly/git/hooks:/home/git/hooks
-      - ./data/gitaly/log:/var/log/gitaly
+      - ./gitea:/bitnami/gitea
     networks:
-      - my_ce_network
+      - my_network
+
+  mirror:
+    image: "opencsg/csghub-git"
+    depends_on:
+      - postgres
+    environment:
+      - GITEA_DAEMON_USER=git
+      - GITEA_ROOT_URL=$GITEA_MIRROR_ROOT_URL
+      - GITEA_SSH_DOMAIN=$GITEA_MIRROR_SSH_DOMAIN
+      - GITEA_HTTP_PORT=3001
+      - GITEA_ADMIN_USER=root
+      - GITEA_ADMIN_PASSWORD=password123
+      - GITEA_ADMIN_EMAIL=root@opencsg.com
+      - GITEA_DATABASE_TYPE=postgres
+      - GITEA_DATABASE_HOST=postgres
+      - GITEA_DATABASE_PORT_NUMBER=5432
+      - GITEA_DATABASE_NAME=mirror
+      - GITEA_DATABASE_USERNAME=postgres
+      - GITEA_DATABASE_PASSWORD=postgres
+      - GITEA_DATABASE_SSL_MODE=disable
+      - GITEA_APP_NAME=gitea
+      - GITEA_SMTP_ENABLED=false
+      - BITNAMI_DEBUG=true
+      - GITEA_LFS_START_SERVER=true
+      - GITEA_LFS_ROOT_PATH=/bitnami/gitea/data/lfs
+      - GITEA_LFS_STORAGE_TYPE=minio
+      - GITEA_LFS_MINIO_ACCESS_KEY_ID=minio-root-user-User-123
+      - GITEA_LFS_MINIO_SECRET_ACCESS_KEY=minio-root-password-User-123
+      - GITEA_LFS_MINIO_ENDPOINT=minio:9000
+      - GITEA_LFS_MINIO_BUCKET=opencsg-server-lfs
+      - GITEA_LFS_MINIO_LOCATION=beijing
+      - GITEA_LFS_MINIO_USE_SSL=false
+      - GITEA_LFS_SERVE_DIRECT=true
+      - GITEA_SERVICE_DEFAULT_ALLOW_CREATE_ORGANIZATION=true
+    ports:
+      - "3002:3002"
+    volumes:
+      - ./mirror:/bitnami/gitea
+    networks:
+      - my_network
 
   natsmaster:
-    image: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/csghub_nats:2.10.16
+    image: "nats:2.10.16"
     deploy:
       resources:
         limits:
@@ -133,8 +187,8 @@ services:
       - "6222:6222"
       - "8222:8222"
     volumes:
-      - ./data/nats-server.conf:/nats-server.conf
-      - ./data/jetstream:/data/jetstream
+      - ./nats-server.conf:/nats-server.conf
+      - ./jetstream:/data/jetstream
     restart: always
     networks:
       - my_ce_network
@@ -247,98 +301,33 @@ services:
       - my_ce_network
 
   account_server:
-    image: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/csghub-server:latest
+    image: "opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/csghub_server:latest"
     entrypoint:
       - /starhub-bin/starhub
       - accounting
       - launch
-      - "--config=/starhub-bin/config/config.toml"
     depends_on:
       - postgres
       - natsmaster
-      - starhub_server
+    environment:
+      STARHUB_SERVER_API_TOKEN: $STARHUB_SERVER_API_TOKEN
+      STARHUB_DATABASE_DSN: postgresql://postgres:postgres@postgres:5432/starhub_server?sslmode=disable
+      OPENCSG_ACCOUNTING_SERVER_PORT: 8086
+      OPENCSG_ACCOUNTING_NATS_URL: nats://natsadmin:vf3jv9SsJBdv3n02n8Kxbvjf@natsmaster:4222
+      OPENCSG_ACCOUNTING_FEE_EVENT_SUBJECT: "accounting.fee.>"
+      OPENCSG_ACCOUNTING_NOTIFY_NOBALANCE_SUBJECT: "accounting.notify.nobalance"
+      OPENCSG_ACCOUNTING_MSG_FETCH_TIMEOUTINSEC: 5
+      GIN_MODE: release
     ports:
       - "8086:8086"
-    volumes:
-      - ./data/config.toml:/starhub-bin/config/config.toml:r
-    networks:
-      - my_ce_network
-
-  dataviewer:
-    image: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/csghub-server:latest
-    deploy:
-      resources:
-        limits:
-          cpus: '2'
-          memory: 2G
-    entrypoint:
-      - /starhub-bin/starhub
-      - dataviewer
-      - launch
-      - "--config=/starhub-bin/config/config.toml"
-    depends_on:
-      - postgres
-      - gitaly
-      - starhub_server
-    ports:
-      - "8093:8093"
-    volumes:
-      - ./data/config.toml:/starhub-bin/config/config.toml:r
-    networks:
-      - my_ce_network
-
-  notification_server:
-    image: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/csghub-server:latest
-    entrypoint:
-      - /starhub-bin/starhub
-      - notification
-      - launch
-      - --config=/starhub-bin/config/config.toml
-    depends_on:
-      - postgres
-      - starhub_server
-    ports:
-      - "8095:8095"
-    volumes:
-      - ./data/config.toml:/starhub-bin/config/config.toml:r
-    networks:
-      - my_ce_network
-
-  starhub_proxy:
-    image: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/csghub-server:latest
-    entrypoint:
-      - /starhub-bin/starhub
-      - start
-      - rproxy
-      - --config=/starhub-bin/config/config.toml
-    depends_on:
-      - postgres
-      - starhub_server
-    ports:
-      - "8083:8083"
-    volumes:
-      - ./data/config.toml:/starhub-bin/config/config.toml:r
-    networks:
-      - my_ce_network
-
-  # Uncomment starhub_runner when you have Kubernetes config file
-  # starhub_runner:
-  #   image: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/csghub-server:latest
-  #   entrypoint:
-  #     - /starhub-bin/starhub
-  #     - deploy
-  #     - runner
-  #     - --config=/starhub-bin/config/config.toml
-  #   ports:
-  #     - "8082:8082"
-  #   volumes:
-  #     - ./data/kube:/root/.kube:r
-  #     - ./data/config.toml:/starhub-bin/config/config.toml:r
-  #   networks:
-  #     - my_ce_network
+    restart: always
 
   temporal_worker:
-    image: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/csghub-server:latest
+    build:
+      context: ./
+      dockerfile: docker/Dockerfile-saas
+      args:
+        CSGHUB_TAGS: ${CSGHUB_TAGS}
     entrypoint:
       - /starhub-bin/starhub
       - temporal-worker
@@ -346,10 +335,9 @@ services:
       - --config=/starhub-bin/config/config.toml
     restart: always
     volumes:
-      - ./data/config.toml:/starhub-bin/config/config.toml:r
-    networks:
-      - my_ce_network
-      
+      - ./common/config/local.toml:/starhub-bin/config/config.toml:r
+
 networks:
-  my_ce_network:
+  my_network:
     driver: bridge
+
