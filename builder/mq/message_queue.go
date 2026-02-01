@@ -9,8 +9,10 @@ import (
 )
 
 type MessageQueue interface {
-	Publish(topic string, raw []byte) error
+	Publish(topic string, data []byte) error
 	Subscribe(params SubscribeParams) error
+	PurgeStream(streamName string) error
+	DeleteMessagesByFilter(streamName string, filter func(data []byte) bool) error
 }
 
 type MessageQueueFactory interface {

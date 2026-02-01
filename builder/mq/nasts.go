@@ -123,3 +123,91 @@ func (n *Nats) getOrCreateStreamConsumer(params SubscribeParams) (jetstream.Cons
 
 	return jsc, nil
 }
+
+func (n *Nats) PurgeStream(streamName string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	stream, err := n.js.Stream(ctx, streamName)
+	if err != nil {
+		return fmt.Errorf("[nats] failed to get stream %s error: %w", streamName, err)
+	}
+
+	err = stream.Purge(ctx)
+	if err != nil {
+		return fmt.Errorf("[nats] failed to purge stream %s error: %w", streamName, err)
+	}
+
+	slog.Info("[nats] stream purged successfully", slog.String("stream", streamName))
+	return nil
+}
+
+func (n *Nats) DeleteMessagesByFilter(streamName string, filter func(data []byte) bool) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	stream, err := n.js.Stream(ctx, streamName)
+	if err != nil {
+		return fmt.Errorf("[nats] failed to get stream %s error: %w", streamName, err)
+	}
+
+	info, err := stream.Info(ctx)
+	if err != nil {
+		return fmt.Errorf("[nats] failed to get stream info for %s error: %w", streamName, err)
+	}
+
+	if info.State.Msgs == 0 {
+		slog.Info("[nats] no messages to delete in stream", slog.String("stream", streamName))
+		return nil
+	}
+
+	tempConsumerName := fmt.Sprintf("temp-delete-consumer-%d", time.Now().UnixNano())
+	consumer, err := stream.CreateConsumer(ctx, jetstream.ConsumerConfig{
+		Name:          tempConsumerName,
+		AckPolicy:     jetstream.AckExplicitPolicy,
+		DeliverPolicy: jetstream.DeliverAllPolicy,
+	})
+	if err != nil {
+		return fmt.Errorf("[nats] failed to create temporary consumer error: %w", err)
+	}
+	defer func() {
+		if delErr := stream.DeleteConsumer(ctx, tempConsumerName); delErr != nil {
+			slog.Error("[nats] failed to delete temporary consumer",
+				slog.String("consumer", tempConsumerName),
+				slog.Any("error", delErr))
+		}
+	}()
+
+	deletedCount := 0
+	batch, err := consumer.Fetch(int(info.State.Msgs))
+	if err != nil {
+		return fmt.Errorf("[nats] failed to fetch messages error: %w", err)
+	}
+
+	for msg := range batch.Messages() {
+		if filter(msg.Data()) {
+			metadata, err := msg.Metadata()
+			if err != nil {
+				slog.Error("[nats] failed to get message metadata", slog.Any("error", err))
+				continue
+			}
+
+			err = stream.DeleteMsg(ctx, metadata.Sequence.Stream)
+		if err != nil {
+			slog.Error("[nats] failed to delete message",
+				slog.Uint64("sequence", metadata.Sequence.Stream),
+				slog.Any("error", err))
+			continue
+		}
+		deletedCount++
+	}
+	if err := msg.Ack(); err != nil {
+		slog.Warn("[nats] failed to ack message", slog.Any("error", err))
+	}
+	}
+
+	slog.Info("[nats] messages deleted by filter",
+		slog.String("stream", streamName),
+		slog.Int("deleted_count", deletedCount))
+	return nil
+}

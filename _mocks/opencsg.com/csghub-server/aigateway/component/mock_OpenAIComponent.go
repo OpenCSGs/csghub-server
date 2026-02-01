@@ -83,64 +83,6 @@ func (_c *MockOpenAIComponent_GetAvailableModels_Call) RunAndReturn(run func(con
 	return _c
 }
 
-// ListModels provides a mock function with given fields: c, user, req
-func (_m *MockOpenAIComponent) ListModels(c context.Context, user string, req types.ListModelsReq) (types.ModelList, error) {
-	ret := _m.Called(c, user, req)
-
-	if len(ret) == 0 {
-		panic("no return value specified for ListModels")
-	}
-
-	var r0 types.ModelList
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, types.ListModelsReq) (types.ModelList, error)); ok {
-		return rf(c, user, req)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, types.ListModelsReq) types.ModelList); ok {
-		r0 = rf(c, user, req)
-	} else {
-		r0 = ret.Get(0).(types.ModelList)
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, string, types.ListModelsReq) error); ok {
-		r1 = rf(c, user, req)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockOpenAIComponent_ListModels_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListModels'
-type MockOpenAIComponent_ListModels_Call struct {
-	*mock.Call
-}
-
-// ListModels is a helper method to define mock.On call
-//   - c context.Context
-//   - user string
-//   - req types.ListModelsReq
-func (_e *MockOpenAIComponent_Expecter) ListModels(c interface{}, user interface{}, req interface{}) *MockOpenAIComponent_ListModels_Call {
-	return &MockOpenAIComponent_ListModels_Call{Call: _e.mock.On("ListModels", c, user, req)}
-}
-
-func (_c *MockOpenAIComponent_ListModels_Call) Run(run func(c context.Context, user string, req types.ListModelsReq)) *MockOpenAIComponent_ListModels_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(types.ListModelsReq))
-	})
-	return _c
-}
-
-func (_c *MockOpenAIComponent_ListModels_Call) Return(_a0 types.ModelList, _a1 error) *MockOpenAIComponent_ListModels_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockOpenAIComponent_ListModels_Call) RunAndReturn(run func(context.Context, string, types.ListModelsReq) (types.ModelList, error)) *MockOpenAIComponent_ListModels_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // GetModelByID provides a mock function with given fields: c, username, modelID
 func (_m *MockOpenAIComponent) GetModelByID(c context.Context, username string, modelID string) (*types.Model, error) {
 	ret := _m.Called(c, username, modelID)
@@ -197,6 +139,64 @@ func (_c *MockOpenAIComponent_GetModelByID_Call) Return(_a0 *types.Model, _a1 er
 }
 
 func (_c *MockOpenAIComponent_GetModelByID_Call) RunAndReturn(run func(context.Context, string, string) (*types.Model, error)) *MockOpenAIComponent_GetModelByID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ListModels provides a mock function with given fields: c, user, req
+func (_m *MockOpenAIComponent) ListModels(c context.Context, user string, req types.ListModelsReq) (types.ModelList, error) {
+	ret := _m.Called(c, user, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListModels")
+	}
+
+	var r0 types.ModelList
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, types.ListModelsReq) (types.ModelList, error)); ok {
+		return rf(c, user, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, types.ListModelsReq) types.ModelList); ok {
+		r0 = rf(c, user, req)
+	} else {
+		r0 = ret.Get(0).(types.ModelList)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, types.ListModelsReq) error); ok {
+		r1 = rf(c, user, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockOpenAIComponent_ListModels_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListModels'
+type MockOpenAIComponent_ListModels_Call struct {
+	*mock.Call
+}
+
+// ListModels is a helper method to define mock.On call
+//   - c context.Context
+//   - user string
+//   - req types.ListModelsReq
+func (_e *MockOpenAIComponent_Expecter) ListModels(c interface{}, user interface{}, req interface{}) *MockOpenAIComponent_ListModels_Call {
+	return &MockOpenAIComponent_ListModels_Call{Call: _e.mock.On("ListModels", c, user, req)}
+}
+
+func (_c *MockOpenAIComponent_ListModels_Call) Run(run func(c context.Context, user string, req types.ListModelsReq)) *MockOpenAIComponent_ListModels_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(types.ListModelsReq))
+	})
+	return _c
+}
+
+func (_c *MockOpenAIComponent_ListModels_Call) Return(_a0 types.ModelList, _a1 error) *MockOpenAIComponent_ListModels_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockOpenAIComponent_ListModels_Call) RunAndReturn(run func(context.Context, string, types.ListModelsReq) (types.ModelList, error)) *MockOpenAIComponent_ListModels_Call {
 	_c.Call.Return(run)
 	return _c
 }

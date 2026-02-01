@@ -95,3 +95,11 @@ func (k *Kafka) startConsumer(consumer *kafka.Consumer, params SubscribeParams) 
 	}
 
 }
+
+func (k *Kafka) PurgeStream(streamName string) error {
+	return fmt.Errorf("PurgeStream is not supported for Kafka message queue")
+}
+
+func (k *Kafka) DeleteMessagesByFilter(streamName string, filter func(data []byte) bool) error {
+	return fmt.Errorf("DeleteMessagesByFilter is not supported for Kafka message queue")
+}
