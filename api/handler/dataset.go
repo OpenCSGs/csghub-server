@@ -345,6 +345,7 @@ func getFilterFromContext(ctx *gin.Context, filter *types.RepoFilter) *types.Rep
 		filter.Sort = "recently_update"
 	}
 	filter.Source = ctx.Query("source")
+	filter.Status = ctx.Query("status")
 	return filter
 }
 
