@@ -742,6 +742,9 @@ func TestDeployer_getResourceMap(t *testing.T) {
 }
 
 func TestDeployer_CheckResource(t *testing.T) {
+	config := &config.Config{}
+	config.Runner.VGPUResourceReqKey = "nvidia.com/vgpu"
+	config.Runner.VGPUMemoryReqKey = "nvidia.com/vgpumem"
 
 	cases := []struct {
 		hardware  *types.HardWare
@@ -785,7 +788,7 @@ func TestDeployer_CheckResource(t *testing.T) {
 					},
 				},
 			},
-		}, c.hardware)
+		}, c.hardware, config)
 		require.Equal(t, c.available, v, c.hardware)
 	}
 

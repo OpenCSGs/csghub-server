@@ -98,7 +98,7 @@ func (d *deployer) startAccounting() {
 	go d.startAcctMetering()
 }
 
-func checkNodeResource(node types.NodeResourceInfo, hardware *types.HardWare) bool {
+func checkNodeResource(node types.NodeResourceInfo, hardware *types.HardWare, config *config.Config) bool {
 
 	if hardware.Cpu.Num != "" {
 		requestedCPU, err := resource.ParseQuantity(hardware.Cpu.Num)

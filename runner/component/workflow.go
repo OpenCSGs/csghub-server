@@ -269,7 +269,7 @@ func generateWorkflow(req types.ArgoWorkFlowReq, config *config.Config) (*v1alph
 	applier := sched.NewApplier(req.Scheduler)
 	templates := []v1alpha1.Template{}
 	for _, v := range req.Templates {
-		resReq, _, nodeAffinity := generateResources(v.HardWare, req.Nodes)
+		resReq, _, nodeAffinity := generateResources(v.HardWare, req.Nodes, config)
 		environments := []corev1.EnvVar{}
 		for key, value := range v.Env {
 			environments = append(environments, corev1.EnvVar{Name: key, Value: value})
