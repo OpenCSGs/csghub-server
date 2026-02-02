@@ -17,12 +17,12 @@ echo "$OPENCSG_ACR_PASSWORD" | docker login $OPENCSG_ACR -u $OPENCSG_ACR_USERNAM
 ## Build Multi-Platform Images
 
 ```bash
-#opencsg-registry.cn-beijing.cr.aliyuncs.com/public/llama-factory:0.9.2
+#opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/llama-factory:0.9.4
 export BUILDX_NO_DEFAULT_ATTESTATIONS=1
-export IMAGE_TAG=0.9.2
+export IMAGE_TAG=0.9.4
 docker buildx build --platform linux/amd64,linux/arm64 \
-  -t ${OPENCSG_ACR}/public/llama-factory:${IMAGE_TAG} \
-  -t ${OPENCSG_ACR}/public/llama-factory:latest \
+  -t ${OPENCSG_ACR}/opencsghq/llama-factory:${IMAGE_TAG} \
+  -t ${OPENCSG_ACR}/opencsghq/llama-factory:latest \
   -f Dockerfile.llamafactory \
   --push .
 ```
@@ -33,8 +33,8 @@ docker buildx build --platform linux/amd64,linux/arm64 \
 export BUILDX_NO_DEFAULT_ATTESTATIONS=1
 export IMAGE_TAG=2.1-8.0.rc2.alpha003-910b-ubuntu22.04-py3.8
 docker buildx build --platform linux/arm64 \
-  -t ${OPENCSG_ACR}/public/llama-factory:${IMAGE_TAG} \
-  -t ${OPENCSG_ACR}/public/llama-factory:latest \
+  -t ${OPENCSG_ACR}/opencsghq/llama-factory:${IMAGE_TAG} \
+  -t ${OPENCSG_ACR}/opencsghq/llama-factory:latest \
   -f Dockerfile.llamafactory-npu \
   --push .
 ```
@@ -42,12 +42,12 @@ docker buildx build --platform linux/arm64 \
 ## Build Multi-Platform Images for swift
 
 ```bash
-#opencsg-registry.cn-beijing.cr.aliyuncs.com/public/ms-swift:v3.2.0.post2
+#opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/ms-swift:v3.7.2
 export BUILDX_NO_DEFAULT_ATTESTATIONS=1
-export IMAGE_TAG=v3.2.0.post2
+export IMAGE_TAG=v3.11.1
 docker buildx build --platform linux/amd64,linux/arm64 \
-  -t ${OPENCSG_ACR}/public/ms-swift:${IMAGE_TAG} \
-  -t ${OPENCSG_ACR}/public/ms-swift:latest \
+  -t ${OPENCSG_ACR}/opencsghq/ms-swift:${IMAGE_TAG} \
+  -t ${OPENCSG_ACR}/opencsghq/ms-swift:latest \
   -f Dockerfile.ms-swift \
   --push .
 ```
@@ -57,9 +57,9 @@ _Note: The above command will create `linux/amd64` and `linux/arm64` images with
 ## build gradio whl
 
 ```
-1. build gradio base image or pick from opencsg-registry.cn-beijing.cr.aliyuncs.com/public/gradio-build-base:1.0
+1. build gradio base image or pick from opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/gradio-build-base:1.0
 2. docker run -itd base_image
-3. download gradio resource:  git clone https://gitee.com/xzgan/gradio.git --branch 5.12.0 --single-branch
+3. download gradio resource:  git clone https://gitee.com/xzgan/gradio.git --branch 5.32.1 --single-branch
 4. build frontend js: bash scripts/build_frontend.sh
 5. build whl: python3 -m build -w
 6. check whl file in dist folder and upload to https://git-devops.opencsg.com/opensource/gradio/
@@ -81,7 +81,7 @@ docker run -d \
   -e REPO_ID="OpenCSG/csg-wukong-1B" \
   -e HF_ENDPOINT=https://hub.opencsg.com/hf \
   -p 30148:8000 \
-  ${OPENCSG_ACR}/public/llama-factory:${IMAGE_TAG}
+  ${OPENCSG_ACR}/opencsghq/llama-factory:${IMAGE_TAG}
 
 docker run -d \
   --gpus device=5 \
@@ -89,7 +89,7 @@ docker run -d \
   -e REPO_ID="OpenCSG/csg-wukong-1B" \
   -e HF_ENDPOINT=https://hub.opencsg.com/hf \
   -p 30147:8000 \
-  ${OPENCSG_ACR}/public/ms-swift:${IMAGE_TAG}
+  ${OPENCSG_ACR}/opencsghq/ms-swift:${IMAGE_TAG}
 ```
 
 _Note: HF_ENDPOINT should be use the real csghub address._

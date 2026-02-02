@@ -1,0 +1,22 @@
+FROM rocm/vllm:rocm7.0.0_vllm_0.11.2_20251210
+RUN pip config set global.index-url https://mirrors.aliyun.com/pypi/simple
+RUN pip install --no-cache-dir csghub-sdk==0.7.3 ray supervisor
+RUN sed -i 's|http://archive.ubuntu.com/ubuntu|http://mirrors.aliyun.com/ubuntu|g' /etc/apt/sources.list && \
+    sed -i 's|http://security.ubuntu.com/ubuntu|http://mirrors.aliyun.com/ubuntu|g' /etc/apt/sources.list && \
+    apt-get update && apt-get install -y supervisor
+RUN mkdir -p /var/log/supervisord
+COPY ./supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY ./vllm/ /etc/csghub/
+RUN chmod +x /etc/csghub/*.sh
+RUN chmod +x /app/vllm/examples/online_serving/*.sh
+
+WORKDIR /workspace/
+ENV HUGGINGFACE_HUB_CACHE=/workspace/ \
+    HF_HUB_ENABLE_HF_TRANSFER=0 \
+    HSA_ENABLE_IPC_MODE_LEGACY=0 \
+    VLLM_ENFORCE_EAGER=1 \
+    NCCL_P2P_DISABLE=1
+
+EXPOSE 8000
+
+ENTRYPOINT ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]

@@ -38,5 +38,10 @@ if ! grep -q "chat_template" "$tokenizer_config"; then
         ENGINE_ARGS="$ENGINE_ARGS --chat_template /etc/csghub/chat_template.jinja"
     fi
 fi
+
+if [ "${VLLM_ENFORCE_EAGER}" = "true" ] || [ "${VLLM_ENFORCE_EAGER}" = "1" ]; then
+    ENGINE_ARGS="$ENGINE_ARGS --enforce-eager"
+    echo "Enabled --enforce-eager via env var."
+fi
     
 python3 -m vllm.entrypoints.openai.api_server $ENGINE_ARGS

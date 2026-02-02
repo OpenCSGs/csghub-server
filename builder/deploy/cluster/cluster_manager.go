@@ -595,6 +595,10 @@ func getXPULabel(labels map[string]string, config *config.Config) (string, strin
 		//for enflame gcu
 		return "enflame.com/gcu.count", "enflame.com/gcu.model", "enflame.com/gcu.mem"
 	}
+	if _, found := labels["amd.com/gpu"]; found {
+		//for enflame gcu
+		return "amd.com/gpu", "amd.com/gpu.product-name", "amd.com/gpu.vram"
+	}
 	//check custom gpu model label
 	if config.Space.GPUModelLabel != "" {
 		var gpuLabels []types.GPUModel

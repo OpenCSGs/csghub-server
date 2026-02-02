@@ -1,4 +1,4 @@
-FROM hiyouga/llamafactory:0.9.4
+FROM docker.1ms.run/nvidia/cuda:12.6.3-cudnn-devel-ubuntu22.04
 
 # Set bash as the default shell
 ENV SHELL=/bin/bash \
@@ -10,20 +10,35 @@ ENV SHELL=/bin/bash \
     DEBIAN_FRONTEND=noninteractive
 
 # Build with some basic utilities
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3-pip apt-utils wget curl vim \
+RUN sed -i 's|http://archive.ubuntu.com/ubuntu|http://mirrors.aliyun.com/ubuntu|g' /etc/apt/sources.list && \
+    sed -i 's|http://security.ubuntu.com/ubuntu|http://mirrors.aliyun.com/ubuntu|g' /etc/apt/sources.list && \
+    sed -i 's|http://ports.ubuntu.com/ubuntu-ports|https://mirrors.aliyun.com/ubuntu-ports/|g' /etc/apt/sources.list && \
+    apt-get update && apt-get install -y --no-install-recommends \
+    software-properties-common && \
+    add-apt-repository ppa:deadsnakes/ppa && \
+    apt-get update && apt-get install -y --no-install-recommends \
+    python3.11 python3.11-dev python3.11-distutils apt-utils wget curl vim \
     git git-lfs supervisor unzip tzdata && \
+    curl -sS https://bootstrap.pypa.io/get-pip.py | python3.11 && \
+    ln -sf /usr/bin/python3.11 /usr/bin/python3 && \
+    ln -sf /usr/local/bin/pip3.11 /usr/local/bin/pip && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Set timezone
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && \
     echo $TZ > /etc/timezone && \
     dpkg-reconfigure -f noninteractive tzdata
-
+    
+RUN pip config set global.index-url https://mirrors.aliyun.com/pypi/simple
 # Install the appropriate torch version 
 RUN pip install --no-cache-dir jupyterlab jupyter-server-proxy==4.4.0 \
+    torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 \
     && pip uninstall -y gradio && pip install --no-cache-dir https://git-devops.opencsg.com/opensource/gradio/-/raw/main/gradio-5.31.0-py3-none-any.whl
 
+RUN pip install pip packaging wheel setuptools Cython --no-cache-dir
+
+RUN git clone --depth 1 https://gitee.com/xzgan/LLaMA-Factory.git --branch v0.9.4   --single-branch /app && cd /app && \
+    pip install --no-cache-dir -e ".[metrics,deepspeed]"
 # Create a working directory
 WORKDIR /etc/csghub
 

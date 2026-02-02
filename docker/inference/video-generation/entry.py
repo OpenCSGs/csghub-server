@@ -33,51 +33,59 @@ while retry_count < max_retries:
 repo_path = os.path.join(DOWNLOAD_DIR, REPO_ID)
 loras_dir = os.path.join(repo_path, "loras")
 
+# Ensure loras directory exists
 if not os.path.exists(loras_dir):
     print(f"Creating loras directory: {loras_dir}")
     os.makedirs(loras_dir, exist_ok=True)
 
-    # Download lora files based on HF_TASK
-    lora_repo_id = "AIWizards/Wan2.2-Distill-Loras"
-    lora_pattern = None
+# Download lora files based on HF_TASK (always attempt download regardless of directory existence)
+lora_repo_id = "AIWizards/Wan2.2-Distill-Loras"
+lora_pattern = None
 
-    if HF_TASK == "text-to-video":
-        lora_pattern = "wan2.2_t2v*.safetensors"
-        print(f"Downloading text-to-video lora files: {lora_pattern}")
-    elif HF_TASK == "image-to-video":
-        lora_pattern = "wan2.2_i2v*.safetensors"
-        print(f"Downloading image-to-video lora files: {lora_pattern}")
+if HF_TASK == "text-to-video":
+    lora_pattern = "wan2.2_t2v*.safetensors"
+    print(f"Downloading text-to-video lora files: {lora_pattern}")
+elif HF_TASK == "image-to-video":
+    lora_pattern = "wan2.2_i2v*.safetensors"
+    print(f"Downloading image-to-video lora files: {lora_pattern}")
 
-    if lora_pattern:
-        retry_count = 0
-        while retry_count < max_retries:
-            try:
-                snapshot_download(
-                    lora_repo_id,
-                    cache_dir=DOWNLOAD_DIR,
-                    endpoint="https://hub.opencsg.com",
-                    token=TOKEN,
-                    allow_patterns=[lora_pattern]
-                )
+if lora_pattern:
+    retry_count = 0
+    # Save the original CSGHUB_DOMAIN and override it for lora download
+    original_csghub_domain = os.environ.get('CSGHUB_DOMAIN')
+    os.environ['CSGHUB_DOMAIN'] = "https://hub.opencsg.com"
+    while retry_count < max_retries:
+        try:
+            snapshot_download(
+                lora_repo_id,
+                cache_dir=DOWNLOAD_DIR,
+                endpoint="https://hub.opencsg.com",
+                allow_patterns=[lora_pattern]
+            )
 
-                # Move downloaded lora files to the loras directory
-                lora_repo_path = os.path.join(DOWNLOAD_DIR, lora_repo_id)
-                if os.path.exists(lora_repo_path):
-                    for root, dirs, files in os.walk(lora_repo_path):
-                        for file in files:
-                            if file.endswith('.safetensors') and (
-                                (HF_TASK == "text-to-video" and file.startswith("wan2.2_t2v")) or
-                                (HF_TASK == "image-to-video" and file.startswith("wan2.2_i2v"))
-                            ):
-                                src_file = os.path.join(root, file)
-                                dst_file = os.path.join(loras_dir, file)
-                                print(f"Copying {src_file} to {dst_file}")
-                                os.rename(src_file, dst_file)
+            # Move downloaded lora files to the loras directory
+            lora_repo_path = os.path.join(DOWNLOAD_DIR, lora_repo_id)
+            if os.path.exists(lora_repo_path):
+                for root, dirs, files in os.walk(lora_repo_path):
+                    for file in files:
+                        if file.endswith('.safetensors') and (
+                            (HF_TASK == "text-to-video" and file.startswith("wan2.2_t2v")) or
+                            (HF_TASK == "image-to-video" and file.startswith("wan2.2_i2v"))
+                        ):
+                            src_file = os.path.join(root, file)
+                            dst_file = os.path.join(loras_dir, file)
+                            print(f"Copying {src_file} to {dst_file}")
+                            os.rename(src_file, dst_file)
 
-                print(f"Successfully downloaded lora files to {loras_dir}")
-                break
-            except (ConnectionError, HTTPError) as e:
-                retry_count += 1
-                print(
-                    f"exception occurred while downloading lora files: {e}. Retrying in 10 seconds... (Attempt {retry_count}/{max_retries})")
-                time.sleep(10)
+            print(f"Successfully downloaded lora files to {loras_dir}")
+            break
+        except (ConnectionError, HTTPError) as e:
+            retry_count += 1
+            print(
+                f"exception occurred while downloading lora files: {e}. Retrying in 10 seconds... (Attempt {retry_count}/{max_retries})")
+            time.sleep(10)
+    # Restore the original CSGHUB_DOMAIN if it existed
+    if original_csghub_domain:
+        os.environ['CSGHUB_DOMAIN'] = original_csghub_domain
+    elif 'CSGHUB_DOMAIN' in os.environ:
+        del os.environ['CSGHUB_DOMAIN']
