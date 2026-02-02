@@ -20,9 +20,56 @@ func (_m *MockMessageQueue) EXPECT() *MockMessageQueue_Expecter {
 	return &MockMessageQueue_Expecter{mock: &_m.Mock}
 }
 
-// Publish provides a mock function with given fields: topic, raw
-func (_m *MockMessageQueue) Publish(topic string, raw []byte) error {
-	ret := _m.Called(topic, raw)
+// DeleteMessagesByFilter provides a mock function with given fields: streamName, filter
+func (_m *MockMessageQueue) DeleteMessagesByFilter(streamName string, filter func([]byte) bool) error {
+	ret := _m.Called(streamName, filter)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteMessagesByFilter")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string, func([]byte) bool) error); ok {
+		r0 = rf(streamName, filter)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockMessageQueue_DeleteMessagesByFilter_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteMessagesByFilter'
+type MockMessageQueue_DeleteMessagesByFilter_Call struct {
+	*mock.Call
+}
+
+// DeleteMessagesByFilter is a helper method to define mock.On call
+//   - streamName string
+//   - filter func([]byte) bool
+func (_e *MockMessageQueue_Expecter) DeleteMessagesByFilter(streamName interface{}, filter interface{}) *MockMessageQueue_DeleteMessagesByFilter_Call {
+	return &MockMessageQueue_DeleteMessagesByFilter_Call{Call: _e.mock.On("DeleteMessagesByFilter", streamName, filter)}
+}
+
+func (_c *MockMessageQueue_DeleteMessagesByFilter_Call) Run(run func(streamName string, filter func([]byte) bool)) *MockMessageQueue_DeleteMessagesByFilter_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(string), args[1].(func([]byte) bool))
+	})
+	return _c
+}
+
+func (_c *MockMessageQueue_DeleteMessagesByFilter_Call) Return(_a0 error) *MockMessageQueue_DeleteMessagesByFilter_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockMessageQueue_DeleteMessagesByFilter_Call) RunAndReturn(run func(string, func([]byte) bool) error) *MockMessageQueue_DeleteMessagesByFilter_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// Publish provides a mock function with given fields: topic, data
+func (_m *MockMessageQueue) Publish(topic string, data []byte) error {
+	ret := _m.Called(topic, data)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Publish")
@@ -30,7 +77,7 @@ func (_m *MockMessageQueue) Publish(topic string, raw []byte) error {
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func(string, []byte) error); ok {
-		r0 = rf(topic, raw)
+		r0 = rf(topic, data)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -45,12 +92,12 @@ type MockMessageQueue_Publish_Call struct {
 
 // Publish is a helper method to define mock.On call
 //   - topic string
-//   - raw []byte
-func (_e *MockMessageQueue_Expecter) Publish(topic interface{}, raw interface{}) *MockMessageQueue_Publish_Call {
-	return &MockMessageQueue_Publish_Call{Call: _e.mock.On("Publish", topic, raw)}
+//   - data []byte
+func (_e *MockMessageQueue_Expecter) Publish(topic interface{}, data interface{}) *MockMessageQueue_Publish_Call {
+	return &MockMessageQueue_Publish_Call{Call: _e.mock.On("Publish", topic, data)}
 }
 
-func (_c *MockMessageQueue_Publish_Call) Run(run func(topic string, raw []byte)) *MockMessageQueue_Publish_Call {
+func (_c *MockMessageQueue_Publish_Call) Run(run func(topic string, data []byte)) *MockMessageQueue_Publish_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(string), args[1].([]byte))
 	})
@@ -63,6 +110,52 @@ func (_c *MockMessageQueue_Publish_Call) Return(_a0 error) *MockMessageQueue_Pub
 }
 
 func (_c *MockMessageQueue_Publish_Call) RunAndReturn(run func(string, []byte) error) *MockMessageQueue_Publish_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// PurgeStream provides a mock function with given fields: streamName
+func (_m *MockMessageQueue) PurgeStream(streamName string) error {
+	ret := _m.Called(streamName)
+
+	if len(ret) == 0 {
+		panic("no return value specified for PurgeStream")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string) error); ok {
+		r0 = rf(streamName)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockMessageQueue_PurgeStream_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PurgeStream'
+type MockMessageQueue_PurgeStream_Call struct {
+	*mock.Call
+}
+
+// PurgeStream is a helper method to define mock.On call
+//   - streamName string
+func (_e *MockMessageQueue_Expecter) PurgeStream(streamName interface{}) *MockMessageQueue_PurgeStream_Call {
+	return &MockMessageQueue_PurgeStream_Call{Call: _e.mock.On("PurgeStream", streamName)}
+}
+
+func (_c *MockMessageQueue_PurgeStream_Call) Run(run func(streamName string)) *MockMessageQueue_PurgeStream_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(string))
+	})
+	return _c
+}
+
+func (_c *MockMessageQueue_PurgeStream_Call) Return(_a0 error) *MockMessageQueue_PurgeStream_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockMessageQueue_PurgeStream_Call) RunAndReturn(run func(string) error) *MockMessageQueue_PurgeStream_Call {
 	_c.Call.Return(run)
 	return _c
 }
