@@ -56,6 +56,7 @@ func newStreamResponseWriter(internalWritter gin.ResponseWriter, moderationCompo
 	return &ResponseWriterWrapper{
 		internalWritter:     internalWritter,
 		moderationComponent: moderationComponent,
+		tokenCounter:        tokenCounter,
 		eventStreamDecoder:  &eventStreamDecoder{},
 		id:                  fmt.Sprint(id),
 	}
