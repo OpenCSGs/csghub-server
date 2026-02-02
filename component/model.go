@@ -130,6 +130,7 @@ func NewModelComponent(config *config.Config) (ModelComponent, error) {
 	c.userSvcClient = rpc.NewUserSvcHttpClient(fmt.Sprintf("%s:%d", config.User.Host, config.User.Port),
 		rpc.AuthWithApiKey(config.APIToken))
 	c.recomStore = database.NewRecomStore()
+	c.mirrorStore = database.NewMirrorStore()
 	c.xnetMigrationTaskStore = database.NewXnetMigrationTaskStore()
 	c.lfsMetaObjectStore = database.NewLfsMetaObjectStore()
 
@@ -165,6 +166,7 @@ type modelComponentImpl struct {
 	runtimeFrameworksStore    database.RuntimeFrameworksStore
 	userSvcClient             rpc.UserSvcClient
 	imageRunner               imagerunner.Runner
+	mirrorStore               database.MirrorStore
 	xnetMigrationTaskStore    database.XnetMigrationTaskStore
 	lfsMetaObjectStore        database.LfsMetaObjectStore
 }
@@ -598,6 +600,28 @@ func (c *modelComponentImpl) Show(ctx context.Context, namespace, name, currentU
 	resModel.EnableFinetune = enableFinetune
 	enableEvaluation, _ := c.runtimeArchitecturesStore.CheckEngineByArchModelNameAndType(ctx, archs, oriName, modelFormat, types.EvaluationType)
 	resModel.EnableEvaluation = enableEvaluation
+
+	if resModel.EnableFinetune && resModel.Source != types.LocalSource && resModel.Source != "" {
+		mirror, err := c.mirrorStore.FindByRepoID(ctx, resModel.RepositoryID)
+		if err != nil {
+			slog.Warn("failed to find mirror by repo id", slog.Int64("repo_id", resModel.RepositoryID), slog.Any("error", err))
+			resModel.EnableFinetune = false
+			resModel.DisableFinetuneReason = "failed_to_check_mirror_task"
+		} else {
+			hasSuccessfulTask := false
+			for _, task := range mirror.MirrorTasks {
+				if task.Status == types.MirrorLfsSyncFinished || task.Status == types.MirrorRepoSyncFinished {
+					hasSuccessfulTask = true
+					break
+				}
+			}
+			if !hasSuccessfulTask {
+				resModel.EnableFinetune = false
+				resModel.DisableFinetuneReason = "no_successful_mirror_task"
+			}
+		}
+	}
+
 	updateDisabledReason(resModel, archs)
 	return resModel, nil
 }
@@ -612,7 +636,7 @@ func updateDisabledReason(resModel *types.Model, archs []string) {
 	if !resModel.EnableInference {
 		resModel.DisableInferenceReason = "model_not_support_inference"
 	}
-	if !resModel.EnableFinetune {
+	if !resModel.EnableFinetune && resModel.DisableFinetuneReason == "" {
 		resModel.DisableFinetuneReason = "model_not_support_finetune"
 	}
 	if !resModel.EnableEvaluation {

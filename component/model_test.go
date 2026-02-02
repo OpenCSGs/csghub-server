@@ -12,6 +12,7 @@ import (
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -581,6 +582,197 @@ func TestModelComponent_Show_Repository(t *testing.T) {
 		WidgetType:       types.ModelWidgetTypeGeneration,
 		SyncStatus:       types.SyncStatusPending,
 	}, model)
+}
+
+func TestModelComponent_Show_NonLocalRepo_WithSuccessfulMirrorTask(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestModelComponent(ctx, t)
+
+	repository := &database.Repository{
+		ID:     123,
+		Name:   "n",
+		Path:   "foo/bar",
+		Source: types.OpenCSGSource,
+		Metadata: database.Metadata{
+			Architecture: "llama",
+		},
+		Tags: []database.Tag{{Name: "safetensors", Category: "framework"}},
+	}
+
+	mc.mocks.stores.ModelMock().EXPECT().FindByPath(ctx, "ns", "n").Return(&database.Model{
+		ID:           1,
+		RepositoryID: 123,
+		Repository:   repository,
+	}, nil)
+	mc.mocks.components.repo.EXPECT().GetUserRepoPermission(ctx, "user", repository).Return(
+		&types.UserRepoPermission{CanRead: true, CanAdmin: true}, nil,
+	)
+	mc.mocks.components.repo.EXPECT().GetNameSpaceInfo(ctx, "ns").Return(&types.Namespace{Path: "ns"}, nil)
+	mc.mocks.components.repo.EXPECT().GetMirrorTaskStatus(repository).Return("")
+
+	mc.mocks.stores.UserLikesMock().EXPECT().IsExist(ctx, "user", int64(123)).Return(true, nil)
+	mc.mocks.stores.RuntimeArchMock().EXPECT().CheckEngineByArchModelNameAndType(
+		ctx, mock.Anything, "n", "safetensors", types.InferenceType,
+	).Return(true, nil)
+	mc.mocks.stores.RuntimeArchMock().EXPECT().CheckEngineByArchModelNameAndType(
+		ctx, mock.Anything, "n", "safetensors", types.FinetuneType,
+	).Return(true, nil)
+	mc.mocks.stores.RuntimeArchMock().EXPECT().CheckEngineByArchModelNameAndType(
+		ctx, mock.Anything, "n", "safetensors", types.EvaluationType,
+	).Return(true, nil)
+
+	mc.mocks.stores.MirrorMock().EXPECT().FindByRepoID(ctx, int64(123)).Return(&database.Mirror{
+		ID:           1,
+		RepositoryID: 123,
+		MirrorTasks: []*database.MirrorTask{
+			{ID: 1, Status: types.MirrorRepoSyncFinished},
+		},
+	}, nil)
+
+	model, err := mc.Show(ctx, "ns", "n", "user", false, false)
+	require.Nil(t, err)
+	require.True(t, model.EnableFinetune)
+	require.Empty(t, model.DisableFinetuneReason)
+}
+
+func TestModelComponent_Show_NonLocalRepo_WithoutSuccessfulMirrorTask(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestModelComponent(ctx, t)
+
+	repository := &database.Repository{
+		ID:     123,
+		Name:   "n",
+		Path:   "foo/bar",
+		Source: types.OpenCSGSource,
+		Metadata: database.Metadata{
+			Architecture: "llama",
+		},
+		Tags: []database.Tag{{Name: "safetensors", Category: "framework"}},
+	}
+
+	mc.mocks.stores.ModelMock().EXPECT().FindByPath(ctx, "ns", "n").Return(&database.Model{
+		ID:           1,
+		RepositoryID: 123,
+		Repository:   repository,
+	}, nil)
+	mc.mocks.components.repo.EXPECT().GetUserRepoPermission(ctx, "user", repository).Return(
+		&types.UserRepoPermission{CanRead: true, CanAdmin: true}, nil,
+	)
+	mc.mocks.components.repo.EXPECT().GetNameSpaceInfo(ctx, "ns").Return(&types.Namespace{Path: "ns"}, nil)
+	mc.mocks.components.repo.EXPECT().GetMirrorTaskStatus(repository).Return("")
+
+	mc.mocks.stores.UserLikesMock().EXPECT().IsExist(ctx, "user", int64(123)).Return(true, nil)
+	mc.mocks.stores.RuntimeArchMock().EXPECT().CheckEngineByArchModelNameAndType(
+		ctx, mock.Anything, "n", "safetensors", types.InferenceType,
+	).Return(true, nil)
+	mc.mocks.stores.RuntimeArchMock().EXPECT().CheckEngineByArchModelNameAndType(
+		ctx, mock.Anything, "n", "safetensors", types.FinetuneType,
+	).Return(true, nil)
+	mc.mocks.stores.RuntimeArchMock().EXPECT().CheckEngineByArchModelNameAndType(
+		ctx, mock.Anything, "n", "safetensors", types.EvaluationType,
+	).Return(true, nil)
+
+	mc.mocks.stores.MirrorMock().EXPECT().FindByRepoID(ctx, int64(123)).Return(&database.Mirror{
+		ID:           1,
+		RepositoryID: 123,
+		MirrorTasks: []*database.MirrorTask{
+			{ID: 1, Status: types.MirrorRepoSyncStart},
+			{ID: 2, Status: types.MirrorRepoSyncFailed},
+		},
+	}, nil)
+
+	model, err := mc.Show(ctx, "ns", "n", "user", false, false)
+	require.Nil(t, err)
+	require.False(t, model.EnableFinetune)
+	require.Equal(t, "no_successful_mirror_task", model.DisableFinetuneReason)
+}
+
+func TestModelComponent_Show_NonLocalRepo_MirrorNotFound(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestModelComponent(ctx, t)
+
+	repository := &database.Repository{
+		ID:     123,
+		Name:   "n",
+		Path:   "foo/bar",
+		Source: types.OpenCSGSource,
+		Metadata: database.Metadata{
+			Architecture: "llama",
+		},
+		Tags: []database.Tag{{Name: "safetensors", Category: "framework"}},
+	}
+
+	mc.mocks.stores.ModelMock().EXPECT().FindByPath(ctx, "ns", "n").Return(&database.Model{
+		ID:           1,
+		RepositoryID: 123,
+		Repository:   repository,
+	}, nil)
+	mc.mocks.components.repo.EXPECT().GetUserRepoPermission(ctx, "user", repository).Return(
+		&types.UserRepoPermission{CanRead: true, CanAdmin: true}, nil,
+	)
+	mc.mocks.components.repo.EXPECT().GetNameSpaceInfo(ctx, "ns").Return(&types.Namespace{Path: "ns"}, nil)
+	mc.mocks.components.repo.EXPECT().GetMirrorTaskStatus(repository).Return("")
+
+	mc.mocks.stores.UserLikesMock().EXPECT().IsExist(ctx, "user", int64(123)).Return(true, nil)
+	mc.mocks.stores.RuntimeArchMock().EXPECT().CheckEngineByArchModelNameAndType(
+		ctx, mock.Anything, "n", "safetensors", types.InferenceType,
+	).Return(true, nil)
+	mc.mocks.stores.RuntimeArchMock().EXPECT().CheckEngineByArchModelNameAndType(
+		ctx, mock.Anything, "n", "safetensors", types.FinetuneType,
+	).Return(true, nil)
+	mc.mocks.stores.RuntimeArchMock().EXPECT().CheckEngineByArchModelNameAndType(
+		ctx, mock.Anything, "n", "safetensors", types.EvaluationType,
+	).Return(true, nil)
+
+	mc.mocks.stores.MirrorMock().EXPECT().FindByRepoID(ctx, int64(123)).Return(nil, errorx.ErrNotFound)
+
+	model, err := mc.Show(ctx, "ns", "n", "user", false, false)
+	require.Nil(t, err)
+	require.False(t, model.EnableFinetune)
+	require.Equal(t, "failed_to_check_mirror_task", model.DisableFinetuneReason)
+}
+
+func TestModelComponent_Show_LocalRepo_SkipMirrorCheck(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestModelComponent(ctx, t)
+
+	repository := &database.Repository{
+		ID:     123,
+		Name:   "n",
+		Path:   "foo/bar",
+		Source: types.LocalSource,
+		Metadata: database.Metadata{
+			Architecture: "llama",
+		},
+		Tags: []database.Tag{{Name: "safetensors", Category: "framework"}},
+	}
+
+	mc.mocks.stores.ModelMock().EXPECT().FindByPath(ctx, "ns", "n").Return(&database.Model{
+		ID:           1,
+		RepositoryID: 123,
+		Repository:   repository,
+	}, nil)
+	mc.mocks.components.repo.EXPECT().GetUserRepoPermission(ctx, "user", repository).Return(
+		&types.UserRepoPermission{CanRead: true, CanAdmin: true}, nil,
+	)
+	mc.mocks.components.repo.EXPECT().GetNameSpaceInfo(ctx, "ns").Return(&types.Namespace{Path: "ns"}, nil)
+	mc.mocks.components.repo.EXPECT().GetMirrorTaskStatus(repository).Return("")
+
+	mc.mocks.stores.UserLikesMock().EXPECT().IsExist(ctx, "user", int64(123)).Return(true, nil)
+	mc.mocks.stores.RuntimeArchMock().EXPECT().CheckEngineByArchModelNameAndType(
+		ctx, mock.Anything, "n", "safetensors", types.InferenceType,
+	).Return(true, nil)
+	mc.mocks.stores.RuntimeArchMock().EXPECT().CheckEngineByArchModelNameAndType(
+		ctx, mock.Anything, "n", "safetensors", types.FinetuneType,
+	).Return(true, nil)
+	mc.mocks.stores.RuntimeArchMock().EXPECT().CheckEngineByArchModelNameAndType(
+		ctx, mock.Anything, "n", "safetensors", types.EvaluationType,
+	).Return(true, nil)
+
+	model, err := mc.Show(ctx, "ns", "n", "user", false, false)
+	require.Nil(t, err)
+	require.True(t, model.EnableFinetune)
+	require.Empty(t, model.DisableFinetuneReason)
 }
 
 func TestModelComponent_GetServerless(t *testing.T) {

@@ -130,6 +130,7 @@ func (s *mirrorStoreImpl) FindByRepoID(ctx context.Context, repoID int64) (*Mirr
 		Model(&mirror).
 		Relation("CurrentTask").
 		Relation("Repository").
+		Relation("MirrorTasks").
 		Where("repository_id=?", repoID).
 		Scan(ctx)
 	if err != nil {
