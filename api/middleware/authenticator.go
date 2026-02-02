@@ -311,6 +311,30 @@ func UserMatch() gin.HandlerFunc {
 	}
 }
 
+func RestrictMultiSyncTokenToRead() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		authType := httpbase.GetAuthType(c)
+		if authType == httpbase.AuthTypeMultiSyncToken {
+			method := c.Request.Method
+			allowedMethods := map[string]bool{
+				"GET":  true,
+				"HEAD": true,
+			}
+			if !allowedMethods[method] {
+				slog.WarnContext(c.Request.Context(), "MultiSyncToken attempted write operation",
+					slog.String("method", method),
+					slog.String("path", c.Request.URL.Path),
+					slog.String("user", httpbase.GetCurrentUser(c)),
+				)
+				httpbase.ForbiddenError(c, errorx.ErrForbidden)
+				c.Abort()
+				return
+			}
+		}
+		c.Next()
+	}
+}
+
 type MiddlewareCollection struct {
 	Auth struct {
 		// only can be accessed by api key
