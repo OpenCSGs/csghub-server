@@ -735,6 +735,7 @@ func (a *DeployActivity) makeDeployEnv(ctx context.Context, hardware types.HardW
 			envMap["HF_ENDPOINT"] = a.cfg.ModelDownloadEndpoint
 		case types.STREAMLIT.Name:
 		case types.DOCKER.Name:
+			envMap["SDK"] = types.DOCKER.Name
 			envMap["port"] = strconv.Itoa(deployInfo.ContainerPort)
 			envMap["HF_ENDPOINT"] = a.cfg.ModelDownloadEndpoint
 		case types.MCPSERVER.Name:
