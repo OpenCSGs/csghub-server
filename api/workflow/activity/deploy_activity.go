@@ -514,10 +514,20 @@ func (a *DeployActivity) createDeployRequest(ctx context.Context, task *database
 		return nil, fmt.Errorf("failed to get git access token: %w", err)
 	}
 
-	pathParts := strings.Split(repoInfo.Path, "/")
 	deployInfo, err := a.ds.GetDeployByID(ctx, task.DeployID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get deploy with error: %w", err)
+	}
+
+	pathParts := strings.Split(repoInfo.Path, "/")
+	orgName, repoName := "", ""
+	if deployInfo.Type == types.NotebookType {
+	//just a placeholder value
+		orgName = "notebook"
+		repoName = deployInfo.SvcName
+	} else if len(pathParts) >= 2 {
+		orgName = pathParts[0]
+		repoName = pathParts[1]
 	}
 
 	var engineArgsTemplates []types.EngineArg
@@ -578,8 +588,8 @@ func (a *DeployActivity) createDeployRequest(ctx context.Context, task *database
 
 	return &types.RunRequest{
 		ID:            targetID,
-		OrgName:       pathParts[0],
-		RepoName:      pathParts[1],
+		OrgName:       orgName,
+		RepoName:      repoName,
 		RepoType:      repoInfo.RepoType,
 		UserName:      repoInfo.UserName,
 		Annotation:    annotationMap,
@@ -646,27 +656,33 @@ func (a *DeployActivity) makeDeployEnv(ctx context.Context, hardware types.HardW
 		}
 	}
 
-	pathParts := strings.Split(repoInfo.Path, "/")
-	commit, err := a.gs.GetRepoLastCommit(ctx, gitserver.GetRepoLastCommitReq{
-		Namespace: pathParts[0],
-		Name:      pathParts[1],
-		Ref:       deployInfo.GitBranch,
-		RepoType:  types.RepositoryType(repoInfo.RepoType),
-	})
-
-	if err != nil {
-		return nil, err
-	}
-
-	commitID, err := utilcommon.ShortenCommitID7(commit.ID)
-	if err != nil {
-		return nil, errorx.ErrInvalidCommitID
-	}
 	envMap["S3_INTERNAL"] = fmt.Sprintf("%v", a.cfg.S3Internal)
-	envMap["HTTPCloneURL"] = a.getHttpCloneURLWithToken(repoInfo.HTTPCloneURL, accessToken.User.Username, accessToken.Token)
 	envMap["ACCESS_TOKEN"] = accessToken.Token
-	envMap["REPO_ID"] = repoInfo.Path // "namespace/name"
-	envMap["REVISION"] = commitID     // branch
+
+	// Notebook has no git repo; skip GetRepoLastCommit and use empty git-related env
+	if deployInfo.Type != types.NotebookType {
+		pathParts := strings.Split(repoInfo.Path, "/")
+		commit, err := a.gs.GetRepoLastCommit(ctx, gitserver.GetRepoLastCommitReq{
+			Namespace: pathParts[0],
+			Name:      pathParts[1],
+			Ref:       deployInfo.GitBranch,
+			RepoType:  types.RepositoryType(repoInfo.RepoType),
+		})
+		if err != nil {
+			return nil, err
+		}
+		commitID, err := utilcommon.ShortenCommitID7(commit.ID)
+		if err != nil {
+			return nil, errorx.ErrInvalidCommitID
+		}
+		envMap["HTTPCloneURL"] = a.getHttpCloneURLWithToken(repoInfo.HTTPCloneURL, accessToken.User.Username, accessToken.Token)
+		envMap["REPO_ID"] = repoInfo.Path // "namespace/name"
+		envMap["REVISION"] = commitID     // branch
+	} else {
+		envMap["HTTPCloneURL"] = ""
+		envMap["REPO_ID"] = ""
+		envMap["REVISION"] = ""
+	}
 
 	if len(engineArgsTemplates) > 0 {
 		var engineArgs strings.Builder
