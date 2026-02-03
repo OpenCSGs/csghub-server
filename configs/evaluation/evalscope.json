@@ -5,14 +5,14 @@
   "engine_images": [
     {
       "compute_type": "cpu",
-      "image": "opencsghq/evalscope:1.1.1-cpu",
-      "engine_version": "1.1.1"
+      "image": "opencsghq/evalscope:1.4.2-cpu",
+      "engine_version": "1.4.2"
     },
     {
       "compute_type": "gpu",
-      "image": "opencsghq/evalscope:1.1.1-cu124",
+      "image": "opencsghq/evalscope:1.4.2-cu124",
       "driver_version": "12.4",
-      "engine_version": "1.1.1"
+      "engine_version": "1.4.2"
     }
   ],
   "supported_archs": [
