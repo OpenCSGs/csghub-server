@@ -1,10 +1,10 @@
-FROM modelscope-registry.cn-hangzhou.cr.aliyuncs.com/modelscope-repo/modelscope:ubuntu22.04-cuda12.4.0-py311-torch2.6.0-1.26.0-LLM
+FROM modelscope-registry.cn-beijing.cr.aliyuncs.com/modelscope-repo/modelscope:ubuntu22.04-cuda12.4.0-py311-torch2.9.1-1.34.0-LLM
 RUN apt-get update && apt-get -y install dumb-init \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 RUN pip install --no-cache-dir minio oss2 csghub-sdk==0.7.2
-RUN pip install -U --no-cache-dir evalscope==1.1.1
+RUN pip install -U --no-cache-dir evalscope==1.4.2
 # Download NLTK resources required for BLEU and other metrics
-RUN python -c "import nltk; nltk.download('punkt_tab', quiet=True)"
+RUN python -c "from evalscope.utils.resource_utils import check_nltk_data; check_nltk_data('punkt_tab')"
 COPY ./evalscope/ /etc/csghub/
 RUN ln -s /usr/bin/python3 /usr/bin/python &&\
     chmod +x /etc/csghub/*.sh && \

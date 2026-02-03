@@ -27,6 +27,21 @@ docker buildx build --platform linux/amd64,linux/arm64 \
   -t ${OPENCSG_ACR}/public/lm-evaluation-harness:latest \
   -f Dockerfile.lm-evaluation-harness \
   --push .
+
+#opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/evalscope:1.4.2-cu124
+export IMAGE_TAG=1.4.2-cu124
+docker buildx build --platform linux/amd64 \
+  -t ${OPENCSG_ACR}/opencsghq/evalscope:${IMAGE_TAG} \
+  -t ${OPENCSG_ACR}/opencsghq/evalscope:latest \
+  -f Dockerfile.evalscope-gpu \
+  --push .
+#opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/evalscope:1.4.2-cpu
+export IMAGE_TAG=1.4.2-cpu
+docker buildx build --platform linux/amd64 \
+  -t ${OPENCSG_ACR}/opencsghq/evalscope:${IMAGE_TAG} \
+  -t ${OPENCSG_ACR}/opencsghq/evalscope:latest \
+  -f Dockerfile.evalscope-cpu \
+  --push .
 ```
 
 _The above command will create `linux/amd64` and `linux/arm64` images with the tags `${IMAGE_TAG}` and `latest` at the same time._
