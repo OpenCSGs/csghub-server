@@ -149,3 +149,47 @@ func Test_GetDeploysReport_InvalidFormat(t *testing.T) {
 	tester.WithQuery("start_time", "invalid").WithQuery("end_time", "2024-01-01").Execute()
 	tester.ResponseEqSimple(t, http.StatusBadRequest, httpbase.R{Msg: "invalid datetime format, use '2006-01-02 15:04:05' or '2006-01-02'"})
 }
+
+func Test_GetClusterPublic(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		tester := newClusterTester(t).withHandlerFunc(func(clusterHandler *ClusterHandler) gin.HandlerFunc {
+			return clusterHandler.GetClusterPublic
+		})
+
+		expectedResult := types.PublicClusterRes{
+			Hardware: []types.HardwareInfo{
+				{GPUVendor: "NVIDIA", XPUModel: "A100", XPUMem: 40, Region: "us-west-1"},
+			},
+			Regions:    []string{"us-west-1"},
+			GPUVendors: []string{"NVIDIA"},
+		}
+
+		tester.mocks.clusterComponent.EXPECT().
+			IndexPublic(context.Background()).
+			Once().
+			Return(expectedResult, nil)
+
+		tester.Execute()
+		tester.ResponseEqSimple(t, 200, httpbase.R{
+			Msg:  "OK",
+			Data: expectedResult,
+		})
+	})
+
+	t.Run("error", func(t *testing.T) {
+		tester := newClusterTester(t).withHandlerFunc(func(clusterHandler *ClusterHandler) gin.HandlerFunc {
+			return clusterHandler.GetClusterPublic
+		})
+
+		tester.mocks.clusterComponent.EXPECT().
+			IndexPublic(context.Background()).
+			Once().
+			Return(types.PublicClusterRes{}, errorx.ErrInternalServerError)
+
+		tester.Execute()
+		tester.ResponseEqSimple(t, http.StatusInternalServerError, httpbase.R{
+			Msg:  errorx.ErrInternalServerError.Error(),
+			Code: errorx.ErrInternalServerError.(errorx.CustomError).Code(),
+		})
+	})
+}

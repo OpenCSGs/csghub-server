@@ -13,6 +13,8 @@ import (
 	"strings"
 	"time"
 
+	sched "opencsg.com/csghub-server/runner/component/kube_scheduler"
+
 	"opencsg.com/csghub-server/component/reporter"
 
 	v1alpha1 "github.com/argoproj/argo-workflows/v3/pkg/apis/workflow/v1alpha1"
@@ -330,6 +332,21 @@ func wfTemplateForImageBuilder(cfg *config.Config, params ctypes.ImageBuilderReq
 		})
 	}
 
+	specVolumes = append(specVolumes, corev1.Volume{
+		Name: "docker-config",
+		VolumeSource: corev1.VolumeSource{
+			Secret: &corev1.SecretVolumeSource{
+				SecretName: cfg.Space.ImagePullSecret,
+				Items: []corev1.KeyToPath{
+					{
+						Key:  ".dockerconfigjson",
+						Path: "config.json",
+					},
+				},
+			},
+		},
+	})
+
 	wfTemplate := &v1alpha1.Workflow{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "imagebuilder-",
@@ -341,7 +358,6 @@ func wfTemplateForImageBuilder(cfg *config.Config, params ctypes.ImageBuilderReq
 				Labels: labels,
 			},
 			Entrypoint: "main",
-			Volumes:    specVolumes,
 			Templates: []v1alpha1.Template{
 				{
 					Name: "main",
@@ -357,7 +373,8 @@ func wfTemplateForImageBuilder(cfg *config.Config, params ctypes.ImageBuilderReq
 					},
 				},
 				{
-					Name: buildContainerType,
+					Name:    buildContainerType,
+					Volumes: specVolumes,
 					InitContainers: []v1alpha1.UserContainer{
 						{
 							Container: corev1.Container{
@@ -411,22 +428,15 @@ func wfTemplateForImageBuilder(cfg *config.Config, params ctypes.ImageBuilderReq
 			Name: cfg.Space.ImagePullSecret,
 		},
 	}
-
-	wfTemplate.Spec.Volumes = append(wfTemplate.Spec.Volumes, corev1.Volume{
-		Name: "docker-config",
-		VolumeSource: corev1.VolumeSource{
-			Secret: &corev1.SecretVolumeSource{
-				SecretName: cfg.Space.ImagePullSecret,
-				Items: []corev1.KeyToPath{
-					{
-						Key:  ".dockerconfigjson",
-						Path: "config.json",
-					},
-				},
-			},
-		},
-	})
 	wfTemplate.Spec.ServiceAccountName = cfg.Argo.ServiceAccountName
+
+	// Assignment Scheduler from req params
+	applier := sched.NewApplier(params.Scheduler)
+	for _, template := range wfTemplate.Spec.Templates {
+		if err := applier.ApplyToArgo(&template); err != nil {
+			return nil, err
+		}
+	}
 
 	return wfTemplate, nil
 }

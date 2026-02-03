@@ -193,17 +193,17 @@ func (n *Nats) DeleteMessagesByFilter(streamName string, filter func(data []byte
 			}
 
 			err = stream.DeleteMsg(ctx, metadata.Sequence.Stream)
-		if err != nil {
-			slog.Error("[nats] failed to delete message",
-				slog.Uint64("sequence", metadata.Sequence.Stream),
-				slog.Any("error", err))
-			continue
+			if err != nil {
+				slog.Error("[nats] failed to delete message",
+					slog.Uint64("sequence", metadata.Sequence.Stream),
+					slog.Any("error", err))
+				continue
+			}
+			deletedCount++
 		}
-		deletedCount++
-	}
-	if err := msg.Ack(); err != nil {
-		slog.Warn("[nats] failed to ack message", slog.Any("error", err))
-	}
+		if err := msg.Ack(); err != nil {
+			slog.Warn("[nats] failed to ack message", slog.Any("error", err))
+		}
 	}
 
 	slog.Info("[nats] messages deleted by filter",

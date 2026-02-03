@@ -30,6 +30,7 @@ import (
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/runner/common"
+	sched "opencsg.com/csghub-server/runner/component/kube_scheduler"
 )
 
 type workFlowComponentImpl struct {
@@ -102,7 +103,10 @@ func (wc *workFlowComponentImpl) CreateWorkflow(ctx context.Context, req types.A
 		argowf.ResultURL = req.Username + "/" + req.FinetunedModelName
 	}
 	// create workflow in argo
-	awf := generateWorkflow(req, wc.config)
+	awf, err := generateWorkflow(req, wc.config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate workflow: %v", err)
+	}
 	wc.setLabels(argowf, awf)
 	slog.InfoContext(ctx, "create workflow in runner", slog.Any("namespace", namespace), slog.Any("awf.name", awf.Name),
 		slog.Any("result-url", argowf.ResultURL), slog.Any("task-type", argowf.TaskType))
@@ -254,7 +258,8 @@ func (wc *workFlowComponentImpl) FindWorkFlows(ctx context.Context, username str
 }
 
 // create workflow in argo
-func generateWorkflow(req types.ArgoWorkFlowReq, config *config.Config) *v1alpha1.Workflow {
+func generateWorkflow(req types.ArgoWorkFlowReq, config *config.Config) (*v1alpha1.Workflow, error) {
+	applier := sched.NewApplier(req.Scheduler)
 	templates := []v1alpha1.Template{}
 	for _, v := range req.Templates {
 		resReq, _, nodeAffinity := generateResources(v.HardWare, req.Nodes)
@@ -323,6 +328,10 @@ func generateWorkflow(req types.ArgoWorkFlowReq, config *config.Config) *v1alpha
 			}
 		}
 
+		if err := applier.ApplyToArgo(&temp); err != nil {
+			return nil, fmt.Errorf("failed to apply scheduler to argo template: %v", err)
+		}
+
 		if req.TaskType == types.TaskTypeEvaluation {
 			temp.Outputs = v1alpha1.Outputs{
 				Parameters: []v1alpha1.Parameter{
@@ -365,7 +374,7 @@ func generateWorkflow(req types.ArgoWorkFlowReq, config *config.Config) *v1alpha
 		},
 	}
 
-	return workflowObject
+	return workflowObject, nil
 }
 
 func (wc *workFlowComponentImpl) RunInformer(c *config.Config) {

@@ -7,6 +7,7 @@ require (
 	github.com/OpenCSGs/gitea-go-sdk/gitea v0.0.0-20240618091626-54fa52f1cec6
 	github.com/alibabacloud-go/darabonba-openapi/v2 v2.1.8
 	github.com/alibabacloud-go/dm-20151123/v2 v2.4.0
+	github.com/alibabacloud-go/dysmsapi-20170525/v5 v5.1.2
 	github.com/alibabacloud-go/green-20220302/v2 v2.20.0
 	github.com/alibabacloud-go/tea v1.3.9
 	github.com/aliyun/alibaba-cloud-sdk-go v1.62.648
@@ -23,22 +24,30 @@ require (
 	github.com/gin-contrib/sessions v0.0.5
 	github.com/gin-gonic/gin v1.10.0
 	github.com/go-pay/errgroup v0.0.2
+	github.com/go-pay/gopay v1.5.106
 	github.com/go-redsync/redsync/v4 v4.13.0
 	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/golang/gddo v0.0.0-20210115222349-20d68f94ee1f
+	github.com/golang/mock v1.6.0
 	github.com/google/wire v0.6.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/jarcoal/httpmock v1.3.1
+	github.com/larksuite/oapi-sdk-go/v3 v3.4.18
 	github.com/looplab/fsm v1.0.3
 	github.com/marcboeker/go-duckdb v1.5.6
+	github.com/matoous/go-nanoid/v2 v2.1.0
 	github.com/mcuadros/go-defaults v1.2.0
 	github.com/minio/minio-go/v7 v7.0.84
 	github.com/minio/sha256-simd v1.0.1
+	github.com/modelcontextprotocol/go-sdk v1.2.0
+	github.com/mojocn/base64Captcha v1.3.8
 	github.com/naoina/toml v0.1.1
 	github.com/nicksnyder/go-i18n/v2 v2.6.0
 	github.com/nyaruka/phonenumbers v1.6.5
 	github.com/openai/openai-go/v3 v3.8.1
+	github.com/oschwald/geoip2-golang/v2 v2.0.0
 	github.com/parquet-go/parquet-go v0.24.0
+	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/prometheus/client_golang v1.21.1
 	github.com/prometheus/client_model v0.6.1
 	github.com/redis/go-redis/v9 v9.5.5
@@ -146,11 +155,16 @@ require (
 	github.com/go-ini/ini v1.67.0 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
+	github.com/go-pay/crypto v0.0.1 // indirect
+	github.com/go-pay/util v0.0.4 // indirect
+	github.com/go-pay/xlog v0.0.3 // indirect
+	github.com/go-pay/xtime v0.0.2 // indirect
 	github.com/go-sql-driver/mysql v1.9.1 // indirect
 	github.com/gocql/gocql v1.7.0 // indirect
+	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
-	github.com/golang/mock v1.6.0 // indirect
 	github.com/golang/snappy v1.0.0 // indirect
+	github.com/google/jsonschema-go v0.3.0 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.6 // indirect
 	github.com/googleapis/gax-go/v2 v2.14.1 // indirect
@@ -194,6 +208,7 @@ require (
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/olivere/elastic/v7 v7.0.32 // indirect
 	github.com/opencontainers/image-spec v1.1.1 // indirect
+	github.com/oschwald/maxminddb-golang/v2 v2.0.0 // indirect
 	github.com/pborman/uuid v1.2.1 // indirect
 	github.com/philhofer/fwd v1.1.1 // indirect
 	github.com/pierrec/lz4/v4 v4.1.21 // indirect
@@ -233,6 +248,7 @@ require (
 	github.com/uber/jaeger-lib v2.4.1+incompatible // indirect
 	github.com/uptrace/opentelemetry-go-extra/otelsql v0.3.2 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
+	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	gitlab.com/gitlab-org/go/reopen v1.0.0 // indirect
 	gitlab.com/gitlab-org/labkit v1.21.2 // indirect
@@ -247,6 +263,7 @@ require (
 	go.uber.org/fx v1.23.0 // indirect
 	go.uber.org/mock v0.5.0 // indirect
 	golang.org/x/exp v0.0.0-20250305212735-054e65f0b394 // indirect
+	golang.org/x/image v0.23.0 // indirect
 	golang.org/x/xerrors v0.0.0-20231012003039-104605ab7028 // indirect
 	gonum.org/v1/gonum v0.15.1 // indirect
 	google.golang.org/api v0.228.0 // indirect
@@ -377,5 +394,5 @@ require (
 	sigs.k8s.io/json v0.0.0-20241010143419-9aa6b5e7a4b3 // indirect
 	sigs.k8s.io/lws v0.6.1
 	sigs.k8s.io/structured-merge-diff/v4 v4.7.0 // indirect
-	sigs.k8s.io/yaml v1.4.0 // indirect
+	sigs.k8s.io/yaml v1.4.0
 )

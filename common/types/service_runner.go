@@ -16,6 +16,23 @@ const (
 
 type StrategyType string
 
+type KubeScheduler string
+
+func (ks KubeScheduler) ToString() string {
+	return string(ks)
+}
+
+const (
+	KubeSchedulerVolcano KubeScheduler = "volcano"
+)
+
+type VolcanoVgpuModel string
+
+const (
+	VolcanoVgpuModelHamiCore VolcanoVgpuModel = "hami-core"
+	VolcanoVgpuModelMig      VolcanoVgpuModel = "mig"
+)
+
 type (
 	RunRequest struct {
 		ID       int64  `json:"id"`
@@ -34,18 +51,19 @@ type (
 		Env        map[string]string `json:"env,omitempty"`        // runtime env variables
 		Annotation map[string]string `json:"annotation,omitempty"` // resource annotations
 
-		RuntimeFramework string `json:"runtime_framework"` // runtime framework of image, TGI/vllm/Pipeline/Deepspeed/LLamacpp
-		ImageID          string `json:"image_id"`          // container_image
-		DeployID         int64  `json:"deploy_id"`
-		Accesstoken      string `json:"access_token"`
-		ClusterID        string `json:"cluster_id"`
-		SvcName          string `json:"svc_name"`
-		DeployType       int    `json:"deploy_type"`
-		UserID           string `json:"user_id"`
-		Sku              string `json:"sku"`
-		OrderDetailID    int64  `json:"order_detail_id"`
-		TaskId           int64  `json:"task_id"`
-		Nodes            []Node `json:"nodes"`
+		RuntimeFramework string     `json:"runtime_framework"` // runtime framework of image, TGI/vllm/Pipeline/Deepspeed/LLamacpp
+		ImageID          string     `json:"image_id"`          // container_image
+		DeployID         int64      `json:"deploy_id"`
+		Accesstoken      string     `json:"access_token"`
+		ClusterID        string     `json:"cluster_id"`
+		SvcName          string     `json:"svc_name"`
+		DeployType       int        `json:"deploy_type"`
+		UserID           string     `json:"user_id"`
+		Sku              string     `json:"sku"`
+		OrderDetailID    int64      `json:"order_detail_id"`
+		TaskId           int64      `json:"task_id"`
+		Nodes            []Node     `json:"nodes"`
+		Scheduler        *Scheduler `json:"scheduler,omitempty"`
 	}
 
 	Node struct {
@@ -207,7 +225,28 @@ type (
 		TaskId        int64             `json:"task_id"`
 		Nodes         []Node            `json:"nodes"`
 
-		StrategyType string `json:"strategy_type"` // blue_green/canary
+		StrategyType string     `json:"strategy_type"` // blue_green/canary
+		Scheduler    *Scheduler `json:"scheduler,omitempty"`
+	}
+
+	Scheduler struct {
+		Volcano *VolcanoConfig `json:"volcano,omitempty"`
+	}
+
+	VolcanoConfig struct {
+		SchedulerName     string              `json:"schedulerName,omitempty"`
+		PriorityClassName string              `json:"priorityClassName,omitempty"`
+		Queue             string              `json:"queue,omitempty"`
+		MinAvailable      int32               `json:"minAvailable,omitempty"`
+		Policies          []VolcanoPolicy     `json:"policies,omitempty"`
+		Plugins           map[string][]string `json:"plugins,omitempty"`
+		MaxRetry          int32               `json:"maxRetry,omitempty"`
+		VGPUMode          string              `json:"volcano.sh/vgpu-mode,omitempty"`
+	}
+
+	VolcanoPolicy struct {
+		Event  string `json:"event"`
+		Action string `json:"action"`
 	}
 
 	EngineArg struct {
