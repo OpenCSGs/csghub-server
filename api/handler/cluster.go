@@ -145,6 +145,26 @@ func (h *ClusterHandler) GetDeploys(ctx *gin.Context) {
 	httpbase.OKWithTotal(ctx, deploys, total)
 }
 
+// GetClusterPublic   godoc
+// @Summary      Get cluster list public
+// @Description  Get cluster list public
+// @Tags         Cluster
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /cluster/public [get]
+func (h *ClusterHandler) GetClusterPublic(ctx *gin.Context) {
+	clusters, err := h.c.IndexPublic(ctx.Request.Context())
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get cluster list", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	httpbase.OK(ctx, clusters)
+}
+
 // GetClusterDeploysReport  godoc
 // @Security     ApiKey
 // @Summary      Export cluster deploys as CSV

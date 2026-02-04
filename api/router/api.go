@@ -397,6 +397,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		cluster.GET("/deploys_report", middlewareCollection.Auth.NeedAdmin, clusterHandler.GetDeploysReport)
 		cluster.GET("/:id", middlewareCollection.Auth.NeedLogin, clusterHandler.GetClusterById)
 		cluster.PUT("/:id", middlewareCollection.Auth.NeedAdmin, clusterHandler.Update)
+		cluster.GET("/public", clusterHandler.GetClusterPublic)
 	}
 
 	eventHandler, err := handler.NewEventHandler()

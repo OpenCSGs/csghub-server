@@ -2,6 +2,7 @@ package component
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -224,4 +225,131 @@ func TestClusterComponent_ExtractDeployTargetAndHost2(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, "remote", endpoint)
 	require.Equal(t, "127.0.0.1", host)
+}
+
+func TestClusterComponent_IndexPublic(t *testing.T) {
+	ctx := context.TODO()
+	cc := initializeTestClusterComponent(ctx, t)
+
+	// Mock cluster store to return clusters with different statuses
+	cc.mocks.stores.ClusterInfoMock().EXPECT().List(ctx).Return([]database.ClusterInfo{
+		{ClusterID: "c1", Status: "running", Enable: true, Region: "us-west-1"},
+		{ClusterID: "c2", Status: "Unavailable", Enable: true, Region: "us-east-1"}, // Should be filtered out
+		{ClusterID: "c3", Status: "running", Enable: false, Region: "eu-west-1"},    // Should be filtered out
+		{ClusterID: "c4", Status: "running", Enable: true, Region: "ap-southeast-1"},
+	}, nil)
+
+	// Mock deployer for clusters that should be included
+	cc.mocks.deployer.EXPECT().GetClusterById(ctx, "c1").Return(&types.ClusterRes{
+		ClusterID: "c1",
+		Resources: []types.NodeResourceInfo{
+			{
+				NodeHardware: types.NodeHardware{
+					GPUVendor: "NVIDIA",
+					XPUModel:  "A100",
+					XPUMem:    "40Gi"},
+			},
+			{
+				NodeHardware: types.NodeHardware{
+					GPUVendor: "AMD",
+					XPUModel:  "MI100",
+					XPUMem:    "32Gi"},
+			},
+		},
+	}, nil)
+
+	cc.mocks.deployer.EXPECT().GetClusterById(ctx, "c4").Return(&types.ClusterRes{
+		ClusterID: "c4",
+		Resources: []types.NodeResourceInfo{
+			{NodeHardware: types.NodeHardware{
+				GPUVendor: "NVIDIA",
+				XPUModel:  "H100",
+				XPUMem:    "80Gi"},
+			},
+		},
+	}, nil)
+
+	// Test the method
+	result, err := cc.IndexPublic(ctx)
+	require.Nil(t, err)
+
+	// Verify results
+	require.Len(t, result.Hardware, 3)
+	require.Len(t, result.Regions, 2)
+	require.Len(t, result.GPUVendors, 2)
+	require.Contains(t, result.Regions, "us-west-1")
+	require.Contains(t, result.Regions, "ap-southeast-1")
+	require.Contains(t, result.GPUVendors, "NVIDIA")
+	require.Contains(t, result.GPUVendors, "AMD")
+}
+
+func TestClusterComponent_IndexPublic_DeployerError(t *testing.T) {
+	ctx := context.TODO()
+	cc := initializeTestClusterComponent(ctx, t)
+
+	// Mock cluster store to return a cluster
+	cc.mocks.stores.ClusterInfoMock().EXPECT().List(ctx).Return([]database.ClusterInfo{
+		{ClusterID: "c1", Status: "running", Enable: true, Region: "us-west-1"},
+	}, nil)
+
+	// Mock deployer to return error
+	cc.mocks.deployer.EXPECT().GetClusterById(ctx, "c1").Return(nil, fmt.Errorf("deployer error"))
+
+	// Test the method
+	result, err := cc.IndexPublic(ctx)
+	require.Nil(t, err)
+
+	// Verify results - should include cluster but no hardware info
+	require.Len(t, result.Hardware, 0)
+	require.Len(t, result.Regions, 1)
+	require.Len(t, result.GPUVendors, 0)
+	require.Contains(t, result.Regions, "us-west-1")
+}
+
+func TestClusterComponent_IndexPublic_ClusterStoreError(t *testing.T) {
+	ctx := context.TODO()
+	cc := initializeTestClusterComponent(ctx, t)
+
+	// Mock cluster store to return error
+	cc.mocks.stores.ClusterInfoMock().EXPECT().List(ctx).Return(nil, fmt.Errorf("store error"))
+
+	// Test the method
+	result, err := cc.IndexPublic(ctx)
+	require.NotNil(t, err)
+	require.Equal(t, types.PublicClusterRes{}, result)
+}
+
+func TestClusterComponent_IndexPublic_GPUMemParseError(t *testing.T) {
+	ctx := context.TODO()
+	cc := initializeTestClusterComponent(ctx, t)
+
+	// Mock cluster store to return a cluster
+	cc.mocks.stores.ClusterInfoMock().EXPECT().List(ctx).Return([]database.ClusterInfo{
+		{ClusterID: "c1", Status: "running", Enable: true, Region: "us-west-1"},
+	}, nil)
+
+	// Mock deployer with invalid XPUMem value
+	cc.mocks.deployer.EXPECT().GetClusterById(ctx, "c1").Return(&types.ClusterRes{
+		ClusterID: "c1",
+		Resources: []types.NodeResourceInfo{
+			{NodeHardware: types.NodeHardware{
+				GPUVendor: "NVIDIA",
+				XPUModel:  "A100",
+				XPUMem:    "invalid-mem"}, // Invalid memory format
+			},
+		},
+	}, nil)
+
+	// Test the method
+	result, err := cc.IndexPublic(ctx)
+	require.Nil(t, err)
+
+	// Verify results - should include cluster with 0 memory
+	require.Len(t, result.Hardware, 1)
+	require.Len(t, result.Regions, 1)
+	require.Len(t, result.GPUVendors, 1)
+	require.Equal(t, int64(0), result.Hardware[0].XPUMem)
+	require.Equal(t, "NVIDIA", result.Hardware[0].GPUVendor)
+	require.Equal(t, "A100", result.Hardware[0].XPUModel)
+	require.Equal(t, "us-west-1", result.Hardware[0].Region)
 }
