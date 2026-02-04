@@ -145,6 +145,7 @@ func TestDeployWorkflowSuccess(t *testing.T) {
 
 	mockDeployTaskStore.EXPECT().GetDeployTask(mock.Anything, runTask.ID).Return(runTask, nil)
 	mockDeployTaskStore.EXPECT().GetDeployByID(mock.Anything, mock.Anything).Return(deploy, nil).Maybe()
+	mockDeployTaskStore.EXPECT().GetLastTaskByType(mock.Anything, runTask.Deploy.ID, runTask.TaskType).Return(runTask, nil)
 
 	runTask.Status = common.Pending
 	mockImageRunner.EXPECT().Run(mock.Anything, mock.Anything).Return(&types.RunResponse{
