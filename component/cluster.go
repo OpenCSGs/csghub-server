@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
+	"math/big"
 	"net/url"
 	"time"
 
+	units "github.com/dustin/go-humanize"
 	"opencsg.com/csghub-server/builder/accounting"
 	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/store/database"
@@ -18,6 +20,7 @@ import (
 
 type ClusterComponent interface {
 	Index(ctx context.Context) ([]types.ClusterRes, error)
+	IndexPublic(ctx context.Context) (types.PublicClusterRes, error)
 	GetClusterWithResourceByID(ctx context.Context, clusterId string) (*types.ClusterRes, error)
 	Update(ctx context.Context, data types.ClusterRequest) (*types.ClusterRes, error)
 	GetClusterUsages(ctx context.Context) ([]types.ClusterRes, error)
@@ -71,6 +74,52 @@ func (c *clusterComponentImpl) Index(ctx context.Context) ([]types.ClusterRes, e
 		clusters = append(clusters, *cluster)
 	}
 	return clusters, nil
+}
+
+func (c *clusterComponentImpl) IndexPublic(ctx context.Context) (types.PublicClusterRes, error) {
+	clusterInos, err := c.clusterStore.List(ctx)
+	if err != nil {
+		return types.PublicClusterRes{}, err
+	}
+	var publicClusters types.PublicClusterRes
+	gpuVendorMap := make(map[string]bool)
+	for _, clusterInfo := range clusterInos {
+		if types.ClusterStatus(clusterInfo.Status) == types.ClusterStatusUnavailable {
+			continue
+		}
+		if !clusterInfo.Enable {
+			continue
+		}
+		// Get cluster details to include GPU information
+		clusterRes, err := c.deployer.GetClusterById(ctx, clusterInfo.ClusterID)
+		var hardware []types.HardwareInfo
+		if err == nil {
+			// Use NodeResourceInfo from clusterRes.Resources
+			for _, nodeRes := range clusterRes.Resources {
+				if nodeRes.XPUModel != "" {
+					gpuVendorMap[nodeRes.GPUVendor] = true
+					bitIntXPUMem, err := units.ParseBigBytes(nodeRes.XPUMem)
+					if err != nil {
+						slog.WarnContext(ctx, "parse xpu mem failed", "xpu_mem", nodeRes.XPUMem, "error", err)
+						bitIntXPUMem = big.NewInt(0)
+					}
+					hardware = append(hardware, types.HardwareInfo{
+						Region:    clusterInfo.Region,
+						GPUVendor: nodeRes.GPUVendor,
+						XPUModel:  nodeRes.XPUModel,
+						XPUMem:    bitIntXPUMem.Int64() / (1024 * 1024 * 1024),
+					})
+				}
+			}
+		}
+		publicClusters.Hardware = append(publicClusters.Hardware, hardware...)
+		publicClusters.Regions = append(publicClusters.Regions, clusterInfo.Region)
+	}
+	publicClusters.GPUVendors = make([]string, 0, len(gpuVendorMap))
+	for vendor := range gpuVendorMap {
+		publicClusters.GPUVendors = append(publicClusters.GPUVendors, vendor)
+	}
+	return publicClusters, nil
 }
 
 func (c *clusterComponentImpl) GetClusterUsages(ctx context.Context) ([]types.ClusterRes, error) {

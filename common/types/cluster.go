@@ -27,6 +27,19 @@ type ClusterEvent struct {
 	Mode             ClusterMode   `json:"mode"`              // InCluster | kubeconfig
 	AppEndpoint      string        `json:"app_endpoint"`      // address of space/inference application
 }
+type HardwareInfo struct {
+	Region    string `json:"region"`
+	GPUVendor string `json:"gpu_vendor"`
+	XPUModel  string `json:"xpu_model"`
+	XPUMem    int64  `json:"xpu_mem"`
+}
+
+type PublicClusterRes struct {
+	Regions    []string       `json:"region"`
+	GPUVendors []string       `json:"gpu_vendor"`
+	Hardware   []HardwareInfo `json:"hardware"`
+}
+
 type ClusterRes struct {
 	ClusterID        string             `json:"cluster_id"`
 	Status           ClusterStatus      `json:"status" i18n:"cluster.status"` //active, inactive
