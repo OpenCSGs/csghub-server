@@ -10,6 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/aigateway/component"
 	mocktoken "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/aigateway/token"
 	"opencsg.com/csghub-server/aigateway/types"
@@ -22,9 +23,7 @@ func TestResponseWriterWrapper_NewResponseWriterWrapper(t *testing.T) {
 	ctx, _ := gin.CreateTestContext(w)
 
 	rw := newStreamResponseWriter(ctx.Writer, component.NewMockModeration(t), mocktoken.NewMockChatTokenCounter(t))
-	if rw == nil {
-		t.Fatal("NewResponseWriterWrapper should not return nil")
-	}
+	require.NotNil(t, rw)
 	if rw.internalWritter != ctx.Writer {
 		t.Error("internalWritter should be set correctly")
 	}

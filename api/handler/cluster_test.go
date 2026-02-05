@@ -155,37 +155,37 @@ func Test_GetClusterPublic(t *testing.T) {
 		tester := newClusterTester(t).withHandlerFunc(func(clusterHandler *ClusterHandler) gin.HandlerFunc {
 			return clusterHandler.GetClusterPublic
 		})
-		
+
 		expectedResult := types.PublicClusterRes{
 			Hardware: []types.HardwareInfo{
 				{GPUVendor: "NVIDIA", XPUModel: "A100", XPUMem: 40, Region: "us-west-1"},
 			},
-			Regions: []string{"us-west-1"},
+			Regions:    []string{"us-west-1"},
 			GPUVendors: []string{"NVIDIA"},
 		}
-		
+
 		tester.mocks.clusterComponent.EXPECT().
 			IndexPublic(context.Background()).
 			Once().
 			Return(expectedResult, nil)
-		
+
 		tester.Execute()
 		tester.ResponseEqSimple(t, 200, httpbase.R{
-			Msg: "OK",
+			Msg:  "OK",
 			Data: expectedResult,
 		})
 	})
-	
+
 	t.Run("error", func(t *testing.T) {
 		tester := newClusterTester(t).withHandlerFunc(func(clusterHandler *ClusterHandler) gin.HandlerFunc {
 			return clusterHandler.GetClusterPublic
 		})
-		
+
 		tester.mocks.clusterComponent.EXPECT().
 			IndexPublic(context.Background()).
 			Once().
 			Return(types.PublicClusterRes{}, errorx.ErrInternalServerError)
-		
+
 		tester.Execute()
 		tester.ResponseEqSimple(t, http.StatusInternalServerError, httpbase.R{
 			Msg:  errorx.ErrInternalServerError.Error(),
