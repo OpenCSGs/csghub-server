@@ -346,8 +346,20 @@ func (a *DeployActivity) updateDeployTaskStatus(task *database.DeployTask, servi
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(5))
 	defer cancel()
-	if err := a.ds.UpdateInTx(ctx, []string{"status", "svc_name"}, []string{"status", "message"}, task.Deploy, task); err != nil {
-		return err
+
+	lastTask, err := a.ds.GetLastTaskByType(ctx, task.Deploy.ID, task.TaskType)
+	if err != nil {
+		return fmt.Errorf("failed to get last task by type: %w", err)
+	}
+	if lastTask.ID != task.ID {
+		// only update task
+		if err := a.ds.UpdateInTx(ctx, []string{"status", "svc_name"}, []string{"status", "message"}, nil, task); err != nil {
+			return err
+		}
+	} else {
+		if err := a.ds.UpdateInTx(ctx, []string{"status", "svc_name"}, []string{"status", "message"}, task.Deploy, task); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -355,9 +367,20 @@ func (a *DeployActivity) updateDeployTaskStatus(task *database.DeployTask, servi
 func (a *DeployActivity) updateTaskStatus(task *database.DeployTask) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(5))
 	defer cancel()
+	lastTask, err := a.ds.GetLastTaskByType(ctx, task.Deploy.ID, task.TaskType)
+	if err != nil {
+		return fmt.Errorf("failed to get last task by type: %w", err)
+	}
 
-	if err := a.ds.UpdateInTx(ctx, []string{"status"}, []string{"status", "message"}, task.Deploy, task); err != nil {
-		return err
+	if lastTask.ID != task.ID {
+		// only update task
+		if err := a.ds.UpdateInTx(ctx, []string{"status"}, []string{"status", "message"}, nil, task); err != nil {
+			return err
+		}
+	} else {
+		if err := a.ds.UpdateInTx(ctx, []string{"status"}, []string{"status", "message"}, task.Deploy, task); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -502,6 +525,7 @@ func (a *DeployActivity) createBuildRequest(ctx context.Context, task *database.
 		LastCommitID:   lastCommit.ID,
 		TaskId:         task.ID,
 		RepoId:         repoInfo.RepoID,
+		Scheduler:      common.GenerateScheduler(a.cfg),
 	}, nil
 }
 
@@ -522,7 +546,7 @@ func (a *DeployActivity) createDeployRequest(ctx context.Context, task *database
 	pathParts := strings.Split(repoInfo.Path, "/")
 	orgName, repoName := "", ""
 	if deployInfo.Type == types.NotebookType {
-	//just a placeholder value
+		//just a placeholder value
 		orgName = "notebook"
 		repoName = deployInfo.SvcName
 	} else if len(pathParts) >= 2 {
@@ -609,7 +633,8 @@ func (a *DeployActivity) createDeployRequest(ctx context.Context, task *database
 		Sku:           deployInfo.SKU,
 		OrderDetailID: deployInfo.OrderDetailID,
 		TaskId:        task.ID,
-		Nodes: requestNodes,
+		Nodes:         requestNodes,
+		Scheduler:     common.GenerateScheduler(a.cfg),
 	}, nil
 }
 

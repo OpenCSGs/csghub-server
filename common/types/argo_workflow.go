@@ -103,6 +103,7 @@ type ArgoWorkFlowReq struct {
 	ShareMode          bool               `json:"share_mode"`
 	FinetunedModelName string             `json:"finetuned_model_name,omitempty"`
 	Nodes              []Node             `json:"nodes"`
+	Scheduler          *Scheduler         `json:"scheduler,omitempty"`
 }
 
 type ArgoWorkFlowListRes struct {

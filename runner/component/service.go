@@ -35,6 +35,7 @@ import (
 	"opencsg.com/csghub-server/common/types"
 	utils "opencsg.com/csghub-server/common/utils/common"
 	rcommon "opencsg.com/csghub-server/runner/common"
+	sched "opencsg.com/csghub-server/runner/component/kube_scheduler"
 )
 
 var (
@@ -287,6 +288,11 @@ func (s *serviceComponentImpl) generateService(ctx context.Context, cluster *clu
 			NodeAffinity: nodeAffinity,
 		}
 	}
+
+	// Apply scheduler configuration
+	applier := sched.NewApplier(request.Scheduler)
+	applier.ApplyToKnative(&service.Spec.ConfigurationSpec.Template, request)
+
 	return service, nil
 }
 

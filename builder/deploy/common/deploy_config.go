@@ -2,6 +2,7 @@ package common
 
 import (
 	"log/slog"
+	"opencsg.com/csghub-server/common/types"
 	"time"
 
 	"opencsg.com/csghub-server/builder/redis"
@@ -28,6 +29,8 @@ type DeployConfig struct {
 	HeartBeatTimeInSec int
 	PublicDomain       string
 	SSHDomain          string
+	KubeScheduler      string
+	VolcanoConfig      *types.VolcanoConfig
 }
 
 func BuildDeployConfig(cfg *config.Config) DeployConfig {
@@ -51,6 +54,11 @@ func BuildDeployConfig(cfg *config.Config) DeployConfig {
 		HeartBeatTimeInSec:      cfg.Runner.HearBeatIntervalInSec,
 		PublicDomain:            cfg.APIServer.PublicDomain,
 		SSHDomain:               cfg.APIServer.SSHDomain,
-		RedisLocker:             redisLocker,
+		KubeScheduler:           cfg.Runner.KubeScheduler,
+		VolcanoConfig: &types.VolcanoConfig{
+			SchedulerName: cfg.Runner.KubeScheduler,
+			Queue:         cfg.Runner.Volcano.Queue,
+		},
+		RedisLocker: redisLocker,
 	}
 }

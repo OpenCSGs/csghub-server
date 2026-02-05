@@ -50,6 +50,7 @@ func (h *RemoteRunner) Run(ctx context.Context, req *types.RunRequest) (*types.R
 	if err != nil {
 		return nil, err
 	}
+	// inject scheduler config
 	slog.Debug("send request", slog.Any("body", req))
 	svcName := req.SvcName
 	u := fmt.Sprintf("%s/api/v1/service/%s/run", remote, svcName)
