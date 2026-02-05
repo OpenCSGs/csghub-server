@@ -156,6 +156,7 @@ func TestDeployWorkflowSuccess(t *testing.T) {
 	mockGitServer.EXPECT().GetRepoLastCommit(mock.Anything, mock.Anything).Return(&types.Commit{
 		ID: "1234567",
 	}, nil).Maybe()
+	mockDeployTaskStore.EXPECT().GetLastTaskByType(mock.Anything, mock.Anything, mock.Anything).Return(runTask, nil)
 	mockDeployTaskStore.EXPECT().UpdateInTx(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Times(1)
 
 	mockClusterStore.EXPECT().FindNodeByClusterID(mock.Anything, deploy.ClusterID).Return([]database.ClusterNode{

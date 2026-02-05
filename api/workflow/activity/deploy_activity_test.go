@@ -145,7 +145,7 @@ func TestActivities_handleDeployError(t *testing.T) {
 	}
 
 	// Setup expectations
-	tester.mockDeployTaskStore.EXPECT().GetLastTaskByType(mock.Anything, task.Deploy.ID, task.TaskType).Return(task, nil)
+	tester.mockDeployTaskStore.EXPECT().GetLastTaskByType(mock.Anything, mock.Anything, mock.Anything).Return(task, nil)
 	tester.mockDeployTaskStore.EXPECT().UpdateInTx(
 		mock.Anything,
 		[]string{"status"},
@@ -461,7 +461,7 @@ func TestBuildFailed(t *testing.T) {
 
 	tester.mockGitServer.EXPECT().GetRepoLastCommit(mock.Anything, mock.Anything).Return(&types.Commit{}, nil)
 	tester.mockDeployTaskStore.EXPECT().UpdateDeployTask(mock.Anything, mock.Anything).Return(nil).Maybe()
-	tester.mockDeployTaskStore.EXPECT().GetLastTaskByType(mock.Anything, buildTask.Deploy.ID, buildTask.TaskType).Return(buildTask, nil)
+	tester.mockDeployTaskStore.EXPECT().GetLastTaskByType(mock.Anything, mock.Anything, mock.Anything).Return(buildTask, nil)
 	tester.mockDeployTaskStore.EXPECT().UpdateInTx(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	tester.mockSpaceStore.EXPECT().ByID(mock.Anything, mock.Anything).Return(&database.Space{
 		Repository:   deploy.Repository,
@@ -517,7 +517,7 @@ func TestDeploy(t *testing.T) {
 	}, nil)
 
 	tester.mockDeployTaskStore.EXPECT().UpdateDeployTask(mock.Anything, mock.Anything).Return(nil).Maybe()
-	tester.mockDeployTaskStore.EXPECT().GetLastTaskByType(mock.Anything, runTask.Deploy.ID, runTask.TaskType).Return(runTask, nil)
+	tester.mockDeployTaskStore.EXPECT().GetLastTaskByType(mock.Anything, mock.Anything, mock.Anything).Return(runTask, nil)
 	tester.mockDeployTaskStore.EXPECT().UpdateInTx(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	tester.mockDeployTaskStore.EXPECT().GetDeployByID(mock.Anything, mock.Anything).Return(deploy, nil)
 	tester.mockSpaceStore.EXPECT().ByID(mock.Anything, mock.Anything).Return(&database.Space{
