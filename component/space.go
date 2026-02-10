@@ -1001,15 +1001,15 @@ func (c *spaceComponentImpl) Deploy(ctx context.Context, namespace, name, curren
 		if (space.Sdk == types.GRADIO.Name && space.SdkVersion != types.GRADIO.Version) ||
 			(space.Sdk == types.STREAMLIT.Name && space.SdkVersion != types.STREAMLIT.Version) {
 			// Using old base image 1.0.3 for old spaces, will be removed in the future
-			frame, err = c.rfs.FindByFrameNameAndDriverVersion(ctx, "space", "1.0.3", space.DriverVersion)
+			frame, err = c.rfs.FindByFrameNameAndDriverVersion(ctx, "space", EngineVersion103, space.DriverVersion)
 			if err != nil {
-				return -1, fmt.Errorf("cannot find available (1.0.3) runtime framework, %w", err)
+				return -1, fmt.Errorf("cannot find available (%s) runtime framework, %w", EngineVersion103, err)
 			}
 		} else {
-			// 1.0.4
-			frame, err = c.rfs.FindByFrameNameAndDriverVersion(ctx, "space", "1.0.4", space.DriverVersion)
+			// use latest base space runtime image
+			frame, err = c.rfs.FindSpaceLatestVersion(ctx, "space", space.DriverVersion)
 			if err != nil {
-				return -1, fmt.Errorf("cannot find available (1.0.4) runtime framework, %w", err)
+				return -1, fmt.Errorf("cannot find available latest space runtime framework, %w", err)
 			}
 		}
 

@@ -189,7 +189,7 @@ func TestSpaceComponent_Deploy(t *testing.T) {
 	sc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
 		Username: "user1",
 	}, nil)
-	sc.mocks.stores.RuntimeFrameworkMock().EXPECT().FindByFrameNameAndDriverVersion(ctx, mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
+	sc.mocks.stores.RuntimeFrameworkMock().EXPECT().FindSpaceLatestVersion(ctx, mock.Anything, mock.Anything).Return(&database.RuntimeFramework{}, nil)
 
 	t.Run("Deploy", func(t *testing.T) {
 		sc.mocks.stores.SpaceMock().EXPECT().FindByPath(ctx, "ns1", "n1").Return(&database.Space{
