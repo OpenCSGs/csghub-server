@@ -650,15 +650,17 @@ func (h *SpaceHandler) Logs(ctx *gin.Context) {
 // @Security     ApiKey
 // @Accept       json
 // @Produce      json
-// @Param        namespace path string true "namespace"
-// @Param        name path string true "name"
 // @Param        resource_type query string true "resource_type"
 // @Success      200  {object}  types.Response{data=[]string} "Success"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
-// @Router       /spaces/{namespace}/{name}/cuda-versions/{resource_type} [get]
+// @Router       /spaces/cuda-versions [get]
 func (h *SpaceHandler) GetSupportedCUDAVersions(ctx *gin.Context) {
-	resourceType := ctx.Param("resource_type")
+	resourceType := ctx.Query("resource_type")
+	if resourceType == "" {
+		resourceType = "gpu"
+	}
+
 	versions, err := h.space.GetSupportedCUDAVersions(ctx.Request.Context(), resourceType)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "failed to get supported cuda versions", "error", err)
