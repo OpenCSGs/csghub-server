@@ -525,7 +525,6 @@ func (a *DeployActivity) createBuildRequest(ctx context.Context, task *database.
 		LastCommitID:   lastCommit.ID,
 		TaskId:         task.ID,
 		RepoId:         repoInfo.RepoID,
-		Scheduler:      common.GenerateScheduler(a.cfg),
 	}, nil
 }
 
@@ -546,7 +545,7 @@ func (a *DeployActivity) createDeployRequest(ctx context.Context, task *database
 	pathParts := strings.Split(repoInfo.Path, "/")
 	orgName, repoName := "", ""
 	if deployInfo.Type == types.NotebookType {
-		//just a placeholder value
+	//just a placeholder value
 		orgName = "notebook"
 		repoName = deployInfo.SvcName
 	} else if len(pathParts) >= 2 {
@@ -633,8 +632,7 @@ func (a *DeployActivity) createDeployRequest(ctx context.Context, task *database
 		Sku:           deployInfo.SKU,
 		OrderDetailID: deployInfo.OrderDetailID,
 		TaskId:        task.ID,
-		Nodes:         requestNodes,
-		Scheduler:     common.GenerateScheduler(a.cfg),
+		Nodes: requestNodes,
 	}, nil
 }
 
