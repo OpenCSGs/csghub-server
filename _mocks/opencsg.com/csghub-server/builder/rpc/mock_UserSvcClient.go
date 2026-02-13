@@ -329,6 +329,65 @@ func (_c *MockUserSvcClient_GetOrCreateFirstAvaiTokens_Call) RunAndReturn(run fu
 	return _c
 }
 
+// GetOrgByName provides a mock function with given fields: ctx, orgName
+func (_m *MockUserSvcClient) GetOrgByName(ctx context.Context, orgName string) (*types.Organization, error) {
+	ret := _m.Called(ctx, orgName)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetOrgByName")
+	}
+
+	var r0 *types.Organization
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*types.Organization, error)); ok {
+		return rf(ctx, orgName)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *types.Organization); ok {
+		r0 = rf(ctx, orgName)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.Organization)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, orgName)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockUserSvcClient_GetOrgByName_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetOrgByName'
+type MockUserSvcClient_GetOrgByName_Call struct {
+	*mock.Call
+}
+
+// GetOrgByName is a helper method to define mock.On call
+//   - ctx context.Context
+//   - orgName string
+func (_e *MockUserSvcClient_Expecter) GetOrgByName(ctx interface{}, orgName interface{}) *MockUserSvcClient_GetOrgByName_Call {
+	return &MockUserSvcClient_GetOrgByName_Call{Call: _e.mock.On("GetOrgByName", ctx, orgName)}
+}
+
+func (_c *MockUserSvcClient_GetOrgByName_Call) Run(run func(ctx context.Context, orgName string)) *MockUserSvcClient_GetOrgByName_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockUserSvcClient_GetOrgByName_Call) Return(_a0 *types.Organization, _a1 error) *MockUserSvcClient_GetOrgByName_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockUserSvcClient_GetOrgByName_Call) RunAndReturn(run func(context.Context, string) (*types.Organization, error)) *MockUserSvcClient_GetOrgByName_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetUserByName provides a mock function with given fields: ctx, userName
 func (_m *MockUserSvcClient) GetUserByName(ctx context.Context, userName string) (*types.User, error) {
 	ret := _m.Called(ctx, userName)

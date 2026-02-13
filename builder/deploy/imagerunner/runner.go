@@ -27,4 +27,5 @@ type Runner interface {
 	CreateRevisions(context.Context, *types.CreateRevisionReq) error
 	ListKsvcVersions(ctx context.Context, clusterID, svcName string) ([]types.KsvcRevisionInfo, error)
 	DeleteKsvcVersion(ctx context.Context, clusterID, svcName, commitID string) error
+	LabelNode(ctx context.Context, req *types.NodeLabel) error
 }

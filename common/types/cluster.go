@@ -59,6 +59,7 @@ type ClusterRes struct {
 	VXPUUsage        float64            `json:"vxpu_usage"`         // vxpu num usage
 	VXPUMemUsage     float64            `json:"vxpu_mem_usage"`     // vxpu mem usage
 	NodeNumber       int                `json:"node_number"`
+	NodeOfflines     int                `json:"node_offlines"` // offline node number
 	Region           string             `json:"region"`
 	Zone             string             `json:"zone"`     //cn-beijing
 	Provider         string             `json:"provider"` //ali
@@ -98,10 +99,19 @@ type VXPU struct {
 }
 
 type ProcessInfo struct {
-	PodName  string `json:"pod_name"`
-	DeployID int64  `json:"deploy_id"`
-	SvcName  string `json:"svc_name"`
-	VXPUs    []VXPU `json:"vxpus"`
+	PodName      string `json:"pod_name"`
+	DeployID     string `json:"deploy_id"`
+	SvcName      string `json:"svc_name"`
+	VXPUs        []VXPU `json:"vxpus"`
+	WorkflowName string `json:"workflow_name"`
+	ClusterNode  string `json:"cluster_node"`
+}
+
+type MIGResource struct {
+	Capacity    int64 `json:"capacity"`
+	Allocatable int64 `json:"allocatable"`
+	Requests    int64 `json:"requests"`
+	Limits      int64 `json:"limits"`
 }
 
 type NodeHardware struct {
@@ -122,6 +132,8 @@ type NodeHardware struct {
 	UsedVXPUNum      int64  `json:"used_vxpu_num"`      // used vxpu num
 	TotalVXPUMem     int64  `json:"total_vxpu_mem"`     // total mem in MB
 	AvailableVXPUMem int64  `json:"available_vxpu_mem"` // available mem in MB
+
+	MIGs map[string]*MIGResource `json:"migs"` // mig resources
 }
 
 type NodeResourceInfo struct {
@@ -131,6 +143,7 @@ type NodeResourceInfo struct {
 	Processes  []ProcessInfo     `json:"processes"` // pods running on the node
 	Labels     map[string]string `json:"labels"`    // labels of the node
 	EnableVXPU bool              `json:"enable_vxpu"`
+	UpdateAt   int64             `json:"update_at"`
 }
 
 type UpdateClusterResponse struct {
@@ -199,4 +212,28 @@ type HAMIGPU struct {
 	Numa    *int   `json:"numa"`
 	Mode    string `json:"mode"`
 	Health  bool   `json:"health"`
+}
+
+type UpdateClusterNodeReq struct {
+	ID         int64 `json:"id"`
+	EnableVXPU bool  `json:"enable_vxpu"`
+}
+
+type UpdateNodeLabelReq struct {
+	ReservedBy string `json:"reserved_by"`
+	Exclusive  bool   `json:"exclusive"`
+}
+
+type NodeLabel struct {
+	ClusterID  string `json:"cluster_id"`
+	NodeName   string `json:"node_name"`
+	ReservedBy string `json:"reserved_by"`
+	Exclusive  bool   `json:"exclusive"`
+}
+
+type SetNodeAccessModeReq struct {
+	NodeID    int64  `json:"-"`
+	UserName  string `json:"user_name"`
+	OrgName   string `json:"org_name"`
+	Exclusive bool   `json:"exclusive"`
 }

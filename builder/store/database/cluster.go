@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"slices"
+	"strings"
 
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
@@ -28,6 +30,16 @@ type ClusterInfoStore interface {
 	BatchUpdateStatus(ctx context.Context, statusEvent []*types.ClusterRes) error
 	GetClusterResources(ctx context.Context, clusterID string) (*types.ClusterRes, error)
 	FindNodeByClusterID(ctx context.Context, clusterID string) ([]ClusterNode, error)
+	ListAllNodes(ctx context.Context) ([]ClusterNodeWithRegion, error)
+	GetNodeByID(ctx context.Context, id int64) (*ClusterNodeWithRegion, error)
+	UpdateNode(ctx context.Context, id int64, enableVXPU bool) (*ClusterNode, error)
+	GetClusterNodeByID(ctx context.Context, id int64) (*ClusterNode, error)
+	UpdateClusterNodeByNode(ctx context.Context, node ClusterNode) error
+	AddNodeOwnership(ctx context.Context, ownership ClusterNodeOwnership) error
+	DeleteNodeOwnership(ctx context.Context, clusterNodeID int64) error
+	GetNodeOwnership(ctx context.Context, clusterNodeID int64) (*ClusterNodeOwnership, error)
+	UpdateNodeOwnership(ctx context.Context, ownership ClusterNodeOwnership) error
+	ExecuteInTx(ctx context.Context, fn func(ctx context.Context, store ClusterInfoStore) error) error
 }
 
 func NewClusterInfoStore() ClusterInfoStore {
@@ -71,6 +83,21 @@ type ClusterNode struct {
 	Processes   []types.ProcessInfo `bun:",type:jsonb,nullzero" json:"processes"`
 	Exclusive   bool                `bun:",default:false" json:"exclusive"`
 	times
+}
+
+type ClusterNodeOwnership struct {
+	ID            int64  `bun:",pk,autoincrement" json:"id"`
+	ClusterNodeID int64  `bun:",notnull" json:"cluster_node_id"`
+	ClusterID     string `bun:",notnull" json:"cluster_id"`
+	UserUUID      string `bun:",nullzero" json:"user_uuid"`
+	OrgUUID       string `bun:",nullzero" json:"org_uuid"`
+	times
+}
+
+type ClusterNodeWithRegion struct {
+	ClusterNode
+	ClusterRegion  string `json:"cluster_region"`
+	TaskRunningNum int    `json:"task_running_num"`
 }
 
 func (r *clusterInfoStoreImpl) Add(ctx context.Context, clusterConfig string, region string, mode types.ClusterMode) (*ClusterInfo, error) {
@@ -241,12 +268,76 @@ func (s *clusterInfoStoreImpl) BatchUpdateStatus(ctx context.Context, statusEven
 					return errorx.HandleDBError(err, nil)
 				}
 			}
+
+			if len(cluster.Resources) > 0 {
+				err = s.updateServiceClusterNodes(ctx, tx, cluster)
+				if err != nil {
+					return errorx.HandleDBError(err, nil)
+				}
+			}
 		}
 
 		return nil
 	})
 
 	return err
+}
+
+func (s *clusterInfoStoreImpl) updateServiceClusterNodes(ctx context.Context, tx bun.Tx, cluster *types.ClusterRes) error {
+	deployNodes := make(map[string]string)
+	argoWFNodes := make(map[string]string)
+
+	for _, nodeRes := range cluster.Resources {
+		for _, process := range nodeRes.Processes {
+			if len(process.DeployID) < 1 || len(process.ClusterNode) < 1 {
+				continue
+			}
+			if len(process.SvcName) > 0 {
+				// svcName is unique in a cluster, so we just use svcName as the key.
+				nodes := deployNodes[process.SvcName]
+				if slices.Contains(strings.Split(nodes, ","), process.ClusterNode) {
+					continue
+				}
+				if len(nodes) > 0 {
+					nodes += ","
+				}
+				nodes += process.ClusterNode
+				deployNodes[process.SvcName] = nodes
+			}
+			if len(process.WorkflowName) > 0 {
+				// workflowName is unique in a cluster, so we can use it as the key directly.
+				nodes := argoWFNodes[process.WorkflowName]
+				if slices.Contains(strings.Split(nodes, ","), process.ClusterNode) {
+					continue
+				}
+				if len(nodes) > 0 {
+					nodes += ","
+				}
+				nodes += process.ClusterNode
+				argoWFNodes[process.WorkflowName] = nodes
+			}
+		}
+	}
+
+	for svcName, nodes := range deployNodes {
+		_, err := tx.NewUpdate().Model(&Deploy{}).
+			Set("cluster_node = ?", nodes).
+			Where("svc_name = ?", svcName).Exec(ctx)
+		if err != nil {
+			return errorx.HandleDBError(err, nil)
+		}
+	}
+
+	for wfName, nodes := range argoWFNodes {
+		_, err := tx.NewUpdate().Model(&ArgoWorkflow{}).
+			Set("cluster_node = ?", nodes).
+			Where("task_id = ?", wfName).Exec(ctx)
+		if err != nil {
+			return errorx.HandleDBError(err, nil)
+		}
+	}
+
+	return nil
 }
 
 func (s *clusterInfoStoreImpl) GetClusterResources(ctx context.Context, clusterID string) (*types.ClusterRes, error) {
@@ -270,6 +361,7 @@ func (s *clusterInfoStoreImpl) GetClusterResources(ctx context.Context, clusterI
 			NodeHardware: node.Hardware,
 			Processes:    node.Processes,
 			EnableVXPU:   node.EnableVXPU,
+			UpdateAt:     node.UpdatedAt.Unix(),
 		})
 	}
 
@@ -295,4 +387,108 @@ func (s *clusterInfoStoreImpl) FindNodeByClusterID(ctx context.Context, clusterI
 		return nil, errorx.HandleDBError(err, nil)
 	}
 	return result, nil
+}
+
+func (s *clusterInfoStoreImpl) ListAllNodes(ctx context.Context) ([]ClusterNodeWithRegion, error) {
+	var result []ClusterNodeWithRegion
+	err := s.db.Operator.Core.NewSelect().
+		ColumnExpr("cn.*, ci.region as cluster_region").
+		TableExpr("cluster_nodes as cn").
+		Join("JOIN cluster_infos ci ON ci.cluster_id = cn.cluster_id").
+		Order("cn.cluster_id").
+		Order("cn.name").
+		Scan(ctx, &result)
+	if err != nil {
+		return nil, errorx.HandleDBError(err, nil)
+	}
+	return result, nil
+}
+
+func (s *clusterInfoStoreImpl) GetNodeByID(ctx context.Context, id int64) (*ClusterNodeWithRegion, error) {
+	node := &ClusterNodeWithRegion{}
+	err := s.db.Operator.Core.NewSelect().
+		ColumnExpr("cn.*, ci.region as cluster_region").
+		TableExpr("cluster_nodes as cn").
+		Join("JOIN cluster_infos ci ON ci.cluster_id = cn.cluster_id").
+		Where("cn.id = ?", id).
+		Scan(ctx, node)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, errorx.HandleDBError(err, nil)
+	}
+	return node, nil
+}
+
+func (s *clusterInfoStoreImpl) UpdateNode(ctx context.Context, id int64, enableVXPU bool) (*ClusterNode, error) {
+	node := &ClusterNode{ID: id}
+	err := s.db.Operator.Core.NewSelect().Model(node).WherePK().Scan(ctx)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, errorx.HandleDBError(err, nil)
+	}
+
+	node.EnableVXPU = enableVXPU
+	_, err = s.db.Operator.Core.NewUpdate().Model(node).WherePK().Exec(ctx)
+	if err != nil {
+		return nil, errorx.HandleDBError(err, nil)
+	}
+
+	return node, nil
+}
+
+func (s *clusterInfoStoreImpl) GetClusterNodeByID(ctx context.Context, id int64) (*ClusterNode, error) {
+	var node ClusterNode
+	err := s.db.Operator.Core.NewSelect().Model(&node).Where("id = ?", id).Scan(ctx)
+	if err != nil {
+		return nil, errorx.HandleDBError(err, nil)
+	}
+	return &node, nil
+}
+
+func (s *clusterInfoStoreImpl) UpdateClusterNodeByNode(ctx context.Context, node ClusterNode) error {
+	_, err := s.db.Operator.Core.NewUpdate().Model(&node).WherePK().Exec(ctx)
+	return errorx.HandleDBError(err, nil)
+}
+
+func (s *clusterInfoStoreImpl) AddNodeOwnership(ctx context.Context, ownership ClusterNodeOwnership) error {
+	_, err := s.db.Operator.Core.NewInsert().Model(&ownership).Exec(ctx)
+	return errorx.HandleDBError(err, nil)
+}
+
+func (s *clusterInfoStoreImpl) DeleteNodeOwnership(ctx context.Context, clusterNodeID int64) error {
+	_, err := s.db.Operator.Core.NewDelete().Model(&ClusterNodeOwnership{}).Where("cluster_node_id = ?", clusterNodeID).Exec(ctx)
+	return errorx.HandleDBError(err, nil)
+}
+
+func (s *clusterInfoStoreImpl) GetNodeOwnership(ctx context.Context, clusterNodeID int64) (*ClusterNodeOwnership, error) {
+	var ownership ClusterNodeOwnership
+	err := s.db.Operator.Core.NewSelect().Model(&ownership).Where("cluster_node_id = ?", clusterNodeID).Scan(ctx)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, errorx.HandleDBError(err, nil)
+	}
+	return &ownership, nil
+}
+
+func (s *clusterInfoStoreImpl) UpdateNodeOwnership(ctx context.Context, ownership ClusterNodeOwnership) error {
+	_, err := s.db.Operator.Core.NewUpdate().Model(&ownership).WherePK().Exec(ctx)
+	return errorx.HandleDBError(err, nil)
+}
+
+func (s *clusterInfoStoreImpl) ExecuteInTx(ctx context.Context, fn func(ctx context.Context, store ClusterInfoStore) error) error {
+	return s.db.RunInTx(ctx, func(ctx context.Context, tx Operator) error {
+		txStore := &clusterInfoStoreImpl{
+			db: &DB{
+				Operator: tx,
+				BunDB:    s.db.BunDB,
+			},
+		}
+		return fn(ctx, txStore)
+	})
 }

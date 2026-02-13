@@ -10,6 +10,8 @@ import (
 	"net/url"
 	"time"
 
+	"opencsg.com/csghub-server/builder/rpc"
+
 	units "github.com/dustin/go-humanize"
 	"opencsg.com/csghub-server/builder/accounting"
 	"opencsg.com/csghub-server/builder/deploy"
@@ -26,19 +28,30 @@ type ClusterComponent interface {
 	GetClusterUsages(ctx context.Context) ([]types.ClusterRes, error)
 	GetDeploys(ctx context.Context, req types.DeployReq) ([]types.DeployRes, int, error)
 	GetClusterByID(ctx context.Context, clusterId string) (*database.ClusterInfo, error)
+	GetClusterNodes(ctx context.Context) ([]database.ClusterNodeWithRegion, error)
+	GetClusterNodeByID(ctx context.Context, id int64) (*database.ClusterNodeWithRegion, error)
+	QueryClusterDeploys(ctx context.Context, req types.ClusterDeployReq) ([]database.Deploy, int, error)
+	QueryClusterWorkflows(ctx context.Context, req types.ClusterWFReq) ([]database.ArgoWorkflow, int, error)
+	UpdateClusterNodeVXPU(ctx context.Context, req types.UpdateClusterNodeReq) (*database.ClusterNodeWithRegion, error)
+	SetClusterNodeAccessMode(ctx context.Context, req types.SetNodeAccessModeReq) error
 }
 
 func NewClusterComponent(config *config.Config) (ClusterComponent, error) {
 	c := &clusterComponentImpl{}
+	c.config = config
 	c.deployer = deploy.NewDeployer()
 	c.clusterStore = database.NewClusterInfoStore()
-
 	c.deployTaskStore = database.NewDeployTaskStore()
 	acctClient, err := accounting.NewAccountingClient(config)
 	if err != nil {
 		return nil, err
 	}
 	c.acctClient = acctClient
+	usrClient := rpc.NewUserSvcHttpClient(fmt.Sprintf("%s:%d", config.User.Host, config.User.Port),
+		rpc.AuthWithApiKey(config.APIToken))
+	c.usrClient = usrClient
+	c.resStore = database.NewSpaceResourceStore()
+	c.workflowStore = database.NewArgoWorkFlowStore()
 	return c, nil
 }
 
@@ -47,6 +60,10 @@ type clusterComponentImpl struct {
 	clusterStore    database.ClusterInfoStore
 	deployTaskStore database.DeployTaskStore
 	acctClient      accounting.AccountingClient
+	config          *config.Config
+	resStore        database.SpaceResourceStore
+	workflowStore   database.ArgoWorkFlowStore
+	usrClient       rpc.UserSvcClient
 }
 
 func (c *clusterComponentImpl) Index(ctx context.Context) ([]types.ClusterRes, error) {
@@ -120,47 +137,6 @@ func (c *clusterComponentImpl) IndexPublic(ctx context.Context) (types.PublicClu
 		publicClusters.GPUVendors = append(publicClusters.GPUVendors, vendor)
 	}
 	return publicClusters, nil
-}
-
-func (c *clusterComponentImpl) GetClusterUsages(ctx context.Context) ([]types.ClusterRes, error) {
-	clusterList, err := c.clusterStore.List(ctx)
-	if err != nil {
-		slog.ErrorContext(ctx, "failed to list clusters from db", slog.Any("error", err))
-		return nil, err
-	}
-
-	if len(clusterList) == 0 {
-		return []types.ClusterRes{}, nil
-	}
-
-	var result []types.ClusterRes
-	for _, cluster := range clusterList {
-		if !cluster.Enable {
-			continue
-		}
-
-		clusterRes, err := c.deployer.GetClusterUsageById(ctx, cluster.ClusterID)
-		if err != nil {
-			slog.ErrorContext(ctx, "get cluster usage failed",
-				slog.String("clusterID", cluster.ClusterID),
-				slog.Any("error", err))
-
-			result = append(result, types.ClusterRes{
-				ClusterID: cluster.ClusterID,
-				Status:    types.ClusterStatusUnavailable,
-				Region:    cluster.Region,
-				Zone:      cluster.Zone,
-				Provider:  cluster.Provider,
-				GPUUsage:  0,
-				MemUsage:  0,
-				CPUUsage:  0,
-			})
-		}
-
-		result = append(result, *clusterRes)
-	}
-
-	return result, nil
 }
 
 func (c *clusterComponentImpl) GetDeploys(ctx context.Context, req types.DeployReq) ([]types.DeployRes, int, error) {
@@ -341,4 +317,126 @@ func extractHostFromEndpoint(endpoint string) (string, error) {
 		return "", fmt.Errorf("extract host of endpoint %s is empty", endpoint)
 	}
 	return host, nil
+}
+
+func (c *clusterComponentImpl) GetClusterUsages(ctx context.Context) ([]types.ClusterRes, error) {
+	clusterList, err := c.clusterStore.List(ctx)
+	if err != nil {
+		slog.ErrorContext(ctx, "failed to list clusters from db", slog.Any("error", err))
+		return nil, err
+	}
+
+	if len(clusterList) == 0 {
+		return []types.ClusterRes{}, nil
+	}
+
+	var result []types.ClusterRes
+	for _, cluster := range clusterList {
+		if !cluster.Enable {
+			continue
+		}
+
+		clusterRes, err := c.getClusterUsageById(ctx, cluster.ClusterID)
+		if err != nil {
+			slog.ErrorContext(ctx, "get cluster usage failed",
+				slog.String("clusterID", cluster.ClusterID),
+				slog.Any("error", err))
+
+			result = append(result, types.ClusterRes{
+				ClusterID: cluster.ClusterID,
+				Status:    types.ClusterStatusUnavailable,
+				Region:    cluster.Region,
+				Zone:      cluster.Zone,
+				Provider:  cluster.Provider,
+			})
+		}
+
+		result = append(result, *clusterRes)
+	}
+
+	return result, nil
+}
+
+func (d *clusterComponentImpl) getClusterUsageById(ctx context.Context, clusterId string) (*types.ClusterRes, error) {
+	cluster, err := d.clusterStore.GetClusterResources(ctx, clusterId)
+	if err != nil {
+		return nil, err
+	}
+
+	res := types.ClusterRes{
+		ClusterID:      cluster.ClusterID,
+		Region:         cluster.Region,
+		Zone:           cluster.Zone,
+		Provider:       cluster.Provider,
+		Status:         cluster.Status,
+		LastUpdateTime: cluster.LastUpdateTime,
+		Enable:         cluster.Enable,
+	}
+
+	var vendorSet = make(map[string]struct{}, 0)
+	var modelsSet = make(map[string]struct{}, 0)
+
+	offlineNodeNum := 0
+	for _, node := range cluster.Resources {
+		res.TotalCPU += node.TotalCPU
+		res.AvailableCPU += node.AvailableCPU
+		res.TotalMem += float64(node.TotalMem)
+		res.AvailableMem += float64(node.AvailableMem)
+		res.TotalGPU += node.TotalXPU
+		res.AvailableGPU += node.AvailableXPU
+		res.TotalVXPU += node.TotalVXPU
+		res.UsedVXPUNum += node.UsedVXPUNum
+		res.TotalVXPUMem += node.TotalVXPUMem
+		res.AvailableVXPUMem += node.AvailableVXPUMem
+		if node.GPUVendor != "" {
+			vendorSet[node.GPUVendor] = struct{}{}
+			modelsSet[fmt.Sprintf("%s(%s)", node.XPUModel, node.XPUMem)] = struct{}{}
+		}
+		if (time.Now().Unix() - node.UpdateAt) > int64(d.config.Runner.HearBeatIntervalInSec*2) {
+			offlineNodeNum++
+		}
+	}
+
+	var vendor string
+	for k := range vendorSet {
+		vendor += k + ", "
+	}
+	if vendor != "" {
+		vendor = vendor[:len(vendor)-2]
+	}
+
+	var models string
+	for k := range modelsSet {
+		models += k + ", "
+	}
+	if models != "" {
+		models = models[:len(models)-2]
+	}
+
+	res.XPUVendors = vendor
+	res.XPUModels = models
+
+	res.AvailableCPU = math.Floor(res.AvailableCPU)
+	res.TotalMem = math.Floor(res.TotalMem)
+	res.AvailableMem = math.Floor(res.AvailableMem)
+	res.NodeNumber = len(cluster.Resources)
+	res.NodeOfflines = offlineNodeNum
+
+	if res.TotalCPU > 0 {
+		res.CPUUsage = math.Round((res.TotalCPU-res.AvailableCPU)/res.TotalCPU*100) / 100
+	}
+	if res.TotalMem > 0 {
+		res.MemUsage = math.Round((res.TotalMem-res.AvailableMem)/res.TotalMem*100) / 100
+	}
+	if res.TotalGPU > 0 {
+		res.GPUUsage = math.Round(float64(res.TotalGPU-res.AvailableGPU)/float64(res.TotalGPU)*100) / 100
+	}
+	if res.TotalVXPU > 0 {
+		res.VXPUUsage = math.Round(float64(res.UsedVXPUNum)/float64(res.TotalVXPU)*100) / 100
+	}
+	if res.TotalVXPUMem > 0 {
+		res.VXPUMemUsage = math.Round(float64(res.TotalVXPUMem-res.AvailableVXPUMem)/float64(res.TotalVXPUMem)*100) / 100
+	}
+
+	return &res, err
 }

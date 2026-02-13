@@ -93,3 +93,68 @@ func TestClusterStore_BatchUpdateStatus(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, types.ClusterStatusRunning, c2.Status)
 }
+
+func TestClusterStore_ClusterNodeOperations(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewClusterInfoStoreWithDB(db)
+
+	// 1. Create a cluster
+	cluster, err := store.Add(ctx, "config-1", "region-1", types.ConnectModeKubeConfig)
+	require.NoError(t, err)
+
+	// 2. Create a cluster node directly in DB
+	node := &database.ClusterNode{
+		ClusterID: cluster.ClusterID,
+		Name:      "node-1",
+		Status:    "Ready",
+		Exclusive: false,
+	}
+	_, err = db.Core.NewInsert().Model(node).Exec(ctx)
+	require.NoError(t, err)
+	require.NotZero(t, node.ID)
+
+	// 3. Test GetClusterNodeByID
+	fetchedNode, err := store.GetClusterNodeByID(ctx, node.ID)
+	require.NoError(t, err)
+	require.Equal(t, node.Name, fetchedNode.Name)
+	require.Equal(t, node.ClusterID, fetchedNode.ClusterID)
+	require.False(t, fetchedNode.Exclusive)
+
+	// 4. Test UpdateClusterNode
+	fetchedNode.Exclusive = true
+	err = store.UpdateClusterNodeByNode(ctx, *fetchedNode)
+	require.NoError(t, err)
+
+	updatedNode, err := store.GetClusterNodeByID(ctx, node.ID)
+	require.NoError(t, err)
+	require.True(t, updatedNode.Exclusive)
+
+	// 5. Test AddNodeOwnership
+	ownership := database.ClusterNodeOwnership{
+		ClusterNodeID: node.ID,
+		ClusterID:     cluster.ClusterID,
+		UserUUID:      "user-1",
+		OrgUUID:       "org-1",
+	}
+	err = store.AddNodeOwnership(ctx, ownership)
+	require.NoError(t, err)
+
+	// 6. Test GetNodeOwnership
+	fetchedOwnership, err := store.GetNodeOwnership(ctx, node.ID)
+	require.NoError(t, err)
+	require.NotNil(t, fetchedOwnership)
+	require.Equal(t, ownership.UserUUID, fetchedOwnership.UserUUID)
+	require.Equal(t, ownership.OrgUUID, fetchedOwnership.OrgUUID)
+	require.Equal(t, ownership.ClusterNodeID, fetchedOwnership.ClusterNodeID)
+
+	// 7. Test DeleteNodeOwnership
+	err = store.DeleteNodeOwnership(ctx, node.ID)
+	require.NoError(t, err)
+
+	deletedOwnership, err := store.GetNodeOwnership(ctx, node.ID)
+	require.NoError(t, err)
+	require.Nil(t, deletedOwnership)
+}

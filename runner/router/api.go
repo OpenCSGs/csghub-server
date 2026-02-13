@@ -66,6 +66,7 @@ func NewHttpServer(ctx context.Context, config *config.Config) (*gin.Engine, err
 	cluster := apiGroup.Group("/cluster")
 	{
 		cluster.GET("/:id", clusterHandler.GetClusterInfoByID)
+		addClusterNodeRoutes(cluster, clusterHandler)
 	}
 
 	// argo for evaluation
