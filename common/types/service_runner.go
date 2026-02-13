@@ -116,8 +116,9 @@ type (
 		ActualReplica  int        `json:"actual_replica"`
 		DesiredReplica int        `json:"desired_replica"`
 		Reason         string     `json:"reason"`
-
-		Revisions []Revision `json:"revision"`
+		ServiceMessage string     `json:"-"`
+		ServiceReason  string     `json:"-"`
+		Revisions      []Revision `json:"revision"`
 	}
 
 	Revision struct {

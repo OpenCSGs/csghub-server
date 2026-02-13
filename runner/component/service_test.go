@@ -3,13 +3,17 @@ package component
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
+	apis "knative.dev/pkg/apis"
+	duckv1 "knative.dev/pkg/apis/duck/v1"
 	v1 "knative.dev/serving/pkg/apis/serving/v1"
 	knativefake "knative.dev/serving/pkg/client/clientset/versioned/fake"
 	mockCluster "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/deploy/cluster"
@@ -21,6 +25,7 @@ import (
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
+	rtypes "opencsg.com/csghub-server/runner/types"
 )
 
 func TestServiceComponent_RunService(t *testing.T) {
@@ -757,7 +762,7 @@ func TestServiceComponent_GetServiceByNameFromK8s(t *testing.T) {
 	resp, err := sc.GetServiceByName(ctx, "test", "test")
 	require.Nil(t, err)
 	require.Equal(t, "test", resp.ServiceName)
-	require.Equal(t, common.Deploying, resp.Code)
+	require.Equal(t, common.Pending, resp.Code)
 }
 
 func TestServiceComponent_SetVersionsTraffic(t *testing.T) {
@@ -812,6 +817,82 @@ func TestServiceComponent_SetVersionsTraffic(t *testing.T) {
 	if err != nil {
 		// t.Errorf("SetVersionsTraffic failed: %v", err)
 		t.Logf("SetVersionsTraffic failed: %v", err)
+	}
+}
+
+func Test_isContainerStatusChanged(t *testing.T) {
+	tests := []struct {
+		name           string
+		oldPod         *corev1.Pod
+		newPod         *corev1.Pod
+		containerNames []string
+		want           bool
+	}{
+		{
+			name: "no change",
+			oldPod: &corev1.Pod{
+				Status: corev1.PodStatus{
+					ContainerStatuses: []corev1.ContainerStatus{
+						{
+							Name: "c1",
+							State: corev1.ContainerState{
+								Running: &corev1.ContainerStateRunning{},
+							},
+						},
+					},
+				},
+			},
+			newPod: &corev1.Pod{
+				Status: corev1.PodStatus{
+					ContainerStatuses: []corev1.ContainerStatus{
+						{
+							Name: "c1",
+							State: corev1.ContainerState{
+								Running: &corev1.ContainerStateRunning{},
+							},
+						},
+					},
+				},
+			},
+			containerNames: []string{"c1"},
+			want:           false,
+		},
+		{
+			name: "status changed",
+			oldPod: &corev1.Pod{
+				Status: corev1.PodStatus{
+					ContainerStatuses: []corev1.ContainerStatus{
+						{
+							Name: "c1",
+							State: corev1.ContainerState{
+								Running: &corev1.ContainerStateRunning{},
+							},
+						},
+					},
+				},
+			},
+			newPod: &corev1.Pod{
+				Status: corev1.PodStatus{
+					ContainerStatuses: []corev1.ContainerStatus{
+						{
+							Name: "c1",
+							State: corev1.ContainerState{
+								Terminated: &corev1.ContainerStateTerminated{},
+							},
+						},
+					},
+				},
+			},
+			containerNames: []string{"c1"},
+			want:           true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isContainerStatusChanged(tt.oldPod, tt.newPod, tt.containerNames...); got != tt.want {
+				t.Errorf("isContainerStatusChanged() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
 
@@ -930,4 +1011,181 @@ func TestServiceComponent_DeleteKsvcVersion(t *testing.T) {
 	err = sc.DeleteKsvcVersion(ctx, "test", "test-service", "commit2")
 	require.Error(t, err)
 	require.Equal(t, errorx.ErrDeployNotFoundErr, err)
+}
+
+func TestServiceComponent_reportServiceLog(t *testing.T) {
+	reporter := mockReporter.NewMockLogCollector(t)
+	sc := &serviceComponentImpl{
+		logReporter: reporter,
+	}
+
+	ksvc := &database.KnativeService{
+		Name:       "test-service",
+		Status:     corev1.ConditionTrue,
+		DeployID:   123,
+		ClusterID:  "test-cluster",
+		DeployType: 1,
+		ID:         456,
+	}
+
+	statusRes := &types.StatusResponse{
+		Code:           1,
+		Message:        "test message",
+		Reason:         "test reason",
+		ServiceMessage: "svc msg",
+		ServiceReason:  "svc reason",
+	}
+
+	// Expect Report to be called with correct message format
+	reporter.EXPECT().Report(mock.MatchedBy(func(logEntry types.LogEntry) bool {
+		expectedMsg := fmt.Sprintf("test msg, ksvc statue: %s, deploy status: %d,\nksvc msg: %s\nksvc reason: %s",
+			ksvc.Status, statusRes.Code, statusRes.ServiceMessage, statusRes.ServiceReason)
+		return logEntry.Message == expectedMsg
+	})).Return()
+
+	sc.reportServiceLog("test msg", ksvc, nil, statusRes)
+}
+
+func TestServiceComponent_getServiceStatus(t *testing.T) {
+	ctx := context.TODO()
+	pool := mockCluster.NewMockPool(t)
+	kubeClient := fake.NewSimpleClientset()
+	knativeClient := knativefake.NewSimpleClientset()
+
+	expectCluster := &cluster.Cluster{
+		CID:           "config",
+		ID:            "test-cluster",
+		Client:        kubeClient,
+		KnativeClient: knativeClient,
+	}
+
+	sc := &serviceComponentImpl{
+		clusterPool: pool,
+	}
+
+	// Setup K8s resources
+	namespace := "test-ns"
+	svcName := "test-service"
+
+	// Create Pod
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-pod",
+			Namespace: namespace,
+			Labels: map[string]string{
+				KeyServiceLabel: svcName,
+			},
+		},
+		Status: corev1.PodStatus{
+			Phase: corev1.PodRunning,
+			ContainerStatuses: []corev1.ContainerStatus{
+				{
+					Name:  rtypes.UserContainerName,
+					Ready: true,
+				},
+			},
+		},
+	}
+	_, err := kubeClient.CoreV1().Pods(namespace).Create(ctx, pod, metav1.CreateOptions{})
+	require.Nil(t, err)
+
+	ks := v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      svcName,
+			Namespace: namespace,
+		},
+		Status: v1.ServiceStatus{
+			Status: duckv1.Status{
+				Conditions: []apis.Condition{
+					{
+						Type:   v1.ServiceConditionReady,
+						Status: corev1.ConditionTrue,
+					},
+				},
+			},
+		},
+	}
+
+	// Create revisions
+	rev := &v1.Revision{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-rev",
+			Namespace: namespace,
+			Labels: map[string]string{
+				"serving.knative.dev/service": svcName,
+			},
+		},
+		Status: v1.RevisionStatus{
+			Status: duckv1.Status{
+				Conditions: []apis.Condition{
+					{
+						Type:   v1.RevisionConditionReady,
+						Status: corev1.ConditionTrue,
+					},
+				},
+			},
+		},
+	}
+	_, err = knativeClient.ServingV1().Revisions(namespace).Create(ctx, rev, metav1.CreateOptions{})
+	require.Nil(t, err)
+
+	pool.EXPECT().GetClusterByID(ctx, "test-cluster").Return(expectCluster, nil)
+
+	// Call getServiceStatus
+	resp, err := sc.getServiceStatus(ctx, ks, "test-cluster")
+	require.Nil(t, err)
+	require.Equal(t, common.Deploying, resp.Code)
+	require.NotEmpty(t, resp.Instances)
+}
+
+func Test_isUserContainerActive(t *testing.T) {
+	tests := []struct {
+		name     string
+		instList []types.Instance
+		wantBool bool
+		wantStr  string
+	}{
+		{
+			name: "Running pod",
+			instList: []types.Instance{
+				{Status: string(corev1.PodRunning)},
+			},
+			wantBool: true,
+			wantStr:  string(corev1.PodRunning),
+		},
+		{
+			name: "Pending pod",
+			instList: []types.Instance{
+				{Status: string(corev1.PodPending)},
+			},
+			wantBool: true,
+			wantStr:  string(corev1.PodPending),
+		},
+		{
+			name: "Failed pod",
+			instList: []types.Instance{
+				{Status: string(corev1.PodFailed)},
+			},
+			wantBool: false,
+			wantStr:  "",
+		},
+		{
+			name:     "Empty list",
+			instList: []types.Instance{},
+			wantBool: false,
+			wantStr:  "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotBool, gotStr := isUserContainerActive(tt.instList)
+			if gotBool != tt.wantBool {
+				t.Errorf("isUserContainerActive() gotBool = %v, want %v", gotBool, tt.wantBool)
+			}
+			if gotStr != tt.wantStr {
+				t.Errorf("isUserContainerActive() gotStr = %v, want %v", gotStr, tt.wantStr)
+			}
+		})
+	}
 }

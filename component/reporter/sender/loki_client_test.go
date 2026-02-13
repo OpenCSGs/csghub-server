@@ -114,11 +114,11 @@ func Test_lokiClient_formatLokiLog(t *testing.T) {
 			},
 		}
 
-		expected := fmt.Sprintf("build-1963574892 | 2025-09-01 11:29:01 time=\"2025-09-01T03:29:01.179Z\" level=info msg=\"Starting Workflow Executor\"%s", c.lineSeparator) +
-			fmt.Sprintf("build-1963574892 | 2025-09-01 11:29:01 time=\"2025-09-01T03:29:01.181Z\" level=info msg=\"Using executor retry strategy\"%s", c.lineSeparator) +
+		expected := fmt.Sprintf("build-1963574892 | 2025-09-01 time=\"2025-09-01T03:29:01.179Z\" level=info msg=\"Starting Workflow Executor\"%s", c.lineSeparator) +
+			fmt.Sprintf("build-1963574892 | 2025-09-01 time=\"2025-09-01T03:29:01.181Z\" level=info msg=\"Using executor retry strategy\"%s", c.lineSeparator) +
 			fmt.Sprintf("build-1963574892 | malformed log line without timestamp%s", c.lineSeparator) +
 			fmt.Sprintf("build-1963574892 | invalid-timestamp-format another message%s", c.lineSeparator) +
-			"platform | 2025-09-01 11:29:29 time=\"2025-09-01T03:29:29.209Z\" level=info msg=\"Main container completed\""
+			"platform | 2025-09-01 time=\"2025-09-01T03:29:29.209Z\" level=info msg=\"Main container completed\""
 
 		actual := c.formatLokiLog(lokiLog, loc)
 		assert.Equal(t, expected, actual)
