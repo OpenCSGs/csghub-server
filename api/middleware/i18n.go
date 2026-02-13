@@ -42,6 +42,7 @@ var skipRoutes = []string{
 	"/healthz",
 	"/csg",
 	"/hf",
+	"/api/v1/storage",
 }
 
 func shouldSkip(c *gin.Context) bool {
