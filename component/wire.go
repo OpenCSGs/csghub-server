@@ -685,3 +685,19 @@ func initializeTestXnetComponent(ctx context.Context, t interface {
 	)
 	return &testXnetWithMocks{}
 }
+
+type testSkillWithMocks struct {
+	*skillComponentImpl
+	mocks *Mocks
+}
+
+func initializeTestSkillComponent(ctx context.Context, t interface {
+	Cleanup(func())
+	mock.TestingT
+}) *testSkillWithMocks {
+	wire.Build(
+		MockSuperSet, SkillComponentSet,
+		wire.Struct(new(testSkillWithMocks), "*"),
+	)
+	return &testSkillWithMocks{}
+}
