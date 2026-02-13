@@ -1498,7 +1498,7 @@ func (c *spaceComponentImpl) GetSupportedCUDAVersions(ctx context.Context, resou
 		return nil, err
 	}
 
-	var versions []string
+	var versions = []string{}
 	for _, frame := range frames {
 		versions = append(versions, frame.DriverVersion)
 	}
