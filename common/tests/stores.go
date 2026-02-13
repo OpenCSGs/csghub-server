@@ -60,6 +60,7 @@ type MockStores struct {
 	StatSnapStore          database.StatSnapStore
 	MirrorTaskStore        database.MirrorTaskStore
 	MirrorNamespaceMapping database.MirrorNamespaceMappingStore
+	Skill                  database.SkillStore
 }
 
 func NewMockStores(t interface {
@@ -120,6 +121,7 @@ func NewMockStores(t interface {
 		StatSnapStore:          mockdb.NewMockStatSnapStore(t),
 		MirrorTaskStore:        mockdb.NewMockMirrorTaskStore(t),
 		MirrorNamespaceMapping: mockdb.NewMockMirrorNamespaceMappingStore(t),
+		Skill:                  mockdb.NewMockSkillStore(t),
 	}
 }
 
@@ -333,4 +335,8 @@ func (s *MockStores) MirrorTaskMock() *mockdb.MockMirrorTaskStore {
 
 func (s *MockStores) MirrorNamespaceMappingMock() *mockdb.MockMirrorNamespaceMappingStore {
 	return s.MirrorNamespaceMapping.(*mockdb.MockMirrorNamespaceMappingStore)
+}
+
+func (s *MockStores) SkillMock() *mockdb.MockSkillStore {
+	return s.Skill.(*mockdb.MockSkillStore)
 }
