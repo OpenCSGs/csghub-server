@@ -139,7 +139,7 @@ func (dva *dataViewerActivityImpl) ScanRepoFiles(ctx context.Context, scanParam 
 	}
 
 	var cursor string
-	for {
+	for len(fileClass.AllFiles) < scanParam.MaxFileNum {
 		resp, err := dva.gitServer.GetTree(ctx, types.GetTreeRequest{
 			Namespace: scanParam.Req.Namespace,
 			Name:      scanParam.Req.Name,
