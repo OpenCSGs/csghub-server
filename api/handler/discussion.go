@@ -71,7 +71,7 @@ func (h *DiscussionHandler) CreateRepoDiscussion(ctx *gin.Context) {
 	_, err = h.sensitive.CheckRequestV2(ctx.Request.Context(), &req)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "failed to check sensitive request", slog.Any("error", err))
-		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
+		httpbase.BadRequestWithExt(ctx, errorx.ErrSensitiveInfoNotAllowed)
 		return
 	}
 
@@ -122,7 +122,7 @@ func (h *DiscussionHandler) UpdateDiscussion(ctx *gin.Context) {
 	_, err = h.sensitive.CheckRequestV2(ctx.Request.Context(), &req)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "failed to check sensitive request", slog.Any("error", err))
-		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
+		httpbase.BadRequestWithExt(ctx, errorx.ErrSensitiveInfoNotAllowed)
 		return
 	}
 
@@ -304,7 +304,7 @@ func (h *DiscussionHandler) CreateDiscussionComment(ctx *gin.Context) {
 	_, err = h.sensitive.CheckRequestV2(ctx.Request.Context(), &req)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "failed to check sensitive request", slog.Any("error", err))
-		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
+		httpbase.BadRequestWithExt(ctx, errorx.ErrSensitiveInfoNotAllowed)
 		return
 	}
 
@@ -351,7 +351,7 @@ func (h *DiscussionHandler) UpdateComment(ctx *gin.Context) {
 	_, err = h.sensitive.CheckRequestV2(ctx.Request.Context(), &req)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "failed to check sensitive request", slog.Any("error", err))
-		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
+		httpbase.BadRequestWithExt(ctx, errorx.ErrSensitiveInfoNotAllowed)
 		return
 	}
 

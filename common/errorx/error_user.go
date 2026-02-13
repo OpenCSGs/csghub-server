@@ -21,6 +21,7 @@ const (
 	userHasOrganizations
 	userHasDeployments
 	userHasBills
+	userEmailEmpty
 )
 
 var (
@@ -242,6 +243,17 @@ var (
 	//
 	// zh-HK: 擁有賬單的用戶不能被刪除
 	ErrUserHasBills error = CustomError{prefix: errUserPrefix, code: userHasBills}
+
+	// Description: User email is empty.
+	//
+	// Description_ZH: 用户邮箱未设置
+	//
+	// en-US: User email is empty
+	//
+	// zh-CN: 用户邮箱未设置
+	//
+	// zh-HK: 用戶郵箱未設置
+	ErrUserEmailEmpty error = CustomError{prefix: errUserPrefix, code: userEmailEmpty}
 )
 
 // UsernameExists creates a specific error for username conflicts with the conflicting username

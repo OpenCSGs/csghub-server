@@ -208,21 +208,25 @@ func (c *repoComponentImpl) CreateRepo(ctx context.Context, req types.CreateRepo
 	// Name validation
 	valid, err := common.IsValidName(req.Name)
 	if !valid {
-		return nil, nil, commitFilesReq, fmt.Errorf("repo name is invalid, error: %w", err)
+		slog.ErrorContext(ctx, "repo name is invalid", slog.Any("error", err))
+		return nil, nil, commitFilesReq, errorx.ErrRepoNameInvalid
 	}
 
 	namespace, err := c.namespaceStore.FindByPath(ctx, req.Namespace)
 	if err != nil {
-		return nil, nil, commitFilesReq, errors.New("namespace does not exist")
+		slog.ErrorContext(ctx, "namespace does not exist", slog.Any("error", err))
+		return nil, nil, commitFilesReq, errorx.ErrNamespaceNotFound
 	}
 
 	user, err := c.userStore.FindByUsername(ctx, req.Username)
 	if err != nil {
-		return nil, nil, commitFilesReq, errors.New("user does not exist")
+		slog.ErrorContext(ctx, "user does not exist", slog.Any("error", err))
+		return nil, nil, commitFilesReq, errorx.ErrUserNotFound
 	}
 
 	if user.Email == "" {
-		return nil, nil, commitFilesReq, fmt.Errorf("please set your email first")
+		slog.ErrorContext(ctx, "user email is empty", slog.Any("user", user))
+		return nil, nil, commitFilesReq, errorx.ErrUserEmailEmpty
 	}
 
 	if !user.CanAdmin() {

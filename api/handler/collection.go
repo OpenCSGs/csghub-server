@@ -109,7 +109,7 @@ func (c *CollectionHandler) Create(ctx *gin.Context) {
 	_, err := c.sensitive.CheckRequestV2(ctx.Request.Context(), req)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "failed to check sensitive request", slog.Any("error", err))
-		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
+		httpbase.BadRequestWithExt(ctx, errorx.ErrSensitiveInfoNotAllowed)
 		return
 	}
 
@@ -181,7 +181,7 @@ func (c *CollectionHandler) UpdateCollection(ctx *gin.Context) {
 	_, err := c.sensitive.CheckRequestV2(ctx.Request.Context(), req)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "failed to check sensitive request", slog.Any("error", err))
-		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
+		httpbase.BadRequestWithExt(ctx, errorx.ErrSensitiveInfoNotAllowed)
 		return
 	}
 
@@ -275,7 +275,7 @@ func (c *CollectionHandler) AddRepoToCollection(ctx *gin.Context) {
 					slog.Int64("collection_id", req.ID),
 					slog.Int64("repo_id", repoId),
 					slog.Any("error", err))
-				httpbase.ServerError(ctx, fmt.Errorf("sensitive check failed: %w", err))
+				httpbase.BadRequestWithExt(ctx, errorx.ErrSensitiveInfoNotAllowed)
 				return
 			}
 		}
@@ -376,7 +376,7 @@ func (c *CollectionHandler) UpdateCollectionRepo(ctx *gin.Context) {
 			slog.Int64("collection_id", collectionId),
 			slog.Int64("repo_id", repoId),
 			slog.Any("error", err))
-		httpbase.ServerError(ctx, fmt.Errorf("sensitive check failed: %w", err))
+		httpbase.BadRequestWithExt(ctx, errorx.ErrSensitiveInfoNotAllowed)
 		return
 	}
 

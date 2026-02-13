@@ -29,6 +29,9 @@
     "error.USER-ERR-17": {
         "other": "User who owns bills cannot be deleted"
     },
+    "error.USER-ERR-18": {
+        "other": "User email is empty"
+    },
     "error.USER-ERR-2": {
         "other": "New phone number already exists in sso service"
     },
