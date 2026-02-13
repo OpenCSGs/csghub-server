@@ -808,7 +808,9 @@ func (c *gitHTTPComponentImpl) buildMultipartUploadLink(ctx context.Context, req
 	for totalSize := pointer.Size; totalSize > 0; totalSize -= chunSize {
 		reqHeader := make(url.Values)
 		for k, v := range header {
-			reqHeader.Set(k, v.(string))
+			if strVal, ok := v.(string); ok {
+				reqHeader.Set(k, strVal)
+			}
 		}
 		reqHeader.Set("uploadId", uploadID)
 		reqHeader.Set("partNumber", strconv.Itoa(partNumber))
@@ -843,7 +845,11 @@ func (c *gitHTTPComponentImpl) CompleteMultipartUpload(ctx context.Context, req 
 		AutoChecksum: minio.ChecksumSHA256,
 	})
 	if err != nil {
-		code = err.(minio.ErrorResponse).StatusCode
+		if minioErr, ok := err.(minio.ErrorResponse); ok {
+			code = minioErr.StatusCode
+		} else {
+			code = http.StatusInternalServerError
+		}
 		return code, fmt.Errorf("complete multipart upload failed: %v", err)
 	}
 	return code, nil
