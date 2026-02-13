@@ -699,6 +699,8 @@ func createModelRoutes(config *config.Config,
 
 		// deploy model as finetune instance
 		modelsDeployGroup.POST("/:namespace/:name/finetune", modelHandler.FinetuneCreate)
+		// update finetune instance (resource_id and cluster_id)
+		modelsDeployGroup.PUT("/:namespace/:name/finetune/:id", modelHandler.FinetuneUpdate)
 		// stop a finetune instance
 		modelsDeployGroup.PUT("/:namespace/:name/finetune/:id/stop", modelHandler.FinetuneStop)
 		// start a finetune instance
