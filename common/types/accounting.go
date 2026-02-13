@@ -20,6 +20,7 @@ const (
 	MeterFromSource    = "from_source"
 	PromptTokenNum     = "prompt_token_num"
 	CompletionTokenNum = "completion_token_num"
+	OwnerType          = "owner_type"
 )
 
 type OrderStatus int
@@ -61,9 +62,10 @@ var (
 type SKUType int
 
 var (
-	SKUReserve  SKUType = 0 // system reserve
-	SKUCSGHub   SKUType = 1 // csghub server
-	SKUStarship SKUType = 2 // starship
+	SKUReserve    SKUType = 0 // system reserve
+	SKUCSGHub     SKUType = 1 // csghub server
+	SKUStarship   SKUType = 2 // starship
+	SKUAgenticHub SKUType = 3 // agentic hub
 )
 
 type SKUKind int
@@ -79,6 +81,13 @@ var (
 var (
 	ChargeBalance     string = "balance"
 	ChargeCashBalance string = "cash_balance"
+)
+
+// HTTP Header constants for scene detection
+const (
+	SceneHeaderKey        = "X-Scene"    // HTTP header key for scene detection
+	SceneHeaderCSGHub     = "csghub"     // For SceneModelServerless (15)
+	SceneHeaderAgenticHub = "agentichub" // For SceneAgenticHub (30)
 )
 
 type SceneType int
@@ -97,8 +106,9 @@ var (
 	SceneEvaluation      SceneType = 14 // model evaluation
 	SceneModelServerless SceneType = 15 // model serverless deploy
 	// starship
-	SceneStarship SceneType = 20 // starship
-	SceneGuiAgent SceneType = 22 // gui agent
+	SceneStarship   SceneType = 20 // starship
+	SceneGuiAgent   SceneType = 22 // gui agent
+	SceneAgenticHub SceneType = 30 // agentic hub
 	// unknow
 	SceneUnknow SceneType = 99 // unknow
 )
