@@ -59,7 +59,7 @@ func NewOpenAIHandlerFromConfig(config *config.Config) (OpenAIHandler, error) {
 			return nil, err
 		}
 	}
-	modComponent := component.NewModerationImplWithClient(modSvcClient, cacheClient)
+	modComponent := component.NewModerationImplWithClient(config, modSvcClient, cacheClient)
 	clusterComp, err := apicomp.NewClusterComponent(config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cluster component, error: %w", err)
