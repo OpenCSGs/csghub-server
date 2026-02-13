@@ -1208,3 +1208,90 @@ func (c *Client) CommitFiles(ctx context.Context, req gitserver.CommitFilesReq) 
 
 	return nil
 }
+
+func (c *Client) GetFilesByRevisionAndPaths(ctx context.Context, req gitserver.GetFilesByRevisionAndPathsReq) ([]*types.File, error) {
+	var (
+		files []*types.File
+		oids  []string
+	)
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
+
+	relativePath, err := c.BuildRelativePath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return nil, err
+	}
+	repository := &gitalypb.Repository{
+		StorageName:  c.config.GitalyServer.Storage,
+		RelativePath: relativePath,
+	}
+
+	var revision_paths []*gitalypb.GetBlobsRequest_RevisionPath
+	for _, path := range req.Paths {
+		revision_paths = append(revision_paths, &gitalypb.GetBlobsRequest_RevisionPath{
+			Revision: req.Revision,
+			Path:     []byte(path),
+		})
+	}
+
+	res, err := c.blobClient.GetBlobs(ctx, &gitalypb.GetBlobsRequest{
+		Repository:    repository,
+		RevisionPaths: revision_paths,
+		Limit:         0,
+	})
+	if err != nil {
+		return nil, errorx.ErrGitGetBlobsFailed(err, errorx.Ctx())
+	}
+
+	for {
+		blobResp, err := res.Recv()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return nil, errorx.ErrGitGetBlobsFailed(err, errorx.Ctx())
+		}
+		if blobResp != nil && blobResp.Oid != "" {
+			file := &types.File{
+				Path:    string(blobResp.Path),
+				Name:    filepath.Base(string(blobResp.Path)),
+				Content: string(blobResp.Data),
+				Size:    blobResp.Size,
+				SHA:     blobResp.Oid,
+			}
+			files = append(files, file)
+			oids = append(oids, blobResp.Oid)
+		}
+	}
+
+	pRes, err := c.blobClient.GetLFSPointers(ctx, &gitalypb.GetLFSPointersRequest{
+		Repository: repository,
+		BlobIds:    oids,
+	})
+	if err != nil {
+		return nil, errorx.ErrGitGetLfsPointersFailed(err, errorx.Ctx())
+	}
+	for {
+		lfsPointerResp, err := pRes.Recv()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return nil, errorx.ErrGitGetLfsPointersFailed(err, errorx.Ctx())
+		}
+		if lfsPointerResp != nil {
+			for _, p := range lfsPointerResp.LfsPointers {
+				for _, file := range files {
+					if file.SHA == p.Oid {
+						file.Lfs = true
+						file.LfsSHA256 = string(p.FileOid)
+						break
+					}
+				}
+			}
+
+		}
+	}
+
+	return files, nil
+}

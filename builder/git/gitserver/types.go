@@ -300,3 +300,11 @@ type ReplicateRepositoryReq struct {
 	FromRelativePath string `json:"from_relative_path"`
 	ToRelativePath   string `json:"to_relative_path"`
 }
+
+type GetFilesByRevisionAndPathsReq struct {
+	Namespace string               `json:"namespace"`
+	Name      string               `json:"name"`
+	RepoType  types.RepositoryType `json:"repo_type"`
+	Revision  string               `json:"revision"`
+	Paths     []string             `json:"paths"`
+}

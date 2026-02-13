@@ -18,6 +18,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	mockrpc "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/deploy"
 	deployStatus "opencsg.com/csghub-server/builder/deploy/common"
@@ -630,6 +632,40 @@ func TestRepoComponent_FileRaw(t *testing.T) {
 
 }
 
+func TestRepoComponent_FileRawNotFound(t *testing.T) {
+	ctx := context.TODO()
+	repo := initializeTestRepoComponent(ctx, t)
+
+	r := &database.Repository{
+		ID:      123,
+		Private: true,
+		Source:  types.LocalSource,
+		Readme:  "readme1",
+	}
+	repo.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(r, nil)
+	currentUser := "user"
+	mockUserRepoAdminPermission(ctx, repo.mocks.stores, "user")
+
+	repo.mocks.gitServer.EXPECT().GetRepoFileRaw(ctx, gitserver.GetRepoInfoByPathReq{
+		Namespace: "ns",
+		Name:      "n",
+		Ref:       "main",
+		Path:      "not_exists",
+		RepoType:  types.ModelRepo,
+	}).Return("", status.Error(codes.NotFound, "resource not found"))
+
+	_, err := repo.FileRaw(ctx, &types.GetFileReq{
+		Namespace:   "ns",
+		Name:        "n",
+		RepoType:    types.ModelRepo,
+		Ref:         "main",
+		Path:        "not_exists",
+		CurrentUser: currentUser,
+	})
+	require.NotNil(t, err)
+	require.Equal(t, err, errorx.ErrNotFound)
+}
+
 func TestRepoComponent_DownloadFile(t *testing.T) {
 	for _, lfs := range []bool{false, true} {
 		t.Run(fmt.Sprintf("is lfs: %v", lfs), func(t *testing.T) {
@@ -843,8 +879,6 @@ func TestRepoComponent_SDKDownloadFile(t *testing.T) {
 			repo.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(
 				mockedRepo, nil,
 			)
-
-			// Add expectation for UpdateRepoFileDownloads
 			repo.mocks.stores.RepoMock().EXPECT().UpdateRepoFileDownloads(ctx, mockedRepo, mock.Anything, int64(1)).Return(nil)
 
 			if lfs {
@@ -1092,6 +1126,92 @@ func TestRepoComponent_ListRuntimeFramework(t *testing.T) {
 		Enabled: 1, ContainerPort: 321, Type: 12,
 	}, fs[0])
 
+}
+
+func TestRepoComponent_ListRuntimeFrameworkV2_VLLMFirstWhenDeployTypeInference(t *testing.T) {
+	ctx := context.TODO()
+	repo := initializeTestRepoComponent(ctx, t)
+
+	repo.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(&database.Repository{
+		ID:   123,
+		Name: "test",
+		Tags: []database.Tag{
+			{
+				Name:     "safetensors",
+				Category: "framework",
+			},
+		},
+		Metadata: database.Metadata{
+			Architecture: "qwen",
+		},
+	}, nil)
+
+	// frames order: amd-vllm, nvidia-vllm, vllm, sglang -> vllm should be moved to first when deploy_type=1
+	frames := []database.RuntimeFramework{
+		{ID: 1, FrameName: "amd-vllm", FrameVersion: "v1", FrameImage: "img:tag1", Enabled: 1, ContainerPort: 8000, Type: 1, ModelFormat: "safetensors", ComputeType: "gpu", DriverVersion: "12.0"},
+		{ID: 2, FrameName: "nvidia-vllm", FrameVersion: "v1", FrameImage: "img:tag2", Enabled: 1, ContainerPort: 8000, Type: 1, ModelFormat: "safetensors", ComputeType: "gpu", DriverVersion: "12.0"},
+		{ID: 3, FrameName: "vllm", FrameVersion: "v1", FrameImage: "img:tag3", Enabled: 1, ContainerPort: 8000, Type: 1, ModelFormat: "safetensors", ComputeType: "gpu", DriverVersion: "12.0"},
+		{ID: 4, FrameName: "sglang", FrameVersion: "v1", FrameImage: "img:tag4", Enabled: 1, ContainerPort: 8000, Type: 1, ModelFormat: "safetensors", ComputeType: "gpu", DriverVersion: "12.0"},
+	}
+	repo.mocks.stores.RuntimeFrameworkMock().EXPECT().ListByArchsNameAndType(ctx, "test", "safetensors", []string{"qwen"}, types.InferenceType).Return(frames, nil)
+
+	list, err := repo.ListRuntimeFrameworkV2(ctx, types.ModelRepo, "ns", "n", types.InferenceType)
+	require.Nil(t, err)
+	require.Len(t, list, 4)
+	// deploy_type=1: vllm must be first
+	require.Equal(t, "vllm", list[0].FrameName)
+	require.Equal(t, "amd-vllm", list[1].FrameName)
+	require.Equal(t, "nvidia-vllm", list[2].FrameName)
+	require.Equal(t, "sglang", list[3].FrameName)
+}
+
+func TestRepoComponent_ListRuntimeFrameworkV2_NoReorderWhenDeployTypeNotInference(t *testing.T) {
+	ctx := context.TODO()
+	repo := initializeTestRepoComponent(ctx, t)
+
+	repo.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(&database.Repository{
+		ID:       123,
+		Name:     "test",
+		Tags:     []database.Tag{{Name: "safetensors", Category: "framework"}},
+		Metadata: database.Metadata{Architecture: "qwen"},
+	}, nil)
+
+	frames := []database.RuntimeFramework{
+		{ID: 1, FrameName: "amd-vllm", FrameVersion: "v1", FrameImage: "img:tag1", Enabled: 1, ContainerPort: 8000, Type: 1, ModelFormat: "safetensors", ComputeType: "gpu", DriverVersion: "12.0"},
+		{ID: 2, FrameName: "vllm", FrameVersion: "v1", FrameImage: "img:tag2", Enabled: 1, ContainerPort: 8000, Type: 1, ModelFormat: "safetensors", ComputeType: "gpu", DriverVersion: "12.0"},
+	}
+	repo.mocks.stores.RuntimeFrameworkMock().EXPECT().ListByArchsNameAndType(ctx, "test", "safetensors", []string{"qwen"}, 2).Return(frames, nil)
+
+	list, err := repo.ListRuntimeFrameworkV2(ctx, types.ModelRepo, "ns", "n", 2)
+	require.Nil(t, err)
+	require.Len(t, list, 2)
+	// deploy_type!=1: keep original order
+	require.Equal(t, "amd-vllm", list[0].FrameName)
+	require.Equal(t, "vllm", list[1].FrameName)
+}
+
+func TestRepoComponent_ListRuntimeFrameworkV2_VLLMAlreadyFirst(t *testing.T) {
+	ctx := context.TODO()
+	repo := initializeTestRepoComponent(ctx, t)
+
+	repo.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(&database.Repository{
+		ID:       123,
+		Name:     "test",
+		Tags:     []database.Tag{{Name: "safetensors", Category: "framework"}},
+		Metadata: database.Metadata{Architecture: "qwen"},
+	}, nil)
+
+	frames := []database.RuntimeFramework{
+		{ID: 1, FrameName: "vllm", FrameVersion: "v1", FrameImage: "img:tag1", Enabled: 1, ContainerPort: 8000, Type: 1, ModelFormat: "safetensors", ComputeType: "gpu", DriverVersion: "12.0"},
+		{ID: 2, FrameName: "sglang", FrameVersion: "v1", FrameImage: "img:tag2", Enabled: 1, ContainerPort: 8000, Type: 1, ModelFormat: "safetensors", ComputeType: "gpu", DriverVersion: "12.0"},
+	}
+	repo.mocks.stores.RuntimeFrameworkMock().EXPECT().ListByArchsNameAndType(ctx, "test", "safetensors", []string{"qwen"}, types.InferenceType).Return(frames, nil)
+
+	list, err := repo.ListRuntimeFrameworkV2(ctx, types.ModelRepo, "ns", "n", types.InferenceType)
+	require.Nil(t, err)
+	require.Len(t, list, 2)
+	require.Equal(t, "vllm", list[0].FrameName)
+	require.Equal(t, "sglang", list[1].FrameName)
 }
 
 func TestRepoComponent_CreateRuntimeFramework(t *testing.T) {
@@ -2460,18 +2580,15 @@ func TestRepoComponent_Preupload(t *testing.T) {
 	}
 
 	repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(mock.Anything, types.ModelRepo, ns.Path, repo.Name).Return(repo, nil)
-	repoComp.mocks.gitServer.EXPECT().GetTree(mock.Anything, mock.Anything).Return(&types.GetRepoFileTreeResp{
-		Files: []*types.File{
-			{
-				Path: "a.go",
-				SHA:  "sha",
-			},
-			{
-				Path: "dir/a.go",
-				SHA:  "sha",
-			},
+	repoComp.mocks.gitServer.EXPECT().GetFilesByRevisionAndPaths(mock.Anything, mock.Anything).Return([]*types.File{
+		{
+			Path: "a.go",
+			SHA:  "sha",
 		},
-		Cursor: "",
+		{
+			Path: "dir/a.go",
+			SHA:  "sha",
+		},
 	}, nil)
 
 	content := `

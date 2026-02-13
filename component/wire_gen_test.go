@@ -27,6 +27,10 @@ import (
 	"opencsg.com/csghub-server/common/tests"
 )
 
+import (
+	_ "opencsg.com/csghub-server/builder/memory/memmachine"
+)
+
 // Injectors from wire.go:
 
 func initializeTestRepoComponent(ctx context.Context, t interface {
