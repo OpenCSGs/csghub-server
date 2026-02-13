@@ -145,6 +145,8 @@ func TestShouldSkip(t *testing.T) {
 		{"HF route", "/hf", true},
 		{"CSG subroute", "/csg/api/v1", true},
 		{"HF subroute", "/hf/models", true},
+		{"Storage gateway route", "/api/v1/storage/bucket/key", true},
+		{"Storage gateway root", "/api/v1/storage", true},
 		{"Other route", "/api/v1/users", false},
 		{"Root route", "/", false},
 	}
