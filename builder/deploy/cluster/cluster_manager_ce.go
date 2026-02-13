@@ -18,3 +18,12 @@ func collectPodVXPU(pod v1.Pod) []types.VXPU {
 func calcSingleNodeXPUMem(nodeRes *types.NodeResourceInfo) *types.NodeResourceInfo {
 	return nodeRes
 }
+
+// collect mig resource
+func collectMIGResources(node v1.Node) map[string]*types.MIGResource {
+	migResources := make(map[string]*types.MIGResource)
+	return migResources
+}
+
+func calcMIGResource(resources v1.ResourceRequirements, migs map[string]*types.MIGResource) {
+}
