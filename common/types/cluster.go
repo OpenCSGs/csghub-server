@@ -98,10 +98,12 @@ type VXPU struct {
 }
 
 type ProcessInfo struct {
-	PodName  string `json:"pod_name"`
-	DeployID int64  `json:"deploy_id"`
-	SvcName  string `json:"svc_name"`
-	VXPUs    []VXPU `json:"vxpus"`
+	PodName      string `json:"pod_name"`
+	DeployID     string `json:"deploy_id"`
+	SvcName      string `json:"svc_name"`
+	VXPUs        []VXPU `json:"vxpus"`
+	WorkflowName string `json:"workflow_name"`
+	ClusterNode  string `json:"cluster_node"`
 }
 
 type NodeHardware struct {

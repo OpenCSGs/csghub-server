@@ -50,6 +50,8 @@ type KnativeService struct {
 	DeploySKU      string                 `bun:"," json:"deploy_sku"`
 	OrderDetailID  int64                  `bun:"," json:"order_detail_id"`
 	TaskID         int64                  `bun:"," json:"task_id"`
+	ClusterNode    string                 `bun:"," json:"cluster_node"`
+	QueueName      string                 `bun:"," json:"queue_name"`
 
 	times
 }

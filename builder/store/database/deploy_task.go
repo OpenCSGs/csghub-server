@@ -59,6 +59,8 @@ type Deploy struct {
 	Variables     string             `bun:",nullzero" json:"variables"`
 	Message       string             `bun:",nullzero" json:"message"`
 	Reason        string             `bun:",nullzero" json:"reason"`
+	ClusterNode   string             `bun:"," json:"cluster_node"`
+	QueueName     string             `bun:"," json:"queue_name"`
 	times
 }
 
