@@ -24,6 +24,7 @@ type ArgoWorkFlowStore interface {
 	// delete workflow by id
 	DeleteWorkFlow(ctx context.Context, id int64) error
 	ListAllRunningEvaluations(ctx context.Context) (WorkFlows []ArgoWorkflow, err error)
+	GetClusterWorkflows(ctx context.Context, req types.ClusterWFReq) ([]ArgoWorkflow, int, error)
 }
 
 func NewArgoWorkFlowStore() ArgoWorkFlowStore {
@@ -142,4 +143,42 @@ func (s *argoWorkFlowStoreImpl) ListAllRunningEvaluations(ctx context.Context) (
 		Scan(ctx)
 	return
 
+}
+
+func (s *argoWorkFlowStoreImpl) GetClusterWorkflows(ctx context.Context, req types.ClusterWFReq) ([]ArgoWorkflow, int, error) {
+	var result []ArgoWorkflow
+	query := s.db.Operator.Core.NewSelect().Model(&result)
+
+	if req.ClusterID != "" {
+		query = query.Where("cluster_id = ?", req.ClusterID)
+	}
+	if req.ClusterNode != "" {
+		query = query.Where(
+			"? = ANY(STRING_TO_ARRAY(COALESCE(cluster_node, ''), ','))",
+			req.ClusterNode,
+		)
+	}
+	if req.Status != "" {
+		query = query.Where("status = ?", req.Status)
+	}
+	if req.ResourceName != "" {
+		query = query.Where("resource_name = ?", req.ResourceName)
+	}
+	if req.Search != "" {
+		searchPattern := "%" + req.Search + "%"
+		query = query.Where("task_name LIKE ? OR username LIKE ?", searchPattern, searchPattern)
+	}
+
+	total, err := query.Count(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	query = query.Order("id DESC").Limit(req.Per).Offset((req.Page - 1) * req.Per)
+	err = query.Scan(ctx, &result)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return result, total, nil
 }

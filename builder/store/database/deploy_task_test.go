@@ -750,3 +750,455 @@ func TestDeployTaskStore_GetLatestDeploysBySpaceIDs(t *testing.T) {
 	require.NotNil(t, result)
 	require.Equal(t, 0, len(result))
 }
+
+func TestDeployTaskStore_ListServerless_Search(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewDeployTaskStoreWithDB(db)
+
+	// Create test serverless deploys with different deploy names and git paths
+	deploys := []database.Deploy{
+		{
+			DeployName: "qwen-model-deploy",
+			GitPath:    "models_namespace1/qwen-model",
+			GitBranch:  "main",
+			Template:   "test",
+			Hardware:   "test",
+			Type:       types.ServerlessType,
+			Status:     common.Running,
+			RepoID:     1,
+			UserID:     1,
+			SpaceID:    0,
+			SvcName:    "svc1",
+		},
+		{
+			DeployName: "test-deploy",
+			GitPath:    "models_namespace2/test-model",
+			GitBranch:  "main",
+			Template:   "test",
+			Hardware:   "test",
+			Type:       types.ServerlessType,
+			Status:     common.Running,
+			RepoID:     2,
+			UserID:     1,
+			SpaceID:    0,
+			SvcName:    "svc2",
+		},
+		{
+			DeployName: "QWEN-Deploy-Upper",
+			GitPath:    "models_namespace3/another-model",
+			GitBranch:  "main",
+			Template:   "test",
+			Hardware:   "test",
+			Type:       types.ServerlessType,
+			Status:     common.Running,
+			RepoID:     3,
+			UserID:     1,
+			SpaceID:    0,
+			SvcName:    "svc3",
+		},
+		{
+			DeployName: "other-deploy",
+			GitPath:    "models_namespace4/qwen-other",
+			GitBranch:  "main",
+			Template:   "test",
+			Hardware:   "test",
+			Type:       types.ServerlessType,
+			Status:     common.Running,
+			RepoID:     4,
+			UserID:     1,
+			SpaceID:    0,
+			SvcName:    "svc4",
+		},
+		{
+			DeployName: "deleted-deploy",
+			GitPath:    "models_namespace5/qwen-deleted",
+			GitBranch:  "main",
+			Template:   "test",
+			Hardware:   "test",
+			Type:       types.ServerlessType,
+			Status:     common.Deleted,
+			RepoID:     5,
+			UserID:     1,
+			SpaceID:    0,
+			SvcName:    "svc5",
+		},
+		{
+			DeployName: "non-serverless",
+			GitPath:    "models_namespace6/qwen-non-serverless",
+			GitBranch:  "main",
+			Template:   "test",
+			Hardware:   "test",
+			Type:       types.InferenceType,
+			Status:     common.Running,
+			RepoID:     6,
+			UserID:     1,
+			SpaceID:    0,
+			SvcName:    "svc6",
+		},
+	}
+
+	for _, dp := range deploys {
+		err := store.CreateDeploy(ctx, &dp)
+		require.Nil(t, err)
+	}
+
+	// Test 1: List all serverless (no search)
+	dps, total, err := store.ListServerless(ctx, types.DeployReq{
+		DeployType: types.ServerlessType,
+		PageOpts: types.PageOpts{
+			Page:     1,
+			PageSize: 10,
+		},
+	})
+	require.Nil(t, err)
+	require.Equal(t, 4, total) // 4 serverless deploys (excluding deleted and non-serverless)
+	require.Equal(t, 4, len(dps))
+
+	// Test 2: Search by deploy_name (case-insensitive)
+	dps, total, err = store.ListServerless(ctx, types.DeployReq{
+		DeployType: types.ServerlessType,
+		Query:      "qwen",
+		PageOpts: types.PageOpts{
+			Page:     1,
+			PageSize: 10,
+		},
+	})
+	require.Nil(t, err)
+	require.Equal(t, 3, total) // qwen-model-deploy, QWEN-Deploy-Upper, qwen-other (in git_path)
+	require.Equal(t, 3, len(dps))
+	deployNames := []string{}
+	for _, dp := range dps {
+		deployNames = append(deployNames, dp.DeployName)
+	}
+	require.Contains(t, deployNames, "qwen-model-deploy")
+	require.Contains(t, deployNames, "QWEN-Deploy-Upper")
+	require.Contains(t, deployNames, "other-deploy") // matches git_path
+
+	// Test 3: Search by git_path
+	dps, total, err = store.ListServerless(ctx, types.DeployReq{
+		DeployType: types.ServerlessType,
+		Query:      "namespace2",
+		PageOpts: types.PageOpts{
+			Page:     1,
+			PageSize: 10,
+		},
+	})
+	require.Nil(t, err)
+	require.Equal(t, 1, total)
+	require.Equal(t, 1, len(dps))
+	require.Equal(t, "test-deploy", dps[0].DeployName)
+
+	// Test 4: Search with uppercase (case-insensitive)
+	dps, total, err = store.ListServerless(ctx, types.DeployReq{
+		DeployType: types.ServerlessType,
+		Query:      "QWEN",
+		PageOpts: types.PageOpts{
+			Page:     1,
+			PageSize: 10,
+		},
+	})
+	require.Nil(t, err)
+	require.Equal(t, 3, total) // Should match lowercase and uppercase
+	require.Equal(t, 3, len(dps))
+
+	// Test 5: Search with empty string (should return all)
+	dps, total, err = store.ListServerless(ctx, types.DeployReq{
+		DeployType: types.ServerlessType,
+		Query:      "",
+		PageOpts: types.PageOpts{
+			Page:     1,
+			PageSize: 10,
+		},
+	})
+	require.Nil(t, err)
+	require.Equal(t, 4, total)
+	require.Equal(t, 4, len(dps))
+
+	// Test 6: Search with whitespace (should be trimmed and return all)
+	dps, total, err = store.ListServerless(ctx, types.DeployReq{
+		DeployType: types.ServerlessType,
+		Query:      "   ",
+		PageOpts: types.PageOpts{
+			Page:     1,
+			PageSize: 10,
+		},
+	})
+	require.Nil(t, err)
+	require.Equal(t, 4, total)
+	require.Equal(t, 4, len(dps))
+
+	// Test 7: Search with no matches
+	dps, total, err = store.ListServerless(ctx, types.DeployReq{
+		DeployType: types.ServerlessType,
+		Query:      "nonexistent",
+		PageOpts: types.PageOpts{
+			Page:     1,
+			PageSize: 10,
+		},
+	})
+	require.Nil(t, err)
+	require.Equal(t, 0, total)
+	require.Equal(t, 0, len(dps))
+
+	// Test 8: Search with pagination
+	dps, total, err = store.ListServerless(ctx, types.DeployReq{
+		DeployType: types.ServerlessType,
+		Query:      "qwen",
+		PageOpts: types.PageOpts{
+			Page:     1,
+			PageSize: 2,
+		},
+	})
+	require.Nil(t, err)
+	require.Equal(t, 3, total)    // Total should be 3
+	require.Equal(t, 2, len(dps)) // But only 2 per page
+}
+
+func TestDeployTaskStore_GetClusterDeploys(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewDeployTaskStoreWithDB(db)
+
+	// Create test users first (since we need to join with users table)
+	user1 := &database.User{Username: "user1", NickName: "User One", Email: "user1@test.com", UUID: "uuid-user-1"}
+	user2 := &database.User{Username: "user2", NickName: "User Two", Email: "user2@test.com", UUID: "uuid-user-2"}
+	user3 := &database.User{Username: "user3", NickName: "User Three", Email: "user3@test.com", UUID: "uuid-user-3"}
+
+	for _, u := range []*database.User{user1, user2, user3} {
+		_, err := db.Core.NewInsert().Model(u).Exec(ctx)
+		require.Nil(t, err)
+	}
+
+	// Create test deploys with different cluster configurations
+	deploys := []database.Deploy{
+		{
+			DeployName:  "deploy-cluster1",
+			SvcName:     "svc-cluster1",
+			RepoID:      1,
+			UserID:      user1.ID,
+			ClusterID:   "cluster-1",
+			ClusterNode: "node-a,node-b",
+			Status:      common.Running,
+			Hardware:    "nvidia-a100",
+			Type:        types.InferenceType,
+			GitPath:     "test",
+			GitBranch:   "main",
+			Template:    "test",
+		},
+		{
+			DeployName:  "deploy-cluster1-nodea",
+			SvcName:     "svc-cluster1-nodea",
+			RepoID:      2,
+			UserID:      user2.ID,
+			ClusterID:   "cluster-1",
+			ClusterNode: "node-a",
+			Status:      common.Deploying,
+			Hardware:    "nvidia-v100",
+			Type:        types.InferenceType,
+			GitPath:     "test",
+			GitBranch:   "main",
+			Template:    "test",
+		},
+		{
+			DeployName:  "deploy-cluster2",
+			SvcName:     "svc-cluster2",
+			RepoID:      3,
+			UserID:      user3.ID,
+			ClusterID:   "cluster-2",
+			ClusterNode: "node-c",
+			Status:      common.Running,
+			Hardware:    "nvidia-a100",
+			Type:        types.SpaceType,
+			GitPath:     "test",
+			GitBranch:   "main",
+			Template:    "test",
+		},
+		{
+			DeployName: "deploy-nocluster",
+			SvcName:    "svc-nocluster",
+			RepoID:     4,
+			UserID:     user1.ID,
+			ClusterID:  "",
+			Status:     common.Stopped,
+			Hardware:   "cpu",
+			Type:       types.FinetuneType,
+			GitPath:    "test",
+			GitBranch:  "main",
+			Template:   "test",
+		},
+		{
+			DeployName:  "deploy-cluster1-stopped",
+			SvcName:     "svc-cluster1-stopped",
+			RepoID:      5,
+			UserID:      user2.ID,
+			ClusterID:   "cluster-1",
+			ClusterNode: "node-b",
+			Status:      common.Stopped,
+			Hardware:    "nvidia-a100",
+			Type:        types.InferenceType,
+			GitPath:     "test",
+			GitBranch:   "main",
+			Template:    "test",
+		},
+	}
+
+	for _, dp := range deploys {
+		err := store.CreateDeploy(ctx, &dp)
+		require.Nil(t, err)
+	}
+
+	// Test 1: Filter by ClusterID
+	result, total, err := store.GetClusterDeploys(ctx, types.ClusterDeployReq{
+		ClusterID: "cluster-1",
+		Per:       10,
+		Page:      1,
+	})
+	require.Nil(t, err)
+	require.Equal(t, 3, total)
+	require.Equal(t, 3, len(result))
+	names := []string{}
+	for _, dp := range result {
+		names = append(names, dp.DeployName)
+	}
+	require.ElementsMatch(t, []string{"deploy-cluster1", "deploy-cluster1-nodea", "deploy-cluster1-stopped"}, names)
+
+	// Test 2: Filter by ClusterNode
+	result, total, err = store.GetClusterDeploys(ctx, types.ClusterDeployReq{
+		ClusterNode: "node-a",
+		Per:         10,
+		Page:        1,
+	})
+	require.Nil(t, err)
+	require.Equal(t, 2, total)
+	require.Equal(t, 2, len(result))
+	names = []string{}
+	for _, dp := range result {
+		names = append(names, dp.DeployName)
+	}
+	require.ElementsMatch(t, []string{"deploy-cluster1", "deploy-cluster1-nodea"}, names)
+
+	// Test 3: Filter by Status
+	result, total, err = store.GetClusterDeploys(ctx, types.ClusterDeployReq{
+		Status: common.Running,
+		Per:    10,
+		Page:   1,
+	})
+	require.Nil(t, err)
+	require.Equal(t, 2, total)
+	require.Equal(t, 2, len(result))
+	names = []string{}
+	for _, dp := range result {
+		names = append(names, dp.DeployName)
+		require.Equal(t, common.Running, dp.Status)
+	}
+	require.ElementsMatch(t, []string{"deploy-cluster1", "deploy-cluster2"}, names)
+
+	// Test 4: Filter by ResourceName (Hardware)
+	result, total, err = store.GetClusterDeploys(ctx, types.ClusterDeployReq{
+		ResourceName: "nvidia-a100",
+		Per:          10,
+		Page:         1,
+	})
+	require.Nil(t, err)
+	require.Equal(t, 3, total)
+	require.Equal(t, 3, len(result))
+	names = []string{}
+	for _, dp := range result {
+		names = append(names, dp.DeployName)
+		require.Equal(t, "nvidia-a100", dp.Hardware)
+	}
+	require.ElementsMatch(t, []string{"deploy-cluster1", "deploy-cluster2", "deploy-cluster1-stopped"}, names)
+
+	// Test 5: Filter by Search (svc_name)
+	result, total, err = store.GetClusterDeploys(ctx, types.ClusterDeployReq{
+		Search: "svc-cluster1-nodea",
+		Per:    10,
+		Page:   1,
+	})
+	require.Nil(t, err)
+	require.Equal(t, 1, total)
+	require.Equal(t, 1, len(result))
+	require.Equal(t, "deploy-cluster1-nodea", result[0].DeployName)
+
+	// Test 6: Filter by Search (username)
+	result, total, err = store.GetClusterDeploys(ctx, types.ClusterDeployReq{
+		Search: "user1",
+		Per:    10,
+		Page:   1,
+	})
+	require.Nil(t, err)
+	require.Equal(t, 2, total)
+	require.Equal(t, 2, len(result))
+	names = []string{}
+	for _, dp := range result {
+		names = append(names, dp.DeployName)
+	}
+	require.ElementsMatch(t, []string{"deploy-cluster1", "deploy-nocluster"}, names)
+
+	// Test 7: Combined filters
+	result, total, err = store.GetClusterDeploys(ctx, types.ClusterDeployReq{
+		ClusterID:    "cluster-1",
+		Status:       common.Running,
+		ResourceName: "nvidia-a100",
+		Per:          10,
+		Page:         1,
+	})
+	require.Nil(t, err)
+	require.Equal(t, 1, total)
+	require.Equal(t, 1, len(result))
+	require.Equal(t, "deploy-cluster1", result[0].DeployName)
+
+	// Test 8: Pagination
+	result, total, err = store.GetClusterDeploys(ctx, types.ClusterDeployReq{
+		ClusterID: "cluster-1",
+		Per:       2,
+		Page:      1,
+	})
+	require.Nil(t, err)
+	require.Equal(t, 3, total)
+	require.Equal(t, 2, len(result))
+
+	result, total, err = store.GetClusterDeploys(ctx, types.ClusterDeployReq{
+		ClusterID: "cluster-1",
+		Per:       2,
+		Page:      2,
+	})
+	require.Nil(t, err)
+	require.Equal(t, 3, total)
+	require.Equal(t, 1, len(result))
+
+	// Test 9: No filters (all deploys)
+	result, total, err = store.GetClusterDeploys(ctx, types.ClusterDeployReq{
+		Per:  10,
+		Page: 1,
+	})
+	require.Nil(t, err)
+	require.Equal(t, 5, total)
+	require.Equal(t, 5, len(result))
+
+	// Test 10: Non-existent cluster
+	result, total, err = store.GetClusterDeploys(ctx, types.ClusterDeployReq{
+		ClusterID: "non-existent-cluster",
+		Per:       10,
+		Page:      1,
+	})
+	require.Nil(t, err)
+	require.Equal(t, 0, total)
+	require.Equal(t, 0, len(result))
+
+	// Test 11: Verify User relation is loaded
+	result, total, err = store.GetClusterDeploys(ctx, types.ClusterDeployReq{
+		ClusterID: "cluster-2",
+		Per:       10,
+		Page:      1,
+	})
+	require.Nil(t, err)
+	require.Equal(t, 1, total)
+	require.NotNil(t, result[0].User)
+	require.Equal(t, "user3", result[0].User.Username)
+}

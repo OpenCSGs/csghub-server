@@ -313,6 +313,72 @@ func (_c *MockArgoWorkFlowStore_FindByUsername_Call) RunAndReturn(run func(conte
 	return _c
 }
 
+// GetClusterWorkflows provides a mock function with given fields: ctx, req
+func (_m *MockArgoWorkFlowStore) GetClusterWorkflows(ctx context.Context, req types.ClusterWFReq) ([]database.ArgoWorkflow, int, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetClusterWorkflows")
+	}
+
+	var r0 []database.ArgoWorkflow
+	var r1 int
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.ClusterWFReq) ([]database.ArgoWorkflow, int, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.ClusterWFReq) []database.ArgoWorkflow); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.ArgoWorkflow)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.ClusterWFReq) int); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, types.ClusterWFReq) error); ok {
+		r2 = rf(ctx, req)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockArgoWorkFlowStore_GetClusterWorkflows_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetClusterWorkflows'
+type MockArgoWorkFlowStore_GetClusterWorkflows_Call struct {
+	*mock.Call
+}
+
+// GetClusterWorkflows is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.ClusterWFReq
+func (_e *MockArgoWorkFlowStore_Expecter) GetClusterWorkflows(ctx interface{}, req interface{}) *MockArgoWorkFlowStore_GetClusterWorkflows_Call {
+	return &MockArgoWorkFlowStore_GetClusterWorkflows_Call{Call: _e.mock.On("GetClusterWorkflows", ctx, req)}
+}
+
+func (_c *MockArgoWorkFlowStore_GetClusterWorkflows_Call) Run(run func(ctx context.Context, req types.ClusterWFReq)) *MockArgoWorkFlowStore_GetClusterWorkflows_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.ClusterWFReq))
+	})
+	return _c
+}
+
+func (_c *MockArgoWorkFlowStore_GetClusterWorkflows_Call) Return(_a0 []database.ArgoWorkflow, _a1 int, _a2 error) *MockArgoWorkFlowStore_GetClusterWorkflows_Call {
+	_c.Call.Return(_a0, _a1, _a2)
+	return _c
+}
+
+func (_c *MockArgoWorkFlowStore_GetClusterWorkflows_Call) RunAndReturn(run func(context.Context, types.ClusterWFReq) ([]database.ArgoWorkflow, int, error)) *MockArgoWorkFlowStore_GetClusterWorkflows_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ListAllRunningEvaluations provides a mock function with given fields: ctx
 func (_m *MockArgoWorkFlowStore) ListAllRunningEvaluations(ctx context.Context) ([]database.ArgoWorkflow, error) {
 	ret := _m.Called(ctx)

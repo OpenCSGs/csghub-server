@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"log/slog"
 	"strconv"
 
@@ -53,6 +54,7 @@ func (h *SpaceResourceHandler) Index(ctx *gin.Context) {
 		return
 	}
 	req.CurrentUser = httpbase.GetCurrentUser(ctx)
+
 	clusters := []string{}
 	for _, c := range req.ClusterIDs {
 		if c != "" {
@@ -60,6 +62,7 @@ func (h *SpaceResourceHandler) Index(ctx *gin.Context) {
 		}
 	}
 	req.ClusterIDs = clusters
+
 	if len(req.ClusterIDs) == 0 {
 		clusters, err := h.cluster.Index(ctx.Request.Context())
 		if err != nil {
@@ -71,6 +74,12 @@ func (h *SpaceResourceHandler) Index(ctx *gin.Context) {
 			req.ClusterIDs[i] = clusters[i].ClusterID
 		}
 	}
+
+	if len(req.ClusterIDs) < 1 {
+		httpbase.ServerError(ctx, errors.New("cluster is required"))
+		return
+	}
+
 	spaceResources, total, err := h.spaceResource.Index(ctx.Request.Context(), req)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Failed to get space resources", slog.Any("cluster_id", req.ClusterIDs), slog.Any("deploy_type", req.DeployType), slog.Any("error", err))
