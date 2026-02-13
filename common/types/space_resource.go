@@ -39,6 +39,7 @@ type SpaceResource struct {
 	ID            int64        `json:"id"`
 	Name          string       `json:"name"`
 	ClusterID     string       `json:"cluster_id"`
+	ClusterRegion string       `json:"cluster_region"`
 	Resources     string       `json:"resources"`
 	Price         float64      `json:"price"`
 	IsAvailable   bool         `json:"is_available"`

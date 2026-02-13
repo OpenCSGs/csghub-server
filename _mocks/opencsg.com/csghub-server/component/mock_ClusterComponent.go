@@ -83,6 +83,123 @@ func (_c *MockClusterComponent_GetClusterByID_Call) RunAndReturn(run func(contex
 	return _c
 }
 
+// GetClusterNodeByID provides a mock function with given fields: ctx, id
+func (_m *MockClusterComponent) GetClusterNodeByID(ctx context.Context, id int64) (*database.ClusterNodeWithRegion, error) {
+	ret := _m.Called(ctx, id)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetClusterNodeByID")
+	}
+
+	var r0 *database.ClusterNodeWithRegion
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64) (*database.ClusterNodeWithRegion, error)); ok {
+		return rf(ctx, id)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, int64) *database.ClusterNodeWithRegion); ok {
+		r0 = rf(ctx, id)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.ClusterNodeWithRegion)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, int64) error); ok {
+		r1 = rf(ctx, id)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClusterComponent_GetClusterNodeByID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetClusterNodeByID'
+type MockClusterComponent_GetClusterNodeByID_Call struct {
+	*mock.Call
+}
+
+// GetClusterNodeByID is a helper method to define mock.On call
+//   - ctx context.Context
+//   - id int64
+func (_e *MockClusterComponent_Expecter) GetClusterNodeByID(ctx interface{}, id interface{}) *MockClusterComponent_GetClusterNodeByID_Call {
+	return &MockClusterComponent_GetClusterNodeByID_Call{Call: _e.mock.On("GetClusterNodeByID", ctx, id)}
+}
+
+func (_c *MockClusterComponent_GetClusterNodeByID_Call) Run(run func(ctx context.Context, id int64)) *MockClusterComponent_GetClusterNodeByID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64))
+	})
+	return _c
+}
+
+func (_c *MockClusterComponent_GetClusterNodeByID_Call) Return(_a0 *database.ClusterNodeWithRegion, _a1 error) *MockClusterComponent_GetClusterNodeByID_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClusterComponent_GetClusterNodeByID_Call) RunAndReturn(run func(context.Context, int64) (*database.ClusterNodeWithRegion, error)) *MockClusterComponent_GetClusterNodeByID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetClusterNodes provides a mock function with given fields: ctx
+func (_m *MockClusterComponent) GetClusterNodes(ctx context.Context) ([]database.ClusterNodeWithRegion, error) {
+	ret := _m.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetClusterNodes")
+	}
+
+	var r0 []database.ClusterNodeWithRegion
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context) ([]database.ClusterNodeWithRegion, error)); ok {
+		return rf(ctx)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context) []database.ClusterNodeWithRegion); ok {
+		r0 = rf(ctx)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.ClusterNodeWithRegion)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClusterComponent_GetClusterNodes_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetClusterNodes'
+type MockClusterComponent_GetClusterNodes_Call struct {
+	*mock.Call
+}
+
+// GetClusterNodes is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *MockClusterComponent_Expecter) GetClusterNodes(ctx interface{}) *MockClusterComponent_GetClusterNodes_Call {
+	return &MockClusterComponent_GetClusterNodes_Call{Call: _e.mock.On("GetClusterNodes", ctx)}
+}
+
+func (_c *MockClusterComponent_GetClusterNodes_Call) Run(run func(ctx context.Context)) *MockClusterComponent_GetClusterNodes_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context))
+	})
+	return _c
+}
+
+func (_c *MockClusterComponent_GetClusterNodes_Call) Return(_a0 []database.ClusterNodeWithRegion, _a1 error) *MockClusterComponent_GetClusterNodes_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClusterComponent_GetClusterNodes_Call) RunAndReturn(run func(context.Context) ([]database.ClusterNodeWithRegion, error)) *MockClusterComponent_GetClusterNodes_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetClusterUsages provides a mock function with given fields: ctx
 func (_m *MockClusterComponent) GetClusterUsages(ctx context.Context) ([]types.ClusterRes, error) {
 	ret := _m.Called(ctx)
@@ -380,6 +497,138 @@ func (_c *MockClusterComponent_IndexPublic_Call) RunAndReturn(run func(context.C
 	return _c
 }
 
+// QueryClusterDeploys provides a mock function with given fields: ctx, req
+func (_m *MockClusterComponent) QueryClusterDeploys(ctx context.Context, req types.ClusterDeployReq) ([]database.Deploy, int, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for QueryClusterDeploys")
+	}
+
+	var r0 []database.Deploy
+	var r1 int
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.ClusterDeployReq) ([]database.Deploy, int, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.ClusterDeployReq) []database.Deploy); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.Deploy)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.ClusterDeployReq) int); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, types.ClusterDeployReq) error); ok {
+		r2 = rf(ctx, req)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockClusterComponent_QueryClusterDeploys_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'QueryClusterDeploys'
+type MockClusterComponent_QueryClusterDeploys_Call struct {
+	*mock.Call
+}
+
+// QueryClusterDeploys is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.ClusterDeployReq
+func (_e *MockClusterComponent_Expecter) QueryClusterDeploys(ctx interface{}, req interface{}) *MockClusterComponent_QueryClusterDeploys_Call {
+	return &MockClusterComponent_QueryClusterDeploys_Call{Call: _e.mock.On("QueryClusterDeploys", ctx, req)}
+}
+
+func (_c *MockClusterComponent_QueryClusterDeploys_Call) Run(run func(ctx context.Context, req types.ClusterDeployReq)) *MockClusterComponent_QueryClusterDeploys_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.ClusterDeployReq))
+	})
+	return _c
+}
+
+func (_c *MockClusterComponent_QueryClusterDeploys_Call) Return(_a0 []database.Deploy, _a1 int, _a2 error) *MockClusterComponent_QueryClusterDeploys_Call {
+	_c.Call.Return(_a0, _a1, _a2)
+	return _c
+}
+
+func (_c *MockClusterComponent_QueryClusterDeploys_Call) RunAndReturn(run func(context.Context, types.ClusterDeployReq) ([]database.Deploy, int, error)) *MockClusterComponent_QueryClusterDeploys_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// QueryClusterWorkflows provides a mock function with given fields: ctx, req
+func (_m *MockClusterComponent) QueryClusterWorkflows(ctx context.Context, req types.ClusterWFReq) ([]database.ArgoWorkflow, int, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for QueryClusterWorkflows")
+	}
+
+	var r0 []database.ArgoWorkflow
+	var r1 int
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.ClusterWFReq) ([]database.ArgoWorkflow, int, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.ClusterWFReq) []database.ArgoWorkflow); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.ArgoWorkflow)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.ClusterWFReq) int); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, types.ClusterWFReq) error); ok {
+		r2 = rf(ctx, req)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockClusterComponent_QueryClusterWorkflows_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'QueryClusterWorkflows'
+type MockClusterComponent_QueryClusterWorkflows_Call struct {
+	*mock.Call
+}
+
+// QueryClusterWorkflows is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.ClusterWFReq
+func (_e *MockClusterComponent_Expecter) QueryClusterWorkflows(ctx interface{}, req interface{}) *MockClusterComponent_QueryClusterWorkflows_Call {
+	return &MockClusterComponent_QueryClusterWorkflows_Call{Call: _e.mock.On("QueryClusterWorkflows", ctx, req)}
+}
+
+func (_c *MockClusterComponent_QueryClusterWorkflows_Call) Run(run func(ctx context.Context, req types.ClusterWFReq)) *MockClusterComponent_QueryClusterWorkflows_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.ClusterWFReq))
+	})
+	return _c
+}
+
+func (_c *MockClusterComponent_QueryClusterWorkflows_Call) Return(_a0 []database.ArgoWorkflow, _a1 int, _a2 error) *MockClusterComponent_QueryClusterWorkflows_Call {
+	_c.Call.Return(_a0, _a1, _a2)
+	return _c
+}
+
+func (_c *MockClusterComponent_QueryClusterWorkflows_Call) RunAndReturn(run func(context.Context, types.ClusterWFReq) ([]database.ArgoWorkflow, int, error)) *MockClusterComponent_QueryClusterWorkflows_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Update provides a mock function with given fields: ctx, data
 func (_m *MockClusterComponent) Update(ctx context.Context, data types.ClusterRequest) (*types.ClusterRes, error) {
 	ret := _m.Called(ctx, data)
@@ -435,6 +684,65 @@ func (_c *MockClusterComponent_Update_Call) Return(_a0 *types.ClusterRes, _a1 er
 }
 
 func (_c *MockClusterComponent_Update_Call) RunAndReturn(run func(context.Context, types.ClusterRequest) (*types.ClusterRes, error)) *MockClusterComponent_Update_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// UpdateClusterNodeVXPU provides a mock function with given fields: ctx, req
+func (_m *MockClusterComponent) UpdateClusterNodeVXPU(ctx context.Context, req types.UpdateClusterNodeReq) (*database.ClusterNodeWithRegion, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateClusterNodeVXPU")
+	}
+
+	var r0 *database.ClusterNodeWithRegion
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.UpdateClusterNodeReq) (*database.ClusterNodeWithRegion, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.UpdateClusterNodeReq) *database.ClusterNodeWithRegion); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.ClusterNodeWithRegion)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.UpdateClusterNodeReq) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClusterComponent_UpdateClusterNodeVXPU_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateClusterNodeVXPU'
+type MockClusterComponent_UpdateClusterNodeVXPU_Call struct {
+	*mock.Call
+}
+
+// UpdateClusterNodeVXPU is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.UpdateClusterNodeReq
+func (_e *MockClusterComponent_Expecter) UpdateClusterNodeVXPU(ctx interface{}, req interface{}) *MockClusterComponent_UpdateClusterNodeVXPU_Call {
+	return &MockClusterComponent_UpdateClusterNodeVXPU_Call{Call: _e.mock.On("UpdateClusterNodeVXPU", ctx, req)}
+}
+
+func (_c *MockClusterComponent_UpdateClusterNodeVXPU_Call) Run(run func(ctx context.Context, req types.UpdateClusterNodeReq)) *MockClusterComponent_UpdateClusterNodeVXPU_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.UpdateClusterNodeReq))
+	})
+	return _c
+}
+
+func (_c *MockClusterComponent_UpdateClusterNodeVXPU_Call) Return(_a0 *database.ClusterNodeWithRegion, _a1 error) *MockClusterComponent_UpdateClusterNodeVXPU_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClusterComponent_UpdateClusterNodeVXPU_Call) RunAndReturn(run func(context.Context, types.UpdateClusterNodeReq) (*database.ClusterNodeWithRegion, error)) *MockClusterComponent_UpdateClusterNodeVXPU_Call {
 	_c.Call.Return(run)
 	return _c
 }

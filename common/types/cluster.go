@@ -59,6 +59,7 @@ type ClusterRes struct {
 	VXPUUsage        float64            `json:"vxpu_usage"`         // vxpu num usage
 	VXPUMemUsage     float64            `json:"vxpu_mem_usage"`     // vxpu mem usage
 	NodeNumber       int                `json:"node_number"`
+	NodeOfflines     int                `json:"node_offlines"` // offline node number
 	Region           string             `json:"region"`
 	Zone             string             `json:"zone"`     //cn-beijing
 	Provider         string             `json:"provider"` //ali
@@ -131,6 +132,7 @@ type NodeResourceInfo struct {
 	Processes  []ProcessInfo     `json:"processes"` // pods running on the node
 	Labels     map[string]string `json:"labels"`    // labels of the node
 	EnableVXPU bool              `json:"enable_vxpu"`
+	UpdateAt   int64             `json:"update_at"`
 }
 
 type UpdateClusterResponse struct {
@@ -199,4 +201,9 @@ type HAMIGPU struct {
 	Numa    *int   `json:"numa"`
 	Mode    string `json:"mode"`
 	Health  bool   `json:"health"`
+}
+
+type UpdateClusterNodeReq struct {
+	ID         int64 `json:"id"`
+	EnableVXPU bool  `json:"enable_vxpu"`
 }

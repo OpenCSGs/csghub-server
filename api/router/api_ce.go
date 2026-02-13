@@ -31,6 +31,10 @@ func createXnetRoutes(_ *gin.Engine, _ middleware.MiddlewareCollection, _ *confi
 	return nil
 }
 
+func createComputingRoutes(_ *gin.RouterGroup, _ middleware.MiddlewareCollection, _ *config.Config, _ *handler.ClusterHandler) error {
+	return nil
+}
+
 func createRepoRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware.MiddlewareCollection, repoHandler *handler.RepoHandler) {
 	modelsGroup := apiGroup.Group("/models")
 	modelsGroup.Use(middleware.RepoType(types.ModelRepo), middlewareCollection.Repo.RepoExists)

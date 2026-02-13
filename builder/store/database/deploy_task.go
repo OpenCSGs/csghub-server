@@ -110,6 +110,7 @@ type DeployTaskStore interface {
 	RunningVisibleToUser(ctx context.Context, userID int64) ([]Deploy, error)
 	ListAllRunningDeploys(ctx context.Context) ([]Deploy, error)
 	GetLastTaskByType(ctx context.Context, deployID int64, taskType int) (*DeployTask, error)
+	GetClusterDeploys(ctx context.Context, req types.ClusterDeployReq) ([]Deploy, int, error)
 }
 
 func NewDeployTaskStore() DeployTaskStore {
@@ -569,4 +570,44 @@ func (s *deployTaskStoreImpl) GetLastTaskByType(ctx context.Context, deployID in
 		return nil, err
 	}
 	return &result, nil
+}
+
+func (s *deployTaskStoreImpl) GetClusterDeploys(ctx context.Context, req types.ClusterDeployReq) ([]Deploy, int, error) {
+	var result []Deploy
+	query := s.db.Operator.Core.NewSelect().Model(&result).Relation("User")
+
+	if req.ClusterID != "" {
+		query = query.Where("cluster_id = ?", req.ClusterID)
+	}
+	if req.ClusterNode != "" {
+		query = query.Where(
+			"? = ANY(STRING_TO_ARRAY(COALESCE(cluster_node, ''), ','))",
+			req.ClusterNode,
+		)
+	}
+	if req.Status != 0 {
+		query = query.Where("status = ?", req.Status)
+	}
+	if req.ResourceName != "" {
+		query = query.Where("hardware = ?", req.ResourceName)
+	}
+	if req.Search != "" {
+		searchPattern := "%" + req.Search + "%"
+		query = query.Where("svc_name LIKE ? OR \"user\".\"username\" LIKE ?", searchPattern, searchPattern)
+	}
+
+	total, err := query.Count(ctx)
+	if err != nil {
+		err = errorx.HandleDBError(err, nil)
+		return nil, 0, err
+	}
+
+	query = query.Order("id DESC").Limit(req.Per).Offset((req.Page - 1) * req.Per)
+	_, err = query.Exec(ctx, &result)
+	if err != nil {
+		err = errorx.HandleDBError(err, nil)
+		return nil, 0, err
+	}
+
+	return result, total, nil
 }
