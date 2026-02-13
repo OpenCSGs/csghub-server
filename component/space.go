@@ -458,6 +458,7 @@ func (c *spaceComponentImpl) Show(ctx context.Context, namespace, name, currentU
 		Instances:     instList,
 		ClusterID:     space.ClusterID,
 		MinReplica:    space.MinReplica,
+		DriverVersion: space.DriverVersion,
 	}
 	if permission.CanAdmin {
 		resSpace.SensitiveCheckStatus = space.Repository.SensitiveCheckStatus.String()
