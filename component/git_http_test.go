@@ -755,3 +755,68 @@ func TestGitHTTPComponent_CompleteMultipartUpload(t *testing.T) {
 	}, types.CompleteMultipartUploadBody{})
 	require.Nil(t, err)
 }
+
+func TestGitHTTPComponent_CompleteMultipartUpload_MinioError(t *testing.T) {
+	ctx := context.TODO()
+	gc := initializeTestGitHTTPComponent(ctx, t)
+	objectKey := "key"
+	uploadID := "uploadID"
+	expiresAt := "2099-01-01T00:00:00Z"
+
+	toSign := fmt.Sprintf("%s:%s:%s", objectKey, uploadID, expiresAt)
+	mac := hmac.New(sha256.New, []byte(gc.config.Git.SignatureSecertKey))
+	mac.Write([]byte(toSign))
+	sign := hex.EncodeToString(mac.Sum(nil))
+
+	minioErr := minio.ErrorResponse{
+		StatusCode: http.StatusNotFound,
+		Code:       "NoSuchUpload",
+		Message:    "The specified upload does not exist",
+	}
+
+	gc.mocks.s3Core.EXPECT().CompleteMultipartUpload(ctx, mock.Anything, objectKey, uploadID, mock.Anything, minio.PutObjectOptions{
+		AutoChecksum: minio.ChecksumSHA256,
+	}).Return(minio.UploadInfo{}, minioErr)
+
+	code, err := gc.CompleteMultipartUpload(ctx, types.CompleteMultipartUploadReq{
+		ObjectKey: objectKey,
+		UploadID:  uploadID,
+		ExpiresAt: expiresAt,
+		Signature: sign,
+	}, types.CompleteMultipartUploadBody{})
+
+	require.NotNil(t, err)
+	require.Equal(t, http.StatusNotFound, code)
+	require.Contains(t, err.Error(), "complete multipart upload failed")
+}
+
+func TestGitHTTPComponent_CompleteMultipartUpload_GenericError(t *testing.T) {
+	ctx := context.TODO()
+	gc := initializeTestGitHTTPComponent(ctx, t)
+	objectKey := "key"
+	uploadID := "uploadID"
+	expiresAt := "2099-01-01T00:00:00Z"
+
+	toSign := fmt.Sprintf("%s:%s:%s", objectKey, uploadID, expiresAt)
+	mac := hmac.New(sha256.New, []byte(gc.config.Git.SignatureSecertKey))
+	mac.Write([]byte(toSign))
+	sign := hex.EncodeToString(mac.Sum(nil))
+
+	genericErr := fmt.Errorf("network timeout")
+
+	gc.mocks.s3Core.EXPECT().CompleteMultipartUpload(ctx, mock.Anything, objectKey, uploadID, mock.Anything, minio.PutObjectOptions{
+		AutoChecksum: minio.ChecksumSHA256,
+	}).Return(minio.UploadInfo{}, genericErr)
+
+	code, err := gc.CompleteMultipartUpload(ctx, types.CompleteMultipartUploadReq{
+		ObjectKey: objectKey,
+		UploadID:  uploadID,
+		ExpiresAt: expiresAt,
+		Signature: sign,
+	}, types.CompleteMultipartUploadBody{})
+
+	require.NotNil(t, err)
+	require.Equal(t, http.StatusInternalServerError, code)
+	require.Contains(t, err.Error(), "complete multipart upload failed")
+	require.Contains(t, err.Error(), "network timeout")
+}
