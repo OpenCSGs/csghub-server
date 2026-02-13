@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/mod/semver"
 	"opencsg.com/csghub-server/builder/deploy"
+	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/store/database"
@@ -214,6 +215,7 @@ func TestSpaceComponent_Show(t *testing.T) {
 
 	sc.mocks.stores.UserLikesMock().EXPECT().IsExist(ctx, "user", int64(123)).Return(true, nil)
 
+	sc.mocks.deployer.EXPECT().Status(ctx, mock.Anything, false).Return("svc", common.Stopped, nil, nil)
 	space, err := sc.Show(ctx, "ns", "n", "user", false)
 	require.Nil(t, err)
 	require.Equal(t, &types.Space{
@@ -767,6 +769,7 @@ func TestSpaceComponent_GetMCPServiceBySvcName(t *testing.T) {
 		sc.mocks.stores.DeployTaskMock().EXPECT().GetDeployBySvcName(ctx, svcName).Return(deploy, nil).Once()
 		sc.mocks.stores.SpaceMock().EXPECT().ByID(ctx, deploy.SpaceID).Return(space, nil).Once()
 		sc.mocks.stores.DeployTaskMock().EXPECT().GetLatestDeployBySpaceID(ctx, space.ID).Return(deploy, nil).Once()
+		sc.mocks.deployer.EXPECT().Status(ctx, mock.Anything, false).Return("test-svc", common.Running, nil, nil)
 
 		mcpService, err := sc.GetMCPServiceBySvcName(ctx, svcName)
 
