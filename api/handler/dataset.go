@@ -73,7 +73,7 @@ func (h *DatasetHandler) Create(ctx *gin.Context) {
 	_, err := h.sensitive.CheckRequestV2(ctx.Request.Context(), req)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "failed to check sensitive request", slog.Any("error", err))
-		httpbase.ServerError(ctx, fmt.Errorf("sensitive check failed: %w", err))
+		httpbase.BadRequestWithExt(ctx, errorx.ErrSensitiveInfoNotAllowed)
 		return
 	}
 	if !req.Private && !h.allowCreatePublic() {
@@ -189,7 +189,7 @@ func (h *DatasetHandler) Update(ctx *gin.Context) {
 	_, err := h.sensitive.CheckRequestV2(ctx.Request.Context(), req)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "failed to check sensitive request", slog.Any("error", err))
-		httpbase.ServerError(ctx, fmt.Errorf("sensitive check failed: %w", err))
+		httpbase.BadRequestWithExt(ctx, errorx.ErrSensitiveInfoNotAllowed)
 		return
 	}
 	req.Username = currentUser
