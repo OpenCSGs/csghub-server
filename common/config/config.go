@@ -363,6 +363,7 @@ type Config struct {
 		MaxConcurrentSessionExecutionSize       int    `env:"OPENCSG_DATAVIEWER_MAX_CONCURRENT_SESSION_EXECUTION_SIZE" default:"1"`
 		SessionExecutionTimeout                 int    `env:"OPENCSG_DATAVIEWER_SESSION_EXECUTION_TIMEOUT" default:"240"` // 240 mins
 		ConvertLimitSize                        int64  `env:"OPENCSG_DATAVIEWER_CONVERT_LIMIT_SIZE" default:"5368709120"` // 5G
+		ScanFileNumLimit                        int    `env:"OPENCSG_DATAVIEWER_SCAN_FILE_NUM_LIMIT" default:"5000"`      // 5K files
 	}
 
 	Proxy struct {

@@ -146,6 +146,7 @@ type WorkflowUpdateParams struct {
 type ScanRepoFileReq struct {
 	Req              types.UpdateViewerReq
 	ConvertLimitSize int64
+	MaxFileNum       int
 }
 
 type DetermineCardReq struct {
