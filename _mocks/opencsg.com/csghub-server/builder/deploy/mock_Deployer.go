@@ -5,8 +5,11 @@ package deploy
 import (
 	context "context"
 
-	deploy "opencsg.com/csghub-server/builder/deploy"
+	config "opencsg.com/csghub-server/common/config"
+
 	database "opencsg.com/csghub-server/builder/store/database"
+
+	deploy "opencsg.com/csghub-server/builder/deploy"
 
 	loki "opencsg.com/csghub-server/builder/loki"
 
@@ -602,6 +605,52 @@ func (_c *MockDeployer_GetReplica_Call) RunAndReturn(run func(context.Context, t
 	return _c
 }
 
+// GetSharedModeResourceName provides a mock function with given fields: _a0
+func (_m *MockDeployer) GetSharedModeResourceName(_a0 *config.Config) string {
+	ret := _m.Called(_a0)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetSharedModeResourceName")
+	}
+
+	var r0 string
+	if rf, ok := ret.Get(0).(func(*config.Config) string); ok {
+		r0 = rf(_a0)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	return r0
+}
+
+// MockDeployer_GetSharedModeResourceName_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetSharedModeResourceName'
+type MockDeployer_GetSharedModeResourceName_Call struct {
+	*mock.Call
+}
+
+// GetSharedModeResourceName is a helper method to define mock.On call
+//   - _a0 *config.Config
+func (_e *MockDeployer_Expecter) GetSharedModeResourceName(_a0 interface{}) *MockDeployer_GetSharedModeResourceName_Call {
+	return &MockDeployer_GetSharedModeResourceName_Call{Call: _e.mock.On("GetSharedModeResourceName", _a0)}
+}
+
+func (_c *MockDeployer_GetSharedModeResourceName_Call) Run(run func(_a0 *config.Config)) *MockDeployer_GetSharedModeResourceName_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(*config.Config))
+	})
+	return _c
+}
+
+func (_c *MockDeployer_GetSharedModeResourceName_Call) Return(_a0 string) *MockDeployer_GetSharedModeResourceName_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockDeployer_GetSharedModeResourceName_Call) RunAndReturn(run func(*config.Config) string) *MockDeployer_GetSharedModeResourceName_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetWorkflowLogsInStream provides a mock function with given fields: ctx, req
 func (_m *MockDeployer) GetWorkflowLogsInStream(ctx context.Context, req types.FinetuneLogReq) (*deploy.MultiLogReader, error) {
 	ret := _m.Called(ctx, req)
@@ -775,6 +824,51 @@ func (_c *MockDeployer_InstanceLogs_Call) Return(_a0 *deploy.MultiLogReader, _a1
 }
 
 func (_c *MockDeployer_InstanceLogs_Call) RunAndReturn(run func(context.Context, types.DeployRepo) (*deploy.MultiLogReader, error)) *MockDeployer_InstanceLogs_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// IsDefaultScheduler provides a mock function with no fields
+func (_m *MockDeployer) IsDefaultScheduler() bool {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for IsDefaultScheduler")
+	}
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func() bool); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
+}
+
+// MockDeployer_IsDefaultScheduler_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'IsDefaultScheduler'
+type MockDeployer_IsDefaultScheduler_Call struct {
+	*mock.Call
+}
+
+// IsDefaultScheduler is a helper method to define mock.On call
+func (_e *MockDeployer_Expecter) IsDefaultScheduler() *MockDeployer_IsDefaultScheduler_Call {
+	return &MockDeployer_IsDefaultScheduler_Call{Call: _e.mock.On("IsDefaultScheduler")}
+}
+
+func (_c *MockDeployer_IsDefaultScheduler_Call) Run(run func()) *MockDeployer_IsDefaultScheduler_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockDeployer_IsDefaultScheduler_Call) Return(_a0 bool) *MockDeployer_IsDefaultScheduler_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockDeployer_IsDefaultScheduler_Call) RunAndReturn(run func() bool) *MockDeployer_IsDefaultScheduler_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -14,6 +14,7 @@ import (
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
+	rtypes "opencsg.com/csghub-server/runner/types"
 )
 
 type MonitorComponent interface {
@@ -348,7 +349,7 @@ func (m *monitorComponentImpl) hasPermission(ctx context.Context, req *types.Mon
 
 func (m *monitorComponentImpl) hasPermissionForDeploy(ctx context.Context, req *types.MonitorReq) (bool, error, string, string) {
 	namespace := m.k8sNameSpace
-	container := "user-container"
+	container := rtypes.UserContainerName
 	user, err := m.userSvcClient.GetUserInfo(ctx, req.CurrentUser, req.CurrentUser)
 	if err != nil {
 		return false, fmt.Errorf("failed to get user %s info error: %w", req.CurrentUser, err), "", ""

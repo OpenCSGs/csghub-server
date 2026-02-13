@@ -41,9 +41,11 @@ type deployer struct {
 	clusterStore          database.ClusterInfoStore
 	lokiClient            sender.LogSender
 	logReporter           reporter.LogCollector
+	config                *config.Config
+	kubeScheduler         *types.Scheduler
 }
 
-func newDeployer(ib imagebuilder.Builder, ir imagerunner.Runner, c common.DeployConfig, logReporter reporter.LogCollector, cfg *config.Config, startJobs bool) (*deployer, error) {
+func newDeployer(ib imagebuilder.Builder, ir imagerunner.Runner, c common.DeployConfig, logReporter reporter.LogCollector, config *config.Config, startJobs bool) (*deployer, error) {
 
 	store := database.NewDeployTaskStore()
 	node, err := snowflake.NewNode(1)
@@ -68,8 +70,9 @@ func newDeployer(ib imagebuilder.Builder, ir imagerunner.Runner, c common.Deploy
 		lokiClient:            logReporter.GetSender(),
 		logReporter:           logReporter,
 		argoWorkflowStore:     database.NewArgoWorkFlowStore(),
+		config:                config,
+		kubeScheduler:         common.GenerateScheduler(c),
 	}
-
 	if startJobs {
 		d.startJobs()
 	}
@@ -96,7 +99,7 @@ func (d *deployer) startAccounting() {
 	go d.startAcctMetering()
 }
 
-func checkNodeResource(node types.NodeResourceInfo, hardware *types.HardWare) bool {
+func checkNodeResource(node types.NodeResourceInfo, hardware *types.HardWare, config *config.Config) bool {
 
 	if hardware.Cpu.Num != "" {
 		requestedCPU, err := resource.ParseQuantity(hardware.Cpu.Num)

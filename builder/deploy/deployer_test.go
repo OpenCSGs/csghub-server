@@ -1350,3 +1350,40 @@ func TestDeployer_startAcctMeteringRequest(t *testing.T) {
 		// Should use default replicaCount of 1
 	})
 }
+
+func TestDeployer_IsDefaultScheduler(t *testing.T) {
+	t.Run("default scheduler", func(t *testing.T) {
+		d := &deployer{
+			kubeScheduler: nil,
+		}
+		require.True(t, d.IsDefaultScheduler())
+	})
+
+	t.Run("custom scheduler", func(t *testing.T) {
+		d := &deployer{
+			kubeScheduler: &types.Scheduler{},
+		}
+		require.False(t, d.IsDefaultScheduler())
+	})
+}
+
+func TestDeployer_GetSharedModeResourceName(t *testing.T) {
+	config := &config.Config{}
+	config.Runner.VGPUResourceReqKey = "nvidia.com/vgpu"
+
+	t.Run("default scheduler", func(t *testing.T) {
+		d := &deployer{
+			kubeScheduler: nil,
+		}
+		name := d.GetSharedModeResourceName(config)
+		require.Equal(t, common.DefaultResourceName, name)
+	})
+
+	t.Run("custom scheduler", func(t *testing.T) {
+		d := &deployer{
+			kubeScheduler: &types.Scheduler{},
+		}
+		name := d.GetSharedModeResourceName(config)
+		require.Equal(t, "nvidia.com/vgpu", name)
+	})
+}
