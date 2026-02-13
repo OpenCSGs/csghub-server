@@ -35,6 +35,7 @@ import (
 // @Param        need_op_weight query bool false "need op weight" default(false)
 // @Param        sort query string false "sort by"
 // @Param        source query string false "source" Enums(opencsg, huggingface, local)
+// @Param        xnet_migration_status query string false "filter by xnet migration status" Enums(pending, running, completed, failed)
 // @Param        per query int false "per" default(20)
 // @Param        page query int false "per page" default(1)
 // @Param        model_tree query string false "example: base_model:finetune:1"
