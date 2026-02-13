@@ -1094,6 +1094,92 @@ func TestRepoComponent_ListRuntimeFramework(t *testing.T) {
 
 }
 
+func TestRepoComponent_ListRuntimeFrameworkV2_VLLMFirstWhenDeployTypeInference(t *testing.T) {
+	ctx := context.TODO()
+	repo := initializeTestRepoComponent(ctx, t)
+
+	repo.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(&database.Repository{
+		ID:   123,
+		Name: "test",
+		Tags: []database.Tag{
+			{
+				Name:     "safetensors",
+				Category: "framework",
+			},
+		},
+		Metadata: database.Metadata{
+			Architecture: "qwen",
+		},
+	}, nil)
+
+	// frames order: amd-vllm, nvidia-vllm, vllm, sglang -> vllm should be moved to first when deploy_type=1
+	frames := []database.RuntimeFramework{
+		{ID: 1, FrameName: "amd-vllm", FrameVersion: "v1", FrameImage: "img:tag1", Enabled: 1, ContainerPort: 8000, Type: 1, ModelFormat: "safetensors", ComputeType: "gpu", DriverVersion: "12.0"},
+		{ID: 2, FrameName: "nvidia-vllm", FrameVersion: "v1", FrameImage: "img:tag2", Enabled: 1, ContainerPort: 8000, Type: 1, ModelFormat: "safetensors", ComputeType: "gpu", DriverVersion: "12.0"},
+		{ID: 3, FrameName: "vllm", FrameVersion: "v1", FrameImage: "img:tag3", Enabled: 1, ContainerPort: 8000, Type: 1, ModelFormat: "safetensors", ComputeType: "gpu", DriverVersion: "12.0"},
+		{ID: 4, FrameName: "sglang", FrameVersion: "v1", FrameImage: "img:tag4", Enabled: 1, ContainerPort: 8000, Type: 1, ModelFormat: "safetensors", ComputeType: "gpu", DriverVersion: "12.0"},
+	}
+	repo.mocks.stores.RuntimeFrameworkMock().EXPECT().ListByArchsNameAndType(ctx, "test", "safetensors", []string{"qwen"}, types.InferenceType).Return(frames, nil)
+
+	list, err := repo.ListRuntimeFrameworkV2(ctx, types.ModelRepo, "ns", "n", types.InferenceType)
+	require.Nil(t, err)
+	require.Len(t, list, 4)
+	// deploy_type=1: vllm must be first
+	require.Equal(t, "vllm", list[0].FrameName)
+	require.Equal(t, "amd-vllm", list[1].FrameName)
+	require.Equal(t, "nvidia-vllm", list[2].FrameName)
+	require.Equal(t, "sglang", list[3].FrameName)
+}
+
+func TestRepoComponent_ListRuntimeFrameworkV2_NoReorderWhenDeployTypeNotInference(t *testing.T) {
+	ctx := context.TODO()
+	repo := initializeTestRepoComponent(ctx, t)
+
+	repo.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(&database.Repository{
+		ID:   123,
+		Name: "test",
+		Tags: []database.Tag{{Name: "safetensors", Category: "framework"}},
+		Metadata: database.Metadata{Architecture: "qwen"},
+	}, nil)
+
+	frames := []database.RuntimeFramework{
+		{ID: 1, FrameName: "amd-vllm", FrameVersion: "v1", FrameImage: "img:tag1", Enabled: 1, ContainerPort: 8000, Type: 1, ModelFormat: "safetensors", ComputeType: "gpu", DriverVersion: "12.0"},
+		{ID: 2, FrameName: "vllm", FrameVersion: "v1", FrameImage: "img:tag2", Enabled: 1, ContainerPort: 8000, Type: 1, ModelFormat: "safetensors", ComputeType: "gpu", DriverVersion: "12.0"},
+	}
+	repo.mocks.stores.RuntimeFrameworkMock().EXPECT().ListByArchsNameAndType(ctx, "test", "safetensors", []string{"qwen"}, 2).Return(frames, nil)
+
+	list, err := repo.ListRuntimeFrameworkV2(ctx, types.ModelRepo, "ns", "n", 2)
+	require.Nil(t, err)
+	require.Len(t, list, 2)
+	// deploy_type!=1: keep original order
+	require.Equal(t, "amd-vllm", list[0].FrameName)
+	require.Equal(t, "vllm", list[1].FrameName)
+}
+
+func TestRepoComponent_ListRuntimeFrameworkV2_VLLMAlreadyFirst(t *testing.T) {
+	ctx := context.TODO()
+	repo := initializeTestRepoComponent(ctx, t)
+
+	repo.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(&database.Repository{
+		ID:   123,
+		Name: "test",
+		Tags: []database.Tag{{Name: "safetensors", Category: "framework"}},
+		Metadata: database.Metadata{Architecture: "qwen"},
+	}, nil)
+
+	frames := []database.RuntimeFramework{
+		{ID: 1, FrameName: "vllm", FrameVersion: "v1", FrameImage: "img:tag1", Enabled: 1, ContainerPort: 8000, Type: 1, ModelFormat: "safetensors", ComputeType: "gpu", DriverVersion: "12.0"},
+		{ID: 2, FrameName: "sglang", FrameVersion: "v1", FrameImage: "img:tag2", Enabled: 1, ContainerPort: 8000, Type: 1, ModelFormat: "safetensors", ComputeType: "gpu", DriverVersion: "12.0"},
+	}
+	repo.mocks.stores.RuntimeFrameworkMock().EXPECT().ListByArchsNameAndType(ctx, "test", "safetensors", []string{"qwen"}, types.InferenceType).Return(frames, nil)
+
+	list, err := repo.ListRuntimeFrameworkV2(ctx, types.ModelRepo, "ns", "n", types.InferenceType)
+	require.Nil(t, err)
+	require.Len(t, list, 2)
+	require.Equal(t, "vllm", list[0].FrameName)
+	require.Equal(t, "sglang", list[1].FrameName)
+}
+
 func TestRepoComponent_CreateRuntimeFramework(t *testing.T) {
 	ctx := context.TODO()
 	repo := initializeTestRepoComponent(ctx, t)
