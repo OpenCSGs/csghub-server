@@ -181,6 +181,26 @@ func generateSensitiveRespForPrompt() types.ChatCompletionChunk {
 	return newChunk
 }
 
+func generateInsufficientBalanceResp(frontendURL string) types.ChatCompletionChunk {
+	rechargeURL := fmt.Sprintf("%s/settings/recharge-payment", frontendURL)
+	message := fmt.Sprintf(
+		"**Insufficient balance**\n\n👉 [Recharge your account](%s) to continue.",
+		rechargeURL,
+	)
+	newChunk := types.ChatCompletionChunk{
+		Choices: []types.ChatCompletionChunkChoice{
+			{
+				Delta: types.ChatCompletionChunkChoiceDelta{
+					Content: message,
+				},
+				FinishReason: "insufficient_balance",
+				Index:        0,
+			},
+		},
+	}
+	return newChunk
+}
+
 func (rw *ResponseWriterWrapper) Flush() {
 	rw.internalWritter.Flush()
 }

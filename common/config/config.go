@@ -219,6 +219,8 @@ type Config struct {
 		SubscriptionCronExpression   string `env:"OPENCSG_ACCOUNTING_SUBSCRIPTION_CRON_EXPRESSION" default:"*/5 * * * *"`
 		ExpiredPresentCronExpression string `env:"OPENCSG_ACCOUNTING_EXPIRED_PRESENT_CRON_EXPRESSION" default:"0 0 * * *"`
 		ThresholdOfStopDeploy        int    `env:"OPENCSG_ACCOUNTING_THRESHOLD_OF_STOP_DEPLOY" default:"5000"`
+		ThresholdOfStopLLMInference  int    `env:"OPENCSG_ACCOUNTING_THRESHOLD_OF_STOP_LLM_INFERENCE" default:"5000"`
+		LLMBalanceCheckCacheTTL      int    `env:"OPENCSG_ACCOUNTING_LLM_BALANCE_CHECK_CACHE_TTL" default:"86400"`
 	}
 
 	User struct {
