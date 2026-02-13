@@ -2208,6 +2208,18 @@ func (c *repoComponentImpl) ListRuntimeFrameworkV2(ctx context.Context, repoType
 		}
 
 	}
+	// when deploy_type=1 (inference), put vllm first if present
+	if deployType == types.InferenceType {
+		for i, f := range frameList {
+			if f.FrameName == "vllm" && i > 0 {
+				// shift vllm to index 0 without allocating new slice
+				for j := i; j > 0; j-- {
+					frameList[j], frameList[j-1] = frameList[j-1], frameList[j]
+				}
+				break
+			}
+		}
+	}
 	return frameList, nil
 }
 
