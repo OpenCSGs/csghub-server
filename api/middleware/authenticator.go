@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"encoding/base64"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -80,40 +81,53 @@ func Authenticator(config *config.Config) gin.HandlerFunc {
 			return
 		}
 
-		if !strings.HasPrefix(authHeader, "Bearer ") {
+		switch {
+		case strings.HasPrefix(authHeader, "Bearer "):
+			token := strings.TrimPrefix(authHeader, "Bearer ")
+			result = isValidApiToken(c, config, token)
+			if result {
+				c.Next()
+				return
+			}
+
+			result = isValidJWTToken(c, config, token)
+			if result {
+				c.Next()
+				return
+			}
+
+			result = isValidAccessToken(c, userSvcClient, token)
+			if result {
+				c.Next()
+				return
+			}
+
+			slog.ErrorContext(c, "invalid Bearer token", slog.String("token", token),
+				slog.String("ip", c.ClientIP()),
+				slog.String("method", c.Request.Method),
+				slog.String("url", c.Request.URL.RequestURI()),
+			)
 			httpbase.UnauthorizedError(c, errorx.ErrInvalidAuthHeader)
 			c.Abort()
-			return
+		case strings.HasPrefix(authHeader, "Basic "):
+			token := strings.TrimPrefix(authHeader, "Basic ")
+			result = isValidBasicToken(c, userSvcClient, token)
+			if result {
+				c.Next()
+				return
+			}
+
+			slog.ErrorContext(c, "invalid Basic token", slog.String("token", token),
+				slog.String("ip", c.ClientIP()),
+				slog.String("method", c.Request.Method),
+				slog.String("url", c.Request.URL.RequestURI()),
+			)
+			httpbase.UnauthorizedError(c, errorx.ErrInvalidAuthHeader)
+			c.Abort()
+		default:
+			httpbase.UnauthorizedError(c, errorx.ErrInvalidAuthHeader)
+			c.Abort()
 		}
-
-		// Get token from header
-		token := strings.TrimPrefix(authHeader, "Bearer ")
-
-		result = isValidApiToken(c, config, token)
-		if result {
-			c.Next()
-			return
-		}
-
-		result = isValidJWTToken(c, config, token)
-		if result {
-			c.Next()
-			return
-		}
-
-		result = isValidAccessToken(c, userSvcClient, token)
-		if result {
-			c.Next()
-			return
-		}
-
-		slog.ErrorContext(c, "invalid Bearer token", slog.String("token", token),
-			slog.String("ip", c.ClientIP()),
-			slog.String("method", c.Request.Method),
-			slog.String("url", c.Request.URL.RequestURI()),
-		)
-		httpbase.UnauthorizedError(c, errorx.ErrInvalidAuthHeader)
-		c.Abort()
 	}
 }
 
@@ -211,6 +225,28 @@ func parseJWTToken(signKey, tokenString string) (*types.JWTClaims, error) {
 	}
 	err = fmt.Errorf("JWT token claims not match: %+v", *token)
 	return nil, errorx.InvalidAuthHeader(err, nil)
+}
+
+func isValidBasicToken(c *gin.Context, userSvcClient rpc.UserSvcClient, token string) bool {
+	var username, accessToken string
+	authInfo, err := base64.StdEncoding.DecodeString(token)
+	if err != nil {
+		slog.ErrorContext(c, "Failed to decode basic auth header", slog.Any("token", token), slog.Any("error", err))
+		return false
+	}
+	username = strings.Split(string(authInfo), ":")[0]
+	accessToken = strings.Split(string(authInfo), ":")[1]
+	user, err := userSvcClient.VerifyByAccessToken(c.Request.Context(), accessToken)
+	if err != nil {
+		slog.ErrorContext(c, "verify access token error", slog.Any("error", err))
+		return false
+	}
+	if user.Username == username {
+		httpbase.SetCurrentUser(c, username)
+		httpbase.SetCurrentUserUUID(c, user.UserUUID)
+		return true
+	}
+	return false
 }
 
 func NeedAPIKey(config *config.Config) gin.HandlerFunc {
