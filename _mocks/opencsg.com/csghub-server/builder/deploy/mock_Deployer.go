@@ -5,8 +5,11 @@ package deploy
 import (
 	context "context"
 
-	deploy "opencsg.com/csghub-server/builder/deploy"
+	config "opencsg.com/csghub-server/common/config"
+
 	database "opencsg.com/csghub-server/builder/store/database"
+
+	deploy "opencsg.com/csghub-server/builder/deploy"
 
 	loki "opencsg.com/csghub-server/builder/loki"
 
@@ -411,65 +414,6 @@ func (_c *MockDeployer_GetClusterById_Call) RunAndReturn(run func(context.Contex
 	return _c
 }
 
-// GetClusterUsageById provides a mock function with given fields: ctx, clusterId
-func (_m *MockDeployer) GetClusterUsageById(ctx context.Context, clusterId string) (*types.ClusterRes, error) {
-	ret := _m.Called(ctx, clusterId)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetClusterUsageById")
-	}
-
-	var r0 *types.ClusterRes
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) (*types.ClusterRes, error)); ok {
-		return rf(ctx, clusterId)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, string) *types.ClusterRes); ok {
-		r0 = rf(ctx, clusterId)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*types.ClusterRes)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = rf(ctx, clusterId)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockDeployer_GetClusterUsageById_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetClusterUsageById'
-type MockDeployer_GetClusterUsageById_Call struct {
-	*mock.Call
-}
-
-// GetClusterUsageById is a helper method to define mock.On call
-//   - ctx context.Context
-//   - clusterId string
-func (_e *MockDeployer_Expecter) GetClusterUsageById(ctx interface{}, clusterId interface{}) *MockDeployer_GetClusterUsageById_Call {
-	return &MockDeployer_GetClusterUsageById_Call{Call: _e.mock.On("GetClusterUsageById", ctx, clusterId)}
-}
-
-func (_c *MockDeployer_GetClusterUsageById_Call) Run(run func(ctx context.Context, clusterId string)) *MockDeployer_GetClusterUsageById_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string))
-	})
-	return _c
-}
-
-func (_c *MockDeployer_GetClusterUsageById_Call) Return(_a0 *types.ClusterRes, _a1 error) *MockDeployer_GetClusterUsageById_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockDeployer_GetClusterUsageById_Call) RunAndReturn(run func(context.Context, string) (*types.ClusterRes, error)) *MockDeployer_GetClusterUsageById_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // GetEvaluation provides a mock function with given fields: ctx, req
 func (_m *MockDeployer) GetEvaluation(ctx context.Context, req types.EvaluationGetReq) (*types.ArgoWorkFlowRes, error) {
 	ret := _m.Called(ctx, req)
@@ -598,6 +542,52 @@ func (_c *MockDeployer_GetReplica_Call) Return(_a0 int, _a1 int, _a2 []types.Ins
 }
 
 func (_c *MockDeployer_GetReplica_Call) RunAndReturn(run func(context.Context, types.DeployRepo) (int, int, []types.Instance, error)) *MockDeployer_GetReplica_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetSharedModeResourceName provides a mock function with given fields: _a0
+func (_m *MockDeployer) GetSharedModeResourceName(_a0 *config.Config) string {
+	ret := _m.Called(_a0)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetSharedModeResourceName")
+	}
+
+	var r0 string
+	if rf, ok := ret.Get(0).(func(*config.Config) string); ok {
+		r0 = rf(_a0)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	return r0
+}
+
+// MockDeployer_GetSharedModeResourceName_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetSharedModeResourceName'
+type MockDeployer_GetSharedModeResourceName_Call struct {
+	*mock.Call
+}
+
+// GetSharedModeResourceName is a helper method to define mock.On call
+//   - _a0 *config.Config
+func (_e *MockDeployer_Expecter) GetSharedModeResourceName(_a0 interface{}) *MockDeployer_GetSharedModeResourceName_Call {
+	return &MockDeployer_GetSharedModeResourceName_Call{Call: _e.mock.On("GetSharedModeResourceName", _a0)}
+}
+
+func (_c *MockDeployer_GetSharedModeResourceName_Call) Run(run func(_a0 *config.Config)) *MockDeployer_GetSharedModeResourceName_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(*config.Config))
+	})
+	return _c
+}
+
+func (_c *MockDeployer_GetSharedModeResourceName_Call) Return(_a0 string) *MockDeployer_GetSharedModeResourceName_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockDeployer_GetSharedModeResourceName_Call) RunAndReturn(run func(*config.Config) string) *MockDeployer_GetSharedModeResourceName_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -775,6 +765,98 @@ func (_c *MockDeployer_InstanceLogs_Call) Return(_a0 *deploy.MultiLogReader, _a1
 }
 
 func (_c *MockDeployer_InstanceLogs_Call) RunAndReturn(run func(context.Context, types.DeployRepo) (*deploy.MultiLogReader, error)) *MockDeployer_InstanceLogs_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// IsDefaultScheduler provides a mock function with no fields
+func (_m *MockDeployer) IsDefaultScheduler() bool {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for IsDefaultScheduler")
+	}
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func() bool); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
+}
+
+// MockDeployer_IsDefaultScheduler_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'IsDefaultScheduler'
+type MockDeployer_IsDefaultScheduler_Call struct {
+	*mock.Call
+}
+
+// IsDefaultScheduler is a helper method to define mock.On call
+func (_e *MockDeployer_Expecter) IsDefaultScheduler() *MockDeployer_IsDefaultScheduler_Call {
+	return &MockDeployer_IsDefaultScheduler_Call{Call: _e.mock.On("IsDefaultScheduler")}
+}
+
+func (_c *MockDeployer_IsDefaultScheduler_Call) Run(run func()) *MockDeployer_IsDefaultScheduler_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockDeployer_IsDefaultScheduler_Call) Return(_a0 bool) *MockDeployer_IsDefaultScheduler_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockDeployer_IsDefaultScheduler_Call) RunAndReturn(run func() bool) *MockDeployer_IsDefaultScheduler_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// LabelNode provides a mock function with given fields: ctx, req
+func (_m *MockDeployer) LabelNode(ctx context.Context, req *types.NodeLabel) error {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for LabelNode")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, *types.NodeLabel) error); ok {
+		r0 = rf(ctx, req)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockDeployer_LabelNode_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'LabelNode'
+type MockDeployer_LabelNode_Call struct {
+	*mock.Call
+}
+
+// LabelNode is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req *types.NodeLabel
+func (_e *MockDeployer_Expecter) LabelNode(ctx interface{}, req interface{}) *MockDeployer_LabelNode_Call {
+	return &MockDeployer_LabelNode_Call{Call: _e.mock.On("LabelNode", ctx, req)}
+}
+
+func (_c *MockDeployer_LabelNode_Call) Run(run func(ctx context.Context, req *types.NodeLabel)) *MockDeployer_LabelNode_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*types.NodeLabel))
+	})
+	return _c
+}
+
+func (_c *MockDeployer_LabelNode_Call) Return(_a0 error) *MockDeployer_LabelNode_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockDeployer_LabelNode_Call) RunAndReturn(run func(context.Context, *types.NodeLabel) error) *MockDeployer_LabelNode_Call {
 	_c.Call.Return(run)
 	return _c
 }

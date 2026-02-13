@@ -145,6 +145,53 @@ func (_c *MockClusterInfoStore_AddByClusterID_Call) RunAndReturn(run func(contex
 	return _c
 }
 
+// AddNodeOwnership provides a mock function with given fields: ctx, ownership
+func (_m *MockClusterInfoStore) AddNodeOwnership(ctx context.Context, ownership database.ClusterNodeOwnership) error {
+	ret := _m.Called(ctx, ownership)
+
+	if len(ret) == 0 {
+		panic("no return value specified for AddNodeOwnership")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, database.ClusterNodeOwnership) error); ok {
+		r0 = rf(ctx, ownership)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockClusterInfoStore_AddNodeOwnership_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'AddNodeOwnership'
+type MockClusterInfoStore_AddNodeOwnership_Call struct {
+	*mock.Call
+}
+
+// AddNodeOwnership is a helper method to define mock.On call
+//   - ctx context.Context
+//   - ownership database.ClusterNodeOwnership
+func (_e *MockClusterInfoStore_Expecter) AddNodeOwnership(ctx interface{}, ownership interface{}) *MockClusterInfoStore_AddNodeOwnership_Call {
+	return &MockClusterInfoStore_AddNodeOwnership_Call{Call: _e.mock.On("AddNodeOwnership", ctx, ownership)}
+}
+
+func (_c *MockClusterInfoStore_AddNodeOwnership_Call) Run(run func(ctx context.Context, ownership database.ClusterNodeOwnership)) *MockClusterInfoStore_AddNodeOwnership_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(database.ClusterNodeOwnership))
+	})
+	return _c
+}
+
+func (_c *MockClusterInfoStore_AddNodeOwnership_Call) Return(_a0 error) *MockClusterInfoStore_AddNodeOwnership_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockClusterInfoStore_AddNodeOwnership_Call) RunAndReturn(run func(context.Context, database.ClusterNodeOwnership) error) *MockClusterInfoStore_AddNodeOwnership_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // BatchUpdateStatus provides a mock function with given fields: ctx, statusEvent
 func (_m *MockClusterInfoStore) BatchUpdateStatus(ctx context.Context, statusEvent []*types.ClusterRes) error {
 	ret := _m.Called(ctx, statusEvent)
@@ -306,6 +353,100 @@ func (_c *MockClusterInfoStore_ByClusterID_Call) RunAndReturn(run func(context.C
 	return _c
 }
 
+// DeleteNodeOwnership provides a mock function with given fields: ctx, clusterNodeID
+func (_m *MockClusterInfoStore) DeleteNodeOwnership(ctx context.Context, clusterNodeID int64) error {
+	ret := _m.Called(ctx, clusterNodeID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteNodeOwnership")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64) error); ok {
+		r0 = rf(ctx, clusterNodeID)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockClusterInfoStore_DeleteNodeOwnership_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteNodeOwnership'
+type MockClusterInfoStore_DeleteNodeOwnership_Call struct {
+	*mock.Call
+}
+
+// DeleteNodeOwnership is a helper method to define mock.On call
+//   - ctx context.Context
+//   - clusterNodeID int64
+func (_e *MockClusterInfoStore_Expecter) DeleteNodeOwnership(ctx interface{}, clusterNodeID interface{}) *MockClusterInfoStore_DeleteNodeOwnership_Call {
+	return &MockClusterInfoStore_DeleteNodeOwnership_Call{Call: _e.mock.On("DeleteNodeOwnership", ctx, clusterNodeID)}
+}
+
+func (_c *MockClusterInfoStore_DeleteNodeOwnership_Call) Run(run func(ctx context.Context, clusterNodeID int64)) *MockClusterInfoStore_DeleteNodeOwnership_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64))
+	})
+	return _c
+}
+
+func (_c *MockClusterInfoStore_DeleteNodeOwnership_Call) Return(_a0 error) *MockClusterInfoStore_DeleteNodeOwnership_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockClusterInfoStore_DeleteNodeOwnership_Call) RunAndReturn(run func(context.Context, int64) error) *MockClusterInfoStore_DeleteNodeOwnership_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ExecuteInTx provides a mock function with given fields: ctx, fn
+func (_m *MockClusterInfoStore) ExecuteInTx(ctx context.Context, fn func(context.Context, database.ClusterInfoStore) error) error {
+	ret := _m.Called(ctx, fn)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ExecuteInTx")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, func(context.Context, database.ClusterInfoStore) error) error); ok {
+		r0 = rf(ctx, fn)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockClusterInfoStore_ExecuteInTx_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ExecuteInTx'
+type MockClusterInfoStore_ExecuteInTx_Call struct {
+	*mock.Call
+}
+
+// ExecuteInTx is a helper method to define mock.On call
+//   - ctx context.Context
+//   - fn func(context.Context , database.ClusterInfoStore) error
+func (_e *MockClusterInfoStore_Expecter) ExecuteInTx(ctx interface{}, fn interface{}) *MockClusterInfoStore_ExecuteInTx_Call {
+	return &MockClusterInfoStore_ExecuteInTx_Call{Call: _e.mock.On("ExecuteInTx", ctx, fn)}
+}
+
+func (_c *MockClusterInfoStore_ExecuteInTx_Call) Run(run func(ctx context.Context, fn func(context.Context, database.ClusterInfoStore) error)) *MockClusterInfoStore_ExecuteInTx_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(func(context.Context, database.ClusterInfoStore) error))
+	})
+	return _c
+}
+
+func (_c *MockClusterInfoStore_ExecuteInTx_Call) Return(_a0 error) *MockClusterInfoStore_ExecuteInTx_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockClusterInfoStore_ExecuteInTx_Call) RunAndReturn(run func(context.Context, func(context.Context, database.ClusterInfoStore) error) error) *MockClusterInfoStore_ExecuteInTx_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // FindNodeByClusterID provides a mock function with given fields: ctx, clusterID
 func (_m *MockClusterInfoStore) FindNodeByClusterID(ctx context.Context, clusterID string) ([]database.ClusterNode, error) {
 	ret := _m.Called(ctx, clusterID)
@@ -361,6 +502,65 @@ func (_c *MockClusterInfoStore_FindNodeByClusterID_Call) Return(_a0 []database.C
 }
 
 func (_c *MockClusterInfoStore_FindNodeByClusterID_Call) RunAndReturn(run func(context.Context, string) ([]database.ClusterNode, error)) *MockClusterInfoStore_FindNodeByClusterID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetClusterNodeByID provides a mock function with given fields: ctx, id
+func (_m *MockClusterInfoStore) GetClusterNodeByID(ctx context.Context, id int64) (*database.ClusterNode, error) {
+	ret := _m.Called(ctx, id)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetClusterNodeByID")
+	}
+
+	var r0 *database.ClusterNode
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64) (*database.ClusterNode, error)); ok {
+		return rf(ctx, id)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, int64) *database.ClusterNode); ok {
+		r0 = rf(ctx, id)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.ClusterNode)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, int64) error); ok {
+		r1 = rf(ctx, id)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClusterInfoStore_GetClusterNodeByID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetClusterNodeByID'
+type MockClusterInfoStore_GetClusterNodeByID_Call struct {
+	*mock.Call
+}
+
+// GetClusterNodeByID is a helper method to define mock.On call
+//   - ctx context.Context
+//   - id int64
+func (_e *MockClusterInfoStore_Expecter) GetClusterNodeByID(ctx interface{}, id interface{}) *MockClusterInfoStore_GetClusterNodeByID_Call {
+	return &MockClusterInfoStore_GetClusterNodeByID_Call{Call: _e.mock.On("GetClusterNodeByID", ctx, id)}
+}
+
+func (_c *MockClusterInfoStore_GetClusterNodeByID_Call) Run(run func(ctx context.Context, id int64)) *MockClusterInfoStore_GetClusterNodeByID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64))
+	})
+	return _c
+}
+
+func (_c *MockClusterInfoStore_GetClusterNodeByID_Call) Return(_a0 *database.ClusterNode, _a1 error) *MockClusterInfoStore_GetClusterNodeByID_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClusterInfoStore_GetClusterNodeByID_Call) RunAndReturn(run func(context.Context, int64) (*database.ClusterNode, error)) *MockClusterInfoStore_GetClusterNodeByID_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -424,6 +624,124 @@ func (_c *MockClusterInfoStore_GetClusterResources_Call) RunAndReturn(run func(c
 	return _c
 }
 
+// GetNodeByID provides a mock function with given fields: ctx, id
+func (_m *MockClusterInfoStore) GetNodeByID(ctx context.Context, id int64) (*database.ClusterNodeWithRegion, error) {
+	ret := _m.Called(ctx, id)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetNodeByID")
+	}
+
+	var r0 *database.ClusterNodeWithRegion
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64) (*database.ClusterNodeWithRegion, error)); ok {
+		return rf(ctx, id)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, int64) *database.ClusterNodeWithRegion); ok {
+		r0 = rf(ctx, id)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.ClusterNodeWithRegion)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, int64) error); ok {
+		r1 = rf(ctx, id)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClusterInfoStore_GetNodeByID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetNodeByID'
+type MockClusterInfoStore_GetNodeByID_Call struct {
+	*mock.Call
+}
+
+// GetNodeByID is a helper method to define mock.On call
+//   - ctx context.Context
+//   - id int64
+func (_e *MockClusterInfoStore_Expecter) GetNodeByID(ctx interface{}, id interface{}) *MockClusterInfoStore_GetNodeByID_Call {
+	return &MockClusterInfoStore_GetNodeByID_Call{Call: _e.mock.On("GetNodeByID", ctx, id)}
+}
+
+func (_c *MockClusterInfoStore_GetNodeByID_Call) Run(run func(ctx context.Context, id int64)) *MockClusterInfoStore_GetNodeByID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64))
+	})
+	return _c
+}
+
+func (_c *MockClusterInfoStore_GetNodeByID_Call) Return(_a0 *database.ClusterNodeWithRegion, _a1 error) *MockClusterInfoStore_GetNodeByID_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClusterInfoStore_GetNodeByID_Call) RunAndReturn(run func(context.Context, int64) (*database.ClusterNodeWithRegion, error)) *MockClusterInfoStore_GetNodeByID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetNodeOwnership provides a mock function with given fields: ctx, clusterNodeID
+func (_m *MockClusterInfoStore) GetNodeOwnership(ctx context.Context, clusterNodeID int64) (*database.ClusterNodeOwnership, error) {
+	ret := _m.Called(ctx, clusterNodeID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetNodeOwnership")
+	}
+
+	var r0 *database.ClusterNodeOwnership
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64) (*database.ClusterNodeOwnership, error)); ok {
+		return rf(ctx, clusterNodeID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, int64) *database.ClusterNodeOwnership); ok {
+		r0 = rf(ctx, clusterNodeID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.ClusterNodeOwnership)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, int64) error); ok {
+		r1 = rf(ctx, clusterNodeID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClusterInfoStore_GetNodeOwnership_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetNodeOwnership'
+type MockClusterInfoStore_GetNodeOwnership_Call struct {
+	*mock.Call
+}
+
+// GetNodeOwnership is a helper method to define mock.On call
+//   - ctx context.Context
+//   - clusterNodeID int64
+func (_e *MockClusterInfoStore_Expecter) GetNodeOwnership(ctx interface{}, clusterNodeID interface{}) *MockClusterInfoStore_GetNodeOwnership_Call {
+	return &MockClusterInfoStore_GetNodeOwnership_Call{Call: _e.mock.On("GetNodeOwnership", ctx, clusterNodeID)}
+}
+
+func (_c *MockClusterInfoStore_GetNodeOwnership_Call) Run(run func(ctx context.Context, clusterNodeID int64)) *MockClusterInfoStore_GetNodeOwnership_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64))
+	})
+	return _c
+}
+
+func (_c *MockClusterInfoStore_GetNodeOwnership_Call) Return(_a0 *database.ClusterNodeOwnership, _a1 error) *MockClusterInfoStore_GetNodeOwnership_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClusterInfoStore_GetNodeOwnership_Call) RunAndReturn(run func(context.Context, int64) (*database.ClusterNodeOwnership, error)) *MockClusterInfoStore_GetNodeOwnership_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // List provides a mock function with given fields: ctx
 func (_m *MockClusterInfoStore) List(ctx context.Context) ([]database.ClusterInfo, error) {
 	ret := _m.Called(ctx)
@@ -478,6 +796,64 @@ func (_c *MockClusterInfoStore_List_Call) Return(_a0 []database.ClusterInfo, _a1
 }
 
 func (_c *MockClusterInfoStore_List_Call) RunAndReturn(run func(context.Context) ([]database.ClusterInfo, error)) *MockClusterInfoStore_List_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ListAllNodes provides a mock function with given fields: ctx
+func (_m *MockClusterInfoStore) ListAllNodes(ctx context.Context) ([]database.ClusterNodeWithRegion, error) {
+	ret := _m.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListAllNodes")
+	}
+
+	var r0 []database.ClusterNodeWithRegion
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context) ([]database.ClusterNodeWithRegion, error)); ok {
+		return rf(ctx)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context) []database.ClusterNodeWithRegion); ok {
+		r0 = rf(ctx)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.ClusterNodeWithRegion)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClusterInfoStore_ListAllNodes_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListAllNodes'
+type MockClusterInfoStore_ListAllNodes_Call struct {
+	*mock.Call
+}
+
+// ListAllNodes is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *MockClusterInfoStore_Expecter) ListAllNodes(ctx interface{}) *MockClusterInfoStore_ListAllNodes_Call {
+	return &MockClusterInfoStore_ListAllNodes_Call{Call: _e.mock.On("ListAllNodes", ctx)}
+}
+
+func (_c *MockClusterInfoStore_ListAllNodes_Call) Run(run func(ctx context.Context)) *MockClusterInfoStore_ListAllNodes_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context))
+	})
+	return _c
+}
+
+func (_c *MockClusterInfoStore_ListAllNodes_Call) Return(_a0 []database.ClusterNodeWithRegion, _a1 error) *MockClusterInfoStore_ListAllNodes_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClusterInfoStore_ListAllNodes_Call) RunAndReturn(run func(context.Context) ([]database.ClusterNodeWithRegion, error)) *MockClusterInfoStore_ListAllNodes_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -572,6 +948,160 @@ func (_c *MockClusterInfoStore_UpdateByClusterID_Call) Return(_a0 error) *MockCl
 }
 
 func (_c *MockClusterInfoStore_UpdateByClusterID_Call) RunAndReturn(run func(context.Context, types.ClusterEvent) error) *MockClusterInfoStore_UpdateByClusterID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// UpdateClusterNodeByNode provides a mock function with given fields: ctx, node
+func (_m *MockClusterInfoStore) UpdateClusterNodeByNode(ctx context.Context, node database.ClusterNode) error {
+	ret := _m.Called(ctx, node)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateClusterNodeByNode")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, database.ClusterNode) error); ok {
+		r0 = rf(ctx, node)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockClusterInfoStore_UpdateClusterNodeByNode_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateClusterNodeByNode'
+type MockClusterInfoStore_UpdateClusterNodeByNode_Call struct {
+	*mock.Call
+}
+
+// UpdateClusterNodeByNode is a helper method to define mock.On call
+//   - ctx context.Context
+//   - node database.ClusterNode
+func (_e *MockClusterInfoStore_Expecter) UpdateClusterNodeByNode(ctx interface{}, node interface{}) *MockClusterInfoStore_UpdateClusterNodeByNode_Call {
+	return &MockClusterInfoStore_UpdateClusterNodeByNode_Call{Call: _e.mock.On("UpdateClusterNodeByNode", ctx, node)}
+}
+
+func (_c *MockClusterInfoStore_UpdateClusterNodeByNode_Call) Run(run func(ctx context.Context, node database.ClusterNode)) *MockClusterInfoStore_UpdateClusterNodeByNode_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(database.ClusterNode))
+	})
+	return _c
+}
+
+func (_c *MockClusterInfoStore_UpdateClusterNodeByNode_Call) Return(_a0 error) *MockClusterInfoStore_UpdateClusterNodeByNode_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockClusterInfoStore_UpdateClusterNodeByNode_Call) RunAndReturn(run func(context.Context, database.ClusterNode) error) *MockClusterInfoStore_UpdateClusterNodeByNode_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// UpdateNode provides a mock function with given fields: ctx, id, enableVXPU
+func (_m *MockClusterInfoStore) UpdateNode(ctx context.Context, id int64, enableVXPU bool) (*database.ClusterNode, error) {
+	ret := _m.Called(ctx, id, enableVXPU)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateNode")
+	}
+
+	var r0 *database.ClusterNode
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64, bool) (*database.ClusterNode, error)); ok {
+		return rf(ctx, id, enableVXPU)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, int64, bool) *database.ClusterNode); ok {
+		r0 = rf(ctx, id, enableVXPU)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.ClusterNode)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, int64, bool) error); ok {
+		r1 = rf(ctx, id, enableVXPU)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClusterInfoStore_UpdateNode_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateNode'
+type MockClusterInfoStore_UpdateNode_Call struct {
+	*mock.Call
+}
+
+// UpdateNode is a helper method to define mock.On call
+//   - ctx context.Context
+//   - id int64
+//   - enableVXPU bool
+func (_e *MockClusterInfoStore_Expecter) UpdateNode(ctx interface{}, id interface{}, enableVXPU interface{}) *MockClusterInfoStore_UpdateNode_Call {
+	return &MockClusterInfoStore_UpdateNode_Call{Call: _e.mock.On("UpdateNode", ctx, id, enableVXPU)}
+}
+
+func (_c *MockClusterInfoStore_UpdateNode_Call) Run(run func(ctx context.Context, id int64, enableVXPU bool)) *MockClusterInfoStore_UpdateNode_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64), args[2].(bool))
+	})
+	return _c
+}
+
+func (_c *MockClusterInfoStore_UpdateNode_Call) Return(_a0 *database.ClusterNode, _a1 error) *MockClusterInfoStore_UpdateNode_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClusterInfoStore_UpdateNode_Call) RunAndReturn(run func(context.Context, int64, bool) (*database.ClusterNode, error)) *MockClusterInfoStore_UpdateNode_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// UpdateNodeOwnership provides a mock function with given fields: ctx, ownership
+func (_m *MockClusterInfoStore) UpdateNodeOwnership(ctx context.Context, ownership database.ClusterNodeOwnership) error {
+	ret := _m.Called(ctx, ownership)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateNodeOwnership")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, database.ClusterNodeOwnership) error); ok {
+		r0 = rf(ctx, ownership)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockClusterInfoStore_UpdateNodeOwnership_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateNodeOwnership'
+type MockClusterInfoStore_UpdateNodeOwnership_Call struct {
+	*mock.Call
+}
+
+// UpdateNodeOwnership is a helper method to define mock.On call
+//   - ctx context.Context
+//   - ownership database.ClusterNodeOwnership
+func (_e *MockClusterInfoStore_Expecter) UpdateNodeOwnership(ctx interface{}, ownership interface{}) *MockClusterInfoStore_UpdateNodeOwnership_Call {
+	return &MockClusterInfoStore_UpdateNodeOwnership_Call{Call: _e.mock.On("UpdateNodeOwnership", ctx, ownership)}
+}
+
+func (_c *MockClusterInfoStore_UpdateNodeOwnership_Call) Run(run func(ctx context.Context, ownership database.ClusterNodeOwnership)) *MockClusterInfoStore_UpdateNodeOwnership_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(database.ClusterNodeOwnership))
+	})
+	return _c
+}
+
+func (_c *MockClusterInfoStore_UpdateNodeOwnership_Call) Return(_a0 error) *MockClusterInfoStore_UpdateNodeOwnership_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockClusterInfoStore_UpdateNodeOwnership_Call) RunAndReturn(run func(context.Context, database.ClusterNodeOwnership) error) *MockClusterInfoStore_UpdateNodeOwnership_Call {
 	_c.Call.Return(run)
 	return _c
 }
