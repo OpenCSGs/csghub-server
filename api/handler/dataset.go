@@ -113,6 +113,7 @@ func (h *DatasetHandler) Create(ctx *gin.Context) {
 // @Param        language_tag query string false "filter by language tag"
 // @Param        sort query string false "sort by"
 // @Param        source query string false "source" Enums(opencsg, huggingface, local)
+// @Param        xnet_migration_status query string false "filter by xnet migration status" Enums(pending, running, completed, failed)
 // @Param        per query int false "per" default(20)
 // @Param        page query int false "per page" default(1)
 // @Success      200  {object}  types.ResponseWithTotal{data=[]types.Dataset,total=int} "OK"
@@ -346,6 +347,18 @@ func getFilterFromContext(ctx *gin.Context, filter *types.RepoFilter) *types.Rep
 	}
 	filter.Source = ctx.Query("source")
 	filter.Status = ctx.Query("status")
+
+	xnetMigrationStatus := ctx.Query("xnet_migration_status")
+	if xnetMigrationStatus != "" {
+		status := types.XnetMigrationTaskStatus(xnetMigrationStatus)
+		if status == types.XnetMigrationTaskStatusPending ||
+			status == types.XnetMigrationTaskStatusRunning ||
+			status == types.XnetMigrationTaskStatusCompleted ||
+			status == types.XnetMigrationTaskStatusFailed {
+			filter.XnetMigrationStatus = &status
+		}
+	}
+
 	return filter
 }
 
