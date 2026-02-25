@@ -729,7 +729,7 @@ func (a *DeployActivity) makeDeployEnv(ctx context.Context, hardware types.HardW
 						engineArgs.WriteString(arg.Format)
 					} else {
 						engineArgs.WriteString(" ")
-						engineArgs.WriteString(fmt.Sprintf(arg.Format, value))
+						fmt.Fprintf(&engineArgs, arg.Format, value)
 					}
 				}
 			}

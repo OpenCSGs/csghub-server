@@ -89,7 +89,7 @@ func (d *deployer) serverlessDeploy(ctx context.Context, dr types.DeployRepo) (*
 		return nil, nil
 	}
 	if err != nil {
-		return nil, fmt.Errorf("fail to find space or serverless deploy, spaceid:%v, repoid:%v, %w", dr.SpaceID, dr.RepoID, err)
+		return nil, fmt.Errorf("failed to find space or serverless deploy, space_id:%d, repo_id:%d, %w", dr.SpaceID, dr.RepoID, err)
 	}
 	if deploy == nil {
 		return nil, nil
@@ -125,7 +125,7 @@ func (d *deployer) serverlessDeploy(ctx context.Context, dr types.DeployRepo) (*
 func (d *deployer) dedicatedDeploy(ctx context.Context, dr types.DeployRepo) (*database.Deploy, error) {
 	uniqueSvcName := d.GenerateUniqueSvcName(dr)
 	if len(uniqueSvcName) < 1 {
-		err := fmt.Errorf("fail to generate uuid for deploy")
+		err := fmt.Errorf("failed to generate uuid for deploy")
 		return nil, errorx.InternalServerError(err,
 			errorx.Ctx().
 				Set("deploy_type", dr.Type).
@@ -181,8 +181,9 @@ func (d *deployer) buildDeploy(ctx context.Context, dr types.DeployRepo) (*datab
 	}
 	slog.Debug("do deployer.buildDeploy", slog.Any("dr", dr), slog.Any("deploy", deploy))
 	if deploy == nil {
-		// create new deploy for model inference and no latest deploy of space
-		// create new deploy for note book
+		// create new deploy for:
+		// 1. create inference/finetune/notebook
+		// 2. create space/serverless first time
 		deploy, err = d.dedicatedDeploy(ctx, dr)
 	}
 
@@ -693,7 +694,7 @@ func (d *deployer) UpdateDeploy(ctx context.Context, dur *types.DeployUpdateReq,
 	// update deploy table
 	err = d.deployTaskStore.UpdateDeploy(ctx, deploy)
 	if err != nil {
-		return fmt.Errorf("failed to update deploy, %w", err)
+		return fmt.Errorf("failed to update deploy, error: %w", err)
 	}
 
 	return nil
@@ -1227,7 +1228,7 @@ func (d *deployer) GetWorkflowLogsNonStream(ctx context.Context, req types.Finet
 		if !first {
 			queryBuilder.WriteString(",")
 		}
-		queryBuilder.WriteString(fmt.Sprintf(`%s="%s"`, k, v))
+		fmt.Fprintf(&queryBuilder, `%s="%s"`, k, v)
 		first = false
 	}
 	queryBuilder.WriteString("}")
