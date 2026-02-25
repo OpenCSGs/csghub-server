@@ -106,6 +106,13 @@ type ProcessInfo struct {
 	ClusterNode  string `json:"cluster_node"`
 }
 
+type MIGResource struct {
+	Capacity    int64 `json:"capacity"`
+	Allocatable int64 `json:"allocatable"`
+	Requests    int64 `json:"requests"`
+	Limits      int64 `json:"limits"`
+}
+
 type NodeHardware struct {
 	TotalCPU         float64 `json:"total_cpu"`
 	AvailableCPU     float64 `json:"available_cpu"`
@@ -124,6 +131,8 @@ type NodeHardware struct {
 	UsedVXPUNum      int64  `json:"used_vxpu_num"`      // used vxpu num
 	TotalVXPUMem     int64  `json:"total_vxpu_mem"`     // total mem in MB
 	AvailableVXPUMem int64  `json:"available_vxpu_mem"` // available mem in MB
+
+	MIGs map[string]*MIGResource `json:"migs"` // mig resources
 }
 
 type NodeResourceInfo struct {
