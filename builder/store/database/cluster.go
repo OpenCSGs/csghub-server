@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"slices"
+	"strings"
 
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
@@ -241,12 +243,76 @@ func (s *clusterInfoStoreImpl) BatchUpdateStatus(ctx context.Context, statusEven
 					return errorx.HandleDBError(err, nil)
 				}
 			}
+
+			if len(cluster.Resources) > 0 {
+				err = s.updateServiceClusterNodes(ctx, tx, cluster)
+				if err != nil {
+					return errorx.HandleDBError(err, nil)
+				}
+			}
 		}
 
 		return nil
 	})
 
 	return err
+}
+
+func (s *clusterInfoStoreImpl) updateServiceClusterNodes(ctx context.Context, tx bun.Tx, cluster *types.ClusterRes) error {
+	deployNodes := make(map[string]string)
+	argoWFNodes := make(map[string]string)
+
+	for _, nodeRes := range cluster.Resources {
+		for _, process := range nodeRes.Processes {
+			if len(process.DeployID) < 1 || len(process.ClusterNode) < 1 {
+				continue
+			}
+			if len(process.SvcName) > 0 {
+				// svcName is unique in a cluster, so we just use svcName as the key.
+				nodes := deployNodes[process.SvcName]
+				if slices.Contains(strings.Split(nodes, ","), process.ClusterNode) {
+					continue
+				}
+				if len(nodes) > 0 {
+					nodes += ","
+				}
+				nodes += process.ClusterNode
+				deployNodes[process.SvcName] = nodes
+			}
+			if len(process.WorkflowName) > 0 {
+				// workflowName is unique in a cluster, so we can use it as the key directly.
+				nodes := argoWFNodes[process.WorkflowName]
+				if slices.Contains(strings.Split(nodes, ","), process.ClusterNode) {
+					continue
+				}
+				if len(nodes) > 0 {
+					nodes += ","
+				}
+				nodes += process.ClusterNode
+				argoWFNodes[process.WorkflowName] = nodes
+			}
+		}
+	}
+
+	for svcName, nodes := range deployNodes {
+		_, err := tx.NewUpdate().Model(&Deploy{}).
+			Set("cluster_node = ?", nodes).
+			Where("svc_name = ?", svcName).Exec(ctx)
+		if err != nil {
+			return errorx.HandleDBError(err, nil)
+		}
+	}
+
+	for wfName, nodes := range argoWFNodes {
+		_, err := tx.NewUpdate().Model(&ArgoWorkflow{}).
+			Set("cluster_node = ?", nodes).
+			Where("task_id = ?", wfName).Exec(ctx)
+		if err != nil {
+			return errorx.HandleDBError(err, nil)
+		}
+	}
+
+	return nil
 }
 
 func (s *clusterInfoStoreImpl) GetClusterResources(ctx context.Context, clusterID string) (*types.ClusterRes, error) {

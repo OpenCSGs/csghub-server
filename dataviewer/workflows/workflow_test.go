@@ -70,6 +70,7 @@ func TestWorkflow_DataviewerWorkflow(t *testing.T) {
 			dvCom.ScanRepoFileReq{
 				Req:              req,
 				ConvertLimitSize: cfg.DataViewer.ConvertLimitSize,
+				MaxFileNum:       cfg.DataViewer.ScanFileNumLimit,
 			}).Return(&dvCom.RepoFilesClass{
 			JsonlFiles: map[string]*dvCom.RepoFile{
 				"test": {
@@ -165,6 +166,7 @@ func TestWorkflow_DataviewerWorkflow(t *testing.T) {
 			dvCom.ScanRepoFileReq{
 				Req:              req,
 				ConvertLimitSize: cfg.DataViewer.ConvertLimitSize,
+				MaxFileNum:       cfg.DataViewer.ScanFileNumLimit,
 			}).Return(&dvCom.RepoFilesClass{
 			ParquetFiles: map[string]*dvCom.RepoFile{
 				"test": {

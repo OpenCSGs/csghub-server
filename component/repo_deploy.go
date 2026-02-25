@@ -617,8 +617,6 @@ func deployStatusCodeToString(code int) string {
 		txt = SpaceStatusStopped
 	case 27:
 		txt = RepoStatusDeleted
-	case 28:
-		txt = ResourceUnhealthy
 	default:
 		txt = SpaceStatusStopped
 	}
