@@ -2400,6 +2400,7 @@ func (c *repoComponentImpl) Preupload(ctx context.Context, req types.PreuploadRe
 	var (
 		resp               types.PreuploadResp
 		filePathOidMapping = make(map[string]*types.File)
+		paths              []string
 	)
 	repo, err := c.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
 	if err != nil {
@@ -2417,7 +2418,17 @@ func (c *repoComponentImpl) Preupload(ctx context.Context, req types.PreuploadRe
 		return nil, errorx.ErrForbiddenMsg("users do not have permission to get diff bewtween two commits in this repo")
 	}
 
-	existFiles, err := getAllFiles(ctx, req.Namespace, req.Name, "", req.RepoType, req.Revision, c.git.GetTree)
+	for _, file := range req.Files {
+		paths = append(paths, file.Path)
+	}
+
+	existFiles, err := c.git.GetFilesByRevisionAndPaths(ctx, gitserver.GetFilesByRevisionAndPathsReq{
+		Namespace: req.Namespace,
+		Name:      req.Name,
+		RepoType:  req.RepoType,
+		Revision:  req.Revision,
+		Paths:     paths,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get repo files, err: %w", err)
 	}

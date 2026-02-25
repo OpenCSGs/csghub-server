@@ -18,6 +18,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	mockrpc "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/deploy"
 	deployStatus "opencsg.com/csghub-server/builder/deploy/common"
@@ -630,6 +632,40 @@ func TestRepoComponent_FileRaw(t *testing.T) {
 
 }
 
+func TestRepoComponent_FileRawNotFound(t *testing.T) {
+	ctx := context.TODO()
+	repo := initializeTestRepoComponent(ctx, t)
+
+	r := &database.Repository{
+		ID:      123,
+		Private: true,
+		Source:  types.LocalSource,
+		Readme:  "readme1",
+	}
+	repo.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(r, nil)
+	currentUser := "user"
+	mockUserRepoAdminPermission(ctx, repo.mocks.stores, "user")
+
+	repo.mocks.gitServer.EXPECT().GetRepoFileRaw(ctx, gitserver.GetRepoInfoByPathReq{
+		Namespace: "ns",
+		Name:      "n",
+		Ref:       "main",
+		Path:      "not_exists",
+		RepoType:  types.ModelRepo,
+	}).Return("", status.Error(codes.NotFound, "resource not found"))
+
+	_, err := repo.FileRaw(ctx, &types.GetFileReq{
+		Namespace:   "ns",
+		Name:        "n",
+		RepoType:    types.ModelRepo,
+		Ref:         "main",
+		Path:        "not_exists",
+		CurrentUser: currentUser,
+	})
+	require.NotNil(t, err)
+	require.Equal(t, err, errorx.ErrNotFound)
+}
+
 func TestRepoComponent_DownloadFile(t *testing.T) {
 	for _, lfs := range []bool{false, true} {
 		t.Run(fmt.Sprintf("is lfs: %v", lfs), func(t *testing.T) {
@@ -843,8 +879,6 @@ func TestRepoComponent_SDKDownloadFile(t *testing.T) {
 			repo.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(
 				mockedRepo, nil,
 			)
-
-			// Add expectation for UpdateRepoFileDownloads
 			repo.mocks.stores.RepoMock().EXPECT().UpdateRepoFileDownloads(ctx, mockedRepo, mock.Anything, int64(1)).Return(nil)
 
 			if lfs {
@@ -2546,18 +2580,15 @@ func TestRepoComponent_Preupload(t *testing.T) {
 	}
 
 	repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(mock.Anything, types.ModelRepo, ns.Path, repo.Name).Return(repo, nil)
-	repoComp.mocks.gitServer.EXPECT().GetTree(mock.Anything, mock.Anything).Return(&types.GetRepoFileTreeResp{
-		Files: []*types.File{
-			{
-				Path: "a.go",
-				SHA:  "sha",
-			},
-			{
-				Path: "dir/a.go",
-				SHA:  "sha",
-			},
+	repoComp.mocks.gitServer.EXPECT().GetFilesByRevisionAndPaths(mock.Anything, mock.Anything).Return([]*types.File{
+		{
+			Path: "a.go",
+			SHA:  "sha",
 		},
-		Cursor: "",
+		{
+			Path: "dir/a.go",
+			SHA:  "sha",
+		},
 	}, nil)
 
 	content := `
