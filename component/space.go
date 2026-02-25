@@ -1186,10 +1186,20 @@ func (c *spaceComponentImpl) status(ctx context.Context, s *database.Space) (typ
 			Status: SpaceStatusStopped,
 		}, fmt.Errorf("failed to get latest space deploy by space id %d, error: %w", s.ID, err)
 	}
+
+	svcName, statusCode, _, err := c.deployer.Status(ctx, types.DeployRepo{
+		DeployID: deploy.ID,
+	}, false)
+	if err != nil {
+		return types.SpaceStatus{
+			Status: SpaceStatusStopped,
+		}, fmt.Errorf("failed to get latest space deploy by space id %d, error: %w", s.ID, err)
+	}
+
 	slog.Debug("space deploy", slog.Any("deploy", deploy))
 	return types.SpaceStatus{
-		SvcName:   deploy.SvcName,
-		Status:    deployStatusCodeToString(deploy.Status),
+		SvcName:   svcName,
+		Status:    deployStatusCodeToString(statusCode),
 		DeployID:  deploy.ID,
 		ClusterID: deploy.ClusterID,
 	}, nil
@@ -1556,4 +1566,5 @@ const (
 	SpaceStatusNoAppFile   = "NoAppFile"
 	RepoStatusDeleted      = "Deleted"
 	SpaceStatusNoNGINXConf = "NoNGINXConf"
+	ResourceUnhealthy      = "ResourceUnhealthy"
 )

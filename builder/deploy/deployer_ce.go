@@ -41,9 +41,10 @@ type deployer struct {
 	clusterStore          database.ClusterInfoStore
 	lokiClient            sender.LogSender
 	logReporter           reporter.LogCollector
+	config                *config.Config
 }
 
-func newDeployer(ib imagebuilder.Builder, ir imagerunner.Runner, c common.DeployConfig, logReporter reporter.LogCollector, cfg *config.Config, startJobs bool) (*deployer, error) {
+func newDeployer(ib imagebuilder.Builder, ir imagerunner.Runner, c common.DeployConfig, logReporter reporter.LogCollector, config *config.Config, startJobs bool) (*deployer, error) {
 
 	store := database.NewDeployTaskStore()
 	node, err := snowflake.NewNode(1)
@@ -68,6 +69,7 @@ func newDeployer(ib imagebuilder.Builder, ir imagerunner.Runner, c common.Deploy
 		lokiClient:            logReporter.GetSender(),
 		logReporter:           logReporter,
 		argoWorkflowStore:     database.NewArgoWorkFlowStore(),
+		config:                config,
 	}
 
 	if startJobs {

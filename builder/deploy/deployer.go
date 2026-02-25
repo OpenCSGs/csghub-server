@@ -262,6 +262,13 @@ func (d *deployer) Status(ctx context.Context, dr types.DeployRepo, needDetails 
 		slog.Error("fail to get deploy by deploy id", slog.Any("DeployID", dr.DeployID), slog.Any("error", err))
 		return "", common.Stopped, nil, fmt.Errorf("can't get deploy, %w", err)
 	}
+
+	healthy := d.CheckClusterHealthy(ctx, deploy.ClusterID)
+	if !healthy {
+		slog.WarnContext(ctx, "cluster resources unhealthy")
+		return "", common.ResourceUnhealthy, nil, nil
+	}
+
 	svcName := deploy.SvcName
 	if deploy.Status == common.Pending {
 		//if deploy is pending, no need to check ksvc status
@@ -1246,4 +1253,29 @@ func (d *deployer) GetWorkflowLogsNonStream(ctx context.Context, req types.Finet
 	}
 
 	return d.lokiClient.QueryRange(ctx, params)
+}
+
+func (d *deployer) CheckClusterHealthy(ctx context.Context, deployId string) bool {
+	clusterRes, err := d.clusterStore.GetClusterResources(ctx, deployId)
+	if err != nil {
+		slog.ErrorContext(ctx, "fail to get cluster resources", slog.Any("error", err))
+		return false
+	}
+
+	if !clusterRes.Enable {
+		slog.WarnContext(ctx, "cluster resources unhealthy, cluster disabled")
+		return false
+	}
+
+	if clusterRes.Status == types.ClusterStatusUnavailable {
+		slog.WarnContext(ctx, "cluster resources unhealthy, cluster status unavailable")
+		return false
+	}
+
+	timePassed := time.Since(time.Unix(clusterRes.LastUpdateTime, 0))
+	if timePassed > time.Duration(d.config.Runner.HearBeatIntervalInSec*2*int(time.Second)) {
+		slog.WarnContext(ctx, "cluster resources unhealthy, last update time", slog.Any("last_update_time", clusterRes.LastUpdateTime))
+		return false
+	}
+	return true
 }
