@@ -213,7 +213,14 @@ func (wc *workFlowComponentImpl) UpdateWorkflow(ctx context.Context, update *v1a
 					oldwf.Reason = string(logs)
 				}
 			}
-
+		}
+		// get node name of pod
+		pod, err := cluster.Client.CoreV1().Pods(update.Namespace).Get(ctx, update.Name, v1.GetOptions{})
+		if err != nil {
+			slog.WarnContext(ctx, "failed to get pod of workflow", slog.Any("error", err),
+				slog.Any("pod name", update.Name), slog.Any("namespace", update.Namespace))
+		} else {
+			oldwf.ClusterNode = pod.Spec.NodeName
 		}
 	}
 

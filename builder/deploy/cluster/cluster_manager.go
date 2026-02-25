@@ -8,7 +8,6 @@ import (
 	"math"
 	"math/rand"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
@@ -507,16 +506,13 @@ func collectNodePodsResource(pod v1.Pod, config *config.Config, nodeResource *ty
 	}
 
 	if pod.Namespace == config.Cluster.SpaceNamespace {
-		deployIDStr := pod.Labels[types.StreamKeyDeployID]
-		deployID, err := strconv.ParseInt(deployIDStr, 10, 64)
-		if err != nil {
-			slog.Warn("failed to convert csghub_deploy_id in collecting node pod resource")
-		}
 		nodeResource.Processes = append(nodeResource.Processes, types.ProcessInfo{
-			PodName:  pod.Name,
-			DeployID: deployID,
-			SvcName:  pod.Labels[rtypes.KnativeConfigLabelName],
-			VXPUs:    collectPodVXPU(pod),
+			PodName:      pod.Name,
+			DeployID:     pod.Labels[types.StreamKeyDeployID],
+			SvcName:      pod.Labels[rtypes.KnativeConfigLabelName],
+			WorkflowName: pod.Labels[rtypes.WorkflowConfigLabelName],
+			ClusterNode:  pod.Spec.NodeName,
+			VXPUs:        collectPodVXPU(pod),
 		})
 	}
 }
