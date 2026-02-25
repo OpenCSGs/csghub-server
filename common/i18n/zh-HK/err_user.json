@@ -32,6 +32,9 @@
     "error.USER-ERR-18": {
         "other": "用戶郵箱未設置"
     },
+    "error.USER-ERR-19": {
+        "other": "UUID與現有用戶衝突"
+    },
     "error.USER-ERR-2": {
         "other": "新電話號碼已經存在於sso服務中"
     },

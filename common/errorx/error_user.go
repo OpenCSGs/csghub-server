@@ -22,6 +22,7 @@ const (
 	userHasDeployments
 	userHasBills
 	userEmailEmpty
+	uuidConflict
 )
 
 var (
@@ -254,6 +255,19 @@ var (
 	//
 	// zh-HK: 用戶郵箱未設置
 	ErrUserEmailEmpty error = CustomError{prefix: errUserPrefix, code: userEmailEmpty}
+
+	// uuid conflict with existing user
+	//
+	// Description: The UUID generated for the organization already exists in the system.
+	//
+	// Description_ZH: 组织生成的UUID已存在于系统中
+	//
+	// en-US: UUID conflict with existing user
+	//
+	// zh-CN: UUID与现有用户冲突
+	//
+	// zh-HK: UUID與現有用戶衝突
+	ErrUUIDConflict error = CustomError{prefix: errUserPrefix, code: uuidConflict}
 )
 
 // UsernameExists creates a specific error for username conflicts with the conflicting username
@@ -271,5 +285,14 @@ func EmailExists(email string) error {
 		prefix:  errUserPrefix,
 		code:    emailExists,
 		context: map[string]interface{}{"email": email},
+	}
+}
+
+// UUIDConflict creates a specific error for UUID conflicts with the conflicting UUID
+func UUIDConflict(uuid string) error {
+	return CustomError{
+		prefix:  errUserPrefix,
+		code:    uuidConflict,
+		context: map[string]interface{}{"uuid": uuid},
 	}
 }
