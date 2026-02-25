@@ -8,6 +8,7 @@ import (
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 
+	"github.com/google/uuid"
 	"github.com/uptrace/bun"
 )
 
@@ -56,6 +57,7 @@ type Organization struct {
 	NamespaceID  int64              `bun:",notnull" json:"namespace_id"`
 	Namespace    *Namespace         `bun:"rel:has-one,join:namespace_id=id" json:"namespace"`
 	VerifyStatus types.VerifyStatus `bun:",notnull,default:'none'" json:"verify_status"` // none, pending, approved, rejected
+	UUID         uuid.UUID          `bun:"type:uuid,notnull,unique" json:"uuid"`
 	times
 }
 
