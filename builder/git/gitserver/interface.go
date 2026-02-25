@@ -81,4 +81,5 @@ type GitServer interface {
 	UpdateRef(ctx context.Context, req UpdateRefReq) error
 	GetRepoLfsPointers(ctx context.Context, req GetRepoFilesReq) ([]*types.LFSPointer, error)
 	CopyRepository(ctx context.Context, req CopyRepositoryReq) error
+	GetFilesByRevisionAndPaths(ctx context.Context, req GetFilesByRevisionAndPathsReq) ([]*types.File, error)
 }

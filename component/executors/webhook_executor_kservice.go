@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
+	"strings"
 	"time"
 
 	"opencsg.com/csghub-server/builder/deploy/common"
@@ -116,6 +118,15 @@ func (k *kserviceExecutorImpl) updateDeployStatus(ctx context.Context, event *ty
 	deploy.Message = event.Message
 	deploy.Reason = event.Reason
 	deploy.Endpoint = event.Endpoint
+	if len(event.ClusterNode) > 0 && !slices.Contains(strings.Split(deploy.ClusterNode, ","), event.ClusterNode) {
+		if len(deploy.ClusterNode) > 0 {
+			deploy.ClusterNode += ","
+		}
+		deploy.ClusterNode += fmt.Sprintf("%s%s", deploy.ClusterNode, event.ClusterNode)
+	}
+	if len(event.QueueName) > 0 {
+		deploy.QueueName = event.QueueName
+	}
 	err = k.deployTaskStore.UpdateDeploy(ctx, deploy)
 	if err != nil {
 		return fmt.Errorf("failed to update deploy %s status %d in webhook error: %w", event.ServiceName, event.Status, err)

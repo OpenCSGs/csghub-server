@@ -29,6 +29,9 @@
     "error.USER-ERR-17": {
         "other": "擁有賬單的用戶不能被刪除"
     },
+    "error.USER-ERR-18": {
+        "other": "用戶郵箱未設置"
+    },
     "error.USER-ERR-2": {
         "other": "新電話號碼已經存在於sso服務中"
     },

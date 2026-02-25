@@ -1,0 +1,8 @@
+{
+    "error.RESOURCE-ERR-0": {
+        "other": "無法找到指定的資源"
+    },
+    "error.RESOURCE-ERR-1": {
+        "other": "資源暫不可用"
+    }
+}

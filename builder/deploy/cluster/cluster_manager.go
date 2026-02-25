@@ -8,7 +8,6 @@ import (
 	"math"
 	"math/rand"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
@@ -282,7 +281,7 @@ func buildCluster(kubeconfig *rest.Config, id string, index int, connectMode typ
 	} else {
 		region = config.Cluster.Region
 		var clusterID string
-		clusterID, err = GetClusterID(client, config)
+		clusterID, err = getClusterID(client, config)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get cluster id,%w", err)
 		}
@@ -485,6 +484,7 @@ func collectNodeResource(node v1.Node, config *config.Config) types.NodeResource
 			XPUCapacityLabel: xpuCapacityLabel,
 			XPUMem:           bigXPUMem,
 			VXPUs:            vXPUs,
+			MIGs:             collectMIGResources(node),
 		},
 		Processes:  []types.ProcessInfo{},
 		EnableVXPU: (len(vXPUs) > 0),
@@ -504,25 +504,23 @@ func collectNodePodsResource(pod v1.Pod, config *config.Config, nodeResource *ty
 		if cpuRequest, hasCPU := container.Resources.Requests[v1.ResourceCPU]; hasCPU {
 			nodeResource.AvailableCPU -= millicoresToCores(cpuRequest.MilliValue())
 		}
+		calcMIGResource(container.Resources, nodeResource.MIGs)
 	}
 
 	if pod.Namespace == config.Cluster.SpaceNamespace {
-		deployIDStr := pod.Labels[types.StreamKeyDeployID]
-		deployID, err := strconv.ParseInt(deployIDStr, 10, 64)
-		if err != nil {
-			slog.Warn("failed to convert csghub_deploy_id in collecting node pod resource")
-		}
 		nodeResource.Processes = append(nodeResource.Processes, types.ProcessInfo{
-			PodName:  pod.Name,
-			DeployID: deployID,
-			SvcName:  pod.Labels[rtypes.KnativeConfigLabelName],
-			VXPUs:    collectPodVXPU(pod),
+			PodName:      pod.Name,
+			DeployID:     pod.Labels[types.StreamKeyDeployID],
+			SvcName:      pod.Labels[rtypes.KnativeConfigLabelName],
+			WorkflowName: pod.Labels[rtypes.WorkflowConfigLabelName],
+			ClusterNode:  pod.Spec.NodeName,
+			VXPUs:        collectPodVXPU(pod),
 		})
 	}
 }
 
 // GetClusterID retrieves the unique ID of the cluster by fetching the UID of the specified namespace.
-func GetClusterID(clientset kubernetes.Interface, config *config.Config) (string, error) {
+func getClusterID(clientset kubernetes.Interface, config *config.Config) (string, error) {
 	if len(config.Cluster.ClusterID) != 0 {
 		return config.Cluster.ClusterID, nil
 	}
