@@ -24,6 +24,7 @@ import (
 	"opencsg.com/csghub-server/builder/event"
 	"opencsg.com/csghub-server/builder/loki"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/tests"
 	"opencsg.com/csghub-server/common/types"
 )
