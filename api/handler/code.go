@@ -71,7 +71,7 @@ func (h *CodeHandler) Create(ctx *gin.Context) {
 	_, err := h.sensitive.CheckRequestV2(ctx.Request.Context(), req)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "failed to check sensitive request", slog.Any("error", err))
-		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
+		httpbase.BadRequestWithExt(ctx, errorx.ErrSensitiveInfoNotAllowed)
 		return
 	}
 
@@ -192,7 +192,7 @@ func (h *CodeHandler) Update(ctx *gin.Context) {
 	_, err := h.sensitive.CheckRequestV2(ctx.Request.Context(), req)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "failed to check sensitive request", slog.Any("error", err))
-		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
+		httpbase.BadRequestWithExt(ctx, errorx.ErrSensitiveInfoNotAllowed)
 		return
 	}
 	req.Username = currentUser

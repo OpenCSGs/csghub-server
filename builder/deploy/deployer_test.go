@@ -24,6 +24,7 @@ import (
 	"opencsg.com/csghub-server/builder/event"
 	"opencsg.com/csghub-server/builder/loki"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/tests"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -263,6 +264,15 @@ func TestDeployer_Status(t *testing.T) {
 			Status:  common.Building,
 			SvcName: "svc",
 		}
+		mockClusterInfoStore := mockdb.NewMockClusterInfoStore(t)
+		mockClusterInfoStore.EXPECT().GetClusterResources(mock.Anything, mock.Anything).
+			Return(&types.ClusterRes{
+				Enable:         true,
+				LastUpdateTime: time.Now().Unix(),
+				Status:         types.ClusterStatusRunning,
+			}, nil)
+		cfg := config.Config{}
+		cfg.Runner.HearBeatIntervalInSec = 120
 		mockRunner := mockrunner.NewMockRunner(t)
 		mockDeployTaskStore := mockdb.NewMockDeployTaskStore(t)
 		mockDeployTaskStore.EXPECT().GetDeployByID(mock.Anything, dr.DeployID).
@@ -271,6 +281,8 @@ func TestDeployer_Status(t *testing.T) {
 		d := &deployer{
 			deployTaskStore: mockDeployTaskStore,
 			imageRunner:     mockRunner,
+			clusterStore:    mockClusterInfoStore,
+			config:          &cfg,
 		}
 		mockRunner.EXPECT().Exist(mock.Anything, mock.Anything).
 			Return(&types.StatusResponse{
@@ -302,11 +314,22 @@ func TestDeployer_Status(t *testing.T) {
 		mockDeployTaskStore := mockdb.NewMockDeployTaskStore(t)
 		mockDeployTaskStore.EXPECT().GetDeployByID(mock.Anything, dr.DeployID).
 			Return(deploy, nil)
-
+		mockClusterInfoStore := mockdb.NewMockClusterInfoStore(t)
+		mockClusterInfoStore.EXPECT().GetClusterResources(mock.Anything, mock.Anything).
+			Return(&types.ClusterRes{
+				Enable:         true,
+				LastUpdateTime: time.Now().Unix(),
+				Status:         types.ClusterStatusRunning,
+			}, nil)
+		cfg := config.Config{}
+		cfg.Runner.HearBeatIntervalInSec = 120
 		d := &deployer{
 			deployTaskStore: mockDeployTaskStore,
 			imageRunner:     mockRunner,
+			clusterStore:    mockClusterInfoStore,
+			config:          &cfg,
 		}
+
 		mockRunner.EXPECT().Exist(mock.Anything, mock.Anything).
 			Return(&types.StatusResponse{
 				DeployID: 1,
@@ -336,15 +359,26 @@ func TestDeployer_Status(t *testing.T) {
 			SvcName: "svc",
 		}
 
+		mockClusterInfoStore := mockdb.NewMockClusterInfoStore(t)
+		mockClusterInfoStore.EXPECT().GetClusterResources(mock.Anything, mock.Anything).
+			Return(&types.ClusterRes{
+				Enable:         true,
+				LastUpdateTime: time.Now().Unix(),
+				Status:         types.ClusterStatusRunning,
+			}, nil)
 		mockDeployTaskStore := mockdb.NewMockDeployTaskStore(t)
 		mockDeployTaskStore.EXPECT().GetDeployByID(mock.Anything, dr.DeployID).
 			Return(deploy, nil)
 
 		mockRunner := mockrunner.NewMockRunner(t)
 
+		cfg := config.Config{}
+		cfg.Runner.HearBeatIntervalInSec = 120
 		d := &deployer{
 			deployTaskStore: mockDeployTaskStore,
 			imageRunner:     mockRunner,
+			clusterStore:    mockClusterInfoStore,
+			config:          &cfg,
 		}
 		mockRunner.EXPECT().Exist(mock.Anything, mock.Anything).
 			Return(&types.StatusResponse{

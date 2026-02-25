@@ -35,6 +35,7 @@ import (
 // @Param        need_op_weight query bool false "need op weight" default(false)
 // @Param        sort query string false "sort by"
 // @Param        source query string false "source" Enums(opencsg, huggingface, local)
+// @Param        xnet_migration_status query string false "filter by xnet migration status" Enums(pending, running, completed, failed)
 // @Param        per query int false "per" default(20)
 // @Param        page query int false "per page" default(1)
 // @Param        model_tree query string false "example: base_model:finetune:1"
@@ -135,7 +136,7 @@ func (h *ModelHandler) Create(ctx *gin.Context) {
 	_, err := h.sensitive.CheckRequestV2(ctx.Request.Context(), req)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "failed to check sensitive request", slog.Any("error", err))
-		httpbase.ServerError(ctx, fmt.Errorf("sensitive check failed: %w", err))
+		httpbase.BadRequestWithExt(ctx, errorx.ErrSensitiveInfoNotAllowed)
 		return
 	}
 
@@ -182,7 +183,7 @@ func (h *ModelHandler) Update(ctx *gin.Context) {
 	_, err := h.sensitive.CheckRequestV2(ctx.Request.Context(), req)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "failed to check sensitive request", slog.Any("error", err))
-		httpbase.ServerError(ctx, fmt.Errorf("sensitive check failed: %w", err))
+		httpbase.BadRequestWithExt(ctx, errorx.ErrSensitiveInfoNotAllowed)
 		return
 	}
 
@@ -632,7 +633,7 @@ func (h *ModelHandler) DeployDedicated(ctx *gin.Context) {
 	_, err = h.sensitive.CheckRequestV2(ctx.Request.Context(), &req)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "failed to check sensitive request", slog.Any("error", err))
-		httpbase.ServerError(ctx, fmt.Errorf("sensitive check failed: %w", err))
+		httpbase.BadRequestWithExt(ctx, errorx.ErrSensitiveInfoNotAllowed)
 		return
 	}
 

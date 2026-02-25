@@ -1170,9 +1170,9 @@ func TestRepoComponent_ListRuntimeFrameworkV2_NoReorderWhenDeployTypeNotInferenc
 	repo := initializeTestRepoComponent(ctx, t)
 
 	repo.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(&database.Repository{
-		ID:       123,
-		Name:     "test",
-		Tags:     []database.Tag{{Name: "safetensors", Category: "framework"}},
+		ID:   123,
+		Name: "test",
+		Tags: []database.Tag{{Name: "safetensors", Category: "framework"}},
 		Metadata: database.Metadata{Architecture: "qwen"},
 	}, nil)
 
@@ -1195,9 +1195,9 @@ func TestRepoComponent_ListRuntimeFrameworkV2_VLLMAlreadyFirst(t *testing.T) {
 	repo := initializeTestRepoComponent(ctx, t)
 
 	repo.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "ns", "n").Return(&database.Repository{
-		ID:       123,
-		Name:     "test",
-		Tags:     []database.Tag{{Name: "safetensors", Category: "framework"}},
+		ID:   123,
+		Name: "test",
+		Tags: []database.Tag{{Name: "safetensors", Category: "framework"}},
 		Metadata: database.Metadata{Architecture: "qwen"},
 	}, nil)
 
