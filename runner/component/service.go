@@ -114,7 +114,7 @@ func (s *serviceComponentImpl) generateService(ctx context.Context, cluster *clu
 	}
 	appPort := 0
 	hardware := request.Hardware
-	resReq, nodeSelector, nodeAffinity := generateResources(hardware, request.Nodes)
+	resReq, nodeSelector, nodeAffinity := generateResources(hardware, request.Nodes, s.env)
 	var err error
 	var revision string
 	if request.Env != nil {
@@ -434,7 +434,7 @@ func getPodError(podList *corev1.PodList) (*string, *string) {
 	return nil, nil
 }
 
-func generateResources(hardware types.HardWare, nodes []types.Node) (map[corev1.ResourceName]resource.Quantity, map[string]string, *corev1.NodeAffinity) {
+func generateResources(hardware types.HardWare, nodes []types.Node, config *config.Config) (map[corev1.ResourceName]resource.Quantity, map[string]string, *corev1.NodeAffinity) {
 	nodeSelector := make(map[string]string)
 	resReq := make(map[corev1.ResourceName]resource.Quantity)
 
@@ -482,7 +482,7 @@ func generateResources(hardware types.HardWare, nodes []types.Node) (map[corev1.
 		resReq[corev1.ResourceEphemeralStorage] = qty
 	}
 
-	nodeAffinity := handleAccelerator(hardware, resReq, nodes)
+	nodeAffinity := handleAccelerator(hardware, resReq, nodes, config)
 
 	return resReq, nodeSelector, nodeAffinity
 }
@@ -1253,7 +1253,7 @@ func (s *serviceComponentImpl) UpdateService(ctx context.Context, req types.Mode
 	}
 	// Update CPU and Memory requests and limits
 	hardware := req.Hardware
-	resReq, nodeSelector, nodeAffinity := generateResources(hardware, req.Nodes)
+	resReq, nodeSelector, nodeAffinity := generateResources(hardware, req.Nodes, s.env)
 	resources := corev1.ResourceRequirements{
 		Limits:   resReq,
 		Requests: resReq,

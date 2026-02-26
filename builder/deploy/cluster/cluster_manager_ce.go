@@ -4,14 +4,15 @@ package cluster
 
 import (
 	v1 "k8s.io/api/core/v1"
+	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 )
 
-func collectNodeVXPU(node v1.Node) []types.VXPU {
+func collectNodeVXPU(node v1.Node, config *config.Config) []types.VXPU {
 	return []types.VXPU{}
 }
 
-func collectPodVXPU(pod v1.Pod) []types.VXPU {
+func collectPodVXPU(pod v1.Pod, config *config.Config) []types.VXPU {
 	return []types.VXPU{}
 }
 
