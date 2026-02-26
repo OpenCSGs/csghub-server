@@ -59,7 +59,7 @@ func (c *spaceResourceComponentImpl) Index(ctx context.Context, req *types.Space
 			if err != nil {
 				slog.ErrorContext(ctx, "invalid hardware setting", slog.Any("error", err), slog.String("hardware", r.Resources))
 			} else {
-				isAvailable = deploy.CheckResource(clusterResources, &hardware)
+				isAvailable = deploy.CheckResource(clusterResources, &hardware, c.config)
 			}
 			if !c.deployAvailable(req.DeployType, hardware) {
 				// must have gpu for finetune

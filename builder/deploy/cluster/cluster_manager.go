@@ -467,7 +467,7 @@ func collectNodeResource(node v1.Node, config *config.Config) types.NodeResource
 	}
 
 	gpuModelVendor, gpuModel := getGpuTypeAndVendor(node.Labels[xpuTypeLabel], xpuCapacityLabel)
-	vXPUs := collectNodeVXPU(node)
+	vXPUs := collectNodeVXPU(node, config)
 	nodeResourceInfo := types.NodeResourceInfo{
 		NodeName:   node.Name,
 		NodeStatus: status,
@@ -514,7 +514,7 @@ func collectNodePodsResource(pod v1.Pod, config *config.Config, nodeResource *ty
 			SvcName:      pod.Labels[rtypes.KnativeConfigLabelName],
 			WorkflowName: pod.Labels[rtypes.WorkflowConfigLabelName],
 			ClusterNode:  pod.Spec.NodeName,
-			VXPUs:        collectPodVXPU(pod),
+			VXPUs:        collectPodVXPU(pod, config),
 		})
 	}
 }
