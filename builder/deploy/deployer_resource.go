@@ -177,7 +177,9 @@ func (d *deployer) CheckResourceAvailable(ctx context.Context, clusterId string,
 			Set("region", clusterResources.Region))
 	}
 
-	if clusterResources.ResourceStatus != types.StatusUncertain && !CheckResource(clusterResources, hardWare, d.config) {
+	if d.IsDefaultScheduler() &&
+		clusterResources.ResourceStatus != types.StatusUncertain &&
+		!CheckResource(clusterResources, hardWare, d.config) {
 		err := fmt.Errorf("required resource on cluster %s is not enough with resource status %s",
 			clusterId, clusterResources.ResourceStatus)
 		return false, errorx.NotEnoughResource(err, errorx.Ctx().

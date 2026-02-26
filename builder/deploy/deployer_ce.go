@@ -42,6 +42,7 @@ type deployer struct {
 	lokiClient            sender.LogSender
 	logReporter           reporter.LogCollector
 	config                *config.Config
+	kubeScheduler         *types.Scheduler
 }
 
 func newDeployer(ib imagebuilder.Builder, ir imagerunner.Runner, c common.DeployConfig, logReporter reporter.LogCollector, config *config.Config, startJobs bool) (*deployer, error) {
@@ -70,8 +71,8 @@ func newDeployer(ib imagebuilder.Builder, ir imagerunner.Runner, c common.Deploy
 		logReporter:           logReporter,
 		argoWorkflowStore:     database.NewArgoWorkFlowStore(),
 		config:                config,
+		kubeScheduler:         common.GenerateScheduler(c),
 	}
-
 	if startJobs {
 		d.startJobs()
 	}

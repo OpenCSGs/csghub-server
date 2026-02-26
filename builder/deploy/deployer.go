@@ -19,6 +19,7 @@ import (
 	"opencsg.com/csghub-server/builder/loki"
 	"opencsg.com/csghub-server/builder/redis"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	hubcom "opencsg.com/csghub-server/common/utils/common"
@@ -54,6 +55,8 @@ type Deployer interface {
 	DeleteFinetuneJob(ctx context.Context, req types.ArgoWorkFlowDeleteReq) error
 	GetWorkflowLogsInStream(ctx context.Context, req types.FinetuneLogReq) (*MultiLogReader, error)
 	GetWorkflowLogsNonStream(ctx context.Context, req types.FinetuneLogReq) (*loki.LokiQueryResponse, error)
+	IsDefaultScheduler() bool
+	GetSharedModeResourceName(config *config.Config) string
 }
 
 func (d *deployer) GenerateUniqueSvcName(dr types.DeployRepo) string {
@@ -1073,7 +1076,7 @@ func (d *deployer) SubmitEvaluation(ctx context.Context, req types.EvaluationReq
 	if req.ResourceId == 0 {
 		flowReq.ShareMode = true
 	}
-	flowReq.Scheduler = common.GenerateScheduler(d.deployConfig)
+	flowReq.Scheduler = d.kubeScheduler
 	return d.imageRunner.SubmitWorkFlow(ctx, flowReq)
 }
 
@@ -1278,4 +1281,16 @@ func (d *deployer) CheckClusterHealthy(ctx context.Context, deployId string) boo
 		return false
 	}
 	return true
+}
+
+func (d *deployer) IsDefaultScheduler() bool {
+	return d.kubeScheduler == nil
+}
+
+func (d *deployer) GetSharedModeResourceName(config *config.Config) string {
+	resourceName := common.DefaultResourceName
+	if !d.IsDefaultScheduler() {
+		resourceName = config.Runner.VGPUResourceReqKey
+	}
+	return resourceName
 }

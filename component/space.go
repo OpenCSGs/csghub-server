@@ -1554,6 +1554,7 @@ func (c *spaceComponentImpl) FindSpaceLatestCUDAVersion(ctx context.Context, com
 const (
 	// SpaceStatusEmpty is the init status by default
 	SpaceStatusEmpty        = ""
+	SpaceStatusPending      = "Pending"
 	SpaceStatusBuilding     = "Building"
 	SpaceStatusBuildFailed  = "BuildingFailed"
 	SpaceStatusDeploying    = "Deploying"

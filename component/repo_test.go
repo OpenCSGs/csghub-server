@@ -1331,7 +1331,7 @@ func TestRepoComponent_ListDeploy(t *testing.T) {
 		DeployName: "foo",
 		RepoID:     123,
 		GitBranch:  "main",
-		Status:     "Stopped",
+		Status:     "Pending",
 	}, ds[0])
 }
 

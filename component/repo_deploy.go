@@ -577,6 +577,7 @@ func (c *repoComponentImpl) DeployDetail(ctx context.Context, detailReq types.De
 }
 
 func deployStatusCodeToString(code int) string {
+	// Pending    = 0
 	// DeployBuildPending    = 10
 	// DeployBuildInProgress = 11
 	// DeployBuildFailed     = 12
@@ -593,6 +594,8 @@ func deployStatusCodeToString(code int) string {
 	// simplified status for frontend show
 	var txt string
 	switch code {
+	case 0:
+		txt = SpaceStatusPending
 	case 10:
 		txt = SpaceStatusBuilding // need to change it to queue? This requires UI modification as well
 	case 11:
@@ -617,6 +620,8 @@ func deployStatusCodeToString(code int) string {
 		txt = SpaceStatusStopped
 	case 27:
 		txt = RepoStatusDeleted
+	case 28:
+		txt = ResourceUnhealthy
 	default:
 		txt = SpaceStatusStopped
 	}
