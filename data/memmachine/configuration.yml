@@ -58,7 +58,7 @@ resources:
         dimensions: 1536
 
   language_models:
-    openai_compatible_embedder:
+    openai_compatible_model:
       provider: openai-chat-completions
       config:
         model: "gpt-5-mini"
