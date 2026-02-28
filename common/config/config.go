@@ -349,6 +349,8 @@ type Config struct {
 		AgentHubServiceToken      string `env:"OPENCSG_AGENT_AGENTHUB_SERVICE_TOKEN" default:""`
 		MCPInspectMaxConcurrency  int    `env:"OPENCSG_AGENT_MCP_INSPECT_MAX_CONCURRENCY" default:"50"`
 		ShareSessionTokenValidDay int    `env:"STARHUB_SERVER_AGENT_SHARE_SESSION_TOKEN_VALIDATE_Day" default:"365"` // 1 year
+		BalanceThreshold          int    `env:"OPENCSG_AGENT_BALANCE_THRESHOLD" default:"5000"`
+		BalanceCheckCacheTTL      int    `env:"OPENCSG_AGENT_BALANCE_CHECK_CACHE_TTL" default:"86400"`
 	}
 
 	DataViewer struct {
