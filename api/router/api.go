@@ -896,6 +896,7 @@ func createSpaceRoutes(config *config.Config,
 	repoCommonHandler *handler.RepoHandler,
 	monitorHandler *handler.MonitorHandler) {
 	spaces := apiGroup.Group("/spaces")
+	spaces.GET("/cuda-versions", spaceHandler.GetSupportedCUDAVersions)
 	spaces.Use(middleware.RepoType(types.SpaceRepo), middlewareCollection.Repo.RepoExists)
 	{
 		// list all spaces
@@ -905,7 +906,6 @@ func createSpaceRoutes(config *config.Config,
 		spaces.GET("/:namespace/:name", middlewareCollection.Auth.NeedLogin, spaceHandler.Show)
 		spaces.PUT("/:namespace/:name", middlewareCollection.Auth.NeedLogin, spaceHandler.Update)
 		// get supported cuda versions
-		spaces.GET("/:namespace/:name/cuda-versions/:resource_type", middlewareCollection.Auth.NeedLogin, spaceHandler.GetSupportedCUDAVersions)
 		spaces.DELETE("/:namespace/:name", middlewareCollection.Auth.NeedLogin, spaceHandler.Delete)
 		// depoly and start running the space
 		spaces.POST("/:namespace/:name/run", middlewareCollection.Auth.NeedLogin, spaceHandler.Run)
