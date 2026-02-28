@@ -48,8 +48,8 @@ func initializeTestRepoComponent(ctx context.Context, t interface {
 	mockAccountingComponent := component.NewMockAccountingComponent(t)
 	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
 	multisyncMockClient := multisync.NewMockClient(t)
-	mockXnetClient := rpc.NewMockXnetSvcClient(t)
-	componentRepoComponentImpl := NewTestRepoComponent(config, mockStores, mockUserSvcClient, mockGitServer, mockTagComponent, mockClient, mockDeployer, mockCache, mockAccountingComponent, mockMirrorServer, multisyncMockClient, mockXnetClient)
+	mockXnetSvcClient := rpc.NewMockXnetSvcClient(t)
+	componentRepoComponentImpl := NewTestRepoComponent(config, mockStores, mockUserSvcClient, mockGitServer, mockTagComponent, mockClient, mockDeployer, mockCache, mockAccountingComponent, mockMirrorServer, multisyncMockClient, mockXnetSvcClient)
 	mockRepoComponent := component.NewMockRepoComponent(t)
 	mockSpaceComponent := component.NewMockSpaceComponent(t)
 	mockRuntimeArchitectureComponent := component.NewMockRuntimeArchitectureComponent(t)
@@ -414,8 +414,8 @@ func initializeTestGitHTTPComponent(ctx context.Context, t interface {
 	mockGitServer := gitserver.NewMockGitServer(t)
 	mockClient := s3.NewMockClient(t)
 	mockCore := s3.NewMockCore(t)
-	mockXnetClient := rpc.NewMockXnetSvcClient(t)
-	componentGitHTTPComponentImpl := NewTestGitHTTPComponent(config, mockStores, mockRepoComponent, mockGitServer, mockClient, mockCore, mockXnetClient)
+	mockXnetSvcClient := rpc.NewMockXnetSvcClient(t)
+	componentGitHTTPComponentImpl := NewTestGitHTTPComponent(config, mockStores, mockRepoComponent, mockGitServer, mockClient, mockCore, mockXnetSvcClient)
 	mockAccountingComponent := component.NewMockAccountingComponent(t)
 	mockTagComponent := component.NewMockTagComponent(t)
 	mockSpaceComponent := component.NewMockSpaceComponent(t)
@@ -1465,14 +1465,7 @@ func initializeTestEvaluationComponent(ctx context.Context, t interface {
 	mockAccountingComponent := component.NewMockAccountingComponent(t)
 	mockRepoComponent := component.NewMockRepoComponent(t)
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
-	componentEvaluationComponentImpl := NewTestEvaluationComponent(
-		config,
-		mockStores,
-		mockDeployer,
-		mockAccountingComponent,
-		mockRepoComponent,
-		mockUserSvcClient,
-	)
+	componentEvaluationComponentImpl := NewTestEvaluationComponent(config, mockStores, mockDeployer, mockAccountingComponent, mockRepoComponent, mockUserSvcClient)
 	mockTagComponent := component.NewMockTagComponent(t)
 	mockSpaceComponent := component.NewMockSpaceComponent(t)
 	mockRuntimeArchitectureComponent := component.NewMockRuntimeArchitectureComponent(t)
@@ -2577,6 +2570,130 @@ func initializeTestMirrorNamespaceMappingComponent(ctx context.Context, t interf
 	return componentTestMirrorNamespaceMappingWithMocks
 }
 
+func initializeTestXnetComponent(ctx context.Context, t interface {
+	Cleanup(func())
+	mock.TestingT
+}) *testXnetWithMocks {
+	mockStores := tests.NewMockStores(t)
+	mockXnetSvcClient := rpc.NewMockXnetSvcClient(t)
+	mockRepoComponent := component.NewMockRepoComponent(t)
+	xnetComponentImpl := NewTestXnetComponent(mockStores, mockXnetSvcClient, mockRepoComponent)
+	mockAccountingComponent := component.NewMockAccountingComponent(t)
+	mockTagComponent := component.NewMockTagComponent(t)
+	mockSpaceComponent := component.NewMockSpaceComponent(t)
+	mockRuntimeArchitectureComponent := component.NewMockRuntimeArchitectureComponent(t)
+	mockSensitiveComponent := component.NewMockSensitiveComponent(t)
+	componentMockedComponents := &mockedComponents{
+		accounting:          mockAccountingComponent,
+		repo:                mockRepoComponent,
+		tag:                 mockTagComponent,
+		space:               mockSpaceComponent,
+		runtimeArchitecture: mockRuntimeArchitectureComponent,
+		sensitive:           mockSensitiveComponent,
+	}
+	mockGitServer := gitserver.NewMockGitServer(t)
+	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
+	mockClient := s3.NewMockClient(t)
+	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
+	mockDeployer := deploy.NewMockDeployer(t)
+	mockCache := cache.NewMockCache(t)
+	mockAccountingClient := accounting.NewMockAccountingClient(t)
+	mockReader := parquet.NewMockReader(t)
+	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
+	mockKeysReader := rsa.NewMockKeysReader(t)
+	mockImporter := importer.NewMockImporter(t)
+	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
+	multisyncMockClient := multisync.NewMockClient(t)
+	mockCore := s3.NewMockCore(t)
+	mockGitCallbackChecker := checker.NewMockGitCallbackChecker(t)
+	mocks := &Mocks{
+		stores:           mockStores,
+		components:       componentMockedComponents,
+		gitServer:        mockGitServer,
+		userSvcClient:    mockUserSvcClient,
+		s3Client:         mockClient,
+		mirrorServer:     mockMirrorServer,
+		deployer:         mockDeployer,
+		cache:            mockCache,
+		accountingClient: mockAccountingClient,
+		preader:          mockReader,
+		moderationClient: mockModerationSvcClient,
+		rsaReader:        mockKeysReader,
+		importer:         mockImporter,
+		dataviewerClient: mockDataviewerClient,
+		multiSyncClient:  multisyncMockClient,
+		s3Core:           mockCore,
+		checker:          mockGitCallbackChecker,
+	}
+	componentTestXnetWithMocks := &testXnetWithMocks{
+		XnetComponentImpl: xnetComponentImpl,
+		mocks:             mocks,
+	}
+	return componentTestXnetWithMocks
+}
+
+func initializeTestSkillComponent(ctx context.Context, t interface {
+	Cleanup(func())
+	mock.TestingT
+}) *testSkillWithMocks {
+	config := ProvideTestConfig()
+	mockStores := tests.NewMockStores(t)
+	mockRepoComponent := component.NewMockRepoComponent(t)
+	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
+	mockGitServer := gitserver.NewMockGitServer(t)
+	componentSkillComponentImpl := NewTestSkillComponent(config, mockStores, mockRepoComponent, mockUserSvcClient, mockGitServer)
+	mockAccountingComponent := component.NewMockAccountingComponent(t)
+	mockTagComponent := component.NewMockTagComponent(t)
+	mockSpaceComponent := component.NewMockSpaceComponent(t)
+	mockRuntimeArchitectureComponent := component.NewMockRuntimeArchitectureComponent(t)
+	mockSensitiveComponent := component.NewMockSensitiveComponent(t)
+	componentMockedComponents := &mockedComponents{
+		accounting:          mockAccountingComponent,
+		repo:                mockRepoComponent,
+		tag:                 mockTagComponent,
+		space:               mockSpaceComponent,
+		runtimeArchitecture: mockRuntimeArchitectureComponent,
+		sensitive:           mockSensitiveComponent,
+	}
+	mockClient := s3.NewMockClient(t)
+	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
+	mockDeployer := deploy.NewMockDeployer(t)
+	mockCache := cache.NewMockCache(t)
+	mockAccountingClient := accounting.NewMockAccountingClient(t)
+	mockReader := parquet.NewMockReader(t)
+	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
+	mockKeysReader := rsa.NewMockKeysReader(t)
+	mockImporter := importer.NewMockImporter(t)
+	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
+	multisyncMockClient := multisync.NewMockClient(t)
+	mockCore := s3.NewMockCore(t)
+	mockGitCallbackChecker := checker.NewMockGitCallbackChecker(t)
+	mocks := &Mocks{
+		stores:           mockStores,
+		components:       componentMockedComponents,
+		gitServer:        mockGitServer,
+		userSvcClient:    mockUserSvcClient,
+		s3Client:         mockClient,
+		mirrorServer:     mockMirrorServer,
+		deployer:         mockDeployer,
+		cache:            mockCache,
+		accountingClient: mockAccountingClient,
+		preader:          mockReader,
+		moderationClient: mockModerationSvcClient,
+		rsaReader:        mockKeysReader,
+		importer:         mockImporter,
+		dataviewerClient: mockDataviewerClient,
+		multiSyncClient:  multisyncMockClient,
+		s3Core:           mockCore,
+		checker:          mockGitCallbackChecker,
+	}
+	componentTestSkillWithMocks := &testSkillWithMocks{
+		skillComponentImpl: componentSkillComponentImpl,
+		mocks:              mocks,
+	}
+	return componentTestSkillWithMocks
+}
+
 // wire.go:
 
 type testRepoWithMocks struct {
@@ -2785,3 +2902,13 @@ type testNotebookWithMocks struct {
 }
 
 var MirrorNamespaceMappingComponentTestSet = wire.NewSet(NewTestMirrorNamespaceMappingComponent)
+
+type testXnetWithMocks struct {
+	*XnetComponentImpl
+	mocks *Mocks
+}
+
+type testSkillWithMocks struct {
+	*skillComponentImpl
+	mocks *Mocks
+}
