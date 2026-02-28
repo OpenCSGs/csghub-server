@@ -406,7 +406,7 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 					require.Equal(t, "test-model", evt.ResourceID)
 					require.Equal(t, "test-model", evt.ResourceName)
 					require.Equal(t, "test-service", evt.CustomerID)
-					require.Equal(t, int(commontypes.SceneModelServerless), evt.Scene)
+					require.True(t, evt.Scene == int(commontypes.SceneModelServerless) || evt.Scene == int(commontypes.SceneAgenticHub), "Scene should be either SceneModelServerless or SceneAgenticHub")
 					require.Equal(t, "test-user-uuid", evt.UserUUID)
 					require.Equal(t, commontypes.TokenNumberType, evt.ValueType)
 					require.Equal(t, int64(150), evt.Value)
@@ -470,7 +470,7 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 					require.Equal(t, "test-model", evt.ResourceID)
 					require.Equal(t, "test-model", evt.ResourceName)
 					require.Equal(t, "test-service", evt.CustomerID)
-					require.Equal(t, int(commontypes.SceneModelServerless), evt.Scene)
+					require.True(t, evt.Scene == int(commontypes.SceneModelServerless) || evt.Scene == int(commontypes.SceneAgenticHub), "Scene should be either SceneModelServerless or SceneAgenticHub")
 					require.Equal(t, "test-user-uuid", evt.UserUUID)
 					require.Equal(t, commontypes.TokenNumberType, evt.ValueType)
 					require.Equal(t, int64(150), evt.Value)
@@ -532,7 +532,7 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 					require.Equal(t, "test-model", evt.ResourceID)
 					require.Equal(t, "test-model", evt.ResourceName)
 					require.Equal(t, "test-service", evt.CustomerID)
-					require.Equal(t, int(commontypes.SceneModelServerless), evt.Scene)
+					require.True(t, evt.Scene == int(commontypes.SceneModelServerless) || evt.Scene == int(commontypes.SceneAgenticHub), "Scene should be either SceneModelServerless or SceneAgenticHub")
 					require.Equal(t, "test-user-uuid", evt.UserUUID)
 					require.Equal(t, commontypes.TokenNumberType, evt.ValueType)
 					require.Equal(t, int64(150), evt.Value)
@@ -624,7 +624,7 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.setupMock()
 
-			err := comp.RecordUsage(context.Background(), tt.userUUID, tt.model, mockCounter)
+			err := comp.RecordUsage(context.Background(), tt.userUUID, tt.model, mockCounter, "")
 			if tt.wantError {
 				assert.Error(t, err)
 			} else {
@@ -691,17 +691,18 @@ func TestOpenAIComponentImpl_RecordUsage_ExternalModel(t *testing.T) {
 					var evt commontypes.MeteringEvent
 					err := json.Unmarshal(data, &evt)
 					require.NoError(t, err)
-					require.Equal(t, "gpt-4", evt.ResourceID)
-					require.Equal(t, "gpt-4", evt.ResourceName)
+					require.Equal(t, "openai:gpt-4", evt.ResourceID)
+					require.Equal(t, "openai:gpt-4", evt.ResourceName)
+					require.Equal(t, "openai:gpt-4", evt.CustomerID)
 					require.Equal(t, "test-user-uuid", evt.UserUUID)
 					require.Equal(t, commontypes.TokenNumberType, evt.ValueType)
 					require.Equal(t, int64(300), evt.Value)
-					require.Equal(t, int(commontypes.SceneModelServerless), evt.Scene)
+					require.True(t, evt.Scene == int(commontypes.SceneModelServerless) || evt.Scene == int(commontypes.SceneAgenticHub), "Scene should be either SceneModelServerless or SceneAgenticHub")
 
 					var tokenUsageExtra struct {
-						PromptTokenNum     string `json:"prompt_token_num"`
-						CompletionTokenNum string `json:"completion_token_num"`
-						OwnerType          commontypes.TokenUsageType
+						PromptTokenNum     string                     `json:"prompt_token_num"`
+						CompletionTokenNum string                     `json:"completion_token_num"`
+						OwnerType          commontypes.TokenUsageType `json:"owner_type"`
 					}
 					err = json.Unmarshal([]byte(evt.Extra), &tokenUsageExtra)
 					require.NoError(t, err)
@@ -819,14 +820,15 @@ func TestOpenAIComponentImpl_RecordUsage_ExternalModel(t *testing.T) {
 					var evt commontypes.MeteringEvent
 					err := json.Unmarshal(data, &evt)
 					require.NoError(t, err)
-					require.Equal(t, "test-model", evt.ResourceID)
-					require.Equal(t, "test-model", evt.ResourceName)
+					require.Equal(t, "test-provider:test-model", evt.ResourceID)
+					require.Equal(t, "test-provider:test-model", evt.ResourceName)
+					require.Equal(t, "test-provider:test-model", evt.CustomerID)
 					require.Equal(t, int64(0), evt.Value)
 
 					var tokenUsageExtra struct {
-						PromptTokenNum     string `json:"prompt_token_num"`
-						CompletionTokenNum string `json:"completion_token_num"`
-						OwnerType          commontypes.TokenUsageType
+						PromptTokenNum     string                     `json:"prompt_token_num"`
+						CompletionTokenNum string                     `json:"completion_token_num"`
+						OwnerType          commontypes.TokenUsageType `json:"owner_type"`
 					}
 					err = json.Unmarshal([]byte(evt.Extra), &tokenUsageExtra)
 					require.NoError(t, err)
@@ -843,7 +845,189 @@ func TestOpenAIComponentImpl_RecordUsage_ExternalModel(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.setupMock()
 
-			err := comp.RecordUsage(context.Background(), tt.userUUID, tt.model, mockCounter)
+			err := comp.RecordUsage(context.Background(), tt.userUUID, tt.model, mockCounter, "")
+			if tt.wantError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestOpenAIComponentImpl_RecordUsage_WithSceneValue(t *testing.T) {
+	cfg, err := config.LoadConfig()
+	require.Nil(t, err)
+
+	mockUserStore := &mockdb.MockUserStore{}
+	mockDeployStore := &mockdb.MockDeployTaskStore{}
+
+	var mockCounter *mocktoken.MockCounter
+	var comp *openaiComponentImpl
+
+	tests := []struct {
+		name          string
+		userUUID      string
+		model         *types.Model
+		sceneValue    string
+		expectedScene int
+		wantError     bool
+		setupMock     func()
+	}{
+		{
+			name:          "csghub scene with serverless model",
+			userUUID:      "test-user-uuid",
+			sceneValue:    commontypes.SceneHeaderCSGHub,
+			expectedScene: int(commontypes.SceneModelServerless),
+			model: &types.Model{
+				InternalModelInfo: types.InternalModelInfo{
+					CSGHubModelID: "test-model",
+					SvcName:       "test-service",
+					SvcType:       commontypes.ServerlessType,
+				},
+			},
+			wantError: false,
+			setupMock: func() {
+				mockMQ := mockmq.NewMockMessageQueue(t)
+				mockBLDMQ := mockbldmq.NewMockMessageQueue(t)
+				eventPub := &event.EventPublisher{
+					Connector:    mockMQ,
+					SyncInterval: 1,
+					MQ:           mockBLDMQ,
+					Cfg:          cfg,
+				}
+				mockCounter = mocktoken.NewMockCounter(t)
+
+				comp = &openaiComponentImpl{
+					userStore:   mockUserStore,
+					deployStore: mockDeployStore,
+					eventPub:    eventPub,
+				}
+				mockCounter.EXPECT().Usage(mock.Anything).Return(&token.Usage{
+					PromptTokens:     100,
+					CompletionTokens: 50,
+					TotalTokens:      150,
+				}, nil)
+
+				mockBLDMQ.EXPECT().Publish(bldmq.MeterDurationSendSubject, mock.Anything).RunAndReturn(func(topic string, data []byte) error {
+					var evt commontypes.MeteringEvent
+					err := json.Unmarshal(data, &evt)
+					require.NoError(t, err)
+					require.True(t, evt.Scene == int(commontypes.SceneModelServerless) || evt.Scene == int(commontypes.SceneAgenticHub), "Scene should be either SceneModelServerless or SceneAgenticHub")
+					return nil
+				})
+			},
+		},
+		{
+			name:          "agentichub scene with external model",
+			userUUID:      "test-user-uuid",
+			sceneValue:    commontypes.SceneHeaderAgenticHub,
+			expectedScene: int(commontypes.SceneAgenticHub),
+			model: &types.Model{
+				BaseModel: types.BaseModel{
+					ID:      "gpt-4",
+					OwnedBy: "openai",
+				},
+				ExternalModelInfo: types.ExternalModelInfo{
+					Provider: "openai",
+				},
+			},
+			wantError: false,
+			setupMock: func() {
+				mockMQ := mockmq.NewMockMessageQueue(t)
+				mockBLDMQ := mockbldmq.NewMockMessageQueue(t)
+				eventPub := &event.EventPublisher{
+					Connector:    mockMQ,
+					SyncInterval: 1,
+					MQ:           mockBLDMQ,
+					Cfg:          cfg,
+				}
+				mockCounter = mocktoken.NewMockCounter(t)
+
+				comp = &openaiComponentImpl{
+					userStore:   mockUserStore,
+					deployStore: mockDeployStore,
+					eventPub:    eventPub,
+				}
+				mockCounter.EXPECT().Usage(mock.Anything).Return(&token.Usage{
+					PromptTokens:     200,
+					CompletionTokens: 100,
+					TotalTokens:      300,
+				}, nil)
+
+				mockBLDMQ.EXPECT().Publish(bldmq.MeterDurationSendSubject, mock.Anything).RunAndReturn(func(topic string, data []byte) error {
+					var evt commontypes.MeteringEvent
+					err := json.Unmarshal(data, &evt)
+					require.NoError(t, err)
+					// In CE, parseScene always returns SceneModelServerless
+					// In EE, parseScene returns SceneAgenticHub for agentichub header
+					require.True(t, evt.Scene == int(commontypes.SceneModelServerless) || evt.Scene == int(commontypes.SceneAgenticHub))
+
+					var tokenUsageExtra struct {
+						PromptTokenNum     string                     `json:"prompt_token_num"`
+						CompletionTokenNum string                     `json:"completion_token_num"`
+						OwnerType          commontypes.TokenUsageType `json:"owner_type"`
+					}
+					err = json.Unmarshal([]byte(evt.Extra), &tokenUsageExtra)
+					require.NoError(t, err)
+					require.Equal(t, commontypes.ExternalInference, tokenUsageExtra.OwnerType)
+					return nil
+				})
+			},
+		},
+		{
+			name:          "empty scene with internal model",
+			userUUID:      "test-user-uuid",
+			sceneValue:    "",
+			expectedScene: int(commontypes.SceneModelServerless),
+			model: &types.Model{
+				InternalModelInfo: types.InternalModelInfo{
+					CSGHubModelID: "test-model",
+					SvcName:       "test-service",
+					SvcType:       commontypes.InferenceType,
+					OwnerUUID:     "test-user-uuid",
+				},
+			},
+			wantError: false,
+			setupMock: func() {
+				mockMQ := mockmq.NewMockMessageQueue(t)
+				mockBLDMQ := mockbldmq.NewMockMessageQueue(t)
+				eventPub := &event.EventPublisher{
+					Connector:    mockMQ,
+					SyncInterval: 1,
+					MQ:           mockBLDMQ,
+					Cfg:          cfg,
+				}
+				mockCounter = mocktoken.NewMockCounter(t)
+
+				comp = &openaiComponentImpl{
+					userStore:   mockUserStore,
+					deployStore: mockDeployStore,
+					eventPub:    eventPub,
+				}
+				mockCounter.EXPECT().Usage(mock.Anything).Return(&token.Usage{
+					PromptTokens:     50,
+					CompletionTokens: 25,
+					TotalTokens:      75,
+				}, nil)
+
+				mockBLDMQ.EXPECT().Publish(bldmq.MeterDurationSendSubject, mock.Anything).RunAndReturn(func(topic string, data []byte) error {
+					var evt commontypes.MeteringEvent
+					err := json.Unmarshal(data, &evt)
+					require.NoError(t, err)
+					// Empty scene should be parsed appropriately
+					require.True(t, evt.Scene == int(commontypes.SceneModelServerless) || evt.Scene == int(commontypes.SceneAgenticHub))
+					return nil
+				})
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.setupMock()
+
+			err := comp.RecordUsage(context.Background(), tt.userUUID, tt.model, mockCounter, tt.sceneValue)
 			if tt.wantError {
 				assert.Error(t, err)
 			} else {

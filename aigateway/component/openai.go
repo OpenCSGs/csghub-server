@@ -29,7 +29,8 @@ type OpenAIComponent interface {
 	GetAvailableModels(c context.Context, user string) ([]types.Model, error)
 	ListModels(c context.Context, user string, req types.ListModelsReq) (types.ModelList, error)
 	GetModelByID(c context.Context, username, modelID string) (*types.Model, error)
-	RecordUsage(c context.Context, userUUID string, model *types.Model, tokenCounter token.Counter) error
+	RecordUsage(c context.Context, userUUID string, model *types.Model, tokenCounter token.Counter, sceneValue string) error
+	CheckBalance(ctx context.Context, username string, model *types.Model, sceneValue string) error
 }
 
 type openaiComponentImpl struct {
@@ -363,17 +364,19 @@ func getSceneFromSvcType(svcType int) int {
 	}
 }
 
-func (m *openaiComponentImpl) RecordUsage(c context.Context, userUUID string, model *types.Model, counter token.Counter) error {
+func (m *openaiComponentImpl) RecordUsage(c context.Context, userUUID string, model *types.Model, counter token.Counter, sceneValue string) error {
 	usage, err := counter.Usage(c)
 	if err != nil {
 		return fmt.Errorf("failed to get token usage from counter,error:%w", err)
 	}
-	slog.Debug("token", slog.Any("usage", usage))
+
+	scene := parseScene(sceneValue)
+	slog.DebugContext(c, "token usage", slog.Any("usage", usage), slog.Any("scene", scene))
 	var tokenUsageExtra = struct {
 		PromptTokenNum     string `json:"prompt_token_num"`
 		CompletionTokenNum string `json:"completion_token_num"`
 		// 0: external, 1: owner is user, 2: other user is inference, 3: serverless
-		OwnerType commontypes.TokenUsageType
+		OwnerType commontypes.TokenUsageType `json:"owner_type"`
 	}{
 		PromptTokenNum:     fmt.Sprintf("%d", usage.PromptTokens),
 		CompletionTokenNum: fmt.Sprintf("%d", usage.CompletionTokens),
@@ -419,7 +422,7 @@ func (m *openaiComponentImpl) RecordUsage(c context.Context, userUUID string, mo
 		UserUUID:  userUUID,
 		Value:     usage.TotalTokens,
 		ValueType: commontypes.TokenNumberType, // count by token
-		Scene:     int(commontypes.SceneModelServerless),
+		Scene:     int(scene),
 		OpUID:     "aigateway",
 		CreatedAt: time.Now(),
 		Extra:     string(extraData),
@@ -430,18 +433,19 @@ func (m *openaiComponentImpl) RecordUsage(c context.Context, userUUID string, mo
 		event.CustomerID = model.SvcName
 	}
 	if model.Provider != "" {
-		event.ResourceID = model.ID
-		event.ResourceName = model.ID
-		event.CustomerID = model.Provider
+		extendModelKey := fmt.Sprintf("%s:%s", model.Provider, model.ID)
+		event.ResourceID = extendModelKey
+		event.ResourceName = extendModelKey
+		event.CustomerID = extendModelKey
 	}
 	eventData, _ := json.Marshal(event)
 	err = m.eventPub.PublishMeteringEvent(eventData)
 	if err != nil {
-		slog.Error("failed to publish token usage event", "event", event, "error", err)
+		slog.ErrorContext(c, "failed to publish token usage event", slog.Any("event", event), slog.Any("error", err))
 		return fmt.Errorf("failed to publish token usage event,error:%w", err)
 	}
 
-	slog.Info("public token usage event success", "event", event)
+	slog.InfoContext(c, "public token usage event success", slog.Any("event", event))
 	return nil
 }
 
