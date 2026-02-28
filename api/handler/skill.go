@@ -30,14 +30,14 @@ func NewSkillHandler(config *config.Config) (*SkillHandler, error) {
 		return nil, fmt.Errorf("error creating repo component:%w", err)
 	}
 	return &SkillHandler{
-		skill:      tc,
+		skill:     tc,
 		sensitive: sc,
 		repo:      repo,
 	}, nil
 }
 
 type SkillHandler struct {
-	skill      component.SkillComponent
+	skill     component.SkillComponent
 	sensitive component.SensitiveComponent
 	repo      component.RepoComponent
 }
