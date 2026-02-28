@@ -282,6 +282,7 @@ func (c *notebookComponentImpl) UpdateNotebook(ctx context.Context, req *types.U
 
 	dur := &types.DeployUpdateReq{
 		ResourceID: &req.ResourceID,
+		ClusterID:  &resource.ClusterID,
 	}
 
 	err = c.deployer.UpdateDeploy(ctx, dur, deploy)
