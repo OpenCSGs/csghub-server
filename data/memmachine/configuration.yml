@@ -1,0 +1,72 @@
+logging:
+  path: /tmp/mem-machine.log
+  level: info #| debug | error
+
+episode_store:
+  database: profile_storage
+
+episodic_memory:
+  long_term_memory:
+    embedder: openai_compatible_embedder
+    reranker: default_reranker
+    vector_graph_store: graph_storage
+  short_term_memory:
+    llm_model: openai_compatible_model
+    message_capacity: 500
+
+semantic_memory:
+  llm_model: openai_compatible_model
+  embedding_model: openai_compatible_embedder
+  database: profile_storage
+
+session_manager:
+  database: profile_storage
+
+prompt:
+  session:
+  - profile_prompt
+
+resources:
+  databases:
+    profile_storage:
+      provider: postgres
+      config:
+        host: postgres
+        port: 5432
+        user: memmachine
+        password: memmachine_password
+        db_name: memmachine
+        pool_size: 5
+        max_overflow: 10
+    graph_storage:
+      provider: neo4j
+      config:
+        uri: 'bolt://neo4j:7687'
+        username: neo4j
+        password: neo4j_password
+        max_connection_pool_size: 100
+        connection_acquisition_timeout: 60.0
+        range_index_creation_threshold: 10000
+        vector_index_creation_threshold: 10000
+  embedders:
+    openai_compatible_embedder:
+      provider: openai
+      config:
+        model: "text-embedding-3-small"
+        api_key: <YOUR_API_KEY>
+        base_url: "https://api.openai.com/v1"
+        dimensions: 1536
+
+  language_models:
+    openai_compatible_model:
+      provider: openai-chat-completions
+      config:
+        model: "gpt-5-mini"
+        api_key: <YOUR_API_KEY>
+        base_url: "https://api.openai.com/v1"
+
+  rerankers:
+    default_reranker:
+      provider: embedder
+      config:
+         embedder_id: openai_compatible_embedder

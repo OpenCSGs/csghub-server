@@ -239,6 +239,13 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	// Code routes
 	createCodeRoutes(config, apiGroup, middlewareCollection, codeHandler, repoCommonHandler)
 
+	skillHandler, err := handler.NewSkillHandler(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating skill handler:%w", err)
+	}
+	// Skill routes
+	createSkillRoutes(config, apiGroup, middlewareCollection, skillHandler, repoCommonHandler)
+
 	spaceHandler, err := handler.NewSpaceHandler(config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating space handler:%w", err)
@@ -891,6 +898,7 @@ func createSpaceRoutes(config *config.Config,
 	repoCommonHandler *handler.RepoHandler,
 	monitorHandler *handler.MonitorHandler) {
 	spaces := apiGroup.Group("/spaces")
+	spaces.GET("/cuda-versions", spaceHandler.GetSupportedCUDAVersions)
 	spaces.Use(middleware.RepoType(types.SpaceRepo), middlewareCollection.Repo.RepoExists)
 	{
 		// list all spaces
@@ -900,7 +908,6 @@ func createSpaceRoutes(config *config.Config,
 		spaces.GET("/:namespace/:name", middlewareCollection.Auth.NeedLogin, spaceHandler.Show)
 		spaces.PUT("/:namespace/:name", middlewareCollection.Auth.NeedLogin, spaceHandler.Update)
 		// get supported cuda versions
-		spaces.GET("/:namespace/:name/cuda-versions/:resource_type", middlewareCollection.Auth.NeedLogin, spaceHandler.GetSupportedCUDAVersions)
 		spaces.DELETE("/:namespace/:name", middlewareCollection.Auth.NeedLogin, spaceHandler.Delete)
 		// depoly and start running the space
 		spaces.POST("/:namespace/:name/run", middlewareCollection.Auth.NeedLogin, spaceHandler.Run)
@@ -1396,5 +1403,55 @@ func createCustomValidator() error {
 		return nil // Return nil if no error occurred during registration of custom validation functions
 	} else {
 		return fmt.Errorf("fail to register custom validation functions")
+	}
+}
+
+func createSkillRoutes(
+	config *config.Config,
+	apiGroup *gin.RouterGroup,
+	middlewareCollection middleware.MiddlewareCollection,
+	skillHandler *handler.SkillHandler,
+	repoCommonHandler *handler.RepoHandler,
+) {
+	skillGroup := apiGroup.Group("/skills")
+	skillGroup.Use(middleware.RepoType(types.SkillRepo), middlewareCollection.Repo.RepoExists)
+	{
+		skillGroup.POST("", middlewareCollection.Auth.NeedPhoneVerified, skillHandler.Create)
+		skillGroup.GET("", skillHandler.Index)
+		skillGroup.PUT("/:namespace/:name", middlewareCollection.Auth.NeedLogin, skillHandler.Update)
+		skillGroup.DELETE("/:namespace/:name", middlewareCollection.Auth.NeedLogin, skillHandler.Delete)
+		skillGroup.GET("/:namespace/:name", skillHandler.Show)
+		skillGroup.GET("/:namespace/:name/branches", repoCommonHandler.Branches)
+		skillGroup.GET("/:namespace/:name/tags", repoCommonHandler.Tags)
+		skillGroup.POST("/:namespace/:name/preupload/:revision", middlewareCollection.Auth.NeedPhoneVerified, repoCommonHandler.Preupload)
+
+		// update tags of a certain category
+		skillGroup.GET("/:namespace/:name/all_files", repoCommonHandler.AllFiles)
+		skillGroup.POST("/:namespace/:name/tags/:category", middlewareCollection.Auth.NeedLogin, repoCommonHandler.UpdateTags)
+		skillGroup.GET("/:namespace/:name/last_commit", repoCommonHandler.LastCommit)
+		skillGroup.GET("/:namespace/:name/commit/:commit_id", repoCommonHandler.CommitWithDiff)
+		skillGroup.POST("/:namespace/:name/commit/:revision", middlewareCollection.Auth.NeedPhoneVerified, repoCommonHandler.CommitFiles)
+		skillGroup.GET("/:namespace/:name/diff", repoCommonHandler.DiffBetweenTwoCommits)
+		skillGroup.GET("/:namespace/:name/remote_diff", repoCommonHandler.RemoteDiff)
+		skillGroup.GET("/:namespace/:name/tree", repoCommonHandler.Tree)
+		skillGroup.GET("/:namespace/:name/refs/:ref/tree/*path", repoCommonHandler.TreeV2)
+		skillGroup.GET("/:namespace/:name/refs/:ref/remote_tree/*path", repoCommonHandler.RemoteTree)
+		skillGroup.GET("/:namespace/:name/refs/:ref/logs_tree/*path", repoCommonHandler.LogsTree)
+		skillGroup.GET("/:namespace/:name/commits", repoCommonHandler.Commits)
+		skillGroup.POST("/:namespace/:name/raw/*file_path", middlewareCollection.Auth.NeedPhoneVerified, repoCommonHandler.CreateFile)
+		skillGroup.GET("/:namespace/:name/raw/*file_path", repoCommonHandler.FileRaw)
+		skillGroup.GET("/:namespace/:name/blob/*file_path", repoCommonHandler.FileInfo)
+		skillGroup.GET("/:namespace/:name/download/*file_path", repoCommonHandler.DownloadFile)
+		skillGroup.GET("/:namespace/:name/resolve/*file_path", repoCommonHandler.ResolveDownload)
+		skillGroup.PUT("/:namespace/:name/raw/*file_path", middlewareCollection.Auth.NeedLogin, repoCommonHandler.UpdateFile)
+		skillGroup.DELETE("/:namespace/:name/raw/*file_path", middlewareCollection.Auth.NeedLogin, repoCommonHandler.DeleteFile)
+		skillGroup.POST("/:namespace/:name/update_downloads", repoCommonHandler.UpdateDownloads)
+		skillGroup.PUT("/:namespace/:name/incr_downloads", repoCommonHandler.IncrDownloads)
+		skillGroup.POST("/:namespace/:name/upload_file", middlewareCollection.Auth.NeedPhoneVerified, repoCommonHandler.UploadFile)
+		skillGroup.POST("/:namespace/:name/mirror", middlewareCollection.Auth.NeedLogin, repoCommonHandler.CreateMirror)
+		skillGroup.GET("/:namespace/:name/mirror", middlewareCollection.Auth.NeedLogin, repoCommonHandler.GetMirror)
+		skillGroup.PUT("/:namespace/:name/mirror", middlewareCollection.Auth.NeedLogin, repoCommonHandler.UpdateMirror)
+		skillGroup.DELETE("/:namespace/:name/mirror", middlewareCollection.Auth.NeedLogin, repoCommonHandler.DeleteMirror)
+		skillGroup.POST("/:namespace/:name/mirror/sync", middlewareCollection.Auth.NeedLogin, repoCommonHandler.SyncMirror)
 	}
 }

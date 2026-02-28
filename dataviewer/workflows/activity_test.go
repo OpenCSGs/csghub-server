@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"testing"
 
+	"github.com/mcuadros/go-defaults"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/git/gitserver"
@@ -79,6 +80,8 @@ func TestActivity_ScanRepoFiles(t *testing.T) {
 	ctx := context.TODO()
 
 	config := &config.Config{}
+	defaults.SetDefaults(config)
+
 	dvstore := mockdb.NewMockDataviewerStore(t)
 	mockGitServer := mockGit.NewMockGitServer(t)
 	s3Client := mockS3.NewMockClient(t)
@@ -111,6 +114,7 @@ func TestActivity_ScanRepoFiles(t *testing.T) {
 	cls, err := dvActivity.ScanRepoFiles(ctx, dvCom.ScanRepoFileReq{
 		Req:              req,
 		ConvertLimitSize: config.DataViewer.ConvertLimitSize,
+		MaxFileNum:       config.DataViewer.ScanFileNumLimit,
 	})
 	require.Nil(t, err)
 	require.NotNil(t, cls)

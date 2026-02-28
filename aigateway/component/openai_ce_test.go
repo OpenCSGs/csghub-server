@@ -480,3 +480,39 @@ func TestOpenAIComponent_ExtGetAvailableModels_SinglePage(t *testing.T) {
 	require.Equal(t, "test-model-1", models[0].ID)
 	wg.Wait()
 }
+
+func TestParseScene(t *testing.T) {
+	tests := []struct {
+		name       string
+		sceneValue string
+		expected   commontypes.SceneType
+	}{
+		{
+			name:       "any scene value returns SceneModelServerless",
+			sceneValue: commontypes.SceneHeaderCSGHub,
+			expected:   commontypes.SceneModelServerless,
+		},
+		{
+			name:       "empty scene returns SceneModelServerless",
+			sceneValue: "",
+			expected:   commontypes.SceneModelServerless,
+		},
+		{
+			name:       "agentichub scene returns SceneModelServerless",
+			sceneValue: commontypes.SceneHeaderAgenticHub,
+			expected:   commontypes.SceneModelServerless,
+		},
+		{
+			name:       "unknown scene returns SceneModelServerless",
+			sceneValue: "unknown",
+			expected:   commontypes.SceneModelServerless,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := parseScene(tt.sceneValue)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}

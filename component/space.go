@@ -96,18 +96,20 @@ func (c *spaceComponentImpl) Create(ctx context.Context, req types.CreateSpaceRe
 	req.Readme = generateReadmeData(req.License)
 	resource, err := c.spaceResourceStore.FindByID(ctx, req.ResourceID)
 	if err != nil {
-		return nil, fmt.Errorf("fail to find resource by id, %w", err)
+		return nil, errorx.ErrResourceNotFound
 	}
 	err = c.repoComponent.CheckAccountAndResource(ctx, req.Username, req.ClusterID, req.OrderDetailID, resource)
 	if err != nil {
-		return nil, fmt.Errorf("fail to check resource error: %w", err)
+		slog.ErrorContext(ctx, "CheckAccountAndResource failed", slog.Any("error", err))
+		return nil, err
 	}
 
 	var templatePath string
 	if req.Sdk == types.DOCKER.Name {
 		templatePath, err = c.getSpaceDockerTemplatePath(ctx, req)
 		if err != nil {
-			return nil, fmt.Errorf("fail to get space docker template path, %w", err)
+			slog.ErrorContext(ctx, "fail to get space docker template path", slog.Any("error", err))
+			return nil, errorx.ErrGetSpaceDockerTemplatePathFailed
 		}
 	}
 
@@ -148,7 +150,7 @@ func (c *spaceComponentImpl) Create(ctx context.Context, req types.CreateSpaceRe
 	err = c.createSpaceDefaultFiles(ctx, dbRepo, req, templatePath)
 	if err != nil {
 		slog.Error("failed to create new space default files", slog.Any("req", req), slog.Any("error", err))
-		return nil, fmt.Errorf("failed to create new space %s/%s default files, error: %w", req.Namespace, req.Name, err)
+		return nil, errorx.ErrSpaceInitFailed
 	}
 
 	space := &types.Space{
@@ -1184,10 +1186,20 @@ func (c *spaceComponentImpl) status(ctx context.Context, s *database.Space) (typ
 			Status: SpaceStatusStopped,
 		}, fmt.Errorf("failed to get latest space deploy by space id %d, error: %w", s.ID, err)
 	}
+
+	svcName, statusCode, _, err := c.deployer.Status(ctx, types.DeployRepo{
+		DeployID: deploy.ID,
+	}, false)
+	if err != nil {
+		return types.SpaceStatus{
+			Status: SpaceStatusStopped,
+		}, fmt.Errorf("failed to get latest space deploy by space id %d, error: %w", s.ID, err)
+	}
+
 	slog.Debug("space deploy", slog.Any("deploy", deploy))
 	return types.SpaceStatus{
-		SvcName:   deploy.SvcName,
-		Status:    deployStatusCodeToString(deploy.Status),
+		SvcName:   svcName,
+		Status:    deployStatusCodeToString(statusCode),
 		DeployID:  deploy.ID,
 		ClusterID: deploy.ClusterID,
 	}, nil
@@ -1498,7 +1510,7 @@ func (c *spaceComponentImpl) GetSupportedCUDAVersions(ctx context.Context, resou
 		return nil, err
 	}
 
-	var versions []string
+	var versions = []string{}
 	for _, frame := range frames {
 		versions = append(versions, frame.DriverVersion)
 	}
@@ -1542,6 +1554,7 @@ func (c *spaceComponentImpl) FindSpaceLatestCUDAVersion(ctx context.Context, com
 const (
 	// SpaceStatusEmpty is the init status by default
 	SpaceStatusEmpty        = ""
+	SpaceStatusPending      = "Pending"
 	SpaceStatusBuilding     = "Building"
 	SpaceStatusBuildFailed  = "BuildingFailed"
 	SpaceStatusDeploying    = "Deploying"
@@ -1554,4 +1567,5 @@ const (
 	SpaceStatusNoAppFile   = "NoAppFile"
 	RepoStatusDeleted      = "Deleted"
 	SpaceStatusNoNGINXConf = "NoNGINXConf"
+	ResourceUnhealthy      = "ResourceUnhealthy"
 )

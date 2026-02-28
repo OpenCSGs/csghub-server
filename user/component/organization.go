@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/google/uuid"
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/git/membership"
@@ -101,6 +102,7 @@ func (c *organizationComponentImpl) Create(ctx context.Context, req *types.Creat
 		Path:   dbOrg.Name,
 		UserID: user.ID,
 	}
+	dbOrg.UUID = uuid.New()
 	err = c.orgStore.Create(ctx, dbOrg, namespace)
 	if err != nil {
 		return nil, fmt.Errorf("failed create database organization, error: %w", err)
@@ -123,6 +125,7 @@ func (c *organizationComponentImpl) Create(ctx context.Context, req *types.Creat
 		Logo:     dbOrg.Logo,
 		OrgType:  dbOrg.OrgType,
 		Verified: dbOrg.Verified,
+		UUID:     dbOrg.UUID,
 	}
 	return org, err
 }
@@ -159,6 +162,7 @@ func (c *organizationComponentImpl) Index(ctx context.Context, username, search 
 			OrgType:      dborg.OrgType,
 			Verified:     dborg.Verified,
 			VerifyStatus: string(dborg.VerifyStatus),
+			UUID:         dborg.UUID,
 		}
 		orgs = append(orgs, org)
 	}
@@ -177,6 +181,7 @@ func (c *organizationComponentImpl) Get(ctx context.Context, orgName string) (*t
 		Logo:     dborg.Logo,
 		OrgType:  dborg.OrgType,
 		Verified: dborg.Verified,
+		UUID:     dborg.UUID,
 	}
 	return org, nil
 }

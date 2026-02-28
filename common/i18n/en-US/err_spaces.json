@@ -1,0 +1,11 @@
+{
+    "error.SPACE-ERR-0": {
+        "other": "Failed to get the space Docker template path."
+    },
+    "error.SPACE-ERR-1": {
+        "other": "The space name already exists."
+    },
+    "error.SPACE-ERR-2": {
+        "other": "Failed to initialize the space."
+    }
+}

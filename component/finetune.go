@@ -114,7 +114,7 @@ func (c *finetuneComponentImpl) CreateFinetuneJob(ctx context.Context, req types
 		resource := ""
 		if frame.ComputeType == string(types.ResourceTypeGPU) {
 			hardware.Gpu.Num = c.config.Argo.QuotaGPUNumber
-			hardware.Gpu.ResourceName = "nvidia.com/gpu"
+			hardware.Gpu.ResourceName = c.deployer.GetSharedModeResourceName(c.config)
 			resource = fmt.Sprintf("%s GPU · ", c.config.Argo.QuotaGPUNumber)
 		}
 		hardware.Cpu.Num = "4"

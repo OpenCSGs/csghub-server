@@ -1,0 +1,11 @@
+{
+    "error.SPACE-ERR-0": {
+        "other": "获取空间 Docker 模板路径失败"
+    },
+    "error.SPACE-ERR-1": {
+        "other": "空间名称已经存在"
+    },
+    "error.SPACE-ERR-2": {
+        "other": "初始化空间失败"
+    }
+}

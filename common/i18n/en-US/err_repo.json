@@ -1,0 +1,11 @@
+{
+    "error.REPO-ERR-0": {
+        "other": "A repository with the same name already exists."
+    },
+    "error.REPO-ERR-1": {
+        "other": "The repository name is invalid."
+    },
+    "error.REPO-ERR-2": {
+        "other": "The namespace does not exist."
+    }
+}
