@@ -393,7 +393,8 @@ type Config struct {
 	}
 
 	AIGateway struct {
-		Port int `env:"OPENCSG_AIGATEWAY_PORT" default:"8094"`
+		Port                           int  `env:"OPENCSG_AIGATEWAY_PORT" default:"8094"`
+		ModerationBypassSensitiveCheck bool `env:"OPENCSG_AIGATEWAY_MODERATION_BYPASS_SENSITIVE_CHECK" default:"false"`
 	}
 
 	Integration struct {
