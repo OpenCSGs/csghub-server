@@ -414,65 +414,6 @@ func (_c *MockDeployer_GetClusterById_Call) RunAndReturn(run func(context.Contex
 	return _c
 }
 
-// GetClusterUsageById provides a mock function with given fields: ctx, clusterId
-func (_m *MockDeployer) GetClusterUsageById(ctx context.Context, clusterId string) (*types.ClusterRes, error) {
-	ret := _m.Called(ctx, clusterId)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetClusterUsageById")
-	}
-
-	var r0 *types.ClusterRes
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) (*types.ClusterRes, error)); ok {
-		return rf(ctx, clusterId)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, string) *types.ClusterRes); ok {
-		r0 = rf(ctx, clusterId)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*types.ClusterRes)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = rf(ctx, clusterId)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockDeployer_GetClusterUsageById_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetClusterUsageById'
-type MockDeployer_GetClusterUsageById_Call struct {
-	*mock.Call
-}
-
-// GetClusterUsageById is a helper method to define mock.On call
-//   - ctx context.Context
-//   - clusterId string
-func (_e *MockDeployer_Expecter) GetClusterUsageById(ctx interface{}, clusterId interface{}) *MockDeployer_GetClusterUsageById_Call {
-	return &MockDeployer_GetClusterUsageById_Call{Call: _e.mock.On("GetClusterUsageById", ctx, clusterId)}
-}
-
-func (_c *MockDeployer_GetClusterUsageById_Call) Run(run func(ctx context.Context, clusterId string)) *MockDeployer_GetClusterUsageById_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string))
-	})
-	return _c
-}
-
-func (_c *MockDeployer_GetClusterUsageById_Call) Return(_a0 *types.ClusterRes, _a1 error) *MockDeployer_GetClusterUsageById_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockDeployer_GetClusterUsageById_Call) RunAndReturn(run func(context.Context, string) (*types.ClusterRes, error)) *MockDeployer_GetClusterUsageById_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // GetEvaluation provides a mock function with given fields: ctx, req
 func (_m *MockDeployer) GetEvaluation(ctx context.Context, req types.EvaluationGetReq) (*types.ArgoWorkFlowRes, error) {
 	ret := _m.Called(ctx, req)

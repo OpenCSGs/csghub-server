@@ -30,6 +30,9 @@ type ClusterInfoStore interface {
 	BatchUpdateStatus(ctx context.Context, statusEvent []*types.ClusterRes) error
 	GetClusterResources(ctx context.Context, clusterID string) (*types.ClusterRes, error)
 	FindNodeByClusterID(ctx context.Context, clusterID string) ([]ClusterNode, error)
+	ListAllNodes(ctx context.Context) ([]ClusterNodeWithRegion, error)
+	GetNodeByID(ctx context.Context, id int64) (*ClusterNodeWithRegion, error)
+	UpdateNode(ctx context.Context, id int64, enableVXPU bool) (*ClusterNode, error)
 }
 
 func NewClusterInfoStore() ClusterInfoStore {
@@ -73,6 +76,12 @@ type ClusterNode struct {
 	Processes   []types.ProcessInfo `bun:",type:jsonb,nullzero" json:"processes"`
 	Exclusive   bool                `bun:",default:false" json:"exclusive"`
 	times
+}
+
+type ClusterNodeWithRegion struct {
+	ClusterNode
+	ClusterRegion  string `json:"cluster_region"`
+	TaskRunningNum int    `json:"task_running_num"`
 }
 
 func (r *clusterInfoStoreImpl) Add(ctx context.Context, clusterConfig string, region string, mode types.ClusterMode) (*ClusterInfo, error) {
@@ -336,6 +345,7 @@ func (s *clusterInfoStoreImpl) GetClusterResources(ctx context.Context, clusterI
 			NodeHardware: node.Hardware,
 			Processes:    node.Processes,
 			EnableVXPU:   node.EnableVXPU,
+			UpdateAt:     node.UpdatedAt.Unix(),
 		})
 	}
 
@@ -361,4 +371,55 @@ func (s *clusterInfoStoreImpl) FindNodeByClusterID(ctx context.Context, clusterI
 		return nil, errorx.HandleDBError(err, nil)
 	}
 	return result, nil
+}
+
+func (s *clusterInfoStoreImpl) ListAllNodes(ctx context.Context) ([]ClusterNodeWithRegion, error) {
+	var result []ClusterNodeWithRegion
+	err := s.db.Operator.Core.NewSelect().
+		ColumnExpr("cn.*, ci.region as cluster_region").
+		TableExpr("cluster_nodes as cn").
+		Join("JOIN cluster_infos ci ON ci.cluster_id = cn.cluster_id").
+		Order("cn.cluster_id").
+		Order("cn.name").
+		Scan(ctx, &result)
+	if err != nil {
+		return nil, errorx.HandleDBError(err, nil)
+	}
+	return result, nil
+}
+
+func (s *clusterInfoStoreImpl) GetNodeByID(ctx context.Context, id int64) (*ClusterNodeWithRegion, error) {
+	node := &ClusterNodeWithRegion{}
+	err := s.db.Operator.Core.NewSelect().
+		ColumnExpr("cn.*, ci.region as cluster_region").
+		TableExpr("cluster_nodes as cn").
+		Join("JOIN cluster_infos ci ON ci.cluster_id = cn.cluster_id").
+		Where("cn.id = ?", id).
+		Scan(ctx, node)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, errorx.HandleDBError(err, nil)
+	}
+	return node, nil
+}
+
+func (s *clusterInfoStoreImpl) UpdateNode(ctx context.Context, id int64, enableVXPU bool) (*ClusterNode, error) {
+	node := &ClusterNode{ID: id}
+	err := s.db.Operator.Core.NewSelect().Model(node).WherePK().Scan(ctx)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, errorx.HandleDBError(err, nil)
+	}
+
+	node.EnableVXPU = enableVXPU
+	_, err = s.db.Operator.Core.NewUpdate().Model(node).WherePK().Exec(ctx)
+	if err != nil {
+		return nil, errorx.HandleDBError(err, nil)
+	}
+
+	return node, nil
 }

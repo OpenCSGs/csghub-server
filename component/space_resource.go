@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
+	"math"
 
 	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/deploy/common"
@@ -20,27 +21,17 @@ type SpaceResourceComponent interface {
 }
 
 func (c *spaceResourceComponentImpl) Index(ctx context.Context, req *types.SpaceResourceIndexReq) ([]types.SpaceResource, int, error) {
-	clusterIDs := []string{}
-	for _, c := range req.ClusterIDs {
-		if c != "" {
-			clusterIDs = append(clusterIDs, c)
-		}
-	}
-	req.ClusterIDs = clusterIDs
-	if len(req.ClusterIDs) == 0 {
-		return nil, 0, nil
-	}
-
 	var result []types.SpaceResource
 	var total int
 	for _, clusterID := range req.ClusterIDs {
+		resourceCount := 0
 		var singleClusterResult []types.SpaceResource
 		dbReq := types.SpaceResourceFilter{
 			ClusterID:    clusterID,
 			HardwareType: req.HardwareType,
 			ResourceType: req.ResourceType,
 		}
-		databaseSpaceResources, currentTotal, err := c.spaceResourceStore.Index(ctx, dbReq, 200, 1)
+		databaseSpaceResources, _, err := c.spaceResourceStore.Index(ctx, dbReq, math.MaxInt, 1)
 		if err != nil {
 			slog.Error("failed to index space resource", slog.String("clusterID", clusterID), slog.Any("error", err))
 			continue
@@ -77,13 +68,15 @@ func (c *spaceResourceComponentImpl) Index(ctx context.Context, req *types.Space
 			}
 			resourceType := common.ResourceType(hardware)
 			singleClusterResult = append(singleClusterResult, types.SpaceResource{
-				ID:          r.ID,
-				ClusterID:   r.ClusterID,
-				Name:        r.Name,
-				Resources:   r.Resources,
-				IsAvailable: isAvailable,
-				Type:        resourceType,
+				ID:            r.ID,
+				ClusterID:     r.ClusterID,
+				ClusterRegion: clusterResources.Region,
+				Name:          r.Name,
+				Resources:     r.Resources,
+				IsAvailable:   isAvailable,
+				Type:          resourceType,
 			})
+			resourceCount++
 		}
 
 		err = c.updatePriceInfo(req, singleClusterResult)
@@ -99,7 +92,7 @@ func (c *spaceResourceComponentImpl) Index(ctx context.Context, req *types.Space
 		// 	continue
 		// }
 		result = append(result, singleClusterResult...)
-		total += currentTotal
+		total += resourceCount
 	}
 
 	return result, total, nil

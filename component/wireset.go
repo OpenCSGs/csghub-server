@@ -503,8 +503,11 @@ var TelemetryComponentSet = wire.NewSet(NewTestTelemetryComponent)
 
 func NewTestClusterComponent(config *config.Config, deployer deploy.Deployer, stores *tests.MockStores) *clusterComponentImpl {
 	return &clusterComponentImpl{
-		deployer:     deployer,
-		clusterStore: stores.ClusterInfo,
+		deployer:        deployer,
+		clusterStore:    stores.ClusterInfo,
+		deployTaskStore: stores.DeployTask,
+		resStore:        stores.SpaceResource,
+		workflowStore:   stores.Workflow,
 	}
 }
 
