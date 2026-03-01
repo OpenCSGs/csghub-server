@@ -250,6 +250,7 @@ func TestNotebookComponentImpl_UpdateNotebook_Success(t *testing.T) {
 	nc.mocks.deployer.EXPECT().
 		UpdateDeploy(ctx, &types.DeployUpdateReq{
 			ResourceID: &resource.ID,
+			ClusterID:  &resource.ClusterID,
 		}, deploy).
 		Return(nil)
 
@@ -490,6 +491,7 @@ func TestNotebookComponentImpl_UpdateNotebook_UpdateDeployFails(t *testing.T) {
 	nc.mocks.deployer.EXPECT().
 		UpdateDeploy(ctx, &types.DeployUpdateReq{
 			ResourceID: &resource.ID,
+			ClusterID:  &resource.ClusterID,
 		}, deploy).
 		Return(errors.New("update failed"))
 
@@ -895,7 +897,7 @@ func TestNotebookComponentImpl_StatusNotebook(t *testing.T) {
 		CurrentUser: "testuser",
 	})
 	require.NoError(t, err)
-	require.Equal(t, "Stopped", status)
+	require.Equal(t, "Pending", status)
 }
 
 func TestNotebookComponentImpl_LogsNotebook(t *testing.T) {

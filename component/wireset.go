@@ -399,7 +399,21 @@ func NewTestCodeComponent(config *config.Config, stores *tests.MockStores, repoC
 	}
 }
 
+func NewTestSkillComponent(config *config.Config, stores *tests.MockStores, repoComponent RepoComponent, userSvcClient rpc.UserSvcClient, gitServer gitserver.GitServer) *skillComponentImpl {
+	return &skillComponentImpl{
+		config:         config,
+		repoComponent:  repoComponent,
+		skillStore:     stores.Skill,
+		repoStore:      stores.Repo,
+		userLikesStore: stores.UserLikes,
+		gitServer:      gitServer,
+		userSvcClient:  userSvcClient,
+		recomStore:     stores.Recom,
+	}
+}
+
 var CodeComponentSet = wire.NewSet(NewTestCodeComponent)
+var SkillComponentSet = wire.NewSet(NewTestSkillComponent)
 
 func NewTestMultiSyncComponent(config *config.Config, stores *tests.MockStores, gitServer gitserver.GitServer) *multiSyncComponentImpl {
 	return &multiSyncComponentImpl{

@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	mockgit "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/git/gitserver"
@@ -46,15 +47,6 @@ func TestOrganizationComponent_Create(t *testing.T) {
 	mockMemberComponent.EXPECT().InitRoles(mock.Anything, mock.Anything).Return(nil).Once()
 	mockMemberComponent.EXPECT().SetAdmin(mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
-	expected := &types.Organization{
-		Name:     req.Name,
-		Nickname: req.Nickname,
-		Homepage: req.Homepage,
-		Logo:     req.Logo,
-		OrgType:  req.OrgType,
-		Verified: req.Verified,
-	}
-
 	c := &organizationComponentImpl{
 		userStore: mockUserStore,
 		nsStore:   mockNamespaceStore,
@@ -64,7 +56,13 @@ func TestOrganizationComponent_Create(t *testing.T) {
 	}
 	org, err := c.Create(context.Background(), req)
 	require.NoError(t, err)
-	require.EqualValues(t, expected, org)
+	require.Equal(t, req.Name, org.Name)
+	require.Equal(t, req.Nickname, org.Nickname)
+	require.Equal(t, req.Homepage, org.Homepage)
+	require.Equal(t, req.Logo, org.Logo)
+	require.Equal(t, req.OrgType, org.OrgType)
+	require.Equal(t, req.Verified, org.Verified)
+	require.NotEqual(t, uuid.Nil, org.UUID)
 }
 
 func TestOrganizationComponent_Index(t *testing.T) {

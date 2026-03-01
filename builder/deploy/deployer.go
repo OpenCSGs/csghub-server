@@ -19,6 +19,7 @@ import (
 	"opencsg.com/csghub-server/builder/loki"
 	"opencsg.com/csghub-server/builder/redis"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	hubcom "opencsg.com/csghub-server/common/utils/common"
@@ -53,6 +54,8 @@ type Deployer interface {
 	DeleteFinetuneJob(ctx context.Context, req types.ArgoWorkFlowDeleteReq) error
 	GetWorkflowLogsInStream(ctx context.Context, req types.FinetuneLogReq) (*MultiLogReader, error)
 	GetWorkflowLogsNonStream(ctx context.Context, req types.FinetuneLogReq) (*loki.LokiQueryResponse, error)
+	IsDefaultScheduler() bool
+	GetSharedModeResourceName(config *config.Config) string
 }
 
 func (d *deployer) GenerateUniqueSvcName(dr types.DeployRepo) string {
@@ -88,7 +91,7 @@ func (d *deployer) serverlessDeploy(ctx context.Context, dr types.DeployRepo) (*
 		return nil, nil
 	}
 	if err != nil {
-		return nil, fmt.Errorf("fail to find space or serverless deploy, spaceid:%v, repoid:%v, %w", dr.SpaceID, dr.RepoID, err)
+		return nil, fmt.Errorf("failed to find space or serverless deploy, space_id:%d, repo_id:%d, %w", dr.SpaceID, dr.RepoID, err)
 	}
 	if deploy == nil {
 		return nil, nil
@@ -124,7 +127,7 @@ func (d *deployer) serverlessDeploy(ctx context.Context, dr types.DeployRepo) (*
 func (d *deployer) dedicatedDeploy(ctx context.Context, dr types.DeployRepo) (*database.Deploy, error) {
 	uniqueSvcName := d.GenerateUniqueSvcName(dr)
 	if len(uniqueSvcName) < 1 {
-		err := fmt.Errorf("fail to generate uuid for deploy")
+		err := fmt.Errorf("failed to generate uuid for deploy")
 		return nil, errorx.InternalServerError(err,
 			errorx.Ctx().
 				Set("deploy_type", dr.Type).
@@ -180,8 +183,9 @@ func (d *deployer) buildDeploy(ctx context.Context, dr types.DeployRepo) (*datab
 	}
 	slog.Debug("do deployer.buildDeploy", slog.Any("dr", dr), slog.Any("deploy", deploy))
 	if deploy == nil {
-		// create new deploy for model inference and no latest deploy of space
-		// create new deploy for note book
+		// create new deploy for:
+		// 1. create inference/finetune/notebook
+		// 2. create space/serverless first time
 		deploy, err = d.dedicatedDeploy(ctx, dr)
 	}
 
@@ -260,6 +264,13 @@ func (d *deployer) Status(ctx context.Context, dr types.DeployRepo, needDetails 
 		slog.Error("fail to get deploy by deploy id", slog.Any("DeployID", dr.DeployID), slog.Any("error", err))
 		return "", common.Stopped, nil, fmt.Errorf("can't get deploy, %w", err)
 	}
+
+	healthy := d.CheckClusterHealthy(ctx, deploy.ClusterID)
+	if !healthy {
+		slog.WarnContext(ctx, "cluster resources unhealthy")
+		return "", common.ResourceUnhealthy, nil, nil
+	}
+
 	svcName := deploy.SvcName
 	if deploy.Status == common.Pending {
 		//if deploy is pending, no need to check ksvc status
@@ -692,7 +703,7 @@ func (d *deployer) UpdateDeploy(ctx context.Context, dur *types.DeployUpdateReq,
 	// update deploy table
 	err = d.deployTaskStore.UpdateDeploy(ctx, deploy)
 	if err != nil {
-		return fmt.Errorf("failed to update deploy, %w", err)
+		return fmt.Errorf("failed to update deploy, error: %w", err)
 	}
 
 	return nil
@@ -1064,7 +1075,7 @@ func (d *deployer) SubmitEvaluation(ctx context.Context, req types.EvaluationReq
 	if req.ResourceId == 0 {
 		flowReq.ShareMode = true
 	}
-	flowReq.Scheduler = common.GenerateScheduler(d.deployConfig)
+	flowReq.Scheduler = d.kubeScheduler
 	return d.imageRunner.SubmitWorkFlow(ctx, flowReq)
 }
 
@@ -1226,7 +1237,7 @@ func (d *deployer) GetWorkflowLogsNonStream(ctx context.Context, req types.Finet
 		if !first {
 			queryBuilder.WriteString(",")
 		}
-		queryBuilder.WriteString(fmt.Sprintf(`%s="%s"`, k, v))
+		fmt.Fprintf(&queryBuilder, `%s="%s"`, k, v)
 		first = false
 	}
 	queryBuilder.WriteString("}")
@@ -1244,4 +1255,41 @@ func (d *deployer) GetWorkflowLogsNonStream(ctx context.Context, req types.Finet
 	}
 
 	return d.lokiClient.QueryRange(ctx, params)
+}
+
+func (d *deployer) CheckClusterHealthy(ctx context.Context, deployId string) bool {
+	clusterRes, err := d.clusterStore.GetClusterResources(ctx, deployId)
+	if err != nil {
+		slog.ErrorContext(ctx, "fail to get cluster resources", slog.Any("error", err))
+		return false
+	}
+
+	if !clusterRes.Enable {
+		slog.WarnContext(ctx, "cluster resources unhealthy, cluster disabled")
+		return false
+	}
+
+	if clusterRes.Status == types.ClusterStatusUnavailable {
+		slog.WarnContext(ctx, "cluster resources unhealthy, cluster status unavailable")
+		return false
+	}
+
+	timePassed := time.Since(time.Unix(clusterRes.LastUpdateTime, 0))
+	if timePassed > time.Duration(d.config.Runner.HearBeatIntervalInSec*2*int(time.Second)) {
+		slog.WarnContext(ctx, "cluster resources unhealthy, last update time", slog.Any("last_update_time", clusterRes.LastUpdateTime))
+		return false
+	}
+	return true
+}
+
+func (d *deployer) IsDefaultScheduler() bool {
+	return d.kubeScheduler == nil
+}
+
+func (d *deployer) GetSharedModeResourceName(config *config.Config) string {
+	resourceName := common.DefaultResourceName
+	if !d.IsDefaultScheduler() {
+		resourceName = config.Runner.VGPUResourceReqKey
+	}
+	return resourceName
 }

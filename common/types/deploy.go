@@ -26,6 +26,8 @@ type ServiceEvent struct {
 	Message     string `json:"message"`      // event message
 	Reason      string `json:"reason"`       // event reason
 	TaskID      int64  `json:"task_id"`      // task id
+	ClusterNode string `json:"cluster_node"` // cluster node name
+	QueueName   string `json:"queue_name"`   // queue name
 }
 
 type StatRunningDeploy struct {

@@ -38,6 +38,7 @@ type Moderation interface {
 type moderationImpl struct {
 	modSvcClient rpc.ModerationSvcClient
 	cacheClient  cache.RedisClient
+	config       *config.Config
 }
 
 func NewModerationImpl(config *config.Config) Moderation {
@@ -52,13 +53,15 @@ func NewModerationImpl(config *config.Config) Moderation {
 	return &moderationImpl{
 		modSvcClient: rpc.NewModerationSvcHttpClient(fmt.Sprintf("%s:%d", config.Moderation.Host, config.Moderation.Port)),
 		cacheClient:  cacheClient,
+		config:       config,
 	}
 }
 
-func NewModerationImplWithClient(modSvcClient rpc.ModerationSvcClient, cacheClient cache.RedisClient) Moderation {
+func NewModerationImplWithClient(config *config.Config, modSvcClient rpc.ModerationSvcClient, cacheClient cache.RedisClient) Moderation {
 	return &moderationImpl{
 		modSvcClient: modSvcClient,
 		cacheClient:  cacheClient,
+		config:       config,
 	}
 }
 
@@ -121,6 +124,7 @@ func (modImpl *moderationImpl) checkSingleChunk(ctx context.Context, content, ke
 			}
 		}
 	}
+	modImpl.postCheck(ctx, result)
 	return result, nil
 }
 
@@ -135,6 +139,7 @@ func (modImpl *moderationImpl) checkBuffer(
 		return nil, err
 	}
 	// TODO: if result is sensitive, cache unsensitive chunks
+	modImpl.postCheck(ctx, result)
 	if result.IsSensitive {
 		return result, nil
 	}
@@ -205,6 +210,7 @@ func (modImpl *moderationImpl) CheckChatPrompts(ctx context.Context, messages []
 			return nil, fmt.Errorf("failed to check message content: %w", err)
 		}
 
+		modImpl.postCheck(ctx, result)
 		// If sensitive content found, return immediately
 		if result.IsSensitive {
 			slog.Debug("sensitive content found in chat message",
@@ -242,6 +248,7 @@ func (modImpl *moderationImpl) checkLLMPrompt(ctx context.Context, content, key 
 				var result rpc.CheckResult
 				if err = json.Unmarshal([]byte(cached), &result); err == nil {
 					slog.Debug("moderation check cache hit for chunk", slog.String("chunk", chunk))
+					modImpl.postCheck(ctx, &result)
 					if result.IsSensitive {
 						return &result, nil
 					} else {
@@ -271,6 +278,7 @@ func (modImpl *moderationImpl) checkLLMPrompt(ctx context.Context, content, key 
 				var result rpc.CheckResult
 				if err = json.Unmarshal([]byte(cached), &result); err == nil {
 					slog.Debug("moderation check cache hit for chunk", slog.String("chunk", chunk))
+					modImpl.postCheck(ctx, &result)
 					if result.IsSensitive {
 						return &result, nil
 					} else {
@@ -293,6 +301,7 @@ func (modImpl *moderationImpl) checkLLMPrompt(ctx context.Context, content, key 
 			if err != nil {
 				return nil, fmt.Errorf("failed to call moderation on buffer: %w", err)
 			}
+			modImpl.postCheck(ctx, result)
 			if result.IsSensitive {
 				slog.Debug("sensitive content in buffer", slog.String("reason", result.Reason), slog.String("buffer", buffer.String()))
 				return result, nil
@@ -315,6 +324,7 @@ func (modImpl *moderationImpl) checkLLMPrompt(ctx context.Context, content, key 
 		if err != nil {
 			return nil, fmt.Errorf("failed to call moderation on remaining buffer: %w", err)
 		}
+		modImpl.postCheck(ctx, result)
 		if result.IsSensitive {
 			slog.Debug("sensitive content in remaining buffer", slog.String("reason", result.Reason), slog.String("buffer", buffer.String()))
 			return result, nil
@@ -348,6 +358,8 @@ func (modImpl *moderationImpl) CheckChatStreamResponse(ctx context.Context, chun
 			slog.Any("raw data", chunk),
 			slog.Any("unmarshal chunk", chunk))
 	}
+
+	modImpl.postCheck(ctx, result)
 	return result, err
 }
 
@@ -361,5 +373,21 @@ func (modImpl *moderationImpl) CheckChatNonStreamResponse(ctx context.Context, c
 	if completion.Choices[0].Message.Content == "" {
 		return &rpc.CheckResult{IsSensitive: false}, nil
 	}
-	return modImpl.modSvcClient.PassTextCheck(ctx, commontypes.ScenarioChatDetection, completion.Choices[0].Message.Content)
+	result, err := modImpl.modSvcClient.PassTextCheck(ctx, commontypes.ScenarioChatDetection, completion.Choices[0].Message.Content)
+	if err != nil {
+		return nil, err
+	}
+	modImpl.postCheck(ctx, result)
+	return result, nil
+}
+
+func (modImpl *moderationImpl) postCheck(ctx context.Context, result *rpc.CheckResult) {
+	if result.IsSensitive {
+		slog.ErrorContext(ctx, "sensitive content found", slog.Any("reason", result.Reason))
+		// If ModerationBypassSensitiveCheck is enabled, don't block the response
+		if modImpl.config != nil && modImpl.config.AIGateway.ModerationBypassSensitiveCheck {
+			result.IsSensitive = false
+			result.Reason = ""
+		}
+	}
 }

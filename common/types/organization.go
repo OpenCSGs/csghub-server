@@ -1,5 +1,7 @@
 package types
 
+import "github.com/google/uuid"
+
 type CreateOrgReq struct {
 	// Org unique identifier
 	Name string `json:"name" example:"org_name_1" binding:"lt=30"`
@@ -114,14 +116,15 @@ type (
 
 type Organization struct {
 	// unique name of the organization
-	Name         string `json:"path"`
-	Nickname     string `json:"name,omitempty"`
-	Homepage     string `json:"homepage,omitempty"`
-	Logo         string `json:"logo,omitempty"`
-	OrgType      string `json:"org_type,omitempty"`
-	Verified     bool   `json:"verified"`
-	UserID       int64  `json:"user_id,omitempty"`
-	VerifyStatus string `json:"verify_status,omitempty"`
+	Name         string    `json:"path"`
+	Nickname     string    `json:"name,omitempty"`
+	Homepage     string    `json:"homepage,omitempty"`
+	Logo         string    `json:"logo,omitempty"`
+	OrgType      string    `json:"org_type,omitempty"`
+	Verified     bool      `json:"verified"`
+	UserID       int64     `json:"user_id,omitempty"`
+	VerifyStatus string    `json:"verify_status,omitempty"`
+	UUID         uuid.UUID `json:"uuid,omitempty"`
 }
 
 type Member struct {

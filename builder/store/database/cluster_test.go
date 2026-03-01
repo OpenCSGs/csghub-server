@@ -71,14 +71,77 @@ func TestClusterStore_BatchUpdateStatus(t *testing.T) {
 	cls2, err := store.Add(ctx, "bar", "region2", types.ConnectModeKubeConfig)
 	require.Nil(t, err)
 
+	deployStore := database.NewDeployTaskStoreWithDB(db)
+
+	err = deployStore.CreateDeploy(ctx, &database.Deploy{
+		ClusterID:  cls1.ClusterID,
+		DeployName: "deploy-1",
+		SvcName:    "svc-1",
+	})
+	require.Nil(t, err)
+
+	err = deployStore.CreateDeploy(ctx, &database.Deploy{
+		ClusterID:  cls2.ClusterID,
+		DeployName: "deploy-2",
+		SvcName:    "svc-2",
+	})
+	require.Nil(t, err)
+
+	workflowStore := database.NewArgoWorkFlowStoreWithDB(db)
+	_, err = workflowStore.CreateWorkFlow(ctx, database.ArgoWorkflow{
+		ClusterID: cls2.ClusterID,
+		TaskId:    "workflow-1",
+	})
+	require.Nil(t, err)
+
 	statusEvent := []*types.ClusterRes{
 		{
 			ClusterID: cls1.ClusterID,
 			Status:    types.ClusterStatusRunning,
+			Resources: []types.NodeResourceInfo{
+				{
+					Processes: []types.ProcessInfo{
+						{
+							DeployID:     "deploy-1",
+							SvcName:      "svc-1",
+							WorkflowName: "",
+							ClusterNode:  "node-1",
+						},
+						{
+							DeployID:     "deploy-2",
+							SvcName:      "svc-2",
+							WorkflowName: "",
+							ClusterNode:  "node-1",
+						},
+					},
+				},
+				{
+					Processes: []types.ProcessInfo{
+						{
+							DeployID:     "deploy-2",
+							SvcName:      "svc-2",
+							WorkflowName: "",
+							ClusterNode:  "node-2",
+						},
+					},
+				},
+			},
 		},
 		{
 			ClusterID: cls2.ClusterID,
 			Status:    types.ClusterStatusUnavailable,
+			Resources: []types.NodeResourceInfo{
+				{
+					Processes: []types.ProcessInfo{
+						{
+							DeployID:     "workflow-1",
+							SvcName:      "",
+							WorkflowName: "workflow-1",
+							ClusterNode:  "node-3",
+						},
+					},
+				},
+			},
 		},
 	}
 
@@ -92,6 +155,18 @@ func TestClusterStore_BatchUpdateStatus(t *testing.T) {
 	c2, err := store.ByClusterID(ctx, cls2.ClusterID)
 	require.Nil(t, err)
 	require.Equal(t, types.ClusterStatusRunning, c2.Status)
+
+	deploy1, err := deployStore.GetDeployBySvcName(ctx, "svc-1")
+	require.Nil(t, err)
+	require.Equal(t, "node-1", deploy1.ClusterNode)
+
+	deploy2, err := deployStore.GetDeployBySvcName(ctx, "svc-2")
+	require.Nil(t, err)
+	require.Equal(t, "node-1,node-2", deploy2.ClusterNode)
+
+	workflow1, err := workflowStore.FindByTaskID(ctx, "workflow-1")
+	require.Nil(t, err)
+	require.Equal(t, "node-3", workflow1.ClusterNode)
 }
 
 func TestClusterStore_ListAllNodes(t *testing.T) {

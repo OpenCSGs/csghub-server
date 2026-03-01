@@ -24,6 +24,7 @@ import (
 	"opencsg.com/csghub-server/builder/event"
 	"opencsg.com/csghub-server/builder/loki"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/tests"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -263,6 +264,15 @@ func TestDeployer_Status(t *testing.T) {
 			Status:  common.Building,
 			SvcName: "svc",
 		}
+		mockClusterInfoStore := mockdb.NewMockClusterInfoStore(t)
+		mockClusterInfoStore.EXPECT().GetClusterResources(mock.Anything, mock.Anything).
+			Return(&types.ClusterRes{
+				Enable:         true,
+				LastUpdateTime: time.Now().Unix(),
+				Status:         types.ClusterStatusRunning,
+			}, nil)
+		cfg := config.Config{}
+		cfg.Runner.HearBeatIntervalInSec = 120
 		mockRunner := mockrunner.NewMockRunner(t)
 		mockDeployTaskStore := mockdb.NewMockDeployTaskStore(t)
 		mockDeployTaskStore.EXPECT().GetDeployByID(mock.Anything, dr.DeployID).
@@ -271,6 +281,8 @@ func TestDeployer_Status(t *testing.T) {
 		d := &deployer{
 			deployTaskStore: mockDeployTaskStore,
 			imageRunner:     mockRunner,
+			clusterStore:    mockClusterInfoStore,
+			config:          &cfg,
 		}
 		mockRunner.EXPECT().Exist(mock.Anything, mock.Anything).
 			Return(&types.StatusResponse{
@@ -302,11 +314,22 @@ func TestDeployer_Status(t *testing.T) {
 		mockDeployTaskStore := mockdb.NewMockDeployTaskStore(t)
 		mockDeployTaskStore.EXPECT().GetDeployByID(mock.Anything, dr.DeployID).
 			Return(deploy, nil)
-
+		mockClusterInfoStore := mockdb.NewMockClusterInfoStore(t)
+		mockClusterInfoStore.EXPECT().GetClusterResources(mock.Anything, mock.Anything).
+			Return(&types.ClusterRes{
+				Enable:         true,
+				LastUpdateTime: time.Now().Unix(),
+				Status:         types.ClusterStatusRunning,
+			}, nil)
+		cfg := config.Config{}
+		cfg.Runner.HearBeatIntervalInSec = 120
 		d := &deployer{
 			deployTaskStore: mockDeployTaskStore,
 			imageRunner:     mockRunner,
+			clusterStore:    mockClusterInfoStore,
+			config:          &cfg,
 		}
+
 		mockRunner.EXPECT().Exist(mock.Anything, mock.Anything).
 			Return(&types.StatusResponse{
 				DeployID: 1,
@@ -336,15 +359,26 @@ func TestDeployer_Status(t *testing.T) {
 			SvcName: "svc",
 		}
 
+		mockClusterInfoStore := mockdb.NewMockClusterInfoStore(t)
+		mockClusterInfoStore.EXPECT().GetClusterResources(mock.Anything, mock.Anything).
+			Return(&types.ClusterRes{
+				Enable:         true,
+				LastUpdateTime: time.Now().Unix(),
+				Status:         types.ClusterStatusRunning,
+			}, nil)
 		mockDeployTaskStore := mockdb.NewMockDeployTaskStore(t)
 		mockDeployTaskStore.EXPECT().GetDeployByID(mock.Anything, dr.DeployID).
 			Return(deploy, nil)
 
 		mockRunner := mockrunner.NewMockRunner(t)
 
+		cfg := config.Config{}
+		cfg.Runner.HearBeatIntervalInSec = 120
 		d := &deployer{
 			deployTaskStore: mockDeployTaskStore,
 			imageRunner:     mockRunner,
+			clusterStore:    mockClusterInfoStore,
+			config:          &cfg,
 		}
 		mockRunner.EXPECT().Exist(mock.Anything, mock.Anything).
 			Return(&types.StatusResponse{
@@ -708,6 +742,9 @@ func TestDeployer_getResourceMap(t *testing.T) {
 }
 
 func TestDeployer_CheckResource(t *testing.T) {
+	config := &config.Config{}
+	config.Runner.VGPUResourceReqKey = "nvidia.com/vgpu"
+	config.Runner.VGPUMemoryReqKey = "nvidia.com/vgpumem"
 
 	cases := []struct {
 		hardware  *types.HardWare
@@ -751,7 +788,7 @@ func TestDeployer_CheckResource(t *testing.T) {
 					},
 				},
 			},
-		}, c.hardware)
+		}, c.hardware, config)
 		require.Equal(t, c.available, v, c.hardware)
 	}
 
@@ -1348,5 +1385,42 @@ func TestDeployer_startAcctMeteringRequest(t *testing.T) {
 		}
 		d.startAcctMeteringRequest(resMap, clusterMap, deploy, eventTime)
 		// Should use default replicaCount of 1
+	})
+}
+
+func TestDeployer_IsDefaultScheduler(t *testing.T) {
+	t.Run("default scheduler", func(t *testing.T) {
+		d := &deployer{
+			kubeScheduler: nil,
+		}
+		require.True(t, d.IsDefaultScheduler())
+	})
+
+	t.Run("custom scheduler", func(t *testing.T) {
+		d := &deployer{
+			kubeScheduler: &types.Scheduler{},
+		}
+		require.False(t, d.IsDefaultScheduler())
+	})
+}
+
+func TestDeployer_GetSharedModeResourceName(t *testing.T) {
+	config := &config.Config{}
+	config.Runner.VGPUResourceReqKey = "nvidia.com/vgpu"
+
+	t.Run("default scheduler", func(t *testing.T) {
+		d := &deployer{
+			kubeScheduler: nil,
+		}
+		name := d.GetSharedModeResourceName(config)
+		require.Equal(t, common.DefaultResourceName, name)
+	})
+
+	t.Run("custom scheduler", func(t *testing.T) {
+		d := &deployer{
+			kubeScheduler: &types.Scheduler{},
+		}
+		name := d.GetSharedModeResourceName(config)
+		require.Equal(t, "nvidia.com/vgpu", name)
 	})
 }

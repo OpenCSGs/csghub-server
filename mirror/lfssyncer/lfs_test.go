@@ -420,6 +420,7 @@ func (suite *LfsSyncWorkerTestSuite) TestRun_Success_HasLfsFiles() {
 			Size: 1024,
 		},
 	}, nil)
+	suite.mocks.lfsMetaObjectStore.EXPECT().BulkUpdateOrCreate(mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	suite.mocks.git.EXPECT().GetDiffBetweenTwoCommits(mock.Anything, mock.Anything).Return(&types.GiteaCallbackPushReq{}, nil)
 	suite.mocks.ossClient.EXPECT().StatObject(mock.Anything, "test-bucket", "lfs/oi/d1", mock.Anything).Return(minio.ObjectInfo{Size: 1024}, nil)
 	suite.mocks.lfsMetaObjectStore.EXPECT().UpdateOrCreate(mock.Anything, mock.Anything).Return(nil, nil)
@@ -519,6 +520,14 @@ func (suite *LfsSyncWorkerTestSuite) TestGetSyncPointers() {
 				mocks.lfsMetaObjectStore.EXPECT().FindByRepoID(ctx, repo.ID).Return(nil, errors.New("database error"))
 			} else {
 				mocks.lfsMetaObjectStore.EXPECT().FindByRepoID(ctx, repo.ID).Return(tt.lfsObjects, nil)
+				for _, obj := range tt.lfsObjects {
+					if obj.Existing {
+						mocks.ossClient.EXPECT().StatObject(ctx, "test-bucket", "lfs/"+obj.Oid[:2]+"/"+obj.Oid[2:], mock.Anything).Return(minio.ObjectInfo{Size: obj.Size}, nil)
+					} else {
+						mocks.ossClient.EXPECT().StatObject(ctx, "test-bucket", "lfs/"+obj.Oid[:2]+"/"+obj.Oid[2:], mock.Anything).Return(minio.ObjectInfo{}, errors.New("NoSuchKey"))
+					}
+				}
+				mocks.lfsMetaObjectStore.EXPECT().BulkUpdateOrCreate(mock.Anything, mock.Anything, mock.Anything).Return(nil)
 			}
 
 			pointers, err := worker.getSyncPointers(ctx, task)

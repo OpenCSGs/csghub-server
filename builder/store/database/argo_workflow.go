@@ -63,6 +63,8 @@ type ArgoWorkflow struct {
 	ResultURL    string                 `bun:"," json:"result_url"`
 	DownloadURL  string                 `bun:"," json:"download_url"`
 	FailuresURL  string                 `bun:"," json:"failures_url"`
+	ClusterNode  string                 `bun:"," json:"cluster_node"`
+	QueueName    string                 `bun:"," json:"queue_name"`
 }
 
 func (s *argoWorkFlowStoreImpl) FindByID(ctx context.Context, id int64) (WorkFlow ArgoWorkflow, err error) {
