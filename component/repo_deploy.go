@@ -835,6 +835,10 @@ func (c *repoComponentImpl) DeployUpdate(ctx context.Context, updateReq types.De
 		if err != nil {
 			return err
 		}
+		// update deploy's cluster_id together with resource_id (same as notebook update)
+		if req.ClusterID == nil {
+			req.ClusterID = &resource.ClusterID
+		}
 		if req.RuntimeFrameworkID == nil {
 			frame, err := c.runtimeFrameworksStore.FindEnabledByName(ctx, deploy.RuntimeFramework)
 			if err != nil {

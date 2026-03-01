@@ -896,6 +896,83 @@ func (h *ModelHandler) FinetuneDelete(ctx *gin.Context) {
 	httpbase.OK(ctx, nil)
 }
 
+// FinetuneUpdate  godoc
+// @Security     ApiKey
+// @Summary      Update a finetune instance
+// @Description  update finetune instance resource_id and cluster_id (deploy must be stopped first)
+// @Tags         Model
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        id path int true "finetune deploy id"
+// @Param        body body types.DeployUpdateReq true "at least resource_id to update resource and cluster"
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /models/{namespace}/{name}/finetune/{id} [put]
+func (h *ModelHandler) FinetuneUpdate(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
+		httpbase.BadRequestWithExt(ctx, err)
+		return
+	}
+	allow, err := h.repo.AllowReadAccess(ctx.Request.Context(), types.ModelRepo, namespace, name, currentUser)
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "failed to check user permission", "error", err)
+		httpbase.ServerError(ctx, errors.New("failed to check user permission"))
+		return
+	}
+	if !allow {
+		slog.Warn("user not allowed to update finetune", slog.String("namespace", namespace), slog.String("name", name), slog.Any("username", currentUser))
+		httpbase.ForbiddenError(ctx, errors.New("user is not authorized to update this finetune"))
+		return
+	}
+	deployID, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", slog.Any("error", err), slog.Any("id", ctx.Param("id")))
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	var req *types.DeployUpdateReq
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err, slog.Any("request.body", ctx.Request.Body))
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	if req.MinReplica != nil && req.MaxReplica != nil {
+		err = Validate.Struct(req)
+		if err != nil {
+			slog.ErrorContext(ctx.Request.Context(), "Bad request setting for finetune update", slog.Any("req", *req), slog.Any("err", err))
+			httpbase.BadRequest(ctx, fmt.Sprintf("Bad request setting for deploy, %v", err))
+			return
+		}
+	}
+	updateReq := types.DeployActReq{
+		RepoType:    types.ModelRepo,
+		Namespace:   namespace,
+		Name:        name,
+		CurrentUser: currentUser,
+		DeployID:    deployID,
+		DeployType:  types.FinetuneType,
+	}
+	err = h.repo.DeployUpdate(ctx.Request.Context(), updateReq, req)
+	if err != nil {
+		if errors.Is(err, errorx.ErrForbidden) {
+			slog.ErrorContext(ctx.Request.Context(), "user not allowed to update finetune", slog.String("namespace", namespace),
+				slog.String("name", name), slog.Any("username", currentUser), slog.Int64("deploy_id", deployID))
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
+		slog.ErrorContext(ctx.Request.Context(), "failed to update finetune", slog.String("namespace", namespace), slog.String("name", name), slog.Any("username", currentUser), slog.Int64("deploy_id", deployID), slog.Any("error", err))
+		httpbase.ServerError(ctx, fmt.Errorf("failed to update finetune, %w", err))
+		return
+	}
+	httpbase.OK(ctx, nil)
+}
+
 // StopDeploy    godoc
 // @Security     ApiKey
 // @Summary      Stop a model inference
