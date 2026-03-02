@@ -168,3 +168,177 @@ func TestClusterStore_BatchUpdateStatus(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, "node-3", workflow1.ClusterNode)
 }
+
+func TestClusterStore_ListAllNodes(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewClusterInfoStoreWithDB(db)
+
+	nodes, err := store.ListAllNodes(ctx)
+	require.NoError(t, err)
+	require.Empty(t, nodes)
+
+	cluster1, err := store.Add(ctx, "config-1", "region-1", types.ConnectModeKubeConfig)
+	require.NoError(t, err)
+
+	cluster2, err := store.Add(ctx, "config-2", "region-2", types.ConnectModeKubeConfig)
+	require.NoError(t, err)
+
+	node1 := &database.ClusterNode{
+		ClusterID: cluster1.ClusterID,
+		Name:      "node-1",
+		Status:    "Ready",
+		Labels:    map[string]string{"zone": "a"},
+		Hardware: types.NodeHardware{
+			TotalXPU:  4,
+			GPUVendor: "NVIDIA",
+			XPUModel:  "A100",
+			XPUMem:    "40GB",
+		},
+	}
+	_, err = db.Core.NewInsert().Model(node1).Exec(ctx)
+	require.NoError(t, err)
+
+	node2 := &database.ClusterNode{
+		ClusterID: cluster1.ClusterID,
+		Name:      "node-2",
+		Status:    "Ready",
+		Labels:    map[string]string{"zone": "b"},
+		Hardware: types.NodeHardware{
+			TotalXPU:  2,
+			GPUVendor: "NVIDIA",
+			XPUModel:  "V100",
+			XPUMem:    "32GB",
+		},
+	}
+	_, err = db.Core.NewInsert().Model(node2).Exec(ctx)
+	require.NoError(t, err)
+
+	node3 := &database.ClusterNode{
+		ClusterID: cluster2.ClusterID,
+		Name:      "node-3",
+		Status:    "NotReady",
+		Labels:    map[string]string{"zone": "c"},
+		Hardware: types.NodeHardware{
+			TotalXPU: 0,
+		},
+	}
+	_, err = db.Core.NewInsert().Model(node3).Exec(ctx)
+	require.NoError(t, err)
+
+	nodes, err = store.ListAllNodes(ctx)
+	require.NoError(t, err)
+	require.Len(t, nodes, 3)
+}
+
+func TestClusterStore_GetNodeByID(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewClusterInfoStoreWithDB(db)
+
+	// Test getting non-existent node
+	node, err := store.GetNodeByID(ctx, 99999)
+	require.NoError(t, err)
+	require.Nil(t, node)
+
+	// Create a cluster
+	cluster, err := store.Add(ctx, "test-config", "test-region", types.ConnectModeKubeConfig)
+	require.NoError(t, err)
+
+	// Insert a node
+	testNode := &database.ClusterNode{
+		ClusterID:   cluster.ClusterID,
+		Name:        "test-node",
+		Status:      "Ready",
+		Labels:      map[string]string{"zone": "a", "env": "test"},
+		EnableVXPU:  true,
+		ComputeCard: "2 x NVIDIA A100 40GB",
+		Hardware: types.NodeHardware{
+			TotalCPU:     32,
+			AvailableCPU: 28,
+			TotalMem:     256,
+			AvailableMem: 200,
+			XPUModel:     "A100",
+			TotalXPU:     2,
+			AvailableXPU: 1,
+			GPUVendor:    "NVIDIA",
+			XPUMem:       "40GB",
+		},
+	}
+	_, err = db.Core.NewInsert().Model(testNode).Exec(ctx)
+	require.NoError(t, err)
+	require.NotZero(t, testNode.ID)
+
+	// Get node by ID
+	node, err = store.GetNodeByID(ctx, testNode.ID)
+	require.NoError(t, err)
+	require.NotNil(t, node)
+
+	// Verify node data
+	require.Equal(t, testNode.ID, node.ID)
+	require.Equal(t, testNode.ClusterID, node.ClusterID)
+	require.Equal(t, testNode.Name, node.Name)
+	require.Equal(t, testNode.Status, node.Status)
+	require.Equal(t, testNode.Labels, node.Labels)
+	require.Equal(t, testNode.EnableVXPU, node.EnableVXPU)
+	require.Equal(t, testNode.ComputeCard, node.ComputeCard)
+	require.Equal(t, "test-region", node.ClusterRegion)
+
+	// Verify hardware
+	require.Equal(t, testNode.Hardware.TotalCPU, node.Hardware.TotalCPU)
+	require.Equal(t, testNode.Hardware.AvailableCPU, node.Hardware.AvailableCPU)
+	require.Equal(t, testNode.Hardware.TotalMem, node.Hardware.TotalMem)
+	require.Equal(t, testNode.Hardware.AvailableMem, node.Hardware.AvailableMem)
+	require.Equal(t, testNode.Hardware.XPUModel, node.Hardware.XPUModel)
+	require.Equal(t, testNode.Hardware.TotalXPU, node.Hardware.TotalXPU)
+	require.Equal(t, testNode.Hardware.AvailableXPU, node.Hardware.AvailableXPU)
+	require.Equal(t, testNode.Hardware.GPUVendor, node.Hardware.GPUVendor)
+	require.Equal(t, testNode.Hardware.XPUMem, node.Hardware.XPUMem)
+}
+
+func TestClusterStore_UpdateNode(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewClusterInfoStoreWithDB(db)
+
+	node, err := store.UpdateNode(ctx, 99999, true)
+	require.NoError(t, err)
+	require.Nil(t, node)
+
+	cluster, err := store.Add(ctx, "test-config", "test-region", types.ConnectModeKubeConfig)
+	require.NoError(t, err)
+
+	testNode := &database.ClusterNode{
+		ClusterID:  cluster.ClusterID,
+		Name:       "test-node",
+		Status:     "Ready",
+		EnableVXPU: false,
+		Hardware: types.NodeHardware{
+			TotalCPU:     32,
+			AvailableCPU: 28,
+			TotalMem:     256,
+			AvailableMem: 200,
+			XPUModel:     "A100",
+			TotalXPU:     2,
+			AvailableXPU: 1,
+			GPUVendor:    "NVIDIA",
+			XPUMem:       "40GB",
+		},
+	}
+	_, err = db.Core.NewInsert().Model(testNode).Exec(ctx)
+	require.NoError(t, err)
+	require.NotZero(t, testNode.ID)
+
+	updatedNode, err := store.UpdateNode(ctx, testNode.ID, true)
+	require.NoError(t, err)
+	require.NotNil(t, updatedNode)
+	require.Equal(t, testNode.ID, updatedNode.ID)
+	require.True(t, updatedNode.EnableVXPU)
+	require.Equal(t, "test-node", updatedNode.Name)
+}

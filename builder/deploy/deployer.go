@@ -42,7 +42,6 @@ type Deployer interface {
 	InstanceLogs(ctx context.Context, dr types.DeployRepo) (*MultiLogReader, error)
 	ListCluster(ctx context.Context) ([]types.ClusterRes, error)
 	GetClusterById(ctx context.Context, clusterId string) (*types.ClusterRes, error)
-	GetClusterUsageById(ctx context.Context, clusterId string) (*types.ClusterRes, error)
 	UpdateCluster(ctx context.Context, data types.ClusterRequest) (*types.UpdateClusterResponse, error)
 	UpdateDeploy(ctx context.Context, dur *types.DeployUpdateReq, deploy *database.Deploy) error
 	StartDeploy(ctx context.Context, deploy *database.Deploy) error

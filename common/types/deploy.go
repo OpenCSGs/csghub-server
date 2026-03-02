@@ -40,3 +40,14 @@ type StatRunningDeploy struct {
 	DcuNum    int `json:"dcu_num"`
 	GPGpuNum  int `json:"gpgpu_num"`
 }
+
+type ClusterDeployReq struct {
+	ClusterID    string `json:"cluster_id"`
+	ClusterNode  string `json:"cluster_node"`
+	Status       int    `json:"status"`
+	ResourceID   int    `json:"resource_id"`
+	ResourceName string `json:"resource_name"`
+	Search       string `json:"search"`
+	Per          int    `json:"per"`
+	Page         int    `json:"page"`
+}

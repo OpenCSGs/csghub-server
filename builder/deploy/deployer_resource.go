@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"math"
 	"strconv"
 	"strings"
 
@@ -67,85 +66,6 @@ func (d *deployer) GetClusterById(ctx context.Context, clusterId string) (*types
 		result.VXPUMemUsage = float64(result.TotalVXPUMem-result.AvailableVXPUMem) / float64(result.TotalVXPUMem)
 	}
 	return &result, err
-}
-
-func (d *deployer) GetClusterUsageById(ctx context.Context, clusterId string) (*types.ClusterRes, error) {
-	cluster, err := d.clusterStore.GetClusterResources(ctx, clusterId)
-	if err != nil {
-		return nil, err
-	}
-
-	res := types.ClusterRes{
-		ClusterID:      cluster.ClusterID,
-		Region:         cluster.Region,
-		Zone:           cluster.Zone,
-		Provider:       cluster.Provider,
-		Status:         cluster.Status,
-		LastUpdateTime: cluster.LastUpdateTime,
-		Enable:         cluster.Enable,
-	}
-
-	var vendorSet = make(map[string]struct{}, 0)
-	var modelsSet = make(map[string]struct{}, 0)
-
-	for _, node := range cluster.Resources {
-		res.TotalCPU += node.TotalCPU
-		res.AvailableCPU += node.AvailableCPU
-		res.TotalMem += float64(node.TotalMem)
-		res.AvailableMem += float64(node.AvailableMem)
-		res.TotalGPU += node.TotalXPU
-		res.AvailableGPU += node.AvailableXPU
-		res.TotalVXPU += node.TotalVXPU
-		res.UsedVXPUNum += node.UsedVXPUNum
-		res.TotalVXPUMem += node.TotalVXPUMem
-		res.AvailableVXPUMem += node.AvailableVXPUMem
-		if node.GPUVendor != "" {
-			vendorSet[node.GPUVendor] = struct{}{}
-			modelsSet[fmt.Sprintf("%s(%s)", node.XPUModel, node.XPUMem)] = struct{}{}
-		}
-	}
-
-	var vendor string
-	for k := range vendorSet {
-		vendor += k + ", "
-	}
-	if vendor != "" {
-		vendor = vendor[:len(vendor)-2]
-	}
-
-	var models string
-	for k := range modelsSet {
-		models += k + ", "
-	}
-	if models != "" {
-		models = models[:len(models)-2]
-	}
-
-	res.XPUVendors = vendor
-	res.XPUModels = models
-
-	res.AvailableCPU = math.Floor(res.AvailableCPU)
-	res.TotalMem = math.Floor(res.TotalMem)
-	res.AvailableMem = math.Floor(res.AvailableMem)
-	res.NodeNumber = len(cluster.Resources)
-
-	if res.TotalCPU > 0 {
-		res.CPUUsage = math.Round((res.TotalCPU-res.AvailableCPU)/res.TotalCPU*100) / 100
-	}
-	if res.TotalMem > 0 {
-		res.MemUsage = math.Round((res.TotalMem-res.AvailableMem)/res.TotalMem*100) / 100
-	}
-	if res.TotalGPU > 0 {
-		res.GPUUsage = math.Round(float64(res.TotalGPU-res.AvailableGPU)/float64(res.TotalGPU)*100) / 100
-	}
-	if res.TotalVXPU > 0 {
-		res.VXPUUsage = math.Round(float64(res.UsedVXPUNum)/float64(res.TotalVXPU)*100) / 100
-	}
-	if res.TotalVXPUMem > 0 {
-		res.VXPUMemUsage = math.Round(float64(res.TotalVXPUMem-res.AvailableVXPUMem)/float64(res.TotalVXPUMem)*100) / 100
-	}
-
-	return &res, err
 }
 
 func (d *deployer) CheckResourceAvailable(ctx context.Context, clusterId string, orderDetailID int64, hardWare *types.HardWare) (bool, error) {

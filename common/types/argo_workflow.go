@@ -177,3 +177,14 @@ type ArgoWorkFlowDeleteReq struct {
 	TaskID    string `json:"task_id"`
 	Namespace string `json:"namespace"`
 }
+
+type ClusterWFReq struct {
+	ClusterID    string `json:"cluster_id"`
+	ClusterNode  string `json:"cluster_node"`
+	Status       string `json:"status"`
+	ResourceID   int    `json:"resource_id"`
+	ResourceName string `json:"resource_name"`
+	Search       string `json:"search"`
+	Per          int    `json:"per"`
+	Page         int    `json:"page"`
+}

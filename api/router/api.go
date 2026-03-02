@@ -391,20 +391,9 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		collections.PUT("/:id/repos/:repo_id", middlewareCollection.Auth.NeedLogin, collectionHandler.UpdateCollectionRepo)
 	}
 
-	// cluster infos
-	clusterHandler, err := handler.NewClusterHandler(config)
+	err = createClusterRoutes(apiGroup, middlewareCollection, config)
 	if err != nil {
-		return nil, fmt.Errorf("fail to creating cluster handler: %w", err)
-	}
-	cluster := apiGroup.Group("/cluster")
-	{
-		cluster.GET("", middlewareCollection.Auth.NeedLogin, clusterHandler.Index)
-		cluster.GET("/usage", middlewareCollection.Auth.NeedAdmin, clusterHandler.GetClusterUsage)
-		cluster.GET("/deploys", middlewareCollection.Auth.NeedAdmin, clusterHandler.GetDeploys)
-		cluster.GET("/deploys_report", middlewareCollection.Auth.NeedAdmin, clusterHandler.GetDeploysReport)
-		cluster.GET("/:id", middlewareCollection.Auth.NeedLogin, clusterHandler.GetClusterById)
-		cluster.PUT("/:id", middlewareCollection.Auth.NeedAdmin, clusterHandler.Update)
-		cluster.GET("/public", clusterHandler.GetClusterPublic)
+		return nil, fmt.Errorf("error creating cluster routes:%w", err)
 	}
 
 	eventHandler, err := handler.NewEventHandler()
@@ -1404,6 +1393,31 @@ func createCustomValidator() error {
 	} else {
 		return fmt.Errorf("fail to register custom validation functions")
 	}
+}
+
+func createClusterRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware.MiddlewareCollection, config *config.Config) error {
+	// cluster infos
+	clusterHandler, err := handler.NewClusterHandler(config)
+	if err != nil {
+		return fmt.Errorf("fail to creating cluster handler: %w", err)
+	}
+	clusterGrp := apiGroup.Group("/cluster")
+	{
+		clusterGrp.GET("", middlewareCollection.Auth.NeedLogin, clusterHandler.Index)
+		clusterGrp.GET("/usage", middlewareCollection.Auth.NeedAdmin, clusterHandler.GetClusterUsage)
+		clusterGrp.GET("/deploys", middlewareCollection.Auth.NeedAdmin, clusterHandler.GetDeploys)
+		clusterGrp.GET("/deploys_report", middlewareCollection.Auth.NeedAdmin, clusterHandler.GetDeploysReport)
+		clusterGrp.GET("/:id", middlewareCollection.Auth.NeedLogin, clusterHandler.GetClusterById)
+		clusterGrp.PUT("/:id", middlewareCollection.Auth.NeedAdmin, clusterHandler.Update)
+		clusterGrp.GET("/public", clusterHandler.GetClusterPublic)
+	}
+
+	err = createComputingRoutes(clusterGrp, middlewareCollection, config, clusterHandler)
+	if err != nil {
+		return fmt.Errorf("error creating computing routes: %w", err)
+	}
+
+	return nil
 }
 
 func createSkillRoutes(
