@@ -54,6 +54,17 @@ func TestMultiSyncComponent_SyncAsClient(t *testing.T) {
 			Versions: []types.SyncVersion{
 				{Version: 3},
 			},
+			HasMore: true,
+		},
+	}, nil)
+	mockedClient.EXPECT().Latest(ctx, int64(3)).Return(types.SyncVersionResponse{
+		Data: struct {
+			Versions []types.SyncVersion "json:\"versions\""
+			HasMore  bool                "json:\"has_more\""
+		}{
+			Versions: []types.SyncVersion{
+				{Version: 4},
+			},
 			HasMore: false,
 		},
 	}, nil)
@@ -63,9 +74,13 @@ func TestMultiSyncComponent_SyncAsClient(t *testing.T) {
 	mc.mocks.stores.SyncVersionMock().EXPECT().Create(ctx, &database.SyncVersion{
 		Version: 3,
 	}).Return(nil)
+	mc.mocks.stores.SyncVersionMock().EXPECT().Create(ctx, &database.SyncVersion{
+		Version: 4,
+	}).Return(nil)
 	dsvs := []database.SyncVersion{
 		{RepoType: types.ModelRepo, Version: 2},
 		{RepoType: types.DatasetRepo, Version: 3},
+		{RepoType: types.SkillRepo, Version: 4},
 	}
 	mc.mocks.stores.MultiSyncMock().EXPECT().GetNotCompletedDistinct(ctx).Return(
 		dsvs, nil,
@@ -74,6 +89,7 @@ func TestMultiSyncComponent_SyncAsClient(t *testing.T) {
 	svs := []types.SyncVersion{
 		{RepoType: types.ModelRepo, Version: 2},
 		{RepoType: types.DatasetRepo, Version: 3},
+		{RepoType: types.SkillRepo, Version: 4},
 	}
 	// new model mock
 	mockedClient.EXPECT().ModelInfo(ctx, svs[0]).Return(&types.Model{
@@ -216,9 +232,72 @@ func TestMultiSyncComponent_SyncAsClient(t *testing.T) {
 		{RepositoryID: 2, WeightName: database.RecomWeightTotal, Score: 100},
 	}).Return(nil)
 
+	// new skill mock
+	dbrepo = &database.Repository{
+		Path:           "CSG_ns/user",
+		GitPath:        "skills_CSG_ns/user",
+		Name:           "user",
+		Readme:         "readme",
+		Source:         types.OpenCSGSource,
+		SyncStatus:     types.SyncStatusPending,
+		RepositoryType: types.SkillRepo,
+	}
+	mockedClient.EXPECT().SkillInfo(ctx, svs[2]).Return(&types.Skill{
+		User: types.User{Nickname: "nn"},
+		Path: "ns/user",
+		Tags: []types.RepoTag{{Name: "t3"}},
+		Scores: []types.WeightScore{{
+			WeightName: string(database.RecomWeightOp),
+			Score:      40,
+		}, {
+			WeightName: string(database.RecomWeightQuality),
+			Score:      50,
+		}, {
+			WeightName: string(database.RecomWeightDownloads),
+			Score:      60,
+		}, {
+			WeightName: string(database.RecomWeightFreshness),
+			Score:      70,
+		}, {
+			WeightName: string(database.RecomWeightTotal),
+			Score:      100,
+		}},
+	}, nil)
+	mockedClient.EXPECT().ReadMeData(ctx, svs[2]).Return("readme", nil)
+	mc.mocks.stores.RepoMock().EXPECT().UpdateOrCreateRepo(ctx, *dbrepo).Return(dbrepo, nil)
+	dbrepo.ID = 3
+	mc.mocks.stores.TagMock().EXPECT().FindOrCreate(ctx, database.Tag{
+		Name: "t3", Scope: types.CodeTagScope,
+	}).Return(
+		&database.Tag{Name: "t3", ID: 13}, nil,
+	)
+	mc.mocks.stores.RepoMock().EXPECT().DeleteAllTags(ctx, int64(3)).Return(nil)
+	mc.mocks.stores.RepoMock().EXPECT().BatchCreateRepoTags(ctx, []database.RepositoryTag{
+		{RepositoryID: 3, TagID: 13},
+	}).Return(nil)
+	mc.mocks.stores.RepoMock().EXPECT().DeleteAllFiles(ctx, int64(3)).Return(nil)
+	mockedClient.EXPECT().FileList(ctx, svs[2]).Return([]types.File{
+		{Name: "foo.go"},
+	}, nil)
+	mc.mocks.stores.FileMock().EXPECT().BatchCreate(ctx, []database.File{
+		{Name: "foo.go", ParentPath: "/", RepositoryID: 3},
+	}).Return(nil)
+	mc.mocks.stores.SkillMock().EXPECT().CreateIfNotExist(ctx, database.Skill{
+		RepositoryID: 3,
+		Repository:   dbrepo,
+	}).Return(nil, nil)
+	mc.mocks.stores.RecomMock().EXPECT().UpsertScore(ctx, []*database.RecomRepoScore{
+		{RepositoryID: 3, WeightName: database.RecomWeightOp, Score: 40},
+		{RepositoryID: 3, WeightName: database.RecomWeightQuality, Score: 50},
+		{RepositoryID: 3, WeightName: database.RecomWeightDownloads, Score: 60},
+		{RepositoryID: 3, WeightName: database.RecomWeightFreshness, Score: 70},
+		{RepositoryID: 3, WeightName: database.RecomWeightTotal, Score: 100},
+	}).Return(nil)
+
 	// Expect syncVersionStore.Complete to be called for each successful sync version
 	mc.mocks.stores.SyncVersionMock().EXPECT().Complete(ctx, dsvs[0]).Return(nil)
 	mc.mocks.stores.SyncVersionMock().EXPECT().Complete(ctx, dsvs[1]).Return(nil)
+	mc.mocks.stores.SyncVersionMock().EXPECT().Complete(ctx, dsvs[2]).Return(nil)
 
 	err := mc.SyncAsClient(context.TODO(), mockedClient)
 	require.Nil(t, err)

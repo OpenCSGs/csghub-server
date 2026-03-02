@@ -16,6 +16,7 @@ type Client interface {
 	CodeInfo(ctx context.Context, v types.SyncVersion) (*types.Code, error)
 	PromptInfo(ctx context.Context, v types.SyncVersion) (*types.PromptRes, error)
 	MCPServerInfo(ctx context.Context, v types.SyncVersion) (*types.MCPServer, error)
+	SkillInfo(ctx context.Context, v types.SyncVersion) (*types.Skill, error)
 	ReadMeData(ctx context.Context, v types.SyncVersion) (string, error)
 	FileList(ctx context.Context, v types.SyncVersion) ([]types.File, error)
 	Diff(ctx context.Context, req types.RemoteDiffReq) ([]types.RemoteDiffs, error)
@@ -94,6 +95,19 @@ func (c *commonClient) MCPServerInfo(ctx context.Context, v types.SyncVersion) (
 	err := c.rpcClent.Get(ctx, url, &res)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get mcpserver info, cause: %w", err)
+	}
+	return &res.Data, nil
+}
+
+func (c *commonClient) SkillInfo(ctx context.Context, v types.SyncVersion) (*types.Skill, error) {
+	namespace, name, _ := strings.Cut(v.RepoPath, "/")
+	url := fmt.Sprintf("/api/v1/skills/%s/%s?need_multi_sync=true", namespace, name)
+	var res struct {
+		Data types.Skill `json:"data"`
+	}
+	err := c.rpcClent.Get(ctx, url, &res)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get skill info, cause: %w", err)
 	}
 	return &res.Data, nil
 }
