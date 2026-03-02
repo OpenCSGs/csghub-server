@@ -1,0 +1,64 @@
+FROM docker.m.daocloud.io/rocm/pytorch:rocm7.1_ubuntu22.04_py3.11_pytorch_release_2.9.1
+
+# Set the working directory
+WORKDIR /app
+
+# Set bash as the default shell
+ENV SHELL=/bin/bash \
+    JUPYTERHUB_SERVICE_PREFIX=/proxy/ \
+    GRADIO_ROOT_PATH=/proxy/7860/ \
+    TZ=Asia/Shanghai \
+    NCCL_IB_DISABLE=1 NCCL_P2P_DISABLE=1 \
+    HF_HOME=/workspace/.cache \
+    DEBIAN_FRONTEND=noninteractive
+
+# Build with some basic utilities
+RUN sed -i 's|http://archive.ubuntu.com/ubuntu|http://mirrors.aliyun.com/ubuntu|g' /etc/apt/sources.list && \
+    sed -i 's|http://security.ubuntu.com/ubuntu|http://mirrors.aliyun.com/ubuntu|g' /etc/apt/sources.list && \
+    sed -i 's|http://ports.ubuntu.com/ubuntu-ports|https://mirrors.aliyun.com/ubuntu-ports/|g' /etc/apt/sources.list && \
+    apt-get update && apt-get install -y --no-install-recommends \
+    software-properties-common && \
+    add-apt-repository ppa:deadsnakes/ppa && \
+    apt-get update && apt-get install -y --no-install-recommends \
+    git git-lfs supervisor unzip tzdata && \
+    curl -sS https://bootstrap.pypa.io/get-pip.py | python3.11 && \
+    ln -sf /usr/bin/python3.11 /usr/bin/python3 && \
+    ln -sf /usr/local/bin/pip3.11 /usr/local/bin/pip && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Set timezone
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && \
+    echo $TZ > /etc/timezone && \
+    dpkg-reconfigure -f noninteractive tzdata
+    
+RUN pip config set global.index-url https://mirrors.aliyun.com/pypi/simple
+# Install the appropriate torch version 
+RUN pip install --no-cache-dir jupyterlab jupyter-server-proxy==4.4.0 \
+    && pip uninstall -y gradio && pip install --no-cache-dir https://git-devops.opencsg.com/opensource/gradio/-/raw/main/gradio-5.31.0-py3-none-any.whl
+
+RUN pip install pip packaging wheel setuptools Cython --no-cache-dir
+
+RUN git clone --depth 1 https://gitee.com/xzgan/LLaMA-Factory.git --branch v0.9.4   --single-branch /app && cd /app && \
+    pip install --no-cache-dir -e ".[metrics,deepspeed]"
+# Create a working directory
+WORKDIR /etc/csghub
+
+# Setup supervisord
+COPY llama-factory/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY llama-factory/jupyter_notebook_config.py /root/.jupyter/jupyter_notebook_config.py
+COPY llama-factory/ /etc/csghub/
+
+RUN mkdir -p /var/log/supervisord && \
+    chmod +x /etc/csghub/*.sh && \
+    chmod +x /etc/csghub/*.py && \
+    mkdir -p /root/.jupyter/lab/user-settings/@jupyterlab/apputils-extension && \
+	echo '{"theme":"JupyterLab Dark"}' > /root/.jupyter/lab/user-settings/@jupyterlab/apputils-extension/themes.jupyterlab-settings && \
+	mkdir -p /root/.jupyter/lab/user-settings/@jupyterlab/notebook-extension && \
+	echo '{"codeCellConfig":{"lineNumbers":true }}' > /root/.jupyter/lab/user-settings/@jupyterlab/notebook-extension/tracker.jupyterlab-settings
+
+
+
+# Create a working directory
+WORKDIR /workspace/
+EXPOSE 8000
+ENTRYPOINT ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
