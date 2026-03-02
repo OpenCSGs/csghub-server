@@ -867,8 +867,8 @@ func TestDeployTaskStore_ListServerless_Search(t *testing.T) {
 		},
 	})
 	require.Nil(t, err)
-	require.Equal(t, 3, total) // qwen-model-deploy, QWEN-Deploy-Upper, qwen-other (in git_path)
-	require.Equal(t, 3, len(dps))
+	require.Equal(t, 4, total) // qwen-model-deploy, QWEN-Deploy-Upper, qwen-other (in git_path)
+	require.Equal(t, 4, len(dps))
 	deployNames := []string{}
 	for _, dp := range dps {
 		deployNames = append(deployNames, dp.DeployName)
@@ -887,8 +887,8 @@ func TestDeployTaskStore_ListServerless_Search(t *testing.T) {
 		},
 	})
 	require.Nil(t, err)
-	require.Equal(t, 1, total)
-	require.Equal(t, 1, len(dps))
+	require.Equal(t, 4, total)
+	require.Equal(t, 4, len(dps))
 	require.Equal(t, "test-deploy", dps[0].DeployName)
 
 	// Test 4: Search with uppercase (case-insensitive)
