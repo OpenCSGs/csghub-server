@@ -28,6 +28,9 @@ func NewAccountingEventComponent() AccountingEventComponent {
 
 func (a *accountingEventComponentImpl) AddNewAccountingEvent(ctx context.Context, event *types.MeteringEvent, isDuplicated bool) error {
 	_, err := a.ae.GetByEventID(ctx, event.Uuid)
+ if err != nil {
+     log.Printf("Error: %v", err)
+ }
 	if errors.Is(err, sql.ErrNoRows) {
 		body := make(map[string]string)
 		elem := reflect.ValueOf(event).Elem()
