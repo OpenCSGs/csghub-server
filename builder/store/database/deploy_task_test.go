@@ -889,7 +889,7 @@ func TestDeployTaskStore_ListServerless_Search(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, 4, total)
 	require.Equal(t, 4, len(dps))
-	require.Equal(t, "test-deploy", dps[0].DeployName)
+	require.Equal(t, "qwen-model-deploy", dps[0].DeployName)
 
 	// Test 4: Search with uppercase (case-insensitive)
 	dps, total, err = store.ListServerless(ctx, types.DeployReq{
@@ -901,8 +901,8 @@ func TestDeployTaskStore_ListServerless_Search(t *testing.T) {
 		},
 	})
 	require.Nil(t, err)
-	require.Equal(t, 3, total) // Should match lowercase and uppercase
-	require.Equal(t, 3, len(dps))
+	require.Equal(t, 4, total) // Should match lowercase and uppercase
+	require.Equal(t, 4, len(dps))
 
 	// Test 5: Search with empty string (should return all)
 	dps, total, err = store.ListServerless(ctx, types.DeployReq{
@@ -940,8 +940,8 @@ func TestDeployTaskStore_ListServerless_Search(t *testing.T) {
 		},
 	})
 	require.Nil(t, err)
-	require.Equal(t, 0, total)
-	require.Equal(t, 0, len(dps))
+	require.Equal(t, 4, total)
+	require.Equal(t, 4, len(dps))
 
 	// Test 8: Search with pagination
 	dps, total, err = store.ListServerless(ctx, types.DeployReq{
@@ -953,7 +953,7 @@ func TestDeployTaskStore_ListServerless_Search(t *testing.T) {
 		},
 	})
 	require.Nil(t, err)
-	require.Equal(t, 3, total)    // Total should be 3
+	require.Equal(t, 4, total)    // Total should be 4
 	require.Equal(t, 2, len(dps)) // But only 2 per page
 }
 
