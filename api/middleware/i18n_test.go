@@ -58,6 +58,14 @@ func TestLocalizedErrorMiddleware(t *testing.T) {
 		httpbase.BadRequestWithExt(c, errorx.NewCustomError("REQ", 1, nil, errorx.Ctx().Set("param", "test")))
 	})
 
+	// Test case 8: 206 Partial Content response (range request)
+	router.GET("/range", func(c *gin.Context) {
+		body := []byte{0xe0, 0x8a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
+		c.Header("Content-Range", "bytes 0-7/1503300328")
+		c.Header("Content-Length", "8")
+		c.Data(http.StatusPartialContent, "application/octet-stream", body)
+	})
+
 	// Run tests
 	t.Run("SkipRoute", func(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/healthz", nil)
@@ -131,6 +139,18 @@ func TestLocalizedErrorMiddleware(t *testing.T) {
 		_ = json.Unmarshal(w.Body.Bytes(), &resp)
 		assert.Equal(t, "REQ-1", resp.Msg)
 		assert.NotNil(t, resp.Context)
+	})
+
+	t.Run("PartialContentResponse", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/range", nil)
+		req.Header.Set("Range", "bytes=0-7")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusPartialContent, w.Code)
+		// Body must be delivered intact — not silently discarded by the middleware
+		expected := []byte{0xe0, 0x8a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
+		assert.Equal(t, expected, w.Body.Bytes())
 	})
 }
 

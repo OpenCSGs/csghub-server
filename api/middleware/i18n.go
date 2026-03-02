@@ -151,10 +151,10 @@ type bodyWriter struct {
 }
 
 func (w *bodyWriter) Write(b []byte) (int, error) {
-	if w.Status() == 200 || w.isSkipped {
-		return w.ResponseWriter.Write(b) // If status is 200, write directly to the ResponseWriter
+	if w.Status() < 400 || w.isSkipped {
+		return w.ResponseWriter.Write(b)
 	} else {
-		return w.body.Write(b) // If status is not 200, write to the buffer
+		return w.body.Write(b)
 	}
 }
 
