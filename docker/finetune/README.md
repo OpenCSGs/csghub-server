@@ -50,6 +50,13 @@ docker buildx build --platform linux/amd64,linux/arm64 \
   -t ${OPENCSG_ACR}/opencsghq/ms-swift:latest \
   -f Dockerfile.ms-swift \
   --push .
+export BUILDX_NO_DEFAULT_ATTESTATIONS=1
+export IMAGE_TAG=v0.9.4
+docker buildx build --platform linux/amd64 \
+  -t ${OPENCSG_ACR}/opencsghq/llama-factory-amd:${IMAGE_TAG} \
+  -t ${OPENCSG_ACR}/opencsghq/llama-factory-amd:latest \
+  -f Dockerfile.llamafactory-amd \
+  --push .
 ```
 
 _Note: The above command will create `linux/amd64` and `linux/arm64` images with the tags `${IMAGE_TAG}` and `latest` at the same time._
