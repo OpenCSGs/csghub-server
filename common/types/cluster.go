@@ -218,3 +218,22 @@ type UpdateClusterNodeReq struct {
 	ID         int64 `json:"id"`
 	EnableVXPU bool  `json:"enable_vxpu"`
 }
+
+type UpdateNodeLabelReq struct {
+	ReservedBy string `json:"reserved_by"`
+	Exclusive  bool   `json:"exclusive"`
+}
+
+type NodeLabel struct {
+	ClusterID  string `json:"cluster_id"`
+	NodeName   string `json:"node_name"`
+	ReservedBy string `json:"reserved_by"`
+	Exclusive  bool   `json:"exclusive"`
+}
+
+type SetNodeAccessModeReq struct {
+	NodeID    int64  `json:"-"`
+	UserName  string `json:"user_name"`
+	OrgName   string `json:"org_name"`
+	Exclusive bool   `json:"exclusive"`
+}

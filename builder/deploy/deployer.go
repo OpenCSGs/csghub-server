@@ -56,6 +56,7 @@ type Deployer interface {
 	GetWorkflowLogsNonStream(ctx context.Context, req types.FinetuneLogReq) (*loki.LokiQueryResponse, error)
 	IsDefaultScheduler() bool
 	GetSharedModeResourceName(config *config.Config) string
+	LabelNode(ctx context.Context, req *types.NodeLabel) error
 }
 
 func (d *deployer) GenerateUniqueSvcName(dr types.DeployRepo) string {

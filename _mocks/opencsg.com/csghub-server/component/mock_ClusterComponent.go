@@ -629,6 +629,53 @@ func (_c *MockClusterComponent_QueryClusterWorkflows_Call) RunAndReturn(run func
 	return _c
 }
 
+// SetClusterNodeAccessMode provides a mock function with given fields: ctx, req
+func (_m *MockClusterComponent) SetClusterNodeAccessMode(ctx context.Context, req types.SetNodeAccessModeReq) error {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetClusterNodeAccessMode")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.SetNodeAccessModeReq) error); ok {
+		r0 = rf(ctx, req)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockClusterComponent_SetClusterNodeAccessMode_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SetClusterNodeAccessMode'
+type MockClusterComponent_SetClusterNodeAccessMode_Call struct {
+	*mock.Call
+}
+
+// SetClusterNodeAccessMode is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.SetNodeAccessModeReq
+func (_e *MockClusterComponent_Expecter) SetClusterNodeAccessMode(ctx interface{}, req interface{}) *MockClusterComponent_SetClusterNodeAccessMode_Call {
+	return &MockClusterComponent_SetClusterNodeAccessMode_Call{Call: _e.mock.On("SetClusterNodeAccessMode", ctx, req)}
+}
+
+func (_c *MockClusterComponent_SetClusterNodeAccessMode_Call) Run(run func(ctx context.Context, req types.SetNodeAccessModeReq)) *MockClusterComponent_SetClusterNodeAccessMode_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.SetNodeAccessModeReq))
+	})
+	return _c
+}
+
+func (_c *MockClusterComponent_SetClusterNodeAccessMode_Call) Return(_a0 error) *MockClusterComponent_SetClusterNodeAccessMode_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockClusterComponent_SetClusterNodeAccessMode_Call) RunAndReturn(run func(context.Context, types.SetNodeAccessModeReq) error) *MockClusterComponent_SetClusterNodeAccessMode_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Update provides a mock function with given fields: ctx, data
 func (_m *MockClusterComponent) Update(ctx context.Context, data types.ClusterRequest) (*types.ClusterRes, error) {
 	ret := _m.Called(ctx, data)

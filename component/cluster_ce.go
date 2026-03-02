@@ -28,3 +28,7 @@ func (c *clusterComponentImpl) QueryClusterWorkflows(ctx context.Context, req ty
 func (c *clusterComponentImpl) UpdateClusterNodeVXPU(ctx context.Context, req types.UpdateClusterNodeReq) (*database.ClusterNodeWithRegion, error) {
 	return nil, nil
 }
+
+func (c *clusterComponentImpl) SetClusterNodeAccessMode(ctx context.Context, req types.SetNodeAccessModeReq) error {
+	return nil
+}

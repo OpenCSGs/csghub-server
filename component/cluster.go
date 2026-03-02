@@ -10,6 +10,8 @@ import (
 	"net/url"
 	"time"
 
+	"opencsg.com/csghub-server/builder/rpc"
+
 	units "github.com/dustin/go-humanize"
 	"opencsg.com/csghub-server/builder/accounting"
 	"opencsg.com/csghub-server/builder/deploy"
@@ -31,6 +33,7 @@ type ClusterComponent interface {
 	QueryClusterDeploys(ctx context.Context, req types.ClusterDeployReq) ([]database.Deploy, int, error)
 	QueryClusterWorkflows(ctx context.Context, req types.ClusterWFReq) ([]database.ArgoWorkflow, int, error)
 	UpdateClusterNodeVXPU(ctx context.Context, req types.UpdateClusterNodeReq) (*database.ClusterNodeWithRegion, error)
+	SetClusterNodeAccessMode(ctx context.Context, req types.SetNodeAccessModeReq) error
 }
 
 func NewClusterComponent(config *config.Config) (ClusterComponent, error) {
@@ -44,6 +47,9 @@ func NewClusterComponent(config *config.Config) (ClusterComponent, error) {
 		return nil, err
 	}
 	c.acctClient = acctClient
+	usrClient := rpc.NewUserSvcHttpClient(fmt.Sprintf("%s:%d", config.User.Host, config.User.Port),
+		rpc.AuthWithApiKey(config.APIToken))
+	c.usrClient = usrClient
 	c.resStore = database.NewSpaceResourceStore()
 	c.workflowStore = database.NewArgoWorkFlowStore()
 	return c, nil
@@ -57,6 +63,7 @@ type clusterComponentImpl struct {
 	config          *config.Config
 	resStore        database.SpaceResourceStore
 	workflowStore   database.ArgoWorkFlowStore
+	usrClient       rpc.UserSvcClient
 }
 
 func (c *clusterComponentImpl) Index(ctx context.Context) ([]types.ClusterRes, error) {

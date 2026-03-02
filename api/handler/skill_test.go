@@ -16,7 +16,7 @@ type SkillTester struct {
 	*testutil.GinTester
 	handler *SkillHandler
 	mocks   struct {
-		skill      *mockcomponent.MockSkillComponent
+		skill     *mockcomponent.MockSkillComponent
 		sensitive *mockcomponent.MockSensitiveComponent
 		repo      *mockcomponent.MockRepoComponent
 	}
@@ -28,7 +28,7 @@ func NewSkillTester(t *testing.T) *SkillTester {
 	tester.mocks.sensitive = mockcomponent.NewMockSensitiveComponent(t)
 	tester.mocks.repo = mockcomponent.NewMockRepoComponent(t)
 	tester.handler = &SkillHandler{
-		skill:      tester.mocks.skill,
+		skill:     tester.mocks.skill,
 		sensitive: tester.mocks.sensitive,
 		repo:      tester.mocks.repo,
 	}

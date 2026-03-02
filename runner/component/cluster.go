@@ -23,6 +23,7 @@ type clusterComponentImpl struct {
 type ClusterComponent interface {
 	ByClusterID(ctx context.Context, clusterId string) (clusterInfo database.ClusterInfo, err error)
 	GetResourceByID(ctx context.Context, clusterId string) (types.ResourceStatus, map[string]types.NodeResourceInfo, error)
+	LabelNode(ctx context.Context, req *types.NodeLabel) error
 }
 
 func NewClusterComponent(config *config.Config, clusterPool cluster.Pool) ClusterComponent {

@@ -33,6 +33,13 @@ type ClusterInfoStore interface {
 	ListAllNodes(ctx context.Context) ([]ClusterNodeWithRegion, error)
 	GetNodeByID(ctx context.Context, id int64) (*ClusterNodeWithRegion, error)
 	UpdateNode(ctx context.Context, id int64, enableVXPU bool) (*ClusterNode, error)
+	GetClusterNodeByID(ctx context.Context, id int64) (*ClusterNode, error)
+	UpdateClusterNodeByNode(ctx context.Context, node ClusterNode) error
+	AddNodeOwnership(ctx context.Context, ownership ClusterNodeOwnership) error
+	DeleteNodeOwnership(ctx context.Context, clusterNodeID int64) error
+	GetNodeOwnership(ctx context.Context, clusterNodeID int64) (*ClusterNodeOwnership, error)
+	UpdateNodeOwnership(ctx context.Context, ownership ClusterNodeOwnership) error
+	ExecuteInTx(ctx context.Context, fn func(ctx context.Context, store ClusterInfoStore) error) error
 }
 
 func NewClusterInfoStore() ClusterInfoStore {
@@ -75,6 +82,15 @@ type ClusterNode struct {
 	Hardware    types.NodeHardware  `bun:",type:jsonb,nullzero" json:"hardware"`
 	Processes   []types.ProcessInfo `bun:",type:jsonb,nullzero" json:"processes"`
 	Exclusive   bool                `bun:",default:false" json:"exclusive"`
+	times
+}
+
+type ClusterNodeOwnership struct {
+	ID            int64  `bun:",pk,autoincrement" json:"id"`
+	ClusterNodeID int64  `bun:",notnull" json:"cluster_node_id"`
+	ClusterID     string `bun:",notnull" json:"cluster_id"`
+	UserUUID      string `bun:",nullzero" json:"user_uuid"`
+	OrgUUID       string `bun:",nullzero" json:"org_uuid"`
 	times
 }
 
@@ -422,4 +438,57 @@ func (s *clusterInfoStoreImpl) UpdateNode(ctx context.Context, id int64, enableV
 	}
 
 	return node, nil
+}
+
+func (s *clusterInfoStoreImpl) GetClusterNodeByID(ctx context.Context, id int64) (*ClusterNode, error) {
+	var node ClusterNode
+	err := s.db.Operator.Core.NewSelect().Model(&node).Where("id = ?", id).Scan(ctx)
+	if err != nil {
+		return nil, errorx.HandleDBError(err, nil)
+	}
+	return &node, nil
+}
+
+func (s *clusterInfoStoreImpl) UpdateClusterNodeByNode(ctx context.Context, node ClusterNode) error {
+	_, err := s.db.Operator.Core.NewUpdate().Model(&node).WherePK().Exec(ctx)
+	return errorx.HandleDBError(err, nil)
+}
+
+func (s *clusterInfoStoreImpl) AddNodeOwnership(ctx context.Context, ownership ClusterNodeOwnership) error {
+	_, err := s.db.Operator.Core.NewInsert().Model(&ownership).Exec(ctx)
+	return errorx.HandleDBError(err, nil)
+}
+
+func (s *clusterInfoStoreImpl) DeleteNodeOwnership(ctx context.Context, clusterNodeID int64) error {
+	_, err := s.db.Operator.Core.NewDelete().Model(&ClusterNodeOwnership{}).Where("cluster_node_id = ?", clusterNodeID).Exec(ctx)
+	return errorx.HandleDBError(err, nil)
+}
+
+func (s *clusterInfoStoreImpl) GetNodeOwnership(ctx context.Context, clusterNodeID int64) (*ClusterNodeOwnership, error) {
+	var ownership ClusterNodeOwnership
+	err := s.db.Operator.Core.NewSelect().Model(&ownership).Where("cluster_node_id = ?", clusterNodeID).Scan(ctx)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, errorx.HandleDBError(err, nil)
+	}
+	return &ownership, nil
+}
+
+func (s *clusterInfoStoreImpl) UpdateNodeOwnership(ctx context.Context, ownership ClusterNodeOwnership) error {
+	_, err := s.db.Operator.Core.NewUpdate().Model(&ownership).WherePK().Exec(ctx)
+	return errorx.HandleDBError(err, nil)
+}
+
+func (s *clusterInfoStoreImpl) ExecuteInTx(ctx context.Context, fn func(ctx context.Context, store ClusterInfoStore) error) error {
+	return s.db.RunInTx(ctx, func(ctx context.Context, tx Operator) error {
+		txStore := &clusterInfoStoreImpl{
+			db: &DB{
+				Operator: tx,
+				BunDB:    s.db.BunDB,
+			},
+		}
+		return fn(ctx, txStore)
+	})
 }

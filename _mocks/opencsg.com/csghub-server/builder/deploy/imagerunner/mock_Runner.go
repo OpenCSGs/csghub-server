@@ -475,6 +475,53 @@ func (_c *MockRunner_InstanceLogs_Call) RunAndReturn(run func(context.Context, *
 	return _c
 }
 
+// LabelNode provides a mock function with given fields: ctx, req
+func (_m *MockRunner) LabelNode(ctx context.Context, req *types.NodeLabel) error {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for LabelNode")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, *types.NodeLabel) error); ok {
+		r0 = rf(ctx, req)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockRunner_LabelNode_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'LabelNode'
+type MockRunner_LabelNode_Call struct {
+	*mock.Call
+}
+
+// LabelNode is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req *types.NodeLabel
+func (_e *MockRunner_Expecter) LabelNode(ctx interface{}, req interface{}) *MockRunner_LabelNode_Call {
+	return &MockRunner_LabelNode_Call{Call: _e.mock.On("LabelNode", ctx, req)}
+}
+
+func (_c *MockRunner_LabelNode_Call) Run(run func(ctx context.Context, req *types.NodeLabel)) *MockRunner_LabelNode_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*types.NodeLabel))
+	})
+	return _c
+}
+
+func (_c *MockRunner_LabelNode_Call) Return(_a0 error) *MockRunner_LabelNode_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockRunner_LabelNode_Call) RunAndReturn(run func(context.Context, *types.NodeLabel) error) *MockRunner_LabelNode_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ListCluster provides a mock function with given fields: ctx
 func (_m *MockRunner) ListCluster(ctx context.Context) ([]types.ClusterRes, error) {
 	ret := _m.Called(ctx)
