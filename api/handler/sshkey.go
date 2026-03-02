@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
 	"opencsg.com/csghub-server/component"
@@ -56,7 +57,7 @@ func (h *SSHKeyHandler) Create(ctx *gin.Context) {
 	_, err := h.sc.CheckRequestV2(ctx.Request.Context(), &req)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "failed to check sensitive request", slog.Any("error", err))
-		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
+		httpbase.BadRequestWithExt(ctx, errorx.ErrSensitiveInfoNotAllowed)
 		return
 	}
 	currentUser := httpbase.GetCurrentUser(ctx)

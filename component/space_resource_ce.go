@@ -19,6 +19,7 @@ func NewSpaceResourceComponent(config *config.Config) (SpaceResourceComponent, e
 		return nil, err
 	}
 	c.accountComponent = ac
+	c.config = config
 	return c, nil
 }
 
@@ -27,6 +28,7 @@ type spaceResourceComponentImpl struct {
 	deployer           deploy.Deployer
 	userStore          database.UserStore
 	accountComponent   AccountingComponent
+	config             *config.Config
 }
 
 func (c *spaceResourceComponentImpl) updatePriceInfo(req *types.SpaceResourceIndexReq, resources []types.SpaceResource) error {

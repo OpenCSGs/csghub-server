@@ -694,19 +694,21 @@ func (s *repoStoreImpl) PublicToUser(ctx context.Context, repoType types.Reposit
 		}
 	}
 
+	needDistinct := false
 	if filter.Source != "" {
 		if filter.Source == "local" {
 			q.Join("LEFT JOIN mirrors ON mirrors.repository_id = repository.id").
 				Join("LEFT JOIN mirror_tasks ON mirror_tasks.mirror_id = mirrors.id").
 				Where("mirror_tasks.status = ? or repository.source = ?", types.MirrorLfsSyncFinished, "local")
+			needDistinct = true
 		} else {
 			q.Where("repository.source = ?", filter.Source)
 		}
 	}
-
 	if filter.XnetMigrationStatus != nil {
 		q.Join("LEFT JOIN xnet_migration_tasks ON xnet_migration_tasks.id = repository.current_xnet_migration_task_id").
 			Where("xnet_migration_tasks.status = ?", *filter.XnetMigrationStatus)
+		needDistinct = true
 	}
 
 	// model tree filter
@@ -738,6 +740,17 @@ func (s *repoStoreImpl) PublicToUser(ctx context.Context, repoType types.Reposit
 				q.Where(fmt.Sprintf("%s.group = ?", asTag), tag.Group)
 			}
 		}
+		needDistinct = true
+	}
+
+	if filter.Sort == "trending" {
+		q.Join("LEFT JOIN recom_repo_scores ON repository.id = recom_repo_scores.repository_id")
+		q.Where("recom_repo_scores.weight_name = ?", RecomWeightTotal)
+		q.ColumnExpr(`COALESCE(recom_repo_scores.score, 0) AS popularity`)
+		needDistinct = true
+	}
+
+	if needDistinct {
 		q.Distinct()
 	}
 
@@ -752,11 +765,6 @@ func (s *repoStoreImpl) PublicToUser(ctx context.Context, repoType types.Reposit
 		return
 	}
 
-	if filter.Sort == "trending" {
-		q.Join("LEFT JOIN recom_repo_scores ON repository.id = recom_repo_scores.repository_id")
-		q.Where("recom_repo_scores.weight_name = ?", RecomWeightTotal)
-		q.ColumnExpr(`COALESCE(recom_repo_scores.score, 0) AS popularity`)
-	}
 	q.Order(sortBy[filter.Sort])
 
 	count, err = q.Count(ctx)

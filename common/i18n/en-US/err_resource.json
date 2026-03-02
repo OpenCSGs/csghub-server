@@ -1,0 +1,8 @@
+{
+    "error.RESOURCE-ERR-0": {
+        "other": "The resource was not found."
+    },
+    "error.RESOURCE-ERR-1": {
+        "other": "The resource is temporarily unavailable."
+    }
+}

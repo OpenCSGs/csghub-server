@@ -1,0 +1,11 @@
+{
+    "error.REPO-ERR-0": {
+        "other": "仓库名称已存在"
+    },
+    "error.REPO-ERR-1": {
+        "other": "仓库名称无效"
+    },
+    "error.REPO-ERR-2": {
+        "other": "命名空间不存在"
+    }
+}

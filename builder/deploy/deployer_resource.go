@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -96,7 +97,9 @@ func (d *deployer) CheckResourceAvailable(ctx context.Context, clusterId string,
 			Set("region", clusterResources.Region))
 	}
 
-	if clusterResources.ResourceStatus != types.StatusUncertain && !CheckResource(clusterResources, hardWare) {
+	if d.IsDefaultScheduler() &&
+		clusterResources.ResourceStatus != types.StatusUncertain &&
+		!CheckResource(clusterResources, hardWare, d.config) {
 		err := fmt.Errorf("required resource on cluster %s is not enough with resource status %s",
 			clusterId, clusterResources.ResourceStatus)
 		return false, errorx.NotEnoughResource(err, errorx.Ctx().
@@ -107,7 +110,7 @@ func (d *deployer) CheckResourceAvailable(ctx context.Context, clusterId string,
 	return true, nil
 }
 
-func CheckResource(clusterResources *types.ClusterRes, hardware *types.HardWare) bool {
+func CheckResource(clusterResources *types.ClusterRes, hardware *types.HardWare, config *config.Config) bool {
 	if hardware == nil {
 		slog.Error("hardware is empty for check resource", slog.Any("clusterResources", clusterResources))
 		return false
@@ -118,17 +121,17 @@ func CheckResource(clusterResources *types.ClusterRes, hardware *types.HardWare)
 		return false
 	}
 	if hardware.Replicas > 1 {
-		return checkMultiNodeResource(mem, clusterResources, hardware)
+		return checkMultiNodeResource(mem, clusterResources, hardware, config)
 	} else {
-		return checkSingleNodeResource(mem, clusterResources, hardware)
+		return checkSingleNodeResource(mem, clusterResources, hardware, config)
 	}
 }
 
 // check resource for sigle node
-func checkSingleNodeResource(mem int, clusterResources *types.ClusterRes, hardware *types.HardWare) bool {
+func checkSingleNodeResource(mem int, clusterResources *types.ClusterRes, hardware *types.HardWare, config *config.Config) bool {
 	for _, node := range clusterResources.Resources {
 		if float32(mem) <= node.AvailableMem {
-			isAvailable := checkNodeResource(node, hardware)
+			isAvailable := checkNodeResource(node, hardware, config)
 			if isAvailable {
 				// if true return, otherwise continue check next node
 				return true
@@ -138,11 +141,11 @@ func checkSingleNodeResource(mem int, clusterResources *types.ClusterRes, hardwa
 	return false
 }
 
-func checkMultiNodeResource(mem int, clusterResources *types.ClusterRes, hardware *types.HardWare) bool {
+func checkMultiNodeResource(mem int, clusterResources *types.ClusterRes, hardware *types.HardWare, config *config.Config) bool {
 	ready := 0
 	for _, node := range clusterResources.Resources {
 		if float32(mem) <= node.AvailableMem {
-			isAvailable := checkNodeResource(node, hardware)
+			isAvailable := checkNodeResource(node, hardware, config)
 			if isAvailable {
 				ready++
 				if ready >= hardware.Replicas {

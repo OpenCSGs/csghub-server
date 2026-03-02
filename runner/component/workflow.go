@@ -213,7 +213,14 @@ func (wc *workFlowComponentImpl) UpdateWorkflow(ctx context.Context, update *v1a
 					oldwf.Reason = string(logs)
 				}
 			}
-
+		}
+		// get node name of pod
+		pod, err := cluster.Client.CoreV1().Pods(update.Namespace).Get(ctx, update.Name, v1.GetOptions{})
+		if err != nil {
+			slog.WarnContext(ctx, "failed to get pod of workflow", slog.Any("error", err),
+				slog.Any("pod name", update.Name), slog.Any("namespace", update.Namespace))
+		} else {
+			oldwf.ClusterNode = pod.Spec.NodeName
 		}
 	}
 
@@ -262,7 +269,7 @@ func generateWorkflow(req types.ArgoWorkFlowReq, config *config.Config) (*v1alph
 	applier := sched.NewApplier(req.Scheduler)
 	templates := []v1alpha1.Template{}
 	for _, v := range req.Templates {
-		resReq, _, nodeAffinity := generateResources(v.HardWare, req.Nodes)
+		resReq, _, nodeAffinity := generateResources(v.HardWare, req.Nodes, config)
 		environments := []corev1.EnvVar{}
 		for key, value := range v.Env {
 			environments = append(environments, corev1.EnvVar{Name: key, Value: value})

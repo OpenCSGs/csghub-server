@@ -80,6 +80,7 @@ func TestEvaluationComponent_CreateEvaluation(t *testing.T) {
 			HFPath:        "Rowan/hellaswag",
 		}, nil)
 		req2.ResourceName = "1 GPU · 4 vCPU · 32Gi"
+		c.mocks.deployer.EXPECT().GetSharedModeResourceName(mock.Anything).Return("nvidia.com/gpu").Maybe()
 		c.mocks.deployer.EXPECT().SubmitEvaluation(ctx, req2).Return(&types.ArgoWorkFlowRes{
 			ID:       1,
 			TaskName: "test",
@@ -136,6 +137,7 @@ func TestEvaluationComponent_CreateEvaluation(t *testing.T) {
 			ID:        1,
 			Resources: string(resource),
 		}, nil)
+		c.mocks.deployer.EXPECT().GetSharedModeResourceName(mock.Anything).Return("nvidia.com/gpu").Maybe()
 		c.mocks.deployer.EXPECT().SubmitEvaluation(ctx, req2).Return(&types.ArgoWorkFlowRes{
 			ID:       1,
 			TaskName: "test",

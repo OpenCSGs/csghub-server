@@ -68,7 +68,7 @@ func (h *MCPServerHandler) Create(ctx *gin.Context) {
 	_, err := h.sensitive.CheckRequestV2(ctx.Request.Context(), req)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "failed to check sensitive for mcp create request", slog.Any("error", err))
-		httpbase.ServerError(ctx, fmt.Errorf("sensitive check failed: %w", err))
+		httpbase.BadRequestWithExt(ctx, errorx.ErrSensitiveInfoNotAllowed)
 		return
 	}
 
@@ -172,7 +172,7 @@ func (h *MCPServerHandler) Update(ctx *gin.Context) {
 	_, err = h.sensitive.CheckRequestV2(ctx.Request.Context(), req)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "failed to check sensitive request for update mcp server", slog.Any("error", err))
-		httpbase.ServerError(ctx, fmt.Errorf("sensitive check failed: %w", err))
+		httpbase.BadRequestWithExt(ctx, errorx.ErrSensitiveInfoNotAllowed)
 		return
 	}
 
@@ -381,7 +381,7 @@ func (h *MCPServerHandler) Deploy(ctx *gin.Context) {
 	_, err = h.sensitive.CheckRequestV2(ctx.Request.Context(), req)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "failed to check sensitive for mcp deploy request", slog.Any("error", err))
-		httpbase.ServerError(ctx, fmt.Errorf("sensitive check failed: %w", err))
+		httpbase.BadRequestWithExt(ctx, errorx.ErrSensitiveInfoNotAllowed)
 		return
 	}
 

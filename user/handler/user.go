@@ -139,7 +139,7 @@ func (h *UserHandler) Update(ctx *gin.Context) {
 	_, err = h.sc.CheckRequestV2(ctx, req)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "failed to check sensitive request", slog.Any("error", err))
-		httpbase.ServerError(ctx, fmt.Errorf("sensitive check failed: %w", err))
+		httpbase.BadRequestWithExt(ctx, errorx.ErrSensitiveInfoNotAllowed)
 		return
 	}
 

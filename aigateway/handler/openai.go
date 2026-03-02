@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -22,6 +23,7 @@ import (
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/cache"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	commonType "opencsg.com/csghub-server/common/types"
 	apicomp "opencsg.com/csghub-server/component"
 )
@@ -59,12 +61,12 @@ func NewOpenAIHandlerFromConfig(config *config.Config) (OpenAIHandler, error) {
 			return nil, err
 		}
 	}
-	modComponent := component.NewModerationImplWithClient(modSvcClient, cacheClient)
+	modComponent := component.NewModerationImplWithClient(config, modSvcClient, cacheClient)
 	clusterComp, err := apicomp.NewClusterComponent(config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cluster component, error: %w", err)
 	}
-	return newOpenAIHandler(modelService, repoComp, modComponent, clusterComp, token.NewCounterFactory()), nil
+	return newOpenAIHandler(modelService, repoComp, modComponent, clusterComp, token.NewCounterFactory(), config), nil
 }
 
 func newOpenAIHandler(
@@ -73,6 +75,7 @@ func newOpenAIHandler(
 	modComponent component.Moderation,
 	clusterComp apicomp.ClusterComponent,
 	tokenCounterFactory token.CounterFactory,
+	config *config.Config,
 ) *OpenAIHandlerImpl {
 	return &OpenAIHandlerImpl{
 		openaiComponent:     modelService,
@@ -80,6 +83,36 @@ func newOpenAIHandler(
 		modComponent:        modComponent,
 		clusterComp:         clusterComp,
 		tokenCounterFactory: tokenCounterFactory,
+		config:              config,
+	}
+}
+
+// handleInsufficientBalance handles the insufficient balance error response
+// for both stream and non-stream requests
+func (h *OpenAIHandlerImpl) handleInsufficientBalance(c *gin.Context, isStream bool, username, modelID string, err error) {
+	// Check if the error is the standard insufficient balance error
+	if !errors.Is(err, errorx.ErrInsufficientBalance) {
+		// If it's a different error, log and return generic error
+		slog.ErrorContext(c.Request.Context(), "balance check failed",
+			"user", username, "model", modelID, "error", err)
+		httpbase.ServerError(c, err)
+		return
+	}
+
+	slog.WarnContext(c.Request.Context(), "insufficient balance for request",
+		"user", username, "model", modelID)
+
+	if isStream {
+		// For stream requests, write error chunk
+		errorChunk := generateInsufficientBalanceResp(h.config.Frontend.URL)
+		errorChunkJson, _ := json.Marshal(errorChunk)
+		_, writeErr := c.Writer.Write([]byte("data: " + string(errorChunkJson) + "\n\ndata: [DONE]\n\n"))
+		if writeErr != nil {
+			slog.Error("failed to write insufficient balance error to stream", "error", writeErr)
+		}
+		c.Writer.Flush()
+	} else {
+		httpbase.ForbiddenError(c, err)
 	}
 }
 
@@ -90,6 +123,7 @@ type OpenAIHandlerImpl struct {
 	modComponent        component.Moderation
 	clusterComp         apicomp.ClusterComponent
 	tokenCounterFactory token.CounterFactory
+	config              *config.Config
 }
 
 // ListModels godoc
@@ -264,6 +298,13 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 		}
 	}
 
+	sceneValue := c.Request.Header.Get(commonType.SceneHeaderKey)
+	// Check balance before processing request
+	if err := h.openaiComponent.CheckBalance(c.Request.Context(), username, model, sceneValue); err != nil {
+		h.handleInsufficientBalance(c, chatReq.Stream, username, modelID, err)
+		return
+	}
+
 	// marshal updated request map back to JSON bytes
 	updatedBodyBytes, _ := json.Marshal(chatReq)
 	c.Request.Body = io.NopCloser(bytes.NewReader(updatedBodyBytes))
@@ -324,9 +365,10 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 	rp.ServeHTTP(w, c.Request, proxyToApi, host)
 
 	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		usageCtx, cancel := context.WithTimeout(context.WithoutCancel(c.Request.Context()), 3*time.Second)
 		defer cancel()
-		err := h.openaiComponent.RecordUsage(ctx, userUUID, model, tokenCounter)
+
+		err := h.openaiComponent.RecordUsage(usageCtx, userUUID, model, tokenCounter, sceneValue)
 		if err != nil {
 			slog.Error("failed to record token usage", "error", err)
 		}
@@ -407,6 +449,14 @@ func (h *OpenAIHandlerImpl) Embedding(c *gin.Context) {
 			}})
 		return
 	}
+
+	sceneValue := c.Request.Header.Get(commonType.SceneHeaderKey)
+	// Check balance before processing request
+	if err := h.openaiComponent.CheckBalance(c.Request.Context(), username, model, sceneValue); err != nil {
+		h.handleInsufficientBalance(c, false, username, modelID, err)
+		return
+	}
+
 	modelName, _, err := (component.ModelIDBuilder{}).From(modelID)
 	if err != nil {
 		slog.ErrorContext(c, "failed to process chat request", "error", err, "model_id", modelID)
@@ -434,7 +484,10 @@ func (h *OpenAIHandlerImpl) Embedding(c *gin.Context) {
 
 	rp.ServeHTTP(w, c.Request, "", host)
 	go func() {
-		err := h.openaiComponent.RecordUsage(c.Request.Context(), userUUID, model, tokenCounter)
+		usageCtx, cancel := context.WithTimeout(context.WithoutCancel(c.Request.Context()), 3*time.Second)
+		defer cancel()
+
+		err := h.openaiComponent.RecordUsage(usageCtx, userUUID, model, tokenCounter, sceneValue)
 		if err != nil {
 			slog.ErrorContext(c, "failed to record embedding token usage", "error", err)
 		}

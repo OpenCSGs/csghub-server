@@ -2,7 +2,6 @@ package handler
 
 import (
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -11,6 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -37,7 +37,7 @@ func (h *FinetuneHandler) RunFinetuneJob(ctx *gin.Context) {
 	_, err := h.sensitive.CheckRequestV2(ctx.Request.Context(), &req)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "failed to check sensitive request for create finetune", slog.Any("error", err))
-		httpbase.BadRequest(ctx, fmt.Errorf("sensitive check failed: %w", err).Error())
+		httpbase.BadRequestWithExt(ctx, errorx.ErrSensitiveInfoNotAllowed)
 		return
 	}
 	if req.LearningRate <= 0 {

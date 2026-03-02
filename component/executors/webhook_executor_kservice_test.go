@@ -36,6 +36,7 @@ func TestWebHookExecutorKService_ProcessEvent(t *testing.T) {
 		Status:      20,
 		Message:     "msg",
 		Reason:      "test",
+		ClusterNode: "node1",
 	}
 
 	dts := mockdb.NewMockDeployTaskStore(t)
@@ -52,11 +53,12 @@ func TestWebHookExecutorKService_ProcessEvent(t *testing.T) {
 	}, nil)
 
 	dts.EXPECT().UpdateDeploy(ctx, &database.Deploy{
-		ID:      int64(1),
-		Status:  event.Status,
-		SvcName: event.ServiceName,
-		Message: event.Message,
-		Reason:  event.Reason,
+		ID:          int64(1),
+		Status:      event.Status,
+		SvcName:     event.ServiceName,
+		Message:     event.Message,
+		Reason:      event.Reason,
+		ClusterNode: event.ClusterNode,
 	}).Return(nil)
 
 	exec := NewTestKServiceExecutor(cfg, dts)

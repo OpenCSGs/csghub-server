@@ -289,7 +289,7 @@ func (h *PromptHandler) CreatePrompt(ctx *gin.Context) {
 	_, err = h.sensitive.CheckRequestV2(ctx.Request.Context(), body)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "failed to check sensitive request", slog.Any("error", err))
-		httpbase.ServerError(ctx, fmt.Errorf("sensitive check failed: %w", err))
+		httpbase.BadRequestWithExt(ctx, errorx.ErrSensitiveInfoNotAllowed)
 		return
 	}
 
@@ -350,7 +350,7 @@ func (h *PromptHandler) UpdatePrompt(ctx *gin.Context) {
 	_, err = h.sensitive.CheckRequestV2(ctx.Request.Context(), body)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "failed to check sensitive request", slog.Any("error", err))
-		httpbase.ServerError(ctx, fmt.Errorf("sensitive check failed: %w", err))
+		httpbase.BadRequestWithExt(ctx, errorx.ErrSensitiveInfoNotAllowed)
 		return
 	}
 
@@ -623,7 +623,7 @@ func (h *PromptHandler) Create(ctx *gin.Context) {
 	_, err := h.sensitive.CheckRequestV2(ctx.Request.Context(), req)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "failed to check sensitive request", slog.Any("error", err))
-		httpbase.ServerError(ctx, fmt.Errorf("sensitive check failed: %w", err))
+		httpbase.BadRequestWithExt(ctx, errorx.ErrSensitiveInfoNotAllowed)
 		return
 	}
 	req.Username = currentUser
@@ -669,7 +669,7 @@ func (h *PromptHandler) Update(ctx *gin.Context) {
 	_, err := h.sensitive.CheckRequestV2(ctx.Request.Context(), req)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "failed to check sensitive request", slog.Any("error", err))
-		httpbase.ServerError(ctx, fmt.Errorf("sensitive check failed: %w", err))
+		httpbase.BadRequestWithExt(ctx, errorx.ErrSensitiveInfoNotAllowed)
 		return
 	}
 	req.Username = currentUser

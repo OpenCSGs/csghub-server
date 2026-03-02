@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	v1 "knative.dev/serving/pkg/apis/serving/v1"
 	"opencsg.com/csghub-server/builder/deploy/cluster"
+	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -21,7 +22,7 @@ func (s *serviceComponentImpl) RemoveWorkset(ctx context.Context, cluster cluste
 	return nil
 }
 
-func handleAccelerator(hardware types.HardWare, resReq map[corev1.ResourceName]resource.Quantity, nodes []types.Node) *corev1.NodeAffinity {
+func handleAccelerator(hardware types.HardWare, resReq map[corev1.ResourceName]resource.Quantity, nodes []types.Node, config *config.Config) *corev1.NodeAffinity {
 	// Process accelerator resources
 	accelerators := []struct {
 		resourceName string

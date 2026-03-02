@@ -349,13 +349,13 @@ func generateMarkdownDoc(infosByFile map[string][]ErrorInfo, config MarkdownConf
 
 		moduleName := strings.TrimSuffix(strings.TrimPrefix(goFileName, "error_"), ".go")
 		chapterTitle := strings.ToUpper(string(moduleName[0])) + moduleName[1:]
-		builder.WriteString(fmt.Sprintf(config.ChapterFormat+"\n\n", chapterTitle))
+		fmt.Fprintf(&builder, config.ChapterFormat+"\n\n", chapterTitle)
 
 		for i, info := range infos {
-			builder.WriteString(fmt.Sprintf("### `%s`\n\n", info.FullCode))
+			fmt.Fprintf(&builder, "### `%s`\n\n", info.FullCode)
 
-			builder.WriteString(fmt.Sprintf("- **%s:** `%s`\n", config.DetailLabels["FullCode"], info.FullCode))
-			builder.WriteString(fmt.Sprintf("- **%s:** `%s`\n", config.DetailLabels["ConstantName"], info.ConstName))
+			fmt.Fprintf(&builder, "- **%s:** `%s`\n", config.DetailLabels["FullCode"], info.FullCode)
+			fmt.Fprintf(&builder, "- **%s:** `%s`\n", config.DetailLabels["ConstantName"], info.ConstName)
 
 			var description string
 			if config.Lang == "zh" {
@@ -370,7 +370,7 @@ func generateMarkdownDoc(infosByFile map[string][]ErrorInfo, config MarkdownConf
 
 			placeholderRegex := regexp.MustCompile(`\{([a-zA-Z0-9_]+)\}`)
 			description = placeholderRegex.ReplaceAllString(description, "`$0`")
-			builder.WriteString(fmt.Sprintf("- **%s:** %s\n", config.DetailLabels["Description"], description))
+			fmt.Fprintf(&builder, "- **%s:** %s\n", config.DetailLabels["Description"], description)
 
 			if i < len(infos)-1 {
 				builder.WriteString("\n---\n\n")

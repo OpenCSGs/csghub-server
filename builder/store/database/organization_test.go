@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/tests"
@@ -16,11 +17,13 @@ func TestOrganizationStore_CRUD(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
 	ctx := context.TODO()
+	uuid := uuid.New()
 
 	store := database.NewOrgStoreWithDB(db)
 	err := store.Create(ctx, &database.Organization{
 		Name:     "o1",
 		Nickname: "o1_nickname",
+		UUID:     uuid,
 	}, &database.Namespace{Path: "o1"})
 	require.Nil(t, err)
 
@@ -29,6 +32,7 @@ func TestOrganizationStore_CRUD(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, 1, total)
 	require.Equal(t, "o1", orgs[0].Name)
+	require.Equal(t, uuid, orgs[0].UUID)
 	//search with nickname
 	orgs, total, err = store.Search(ctx, "nickname", 10, 1, "", "")
 	require.Nil(t, err)
@@ -145,21 +149,24 @@ func TestOrganization_CreateWithForceDelete(t *testing.T) {
 	_, err = nsStore.FindByPath(ctx, "o1")
 	require.Equal(t, true, errors.Is(err, sql.ErrNoRows))
 }
+
 func TestOrganizationStore_GetOrgByUserIDs(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
 	ctx := context.TODO()
 	store := database.NewOrgStoreWithDB(db)
 
-	// Create organizations
+	// Create organizations with explicit UUID values
 	err := store.Create(ctx, &database.Organization{
 		Name:     "org1",
 		Nickname: "org1_nickname",
+		UUID:     uuid.New(),
 	}, &database.Namespace{Path: "org1"})
 	require.Nil(t, err)
 	err = store.Create(ctx, &database.Organization{
 		Name:     "org2",
 		Nickname: "org2_nickname",
+		UUID:     uuid.New(),
 	}, &database.Namespace{Path: "org2"})
 	require.Nil(t, err)
 
