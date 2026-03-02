@@ -39,4 +39,6 @@ const (
 	Sleeping     = 25
 	Stopped      = 26
 	Deleted      = 27 // end user trigger delete action for deploy
+
+	ResourceUnhealthy = 28 // cluster resource unhealthy
 )

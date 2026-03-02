@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	mockcomponent "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
 	"opencsg.com/csghub-server/api/httpbase"
@@ -431,6 +432,32 @@ func TestModelHandler_FinetuneDelete(t *testing.T) {
 		DeployID:    1,
 		DeployType:  types.FinetuneType,
 	}).Return(nil)
+
+	tester.WithParam("id", "1").Execute()
+
+	tester.ResponseEq(t, 200, tester.OKText, nil)
+}
+
+func TestModelHandler_FinetuneUpdate(t *testing.T) {
+	resourceID := int64(100)
+	reqBody := &types.DeployUpdateReq{ResourceID: &resourceID}
+	tester := NewModelTester(t).WithHandleFunc(func(h *ModelHandler) gin.HandlerFunc {
+		return h.FinetuneUpdate
+	})
+	tester.WithUser()
+
+	tester.mocks.repo.EXPECT().AllowReadAccess(tester.Ctx(), types.ModelRepo, "u", "r", "u").Return(true, nil)
+	tester.WithBody(t, reqBody)
+	tester.mocks.repo.EXPECT().DeployUpdate(tester.Ctx(), types.DeployActReq{
+		RepoType:    types.ModelRepo,
+		Namespace:   "u",
+		Name:        "r",
+		CurrentUser: "u",
+		DeployID:    1,
+		DeployType:  types.FinetuneType,
+	}, mock.MatchedBy(func(r *types.DeployUpdateReq) bool {
+		return r != nil && r.ResourceID != nil && *r.ResourceID == 100
+	})).Return(nil)
 
 	tester.WithParam("id", "1").Execute()
 

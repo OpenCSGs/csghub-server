@@ -12,6 +12,7 @@ import (
 	mockdb "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -71,24 +72,70 @@ func TestClusterComponent_GetClusterUsages(t *testing.T) {
 	clsStore := mockdb.NewMockClusterInfoStore(t)
 
 	// Create cluster component with mock
+	cfg := &config.Config{}
+	cfg.Runner.HearBeatIntervalInSec = 30
 	c := &clusterComponentImpl{
 		deployer:     mockDeployer,
 		clusterStore: clsStore,
+		config:       cfg,
 	}
 
 	// Test the method
 	clsStore.EXPECT().List(ctx).Return([]database.ClusterInfo{
-		{ClusterID: "c1", Enable: true},
-		{ClusterID: "c2", Enable: true},
+		{ClusterID: "c1", Enable: true, Region: "us-west-1", Zone: "zone-a", Provider: "aws"},
+		{ClusterID: "c2", Enable: true, Region: "us-east-1", Zone: "zone-b", Provider: "gcp"},
 	}, nil)
 
-	mockDeployer.EXPECT().GetClusterUsageById(ctx, "c1").Return(&types.ClusterRes{
+	clsStore.EXPECT().GetClusterResources(ctx, "c1").Return(&types.ClusterRes{
 		ClusterID: "c1",
 		Status:    types.ClusterStatusRunning,
+		Region:    "us-west-1",
+		Zone:      "zone-a",
+		Provider:  "aws",
+		Resources: []types.NodeResourceInfo{
+			{
+				NodeName:   "node-1",
+				NodeStatus: "Ready",
+				NodeHardware: types.NodeHardware{
+					TotalCPU:     64,
+					AvailableCPU: 32,
+					TotalMem:     256,
+					AvailableMem: 128,
+					TotalXPU:     8,
+					AvailableXPU: 4,
+					GPUVendor:    "NVIDIA",
+					XPUModel:     "A100",
+					XPUMem:       "40Gi",
+				},
+				UpdateAt: time.Now().Unix(),
+			},
+		},
 	}, nil)
-	mockDeployer.EXPECT().GetClusterUsageById(ctx, "c2").Return(&types.ClusterRes{
+
+	clsStore.EXPECT().GetClusterResources(ctx, "c2").Return(&types.ClusterRes{
 		ClusterID: "c2",
 		Status:    types.ClusterStatusRunning,
+		Region:    "us-east-1",
+		Zone:      "zone-b",
+		Provider:  "gcp",
+		Resources: []types.NodeResourceInfo{
+			{
+				NodeName:   "node-2",
+				NodeStatus: "Ready",
+				NodeHardware: types.NodeHardware{
+					TotalCPU:     32,
+					AvailableCPU: 16,
+					TotalMem:     128,
+					AvailableMem: 64,
+					TotalXPU:     4,
+					AvailableXPU: 2,
+					GPUVendor:    "AMD",
+					XPUModel:     "MI100",
+					XPUMem:       "32Gi",
+				},
+				UpdateAt: time.Now().Unix(),
+			},
+		},
 	}, nil)
 
 	res, err := c.GetClusterUsages(ctx)

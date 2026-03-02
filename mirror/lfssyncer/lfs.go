@@ -424,14 +424,42 @@ func (w *LfsSyncWorker) getSyncPointers(
 		)
 		return pointers, fmt.Errorf("fail to get lfs meta objects: %w", err)
 	}
+	repo := mt.Mirror.Repository
+	var toBeUpdateLfsMetaObjects []database.LfsMetaObject
 	for _, lfsMetaObject := range lfsMetaObjects {
-		if !lfsMetaObject.Existing {
+		objectKey := common.BuildLfsPath(repo.ID, lfsMetaObject.Oid, repo.Migrated)
+		exists, err := w.CheckIfLFSFileExists(ctx, objectKey)
+		if err != nil {
+			slog.Error(
+				"failed to check if lfs file exists",
+				slog.Int("workerID", w.id),
+				slog.Any("error", err),
+				slog.Any("objectKey", objectKey),
+				slog.Any("repoPath", repo.Path),
+				slog.Any("repoType", repo.RepositoryType),
+			)
+		}
+		if exists {
+			lfsMetaObject.Existing = true
+			toBeUpdateLfsMetaObjects = append(toBeUpdateLfsMetaObjects, lfsMetaObject)
+		} else {
 			pointers = append(pointers, &types.Pointer{
 				Oid:  lfsMetaObject.Oid,
 				Size: lfsMetaObject.Size,
 			})
 		}
 	}
+	if len(toBeUpdateLfsMetaObjects) > 0 {
+		err = w.lfsMetaObjectStore.BulkUpdateOrCreate(ctx, repo.ID, toBeUpdateLfsMetaObjects)
+		if err != nil {
+			slog.Error(
+				"failed to update lfs meta objects",
+				slog.Int("workerID", w.id),
+				slog.Any("error", err),
+			)
+		}
+	}
+
 	if len(pointers) == 0 {
 		slog.Info("no lfs files to sync, finish sync lfs", slog.Int("workerId", w.id), slog.String("repoPath", repoPath))
 	}

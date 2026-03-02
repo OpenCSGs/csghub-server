@@ -163,7 +163,3 @@ var (
 	ClientTypeCSGHUB       ClientType = "csghub"
 	ClientTypeLogCollector ClientType = "logcollector"
 )
-
-const (
-	TimeLayout = "2006-01-02 15:04:05"
-)

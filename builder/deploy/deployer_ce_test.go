@@ -16,6 +16,7 @@ import (
 	mockdb "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/tests"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -139,6 +140,8 @@ func TestDeployer_updateEvaluationEnvHardware(t *testing.T) {
 }
 
 func Test_CheckNodeResource(t *testing.T) {
+	config := &config.Config{}
+
 	baseNode := types.NodeResourceInfo{
 		NodeHardware: types.NodeHardware{
 			AvailableCPU: 16,
@@ -202,7 +205,7 @@ func Test_CheckNodeResource(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := checkNodeResource(tc.node, tc.hardware)
+			got := checkNodeResource(tc.node, tc.hardware, config)
 			if got != tc.want {
 				t.Errorf("checkNodeResource() = %v, want %v", got, tc.want)
 			}

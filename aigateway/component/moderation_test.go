@@ -18,6 +18,7 @@ import (
 	mock_cache "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/cache"
 	"opencsg.com/csghub-server/aigateway/types"
 	"opencsg.com/csghub-server/builder/rpc"
+	"opencsg.com/csghub-server/common/config"
 	common_types "opencsg.com/csghub-server/common/types"
 )
 
@@ -63,7 +64,7 @@ func TestModerationImpl_CheckLLMPrompt_WithoutCache(t *testing.T) {
 
 	t.Run("short and not sensitive", func(t *testing.T) {
 		mockClient := mock_rpc.NewMockModerationSvcClient(t)
-		moderation := NewModerationImplWithClient(mockClient, nil)
+		moderation := NewModerationImplWithClient(&config.Config{}, mockClient, nil)
 		content := "this is a short and safe text"
 
 		mockClient.EXPECT().PassLLMPromptCheck(ctx, content, key).Return(&rpc.CheckResult{IsSensitive: false}, nil).Once()
@@ -86,7 +87,7 @@ func TestModerationImpl_CheckLLMPrompt_WithoutCache(t *testing.T) {
 
 	t.Run("short and sensitive", func(t *testing.T) {
 		mockClient := mock_rpc.NewMockModerationSvcClient(t)
-		moderation := NewModerationImplWithClient(mockClient, nil)
+		moderation := NewModerationImplWithClient(&config.Config{}, mockClient, nil)
 		content := "this is a short and sensitive text"
 
 		mockClient.On("PassLLMPromptCheck", ctx, content, key).Return(&rpc.CheckResult{IsSensitive: true, Reason: "sensitive"}, nil).Once()
@@ -272,7 +273,7 @@ func TestModerationImpl_CheckChatStreamResponse(t *testing.T) {
 	t.Run("should_return_error_when_PassLLMRespCheck_fails", func(t *testing.T) {
 		mockModClient := mock_rpc.NewMockModerationSvcClient(t)
 		mockModClient.EXPECT().PassLLMRespCheck(ctx, "test content", uuid).
-			Return(nil, assert.AnError).Once()
+			Return(&rpc.CheckResult{IsSensitive: false}, assert.AnError).Once()
 		modImpl := &moderationImpl{
 			modSvcClient: mockModClient,
 			cacheClient:  nil,
@@ -288,7 +289,7 @@ func TestModerationImpl_CheckChatStreamResponse(t *testing.T) {
 
 		result, err := modImpl.CheckChatStreamResponse(ctx, chunk, uuid)
 		assert.Error(t, err)
-		assert.Nil(t, result)
+		assert.NotNil(t, result)
 		mockModClient.AssertExpectations(t)
 	})
 
@@ -452,5 +453,252 @@ func TestModerationImpl_CheckLLMPrompt_CacheCheck(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
 		assert.False(t, result.IsSensitive)
+	})
+}
+
+// TestModerationImpl_PostCheck tests the postCheck function with ModerationBypassSensitiveCheck config
+func TestModerationImpl_PostCheck(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("should_not_modify_non_sensitive_result", func(t *testing.T) {
+		modImpl := &moderationImpl{
+			config: &config.Config{},
+		}
+		result := &rpc.CheckResult{IsSensitive: false}
+		modImpl.postCheck(ctx, result)
+		assert.NotNil(t, result)
+		assert.False(t, result.IsSensitive)
+	})
+
+	t.Run("should_block_sensitive_content_when_ModerationBypassSensitiveCheck_is_false", func(t *testing.T) {
+		cfg := &config.Config{}
+		cfg.AIGateway.ModerationBypassSensitiveCheck = false
+		modImpl := &moderationImpl{
+			config: cfg,
+		}
+		result := &rpc.CheckResult{IsSensitive: true, Reason: "test reason"}
+		modImpl.postCheck(ctx, result)
+		assert.NotNil(t, result)
+		assert.True(t, result.IsSensitive, "should keep IsSensitive as true when ModerationBypassSensitiveCheck is false")
+		assert.Equal(t, "test reason", result.Reason)
+	})
+
+	t.Run("should_not_block_sensitive_content_when_ModerationBypassSensitiveCheck_is_true", func(t *testing.T) {
+		cfg := &config.Config{}
+		cfg.AIGateway.ModerationBypassSensitiveCheck = true
+		modImpl := &moderationImpl{
+			config: cfg,
+		}
+		result := &rpc.CheckResult{IsSensitive: true, Reason: "test reason"}
+		modImpl.postCheck(ctx, result)
+		assert.NotNil(t, result)
+		assert.False(t, result.IsSensitive, "should change IsSensitive to false when ModerationBypassSensitiveCheck is true")
+		assert.Equal(t, "", result.Reason, "should clear the reason when bypassing")
+	})
+
+	t.Run("should_block_sensitive_content_when_config_is_nil", func(t *testing.T) {
+		modImpl := &moderationImpl{
+			config: nil,
+		}
+		result := &rpc.CheckResult{IsSensitive: true, Reason: "test reason"}
+		modImpl.postCheck(ctx, result)
+		assert.NotNil(t, result)
+		assert.True(t, result.IsSensitive, "should keep IsSensitive as true when config is nil (default behavior)")
+		assert.Equal(t, "test reason", result.Reason)
+	})
+}
+
+// TestModerationImpl_CheckChatPrompts_WithModerationBypass tests CheckChatPrompts with ModerationBypassSensitiveCheck config
+func TestModerationImpl_CheckChatPrompts_WithModerationBypass(t *testing.T) {
+	ctx := context.Background()
+	key := "test-key"
+
+	t.Run("should_block_sensitive_content_when_ModerationBypassSensitiveCheck_is_false", func(t *testing.T) {
+		mockClient := mock_rpc.NewMockModerationSvcClient(t)
+		content := "sensitive content"
+
+		mockClient.On("PassLLMPromptCheck", ctx, content, key).
+			Return(&rpc.CheckResult{IsSensitive: true, Reason: "inappropriate"}, nil).Once()
+
+		cfg := &config.Config{}
+		cfg.AIGateway.ModerationBypassSensitiveCheck = false
+		modImpl := &moderationImpl{
+			modSvcClient: mockClient,
+			cacheClient:  nil,
+			config:       cfg,
+		}
+
+		result, err := modImpl.CheckChatPrompts(ctx, []openai.ChatCompletionMessageParamUnion{
+			{
+				OfSystem: &openai.ChatCompletionSystemMessageParam{
+					Content: openai.ChatCompletionSystemMessageParamContentUnion{
+						OfString: param.Opt[string]{Value: content},
+					},
+				},
+			},
+		}, key)
+
+		assert.NoError(t, err)
+		assert.NotNil(t, result)
+		assert.True(t, result.IsSensitive, "should block sensitive content when ModerationBypassSensitiveCheck is false")
+		mockClient.AssertExpectations(t)
+	})
+
+	t.Run("should_not_block_sensitive_content_when_ModerationBypassSensitiveCheck_is_true", func(t *testing.T) {
+		mockClient := mock_rpc.NewMockModerationSvcClient(t)
+		content := "sensitive content"
+
+		mockClient.On("PassLLMPromptCheck", ctx, content, key).
+			Return(&rpc.CheckResult{IsSensitive: true, Reason: "inappropriate"}, nil).Once()
+
+		cfg := &config.Config{}
+		cfg.AIGateway.ModerationBypassSensitiveCheck = true
+		modImpl := &moderationImpl{
+			modSvcClient: mockClient,
+			cacheClient:  nil,
+			config:       cfg,
+		}
+
+		result, err := modImpl.CheckChatPrompts(ctx, []openai.ChatCompletionMessageParamUnion{
+			{
+				OfSystem: &openai.ChatCompletionSystemMessageParam{
+					Content: openai.ChatCompletionSystemMessageParamContentUnion{
+						OfString: param.Opt[string]{Value: content},
+					},
+				},
+			},
+		}, key)
+
+		assert.NoError(t, err)
+		assert.NotNil(t, result)
+		assert.False(t, result.IsSensitive, "should not block sensitive content when ModerationBypassSensitiveCheck is true")
+		mockClient.AssertExpectations(t)
+	})
+}
+
+// TestModerationImpl_CheckChatStreamResponse_WithModerationBypass tests CheckChatStreamResponse with ModerationBypassSensitiveCheck config
+func TestModerationImpl_CheckChatStreamResponse_WithModerationBypass(t *testing.T) {
+	ctx := context.Background()
+	uuid := "test-uuid"
+
+	t.Run("should_block_sensitive_content_when_ModerationBypassSensitiveCheck_is_false", func(t *testing.T) {
+		mockModClient := mock_rpc.NewMockModerationSvcClient(t)
+		mockModClient.EXPECT().PassLLMRespCheck(ctx, "sensitive content", uuid).
+			Return(&rpc.CheckResult{IsSensitive: true, Reason: "inappropriate language"}, nil).Once()
+
+		cfg := &config.Config{}
+		cfg.AIGateway.ModerationBypassSensitiveCheck = false
+		modImpl := &moderationImpl{
+			modSvcClient: mockModClient,
+			cacheClient:  nil,
+			config:       cfg,
+		}
+
+		chunk := types.ChatCompletionChunk{
+			Choices: []types.ChatCompletionChunkChoice{{
+				Delta: types.ChatCompletionChunkChoiceDelta{
+					Content: "sensitive content",
+				},
+			}},
+		}
+
+		result, err := modImpl.CheckChatStreamResponse(ctx, chunk, uuid)
+		assert.NoError(t, err)
+		assert.NotNil(t, result)
+		assert.True(t, result.IsSensitive, "should block sensitive content when ModerationBypassSensitiveCheck is false")
+		mockModClient.AssertExpectations(t)
+	})
+
+	t.Run("should_not_block_sensitive_content_when_ModerationBypassSensitiveCheck_is_true", func(t *testing.T) {
+		mockModClient := mock_rpc.NewMockModerationSvcClient(t)
+		mockModClient.EXPECT().PassLLMRespCheck(ctx, "sensitive content", uuid).
+			Return(&rpc.CheckResult{IsSensitive: true, Reason: "inappropriate language"}, nil).Once()
+
+		cfg := &config.Config{}
+		cfg.AIGateway.ModerationBypassSensitiveCheck = true
+		modImpl := &moderationImpl{
+			modSvcClient: mockModClient,
+			cacheClient:  nil,
+			config:       cfg,
+		}
+
+		chunk := types.ChatCompletionChunk{
+			Choices: []types.ChatCompletionChunkChoice{{
+				Delta: types.ChatCompletionChunkChoiceDelta{
+					Content: "sensitive content",
+				},
+			}},
+		}
+
+		result, err := modImpl.CheckChatStreamResponse(ctx, chunk, uuid)
+		assert.NoError(t, err)
+		assert.NotNil(t, result)
+		assert.False(t, result.IsSensitive, "should not block sensitive content when ModerationBypassSensitiveCheck is true")
+		mockModClient.AssertExpectations(t)
+	})
+}
+
+// TestModerationImpl_CheckChatNonStreamResponse_WithModerationBypass tests CheckChatNonStreamResponse with ModerationBypassSensitiveCheck config
+func TestModerationImpl_CheckChatNonStreamResponse_WithModerationBypass(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("should_block_sensitive_content_when_ModerationBypassSensitiveCheck_is_false", func(t *testing.T) {
+		mockModClient := mock_rpc.NewMockModerationSvcClient(t)
+		mockModClient.EXPECT().PassTextCheck(ctx, common_types.ScenarioChatDetection, "sensitive content").
+			Return(&rpc.CheckResult{IsSensitive: true, Reason: "inappropriate language"}, nil).Once()
+
+		cfg := &config.Config{}
+		cfg.AIGateway.ModerationBypassSensitiveCheck = false
+		modImpl := &moderationImpl{
+			modSvcClient: mockModClient,
+			cacheClient:  nil,
+			config:       cfg,
+		}
+
+		completion := types.ChatCompletion{
+			ChatCompletion: openai.ChatCompletion{
+				Choices: []openai.ChatCompletionChoice{{
+					Message: openai.ChatCompletionMessage{
+						Content: "sensitive content",
+					},
+				}},
+			},
+		}
+
+		result, err := modImpl.CheckChatNonStreamResponse(ctx, completion)
+		assert.NoError(t, err)
+		assert.NotNil(t, result)
+		assert.True(t, result.IsSensitive, "should block sensitive content when ModerationBypassSensitiveCheck is false")
+		mockModClient.AssertExpectations(t)
+	})
+
+	t.Run("should_not_block_sensitive_content_when_ModerationBypassSensitiveCheck_is_true", func(t *testing.T) {
+		mockModClient := mock_rpc.NewMockModerationSvcClient(t)
+		mockModClient.EXPECT().PassTextCheck(ctx, common_types.ScenarioChatDetection, "sensitive content").
+			Return(&rpc.CheckResult{IsSensitive: true, Reason: "inappropriate language"}, nil).Once()
+
+		cfg := &config.Config{}
+		cfg.AIGateway.ModerationBypassSensitiveCheck = true
+		modImpl := &moderationImpl{
+			modSvcClient: mockModClient,
+			cacheClient:  nil,
+			config:       cfg,
+		}
+
+		completion := types.ChatCompletion{
+			ChatCompletion: openai.ChatCompletion{
+				Choices: []openai.ChatCompletionChoice{{
+					Message: openai.ChatCompletionMessage{
+						Content: "sensitive content",
+					},
+				}},
+			},
+		}
+
+		result, err := modImpl.CheckChatNonStreamResponse(ctx, completion)
+		assert.NoError(t, err)
+		assert.NotNil(t, result)
+		assert.False(t, result.IsSensitive, "should not block sensitive content when ModerationBypassSensitiveCheck is true")
+		mockModClient.AssertExpectations(t)
 	})
 }

@@ -219,6 +219,8 @@ type Config struct {
 		SubscriptionCronExpression   string `env:"OPENCSG_ACCOUNTING_SUBSCRIPTION_CRON_EXPRESSION" default:"*/5 * * * *"`
 		ExpiredPresentCronExpression string `env:"OPENCSG_ACCOUNTING_EXPIRED_PRESENT_CRON_EXPRESSION" default:"0 0 * * *"`
 		ThresholdOfStopDeploy        int    `env:"OPENCSG_ACCOUNTING_THRESHOLD_OF_STOP_DEPLOY" default:"5000"`
+		ThresholdOfStopLLMInference  int    `env:"OPENCSG_ACCOUNTING_THRESHOLD_OF_STOP_LLM_INFERENCE" default:"5000"`
+		LLMBalanceCheckCacheTTL      int    `env:"OPENCSG_ACCOUNTING_LLM_BALANCE_CHECK_CACHE_TTL" default:"86400"`
 	}
 
 	User struct {
@@ -347,6 +349,8 @@ type Config struct {
 		AgentHubServiceToken      string `env:"OPENCSG_AGENT_AGENTHUB_SERVICE_TOKEN" default:""`
 		MCPInspectMaxConcurrency  int    `env:"OPENCSG_AGENT_MCP_INSPECT_MAX_CONCURRENCY" default:"50"`
 		ShareSessionTokenValidDay int    `env:"STARHUB_SERVER_AGENT_SHARE_SESSION_TOKEN_VALIDATE_Day" default:"365"` // 1 year
+		BalanceThreshold          int    `env:"OPENCSG_AGENT_BALANCE_THRESHOLD" default:"5000"`
+		BalanceCheckCacheTTL      int    `env:"OPENCSG_AGENT_BALANCE_CHECK_CACHE_TTL" default:"86400"`
 	}
 
 	DataViewer struct {
@@ -363,6 +367,7 @@ type Config struct {
 		MaxConcurrentSessionExecutionSize       int    `env:"OPENCSG_DATAVIEWER_MAX_CONCURRENT_SESSION_EXECUTION_SIZE" default:"1"`
 		SessionExecutionTimeout                 int    `env:"OPENCSG_DATAVIEWER_SESSION_EXECUTION_TIMEOUT" default:"240"` // 240 mins
 		ConvertLimitSize                        int64  `env:"OPENCSG_DATAVIEWER_CONVERT_LIMIT_SIZE" default:"5368709120"` // 5G
+		ScanFileNumLimit                        int    `env:"OPENCSG_DATAVIEWER_SCAN_FILE_NUM_LIMIT" default:"5000"`      // 5K files
 	}
 
 	Proxy struct {
@@ -392,7 +397,8 @@ type Config struct {
 	}
 
 	AIGateway struct {
-		Port int `env:"OPENCSG_AIGATEWAY_PORT" default:"8094"`
+		Port                           int  `env:"OPENCSG_AIGATEWAY_PORT" default:"8094"`
+		ModerationBypassSensitiveCheck bool `env:"OPENCSG_AIGATEWAY_MODERATION_BYPASS_SENSITIVE_CHECK" default:"false"`
 	}
 
 	Integration struct {

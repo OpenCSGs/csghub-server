@@ -103,7 +103,9 @@ func runWorkFlow(sessionCtx workflow.Context, updateWorkflow dvCom.WorkflowUpdat
 	err = workflow.ExecuteActivity(sessionCtx, DataViewerActivity.ScanRepoFiles,
 		dvCom.ScanRepoFileReq{
 			Req:              updateWorkflow.Req,
-			ConvertLimitSize: updateWorkflow.Config.DataViewer.ConvertLimitSize},
+			ConvertLimitSize: updateWorkflow.Config.DataViewer.ConvertLimitSize,
+			MaxFileNum:       updateWorkflow.Config.DataViewer.ScanFileNumLimit,
+		},
 	).Get(sessionCtx, &repoFileClass)
 	if err != nil {
 		return false, fmt.Errorf("run data viewer activity GetCardFromReadme error: %w", err)

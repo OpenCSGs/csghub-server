@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"github.com/uptrace/bun"
 	"opencsg.com/csghub-server/common/errorx"
@@ -251,7 +252,8 @@ func (s *spaceStoreImpl) CreateAndUpdateRepoPath(ctx context.Context, input Spac
 		}
 		repo, err = updateRepoPath(ctx, tx, types.SpaceRepo, path, input.RepositoryID)
 		if err != nil {
-			return fmt.Errorf("failed to update repository path: %w", err)
+			slog.ErrorContext(ctx, "failed to update repository path", slog.Any("err:", err))
+			return err
 		}
 		input.Repository = &repo
 		return nil

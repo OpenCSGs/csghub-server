@@ -1238,7 +1238,7 @@ func (d *deployer) GetWorkflowLogsNonStream(ctx context.Context, req types.Finet
 		if !first {
 			queryBuilder.WriteString(",")
 		}
-		queryBuilder.WriteString(fmt.Sprintf(`%s="%s"`, k, v))
+		fmt.Fprintf(&queryBuilder, `%s="%s"`, k, v)
 		first = false
 	}
 	queryBuilder.WriteString("}")

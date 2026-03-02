@@ -250,7 +250,7 @@ func (c *lokiClient) formatLokiLog(lokiLog *loki.LokiPushRequest, timeLoc *time.
 					// if parse failed, use original timestamp
 					formattedTime = lineParts[0]
 				} else {
-					formattedTime = t.In(timeLoc).Format(types.TimeLayout)
+					formattedTime = t.In(timeLoc).Format(time.DateOnly)
 				}
 
 				formattedLog := fmt.Sprintf("%s | %s %s", podIdentifier, formattedTime, lineParts[1])
@@ -277,7 +277,7 @@ func (c *lokiClient) StreamAllLogs(
 		if !first {
 			queryBuilder.WriteString(",")
 		}
-		queryBuilder.WriteString(fmt.Sprintf(`%s="%s"`, k, v))
+		fmt.Fprintf(&queryBuilder, `%s="%s"`, k, v)
 		first = false
 	}
 	queryBuilder.WriteString("}")

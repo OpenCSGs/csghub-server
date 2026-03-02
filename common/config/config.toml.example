@@ -87,6 +87,7 @@ signing_key = "signing-key"
 valid_hour = 24
 
 [space]
+public_docker_reg_base="opencsg-registry.cn-beijing.cr.aliyuncs.com"
 builder_endpoint = "http://localhost:8081"
 runner_endpoint = "http://localhost:8082"
 runner_server_port = 8082

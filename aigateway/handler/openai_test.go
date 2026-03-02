@@ -25,6 +25,7 @@ import (
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/testutil"
+	"opencsg.com/csghub-server/common/config"
 )
 
 type testerOpenAIHandler struct {
@@ -46,7 +47,8 @@ func setupTest(t *testing.T) (*testerOpenAIHandler, *gin.Context, *httptest.Resp
 	mockModeration := mockcomp.NewMockModeration(t)
 	mockClsComp := apicomp.NewMockClusterComponent(t)
 	mockTokenCounterFactory := mocktoken.NewMockCounterFactory(t)
-	handler := newOpenAIHandler(mockOpenAI, mockRepo, mockModeration, mockClsComp, mockTokenCounterFactory)
+	cfg := &config.Config{}
+	handler := newOpenAIHandler(mockOpenAI, mockRepo, mockModeration, mockClsComp, mockTokenCounterFactory, cfg)
 
 	// Set test user
 	tester := &testerOpenAIHandler{
@@ -329,6 +331,7 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 			ClusterID: "test-cls",
 		}, nil)
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1:svc1").Return(model, nil)
+		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuser", model, "").Return(nil)
 		expectReq := ChatCompletionRequest{}
 		_ = json.Unmarshal(body, &expectReq)
 		tester.mocks.moderationComp.EXPECT().CheckChatPrompts(mock.Anything, expectReq.Messages, "testuuid:"+model.ID).
@@ -372,6 +375,7 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 			ClusterID: "test-cls",
 		}, nil)
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1:svc1").Return(model, nil)
+		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuser", model, "").Return(nil)
 		expectReq := ChatCompletionRequest{}
 		_ = json.Unmarshal(body, &expectReq)
 		tester.mocks.moderationComp.EXPECT().CheckChatPrompts(mock.Anything, expectReq.Messages, "testuuid:"+model.ID).
@@ -415,6 +419,7 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 			ClusterID: "test-cls",
 		}, nil)
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1:svc1").Return(model, nil)
+		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuser", model, "").Return(nil)
 		expectReq := ChatCompletionRequest{}
 		_ = json.Unmarshal(body, &expectReq)
 		tester.mocks.moderationComp.EXPECT().CheckChatPrompts(mock.Anything, expectReq.Messages, "testuuid:"+model.ID).
@@ -431,8 +436,8 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 		llmTokenCounter.EXPECT().AppendPrompts(expectReq.Messages).Return()
 		var wg sync.WaitGroup
 		wg.Add(1)
-		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, "testuuid", model, llmTokenCounter).
-			RunAndReturn(func(ctx context.Context, uuid string, model *types.Model, counter token.Counter) error {
+		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, "testuuid", model, llmTokenCounter, mock.Anything).
+			RunAndReturn(func(ctx context.Context, uuid string, model *types.Model, counter token.Counter, sceneValue string) error {
 				wg.Done()
 				return nil
 			})
@@ -475,6 +480,7 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 			ClusterID: "test-cls",
 		}, nil)
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1:svc1").Return(model, nil)
+		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuser", model, "").Return(nil)
 		expectReq := ChatCompletionRequest{}
 		_ = json.Unmarshal(body, &expectReq)
 		tester.mocks.moderationComp.EXPECT().CheckChatPrompts(mock.Anything, expectReq.Messages, "testuuid:"+model.ID).
@@ -491,8 +497,8 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 		llmTokenCounter.EXPECT().AppendPrompts(expectReq.Messages).Return()
 		var wg sync.WaitGroup
 		wg.Add(1)
-		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, "testuuid", model, llmTokenCounter).
-			RunAndReturn(func(ctx context.Context, uuid string, model *types.Model, counter token.Counter) error {
+		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, "testuuid", model, llmTokenCounter, mock.Anything).
+			RunAndReturn(func(ctx context.Context, uuid string, model *types.Model, counter token.Counter, sceneValue string) error {
 				wg.Done()
 				return errors.New("record usage error")
 			})
@@ -673,8 +679,9 @@ func TestOpenAIHandler_Embedding(t *testing.T) {
 			Return(tokenCounter).Once()
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1").
 			Return(model, nil)
-		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, "testuuid", model, mock.Anything).RunAndReturn(
-			func(ctx context.Context, userID string, model *types.Model, counter token.Counter) error {
+		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuser", model, "").Return(nil)
+		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, "testuuid", model, mock.Anything, mock.Anything).RunAndReturn(
+			func(ctx context.Context, userID string, model *types.Model, counter token.Counter, sceneValue string) error {
 				wg.Done()
 				return nil
 			})

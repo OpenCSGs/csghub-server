@@ -314,3 +314,7 @@ func (c *Client) CommitFiles(ctx context.Context, req gitserver.CommitFilesReq) 
 func (c *Client) GetRepoLfsPointers(ctx context.Context, req gitserver.GetRepoFilesReq) ([]*types.LFSPointer, error) {
 	return nil, nil
 }
+
+func (c *Client) GetFilesByRevisionAndPaths(ctx context.Context, req gitserver.GetFilesByRevisionAndPathsReq) ([]*types.File, error) {
+	return nil, nil
+}

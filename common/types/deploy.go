@@ -26,6 +26,8 @@ type ServiceEvent struct {
 	Message     string `json:"message"`      // event message
 	Reason      string `json:"reason"`       // event reason
 	TaskID      int64  `json:"task_id"`      // task id
+	ClusterNode string `json:"cluster_node"` // cluster node name
+	QueueName   string `json:"queue_name"`   // queue name
 }
 
 type StatRunningDeploy struct {
@@ -37,4 +39,15 @@ type StatRunningDeploy struct {
 	MluNum    int `json:"mlu_num"`
 	DcuNum    int `json:"dcu_num"`
 	GPGpuNum  int `json:"gpgpu_num"`
+}
+
+type ClusterDeployReq struct {
+	ClusterID    string `json:"cluster_id"`
+	ClusterNode  string `json:"cluster_node"`
+	Status       int    `json:"status"`
+	ResourceID   int    `json:"resource_id"`
+	ResourceName string `json:"resource_name"`
+	Search       string `json:"search"`
+	Per          int    `json:"per"`
+	Page         int    `json:"page"`
 }

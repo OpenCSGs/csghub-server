@@ -29,6 +29,9 @@
     "error.USER-ERR-17": {
         "other": "拥有账单的用户不能被删除"
     },
+    "error.USER-ERR-18": {
+        "other": "用户邮箱未设置"
+    },
     "error.USER-ERR-2": {
         "other": "新电话号码已经存在于sso服务中"
     },

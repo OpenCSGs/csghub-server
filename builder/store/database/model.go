@@ -2,10 +2,12 @@ package database
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/uptrace/bun"
+	"github.com/uptrace/bun/driver/pgdriver"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -330,6 +332,12 @@ func updateRepoPath(ctx context.Context, tx bun.Tx, repoType types.RepositoryTyp
 		Returning("*", &repo).
 		Scan(ctx, &repo)
 	if err != nil {
+		var pqErr pgdriver.Error
+		if errors.As(err, &pqErr) {
+			if pqErr.IntegrityViolation() {
+				return repo, errorx.ErrSpaceNameAlreadyExist
+			}
+		}
 		return repo, fmt.Errorf("failed to update repository path: %w", err)
 	}
 	return repo, nil
