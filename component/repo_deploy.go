@@ -577,7 +577,6 @@ func (c *repoComponentImpl) DeployDetail(ctx context.Context, detailReq types.De
 }
 
 func deployStatusCodeToString(code int) string {
-	// Pending    = 0
 	// DeployBuildPending    = 10
 	// DeployBuildInProgress = 11
 	// DeployBuildFailed     = 12
@@ -594,8 +593,6 @@ func deployStatusCodeToString(code int) string {
 	// simplified status for frontend show
 	var txt string
 	switch code {
-	case 0:
-		txt = SpaceStatusPending
 	case 10:
 		txt = SpaceStatusBuilding // need to change it to queue? This requires UI modification as well
 	case 11:
@@ -620,8 +617,6 @@ func deployStatusCodeToString(code int) string {
 		txt = SpaceStatusStopped
 	case 27:
 		txt = RepoStatusDeleted
-	case 28:
-		txt = ResourceUnhealthy
 	default:
 		txt = SpaceStatusStopped
 	}
@@ -834,10 +829,6 @@ func (c *repoComponentImpl) DeployUpdate(ctx context.Context, updateReq types.De
 		err = c.CheckAccountAndResource(ctx, updateReq.CurrentUser, resource.ClusterID, deploy.OrderDetailID, resource)
 		if err != nil {
 			return err
-		}
-		// update deploy's cluster_id together with resource_id (same as notebook update)
-		if req.ClusterID == nil {
-			req.ClusterID = &resource.ClusterID
 		}
 		if req.RuntimeFrameworkID == nil {
 			frame, err := c.runtimeFrameworksStore.FindEnabledByName(ctx, deploy.RuntimeFramework)
