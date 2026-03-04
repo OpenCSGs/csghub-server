@@ -6,7 +6,6 @@ const (
 	UserContainerName       = "user-container"
 	InitRepoName            = "init-repo"
 	MainContainerName       = "main"
-	QueueProxyName          = "queue-proxy"
 )
 
 var LogTargetContainersMap = map[string]struct{}{
