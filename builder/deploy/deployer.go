@@ -42,6 +42,7 @@ type Deployer interface {
 	InstanceLogs(ctx context.Context, dr types.DeployRepo) (*MultiLogReader, error)
 	ListCluster(ctx context.Context) ([]types.ClusterRes, error)
 	GetClusterById(ctx context.Context, clusterId string) (*types.ClusterRes, error)
+	GetClusterUsageById(ctx context.Context, clusterId string) (*types.ClusterRes, error)
 	UpdateCluster(ctx context.Context, data types.ClusterRequest) (*types.UpdateClusterResponse, error)
 	UpdateDeploy(ctx context.Context, dur *types.DeployUpdateReq, deploy *database.Deploy) error
 	StartDeploy(ctx context.Context, deploy *database.Deploy) error
@@ -56,7 +57,6 @@ type Deployer interface {
 	GetWorkflowLogsNonStream(ctx context.Context, req types.FinetuneLogReq) (*loki.LokiQueryResponse, error)
 	IsDefaultScheduler() bool
 	GetSharedModeResourceName(config *config.Config) string
-	LabelNode(ctx context.Context, req *types.NodeLabel) error
 }
 
 func (d *deployer) GenerateUniqueSvcName(dr types.DeployRepo) string {
@@ -1238,7 +1238,7 @@ func (d *deployer) GetWorkflowLogsNonStream(ctx context.Context, req types.Finet
 		if !first {
 			queryBuilder.WriteString(",")
 		}
-		fmt.Fprintf(&queryBuilder, `%s="%s"`, k, v)
+		queryBuilder.WriteString(fmt.Sprintf(`%s="%s"`, k, v))
 		first = false
 	}
 	queryBuilder.WriteString("}")
