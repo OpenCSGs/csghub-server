@@ -1266,10 +1266,6 @@ func (c *Client) GetFilesByRevisionAndPaths(ctx context.Context, req gitserver.G
 		}
 	}
 
-	if len(oids) == 0 {
-		return files, nil
-	}
-
 	pRes, err := c.blobClient.GetLFSPointers(ctx, &gitalypb.GetLFSPointersRequest{
 		Repository: repository,
 		BlobIds:    oids,
