@@ -512,6 +512,7 @@ type Config struct {
 		MaxConcurrentActivityExecutionSize      int `env:"OPENCSG_TEMPORAL_MAX_CONCURRENT_ACTIVITY_EXECUTION_SIZE" default:"5"`
 		MaxConcurrentLocalActivityExecutionSize int `env:"OPENCSG_TEMPORAL_MAX_CONCURRENT_LOCAL_ACTIVITY_EXECUTION_SIZE" default:"10"`
 		MaxConcurrentWorkflowTaskExecutionSize  int `env:"OPENCSG_TEMPORAL_MAX_CONCURRENT_WORKFLOW_TASK_EXECUTION_SIZE" default:"50"`
+		GetSystemInfoTimeout                    int `env:"OPENCSG_TEMPORAL_GET_SYSTEM_INFO_TIMEOUT" default:"5"`
 	}
 
 	APIRateLimiter struct {

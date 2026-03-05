@@ -673,17 +673,17 @@ func (s *repoStoreImpl) PublicToUser(ctx context.Context, repoType types.Reposit
 	// join table by repo type to filter out deleted and half-created records
 	switch repoType {
 	case types.ModelRepo:
-		q.Join("LEFT JOIN models ON models.repository_id = repository.id")
+		q.Join("INNER JOIN models ON models.repository_id = repository.id")
 	case types.DatasetRepo:
-		q.Join("LEFT JOIN datasets ON datasets.repository_id = repository.id")
+		q.Join("INNER JOIN datasets ON datasets.repository_id = repository.id")
 	case types.CodeRepo:
-		q.Join("LEFT JOIN codes ON codes.repository_id = repository.id")
+		q.Join("INNER JOIN codes ON codes.repository_id = repository.id")
 	case types.SpaceRepo:
-		q.Join("LEFT JOIN spaces ON spaces.repository_id = repository.id")
+		q.Join("INNER JOIN spaces ON spaces.repository_id = repository.id")
 	case types.PromptRepo:
-		q.Join("LEFT JOIN prompts ON prompts.repository_id = repository.id")
+		q.Join("INNER JOIN prompts ON prompts.repository_id = repository.id")
 	case types.MCPServerRepo:
-		q.Join("LEFT JOIN mcp_servers ON mcp_servers.repository_id = repository.id")
+		q.Join("INNER JOIN mcp_servers ON mcp_servers.repository_id = repository.id")
 	}
 
 	if !isAdmin {
