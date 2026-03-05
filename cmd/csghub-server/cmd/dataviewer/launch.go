@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/spf13/cobra"
 	"go.temporal.io/sdk/client"
@@ -47,6 +48,9 @@ var launchCmd = &cobra.Command{
 		client, err := temporal.NewClient(client.Options{
 			HostPort: cfg.WorkFLow.Endpoint,
 			Logger:   log.NewStructuredLogger(slog.Default()),
+			ConnectionOptions: client.ConnectionOptions{
+				GetSystemInfoTimeout: time.Duration(cfg.Temporal.GetSystemInfoTimeout) * time.Second,
+			},
 		}, "dataset-viewer")
 		if err != nil {
 			return fmt.Errorf("unable to create workflow client, error: %w", err)

@@ -742,6 +742,16 @@ func TestRepoStore_PublicToUser(t *testing.T) {
 				repo.UpdatedAt = time.Now()
 				rn, err := store.CreateRepo(ctx, *repo)
 				require.Nil(t, err)
+
+				// Create corresponding record in codes table for CodeRepo
+				if repo.RepositoryType == types.CodeRepo {
+					code := database.Code{
+						RepositoryID: rn.ID,
+					}
+					_, err = db.Core.NewInsert().Model(&code).Exec(ctx)
+					require.Nil(t, err)
+				}
+
 				for _, tag := range repo.Tags {
 					_, err = db.Core.NewInsert().Model(&tag).Exec(ctx, &tag)
 					require.Nil(t, err)
@@ -1681,6 +1691,13 @@ func TestRepoStore_PublicToUserMirror(t *testing.T) {
 	require.Nil(t, err)
 	require.NotNil(t, repo)
 
+	// Create corresponding record in datasets table for DatasetRepo
+	dataset := database.Dataset{
+		RepositoryID: repo.ID,
+	}
+	_, err = db.Core.NewInsert().Model(&dataset).Exec(ctx)
+	require.Nil(t, err)
+
 	userName1 := "user_name_" + uuid.NewString()
 	repoName1 := "repo_name_" + uuid.NewString()
 	repo1, err := rs.CreateRepo(ctx, database.Repository{
@@ -1697,6 +1714,13 @@ func TestRepoStore_PublicToUserMirror(t *testing.T) {
 	})
 	require.Nil(t, err)
 	require.NotNil(t, repo1)
+
+	// Create corresponding record in datasets table for DatasetRepo
+	dataset1 := database.Dataset{
+		RepositoryID: repo1.ID,
+	}
+	_, err = db.Core.NewInsert().Model(&dataset1).Exec(ctx)
+	require.Nil(t, err)
 
 	mirrorStore := database.NewMirrorStoreWithDB(db)
 	mirror, err := mirrorStore.Create(ctx, &database.Mirror{
