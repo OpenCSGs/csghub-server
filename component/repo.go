@@ -187,6 +187,7 @@ type RepoComponent interface {
 	BatchMigrateRepoToHashedPath(ctx context.Context, auto bool, batchSize int, lastID int64) (int64, error)
 	GetMirrorTaskStatus(repo *database.Repository) types.MirrorTaskStatus
 	CheckDeployPermissionForUser(ctx context.Context, deployReq types.DeployActReq) (*database.User, *database.Deploy, error)
+	GetNamespaceBillingUUID(ctx context.Context, namespace string) (string, error)
 	DeletePendingDeletion(ctx context.Context) error
 	GetRepos(ctx context.Context, search, currentUser string, repoType types.RepositoryType) ([]string, error)
 	advancedRepoInterface
@@ -384,6 +385,10 @@ func (c *repoComponentImpl) UpdateRepo(ctx context.Context, req types.UpdateRepo
 	}
 	if req.Description != nil {
 		repo.Description = *req.Description
+	}
+
+	if req.DefaultBranch != nil {
+		repo.DefaultBranch = *req.DefaultBranch
 	}
 
 	gitRepoReq := gitserver.UpdateRepoReq{
@@ -1744,6 +1749,8 @@ func getTagScopeByRepoType(repoType types.RepositoryType) types.TagScope {
 		return types.PromptTagScope
 	case types.MCPServerRepo:
 		return types.MCPTagScope
+	case types.SkillRepo:
+		return types.SkillTagScope
 	default:
 		panic("convert repo type to tag scope failed, unknown repo type:" + repoType)
 	}
@@ -1876,6 +1883,21 @@ func (c *repoComponentImpl) CheckCurrentUserPermission(ctx context.Context, user
 			return false, fmt.Errorf("unknown role %s", role)
 		}
 	}
+}
+
+func (c *repoComponentImpl) GetNamespaceBillingUUID(ctx context.Context, namespace string) (string, error) {
+	ns, err := c.namespaceStore.FindByPath(ctx, namespace)
+	if err != nil {
+		return "", fmt.Errorf("fail to find namespace '%s', error: %w", namespace, err)
+	}
+	if ns.NamespaceType == database.UserNamespace {
+		return ns.User.UUID, nil
+	}
+	org, err := c.userSvcClient.GetOrgByName(ctx, namespace)
+	if err != nil {
+		return "", fmt.Errorf("fail to get org '%s', error: %w", namespace, err)
+	}
+	return org.UUID.String(), nil
 }
 
 func (c *repoComponentImpl) GetCommitWithDiff(ctx context.Context, req *types.GetCommitsReq) (*types.CommitResponse, error) {
