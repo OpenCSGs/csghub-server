@@ -19,6 +19,7 @@ import (
 	"opencsg.com/csghub-server/builder/loki"
 	"opencsg.com/csghub-server/builder/redis"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	hubcom "opencsg.com/csghub-server/common/utils/common"
@@ -41,7 +42,6 @@ type Deployer interface {
 	InstanceLogs(ctx context.Context, dr types.DeployRepo) (*MultiLogReader, error)
 	ListCluster(ctx context.Context) ([]types.ClusterRes, error)
 	GetClusterById(ctx context.Context, clusterId string) (*types.ClusterRes, error)
-	GetClusterUsageById(ctx context.Context, clusterId string) (*types.ClusterRes, error)
 	UpdateCluster(ctx context.Context, data types.ClusterRequest) (*types.UpdateClusterResponse, error)
 	UpdateDeploy(ctx context.Context, dur *types.DeployUpdateReq, deploy *database.Deploy) error
 	StartDeploy(ctx context.Context, deploy *database.Deploy) error
@@ -54,6 +54,7 @@ type Deployer interface {
 	DeleteFinetuneJob(ctx context.Context, req types.ArgoWorkFlowDeleteReq) error
 	GetWorkflowLogsInStream(ctx context.Context, req types.FinetuneLogReq) (*MultiLogReader, error)
 	GetWorkflowLogsNonStream(ctx context.Context, req types.FinetuneLogReq) (*loki.LokiQueryResponse, error)
+	GetSharedModeResourceName(config *config.Config) string
 }
 
 func (d *deployer) GenerateUniqueSvcName(dr types.DeployRepo) string {
@@ -1278,4 +1279,16 @@ func (d *deployer) CheckClusterHealthy(ctx context.Context, deployId string) boo
 		return false
 	}
 	return true
+}
+
+func (d *deployer) IsDefaultScheduler() bool {
+	return d.kubeScheduler == nil
+}
+
+func (d *deployer) GetSharedModeResourceName(config *config.Config) string {
+	resourceName := common.DefaultResourceName
+	if !d.IsDefaultScheduler() {
+		resourceName = config.Runner.VGPUResourceReqKey
+	}
+	return resourceName
 }
