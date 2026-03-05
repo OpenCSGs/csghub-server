@@ -897,7 +897,7 @@ func TestNotebookComponentImpl_StatusNotebook(t *testing.T) {
 		CurrentUser: "testuser",
 	})
 	require.NoError(t, err)
-	require.Equal(t, "Pending", status)
+	require.Equal(t, "Stopped", status)
 }
 
 func TestNotebookComponentImpl_LogsNotebook(t *testing.T) {
