@@ -826,7 +826,11 @@ func (c *repoComponentImpl) DeployUpdate(ctx context.Context, updateReq types.De
 		if err != nil {
 			return fmt.Errorf("cannot find available resource, %w", err)
 		}
-		err = c.CheckAccountAndResource(ctx, updateReq.CurrentUser, resource.ClusterID, deploy.OrderDetailID, resource)
+		billingNamespace := deploy.OwnerNamespace
+		if billingNamespace == "" {
+			billingNamespace = updateReq.CurrentUser
+		}
+		err = c.CheckAccountAndResource(ctx, billingNamespace, resource.ClusterID, deploy.OrderDetailID, resource)
 		if err != nil {
 			return err
 		}
@@ -911,8 +915,11 @@ func (c *repoComponentImpl) DeployStart(ctx context.Context, startReq types.Depl
 	if err != nil {
 		return fmt.Errorf("failed to find resource, %w", err)
 	}
-	// check resource available
-	err = c.CheckAccountAndResource(ctx, startReq.CurrentUser, deploy.ClusterID, deploy.OrderDetailID, resource)
+	billingNamespace := deploy.OwnerNamespace
+	if billingNamespace == "" {
+		billingNamespace = startReq.CurrentUser
+	}
+	err = c.CheckAccountAndResource(ctx, billingNamespace, deploy.ClusterID, deploy.OrderDetailID, resource)
 	if err != nil {
 		return err
 	}

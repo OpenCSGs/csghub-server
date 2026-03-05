@@ -2538,6 +2538,63 @@ func (_c *MockRepoComponent_GetNameSpaceInfo_Call) RunAndReturn(run func(context
 	return _c
 }
 
+// GetNamespaceBillingUUID provides a mock function with given fields: ctx, namespace
+func (_m *MockRepoComponent) GetNamespaceBillingUUID(ctx context.Context, namespace string) (string, error) {
+	ret := _m.Called(ctx, namespace)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetNamespaceBillingUUID")
+	}
+
+	var r0 string
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (string, error)); ok {
+		return rf(ctx, namespace)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) string); ok {
+		r0 = rf(ctx, namespace)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, namespace)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockRepoComponent_GetNamespaceBillingUUID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetNamespaceBillingUUID'
+type MockRepoComponent_GetNamespaceBillingUUID_Call struct {
+	*mock.Call
+}
+
+// GetNamespaceBillingUUID is a helper method to define mock.On call
+//   - ctx context.Context
+//   - namespace string
+func (_e *MockRepoComponent_Expecter) GetNamespaceBillingUUID(ctx interface{}, namespace interface{}) *MockRepoComponent_GetNamespaceBillingUUID_Call {
+	return &MockRepoComponent_GetNamespaceBillingUUID_Call{Call: _e.mock.On("GetNamespaceBillingUUID", ctx, namespace)}
+}
+
+func (_c *MockRepoComponent_GetNamespaceBillingUUID_Call) Run(run func(ctx context.Context, namespace string)) *MockRepoComponent_GetNamespaceBillingUUID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockRepoComponent_GetNamespaceBillingUUID_Call) Return(_a0 string, _a1 error) *MockRepoComponent_GetNamespaceBillingUUID_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockRepoComponent_GetNamespaceBillingUUID_Call) RunAndReturn(run func(context.Context, string) (string, error)) *MockRepoComponent_GetNamespaceBillingUUID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetRepos provides a mock function with given fields: ctx, search, currentUser, repoType
 func (_m *MockRepoComponent) GetRepos(ctx context.Context, search string, currentUser string, repoType types.RepositoryType) ([]string, error) {
 	ret := _m.Called(ctx, search, currentUser, repoType)

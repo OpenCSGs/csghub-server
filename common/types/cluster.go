@@ -233,7 +233,6 @@ type NodeLabel struct {
 
 type SetNodeAccessModeReq struct {
 	NodeID    int64  `json:"-"`
-	UserName  string `json:"user_name"`
-	OrgName   string `json:"org_name"`
+	Namespace string `json:"-"`
 	Exclusive bool   `json:"exclusive"`
 }
