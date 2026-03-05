@@ -801,7 +801,7 @@ func TestModelComponent_GetServerless(t *testing.T) {
 	require.Equal(t, &types.DeployRepo{
 		DeployID:      1,
 		ProxyEndpoint: "ep",
-		Status:        "Pending",
+		Status:        "Stopped",
 	}, dr)
 
 }
