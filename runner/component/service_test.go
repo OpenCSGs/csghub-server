@@ -142,6 +142,42 @@ func TestServiceComponent_StopService(t *testing.T) {
 	require.Equal(t, resp.Code, 0)
 }
 
+func TestServiceComponent_StopService_NotExistInK8s(t *testing.T) {
+	kss := mockdb.NewMockKnativeServiceStore(t)
+	ctx := context.TODO()
+	pool := mockCluster.NewMockPool(t)
+	kubeClient := fake.NewSimpleClientset()
+	knativeClient := knativefake.NewSimpleClientset()
+	cluster := cluster.Cluster{
+		CID:           "config",
+		ID:            "test",
+		Client:        kubeClient,
+		KnativeClient: knativeClient,
+	}
+	pool.EXPECT().GetClusterByID(mock.Anything, "test").Return(&cluster, nil)
+	sc := &serviceComponentImpl{
+		k8sNameSpace:       "test",
+		env:                &config.Config{},
+		spaceDockerRegBase: "http://test.com",
+		modelDockerRegBase: "http://test.com",
+		imagePullSecret:    "test",
+		serviceStore:       kss,
+		clusterPool:        pool,
+		logReporter:        mockReporter.NewMockLogCollector(t),
+	}
+
+	kss.EXPECT().Delete(ctx, "test", "nonexistent").Return(nil)
+
+	resp, err := sc.StopService(ctx, types.StopRequest{
+		SvcName:   "nonexistent",
+		ClusterID: "test",
+	})
+	require.Nil(t, err)
+	require.NotNil(t, resp)
+	require.Equal(t, resp.Code, 0)
+	require.Equal(t, "skip,service not exist", resp.Message)
+}
+
 func TestServiceComponent_PurgeService(t *testing.T) {
 	kss := mockdb.NewMockKnativeServiceStore(t)
 	ctx := context.TODO()

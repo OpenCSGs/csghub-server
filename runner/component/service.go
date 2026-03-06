@@ -1202,6 +1202,12 @@ func (s *serviceComponentImpl) StopService(ctx context.Context, req types.StopRe
 		k8serr := new(k8serrors.StatusError)
 		if errors.As(err, &k8serr) {
 			if k8serr.Status().Code == http.StatusNotFound {
+				// force delete db record for not exist ksvc
+				dberr := s.serviceStore.Delete(ctx, cluster.ID, req.SvcName)
+				if dberr != nil && !errors.Is(dberr, sql.ErrNoRows) {
+					slog.ErrorContext(ctx, "clean db record %s failed, error: %v", req.SvcName, dberr)
+				}
+				
 				slog.Info("stop service skip,service not exist", slog.String("svc_name", req.SvcName), slog.Any("k8s_err", k8serr))
 				resp.Code = 0
 				resp.Message = "skip,service not exist"
