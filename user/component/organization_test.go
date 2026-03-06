@@ -2,6 +2,7 @@ package component
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/google/uuid"
@@ -29,6 +30,8 @@ func TestOrganizationComponent_Create(t *testing.T) {
 	mockUserStore.EXPECT().FindByUsername(mock.Anything, req.Username).Return(database.User{
 		Username: "user1",
 	}, nil).Once()
+	// Mock FindByUUID to return not found (so UUID doesn't conflict)
+	mockUserStore.EXPECT().FindByUUID(mock.Anything, mock.Anything).Return(nil, errors.New("not found")).Once()
 
 	mockNamespaceStore := mockdb.NewMockNamespaceStore(t)
 	mockNamespaceStore.EXPECT().Exists(mock.Anything, req.Name).Return(false, nil).Once()
