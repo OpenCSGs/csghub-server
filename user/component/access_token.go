@@ -2,7 +2,6 @@ package component
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -15,6 +14,7 @@ import (
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -144,8 +144,11 @@ func (c *accessTokenComponentImpl) Delete(ctx context.Context, req *types.Delete
 		return fmt.Errorf("user does not exists,error:%w", err)
 	}
 	te, err := c.ts.IsExist(ctx, req.Username, req.TokenName, string(req.Application))
+	if err != nil {
+		return fmt.Errorf("failed to check if token exists,error:%w", err)
+	}
 	if !te {
-		return fmt.Errorf("user access token does not exists,error:%w", err)
+		return errorx.ErrNotFound
 	}
 
 	if req.Application == types.AccessTokenAppGit {
@@ -166,7 +169,10 @@ func (c *accessTokenComponentImpl) Check(ctx context.Context, req *types.CheckAc
 	var resp types.CheckAccessTokenResp
 	t, err := c.ts.FindByToken(ctx, req.Token, req.Application)
 	if err != nil {
-		return resp, fmt.Errorf("failed to find database user access token,error:%w", err)
+		if errors.Is(err, errorx.ErrDatabaseNoRows) {
+			return resp, errorx.ErrNotFound
+		}
+		return resp, err
 	}
 
 	resp.Token = t.Token
@@ -182,8 +188,8 @@ func (c *accessTokenComponentImpl) Check(ctx context.Context, req *types.CheckAc
 func (c *accessTokenComponentImpl) GetTokens(ctx context.Context, username, app string) ([]types.CheckAccessTokenResp, error) {
 	var resps []types.CheckAccessTokenResp
 	tokens, err := c.ts.FindByUser(ctx, username, app)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return nil, fmt.Errorf("failed to find database user access token,error:%w", err)
+	if err != nil {
+		return nil, err
 	}
 
 	for _, t := range tokens {
@@ -205,7 +211,10 @@ func (c *accessTokenComponentImpl) RefreshToken(ctx context.Context, userName, t
 	var resp types.CheckAccessTokenResp
 	t, err := c.ts.FindByTokenName(ctx, userName, tokenName, app)
 	if err != nil {
-		return types.CheckAccessTokenResp{}, fmt.Errorf("failed to find database user access token,error:%w", err)
+		if errors.Is(err, errorx.ErrDatabaseNoRows) {
+			return types.CheckAccessTokenResp{}, errorx.ErrNotFound
+		}
+		return types.CheckAccessTokenResp{}, err
 	}
 
 	var newTokenValue string
