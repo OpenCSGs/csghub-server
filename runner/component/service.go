@@ -1409,6 +1409,7 @@ func (s *serviceComponentImpl) updateKServiceWithEvent(ctx context.Context, ksvc
 			TaskID:      ksvc.TaskID,
 			ClusterNode: ksvc.ClusterNode,
 			QueueName:   ksvc.QueueName,
+			Instances:   ksvc.Instances,
 		}
 		s.pushEvent(types.RunnerServiceChange, updateEvent, ksvc.ClusterID)
 	}

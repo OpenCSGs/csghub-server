@@ -43,7 +43,7 @@ func NewRepoHandler(config *config.Config) (*RepoHandler, error) {
 		c:                         uc,
 		m:                         m,
 		d:                         d,
-		deployStatusCheckInterval: 5 * time.Second,
+		deployStatusCheckInterval: time.Duration(config.Model.DeployStatusCheckInterval) * time.Second,
 		config:                    config,
 	}, nil
 }

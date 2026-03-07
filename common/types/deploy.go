@@ -1,6 +1,8 @@
 package types
 
-import "time"
+import (
+	"time"
+)
 
 const (
 	// EngineArgEnableToolCalling is the engine argument for enabling tool calling
@@ -20,14 +22,15 @@ type DeployReq struct {
 }
 
 type ServiceEvent struct {
-	ServiceName string `json:"service_name"` // service name
-	Status      int    `json:"status"`       // event status
-	Endpoint    string `json:"endpoint"`     // service endpoint
-	Message     string `json:"message"`      // event message
-	Reason      string `json:"reason"`       // event reason
-	TaskID      int64  `json:"task_id"`      // task id
-	ClusterNode string `json:"cluster_node"` // cluster node name
-	QueueName   string `json:"queue_name"`   // queue name
+	ServiceName string     `json:"service_name"` // service name
+	Status      int        `json:"status"`       // event status
+	Endpoint    string     `json:"endpoint"`     // service endpoint
+	Message     string     `json:"message"`      // event message
+	Reason      string     `json:"reason"`       // event reason
+	TaskID      int64      `json:"task_id"`      // task id
+	ClusterNode string     `json:"cluster_node"` // cluster node name
+	QueueName   string     `json:"queue_name"`   // queue name
+	Instances   []Instance `json:"instances"`
 }
 
 type StatRunningDeploy struct {
