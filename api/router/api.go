@@ -1330,6 +1330,10 @@ func createOrgRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware.
 		apiGroup.GET("/organization/:namespace/collections", orgHandler.Collections)
 		apiGroup.GET("/organization/:namespace/prompts", orgHandler.Prompts)
 		apiGroup.GET("/organization/:namespace/mcps", orgHandler.MCPServers)
+		apiGroup.GET("/organization/:namespace/finetunes", orgHandler.Finetunes)
+		apiGroup.GET("/organization/:namespace/evaluations", orgHandler.Evaluations)
+		apiGroup.GET("/organization/:namespace/run/:repo_type", orgHandler.RunDeploys)
+		apiGroup.GET("/organization/:namespace/notebooks", orgHandler.Notebooks)
 	}
 
 	{

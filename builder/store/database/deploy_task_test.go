@@ -612,6 +612,53 @@ func TestDeployTaskStore_ListDeployBytype(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, 0, len(result))
 }
+
+func TestDeployTaskStore_ListDeployByOwnerNamespace(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+	store := database.NewDeployTaskStoreWithDB(db)
+
+	deploys := []database.Deploy{
+		{UserID: 1, SpaceID: 0, ModelID: 101, RepoID: 101, Type: types.InferenceType, Status: common.Running, DeployName: "inf-org1-1", OwnerNamespace: "org1", GitPath: "models_a/b", GitBranch: "main", Template: "t", Hardware: "{}"},
+		{UserID: 1, SpaceID: 0, ModelID: 102, RepoID: 102, Type: types.InferenceType, Status: common.Running, DeployName: "inf-org1-2", OwnerNamespace: "org1", GitPath: "models_c/d", GitBranch: "main", Template: "t", Hardware: "{}"},
+		{UserID: 1, SpaceID: 0, ModelID: 103, RepoID: 103, Type: types.InferenceType, Status: common.Running, DeployName: "inf-org2-1", OwnerNamespace: "org2", GitPath: "models_e/f", GitBranch: "main", Template: "t", Hardware: "{}"},
+		{UserID: 1, SpaceID: 201, ModelID: 0, RepoID: 201, Type: types.SpaceType, Status: common.Running, DeployName: "space-org1-1", OwnerNamespace: "org1", GitPath: "spaces_x/y", GitBranch: "main", Template: "t", Hardware: "{}"},
+	}
+	for i := range deploys {
+		err := store.CreateDeploy(ctx, &deploys[i])
+		require.Nil(t, err)
+	}
+
+	req := &types.DeployReq{
+		PageOpts:   types.PageOpts{Page: 1, PageSize: 10},
+		DeployType: types.InferenceType,
+		RepoType:   types.ModelRepo,
+	}
+	result, total, err := store.ListDeployByOwnerNamespace(ctx, "org1", req)
+	require.Nil(t, err)
+	require.Equal(t, 2, total)
+	require.Len(t, result, 2)
+	names := make([]string, len(result))
+	for i, d := range result {
+		names[i] = d.DeployName
+	}
+	require.ElementsMatch(t, []string{"inf-org1-1", "inf-org1-2"}, names)
+
+	req.RepoType = types.SpaceRepo
+	result, total, err = store.ListDeployByOwnerNamespace(ctx, "org1", req)
+	require.Nil(t, err)
+	require.Equal(t, 0, total)
+	require.Len(t, result, 0)
+
+	req.DeployType = types.SpaceType
+	result, total, err = store.ListDeployByOwnerNamespace(ctx, "org1", req)
+	require.Nil(t, err)
+	require.Equal(t, 1, total)
+	require.Len(t, result, 1)
+	require.Equal(t, "space-org1-1", result[0].DeployName)
+}
+
 func TestDeployTaskStore_DeleteDeployByID(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()

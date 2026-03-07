@@ -112,7 +112,19 @@ type (
 	OrgCollectionsReq = OrgDatasetsReq
 	OrgPromptsReq     = OrgDatasetsReq
 	OrgMCPsReq        = OrgDatasetsReq
+	OrgFinetunesReq   = OrgDatasetsReq
+	OrgEvaluationsReq = OrgDatasetsReq
+	OrgNotebooksReq   = OrgDatasetsReq
 )
+
+// OrgRunDeploysReq is used for listing organization run deploys (e.g. inference).
+type OrgRunDeploysReq struct {
+	Namespace   string `json:"-"`
+	CurrentUser string `json:"-"`
+	RepoType    RepositoryType `json:"-"`
+	DeployType  int            `json:"-"`
+	PageOpts
+}
 
 type Organization struct {
 	// unique name of the organization

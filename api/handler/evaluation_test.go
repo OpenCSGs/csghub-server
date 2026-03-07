@@ -45,7 +45,8 @@ func TestEvaluationHandler_Run(t *testing.T) {
 
 	tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), &types.EvaluationReq{}).Return(true, nil)
 	tester.mocks.evaluation.EXPECT().CreateEvaluation(tester.Ctx(), types.EvaluationReq{
-		Username: "u",
+		Username:       "u",
+		OwnerNamespace: "u",
 	}).Return(&types.ArgoWorkFlowRes{ID: 1}, nil)
 	tester.WithBody(t, &types.EvaluationReq{}).Execute()
 
@@ -83,4 +84,21 @@ func TestEvaluationHandler_Delete(t *testing.T) {
 
 	tester.ResponseEq(t, 200, tester.OKText, nil)
 
+}
+
+func TestEvaluationHandler_Run_WithExplicitNamespace(t *testing.T) {
+	tester := NewEvaluationTester(t).WithHandleFunc(func(h *EvaluationHandler) gin.HandlerFunc {
+		return h.RunEvaluation
+	})
+	tester.WithUser()
+
+	body := &types.EvaluationReq{OwnerNamespace: "org1"}
+	tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), body).Return(true, nil)
+	tester.mocks.evaluation.EXPECT().CreateEvaluation(tester.Ctx(), types.EvaluationReq{
+		Username:       "u",
+		OwnerNamespace: "org1",
+	}).Return(&types.ArgoWorkFlowRes{ID: 1}, nil)
+	tester.WithBody(t, body).Execute()
+
+	tester.ResponseEq(t, 200, tester.OKText, &types.ArgoWorkFlowRes{ID: 1})
 }
