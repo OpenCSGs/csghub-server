@@ -83,6 +83,7 @@ type AgentType string
 const (
 	AgentTypeLangflow AgentType = "langflow"
 	AgentTypeCode     AgentType = "code"
+	AgentTypeOpenClaw AgentType = "openclaw"
 )
 
 func (t AgentType) String() string {
