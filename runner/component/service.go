@@ -153,7 +153,8 @@ func (s *serviceComponentImpl) generateService(ctx context.Context, cluster *clu
 		environments = append(environments, corev1.EnvVar{Name: "TOPS_VISIBLE_DEVICES", Value: "none"})
 	}
 
-	if hardware.Dcu.ResourceName == "" || hardware.Dcu.Num == "" {
+	// ROCR is used by both AMD GPU and DCU; only set to none when neither has value
+	if (hardware.Dcu.ResourceName == "" && hardware.Dcu.Num == "") && (hardware.Gpu.ResourceName == "" && hardware.Gpu.Num == "") {
 		environments = append(environments, corev1.EnvVar{Name: "ROCR_VISIBLE_DEVICES", Value: "none"})
 	}
 
