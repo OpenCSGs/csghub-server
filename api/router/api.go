@@ -1116,6 +1116,11 @@ func createMappingRoutes(
 			hfMcpserverFileGroup.GET("/:namespace/:name/resolve/:branch/*file_path", middleware.RepoMapping(types.MCPServerRepo), repoCommonHandler.SDKDownload)
 			hfMcpserverFileGroup.HEAD("/:namespace/:name/resolve/:branch/*file_path", middleware.RepoMapping(types.MCPServerRepo), repoCommonHandler.HeadSDKDownload)
 		}
+		hfSkillFileGroup := hfGroup.Group("/skills")
+		{
+			hfSkillFileGroup.GET("/:namespace/:name/resolve/:branch/*file_path", middleware.RepoMapping(types.SkillRepo), repoCommonHandler.SDKDownload)
+			hfSkillFileGroup.HEAD("/:namespace/:name/resolve/:branch/*file_path", middleware.RepoMapping(types.SkillRepo), repoCommonHandler.HeadSDKDownload)
+		}
 		hfAPIGroup := hfGroup.Group("/api")
 		{
 			hfAPIGroup.GET("/whoami-v2", middlewareCollection.Auth.NeedLogin, userHandler.UserPermission)
@@ -1152,6 +1157,11 @@ func createMappingRoutes(
 			{
 				hfMcperverAPIGroup.GET("/:namespace/:name/revision/:ref", middleware.RepoMapping(types.MCPServerRepo), repoCommonHandler.SDKListFiles)
 				hfMcperverAPIGroup.GET("/:namespace/:name", middleware.RepoMapping(types.MCPServerRepo), repoCommonHandler.SDKListFiles)
+			}
+			hfSkillAPIGroup := hfAPIGroup.Group("/skills")
+			{
+				hfSkillAPIGroup.GET("/:namespace/:name/revision/:ref", middleware.RepoMapping(types.SkillRepo), repoCommonHandler.SDKListFiles)
+				hfSkillAPIGroup.GET("/:namespace/:name", middleware.RepoMapping(types.SkillRepo), repoCommonHandler.SDKListFiles)
 			}
 			hfReposAPIGroup := hfAPIGroup.Group("/repos")
 			{
