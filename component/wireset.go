@@ -260,6 +260,8 @@ func NewTestAccountingComponent(stores *tests.MockStores, accountingClient accou
 	return &accountingComponentImpl{
 		accountingClient: accountingClient,
 		userStore:        stores.User,
+		orgStore:         stores.Org,
+		memberStore:      stores.Member,
 		deployTaskStore:  stores.DeployTask,
 	}
 }
