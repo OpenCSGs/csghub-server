@@ -246,6 +246,72 @@ func (_c *MockFinetuneComponent_GetFinetuneJob_Call) RunAndReturn(run func(conte
 	return _c
 }
 
+// OrgFinetunes provides a mock function with given fields: ctx, req
+func (_m *MockFinetuneComponent) OrgFinetunes(ctx context.Context, req *types.OrgFinetunesReq) ([]types.ArgoWorkFlowRes, int, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for OrgFinetunes")
+	}
+
+	var r0 []types.ArgoWorkFlowRes
+	var r1 int
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, *types.OrgFinetunesReq) ([]types.ArgoWorkFlowRes, int, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *types.OrgFinetunesReq) []types.ArgoWorkFlowRes); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]types.ArgoWorkFlowRes)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *types.OrgFinetunesReq) int); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, *types.OrgFinetunesReq) error); ok {
+		r2 = rf(ctx, req)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockFinetuneComponent_OrgFinetunes_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'OrgFinetunes'
+type MockFinetuneComponent_OrgFinetunes_Call struct {
+	*mock.Call
+}
+
+// OrgFinetunes is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req *types.OrgFinetunesReq
+func (_e *MockFinetuneComponent_Expecter) OrgFinetunes(ctx interface{}, req interface{}) *MockFinetuneComponent_OrgFinetunes_Call {
+	return &MockFinetuneComponent_OrgFinetunes_Call{Call: _e.mock.On("OrgFinetunes", ctx, req)}
+}
+
+func (_c *MockFinetuneComponent_OrgFinetunes_Call) Run(run func(ctx context.Context, req *types.OrgFinetunesReq)) *MockFinetuneComponent_OrgFinetunes_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*types.OrgFinetunesReq))
+	})
+	return _c
+}
+
+func (_c *MockFinetuneComponent_OrgFinetunes_Call) Return(_a0 []types.ArgoWorkFlowRes, _a1 int, _a2 error) *MockFinetuneComponent_OrgFinetunes_Call {
+	_c.Call.Return(_a0, _a1, _a2)
+	return _c
+}
+
+func (_c *MockFinetuneComponent_OrgFinetunes_Call) RunAndReturn(run func(context.Context, *types.OrgFinetunesReq) ([]types.ArgoWorkFlowRes, int, error)) *MockFinetuneComponent_OrgFinetunes_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ReadJobLogsInStream provides a mock function with given fields: ctx, req
 func (_m *MockFinetuneComponent) ReadJobLogsInStream(ctx context.Context, req types.FinetuneLogReq) (*deploy.MultiLogReader, error) {
 	ret := _m.Called(ctx, req)

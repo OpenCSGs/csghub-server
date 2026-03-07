@@ -964,6 +964,8 @@ func TestDeployTaskStore_GetClusterDeploys(t *testing.T) {
 
 	store := database.NewDeployTaskStoreWithDB(db)
 
+	runningStatus := common.Running
+
 	// Create test users first (since we need to join with users table)
 	user1 := &database.User{Username: "user1", NickName: "User One", Email: "user1@test.com", UUID: "uuid-user-1"}
 	user2 := &database.User{Username: "user2", NickName: "User Two", Email: "user2@test.com", UUID: "uuid-user-2"}
@@ -1084,10 +1086,11 @@ func TestDeployTaskStore_GetClusterDeploys(t *testing.T) {
 
 	// Test 3: Filter by Status
 	result, total, err = store.GetClusterDeploys(ctx, types.ClusterDeployReq{
-		Status: common.Running,
+		Status: runningStatus,
 		Per:    10,
 		Page:   1,
 	})
+	require.Nil(t, err)
 	require.Nil(t, err)
 	require.Equal(t, 2, total)
 	require.Equal(t, 2, len(result))
@@ -1143,11 +1146,12 @@ func TestDeployTaskStore_GetClusterDeploys(t *testing.T) {
 	// Test 7: Combined filters
 	result, total, err = store.GetClusterDeploys(ctx, types.ClusterDeployReq{
 		ClusterID:    "cluster-1",
-		Status:       common.Running,
+		Status:       runningStatus,
 		ResourceName: "nvidia-a100",
 		Per:          10,
 		Page:         1,
 	})
+	require.Nil(t, err)
 	require.Nil(t, err)
 	require.Equal(t, 1, total)
 	require.Equal(t, 1, len(result))
@@ -1201,4 +1205,126 @@ func TestDeployTaskStore_GetClusterDeploys(t *testing.T) {
 	require.Equal(t, 1, total)
 	require.NotNil(t, result[0].User)
 	require.Equal(t, "user3", result[0].User.Username)
+}
+
+func TestDeployTaskStore_ListDeploysByTimeRange(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewDeployTaskStoreWithDB(db)
+
+	now := time.Now().UTC().Truncate(time.Second)
+
+	// Create test users first (since we need to join with users table)
+	user1 := &database.User{Username: "user1", NickName: "User One", Email: "user1@test.com", UUID: "uuid-user-1"}
+	user2 := &database.User{Username: "user2", NickName: "User Two", Email: "user2@test.com", UUID: "uuid-user-2"}
+
+	for _, u := range []*database.User{user1, user2} {
+		_, err := db.Core.NewInsert().Model(u).Exec(ctx)
+		require.Nil(t, err)
+	}
+
+	// Create deploys with different timestamps
+	deploys := []database.Deploy{
+		{UserID: user1.ID, Type: 1, Status: common.Running, DeployName: "deploy-old", SvcName: "svc-old", RepoID: 1},
+		{UserID: user1.ID, Type: 1, Status: common.Running, DeployName: "deploy-middle", SvcName: "svc-middle", RepoID: 2},
+		{UserID: user2.ID, Type: 1, Status: common.Running, DeployName: "deploy-recent", SvcName: "svc-recent", RepoID: 3},
+		{UserID: user2.ID, Type: 2, Status: common.Stopped, DeployName: "deploy-stopped", SvcName: "svc-stopped", RepoID: 4},
+	}
+
+	for _, dp := range deploys {
+		err := store.CreateDeploy(ctx, &dp)
+		require.Nil(t, err)
+	}
+
+	// Set different timestamps for each deploy
+	// deploy-old: 72 hours ago
+	// deploy-middle: 24 hours ago
+	// deploy-recent: 2 hours ago
+	// deploy-stopped: 1 hour ago
+	older := now.Add(-72 * time.Hour)
+	middle := now.Add(-24 * time.Hour)
+	recent := now.Add(-2 * time.Hour)
+	latest := now.Add(-1 * time.Hour)
+
+	_, err := db.BunDB.ExecContext(ctx, "UPDATE deploys SET created_at = ?, updated_at = ? WHERE deploy_name = ?", older, older, "deploy-old")
+	require.NoError(t, err)
+	_, err = db.BunDB.ExecContext(ctx, "UPDATE deploys SET created_at = ?, updated_at = ? WHERE deploy_name = ?", middle, middle, "deploy-middle")
+	require.NoError(t, err)
+	_, err = db.BunDB.ExecContext(ctx, "UPDATE deploys SET created_at = ?, updated_at = ? WHERE deploy_name = ?", recent, recent, "deploy-recent")
+	require.NoError(t, err)
+	_, err = db.BunDB.ExecContext(ctx, "UPDATE deploys SET created_at = ?, updated_at = ? WHERE deploy_name = ?", latest, latest, "deploy-stopped")
+	require.NoError(t, err)
+
+	// Test 1: Query with no time filter (should return all)
+	result, total, err := store.ListDeploysByTimeRange(ctx, types.DeployTimeRangeReq{})
+	require.Nil(t, err)
+	require.Equal(t, 4, total)
+	require.Equal(t, 4, len(result))
+
+	// Test 2: Query with start time only (last 48 hours)
+	startTime := now.Add(-48 * time.Hour)
+	result, total, err = store.ListDeploysByTimeRange(ctx, types.DeployTimeRangeReq{
+		StartTime: &startTime,
+	})
+	require.Nil(t, err)
+	require.Equal(t, 3, total) // deploy-middle, deploy-recent, deploy-stopped
+	require.Equal(t, 3, len(result))
+
+	// Test 3: Query with end time only (before 48 hours ago)
+	endTime := now.Add(-48 * time.Hour)
+	result, total, err = store.ListDeploysByTimeRange(ctx, types.DeployTimeRangeReq{
+		EndTime: &endTime,
+	})
+	require.Nil(t, err)
+	require.Equal(t, 1, total) // deploy-old only
+	require.Equal(t, 1, len(result))
+	require.Equal(t, "deploy-old", result[0].DeployName)
+
+	// Test 4: Query with both start and end time (last 25 hours)
+	startTime = now.Add(-25 * time.Hour)
+	endTime = now
+	result, total, err = store.ListDeploysByTimeRange(ctx, types.DeployTimeRangeReq{
+		StartTime: &startTime,
+		EndTime:   &endTime,
+	})
+	require.Nil(t, err)
+	require.Equal(t, 3, total) // deploy-middle, deploy-recent, deploy-stopped
+	require.Equal(t, 3, len(result))
+
+	// Verify results are ordered by created_at DESC
+	for i := 0; i < len(result)-1; i++ {
+		require.True(t, result[i].CreatedAt.After(result[i+1].CreatedAt) || result[i].CreatedAt.Equal(result[i+1].CreatedAt),
+			"Results should be ordered by created_at DESC")
+	}
+
+	// Test 5: Query with very narrow time range (no results)
+	narrowStart := now.Add(-30 * time.Minute)
+	narrowEnd := now.Add(-20 * time.Minute)
+	result, total, err = store.ListDeploysByTimeRange(ctx, types.DeployTimeRangeReq{
+		StartTime: &narrowStart,
+		EndTime:   &narrowEnd,
+	})
+	require.Nil(t, err)
+	require.Equal(t, 0, total)
+	require.Equal(t, 0, len(result))
+
+	// Test 6: Query with time range covering all (last 200 hours)
+	wideStart := now.Add(-200 * time.Hour)
+	wideEnd := now
+	result, total, err = store.ListDeploysByTimeRange(ctx, types.DeployTimeRangeReq{
+		StartTime: &wideStart,
+		EndTime:   &wideEnd,
+	})
+	require.Nil(t, err)
+	require.Equal(t, 4, total)
+	require.Equal(t, 4, len(result))
+
+	// Test 7: Verify User relation is loaded
+	result, _, err = store.ListDeploysByTimeRange(ctx, types.DeployTimeRangeReq{})
+	require.Nil(t, err)
+	for _, dp := range result {
+		require.NotNil(t, dp.User, "User relation should be loaded")
+	}
 }

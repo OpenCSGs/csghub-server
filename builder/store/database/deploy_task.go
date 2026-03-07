@@ -114,6 +114,7 @@ type DeployTaskStore interface {
 	ListAllRunningDeploys(ctx context.Context) ([]Deploy, error)
 	GetLastTaskByType(ctx context.Context, deployID int64, taskType int) (*DeployTask, error)
 	GetClusterDeploys(ctx context.Context, req types.ClusterDeployReq) ([]Deploy, int, error)
+	ListDeploysByTimeRange(ctx context.Context, req types.DeployTimeRangeReq) ([]Deploy, int, error)
 }
 
 func NewDeployTaskStore() DeployTaskStore {
@@ -614,3 +615,39 @@ func (s *deployTaskStoreImpl) GetClusterDeploys(ctx context.Context, req types.C
 
 	return result, total, nil
 }
+func (s *deployTaskStoreImpl) ListDeploysByTimeRange(ctx context.Context, req types.DeployTimeRangeReq) ([]Deploy, int, error) {
+	var result []Deploy
+	query := s.db.Operator.Core.NewSelect().Model(&result).Relation("User")
+
+	if req.StartTime != nil {
+		query = query.Where("deploy.created_at >= ?", req.StartTime)
+	}
+	if req.EndTime != nil {
+		query = query.Where("deploy.created_at <= ?", req.EndTime)
+	}
+
+	// Get total count
+	total, err := query.Count(ctx)
+	if err != nil {
+		err = errorx.HandleDBError(err, nil)
+		return nil, 0, err
+	}
+
+	// Apply pagination
+	if req.PageSize > 0 {
+		query = query.Limit(req.PageSize)
+	}
+	if req.Page > 0 {
+		query = query.Offset((req.Page - 1) * req.PageSize)
+	}
+
+	query = query.Order("deploy.created_at DESC")
+	_, err = query.Exec(ctx, &result)
+	if err != nil {
+		err = errorx.HandleDBError(err, nil)
+		return nil, 0, err
+	}
+
+	return result, total, nil
+}
+

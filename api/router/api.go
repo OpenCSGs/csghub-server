@@ -1411,8 +1411,9 @@ func createClusterRoutes(apiGroup *gin.RouterGroup, middlewareCollection middlew
 		clusterGrp.PUT("/:id", middlewareCollection.Auth.NeedAdmin, clusterHandler.Update)
 		clusterGrp.GET("/public", clusterHandler.GetClusterPublic)
 	}
-
-	err = createComputingRoutes(clusterGrp, middlewareCollection, config, clusterHandler)
+	adminGrp := apiGroup.Group("/admin")
+	adminGrp.Use(middleware.NeedAdmin(config))
+	err = createComputingRoutes(adminGrp, clusterHandler)
 	if err != nil {
 		return fmt.Errorf("error creating computing routes: %w", err)
 	}
