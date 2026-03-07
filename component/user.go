@@ -47,6 +47,7 @@ type UserComponent interface {
 	LikesMCPServers(ctx context.Context, req *types.UserMCPsReq) ([]types.MCPServer, int, error)
 	ListNotebooks(ctx context.Context, req *types.DeployReq) ([]types.NotebookRes, int, error)
 	ListFinetunes(ctx context.Context, req *types.UserEvaluationReq) ([]types.ArgoWorkFlowRes, int, error)
+	LikesSkills(ctx context.Context, req *types.UserMCPsReq) ([]types.Skill, int, error)
 }
 
 func NewUserComponent(config *config.Config) (UserComponent, error) {
@@ -88,6 +89,7 @@ func NewUserComponent(config *config.Config) (UserComponent, error) {
 	c.promptStore = database.NewPromptStore()
 	c.workflowStore = database.NewArgoWorkFlowStore()
 	c.mcpServerStore = database.NewMCPServerStore()
+	c.skillStore = database.NewSkillStore()
 	return c, nil
 }
 
@@ -112,6 +114,7 @@ type userComponentImpl struct {
 	promptStore         database.PromptStore
 	workflowStore       database.ArgoWorkFlowStore
 	mcpServerStore      database.MCPServerStore
+	skillStore          database.SkillStore
 }
 
 func (c *userComponentImpl) Datasets(ctx context.Context, req *types.UserDatasetsReq) ([]types.Dataset, int, error) {
@@ -775,6 +778,40 @@ func (c *userComponentImpl) LikesMCPServers(ctx context.Context, req *types.User
 			GithubPath:   mcpServer.Repository.GithubPath,
 			ToolsNum:     mcpServer.ToolsNum,
 			StarNum:      mcpServer.Repository.StarCount,
+		})
+	}
+
+	return res, total, nil
+}
+
+func (c *userComponentImpl) LikesSkills(ctx context.Context, req *types.UserMCPsReq) ([]types.Skill, int, error) {
+	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to get user by username %s, error: %w", req.CurrentUser, err)
+	}
+
+	skills, total, err := c.skillStore.UserLikesSkills(ctx, user.ID, req.PageSize, req.Page)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to get user liked skills, error: %w", err)
+	}
+
+	var res []types.Skill
+	for _, skill := range skills {
+		res = append(res, types.Skill{
+			ID:           skill.ID,
+			Name:         skill.Repository.Name,
+			Nickname:     skill.Repository.Nickname,
+			Description:  skill.Repository.Description,
+			Likes:        skill.Repository.Likes,
+			Downloads:    skill.Repository.DownloadCount,
+			Path:         skill.Repository.Path,
+			RepositoryID: skill.RepositoryID,
+			Private:      skill.Repository.Private,
+			CreatedAt:    skill.CreatedAt,
+			UpdatedAt:    skill.Repository.UpdatedAt,
+			Source:       skill.Repository.Source,
+			SyncStatus:   skill.Repository.SyncStatus,
+			License:      skill.Repository.License,
 		})
 	}
 
