@@ -541,5 +541,8 @@
     },
     "Tag.I18nKey.BSD-3-Clause": {
         "other": "BSD-3-Clause"
+    },
+    "Tag.I18nKey.agentichub-skills": {
+        "other": "AgenticHub 技能"
     }
 }
