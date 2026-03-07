@@ -385,8 +385,7 @@ func TestClusterStore_ClusterNodeOperations(t *testing.T) {
 	ownership := database.ClusterNodeOwnership{
 		ClusterNodeID: node.ID,
 		ClusterID:     cluster.ClusterID,
-		UserUUID:      "user-1",
-		OrgUUID:       "org-1",
+		Namespace:     "ns-1",
 	}
 	err = store.AddNodeOwnership(ctx, ownership)
 	require.NoError(t, err)
@@ -395,8 +394,7 @@ func TestClusterStore_ClusterNodeOperations(t *testing.T) {
 	fetchedOwnership, err := store.GetNodeOwnership(ctx, node.ID)
 	require.NoError(t, err)
 	require.NotNil(t, fetchedOwnership)
-	require.Equal(t, ownership.UserUUID, fetchedOwnership.UserUUID)
-	require.Equal(t, ownership.OrgUUID, fetchedOwnership.OrgUUID)
+	require.Equal(t, ownership.Namespace, fetchedOwnership.Namespace)
 	require.Equal(t, ownership.ClusterNodeID, fetchedOwnership.ClusterNodeID)
 
 	// 7. Test DeleteNodeOwnership
