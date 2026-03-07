@@ -25,6 +25,7 @@ func (c *FinetuneReq) GetSensitiveFields() []SensitiveField {
 
 type FinetuneReq struct {
 	Username         string   `json:"-"`
+	Namespace        string   `json:"namespace,omitempty"`
 	Token            string   `json:"-"`
 	Hardware         HardWare `json:"-"`
 	UserUUID         string   `json:"-"`

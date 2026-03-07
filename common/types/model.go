@@ -274,6 +274,8 @@ type ModelRunReq struct {
 	Entrypoint         string `json:"entrypoint"` // model file name for gguf model
 	EngineArgs         string `json:"engine_args"`
 	Agent              string `json:"agent"`
+	// OwnerNamespace is optional. If set, the inference is created under this namespace (user or org) for billing and listing; path {namespace} remains the model's owner.
+	OwnerNamespace string `json:"owner_namespace,omitempty"`
 }
 
 var _ SensitiveRequestV2 = (*ModelRunReq)(nil)
@@ -298,6 +300,8 @@ type InstanceRunReq struct {
 	Revision           string `json:"revision"`
 	OrderDetailID      int64  `json:"order_detail_id"`
 	EngineArgs         string `json:"engine_args"`
+	// OwnerNamespace is optional. If set, the finetune is created under this namespace (user or org); path {namespace} remains the model's owner.
+	OwnerNamespace string `json:"owner_namespace,omitempty"`
 }
 
 var _ SensitiveRequestV2 = (*InstanceRunReq)(nil)

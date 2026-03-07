@@ -1356,6 +1356,73 @@ func (_c *MockDeployTaskStore_ListDeployByUserID_Call) RunAndReturn(run func(con
 	return _c
 }
 
+// ListDeployByOwnerNamespace provides a mock function with given fields: ctx, ownerNamespace, req
+func (_m *MockDeployTaskStore) ListDeployByOwnerNamespace(ctx context.Context, ownerNamespace string, req *types.DeployReq) ([]database.Deploy, int, error) {
+	ret := _m.Called(ctx, ownerNamespace, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListDeployByOwnerNamespace")
+	}
+
+	var r0 []database.Deploy
+	var r1 int
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, *types.DeployReq) ([]database.Deploy, int, error)); ok {
+		return rf(ctx, ownerNamespace, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, *types.DeployReq) []database.Deploy); ok {
+		r0 = rf(ctx, ownerNamespace, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.Deploy)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, *types.DeployReq) int); ok {
+		r1 = rf(ctx, ownerNamespace, req)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, string, *types.DeployReq) error); ok {
+		r2 = rf(ctx, ownerNamespace, req)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockDeployTaskStore_ListDeployByOwnerNamespace_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListDeployByOwnerNamespace'
+type MockDeployTaskStore_ListDeployByOwnerNamespace_Call struct {
+	*mock.Call
+}
+
+// ListDeployByOwnerNamespace is a helper method to define mock.On call
+//   - ctx context.Context
+//   - ownerNamespace string
+//   - req *types.DeployReq
+func (_e *MockDeployTaskStore_Expecter) ListDeployByOwnerNamespace(ctx interface{}, ownerNamespace interface{}, req interface{}) *MockDeployTaskStore_ListDeployByOwnerNamespace_Call {
+	return &MockDeployTaskStore_ListDeployByOwnerNamespace_Call{Call: _e.mock.On("ListDeployByOwnerNamespace", ctx, ownerNamespace, req)}
+}
+
+func (_c *MockDeployTaskStore_ListDeployByOwnerNamespace_Call) Run(run func(ctx context.Context, ownerNamespace string, req *types.DeployReq)) *MockDeployTaskStore_ListDeployByOwnerNamespace_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(*types.DeployReq))
+	})
+	return _c
+}
+
+func (_c *MockDeployTaskStore_ListDeployByOwnerNamespace_Call) Return(_a0 []database.Deploy, _a1 int, _a2 error) *MockDeployTaskStore_ListDeployByOwnerNamespace_Call {
+	_c.Call.Return(_a0, _a1, _a2)
+	return _c
+}
+
+func (_c *MockDeployTaskStore_ListDeployByOwnerNamespace_Call) RunAndReturn(run func(context.Context, string, *types.DeployReq) ([]database.Deploy, int, error)) *MockDeployTaskStore_ListDeployByOwnerNamespace_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ListInstancesByUserID provides a mock function with given fields: ctx, userID, per, page
 func (_m *MockDeployTaskStore) ListInstancesByUserID(ctx context.Context, userID int64, per int, page int) ([]database.Deploy, int, error) {
 	ret := _m.Called(ctx, userID, per, page)

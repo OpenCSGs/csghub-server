@@ -11,6 +11,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
+	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
@@ -570,7 +571,7 @@ func convertFilePathFromRoute(path string) string {
 // @Param        namespace path string true "namespace"
 // @Param        name path string true "name"
 // @Param        current_user query string true "current_user"
-// @Param        body body types.ModelRunReq true "deploy setting of inference"
+// @Param        body body types.ModelRunReq true "deploy setting of inference (owner_namespace optional: user or org to create inference under)"
 // @Success      200  {object}  string "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
@@ -616,6 +617,20 @@ func (h *ModelHandler) DeployDedicated(ctx *gin.Context) {
 		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, errorx.ReqBodyFormat(err, nil))
 		return
+	}
+
+	// Optional owner_namespace: create inference under this user/org (path namespace is still the model's).
+	if req.OwnerNamespace != "" {
+		canWrite, err := h.repo.CheckCurrentUserPermission(ctx.Request.Context(), currentUser, req.OwnerNamespace, membership.RoleWrite)
+		if err != nil {
+			slog.ErrorContext(ctx.Request.Context(), "failed to check owner_namespace permission", "error", err)
+			httpbase.ServerError(ctx, err)
+			return
+		}
+		if !canWrite {
+			httpbase.ForbiddenError(ctx, errors.New("no permission to create inference under the given owner_namespace"))
+			return
+		}
 	}
 
 	if req.MinReplica < 0 || req.MaxReplica < 0 || req.MinReplica > req.MaxReplica {
@@ -687,7 +702,7 @@ func (h *ModelHandler) DeployDedicated(ctx *gin.Context) {
 // @Param        namespace path string true "namespace"
 // @Param        name path string true "name"
 // @Param        current_user query string true "current_user"
-// @Param        body body types.InstanceRunReq true "deploy setting of instance"
+// @Param        body body types.InstanceRunReq true "deploy setting of instance (owner_namespace optional: user or org to create under)"
 // @Success      200  {object}  string "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
@@ -733,6 +748,20 @@ func (h *ModelHandler) FinetuneCreate(ctx *gin.Context) {
 		return
 	}
 
+	// Optional owner_namespace: create finetune under this user/org (path namespace is still the model's).
+	if req.OwnerNamespace != "" {
+		canWrite, err := h.repo.CheckCurrentUserPermission(ctx.Request.Context(), currentUser, req.OwnerNamespace, membership.RoleWrite)
+		if err != nil {
+			slog.ErrorContext(ctx.Request.Context(), "failed to check owner_namespace permission", "error", err)
+			httpbase.ServerError(ctx, err)
+			return
+		}
+		if !canWrite {
+			httpbase.ForbiddenError(ctx, errors.New("no permission to create finetune under the given owner_namespace"))
+			return
+		}
+	}
+
 	modelReq := &types.ModelRunReq{
 		DeployName:         req.DeployName,
 		ClusterID:          req.ClusterID,
@@ -743,6 +772,7 @@ func (h *ModelHandler) FinetuneCreate(ctx *gin.Context) {
 		SecureLevel:        2,
 		Revision:           req.Revision,
 		OrderDetailID:      req.OrderDetailID,
+		OwnerNamespace:     req.OwnerNamespace,
 	}
 
 	ftReq := types.DeployActReq{

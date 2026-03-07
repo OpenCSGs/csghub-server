@@ -10,6 +10,7 @@ import (
 
 	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/deploy/common"
+	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
@@ -36,10 +37,10 @@ type evaluationComponentImpl struct {
 }
 
 type EvaluationComponent interface {
-	// Create argo workflow
 	CreateEvaluation(ctx context.Context, req types.EvaluationReq) (*types.ArgoWorkFlowRes, error)
 	GetEvaluation(ctx context.Context, req types.EvaluationGetReq) (*types.EvaluationRes, error)
 	DeleteEvaluation(ctx context.Context, req types.ArgoWorkFlowDeleteReq) error
+	OrgEvaluations(ctx context.Context, req *types.OrgEvaluationsReq) ([]types.ArgoWorkFlowRes, int, error)
 }
 
 func NewEvaluationComponent(config *config.Config) (EvaluationComponent, error) {
@@ -74,10 +75,25 @@ func NewEvaluationComponent(config *config.Config) (EvaluationComponent, error) 
 
 // Create argo workflow
 func (c *evaluationComponentImpl) CreateEvaluation(ctx context.Context, req types.EvaluationReq) (*types.ArgoWorkFlowRes, error) {
-	user, err := c.userStore.FindByUsername(ctx, req.Username)
+	operatorUsername := req.Username
+	if req.OwnerNamespace == "" {
+		req.OwnerNamespace = operatorUsername
+	}
+	user, err := c.userStore.FindByUsername(ctx, operatorUsername)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get current user %s, error:%w", req.Username, err)
 	}
+
+	if !user.CanAdmin() {
+		canWrite, err := c.repoComponent.CheckCurrentUserPermission(ctx, operatorUsername, req.OwnerNamespace, membership.RoleWrite)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check namespace permission, error: %w", err)
+		}
+		if !canWrite {
+			return nil, errorx.ErrForbiddenMsg("users do not have permission to create evaluation in this namespace")
+		}
+	}
+
 	if req.ModelIds == nil {
 		req.ModelIds = []string{}
 	}
@@ -129,7 +145,7 @@ func (c *evaluationComponentImpl) CreateEvaluation(ctx context.Context, req type
 			return nil, fmt.Errorf("evaluation requires graphics card resources")
 		}
 		// check resource available
-		err = c.repoComponent.CheckAccountAndResource(ctx, req.Username, resource.ClusterID, 0, resource)
+		err = c.repoComponent.CheckAccountAndResource(ctx, req.OwnerNamespace, resource.ClusterID, 0, resource)
 		if err != nil {
 			return nil, err
 		}
@@ -164,7 +180,17 @@ func (c *evaluationComponentImpl) CreateEvaluation(ctx context.Context, req type
 	req.Hardware = hardware
 	// choose image
 	containerImg := frame.FrameImage
-	req.UserUUID = user.UUID
+	billingUUID := user.UUID
+	if req.OwnerNamespace != operatorUsername {
+		resolved, err := c.repoComponent.GetNamespaceBillingUUID(ctx, req.OwnerNamespace)
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve billing UUID for namespace %s, error: %w", req.OwnerNamespace, err)
+		}
+		billingUUID = resolved
+	}
+	req.UserUUID = billingUUID
+	// Persist workflow under owner namespace (user or organization).
+	req.Username = req.OwnerNamespace
 	req.Image = containerImg
 	req.RepoType = string(types.ModelRepo)
 	req.TaskType = types.TaskTypeEvaluation
@@ -210,6 +236,15 @@ func (c *evaluationComponentImpl) DeleteEvaluation(ctx context.Context, req type
 	if err != nil {
 		return fmt.Errorf("fail to get evaluation result, %w", err)
 	}
+	if wf.Username != req.Username {
+		canWrite, err := c.repoComponent.CheckCurrentUserPermission(ctx, req.Username, wf.Username, membership.RoleWrite)
+		if err != nil {
+			return fmt.Errorf("failed to check namespace permission, error: %w", err)
+		}
+		if !canWrite {
+			return errorx.ErrForbiddenMsg("users do not have permission to delete evaluation in this namespace")
+		}
+	}
 	req.TaskID = wf.TaskId
 	req.Namespace = wf.Namespace
 	req.ClusterID = wf.ClusterID
@@ -227,11 +262,11 @@ func (c *evaluationComponentImpl) GetEvaluation(ctx context.Context, req types.E
 		return nil, fmt.Errorf("fail to get evaluation result, %w", err)
 	}
 	if wf.Username != req.Username {
-		userInfo, err := c.userSvcClient.GetUserByName(ctx, req.Username)
+		canRead, err := c.repoComponent.CheckCurrentUserPermission(ctx, req.Username, wf.Username, membership.RoleRead)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get user info for %s, %w", req.Username, err)
+			return nil, fmt.Errorf("failed to check namespace permission, error: %w", err)
 		}
-		if !userInfo.IsAdmin() {
+		if !canRead {
 			return nil, errorx.ErrForbidden
 		}
 	}
@@ -291,4 +326,47 @@ func (c *evaluationComponentImpl) GetEvaluation(ctx context.Context, req types.E
 		FailuresURL:  wf.FailuresURL,
 	}
 	return res, nil
+}
+
+func (c *evaluationComponentImpl) OrgEvaluations(ctx context.Context, req *types.OrgEvaluationsReq) ([]types.ArgoWorkFlowRes, int, error) {
+	if req.CurrentUser != "" {
+		canRead, err := c.repoComponent.CheckCurrentUserPermission(ctx, req.CurrentUser, req.Namespace, membership.RoleRead)
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to check namespace permission, error: %w", err)
+		}
+		if !canRead {
+			return nil, 0, errorx.ErrForbiddenMsg("users do not have permission to view evaluations in this namespace")
+		}
+	}
+
+	workflows, total, err := c.workflowStore.FindByUsername(ctx, req.Namespace, types.TaskTypeEvaluation, req.PageSize, req.Page)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to get org evaluations, error: %w", err)
+	}
+
+	var res []types.ArgoWorkFlowRes
+	for _, wf := range workflows {
+		res = append(res, types.ArgoWorkFlowRes{
+			ID:           wf.ID,
+			RepoIds:      wf.RepoIds,
+			RepoType:     wf.RepoType,
+			TaskName:     wf.TaskName,
+			Username:     wf.Username,
+			TaskId:       wf.TaskId,
+			Status:       wf.Status,
+			TaskType:     wf.TaskType,
+			TaskDesc:     wf.TaskDesc,
+			Datasets:     wf.Datasets,
+			ResourceId:   wf.ResourceId,
+			ResourceName: wf.ResourceName,
+			Reason:       wf.Reason,
+			SubmitTime:   wf.SubmitTime,
+			StartTime:    wf.StartTime,
+			EndTime:      wf.EndTime,
+			DownloadURL:  wf.DownloadURL,
+			ResultURL:    wf.ResultURL,
+			Image:        wf.Image,
+		})
+	}
+	return res, total, nil
 }
