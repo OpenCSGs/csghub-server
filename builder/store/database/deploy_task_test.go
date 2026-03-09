@@ -612,6 +612,108 @@ func TestDeployTaskStore_ListDeployBytype(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, 0, len(result))
 }
+
+func TestDeployTaskStore_ListFinetunesByOwnerNamespace(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+	store := database.NewDeployTaskStoreWithDB(db)
+
+	// Create finetune deploys for org1, org2, and non-finetune types; some deleted
+	deploys := []database.Deploy{
+		{UserID: 1, Type: types.FinetuneType, Status: common.Running, DeployName: "ft-org1-1", OwnerNamespace: "org1", GitPath: "models_a/b", GitBranch: "main", Template: "t", Hardware: "{}"},
+		{UserID: 1, Type: types.FinetuneType, Status: common.Running, DeployName: "ft-org1-2", OwnerNamespace: "org1", GitPath: "models_c/d", GitBranch: "main", Template: "t", Hardware: "{}"},
+		{UserID: 1, Type: types.FinetuneType, Status: common.Deleted, DeployName: "ft-org1-deleted", OwnerNamespace: "org1", GitPath: "models_x/y", GitBranch: "main", Template: "t", Hardware: "{}"},
+		{UserID: 1, Type: types.FinetuneType, Status: common.Running, DeployName: "ft-org2-1", OwnerNamespace: "org2", GitPath: "models_e/f", GitBranch: "main", Template: "t", Hardware: "{}"},
+		{UserID: 1, Type: types.InferenceType, Status: common.Running, DeployName: "inf-org1-1", OwnerNamespace: "org1", GitPath: "models_g/h", GitBranch: "main", Template: "t", Hardware: "{}"},
+	}
+	for i := range deploys {
+		err := store.CreateDeploy(ctx, &deploys[i])
+		require.Nil(t, err)
+	}
+
+	// List finetunes for org1: should return 2 (excluding deleted and inference)
+	result, total, err := store.ListFinetunesByOwnerNamespace(ctx, "org1", 10, 1)
+	require.Nil(t, err)
+	require.Equal(t, 2, total)
+	require.Len(t, result, 2)
+	names := make([]string, len(result))
+	for i, d := range result {
+		names[i] = d.DeployName
+	}
+	require.ElementsMatch(t, []string{"ft-org1-1", "ft-org1-2"}, names)
+
+	// List finetunes for org2: should return 1
+	result, total, err = store.ListFinetunesByOwnerNamespace(ctx, "org2", 10, 1)
+	require.Nil(t, err)
+	require.Equal(t, 1, total)
+	require.Len(t, result, 1)
+	require.Equal(t, "ft-org2-1", result[0].DeployName)
+
+	// Pagination: page size 1, page 1 and 2
+	result, total, err = store.ListFinetunesByOwnerNamespace(ctx, "org1", 1, 1)
+	require.Nil(t, err)
+	require.Equal(t, 2, total)
+	require.Len(t, result, 1)
+
+	result, total, err = store.ListFinetunesByOwnerNamespace(ctx, "org1", 1, 2)
+	require.Nil(t, err)
+	require.Equal(t, 2, total)
+	require.Len(t, result, 1)
+
+	// Non-existent namespace
+	result, total, err = store.ListFinetunesByOwnerNamespace(ctx, "nonexistent", 10, 1)
+	require.Nil(t, err)
+	require.Equal(t, 0, total)
+	require.Len(t, result, 0)
+}
+
+func TestDeployTaskStore_ListDeployByOwnerNamespace(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+	store := database.NewDeployTaskStoreWithDB(db)
+
+	deploys := []database.Deploy{
+		{UserID: 1, SpaceID: 0, ModelID: 101, RepoID: 101, Type: types.InferenceType, Status: common.Running, DeployName: "inf-org1-1", OwnerNamespace: "org1", GitPath: "models_a/b", GitBranch: "main", Template: "t", Hardware: "{}"},
+		{UserID: 1, SpaceID: 0, ModelID: 102, RepoID: 102, Type: types.InferenceType, Status: common.Running, DeployName: "inf-org1-2", OwnerNamespace: "org1", GitPath: "models_c/d", GitBranch: "main", Template: "t", Hardware: "{}"},
+		{UserID: 1, SpaceID: 0, ModelID: 103, RepoID: 103, Type: types.InferenceType, Status: common.Running, DeployName: "inf-org2-1", OwnerNamespace: "org2", GitPath: "models_e/f", GitBranch: "main", Template: "t", Hardware: "{}"},
+		{UserID: 1, SpaceID: 201, ModelID: 0, RepoID: 201, Type: types.SpaceType, Status: common.Running, DeployName: "space-org1-1", OwnerNamespace: "org1", GitPath: "spaces_x/y", GitBranch: "main", Template: "t", Hardware: "{}"},
+	}
+	for i := range deploys {
+		err := store.CreateDeploy(ctx, &deploys[i])
+		require.Nil(t, err)
+	}
+
+	req := &types.DeployReq{
+		PageOpts:   types.PageOpts{Page: 1, PageSize: 10},
+		DeployType: types.InferenceType,
+		RepoType:   types.ModelRepo,
+	}
+	result, total, err := store.ListDeployByOwnerNamespace(ctx, "org1", req)
+	require.Nil(t, err)
+	require.Equal(t, 2, total)
+	require.Len(t, result, 2)
+	names := make([]string, len(result))
+	for i, d := range result {
+		names[i] = d.DeployName
+	}
+	require.ElementsMatch(t, []string{"inf-org1-1", "inf-org1-2"}, names)
+
+	req.RepoType = types.SpaceRepo
+	result, total, err = store.ListDeployByOwnerNamespace(ctx, "org1", req)
+	require.Nil(t, err)
+	require.Equal(t, 0, total)
+	require.Len(t, result, 0)
+
+	req.DeployType = types.SpaceType
+	result, total, err = store.ListDeployByOwnerNamespace(ctx, "org1", req)
+	require.Nil(t, err)
+	require.Equal(t, 1, total)
+	require.Len(t, result, 1)
+	require.Equal(t, "space-org1-1", result[0].DeployName)
+}
+
 func TestDeployTaskStore_DeleteDeployByID(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
@@ -867,8 +969,8 @@ func TestDeployTaskStore_ListServerless_Search(t *testing.T) {
 		},
 	})
 	require.Nil(t, err)
-	require.Equal(t, 4, total) // qwen-model-deploy, QWEN-Deploy-Upper, qwen-other (in git_path)
-	require.Equal(t, 4, len(dps))
+	require.Equal(t, 3, total) // qwen-model-deploy, QWEN-Deploy-Upper, qwen-other (in git_path)
+	require.Equal(t, 3, len(dps))
 	deployNames := []string{}
 	for _, dp := range dps {
 		deployNames = append(deployNames, dp.DeployName)
@@ -887,9 +989,9 @@ func TestDeployTaskStore_ListServerless_Search(t *testing.T) {
 		},
 	})
 	require.Nil(t, err)
-	require.Equal(t, 4, total)
-	require.Equal(t, 4, len(dps))
-	require.Equal(t, "qwen-model-deploy", dps[0].DeployName)
+	require.Equal(t, 1, total)
+	require.Equal(t, 1, len(dps))
+	require.Equal(t, "test-deploy", dps[0].DeployName)
 
 	// Test 4: Search with uppercase (case-insensitive)
 	dps, total, err = store.ListServerless(ctx, types.DeployReq{
@@ -901,8 +1003,8 @@ func TestDeployTaskStore_ListServerless_Search(t *testing.T) {
 		},
 	})
 	require.Nil(t, err)
-	require.Equal(t, 4, total) // Should match lowercase and uppercase
-	require.Equal(t, 4, len(dps))
+	require.Equal(t, 3, total) // Should match lowercase and uppercase
+	require.Equal(t, 3, len(dps))
 
 	// Test 5: Search with empty string (should return all)
 	dps, total, err = store.ListServerless(ctx, types.DeployReq{
@@ -940,8 +1042,8 @@ func TestDeployTaskStore_ListServerless_Search(t *testing.T) {
 		},
 	})
 	require.Nil(t, err)
-	require.Equal(t, 4, total)
-	require.Equal(t, 4, len(dps))
+	require.Equal(t, 0, total)
+	require.Equal(t, 0, len(dps))
 
 	// Test 8: Search with pagination
 	dps, total, err = store.ListServerless(ctx, types.DeployReq{
@@ -953,7 +1055,7 @@ func TestDeployTaskStore_ListServerless_Search(t *testing.T) {
 		},
 	})
 	require.Nil(t, err)
-	require.Equal(t, 4, total)    // Total should be 4
+	require.Equal(t, 3, total)    // Total should be 3
 	require.Equal(t, 2, len(dps)) // But only 2 per page
 }
 

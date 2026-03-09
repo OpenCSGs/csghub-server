@@ -22,8 +22,7 @@ func TestUserComponent_ListDeploys(t *testing.T) {
 			PageSize: 10,
 		},
 	}
-	uc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{ID: 1}, nil)
-	uc.mocks.stores.DeployTaskMock().EXPECT().ListDeployByUserID(ctx, int64(1), req).Return([]database.Deploy{
+	uc.mocks.stores.DeployTaskMock().EXPECT().ListDeployByOwnerNamespace(ctx, "user", req).Return([]database.Deploy{
 		{
 			SvcName: "svc", ClusterID: "cluster", SKU: "sku",
 			GitPath: "models_foo/bar", Hardware: `{"memory": "foo"}`,
@@ -64,8 +63,7 @@ func TestUserComponent_ListInstances(t *testing.T) {
 			PageSize: 10,
 		},
 	}
-	uc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{ID: 1}, nil)
-	uc.mocks.stores.DeployTaskMock().EXPECT().ListInstancesByUserID(ctx, int64(1), 10, 1).Return([]database.Deploy{
+	uc.mocks.stores.DeployTaskMock().EXPECT().ListFinetunesByOwnerNamespace(ctx, "user", 10, 1).Return([]database.Deploy{
 		{
 			SvcName: "svc", ClusterID: "cluster", SKU: "sku",
 			GitPath: "models_foo/bar", Hardware: `{"memory": "foo"}`,

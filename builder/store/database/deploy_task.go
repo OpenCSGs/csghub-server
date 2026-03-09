@@ -101,6 +101,7 @@ type DeployTaskStore interface {
 	DeleteDeployByID(ctx context.Context, userID int64, deployID int64) error
 	ListDeployByUserID(ctx context.Context, userID int64, req *types.DeployReq) ([]Deploy, int, error)
 	ListInstancesByUserID(ctx context.Context, userID int64, per, page int) ([]Deploy, int, error)
+	ListFinetunesByOwnerNamespace(ctx context.Context, ownerNamespace string, per, page int) ([]Deploy, int, error)
 	GetDeployByID(ctx context.Context, deployID int64) (*Deploy, error)
 	GetDeployBySvcName(ctx context.Context, svcName string) (*Deploy, error)
 	StopDeploy(ctx context.Context, repoType types.RepositoryType, repoID, userID int64, deployID int64) error
@@ -338,6 +339,25 @@ func (s *deployTaskStoreImpl) ListDeployByUserID(ctx context.Context, userID int
 func (s *deployTaskStoreImpl) ListInstancesByUserID(ctx context.Context, userID int64, per, page int) ([]Deploy, int, error) {
 	var result []Deploy
 	query := s.db.Operator.Core.NewSelect().Model(&result).Where("user_id = ?", userID)
+	query = query.Where("type = ? and status != ?", types.FinetuneType, common.Deleted)
+	query = query.Order("id desc")
+	query = query.Limit(per).Offset((page - 1) * per)
+	_, err := query.Exec(ctx, &result)
+	if err != nil {
+		err = errorx.HandleDBError(err, nil)
+		return nil, 0, err
+	}
+	total, err := query.Count(ctx)
+	if err != nil {
+		err = errorx.HandleDBError(err, nil)
+		return nil, 0, err
+	}
+	return result, total, nil
+}
+
+func (s *deployTaskStoreImpl) ListFinetunesByOwnerNamespace(ctx context.Context, ownerNamespace string, per, page int) ([]Deploy, int, error) {
+	var result []Deploy
+	query := s.db.Operator.Core.NewSelect().Model(&result).Where("owner_namespace = ?", ownerNamespace)
 	query = query.Where("type = ? and status != ?", types.FinetuneType, common.Deleted)
 	query = query.Order("id desc")
 	query = query.Limit(per).Offset((page - 1) * per)
