@@ -127,6 +127,9 @@ func (k *kserviceExecutorImpl) updateDeployStatus(ctx context.Context, event *ty
 	if len(event.QueueName) > 0 {
 		deploy.QueueName = event.QueueName
 	}
+	if len(event.Instances) > 0 {
+		deploy.Instances = event.Instances
+	}
 	err = k.deployTaskStore.UpdateDeploy(ctx, deploy)
 	if err != nil {
 		return fmt.Errorf("failed to update deploy %s status %d in webhook error: %w", event.ServiceName, event.Status, err)

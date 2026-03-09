@@ -270,25 +270,8 @@ func (d *deployer) Status(ctx context.Context, dr types.DeployRepo, needDetails 
 		slog.WarnContext(ctx, "cluster resources unhealthy")
 		return "", common.ResourceUnhealthy, nil, nil
 	}
-
-	svcName := deploy.SvcName
-	if deploy.Status == common.Pending {
-		//if deploy is pending, no need to check ksvc status
-		return svcName, common.Pending, nil, nil
-	}
-	svc, err := d.imageRunner.Exist(ctx, &types.CheckRequest{
-		SvcName:   svcName,
-		ClusterID: deploy.ClusterID,
-	})
-	if err != nil {
-		slog.Error("fail to get deploy by service name", slog.Any("Service NamE", svcName), slog.Any("error", err))
-		return "", common.Stopped, nil, fmt.Errorf("can't get svc, %w", err)
-	}
-	if svc.Code == common.Stopped || svc.Code == -1 {
-		// like queuing, or stopped, use status from deploy
-		return svcName, deploy.Status, nil, nil
-	}
-	return svcName, svc.Code, svc.Instances, nil
+	// deploy status and instances reported from runner
+	return deploy.SvcName, deploy.Status, deploy.Instances, nil
 }
 
 func (d *deployer) Logs(ctx context.Context, dr types.DeployRepo) (*MultiLogReader, error) {

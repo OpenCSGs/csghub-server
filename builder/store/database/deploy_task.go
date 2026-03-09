@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -62,6 +63,7 @@ type Deploy struct {
 	ClusterNode    string             `bun:"," json:"cluster_node"`
 	QueueName      string             `bun:"," json:"queue_name"`
 	OwnerNamespace string             `bun:"," json:"owner_namespace"`
+	Instances      []types.Instance   `bun:"type:jsonb" json:"instances"`
 	times
 }
 
@@ -100,7 +102,9 @@ type DeployTaskStore interface {
 	DeleteDeployNow(ctx context.Context, deployID int64) error
 	DeleteDeployByID(ctx context.Context, userID int64, deployID int64) error
 	ListDeployByUserID(ctx context.Context, userID int64, req *types.DeployReq) ([]Deploy, int, error)
+	ListDeployByOwnerNamespace(ctx context.Context, ownerNamespace string, req *types.DeployReq) ([]Deploy, int, error)
 	ListInstancesByUserID(ctx context.Context, userID int64, per, page int) ([]Deploy, int, error)
+	ListFinetunesByOwnerNamespace(ctx context.Context, ownerNamespace string, per, page int) ([]Deploy, int, error)
 	GetDeployByID(ctx context.Context, deployID int64) (*Deploy, error)
 	GetDeployBySvcName(ctx context.Context, svcName string) (*Deploy, error)
 	StopDeploy(ctx context.Context, repoType types.RepositoryType, repoID, userID int64, deployID int64) error
@@ -336,9 +340,53 @@ func (s *deployTaskStoreImpl) ListDeployByUserID(ctx context.Context, userID int
 	return result, total, nil
 }
 
+func (s *deployTaskStoreImpl) ListDeployByOwnerNamespace(ctx context.Context, ownerNamespace string, req *types.DeployReq) ([]Deploy, int, error) {
+	var result []Deploy
+	query := s.db.Operator.Core.NewSelect().Model(&result).Where("owner_namespace = ? and type = ?", ownerNamespace, req.DeployType)
+	query = query.Where("status != ?", common.Deleted)
+	if req.RepoType == types.ModelRepo {
+		query = query.Where("model_id > 0")
+	}
+	query = query.Order("id desc")
+	if req.RepoType == types.SpaceRepo {
+		query = query.Where("space_id > 0")
+	}
+	query = query.Limit(req.PageSize).Offset((req.Page - 1) * req.PageSize)
+	_, err := query.Exec(ctx, &result)
+	if err != nil {
+		err = errorx.HandleDBError(err, nil)
+		return nil, 0, err
+	}
+	total, err := query.Count(ctx)
+	if err != nil {
+		err = errorx.HandleDBError(err, nil)
+		return nil, 0, err
+	}
+	return result, total, nil
+}
+
 func (s *deployTaskStoreImpl) ListInstancesByUserID(ctx context.Context, userID int64, per, page int) ([]Deploy, int, error) {
 	var result []Deploy
 	query := s.db.Operator.Core.NewSelect().Model(&result).Where("user_id = ?", userID)
+	query = query.Where("type = ? and status != ?", types.FinetuneType, common.Deleted)
+	query = query.Order("id desc")
+	query = query.Limit(per).Offset((page - 1) * per)
+	_, err := query.Exec(ctx, &result)
+	if err != nil {
+		err = errorx.HandleDBError(err, nil)
+		return nil, 0, err
+	}
+	total, err := query.Count(ctx)
+	if err != nil {
+		err = errorx.HandleDBError(err, nil)
+		return nil, 0, err
+	}
+	return result, total, nil
+}
+
+func (s *deployTaskStoreImpl) ListFinetunesByOwnerNamespace(ctx context.Context, ownerNamespace string, per, page int) ([]Deploy, int, error) {
+	var result []Deploy
+	query := s.db.Operator.Core.NewSelect().Model(&result).Where("owner_namespace = ?", ownerNamespace)
 	query = query.Where("type = ? and status != ?", types.FinetuneType, common.Deleted)
 	query = query.Order("id desc")
 	query = query.Limit(per).Offset((page - 1) * per)
@@ -401,13 +449,21 @@ func (s *deployTaskStoreImpl) ListServerless(ctx context.Context, req types.Depl
 	var result []Deploy
 	query := s.db.Operator.Core.NewSelect().Model(&result).Where("type = ?", req.DeployType)
 	query = query.Where("status != ?", common.Deleted)
-	query = query.Limit(req.PageSize).Offset((req.Page - 1) * req.PageSize)
-	_, err := query.Exec(ctx, &result)
+
+	searchQuery := strings.TrimSpace(req.Query)
+	if searchQuery != "" {
+		searchPattern := "%" + strings.ToLower(searchQuery) + "%"
+		query = query.Where("LOWER(deploy_name) LIKE ? OR LOWER(git_path) LIKE ?", searchPattern, searchPattern)
+	}
+
+	total, err := query.Count(ctx)
 	if err != nil {
 		err = errorx.HandleDBError(err, nil)
 		return nil, 0, err
 	}
-	total, err := query.Count(ctx)
+
+	query = query.Limit(req.PageSize).Offset((req.Page - 1) * req.PageSize)
+	_, err = query.Exec(ctx, &result)
 	if err != nil {
 		err = errorx.HandleDBError(err, nil)
 		return nil, 0, err
