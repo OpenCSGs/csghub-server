@@ -114,13 +114,151 @@ func Test_lokiClient_formatLokiLog(t *testing.T) {
 			},
 		}
 
-		expected := fmt.Sprintf("build-1963574892 | 2025-09-01 time=\"2025-09-01T03:29:01.179Z\" level=info msg=\"Starting Workflow Executor\"%s", c.lineSeparator) +
-			fmt.Sprintf("build-1963574892 | 2025-09-01 time=\"2025-09-01T03:29:01.181Z\" level=info msg=\"Using executor retry strategy\"%s", c.lineSeparator) +
+		expected := fmt.Sprintf("build-1963574892 | 2025-09-01 11:29:01 time=\"2025-09-01T03:29:01.179Z\" level=info msg=\"Starting Workflow Executor\"%s", c.lineSeparator) +
+			fmt.Sprintf("build-1963574892 | 2025-09-01 11:29:01 time=\"2025-09-01T03:29:01.181Z\" level=info msg=\"Using executor retry strategy\"%s", c.lineSeparator) +
 			fmt.Sprintf("build-1963574892 | malformed log line without timestamp%s", c.lineSeparator) +
 			fmt.Sprintf("build-1963574892 | invalid-timestamp-format another message%s", c.lineSeparator) +
-			"platform | 2025-09-01 time=\"2025-09-01T03:29:29.209Z\" level=info msg=\"Main container completed\""
+			"platform | 2025-09-01 11:29:29 time=\"2025-09-01T03:29:29.209Z\" level=info msg=\"Main container completed\""
 
 		actual := c.formatLokiLog(lokiLog, loc)
 		assert.Equal(t, expected, actual)
 	})
+}
+
+func Test_lokiClient_logEntryToMap(t *testing.T) {
+	c := &lokiClient{
+		clientID:          types.ClientTypeRunner,
+		acceptLabelPrefix: "csghub_",
+	}
+
+	testCases := []struct {
+		name     string
+		entry    *types.LogEntry
+		expected map[string]string
+	}{
+		{
+			name: "basic entry",
+			entry: &types.LogEntry{
+				Category: types.LogCategoryContainer,
+				DeployID: "deploy-123",
+				Labels: map[string]string{
+					types.StreamKeyDeployTaskID: "task-123",
+				},
+			},
+			expected: map[string]string{
+				"client_id":                 "runner",
+				"category":                  "container",
+				types.StreamKeyDeployID:     "deploy-123",
+				types.StreamKeyDeployTaskID: "task-123",
+			},
+		},
+		{
+			name: "entry with pod info",
+			entry: &types.LogEntry{
+				Category: types.LogCategoryContainer,
+				DeployID: "deploy-123",
+				Labels: map[string]string{
+					types.StreamKeyDeployTaskID: "task-123",
+				},
+				PodInfo: &types.PodInfo{
+					PodName:       "pod-abc",
+					PodUID:        "uid-abc",
+					Namespace:     "default",
+					ServiceName:   "service-abc",
+					ContainerName: "container-abc",
+					Labels: map[string]string{
+						"csghub_label": "value1",
+						"other_label":  "value2",
+						"csghub_empty": "",
+					},
+				},
+			},
+			expected: map[string]string{
+				"client_id":                 "runner",
+				"category":                  "container",
+				types.StreamKeyDeployID:     "deploy-123",
+				types.StreamKeyDeployTaskID: "task-123",
+				"pod_name":                  "pod-abc",
+				"pod_uid":                   "uid-abc",
+				"namespace":                 "default",
+				"service_name":              "service-abc",
+				"container_name":            "container-abc",
+				"csghub_label":              "value1",
+			},
+		},
+		{
+			name: "entry with custom labels",
+			entry: &types.LogEntry{
+				Category: types.LogCategoryContainer,
+				DeployID: "deploy-123",
+				Labels: map[string]string{
+					types.StreamKeyDeployTaskID: "task-123",
+					"custom_label":              "custom_value",
+					"empty_label":               "",
+				},
+			},
+			expected: map[string]string{
+				"client_id":                 "runner",
+				"category":                  "container",
+				types.StreamKeyDeployID:     "deploy-123",
+				types.StreamKeyDeployTaskID: "task-123",
+				"custom_label":              "custom_value",
+			},
+		},
+		{
+			name: "max label count limit",
+			entry: &types.LogEntry{
+				Category: types.LogCategoryContainer,
+				DeployID: "deploy-123",
+				Labels: map[string]string{
+					types.StreamKeyDeployTaskID: "task-123",
+					"l1":                        "v1",
+					"l2":                        "v2",
+					"l3":                        "v3",
+					"l4":                        "v4",
+					"l5":                        "v5",
+					"l6":                        "v6",
+					"l7":                        "v7",
+					"l8":                        "v8",
+					"l9":                        "v9",
+					"l10":                       "v10",
+				},
+				PodInfo: &types.PodInfo{
+					PodName:       "p1",
+					PodUID:        "u1",
+					Namespace:     "n1",
+					ServiceName:   "s1",
+					ContainerName: "c1",
+				},
+			},
+			// Base: 4
+			// PodInfo: 5. Total 9.
+			// Custom labels: 11 provided.
+			// Max is 15.
+			// Allowed custom labels: 15 - 9 = 6.
+			// Note: types.StreamKeyDeployTaskID is in Labels, so it takes 1 slot.
+			// So 5 more custom labels should be present.
+			// Total in map should be 15.
+			// However, map iteration order is random, so we can't deterministically say WHICH labels are present,
+			// only that the count is 15 (if keys are unique) or less (if keys overlap).
+			// Here all keys are unique (except overlap of StreamKeyDeployTaskID).
+			// StreamKeyDeployTaskID is added in base, then re-added in loop.
+			// If it's re-added, it consumes a slot.
+			// Let's just check the length of the result map.
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			actual := c.logEntryToMap(tc.entry)
+			if tc.name == "max label count limit" {
+				assert.LessOrEqual(t, len(actual), types.MaxLabelCount)
+				// Base keys must exist
+				assert.Equal(t, "runner", actual["client_id"])
+				assert.Equal(t, "p1", actual["pod_name"])
+			} else {
+				assert.Equal(t, tc.expected, actual)
+			}
+		})
+	}
 }
