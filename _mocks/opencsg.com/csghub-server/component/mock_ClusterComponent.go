@@ -383,6 +383,260 @@ func (_c *MockClusterComponent_GetDeploys_Call) RunAndReturn(run func(context.Co
 	return _c
 }
 
+// GetDeploysByTimeRange provides a mock function with given fields: ctx, req
+func (_m *MockClusterComponent) GetDeploysByTimeRange(ctx context.Context, req types.DeployTimeRangeReq) ([]database.Deploy, int, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetDeploysByTimeRange")
+	}
+
+	var r0 []database.Deploy
+	var r1 int
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.DeployTimeRangeReq) ([]database.Deploy, int, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.DeployTimeRangeReq) []database.Deploy); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.Deploy)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.DeployTimeRangeReq) int); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, types.DeployTimeRangeReq) error); ok {
+		r2 = rf(ctx, req)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockClusterComponent_GetDeploysByTimeRange_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetDeploysByTimeRange'
+type MockClusterComponent_GetDeploysByTimeRange_Call struct {
+	*mock.Call
+}
+
+// GetDeploysByTimeRange is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.DeployTimeRangeReq
+func (_e *MockClusterComponent_Expecter) GetDeploysByTimeRange(ctx interface{}, req interface{}) *MockClusterComponent_GetDeploysByTimeRange_Call {
+	return &MockClusterComponent_GetDeploysByTimeRange_Call{Call: _e.mock.On("GetDeploysByTimeRange", ctx, req)}
+}
+
+func (_c *MockClusterComponent_GetDeploysByTimeRange_Call) Run(run func(ctx context.Context, req types.DeployTimeRangeReq)) *MockClusterComponent_GetDeploysByTimeRange_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.DeployTimeRangeReq))
+	})
+	return _c
+}
+
+func (_c *MockClusterComponent_GetDeploysByTimeRange_Call) Return(_a0 []database.Deploy, _a1 int, _a2 error) *MockClusterComponent_GetDeploysByTimeRange_Call {
+	_c.Call.Return(_a0, _a1, _a2)
+	return _c
+}
+
+func (_c *MockClusterComponent_GetDeploysByTimeRange_Call) RunAndReturn(run func(context.Context, types.DeployTimeRangeReq) ([]database.Deploy, int, error)) *MockClusterComponent_GetDeploysByTimeRange_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetDeploysByTimeRangeStream provides a mock function with given fields: ctx, req
+func (_m *MockClusterComponent) GetDeploysByTimeRangeStream(ctx context.Context, req types.DeployTimeRangeReq) (<-chan []string, <-chan error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetDeploysByTimeRangeStream")
+	}
+
+	var r0 <-chan []string
+	var r1 <-chan error
+	if rf, ok := ret.Get(0).(func(context.Context, types.DeployTimeRangeReq) (<-chan []string, <-chan error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.DeployTimeRangeReq) <-chan []string); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(<-chan []string)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.DeployTimeRangeReq) <-chan error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(<-chan error)
+		}
+	}
+
+	return r0, r1
+}
+
+// MockClusterComponent_GetDeploysByTimeRangeStream_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetDeploysByTimeRangeStream'
+type MockClusterComponent_GetDeploysByTimeRangeStream_Call struct {
+	*mock.Call
+}
+
+// GetDeploysByTimeRangeStream is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.DeployTimeRangeReq
+func (_e *MockClusterComponent_Expecter) GetDeploysByTimeRangeStream(ctx interface{}, req interface{}) *MockClusterComponent_GetDeploysByTimeRangeStream_Call {
+	return &MockClusterComponent_GetDeploysByTimeRangeStream_Call{Call: _e.mock.On("GetDeploysByTimeRangeStream", ctx, req)}
+}
+
+func (_c *MockClusterComponent_GetDeploysByTimeRangeStream_Call) Run(run func(ctx context.Context, req types.DeployTimeRangeReq)) *MockClusterComponent_GetDeploysByTimeRangeStream_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.DeployTimeRangeReq))
+	})
+	return _c
+}
+
+func (_c *MockClusterComponent_GetDeploysByTimeRangeStream_Call) Return(_a0 <-chan []string, _a1 <-chan error) *MockClusterComponent_GetDeploysByTimeRangeStream_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClusterComponent_GetDeploysByTimeRangeStream_Call) RunAndReturn(run func(context.Context, types.DeployTimeRangeReq) (<-chan []string, <-chan error)) *MockClusterComponent_GetDeploysByTimeRangeStream_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetWorkflowsByTimeRange provides a mock function with given fields: ctx, req
+func (_m *MockClusterComponent) GetWorkflowsByTimeRange(ctx context.Context, req types.WorkflowTimeRangeReq) ([]database.ArgoWorkflow, int, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetWorkflowsByTimeRange")
+	}
+
+	var r0 []database.ArgoWorkflow
+	var r1 int
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.WorkflowTimeRangeReq) ([]database.ArgoWorkflow, int, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.WorkflowTimeRangeReq) []database.ArgoWorkflow); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.ArgoWorkflow)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.WorkflowTimeRangeReq) int); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, types.WorkflowTimeRangeReq) error); ok {
+		r2 = rf(ctx, req)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockClusterComponent_GetWorkflowsByTimeRange_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetWorkflowsByTimeRange'
+type MockClusterComponent_GetWorkflowsByTimeRange_Call struct {
+	*mock.Call
+}
+
+// GetWorkflowsByTimeRange is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.WorkflowTimeRangeReq
+func (_e *MockClusterComponent_Expecter) GetWorkflowsByTimeRange(ctx interface{}, req interface{}) *MockClusterComponent_GetWorkflowsByTimeRange_Call {
+	return &MockClusterComponent_GetWorkflowsByTimeRange_Call{Call: _e.mock.On("GetWorkflowsByTimeRange", ctx, req)}
+}
+
+func (_c *MockClusterComponent_GetWorkflowsByTimeRange_Call) Run(run func(ctx context.Context, req types.WorkflowTimeRangeReq)) *MockClusterComponent_GetWorkflowsByTimeRange_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.WorkflowTimeRangeReq))
+	})
+	return _c
+}
+
+func (_c *MockClusterComponent_GetWorkflowsByTimeRange_Call) Return(_a0 []database.ArgoWorkflow, _a1 int, _a2 error) *MockClusterComponent_GetWorkflowsByTimeRange_Call {
+	_c.Call.Return(_a0, _a1, _a2)
+	return _c
+}
+
+func (_c *MockClusterComponent_GetWorkflowsByTimeRange_Call) RunAndReturn(run func(context.Context, types.WorkflowTimeRangeReq) ([]database.ArgoWorkflow, int, error)) *MockClusterComponent_GetWorkflowsByTimeRange_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetWorkflowsByTimeRangeStream provides a mock function with given fields: ctx, req
+func (_m *MockClusterComponent) GetWorkflowsByTimeRangeStream(ctx context.Context, req types.WorkflowTimeRangeReq) (<-chan []string, <-chan error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetWorkflowsByTimeRangeStream")
+	}
+
+	var r0 <-chan []string
+	var r1 <-chan error
+	if rf, ok := ret.Get(0).(func(context.Context, types.WorkflowTimeRangeReq) (<-chan []string, <-chan error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.WorkflowTimeRangeReq) <-chan []string); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(<-chan []string)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.WorkflowTimeRangeReq) <-chan error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(<-chan error)
+		}
+	}
+
+	return r0, r1
+}
+
+// MockClusterComponent_GetWorkflowsByTimeRangeStream_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetWorkflowsByTimeRangeStream'
+type MockClusterComponent_GetWorkflowsByTimeRangeStream_Call struct {
+	*mock.Call
+}
+
+// GetWorkflowsByTimeRangeStream is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.WorkflowTimeRangeReq
+func (_e *MockClusterComponent_Expecter) GetWorkflowsByTimeRangeStream(ctx interface{}, req interface{}) *MockClusterComponent_GetWorkflowsByTimeRangeStream_Call {
+	return &MockClusterComponent_GetWorkflowsByTimeRangeStream_Call{Call: _e.mock.On("GetWorkflowsByTimeRangeStream", ctx, req)}
+}
+
+func (_c *MockClusterComponent_GetWorkflowsByTimeRangeStream_Call) Run(run func(ctx context.Context, req types.WorkflowTimeRangeReq)) *MockClusterComponent_GetWorkflowsByTimeRangeStream_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.WorkflowTimeRangeReq))
+	})
+	return _c
+}
+
+func (_c *MockClusterComponent_GetWorkflowsByTimeRangeStream_Call) Return(_a0 <-chan []string, _a1 <-chan error) *MockClusterComponent_GetWorkflowsByTimeRangeStream_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClusterComponent_GetWorkflowsByTimeRangeStream_Call) RunAndReturn(run func(context.Context, types.WorkflowTimeRangeReq) (<-chan []string, <-chan error)) *MockClusterComponent_GetWorkflowsByTimeRangeStream_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Index provides a mock function with given fields: ctx
 func (_m *MockClusterComponent) Index(ctx context.Context) ([]types.ClusterRes, error) {
 	ret := _m.Called(ctx)

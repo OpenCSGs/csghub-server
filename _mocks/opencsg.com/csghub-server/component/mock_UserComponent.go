@@ -979,6 +979,72 @@ func (_c *MockUserComponent_LikesModels_Call) RunAndReturn(run func(context.Cont
 	return _c
 }
 
+// LikesSkills provides a mock function with given fields: ctx, req
+func (_m *MockUserComponent) LikesSkills(ctx context.Context, req *types.UserMCPsReq) ([]types.Skill, int, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for LikesSkills")
+	}
+
+	var r0 []types.Skill
+	var r1 int
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, *types.UserMCPsReq) ([]types.Skill, int, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *types.UserMCPsReq) []types.Skill); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]types.Skill)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *types.UserMCPsReq) int); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, *types.UserMCPsReq) error); ok {
+		r2 = rf(ctx, req)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockUserComponent_LikesSkills_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'LikesSkills'
+type MockUserComponent_LikesSkills_Call struct {
+	*mock.Call
+}
+
+// LikesSkills is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req *types.UserMCPsReq
+func (_e *MockUserComponent_Expecter) LikesSkills(ctx interface{}, req interface{}) *MockUserComponent_LikesSkills_Call {
+	return &MockUserComponent_LikesSkills_Call{Call: _e.mock.On("LikesSkills", ctx, req)}
+}
+
+func (_c *MockUserComponent_LikesSkills_Call) Run(run func(ctx context.Context, req *types.UserMCPsReq)) *MockUserComponent_LikesSkills_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*types.UserMCPsReq))
+	})
+	return _c
+}
+
+func (_c *MockUserComponent_LikesSkills_Call) Return(_a0 []types.Skill, _a1 int, _a2 error) *MockUserComponent_LikesSkills_Call {
+	_c.Call.Return(_a0, _a1, _a2)
+	return _c
+}
+
+func (_c *MockUserComponent_LikesSkills_Call) RunAndReturn(run func(context.Context, *types.UserMCPsReq) ([]types.Skill, int, error)) *MockUserComponent_LikesSkills_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // LikesSpaces provides a mock function with given fields: ctx, req
 func (_m *MockUserComponent) LikesSpaces(ctx context.Context, req *types.UserCollectionReq) ([]types.Space, int, error) {
 	ret := _m.Called(ctx, req)
@@ -1108,6 +1174,72 @@ func (_c *MockUserComponent_ListDeploys_Call) Return(_a0 []types.DeployRepo, _a1
 }
 
 func (_c *MockUserComponent_ListDeploys_Call) RunAndReturn(run func(context.Context, types.RepositoryType, *types.DeployReq) ([]types.DeployRepo, int, error)) *MockUserComponent_ListDeploys_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ListDeploysByNamespace provides a mock function with given fields: ctx, req
+func (_m *MockUserComponent) ListDeploysByNamespace(ctx context.Context, req *types.OrgRunDeploysReq) ([]types.DeployRepo, int, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListDeploysByNamespace")
+	}
+
+	var r0 []types.DeployRepo
+	var r1 int
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, *types.OrgRunDeploysReq) ([]types.DeployRepo, int, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *types.OrgRunDeploysReq) []types.DeployRepo); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]types.DeployRepo)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *types.OrgRunDeploysReq) int); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, *types.OrgRunDeploysReq) error); ok {
+		r2 = rf(ctx, req)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockUserComponent_ListDeploysByNamespace_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListDeploysByNamespace'
+type MockUserComponent_ListDeploysByNamespace_Call struct {
+	*mock.Call
+}
+
+// ListDeploysByNamespace is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req *types.OrgRunDeploysReq
+func (_e *MockUserComponent_Expecter) ListDeploysByNamespace(ctx interface{}, req interface{}) *MockUserComponent_ListDeploysByNamespace_Call {
+	return &MockUserComponent_ListDeploysByNamespace_Call{Call: _e.mock.On("ListDeploysByNamespace", ctx, req)}
+}
+
+func (_c *MockUserComponent_ListDeploysByNamespace_Call) Run(run func(ctx context.Context, req *types.OrgRunDeploysReq)) *MockUserComponent_ListDeploysByNamespace_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*types.OrgRunDeploysReq))
+	})
+	return _c
+}
+
+func (_c *MockUserComponent_ListDeploysByNamespace_Call) Return(_a0 []types.DeployRepo, _a1 int, _a2 error) *MockUserComponent_ListDeploysByNamespace_Call {
+	_c.Call.Return(_a0, _a1, _a2)
+	return _c
+}
+
+func (_c *MockUserComponent_ListDeploysByNamespace_Call) RunAndReturn(run func(context.Context, *types.OrgRunDeploysReq) ([]types.DeployRepo, int, error)) *MockUserComponent_ListDeploysByNamespace_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1306,6 +1438,72 @@ func (_c *MockUserComponent_ListNotebooks_Call) Return(_a0 []types.NotebookRes, 
 }
 
 func (_c *MockUserComponent_ListNotebooks_Call) RunAndReturn(run func(context.Context, *types.DeployReq) ([]types.NotebookRes, int, error)) *MockUserComponent_ListNotebooks_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ListNotebooksByNamespace provides a mock function with given fields: ctx, req
+func (_m *MockUserComponent) ListNotebooksByNamespace(ctx context.Context, req *types.OrgNotebooksReq) ([]types.NotebookRes, int, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListNotebooksByNamespace")
+	}
+
+	var r0 []types.NotebookRes
+	var r1 int
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, *types.OrgNotebooksReq) ([]types.NotebookRes, int, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *types.OrgNotebooksReq) []types.NotebookRes); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]types.NotebookRes)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *types.OrgNotebooksReq) int); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, *types.OrgNotebooksReq) error); ok {
+		r2 = rf(ctx, req)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockUserComponent_ListNotebooksByNamespace_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListNotebooksByNamespace'
+type MockUserComponent_ListNotebooksByNamespace_Call struct {
+	*mock.Call
+}
+
+// ListNotebooksByNamespace is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req *types.OrgNotebooksReq
+func (_e *MockUserComponent_Expecter) ListNotebooksByNamespace(ctx interface{}, req interface{}) *MockUserComponent_ListNotebooksByNamespace_Call {
+	return &MockUserComponent_ListNotebooksByNamespace_Call{Call: _e.mock.On("ListNotebooksByNamespace", ctx, req)}
+}
+
+func (_c *MockUserComponent_ListNotebooksByNamespace_Call) Run(run func(ctx context.Context, req *types.OrgNotebooksReq)) *MockUserComponent_ListNotebooksByNamespace_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*types.OrgNotebooksReq))
+	})
+	return _c
+}
+
+func (_c *MockUserComponent_ListNotebooksByNamespace_Call) Return(_a0 []types.NotebookRes, _a1 int, _a2 error) *MockUserComponent_ListNotebooksByNamespace_Call {
+	_c.Call.Return(_a0, _a1, _a2)
+	return _c
+}
+
+func (_c *MockUserComponent_ListNotebooksByNamespace_Call) RunAndReturn(run func(context.Context, *types.OrgNotebooksReq) ([]types.NotebookRes, int, error)) *MockUserComponent_ListNotebooksByNamespace_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -51,3 +51,9 @@ type ClusterDeployReq struct {
 	Per          int    `json:"per"`
 	Page         int    `json:"page"`
 }
+
+type DeployTimeRangeReq struct {
+	PageOpts
+	StartTime *time.Time `json:"start_time,omitempty"`
+	EndTime   *time.Time `json:"end_time,omitempty"`
+}
