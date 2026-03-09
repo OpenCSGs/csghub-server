@@ -513,6 +513,7 @@ func NewTestClusterComponent(config *config.Config, deployer deploy.Deployer, st
 		deployTaskStore: stores.DeployTask,
 		resStore:        stores.SpaceResource,
 		workflowStore:   stores.Workflow,
+		namespaceStore:  stores.Namespace,
 	}
 }
 
