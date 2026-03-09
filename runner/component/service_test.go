@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strconv"
 	"testing"
 	"time"
 
@@ -1074,8 +1075,8 @@ func TestServiceComponent_reportServiceLog(t *testing.T) {
 
 	// Expect Report to be called with correct message format
 	reporter.EXPECT().Report(mock.MatchedBy(func(logEntry types.LogEntry) bool {
-		expectedMsg := fmt.Sprintf("test msg, ksvc statue: %s, deploy status: %d,\nksvc msg: %s\nksvc reason: %s",
-			ksvc.Status, statusRes.Code, statusRes.ServiceMessage, statusRes.ServiceReason)
+		expectedMsg := fmt.Sprintf("test msg ksvc statue: %s, deploy status: %d, pod msg: %s, pod reason: %s",
+			ksvc.Status, statusRes.Code, statusRes.Message, statusRes.Reason)
 		return logEntry.Message == expectedMsg
 	})).Return()
 
@@ -1221,6 +1222,298 @@ func Test_isUserContainerActive(t *testing.T) {
 			}
 			if gotStr != tt.wantStr {
 				t.Errorf("isUserContainerActive() gotStr = %v, want %v", gotStr, tt.wantStr)
+			}
+		})
+	}
+}
+
+func TestServiceComponent_reportServiceLog_New(t *testing.T) {
+	reporter := mockReporter.NewMockLogCollector(t)
+	sc := &serviceComponentImpl{
+		logReporter: reporter,
+	}
+
+	ksvc := &database.KnativeService{
+		Name:       "test-service",
+		Status:     corev1.ConditionTrue,
+		DeployID:   123,
+		ClusterID:  "test-cluster",
+		DeployType: 1,
+		ID:         456,
+		TaskID:     789,
+	}
+
+	podInfo := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-pod",
+			Namespace: "test-ns",
+			UID:       "pod-uid",
+			Labels: map[string]string{
+				"label1": "value1",
+			},
+		},
+		Status: corev1.PodStatus{
+			Phase: corev1.PodRunning,
+		},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{Name: "test-container"},
+			},
+		},
+	}
+
+	statusRes := &types.StatusResponse{
+		Code:           1,
+		Message:        "test message",
+		Reason:         "test reason",
+		ServiceMessage: "svc msg",
+		ServiceReason:  "svc reason",
+	}
+
+	// Expect Report to be called with correct message format and LogEntry fields
+	reporter.EXPECT().Report(mock.MatchedBy(func(logEntry types.LogEntry) bool {
+		expectedMsg := fmt.Sprintf("test msg ksvc statue: %s, deploy status: %d, pod msg: %s, pod reason: %s",
+			ksvc.Status, statusRes.Code, statusRes.Message, statusRes.Reason)
+
+		if logEntry.Message != expectedMsg {
+			return false
+		}
+		if logEntry.DeployID != strconv.FormatInt(ksvc.DeployID, 10) {
+			return false
+		}
+		if logEntry.Labels[types.LogLabelTypeKey] != types.LogLabelDeploy {
+			return false
+		}
+		if logEntry.Labels[types.LogLabelKeyClusterID] != ksvc.ClusterID {
+			return false
+		}
+		if logEntry.Labels[types.StreamKeyDeployType] != strconv.Itoa(ksvc.DeployType) {
+			return false
+		}
+		if logEntry.Labels[types.StreamKeyDeployTypeID] != strconv.FormatInt(ksvc.ID, 10) {
+			return false
+		}
+		if logEntry.Labels[types.StreamKeyDeployTaskID] != strconv.FormatInt(ksvc.TaskID, 10) {
+			return false
+		}
+		if logEntry.PodInfo == nil {
+			return false
+		}
+		if logEntry.PodInfo.ServiceName != ksvc.Name {
+			return false
+		}
+		if logEntry.PodInfo.Namespace != podInfo.Namespace {
+			return false
+		}
+		if logEntry.PodInfo.PodName != podInfo.Name {
+			return false
+		}
+		if logEntry.PodInfo.Phase != podInfo.Status.Phase {
+			return false
+		}
+		if logEntry.PodInfo.PodUID != string(podInfo.UID) {
+			return false
+		}
+		if logEntry.PodInfo.ContainerName != podInfo.Spec.Containers[0].Name {
+			return false
+		}
+		if len(logEntry.PodInfo.Labels) != len(podInfo.Labels) {
+			return false
+		}
+
+		return true
+	})).Return()
+
+	sc.reportServiceLog("test msg", ksvc, podInfo, statusRes)
+}
+
+func Test_getPodError(t *testing.T) {
+	tests := []struct {
+		name        string
+		podList     *corev1.PodList
+		wantMessage string
+		wantReason  string
+	}{
+		{
+			name: "No pods",
+			podList: &corev1.PodList{
+				Items: []corev1.Pod{},
+			},
+			wantMessage: "",
+			wantReason:  "",
+		},
+		{
+			name: "Pod terminated with error",
+			podList: &corev1.PodList{
+				Items: []corev1.Pod{
+					{
+						Status: corev1.PodStatus{
+							ContainerStatuses: []corev1.ContainerStatus{
+								{
+									Name: rtypes.UserContainerName,
+									LastTerminationState: corev1.ContainerState{
+										Terminated: &corev1.ContainerStateTerminated{
+											Message: "OOMKilled",
+											Reason:  "OOMKilled",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantMessage: "OOMKilled",
+			wantReason:  "OOMKilled",
+		},
+		{
+			name: "Pod scheduled failed",
+			podList: &corev1.PodList{
+				Items: []corev1.Pod{
+					{
+						Status: corev1.PodStatus{
+							Conditions: []corev1.PodCondition{
+								{
+									Type:    corev1.PodScheduled,
+									Status:  corev1.ConditionFalse,
+									Message: "0/1 nodes are unavailable",
+									Reason:  "Unschedulable",
+								},
+							},
+						},
+					},
+				},
+			},
+			wantMessage: "0/1 nodes are unavailable",
+			wantReason:  "Unschedulable",
+		},
+		{
+			name: "Pod image pull failed",
+			podList: &corev1.PodList{
+				Items: []corev1.Pod{
+					{
+						Status: corev1.PodStatus{
+							ContainerStatuses: []corev1.ContainerStatus{
+								{
+									Name: rtypes.UserContainerName,
+									State: corev1.ContainerState{
+										Waiting: &corev1.ContainerStateWaiting{
+											Reason:  "ErrImagePull",
+											Message: "rpc error: code = Unknown desc = Error response from daemon",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantMessage: "rpc error: code = Unknown desc = Error response from daemon",
+			wantReason:  "ErrImagePull",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			msg, reason := getPodError(tt.podList)
+			if tt.wantMessage == "" {
+				if msg != nil {
+					t.Errorf("getPodError() message = %v, want nil", *msg)
+				}
+			} else {
+				if msg == nil || *msg != tt.wantMessage {
+					t.Errorf("getPodError() message = %v, want %v", msg, tt.wantMessage)
+				}
+			}
+
+			if tt.wantReason == "" {
+				if reason != nil {
+					t.Errorf("getPodError() reason = %v, want nil", *reason)
+				}
+			} else {
+				if reason == nil || *reason != tt.wantReason {
+					t.Errorf("getPodError() reason = %v, want %v", reason, tt.wantReason)
+				}
+			}
+		})
+	}
+}
+
+func Test_hasFailedStatus(t *testing.T) {
+	tests := []struct {
+		name       string
+		pod        *corev1.Pod
+		wantReason string
+		wantFailed bool
+	}{
+		{
+			name:       "nil pod",
+			pod:        nil,
+			wantReason: "",
+			wantFailed: false,
+		},
+		{
+			name: "normal running pod",
+			pod: &corev1.Pod{
+				Status: corev1.PodStatus{
+					ContainerStatuses: []corev1.ContainerStatus{
+						{
+							Name: rtypes.UserContainerName,
+							State: corev1.ContainerState{
+								Running: &corev1.ContainerStateRunning{},
+							},
+						},
+					},
+				},
+			},
+			wantReason: "",
+			wantFailed: false,
+		},
+		{
+			name: "pod scheduled failed",
+			pod: &corev1.Pod{
+				Status: corev1.PodStatus{
+					Conditions: []corev1.PodCondition{
+						{
+							Type:   corev1.PodScheduled,
+							Status: corev1.ConditionFalse,
+							Reason: "Unschedulable",
+						},
+					},
+				},
+			},
+			wantReason: "Unschedulable",
+			wantFailed: true,
+		},
+		{
+			name: "pod image pull failed",
+			pod: &corev1.Pod{
+				Status: corev1.PodStatus{
+					ContainerStatuses: []corev1.ContainerStatus{
+						{
+							Name: rtypes.UserContainerName,
+							State: corev1.ContainerState{
+								Waiting: &corev1.ContainerStateWaiting{
+									Reason: "ErrImagePull",
+								},
+							},
+						},
+					},
+				},
+			},
+			wantReason: "ErrImagePull",
+			wantFailed: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reason, failed := hasFailedStatus(tt.pod)
+			if failed != tt.wantFailed {
+				t.Errorf("hasFailedStatus() failed = %v, want %v", failed, tt.wantFailed)
+			}
+			if reason != tt.wantReason {
+				t.Errorf("hasFailedStatus() reason = %v, want %v", reason, tt.wantReason)
 			}
 		})
 	}
