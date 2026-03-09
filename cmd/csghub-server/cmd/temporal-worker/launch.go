@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"opencsg.com/csghub-server/moderation/checker"
 
@@ -81,6 +82,9 @@ var cmdLaunch = &cobra.Command{
 		temporalClient, err := temporal.NewClient(client.Options{
 			HostPort: cfg.WorkFLow.Endpoint,
 			Logger:   log.NewStructuredLogger(slog.Default()),
+			ConnectionOptions: client.ConnectionOptions{
+				GetSystemInfoTimeout: time.Duration(cfg.Temporal.GetSystemInfoTimeout) * time.Second,
+			},
 		}, instrumentation.TemporalWorker)
 		if err != nil {
 			return fmt.Errorf("unable to create temporal client, error: %w", err)
