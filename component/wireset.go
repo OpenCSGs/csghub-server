@@ -208,6 +208,7 @@ func NewTestUserComponent(
 		promptStore:         stores.Prompt,
 		workflowStore:       stores.Workflow,
 		mcpServerStore:      stores.MCPServerStore,
+		skillStore:          stores.Skill,
 	}
 }
 
