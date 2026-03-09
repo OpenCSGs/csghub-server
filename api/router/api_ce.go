@@ -31,7 +31,7 @@ func createXnetRoutes(_ *gin.Engine, _ middleware.MiddlewareCollection, _ *confi
 	return nil
 }
 
-func createComputingRoutes(_ *gin.RouterGroup, _ middleware.MiddlewareCollection, _ *config.Config, _ *handler.ClusterHandler) error {
+func createComputingRoutes(_ *gin.RouterGroup, _ *handler.ClusterHandler) error {
 	return nil
 }
 

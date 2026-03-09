@@ -75,6 +75,9 @@ const (
 	StreamKeyDeployCommitID = "csghub_deploy_commit_id"
 )
 
+// MaxLabelCount is the maximum number of labels allowed in Loki.
+const MaxLabelCount = 15
+
 type ReportMsg string
 
 // String implements fmt.Stringer interface

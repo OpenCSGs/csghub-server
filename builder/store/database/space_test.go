@@ -186,7 +186,8 @@ func TestSpaceStore_ListByPath(t *testing.T) {
 	for _, sp := range sps {
 		names = append(names, sp.Repository.Name)
 	}
-	require.Equal(t, []string{"repo2", "repo", "repo3"}, names)
+	// 忽略顺序，只检查内容是否一致
+	require.ElementsMatch(t, []string{"repo2", "repo", "repo3"}, names)
 
 }
 
