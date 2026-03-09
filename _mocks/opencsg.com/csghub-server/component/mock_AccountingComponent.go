@@ -789,9 +789,9 @@ func (_c *MockAccountingComponent_QueryAllUsersBalance_Call) RunAndReturn(run fu
 	return _c
 }
 
-// QueryBalanceByUserID provides a mock function with given fields: ctx, currentUser, userUUID
-func (_m *MockAccountingComponent) QueryBalanceByUserID(ctx context.Context, currentUser string, userUUID string) (interface{}, error) {
-	ret := _m.Called(ctx, currentUser, userUUID)
+// QueryBalanceByUserID provides a mock function with given fields: ctx, currentUser, UUID
+func (_m *MockAccountingComponent) QueryBalanceByUserID(ctx context.Context, currentUser string, UUID string) (interface{}, error) {
+	ret := _m.Called(ctx, currentUser, UUID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for QueryBalanceByUserID")
@@ -800,10 +800,10 @@ func (_m *MockAccountingComponent) QueryBalanceByUserID(ctx context.Context, cur
 	var r0 interface{}
 	var r1 error
 	if rf, ok := ret.Get(0).(func(context.Context, string, string) (interface{}, error)); ok {
-		return rf(ctx, currentUser, userUUID)
+		return rf(ctx, currentUser, UUID)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, string, string) interface{}); ok {
-		r0 = rf(ctx, currentUser, userUUID)
+		r0 = rf(ctx, currentUser, UUID)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(interface{})
@@ -811,7 +811,7 @@ func (_m *MockAccountingComponent) QueryBalanceByUserID(ctx context.Context, cur
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
-		r1 = rf(ctx, currentUser, userUUID)
+		r1 = rf(ctx, currentUser, UUID)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -827,12 +827,12 @@ type MockAccountingComponent_QueryBalanceByUserID_Call struct {
 // QueryBalanceByUserID is a helper method to define mock.On call
 //   - ctx context.Context
 //   - currentUser string
-//   - userUUID string
-func (_e *MockAccountingComponent_Expecter) QueryBalanceByUserID(ctx interface{}, currentUser interface{}, userUUID interface{}) *MockAccountingComponent_QueryBalanceByUserID_Call {
-	return &MockAccountingComponent_QueryBalanceByUserID_Call{Call: _e.mock.On("QueryBalanceByUserID", ctx, currentUser, userUUID)}
+//   - UUID string
+func (_e *MockAccountingComponent_Expecter) QueryBalanceByUserID(ctx interface{}, currentUser interface{}, UUID interface{}) *MockAccountingComponent_QueryBalanceByUserID_Call {
+	return &MockAccountingComponent_QueryBalanceByUserID_Call{Call: _e.mock.On("QueryBalanceByUserID", ctx, currentUser, UUID)}
 }
 
-func (_c *MockAccountingComponent_QueryBalanceByUserID_Call) Run(run func(ctx context.Context, currentUser string, userUUID string)) *MockAccountingComponent_QueryBalanceByUserID_Call {
+func (_c *MockAccountingComponent_QueryBalanceByUserID_Call) Run(run func(ctx context.Context, currentUser string, UUID string)) *MockAccountingComponent_QueryBalanceByUserID_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(context.Context), args[1].(string), args[2].(string))
 	})
@@ -967,9 +967,9 @@ func (_c *MockAccountingComponent_QueryPricesBySKUType_Call) RunAndReturn(run fu
 	return _c
 }
 
-// RechargeAccountingUser provides a mock function with given fields: ctx, userUUID, req
-func (_m *MockAccountingComponent) RechargeAccountingUser(ctx context.Context, userUUID string, req types.RechargeReq) (interface{}, error) {
-	ret := _m.Called(ctx, userUUID, req)
+// RechargeAccountingUser provides a mock function with given fields: ctx, UUID, req
+func (_m *MockAccountingComponent) RechargeAccountingUser(ctx context.Context, UUID string, req types.RechargeReq) (interface{}, error) {
+	ret := _m.Called(ctx, UUID, req)
 
 	if len(ret) == 0 {
 		panic("no return value specified for RechargeAccountingUser")
@@ -978,10 +978,10 @@ func (_m *MockAccountingComponent) RechargeAccountingUser(ctx context.Context, u
 	var r0 interface{}
 	var r1 error
 	if rf, ok := ret.Get(0).(func(context.Context, string, types.RechargeReq) (interface{}, error)); ok {
-		return rf(ctx, userUUID, req)
+		return rf(ctx, UUID, req)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, string, types.RechargeReq) interface{}); ok {
-		r0 = rf(ctx, userUUID, req)
+		r0 = rf(ctx, UUID, req)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(interface{})
@@ -989,7 +989,7 @@ func (_m *MockAccountingComponent) RechargeAccountingUser(ctx context.Context, u
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, string, types.RechargeReq) error); ok {
-		r1 = rf(ctx, userUUID, req)
+		r1 = rf(ctx, UUID, req)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -1004,13 +1004,13 @@ type MockAccountingComponent_RechargeAccountingUser_Call struct {
 
 // RechargeAccountingUser is a helper method to define mock.On call
 //   - ctx context.Context
-//   - userUUID string
+//   - UUID string
 //   - req types.RechargeReq
-func (_e *MockAccountingComponent_Expecter) RechargeAccountingUser(ctx interface{}, userUUID interface{}, req interface{}) *MockAccountingComponent_RechargeAccountingUser_Call {
-	return &MockAccountingComponent_RechargeAccountingUser_Call{Call: _e.mock.On("RechargeAccountingUser", ctx, userUUID, req)}
+func (_e *MockAccountingComponent_Expecter) RechargeAccountingUser(ctx interface{}, UUID interface{}, req interface{}) *MockAccountingComponent_RechargeAccountingUser_Call {
+	return &MockAccountingComponent_RechargeAccountingUser_Call{Call: _e.mock.On("RechargeAccountingUser", ctx, UUID, req)}
 }
 
-func (_c *MockAccountingComponent_RechargeAccountingUser_Call) Run(run func(ctx context.Context, userUUID string, req types.RechargeReq)) *MockAccountingComponent_RechargeAccountingUser_Call {
+func (_c *MockAccountingComponent_RechargeAccountingUser_Call) Run(run func(ctx context.Context, UUID string, req types.RechargeReq)) *MockAccountingComponent_RechargeAccountingUser_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(context.Context), args[1].(string), args[2].(types.RechargeReq))
 	})
