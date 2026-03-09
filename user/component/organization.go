@@ -103,6 +103,11 @@ func (c *organizationComponentImpl) Create(ctx context.Context, req *types.Creat
 		UserID: user.ID,
 	}
 	dbOrg.UUID = uuid.New()
+
+	chkUser, err := c.userStore.FindByUUID(ctx, dbOrg.UUID.String())
+	if err == nil && chkUser != nil && chkUser.UUID == dbOrg.UUID.String() {
+		return nil, errorx.UUIDConflict(dbOrg.UUID.String())
+	}
 	err = c.orgStore.Create(ctx, dbOrg, namespace)
 	if err != nil {
 		return nil, fmt.Errorf("failed create database organization, error: %w", err)

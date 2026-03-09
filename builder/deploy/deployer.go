@@ -55,7 +55,6 @@ type Deployer interface {
 	DeleteFinetuneJob(ctx context.Context, req types.ArgoWorkFlowDeleteReq) error
 	GetWorkflowLogsInStream(ctx context.Context, req types.FinetuneLogReq) (*MultiLogReader, error)
 	GetWorkflowLogsNonStream(ctx context.Context, req types.FinetuneLogReq) (*loki.LokiQueryResponse, error)
-	IsDefaultScheduler() bool
 	GetSharedModeResourceName(config *config.Config) string
 }
 
@@ -1076,7 +1075,7 @@ func (d *deployer) SubmitEvaluation(ctx context.Context, req types.EvaluationReq
 	if req.ResourceId == 0 {
 		flowReq.ShareMode = true
 	}
-	flowReq.Scheduler = d.kubeScheduler
+	flowReq.Scheduler = common.GenerateScheduler(d.deployConfig)
 	return d.imageRunner.SubmitWorkFlow(ctx, flowReq)
 }
 

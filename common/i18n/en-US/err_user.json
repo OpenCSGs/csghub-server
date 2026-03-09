@@ -32,6 +32,9 @@
     "error.USER-ERR-18": {
         "other": "User email is empty"
     },
+    "error.USER-ERR-19": {
+        "other": "UUID conflict with existing user"
+    },
     "error.USER-ERR-2": {
         "other": "New phone number already exists in sso service"
     },

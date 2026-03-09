@@ -722,7 +722,7 @@ func (a *DeployActivity) makeDeployEnv(ctx context.Context, hardware types.HardW
 					}
 					// handle boolean value
 					if !strings.Contains(arg.Format, "%") {
-						if value == "false" || value == "0" || value == "" {
+						if value == "false" || value == "0" || value == "" || value == "disable" {
 							continue
 						}
 						engineArgs.WriteString(" ")
@@ -794,6 +794,7 @@ func (a *DeployActivity) makeDeployEnv(ctx context.Context, hardware types.HardW
 		envMap["HF_ENDPOINT"] = a.cfg.ModelDownloadEndpoint // "https://hub.opencsg-stg.com/"
 		envMap["HF_HUB_OFFLINE"] = "1"
 		envMap["HF_TASK"] = string(deployInfo.Task)
+		envMap["VLLM_ENFORCE_EAGER"] = "1"
 	}
 
 	if deployInfo.Type == types.FinetuneType {

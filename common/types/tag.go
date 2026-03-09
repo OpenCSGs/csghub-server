@@ -67,6 +67,7 @@ const (
 	SpaceTagScope   TagScope = "space"
 	PromptTagScope  TagScope = "prompt"
 	MCPTagScope     TagScope = "mcp"
+	SkillTagScope   TagScope = "skill"
 	UnknownScope    TagScope = "unknown"
 )
 

@@ -914,3 +914,18 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Name:** `userHasBills`
 - **Description:** The user who owns bills cannot be deleted.
 
+---
+
+### `USER-ERR-18`
+
+- **Error Code:** `USER-ERR-18`
+- **Error Name:** `userEmailEmpty`
+- **Description:** User email is empty.
+
+---
+
+### `USER-ERR-19`
+
+- **Error Code:** `USER-ERR-19`
+- **Error Name:** `uuidConflict`
+- **Description:** The UUID generated for the organization already exists in the system.
