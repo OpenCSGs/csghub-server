@@ -187,6 +187,72 @@ func (_c *MockEvaluationComponent_GetEvaluation_Call) RunAndReturn(run func(cont
 	return _c
 }
 
+// OrgEvaluations provides a mock function with given fields: ctx, req
+func (_m *MockEvaluationComponent) OrgEvaluations(ctx context.Context, req *types.OrgEvaluationsReq) ([]types.ArgoWorkFlowRes, int, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for OrgEvaluations")
+	}
+
+	var r0 []types.ArgoWorkFlowRes
+	var r1 int
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, *types.OrgEvaluationsReq) ([]types.ArgoWorkFlowRes, int, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *types.OrgEvaluationsReq) []types.ArgoWorkFlowRes); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]types.ArgoWorkFlowRes)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *types.OrgEvaluationsReq) int); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, *types.OrgEvaluationsReq) error); ok {
+		r2 = rf(ctx, req)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockEvaluationComponent_OrgEvaluations_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'OrgEvaluations'
+type MockEvaluationComponent_OrgEvaluations_Call struct {
+	*mock.Call
+}
+
+// OrgEvaluations is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req *types.OrgEvaluationsReq
+func (_e *MockEvaluationComponent_Expecter) OrgEvaluations(ctx interface{}, req interface{}) *MockEvaluationComponent_OrgEvaluations_Call {
+	return &MockEvaluationComponent_OrgEvaluations_Call{Call: _e.mock.On("OrgEvaluations", ctx, req)}
+}
+
+func (_c *MockEvaluationComponent_OrgEvaluations_Call) Run(run func(ctx context.Context, req *types.OrgEvaluationsReq)) *MockEvaluationComponent_OrgEvaluations_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*types.OrgEvaluationsReq))
+	})
+	return _c
+}
+
+func (_c *MockEvaluationComponent_OrgEvaluations_Call) Return(_a0 []types.ArgoWorkFlowRes, _a1 int, _a2 error) *MockEvaluationComponent_OrgEvaluations_Call {
+	_c.Call.Return(_a0, _a1, _a2)
+	return _c
+}
+
+func (_c *MockEvaluationComponent_OrgEvaluations_Call) RunAndReturn(run func(context.Context, *types.OrgEvaluationsReq) ([]types.ArgoWorkFlowRes, int, error)) *MockEvaluationComponent_OrgEvaluations_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // NewMockEvaluationComponent creates a new instance of MockEvaluationComponent. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewMockEvaluationComponent(t interface {

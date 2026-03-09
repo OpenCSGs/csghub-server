@@ -162,16 +162,18 @@ type Config struct {
 		ReadinessFailureThreshold int    `env:"STARHUB_SERVER_READINESS_FAILURE_THRESHOLD" default:"3"`
 		PYPIIndexURL              string `env:"STARHUB_SERVER_SPACE_PYPI_INDEX_URL" default:""`
 		InformerSyncPeriodInMin   int    `env:"STARHUB_SERVER_SPACE_INFORMER_SYNC_PERIOD_IN_MINUTES" default:"2"`
+		StatusCheckInterval       int    `env:"STARHUB_SERVER_SPACE_STATUS_CHECK_INTERVAL" default:"10"` // 10 seconds
 	}
 
 	Model struct {
-		DeployTimeoutInMin      int    `env:"STARHUB_SERVER_MODEL_DEPLOY_TIMEOUT_IN_MINUTES" default:"60"`
-		DownloadEndpoint        string `env:"STARHUB_SERVER_MODEL_DOWNLOAD_ENDPOINT" default:"https://hub.opencsg.com"`
-		DockerRegBase           string `env:"STARHUB_SERVER_MODEL_DOCKER_REG_BASE" default:"opencsg-registry.cn-beijing.cr.aliyuncs.com"`
-		NimDockerSecretName     string `env:"STARHUB_SERVER_MODEL_NIM_DOCKER_SECRET_NAME" default:"ngc-secret"`
-		NimNGCSecretName        string `env:"STARHUB_SERVER_MODEL_NIM_NGC_SECRET_NAME" default:"nvidia-nim-secrets"`
-		MinContextForEstimation int    `env:"STARHUB_SERVER_MODEL_MIN_CONTEXT_FOR_ESTIMATION" default:"2048"`
-		MinContextForFinetune   int    `env:"STARHUB_SERVER_MODEL_MIN_CONTEXT_FOR_FINETUNE" default:"512"`
+		DeployTimeoutInMin        int    `env:"STARHUB_SERVER_MODEL_DEPLOY_TIMEOUT_IN_MINUTES" default:"60"`
+		DownloadEndpoint          string `env:"STARHUB_SERVER_MODEL_DOWNLOAD_ENDPOINT" default:"https://hub.opencsg.com"`
+		DockerRegBase             string `env:"STARHUB_SERVER_MODEL_DOCKER_REG_BASE" default:"opencsg-registry.cn-beijing.cr.aliyuncs.com"`
+		NimDockerSecretName       string `env:"STARHUB_SERVER_MODEL_NIM_DOCKER_SECRET_NAME" default:"ngc-secret"`
+		NimNGCSecretName          string `env:"STARHUB_SERVER_MODEL_NIM_NGC_SECRET_NAME" default:"nvidia-nim-secrets"`
+		MinContextForEstimation   int    `env:"STARHUB_SERVER_MODEL_MIN_CONTEXT_FOR_ESTIMATION" default:"2048"`
+		MinContextForFinetune     int    `env:"STARHUB_SERVER_MODEL_MIN_CONTEXT_FOR_FINETUNE" default:"512"`
+		DeployStatusCheckInterval int    `env:"STARHUB_SERVER_MODEL_DEPLOY_STATUS_CHECK_INTERVAL" default:"10"` // 10 seconds
 	}
 
 	Search struct {

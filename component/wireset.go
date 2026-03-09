@@ -208,6 +208,7 @@ func NewTestUserComponent(
 		promptStore:         stores.Prompt,
 		workflowStore:       stores.Workflow,
 		mcpServerStore:      stores.MCPServerStore,
+		skillStore:          stores.Skill,
 	}
 }
 
@@ -514,6 +515,7 @@ func NewTestClusterComponent(config *config.Config, deployer deploy.Deployer, st
 		deployTaskStore: stores.DeployTask,
 		resStore:        stores.SpaceResource,
 		workflowStore:   stores.Workflow,
+		namespaceStore:  stores.Namespace,
 	}
 }
 

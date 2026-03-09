@@ -1005,6 +1005,7 @@ func createUserRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware
 		apiGroup.GET("/user/:username/likes/models", middlewareCollection.Auth.NeedLogin, userHandler.LikesModels)
 		apiGroup.GET("/user/:username/likes/datasets", middlewareCollection.Auth.NeedLogin, userHandler.LikesDatasets)
 		apiGroup.GET("/user/:username/likes/mcps", middlewareCollection.Auth.NeedLogin, userHandler.LikesMCPServers)
+		apiGroup.GET("/user/:username/likes/skills", middlewareCollection.Auth.NeedLogin, userHandler.LikesSkills)
 	}
 
 	{
@@ -1411,8 +1412,9 @@ func createClusterRoutes(apiGroup *gin.RouterGroup, middlewareCollection middlew
 		clusterGrp.PUT("/:id", middlewareCollection.Auth.NeedAdmin, clusterHandler.Update)
 		clusterGrp.GET("/public", clusterHandler.GetClusterPublic)
 	}
-
-	err = createComputingRoutes(clusterGrp, middlewareCollection, config, clusterHandler)
+	adminGrp := apiGroup.Group("/admin")
+	adminGrp.Use(middleware.NeedAdmin(config))
+	err = createComputingRoutes(adminGrp, clusterHandler)
 	if err != nil {
 		return fmt.Errorf("error creating computing routes: %w", err)
 	}

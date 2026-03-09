@@ -297,3 +297,217 @@ func TestArgoWorkflowStore_GetClusterWorkflows(t *testing.T) {
 	require.True(t, result[1].ID > result[2].ID)
 	require.True(t, result[2].ID > result[3].ID)
 }
+
+func TestArgoWorkflowStore_ListWorkflowsByTimeRange(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewArgoWorkFlowStoreWithDB(db)
+
+	// Create workflows with different submit times
+	baseTime := time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC)
+
+	workflows := []database.ArgoWorkflow{
+		{
+			Username:   "user1",
+			Namespace:  "ns1",
+			TaskName:   "task-1",
+			TaskId:     "tid-time-001",
+			TaskType:   types.TaskTypeEvaluation,
+			ClusterID:  "cluster-1",
+			SubmitTime: baseTime.Add(-48 * time.Hour), // 2024-01-13 10:00:00
+		},
+		{
+			Username:   "user2",
+			Namespace:  "ns2",
+			TaskName:   "task-2",
+			TaskId:     "tid-time-002",
+			TaskType:   types.TaskTypeTraining,
+			ClusterID:  "cluster-1",
+			SubmitTime: baseTime.Add(-24 * time.Hour), // 2024-01-14 10:00:00
+		},
+		{
+			Username:   "user1",
+			Namespace:  "ns3",
+			TaskName:   "task-3",
+			TaskId:     "tid-time-003",
+			TaskType:   types.TaskTypeEvaluation,
+			ClusterID:  "cluster-2",
+			SubmitTime: baseTime, // 2024-01-15 10:00:00
+		},
+		{
+			Username:   "user3",
+			Namespace:  "ns4",
+			TaskName:   "task-4",
+			TaskId:     "tid-time-004",
+			TaskType:   types.TaskTypeFinetune,
+			ClusterID:  "cluster-1",
+			SubmitTime: baseTime.Add(24 * time.Hour), // 2024-01-16 10:00:00
+		},
+		{
+			Username:   "user2",
+			Namespace:  "ns5",
+			TaskName:   "task-5",
+			TaskId:     "tid-time-005",
+			TaskType:   types.TaskTypeComparison,
+			ClusterID:  "cluster-2",
+			SubmitTime: baseTime.Add(48 * time.Hour), // 2024-01-17 10:00:00
+		},
+	}
+
+	for _, wf := range workflows {
+		_, err := store.CreateWorkFlow(ctx, wf)
+		require.Nil(t, err)
+	}
+
+	// Test 1: Get all workflows with no time filter (should return all)
+	req := types.WorkflowTimeRangeReq{
+		PageOpts: types.PageOpts{
+			Page:     1,
+			PageSize: 10,
+		},
+	}
+	result, total, err := store.ListWorkflowsByTimeRange(ctx, req)
+	require.Nil(t, err)
+	require.Equal(t, 5, total)
+	require.Equal(t, 5, len(result))
+
+	// Test 2: Filter by start time only
+	startTime := baseTime.Add(-12 * time.Hour) // 2024-01-15 22:00:00
+	req = types.WorkflowTimeRangeReq{
+		StartTime: &startTime,
+		PageOpts: types.PageOpts{
+			Page:     1,
+			PageSize: 10,
+		},
+	}
+	result, total, err = store.ListWorkflowsByTimeRange(ctx, req)
+	require.Nil(t, err)
+	require.Equal(t, 3, total) // task-3, task-4, task-5
+	require.Equal(t, 3, len(result))
+
+	// Test 3: Filter by end time only
+	endTime := baseTime.Add(12 * time.Hour) // 2024-01-15 22:00:00
+	req = types.WorkflowTimeRangeReq{
+		EndTime: &endTime,
+		PageOpts: types.PageOpts{
+			Page:     1,
+			PageSize: 10,
+		},
+	}
+	result, total, err = store.ListWorkflowsByTimeRange(ctx, req)
+	require.Nil(t, err)
+	require.Equal(t, 3, total) // task-1, task-2, task-3
+	require.Equal(t, 3, len(result))
+
+	// Test 4: Filter by both start and end time (middle range)
+	startTime = baseTime.Add(-12 * time.Hour)
+	endTime = baseTime.Add(36 * time.Hour)
+	req = types.WorkflowTimeRangeReq{
+		StartTime: &startTime,
+		EndTime:   &endTime,
+		PageOpts: types.PageOpts{
+			Page:     1,
+			PageSize: 10,
+		},
+	}
+	result, total, err = store.ListWorkflowsByTimeRange(ctx, req)
+	require.Nil(t, err)
+	require.Equal(t, 2, total) // task-3, task-4
+	require.Equal(t, 2, len(result))
+
+	// Test 5: No results - outside time range
+	startTime = baseTime.Add(100 * time.Hour)
+	endTime = baseTime.Add(200 * time.Hour)
+	req = types.WorkflowTimeRangeReq{
+		StartTime: &startTime,
+		EndTime:   &endTime,
+		PageOpts: types.PageOpts{
+			Page:     1,
+			PageSize: 10,
+		},
+	}
+	result, total, err = store.ListWorkflowsByTimeRange(ctx, req)
+	require.Nil(t, err)
+	require.Equal(t, 0, total)
+	require.Equal(t, 0, len(result))
+
+	// Test 6: Pagination - Page 1 with PageSize=2
+	req = types.WorkflowTimeRangeReq{
+		PageOpts: types.PageOpts{
+			Page:     1,
+			PageSize: 2,
+		},
+	}
+	result, total, err = store.ListWorkflowsByTimeRange(ctx, req)
+	require.Nil(t, err)
+	require.Equal(t, 5, total)
+	require.Equal(t, 2, len(result))
+
+	// Test 7: Pagination - Page 2 with PageSize=2
+	req = types.WorkflowTimeRangeReq{
+		PageOpts: types.PageOpts{
+			Page:     2,
+			PageSize: 2,
+		},
+	}
+	result, total, err = store.ListWorkflowsByTimeRange(ctx, req)
+	require.Nil(t, err)
+	require.Equal(t, 5, total)
+	require.Equal(t, 2, len(result))
+
+	// Test 8: Pagination - Page 3 with PageSize=2 (last page)
+	req = types.WorkflowTimeRangeReq{
+		PageOpts: types.PageOpts{
+			Page:     3,
+			PageSize: 2,
+		},
+	}
+	result, total, err = store.ListWorkflowsByTimeRange(ctx, req)
+	require.Nil(t, err)
+	require.Equal(t, 5, total)
+	require.Equal(t, 1, len(result))
+
+	// Test 9: Order by submit_time DESC (default)
+	req = types.WorkflowTimeRangeReq{
+		PageOpts: types.PageOpts{
+			Page:     1,
+			PageSize: 10,
+		},
+	}
+	result, total, err = store.ListWorkflowsByTimeRange(ctx, req)
+	require.Nil(t, err)
+	require.Equal(t, 5, total)
+	// Results should be in descending order by submit_time
+	require.True(t, result[0].SubmitTime.After(result[1].SubmitTime) || result[0].SubmitTime.Equal(result[1].SubmitTime))
+	require.True(t, result[1].SubmitTime.After(result[2].SubmitTime) || result[1].SubmitTime.Equal(result[2].SubmitTime))
+	require.True(t, result[2].SubmitTime.After(result[3].SubmitTime) || result[2].SubmitTime.Equal(result[3].SubmitTime))
+	require.True(t, result[3].SubmitTime.After(result[4].SubmitTime) || result[3].SubmitTime.Equal(result[4].SubmitTime))
+
+	// Test 10: Exact time boundary - start time equals workflow submit time
+	startTime = baseTime.Add(-24 * time.Hour) // Exactly when task-2 was submitted
+	req = types.WorkflowTimeRangeReq{
+		StartTime: &startTime,
+		PageOpts: types.PageOpts{
+			Page:     1,
+			PageSize: 10,
+		},
+	}
+	_, total, err = store.ListWorkflowsByTimeRange(ctx, req)
+	require.Nil(t, err)
+	require.Equal(t, 4, total) // task-2, task-3, task-4, task-5 (not task-1)
+
+	// Test 11: Exact time boundary - end time equals workflow submit time
+	endTime = baseTime.Add(24 * time.Hour) // Exactly when task-4 was submitted
+	req = types.WorkflowTimeRangeReq{
+		EndTime: &endTime,
+		PageOpts: types.PageOpts{
+			Page:     1,
+			PageSize: 10,
+		},
+	}
+	_, total, err = store.ListWorkflowsByTimeRange(ctx, req)
+	require.Nil(t, err)
+	require.Equal(t, 4, total) // task-1, task-2, task-3, task-4 (not task-5)
+}

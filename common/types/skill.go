@@ -1,22 +1,16 @@
 package types
 
-import (
-	"time"
-)
+import "time"
 
-type CodeTagCommit struct {
-	ID string `json:"id"`
-}
-
-type CreateCodeReq struct {
+type CreateSkillReq struct {
 	CreateRepoReq
 }
 
-type UpdateCodeReq struct {
+type UpdateSkillReq struct {
 	UpdateRepoReq
 }
 
-type Code struct {
+type Skill struct {
 	ID                   int64                `json:"id"`
 	Name                 string               `json:"name"`
 	Nickname             string               `json:"nickname"`
@@ -45,4 +39,10 @@ type Code struct {
 	Scores               []WeightScore        `json:"scores"`
 	MultiSource
 	MirrorTaskStatus MirrorTaskStatus `json:"mirror_task_status"`
+}
+
+type OrgSkillsReq struct {
+	Namespace   string `json:"namespace"`
+	CurrentUser string `json:"current_user"`
+	PageOpts
 }

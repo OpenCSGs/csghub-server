@@ -88,7 +88,16 @@ func (c *Client) CreateRepo(ctx context.Context, req gitserver.CreateRepoReq) (*
 }
 
 func (c *Client) UpdateRepo(ctx context.Context, req gitserver.UpdateRepoReq) (*gitserver.CreateRepoResp, error) {
-	return nil, nil
+	var err error
+	if req.DefaultBranch != "" {
+		err = c.SetDefaultBranch(ctx, gitserver.SetDefaultBranchReq{
+			Namespace:  req.Namespace,
+			Name:       req.Name,
+			BranchName: req.DefaultBranch,
+			RepoType:   req.RepoType,
+		})
+	}
+	return nil, err
 }
 
 func (c *Client) DeleteRepo(ctx context.Context, relativePath string) error {

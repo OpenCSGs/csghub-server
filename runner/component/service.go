@@ -40,6 +40,11 @@ import (
 	rtypes "opencsg.com/csghub-server/runner/types"
 )
 
+const (
+	ReasonContainerCreating = "ContainerCreating"
+	ReasonPodInitializing   = "PodInitializing"
+)
+
 var (
 	KeyDeployID      string = "deploy_id"
 	KeyTaskID        string = "task_id"
@@ -153,7 +158,8 @@ func (s *serviceComponentImpl) generateService(ctx context.Context, cluster *clu
 		environments = append(environments, corev1.EnvVar{Name: "TOPS_VISIBLE_DEVICES", Value: "none"})
 	}
 
-	if hardware.Dcu.ResourceName == "" || hardware.Dcu.Num == "" {
+	// ROCR is used by both AMD GPU and DCU; only set to none when neither has value
+	if (hardware.Dcu.ResourceName == "" && hardware.Dcu.Num == "") && (hardware.Gpu.ResourceName == "" && hardware.Gpu.Num == "") {
 		environments = append(environments, corev1.EnvVar{Name: "ROCR_VISIBLE_DEVICES", Value: "none"})
 	}
 
@@ -362,7 +368,18 @@ func (s *serviceComponentImpl) getServicePodsWithStatus(ctx context.Context, clu
 }
 
 func hasFailedStatus(pod *corev1.Pod) (string, bool) {
-	if pod == nil || len(pod.Status.ContainerStatuses) == 0 {
+	if pod == nil {
+		return "", false
+	}
+
+	// check pod conditions for scheduling failure
+	for _, cond := range pod.Status.Conditions {
+		if cond.Type == corev1.PodScheduled && cond.Status == corev1.ConditionFalse {
+			return cond.Reason, true
+		}
+	}
+
+	if len(pod.Status.ContainerStatuses) == 0 {
 		return "", false
 	}
 
@@ -414,7 +431,7 @@ func isContainerCreating(pod *corev1.Pod) bool {
 		if cs.Name != rtypes.UserContainerName {
 			continue
 		}
-		if cs.State.Waiting != nil && cs.State.Waiting.Reason == "ContainerCreating" {
+		if cs.State.Waiting != nil && cs.State.Waiting.Reason == ReasonContainerCreating {
 			return true
 		}
 	}
@@ -423,6 +440,13 @@ func isContainerCreating(pod *corev1.Pod) bool {
 
 func getPodError(podList *corev1.PodList) (*string, *string) {
 	for _, pod := range podList.Items {
+		// check pod conditions
+		for _, cond := range pod.Status.Conditions {
+			if cond.Type == corev1.PodScheduled && cond.Status == corev1.ConditionFalse {
+				return &cond.Message, &cond.Reason
+			}
+		}
+
 		for _, cs := range pod.Status.ContainerStatuses {
 			if cs.Name != rtypes.UserContainerName {
 				continue
@@ -430,6 +454,14 @@ func getPodError(podList *corev1.PodList) (*string, *string) {
 			if cs.LastTerminationState.Terminated != nil {
 				lastState := cs.LastTerminationState.Terminated
 				return &lastState.Message, &lastState.Reason
+			}
+
+			if cs.State.Waiting != nil && cs.State.Waiting.Reason != ReasonContainerCreating && cs.State.Waiting.Reason != ReasonPodInitializing {
+				return &cs.State.Waiting.Message, &cs.State.Waiting.Reason
+			}
+
+			if cs.State.Terminated != nil && cs.State.Terminated.ExitCode != 0 {
+				return &cs.State.Terminated.Message, &cs.State.Terminated.Reason
 			}
 		}
 	}
@@ -959,6 +991,7 @@ func (s *serviceComponentImpl) getServiceStatus(ctx context.Context, ks v1.Servi
 	resp.ServiceReason = serviceReason
 	resp.Instances = instInfo.Instances
 	resp.Reason = instInfo.Reason
+	resp.Message = instInfo.Message
 	resp.Revisions = revsions
 	return resp, nil
 }
@@ -1409,6 +1442,7 @@ func (s *serviceComponentImpl) updateKServiceWithEvent(ctx context.Context, ksvc
 			TaskID:      ksvc.TaskID,
 			ClusterNode: ksvc.ClusterNode,
 			QueueName:   ksvc.QueueName,
+			Instances:   ksvc.Instances,
 		}
 		s.pushEvent(types.RunnerServiceChange, updateEvent, ksvc.ClusterID)
 	}
@@ -1492,14 +1526,14 @@ func (s *serviceComponentImpl) GetPodLogsFromDB(ctx context.Context, cluster *cl
 }
 
 func (s *serviceComponentImpl) reportServiceLog(msg string, ksvc *database.KnativeService, podInfo *corev1.Pod, statusRes *types.StatusResponse) {
-	message := fmt.Sprintf("%s, ksvc statue: %s", msg, ksvc.Status)
-	if statusRes != nil {
+	message := fmt.Sprintf("%s ksvc statue: %s", msg, ksvc.Status)
+	if statusRes != nil && statusRes.Message != "" && statusRes.Reason != "" {
 		message = fmt.Sprintf(
-			"%s, deploy status: %d,\nksvc msg: %s\nksvc reason: %s",
+			"%s, deploy status: %d, pod msg: %s, pod reason: %s",
 			message,
 			statusRes.Code,
-			statusRes.ServiceMessage,
-			statusRes.ServiceReason,
+			statusRes.Message,
+			statusRes.Reason,
 		)
 	}
 
