@@ -208,6 +208,7 @@ func NewTestUserComponent(
 		promptStore:         stores.Prompt,
 		workflowStore:       stores.Workflow,
 		mcpServerStore:      stores.MCPServerStore,
+		skillStore:          stores.Skill,
 	}
 }
 
@@ -260,6 +261,8 @@ func NewTestAccountingComponent(stores *tests.MockStores, accountingClient accou
 	return &accountingComponentImpl{
 		accountingClient: accountingClient,
 		userStore:        stores.User,
+		orgStore:         stores.Org,
+		memberStore:      stores.Member,
 		deployTaskStore:  stores.DeployTask,
 	}
 }
@@ -512,6 +515,7 @@ func NewTestClusterComponent(config *config.Config, deployer deploy.Deployer, st
 		deployTaskStore: stores.DeployTask,
 		resStore:        stores.SpaceResource,
 		workflowStore:   stores.Workflow,
+		namespaceStore:  stores.Namespace,
 	}
 }
 

@@ -19,7 +19,8 @@ func TestGetNameSpaceResourcesQuota(t *testing.T) {
 	testNamespace := "test-ns"
 	testQuotaName := "compute-quota"
 	customGPUConfigJSON := `[{"type_label": "my-custom.com/gpu-model", "capacity_label": "my-custom.com/gpu-count"}]`
-
+	cfg := &config.Config{}
+	cfg.Space.GPUModelLabel = customGPUConfigJSON
 	testCases := []struct {
 		name           string
 		namespace      string
@@ -120,27 +121,7 @@ func TestGetNameSpaceResourcesQuota(t *testing.T) {
 			name:      "Success - with custom GPU label from config",
 			namespace: testNamespace,
 			quotaName: testQuotaName,
-			config: &config.Config{Space: struct {
-				BuilderEndpoint           string "env:\"STARHUB_SERVER_SPACE_BUILDER_ENDPOINT\" default:\"http://localhost:8082\""
-				RunnerEndpoint            string "env:\"STARHUB_SERVER_SPACE_RUNNER_ENDPOINT\" default:\"http://localhost:8082\""
-				RunnerServerPort          int    "env:\"STARHUB_SERVER_SPACE_RUNNER_SERVER_PORT\" default:\"8082\""
-				InternalRootDomain        string "env:\"STARHUB_SERVER_INTERNAL_ROOT_DOMAIN\" default:\"internal.example.com\""
-				PublicRootDomain          string "env:\"STARHUB_SERVER_PUBLIC_ROOT_DOMAIN\""
-				DockerRegBase             string "env:\"STARHUB_SERVER_DOCKER_REG_BASE\" default:\"registry.cn-beijing.aliyuncs.com/opencsg_public/\""
-				ImagePullSecret           string "env:\"STARHUB_SERVER_DOCKER_IMAGE_PULL_SECRET\" default:\"opencsg-pull-secret\""
-				RProxyServerPort          int    "env:\"STARHUB_SERVER_SPACE_RPROXY_SERVER_PORT\" default:\"8083\""
-				SessionSecretKey          string "env:\"STARHUB_SERVER_SPACE_SESSION_SECRET_KEY\" default:\"secret\""
-				DeployTimeoutInMin        int    "env:\"STARHUB_SERVER_SPACE_DEPLOY_TIMEOUT_IN_MINUTES\" default:\"30\""
-				BuildTimeoutInMin         int    "env:\"STARHUB_SERVER_SPACE_BUILD_TIMEOUT_IN_MINUTES\" default:\"30\""
-				GPUModelLabel             string "env:\"STARHUB_SERVER_GPU_MODEL_LABEL\""
-				ReadinessDelaySeconds     int    "env:\"STARHUB_SERVER_READINESS_DELAY_SECONDS\" default:\"120\""
-				ReadinessPeriodSeconds    int    "env:\"STARHUB_SERVER_READINESS_PERIOD_SECONDS\" default:\"10\""
-				ReadinessFailureThreshold int    "env:\"STARHUB_SERVER_READINESS_FAILURE_THRESHOLD\" default:\"3\""
-				PYPIIndexURL              string "env:\"STARHUB_SERVER_SPACE_PYPI_INDEX_URL\" default:\"\""
-				InformerSyncPeriodInMin   int    "env:\"STARHUB_SERVER_SPACE_INFORMER_SYNC_PERIOD_IN_MINUTES\" default:\"2\""
-			}{
-				GPUModelLabel: customGPUConfigJSON,
-			}},
+			config:    cfg,
 			initialObjects: []runtime.Object{
 				&v1.ResourceQuota{
 					ObjectMeta: metav1.ObjectMeta{
