@@ -89,8 +89,7 @@ type ClusterNodeOwnership struct {
 	ID            int64  `bun:",pk,autoincrement" json:"id"`
 	ClusterNodeID int64  `bun:",notnull" json:"cluster_node_id"`
 	ClusterID     string `bun:",notnull" json:"cluster_id"`
-	UserUUID      string `bun:",nullzero" json:"user_uuid"`
-	OrgUUID       string `bun:",nullzero" json:"org_uuid"`
+	Namespace     string `bun:",notnull" json:"namespace"`
 	times
 }
 

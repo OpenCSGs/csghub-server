@@ -45,38 +45,50 @@ func NewLokiClient(url string, clientID types.ClientType, config *config.Config)
 // logEntryToMap Create a unique key for each stream based on labels
 // Priority: entry.PodInfo.Labels > entry.Labels > default labels
 func (c *lokiClient) logEntryToMap(entry *types.LogEntry) map[string]string {
+	labelCount := 0
+	// must have labels
 	labels := map[string]string{
 		"client_id":             c.clientID.String(),
-		"trace_id":              entry.TraceID,
-		"stage":                 string(entry.Stage),
-		"step":                  string(entry.Step),
 		"category":              entry.Category.String(),
 		types.StreamKeyDeployID: entry.DeployID,
+		types.StreamKeyDeployTaskID: entry.Labels[types.StreamKeyDeployTaskID],
 	}
-
-	// Add custom labels; if they exist, they will override the default labels
-	for k, v := range entry.Labels {
-		labels[k] = v
-	}
-
+	labelCount = len(labels)
+	// optional labels
 	if entry.PodInfo != nil {
 		labels["pod_name"] = entry.PodInfo.PodName
 		labels["pod_uid"] = entry.PodInfo.PodUID
 		labels["namespace"] = entry.PodInfo.Namespace
 		labels["service_name"] = entry.PodInfo.ServiceName
 		labels["container_name"] = entry.PodInfo.ContainerName
+		labelCount = len(labels)
 		for key, value := range entry.PodInfo.Labels {
+			if len(value) == 0 {
+				continue
+			}
+			if labelCount > types.MaxLabelCount {
+				break
+			}
 			if strings.HasPrefix(key, c.acceptLabelPrefix) && value != "" {
 				labels[key] = value
+				labelCount++
 			}
 		}
 	}
 
-	// filter  labels with empty values
-	for k, v := range labels {
-		if v == "" {
-			delete(labels, k)
+	// optional labels
+	// Add custom labels; if they exist, they will override the default labels
+	for k, v := range entry.Labels {
+		if len(v) == 0 {
+			continue
 		}
+		if labelCount >= types.MaxLabelCount {
+			break
+		}
+		if _, exists := labels[k]; !exists {
+			labelCount++
+		}
+		labels[k] = v
 	}
 	return labels
 }
@@ -250,7 +262,7 @@ func (c *lokiClient) formatLokiLog(lokiLog *loki.LokiPushRequest, timeLoc *time.
 					// if parse failed, use original timestamp
 					formattedTime = lineParts[0]
 				} else {
-					formattedTime = t.In(timeLoc).Format(time.DateOnly)
+					formattedTime = t.In(timeLoc).Format(time.DateTime)
 				}
 
 				formattedLog := fmt.Sprintf("%s | %s %s", podIdentifier, formattedTime, lineParts[1])

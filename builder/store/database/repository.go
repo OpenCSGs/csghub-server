@@ -181,7 +181,7 @@ type Repository struct {
 	HTTPCloneURL               string                     `bun:",nullzero" json:"http_clone_url"`
 	SSHCloneURL                string                     `bun:",nullzero" json:"ssh_clone_url"`
 	Source                     types.RepositorySource     `bun:",nullzero,default:'local'" json:"source"`
-	SyncStatus                 types.RepositorySyncStatus `bun:",nullzero" json:"sync_status"` // Only used for multi-source sync status // Only used for multi-source sync status
+	SyncStatus                 types.RepositorySyncStatus `bun:",nullzero" json:"sync_status"` // Only used for multi-source sync status
 	SensitiveCheckStatus       types.SensitiveCheckStatus `bun:",default:0" json:"sensitive_check_status"`
 	MSPath                     string                     `bun:",nullzero" json:"ms_path"`
 	CSGPath                    string                     `bun:",nullzero" json:"csg_path"`
@@ -684,6 +684,8 @@ func (s *repoStoreImpl) PublicToUser(ctx context.Context, repoType types.Reposit
 		q.Join("INNER JOIN prompts ON prompts.repository_id = repository.id")
 	case types.MCPServerRepo:
 		q.Join("INNER JOIN mcp_servers ON mcp_servers.repository_id = repository.id")
+	case types.SkillRepo:
+		q.Join("INNER JOIN skills ON skills.repository_id = repository.id")
 	}
 
 	if !isAdmin {

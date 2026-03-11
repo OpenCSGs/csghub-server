@@ -233,6 +233,65 @@ func (_c *MockOrgStore_FindByPath_Call) RunAndReturn(run func(context.Context, s
 	return _c
 }
 
+// FindByUUID provides a mock function with given fields: ctx, uuid
+func (_m *MockOrgStore) FindByUUID(ctx context.Context, uuid string) (*database.Organization, error) {
+	ret := _m.Called(ctx, uuid)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FindByUUID")
+	}
+
+	var r0 *database.Organization
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*database.Organization, error)); ok {
+		return rf(ctx, uuid)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *database.Organization); ok {
+		r0 = rf(ctx, uuid)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.Organization)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, uuid)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockOrgStore_FindByUUID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindByUUID'
+type MockOrgStore_FindByUUID_Call struct {
+	*mock.Call
+}
+
+// FindByUUID is a helper method to define mock.On call
+//   - ctx context.Context
+//   - uuid string
+func (_e *MockOrgStore_Expecter) FindByUUID(ctx interface{}, uuid interface{}) *MockOrgStore_FindByUUID_Call {
+	return &MockOrgStore_FindByUUID_Call{Call: _e.mock.On("FindByUUID", ctx, uuid)}
+}
+
+func (_c *MockOrgStore_FindByUUID_Call) Run(run func(ctx context.Context, uuid string)) *MockOrgStore_FindByUUID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockOrgStore_FindByUUID_Call) Return(_a0 *database.Organization, _a1 error) *MockOrgStore_FindByUUID_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockOrgStore_FindByUUID_Call) RunAndReturn(run func(context.Context, string) (*database.Organization, error)) *MockOrgStore_FindByUUID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetSharedOrgIDs provides a mock function with given fields: ctx, userIDs
 func (_m *MockOrgStore) GetSharedOrgIDs(ctx context.Context, userIDs []int64) ([]int64, error) {
 	ret := _m.Called(ctx, userIDs)

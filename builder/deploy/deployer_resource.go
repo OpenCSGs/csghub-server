@@ -4,9 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"strconv"
-	"strings"
-
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
@@ -115,42 +112,33 @@ func CheckResource(clusterResources *types.ClusterRes, hardware *types.HardWare,
 		slog.Error("hardware is empty for check resource", slog.Any("clusterResources", clusterResources))
 		return false
 	}
-	mem, err := strconv.Atoi(strings.ReplaceAll(hardware.Memory, "Gi", ""))
-	if err != nil {
-		slog.Error("failed to parse hardware memory for check resource", slog.Any("error", err))
-		return false
-	}
 	if hardware.Replicas > 1 {
-		return checkMultiNodeResource(mem, clusterResources, hardware, config)
+		return checkMultiNodeResource(clusterResources, hardware, config)
 	} else {
-		return checkSingleNodeResource(mem, clusterResources, hardware, config)
+		return checkSingleNodeResource(clusterResources, hardware, config)
 	}
 }
 
 // check resource for sigle node
-func checkSingleNodeResource(mem int, clusterResources *types.ClusterRes, hardware *types.HardWare, config *config.Config) bool {
+func checkSingleNodeResource(clusterResources *types.ClusterRes, hardware *types.HardWare, config *config.Config) bool {
 	for _, node := range clusterResources.Resources {
-		if float32(mem) <= node.AvailableMem {
-			isAvailable := checkNodeResource(node, hardware, config)
-			if isAvailable {
-				// if true return, otherwise continue check next node
-				return true
-			}
+		isAvailable := checkNodeResource(node, hardware, config)
+		if isAvailable {
+			// if true return, otherwise continue check next node
+			return true
 		}
 	}
 	return false
 }
 
-func checkMultiNodeResource(mem int, clusterResources *types.ClusterRes, hardware *types.HardWare, config *config.Config) bool {
+func checkMultiNodeResource(clusterResources *types.ClusterRes, hardware *types.HardWare, config *config.Config) bool {
 	ready := 0
 	for _, node := range clusterResources.Resources {
-		if float32(mem) <= node.AvailableMem {
-			isAvailable := checkNodeResource(node, hardware, config)
-			if isAvailable {
-				ready++
-				if ready >= hardware.Replicas {
-					return true
-				}
+		isAvailable := checkNodeResource(node, hardware, config)
+		if isAvailable {
+			ready++
+			if ready >= hardware.Replicas {
+				return true
 			}
 		}
 	}

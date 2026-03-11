@@ -2,11 +2,13 @@ package database_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/tests"
 )
 
@@ -42,6 +44,13 @@ func TestSkillStore_CRUD(t *testing.T) {
 	sk, err := store.ByRepoID(ctx, repo.ID)
 	require.Nil(t, err)
 	require.Equal(t, repo.ID, sk.RepositoryID)
+
+	skByID, err := store.BySkillID(ctx, sk.ID)
+	require.Nil(t, err)
+	require.Equal(t, sk.ID, skByID.ID)
+	require.Equal(t, repo.ID, skByID.RepositoryID)
+	require.NotNil(t, skByID.Repository)
+	require.Equal(t, "foo/bar", skByID.Repository.Path)
 
 	skills, err := store.ByRepoIDs(ctx, []int64{repo.ID})
 	require.Nil(t, err)
@@ -156,4 +165,16 @@ func TestSkillStore_CreateAndUpdateRepoPath(t *testing.T) {
 
 	require.Nil(t, err)
 	require.Equal(t, "p2", skill.Repository.Path)
+}
+
+func TestSkillStore_BySkillID_NotFound(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewSkillStoreWithDB(db)
+
+	_, err := store.BySkillID(ctx, 99999)
+	require.Error(t, err)
+	require.True(t, errors.Is(err, errorx.ErrDatabaseNoRows))
 }

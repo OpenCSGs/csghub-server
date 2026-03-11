@@ -37,6 +37,12 @@ func TestWebHookExecutorKService_ProcessEvent(t *testing.T) {
 		Message:     "msg",
 		Reason:      "test",
 		ClusterNode: "node1",
+		Instances: []types.Instance{
+			{
+				Name:   "instance1",
+				Status: "running",
+			},
+		},
 	}
 
 	dts := mockdb.NewMockDeployTaskStore(t)
@@ -59,6 +65,7 @@ func TestWebHookExecutorKService_ProcessEvent(t *testing.T) {
 		Message:     event.Message,
 		Reason:      event.Reason,
 		ClusterNode: event.ClusterNode,
+		Instances:   event.Instances,
 	}).Return(nil)
 
 	exec := NewTestKServiceExecutor(cfg, dts)

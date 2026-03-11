@@ -32,7 +32,7 @@ func NewKafka(config *config.Config) (MessageQueue, error) {
 
 func (k *Kafka) Publish(topic string, data []byte) error {
 	err := k.producer.Produce(&kafka.Message{
-		TopicPartition: kafka.TopicPartition{Topic: &topic, Partition: kafka.PartitionAny},
+		TopicPartition: kafka.TopicPartition{Topic: &topic, Partition: int32(kafka.PartitionAny)},
 		Value:          data,
 	}, nil)
 	if err != nil {

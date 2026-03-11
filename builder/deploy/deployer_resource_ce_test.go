@@ -5,8 +5,6 @@ package deploy
 import (
 	"context"
 	"errors"
-	"strconv"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -517,6 +515,38 @@ func TestCheckSingleNodeResource(t *testing.T) {
 			},
 			expectedResult: true,
 		},
+		{
+			name: "no node has enough memory in Mi",
+			resources: []types.NodeResourceInfo{
+				{
+					NodeHardware: types.NodeHardware{
+						AvailableMem: 0.5,
+						AvailableCPU: 16,
+					},
+				},
+			},
+			hardware: &types.HardWare{
+				Memory:   "600Mi",
+				Replicas: 1,
+			},
+			expectedResult: false,
+		},
+		{
+			name: "satisfies requirements in Mi",
+			resources: []types.NodeResourceInfo{
+				{
+					NodeHardware: types.NodeHardware{
+						AvailableMem: 0.5,
+						AvailableCPU: 16,
+					},
+				},
+			},
+			hardware: &types.HardWare{
+				Memory:   "200Mi",
+				Replicas: 1,
+			},
+			expectedResult: true,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -525,8 +555,7 @@ func TestCheckSingleNodeResource(t *testing.T) {
 				ClusterID: "c1",
 				Resources: tc.resources,
 			}
-			mem, _ := strconv.Atoi(strings.ReplaceAll(tc.hardware.Memory, "Gi", ""))
-			result := checkSingleNodeResource(mem, clusterRes, tc.hardware, cfg)
+			result := checkSingleNodeResource(clusterRes, tc.hardware, cfg)
 			require.Equal(t, tc.expectedResult, result)
 		})
 	}
@@ -661,8 +690,7 @@ func TestCheckMultiNodeResource(t *testing.T) {
 				ClusterID: "c1",
 				Resources: tc.resources,
 			}
-			mem, _ := strconv.Atoi(strings.ReplaceAll(tc.hardware.Memory, "Gi", ""))
-			result := checkMultiNodeResource(mem, clusterRes, tc.hardware, cfg)
+			result := checkMultiNodeResource(clusterRes, tc.hardware, cfg)
 			require.Equal(t, tc.expectedResult, result)
 		})
 	}

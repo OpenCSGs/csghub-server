@@ -1003,6 +1003,47 @@ func (h *UserHandler) LikesMCPServers(ctx *gin.Context) {
 	httpbase.OK(ctx, respData)
 }
 
+// GetUserLikeSkills godoc
+// @Security     ApiKey
+// @Summary      Get user likes skills
+// @Description  get user likes skills
+// @Tags         User
+// @Accept       json
+// @Produce      json
+// @Param        username path string true "username"
+// @Success      200  {object}  types.ResponseWithTotal{data=[]types.MCPServer,total=int} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /user/{username}/likes/skills [get]
+func (h *UserHandler) LikesSkills(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	var req types.UserMCPsReq
+	per, page, err := common.GetPerAndPageFromContext(ctx)
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format of page and per", "error", err)
+		httpbase.BadRequestWithExt(ctx, err)
+		return
+	}
+
+	req.Owner = ctx.Param("username")
+	req.CurrentUser = currentUser
+	req.Page = page
+	req.PageSize = per
+	data, total, err := h.user.LikesSkills(ctx.Request.Context(), &req)
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get user likes skills", slog.Any("error", err), slog.Any("req", req))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	respData := gin.H{
+		"data":  data,
+		"total": total,
+	}
+
+	httpbase.OK(ctx, respData)
+}
+
 // GetUserNotebooks godoc
 // @Summary      get user's notebooks
 // @Description  get user's notebooks
