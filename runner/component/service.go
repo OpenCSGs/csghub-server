@@ -1240,7 +1240,7 @@ func (s *serviceComponentImpl) StopService(ctx context.Context, req types.StopRe
 				if dberr != nil && !errors.Is(dberr, sql.ErrNoRows) {
 					slog.ErrorContext(ctx, "clean db record %s failed, error: %v", req.SvcName, dberr)
 				}
-				
+
 				slog.Info("stop service skip,service not exist", slog.String("svc_name", req.SvcName), slog.Any("k8s_err", k8serr))
 				resp.Code = 0
 				resp.Message = "skip,service not exist"
