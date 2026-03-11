@@ -61,124 +61,135 @@ func TestRProxyHandler_CheckAccessPermission(t *testing.T) {
 		repoError      bool
 	}{
 		{
-			name:          "Non-MCP space with JWT auth",
-			hasSpace:      true,
-			spaceSDK:      "gradio",
-			authType:      httpbase.AuthTypeJwt,
-			expectedAllow: true,
-			expectedError: false,
+			name:           "Non-MCP space with JWT auth",
+			hasSpace:       true,
+			spaceSDK:       "gradio",
+			authType:       httpbase.AuthTypeJwt,
+			expectedAllow:  true,
+			expectedError:  false,
 			expectSpaceGet: true,
 			expectRepoCall: true,
 			repoAllow:      true,
 			repoError:      false,
 		},
 		{
-			name:          "Non-MCP space with AccessToken auth",
-			hasSpace:      true,
-			spaceSDK:      "gradio",
-			authType:      httpbase.AuthTypeAccessToken,
-			expectedAllow: true,
-			expectedError: false,
+			name:           "Non-MCP space with AccessToken auth",
+			hasSpace:       true,
+			spaceSDK:       "gradio",
+			authType:       httpbase.AuthTypeAccessToken,
+			expectedAllow:  true,
+			expectedError:  false,
 			expectSpaceGet: true,
 			expectRepoCall: true,
 			repoAllow:      true,
 			repoError:      false,
 		},
 		{
-			name:          "Non-MCP space with ApiKey auth",
-			hasSpace:      true,
-			spaceSDK:      "gradio",
-			authType:      httpbase.AuthTypeApiKey,
-			expectedAllow: false,
-			expectedError: true,
+			name:           "Non-MCP space with ApiKey auth",
+			hasSpace:       true,
+			spaceSDK:       "gradio",
+			authType:       httpbase.AuthTypeApiKey,
+			expectedAllow:  false,
+			expectedError:  true,
 			expectSpaceGet: true,
 			expectRepoCall: false,
 			repoAllow:      false,
 			repoError:      false,
 		},
 		{
-			name:          "Non-MCP space with MultiSyncToken auth",
-			hasSpace:      true,
-			spaceSDK:      "gradio",
-			authType:      httpbase.AuthTypeMultiSyncToken,
-			expectedAllow: false,
-			expectedError: true,
+			name:           "Non-MCP space with MultiSyncToken auth",
+			hasSpace:       true,
+			spaceSDK:       "gradio",
+			authType:       httpbase.AuthTypeMultiSyncToken,
+			expectedAllow:  false,
+			expectedError:  true,
 			expectSpaceGet: true,
 			expectRepoCall: false,
 			repoAllow:      false,
 			repoError:      false,
 		},
 		{
-			name:          "MCP space with JWT auth",
-			hasSpace:      true,
-			spaceSDK:      types.MCPSERVER.Name,
-			authType:      httpbase.AuthTypeJwt,
-			expectedAllow: true,
-			expectedError: false,
+			name:           "MCP space with JWT auth",
+			hasSpace:       true,
+			spaceSDK:       types.MCPSERVER.Name,
+			authType:       httpbase.AuthTypeJwt,
+			expectedAllow:  true,
+			expectedError:  false,
 			expectSpaceGet: true,
 			expectRepoCall: true,
 			repoAllow:      true,
 			repoError:      false,
 		},
 		{
-			name:          "MCP space with AccessToken auth",
-			hasSpace:      true,
-			spaceSDK:      types.MCPSERVER.Name,
-			authType:      httpbase.AuthTypeAccessToken,
-			expectedAllow: true,
-			expectedError: false,
+			name:           "MCP space with AccessToken auth",
+			hasSpace:       true,
+			spaceSDK:       types.MCPSERVER.Name,
+			authType:       httpbase.AuthTypeAccessToken,
+			expectedAllow:  true,
+			expectedError:  false,
 			expectSpaceGet: true,
 			expectRepoCall: true,
 			repoAllow:      true,
 			repoError:      false,
 		},
 		{
-			name:          "MCP space with ApiKey auth",
-			hasSpace:      true,
-			spaceSDK:      types.MCPSERVER.Name,
-			authType:      httpbase.AuthTypeApiKey,
-			expectedAllow: false,
-			expectedError: true,
+			name:           "MCP space with ApiKey auth",
+			hasSpace:       true,
+			spaceSDK:       types.MCPSERVER.Name,
+			authType:       httpbase.AuthTypeApiKey,
+			expectedAllow:  true,
+			expectedError:  false,
 			expectSpaceGet: true,
-			expectRepoCall: false,
-			repoAllow:      false,
+			expectRepoCall: true,
+			repoAllow:      true,
 			repoError:      false,
 		},
 		{
-			name:          "Non-space case",
-			hasSpace:      false,
-			spaceSDK:      "",
-			authType:      httpbase.AuthTypeJwt,
-			expectedAllow: true,
-			expectedError: false,
+			name:           "Non-space case",
+			hasSpace:       false,
+			spaceSDK:       "",
+			authType:       httpbase.AuthTypeJwt,
+			expectedAllow:  true,
+			expectedError:  false,
 			expectSpaceGet: false,
 			expectRepoCall: true,
 			repoAllow:      true,
 			repoError:      false,
 		},
 		{
-			name:          "Space get error",
-			hasSpace:      true,
-			spaceSDK:      "gradio",
-			authType:      httpbase.AuthTypeJwt,
-			expectedAllow: false,
-			expectedError: true,
+			name:           "Space get error",
+			hasSpace:       true,
+			spaceSDK:       "gradio",
+			authType:       httpbase.AuthTypeJwt,
+			expectedAllow:  false,
+			expectedError:  true,
 			expectSpaceGet: false,
 			expectRepoCall: false,
 			repoAllow:      false,
 			repoError:      false,
 		},
 		{
-			name:          "Repo allow access error",
-			hasSpace:      true,
-			spaceSDK:      "gradio",
-			authType:      httpbase.AuthTypeJwt,
-			expectedAllow: false,
-			expectedError: true,
+			name:           "Repo allow access error",
+			hasSpace:       true,
+			spaceSDK:       "gradio",
+			authType:       httpbase.AuthTypeJwt,
+			expectedAllow:  false,
+			expectedError:  true,
 			expectSpaceGet: true,
 			expectRepoCall: true,
 			repoAllow:      false,
 			repoError:      true,
+		},
+		{
+			name:           "Public MCP space",
+			hasSpace:       true,
+			spaceSDK:       types.MCPSERVER.Name,
+			expectedAllow:  true,
+			expectedError:  false,
+			expectSpaceGet: true,
+			expectRepoCall: true,
+			repoAllow:      true,
+			repoError:      false,
 		},
 	}
 
@@ -191,15 +202,21 @@ func TestRProxyHandler_CheckAccessPermission(t *testing.T) {
 				deploy.SpaceID = 1
 				deploy.RepoID = 1
 				if tt.expectSpaceGet {
-					if tt.repoError {
-						tester.mocks.space.EXPECT().GetByID(tester.ctx.Request.Context(), int64(1)).Return(&database.Space{Sdk: tt.spaceSDK}, nil)
-						tester.mocks.repo.EXPECT().AllowAccessByRepoID(tester.ctx.Request.Context(), int64(1), "testuser").Return(false, errors.New("repo access error"))
-					} else if tt.expectedError {
-						// 对于认证失败的测试用例，不需要调用 AllowAccessByRepoID
-						tester.mocks.space.EXPECT().GetByID(tester.ctx.Request.Context(), int64(1)).Return(&database.Space{Sdk: tt.spaceSDK}, nil)
-					} else {
-						tester.mocks.space.EXPECT().GetByID(tester.ctx.Request.Context(), int64(1)).Return(&database.Space{Sdk: tt.spaceSDK}, nil)
-						tester.mocks.repo.EXPECT().AllowAccessByRepoID(tester.ctx.Request.Context(), int64(1), "testuser").Return(tt.repoAllow, nil)
+					tester.mocks.space.EXPECT().GetByID(tester.ctx.Request.Context(), int64(1)).Return(&database.Space{Sdk: tt.spaceSDK}, nil)
+					if tt.expectRepoCall {
+						if tt.repoError {
+							if tt.spaceSDK == types.MCPSERVER.Name {
+								tester.mocks.repo.EXPECT().AllowAccessEndpoint(tester.ctx.Request.Context(), "testuser", deploy).Return(false, errors.New("repo access error"))
+							} else {
+								tester.mocks.repo.EXPECT().AllowAccessByRepoID(tester.ctx.Request.Context(), int64(1), "testuser").Return(false, errors.New("repo access error"))
+							}
+						} else {
+							if tt.spaceSDK == types.MCPSERVER.Name {
+								tester.mocks.repo.EXPECT().AllowAccessEndpoint(tester.ctx.Request.Context(), "testuser", deploy).Return(tt.repoAllow, nil)
+							} else {
+								tester.mocks.repo.EXPECT().AllowAccessByRepoID(tester.ctx.Request.Context(), int64(1), "testuser").Return(tt.repoAllow, nil)
+							}
+						}
 					}
 				} else {
 					tester.mocks.space.EXPECT().GetByID(tester.ctx.Request.Context(), int64(1)).Return(nil, errors.New("space get error"))
