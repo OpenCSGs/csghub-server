@@ -709,3 +709,9 @@ tags:
   group: ""
   scope: dataset
   built_in: true
+- name: agentichub-skills
+  category: task
+  group: agentichub
+  scope: skill
+  show_name: AgenticHub Skills
+  built_in: true

@@ -209,6 +209,65 @@ func (_c *MockSkillStore_ByRepoIDs_Call) RunAndReturn(run func(context.Context, 
 	return _c
 }
 
+// BySkillID provides a mock function with given fields: ctx, skillID
+func (_m *MockSkillStore) BySkillID(ctx context.Context, skillID int64) (*database.Skill, error) {
+	ret := _m.Called(ctx, skillID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for BySkillID")
+	}
+
+	var r0 *database.Skill
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64) (*database.Skill, error)); ok {
+		return rf(ctx, skillID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, int64) *database.Skill); ok {
+		r0 = rf(ctx, skillID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.Skill)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, int64) error); ok {
+		r1 = rf(ctx, skillID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockSkillStore_BySkillID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BySkillID'
+type MockSkillStore_BySkillID_Call struct {
+	*mock.Call
+}
+
+// BySkillID is a helper method to define mock.On call
+//   - ctx context.Context
+//   - skillID int64
+func (_e *MockSkillStore_Expecter) BySkillID(ctx interface{}, skillID interface{}) *MockSkillStore_BySkillID_Call {
+	return &MockSkillStore_BySkillID_Call{Call: _e.mock.On("BySkillID", ctx, skillID)}
+}
+
+func (_c *MockSkillStore_BySkillID_Call) Run(run func(ctx context.Context, skillID int64)) *MockSkillStore_BySkillID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64))
+	})
+	return _c
+}
+
+func (_c *MockSkillStore_BySkillID_Call) Return(_a0 *database.Skill, _a1 error) *MockSkillStore_BySkillID_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockSkillStore_BySkillID_Call) RunAndReturn(run func(context.Context, int64) (*database.Skill, error)) *MockSkillStore_BySkillID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ByUsername provides a mock function with given fields: ctx, username, per, page, onlyPublic
 func (_m *MockSkillStore) ByUsername(ctx context.Context, username string, per int, page int, onlyPublic bool) ([]database.Skill, int, error) {
 	ret := _m.Called(ctx, username, per, page, onlyPublic)
