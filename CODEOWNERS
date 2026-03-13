@@ -11,8 +11,8 @@
 /mirror/ @zhzhang
 /builder/git/ @zhzhang
 
-/runner/ @james @rbqin @hhwang
-/builder/deploy/ @james @rbqin @hhwang
+/runner/ @james @rbqin
+/builder/deploy/ @james @rbqin
 /api/handler/collection.go @james
 /component/collection.go @james
 
