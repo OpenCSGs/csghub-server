@@ -41,8 +41,7 @@ RUN curl -O https://bootstrap.pypa.io/get-pip.py && \
 WORKDIR /etc/csghub
 RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
 RUN git clone --depth 1 https://gitee.com/xzgan/huggingface-inference-toolkit.git --branch 0.5.3 --single-branch && \
-    cd huggingface-inference-toolkit && pip install --no-cache-dir -e ".[torch,diffusers,st]" && \
-    mkdir -p /workspace && cp src/huggingface_inference_toolkit/webservice_starlette.py /workspace/ 
+    cd huggingface-inference-toolkit && pip install --no-cache-dir -e ".[torch,diffusers,st]"
 
 RUN pip install --no-cache-dir csghub-sdk==0.4.7
 

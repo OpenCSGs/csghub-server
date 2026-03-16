@@ -37,7 +37,7 @@ RUN pip install --no-cache-dir jupyterlab jupyter-server-proxy==4.4.0 \
 
 RUN pip install pip packaging wheel setuptools Cython --no-cache-dir
 
-RUN git clone --depth 1 https://gitee.com/xzgan/LLaMA-Factory.git --branch v0.9.4   --single-branch /app && cd /app && \
+RUN git clone --depth 1 https://gitee.com/xzgan/LLaMA-Factory.git --branch v0.9.5   --single-branch /app && cd /app && \
     pip install --no-cache-dir -e ".[metrics,deepspeed]"
 # Create a working directory
 WORKDIR /etc/csghub
