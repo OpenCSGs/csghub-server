@@ -39,7 +39,7 @@ func NewHttpServer(ctx context.Context, config *config.Config) (*gin.Engine, err
 	if err != nil {
 		return nil, fmt.Errorf("failed to build NewK8sHandler error: %w", err)
 	}
-	apiGroup := r.Group("/api/v1")
+	apiGroup := r.Group("/api/v1", needAPIKey)
 	service := apiGroup.Group("/service")
 	{
 		service.POST("/:service/run", k8sHandler.RunService)
