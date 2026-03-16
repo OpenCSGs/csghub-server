@@ -132,7 +132,7 @@ func TestEvaluationComponent_CreateEvaluation(t *testing.T) {
 		}, nil)
 		resource, err := json.Marshal(req2.Hardware)
 		require.Nil(t, err)
-		c.mocks.components.repo.EXPECT().CheckAccountAndResource(ctx, "test", "", int64(0), mock.Anything).Return(nil)
+		c.mocks.components.repo.EXPECT().CheckAccountAndResource(ctx, "test", "", int64(0), mock.Anything).Return(&types.CheckExclusiveResp{}, nil)
 		c.mocks.stores.SpaceResourceMock().EXPECT().FindByID(ctx, int64(1)).Return(&database.SpaceResource{
 			ID:        1,
 			Resources: string(resource),

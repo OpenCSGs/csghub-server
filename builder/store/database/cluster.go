@@ -38,7 +38,9 @@ type ClusterInfoStore interface {
 	AddNodeOwnership(ctx context.Context, ownership ClusterNodeOwnership) error
 	DeleteNodeOwnership(ctx context.Context, clusterNodeID int64) error
 	GetNodeOwnership(ctx context.Context, clusterNodeID int64) (*ClusterNodeOwnership, error)
+	GetNodeOwnershipByNameSpace(ctx context.Context, nameSpace string) ([]ClusterNodeOwnership, error)
 	UpdateNodeOwnership(ctx context.Context, ownership ClusterNodeOwnership) error
+	GetNodesByIDs(ctx context.Context, ids []int64) ([]ClusterNodeWithRegion, error)
 	ExecuteInTx(ctx context.Context, fn func(ctx context.Context, store ClusterInfoStore) error) error
 }
 
@@ -475,9 +477,37 @@ func (s *clusterInfoStoreImpl) GetNodeOwnership(ctx context.Context, clusterNode
 	return &ownership, nil
 }
 
+func (s *clusterInfoStoreImpl) GetNodeOwnershipByNameSpace(ctx context.Context, nameSpace string) ([]ClusterNodeOwnership, error) {
+	var ownerships []ClusterNodeOwnership
+	query := s.db.Operator.Core.NewSelect().Model(&ownerships)
+	query.Where("namespace = ?", nameSpace)
+	err := query.Scan(ctx)
+	if err != nil {
+		return nil, errorx.HandleDBError(err, nil)
+	}
+	return ownerships, nil
+}
+
 func (s *clusterInfoStoreImpl) UpdateNodeOwnership(ctx context.Context, ownership ClusterNodeOwnership) error {
 	_, err := s.db.Operator.Core.NewUpdate().Model(&ownership).WherePK().Exec(ctx)
 	return errorx.HandleDBError(err, nil)
+}
+
+func (s *clusterInfoStoreImpl) GetNodesByIDs(ctx context.Context, ids []int64) ([]ClusterNodeWithRegion, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	var result []ClusterNodeWithRegion
+	err := s.db.Operator.Core.NewSelect().
+		ColumnExpr("cn.*, ci.region as cluster_region").
+		TableExpr("cluster_nodes as cn").
+		Join("JOIN cluster_infos ci ON ci.cluster_id = cn.cluster_id").
+		Where("cn.id IN (?)", bun.In(ids)).
+		Scan(ctx, &result)
+	if err != nil {
+		return nil, errorx.HandleDBError(err, nil)
+	}
+	return result, nil
 }
 
 func (s *clusterInfoStoreImpl) ExecuteInTx(ctx context.Context, fn func(ctx context.Context, store ClusterInfoStore) error) error {

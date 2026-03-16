@@ -14,6 +14,8 @@ import (
 	"sync"
 	"time"
 
+	nodeutils "opencsg.com/csghub-server/runner/utils"
+
 	"opencsg.com/csghub-server/component/reporter"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -121,7 +123,13 @@ func (s *serviceComponentImpl) generateService(ctx context.Context, cluster *clu
 	}
 	appPort := 0
 	hardware := request.Hardware
-	resReq, nodeSelector, nodeAffinity := generateResources(hardware, request.Nodes, s.env)
+	genRes := rcommon.GenerateResources(rtypes.ResourceGeneratorParams{
+		Hardware:  hardware,
+		Nodes:     request.Nodes,
+		DeployExt: request.DeployExtend,
+		Config:    s.env,
+	})
+	resReq, nodeSelector, nodeAffinity := genRes.ResourceRequirements, genRes.NodeSelector, genRes.NodeAffinity
 	var err error
 	var revision string
 	if request.Env != nil {
@@ -291,10 +299,12 @@ func (s *serviceComponentImpl) generateService(ctx context.Context, cluster *clu
 		},
 	}
 
-	if nodeAffinity != nil {
-		service.Spec.ConfigurationSpec.Template.Spec.PodSpec.Affinity = &corev1.Affinity{
-			NodeAffinity: nodeAffinity,
-		}
+	// fill node affinity
+	nodeutils.FillAffinity(&service.Spec.ConfigurationSpec.Template.Spec.PodSpec.Affinity, nodeAffinity)
+
+	// fill tolerations
+	if len(genRes.Tolerations) > 0 {
+		service.Spec.ConfigurationSpec.Template.Spec.PodSpec.Tolerations = genRes.Tolerations
 	}
 
 	// Apply scheduler configuration
@@ -498,66 +508,7 @@ func isContainerStatusChanged(oldPod, newPod *corev1.Pod, containerNames ...stri
 	return false
 }
 
-func generateResources(hardware types.HardWare, nodes []types.Node, config *config.Config) (map[corev1.ResourceName]resource.Quantity, map[string]string, *corev1.NodeAffinity) {
-	nodeSelector := make(map[string]string)
-	resReq := make(map[corev1.ResourceName]resource.Quantity)
 
-	// Helper function to process labels
-	addLabels := func(labels map[string]string) {
-		for key, value := range labels {
-			nodeSelector[key] = value
-		}
-	}
-
-	// Process all hardware labels
-	hardwareTypes := []struct {
-		labels map[string]string
-	}{
-		{hardware.Gpu.Labels},
-		{hardware.Npu.Labels},
-		{hardware.Gcu.Labels},
-		{hardware.Mlu.Labels},
-		{hardware.Dcu.Labels},
-		{hardware.GPGpu.Labels},
-		{hardware.Cpu.Labels},
-	}
-
-	for _, hw := range hardwareTypes {
-		if hw.labels != nil {
-			addLabels(hw.labels)
-		}
-	}
-
-	// Process CPU resources
-	if hardware.Cpu.Num != "" {
-		qty := parseResource(hardware.Cpu.Num)
-		resReq[corev1.ResourceCPU] = qty
-	}
-
-	// Process memory resources
-	if hardware.Memory != "" {
-		qty := parseResource(hardware.Memory)
-		resReq[corev1.ResourceMemory] = qty
-	}
-
-	// Process ephemeral storage
-	if hardware.EphemeralStorage != "" {
-		qty := parseResource(hardware.EphemeralStorage)
-		resReq[corev1.ResourceEphemeralStorage] = qty
-	}
-
-	nodeAffinity := handleAccelerator(hardware, resReq, nodes, config)
-
-	return resReq, nodeSelector, nodeAffinity
-}
-
-// Helper function to parse resource quantities
-func parseResource(value string) resource.Quantity {
-	if value == "" {
-		return resource.Quantity{}
-	}
-	return resource.MustParse(value)
-}
 
 // NewPersistentVolumeClaim creates a new k8s PVC with some default values set.
 func (s *serviceComponentImpl) newPersistentVolumeClaim(name string, ctx context.Context, cluster *cluster.Cluster, hardware types.HardWare) error {
@@ -1322,21 +1273,30 @@ func (s *serviceComponentImpl) UpdateService(ctx context.Context, req types.Mode
 	}
 	// Update CPU and Memory requests and limits
 	hardware := req.Hardware
-	resReq, nodeSelector, nodeAffinity := generateResources(hardware, req.Nodes, s.env)
+	deployExt := types.DeployExtend{
+		NodeAffinity: req.NodeAffinity,
+		Tolerations:  req.Tolerations,
+	}
+	genRes := rcommon.GenerateResources(rtypes.ResourceGeneratorParams{
+		Hardware:  hardware,
+		Nodes:     req.Nodes,
+		DeployExt: deployExt,
+		Config:    s.env,
+	})
+	resReq, nodeSelector, nodeAffinity := genRes.ResourceRequirements, genRes.NodeSelector, genRes.NodeAffinity
 	resources := corev1.ResourceRequirements{
 		Limits:   resReq,
 		Requests: resReq,
 	}
 	srv.Spec.Template.Spec.Containers[0].Resources = resources
 	srv.Spec.Template.Spec.NodeSelector = nodeSelector
+	// merge node affinity
 	if nodeAffinity != nil {
-		if srv.Spec.Template.Spec.Affinity != nil {
-			srv.Spec.Template.Spec.Affinity.NodeAffinity = nodeAffinity
-		} else {
-			srv.Spec.Template.Spec.Affinity = &corev1.Affinity{
-				NodeAffinity: nodeAffinity,
-			}
-		}
+		nodeutils.FillAffinity(&srv.Spec.Template.Spec.Affinity, nodeAffinity)
+	}
+
+	if len(genRes.Tolerations) > 0 {
+		srv.Spec.Template.Spec.Tolerations = genRes.Tolerations
 	}
 	// Update replica
 	srv.Spec.Template.Annotations["autoscaling.knative.dev/min-scale"] = strconv.Itoa(req.MinReplica)

@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/deploy"
+	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/loki"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
@@ -26,7 +27,7 @@ func NewTestFinetuneComponent(config *config.Config,
 	mirrorStore database.MirrorStore, tokenStore database.AccessTokenStore,
 	repoStore database.RepoStore, frameStore database.RuntimeFrameworksStore,
 	argoStore database.ArgoWorkFlowStore,
-	acctComp AccountingComponent, repoComp RepoComponent) FinetuneComponent {
+	acctComp AccountingComponent, repoComp RepoComponent, deployTaskStore database.DeployTaskStore) FinetuneComponent {
 	c := &finetuneComponentImpl{}
 	c.deployer = deployer
 	c.userStore = userStore
@@ -38,6 +39,7 @@ func NewTestFinetuneComponent(config *config.Config,
 	c.repoStore = repoStore
 	c.runtimeFrameworkStore = frameStore
 	c.workflowStore = argoStore
+	c.deployTaskStore = deployTaskStore
 	c.config = config
 	c.repoComponent = repoComp
 	c.accountingComponent = acctComp
@@ -79,6 +81,7 @@ func TestEvaluationComponent_CreateFinetune(t *testing.T) {
 		TaskName:           "testtask",
 		ModelId:            "opencsg/wukong",
 		Username:           "testuser",
+		Namespace:          "testuser",
 		ResourceId:         4,
 		DatasetId:          "opencsg/hellaswag",
 		RuntimeFrameworkId: 1,
@@ -103,12 +106,13 @@ func TestEvaluationComponent_CreateFinetune(t *testing.T) {
 	require.Nil(t, err)
 
 	c := NewTestFinetuneComponent(cfg, mockDeployer, mockUser, modelStore, spaceResStore, datasetStore, mirrorStore,
-		tokenStore, repoStore, frameStore, argoStore, acctComp, repoComp)
+		tokenStore, repoStore, frameStore, argoStore, acctComp, repoComp, nil)
 
 	mockUser.EXPECT().FindByUsername(ctx, req.Username).Return(database.User{
 		Username: req.Username,
 		UUID:     req.Username,
 		ID:       1,
+		RoleMask: "admin",
 	}, nil).Once()
 
 	tokenStore.EXPECT().FindByUID(ctx, int64(1)).Return(&database.AccessToken{Token: "foo"}, nil)
@@ -124,7 +128,7 @@ func TestEvaluationComponent_CreateFinetune(t *testing.T) {
 		Resources: string(resource),
 	}, nil)
 
-	repoComp.EXPECT().CheckAccountAndResource(ctx, req.Username, "", int64(0), mock.Anything).Return(nil)
+	repoComp.EXPECT().CheckAccountAndResource(ctx, "testuser", "", int64(0), mock.Anything).Return(&types.CheckExclusiveResp{}, nil)
 
 	mockDeployer.EXPECT().SubmitFinetuneJob(ctx, req2).Return(&types.ArgoWorkFlowRes{
 		ID:       1,
@@ -135,6 +139,65 @@ func TestEvaluationComponent_CreateFinetune(t *testing.T) {
 	require.NotNil(t, e)
 	require.Equal(t, "test", e.TaskName)
 	require.Nil(t, err)
+}
+
+func TestFinetuneComponent_CreateFinetuneJob_NonAdminNamespace(t *testing.T) {
+	ctx := context.TODO()
+	cfg := &config.Config{}
+	cfg.Argo.QuotaGPUNumber = "1"
+	mockDeployer := mockdeploy.NewMockDeployer(t)
+	mockUser := mockdb.NewMockUserStore(t)
+	modelStore := mockdb.NewMockModelStore(t)
+	spaceResStore := mockdb.NewMockSpaceResourceStore(t)
+	datasetStore := mockdb.NewMockDatasetStore(t)
+	mirrorStore := mockdb.NewMockMirrorStore(t)
+	tokenStore := mockdb.NewMockAccessTokenStore(t)
+	repoStore := mockdb.NewMockRepoStore(t)
+	frameStore := mockdb.NewMockRuntimeFrameworksStore(t)
+	argoStore := mockdb.NewMockArgoWorkFlowStore(t)
+	acctComp := mockComps.NewMockAccountingComponent(t)
+	repoComp := mockComps.NewMockRepoComponent(t)
+
+	req := types.FinetuneReq{
+		Username:           "testuser",
+		TaskName:           "testtask",
+		RuntimeFrameworkId: 1,
+		ResourceId:         4,
+		ModelId:            "opencsg/wukong",
+		DatasetId:          "opencsg/hellaswag",
+		Namespace:          "org1",
+		Epochs:             3,
+		ShareMode:          false,
+	}
+
+	t.Run("namespace_permission_error", func(t *testing.T) {
+		c := NewTestFinetuneComponent(cfg, mockDeployer, mockUser, modelStore, spaceResStore, datasetStore, mirrorStore,
+			tokenStore, repoStore, frameStore, argoStore, acctComp, repoComp, nil)
+		mockUser.EXPECT().FindByUsername(ctx, req.Username).Return(database.User{
+			Username: req.Username,
+			UUID:     req.Username,
+			ID:       1,
+			RoleMask: "",
+		}, nil).Once()
+		repoComp.EXPECT().CheckCurrentUserPermission(ctx, "testuser", "org1", membership.RoleWrite).Return(false, errors.New("rpc error")).Once()
+		_, err := c.CreateFinetuneJob(ctx, req)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "failed to check namespace permission")
+	})
+	t.Run("namespace_forbidden", func(t *testing.T) {
+		c := NewTestFinetuneComponent(cfg, mockDeployer, mockUser, modelStore, spaceResStore, datasetStore, mirrorStore,
+			tokenStore, repoStore, frameStore, argoStore, acctComp, repoComp, nil)
+		mockUser.EXPECT().FindByUsername(ctx, req.Username).Return(database.User{
+			Username: req.Username,
+			UUID:     req.Username,
+			ID:       1,
+			RoleMask: "",
+		}, nil).Once()
+		repoComp.EXPECT().CheckCurrentUserPermission(ctx, "testuser", "org1", membership.RoleWrite).Return(false, nil).Once()
+		_, err := c.CreateFinetuneJob(ctx, req)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "do not have permission to create finetune in this namespace")
+	})
 }
 
 func TestEvaluationComponent_GetFinetune(t *testing.T) {
@@ -162,7 +225,7 @@ func TestEvaluationComponent_GetFinetune(t *testing.T) {
 	}
 
 	c := NewTestFinetuneComponent(cfg, mockDeployer, mockUser, modelStore, spaceResStore, datasetStore, mirrorStore,
-		tokenStore, repoStore, frameStore, argoStore, acctComp, repoComp)
+		tokenStore, repoStore, frameStore, argoStore, acctComp, repoComp, nil)
 
 	argoStore.EXPECT().FindByID(ctx, int64(1)).Return(database.ArgoWorkflow{
 		ID:       1,
@@ -196,7 +259,7 @@ func TestEvaluationComponent_DeleteFinetune(t *testing.T) {
 	repoComp := mockComps.NewMockRepoComponent(t)
 
 	c := NewTestFinetuneComponent(cfg, mockDeployer, mockUser, modelStore, spaceResStore, datasetStore, mirrorStore,
-		tokenStore, repoStore, frameStore, argoStore, acctComp, repoComp)
+		tokenStore, repoStore, frameStore, argoStore, acctComp, repoComp, nil)
 
 	argoStore.EXPECT().FindByID(ctx, int64(1)).Return(database.ArgoWorkflow{
 		ID:        1,
@@ -236,7 +299,7 @@ func TestFinetuneComponent_ReadJobLogsNonStream(t *testing.T) {
 		argoStore := mockdb.NewMockArgoWorkFlowStore(t)
 
 		c := NewTestFinetuneComponent(cfg, mockDeployer, nil, nil, nil, nil, nil,
-			nil, nil, nil, argoStore, nil, nil)
+			nil, nil, nil, argoStore, nil, nil, nil)
 
 		req := types.FinetuneLogReq{
 			ID: 1,
@@ -261,7 +324,7 @@ func TestFinetuneComponent_ReadJobLogsNonStream(t *testing.T) {
 		argoStore := mockdb.NewMockArgoWorkFlowStore(t)
 
 		c := NewTestFinetuneComponent(cfg, mockDeployer, nil, nil, nil, nil, nil,
-			nil, nil, nil, argoStore, nil, nil)
+			nil, nil, nil, argoStore, nil, nil, nil)
 
 		req := types.FinetuneLogReq{
 			ID: 1,
@@ -279,7 +342,7 @@ func TestFinetuneComponent_ReadJobLogsNonStream(t *testing.T) {
 		argoStore := mockdb.NewMockArgoWorkFlowStore(t)
 
 		c := NewTestFinetuneComponent(cfg, mockDeployer, nil, nil, nil, nil, nil,
-			nil, nil, nil, argoStore, nil, nil)
+			nil, nil, nil, argoStore, nil, nil, nil)
 		req := types.FinetuneLogReq{
 			ID: 1,
 		}
@@ -307,7 +370,7 @@ func TestFinetuneComponent_ReadJobLogsInStream(t *testing.T) {
 		argoStore := mockdb.NewMockArgoWorkFlowStore(t)
 
 		c := NewTestFinetuneComponent(cfg, mockDeployer, nil, nil, nil, nil, nil,
-			nil, nil, nil, argoStore, nil, nil)
+			nil, nil, nil, argoStore, nil, nil, nil)
 
 		req := types.FinetuneLogReq{
 			ID: 1,
@@ -332,7 +395,7 @@ func TestFinetuneComponent_ReadJobLogsInStream(t *testing.T) {
 		argoStore := mockdb.NewMockArgoWorkFlowStore(t)
 
 		c := NewTestFinetuneComponent(cfg, mockDeployer, nil, nil, nil, nil, nil,
-			nil, nil, nil, argoStore, nil, nil)
+			nil, nil, nil, argoStore, nil, nil, nil)
 
 		req := types.FinetuneLogReq{
 			ID: 1,
@@ -344,4 +407,27 @@ func TestFinetuneComponent_ReadJobLogsInStream(t *testing.T) {
 		_, err := c.ReadJobLogsInStream(ctx, req)
 		require.NotNil(t, err)
 	})
+}
+
+func TestFinetuneComponent_OrgFinetunes(t *testing.T) {
+	ctx := context.TODO()
+	cfg := &config.Config{}
+	mockDeployTask := mockdb.NewMockDeployTaskStore(t)
+	mockRepoComp := mockComps.NewMockRepoComponent(t)
+	req := &types.OrgFinetunesReq{
+		Namespace:   "org1",
+		CurrentUser: "user1",
+		PageOpts:    types.PageOpts{Page: 1, PageSize: 10},
+	}
+	mockRepoComp.EXPECT().CheckCurrentUserPermission(ctx, "user1", "org1", mock.Anything).Return(true, nil)
+	mockDeployTask.EXPECT().ListDeployByOwnerNamespace(ctx, "org1", mock.Anything).Return([]database.Deploy{
+		{ID: 1, DeployName: "ft1", OwnerNamespace: "org1", RepoID: 101, Status: 1},
+	}, 1, nil)
+	c := NewTestFinetuneComponent(cfg, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, mockRepoComp, mockDeployTask)
+	res, total, err := c.OrgFinetunes(ctx, req)
+	require.Nil(t, err)
+	require.Equal(t, 1, total)
+	require.Len(t, res, 1)
+	require.Equal(t, "ft1", res[0].TaskName)
+	require.Equal(t, "org1", res[0].Username)
 }

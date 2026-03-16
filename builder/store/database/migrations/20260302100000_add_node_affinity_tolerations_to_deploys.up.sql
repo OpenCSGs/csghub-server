@@ -1,0 +1,4 @@
+ALTER TABLE deploys
+    ADD COLUMN IF NOT EXISTS node_affinity JSONB;
+ALTER TABLE deploys
+    ADD COLUMN IF NOT EXISTS tolerations JSONB;

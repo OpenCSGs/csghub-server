@@ -2,6 +2,8 @@ package types
 
 import (
 	"time"
+
+	corev1 "k8s.io/api/core/v1"
 )
 
 const LFSPrefix = "version https://git-lfs.github.com/spec/v1"
@@ -315,14 +317,16 @@ func (c *InstanceRunReq) GetSensitiveFields() []SensitiveField {
 }
 
 type ModelUpdateRequest struct {
-	MinReplica int               `json:"min_replica"` // min replica of instance/pod
-	MaxReplica int               `json:"max_replica"` // max replica of instance/pod
-	Hardware   HardWare          `json:"hardware"`    // resource requirements
-	ImageID    string            `json:"image_id" binding:"required"`
-	Env        map[string]string `json:"env"` // runtime env variables
-	ClusterID  string            `json:"cluster_id"`
-	SvcName    string            `json:"svc_name"`
-	Nodes      []Node            `json:"nodes"`
+	MinReplica   int                  `json:"min_replica"` // min replica of instance/pod
+	MaxReplica   int                  `json:"max_replica"` // max replica of instance/pod
+	Hardware     HardWare             `json:"hardware"`    // resource requirements
+	ImageID      string               `json:"image_id" binding:"required"`
+	Env          map[string]string    `json:"env"` // runtime env variables
+	ClusterID    string               `json:"cluster_id"`
+	SvcName      string               `json:"svc_name"`
+	Nodes        []Node               `json:"nodes"`
+	NodeAffinity *corev1.NodeAffinity `json:"node_affinity,omitempty"`
+	Tolerations  []Toleration         `json:"tolerations,omitempty"`
 }
 
 type ModelUpdateResponse struct {
@@ -374,6 +378,7 @@ type DeployUpdateReq struct {
 	Entrypoint         *string `json:"entrypoint"`
 	Variables          *string `json:"variables"`
 	EngineArgs         *string `json:"engine_args"`
+	DeployExtend
 }
 
 type RelationModels struct {

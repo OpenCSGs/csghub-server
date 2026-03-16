@@ -96,6 +96,7 @@ type repoComponentImpl struct {
 	mirrorSvcClient        rpc.MirrorSvcClient
 	pendingDeletion        database.PendingDeletionStore
 	xnetClient             rpc.XnetSvcClient
+	clusterComponent       ClusterComponent
 	extendRepoImpl
 }
 
@@ -173,7 +174,7 @@ type RepoComponent interface {
 	GenerateEndpoint(ctx context.Context, deploy *database.Deploy) (string, string)
 	FixRepoSource(ctx context.Context) error
 	IsAdminRole(user database.User) bool
-	CheckAccountAndResource(ctx context.Context, userName string, clusterID string, orderDetailID int64, resource *database.SpaceResource) error
+	CheckAccountAndResource(ctx context.Context, userName string, clusterID string, orderDetailID int64, resource *database.SpaceResource) (*types.CheckExclusiveResp, error)
 	DiffBetweenTwoCommits(ctx context.Context, req types.GetDiffBetweenCommitsReq) ([]types.GiteaCallbackPushReq_Commit, error)
 	RemoteDiff(ctx context.Context, req types.GetDiffBetweenCommitsReq) ([]types.RemoteDiffs, error)
 	SendAssetManagementMsg(ctx context.Context, req types.RepoNotificationReq) error

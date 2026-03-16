@@ -224,14 +224,13 @@ func TestOrganizationStore_GetOrgByUserIDs(t *testing.T) {
 	require.Empty(t, orgs)
 }
 
-
 func TestOrganizationStore_FindByUUID(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
 	ctx := context.TODO()
-	
+
 	store := database.NewOrgStoreWithDB(db)
-	
+
 	// Test case 1: Find an existing organization by UUID
 	testUUID := uuid.New()
 	err := store.Create(ctx, &database.Organization{
@@ -240,20 +239,20 @@ func TestOrganizationStore_FindByUUID(t *testing.T) {
 		UUID:     testUUID,
 	}, &database.Namespace{Path: "test_org"})
 	require.Nil(t, err)
-	
+
 	// Find the organization by UUID
 	org, err := store.FindByUUID(ctx, testUUID.String())
 	require.Nil(t, err)
 	require.NotNil(t, org)
 	require.Equal(t, "test_org", org.Name)
 	require.Equal(t, testUUID, org.UUID)
-	
+
 	// Test case 2: Find non-existent organization by UUID
 	nonExistentUUID := uuid.New()
 	org, err = store.FindByUUID(ctx, nonExistentUUID.String())
 	require.Nil(t, err)
 	require.Nil(t, org)
-	
+
 	// Test case 3: Find organization with invalid UUID format
 	// Database returns error for invalid UUID format
 	org, err = store.FindByUUID(ctx, "invalid-uuid-format")

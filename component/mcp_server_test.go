@@ -530,9 +530,9 @@ func TestMCPServerComponent_CheckDeployBranch(t *testing.T) {
 		ID: 1,
 	}, nil)
 
-	mc.mocks.components.repo.EXPECT().CheckAccountAndResource(ctx, req.CurrentUser, req.ClusterID, int64(0), &database.SpaceResource{
+	mc.mocks.components.repo.EXPECT().CheckAccountAndResource(ctx, req.MCPRepo.Namespace, req.ClusterID, int64(0), &database.SpaceResource{
 		ID: 1,
-	}).Return(nil)
+	}).Return(&types.CheckExclusiveResp{}, nil)
 
 	mc.mocks.stores.NamespaceMock().EXPECT().FindByPath(ctx, req.Namespace).Return(database.Namespace{
 		ID: 1,

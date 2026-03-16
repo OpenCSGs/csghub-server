@@ -11,6 +11,7 @@ import (
 
 	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/deploy/common"
+	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
@@ -54,10 +55,23 @@ type notebookComponentImpl struct {
 }
 
 func (c *notebookComponentImpl) CreateNotebook(ctx context.Context, req *types.CreateNotebookReq) (*types.NotebookRes, error) {
-	// found user id
+	if req.OwnerNamespace == "" {
+		req.OwnerNamespace = req.CurrentUser
+	}
+
 	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
 	if err != nil {
 		return nil, fmt.Errorf("cannot find user for notebook creation, %w", err)
+	}
+
+	if !user.CanAdmin() {
+		canWrite, err := c.repoComponent.CheckCurrentUserPermission(ctx, req.CurrentUser, req.OwnerNamespace, membership.RoleWrite)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check namespace permission, error: %w", err)
+		}
+		if !canWrite {
+			return nil, errorx.ErrForbiddenMsg("users do not have permission to create notebook in this namespace")
+		}
 	}
 
 	frame, err := c.runtimeFrameworksStore.FindEnabledByID(ctx, req.RuntimeFrameworkID)
@@ -80,7 +94,7 @@ func (c *notebookComponentImpl) CreateNotebook(ctx context.Context, req *types.C
 
 	// resource available only if err is nil, err message should contain
 	// the reason why resource is unavailable
-	err = c.repoComponent.CheckAccountAndResource(ctx, req.CurrentUser, resource.ClusterID, req.OrderDetailID, resource)
+	exclusiveResp, err := c.repoComponent.CheckAccountAndResource(ctx, req.OwnerNamespace, resource.ClusterID, req.OrderDetailID, resource)
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +111,15 @@ func (c *notebookComponentImpl) CreateNotebook(ctx context.Context, req *types.C
 		return nil, errorx.ErrMultiHostNotebookNotSupported
 	}
 
-	// create deploy for notebook
+	billingUUID := user.UUID
+	if req.OwnerNamespace != req.CurrentUser {
+		resolved, err := c.repoComponent.GetNamespaceBillingUUID(ctx, req.OwnerNamespace)
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve billing UUID for namespace %s, error: %w", req.OwnerNamespace, err)
+		}
+		billingUUID = resolved
+	}
+
 	dp := types.DeployRepo{
 		DeployName:       req.DeployName,
 		SpaceID:          0,
@@ -112,9 +134,14 @@ func (c *notebookComponentImpl) CreateNotebook(ctx context.Context, req *types.C
 		ClusterID:        resource.ClusterID,
 		SecureLevel:      2,
 		Type:             types.NotebookType,
-		UserUUID:         user.UUID,
+		UserUUID:         billingUUID,
 		OrderDetailID:    req.OrderDetailID,
 		SKU:              strconv.FormatInt(resource.ID, 10),
+		OwnerNamespace:   req.OwnerNamespace,
+		DeployExtend: types.DeployExtend{
+			NodeAffinity: exclusiveResp.NodeAffinity,
+			Tolerations:  exclusiveResp.Tolerations,
+		},
 	}
 
 	deployID, err := c.deployer.Deploy(ctx, dp)
@@ -201,6 +228,7 @@ func (c *notebookComponentImpl) LogsNotebook(ctx context.Context, req *types.Sta
 	return c.deployer.InstanceLogs(ctx, types.DeployRepo{
 		DeployID:     deploy.ID,
 		InstanceName: req.InstanceName,
+		Since:        req.Since,
 	})
 }
 
@@ -264,7 +292,11 @@ func (c *notebookComponentImpl) UpdateNotebook(ctx context.Context, req *types.U
 		return fmt.Errorf("cannot find resource, %w", err)
 	}
 
-	err = c.repoComponent.CheckAccountAndResource(ctx, req.CurrentUser, resource.ClusterID, deploy.OrderDetailID, resource)
+	notebookBillingNs := deploy.OwnerNamespace
+	if notebookBillingNs == "" {
+		notebookBillingNs = req.CurrentUser
+	}
+	exclusiveResp, err := c.repoComponent.CheckAccountAndResource(ctx, notebookBillingNs, resource.ClusterID, deploy.OrderDetailID, resource)
 	if err != nil {
 		return fmt.Errorf("resource is not available, %w", err)
 	}
@@ -283,6 +315,10 @@ func (c *notebookComponentImpl) UpdateNotebook(ctx context.Context, req *types.U
 	dur := &types.DeployUpdateReq{
 		ResourceID: &req.ResourceID,
 		ClusterID:  &resource.ClusterID,
+		DeployExtend: types.DeployExtend{
+			NodeAffinity: exclusiveResp.NodeAffinity,
+			Tolerations:  exclusiveResp.Tolerations,
+		},
 	}
 
 	err = c.deployer.UpdateDeploy(ctx, dur, deploy)

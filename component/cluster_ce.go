@@ -33,6 +33,10 @@ func (c *clusterComponentImpl) SetClusterNodeAccessMode(ctx context.Context, req
 	return nil
 }
 
+func (c *clusterComponentImpl) CheckExclusiveResource(ctx context.Context, req types.CheckExclusiveReq) (*types.CheckExclusiveResp, error) {
+	return &types.CheckExclusiveResp{UsedExclusive: false}, nil
+}
+
 func (c *clusterComponentImpl) GetDeploysByTimeRange(ctx context.Context, req types.DeployTimeRangeReq) ([]database.Deploy, int, error) {
 	return nil, 0, nil
 }

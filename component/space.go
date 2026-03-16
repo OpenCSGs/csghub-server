@@ -98,7 +98,7 @@ func (c *spaceComponentImpl) Create(ctx context.Context, req types.CreateSpaceRe
 	if err != nil {
 		return nil, errorx.ErrResourceNotFound
 	}
-	err = c.repoComponent.CheckAccountAndResource(ctx, req.Username, req.ClusterID, req.OrderDetailID, resource)
+	_, err = c.repoComponent.CheckAccountAndResource(ctx, req.Namespace, req.ClusterID, req.OrderDetailID, resource)
 	if err != nil {
 		slog.ErrorContext(ctx, "CheckAccountAndResource failed", slog.Any("error", err))
 		return nil, err
@@ -961,9 +961,10 @@ func (c *spaceComponentImpl) Deploy(ctx context.Context, namespace, name, curren
 	if err != nil {
 		return -1, fmt.Errorf("fail to find resource by id %d, error: %w", resID, err)
 	}
-	slog.Info("deploy space with resource", slog.Any("resource", resource),
+
+	slog.Info("deploy space with resource", slog.Any("resource", resource), slog.String("namespace", namespace),
 		slog.String("username", currentUser), slog.Any("cluster_id", resource.ClusterID))
-	err = c.repoComponent.CheckAccountAndResource(ctx, currentUser, resource.ClusterID, 0, resource)
+	exclusiveResp, err := c.repoComponent.CheckAccountAndResource(ctx, namespace, resource.ClusterID, 0, resource)
 	if err != nil {
 		return -1, err
 	}
@@ -1001,9 +1002,10 @@ func (c *spaceComponentImpl) Deploy(ctx context.Context, namespace, name, curren
 	if space.Sdk != types.DOCKER.Name {
 		var frame *database.RuntimeFramework
 		var err error
+		// check if using old base  space runtime image 1.0.3 for old spaces
 		if (space.Sdk == types.GRADIO.Name && space.SdkVersion != types.GRADIO.Version) ||
 			(space.Sdk == types.STREAMLIT.Name && space.SdkVersion != types.STREAMLIT.Version) {
-			// Using old base image 1.0.3 for old spaces, will be removed in the future
+			slog.InfoContext(ctx, "Using old base image 1.0.3 for old spaces")
 			frame, err = c.rfs.FindByFrameNameAndDriverVersion(ctx, "space", EngineVersion103, space.DriverVersion)
 			if err != nil {
 				return -1, fmt.Errorf("cannot find available (%s) runtime framework, %w", EngineVersion103, err)
@@ -1019,7 +1021,6 @@ func (c *spaceComponentImpl) Deploy(ctx context.Context, namespace, name, curren
 		if frame != nil {
 			imageID = frame.FrameImage
 		}
-
 	}
 	// create deploy for space
 	dr := types.DeployRepo{
@@ -1044,6 +1045,12 @@ func (c *spaceComponentImpl) Deploy(ctx context.Context, namespace, name, curren
 		ContainerPort: containerPort,
 		Variables:     space.Variables,
 		ClusterID:     space.ClusterID,
+
+		OwnerNamespace: namespace,
+		DeployExtend: types.DeployExtend{
+			NodeAffinity: exclusiveResp.NodeAffinity,
+			Tolerations:  exclusiveResp.Tolerations,
+		},
 	}
 	dr = c.updateDeployRepoBySpace(dr, space)
 
@@ -1357,15 +1364,15 @@ func (c *spaceComponentImpl) mergeUpdateSpaceRequest(ctx context.Context, space 
 			slog.ErrorContext(ctx, "invalid hardware setting", slog.Any("error", err))
 			return fmt.Errorf("invalid hardware setting, %w", err)
 		}
-		_, resourceType := deployCommon.GetResourceAndType(hardware)
-		if resourceType == "" { // only cpu resource
+		resourceType := deployCommon.ResourceType(hardware)
+		if resourceType == types.ResourceTypeCPU { // only cpu resource
 			space.DriverVersion = ""
 		} else {
 			if req.DriverVersion == nil {
 				// set default value(compatible old version) latest cuda version by resocouurce type
-				frame, err := c.FindSpaceLatestCUDAVersion(ctx, resourceType)
+				frame, err := c.FindSpaceLatestCUDAVersion(ctx, string(resourceType))
 				if err != nil {
-					return fmt.Errorf("can't find latest cuda version for space resource, resource type:%s, error:%w", resourceType, err)
+					return fmt.Errorf("can't find latest cuda version for space resource, resource type:%s, error:%w", string(resourceType), err)
 				}
 
 				req.DriverVersion = &frame.DriverVersion

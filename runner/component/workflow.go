@@ -12,6 +12,9 @@ import (
 	"sync"
 	"time"
 
+	rtypes "opencsg.com/csghub-server/runner/types"
+	"opencsg.com/csghub-server/runner/utils"
+
 	"opencsg.com/csghub-server/component/reporter"
 
 	"github.com/argoproj/argo-workflows/v3/pkg/apis/workflow/v1alpha1"
@@ -269,7 +272,17 @@ func generateWorkflow(req types.ArgoWorkFlowReq, config *config.Config) (*v1alph
 	applier := sched.NewApplier(req.Scheduler)
 	templates := []v1alpha1.Template{}
 	for _, v := range req.Templates {
-		resReq, _, nodeAffinity := generateResources(v.HardWare, req.Nodes, config)
+		deployExt := types.DeployExtend{
+			NodeAffinity: req.NodeAffinity,
+			Tolerations:  req.Tolerations,
+		}
+		genRes := common.GenerateResources(rtypes.ResourceGeneratorParams{
+			Hardware:  v.HardWare,
+			Nodes:     req.Nodes,
+			DeployExt: deployExt,
+			Config:    config,
+		})
+		resReq, nodeAffinity := genRes.ResourceRequirements, genRes.NodeAffinity
 		environments := []corev1.EnvVar{}
 		for key, value := range v.Env {
 			environments = append(environments, corev1.EnvVar{Name: key, Value: value})
@@ -329,10 +342,12 @@ func generateWorkflow(req types.ArgoWorkFlowReq, config *config.Config) (*v1alph
 			},
 		}
 
-		if nodeAffinity != nil {
-			temp.Affinity = &corev1.Affinity{
-				NodeAffinity: nodeAffinity,
-			}
+		// merge node affinity
+		utils.FillAffinity(&temp.Affinity, nodeAffinity)
+
+		// fill tolerations
+		if len(genRes.Tolerations) > 0 {
+			temp.Tolerations = genRes.Tolerations
 		}
 
 		if err := applier.ApplyToArgo(&temp); err != nil {

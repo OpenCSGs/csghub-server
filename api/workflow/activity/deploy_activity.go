@@ -635,6 +635,10 @@ func (a *DeployActivity) createDeployRequest(ctx context.Context, task *database
 		TaskId:        task.ID,
 		Nodes:         requestNodes,
 		Scheduler:     common.GenerateScheduler(a.cfg),
+		DeployExtend: types.DeployExtend{
+			NodeAffinity: deployInfo.NodeAffinity,
+			Tolerations:  deployInfo.Tolerations,
+		},
 	}, nil
 }
 

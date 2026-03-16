@@ -27,6 +27,8 @@ import (
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/tests"
 	"opencsg.com/csghub-server/common/types"
+
+	corev1 "k8s.io/api/core/v1"
 )
 
 type testDepolyerWithMocks struct {
@@ -85,6 +87,31 @@ func TestDeployer_serverlessDeploy(t *testing.T) {
 			Template:         "test template",
 			MinReplica:       1,
 			MaxReplica:       2,
+			DeployExtend: types.DeployExtend{
+				NodeAffinity: &corev1.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+						NodeSelectorTerms: []corev1.NodeSelectorTerm{
+							{
+								MatchExpressions: []corev1.NodeSelectorRequirement{
+									{
+										Key:      "foo",
+										Operator: corev1.NodeSelectorOpIn,
+										Values:   []string{"bar"},
+									},
+								},
+							},
+						},
+					},
+				},
+				Tolerations: []types.Toleration{
+					{
+						Key:      "foo",
+						Operator: "Equal",
+						Value:    "bar",
+						Effect:   "NoSchedule",
+					},
+				},
+			},
 		}
 
 		newDeploy := oldDeploy
@@ -100,6 +127,8 @@ func TestDeployer_serverlessDeploy(t *testing.T) {
 		newDeploy.Template = dr.Template
 		newDeploy.MinReplica = dr.MinReplica
 		newDeploy.MaxReplica = dr.MaxReplica
+		newDeploy.NodeAffinity = dr.NodeAffinity
+		newDeploy.Tolerations = dr.Tolerations
 
 		mockTaskStore := mockdb.NewMockDeployTaskStore(t)
 		mockTaskStore.EXPECT().GetLatestDeployBySpaceID(mock.Anything, dr.SpaceID).Return(&oldDeploy, nil)
@@ -132,6 +161,31 @@ func TestDeployer_serverlessDeploy(t *testing.T) {
 			Template:         "test template",
 			MinReplica:       1,
 			MaxReplica:       2,
+			DeployExtend: types.DeployExtend{
+				NodeAffinity: &corev1.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+						NodeSelectorTerms: []corev1.NodeSelectorTerm{
+							{
+								MatchExpressions: []corev1.NodeSelectorRequirement{
+									{
+										Key:      "foo",
+										Operator: corev1.NodeSelectorOpIn,
+										Values:   []string{"bar"},
+									},
+								},
+							},
+						},
+					},
+				},
+				Tolerations: []types.Toleration{
+					{
+						Key:      "foo",
+						Operator: "Equal",
+						Value:    "bar",
+						Effect:   "NoSchedule",
+					},
+				},
+			},
 		}
 
 		newDeploy := oldDeploy
@@ -147,6 +201,8 @@ func TestDeployer_serverlessDeploy(t *testing.T) {
 		newDeploy.Template = dr.Template
 		newDeploy.MinReplica = dr.MinReplica
 		newDeploy.MaxReplica = dr.MaxReplica
+		newDeploy.NodeAffinity = dr.NodeAffinity
+		newDeploy.Tolerations = dr.Tolerations
 
 		mockTaskStore := mockdb.NewMockDeployTaskStore(t)
 		mockTaskStore.EXPECT().GetServerlessDeployByRepID(mock.Anything, dr.RepoID).Return(&oldDeploy, nil)

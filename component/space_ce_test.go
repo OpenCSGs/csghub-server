@@ -28,7 +28,7 @@ func TestSpaceComponent_Create(t *testing.T) {
 		Resources: `{"memory": "foo"}`,
 	}, nil)
 
-	sc.mocks.components.repo.EXPECT().CheckAccountAndResource(ctx, "user", "cluster", int64(0), mock.Anything).Return(nil)
+	sc.mocks.components.repo.EXPECT().CheckAccountAndResource(ctx, "ns", "cluster", int64(0), mock.Anything).Return(&types.CheckExclusiveResp{}, nil)
 	sc.mocks.components.repo.EXPECT().CreateRepo(ctx, types.CreateRepoReq{
 		DefaultBranch: "main",
 		Readme:        generateReadmeData("MIT"),
@@ -201,15 +201,16 @@ func TestSpaceComponent_Deploy(t *testing.T) {
 		sc.mocks.stores.SpaceResourceMock().EXPECT().FindByID(ctx, int64(1)).Return(&database.SpaceResource{
 			ID: 1,
 		}, nil)
-		sc.mocks.components.repo.EXPECT().CheckAccountAndResource(ctx, "user", "", int64(0), &database.SpaceResource{
+		sc.mocks.components.repo.EXPECT().CheckAccountAndResource(ctx, "ns1", "", int64(0), &database.SpaceResource{
 			ID: 1,
-		}).Return(nil)
+		}).Return(&types.CheckExclusiveResp{}, nil)
 		sc.mocks.deployer.EXPECT().Deploy(ctx, types.DeployRepo{
-			SpaceID:       1,
-			Path:          "foo1/bar1",
-			Annotation:    "{\"hub-deploy-user\":\"user1\",\"hub-res-name\":\"ns1/n1\",\"hub-res-type\":\"space\"}",
-			ContainerPort: 8080,
-			SKU:           "1",
+			SpaceID:        1,
+			Path:           "foo1/bar1",
+			Annotation:     "{\"hub-deploy-user\":\"user1\",\"hub-res-name\":\"ns1/n1\",\"hub-res-type\":\"space\"}",
+			ContainerPort:  8080,
+			SKU:            "1",
+			OwnerNamespace: "ns1",
 		}).Return(123, nil)
 
 		id, err := sc.Deploy(ctx, "ns1", "n1", "user")

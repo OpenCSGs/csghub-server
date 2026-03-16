@@ -5,9 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"strings"
 
+	"github.com/argoproj/argo-workflows/v3/pkg/apis/workflow/v1alpha1"
 	"opencsg.com/csghub-server/builder/deploy"
+	deploycommon "opencsg.com/csghub-server/builder/deploy/common"
+	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/loki"
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
@@ -27,6 +31,7 @@ type finetuneComponentImpl struct {
 	tokenStore            database.AccessTokenStore
 	runtimeFrameworkStore database.RuntimeFrameworksStore
 	workflowStore         database.ArgoWorkFlowStore
+	deployTaskStore       database.DeployTaskStore
 	config                *config.Config
 	accountingComponent   AccountingComponent
 	repoComponent         RepoComponent
@@ -35,10 +40,10 @@ type finetuneComponentImpl struct {
 }
 
 type FinetuneComponent interface {
-	// Create argo workflow
 	CreateFinetuneJob(ctx context.Context, req types.FinetuneReq) (*types.ArgoWorkFlowRes, error)
 	GetFinetuneJob(ctx context.Context, req types.FinetineGetReq) (*types.FinetuneRes, error)
 	DeleteFinetuneJob(ctx context.Context, req types.ArgoWorkFlowDeleteReq) error
+	OrgFinetunes(ctx context.Context, req *types.OrgFinetunesReq) ([]types.ArgoWorkFlowRes, int, error)
 	CheckUserPermission(ctx context.Context, req types.FinetuneLogReq) (bool, error)
 	ReadJobLogsNonStream(ctx context.Context, req types.FinetuneLogReq) (string, error)
 	ReadJobLogsInStream(ctx context.Context, req types.FinetuneLogReq) (*deploy.MultiLogReader, error)
@@ -56,6 +61,7 @@ func NewFinetuneComponent(config *config.Config) (FinetuneComponent, error) {
 	c.repoStore = database.NewRepoStore()
 	c.runtimeFrameworkStore = database.NewRuntimeFrameworksStore()
 	c.workflowStore = database.NewArgoWorkFlowStore()
+	c.deployTaskStore = database.NewDeployTaskStore()
 	c.config = config
 	ac, err := NewAccountingComponent(config)
 	if err != nil {
@@ -74,9 +80,23 @@ func NewFinetuneComponent(config *config.Config) (FinetuneComponent, error) {
 
 // Create finetune argo workflow
 func (c *finetuneComponentImpl) CreateFinetuneJob(ctx context.Context, req types.FinetuneReq) (*types.ArgoWorkFlowRes, error) {
-	user, err := c.userStore.FindByUsername(ctx, req.Username)
+	operatorUsername := req.Username
+	if req.Namespace == "" {
+		req.Namespace = operatorUsername
+	}
+	user, err := c.userStore.FindByUsername(ctx, operatorUsername)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get current user %s, error: %w", req.Username, err)
+	}
+
+	if !user.CanAdmin() {
+		canWrite, err := c.repoComponent.CheckCurrentUserPermission(ctx, operatorUsername, req.Namespace, membership.RoleWrite)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check namespace permission, error: %w", err)
+		}
+		if !canWrite {
+			return nil, errorx.ErrForbiddenMsg("users do not have permission to create finetune in this namespace")
+		}
 	}
 
 	token, err := c.tokenStore.FindByUID(ctx, user.ID)
@@ -102,11 +122,12 @@ func (c *finetuneComponentImpl) CreateFinetuneJob(ctx context.Context, req types
 		}
 
 		// check resource available
-		err = c.repoComponent.CheckAccountAndResource(ctx, req.Username, resource.ClusterID, 0, resource)
+		exclusiveResp, err := c.repoComponent.CheckAccountAndResource(ctx, req.Namespace, resource.ClusterID, 0, resource)
 		if err != nil {
 			return nil, err
 		}
-
+		req.NodeAffinity = exclusiveResp.NodeAffinity
+		req.Tolerations = exclusiveResp.Tolerations
 		req.ClusterID = resource.ClusterID
 		req.ResourceName = resource.Name
 	} else {
@@ -127,6 +148,8 @@ func (c *finetuneComponentImpl) CreateFinetuneJob(ctx context.Context, req types
 	// choose image
 	containerImg := frame.FrameImage
 	req.UserUUID = user.UUID
+	// Persist workflow under owner namespace (user or organization).
+	req.Username = req.Namespace
 	req.Image = containerImg
 	req.RepoType = string(types.ModelRepo)
 	req.TaskType = types.TaskTypeFinetune
@@ -180,6 +203,65 @@ func (c *finetuneComponentImpl) GetFinetuneJob(ctx context.Context, req types.Fi
 		Datasets:     wf.Datasets,
 	}
 	return res, nil
+}
+
+func (c *finetuneComponentImpl) OrgFinetunes(ctx context.Context, req *types.OrgFinetunesReq) ([]types.ArgoWorkFlowRes, int, error) {
+	if req.CurrentUser != "" {
+		canRead, err := c.repoComponent.CheckCurrentUserPermission(ctx, req.CurrentUser, req.Namespace, membership.RoleRead)
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to check namespace permission, error: %w", err)
+		}
+		if !canRead {
+			return nil, 0, errorx.ErrForbiddenMsg("users do not have permission to view finetunes in this namespace")
+		}
+	}
+
+	// List org finetunes from deploys (owner_namespace); model-instance finetunes are stored here.
+	deployReq := &types.DeployReq{
+		PageOpts:   types.PageOpts{Page: req.Page, PageSize: req.PageSize},
+		DeployType: types.FinetuneType,
+		RepoType:   types.ModelRepo,
+	}
+	deploys, total, err := c.deployTaskStore.ListDeployByOwnerNamespace(ctx, req.Namespace, deployReq)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to get org finetunes, error: %w", err)
+	}
+
+	var res []types.ArgoWorkFlowRes
+	for _, d := range deploys {
+		repoIds := []string{}
+		if d.RepoID > 0 {
+			repoIds = append(repoIds, strconv.FormatInt(d.RepoID, 10))
+		}
+		res = append(res, types.ArgoWorkFlowRes{
+			ID:         d.ID,
+			RepoIds:    repoIds,
+			RepoType:   string(types.ModelRepo),
+			TaskName:   d.DeployName,
+			Username:   d.OwnerNamespace,
+			TaskId:     d.SvcName,
+			Status:     deployStatusToWorkflowPhase(d.Status),
+			TaskType:   types.TaskTypeFinetune,
+			SubmitTime: d.CreatedAt,
+			Image:      d.ImageID,
+		})
+	}
+	return res, total, nil
+}
+
+// deployStatusToWorkflowPhase maps deploy status (int) to argo WorkflowPhase for list response.
+func deployStatusToWorkflowPhase(status int) v1alpha1.WorkflowPhase {
+	switch status {
+	case deploycommon.Running, deploycommon.Startup:
+		return v1alpha1.WorkflowRunning
+	case deploycommon.BuildFailed, deploycommon.DeployFailed, deploycommon.RunTimeError, deploycommon.Stopped, deploycommon.Deleted:
+		return v1alpha1.WorkflowFailed
+	case deploycommon.Pending, deploycommon.BuildInQueue, deploycommon.Building, deploycommon.Deploying,
+		deploycommon.BuildSuccess, deploycommon.BuildSkip, deploycommon.Sleeping:
+		return v1alpha1.WorkflowPending
+	default:
+		return v1alpha1.WorkflowPending
+	}
 }
 
 func (c *finetuneComponentImpl) CheckUserPermission(ctx context.Context, req types.FinetuneLogReq) (bool, error) {
