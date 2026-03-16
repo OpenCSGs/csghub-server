@@ -967,6 +967,35 @@ func TestDeployer_DeleteFinetune(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestDeployer_DeleteEvaluation(t *testing.T) {
+	tester := newTestDeployer(t)
+	ctx := context.TODO()
+
+	tester.mocks.runner.EXPECT().DeleteWorkFlow(ctx, types.ArgoWorkFlowDeleteReq{
+		ID: 1,
+	}).Return(nil, nil)
+
+	err := tester.DeleteEvaluation(ctx, types.ArgoWorkFlowDeleteReq{
+		ID: 1,
+	})
+	require.NoError(t, err)
+}
+
+func TestDeployer_DeleteEvaluation_Error(t *testing.T) {
+	tester := newTestDeployer(t)
+	ctx := context.TODO()
+
+	tester.mocks.runner.EXPECT().DeleteWorkFlow(ctx, types.ArgoWorkFlowDeleteReq{
+		ID: 1,
+	}).Return(nil, errors.New("delete workflow failed"))
+
+	err := tester.DeleteEvaluation(ctx, types.ArgoWorkFlowDeleteReq{
+		ID: 1,
+	})
+	require.Error(t, err)
+	require.Equal(t, "delete workflow failed", err.Error())
+}
+
 func TestDeployer_GetWorkflowLogsInStream(t *testing.T) {
 	now := time.Now()
 	req := types.FinetuneLogReq{
