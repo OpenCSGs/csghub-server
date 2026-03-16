@@ -1,0 +1,13 @@
+groups:
+- name: cluster_alerts
+  rules:
+  - alert: ClusterHeartbeatMissing
+    # 假设心跳周期为 60s，如果超过 3 个周期 (3 * 60s = 180s) 没有收到心跳，则告警
+    # 使用 time() - last_heartbeat_timestamp > 180s
+    expr: time() - csghub_cluster_heartbeat_last_timestamp_seconds > 180
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Cluster {{ $labels.cluster_id }} heartbeat missing"
+      description: "Cluster {{ $labels.cluster_id }} (region: {{ $labels.region }}) has not sent a heartbeat for more than 3 minutes."

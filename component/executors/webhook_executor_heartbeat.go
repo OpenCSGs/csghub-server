@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"opencsg.com/csghub-server/builder/prometheus"
 
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
@@ -55,6 +56,10 @@ func (h *heartbeatExecutorImpl) UpdateClusterStatus(ctx context.Context, eventDa
 	err := h.clusterStore.BatchUpdateStatus(ctx, eventData)
 	if err != nil {
 		return fmt.Errorf("failed to batch update cluster in heartbeat event error: %w", err)
+	}
+
+	for _, cluster := range eventData {
+		prometheus.ClusterHeartbeatLastTimestamp.WithLabelValues(cluster.ClusterID, cluster.Region).SetToCurrentTime()
 	}
 	return nil
 }

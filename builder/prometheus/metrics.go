@@ -10,6 +10,8 @@ var (
 
 	WebhookRequestsTotal   prometheus.Counter
 	WebhookRequestDuration *prometheus.HistogramVec
+
+	ClusterHeartbeatLastTimestamp *prometheus.GaugeVec
 )
 
 func InitMetrics() {
@@ -28,4 +30,9 @@ func InitMetrics() {
 		Help:    "Duration of webhook requests in seconds",
 		Buckets: prometheus.DefBuckets,
 	}, []string{"method", "endpoint", "status"})
+
+	ClusterHeartbeatLastTimestamp = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "csghub_cluster_heartbeat_last_timestamp_seconds",
+		Help: "Timestamp of the last cluster heartbeat received",
+	}, []string{"cluster_id", "region"})
 }
