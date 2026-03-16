@@ -4,18 +4,22 @@ const (
 	NotifySubChangeSubject  string = "accounting.notify.subscription"
 	NotifyStopDeploySubject string = "accounting.notify.stopdeploy"
 
-	FeeRequestSubject       string = "accounting.fee.>"
-	FeeSendSubject          string = "accounting.fee.credit"
-	TokenSendSubject        string = "accounting.fee.token"
-	QuotaSendSubject        string = "accounting.fee.quota"
-	SubscriptionSendSubject string = "accounting.fee.subscription"
+	// Receive fee message subject
+	// FeeRequestSubject string = "accounting.fee.>"
+	// Send fee message subject
+	FeeSendSubject   string = "accounting.fee.credit"
+	TokenSendSubject string = "accounting.fee.token"
+	QuotaSendSubject string = "accounting.fee.quota"
+	// SubscriptionSendSubject string = "accounting.fee.subscription"
 
-	MeterRequestSubject      string = "accounting.metering.>"
+	// Receive metering data subject
+	// MeterRequestSubject string = "accounting.metering.>"
+	// Send metering data subject
 	MeterDurationSendSubject string = "accounting.metering.duration"
 	MeterTokenSendSubject    string = "accounting.metering.token"
 	MeterQuotaSendSubject    string = "accounting.metering.quota"
 
-	OrderExpiredSubject    string = "accounting.order.expired"
+	// OrderExpiredSubject    string = "accounting.order.expired"
 	RechargeSucceedSubject string = "accounting.recharge.succeed"
 
 	DLQFeeSubject      string = "accounting.dlq.fee"
