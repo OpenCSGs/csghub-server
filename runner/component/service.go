@@ -1090,7 +1090,7 @@ func (s *serviceComponentImpl) runServiceSingleHost(ctx context.Context, req typ
 			MountPath: "/dev/shm",
 		})
 	}
-	pvcName := strings.ToLower(req.UserID)
+	pvcName := nodeutils.SafeName(req.UserID)
 	// add pvc if possible
 	// space image was built from user's code, model cache dir is hard to control
 	// so no PV cache for space case so far
