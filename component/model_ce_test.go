@@ -4,6 +4,7 @@ package component
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
@@ -28,6 +29,7 @@ func TestModelComponent_Deploy(t *testing.T) {
 	)
 	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
 		RoleMask: "admin",
+		UUID:     "user-uuid",
 	}, nil)
 	mc.mocks.stores.RuntimeFrameworkMock().EXPECT().FindEnabledByID(ctx, int64(11)).Return(
 		&database.RuntimeFramework{}, nil,
@@ -40,19 +42,14 @@ func TestModelComponent_Deploy(t *testing.T) {
 		}, nil,
 	)
 
+	// When OwnerNamespace is not set, ownerNamespace is CurrentUser and GetNamespaceBillingUUID is not called
 	mc.mocks.components.repo.EXPECT().CheckAccountAndResource(ctx, "user", "cluster", int64(0), mock.Anything).Return(nil)
 
-	mc.mocks.deployer.EXPECT().Deploy(ctx, types.DeployRepo{
-		DeployName: "dp",
-		Path:       "foo",
-		Hardware:   "{\"memory\": \"foo\"}",
-		Annotation: "{\"hub-deploy-user\":\"\",\"hub-res-name\":\"ns/n\",\"hub-res-type\":\"model\"}",
-		ClusterID:  "cluster",
-		RepoID:     1,
-		SKU:        "123",
-		Type:       types.ServerlessType,
-		Task:       "text-generation",
-	}).Return(111, nil)
+	mc.mocks.deployer.EXPECT().Deploy(ctx, mock.MatchedBy(func(dp types.DeployRepo) bool {
+		return dp.DeployName == "dp" && dp.Path == "foo" && dp.ClusterID == "cluster" &&
+			dp.RepoID == 1 && dp.SKU == "123" && dp.Type == types.ServerlessType &&
+			dp.Task == "text-generation" && dp.UserUUID == "user-uuid" && dp.OwnerNamespace == "user"
+	})).Return(111, nil)
 
 	id, err := mc.Deploy(ctx, types.DeployActReq{
 		Namespace:   "ns",
@@ -67,5 +64,40 @@ func TestModelComponent_Deploy(t *testing.T) {
 	})
 	require.Nil(t, err)
 	require.Equal(t, int64(111), id)
+}
 
+func TestModelComponent_Deploy_OwnerNamespace_BillingUUIDError(t *testing.T) {
+	ctx := context.TODO()
+	mc := initializeTestModelComponent(ctx, t)
+
+	mc.mocks.stores.ModelMock().EXPECT().FindByPath(ctx, "ns", "n").Return(&database.Model{
+		RepositoryID: int64(123),
+		Repository: &database.Repository{
+			ID:   1,
+			Path: "foo",
+		},
+	}, nil)
+	mc.mocks.stores.DeployTaskMock().EXPECT().GetServerlessDeployByRepID(ctx, int64(1)).Return(nil, nil)
+	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
+		RoleMask: "admin",
+	}, nil)
+	mc.mocks.stores.RuntimeFrameworkMock().EXPECT().FindEnabledByID(ctx, int64(11)).Return(&database.RuntimeFramework{}, nil)
+	// Explicit OwnerNamespace: resolve billing UUID for "org1" fails (Deploy returns before FindByID)
+	mc.mocks.components.repo.EXPECT().GetNamespaceBillingUUID(ctx, "org1").Return("", errors.New("resolve billing error"))
+
+	id, err := mc.Deploy(ctx, types.DeployActReq{
+		Namespace:   "ns",
+		Name:        "n",
+		CurrentUser: "user",
+		DeployType:  types.ServerlessType,
+	}, types.ModelRunReq{
+		RuntimeFrameworkID: 11,
+		ResourceID:         123,
+		ClusterID:          "cluster",
+		DeployName:         "dp",
+		OwnerNamespace:    "org1",
+	})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "failed to resolve billing UUID for namespace")
+	require.Equal(t, int64(-1), id)
 }
