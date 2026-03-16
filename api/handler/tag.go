@@ -36,7 +36,7 @@ type TagsHandler struct {
 // @Accept       json
 // @Produce      json
 // @Param		 category query string false "category name"
-// @Param		 scope query string false "scope name" Enums(model, dataset, code, space, prompt)
+// @Param		 scope query string false "scope name" Enums(model, dataset, code, space, prompt, skill)
 // @Param		 built_in query bool false "built_in"
 // @Param		 search query string false "search on name and show_name fields"
 // @Success      200  {object}  types.Response{data=[]types.RepoTag} "tags"
