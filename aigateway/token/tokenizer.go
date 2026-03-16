@@ -16,7 +16,8 @@ type Tokenizer interface {
 	EmbeddingEncode(string) (int64, error)
 }
 
-func NewTokenizerImpl(endpoint, host, model, imageID string) Tokenizer {
+func NewTokenizerImpl(endpoint, host, model, imageID, provider string) Tokenizer {
+	// Internal models: use imageID to determine the inference engine
 	switch {
 	case strings.Contains(imageID, "vllm-local"):
 		return newVllmTokenizerImpl(endpoint, host, model)
@@ -28,9 +29,21 @@ func NewTokenizerImpl(endpoint, host, model, imageID string) Tokenizer {
 		return newSGLangTokenizerImpl(endpoint, host, model)
 	case strings.Contains(imageID, "tei"):
 		return newTEITokenizerImpl(endpoint, host, model)
-	default:
-		return nil
 	}
+
+	// External models: when stream is interrupted (sensitive content), use provider-specific tokenizer to count tokens:
+	// 1. Usage chunk never arrives
+	// 2. Accumulate content from all chunks
+	// 3. Use provider-specific tokenizer to count
+	if provider != "" {
+		switch {
+		case strings.Contains(model, "gpt"), strings.Contains(model, "deepseek"): // PBE based tokenizer
+			return newTiktokenTokenizerImpl()
+		}
+		// TODO: add gemini tokenizer later, SentencePiece based tokenizer is not supported yet
+	}
+
+	return nil
 }
 
 var _ Tokenizer = (*DumyTokenizer)(nil)

@@ -667,7 +667,7 @@ func TestOpenAIHandler_Embedding(t *testing.T) {
 		}
 		var wg sync.WaitGroup
 		wg.Add(1)
-		tokenizer := token.NewTokenizerImpl(model.Endpoint, "", "model1", model.ImageID)
+		tokenizer := token.NewTokenizerImpl(model.Endpoint, "", "model1", model.ImageID, model.Provider)
 		tokenCounter := token.NewEmbeddingTokenCounter(tokenizer)
 		tester.mocks.tokenCounterFactory.EXPECT().NewEmbedding(
 			token.CreateParam{
@@ -675,6 +675,7 @@ func TestOpenAIHandler_Embedding(t *testing.T) {
 				Host:     "",
 				Model:    model.ID,
 				ImageID:  model.ImageID,
+				Provider: model.Provider,
 			}).
 			Return(tokenCounter).Once()
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1").
