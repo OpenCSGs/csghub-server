@@ -23,7 +23,7 @@ func TestResponseWriterWrapper_NewResponseWriterWrapper(t *testing.T) {
 	ctx, _ := gin.CreateTestContext(w)
 
 	rw := newStreamResponseWriter(ctx.Writer, component.NewMockModeration(t), mocktoken.NewMockChatTokenCounter(t))
-	require.NotNil(t, rw)
+	require.NotNil(t, rw, "NewResponseWriterWrapper should not return nil")
 	if rw.internalWritter != ctx.Writer {
 		t.Error("internalWritter should be set correctly")
 	}

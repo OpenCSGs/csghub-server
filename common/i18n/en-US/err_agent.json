@@ -1,5 +1,32 @@
 {
     "error.AGENT-ERR-0": {
         "other": "Instance quota exceeded, agent type: {{.agent_type}}, instance count: {{.instance_count}}, quota: {{.quota}}"
+    },
+    "error.AGENT-ERR-1": {
+        "other": "You have a instance with the same name: {{.instance_name}}"
+    },
+    "error.AGENT-ERR-2": {
+        "other": "You have a knowledge base with the same name: {{.knowledge_base_name}}"
+    },
+    "error.AGENT-ERR-3": {
+        "other": "You have an MCP server with the same name: {{.server_name}}"
+    },
+    "error.AGENT-ERR-4": {
+        "other": "Pin limit exceeded. Maximum 5 items can be pinned per entity type."
+    },
+    "error.AGENT-ERR-5": {
+        "other": "Invalid share session uuid"
+    },
+    "error.AGENT-ERR-6": {
+        "other": "Share session UUID expired"
+    },
+    "error.AGENT-ERR-7": {
+        "other": "You have created {{.scheduler_count}} scheduled tasks, which has reached the limit. Please delete unused scheduled tasks to free up slots before creating new ones."
+    },
+    "error.AGENT-ERR-8": {
+        "other": "Agent instance does not support scheduling"
+    },
+    "error.AGENT-ERR-9": {
+        "other": "Scheduler start time {{.start_time}} is in the past; use a future date/time for one-time schedules"
     }
 }
