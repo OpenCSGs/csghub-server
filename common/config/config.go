@@ -399,8 +399,10 @@ type Config struct {
 	}
 
 	AIGateway struct {
-		Port                           int  `env:"OPENCSG_AIGATEWAY_PORT" default:"8094"`
-		ModerationBypassSensitiveCheck bool `env:"OPENCSG_AIGATEWAY_MODERATION_BYPASS_SENSITIVE_CHECK" default:"false"`
+		Port                           int    `env:"OPENCSG_AIGATEWAY_PORT" default:"8094"`
+		ModerationBypassSensitiveCheck bool   `env:"OPENCSG_AIGATEWAY_MODERATION_BYPASS_SENSITIVE_CHECK" default:"false"`
+		SensitiveDefaultImg            string `env:"STARHUB_SERVER_AIGATEWAY_SENSITIVE_DEFAULT_IMG" default:""`
+		PresignExpirySeconds           int    `env:"OPENCSG_AIGATEWAY_PRESIGN_EXPIRY" default:"86400"`
 	}
 
 	Integration struct {

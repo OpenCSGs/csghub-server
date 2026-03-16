@@ -19,6 +19,7 @@ import (
 	mockcomp "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/aigateway/component"
 	mocktoken "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/aigateway/token"
 	apicomp "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
+	"opencsg.com/csghub-server/aigateway/component/adapter/text2image"
 	"opencsg.com/csghub-server/aigateway/token"
 	"opencsg.com/csghub-server/aigateway/types"
 	"opencsg.com/csghub-server/api/httpbase"
@@ -48,7 +49,7 @@ func setupTest(t *testing.T) (*testerOpenAIHandler, *gin.Context, *httptest.Resp
 	mockClsComp := apicomp.NewMockClusterComponent(t)
 	mockTokenCounterFactory := mocktoken.NewMockCounterFactory(t)
 	cfg := &config.Config{}
-	handler := newOpenAIHandler(mockOpenAI, mockRepo, mockModeration, mockClsComp, mockTokenCounterFactory, cfg)
+	handler := newOpenAIHandler(mockOpenAI, mockRepo, mockModeration, mockClsComp, mockTokenCounterFactory, text2image.NewRegistry(), cfg, nil)
 
 	// Set test user
 	tester := &testerOpenAIHandler{
@@ -688,5 +689,172 @@ func TestOpenAIHandler_Embedding(t *testing.T) {
 
 		tester.handler.Embedding(c)
 		wg.Wait()
+	})
+}
+
+func TestOpenAIHandler_GenerateImage(t *testing.T) {
+	t.Run("invalid request body", func(t *testing.T) {
+		tester, c, w := setupTest(t)
+		c.Request.Method = http.MethodPost
+		c.Request.Body = http.NoBody
+
+		tester.handler.GenerateImage(c)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+	})
+
+	t.Run("missing required fields", func(t *testing.T) {
+		tester, c, w := setupTest(t)
+		// Test missing prompt
+		imageReq := ImageGenerationRequest{
+			ImageGenerateParams: openai.ImageGenerateParams{
+				Model: "test-model:svc",
+			},
+		}
+		body, _ := json.Marshal(imageReq)
+		c.Request.Method = http.MethodPost
+		c.Request.Body = io.NopCloser(bytes.NewReader(body))
+
+		tester.handler.GenerateImage(c)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+
+		// Test missing model
+		tester2, c2, w2 := setupTest(t)
+		imageReq2 := ImageGenerationRequest{
+			ImageGenerateParams: openai.ImageGenerateParams{
+				Prompt: "test prompt",
+			},
+		}
+		body2, _ := json.Marshal(imageReq2)
+		c2.Request.Method = http.MethodPost
+		c2.Request.Body = io.NopCloser(bytes.NewReader(body2))
+
+		tester2.handler.GenerateImage(c2)
+
+		assert.Equal(t, http.StatusBadRequest, w2.Code)
+	})
+
+	t.Run("model not found", func(t *testing.T) {
+		tester, c, w := setupTest(t)
+		imageReq := ImageGenerationRequest{
+			ImageGenerateParams: openai.ImageGenerateParams{
+				Model:  "nonexistent:svc",
+				Prompt: "test prompt",
+			},
+		}
+		body, _ := json.Marshal(imageReq)
+		c.Request.Method = http.MethodPost
+		c.Request.Body = io.NopCloser(bytes.NewReader(body))
+
+		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "nonexistent:svc").Return(nil, nil)
+
+		tester.handler.GenerateImage(c)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+	})
+
+	t.Run("get model error", func(t *testing.T) {
+		tester, c, w := setupTest(t)
+		imageReq := ImageGenerationRequest{
+			ImageGenerateParams: openai.ImageGenerateParams{
+				Model:  "test-model:svc",
+				Prompt: "test prompt",
+			},
+		}
+		body, _ := json.Marshal(imageReq)
+		c.Request.Method = http.MethodPost
+		c.Request.Body = io.NopCloser(bytes.NewReader(body))
+
+		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "test-model:svc").Return(nil, errors.New("internal error"))
+
+		tester.handler.GenerateImage(c)
+
+		assert.Equal(t, http.StatusInternalServerError, w.Code)
+	})
+
+	t.Run("model not running", func(t *testing.T) {
+		tester, c, w := setupTest(t)
+		imageReq := ImageGenerationRequest{
+			ImageGenerateParams: openai.ImageGenerateParams{
+				Model:  "test-model:svc",
+				Prompt: "test prompt",
+			},
+		}
+		body, _ := json.Marshal(imageReq)
+		c.Request.Method = http.MethodPost
+		c.Request.Body = io.NopCloser(bytes.NewReader(body))
+
+		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "test-model:svc").Return(nil, nil)
+
+		tester.handler.GenerateImage(c)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+	})
+
+	t.Run("sensitive content detected", func(t *testing.T) {
+		tester, c, w := setupTest(t)
+		imageReq := ImageGenerationRequest{
+			ImageGenerateParams: openai.ImageGenerateParams{
+				Model:  "test-model",
+				Prompt: "sensitive prompt",
+			},
+		}
+		body, _ := json.Marshal(imageReq)
+		c.Request.Method = http.MethodPost
+		c.Request.Body = io.NopCloser(bytes.NewReader(body))
+
+		model := &types.Model{
+			BaseModel: types.BaseModel{
+				ID:      "test-model",
+				Object:  "model",
+				OwnedBy: "testuser",
+				Task:    "text-to-image",
+			},
+			InternalModelInfo: types.InternalModelInfo{
+				SvcName: "",
+			},
+			Endpoint: "https://api.example.com/images/generations",
+		}
+		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "test-model").Return(model, nil)
+		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuser", model, mock.Anything).Return(nil)
+		tester.mocks.moderationComp.EXPECT().CheckImagePrompts(mock.Anything, "sensitive prompt", "testuuid").Return(&rpc.CheckResult{IsSensitive: true}, nil)
+
+		tester.handler.GenerateImage(c)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+	})
+
+	t.Run("sensitive content check failed", func(t *testing.T) {
+		tester, c, w := setupTest(t)
+		imageReq := ImageGenerationRequest{
+			ImageGenerateParams: openai.ImageGenerateParams{
+				Model:  "test-model",
+				Prompt: "test prompt",
+			},
+		}
+		body, _ := json.Marshal(imageReq)
+		c.Request.Method = http.MethodPost
+		c.Request.Body = io.NopCloser(bytes.NewReader(body))
+
+		model := &types.Model{
+			BaseModel: types.BaseModel{
+				ID:      "test-model",
+				Object:  "model",
+				OwnedBy: "testuser",
+				Task:    "text-to-image",
+			},
+			InternalModelInfo: types.InternalModelInfo{
+				SvcName: "",
+			},
+			Endpoint: "https://api.example.com/images/generations",
+		}
+		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "test-model").Return(model, nil)
+		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuser", model, mock.Anything).Return(nil)
+		tester.mocks.moderationComp.EXPECT().CheckImagePrompts(mock.Anything, "test prompt", "testuuid").Return(nil, errors.New("moderation service error"))
+
+		tester.handler.GenerateImage(c)
+
+		assert.Equal(t, http.StatusInternalServerError, w.Code)
 	})
 }

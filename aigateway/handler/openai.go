@@ -16,6 +16,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/openai/openai-go/v3"
 	"opencsg.com/csghub-server/aigateway/component"
+	"opencsg.com/csghub-server/aigateway/component/adapter/text2image"
+	"opencsg.com/csghub-server/aigateway/http/response/wrapper"
 	"opencsg.com/csghub-server/aigateway/token"
 	"opencsg.com/csghub-server/aigateway/types"
 	"opencsg.com/csghub-server/api/httpbase"
@@ -37,6 +39,8 @@ type OpenAIHandler interface {
 	// Chat with backend model
 	Chat(c *gin.Context)
 	Embedding(c *gin.Context)
+	// Generate image from text
+	GenerateImage(c *gin.Context)
 }
 
 func NewOpenAIHandlerFromConfig(config *config.Config) (OpenAIHandler, error) {
@@ -66,7 +70,8 @@ func NewOpenAIHandlerFromConfig(config *config.Config) (OpenAIHandler, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cluster component, error: %w", err)
 	}
-	return newOpenAIHandler(modelService, repoComp, modComponent, clusterComp, token.NewCounterFactory(), config), nil
+	storage, _ := component.NewStorage(config)
+	return newOpenAIHandler(modelService, repoComp, modComponent, clusterComp, token.NewCounterFactory(), text2image.NewRegistry(), config, storage), nil
 }
 
 func newOpenAIHandler(
@@ -75,7 +80,9 @@ func newOpenAIHandler(
 	modComponent component.Moderation,
 	clusterComp apicomp.ClusterComponent,
 	tokenCounterFactory token.CounterFactory,
+	t2iRegistry *text2image.Registry,
 	config *config.Config,
+	storage types.Storage,
 ) *OpenAIHandlerImpl {
 	return &OpenAIHandlerImpl{
 		openaiComponent:     modelService,
@@ -83,7 +90,9 @@ func newOpenAIHandler(
 		modComponent:        modComponent,
 		clusterComp:         clusterComp,
 		tokenCounterFactory: tokenCounterFactory,
+		t2iRegistry:         t2iRegistry,
 		config:              config,
+		storage:             storage,
 	}
 }
 
@@ -123,7 +132,9 @@ type OpenAIHandlerImpl struct {
 	modComponent        component.Moderation
 	clusterComp         apicomp.ClusterComponent
 	tokenCounterFactory token.CounterFactory
+	t2iRegistry         *text2image.Registry
 	config              *config.Config
+	storage             types.Storage
 }
 
 // ListModels godoc
@@ -345,7 +356,179 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 	if model.Endpoint != "" {
 		uri, err := url.ParseRequestURI(model.Endpoint)
 		if err != nil {
-			slog.Warn("endpoint has wrong struct ", slog.String("model", modelName))
+			slog.Warn("endpoint has wrong struct", slog.String("model", modelName))
+		} else {
+			proxyToApi = uri.Path
+		}
+	}
+
+	if model.AuthHead != "" {
+		var authMap map[string]string
+		if err := json.Unmarshal([]byte(model.AuthHead), &authMap); err != nil {
+			slog.WarnContext(c.Request.Context(), "invalid auth head", slog.String("model", modelName))
+		} else {
+			for authKey, authVal := range authMap {
+				c.Request.Header.Set(authKey, authVal)
+			}
+		}
+	}
+
+	rp.ServeHTTP(w, c.Request, proxyToApi, host)
+
+	go func() {
+		usageCtx, cancel := context.WithTimeout(context.WithoutCancel(c.Request.Context()), 3*time.Second)
+		defer cancel()
+
+		err := h.openaiComponent.RecordUsage(usageCtx, userUUID, model, tokenCounter, sceneValue)
+		if err != nil {
+			slog.ErrorContext(usageCtx, "failed to record token usage", slog.Any("error", err))
+		}
+	}()
+}
+
+// GenerateImage godoc
+// @Security     ApiKey
+// @Summary      Generate image from text prompt
+// @Description  Generates images based on a text prompt
+// @Tags         AIGateway
+// @Accept       json
+// @Produce      json
+// @Param        request body  ImageGenerationRequest true "Image generation request"
+// @Success      200  {object}  types.ImageGenerationResponse "OK"
+// @Failure      400  {object}  error "Bad request or sensitive input"
+// @Failure      404  {object}  error "Model not found"
+// @Failure      500  {object}  error "Internal server error"
+// @Router       /v1/images/generations [post]
+func (h *OpenAIHandlerImpl) GenerateImage(c *gin.Context) {
+	username := httpbase.GetCurrentUser(c)
+	userUUID := httpbase.GetCurrentUserUUID(c)
+	ctx := c.Request.Context()
+
+	var req ImageGenerationRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
+			Code: "invalid_request_error", Message: err.Error(), Type: "invalid_request_error",
+		}})
+		return
+	}
+	if req.Prompt == "" || req.Model == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
+			Code: "invalid_request_error", Message: "Model and prompt cannot be empty", Type: "invalid_request_error",
+		}})
+		return
+	}
+
+	modelID := req.Model
+	model, err := h.openaiComponent.GetModelByID(ctx, username, modelID)
+	if err != nil {
+		slog.ErrorContext(ctx, "failed to get model by id", slog.String("model_id", modelID), slog.Any("error", err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": types.Error{
+			Code: "internal_error", Message: err.Error(), Type: "internal_error",
+		}})
+		return
+	}
+	if model == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
+			Code: "model_not_found", Message: fmt.Sprintf("model '%s' not found", modelID), Type: "invalid_request_error",
+		}})
+		return
+	}
+
+	targetReq := commonType.EndpointReq{
+		ClusterID: model.ClusterID,
+		Target:    model.Endpoint,
+		Host:      "",
+		Endpoint:  model.Endpoint,
+		SvcName:   model.SvcName,
+	}
+	target := ""
+	host := ""
+	if len(model.SvcName) > 0 {
+		target, host, err = apicomp.ExtractDeployTargetAndHost(ctx, h.clusterComp, targetReq)
+	} else {
+		target = model.Endpoint
+	}
+	if err != nil || len(target) < 1 {
+		slog.ErrorContext(ctx, "failed to get model target address", slog.Any("error", err), slog.String("model_id", modelID))
+		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
+			Code: "model_not_running", Message: fmt.Sprintf("model '%s' not running", modelID), Type: "invalid_request_error",
+		}})
+		return
+	}
+
+	modelName, _, err := (component.ModelIDBuilder{}).From(modelID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
+			Code: "invalid_model_id", Message: "invalid model ID: " + err.Error(), Type: "invalid_request_error",
+		}})
+		return
+	}
+
+	adapter := h.t2iRegistry.GetAdapter(model)
+	if adapter == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
+			Code: "unsupported_model", Message: fmt.Sprintf("no adapter for model '%s'", modelID), Type: "invalid_request_error",
+		}})
+		return
+	}
+
+	sceneValue := c.Request.Header.Get(commonType.SceneHeaderKey)
+	if err := h.openaiComponent.CheckBalance(ctx, username, model, sceneValue); err != nil {
+		h.handleInsufficientBalance(c, false, username, modelID, err)
+		return
+	}
+
+	typesReq := types.ImageGenerationRequest{
+		ImageGenerateParams: req.ImageGenerateParams,
+		RawJSON:             req.RawJSON,
+	}
+	typesReq.Model = modelName
+	bodyBytes, err := adapter.TransformRequest(ctx, typesReq)
+	if err != nil {
+		slog.ErrorContext(ctx, "failed to transform image request", slog.Any("error", err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": types.Error{
+			Code: "internal_error", Message: err.Error(), Type: "internal_error",
+		}})
+		return
+	}
+
+	result, err := h.modComponent.CheckImagePrompts(ctx, req.Prompt, userUUID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": types.Error{
+			Code: "moderation_error", Message: "failed to check image prompts: " + err.Error(), Type: "internal_error",
+		}})
+		return
+	}
+	if result != nil && result.IsSensitive {
+		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
+			Code: "content_policy_violation", Message: "Input data may contain inappropriate content.", Type: "invalid_request_error",
+		}})
+		return
+	}
+
+	c.Request.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+	c.Request.ContentLength = int64(len(bodyBytes))
+	for k, v := range adapter.GetHeaders(model, &typesReq) {
+		c.Request.Header.Set(k, v)
+	}
+
+	rp, _ := proxy.NewReverseProxy(target)
+	slog.InfoContext(ctx, "proxy image generation request to model target", slog.Any("target", target), slog.Any("host", host),
+		slog.Any("user", username), slog.Any("model_name", modelName))
+
+	imageCounter := token.NewImageUsageCounter()
+	responseFormat := string(req.ResponseFormat)
+	if responseFormat == "" {
+		responseFormat = "url"
+	}
+	imageWrapper := wrapper.NewImageGeneration(c.Writer, adapter, h.modComponent, h.config.AIGateway.SensitiveDefaultImg, imageCounter, responseFormat, h.storage, h.config.S3.Bucket)
+	var w http.ResponseWriter = imageWrapper
+
+	proxyToApi := ""
+	if model.Endpoint != "" {
+		uri, err := url.ParseRequestURI(model.Endpoint)
+		if err != nil {
+			slog.WarnContext(ctx, "endpoint has wrong struct", slog.String("model", modelName))
 		} else {
 			proxyToApi = uri.Path
 		}
@@ -364,13 +547,14 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 
 	rp.ServeHTTP(w, c.Request, proxyToApi, host)
 
+	if err := imageWrapper.Finalize(); err != nil {
+		slog.ErrorContext(ctx, "failed to finalize image response", slog.Any("error", err))
+	}
 	go func() {
 		usageCtx, cancel := context.WithTimeout(context.WithoutCancel(c.Request.Context()), 3*time.Second)
 		defer cancel()
-
-		err := h.openaiComponent.RecordUsage(usageCtx, userUUID, model, tokenCounter, sceneValue)
-		if err != nil {
-			slog.Error("failed to record token usage", "error", err)
+		if err := h.openaiComponent.RecordUsage(usageCtx, userUUID, model, imageCounter, sceneValue); err != nil {
+			slog.ErrorContext(usageCtx, "failed to record image usage", slog.Any("error", err))
 		}
 	}()
 }

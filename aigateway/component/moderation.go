@@ -33,6 +33,8 @@ type Moderation interface {
 	CheckChatPrompts(ctx context.Context, messages []openai.ChatCompletionMessageParamUnion, uuid string) (*rpc.CheckResult, error)
 	CheckChatStreamResponse(ctx context.Context, chunk types.ChatCompletionChunk, uuid string) (*rpc.CheckResult, error)
 	CheckChatNonStreamResponse(ctx context.Context, completion types.ChatCompletion) (*rpc.CheckResult, error)
+	CheckImagePrompts(ctx context.Context, prompt string, uuid string) (*rpc.CheckResult, error)
+	CheckImage(ctx context.Context, completion types.ImageGenerationResponse) (*rpc.CheckResult, error)
 }
 
 type moderationImpl struct {
@@ -390,4 +392,31 @@ func (modImpl *moderationImpl) postCheck(ctx context.Context, result *rpc.CheckR
 			result.Reason = ""
 		}
 	}
+}
+
+func (modImpl *moderationImpl) CheckImagePrompts(ctx context.Context, prompt string, uuid string) (*rpc.CheckResult, error) {
+	if modImpl.modSvcClient == nil {
+		return &rpc.CheckResult{IsSensitive: false}, nil
+	}
+	return modImpl.checkLLMPrompt(ctx, prompt, uuid)
+}
+
+func (modImpl *moderationImpl) CheckImage(ctx context.Context, completion types.ImageGenerationResponse) (*rpc.CheckResult, error) {
+	if modImpl.modSvcClient == nil {
+		return &rpc.CheckResult{IsSensitive: false}, nil
+	}
+	if len(completion.Data) == 0 {
+		return &rpc.CheckResult{IsSensitive: false}, nil
+	}
+	for _, item := range completion.Data {
+		if item.URL == "" && item.B64JSON == "" {
+			continue
+		}
+		if item.URL != "" {
+			slog.Debug("check image url", slog.String("url", item.URL))
+		} else if item.B64JSON != "" {
+			slog.Debug("check image b64json", slog.String("b64json", item.B64JSON))
+		}
+	}
+	return &rpc.CheckResult{IsSensitive: false}, nil
 }

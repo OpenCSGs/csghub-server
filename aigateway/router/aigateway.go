@@ -36,6 +36,7 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 	v1Group.GET("/models/:model", middlewareCollection.Auth.NeedLogin, openAIhandler.GetModel)
 	v1Group.POST("/chat/completions", middlewareCollection.Auth.NeedLogin, openAIhandler.Chat)
 	v1Group.POST("/embeddings", middlewareCollection.Auth.NeedLogin, openAIhandler.Embedding)
+	v1Group.POST("/images/generations", middlewareCollection.Auth.NeedLogin, openAIhandler.GenerateImage)
 
 	mcpProxy, err := handler.NewMCPProxyHandler(config)
 	if err != nil {

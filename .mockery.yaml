@@ -245,6 +245,9 @@ packages:
   opencsg.com/csghub-server/aigateway/token:
     config:
       all: true
+  opencsg.com/csghub-server/aigateway/component/adapter/text2image:
+    config:
+      all: true
   opencsg.com/csghub-server/notification/component:
     config:
     interfaces:
