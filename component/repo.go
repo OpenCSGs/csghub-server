@@ -504,12 +504,12 @@ func (c *repoComponentImpl) cleanLfsStorage(ctx context.Context, repoID int64, m
 		for _, meta := range lfsMetas {
 			if !migrated {
 				// For non-migrated (shared) storage, check if other repos use this OID
-				count, err := c.lfsMetaObjectStore.CountByOidExclRepo(ctx, meta.Oid, repoID)
+				exists, err := c.lfsMetaObjectStore.ExistsByOidExclRepo(ctx, meta.Oid, repoID)
 				if err != nil {
 					slog.Error("Failed to check OID references", slog.String("oid", meta.Oid), slog.Any("error", err))
 					continue
 				}
-				if count > 0 {
+				if exists {
 					slog.Debug("Skipping shared LFS file", slog.String("oid", meta.Oid), slog.Int64("repo_id", repoID))
 					continue
 				}

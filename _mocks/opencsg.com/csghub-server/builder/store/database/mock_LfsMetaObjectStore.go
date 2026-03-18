@@ -128,23 +128,23 @@ func (_c *MockLfsMetaObjectStore_CheckIfAllMigratedToXnet_Call) RunAndReturn(run
 	return _c
 }
 
-// CountByOidExclRepo provides a mock function with given fields: ctx, oid, repoID
-func (_m *MockLfsMetaObjectStore) CountByOidExclRepo(ctx context.Context, oid string, repoID int64) (int, error) {
+// ExistsByOidExclRepo provides a mock function with given fields: ctx, oid, repoID
+func (_m *MockLfsMetaObjectStore) ExistsByOidExclRepo(ctx context.Context, oid string, repoID int64) (bool, error) {
 	ret := _m.Called(ctx, oid, repoID)
 
 	if len(ret) == 0 {
-		panic("no return value specified for CountByOidExclRepo")
+		panic("no return value specified for ExistsByOidExclRepo")
 	}
 
-	var r0 int
+	var r0 bool
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, int64) (int, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, int64) (bool, error)); ok {
 		return rf(ctx, oid, repoID)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, int64) int); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, int64) bool); ok {
 		r0 = rf(ctx, oid, repoID)
 	} else {
-		r0 = ret.Get(0).(int)
+		r0 = ret.Get(0).(bool)
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, string, int64) error); ok {
@@ -156,32 +156,32 @@ func (_m *MockLfsMetaObjectStore) CountByOidExclRepo(ctx context.Context, oid st
 	return r0, r1
 }
 
-// MockLfsMetaObjectStore_CountByOidExclRepo_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CountByOidExclRepo'
-type MockLfsMetaObjectStore_CountByOidExclRepo_Call struct {
+// MockLfsMetaObjectStore_ExistsByOidExclRepo_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ExistsByOidExclRepo'
+type MockLfsMetaObjectStore_ExistsByOidExclRepo_Call struct {
 	*mock.Call
 }
 
-// CountByOidExclRepo is a helper method to define mock.On call
+// ExistsByOidExclRepo is a helper method to define mock.On call
 //   - ctx context.Context
 //   - oid string
 //   - repoID int64
-func (_e *MockLfsMetaObjectStore_Expecter) CountByOidExclRepo(ctx interface{}, oid interface{}, repoID interface{}) *MockLfsMetaObjectStore_CountByOidExclRepo_Call {
-	return &MockLfsMetaObjectStore_CountByOidExclRepo_Call{Call: _e.mock.On("CountByOidExclRepo", ctx, oid, repoID)}
+func (_e *MockLfsMetaObjectStore_Expecter) ExistsByOidExclRepo(ctx interface{}, oid interface{}, repoID interface{}) *MockLfsMetaObjectStore_ExistsByOidExclRepo_Call {
+	return &MockLfsMetaObjectStore_ExistsByOidExclRepo_Call{Call: _e.mock.On("ExistsByOidExclRepo", ctx, oid, repoID)}
 }
 
-func (_c *MockLfsMetaObjectStore_CountByOidExclRepo_Call) Run(run func(ctx context.Context, oid string, repoID int64)) *MockLfsMetaObjectStore_CountByOidExclRepo_Call {
+func (_c *MockLfsMetaObjectStore_ExistsByOidExclRepo_Call) Run(run func(ctx context.Context, oid string, repoID int64)) *MockLfsMetaObjectStore_ExistsByOidExclRepo_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(context.Context), args[1].(string), args[2].(int64))
 	})
 	return _c
 }
 
-func (_c *MockLfsMetaObjectStore_CountByOidExclRepo_Call) Return(_a0 int, _a1 error) *MockLfsMetaObjectStore_CountByOidExclRepo_Call {
+func (_c *MockLfsMetaObjectStore_ExistsByOidExclRepo_Call) Return(_a0 bool, _a1 error) *MockLfsMetaObjectStore_ExistsByOidExclRepo_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockLfsMetaObjectStore_CountByOidExclRepo_Call) RunAndReturn(run func(context.Context, string, int64) (int, error)) *MockLfsMetaObjectStore_CountByOidExclRepo_Call {
+func (_c *MockLfsMetaObjectStore_ExistsByOidExclRepo_Call) RunAndReturn(run func(context.Context, string, int64) (bool, error)) *MockLfsMetaObjectStore_ExistsByOidExclRepo_Call {
 	_c.Call.Return(run)
 	return _c
 }
