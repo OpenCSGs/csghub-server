@@ -43,7 +43,7 @@ func NewRepoHandler(config *config.Config) (*RepoHandler, error) {
 		c:                         uc,
 		m:                         m,
 		d:                         d,
-		deployStatusCheckInterval: 5 * time.Second,
+		deployStatusCheckInterval: time.Duration(config.Model.DeployStatusCheckInterval) * time.Second,
 		config:                    config,
 	}, nil
 }
@@ -88,7 +88,7 @@ func (h *RepoHandler) CreateRepo(ctx *gin.Context) {
 		}
 		resp, err := h.m.Create(ctx.Request.Context(), modelReq)
 		if err != nil {
-			if strings.Contains(err.Error(), "duplicate key") {
+			if errors.Is(err, errorx.ErrRepoAlreadyExist) || errors.Is(err, errorx.ErrSpaceNameAlreadyExist) || strings.Contains(err.Error(), "duplicate key") {
 				resp := &types.Model{
 					URL: fmt.Sprintf("%s/%s", req.Namespace, req.Name),
 				}
@@ -106,7 +106,7 @@ func (h *RepoHandler) CreateRepo(ctx *gin.Context) {
 		}
 		resp, err := h.d.Create(ctx.Request.Context(), datasetReq)
 		if err != nil {
-			if strings.Contains(err.Error(), "duplicate key") {
+			if errors.Is(err, errorx.ErrRepoAlreadyExist) || errors.Is(err, errorx.ErrSpaceNameAlreadyExist) || strings.Contains(err.Error(), "duplicate key") {
 				resp := &types.Dataset{
 					URL: fmt.Sprintf("%s/%s", req.Namespace, req.Name),
 				}

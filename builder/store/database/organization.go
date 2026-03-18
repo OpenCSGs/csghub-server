@@ -2,6 +2,8 @@ package database
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -27,6 +29,7 @@ type OrgStore interface {
 	Search(ctx context.Context, search string, per, page int, orgType, verifyStatus string) (orgs []Organization, total int, err error)
 	UpdateVerifyStatus(ctx context.Context, path string, status types.VerifyStatus) error
 	GetSharedOrgIDs(ctx context.Context, userIDs []int64) ([]int64, error)
+	FindByUUID(ctx context.Context, uuid string) (*Organization, error)
 }
 
 func NewOrgStore() OrgStore {
@@ -219,4 +222,19 @@ func (s *orgStoreImpl) GetSharedOrgIDs(ctx context.Context, userIDs []int64) ([]
 		return nil, errorx.HandleDBError(err, nil)
 	}
 	return orgIDs, nil
+}
+
+func (s *orgStoreImpl) FindByUUID(ctx context.Context, uuid string) (*Organization, error) {
+	var org Organization
+	err := s.db.Operator.Core.NewSelect().
+		Model(&org).
+		Where("uuid = ?", uuid).
+		Scan(ctx)
+	if err == nil {
+		return &org, nil
+	}
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	return nil, errorx.HandleDBError(err, nil)
 }

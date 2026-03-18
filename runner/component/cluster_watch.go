@@ -123,7 +123,7 @@ func (w *clusterWatcher) getClusterAppEndpoint(configmapData map[string]string) 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	svc, err := w.cluster.Client.CoreV1().Services("kourier-system").Get(ctx, "kourier", metav1.GetOptions{})
+	svc, err := w.cluster.Client.CoreV1().Services("knative-serving").Get(ctx, "kourier", metav1.GetOptions{})
 	if err != nil {
 		slog.Warn("failed to get kourier-system/kourier service and use app endpoint input value", slog.Any("error", err))
 		return inputVal

@@ -189,3 +189,9 @@ type ClusterWFReq struct {
 	Per          int    `json:"per"`
 	Page         int    `json:"page"`
 }
+
+type WorkflowTimeRangeReq struct {
+	PageOpts
+	StartTime *time.Time `json:"start_time,omitempty"`
+	EndTime   *time.Time `json:"end_time,omitempty"`
+}

@@ -63,6 +63,7 @@ type Deploy struct {
 	ClusterNode    string             `bun:"," json:"cluster_node"`
 	QueueName      string             `bun:"," json:"queue_name"`
 	OwnerNamespace string             `bun:"," json:"owner_namespace"`
+	Instances      []types.Instance   `bun:"type:jsonb" json:"instances"`
 	times
 }
 
@@ -103,6 +104,7 @@ type DeployTaskStore interface {
 	ListDeployByUserID(ctx context.Context, userID int64, req *types.DeployReq) ([]Deploy, int, error)
 	ListDeployByOwnerNamespace(ctx context.Context, ownerNamespace string, req *types.DeployReq) ([]Deploy, int, error)
 	ListInstancesByUserID(ctx context.Context, userID int64, per, page int) ([]Deploy, int, error)
+	ListFinetunesByOwnerNamespace(ctx context.Context, ownerNamespace string, per, page int) ([]Deploy, int, error)
 	GetDeployByID(ctx context.Context, deployID int64) (*Deploy, error)
 	GetDeployBySvcName(ctx context.Context, svcName string) (*Deploy, error)
 	StopDeploy(ctx context.Context, repoType types.RepositoryType, repoID, userID int64, deployID int64) error
@@ -116,6 +118,7 @@ type DeployTaskStore interface {
 	ListAllRunningDeploys(ctx context.Context) ([]Deploy, error)
 	GetLastTaskByType(ctx context.Context, deployID int64, taskType int) (*DeployTask, error)
 	GetClusterDeploys(ctx context.Context, req types.ClusterDeployReq) ([]Deploy, int, error)
+	ListDeploysByTimeRange(ctx context.Context, req types.DeployTimeRangeReq) ([]Deploy, int, error)
 }
 
 func NewDeployTaskStore() DeployTaskStore {
@@ -365,6 +368,25 @@ func (s *deployTaskStoreImpl) ListDeployByOwnerNamespace(ctx context.Context, ow
 func (s *deployTaskStoreImpl) ListInstancesByUserID(ctx context.Context, userID int64, per, page int) ([]Deploy, int, error) {
 	var result []Deploy
 	query := s.db.Operator.Core.NewSelect().Model(&result).Where("user_id = ?", userID)
+	query = query.Where("type = ? and status != ?", types.FinetuneType, common.Deleted)
+	query = query.Order("id desc")
+	query = query.Limit(per).Offset((page - 1) * per)
+	_, err := query.Exec(ctx, &result)
+	if err != nil {
+		err = errorx.HandleDBError(err, nil)
+		return nil, 0, err
+	}
+	total, err := query.Count(ctx)
+	if err != nil {
+		err = errorx.HandleDBError(err, nil)
+		return nil, 0, err
+	}
+	return result, total, nil
+}
+
+func (s *deployTaskStoreImpl) ListFinetunesByOwnerNamespace(ctx context.Context, ownerNamespace string, per, page int) ([]Deploy, int, error) {
+	var result []Deploy
+	query := s.db.Operator.Core.NewSelect().Model(&result).Where("owner_namespace = ?", ownerNamespace)
 	query = query.Where("type = ? and status != ?", types.FinetuneType, common.Deleted)
 	query = query.Order("id desc")
 	query = query.Limit(per).Offset((page - 1) * per)
@@ -649,3 +671,39 @@ func (s *deployTaskStoreImpl) GetClusterDeploys(ctx context.Context, req types.C
 
 	return result, total, nil
 }
+func (s *deployTaskStoreImpl) ListDeploysByTimeRange(ctx context.Context, req types.DeployTimeRangeReq) ([]Deploy, int, error) {
+	var result []Deploy
+	query := s.db.Operator.Core.NewSelect().Model(&result).Relation("User")
+
+	if req.StartTime != nil {
+		query = query.Where("deploy.created_at >= ?", req.StartTime)
+	}
+	if req.EndTime != nil {
+		query = query.Where("deploy.created_at <= ?", req.EndTime)
+	}
+
+	// Get total count
+	total, err := query.Count(ctx)
+	if err != nil {
+		err = errorx.HandleDBError(err, nil)
+		return nil, 0, err
+	}
+
+	// Apply pagination
+	if req.PageSize > 0 {
+		query = query.Limit(req.PageSize)
+	}
+	if req.Page > 0 {
+		query = query.Offset((req.Page - 1) * req.PageSize)
+	}
+
+	query = query.Order("deploy.created_at DESC")
+	_, err = query.Exec(ctx, &result)
+	if err != nil {
+		err = errorx.HandleDBError(err, nil)
+		return nil, 0, err
+	}
+
+	return result, total, nil
+}
+

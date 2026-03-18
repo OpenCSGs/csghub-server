@@ -119,8 +119,8 @@ type (
 
 // OrgRunDeploysReq is used for listing organization run deploys (e.g. inference).
 type OrgRunDeploysReq struct {
-	Namespace   string `json:"-"`
-	CurrentUser string `json:"-"`
+	Namespace   string         `json:"-"`
+	CurrentUser string         `json:"-"`
 	RepoType    RepositoryType `json:"-"`
 	DeployType  int            `json:"-"`
 	PageOpts

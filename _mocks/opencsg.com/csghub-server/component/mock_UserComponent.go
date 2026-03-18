@@ -979,6 +979,72 @@ func (_c *MockUserComponent_LikesModels_Call) RunAndReturn(run func(context.Cont
 	return _c
 }
 
+// LikesSkills provides a mock function with given fields: ctx, req
+func (_m *MockUserComponent) LikesSkills(ctx context.Context, req *types.UserMCPsReq) ([]types.Skill, int, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for LikesSkills")
+	}
+
+	var r0 []types.Skill
+	var r1 int
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, *types.UserMCPsReq) ([]types.Skill, int, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *types.UserMCPsReq) []types.Skill); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]types.Skill)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *types.UserMCPsReq) int); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, *types.UserMCPsReq) error); ok {
+		r2 = rf(ctx, req)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockUserComponent_LikesSkills_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'LikesSkills'
+type MockUserComponent_LikesSkills_Call struct {
+	*mock.Call
+}
+
+// LikesSkills is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req *types.UserMCPsReq
+func (_e *MockUserComponent_Expecter) LikesSkills(ctx interface{}, req interface{}) *MockUserComponent_LikesSkills_Call {
+	return &MockUserComponent_LikesSkills_Call{Call: _e.mock.On("LikesSkills", ctx, req)}
+}
+
+func (_c *MockUserComponent_LikesSkills_Call) Run(run func(ctx context.Context, req *types.UserMCPsReq)) *MockUserComponent_LikesSkills_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*types.UserMCPsReq))
+	})
+	return _c
+}
+
+func (_c *MockUserComponent_LikesSkills_Call) Return(_a0 []types.Skill, _a1 int, _a2 error) *MockUserComponent_LikesSkills_Call {
+	_c.Call.Return(_a0, _a1, _a2)
+	return _c
+}
+
+func (_c *MockUserComponent_LikesSkills_Call) RunAndReturn(run func(context.Context, *types.UserMCPsReq) ([]types.Skill, int, error)) *MockUserComponent_LikesSkills_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // LikesSpaces provides a mock function with given fields: ctx, req
 func (_m *MockUserComponent) LikesSpaces(ctx context.Context, req *types.UserCollectionReq) ([]types.Space, int, error) {
 	ret := _m.Called(ctx, req)

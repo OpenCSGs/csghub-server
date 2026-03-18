@@ -1223,6 +1223,73 @@ func (_c *MockDeployTaskStore_ListDeploy_Call) RunAndReturn(run func(context.Con
 	return _c
 }
 
+// ListDeployByOwnerNamespace provides a mock function with given fields: ctx, ownerNamespace, req
+func (_m *MockDeployTaskStore) ListDeployByOwnerNamespace(ctx context.Context, ownerNamespace string, req *types.DeployReq) ([]database.Deploy, int, error) {
+	ret := _m.Called(ctx, ownerNamespace, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListDeployByOwnerNamespace")
+	}
+
+	var r0 []database.Deploy
+	var r1 int
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, *types.DeployReq) ([]database.Deploy, int, error)); ok {
+		return rf(ctx, ownerNamespace, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, *types.DeployReq) []database.Deploy); ok {
+		r0 = rf(ctx, ownerNamespace, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.Deploy)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, *types.DeployReq) int); ok {
+		r1 = rf(ctx, ownerNamespace, req)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, string, *types.DeployReq) error); ok {
+		r2 = rf(ctx, ownerNamespace, req)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockDeployTaskStore_ListDeployByOwnerNamespace_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListDeployByOwnerNamespace'
+type MockDeployTaskStore_ListDeployByOwnerNamespace_Call struct {
+	*mock.Call
+}
+
+// ListDeployByOwnerNamespace is a helper method to define mock.On call
+//   - ctx context.Context
+//   - ownerNamespace string
+//   - req *types.DeployReq
+func (_e *MockDeployTaskStore_Expecter) ListDeployByOwnerNamespace(ctx interface{}, ownerNamespace interface{}, req interface{}) *MockDeployTaskStore_ListDeployByOwnerNamespace_Call {
+	return &MockDeployTaskStore_ListDeployByOwnerNamespace_Call{Call: _e.mock.On("ListDeployByOwnerNamespace", ctx, ownerNamespace, req)}
+}
+
+func (_c *MockDeployTaskStore_ListDeployByOwnerNamespace_Call) Run(run func(ctx context.Context, ownerNamespace string, req *types.DeployReq)) *MockDeployTaskStore_ListDeployByOwnerNamespace_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(*types.DeployReq))
+	})
+	return _c
+}
+
+func (_c *MockDeployTaskStore_ListDeployByOwnerNamespace_Call) Return(_a0 []database.Deploy, _a1 int, _a2 error) *MockDeployTaskStore_ListDeployByOwnerNamespace_Call {
+	_c.Call.Return(_a0, _a1, _a2)
+	return _c
+}
+
+func (_c *MockDeployTaskStore_ListDeployByOwnerNamespace_Call) RunAndReturn(run func(context.Context, string, *types.DeployReq) ([]database.Deploy, int, error)) *MockDeployTaskStore_ListDeployByOwnerNamespace_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ListDeployByType provides a mock function with given fields: ctx, req
 func (_m *MockDeployTaskStore) ListDeployByType(ctx context.Context, req types.DeployReq) ([]database.Deploy, int, error) {
 	ret := _m.Called(ctx, req)
@@ -1352,73 +1419,6 @@ func (_c *MockDeployTaskStore_ListDeployByUserID_Call) Return(_a0 []database.Dep
 }
 
 func (_c *MockDeployTaskStore_ListDeployByUserID_Call) RunAndReturn(run func(context.Context, int64, *types.DeployReq) ([]database.Deploy, int, error)) *MockDeployTaskStore_ListDeployByUserID_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// ListDeployByOwnerNamespace provides a mock function with given fields: ctx, ownerNamespace, req
-func (_m *MockDeployTaskStore) ListDeployByOwnerNamespace(ctx context.Context, ownerNamespace string, req *types.DeployReq) ([]database.Deploy, int, error) {
-	ret := _m.Called(ctx, ownerNamespace, req)
-
-	if len(ret) == 0 {
-		panic("no return value specified for ListDeployByOwnerNamespace")
-	}
-
-	var r0 []database.Deploy
-	var r1 int
-	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, *types.DeployReq) ([]database.Deploy, int, error)); ok {
-		return rf(ctx, ownerNamespace, req)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, *types.DeployReq) []database.Deploy); ok {
-		r0 = rf(ctx, ownerNamespace, req)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]database.Deploy)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, string, *types.DeployReq) int); ok {
-		r1 = rf(ctx, ownerNamespace, req)
-	} else {
-		r1 = ret.Get(1).(int)
-	}
-
-	if rf, ok := ret.Get(2).(func(context.Context, string, *types.DeployReq) error); ok {
-		r2 = rf(ctx, ownerNamespace, req)
-	} else {
-		r2 = ret.Error(2)
-	}
-
-	return r0, r1, r2
-}
-
-// MockDeployTaskStore_ListDeployByOwnerNamespace_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListDeployByOwnerNamespace'
-type MockDeployTaskStore_ListDeployByOwnerNamespace_Call struct {
-	*mock.Call
-}
-
-// ListDeployByOwnerNamespace is a helper method to define mock.On call
-//   - ctx context.Context
-//   - ownerNamespace string
-//   - req *types.DeployReq
-func (_e *MockDeployTaskStore_Expecter) ListDeployByOwnerNamespace(ctx interface{}, ownerNamespace interface{}, req interface{}) *MockDeployTaskStore_ListDeployByOwnerNamespace_Call {
-	return &MockDeployTaskStore_ListDeployByOwnerNamespace_Call{Call: _e.mock.On("ListDeployByOwnerNamespace", ctx, ownerNamespace, req)}
-}
-
-func (_c *MockDeployTaskStore_ListDeployByOwnerNamespace_Call) Run(run func(ctx context.Context, ownerNamespace string, req *types.DeployReq)) *MockDeployTaskStore_ListDeployByOwnerNamespace_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(*types.DeployReq))
-	})
-	return _c
-}
-
-func (_c *MockDeployTaskStore_ListDeployByOwnerNamespace_Call) Return(_a0 []database.Deploy, _a1 int, _a2 error) *MockDeployTaskStore_ListDeployByOwnerNamespace_Call {
-	_c.Call.Return(_a0, _a1, _a2)
-	return _c
-}
-
-func (_c *MockDeployTaskStore_ListDeployByOwnerNamespace_Call) RunAndReturn(run func(context.Context, string, *types.DeployReq) ([]database.Deploy, int, error)) *MockDeployTaskStore_ListDeployByOwnerNamespace_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1868,6 +1868,140 @@ func (_c *MockDeployTaskStore_UpdateInTx_Call) Return(_a0 error) *MockDeployTask
 }
 
 func (_c *MockDeployTaskStore_UpdateInTx_Call) RunAndReturn(run func(context.Context, []string, []string, *database.Deploy, ...*database.DeployTask) error) *MockDeployTaskStore_UpdateInTx_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ListFinetunesByOwnerNamespace provides a mock function with given fields: ctx, ownerNamespace, per, page
+func (_m *MockDeployTaskStore) ListFinetunesByOwnerNamespace(ctx context.Context, ownerNamespace string, per int, page int) ([]database.Deploy, int, error) {
+	ret := _m.Called(ctx, ownerNamespace, per, page)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListFinetunesByOwnerNamespace")
+	}
+
+	var r0 []database.Deploy
+	var r1 int
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, int, int) ([]database.Deploy, int, error)); ok {
+		return rf(ctx, ownerNamespace, per, page)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, int, int) []database.Deploy); ok {
+		r0 = rf(ctx, ownerNamespace, per, page)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.Deploy)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, int, int) int); ok {
+		r1 = rf(ctx, ownerNamespace, per, page)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, string, int, int) error); ok {
+		r2 = rf(ctx, ownerNamespace, per, page)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockDeployTaskStore_ListFinetunesByOwnerNamespace_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListFinetunesByOwnerNamespace'
+type MockDeployTaskStore_ListFinetunesByOwnerNamespace_Call struct {
+	*mock.Call
+}
+
+// ListFinetunesByOwnerNamespace is a helper method to define mock.On call
+//   - ctx context.Context
+//   - ownerNamespace string
+//   - per int
+//   - page int
+func (_e *MockDeployTaskStore_Expecter) ListFinetunesByOwnerNamespace(ctx interface{}, ownerNamespace interface{}, per interface{}, page interface{}) *MockDeployTaskStore_ListFinetunesByOwnerNamespace_Call {
+	return &MockDeployTaskStore_ListFinetunesByOwnerNamespace_Call{Call: _e.mock.On("ListFinetunesByOwnerNamespace", ctx, ownerNamespace, per, page)}
+}
+
+func (_c *MockDeployTaskStore_ListFinetunesByOwnerNamespace_Call) Run(run func(ctx context.Context, ownerNamespace string, per int, page int)) *MockDeployTaskStore_ListFinetunesByOwnerNamespace_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(int), args[3].(int))
+	})
+	return _c
+}
+
+func (_c *MockDeployTaskStore_ListFinetunesByOwnerNamespace_Call) Return(_a0 []database.Deploy, _a1 int, _a2 error) *MockDeployTaskStore_ListFinetunesByOwnerNamespace_Call {
+	_c.Call.Return(_a0, _a1, _a2)
+	return _c
+}
+
+func (_c *MockDeployTaskStore_ListFinetunesByOwnerNamespace_Call) RunAndReturn(run func(context.Context, string, int, int) ([]database.Deploy, int, error)) *MockDeployTaskStore_ListFinetunesByOwnerNamespace_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ListDeploysByTimeRange provides a mock function with given fields: ctx, req
+func (_m *MockDeployTaskStore) ListDeploysByTimeRange(ctx context.Context, req types.DeployTimeRangeReq) ([]database.Deploy, int, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListDeploysByTimeRange")
+	}
+
+	var r0 []database.Deploy
+	var r1 int
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.DeployTimeRangeReq) ([]database.Deploy, int, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.DeployTimeRangeReq) []database.Deploy); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.Deploy)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.DeployTimeRangeReq) int); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, types.DeployTimeRangeReq) error); ok {
+		r2 = rf(ctx, req)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockDeployTaskStore_ListDeploysByTimeRange_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListDeploysByTimeRange'
+type MockDeployTaskStore_ListDeploysByTimeRange_Call struct {
+	*mock.Call
+}
+
+// ListDeploysByTimeRange is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.DeployTimeRangeReq
+func (_e *MockDeployTaskStore_Expecter) ListDeploysByTimeRange(ctx interface{}, req interface{}) *MockDeployTaskStore_ListDeploysByTimeRange_Call {
+	return &MockDeployTaskStore_ListDeploysByTimeRange_Call{Call: _e.mock.On("ListDeploysByTimeRange", ctx, req)}
+}
+
+func (_c *MockDeployTaskStore_ListDeploysByTimeRange_Call) Run(run func(ctx context.Context, req types.DeployTimeRangeReq)) *MockDeployTaskStore_ListDeploysByTimeRange_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.DeployTimeRangeReq))
+	})
+	return _c
+}
+
+func (_c *MockDeployTaskStore_ListDeploysByTimeRange_Call) Return(_a0 []database.Deploy, _a1 int, _a2 error) *MockDeployTaskStore_ListDeploysByTimeRange_Call {
+	_c.Call.Return(_a0, _a1, _a2)
+	return _c
+}
+
+func (_c *MockDeployTaskStore_ListDeploysByTimeRange_Call) RunAndReturn(run func(context.Context, types.DeployTimeRangeReq) ([]database.Deploy, int, error)) *MockDeployTaskStore_ListDeploysByTimeRange_Call {
 	_c.Call.Return(run)
 	return _c
 }

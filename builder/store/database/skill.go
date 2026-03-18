@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/uptrace/bun"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -19,6 +20,7 @@ type skillStoreImpl struct {
 type SkillStore interface {
 	ByRepoIDs(ctx context.Context, repoIDs []int64) (skills []Skill, err error)
 	ByRepoID(ctx context.Context, repoID int64) (*Skill, error)
+	BySkillID(ctx context.Context, skillID int64) (*Skill, error)
 	ByUsername(ctx context.Context, username string, per, page int, onlyPublic bool) (skills []Skill, total int, err error)
 	UserLikesSkills(ctx context.Context, userID int64, per, page int) (skills []Skill, total int, err error)
 	ByOrgPath(ctx context.Context, namespace string, per, page int, onlyPublic bool) (skills []Skill, total int, err error)
@@ -70,6 +72,19 @@ func (s *skillStoreImpl) ByRepoID(ctx context.Context, repoID int64) (*Skill, er
 		return nil, fmt.Errorf("failed to select skill, error: %w", err)
 	}
 
+	return &skill, nil
+}
+
+func (s *skillStoreImpl) BySkillID(ctx context.Context, skillID int64) (*Skill, error) {
+	var skill Skill
+	err := s.db.Operator.Core.NewSelect().
+		Model(&skill).
+		Relation("Repository").
+		Where("skill.id = ?", skillID).
+		Scan(ctx)
+	if err != nil {
+		return nil, errorx.HandleDBError(err, errorx.Ctx().Set("skill_id", skillID))
+	}
 	return &skill, nil
 }
 

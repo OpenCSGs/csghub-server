@@ -34,6 +34,10 @@ type ClusterComponent interface {
 	QueryClusterWorkflows(ctx context.Context, req types.ClusterWFReq) ([]database.ArgoWorkflow, int, error)
 	UpdateClusterNodeVXPU(ctx context.Context, req types.UpdateClusterNodeReq) (*database.ClusterNodeWithRegion, error)
 	SetClusterNodeAccessMode(ctx context.Context, req types.SetNodeAccessModeReq) error
+	GetDeploysByTimeRange(ctx context.Context, req types.DeployTimeRangeReq) ([]database.Deploy, int, error)
+	GetDeploysByTimeRangeStream(ctx context.Context, req types.DeployTimeRangeReq) (<-chan []string, <-chan error)
+	GetWorkflowsByTimeRange(ctx context.Context, req types.WorkflowTimeRangeReq) ([]database.ArgoWorkflow, int, error)
+	GetWorkflowsByTimeRangeStream(ctx context.Context, req types.WorkflowTimeRangeReq) (<-chan []string, <-chan error)
 }
 
 func NewClusterComponent(config *config.Config) (ClusterComponent, error) {
@@ -52,6 +56,7 @@ func NewClusterComponent(config *config.Config) (ClusterComponent, error) {
 	c.usrClient = usrClient
 	c.resStore = database.NewSpaceResourceStore()
 	c.workflowStore = database.NewArgoWorkFlowStore()
+	c.namespaceStore = database.NewNamespaceStore()
 	return c, nil
 }
 
@@ -64,6 +69,7 @@ type clusterComponentImpl struct {
 	resStore        database.SpaceResourceStore
 	workflowStore   database.ArgoWorkFlowStore
 	usrClient       rpc.UserSvcClient
+	namespaceStore  database.NamespaceStore
 }
 
 func (c *clusterComponentImpl) Index(ctx context.Context) ([]types.ClusterRes, error) {

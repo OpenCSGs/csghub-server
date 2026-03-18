@@ -1005,6 +1005,7 @@ func createUserRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware
 		apiGroup.GET("/user/:username/likes/models", middlewareCollection.Auth.NeedLogin, userHandler.LikesModels)
 		apiGroup.GET("/user/:username/likes/datasets", middlewareCollection.Auth.NeedLogin, userHandler.LikesDatasets)
 		apiGroup.GET("/user/:username/likes/mcps", middlewareCollection.Auth.NeedLogin, userHandler.LikesMCPServers)
+		apiGroup.GET("/user/:username/likes/skills", middlewareCollection.Auth.NeedLogin, userHandler.LikesSkills)
 	}
 
 	{
@@ -1116,6 +1117,11 @@ func createMappingRoutes(
 			hfMcpserverFileGroup.GET("/:namespace/:name/resolve/:branch/*file_path", middleware.RepoMapping(types.MCPServerRepo), repoCommonHandler.SDKDownload)
 			hfMcpserverFileGroup.HEAD("/:namespace/:name/resolve/:branch/*file_path", middleware.RepoMapping(types.MCPServerRepo), repoCommonHandler.HeadSDKDownload)
 		}
+		hfSkillFileGroup := hfGroup.Group("/skills")
+		{
+			hfSkillFileGroup.GET("/:namespace/:name/resolve/:branch/*file_path", middleware.RepoMapping(types.SkillRepo), repoCommonHandler.SDKDownload)
+			hfSkillFileGroup.HEAD("/:namespace/:name/resolve/:branch/*file_path", middleware.RepoMapping(types.SkillRepo), repoCommonHandler.HeadSDKDownload)
+		}
 		hfAPIGroup := hfGroup.Group("/api")
 		{
 			hfAPIGroup.GET("/whoami-v2", middlewareCollection.Auth.NeedLogin, userHandler.UserPermission)
@@ -1152,6 +1158,11 @@ func createMappingRoutes(
 			{
 				hfMcperverAPIGroup.GET("/:namespace/:name/revision/:ref", middleware.RepoMapping(types.MCPServerRepo), repoCommonHandler.SDKListFiles)
 				hfMcperverAPIGroup.GET("/:namespace/:name", middleware.RepoMapping(types.MCPServerRepo), repoCommonHandler.SDKListFiles)
+			}
+			hfSkillAPIGroup := hfAPIGroup.Group("/skills")
+			{
+				hfSkillAPIGroup.GET("/:namespace/:name/revision/:ref", middleware.RepoMapping(types.SkillRepo), repoCommonHandler.SDKListFiles)
+				hfSkillAPIGroup.GET("/:namespace/:name", middleware.RepoMapping(types.SkillRepo), repoCommonHandler.SDKListFiles)
 			}
 			hfReposAPIGroup := hfAPIGroup.Group("/repos")
 			{
@@ -1415,8 +1426,9 @@ func createClusterRoutes(apiGroup *gin.RouterGroup, middlewareCollection middlew
 		clusterGrp.PUT("/:id", middlewareCollection.Auth.NeedAdmin, clusterHandler.Update)
 		clusterGrp.GET("/public", clusterHandler.GetClusterPublic)
 	}
-
-	err = createComputingRoutes(clusterGrp, middlewareCollection, config, clusterHandler)
+	adminGrp := apiGroup.Group("/admin")
+	adminGrp.Use(middleware.NeedAdmin(config))
+	err = createComputingRoutes(adminGrp, clusterHandler)
 	if err != nil {
 		return fmt.Errorf("error creating computing routes: %w", err)
 	}
