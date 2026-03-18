@@ -15410,7 +15410,7 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "description": "deploy setting of instance",
+                        "description": "deploy setting of instance (owner_namespace optional: user or org to create under)",
                         "name": "body",
                         "in": "body",
                         "required": true,
@@ -16186,7 +16186,7 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "description": "deploy setting of inference",
+                        "description": "deploy setting of inference (owner_namespace optional: user or org to create inference under)",
                         "name": "body",
                         "in": "body",
                         "required": true,
@@ -19281,6 +19281,164 @@ const docTemplate = `{
                 }
             }
         },
+        "/organization/{namespace}/evaluations": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "get organization evaluation jobs",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Organization"
+                ],
+                "summary": "Get organization evaluation jobs",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "org name",
+                        "name": "namespace",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "page size",
+                        "name": "per",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "current page number",
+                        "name": "page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.ResponseWithTotal"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/types.ArgoWorkFlowRes"
+                                            }
+                                        },
+                                        "total": {
+                                            "type": "integer"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/organization/{namespace}/finetunes": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "get organization finetune jobs",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Organization"
+                ],
+                "summary": "Get organization finetune jobs",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "org name",
+                        "name": "namespace",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "page size",
+                        "name": "per",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "current page number",
+                        "name": "page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.ResponseWithTotal"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/types.ArgoWorkFlowRes"
+                                            }
+                                        },
+                                        "total": {
+                                            "type": "integer"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
         "/organization/{namespace}/mcps": {
             "get": {
                 "security": [
@@ -19796,6 +19954,85 @@ const docTemplate = `{
                 }
             }
         },
+        "/organization/{namespace}/notebooks": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "get organization notebooks",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Organization"
+                ],
+                "summary": "Get organization notebooks",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "org name",
+                        "name": "namespace",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "page size",
+                        "name": "per",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "current page number",
+                        "name": "page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.ResponseWithTotal"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/types.NotebookRes"
+                                            }
+                                        },
+                                        "total": {
+                                            "type": "integer"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
         "/organization/{namespace}/prompts": {
             "get": {
                 "security": [
@@ -19857,6 +20094,103 @@ const docTemplate = `{
                                             "type": "array",
                                             "items": {
                                                 "$ref": "#/definitions/types.PromptRes"
+                                            }
+                                        },
+                                        "total": {
+                                            "type": "integer"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/organization/{namespace}/run/{repo_type}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "get organization run deploys by deploy type (0-space, 1-inference, 2-finetune)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Organization"
+                ],
+                "summary": "Get organization run deploys (e.g. inference)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "org name",
+                        "name": "namespace",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "enum": [
+                            "model",
+                            "space"
+                        ],
+                        "type": "string",
+                        "description": "model or space",
+                        "name": "repo_type",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "deploy type (0-space, 1-inference, 2-finetune)",
+                        "name": "deploy_type",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "page size",
+                        "name": "per",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "current page number",
+                        "name": "page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.ResponseWithTotal"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/types.DeployRepo"
                                             }
                                         },
                                         "total": {
@@ -40860,6 +41194,9 @@ const docTemplate = `{
                 "order_detail_id": {
                     "type": "integer"
                 },
+                "owner_namespace": {
+                    "type": "string"
+                },
                 "resource_id": {
                     "type": "integer"
                 },
@@ -41806,6 +42143,9 @@ const docTemplate = `{
                 "order_detail_id": {
                     "type": "integer"
                 },
+                "owner_namespace": {
+                    "type": "string"
+                },
                 "pay_mode": {
                     "$ref": "#/definitions/types.PayMode"
                 },
@@ -42023,6 +42363,9 @@ const docTemplate = `{
                     "items": {
                         "type": "string"
                     }
+                },
+                "owner_namespace": {
+                    "type": "string"
                 },
                 "resource_id": {
                     "type": "integer"
@@ -42456,6 +42799,10 @@ const docTemplate = `{
                 },
                 "order_detail_id": {
                     "type": "integer"
+                },
+                "owner_namespace": {
+                    "description": "OwnerNamespace is optional. If set, the finetune is created under this namespace (user or org); path {namespace} remains the model's owner.",
+                    "type": "string"
                 },
                 "resource_id": {
                     "type": "integer"
@@ -43482,6 +43829,10 @@ const docTemplate = `{
                 },
                 "order_detail_id": {
                     "type": "integer"
+                },
+                "owner_namespace": {
+                    "description": "OwnerNamespace is optional. If set, the inference is created under this namespace (user or org) for billing and listing; path {namespace} remains the model's owner.",
+                    "type": "string"
                 },
                 "resource_id": {
                     "type": "integer"

@@ -44,7 +44,8 @@ const (
 )
 
 type EvaluationReq struct {
-	Username           string   `json:"-"`
+	Username       string `json:"-"`
+	OwnerNamespace string `json:"owner_namespace,omitempty"`
 	TaskName           string   `json:"task_name"`
 	TaskDesc           string   `json:"task_desc"`
 	RuntimeFrameworkId int64    `json:"runtime_framework_id"` // ArgoWorkFlow framework

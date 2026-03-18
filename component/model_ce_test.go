@@ -42,13 +42,14 @@ func TestModelComponent_Deploy(t *testing.T) {
 		}, nil,
 	)
 
-	// When OwnerNamespace is not set, ownerNamespace is CurrentUser and GetNamespaceBillingUUID is not called
-	mc.mocks.components.repo.EXPECT().CheckAccountAndResource(ctx, "user", "cluster", int64(0), mock.Anything).Return(nil)
+	// Model is under org "ns", current user "user" -> resolve billing UUID for namespace "ns"
+	mc.mocks.components.repo.EXPECT().GetNamespaceBillingUUID(ctx, "ns").Return("ns-billing-uuid", nil)
+	mc.mocks.components.repo.EXPECT().CheckAccountAndResource(ctx, "ns", "cluster", int64(0), mock.Anything).Return(nil)
 
 	mc.mocks.deployer.EXPECT().Deploy(ctx, mock.MatchedBy(func(dp types.DeployRepo) bool {
 		return dp.DeployName == "dp" && dp.Path == "foo" && dp.ClusterID == "cluster" &&
 			dp.RepoID == 1 && dp.SKU == "123" && dp.Type == types.ServerlessType &&
-			dp.Task == "text-generation" && dp.UserUUID == "user-uuid" && dp.OwnerNamespace == "user"
+			dp.Task == "text-generation" && dp.UserUUID == "ns-billing-uuid" && dp.OwnerNamespace == "ns"
 	})).Return(111, nil)
 
 	id, err := mc.Deploy(ctx, types.DeployActReq{
@@ -95,7 +96,7 @@ func TestModelComponent_Deploy_OwnerNamespace_BillingUUIDError(t *testing.T) {
 		ResourceID:         123,
 		ClusterID:          "cluster",
 		DeployName:         "dp",
-		OwnerNamespace:    "org1",
+		OwnerNamespace:     "org1",
 	})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "failed to resolve billing UUID for namespace")

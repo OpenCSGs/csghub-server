@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	deployer "opencsg.com/csghub-server/builder/deploy"
+	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -17,7 +18,7 @@ func TestNotebookComponentImpl_CreateNotebook(t *testing.T) {
 	ctx := context.TODO()
 	nc := initializeTestNotebookComponent(ctx, t)
 	username := "testuser"
-	nc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, username).Return(database.User{ID: 1, Username: username}, nil)
+	nc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, username).Return(database.User{ID: 1, Username: username, RoleMask: "admin"}, nil)
 	nc.mocks.stores.RuntimeFrameworkMock().EXPECT().FindEnabledByID(ctx, int64(1)).Return(&database.RuntimeFramework{ID: 1, FrameName: "rf1", FrameImage: "abc/notebook:latest"}, nil)
 	nc.mocks.stores.SpaceResourceMock().EXPECT().FindByID(ctx, int64(1)).Return(&database.SpaceResource{ID: 1, ClusterID: "1", Name: "sr1", Resources: `{"memory": "foo"}`}, nil)
 	nc.mocks.components.repo.EXPECT().CheckAccountAndResource(ctx, username, "1", int64(0), &database.SpaceResource{ID: 1, ClusterID: "1", Name: "sr1", Resources: `{"memory": "foo"}`}).Return(nil)
@@ -34,6 +35,7 @@ func TestNotebookComponentImpl_CreateNotebook(t *testing.T) {
 		MinReplica:       0,
 		MaxReplica:       1,
 		SecureLevel:      2,
+		OwnerNamespace:   username,
 	}).Return(int64(123), nil)
 
 	res, err := nc.CreateNotebook(ctx, &types.CreateNotebookReq{
@@ -44,6 +46,39 @@ func TestNotebookComponentImpl_CreateNotebook(t *testing.T) {
 	})
 	require.Nil(t, err)
 	require.Equal(t, int64(123), res.ID)
+}
+
+func TestNotebookComponentImpl_CreateNotebook_NonAdminOwnerNamespace(t *testing.T) {
+	ctx := context.TODO()
+
+	t.Run("owner_namespace_permission_error", func(t *testing.T) {
+		nc := initializeTestNotebookComponent(ctx, t)
+		nc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "testuser").Return(database.User{ID: 1, Username: "testuser", RoleMask: ""}, nil)
+		nc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "testuser", "org1", membership.RoleWrite).Return(false, errors.New("rpc error"))
+		_, err := nc.CreateNotebook(ctx, &types.CreateNotebookReq{
+			CurrentUser:        "testuser",
+			OwnerNamespace:     "org1",
+			DeployName:         "nb",
+			ResourceID:         1,
+			RuntimeFrameworkID: 1,
+		})
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "failed to check namespace permission")
+	})
+	t.Run("owner_namespace_forbidden", func(t *testing.T) {
+		nc := initializeTestNotebookComponent(ctx, t)
+		nc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "testuser").Return(database.User{ID: 1, Username: "testuser", RoleMask: ""}, nil)
+		nc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "testuser", "org1", membership.RoleWrite).Return(false, nil)
+		_, err := nc.CreateNotebook(ctx, &types.CreateNotebookReq{
+			CurrentUser:        "testuser",
+			OwnerNamespace:     "org1",
+			DeployName:         "nb",
+			ResourceID:         1,
+			RuntimeFrameworkID: 1,
+		})
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "do not have permission to create notebook in this namespace")
+	})
 }
 
 func TestNotebookComponentImpl_GetNotebookByID(t *testing.T) {
