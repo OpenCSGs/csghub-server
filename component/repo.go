@@ -2452,7 +2452,15 @@ func (c *repoComponentImpl) Preupload(ctx context.Context, req types.PreuploadRe
 		Paths:     paths,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to get repo files, err: %w", err)
+		// If the branch doesn't exist yet, treat it as if there are no existing files.
+		// This allows uploading to a new branch that hasn't been created yet.
+		if errors.Is(err, errorx.ErrGitCommitNotFound) || status.Code(err) == codes.NotFound || status.Code(err) == codes.InvalidArgument {
+			slog.InfoContext(ctx, "branch not found when getting existing files for preupload, treating as empty",
+				slog.String("revision", req.Revision),
+				slog.String("repo", req.Namespace+"/"+req.Name))
+		} else {
+			return nil, fmt.Errorf("failed to get repo files, err: %w", err)
+		}
 	}
 
 	for _, file := range existFiles {
@@ -2466,7 +2474,7 @@ func (c *repoComponentImpl) Preupload(ctx context.Context, req types.PreuploadRe
 		Ref:       req.Revision,
 		Path:      GitAttributesFileName,
 	})
-	if err != nil && status.Code(err) != codes.InvalidArgument {
+	if err != nil && status.Code(err) != codes.InvalidArgument && !errors.Is(err, errorx.ErrGitCommitNotFound) {
 		return nil, fmt.Errorf("failed to get gitattributes file, err: %w", err)
 	}
 
@@ -2485,7 +2493,7 @@ func (c *repoComponentImpl) Preupload(ctx context.Context, req types.PreuploadRe
 		Path:      GitIgnoreFileName,
 	})
 	code := status.Code(err)
-	if err != nil && code != codes.InvalidArgument {
+	if err != nil && code != codes.InvalidArgument && !errors.Is(err, errorx.ErrGitCommitNotFound) {
 		return nil, fmt.Errorf("failed to get .gitignore file, err: %w", err)
 	}
 
