@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"encoding/base64"
 	"fmt"
 	"log/slog"
@@ -11,10 +12,15 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/builder/rpc"
+	"opencsg.com/csghub-server/builder/store/cache"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
+)
+
+const (
+	jwtBlacklistKey = "jwt_blacklist"
 )
 
 // BuildJwtSession create and save session with jwt from query string
@@ -67,6 +73,16 @@ func AuthSession() gin.HandlerFunc {
 func Authenticator(config *config.Config) gin.HandlerFunc {
 	svcAddr := fmt.Sprintf("%s:%d", config.User.Host, config.User.Port)
 	userSvcClient := rpc.NewUserSvcHttpClient(svcAddr, rpc.AuthWithApiKey(config.APIToken))
+
+	redisClient, err := cache.NewCache(context.Background(), cache.RedisConfig{
+		Addr:     config.Redis.Endpoint,
+		Username: config.Redis.User,
+		Password: config.Redis.Password,
+	})
+	if err != nil {
+		slog.Error("failed to initialize redis client in authenticator", slog.Any("error", err))
+	}
+
 	return func(c *gin.Context) {
 		result := isValidBrowserSession(c)
 		if result {
@@ -90,7 +106,7 @@ func Authenticator(config *config.Config) gin.HandlerFunc {
 				return
 			}
 
-			result = isValidJWTToken(c, config, token)
+			result = isValidJWTToken(c, config, token, redisClient)
 			if result {
 				c.Next()
 				return
@@ -168,8 +184,15 @@ func isValidApiToken(c *gin.Context, config *config.Config, token string) bool {
 	return false
 }
 
-func isValidJWTToken(c *gin.Context, config *config.Config, token string) bool {
+func isValidJWTToken(c *gin.Context, config *config.Config, token string, rc cache.RedisClient) bool {
 	if strings.Contains(token, ".") {
+		if rc != nil {
+			isMember, _ := rc.SIsMember(c.Request.Context(), jwtBlacklistKey, token)
+			if isMember {
+				slog.WarnContext(c.Request.Context(), "jwt token is in blacklist", slog.String("token", token))
+				return false
+			}
+		}
 		claims, err := parseJWTToken(config.JWT.SigningKey, token)
 		if err == nil {
 			httpbase.SetCurrentUser(c, claims.CurrentUser)
