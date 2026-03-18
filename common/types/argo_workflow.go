@@ -44,7 +44,8 @@ const (
 )
 
 type EvaluationReq struct {
-	Username           string   `json:"-"`
+	Username       string `json:"-"`
+	OwnerNamespace string `json:"owner_namespace,omitempty"`
 	TaskName           string   `json:"task_name"`
 	TaskDesc           string   `json:"task_desc"`
 	RuntimeFrameworkId int64    `json:"runtime_framework_id"` // ArgoWorkFlow framework
@@ -187,4 +188,10 @@ type ClusterWFReq struct {
 	Search       string `json:"search"`
 	Per          int    `json:"per"`
 	Page         int    `json:"page"`
+}
+
+type WorkflowTimeRangeReq struct {
+	PageOpts
+	StartTime *time.Time `json:"start_time,omitempty"`
+	EndTime   *time.Time `json:"end_time,omitempty"`
 }

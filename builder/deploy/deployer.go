@@ -55,6 +55,7 @@ type Deployer interface {
 	GetWorkflowLogsInStream(ctx context.Context, req types.FinetuneLogReq) (*MultiLogReader, error)
 	GetWorkflowLogsNonStream(ctx context.Context, req types.FinetuneLogReq) (*loki.LokiQueryResponse, error)
 	GetSharedModeResourceName(config *config.Config) string
+	LabelNode(ctx context.Context, req *types.NodeLabel) error
 }
 
 func (d *deployer) GenerateUniqueSvcName(dr types.DeployRepo) string {
@@ -113,7 +114,7 @@ func (d *deployer) serverlessDeploy(ctx context.Context, dr types.DeployRepo) (*
 	deploy.Variables = dr.Variables
 	deploy.ClusterID = dr.ClusterID
 	deploy.Task = types.PipelineTask(dr.Task)
-	// deploy
+	deploy.OwnerNamespace = dr.OwnerNamespace
 	slog.Debug("do deployer.serverlessDeploy", slog.Any("dr", dr), slog.Any("deploy", deploy))
 	err = d.deployTaskStore.UpdateDeploy(ctx, deploy)
 	if err != nil {
@@ -163,6 +164,7 @@ func (d *deployer) dedicatedDeploy(ctx context.Context, dr types.DeployRepo) (*d
 		Task:             types.PipelineTask(dr.Task),
 		EngineArgs:       dr.EngineArgs,
 		Variables:        dr.Variables,
+		OwnerNamespace:   dr.OwnerNamespace,
 	}
 	updateDatabaseDeploy(deploy, dr)
 	err := d.deployTaskStore.CreateDeploy(ctx, deploy)
@@ -269,25 +271,8 @@ func (d *deployer) Status(ctx context.Context, dr types.DeployRepo, needDetails 
 		slog.WarnContext(ctx, "cluster resources unhealthy")
 		return "", common.ResourceUnhealthy, nil, nil
 	}
-
-	svcName := deploy.SvcName
-	if deploy.Status == common.Pending {
-		//if deploy is pending, no need to check ksvc status
-		return svcName, common.Pending, nil, nil
-	}
-	svc, err := d.imageRunner.Exist(ctx, &types.CheckRequest{
-		SvcName:   svcName,
-		ClusterID: deploy.ClusterID,
-	})
-	if err != nil {
-		slog.Error("fail to get deploy by service name", slog.Any("Service NamE", svcName), slog.Any("error", err))
-		return "", common.Stopped, nil, fmt.Errorf("can't get svc, %w", err)
-	}
-	if svc.Code == common.Stopped || svc.Code == -1 {
-		// like queuing, or stopped, use status from deploy
-		return svcName, deploy.Status, nil, nil
-	}
-	return svcName, svc.Code, svc.Instances, nil
+	// deploy status and instances reported from runner
+	return deploy.SvcName, deploy.Status, deploy.Instances, nil
 }
 
 func (d *deployer) Logs(ctx context.Context, dr types.DeployRepo) (*MultiLogReader, error) {

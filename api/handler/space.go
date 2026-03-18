@@ -36,7 +36,7 @@ func NewSpaceHandler(config *config.Config) (*SpaceHandler, error) {
 		space:                    c,
 		sensitive:                ssc,
 		repo:                     repo,
-		spaceStatusCheckInterval: 5 * time.Second,
+		spaceStatusCheckInterval: time.Duration(config.Space.StatusCheckInterval) * time.Second,
 	}, nil
 }
 

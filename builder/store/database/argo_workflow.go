@@ -24,7 +24,8 @@ type ArgoWorkFlowStore interface {
 	// delete workflow by id
 	DeleteWorkFlow(ctx context.Context, id int64) error
 	ListAllRunningEvaluations(ctx context.Context) (WorkFlows []ArgoWorkflow, err error)
-	GetClusterWorkflows(ctx context.Context, req types.ClusterWFReq) ([]ArgoWorkflow, int, error)
+GetClusterWorkflows(ctx context.Context, req types.ClusterWFReq) ([]ArgoWorkflow, int, error)
+	ListWorkflowsByTimeRange(ctx context.Context, req types.WorkflowTimeRangeReq) ([]ArgoWorkflow, int, error)
 }
 
 func NewArgoWorkFlowStore() ArgoWorkFlowStore {
@@ -177,6 +178,41 @@ func (s *argoWorkFlowStoreImpl) GetClusterWorkflows(ctx context.Context, req typ
 	}
 
 	query = query.Order("id DESC").Limit(req.Per).Offset((req.Page - 1) * req.Per)
+	err = query.Scan(ctx, &result)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return result, total, nil
+}
+
+
+func (s *argoWorkFlowStoreImpl) ListWorkflowsByTimeRange(ctx context.Context, req types.WorkflowTimeRangeReq) ([]ArgoWorkflow, int, error) {
+	var result []ArgoWorkflow
+	query := s.db.Operator.Core.NewSelect().Model(&result)
+
+	if req.StartTime != nil {
+		query = query.Where("submit_time >= ?", req.StartTime)
+	}
+	if req.EndTime != nil {
+		query = query.Where("submit_time <= ?", req.EndTime)
+	}
+
+	// Get total count
+	total, err := query.Count(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// Apply pagination
+	if req.PageSize > 0 {
+		query = query.Limit(req.PageSize)
+	}
+	if req.Page > 0 {
+		query = query.Offset((req.Page - 1) * req.PageSize)
+	}
+
+	query = query.Order("submit_time DESC")
 	err = query.Scan(ctx, &result)
 	if err != nil {
 		return nil, 0, err

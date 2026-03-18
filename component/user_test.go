@@ -502,3 +502,27 @@ func TestUserComponent_Finetunes(t *testing.T) {
 	require.Equal(t, 100, total)
 	require.Equal(t, []types.ArgoWorkFlowRes{{ID: 1}}, data)
 }
+
+func TestUserComponent_LikesSkills(t *testing.T) {
+	ctx := context.TODO()
+	uc := initializeTestUserComponent(ctx, t)
+
+	req := &types.UserMCPsReq{
+		Owner:       "owner",
+		CurrentUser: "user",
+		PageOpts: types.PageOpts{
+			Page:     1,
+			PageSize: 10,
+		},
+	}
+	uc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{ID: 1}, nil)
+	uc.mocks.stores.SkillMock().EXPECT().UserLikesSkills(ctx, int64(1), 10, 1).Return([]database.Skill{
+		{ID: 1, Repository: &database.Repository{Name: "foo"}},
+	}, 100, nil)
+	data, total, err := uc.LikesSkills(ctx, req)
+	require.Nil(t, err)
+	require.Equal(t, 100, total)
+	require.Equal(t, []types.Skill{
+		{ID: 1, Name: "foo"},
+	}, data)
+}

@@ -86,7 +86,7 @@ func (h *DatasetHandler) Create(ctx *gin.Context) {
 		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
 			return
-		} else if errors.Is(err, errorx.ErrDatabaseDuplicateKey) {
+		} else if errors.Is(err, errorx.ErrDatabaseDuplicateKey) || errors.Is(err, errorx.ErrRepoAlreadyExist) || errors.Is(err, errorx.ErrSpaceNameAlreadyExist) {
 			httpbase.BadRequestWithExt(ctx, err)
 		} else {
 			slog.ErrorContext(ctx.Request.Context(), "Failed to create dataset", slog.Any("error", err))

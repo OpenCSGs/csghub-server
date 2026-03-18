@@ -554,3 +554,26 @@ func TestUserHandler_GetUserFinetunes(t *testing.T) {
 		"total": 100,
 	})
 }
+
+func TestUserHandler_LikesSkills(t *testing.T) {
+	tester := NewUserTester(t).WithHandleFunc(func(h *UserHandler) gin.HandlerFunc {
+		return h.LikesSkills
+	})
+	tester.WithUser()
+
+	tester.mocks.user.EXPECT().LikesSkills(tester.Ctx(), &types.UserMCPsReq{
+		Owner:       "foo",
+		CurrentUser: "u",
+		PageOpts: types.PageOpts{
+			Page:     1,
+			PageSize: 10,
+		},
+	}).Return([]types.Skill{{Name: "sk"}}, 100, nil)
+
+	tester.WithParam("username", "foo").AddPagination(1, 10).Execute()
+
+	tester.ResponseEq(t, 200, tester.OKText, gin.H{
+		"data":  []types.Skill{{Name: "sk"}},
+		"total": 100,
+	})
+}

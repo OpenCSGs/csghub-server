@@ -5,6 +5,18 @@ import (
 	"time"
 )
 
+const (
+	CSGBotHeaderUserUUID  = "X-CSG-User-UUID"
+	CSGBotHeaderUserName  = "X-CSG-User-Name"
+	CSGBotHeaderUserToken = "X-CSG-User-Token"
+	CSGBotHeaderRequestID = "X-CSG-Request-Id"
+	CSGBotHeaderAgentName = "X-CSG-Agent-Name"
+	CSGBotHeaderSessionID = "X-CSG-Session-Id"
+)
+
+// AgentichubSkillsTagName is the tag name for platform/built-in agent skills.
+const AgentichubSkillsTagName = "agentichub-skills"
+
 // AgentConfig represents the agent system configuration
 type AgentConfig struct {
 	ID        int64          `json:"id"`
@@ -83,6 +95,7 @@ type AgentType string
 const (
 	AgentTypeLangflow AgentType = "langflow"
 	AgentTypeCode     AgentType = "code"
+	AgentTypeOpenClaw AgentType = "openclaw"
 )
 
 func (t AgentType) String() string {
@@ -237,6 +250,32 @@ type AgentInstanceSessionHistory struct {
 type AgentInstanceSessionResponse struct {
 	SessionUUID string   `json:"session_uuid"`
 	Histories   []string `json:"histories"` // list of history contents
+}
+
+// AgentSessionShareResponse represents the response for creating a shared session.
+type AgentSessionShareResponse struct {
+	ShareUUID string `json:"share_uuid"`
+	ExpiresAt int64  `json:"expires_at"`
+}
+
+// AgentSessionShareTokenResponse represents the response for creating a share token.
+type AgentSessionShareTokenResponse struct {
+	Token string `json:"token"`
+}
+
+// AgentSharedSessionResponse represents the public shared session response.
+type AgentSharedSessionResponse struct {
+	Session   *AgentSharedSession            `json:"session"`
+	Histories []*AgentInstanceSessionHistory `json:"histories"`
+}
+
+// AgentSharedSession represents the minimal shared session view.
+type AgentSharedSession struct {
+	SessionUUID string `json:"session_uuid"`
+	InstanceID  int64  `json:"instance_id"`
+	MaxTurn     int64  `json:"max_turn"`
+	UserUUID    string `json:"user_uuid"`
+	Name        string `json:"name"`
 }
 
 type AgentSessionHistoryFeedback string
@@ -396,6 +435,17 @@ type AgentMonitorRequest struct {
 	InstanceIDs []int64 `json:"instance_ids" binding:"required"`
 }
 
+type AgentMCPServerMonitorRequest struct {
+	MonitorID    string   `json:"monitor_id" binding:"required"`
+	MCPServerIDs []string `json:"mcp_server_ids" binding:"required,min=1"`
+}
+
+type AgentMCPServerStatusResponse struct {
+	ID     string `json:"id"`               // MCP server ID (format: "builtin:{id}" or "user:{id}")
+	Status string `json:"status,omitempty"` // Status: "connected" or "error"
+	Error  string `json:"error,omitempty"`  // Error message if status check failed
+}
+
 // AgentMCPServerConnectionType represents the connection type for MCP servers
 type AgentMCPServerConnectionType string
 
@@ -429,6 +479,8 @@ type AgentMCPServerFilter struct {
 	BuiltIn     *bool   `json:"built_in,omitempty"`     // Filter by built-in status
 	Protocol    *string `json:"protocol,omitempty"`     // Filter by protocol (streamable, sse)
 	NeedInstall *bool   `json:"need_install,omitempty"` // Filter by need_install status
+	Status      *string `json:"status,omitempty"`       // Filter by status (connected, disconnected, error)
+	Installed   *bool   `json:"installed,omitempty"`    // Filter by installed status
 }
 
 // CreateAgentMCPServerRequest represents a request to create an agent MCP server
@@ -452,39 +504,89 @@ type UpdateAgentMCPServerRequest struct {
 	Env         *map[string]any `json:"env,omitempty"`
 }
 
+// InspectMCPServerRequest represents a request to inspect an MCP server directly.
+type InspectMCPServerRequest struct {
+	Protocol string         `json:"protocol" binding:"required,oneof=streamable sse"`
+	URL      string         `json:"url" binding:"required"`
+	Headers  map[string]any `json:"headers,omitempty"`
+}
+
 // AgentMCPServerListItem represents an MCP server in list responses
 type AgentMCPServerListItem struct {
-	ID          string    `json:"id"` // String ID (format: "builtin:{id}" or "user:{id}")
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
-	URL         string    `json:"url"`
-	Owner       string    `json:"owner"`
-	Avatar      string    `json:"avatar"`
-	Protocol    string    `json:"protocol,omitempty"`
-	BuiltIn     bool      `json:"built_in"`
-	NeedInstall bool      `json:"need_install"`
-	IsPinned    bool      `json:"is_pinned"` // Whether the MCP server is pinned by the user
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID           string         `json:"id"` // String ID (format: "builtin:{id}" or "user:{id}")
+	Name         string         `json:"name"`
+	Description  string         `json:"description"`
+	URL          string         `json:"url"`
+	Owner        string         `json:"owner"`
+	Avatar       string         `json:"avatar"`
+	Protocol     string         `json:"protocol,omitempty"`
+	BuiltIn      bool           `json:"built_in"`
+	NeedInstall  bool           `json:"need_install"`
+	Installed    bool           `json:"installed"`
+	Status       string         `json:"status,omitempty"` // Connection status: 'connected'，'error'
+	Capabilities map[string]any `json:"capabilities,omitempty"`
+	IsPinned     bool           `json:"is_pinned"` // Whether the MCP server is pinned by the user
+	CreatedAt    time.Time      `json:"created_at"`
+	UpdatedAt    time.Time      `json:"updated_at"`
 }
 
 // AgentMCPServerDetail represents a complete MCP server with all configuration details
 type AgentMCPServerDetail struct {
-	ID          string         `json:"id"` // String ID (format: "builtin:{id}" or "user:{id}")
-	Name        string         `json:"name"`
-	Description string         `json:"description"`
-	UserUUID    string         `json:"user_uuid"`
-	Owner       string         `json:"owner"`
-	Avatar      string         `json:"avatar"`
-	Protocol    string         `json:"protocol,omitempty"`
-	URL         string         `json:"url,omitempty"`
-	Headers     map[string]any `json:"headers,omitempty"`
-	Env         map[string]any `json:"env,omitempty"`
-	BuiltIn     bool           `json:"built_in"`
-	NeedInstall bool           `json:"need_install"`
-	IsPinned    bool           `json:"is_pinned"` // Whether the MCP server is pinned by the user
-	CreatedAt   time.Time      `json:"created_at"`
-	UpdatedAt   time.Time      `json:"updated_at"`
+	ID              string         `json:"id"` // String ID (format: "builtin:{id}" or "user:{id}")
+	Name            string         `json:"name"`
+	Description     string         `json:"description"`
+	UserUUID        string         `json:"user_uuid"`
+	Owner           string         `json:"owner"`
+	Avatar          string         `json:"avatar"`
+	Protocol        string         `json:"protocol,omitempty"`
+	URL             string         `json:"url,omitempty"`
+	Headers         map[string]any `json:"headers,omitempty"`
+	Env             map[string]any `json:"env,omitempty"`
+	BuiltIn         bool           `json:"built_in"`
+	NeedInstall     bool           `json:"need_install"`
+	Installed       bool           `json:"installed"`
+	Status          string         `json:"status,omitempty"`            // Connection status: 'connected', 'error'
+	Capabilities    map[string]any `json:"capabilities,omitempty"`      // Cached capabilities from capabilities table
+	LastInspectedAt *time.Time     `json:"last_inspected_at,omitempty"` // Last inspection time
+	IsPinned        bool           `json:"is_pinned"`                   // Whether the MCP server is pinned by the user
+	CreatedAt       time.Time      `json:"created_at"`
+	UpdatedAt       time.Time      `json:"updated_at"`
+}
+
+// AgentMCPServerStatus represents cached status for an MCP server
+type AgentMCPServerStatus struct {
+	ID              int64          `json:"id"`
+	ServerID        string         `json:"server_id"` // "builtin:{id}" or "user:{id}"
+	UserUUID        string         `json:"user_uuid,omitempty"`
+	Status          string         `json:"status"` // 'connected', 'error'
+	Error           string         `json:"error,omitempty"`
+	Capabilities    map[string]any `json:"capabilities"` // tools, resources, prompts, resource_templates
+	LastInspectedAt *time.Time     `json:"last_inspected_at,omitempty"`
+	CreatedAt       time.Time      `json:"created_at"`
+	UpdatedAt       time.Time      `json:"updated_at"`
+}
+
+type AgentMCPServerInspectTarget struct {
+	ServerID string         `json:"server_id"`
+	UserUUID string         `json:"user_uuid,omitempty"`
+	Protocol string         `json:"protocol"`
+	URL      string         `json:"url"`
+	Headers  map[string]any `json:"headers,omitempty"`
+}
+
+type AgentMCPServerInspectAllRequest struct {
+	Page int `json:"page"`
+	Per  int `json:"per"`
+}
+
+type AgentMCPServerInspectAllResponse struct {
+	Targets  []AgentMCPServerInspectTarget `json:"targets"`
+	NextPage int                           `json:"next_page"`
+	Done     bool                          `json:"done"`
+}
+
+type AgentMCPServerInspectBatchRequest struct {
+	Targets []AgentMCPServerInspectTarget `json:"targets"`
 }
 
 type InspectMCPServerResponse struct {
@@ -613,6 +715,7 @@ const (
 	AgentUserPreferenceEntityTypeAgentTask          = "agent_task"
 	AgentUserPreferenceEntityTypePrompt             = "agent_prompt"
 	AgentUserPreferenceEntityTypeAgentModel         = "agent_model"
+	AgentUserPreferenceEntityTypeAgentSkill         = "agent_skill"
 )
 
 // AgentUserPreferenceAction represents the type of preference action
@@ -622,7 +725,33 @@ const (
 
 // AgentUserPreferenceRequest represents a request to set or remove a preference
 type AgentUserPreferenceRequest struct {
-	EntityType string `json:"entity_type" binding:"required,oneof=agent_instance agent_knowledge_base agent_template agent_mcp_server agent_task agent_prompt agent_model"`
+	EntityType string `json:"entity_type" binding:"required,oneof=agent_instance agent_knowledge_base agent_template agent_mcp_server agent_task agent_prompt agent_model agent_skill"`
 	EntityID   string `json:"entity_id" binding:"required"`
 	Preference string `json:"preference" binding:"required,oneof=pin"`
+}
+
+// AgentSkillListItem represents a skill in the agent skills list response.
+// Used for both bun scan (List query) and API JSON; Private is scan-only, Public is set after scan.
+type AgentSkillListItem struct {
+	ID          int64     `bun:",scanonly" json:"id"`
+	Name        string    `bun:",scanonly" json:"name"`
+	Description string    `bun:",scanonly" json:"description"`
+	Path        string    `bun:",scanonly" json:"path"`
+	Private     bool      `bun:",scanonly" json:"-"`                   // from DB; Public is derived as !Private
+	Public      bool      `json:"public"`                              // set after scan
+	IsPinned    bool      `bun:",scanonly" json:"is_pinned"`           // true if pinned by user
+	PinnedAt    time.Time `bun:",scanonly" json:"pinned_at,omitempty"` // when pinned (optional in API)
+	BuiltIn     bool      `bun:",scanonly" json:"built_in"`            // true if platform skill (has agentichub-skills tag)
+	Owner       string    `bun:",scanonly" json:"owner,omitempty"`
+	OwnerAvatar string    `bun:",scanonly" json:"owner_avatar,omitempty"`
+	CreatedAt   time.Time `bun:",scanonly" json:"created_at"`
+	UpdatedAt   time.Time `bun:",scanonly" json:"updated_at"`
+}
+
+// AgentSkillFilter for list filtering
+type AgentSkillFilter struct {
+	Search     string `json:"search,omitempty" form:"search"`
+	UserUUID   string `json:"user_uuid"`
+	PinEnabled bool   `json:"pin_enabled,omitempty"`
+	BuiltIn    *bool  `json:"built_in,omitempty" form:"built_in"` // nil = all, true = built-in only, false = user-created only
 }

@@ -261,11 +261,13 @@ func TestDeployer_Status(t *testing.T) {
 			ClusterID: "test",
 		}
 		deploy := &database.Deploy{
-			Status:  common.Building,
-			SvcName: "svc",
+			Status:    common.Building,
+			SvcName:   "svc",
+			ClusterID: "test",
+			Instances: nil,
 		}
 		mockClusterInfoStore := mockdb.NewMockClusterInfoStore(t)
-		mockClusterInfoStore.EXPECT().GetClusterResources(mock.Anything, mock.Anything).
+		mockClusterInfoStore.EXPECT().GetClusterResources(mock.Anything, "test").
 			Return(&types.ClusterRes{
 				Enable:         true,
 				LastUpdateTime: time.Now().Unix(),
@@ -273,23 +275,15 @@ func TestDeployer_Status(t *testing.T) {
 			}, nil)
 		cfg := config.Config{}
 		cfg.Runner.HearBeatIntervalInSec = 120
-		mockRunner := mockrunner.NewMockRunner(t)
 		mockDeployTaskStore := mockdb.NewMockDeployTaskStore(t)
 		mockDeployTaskStore.EXPECT().GetDeployByID(mock.Anything, dr.DeployID).
 			Return(deploy, nil)
 
 		d := &deployer{
 			deployTaskStore: mockDeployTaskStore,
-			imageRunner:     mockRunner,
 			clusterStore:    mockClusterInfoStore,
 			config:          &cfg,
 		}
-		mockRunner.EXPECT().Exist(mock.Anything, mock.Anything).
-			Return(&types.StatusResponse{
-				DeployID: 1,
-				UserID:   "",
-				Code:     common.Stopped,
-			}, nil)
 
 		svcName, deployStatus, instances, err := d.Status(context.TODO(), dr, false)
 		require.Nil(t, err)
@@ -301,21 +295,23 @@ func TestDeployer_Status(t *testing.T) {
 
 	t.Run("cache miss and not running", func(t *testing.T) {
 		dr := types.DeployRepo{
-			DeployID: 1,
-			UserUUID: "1",
-			Path:     "namespace/name",
-			Type:     types.InferenceType,
+			DeployID:  1,
+			UserUUID:  "1",
+			Path:      "namespace/name",
+			Type:      types.InferenceType,
+			ClusterID: "test",
 		}
 		deploy := &database.Deploy{
-			Status:  common.BuildSuccess,
-			SvcName: "svc",
+			Status:    common.BuildSuccess,
+			SvcName:   "svc",
+			ClusterID: "test",
+			Instances: nil,
 		}
-		mockRunner := mockrunner.NewMockRunner(t)
 		mockDeployTaskStore := mockdb.NewMockDeployTaskStore(t)
 		mockDeployTaskStore.EXPECT().GetDeployByID(mock.Anything, dr.DeployID).
 			Return(deploy, nil)
 		mockClusterInfoStore := mockdb.NewMockClusterInfoStore(t)
-		mockClusterInfoStore.EXPECT().GetClusterResources(mock.Anything, mock.Anything).
+		mockClusterInfoStore.EXPECT().GetClusterResources(mock.Anything, "test").
 			Return(&types.ClusterRes{
 				Enable:         true,
 				LastUpdateTime: time.Now().Unix(),
@@ -325,17 +321,9 @@ func TestDeployer_Status(t *testing.T) {
 		cfg.Runner.HearBeatIntervalInSec = 120
 		d := &deployer{
 			deployTaskStore: mockDeployTaskStore,
-			imageRunner:     mockRunner,
 			clusterStore:    mockClusterInfoStore,
 			config:          &cfg,
 		}
-
-		mockRunner.EXPECT().Exist(mock.Anything, mock.Anything).
-			Return(&types.StatusResponse{
-				DeployID: 1,
-				UserID:   "",
-				Code:     int(common.BuildSuccess),
-			}, nil)
 
 		svcName, deployStatus, instances, err := d.Status(context.TODO(), dr, false)
 		require.Nil(t, err)
@@ -347,20 +335,25 @@ func TestDeployer_Status(t *testing.T) {
 
 	t.Run("cache hit and running", func(t *testing.T) {
 		dr := types.DeployRepo{
-			DeployID: 1,
-			UserUUID: "1",
-			Path:     "namespace/name",
-			Type:     types.InferenceType,
-			ModelID:  1,
+			DeployID:  1,
+			UserUUID:  "1",
+			Path:      "namespace/name",
+			Type:      types.InferenceType,
+			ModelID:   1,
+			ClusterID: "test",
 		}
 		// build success status in db
 		deploy := &database.Deploy{
-			Status:  common.BuildSuccess,
-			SvcName: "svc",
+			Status:    common.BuildSuccess,
+			SvcName:   "svc",
+			ClusterID: "test",
+			Instances: []types.Instance{{
+				Name: "instance1",
+			}},
 		}
 
 		mockClusterInfoStore := mockdb.NewMockClusterInfoStore(t)
-		mockClusterInfoStore.EXPECT().GetClusterResources(mock.Anything, mock.Anything).
+		mockClusterInfoStore.EXPECT().GetClusterResources(mock.Anything, "test").
 			Return(&types.ClusterRes{
 				Enable:         true,
 				LastUpdateTime: time.Now().Unix(),
@@ -370,30 +363,18 @@ func TestDeployer_Status(t *testing.T) {
 		mockDeployTaskStore.EXPECT().GetDeployByID(mock.Anything, dr.DeployID).
 			Return(deploy, nil)
 
-		mockRunner := mockrunner.NewMockRunner(t)
-
 		cfg := config.Config{}
 		cfg.Runner.HearBeatIntervalInSec = 120
 		d := &deployer{
 			deployTaskStore: mockDeployTaskStore,
-			imageRunner:     mockRunner,
 			clusterStore:    mockClusterInfoStore,
 			config:          &cfg,
 		}
-		mockRunner.EXPECT().Exist(mock.Anything, mock.Anything).
-			Return(&types.StatusResponse{
-				DeployID: 1,
-				UserID:   "",
-				Code:     common.Running,
-				Instances: []types.Instance{{
-					Name: "instance1",
-				}},
-			}, nil)
 
 		svcName, deployStatus, instances, err := d.Status(context.TODO(), dr, false)
 		require.Nil(t, err)
 		require.Equal(t, "svc", svcName)
-		require.Equal(t, common.Running, deployStatus)
+		require.Equal(t, common.BuildSuccess, deployStatus)
 		require.Len(t, instances, 1)
 
 	})

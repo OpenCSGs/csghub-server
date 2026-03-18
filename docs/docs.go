@@ -15,6 +15,1330 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/accounting/credit/balance": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Get all users balance, used for admin",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounting"
+                ],
+                "summary": "Get all users balance",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "current_user",
+                        "name": "current_user",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "per",
+                        "name": "per",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "per page",
+                        "name": "page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/accounting/credit/low-balance-warn": {
+            "put": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Set the low balance warning threshold for the current authenticated user.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounting"
+                ],
+                "summary": "Set low balance warning threshold",
+                "parameters": [
+                    {
+                        "description": "LowBalanceWarn request body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.SetLowBalanceWarnReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Low balance warning successfully set",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request, invalid JSON format",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized, user not found",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/accounting/credit/{id}/balance": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Get user balance by user uuid, used for admin or current user",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounting"
+                ],
+                "summary": "Get user balance by user uuid",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "user uuid",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current_user",
+                        "name": "current_user",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/accounting/credit/{id}/bills": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "List user bills by user uuid and start date and end date",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounting"
+                ],
+                "summary": "List user bills by user uuid and start date and end date",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "user uuid",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "enum": [
+                            10,
+                            11,
+                            12,
+                            20
+                        ],
+                        "type": "integer",
+                        "default": 10,
+                        "description": "scene",
+                        "name": "scene",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "start_date, format: '2024-06-12'",
+                        "name": "start_date",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "end_date, format: '2024-07-12'",
+                        "name": "end_date",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current_user",
+                        "name": "current_user",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "per",
+                        "name": "per",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "per page",
+                        "name": "page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/accounting/credit/{id}/recharge": {
+            "put": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Recharge fee for account, used for admin",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounting"
+                ],
+                "summary": "Recharge fee for account",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "user uuid",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current_user",
+                        "name": "current_user",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.RechargeReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/accounting/credit/{id}/recharge/list": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "List recharges by user uuid and start time and end time",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounting"
+                ],
+                "summary": "List recharges by user uuid and start time and end time",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "user uuid",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "activity_id",
+                        "name": "activity_id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "start_time, format: '2024-06-12 08:27:22'",
+                        "name": "start_time",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "end_time, format: '2024-06-12 17:17:22'",
+                        "name": "end_time",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current_user",
+                        "name": "current_user",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "per",
+                        "name": "per",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "per page",
+                        "name": "page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/accounting/credit/{id}/statements": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "List statements by user uuid and start time and end time",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounting"
+                ],
+                "summary": "List statements by user uuid and start time and end time",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "user uuid",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "enum": [
+                            10,
+                            11,
+                            12,
+                            20
+                        ],
+                        "type": "integer",
+                        "default": 10,
+                        "description": "scene",
+                        "name": "scene",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "instance name",
+                        "name": "instance_name",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "start_time, format: '2024-06-12 08:27:22'",
+                        "name": "start_time",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "end_time, format: '2024-06-12 17:17:22'",
+                        "name": "end_time",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current_user",
+                        "name": "current_user",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "per",
+                        "name": "per",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "per page",
+                        "name": "page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/accounting/invoice/admin/list": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "List all applicable invoices based on the request parameters provided by the administrator.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounting-Invoices"
+                ],
+                "summary": "List applicable invoices for the administrator",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Authorization token (Bearer \u003ctoken\u003e)",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "Invoice list request parameters",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.AccInvoiceListReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Applicable invoice list retrieved successfully",
+                        "schema": {
+                            "$ref": "#/definitions/types.AccInvoiceListResp"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request format",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Server error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
+        "/accounting/invoice/admin/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Get an invoice by ID for administrators.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounting-Invoices"
+                ],
+                "summary": "Get an invoice by ID for administrators.(only admin)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Authorization token (Bearer \u003ctoken\u003e)",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Invoice ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Get invoice successful",
+                        "schema": {
+                            "$ref": "#/definitions/types.AccInvoiceResp"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request format",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Server error",
+                        "schema": {}
+                    }
+                }
+            },
+            "put": {
+                "description": "The administrator updates the invoice information with the specified ID. Invoice status eq issued,failed",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounting-Invoices"
+                ],
+                "summary": "Update invoice information (admin)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Authorization token (Bearer \u003ctoken\u003e)",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Invoice ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Update request parameters",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.AdminUpdateInvoiceReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successfully return the updated invoice information",
+                        "schema": {
+                            "$ref": "#/definitions/types.AccInvoiceResp"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request format",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Server error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Delete an invoice by admin based on the provided invoice ID.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounting-Invoices"
+                ],
+                "summary": "Delete an invoice by admin",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Authorization token (Bearer \u003ctoken\u003e)",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Invoice ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Delete successful",
+                        "schema": {}
+                    },
+                    "400": {
+                        "description": "Bad request format",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Server error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
+        "/accounting/invoice/create": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Create a new invoice based on the request parameters provided by the user. Before creation, check the bill date, invoice amount, etc.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounting-Invoices"
+                ],
+                "summary": "Create a new invoice",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Authorization token (Bearer \u003ctoken\u003e)",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "Invoice creation request parameters",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.AccInvoiceCreateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Invoice created successfully"
+                    },
+                    "400": {
+                        "description": "Bad request format",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Server error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
+        "/accounting/invoice/dashboard": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Get invoice dashboard data, including non-invoiceable amount, invoiced amount, and uninvoiced amount for the current month, based on the time range and user ID provided by the user.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounting-Invoices"
+                ],
+                "summary": "Get invoice dashboard data",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Authorization token (Bearer \u003ctoken\u003e)",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "Invoice Dashboard request parameters",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.AccInvoiceDashboardReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Invoice dashboard data retrieved successfully",
+                        "schema": {
+                            "$ref": "#/definitions/types.AccInvoiceDashboardResp"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request format",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Server error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
+        "/accounting/invoice/invoicable": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Get the list of invoicable items based on the user's UUID and time range.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounting-Invoices"
+                ],
+                "summary": "Get the list of invoicable items",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Authorization token (Bearer \u003ctoken\u003e)",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "Invoicable request parameters",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.AccInvoicableReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Invoicable list retrieved successfully",
+                        "schema": {
+                            "$ref": "#/definitions/types.AccInvoicableResp"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request format",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Server error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
+        "/accounting/invoice/list": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "List the invoices of a specified user based on the request parameters provided by the user.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounting-Invoices"
+                ],
+                "summary": "List the user's invoice list",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Authorization token (Bearer \u003ctoken\u003e)",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "Invoice list request parameters",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.AccInvoiceListReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Invoice list retrieved successfully",
+                        "schema": {
+                            "$ref": "#/definitions/types.AccInvoiceListResp"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request format",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Server error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
+        "/accounting/invoice/title": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Creates a new invoice title.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounting-Invoices"
+                ],
+                "summary": "Create a new invoice title.",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Authorization token (Bearer \u003ctoken\u003e)",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "Invoice title information",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.AccInvoiceTitleReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Creation successful",
+                        "schema": {
+                            "$ref": "#/definitions/types.AccInvoiceTitleResp"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request format",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Server error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
+        "/accounting/invoice/title/list": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "List all invoice titles",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounting-Invoices"
+                ],
+                "summary": "List all invoice titles",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Authorization token (Bearer \u003ctoken\u003e)",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "Invoice title list request",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.AccInvoiceTitleListReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List successful",
+                        "schema": {
+                            "$ref": "#/definitions/types.AccInvoiceTitleListResp"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request format",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Server error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
+        "/accounting/invoice/title/types": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Get all available invoice title types",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounting-Invoices"
+                ],
+                "summary": "Get the list of invoice title types",
+                "responses": {
+                    "200": {
+                        "description": "List of invoice title types",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request format",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Server error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
+        "/accounting/invoice/title/{id}": {
+            "put": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Update the invoice title information for a user",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounting-Invoices"
+                ],
+                "summary": "Update invoice title",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Authorization token (Bearer \u003ctoken\u003e)",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "Request body containing invoice title information",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.AccInvoiceTitleReq"
+                        }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Invoice title ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {}
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Delete invoice title.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounting-Invoices"
+                ],
+                "summary": "Delete invoice title.",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Authorization token (Bearer \u003ctoken\u003e)",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Invoice title ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Delete successful",
+                        "schema": {}
+                    },
+                    "400": {
+                        "description": "Bad request format",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Server error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
+        "/accounting/invoice/types": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Get all available invoice types",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounting-Invoices"
+                ],
+                "summary": "Get the list of invoice types",
+                "responses": {
+                    "200": {
+                        "description": "List of invoice types",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request format",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Server error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
+        "/accounting/invoice/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Get an invoice by ID.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounting-Invoices"
+                ],
+                "summary": "Get an invoice by ID.",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Authorization token (Bearer \u003ctoken\u003e)",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Invoice ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Get invoice successful",
+                        "schema": {
+                            "$ref": "#/definitions/types.AccInvoiceResp"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request format",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Server error",
+                        "schema": {}
+                    }
+                }
+            }
+        },
         "/accounting/metering/{id}/statements": {
             "get": {
                 "security": [
@@ -119,6 +1443,2279 @@ const docTemplate = `{
                 }
             }
         },
+        "/accounting/multisync/download": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Get account quota statement",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounting"
+                ],
+                "summary": "Get account quota statement",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "repo path",
+                        "name": "repo_path",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "repo type",
+                        "name": "repo_type",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/accounting/multisync/downloads": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Add download count",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounting"
+                ],
+                "summary": "Add download count",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "current_user",
+                        "name": "current_user",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.AcctQuotaStatementReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/accounting/multisync/quota": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Get account quota by user id",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounting"
+                ],
+                "summary": "Get account quota by user id",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "current_user",
+                        "name": "current_user",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/accounting/multisync/quotas": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Add or update account quota",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounting"
+                ],
+                "summary": "Add or update account quota",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "current_user",
+                        "name": "current_user",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.AcctQuotaReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/accounting/price": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "List sku prices",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounting"
+                ],
+                "summary": "List sku prices",
+                "parameters": [
+                    {
+                        "enum": [
+                            "1",
+                            "2"
+                        ],
+                        "type": "string",
+                        "default": "1",
+                        "description": "sku_type",
+                        "name": "sku_type",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "sku_kind",
+                        "name": "sku_kind",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "resource_id",
+                        "name": "resource_id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current_user",
+                        "name": "current_user",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "per",
+                        "name": "per",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "per page",
+                        "name": "page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Add sku price",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounting"
+                ],
+                "summary": "Add sku price",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "current_user",
+                        "name": "current_user",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.AcctPriceCreateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/accounting/price/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Get price by id",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounting"
+                ],
+                "summary": "Get price by id",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current_user",
+                        "name": "current_user",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Update sku price",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounting"
+                ],
+                "summary": "Update sku price",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current_user",
+                        "name": "current_user",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.AcctPriceCreateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Delete price by id",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounting"
+                ],
+                "summary": "Delete price by id",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current_user",
+                        "name": "current_user",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/accounting/recharge/create-pay-order": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Create recharge order",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounting"
+                ],
+                "summary": "Create recharge order",
+                "parameters": [
+                    {
+                        "description": "Recharge request payload",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.AcctRechargeReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.AcctRechargeResp"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/accounting/recharge/list": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "List recharges by user name, order no, recharge status, payment type and time range",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounting"
+                ],
+                "summary": "List recharges by user name, order no, status, payment type and time range",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "user uuid",
+                        "name": "user_uuid",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Order number",
+                        "name": "order_no",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Recharge status",
+                        "name": "recharge_status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Recharge payment type",
+                        "name": "recharge_payment_type",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Start date, format: '2024-06-12'",
+                        "name": "start_date",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "End date, format: '2024-06-12'",
+                        "name": "end_date",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Items per page",
+                        "name": "per",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "Page number",
+                        "name": "page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.RechargesIndexResp"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/accounting/recharge/user-recharge-list": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "List current user recharge list by start_time and end_time and query",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounting"
+                ],
+                "summary": "List current user recharge list by start_time and end_time and query",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Recharge status, options: 'succeed, waitpay'",
+                        "name": "recharge_status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Recharge payment type, options: 'wx_pub_qr, alipay_qr'",
+                        "name": "recharge_payment_type",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Query string against recharge uuid",
+                        "name": "query",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Start time, format: '2024-06-12 08:27:22'",
+                        "name": "start_time",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "End time, format: '2024-06-12 17:17:22'",
+                        "name": "end_time",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Current user identifier",
+                        "name": "current_user",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "default": 50,
+                        "description": "Items per page",
+                        "name": "per",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "Page number",
+                        "name": "page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/accounting/recharge/{id}/status": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Fetch recharge order status by recharge id",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounting"
+                ],
+                "summary": "Fetch recharge order status by recharge id",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "recharge uuid",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.RechargeStatusResp"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/accounting/recharges": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "List recharges by user name, order no, recharge status, payment type and time range",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounting"
+                ],
+                "summary": "List recharges by user name, order no, status, payment type and time range",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "User name",
+                        "name": "user_name",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Order number",
+                        "name": "order_no",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Recharge status",
+                        "name": "recharge_status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Recharge payment type",
+                        "name": "recharge_payment_type",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Start date, format: '2024-06-12'",
+                        "name": "start_date",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "End date, format: '2024-06-12'",
+                        "name": "end_date",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Items per page",
+                        "name": "per",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "Page number",
+                        "name": "page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/accounting/statements": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "List statements by user name, instance name, scene and time range",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounting"
+                ],
+                "summary": "List statements by user name, instance name, scene and time range",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "User name",
+                        "name": "user_name",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Instance name",
+                        "name": "instance_name",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Scene",
+                        "name": "scene",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Start date, format: '2024-06-12'",
+                        "name": "start_date",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "End date, format: '2024-06-12'",
+                        "name": "end_date",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Items per page",
+                        "name": "per",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "Page number",
+                        "name": "page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/accounting/stripe/pay/cancel": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Mark stripe pay session as cancel",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounting"
+                ],
+                "summary": "Mark stripe pay session as cancel",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "session_id",
+                        "name": "session_id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/accounting/stripe/pay/sessions": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "List pay sessions by user uuid and start time and end time",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounting"
+                ],
+                "summary": "List pay sessions by user uuid and start time and end time",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "start_time, format: '2024-06-12 08:27:22'",
+                        "name": "start_time",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "end_time, format: '2024-06-12 17:17:22'",
+                        "name": "end_time",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "user uuid",
+                        "name": "user_uuid",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "session status",
+                        "name": "session_status",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "default": 50,
+                        "description": "per",
+                        "name": "per",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "per page",
+                        "name": "page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Create stripe pay session",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounting"
+                ],
+                "summary": "Create stripe pay session",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "current_user",
+                        "name": "current_user",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.CreateStripeSessionReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/accounting/stripe/pay/sessions/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Get a stripe pay session",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounting"
+                ],
+                "summary": "Get a stripe pay session",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Close a stripe pay session",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounting"
+                ],
+                "summary": "Close a stripe pay session",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/accounting/stripe/pay/success": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Mark stripe pay session as success",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounting"
+                ],
+                "summary": "Mark stripe pay session as success",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "session_id",
+                        "name": "session_id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/accounting/subscriptions": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "List subscriptions by user uuid and start time and end time",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounting"
+                ],
+                "summary": "List subscriptions by user uuid and start time and end time",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "status",
+                        "name": "status",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "sku_type",
+                        "name": "sku_type",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "start_time, format: '2024-06-12 08:27:22'",
+                        "name": "start_time",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "end_time, format: '2024-06-12 17:17:22'",
+                        "name": "end_time",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "user uuid",
+                        "name": "user_uuid",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 50,
+                        "description": "per",
+                        "name": "per",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "per page",
+                        "name": "page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Post a subscription change for a user",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounting"
+                ],
+                "summary": "Post a subscription change for a user",
+                "parameters": [
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.SubscriptionUpdateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/accounting/subscriptions/bills": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "List bills by user uuid and start time and end time",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounting"
+                ],
+                "summary": "List bills by user uuid and start time and end time",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "status",
+                        "name": "status",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "start_time, format: '2024-06-12 08:27:22'",
+                        "name": "start_time",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "end_time, format: '2024-06-12 17:17:22'",
+                        "name": "end_time",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "user uuid",
+                        "name": "user_uuid",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "sku_type",
+                        "name": "sku_type",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "default": 50,
+                        "description": "per",
+                        "name": "per",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "per page",
+                        "name": "page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/accounting/subscriptions/status": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Get user subscription status",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounting"
+                ],
+                "summary": "Get user subscription status",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "sku_type",
+                        "name": "sku_type",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/accounting/subscriptions/status/batch": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Get a bunch of subscriptions status",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounting"
+                ],
+                "summary": "Get a bunch of subscriptions status",
+                "parameters": [
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.SubscriptionBatchStatusReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/accounting/weekly_recharges": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Trigger the accounting service to calculate and process weekly recharges.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounting"
+                ],
+                "summary": "Trigger weekly recharges calculation",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/agent/configs": {
+            "get": {
+                "description": "List all agent system configurations",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Agent"
+                ],
+                "summary": "List Agent Configs",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/types.AgentConfig"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Create a new agent system configuration",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Agent"
+                ],
+                "summary": "Create Agent Config",
+                "parameters": [
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.CreateAgentConfigReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.AgentConfig"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/agent/configs/:id": {
+            "get": {
+                "description": "Get agent system configuration by ID",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Agent"
+                ],
+                "summary": "Get Agent Config",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Agent Config ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.AgentConfig"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "description": "Update agent system configuration",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Agent"
+                ],
+                "summary": "Update Agent Config",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Agent Config ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.UpdateAgentConfigReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.AgentConfig"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "Delete an agent system configuration by ID",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Agent"
+                ],
+                "summary": "Delete Agent Config",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Agent Config ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/repos": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Repository"
+                ],
+                "summary": "Get repo paths with search query",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "current user name",
+                        "name": "current_user",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "search query",
+                        "name": "search",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "enum": [
+                            "model",
+                            "dataset",
+                            "code",
+                            "space",
+                            "mcpserver"
+                        ],
+                        "type": "string",
+                        "description": "repository type query",
+                        "name": "type",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/wordsets": {
+            "get": {
+                "description": "List sensitive word sets",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Moderation"
+                ],
+                "summary": "List sensitive word sets",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Search string",
+                        "name": "search",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/types.SensitiveWordSet"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Create sensitive word set",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Moderation"
+                ],
+                "summary": "Create sensitive word set",
+                "parameters": [
+                    {
+                        "description": "Create sensitive word set",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.CreateSensitiveWordSetReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/wordsets/{id}": {
+            "get": {
+                "description": "Show sensitive word set detail",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Moderation"
+                ],
+                "summary": "Show sensitive word set detail",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Sensitive word set id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.SensitiveWordSet"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "description": "Update sensitive word set",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Moderation"
+                ],
+                "summary": "Update sensitive word set",
+                "parameters": [
+                    {
+                        "description": "Update sensitive word set",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.UpdateSensitiveWordSetReq"
+                        }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Sensitive word set id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
         "/admin/{repo_type}/{namespace}/{name}/change_path": {
             "post": {
                 "security": [
@@ -189,6 +3786,3887 @@ const docTemplate = `{
                         "description": "Bad request",
                         "schema": {
                             "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/agent/instances": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Get all agent instances belonging to the current user",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Agent"
+                ],
+                "summary": "List agent instances for the current user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "search text",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "langflow",
+                            "code"
+                        ],
+                        "type": "string",
+                        "description": "type",
+                        "name": "type",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "built in",
+                        "name": "built_in",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "public",
+                        "name": "public",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "editable",
+                        "name": "editable",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "per",
+                        "name": "per",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "per page",
+                        "name": "page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.ResponseWithTotal"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/types.AgentInstance"
+                                            }
+                                        },
+                                        "total": {
+                                            "type": "integer"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIUnauthorized"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Create a new agent instance from a template. If data is provided, it is used to create the flow.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Agent"
+                ],
+                "summary": "Create a new agent instance",
+                "parameters": [
+                    {
+                        "description": "Agent instance data",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.CreateAgentInstanceRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.AgentInstance"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/agent/instances/by-content-id/{type}/{content_id}": {
+            "put": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Update the details of an existing agent instance by type and content id",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Agent"
+                ],
+                "summary": "Update an existing agent instance by type and content id",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "type",
+                        "name": "type",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "content id",
+                        "name": "content_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Updated instance data",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.UpdateAgentInstanceRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.AgentInstance"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIForbidden"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Permanently delete an agent instance by type and content id",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Agent"
+                ],
+                "summary": "Delete an agent instance by type and content id",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "type",
+                        "name": "type",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "content id",
+                        "name": "content_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIForbidden"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/agent/instances/monitor": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Monitor status for agent instances",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Agent"
+                ],
+                "summary": "Monitor status for agent instances",
+                "parameters": [
+                    {
+                        "description": "Agent monitor request",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.AgentMonitorRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/agent/instances/status": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Monitor status of multiple agent instances using Server-Sent Events. Each event contains status update for a single instance.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "text/event-stream"
+                ],
+                "tags": [
+                    "Agent"
+                ],
+                "summary": "Get status for multiple agent instances with SSE",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Monitor UUID",
+                        "name": "monitor_id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "SSE stream with status updates",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/agent/instances/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Get details of a specific agent instance",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Agent"
+                ],
+                "summary": "Get an agent instance by ID",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "format": "int64",
+                        "description": "Instance ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.AgentInstance"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Update the details of an existing agent instance",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Agent"
+                ],
+                "summary": "Update an existing agent instance",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "format": "int64",
+                        "description": "Instance ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Updated instance data",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.AgentInstance"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIForbidden"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Permanently delete an agent instance",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Agent"
+                ],
+                "summary": "Delete an agent instance",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "format": "int64",
+                        "description": "Instance ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIForbidden"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/agent/instances/{id}/sessions": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "List all sessions for a specific agent instance with pagination",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Agent"
+                ],
+                "summary": "List sessions by instance ID",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Instance ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "page size",
+                        "name": "per",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "current page number",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "search by session name",
+                        "name": "search",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.ResponseWithTotal"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/types.AgentInstanceSession"
+                                            }
+                                        },
+                                        "total": {
+                                            "type": "integer"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Create a new session for an agent instance",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Agent"
+                ],
+                "summary": "Create a new session for an agent instance",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Instance ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Session data",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.CreateAgentInstanceSessionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.CreateAgentInstanceSessionResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/agent/instances/{id}/sessions/{session_uuid}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Get a session by session UUID",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Agent"
+                ],
+                "summary": "Get session by session UUID",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Instance ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Session UUID",
+                        "name": "session_uuid",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.AgentInstanceSession"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Update a session by session UUID",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Agent"
+                ],
+                "summary": "Update session by session UUID",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Instance ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Session UUID",
+                        "name": "session_uuid",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Session data",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.UpdateAgentInstanceSessionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIForbidden"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Delete a session by session UUID",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Agent"
+                ],
+                "summary": "Delete session by session UUID",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Instance ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Session UUID",
+                        "name": "session_uuid",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/agent/instances/{id}/sessions/{session_uuid}/histories": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "List all session histories for a specific session",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Agent"
+                ],
+                "summary": "List session histories by session UUID",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Instance ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Session UUID",
+                        "name": "session_uuid",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Max turn number",
+                        "name": "max_turn",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/types.AgentInstanceSessionHistory"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Create session histories for an agent instance session",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Agent"
+                ],
+                "summary": "Create session histories for an agent instance session",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Instance ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Session UUID",
+                        "name": "session_uuid",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Session history",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.CreateSessionHistoryRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.CreateSessionHistoryResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/agent/instances/{id}/sessions/{session_uuid}/histories/{msg_uuid}/feedback": {
+            "put": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Update the feedback of a session history message",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Agent"
+                ],
+                "summary": "Update the feedback of a session history message",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Instance ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Session UUID",
+                        "name": "session_uuid",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Message UUID",
+                        "name": "msg_uuid",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "feedback for session history message",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.FeedbackSessionHistoryRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/agent/instances/{id}/sessions/{session_uuid}/histories/{msg_uuid}/rewrite": {
+            "put": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Rewrite an output message",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Agent"
+                ],
+                "summary": "Rewrite an output message",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Instance ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Session UUID",
+                        "name": "session_uuid",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Message UUID",
+                        "name": "msg_uuid",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Rewrite session history request",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.RewriteSessionHistoryRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.RewriteSessionHistoryResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/agent/instances/{id}/sessions/{session_uuid}/share": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Create a read-only shared session snapshot for an agent instance session",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Agent"
+                ],
+                "summary": "Share a session",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Instance ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Session UUID",
+                        "name": "session_uuid",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.AgentSessionShareResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIForbidden"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/agent/knowledge-bases": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Get all agent knowledge bases for the current user with filtering and pagination",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Agent"
+                ],
+                "summary": "List agent knowledge bases",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Search term for name field",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Filter by public status",
+                        "name": "public",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Filter by editable status (true = owned by user, false = not owned by user)",
+                        "name": "editable",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 50,
+                        "description": "Items per page",
+                        "name": "per",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "Page number",
+                        "name": "page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.ResponseWithTotal"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/types.AgentKnowledgeBaseListItem"
+                                            }
+                                        },
+                                        "total": {
+                                            "type": "integer"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIUnauthorized"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Create a new agent knowledge base configuration",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Agent"
+                ],
+                "summary": "Create a new agent knowledge base",
+                "parameters": [
+                    {
+                        "description": "Create agent knowledge base request",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.CreateAgentKnowledgeBaseReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.AgentKnowledgeBase"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/agent/knowledge-bases/content-id/{content_id}": {
+            "put": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Update the details of an existing agent knowledge base by its content ID",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Agent"
+                ],
+                "summary": "Update an agent knowledge base by ContentID",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Knowledge base ContentID",
+                        "name": "content_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Updated knowledge base data",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.UpdateAgentKnowledgeBaseRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIForbidden"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Delete an agent knowledge base by its content ID",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Agent"
+                ],
+                "summary": "Delete an agent knowledge base by ContentID",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Knowledge base ContentID",
+                        "name": "content_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIForbidden"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/agent/knowledge-bases/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Get details of a specific agent knowledge base",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Agent"
+                ],
+                "summary": "Get an agent knowledge base by ID",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "format": "int64",
+                        "description": "Knowledge base ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.AgentKnowledgeBaseDetail"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIForbidden"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Update the details of an existing agent knowledge base",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Agent"
+                ],
+                "summary": "Update an existing agent knowledge base",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "format": "int64",
+                        "description": "Knowledge base ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Updated knowledge base data",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.UpdateAgentKnowledgeBaseRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIForbidden"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Delete an agent knowledge base",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Agent"
+                ],
+                "summary": "Delete an agent knowledge base",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "format": "int64",
+                        "description": "Knowledge base ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIForbidden"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/agent/mcp-servers": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Get all agent MCP servers (built-in and user-created) with filtering and pagination",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Agent"
+                ],
+                "summary": "List agent MCP servers",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Search term for name field",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Filter by built-in status",
+                        "name": "built_in",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "streamable",
+                            "sse"
+                        ],
+                        "type": "string",
+                        "description": "Filter by protocol",
+                        "name": "protocol",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Filter by need_install status",
+                        "name": "need_install",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "connected",
+                            "error"
+                        ],
+                        "type": "string",
+                        "description": "Filter by status",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Filter by installed status",
+                        "name": "installed",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 50,
+                        "description": "Items per page",
+                        "name": "per",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "Page number",
+                        "name": "page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.ResponseWithTotal"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/types.AgentMCPServerListItem"
+                                            }
+                                        },
+                                        "total": {
+                                            "type": "integer"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIUnauthorized"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Create a new agent MCP server configuration",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Agent"
+                ],
+                "summary": "Create a new agent MCP server",
+                "parameters": [
+                    {
+                        "description": "MCP server data",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.CreateAgentMCPServerRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.AgentMCPServer"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/agent/mcp-servers/inspect": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Inspect an MCP server and fetch its capabilities (tools, resources, prompts, resource templates). Returns the connection status and capabilities.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Agent"
+                ],
+                "summary": "Inspect an MCP server and fetch capabilities",
+                "parameters": [
+                    {
+                        "description": "Inspect MCP server request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.InspectMCPServerRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.InspectMCPServerResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/agent/mcp-servers/monitor": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Monitor status for MCP servers",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Agent"
+                ],
+                "summary": "Monitor status for MCP servers",
+                "parameters": [
+                    {
+                        "description": "MCP server monitor request",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.AgentMCPServerMonitorRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/agent/mcp-servers/status": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Monitor status of MCP servers using Server-Sent Events. Each event contains status update for a single MCP server.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "text/event-stream"
+                ],
+                "tags": [
+                    "Agent"
+                ],
+                "summary": "Get status for MCP servers with SSE",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Monitor UUID",
+                        "name": "monitor_id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "SSE stream with status updates",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/agent/mcp-servers/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Get details of a specific agent MCP server (built-in or user-created)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Agent"
+                ],
+                "summary": "Get an agent MCP server by ID",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Server ID (format: builtin:{id} or user:{id})",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.AgentMCPServerListItem"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Update the details of an existing agent MCP server (built-in or user-created). For built-in servers, updates are stored as user overrides. For user-created servers, the record is directly updated.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Agent"
+                ],
+                "summary": "Update an existing agent MCP server",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Server ID (format: builtin:{id} or user:{id})",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Updated MCP server data",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.UpdateAgentMCPServerRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "For built-in servers: delete user's override config. For user-created servers: permanently delete the server.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Agent"
+                ],
+                "summary": "Delete an agent MCP server or config",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Server ID (format: builtin:{id} or user:{id})",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIForbidden"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/agent/prompts": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Get all prompts for the current user with pin information and ordering",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Agent"
+                ],
+                "summary": "List agent prompts",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Search term for path field",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Items per page",
+                        "name": "per",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "Page number",
+                        "name": "page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.ResponseWithTotal"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/types.AgentPromptListItem"
+                                            }
+                                        },
+                                        "total": {
+                                            "type": "integer"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIUnauthorized"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/agent/prompts/optimize": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Optimize agent prompt content",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Agent"
+                ],
+                "summary": "Optimize agent prompt",
+                "parameters": [
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.AgentPromptOptimizeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.AgentPromptOptimizeResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/agent/shared/session": {
+            "get": {
+                "description": "Fetch a read-only shared session snapshot by share uuid",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Agent"
+                ],
+                "summary": "Get shared session by share uuid",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Share UUID",
+                        "name": "share_uuid",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.AgentSharedSessionResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "schema": {}
+                    },
+                    "410": {
+                        "description": "Gone",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/agent/tasks": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "List all agent tasks for the current user with filtering and pagination",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Agent"
+                ],
+                "summary": "List agent tasks",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "search by task name",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "finetuneJob",
+                            "inference"
+                        ],
+                        "type": "string",
+                        "description": "filter by task type",
+                        "name": "task_type",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "in_progress",
+                            "completed",
+                            "failed"
+                        ],
+                        "type": "string",
+                        "description": "filter by status",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "filter by instance ID",
+                        "name": "instance_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "filter by session UUID",
+                        "name": "session_uuid",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 50,
+                        "description": "page size",
+                        "name": "per",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "current page number",
+                        "name": "page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.ResponseWithTotal"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/types.AgentTaskListItemResponse"
+                                            }
+                                        },
+                                        "total": {
+                                            "type": "integer"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/agent/tasks/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Get detailed information about a specific agent task",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Agent"
+                ],
+                "summary": "Get agent task detail",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Task ID (primary key)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.AgentTaskDetail"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "404": {
+                        "description": "Task not found",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/agent/templates": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Get all agent templates belonging to the current user",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Agent"
+                ],
+                "summary": "List agent templates for the current user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "search text",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "langflow",
+                            "code"
+                        ],
+                        "type": "string",
+                        "description": "type",
+                        "name": "type",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "per",
+                        "name": "per",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "per page",
+                        "name": "page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.ResponseWithTotal"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/types.AgentTemplate"
+                                            }
+                                        },
+                                        "total": {
+                                            "type": "integer"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIUnauthorized"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Create a new agent template",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Agent"
+                ],
+                "summary": "Create a new agent template",
+                "parameters": [
+                    {
+                        "description": "Agent template data",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.AgentTemplate"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.AgentTemplate"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/agent/templates/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Get details of a specific agent template",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Agent"
+                ],
+                "summary": "Get an agent template by ID",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "format": "int64",
+                        "description": "Template ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.AgentTemplate"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Update the details of an existing agent template",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Agent"
+                ],
+                "summary": "Update an existing agent template",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "format": "int64",
+                        "description": "Template ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Updated template data",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.AgentTemplate"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.AgentTemplate"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIForbidden"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Permanently delete an agent template",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Agent"
+                ],
+                "summary": "Delete an agent template",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "format": "int64",
+                        "description": "Template ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIForbidden"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/agent/templates/{id}/instances": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Get all agent instances created from a specific template",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Agent"
+                ],
+                "summary": "List agent instances by template ID",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "format": "int64",
+                        "description": "Template ID",
+                        "name": "template_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "search term",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "filter by type",
+                        "name": "type",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "per",
+                        "name": "per",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "per page",
+                        "name": "page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.ResponseWithTotal"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/types.AgentInstance"
+                                            }
+                                        },
+                                        "total": {
+                                            "type": "integer"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIUnauthorized"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/agent/user-preferences": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Set a preference (e.g., pin) for an entity.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Agent"
+                ],
+                "summary": "Set a preference for an entity (e.g., pin)",
+                "parameters": [
+                    {
+                        "description": "Preference request",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.AgentUserPreferenceRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIForbidden"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Remove a preference (e.g., unpin) for an entity.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Agent"
+                ],
+                "summary": "Remove a preference for an entity (e.g., unpin)",
+                "parameters": [
+                    {
+                        "description": "Preference removal request",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.AgentUserPreferenceRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIForbidden"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/storage/{bucket}/{key}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Get object using proxy mode. If presigned URL parameters are present, reverse proxy to OSS. Otherwise, use S3 client to fetch object.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "StorageGateway"
+                ],
+                "summary": "Get object from storage",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bucket name",
+                        "name": "bucket",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Object key",
+                        "name": "key",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK (streams object)",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "404": {
+                        "description": "Object not found",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Upload object to storage gateway. If presigned URL parameters are present, the request is reverse proxied to OSS.",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "StorageGateway"
+                ],
+                "summary": "Upload object to storage",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bucket name",
+                        "name": "bucket",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Object key",
+                        "name": "key",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "file",
+                        "description": "File to upload",
+                        "name": "file",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Delete object from storage gateway",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "StorageGateway"
+                ],
+                "summary": "Delete object from storage",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bucket name",
+                        "name": "bucket",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Object key",
+                        "name": "key",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "head": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Get object metadata without downloading the object",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "StorageGateway"
+                ],
+                "summary": "Get object metadata",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bucket name",
+                        "name": "bucket",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Object key",
+                        "name": "key",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "schema": {}
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/api_rate_limits": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "List all api rate limits from database",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ApiRateLimit"
+                ],
+                "summary": "List all api rate limits",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/database.ApiRateLimit"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Create a new api rate limit",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ApiRateLimit"
+                ],
+                "summary": "Create a new api rate limit",
+                "parameters": [
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.ApiRateLimitCreateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/api_rate_limits/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Get an api rate limit by ID from database",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ApiRateLimit"
+                ],
+                "summary": "Get an api rate limit by ID",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "api rate limit ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/database.ApiRateLimit"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Update an api rate limit",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ApiRateLimit"
+                ],
+                "summary": "Update an api rate limit",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "api rate limit ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.ApiRateLimitParam"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Delete an api rate limit",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ApiRateLimit"
+                ],
+                "summary": "Delete an api rate limit",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "api rate limit ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
                         }
                     },
                     "500": {
@@ -429,6 +7907,113 @@ const docTemplate = `{
                 }
             }
         },
+        "/captcha": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "generate captcha",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Captcha"
+                ],
+                "summary": "Generate captcha",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.CaptchaResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "verify captcha with user identity information",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Captcha"
+                ],
+                "summary": "Verify captcha",
+                "parameters": [
+                    {
+                        "description": "Captcha verification request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.CaptchaVerifyRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.CaptchaVerifyResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
         "/cluster": {
             "get": {
                 "security": [
@@ -452,6 +8037,459 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/cluster/admin/deploys": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Query cluster deploys with filters",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Cluster"
+                ],
+                "summary": "Query cluster deploys",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "cluster id",
+                        "name": "cluster_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "cluster node",
+                        "name": "cluster_node",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "status",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "resource id",
+                        "name": "resource_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "search keyword",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 10,
+                        "description": "per page",
+                        "name": "per",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "page",
+                        "name": "page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/database.Deploy"
+                                            }
+                                        },
+                                        "total": {
+                                            "type": "integer"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/cluster/admin/nodes": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Get all cluster nodes with region information",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Cluster"
+                ],
+                "summary": "Get all cluster nodes",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/cluster/admin/nodes/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Get a single cluster node by its ID with region information",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Cluster"
+                ],
+                "summary": "Get cluster node by ID",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Node ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/cluster/admin/nodes/{id}/vxpu/disable": {
+            "put": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Disable a cluster node by its ID",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Cluster"
+                ],
+                "summary": "Disable cluster node",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Node ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/cluster/admin/nodes/{id}/vxpu/enable": {
+            "put": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Enable a cluster node by its ID",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Cluster"
+                ],
+                "summary": "Enable cluster node",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Node ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/cluster/admin/nodes/{id}/{namespace}/set_access_mode": {
+            "put": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Set node access mode",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Cluster"
+                ],
+                "summary": "Set node access mode",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Node ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.SetNodeAccessModeReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/cluster/admin/workflows": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Query cluster workflows with filters",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Cluster"
+                ],
+                "summary": "Query cluster workflows",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "cluster id",
+                        "name": "cluster_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "cluster node",
+                        "name": "cluster_node",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "status",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "resource id",
+                        "name": "resource_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "search keyword",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 10,
+                        "description": "per page",
+                        "name": "per",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "page",
+                        "name": "page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/database.ArgoWorkflow"
+                                            }
+                                        },
+                                        "total": {
+                                            "type": "integer"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -523,6 +8561,112 @@ const docTemplate = `{
                         "in": "query"
                     }
                 ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/cluster/deploys_report": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Export all cluster deploys (Excel-readable CSV) with streaming output",
+                "produces": [
+                    "text/csv"
+                ],
+                "tags": [
+                    "Cluster"
+                ],
+                "summary": "Export cluster deploys as CSV",
+                "parameters": [
+                    {
+                        "enum": [
+                            "all",
+                            "running",
+                            "stopped",
+                            "deployfailed"
+                        ],
+                        "type": "string",
+                        "default": "all",
+                        "description": "status",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "default": "\"\"",
+                        "description": "search",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "filter deploys created after or at this time",
+                        "name": "start_time",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "filter deploys created before or at this time",
+                        "name": "end_time",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "CSV file",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/cluster/public": {
+            "get": {
+                "description": "Get cluster list public",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Cluster"
+                ],
+                "summary": "Get cluster list public",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -1777,6 +9921,592 @@ const docTemplate = `{
                 }
             }
         },
+        "/config/llms": {
+            "get": {
+                "description": "Get LLMConfig in database. Return a list of LLM configurations with optional filtering by keyword and type.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "LLMService"
+                ],
+                "summary": "Get LLM Config",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "define which batch of results to retrieve",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "define the batch size to return in a single response",
+                        "name": "per",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "search in model_name",
+                        "name": "keyword",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "search in type (e.g., 1: optimization, 2: comparison)",
+                        "name": "type",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/types.LLMConfig"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Create LLM Config according to \"model_name\", \"api_endpoint\", \"auth_header\", \"type\", \"enabled\"",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "LLMService"
+                ],
+                "summary": "Create LLM Config",
+                "parameters": [
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.CreateLLMConfigReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.LLMConfig"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/config/llms/{id}": {
+            "get": {
+                "description": "Use LLMConfig.ID to retrieve in database",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "LLMService"
+                ],
+                "summary": "Get detail of llm config by id",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "LLMConfig.ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.LLMConfig"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "description": "Update existing LLM configuration by ID. If input ModelName, ApiEndpoint, AuthHeader, Type, Enabled not null, update in database. Return the updated LLM configuration. If the provided ID does not exist, it returns an error.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "LLMService"
+                ],
+                "summary": "Update LLM Config",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.UpdateLLMConfigReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.LLMConfig"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "Use LLMConfig.ID to delete LLM Config in database",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "LLMService"
+                ],
+                "summary": "Delete LLM Config",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "LLMConfig.ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/config/prompt_prefixes": {
+            "get": {
+                "description": "Get PromptPrefix in database. Return a list of prompt prefixes with optional filtering by keyword and kind.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "LLMService"
+                ],
+                "summary": "Get Prompt Config",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "which batch of results to retrieve",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "the batch size to return in a single response",
+                        "name": "per",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "search in prompt.zh",
+                        "name": "keyword",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "search in prompt.kind",
+                        "name": "kind",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/types.PromptPrefix"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Create PromptPrefix in database according to prompt in Chinese, prompt in English, prompt kind",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "LLMService"
+                ],
+                "summary": "Create Prompt Config",
+                "parameters": [
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.CreatePromptPrefixReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.PromptPrefix"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/config/prompt_prefixes/{id}": {
+            "get": {
+                "description": "Use PromptPrefix.ID to retrieve in database",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "LLMService"
+                ],
+                "summary": "Get detail of prompt config by id",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "PromptPrefix.ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.PromptPrefix"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "description": "Update existing prompt prefix by ID, supports partial updates of Chinese prompt (zh), English prompt (en) and kind fields. Return the updated prompt prefix. If the provided ID does not exist, it returns an error.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "LLMService"
+                ],
+                "summary": "Update Prompt Config",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "prompt_prefix.id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.UpdatePromptPrefixReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.PromptPrefix"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "Use PromptPrefix.ID to Delete PromptPrefix in database",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "LLMService"
+                ],
+                "summary": "Delete Prompt Config",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "PromptPrefix.ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
         "/datasets": {
             "get": {
                 "security": [
@@ -1847,6 +10577,18 @@ const docTemplate = `{
                         "type": "string",
                         "description": "source",
                         "name": "source",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "pending",
+                            "running",
+                            "completed",
+                            "failed"
+                        ],
+                        "type": "string",
+                        "description": "filter by xnet migration status",
+                        "name": "xnet_migration_status",
                         "in": "query"
                     },
                     {
@@ -2505,7 +11247,7 @@ const docTemplate = `{
                 "tags": [
                     "Discussion"
                 ],
-                "summary": "Show a discussion and its comments",
+                "summary": "Show a discussion and its comments with pagination",
                 "parameters": [
                     {
                         "type": "string",
@@ -2513,6 +11255,20 @@ const docTemplate = `{
                         "name": "id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "default": 10,
+                        "description": "per",
+                        "name": "per",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "per page",
+                        "name": "page",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -2691,6 +11447,20 @@ const docTemplate = `{
                         "name": "id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "default": 10,
+                        "description": "per",
+                        "name": "per",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "per page",
+                        "name": "page",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -3004,13 +11774,403 @@ const docTemplate = `{
                 }
             }
         },
-        "/healthz": {
-            "head": {
-                "tags": [
-                    "Health"
+        "/finetunes": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
                 ],
-                "summary": "Health check",
-                "responses": {}
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Finetune"
+                ],
+                "summary": "run fineune with model and dataset",
+                "parameters": [
+                    {
+                        "description": "body setting of finetune",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.FinetuneReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/finetunes/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Finetune"
+                ],
+                "summary": "get Finetune job by id",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.EvaluationRes"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Finetune"
+                ],
+                "summary": "delete finetune job by id",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/finetunes/{id}/logs": {
+            "get": {
+                "security": [
+                    {
+                        "JWT token": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Finetune"
+                ],
+                "summary": "get finetune job logs",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "finetune job id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "since time. Optional values: 10mins, 30mins, 1hour, 6hours, 1day, 2days, 1week",
+                        "name": "since",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/import/gitlab": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Import"
+                ],
+                "summary": "Import all gitlab repository",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "gitlab instance url",
+                        "name": "base_url",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "gitlab instance access token",
+                        "name": "access_token",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "search query",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "per",
+                        "name": "per",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "per page",
+                        "name": "page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/types.RemoteRepository"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/import/gitlab/import": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Import"
+                ],
+                "summary": "Import gitlab repository, used for admin",
+                "parameters": [
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.ImportReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/import/gitlab/import_status": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Import"
+                ],
+                "summary": "Import all gitlab repository",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "per",
+                        "name": "per",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "per page",
+                        "name": "page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.ImportStatusResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
             }
         },
         "/internal/user/emails": {
@@ -3066,6 +12226,198 @@ const docTemplate = `{
                                         },
                                         "total": {
                                             "type": "integer"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/invitations": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "get invitation info of current user",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Invitations"
+                ],
+                "summary": "Get invitation info of current user",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.Invitation"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "create invitation code for current user",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Invitations"
+                ],
+                "summary": "Create invitation code for current user",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.CreateInvitationResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/invitations/activities": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "list invitation activities of current inviter",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Invitations"
+                ],
+                "summary": "List invitation activities of current inviter",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "\"pending\"",
+                        "description": "status",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "start_date",
+                        "name": "start_date",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "end_date",
+                        "name": "end_date",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "per",
+                        "name": "per",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "page",
+                        "name": "page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/types.InvitationActivity"
+                                            }
                                         }
                                     }
                                 }
@@ -3168,6 +12520,502 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/types.User"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/licenses": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "List license",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "License"
+                ],
+                "summary": "List license",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "product",
+                        "name": "product",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "edition",
+                        "name": "edition",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "search",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "current user",
+                        "name": "current_user",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/database.License"
+                                            }
+                                        },
+                                        "total": {
+                                            "type": "integer"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/licenses/import": {
+            "put": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Import a license",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "License"
+                ],
+                "summary": "Import a license",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "current user",
+                        "name": "current_user",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.ImportLicenseReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/licenses/management": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Create a license",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "License"
+                ],
+                "summary": "Create a license",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "current user",
+                        "name": "current_user",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.CreateLicenseReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/licenses/management/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Get a license by id",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "License"
+                ],
+                "summary": "Get a license by id",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "create license file",
+                        "name": "create_license_file",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "current user",
+                        "name": "current_user",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/database.License"
+                                        },
+                                        "license": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Update a license by id",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "License"
+                ],
+                "summary": "Update a license by id",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current user",
+                        "name": "current_user",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.UpdateLicenseReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/licenses/status": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Get active license status",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "License"
+                ],
+                "summary": "Get active license status",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/licenses/verify": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Verify a license",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "License"
+                ],
+                "summary": "Verify a license",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "current user",
+                        "name": "current_user",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.ImportLicenseReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/licenses/{id}": {
+            "delete": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Delete a license by id",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "License"
+                ],
+                "summary": "Delete a license by id",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current user",
+                        "name": "current_user",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
                         }
                     },
                     "400": {
@@ -4589,6 +14437,293 @@ const docTemplate = `{
                 }
             }
         },
+        "/mirror_namespace_mappings": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Mirror"
+                ],
+                "summary": "Get mirror namespace mappings, used for admin",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/database.MirrorNamespaceMapping"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Mirror"
+                ],
+                "summary": "Create mirror namespace mapping, used for admin",
+                "parameters": [
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.CreateMirrorNamespaceMappingReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/database.MirrorNamespaceMapping"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/mirror_namespace_mappings/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Mirror"
+                ],
+                "summary": "Get mirror namespace mapping, used for admin",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/database.MirrorNamespaceMapping"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Mirror"
+                ],
+                "summary": "Update mirror namespace mapping, used for admin",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.UpdateMirrorNamespaceMappingReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/database.MirrorNamespaceMapping"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Mirror"
+                ],
+                "summary": "Delete mirror namespace mapping, used for admin",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
         "/mirrors": {
             "get": {
                 "security": [
@@ -4757,6 +14892,18 @@ const docTemplate = `{
                         "type": "string",
                         "description": "source",
                         "name": "source",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "pending",
+                            "running",
+                            "completed",
+                            "failed"
+                        ],
+                        "type": "string",
+                        "description": "filter by xnet migration status",
+                        "name": "xnet_migration_status",
                         "in": "query"
                     },
                     {
@@ -5263,7 +15410,7 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "description": "deploy setting of instance",
+                        "description": "deploy setting of instance (owner_namespace optional: user or org to create under)",
                         "name": "body",
                         "in": "body",
                         "required": true,
@@ -5295,6 +15442,76 @@ const docTemplate = `{
             }
         },
         "/models/{namespace}/{name}/finetune/{id}": {
+            "put": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "update finetune instance resource_id and cluster_id (deploy must be stopped first)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Model"
+                ],
+                "summary": "Update a finetune instance",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "namespace",
+                        "name": "namespace",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "finetune deploy id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "at least resource_id to update resource and cluster",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.DeployUpdateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
             "delete": {
                 "security": [
                     {
@@ -5352,6 +15569,88 @@ const docTemplate = `{
                         "description": "Bad request",
                         "schema": {
                             "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/models/{namespace}/{name}/finetune/{id}/logs/{instance}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Repository"
+                ],
+                "summary": "get finetune instance logs",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "namespace",
+                        "name": "namespace",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "instance",
+                        "name": "instance",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current_user",
+                        "name": "current_user",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "since time. Optional values: 10mins, 30mins, 1hour, 6hours, 1day, 2days, 1week",
+                        "name": "since",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "401": {
+                        "description": "Permission denied",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIUnauthorized"
                         }
                     },
                     "500": {
@@ -5887,7 +16186,7 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "description": "deploy setting of inference",
+                        "description": "deploy setting of inference (owner_namespace optional: user or org to create inference under)",
                         "name": "body",
                         "in": "body",
                         "required": true,
@@ -5901,6 +16200,295 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/models/{namespace}/{name}/run/versions/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Model"
+                ],
+                "summary": "list all inference versions",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "namespace",
+                        "name": "namespace",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/types.ListInferenceVersionsResp"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Model"
+                ],
+                "summary": "create a new inference version",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "namespace",
+                        "name": "namespace",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "req",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.CreateInferenceVersionReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/models/{namespace}/{name}/run/versions/{id}/traffic": {
+            "put": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Model"
+                ],
+                "summary": "update inference version traffic percent",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "namespace",
+                        "name": "namespace",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "req",
+                        "name": "req",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/types.UpdateInferenceVersionTrafficReq"
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/models/{namespace}/{name}/run/versions/{id}/{commit_id}": {
+            "delete": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Model"
+                ],
+                "summary": "delete inference version",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "namespace",
+                        "name": "namespace",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "commit_id",
+                        "name": "commit_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
                         }
                     },
                     "400": {
@@ -6597,11 +17185,17 @@ const docTemplate = `{
                         "name": "current_user",
                         "in": "query",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "since time. Optional values: 10mins, 30mins, 1hour, 6hours, 1day, 2days, 1week",
+                        "name": "since",
+                        "in": "query"
                     }
                 ],
                 "responses": {
                     "400": {
-                        "description": "Bad request",
+                        "description": "Bad request. May occur when the since time format is unsupported",
                         "schema": {
                             "$ref": "#/definitions/types.APIBadRequest"
                         }
@@ -6799,6 +17393,91 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/modeltrees/scan": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "scan model tree",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Model"
+                ],
+                "summary": "scan model tree",
+                "parameters": [
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "schema": {
+                            "$ref": "#/definitions/types.ScanModels"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/modeltrees/{namespace}/{name}/lineage": {
+            "get": {
+                "description": "get model tree",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Model"
+                ],
+                "summary": "Get model tree",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.ModelTree"
                         }
                     },
                     "400": {
@@ -7059,6 +17738,61 @@ const docTemplate = `{
                 }
             }
         },
+        "/notebooks/{id}/logs/{instance}": {
+            "get": {
+                "security": [
+                    {
+                        "JWT token": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Notebook"
+                ],
+                "summary": "get notebook logs",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "notebook id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "notebook instance name",
+                        "name": "instance",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "since time. Optional values: 10mins, 30mins, 1hour, 6hours, 1day, 2days, 1week",
+                        "name": "since",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "400": {
+                        "description": "Bad request. May occur when the since time format is unsupported",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
         "/notebooks/{id}/start": {
             "put": {
                 "description": "start notebook",
@@ -7103,6 +17837,48 @@ const docTemplate = `{
                 }
             }
         },
+        "/notebooks/{id}/status": {
+            "get": {
+                "security": [
+                    {
+                        "JWT token": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Notebook"
+                ],
+                "summary": "get notebook status",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "notebook id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
         "/notebooks/{id}/stop": {
             "put": {
                 "description": "stop notebook",
@@ -7116,6 +17892,50 @@ const docTemplate = `{
                     "Notebook"
                 ],
                 "summary": "Stop notebook",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "notebook id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/notebooks/{id}/wakeup": {
+            "put": {
+                "description": "Wakeup notebook",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Notebook"
+                ],
+                "summary": "Wakeup notebook",
                 "parameters": [
                     {
                         "type": "string",
@@ -8461,6 +19281,164 @@ const docTemplate = `{
                 }
             }
         },
+        "/organization/{namespace}/evaluations": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "get organization evaluation jobs",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Organization"
+                ],
+                "summary": "Get organization evaluation jobs",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "org name",
+                        "name": "namespace",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "page size",
+                        "name": "per",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "current page number",
+                        "name": "page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.ResponseWithTotal"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/types.ArgoWorkFlowRes"
+                                            }
+                                        },
+                                        "total": {
+                                            "type": "integer"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/organization/{namespace}/finetunes": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "get organization finetune jobs",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Organization"
+                ],
+                "summary": "Get organization finetune jobs",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "org name",
+                        "name": "namespace",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "page size",
+                        "name": "per",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "current page number",
+                        "name": "page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.ResponseWithTotal"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/types.ArgoWorkFlowRes"
+                                            }
+                                        },
+                                        "total": {
+                                            "type": "integer"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
         "/organization/{namespace}/mcps": {
             "get": {
                 "security": [
@@ -8976,6 +19954,85 @@ const docTemplate = `{
                 }
             }
         },
+        "/organization/{namespace}/notebooks": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "get organization notebooks",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Organization"
+                ],
+                "summary": "Get organization notebooks",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "org name",
+                        "name": "namespace",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "page size",
+                        "name": "per",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "current page number",
+                        "name": "page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.ResponseWithTotal"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/types.NotebookRes"
+                                            }
+                                        },
+                                        "total": {
+                                            "type": "integer"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
         "/organization/{namespace}/prompts": {
             "get": {
                 "security": [
@@ -9037,6 +20094,103 @@ const docTemplate = `{
                                             "type": "array",
                                             "items": {
                                                 "$ref": "#/definitions/types.PromptRes"
+                                            }
+                                        },
+                                        "total": {
+                                            "type": "integer"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/organization/{namespace}/run/{repo_type}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "get organization run deploys by deploy type (0-space, 1-inference, 2-finetune)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Organization"
+                ],
+                "summary": "Get organization run deploys (e.g. inference)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "org name",
+                        "name": "namespace",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "enum": [
+                            "model",
+                            "space"
+                        ],
+                        "type": "string",
+                        "description": "model or space",
+                        "name": "repo_type",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "deploy type (0-space, 1-inference, 2-finetune)",
+                        "name": "deploy_type",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "page size",
+                        "name": "per",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "current page number",
+                        "name": "page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.ResponseWithTotal"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/types.DeployRepo"
                                             }
                                         },
                                         "total": {
@@ -9421,6 +20575,464 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/types.CreatePromptRepoReq"
                         }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/prompts/conversations": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "List conversations of user",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Prompt"
+                ],
+                "summary": "List conversations of user",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Create new conversation",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Prompt"
+                ],
+                "summary": "Create new conversation",
+                "parameters": [
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.Conversation"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/prompts/conversations/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Get a conversation by uuid",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Prompt"
+                ],
+                "summary": "Get a conversation by uuid",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "conversation uuid",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Update a conversation title",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Prompt"
+                ],
+                "summary": "Update a conversation title",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "conversation uuid",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.ConversationTitle"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Submit a conversation message",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Prompt"
+                ],
+                "summary": "Submit a conversation message",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "conversation uuid",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.Conversation"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Delete a conversation",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Prompt"
+                ],
+                "summary": "Delete a conversation",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "conversation uuid",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/prompts/conversations/{id}/message/{msgid}/hate": {
+            "put": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Hate a conversation message",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Prompt"
+                ],
+                "summary": "Hate a conversation message",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "conversation uuid",
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "message id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/prompts/conversations/{id}/message/{msgid}/like": {
+            "put": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Like a conversation message",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Prompt"
+                ],
+                "summary": "Like a conversation message",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "conversation uuid",
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "message id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/prompts/conversations/{id}/summary": {
+            "put": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Summarize a conversation title",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Prompt"
+                ],
+                "summary": "Summarize a conversation title",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "conversation uuid",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -10569,6 +22181,45 @@ const docTemplate = `{
                 }
             }
         },
+        "/repos/batch_migrate_to_xnet": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Repository"
+                ],
+                "summary": "Batch migrate all repos to Xnet",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
         "/repos/create": {
             "post": {
                 "security": [
@@ -10619,6 +22270,84 @@ const docTemplate = `{
                 }
             }
         },
+        "/repos/migration_stats": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Repository"
+                ],
+                "summary": "Get xnet migration statistics",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.MigrationStatsResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/repos/stop_all_migrate_to_xnet": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Repository"
+                ],
+                "summary": "Stop all repo migrations to Xnet",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
         "/runtime_framework": {
             "get": {
                 "security": [
@@ -10642,6 +22371,20 @@ const docTemplate = `{
                         "type": "string",
                         "description": "current user",
                         "name": "current_user",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            1,
+                            2,
+                            3,
+                            4,
+                            5
+                        ],
+                        "type": "integer",
+                        "default": 1,
+                        "description": "deploy_type",
+                        "name": "deploy_type",
                         "in": "query"
                     }
                 ],
@@ -11487,6 +23230,479 @@ const docTemplate = `{
                 }
             }
         },
+        "/skills": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "get visiable skills for current user",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Skill"
+                ],
+                "summary": "Get Visiable skills for current user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "current user",
+                        "name": "current_user",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "search text",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "sort by",
+                        "name": "sort",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "opencsg",
+                            "huggingface",
+                            "local"
+                        ],
+                        "type": "string",
+                        "description": "source",
+                        "name": "source",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "per",
+                        "name": "per",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "per page",
+                        "name": "page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.ResponseWithTotal"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/types.Skill"
+                                            }
+                                        },
+                                        "total": {
+                                            "type": "integer"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "create a new skill",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Skill"
+                ],
+                "summary": "Create a new skill",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "current user, the owner",
+                        "name": "current_user",
+                        "in": "query"
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.CreateSkillReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.Skill"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/skills/{namespace}/{name}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "get skill detail",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Skill"
+                ],
+                "summary": "Get skill detail",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "namespace",
+                        "name": "namespace",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current_user",
+                        "name": "current_user",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "need op weight",
+                        "name": "need_op_weight",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "need multi sync",
+                        "name": "need_multi_sync",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.Skill"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "update a exists skill",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Skill"
+                ],
+                "summary": "Update a exists skill",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "namespace",
+                        "name": "namespace",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current user, the owner",
+                        "name": "current_user",
+                        "in": "query"
+                    },
+                    {
+                        "description": "body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.UpdateSkillReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/database.Skill"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "delete a exists skill",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Skill"
+                ],
+                "summary": "Delete a exists skill",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "namespace",
+                        "name": "namespace",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current user, the owner",
+                        "name": "current_user",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/skills/{namespace}/{name}/relations": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Skill"
+                ],
+                "summary": "Get skill related assets",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "namespace",
+                        "name": "namespace",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current_user",
+                        "name": "current_user",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.Relations"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
         "/space_resources": {
             "get": {
                 "security": [
@@ -11508,8 +23724,8 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "integer",
-                        "default": 20,
-                        "description": "per",
+                        "default": 50,
+                        "description": "page size",
                         "name": "per",
                         "in": "query"
                     },
@@ -12383,6 +24599,24 @@ const docTemplate = `{
                         "in": "query"
                     },
                     {
+                        "enum": [
+                            "Building",
+                            "BuildingFailed",
+                            "Deploying",
+                            "DeployFailed",
+                            "Running",
+                            "RuntimeError",
+                            "Stopped",
+                            "Sleeping",
+                            "NoAppFile",
+                            "NoNGINXConf"
+                        ],
+                        "type": "string",
+                        "description": "filter by space status",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
                         "type": "integer",
                         "default": 20,
                         "description": "per",
@@ -12484,6 +24718,70 @@ const docTemplate = `{
                                     "properties": {
                                         "data": {
                                             "$ref": "#/definitions/types.Space"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/spaces/cuda-versions": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Get supported CUDA versions for a space",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Space"
+                ],
+                "summary": "Get supported CUDA versions",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "resource_type",
+                        "name": "resource_type",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
                                         }
                                     }
                                 }
@@ -12767,6 +25065,12 @@ const docTemplate = `{
                         "name": "current_user",
                         "in": "query",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "since time. Optional values: 10mins, 30mins, 1hour, 6hours, 1day, 2days, 1week",
+                        "name": "since",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -13030,10 +25334,22 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "$ref": "#/definitions/types.StatRunningDeploy"
-                            }
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "additionalProperties": {
+                                                "$ref": "#/definitions/types.StatRunningDeploy"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "401": {
@@ -13095,10 +25411,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "$ref": "#/definitions/types.StatSnapshotResp"
-                            }
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.StatSnapshotResp"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -13350,7 +25675,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/types.ResponseWithTotal"
+                                    "$ref": "#/definitions/types.Response"
                                 },
                                 {
                                     "type": "object",
@@ -13412,7 +25737,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/types.Response"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/database.Tag"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -13454,7 +25791,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/types.ResponseWithTotal"
+                                    "$ref": "#/definitions/types.Response"
                                 },
                                 {
                                     "type": "object",
@@ -13516,7 +25853,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/types.Response"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/database.TagCategory"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -13567,7 +25916,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/types.Response"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/database.TagCategory"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -13654,7 +26015,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/types.Response"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/database.Tag"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -13710,7 +26083,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/types.Response"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/database.Tag"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -14278,6 +26663,246 @@ const docTemplate = `{
                 }
             }
         },
+        "/user/phone": {
+            "put": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "Update current user phone",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "User"
+                ],
+                "summary": "Update current user phone",
+                "parameters": [
+                    {
+                        "description": "UpdateUserPhoneRequest",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.UpdateUserPhoneRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/user/public/sms-code": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "generate sms verification code and send it by sms with scene parameter. Accessible to both logged-in and anonymous users.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "User"
+                ],
+                "summary": "generate sms verification code and send it by sms (public endpoint)",
+                "parameters": [
+                    {
+                        "description": "SendPublicSMSCodeRequest",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.SendPublicSMSCodeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.SendSMSCodeResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/user/public/sms-code/verify": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "verify sms verification code with scene parameter. Accessible to both logged-in and anonymous users.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "User"
+                ],
+                "summary": "verify sms verification code (public endpoint)",
+                "parameters": [
+                    {
+                        "description": "VerifyPublicSMSCodeRequest",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.VerifyPublicSMSCodeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/user/sms-code": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "generate sms verification code and send it by sms",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "User"
+                ],
+                "summary": "generate sms verification code and send it by sms",
+                "parameters": [
+                    {
+                        "description": "SendSMSCodeRequest",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.SendSMSCodeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.SendSMSCodeResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
         "/user/tags": {
             "post": {
                 "security": [
@@ -14555,6 +27180,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "integer",
+                        "format": "int64",
                         "description": "verification ID",
                         "name": "id",
                         "in": "path",
@@ -15120,7 +27746,25 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/types.Response"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.ResponseWithTotal"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/types.DeployRepo"
+                                            }
+                                        },
+                                        "total": {
+                                            "type": "integer"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -15189,7 +27833,106 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/types.Response"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.ResponseWithTotal"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/types.DeployRepo"
+                                            }
+                                        },
+                                        "total": {
+                                            "type": "integer"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/user/{username}/finetune/jobs": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "get user backend fintunes",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "User"
+                ],
+                "summary": "Get user backend fintunes",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "username",
+                        "name": "username",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "per",
+                        "name": "per",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "per page",
+                        "name": "page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.ResponseWithTotal"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/types.ArgoWorkFlowRes"
+                                            }
+                                        },
+                                        "total": {
+                                            "type": "integer"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -15649,6 +28392,73 @@ const docTemplate = `{
                 }
             }
         },
+        "/user/{username}/likes/skills": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "get user likes skills",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "User"
+                ],
+                "summary": "Get user likes skills",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "username",
+                        "name": "username",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.ResponseWithTotal"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/types.MCPServer"
+                                            }
+                                        },
+                                        "total": {
+                                            "type": "integer"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
         "/user/{username}/likes/spaces": {
             "get": {
                 "security": [
@@ -15871,7 +28681,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/types.Response"
+                                    "$ref": "#/definitions/types.ResponseWithTotal"
                                 },
                                 {
                                     "type": "object",
@@ -16003,28 +28813,25 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "allOf": [
-                                    {
-                                        "$ref": "#/definitions/types.ResponseWithTotal"
-                                    },
-                                    {
-                                        "type": "object",
-                                        "properties": {
-                                            "data": {
-                                                "type": "array",
-                                                "items": {
-                                                    "$ref": "#/definitions/types.NotebookRes"
-                                                }
-                                            },
-                                            "total": {
-                                                "type": "integer"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.ResponseWithTotal"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/types.NotebookRes"
                                             }
+                                        },
+                                        "total": {
+                                            "type": "integer"
                                         }
                                     }
-                                ]
-                            }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -16252,7 +29059,25 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/types.Response"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.ResponseWithTotal"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/types.DeployRepo"
+                                            }
+                                        },
+                                        "total": {
+                                            "type": "integer"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -16315,13 +29140,37 @@ const docTemplate = `{
                         "description": "current user",
                         "name": "current_user",
                         "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "search by path or deployname",
+                        "name": "search",
+                        "in": "query"
                     }
                 ],
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/types.Response"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.ResponseWithTotal"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/types.DeployRepo"
+                                            }
+                                        },
+                                        "total": {
+                                            "type": "integer"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -16413,7 +29262,25 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/types.Response"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.ResponseWithTotal"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/types.DeployRepo"
+                                            }
+                                        },
+                                        "total": {
+                                            "type": "integer"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -17015,6 +29882,18 @@ const docTemplate = `{
                         "description": "labels, such as ['vip', 'basic']",
                         "name": "labels",
                         "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "exact_match, default is false",
+                        "name": "exact_match",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "exact_match, default is false",
+                        "name": "exact_match",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -17125,6 +30004,67 @@ const docTemplate = `{
                 }
             }
         },
+        "/users/stream-export": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "User"
+                ],
+                "summary": "Export users info. Only Admin",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Verify status (e.g. 'none', 'pending', 'approved', 'rejected')",
+                        "name": "verify_status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Search keyword (match username/email/phone)",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Labels (e.g. vip,basic) - multiple values supported",
+                        "name": "labels",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "format": "int64",
+                        "description": "Cursor for pagination",
+                        "name": "cursor",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK - SSE stream: events are 'users' (single user JSON), 'error' (error message), 'end' (completion message)"
+                    },
+                    "403": {
+                        "description": "Forbidden - not admin",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIForbidden"
+                        }
+                    }
+                }
+            }
+        },
         "/v1/chat/completions": {
             "post": {
                 "security": [
@@ -17158,7 +30098,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handler.ChatCompletionResponse"
+                            "$ref": "#/definitions/openai.ChatCompletionChunk"
                         }
                     },
                     "400": {
@@ -17227,14 +30167,14 @@ const docTemplate = `{
                 }
             }
         },
-        "/v1/mcp/servers": {
+        "/v1/mcp/resources": {
             "get": {
                 "security": [
                     {
                         "ApiKey": []
                     }
                 ],
-                "description": "Returns a list of available mcp servers",
+                "description": "Returns a list of recommended mcp servers",
                 "consumes": [
                     "application/json"
                 ],
@@ -17244,11 +30184,11 @@ const docTemplate = `{
                 "tags": [
                     "AIGateway"
                 ],
-                "summary": "List available mcp servers",
+                "summary": "List recommanded mcp servers",
                 "parameters": [
                     {
                         "type": "integer",
-                        "default": 20,
+                        "default": 50,
                         "description": "per",
                         "name": "per",
                         "in": "query"
@@ -17273,10 +30213,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "$ref": "#/definitions/types.MCPService"
-                                            }
+                                            "$ref": "#/definitions/database.MCPResource"
                                         },
                                         "total": {
                                             "type": "integer"
@@ -17300,7 +30237,7 @@ const docTemplate = `{
                         "ApiKey": []
                     }
                 ],
-                "description": "Returns a list of available models",
+                "description": "Returns a list of available models, supports fuzzy search by model_id query parameter and filtering by public status",
                 "consumes": [
                     "application/json"
                 ],
@@ -17311,6 +30248,32 @@ const docTemplate = `{
                     "AIGateway"
                 ],
                 "summary": "List available models",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Model ID for fuzzy search",
+                        "name": "model_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Filter by public status (true for public models, false for private models)",
+                        "name": "public",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Models per page (default 20, max 100)",
+                        "name": "per",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page number (1-based, default 1)",
+                        "name": "page",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -17403,6 +30366,92 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/types.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/{namespace}/{name}/xet-{permission}-token/{branch}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "description": "get xnet write token",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "User"
+                ],
+                "summary": "Get xnet write token",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "namespace",
+                        "name": "namespace",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "branch",
+                        "name": "branch",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "enum": [
+                            "write",
+                            "read"
+                        ],
+                        "type": "string",
+                        "description": "permission",
+                        "name": "permission",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.ResponseWithTotal"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.XnetTokenResp"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -17597,7 +30646,10 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/types.File"
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/types.File"
+                                            }
                                         }
                                     }
                                 }
@@ -18230,6 +31282,20 @@ const docTemplate = `{
                 "summary": "List repo discussions",
                 "parameters": [
                     {
+                        "type": "integer",
+                        "default": 10,
+                        "description": "per",
+                        "name": "per",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "per page",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
                         "type": "string",
                         "description": "current user",
                         "name": "current_user",
@@ -18637,6 +31703,166 @@ const docTemplate = `{
                                     "properties": {
                                         "data": {
                                             "$ref": "#/definitions/types.Commit"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/{repo_type}/{namespace}/{name}/migrate_to_xnet": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Repository"
+                ],
+                "summary": "Migrate repo to Xnet",
+                "parameters": [
+                    {
+                        "enum": [
+                            "models",
+                            "datasets",
+                            "codes",
+                            "spaces"
+                        ],
+                        "type": "string",
+                        "description": "models,datasets,codes or spaces",
+                        "name": "repo_type",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "repo owner name",
+                        "name": "namespace",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "repo name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/database.XnetMigrationTask"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/{repo_type}/{namespace}/{name}/migrate_to_xnet_progress": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Repository"
+                ],
+                "summary": "Migrate repo to Xnet progress",
+                "parameters": [
+                    {
+                        "enum": [
+                            "models",
+                            "datasets",
+                            "codes",
+                            "spaces"
+                        ],
+                        "type": "string",
+                        "description": "models,datasets,codes or spaces",
+                        "name": "repo_type",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "repo owner name",
+                        "name": "namespace",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "repo name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/types.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/types.XnetMigrationTaskProgress"
                                         }
                                     }
                                 }
@@ -20561,6 +33787,12 @@ const docTemplate = `{
                         "name": "current_user",
                         "in": "query",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "since time. Optional values: 10mins, 30mins, 1hour, 6hours, 1day, 2days, 1week",
+                        "name": "since",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -20850,6 +34082,167 @@ const docTemplate = `{
                                     }
                                 }
                             ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/{repo_type}/{namespace}/{name}/serverless/{id}/versions/{commit_id}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Repository"
+                ],
+                "summary": "get serverless logs by version (commitid)",
+                "parameters": [
+                    {
+                        "enum": [
+                            "models",
+                            "spaces"
+                        ],
+                        "type": "string",
+                        "description": "models,spaces",
+                        "name": "repo_type",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "namespace",
+                        "name": "namespace",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "commit_id",
+                        "name": "commit_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "current_user",
+                        "name": "current_user",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "since time. Optional values: 10mins, 30mins, 1hour, 6hours, 1day, 2days, 1week",
+                        "name": "since",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIBadRequest"
+                        }
+                    },
+                    "401": {
+                        "description": "Permission denied",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIUnauthorized"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/types.APIInternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/{repo_type}/{namespace}/{name}/stop_migrate_to_xnet": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKey": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Repository"
+                ],
+                "summary": "Stop single repo migration to Xnet",
+                "parameters": [
+                    {
+                        "enum": [
+                            "models",
+                            "datasets",
+                            "codes",
+                            "spaces"
+                        ],
+                        "type": "string",
+                        "description": "models,datasets,codes or spaces",
+                        "name": "repo_type",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "repo owner name",
+                        "name": "namespace",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "repo name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.Response"
                         }
                     },
                     "400": {
@@ -21466,6 +34859,129 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "consts.PaymentChannel": {
+            "type": "string",
+            "enum": [
+                "alipay",
+                "alipay_wap",
+                "alipay_qr",
+                "alipay_scan",
+                "alipay_lite",
+                "alipay_pc_direct",
+                "wx",
+                "wx_pub",
+                "wx_pub_qr",
+                "wx_pub_scan",
+                "wx_wap",
+                "wx_lite",
+                "qpay",
+                "qpay_pub",
+                "upacp",
+                "upacp_pc",
+                "upacp_qr",
+                "upacp_scan",
+                "upacp_wap",
+                "upacp_b2b",
+                "cp_b2b",
+                "applepay_upacp",
+                "cmb_wallet",
+                "cmb_pc_qr",
+                "bfb_wap",
+                "jdpay_wap",
+                "yeepay_wap",
+                "isv_qr",
+                "isv_scan",
+                "isv_wap",
+                "isv_lite",
+                "ccb_pay",
+                "ccb_qr",
+                "cmpay",
+                "coolcredit",
+                "cb_alipay",
+                "cb_alipay_wap",
+                "cb_alipay_qr",
+                "cb_alipay_scan",
+                "cb_alipay_pc_direct",
+                "cb_wx",
+                "cb_wx_pub",
+                "cb_wx_pub_qr",
+                "cb_wx_pub_scan",
+                "paypal",
+                "balance",
+                "yeepay_wx_pub_qr",
+                "yeepay_wx_pub",
+                "yeepay_wx_pub_ofl",
+                "yeepay_wx_lite",
+                "yeepay_wx_lite_ofl",
+                "yeepay_wx_pub_scan",
+                "yeepay_alipay_qr",
+                "yeepay_alipay_lite",
+                "yeepay_alipay_pub",
+                "yeepay_alipay_scan",
+                "yeepay_upacp_qr",
+                "yeepay_upacp_scan"
+            ],
+            "x-enum-varnames": [
+                "ChannelAlipay",
+                "ChannelAlipayWap",
+                "ChannelAlipayQr",
+                "ChannelAlipayScan",
+                "ChannelAlipayLite",
+                "ChannelAlipayPcDirect",
+                "ChannelWx",
+                "ChannelWxPub",
+                "ChannelWxPubQr",
+                "ChannelWxPubScan",
+                "ChannelWxWap",
+                "ChannelWxLite",
+                "ChannelQpay",
+                "ChannelQpayPub",
+                "ChannelUpacp",
+                "ChannelUpacpPc",
+                "ChannelUpacpQr",
+                "ChannelUpacpScan",
+                "ChannelUpacpWap",
+                "ChannelUpacpB2b",
+                "ChannelCpB2b",
+                "ChannelApplepayUpacp",
+                "ChannelCmbWallet",
+                "ChannelCmbPcQr",
+                "ChannelBfbWap",
+                "ChannelJdpayWap",
+                "ChannelYeepayWap",
+                "ChannelIsvQr",
+                "ChannelIsvScan",
+                "ChannelIsvWap",
+                "ChannelIsvLite",
+                "ChannelCcbPay",
+                "ChannelCcbQr",
+                "ChannelCmpay",
+                "ChannelCoolcredit",
+                "ChannelCbAlipay",
+                "ChannelCbAlipayWap",
+                "ChannelCbAlipayQr",
+                "ChannelCbAlipayScan",
+                "ChannelCbAlipayPcDirect",
+                "ChannelCbWx",
+                "ChannelCbWxPub",
+                "ChannelCbWxPubQr",
+                "ChannelCbWxPubScan",
+                "ChannelPaypal",
+                "ChannelBalance",
+                "ChannelYeepayWxPubQr",
+                "ChannelYeepayWxPub",
+                "ChannelYeepayWxPubOfl",
+                "ChannelYeepayWxLite",
+                "ChannelYeepayWxLiteOfl",
+                "ChannelYeepayWxPubScan",
+                "ChannelYeepayAlipayQr",
+                "ChannelYeepayAlipayLite",
+                "ChannelYeepayAlipayPub",
+                "ChannelYeepayAlipayScan",
+                "ChannelYeepayUpacpQr",
+                "ChannelYeepayUpacpScan"
+            ]
+        },
         "database.AccessToken": {
             "type": "object",
             "properties": {
@@ -21512,6 +35028,122 @@ const docTemplate = `{
                 },
                 "user_id": {
                     "type": "integer"
+                }
+            }
+        },
+        "database.ApiRateLimit": {
+            "type": "object",
+            "properties": {
+                "checkIP": {
+                    "type": "boolean"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "path": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "window": {
+                    "type": "integer"
+                }
+            }
+        },
+        "database.ArgoWorkflow": {
+            "type": "object",
+            "properties": {
+                "cluster_id": {
+                    "type": "string"
+                },
+                "cluster_node": {
+                    "type": "string"
+                },
+                "datasets": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "download_url": {
+                    "type": "string"
+                },
+                "end_time": {
+                    "type": "string"
+                },
+                "failures_url": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "image": {
+                    "description": "ArgoWorkFlow framework",
+                    "type": "string"
+                },
+                "namespace": {
+                    "type": "string"
+                },
+                "queue_name": {
+                    "type": "string"
+                },
+                "reason": {
+                    "description": "reason for status",
+                    "type": "string"
+                },
+                "repo_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "repo_type": {
+                    "type": "string"
+                },
+                "resource_id": {
+                    "type": "integer"
+                },
+                "resource_name": {
+                    "type": "string"
+                },
+                "result_url": {
+                    "type": "string"
+                },
+                "start_time": {
+                    "type": "string"
+                },
+                "status": {
+                    "$ref": "#/definitions/v1alpha1.WorkflowPhase"
+                },
+                "submit_time": {
+                    "type": "string"
+                },
+                "task_desc": {
+                    "type": "string"
+                },
+                "task_id": {
+                    "description": "generated task id",
+                    "type": "string"
+                },
+                "task_name": {
+                    "description": "user input name",
+                    "type": "string"
+                },
+                "task_type": {
+                    "$ref": "#/definitions/types.TaskType"
+                },
+                "user_uuid": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
                 }
             }
         },
@@ -21607,6 +35239,233 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "database.Deploy": {
+            "type": "object",
+            "properties": {
+                "annotation": {
+                    "type": "string"
+                },
+                "cluster_id": {
+                    "type": "string"
+                },
+                "cluster_node": {
+                    "type": "string"
+                },
+                "container_port": {
+                    "type": "integer"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "deploy_name": {
+                    "description": "add at 2024-05",
+                    "type": "string"
+                },
+                "endpoint": {
+                    "type": "string"
+                },
+                "engine_args": {
+                    "type": "string"
+                },
+                "env": {
+                    "type": "string"
+                },
+                "git_branch": {
+                    "type": "string"
+                },
+                "git_path": {
+                    "type": "string"
+                },
+                "hardware": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "image_id": {
+                    "description": "for image run task, aka task_type = 1\nrunning image of cluster, comes from builder or pre-define",
+                    "type": "string"
+                },
+                "max_replica": {
+                    "type": "integer"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "min_replica": {
+                    "type": "integer"
+                },
+                "model_id": {
+                    "description": "model_id to deploy, it's 0 if deploy space",
+                    "type": "integer"
+                },
+                "order_detail_id": {
+                    "type": "integer"
+                },
+                "queue_name": {
+                    "type": "string"
+                },
+                "reason": {
+                    "type": "string"
+                },
+                "repo_id": {
+                    "description": "repository_id of model/space/code/dataset",
+                    "type": "integer"
+                },
+                "repository": {
+                    "$ref": "#/definitions/database.Repository"
+                },
+                "runtime_framework": {
+                    "description": "model running engine vllm or TGI",
+                    "type": "string"
+                },
+                "secret": {
+                    "type": "string"
+                },
+                "secure_level": {
+                    "description": "1-public, 2-private, 3-extension in future",
+                    "type": "integer"
+                },
+                "sku": {
+                    "type": "string"
+                },
+                "space_id": {
+                    "description": "space_id to deploy, it's 0 if deploy model",
+                    "type": "integer"
+                },
+                "status": {
+                    "type": "integer"
+                },
+                "svc_name": {
+                    "type": "string"
+                },
+                "task": {
+                    "description": "text-generation,text-to-image,text-to-speech",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/types.PipelineTask"
+                        }
+                    ]
+                },
+                "template": {
+                    "type": "string"
+                },
+                "type": {
+                    "description": "0-space, 1-inference, 2-finetune, 3-serverless, 4-evaluation, 5-notebook",
+                    "type": "integer"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user": {
+                    "$ref": "#/definitions/database.User"
+                },
+                "user_id": {
+                    "description": "user_id trigger deploy action, rather than repo owner user_id",
+                    "type": "integer"
+                },
+                "user_uuid": {
+                    "type": "string"
+                },
+                "variables": {
+                    "type": "string"
+                }
+            }
+        },
+        "database.License": {
+            "type": "object",
+            "properties": {
+                "company": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "edition": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "expire_time": {
+                    "type": "string"
+                },
+                "extra": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "key": {
+                    "type": "string"
+                },
+                "max_user": {
+                    "type": "integer"
+                },
+                "product": {
+                    "type": "string"
+                },
+                "remark": {
+                    "type": "string"
+                },
+                "start_time": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user_uuid": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "string"
+                }
+            }
+        },
+        "database.MCPResource": {
+            "type": "object",
+            "properties": {
+                "avatar": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "headers": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "need_install": {
+                    "description": "set this to true if the headers need to be set by the user or some other before use",
+                    "type": "boolean"
+                },
+                "owner": {
+                    "type": "string"
+                },
+                "protocol": {
+                    "description": "sse/streamable",
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "url": {
                     "type": "string"
                 }
             }
@@ -21955,6 +35814,9 @@ const docTemplate = `{
                 "user_id": {
                     "type": "integer"
                 },
+                "uuid": {
+                    "type": "string"
+                },
                 "verified": {
                     "type": "boolean"
                 },
@@ -22025,6 +35887,12 @@ const docTemplate = `{
                 },
                 "csg_path": {
                     "type": "string"
+                },
+                "current_xnet_migration_task": {
+                    "$ref": "#/definitions/database.XnetMigrationTask"
+                },
+                "current_xnet_migration_task_id": {
+                    "type": "integer"
                 },
                 "default_branch": {
                     "type": "string"
@@ -22119,7 +35987,12 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "sync_status": {
-                    "$ref": "#/definitions/types.RepositorySyncStatus"
+                    "description": "Only used for multi-source sync status",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/types.RepositorySyncStatus"
+                        }
+                    ]
                 },
                 "tags": {
                     "type": "array",
@@ -22135,6 +36008,9 @@ const docTemplate = `{
                 },
                 "user_id": {
                     "type": "integer"
+                },
+                "xnet_enabled": {
+                    "type": "boolean"
                 }
             }
         },
@@ -22199,6 +36075,29 @@ const docTemplate = `{
                 },
                 "user_id": {
                     "type": "integer"
+                }
+            }
+        },
+        "database.Skill": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "last_updated_at": {
+                    "type": "string"
+                },
+                "repository": {
+                    "$ref": "#/definitions/database.Repository"
+                },
+                "repository_id": {
+                    "type": "integer"
+                },
+                "updated_at": {
+                    "type": "string"
                 }
             }
         },
@@ -22304,6 +36203,26 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "database.TagCategory": {
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "type": "boolean"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "scope": {
+                    "$ref": "#/definitions/types.TagScope"
+                },
+                "show_name": {
                     "type": "string"
                 }
             }
@@ -22484,6 +36403,29 @@ const docTemplate = `{
                 }
             }
         },
+        "database.XnetMigrationTask": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "lastMessage": {
+                    "type": "string"
+                },
+                "repositoryID": {
+                    "type": "integer"
+                },
+                "status": {
+                    "$ref": "#/definitions/types.XnetMigrationTaskStatus"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
         "handler.ChatCompletionRequest": {
             "type": "object",
             "properties": {
@@ -22493,7 +36435,7 @@ const docTemplate = `{
                 "messages": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/handler.ChatMessage"
+                        "$ref": "#/definitions/openai.ChatCompletionMessageParamUnion"
                     }
                 },
                 "model": {
@@ -22507,65 +36449,21 @@ const docTemplate = `{
                 },
                 "temperature": {
                     "type": "number"
-                }
-            }
-        },
-        "handler.ChatCompletionResponse": {
-            "type": "object",
-            "properties": {
-                "choices": {
+                },
+                "tool_choice": {
+                    "description": "Controls which (if any) tool is called by the model. ` + "`" + `none` + "`" + ` means the model will\nnot call any tool and instead generates a message. ` + "`" + `auto` + "`" + ` means the model can\npick between generating a message or calling one or more tools. ` + "`" + `required` + "`" + ` means\nthe model must call one or more tools. Specifying a particular tool via\n` + "`" + `{\"type\": \"function\", \"function\": {\"name\": \"my_function\"}}` + "`" + ` forces the model to\ncall that tool.\n\n` + "`" + `none` + "`" + ` is the default when no tools are present. ` + "`" + `auto` + "`" + ` is the default if tools\nare present.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/openai.ChatCompletionToolChoiceOptionUnionParam"
+                        }
+                    ]
+                },
+                "tools": {
+                    "description": "A list of tools the model may call. You can provide either\n[custom tools](https://platform.openai.com/docs/guides/function-calling#custom-tools)\nor [function tools](https://platform.openai.com/docs/guides/function-calling).",
                     "type": "array",
                     "items": {
-                        "type": "object",
-                        "properties": {
-                            "finish_reason": {
-                                "type": "string"
-                            },
-                            "index": {
-                                "type": "integer"
-                            },
-                            "message": {
-                                "$ref": "#/definitions/handler.ChatMessage"
-                            }
-                        }
+                        "$ref": "#/definitions/openai.ChatCompletionToolUnionParam"
                     }
-                },
-                "created": {
-                    "type": "integer"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "model": {
-                    "type": "string"
-                },
-                "object": {
-                    "type": "string"
-                },
-                "usage": {
-                    "type": "object",
-                    "properties": {
-                        "completion_tokens": {
-                            "type": "integer"
-                        },
-                        "prompt_tokens": {
-                            "type": "integer"
-                        },
-                        "total_tokens": {
-                            "type": "integer"
-                        }
-                    }
-                }
-            }
-        },
-        "handler.ChatMessage": {
-            "type": "object",
-            "properties": {
-                "content": {
-                    "type": "string"
-                },
-                "role": {
-                    "type": "string"
                 }
             }
         },
@@ -22589,25 +36487,53 @@ const docTemplate = `{
         "handler.EmbeddingRequest": {
             "type": "object",
             "properties": {
+                "any": {},
+                "dimensions": {
+                    "description": "The number of dimensions the resulting output embeddings should have. Only\nsupported in ` + "`" + `text-embedding-3` + "`" + ` and later models.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/param.Opt-int64"
+                        }
+                    ]
+                },
                 "encoding_format": {
-                    "description": "Encoding format (e.g., \"float\")",
-                    "type": "string"
+                    "description": "The format to return the embeddings in. Can be either ` + "`" + `float` + "`" + ` or\n[` + "`" + `base64` + "`" + `](https://pypi.org/project/pybase64/).\n\nAny of \"float\", \"base64\".",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/openai.EmbeddingNewParamsEncodingFormat"
+                        }
+                    ]
                 },
                 "input": {
-                    "description": "Input text content",
-                    "type": "string"
+                    "description": "Input text to embed, encoded as a string or array of tokens. To embed multiple\ninputs in a single request, pass an array of strings or array of token arrays.\nThe input must not exceed the max input tokens for the model (8192 tokens for\nall embedding models), cannot be an empty string, and any array must be 2048\ndimensions or less.\n[Example Python code](https://cookbook.openai.com/examples/how_to_count_tokens_with_tiktoken)\nfor counting tokens. In addition to the per-input token limit, all embedding\nmodels enforce a maximum of 300,000 tokens summed across all inputs in a single\nrequest.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/openai.EmbeddingNewParamsInputUnion"
+                        }
+                    ]
                 },
                 "model": {
-                    "description": "Model name used (e.g., \"text-embedding-ada-002\")",
-                    "type": "string"
+                    "description": "ID of the model to use. You can use the\n[List models](https://platform.openai.com/docs/api-reference/models/list) API to\nsee all of your available models, or see our\n[Model overview](https://platform.openai.com/docs/models) for descriptions of\nthem.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/openai.EmbeddingModel"
+                        }
+                    ]
+                },
+                "user": {
+                    "description": "A unique identifier representing your end-user, which can help OpenAI to monitor\nand detect abuse.\n[Learn more](https://platform.openai.com/docs/guides/safety-best-practices#end-user-ids).",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/param.Opt-string"
+                        }
+                    ]
                 }
             }
         },
         "handler.SetOpWeight.SetOpWeightReq": {
             "type": "object",
             "required": [
-                "repo_id",
-                "weight"
+                "repo_id"
             ],
             "properties": {
                 "repo_id": {
@@ -22641,6 +36567,1435 @@ const docTemplate = `{
                 }
             }
         },
+        "openai.ChatCompletion": {
+            "type": "object",
+            "properties": {
+                "choices": {
+                    "description": "A list of chat completion choices. Can be more than one if ` + "`" + `n` + "`" + ` is greater\nthan 1.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/openai.ChatCompletionChoice"
+                    }
+                },
+                "created": {
+                    "description": "The Unix timestamp (in seconds) of when the chat completion was created.",
+                    "type": "integer"
+                },
+                "id": {
+                    "description": "A unique identifier for the chat completion.",
+                    "type": "string"
+                },
+                "model": {
+                    "description": "The model used for the chat completion.",
+                    "type": "string"
+                },
+                "object": {
+                    "description": "The object type, which is always ` + "`" + `chat.completion` + "`" + `.",
+                    "type": "string"
+                },
+                "service_tier": {
+                    "description": "Specifies the processing type used for serving the request.\n\n  - If set to 'auto', then the request will be processed with the service tier\n    configured in the Project settings. Unless otherwise configured, the Project\n    will use 'default'.\n  - If set to 'default', then the request will be processed with the standard\n    pricing and performance for the selected model.\n  - If set to '[flex](https://platform.openai.com/docs/guides/flex-processing)' or\n    '[priority](https://openai.com/api-priority-processing/)', then the request\n    will be processed with the corresponding service tier.\n  - When not set, the default behavior is 'auto'.\n\nWhen the ` + "`" + `service_tier` + "`" + ` parameter is set, the response body will include the\n` + "`" + `service_tier` + "`" + ` value based on the processing mode actually used to serve the\nrequest. This response value may be different from the value set in the\nparameter.\n\nAny of \"auto\", \"default\", \"flex\", \"scale\", \"priority\".",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/openai.ChatCompletionServiceTier"
+                        }
+                    ]
+                },
+                "system_fingerprint": {
+                    "description": "This fingerprint represents the backend configuration that the model runs with.\n\nCan be used in conjunction with the ` + "`" + `seed` + "`" + ` request parameter to understand when\nbackend changes have been made that might impact determinism.\n\nDeprecated: deprecated",
+                    "type": "string"
+                },
+                "usage": {
+                    "description": "Usage statistics for the completion request.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/openai.CompletionUsage"
+                        }
+                    ]
+                }
+            }
+        },
+        "openai.ChatCompletionAllowedToolChoiceParam": {
+            "type": "object",
+            "properties": {
+                "allowed_tools": {
+                    "description": "Constrains the tools available to the model to a pre-defined set.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/openai.ChatCompletionAllowedToolsParam"
+                        }
+                    ]
+                },
+                "any": {},
+                "type": {
+                    "description": "Allowed tool configuration type. Always ` + "`" + `allowed_tools` + "`" + `.\n\nThis field can be elided, and will marshal its zero value as \"allowed_tools\".",
+                    "type": "string"
+                }
+            }
+        },
+        "openai.ChatCompletionAllowedToolsMode": {
+            "type": "string",
+            "enum": [
+                "auto",
+                "required"
+            ],
+            "x-enum-varnames": [
+                "ChatCompletionAllowedToolsModeAuto",
+                "ChatCompletionAllowedToolsModeRequired"
+            ]
+        },
+        "openai.ChatCompletionAllowedToolsParam": {
+            "type": "object",
+            "properties": {
+                "any": {},
+                "mode": {
+                    "description": "Constrains the tools available to the model to a pre-defined set.\n\n` + "`" + `auto` + "`" + ` allows the model to pick from among the allowed tools and generate a\nmessage.\n\n` + "`" + `required` + "`" + ` requires the model to call one or more of the allowed tools.\n\nAny of \"auto\", \"required\".",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/openai.ChatCompletionAllowedToolsMode"
+                        }
+                    ]
+                },
+                "tools": {
+                    "description": "A list of tool definitions that the model should be allowed to call.\n\nFor the Chat Completions API, the list of tool definitions might look like:\n\n` + "`" + `` + "`" + `` + "`" + `json\n[\n\n\t{ \"type\": \"function\", \"function\": { \"name\": \"get_weather\" } },\n\t{ \"type\": \"function\", \"function\": { \"name\": \"get_time\" } }\n\n]\n` + "`" + `` + "`" + `` + "`" + `",
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": {}
+                    }
+                }
+            }
+        },
+        "openai.ChatCompletionAssistantMessageParam": {
+            "type": "object",
+            "properties": {
+                "any": {},
+                "audio": {
+                    "description": "Data about a previous audio response from the model.\n[Learn more](https://platform.openai.com/docs/guides/audio).",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/openai.ChatCompletionAssistantMessageParamAudio"
+                        }
+                    ]
+                },
+                "content": {
+                    "description": "The contents of the assistant message. Required unless ` + "`" + `tool_calls` + "`" + ` or\n` + "`" + `function_call` + "`" + ` is specified.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/openai.ChatCompletionAssistantMessageParamContentUnion"
+                        }
+                    ]
+                },
+                "function_call": {
+                    "description": "Deprecated and replaced by ` + "`" + `tool_calls` + "`" + `. The name and arguments of a function\nthat should be called, as generated by the model.\n\nDeprecated: deprecated",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/openai.ChatCompletionAssistantMessageParamFunctionCall"
+                        }
+                    ]
+                },
+                "name": {
+                    "description": "An optional name for the participant. Provides the model information to\ndifferentiate between participants of the same role.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/param.Opt-string"
+                        }
+                    ]
+                },
+                "refusal": {
+                    "description": "The refusal message by the assistant.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/param.Opt-string"
+                        }
+                    ]
+                },
+                "role": {
+                    "description": "The role of the messages author, in this case ` + "`" + `assistant` + "`" + `.\n\nThis field can be elided, and will marshal its zero value as \"assistant\".",
+                    "type": "string"
+                },
+                "tool_calls": {
+                    "description": "The tool calls generated by the model, such as function calls.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/openai.ChatCompletionMessageToolCallUnionParam"
+                    }
+                }
+            }
+        },
+        "openai.ChatCompletionAssistantMessageParamAudio": {
+            "type": "object",
+            "properties": {
+                "any": {},
+                "id": {
+                    "description": "Unique identifier for a previous audio response from the model.",
+                    "type": "string"
+                }
+            }
+        },
+        "openai.ChatCompletionAssistantMessageParamContentArrayOfContentPartUnion": {
+            "type": "object",
+            "properties": {
+                "any": {},
+                "ofRefusal": {
+                    "$ref": "#/definitions/openai.ChatCompletionContentPartRefusalParam"
+                },
+                "ofText": {
+                    "$ref": "#/definitions/openai.ChatCompletionContentPartTextParam"
+                }
+            }
+        },
+        "openai.ChatCompletionAssistantMessageParamContentUnion": {
+            "type": "object",
+            "properties": {
+                "any": {},
+                "ofArrayOfContentParts": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/openai.ChatCompletionAssistantMessageParamContentArrayOfContentPartUnion"
+                    }
+                },
+                "ofString": {
+                    "$ref": "#/definitions/param.Opt-string"
+                }
+            }
+        },
+        "openai.ChatCompletionAssistantMessageParamFunctionCall": {
+            "type": "object",
+            "properties": {
+                "any": {},
+                "arguments": {
+                    "description": "The arguments to call the function with, as generated by the model in JSON\nformat. Note that the model does not always generate valid JSON, and may\nhallucinate parameters not defined by your function schema. Validate the\narguments in your code before calling your function.",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "The name of the function to call.",
+                    "type": "string"
+                }
+            }
+        },
+        "openai.ChatCompletionAudio": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "description": "Base64 encoded audio bytes generated by the model, in the format specified in\nthe request.",
+                    "type": "string"
+                },
+                "expires_at": {
+                    "description": "The Unix timestamp (in seconds) for when this audio response will no longer be\naccessible on the server for use in multi-turn conversations.",
+                    "type": "integer"
+                },
+                "id": {
+                    "description": "Unique identifier for this audio response.",
+                    "type": "string"
+                },
+                "transcript": {
+                    "description": "Transcript of the audio generated by the model.",
+                    "type": "string"
+                }
+            }
+        },
+        "openai.ChatCompletionChoice": {
+            "type": "object",
+            "properties": {
+                "finish_reason": {
+                    "description": "The reason the model stopped generating tokens. This will be ` + "`" + `stop` + "`" + ` if the model\nhit a natural stop point or a provided stop sequence, ` + "`" + `length` + "`" + ` if the maximum\nnumber of tokens specified in the request was reached, ` + "`" + `content_filter` + "`" + ` if\ncontent was omitted due to a flag from our content filters, ` + "`" + `tool_calls` + "`" + ` if the\nmodel called a tool, or ` + "`" + `function_call` + "`" + ` (deprecated) if the model called a\nfunction.\n\nAny of \"stop\", \"length\", \"tool_calls\", \"content_filter\", \"function_call\".",
+                    "type": "string"
+                },
+                "index": {
+                    "description": "The index of the choice in the list of choices.",
+                    "type": "integer"
+                },
+                "logprobs": {
+                    "description": "Log probability information for the choice.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/openai.ChatCompletionChoiceLogprobs"
+                        }
+                    ]
+                },
+                "message": {
+                    "description": "A chat completion message generated by the model.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/openai.ChatCompletionMessage"
+                        }
+                    ]
+                }
+            }
+        },
+        "openai.ChatCompletionChoiceLogprobs": {
+            "type": "object",
+            "properties": {
+                "content": {
+                    "description": "A list of message content tokens with log probability information.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/openai.ChatCompletionTokenLogprob"
+                    }
+                },
+                "refusal": {
+                    "description": "A list of message refusal tokens with log probability information.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/openai.ChatCompletionTokenLogprob"
+                    }
+                }
+            }
+        },
+        "openai.ChatCompletionChunk": {
+            "type": "object",
+            "properties": {
+                "choices": {
+                    "description": "A list of chat completion choices. Can contain more than one elements if ` + "`" + `n` + "`" + ` is\ngreater than 1. Can also be empty for the last chunk if you set\n` + "`" + `stream_options: {\"include_usage\": true}` + "`" + `.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/openai.ChatCompletionChunkChoice"
+                    }
+                },
+                "created": {
+                    "description": "The Unix timestamp (in seconds) of when the chat completion was created. Each\nchunk has the same timestamp.",
+                    "type": "integer"
+                },
+                "id": {
+                    "description": "A unique identifier for the chat completion. Each chunk has the same ID.",
+                    "type": "string"
+                },
+                "model": {
+                    "description": "The model to generate the completion.",
+                    "type": "string"
+                },
+                "object": {
+                    "description": "The object type, which is always ` + "`" + `chat.completion.chunk` + "`" + `.",
+                    "type": "string"
+                },
+                "service_tier": {
+                    "description": "Specifies the processing type used for serving the request.\n\n  - If set to 'auto', then the request will be processed with the service tier\n    configured in the Project settings. Unless otherwise configured, the Project\n    will use 'default'.\n  - If set to 'default', then the request will be processed with the standard\n    pricing and performance for the selected model.\n  - If set to '[flex](https://platform.openai.com/docs/guides/flex-processing)' or\n    '[priority](https://openai.com/api-priority-processing/)', then the request\n    will be processed with the corresponding service tier.\n  - When not set, the default behavior is 'auto'.\n\nWhen the ` + "`" + `service_tier` + "`" + ` parameter is set, the response body will include the\n` + "`" + `service_tier` + "`" + ` value based on the processing mode actually used to serve the\nrequest. This response value may be different from the value set in the\nparameter.\n\nAny of \"auto\", \"default\", \"flex\", \"scale\", \"priority\".",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/openai.ChatCompletionChunkServiceTier"
+                        }
+                    ]
+                },
+                "system_fingerprint": {
+                    "description": "This fingerprint represents the backend configuration that the model runs with.\nCan be used in conjunction with the ` + "`" + `seed` + "`" + ` request parameter to understand when\nbackend changes have been made that might impact determinism.\n\nDeprecated: deprecated",
+                    "type": "string"
+                },
+                "usage": {
+                    "description": "An optional field that will only be present when you set\n` + "`" + `stream_options: {\"include_usage\": true}` + "`" + ` in your request. When present, it\ncontains a null value **except for the last chunk** which contains the token\nusage statistics for the entire request.\n\n**NOTE:** If the stream is interrupted or cancelled, you may not receive the\nfinal usage chunk which contains the total token usage for the request.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/openai.CompletionUsage"
+                        }
+                    ]
+                }
+            }
+        },
+        "openai.ChatCompletionChunkChoice": {
+            "type": "object",
+            "properties": {
+                "delta": {
+                    "description": "A chat completion delta generated by streamed model responses.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/openai.ChatCompletionChunkChoiceDelta"
+                        }
+                    ]
+                },
+                "finish_reason": {
+                    "description": "The reason the model stopped generating tokens. This will be ` + "`" + `stop` + "`" + ` if the model\nhit a natural stop point or a provided stop sequence, ` + "`" + `length` + "`" + ` if the maximum\nnumber of tokens specified in the request was reached, ` + "`" + `content_filter` + "`" + ` if\ncontent was omitted due to a flag from our content filters, ` + "`" + `tool_calls` + "`" + ` if the\nmodel called a tool, or ` + "`" + `function_call` + "`" + ` (deprecated) if the model called a\nfunction.\n\nAny of \"stop\", \"length\", \"tool_calls\", \"content_filter\", \"function_call\".",
+                    "type": "string"
+                },
+                "index": {
+                    "description": "The index of the choice in the list of choices.",
+                    "type": "integer"
+                },
+                "logprobs": {
+                    "description": "Log probability information for the choice.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/openai.ChatCompletionChunkChoiceLogprobs"
+                        }
+                    ]
+                }
+            }
+        },
+        "openai.ChatCompletionChunkChoiceDelta": {
+            "type": "object",
+            "properties": {
+                "content": {
+                    "description": "The contents of the chunk message.",
+                    "type": "string"
+                },
+                "function_call": {
+                    "description": "Deprecated and replaced by ` + "`" + `tool_calls` + "`" + `. The name and arguments of a function\nthat should be called, as generated by the model.\n\nDeprecated: deprecated",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/openai.ChatCompletionChunkChoiceDeltaFunctionCall"
+                        }
+                    ]
+                },
+                "refusal": {
+                    "description": "The refusal message generated by the model.",
+                    "type": "string"
+                },
+                "role": {
+                    "description": "The role of the author of this message.\n\nAny of \"developer\", \"system\", \"user\", \"assistant\", \"tool\".",
+                    "type": "string"
+                },
+                "tool_calls": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/openai.ChatCompletionChunkChoiceDeltaToolCall"
+                    }
+                }
+            }
+        },
+        "openai.ChatCompletionChunkChoiceDeltaFunctionCall": {
+            "type": "object",
+            "properties": {
+                "arguments": {
+                    "description": "The arguments to call the function with, as generated by the model in JSON\nformat. Note that the model does not always generate valid JSON, and may\nhallucinate parameters not defined by your function schema. Validate the\narguments in your code before calling your function.",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "The name of the function to call.",
+                    "type": "string"
+                }
+            }
+        },
+        "openai.ChatCompletionChunkChoiceDeltaToolCall": {
+            "type": "object",
+            "properties": {
+                "function": {
+                    "$ref": "#/definitions/openai.ChatCompletionChunkChoiceDeltaToolCallFunction"
+                },
+                "id": {
+                    "description": "The ID of the tool call.",
+                    "type": "string"
+                },
+                "index": {
+                    "type": "integer"
+                },
+                "type": {
+                    "description": "The type of the tool. Currently, only ` + "`" + `function` + "`" + ` is supported.\n\nAny of \"function\".",
+                    "type": "string"
+                }
+            }
+        },
+        "openai.ChatCompletionChunkChoiceDeltaToolCallFunction": {
+            "type": "object",
+            "properties": {
+                "arguments": {
+                    "description": "The arguments to call the function with, as generated by the model in JSON\nformat. Note that the model does not always generate valid JSON, and may\nhallucinate parameters not defined by your function schema. Validate the\narguments in your code before calling your function.",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "The name of the function to call.",
+                    "type": "string"
+                }
+            }
+        },
+        "openai.ChatCompletionChunkChoiceLogprobs": {
+            "type": "object",
+            "properties": {
+                "content": {
+                    "description": "A list of message content tokens with log probability information.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/openai.ChatCompletionTokenLogprob"
+                    }
+                },
+                "refusal": {
+                    "description": "A list of message refusal tokens with log probability information.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/openai.ChatCompletionTokenLogprob"
+                    }
+                }
+            }
+        },
+        "openai.ChatCompletionChunkServiceTier": {
+            "type": "string",
+            "enum": [
+                "auto",
+                "default",
+                "flex",
+                "scale",
+                "priority"
+            ],
+            "x-enum-varnames": [
+                "ChatCompletionChunkServiceTierAuto",
+                "ChatCompletionChunkServiceTierDefault",
+                "ChatCompletionChunkServiceTierFlex",
+                "ChatCompletionChunkServiceTierScale",
+                "ChatCompletionChunkServiceTierPriority"
+            ]
+        },
+        "openai.ChatCompletionContentPartFileFileParam": {
+            "type": "object",
+            "properties": {
+                "any": {},
+                "file_data": {
+                    "description": "The base64 encoded file data, used when passing the file to the model as a\nstring.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/param.Opt-string"
+                        }
+                    ]
+                },
+                "file_id": {
+                    "description": "The ID of an uploaded file to use as input.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/param.Opt-string"
+                        }
+                    ]
+                },
+                "filename": {
+                    "description": "The name of the file, used when passing the file to the model as a string.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/param.Opt-string"
+                        }
+                    ]
+                }
+            }
+        },
+        "openai.ChatCompletionContentPartFileParam": {
+            "type": "object",
+            "properties": {
+                "any": {},
+                "file": {
+                    "$ref": "#/definitions/openai.ChatCompletionContentPartFileFileParam"
+                },
+                "type": {
+                    "description": "The type of the content part. Always ` + "`" + `file` + "`" + `.\n\nThis field can be elided, and will marshal its zero value as \"file\".",
+                    "type": "string"
+                }
+            }
+        },
+        "openai.ChatCompletionContentPartImageImageURLParam": {
+            "type": "object",
+            "properties": {
+                "any": {},
+                "detail": {
+                    "description": "Specifies the detail level of the image. Learn more in the\n[Vision guide](https://platform.openai.com/docs/guides/vision#low-or-high-fidelity-image-understanding).\n\nAny of \"auto\", \"low\", \"high\".",
+                    "type": "string"
+                },
+                "url": {
+                    "description": "Either a URL of the image or the base64 encoded image data.",
+                    "type": "string",
+                    "format": "uri"
+                }
+            }
+        },
+        "openai.ChatCompletionContentPartImageParam": {
+            "type": "object",
+            "properties": {
+                "any": {},
+                "image_url": {
+                    "$ref": "#/definitions/openai.ChatCompletionContentPartImageImageURLParam"
+                },
+                "type": {
+                    "description": "The type of the content part.\n\nThis field can be elided, and will marshal its zero value as \"image_url\".",
+                    "type": "string"
+                }
+            }
+        },
+        "openai.ChatCompletionContentPartInputAudioInputAudioParam": {
+            "type": "object",
+            "properties": {
+                "any": {},
+                "data": {
+                    "description": "Base64 encoded audio data.",
+                    "type": "string"
+                },
+                "format": {
+                    "description": "The format of the encoded audio data. Currently supports \"wav\" and \"mp3\".\n\nAny of \"wav\", \"mp3\".",
+                    "type": "string"
+                }
+            }
+        },
+        "openai.ChatCompletionContentPartInputAudioParam": {
+            "type": "object",
+            "properties": {
+                "any": {},
+                "input_audio": {
+                    "$ref": "#/definitions/openai.ChatCompletionContentPartInputAudioInputAudioParam"
+                },
+                "type": {
+                    "description": "The type of the content part. Always ` + "`" + `input_audio` + "`" + `.\n\nThis field can be elided, and will marshal its zero value as \"input_audio\".",
+                    "type": "string"
+                }
+            }
+        },
+        "openai.ChatCompletionContentPartRefusalParam": {
+            "type": "object",
+            "properties": {
+                "any": {},
+                "refusal": {
+                    "description": "The refusal message generated by the model.",
+                    "type": "string"
+                },
+                "type": {
+                    "description": "The type of the content part.\n\nThis field can be elided, and will marshal its zero value as \"refusal\".",
+                    "type": "string"
+                }
+            }
+        },
+        "openai.ChatCompletionContentPartTextParam": {
+            "type": "object",
+            "properties": {
+                "any": {},
+                "text": {
+                    "description": "The text content.",
+                    "type": "string"
+                },
+                "type": {
+                    "description": "The type of the content part.\n\nThis field can be elided, and will marshal its zero value as \"text\".",
+                    "type": "string"
+                }
+            }
+        },
+        "openai.ChatCompletionContentPartUnionParam": {
+            "type": "object",
+            "properties": {
+                "any": {},
+                "ofFile": {
+                    "$ref": "#/definitions/openai.ChatCompletionContentPartFileParam"
+                },
+                "ofImageURL": {
+                    "$ref": "#/definitions/openai.ChatCompletionContentPartImageParam"
+                },
+                "ofInputAudio": {
+                    "$ref": "#/definitions/openai.ChatCompletionContentPartInputAudioParam"
+                },
+                "ofText": {
+                    "$ref": "#/definitions/openai.ChatCompletionContentPartTextParam"
+                }
+            }
+        },
+        "openai.ChatCompletionCustomToolCustomFormatGrammarGrammarParam": {
+            "type": "object",
+            "properties": {
+                "any": {},
+                "definition": {
+                    "description": "The grammar definition.",
+                    "type": "string"
+                },
+                "syntax": {
+                    "description": "The syntax of the grammar definition. One of ` + "`" + `lark` + "`" + ` or ` + "`" + `regex` + "`" + `.\n\nAny of \"lark\", \"regex\".",
+                    "type": "string"
+                }
+            }
+        },
+        "openai.ChatCompletionCustomToolCustomFormatGrammarParam": {
+            "type": "object",
+            "properties": {
+                "any": {},
+                "grammar": {
+                    "description": "Your chosen grammar.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/openai.ChatCompletionCustomToolCustomFormatGrammarGrammarParam"
+                        }
+                    ]
+                },
+                "type": {
+                    "description": "Grammar format. Always ` + "`" + `grammar` + "`" + `.\n\nThis field can be elided, and will marshal its zero value as \"grammar\".",
+                    "type": "string"
+                }
+            }
+        },
+        "openai.ChatCompletionCustomToolCustomFormatTextParam": {
+            "type": "object",
+            "properties": {
+                "any": {},
+                "type": {
+                    "description": "Unconstrained text format. Always ` + "`" + `text` + "`" + `.",
+                    "type": "string"
+                }
+            }
+        },
+        "openai.ChatCompletionCustomToolCustomFormatUnionParam": {
+            "type": "object",
+            "properties": {
+                "any": {},
+                "ofGrammar": {
+                    "$ref": "#/definitions/openai.ChatCompletionCustomToolCustomFormatGrammarParam"
+                },
+                "ofText": {
+                    "$ref": "#/definitions/openai.ChatCompletionCustomToolCustomFormatTextParam"
+                }
+            }
+        },
+        "openai.ChatCompletionCustomToolCustomParam": {
+            "type": "object",
+            "properties": {
+                "any": {},
+                "description": {
+                    "description": "Optional description of the custom tool, used to provide more context.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/param.Opt-string"
+                        }
+                    ]
+                },
+                "format": {
+                    "description": "The input format for the custom tool. Default is unconstrained text.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/openai.ChatCompletionCustomToolCustomFormatUnionParam"
+                        }
+                    ]
+                },
+                "name": {
+                    "description": "The name of the custom tool, used to identify it in tool calls.",
+                    "type": "string"
+                }
+            }
+        },
+        "openai.ChatCompletionCustomToolParam": {
+            "type": "object",
+            "properties": {
+                "any": {},
+                "custom": {
+                    "description": "Properties of the custom tool.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/openai.ChatCompletionCustomToolCustomParam"
+                        }
+                    ]
+                },
+                "type": {
+                    "description": "The type of the custom tool. Always ` + "`" + `custom` + "`" + `.\n\nThis field can be elided, and will marshal its zero value as \"custom\".",
+                    "type": "string"
+                }
+            }
+        },
+        "openai.ChatCompletionDeveloperMessageParam": {
+            "type": "object",
+            "properties": {
+                "any": {},
+                "content": {
+                    "description": "The contents of the developer message.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/openai.ChatCompletionDeveloperMessageParamContentUnion"
+                        }
+                    ]
+                },
+                "name": {
+                    "description": "An optional name for the participant. Provides the model information to\ndifferentiate between participants of the same role.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/param.Opt-string"
+                        }
+                    ]
+                },
+                "role": {
+                    "description": "The role of the messages author, in this case ` + "`" + `developer` + "`" + `.\n\nThis field can be elided, and will marshal its zero value as \"developer\".",
+                    "type": "string"
+                }
+            }
+        },
+        "openai.ChatCompletionDeveloperMessageParamContentUnion": {
+            "type": "object",
+            "properties": {
+                "any": {},
+                "ofArrayOfContentParts": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/openai.ChatCompletionContentPartTextParam"
+                    }
+                },
+                "ofString": {
+                    "$ref": "#/definitions/param.Opt-string"
+                }
+            }
+        },
+        "openai.ChatCompletionFunctionMessageParam": {
+            "type": "object",
+            "properties": {
+                "any": {},
+                "content": {
+                    "description": "The contents of the function message.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/param.Opt-string"
+                        }
+                    ]
+                },
+                "name": {
+                    "description": "The name of the function to call.",
+                    "type": "string"
+                },
+                "role": {
+                    "description": "The role of the messages author, in this case ` + "`" + `function` + "`" + `.\n\nThis field can be elided, and will marshal its zero value as \"function\".",
+                    "type": "string"
+                }
+            }
+        },
+        "openai.ChatCompletionFunctionToolParam": {
+            "type": "object",
+            "properties": {
+                "any": {},
+                "function": {
+                    "$ref": "#/definitions/shared.FunctionDefinitionParam"
+                },
+                "type": {
+                    "description": "The type of the tool. Currently, only ` + "`" + `function` + "`" + ` is supported.\n\nThis field can be elided, and will marshal its zero value as \"function\".",
+                    "type": "string"
+                }
+            }
+        },
+        "openai.ChatCompletionMessage": {
+            "type": "object",
+            "properties": {
+                "annotations": {
+                    "description": "Annotations for the message, when applicable, as when using the\n[web search tool](https://platform.openai.com/docs/guides/tools-web-search?api-mode=chat).",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/openai.ChatCompletionMessageAnnotation"
+                    }
+                },
+                "audio": {
+                    "description": "If the audio output modality is requested, this object contains data about the\naudio response from the model.\n[Learn more](https://platform.openai.com/docs/guides/audio).",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/openai.ChatCompletionAudio"
+                        }
+                    ]
+                },
+                "content": {
+                    "description": "The contents of the message.",
+                    "type": "string"
+                },
+                "function_call": {
+                    "description": "Deprecated and replaced by ` + "`" + `tool_calls` + "`" + `. The name and arguments of a function\nthat should be called, as generated by the model.\n\nDeprecated: deprecated",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/openai.ChatCompletionMessageFunctionCall"
+                        }
+                    ]
+                },
+                "refusal": {
+                    "description": "The refusal message generated by the model.",
+                    "type": "string"
+                },
+                "role": {
+                    "description": "The role of the author of this message.",
+                    "type": "string"
+                },
+                "tool_calls": {
+                    "description": "The tool calls generated by the model, such as function calls.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/openai.ChatCompletionMessageToolCallUnion"
+                    }
+                }
+            }
+        },
+        "openai.ChatCompletionMessageAnnotation": {
+            "type": "object",
+            "properties": {
+                "type": {
+                    "description": "The type of the URL citation. Always ` + "`" + `url_citation` + "`" + `.",
+                    "type": "string"
+                },
+                "url_citation": {
+                    "description": "A URL citation when using web search.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/openai.ChatCompletionMessageAnnotationURLCitation"
+                        }
+                    ]
+                }
+            }
+        },
+        "openai.ChatCompletionMessageAnnotationURLCitation": {
+            "type": "object",
+            "properties": {
+                "end_index": {
+                    "description": "The index of the last character of the URL citation in the message.",
+                    "type": "integer"
+                },
+                "start_index": {
+                    "description": "The index of the first character of the URL citation in the message.",
+                    "type": "integer"
+                },
+                "title": {
+                    "description": "The title of the web resource.",
+                    "type": "string"
+                },
+                "url": {
+                    "description": "The URL of the web resource.",
+                    "type": "string"
+                }
+            }
+        },
+        "openai.ChatCompletionMessageCustomToolCallCustom": {
+            "type": "object",
+            "properties": {
+                "input": {
+                    "description": "The input for the custom tool call generated by the model.",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "The name of the custom tool to call.",
+                    "type": "string"
+                }
+            }
+        },
+        "openai.ChatCompletionMessageCustomToolCallCustomParam": {
+            "type": "object",
+            "properties": {
+                "any": {},
+                "input": {
+                    "description": "The input for the custom tool call generated by the model.",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "The name of the custom tool to call.",
+                    "type": "string"
+                }
+            }
+        },
+        "openai.ChatCompletionMessageCustomToolCallParam": {
+            "type": "object",
+            "properties": {
+                "any": {},
+                "custom": {
+                    "description": "The custom tool that the model called.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/openai.ChatCompletionMessageCustomToolCallCustomParam"
+                        }
+                    ]
+                },
+                "id": {
+                    "description": "The ID of the tool call.",
+                    "type": "string"
+                },
+                "type": {
+                    "description": "The type of the tool. Always ` + "`" + `custom` + "`" + `.\n\nThis field can be elided, and will marshal its zero value as \"custom\".",
+                    "type": "string"
+                }
+            }
+        },
+        "openai.ChatCompletionMessageFunctionCall": {
+            "type": "object",
+            "properties": {
+                "arguments": {
+                    "description": "The arguments to call the function with, as generated by the model in JSON\nformat. Note that the model does not always generate valid JSON, and may\nhallucinate parameters not defined by your function schema. Validate the\narguments in your code before calling your function.",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "The name of the function to call.",
+                    "type": "string"
+                }
+            }
+        },
+        "openai.ChatCompletionMessageFunctionToolCallFunction": {
+            "type": "object",
+            "properties": {
+                "arguments": {
+                    "description": "The arguments to call the function with, as generated by the model in JSON\nformat. Note that the model does not always generate valid JSON, and may\nhallucinate parameters not defined by your function schema. Validate the\narguments in your code before calling your function.",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "The name of the function to call.",
+                    "type": "string"
+                }
+            }
+        },
+        "openai.ChatCompletionMessageFunctionToolCallFunctionParam": {
+            "type": "object",
+            "properties": {
+                "any": {},
+                "arguments": {
+                    "description": "The arguments to call the function with, as generated by the model in JSON\nformat. Note that the model does not always generate valid JSON, and may\nhallucinate parameters not defined by your function schema. Validate the\narguments in your code before calling your function.",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "The name of the function to call.",
+                    "type": "string"
+                }
+            }
+        },
+        "openai.ChatCompletionMessageFunctionToolCallParam": {
+            "type": "object",
+            "properties": {
+                "any": {},
+                "function": {
+                    "description": "The function that the model called.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/openai.ChatCompletionMessageFunctionToolCallFunctionParam"
+                        }
+                    ]
+                },
+                "id": {
+                    "description": "The ID of the tool call.",
+                    "type": "string"
+                },
+                "type": {
+                    "description": "The type of the tool. Currently, only ` + "`" + `function` + "`" + ` is supported.\n\nThis field can be elided, and will marshal its zero value as \"function\".",
+                    "type": "string"
+                }
+            }
+        },
+        "openai.ChatCompletionMessageParamUnion": {
+            "type": "object",
+            "properties": {
+                "any": {},
+                "ofAssistant": {
+                    "$ref": "#/definitions/openai.ChatCompletionAssistantMessageParam"
+                },
+                "ofDeveloper": {
+                    "$ref": "#/definitions/openai.ChatCompletionDeveloperMessageParam"
+                },
+                "ofFunction": {
+                    "$ref": "#/definitions/openai.ChatCompletionFunctionMessageParam"
+                },
+                "ofSystem": {
+                    "$ref": "#/definitions/openai.ChatCompletionSystemMessageParam"
+                },
+                "ofTool": {
+                    "$ref": "#/definitions/openai.ChatCompletionToolMessageParam"
+                },
+                "ofUser": {
+                    "$ref": "#/definitions/openai.ChatCompletionUserMessageParam"
+                }
+            }
+        },
+        "openai.ChatCompletionMessageToolCallUnion": {
+            "type": "object",
+            "properties": {
+                "custom": {
+                    "description": "This field is from variant [ChatCompletionMessageCustomToolCall].",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/openai.ChatCompletionMessageCustomToolCallCustom"
+                        }
+                    ]
+                },
+                "function": {
+                    "description": "This field is from variant [ChatCompletionMessageFunctionToolCall].",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/openai.ChatCompletionMessageFunctionToolCallFunction"
+                        }
+                    ]
+                },
+                "id": {
+                    "type": "string"
+                },
+                "type": {
+                    "description": "Any of \"function\", \"custom\".",
+                    "type": "string"
+                }
+            }
+        },
+        "openai.ChatCompletionMessageToolCallUnionParam": {
+            "type": "object",
+            "properties": {
+                "any": {},
+                "ofCustom": {
+                    "$ref": "#/definitions/openai.ChatCompletionMessageCustomToolCallParam"
+                },
+                "ofFunction": {
+                    "$ref": "#/definitions/openai.ChatCompletionMessageFunctionToolCallParam"
+                }
+            }
+        },
+        "openai.ChatCompletionNamedToolChoiceCustomCustomParam": {
+            "type": "object",
+            "properties": {
+                "any": {},
+                "name": {
+                    "description": "The name of the custom tool to call.",
+                    "type": "string"
+                }
+            }
+        },
+        "openai.ChatCompletionNamedToolChoiceCustomParam": {
+            "type": "object",
+            "properties": {
+                "any": {},
+                "custom": {
+                    "$ref": "#/definitions/openai.ChatCompletionNamedToolChoiceCustomCustomParam"
+                },
+                "type": {
+                    "description": "For custom tool calling, the type is always ` + "`" + `custom` + "`" + `.\n\nThis field can be elided, and will marshal its zero value as \"custom\".",
+                    "type": "string"
+                }
+            }
+        },
+        "openai.ChatCompletionNamedToolChoiceFunctionParam": {
+            "type": "object",
+            "properties": {
+                "any": {},
+                "name": {
+                    "description": "The name of the function to call.",
+                    "type": "string"
+                }
+            }
+        },
+        "openai.ChatCompletionNamedToolChoiceParam": {
+            "type": "object",
+            "properties": {
+                "any": {},
+                "function": {
+                    "$ref": "#/definitions/openai.ChatCompletionNamedToolChoiceFunctionParam"
+                },
+                "type": {
+                    "description": "For function calling, the type is always ` + "`" + `function` + "`" + `.\n\nThis field can be elided, and will marshal its zero value as \"function\".",
+                    "type": "string"
+                }
+            }
+        },
+        "openai.ChatCompletionServiceTier": {
+            "type": "string",
+            "enum": [
+                "auto",
+                "default",
+                "flex",
+                "scale",
+                "priority"
+            ],
+            "x-enum-varnames": [
+                "ChatCompletionServiceTierAuto",
+                "ChatCompletionServiceTierDefault",
+                "ChatCompletionServiceTierFlex",
+                "ChatCompletionServiceTierScale",
+                "ChatCompletionServiceTierPriority"
+            ]
+        },
+        "openai.ChatCompletionSystemMessageParam": {
+            "type": "object",
+            "properties": {
+                "any": {},
+                "content": {
+                    "description": "The contents of the system message.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/openai.ChatCompletionSystemMessageParamContentUnion"
+                        }
+                    ]
+                },
+                "name": {
+                    "description": "An optional name for the participant. Provides the model information to\ndifferentiate between participants of the same role.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/param.Opt-string"
+                        }
+                    ]
+                },
+                "role": {
+                    "description": "The role of the messages author, in this case ` + "`" + `system` + "`" + `.\n\nThis field can be elided, and will marshal its zero value as \"system\".",
+                    "type": "string"
+                }
+            }
+        },
+        "openai.ChatCompletionSystemMessageParamContentUnion": {
+            "type": "object",
+            "properties": {
+                "any": {},
+                "ofArrayOfContentParts": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/openai.ChatCompletionContentPartTextParam"
+                    }
+                },
+                "ofString": {
+                    "$ref": "#/definitions/param.Opt-string"
+                }
+            }
+        },
+        "openai.ChatCompletionTokenLogprob": {
+            "type": "object",
+            "properties": {
+                "bytes": {
+                    "description": "A list of integers representing the UTF-8 bytes representation of the token.\nUseful in instances where characters are represented by multiple tokens and\ntheir byte representations must be combined to generate the correct text\nrepresentation. Can be ` + "`" + `null` + "`" + ` if there is no bytes representation for the token.",
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "logprob": {
+                    "description": "The log probability of this token, if it is within the top 20 most likely\ntokens. Otherwise, the value ` + "`" + `-9999.0` + "`" + ` is used to signify that the token is very\nunlikely.",
+                    "type": "number"
+                },
+                "token": {
+                    "description": "The token.",
+                    "type": "string"
+                },
+                "top_logprobs": {
+                    "description": "List of the most likely tokens and their log probability, at this token\nposition. In rare cases, there may be fewer than the number of requested\n` + "`" + `top_logprobs` + "`" + ` returned.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/openai.ChatCompletionTokenLogprobTopLogprob"
+                    }
+                }
+            }
+        },
+        "openai.ChatCompletionTokenLogprobTopLogprob": {
+            "type": "object",
+            "properties": {
+                "bytes": {
+                    "description": "A list of integers representing the UTF-8 bytes representation of the token.\nUseful in instances where characters are represented by multiple tokens and\ntheir byte representations must be combined to generate the correct text\nrepresentation. Can be ` + "`" + `null` + "`" + ` if there is no bytes representation for the token.",
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "logprob": {
+                    "description": "The log probability of this token, if it is within the top 20 most likely\ntokens. Otherwise, the value ` + "`" + `-9999.0` + "`" + ` is used to signify that the token is very\nunlikely.",
+                    "type": "number"
+                },
+                "token": {
+                    "description": "The token.",
+                    "type": "string"
+                }
+            }
+        },
+        "openai.ChatCompletionToolChoiceOptionUnionParam": {
+            "type": "object",
+            "properties": {
+                "any": {},
+                "ofAllowedTools": {
+                    "$ref": "#/definitions/openai.ChatCompletionAllowedToolChoiceParam"
+                },
+                "ofAuto": {
+                    "description": "Check if union is this variant with !param.IsOmitted(union.OfAuto)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/param.Opt-string"
+                        }
+                    ]
+                },
+                "ofCustomToolChoice": {
+                    "$ref": "#/definitions/openai.ChatCompletionNamedToolChoiceCustomParam"
+                },
+                "ofFunctionToolChoice": {
+                    "$ref": "#/definitions/openai.ChatCompletionNamedToolChoiceParam"
+                }
+            }
+        },
+        "openai.ChatCompletionToolMessageParam": {
+            "type": "object",
+            "properties": {
+                "any": {},
+                "content": {
+                    "description": "The contents of the tool message.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/openai.ChatCompletionToolMessageParamContentUnion"
+                        }
+                    ]
+                },
+                "role": {
+                    "description": "The role of the messages author, in this case ` + "`" + `tool` + "`" + `.\n\nThis field can be elided, and will marshal its zero value as \"tool\".",
+                    "type": "string"
+                },
+                "tool_call_id": {
+                    "description": "Tool call that this message is responding to.",
+                    "type": "string"
+                }
+            }
+        },
+        "openai.ChatCompletionToolMessageParamContentUnion": {
+            "type": "object",
+            "properties": {
+                "any": {},
+                "ofArrayOfContentParts": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/openai.ChatCompletionContentPartTextParam"
+                    }
+                },
+                "ofString": {
+                    "$ref": "#/definitions/param.Opt-string"
+                }
+            }
+        },
+        "openai.ChatCompletionToolUnionParam": {
+            "type": "object",
+            "properties": {
+                "any": {},
+                "ofCustom": {
+                    "$ref": "#/definitions/openai.ChatCompletionCustomToolParam"
+                },
+                "ofFunction": {
+                    "$ref": "#/definitions/openai.ChatCompletionFunctionToolParam"
+                }
+            }
+        },
+        "openai.ChatCompletionUserMessageParam": {
+            "type": "object",
+            "properties": {
+                "any": {},
+                "content": {
+                    "description": "The contents of the user message.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/openai.ChatCompletionUserMessageParamContentUnion"
+                        }
+                    ]
+                },
+                "name": {
+                    "description": "An optional name for the participant. Provides the model information to\ndifferentiate between participants of the same role.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/param.Opt-string"
+                        }
+                    ]
+                },
+                "role": {
+                    "description": "The role of the messages author, in this case ` + "`" + `user` + "`" + `.\n\nThis field can be elided, and will marshal its zero value as \"user\".",
+                    "type": "string"
+                }
+            }
+        },
+        "openai.ChatCompletionUserMessageParamContentUnion": {
+            "type": "object",
+            "properties": {
+                "any": {},
+                "ofArrayOfContentParts": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/openai.ChatCompletionContentPartUnionParam"
+                    }
+                },
+                "ofString": {
+                    "$ref": "#/definitions/param.Opt-string"
+                }
+            }
+        },
+        "openai.CompletionUsage": {
+            "type": "object",
+            "properties": {
+                "completion_tokens": {
+                    "description": "Number of tokens in the generated completion.",
+                    "type": "integer"
+                },
+                "completion_tokens_details": {
+                    "description": "Breakdown of tokens used in a completion.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/openai.CompletionUsageCompletionTokensDetails"
+                        }
+                    ]
+                },
+                "prompt_tokens": {
+                    "description": "Number of tokens in the prompt.",
+                    "type": "integer"
+                },
+                "prompt_tokens_details": {
+                    "description": "Breakdown of tokens used in the prompt.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/openai.CompletionUsagePromptTokensDetails"
+                        }
+                    ]
+                },
+                "total_tokens": {
+                    "description": "Total number of tokens used in the request (prompt + completion).",
+                    "type": "integer"
+                }
+            }
+        },
+        "openai.CompletionUsageCompletionTokensDetails": {
+            "type": "object",
+            "properties": {
+                "accepted_prediction_tokens": {
+                    "description": "When using Predicted Outputs, the number of tokens in the prediction that\nappeared in the completion.",
+                    "type": "integer"
+                },
+                "audio_tokens": {
+                    "description": "Audio input tokens generated by the model.",
+                    "type": "integer"
+                },
+                "reasoning_tokens": {
+                    "description": "Tokens generated by the model for reasoning.",
+                    "type": "integer"
+                },
+                "rejected_prediction_tokens": {
+                    "description": "When using Predicted Outputs, the number of tokens in the prediction that did\nnot appear in the completion. However, like reasoning tokens, these tokens are\nstill counted in the total completion tokens for purposes of billing, output,\nand context window limits.",
+                    "type": "integer"
+                }
+            }
+        },
+        "openai.CompletionUsagePromptTokensDetails": {
+            "type": "object",
+            "properties": {
+                "audio_tokens": {
+                    "description": "Audio input tokens present in the prompt.",
+                    "type": "integer"
+                },
+                "cached_tokens": {
+                    "description": "Cached tokens present in the prompt.",
+                    "type": "integer"
+                }
+            }
+        },
+        "openai.EmbeddingModel": {
+            "type": "string",
+            "enum": [
+                "text-embedding-ada-002",
+                "text-embedding-3-small",
+                "text-embedding-3-large"
+            ],
+            "x-enum-varnames": [
+                "EmbeddingModelTextEmbeddingAda002",
+                "EmbeddingModelTextEmbedding3Small",
+                "EmbeddingModelTextEmbedding3Large"
+            ]
+        },
+        "openai.EmbeddingNewParamsEncodingFormat": {
+            "type": "string",
+            "enum": [
+                "float",
+                "base64"
+            ],
+            "x-enum-varnames": [
+                "EmbeddingNewParamsEncodingFormatFloat",
+                "EmbeddingNewParamsEncodingFormatBase64"
+            ]
+        },
+        "openai.EmbeddingNewParamsInputUnion": {
+            "type": "object",
+            "properties": {
+                "any": {},
+                "ofArrayOfStrings": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "ofArrayOfTokenArrays": {
+                    "type": "array",
+                    "items": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer",
+                            "format": "int64"
+                        }
+                    }
+                },
+                "ofArrayOfTokens": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "ofString": {
+                    "$ref": "#/definitions/param.Opt-string"
+                }
+            }
+        },
         "opencsg_com_csghub-server_aigateway_types.Model": {
             "type": "object",
             "properties": {
@@ -22648,8 +38003,15 @@ const docTemplate = `{
                     "description": "organization-owner (e.g. openai)",
                     "type": "integer"
                 },
+                "endpoint": {
+                    "type": "string"
+                },
                 "id": {
                     "type": "string"
+                },
+                "is_pinned": {
+                    "description": "whether the model is pinned",
+                    "type": "boolean"
                 },
                 "object": {
                     "type": "string"
@@ -22657,8 +38019,16 @@ const docTemplate = `{
                 "owned_by": {
                     "type": "string"
                 },
+                "public": {
+                    "description": "whether the model is public (false = private, true = public)",
+                    "type": "boolean"
+                },
+                "support_function_call": {
+                    "description": "whether the model supports function calling",
+                    "type": "boolean"
+                },
                 "task": {
-                    "description": "extend opanai struct",
+                    "description": "like text-generation, text-to-image etc",
                     "type": "string"
                 }
             }
@@ -22814,8 +38184,80 @@ const docTemplate = `{
                         }
                     ],
                     "example": "generation"
+                },
+                "xnet_enabled": {
+                    "type": "boolean"
+                },
+                "xnet_migration_progress": {
+                    "type": "integer"
+                },
+                "xnet_migration_status": {
+                    "$ref": "#/definitions/types.XnetMigrationTaskStatus"
                 }
             }
+        },
+        "param.Opt-bool": {
+            "type": "object",
+            "properties": {
+                "value": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "param.Opt-int64": {
+            "type": "object",
+            "properties": {
+                "value": {
+                    "type": "integer",
+                    "format": "int64"
+                }
+            }
+        },
+        "param.Opt-string": {
+            "type": "object",
+            "properties": {
+                "value": {
+                    "type": "string"
+                }
+            }
+        },
+        "shared.FunctionDefinitionParam": {
+            "type": "object",
+            "properties": {
+                "any": {},
+                "description": {
+                    "description": "A description of what the function does, used by the model to choose when and\nhow to call the function.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/param.Opt-string"
+                        }
+                    ]
+                },
+                "name": {
+                    "description": "The name of the function to be called. Must be a-z, A-Z, 0-9, or contain\nunderscores and dashes, with a maximum length of 64.",
+                    "type": "string"
+                },
+                "parameters": {
+                    "description": "The parameters the functions accepts, described as a JSON Schema object. See the\n[guide](https://platform.openai.com/docs/guides/function-calling) for examples,\nand the\n[JSON Schema reference](https://json-schema.org/understanding-json-schema/) for\ndocumentation about the format.\n\nOmitting ` + "`" + `parameters` + "`" + ` defines a function with an empty parameter list.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/shared.FunctionParameters"
+                        }
+                    ]
+                },
+                "strict": {
+                    "description": "Whether to enable strict schema adherence when generating the function call. If\nset to true, the model will follow the exact schema defined in the ` + "`" + `parameters` + "`" + `\nfield. Only a subset of JSON Schema is supported when ` + "`" + `strict` + "`" + ` is ` + "`" + `true` + "`" + `. Learn\nmore about Structured Outputs in the\n[function calling guide](https://platform.openai.com/docs/guides/function-calling).",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/param.Opt-bool"
+                        }
+                    ]
+                }
+            }
+        },
+        "shared.FunctionParameters": {
+            "type": "object",
+            "additionalProperties": {}
         },
         "telemetry.Counts": {
             "type": "object",
@@ -22958,6 +38400,368 @@ const docTemplate = `{
         "types.APIUnauthorized": {
             "type": "object"
         },
+        "types.AccInvoicable": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "number"
+                },
+                "bill_cycle": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.AccInvoicableReq": {
+            "type": "object",
+            "properties": {
+                "end_month": {
+                    "type": "string"
+                },
+                "page": {
+                    "description": "Current page number",
+                    "type": "integer",
+                    "minimum": 1
+                },
+                "page_size": {
+                    "description": "Number of items per page",
+                    "type": "integer",
+                    "maximum": 100,
+                    "minimum": 1
+                },
+                "start_month": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.AccInvoicableResp": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.AccInvoicable"
+                    }
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "types.AccInvoiceCreateReq": {
+            "type": "object",
+            "required": [
+                "bill_cycle",
+                "invoice_amount",
+                "title_id"
+            ],
+            "properties": {
+                "bill_cycle": {
+                    "type": "string"
+                },
+                "invoice_amount": {
+                    "type": "number"
+                },
+                "title_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "types.AccInvoiceDashboardReq": {
+            "type": "object",
+            "required": [
+                "end_month",
+                "start_month"
+            ],
+            "properties": {
+                "end_month": {
+                    "type": "string"
+                },
+                "start_month": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.AccInvoiceDashboardResp": {
+            "type": "object",
+            "properties": {
+                "current_month_non_invoicable": {
+                    "type": "number"
+                },
+                "invoiced_amount": {
+                    "type": "number"
+                },
+                "uninvoiced_amount": {
+                    "type": "number"
+                }
+            }
+        },
+        "types.AccInvoiceListReq": {
+            "type": "object",
+            "properties": {
+                "page": {
+                    "description": "Current page number",
+                    "type": "integer",
+                    "minimum": 1
+                },
+                "page_size": {
+                    "description": "Number of items per page",
+                    "type": "integer",
+                    "maximum": 100,
+                    "minimum": 1
+                },
+                "search": {
+                    "description": "Search field",
+                    "type": "string"
+                },
+                "status": {
+                    "description": "Invoice status eq processing,issued,failed",
+                    "type": "string"
+                }
+            }
+        },
+        "types.AccInvoiceListResp": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.AccInvoiceResp"
+                    }
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "types.AccInvoiceResp": {
+            "type": "object",
+            "properties": {
+                "apply_time": {
+                    "description": "Invoice application time",
+                    "type": "string"
+                },
+                "bank_account": {
+                    "description": "Bank account number",
+                    "type": "string"
+                },
+                "bank_name": {
+                    "description": "Bank name",
+                    "type": "string"
+                },
+                "bill_cycle": {
+                    "description": "Billing cycle",
+                    "type": "string"
+                },
+                "contact_phone": {
+                    "description": "Contact phone number",
+                    "type": "string"
+                },
+                "created_at": {
+                    "description": "Creation time",
+                    "type": "string"
+                },
+                "email": {
+                    "description": "Email address",
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "invoice_amount": {
+                    "description": "Invoice amount",
+                    "type": "number"
+                },
+                "invoice_date": {
+                    "description": "Invoice issuance date",
+                    "type": "string"
+                },
+                "invoice_title": {
+                    "description": "Invoice title",
+                    "type": "string"
+                },
+                "invoice_type": {
+                    "description": "Invoice type",
+                    "type": "string"
+                },
+                "invoice_url": {
+                    "description": "Invoice URL",
+                    "type": "string"
+                },
+                "reason": {
+                    "description": "Reason",
+                    "type": "string"
+                },
+                "registered_addr": {
+                    "description": "Registered address",
+                    "type": "string"
+                },
+                "status": {
+                    "description": "Invoice status eq processing,issued,failed",
+                    "type": "string"
+                },
+                "taxpayer_id": {
+                    "description": "Taxpayer identification number",
+                    "type": "string"
+                },
+                "title_type": {
+                    "description": "Invoice title type",
+                    "type": "string"
+                },
+                "updated_at": {
+                    "description": "Update time",
+                    "type": "string"
+                },
+                "user_name": {
+                    "description": "User name",
+                    "type": "string"
+                },
+                "user_uuid": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.AccInvoiceTitleListReq": {
+            "type": "object",
+            "properties": {
+                "page": {
+                    "description": "Current page number",
+                    "type": "integer",
+                    "minimum": 1
+                },
+                "page_size": {
+                    "description": "Number of items per page",
+                    "type": "integer",
+                    "maximum": 100,
+                    "minimum": 1
+                },
+                "search": {
+                    "description": "Search field",
+                    "type": "string"
+                }
+            }
+        },
+        "types.AccInvoiceTitleListResp": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.AccInvoiceTitleResp"
+                    }
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "types.AccInvoiceTitleReq": {
+            "type": "object",
+            "required": [
+                "contact_phone",
+                "email",
+                "invoice_type",
+                "tax_id",
+                "title",
+                "title_type"
+            ],
+            "properties": {
+                "address": {
+                    "description": "Registered address",
+                    "type": "string"
+                },
+                "bank_account": {
+                    "description": "Bank account number",
+                    "type": "string"
+                },
+                "bank_name": {
+                    "description": "Bank name",
+                    "type": "string"
+                },
+                "contact_phone": {
+                    "description": "Contact phone number",
+                    "type": "string"
+                },
+                "email": {
+                    "description": "Email address",
+                    "type": "string"
+                },
+                "invoice_type": {
+                    "type": "string"
+                },
+                "is_default": {
+                    "type": "boolean"
+                },
+                "tax_id": {
+                    "description": "Taxpayer identification number",
+                    "type": "string"
+                },
+                "title": {
+                    "description": "Invoice title name",
+                    "type": "string"
+                },
+                "title_type": {
+                    "description": "Invoice title type",
+                    "type": "string"
+                }
+            }
+        },
+        "types.AccInvoiceTitleResp": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "description": "Registered address",
+                    "type": "string"
+                },
+                "bank_account": {
+                    "description": "Bank account number",
+                    "type": "string"
+                },
+                "bank_name": {
+                    "description": "Bank name",
+                    "type": "string"
+                },
+                "contact_phone": {
+                    "description": "Contact phone number",
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "email": {
+                    "description": "Email address",
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "is_default": {
+                    "description": "Whether it is the default title",
+                    "type": "boolean"
+                },
+                "tax_id": {
+                    "description": "Taxpayer identification number",
+                    "type": "string"
+                },
+                "title": {
+                    "description": "Invoice title name",
+                    "type": "string"
+                },
+                "title_type": {
+                    "description": "Invoice title type",
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user_name": {
+                    "type": "string"
+                },
+                "user_uuid": {
+                    "description": "User",
+                    "type": "string"
+                }
+            }
+        },
         "types.AccessTokenApp": {
             "type": "string",
             "enum": [
@@ -22996,6 +38800,1031 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "sku_unit_type": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.AcctPriceCreateReq": {
+            "type": "object",
+            "properties": {
+                "discount": {
+                    "type": "number",
+                    "maximum": 1,
+                    "minimum": 0
+                },
+                "quota": {
+                    "type": "string"
+                },
+                "resource_id": {
+                    "type": "string"
+                },
+                "sku_desc": {
+                    "type": "string"
+                },
+                "sku_kind": {
+                    "type": "integer"
+                },
+                "sku_price": {
+                    "type": "integer"
+                },
+                "sku_price_currency": {
+                    "type": "string"
+                },
+                "sku_price_id": {
+                    "type": "integer"
+                },
+                "sku_type": {
+                    "type": "integer"
+                },
+                "sku_unit": {
+                    "type": "integer"
+                },
+                "sku_unit_type": {
+                    "type": "string"
+                },
+                "use_limit_price": {
+                    "type": "integer"
+                }
+            }
+        },
+        "types.AcctQuotaReq": {
+            "type": "object",
+            "properties": {
+                "repo_count_limit": {
+                    "type": "integer"
+                },
+                "speed_limit": {
+                    "type": "integer"
+                },
+                "traffic_limit": {
+                    "type": "integer"
+                }
+            }
+        },
+        "types.AcctQuotaStatementReq": {
+            "type": "object",
+            "properties": {
+                "repo_path": {
+                    "type": "string"
+                },
+                "repo_type": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.AcctRechargeReq": {
+            "type": "object",
+            "properties": {
+                "channelCode": {
+                    "$ref": "#/definitions/consts.PaymentChannel"
+                },
+                "rechargeAmount": {
+                    "description": "unit yuan",
+                    "type": "number"
+                }
+            }
+        },
+        "types.AcctRechargeResp": {
+            "type": "object",
+            "properties": {
+                "channel": {
+                    "$ref": "#/definitions/consts.PaymentChannel"
+                },
+                "content": {
+                    "type": "string"
+                },
+                "createTime": {
+                    "description": "2024-11-18 15:50:47",
+                    "type": "string"
+                },
+                "orderNo": {
+                    "type": "string"
+                },
+                "rechargeUUID": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.AcctStatementsRes": {
+            "type": "object",
+            "properties": {
+                "consumption": {
+                    "type": "number"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "event_date": {
+                    "type": "string"
+                },
+                "event_uuid": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "instance_name": {
+                    "type": "string"
+                },
+                "op_uid": {
+                    "type": "string"
+                },
+                "price": {
+                    "type": "number"
+                },
+                "price_unit": {
+                    "type": "string"
+                },
+                "scene": {
+                    "type": "integer"
+                },
+                "sku_desc": {
+                    "type": "string"
+                },
+                "sku_id": {
+                    "type": "integer"
+                },
+                "sku_kind": {
+                    "type": "integer"
+                },
+                "sku_price_currency": {
+                    "type": "string"
+                },
+                "sku_type": {
+                    "type": "integer"
+                },
+                "sku_unit": {
+                    "type": "integer"
+                },
+                "sku_unit_type": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
+                },
+                "user_name": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "number"
+                }
+            }
+        },
+        "types.AcctStatementsResult": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.AcctStatementsRes"
+                    }
+                },
+                "total": {
+                    "type": "integer"
+                },
+                "total_consumption": {
+                    "type": "number"
+                },
+                "total_value": {
+                    "type": "number"
+                }
+            }
+        },
+        "types.AdminUpdateInvoiceReq": {
+            "type": "object",
+            "required": [
+                "status"
+            ],
+            "properties": {
+                "invoice_url": {
+                    "type": "string"
+                },
+                "reason": {
+                    "type": "string"
+                },
+                "status": {
+                    "description": "Invoice status eq processing,issued,failed",
+                    "type": "string"
+                }
+            }
+        },
+        "types.AgentConfig": {
+            "type": "object",
+            "properties": {
+                "config": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.AgentInstance": {
+            "type": "object",
+            "properties": {
+                "built_in": {
+                    "description": "Whether the instance is built-in",
+                    "type": "boolean"
+                },
+                "content_id": {
+                    "description": "Used to specify the unique id of the instance resource",
+                    "type": "string"
+                },
+                "created_at": {
+                    "description": "When the instance was created",
+                    "type": "string"
+                },
+                "description": {
+                    "description": "Instance description",
+                    "type": "string"
+                },
+                "editable": {
+                    "description": "Whether the instance is editable",
+                    "type": "boolean"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "is_pinned": {
+                    "description": "Whether the instance is pinned by the user",
+                    "type": "boolean"
+                },
+                "is_running": {
+                    "description": "Whether the instance is running",
+                    "type": "boolean"
+                },
+                "metadata": {
+                    "description": "Instance metadata",
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "name": {
+                    "description": "Instance name",
+                    "type": "string"
+                },
+                "public": {
+                    "description": "Whether the instance is public",
+                    "type": "boolean"
+                },
+                "template_id": {
+                    "description": "Associated with the id in the template table",
+                    "type": "integer",
+                    "minimum": 1
+                },
+                "type": {
+                    "description": "Possible values: langflow, agno, code, etc.",
+                    "type": "string"
+                },
+                "updated_at": {
+                    "description": "When the instance was last updated",
+                    "type": "string"
+                }
+            }
+        },
+        "types.AgentInstanceSession": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "instance_id": {
+                    "type": "integer"
+                },
+                "last_turn": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "session_uuid": {
+                    "type": "string"
+                },
+                "type": {
+                    "description": "Possible values: langflow, agno, code, etc.",
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user_uuid": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.AgentInstanceSessionHistory": {
+            "type": "object",
+            "properties": {
+                "content": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "feedback": {
+                    "$ref": "#/definitions/types.AgentSessionHistoryFeedback"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "is_rewritten": {
+                    "type": "boolean"
+                },
+                "msg_uuid": {
+                    "type": "string"
+                },
+                "request": {
+                    "type": "boolean"
+                },
+                "session_id": {
+                    "type": "integer"
+                },
+                "session_uuid": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.AgentKnowledgeBase": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "content_id": {
+                    "description": "Used to specify the unique id of the knowledge base resource",
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string",
+                    "maxLength": 500
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "metadata": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "public": {
+                    "description": "Whether the knowledge base is public",
+                    "type": "boolean"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.AgentKnowledgeBaseDetail": {
+            "type": "object",
+            "properties": {
+                "avatar": {
+                    "type": "string"
+                },
+                "content_id": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "editable": {
+                    "type": "boolean"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "is_pinned": {
+                    "description": "Whether the knowledge base is pinned by the user",
+                    "type": "boolean"
+                },
+                "metadata": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "name": {
+                    "type": "string"
+                },
+                "owner": {
+                    "type": "string"
+                },
+                "public": {
+                    "type": "boolean"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user_uuid": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.AgentKnowledgeBaseListItem": {
+            "type": "object",
+            "properties": {
+                "content_id": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "editable": {
+                    "type": "boolean"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "is_pinned": {
+                    "description": "Whether the knowledge base is pinned by the user",
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "public": {
+                    "type": "boolean"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.AgentMCPServer": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "env": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "headers": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "protocol": {
+                    "description": "streamable or sse",
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "url": {
+                    "type": "string"
+                },
+                "user_uuid": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.AgentMCPServerListItem": {
+            "type": "object",
+            "properties": {
+                "avatar": {
+                    "type": "string"
+                },
+                "built_in": {
+                    "type": "boolean"
+                },
+                "capabilities": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "description": "String ID (format: \"builtin:{id}\" or \"user:{id}\")",
+                    "type": "string"
+                },
+                "installed": {
+                    "type": "boolean"
+                },
+                "is_pinned": {
+                    "description": "Whether the MCP server is pinned by the user",
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "need_install": {
+                    "type": "boolean"
+                },
+                "owner": {
+                    "type": "string"
+                },
+                "protocol": {
+                    "type": "string"
+                },
+                "status": {
+                    "description": "Connection status: 'connected'，'error'",
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "url": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.AgentMCPServerMonitorRequest": {
+            "type": "object",
+            "required": [
+                "mcp_server_ids",
+                "monitor_id"
+            ],
+            "properties": {
+                "mcp_server_ids": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "monitor_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.AgentMonitorRequest": {
+            "type": "object",
+            "required": [
+                "instance_ids",
+                "monitor_id"
+            ],
+            "properties": {
+                "instance_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "monitor_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.AgentPromptListItem": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "is_pinned": {
+                    "description": "Whether the prompt is pinned by the user",
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "path": {
+                    "type": "string"
+                },
+                "public": {
+                    "type": "boolean"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.AgentPromptOptimizeRequest": {
+            "type": "object",
+            "required": [
+                "prompt"
+            ],
+            "properties": {
+                "prompt": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.AgentPromptOptimizeResponse": {
+            "type": "object",
+            "properties": {
+                "optimized_prompt": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.AgentSessionHistoryFeedback": {
+            "type": "string",
+            "enum": [
+                "none",
+                "like",
+                "dislike"
+            ],
+            "x-enum-varnames": [
+                "AgentSessionHistoryFeedbackNone",
+                "AgentSessionHistoryFeedbackLike",
+                "AgentSessionHistoryFeedbackDislike"
+            ]
+        },
+        "types.AgentSessionShareResponse": {
+            "type": "object",
+            "properties": {
+                "expires_at": {
+                    "type": "integer"
+                },
+                "share_uuid": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.AgentSharedSession": {
+            "type": "object",
+            "properties": {
+                "instance_id": {
+                    "type": "integer"
+                },
+                "max_turn": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "session_uuid": {
+                    "type": "string"
+                },
+                "user_uuid": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.AgentSharedSessionResponse": {
+            "type": "object",
+            "properties": {
+                "histories": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.AgentInstanceSessionHistory"
+                    }
+                },
+                "session": {
+                    "$ref": "#/definitions/types.AgentSharedSession"
+                }
+            }
+        },
+        "types.AgentTaskDetail": {
+            "type": "object",
+            "properties": {
+                "backend": {
+                    "description": "Backend system of the task (argo_workflow, deploy)",
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "instance_id": {
+                    "type": "integer"
+                },
+                "instance_name": {
+                    "type": "string"
+                },
+                "instance_type": {
+                    "type": "string"
+                },
+                "metadata": {
+                    "description": "Backend-specific fields (argo_workflow or deploy)",
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "session_name": {
+                    "type": "string"
+                },
+                "session_uuid": {
+                    "type": "string"
+                },
+                "status": {
+                    "$ref": "#/definitions/types.AgentTaskStatus"
+                },
+                "task_desc": {
+                    "type": "string"
+                },
+                "task_id": {
+                    "type": "string"
+                },
+                "task_name": {
+                    "type": "string"
+                },
+                "task_type": {
+                    "$ref": "#/definitions/types.AgentTaskType"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.AgentTaskListItemResponse": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "instance_id": {
+                    "type": "integer"
+                },
+                "is_pinned": {
+                    "description": "Whether the task is pinned by the user",
+                    "type": "boolean"
+                },
+                "session_uuid": {
+                    "type": "string"
+                },
+                "task_id": {
+                    "type": "string"
+                },
+                "task_name": {
+                    "type": "string"
+                },
+                "task_status": {
+                    "$ref": "#/definitions/types.AgentTaskStatus"
+                },
+                "task_type": {
+                    "$ref": "#/definitions/types.AgentTaskType"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.AgentTaskStatus": {
+            "type": "string",
+            "enum": [
+                "in_progress",
+                "completed",
+                "failed"
+            ],
+            "x-enum-varnames": [
+                "AgentTaskStatusInProgress",
+                "AgentTaskStatusCompleted",
+                "AgentTaskStatusFailed"
+            ]
+        },
+        "types.AgentTaskType": {
+            "type": "string",
+            "enum": [
+                "finetuneJob",
+                "inference"
+            ],
+            "x-enum-varnames": [
+                "AgentTaskTypeFinetuneJob",
+                "AgentTaskTypeInference"
+            ]
+        },
+        "types.AgentTemplate": {
+            "type": "object",
+            "required": [
+                "name",
+                "type"
+            ],
+            "properties": {
+                "content": {
+                    "description": "Used to store the complete content of the template",
+                    "type": "string"
+                },
+                "created_at": {
+                    "description": "When the template was created",
+                    "type": "string"
+                },
+                "description": {
+                    "description": "Agent template description",
+                    "type": "string",
+                    "maxLength": 500
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "is_pinned": {
+                    "description": "Whether the template is pinned by the user",
+                    "type": "boolean"
+                },
+                "metadata": {
+                    "description": "Template metadata",
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "name": {
+                    "description": "Agent template name",
+                    "type": "string",
+                    "maxLength": 255
+                },
+                "public": {
+                    "description": "Whether the template is public",
+                    "type": "boolean"
+                },
+                "type": {
+                    "description": "Possible values: langflow, agno, code, etc.",
+                    "type": "string"
+                },
+                "updated_at": {
+                    "description": "When the template was last updated",
+                    "type": "string"
+                }
+            }
+        },
+        "types.AgentUserPreferenceRequest": {
+            "type": "object",
+            "required": [
+                "entity_id",
+                "entity_type",
+                "preference"
+            ],
+            "properties": {
+                "entity_id": {
+                    "type": "string"
+                },
+                "entity_type": {
+                    "type": "string",
+                    "enum": [
+                        "agent_instance",
+                        "agent_knowledge_base",
+                        "agent_template",
+                        "agent_mcp_server",
+                        "agent_task",
+                        "agent_prompt",
+                        "agent_model"
+                    ]
+                },
+                "preference": {
+                    "type": "string",
+                    "enum": [
+                        "pin"
+                    ]
+                }
+            }
+        },
+        "types.ApiRateLimitCreateRequest": {
+            "type": "object",
+            "required": [
+                "param",
+                "path"
+            ],
+            "properties": {
+                "param": {
+                    "type": "object",
+                    "required": [
+                        "limit"
+                    ],
+                    "properties": {
+                        "checkIP": {
+                            "type": "boolean"
+                        },
+                        "limit": {
+                            "type": "integer"
+                        },
+                        "window": {
+                            "description": "in seconds",
+                            "type": "integer"
+                        }
+                    }
+                },
+                "path": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.ApiRateLimitParam": {
+            "type": "object",
+            "properties": {
+                "checkIP": {
+                    "type": "boolean"
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "window": {
+                    "description": "in seconds",
+                    "type": "integer"
+                }
+            }
+        },
+        "types.ArgoWorkFlowRes": {
+            "type": "object",
+            "properties": {
+                "datasets": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "download_url": {
+                    "type": "string"
+                },
+                "end_time": {
+                    "type": "string"
+                },
+                "failures_url": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "image": {
+                    "type": "string"
+                },
+                "namespace": {
+                    "description": "Namespace of the workflow",
+                    "type": "string"
+                },
+                "reason": {
+                    "type": "string"
+                },
+                "repo_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "repo_type": {
+                    "type": "string"
+                },
+                "resource_id": {
+                    "type": "integer"
+                },
+                "resource_name": {
+                    "type": "string"
+                },
+                "result_url": {
+                    "type": "string"
+                },
+                "start_time": {
+                    "type": "string"
+                },
+                "status": {
+                    "$ref": "#/definitions/v1alpha1.WorkflowPhase"
+                },
+                "submit_time": {
+                    "type": "string"
+                },
+                "task_desc": {
+                    "type": "string"
+                },
+                "task_id": {
+                    "type": "string"
+                },
+                "task_name": {
+                    "type": "string"
+                },
+                "task_type": {
+                    "$ref": "#/definitions/types.TaskType"
+                },
+                "username": {
                     "type": "string"
                 }
             }
@@ -23056,6 +39885,48 @@ const docTemplate = `{
                 },
                 "theme": {
                     "type": "string"
+                }
+            }
+        },
+        "types.CaptchaResponse": {
+            "type": "object",
+            "properties": {
+                "bs64": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.CaptchaVerifyRequest": {
+            "description": "Request body for captcha verification",
+            "type": "object",
+            "required": [
+                "answer",
+                "id"
+            ],
+            "properties": {
+                "answer": {
+                    "description": "Answer is the user-provided captcha answer",
+                    "type": "string"
+                },
+                "id": {
+                    "description": "ID is the captcha identifier",
+                    "type": "string"
+                }
+            }
+        },
+        "types.CaptchaVerifyResponse": {
+            "description": "Response for captcha verification",
+            "type": "object",
+            "properties": {
+                "token": {
+                    "type": "string"
+                },
+                "valid": {
+                    "description": "Valid indicates whether the captcha was verified successfully",
+                    "type": "boolean"
                 }
             }
         },
@@ -23289,6 +40160,26 @@ const docTemplate = `{
                 }
             }
         },
+        "types.CommentsWithPagination": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.DiscussionResponse_Comment"
+                    }
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "per": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
         "types.Commit": {
             "type": "object",
             "properties": {
@@ -23333,6 +40224,20 @@ const docTemplate = `{
                 "CommitActionUpdate",
                 "CommitActionDelete"
             ]
+        },
+        "types.CommitFile": {
+            "type": "object",
+            "properties": {
+                "content": {
+                    "type": "string"
+                },
+                "encoding": {
+                    "type": "string"
+                },
+                "path": {
+                    "type": "string"
+                }
+            }
         },
         "types.CommitFileReq": {
             "type": "object",
@@ -23475,6 +40380,163 @@ const docTemplate = `{
                 }
             }
         },
+        "types.Conversation": {
+            "type": "object",
+            "required": [
+                "message",
+                "uuid"
+            ],
+            "properties": {
+                "message": {
+                    "type": "string"
+                },
+                "temperature": {
+                    "type": "number"
+                },
+                "uuid": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.ConversationTitle": {
+            "type": "object",
+            "required": [
+                "title",
+                "uuid"
+            ],
+            "properties": {
+                "title": {
+                    "type": "string"
+                },
+                "uuid": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.CreateAgentConfigReq": {
+            "type": "object",
+            "required": [
+                "config",
+                "name"
+            ],
+            "properties": {
+                "config": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.CreateAgentInstanceRequest": {
+            "type": "object",
+            "properties": {
+                "content_id": {
+                    "type": "string"
+                },
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "description": {
+                    "type": "string"
+                },
+                "metadata": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "name": {
+                    "type": "string"
+                },
+                "public": {
+                    "type": "boolean"
+                },
+                "template_id": {
+                    "type": "integer",
+                    "minimum": 1
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.CreateAgentInstanceSessionRequest": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "maxLength": 255
+                },
+                "session_uuid": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.CreateAgentInstanceSessionResponse": {
+            "type": "object",
+            "properties": {
+                "session_uuid": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.CreateAgentKnowledgeBaseReq": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "description": {
+                    "type": "string",
+                    "maxLength": 500
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "public": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "types.CreateAgentMCPServerRequest": {
+            "type": "object",
+            "required": [
+                "name",
+                "protocol",
+                "url"
+            ],
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "env": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "headers": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 255
+                },
+                "protocol": {
+                    "type": "string",
+                    "enum": [
+                        "streamable",
+                        "sse"
+                    ]
+                },
+                "url": {
+                    "type": "string"
+                }
+            }
+        },
         "types.CreateCategory": {
             "type": "object",
             "required": [
@@ -23500,49 +40562,64 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "admin": {
+                    "description": "Admin user",
                     "type": "string"
                 },
+                "commit_files": {
+                    "description": "Files to commit",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.CommitFile"
+                    }
+                },
                 "default_branch": {
+                    "description": "The default branch of the repository",
                     "type": "string",
                     "example": "main"
                 },
                 "description": {
+                    "description": "A description for the repository",
                     "type": "string"
                 },
-                "labels": {
-                    "type": "string",
-                    "example": ""
-                },
                 "license": {
+                    "description": "The license for the repository",
                     "type": "string",
                     "example": "MIT"
                 },
                 "name": {
+                    "description": "The name of the repository",
                     "type": "string",
                     "example": "model_name_1"
                 },
                 "namespace": {
+                    "description": "The namespace of the repository, which can be a user or an organization",
                     "type": "string",
                     "example": "user_or_org_name"
                 },
                 "nickname": {
+                    "description": "The display name of the repository",
                     "type": "string",
                     "example": "model display name"
                 },
                 "private": {
+                    "description": "Whether the repository is private",
                     "type": "boolean"
                 },
-                "readme": {
-                    "type": "string"
-                },
                 "star_count": {
+                    "description": "Star count",
                     "type": "integer"
                 },
                 "tool_count": {
+                    "description": "Tool count",
                     "type": "integer"
                 },
                 "type": {
-                    "$ref": "#/definitions/types.RepositoryType"
+                    "description": "The type of the repository",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/types.RepositoryType"
+                        }
+                    ]
                 }
             }
         },
@@ -23614,48 +40691,59 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "admin": {
+                    "description": "Admin user",
                     "type": "string"
                 },
+                "commit_files": {
+                    "description": "Files to commit",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.CommitFile"
+                    }
+                },
                 "default_branch": {
+                    "description": "The default branch of the repository",
                     "type": "string",
                     "example": "main"
                 },
                 "description": {
+                    "description": "A description for the repository",
                     "type": "string"
                 },
-                "labels": {
-                    "type": "string",
-                    "example": ""
-                },
                 "license": {
+                    "description": "The license for the repository",
                     "type": "string",
                     "example": "MIT"
                 },
                 "name": {
+                    "description": "The name of the repository",
                     "type": "string",
                     "example": "model_name_1"
                 },
                 "namespace": {
+                    "description": "The namespace of the repository, which can be a user or an organization",
                     "type": "string",
                     "example": "user_or_org_name"
                 },
                 "nickname": {
+                    "description": "The display name of the repository",
                     "type": "string",
                     "example": "model display name"
                 },
                 "private": {
+                    "description": "Whether the repository is private",
                     "type": "boolean"
                 },
-                "readme": {
-                    "type": "string"
-                },
                 "star_count": {
+                    "description": "Star count",
                     "type": "integer"
                 },
                 "tool_count": {
+                    "description": "Tool count",
                     "type": "integer"
                 },
                 "type": {
+                    "description": "The type of the dataset",
                     "type": "integer"
                 }
             }
@@ -23729,6 +40817,25 @@ const docTemplate = `{
         "types.CreateFileResp": {
             "type": "object"
         },
+        "types.CreateInferenceVersionReq": {
+            "type": "object",
+            "properties": {
+                "commit_id": {
+                    "type": "string"
+                },
+                "traffic_percent": {
+                    "type": "integer"
+                }
+            }
+        },
+        "types.CreateInvitationResp": {
+            "type": "object",
+            "properties": {
+                "invite_code": {
+                    "type": "string"
+                }
+            }
+        },
         "types.CreateJWTReq": {
             "type": "object",
             "required": [
@@ -23751,56 +40858,142 @@ const docTemplate = `{
                 }
             }
         },
+        "types.CreateLLMConfigReq": {
+            "type": "object",
+            "properties": {
+                "api_endpoint": {
+                    "type": "string"
+                },
+                "auth_header": {
+                    "type": "string"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "model_name": {
+                    "type": "string"
+                },
+                "provider": {
+                    "type": "string"
+                },
+                "type": {
+                    "description": "1: optimization, 2: comparison, 4: summary readme",
+                    "type": "integer"
+                }
+            }
+        },
+        "types.CreateLicenseReq": {
+            "type": "object",
+            "required": [
+                "company",
+                "edition",
+                "expire_time",
+                "max_user",
+                "product",
+                "start_time"
+            ],
+            "properties": {
+                "company": {
+                    "type": "string"
+                },
+                "current_user": {
+                    "type": "string"
+                },
+                "edition": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "expire_time": {
+                    "type": "string"
+                },
+                "extra": {
+                    "type": "string"
+                },
+                "max_user": {
+                    "type": "integer",
+                    "minimum": 1
+                },
+                "product": {
+                    "type": "string"
+                },
+                "remark": {
+                    "type": "string"
+                },
+                "start_time": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "string"
+                }
+            }
+        },
         "types.CreateMCPServerReq": {
             "type": "object",
             "properties": {
                 "admin": {
+                    "description": "Admin user",
                     "type": "string"
+                },
+                "commit_files": {
+                    "description": "Files to commit",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.CommitFile"
+                    }
                 },
                 "configuration": {
                     "type": "string"
                 },
                 "default_branch": {
+                    "description": "The default branch of the repository",
                     "type": "string",
                     "example": "main"
                 },
                 "description": {
+                    "description": "A description for the repository",
                     "type": "string"
                 },
-                "labels": {
-                    "type": "string",
-                    "example": ""
-                },
                 "license": {
+                    "description": "The license for the repository",
                     "type": "string",
                     "example": "MIT"
                 },
                 "name": {
+                    "description": "The name of the repository",
                     "type": "string",
                     "example": "model_name_1"
                 },
                 "namespace": {
+                    "description": "The namespace of the repository, which can be a user or an organization",
                     "type": "string",
                     "example": "user_or_org_name"
                 },
                 "nickname": {
+                    "description": "The display name of the repository",
                     "type": "string",
                     "example": "model display name"
                 },
                 "private": {
+                    "description": "Whether the repository is private",
                     "type": "boolean"
                 },
-                "readme": {
-                    "type": "string"
-                },
                 "star_count": {
+                    "description": "Star count",
                     "type": "integer"
                 },
                 "tool_count": {
+                    "description": "Tool count",
                     "type": "integer"
                 },
                 "type": {
-                    "$ref": "#/definitions/types.RepositoryType"
+                    "description": "The type of the repository",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/types.RepositoryType"
+                        }
+                    ]
                 }
             }
         },
@@ -23838,7 +41031,6 @@ const docTemplate = `{
         "types.CreateMirrorRepoReq": {
             "type": "object",
             "required": [
-                "mirror_source_id",
                 "repo_type",
                 "source_name",
                 "source_namespace",
@@ -23913,26 +41105,33 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "admin": {
+                    "description": "Admin user",
                     "type": "string"
                 },
                 "base_model": {
                     "type": "string"
                 },
+                "commit_files": {
+                    "description": "Files to commit",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.CommitFile"
+                    }
+                },
                 "default_branch": {
+                    "description": "The default branch of the repository",
                     "type": "string",
                     "example": "main"
                 },
                 "description": {
+                    "description": "A description for the repository",
                     "type": "string"
                 },
                 "high_risk_count": {
                     "type": "integer"
                 },
-                "labels": {
-                    "type": "string",
-                    "example": ""
-                },
                 "license": {
+                    "description": "The license for the repository",
                     "type": "string",
                     "example": "MIT"
                 },
@@ -23940,34 +41139,42 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "name": {
+                    "description": "The name of the repository",
                     "type": "string",
                     "example": "model_name_1"
                 },
                 "namespace": {
+                    "description": "The namespace of the repository, which can be a user or an organization",
                     "type": "string",
                     "example": "user_or_org_name"
                 },
                 "nickname": {
+                    "description": "The display name of the repository",
                     "type": "string",
                     "example": "model display name"
                 },
                 "private": {
+                    "description": "Whether the repository is private",
                     "type": "boolean"
-                },
-                "readme": {
-                    "type": "string"
                 },
                 "report_url": {
                     "type": "string"
                 },
                 "star_count": {
+                    "description": "Star count",
                     "type": "integer"
                 },
                 "tool_count": {
+                    "description": "Tool count",
                     "type": "integer"
                 },
                 "type": {
-                    "$ref": "#/definitions/types.RepositoryType"
+                    "description": "The type of the repository",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/types.RepositoryType"
+                        }
+                    ]
                 }
             }
         },
@@ -23980,8 +41187,15 @@ const docTemplate = `{
                 "deploy_name": {
                     "type": "string"
                 },
+                "min_replica": {
+                    "type": "integer",
+                    "minimum": 0
+                },
                 "order_detail_id": {
                     "type": "integer"
+                },
+                "owner_namespace": {
+                    "type": "string"
                 },
                 "resource_id": {
                     "type": "integer"
@@ -24026,53 +41240,82 @@ const docTemplate = `{
                 }
             }
         },
+        "types.CreatePromptPrefixReq": {
+            "type": "object",
+            "properties": {
+                "en": {
+                    "type": "string"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "zh": {
+                    "type": "string"
+                }
+            }
+        },
         "types.CreatePromptRepoReq": {
             "type": "object",
             "properties": {
                 "admin": {
+                    "description": "Admin user",
                     "type": "string"
                 },
+                "commit_files": {
+                    "description": "Files to commit",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.CommitFile"
+                    }
+                },
                 "default_branch": {
+                    "description": "The default branch of the repository",
                     "type": "string",
                     "example": "main"
                 },
                 "description": {
+                    "description": "A description for the repository",
                     "type": "string"
                 },
-                "labels": {
-                    "type": "string",
-                    "example": ""
-                },
                 "license": {
+                    "description": "The license for the repository",
                     "type": "string",
                     "example": "MIT"
                 },
                 "name": {
+                    "description": "The name of the repository",
                     "type": "string",
                     "example": "model_name_1"
                 },
                 "namespace": {
+                    "description": "The namespace of the repository, which can be a user or an organization",
                     "type": "string",
                     "example": "user_or_org_name"
                 },
                 "nickname": {
+                    "description": "The display name of the repository",
                     "type": "string",
                     "example": "model display name"
                 },
                 "private": {
+                    "description": "Whether the repository is private",
                     "type": "boolean"
                 },
-                "readme": {
-                    "type": "string"
-                },
                 "star_count": {
+                    "description": "Star count",
                     "type": "integer"
                 },
                 "tool_count": {
+                    "description": "Tool count",
                     "type": "integer"
                 },
                 "type": {
-                    "$ref": "#/definitions/types.RepositoryType"
+                    "description": "The type of the repository",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/types.RepositoryType"
+                        }
+                    ]
                 }
             }
         },
@@ -24091,49 +41334,64 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "admin": {
+                    "description": "Admin user",
                     "type": "string"
                 },
+                "commit_files": {
+                    "description": "Files to commit",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.CommitFile"
+                    }
+                },
                 "default_branch": {
+                    "description": "The default branch of the repository",
                     "type": "string",
                     "example": "main"
                 },
                 "description": {
+                    "description": "A description for the repository",
                     "type": "string"
                 },
-                "labels": {
-                    "type": "string",
-                    "example": ""
-                },
                 "license": {
+                    "description": "The license for the repository",
                     "type": "string",
                     "example": "MIT"
                 },
                 "name": {
+                    "description": "The name of the repository",
                     "type": "string",
                     "example": "model_name_1"
                 },
                 "namespace": {
+                    "description": "The namespace of the repository, which can be a user or an organization",
                     "type": "string",
                     "example": "user_or_org_name"
                 },
                 "nickname": {
+                    "description": "The display name of the repository",
                     "type": "string",
                     "example": "model display name"
                 },
                 "private": {
+                    "description": "Whether the repository is private",
                     "type": "boolean"
                 },
-                "readme": {
-                    "type": "string"
-                },
                 "star_count": {
+                    "description": "Star count",
                     "type": "integer"
                 },
                 "tool_count": {
+                    "description": "Tool count",
                     "type": "integer"
                 },
                 "type": {
-                    "$ref": "#/definitions/types.RepositoryType"
+                    "description": "The type of the repository",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/types.RepositoryType"
+                        }
+                    ]
                 }
             }
         },
@@ -24151,6 +41409,119 @@ const docTemplate = `{
                 }
             }
         },
+        "types.CreateSensitiveWordSetReq": {
+            "type": "object",
+            "properties": {
+                "category_id": {
+                    "type": "integer"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "show_name": {
+                    "type": "string"
+                },
+                "words": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "types.CreateSessionHistoryRequest": {
+            "type": "object",
+            "required": [
+                "messages"
+            ],
+            "properties": {
+                "messages": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.SessionHistoryMessage"
+                    }
+                }
+            }
+        },
+        "types.CreateSessionHistoryResponse": {
+            "type": "object",
+            "properties": {
+                "msg_uuids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "types.CreateSkillReq": {
+            "type": "object",
+            "properties": {
+                "admin": {
+                    "description": "Admin user",
+                    "type": "string"
+                },
+                "commit_files": {
+                    "description": "Files to commit",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.CommitFile"
+                    }
+                },
+                "default_branch": {
+                    "description": "The default branch of the repository",
+                    "type": "string",
+                    "example": "main"
+                },
+                "description": {
+                    "description": "A description for the repository",
+                    "type": "string"
+                },
+                "license": {
+                    "description": "The license for the repository",
+                    "type": "string",
+                    "example": "MIT"
+                },
+                "name": {
+                    "description": "The name of the repository",
+                    "type": "string",
+                    "example": "model_name_1"
+                },
+                "namespace": {
+                    "description": "The namespace of the repository, which can be a user or an organization",
+                    "type": "string",
+                    "example": "user_or_org_name"
+                },
+                "nickname": {
+                    "description": "The display name of the repository",
+                    "type": "string",
+                    "example": "model display name"
+                },
+                "private": {
+                    "description": "Whether the repository is private",
+                    "type": "boolean"
+                },
+                "star_count": {
+                    "description": "Star count",
+                    "type": "integer"
+                },
+                "tool_count": {
+                    "description": "Tool count",
+                    "type": "integer"
+                },
+                "type": {
+                    "description": "The type of the repository",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/types.RepositoryType"
+                        }
+                    ]
+                }
+            }
+        },
         "types.CreateSpaceReq": {
             "type": "object",
             "required": [
@@ -24160,19 +41531,29 @@ const docTemplate = `{
             ],
             "properties": {
                 "admin": {
+                    "description": "Admin user",
                     "type": "string"
                 },
                 "cluster_id": {
                     "type": "string"
                 },
+                "commit_files": {
+                    "description": "Files to commit",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.CommitFile"
+                    }
+                },
                 "cover_image_url": {
                     "type": "string"
                 },
                 "default_branch": {
+                    "description": "The default branch of the repository",
                     "type": "string",
                     "example": "main"
                 },
                 "description": {
+                    "description": "A description for the repository",
                     "type": "string"
                 },
                 "driver_version": {
@@ -24182,23 +41563,28 @@ const docTemplate = `{
                 "env": {
                     "type": "string"
                 },
-                "labels": {
-                    "type": "string",
-                    "example": ""
-                },
                 "license": {
+                    "description": "The license for the repository",
                     "type": "string",
                     "example": "MIT"
                 },
+                "min_replica": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "example": 0
+                },
                 "name": {
+                    "description": "The name of the repository",
                     "type": "string",
                     "example": "model_name_1"
                 },
                 "namespace": {
+                    "description": "The namespace of the repository, which can be a user or an organization",
                     "type": "string",
                     "example": "user_or_org_name"
                 },
                 "nickname": {
+                    "description": "The display name of the repository",
                     "type": "string",
                     "example": "model display name"
                 },
@@ -24206,10 +41592,8 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "private": {
+                    "description": "Whether the repository is private",
                     "type": "boolean"
-                },
-                "readme": {
-                    "type": "string"
                 },
                 "resource_id": {
                     "type": "integer"
@@ -24226,16 +41610,23 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "star_count": {
+                    "description": "Star count",
                     "type": "integer"
                 },
                 "template": {
                     "type": "string"
                 },
                 "tool_count": {
+                    "description": "Tool count",
                     "type": "integer"
                 },
                 "type": {
-                    "$ref": "#/definitions/types.RepositoryType"
+                    "description": "The type of the repository",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/types.RepositoryType"
+                        }
+                    ]
                 },
                 "variables": {
                     "type": "string"
@@ -24272,6 +41663,26 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "version": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.CreateStripeSessionReq": {
+            "type": "object",
+            "required": [
+                "amount_total",
+                "cancel_url",
+                "success_url"
+            ],
+            "properties": {
+                "amount_total": {
+                    "type": "integer",
+                    "minimum": 400
+                },
+                "cancel_url": {
+                    "type": "string"
+                },
+                "success_url": {
                     "type": "string"
                 }
             }
@@ -24463,6 +41874,15 @@ const docTemplate = `{
                 },
                 "user_likes": {
                     "type": "boolean"
+                },
+                "xnet_enabled": {
+                    "type": "boolean"
+                },
+                "xnet_migration_progress": {
+                    "type": "integer"
+                },
+                "xnet_migration_status": {
+                    "$ref": "#/definitions/types.XnetMigrationTaskStatus"
                 }
             }
         },
@@ -24561,62 +41981,77 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "admin": {
+                    "description": "Admin user",
                     "type": "string"
                 },
                 "cluster_id": {
                     "type": "string"
                 },
+                "commit_files": {
+                    "description": "Files to commit",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.CommitFile"
+                    }
+                },
                 "cover_image_url": {
                     "type": "string"
                 },
                 "default_branch": {
+                    "description": "The default branch of the repository",
                     "type": "string",
                     "example": "main"
                 },
                 "description": {
+                    "description": "A description for the repository",
                     "type": "string"
                 },
                 "env": {
                     "type": "string"
                 },
-                "labels": {
-                    "type": "string",
-                    "example": ""
-                },
                 "license": {
+                    "description": "The license for the repository",
                     "type": "string",
                     "example": "MIT"
                 },
                 "name": {
+                    "description": "The name of the repository",
                     "type": "string",
                     "example": "model_name_1"
                 },
                 "namespace": {
+                    "description": "The namespace of the repository, which can be a user or an organization",
                     "type": "string",
                     "example": "user_or_org_name"
                 },
                 "nickname": {
+                    "description": "The display name of the repository",
                     "type": "string",
                     "example": "model display name"
                 },
                 "private": {
+                    "description": "Whether the repository is private",
                     "type": "boolean"
-                },
-                "readme": {
-                    "type": "string"
                 },
                 "resource_id": {
                     "description": "space resource id",
                     "type": "integer"
                 },
                 "star_count": {
+                    "description": "Star count",
                     "type": "integer"
                 },
                 "tool_count": {
+                    "description": "Tool count",
                     "type": "integer"
                 },
                 "type": {
-                    "$ref": "#/definitions/types.RepositoryType"
+                    "description": "The type of the repository",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/types.RepositoryType"
+                        }
+                    ]
                 }
             }
         },
@@ -24630,6 +42065,9 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "cluster_id": {
+                    "type": "string"
+                },
+                "commit_id": {
                     "type": "string"
                 },
                 "container_port": {
@@ -24671,6 +42109,9 @@ const docTemplate = `{
                 "image_id": {
                     "type": "string"
                 },
+                "instance": {
+                    "type": "string"
+                },
                 "instance_name": {
                     "type": "string"
                 },
@@ -24701,6 +42142,9 @@ const docTemplate = `{
                 },
                 "order_detail_id": {
                     "type": "integer"
+                },
+                "owner_namespace": {
+                    "type": "string"
                 },
                 "pay_mode": {
                     "$ref": "#/definitions/types.PayMode"
@@ -24745,6 +42189,9 @@ const docTemplate = `{
                 "secure_level": {
                     "type": "integer"
                 },
+                "since": {
+                    "type": "string"
+                },
                 "sku": {
                     "type": "string"
                 },
@@ -24753,6 +42200,9 @@ const docTemplate = `{
                 },
                 "status": {
                     "type": "string"
+                },
+                "support_function_call": {
+                    "type": "boolean"
                 },
                 "svc_name": {
                     "type": "string"
@@ -24914,6 +42364,9 @@ const docTemplate = `{
                         "type": "string"
                     }
                 },
+                "owner_namespace": {
+                    "type": "string"
+                },
                 "resource_id": {
                     "type": "integer"
                 },
@@ -25033,6 +42486,26 @@ const docTemplate = `{
                 }
             }
         },
+        "types.FeedbackSessionHistoryRequest": {
+            "type": "object",
+            "required": [
+                "feedback"
+            ],
+            "properties": {
+                "feedback": {
+                    "enum": [
+                        "none",
+                        "like",
+                        "dislike"
+                    ],
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/types.AgentSessionHistoryFeedback"
+                        }
+                    ]
+                }
+            }
+        },
         "types.File": {
             "type": "object",
             "properties": {
@@ -25087,6 +42560,9 @@ const docTemplate = `{
                 "url": {
                     "description": "URL to browse the file",
                     "type": "string"
+                },
+                "xnet_enabled": {
+                    "type": "boolean"
                 }
             }
         },
@@ -25102,6 +42578,50 @@ const docTemplate = `{
                 "FilePreviewCodeTooLarge",
                 "FilePreviewCodeNotText"
             ]
+        },
+        "types.FinetuneReq": {
+            "type": "object",
+            "required": [
+                "dataset_id",
+                "model_id",
+                "resource_id",
+                "runtime_framework_id"
+            ],
+            "properties": {
+                "agent": {
+                    "type": "string"
+                },
+                "custom_args": {
+                    "type": "string"
+                },
+                "dataset_id": {
+                    "type": "string"
+                },
+                "epochs": {
+                    "type": "integer"
+                },
+                "learning_rate": {
+                    "type": "number"
+                },
+                "model_id": {
+                    "type": "string"
+                },
+                "resource_id": {
+                    "type": "integer"
+                },
+                "runtime_framework_id": {
+                    "type": "integer"
+                },
+                "share_mode": {
+                    "type": "boolean"
+                },
+                "task_desc": {
+                    "type": "string"
+                },
+                "task_name": {
+                    "type": "string"
+                }
+            }
         },
         "types.GetRepoFileTreeResp": {
             "type": "object",
@@ -25140,6 +42660,120 @@ const docTemplate = `{
                 }
             }
         },
+        "types.ImportBaseReq": {
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string"
+                },
+                "private": {
+                    "type": "boolean"
+                },
+                "source_path": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.ImportLicenseReq": {
+            "type": "object",
+            "required": [
+                "data"
+            ],
+            "properties": {
+                "data": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.ImportReq": {
+            "type": "object",
+            "required": [
+                "access_token",
+                "base_url"
+            ],
+            "properties": {
+                "access_token": {
+                    "type": "string"
+                },
+                "base_url": {
+                    "type": "string"
+                },
+                "import_repos": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.ImportBaseReq"
+                    }
+                }
+            }
+        },
+        "types.ImportStatusResp": {
+            "type": "object",
+            "properties": {
+                "imported_projects": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.ImportedRepository"
+                    }
+                },
+                "remote_repositories": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.RemoteRepository"
+                    }
+                }
+            }
+        },
+        "types.ImportedRepository": {
+            "type": "object",
+            "properties": {
+                "local_path": {
+                    "type": "string"
+                },
+                "source_path": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.InspectMCPServerRequest": {
+            "type": "object",
+            "required": [
+                "protocol",
+                "url"
+            ],
+            "properties": {
+                "headers": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "protocol": {
+                    "type": "string",
+                    "enum": [
+                        "streamable",
+                        "sse"
+                    ]
+                },
+                "url": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.InspectMCPServerResponse": {
+            "type": "object",
+            "properties": {
+                "capabilities": {
+                    "description": "Fetched capabilities (tools, resources, prompts, resource_templates)",
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "status": {
+                    "description": "Status: 'connected' or 'error'",
+                    "type": "string"
+                }
+            }
+        },
         "types.Instance": {
             "type": "object",
             "properties": {
@@ -25166,6 +42800,10 @@ const docTemplate = `{
                 "order_detail_id": {
                     "type": "integer"
                 },
+                "owner_namespace": {
+                    "description": "OwnerNamespace is optional. If set, the finetune is created under this namespace (user or org); path {namespace} remains the model's owner.",
+                    "type": "string"
+                },
                 "resource_id": {
                     "type": "integer"
                 },
@@ -25176,6 +42814,80 @@ const docTemplate = `{
                     "type": "integer"
                 }
             }
+        },
+        "types.Invitation": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "invite_code": {
+                    "type": "string"
+                },
+                "invites": {
+                    "type": "integer"
+                },
+                "pending_credit": {
+                    "type": "number"
+                },
+                "total_credit": {
+                    "type": "number"
+                },
+                "user_uuid": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.InvitationActivity": {
+            "type": "object",
+            "properties": {
+                "award_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "invite_code": {
+                    "type": "string"
+                },
+                "invitee_credit_amount": {
+                    "type": "number"
+                },
+                "invitee_name": {
+                    "type": "string"
+                },
+                "invitee_status": {
+                    "$ref": "#/definitions/types.InvitationActivityStatus"
+                },
+                "invitee_uuid": {
+                    "type": "string"
+                },
+                "inviter_credit_amount": {
+                    "type": "number"
+                },
+                "inviter_status": {
+                    "$ref": "#/definitions/types.InvitationActivityStatus"
+                },
+                "inviter_uuid": {
+                    "type": "string"
+                },
+                "register_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.InvitationActivityStatus": {
+            "type": "string",
+            "enum": [
+                "pending",
+                "awarded",
+                "failed"
+            ],
+            "x-enum-varnames": [
+                "InvitationActivityStatusPending",
+                "InvitationActivityStatusAwarded",
+                "InvitationActivityStatusFailed"
+            ]
         },
         "types.LFSSyncProgressResp": {
             "type": "object",
@@ -25194,6 +42906,50 @@ const docTemplate = `{
                 }
             }
         },
+        "types.LLMConfig": {
+            "type": "object",
+            "properties": {
+                "api_endpoint": {
+                    "type": "string"
+                },
+                "auth_header": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "model_name": {
+                    "type": "string"
+                },
+                "provider": {
+                    "type": "string"
+                },
+                "type": {
+                    "description": "1: optimization, 2: comparison, 4: summary readme",
+                    "type": "integer"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.LfsProgress": {
+            "type": "object",
+            "properties": {
+                "oid": {
+                    "type": "string"
+                },
+                "progress": {
+                    "type": "integer"
+                }
+            }
+        },
         "types.ListByPathReq": {
             "type": "object",
             "properties": {
@@ -25202,6 +42958,32 @@ const docTemplate = `{
                     "items": {
                         "type": "string"
                     }
+                }
+            }
+        },
+        "types.ListInferenceVersionsResp": {
+            "type": "object",
+            "properties": {
+                "commit": {
+                    "type": "string"
+                },
+                "create_time": {
+                    "type": "string"
+                },
+                "is_ready": {
+                    "type": "boolean"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "reason": {
+                    "type": "string"
+                },
+                "revision_name": {
+                    "type": "string"
+                },
+                "traffic_percent": {
+                    "type": "integer"
                 }
             }
         },
@@ -25477,72 +43259,6 @@ const docTemplate = `{
                 }
             }
         },
-        "types.MCPService": {
-            "type": "object",
-            "properties": {
-                "created_at": {
-                    "type": "string"
-                },
-                "default_branch": {
-                    "type": "string"
-                },
-                "description": {
-                    "type": "string",
-                    "example": ""
-                },
-                "endpoint": {
-                    "type": "string",
-                    "example": "https://localhost/spaces/myname/mymcp"
-                },
-                "env": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "integer"
-                },
-                "license": {
-                    "type": "string",
-                    "example": "MIT"
-                },
-                "name": {
-                    "type": "string",
-                    "example": "mcp_name_1"
-                },
-                "nickname": {
-                    "type": "string",
-                    "example": ""
-                },
-                "path": {
-                    "type": "string",
-                    "example": "user_or_org_name/mcp_name_1"
-                },
-                "private": {
-                    "type": "boolean"
-                },
-                "repository_id": {
-                    "type": "integer"
-                },
-                "secrets": {
-                    "type": "string"
-                },
-                "status": {
-                    "type": "string"
-                },
-                "svc_name": {
-                    "type": "string"
-                },
-                "updated_at": {
-                    "type": "string"
-                },
-                "username": {
-                    "type": "string",
-                    "example": "creator_user_name"
-                },
-                "variables": {
-                    "type": "string"
-                }
-            }
-        },
         "types.MCPTool": {
             "type": "object",
             "properties": {
@@ -25648,6 +43364,7 @@ const docTemplate = `{
                 "repo-sync",
                 "internal-notification",
                 "email-verify-code",
+                "sms-verify-code",
                 "asset-management",
                 "user-verify",
                 "org-verify",
@@ -25657,12 +43374,25 @@ const docTemplate = `{
                 "low-balance",
                 "recharge-success",
                 "weekly-recharges",
-                "deployment"
+                "deployment",
+                "negative-balance",
+                "inviter-pending-award",
+                "inviter-award",
+                "invitee-award",
+                "invitation-award-cancelled",
+                "agent-instance-updated",
+                "agent-instance-deleted",
+                "invoice-created",
+                "csgbot-critical-error",
+                "agentichub-feedback",
+                "model-dataset-recommend",
+                "gitlab-issue-feedback"
             ],
             "x-enum-varnames": [
                 "MessageScenarioRepoSync",
                 "MessageScenarioInternalNotification",
                 "MessageScenarioEmailVerifyCode",
+                "MessageScenarioSMSVerifyCode",
                 "MessageScenarioAssetManagement",
                 "MessageScenarioUserVerify",
                 "MessageScenarioOrgVerify",
@@ -25672,7 +43402,19 @@ const docTemplate = `{
                 "MessageScenarioLowBalance",
                 "MessageScenarioRechargeSuccess",
                 "MessageScenarioWeeklyRecharges",
-                "MessageScenarioDeployment"
+                "MessageScenarioDeployment",
+                "MessageScenarioNegativeBalance",
+                "MessageScenarioInviterPendingAward",
+                "MessageScenarioInviterAward",
+                "MessageScenarioInviteeAward",
+                "MessageScenarioInvitationAwardCancelled",
+                "MessageScenarioAgentInstanceUpdated",
+                "MessageScenarioAgentInstanceDeleted",
+                "MessageScenarioInvoiceCreated",
+                "MessageScenarioCSGBotCriticalError",
+                "MessageScenarioAgentichubFeedback",
+                "MessageScenarioModelDatasetRecommend",
+                "MessageScenarioGitlabIssueFeedback"
             ]
         },
         "types.Metadata": {
@@ -25704,6 +43446,29 @@ const docTemplate = `{
                 },
                 "tensor_type": {
                     "type": "string"
+                }
+            }
+        },
+        "types.MigrationStatsResp": {
+            "type": "object",
+            "properties": {
+                "lfs_object_count": {
+                    "type": "integer"
+                },
+                "lfs_storage_size": {
+                    "type": "integer"
+                },
+                "storage_efficiency_ratio": {
+                    "type": "number"
+                },
+                "total_original_size": {
+                    "type": "integer"
+                },
+                "total_stats_source": {
+                    "type": "string"
+                },
+                "total_xnet_size": {
+                    "type": "integer"
                 }
             }
         },
@@ -25944,10 +43709,63 @@ const docTemplate = `{
                         "$ref": "#/definitions/opencsg_com_csghub-server_aigateway_types.Model"
                     }
                 },
+                "first_id": {
+                    "description": "Pagination metadata",
+                    "type": "string"
+                },
+                "has_more": {
+                    "type": "boolean"
+                },
+                "last_id": {
+                    "type": "string"
+                },
                 "object": {
                     "type": "string"
+                },
+                "total_count": {
+                    "type": "integer"
                 }
             }
+        },
+        "types.ModelNode": {
+            "type": "object",
+            "properties": {
+                "brothers": {
+                    "type": "integer"
+                },
+                "children": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.ModelNode"
+                    }
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "path": {
+                    "type": "string"
+                },
+                "relation": {
+                    "$ref": "#/definitions/types.ModelRelation"
+                }
+            }
+        },
+        "types.ModelRelation": {
+            "type": "string",
+            "enum": [
+                "base",
+                "finetune",
+                "adapter",
+                "merge",
+                "quantized"
+            ],
+            "x-enum-varnames": [
+                "RelationBase",
+                "RelationFinetune",
+                "RelationAdapter",
+                "RelationMerge",
+                "RelationQuantized"
+            ]
         },
         "types.ModelResp": {
             "type": "object",
@@ -25984,6 +43802,9 @@ const docTemplate = `{
         "types.ModelRunReq": {
             "type": "object",
             "properties": {
+                "agent": {
+                    "type": "string"
+                },
                 "cluster_id": {
                     "type": "string"
                 },
@@ -26009,6 +43830,10 @@ const docTemplate = `{
                 "order_detail_id": {
                     "type": "integer"
                 },
+                "owner_namespace": {
+                    "description": "OwnerNamespace is optional. If set, the inference is created under this namespace (user or org) for billing and listing; path {namespace} remains the model's owner.",
+                    "type": "string"
+                },
                 "resource_id": {
                     "type": "integer"
                 },
@@ -26020,6 +43845,26 @@ const docTemplate = `{
                 },
                 "secure_level": {
                     "type": "integer"
+                }
+            }
+        },
+        "types.ModelTree": {
+            "type": "object",
+            "properties": {
+                "current_node": {
+                    "$ref": "#/definitions/types.ModelNode"
+                },
+                "parent_nodes": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.ModelNode"
+                    }
+                },
+                "sub_node_info": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "integer"
+                    }
                 }
             }
         },
@@ -26174,11 +44019,26 @@ const docTemplate = `{
                 "id": {
                     "type": "integer"
                 },
+                "instances": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.Instance"
+                    }
+                },
+                "max_replica": {
+                    "type": "integer"
+                },
+                "min_replica": {
+                    "type": "integer"
+                },
                 "order_detail_id": {
                     "type": "integer"
                 },
                 "pay_mode": {
                     "$ref": "#/definitions/types.PayMode"
+                },
+                "provider": {
+                    "type": "string"
                 },
                 "resource_id": {
                     "type": "string"
@@ -26393,6 +44253,9 @@ const docTemplate = `{
                 "user_id": {
                     "type": "integer"
                 },
+                "uuid": {
+                    "type": "string"
+                },
                 "verified": {
                     "type": "boolean"
                 },
@@ -26421,20 +44284,26 @@ const docTemplate = `{
             "enum": [
                 "text-generation",
                 "text-to-image",
+                "text-to-video",
+                "image-to-video",
                 "image-text-to-text",
                 "feature-extraction",
                 "sentence-similarity",
                 "task-auto-detection",
-                "video-text-to-text"
+                "video-text-to-text",
+                "text-to-speech"
             ],
             "x-enum-varnames": [
                 "TextGeneration",
                 "Text2Image",
+                "Text2Video",
+                "Image2Video",
                 "ImageText2Text",
                 "FeatureExtraction",
                 "SentenceSimilarity",
                 "TaskAutoDetection",
-                "VideoText2Text"
+                "VideoText2Text",
+                "TextToSpeech"
             ]
         },
         "types.Pointer": {
@@ -26504,6 +44373,23 @@ const docTemplate = `{
                 },
                 "uploadMode": {
                     "$ref": "#/definitions/types.UploadMode"
+                }
+            }
+        },
+        "types.PromptPrefix": {
+            "type": "object",
+            "properties": {
+                "en": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "zh": {
+                    "type": "string"
                 }
             }
         },
@@ -26619,6 +44505,100 @@ const docTemplate = `{
                 }
             }
         },
+        "types.RechargeIndexResp": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "number"
+                },
+                "closed": {
+                    "type": "boolean"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "currency": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "from_user_uuid": {
+                    "type": "string"
+                },
+                "order_no": {
+                    "type": "string"
+                },
+                "payment_uuid": {
+                    "type": "string"
+                },
+                "recharge_payment_type": {
+                    "type": "string"
+                },
+                "succeeded": {
+                    "type": "boolean"
+                },
+                "time_succeeded": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user_name": {
+                    "type": "string"
+                },
+                "user_uuid": {
+                    "type": "string"
+                },
+                "uuid": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.RechargeReq": {
+            "type": "object",
+            "properties": {
+                "op_uid": {
+                    "type": "string"
+                },
+                "scene": {
+                    "type": "integer"
+                },
+                "value": {
+                    "type": "number",
+                    "minimum": 1
+                }
+            }
+        },
+        "types.RechargeStatusResp": {
+            "type": "object",
+            "properties": {
+                "rechargeSucceeded": {
+                    "type": "boolean"
+                },
+                "rechargeUUID": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.RechargesIndexResp": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.RechargeIndexResp"
+                    }
+                },
+                "sum": {
+                    "description": "Total recharge amount",
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
         "types.RelationDataset": {
             "type": "object",
             "properties": {
@@ -26712,6 +44692,23 @@ const docTemplate = `{
                     "items": {
                         "type": "string"
                     }
+                }
+            }
+        },
+        "types.RemoteRepository": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "path": {
+                    "type": "string"
+                },
+                "private": {
+                    "type": "boolean"
+                },
+                "source_url": {
+                    "type": "string"
                 }
             }
         },
@@ -26858,6 +44855,7 @@ const docTemplate = `{
                 "prompt",
                 "mcpserver",
                 "template",
+                "skill",
                 ""
             ],
             "x-enum-varnames": [
@@ -26868,6 +44866,7 @@ const docTemplate = `{
                 "PromptRepo",
                 "MCPServerRepo",
                 "TemplateRepo",
+                "SkillRepo",
                 "UnknownRepo"
             ]
         },
@@ -26910,6 +44909,25 @@ const docTemplate = `{
                 },
                 "total": {
                     "type": "integer"
+                }
+            }
+        },
+        "types.RewriteSessionHistoryRequest": {
+            "type": "object",
+            "required": [
+                "content"
+            ],
+            "properties": {
+                "content": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.RewriteSessionHistoryResponse": {
+            "type": "object",
+            "properties": {
+                "msg_uuid": {
+                    "type": "string"
                 }
             }
         },
@@ -27034,6 +45052,59 @@ const docTemplate = `{
                 }
             }
         },
+        "types.ScanModels": {
+            "type": "object",
+            "properties": {
+                "models": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "types.SendPublicSMSCodeRequest": {
+            "type": "object",
+            "required": [
+                "phone",
+                "phone_area",
+                "scene"
+            ],
+            "properties": {
+                "phone": {
+                    "type": "string"
+                },
+                "phone_area": {
+                    "type": "string"
+                },
+                "scene": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.SendSMSCodeRequest": {
+            "type": "object",
+            "required": [
+                "phone",
+                "phone_area"
+            ],
+            "properties": {
+                "phone": {
+                    "type": "string"
+                },
+                "phone_area": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.SendSMSCodeResponse": {
+            "type": "object",
+            "properties": {
+                "expired_at": {
+                    "type": "string"
+                }
+            }
+        },
         "types.SensitiveCheckStatus": {
             "type": "integer",
             "enum": [
@@ -27050,6 +45121,13 @@ const docTemplate = `{
                 "SensitiveCheckPending": "default",
                 "SensitiveCheckSkip": "skip"
             },
+            "x-enum-descriptions": [
+                "sensitive content detected",
+                "default",
+                "pass",
+                "skip",
+                "error happen"
+            ],
             "x-enum-varnames": [
                 "SensitiveCheckFail",
                 "SensitiveCheckPending",
@@ -27058,6 +45136,84 @@ const docTemplate = `{
                 "SensitiveCheckException"
             ]
         },
+        "types.SensitiveWordSet": {
+            "type": "object",
+            "properties": {
+                "category": {
+                    "$ref": "#/definitions/types.SensitiveWordSetCategory"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "show_name": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "words": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "types.SensitiveWordSetCategory": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "show_name": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.SessionHistoryMessage": {
+            "type": "object",
+            "properties": {
+                "content": {
+                    "description": "message content",
+                    "type": "string"
+                },
+                "request": {
+                    "description": "true: request, false: response",
+                    "type": "boolean"
+                }
+            }
+        },
+        "types.SetLowBalanceWarnReq": {
+            "type": "object",
+            "properties": {
+                "low_balance_warn": {
+                    "type": "number"
+                },
+                "user_uuid": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.SetNodeAccessModeReq": {
+            "type": "object",
+            "properties": {
+                "exclusive": {
+                    "type": "boolean"
+                }
+            }
+        },
         "types.ShowDiscussionResponse": {
             "type": "object",
             "properties": {
@@ -27065,10 +45221,7 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "comments": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/types.DiscussionResponse_Comment"
-                    }
+                    "$ref": "#/definitions/types.CommentsWithPagination"
                 },
                 "id": {
                     "type": "integer"
@@ -27092,6 +45245,107 @@ const docTemplate = `{
                 },
                 "size": {
                     "type": "integer"
+                }
+            }
+        },
+        "types.Skill": {
+            "type": "object",
+            "properties": {
+                "can_manage": {
+                    "type": "boolean"
+                },
+                "can_write": {
+                    "type": "boolean"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "csg_path": {
+                    "type": "string"
+                },
+                "default_branch": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "downloads": {
+                    "type": "integer"
+                },
+                "hf_path": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "license": {
+                    "type": "string"
+                },
+                "likes": {
+                    "type": "integer"
+                },
+                "mirror_task_status": {
+                    "$ref": "#/definitions/types.MirrorTaskStatus"
+                },
+                "ms_path": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "namespace": {
+                    "$ref": "#/definitions/types.Namespace"
+                },
+                "nickname": {
+                    "type": "string"
+                },
+                "path": {
+                    "type": "string"
+                },
+                "private": {
+                    "type": "boolean"
+                },
+                "readme": {
+                    "type": "string"
+                },
+                "recom_op_weight": {
+                    "type": "integer"
+                },
+                "repository": {
+                    "$ref": "#/definitions/types.Repository"
+                },
+                "repository_id": {
+                    "type": "integer"
+                },
+                "scores": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.WeightScore"
+                    }
+                },
+                "sensitive_check_status": {
+                    "type": "string"
+                },
+                "source": {
+                    "$ref": "#/definitions/types.RepositorySource"
+                },
+                "sync_status": {
+                    "$ref": "#/definitions/types.RepositorySyncStatus"
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.RepoTag"
+                    }
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user": {
+                    "$ref": "#/definitions/types.User"
+                },
+                "user_likes": {
+                    "type": "boolean"
                 }
             }
         },
@@ -27152,6 +45406,9 @@ const docTemplate = `{
                     "example": "MIT"
                 },
                 "like_count": {
+                    "type": "integer"
+                },
+                "min_replica": {
                     "type": "integer"
                 },
                 "name": {
@@ -27245,6 +45502,9 @@ const docTemplate = `{
                 "cluster_id": {
                     "type": "string"
                 },
+                "cluster_region": {
+                    "type": "string"
+                },
                 "id": {
                     "type": "integer"
                 },
@@ -27265,6 +45525,12 @@ const docTemplate = `{
                 },
                 "price": {
                     "type": "number"
+                },
+                "price_unit": {
+                    "type": "integer"
+                },
+                "price_unit_type": {
+                    "type": "string"
                 },
                 "resources": {
                     "type": "string"
@@ -27387,6 +45653,50 @@ const docTemplate = `{
                 }
             }
         },
+        "types.SubscriptionBatchStatusReq": {
+            "type": "object",
+            "required": [
+                "query_user_uuids",
+                "sku_type"
+            ],
+            "properties": {
+                "query_user_uuids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "sku_type": {
+                    "type": "integer"
+                }
+            }
+        },
+        "types.SubscriptionUpdateReq": {
+            "type": "object",
+            "required": [
+                "resource_id",
+                "sku_type",
+                "sku_unit_type"
+            ],
+            "properties": {
+                "resource_id": {
+                    "type": "string"
+                },
+                "sku_type": {
+                    "type": "integer",
+                    "enum": [
+                        1,
+                        2
+                    ]
+                },
+                "sku_unit_type": {
+                    "type": "string",
+                    "enum": [
+                        "month"
+                    ]
+                }
+            }
+        },
         "types.SyncVersion": {
             "type": "object",
             "properties": {
@@ -27460,14 +45770,105 @@ const docTemplate = `{
                 "evaluation",
                 "training",
                 "comparison",
-                "leaderboard"
+                "leaderboard",
+                "finetune"
             ],
             "x-enum-varnames": [
                 "TaskTypeEvaluation",
                 "TaskTypeTraining",
                 "TaskTypeComparison",
-                "TaskTypeLeaderBoard"
+                "TaskTypeLeaderBoard",
+                "TaskTypeFinetune"
             ]
+        },
+        "types.UpdateAgentConfigReq": {
+            "type": "object",
+            "properties": {
+                "config": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.UpdateAgentInstanceRequest": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "metadata": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "types.UpdateAgentInstanceSessionRequest": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "maxLength": 255
+                }
+            }
+        },
+        "types.UpdateAgentKnowledgeBaseRequest": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string",
+                    "maxLength": 500
+                },
+                "metadata": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "public": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "types.UpdateAgentMCPServerRequest": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "env": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "headers": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 255
+                },
+                "protocol": {
+                    "type": "string",
+                    "enum": [
+                        "streamable",
+                        "sse"
+                    ]
+                },
+                "url": {
+                    "type": "string"
+                }
+            }
         },
         "types.UpdateCategory": {
             "type": "object",
@@ -27494,15 +45895,21 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "description": {
+                    "description": "The new description for the repository",
                     "type": "string"
                 },
                 "nickname": {
+                    "description": "The new display name of the repository",
                     "type": "string",
                     "example": "model display name"
                 },
                 "private": {
+                    "description": "The new visibility of the repository",
                     "type": "boolean",
                     "example": false
+                },
+                "xnet_enabled": {
+                    "type": "boolean"
                 }
             }
         },
@@ -27547,15 +45954,21 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "description": {
+                    "description": "The new description for the repository",
                     "type": "string"
                 },
                 "nickname": {
+                    "description": "The new display name of the repository",
                     "type": "string",
                     "example": "model display name"
                 },
                 "private": {
+                    "description": "The new visibility of the repository",
                     "type": "boolean",
                     "example": false
+                },
+                "xnet_enabled": {
+                    "type": "boolean"
                 }
             }
         },
@@ -27624,6 +46037,82 @@ const docTemplate = `{
         "types.UpdateFileResp": {
             "type": "object"
         },
+        "types.UpdateInferenceVersionTrafficReq": {
+            "type": "object",
+            "required": [
+                "commit_id"
+            ],
+            "properties": {
+                "commit_id": {
+                    "type": "string"
+                },
+                "traffic_percent": {
+                    "type": "integer"
+                }
+            }
+        },
+        "types.UpdateLLMConfigReq": {
+            "type": "object",
+            "properties": {
+                "api_endpoint": {
+                    "type": "string"
+                },
+                "auth_header": {
+                    "type": "string"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "model_name": {
+                    "type": "string"
+                },
+                "provider": {
+                    "type": "string"
+                },
+                "type": {
+                    "description": "1: optimization, 2: comparison, 4: summary readme",
+                    "type": "integer"
+                }
+            }
+        },
+        "types.UpdateLicenseReq": {
+            "type": "object",
+            "properties": {
+                "company": {
+                    "type": "string"
+                },
+                "edition": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "expire_time": {
+                    "type": "string"
+                },
+                "extra": {
+                    "type": "string"
+                },
+                "max_user": {
+                    "type": "integer"
+                },
+                "product": {
+                    "type": "string"
+                },
+                "remark": {
+                    "type": "string"
+                },
+                "start_time": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "string"
+                }
+            }
+        },
         "types.UpdateMCPServerReq": {
             "type": "object",
             "properties": {
@@ -27634,6 +46123,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "description": {
+                    "description": "The new description for the repository",
                     "type": "string"
                 },
                 "install_deps_cmds": {
@@ -27643,10 +46133,12 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "nickname": {
+                    "description": "The new display name of the repository",
                     "type": "string",
                     "example": "model display name"
                 },
                 "private": {
+                    "description": "The new visibility of the repository",
                     "type": "boolean",
                     "example": false
                 },
@@ -27655,6 +46147,9 @@ const docTemplate = `{
                 },
                 "run_mode": {
                     "type": "string"
+                },
+                "xnet_enabled": {
+                    "type": "boolean"
                 }
             }
         },
@@ -27719,6 +46214,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "description": {
+                    "description": "The new description for the repository",
                     "type": "string"
                 },
                 "high_risk_count": {
@@ -27728,15 +46224,20 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "nickname": {
+                    "description": "The new display name of the repository",
                     "type": "string",
                     "example": "model display name"
                 },
                 "private": {
+                    "description": "The new visibility of the repository",
                     "type": "boolean",
                     "example": false
                 },
                 "report_url": {
                     "type": "string"
+                },
+                "xnet_enabled": {
+                    "type": "boolean"
                 }
             }
         },
@@ -27749,8 +46250,14 @@ const docTemplate = `{
                 "id": {
                     "type": "integer"
                 },
+                "instance_name": {
+                    "type": "string"
+                },
                 "resource_id": {
                     "type": "integer"
+                },
+                "since": {
+                    "type": "string"
                 }
             }
         },
@@ -27795,19 +46302,90 @@ const docTemplate = `{
                 }
             }
         },
+        "types.UpdatePromptPrefixReq": {
+            "type": "object",
+            "properties": {
+                "en": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "zh": {
+                    "type": "string"
+                }
+            }
+        },
         "types.UpdatePromptRepoReq": {
             "type": "object",
             "properties": {
                 "description": {
+                    "description": "The new description for the repository",
                     "type": "string"
                 },
                 "nickname": {
+                    "description": "The new display name of the repository",
                     "type": "string",
                     "example": "model display name"
                 },
                 "private": {
+                    "description": "The new visibility of the repository",
                     "type": "boolean",
                     "example": false
+                },
+                "xnet_enabled": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "types.UpdateSensitiveWordSetReq": {
+            "type": "object",
+            "properties": {
+                "_": {
+                    "type": "integer"
+                },
+                "category_id": {
+                    "type": "integer"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "show_name": {
+                    "type": "string"
+                },
+                "words": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "types.UpdateSkillReq": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "description": "The new description for the repository",
+                    "type": "string"
+                },
+                "nickname": {
+                    "description": "The new display name of the repository",
+                    "type": "string",
+                    "example": "model display name"
+                },
+                "private": {
+                    "description": "The new visibility of the repository",
+                    "type": "boolean",
+                    "example": false
+                },
+                "xnet_enabled": {
+                    "type": "boolean"
                 }
             }
         },
@@ -27821,12 +46399,22 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "description": {
+                    "description": "The new description for the repository",
+                    "type": "string"
+                },
+                "driver_version": {
                     "type": "string"
                 },
                 "env": {
                     "type": "string"
                 },
+                "min_replica": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "example": 0
+                },
                 "nickname": {
+                    "description": "The new display name of the repository",
                     "type": "string",
                     "example": "model display name"
                 },
@@ -27834,6 +46422,7 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "private": {
+                    "description": "The new visibility of the repository",
                     "type": "boolean",
                     "example": false
                 },
@@ -27856,6 +46445,9 @@ const docTemplate = `{
                 },
                 "variables": {
                     "type": "string"
+                },
+                "xnet_enabled": {
+                    "type": "boolean"
                 }
             }
         },
@@ -27947,6 +46539,24 @@ const docTemplate = `{
                 },
                 "show_name": {
                     "description": "deprecated: use I18nKey instead",
+                    "type": "string"
+                }
+            }
+        },
+        "types.UpdateUserPhoneRequest": {
+            "type": "object",
+            "required": [
+                "phone",
+                "verification_code"
+            ],
+            "properties": {
+                "phone": {
+                    "type": "string"
+                },
+                "phone_area": {
+                    "type": "string"
+                },
+                "verification_code": {
                     "type": "string"
                 }
             }
@@ -28214,6 +46824,29 @@ const docTemplate = `{
                 }
             }
         },
+        "types.VerifyPublicSMSCodeRequest": {
+            "type": "object",
+            "required": [
+                "phone",
+                "phone_area",
+                "scene",
+                "verification_code"
+            ],
+            "properties": {
+                "phone": {
+                    "type": "string"
+                },
+                "phone_area": {
+                    "type": "string"
+                },
+                "scene": {
+                    "type": "string"
+                },
+                "verification_code": {
+                    "type": "string"
+                }
+            }
+        },
         "types.VerifyStatus": {
             "type": "string",
             "enum": [
@@ -28237,6 +46870,90 @@ const docTemplate = `{
                     "type": "string"
                 }
             }
+        },
+        "types.XnetMigrationTaskProgress": {
+            "type": "object",
+            "properties": {
+                "last_message": {
+                    "type": "string"
+                },
+                "lfs_progress": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.LfsProgress"
+                    }
+                },
+                "migrated_objects": {
+                    "type": "integer"
+                },
+                "status": {
+                    "$ref": "#/definitions/types.XnetMigrationTaskStatus"
+                },
+                "total_objects": {
+                    "type": "integer"
+                }
+            }
+        },
+        "types.XnetMigrationTaskStatus": {
+            "type": "string",
+            "enum": [
+                "pending",
+                "running",
+                "completed",
+                "failed"
+            ],
+            "x-enum-varnames": [
+                "XnetMigrationTaskStatusPending",
+                "XnetMigrationTaskStatusRunning",
+                "XnetMigrationTaskStatusCompleted",
+                "XnetMigrationTaskStatusFailed"
+            ]
+        },
+        "types.XnetTokenResp": {
+            "type": "object",
+            "properties": {
+                "accessToken": {
+                    "type": "string"
+                },
+                "casUrl": {
+                    "type": "string"
+                },
+                "exp": {
+                    "type": "integer"
+                }
+            }
+        },
+        "v1alpha1.WorkflowPhase": {
+            "type": "string",
+            "enum": [
+                "",
+                "Pending",
+                "Running",
+                "Succeeded",
+                "Failed",
+                "Error"
+            ],
+            "x-enum-comments": {
+                "WorkflowFailed": "it maybe that the workflow was terminated",
+                "WorkflowPending": "pending some set-up - rarely used",
+                "WorkflowRunning": "any node has started; pods might not be running yet, the workflow maybe suspended too"
+            },
+            "x-enum-descriptions": [
+                "",
+                "pending some set-up - rarely used",
+                "any node has started; pods might not be running yet, the workflow maybe suspended too",
+                "",
+                "it maybe that the workflow was terminated",
+                ""
+            ],
+            "x-enum-varnames": [
+                "WorkflowUnknown",
+                "WorkflowPending",
+                "WorkflowRunning",
+                "WorkflowSucceeded",
+                "WorkflowFailed",
+                "WorkflowError"
+            ]
         }
     },
     "securityDefinitions": {
