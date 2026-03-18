@@ -114,7 +114,7 @@ func (d *deployer) serverlessDeploy(ctx context.Context, dr types.DeployRepo) (*
 	deploy.Variables = dr.Variables
 	deploy.ClusterID = dr.ClusterID
 	deploy.Task = types.PipelineTask(dr.Task)
-	// deploy
+	deploy.OwnerNamespace = dr.OwnerNamespace
 	slog.Debug("do deployer.serverlessDeploy", slog.Any("dr", dr), slog.Any("deploy", deploy))
 	err = d.deployTaskStore.UpdateDeploy(ctx, deploy)
 	if err != nil {
@@ -164,6 +164,7 @@ func (d *deployer) dedicatedDeploy(ctx context.Context, dr types.DeployRepo) (*d
 		Task:             types.PipelineTask(dr.Task),
 		EngineArgs:       dr.EngineArgs,
 		Variables:        dr.Variables,
+		OwnerNamespace:   dr.OwnerNamespace,
 	}
 	updateDatabaseDeploy(deploy, dr)
 	err := d.deployTaskStore.CreateDeploy(ctx, deploy)

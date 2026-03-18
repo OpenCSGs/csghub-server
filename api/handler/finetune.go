@@ -44,6 +44,9 @@ func (h *FinetuneHandler) RunFinetuneJob(ctx *gin.Context) {
 		req.LearningRate = 0.0001
 	}
 	req.Username = currentUser
+	if req.Namespace == "" {
+		req.Namespace = currentUser
+	}
 	finetune, err := h.ftComp.CreateFinetuneJob(ctx.Request.Context(), req)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Failed to create finetune job", slog.Any("error", err))

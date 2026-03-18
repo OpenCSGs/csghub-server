@@ -52,6 +52,9 @@ func (h *NotebookHandler) Create(ctx *gin.Context) {
 	}
 	currentUser := httpbase.GetCurrentUser(ctx)
 	req.CurrentUser = currentUser
+	if req.OwnerNamespace == "" {
+		req.OwnerNamespace = currentUser
+	}
 	notebook, err := h.nc.CreateNotebook(ctx.Request.Context(), &req)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Failed to create notebook", slog.Any("error", err))
