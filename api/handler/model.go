@@ -144,7 +144,7 @@ func (h *ModelHandler) Create(ctx *gin.Context) {
 	if err != nil {
 		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
-		} else if errors.Is(err, errorx.ErrDatabaseDuplicateKey) {
+		} else if errors.Is(err, errorx.ErrDatabaseDuplicateKey) || errors.Is(err, errorx.ErrRepoAlreadyExist) || errors.Is(err, errorx.ErrSpaceNameAlreadyExist) {
 			httpbase.BadRequestWithExt(ctx, err)
 		} else {
 			slog.ErrorContext(ctx.Request.Context(), "Failed to create model", slog.Any("error", err))
