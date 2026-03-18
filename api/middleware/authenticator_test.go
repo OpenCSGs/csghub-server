@@ -3,12 +3,18 @@ package middleware
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
+	mock "github.com/stretchr/testify/mock"
+	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/cache"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/types"
 )
 
 func TestRestrictMultiSyncTokenToRead(t *testing.T) {
@@ -146,15 +152,26 @@ func TestAuthenticator(t *testing.T) {
 	apiToken := "test-api-token-for-ut"
 	cfg := &config.Config{}
 	cfg.APIToken = apiToken
-	// User.Host/Port used when verifying access token; use default to avoid scheme error in invalid-token test
 	cfg.User.Host = "http://localhost"
 	cfg.User.Port = 8088
+	cfg.JWT.SigningKey = "test-signing-key"
+
+	validClaims := &types.JWTClaims{
+		CurrentUser: "testuser",
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)),
+		},
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, validClaims)
+	validToken, _ := token.SignedString([]byte(cfg.JWT.SigningKey))
 
 	tests := []struct {
 		name           string
 		authHeader     string
 		expectedStatus int
 		handlerCalled  bool
+		isJWTTest      bool
+		inBlacklist    bool
 	}{
 		{
 			name:           "no Authorization header passes through",
@@ -186,29 +203,64 @@ func TestAuthenticator(t *testing.T) {
 			expectedStatus: http.StatusUnauthorized,
 			handlerCalled:  false,
 		},
+		{
+			name:           "JWT token in blacklist returns 401",
+			authHeader:     "Bearer " + validToken,
+			expectedStatus: http.StatusUnauthorized,
+			handlerCalled:  false,
+			isJWTTest:      true,
+			inBlacklist:    true,
+		},
+		{
+			name:           "JWT token not in blacklist passes",
+			authHeader:     "Bearer " + validToken,
+			expectedStatus: http.StatusOK,
+			handlerCalled:  true,
+			isJWTTest:      true,
+			inBlacklist:    false,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			router := gin.New()
-			router.Use(Authenticator(cfg))
+			if tt.isJWTTest {
+				mockRedis := cache.NewMockRedisClient(t)
+				tokenStr := strings.TrimPrefix(tt.authHeader, "Bearer ")
+				
+				mockRedis.EXPECT().SIsMember(mock.Anything, "jwt_blacklist", tokenStr).Return(tt.inBlacklist, nil)
 
-			handlerCalled := false
-			router.GET("/test", func(c *gin.Context) {
-				handlerCalled = true
-				c.Status(http.StatusOK)
-			})
+				w := httptest.NewRecorder()
+				c, _ := gin.CreateTestContext(w)
+				c.Request = httptest.NewRequest("GET", "/test", nil)
+				
+				result := isValidJWTToken(c, cfg, tokenStr, mockRedis)
+				
+				if tt.expectedStatus == http.StatusOK {
+					assert.True(t, result)
+				} else {
+					assert.False(t, result)
+				}
+			} else {
+				router := gin.New()
+				router.Use(Authenticator(cfg))
 
-			req := httptest.NewRequest(http.MethodGet, "/test", nil)
-			if tt.authHeader != "" {
-				req.Header.Set("Authorization", tt.authHeader)
+				handlerCalled := false
+				router.GET("/test", func(c *gin.Context) {
+					handlerCalled = true
+					c.Status(http.StatusOK)
+				})
+
+				req := httptest.NewRequest(http.MethodGet, "/test", nil)
+				if tt.authHeader != "" {
+					req.Header.Set("Authorization", tt.authHeader)
+				}
+				w := httptest.NewRecorder()
+
+				router.ServeHTTP(w, req)
+
+				assert.Equal(t, tt.expectedStatus, w.Code)
+				assert.Equal(t, tt.handlerCalled, handlerCalled)
 			}
-			w := httptest.NewRecorder()
-
-			router.ServeHTTP(w, req)
-
-			assert.Equal(t, tt.expectedStatus, w.Code)
-			assert.Equal(t, tt.handlerCalled, handlerCalled)
 		})
 	}
 }

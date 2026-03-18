@@ -24,7 +24,6 @@ func NewFinetuneTester(t *testing.T) *FinetuneTester {
 	tester := &FinetuneTester{GinTester: testutil.NewGinTester()}
 	tester.mocks.finetune = mockcomponent.NewMockFinetuneComponent(t)
 	tester.mocks.sensitive = mockcomponent.NewMockSensitiveComponent(t)
-
 	tester.handler = &FinetuneHandler{
 		ftComp:    tester.mocks.finetune,
 		sensitive: tester.mocks.sensitive,
@@ -50,15 +49,51 @@ func TestFinetuneHandler_Run(t *testing.T) {
 		ResourceId:         4,
 		ModelId:            "u/m",
 		DatasetId:          "u/d",
+		Agent:              "{\"type\":\"code\",\"id\":\"123\",\"request_id\":\"123\"}",
 	}).Return(true, nil)
 	tester.mocks.finetune.EXPECT().CreateFinetuneJob(tester.Ctx(), types.FinetuneReq{
 		Username:           "u",
+		Namespace:          "u",
 		RuntimeFrameworkId: 1,
 		ResourceId:         4,
 		ModelId:            "u/m",
 		DatasetId:          "u/d",
 		LearningRate:       0.0001,
-	}).Return(&types.ArgoWorkFlowRes{ID: 1}, nil)
+		Agent:              "{\"type\":\"code\",\"id\":\"123\",\"request_id\":\"123\"}",
+	}).Return(&types.ArgoWorkFlowRes{ID: 1, TaskId: "task-123"}, nil)
+
+	tester.WithBody(t, &types.FinetuneReq{
+		RuntimeFrameworkId: 1,
+		ResourceId:         4,
+		ModelId:            "u/m",
+		DatasetId:          "u/d",
+		Agent:              "{\"type\":\"code\",\"id\":\"123\",\"request_id\":\"123\"}",
+	}).Execute()
+
+	tester.ResponseEq(t, 200, tester.OKText, &types.ArgoWorkFlowRes{ID: 1, TaskId: "task-123"})
+}
+
+func TestFinetuneHandler_Run_NoAgent(t *testing.T) {
+	tester := NewFinetuneTester(t).WithHandleFunc(func(h *FinetuneHandler) gin.HandlerFunc {
+		return h.RunFinetuneJob
+	})
+	tester.WithUser()
+
+	tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), &types.FinetuneReq{
+		RuntimeFrameworkId: 1,
+		ResourceId:         4,
+		ModelId:            "u/m",
+		DatasetId:          "u/d",
+	}).Return(true, nil)
+	tester.mocks.finetune.EXPECT().CreateFinetuneJob(tester.Ctx(), types.FinetuneReq{
+		Username:           "u",
+		Namespace:          "u",
+		RuntimeFrameworkId: 1,
+		ResourceId:         4,
+		ModelId:            "u/m",
+		DatasetId:          "u/d",
+		LearningRate:       0.0001,
+	}).Return(&types.ArgoWorkFlowRes{ID: 1, TaskId: "task-123"}, nil)
 
 	tester.WithBody(t, &types.FinetuneReq{
 		RuntimeFrameworkId: 1,
@@ -67,8 +102,35 @@ func TestFinetuneHandler_Run(t *testing.T) {
 		DatasetId:          "u/d",
 	}).Execute()
 
-	tester.ResponseEq(t, 200, tester.OKText, &types.ArgoWorkFlowRes{ID: 1})
+	tester.ResponseEq(t, 200, tester.OKText, &types.ArgoWorkFlowRes{ID: 1, TaskId: "task-123"})
+}
 
+func TestFinetuneHandler_Run_WithExplicitNamespace(t *testing.T) {
+	tester := NewFinetuneTester(t).WithHandleFunc(func(h *FinetuneHandler) gin.HandlerFunc {
+		return h.RunFinetuneJob
+	})
+	tester.WithUser()
+
+	body := &types.FinetuneReq{
+		Namespace:          "org1",
+		RuntimeFrameworkId: 1,
+		ResourceId:         4,
+		ModelId:            "u/m",
+		DatasetId:          "u/d",
+	}
+	tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), body).Return(true, nil)
+	tester.mocks.finetune.EXPECT().CreateFinetuneJob(tester.Ctx(), types.FinetuneReq{
+		Username:           "u",
+		Namespace:          "org1",
+		RuntimeFrameworkId: 1,
+		ResourceId:         4,
+		ModelId:            "u/m",
+		DatasetId:          "u/d",
+		LearningRate:       0.0001,
+	}).Return(&types.ArgoWorkFlowRes{ID: 1, TaskId: "task-123"}, nil)
+	tester.WithBody(t, body).Execute()
+
+	tester.ResponseEq(t, 200, tester.OKText, &types.ArgoWorkFlowRes{ID: 1, TaskId: "task-123"})
 }
 
 func TestFinetuneHandler_Get(t *testing.T) {
