@@ -16,12 +16,7 @@ import (
 )
 
 func (c *userComponentImpl) ListDeploys(ctx context.Context, repoType types.RepositoryType, req *types.DeployReq) ([]types.DeployRepo, int, error) {
-	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
-	if err != nil {
-		newError := fmt.Errorf("failed to check for the presence of the user:%s, error:%w", req.CurrentUser, err)
-		return nil, 0, newError
-	}
-	deploys, total, err := c.deployTaskStore.ListDeployByUserID(ctx, user.ID, req)
+	deploys, total, err := c.deployTaskStore.ListDeployByOwnerNamespace(ctx, req.CurrentUser, req)
 	if err != nil {
 		newError := fmt.Errorf("failed to get user deploys for %s with error:%w", repoType, err)
 		return nil, 0, newError
@@ -75,12 +70,7 @@ func (c *userComponentImpl) ListDeploys(ctx context.Context, repoType types.Repo
 }
 
 func (c *userComponentImpl) ListInstances(ctx context.Context, req *types.UserRepoReq) ([]types.DeployRepo, int, error) {
-	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
-	if err != nil {
-		newError := fmt.Errorf("failed to check for the presence of the user:%s, error:%w", req.CurrentUser, err)
-		return nil, 0, newError
-	}
-	deploys, total, err := c.deployTaskStore.ListInstancesByUserID(ctx, user.ID, req.PageSize, req.Page)
+	deploys, total, err := c.deployTaskStore.ListFinetunesByOwnerNamespace(ctx, req.CurrentUser, req.PageSize, req.Page)
 	if err != nil {
 		newError := fmt.Errorf("failed to get user instances error:%w", err)
 		return nil, 0, newError
@@ -128,11 +118,7 @@ func (c *userComponentImpl) GetUserResource(ctx context.Context, req types.GetUs
 }
 
 func (c *userComponentImpl) ListNotebooks(ctx context.Context, req *types.DeployReq) ([]types.NotebookRes, int, error) {
-	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
-	if err != nil {
-		return nil, 0, fmt.Errorf("cannot find user for notebook list, %w", err)
-	}
-	deploys, total, err := c.deployTaskStore.ListDeployByUserID(ctx, user.ID, req)
+	deploys, total, err := c.deployTaskStore.ListDeployByOwnerNamespace(ctx, req.CurrentUser, req)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to get user notebooks with error:%w", err)
 	}
