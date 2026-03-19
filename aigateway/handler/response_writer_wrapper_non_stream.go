@@ -22,7 +22,6 @@ type nonStreamResponseWriter struct {
 	moderationComponent component.Moderation
 	tokenCounter        token.ChatTokenCounter
 	buffer              bytes.Buffer
-	hasProcessed        bool
 }
 
 func newNonStreamResponseWriter(internalWritter gin.ResponseWriter, moderationComponent component.Moderation, tokenCounter token.ChatTokenCounter) *nonStreamResponseWriter {
@@ -30,7 +29,6 @@ func newNonStreamResponseWriter(internalWritter gin.ResponseWriter, moderationCo
 		internalWritter:     internalWritter,
 		moderationComponent: moderationComponent,
 		tokenCounter:        tokenCounter,
-		hasProcessed:        false,
 	}
 }
 
