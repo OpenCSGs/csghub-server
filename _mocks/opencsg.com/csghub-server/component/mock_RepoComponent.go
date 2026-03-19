@@ -4826,6 +4826,28 @@ func (_c *MockRepoComponent_VisiableToUser_Call) RunAndReturn(run func(context.C
 	return _c
 }
 
+// CreateBranch provides a mock function with given fields: ctx, req
+func (_m *MockRepoComponent) CreateBranch(ctx context.Context, req *types.CreateBranchReq) error {
+	ret := _m.Called(ctx, req)
+	if len(ret) == 0 {
+		panic("no return value specified for CreateBranch")
+	}
+	var r0 error
+	r0 = ret.Error(0)
+	return r0
+}
+
+// DeleteBranch provides a mock function with given fields: ctx, req
+func (_m *MockRepoComponent) DeleteBranch(ctx context.Context, req *types.DeleteBranchReq) error {
+	ret := _m.Called(ctx, req)
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteBranch")
+	}
+	var r0 error
+	r0 = ret.Error(0)
+	return r0
+}
+
 // NewMockRepoComponent creates a new instance of MockRepoComponent. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewMockRepoComponent(t interface {
