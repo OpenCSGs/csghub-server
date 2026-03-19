@@ -1,6 +1,8 @@
 package types
 
-import "time"
+import (
+	"time"
+)
 
 var _ SensitiveRequestV2 = (*FinetuneReq)(nil)
 
@@ -48,6 +50,8 @@ type FinetuneReq struct {
 	CustomeArgs        string  `json:"custom_args"`
 	Agent              string  `json:"agent,omitempty"`
 	Nodes              []Node  `json:"-"`
+
+	DeployExtend
 }
 
 type FinetineGetReq struct {

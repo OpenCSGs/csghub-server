@@ -148,12 +148,14 @@ func (c *evaluationComponentImpl) CreateEvaluation(ctx context.Context, req type
 			return nil, fmt.Errorf("evaluation requires graphics card resources")
 		}
 		// check resource available
-		err = c.repoComponent.CheckAccountAndResource(ctx, req.OwnerNamespace, resource.ClusterID, 0, resource)
+		exclusiveResp, err := c.repoComponent.CheckAccountAndResource(ctx, req.OwnerNamespace, resource.ClusterID, 0, resource)
 		if err != nil {
 			return nil, err
 		}
 		req.ClusterID = resource.ClusterID
 		req.ResourceName = resource.Name
+		req.NodeAffinity = exclusiveResp.NodeAffinity
+		req.Tolerations = exclusiveResp.Tolerations
 	} else {
 		// for share mode
 		resource := ""
@@ -208,9 +210,11 @@ func (c *evaluationComponentImpl) GenerateMirrorRepoIds(ctx context.Context, dat
 	for _, ds := range datasets {
 		parts := strings.Split(ds, "/")
 		if len(parts) != 2 {
-			return nil, nil, fmt.Errorf("invalid dataset id format: %s", ds)
+			return nil, nil, fmt.Errorf("invalid dataset path: %s", ds)
 		}
-		repo, err := c.repoStore.FindByPath(ctx, types.DatasetRepo, parts[0], parts[1])
+		namespace := parts[0]
+		name := parts[1]
+		repo, err := c.repoStore.FindByPath(ctx, types.DatasetRepo, namespace, name)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to find dataset repo, %w", err)
 		}
@@ -226,7 +230,7 @@ func (c *evaluationComponentImpl) generateDatasetsAndTasks(ctx context.Context, 
 	for _, cds := range customDataSets {
 		parts := strings.Split(cds, "/")
 		if len(parts) != 2 {
-			return nil, nil, fmt.Errorf("invalid custom dataset id format: %s", cds)
+			return nil, nil, fmt.Errorf("invalid dataset path: %s", cds)
 		}
 		namespace := parts[0]
 		name := parts[1]

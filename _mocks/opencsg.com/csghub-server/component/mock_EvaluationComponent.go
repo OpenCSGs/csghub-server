@@ -229,6 +229,9 @@ type MockEvaluationComponent_OrgEvaluations_Call struct {
 	*mock.Call
 }
 
+// OrgEvaluations is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req *types.OrgEvaluationsReq
 func (_e *MockEvaluationComponent_Expecter) OrgEvaluations(ctx interface{}, req interface{}) *MockEvaluationComponent_OrgEvaluations_Call {
 	return &MockEvaluationComponent_OrgEvaluations_Call{Call: _e.mock.On("OrgEvaluations", ctx, req)}
 }

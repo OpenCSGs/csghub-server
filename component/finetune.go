@@ -122,11 +122,12 @@ func (c *finetuneComponentImpl) CreateFinetuneJob(ctx context.Context, req types
 		}
 
 		// check resource available
-		err = c.repoComponent.CheckAccountAndResource(ctx, req.Namespace, resource.ClusterID, 0, resource)
+		exclusiveResp, err := c.repoComponent.CheckAccountAndResource(ctx, req.Namespace, resource.ClusterID, 0, resource)
 		if err != nil {
 			return nil, err
 		}
-
+		req.NodeAffinity = exclusiveResp.NodeAffinity
+		req.Tolerations = exclusiveResp.Tolerations
 		req.ClusterID = resource.ClusterID
 		req.ResourceName = resource.Name
 	} else {

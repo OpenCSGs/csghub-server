@@ -52,6 +52,7 @@ type Deployer interface {
 	DeleteFinetuneJob(ctx context.Context, req types.ArgoWorkFlowDeleteReq) error
 	GetWorkflowLogsInStream(ctx context.Context, req types.FinetuneLogReq) (*MultiLogReader, error)
 	GetWorkflowLogsNonStream(ctx context.Context, req types.FinetuneLogReq) (*loki.LokiQueryResponse, error)
+	IsDefaultScheduler() bool
 	GetSharedModeResourceName(config *config.Config) string
 	LabelNode(ctx context.Context, req *types.NodeLabel) error
 }
@@ -114,6 +115,8 @@ func (d *deployer) serverlessDeploy(ctx context.Context, dr types.DeployRepo) (*
 	deploy.ClusterID = dr.ClusterID
 	deploy.Task = types.PipelineTask(dr.Task)
 	deploy.OwnerNamespace = dr.OwnerNamespace
+	deploy.NodeAffinity = dr.NodeAffinity
+	deploy.Tolerations = dr.Tolerations
 	slog.Debug("do deployer.serverlessDeploy", slog.Any("dr", dr), slog.Any("deploy", deploy))
 	err = d.deployTaskStore.UpdateDeploy(ctx, deploy)
 	if err != nil {
@@ -164,6 +167,8 @@ func (d *deployer) dedicatedDeploy(ctx context.Context, dr types.DeployRepo) (*d
 		EngineArgs:       dr.EngineArgs,
 		Variables:        dr.Variables,
 		OwnerNamespace:   dr.OwnerNamespace,
+		NodeAffinity:     dr.NodeAffinity,
+		Tolerations:      dr.Tolerations,
 	}
 	updateDatabaseDeploy(deploy, dr)
 	err := d.deployTaskStore.CreateDeploy(ctx, deploy)
@@ -683,6 +688,13 @@ func (d *deployer) UpdateDeploy(ctx context.Context, dur *types.DeployUpdateReq,
 		deploy.Variables = *dur.Variables
 	}
 
+	if dur.NodeAffinity != nil {
+		deploy.NodeAffinity = dur.NodeAffinity
+	}
+	if len(dur.Tolerations) != 0 {
+		deploy.Tolerations = dur.Tolerations
+	}
+
 	// update deploy table
 	err = d.deployTaskStore.UpdateDeploy(ctx, deploy)
 	if err != nil {
@@ -785,11 +797,15 @@ func (d *deployer) SubmitEvaluation(ctx context.Context, req types.EvaluationReq
 		ResourceId:   req.ResourceId,
 		ResourceName: req.ResourceName,
 		Nodes:        req.Nodes,
+		Scheduler:    d.kubeScheduler,
+		DeployExtend: types.DeployExtend{
+			NodeAffinity: req.NodeAffinity,
+			Tolerations:  req.Tolerations,
+		},
 	}
 	if req.ResourceId == 0 {
 		flowReq.ShareMode = true
 	}
-	flowReq.Scheduler = common.GenerateScheduler(d.deployConfig)
 	return d.imageRunner.SubmitWorkFlow(ctx, flowReq)
 }
 
@@ -886,6 +902,11 @@ func (d *deployer) SubmitFinetuneJob(ctx context.Context, req types.FinetuneReq)
 		ResourceId:         req.ResourceId,
 		ResourceName:       req.ResourceName,
 		FinetunedModelName: finetunedModelName,
+		Scheduler:          d.kubeScheduler,
+		DeployExtend: types.DeployExtend{
+			NodeAffinity: req.NodeAffinity,
+			Tolerations:  req.Tolerations,
+		},
 	}
 	if req.ResourceId == 0 {
 		flowReq.ShareMode = true
@@ -951,7 +972,7 @@ func (d *deployer) GetWorkflowLogsNonStream(ctx context.Context, req types.Finet
 		if !first {
 			queryBuilder.WriteString(",")
 		}
-		fmt.Fprintf(&queryBuilder, "%s=\"%s\"", k, v)
+		fmt.Fprintf(&queryBuilder, `%s="%s"`, k, v)
 		first = false
 	}
 	queryBuilder.WriteString("}")

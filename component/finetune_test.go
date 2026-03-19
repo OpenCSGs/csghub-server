@@ -128,7 +128,7 @@ func TestEvaluationComponent_CreateFinetune(t *testing.T) {
 		Resources: string(resource),
 	}, nil)
 
-	repoComp.EXPECT().CheckAccountAndResource(ctx, "testuser", "", int64(0), mock.Anything).Return(nil)
+	repoComp.EXPECT().CheckAccountAndResource(ctx, "testuser", "", int64(0), mock.Anything).Return(&types.CheckExclusiveResp{}, nil)
 
 	mockDeployer.EXPECT().SubmitFinetuneJob(ctx, req2).Return(&types.ArgoWorkFlowRes{
 		ID:       1,

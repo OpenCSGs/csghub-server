@@ -24,7 +24,7 @@ type ArgoWorkFlowStore interface {
 	// delete workflow by id
 	DeleteWorkFlow(ctx context.Context, id int64) error
 	ListAllRunningEvaluations(ctx context.Context) (WorkFlows []ArgoWorkflow, err error)
-GetClusterWorkflows(ctx context.Context, req types.ClusterWFReq) ([]ArgoWorkflow, int, error)
+	GetClusterWorkflows(ctx context.Context, req types.ClusterWFReq) ([]ArgoWorkflow, int, error)
 	ListWorkflowsByTimeRange(ctx context.Context, req types.WorkflowTimeRangeReq) ([]ArgoWorkflow, int, error)
 }
 
@@ -185,7 +185,6 @@ func (s *argoWorkFlowStoreImpl) GetClusterWorkflows(ctx context.Context, req typ
 
 	return result, total, nil
 }
-
 
 func (s *argoWorkFlowStoreImpl) ListWorkflowsByTimeRange(ctx context.Context, req types.WorkflowTimeRangeReq) ([]ArgoWorkflow, int, error) {
 	var result []ArgoWorkflow

@@ -94,7 +94,7 @@ func (c *notebookComponentImpl) CreateNotebook(ctx context.Context, req *types.C
 
 	// resource available only if err is nil, err message should contain
 	// the reason why resource is unavailable
-	err = c.repoComponent.CheckAccountAndResource(ctx, req.OwnerNamespace, resource.ClusterID, req.OrderDetailID, resource)
+	exclusiveResp, err := c.repoComponent.CheckAccountAndResource(ctx, req.OwnerNamespace, resource.ClusterID, req.OrderDetailID, resource)
 	if err != nil {
 		return nil, err
 	}
@@ -138,6 +138,10 @@ func (c *notebookComponentImpl) CreateNotebook(ctx context.Context, req *types.C
 		OrderDetailID:    req.OrderDetailID,
 		SKU:              strconv.FormatInt(resource.ID, 10),
 		OwnerNamespace:   req.OwnerNamespace,
+		DeployExtend: types.DeployExtend{
+			NodeAffinity: exclusiveResp.NodeAffinity,
+			Tolerations:  exclusiveResp.Tolerations,
+		},
 	}
 
 	deployID, err := c.deployer.Deploy(ctx, dp)
@@ -224,6 +228,7 @@ func (c *notebookComponentImpl) LogsNotebook(ctx context.Context, req *types.Sta
 	return c.deployer.InstanceLogs(ctx, types.DeployRepo{
 		DeployID:     deploy.ID,
 		InstanceName: req.InstanceName,
+		Since:        req.Since,
 	})
 }
 
@@ -291,7 +296,7 @@ func (c *notebookComponentImpl) UpdateNotebook(ctx context.Context, req *types.U
 	if notebookBillingNs == "" {
 		notebookBillingNs = req.CurrentUser
 	}
-	err = c.repoComponent.CheckAccountAndResource(ctx, notebookBillingNs, resource.ClusterID, deploy.OrderDetailID, resource)
+	exclusiveResp, err := c.repoComponent.CheckAccountAndResource(ctx, notebookBillingNs, resource.ClusterID, deploy.OrderDetailID, resource)
 	if err != nil {
 		return fmt.Errorf("resource is not available, %w", err)
 	}
@@ -310,6 +315,10 @@ func (c *notebookComponentImpl) UpdateNotebook(ctx context.Context, req *types.U
 	dur := &types.DeployUpdateReq{
 		ResourceID: &req.ResourceID,
 		ClusterID:  &resource.ClusterID,
+		DeployExtend: types.DeployExtend{
+			NodeAffinity: exclusiveResp.NodeAffinity,
+			Tolerations:  exclusiveResp.Tolerations,
+		},
 	}
 
 	err = c.deployer.UpdateDeploy(ctx, dur, deploy)

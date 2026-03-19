@@ -34,6 +34,7 @@ type ClusterComponent interface {
 	QueryClusterWorkflows(ctx context.Context, req types.ClusterWFReq) ([]database.ArgoWorkflow, int, error)
 	UpdateClusterNodeVXPU(ctx context.Context, req types.UpdateClusterNodeReq) (*database.ClusterNodeWithRegion, error)
 	SetClusterNodeAccessMode(ctx context.Context, req types.SetNodeAccessModeReq) error
+	CheckExclusiveResource(ctx context.Context, req types.CheckExclusiveReq) (*types.CheckExclusiveResp, error)
 	GetDeploysByTimeRange(ctx context.Context, req types.DeployTimeRangeReq) ([]database.Deploy, int, error)
 	GetDeploysByTimeRangeStream(ctx context.Context, req types.DeployTimeRangeReq) (<-chan []string, <-chan error)
 	GetWorkflowsByTimeRange(ctx context.Context, req types.WorkflowTimeRangeReq) ([]database.ArgoWorkflow, int, error)

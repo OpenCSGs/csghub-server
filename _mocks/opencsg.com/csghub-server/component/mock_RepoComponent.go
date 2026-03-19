@@ -733,21 +733,33 @@ func (_c *MockRepoComponent_ChangePath_Call) RunAndReturn(run func(context.Conte
 }
 
 // CheckAccountAndResource provides a mock function with given fields: ctx, userName, clusterID, orderDetailID, resource
-func (_m *MockRepoComponent) CheckAccountAndResource(ctx context.Context, userName string, clusterID string, orderDetailID int64, resource *database.SpaceResource) error {
+func (_m *MockRepoComponent) CheckAccountAndResource(ctx context.Context, userName string, clusterID string, orderDetailID int64, resource *database.SpaceResource) (*types.CheckExclusiveResp, error) {
 	ret := _m.Called(ctx, userName, clusterID, orderDetailID, resource)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CheckAccountAndResource")
 	}
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, int64, *database.SpaceResource) error); ok {
+	var r0 *types.CheckExclusiveResp
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, int64, *database.SpaceResource) (*types.CheckExclusiveResp, error)); ok {
+		return rf(ctx, userName, clusterID, orderDetailID, resource)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, int64, *database.SpaceResource) *types.CheckExclusiveResp); ok {
 		r0 = rf(ctx, userName, clusterID, orderDetailID, resource)
 	} else {
-		r0 = ret.Error(0)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.CheckExclusiveResp)
+		}
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, int64, *database.SpaceResource) error); ok {
+		r1 = rf(ctx, userName, clusterID, orderDetailID, resource)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // MockRepoComponent_CheckAccountAndResource_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CheckAccountAndResource'
@@ -772,12 +784,12 @@ func (_c *MockRepoComponent_CheckAccountAndResource_Call) Run(run func(ctx conte
 	return _c
 }
 
-func (_c *MockRepoComponent_CheckAccountAndResource_Call) Return(_a0 error) *MockRepoComponent_CheckAccountAndResource_Call {
-	_c.Call.Return(_a0)
+func (_c *MockRepoComponent_CheckAccountAndResource_Call) Return(_a0 *types.CheckExclusiveResp, _a1 error) *MockRepoComponent_CheckAccountAndResource_Call {
+	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockRepoComponent_CheckAccountAndResource_Call) RunAndReturn(run func(context.Context, string, string, int64, *database.SpaceResource) error) *MockRepoComponent_CheckAccountAndResource_Call {
+func (_c *MockRepoComponent_CheckAccountAndResource_Call) RunAndReturn(run func(context.Context, string, string, int64, *database.SpaceResource) (*types.CheckExclusiveResp, error)) *MockRepoComponent_CheckAccountAndResource_Call {
 	_c.Call.Return(run)
 	return _c
 }

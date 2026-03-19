@@ -288,6 +288,9 @@ type MockFinetuneComponent_OrgFinetunes_Call struct {
 	*mock.Call
 }
 
+// OrgFinetunes is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req *types.OrgFinetunesReq
 func (_e *MockFinetuneComponent_Expecter) OrgFinetunes(ctx interface{}, req interface{}) *MockFinetuneComponent_OrgFinetunes_Call {
 	return &MockFinetuneComponent_OrgFinetunes_Call{Call: _e.mock.On("OrgFinetunes", ctx, req)}
 }

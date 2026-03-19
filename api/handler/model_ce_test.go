@@ -34,7 +34,6 @@ func NewModelTester(t *testing.T) *ModelTester {
 	tester.mocks.model = mockcomponent.NewMockModelComponent(t)
 	tester.mocks.sensitive = mockcomponent.NewMockSensitiveComponent(t)
 	tester.mocks.repo = mockcomponent.NewMockRepoComponent(t)
-
 	tester.handler = &ModelHandler{
 		model: tester.mocks.model, sensitive: tester.mocks.sensitive,
 		repo: tester.mocks.repo,
@@ -281,6 +280,7 @@ func TestModelHandler_DeployDedicated(t *testing.T) {
 
 		tester.ResponseEq(t, 200, tester.OKText, types.DeployRepo{DeployID: 123})
 	})
+
 	t.Run("error_badrequest", func(t *testing.T) {
 		tester := NewModelTester(t).WithHandleFunc(func(h *ModelHandler) gin.HandlerFunc {
 			return h.DeployDedicated
@@ -365,11 +365,11 @@ func TestModelHandler_DeployDedicated(t *testing.T) {
 		tester.mocks.repo.EXPECT().AllowReadAccess(tester.Ctx(), types.ModelRepo, "u", "r", "u").Return(true, nil)
 		tester.mocks.repo.EXPECT().CheckCurrentUserPermission(tester.Ctx(), "u", "org1", mock.Anything).Return(true, nil)
 		tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), &types.ModelRunReq{
-			DeployName:      "test",
-			MinReplica:      1,
-			MaxReplica:      2,
-			Revision:        "main",
-			OwnerNamespace:  "org1",
+			DeployName:     "test",
+			MinReplica:     1,
+			MaxReplica:     2,
+			Revision:       "main",
+			OwnerNamespace: "org1",
 		}).Return(true, nil)
 		tester.mocks.model.EXPECT().Deploy(tester.Ctx(), types.DeployActReq{
 			Namespace:   "u",

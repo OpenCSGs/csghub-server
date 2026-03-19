@@ -134,6 +134,11 @@ func NewModelComponent(config *config.Config) (ModelComponent, error) {
 	c.xnetMigrationTaskStore = database.NewXnetMigrationTaskStore()
 	c.lfsMetaObjectStore = database.NewLfsMetaObjectStore()
 
+	c.clusterComponent, err = NewClusterComponent(config)
+	if err != nil {
+		return nil, err
+	}
+
 	dc := dcommon.BuildDeployConfig(config)
 	ir, err := imagerunner.NewRemoteRunner(dc.ImageRunnerURL, dc)
 	if err != nil {
@@ -169,6 +174,7 @@ type modelComponentImpl struct {
 	mirrorStore               database.MirrorStore
 	xnetMigrationTaskStore    database.XnetMigrationTaskStore
 	lfsMetaObjectStore        database.LfsMetaObjectStore
+	clusterComponent          ClusterComponent
 }
 
 func (c *modelComponentImpl) Index(ctx context.Context, filter *types.RepoFilter, per, page int, needOpWeight bool) ([]*types.Model, int, error) {
@@ -1117,7 +1123,7 @@ func (c *modelComponentImpl) Deploy(ctx context.Context, deployReq types.DeployA
 
 	req.ClusterID = resource.ClusterID
 
-	err = c.repoComponent.CheckAccountAndResource(ctx, ownerNamespace, req.ClusterID, req.OrderDetailID, resource)
+	exclusiveResp, err := c.repoComponent.CheckAccountAndResource(ctx, ownerNamespace, req.ClusterID, req.OrderDetailID, resource)
 	if err != nil {
 		return -1, err
 	}
@@ -1164,6 +1170,10 @@ func (c *modelComponentImpl) Deploy(ctx context.Context, deployReq types.DeployA
 		Variables:        varStr,
 		EngineArgs:       req.EngineArgs,
 		OwnerNamespace:   ownerNamespace,
+		DeployExtend: types.DeployExtend{
+			NodeAffinity: exclusiveResp.NodeAffinity,
+			Tolerations:  exclusiveResp.Tolerations,
+		},
 	}
 	dp = modelRunUpdateDeployRepo(dp, req)
 	return c.deployer.Deploy(ctx, dp)

@@ -479,7 +479,6 @@ func (_e *MockClient_Expecter) RemoveObject(ctx interface{}, bucketName interfac
 	return &MockClient_RemoveObject_Call{Call: _e.mock.On("RemoveObject", ctx, bucketName, objectName, opts)}
 }
 
-
 func (_c *MockClient_RemoveObject_Call) Run(run func(ctx context.Context, bucketName string, objectName string, opts minio.RemoveObjectOptions)) *MockClient_RemoveObject_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(minio.RemoveObjectOptions))
