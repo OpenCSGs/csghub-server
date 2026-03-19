@@ -324,6 +324,10 @@ func TestOpenAIComponent_GetModelByID(t *testing.T) {
 			Return(1, nil).Once()
 		mockCache.EXPECT().HGet(mock.Anything, modelCacheKey, "nonexistent:svc").
 			Return("", redis.Nil).Once()
+		// Cache miss: GetModelByID falls through to GetAvailableModels, which calls getCSGHubModels and getExternalModels
+		mockDeployStore.EXPECT().RunningVisibleToUser(mock.Anything, int64(1)).Return([]database.Deploy{}, nil).Once()
+		mockLLMConfigStore.EXPECT().Index(mock.Anything, 50, 1, mock.Anything).
+			Return([]*database.LLMConfig{}, 0, nil).Once()
 		model, err := comp.GetModelByID(context.Background(), "testuser", "nonexistent:svc")
 		assert.NoError(t, err)
 		assert.Nil(t, model)

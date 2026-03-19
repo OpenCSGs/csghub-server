@@ -189,12 +189,13 @@ func (m *openaiComponentImpl) getCSGHubModels(c context.Context, userID int64) (
 				Public:              isPublic,
 			},
 			InternalModelInfo: types.InternalModelInfo{
-				CSGHubModelID: deploy.Repository.Path,
-				OwnerUUID:     deploy.User.UUID,
-				ClusterID:     deploy.ClusterID,
-				SvcName:       deploy.SvcName,
-				SvcType:       deploy.Type,
-				ImageID:       deploy.ImageID,
+				CSGHubModelID:    deploy.Repository.Path,
+				OwnerUUID:        deploy.User.UUID,
+				ClusterID:        deploy.ClusterID,
+				SvcName:          deploy.SvcName,
+				SvcType:          deploy.Type,
+				ImageID:          deploy.ImageID,
+				RuntimeFramework: deploy.RuntimeFramework,
 			},
 		}
 		if deploy.Type == commontypes.ServerlessType {
@@ -321,26 +322,16 @@ func (m *openaiComponentImpl) loadModelFromCache(ctx context.Context, modelID st
 }
 
 func (m *openaiComponentImpl) GetModelByID(c context.Context, username, modelID string) (*types.Model, error) {
-	// First try to load model from cache
 	model, err := m.loadModelFromCache(c, modelID)
-	// Handle different error cases
 	if err != nil {
 		if !errors.Is(err, redis.Nil) {
-			// Other errors should be returned
 			return nil, err
-		} else {
-			// no cache hint
-			return nil, nil
 		}
-	} else {
-		if model != nil {
-			// Cache hit, return the model
-			return model, nil
-		} else {
-			slog.Debug("cache expire, refresh cache")
-		}
+		// redis.Nil: no cache yet; fall through to fetch from GetAvailableModels (and allow cache to be populated)
+	} else if model != nil {
+		return model, nil
 	}
-
+	// Cache miss or cache expired: fetch full list (which also triggers saveModelsToCache)
 	models, err := m.GetAvailableModels(c, username)
 	if err != nil {
 		return nil, err

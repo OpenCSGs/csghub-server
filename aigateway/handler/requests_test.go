@@ -6,6 +6,7 @@ import (
 
 	"github.com/openai/openai-go/v3"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestChatCompletionRequest_MarshalUnmarshal(t *testing.T) {
@@ -228,4 +229,141 @@ func TestEmbeddingRequest_UnknownFields(t *testing.T) {
 	// Check unknown fields
 	assert.Equal(t, "unknown_value", resultMap["unknown_field"])
 	assert.Equal(t, 12345.0, resultMap["another_unknown"])
+}
+func TestImageGenerationRequest_MarshalUnmarshal(t *testing.T) {
+	// Test case 1: Only known fields
+	t.Run("OnlyKnownFields", func(t *testing.T) {
+		// Create a request with only known fields
+		original := ImageGenerationRequest{
+			ImageGenerateParams: openai.ImageGenerateParams{
+				Model:  "dall-e-3",
+				Prompt: "A beautiful sunset",
+				Size:   openai.ImageGenerateParamsSize1024x1024,
+			},
+		}
+
+		// Marshal to JSON
+		jsonData, err := json.Marshal(original)
+		require.NoError(t, err)
+
+		// Unmarshal back
+		var unmarshaled ImageGenerationRequest
+		err = json.Unmarshal(jsonData, &unmarshaled)
+		require.NoError(t, err)
+
+		// Check that known fields are preserved
+		assert.Equal(t, original.Model, unmarshaled.Model)
+		assert.Equal(t, original.Prompt, unmarshaled.Prompt)
+		assert.Equal(t, original.Size, unmarshaled.Size)
+		// RawJSON should be nil
+		assert.Nil(t, unmarshaled.RawJSON)
+	})
+
+	// Test case 2: Only unknown fields
+	t.Run("OnlyUnknownFields", func(t *testing.T) {
+		// JSON with only unknown fields
+		jsonData := []byte(`{"custom_field": "value", "another_custom": 123}`)
+
+		// Unmarshal
+		var unmarshaled ImageGenerationRequest
+		err := json.Unmarshal(jsonData, &unmarshaled)
+		require.NoError(t, err)
+
+		// Check that known fields are zero values
+		assert.Empty(t, unmarshaled.Model)
+		assert.Empty(t, unmarshaled.Prompt)
+		assert.Empty(t, unmarshaled.Size)
+
+		// Check that unknown fields are stored in RawJSON
+		assert.NotNil(t, unmarshaled.RawJSON)
+		assert.JSONEq(t, string(jsonData), string(unmarshaled.RawJSON))
+
+		// Marshal back and check
+		marshaledData, err := json.Marshal(unmarshaled)
+		require.NoError(t, err)
+		// must contain all unknown fields and required fields
+		assert.Contains(t, string(marshaledData), "custom_field")
+		assert.Contains(t, string(marshaledData), "another_custom")
+		assert.Contains(t, string(marshaledData), "prompt")
+	})
+
+	// Test case 3: Both known and unknown fields
+	t.Run("KnownAndUnknownFields", func(t *testing.T) {
+		// JSON with both known and unknown fields
+		jsonData := []byte(`{
+			"model": "dall-e-3",
+			"prompt": "A beautiful sunset",
+			"size": "1024x1024",
+			"custom_field": "value",
+			"another_custom": 123
+		}`)
+
+		// Unmarshal
+		var unmarshaled ImageGenerationRequest
+		err := json.Unmarshal(jsonData, &unmarshaled)
+		require.NoError(t, err)
+
+		// Check that known fields are correctly unmarshaled
+		assert.Equal(t, "dall-e-3", unmarshaled.Model)
+		assert.Equal(t, "A beautiful sunset", unmarshaled.Prompt)
+		assert.Equal(t, openai.ImageGenerateParamsSize1024x1024, unmarshaled.Size)
+
+		// Check that unknown fields are stored in RawJSON
+		assert.NotNil(t, unmarshaled.RawJSON)
+		assert.JSONEq(t, `{"custom_field": "value", "another_custom": 123}`, string(unmarshaled.RawJSON))
+
+		// Marshal back and check
+		marshaledData, err := json.Marshal(unmarshaled)
+		require.NoError(t, err)
+		assert.JSONEq(t, string(jsonData), string(marshaledData))
+	})
+
+	// Test case 4: Unknown fields override known fields during marshal
+	t.Run("UnknownFieldsOverride", func(t *testing.T) {
+		// Create a request with known fields
+		request := ImageGenerationRequest{
+			ImageGenerateParams: openai.ImageGenerateParams{
+				Model:  "dall-e-3",
+				Prompt: "A beautiful sunset",
+			},
+			// Add unknown field that overrides a known field
+			RawJSON: []byte(`{"prompt": "Overridden prompt"}`),
+		}
+
+		// Marshal to JSON
+		jsonData, err := json.Marshal(request)
+		require.NoError(t, err)
+
+		// Check that unknown field overrides known field in output
+		var result map[string]interface{}
+		err = json.Unmarshal(jsonData, &result)
+		require.NoError(t, err)
+		assert.Equal(t, "Overridden prompt", result["prompt"])
+		assert.Equal(t, "dall-e-3", result["model"])
+	})
+
+	// Test case 5: Empty RawJSON
+	t.Run("EmptyRawJSON", func(t *testing.T) {
+		// Create a request with empty RawJSON
+		request := ImageGenerationRequest{
+			ImageGenerateParams: openai.ImageGenerateParams{
+				Model:  "dall-e-3",
+				Prompt: "A beautiful sunset",
+			},
+			RawJSON: []byte(`{}`),
+		}
+
+		// Marshal to JSON
+		jsonData, err := json.Marshal(request)
+		require.NoError(t, err)
+
+		// Check that output doesn't include empty object fields
+		var result map[string]interface{}
+		err = json.Unmarshal(jsonData, &result)
+		require.NoError(t, err)
+		assert.Equal(t, "dall-e-3", result["model"])
+		assert.Equal(t, "A beautiful sunset", result["prompt"])
+		// Should not have any extra fields
+		assert.Len(t, result, 2) // model and prompt
+	})
 }
