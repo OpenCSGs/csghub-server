@@ -62,6 +62,7 @@ func TestModelComponent_Deploy(t *testing.T) {
 		ResourceID:         123,
 		ClusterID:          "cluster",
 		DeployName:         "dp",
+		OwnerNamespace:     "ns",
 	})
 	require.Nil(t, err)
 	require.Equal(t, int64(111), id)
