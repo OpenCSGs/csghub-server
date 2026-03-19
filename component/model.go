@@ -1108,14 +1108,6 @@ func (c *modelComponentImpl) Deploy(ctx context.Context, deployReq types.DeployA
 			return -1, fmt.Errorf("failed to resolve billing UUID for namespace %s, error: %w", ownerNamespace, err)
 		}
 		billingUUID = resolved
-	} else if deployReq.Namespace != deployReq.CurrentUser {
-		// Model is under an org; default to that org as owner.
-		ownerNamespace = deployReq.Namespace
-		resolved, err := c.repoComponent.GetNamespaceBillingUUID(ctx, deployReq.Namespace)
-		if err != nil {
-			return -1, fmt.Errorf("failed to resolve billing UUID for namespace %s, error: %w", deployReq.Namespace, err)
-		}
-		billingUUID = resolved
 	}
 
 	resource, err := c.spaceResourceStore.FindByID(ctx, req.ResourceID)

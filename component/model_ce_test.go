@@ -29,6 +29,7 @@ func TestModelComponent_Deploy(t *testing.T) {
 	)
 	mc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
 		RoleMask: "admin",
+		UUID:     "user-uuid",
 	}, nil)
 	mc.mocks.stores.RuntimeFrameworkMock().EXPECT().FindEnabledByID(ctx, int64(11)).Return(
 		&database.RuntimeFramework{}, nil,
@@ -61,6 +62,7 @@ func TestModelComponent_Deploy(t *testing.T) {
 		ResourceID:         123,
 		ClusterID:          "cluster",
 		DeployName:         "dp",
+		OwnerNamespace:     "ns",
 	})
 	require.Nil(t, err)
 	require.Equal(t, int64(111), id)
@@ -95,7 +97,7 @@ func TestModelComponent_Deploy_OwnerNamespace_BillingUUIDError(t *testing.T) {
 		ResourceID:         123,
 		ClusterID:          "cluster",
 		DeployName:         "dp",
-		OwnerNamespace:    "org1",
+		OwnerNamespace:     "org1",
 	})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "failed to resolve billing UUID for namespace")
