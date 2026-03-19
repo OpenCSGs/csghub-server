@@ -4,6 +4,7 @@ import "time"
 
 type CreateNotebookReq struct {
 	CurrentUser        string `json:"currentUser"`
+	OwnerNamespace     string `json:"owner_namespace,omitempty"`
 	DeployName         string `json:"deploy_name"`
 	ResourceID         int64  `json:"resource_id"`
 	MinReplica         int    `json:"min_replica" validate:"min=0"`

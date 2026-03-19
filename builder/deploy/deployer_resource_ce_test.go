@@ -107,6 +107,70 @@ func TestCheckResource(t *testing.T) {
 			want: false,
 		},
 		{
+			name: "single node - memory unit Mi",
+			clusterResources: &types.ClusterRes{
+				ClusterID: "c1",
+				Resources: []types.NodeResourceInfo{
+					{
+						NodeHardware: types.NodeHardware{
+							AvailableMem: 1, // 1GiB
+						},
+					},
+				},
+			},
+			hardware: &types.HardWare{
+				Memory:   "1024Mi",
+				Replicas: 1,
+			},
+			want: true,
+		},
+		{
+			name: "single node - memory boundary exact match",
+			clusterResources: &types.ClusterRes{
+				ClusterID: "c1",
+				Resources: []types.NodeResourceInfo{
+					{
+						NodeHardware: types.NodeHardware{
+							AvailableMem: 10,
+						},
+					},
+				},
+			},
+			hardware: &types.HardWare{
+				Memory:   "10Gi",
+				Replicas: 1,
+			},
+			want: true,
+		},
+		{
+			name: "multi node - enough nodes count but insufficient resources",
+			clusterResources: &types.ClusterRes{
+				ClusterID: "c1",
+				Resources: []types.NodeResourceInfo{
+					{
+						NodeHardware: types.NodeHardware{
+							AvailableMem: 100,
+						},
+					},
+					{
+						NodeHardware: types.NodeHardware{
+							AvailableMem: 4, // Insufficient for 10Gi
+						},
+					},
+					{
+						NodeHardware: types.NodeHardware{
+							AvailableMem: 4, // Insufficient for 10Gi
+						},
+					},
+				},
+			},
+			hardware: &types.HardWare{
+				Memory:   "10Gi",
+				Replicas: 2,
+			},
+			want: false,
+		},
+		{
 			name: "multi node - resource sufficient",
 			clusterResources: &types.ClusterRes{
 				ClusterID: "c1",

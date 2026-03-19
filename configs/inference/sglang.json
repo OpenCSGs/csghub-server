@@ -6,32 +6,74 @@
   "engine_images": [
     {
       "compute_type": "gpu",
-      "image": "opencsghq/sglang:v0.5.3.rc1-cu126",
-      "driver_version": "12.6",
-      "engine_version": "v0.5.3.rc1",
+      "image": "opencsghq/sglang:v0.5.9-cu130",
+      "driver_version": "13.0",
+      "engine_version": "v0.5.9",
       "extra_archs": [
+        "ApertusForCausalLM",
         "ArceeForCausalLM",
+        "BailingMoEForCausalLM",
         "BailingMoeForCausalLM",
+        "BailingMoeForCausalLMNextN",
+        "BailingMoeV2ForCausalLM",
+        "BailingMoeV2_5ForCausalLM",
         "BertForSequenceClassification",
         "BertModel",
+        "ChatGLMForConditionalGeneration",
         "Contriever",
+        "DeepseekOCR2ForCausalLM",
+        "DeepseekV32ForCausalLM",
+        "DotsVLMForCausalLM",
         "Ernie4_5_ForCausalLM",
         "Ernie4_5_MoeForCausalLM",
         "Ernie4_5_MoeForCausalLMMTP",
+        "Ernie4_5_VLMoeForConditionalGeneration",
+        "FalconH1ForCausalLM",
         "GPT2LMHeadModel",
         "GPTBigCodeForCausalLM",
-        "GptOssForCausalLM",
         "Glm4ForCausalLM",
         "Glm4MoeForCausalLM",
         "Glm4MoeForCausalLMNextN",
         "Glm4vForConditionalGeneration",
         "Glm4vMoeForConditionalGeneration",
+        "GlmMoeDsaForCausalLM",
+        "GlmOcrForConditionalGeneration",
+        "GptOssForCausalLM",
+        "GraniteMoeHybridForCausalLM",
         "HunYuanDenseV1ForCausalLM",
         "HunYuanMoEV1ForCausalLM",
-        "KimiVLForConditionalGeneration",
-        "VILAForConditionalGeneration",
+        "JetNemotronForCausalLM",
+        "JetVLMForConditionalGeneration",
+        "KimiLinearForCausalLM",
+        "LLaDA2MoeModelLM",
+        "LlavaLlamaForCausalLM",
+        "LlavaMistralForCausalLM",
+        "LlavaQwenForCausalLM",
+        "LongcatFlashForCausalLM",
+        "LongcatFlashForCausalLMNextN",
+        "MindSporeForCausalLM",
+        "MiniMaxM2ForCausalLM",
+        "Ministral3ForCausalLM",
+        "MistralLarge3ForCausalLM",
+        "MistralLarge3ForCausalLMEagle",
+        "NemotronForCausalLM",
+        "NemotronHForCausalLM",
+        "NemotronH_Nano_VL_V2",
+        "OPTForCausalLM",
+        "OrionForCausalLM",
+        "POINTSV15ChatModel",
+        "PaddleOCRVLForConditionalGeneration",
         "Phi4FlashForCausalLM",
-        "Qwen3NextForCausalLM"
+        "Qwen3NextForCausalLM",
+        "Qwen3_5MoeForConditionalGeneration",
+        "Sarashina2VisionForCausalLM",
+        "SmolLM3ForCausalLM",
+        "SolarForCausalLM",
+        "Starcoder2ForCausalLM",
+        "Step3p5ForCausalLM",
+        "StepVLForConditionalGeneration",
+        "TeleFLMForCausalLM",
+        "VILAForConditionalGeneration"
       ]
     },
     {
@@ -57,15 +99,31 @@
       "value": "1024",
       "format": "--chunked-prefill-size %s"
     },
-    { "name": "cpu-offload-gb", "value": "1", "format": "--cpu-offload-gb %s" },
-    { "name": "dp-size", "value": "1", "format": "--dp-size %s" },
+    {
+      "name": "cpu-offload-gb",
+      "value": "1",
+      "format": "--cpu-offload-gb %s"
+    },
+    {
+      "name": "dp-size",
+      "value": "1",
+      "format": "--dp-size %s"
+    },
     {
       "name": "enable-dp-attention",
       "value": "enable",
       "format": "--enable-dp-attention"
     },
-    { "name": "enable-ep-moe", "value": "enable", "format": "--enable-ep-moe" },
-    { "name": "custom-options", "value": "", "format": "%s" }
+    {
+      "name": "enable-ep-moe",
+      "value": "enable",
+      "format": "--enable-ep-moe"
+    },
+    {
+      "name": "custom-options",
+      "value": "",
+      "format": "%s"
+    }
   ],
   "supported_archs": [
     "BaichuanForCausalLM",

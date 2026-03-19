@@ -9,10 +9,13 @@ import (
 	"strings"
 
 	"opencsg.com/csghub-server/builder/deploy"
+	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
+	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -48,6 +51,10 @@ type UserComponent interface {
 	ListNotebooks(ctx context.Context, req *types.DeployReq) ([]types.NotebookRes, int, error)
 	ListFinetunes(ctx context.Context, req *types.UserEvaluationReq) ([]types.ArgoWorkFlowRes, int, error)
 	LikesSkills(ctx context.Context, req *types.UserMCPsReq) ([]types.Skill, int, error)
+	// ListDeploysByNamespace lists run deploys (e.g. inference) by owner namespace (org or user).
+	ListDeploysByNamespace(ctx context.Context, req *types.OrgRunDeploysReq) ([]types.DeployRepo, int, error)
+	// ListNotebooksByNamespace lists notebooks by owner namespace (org or user).
+	ListNotebooksByNamespace(ctx context.Context, req *types.OrgNotebooksReq) ([]types.NotebookRes, int, error)
 }
 
 func NewUserComponent(config *config.Config) (UserComponent, error) {
@@ -587,6 +594,72 @@ func (c *userComponentImpl) ListServerless(ctx context.Context, req types.Deploy
 			UpdatedAt:        deploy.UpdatedAt,
 			Type:             deploy.Type,
 			SKU:              deploy.SKU,
+			Task:             string(deploy.Task),
+		})
+	}
+	return resDeploys, total, nil
+}
+
+func (c *userComponentImpl) ListDeploysByNamespace(ctx context.Context, req *types.OrgRunDeploysReq) ([]types.DeployRepo, int, error) {
+	if req.CurrentUser != "" {
+		canRead, err := c.repoComponent.CheckCurrentUserPermission(ctx, req.CurrentUser, req.Namespace, membership.RoleRead)
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to check namespace permission: %w", err)
+		}
+		if !canRead {
+			return nil, 0, errorx.ErrForbiddenMsg("users do not have permission to view run deploys in this namespace")
+		}
+	}
+	deployReq := &types.DeployReq{
+		PageOpts:   types.PageOpts{Page: req.Page, PageSize: req.PageSize},
+		RepoType:   req.RepoType,
+		DeployType: req.DeployType,
+	}
+	deploys, total, err := c.deployTaskStore.ListDeployByOwnerNamespace(ctx, req.Namespace, deployReq)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to get namespace deploys: %w", err)
+	}
+	var resDeploys []types.DeployRepo
+	for _, deploy := range deploys {
+		d := &database.Deploy{
+			SvcName:   deploy.SvcName,
+			ClusterID: deploy.ClusterID,
+			Status:    deploy.Status,
+		}
+		endpoint, provider := c.repoComponent.GenerateEndpoint(ctx, d)
+		repoPath := strings.TrimPrefix(deploy.GitPath, string(req.RepoType)+"s_")
+		var hardware types.HardWare
+		_ = json.Unmarshal([]byte(deploy.Hardware), &hardware)
+		resourceType := common.ResourceType(hardware)
+		tag := ""
+		tags, _ := c.repoStore.TagsWithCategory(ctx, deploy.RepoID, "task")
+		if len(tags) > 0 {
+			tag = tags[0].Name
+		}
+		resDeploys = append(resDeploys, types.DeployRepo{
+			DeployID:         deploy.ID,
+			DeployName:       deploy.DeployName,
+			Path:             repoPath,
+			RepoID:           deploy.RepoID,
+			SvcName:          deploy.SvcName,
+			Status:           deployStatusCodeToString(deploy.Status),
+			Hardware:         deploy.Hardware,
+			Env:              deploy.Env,
+			RuntimeFramework: deploy.RuntimeFramework,
+			ImageID:          deploy.ImageID,
+			MinReplica:       deploy.MinReplica,
+			MaxReplica:       deploy.MaxReplica,
+			GitPath:          deploy.GitPath,
+			GitBranch:        deploy.GitBranch,
+			ClusterID:        deploy.ClusterID,
+			SecureLevel:      deploy.SecureLevel,
+			CreatedAt:        deploy.CreatedAt,
+			UpdatedAt:        deploy.UpdatedAt,
+			Type:             deploy.Type,
+			Endpoint:         endpoint,
+			Provider:         provider,
+			ResourceType:     string(resourceType),
+			RepoTag:          tag,
 			Task:             string(deploy.Task),
 		})
 	}

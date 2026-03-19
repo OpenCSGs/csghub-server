@@ -2,7 +2,6 @@ package component
 
 import (
 	"context"
-	"database/sql"
 	"testing"
 	"time"
 
@@ -12,6 +11,7 @@ import (
 	mockgit "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/git/gitserver"
 	mockdb "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -134,7 +134,7 @@ func TestAccessTokenComponentImpl_Delete(t *testing.T) {
 		})
 
 		require.Error(t, err)
-		require.Contains(t, err.Error(), "user access token does not exists")
+		require.ErrorIs(t, err, errorx.ErrNotFound)
 	})
 
 	t.Run("success delete token", func(t *testing.T) {
@@ -170,7 +170,7 @@ func TestAccessTokenComponentImpl_Check(t *testing.T) {
 	t.Run("token not found", func(t *testing.T) {
 		mockTokenStore := mockdb.NewMockAccessTokenStore(t)
 		mockTokenStore.EXPECT().FindByToken(mock.Anything, "invalid-token", "git").
-			Return(nil, sql.ErrNoRows).Once()
+			Return(nil, errorx.ErrDatabaseNoRows).Once()
 
 		ac := &accessTokenComponentImpl{
 			ts: mockTokenStore,
@@ -182,6 +182,7 @@ func TestAccessTokenComponentImpl_Check(t *testing.T) {
 		})
 
 		require.Error(t, err)
+		require.ErrorIs(t, err, errorx.ErrNotFound)
 		require.Empty(t, resp.Token)
 	})
 
@@ -279,7 +280,7 @@ func TestAccessTokenComponentImpl_RefreshToken(t *testing.T) {
 	t.Run("token not found", func(t *testing.T) {
 		mockTokenStore := mockdb.NewMockAccessTokenStore(t)
 		mockTokenStore.EXPECT().FindByTokenName(mock.Anything, "user1", "test_token_name", "git").
-			Return(nil, sql.ErrNoRows).Once()
+			Return(nil, errorx.ErrDatabaseNoRows).Once()
 
 		ac := &accessTokenComponentImpl{
 			ts: mockTokenStore,
@@ -287,6 +288,7 @@ func TestAccessTokenComponentImpl_RefreshToken(t *testing.T) {
 
 		resp, err := ac.RefreshToken(context.Background(), "user1", "test_token_name", "git", time.Now().Add(time.Hour))
 		require.Error(t, err)
+		require.ErrorIs(t, err, errorx.ErrNotFound)
 		require.Empty(t, resp)
 	})
 

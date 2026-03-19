@@ -194,3 +194,85 @@ func (r EmbeddingRequest) MarshalJSON() ([]byte, error) {
 	// Marshal the merged map back into JSON
 	return json.Marshal(knownFields)
 }
+
+// ImageGenerationRequest represents an image generation request structure
+type ImageGenerationRequest struct {
+	openai.ImageGenerateParams
+	RawJSON json.RawMessage `json:"-"` // Raw JSON data for fields not explicitly defined in the struct
+}
+
+// UnmarshalJSON implements the json.Unmarshaler interface to handle undefined fields
+func (r *ImageGenerationRequest) UnmarshalJSON(data []byte) error {
+	// First, unmarshal into a map to capture all fields
+	var rawMap map[string]interface{}
+	if err := json.Unmarshal(data, &rawMap); err != nil {
+		return err
+	}
+
+	// Then, unmarshal the known fields into the struct
+	knownFieldsData, err := json.Marshal(rawMap)
+	if err != nil {
+		return err
+	}
+	if err := json.Unmarshal(knownFieldsData, &r.ImageGenerateParams); err != nil {
+		return err
+	}
+
+	// Remove the known fields from the map
+	// We need to know what fields are in openai.ImageGenerateParams
+	// For simplicity, we'll re-encode the struct and decode it back to a map
+	// This way we can get all the known field names
+	var knownFields map[string]interface{}
+	if knownData, err := json.Marshal(r.ImageGenerateParams); err == nil {
+		if err := json.Unmarshal(knownData, &knownFields); err == nil {
+			// Remove known fields from rawMap
+			for k := range knownFields {
+				delete(rawMap, k)
+			}
+		}
+	}
+
+	// Marshal the remaining unknown fields back to JSON
+	if len(rawMap) > 0 {
+		rawJSON, err := json.Marshal(rawMap)
+		if err != nil {
+			return err
+		}
+		r.RawJSON = rawJSON
+	} else {
+		r.RawJSON = nil
+	}
+
+	return nil
+}
+
+// MarshalJSON implements the json.Marshaler interface to include undefined fields
+func (r ImageGenerationRequest) MarshalJSON() ([]byte, error) {
+	// First, marshal the known fields
+	knownData, err := json.Marshal(r.ImageGenerateParams)
+	if err != nil {
+		return nil, err
+	}
+
+	// If there are no unknown fields, just return the known fields
+	if len(r.RawJSON) == 0 {
+		return knownData, nil
+	}
+
+	// Unmarshal both known and unknown fields into maps
+	var knownMap, unknownMap map[string]interface{}
+	if err := json.Unmarshal(knownData, &knownMap); err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(r.RawJSON, &unknownMap); err != nil {
+		return nil, err
+	}
+
+	// Merge the maps, unknown fields override known fields
+	for k, v := range unknownMap {
+		knownMap[k] = v
+	}
+
+	// Marshal the merged map back to JSON
+	return json.Marshal(knownMap)
+}

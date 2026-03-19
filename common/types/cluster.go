@@ -237,8 +237,7 @@ type NodeLabel struct {
 
 type SetNodeAccessModeReq struct {
 	NodeID    int64  `json:"-"`
-	UserName  string `json:"user_name"`
-	OrgName   string `json:"org_name"`
+	Namespace string `json:"-"`
 	Exclusive bool   `json:"exclusive"`
 }
 
@@ -252,4 +251,12 @@ type CheckExclusiveResp struct {
 	NodeAffinity  *corev1.NodeAffinity
 	Tolerations   []Toleration
 	UsedExclusive bool
+}
+
+type ExclusiveOwner struct {
+	Namespace string `json:"namespace"`
+	Type      string `json:"type"`
+	UserID    int64  `json:"user_id"`
+	UserName  string `json:"user_name"`
+	UpdatedAt int64  `json:"updated_at"`
 }

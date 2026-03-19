@@ -149,6 +149,7 @@ func (h *AccessTokenHandler) CreateAppToken(ctx *gin.Context) {
 // @Param        body body types.DeleteUserTokenRequest true "body"
 // @Success      200  {object}  types.Response{} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      404  {object}  error "User or access token not found"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /user/{username}/tokens/{token_name} [delete]
 func (h *AccessTokenHandler) Delete(ctx *gin.Context) {
@@ -167,6 +168,10 @@ func (h *AccessTokenHandler) Delete(ctx *gin.Context) {
 	req.TokenName = ctx.Param("token_name")
 	err := h.c.Delete(ctx, &req)
 	if err != nil {
+		if errors.Is(err, errorx.ErrNotFound) {
+			httpbase.NotFoundError(ctx, err)
+			return
+		}
 		slog.ErrorContext(ctx.Request.Context(), "Failed to delete user access token", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
@@ -187,6 +192,7 @@ func (h *AccessTokenHandler) Delete(ctx *gin.Context) {
 // @Param        current_user query string true "current user, the owner"
 // @Success      200  {object}  types.Response{} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      404  {object}  error "Access token not found"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /token/{app}/{token_name} [delete]
 func (h *AccessTokenHandler) DeleteAppToken(ctx *gin.Context) {
@@ -204,6 +210,10 @@ func (h *AccessTokenHandler) DeleteAppToken(ctx *gin.Context) {
 	}
 	err := h.c.Delete(ctx, &req)
 	if err != nil {
+		if errors.Is(err, errorx.ErrNotFound) {
+			httpbase.NotFoundError(ctx, err)
+			return
+		}
 		slog.ErrorContext(ctx.Request.Context(), "Failed to delete user access token", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
@@ -225,6 +235,7 @@ func (h *AccessTokenHandler) DeleteAppToken(ctx *gin.Context) {
 // @Param        expired_at query string false "new expire time, in format RFC3339, like 2006-01-02T15:04:05Z07:00"
 // @Success      200  {object}  types.Response{} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      404  {object}  error "Access token not found"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /token/{app}/{token_name} [put]
 func (h *AccessTokenHandler) Refresh(ctx *gin.Context) {
@@ -248,6 +259,10 @@ func (h *AccessTokenHandler) Refresh(ctx *gin.Context) {
 	}
 	resp, err := h.c.RefreshToken(ctx, currentUser, tokenName, app, expiredAt)
 	if err != nil {
+		if errors.Is(err, errorx.ErrNotFound) {
+			httpbase.NotFoundError(ctx, err)
+			return
+		}
 		slog.ErrorContext(ctx.Request.Context(), "Failed to refresh user access token", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
@@ -284,6 +299,10 @@ func (h *AccessTokenHandler) Get(ctx *gin.Context) {
 	req.Application = ctx.Query("app")
 	resp, err := h.c.Check(ctx, &req)
 	if err != nil {
+		if errors.Is(err, errorx.ErrNotFound) {
+			httpbase.NotFoundError(ctx, err)
+			return
+		}
 		slog.ErrorContext(ctx.Request.Context(), "Failed to check user access token", slog.Any("error", err), slog.Any("req", req))
 		httpbase.ServerError(ctx, err)
 		return

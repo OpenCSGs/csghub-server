@@ -244,20 +244,21 @@ func TestGitHTTPComponent_Batch(t *testing.T) {
 			hasReadAccess: true,
 			err:           errorx.ErrForbidden,
 		},
-		// {
-		// 	name:           "upload file exist",
-		// 	operation:      types.LFSBatchUpload,
-		// 	hasWriteAccess: true,
-		// 	exist:          true,
-		// 	resp: &types.BatchResponse{
-		// 		Objects: []*types.ObjectResponse{
-		// 			{
-		// 				Pointer: types.Pointer{Oid: existOID, Size: 100},
-		// 				Actions: nil,
-		// 			},
-		// 		},
-		// 	},
-		// },
+		{
+			name:           "upload file exist",
+			operation:      types.LFSBatchUpload,
+			hasWriteAccess: true,
+			exist:          true,
+			resp: &types.BatchResponse{
+				Transfer:       "basic",
+				Objects: []*types.ObjectResponse{
+					{
+						Pointer: types.Pointer{Oid: existOID, Size: 100},
+						Actions: nil,
+					},
+				},
+			},
+		},
 		{
 			name:      "upload and current user empty, 401",
 			operation: types.LFSBatchUpload,

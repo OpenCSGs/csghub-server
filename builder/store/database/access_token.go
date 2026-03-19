@@ -3,11 +3,11 @@ package database
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"time"
 
 	"github.com/uptrace/bun"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -57,7 +57,7 @@ type AccessToken struct {
 
 func (s *accessTokenStoreImpl) Create(ctx context.Context, token *AccessToken) (err error) {
 	err = s.db.Operator.Core.NewInsert().Model(token).Scan(ctx)
-	return
+	return errorx.HandleDBError(err, nil)
 }
 
 // Refresh will disable existing access token, and then generate new one
@@ -96,7 +96,7 @@ func (s *accessTokenStoreImpl) Refresh(ctx context.Context, token *AccessToken, 
 	})
 
 	newToken.User = token.User
-	return newToken, err
+	return newToken, errorx.HandleDBError(err, nil)
 }
 
 func (s *accessTokenStoreImpl) FindByID(ctx context.Context, id int64) (*AccessToken, error) {
@@ -107,7 +107,10 @@ func (s *accessTokenStoreImpl) FindByID(ctx context.Context, id int64) (*AccessT
 		Relation("User").
 		Where("access_token.id = ?", id).
 		Scan(ctx)
-	return &token, err
+	if err != nil {
+		return nil, errorx.HandleDBError(err, nil)
+	}
+	return &token, nil
 }
 
 func (s *accessTokenStoreImpl) Delete(ctx context.Context, username, tkName, app string) (err error) {
@@ -121,7 +124,7 @@ func (s *accessTokenStoreImpl) Delete(ctx context.Context, username, tkName, app
 		Where("access_token.name = ? and app = ?", tkName, app).
 		ForceDelete().
 		Exec(ctx)
-	return
+	return errorx.HandleDBError(err, nil)
 }
 
 func (s *accessTokenStoreImpl) IsExist(ctx context.Context, username, tkName, app string) (exists bool, err error) {
@@ -133,7 +136,7 @@ func (s *accessTokenStoreImpl) IsExist(ctx context.Context, username, tkName, ap
 		Where("u.username = ?", username).
 		Where("access_token.name = ? and app = ?", tkName, app).
 		Exists(ctx)
-	return
+	return exists, errorx.HandleDBError(err, nil)
 }
 
 func (s *accessTokenStoreImpl) FindByUID(ctx context.Context, uid int64) (token *AccessToken, err error) {
@@ -149,10 +152,10 @@ func (s *accessTokenStoreImpl) FindByUID(ctx context.Context, uid int64) (token 
 		Limit(1).
 		Scan(ctx)
 	if err != nil {
-		return nil, err
+		return nil, errorx.HandleDBError(err, nil)
 	}
 	if len(tokens) == 0 {
-		return nil, errors.New("access token not found")
+		return nil, errorx.HandleDBError(sql.ErrNoRows, nil)
 	}
 	token = &tokens[0]
 	return
@@ -188,7 +191,7 @@ func (s *accessTokenStoreImpl) FindByToken(ctx context.Context, tokenValue, app 
 	}
 	err := q.Scan(ctx)
 	if err != nil {
-		return nil, err
+		return nil, errorx.HandleDBError(err, nil)
 	}
 	return &token, nil
 }
@@ -202,7 +205,7 @@ func (s *accessTokenStoreImpl) FindByTokenName(ctx context.Context, username, to
 		Where("access_token.name = ? and app = ? and is_active = true and username = ?", tokenName, app, username)
 	err := q.Scan(ctx)
 	if err != nil {
-		return nil, err
+		return nil, errorx.HandleDBError(err, nil)
 	}
 	return &token, nil
 }
@@ -220,7 +223,7 @@ func (s *accessTokenStoreImpl) FindByUser(ctx context.Context, username, app str
 	}
 	err := q.Scan(ctx)
 	if err != nil {
-		return nil, err
+		return nil, errorx.HandleDBError(err, nil)
 	}
 	return tokens, nil
 }
