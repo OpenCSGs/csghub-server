@@ -1,0 +1,13 @@
+groups:
+- name: cluster_alerts
+  rules:
+  - alert: ClusterHeartbeatMissing
+    # Assuming a heartbeat interval of 60 seconds, trigger an alarm if no heartbeat is received for more than 3 intervals (3 * 60s = 180s).
+    # Use: time() - last_heartbeat_timestamp > 180s
+    expr: time() - csghub_cluster_heartbeat_last_timestamp_seconds > 180
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Cluster {{ $labels.cluster_id }} heartbeat missing"
+      description: "Cluster {{ $labels.cluster_id }} (region: {{ $labels.region }}) has not sent a heartbeat for more than 3 minutes."
