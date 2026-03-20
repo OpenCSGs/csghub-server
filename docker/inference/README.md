@@ -13,7 +13,7 @@ echo "$OPENCSG_ACR_PASSWORD" | docker login $OPENCSG_ACR -u $OPENCSG_ACR_USERNAM
 export BUILDX_NO_DEFAULT_ATTESTATIONS=1
 
 # For vllm: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/vllm:v0.8.5
-export IMAGE_TAG=v0.12.0
+export IMAGE_TAG=v0.17.0
 docker buildx build --platform linux/amd64,linux/arm64 \
   -t ${OPENCSG_ACR}/opencsghq/vllm:${IMAGE_TAG} \
   -f Dockerfile.vllm \

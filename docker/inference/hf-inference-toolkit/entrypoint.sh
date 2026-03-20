@@ -16,4 +16,4 @@ if [[ ! -z "${HF_MODEL_DIR}" ]]; then
 fi
 
 # Start the server
-exec uvicorn webservice_starlette:app --host 0.0.0.0 --port ${PORT}
+exec uvicorn huggingface_inference_toolkit.webservice_starlette:app --host 0.0.0.0 --port ${PORT}

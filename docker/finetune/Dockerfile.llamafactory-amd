@@ -1,4 +1,4 @@
-FROM docker.m.daocloud.io/rocm/pytorch:rocm7.1_ubuntu22.04_py3.11_pytorch_release_2.9.1
+FROM rocm/pytorch:rocm7.1_ubuntu22.04_py3.11_pytorch_release_2.9.1
 
 # Set the working directory
 WORKDIR /app
@@ -40,6 +40,10 @@ RUN pip install pip packaging wheel setuptools Cython --no-cache-dir
 
 RUN git clone --depth 1 https://gitee.com/xzgan/LLaMA-Factory.git --branch v0.9.4   --single-branch /app && cd /app && \
     pip install --no-cache-dir -e ".[metrics,deepspeed]"
+
+RUN pip install --no-cache-dir --force-reinstall --no-deps \
+    torch torchvision torchaudio \
+    --index-url https://download.pytorch.org/whl/rocm7.1
 # Create a working directory
 WORKDIR /etc/csghub
 

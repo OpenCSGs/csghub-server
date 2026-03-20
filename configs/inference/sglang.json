@@ -66,6 +66,7 @@
         "Phi4FlashForCausalLM",
         "Qwen3NextForCausalLM",
         "Qwen3_5MoeForConditionalGeneration",
+        "Qwen3_5ForConditionalGeneration",
         "Sarashina2VisionForCausalLM",
         "SmolLM3ForCausalLM",
         "SolarForCausalLM",
