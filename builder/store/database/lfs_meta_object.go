@@ -21,6 +21,7 @@ type LfsMetaObjectStore interface {
 	BulkUpdateOrCreate(ctx context.Context, repoID int64, input []LfsMetaObject) error
 	UpdateXnetUsed(ctx context.Context, repoID int64, oid string, xnetUsed bool) error
 	CheckIfAllMigratedToXnet(ctx context.Context, repoID int64) (bool, error)
+	ExistsByOidExclRepo(ctx context.Context, oid string, repoID int64) (bool, error)
 }
 
 func NewLfsMetaObjectStore() LfsMetaObjectStore {
@@ -149,4 +150,15 @@ func (s *lfsMetaObjectStoreImpl) CheckIfAllMigratedToXnet(ctx context.Context, r
 		return false, err
 	}
 	return count == 0, nil
+}
+
+func (s *lfsMetaObjectStoreImpl) ExistsByOidExclRepo(ctx context.Context, oid string, repoID int64) (bool, error) {
+	exists, err := s.db.Operator.Core.NewSelect().
+		Model((*LfsMetaObject)(nil)).
+		Where("oid = ? AND repository_id != ?", oid, repoID).
+		Exists(ctx)
+	if err != nil {
+		return false, err
+	}
+	return exists, nil
 }

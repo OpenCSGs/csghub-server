@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"opencsg.com/csghub-server/builder/prometheus"
 	mockdb "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
@@ -22,6 +23,7 @@ func NewTestHeartBeatExecutor(config *config.Config, cs database.ClusterInfoStor
 }
 
 func TestWebHookExecutorHeartbeat_ProcessEvent(t *testing.T) {
+	prometheus.InitMetrics()
 	ctx := context.TODO()
 
 	cfg, err := config.LoadConfig()

@@ -12,6 +12,8 @@ import (
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 
+	corev1 "k8s.io/api/core/v1"
+
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -497,6 +499,29 @@ func TestDeploy(t *testing.T) {
 		SvcName:  "aaa",
 		ImageID:  "aaa",
 		Hardware: `{}`,
+		NodeAffinity: &corev1.NodeAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+				NodeSelectorTerms: []corev1.NodeSelectorTerm{
+					{
+						MatchExpressions: []corev1.NodeSelectorRequirement{
+							{
+								Key:      "foo",
+								Operator: corev1.NodeSelectorOpIn,
+								Values:   []string{"bar"},
+							},
+						},
+					},
+				},
+			},
+		},
+		Tolerations: []types.Toleration{
+			{
+				Key:      "foo",
+				Operator: "Equal",
+				Value:    "bar",
+				Effect:   "NoSchedule",
+			},
+		},
 	}
 
 	runTask := &database.DeployTask{
@@ -526,7 +551,12 @@ func TestDeploy(t *testing.T) {
 		Sdk:          "gradio",
 		RepositoryID: deploy.Repository.ID,
 	}, nil)
-	tester.mockImageRunner.EXPECT().Run(mock.Anything, mock.Anything).Return(&types.RunResponse{
+	tester.mockImageRunner.EXPECT().Run(mock.Anything, mock.MatchedBy(func(req *types.RunRequest) bool {
+		if req.DeployExtend.NodeAffinity == nil || len(req.DeployExtend.Tolerations) == 0 {
+			return false
+		}
+		return req.DeployExtend.Tolerations[0].Key == "foo"
+	})).Return(&types.RunResponse{
 		DeployID: 0,
 		Code:     0,
 		Message:  "",

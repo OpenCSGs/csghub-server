@@ -361,7 +361,7 @@ func TestUserComponent_ListServeless(t *testing.T) {
 	require.Equal(t, 100, total)
 	require.Equal(t, []types.DeployRepo{
 		{
-			Path: "models_foo/bar", Status: "Stopped", GitPath: "models_foo/bar", Hardware: `{"memory": "foo"}`,
+			Path: "models_foo/bar", Status: "Pending", GitPath: "models_foo/bar", Hardware: `{"memory": "foo"}`,
 			RepoID: 123, SvcName: "svc", ClusterID: "cluster", SKU: "sku",
 		},
 	}, data)

@@ -186,6 +186,64 @@ func (_c *MockLfsMetaObjectStore_Create_Call) RunAndReturn(run func(context.Cont
 	return _c
 }
 
+// ExistsByOidExclRepo provides a mock function with given fields: ctx, oid, repoID
+func (_m *MockLfsMetaObjectStore) ExistsByOidExclRepo(ctx context.Context, oid string, repoID int64) (bool, error) {
+	ret := _m.Called(ctx, oid, repoID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ExistsByOidExclRepo")
+	}
+
+	var r0 bool
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, int64) (bool, error)); ok {
+		return rf(ctx, oid, repoID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, int64) bool); ok {
+		r0 = rf(ctx, oid, repoID)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, int64) error); ok {
+		r1 = rf(ctx, oid, repoID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockLfsMetaObjectStore_ExistsByOidExclRepo_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ExistsByOidExclRepo'
+type MockLfsMetaObjectStore_ExistsByOidExclRepo_Call struct {
+	*mock.Call
+}
+
+// ExistsByOidExclRepo is a helper method to define mock.On call
+//   - ctx context.Context
+//   - oid string
+//   - repoID int64
+func (_e *MockLfsMetaObjectStore_Expecter) ExistsByOidExclRepo(ctx interface{}, oid interface{}, repoID interface{}) *MockLfsMetaObjectStore_ExistsByOidExclRepo_Call {
+	return &MockLfsMetaObjectStore_ExistsByOidExclRepo_Call{Call: _e.mock.On("ExistsByOidExclRepo", ctx, oid, repoID)}
+}
+
+func (_c *MockLfsMetaObjectStore_ExistsByOidExclRepo_Call) Run(run func(ctx context.Context, oid string, repoID int64)) *MockLfsMetaObjectStore_ExistsByOidExclRepo_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(int64))
+	})
+	return _c
+}
+
+func (_c *MockLfsMetaObjectStore_ExistsByOidExclRepo_Call) Return(_a0 bool, _a1 error) *MockLfsMetaObjectStore_ExistsByOidExclRepo_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockLfsMetaObjectStore_ExistsByOidExclRepo_Call) RunAndReturn(run func(context.Context, string, int64) (bool, error)) *MockLfsMetaObjectStore_ExistsByOidExclRepo_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // FindByOID provides a mock function with given fields: ctx, RepoId, Oid
 func (_m *MockLfsMetaObjectStore) FindByOID(ctx context.Context, RepoId int64, Oid string) (*database.LfsMetaObject, error) {
 	ret := _m.Called(ctx, RepoId, Oid)

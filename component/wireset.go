@@ -44,6 +44,7 @@ type mockedComponents struct {
 	space               *mock_component.MockSpaceComponent
 	runtimeArchitecture *mock_component.MockRuntimeArchitectureComponent
 	sensitive           *mock_component.MockSensitiveComponent
+	cluster             *mock_component.MockClusterComponent
 }
 
 var MockedStoreSet = wire.NewSet(
@@ -69,6 +70,8 @@ var MockedComponentSet = wire.NewSet(
 	wire.Bind(new(SpaceTemplateComponent), new(*mock_component.MockSpaceTemplateComponent)),
 	mock_component.NewMockMCPServerComponent,
 	wire.Bind(new(MCPServerComponent), new(*mock_component.MockMCPServerComponent)),
+	mock_component.NewMockClusterComponent,
+	wire.Bind(new(ClusterComponent), new(*mock_component.MockClusterComponent)),
 )
 
 var MockedGitServerSet = wire.NewSet(
@@ -226,6 +229,7 @@ func NewTestModelComponent(
 	runtimeArchComponent RuntimeArchitectureComponent,
 	gitServer gitserver.GitServer,
 	userSvcClient rpc.UserSvcClient,
+	clusterComponent ClusterComponent,
 ) *modelComponentImpl {
 	config.APIServer.PublicDomain = "https://foo.com"
 	config.APIServer.SSHDomain = "ssh://test@127.0.0.1"
@@ -252,6 +256,7 @@ func NewTestModelComponent(
 		runtimeArchitecturesStore: stores.RuntimeArch,
 		mirrorStore:               stores.Mirror,
 		lfsMetaObjectStore:        stores.LfsMetaObject,
+		clusterComponent:          clusterComponent,
 	}
 }
 

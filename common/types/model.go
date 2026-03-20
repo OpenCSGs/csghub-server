@@ -2,6 +2,8 @@ package types
 
 import (
 	"time"
+
+	corev1 "k8s.io/api/core/v1"
 )
 
 const LFSPrefix = "version https://git-lfs.github.com/spec/v1"
@@ -274,6 +276,8 @@ type ModelRunReq struct {
 	Entrypoint         string `json:"entrypoint"` // model file name for gguf model
 	EngineArgs         string `json:"engine_args"`
 	Agent              string `json:"agent"`
+	// OwnerNamespace is optional. If set, the inference is created under this namespace (user or org) for billing and listing; path {namespace} remains the model's owner.
+	OwnerNamespace string `json:"owner_namespace,omitempty"`
 }
 
 var _ SensitiveRequestV2 = (*ModelRunReq)(nil)
@@ -298,6 +302,8 @@ type InstanceRunReq struct {
 	Revision           string `json:"revision"`
 	OrderDetailID      int64  `json:"order_detail_id"`
 	EngineArgs         string `json:"engine_args"`
+	// OwnerNamespace is optional. If set, the finetune is created under this namespace (user or org); path {namespace} remains the model's owner.
+	OwnerNamespace string `json:"owner_namespace,omitempty"`
 }
 
 var _ SensitiveRequestV2 = (*InstanceRunReq)(nil)
@@ -315,14 +321,16 @@ func (c *InstanceRunReq) GetSensitiveFields() []SensitiveField {
 }
 
 type ModelUpdateRequest struct {
-	MinReplica int               `json:"min_replica"` // min replica of instance/pod
-	MaxReplica int               `json:"max_replica"` // max replica of instance/pod
-	Hardware   HardWare          `json:"hardware"`    // resource requirements
-	ImageID    string            `json:"image_id" binding:"required"`
-	Env        map[string]string `json:"env"` // runtime env variables
-	ClusterID  string            `json:"cluster_id"`
-	SvcName    string            `json:"svc_name"`
-	Nodes      []Node            `json:"nodes"`
+	MinReplica   int                  `json:"min_replica"` // min replica of instance/pod
+	MaxReplica   int                  `json:"max_replica"` // max replica of instance/pod
+	Hardware     HardWare             `json:"hardware"`    // resource requirements
+	ImageID      string               `json:"image_id" binding:"required"`
+	Env          map[string]string    `json:"env"` // runtime env variables
+	ClusterID    string               `json:"cluster_id"`
+	SvcName      string               `json:"svc_name"`
+	Nodes        []Node               `json:"nodes"`
+	NodeAffinity *corev1.NodeAffinity `json:"node_affinity,omitempty"`
+	Tolerations  []Toleration         `json:"tolerations,omitempty"`
 }
 
 type ModelUpdateResponse struct {
@@ -374,6 +382,7 @@ type DeployUpdateReq struct {
 	Entrypoint         *string `json:"entrypoint"`
 	Variables          *string `json:"variables"`
 	EngineArgs         *string `json:"engine_args"`
+	DeployExtend
 }
 
 type RelationModels struct {

@@ -496,6 +496,57 @@ func (_c *MockClient_RemoveObject_Call) RunAndReturn(run func(context.Context, s
 	return _c
 }
 
+// RemoveObjects provides a mock function with given fields: ctx, bucketName, objectsCh, opts
+func (_m *MockClient) RemoveObjects(ctx context.Context, bucketName string, objectsCh <-chan minio.ObjectInfo, opts minio.RemoveObjectsOptions) <-chan minio.RemoveObjectError {
+	ret := _m.Called(ctx, bucketName, objectsCh, opts)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RemoveObjects")
+	}
+
+	var r0 <-chan minio.RemoveObjectError
+	if rf, ok := ret.Get(0).(func(context.Context, string, <-chan minio.ObjectInfo, minio.RemoveObjectsOptions) <-chan minio.RemoveObjectError); ok {
+		r0 = rf(ctx, bucketName, objectsCh, opts)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(<-chan minio.RemoveObjectError)
+		}
+	}
+
+	return r0
+}
+
+// MockClient_RemoveObjects_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RemoveObjects'
+type MockClient_RemoveObjects_Call struct {
+	*mock.Call
+}
+
+// RemoveObjects is a helper method to define mock.On call
+//   - ctx context.Context
+//   - bucketName string
+//   - objectsCh <-chan minio.ObjectInfo
+//   - opts minio.RemoveObjectsOptions
+func (_e *MockClient_Expecter) RemoveObjects(ctx interface{}, bucketName interface{}, objectsCh interface{}, opts interface{}) *MockClient_RemoveObjects_Call {
+	return &MockClient_RemoveObjects_Call{Call: _e.mock.On("RemoveObjects", ctx, bucketName, objectsCh, opts)}
+}
+
+func (_c *MockClient_RemoveObjects_Call) Run(run func(ctx context.Context, bucketName string, objectsCh <-chan minio.ObjectInfo, opts minio.RemoveObjectsOptions)) *MockClient_RemoveObjects_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(<-chan minio.ObjectInfo), args[3].(minio.RemoveObjectsOptions))
+	})
+	return _c
+}
+
+func (_c *MockClient_RemoveObjects_Call) Return(_a0 <-chan minio.RemoveObjectError) *MockClient_RemoveObjects_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockClient_RemoveObjects_Call) RunAndReturn(run func(context.Context, string, <-chan minio.ObjectInfo, minio.RemoveObjectsOptions) <-chan minio.RemoveObjectError) *MockClient_RemoveObjects_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // StatObject provides a mock function with given fields: ctx, bucketName, objectName, opts
 func (_m *MockClient) StatObject(ctx context.Context, bucketName string, objectName string, opts minio.StatObjectOptions) (minio.ObjectInfo, error) {
 	ret := _m.Called(ctx, bucketName, objectName, opts)

@@ -1,6 +1,10 @@
 package types
 
-import "time"
+import (
+	"time"
+
+	corev1 "k8s.io/api/core/v1"
+)
 
 type ClusterRequest struct {
 	ClusterID     string `json:"cluster_id"`
@@ -233,7 +237,26 @@ type NodeLabel struct {
 
 type SetNodeAccessModeReq struct {
 	NodeID    int64  `json:"-"`
-	UserName  string `json:"user_name"`
-	OrgName   string `json:"org_name"`
+	Namespace string `json:"-"`
 	Exclusive bool   `json:"exclusive"`
+}
+
+type CheckExclusiveReq struct {
+	ClusterID string
+	Namespace string
+	Hardware  HardWare
+}
+
+type CheckExclusiveResp struct {
+	NodeAffinity  *corev1.NodeAffinity
+	Tolerations   []Toleration
+	UsedExclusive bool
+}
+
+type ExclusiveOwner struct {
+	Namespace string `json:"namespace"`
+	Type      string `json:"type"`
+	UserID    int64  `json:"user_id"`
+	UserName  string `json:"user_name"`
+	UpdatedAt int64  `json:"updated_at"`
 }

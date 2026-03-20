@@ -182,3 +182,51 @@ func TestLfsMetaStore_CheckIfAllMigratedToXnet(t *testing.T) {
 	require.Nil(t, err)
 	require.True(t, allMigrated, "Should return true when all objects are migrated")
 }
+
+func TestLfsMetaStore_ExistsByOidExclRepo(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewLfsMetaObjectStoreWithDB(db)
+
+	oid := "test-oid-exists"
+	repo1 := int64(1001)
+	repo2 := int64(1002)
+
+	// Test with no objects
+	exists, err := store.ExistsByOidExclRepo(ctx, oid, repo1)
+	require.Nil(t, err)
+	require.False(t, exists)
+
+	// Create object in repo1
+	_, err = store.Create(ctx, database.LfsMetaObject{
+		RepositoryID: repo1,
+		Oid:          oid,
+		Size:         1024,
+	})
+	require.Nil(t, err)
+
+	// Should be false because we exclude repo1
+	exists, err = store.ExistsByOidExclRepo(ctx, oid, repo1)
+	require.Nil(t, err)
+	require.False(t, exists)
+
+	// Should be true because we exclude repo2, and repo1 has the oid
+	exists, err = store.ExistsByOidExclRepo(ctx, oid, repo2)
+	require.Nil(t, err)
+	require.True(t, exists)
+
+	// Create object in repo2 as well
+	_, err = store.Create(ctx, database.LfsMetaObject{
+		RepositoryID: repo2,
+		Oid:          oid,
+		Size:         1024,
+	})
+	require.Nil(t, err)
+
+	// Now it should be true for both
+	exists, err = store.ExistsByOidExclRepo(ctx, oid, repo1)
+	require.Nil(t, err)
+	require.True(t, exists)
+}

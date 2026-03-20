@@ -64,6 +64,14 @@ type (
 		TaskId           int64      `json:"task_id"`
 		Nodes            []Node     `json:"nodes"`
 		Scheduler        *Scheduler `json:"scheduler,omitempty"`
+		DeployExtend
+	}
+
+	Toleration struct {
+		Key      string `json:"key"`
+		Operator string `json:"operator"`
+		Value    string `json:"value"`
+		Effect   string `json:"effect"`
 	}
 
 	Node struct {
@@ -228,6 +236,7 @@ type (
 
 		StrategyType string     `json:"strategy_type"` // blue_green/canary
 		Scheduler    *Scheduler `json:"scheduler,omitempty"`
+		DeployExtend
 	}
 
 	Scheduler struct {

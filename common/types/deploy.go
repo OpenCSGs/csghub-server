@@ -1,6 +1,7 @@
 package types
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	"time"
 )
 
@@ -53,6 +54,13 @@ type ClusterDeployReq struct {
 	Search       string `json:"search"`
 	Per          int    `json:"per"`
 	Page         int    `json:"page"`
+}
+
+// DeployExtend Use common fields for storage deployment to simplify the process of adding a large number
+// of repetitive fields to the request structure for each different scenario.
+type DeployExtend struct {
+	NodeAffinity *corev1.NodeAffinity `json:"node_affinity,omitempty"`
+	Tolerations  []Toleration         `json:"tolerations,omitempty"`
 }
 
 type DeployTimeRangeReq struct {

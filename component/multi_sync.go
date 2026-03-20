@@ -339,6 +339,7 @@ func (c *multiSyncComponentImpl) createLocalDataset(ctx context.Context, m *type
 		MSPath:  m.MultiSource.MSPath,
 		HFPath:  m.MultiSource.HFPath,
 		CSGPath: m.MultiSource.CSGPath,
+		Hashed:  true,
 	}
 	newDBRepo, err := c.repoStore.UpdateOrCreateRepo(ctx, dbRepo)
 	if err != nil {
@@ -478,6 +479,7 @@ func (c *multiSyncComponentImpl) createLocalModel(ctx context.Context, m *types.
 		MSPath:  m.MultiSource.MSPath,
 		HFPath:  m.MultiSource.HFPath,
 		CSGPath: m.MultiSource.CSGPath,
+		Hashed:  true,
 	}
 	newDBRepo, err := c.repoStore.UpdateOrCreateRepo(ctx, dbRepo)
 	if err != nil {
@@ -617,6 +619,7 @@ func (c *multiSyncComponentImpl) createLocalCode(ctx context.Context, m *types.C
 		MSPath:  m.MultiSource.MSPath,
 		HFPath:  m.MultiSource.HFPath,
 		CSGPath: m.MultiSource.CSGPath,
+		Hashed:  true,
 	}
 	newDBRepo, err := c.repoStore.UpdateOrCreateRepo(ctx, dbRepo)
 	if err != nil {
@@ -754,6 +757,7 @@ func (c *multiSyncComponentImpl) createLocalPrompt(ctx context.Context, m *types
 		MSPath:  m.MultiSource.MSPath,
 		HFPath:  m.MultiSource.HFPath,
 		CSGPath: m.MultiSource.CSGPath,
+		Hashed:  true,
 	}
 	newDBRepo, err := c.repoStore.UpdateOrCreateRepo(ctx, dbRepo)
 	if err != nil {
@@ -891,6 +895,7 @@ func (c *multiSyncComponentImpl) createLocalMCPServer(ctx context.Context, m *ty
 		MSPath:  m.MultiSource.MSPath,
 		HFPath:  m.MultiSource.HFPath,
 		CSGPath: m.MultiSource.CSGPath,
+		Hashed:  true,
 	}
 	newDBRepo, err := c.repoStore.UpdateOrCreateRepo(ctx, dbRepo)
 	if err != nil {
@@ -1036,6 +1041,7 @@ func (c *multiSyncComponentImpl) createLocalSkill(ctx context.Context, m *types.
 		MSPath:  m.MultiSource.MSPath,
 		HFPath:  m.MultiSource.HFPath,
 		CSGPath: m.MultiSource.CSGPath,
+		Hashed:  true,
 	}
 	newDBRepo, err := c.repoStore.UpdateOrCreateRepo(ctx, dbRepo)
 	if err != nil {

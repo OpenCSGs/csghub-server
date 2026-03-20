@@ -222,10 +222,13 @@ type DeployRepo struct {
 	Reason              string     `json:"reason,omitempty"`
 	Message             string     `json:"message,omitempty"`
 	SupportFunctionCall bool       `json:"support_function_call,omitempty"`
+	OwnerNamespace      string     `json:"owner_namespace,omitempty"`
 
 	Since    string `json:"since,omitempty"`
 	CommitID string `json:"commit_id,omitempty"`
 	Instance string `json:"instance,omitempty"`
+
+	DeployExtend
 }
 
 type RuntimeFrameworkReq struct {

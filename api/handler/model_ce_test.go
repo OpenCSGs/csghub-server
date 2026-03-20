@@ -3,6 +3,7 @@
 package handler
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"testing"
@@ -33,7 +34,6 @@ func NewModelTester(t *testing.T) *ModelTester {
 	tester.mocks.model = mockcomponent.NewMockModelComponent(t)
 	tester.mocks.sensitive = mockcomponent.NewMockSensitiveComponent(t)
 	tester.mocks.repo = mockcomponent.NewMockRepoComponent(t)
-
 	tester.handler = &ModelHandler{
 		model: tester.mocks.model, sensitive: tester.mocks.sensitive,
 		repo: tester.mocks.repo,
@@ -280,6 +280,7 @@ func TestModelHandler_DeployDedicated(t *testing.T) {
 
 		tester.ResponseEq(t, 200, tester.OKText, types.DeployRepo{DeployID: 123})
 	})
+
 	t.Run("error_badrequest", func(t *testing.T) {
 		tester := NewModelTester(t).WithHandleFunc(func(h *ModelHandler) gin.HandlerFunc {
 			return h.DeployDedicated
@@ -354,6 +355,54 @@ func TestModelHandler_DeployDedicated(t *testing.T) {
 			Msg:  errorx.ErrInternalServerError.Error() + ": invalid character 's' looking for beginning of value",
 		})
 	})
+	t.Run("success_with_owner_namespace", func(t *testing.T) {
+		tester := NewModelTester(t).WithHandleFunc(func(h *ModelHandler) gin.HandlerFunc {
+			return h.DeployDedicated
+		})
+		tester.WithUser()
+
+		tester.mocks.repo.EXPECT().IsSyncing(tester.Ctx(), types.ModelRepo, "u", "r").Return(false, nil)
+		tester.mocks.repo.EXPECT().AllowReadAccess(tester.Ctx(), types.ModelRepo, "u", "r", "u").Return(true, nil)
+		tester.mocks.repo.EXPECT().CheckCurrentUserPermission(tester.Ctx(), "u", "org1", mock.Anything).Return(true, nil)
+		tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), &types.ModelRunReq{
+			DeployName:     "test",
+			MinReplica:     1,
+			MaxReplica:     2,
+			Revision:       "main",
+			OwnerNamespace: "org1",
+		}).Return(true, nil)
+		tester.mocks.model.EXPECT().Deploy(tester.Ctx(), types.DeployActReq{
+			Namespace:   "u",
+			Name:        "r",
+			CurrentUser: "u",
+			DeployType:  types.InferenceType,
+		}, types.ModelRunReq{DeployName: "test", MinReplica: 1, MaxReplica: 2, Revision: "main", OwnerNamespace: "org1"}).Return(int64(123), nil)
+
+		tester.WithBody(t, &types.ModelRunReq{DeployName: "test", MinReplica: 1, MaxReplica: 2, Revision: "main", OwnerNamespace: "org1"}).Execute()
+		tester.ResponseEq(t, 200, tester.OKText, types.DeployRepo{DeployID: 123})
+	})
+	t.Run("owner_namespace_permission_error", func(t *testing.T) {
+		tester := NewModelTester(t).WithHandleFunc(func(h *ModelHandler) gin.HandlerFunc {
+			return h.DeployDedicated
+		})
+		tester.WithUser()
+		tester.mocks.repo.EXPECT().IsSyncing(tester.Ctx(), types.ModelRepo, "u", "r").Return(false, nil)
+		tester.mocks.repo.EXPECT().AllowReadAccess(tester.Ctx(), types.ModelRepo, "u", "r", "u").Return(true, nil)
+		tester.mocks.repo.EXPECT().CheckCurrentUserPermission(tester.Ctx(), "u", "org1", mock.Anything).Return(false, errors.New("rpc error"))
+		tester.WithBody(t, &types.ModelRunReq{DeployName: "test", MinReplica: 1, MaxReplica: 2, Revision: "main", OwnerNamespace: "org1"}).Execute()
+		tester.ResponseEqCode(t, http.StatusInternalServerError)
+	})
+	t.Run("owner_namespace_forbidden", func(t *testing.T) {
+		tester := NewModelTester(t).WithHandleFunc(func(h *ModelHandler) gin.HandlerFunc {
+			return h.DeployDedicated
+		})
+		tester.WithUser()
+		tester.mocks.repo.EXPECT().IsSyncing(tester.Ctx(), types.ModelRepo, "u", "r").Return(false, nil)
+		tester.mocks.repo.EXPECT().AllowReadAccess(tester.Ctx(), types.ModelRepo, "u", "r", "u").Return(true, nil)
+		tester.mocks.repo.EXPECT().CheckCurrentUserPermission(tester.Ctx(), "u", "org1", mock.Anything).Return(false, nil)
+		tester.WithBody(t, &types.ModelRunReq{DeployName: "test", MinReplica: 1, MaxReplica: 2, Revision: "main", OwnerNamespace: "org1"}).Execute()
+		tester.ResponseEqCode(t, http.StatusForbidden)
+	})
 }
 
 func TestModelHandler_FinetuneCreate(t *testing.T) {
@@ -395,7 +444,47 @@ func TestModelHandler_FinetuneCreate(t *testing.T) {
 			Context: errorx.Ctx().Set("detail", "Length must be between 2 and 64 characters.").Set("name", ""),
 		})
 	})
+	t.Run("success_with_owner_namespace", func(t *testing.T) {
+		tester := NewModelTester(t).WithHandleFunc(func(h *ModelHandler) gin.HandlerFunc {
+			return h.FinetuneCreate
+		})
+		tester.WithUser()
 
+		tester.mocks.repo.EXPECT().IsSyncing(tester.Ctx(), types.ModelRepo, "u", "r").Return(false, nil)
+		tester.mocks.repo.EXPECT().AllowReadAccess(tester.Ctx(), types.ModelRepo, "u", "r", "u").Return(true, nil)
+		tester.mocks.repo.EXPECT().CheckCurrentUserPermission(tester.Ctx(), "u", "org1", mock.Anything).Return(true, nil)
+		tester.mocks.model.EXPECT().Deploy(tester.Ctx(), types.DeployActReq{
+			Namespace:   "u",
+			Name:        "r",
+			CurrentUser: "u",
+			DeployType:  types.FinetuneType,
+		}, types.ModelRunReq{DeployName: "test", MinReplica: 1, MaxReplica: 1, Revision: "main", SecureLevel: 2, OwnerNamespace: "org1"}).Return(int64(123), nil)
+
+		tester.WithBody(t, &types.InstanceRunReq{DeployName: "test", Revision: "main", OwnerNamespace: "org1"}).Execute()
+		tester.ResponseEq(t, 200, tester.OKText, types.DeployRepo{DeployID: 123})
+	})
+	t.Run("owner_namespace_permission_error", func(t *testing.T) {
+		tester := NewModelTester(t).WithHandleFunc(func(h *ModelHandler) gin.HandlerFunc {
+			return h.FinetuneCreate
+		})
+		tester.WithUser()
+		tester.mocks.repo.EXPECT().IsSyncing(tester.Ctx(), types.ModelRepo, "u", "r").Return(false, nil)
+		tester.mocks.repo.EXPECT().AllowReadAccess(tester.Ctx(), types.ModelRepo, "u", "r", "u").Return(true, nil)
+		tester.mocks.repo.EXPECT().CheckCurrentUserPermission(tester.Ctx(), "u", "org1", mock.Anything).Return(false, errors.New("rpc error"))
+		tester.WithBody(t, &types.InstanceRunReq{DeployName: "test", Revision: "main", OwnerNamespace: "org1"}).Execute()
+		tester.ResponseEqCode(t, http.StatusInternalServerError)
+	})
+	t.Run("owner_namespace_forbidden", func(t *testing.T) {
+		tester := NewModelTester(t).WithHandleFunc(func(h *ModelHandler) gin.HandlerFunc {
+			return h.FinetuneCreate
+		})
+		tester.WithUser()
+		tester.mocks.repo.EXPECT().IsSyncing(tester.Ctx(), types.ModelRepo, "u", "r").Return(false, nil)
+		tester.mocks.repo.EXPECT().AllowReadAccess(tester.Ctx(), types.ModelRepo, "u", "r", "u").Return(true, nil)
+		tester.mocks.repo.EXPECT().CheckCurrentUserPermission(tester.Ctx(), "u", "org1", mock.Anything).Return(false, nil)
+		tester.WithBody(t, &types.InstanceRunReq{DeployName: "test", Revision: "main", OwnerNamespace: "org1"}).Execute()
+		tester.ResponseEqCode(t, http.StatusForbidden)
+	})
 }
 
 func TestModelHandler_DeployDelete(t *testing.T) {

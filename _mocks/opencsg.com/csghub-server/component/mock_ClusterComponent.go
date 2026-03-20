@@ -24,6 +24,65 @@ func (_m *MockClusterComponent) EXPECT() *MockClusterComponent_Expecter {
 	return &MockClusterComponent_Expecter{mock: &_m.Mock}
 }
 
+// CheckExclusiveResource provides a mock function with given fields: ctx, req
+func (_m *MockClusterComponent) CheckExclusiveResource(ctx context.Context, req types.CheckExclusiveReq) (*types.CheckExclusiveResp, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CheckExclusiveResource")
+	}
+
+	var r0 *types.CheckExclusiveResp
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.CheckExclusiveReq) (*types.CheckExclusiveResp, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.CheckExclusiveReq) *types.CheckExclusiveResp); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.CheckExclusiveResp)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.CheckExclusiveReq) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClusterComponent_CheckExclusiveResource_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CheckExclusiveResource'
+type MockClusterComponent_CheckExclusiveResource_Call struct {
+	*mock.Call
+}
+
+// CheckExclusiveResource is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.CheckExclusiveReq
+func (_e *MockClusterComponent_Expecter) CheckExclusiveResource(ctx interface{}, req interface{}) *MockClusterComponent_CheckExclusiveResource_Call {
+	return &MockClusterComponent_CheckExclusiveResource_Call{Call: _e.mock.On("CheckExclusiveResource", ctx, req)}
+}
+
+func (_c *MockClusterComponent_CheckExclusiveResource_Call) Run(run func(ctx context.Context, req types.CheckExclusiveReq)) *MockClusterComponent_CheckExclusiveResource_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.CheckExclusiveReq))
+	})
+	return _c
+}
+
+func (_c *MockClusterComponent_CheckExclusiveResource_Call) Return(_a0 *types.CheckExclusiveResp, _a1 error) *MockClusterComponent_CheckExclusiveResource_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClusterComponent_CheckExclusiveResource_Call) RunAndReturn(run func(context.Context, types.CheckExclusiveReq) (*types.CheckExclusiveResp, error)) *MockClusterComponent_CheckExclusiveResource_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetClusterByID provides a mock function with given fields: ctx, clusterId
 func (_m *MockClusterComponent) GetClusterByID(ctx context.Context, clusterId string) (*database.ClusterInfo, error) {
 	ret := _m.Called(ctx, clusterId)

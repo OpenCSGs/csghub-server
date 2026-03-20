@@ -45,6 +45,7 @@ const (
 
 type EvaluationReq struct {
 	Username           string   `json:"-"`
+	OwnerNamespace     string   `json:"owner_namespace,omitempty"`
 	TaskName           string   `json:"task_name"`
 	TaskDesc           string   `json:"task_desc"`
 	RuntimeFrameworkId int64    `json:"runtime_framework_id"` // ArgoWorkFlow framework
@@ -67,6 +68,7 @@ type EvaluationReq struct {
 	DatasetRevisions   []string `json:"-"`
 	UseCustomDataset   bool     `json:"-"`
 	Nodes              []Node   `json:"-"`
+	DeployExtend
 }
 
 type CustomData struct {
@@ -104,6 +106,8 @@ type ArgoWorkFlowReq struct {
 	FinetunedModelName string             `json:"finetuned_model_name,omitempty"`
 	Nodes              []Node             `json:"nodes"`
 	Scheduler          *Scheduler         `json:"scheduler,omitempty"`
+
+	DeployExtend
 }
 
 type ArgoWorkFlowListRes struct {

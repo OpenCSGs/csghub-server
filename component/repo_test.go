@@ -179,6 +179,7 @@ func TestRepoComponent_DeleteRepo(t *testing.T) {
 	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(dbuser, nil)
 	repo.mocks.stores.RepoMock().EXPECT().CleanRelationsByRepoID(ctx, dbrepo.ID).Return(nil)
 	repo.mocks.stores.MirrorMock().EXPECT().FindByRepoID(ctx, dbrepo.ID).Return(nil, nil)
+	repo.mocks.stores.LfsMetaObjectMock().EXPECT().FindByRepoID(ctx, dbrepo.ID).Return([]database.LfsMetaObject{}, nil)
 
 	repo.mocks.gitServer.EXPECT().DeleteRepo(ctx, "models_ns/n.git").Return(nil)
 
@@ -1331,7 +1332,7 @@ func TestRepoComponent_ListDeploy(t *testing.T) {
 		DeployName: "foo",
 		RepoID:     123,
 		GitBranch:  "main",
-		Status:     "Stopped",
+		Status:     "Pending",
 	}, ds[0])
 }
 

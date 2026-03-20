@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	corev1 "k8s.io/api/core/v1"
 	"log/slog"
 	"strings"
 	"time"
@@ -51,19 +52,21 @@ type Deploy struct {
 	// 1-public, 2-private, 3-extension in future
 	SecureLevel int `json:"secure_level"`
 	// 0-space, 1-inference, 2-finetune, 3-serverless, 4-evaluation, 5-notebook
-	Type           int                `json:"type"`
-	Task           types.PipelineTask `bun:",nullzero" json:"task"` //text-generation,text-to-image,text-to-speech
-	UserUUID       string             `bun:"," json:"user_uuid"`
-	SKU            string             `bun:"," json:"sku"`
-	OrderDetailID  int64              `bun:"," json:"order_detail_id"`
-	EngineArgs     string             `bun:"," json:"engine_args"`
-	Variables      string             `bun:",nullzero" json:"variables"`
-	Message        string             `bun:",nullzero" json:"message"`
-	Reason         string             `bun:",nullzero" json:"reason"`
-	ClusterNode    string             `bun:"," json:"cluster_node"`
-	QueueName      string             `bun:"," json:"queue_name"`
-	OwnerNamespace string             `bun:"," json:"owner_namespace"`
+	Type           int                  `json:"type"`
+	Task           types.PipelineTask   `bun:",nullzero" json:"task"` //text-generation,text-to-image,text-to-speech
+	UserUUID       string               `bun:"," json:"user_uuid"`
+	SKU            string               `bun:"," json:"sku"`
+	OrderDetailID  int64                `bun:"," json:"order_detail_id"`
+	EngineArgs     string               `bun:"," json:"engine_args"`
+	Variables      string               `bun:",nullzero" json:"variables"`
+	Message        string               `bun:",nullzero" json:"message"`
+	Reason         string               `bun:",nullzero" json:"reason"`
+	ClusterNode    string               `bun:"," json:"cluster_node"`
+	QueueName      string               `bun:"," json:"queue_name"`
+	OwnerNamespace string               `bun:"," json:"owner_namespace"`
 	Instances      []types.Instance   `bun:"type:jsonb" json:"instances"`
+	NodeAffinity   *corev1.NodeAffinity `json:"node_affinity,omitempty"`
+	Tolerations    []types.Toleration   `json:"tolerations,omitempty"`
 	times
 }
 

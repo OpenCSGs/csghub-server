@@ -7,8 +7,11 @@ import (
 
 	"github.com/stretchr/testify/require"
 	deployer "opencsg.com/csghub-server/builder/deploy"
+	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/types"
+
+	corev1 "k8s.io/api/core/v1"
 )
 
 // --- Test ---
@@ -17,10 +20,35 @@ func TestNotebookComponentImpl_CreateNotebook(t *testing.T) {
 	ctx := context.TODO()
 	nc := initializeTestNotebookComponent(ctx, t)
 	username := "testuser"
-	nc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, username).Return(database.User{ID: 1, Username: username}, nil)
+	nc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, username).Return(database.User{ID: 1, Username: username, RoleMask: "admin"}, nil)
 	nc.mocks.stores.RuntimeFrameworkMock().EXPECT().FindEnabledByID(ctx, int64(1)).Return(&database.RuntimeFramework{ID: 1, FrameName: "rf1", FrameImage: "abc/notebook:latest"}, nil)
 	nc.mocks.stores.SpaceResourceMock().EXPECT().FindByID(ctx, int64(1)).Return(&database.SpaceResource{ID: 1, ClusterID: "1", Name: "sr1", Resources: `{"memory": "foo"}`}, nil)
-	nc.mocks.components.repo.EXPECT().CheckAccountAndResource(ctx, username, "1", int64(0), &database.SpaceResource{ID: 1, ClusterID: "1", Name: "sr1", Resources: `{"memory": "foo"}`}).Return(nil)
+	nc.mocks.components.repo.EXPECT().CheckAccountAndResource(ctx, username, "1", int64(0), &database.SpaceResource{ID: 1, ClusterID: "1", Name: "sr1", Resources: `{"memory": "foo"}`}).Return(&types.CheckExclusiveResp{
+		NodeAffinity: &corev1.NodeAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+				NodeSelectorTerms: []corev1.NodeSelectorTerm{
+					{
+						MatchExpressions: []corev1.NodeSelectorRequirement{
+							{
+								Key:      "foo",
+								Operator: corev1.NodeSelectorOpIn,
+								Values:   []string{"bar"},
+							},
+						},
+					},
+				},
+			},
+		},
+		Tolerations: []types.Toleration{
+			{
+				Key:      "foo",
+				Operator: "Equal",
+				Value:    "bar",
+				Effect:   "NoSchedule",
+			},
+		},
+	}, nil)
+
 	nc.mocks.deployer.EXPECT().Deploy(ctx, types.DeployRepo{
 		DeployName:       "notebook-deploy",
 		Hardware:         "{\"memory\": \"foo\"}",
@@ -34,6 +62,32 @@ func TestNotebookComponentImpl_CreateNotebook(t *testing.T) {
 		MinReplica:       0,
 		MaxReplica:       1,
 		SecureLevel:      2,
+		OwnerNamespace:   username,
+		DeployExtend: types.DeployExtend{
+			NodeAffinity: &corev1.NodeAffinity{
+				RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+					NodeSelectorTerms: []corev1.NodeSelectorTerm{
+						{
+							MatchExpressions: []corev1.NodeSelectorRequirement{
+								{
+									Key:      "foo",
+									Operator: corev1.NodeSelectorOpIn,
+									Values:   []string{"bar"},
+								},
+							},
+						},
+					},
+				},
+			},
+			Tolerations: []types.Toleration{
+				{
+					Key:      "foo",
+					Operator: "Equal",
+					Value:    "bar",
+					Effect:   "NoSchedule",
+				},
+			},
+		},
 	}).Return(int64(123), nil)
 
 	res, err := nc.CreateNotebook(ctx, &types.CreateNotebookReq{
@@ -44,6 +98,39 @@ func TestNotebookComponentImpl_CreateNotebook(t *testing.T) {
 	})
 	require.Nil(t, err)
 	require.Equal(t, int64(123), res.ID)
+}
+
+func TestNotebookComponentImpl_CreateNotebook_NonAdminOwnerNamespace(t *testing.T) {
+	ctx := context.TODO()
+
+	t.Run("owner_namespace_permission_error", func(t *testing.T) {
+		nc := initializeTestNotebookComponent(ctx, t)
+		nc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "testuser").Return(database.User{ID: 1, Username: "testuser", RoleMask: ""}, nil)
+		nc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "testuser", "org1", membership.RoleWrite).Return(false, errors.New("rpc error"))
+		_, err := nc.CreateNotebook(ctx, &types.CreateNotebookReq{
+			CurrentUser:        "testuser",
+			OwnerNamespace:     "org1",
+			DeployName:         "nb",
+			ResourceID:         1,
+			RuntimeFrameworkID: 1,
+		})
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "failed to check namespace permission")
+	})
+	t.Run("owner_namespace_forbidden", func(t *testing.T) {
+		nc := initializeTestNotebookComponent(ctx, t)
+		nc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "testuser").Return(database.User{ID: 1, Username: "testuser", RoleMask: ""}, nil)
+		nc.mocks.components.repo.EXPECT().CheckCurrentUserPermission(ctx, "testuser", "org1", membership.RoleWrite).Return(false, nil)
+		_, err := nc.CreateNotebook(ctx, &types.CreateNotebookReq{
+			CurrentUser:        "testuser",
+			OwnerNamespace:     "org1",
+			DeployName:         "nb",
+			ResourceID:         1,
+			RuntimeFrameworkID: 1,
+		})
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "do not have permission to create notebook in this namespace")
+	})
 }
 
 func TestNotebookComponentImpl_GetNotebookByID(t *testing.T) {
@@ -212,6 +299,7 @@ func TestNotebookComponentImpl_UpdateNotebook_Success(t *testing.T) {
 	ctx := context.TODO()
 	nc := initializeTestNotebookComponent(ctx, t)
 	user := &database.User{ID: 1, Username: "testuser"}
+	ResourceID := int64(2)
 	deploy := &database.Deploy{
 		ID:            20,
 		SvcName:       "notebook-svc",
@@ -219,7 +307,7 @@ func TestNotebookComponentImpl_UpdateNotebook_Success(t *testing.T) {
 		OrderDetailID: 0,
 	}
 	resource := &database.SpaceResource{
-		ID:        2,
+		ID:        ResourceID,
 		ClusterID: "1",
 		Resources: `{"memory": "2Gi", "replicas": 1}`,
 	}
@@ -240,24 +328,73 @@ func TestNotebookComponentImpl_UpdateNotebook_Success(t *testing.T) {
 		Return(false, nil)
 
 	nc.mocks.stores.SpaceResourceMock().EXPECT().
-		FindByID(ctx, int64(2)).
+		FindByID(ctx, int64(ResourceID)).
 		Return(resource, nil)
 
 	nc.mocks.components.repo.EXPECT().
 		CheckAccountAndResource(ctx, "testuser", "1", int64(0), resource).
-		Return(nil)
+		Return(&types.CheckExclusiveResp{
+			NodeAffinity: &corev1.NodeAffinity{
+				RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+					NodeSelectorTerms: []corev1.NodeSelectorTerm{
+						{
+							MatchExpressions: []corev1.NodeSelectorRequirement{
+								{
+									Key:      "foo",
+									Operator: corev1.NodeSelectorOpIn,
+									Values:   []string{"bar"},
+								},
+							},
+						},
+					},
+				},
+			},
+			Tolerations: []types.Toleration{
+				{
+					Key:      "foo",
+					Operator: "Equal",
+					Value:    "bar",
+					Effect:   "NoSchedule",
+				},
+			},
+		}, nil)
 
 	nc.mocks.deployer.EXPECT().
 		UpdateDeploy(ctx, &types.DeployUpdateReq{
-			ResourceID: &resource.ID,
+			ResourceID: &ResourceID,
 			ClusterID:  &resource.ClusterID,
+			DeployExtend: types.DeployExtend{
+				NodeAffinity: &corev1.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+						NodeSelectorTerms: []corev1.NodeSelectorTerm{
+							{
+								MatchExpressions: []corev1.NodeSelectorRequirement{
+									{
+										Key:      "foo",
+										Operator: corev1.NodeSelectorOpIn,
+										Values:   []string{"bar"},
+									},
+								},
+							},
+						},
+					},
+				},
+				Tolerations: []types.Toleration{
+					{
+						Key:      "foo",
+						Operator: "Equal",
+						Value:    "bar",
+						Effect:   "NoSchedule",
+					},
+				},
+			},
 		}, deploy).
 		Return(nil)
 
 	err := nc.UpdateNotebook(ctx, &types.UpdateNotebookReq{
 		ID:          20,
 		CurrentUser: "testuser",
-		ResourceID:  2,
+		ResourceID:  ResourceID,
 	})
 	require.NoError(t, err)
 }
@@ -391,7 +528,7 @@ func TestNotebookComponentImpl_UpdateNotebook_ResourceUnavailable(t *testing.T) 
 
 	nc.mocks.components.repo.EXPECT().
 		CheckAccountAndResource(ctx, "testuser", "1", int64(0), resource).
-		Return(errors.New("resource unavailable"))
+		Return(nil, errors.New("resource unavailable"))
 
 	err := nc.UpdateNotebook(ctx, &types.UpdateNotebookReq{
 		ID:          24,
@@ -439,7 +576,7 @@ func TestNotebookComponentImpl_UpdateNotebook_MultiHostNotSupported(t *testing.T
 
 	nc.mocks.components.repo.EXPECT().
 		CheckAccountAndResource(ctx, "testuser", "1", int64(0), resource).
-		Return(nil)
+		Return(&types.CheckExclusiveResp{}, nil)
 
 	err := nc.UpdateNotebook(ctx, &types.UpdateNotebookReq{
 		ID:          25,
@@ -486,7 +623,7 @@ func TestNotebookComponentImpl_UpdateNotebook_UpdateDeployFails(t *testing.T) {
 
 	nc.mocks.components.repo.EXPECT().
 		CheckAccountAndResource(ctx, "testuser", "1", int64(0), resource).
-		Return(nil)
+		Return(&types.CheckExclusiveResp{}, nil)
 
 	nc.mocks.deployer.EXPECT().
 		UpdateDeploy(ctx, &types.DeployUpdateReq{
@@ -897,7 +1034,7 @@ func TestNotebookComponentImpl_StatusNotebook(t *testing.T) {
 		CurrentUser: "testuser",
 	})
 	require.NoError(t, err)
-	require.Equal(t, "Stopped", status)
+	require.Equal(t, "Pending", status)
 }
 
 func TestNotebookComponentImpl_LogsNotebook(t *testing.T) {

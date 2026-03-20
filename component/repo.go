@@ -96,6 +96,7 @@ type repoComponentImpl struct {
 	mirrorSvcClient        rpc.MirrorSvcClient
 	pendingDeletion        database.PendingDeletionStore
 	xnetClient             rpc.XnetSvcClient
+	clusterComponent       ClusterComponent
 	extendRepoImpl
 }
 
@@ -173,7 +174,7 @@ type RepoComponent interface {
 	GenerateEndpoint(ctx context.Context, deploy *database.Deploy) (string, string)
 	FixRepoSource(ctx context.Context) error
 	IsAdminRole(user database.User) bool
-	CheckAccountAndResource(ctx context.Context, userName string, clusterID string, orderDetailID int64, resource *database.SpaceResource) error
+	CheckAccountAndResource(ctx context.Context, userName string, clusterID string, orderDetailID int64, resource *database.SpaceResource) (*types.CheckExclusiveResp, error)
 	DiffBetweenTwoCommits(ctx context.Context, req types.GetDiffBetweenCommitsReq) ([]types.GiteaCallbackPushReq_Commit, error)
 	RemoteDiff(ctx context.Context, req types.GetDiffBetweenCommitsReq) ([]types.RemoteDiffs, error)
 	SendAssetManagementMsg(ctx context.Context, req types.RepoNotificationReq) error
@@ -452,6 +453,12 @@ func (c *repoComponentImpl) DeleteRepo(ctx context.Context, req types.DeleteRepo
 		return nil, fmt.Errorf("fail to find mirror, %w", err)
 	}
 
+	// fetch lfs metas before database deletion
+	lfsMetas, err := c.lfsMetaObjectStore.FindByRepoID(ctx, repo.ID)
+	if err != nil {
+		slog.Error("fail to fetch lfs metas for cleanup", slog.Int64("repo_id", repo.ID), slog.Any("error", err))
+	}
+
 	err = c.repoStore.CleanRelationsByRepoID(ctx, repo.ID)
 	if err != nil {
 		return nil, fmt.Errorf("fail to clean repo relations, %w", err)
@@ -472,11 +479,54 @@ func (c *repoComponentImpl) DeleteRepo(ctx context.Context, req types.DeleteRepo
 
 	err = c.repoStore.DeleteRepo(ctx, *repo)
 	if err != nil {
-		slog.Error("fail to delete repo in git ", slog.Any("req", req), slog.String("error", err.Error()))
+		slog.Error("fail to delete repo in database ", slog.Any("req", req), slog.String("error", err.Error()))
 		return nil, fmt.Errorf("fail to delete repo in database, error: %w", err)
 	}
+
+	// trigger lfs cleanup asynchronously
+	if len(lfsMetas) > 0 {
+		go func() {
+			cleanupCtx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+			defer cancel()
+			c.cleanLfsStorage(cleanupCtx, repo.ID, repo.Migrated, lfsMetas)
+		}()
+	}
+
 	repo.User = user
 	return repo, nil
+}
+
+func (c *repoComponentImpl) cleanLfsStorage(ctx context.Context, repoID int64, migrated bool, lfsMetas []database.LfsMetaObject) {
+	slog.Info("Cleaning LFS storage for repo", slog.Int64("repo_id", repoID), slog.Bool("migrated", migrated), slog.Int("file_count", len(lfsMetas)))
+
+	objectsCh := make(chan minio.ObjectInfo)
+	go func() {
+		defer close(objectsCh)
+		for _, meta := range lfsMetas {
+			if !migrated {
+				// For non-migrated (shared) storage, check if other repos use this OID
+				exists, err := c.lfsMetaObjectStore.ExistsByOidExclRepo(ctx, meta.Oid, repoID)
+				if err != nil {
+					slog.Error("Failed to check OID references", slog.String("oid", meta.Oid), slog.Any("error", err))
+					continue
+				}
+				if exists {
+					slog.Debug("Skipping shared LFS file", slog.String("oid", meta.Oid), slog.Int64("repo_id", repoID))
+					continue
+				}
+			}
+
+			objectKey := common.BuildLfsPath(repoID, meta.Oid, migrated)
+			objectsCh <- minio.ObjectInfo{
+				Key: objectKey,
+			}
+		}
+	}()
+
+	for rErr := range c.s3Client.RemoveObjects(ctx, c.config.S3.Bucket, objectsCh, minio.RemoveObjectsOptions{}) {
+		slog.Error("Failed to remove LFS object", slog.String("key", rErr.ObjectName), slog.Any("error", rErr.Err))
+	}
+	slog.Info("Completed LFS storage cleanup for repo", slog.Int64("repo_id", repoID))
 }
 
 // PublicToUser gets visible repos of the given user and user's orgs
@@ -2452,7 +2502,15 @@ func (c *repoComponentImpl) Preupload(ctx context.Context, req types.PreuploadRe
 		Paths:     paths,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to get repo files, err: %w", err)
+		// If the branch doesn't exist yet, treat it as if there are no existing files.
+		// This allows uploading to a new branch that hasn't been created yet.
+		if errors.Is(err, errorx.ErrGitCommitNotFound) || status.Code(err) == codes.NotFound || status.Code(err) == codes.InvalidArgument {
+			slog.InfoContext(ctx, "branch not found when getting existing files for preupload, treating as empty",
+				slog.String("revision", req.Revision),
+				slog.String("repo", req.Namespace+"/"+req.Name))
+		} else {
+			return nil, fmt.Errorf("failed to get repo files, err: %w", err)
+		}
 	}
 
 	for _, file := range existFiles {
@@ -2466,7 +2524,7 @@ func (c *repoComponentImpl) Preupload(ctx context.Context, req types.PreuploadRe
 		Ref:       req.Revision,
 		Path:      GitAttributesFileName,
 	})
-	if err != nil && status.Code(err) != codes.InvalidArgument {
+	if err != nil && status.Code(err) != codes.InvalidArgument && !errors.Is(err, errorx.ErrGitCommitNotFound) {
 		return nil, fmt.Errorf("failed to get gitattributes file, err: %w", err)
 	}
 
@@ -2485,7 +2543,7 @@ func (c *repoComponentImpl) Preupload(ctx context.Context, req types.PreuploadRe
 		Path:      GitIgnoreFileName,
 	})
 	code := status.Code(err)
-	if err != nil && code != codes.InvalidArgument {
+	if err != nil && code != codes.InvalidArgument && !errors.Is(err, errorx.ErrGitCommitNotFound) {
 		return nil, fmt.Errorf("failed to get .gitignore file, err: %w", err)
 	}
 

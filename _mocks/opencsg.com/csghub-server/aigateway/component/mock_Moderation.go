@@ -205,6 +205,125 @@ func (_c *MockModeration_CheckChatStreamResponse_Call) RunAndReturn(run func(con
 	return _c
 }
 
+// CheckImage provides a mock function with given fields: ctx, completion
+func (_m *MockModeration) CheckImage(ctx context.Context, completion types.ImageGenerationResponse) (*rpc.CheckResult, error) {
+	ret := _m.Called(ctx, completion)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CheckImage")
+	}
+
+	var r0 *rpc.CheckResult
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.ImageGenerationResponse) (*rpc.CheckResult, error)); ok {
+		return rf(ctx, completion)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.ImageGenerationResponse) *rpc.CheckResult); ok {
+		r0 = rf(ctx, completion)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*rpc.CheckResult)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.ImageGenerationResponse) error); ok {
+		r1 = rf(ctx, completion)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockModeration_CheckImage_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CheckImage'
+type MockModeration_CheckImage_Call struct {
+	*mock.Call
+}
+
+// CheckImage is a helper method to define mock.On call
+//   - ctx context.Context
+//   - completion types.ImageGenerationResponse
+func (_e *MockModeration_Expecter) CheckImage(ctx interface{}, completion interface{}) *MockModeration_CheckImage_Call {
+	return &MockModeration_CheckImage_Call{Call: _e.mock.On("CheckImage", ctx, completion)}
+}
+
+func (_c *MockModeration_CheckImage_Call) Run(run func(ctx context.Context, completion types.ImageGenerationResponse)) *MockModeration_CheckImage_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.ImageGenerationResponse))
+	})
+	return _c
+}
+
+func (_c *MockModeration_CheckImage_Call) Return(_a0 *rpc.CheckResult, _a1 error) *MockModeration_CheckImage_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockModeration_CheckImage_Call) RunAndReturn(run func(context.Context, types.ImageGenerationResponse) (*rpc.CheckResult, error)) *MockModeration_CheckImage_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// CheckImagePrompts provides a mock function with given fields: ctx, prompt, uuid
+func (_m *MockModeration) CheckImagePrompts(ctx context.Context, prompt string, uuid string) (*rpc.CheckResult, error) {
+	ret := _m.Called(ctx, prompt, uuid)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CheckImagePrompts")
+	}
+
+	var r0 *rpc.CheckResult
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) (*rpc.CheckResult, error)); ok {
+		return rf(ctx, prompt, uuid)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) *rpc.CheckResult); ok {
+		r0 = rf(ctx, prompt, uuid)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*rpc.CheckResult)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+		r1 = rf(ctx, prompt, uuid)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockModeration_CheckImagePrompts_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CheckImagePrompts'
+type MockModeration_CheckImagePrompts_Call struct {
+	*mock.Call
+}
+
+// CheckImagePrompts is a helper method to define mock.On call
+//   - ctx context.Context
+//   - prompt string
+//   - uuid string
+func (_e *MockModeration_Expecter) CheckImagePrompts(ctx interface{}, prompt interface{}, uuid interface{}) *MockModeration_CheckImagePrompts_Call {
+	return &MockModeration_CheckImagePrompts_Call{Call: _e.mock.On("CheckImagePrompts", ctx, prompt, uuid)}
+}
+
+func (_c *MockModeration_CheckImagePrompts_Call) Run(run func(ctx context.Context, prompt string, uuid string)) *MockModeration_CheckImagePrompts_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(string))
+	})
+	return _c
+}
+
+func (_c *MockModeration_CheckImagePrompts_Call) Return(_a0 *rpc.CheckResult, _a1 error) *MockModeration_CheckImagePrompts_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockModeration_CheckImagePrompts_Call) RunAndReturn(run func(context.Context, string, string) (*rpc.CheckResult, error)) *MockModeration_CheckImagePrompts_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // NewMockModeration creates a new instance of MockModeration. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewMockModeration(t interface {

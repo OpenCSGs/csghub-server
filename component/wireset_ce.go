@@ -104,7 +104,7 @@ func NewTestMirrorNamespaceMappingComponent(config *config.Config, stores *tests
 	}
 }
 
-func NewTestRepoComponent(config *config.Config, stores *tests.MockStores, rpcUser rpc.UserSvcClient, gitServer gitserver.GitServer, tagComponent TagComponent, s3Client s3.Client, deployer deploy.Deployer, cache cache.Cache, accountingComponent AccountingComponent, mirrorServer mirrorserver.MirrorServer, multiSyncClient multisync.Client, xnetClient rpc.XnetSvcClient) *repoComponentImpl {
+func NewTestRepoComponent(config *config.Config, stores *tests.MockStores, rpcUser rpc.UserSvcClient, gitServer gitserver.GitServer, tagComponent TagComponent, s3Client s3.Client, deployer deploy.Deployer, cache cache.Cache, accountingComponent AccountingComponent, mirrorServer mirrorserver.MirrorServer, multiSyncClient multisync.Client, xnetClient rpc.XnetSvcClient, clusterComponent ClusterComponent) *repoComponentImpl {
 	return &repoComponentImpl{
 		userStore:              stores.User,
 		repoStore:              stores.Repo,
@@ -134,5 +134,6 @@ func NewTestRepoComponent(config *config.Config, stores *tests.MockStores, rpcUs
 		mirrorTaskStore:        stores.MirrorTaskStore,
 		recomStore:             stores.Recom,
 		xnetClient:             xnetClient,
+		clusterComponent:       clusterComponent,
 	}
 }

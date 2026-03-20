@@ -49,6 +49,7 @@ func TestNotebookHandler_Create(t *testing.T) {
 
 	req := &types.CreateNotebookReq{
 		CurrentUser:        "u",
+		OwnerNamespace:     "u",
 		ResourceID:         1,
 		RuntimeFrameworkID: 1,
 		DeployName:         "test-instance",
@@ -58,6 +59,51 @@ func TestNotebookHandler_Create(t *testing.T) {
 	tester.WithBody(t, req).Execute()
 	tester.ResponseEq(t, 200, tester.OKText, types.NotebookRes{ID: 123})
 }
+
+func TestNotebookHandler_Create_OwnerNamespaceDefaultsToCurrentUser(t *testing.T) {
+	tester := NewNotebookHandlerTester(t)
+	tester.WithHandleFunc(func(h *NotebookHandler) gin.HandlerFunc {
+		return h.Create
+	})
+	tester.WithUser()
+
+	body := &types.CreateNotebookReq{
+		CurrentUser:        "u",
+		ResourceID:         1,
+		RuntimeFrameworkID: 1,
+		DeployName:         "test-instance",
+	}
+	expectedReq := &types.CreateNotebookReq{
+		CurrentUser:        "u",
+		OwnerNamespace:     "u",
+		ResourceID:         1,
+		RuntimeFrameworkID: 1,
+		DeployName:         "test-instance",
+	}
+	tester.mocks.component.EXPECT().CreateNotebook(tester.Ctx(), expectedReq).Return(&types.NotebookRes{ID: 123}, nil)
+	tester.WithBody(t, body).Execute()
+	tester.ResponseEq(t, 200, tester.OKText, types.NotebookRes{ID: 123})
+}
+
+func TestNotebookHandler_Create_WithOwnerNamespace(t *testing.T) {
+	tester := NewNotebookHandlerTester(t)
+	tester.WithHandleFunc(func(h *NotebookHandler) gin.HandlerFunc {
+		return h.Create
+	})
+	tester.WithUser()
+
+	req := &types.CreateNotebookReq{
+		CurrentUser:        "u",
+		OwnerNamespace:     "org1",
+		ResourceID:         1,
+		RuntimeFrameworkID: 1,
+		DeployName:         "test-instance",
+	}
+	tester.mocks.component.EXPECT().CreateNotebook(tester.Ctx(), req).Return(&types.NotebookRes{ID: 123}, nil)
+	tester.WithBody(t, req).Execute()
+	tester.ResponseEq(t, 200, tester.OKText, types.NotebookRes{ID: 123})
+}
+
 func TestNotebookHandler_Get_Success(t *testing.T) {
 	tester := NewNotebookHandlerTester(t)
 	tester.WithHandleFunc(func(h *NotebookHandler) gin.HandlerFunc {

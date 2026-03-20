@@ -63,6 +63,9 @@ func (h *EvaluationHandler) RunEvaluation(ctx *gin.Context) {
 		return
 	}
 	req.Username = currentUser
+	if req.OwnerNamespace == "" {
+		req.OwnerNamespace = currentUser
+	}
 	evaluation, err := h.evaluation.CreateEvaluation(ctx.Request.Context(), req)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Failed to create evaluation job", slog.Any("error", err))

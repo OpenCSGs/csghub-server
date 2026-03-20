@@ -139,6 +139,7 @@ func TestMultiSyncComponent_SyncAsClient(t *testing.T) {
 		Source:         types.OpenCSGSource,
 		SyncStatus:     types.SyncStatusPending,
 		RepositoryType: types.ModelRepo,
+		Hashed:         true,
 	}
 	mc.mocks.stores.RepoMock().EXPECT().UpdateOrCreateRepo(ctx, *dbrepo).Return(dbrepo, nil)
 	dbrepo.ID = 1
@@ -179,6 +180,7 @@ func TestMultiSyncComponent_SyncAsClient(t *testing.T) {
 		Source:         types.OpenCSGSource,
 		SyncStatus:     types.SyncStatusPending,
 		RepositoryType: types.DatasetRepo,
+		Hashed:         true,
 	}
 	mockedClient.EXPECT().DatasetInfo(ctx, svs[1]).Return(&types.Dataset{
 		User: types.User{Nickname: "nn"},
@@ -241,6 +243,7 @@ func TestMultiSyncComponent_SyncAsClient(t *testing.T) {
 		Source:         types.OpenCSGSource,
 		SyncStatus:     types.SyncStatusPending,
 		RepositoryType: types.SkillRepo,
+		Hashed:         true,
 	}
 	mockedClient.EXPECT().SkillInfo(ctx, svs[2]).Return(&types.Skill{
 		User: types.User{Nickname: "nn"},

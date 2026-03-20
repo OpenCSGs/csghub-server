@@ -2,7 +2,13 @@ package utils
 
 import (
 	"net/url"
+	"regexp"
 	"strings"
+)
+
+var (
+	invalidChar = regexp.MustCompile(`[^a-z0-9\-.]+`)
+	trimEdge    = regexp.MustCompile(`^[^a-z0-9]+|[^a-z0-9]+$`)
 )
 
 func ValidUrl(endpoint string) bool {
@@ -30,4 +36,32 @@ func ValidUrl(endpoint string) bool {
 	}
 
 	return true
+}
+
+// SafeName sanitizes the input string to be a valid Kubernetes resource name.
+// It follows RFC 1123 subdomain rules:
+// - contain only lowercase alphanumeric characters, '-' or '.'
+// - start with an alphanumeric character
+// - end with an alphanumeric character
+func SafeName(name string) string {
+	// 1. Convert to lower case
+	name = strings.ToLower(name)
+
+	// 2. Replace invalid characters with '-'
+	name = invalidChar.ReplaceAllString(name, "-")
+
+	// 3. Trim non-alphanumeric characters from start and end
+	name = trimEdge.ReplaceAllString(name, "")
+
+	// 4. Limit length to 253 characters (K8s RFC1123 max 253)
+	if len(name) > 253 {
+		name = name[:253]
+	}
+
+	// 5. Prevent empty string
+	if name == "" {
+		name = "default"
+	}
+
+	return name
 }

@@ -72,7 +72,7 @@ const (
 )
 
 type TagFilter struct {
-	Scopes     []TagScope `form:"scope" binding:"omitempty,dive,eq=model|eq=dataset|eq=code|eq=space|eq=prompt|eq=mcp"`
+	Scopes     []TagScope `form:"scope" binding:"omitempty,dive,eq=model|eq=dataset|eq=code|eq=space|eq=prompt|eq=mcp|eq=skill"`
 	Categories []string   `form:"category" binding:"omitempty,dive"`
 	BuiltIn    *bool      `form:"built_in" binding:"omitnil"`
 	Search     string     `form:"search" binding:"omitempty"`

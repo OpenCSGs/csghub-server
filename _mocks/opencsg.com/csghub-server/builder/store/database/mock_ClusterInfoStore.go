@@ -742,6 +742,124 @@ func (_c *MockClusterInfoStore_GetNodeOwnership_Call) RunAndReturn(run func(cont
 	return _c
 }
 
+// GetNodeOwnershipByNameSpace provides a mock function with given fields: ctx, nameSpace
+func (_m *MockClusterInfoStore) GetNodeOwnershipByNameSpace(ctx context.Context, nameSpace string) ([]database.ClusterNodeOwnership, error) {
+	ret := _m.Called(ctx, nameSpace)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetNodeOwnershipByNameSpace")
+	}
+
+	var r0 []database.ClusterNodeOwnership
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) ([]database.ClusterNodeOwnership, error)); ok {
+		return rf(ctx, nameSpace)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) []database.ClusterNodeOwnership); ok {
+		r0 = rf(ctx, nameSpace)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.ClusterNodeOwnership)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, nameSpace)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClusterInfoStore_GetNodeOwnershipByNameSpace_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetNodeOwnershipByNameSpace'
+type MockClusterInfoStore_GetNodeOwnershipByNameSpace_Call struct {
+	*mock.Call
+}
+
+// GetNodeOwnershipByNameSpace is a helper method to define mock.On call
+//   - ctx context.Context
+//   - nameSpace string
+func (_e *MockClusterInfoStore_Expecter) GetNodeOwnershipByNameSpace(ctx interface{}, nameSpace interface{}) *MockClusterInfoStore_GetNodeOwnershipByNameSpace_Call {
+	return &MockClusterInfoStore_GetNodeOwnershipByNameSpace_Call{Call: _e.mock.On("GetNodeOwnershipByNameSpace", ctx, nameSpace)}
+}
+
+func (_c *MockClusterInfoStore_GetNodeOwnershipByNameSpace_Call) Run(run func(ctx context.Context, nameSpace string)) *MockClusterInfoStore_GetNodeOwnershipByNameSpace_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockClusterInfoStore_GetNodeOwnershipByNameSpace_Call) Return(_a0 []database.ClusterNodeOwnership, _a1 error) *MockClusterInfoStore_GetNodeOwnershipByNameSpace_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClusterInfoStore_GetNodeOwnershipByNameSpace_Call) RunAndReturn(run func(context.Context, string) ([]database.ClusterNodeOwnership, error)) *MockClusterInfoStore_GetNodeOwnershipByNameSpace_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetNodesByIDs provides a mock function with given fields: ctx, ids
+func (_m *MockClusterInfoStore) GetNodesByIDs(ctx context.Context, ids []int64) ([]database.ClusterNodeWithRegion, error) {
+	ret := _m.Called(ctx, ids)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetNodesByIDs")
+	}
+
+	var r0 []database.ClusterNodeWithRegion
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, []int64) ([]database.ClusterNodeWithRegion, error)); ok {
+		return rf(ctx, ids)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, []int64) []database.ClusterNodeWithRegion); ok {
+		r0 = rf(ctx, ids)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.ClusterNodeWithRegion)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, []int64) error); ok {
+		r1 = rf(ctx, ids)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClusterInfoStore_GetNodesByIDs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetNodesByIDs'
+type MockClusterInfoStore_GetNodesByIDs_Call struct {
+	*mock.Call
+}
+
+// GetNodesByIDs is a helper method to define mock.On call
+//   - ctx context.Context
+//   - ids []int64
+func (_e *MockClusterInfoStore_Expecter) GetNodesByIDs(ctx interface{}, ids interface{}) *MockClusterInfoStore_GetNodesByIDs_Call {
+	return &MockClusterInfoStore_GetNodesByIDs_Call{Call: _e.mock.On("GetNodesByIDs", ctx, ids)}
+}
+
+func (_c *MockClusterInfoStore_GetNodesByIDs_Call) Run(run func(ctx context.Context, ids []int64)) *MockClusterInfoStore_GetNodesByIDs_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].([]int64))
+	})
+	return _c
+}
+
+func (_c *MockClusterInfoStore_GetNodesByIDs_Call) Return(_a0 []database.ClusterNodeWithRegion, _a1 error) *MockClusterInfoStore_GetNodesByIDs_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClusterInfoStore_GetNodesByIDs_Call) RunAndReturn(run func(context.Context, []int64) ([]database.ClusterNodeWithRegion, error)) *MockClusterInfoStore_GetNodesByIDs_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // List provides a mock function with given fields: ctx
 func (_m *MockClusterInfoStore) List(ctx context.Context) ([]database.ClusterInfo, error) {
 	ret := _m.Called(ctx)
