@@ -135,6 +135,23 @@ type Tag struct {
 	Commit  DatasetTagCommit `json:"commit"`
 }
 
+type CreateBranchReq struct {
+	Namespace   string         `json:"namespace"`
+	Name        string         `json:"name"`
+	BranchName  string         `json:"branch_name"`
+	CommitID    string         `json:"commit_id"`
+	RepoType    RepositoryType `json:"-"`
+	CurrentUser string         `json:"-"`
+}
+
+type DeleteBranchReq struct {
+	Namespace   string         `json:"namespace"`
+	Name        string         `json:"name"`
+	BranchName  string         `json:"branch_name"`
+	RepoType    RepositoryType `json:"-"`
+	CurrentUser string         `json:"-"`
+}
+
 type Repository struct {
 	HTTPCloneURL string `json:"http_clone_url"`
 	SSHCloneURL  string `json:"ssh_clone_url"`
