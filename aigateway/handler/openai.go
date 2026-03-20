@@ -243,14 +243,14 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 	userUUID := httpbase.GetCurrentUserUUID(c)
 	chatReq := &ChatCompletionRequest{}
 	if err := c.BindJSON(chatReq); err != nil {
-		slog.Error("invalid chat compoletion request body", "error", err.Error())
+		slog.ErrorContext(c.Request.Context(), "invalid chat compoletion request body", "error", err.Error())
 		c.String(http.StatusBadRequest, fmt.Errorf("invalid chat compoletion request body:%w", err).Error())
 		return
 	}
 	modelID := chatReq.Model
 	model, err := h.openaiComponent.GetModelByID(c.Request.Context(), username, modelID)
 	if err != nil {
-		slog.Error("failed to get model by id", "model_id", modelID, "error", err.Error())
+		slog.ErrorContext(c.Request.Context(), "failed to get model by id", "model_id", modelID, "error", err.Error())
 		c.String(http.StatusInternalServerError, fmt.Errorf("failed to get model by id '%s',error:%w", modelID, err).Error())
 		return
 	}
@@ -277,11 +277,11 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 	if len(model.SvcName) > 0 {
 		target, host, err = apicomp.ExtractDeployTargetAndHost(c.Request.Context(), h.clusterComp, targetReq)
 	} else {
-		slog.Debug("external model", slog.Any("model", model))
+		slog.DebugContext(c.Request.Context(), "external model", slog.Any("model", model))
 		target = model.Endpoint
 	}
 	if err != nil || len(target) < 1 {
-		slog.Error("failed to get model target address", slog.Any("error", err),
+		slog.ErrorContext(c.Request.Context(), "failed to get model target address", slog.Any("error", err),
 			slog.Any("model", model), slog.Any("targetReq", targetReq), slog.Any("model_id", modelID),
 			slog.Any("target", target), slog.Any("host", host))
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -295,7 +295,7 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 
 	modelName, _, err := (component.ModelIDBuilder{}).From(modelID)
 	if err != nil {
-		slog.Error("failed to process chat request", "error", err, "model_id", modelID)
+		slog.ErrorContext(c.Request.Context(), "failed to process chat request", "error", err, "model_id", modelID)
 		c.String(http.StatusBadRequest, err.Error())
 		return
 	}
@@ -320,8 +320,13 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 	updatedBodyBytes, _ := json.Marshal(chatReq)
 	c.Request.Body = io.NopCloser(bytes.NewReader(updatedBodyBytes))
 	c.Request.ContentLength = int64(len(updatedBodyBytes))
-	rp, _ := proxy.NewReverseProxy(target)
-	slog.Info("proxy chat request to model target", slog.Any("target", target), slog.Any("host", host),
+	rp, err := proxy.NewReverseProxy(target)
+	if err != nil {
+		slog.ErrorContext(c.Request.Context(), "failed to create reverse proxy", slog.Any("error", err))
+		c.String(http.StatusInternalServerError, fmt.Errorf("failed to create reverse proxy:%w", err).Error())
+		return
+	}
+	slog.InfoContext(c.Request.Context(), "proxy chat request to model target", slog.Any("target", target), slog.Any("host", host),
 		slog.Any("user", username), slog.Any("model_name", modelName))
 	// Create a combined key using userUUID and modelID for caching and tracking
 	key := fmt.Sprintf("%s:%s", userUUID, modelID)
@@ -331,12 +336,12 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 		return
 	}
 	if result.IsSensitive {
-		slog.Debug("sensitive content", slog.String("reason", result.Reason))
+		slog.DebugContext(c.Request.Context(), "sensitive content", slog.String("reason", result.Reason))
 		errorChunk := generateSensitiveRespForPrompt()
 		errorChunkJson, _ := json.Marshal(errorChunk)
 		_, err := c.Writer.Write([]byte("data: " + string(errorChunkJson) + "\n\n" + "[DONE]"))
 		if err != nil {
-			slog.Error("write into resp error:", slog.String("err", err.Error()))
+			slog.ErrorContext(c.Request.Context(), "write into resp error:", slog.String("err", err.Error()))
 		}
 		c.Writer.Flush()
 		return
@@ -346,6 +351,7 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 		Host:     host,
 		Model:    modelName,
 		ImageID:  model.ImageID,
+		Provider: model.Provider,
 	})
 	w := NewResponseWriterWrapper(c.Writer, chatReq.Stream, h.modComponent, tokenCounter)
 	defer w.ClearBuffer()
@@ -537,7 +543,7 @@ func (h *OpenAIHandlerImpl) GenerateImage(c *gin.Context) {
 	if model.AuthHead != "" {
 		var authMap map[string]string
 		if err := json.Unmarshal([]byte(model.AuthHead), &authMap); err != nil {
-			slog.Warn("invalid auth head", slog.String("model", modelName))
+			slog.WarnContext(c.Request.Context(), "invalid auth head", slog.String("model", modelName))
 		} else {
 			for authKey, authVal := range authMap {
 				c.Request.Header.Set(authKey, authVal)

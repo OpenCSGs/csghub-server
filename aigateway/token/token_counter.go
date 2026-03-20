@@ -7,6 +7,7 @@ type CreateParam struct {
 	Host     string
 	Model    string
 	ImageID  string
+	Provider string
 }
 
 type CounterFactory interface {
@@ -21,12 +22,12 @@ func NewCounterFactory() CounterFactory {
 type counterFactoryImpl struct{}
 
 func (f *counterFactoryImpl) NewChat(param CreateParam) ChatTokenCounter {
-	tokenizer := NewTokenizerImpl(param.Endpoint, param.Host, param.Model, param.ImageID)
+	tokenizer := NewTokenizerImpl(param.Endpoint, param.Host, param.Model, param.ImageID, param.Provider)
 	return NewLLMTokenCounter(tokenizer)
 }
 
 func (f *counterFactoryImpl) NewEmbedding(param CreateParam) EmbeddingTokenCounter {
-	tokenizer := NewTokenizerImpl(param.Endpoint, param.Host, param.Model, param.ImageID)
+	tokenizer := NewTokenizerImpl(param.Endpoint, param.Host, param.Model, param.ImageID, param.Provider)
 	return NewEmbeddingTokenCounter(tokenizer)
 }
 
