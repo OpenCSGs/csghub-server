@@ -52,8 +52,11 @@ var launchCmd = &cobra.Command{
 		}
 
 		// Do metering
-		meter := consumer.NewMetering(mqHandler, cfg)
-		meter.Run()
+		metering, err := consumer.NewMetering(cfg, mqFactory)
+		if err != nil {
+			return fmt.Errorf("failed to create metering: %w", err)
+		}
+		metering.Run()
 
 		err = createAdvancedConsumer(cfg, mqHandler, mqFactory)
 		if err != nil {

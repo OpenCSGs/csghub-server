@@ -14,26 +14,10 @@ type MessageQueue interface {
 	GetJetStream() error
 	CreateOrUpdateStream(ctx context.Context, streamName string, streamCfg jetstream.StreamConfig) (jetstream.Stream, error)
 	BuildEventStreamAndConsumer(cfg EventConfig, streamCfg jetstream.StreamConfig, consumerCfg jetstream.ConsumerConfig) (jetstream.Consumer, error)
-	BuildFeeEventStream() error
-	BuildMeterEventStream() error
-	BuildOrderEventStream() error
-	BuildDLQStream() error
-	FetchMeterEventMessages(batch int) (jetstream.MessageBatch, error)
-	FetchFeeEventMessages(batch int) (jetstream.MessageBatch, error)
 	VerifyStreamByName(streamName string) error
-	VerifyFeeEventStream() error
-	VerifyMeteringStream() error
 	VerifyDLQStream() error
 	PublishData(subject string, data []byte) error
-	PublishNotificationForSubscription(data []byte) error
-	PublishFeeCreditData(data []byte) error
-	PublishFeeTokenData(data []byte) error
-	PublishFeeQuotaData(data []byte) error
 	PublishFeeDataToDLQ(data []byte) error
-	PublishMeterDataToDLQ(data []byte) error
-	PublishOrderExpiredData(data []byte) error
-	PublishSubscriptionData(data []byte) error
-	BuildOrderConsumerWithName(consumerName string) (jetstream.Consumer, error)
 	BuildRechargeEventStream() error
 	VerifyRechargeStream() error
 	PublishRechargeDurationData(data []byte) error
@@ -47,4 +31,8 @@ type MessageQueue interface {
 	PublishNormalPriorityMsg(msg types.ScenarioMessage) error
 	BuildNormalPriorityMsgStream(conf *config.Config) error
 	BuildNormalPriorityMsgConsumer() (jetstream.Consumer, error)
+
+	PublishAgentSessionHistoryMsg(msg types.SessionHistoryMessageEnvelope) error
+	BuildAgentSessionHistoryMsgStream(conf *config.Config) error
+	BuildAgentSessionHistoryMsgConsumer() (jetstream.Consumer, error)
 }

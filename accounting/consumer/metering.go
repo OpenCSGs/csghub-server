@@ -7,166 +7,119 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/nats-io/nats.go"
-	"github.com/nats-io/nats.go/jetstream"
 	"opencsg.com/csghub-server/accounting/component"
 	"opencsg.com/csghub-server/accounting/utils"
+	bldmq "opencsg.com/csghub-server/builder/mq"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
-	"opencsg.com/csghub-server/mq"
 )
 
-var (
-	meterIdleDuration = 10 * time.Second
-)
+type Metering interface {
+	Run()
+}
 
-type Metering struct {
-	sysMQ          mq.MessageQueue
+type MeteringImpl struct {
 	meterComp      component.MeteringComponent
 	acctEvtComp    component.AccountingEventComponent
 	chargingEnable bool
+	bldMQ          bldmq.MessageQueue
 }
 
-func NewMetering(natHandler mq.MessageQueue, config *config.Config) *Metering {
-	meter := &Metering{
-		sysMQ:          natHandler,
+func NewMetering(config *config.Config, mqFactory bldmq.MessageQueueFactory) (Metering, error) {
+	mq, err := mqFactory.GetInstance()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get message queue factory instance error: %w", err)
+	}
+	meter := &MeteringImpl{
 		meterComp:      component.NewMeteringComponent(),
 		acctEvtComp:    component.NewAccountingEventComponent(),
 		chargingEnable: config.Accounting.ChargingEnable,
+		bldMQ:          mq,
 	}
-	return meter
+	return meter, nil
 }
 
-func (m *Metering) Run() {
-	go m.startMetering()
-}
-
-func (m *Metering) startMetering() {
-	for {
-		m.preReadMsgs()
-		m.handleReadMsgs(10)
-		time.Sleep(2 * meterIdleDuration)
-	}
-}
-
-func (m *Metering) preReadMsgs() {
-	var err error
-	var i = 0
-	for {
-		i++
-		err = m.sysMQ.BuildMeterEventStream()
-		if err != nil {
-			tip := fmt.Sprintf("fail to build metering stream for the %d time", i)
-			slog.Error(tip, slog.Any("error", err))
-			time.Sleep(2 * time.Second)
-			continue
-		}
-		err = m.sysMQ.BuildDLQStream()
-		if err != nil {
-			tip := fmt.Sprintf("fail to build DLQ stream in metering for the %d time", i)
-			slog.Error(tip, slog.Any("error", err))
-			time.Sleep(2 * time.Second)
-			continue
-		}
-		break
+func (m *MeteringImpl) Run() {
+	err := m.bldMQ.Subscribe(bldmq.SubscribeParams{
+		Group: bldmq.MeteringEventGroup,
+		Topics: []string{
+			bldmq.MeterDurationSendSubject,
+			bldmq.MeterTokenSendSubject,
+			bldmq.MeterQuotaSendSubject,
+		},
+		AutoACK:  true,
+		Callback: m.handleMsgWithRetry,
+	})
+	if err != nil {
+		slog.Error("failed to subscribe metering event", slog.Any("error", err))
 	}
 }
 
-func (m *Metering) handleReadMsgs(failedLimit int) {
-	failReadTime := 0
-	for failReadTime < failedLimit {
-		err := m.sysMQ.VerifyMeteringStream()
-		if err != nil {
-			tip := fmt.Sprintf("fail to verify metering stream for the %d time", (failReadTime + 1))
-			slog.Error(tip, slog.Any("err", err))
-			failReadTime++
-			continue
-		}
-		msgs, err := m.sysMQ.FetchMeterEventMessages(5)
-		if err == nats.ErrTimeout {
-			continue
-		}
+func (m *MeteringImpl) handleMsgWithRetry(raw []byte, meta bldmq.MessageMeta) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 
-		if err != nil {
-			tip := fmt.Sprintf("fail to fetch metering messages for the %d time", (failReadTime + 1))
-			slog.Error(tip, slog.Any("err", err))
-			failReadTime++
-			continue
-		}
-		if msgs == nil {
-			tip := fmt.Sprintf("metering msgs is null for the %d time", (failReadTime + 1))
-			slog.Warn(tip)
-			failReadTime++
-			continue
-		}
-
-		for msg := range msgs.Messages() {
-			m.handleMsgWithRetry(msg)
-		}
-	}
-}
-
-func (m *Metering) handleMsgWithRetry(msg jetstream.Msg) {
-	strData := string(msg.Data())
-	slog.Debug("Meter->received", slog.Any("msg.subject", msg.Subject()), slog.Any("msg.data", strData))
+	strData := string(raw)
+	slog.DebugContext(ctx, "Meter->received", slog.Any("msg.subject", meta.Topic), slog.Any("msg.data", strData))
 	// A maximum of 3 attempts
+	retryLimit := 3
 	var (
 		err error                = nil
 		evt *types.MeteringEvent = nil
 	)
-	for range 3 {
-		evt, err = m.handleMsgData(msg)
+	for range retryLimit {
+		evt, err = m.handleMsgData(ctx, raw)
 		if err == nil {
 			break
 		}
+		time.Sleep(1 * time.Second)
 	}
 
 	if err != nil {
-		slog.Error("metering handles a single msg with 3 retries", slog.Any("msg.data", strData), slog.Any("error", err))
+		tip := fmt.Sprintf("handles a single metering msg with %d retries", retryLimit)
+		slog.ErrorContext(ctx, tip, slog.Any("event", strData), slog.Any("error", err), slog.Any("topic", meta.Topic))
 		// move to DLQ for failed to handle message
-		err = m.moveMsgToDLQWithReTry(msg, 5)
+		err = m.moveMsgToDLQWithReTry(raw, retryLimit)
 		if err != nil {
-			tip := fmt.Sprintf("failed to move meter msg to DLQ with %d retries", 5)
-			slog.Error(tip, slog.Any("msg.data", string(msg.Data())), slog.Any("error", err))
+			tip := fmt.Sprintf("failed to move metering msg to DLQ with %d retries", retryLimit)
+			slog.ErrorContext(ctx, tip, slog.Any("event", strData), slog.Any("error", err), slog.Any("topic", meta.Topic))
 		}
-	} else {
-		if m.chargingEnable {
-			err = m.pubFeeEventWithReTry(msg, evt, 5)
-			if err != nil {
-				tip := fmt.Sprintf("failed to pub fee event msg with %d retries", 5)
-				slog.Error(tip, slog.Any("msg.data", string(msg.Data())), slog.Any("error", err))
-				// todo: need more discuss on how to persist failed message finally
-			}
+		return err
+	}
+
+	if m.chargingEnable {
+		err = m.pubFeeEventWithReTry(raw, evt, retryLimit)
+		if err != nil {
+			tip := fmt.Sprintf("failed to pub fee event msg with %d retries in metering consumer", retryLimit)
+			slog.ErrorContext(ctx, tip, slog.Any("event", strData), slog.Any("error", err), slog.Any("topic", meta.Topic))
+			return err
+			// todo: need more discuss on how to persist failed message finally
 		}
 	}
 
-	// ack for handle metering message done
-	err = msg.Ack()
-	if err != nil {
-		slog.Warn("failed to ack after processing meter msg", slog.Any("msg.data", strData), slog.Any("error", err))
-	}
+	return nil
 }
 
-func (c *Metering) checkDuplicatedEvent(ctx context.Context, event *types.MeteringEvent) (bool, *database.AccountMetering, error) {
-	meter, err := c.meterComp.GetMeteringByEventUUID(ctx, event.Uuid)
+func (m *MeteringImpl) handleMsgData(ctx context.Context, raw []byte) (*types.MeteringEvent, error) {
+	event, err := m.parseMessageData(raw)
 	if err != nil {
-		return false, nil, fmt.Errorf("failed to get metering by uuid, %v, %w", event.Uuid, err)
+		return nil, err
 	}
-	if meter != nil {
-		return true, meter, types.ErrDuplicatedMeterByUUID
-	}
-	meter, err = c.meterComp.FindMeteringByCustomerIDAndRecordAtInMin(ctx, event.CustomerID, event.CreatedAt)
+
+	err = m.logAndVerifyEvent(ctx, event)
 	if err != nil {
-		return false, nil, fmt.Errorf("fail to check existing metering event in minute level, %v, %w", event, err)
+		return nil, fmt.Errorf("failed to log and verify metering event, error: %w", err)
 	}
-	if meter != nil {
-		return true, meter, types.ErrDuplicatedMeterInMinute
+
+	err = m.meterComp.SaveMeteringEventRecord(ctx, event)
+	if err != nil {
+		return nil, fmt.Errorf("failed to save metering event, %v, %w", event, err)
 	}
-	return false, nil, nil
+	return event, nil
 }
 
-func (c *Metering) logAndVerifyEvent(ctx context.Context, event *types.MeteringEvent) error {
+func (c *MeteringImpl) logAndVerifyEvent(ctx context.Context, event *types.MeteringEvent) error {
 	var (
 		existEvent   *database.AccountMetering
 		isDuplicated bool
@@ -175,78 +128,78 @@ func (c *Metering) logAndVerifyEvent(ctx context.Context, event *types.MeteringE
 	if utils.IsNeedCheckMeteringInMinute(types.SceneType(event.Scene), event.ValueType) {
 		isDuplicated, existEvent, err = c.checkDuplicatedEvent(ctx, event)
 		if err != nil && !isDuplicated {
-			return fmt.Errorf("check duplicated event, error: %w", err)
+			return fmt.Errorf("check duplicated metering event, error: %w", err)
 		}
 	}
 	err1 := c.acctEvtComp.AddNewAccountingEvent(ctx, event, isDuplicated)
 	if err1 != nil {
-		return fmt.Errorf("fail to save metering event log, %v, %w", event, err)
+		return fmt.Errorf("failed to save metering event log, %v, %w", event, err)
 	}
 	if isDuplicated {
-		return fmt.Errorf("duplicated with event uuid %s, error: %w", existEvent.EventUUID, err)
+		return fmt.Errorf("duplicated with metering event uuid %s, error: %w", existEvent.EventUUID, err)
 	}
 	return nil
 }
 
-func (m *Metering) handleMsgData(msg jetstream.Msg) (*types.MeteringEvent, error) {
-	event, err := m.parseMessageData(msg)
+func (c *MeteringImpl) checkDuplicatedEvent(ctx context.Context, event *types.MeteringEvent) (bool, *database.AccountMetering, error) {
+	meter, err := c.meterComp.GetMeteringByEventUUID(ctx, event.Uuid)
 	if err != nil {
-		return nil, err
+		return false, nil, fmt.Errorf("failed to get metering event by uuid, %v, %w", event.Uuid, err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	err = m.logAndVerifyEvent(ctx, event)
+	if meter != nil {
+		return true, meter, types.ErrDuplicatedMeterByUUID
+	}
+	meter, err = c.meterComp.FindMeteringByCustomerIDAndRecordAtInMin(ctx, event.CustomerID, event.CreatedAt)
 	if err != nil {
-		return nil, fmt.Errorf("fail to log and verify event, error: %w", err)
+		return false, nil, fmt.Errorf("failed to check existing metering event in minute level, %v, %w", event, err)
 	}
-
-	err = m.meterComp.SaveMeteringEventRecord(ctx, event)
-	if err != nil {
-		return nil, fmt.Errorf("failed to save meter event, %v, %w", event, err)
+	if meter != nil {
+		return true, meter, types.ErrDuplicatedMeterInMinute
 	}
-	return event, nil
+	return false, nil, nil
 }
 
-func (m *Metering) parseMessageData(msg jetstream.Msg) (*types.MeteringEvent, error) {
-	strData := string(msg.Data())
+func (m *MeteringImpl) parseMessageData(raw []byte) (*types.MeteringEvent, error) {
+	strData := string(raw)
 	evt := types.MeteringEvent{}
-	err := json.Unmarshal(msg.Data(), &evt)
+	err := json.Unmarshal(raw, &evt)
 	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal meter event, %v, %w", strData, err)
+		return nil, fmt.Errorf("failed to unmarshal metering event, %v, %w", strData, err)
 	}
 	return &evt, nil
 }
 
-func (m *Metering) pubFeeEventWithReTry(msg jetstream.Msg, evt *types.MeteringEvent, limit int) error {
+func (m *MeteringImpl) pubFeeEventWithReTry(raw []byte, evt *types.MeteringEvent, limit int) error {
 	// A maximum of five attempts for pub fee event
 	var err error
 	for range limit {
 		switch evt.ValueType {
 		case types.TimeDurationMinType:
-			err = m.sysMQ.PublishFeeCreditData(msg.Data())
+			err = m.bldMQ.Publish(bldmq.FeeSendSubject, raw)
 		case types.TokenNumberType:
-			err = m.sysMQ.PublishFeeTokenData(msg.Data())
+			err = m.bldMQ.Publish(bldmq.TokenSendSubject, raw)
 		case types.QuotaNumberType:
-			err = m.sysMQ.PublishFeeQuotaData(msg.Data())
+			err = m.bldMQ.Publish(bldmq.QuotaSendSubject, raw)
 		default:
-			slog.Warn("unsupported metering event value type", slog.Any("value-type", evt.ValueType))
+			slog.Warn("unsupported metering event value type for pub fee event", slog.Any("value-type", evt.ValueType))
 		}
 		if err == nil {
 			break
 		}
+		time.Sleep(1 * time.Second)
 	}
 	return err
 }
 
-func (m *Metering) moveMsgToDLQWithReTry(msg jetstream.Msg, limit int) error {
+func (m *MeteringImpl) moveMsgToDLQWithReTry(raw []byte, limit int) error {
 	// A maximum of five attempts for move DLQ
 	var err error
-	for i := 0; i < limit; i++ {
-		err = m.sysMQ.PublishMeterDataToDLQ(msg.Data())
+	for range limit {
+		err = m.bldMQ.Publish(bldmq.DLQMeterSubject, raw)
 		if err == nil {
 			break
 		}
+		time.Sleep(1 * time.Second)
 	}
 	return err
 }

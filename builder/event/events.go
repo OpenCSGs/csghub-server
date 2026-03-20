@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/nats-io/nats.go/jetstream"
 	bldmq "opencsg.com/csghub-server/builder/mq"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/mq"
@@ -48,9 +47,10 @@ func InitEventPublisher(cfg *config.Config) error {
 	return nil
 }
 
-func (ec *EventPublisher) CreateOrderExpiredConsumer() (jetstream.Consumer, error) {
-	return ec.Connector.BuildOrderConsumerWithName(CSGHubOrderExpiredConsumerName)
-}
+// Todo: update order code logic later
+// func (ec *EventPublisher) CreateOrderExpiredConsumer() (jetstream.Consumer, error) {
+// 	return ec.Connector.BuildOrderConsumerWithName(CSGHubOrderExpiredConsumerName)
+// }
 
 // Publish a message to the specified subject
 func (ec *EventPublisher) PublishMeteringEvent(message []byte) error {

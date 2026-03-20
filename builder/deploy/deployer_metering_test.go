@@ -1,13 +1,12 @@
 package deploy
 
 import (
-	"errors"
+	"context"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	mockrunner "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/deploy/imagerunner"
 	mockmq "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/mq"
 	mockdb "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/deploy/common"
@@ -75,7 +74,7 @@ func TestDeployer_startAcctMeteringRequest(t *testing.T) {
 		}
 
 		d := &deployer{}
-		d.startAcctMeteringRequest(resMap, clusterMap, deploy, eventTime)
+		d.startAcctMeteringRequest(context.Background(), resMap, clusterMap, deploy, eventTime)
 		// Should return early without error
 	})
 
@@ -95,7 +94,7 @@ func TestDeployer_startAcctMeteringRequest(t *testing.T) {
 		}
 
 		d := &deployer{}
-		d.startAcctMeteringRequest(resMap, clusterMap, deploy, eventTime)
+		d.startAcctMeteringRequest(context.Background(), resMap, clusterMap, deploy, eventTime)
 		// Should return early without error
 	})
 
@@ -121,7 +120,7 @@ func TestDeployer_startAcctMeteringRequest(t *testing.T) {
 				HeartBeatTimeInSec: 300, // 5 minutes
 			},
 		}
-		d.startAcctMeteringRequest(resMap, clusterMap, deploy, eventTime)
+		d.startAcctMeteringRequest(context.Background(), resMap, clusterMap, deploy, eventTime)
 		// Should return early without error
 	})
 
@@ -143,7 +142,7 @@ func TestDeployer_startAcctMeteringRequest(t *testing.T) {
 		}
 
 		d := &deployer{}
-		d.startAcctMeteringRequest(resMap, clusterMap, deploy, eventTime)
+		d.startAcctMeteringRequest(context.Background(), resMap, clusterMap, deploy, eventTime)
 		// Should return early without error
 	})
 
@@ -165,7 +164,7 @@ func TestDeployer_startAcctMeteringRequest(t *testing.T) {
 		}
 
 		d := &deployer{}
-		d.startAcctMeteringRequest(resMap, clusterMap, deploy, eventTime)
+		d.startAcctMeteringRequest(context.Background(), resMap, clusterMap, deploy, eventTime)
 		// Should return early without error
 	})
 
@@ -187,7 +186,7 @@ func TestDeployer_startAcctMeteringRequest(t *testing.T) {
 		}
 
 		d := &deployer{}
-		d.startAcctMeteringRequest(resMap, clusterMap, deploy, eventTime)
+		d.startAcctMeteringRequest(context.Background(), resMap, clusterMap, deploy, eventTime)
 		// Should return early without error
 	})
 
@@ -211,7 +210,7 @@ func TestDeployer_startAcctMeteringRequest(t *testing.T) {
 		}
 
 		d := &deployer{}
-		d.startAcctMeteringRequest(resMap, clusterMap, deploy, eventTime)
+		d.startAcctMeteringRequest(context.Background(), resMap, clusterMap, deploy, eventTime)
 		// Should return early without error
 	})
 
@@ -234,7 +233,7 @@ func TestDeployer_startAcctMeteringRequest(t *testing.T) {
 		}
 
 		d := &deployer{}
-		d.startAcctMeteringRequest(resMap, clusterMap, deploy, eventTime)
+		d.startAcctMeteringRequest(context.Background(), resMap, clusterMap, deploy, eventTime)
 		// Should return early without error
 	})
 
@@ -250,28 +249,26 @@ func TestDeployer_startAcctMeteringRequest(t *testing.T) {
 		}
 		hardwareJSON := `{"replicas":1}`
 		deploy := database.Deploy{
-			ID:        1,
-			ClusterID: "cluster1",
-			SKU:       "sku1",
-			Type:      types.InferenceType,
-			Hardware:  hardwareJSON,
-			SvcName:   "test-svc",
-			SpaceID:   0,
-			UserUUID:  "user1",
+			ID:         1,
+			ClusterID:  "cluster1",
+			SKU:        "sku1",
+			Type:       types.InferenceType,
+			Hardware:   hardwareJSON,
+			SvcName:    "test-svc",
+			SpaceID:    0,
+			UserUUID:   "user1",
+			MaxReplica: 2,
+			Instances: []types.Instance{
+				{Status: string(types.ClusterStatusRunning)},
+				{Status: string(types.ClusterStatusRunning)},
+				{Status: string(types.ClusterStatusRunning)},
+			},
 		}
-
-		mockRunner := mockrunner.NewMockRunner(t)
-		mockRunner.EXPECT().GetReplica(mock.Anything, mock.Anything).
-			Return(&types.ReplicaResponse{
-				ActualReplica:  3,
-				DesiredReplica: 3,
-			}, nil)
 
 		mockMQ := mockmq.NewMockMessageQueue(t)
 		mockMQ.EXPECT().Publish(mock.Anything, mock.Anything).Return(nil)
 
 		d := &deployer{
-			imageRunner: mockRunner,
 			eventPub: &event.EventPublisher{
 				SyncInterval: 5, // 5 minutes
 				MQ:           mockMQ,
@@ -281,7 +278,7 @@ func TestDeployer_startAcctMeteringRequest(t *testing.T) {
 				UniqueServiceName:  "test-service",
 			},
 		}
-		d.startAcctMeteringRequest(resMap, clusterMap, deploy, eventTime)
+		d.startAcctMeteringRequest(context.Background(), resMap, clusterMap, deploy, eventTime)
 		// Should complete without error
 	})
 
@@ -319,7 +316,7 @@ func TestDeployer_startAcctMeteringRequest(t *testing.T) {
 				UniqueServiceName:  "test-service",
 			},
 		}
-		d.startAcctMeteringRequest(resMap, clusterMap, deploy, eventTime)
+		d.startAcctMeteringRequest(context.Background(), resMap, clusterMap, deploy, eventTime)
 		// Should complete without calling GetReplica
 	})
 
@@ -335,28 +332,25 @@ func TestDeployer_startAcctMeteringRequest(t *testing.T) {
 		}
 		hardwareJSON := `{"replicas":1}`
 		deploy := database.Deploy{
-			ID:        1,
-			ClusterID: "cluster1",
-			SKU:       "sku1",
-			Type:      types.InferenceType,
-			Hardware:  hardwareJSON,
-			SvcName:   "test-svc",
-			SpaceID:   0,
-			UserUUID:  "user1",
+			ID:         1,
+			ClusterID:  "cluster1",
+			SKU:        "sku1",
+			Type:       types.InferenceType,
+			Hardware:   hardwareJSON,
+			SvcName:    "test-svc",
+			SpaceID:    0,
+			UserUUID:   "user1",
+			MaxReplica: 2,
+			Instances: []types.Instance{
+				{Status: string(types.ClusterStatusRunning)},
+				{Status: string(types.ClusterStatusRunning)},
+			},
 		}
-
-		mockRunner := mockrunner.NewMockRunner(t)
-		mockRunner.EXPECT().GetReplica(mock.Anything, mock.Anything).
-			Return(&types.ReplicaResponse{
-				ActualReplica:  2,
-				DesiredReplica: 2,
-			}, nil)
 
 		mockMQ := mockmq.NewMockMessageQueue(t)
 		mockMQ.EXPECT().Publish(mock.Anything, mock.Anything).Return(nil)
 
 		d := &deployer{
-			imageRunner: mockRunner,
 			eventPub: &event.EventPublisher{
 				SyncInterval: 5,
 				MQ:           mockMQ,
@@ -366,7 +360,7 @@ func TestDeployer_startAcctMeteringRequest(t *testing.T) {
 				UniqueServiceName:  "test-service",
 			},
 		}
-		d.startAcctMeteringRequest(resMap, clusterMap, deploy, eventTime)
+		d.startAcctMeteringRequest(context.Background(), resMap, clusterMap, deploy, eventTime)
 		// Should complete without error
 	})
 
@@ -382,25 +376,22 @@ func TestDeployer_startAcctMeteringRequest(t *testing.T) {
 		}
 		hardwareJSON := `{"replicas":1}`
 		deploy := database.Deploy{
-			ID:        1,
-			ClusterID: "cluster1",
-			SKU:       "sku1",
-			Type:      types.InferenceType,
-			Hardware:  hardwareJSON,
-			SvcName:   "test-svc",
-			SpaceID:   0,
-			UserUUID:  "user1",
+			ID:         1,
+			ClusterID:  "cluster1",
+			SKU:        "sku1",
+			Type:       types.InferenceType,
+			Hardware:   hardwareJSON,
+			SvcName:    "test-svc",
+			SpaceID:    0,
+			UserUUID:   "user1",
+			MaxReplica: 2,
+			Instances:  []types.Instance{},
 		}
-
-		mockRunner := mockrunner.NewMockRunner(t)
-		mockRunner.EXPECT().GetReplica(mock.Anything, mock.Anything).
-			Return(nil, errors.New("replica error"))
 
 		mockMQ := mockmq.NewMockMessageQueue(t)
 		mockMQ.EXPECT().Publish(mock.Anything, mock.Anything).Return(nil)
 
 		d := &deployer{
-			imageRunner: mockRunner,
 			eventPub: &event.EventPublisher{
 				SyncInterval: 5,
 				MQ:           mockMQ,
@@ -410,7 +401,7 @@ func TestDeployer_startAcctMeteringRequest(t *testing.T) {
 				UniqueServiceName:  "test-service",
 			},
 		}
-		d.startAcctMeteringRequest(resMap, clusterMap, deploy, eventTime)
+		d.startAcctMeteringRequest(context.Background(), resMap, clusterMap, deploy, eventTime)
 		// Should use default replicaCount of 1
 	})
 }
