@@ -5,10 +5,11 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	corev1 "k8s.io/api/core/v1"
 	"log/slog"
 	"strings"
 	"time"
+
+	corev1 "k8s.io/api/core/v1"
 
 	"github.com/uptrace/bun"
 	"opencsg.com/csghub-server/builder/deploy/common"
@@ -64,7 +65,7 @@ type Deploy struct {
 	ClusterNode    string               `bun:"," json:"cluster_node"`
 	QueueName      string               `bun:"," json:"queue_name"`
 	OwnerNamespace string               `bun:"," json:"owner_namespace"`
-	Instances      []types.Instance   `bun:"type:jsonb" json:"instances"`
+	Instances      []types.Instance     `bun:"type:jsonb" json:"instances"`
 	NodeAffinity   *corev1.NodeAffinity `json:"node_affinity,omitempty"`
 	Tolerations    []types.Toleration   `json:"tolerations,omitempty"`
 	times
@@ -122,6 +123,7 @@ type DeployTaskStore interface {
 	GetLastTaskByType(ctx context.Context, deployID int64, taskType int) (*DeployTask, error)
 	GetClusterDeploys(ctx context.Context, req types.ClusterDeployReq) ([]Deploy, int, error)
 	ListDeploysByTimeRange(ctx context.Context, req types.DeployTimeRangeReq) ([]Deploy, int, error)
+	FindByDeployNameAndType(ctx context.Context, uuid, deployName string, deployType int) (*Deploy, error)
 }
 
 func NewDeployTaskStore() DeployTaskStore {
@@ -710,3 +712,17 @@ func (s *deployTaskStoreImpl) ListDeploysByTimeRange(ctx context.Context, req ty
 	return result, total, nil
 }
 
+func (s *deployTaskStoreImpl) FindByDeployNameAndType(ctx context.Context, uuid, deployName string, deployType int) (*Deploy, error) {
+	var result Deploy
+	err := s.db.Operator.Core.NewSelect().Model(&result).
+		Where("user_uuid = ? and deploy_name = ? and type = ?", uuid, deployName, deployType).
+		Scan(ctx, &result)
+	if err != nil {
+		err = errorx.HandleDBError(err, nil)
+		if errors.Is(err, errorx.ErrDatabaseNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &result, nil
+}

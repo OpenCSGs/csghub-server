@@ -798,7 +798,7 @@ func TestModelComponent_GetServerless(t *testing.T) {
 
 	dr, err := mc.GetServerless(ctx, "ns", "n", "user")
 	require.Nil(t, err)
-	require.Equal(t, &types.DeployRepo{
+	require.Equal(t, &types.DeployRequest{
 		DeployID:      1,
 		ProxyEndpoint: "ep",
 		Status:        "Pending",
@@ -1132,7 +1132,7 @@ func TestModelComponent_Wakeup(t *testing.T) {
 		&database.Deploy{SvcName: "svc"}, nil,
 	)
 
-	sc.mocks.deployer.EXPECT().Wakeup(ctx, types.DeployRepo{
+	sc.mocks.deployer.EXPECT().Wakeup(ctx, types.DeployRequest{
 		DeployID:  1,
 		Namespace: "ns",
 		Name:      "n",

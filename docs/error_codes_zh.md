@@ -90,6 +90,30 @@
 - **错误名:** `shareSessionUUIDExpired`
 - **描述:** 分享会话UUID已过期。
 
+---
+
+### `AGENT-ERR-7`
+
+- **错误代码:** `AGENT-ERR-7`
+- **错误名:** `schedulerQuotaExceeded`
+- **描述:** 定时任务创建数量已达上限。
+
+---
+
+### `AGENT-ERR-8`
+
+- **错误代码:** `AGENT-ERR-8`
+- **错误名:** `schedulerInstanceNoCapability`
+- **描述:** 该智能体实例不支持定时任务功能，需在实例元数据中添加 "scheduler" 能力。
+
+---
+
+### `AGENT-ERR-9`
+
+- **错误代码:** `AGENT-ERR-9`
+- **错误名:** `schedulerStartTimeInPast`
+- **描述:** 指定的开始时间已过去，一次性定时任务必须使用未来的日期/时间。
+
 ## Auth 错误
 
 ### `AUTH-ERR-0`
@@ -522,6 +546,14 @@
 - **错误名:** `gitUsingGitInXnetRepository`
 - **描述:** 使用 git 操作 xnet 启用的仓库。
 
+---
+
+### `GIT-ERR-38`
+
+- **错误代码:** `GIT-ERR-38`
+- **错误名:** `gitGetRepositorySizeFailed`
+- **描述:** 获取仓库大小失败。这可能由网络问题、身份验证问题或指定的仓库不存在引起。
+
 ## Invitation 错误
 
 ### `INVITATION-ERR-0`
@@ -564,17 +596,17 @@
 
 ## Mcp_gateway 错误
 
-### `MCP-GW-ERR-0`
+### `MCPGW-ERR-0`
 
-- **错误代码:** `MCP-GW-ERR-0`
+- **错误代码:** `MCPGW-ERR-0`
 - **错误名:** `gatewayMCPServerNameAlreadyExists`
 - **描述:** 网关中已存在相同名称的MCP服务器。
 
 ---
 
-### `MCP-GW-ERR-1`
+### `MCPGW-ERR-1`
 
-- **错误代码:** `MCP-GW-ERR-1`
+- **错误代码:** `MCPGW-ERR-1`
 - **错误名:** `gatewayMCPServerInvalidName`
 - **描述:** MCP服务器名称不符合命名规范。
 
@@ -777,6 +809,38 @@
 - **错误代码:** `RUNNER-ERR-4`
 - **错误名:** `codeTrafficPercentNotZeroErr`
 - **描述:** 当前版本仍有流量分配（流量占比≠0）
+
+## Sandbox 错误
+
+### `SANDBOX-ERR-0`
+
+- **错误代码:** `SANDBOX-ERR-0`
+- **错误名:** `codeSandboxNameEmptyErr`
+- **描述:** 沙箱名称不能为空
+
+---
+
+### `SANDBOX-ERR-1`
+
+- **错误代码:** `SANDBOX-ERR-1`
+- **错误名:** `codeSandboxNameTooLongErr`
+- **描述:** 沙箱名称长度超过限制（最大253个字符）
+
+---
+
+### `SANDBOX-ERR-2`
+
+- **错误代码:** `SANDBOX-ERR-2`
+- **错误名:** `codeSandboxNameUppercaseErr`
+- **描述:** 沙箱名称包含大写字母（仅允许小写）
+
+---
+
+### `SANDBOX-ERR-3`
+
+- **错误代码:** `SANDBOX-ERR-3`
+- **错误名:** `codeSandboxNameInvalidCharErr`
+- **描述:** 沙箱名称包含非法字符或格式错误（仅允许小写字母、数字、连字符、点；不能以连字符/点开头/结尾，不能有连续的连字符/点）
 
 ## Sensitive 错误
 

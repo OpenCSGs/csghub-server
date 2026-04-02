@@ -6,6 +6,7 @@ import (
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/common/types"
+	runnerTypes "opencsg.com/csghub-server/runner/types"
 )
 
 var _ Runner = (*LocalRunner)(nil)
@@ -116,5 +117,13 @@ func (h *LocalRunner) ListKsvcVersions(ctx context.Context, clusterID, svcName s
 }
 
 func (h *LocalRunner) DeleteKsvcVersion(ctx context.Context, clusterID, svcName, commitID string) error {
+	return nil
+}
+
+func (h *LocalRunner) CreateSandbox(ctx context.Context, req *runnerTypes.SandboxRequest) (*runnerTypes.Sandbox, error) {
+	return nil, nil
+}
+
+func (h *LocalRunner) DeleteSandbox(ctx context.Context, req *runnerTypes.SandboxDeleteRequest) error {
 	return nil
 }

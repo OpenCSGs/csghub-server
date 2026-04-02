@@ -120,7 +120,7 @@ func (c *notebookComponentImpl) CreateNotebook(ctx context.Context, req *types.C
 		billingUUID = resolved
 	}
 
-	dp := types.DeployRepo{
+	dp := types.DeployRequest{
 		DeployName:       req.DeployName,
 		SpaceID:          0,
 		Hardware:         resource.Resources,
@@ -163,7 +163,7 @@ func (c *notebookComponentImpl) GetNotebook(ctx context.Context, req *types.GetN
 	if err != nil {
 		return nil, err
 	}
-	reqReplica := types.DeployRepo{
+	reqReplica := types.DeployRequest{
 		DeployID:  deploy.ID,
 		SvcName:   deploy.SvcName,
 		ClusterID: deploy.ClusterID,
@@ -225,7 +225,7 @@ func (c *notebookComponentImpl) LogsNotebook(ctx context.Context, req *types.Sta
 	if err != nil {
 		return nil, fmt.Errorf("cannot find notebook for status check, %w", err)
 	}
-	return c.deployer.InstanceLogs(ctx, types.DeployRepo{
+	return c.deployer.InstanceLogs(ctx, types.DeployRequest{
 		DeployID:     deploy.ID,
 		InstanceName: req.InstanceName,
 		Since:        req.Since,
@@ -243,7 +243,7 @@ func (c *notebookComponentImpl) DeleteNotebook(ctx context.Context, req *types.D
 		return err
 	}
 	// delete service
-	deployRepo := types.DeployRepo{
+	deployRepo := types.DeployRequest{
 		SpaceID:   0,
 		DeployID:  deploy.ID,
 		SvcName:   deploy.SvcName,
@@ -272,7 +272,7 @@ func (c *notebookComponentImpl) UpdateNotebook(ctx context.Context, req *types.U
 		return fmt.Errorf("cannot find deploy for notebook, %w", err)
 	}
 
-	deployRepo := types.DeployRepo{
+	deployRepo := types.DeployRequest{
 		DeployID:  deploy.ID,
 		SvcName:   deploy.SvcName,
 		ClusterID: deploy.ClusterID,
@@ -337,7 +337,7 @@ func (c *notebookComponentImpl) StartNotebook(ctx context.Context, req *types.St
 		return fmt.Errorf("cannot find deploy for notebook, %w", err)
 	}
 
-	deployRepo := types.DeployRepo{
+	deployRepo := types.DeployRequest{
 		DeployID:  deploy.ID,
 		SvcName:   deploy.SvcName,
 		ClusterID: deploy.ClusterID,
@@ -371,7 +371,7 @@ func (c *notebookComponentImpl) StopNotebook(ctx context.Context, req *types.Sto
 		return err
 	}
 
-	deployRepo := types.DeployRepo{
+	deployRepo := types.DeployRequest{
 		DeployID:  deploy.ID,
 		SvcName:   deploy.SvcName,
 		ClusterID: deploy.ClusterID,
@@ -406,7 +406,7 @@ func (c *notebookComponentImpl) Wakeup(ctx context.Context, deployId int64) erro
 	if err != nil {
 		return fmt.Errorf("can't get notebook deployment,%w", err)
 	}
-	return c.deployer.Wakeup(ctx, types.DeployRepo{
+	return c.deployer.Wakeup(ctx, types.DeployRequest{
 		DeployID:  deployId,
 		SvcName:   deploy.SvcName,
 		Endpoint:  deploy.Endpoint,

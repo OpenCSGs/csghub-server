@@ -93,5 +93,11 @@ func NewHttpServer(ctx context.Context, config *config.Config) (*gin.Engine, err
 		imagebuilderGroup.PUT("/stop", imagebuilderHandler.Stop)
 	}
 
+	// sandbox
+	err = addSandboxRoutes(apiGroup, config, clusterPool)
+	if err != nil {
+		return nil, fmt.Errorf("failed to add sandbox routes error: %w", err)
+	}
+
 	return r, nil
 }

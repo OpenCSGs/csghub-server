@@ -1,0 +1,14 @@
+{
+    "error.SANDBOX-ERR-0": {
+        "other": "Sandbox name is empty."
+    },
+    "error.SANDBOX-ERR-1": {
+        "other": "Sandbox name exceeds maximum length (253 characters)."
+    },
+    "error.SANDBOX-ERR-2": {
+        "other": "Sandbox name contains uppercase letters (only lowercase allowed)."
+    },
+    "error.SANDBOX-ERR-3": {
+        "other": "Sandbox name has invalid characters or format (only a-z, 0-9, -, . allowed; cannot start/end with -/. or have consecutive -/. )."
+    }
+}

@@ -90,6 +90,30 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Name:** `shareSessionUUIDExpired`
 - **Description:** The share session uuid expired.
 
+---
+
+### `AGENT-ERR-7`
+
+- **Error Code:** `AGENT-ERR-7`
+- **Error Name:** `schedulerQuotaExceeded`
+- **Description:** The scheduled task creation quota exceeded. User has reached the limit of schedulers they can create.
+
+---
+
+### `AGENT-ERR-8`
+
+- **Error Code:** `AGENT-ERR-8`
+- **Error Name:** `schedulerInstanceNoCapability`
+- **Description:** The agent instance does not support scheduling. The "scheduler" capability must be added to the instance metadata.
+
+---
+
+### `AGENT-ERR-9`
+
+- **Error Code:** `AGENT-ERR-9`
+- **Error Name:** `schedulerStartTimeInPast`
+- **Description:** The specified start time is in the past. One-time schedules must use a future date/time.
+
 ## Auth Errors
 
 ### `AUTH-ERR-0`
@@ -522,6 +546,14 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Name:** `gitUsingGitInXnetRepository`
 - **Description:** Using git in xnet-enabled repository error. Git operations are not supported in repositories enabled with xnet.
 
+---
+
+### `GIT-ERR-38`
+
+- **Error Code:** `GIT-ERR-38`
+- **Error Name:** `gitGetRepositorySizeFailed`
+- **Description:** Get repository size failed. This can be caused by network problems, authentication issues, or the specified repository does not exist.
+
 ## Invitation Errors
 
 ### `INVITATION-ERR-0`
@@ -564,17 +596,17 @@ This document lists all the custom error codes defined in the project, categoriz
 
 ## Mcp_gateway Errors
 
-### `MCP-GW-ERR-0`
+### `MCPGW-ERR-0`
 
-- **Error Code:** `MCP-GW-ERR-0`
+- **Error Code:** `MCPGW-ERR-0`
 - **Error Name:** `gatewayMCPServerNameAlreadyExists`
 - **Description:** An MCP server with this name already exists in the gateway.
 
 ---
 
-### `MCP-GW-ERR-1`
+### `MCPGW-ERR-1`
 
-- **Error Code:** `MCP-GW-ERR-1`
+- **Error Code:** `MCPGW-ERR-1`
 - **Error Name:** `gatewayMCPServerInvalidName`
 - **Description:** The MCP server name does not meet naming requirements.
 
@@ -777,6 +809,38 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Code:** `RUNNER-ERR-4`
 - **Error Name:** `codeTrafficPercentNotZeroErr`
 - **Description:** The traffic percent is not zero.
+
+## Sandbox Errors
+
+### `SANDBOX-ERR-0`
+
+- **Error Code:** `SANDBOX-ERR-0`
+- **Error Name:** `codeSandboxNameEmptyErr`
+- **Description:** Sandbox name is empty.
+
+---
+
+### `SANDBOX-ERR-1`
+
+- **Error Code:** `SANDBOX-ERR-1`
+- **Error Name:** `codeSandboxNameTooLongErr`
+- **Description:** Sandbox name exceeds maximum length (253 characters).
+
+---
+
+### `SANDBOX-ERR-2`
+
+- **Error Code:** `SANDBOX-ERR-2`
+- **Error Name:** `codeSandboxNameUppercaseErr`
+- **Description:** Sandbox name contains uppercase letters (only lowercase allowed).
+
+---
+
+### `SANDBOX-ERR-3`
+
+- **Error Code:** `SANDBOX-ERR-3`
+- **Error Name:** `codeSandboxNameInvalidCharErr`
+- **Description:** Sandbox name has invalid characters or format (only a-z, 0-9, -, . allowed; cannot start/end with -/. or have consecutive -/. ).
 
 ## Sensitive Errors
 

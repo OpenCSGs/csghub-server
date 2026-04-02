@@ -9,6 +9,8 @@ import (
 
 	mock "github.com/stretchr/testify/mock"
 
+	runnertypes "opencsg.com/csghub-server/runner/types"
+
 	types "opencsg.com/csghub-server/common/types"
 )
 
@@ -72,6 +74,65 @@ func (_c *MockRunner_CreateRevisions_Call) RunAndReturn(run func(context.Context
 	return _c
 }
 
+// CreateSandbox provides a mock function with given fields: ctx, req
+func (_m *MockRunner) CreateSandbox(ctx context.Context, req *runnertypes.SandboxRequest) (*runnertypes.Sandbox, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateSandbox")
+	}
+
+	var r0 *runnertypes.Sandbox
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *runnertypes.SandboxRequest) (*runnertypes.Sandbox, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *runnertypes.SandboxRequest) *runnertypes.Sandbox); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*runnertypes.Sandbox)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *runnertypes.SandboxRequest) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockRunner_CreateSandbox_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateSandbox'
+type MockRunner_CreateSandbox_Call struct {
+	*mock.Call
+}
+
+// CreateSandbox is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req *runnertypes.SandboxRequest
+func (_e *MockRunner_Expecter) CreateSandbox(ctx interface{}, req interface{}) *MockRunner_CreateSandbox_Call {
+	return &MockRunner_CreateSandbox_Call{Call: _e.mock.On("CreateSandbox", ctx, req)}
+}
+
+func (_c *MockRunner_CreateSandbox_Call) Run(run func(ctx context.Context, req *runnertypes.SandboxRequest)) *MockRunner_CreateSandbox_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*runnertypes.SandboxRequest))
+	})
+	return _c
+}
+
+func (_c *MockRunner_CreateSandbox_Call) Return(_a0 *runnertypes.Sandbox, _a1 error) *MockRunner_CreateSandbox_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockRunner_CreateSandbox_Call) RunAndReturn(run func(context.Context, *runnertypes.SandboxRequest) (*runnertypes.Sandbox, error)) *MockRunner_CreateSandbox_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // DeleteKsvcVersion provides a mock function with given fields: ctx, clusterID, svcName, commitID
 func (_m *MockRunner) DeleteKsvcVersion(ctx context.Context, clusterID string, svcName string, commitID string) error {
 	ret := _m.Called(ctx, clusterID, svcName, commitID)
@@ -117,6 +178,53 @@ func (_c *MockRunner_DeleteKsvcVersion_Call) Return(_a0 error) *MockRunner_Delet
 }
 
 func (_c *MockRunner_DeleteKsvcVersion_Call) RunAndReturn(run func(context.Context, string, string, string) error) *MockRunner_DeleteKsvcVersion_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// DeleteSandbox provides a mock function with given fields: ctx, req
+func (_m *MockRunner) DeleteSandbox(ctx context.Context, req *runnertypes.SandboxDeleteRequest) error {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteSandbox")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, *runnertypes.SandboxDeleteRequest) error); ok {
+		r0 = rf(ctx, req)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockRunner_DeleteSandbox_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteSandbox'
+type MockRunner_DeleteSandbox_Call struct {
+	*mock.Call
+}
+
+// DeleteSandbox is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req *runnertypes.SandboxDeleteRequest
+func (_e *MockRunner_Expecter) DeleteSandbox(ctx interface{}, req interface{}) *MockRunner_DeleteSandbox_Call {
+	return &MockRunner_DeleteSandbox_Call{Call: _e.mock.On("DeleteSandbox", ctx, req)}
+}
+
+func (_c *MockRunner_DeleteSandbox_Call) Run(run func(ctx context.Context, req *runnertypes.SandboxDeleteRequest)) *MockRunner_DeleteSandbox_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*runnertypes.SandboxDeleteRequest))
+	})
+	return _c
+}
+
+func (_c *MockRunner_DeleteSandbox_Call) Return(_a0 error) *MockRunner_DeleteSandbox_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockRunner_DeleteSandbox_Call) RunAndReturn(run func(context.Context, *runnertypes.SandboxDeleteRequest) error) *MockRunner_DeleteSandbox_Call {
 	_c.Call.Return(run)
 	return _c
 }

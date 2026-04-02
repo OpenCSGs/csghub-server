@@ -441,23 +441,23 @@ func (_c *MockModelComponent_Deploy_Call) RunAndReturn(run func(context.Context,
 }
 
 // GetServerless provides a mock function with given fields: ctx, namespace, name, currentUser
-func (_m *MockModelComponent) GetServerless(ctx context.Context, namespace string, name string, currentUser string) (*types.DeployRepo, error) {
+func (_m *MockModelComponent) GetServerless(ctx context.Context, namespace string, name string, currentUser string) (*types.DeployRequest, error) {
 	ret := _m.Called(ctx, namespace, name, currentUser)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetServerless")
 	}
 
-	var r0 *types.DeployRepo
+	var r0 *types.DeployRequest
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) (*types.DeployRepo, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) (*types.DeployRequest, error)); ok {
 		return rf(ctx, namespace, name, currentUser)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) *types.DeployRepo); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) *types.DeployRequest); ok {
 		r0 = rf(ctx, namespace, name, currentUser)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*types.DeployRepo)
+			r0 = ret.Get(0).(*types.DeployRequest)
 		}
 	}
 
@@ -491,12 +491,12 @@ func (_c *MockModelComponent_GetServerless_Call) Run(run func(ctx context.Contex
 	return _c
 }
 
-func (_c *MockModelComponent_GetServerless_Call) Return(_a0 *types.DeployRepo, _a1 error) *MockModelComponent_GetServerless_Call {
+func (_c *MockModelComponent_GetServerless_Call) Return(_a0 *types.DeployRequest, _a1 error) *MockModelComponent_GetServerless_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockModelComponent_GetServerless_Call) RunAndReturn(run func(context.Context, string, string, string) (*types.DeployRepo, error)) *MockModelComponent_GetServerless_Call {
+func (_c *MockModelComponent_GetServerless_Call) RunAndReturn(run func(context.Context, string, string, string) (*types.DeployRequest, error)) *MockModelComponent_GetServerless_Call {
 	_c.Call.Return(run)
 	return _c
 }

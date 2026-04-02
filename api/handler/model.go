@@ -688,7 +688,7 @@ func (h *ModelHandler) DeployDedicated(ctx *gin.Context) {
 	h.createAgentInstanceTask(ctx.Request.Context(), req.Agent, fmt.Sprintf("%d", deployID), types.AgentTaskTypeInference, currentUser)
 
 	// return deploy_id
-	response := types.DeployRepo{DeployID: deployID}
+	response := types.DeployRequest{DeployID: deployID}
 
 	httpbase.OK(ctx, response)
 }
@@ -808,7 +808,7 @@ func (h *ModelHandler) FinetuneCreate(ctx *gin.Context) {
 		slog.String("name", name), slog.Int64("deploy_id", deployID))
 
 	// return deploy_id
-	response := types.DeployRepo{DeployID: deployID}
+	response := types.DeployRequest{DeployID: deployID}
 
 	httpbase.OK(ctx, response)
 }
@@ -1620,7 +1620,7 @@ func (h *ModelHandler) DeployServerless(ctx *gin.Context) {
 		slog.String("name", name), slog.Int64("deploy_id", deployID), slog.String("current_user", currentUser))
 
 	// return deploy_id
-	response := types.DeployRepo{DeployID: deployID}
+	response := types.DeployRequest{DeployID: deployID}
 
 	httpbase.OK(ctx, response)
 }

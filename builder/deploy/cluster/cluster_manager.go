@@ -23,29 +23,35 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
 
+	"k8s.io/client-go/kubernetes/scheme"
 	knative "knative.dev/serving/pkg/client/clientset/versioned"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 	rtypes "opencsg.com/csghub-server/runner/types"
+	agentsandboxv1alpha1 "sigs.k8s.io/agent-sandbox/api/v1alpha1"
+	sandboxclient "sigs.k8s.io/agent-sandbox/clients/k8s/clientset/versioned"
+	extensionsv1alpha1 "sigs.k8s.io/agent-sandbox/extensions/api/v1alpha1"
 	lwscli "sigs.k8s.io/lws/client-go/clientset/versioned"
 )
 
 // Cluster holds basic information about a Kubernetes cluster
 
 type Cluster struct {
-	CID              string               // config id
-	ID               string               // unique id
-	ConfigPath       string               // Path to the kubeconfig file
-	Client           kubernetes.Interface // Kubernetes client
-	KnativeClient    knative.Interface    // Knative client
-	LWSClient        lwscli.Interface     // LWS client
-	ArgoClient       argo.Interface       // Argo client
+	CID              string                  // config id
+	ID               string                  // unique id
+	ConfigPath       string                  // Path to the kubeconfig file
+	Client           kubernetes.Interface    // Kubernetes client
+	SandboxClient    sandboxclient.Interface // Controller client for CRD operations
+	KnativeClient    knative.Interface       // Knative client
+	LWSClient        lwscli.Interface        // LWS client
+	ArgoClient       argo.Interface          // Argo client
 	StorageClass     string
 	NetworkInterface string            // Main network interface, used to rdma, ex: eth0
 	ConnectMode      types.ClusterMode // InCluster | kubeconfig
 	Region           string
 	Nodes            []types.Node
+	RestConfig       *rest.Config
 }
 
 // Pool is a resource pool of cluster information
@@ -236,6 +242,24 @@ func buildCluster(kubeconfig *rest.Config, id string, index int, connectMode typ
 		slog.Error("failed to create lws client", "error", err)
 		return nil, fmt.Errorf("failed to create lws client,%w", err)
 	}
+
+	// Create controller client for CRD operations
+	err = agentsandboxv1alpha1.AddToScheme(scheme.Scheme)
+	if err != nil {
+		slog.Error("failed to add sandbox v1alpha1 to scheme", "error", err)
+		return nil, fmt.Errorf("failed to add sandbox v1alpha1 to scheme,%w", err)
+	}
+	err = extensionsv1alpha1.AddToScheme(scheme.Scheme)
+	if err != nil {
+		slog.Error("failed to add sandbox v1alpha1 to scheme", "error", err)
+		return nil, fmt.Errorf("failed to add sandbox v1alpha1 to scheme,%w", err)
+	}
+	sandboxClient, err := sandboxclient.NewForConfig(kubeconfig)
+	if err != nil {
+		slog.Error("failed to create sandbox client", "error", err)
+		return nil, fmt.Errorf("failed to create sandbox client,%w", err)
+	}
+
 	ctxTimeout, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -331,6 +355,7 @@ func buildCluster(kubeconfig *rest.Config, id string, index int, connectMode typ
 		CID:              id,
 		ID:               cluster.ClusterID,
 		Client:           client,
+		SandboxClient:    sandboxClient,
 		KnativeClient:    knativeClient,
 		ArgoClient:       argoClient,
 		LWSClient:        lwsclient,
@@ -338,6 +363,7 @@ func buildCluster(kubeconfig *rest.Config, id string, index int, connectMode typ
 		Region:           region,
 		StorageClass:     cluster.StorageClass,
 		NetworkInterface: cluster.NetworkInterface,
+		RestConfig:       kubeconfig,
 	}
 	return c, nil
 }
