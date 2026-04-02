@@ -396,6 +396,7 @@ func (s *clusterInfoStoreImpl) ListAllNodes(ctx context.Context) ([]ClusterNodeW
 		ColumnExpr("cn.*, ci.region as cluster_region").
 		TableExpr("cluster_nodes as cn").
 		Join("JOIN cluster_infos ci ON ci.cluster_id = cn.cluster_id").
+		Where("ci.enable = ?", true).
 		Order("cn.cluster_id").
 		Order("cn.name").
 		Scan(ctx, &result)
