@@ -649,7 +649,9 @@ func TestServiceComponent_deleteServiceInDB2(t *testing.T) {
 			"test": "test",
 			"port": "8000",
 		},
-		Annotation: map[string]string{},
+		Annotation: map[string]string{
+			"task_id": "1",
+		},
 	}
 
 	ctx := context.TODO()
@@ -670,7 +672,7 @@ func TestServiceComponent_deleteServiceInDB2(t *testing.T) {
 
 	reporter.EXPECT().Report(mock.Anything)
 
-	err = sc.deleteKServiceWithEvent(ctx, ksvc.Name, "test")
+	err = sc.deleteKServiceWithEvent(ctx, ksvc.Name, "test", 1)
 	require.Nil(t, err)
 }
 

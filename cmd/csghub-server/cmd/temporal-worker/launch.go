@@ -69,7 +69,7 @@ var cmdLaunch = &cobra.Command{
 
 		deploy.DeployWorkflow = func(buildTask, runTask *database.DeployTask) {
 			if err := serverworkflow.StartNewDeployTaskWithCancelOld(buildTask, runTask); err != nil {
-				slog.Error("start new deploy task failed", slog.Any("error", err))
+				slog.Error("start new build and deploy task failed", slog.Any("error", err))
 			}
 		}
 		slog.Info("init model inference deployer")

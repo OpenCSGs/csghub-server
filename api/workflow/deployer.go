@@ -79,7 +79,7 @@ func StartDeployWorker(
 	return nil
 }
 
-func GetDeploymentWorkflowID(deploy *database.Deploy) string {
+func getDeploymentWorkflowID(deploy *database.Deploy) string {
 	typeName, ok := deployTypeNames[deploy.Type]
 	if !ok {
 		typeName = "unknown"
@@ -93,10 +93,6 @@ func GetDeploymentWorkflowID(deploy *database.Deploy) string {
 	return fmt.Sprintf("deploy-%s-%s-%d", typeName, sanitizedGitPath, deploy.ID)
 }
 
-func getDeploymentWorkflowID(deploy *database.Deploy) string {
-	return GetDeploymentWorkflowID(deploy)
-}
-
 const (
 	MaxRetryAttempts      = 3
 	RetryInitialInterval  = 200 * time.Millisecond
@@ -107,7 +103,7 @@ const (
 // StartNewDeployTaskWithCancelOld
 func StartNewDeployTaskWithCancelOld(buildTask, runTask *database.DeployTask) error {
 	if runTask == nil {
-		return fmt.Errorf("failed to start deployment: run task is nil")
+		return fmt.Errorf("failed to start temporal deployment process due to run task is nil")
 	}
 
 	temporalClient := GetClientFunc()
@@ -116,12 +112,14 @@ func StartNewDeployTaskWithCancelOld(buildTask, runTask *database.DeployTask) er
 
 	err := retry.Do(
 		func() error {
+			// Check if the workflow is running and cancel it if necessary.
 			running, err := cancelRunningWorkflow(ctx, temporalClient, workflowID)
 			if err != nil {
 				return fmt.Errorf("failed to handle running workflow: %w", err)
 			}
 
 			if running {
+				// Wait for the workflow to terminate before starting a new one.
 				if err = waitForWorkflowTermination(ctx, temporalClient, workflowID, CancelTimeoutDuration); err != nil {
 					slog.Warn("workflow may not have fully terminated before starting new one",
 						"workflow_id", workflowID, "error", err)
@@ -144,13 +142,13 @@ func StartNewDeployTaskWithCancelOld(buildTask, runTask *database.DeployTask) er
 					TaskQueue:             DeployWorkflowQueue,
 					WorkflowIDReusePolicy: enums.WORKFLOW_ID_REUSE_POLICY_TERMINATE_IF_RUNNING,
 				},
-				DeployWorkflow,
-				buildID,
-				runID,
+				DeployWorkflow, // func to execute
+				buildID,        // pass build task ID to workflow
+				runID,          // pass deploy task ID to workflow
 			)
 
 			if err != nil {
-				return fmt.Errorf("failed to start new workflow: %w", err)
+				return fmt.Errorf("failed to start new workflow %s: %w", workflowID, err)
 			}
 
 			return nil
@@ -163,7 +161,7 @@ func StartNewDeployTaskWithCancelOld(buildTask, runTask *database.DeployTask) er
 			return !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded)
 		}),
 		retry.OnRetry(func(n uint, err error) {
-			slog.Warn("Operation failed, retrying",
+			slog.WarnContext(ctx, "Operation failed, retrying",
 				"attempt", n,
 				"max_attempts", 3,
 				"error", err,
@@ -178,19 +176,19 @@ func StartNewDeployTaskWithCancelOld(buildTask, runTask *database.DeployTask) er
 	return nil
 }
 
-func CancelRunningWorkflow(ctx context.Context, temporalClient client.Client, workflowID string) (bool, error) {
+func cancelRunningWorkflow(ctx context.Context, temporalClient client.Client, workflowID string) (bool, error) {
 	describeResp, err := temporalClient.DescribeWorkflowExecution(ctx, workflowID, "")
 
 	if err != nil {
 		if IsWorkflowNotFoundError(err) {
 			return false, nil
 		}
-		return false, fmt.Errorf("failed to describe workflow: %w", err)
+		return false, fmt.Errorf("failed to describe workflow %s error: %w", workflowID, err)
 	}
 
 	if describeResp.WorkflowExecutionInfo.Status == enums.WORKFLOW_EXECUTION_STATUS_RUNNING {
 		if err := temporalClient.CancelWorkflow(ctx, workflowID, describeResp.WorkflowExecutionInfo.Execution.RunId); err != nil {
-			return false, fmt.Errorf("failed to cancel existing workflow: %w", err)
+			return false, fmt.Errorf("failed to cancel existing running workflow: %w", err)
 		}
 		return true, nil
 	}
@@ -198,11 +196,7 @@ func CancelRunningWorkflow(ctx context.Context, temporalClient client.Client, wo
 	return false, nil
 }
 
-func cancelRunningWorkflow(ctx context.Context, temporalClient client.Client, workflowID string) (bool, error) {
-	return CancelRunningWorkflow(ctx, temporalClient, workflowID)
-}
-
-func WaitForWorkflowTermination(ctx context.Context, temporalClient client.Client, workflowID string, timeout time.Duration) error {
+func waitForWorkflowTermination(ctx context.Context, temporalClient client.Client, workflowID string, timeout time.Duration) error {
 	waitCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
@@ -213,14 +207,16 @@ func WaitForWorkflowTermination(ctx context.Context, temporalClient client.Clien
 	for {
 		select {
 		case <-waitCtx.Done():
-			return fmt.Errorf("timeout waiting for workflow termination: %w", waitCtx.Err())
+			return fmt.Errorf("timeout waiting for workflow %s termination: %w", workflowID, waitCtx.Err())
 		case <-ticker.C:
 			describeResp, err := temporalClient.DescribeWorkflowExecution(ctx, workflowID, "")
 			if err != nil {
 				if IsWorkflowNotFoundError(err) {
 					return nil
 				}
-				return fmt.Errorf("failed to describe workflow: %w", err)
+				slog.WarnContext(ctx, "failed describe workflow", slog.Any("workflowId", workflowID), slog.Any("error", err))
+				// keep retrying if there's an unexpected error
+				continue
 			}
 
 			if describeResp.WorkflowExecutionInfo.Status != enums.WORKFLOW_EXECUTION_STATUS_RUNNING {
@@ -228,10 +224,6 @@ func WaitForWorkflowTermination(ctx context.Context, temporalClient client.Clien
 			}
 		}
 	}
-}
-
-func waitForWorkflowTermination(ctx context.Context, temporalClient client.Client, workflowID string, timeout time.Duration) error {
-	return WaitForWorkflowTermination(ctx, temporalClient, workflowID, timeout)
 }
 
 func IsWorkflowNotFoundError(err error) bool {
@@ -245,7 +237,7 @@ func IsWorkflowNotFoundError(err error) bool {
 
 func DeployWorkflow(ctx workflow.Context, buildTaskId, runTaskId int64) ([]string, error) {
 	logger := workflow.GetLogger(ctx)
-	logger.Info("deploy workflow started")
+	logger.Info("deploy workflow started buildTaskId %d runTaskId %d", buildTaskId, runTaskId)
 
 	result := []string{"deploy workflow started"}
 	retryPolicy := &sdkTemporal.RetryPolicy{
@@ -268,7 +260,7 @@ func DeployWorkflow(ctx workflow.Context, buildTaskId, runTaskId int64) ([]strin
 		result = append(result, "ExecuteActivity build")
 		err := workflow.ExecuteActivity(actCtx, deployActivity.Build, buildTaskId).Get(ctx, nil)
 		if err != nil {
-			logger.Error("failed to build", "error", err)
+			logger.Error("failed to execute build task", slog.Any("buildTaskId", buildTaskId), slog.Any("error", err))
 			result = append(result, "ExecuteActivity build failed")
 			return result, err
 		}
@@ -283,7 +275,7 @@ func DeployWorkflow(ctx workflow.Context, buildTaskId, runTaskId int64) ([]strin
 		result = append(result, "ExecuteActivity run")
 		err := workflow.ExecuteActivity(actCtx, deployActivity.Deploy, runTaskId).Get(ctx, nil)
 		if err != nil {
-			logger.Error("failed to run", "error", err)
+			logger.Error("failed to execute deploy task", slog.Any("runTaskId", runTaskId), slog.Any("error", err))
 			result = append(result, "ExecuteActivity run failed")
 			return result, err
 		}
@@ -291,7 +283,7 @@ func DeployWorkflow(ctx workflow.Context, buildTaskId, runTaskId int64) ([]strin
 		result = append(result, "ExecuteActivity run succeeded")
 	}
 
-	logger.Info("deploy workflow completed")
+	logger.Info("deploy workflow completed buildTaskId %d runTaskId %d", buildTaskId, runTaskId)
 	result = append(result, "deploy workflow completed")
 	return result, nil
 }
