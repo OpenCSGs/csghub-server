@@ -667,6 +667,8 @@ func createModelRoutes(config *config.Config,
 		modelsGroup.PUT("/:namespace/:name/mirror", middlewareCollection.Auth.NeedLogin, repoCommonHandler.UpdateMirror)
 		modelsGroup.DELETE("/:namespace/:name/mirror", middlewareCollection.Auth.NeedLogin, repoCommonHandler.DeleteMirror)
 		modelsGroup.POST("/:namespace/:name/mirror/sync", middlewareCollection.Auth.NeedLogin, repoCommonHandler.SyncMirror)
+		// Get repo size by branch
+		modelsGroup.GET("/:namespace/:name/size/:branch", repoCommonHandler.GetRepoSizeByBranch)
 		// runtime framework
 		modelsGroup.GET("/:namespace/:name/runtime_framework", repoCommonHandler.RuntimeFrameworkList)
 		modelsGroup.GET("/:namespace/:name/runtime_framework_v2", repoCommonHandler.RuntimeFrameworkListV2)
@@ -805,6 +807,8 @@ func createDatasetRoutes(
 		datasetsGroup.PUT("/:namespace/:name/mirror", middleware.MustLogin(), repoCommonHandler.UpdateMirror)
 		datasetsGroup.DELETE("/:namespace/:name/mirror", middleware.MustLogin(), repoCommonHandler.DeleteMirror)
 		datasetsGroup.POST("/:namespace/:name/mirror/sync", middleware.MustLogin(), repoCommonHandler.SyncMirror) // TODO: check license
+		// Get repo size by branch
+		datasetsGroup.GET("/:namespace/:name/size/:branch", repoCommonHandler.GetRepoSizeByBranch)
 	}
 }
 
@@ -858,6 +862,8 @@ func createCodeRoutes(
 		codesGroup.PUT("/:namespace/:name/mirror", middlewareCollection.Auth.NeedLogin, repoCommonHandler.UpdateMirror)
 		codesGroup.DELETE("/:namespace/:name/mirror", middlewareCollection.Auth.NeedLogin, repoCommonHandler.DeleteMirror)
 		codesGroup.POST("/:namespace/:name/mirror/sync", middlewareCollection.Auth.NeedLogin, repoCommonHandler.SyncMirror)
+		// Get repo size by branch
+		codesGroup.GET("/:namespace/:name/size/:branch", repoCommonHandler.GetRepoSizeByBranch)
 	}
 }
 
@@ -950,6 +956,8 @@ func createSpaceRoutes(config *config.Config,
 		spaces.PUT("/:namespace/:name/mirror", middlewareCollection.Auth.NeedLogin, repoCommonHandler.UpdateMirror)
 		spaces.DELETE("/:namespace/:name/mirror", middlewareCollection.Auth.NeedLogin, repoCommonHandler.DeleteMirror)
 		spaces.POST("/:namespace/:name/mirror/sync", middlewareCollection.Auth.NeedLogin, repoCommonHandler.SyncMirror)
+		// Get repo size by branch
+		spaces.GET("/:namespace/:name/size/:branch", repoCommonHandler.GetRepoSizeByBranch)
 		spaces.GET("/:namespace/:name/run", middlewareCollection.Auth.NeedLogin, repoCommonHandler.DeployList)
 		spaces.GET("/:namespace/:name/run/:id", middlewareCollection.Auth.NeedLogin, repoCommonHandler.DeployDetail)
 		spaces.GET("/:namespace/:name/run/:id/status", middlewareCollection.Auth.NeedLogin, repoCommonHandler.DeployStatus)
@@ -1495,5 +1503,6 @@ func createSkillRoutes(
 		skillGroup.PUT("/:namespace/:name/mirror", middlewareCollection.Auth.NeedLogin, repoCommonHandler.UpdateMirror)
 		skillGroup.DELETE("/:namespace/:name/mirror", middlewareCollection.Auth.NeedLogin, repoCommonHandler.DeleteMirror)
 		skillGroup.POST("/:namespace/:name/mirror/sync", middlewareCollection.Auth.NeedLogin, repoCommonHandler.SyncMirror)
+		skillGroup.GET("/:namespace/:name/size/:branch", repoCommonHandler.GetRepoSizeByBranch)
 	}
 }

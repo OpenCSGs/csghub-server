@@ -2001,3 +2001,48 @@ func (h *RepoHandler) GetRepos(ctx *gin.Context) {
 		slog.String("search", search))
 	httpbase.OK(ctx, repos)
 }
+
+// GetRepoSizeByBranch godoc
+// @Security     ApiKey
+// @Summary      Get the repository size for a specific branch
+// @Tags         Repository
+// @Accept       json
+// @Produce      json
+// @Param        repo_type path string true "models,datasets,codes,spaces or mcps" Enums(models,datasets,codes,spaces,mcps)
+// @Param        namespace path string true "repo owner name"
+// @Param        name path string true "repo name"
+// @Param        branch path string true "branch name"
+// @Param        current_user query string false "current user name"
+// @Success      200  {object}  types.Response{data=int64} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /{repo_type}/{namespace}/{name}/size/{branch} [get]
+func (h *RepoHandler) GetRepoSizeByBranch(ctx *gin.Context) {
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	currentUser := httpbase.GetCurrentUser(ctx)
+	branch := ctx.Param("branch")
+	repoType := common.RepoTypeFromContext(ctx)
+
+	size, err := h.c.GetRepoSizeByBranch(ctx.Request.Context(), repoType, namespace, name, branch, currentUser)
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get repo size", slog.String("repo_type", string(repoType)), slog.Any("error", err), slog.String("namespace", namespace), slog.String("name", name), slog.String("branch", branch))
+		if errors.Is(err, errorx.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
+		if errors.Is(err, errorx.ErrNotFound) {
+			httpbase.NotFoundError(ctx, err)
+			return
+		}
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	slog.Debug("Get repo size succeed", slog.String("repo_type", string(repoType)), slog.String("namespace", namespace), slog.String("name", name), slog.String("branch", branch), slog.Any("size", size))
+	httpbase.OK(ctx, size)
+}

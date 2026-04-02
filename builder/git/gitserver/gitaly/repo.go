@@ -204,19 +204,40 @@ func (c *Client) GetRepoSize(ctx context.Context, req gitserver.GetRepoInfoByPat
 		return 0, err
 	}
 
-	gitalyReq := &gitalypb.RepositorySizeRequest{
-		Repository: &gitalypb.Repository{
-			StorageName:  c.config.GitalyServer.Storage,
-			RelativePath: relativePath,
-		},
+	repository := &gitalypb.Repository{
+		StorageName:  c.config.GitalyServer.Storage,
+		RelativePath: relativePath,
 	}
 
-	resp, err := c.repoClient.RepositorySize(ctx, gitalyReq)
+	// Use ListBlobs to get all blobs for the specified branch
+	listBlobsReq := &gitalypb.ListBlobsRequest{
+		Repository: repository,
+		WithPaths:  true,
+		Revisions:  []string{req.Ref},
+	}
+
+	result, err := c.blobClient.ListBlobs(ctx, listBlobsReq)
 	if err != nil {
-		return 0, errorx.GetRepositorySizeFailed(err, errorx.Ctx())
+		return 0, errorx.ErrGitGetBlobsFailed(err, errorx.Ctx())
 	}
 
-	return resp.Size * 1024, nil
+	var totalSize int64
+	for {
+		allFilesResp, err := result.Recv()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return 0, errorx.ErrGitGetBlobsFailed(err, errorx.Ctx())
+		}
+		if allFilesResp != nil {
+			for _, blob := range allFilesResp.Blobs {
+				totalSize += blob.Size
+			}
+		}
+	}
+
+	return totalSize, nil
 }
 
 func (c *Client) GetRepoLfsSize(ctx context.Context, req gitserver.GetRepoInfoByPathReq) (int64, error) {

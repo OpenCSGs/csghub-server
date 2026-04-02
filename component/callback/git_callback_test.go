@@ -184,3 +184,81 @@ func TestGitCallbackComponentImpl_UpdateRepoInfos(t *testing.T) {
 		assert.NoError(t, err)
 	})
 }
+
+func TestGitCallbackComponentImpl_CalculateRepoSize(t *testing.T) {
+	ctx := mock.Anything
+
+	repo := &database.Repository{ID: 1, Path: "namespace/repo"}
+	branchName := "main"
+
+	t.Run("should calculate repo size successfully", func(t *testing.T) {
+		req := &types.GiteaCallbackPushReq{
+			Ref: "refs/heads/" + branchName,
+			Repository: types.GiteaCallbackPushReq_Repository{
+				FullName: "models_namespace/repo",
+			},
+		}
+		gc := initializeTestGitCallbackComponent(context.Background(), t)
+
+		// Expectations for repo lookup
+		gc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "namespace", "repo").Return(repo, nil)
+
+		// Expectations for repo size calculation for the modified branch
+		repoInfoReq := gitserver.GetRepoInfoByPathReq{
+			Namespace: "namespace",
+			Name:      "repo",
+			Ref:       branchName,
+			Path:      "",
+			RepoType:  types.ModelRepo,
+			File:      false,
+		}
+		gc.mocks.gitServer.EXPECT().GetRepoSize(ctx, repoInfoReq).Return(int64(1024), nil)
+		gc.mocks.gitServer.EXPECT().GetRepoLfsSize(ctx, repoInfoReq).Return(int64(2048), nil)
+
+		// Expectations for repository statistics
+		gc.mocks.stores.RepositoryStatisticsMock().EXPECT().FindByRepositoryIDAndBranch(ctx, repo.ID, branchName).Return(nil, nil)
+		gc.mocks.stores.RepositoryStatisticsMock().EXPECT().Create(ctx, mock.Anything).Return(nil)
+
+		err := gc.CalculateRepoSize(context.Background(), req)
+		assert.NoError(t, err)
+	})
+
+	t.Run("should update existing repo statistics", func(t *testing.T) {
+		req := &types.GiteaCallbackPushReq{
+			Ref: "refs/heads/" + branchName,
+			Repository: types.GiteaCallbackPushReq_Repository{
+				FullName: "models_namespace/repo",
+			},
+		}
+		gc := initializeTestGitCallbackComponent(context.Background(), t)
+
+		// Expectations for repo lookup
+		gc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, "namespace", "repo").Return(repo, nil)
+
+		// Expectations for repo size calculation for the modified branch
+		repoInfoReq := gitserver.GetRepoInfoByPathReq{
+			Namespace: "namespace",
+			Name:      "repo",
+			Ref:       branchName,
+			Path:      "",
+			RepoType:  types.ModelRepo,
+			File:      false,
+		}
+		gc.mocks.gitServer.EXPECT().GetRepoSize(ctx, repoInfoReq).Return(int64(1024), nil)
+		gc.mocks.gitServer.EXPECT().GetRepoLfsSize(ctx, repoInfoReq).Return(int64(2048), nil)
+
+		// Expectations for repository statistics
+		existingStats := &database.RepositoryStatistics{
+			RepositoryID: repo.ID,
+			Branch:       branchName,
+			TotalSize:    1000,
+			NonLfsSize:   500,
+			LfsSize:      500,
+		}
+		gc.mocks.stores.RepositoryStatisticsMock().EXPECT().FindByRepositoryIDAndBranch(ctx, repo.ID, branchName).Return(existingStats, nil)
+		gc.mocks.stores.RepositoryStatisticsMock().EXPECT().Update(ctx, mock.Anything).Return(nil)
+
+		err := gc.CalculateRepoSize(context.Background(), req)
+		assert.NoError(t, err)
+	})
+}

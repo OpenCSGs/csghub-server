@@ -222,6 +222,66 @@ func (_c *MockRepositoryStatisticsStore_FindByRepositoryID_Call) RunAndReturn(ru
 	return _c
 }
 
+// FindByRepositoryIDAndBranch provides a mock function with given fields: ctx, repoID, branch
+func (_m *MockRepositoryStatisticsStore) FindByRepositoryIDAndBranch(ctx context.Context, repoID int64, branch string) (*database.RepositoryStatistics, error) {
+	ret := _m.Called(ctx, repoID, branch)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FindByRepositoryIDAndBranch")
+	}
+
+	var r0 *database.RepositoryStatistics
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64, string) (*database.RepositoryStatistics, error)); ok {
+		return rf(ctx, repoID, branch)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, int64, string) *database.RepositoryStatistics); ok {
+		r0 = rf(ctx, repoID, branch)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.RepositoryStatistics)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, int64, string) error); ok {
+		r1 = rf(ctx, repoID, branch)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockRepositoryStatisticsStore_FindByRepositoryIDAndBranch_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindByRepositoryIDAndBranch'
+type MockRepositoryStatisticsStore_FindByRepositoryIDAndBranch_Call struct {
+	*mock.Call
+}
+
+// FindByRepositoryIDAndBranch is a helper method to define mock.On call
+//   - ctx context.Context
+//   - repoID int64
+//   - branch string
+func (_e *MockRepositoryStatisticsStore_Expecter) FindByRepositoryIDAndBranch(ctx interface{}, repoID interface{}, branch interface{}) *MockRepositoryStatisticsStore_FindByRepositoryIDAndBranch_Call {
+	return &MockRepositoryStatisticsStore_FindByRepositoryIDAndBranch_Call{Call: _e.mock.On("FindByRepositoryIDAndBranch", ctx, repoID, branch)}
+}
+
+func (_c *MockRepositoryStatisticsStore_FindByRepositoryIDAndBranch_Call) Run(run func(ctx context.Context, repoID int64, branch string)) *MockRepositoryStatisticsStore_FindByRepositoryIDAndBranch_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64), args[2].(string))
+	})
+	return _c
+}
+
+func (_c *MockRepositoryStatisticsStore_FindByRepositoryIDAndBranch_Call) Return(_a0 *database.RepositoryStatistics, _a1 error) *MockRepositoryStatisticsStore_FindByRepositoryIDAndBranch_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockRepositoryStatisticsStore_FindByRepositoryIDAndBranch_Call) RunAndReturn(run func(context.Context, int64, string) (*database.RepositoryStatistics, error)) *MockRepositoryStatisticsStore_FindByRepositoryIDAndBranch_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Update provides a mock function with given fields: ctx, stats
 func (_m *MockRepositoryStatisticsStore) Update(ctx context.Context, stats *database.RepositoryStatistics) error {
 	ret := _m.Called(ctx, stats)
