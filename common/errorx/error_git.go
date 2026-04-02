@@ -44,6 +44,7 @@ const (
 	gitCopyRepositoryFailed
 	gitReplicateRepositoryFailed
 	gitUsingGitInXnetRepository
+	gitGetRepositorySizeFailed
 )
 
 var (
@@ -470,6 +471,18 @@ var (
 	//
 	// zh-HK: 转移倉庫失敗
 	ErrGitReplicateRepositoryFailed error = CustomError{prefix: errGitPrefix, code: gitReplicateRepositoryFailed}
+	// get repository size failed
+	//
+	// Description: Get repository size failed. This can be caused by network problems, authentication issues, or the specified repository does not exist.
+	//
+	// Description_ZH: 获取仓库大小失败。这可能由网络问题、身份验证问题或指定的仓库不存在引起。
+	//
+	// en-US: Get repository size failed
+	//
+	// zh-CN: 获取仓库大小失败
+	//
+	// zh-HK: 獲取倉庫大小失敗
+	ErrGitGetRepositorySizeFailed error = CustomError{prefix: errGitPrefix, code: gitGetRepositorySizeFailed}
 	// --- GIT-ERR-xxx: Git/Upload, Download, Resource Synchronization ---
 	// using git in xnet-enabled repository error
 	//
@@ -705,6 +718,15 @@ func ErrGitCopyRepositoryFailed(err error, ctx context) error {
 	return CustomError{
 		prefix:  errGitPrefix,
 		code:    gitCopyRepositoryFailed,
+		err:     err,
+		context: ctx,
+	}
+}
+
+func GetRepositorySizeFailed(err error, ctx context) error {
+	return CustomError{
+		prefix:  errGitPrefix,
+		code:    gitGetRepositorySizeFailed,
 		err:     err,
 		context: ctx,
 	}

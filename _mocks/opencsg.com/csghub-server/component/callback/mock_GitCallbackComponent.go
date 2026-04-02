@@ -22,6 +22,53 @@ func (_m *MockGitCallbackComponent) EXPECT() *MockGitCallbackComponent_Expecter 
 	return &MockGitCallbackComponent_Expecter{mock: &_m.Mock}
 }
 
+// CalculateRepoSize provides a mock function with given fields: ctx, req
+func (_m *MockGitCallbackComponent) CalculateRepoSize(ctx context.Context, req *types.GiteaCallbackPushReq) error {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CalculateRepoSize")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, *types.GiteaCallbackPushReq) error); ok {
+		r0 = rf(ctx, req)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockGitCallbackComponent_CalculateRepoSize_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CalculateRepoSize'
+type MockGitCallbackComponent_CalculateRepoSize_Call struct {
+	*mock.Call
+}
+
+// CalculateRepoSize is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req *types.GiteaCallbackPushReq
+func (_e *MockGitCallbackComponent_Expecter) CalculateRepoSize(ctx interface{}, req interface{}) *MockGitCallbackComponent_CalculateRepoSize_Call {
+	return &MockGitCallbackComponent_CalculateRepoSize_Call{Call: _e.mock.On("CalculateRepoSize", ctx, req)}
+}
+
+func (_c *MockGitCallbackComponent_CalculateRepoSize_Call) Run(run func(ctx context.Context, req *types.GiteaCallbackPushReq)) *MockGitCallbackComponent_CalculateRepoSize_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*types.GiteaCallbackPushReq))
+	})
+	return _c
+}
+
+func (_c *MockGitCallbackComponent_CalculateRepoSize_Call) Return(_a0 error) *MockGitCallbackComponent_CalculateRepoSize_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockGitCallbackComponent_CalculateRepoSize_Call) RunAndReturn(run func(context.Context, *types.GiteaCallbackPushReq) error) *MockGitCallbackComponent_CalculateRepoSize_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GenSyncVersion provides a mock function with given fields: ctx, req
 func (_m *MockGitCallbackComponent) GenSyncVersion(ctx context.Context, req *types.GiteaCallbackPushReq) error {
 	ret := _m.Called(ctx, req)

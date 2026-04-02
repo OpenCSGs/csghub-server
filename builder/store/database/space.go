@@ -82,6 +82,7 @@ func (s *spaceStoreImpl) FindByPath(ctx context.Context, namespace, name string)
 		NewSelect().
 		Model(resSpace).
 		Relation("Repository.User").
+		Relation("Repository.Statistics").
 		Where("repository.path = ? and repository.repository_type = ?", fmt.Sprintf("%s/%s", namespace, name), types.SpaceRepo).
 		Scan(ctx)
 	err = errorx.HandleDBError(err, nil)
