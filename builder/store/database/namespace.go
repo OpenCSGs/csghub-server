@@ -3,6 +3,8 @@ package database
 import (
 	"context"
 	"time"
+
+	"opencsg.com/csghub-server/common/errorx"
 )
 
 // Define the NamespaceStore interface
