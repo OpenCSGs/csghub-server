@@ -1772,6 +1772,72 @@ func (_c *MockUserComponent_Prompts_Call) RunAndReturn(run func(context.Context,
 	return _c
 }
 
+// Skills provides a mock function with given fields: ctx, req
+func (_m *MockUserComponent) Skills(ctx context.Context, req *types.UserMCPsReq) ([]types.Skill, int, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Skills")
+	}
+
+	var r0 []types.Skill
+	var r1 int
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, *types.UserMCPsReq) ([]types.Skill, int, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *types.UserMCPsReq) []types.Skill); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]types.Skill)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *types.UserMCPsReq) int); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, *types.UserMCPsReq) error); ok {
+		r2 = rf(ctx, req)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockUserComponent_Skills_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Skills'
+type MockUserComponent_Skills_Call struct {
+	*mock.Call
+}
+
+// Skills is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req *types.UserMCPsReq
+func (_e *MockUserComponent_Expecter) Skills(ctx interface{}, req interface{}) *MockUserComponent_Skills_Call {
+	return &MockUserComponent_Skills_Call{Call: _e.mock.On("Skills", ctx, req)}
+}
+
+func (_c *MockUserComponent_Skills_Call) Run(run func(ctx context.Context, req *types.UserMCPsReq)) *MockUserComponent_Skills_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*types.UserMCPsReq))
+	})
+	return _c
+}
+
+func (_c *MockUserComponent_Skills_Call) Return(_a0 []types.Skill, _a1 int, _a2 error) *MockUserComponent_Skills_Call {
+	_c.Call.Return(_a0, _a1, _a2)
+	return _c
+}
+
+func (_c *MockUserComponent_Skills_Call) RunAndReturn(run func(context.Context, *types.UserMCPsReq) ([]types.Skill, int, error)) *MockUserComponent_Skills_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Spaces provides a mock function with given fields: ctx, req
 func (_m *MockUserComponent) Spaces(ctx context.Context, req *types.UserSpacesReq) ([]types.Space, int, error) {
 	ret := _m.Called(ctx, req)
