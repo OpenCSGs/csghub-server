@@ -537,6 +537,10 @@ func (h *OpenAIHandlerImpl) GenerateImage(c *gin.Context) {
 			slog.WarnContext(ctx, "endpoint has wrong struct", slog.String("model", modelName))
 		} else {
 			proxyToApi = uri.Path
+			if proxyToApi == "" {
+				// Spaces (HF Inference Toolkit) serve at root.
+				proxyToApi = "/"
+			}
 		}
 	}
 
