@@ -9,6 +9,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"opencsg.com/csghub-server/common/types"
 )
@@ -29,7 +30,7 @@ func NewClient() *Client {
 
 func (c *Client) ChatStream(ctx context.Context, endpoint, host string, headers map[string]string, data types.LLMReqBody) (<-chan string, error) {
 	slog.Debug("chat with llm", slog.Any("endpoint", endpoint), slog.Any("data", data))
-	rc, err := c.doRequest(ctx, http.MethodPost, endpoint, host, headers, data)
+	rc, err := c.doRequest(ctx, http.MethodPost, strings.TrimSpace(endpoint), host, headers, data)
 	if err != nil {
 		return nil, fmt.Errorf("do llm stream request, error: %w", err)
 	}
