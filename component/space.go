@@ -461,6 +461,10 @@ func (c *spaceComponentImpl) Show(ctx context.Context, namespace, name, currentU
 		ClusterID:     space.ClusterID,
 		MinReplica:    space.MinReplica,
 		DriverVersion: space.DriverVersion,
+		RepoSize:      0,
+	}
+	if space.Repository.Statistics != nil {
+		resSpace.RepoSize = space.Repository.Statistics.TotalSize
 	}
 	if permission.CanAdmin {
 		resSpace.SensitiveCheckStatus = space.Repository.SensitiveCheckStatus.String()
@@ -1066,7 +1070,7 @@ func (c *spaceComponentImpl) Deploy(ctx context.Context, namespace, name, curren
 func (c *spaceComponentImpl) Wakeup(ctx context.Context, namespace, name string) error {
 	s, err := c.spaceStore.FindByPath(ctx, namespace, name)
 	if err != nil {
-		slog.Error("can't wakeup space", slog.Any("error", err), slog.String("namespace", namespace), slog.String("name", name))
+		slog.ErrorContext(ctx, "No space found", slog.Any("error", err), slog.String("namespace", namespace), slog.String("name", name))
 		return err
 	}
 	if !s.HasAppFile {
@@ -1078,13 +1082,15 @@ func (c *spaceComponentImpl) Wakeup(ctx context.Context, namespace, name string)
 	// get latest Deploy for space
 	deploy, err := c.deployTaskStore.GetLatestDeployBySpaceID(ctx, s.ID)
 	if err != nil {
-		return fmt.Errorf("can't get space delopyment,%w", err)
+		return fmt.Errorf("can't get space deployment,%w", err)
 	}
 	return c.deployer.Wakeup(ctx, types.DeployRepo{
 		SpaceID:   s.ID,
 		Namespace: namespace,
 		Name:      name,
 		SvcName:   deploy.SvcName,
+		Endpoint:  deploy.Endpoint,
+		ClusterID: deploy.ClusterID,
 	})
 }
 
@@ -1128,7 +1134,7 @@ func (c *spaceComponentImpl) stopSpaceDeploy(ctx context.Context, namespace, nam
 	if deploy.Status == deployCommon.Building {
 		deployTasks, err := c.deployTaskStore.GetDeployTasksOfDeploy(ctx, deploy.ID)
 		if err != nil {
-			return fmt.Errorf("can't get space delopyment,%w", err)
+			return fmt.Errorf("can't get space deployment,%w", err)
 		}
 
 		sort.Slice(deployTasks, func(i, j int) bool {
@@ -1136,7 +1142,7 @@ func (c *spaceComponentImpl) stopSpaceDeploy(ctx context.Context, namespace, nam
 		})
 
 		if len(deployTasks) < 2 {
-			return fmt.Errorf("can't get space delopyment")
+			return fmt.Errorf("can't get space deployment")
 		}
 		buildTask := deployTasks[1]
 

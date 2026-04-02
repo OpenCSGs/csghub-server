@@ -409,24 +409,50 @@ func (d *deployer) Purge(ctx context.Context, dr types.DeployRepo) error {
 }
 
 func (d *deployer) Wakeup(ctx context.Context, dr types.DeployRepo) error {
-	// srvName := common.UniqueSpaceAppName(dr.Namespace, dr.Name, dr.SpaceID)
 	svcName := dr.SvcName
-	srvURL := fmt.Sprintf("http://%s.%s", svcName, d.internalRootDomain)
+	svcURL := fmt.Sprintf("http://%s.%s", svcName, d.internalRootDomain)
+
+	cluster, err := d.clusterStore.ByClusterID(ctx, dr.ClusterID)
+	if err != nil {
+		return err
+	}
+
+	svcReq := types.EndpointReq{
+		ClusterID: dr.ClusterID,
+		Target:    svcURL,
+		Host:      svcName,
+		Endpoint:  dr.Endpoint,
+		SvcName:   svcName,
+	}
+
+	target, host, err := hubcom.ExtractDeployTargetAndHost(ctx, &cluster, svcReq)
+	if err != nil {
+		return err
+	}
+	slog.InfoContext(ctx, "wakeup service endpoint", slog.String("svc_name", svcName),
+		slog.String("svc_url", target), slog.String("host", host))
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, target, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create wakeup request: %w", err)
+	}
+	if len(host) > 0 {
+		req.Host = host
+	}
+
 	// Create a new HTTP client with a timeout
 	client := &http.Client{
 		Timeout: 3 * time.Second,
 	}
-
-	// Send a GET request to wake up the service
-	resp, err := client.Get(srvURL)
+	// Send the request
+	resp, err := client.Do(req)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
 			return nil
 		}
-		slog.Error("Error sending request to Knative service",
+		slog.ErrorContext(ctx, "Error sending request to Knative service",
 			slog.String("path", fmt.Sprintf("%s/%s", dr.Namespace, dr.Name)),
 			slog.String("svc_name", svcName),
-			slog.String("svc_url", srvURL),
+			slog.String("svc_url", target),
 			slog.Any("error", err))
 		return fmt.Errorf("failed call service endpoint, %w", err)
 	}

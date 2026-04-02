@@ -27,6 +27,7 @@ import (
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
 	commonType "opencsg.com/csghub-server/common/types"
+	"opencsg.com/csghub-server/common/utils/common"
 	apicomp "opencsg.com/csghub-server/component"
 )
 
@@ -275,7 +276,17 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 	target := ""
 	host := ""
 	if len(model.SvcName) > 0 {
-		target, host, err = apicomp.ExtractDeployTargetAndHost(c.Request.Context(), h.clusterComp, targetReq)
+		cluster, errCls := h.clusterComp.GetClusterByID(c, targetReq.ClusterID)
+		if errCls != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": types.Error{
+					Code:    "cluster_not_found",
+					Message: fmt.Sprintf("cluster '%s' not found", model.ClusterID),
+					Type:    "invalid_request_error",
+				}})
+			return
+		}
+		target, host, _ = common.ExtractDeployTargetAndHost(c.Request.Context(), cluster, targetReq)
 	} else {
 		slog.DebugContext(c.Request.Context(), "external model", slog.Any("model", model))
 		target = model.Endpoint
@@ -450,7 +461,17 @@ func (h *OpenAIHandlerImpl) GenerateImage(c *gin.Context) {
 	target := ""
 	host := ""
 	if len(model.SvcName) > 0 {
-		target, host, err = apicomp.ExtractDeployTargetAndHost(ctx, h.clusterComp, targetReq)
+		cluster, errCls := h.clusterComp.GetClusterByID(c, targetReq.ClusterID)
+		if errCls != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": types.Error{
+					Code:    "cluster_not_found",
+					Message: fmt.Sprintf("cluster '%s' not found", model.ClusterID),
+					Type:    "invalid_request_error",
+				}})
+			return
+		}
+		target, host, _ = common.ExtractDeployTargetAndHost(ctx, cluster, targetReq)
 	} else {
 		target = model.Endpoint
 	}
@@ -623,7 +644,17 @@ func (h *OpenAIHandlerImpl) Embedding(c *gin.Context) {
 	target := ""
 	host := ""
 	if len(model.SvcName) > 0 {
-		target, host, err = apicomp.ExtractDeployTargetAndHost(c.Request.Context(), h.clusterComp, targetReq)
+		cluster, errCls := h.clusterComp.GetClusterByID(c, targetReq.ClusterID)
+		if errCls != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": types.Error{
+					Code:    "cluster_not_found",
+					Message: fmt.Sprintf("cluster '%s' not found", model.ClusterID),
+					Type:    "invalid_request_error",
+				}})
+			return
+		}
+		target, host, _ = common.ExtractDeployTargetAndHost(c.Request.Context(), cluster, targetReq)
 	} else {
 		target = model.Endpoint
 	}
