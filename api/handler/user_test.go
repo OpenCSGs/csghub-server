@@ -118,6 +118,27 @@ func TestUserHandler_Spaces(t *testing.T) {
 	})
 }
 
+func TestUserHandler_Skills(t *testing.T) {
+	tester := NewUserTester(t).WithHandleFunc(func(h *UserHandler) gin.HandlerFunc {
+		return h.Skills
+	})
+
+	tester.mocks.user.EXPECT().Skills(tester.Ctx(), &types.UserMCPsReq{
+		Owner:       "go",
+		CurrentUser: "u",
+		PageOpts: types.PageOpts{
+			Page:     1,
+			PageSize: 10,
+		},
+	}).Return([]types.Skill{{Name: "ds"}}, 100, nil)
+	tester.AddPagination(1, 10).WithUser().WithParam("username", "go").Execute()
+	tester.ResponseEqSimple(t, 200, gin.H{
+		"message": "OK",
+		"data":    []types.Skill{{Name: "ds"}},
+		"total":   100,
+	})
+}
+
 func TestUserHandler_LikesAdd(t *testing.T) {
 	tester := NewUserTester(t).WithHandleFunc(func(h *UserHandler) gin.HandlerFunc {
 		return h.LikesAdd
