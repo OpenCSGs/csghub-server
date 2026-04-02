@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -30,7 +31,7 @@ type OpenAIComponent interface {
 	ListModels(c context.Context, user string, req types.ListModelsReq) (types.ModelList, error)
 	GetModelByID(c context.Context, username, modelID string) (*types.Model, error)
 	RecordUsage(c context.Context, userUUID string, model *types.Model, tokenCounter token.Counter, sceneValue string) error
-	CheckBalance(ctx context.Context, username string, model *types.Model, sceneValue string) error
+	CheckBalance(ctx context.Context, username, userUUID string) error
 }
 
 type openaiComponentImpl struct {
@@ -47,17 +48,27 @@ type openaiComponentImpl struct {
 // GetAvailableModels returns a list of running models
 func (m *openaiComponentImpl) GetAvailableModels(c context.Context, userName string) ([]types.Model, error) {
 	var models []types.Model
-	user, err := m.userStore.FindByUsername(c, userName)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find user by username in db,error:%w", err)
+	var userID int64
+	var userUUID string
+	if strings.TrimSpace(userName) != "" {
+		user, err := m.userStore.FindByUsername(c, userName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to find user by username in db,error:%w", err)
+		}
+		userID = user.ID
+		userUUID = user.UUID
 	}
-	csghubModels, err := m.getCSGHubModels(c, user.ID)
+	var csghubModels []types.Model
+	var err error
+	csghubModels, err = m.getCSGHubModels(c, userID)
 	if err != nil {
 		return nil, err
 	}
 	models = csghubModels
 	externalModels := m.getExternalModels(c)
 	models = append(models, externalModels...)
+
+	models = m.enrichModelsWithPrice(c, models)
 
 	// Save models to cache asynchronously
 	go func(modelList []types.Model) {
@@ -70,15 +81,18 @@ func (m *openaiComponentImpl) GetAvailableModels(c context.Context, userName str
 		}
 	}(models)
 
-	req := &types.UserPreferenceRequest{
-		UserUUID: user.UUID,
-		Models:   models,
-		Scenario: types.AgenticHubApp,
-	}
-	models, err = m.userPreference(c, req)
-	if err != nil {
-		slog.Warn("failed to apply user preference", "error", err)
-		// Continue with original models if user preference fails
+	if strings.TrimSpace(userUUID) != "" {
+		req := &types.UserPreferenceRequest{
+			UserUUID: userUUID,
+			Models:   models,
+			Scenario: types.AgenticHubApp,
+		}
+		var prefErr error
+		models, prefErr = m.userPreference(c, req)
+		if prefErr != nil {
+			slog.Warn("failed to apply user preference", "error", prefErr)
+			// Continue with original models if user preference fails
+		}
 	}
 
 	return models, nil
@@ -92,34 +106,72 @@ func (m *openaiComponentImpl) ListModels(c context.Context, userName string, req
 	return filterAndPaginateModels(models, req), nil
 }
 
+type modelFilter func(m *types.Model) bool
+
+func filterByModelID(query string) modelFilter {
+	return func(m *types.Model) bool {
+		return strings.Contains(strings.ToLower(m.ID), query)
+	}
+}
+
+func filterBySource(source string) modelFilter {
+	return func(m *types.Model) bool {
+		switch source {
+		case string(types.ModelSourceCSGHub):
+			return m.CSGHubModelID != ""
+		case string(types.ModelSourceExternal):
+			return m.Provider != ""
+		default:
+			return true
+		}
+	}
+}
+
+func filterByTask(task string) modelFilter {
+	return func(m *types.Model) bool {
+		modelTasks := strings.FieldsFunc(strings.ToLower(m.Task), func(r rune) bool {
+			return r == ','
+		})
+		return slices.Contains(modelTasks, task)
+	}
+}
+
+func applyFilters(models []types.Model, filters []modelFilter) []types.Model {
+	if len(filters) == 0 {
+		return models
+	}
+	filtered := make([]types.Model, 0, len(models))
+	for i := range models {
+		m := &models[i]
+		keep := true
+		for _, f := range filters {
+			if !f(m) {
+				keep = false
+				break
+			}
+		}
+		if keep {
+			filtered = append(filtered, *m)
+		}
+	}
+	return filtered
+}
+
 func filterAndPaginateModels(models []types.Model, req types.ListModelsReq) types.ModelList {
-	// Apply fuzzy search filter if model_id is provided
-	searchQuery := req.ModelID
-	if searchQuery != "" {
-		filtered := make([]types.Model, 0, len(models))
-		sq := strings.ToLower(searchQuery)
-		for _, model := range models {
-			if strings.Contains(strings.ToLower(model.ID), sq) {
-				filtered = append(filtered, model)
-			}
-		}
-		models = filtered
+	var filters []modelFilter
+
+	if searchQuery := strings.ToLower(req.ModelID); searchQuery != "" {
+		filters = append(filters, filterByModelID(searchQuery))
+	}
+	if source := strings.ToLower(req.Source); source != "" {
+		filters = append(filters, filterBySource(source))
+	}
+	if task := strings.ToLower(req.Task); task != "" {
+		filters = append(filters, filterByTask(task))
 	}
 
-	// Apply public filter if provided and parseable
-	if req.Public != "" {
-		if isPublic, err := strconv.ParseBool(req.Public); err == nil {
-			filtered := make([]types.Model, 0, len(models))
-			for _, model := range models {
-				if model.Public == isPublic {
-					filtered = append(filtered, model)
-				}
-			}
-			models = filtered
-		}
-	}
+	models = applyFilters(models, filters)
 
-	// Parse pagination parameters (defaults match previous handler behavior)
 	per := 20
 	page := 1
 	if req.Per != "" {
@@ -137,8 +189,7 @@ func filterAndPaginateModels(models []types.Model, req types.ListModelsReq) type
 	}
 
 	totalCount := len(models)
-	offset := (page - 1) * per
-	startIndex := offset
+	startIndex := (page - 1) * per
 	if startIndex > totalCount {
 		startIndex = totalCount
 	}
@@ -154,15 +205,26 @@ func filterAndPaginateModels(models []types.Model, req types.ListModelsReq) type
 		firstID = &paginated[0].ID
 		lastID = &paginated[len(paginated)-1].ID
 	}
-	hasMore := endIndex < totalCount
 
 	return types.ModelList{
 		Object:     "list",
 		Data:       paginated,
 		FirstID:    firstID,
 		LastID:     lastID,
-		HasMore:    hasMore,
+		HasMore:    endIndex < totalCount,
 		TotalCount: totalCount,
+	}
+}
+
+// providerTypeFromDeployType maps a deploy type integer to the LLM type string (MetaKeyLLMType).
+func providerTypeFromDeployType(t int) string {
+	switch t {
+	case commontypes.ServerlessType:
+		return types.ProviderTypeServerless
+	case commontypes.InferenceType:
+		return types.ProviderTypeInference
+	default:
+		return types.ProviderTypeInference
 	}
 }
 
@@ -173,20 +235,23 @@ func (m *openaiComponentImpl) getCSGHubModels(c context.Context, userID int64) (
 	}
 	var models []types.Model
 	for _, deploy := range runningDeploys {
+		if deploy.Repository == nil {
+			slog.WarnContext(c, "skip deploy with nil repository", "deploy_id", deploy.ID, "svc_name", deploy.SvcName)
+			continue
+		}
 		// Check if engine_args contains tool-call-parser parameter
 		supportFunctionCall := strings.Contains(deploy.EngineArgs, "tool-call-parser")
-		// Determine public/private based on deployment type, ownership and secure level.
-		isPublic := true
-		if deploy.Type == commontypes.InferenceType && deploy.SecureLevel == commontypes.EndpointPrivate && deploy.UserID == userID {
-			isPublic = false // private - user's own deployment with private secure level
-		}
+		repoName := deploy.Repository.Name
 		m := types.Model{
 			BaseModel: types.BaseModel{
 				Object:              "model",
 				Created:             deploy.CreatedAt.Unix(),
 				SupportFunctionCall: supportFunctionCall,
 				Task:                string(deploy.Task),
-				Public:              isPublic,
+				DisplayName:         repoName,
+				Metadata: map[string]any{
+					types.MetaKeyLLMType: providerTypeFromDeployType(deploy.Type),
+				},
 			},
 			InternalModelInfo: types.InternalModelInfo{
 				CSGHubModelID:    deploy.Repository.Path,
@@ -227,6 +292,8 @@ func (m *openaiComponentImpl) getExternalModels(c context.Context) []types.Model
 	search := &commontypes.SearchLLMConfig{}
 	searchType := 16
 	search.Type = &searchType
+	enabled := true
+	search.Enabled = &enabled
 
 	per := 50
 	page := 1
@@ -239,17 +306,37 @@ func (m *openaiComponentImpl) getExternalModels(c context.Context) []types.Model
 		}
 
 		for _, extModel := range extModels {
+			// Extract tasks from metadata if present
+			task := ""
+			if extModel.Metadata != nil {
+				if tasks, ok := extModel.Metadata[types.MetaKeyTasks].([]any); ok && len(tasks) > 0 {
+					tasksStrings := make([]string, 0, len(tasks))
+					for _, t := range tasks {
+						if s, ok := t.(string); ok {
+							tasksStrings = append(tasksStrings, s)
+						}
+					}
+					task = strings.Join(tasksStrings, ",")
+				}
+			}
+			if extModel.Metadata == nil {
+				extModel.Metadata = map[string]any{}
+			}
+			extModel.Metadata[types.MetaKeyLLMType] = types.ProviderTypeExternalLLM
 			m := types.Model{
 				BaseModel: types.BaseModel{
-					Object:  "model",
-					ID:      extModel.ModelName,
-					OwnedBy: extModel.Provider,
-					Public:  true, // external models are always public
+					Object:      "model",
+					ID:          extModel.ModelName,
+					OwnedBy:     extModel.Provider,
+					DisplayName: extModel.DisplayName,
+					Metadata:    extModel.Metadata,
+					Task:        task,
 				},
 				Endpoint: extModel.ApiEndpoint,
 				ExternalModelInfo: types.ExternalModelInfo{
-					Provider: extModel.Provider,
-					AuthHead: extModel.AuthHeader,
+					Provider:           extModel.Provider,
+					AuthHead:           extModel.AuthHeader,
+					NeedSensitiveCheck: extModel.NeedSensitiveCheck,
 				},
 			}
 			models = append(models, m)

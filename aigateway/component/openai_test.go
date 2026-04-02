@@ -57,10 +57,10 @@ func TestGetSceneFromSvcType(t *testing.T) {
 
 func TestFilterAndPaginateModels(t *testing.T) {
 	models := []types.Model{
-		{BaseModel: types.BaseModel{ID: "gpt-4:svc1", Object: "model", OwnedBy: "u1", Public: true}},
-		{BaseModel: types.BaseModel{ID: "gpt-3.5:svc2", Object: "model", OwnedBy: "u1", Public: false}},
-		{BaseModel: types.BaseModel{ID: "claude:svc3", Object: "model", OwnedBy: "u2", Public: true}},
-		{BaseModel: types.BaseModel{ID: "gpt-4o:svc4", Object: "model", OwnedBy: "u3", Public: true}},
+		{BaseModel: types.BaseModel{ID: "gpt-4:svc1", Object: "model", OwnedBy: "u1"}},
+		{BaseModel: types.BaseModel{ID: "gpt-3.5:svc2", Object: "model", OwnedBy: "u1"}},
+		{BaseModel: types.BaseModel{ID: "claude:svc3", Object: "model", OwnedBy: "u2"}},
+		{BaseModel: types.BaseModel{ID: "gpt-4o:svc4", Object: "model", OwnedBy: "u3"}},
 	}
 
 	t.Run("no filters default pagination", func(t *testing.T) {
@@ -81,20 +81,6 @@ func TestFilterAndPaginateModels(t *testing.T) {
 		assert.Len(t, resp.Data, 3)
 	})
 
-	t.Run("public filter parses bool", func(t *testing.T) {
-		resp := filterAndPaginateModels(models, types.ListModelsReq{Public: "false"})
-		assert.Equal(t, 1, resp.TotalCount)
-		require.Len(t, resp.Data, 1)
-		assert.False(t, resp.Data[0].Public)
-		assert.Equal(t, "gpt-3.5:svc2", resp.Data[0].ID)
-	})
-
-	t.Run("invalid public filter is ignored", func(t *testing.T) {
-		resp := filterAndPaginateModels(models, types.ListModelsReq{Public: "notabool"})
-		assert.Equal(t, 4, resp.TotalCount)
-		assert.Len(t, resp.Data, 4)
-	})
-
 	t.Run("pagination per/page applied after filters", func(t *testing.T) {
 		resp := filterAndPaginateModels(models, types.ListModelsReq{ModelID: "gpt", Per: "2", Page: "2"})
 		// gpt matches 3 models; page=2 per=2 yields 1 item
@@ -102,6 +88,151 @@ func TestFilterAndPaginateModels(t *testing.T) {
 		assert.Len(t, resp.Data, 1)
 		assert.Equal(t, "gpt-4o:svc4", resp.Data[0].ID)
 		assert.False(t, resp.HasMore)
+	})
+
+	t.Run("source filter csghub", func(t *testing.T) {
+		modelsWithSource := []types.Model{
+			{BaseModel: types.BaseModel{ID: "csghub-model:svc1", Object: "model", OwnedBy: "u1"}, InternalModelInfo: types.InternalModelInfo{CSGHubModelID: "user/model1"}},
+			{BaseModel: types.BaseModel{ID: "external-model", Object: "model", OwnedBy: "openai"}, ExternalModelInfo: types.ExternalModelInfo{Provider: "openai"}},
+			{BaseModel: types.BaseModel{ID: "csghub-model:svc2", Object: "model", OwnedBy: "u2"}, InternalModelInfo: types.InternalModelInfo{CSGHubModelID: "org/model2"}},
+		}
+		resp := filterAndPaginateModels(modelsWithSource, types.ListModelsReq{Source: string(types.ModelSourceCSGHub)})
+		assert.Equal(t, 2, resp.TotalCount)
+		assert.Len(t, resp.Data, 2)
+		assert.Equal(t, "csghub-model:svc1", resp.Data[0].ID)
+		assert.Equal(t, "csghub-model:svc2", resp.Data[1].ID)
+	})
+
+	t.Run("source filter external", func(t *testing.T) {
+		modelsWithSource := []types.Model{
+			{BaseModel: types.BaseModel{ID: "csghub-model:svc1", Object: "model", OwnedBy: "u1"}, InternalModelInfo: types.InternalModelInfo{CSGHubModelID: "user/model1"}},
+			{BaseModel: types.BaseModel{ID: "gpt-4", Object: "model", OwnedBy: "openai"}, ExternalModelInfo: types.ExternalModelInfo{Provider: "openai"}},
+			{BaseModel: types.BaseModel{ID: "claude", Object: "model", OwnedBy: "anthropic"}, ExternalModelInfo: types.ExternalModelInfo{Provider: "anthropic"}},
+		}
+		resp := filterAndPaginateModels(modelsWithSource, types.ListModelsReq{Source: string(types.ModelSourceExternal)})
+		assert.Equal(t, 2, resp.TotalCount)
+		assert.Len(t, resp.Data, 2)
+		assert.Equal(t, "gpt-4", resp.Data[0].ID)
+		assert.Equal(t, "claude", resp.Data[1].ID)
+	})
+
+	t.Run("source filter is case-insensitive", func(t *testing.T) {
+		modelsWithSource := []types.Model{
+			{BaseModel: types.BaseModel{ID: "csghub-model:svc1", Object: "model", OwnedBy: "u1"}, InternalModelInfo: types.InternalModelInfo{CSGHubModelID: "user/model1"}},
+			{BaseModel: types.BaseModel{ID: "gpt-4", Object: "model", OwnedBy: "openai"}, ExternalModelInfo: types.ExternalModelInfo{Provider: "openai"}},
+		}
+		resp := filterAndPaginateModels(modelsWithSource, types.ListModelsReq{Source: "CSGHub"})
+		assert.Equal(t, 1, resp.TotalCount)
+		assert.Len(t, resp.Data, 1)
+		assert.Equal(t, "csghub-model:svc1", resp.Data[0].ID)
+	})
+
+	t.Run("unknown source filter includes all", func(t *testing.T) {
+		modelsWithSource := []types.Model{
+			{BaseModel: types.BaseModel{ID: "csghub-model:svc1", Object: "model", OwnedBy: "u1"}, InternalModelInfo: types.InternalModelInfo{CSGHubModelID: "user/model1"}},
+			{BaseModel: types.BaseModel{ID: "gpt-4", Object: "model", OwnedBy: "openai"}, ExternalModelInfo: types.ExternalModelInfo{Provider: "openai"}},
+		}
+		resp := filterAndPaginateModels(modelsWithSource, types.ListModelsReq{Source: "unknown"})
+		assert.Equal(t, 2, resp.TotalCount)
+		assert.Len(t, resp.Data, 2)
+	})
+
+	t.Run("source filter csghub includes public and private deployments", func(t *testing.T) {
+		modelsWithSource := []types.Model{
+			{BaseModel: types.BaseModel{ID: "csghub-public", Object: "model", OwnedBy: "u1"}, InternalModelInfo: types.InternalModelInfo{CSGHubModelID: "user/model1"}},
+			{BaseModel: types.BaseModel{ID: "csghub-private", Object: "model", OwnedBy: "u1"}, InternalModelInfo: types.InternalModelInfo{CSGHubModelID: "user/model2"}},
+			{BaseModel: types.BaseModel{ID: "external-public", Object: "model", OwnedBy: "openai"}, ExternalModelInfo: types.ExternalModelInfo{Provider: "openai"}},
+		}
+		resp := filterAndPaginateModels(modelsWithSource, types.ListModelsReq{Source: string(types.ModelSourceCSGHub)})
+		assert.Equal(t, 2, resp.TotalCount)
+		assert.Len(t, resp.Data, 2)
+		assert.Equal(t, "csghub-public", resp.Data[0].ID)
+		assert.Equal(t, "csghub-private", resp.Data[1].ID)
+	})
+
+	t.Run("task filter text-generation", func(t *testing.T) {
+		modelsWithTask := []types.Model{
+			{BaseModel: types.BaseModel{ID: "model-1", Object: "model", OwnedBy: "u1", Task: "text-generation"}},
+			{BaseModel: types.BaseModel{ID: "model-2", Object: "model", OwnedBy: "u1", Task: "text-to-image"}},
+			{BaseModel: types.BaseModel{ID: "model-3", Object: "model", OwnedBy: "u2", Task: "text-generation"}},
+		}
+		resp := filterAndPaginateModels(modelsWithTask, types.ListModelsReq{Task: "text-generation"})
+		assert.Equal(t, 2, resp.TotalCount)
+		assert.Len(t, resp.Data, 2)
+		assert.Equal(t, "model-1", resp.Data[0].ID)
+		assert.Equal(t, "model-3", resp.Data[1].ID)
+	})
+
+	t.Run("task filter text-to-image", func(t *testing.T) {
+		modelsWithTask := []types.Model{
+			{BaseModel: types.BaseModel{ID: "model-1", Object: "model", OwnedBy: "u1", Task: "text-generation"}},
+			{BaseModel: types.BaseModel{ID: "model-2", Object: "model", OwnedBy: "u1", Task: "text-to-image"}},
+			{BaseModel: types.BaseModel{ID: "model-3", Object: "model", OwnedBy: "u2", Task: "text-generation"}},
+		}
+		resp := filterAndPaginateModels(modelsWithTask, types.ListModelsReq{Task: "text-to-image"})
+		assert.Equal(t, 1, resp.TotalCount)
+		assert.Len(t, resp.Data, 1)
+		assert.Equal(t, "model-2", resp.Data[0].ID)
+	})
+
+	t.Run("task filter is case-insensitive", func(t *testing.T) {
+		modelsWithTask := []types.Model{
+			{BaseModel: types.BaseModel{ID: "model-1", Object: "model", OwnedBy: "u1", Task: "Text-Generation"}},
+			{BaseModel: types.BaseModel{ID: "model-2", Object: "model", OwnedBy: "u1", Task: "TEXT-TO-IMAGE"}},
+		}
+		resp := filterAndPaginateModels(modelsWithTask, types.ListModelsReq{Task: "text-generation"})
+		assert.Equal(t, 1, resp.TotalCount)
+		assert.Len(t, resp.Data, 1)
+		assert.Equal(t, "model-1", resp.Data[0].ID)
+	})
+
+	t.Run("task filter with no matches", func(t *testing.T) {
+		modelsWithTask := []types.Model{
+			{BaseModel: types.BaseModel{ID: "model-1", Object: "model", OwnedBy: "u1", Task: "text-generation"}},
+			{BaseModel: types.BaseModel{ID: "model-2", Object: "model", OwnedBy: "u1", Task: "text-to-image"}},
+		}
+		resp := filterAndPaginateModels(modelsWithTask, types.ListModelsReq{Task: "non-existent-task"})
+		assert.Equal(t, 0, resp.TotalCount)
+		assert.Len(t, resp.Data, 0)
+	})
+
+	t.Run("task filter matches any comma-separated task on model", func(t *testing.T) {
+		modelsWithTask := []types.Model{
+			{BaseModel: types.BaseModel{ID: "multi", Object: "model", OwnedBy: "u1", Task: "text-generation,text-to-image,summarization"}},
+			{BaseModel: types.BaseModel{ID: "single", Object: "model", OwnedBy: "u1", Task: "text-to-image"}},
+			{BaseModel: types.BaseModel{ID: "other", Object: "model", OwnedBy: "u1", Task: "embedding"}},
+		}
+		resp := filterAndPaginateModels(modelsWithTask, types.ListModelsReq{Task: "text-generation"})
+		assert.Equal(t, 1, resp.TotalCount)
+		require.Len(t, resp.Data, 1)
+		assert.Equal(t, "multi", resp.Data[0].ID)
+
+		resp = filterAndPaginateModels(modelsWithTask, types.ListModelsReq{Task: "summarization"})
+		assert.Equal(t, 1, resp.TotalCount)
+		require.Len(t, resp.Data, 1)
+		assert.Equal(t, "multi", resp.Data[0].ID)
+	})
+
+	t.Run("task filter collapses repeated commas in model Task", func(t *testing.T) {
+		modelsWithTask := []types.Model{
+			{BaseModel: types.BaseModel{ID: "sparse", Object: "model", OwnedBy: "u1", Task: "text-generation,,text-to-image"}},
+		}
+		resp := filterAndPaginateModels(modelsWithTask, types.ListModelsReq{Task: "text-generation"})
+		assert.Equal(t, 1, resp.TotalCount)
+		resp = filterAndPaginateModels(modelsWithTask, types.ListModelsReq{Task: "text-to-image"})
+		assert.Equal(t, 1, resp.TotalCount)
+	})
+
+	t.Run("task filter combined with source filter", func(t *testing.T) {
+		modelsWithTask := []types.Model{
+			{BaseModel: types.BaseModel{ID: "csghub-gen", Object: "model", OwnedBy: "u1", Task: "text-generation"}, InternalModelInfo: types.InternalModelInfo{CSGHubModelID: "user/model1"}},
+			{BaseModel: types.BaseModel{ID: "csghub-image", Object: "model", OwnedBy: "u1", Task: "text-to-image"}, InternalModelInfo: types.InternalModelInfo{CSGHubModelID: "user/model2"}},
+			{BaseModel: types.BaseModel{ID: "external-gen", Object: "model", OwnedBy: "openai", Task: "text-generation"}, ExternalModelInfo: types.ExternalModelInfo{Provider: "openai"}},
+		}
+		resp := filterAndPaginateModels(modelsWithTask, types.ListModelsReq{Source: string(types.ModelSourceCSGHub), Task: "text-generation"})
+		assert.Equal(t, 1, resp.TotalCount)
+		assert.Len(t, resp.Data, 1)
+		assert.Equal(t, "csghub-gen", resp.Data[0].ID)
 	})
 }
 
