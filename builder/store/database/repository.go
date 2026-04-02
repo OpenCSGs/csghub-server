@@ -662,6 +662,10 @@ func (s *repoStoreImpl) SetUpdateTimeByPath(ctx context.Context, repoType types.
 }
 
 func (s *repoStoreImpl) PublicToUser(ctx context.Context, repoType types.RepositoryType, userIDs []int64, filter *types.RepoFilter, per, page int, isAdmin bool) (repos []*Repository, count int, err error) {
+	if filter.Sort == "trending" && strings.TrimSpace(filter.Search) == "" {
+		return s.publicToUserTrending(ctx, repoType, userIDs, filter, per, page, isAdmin)
+	}
+
 	q := s.db.Operator.Core.
 		NewSelect().
 		Column("repository.*").
@@ -670,7 +674,6 @@ func (s *repoStoreImpl) PublicToUser(ctx context.Context, repoType types.Reposit
 
 	q.Where("repository.repository_type = ?", repoType)
 
-	// join table by repo type to filter out deleted and half-created records
 	switch repoType {
 	case types.ModelRepo:
 		q.Join("INNER JOIN models ON models.repository_id = repository.id")
@@ -699,25 +702,30 @@ func (s *repoStoreImpl) PublicToUser(ctx context.Context, repoType types.Reposit
 	needDistinct := false
 	if filter.Source != "" {
 		if filter.Source == "local" {
-			q.Join("LEFT JOIN mirrors ON mirrors.repository_id = repository.id").
-				Join("LEFT JOIN mirror_tasks ON mirror_tasks.mirror_id = mirrors.id").
-				Where("mirror_tasks.status = ? or repository.source = ?", types.MirrorLfsSyncFinished, "local")
-			needDistinct = true
+			q.Where(`(
+				repository.source = 'local'
+				OR EXISTS (
+					SELECT 1 FROM mirrors m
+					JOIN mirror_tasks mt ON mt.mirror_id = m.id
+					WHERE m.repository_id = repository.id
+					  AND mt.status = ?
+				)
+			)`, types.MirrorLfsSyncFinished)
 		} else {
 			q.Where("repository.source = ?", filter.Source)
 		}
 	}
+
 	if filter.XnetMigrationStatus != nil {
 		q.Join("LEFT JOIN xnet_migration_tasks ON xnet_migration_tasks.id = repository.current_xnet_migration_task_id").
 			Where("xnet_migration_tasks.status = ?", *filter.XnetMigrationStatus)
 		needDistinct = true
 	}
 
-	// model tree filter
 	if filter.Tree != nil {
 		q.Where("repository.id IN (SELECT target_repo_id FROM model_trees WHERE source_repo_id = ? and relation = ?)", filter.Tree.RepoId, filter.Tree.Relation)
 	}
-	// list serverless
+
 	if filter.ListServerless {
 		q.Where("repository.id IN (SELECT repo_id FROM deploys WHERE type = ? and status = ?)", types.ServerlessType, common.Running)
 	}
@@ -745,20 +753,13 @@ func (s *repoStoreImpl) PublicToUser(ctx context.Context, repoType types.Reposit
 		needDistinct = true
 	}
 
-	if filter.Sort == "trending" {
-		q.Join("LEFT JOIN recom_repo_scores ON repository.id = recom_repo_scores.repository_id")
-		q.Where("recom_repo_scores.weight_name = ?", RecomWeightTotal)
-		q.ColumnExpr(`COALESCE(recom_repo_scores.score, 0) AS popularity`)
-		needDistinct = true
-	}
-
 	if needDistinct {
 		q.Distinct()
 	}
 
 	filter.Search = strings.TrimSpace(filter.Search)
 	if filter.Search != "" {
-		filter.Search = strings.ToLower(filter.Search) // search is case insensitive in our query, and convert to lower can improve the cache hit rate
+		filter.Search = strings.ToLower(filter.Search)
 		repos, count, err = s.SearchRepoWithCache(ctx, q, repoType, filter, per, page)
 		err = errorx.HandleDBError(err, errorx.Ctx().
 			Set("repo_type", repoType).
@@ -779,6 +780,144 @@ func (s *repoStoreImpl) PublicToUser(ctx context.Context, repoType types.Reposit
 	}
 
 	err = q.Limit(per).Offset((page - 1) * per).Scan(ctx)
+
+	return
+}
+
+func (s *repoStoreImpl) publicToUserTrending(ctx context.Context, repoType types.RepositoryType, userIDs []int64, filter *types.RepoFilter, per, page int, isAdmin bool) (repos []*Repository, count int, err error) {
+	repoTypeTable := map[types.RepositoryType]string{
+		types.ModelRepo:     "models",
+		types.DatasetRepo:   "datasets",
+		types.CodeRepo:      "codes",
+		types.SpaceRepo:     "spaces",
+		types.PromptRepo:    "prompts",
+		types.MCPServerRepo: "mcp_servers",
+		types.SkillRepo:     "skills",
+	}
+	bizTable, ok := repoTypeTable[repoType]
+	if !ok {
+		return
+	}
+
+	q := s.db.Operator.Core.
+		NewSelect().
+		ColumnExpr("r.*, rrs.score AS popularity").
+		TableExpr("recom_repo_scores AS rrs").
+		Join("JOIN repositories AS r ON r.id = rrs.repository_id").
+		Where("rrs.weight_name = ?", RecomWeightTotal).
+		Where("r.repository_type = ?", repoType).
+		Where("r.deleted_at IS NULL").
+		Where(fmt.Sprintf("EXISTS (SELECT 1 FROM %s m WHERE m.repository_id = r.id)", bizTable))
+
+	if !isAdmin {
+		if len(userIDs) > 0 {
+			q.Where("r.private = ? OR r.user_id IN (?)", false, bun.In(userIDs))
+		} else {
+			q.Where("r.private = ?", false)
+		}
+	}
+
+	if filter.Source != "" {
+		if filter.Source == "local" {
+			q.Where(`(
+				r.source = 'local'
+				OR EXISTS (
+					SELECT 1 FROM mirrors m
+					JOIN mirror_tasks mt ON mt.mirror_id = m.id
+					WHERE m.repository_id = r.id
+					  AND mt.status = ?
+				)
+			)`, types.MirrorLfsSyncFinished)
+		} else {
+			q.Where("r.source = ?", filter.Source)
+		}
+	}
+
+	if filter.XnetMigrationStatus != nil {
+		q.Where(`EXISTS (
+			SELECT 1 FROM xnet_migration_tasks xmt
+			WHERE xmt.id = r.current_xnet_migration_task_id
+			  AND xmt.status = ?
+		)`, *filter.XnetMigrationStatus)
+	}
+
+	if filter.Tree != nil {
+		q.Where("r.id IN (SELECT target_repo_id FROM model_trees WHERE source_repo_id = ? AND relation = ?)", filter.Tree.RepoId, filter.Tree.Relation)
+	}
+
+	if filter.ListServerless {
+		q.Where("r.id IN (SELECT repo_id FROM deploys WHERE type = ? AND status = ?)", types.ServerlessType, common.Running)
+	}
+
+	if len(filter.SpaceSDK) > 0 {
+		q.Where("spaces.sdk = ?", filter.SpaceSDK)
+	}
+
+	if len(filter.Tags) > 0 {
+		for i, tag := range filter.Tags {
+			asRepoTag := fmt.Sprintf("rt%d", i)
+			asTag := fmt.Sprintf("ts%d", i)
+			q.Join(fmt.Sprintf("JOIN repository_tags AS %s ON r.id = %s.repository_id", asRepoTag, asRepoTag)).
+				Join(fmt.Sprintf("JOIN tags AS %s ON %s.tag_id = %s.id", asTag, asRepoTag, asTag))
+			if tag.Category != "" {
+				q.Where(fmt.Sprintf("%s.category = ?", asTag), tag.Category)
+			}
+			if tag.Name != "" {
+				q.Where(fmt.Sprintf("%s.name = ?", asTag), tag.Name)
+			}
+			if tag.Group != "" {
+				q.Where(fmt.Sprintf("%s.group = ?", asTag), tag.Group)
+			}
+		}
+		q.Distinct()
+	}
+
+	count, err = q.Count(ctx)
+	err = errorx.HandleDBError(err, errorx.Ctx().
+		Set("repo_type", repoType).
+		Set("filter", filter),
+	)
+	if err != nil {
+		return
+	}
+
+	err = q.OrderExpr("rrs.score DESC NULLS LAST").
+		Limit(per).
+		Offset((page-1)*per).
+		Scan(ctx, &repos)
+	err = errorx.HandleDBError(err, errorx.Ctx().
+		Set("repo_type", repoType).
+		Set("filter", filter),
+	)
+	if err != nil {
+		return
+	}
+
+	if len(repos) > 0 {
+		repoIDs := make([]int64, len(repos))
+		for i, r := range repos {
+			repoIDs[i] = r.ID
+		}
+		var repoTags []RepositoryTag
+		err = s.db.Operator.Core.
+			NewSelect().
+			Model(&repoTags).
+			Relation("Tag").
+			Where("repository_tag.repository_id IN (?)", bun.In(repoIDs)).
+			Scan(ctx)
+		err = errorx.HandleDBError(err, errorx.Ctx().Set("repo_type", repoType))
+		if err != nil {
+			return
+		}
+		tagMap := make(map[int64][]Tag, len(repos))
+		for i := range repoTags {
+			rt := &repoTags[i]
+			tagMap[rt.RepositoryID] = append(tagMap[rt.RepositoryID], *rt.Tag)
+		}
+		for i := range repos {
+			repos[i].Tags = tagMap[repos[i].ID]
+		}
+	}
 
 	return
 }
