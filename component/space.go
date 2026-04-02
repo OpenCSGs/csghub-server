@@ -945,12 +945,14 @@ func (c *spaceComponentImpl) Deploy(ctx context.Context, namespace, name, curren
 		)
 	}
 
-	// found user id
-	user, err := c.userStore.FindByUsername(ctx, currentUser)
+	// found namespace by org or user path
+	ns, err := c.userSvcClient.GetNameSpaceInfo(ctx, currentUser)
 	if err != nil {
-		slog.Error("can't find user for deploy space", slog.Any("error", err), slog.String("username", currentUser))
+		slog.Error("can't find namespace for deploy space", slog.Any("error", err), slog.String("ns", currentUser))
 		return -1, err
 	}
+
+	userID := space.Repository.UserID
 
 	resID, err := strconv.Atoi(space.SKU)
 	if err != nil {
@@ -973,7 +975,7 @@ func (c *spaceComponentImpl) Deploy(ctx context.Context, namespace, name, curren
 	annotations := make(map[string]string)
 	annotations[types.ResTypeKey] = string(types.SpaceRepo)
 	annotations[types.ResNameKey] = fmt.Sprintf("%s/%s", namespace, name)
-	annotations[types.ResDeployUser] = user.Username
+	annotations[types.ResDeployUser] = currentUser
 	annoStr, err := json.Marshal(annotations)
 	if err != nil {
 		slog.Error("fail to create annotations for deploy space", slog.Any("error", err), slog.String("username", currentUser))
@@ -1036,11 +1038,11 @@ func (c *spaceComponentImpl) Deploy(ctx context.Context, namespace, name, curren
 		Secret:        space.Secrets,
 		RepoID:        space.Repository.ID,
 		ModelID:       0,
-		UserID:        user.ID,
+		UserID:        userID,
 		Annotation:    string(annoStr),
 		ImageID:       imageID,
 		Type:          types.SpaceType,
-		UserUUID:      user.UUID,
+		UserUUID:      ns.UUID, // user or org uuid
 		SKU:           space.SKU,
 		ContainerPort: containerPort,
 		Variables:     space.Variables,
@@ -1059,7 +1061,7 @@ func (c *spaceComponentImpl) Deploy(ctx context.Context, namespace, name, curren
 		return -1, err
 	}
 
-	c.syncCodeAgentIfExists(user.UUID, user.Username, space.Repository.Path, types.CodeAgentSyncOperationUpdate)
+	c.syncCodeAgentIfExists(ns.UUID, ns.Path, space.Repository.Path, types.CodeAgentSyncOperationUpdate)
 	return deployID, nil
 }
 
