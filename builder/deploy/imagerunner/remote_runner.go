@@ -18,6 +18,7 @@ import (
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
+	runnerTypes "opencsg.com/csghub-server/runner/types"
 )
 
 var _ Runner = (*RemoteRunner)(nil)
@@ -264,14 +265,10 @@ func (h *RemoteRunner) doRequest(ctx context.Context, method, url string, data i
 		if err != nil {
 			err := fmt.Errorf("unexpected http status: %d, error: %w", resp.StatusCode, err)
 			return nil, errorx.RemoteSvcFail(err, nil)
-		} else {
-			err, ok := errorx.RunnerErrors[result.Code]
-			if ok {
-				return nil, err
-			}
-			err = fmt.Errorf("unexpected http status: %d, error: %w", resp.StatusCode, err)
-			return nil, errorx.RemoteSvcFail(err, nil)
 		}
+		slog.WarnContext(ctx, "remote runner response with", slog.Any("StatusCode", resp.StatusCode), slog.Any("result", result))
+		err = fmt.Errorf("unexpected http status: %d", resp.StatusCode)
+		return nil, err
 	}
 
 	return resp, nil
@@ -544,6 +541,39 @@ func (h *RemoteRunner) DeleteKsvcVersion(ctx context.Context, clusterID, svcName
 	response, err := h.doRequest(ctx, http.MethodDelete, url, nil)
 	if err != nil {
 		return fmt.Errorf("failed to delete ksvc version, %w", err)
+	}
+	defer response.Body.Close()
+	return nil
+}
+
+func (h *RemoteRunner) CreateSandbox(ctx context.Context, req *runnerTypes.SandboxRequest) (*runnerTypes.Sandbox, error) {
+	remote, err := h.GetRemoteRunnerHost(ctx, req.ClusterID)
+	if err != nil {
+		return nil, err
+	}
+	url := fmt.Sprintf("%s/api/v1/sandboxes", remote)
+	response, err := h.doRequest(ctx, http.MethodPost, url, req)
+	if err != nil {
+		return nil, err
+	}
+	defer response.Body.Close()
+
+	var res runnerTypes.Sandbox
+	if err := json.NewDecoder(response.Body).Decode(&res); err != nil {
+		return nil, errorx.InternalServerError(err, nil)
+	}
+	return &res, nil
+}
+
+func (h *RemoteRunner) DeleteSandbox(ctx context.Context, req *runnerTypes.SandboxDeleteRequest) error {
+	remote, err := h.GetRemoteRunnerHost(ctx, req.ClusterID)
+	if err != nil {
+		return err
+	}
+	url := fmt.Sprintf("%s/api/v1/sandboxes", remote)
+	response, err := h.doRequest(ctx, http.MethodDelete, url, req)
+	if err != nil {
+		return err
 	}
 	defer response.Body.Close()
 	return nil
