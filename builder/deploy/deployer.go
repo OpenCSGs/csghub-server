@@ -414,7 +414,7 @@ func (d *deployer) Wakeup(ctx context.Context, dr types.DeployRepo) error {
 	srvURL := fmt.Sprintf("http://%s.%s", svcName, d.internalRootDomain)
 	// Create a new HTTP client with a timeout
 	client := &http.Client{
-		Timeout: 3 * time.Second,
+		Timeout: 20 * time.Second,
 	}
 
 	// Send a GET request to wake up the service
