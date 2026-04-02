@@ -213,37 +213,37 @@ func (d *deployer) Deploy(ctx context.Context, dr types.DeployRepo) (int64, erro
 	if err != nil || deploy == nil {
 		return -1, fmt.Errorf("failed to create deploy in db, %w", err)
 	}
-	// skip build step for model as inference
-	bldTaskStatus := 0
+
+	bldTaskStatus := common.TaskStatusBuildPending
 	bldTaskMsg := ""
 
 	imgStrLen := len(strings.Trim(deploy.ImageID, " "))
 	slog.Debug("do deployer.Deploy check image", slog.Any("deploy.ImageID", deploy.ImageID), slog.Any("imgStrLen", imgStrLen))
 	if imgStrLen > 0 {
+		// skip build step for model as inference or finetune
 		bldTaskStatus = common.TaskStatusBuildSkip
 		bldTaskMsg = "Skip"
 	}
 	slog.Debug("create build task", slog.Any("bldTaskStatus", bldTaskStatus), slog.Any("bldTaskMsg", bldTaskMsg))
 	buildTask := &database.DeployTask{
 		DeployID: deploy.ID,
-		TaskType: 0,
+		TaskType: common.TaskTypeBuild, // build task
 		Status:   bldTaskStatus,
 		Message:  bldTaskMsg,
 	}
 	err = d.deployTaskStore.CreateDeployTask(ctx, buildTask)
 	if err != nil {
-		return -1, fmt.Errorf("create deploy task failed: %w", err)
+		return -1, fmt.Errorf("create build task for repo %d failed: %w", dr.RepoID, err)
 	}
 	runTask := &database.DeployTask{
 		DeployID: deploy.ID,
-		TaskType: 1,
+		TaskType: common.TaskTypeDeploy, // deploy task
 	}
 	err = d.deployTaskStore.CreateDeployTask(ctx, runTask)
 	if err != nil {
-		return -1, fmt.Errorf("create deploy task failed: %w", err)
+		return -1, fmt.Errorf("create deploy task for repo %d failed: %w", dr.RepoID, err)
 	}
 
-	// go func() { _ = d.scheduler.Queue(buildTask.ID) }()
 	buildTask.Deploy = deploy
 	runTask.Deploy = deploy
 
