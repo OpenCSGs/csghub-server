@@ -1,4 +1,4 @@
-FROM opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/csghub_server:base-build-1.25.5 AS build-env
+FROM opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/csghub_server:base-3.0-build-go1.26.0 AS build-env
 ENV GOPROXY=https://goproxy.cn,direct
 WORKDIR /starhub
 COPY . .
@@ -11,10 +11,12 @@ RUN CGO_ENABLED=1 GOOS=linux go build \
       -ldflags "-X opencsg.com/csghub-server/version.GitRevision=${CI_COMMIT_SHORT_SHA} -X opencsg.com/csghub-server/version.StarhubAPIVersion=${IMAGE_TAG}" \
       -v -o /go/bin/starhub ./cmd/csghub-server
 
-FROM opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/csghub_server:base-runtime-3.1
+FROM opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsg_public/csghub_server:base-3.0-runtime
 
 WORKDIR /starhub-bin
 ENV GIN_MODE=release
+RUN mkdir -p /starhub-bin && \
+    curl -fL -o /starhub-bin/GeoLite2-City.mmdb https://opencsg-public-resource.oss-cn-beijing.aliyuncs.com/geoip/GeoLite2-City.mmdb
 COPY --from=build-env /go/bin/starhub .
 COPY docker/spaces/templates/ /starhub-bin/docker/spaces/templates/
 COPY configs/ /starhub-bin/configs/
