@@ -456,7 +456,7 @@ type UserBalanceResp struct {
 }
 
 type AcctRechargeListReq struct {
-	UserUUID    string `json:"user_uuid"`
+	TargetUUID  string `json:"target_uuid"`
 	Scene       int    `json:"scene"`
 	ActivityID  int64  `json:"activity_id"`
 	StartTime   string `json:"start_time"`
@@ -464,6 +464,7 @@ type AcctRechargeListReq struct {
 	Per         int    `json:"per"`
 	Page        int    `json:"page"`
 	CurrentUser string `json:"-"`
+	OrgName     string `json:"org_name"`
 }
 
 type AcctRecharge struct {
