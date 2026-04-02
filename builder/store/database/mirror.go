@@ -423,7 +423,8 @@ func (s *mirrorStoreImpl) ToBeScheduled(ctx context.Context) ([]Mirror, error) {
 		Model(&mirrors).
 		Relation("MirrorTasks").
 		Where(
-			"mirror.remote_updated_at > mirror.updated_at",
+			"mirror.remote_updated_at > mirror.updated_at or (mirror.repository_id = 0 and mirror.status = ?)",
+			types.MirrorQueued,
 		).
 		Distinct().
 		Order("mirror_priority desc").
