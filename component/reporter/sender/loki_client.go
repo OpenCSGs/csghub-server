@@ -16,11 +16,13 @@ import (
 
 // lokiClient implements the LogSender interface
 type lokiClient struct {
-	clientID          types.ClientType
-	acceptLabelPrefix string
-	lokiClient        loki.Client
-	timeLoc           *time.Location
-	lineSeparator     string
+	clientID               types.ClientType
+	acceptLabelPrefix      string
+	lokiClient             loki.Client
+	timeLoc                *time.Location
+	lineSeparator          string
+	maxStoreTimeDay        int
+	queryLastReportTimeout int
 }
 
 // NewLokiClient creates a new Loki client
@@ -34,11 +36,13 @@ func NewLokiClient(url string, clientID types.ClientType, config *config.Config)
 		slog.Error("failed to create loki client by TimeZone error", slog.Any("error", err))
 	}
 	return &lokiClient{
-		clientID:          clientID,
-		acceptLabelPrefix: config.LogCollector.AcceptLabelPrefix,
-		lokiClient:        lc,
-		timeLoc:           timeLoc,
-		lineSeparator:     config.LogCollector.LineSeparator,
+		clientID:               clientID,
+		acceptLabelPrefix:      config.LogCollector.AcceptLabelPrefix,
+		lokiClient:             lc,
+		timeLoc:                timeLoc,
+		lineSeparator:          config.LogCollector.LineSeparator,
+		maxStoreTimeDay:        config.LogCollector.MaxStoreTimeDay,
+		queryLastReportTimeout: config.LogCollector.QueryLastReportTimeout,
 	}, err
 }
 
@@ -48,9 +52,9 @@ func (c *lokiClient) logEntryToMap(entry *types.LogEntry) map[string]string {
 	labelCount := 0
 	// must have labels
 	labels := map[string]string{
-		"client_id":             c.clientID.String(),
-		"category":              entry.Category.String(),
-		types.StreamKeyDeployID: entry.DeployID,
+		"client_id":                 c.clientID.String(),
+		"category":                  entry.Category.String(),
+		types.StreamKeyDeployID:     entry.DeployID,
 		types.StreamKeyDeployTaskID: entry.Labels[types.StreamKeyDeployTaskID],
 	}
 	labelCount = len(labels)
@@ -153,22 +157,32 @@ func (c *lokiClient) SendLogs(ctx context.Context, entries []types.LogEntry) err
 
 // GetLastReportedTimestamp queries Loki for the last timestamp for this client
 func (c *lokiClient) GetLastReportedTimestamp(ctx context.Context) (time.Time, error) {
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(c.queryLastReportTimeout)*time.Second)
 	defer cancel()
 	if c.clientID == "" {
 		return time.Time{}, fmt.Errorf("no client ID provided") // No client ID, nothing to query
 	}
 
 	query := fmt.Sprintf(`{client_id="%s"}`, c.clientID)
-	// Search over the last 30 days. Adjust if logs can be older.
-	start := time.Now().Add(-30 * 24 * time.Hour)
 
+	// Query in loki cache
 	queryRangeParams := loki.QueryRangeParams{
 		Query:     query,
 		Limit:     1,
-		Start:     start,
 		Direction: "backward",
 	}
+	t, err := c.queryRange(ctx, queryRangeParams)
+	if err == nil && !t.IsZero() {
+		return t, err
+	}
+
+	// Degenerate query by start time
+	start := time.Now().Add(-time.Duration(c.maxStoreTimeDay) * 24 * time.Hour)
+	queryRangeParams.Start = start
+	return c.queryRange(ctx, queryRangeParams)
+}
+
+func (c *lokiClient) queryRange(ctx context.Context, queryRangeParams loki.QueryRangeParams) (time.Time, error) {
 	queryResponse, err := c.lokiClient.QueryRange(ctx, queryRangeParams)
 	if err != nil {
 		return time.Time{}, fmt.Errorf("failed to query loki: %w", err)
@@ -191,7 +205,7 @@ func (c *lokiClient) GetLastReportedTimestamp(ctx context.Context) (time.Time, e
 	}
 
 	slog.Info("No previous logs found for this client_id, will start from the beginning.", "client_id", c.clientID)
-	return time.Time{}, nil // No logs found
+	return time.Time{}, nil
 }
 
 // Health checks Loki health
@@ -278,23 +292,10 @@ func (c *lokiClient) StreamAllLogs(
 	ctx context.Context,
 	id string,
 	start time.Time,
-	lables map[string]string,
+	labels map[string]string,
 	timeLoc *time.Location) (chan string, error) {
-	lables[types.StreamKeyDeployID] = id
-
-	var queryBuilder strings.Builder
-	queryBuilder.WriteString("{")
-	first := true
-	for k, v := range lables {
-		if !first {
-			queryBuilder.WriteString(",")
-		}
-		fmt.Fprintf(&queryBuilder, `%s="%s"`, k, v)
-		first = false
-	}
-	queryBuilder.WriteString("}")
-	query := queryBuilder.String()
-
+	labels[types.StreamKeyDeployID] = id
+	query := c.GenerateLabelQuery(labels)
 	lokiCh, err := c.lokiClient.Tail(ctx, query, start)
 	if err != nil {
 		return nil, fmt.Errorf("failed to tail logs from loki: %w", err)
@@ -328,4 +329,20 @@ func (c *lokiClient) StreamAllLogs(
 
 func (c *lokiClient) QueryRange(ctx context.Context, params loki.QueryRangeParams) (*loki.LokiQueryResponse, error) {
 	return c.lokiClient.QueryRange(ctx, params)
+}
+
+func (c *lokiClient) GenerateLabelQuery(labels map[string]string) string {
+	var queryBuilder strings.Builder
+	queryBuilder.WriteString("{")
+	first := true
+	for k, v := range labels {
+		if !first {
+			queryBuilder.WriteString(",")
+		}
+		queryBuilder.WriteString(fmt.Sprintf(`%s="%s"`, k, v))
+		first = false
+	}
+	queryBuilder.WriteString("}")
+	query := queryBuilder.String()
+	return query
 }

@@ -968,6 +968,7 @@ func TestDeployer_GetWorkflowLogsNonStream(t *testing.T) {
 
 	sender := mockSender.NewMockLogSender(t)
 
+	sender.EXPECT().GenerateLabelQuery(mock.Anything).Return("test_query")
 	sender.EXPECT().QueryRange(mock.Anything, mock.Anything).Return(&loki.LokiQueryResponse{}, nil)
 
 	d := &deployer{
