@@ -114,7 +114,7 @@ type DeployTaskStore interface {
 	StopDeployByID(ctx context.Context, userID int64, deployID int64) error
 	GetServerlessDeployByRepID(ctx context.Context, repoID int64) (*Deploy, error)
 	ListServerless(ctx context.Context, req types.DeployReq) ([]Deploy, int, error)
-	GetRunningDeployByUserID(ctx context.Context, userID int64) ([]Deploy, error)
+	GetRunningDeployByUserUUID(ctx context.Context, userUUID string) ([]Deploy, error)
 	ListAllDeployByUID(ctx context.Context, userID int64) ([]Deploy, error)
 	ListAllDeploys(ctx context.Context, req types.DeployReq, isActive bool) ([]Deploy, int, error)
 	RunningVisibleToUser(ctx context.Context, userID int64) ([]Deploy, error)
@@ -540,11 +540,11 @@ func (s *deployTaskStoreImpl) GetDeploys(ctx context.Context, filter DeployFilte
 	return result, nil
 }
 
-func (s *deployTaskStoreImpl) GetRunningDeployByUserID(ctx context.Context, userID int64) ([]Deploy, error) {
+func (s *deployTaskStoreImpl) GetRunningDeployByUserUUID(ctx context.Context, userUUID string) ([]Deploy, error) {
 	// get all running inference and finetune of user
 	var result []Deploy
 	_, err := s.db.Operator.Core.NewSelect().Model(&result).
-		Where("user_id = ?", userID).
+		Where("user_uuid = ?", userUUID).
 		Where("type in (?)", bun.In([]int{types.SpaceType, types.InferenceType, types.FinetuneType, types.EvaluationType})).
 		Where("status not in (?)", bun.In([]int{common.Stopped, common.Deleted})).
 		Exec(ctx, &result)

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"time"
 
+	"opencsg.com/csghub-server/common/utils/money"
 	"opencsg.com/csghub-server/common/utils/payment/consts"
 
 	"github.com/google/uuid"
@@ -406,6 +407,7 @@ type AcctPriceListFilter struct {
 type AcctRechargeReq struct {
 	ChannelCode    consts.PaymentChannel `json:"channelCode"`
 	RechargeAmount float64               `json:"rechargeAmount"` //unit yuan
+	OrgName        string                `json:"orgName"`
 }
 
 type AcctRechargeResp struct {
@@ -414,6 +416,16 @@ type AcctRechargeResp struct {
 	RechargeOrderNo string                `json:"orderNo"`
 	Channel         consts.PaymentChannel `json:"channel"`
 	CreateTime      time.Time             `json:"createTime"` //2024-11-18 15:50:47
+}
+
+type AcctRechargeItem struct {
+	TargetUUID  string
+	OpUserUUID  string
+	Description string
+	Amount      *money.Money
+	Channel     consts.PaymentChannel
+	OrgName     string
+	UserName    string
 }
 
 type RechargeStatusResp struct {
@@ -456,7 +468,7 @@ type UserBalanceResp struct {
 }
 
 type AcctRechargeListReq struct {
-	UserUUID    string `json:"user_uuid"`
+	TargetUUID  string `json:"target_uuid"`
 	Scene       int    `json:"scene"`
 	ActivityID  int64  `json:"activity_id"`
 	StartTime   string `json:"start_time"`
@@ -464,6 +476,7 @@ type AcctRechargeListReq struct {
 	Per         int    `json:"per"`
 	Page        int    `json:"page"`
 	CurrentUser string `json:"-"`
+	OrgName     string `json:"org_name"`
 }
 
 type AcctRecharge struct {

@@ -1072,7 +1072,7 @@ func (c *modelComponentImpl) Deploy(ctx context.Context, deployReq types.DeployA
 		// only one service deploy was allowed
 		d, err := c.deployTaskStore.GetServerlessDeployByRepID(ctx, m.Repository.ID)
 		if err != nil {
-			return -1, fmt.Errorf("fail to get deploy, %w", err)
+			return -1, fmt.Errorf("failed to get deploy, %w", err)
 		}
 		if d != nil {
 			return d.ID, nil
@@ -1091,7 +1091,7 @@ func (c *modelComponentImpl) Deploy(ctx context.Context, deployReq types.DeployA
 
 	varStr, err := c.buildVariables(req, frame)
 	if err != nil {
-		return -1, fmt.Errorf("fail to generate variables, %w", err)
+		return -1, fmt.Errorf("failed to generate variables, %w", err)
 	}
 
 	// put repo-type and namespace/name in annotation
