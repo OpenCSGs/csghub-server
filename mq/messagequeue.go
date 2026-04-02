@@ -15,14 +15,7 @@ type MessageQueue interface {
 	CreateOrUpdateStream(ctx context.Context, streamName string, streamCfg jetstream.StreamConfig) (jetstream.Stream, error)
 	BuildEventStreamAndConsumer(cfg EventConfig, streamCfg jetstream.StreamConfig, consumerCfg jetstream.ConsumerConfig) (jetstream.Consumer, error)
 	VerifyStreamByName(streamName string) error
-	VerifyDLQStream() error
 	PublishData(subject string, data []byte) error
-	PublishFeeDataToDLQ(data []byte) error
-	BuildRechargeEventStream() error
-	VerifyRechargeStream() error
-	PublishRechargeDurationData(data []byte) error
-	FetchRechargeEventMessages(batch int) (jetstream.MessageBatch, error)
-	PublishRechargeDataToDLQ(data []byte) error
 
 	PublishHighPriorityMsg(msg types.ScenarioMessage) error
 	BuildHighPriorityMsgStream(conf *config.Config) error

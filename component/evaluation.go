@@ -263,7 +263,7 @@ func (c *evaluationComponentImpl) DeleteEvaluation(ctx context.Context, req type
 	req.ClusterID = wf.ClusterID
 	err = c.workflowStore.DeleteWorkFlow(ctx, req.ID)
 	if err != nil {
-		return fmt.Errorf("fail to delete evaluation result, %w", err)
+		return fmt.Errorf("failed to delete evaluation result, %w", err)
 	}
 	return c.deployer.DeleteEvaluation(ctx, req)
 }
