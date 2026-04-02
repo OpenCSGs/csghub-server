@@ -216,6 +216,7 @@ type User struct {
 	Labels            []string       `json:"labels,omitempty"`
 	CreatedAt         time.Time      `json:"created_at"`
 	Tags              []RepoTag      `json:"tags,omitempty"`
+	Namespaces        []Namespace    `json:"namespaces,omitempty"`
 }
 
 func (u User) IsAdmin() bool {
