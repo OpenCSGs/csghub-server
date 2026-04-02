@@ -278,19 +278,19 @@ func TestDeployTaskStore_UpdateInTx(t *testing.T) {
 
 }
 
-func TestDeployTaskStore_GetRunningDeployByUserID(t *testing.T) {
+func TestDeployTaskStore_GetRunningDeployByUserUUID(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()
 	ctx := context.TODO()
 
 	store := database.NewDeployTaskStoreWithDB(db)
 	deploys := []database.Deploy{
-		{UserID: 123, Type: 1, Status: common.Running, DeployName: "d1"},
-		{UserID: 123, Type: 0, Status: common.Running, DeployName: "d2"},
-		{UserID: 123, Type: 2, Status: common.Running, DeployName: "d3"},
-		{UserID: 123, Type: 3, Status: common.Running, DeployName: "d4"},
-		{UserID: 123, Type: 1, Status: common.Stopped, DeployName: "d5"},
-		{UserID: 456, Type: 1, Status: common.Running, DeployName: "d6"},
+		{UserID: 123, Type: 1, Status: common.Running, DeployName: "d1", UserUUID: "user-uuid-123"},
+		{UserID: 123, Type: 0, Status: common.Running, DeployName: "d2", UserUUID: "user-uuid-123"},
+		{UserID: 123, Type: 2, Status: common.Running, DeployName: "d3", UserUUID: "user-uuid-123"},
+		{UserID: 123, Type: 3, Status: common.Running, DeployName: "d4", UserUUID: "user-uuid-123"},
+		{UserID: 123, Type: 1, Status: common.Stopped, DeployName: "d5", UserUUID: "user-uuid-123"},
+		{UserID: 456, Type: 1, Status: common.Running, DeployName: "d6", UserUUID: "user-uuid-456"},
 	}
 
 	for _, dp := range deploys {
@@ -298,7 +298,7 @@ func TestDeployTaskStore_GetRunningDeployByUserID(t *testing.T) {
 		require.Nil(t, err)
 	}
 
-	dps, err := store.GetRunningDeployByUserID(ctx, 123)
+	dps, err := store.GetRunningDeployByUserUUID(ctx, "user-uuid-123")
 	require.Nil(t, err)
 	names := []string{}
 	for _, dp := range dps {

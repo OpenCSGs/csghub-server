@@ -860,29 +860,29 @@ func (_c *MockDeployTaskStore_GetNewTaskFirst_Call) RunAndReturn(run func(contex
 	return _c
 }
 
-// GetRunningDeployByUserID provides a mock function with given fields: ctx, userID
-func (_m *MockDeployTaskStore) GetRunningDeployByUserID(ctx context.Context, userID int64) ([]database.Deploy, error) {
-	ret := _m.Called(ctx, userID)
+// GetRunningDeployByUserUUID provides a mock function with given fields: ctx, userUUID
+func (_m *MockDeployTaskStore) GetRunningDeployByUserUUID(ctx context.Context, userUUID string) ([]database.Deploy, error) {
+	ret := _m.Called(ctx, userUUID)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetRunningDeployByUserID")
+		panic("no return value specified for GetRunningDeployByUserUUID")
 	}
 
 	var r0 []database.Deploy
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, int64) ([]database.Deploy, error)); ok {
-		return rf(ctx, userID)
+	if rf, ok := ret.Get(0).(func(context.Context, string) ([]database.Deploy, error)); ok {
+		return rf(ctx, userUUID)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, int64) []database.Deploy); ok {
-		r0 = rf(ctx, userID)
+	if rf, ok := ret.Get(0).(func(context.Context, string) []database.Deploy); ok {
+		r0 = rf(ctx, userUUID)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]database.Deploy)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, int64) error); ok {
-		r1 = rf(ctx, userID)
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, userUUID)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -890,31 +890,31 @@ func (_m *MockDeployTaskStore) GetRunningDeployByUserID(ctx context.Context, use
 	return r0, r1
 }
 
-// MockDeployTaskStore_GetRunningDeployByUserID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetRunningDeployByUserID'
-type MockDeployTaskStore_GetRunningDeployByUserID_Call struct {
+// MockDeployTaskStore_GetRunningDeployByUserUUID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetRunningDeployByUserUUID'
+type MockDeployTaskStore_GetRunningDeployByUserUUID_Call struct {
 	*mock.Call
 }
 
-// GetRunningDeployByUserID is a helper method to define mock.On call
+// GetRunningDeployByUserUUID is a helper method to define mock.On call
 //   - ctx context.Context
-//   - userID int64
-func (_e *MockDeployTaskStore_Expecter) GetRunningDeployByUserID(ctx interface{}, userID interface{}) *MockDeployTaskStore_GetRunningDeployByUserID_Call {
-	return &MockDeployTaskStore_GetRunningDeployByUserID_Call{Call: _e.mock.On("GetRunningDeployByUserID", ctx, userID)}
+//   - userUUID string
+func (_e *MockDeployTaskStore_Expecter) GetRunningDeployByUserUUID(ctx interface{}, userUUID interface{}) *MockDeployTaskStore_GetRunningDeployByUserUUID_Call {
+	return &MockDeployTaskStore_GetRunningDeployByUserUUID_Call{Call: _e.mock.On("GetRunningDeployByUserUUID", ctx, userUUID)}
 }
 
-func (_c *MockDeployTaskStore_GetRunningDeployByUserID_Call) Run(run func(ctx context.Context, userID int64)) *MockDeployTaskStore_GetRunningDeployByUserID_Call {
+func (_c *MockDeployTaskStore_GetRunningDeployByUserUUID_Call) Run(run func(ctx context.Context, userUUID string)) *MockDeployTaskStore_GetRunningDeployByUserUUID_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(int64))
+		run(args[0].(context.Context), args[1].(string))
 	})
 	return _c
 }
 
-func (_c *MockDeployTaskStore_GetRunningDeployByUserID_Call) Return(_a0 []database.Deploy, _a1 error) *MockDeployTaskStore_GetRunningDeployByUserID_Call {
+func (_c *MockDeployTaskStore_GetRunningDeployByUserUUID_Call) Return(_a0 []database.Deploy, _a1 error) *MockDeployTaskStore_GetRunningDeployByUserUUID_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockDeployTaskStore_GetRunningDeployByUserID_Call) RunAndReturn(run func(context.Context, int64) ([]database.Deploy, error)) *MockDeployTaskStore_GetRunningDeployByUserID_Call {
+func (_c *MockDeployTaskStore_GetRunningDeployByUserUUID_Call) RunAndReturn(run func(context.Context, string) ([]database.Deploy, error)) *MockDeployTaskStore_GetRunningDeployByUserUUID_Call {
 	_c.Call.Return(run)
 	return _c
 }
