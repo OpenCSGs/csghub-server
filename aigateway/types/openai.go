@@ -8,14 +8,16 @@ import (
 
 // BaseModel represents the base model fields
 type BaseModel struct {
-	ID                  string `json:"id"`
-	Object              string `json:"object"`
-	Created             int64  `json:"created"` // organization-owner (e.g. openai)
-	OwnedBy             string `json:"owned_by"`
-	Task                string `json:"task"`                            // like text-generation, text-to-image etc
-	SupportFunctionCall bool   `json:"support_function_call,omitempty"` // whether the model supports function calling
-	IsPinned            *bool  `json:"is_pinned,omitempty"`             // whether the model is pinned
-	Public              bool   `json:"public"`                          // whether the model is public (false = private, true = public)
+	ID                  string         `json:"id"`
+	Object              string         `json:"object"`
+	Created             int64          `json:"created"` // organization-owner (e.g. openai)
+	OwnedBy             string         `json:"owned_by"`
+	Task                string         `json:"task"` // like text-generation, text-to-image etc
+	DisplayName         string         `json:"display_name"`
+	SupportFunctionCall bool           `json:"support_function_call,omitempty"` // whether the model supports function calling
+	IsPinned            *bool          `json:"is_pinned,omitempty"`             // whether the model is pinned
+	Public              bool           `json:"public"`                          // whether the model is public (false = private, true = public)
+	Metadata            map[string]any `json:"metadata"`
 }
 
 // InternalModelInfo represents the internal model fields
@@ -34,6 +36,10 @@ type InternalModelInfo struct {
 type ExternalModelInfo struct {
 	Provider string `json:"-"` // external provider name, like openai, anthropic etc
 	AuthHead string `json:"-"` // the auth header to access the external model
+	// NeedSensitiveCheck controls whether requests for this model should go
+	// through sensitive content detection in aigateway. Set to false to skip
+	// the check (e.g. for guard models or trusted internal models).
+	NeedSensitiveCheck bool `json:"-"`
 }
 
 type Model struct {
@@ -48,28 +54,34 @@ func (m Model) MarshalJSON() ([]byte, error) {
 	if m.InternalUse {
 		// internalModelResponse
 		type internalModelResponse struct {
-			ID                  string  `json:"id"`
-			Object              string  `json:"object"`
-			Created             int64   `json:"created"`
-			OwnedBy             string  `json:"owned_by"`
-			Task                string  `json:"task"`
-			SupportFunctionCall *bool   `json:"support_function_call,omitempty"`
-			Public              bool    `json:"public"`
-			Endpoint            string  `json:"endpoint"`
-			ClusterID           *string `json:"cluster_id,omitempty"`
-			SvcName             *string `json:"svc_name,omitempty"`
-			ImageID             *string `json:"image_id,omitempty"`
-			AuthHead            *string `json:"auth_head,omitempty"`
-			Provider            *string `json:"provider,omitempty"`
+			ID                  string         `json:"id"`
+			Object              string         `json:"object"`
+			Created             int64          `json:"created"`
+			OwnedBy             string         `json:"owned_by"`
+			Task                string         `json:"task"`
+			DisplayName         string         `json:"display_name"`
+			SupportFunctionCall *bool          `json:"support_function_call,omitempty"`
+			Public              bool           `json:"public"`
+			Endpoint            string         `json:"endpoint"`
+			Metadata            map[string]any `json:"metadata"`
+			ClusterID           *string        `json:"cluster_id,omitempty"`
+			SvcName             *string        `json:"svc_name,omitempty"`
+			ImageID             *string        `json:"image_id,omitempty"`
+			AuthHead            *string        `json:"auth_head,omitempty"`
+			Provider            *string        `json:"provider,omitempty"`
+			NeedSensitiveCheck  bool           `json:"need_sensitive_check"`
 		}
 		resp := internalModelResponse{
-			ID:       m.ID,
-			Object:   m.Object,
-			Created:  m.Created,
-			OwnedBy:  m.OwnedBy,
-			Task:     m.Task,
-			Public:   m.Public,
-			Endpoint: m.Endpoint,
+			ID:                 m.ID,
+			Object:             m.Object,
+			Created:            m.Created,
+			OwnedBy:            m.OwnedBy,
+			Task:               m.Task,
+			DisplayName:        m.DisplayName,
+			Public:             m.Public,
+			Endpoint:           m.Endpoint,
+			Metadata:           m.Metadata,
+			NeedSensitiveCheck: m.NeedSensitiveCheck,
 		}
 
 		if m.SupportFunctionCall {
@@ -100,19 +112,22 @@ func (m Model) MarshalJSON() ([]byte, error) {
 
 func (m *Model) UnmarshalJSON(data []byte) error {
 	type internalModelResponse struct {
-		ID                  string `json:"id"`
-		Object              string `json:"object"`
-		Created             int64  `json:"created"`
-		OwnedBy             string `json:"owned_by"`
-		Task                string `json:"task"`
-		SupportFunctionCall bool   `json:"support_function_call,omitempty"`
-		Public              bool   `json:"public"`
-		Endpoint            string `json:"endpoint"`
-		ClusterID           string `json:"cluster_id,omitempty"`
-		SvcName             string `json:"svc_name,omitempty"`
-		ImageID             string `json:"image_id,omitempty"`
-		AuthHead            string `json:"auth_head,omitempty"`
-		Provider            string `json:"provider,omitempty"`
+		ID                  string         `json:"id"`
+		Object              string         `json:"object"`
+		Created             int64          `json:"created"`
+		OwnedBy             string         `json:"owned_by"`
+		Task                string         `json:"task"`
+		DisplayName         string         `json:"display_name"`
+		SupportFunctionCall bool           `json:"support_function_call,omitempty"`
+		Public              bool           `json:"public"`
+		Endpoint            string         `json:"endpoint"`
+		Metadata            map[string]any `json:"metadata"`
+		ClusterID           string         `json:"cluster_id,omitempty"`
+		SvcName             string         `json:"svc_name,omitempty"`
+		ImageID             string         `json:"image_id,omitempty"`
+		AuthHead            string         `json:"auth_head,omitempty"`
+		Provider            string         `json:"provider,omitempty"`
+		NeedSensitiveCheck  bool           `json:"need_sensitive_check"`
 	}
 	var aux internalModelResponse
 	if err := json.Unmarshal(data, &aux); err != nil {
@@ -123,14 +138,17 @@ func (m *Model) UnmarshalJSON(data []byte) error {
 	m.Created = aux.Created
 	m.OwnedBy = aux.OwnedBy
 	m.Task = aux.Task
+	m.DisplayName = aux.DisplayName
 	m.SupportFunctionCall = aux.SupportFunctionCall
 	m.Public = aux.Public
 	m.Endpoint = aux.Endpoint
+	m.Metadata = aux.Metadata
 	m.ClusterID = aux.ClusterID
 	m.SvcName = aux.SvcName
 	m.ImageID = aux.ImageID
 	m.AuthHead = aux.AuthHead
 	m.Provider = aux.Provider
+	m.NeedSensitiveCheck = aux.NeedSensitiveCheck
 	return nil
 }
 
@@ -144,6 +162,19 @@ func (m *Model) ForInternalUse() *Model {
 func (m *Model) ForExternalResponse() *Model {
 	m.InternalUse = false
 	return m
+}
+
+// SkipBalance set the model for skip balance mode
+func (m *Model) SkipBalance() bool {
+	// MetaTaskKey values is array of strings, check if MetaTaskValGuard is in it
+	if tasks, ok := m.Metadata[MetaTaskKey].([]interface{}); ok {
+		for _, t := range tasks {
+			if task, ok := t.(string); ok && task == MetaTaskValGuard {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // ModelList represents the model list response
@@ -165,6 +196,7 @@ type ListModelsReq struct {
 	Public  string `json:"public"`
 	Per     string `json:"per"`
 	Page    string `json:"page"`
+	Source  string `json:"source"` // filter by source (csghub for CSGHub models, external for external models)
 }
 
 // UserPreferenceRequest defines the request parameters for UserPreference method
@@ -177,5 +209,17 @@ type UserPreferenceRequest struct {
 const OpenCSGAppNameHeader string = "OpenCSG-App-Name"
 
 const (
-	AgenticHubApp = "Agentichub"
+	AgenticHubApp    = "Agentichub"
+	MetaTaskKey      = "task"
+	MetaTaskValGuard = "guard"
+)
+
+// ModelSource represents the source of a model
+type ModelSource string
+
+const (
+	// ModelSourceCSGHub represents models from CSGHub (internal models)
+	ModelSourceCSGHub ModelSource = "csghub"
+	// ModelSourceExternal represents models from external providers
+	ModelSourceExternal ModelSource = "external"
 )

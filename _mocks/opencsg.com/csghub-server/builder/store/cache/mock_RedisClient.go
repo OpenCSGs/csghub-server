@@ -813,6 +813,65 @@ func (_c *MockRedisClient_LPush_Call) RunAndReturn(run func(context.Context, str
 	return _c
 }
 
+// Pipelined provides a mock function with given fields: ctx, fn
+func (_m *MockRedisClient) Pipelined(ctx context.Context, fn func(redis.Pipeliner) error) ([]redis.Cmder, error) {
+	ret := _m.Called(ctx, fn)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Pipelined")
+	}
+
+	var r0 []redis.Cmder
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, func(redis.Pipeliner) error) ([]redis.Cmder, error)); ok {
+		return rf(ctx, fn)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, func(redis.Pipeliner) error) []redis.Cmder); ok {
+		r0 = rf(ctx, fn)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]redis.Cmder)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, func(redis.Pipeliner) error) error); ok {
+		r1 = rf(ctx, fn)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockRedisClient_Pipelined_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Pipelined'
+type MockRedisClient_Pipelined_Call struct {
+	*mock.Call
+}
+
+// Pipelined is a helper method to define mock.On call
+//   - ctx context.Context
+//   - fn func(redis.Pipeliner) error
+func (_e *MockRedisClient_Expecter) Pipelined(ctx interface{}, fn interface{}) *MockRedisClient_Pipelined_Call {
+	return &MockRedisClient_Pipelined_Call{Call: _e.mock.On("Pipelined", ctx, fn)}
+}
+
+func (_c *MockRedisClient_Pipelined_Call) Run(run func(ctx context.Context, fn func(redis.Pipeliner) error)) *MockRedisClient_Pipelined_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(func(redis.Pipeliner) error))
+	})
+	return _c
+}
+
+func (_c *MockRedisClient_Pipelined_Call) Return(_a0 []redis.Cmder, _a1 error) *MockRedisClient_Pipelined_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockRedisClient_Pipelined_Call) RunAndReturn(run func(context.Context, func(redis.Pipeliner) error) ([]redis.Cmder, error)) *MockRedisClient_Pipelined_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // RPush provides a mock function with given fields: ctx, key, values
 func (_m *MockRedisClient) RPush(ctx context.Context, key string, values ...interface{}) error {
 	var _ca []interface{}

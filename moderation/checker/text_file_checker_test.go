@@ -20,15 +20,9 @@ func TestTextFileChecker_Run(t *testing.T) {
 
 	t.Run("contains sensitive words", func(t *testing.T) {
 		mockChecker := mocksens.NewMockSensitiveChecker(t)
-		InitWithContentChecker(&config.Config{SensitiveCheck: struct {
-			Enable          bool   "env:\"STARHUB_SERVER_SENSITIVE_CHECK_ENABLE\" default:\"false\""
-			AccessKeyID     string "env:\"STARHUB_SERVER_SENSITIVE_CHECK_ACCESS_KEY_ID\""
-			AccessKeySecret string "env:\"STARHUB_SERVER_SENSITIVE_CHECK_ACCESS_KEY_SECRET\""
-			Region          string "env:\"STARHUB_SERVER_SENSITIVE_CHECK_REGION\""
-			Endpoint        string "env:\"STARHUB_SERVER_SENSITIVE_CHECK_ENDPOINT\" default:\"oss-cn-beijing.aliyuncs.com\""
-			EnableSSL       bool   "env:\"STARHUB_SERVER_SENSITIVE_CHECK_ENABLE_SSL\" default:\"true\""
-			DictDir         string "env:\"STARHUB_SERVER_SENSITIVE_CHECK_DICT_DIR\" default:\"/starhub-bin/vocabulary\""
-		}{Enable: true}}, mockChecker)
+		cfg := &config.Config{}
+		cfg.SensitiveCheck.Enable = true
+		InitWithContentChecker(cfg, mockChecker)
 		mockChecker.EXPECT().PassTextCheck(mock.Anything, types.ScenarioCommentDetection, "This text contains sensitive word.").
 			Return(&sensitive.CheckResult{IsSensitive: true, Reason: "contains sensitive word"}, nil)
 		checker := NewTextFileChecker()
