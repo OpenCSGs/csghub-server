@@ -42,6 +42,54 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Name:** `instanceQuotaExceeded`
 - **Description:** The instance quota exceeded. Includes agent type, instance count, and quota in the error message.
 
+---
+
+### `AGENT-ERR-1`
+
+- **Error Code:** `AGENT-ERR-1`
+- **Error Name:** `instanceNameAlreadyExists`
+- **Description:** You have an instance with the same name.
+
+---
+
+### `AGENT-ERR-2`
+
+- **Error Code:** `AGENT-ERR-2`
+- **Error Name:** `knowledgeBaseNameAlreadyExists`
+- **Description:** You have a knowledge base with the same name.
+
+---
+
+### `AGENT-ERR-3`
+
+- **Error Code:** `AGENT-ERR-3`
+- **Error Name:** `mcpServerNameAlreadyExists`
+- **Description:** You have an MCP server with the same name.
+
+---
+
+### `AGENT-ERR-4`
+
+- **Error Code:** `AGENT-ERR-4`
+- **Error Name:** `pinLimitExceeded`
+- **Description:** The pin limit exceeded. Maximum 5 items can be pinned per entity type.
+
+---
+
+### `AGENT-ERR-5`
+
+- **Error Code:** `AGENT-ERR-5`
+- **Error Name:** `invalidShareSessionUUID`
+- **Description:** The share session uuid is invalid.
+
+---
+
+### `AGENT-ERR-6`
+
+- **Error Code:** `AGENT-ERR-6`
+- **Error Name:** `shareSessionUUIDExpired`
+- **Description:** The share session uuid expired.
+
 ## Auth Errors
 
 ### `AUTH-ERR-0`
@@ -129,6 +177,22 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Code:** `AUTH-ERR-10`
 - **Error Name:** `userPhoneNotVerified`
 - **Description:** Your phone number has not been verified yet. Please verify your phone number before making any requests.
+
+---
+
+### `AUTH-ERR-11`
+
+- **Error Code:** `AUTH-ERR-11`
+- **Error Name:** `needAccessToken`
+- **Description:** The request must be authenticated with an access token.
+
+## Collection Errors
+
+### `COLL-ERR-0`
+
+- **Error Code:** `COLL-ERR-0`
+- **Error Name:** `repoAlreadyInCollection`
+- **Description:** The repository you are trying to add is already present in this collection.
 
 ## Dataset Errors
 
@@ -458,6 +522,30 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Name:** `gitUsingGitInXnetRepository`
 - **Description:** Using git in xnet-enabled repository error. Git operations are not supported in repositories enabled with xnet.
 
+## Invitation Errors
+
+### `INVITATION-ERR-0`
+
+- **Error Code:** `INVITATION-ERR-0`
+- **Error Name:** `userPhoneNotSet`
+- **Description:** The phone number is not set, cannot create invitation code.
+
+---
+
+### `INVITATION-ERR-1`
+
+- **Error Code:** `INVITATION-ERR-1`
+- **Error Name:** `invitationNotFound`
+- **Description:** The invitation not found.
+
+---
+
+### `INVITATION-ERR-2`
+
+- **Error Code:** `INVITATION-ERR-2`
+- **Error Name:** `userAlreadyHasInvitationCode`
+- **Description:** The invitation code already exists.
+
 ## License Errors
 
 ### `LICENSE-ERR-0`
@@ -465,6 +553,70 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Code:** `LICENSE-ERR-0`
 - **Error Name:** `noActiveLicense`
 - **Description:** No active license found for the current system.
+
+---
+
+### `LICENSE-ERR-1`
+
+- **Error Code:** `LICENSE-ERR-1`
+- **Error Name:** `licenseExpired`
+- **Description:** The license is expired, could not be verified and imported.
+
+## Mcp_gateway Errors
+
+### `MCP-GW-ERR-0`
+
+- **Error Code:** `MCP-GW-ERR-0`
+- **Error Name:** `gatewayMCPServerNameAlreadyExists`
+- **Description:** An MCP server with this name already exists in the gateway.
+
+---
+
+### `MCP-GW-ERR-1`
+
+- **Error Code:** `MCP-GW-ERR-1`
+- **Error Name:** `gatewayMCPServerInvalidName`
+- **Description:** The MCP server name does not meet naming requirements.
+
+## Moderation Errors
+
+### `MOD-ERR-0`
+
+- **Error Code:** `MOD-ERR-0`
+- **Error Name:** `codeNameRequire`
+- **Description:** The request parameter does not match the server requirements, and the server cannot process the request.
+
+---
+
+### `MOD-ERR-1`
+
+- **Error Code:** `MOD-ERR-1`
+- **Error Name:** `codeWordRequire`
+- **Description:** The request parameter does not match the server requirements, and the server cannot process the request.
+
+## Repo Errors
+
+### `REPO-ERR-0`
+
+- **Error Code:** `REPO-ERR-0`
+- **Error Name:** `codeRepoAlreadyExistErr`
+- **Description:** A repository with the same name already exists.
+
+---
+
+### `REPO-ERR-1`
+
+- **Error Code:** `REPO-ERR-1`
+- **Error Name:** `codeRepoNameInvalidErr`
+- **Description:** The repository name is invalid.
+
+---
+
+### `REPO-ERR-2`
+
+- **Error Code:** `REPO-ERR-2`
+- **Error Name:** `codeNamespaceNotFoundErr`
+- **Description:** The namespace does not exist.
 
 ## Req Errors
 
@@ -554,6 +706,38 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Name:** `errRateLimitExceeded`
 - **Description:** The user has sent too many requests in a given amount of time. Further requests will be blocked until the rate limit resets or a valid captcha is provided.
 
+---
+
+### `REQ-ERR-11`
+
+- **Error Code:** `REQ-ERR-11`
+- **Error Name:** `errLimitedIPLocation`
+- **Description:** Requests originating from this IP location are restricted. To proceed, please complete a captcha verification.
+
+---
+
+### `REQ-ERR-12`
+
+- **Error Code:** `REQ-ERR-12`
+- **Error Name:** `errCaptchaIncorrect`
+- **Description:** The provided captcha verification failed. Please try again with a valid captcha.
+
+## Resource Errors
+
+### `RESOURCE-ERR-0`
+
+- **Error Code:** `RESOURCE-ERR-0`
+- **Error Name:** `codeResourceNotFoundErr`
+- **Description:** The resource was not found.
+
+---
+
+### `RESOURCE-ERR-1`
+
+- **Error Code:** `RESOURCE-ERR-1`
+- **Error Name:** `codeResourceUnavailableErr`
+- **Description:** The resource is temporarily unavailable.
+
 ## Runner Errors
 
 ### `RUNNER-ERR-0`
@@ -593,6 +777,14 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Code:** `RUNNER-ERR-4`
 - **Error Name:** `codeTrafficPercentNotZeroErr`
 - **Description:** The traffic percent is not zero.
+
+## Sensitive Errors
+
+### `SENSITIVE-ERR-0`
+
+- **Error Code:** `SENSITIVE-ERR-0`
+- **Error Name:** `codeSensitiveInfoNotAllowedErr`
+- **Description:** The sensitive information is not allowed.
 
 ## Serverless Errors
 
@@ -656,7 +848,7 @@ This document lists all the custom error codes defined in the project, categoriz
 
 - **Error Code:** `SERVERLESS-ERR-7`
 - **Error Name:** `codeTrafficInvalidErr`
-- **Description:** The traffic percent is invalid.
+- **Description:** no other valid revision except
 
 ---
 
@@ -665,6 +857,30 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Code:** `SERVERLESS-ERR-8`
 - **Error Name:** `codeInvalidCommitIDErr`
 - **Description:** The commit id is invalid.
+
+## Spaces Errors
+
+### `SPACE-ERR-0`
+
+- **Error Code:** `SPACE-ERR-0`
+- **Error Name:** `codeGetSpaceDockerTemplatePathFailedErr`
+- **Description:** Failed to get the space Docker template path.
+
+---
+
+### `SPACE-ERR-1`
+
+- **Error Code:** `SPACE-ERR-1`
+- **Error Name:** `codeSpaceNameAlreadyExistErr`
+- **Description:** The space name already exists.
+
+---
+
+### `SPACE-ERR-2`
+
+- **Error Code:** `SPACE-ERR-2`
+- **Error Name:** `codeSpaceInitFailedErr`
+- **Description:** Failed to initialize the space.
 
 ## System Errors
 
@@ -769,6 +985,22 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Code:** `TASK-ERR-3`
 - **Error Name:** `multiHostNotebookNotSupported`
 - **Description:** The multi-host notebook feature (running notebook tasks across multiple hosts) is not supported.
+
+---
+
+### `TASK-ERR-4`
+
+- **Error Code:** `TASK-ERR-4`
+- **Error Name:** `notEnoughResource`
+- **Description:** The task requires more resources than are available in the cluster. This error occurs when the cluster does not have sufficient capacity to run the task.
+
+---
+
+### `TASK-ERR-5`
+
+- **Error Code:** `TASK-ERR-5`
+- **Error Name:** `clusterUnavailable`
+- **Description:** The cluster is currently unavailable, either due to maintenance or other reasons. This error occurs when the cluster is not ready to accept new tasks.
 
 ## User Errors
 
@@ -929,3 +1161,4 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Code:** `USER-ERR-19`
 - **Error Name:** `uuidConflict`
 - **Description:** The UUID generated for the organization already exists in the system.
+
