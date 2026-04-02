@@ -15,7 +15,6 @@ import (
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/i18n"
-	"opencsg.com/csghub-server/mq"
 )
 
 var launchCmd = &cobra.Command{
@@ -39,11 +38,6 @@ var launchCmd = &cobra.Command{
 		if err := database.InitDB(dbConfig); err != nil {
 			slog.Error("failed to initialize database", slog.Any("error", err))
 			return fmt.Errorf("database initialization failed: %w", err)
-		}
-
-		mqHandler, err := mq.GetOrInit(cfg)
-		if err != nil {
-			return fmt.Errorf("fail to build message queue handler: %w", err)
 		}
 
 		mqFactory, err := bldmq.GetOrInitMessageQueueFactory(cfg)
@@ -70,7 +64,7 @@ var launchCmd = &cobra.Command{
 			panic(err)
 		}
 
-		r, err := router.NewAccountRouter(cfg, mqHandler, mqFactory)
+		r, err := router.NewAccountRouter(cfg, mqFactory)
 		if err != nil {
 			return fmt.Errorf("failed to init router: %w", err)
 		}

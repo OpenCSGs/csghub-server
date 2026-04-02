@@ -4,6 +4,7 @@ type Namespace struct {
 	Path   string `json:"path"`
 	Type   string `json:"type"`
 	Avatar string `json:"avatar,omitempty"`
+	NSType string `json:"nstype,omitempty"`
 }
 
 type User struct {
