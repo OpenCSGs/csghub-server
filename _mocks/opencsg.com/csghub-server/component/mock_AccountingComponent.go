@@ -6,6 +6,8 @@ import (
 	context "context"
 
 	mock "github.com/stretchr/testify/mock"
+	database "opencsg.com/csghub-server/builder/store/database"
+
 	types "opencsg.com/csghub-server/common/types"
 )
 
@@ -82,23 +84,23 @@ func (_c *MockAccountingComponent_CreateOrUpdateQuota_Call) RunAndReturn(run fun
 }
 
 // CreateOrder provides a mock function with given fields: currentUser, req
-func (_m *MockAccountingComponent) CreateOrder(currentUser string, req types.AcctOrderCreateReq) (interface{}, error) {
+func (_m *MockAccountingComponent) CreateOrder(currentUser string, req types.AcctOrderCreateReq) (*database.AccountOrder, error) {
 	ret := _m.Called(currentUser, req)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CreateOrder")
 	}
 
-	var r0 interface{}
+	var r0 *database.AccountOrder
 	var r1 error
-	if rf, ok := ret.Get(0).(func(string, types.AcctOrderCreateReq) (interface{}, error)); ok {
+	if rf, ok := ret.Get(0).(func(string, types.AcctOrderCreateReq) (*database.AccountOrder, error)); ok {
 		return rf(currentUser, req)
 	}
-	if rf, ok := ret.Get(0).(func(string, types.AcctOrderCreateReq) interface{}); ok {
+	if rf, ok := ret.Get(0).(func(string, types.AcctOrderCreateReq) *database.AccountOrder); ok {
 		r0 = rf(currentUser, req)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(interface{})
+			r0 = ret.Get(0).(*database.AccountOrder)
 		}
 	}
 
@@ -130,12 +132,12 @@ func (_c *MockAccountingComponent_CreateOrder_Call) Run(run func(currentUser str
 	return _c
 }
 
-func (_c *MockAccountingComponent_CreateOrder_Call) Return(_a0 interface{}, _a1 error) *MockAccountingComponent_CreateOrder_Call {
+func (_c *MockAccountingComponent_CreateOrder_Call) Return(_a0 *database.AccountOrder, _a1 error) *MockAccountingComponent_CreateOrder_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockAccountingComponent_CreateOrder_Call) RunAndReturn(run func(string, types.AcctOrderCreateReq) (interface{}, error)) *MockAccountingComponent_CreateOrder_Call {
+func (_c *MockAccountingComponent_CreateOrder_Call) RunAndReturn(run func(string, types.AcctOrderCreateReq) (*database.AccountOrder, error)) *MockAccountingComponent_CreateOrder_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -611,12 +613,78 @@ func (_c *MockAccountingComponent_ListMeteringsByUserIDAndTime_Call) RunAndRetur
 	return _c
 }
 
-// ListRechargeByUserIDAndTime provides a mock function with given fields: ctx, req
-func (_m *MockAccountingComponent) ListRechargeByUserIDAndTime(ctx context.Context, req types.AcctRechargeListReq) (interface{}, error) {
+// ListPresents provides a mock function with given fields: ctx, req
+func (_m *MockAccountingComponent) ListPresents(ctx context.Context, req types.PresentsIndexReq) ([]*types.PresentIndexResp, int, error) {
 	ret := _m.Called(ctx, req)
 
 	if len(ret) == 0 {
-		panic("no return value specified for ListRechargeByUserIDAndTime")
+		panic("no return value specified for ListPresents")
+	}
+
+	var r0 []*types.PresentIndexResp
+	var r1 int
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.PresentsIndexReq) ([]*types.PresentIndexResp, int, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.PresentsIndexReq) []*types.PresentIndexResp); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*types.PresentIndexResp)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.PresentsIndexReq) int); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, types.PresentsIndexReq) error); ok {
+		r2 = rf(ctx, req)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockAccountingComponent_ListPresents_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListPresents'
+type MockAccountingComponent_ListPresents_Call struct {
+	*mock.Call
+}
+
+// ListPresents is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.PresentsIndexReq
+func (_e *MockAccountingComponent_Expecter) ListPresents(ctx interface{}, req interface{}) *MockAccountingComponent_ListPresents_Call {
+	return &MockAccountingComponent_ListPresents_Call{Call: _e.mock.On("ListPresents", ctx, req)}
+}
+
+func (_c *MockAccountingComponent_ListPresents_Call) Run(run func(ctx context.Context, req types.PresentsIndexReq)) *MockAccountingComponent_ListPresents_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.PresentsIndexReq))
+	})
+	return _c
+}
+
+func (_c *MockAccountingComponent_ListPresents_Call) Return(_a0 []*types.PresentIndexResp, _a1 int, _a2 error) *MockAccountingComponent_ListPresents_Call {
+	_c.Call.Return(_a0, _a1, _a2)
+	return _c
+}
+
+func (_c *MockAccountingComponent_ListPresents_Call) RunAndReturn(run func(context.Context, types.PresentsIndexReq) ([]*types.PresentIndexResp, int, error)) *MockAccountingComponent_ListPresents_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ListRecharge provides a mock function with given fields: ctx, req
+func (_m *MockAccountingComponent) ListRecharge(ctx context.Context, req types.AcctRechargeListReq) (interface{}, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListRecharge")
 	}
 
 	var r0 interface{}
@@ -641,31 +709,31 @@ func (_m *MockAccountingComponent) ListRechargeByUserIDAndTime(ctx context.Conte
 	return r0, r1
 }
 
-// MockAccountingComponent_ListRechargeByUserIDAndTime_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListRechargeByUserIDAndTime'
-type MockAccountingComponent_ListRechargeByUserIDAndTime_Call struct {
+// MockAccountingComponent_ListRecharge_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListRecharge'
+type MockAccountingComponent_ListRecharge_Call struct {
 	*mock.Call
 }
 
-// ListRechargeByUserIDAndTime is a helper method to define mock.On call
+// ListRecharge is a helper method to define mock.On call
 //   - ctx context.Context
 //   - req types.AcctRechargeListReq
-func (_e *MockAccountingComponent_Expecter) ListRechargeByUserIDAndTime(ctx interface{}, req interface{}) *MockAccountingComponent_ListRechargeByUserIDAndTime_Call {
-	return &MockAccountingComponent_ListRechargeByUserIDAndTime_Call{Call: _e.mock.On("ListRechargeByUserIDAndTime", ctx, req)}
+func (_e *MockAccountingComponent_Expecter) ListRecharge(ctx interface{}, req interface{}) *MockAccountingComponent_ListRecharge_Call {
+	return &MockAccountingComponent_ListRecharge_Call{Call: _e.mock.On("ListRecharge", ctx, req)}
 }
 
-func (_c *MockAccountingComponent_ListRechargeByUserIDAndTime_Call) Run(run func(ctx context.Context, req types.AcctRechargeListReq)) *MockAccountingComponent_ListRechargeByUserIDAndTime_Call {
+func (_c *MockAccountingComponent_ListRecharge_Call) Run(run func(ctx context.Context, req types.AcctRechargeListReq)) *MockAccountingComponent_ListRecharge_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(context.Context), args[1].(types.AcctRechargeListReq))
 	})
 	return _c
 }
 
-func (_c *MockAccountingComponent_ListRechargeByUserIDAndTime_Call) Return(_a0 interface{}, _a1 error) *MockAccountingComponent_ListRechargeByUserIDAndTime_Call {
+func (_c *MockAccountingComponent_ListRecharge_Call) Return(_a0 interface{}, _a1 error) *MockAccountingComponent_ListRecharge_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockAccountingComponent_ListRechargeByUserIDAndTime_Call) RunAndReturn(run func(context.Context, types.AcctRechargeListReq) (interface{}, error)) *MockAccountingComponent_ListRechargeByUserIDAndTime_Call {
+func (_c *MockAccountingComponent_ListRecharge_Call) RunAndReturn(run func(context.Context, types.AcctRechargeListReq) (interface{}, error)) *MockAccountingComponent_ListRecharge_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -850,23 +918,23 @@ func (_c *MockAccountingComponent_QueryBalanceByUserID_Call) RunAndReturn(run fu
 }
 
 // QueryBalanceByUserIDInternal provides a mock function with given fields: ctx, currentUser
-func (_m *MockAccountingComponent) QueryBalanceByUserIDInternal(ctx context.Context, currentUser string) (interface{}, error) {
+func (_m *MockAccountingComponent) QueryBalanceByUserIDInternal(ctx context.Context, currentUser string) (*database.AccountUser, error) {
 	ret := _m.Called(ctx, currentUser)
 
 	if len(ret) == 0 {
 		panic("no return value specified for QueryBalanceByUserIDInternal")
 	}
 
-	var r0 interface{}
+	var r0 *database.AccountUser
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) (interface{}, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*database.AccountUser, error)); ok {
 		return rf(ctx, currentUser)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string) interface{}); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string) *database.AccountUser); ok {
 		r0 = rf(ctx, currentUser)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(interface{})
+			r0 = ret.Get(0).(*database.AccountUser)
 		}
 	}
 
@@ -898,34 +966,34 @@ func (_c *MockAccountingComponent_QueryBalanceByUserIDInternal_Call) Run(run fun
 	return _c
 }
 
-func (_c *MockAccountingComponent_QueryBalanceByUserIDInternal_Call) Return(_a0 interface{}, _a1 error) *MockAccountingComponent_QueryBalanceByUserIDInternal_Call {
+func (_c *MockAccountingComponent_QueryBalanceByUserIDInternal_Call) Return(_a0 *database.AccountUser, _a1 error) *MockAccountingComponent_QueryBalanceByUserIDInternal_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockAccountingComponent_QueryBalanceByUserIDInternal_Call) RunAndReturn(run func(context.Context, string) (interface{}, error)) *MockAccountingComponent_QueryBalanceByUserIDInternal_Call {
+func (_c *MockAccountingComponent_QueryBalanceByUserIDInternal_Call) RunAndReturn(run func(context.Context, string) (*database.AccountUser, error)) *MockAccountingComponent_QueryBalanceByUserIDInternal_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // QueryPricesBySKUType provides a mock function with given fields: currentUser, req
-func (_m *MockAccountingComponent) QueryPricesBySKUType(currentUser string, req types.AcctPriceListReq) (interface{}, error) {
+func (_m *MockAccountingComponent) QueryPricesBySKUType(currentUser string, req types.AcctPriceListReq) (*database.PriceResp, error) {
 	ret := _m.Called(currentUser, req)
 
 	if len(ret) == 0 {
 		panic("no return value specified for QueryPricesBySKUType")
 	}
 
-	var r0 interface{}
+	var r0 *database.PriceResp
 	var r1 error
-	if rf, ok := ret.Get(0).(func(string, types.AcctPriceListReq) (interface{}, error)); ok {
+	if rf, ok := ret.Get(0).(func(string, types.AcctPriceListReq) (*database.PriceResp, error)); ok {
 		return rf(currentUser, req)
 	}
-	if rf, ok := ret.Get(0).(func(string, types.AcctPriceListReq) interface{}); ok {
+	if rf, ok := ret.Get(0).(func(string, types.AcctPriceListReq) *database.PriceResp); ok {
 		r0 = rf(currentUser, req)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(interface{})
+			r0 = ret.Get(0).(*database.PriceResp)
 		}
 	}
 
@@ -957,12 +1025,12 @@ func (_c *MockAccountingComponent_QueryPricesBySKUType_Call) Run(run func(curren
 	return _c
 }
 
-func (_c *MockAccountingComponent_QueryPricesBySKUType_Call) Return(_a0 interface{}, _a1 error) *MockAccountingComponent_QueryPricesBySKUType_Call {
+func (_c *MockAccountingComponent_QueryPricesBySKUType_Call) Return(_a0 *database.PriceResp, _a1 error) *MockAccountingComponent_QueryPricesBySKUType_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockAccountingComponent_QueryPricesBySKUType_Call) RunAndReturn(run func(string, types.AcctPriceListReq) (interface{}, error)) *MockAccountingComponent_QueryPricesBySKUType_Call {
+func (_c *MockAccountingComponent_QueryPricesBySKUType_Call) RunAndReturn(run func(string, types.AcctPriceListReq) (*database.PriceResp, error)) *MockAccountingComponent_QueryPricesBySKUType_Call {
 	_c.Call.Return(run)
 	return _c
 }

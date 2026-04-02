@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/ssh"
@@ -151,4 +152,9 @@ func RepoTypeFromString(path string) (types.RepositoryType, error) {
 		return t, nil
 	}
 	return t, fmt.Errorf("invalid repository type: %s", repoType)
+}
+
+// ParseDate parses a date string in the format "2006-01-02"
+func ParseDate(dateStr string) (time.Time, error) {
+	return time.Parse("2006-01-02", dateStr)
 }

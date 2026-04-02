@@ -84,6 +84,10 @@ func (ac *accountingComponentImpl) StatementsIndex(ctx context.Context, req type
 	return nil, 0, nil
 }
 
+func (ac *accountingComponentImpl) ListPresents(ctx context.Context, req types.PresentsIndexReq) ([]*types.PresentIndexResp, int, error) {
+	return nil, 0, nil
+}
+
 func (ac *accountingComponentImpl) WeeklyRecharges(ctx context.Context) error {
 	return nil
 }
