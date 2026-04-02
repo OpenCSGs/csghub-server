@@ -115,8 +115,6 @@ type RepoComponent interface {
 	DownloadFile(ctx context.Context, req *types.GetFileReq, userName string) (io.ReadCloser, int64, string, error)
 	InternalDownloadFile(ctx context.Context, req *types.GetFileReq) (io.ReadCloser, int64, string, error)
 	Branches(ctx context.Context, req *types.GetBranchesReq) ([]types.Branch, error)
-	CreateBranch(ctx context.Context, req *types.CreateBranchReq) error
-	DeleteBranch(ctx context.Context, req *types.DeleteBranchReq) error
 	Tags(ctx context.Context, req *types.GetTagsReq) ([]database.Tag, error)
 	UpdateTags(ctx context.Context, namespace, name string, repoType types.RepositoryType, category, currentUser string, tags []string) error
 	Tree(ctx context.Context, req *types.GetFileReq) ([]*types.File, error)
@@ -499,7 +497,14 @@ func (c *repoComponentImpl) DeleteRepo(ctx context.Context, req types.DeleteRepo
 }
 
 func (c *repoComponentImpl) cleanLfsStorage(ctx context.Context, repoID int64, migrated bool, lfsMetas []database.LfsMetaObject) {
-	slog.Info("Cleaning LFS storage for repo", slog.Int64("repo_id", repoID), slog.Bool("migrated", migrated), slog.Int("file_count", len(lfsMetas)))
+	defer func() {
+		if r := recover(); r != nil {
+			slog.Error("cleanLfsStorage recovered from panic",
+				slog.Any("panic", r), slog.Int64("repo_id", repoID))
+		}
+	}()
+
+	slog.InfoContext(ctx, "Cleaning LFS storage for repo", slog.Int64("repo_id", repoID), slog.Bool("migrated", migrated), slog.Int("file_count", len(lfsMetas)))
 
 	objectsCh := make(chan minio.ObjectInfo)
 	go func() {
@@ -509,11 +514,11 @@ func (c *repoComponentImpl) cleanLfsStorage(ctx context.Context, repoID int64, m
 				// For non-migrated (shared) storage, check if other repos use this OID
 				exists, err := c.lfsMetaObjectStore.ExistsByOidExclRepo(ctx, meta.Oid, repoID)
 				if err != nil {
-					slog.Error("Failed to check OID references", slog.String("oid", meta.Oid), slog.Any("error", err))
+					slog.ErrorContext(ctx, "Failed to check OID references", slog.String("oid", meta.Oid), slog.Any("error", err))
 					continue
 				}
 				if exists {
-					slog.Debug("Skipping shared LFS file", slog.String("oid", meta.Oid), slog.Int64("repo_id", repoID))
+					slog.DebugContext(ctx, "Skipping shared LFS file", slog.String("oid", meta.Oid), slog.Int64("repo_id", repoID))
 					continue
 				}
 			}
@@ -526,97 +531,12 @@ func (c *repoComponentImpl) cleanLfsStorage(ctx context.Context, repoID int64, m
 	}()
 
 	for rErr := range c.s3Client.RemoveObjects(ctx, c.config.S3.Bucket, objectsCh, minio.RemoveObjectsOptions{}) {
-		slog.Error("Failed to remove LFS object", slog.String("key", rErr.ObjectName), slog.Any("error", rErr.Err))
+		slog.ErrorContext(ctx, "Failed to remove LFS object", slog.String("key", rErr.ObjectName), slog.Any("error", rErr.Err))
 	}
-	slog.Info("Completed LFS storage cleanup for repo", slog.Int64("repo_id", repoID))
+	slog.InfoContext(ctx, "Completed LFS storage cleanup for repo", slog.Int64("repo_id", repoID))
 }
 
 // PublicToUser gets visible repos of the given user and user's orgs
-func (c *repoComponentImpl) CreateBranch(ctx context.Context, req *types.CreateBranchReq) error {
-	repo, err := c.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
-	if err != nil {
-		return fmt.Errorf("failed to find repo, error: %w", err)
-	}
-
-	permission, err := c.GetUserRepoPermission(ctx, req.CurrentUser, repo)
-	if err != nil {
-		return fmt.Errorf("failed to check user permission, error: %w", err)
-	}
-	if !permission.CanWrite {
-		return errorx.ErrForbidden
-	}
-
-	sourceRef := req.CommitID
-	if sourceRef == "" {
-		sourceRef = repo.DefaultBranch
-	}
-
-	lastCommit, err := c.git.GetRepoLastCommit(ctx, gitserver.GetRepoLastCommitReq{
-		Namespace: req.Namespace,
-		Name:      req.Name,
-		RepoType:  req.RepoType,
-		Ref:       sourceRef,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to get last commit for ref %s, error: %w", sourceRef, err)
-	}
-
-	createBranchReq := gitserver.CreateBranchReq{
-		Namespace:  req.Namespace,
-		Name:       req.Name,
-		BranchName: req.BranchName,
-		CommitID:   lastCommit.ID,
-		RepoType:   req.RepoType,
-	}
-
-	err = c.git.CreateBranch(ctx, createBranchReq)
-	if err != nil {
-		return fmt.Errorf("failed to create branch in git server, error: %w", err)
-	}
-
-	return nil
-}
-
-func (c *repoComponentImpl) DeleteBranch(ctx context.Context, req *types.DeleteBranchReq) error {
-	repo, err := c.repoStore.FindByPath(ctx, req.RepoType, req.Namespace, req.Name)
-	if err != nil {
-		return fmt.Errorf("failed to find repo, error: %w", err)
-	}
-
-	permission, err := c.GetUserRepoPermission(ctx, req.CurrentUser, repo)
-	if err != nil {
-		return fmt.Errorf("failed to check user permission, error: %w", err)
-	}
-	if !permission.CanWrite {
-		return errorx.ErrForbidden
-	}
-
-	if req.BranchName == repo.DefaultBranch {
-		return fmt.Errorf("cannot delete default branch")
-	}
-
-	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
-	if err != nil {
-		return fmt.Errorf("failed to find user, error: %w", err)
-	}
-
-	deleteBranchReq := gitserver.DeleteBranchReq{
-		Namespace: req.Namespace,
-		Name:      req.Name,
-		Ref:       req.BranchName,
-		RepoType:  req.RepoType,
-		Username:  user.Username,
-		Email:     user.Email,
-	}
-
-	err = c.git.DeleteRepoBranch(ctx, deleteBranchReq)
-	if err != nil {
-		return fmt.Errorf("failed to delete branch in git server, error: %w", err)
-	}
-
-	return nil
-}
-
 func (c *repoComponentImpl) PublicToUser(ctx context.Context, repoType types.RepositoryType, userName string, filter *types.RepoFilter, per, page int) (repos []*database.Repository, count int, err error) {
 	var repoOwnerIDs []int64
 	var isAdmin bool
@@ -2589,15 +2509,7 @@ func (c *repoComponentImpl) Preupload(ctx context.Context, req types.PreuploadRe
 		Paths:     paths,
 	})
 	if err != nil {
-		// If the branch doesn't exist yet, treat it as if there are no existing files.
-		// This allows uploading to a new branch that hasn't been created yet.
-		if errors.Is(err, errorx.ErrGitCommitNotFound) || status.Code(err) == codes.NotFound || status.Code(err) == codes.InvalidArgument {
-			slog.InfoContext(ctx, "branch not found when getting existing files for preupload, treating as empty",
-				slog.String("revision", req.Revision),
-				slog.String("repo", req.Namespace+"/"+req.Name))
-		} else {
-			return nil, fmt.Errorf("failed to get repo files, err: %w", err)
-		}
+		return nil, fmt.Errorf("failed to get repo files, err: %w", err)
 	}
 
 	for _, file := range existFiles {
@@ -2611,7 +2523,7 @@ func (c *repoComponentImpl) Preupload(ctx context.Context, req types.PreuploadRe
 		Ref:       req.Revision,
 		Path:      GitAttributesFileName,
 	})
-	if err != nil && status.Code(err) != codes.InvalidArgument && !errors.Is(err, errorx.ErrGitCommitNotFound) {
+	if err != nil && status.Code(err) != codes.InvalidArgument {
 		return nil, fmt.Errorf("failed to get gitattributes file, err: %w", err)
 	}
 
@@ -2630,7 +2542,7 @@ func (c *repoComponentImpl) Preupload(ctx context.Context, req types.PreuploadRe
 		Path:      GitIgnoreFileName,
 	})
 	code := status.Code(err)
-	if err != nil && code != codes.InvalidArgument && !errors.Is(err, errorx.ErrGitCommitNotFound) {
+	if err != nil && code != codes.InvalidArgument {
 		return nil, fmt.Errorf("failed to get .gitignore file, err: %w", err)
 	}
 
