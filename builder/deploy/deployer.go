@@ -964,20 +964,7 @@ func (d *deployer) GetWorkflowLogsNonStream(ctx context.Context, req types.Finet
 	labels := map[string]string{
 		types.StreamKeyInstanceName: req.PodName,
 	}
-
-	var queryBuilder strings.Builder
-	queryBuilder.WriteString("{")
-	first := true
-	for k, v := range labels {
-		if !first {
-			queryBuilder.WriteString(",")
-		}
-		fmt.Fprintf(&queryBuilder, `%s="%s"`, k, v)
-		first = false
-	}
-	queryBuilder.WriteString("}")
-	query := queryBuilder.String()
-
+	query := d.lokiClient.GenerateLabelQuery(labels)
 	var startTime = req.SubmitTime
 	if req.Since != "" {
 		startTime = parseSinceTime(req.Since)
@@ -987,6 +974,7 @@ func (d *deployer) GetWorkflowLogsNonStream(ctx context.Context, req types.Finet
 		Query:     query,
 		Start:     startTime,
 		Direction: "forward",
+		Limit:     loki.MaxLimit,
 	}
 
 	return d.lokiClient.QueryRange(ctx, params)
