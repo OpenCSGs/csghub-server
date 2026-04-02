@@ -1395,8 +1395,8 @@ func (s *repoStoreImpl) FindMirrorFinishedPrivateModelRepo(ctx context.Context) 
 		Join("JOIN mirrors ON mirrors.repository_id = repository.id").
 		Join("JOIN mirror_tasks ON mirror_tasks.mirror_id = mirrors.id").
 		Where(
-			"repository.repository_type = ? and mirror_tasks.status = ? and repository.sensitive_check_status = ? and repository.private = true",
-			types.ModelRepo, types.MirrorLfsSyncFinished, types.SensitiveCheckPass).
+			"repository.repository_type = ? and mirror_tasks.status = ? and repository.sensitive_check_status in (?) and repository.private = true",
+			types.ModelRepo, types.MirrorLfsSyncFinished, bun.In([]types.SensitiveCheckStatus{types.SensitiveCheckPass, types.SensitiveCheckSkip})).
 		Scan(ctx)
 	return res, err
 }
