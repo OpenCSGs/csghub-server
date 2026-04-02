@@ -97,8 +97,9 @@ type ClusterNodeOwnership struct {
 
 type ClusterNodeWithRegion struct {
 	ClusterNode
-	ClusterRegion  string `json:"cluster_region"`
-	TaskRunningNum int    `json:"task_running_num"`
+	ClusterRegion  string                `json:"cluster_region"`
+	TaskRunningNum int                   `json:"task_running_num"`
+	ExclusiveOwner *types.ExclusiveOwner `json:"execlusive_owner"`
 }
 
 func (r *clusterInfoStoreImpl) Add(ctx context.Context, clusterConfig string, region string, mode types.ClusterMode) (*ClusterInfo, error) {
