@@ -325,6 +325,74 @@ func (_c *MockClient_PresignedGetObject_Call) RunAndReturn(run func(context.Cont
 	return _c
 }
 
+// PresignedPostPolicy provides a mock function with given fields: ctx, policy
+func (_m *MockClient) PresignedPostPolicy(ctx context.Context, policy *minio.PostPolicy) (*url.URL, map[string]string, error) {
+	ret := _m.Called(ctx, policy)
+
+	if len(ret) == 0 {
+		panic("no return value specified for PresignedPostPolicy")
+	}
+
+	var r0 *url.URL
+	var r1 map[string]string
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, *minio.PostPolicy) (*url.URL, map[string]string, error)); ok {
+		return rf(ctx, policy)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *minio.PostPolicy) *url.URL); ok {
+		r0 = rf(ctx, policy)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*url.URL)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *minio.PostPolicy) map[string]string); ok {
+		r1 = rf(ctx, policy)
+	} else {
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(map[string]string)
+		}
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, *minio.PostPolicy) error); ok {
+		r2 = rf(ctx, policy)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockClient_PresignedPostPolicy_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PresignedPostPolicy'
+type MockClient_PresignedPostPolicy_Call struct {
+	*mock.Call
+}
+
+// PresignedPostPolicy is a helper method to define mock.On call
+//   - ctx context.Context
+//   - policy *minio.PostPolicy
+func (_e *MockClient_Expecter) PresignedPostPolicy(ctx interface{}, policy interface{}) *MockClient_PresignedPostPolicy_Call {
+	return &MockClient_PresignedPostPolicy_Call{Call: _e.mock.On("PresignedPostPolicy", ctx, policy)}
+}
+
+func (_c *MockClient_PresignedPostPolicy_Call) Run(run func(ctx context.Context, policy *minio.PostPolicy)) *MockClient_PresignedPostPolicy_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*minio.PostPolicy))
+	})
+	return _c
+}
+
+func (_c *MockClient_PresignedPostPolicy_Call) Return(u *url.URL, formData map[string]string, err error) *MockClient_PresignedPostPolicy_Call {
+	_c.Call.Return(u, formData, err)
+	return _c
+}
+
+func (_c *MockClient_PresignedPostPolicy_Call) RunAndReturn(run func(context.Context, *minio.PostPolicy) (*url.URL, map[string]string, error)) *MockClient_PresignedPostPolicy_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // PresignedPutObject provides a mock function with given fields: ctx, bucketName, objectName, expires
 func (_m *MockClient) PresignedPutObject(ctx context.Context, bucketName string, objectName string, expires time.Duration) (*url.URL, error) {
 	ret := _m.Called(ctx, bucketName, objectName, expires)

@@ -130,6 +130,78 @@ func (_c *MockSkillComponent_Delete_Call) RunAndReturn(run func(context.Context,
 	return _c
 }
 
+// GetUploadUrl provides a mock function with given fields: ctx
+func (_m *MockSkillComponent) GetUploadUrl(ctx context.Context) (string, string, map[string]string, error) {
+	ret := _m.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetUploadUrl")
+	}
+
+	var r0 string
+	var r1 string
+	var r2 map[string]string
+	var r3 error
+	if rf, ok := ret.Get(0).(func(context.Context) (string, string, map[string]string, error)); ok {
+		return rf(ctx)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context) string); ok {
+		r0 = rf(ctx)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context) string); ok {
+		r1 = rf(ctx)
+	} else {
+		r1 = ret.Get(1).(string)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context) map[string]string); ok {
+		r2 = rf(ctx)
+	} else {
+		if ret.Get(2) != nil {
+			r2 = ret.Get(2).(map[string]string)
+		}
+	}
+
+	if rf, ok := ret.Get(3).(func(context.Context) error); ok {
+		r3 = rf(ctx)
+	} else {
+		r3 = ret.Error(3)
+	}
+
+	return r0, r1, r2, r3
+}
+
+// MockSkillComponent_GetUploadUrl_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetUploadUrl'
+type MockSkillComponent_GetUploadUrl_Call struct {
+	*mock.Call
+}
+
+// GetUploadUrl is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *MockSkillComponent_Expecter) GetUploadUrl(ctx interface{}) *MockSkillComponent_GetUploadUrl_Call {
+	return &MockSkillComponent_GetUploadUrl_Call{Call: _e.mock.On("GetUploadUrl", ctx)}
+}
+
+func (_c *MockSkillComponent_GetUploadUrl_Call) Run(run func(ctx context.Context)) *MockSkillComponent_GetUploadUrl_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context))
+	})
+	return _c
+}
+
+func (_c *MockSkillComponent_GetUploadUrl_Call) Return(_a0 string, _a1 string, _a2 map[string]string, _a3 error) *MockSkillComponent_GetUploadUrl_Call {
+	_c.Call.Return(_a0, _a1, _a2, _a3)
+	return _c
+}
+
+func (_c *MockSkillComponent_GetUploadUrl_Call) RunAndReturn(run func(context.Context) (string, string, map[string]string, error)) *MockSkillComponent_GetUploadUrl_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Index provides a mock function with given fields: ctx, filter, per, page, needOpWeight
 func (_m *MockSkillComponent) Index(ctx context.Context, filter *types.RepoFilter, per int, page int, needOpWeight bool) ([]*types.Skill, int, error) {
 	ret := _m.Called(ctx, filter, per, page, needOpWeight)

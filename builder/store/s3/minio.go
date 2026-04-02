@@ -72,6 +72,7 @@ type MinioClient interface {
 	CopyObject(ctx context.Context, dst minio.CopyDestOptions, src minio.CopySrcOptions) (minio.UploadInfo, error)
 	GetObject(ctx context.Context, bucketName, objectName string, opts minio.GetObjectOptions) (*minio.Object, error)
 	ListObjects(ctx context.Context, bucketName string, opts minio.ListObjectsOptions) <-chan minio.ObjectInfo
+	PresignedPostPolicy(ctx context.Context, policy *minio.PostPolicy) (u *url.URL, formData map[string]string, err error)
 }
 
 type Client interface {

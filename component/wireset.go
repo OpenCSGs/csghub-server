@@ -155,7 +155,21 @@ var MockedCheckerSet = wire.NewSet(
 )
 
 func ProvideTestConfig() *config.Config {
-	return &config.Config{}
+	return &config.Config{
+		S3: struct {
+			AccessKeyID     string `env:"STARHUB_SERVER_S3_ACCESS_KEY_ID"`
+			AccessKeySecret string `env:"STARHUB_SERVER_S3_ACCESS_KEY_SECRET"`
+			Region          string `env:"STARHUB_SERVER_S3_REGION"`
+			Endpoint        string `env:"STARHUB_SERVER_S3_ENDPOINT" default:"localhost:9000"`
+			InternalEndpoint string `env:"STARHUB_SERVER_S3_INTERNAL_ENDPOINT"`
+			Bucket           string `env:"STARHUB_SERVER_S3_BUCKET" default:"opencsg-test"`
+			EnableSSL        bool   `env:"STARHUB_SERVER_S3_ENABLE_SSL" default:"false"`
+			BucketLookup string `env:"STARHUB_SERVER_S3_BUCKET_LOOKUP" default:"auto"`
+			PublicBucket string `env:"STARHUB_SERVER_S3_PUBLIC_BUCKET" default:"opencsg-public-resource"`
+		}{
+			Bucket: "test-bucket",
+		},
+	}
 }
 
 var RepoComponentSet = wire.NewSet(NewTestRepoComponent)
@@ -407,7 +421,7 @@ func NewTestCodeComponent(config *config.Config, stores *tests.MockStores, repoC
 	}
 }
 
-func NewTestSkillComponent(config *config.Config, stores *tests.MockStores, repoComponent RepoComponent, userSvcClient rpc.UserSvcClient, gitServer gitserver.GitServer) *skillComponentImpl {
+func NewTestSkillComponent(config *config.Config, stores *tests.MockStores, repoComponent RepoComponent, userSvcClient rpc.UserSvcClient, gitServer gitserver.GitServer, s3Client s3.Client) *skillComponentImpl {
 	return &skillComponentImpl{
 		config:         config,
 		repoComponent:  repoComponent,
@@ -417,6 +431,7 @@ func NewTestSkillComponent(config *config.Config, stores *tests.MockStores, repo
 		gitServer:      gitServer,
 		userSvcClient:  userSvcClient,
 		recomStore:     stores.Recom,
+		s3Client:       s3Client,
 	}
 }
 
