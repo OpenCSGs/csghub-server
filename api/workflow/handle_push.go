@@ -80,6 +80,13 @@ func HandlePushWorkflow(ctx workflow.Context, req *types.GiteaCallbackPushReq) e
 		return err
 	}
 
+	// Calculate repo size
+	err = workflow.ExecuteActivity(actCtx, activities.CalculateRepoSize, req).Get(ctx, nil)
+	if err != nil {
+		logger.Error("[git_callback] failed to calculate repo size", slog.Any("error", err), slog.Any("req", req))
+		return err
+	}
+
 	logger.Info("[git_callback] handle push workflow ended", slog.Any("req.Repository.FullName", req.Repository.FullName))
 
 	return nil

@@ -2130,6 +2130,120 @@ func (_c *MockGitServer_GetRepoLfsPointers_Call) RunAndReturn(run func(context.C
 	return _c
 }
 
+// GetRepoLfsSize provides a mock function with given fields: ctx, req
+func (_m *MockGitServer) GetRepoLfsSize(ctx context.Context, req gitserver.GetRepoInfoByPathReq) (int64, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetRepoLfsSize")
+	}
+
+	var r0 int64
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, gitserver.GetRepoInfoByPathReq) (int64, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, gitserver.GetRepoInfoByPathReq) int64); ok {
+		r0 = rf(ctx, req)
+	} else {
+		r0 = ret.Get(0).(int64)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, gitserver.GetRepoInfoByPathReq) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockGitServer_GetRepoLfsSize_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetRepoLfsSize'
+type MockGitServer_GetRepoLfsSize_Call struct {
+	*mock.Call
+}
+
+// GetRepoLfsSize is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req gitserver.GetRepoInfoByPathReq
+func (_e *MockGitServer_Expecter) GetRepoLfsSize(ctx interface{}, req interface{}) *MockGitServer_GetRepoLfsSize_Call {
+	return &MockGitServer_GetRepoLfsSize_Call{Call: _e.mock.On("GetRepoLfsSize", ctx, req)}
+}
+
+func (_c *MockGitServer_GetRepoLfsSize_Call) Run(run func(ctx context.Context, req gitserver.GetRepoInfoByPathReq)) *MockGitServer_GetRepoLfsSize_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(gitserver.GetRepoInfoByPathReq))
+	})
+	return _c
+}
+
+func (_c *MockGitServer_GetRepoLfsSize_Call) Return(_a0 int64, _a1 error) *MockGitServer_GetRepoLfsSize_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockGitServer_GetRepoLfsSize_Call) RunAndReturn(run func(context.Context, gitserver.GetRepoInfoByPathReq) (int64, error)) *MockGitServer_GetRepoLfsSize_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetRepoSize provides a mock function with given fields: ctx, req
+func (_m *MockGitServer) GetRepoSize(ctx context.Context, req gitserver.GetRepoInfoByPathReq) (int64, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetRepoSize")
+	}
+
+	var r0 int64
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, gitserver.GetRepoInfoByPathReq) (int64, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, gitserver.GetRepoInfoByPathReq) int64); ok {
+		r0 = rf(ctx, req)
+	} else {
+		r0 = ret.Get(0).(int64)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, gitserver.GetRepoInfoByPathReq) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockGitServer_GetRepoSize_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetRepoSize'
+type MockGitServer_GetRepoSize_Call struct {
+	*mock.Call
+}
+
+// GetRepoSize is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req gitserver.GetRepoInfoByPathReq
+func (_e *MockGitServer_Expecter) GetRepoSize(ctx interface{}, req interface{}) *MockGitServer_GetRepoSize_Call {
+	return &MockGitServer_GetRepoSize_Call{Call: _e.mock.On("GetRepoSize", ctx, req)}
+}
+
+func (_c *MockGitServer_GetRepoSize_Call) Run(run func(ctx context.Context, req gitserver.GetRepoInfoByPathReq)) *MockGitServer_GetRepoSize_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(gitserver.GetRepoInfoByPathReq))
+	})
+	return _c
+}
+
+func (_c *MockGitServer_GetRepoSize_Call) Return(_a0 int64, _a1 error) *MockGitServer_GetRepoSize_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockGitServer_GetRepoSize_Call) RunAndReturn(run func(context.Context, gitserver.GetRepoInfoByPathReq) (int64, error)) *MockGitServer_GetRepoSize_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetSingleCommit provides a mock function with given fields: ctx, req
 func (_m *MockGitServer) GetSingleCommit(ctx context.Context, req gitserver.GetRepoLastCommitReq) (*types.CommitResponse, error) {
 	ret := _m.Called(ctx, req)

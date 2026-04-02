@@ -186,6 +186,7 @@ func (s *skillStoreImpl) FindByPath(ctx context.Context, namespace string, repoP
 		Relation("Repository.User").
 		Relation("Repository.Mirror").
 		Relation("Repository.Mirror.CurrentTask").
+		Relation("Repository.Statistics").
 		Where("repository.path =?", fmt.Sprintf("%s/%s", namespace, repoPath)).
 		Scan(ctx)
 	if err != nil {
