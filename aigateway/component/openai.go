@@ -119,6 +119,28 @@ func filterAndPaginateModels(models []types.Model, req types.ListModelsReq) type
 		}
 	}
 
+	// Apply source filter if provided
+	if req.Source != "" {
+		source := strings.ToLower(req.Source)
+		filtered := make([]types.Model, 0, len(models))
+		for _, model := range models {
+			switch source {
+			case string(types.ModelSourceCSGHub):
+				if model.CSGHubModelID != "" {
+					filtered = append(filtered, model)
+				}
+			case string(types.ModelSourceExternal):
+				if model.Provider != "" {
+					filtered = append(filtered, model)
+				}
+			default:
+				// Unknown source value, include all
+				filtered = append(filtered, model)
+			}
+		}
+		models = filtered
+	}
+
 	// Parse pagination parameters (defaults match previous handler behavior)
 	per := 20
 	page := 1

@@ -165,6 +165,7 @@ type ListModelsReq struct {
 	Public  string `json:"public"`
 	Per     string `json:"per"`
 	Page    string `json:"page"`
+	Source  string `json:"source"` // filter by source (csghub for CSGHub models, external for external models)
 }
 
 // UserPreferenceRequest defines the request parameters for UserPreference method
@@ -178,4 +179,14 @@ const OpenCSGAppNameHeader string = "OpenCSG-App-Name"
 
 const (
 	AgenticHubApp = "Agentichub"
+)
+
+// ModelSource represents the source of a model
+type ModelSource string
+
+const (
+	// ModelSourceCSGHub represents models from CSGHub (internal models)
+	ModelSourceCSGHub ModelSource = "csghub"
+	// ModelSourceExternal represents models from external providers
+	ModelSourceExternal ModelSource = "external"
 )
