@@ -112,6 +112,7 @@ type PromptRes struct {
 	SensitiveCheckStatus string               `json:"sensitive_check_status"`
 	RecomOpWeight        int                  `json:"recom_op_weight,omitempty"`
 	Scores               []WeightScore        `json:"scores"`
+	RepoSize             int64                `json:"repo_size"`
 	MultiSource
 }
 

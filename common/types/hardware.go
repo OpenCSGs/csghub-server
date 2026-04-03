@@ -18,10 +18,10 @@ type (
 
 	HardWare struct {
 		Gpu              Processor `json:"gpu,omitempty"`   // nvidia
-		Npu              Processor `json:"npu,omitempty"`   //ascend
+		Npu              Processor `json:"npu,omitempty"`   // ascend
 		Gcu              Processor `json:"gcu,omitempty"`   // enflame
 		Mlu              Processor `json:"mlu,omitempty"`   // cambricon
-		Dcu              Processor `json:"dcu,omitempty"`   //hygon
+		Dcu              Processor `json:"dcu,omitempty"`   // hygon
 		GPGpu            Processor `json:"gpgpu,omitempty"` // iluvatar,metax
 		Cpu              CPU       `json:"cpu,omitempty"`
 		Memory           string    `json:"memory,omitempty"`

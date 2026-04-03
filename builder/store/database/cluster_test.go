@@ -186,6 +186,12 @@ func TestClusterStore_ListAllNodes(t *testing.T) {
 	cluster2, err := store.Add(ctx, "config-2", "region-2", types.ConnectModeKubeConfig)
 	require.NoError(t, err)
 
+	_, err = db.Core.NewUpdate().Model(&database.ClusterInfo{}).Set("status = ?", types.ClusterStatusRunning).Where("cluster_id = ?", cluster1.ClusterID).Exec(ctx)
+	require.NoError(t, err)
+
+	_, err = db.Core.NewUpdate().Model(&database.ClusterInfo{}).Set("status = ?", types.ClusterStatusUnavailable).Where("cluster_id = ?", cluster2.ClusterID).Exec(ctx)
+	require.NoError(t, err)
+
 	node1 := &database.ClusterNode{
 		ClusterID: cluster1.ClusterID,
 		Name:      "node-1",
@@ -231,6 +237,13 @@ func TestClusterStore_ListAllNodes(t *testing.T) {
 	nodes, err = store.ListAllNodes(ctx)
 	require.NoError(t, err)
 	require.Len(t, nodes, 3)
+
+	nodeRegions := make(map[string]string)
+	for _, node := range nodes {
+		nodeRegions[node.ClusterID] = node.ClusterRegion
+	}
+	require.Equal(t, "region-1", nodeRegions[cluster1.ClusterID])
+	require.Equal(t, "region-2", nodeRegions[cluster2.ClusterID])
 }
 
 func TestClusterStore_GetNodeByID(t *testing.T) {

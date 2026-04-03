@@ -161,6 +161,7 @@ packages:
   opencsg.com/csghub-server/accounting/component:
     config:
     interfaces:
+      RechargeComponent:
       AccountingUserComponent:
       AccountingStatementComponent:
       AccountingBillComponent:

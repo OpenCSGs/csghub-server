@@ -47,6 +47,7 @@ type UserComponent interface {
 	Prompts(ctx context.Context, req *types.UserPromptsReq) ([]types.PromptRes, int, error)
 	Evaluations(ctx context.Context, req *types.UserEvaluationReq) ([]types.ArgoWorkFlowRes, int, error)
 	MCPServers(ctx context.Context, req *types.UserMCPsReq) ([]types.MCPServer, int, error)
+	Skills(ctx context.Context, req *types.UserMCPsReq) ([]types.Skill, int, error)
 	LikesMCPServers(ctx context.Context, req *types.UserMCPsReq) ([]types.MCPServer, int, error)
 	ListNotebooks(ctx context.Context, req *types.DeployReq) ([]types.NotebookRes, int, error)
 	ListFinetunes(ctx context.Context, req *types.UserEvaluationReq) ([]types.ArgoWorkFlowRes, int, error)
@@ -818,6 +819,53 @@ func (c *userComponentImpl) MCPServers(ctx context.Context, req *types.UserMCPsR
 	}
 
 	return resMCPs, total, nil
+}
+
+func (c *userComponentImpl) Skills(ctx context.Context, req *types.UserSkillsReq) ([]types.Skill, int, error) {
+	ownerExists, err := c.userStore.IsExist(ctx, req.Owner)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to check skill owner, error: %w", err)
+	}
+	if !ownerExists {
+		return nil, 0, errors.New("skill owner does not exist")
+	}
+	if len(req.CurrentUser) > 0 {
+		currentUserExists, err := c.userStore.IsExist(ctx, req.CurrentUser)
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to check current user, error: %w", err)
+		}
+		if !currentUserExists {
+			return nil, 0, errors.New("current user does not exist")
+		}
+	}
+
+	onlyPublic := req.Owner != req.CurrentUser
+	skills, total, err := c.skillStore.ByUsername(ctx, req.Owner, req.PageSize, req.Page, onlyPublic)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to list owners %s skills, error: %w", req.Owner, err)
+	}
+	var resSkills []types.Skill
+
+	for _, skill := range skills {
+		resSkills = append(resSkills, types.Skill{
+			ID:           skill.ID,
+			Name:         skill.Repository.Name,
+			Nickname:     skill.Repository.Nickname,
+			Description:  skill.Repository.Description,
+			Likes:        skill.Repository.Likes,
+			Downloads:    skill.Repository.DownloadCount,
+			Path:         skill.Repository.Path,
+			RepositoryID: skill.RepositoryID,
+			Private:      skill.Repository.Private,
+			CreatedAt:    skill.CreatedAt,
+			UpdatedAt:    skill.Repository.UpdatedAt,
+			Source:       skill.Repository.Source,
+			SyncStatus:   skill.Repository.SyncStatus,
+			License:      skill.Repository.License,
+		})
+	}
+
+	return resSkills, total, nil
 }
 
 func (c *userComponentImpl) LikesMCPServers(ctx context.Context, req *types.UserMCPsReq) ([]types.MCPServer, int, error) {

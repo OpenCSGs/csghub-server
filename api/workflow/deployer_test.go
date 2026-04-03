@@ -208,7 +208,7 @@ func TestCancelRunningWorkflow(t *testing.T) {
 		// mockTemporalClient.EXPECT().CancelWorkflow(ctx, workflowID, runID).Return(nil)
 
 		// Call the function
-		cancelled, err := CancelRunningWorkflow(ctx, mockTemporalClient, workflowID)
+		cancelled, err := cancelRunningWorkflow(ctx, mockTemporalClient, workflowID)
 
 		// Verify results
 		require.NoError(t, err)
@@ -225,7 +225,7 @@ func TestCancelRunningWorkflow(t *testing.T) {
 		)
 
 		// Call the function
-		cancelled, err := CancelRunningWorkflow(ctx, mockTemporalClient, workflowID)
+		cancelled, err := cancelRunningWorkflow(ctx, mockTemporalClient, workflowID)
 
 		// Verify results
 		require.NoError(t, err)
@@ -243,7 +243,7 @@ func TestCancelRunningWorkflow(t *testing.T) {
 		)
 
 		// Call the function
-		cancelled, err := CancelRunningWorkflow(ctx, mockTemporalClient, workflowID)
+		cancelled, err := cancelRunningWorkflow(ctx, mockTemporalClient, workflowID)
 
 		// Verify results
 		require.Error(t, err)
@@ -276,7 +276,7 @@ func TestCancelRunningWorkflow(t *testing.T) {
 		)
 
 		// Call the function - should not call CancelWorkflow
-		cancelled, err := CancelRunningWorkflow(ctx, mockTemporalClient, workflowID)
+		cancelled, err := cancelRunningWorkflow(ctx, mockTemporalClient, workflowID)
 
 		// Verify results
 		require.NoError(t, err)
@@ -310,11 +310,11 @@ func TestCancelRunningWorkflow(t *testing.T) {
 		mockTemporalClient.EXPECT().CancelWorkflow(ctx, workflowID, runID).Return(errors.New(errMsg))
 
 		// Call the function
-		cancelled, err := CancelRunningWorkflow(ctx, mockTemporalClient, workflowID)
+		cancelled, err := cancelRunningWorkflow(ctx, mockTemporalClient, workflowID)
 
 		// Verify results
 		require.Error(t, err)
-		require.Contains(t, err.Error(), "failed to cancel existing workflow")
+		require.Contains(t, err.Error(), "failed to cancel existing running workflow")
 		require.Contains(t, err.Error(), errMsg)
 		require.False(t, cancelled)
 	})
@@ -335,7 +335,7 @@ func TestWorkflowAlreadyTerminated(t *testing.T) {
 	)
 
 	// Call the function
-	err := WaitForWorkflowTermination(ctx, mockTemporalClient, workflowID, 5*time.Second)
+	err := waitForWorkflowTermination(ctx, mockTemporalClient, workflowID, 5*time.Second)
 	require.NoError(t, err)
 }
 
@@ -350,7 +350,7 @@ func TestWorkflowNotFound(t *testing.T) {
 	)
 
 	// Call the function
-	err := WaitForWorkflowTermination(ctx, mockTemporalClient, workflowID, 5*time.Second)
+	err := waitForWorkflowTermination(ctx, mockTemporalClient, workflowID, 5*time.Second)
 	require.NoError(t, err)
 }
 
@@ -366,10 +366,10 @@ func TestDescribeWorkflowFails(t *testing.T) {
 	)
 
 	// Call the function
-	err := WaitForWorkflowTermination(ctx, mockTemporalClient, workflowID, 5*time.Second)
+	err := waitForWorkflowTermination(ctx, mockTemporalClient, workflowID, 5*time.Second)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "failed to describe workflow")
-	require.Contains(t, err.Error(), errMsg)
+	require.Contains(t, err.Error(), "timeout waiting for workflow")
+	require.Contains(t, err.Error(), workflowID)
 }
 
 func TestWorkflowTransitionsFromRunningToCompleted(t *testing.T) {
@@ -395,6 +395,6 @@ func TestWorkflowTransitionsFromRunningToCompleted(t *testing.T) {
 	).Once()
 
 	// Call the function with sufficient timeout
-	err := WaitForWorkflowTermination(ctx, mockTemporalClient, workflowID, 2*time.Second)
+	err := waitForWorkflowTermination(ctx, mockTemporalClient, workflowID, 2*time.Second)
 	require.NoError(t, err)
 }

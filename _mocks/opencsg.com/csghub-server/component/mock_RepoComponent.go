@@ -1036,6 +1036,53 @@ func (_c *MockRepoComponent_Commits_Call) RunAndReturn(run func(context.Context,
 	return _c
 }
 
+// CreateBranch provides a mock function with given fields: ctx, req
+func (_m *MockRepoComponent) CreateBranch(ctx context.Context, req *types.CreateBranchReq) error {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateBranch")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, *types.CreateBranchReq) error); ok {
+		r0 = rf(ctx, req)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockRepoComponent_CreateBranch_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateBranch'
+type MockRepoComponent_CreateBranch_Call struct {
+	*mock.Call
+}
+
+// CreateBranch is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req *types.CreateBranchReq
+func (_e *MockRepoComponent_Expecter) CreateBranch(ctx interface{}, req interface{}) *MockRepoComponent_CreateBranch_Call {
+	return &MockRepoComponent_CreateBranch_Call{Call: _e.mock.On("CreateBranch", ctx, req)}
+}
+
+func (_c *MockRepoComponent_CreateBranch_Call) Run(run func(ctx context.Context, req *types.CreateBranchReq)) *MockRepoComponent_CreateBranch_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*types.CreateBranchReq))
+	})
+	return _c
+}
+
+func (_c *MockRepoComponent_CreateBranch_Call) Return(_a0 error) *MockRepoComponent_CreateBranch_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockRepoComponent_CreateBranch_Call) RunAndReturn(run func(context.Context, *types.CreateBranchReq) error) *MockRepoComponent_CreateBranch_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CreateFile provides a mock function with given fields: ctx, req
 func (_m *MockRepoComponent) CreateFile(ctx context.Context, req *types.CreateFileReq) (*types.CreateFileResp, error) {
 	ret := _m.Called(ctx, req)
@@ -1286,6 +1333,53 @@ func (_c *MockRepoComponent_CreateRuntimeFramework_Call) Return(_a0 *types.Runti
 }
 
 func (_c *MockRepoComponent_CreateRuntimeFramework_Call) RunAndReturn(run func(context.Context, *types.RuntimeFrameworkReq) (*types.RuntimeFramework, error)) *MockRepoComponent_CreateRuntimeFramework_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// DeleteBranch provides a mock function with given fields: ctx, req
+func (_m *MockRepoComponent) DeleteBranch(ctx context.Context, req *types.DeleteBranchReq) error {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteBranch")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, *types.DeleteBranchReq) error); ok {
+		r0 = rf(ctx, req)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockRepoComponent_DeleteBranch_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteBranch'
+type MockRepoComponent_DeleteBranch_Call struct {
+	*mock.Call
+}
+
+// DeleteBranch is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req *types.DeleteBranchReq
+func (_e *MockRepoComponent_Expecter) DeleteBranch(ctx interface{}, req interface{}) *MockRepoComponent_DeleteBranch_Call {
+	return &MockRepoComponent_DeleteBranch_Call{Call: _e.mock.On("DeleteBranch", ctx, req)}
+}
+
+func (_c *MockRepoComponent_DeleteBranch_Call) Run(run func(ctx context.Context, req *types.DeleteBranchReq)) *MockRepoComponent_DeleteBranch_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*types.DeleteBranchReq))
+	})
+	return _c
+}
+
+func (_c *MockRepoComponent_DeleteBranch_Call) Return(_a0 error) *MockRepoComponent_DeleteBranch_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockRepoComponent_DeleteBranch_Call) RunAndReturn(run func(context.Context, *types.DeleteBranchReq) error) *MockRepoComponent_DeleteBranch_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -4824,28 +4918,6 @@ func (_c *MockRepoComponent_VisiableToUser_Call) Return(_a0 []*database.Reposito
 func (_c *MockRepoComponent_VisiableToUser_Call) RunAndReturn(run func(context.Context, []*database.Repository, string) ([]*database.Repository, error)) *MockRepoComponent_VisiableToUser_Call {
 	_c.Call.Return(run)
 	return _c
-}
-
-// CreateBranch provides a mock function with given fields: ctx, req
-func (_m *MockRepoComponent) CreateBranch(ctx context.Context, req *types.CreateBranchReq) error {
-	ret := _m.Called(ctx, req)
-	if len(ret) == 0 {
-		panic("no return value specified for CreateBranch")
-	}
-	var r0 error
-	r0 = ret.Error(0)
-	return r0
-}
-
-// DeleteBranch provides a mock function with given fields: ctx, req
-func (_m *MockRepoComponent) DeleteBranch(ctx context.Context, req *types.DeleteBranchReq) error {
-	ret := _m.Called(ctx, req)
-	if len(ret) == 0 {
-		panic("no return value specified for DeleteBranch")
-	}
-	var r0 error
-	r0 = ret.Error(0)
-	return r0
 }
 
 // NewMockRepoComponent creates a new instance of MockRepoComponent. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.

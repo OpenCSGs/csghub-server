@@ -171,6 +171,7 @@ func (s *codeStoreImpl) FindByPath(ctx context.Context, namespace string, repoPa
 		Relation("Repository.User").
 		Relation("Repository.Mirror").
 		Relation("Repository.Mirror.CurrentTask").
+		Relation("Repository.Statistics").
 		Where("repository.path =?", fmt.Sprintf("%s/%s", namespace, repoPath)).
 		Scan(ctx)
 	if err != nil {
