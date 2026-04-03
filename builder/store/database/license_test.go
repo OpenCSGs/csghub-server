@@ -22,7 +22,14 @@ func TestLicenseStore_CRUD(t *testing.T) {
 	err := store.Create(ctx, database.License{
 		Key:        "key",
 		Company:    "foo",
+		Email:      "test@example.com",
+		Product:    "test",
+		Edition:    "standard",
+		MaxUser:    10,
+		StartTime:  time.Now(),
 		ExpireTime: time.Now().Add(-1 * time.Hour),
+		UserUUID:   "test-user-uuid",
+		Issuer:     "tester",
 	})
 	require.Nil(t, err)
 
@@ -102,21 +109,33 @@ func TestLicenseStore_List(t *testing.T) {
 					Key: "k1", Product: "p1",
 					Edition: "e1", Company: "foo",
 					Email: "u1@foo.com", Remark: "foo",
+					MaxUser: 10, StartTime: time.Now(),
+					ExpireTime: time.Now().Add(time.Hour),
+					UserUUID: "user1",
 				},
 				{
 					Key: "k2", Product: "p2",
 					Edition: "e2", Company: "foo",
 					Email: "u2@foo.com", Remark: "foo-v2",
+					MaxUser: 20, StartTime: time.Now(),
+					ExpireTime: time.Now().Add(time.Hour),
+					UserUUID: "user2",
 				},
 				{
 					Key: "k3", Product: "p3",
 					Edition: "e1", Company: "bar",
 					Email: "u1@bar.com", Remark: "bar",
+					MaxUser: 30, StartTime: time.Now(),
+					ExpireTime: time.Now().Add(time.Hour),
+					UserUUID: "user3",
 				},
 				{
 					Key: "k4", Product: "p3",
 					Edition: "e2", Company: "bar",
 					Email: "u1@bar.com", Remark: "bar",
+					MaxUser: 40, StartTime: time.Now(),
+					ExpireTime: time.Now().Add(time.Hour),
+					UserUUID: "user4",
 				},
 			}
 			for _, l := range ls {
