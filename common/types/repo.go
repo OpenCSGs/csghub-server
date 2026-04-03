@@ -118,6 +118,11 @@ type RepoRequest struct {
 	Per       int    `json:"per"`
 }
 
+type RepoFullCheckResult struct {
+	Skipped    bool   `json:"skipped"`
+	WorkflowID string `json:"workflow_id"`
+}
+
 type ValidateYamlReq struct {
 	Content  string         `json:"content"`
 	RepoType RepositoryType `json:"repo_type"`

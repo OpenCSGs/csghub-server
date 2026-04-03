@@ -8,13 +8,16 @@ import (
 	"sync"
 	"time"
 
+	"go.temporal.io/sdk/client"
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/sensitive"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/builder/temporal"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/moderation/checker"
+	wfCommon "opencsg.com/csghub-server/moderation/workflow/common"
 )
 
 type repoComponentImpl struct {
@@ -25,6 +28,7 @@ type repoComponentImpl struct {
 	whitelistRule    database.RepositoryFileCheckRuleStore
 	git              gitserver.GitServer
 	concurrencyLimit int
+	config           *config.Config
 }
 
 func NewRepoComponent(cfg *config.Config) (RepoComponent, error) {
@@ -43,6 +47,7 @@ func NewRepoComponent(cfg *config.Config) (RepoComponent, error) {
 	c.whitelistRule = database.NewRepositoryFileCheckRuleStore()
 	c.git = gs
 	c.concurrencyLimit = cfg.Moderation.RepoFileCheckConcurrency
+	c.config = cfg
 	return c, nil
 }
 
@@ -55,12 +60,81 @@ type CheckOption struct {
 	// MaxConcurrent  int
 }
 
+type RepoFullCheckRequest struct {
+	Namespace string
+	Name      string
+	RepoType  types.RepositoryType
+}
+
 func (c *repoComponentImpl) GetRepo(ctx context.Context, repoType types.RepositoryType, namespace string, name string) (*database.Repository, error) {
 	return c.rs.FindByPath(ctx, repoType, namespace, name)
 }
 
 func (c *repoComponentImpl) UpdateRepoSensitiveCheckStatus(ctx context.Context, repoId int64, status types.SensitiveCheckStatus) error {
 	return c.rs.UpdateRepoSensitiveCheckStatus(ctx, repoId, status)
+}
+
+func (c *repoComponentImpl) SkipSensitiveCheckForWhiteList(ctx context.Context, req RepoFullCheckRequest) (bool, error) {
+	whiteList, err := c.GetNamespaceWhiteList(ctx)
+	if err != nil {
+		return false, fmt.Errorf("failed to get namespace white list: %w", err)
+	}
+
+	for _, rule := range whiteList {
+		if req.Namespace != rule {
+			continue
+		}
+		repo, err := c.GetRepo(ctx, req.RepoType, req.Namespace, req.Name)
+		if err != nil {
+			return false, fmt.Errorf("failed to get repo for skip sensitive check, namespace: %s, name: %s, error: %w", req.Namespace, req.Name, err)
+		}
+		err = c.UpdateRepoSensitiveCheckStatus(ctx, repo.ID, types.SensitiveCheckSkip)
+		if err != nil {
+			return false, fmt.Errorf("failed to update repo sensitive check status to skip, repo_id: %d, error: %w", repo.ID, err)
+		}
+		slog.InfoContext(ctx, "namespace in white list, skip repo full check", slog.String("namespace", req.Namespace),
+			slog.String("name", req.Name),
+			slog.Int64("repo_id", repo.ID))
+		return true, nil
+	}
+	return false, nil
+}
+
+func (c *repoComponentImpl) RepoFullCheck(ctx context.Context, req RepoFullCheckRequest) (*types.RepoFullCheckResult, error) {
+	skipped, err := c.SkipSensitiveCheckForWhiteList(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	if skipped {
+		return &types.RepoFullCheckResult{
+			Skipped: true,
+		}, nil
+	}
+
+	workflowClient := temporal.GetClient()
+	workflowOptions := client.StartWorkflowOptions{
+		TaskQueue: wfCommon.RepoFullCheckQueue,
+	}
+
+	we, err := workflowClient.ExecuteWorkflow(context.Background(), workflowOptions, wfCommon.RepoFullCheckWorkflow,
+		wfCommon.Repo{
+			Namespace: req.Namespace,
+			Name:      req.Name,
+			RepoType:  req.RepoType,
+		}, c.config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to start repo full check workflow, error: %w", err)
+	}
+
+	WorkflowID := we.GetID()
+	slog.InfoContext(ctx, "start repo full check workflow",
+		slog.String("namespace", req.Namespace),
+		slog.String("name", req.Name),
+		slog.String("workflow_id", WorkflowID))
+	return &types.RepoFullCheckResult{
+		Skipped:    false,
+		WorkflowID: WorkflowID,
+	}, nil
 }
 
 func (c *repoComponentImpl) CheckRepoFiles(ctx context.Context, repoID int64, options CheckOption) error {
