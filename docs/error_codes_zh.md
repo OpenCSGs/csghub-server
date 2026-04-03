@@ -42,6 +42,54 @@
 - **错误名:** `instanceQuotaExceeded`
 - **描述:** 实例配额超出。错误消息中包含智能体类型、实例数量和配额。
 
+---
+
+### `AGENT-ERR-1`
+
+- **错误代码:** `AGENT-ERR-1`
+- **错误名:** `instanceNameAlreadyExists`
+- **描述:** 您已存在相同名称的实例。
+
+---
+
+### `AGENT-ERR-2`
+
+- **错误代码:** `AGENT-ERR-2`
+- **错误名:** `knowledgeBaseNameAlreadyExists`
+- **描述:** 您已存在相同名称的知识库。
+
+---
+
+### `AGENT-ERR-3`
+
+- **错误代码:** `AGENT-ERR-3`
+- **错误名:** `mcpServerNameAlreadyExists`
+- **描述:** 您已存在相同名称的MCP服务器。
+
+---
+
+### `AGENT-ERR-4`
+
+- **错误代码:** `AGENT-ERR-4`
+- **错误名:** `pinLimitExceeded`
+- **描述:** 置顶数量超出限制。每种实体类型最多可置顶 5 个项目。
+
+---
+
+### `AGENT-ERR-5`
+
+- **错误代码:** `AGENT-ERR-5`
+- **错误名:** `invalidShareSessionUUID`
+- **描述:** 分享会话UUID无效。
+
+---
+
+### `AGENT-ERR-6`
+
+- **错误代码:** `AGENT-ERR-6`
+- **错误名:** `shareSessionUUIDExpired`
+- **描述:** 分享会话UUID已过期。
+
 ## Auth 错误
 
 ### `AUTH-ERR-0`
@@ -129,6 +177,22 @@
 - **错误代码:** `AUTH-ERR-10`
 - **错误名:** `userPhoneNotVerified`
 - **描述:** 您的电话号码尚未验证。请在进行任何请求之前验证您的电话号码。
+
+---
+
+### `AUTH-ERR-11`
+
+- **错误代码:** `AUTH-ERR-11`
+- **错误名:** `needAccessToken`
+- **描述:** 请求必须使用访问令牌进行身份验证。
+
+## Collection 错误
+
+### `COLL-ERR-0`
+
+- **错误代码:** `COLL-ERR-0`
+- **错误名:** `repoAlreadyInCollection`
+- **描述:** 您尝试添加的仓库已经在此集合中。
 
 ## Dataset 错误
 
@@ -458,6 +522,30 @@
 - **错误名:** `gitUsingGitInXnetRepository`
 - **描述:** 使用 git 操作 xnet 启用的仓库。
 
+## Invitation 错误
+
+### `INVITATION-ERR-0`
+
+- **错误代码:** `INVITATION-ERR-0`
+- **错误名:** `userPhoneNotSet`
+- **描述:** 未绑定手机号，不能创建邀请码。
+
+---
+
+### `INVITATION-ERR-1`
+
+- **错误代码:** `INVITATION-ERR-1`
+- **错误名:** `invitationNotFound`
+- **描述:** 邀请码不存在。
+
+---
+
+### `INVITATION-ERR-2`
+
+- **错误代码:** `INVITATION-ERR-2`
+- **错误名:** `userAlreadyHasInvitationCode`
+- **描述:** 邀请码已存在。
+
 ## License 错误
 
 ### `LICENSE-ERR-0`
@@ -465,6 +553,70 @@
 - **错误代码:** `LICENSE-ERR-0`
 - **错误名:** `noActiveLicense`
 - **描述:** 当前系统没有有效的许可证。
+
+---
+
+### `LICENSE-ERR-1`
+
+- **错误代码:** `LICENSE-ERR-1`
+- **错误名:** `licenseExpired`
+- **描述:** 许可证已过期，无法验证和导入。
+
+## Mcp_gateway 错误
+
+### `MCP-GW-ERR-0`
+
+- **错误代码:** `MCP-GW-ERR-0`
+- **错误名:** `gatewayMCPServerNameAlreadyExists`
+- **描述:** 网关中已存在相同名称的MCP服务器。
+
+---
+
+### `MCP-GW-ERR-1`
+
+- **错误代码:** `MCP-GW-ERR-1`
+- **错误名:** `gatewayMCPServerInvalidName`
+- **描述:** MCP服务器名称不符合命名规范。
+
+## Moderation 错误
+
+### `MOD-ERR-0`
+
+- **错误代码:** `MOD-ERR-0`
+- **错误名:** `codeNameRequire`
+- **描述:** 请求参数不匹配, 服务器无法处理该请求。
+
+---
+
+### `MOD-ERR-1`
+
+- **错误代码:** `MOD-ERR-1`
+- **错误名:** `codeWordRequire`
+- **描述:** 请求参数不匹配, 服务器无法处理该请求。
+
+## Repo 错误
+
+### `REPO-ERR-0`
+
+- **错误代码:** `REPO-ERR-0`
+- **错误名:** `codeRepoAlreadyExistErr`
+- **描述:** 仓库名称已存在
+
+---
+
+### `REPO-ERR-1`
+
+- **错误代码:** `REPO-ERR-1`
+- **错误名:** `codeRepoNameInvalidErr`
+- **描述:** 仓库名称无效
+
+---
+
+### `REPO-ERR-2`
+
+- **错误代码:** `REPO-ERR-2`
+- **错误名:** `codeNamespaceNotFoundErr`
+- **描述:** 命名空间不存在
 
 ## Req 错误
 
@@ -554,6 +706,38 @@
 - **错误名:** `errRateLimitExceeded`
 - **描述:** 用户在给定的时间内发送了太多的请求。在速率限制重置或提供有效的验证码之前，将阻止进一步的请求。
 
+---
+
+### `REQ-ERR-11`
+
+- **错误代码:** `REQ-ERR-11`
+- **错误名:** `errLimitedIPLocation`
+- **描述:** 来自此IP位置的请求受到限制。要继续操作，请完成验证码验证。
+
+---
+
+### `REQ-ERR-12`
+
+- **错误代码:** `REQ-ERR-12`
+- **错误名:** `errCaptchaIncorrect`
+- **描述:** 提供的验证码验证失败。请使用有效的验证码重试。
+
+## Resource 错误
+
+### `RESOURCE-ERR-0`
+
+- **错误代码:** `RESOURCE-ERR-0`
+- **错误名:** `codeResourceNotFoundErr`
+- **描述:** 无法找到指定的资源
+
+---
+
+### `RESOURCE-ERR-1`
+
+- **错误代码:** `RESOURCE-ERR-1`
+- **错误名:** `codeResourceUnavailableErr`
+- **描述:** 资源暂不可用
+
 ## Runner 错误
 
 ### `RUNNER-ERR-0`
@@ -593,6 +777,14 @@
 - **错误代码:** `RUNNER-ERR-4`
 - **错误名:** `codeTrafficPercentNotZeroErr`
 - **描述:** 当前版本仍有流量分配（流量占比≠0）
+
+## Sensitive 错误
+
+### `SENSITIVE-ERR-0`
+
+- **错误代码:** `SENSITIVE-ERR-0`
+- **错误名:** `codeSensitiveInfoNotAllowedErr`
+- **描述:** 敏感信息不允许被使用
 
 ## Serverless 错误
 
@@ -656,7 +848,7 @@
 
 - **错误代码:** `SERVERLESS-ERR-7`
 - **错误名:** `codeTrafficInvalidErr`
-- **描述:** 流量百分比无效
+- **描述:** 没有其他有效修订版本
 
 ---
 
@@ -665,6 +857,30 @@
 - **错误代码:** `SERVERLESS-ERR-8`
 - **错误名:** `codeInvalidCommitIDErr`
 - **描述:** 无效的commitId
+
+## Spaces 错误
+
+### `SPACE-ERR-0`
+
+- **错误代码:** `SPACE-ERR-0`
+- **错误名:** `codeGetSpaceDockerTemplatePathFailedErr`
+- **描述:** 获取空间 Docker 模板路径失败
+
+---
+
+### `SPACE-ERR-1`
+
+- **错误代码:** `SPACE-ERR-1`
+- **错误名:** `codeSpaceNameAlreadyExistErr`
+- **描述:** 空间名称已经存在
+
+---
+
+### `SPACE-ERR-2`
+
+- **错误代码:** `SPACE-ERR-2`
+- **错误名:** `codeSpaceInitFailedErr`
+- **描述:** 初始化空间失败
 
 ## System 错误
 
@@ -769,6 +985,22 @@
 - **错误代码:** `TASK-ERR-3`
 - **错误名:** `multiHostNotebookNotSupported`
 - **描述:** 多主机 Notebook 功能（在多个主机上运行 Notebook 任务）不被支持。请改用单主机 Notebook 执行。
+
+---
+
+### `TASK-ERR-4`
+
+- **错误代码:** `TASK-ERR-4`
+- **错误名:** `notEnoughResource`
+- **描述:** 任务需要的资源超过了集群可用的资源。当集群资源不足时，会出现此错误。
+
+---
+
+### `TASK-ERR-5`
+
+- **错误代码:** `TASK-ERR-5`
+- **错误名:** `clusterUnavailable`
+- **描述:** 集群当前不可用，可能是由于维护或其他原因。当集群未准备好接受新任务时，会出现此错误。
 
 ## User 错误
 
@@ -929,3 +1161,4 @@
 - **错误代码:** `USER-ERR-19`
 - **错误名:** `uuidConflict`
 - **描述:** 组织生成的UUID已存在于系统中
+

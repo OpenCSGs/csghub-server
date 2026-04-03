@@ -3,12 +3,14 @@ package router
 import (
 	"fmt"
 
+	"opencsg.com/csghub-server/builder/instrumentation"
+
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/aigateway/handler"
 	"opencsg.com/csghub-server/api/middleware"
-	"opencsg.com/csghub-server/builder/instrumentation"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/i18n"
 )
 
 func NewRouter(config *config.Config) (*gin.Engine, error) {
@@ -21,10 +23,15 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 		AllowAllOrigins:  true,
 	}))
 	//to access model,fintune with any kind of tokens in auth header
+	i18n.InitLocalizersFromEmbedFile()
+	r.Use(middleware.ModifyAcceptLanguageMiddleware(), middleware.LocalizedErrorMiddleware())
 	r.Use(middleware.Authenticator(config))
 	middlewareCollection := middleware.MiddlewareCollection{}
 	middlewareCollection.Auth.NeedLogin = middleware.MustLogin()
+	middlewareCollection.Auth.NeedAdmin = middleware.NeedAdmin(config)
 	middlewareCollection.Auth.NeedPhoneVerified = middleware.NeedPhoneVerified(config)
+	middlewareCollection.Auth.NeedAccessToken = middleware.NeedAccessToken()
+	middlewareCollection.License.Check = middleware.CheckLicense(config)
 
 	v1Group := r.Group("/v1")
 
@@ -38,18 +45,23 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 	v1Group.POST("/embeddings", middlewareCollection.Auth.NeedLogin, openAIhandler.Embedding)
 	v1Group.POST("/images/generations", middlewareCollection.Auth.NeedLogin, openAIhandler.GenerateImage)
 
+	apiV1Group := r.Group("/api/v1")
+	adminGroup := apiV1Group.Group("/admin", middlewareCollection.Auth.NeedAdmin)
+
 	mcpProxy, err := handler.NewMCPProxyHandler(config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating mcp proxy handler :%w", err)
 	}
-	CreateMCPRoute(v1Group, mcpProxy)
-	if err := extendRoutes(v1Group, middlewareCollection, config); err != nil {
+	createMCPRoute(v1Group, mcpProxy)
+
+	if err := extendRoutes(v1Group, apiV1Group, adminGroup, middlewareCollection, config); err != nil {
 		return nil, fmt.Errorf("error creating extended routes :%w", err)
 	}
+
 	return r, nil
 }
 
-func CreateMCPRoute(v1Group *gin.RouterGroup, mcpProxy handler.MCPProxyHandler) {
+func createMCPRoute(v1Group *gin.RouterGroup, mcpProxy handler.MCPProxyHandler) {
 	mcpGroup := v1Group.Group("mcp")
 	mcpGroup.GET("/resources", mcpProxy.Resources)
 

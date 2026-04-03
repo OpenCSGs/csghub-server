@@ -8,6 +8,6 @@ import (
 	"opencsg.com/csghub-server/common/config"
 )
 
-func extendRoutes(_ *gin.RouterGroup, _ middleware.MiddlewareCollection, _ *config.Config) error {
+func extendRoutes(_ *gin.RouterGroup, _ *gin.RouterGroup, _ *gin.RouterGroup, _ middleware.MiddlewareCollection, _ *config.Config) error {
 	return nil
 }
