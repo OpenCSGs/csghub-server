@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -1088,5 +1090,153 @@ func TestDeployer_GetSharedModeResourceName(t *testing.T) {
 		}
 		name := d.GetSharedModeResourceName(config)
 		require.Equal(t, "nvidia.com/vgpu", name)
+	})
+}
+
+func TestDeployer_Wakeup(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("cluster with app endpoint uses app endpoint", func(t *testing.T) {
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		}))
+		defer ts.Close()
+
+		mockClusterStore := mockdb.NewMockClusterInfoStore(t)
+		mockClusterStore.EXPECT().ByClusterID(ctx, "cluster-1").Return(database.ClusterInfo{
+			ClusterID:   "cluster-1",
+			AppEndpoint: ts.URL,
+		}, nil)
+
+		d := &deployer{
+			internalRootDomain: "svc.cluster.local",
+			clusterStore:       mockClusterStore,
+		}
+
+		dr := types.DeployRepo{
+			SpaceID:   1,
+			Namespace: "test",
+			Name:      "space",
+			SvcName:   "test-svc",
+			ClusterID: "cluster-1",
+			Endpoint:  "http://test-svc.app.opencsg.com",
+		}
+
+		err := d.Wakeup(ctx, dr)
+		require.NoError(t, err)
+	})
+
+	t.Run("failed to get cluster returns error", func(t *testing.T) {
+		mockClusterStore := mockdb.NewMockClusterInfoStore(t)
+		mockClusterStore.EXPECT().ByClusterID(ctx, "cluster-1").Return(database.ClusterInfo{}, errors.New("cluster not found"))
+
+		d := &deployer{
+			internalRootDomain: "svc.cluster.local",
+			clusterStore:       mockClusterStore,
+		}
+
+		dr := types.DeployRepo{
+			SpaceID:   1,
+			Namespace: "test",
+			Name:      "space",
+			SvcName:   "test-svc",
+			ClusterID: "cluster-1",
+		}
+
+		err := d.Wakeup(ctx, dr)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "cluster not found")
+	})
+
+	t.Run("http request timeout returns nil", func(t *testing.T) {
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			time.Sleep(10 * time.Second)
+			w.WriteHeader(http.StatusOK)
+		}))
+		defer ts.Close()
+
+		mockClusterStore := mockdb.NewMockClusterInfoStore(t)
+		mockClusterStore.EXPECT().ByClusterID(ctx, "cluster-1").Return(database.ClusterInfo{
+			ClusterID:   "cluster-1",
+			AppEndpoint: ts.URL,
+		}, nil)
+
+		d := &deployer{
+			internalRootDomain: "svc.cluster.local",
+			clusterStore:       mockClusterStore,
+		}
+
+		dr := types.DeployRepo{
+			SpaceID:   1,
+			Namespace: "test",
+			Name:      "space",
+			SvcName:   "test-svc",
+			ClusterID: "cluster-1",
+			Endpoint:  "http://test-svc.app.opencsg.com",
+		}
+
+		err := d.Wakeup(ctx, dr)
+		require.NoError(t, err)
+	})
+
+	t.Run("http request error returns error", func(t *testing.T) {
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			http.Error(w, "service unavailable", http.StatusServiceUnavailable)
+		}))
+		defer ts.Close()
+
+		mockClusterStore := mockdb.NewMockClusterInfoStore(t)
+		mockClusterStore.EXPECT().ByClusterID(ctx, "cluster-1").Return(database.ClusterInfo{
+			ClusterID:   "cluster-1",
+			AppEndpoint: ts.URL,
+		}, nil)
+
+		d := &deployer{
+			internalRootDomain: "svc.cluster.local",
+			clusterStore:       mockClusterStore,
+		}
+
+		dr := types.DeployRepo{
+			SpaceID:   1,
+			Namespace: "test",
+			Name:      "space",
+			SvcName:   "test-svc",
+			ClusterID: "cluster-1",
+			Endpoint:  "http://test-svc.app.opencsg.com",
+		}
+
+		err := d.Wakeup(ctx, dr)
+		require.Error(t, err)
+	})
+
+	t.Run("http status not found returns error", func(t *testing.T) {
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusNotFound)
+		}))
+		defer ts.Close()
+
+		mockClusterStore := mockdb.NewMockClusterInfoStore(t)
+		mockClusterStore.EXPECT().ByClusterID(ctx, "cluster-1").Return(database.ClusterInfo{
+			ClusterID:   "cluster-1",
+			AppEndpoint: ts.URL,
+		}, nil)
+
+		d := &deployer{
+			internalRootDomain: "svc.cluster.local",
+			clusterStore:       mockClusterStore,
+		}
+
+		dr := types.DeployRepo{
+			SpaceID:   1,
+			Namespace: "test",
+			Name:      "space",
+			SvcName:   "test-svc",
+			ClusterID: "cluster-1",
+			Endpoint:  "http://test-svc.app.opencsg.com",
+		}
+
+		err := d.Wakeup(ctx, dr)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "not found")
 	})
 }

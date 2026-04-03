@@ -580,11 +580,11 @@ func (c *modelComponentImpl) Show(ctx context.Context, namespace, name, currentU
 		XnetMigrationStatus:   xnetMigrationStatus,
 		XnetMigrationProgress: xnetMigrationProgress,
 		RepoSize:              0,
-}
-if model.Repository.Statistics != nil {
-	resModel.RepoSize = model.Repository.Statistics.TotalSize
-}
-// admin user or owner can see the sensitive check status
+	}
+	if model.Repository.Statistics != nil {
+		resModel.RepoSize = model.Repository.Statistics.TotalSize
+	}
+	// admin user or owner can see the sensitive check status
 	if permission.CanAdmin {
 		resModel.SensitiveCheckStatus = model.Repository.SensitiveCheckStatus.String()
 	}
@@ -1192,13 +1192,15 @@ func (c *modelComponentImpl) Wakeup(ctx context.Context, namespace, name string,
 	// get Deploy for inference
 	deploy, err := c.deployTaskStore.GetDeployByID(ctx, deployId)
 	if err != nil {
-		return fmt.Errorf("can't get inference delopyment,%w", err)
+		return fmt.Errorf("can't get inference deployment,%w", err)
 	}
 	return c.deployer.Wakeup(ctx, types.DeployRepo{
 		DeployID:  deployId,
 		Namespace: namespace,
 		Name:      name,
 		SvcName:   deploy.SvcName,
+		Endpoint:  deploy.Endpoint,
+		ClusterID: deploy.ClusterID,
 	})
 }
 
