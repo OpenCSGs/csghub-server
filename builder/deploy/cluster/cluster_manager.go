@@ -8,6 +8,7 @@ import (
 	"math"
 	"math/rand"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -459,10 +460,17 @@ func collectNodeResource(node v1.Node, config *config.Config) types.NodeResource
 	}
 
 	bigXPUMem := ""
-	if xpuMemLabel != "" {
-		ulimit, err := units.ParseBigBytes(node.Labels[xpuMemLabel])
-		if err == nil {
-			bigXPUMem = units.BigIBytes(ulimit)
+	if len(xpuMemLabel) > 0 {
+		for _, memLabel := range xpuMemLabel {
+			val, found := node.Labels[memLabel]
+			if !found {
+				continue
+			}
+			ulimit, err := units.ParseBigBytes(val + getXPUMemUnit(val, memLabel))
+			if err == nil {
+				bigXPUMem = units.BigIBytes(ulimit)
+				break
+			}
 		}
 	}
 
@@ -548,54 +556,54 @@ func getGpuTypeAndVendor(vendorType string, label string) (string, string) {
 }
 
 // the first label is the xpu capacity label, the second is the gpu model label
-func getXPULabel(labels map[string]string, config *config.Config) (string, string, string) {
+func getXPULabel(labels map[string]string, config *config.Config) (string, string, []string) {
 	if _, found := labels["aliyun.accelerator/nvidia_name"]; found {
 		//for default cluster
-		return "nvidia.com/gpu", "aliyun.accelerator/nvidia_name", "aliyun.accelerator/nvidia_mem"
+		return "nvidia.com/gpu", "aliyun.accelerator/nvidia_name", []string{"aliyun.accelerator/nvidia_mem"}
 	}
 	if _, found := labels["machine.cluster.vke.volcengine.com/gpu-name"]; found {
 		//for volcano cluster
-		return "nvidia.com/gpu", "machine.cluster.vke.volcengine.com/gpu-name", "machine.cluster.vke.volcengine.com/gpu-mem"
+		return "nvidia.com/gpu", "machine.cluster.vke.volcengine.com/gpu-name", []string{"machine.cluster.vke.volcengine.com/gpu-mem"}
 	}
 	if _, found := labels["eks.tke.cloud.tencent.com/gpu-type"]; found {
 		//for tencent cluster
-		return "nvidia.com/gpu", "eks.tke.cloud.tencent.com/gpu-type", "eks.tke.cloud.tencent.com/gpu-mem"
+		return "nvidia.com/gpu", "eks.tke.cloud.tencent.com/gpu-type", []string{"eks.tke.cloud.tencent.com/gpu-mem"}
 	}
 	if _, found := labels["nvidia.com/nvidia_name"]; found {
-		//for k3s cluster
-		return "nvidia.com/gpu", "nvidia.com/nvidia_name", "nvidia.com/nvidia_mem"
+		//for k3s cluster or A800 cluster
+		return "nvidia.com/gpu", "nvidia.com/nvidia_name", []string{"nvidia.com/nvidia_mem", rtypes.Nvida_Com_GPU_Memory}
 	}
 	if _, found := labels["nvidia.com/gpu.product"]; found {
 		//for nvidia gpu product label
-		return "nvidia.com/gpu", "nvidia.com/gpu.product", "nvidia.com/gpu.mem"
+		return "nvidia.com/gpu", "nvidia.com/gpu.product", []string{"nvidia.com/gpu.mem"}
 	}
 	if _, found := labels["kubemore_xpu_type"]; found {
 		//for huawei gpu
-		return "huawei.com/Ascend910", "kubemore_xpu_type", "kubemore_xpu_mem"
+		return "huawei.com/Ascend910", "kubemore_xpu_type", []string{"kubemore_xpu_mem"}
 	}
 	if _, found := labels["huawei.accelerator"]; found {
 		//for huawei gpu
-		return "huawei.com/Ascend910", "huawei.accelerator", "huawei.accelerator.mem"
+		return "huawei.com/Ascend910", "huawei.accelerator", []string{"huawei.accelerator.mem"}
 	}
 	if _, found := labels["accelerator/huawei-npu"]; found {
 		//for huawei gpu
-		return "huawei.com/Ascend910", "accelerator/huawei-npu", "accelerator/huawei-npu.mem"
+		return "huawei.com/Ascend910", "accelerator/huawei-npu", []string{"accelerator/huawei-npu.mem"}
 	}
 	if _, found := labels["hygon.com/dcu.name"]; found {
 		//for hy dcu
-		return "hygon.com/dcu", "hygon.com/dcu.name", "hygon.com/dcu.mem"
+		return "hygon.com/dcu", "hygon.com/dcu.name", []string{"hygon.com/dcu.mem"}
 	}
 	if _, found := labels["enflame.com/gcu"]; found {
 		//for enflame gcu
-		return "enflame.com/gcu", "enflame.com/gcu.model", "enflame.com/gcu.mem"
+		return "enflame.com/gcu", "enflame.com/gcu.model", []string{"enflame.com/gcu.mem"}
 	}
 	if _, found := labels["enflame.com/gcu.count"]; found {
 		//for enflame gcu
-		return "enflame.com/gcu.count", "enflame.com/gcu.model", "enflame.com/gcu.mem"
+		return "enflame.com/gcu.count", "enflame.com/gcu.model", []string{"enflame.com/gcu.mem"}
 	}
 	if _, found := labels["amd.com/gpu"]; found {
 		//for enflame gcu
-		return "amd.com/gpu", "amd.com/gpu.product-name", "amd.com/gpu.vram"
+		return "amd.com/gpu", "amd.com/gpu.product-name", []string{"amd.com/gpu.vram"}
 	}
 	//check custom gpu model label
 	if config.Space.GPUModelLabel != "" {
@@ -603,15 +611,26 @@ func getXPULabel(labels map[string]string, config *config.Config) (string, strin
 		err := json.Unmarshal([]byte(config.Space.GPUModelLabel), &gpuLabels)
 		if err != nil {
 			slog.Warn("failed to parse custom GPUModelLabel from config", slog.Any("error", err))
-			return "", "", ""
+			return "", "", []string{}
 		}
 		for _, gpuModel := range gpuLabels {
 			if _, found := labels[gpuModel.TypeLabel]; found {
-				return gpuModel.CapacityLabel, gpuModel.TypeLabel, gpuModel.MemLabel
+				return gpuModel.CapacityLabel, gpuModel.TypeLabel, []string{gpuModel.MemLabel}
 			}
 		}
 	}
-	return "", "", ""
+	return "", "", []string{}
+}
+
+func getXPUMemUnit(val string, label string) string {
+	if label == rtypes.Nvida_Com_GPU_Memory && IsAllDigits(val) {
+		return " MB"
+	}
+	return ""
+}
+
+func IsAllDigits(s string) bool {
+	return regexp.MustCompile(`^\d+$`).MatchString(s)
 }
 
 // convert memory in bytes to GB

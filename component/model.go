@@ -579,6 +579,10 @@ func (c *modelComponentImpl) Show(ctx context.Context, namespace, name, currentU
 		XnetEnabled:           model.Repository.XnetEnabled,
 		XnetMigrationStatus:   xnetMigrationStatus,
 		XnetMigrationProgress: xnetMigrationProgress,
+		RepoSize:              0,
+	}
+	if model.Repository.Statistics != nil {
+		resModel.RepoSize = model.Repository.Statistics.TotalSize
 	}
 	// admin user or owner can see the sensitive check status
 	if permission.CanAdmin {
@@ -1072,7 +1076,7 @@ func (c *modelComponentImpl) Deploy(ctx context.Context, deployReq types.DeployA
 		// only one service deploy was allowed
 		d, err := c.deployTaskStore.GetServerlessDeployByRepID(ctx, m.Repository.ID)
 		if err != nil {
-			return -1, fmt.Errorf("fail to get deploy, %w", err)
+			return -1, fmt.Errorf("failed to get deploy, %w", err)
 		}
 		if d != nil {
 			return d.ID, nil
@@ -1091,7 +1095,7 @@ func (c *modelComponentImpl) Deploy(ctx context.Context, deployReq types.DeployA
 
 	varStr, err := c.buildVariables(req, frame)
 	if err != nil {
-		return -1, fmt.Errorf("fail to generate variables, %w", err)
+		return -1, fmt.Errorf("failed to generate variables, %w", err)
 	}
 
 	// put repo-type and namespace/name in annotation
@@ -1188,13 +1192,15 @@ func (c *modelComponentImpl) Wakeup(ctx context.Context, namespace, name string,
 	// get Deploy for inference
 	deploy, err := c.deployTaskStore.GetDeployByID(ctx, deployId)
 	if err != nil {
-		return fmt.Errorf("can't get inference delopyment,%w", err)
+		return fmt.Errorf("can't get inference deployment,%w", err)
 	}
 	return c.deployer.Wakeup(ctx, types.DeployRepo{
 		DeployID:  deployId,
 		Namespace: namespace,
 		Name:      name,
 		SvcName:   deploy.SvcName,
+		Endpoint:  deploy.Endpoint,
+		ClusterID: deploy.ClusterID,
 	})
 }
 

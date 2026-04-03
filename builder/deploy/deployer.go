@@ -213,37 +213,37 @@ func (d *deployer) Deploy(ctx context.Context, dr types.DeployRepo) (int64, erro
 	if err != nil || deploy == nil {
 		return -1, fmt.Errorf("failed to create deploy in db, %w", err)
 	}
-	// skip build step for model as inference
-	bldTaskStatus := 0
+
+	bldTaskStatus := common.TaskStatusBuildPending
 	bldTaskMsg := ""
 
 	imgStrLen := len(strings.Trim(deploy.ImageID, " "))
 	slog.Debug("do deployer.Deploy check image", slog.Any("deploy.ImageID", deploy.ImageID), slog.Any("imgStrLen", imgStrLen))
 	if imgStrLen > 0 {
+		// skip build step for model as inference or finetune
 		bldTaskStatus = common.TaskStatusBuildSkip
 		bldTaskMsg = "Skip"
 	}
 	slog.Debug("create build task", slog.Any("bldTaskStatus", bldTaskStatus), slog.Any("bldTaskMsg", bldTaskMsg))
 	buildTask := &database.DeployTask{
 		DeployID: deploy.ID,
-		TaskType: 0,
+		TaskType: common.TaskTypeBuild, // build task
 		Status:   bldTaskStatus,
 		Message:  bldTaskMsg,
 	}
 	err = d.deployTaskStore.CreateDeployTask(ctx, buildTask)
 	if err != nil {
-		return -1, fmt.Errorf("create deploy task failed: %w", err)
+		return -1, fmt.Errorf("create build task for repo %d failed: %w", dr.RepoID, err)
 	}
 	runTask := &database.DeployTask{
 		DeployID: deploy.ID,
-		TaskType: 1,
+		TaskType: common.TaskTypeDeploy, // deploy task
 	}
 	err = d.deployTaskStore.CreateDeployTask(ctx, runTask)
 	if err != nil {
-		return -1, fmt.Errorf("create deploy task failed: %w", err)
+		return -1, fmt.Errorf("create deploy task for repo %d failed: %w", dr.RepoID, err)
 	}
 
-	// go func() { _ = d.scheduler.Queue(buildTask.ID) }()
 	buildTask.Deploy = deploy
 	runTask.Deploy = deploy
 
@@ -409,24 +409,50 @@ func (d *deployer) Purge(ctx context.Context, dr types.DeployRepo) error {
 }
 
 func (d *deployer) Wakeup(ctx context.Context, dr types.DeployRepo) error {
-	// srvName := common.UniqueSpaceAppName(dr.Namespace, dr.Name, dr.SpaceID)
 	svcName := dr.SvcName
-	srvURL := fmt.Sprintf("http://%s.%s", svcName, d.internalRootDomain)
-	// Create a new HTTP client with a timeout
-	client := &http.Client{
-		Timeout: 3 * time.Second,
+	svcURL := fmt.Sprintf("http://%s.%s", svcName, d.internalRootDomain)
+
+	cluster, err := d.clusterStore.ByClusterID(ctx, dr.ClusterID)
+	if err != nil {
+		return err
 	}
 
-	// Send a GET request to wake up the service
-	resp, err := client.Get(srvURL)
+	svcReq := types.EndpointReq{
+		ClusterID: dr.ClusterID,
+		Target:    svcURL,
+		Host:      svcName,
+		Endpoint:  dr.Endpoint,
+		SvcName:   svcName,
+	}
+
+	target, host, err := hubcom.ExtractDeployTargetAndHost(ctx, &cluster, svcReq)
+	if err != nil {
+		return err
+	}
+	slog.InfoContext(ctx, "wakeup service endpoint", slog.String("svc_name", svcName),
+		slog.String("svc_url", target), slog.String("host", host))
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, target, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create wakeup request: %w", err)
+	}
+	if len(host) > 0 {
+		req.Host = host
+	}
+
+	// Create a new HTTP client with a timeout
+	client := &http.Client{
+		Timeout: 20 * time.Second,
+	}
+	// Send the request
+	resp, err := client.Do(req)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
 			return nil
 		}
-		slog.Error("Error sending request to Knative service",
+		slog.ErrorContext(ctx, "Error sending request to Knative service",
 			slog.String("path", fmt.Sprintf("%s/%s", dr.Namespace, dr.Name)),
 			slog.String("svc_name", svcName),
-			slog.String("svc_url", srvURL),
+			slog.String("svc_url", target),
 			slog.Any("error", err))
 		return fmt.Errorf("failed call service endpoint, %w", err)
 	}
@@ -964,20 +990,7 @@ func (d *deployer) GetWorkflowLogsNonStream(ctx context.Context, req types.Finet
 	labels := map[string]string{
 		types.StreamKeyInstanceName: req.PodName,
 	}
-
-	var queryBuilder strings.Builder
-	queryBuilder.WriteString("{")
-	first := true
-	for k, v := range labels {
-		if !first {
-			queryBuilder.WriteString(",")
-		}
-		fmt.Fprintf(&queryBuilder, `%s="%s"`, k, v)
-		first = false
-	}
-	queryBuilder.WriteString("}")
-	query := queryBuilder.String()
-
+	query := d.lokiClient.GenerateLabelQuery(labels)
 	var startTime = req.SubmitTime
 	if req.Since != "" {
 		startTime = parseSinceTime(req.Since)
@@ -987,6 +1000,7 @@ func (d *deployer) GetWorkflowLogsNonStream(ctx context.Context, req types.Finet
 		Query:     query,
 		Start:     startTime,
 		Direction: "forward",
+		Limit:     loki.MaxLimit,
 	}
 
 	return d.lokiClient.QueryRange(ctx, params)

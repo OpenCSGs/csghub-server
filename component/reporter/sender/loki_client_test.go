@@ -262,3 +262,53 @@ func Test_lokiClient_logEntryToMap(t *testing.T) {
 		})
 	}
 }
+
+func Test_lokiClient_GenerateQuery(t *testing.T) {
+	c := &lokiClient{}
+	testCases := []struct {
+		name     string
+		labels   map[string]string
+		expected string
+	}{
+		{
+			name:     "empty labels",
+			labels:   map[string]string{},
+			expected: "{}",
+		},
+		{
+			name: "single label",
+			labels: map[string]string{
+				"client_id": "runner",
+			},
+			expected: `{client_id="runner"}`,
+		},
+		{
+			name: "label with special characters",
+			labels: map[string]string{
+				"label": "value-with-dash",
+			},
+			expected: `{label="value-with-dash"}`,
+		},
+		{
+			name: "label with empty value",
+			labels: map[string]string{
+				"empty": "",
+			},
+			expected: `{empty=""}`,
+		},
+		{
+			name: "label with double quotes",
+			labels: map[string]string{
+				"label": `value"with"quote`,
+			},
+			expected: `{label="value"with"quote"}`,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			actual := c.GenerateLabelQuery(tc.labels)
+			assert.Equal(t, tc.expected, actual)
+		})
+	}
+}

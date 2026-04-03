@@ -404,10 +404,12 @@ func (c *notebookComponentImpl) Wakeup(ctx context.Context, deployId int64) erro
 	// get Deploy for inference
 	deploy, err := c.deployTaskStore.GetDeployByID(ctx, deployId)
 	if err != nil {
-		return fmt.Errorf("can't get notebook delopyment,%w", err)
+		return fmt.Errorf("can't get notebook deployment,%w", err)
 	}
 	return c.deployer.Wakeup(ctx, types.DeployRepo{
-		DeployID: deployId,
-		SvcName:  deploy.SvcName,
+		DeployID:  deployId,
+		SvcName:   deploy.SvcName,
+		Endpoint:  deploy.Endpoint,
+		ClusterID: deploy.ClusterID,
 	})
 }

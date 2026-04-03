@@ -177,6 +177,7 @@ type Repository struct {
 	Tags                       []Tag                      `bun:"m2m:repository_tags,join:Repository=Tag" json:"tags"`
 	Metadata                   Metadata                   `bun:"rel:has-one,join:id=repository_id" json:"metadata"`
 	Mirror                     Mirror                     `bun:"rel:has-one,join:id=repository_id" json:"mirror"`
+	Statistics                 *RepositoryStatistics      `bun:"rel:has-one,join:id=repository_id" json:"statistics"`
 	RepositoryType             types.RepositoryType       `bun:",notnull" json:"repository_type"`
 	HTTPCloneURL               string                     `bun:",nullzero" json:"http_clone_url"`
 	SSHCloneURL                string                     `bun:",nullzero" json:"ssh_clone_url"`
@@ -1394,8 +1395,8 @@ func (s *repoStoreImpl) FindMirrorFinishedPrivateModelRepo(ctx context.Context) 
 		Join("JOIN mirrors ON mirrors.repository_id = repository.id").
 		Join("JOIN mirror_tasks ON mirror_tasks.mirror_id = mirrors.id").
 		Where(
-			"repository.repository_type = ? and mirror_tasks.status = ? and repository.sensitive_check_status = ? and repository.private = true",
-			types.ModelRepo, types.MirrorLfsSyncFinished, types.SensitiveCheckPass).
+			"repository.repository_type = ? and mirror_tasks.status = ? and repository.sensitive_check_status in (?) and repository.private = true",
+			types.ModelRepo, types.MirrorLfsSyncFinished, bun.In([]types.SensitiveCheckStatus{types.SensitiveCheckPass, types.SensitiveCheckSkip})).
 		Scan(ctx)
 	return res, err
 }

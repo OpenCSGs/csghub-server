@@ -1,4 +1,4 @@
-* @hhwang @zhzhang @dlei @james @rbqin @bhqin @Cemeng
+* @hhwang @zhzhang @dlei @james @rbqin @Cemeng @jluo
 
 /accounting/ @hhwang
 /payment/ @hhwang
@@ -11,8 +11,8 @@
 /mirror/ @zhzhang
 /builder/git/ @zhzhang
 
-/runner/ @james @rbqin @hhwang
-/builder/deploy/ @james @rbqin @hhwang
+/runner/ @james @rbqin @hhwang @Cemeng
+/builder/deploy/ @james @rbqin @hhwang @Cemeng
 /api/handler/collection.go @james
 /component/collection.go @james
 

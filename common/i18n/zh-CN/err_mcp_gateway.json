@@ -1,0 +1,8 @@
+{
+    "error.MCPGW-ERR-0": {
+        "other": "网关中已存在相同名称的MCP服务器: {{.server_name}}"
+    },
+    "error.MCPGW-ERR-1": {
+        "other": "MCP服务器名称无效：必须以字母或数字开头，只能包含字母、数字、下划线或连字符，且最多32个字符"
+    }
+}
