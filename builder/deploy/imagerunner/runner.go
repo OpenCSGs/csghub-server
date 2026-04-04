@@ -5,7 +5,6 @@ import (
 
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/common/types"
-	runnerTypes "opencsg.com/csghub-server/runner/types"
 )
 
 type Runner interface {
@@ -29,6 +28,4 @@ type Runner interface {
 	ListKsvcVersions(ctx context.Context, clusterID, svcName string) ([]types.KsvcRevisionInfo, error)
 	DeleteKsvcVersion(ctx context.Context, clusterID, svcName, commitID string) error
 	LabelNode(ctx context.Context, req *types.NodeLabel) error
-	CreateSandbox(ctx context.Context, req *runnerTypes.SandboxRequest) (*runnerTypes.Sandbox, error)
-	DeleteSandbox(ctx context.Context, req *runnerTypes.SandboxDeleteRequest) error
 }
