@@ -431,9 +431,27 @@ func (d *deployer) Wakeup(ctx context.Context, dr types.DeployRequest) error {
 	}
 	slog.InfoContext(ctx, "wakeup service endpoint", slog.String("svc_name", svcName),
 		slog.String("svc_url", target), slog.String("host", host))
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, target, nil)
+
+	// Spawn goroutine to handle HTTP request asynchronously
+	// This ensures the client.Timeout (20s) takes effect instead of the upstream context deadline
+	go d.wakeUpDeploy(target, host, dr)
+
+	// Return immediately without waiting for the HTTP request to complete
+	return nil
+}
+
+func (d *deployer) wakeUpDeploy(target, host string, dr types.DeployRequest) {
+	timeout := 20 * time.Second
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, target, nil)
 	if err != nil {
-		return fmt.Errorf("failed to create wakeup request: %w", err)
+		slog.ErrorContext(ctx, "failed to create wakeup request",
+			slog.String("path", fmt.Sprintf("%s/%s", dr.Namespace, dr.Name)),
+			slog.String("svc_name", dr.SvcName),
+			slog.String("svc_url", target),
+			slog.Any("error", err))
+		return
 	}
 	if len(host) > 0 {
 		req.Host = host
@@ -441,26 +459,23 @@ func (d *deployer) Wakeup(ctx context.Context, dr types.DeployRequest) error {
 
 	// Create a new HTTP client with a timeout
 	client := &http.Client{
-		Timeout: 3 * time.Second,
+		Timeout: timeout,
 	}
 	// Send the request
 	resp, err := client.Do(req)
 	if err != nil {
-		if errors.Is(err, context.DeadlineExceeded) {
-			return nil
-		}
-		slog.ErrorContext(ctx, "Error sending request to Knative service",
+		slog.ErrorContext(ctx, "wakeup sending request to Knative service",
 			slog.String("path", fmt.Sprintf("%s/%s", dr.Namespace, dr.Name)),
-			slog.String("svc_name", svcName),
+			slog.String("svc_name", dr.SvcName),
 			slog.String("svc_url", target),
 			slog.Any("error", err))
-		return fmt.Errorf("failed call service endpoint, %w", err)
+		return
 	}
 	defer resp.Body.Close()
 
 	// Check if the request was successful
 	if resp.StatusCode == http.StatusOK {
-		return nil
+		return
 	} else {
 		var err error
 		switch resp.StatusCode {
@@ -483,10 +498,10 @@ func (d *deployer) Wakeup(ctx context.Context, dr types.DeployRequest) error {
 		default:
 			err = fmt.Errorf("unexpected response from service endpoint, status: %d", resp.StatusCode)
 		}
-		return errorx.RemoteSvcFail(err,
-			errorx.Ctx().
-				Set("path", fmt.Sprintf("%s/%s", dr.Namespace, dr.Name)).
-				Set("svc_name", svcName))
+		slog.ErrorContext(ctx, "wakeup service endpoint failed",
+			slog.String("path", fmt.Sprintf("%s/%s", dr.Namespace, dr.Name)),
+			slog.String("svc_name", dr.SvcName),
+			slog.Any("error", err))
 	}
 }
 

@@ -1179,7 +1179,7 @@ func TestDeployer_Wakeup(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	t.Run("http request error returns error", func(t *testing.T) {
+	t.Run("http request error is handled asynchronously", func(t *testing.T) {
 		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "service unavailable", http.StatusServiceUnavailable)
 		}))
@@ -1206,10 +1206,11 @@ func TestDeployer_Wakeup(t *testing.T) {
 		}
 
 		err := d.Wakeup(ctx, dr)
-		require.Error(t, err)
+		require.NoError(t, err)
+		time.Sleep(100 * time.Millisecond)
 	})
 
-	t.Run("http status not found returns error", func(t *testing.T) {
+	t.Run("http status not found is handled asynchronously", func(t *testing.T) {
 		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusNotFound)
 		}))
@@ -1236,7 +1237,7 @@ func TestDeployer_Wakeup(t *testing.T) {
 		}
 
 		err := d.Wakeup(ctx, dr)
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "not found")
+		require.NoError(t, err)
+		time.Sleep(100 * time.Millisecond)
 	})
 }
