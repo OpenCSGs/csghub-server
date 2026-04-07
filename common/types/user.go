@@ -185,6 +185,7 @@ type (
 	UserPromptsReq         = UserDatasetsReq
 	UserEvaluationReq      = UserDatasetsReq
 	UserMCPsReq            = UserDatasetsReq
+	UserSkillsReq          = UserDatasetsReq
 )
 
 type PageOpts struct {

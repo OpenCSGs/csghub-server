@@ -11,16 +11,21 @@ import (
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"go.temporal.io/sdk/client"
+	tmocks "go.temporal.io/sdk/mocks"
 	mockgit "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/git/gitserver"
 	mockSensit "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/sensitive"
 	mockdb "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
+	mocktemporal "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/temporal"
 	mocktypes "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/sensitive"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/builder/temporal"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/moderation/checker"
+	wfCommon "opencsg.com/csghub-server/moderation/workflow/common"
 )
 
 func TestRepoComponent_CheckRequestV2(t *testing.T) {
@@ -144,6 +149,117 @@ func TestRepoComponent_UpdateRepoSensitiveCheckStatus(t *testing.T) {
 
 	err := repoComp.UpdateRepoSensitiveCheckStatus(ctx, 1, types.SensitiveCheckFail)
 	require.Nil(t, err)
+}
+
+func TestRepoComponent_SkipSensitiveCheckForWhiteList(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("namespace in whitelist should set skip status and return true", func(t *testing.T) {
+		mockRepoStore := mockdb.NewMockRepoStore(t)
+		mockRuleStore := mockdb.NewMockRepositoryFileCheckRuleStore(t)
+		repoComp := &repoComponentImpl{
+			rs:            mockRepoStore,
+			whitelistRule: mockRuleStore,
+			config:        &config.Config{},
+		}
+		req := RepoFullCheckRequest{
+			Namespace: "admin",
+			Name:      "repo1",
+			RepoType:  types.ModelRepo,
+		}
+
+		mockRuleStore.EXPECT().ListByRuleType(ctx, "namespace").Return([]database.RepositoryFileCheckRule{{Pattern: "admin"}}, nil).Once()
+		mockRepoStore.EXPECT().FindByPath(ctx, req.RepoType, req.Namespace, req.Name).Return(&database.Repository{ID: 10}, nil).Once()
+		mockRepoStore.EXPECT().UpdateRepoSensitiveCheckStatus(ctx, int64(10), types.SensitiveCheckSkip).Return(nil).Once()
+
+		skipped, err := repoComp.SkipSensitiveCheckForWhiteList(ctx, req)
+		require.NoError(t, err)
+		require.True(t, skipped)
+	})
+
+	t.Run("namespace not in whitelist should return false", func(t *testing.T) {
+		mockRepoStore := mockdb.NewMockRepoStore(t)
+		mockRuleStore := mockdb.NewMockRepositoryFileCheckRuleStore(t)
+		repoComp := &repoComponentImpl{
+			rs:            mockRepoStore,
+			whitelistRule: mockRuleStore,
+			config:        &config.Config{},
+		}
+		req := RepoFullCheckRequest{
+			Namespace: "user1",
+			Name:      "repo1",
+			RepoType:  types.ModelRepo,
+		}
+
+		mockRuleStore.EXPECT().ListByRuleType(ctx, "namespace").Return([]database.RepositoryFileCheckRule{{Pattern: "admin"}}, nil).Once()
+
+		skipped, err := repoComp.SkipSensitiveCheckForWhiteList(ctx, req)
+		require.NoError(t, err)
+		require.False(t, skipped)
+	})
+}
+
+func TestRepoComponent_RepoFullCheck(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("namespace in whitelist should return skipped result", func(t *testing.T) {
+		mockRepoStore := mockdb.NewMockRepoStore(t)
+		mockRuleStore := mockdb.NewMockRepositoryFileCheckRuleStore(t)
+		repoComp := &repoComponentImpl{
+			rs:            mockRepoStore,
+			whitelistRule: mockRuleStore,
+			config:        &config.Config{},
+		}
+		req := RepoFullCheckRequest{
+			Namespace: "admin",
+			Name:      "repo1",
+			RepoType:  types.ModelRepo,
+		}
+
+		mockRuleStore.EXPECT().ListByRuleType(ctx, "namespace").Return([]database.RepositoryFileCheckRule{{Pattern: "admin"}}, nil).Once()
+		mockRepoStore.EXPECT().FindByPath(ctx, req.RepoType, req.Namespace, req.Name).Return(&database.Repository{ID: 10}, nil).Once()
+		mockRepoStore.EXPECT().UpdateRepoSensitiveCheckStatus(ctx, int64(10), types.SensitiveCheckSkip).Return(nil).Once()
+
+		result, err := repoComp.RepoFullCheck(ctx, req)
+		require.NoError(t, err)
+		require.True(t, result.Skipped)
+		require.Empty(t, result.WorkflowID)
+	})
+
+	t.Run("namespace not in whitelist should start workflow", func(t *testing.T) {
+		mockRepoStore := mockdb.NewMockRepoStore(t)
+		mockRuleStore := mockdb.NewMockRepositoryFileCheckRuleStore(t)
+		cfg := &config.Config{}
+		repoComp := &repoComponentImpl{
+			rs:            mockRepoStore,
+			whitelistRule: mockRuleStore,
+			config:        cfg,
+		}
+		req := RepoFullCheckRequest{
+			Namespace: "user1",
+			Name:      "repo1",
+			RepoType:  types.ModelRepo,
+		}
+
+		mockRuleStore.EXPECT().ListByRuleType(ctx, "namespace").Return([]database.RepositoryFileCheckRule{{Pattern: "admin"}}, nil).Once()
+		mockWorkflowClient := mocktemporal.NewMockClient(t)
+		temporal.Assign(mockWorkflowClient)
+		workflowOptions := client.StartWorkflowOptions{
+			TaskQueue: wfCommon.RepoFullCheckQueue,
+		}
+		workflowRun := tmocks.NewWorkflowRun(t)
+		workflowRun.On("GetID").Return("wf-id").Once()
+		mockWorkflowClient.EXPECT().ExecuteWorkflow(mock.Anything, workflowOptions, mock.Anything, wfCommon.Repo{
+			Namespace: req.Namespace,
+			Name:      req.Name,
+			RepoType:  req.RepoType,
+		}, cfg).Return(workflowRun, nil).Once()
+
+		result, err := repoComp.RepoFullCheck(ctx, req)
+		require.NoError(t, err)
+		require.False(t, result.Skipped)
+		require.Equal(t, "wf-id", result.WorkflowID)
+	})
 }
 
 func TestRepoComponent_CheckRepoFiles(t *testing.T) {

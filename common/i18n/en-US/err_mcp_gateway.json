@@ -1,0 +1,8 @@
+{
+    "error.MCPGW-ERR-0": {
+        "other": "MCP server with the same name already exists: {{.server_name}}"
+    },
+    "error.MCPGW-ERR-1": {
+        "other": "invalid MCP server name: must start with a letter or digit, contain only letters, digits, underscores, or hyphens, and be at most 32 characters"
+    }
+}

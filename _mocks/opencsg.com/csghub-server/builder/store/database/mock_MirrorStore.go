@@ -224,9 +224,16 @@ func (_c *MockMirrorStore_Delete_Call) RunAndReturn(run func(context.Context, *d
 	return _c
 }
 
-// FindByID provides a mock function with given fields: ctx, ID
-func (_m *MockMirrorStore) FindByID(ctx context.Context, ID int64) (*database.Mirror, error) {
-	ret := _m.Called(ctx, ID)
+// FindByID provides a mock function with given fields: ctx, ID, forUpdate
+func (_m *MockMirrorStore) FindByID(ctx context.Context, ID int64, forUpdate ...bool) (*database.Mirror, error) {
+	_va := make([]interface{}, len(forUpdate))
+	for _i := range forUpdate {
+		_va[_i] = forUpdate[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, ID)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
 
 	if len(ret) == 0 {
 		panic("no return value specified for FindByID")
@@ -234,19 +241,19 @@ func (_m *MockMirrorStore) FindByID(ctx context.Context, ID int64) (*database.Mi
 
 	var r0 *database.Mirror
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, int64) (*database.Mirror, error)); ok {
-		return rf(ctx, ID)
+	if rf, ok := ret.Get(0).(func(context.Context, int64, ...bool) (*database.Mirror, error)); ok {
+		return rf(ctx, ID, forUpdate...)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, int64) *database.Mirror); ok {
-		r0 = rf(ctx, ID)
+	if rf, ok := ret.Get(0).(func(context.Context, int64, ...bool) *database.Mirror); ok {
+		r0 = rf(ctx, ID, forUpdate...)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*database.Mirror)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, int64) error); ok {
-		r1 = rf(ctx, ID)
+	if rf, ok := ret.Get(1).(func(context.Context, int64, ...bool) error); ok {
+		r1 = rf(ctx, ID, forUpdate...)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -262,13 +269,21 @@ type MockMirrorStore_FindByID_Call struct {
 // FindByID is a helper method to define mock.On call
 //   - ctx context.Context
 //   - ID int64
-func (_e *MockMirrorStore_Expecter) FindByID(ctx interface{}, ID interface{}) *MockMirrorStore_FindByID_Call {
-	return &MockMirrorStore_FindByID_Call{Call: _e.mock.On("FindByID", ctx, ID)}
+//   - forUpdate ...bool
+func (_e *MockMirrorStore_Expecter) FindByID(ctx interface{}, ID interface{}, forUpdate ...interface{}) *MockMirrorStore_FindByID_Call {
+	return &MockMirrorStore_FindByID_Call{Call: _e.mock.On("FindByID",
+		append([]interface{}{ctx, ID}, forUpdate...)...)}
 }
 
-func (_c *MockMirrorStore_FindByID_Call) Run(run func(ctx context.Context, ID int64)) *MockMirrorStore_FindByID_Call {
+func (_c *MockMirrorStore_FindByID_Call) Run(run func(ctx context.Context, ID int64, forUpdate ...bool)) *MockMirrorStore_FindByID_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(int64))
+		variadicArgs := make([]bool, len(args)-2)
+		for i, a := range args[2:] {
+			if a != nil {
+				variadicArgs[i] = a.(bool)
+			}
+		}
+		run(args[0].(context.Context), args[1].(int64), variadicArgs...)
 	})
 	return _c
 }
@@ -278,7 +293,7 @@ func (_c *MockMirrorStore_FindByID_Call) Return(_a0 *database.Mirror, _a1 error)
 	return _c
 }
 
-func (_c *MockMirrorStore_FindByID_Call) RunAndReturn(run func(context.Context, int64) (*database.Mirror, error)) *MockMirrorStore_FindByID_Call {
+func (_c *MockMirrorStore_FindByID_Call) RunAndReturn(run func(context.Context, int64, ...bool) (*database.Mirror, error)) *MockMirrorStore_FindByID_Call {
 	_c.Call.Return(run)
 	return _c
 }

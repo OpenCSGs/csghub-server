@@ -1,5 +1,10 @@
 package common
 
+const (
+	TaskTypeBuild  = 0
+	TaskTypeDeploy = 1
+)
+
 // sub build task status
 const (
 	TaskStatusCancelled       = -1
@@ -7,7 +12,7 @@ const (
 	TaskStatusBuildInProgress = 1
 	TaskStatusBuildFailed     = 2
 	TaskStatusBuildSucceed    = 3
-	TaskStatusBuildSkip       = 4 // export for other package
+	TaskStatusBuildSkip       = 4
 	TaskStatusBuildInQueue    = 5
 )
 

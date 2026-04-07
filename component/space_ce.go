@@ -83,12 +83,12 @@ func (c *spaceComponentImpl) resourceReserved(space *database.Space, req *types.
 	return false
 }
 
-func (c *spaceComponentImpl) updateDeployRepoBySpace(repo types.DeployRepo, space *database.Space) types.DeployRepo {
+func (c *spaceComponentImpl) updateDeployRepoBySpace(repo types.DeployRequest, space *database.Space) types.DeployRequest {
 	repo.MinReplica = space.MinReplica
 	return repo
 }
 
-func (c *spaceComponentImpl) updateDeployRepoByDeploy(repo types.DeployRepo, deploy *database.Deploy) types.DeployRepo {
+func (c *spaceComponentImpl) updateDeployRepoByDeploy(repo types.DeployRequest, deploy *database.Deploy) types.DeployRequest {
 	return repo
 }
 

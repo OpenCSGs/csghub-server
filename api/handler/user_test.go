@@ -118,6 +118,27 @@ func TestUserHandler_Spaces(t *testing.T) {
 	})
 }
 
+func TestUserHandler_Skills(t *testing.T) {
+	tester := NewUserTester(t).WithHandleFunc(func(h *UserHandler) gin.HandlerFunc {
+		return h.Skills
+	})
+
+	tester.mocks.user.EXPECT().Skills(tester.Ctx(), &types.UserMCPsReq{
+		Owner:       "go",
+		CurrentUser: "u",
+		PageOpts: types.PageOpts{
+			Page:     1,
+			PageSize: 10,
+		},
+	}).Return([]types.Skill{{Name: "ds"}}, 100, nil)
+	tester.AddPagination(1, 10).WithUser().WithParam("username", "go").Execute()
+	tester.ResponseEqSimple(t, 200, gin.H{
+		"message": "OK",
+		"data":    []types.Skill{{Name: "ds"}},
+		"total":   100,
+	})
+}
+
 func TestUserHandler_LikesAdd(t *testing.T) {
 	tester := NewUserTester(t).WithHandleFunc(func(h *UserHandler) gin.HandlerFunc {
 		return h.LikesAdd
@@ -337,13 +358,13 @@ func TestUserHandler_GetRunDeploys(t *testing.T) {
 			Page:     1,
 			PageSize: 10,
 		},
-	}).Return([]types.DeployRepo{{DeployID: 1}}, 100, nil)
+	}).Return([]types.DeployRequest{{DeployID: 1}}, 100, nil)
 	tester.WithParam("username", "u").WithQuery("deploy_type", "").AddPagination(1, 10)
 	tester.WithParam("repo_type", "model").Execute()
 
 	tester.ResponseEqSimple(t, 200, gin.H{
 		"message": "OK",
-		"data":    []types.DeployRepo{{DeployID: 1}},
+		"data":    []types.DeployRequest{{DeployID: 1}},
 		"total":   100,
 	})
 }
@@ -359,13 +380,13 @@ func TestUserHandler_GetFinetuneInstances(t *testing.T) {
 			Page:     1,
 			PageSize: 10,
 		},
-	}).Return([]types.DeployRepo{{DeployID: 1}}, 100, nil)
+	}).Return([]types.DeployRequest{{DeployID: 1}}, 100, nil)
 	tester.WithUser().WithParam("username", "u").WithQuery("deploy_type", "").AddPagination(1, 10)
 	tester.Execute()
 
 	tester.ResponseEqSimple(t, 200, gin.H{
 		"message": "OK",
-		"data":    []types.DeployRepo{{DeployID: 1}},
+		"data":    []types.DeployRequest{{DeployID: 1}},
 		"total":   100,
 	})
 }
@@ -384,13 +405,13 @@ func TestUserHandler_GetRunServerless(t *testing.T) {
 			Page:     1,
 			PageSize: 10,
 		},
-	}).Return([]types.DeployRepo{{DeployID: 1}}, 100, nil)
+	}).Return([]types.DeployRequest{{DeployID: 1}}, 100, nil)
 	tester.WithParam("username", "u").WithQuery("deploy_type", "").AddPagination(1, 10)
 	tester.WithParam("repo_type", "model").Execute()
 
 	tester.ResponseEqSimple(t, 200, gin.H{
 		"message": "OK",
-		"data":    []types.DeployRepo{{DeployID: 1}},
+		"data":    []types.DeployRequest{{DeployID: 1}},
 		"total":   100,
 	})
 }

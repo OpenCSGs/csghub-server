@@ -1327,7 +1327,7 @@ func TestRepoComponent_ListDeploy(t *testing.T) {
 	ds, err := repo.ListDeploy(ctx, types.ModelRepo, "ns", "n", "user")
 	require.Nil(t, err)
 	require.Equal(t, 1, len(ds))
-	require.Equal(t, types.DeployRepo{
+	require.Equal(t, types.DeployRequest{
 		DeployID:   123,
 		DeployName: "foo",
 		RepoID:     123,
@@ -1340,7 +1340,7 @@ func TestRepoComponent_DeleteDeploy(t *testing.T) {
 	ctx := context.TODO()
 	repo := initializeTestRepoComponent(ctx, t)
 	mockUserRepoAdminPermission(ctx, repo.mocks.stores, "user")
-	dr := types.DeployRepo{
+	dr := types.DeployRequest{
 		SpaceID:   0,
 		DeployID:  3,
 		Namespace: "ns",
@@ -1391,14 +1391,14 @@ func TestRepoComponent_DeployDetail(t *testing.T) {
 		Status:        deployStatus.Running,
 	}, nil)
 
-	repo.mocks.deployer.EXPECT().GetReplica(ctx, types.DeployRepo{
+	repo.mocks.deployer.EXPECT().GetReplica(ctx, types.DeployRequest{
 		Namespace: "ns",
 		Name:      "n",
 		ClusterID: "cluster",
 		SvcName:   "svc",
 	}).Return(1, 2, []types.Instance{{Name: "i1"}}, nil)
 
-	repo.mocks.deployer.EXPECT().Status(ctx, types.DeployRepo{
+	repo.mocks.deployer.EXPECT().Status(ctx, types.DeployRequest{
 		DeployID:  0,
 		SpaceID:   0,
 		ModelID:   0,
@@ -1418,7 +1418,7 @@ func TestRepoComponent_DeployDetail(t *testing.T) {
 		InstanceName: "i1",
 	})
 	require.Nil(t, err)
-	require.Equal(t, types.DeployRepo{
+	require.Equal(t, types.DeployRequest{
 		RepoID:         1,
 		ActualReplica:  1,
 		DesiredReplica: 2,
@@ -1447,7 +1447,7 @@ func TestRepoComponent_DeployInstanceLogs(t *testing.T) {
 	}, nil)
 
 	m := &deploy.MultiLogReader{}
-	repo.mocks.deployer.EXPECT().InstanceLogs(ctx, types.DeployRepo{
+	repo.mocks.deployer.EXPECT().InstanceLogs(ctx, types.DeployRequest{
 		DeployID:     123,
 		Namespace:    "ns",
 		Name:         "n",
@@ -1534,7 +1534,7 @@ func TestRepoComponent_DeployStop(t *testing.T) {
 	ctx := context.TODO()
 	repo := initializeTestRepoComponent(ctx, t)
 
-	dr := types.DeployRepo{DeployID: 3, Namespace: "ns", Name: "n"}
+	dr := types.DeployRequest{DeployID: 3, Namespace: "ns", Name: "n"}
 	repo.mocks.deployer.EXPECT().Stop(ctx, dr).Return(nil)
 	repo.mocks.deployer.EXPECT().Exist(ctx, dr).Return(false, nil)
 	repo.mocks.stores.DeployTaskMock().EXPECT().StopDeploy(
@@ -1591,7 +1591,7 @@ func TestRepoComponent_DeployStatus(t *testing.T) {
 		SvcName:   "svc",
 		ClusterID: "cluster",
 	}, nil)
-	repo.mocks.deployer.EXPECT().Status(ctx, types.DeployRepo{
+	repo.mocks.deployer.EXPECT().Status(ctx, types.DeployRequest{
 		DeployID:  1,
 		SpaceID:   2,
 		ModelID:   3,
