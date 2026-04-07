@@ -488,7 +488,7 @@ func (h *OrganizationHandler) Evaluations(ctx *gin.Context) {
 // @Param        deploy_type query int false "deploy type (0-space, 1-inference, 2-finetune)" default(1)
 // @Param        per query int false "page size"
 // @Param        page query int false "current page number"
-// @Success      200  {object}  types.ResponseWithTotal{data=[]types.DeployRepo,total=int} "OK"
+// @Success      200  {object}  types.ResponseWithTotal{data=[]types.DeployRequest,total=int} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /organization/{namespace}/run/{repo_type} [get]

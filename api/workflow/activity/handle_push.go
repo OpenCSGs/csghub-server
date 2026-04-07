@@ -55,3 +55,9 @@ func (a *Activities) MCPScan(ctx context.Context, req *types.GiteaCallbackPushRe
 	logger.Info("[git_callback] mcp scan start", slog.Any("req", req))
 	return a.callback.MCPScan(ctx, req)
 }
+
+func (a *Activities) CalculateRepoSize(ctx context.Context, req *types.GiteaCallbackPushReq) error {
+	logger := activity.GetLogger(ctx)
+	logger.Info("[git_callback] calculate repo size start", slog.Any("req", req))
+	return a.callback.CalculateRepoSize(ctx, req)
+}

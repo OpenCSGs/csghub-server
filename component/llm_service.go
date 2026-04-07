@@ -6,6 +6,7 @@ import (
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
+	commonutils "opencsg.com/csghub-server/common/utils/common"
 )
 
 // LLMServiceComponent is an interface that defines methods for interacting with LLM configurations.
@@ -66,11 +67,13 @@ func (s *llmServiceComponentImpl) ShowLLMConfig(ctx context.Context, id int64) (
 	llmConfig := &types.LLMConfig{
 		ID:          dbLlmConfig.ID,
 		ModelName:   dbLlmConfig.ModelName,
+		DisplayName: dbLlmConfig.DisplayName,
 		ApiEndpoint: dbLlmConfig.ApiEndpoint,
 		AuthHeader:  dbLlmConfig.AuthHeader,
 		Type:        dbLlmConfig.Type,
 		Enabled:     dbLlmConfig.Enabled,
 		Provider:    dbLlmConfig.Provider,
+		Metadata:    dbLlmConfig.Metadata,
 		CreatedAt:   dbLlmConfig.CreatedAt,
 		UpdatedAt:   dbLlmConfig.UpdatedAt,
 	}
@@ -99,6 +102,9 @@ func (s *llmServiceComponentImpl) UpdateLLMConfig(ctx context.Context, req *type
 	if req.ModelName != nil {
 		llmConfig.ModelName = *req.ModelName
 	}
+	if req.DisplayName != nil {
+		llmConfig.DisplayName = *req.DisplayName
+	}
 	if req.ApiEndpoint != nil {
 		llmConfig.ApiEndpoint = *req.ApiEndpoint
 	}
@@ -114,6 +120,9 @@ func (s *llmServiceComponentImpl) UpdateLLMConfig(ctx context.Context, req *type
 	if req.Provider != nil {
 		llmConfig.Provider = *req.Provider
 	}
+	if req.Metadata != nil {
+		commonutils.MergeMapWithDeletion(&llmConfig.Metadata, *req.Metadata)
+	}
 	updatedConfig, err := s.llmConfigStore.Update(ctx, *llmConfig)
 	if err != nil {
 		return nil, err
@@ -121,11 +130,13 @@ func (s *llmServiceComponentImpl) UpdateLLMConfig(ctx context.Context, req *type
 	resLLMConfig := &types.LLMConfig{
 		ID:          updatedConfig.ID,
 		ModelName:   updatedConfig.ModelName,
+		DisplayName: updatedConfig.DisplayName,
 		ApiEndpoint: updatedConfig.ApiEndpoint,
 		AuthHeader:  updatedConfig.AuthHeader,
 		Type:        updatedConfig.Type,
 		Provider:    updatedConfig.Provider,
 		Enabled:     updatedConfig.Enabled,
+		Metadata:    updatedConfig.Metadata,
 		CreatedAt:   updatedConfig.CreatedAt,
 		UpdatedAt:   updatedConfig.UpdatedAt,
 	}
@@ -162,11 +173,13 @@ func (s *llmServiceComponentImpl) UpdatePromptPrefix(ctx context.Context, req *t
 func (s *llmServiceComponentImpl) CreateLLMConfig(ctx context.Context, req *types.CreateLLMConfigReq) (*types.LLMConfig, error) {
 	dbLLMConfig := database.LLMConfig{
 		ModelName:   req.ModelName,
+		DisplayName: req.DisplayName,
 		ApiEndpoint: req.ApiEndpoint,
 		AuthHeader:  req.AuthHeader,
 		Type:        req.Type,
 		Provider:    req.Provider,
 		Enabled:     req.Enabled,
+		Metadata:    req.Metadata,
 	}
 	dbRes, err := s.llmConfigStore.Create(ctx, dbLLMConfig)
 	if err != nil {
@@ -175,11 +188,13 @@ func (s *llmServiceComponentImpl) CreateLLMConfig(ctx context.Context, req *type
 	resLLMConfig := &types.LLMConfig{
 		ID:          dbRes.ID,
 		ModelName:   dbRes.ModelName,
+		DisplayName: dbRes.DisplayName,
 		ApiEndpoint: dbRes.ApiEndpoint,
 		AuthHeader:  dbRes.AuthHeader,
 		Type:        dbRes.Type,
 		Provider:    dbRes.Provider,
 		Enabled:     dbRes.Enabled,
+		Metadata:    dbRes.Metadata,
 		CreatedAt:   dbRes.CreatedAt,
 		UpdatedAt:   dbRes.UpdatedAt,
 	}

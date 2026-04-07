@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 	mockbldmq "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/mq"
 	mockdb "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
-	mockmq "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/mq"
 	"opencsg.com/csghub-server/aigateway/token"
 	"opencsg.com/csghub-server/aigateway/types"
 
@@ -365,12 +364,9 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 			},
 			wantError: false,
 			setupMock: func() {
-
-				mockMQ := mockmq.NewMockMessageQueue(t)
 				mockBLDMQ := mockbldmq.NewMockMessageQueue(t)
 
 				eventPub := &event.EventPublisher{
-					Connector:    mockMQ,
 					SyncInterval: 1,
 					MQ:           mockBLDMQ,
 					Cfg:          cfg,
@@ -441,11 +437,9 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 			wantError: false,
 			setupMock: func() {
 
-				mockMQ := mockmq.NewMockMessageQueue(t)
 				mockBLDMQ := mockbldmq.NewMockMessageQueue(t)
 
 				eventPub := &event.EventPublisher{
-					Connector:    mockMQ,
 					SyncInterval: 1,
 					MQ:           mockBLDMQ,
 					Cfg:          cfg,
@@ -503,11 +497,9 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 			},
 			wantError: false,
 			setupMock: func() {
-				mockMQ := mockmq.NewMockMessageQueue(t)
 				mockBLDMQ := mockbldmq.NewMockMessageQueue(t)
 
 				eventPub := &event.EventPublisher{
-					Connector:    mockMQ,
 					SyncInterval: 1,
 					MQ:           mockBLDMQ,
 					Cfg:          cfg,
@@ -561,10 +553,8 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 			},
 			wantError: true,
 			setupMock: func() {
-				mockMQ := mockmq.NewMockMessageQueue(t)
 				mockBLDMQ := mockbldmq.NewMockMessageQueue(t)
 				eventPub := &event.EventPublisher{
-					Connector:    mockMQ,
 					SyncInterval: 1,
 					MQ:           mockBLDMQ,
 				}
@@ -596,10 +586,8 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 			},
 			wantError: true,
 			setupMock: func() {
-				mockMQ := mockmq.NewMockMessageQueue(t)
 				mockBLDMQ := mockbldmq.NewMockMessageQueue(t)
 				eventPub := &event.EventPublisher{
-					Connector:    mockMQ,
 					SyncInterval: 1,
 					MQ:           mockBLDMQ,
 					Cfg:          cfg,
@@ -665,11 +653,9 @@ func TestOpenAIComponentImpl_RecordUsage_ExternalModel(t *testing.T) {
 			},
 			wantError: false,
 			setupMock: func() {
-				mockMQ := mockmq.NewMockMessageQueue(t)
 				mockBLDMQ := mockbldmq.NewMockMessageQueue(t)
 
 				eventPub := &event.EventPublisher{
-					Connector:    mockMQ,
 					SyncInterval: 1,
 					MQ:           mockBLDMQ,
 					Cfg:          cfg,
@@ -727,10 +713,8 @@ func TestOpenAIComponentImpl_RecordUsage_ExternalModel(t *testing.T) {
 			},
 			wantError: true,
 			setupMock: func() {
-				mockMQ := mockmq.NewMockMessageQueue(t)
 				mockBLDMQ := mockbldmq.NewMockMessageQueue(t)
 				eventPub := &event.EventPublisher{
-					Connector:    mockMQ,
 					SyncInterval: 1,
 					MQ:           mockBLDMQ,
 				}
@@ -758,10 +742,8 @@ func TestOpenAIComponentImpl_RecordUsage_ExternalModel(t *testing.T) {
 			},
 			wantError: true,
 			setupMock: func() {
-				mockMQ := mockmq.NewMockMessageQueue(t)
 				mockBLDMQ := mockbldmq.NewMockMessageQueue(t)
 				eventPub := &event.EventPublisher{
-					Connector:    mockMQ,
 					SyncInterval: 1,
 					MQ:           mockBLDMQ,
 					Cfg:          cfg,
@@ -794,11 +776,9 @@ func TestOpenAIComponentImpl_RecordUsage_ExternalModel(t *testing.T) {
 			},
 			wantError: false,
 			setupMock: func() {
-				mockMQ := mockmq.NewMockMessageQueue(t)
 				mockBLDMQ := mockbldmq.NewMockMessageQueue(t)
 
 				eventPub := &event.EventPublisher{
-					Connector:    mockMQ,
 					SyncInterval: 1,
 					MQ:           mockBLDMQ,
 					Cfg:          cfg,
@@ -888,10 +868,8 @@ func TestOpenAIComponentImpl_RecordUsage_WithSceneValue(t *testing.T) {
 			},
 			wantError: false,
 			setupMock: func() {
-				mockMQ := mockmq.NewMockMessageQueue(t)
 				mockBLDMQ := mockbldmq.NewMockMessageQueue(t)
 				eventPub := &event.EventPublisher{
-					Connector:    mockMQ,
 					SyncInterval: 1,
 					MQ:           mockBLDMQ,
 					Cfg:          cfg,
@@ -934,10 +912,8 @@ func TestOpenAIComponentImpl_RecordUsage_WithSceneValue(t *testing.T) {
 			},
 			wantError: false,
 			setupMock: func() {
-				mockMQ := mockmq.NewMockMessageQueue(t)
 				mockBLDMQ := mockbldmq.NewMockMessageQueue(t)
 				eventPub := &event.EventPublisher{
-					Connector:    mockMQ,
 					SyncInterval: 1,
 					MQ:           mockBLDMQ,
 					Cfg:          cfg,
@@ -990,10 +966,8 @@ func TestOpenAIComponentImpl_RecordUsage_WithSceneValue(t *testing.T) {
 			},
 			wantError: false,
 			setupMock: func() {
-				mockMQ := mockmq.NewMockMessageQueue(t)
 				mockBLDMQ := mockbldmq.NewMockMessageQueue(t)
 				eventPub := &event.EventPublisher{
-					Connector:    mockMQ,
 					SyncInterval: 1,
 					MQ:           mockBLDMQ,
 					Cfg:          cfg,

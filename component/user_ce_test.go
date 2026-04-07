@@ -42,7 +42,7 @@ func TestUserComponent_ListDeploys(t *testing.T) {
 	data, total, err := uc.ListDeploys(ctx, types.ModelRepo, req)
 	require.Nil(t, err)
 	require.Equal(t, 100, total)
-	require.Equal(t, []types.DeployRepo{
+	require.Equal(t, []types.DeployRequest{
 		{
 			Path: "foo/bar", Status: "Pending", GitPath: "models_foo/bar", Hardware: `{"memory": "foo"}`,
 			RepoID: 123, SvcName: "svc", Endpoint: "endpoint", ClusterID: "cluster",
@@ -75,7 +75,7 @@ func TestUserComponent_ListInstances(t *testing.T) {
 	data, total, err := uc.ListInstances(ctx, req)
 	require.Nil(t, err)
 	require.Equal(t, 100, total)
-	require.Equal(t, []types.DeployRepo{
+	require.Equal(t, []types.DeployRequest{
 		{
 			Path: "foo/bar", Status: "Pending", GitPath: "models_foo/bar", Hardware: `{"memory": "foo"}`,
 			RepoID: 123, SvcName: "svc", ClusterID: "cluster",

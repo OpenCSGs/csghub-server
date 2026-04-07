@@ -511,3 +511,109 @@ func TestArgoWorkflowStore_ListWorkflowsByTimeRange(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, 4, total) // task-1, task-2, task-3, task-4 (not task-5)
 }
+
+func TestArgoWorkflowStore_ListRunningWorkflowsByUserUUID(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewArgoWorkFlowStoreWithDB(db)
+	dt := time.Date(2022, 1, 1, 1, 1, 0, 0, time.UTC)
+
+	workflows := []database.ArgoWorkflow{
+		{
+			Username:   "user1",
+			UserUUID:   "uuid-user-1",
+			Namespace:  "ns1",
+			TaskName:   "task-eval-1",
+			TaskId:     "tid-run-001",
+			TaskType:   types.TaskTypeEvaluation,
+			ClusterID:  "cluster-1",
+			Status:     "Running",
+			Image:      "image1",
+			RepoIds:    []string{"repo1"},
+			RepoType:   "model",
+			SubmitTime: dt,
+		},
+		{
+			Username:   "user1",
+			UserUUID:   "uuid-user-1",
+			Namespace:  "ns2",
+			TaskName:   "task-train-1",
+			TaskId:     "tid-run-002",
+			TaskType:   types.TaskTypeTraining,
+			ClusterID:  "cluster-1",
+			Status:     "Running",
+			Image:      "image2",
+			RepoIds:    []string{"repo2"},
+			RepoType:   "dataset",
+			SubmitTime: dt.Add(time.Hour),
+		},
+		{
+			Username:   "user1",
+			UserUUID:   "uuid-user-1",
+			Namespace:  "ns3",
+			TaskName:   "task-eval-stopped",
+			TaskId:     "tid-stop-001",
+			TaskType:   types.TaskTypeEvaluation,
+			ClusterID:  "cluster-2",
+			Status:     "Succeeded",
+			Image:      "image3",
+			RepoIds:    []string{"repo3"},
+			RepoType:   "model",
+			SubmitTime: dt.Add(2 * time.Hour),
+		},
+		{
+			Username:   "user2",
+			UserUUID:   "uuid-user-2",
+			Namespace:  "ns4",
+			TaskName:   "task-finetune-1",
+			TaskId:     "tid-run-003",
+			TaskType:   types.TaskTypeFinetune,
+			ClusterID:  "cluster-1",
+			Status:     "Running",
+			Image:      "image4",
+			RepoIds:    []string{"repo4"},
+			RepoType:   "model",
+			SubmitTime: dt.Add(3 * time.Hour),
+		},
+		{
+			Username:   "user2",
+			UserUUID:   "uuid-user-2",
+			Namespace:  "ns5",
+			TaskName:   "task-eval-2",
+			TaskId:     "tid-fail-001",
+			TaskType:   types.TaskTypeEvaluation,
+			ClusterID:  "cluster-2",
+			Status:     "Failed",
+			Image:      "image5",
+			RepoIds:    []string{"repo5"},
+			RepoType:   "space",
+			SubmitTime: dt.Add(4 * time.Hour),
+		},
+	}
+
+	for _, wf := range workflows {
+		_, err := store.CreateWorkFlow(ctx, wf)
+		require.Nil(t, err)
+	}
+
+	result, err := store.ListRunningWorkflowsByUserUUID(ctx, "uuid-user-1")
+	require.Nil(t, err)
+	require.Equal(t, 2, len(result))
+
+	result, err = store.ListRunningWorkflowsByUserUUID(ctx, "uuid-user-2")
+	require.Nil(t, err)
+	require.Equal(t, 1, len(result))
+	require.Equal(t, "task-finetune-1", result[0].TaskName)
+
+	result, err = store.ListRunningWorkflowsByUserUUID(ctx, "non-existent-user")
+	require.Nil(t, err)
+	require.Equal(t, 0, len(result))
+
+	result, err = store.ListRunningWorkflowsByUserUUID(ctx, "uuid-user-1")
+	require.Nil(t, err)
+	for _, wf := range result {
+		require.Equal(t, "Running", string(wf.Status))
+	}
+}
