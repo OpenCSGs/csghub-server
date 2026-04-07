@@ -129,6 +129,63 @@ func TestOpenAIHandler_ListModels(t *testing.T) {
 		tester.handler.ListModels(c)
 		assert.Equal(t, http.StatusInternalServerError, w.Code)
 	})
+
+	t.Run("invalid source parameter", func(t *testing.T) {
+		tester, c, w := setupTest(t)
+		tester.WithQuery("source", "invalid")
+
+		tester.handler.ListModels(c)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+		var response map[string]interface{}
+		err := json.Unmarshal(w.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		errObj, ok := response["error"].(map[string]interface{})
+		assert.True(t, ok)
+		assert.Equal(t, "invalid_request_error", errObj["code"])
+		assert.Contains(t, errObj["message"], "Invalid source parameter")
+		assert.Contains(t, errObj["message"], string(types.ModelSourceCSGHub))
+		assert.Contains(t, errObj["message"], string(types.ModelSourceExternal))
+	})
+
+	t.Run("valid source parameter csghub", func(t *testing.T) {
+		tester, c, w := setupTest(t)
+		tester.WithQuery("source", string(types.ModelSourceCSGHub))
+
+		tester.mocks.openAIComp.EXPECT().
+			ListModels(mock.Anything, "testuser", types.ListModelsReq{Source: string(types.ModelSourceCSGHub)}).
+			Return(types.ModelList{Object: "list", Data: []types.Model{}, HasMore: false, TotalCount: 0}, nil).Once()
+
+		tester.handler.ListModels(c)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+	})
+
+	t.Run("valid source parameter external", func(t *testing.T) {
+		tester, c, w := setupTest(t)
+		tester.WithQuery("source", string(types.ModelSourceExternal))
+
+		tester.mocks.openAIComp.EXPECT().
+			ListModels(mock.Anything, "testuser", types.ListModelsReq{Source: string(types.ModelSourceExternal)}).
+			Return(types.ModelList{Object: "list", Data: []types.Model{}, HasMore: false, TotalCount: 0}, nil).Once()
+
+		tester.handler.ListModels(c)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+	})
+
+	t.Run("source parameter is case-insensitive", func(t *testing.T) {
+		tester, c, w := setupTest(t)
+		tester.WithQuery("source", "CSGHub")
+
+		tester.mocks.openAIComp.EXPECT().
+			ListModels(mock.Anything, "testuser", types.ListModelsReq{Source: "CSGHub"}).
+			Return(types.ModelList{Object: "list", Data: []types.Model{}, HasMore: false, TotalCount: 0}, nil).Once()
+
+		tester.handler.ListModels(c)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+	})
 }
 
 func TestOpenAIHandler_ListModels_OpenaiSDK(t *testing.T) {
