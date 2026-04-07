@@ -266,10 +266,10 @@ func TestOrganizationHandler_RunDeploys(t *testing.T) {
 			Page:     1,
 			PageSize: 10,
 		},
-	}).Return([]types.DeployRepo{{DeployName: "d1"}}, 100, nil)
+	}).Return([]types.DeployRequest{{DeployName: "d1"}}, 100, nil)
 	tester.WithUser().AddPagination(1, 10).Execute()
 	tester.ResponseEq(t, 200, tester.OKText, gin.H{
-		"data":  []types.DeployRepo{{DeployName: "d1"}},
+		"data":  []types.DeployRequest{{DeployName: "d1"}},
 		"total": 100,
 	})
 }
@@ -540,9 +540,9 @@ func TestOrganizationHandler_RunDeploys_RepoTypeSpace(t *testing.T) {
 		Namespace: "u", CurrentUser: "u",
 		RepoType: types.SpaceRepo, DeployType: types.SpaceType,
 		PageOpts: types.PageOpts{Page: 1, PageSize: 10},
-	}).Return([]types.DeployRepo{{DeployName: "s1"}}, 1, nil)
+	}).Return([]types.DeployRequest{{DeployName: "s1"}}, 1, nil)
 	tester.WithUser().WithQuery("deploy_type", "0").AddPagination(1, 10).Execute()
-	tester.ResponseEq(t, 200, tester.OKText, gin.H{"data": []types.DeployRepo{{DeployName: "s1"}}, "total": 1})
+	tester.ResponseEq(t, 200, tester.OKText, gin.H{"data": []types.DeployRequest{{DeployName: "s1"}}, "total": 1})
 }
 
 func TestOrganizationHandler_RunDeploys_ComponentError(t *testing.T) {

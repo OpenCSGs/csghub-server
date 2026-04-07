@@ -46,7 +46,7 @@ func TestModelComponent_Deploy(t *testing.T) {
 	mc.mocks.components.repo.EXPECT().GetNamespaceBillingUUID(ctx, "ns").Return("ns-billing-uuid", nil)
 	mc.mocks.components.repo.EXPECT().CheckAccountAndResource(ctx, "ns", "cluster", int64(0), mock.Anything).Return(&types.CheckExclusiveResp{}, nil)
 
-	mc.mocks.deployer.EXPECT().Deploy(ctx, mock.MatchedBy(func(dp types.DeployRepo) bool {
+	mc.mocks.deployer.EXPECT().Deploy(ctx, mock.MatchedBy(func(dp types.DeployRequest) bool {
 		return dp.DeployName == "dp" && dp.Path == "foo" && dp.ClusterID == "cluster" &&
 			dp.RepoID == 1 && dp.SKU == "123" && dp.Type == types.ServerlessType &&
 			dp.Task == "text-generation" && dp.UserUUID == "ns-billing-uuid" && dp.OwnerNamespace == "ns"

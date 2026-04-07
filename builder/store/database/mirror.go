@@ -19,7 +19,7 @@ type MirrorStore interface {
 	IsExist(ctx context.Context, repoID int64) (exists bool, err error)
 	IsRepoExist(ctx context.Context, repoType types.RepositoryType, namespace, name string) (exists bool, err error)
 	FindByRepoID(ctx context.Context, repoID int64) (*Mirror, error)
-	FindByID(ctx context.Context, ID int64) (*Mirror, error)
+	FindByID(ctx context.Context, ID int64, forUpdate ...bool) (*Mirror, error)
 	FindByIDs(ctx context.Context, IDs []int64) ([]Mirror, error)
 	FindByRepoPath(ctx context.Context, repoType types.RepositoryType, namespace, name string) (*Mirror, error)
 	FindWithMapping(ctx context.Context, repoType types.RepositoryType, namespace, name string, mapping types.Mapping) (*Repository, error)
@@ -139,13 +139,19 @@ func (s *mirrorStoreImpl) FindByRepoID(ctx context.Context, repoID int64) (*Mirr
 	return &mirror, nil
 }
 
-func (s *mirrorStoreImpl) FindByID(ctx context.Context, ID int64) (*Mirror, error) {
+func (s *mirrorStoreImpl) FindByID(ctx context.Context, ID int64, forUpdate ...bool) (*Mirror, error) {
 	var mirror Mirror
-	err := s.db.Operator.Core.NewSelect().
+	query := s.db.Operator.Core.NewSelect().
 		Model(&mirror).
 		Relation("Repository").
-		Where("mirror.id=?", ID).
-		Scan(ctx)
+		Where("mirror.id=?", ID)
+
+	// Check if forUpdate is true
+	if len(forUpdate) > 0 && forUpdate[0] {
+		query = query.For("UPDATE OF mirror")
+	}
+
+	err := query.Scan(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -423,7 +429,8 @@ func (s *mirrorStoreImpl) ToBeScheduled(ctx context.Context) ([]Mirror, error) {
 		Model(&mirrors).
 		Relation("MirrorTasks").
 		Where(
-			"mirror.remote_updated_at > mirror.updated_at",
+			"mirror.remote_updated_at > mirror.updated_at or (mirror.repository_id = 0 and mirror.status = ?)",
+			types.MirrorQueued,
 		).
 		Distinct().
 		Order("mirror_priority desc").

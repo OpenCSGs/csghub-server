@@ -21,7 +21,7 @@
         "other": "commit id 为空"
     },
     "error.SERVERLESS-ERR-7": {
-        "other": "流量百分比无效"
+        "other": "没有其他有效修订版本"
     },
     "error.SERVERLESS-ERR-8": {
         "other": "无效的commitId"

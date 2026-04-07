@@ -2,6 +2,7 @@ package router
 
 import (
 	"fmt"
+
 	"net/http"
 
 	"opencsg.com/csghub-server/builder/instrumentation"
@@ -34,6 +35,8 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 	})
 	r.Use(sessions.Sessions("opencsg_jwt_session", store))
 	r.Use(middleware.BuildJwtSession(config.JWT.SigningKey))
+	i18n.InitLocalizersFromEmbedFile()
+	r.Use(middleware.ModifyAcceptLanguageMiddleware(), middleware.LocalizedErrorMiddleware())
 	i18n.InitLocalizersFromEmbedFile()
 	r.Use(middleware.ModifyAcceptLanguageMiddleware(), middleware.LocalizedErrorMiddleware())
 	r.Use(middleware.Authenticator(config))

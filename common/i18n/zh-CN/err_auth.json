@@ -8,6 +8,9 @@
     "error.AUTH-ERR-10": {
         "other": "电话号码未验证"
     },
+    "error.AUTH-ERR-11": {
+        "other": "需要访问令牌进行身份验证"
+    },
     "error.AUTH-ERR-2": {
         "other": "访问被禁止，权限不足"
     },

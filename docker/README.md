@@ -20,7 +20,7 @@ docker buildx build --provenance false --platform linux/amd64,linux/arm64 \
 
 ### GOLANG Base Image
 ```bash
-export IMAGE_TAG=1.25.5
+export IMAGE_TAG=1.26.0
 docker buildx build --provenance false --platform linux/amd64,linux/arm64 \
   -t ${OPENCSG_ACR}/opencsg_public/csghub_server:base-build-${IMAGE_TAG} \
   -f docker/Dockerfile-base-build \
