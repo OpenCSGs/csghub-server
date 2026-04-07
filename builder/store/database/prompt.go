@@ -101,6 +101,7 @@ func (s *promptStoreImpl) FindByPath(ctx context.Context, namespace string, repo
 		NewSelect().
 		Model(resPrompt).
 		Relation("Repository.User").
+		Relation("Repository.Statistics").
 		Where("repository.path =?", fmt.Sprintf("%s/%s", namespace, repoPath)).
 		Scan(ctx)
 	if err != nil {

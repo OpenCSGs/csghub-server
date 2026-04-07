@@ -306,7 +306,6 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 			return
 		}
 		target, host, _ = common.ExtractDeployTargetAndHost(c.Request.Context(), cluster, targetReq)
-		modelName = model.CSGHubModelID
 	} else {
 		slog.DebugContext(c.Request.Context(), "external model", slog.Any("model", model))
 		target = model.Endpoint

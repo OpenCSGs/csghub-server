@@ -12,11 +12,14 @@ var (
 )
 
 type CreateStripeSessionReq struct {
-	UserUUID    string `json:"-"`
+	TargetUUID  string `json:"-"`
+	OpUserUUID  string `json:"-"`
+	UserName    string `json:"-"`
 	Lang        string `json:"-"`
 	AmountTotal int64  `json:"amount_total" binding:"required,min=400"`
 	SuccessUrl  string `json:"success_url" binding:"required"`
 	CancelUrl   string `json:"cancel_url" binding:"required"`
+	OrgName     string `json:"org_name"`
 }
 
 type CreateStripeSessionRes struct {
@@ -42,6 +45,7 @@ type StripeSessionGetReq struct {
 	CurrentUser string `json:"-"`
 	UserUUID    string `json:"-"`
 	ID          int64  `json:"id"`
+	OrgName     string `json:"org_name"`
 }
 
 type StripeSessionCloseReq = StripeSessionGetReq
@@ -50,6 +54,7 @@ type StripeSessionRes struct {
 	ID                 int64     `json:"id"`
 	ClientReferenceID  string    `json:"client_reference_id"`
 	UserUUID           string    `json:"user_uuid"`
+	OpUUID             string    `json:"op_uuid"`
 	AmountTotal        int64     `json:"amount_total"`
 	Currency           string    `json:"currency"`
 	SessionID          string    `json:"session_id"`
@@ -69,7 +74,8 @@ type StripeSessionRes struct {
 type StripeSessionListReq struct {
 	CurrentUser     string
 	CurrentUserUUID string
-	QueryUserUUID   string
+	QueryTargetUUID string
+	OrgName         string
 	Per             int
 	Page            int
 	SessionStatus   string

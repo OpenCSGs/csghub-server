@@ -481,6 +481,10 @@ func (c *datasetComponentImpl) Show(ctx context.Context, namespace, name, curren
 		XnetEnabled:           dataset.Repository.XnetEnabled,
 		XnetMigrationStatus:   xnetMigrationStatus,
 		XnetMigrationProgress: xnetMigrationProgress,
+		RepoSize:              0,
+	}
+	if dataset.Repository.Statistics != nil {
+		resDataset.RepoSize = dataset.Repository.Statistics.TotalSize
 	}
 	if permission.CanAdmin {
 		resDataset.SensitiveCheckStatus = dataset.Repository.SensitiveCheckStatus.String()

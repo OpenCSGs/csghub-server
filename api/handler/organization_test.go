@@ -25,6 +25,7 @@ type OrganizationTester struct {
 		finetune   *mockcomponent.MockFinetuneComponent
 		evaluation *mockcomponent.MockEvaluationComponent
 		user       *mockcomponent.MockUserComponent
+		skill      *mockcomponent.MockSkillComponent
 	}
 }
 
@@ -40,6 +41,7 @@ func NewOrganizationTester(t *testing.T) *OrganizationTester {
 	tester.mocks.finetune = mockcomponent.NewMockFinetuneComponent(t)
 	tester.mocks.evaluation = mockcomponent.NewMockEvaluationComponent(t)
 	tester.mocks.user = mockcomponent.NewMockUserComponent(t)
+	tester.mocks.skill = mockcomponent.NewMockSkillComponent(t)
 
 	tester.handler = &OrganizationHandler{
 		space:      tester.mocks.space,
@@ -52,6 +54,7 @@ func NewOrganizationTester(t *testing.T) *OrganizationTester {
 		finetune:   tester.mocks.finetune,
 		evaluation: tester.mocks.evaluation,
 		user:       tester.mocks.user,
+		skill:      tester.mocks.skill,
 	}
 	tester.WithParam("namespace", "u")
 	tester.WithParam("name", "n")
@@ -266,10 +269,10 @@ func TestOrganizationHandler_RunDeploys(t *testing.T) {
 			Page:     1,
 			PageSize: 10,
 		},
-	}).Return([]types.DeployRepo{{DeployName: "d1"}}, 100, nil)
+	}).Return([]types.DeployRequest{{DeployName: "d1"}}, 100, nil)
 	tester.WithUser().AddPagination(1, 10).Execute()
 	tester.ResponseEq(t, 200, tester.OKText, gin.H{
-		"data":  []types.DeployRepo{{DeployName: "d1"}},
+		"data":  []types.DeployRequest{{DeployName: "d1"}},
 		"total": 100,
 	})
 }
@@ -291,6 +294,27 @@ func TestOrganizationHandler_Notebooks(t *testing.T) {
 	tester.ResponseEq(t, 200, tester.OKText, gin.H{
 		"data":  []types.NotebookRes{{DeployName: "nb1"}},
 		"total": 100,
+	})
+}
+
+func TestOrganizationHandler_Skills(t *testing.T) {
+	tester := NewOrganizationTester(t).WithHandleFunc(func(h *OrganizationHandler) gin.HandlerFunc {
+		return h.Skills
+	})
+
+	tester.mocks.skill.EXPECT().OrgSkills(tester.Ctx(), &types.OrgSkillsReq{
+		PageOpts: types.PageOpts{
+			Page:     1,
+			PageSize: 10,
+		},
+		Namespace:   "u",
+		CurrentUser: "u",
+	}).Return([]types.Skill{{Name: "m"}}, 100, nil)
+	tester.WithUser().AddPagination(1, 10).Execute()
+	tester.ResponseEqSimple(t, 200, gin.H{
+		"message": "OK",
+		"data":    []types.Skill{{Name: "m"}},
+		"total":   100,
 	})
 }
 
@@ -398,7 +422,7 @@ func TestOrganizationHandler_Codes_ComponentError(t *testing.T) {
 		return h.Codes
 	})
 	tester.mocks.code.EXPECT().OrgCodes(tester.Ctx(), &types.OrgCodesReq{
-		PageOpts: types.PageOpts{Page: 1, PageSize: 10},
+		PageOpts:  types.PageOpts{Page: 1, PageSize: 10},
 		Namespace: "u", CurrentUser: "u",
 	}).Return(nil, 0, errors.New("db error"))
 	tester.WithUser().AddPagination(1, 10).Execute()
@@ -410,7 +434,7 @@ func TestOrganizationHandler_Spaces_ComponentError(t *testing.T) {
 		return h.Spaces
 	})
 	tester.mocks.space.EXPECT().OrgSpaces(tester.Ctx(), &types.OrgSpacesReq{
-		PageOpts: types.PageOpts{Page: 1, PageSize: 10},
+		PageOpts:  types.PageOpts{Page: 1, PageSize: 10},
 		Namespace: "u", CurrentUser: "u",
 	}).Return(nil, 0, errors.New("db error"))
 	tester.WithUser().AddPagination(1, 10).Execute()
@@ -422,7 +446,7 @@ func TestOrganizationHandler_Collections_ComponentError(t *testing.T) {
 		return h.Collections
 	})
 	tester.mocks.collection.EXPECT().OrgCollections(tester.Ctx(), &types.OrgCollectionsReq{
-		PageOpts: types.PageOpts{Page: 1, PageSize: 10},
+		PageOpts:  types.PageOpts{Page: 1, PageSize: 10},
 		Namespace: "u", CurrentUser: "u",
 	}).Return(nil, 0, errors.New("db error"))
 	tester.WithUser().AddPagination(1, 10).Execute()
@@ -434,7 +458,7 @@ func TestOrganizationHandler_Prompts_ComponentError(t *testing.T) {
 		return h.Prompts
 	})
 	tester.mocks.prompt.EXPECT().OrgPrompts(tester.Ctx(), &types.OrgPromptsReq{
-		PageOpts: types.PageOpts{Page: 1, PageSize: 10},
+		PageOpts:  types.PageOpts{Page: 1, PageSize: 10},
 		Namespace: "u", CurrentUser: "u",
 	}).Return(nil, 0, errors.New("db error"))
 	tester.WithUser().AddPagination(1, 10).Execute()
@@ -446,7 +470,7 @@ func TestOrganizationHandler_MCPServers_ComponentError(t *testing.T) {
 		return h.MCPServers
 	})
 	tester.mocks.mcp.EXPECT().OrgMCPServers(tester.Ctx(), &types.OrgMCPsReq{
-		PageOpts: types.PageOpts{Page: 1, PageSize: 10},
+		PageOpts:  types.PageOpts{Page: 1, PageSize: 10},
 		Namespace: "u", CurrentUser: "u",
 	}).Return(nil, 0, errors.New("db error"))
 	tester.WithUser().AddPagination(1, 10).Execute()
@@ -458,7 +482,7 @@ func TestOrganizationHandler_Models_ComponentError(t *testing.T) {
 		return h.Models
 	})
 	tester.mocks.model.EXPECT().OrgModels(tester.Ctx(), &types.OrgModelsReq{
-		PageOpts: types.PageOpts{Page: 1, PageSize: 10},
+		PageOpts:  types.PageOpts{Page: 1, PageSize: 10},
 		Namespace: "u", CurrentUser: "u",
 	}).Return(nil, 0, errors.New("db error"))
 	tester.WithUser().AddPagination(1, 10).Execute()
@@ -470,7 +494,7 @@ func TestOrganizationHandler_Datasets_ComponentError(t *testing.T) {
 		return h.Datasets
 	})
 	tester.mocks.dataset.EXPECT().OrgDatasets(tester.Ctx(), &types.OrgDatasetsReq{
-		PageOpts: types.PageOpts{Page: 1, PageSize: 10},
+		PageOpts:  types.PageOpts{Page: 1, PageSize: 10},
 		Namespace: "u", CurrentUser: "u",
 	}).Return(nil, 0, errors.New("db error"))
 	tester.WithUser().AddPagination(1, 10).Execute()
@@ -482,7 +506,7 @@ func TestOrganizationHandler_Finetunes_ComponentError(t *testing.T) {
 		return h.Finetunes
 	})
 	tester.mocks.finetune.EXPECT().OrgFinetunes(tester.Ctx(), &types.OrgFinetunesReq{
-		PageOpts: types.PageOpts{Page: 1, PageSize: 10},
+		PageOpts:  types.PageOpts{Page: 1, PageSize: 10},
 		Namespace: "u", CurrentUser: "u",
 	}).Return(nil, 0, errors.New("backend error"))
 	tester.WithUser().AddPagination(1, 10).Execute()
@@ -494,7 +518,7 @@ func TestOrganizationHandler_Evaluations_ComponentError(t *testing.T) {
 		return h.Evaluations
 	})
 	tester.mocks.evaluation.EXPECT().OrgEvaluations(tester.Ctx(), &types.OrgEvaluationsReq{
-		PageOpts: types.PageOpts{Page: 1, PageSize: 10},
+		PageOpts:  types.PageOpts{Page: 1, PageSize: 10},
 		Namespace: "u", CurrentUser: "u",
 	}).Return(nil, 0, errors.New("backend error"))
 	tester.WithUser().AddPagination(1, 10).Execute()
@@ -506,7 +530,7 @@ func TestOrganizationHandler_Notebooks_ComponentError(t *testing.T) {
 		return h.Notebooks
 	})
 	tester.mocks.user.EXPECT().ListNotebooksByNamespace(tester.Ctx(), &types.OrgNotebooksReq{
-		PageOpts: types.PageOpts{Page: 1, PageSize: 10},
+		PageOpts:  types.PageOpts{Page: 1, PageSize: 10},
 		Namespace: "u", CurrentUser: "u",
 	}).Return(nil, 0, errors.New("backend error"))
 	tester.WithUser().AddPagination(1, 10).Execute()
@@ -540,9 +564,9 @@ func TestOrganizationHandler_RunDeploys_RepoTypeSpace(t *testing.T) {
 		Namespace: "u", CurrentUser: "u",
 		RepoType: types.SpaceRepo, DeployType: types.SpaceType,
 		PageOpts: types.PageOpts{Page: 1, PageSize: 10},
-	}).Return([]types.DeployRepo{{DeployName: "s1"}}, 1, nil)
+	}).Return([]types.DeployRequest{{DeployName: "s1"}}, 1, nil)
 	tester.WithUser().WithQuery("deploy_type", "0").AddPagination(1, 10).Execute()
-	tester.ResponseEq(t, 200, tester.OKText, gin.H{"data": []types.DeployRepo{{DeployName: "s1"}}, "total": 1})
+	tester.ResponseEq(t, 200, tester.OKText, gin.H{"data": []types.DeployRequest{{DeployName: "s1"}}, "total": 1})
 }
 
 func TestOrganizationHandler_RunDeploys_ComponentError(t *testing.T) {
@@ -555,6 +579,26 @@ func TestOrganizationHandler_RunDeploys_ComponentError(t *testing.T) {
 		RepoType: types.ModelRepo, DeployType: types.InferenceType,
 		PageOpts: types.PageOpts{Page: 1, PageSize: 10},
 	}).Return(nil, 0, errors.New("backend error"))
+	tester.WithUser().AddPagination(1, 10).Execute()
+	tester.ResponseEqCode(t, http.StatusInternalServerError)
+}
+
+func TestOrganizationHandler_Skills_BadPagination(t *testing.T) {
+	tester := NewOrganizationTester(t).WithHandleFunc(func(h *OrganizationHandler) gin.HandlerFunc {
+		return h.Skills
+	})
+	tester.WithUser().WithQuery("per", "invalid").WithQuery("page", "1").Execute()
+	tester.ResponseEqCode(t, http.StatusBadRequest)
+}
+
+func TestOrganizationHandler_Skills_ComponentError(t *testing.T) {
+	tester := NewOrganizationTester(t).WithHandleFunc(func(h *OrganizationHandler) gin.HandlerFunc {
+		return h.Skills
+	})
+	tester.mocks.skill.EXPECT().OrgSkills(tester.Ctx(), &types.OrgSkillsReq{
+		PageOpts:  types.PageOpts{Page: 1, PageSize: 10},
+		Namespace: "u", CurrentUser: "u",
+	}).Return(nil, 0, errors.New("db error"))
 	tester.WithUser().AddPagination(1, 10).Execute()
 	tester.ResponseEqCode(t, http.StatusInternalServerError)
 }

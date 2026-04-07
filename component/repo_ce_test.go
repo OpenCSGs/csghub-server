@@ -50,7 +50,7 @@ func TestRepoComponent_DeployUpdate(t *testing.T) {
 	}, nil)
 	repo.mocks.stores.ClusterInfoMock().EXPECT().ByClusterID(ctx, "cluster").Return(database.ClusterInfo{}, nil)
 
-	repo.mocks.deployer.EXPECT().Exist(ctx, types.DeployRepo{
+	repo.mocks.deployer.EXPECT().Exist(ctx, types.DeployRequest{
 		DeployID:  1,
 		Namespace: "ns",
 		Name:      "n",
@@ -96,7 +96,7 @@ func TestRepoComponent_DeployStart(t *testing.T) {
 
 	repo.mocks.deployer.EXPECT().CheckResourceAvailable(ctx, "cluster", int64(0), mock.Anything).Return(true, nil)
 
-	repo.mocks.deployer.EXPECT().Exist(ctx, types.DeployRepo{
+	repo.mocks.deployer.EXPECT().Exist(ctx, types.DeployRequest{
 		DeployID:  1,
 		Namespace: "ns",
 		Name:      "n",
@@ -143,7 +143,7 @@ func TestRepoComponent_DeployStart_ExistAndRunning(t *testing.T) {
 
 	repo.mocks.deployer.EXPECT().CheckResourceAvailable(ctx, "cluster", int64(0), mock.Anything).Return(true, nil)
 
-	deployRepo := types.DeployRepo{
+	deployRepo := types.DeployRequest{
 		DeployID:  1,
 		Namespace: "ns",
 		Name:      "n",
@@ -193,7 +193,7 @@ func TestRepoComponent_DeployStart_ExistButNotRunning(t *testing.T) {
 
 	repo.mocks.deployer.EXPECT().CheckResourceAvailable(ctx, "cluster", int64(0), mock.Anything).Return(true, nil)
 
-	deployRepo := types.DeployRepo{
+	deployRepo := types.DeployRequest{
 		DeployID:  1,
 		Namespace: "ns",
 		Name:      "n",

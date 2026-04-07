@@ -16,6 +16,6 @@ func (c *modelComponentImpl) getXnetMigrationProgress(ctx context.Context, repo 
 func (c *modelComponentImpl) addOpWeightToModel(ctx context.Context, repoIDs []int64, resModels []*types.Model) {
 }
 
-func modelRunUpdateDeployRepo(dp types.DeployRepo, req types.ModelRunReq) types.DeployRepo {
+func modelRunUpdateDeployRepo(dp types.DeployRequest, req types.ModelRunReq) types.DeployRequest {
 	return dp
 }

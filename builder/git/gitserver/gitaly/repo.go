@@ -195,6 +195,73 @@ func (c *Client) CopyRepository(ctx context.Context, req gitserver.CopyRepositor
 	return nil
 }
 
+func (c *Client) GetRepoSize(ctx context.Context, req gitserver.GetRepoInfoByPathReq) (int64, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
+
+	relativePath, err := c.BuildRelativePath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return 0, err
+	}
+
+	gitalyReq := &gitalypb.RepositorySizeRequest{
+		Repository: &gitalypb.Repository{
+			StorageName:  c.config.GitalyServer.Storage,
+			RelativePath: relativePath,
+		},
+	}
+
+	resp, err := c.repoClient.RepositorySize(ctx, gitalyReq)
+	if err != nil {
+		return 0, errorx.GetRepositorySizeFailed(err, errorx.Ctx())
+	}
+
+	return resp.Size * 1024, nil
+}
+
+func (c *Client) GetRepoLfsSize(ctx context.Context, req gitserver.GetRepoInfoByPathReq) (int64, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
+
+	relativePath, err := c.BuildRelativePath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return 0, err
+	}
+
+	repository := &gitalypb.Repository{
+		StorageName:  c.config.GitalyServer.Storage,
+		RelativePath: relativePath,
+	}
+
+	pointersReq := &gitalypb.ListLFSPointersRequest{
+		Repository: repository,
+		Revisions:  []string{req.Ref},
+	}
+
+	allPointersStream, err := c.blobClient.ListLFSPointers(ctx, pointersReq)
+	if err != nil {
+		return 0, errorx.ErrGitGetLfsPointersFailed(err, errorx.Ctx())
+	}
+
+	var totalSize int64
+	for {
+		allPointersResp, err := allPointersStream.Recv()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return 0, errorx.ErrGitGetLfsPointersFailed(err, errorx.Ctx())
+		}
+		if allPointersResp != nil {
+			for _, pointer := range allPointersResp.LfsPointers {
+				totalSize += pointer.FileSize
+			}
+		}
+	}
+
+	return totalSize, nil
+}
+
 type ProjectStorageCloneRequest struct {
 	CurrentGitalyAddress string
 	CurrentGitalyToken   string

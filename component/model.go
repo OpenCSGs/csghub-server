@@ -73,7 +73,7 @@ type ModelComponent interface {
 	Update(ctx context.Context, req *types.UpdateModelReq) (*types.Model, error)
 	Delete(ctx context.Context, namespace, name, currentUser string) error
 	Show(ctx context.Context, namespace, name, currentUser string, needOpWeight, needMultiSync bool) (*types.Model, error)
-	GetServerless(ctx context.Context, namespace, name, currentUser string) (*types.DeployRepo, error)
+	GetServerless(ctx context.Context, namespace, name, currentUser string) (*types.DeployRequest, error)
 	SDKModelInfo(ctx context.Context, namespace, name, ref, currentUser string, blobs bool) (*types.SDKModelInfo, error)
 	Relations(ctx context.Context, namespace, name, currentUser string) (*types.Relations, error)
 	SetRelationDatasets(ctx context.Context, req types.RelationDatasets) error
@@ -579,6 +579,10 @@ func (c *modelComponentImpl) Show(ctx context.Context, namespace, name, currentU
 		XnetEnabled:           model.Repository.XnetEnabled,
 		XnetMigrationStatus:   xnetMigrationStatus,
 		XnetMigrationProgress: xnetMigrationProgress,
+		RepoSize:              0,
+	}
+	if model.Repository.Statistics != nil {
+		resModel.RepoSize = model.Repository.Statistics.TotalSize
 	}
 	// admin user or owner can see the sensitive check status
 	if permission.CanAdmin {
@@ -650,7 +654,7 @@ func updateDisabledReason(resModel *types.Model, archs []string) {
 	}
 }
 
-func (c *modelComponentImpl) GetServerless(ctx context.Context, namespace, name, currentUser string) (*types.DeployRepo, error) {
+func (c *modelComponentImpl) GetServerless(ctx context.Context, namespace, name, currentUser string) (*types.DeployRequest, error) {
 	model, err := c.modelStore.FindByPath(ctx, namespace, name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find model, error: %w", err)
@@ -678,7 +682,7 @@ func (c *modelComponentImpl) GetServerless(ctx context.Context, namespace, name,
 		entrypoint = val
 	}
 
-	resDeploy := types.DeployRepo{
+	resDeploy := types.DeployRequest{
 		DeployID:         deploy.ID,
 		DeployName:       deploy.DeployName,
 		RepoID:           deploy.RepoID,
@@ -1144,7 +1148,7 @@ func (c *modelComponentImpl) Deploy(ctx context.Context, deployReq types.DeployA
 		}
 	}
 
-	dp := types.DeployRepo{
+	dp := types.DeployRequest{
 		DeployName:       req.DeployName,
 		SpaceID:          0,
 		Path:             m.Repository.Path,
@@ -1188,13 +1192,15 @@ func (c *modelComponentImpl) Wakeup(ctx context.Context, namespace, name string,
 	// get Deploy for inference
 	deploy, err := c.deployTaskStore.GetDeployByID(ctx, deployId)
 	if err != nil {
-		return fmt.Errorf("can't get inference delopyment,%w", err)
+		return fmt.Errorf("can't get inference deployment,%w", err)
 	}
-	return c.deployer.Wakeup(ctx, types.DeployRepo{
+	return c.deployer.Wakeup(ctx, types.DeployRequest{
 		DeployID:  deployId,
 		Namespace: namespace,
 		Name:      name,
 		SvcName:   deploy.SvcName,
+		Endpoint:  deploy.Endpoint,
+		ClusterID: deploy.ClusterID,
 	})
 }
 

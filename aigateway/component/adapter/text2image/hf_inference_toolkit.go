@@ -15,6 +15,7 @@ import (
 	"opencsg.com/csghub-server/aigateway/types"
 	"opencsg.com/csghub-server/builder/compress"
 	commonTypes "opencsg.com/csghub-server/common/types"
+	"opencsg.com/csghub-server/common/utils/common"
 )
 
 const frameworkHFInferenceToolkit = "hf-inference-toolkit"
@@ -117,7 +118,7 @@ func (a *HFInferenceToolkitAdapter) TransformResponse(ctx context.Context, respB
 			b64Data := base64.StdEncoding.EncodeToString(decoded)
 			openaiResp.Data = []openai.Image{{B64JSON: b64Data}}
 		}
-		body, err := json.Marshal(openaiResp)
+		body, err := common.MarshalJSONWithoutHTMLEscape(openaiResp)
 		if err != nil {
 			return nil, nil, err
 		}

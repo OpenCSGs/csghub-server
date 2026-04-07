@@ -4,10 +4,14 @@ import (
 	"context"
 	"sync"
 	"testing"
+	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-
 	"github.com/stretchr/testify/require"
+
+	mock_rpc "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rpc"
+	mock_database "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/store/database"
@@ -306,4 +310,108 @@ func TestSkillComponent_OrgSkills(t *testing.T) {
 		{ID: 1, Name: "repo", RepositoryID: 11},
 	}, data)
 
+}
+
+// New tests for OrgSkills with different scenarios
+func TestSkillComponent_OrgSkills_OnlyPublic(t *testing.T) {
+	// Setup mock stores
+	mockSkillStore := new(mock_database.MockSkillStore)
+	mockUserSvcClient := new(mock_rpc.MockUserSvcClient)
+
+	// Mock response
+	expectedSkills := []database.Skill{
+		{
+			ID:           1,
+			RepositoryID: 123,
+			Repository: &database.Repository{
+				Name:          "test-skill",
+				Nickname:      "Test Skill",
+				Description:   "Test skill description",
+				Likes:         10,
+				DownloadCount: 5,
+				Path:          "test-org/test-skill",
+				Private:       false,
+			},
+			LastUpdatedAt: time.Now(),
+		},
+	}
+	expectedTotal := 1
+
+	// Setup mock expectations - user is not a member
+	mockUserSvcClient.On("GetMemberRole", mock.Anything, "test-org", "test-user").Return(membership.RoleUnknown, nil)
+	mockSkillStore.On("ByOrgPath", mock.Anything, "test-org", 10, 1, true).Return(expectedSkills, expectedTotal, nil)
+
+	// Create skill component with mock dependencies
+	component := &skillComponentImpl{
+		skillStore:    mockSkillStore,
+		userSvcClient: mockUserSvcClient,
+	}
+
+	// Create request
+	req := &types.OrgSkillsReq{
+		Namespace:   "test-org",
+		CurrentUser: "test-user",
+		PageOpts: types.PageOpts{
+			Page:     1,
+			PageSize: 10,
+		},
+	}
+
+	// Call method
+	skills, total, err := component.OrgSkills(context.Background(), req)
+
+	// Assert results
+	assert.NoError(t, err)
+	assert.Len(t, skills, 1)
+	assert.Equal(t, expectedTotal, total)
+	assert.Equal(t, "test-skill", skills[0].Name)
+	assert.Equal(t, "Test Skill", skills[0].Nickname)
+	assert.Equal(t, "Test skill description", skills[0].Description)
+	assert.Equal(t, int64(10), skills[0].Likes)
+	assert.Equal(t, int64(5), skills[0].Downloads)
+	assert.Equal(t, "test-org/test-skill", skills[0].Path)
+	assert.Equal(t, int64(123), skills[0].RepositoryID)
+	assert.False(t, skills[0].Private)
+
+	// Verify mocks
+	mockUserSvcClient.AssertCalled(t, "GetMemberRole", mock.Anything, "test-org", "test-user")
+	mockSkillStore.AssertCalled(t, "ByOrgPath", mock.Anything, "test-org", 10, 1, true)
+}
+
+func TestSkillComponent_OrgSkills_Error(t *testing.T) {
+	// Setup mock stores
+	mockSkillStore := new(mock_database.MockSkillStore)
+	mockUserSvcClient := new(mock_rpc.MockUserSvcClient)
+
+	// Setup mock expectations
+	mockUserSvcClient.On("GetMemberRole", mock.Anything, "test-org", "test-user").Return(membership.RoleAdmin, nil)
+	mockSkillStore.On("ByOrgPath", mock.Anything, "test-org", 10, 1, false).Return(nil, 0, assert.AnError)
+
+	// Create skill component with mock dependencies
+	component := &skillComponentImpl{
+		skillStore:    mockSkillStore,
+		userSvcClient: mockUserSvcClient,
+	}
+
+	// Create request
+	req := &types.OrgSkillsReq{
+		Namespace:   "test-org",
+		CurrentUser: "test-user",
+		PageOpts: types.PageOpts{
+			Page:     1,
+			PageSize: 10,
+		},
+	}
+
+	// Call method
+	skills, total, err := component.OrgSkills(context.Background(), req)
+
+	// Assert results
+	assert.Error(t, err)
+	assert.Nil(t, skills)
+	assert.Equal(t, 0, total)
+
+	// Verify mocks
+	mockUserSvcClient.AssertCalled(t, "GetMemberRole", mock.Anything, "test-org", "test-user")
+	mockSkillStore.AssertCalled(t, "ByOrgPath", mock.Anything, "test-org", 10, 1, false)
 }

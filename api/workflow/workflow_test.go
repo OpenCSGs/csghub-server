@@ -49,6 +49,7 @@ func TestWorkflow_HandlePushWorkflow(t *testing.T) {
 	tester.mocks.callback.EXPECT().UpdateRepoInfos(mock.Anything, &types.GiteaCallbackPushReq{}).Return(nil)
 	tester.mocks.callback.EXPECT().SensitiveCheck(mock.Anything, &types.GiteaCallbackPushReq{}).Return(nil)
 	tester.mocks.callback.EXPECT().MCPScan(mock.Anything, &types.GiteaCallbackPushReq{}).Return(nil)
+	tester.mocks.callback.EXPECT().CalculateRepoSize(mock.Anything, &types.GiteaCallbackPushReq{}).Return(nil)
 
 	tester.env.ExecuteWorkflow(workflow.HandlePushWorkflow, &types.GiteaCallbackPushReq{})
 	require.True(t, tester.env.IsWorkflowCompleted())
