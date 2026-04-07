@@ -2,6 +2,7 @@ package client
 
 import (
 	"fmt"
+	"io"
 
 	"gopkg.in/gomail.v2"
 	"opencsg.com/csghub-server/common/config"
@@ -50,7 +51,21 @@ func (m *emailService) Send(req types.EmailReq) error {
 	message.SetBody(string(req.ContentType), req.Body)
 
 	for _, attachment := range req.Attachments {
-		message.Attach(attachment.Path, gomail.Rename(attachment.Name))
+		name := attachment.Name
+		if name == "" {
+			name = "attachment"
+		}
+		if len(attachment.Content) > 0 {
+			content := attachment.Content
+			message.Attach("", gomail.Rename(name), gomail.SetCopyFunc(func(w io.Writer) error {
+				_, err := w.Write(content)
+				return err
+			}))
+			continue
+		}
+		if attachment.Path != "" {
+			message.Attach(attachment.Path, gomail.Rename(name))
+		}
 	}
 
 	err := m.dialer.DialAndSend(message)
