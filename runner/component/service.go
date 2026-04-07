@@ -508,8 +508,6 @@ func isContainerStatusChanged(oldPod, newPod *corev1.Pod, containerNames ...stri
 	return false
 }
 
-
-
 // NewPersistentVolumeClaim creates a new k8s PVC with some default values set.
 func (s *serviceComponentImpl) newPersistentVolumeClaim(name string, ctx context.Context, cluster *cluster.Cluster, hardware types.HardWare) error {
 	// Check if it already exists
@@ -612,9 +610,19 @@ func (s *serviceComponentImpl) runServiceInformer(stopCh <-chan struct{}, cluste
 				slog.Debug("delete knative server by informer", slog.Any("clusterID", cluster.ID), slog.Any("service", service.Name))
 				ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 				defer cancel()
-				err := s.deleteKServiceWithEvent(ctx, service.Name, cluster.ID)
+				// get deploy task id from annotation
+				taskIDStr := service.Annotations[KeyTaskID]
+				taskID, err := strconv.ParseInt(taskIDStr, 10, 64)
 				if err != nil {
-					slog.Error("failed to mark service as deleted by informer delete callback", slog.Any("service", service.Name), slog.Any("error", err))
+					slog.WarnContext(ctx, "failed to convert deploy task id in run service informer delete callback",
+						slog.Any("service", service.Name),
+						slog.Any("deploy_task_id", taskIDStr),
+						slog.Any("error", err))
+				}
+				err = s.deleteKServiceWithEvent(ctx, service.Name, cluster.ID, taskID)
+				if err != nil {
+					slog.ErrorContext(ctx, "failed to mark service as deleted by informer delete callback",
+						slog.Any("service", service.Name), slog.Any("error", err))
 				}
 			default:
 				slog.Error("unknown type", slog.Any("type", obj))
@@ -685,7 +693,7 @@ func (s *serviceComponentImpl) syncServiceInDB(lister listerv1.ServiceLister, cl
 
 		if !found {
 			slog.Debug("delete service in sync", slog.Any("service", localService.Name), slog.Any("cluster", cluster.ID))
-			err = s.deleteKServiceWithEvent(ctx, localService.Name, cluster.ID)
+			err = s.deleteKServiceWithEvent(ctx, localService.Name, cluster.ID, localService.TaskID)
 			if err != nil {
 				slog.Error("failed to delete service", slog.Any("service", localService.Name), slog.Any("error", err))
 			}
@@ -736,12 +744,12 @@ func (s *serviceComponentImpl) runPodInformer(stopCh <-chan struct{}, cluster *c
 				serviceName := new.Labels[KeyServiceLabel]
 				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 				defer cancel()
-				srv, err := cluster.KnativeClient.ServingV1().Services(s.k8sNameSpace).
+				svc, err := cluster.KnativeClient.ServingV1().Services(s.k8sNameSpace).
 					Get(ctx, serviceName, metav1.GetOptions{})
 				if err != nil {
 					slog.Error("failed to get service ", slog.Any("service", serviceName), slog.Any("error", err))
 				}
-				err = s.updateServiceInDB(*srv, cluster.ID, new)
+				err = s.updateServiceInDB(*svc, cluster.ID, new)
 				if err != nil {
 					slog.Error("failed to update service status ", slog.Any("service", serviceName), slog.Any("error", err))
 				}
@@ -1180,7 +1188,7 @@ func (s *serviceComponentImpl) StopService(ctx context.Context, req types.StopRe
 		return nil, fmt.Errorf("fail to get cluster, error: %v ", err)
 	}
 
-	srv, err := cluster.KnativeClient.ServingV1().Services(s.k8sNameSpace).
+	svc, err := cluster.KnativeClient.ServingV1().Services(s.k8sNameSpace).
 		Get(ctx, req.SvcName, metav1.GetOptions{})
 	if err != nil {
 		k8serr := new(k8serrors.StatusError)
@@ -1203,10 +1211,17 @@ func (s *serviceComponentImpl) StopService(ctx context.Context, req types.StopRe
 		return &resp, fmt.Errorf("cannot get service info, error: %v", err)
 	}
 
-	if srv == nil {
+	if svc == nil {
 		resp.Code = 0
 		resp.Message = "service not exist"
 		return &resp, nil
+	}
+	// get deploy task id from annotation
+	taskIDStr := svc.Annotations[KeyTaskID]
+	taskID, err := strconv.ParseInt(taskIDStr, 10, 64)
+	if err != nil {
+		slog.Warn("failed to convert deploy task id in stop service", slog.Any("service", svc.Name),
+			slog.Any("deploy_task_id", taskIDStr), slog.Any("error", err))
 	}
 	err = s.removeServiceForcely(ctx, cluster, req.SvcName)
 	if err != nil {
@@ -1214,14 +1229,14 @@ func (s *serviceComponentImpl) StopService(ctx context.Context, req types.StopRe
 		resp.Message = "failed to get service status"
 		return &resp, fmt.Errorf("cannot delete service,error: %v", err)
 	}
-	err = s.RemoveWorkset(ctx, *cluster, srv)
+	err = s.RemoveWorkset(ctx, *cluster, svc)
 	if err != nil {
 		resp.Code = -1
 		resp.Message = "failed to remove workset pod"
 		return &resp, fmt.Errorf("failed to remove workset pod, error: %v", err)
 	}
 
-	err = s.deleteKServiceWithEvent(ctx, req.SvcName, cluster.ID)
+	err = s.deleteKServiceWithEvent(ctx, req.SvcName, cluster.ID, taskID)
 	if err != nil {
 		resp.Code = -1
 		resp.Message = "failed to delete service"
@@ -1238,7 +1253,7 @@ func (s *serviceComponentImpl) UpdateService(ctx context.Context, req types.Mode
 		return nil, fmt.Errorf("fail to get cluster, error: %v ", err)
 	}
 
-	srv, err := cluster.KnativeClient.ServingV1().Services(s.k8sNameSpace).
+	svc, err := cluster.KnativeClient.ServingV1().Services(s.k8sNameSpace).
 		Get(ctx, req.SvcName, metav1.GetOptions{})
 	if err != nil {
 		k8serr := new(k8serrors.StatusError)
@@ -1254,14 +1269,14 @@ func (s *serviceComponentImpl) UpdateService(ctx context.Context, req types.Mode
 		return &resp, fmt.Errorf("cannot get service info, error: %v", err)
 	}
 
-	if srv == nil {
+	if svc == nil {
 		resp.Code = 0
 		resp.Message = "service not exist"
 		return &resp, nil
 	}
 	// Update Image
 	containerImg := path.Join(s.modelDockerRegBase, req.ImageID)
-	srv.Spec.Template.Spec.Containers[0].Image = containerImg
+	svc.Spec.Template.Spec.Containers[0].Image = containerImg
 	// Update env
 	environments := []corev1.EnvVar{}
 	if req.Env != nil {
@@ -1269,7 +1284,7 @@ func (s *serviceComponentImpl) UpdateService(ctx context.Context, req types.Mode
 		for key, value := range req.Env {
 			environments = append(environments, corev1.EnvVar{Name: key, Value: value})
 		}
-		srv.Spec.Template.Spec.Containers[0].Env = environments
+		svc.Spec.Template.Spec.Containers[0].Env = environments
 	}
 	// Update CPU and Memory requests and limits
 	hardware := req.Hardware
@@ -1288,21 +1303,21 @@ func (s *serviceComponentImpl) UpdateService(ctx context.Context, req types.Mode
 		Limits:   resReq,
 		Requests: resReq,
 	}
-	srv.Spec.Template.Spec.Containers[0].Resources = resources
-	srv.Spec.Template.Spec.NodeSelector = nodeSelector
+	svc.Spec.Template.Spec.Containers[0].Resources = resources
+	svc.Spec.Template.Spec.NodeSelector = nodeSelector
 	// merge node affinity
 	if nodeAffinity != nil {
-		nodeutils.FillAffinity(&srv.Spec.Template.Spec.Affinity, nodeAffinity)
+		nodeutils.FillAffinity(&svc.Spec.Template.Spec.Affinity, nodeAffinity)
 	}
 
 	if len(genRes.Tolerations) > 0 {
-		srv.Spec.Template.Spec.Tolerations = genRes.Tolerations
+		svc.Spec.Template.Spec.Tolerations = genRes.Tolerations
 	}
 	// Update replica
-	srv.Spec.Template.Annotations["autoscaling.knative.dev/min-scale"] = strconv.Itoa(req.MinReplica)
-	srv.Spec.Template.Annotations["autoscaling.knative.dev/max-scale"] = strconv.Itoa(req.MaxReplica)
+	svc.Spec.Template.Annotations["autoscaling.knative.dev/min-scale"] = strconv.Itoa(req.MinReplica)
+	svc.Spec.Template.Annotations["autoscaling.knative.dev/max-scale"] = strconv.Itoa(req.MaxReplica)
 
-	_, err = cluster.KnativeClient.ServingV1().Services(s.k8sNameSpace).Update(ctx, srv, metav1.UpdateOptions{})
+	_, err = cluster.KnativeClient.ServingV1().Services(s.k8sNameSpace).Update(ctx, svc, metav1.UpdateOptions{})
 	if err != nil {
 		resp.Code = -1
 		resp.Message = "failed to update service"
@@ -1416,10 +1431,11 @@ func (s *serviceComponentImpl) updateKServiceWithEvent(ctx context.Context, ksvc
 }
 
 // Delete service, just mark the service as stopped and push event for inside mode
-func (s *serviceComponentImpl) deleteKServiceWithEvent(ctx context.Context, ksvcName, clusterID string) error {
+func (s *serviceComponentImpl) deleteKServiceWithEvent(ctx context.Context, ksvcName, clusterID string, taskID int64) error {
 	stopEvent := types.ServiceEvent{
 		ServiceName: ksvcName,
 		Status:      common.Stopped,
+		TaskID:      taskID,
 	}
 	s.pushEvent(types.RunnerServiceStop, stopEvent, clusterID)
 

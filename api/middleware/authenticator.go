@@ -370,6 +370,18 @@ func UserMatch() gin.HandlerFunc {
 	}
 }
 
+func NeedAccessToken() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		authType := httpbase.GetAuthType(c)
+		if authType != httpbase.AuthTypeAccessToken {
+			httpbase.UnauthorizedError(c, errorx.ErrNeedAccessToken)
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
+
 func RestrictMultiSyncTokenToRead() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authType := httpbase.GetAuthType(c)
@@ -406,6 +418,8 @@ type MiddlewareCollection struct {
 		UserMatch gin.HandlerFunc
 		// user must have phone verified
 		NeedPhoneVerified gin.HandlerFunc
+		// request must be authenticated with an access token
+		NeedAccessToken gin.HandlerFunc
 	}
 
 	Repo struct {

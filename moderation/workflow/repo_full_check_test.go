@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.temporal.io/sdk/testsuite"
+	"go.temporal.io/sdk/workflow"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
@@ -48,7 +49,9 @@ func TestRepoFullCheckWorkflowSuccess(t *testing.T) {
 	wf := newRepoFullCheckWithDB(mockRepoStore)
 
 	// Register workflow
-	env.RegisterWorkflow(wf.Execute)
+	env.RegisterWorkflowWithOptions(wf.Execute, workflow.RegisterOptions{
+		Name: common.RepoFullCheckWorkflowName,
+	})
 
 	// Register activities
 	env.RegisterActivity(activity.RepoSensitiveCheckPending)
@@ -63,7 +66,7 @@ func TestRepoFullCheckWorkflowSuccess(t *testing.T) {
 	env.OnActivity(activity.DetectRepoSensitiveCheckStatus, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 	// Execute workflow
-	env.ExecuteWorkflow(wf.Execute, testRepo, testConfig)
+	env.ExecuteWorkflow(common.RepoFullCheckWorkflowName, testRepo, testConfig)
 
 	// Verify workflow execution success
 	require.NoError(t, env.GetWorkflowError())

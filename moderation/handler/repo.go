@@ -1,23 +1,17 @@
 package handler
 
 import (
-	"context"
-	"fmt"
 	"log/slog"
 
 	"github.com/gin-gonic/gin"
-	"go.temporal.io/sdk/client"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/moderation/component"
-	"opencsg.com/csghub-server/moderation/workflow"
-	"opencsg.com/csghub-server/moderation/workflow/common"
 )
 
 type RepoHandler struct {
-	rc     component.RepoComponent
-	config *config.Config
+	rc component.RepoComponent
 }
 
 func NewRepoHandler(config *config.Config) (*RepoHandler, error) {
@@ -27,8 +21,7 @@ func NewRepoHandler(config *config.Config) (*RepoHandler, error) {
 	}
 
 	return &RepoHandler{
-		rc:     c,
-		config: config,
+		rc: c,
 	}, nil
 }
 
@@ -47,36 +40,16 @@ func (h *RepoHandler) FullCheck(c *gin.Context) {
 		return
 	}
 
-	whiteList, err := h.rc.GetNamespaceWhiteList(c.Request.Context())
+	result, err := h.rc.RepoFullCheck(c.Request.Context(), component.RepoFullCheckRequest{
+		Namespace: req.Namespace,
+		Name:      req.Name,
+		RepoType:  req.RepoType,
+	})
 	if err != nil {
-		slog.Error("failed to get namespace white list", slog.Any("error", err))
+		slog.ErrorContext(c.Request.Context(), "Failed to repo full check", slog.String("namespace", req.Namespace),
+			slog.String("name", req.Name), "error", err)
 		httpbase.ServerError(c, err)
-	}
-	for _, rule := range whiteList {
-		if req.Namespace == rule {
-			slog.Info("namespace in white list, skip repo full check", slog.String("namespace", req.Namespace))
-			httpbase.OK(c, nil)
-			return
-		}
-	}
-
-	//start workflow to do full check
-	workflowClient := workflow.GetWorkflowClient()
-	workflowOptions := client.StartWorkflowOptions{
-		TaskQueue: "moderation_repo_full_check_queue",
-	}
-
-	we, err := workflowClient.ExecuteWorkflow(context.Background(), workflowOptions, workflow.RepoFullCheckWorkflow,
-		common.Repo{
-			Namespace: req.Namespace,
-			Name:      req.Name,
-			RepoType:  req.RepoType,
-		}, h.config)
-	if err != nil {
-		httpbase.ServerError(c, fmt.Errorf("failed to start repo full check workflow, error: %w", err))
 		return
 	}
-
-	slog.Info("start repo full check workflow", slog.String("workflow_id", we.GetID()))
-	httpbase.OK(c, nil)
+	httpbase.OK(c, result)
 }

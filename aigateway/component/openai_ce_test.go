@@ -61,6 +61,7 @@ func TestOpenAIComponent_GetAvailableModels(t *testing.T) {
 				UserID:      1,
 				SecureLevel: commontypes.EndpointPublic,
 				Repository: &database.Repository{
+					Name: "model1",
 					Path: "model1",
 				},
 				User: &database.User{
@@ -93,12 +94,13 @@ func TestOpenAIComponent_GetAvailableModels(t *testing.T) {
 		expectModels := []types.Model{
 			{
 				BaseModel: types.BaseModel{
-					ID:      "model1:svc1",
-					OwnedBy: "testuser",
-					Object:  "model",
-					Created: deploys[0].CreatedAt.Unix(),
-					Task:    "text-generation",
-					Public:  true,
+					ID:          "model1:svc1",
+					OwnedBy:     "testuser",
+					Object:      "model",
+					Created:     deploys[0].CreatedAt.Unix(),
+					Task:        "text-generation",
+					DisplayName: "model1",
+					Public:      true,
 				},
 				Endpoint: "endpoint1",
 				InternalModelInfo: types.InternalModelInfo{
@@ -177,6 +179,7 @@ func TestOpenAIComponent_GetAvailableModels(t *testing.T) {
 				UserID:      1,
 				SecureLevel: commontypes.EndpointPrivate,
 				Repository: &database.Repository{
+					Name: "model3",
 					Path: "model3",
 				},
 				User: &database.User{
@@ -194,12 +197,13 @@ func TestOpenAIComponent_GetAvailableModels(t *testing.T) {
 		expectModels := []types.Model{
 			{
 				BaseModel: types.BaseModel{
-					ID:      "model3:svc3",
-					OwnedBy: "testuser",
-					Object:  "model",
-					Created: deploys[0].CreatedAt.Unix(),
-					Task:    "text-generation",
-					Public:  false,
+					ID:          "model3:svc3",
+					OwnedBy:     "testuser",
+					Object:      "model",
+					Created:     deploys[0].CreatedAt.Unix(),
+					Task:        "text-generation",
+					DisplayName: "model3",
+					Public:      false,
 				},
 				Endpoint: "endpoint3",
 				InternalModelInfo: types.InternalModelInfo{
@@ -265,6 +269,7 @@ func TestOpenAIComponent_GetModelByID(t *testing.T) {
 				SvcName: "svc1",
 				Type:    1,
 				Repository: &database.Repository{
+					Name: "model1",
 					Path: "model1",
 				},
 				User: &database.User{
@@ -279,11 +284,12 @@ func TestOpenAIComponent_GetModelByID(t *testing.T) {
 		expectModels := []types.Model{
 			{
 				BaseModel: types.BaseModel{
-					ID:      "model1:svc1",
-					OwnedBy: "testuser",
-					Object:  "model",
-					Created: deploys[0].CreatedAt.Unix(),
-					Public:  true,
+					ID:          "model1:svc1",
+					OwnedBy:     "testuser",
+					Object:      "model",
+					Created:     deploys[0].CreatedAt.Unix(),
+					DisplayName: "model1",
+					Public:      true,
 				},
 				Endpoint: "endpoint1",
 				InternalModelInfo: types.InternalModelInfo{
@@ -350,6 +356,7 @@ func TestOpenAIComponent_GetModelByID(t *testing.T) {
 				SvcName: "svc1",
 				Type:    1,
 				Repository: &database.Repository{
+					Name: "model1",
 					Path: "model1",
 				},
 				User: &database.User{
@@ -361,12 +368,13 @@ func TestOpenAIComponent_GetModelByID(t *testing.T) {
 		deploys[0].CreatedAt = now
 		expectModel := types.Model{
 			BaseModel: types.BaseModel{
-				ID:      "model1:svc1",
-				OwnedBy: "testuser",
-				Object:  "model",
-				Created: deploys[0].CreatedAt.Unix(),
-				Task:    "text-generation",
-				Public:  true,
+				ID:          "model1:svc1",
+				OwnedBy:     "testuser",
+				Object:      "model",
+				Created:     deploys[0].CreatedAt.Unix(),
+				Task:        "text-generation",
+				DisplayName: "model1",
+				Public:      true,
 			},
 			Endpoint: "endpoint1",
 		}

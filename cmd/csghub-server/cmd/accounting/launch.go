@@ -58,7 +58,7 @@ var launchCmd = &cobra.Command{
 		}
 		metering.Run()
 
-		err = createAdvancedConsumer(cfg, mqHandler, mqFactory)
+		err = createAdvancedConsumer(cfg, mqFactory)
 		if err != nil {
 			return fmt.Errorf("failed to create advanced consumer: %w", err)
 		}

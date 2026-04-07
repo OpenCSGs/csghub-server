@@ -56,6 +56,10 @@ func NewOrganizationHandler(config *config.Config) (*OrganizationHandler, error)
 	if err != nil {
 		return nil, err
 	}
+	skc, err := component.NewSkillComponent(config)
+	if err != nil {
+		return nil, err
+	}
 	return &OrganizationHandler{
 		space:      sc,
 		code:       cc,
@@ -67,6 +71,7 @@ func NewOrganizationHandler(config *config.Config) (*OrganizationHandler, error)
 		finetune:   ftc,
 		evaluation: ec,
 		user:       uc,
+		skill:      skc,
 	}, nil
 }
 
@@ -81,6 +86,7 @@ type OrganizationHandler struct {
 	finetune   component.FinetuneComponent
 	evaluation component.EvaluationComponent
 	user       component.UserComponent
+	skill      component.SkillComponent
 }
 
 // GetOrganizationModels godoc
@@ -482,7 +488,7 @@ func (h *OrganizationHandler) Evaluations(ctx *gin.Context) {
 // @Param        deploy_type query int false "deploy type (0-space, 1-inference, 2-finetune)" default(1)
 // @Param        per query int false "page size"
 // @Param        page query int false "current page number"
-// @Success      200  {object}  types.ResponseWithTotal{data=[]types.DeployRepo,total=int} "OK"
+// @Success      200  {object}  types.ResponseWithTotal{data=[]types.DeployRequest,total=int} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /organization/{namespace}/run/{repo_type} [get]
@@ -566,4 +572,49 @@ func (h *OrganizationHandler) Notebooks(ctx *gin.Context) {
 		"total": total,
 	}
 	httpbase.OK(ctx, respData)
+}
+
+// GetOrganizationSkills godoc
+// @Security     ApiKey
+// @Summary      Get organization skills
+// @Description  get organization skills
+// @Tags         Organization
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "org name"
+// @Param        current_user query string true "current user name"
+// @Param        per query int false "page size"
+// @Param        page query int false "current page number"
+// @Success      200  {object}  types.ResponseWithTotal{data=[]types.Skill,total=int} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /organization/{namespace}/skills [get]
+func (h *OrganizationHandler) Skills(ctx *gin.Context) {
+	var req types.OrgSkillsReq
+	req.Namespace = ctx.Param("namespace")
+	req.CurrentUser = httpbase.GetCurrentUser(ctx)
+
+	per, page, err := common.GetPerAndPageFromContext(ctx)
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
+		httpbase.BadRequestWithExt(ctx, err)
+		return
+	}
+	req.Page = page
+	req.PageSize = per
+	skills, total, err := h.skill.OrgSkills(ctx.Request.Context(), &req)
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get org skills", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	slog.Info("Get org skills succeed", slog.String("org", req.Namespace))
+
+	respData := gin.H{
+		"message": "OK",
+		"data":    skills,
+		"total":   total,
+	}
+	ctx.JSON(http.StatusOK, respData)
 }
