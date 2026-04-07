@@ -139,24 +139,42 @@ type OpenAIHandlerImpl struct {
 }
 
 // ListModels godoc
-// @Security     ApiKey
 // @Summary      List available models
-// @Description  Returns a list of available models, supports fuzzy search by model_id query parameter and filtering by public status
+// @Description  Returns a list of available models, supports fuzzy search by model_id query parameter and filtering by source and task
 // @Tags         AIGateway
 // @Accept       json
 // @Produce      json
 // @Param        model_id query string false "Model ID for fuzzy search"
-// @Param        public query bool false "Filter by public status (true for public models, false for private models)"
+// @Param        source query string false "Filter by source (csghub for CSGHub models, external for external models)" Enums(csghub, external)
+// @Param        task query string false "Filter by task (e.g., text-generation, text-to-image)"
 // @Param        per query int false "Models per page (default 20, max 100)"
 // @Param        page query int false "Page number (1-based, default 1)"
 // @Success      200  {object}  types.ModelList "OK"
+// @Failure      400  {object}  error "Invalid source parameter"
 // @Failure      500  {object}  error "Internal server error"
 // @Router       /v1/models [get]
 func (h *OpenAIHandlerImpl) ListModels(c *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(c)
+
+	// Validate source parameter
+	source := strings.TrimSpace(c.Query("source"))
+	if source != "" {
+		sourceLower := strings.ToLower(source)
+		if sourceLower != string(types.ModelSourceCSGHub) && sourceLower != string(types.ModelSourceExternal) {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": types.Error{
+					Code:    "invalid_request_error",
+					Message: fmt.Sprintf("Invalid source parameter. Must be '%s' or '%s'", types.ModelSourceCSGHub, types.ModelSourceExternal),
+					Type:    "invalid_request_error",
+				}})
+			return
+		}
+	}
+
 	resp, err := h.openaiComponent.ListModels(c.Request.Context(), currentUser, types.ListModelsReq{
 		ModelID: c.Query("model_id"),
-		Public:  c.Query("public"),
+		Source:  source,
+		Task:    c.Query("task"),
 		Per:     c.Query("per"),
 		Page:    c.Query("page"),
 	})
@@ -188,6 +206,7 @@ func (h *OpenAIHandlerImpl) ListModels(c *gin.Context) {
 func (h *OpenAIHandlerImpl) GetModel(c *gin.Context) {
 	username := httpbase.GetCurrentUser(c)
 	modelID := c.Param("model")
+	modelID = strings.TrimPrefix(modelID, "/")
 	if modelID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": types.Error{
@@ -275,6 +294,7 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 	}
 	target := ""
 	host := ""
+	modelName := ""
 	if len(model.SvcName) > 0 {
 		cluster, errCls := h.clusterComp.GetClusterByID(c, targetReq.ClusterID)
 		if errCls != nil {
@@ -287,9 +307,11 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 			return
 		}
 		target, host, _ = common.ExtractDeployTargetAndHost(c.Request.Context(), cluster, targetReq)
+		modelName = model.CSGHubModelID
 	} else {
 		slog.DebugContext(c.Request.Context(), "external model", slog.Any("model", model))
 		target = model.Endpoint
+		modelName = model.ID
 	}
 	if err != nil || len(target) < 1 {
 		slog.ErrorContext(c.Request.Context(), "failed to get model target address", slog.Any("error", err),
@@ -304,12 +326,6 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 		return
 	}
 
-	modelName, _, err := (component.ModelIDBuilder{}).From(modelID)
-	if err != nil {
-		slog.ErrorContext(c.Request.Context(), "failed to process chat request", "error", err, "model_id", modelID)
-		c.String(http.StatusBadRequest, err.Error())
-		return
-	}
 	chatReq.Model = modelName
 	if chatReq.Stream {
 		c.Writer.Header().Set("Content-Type", "text/event-stream")
@@ -320,11 +336,12 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 		}
 	}
 
-	sceneValue := c.Request.Header.Get(commonType.SceneHeaderKey)
 	// Check balance before processing request
-	if err := h.openaiComponent.CheckBalance(c.Request.Context(), username, model, sceneValue); err != nil {
-		h.handleInsufficientBalance(c, chatReq.Stream, username, modelID, err)
-		return
+	if !model.SkipBalance() {
+		if err := h.openaiComponent.CheckBalance(c.Request.Context(), username, userUUID); err != nil {
+			h.handleInsufficientBalance(c, chatReq.Stream, username, modelID, err)
+			return
+		}
 	}
 
 	// marshal updated request map back to JSON bytes
@@ -337,26 +354,26 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 		c.String(http.StatusInternalServerError, fmt.Errorf("failed to create reverse proxy:%w", err).Error())
 		return
 	}
+
+	var modComponent component.Moderation = nil
+	if model.NeedSensitiveCheck {
+		modComponent = h.modComponent
+		// Create a combined key using userUUID and modelID for caching and tracking
+		key := fmt.Sprintf("%s:%s", userUUID, modelID)
+		result, err := h.modComponent.CheckChatPrompts(c.Request.Context(), chatReq.Messages, key, chatReq.Stream)
+		if err != nil {
+			c.String(http.StatusInternalServerError, fmt.Errorf("failed to call moderation error:%w", err).Error())
+			return
+		}
+		if result.IsSensitive {
+			handleSensitiveResponse(c, chatReq.Stream, result)
+			return
+		}
+	}
+
 	slog.InfoContext(c.Request.Context(), "proxy chat request to model target", slog.Any("target", target), slog.Any("host", host),
 		slog.Any("user", username), slog.Any("model_name", modelName))
-	// Create a combined key using userUUID and modelID for caching and tracking
-	key := fmt.Sprintf("%s:%s", userUUID, modelID)
-	result, err := h.modComponent.CheckChatPrompts(c.Request.Context(), chatReq.Messages, key)
-	if err != nil {
-		c.String(http.StatusInternalServerError, fmt.Errorf("failed to call moderation error:%w", err).Error())
-		return
-	}
-	if result.IsSensitive {
-		slog.DebugContext(c.Request.Context(), "sensitive content", slog.String("reason", result.Reason))
-		errorChunk := generateSensitiveRespForPrompt()
-		errorChunkJson, _ := json.Marshal(errorChunk)
-		_, err := c.Writer.Write([]byte("data: " + string(errorChunkJson) + "\n\n" + "[DONE]"))
-		if err != nil {
-			slog.ErrorContext(c.Request.Context(), "write into resp error:", slog.String("err", err.Error()))
-		}
-		c.Writer.Flush()
-		return
-	}
+
 	tokenCounter := h.tokenCounterFactory.NewChat(token.CreateParam{
 		Endpoint: target,
 		Host:     host,
@@ -364,7 +381,8 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 		ImageID:  model.ImageID,
 		Provider: model.Provider,
 	})
-	w := NewResponseWriterWrapper(c.Writer, chatReq.Stream, h.modComponent, tokenCounter)
+
+	w := NewResponseWriterWrapper(c.Writer, chatReq.Stream, modComponent, tokenCounter)
 	defer w.ClearBuffer()
 
 	tokenCounter.AppendPrompts(chatReq.Messages)
@@ -396,7 +414,7 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 		usageCtx, cancel := context.WithTimeout(context.WithoutCancel(c.Request.Context()), 3*time.Second)
 		defer cancel()
 
-		err := h.openaiComponent.RecordUsage(usageCtx, userUUID, model, tokenCounter, sceneValue)
+		err := h.openaiComponent.RecordUsage(usageCtx, userUUID, model, tokenCounter)
 		if err != nil {
 			slog.ErrorContext(usageCtx, "failed to record token usage", slog.Any("error", err))
 		}
@@ -460,6 +478,7 @@ func (h *OpenAIHandlerImpl) GenerateImage(c *gin.Context) {
 	}
 	target := ""
 	host := ""
+	modelName := ""
 	if len(model.SvcName) > 0 {
 		cluster, errCls := h.clusterComp.GetClusterByID(c, targetReq.ClusterID)
 		if errCls != nil {
@@ -472,21 +491,15 @@ func (h *OpenAIHandlerImpl) GenerateImage(c *gin.Context) {
 			return
 		}
 		target, host, _ = common.ExtractDeployTargetAndHost(ctx, cluster, targetReq)
+		modelName = model.CSGHubModelID
 	} else {
 		target = model.Endpoint
+		modelName = model.ID
 	}
 	if err != nil || len(target) < 1 {
 		slog.ErrorContext(ctx, "failed to get model target address", slog.Any("error", err), slog.String("model_id", modelID))
 		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
 			Code: "model_not_running", Message: fmt.Sprintf("model '%s' not running", modelID), Type: "invalid_request_error",
-		}})
-		return
-	}
-
-	modelName, _, err := (component.ModelIDBuilder{}).From(modelID)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
-			Code: "invalid_model_id", Message: "invalid model ID: " + err.Error(), Type: "invalid_request_error",
 		}})
 		return
 	}
@@ -499,8 +512,7 @@ func (h *OpenAIHandlerImpl) GenerateImage(c *gin.Context) {
 		return
 	}
 
-	sceneValue := c.Request.Header.Get(commonType.SceneHeaderKey)
-	if err := h.openaiComponent.CheckBalance(ctx, username, model, sceneValue); err != nil {
+	if err := h.openaiComponent.CheckBalance(ctx, username, userUUID); err != nil {
 		h.handleInsufficientBalance(c, false, username, modelID, err)
 		return
 	}
@@ -584,7 +596,7 @@ func (h *OpenAIHandlerImpl) GenerateImage(c *gin.Context) {
 	go func() {
 		usageCtx, cancel := context.WithTimeout(context.WithoutCancel(c.Request.Context()), 3*time.Second)
 		defer cancel()
-		if err := h.openaiComponent.RecordUsage(usageCtx, userUUID, model, imageCounter, sceneValue); err != nil {
+		if err := h.openaiComponent.RecordUsage(usageCtx, userUUID, model, imageCounter); err != nil {
 			slog.ErrorContext(usageCtx, "failed to record image usage", slog.Any("error", err))
 		}
 	}()
@@ -647,6 +659,7 @@ func (h *OpenAIHandlerImpl) Embedding(c *gin.Context) {
 	}
 	target := ""
 	host := ""
+	modelName := ""
 	if len(model.SvcName) > 0 {
 		cluster, errCls := h.clusterComp.GetClusterByID(c, targetReq.ClusterID)
 		if errCls != nil {
@@ -659,8 +672,10 @@ func (h *OpenAIHandlerImpl) Embedding(c *gin.Context) {
 			return
 		}
 		target, host, _ = common.ExtractDeployTargetAndHost(c.Request.Context(), cluster, targetReq)
+		modelName = model.CSGHubModelID
 	} else {
 		target = model.Endpoint
+		modelName = model.ID
 	}
 	if err != nil || len(target) < 1 {
 		slog.ErrorContext(c, "failed to get embedding target address", slog.Any("error", err),
@@ -675,19 +690,12 @@ func (h *OpenAIHandlerImpl) Embedding(c *gin.Context) {
 		return
 	}
 
-	sceneValue := c.Request.Header.Get(commonType.SceneHeaderKey)
 	// Check balance before processing request
-	if err := h.openaiComponent.CheckBalance(c.Request.Context(), username, model, sceneValue); err != nil {
+	if err := h.openaiComponent.CheckBalance(c.Request.Context(), username, userUUID); err != nil {
 		h.handleInsufficientBalance(c, false, username, modelID, err)
 		return
 	}
 
-	modelName, _, err := (component.ModelIDBuilder{}).From(modelID)
-	if err != nil {
-		slog.ErrorContext(c, "failed to process chat request", "error", err, "model_id", modelID)
-		c.String(http.StatusBadRequest, err.Error())
-		return
-	}
 	req.Model = modelName
 	data, _ := json.Marshal(req)
 	c.Request.Body = io.NopCloser(bytes.NewReader(data))
@@ -712,7 +720,7 @@ func (h *OpenAIHandlerImpl) Embedding(c *gin.Context) {
 		usageCtx, cancel := context.WithTimeout(context.WithoutCancel(c.Request.Context()), 3*time.Second)
 		defer cancel()
 
-		err := h.openaiComponent.RecordUsage(usageCtx, userUUID, model, tokenCounter, sceneValue)
+		err := h.openaiComponent.RecordUsage(usageCtx, userUUID, model, tokenCounter)
 		if err != nil {
 			slog.ErrorContext(c, "failed to record embedding token usage", "error", err)
 		}
