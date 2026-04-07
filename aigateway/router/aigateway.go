@@ -3,9 +3,13 @@ package router
 import (
 	"fmt"
 
+	"net/http"
+
 	"opencsg.com/csghub-server/builder/instrumentation"
 
 	"github.com/gin-contrib/cors"
+	"github.com/gin-contrib/sessions"
+	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/aigateway/handler"
 	"opencsg.com/csghub-server/api/middleware"
@@ -22,7 +26,17 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 		AllowMethods:     []string{"*"},
 		AllowAllOrigins:  true,
 	}))
-	//to access model,fintune with any kind of tokens in auth header
+	store := cookie.NewStore([]byte(config.Space.SessionSecretKey))
+	store.Options(sessions.Options{
+		// SameSite: http.SameSiteNoneMode, // support 3rd part
+		SameSite: http.SameSiteLaxMode,
+		Secure:   config.EnableHTTPS,
+		HttpOnly: true,
+	})
+	r.Use(sessions.Sessions("opencsg_jwt_session", store))
+	r.Use(middleware.BuildJwtSession(config.JWT.SigningKey))
+	i18n.InitLocalizersFromEmbedFile()
+	r.Use(middleware.ModifyAcceptLanguageMiddleware(), middleware.LocalizedErrorMiddleware())
 	i18n.InitLocalizersFromEmbedFile()
 	r.Use(middleware.ModifyAcceptLanguageMiddleware(), middleware.LocalizedErrorMiddleware())
 	r.Use(middleware.Authenticator(config))
