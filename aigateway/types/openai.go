@@ -8,14 +8,16 @@ import (
 
 // BaseModel represents the base model fields
 type BaseModel struct {
-	ID                  string `json:"id"`
-	Object              string `json:"object"`
-	Created             int64  `json:"created"` // organization-owner (e.g. openai)
-	OwnedBy             string `json:"owned_by"`
-	Task                string `json:"task"`                            // like text-generation, text-to-image etc
-	SupportFunctionCall bool   `json:"support_function_call,omitempty"` // whether the model supports function calling
-	IsPinned            *bool  `json:"is_pinned,omitempty"`             // whether the model is pinned
-	Public              bool   `json:"public"`                          // whether the model is public (false = private, true = public)
+	ID                  string         `json:"id"`
+	Object              string         `json:"object"`
+	Created             int64          `json:"created"` // organization-owner (e.g. openai)
+	OwnedBy             string         `json:"owned_by"`
+	Task                string         `json:"task"` // like text-generation, text-to-image etc
+	DisplayName         string         `json:"display_name"`
+	SupportFunctionCall bool           `json:"support_function_call,omitempty"` // whether the model supports function calling
+	IsPinned            *bool          `json:"is_pinned,omitempty"`             // whether the model is pinned
+	Public              bool           `json:"public"`                          // whether the model is public (false = private, true = public)
+	Metadata            map[string]any `json:"metadata"`
 }
 
 // InternalModelInfo represents the internal model fields
@@ -48,28 +50,32 @@ func (m Model) MarshalJSON() ([]byte, error) {
 	if m.InternalUse {
 		// internalModelResponse
 		type internalModelResponse struct {
-			ID                  string  `json:"id"`
-			Object              string  `json:"object"`
-			Created             int64   `json:"created"`
-			OwnedBy             string  `json:"owned_by"`
-			Task                string  `json:"task"`
-			SupportFunctionCall *bool   `json:"support_function_call,omitempty"`
-			Public              bool    `json:"public"`
-			Endpoint            string  `json:"endpoint"`
-			ClusterID           *string `json:"cluster_id,omitempty"`
-			SvcName             *string `json:"svc_name,omitempty"`
-			ImageID             *string `json:"image_id,omitempty"`
-			AuthHead            *string `json:"auth_head,omitempty"`
-			Provider            *string `json:"provider,omitempty"`
+			ID                  string         `json:"id"`
+			Object              string         `json:"object"`
+			Created             int64          `json:"created"`
+			OwnedBy             string         `json:"owned_by"`
+			Task                string         `json:"task"`
+			DisplayName         string         `json:"display_name"`
+			SupportFunctionCall *bool          `json:"support_function_call,omitempty"`
+			Public              bool           `json:"public"`
+			Endpoint            string         `json:"endpoint"`
+			Metadata            map[string]any `json:"metadata"`
+			ClusterID           *string        `json:"cluster_id,omitempty"`
+			SvcName             *string        `json:"svc_name,omitempty"`
+			ImageID             *string        `json:"image_id,omitempty"`
+			AuthHead            *string        `json:"auth_head,omitempty"`
+			Provider            *string        `json:"provider,omitempty"`
 		}
 		resp := internalModelResponse{
-			ID:       m.ID,
-			Object:   m.Object,
-			Created:  m.Created,
-			OwnedBy:  m.OwnedBy,
-			Task:     m.Task,
-			Public:   m.Public,
-			Endpoint: m.Endpoint,
+			ID:          m.ID,
+			Object:      m.Object,
+			Created:     m.Created,
+			OwnedBy:     m.OwnedBy,
+			Task:        m.Task,
+			DisplayName: m.DisplayName,
+			Public:      m.Public,
+			Endpoint:    m.Endpoint,
+			Metadata:    m.Metadata,
 		}
 
 		if m.SupportFunctionCall {
@@ -100,19 +106,21 @@ func (m Model) MarshalJSON() ([]byte, error) {
 
 func (m *Model) UnmarshalJSON(data []byte) error {
 	type internalModelResponse struct {
-		ID                  string `json:"id"`
-		Object              string `json:"object"`
-		Created             int64  `json:"created"`
-		OwnedBy             string `json:"owned_by"`
-		Task                string `json:"task"`
-		SupportFunctionCall bool   `json:"support_function_call,omitempty"`
-		Public              bool   `json:"public"`
-		Endpoint            string `json:"endpoint"`
-		ClusterID           string `json:"cluster_id,omitempty"`
-		SvcName             string `json:"svc_name,omitempty"`
-		ImageID             string `json:"image_id,omitempty"`
-		AuthHead            string `json:"auth_head,omitempty"`
-		Provider            string `json:"provider,omitempty"`
+		ID                  string         `json:"id"`
+		Object              string         `json:"object"`
+		Created             int64          `json:"created"`
+		OwnedBy             string         `json:"owned_by"`
+		Task                string         `json:"task"`
+		DisplayName         string         `json:"display_name"`
+		SupportFunctionCall bool           `json:"support_function_call,omitempty"`
+		Public              bool           `json:"public"`
+		Endpoint            string         `json:"endpoint"`
+		Metadata            map[string]any `json:"metadata"`
+		ClusterID           string         `json:"cluster_id,omitempty"`
+		SvcName             string         `json:"svc_name,omitempty"`
+		ImageID             string         `json:"image_id,omitempty"`
+		AuthHead            string         `json:"auth_head,omitempty"`
+		Provider            string         `json:"provider,omitempty"`
 	}
 	var aux internalModelResponse
 	if err := json.Unmarshal(data, &aux); err != nil {
@@ -123,9 +131,11 @@ func (m *Model) UnmarshalJSON(data []byte) error {
 	m.Created = aux.Created
 	m.OwnedBy = aux.OwnedBy
 	m.Task = aux.Task
+	m.DisplayName = aux.DisplayName
 	m.SupportFunctionCall = aux.SupportFunctionCall
 	m.Public = aux.Public
 	m.Endpoint = aux.Endpoint
+	m.Metadata = aux.Metadata
 	m.ClusterID = aux.ClusterID
 	m.SvcName = aux.SvcName
 	m.ImageID = aux.ImageID

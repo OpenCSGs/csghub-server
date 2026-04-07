@@ -1,0 +1,8 @@
+{
+    "error.MCPGW-ERR-0": {
+        "other": "網關中已存在相同名稱的MCP服務器: {{.server_name}}"
+    },
+    "error.MCPGW-ERR-1": {
+        "other": "MCP服務器名稱無效：必須以字母或數字開頭，只能包含字母、數字、下劃線或連字符，且最多32個字符"
+    }
+}

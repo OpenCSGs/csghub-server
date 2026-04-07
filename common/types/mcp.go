@@ -73,6 +73,7 @@ type MCPServer struct {
 	LaunchCmds       string           `json:"launch_cmds"`
 	AvatarURL        string           `json:"avatar_url"`
 	MirrorTaskStatus MirrorTaskStatus `json:"mirror_task_status"`
+	RepoSize         int64            `json:"repo_size"`
 }
 
 type MCPPropertyFilter struct {

@@ -30,6 +30,10 @@ func parseGitlabShellJWTToken(signKey, tokenString string) (bool, error) {
 func CheckGitlabShellJWTToken(config *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		tokenString := c.Request.Header.Get(apiSecretHeaderName)
+		if tokenString == "" {
+			tokenString = c.Request.Header.Get("Authorization")
+			tokenString = tokenString[len("Bearer "):]
+		}
 		pass, err := parseGitlabShellJWTToken(config.GitalyServer.JWTSecret, tokenString)
 		if err != nil {
 			slog.Debug("fail to parse gitlab-shell jwt token", slog.String("token_get", tokenString), slog.Any("error", err))

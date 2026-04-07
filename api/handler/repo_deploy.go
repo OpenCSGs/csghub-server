@@ -255,7 +255,7 @@ func (h *RepoHandler) RuntimeFrameworkDelete(ctx *gin.Context) {
 // @Param        namespace path string true "namespace"
 // @Param        name path string true "name"
 // @Param        current_user query string false "current user"
-// @Success      200  {object}  types.Response{data=[]types.DeployRepo} "OK"
+// @Success      200  {object}  types.Response{data=[]types.DeployRequest} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /{repo_type}/{namespace}/{name}/run [get]
@@ -290,7 +290,7 @@ func (h *RepoHandler) DeployList(ctx *gin.Context) {
 // @Param        name path string true "name"
 // @Param        id path string true "id"
 // @Param        current_user query string false "current user"
-// @Success      200  {object}  types.Response{data=types.DeployRepo} "OK"
+// @Success      200  {object}  types.Response{data=types.DeployRequest} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      401  {object}  types.APIUnauthorized "Permission denied"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
@@ -812,7 +812,7 @@ func (h *RepoHandler) RuntimeFrameworkListWithType(ctx *gin.Context) {
 // @Param        name path string true "name"
 // @Param        id path string true "id"
 // @Param        current_user query string false "current user"
-// @Success      200  {object}  types.Response{data=types.DeployRepo} "OK"
+// @Success      200  {object}  types.Response{data=types.DeployRequest} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /models/{namespace}/{name}/serverless/{id} [get]

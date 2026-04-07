@@ -97,8 +97,9 @@ type ClusterNodeOwnership struct {
 
 type ClusterNodeWithRegion struct {
 	ClusterNode
-	ClusterRegion  string `json:"cluster_region"`
-	TaskRunningNum int    `json:"task_running_num"`
+	ClusterRegion  string                `json:"cluster_region"`
+	TaskRunningNum int                   `json:"task_running_num"`
+	ExclusiveOwner *types.ExclusiveOwner `json:"execlusive_owner"`
 }
 
 func (r *clusterInfoStoreImpl) Add(ctx context.Context, clusterConfig string, region string, mode types.ClusterMode) (*ClusterInfo, error) {
@@ -396,6 +397,7 @@ func (s *clusterInfoStoreImpl) ListAllNodes(ctx context.Context) ([]ClusterNodeW
 		ColumnExpr("cn.*, ci.region as cluster_region").
 		TableExpr("cluster_nodes as cn").
 		Join("JOIN cluster_infos ci ON ci.cluster_id = cn.cluster_id").
+		Where("ci.enable = ?", true).
 		Order("cn.cluster_id").
 		Order("cn.name").
 		Scan(ctx, &result)
