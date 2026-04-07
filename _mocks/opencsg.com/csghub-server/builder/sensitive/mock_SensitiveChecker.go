@@ -61,7 +61,7 @@ type MockSensitiveChecker_PassImageCheck_Call struct {
 
 // PassImageCheck is a helper method to define mock.On call
 //   - ctx context.Context
-//   - scenario types.Scenario
+//   - scenario types.SensitiveScenario
 //   - ossBucketName string
 //   - ossObjectName string
 func (_e *MockSensitiveChecker_Expecter) PassImageCheck(ctx interface{}, scenario interface{}, ossBucketName interface{}, ossObjectName interface{}) *MockSensitiveChecker_PassImageCheck_Call {
@@ -122,7 +122,7 @@ type MockSensitiveChecker_PassImageURLCheck_Call struct {
 
 // PassImageURLCheck is a helper method to define mock.On call
 //   - ctx context.Context
-//   - scenario types.Scenario
+//   - scenario types.SensitiveScenario
 //   - imageURL string
 func (_e *MockSensitiveChecker_Expecter) PassImageURLCheck(ctx interface{}, scenario interface{}, imageURL interface{}) *MockSensitiveChecker_PassImageURLCheck_Call {
 	return &MockSensitiveChecker_PassImageURLCheck_Call{Call: _e.mock.On("PassImageURLCheck", ctx, scenario, imageURL)}
@@ -182,7 +182,7 @@ type MockSensitiveChecker_PassLLMCheck_Call struct {
 
 // PassLLMCheck is a helper method to define mock.On call
 //   - ctx context.Context
-//   - scenario types.Scenario
+//   - scenario types.SensitiveScenario
 //   - text string
 //   - sessionId string
 //   - accountId string
@@ -244,7 +244,7 @@ type MockSensitiveChecker_PassTextCheck_Call struct {
 
 // PassTextCheck is a helper method to define mock.On call
 //   - ctx context.Context
-//   - scenario types.Scenario
+//   - scenario types.SensitiveScenario
 //   - text string
 func (_e *MockSensitiveChecker_Expecter) PassTextCheck(ctx interface{}, scenario interface{}, text interface{}) *MockSensitiveChecker_PassTextCheck_Call {
 	return &MockSensitiveChecker_PassTextCheck_Call{Call: _e.mock.On("PassTextCheck", ctx, scenario, text)}

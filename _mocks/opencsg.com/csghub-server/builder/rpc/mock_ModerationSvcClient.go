@@ -61,7 +61,7 @@ type MockModerationSvcClient_PassImageCheck_Call struct {
 
 // PassImageCheck is a helper method to define mock.On call
 //   - ctx context.Context
-//   - scenario types.Scenario
+//   - scenario types.SensitiveScenario
 //   - ossBucketName string
 //   - ossObjectName string
 func (_e *MockModerationSvcClient_Expecter) PassImageCheck(ctx interface{}, scenario interface{}, ossBucketName interface{}, ossObjectName interface{}) *MockModerationSvcClient_PassImageCheck_Call {
@@ -122,7 +122,7 @@ type MockModerationSvcClient_PassImageURLCheck_Call struct {
 
 // PassImageURLCheck is a helper method to define mock.On call
 //   - ctx context.Context
-//   - scenario types.Scenario
+//   - scenario types.SensitiveScenario
 //   - imageURL string
 func (_e *MockModerationSvcClient_Expecter) PassImageURLCheck(ctx interface{}, scenario interface{}, imageURL interface{}) *MockModerationSvcClient_PassImageURLCheck_Call {
 	return &MockModerationSvcClient_PassImageURLCheck_Call{Call: _e.mock.On("PassImageURLCheck", ctx, scenario, imageURL)}
@@ -302,7 +302,7 @@ type MockModerationSvcClient_PassTextCheck_Call struct {
 
 // PassTextCheck is a helper method to define mock.On call
 //   - ctx context.Context
-//   - scenario types.Scenario
+//   - scenario types.SensitiveScenario
 //   - text string
 func (_e *MockModerationSvcClient_Expecter) PassTextCheck(ctx interface{}, scenario interface{}, text interface{}) *MockModerationSvcClient_PassTextCheck_Call {
 	return &MockModerationSvcClient_PassTextCheck_Call{Call: _e.mock.On("PassTextCheck", ctx, scenario, text)}
