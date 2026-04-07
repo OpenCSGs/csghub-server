@@ -22,6 +22,8 @@ type SandboxCreateRequest struct {
 	SandboxName  string            `json:"sandbox_name" binding:"required"`
 	Environments map[string]string `json:"environments,omitempty"`
 	Volumes      []SandboxVolume   `json:"volumes,omitempty"`
+	Port         int               `json:"port,omitempty"`
+	Timeout      int               `json:"timeout,omitempty"`
 }
 
 type SandboxUpdateRequest struct {
@@ -30,6 +32,8 @@ type SandboxUpdateRequest struct {
 	ResourceID   int64             `json:"resource_id" binding:"required"`
 	Environments map[string]string `json:"environments,omitempty"`
 	Volumes      []SandboxVolume   `json:"volumes,omitempty"`
+	Port         int               `json:"port,omitempty"`
+	Timeout      int               `json:"timeout,omitempty"`
 }
 
 type SandboxCreateResponse struct {
