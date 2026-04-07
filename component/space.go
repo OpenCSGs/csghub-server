@@ -516,6 +516,10 @@ func (c *spaceComponentImpl) Update(ctx context.Context, req *types.UpdateSpaceR
 		return nil, fmt.Errorf("failed to update database space, error: %w", err)
 	}
 
+	if req.Private != nil {
+		c.syncCodeAgentIfExists(dbRepo.User.UUID, dbRepo.User.Username, dbRepo.Path, types.CodeAgentSyncOperationVisibility)
+	}
+
 	resDataset := &types.Space{
 		ID:            space.ID,
 		Name:          dbRepo.Name,
