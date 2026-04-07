@@ -399,7 +399,7 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 			ClusterID: "test-cls",
 		}, nil)
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1:svc1").Return(model, nil)
-		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuser", "testuuid").Return(nil)
+		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuser", model, mock.Anything).Return(nil)
 		expectReq := ChatCompletionRequest{}
 		_ = json.Unmarshal(body, &expectReq)
 		tester.mocks.moderationComp.EXPECT().CheckChatPrompts(mock.Anything, expectReq.Messages, "testuuid:"+model.ID, false).
@@ -447,7 +447,7 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 			ClusterID: "test-cls",
 		}, nil)
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1:svc1").Return(model, nil)
-		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuser", "testuuid").Return(nil)
+		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuser", model, mock.Anything).Return(nil)
 		expectReq := ChatCompletionRequest{}
 		_ = json.Unmarshal(body, &expectReq)
 		tester.mocks.moderationComp.EXPECT().CheckChatPrompts(mock.Anything, expectReq.Messages, "testuuid:"+model.ID, false).
@@ -495,7 +495,7 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 			ClusterID: "test-cls",
 		}, nil)
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1:svc1").Return(model, nil)
-		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuser", "testuuid").Return(nil)
+		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuser", model, mock.Anything).Return(nil)
 		expectReq := ChatCompletionRequest{}
 		_ = json.Unmarshal(body, &expectReq)
 		tester.mocks.moderationComp.EXPECT().CheckChatPrompts(mock.Anything, expectReq.Messages, "testuuid:"+model.ID, false).
@@ -561,7 +561,7 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 			ClusterID: "test-cls",
 		}, nil)
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1:svc1").Return(model, nil)
-		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuser", "testuuid").Return(nil)
+		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuser", model, mock.Anything).Return(nil)
 		expectReq := ChatCompletionRequest{}
 		_ = json.Unmarshal(body, &expectReq)
 		tester.mocks.moderationComp.EXPECT().CheckChatPrompts(mock.Anything, expectReq.Messages, "testuuid:"+model.ID, false).
@@ -620,7 +620,7 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 			Endpoint: testServer.URL,
 		}
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "external-model-id").Return(model, nil)
-		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuser", "testuuid").Return(nil)
+		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuser", model, mock.Anything).Return(nil)
 		expectReq := ChatCompletionRequest{}
 		_ = json.Unmarshal(body, &expectReq)
 		tester.mocks.moderationComp.EXPECT().CheckChatPrompts(mock.Anything, expectReq.Messages, "testuuid:"+model.ID, false).
@@ -826,7 +826,7 @@ func TestOpenAIHandler_Embedding(t *testing.T) {
 			Return(tokenCounter).Once()
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1").
 			Return(model, nil)
-		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuser", "testuuid").Return(nil)
+		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuser", model, mock.Anything).Return(nil)
 		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, "testuuid", model, mock.Anything, mock.Anything).RunAndReturn(
 			func(ctx context.Context, userID string, model *types.Model, counter token.Counter, sceneValue string) error {
 				wg.Done()
@@ -963,7 +963,7 @@ func TestOpenAIHandler_GenerateImage(t *testing.T) {
 			Endpoint: "https://api.example.com/images/generations",
 		}
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "test-model").Return(model, nil)
-		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuser", "testuuid").Return(nil)
+		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuser", model, mock.Anything).Return(nil)
 		tester.mocks.moderationComp.EXPECT().CheckImagePrompts(mock.Anything, "sensitive prompt", "testuuid").Return(&rpc.CheckResult{IsSensitive: true}, nil)
 
 		tester.handler.GenerateImage(c)
@@ -996,7 +996,7 @@ func TestOpenAIHandler_GenerateImage(t *testing.T) {
 			Endpoint: "https://api.example.com/images/generations",
 		}
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "test-model").Return(model, nil)
-		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuser", "testuuid").Return(nil)
+		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuser", model, mock.Anything).Return(nil)
 		tester.mocks.moderationComp.EXPECT().CheckImagePrompts(mock.Anything, "test prompt", "testuuid").Return(nil, errors.New("moderation service error"))
 
 		tester.handler.GenerateImage(c)

@@ -306,6 +306,7 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 			return
 		}
 		target, host, _ = common.ExtractDeployTargetAndHost(c.Request.Context(), cluster, targetReq)
+		modelName = model.CSGHubModelID
 	} else {
 		slog.DebugContext(c.Request.Context(), "external model", slog.Any("model", model))
 		target = model.Endpoint
@@ -337,7 +338,7 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 	sceneValue := c.Request.Header.Get(commonType.SceneHeaderKey)
 	// Check balance before processing request
 	if !model.SkipBalance() {
-		if err := h.openaiComponent.CheckBalance(c.Request.Context(), username, userUUID); err != nil {
+		if err := h.openaiComponent.CheckBalance(c.Request.Context(), username, model, sceneValue); err != nil {
 			h.handleInsufficientBalance(c, chatReq.Stream, username, modelID, err)
 			return
 		}
@@ -512,7 +513,7 @@ func (h *OpenAIHandlerImpl) GenerateImage(c *gin.Context) {
 	}
 
 	sceneValue := c.Request.Header.Get(commonType.SceneHeaderKey)
-	if err := h.openaiComponent.CheckBalance(ctx, username, userUUID); err != nil {
+	if err := h.openaiComponent.CheckBalance(ctx, username, model, sceneValue); err != nil {
 		h.handleInsufficientBalance(c, false, username, modelID, err)
 		return
 	}
@@ -692,7 +693,7 @@ func (h *OpenAIHandlerImpl) Embedding(c *gin.Context) {
 
 	sceneValue := c.Request.Header.Get(commonType.SceneHeaderKey)
 	// Check balance before processing request
-	if err := h.openaiComponent.CheckBalance(c.Request.Context(), username, userUUID); err != nil {
+	if err := h.openaiComponent.CheckBalance(c.Request.Context(), username, model, sceneValue); err != nil {
 		h.handleInsufficientBalance(c, false, username, modelID, err)
 		return
 	}
