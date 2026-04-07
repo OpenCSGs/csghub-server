@@ -22,6 +22,10 @@ func (ac *accountingClientImpl) ListBillsByUserIDAndDate(req types.ActStatements
 	return nil, nil
 }
 
+func (ac *accountingClientImpl) ListBillsDetailByUserID(req types.AcctBillsDetailReq) (any, error) {
+	return nil, nil
+}
+
 func (ac *accountingClientImpl) RechargeAccountingUser(userID string, req types.RechargeReq) (any, error) {
 	return nil, nil
 }
@@ -47,6 +51,10 @@ func (ac *accountingClientImpl) GetQuotaStatement(currentUser string, req types.
 }
 
 func (ac *accountingClientImpl) QueryPricesBySKUType(currentUser string, req types.AcctPriceListReq) (any, error) {
+	return nil, nil
+}
+
+func (ac *accountingClientImpl) QueryPricesBySkuTypeAndKinds(currentUser string, req types.AcctPriceListByKindsReq) (any, error) {
 	return nil, nil
 }
 

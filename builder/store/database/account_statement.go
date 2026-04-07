@@ -68,6 +68,8 @@ type AccountStatement struct {
 	SubBillID        int64                 `bun:",nullzero" json:"sub_bill_id"`
 	Discount         float64               `json:"discount"`
 	RegularValue     float64               `json:"regular_value"`
+	PromptToken      float64               `json:"prompt_token"`
+	CompletionToken  float64               `json:"completion_token"`
 }
 
 type AccountStatementRes struct {
@@ -362,12 +364,14 @@ func updateFeeBill(ctx context.Context, tx bun.Tx, input AccountStatement) error
 	}
 	// calculate bill
 	bill := AccountBill{
-		BillDate:    input.EventDate,
-		UserUUID:    input.UserUUID,
-		Scene:       input.Scene,
-		CustomerID:  input.CustomerID,
-		Value:       input.Value,
-		Consumption: input.Consumption,
+		BillDate:        input.EventDate,
+		UserUUID:        input.UserUUID,
+		Scene:           input.Scene,
+		CustomerID:      input.CustomerID,
+		Value:           input.Value,
+		Consumption:     input.Consumption,
+		PromptToken:     input.PromptToken,
+		CompletionToken: input.CompletionToken,
 	}
 	err := tx.NewSelect().Model(&bill).Where("bill_date = ? and user_uuid = ? and scene = ? and customer_id = ?", input.EventDate, input.UserUUID, input.Scene, input.CustomerID).For("UPDATE").Scan(ctx)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
@@ -379,7 +383,10 @@ func updateFeeBill(ctx context.Context, tx bun.Tx, input AccountStatement) error
 			return fmt.Errorf("create statement, error:%w", err)
 		}
 	} else {
-		_, err = tx.NewUpdate().Model(&bill).Where("bill_date = ? and user_uuid = ? and scene = ? and customer_id = ?", input.EventDate, input.UserUUID, input.Scene, input.CustomerID).Set("value = value + ?, consumption = consumption + ?, updated_at=current_timestamp", input.Value, input.Consumption).Exec(ctx)
+		_, err = tx.NewUpdate().Model(&bill).
+			Where("bill_date = ? and user_uuid = ? and scene = ? and customer_id = ?", input.EventDate, input.UserUUID, input.Scene, input.CustomerID).
+			Set("value = value + ?, consumption = consumption + ?, prompt_token = prompt_token + ?, completion_token = completion_token + ?, updated_at=current_timestamp", input.Value, input.Consumption, input.PromptToken, input.CompletionToken).
+			Exec(ctx)
 		if err != nil {
 			return fmt.Errorf("update statement, error:%w", err)
 		}
