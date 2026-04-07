@@ -151,7 +151,7 @@ func (s *paymentStripeStoreImpl) doUserCharge(ctx context.Context, tx bun.Tx, in
 	}
 
 	// check account user balance
-	_, err = CheckUserAccount(ctx, tx, userUUID)
+	err = CheckUserAccount(ctx, tx, userUUID)
 	if err != nil {
 		return err
 	}
