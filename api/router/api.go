@@ -1002,6 +1002,7 @@ func createUserRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware
 		apiGroup.GET("/user/:username/spaces", userHandler.Spaces)
 		apiGroup.GET("/user/:username/prompts", userHandler.Prompts)
 		apiGroup.GET("/user/:username/mcps", userHandler.MCPServers)
+		apiGroup.GET("/user/:username/skills", userHandler.Skills)
 	}
 
 	{
@@ -1353,6 +1354,7 @@ func createOrgRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware.
 		apiGroup.GET("/organization/:namespace/evaluations", orgHandler.Evaluations)
 		apiGroup.GET("/organization/:namespace/run/:repo_type", orgHandler.RunDeploys)
 		apiGroup.GET("/organization/:namespace/notebooks", orgHandler.Notebooks)
+		apiGroup.GET("/organization/:namespace/skills", orgHandler.Skills)
 	}
 
 	{

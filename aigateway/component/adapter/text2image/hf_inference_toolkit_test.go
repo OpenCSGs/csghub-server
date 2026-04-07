@@ -31,7 +31,7 @@ func TestHFInferenceToolkitAdapter_TransformResponse_responseFormatURL(t *testin
 	contentType := "image/png"
 
 	t.Run("response_format=url and storage set returns URL and no B64JSON", func(t *testing.T) {
-		presignedURL := "https://storage.example.com/aigateway/generated/images/abc.png?signature=xyz"
+		presignedURL := "https://storage.example.com/aigateway/generated/images/abc.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Signature=xyz"
 		storage := &mockStorage{
 			putAndPresignGet: func(_ context.Context, bucket, key string, data []byte, ct string) (string, error) {
 				assert.Equal(t, "my-bucket", bucket)
@@ -61,6 +61,8 @@ func TestHFInferenceToolkitAdapter_TransformResponse_responseFormatURL(t *testin
 		assert.Equal(t, presignedURL, data0["url"])
 		b64Val, hasB64 := data0["b64_json"]
 		assert.True(t, !hasB64 || b64Val == "" || b64Val == nil)
+		require.Contains(t, string(body), "&X-Amz-Signature")
+		require.NotContains(t, string(body), `\u0026`)
 	})
 
 	t.Run("response_format=b64_json returns B64JSON", func(t *testing.T) {
@@ -159,4 +161,3 @@ func TestHFInferenceToolkitAdapter_GetHeaders(t *testing.T) {
 		assert.Equal(t, map[string]string{"Accept": "image/png"}, headers)
 	})
 }
-

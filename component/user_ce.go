@@ -15,14 +15,14 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
-func (c *userComponentImpl) ListDeploys(ctx context.Context, repoType types.RepositoryType, req *types.DeployReq) ([]types.DeployRepo, int, error) {
+func (c *userComponentImpl) ListDeploys(ctx context.Context, repoType types.RepositoryType, req *types.DeployReq) ([]types.DeployRequest, int, error) {
 	deploys, total, err := c.deployTaskStore.ListDeployByOwnerNamespace(ctx, req.CurrentUser, req)
 	if err != nil {
 		newError := fmt.Errorf("failed to get user deploys for %s with error:%w", repoType, err)
 		return nil, 0, newError
 	}
 
-	var resDeploys []types.DeployRepo
+	var resDeploys []types.DeployRequest
 	for _, deploy := range deploys {
 		d := &database.Deploy{
 			SvcName:   deploy.SvcName,
@@ -39,7 +39,7 @@ func (c *userComponentImpl) ListDeploys(ctx context.Context, repoType types.Repo
 		if len(tags) > 0 {
 			tag = tags[0].Name
 		}
-		resDeploys = append(resDeploys, types.DeployRepo{
+		resDeploys = append(resDeploys, types.DeployRequest{
 			DeployID:         deploy.ID,
 			DeployName:       deploy.DeployName,
 			Path:             repoPath,
@@ -69,17 +69,17 @@ func (c *userComponentImpl) ListDeploys(ctx context.Context, repoType types.Repo
 	return resDeploys, total, nil
 }
 
-func (c *userComponentImpl) ListInstances(ctx context.Context, req *types.UserRepoReq) ([]types.DeployRepo, int, error) {
+func (c *userComponentImpl) ListInstances(ctx context.Context, req *types.UserRepoReq) ([]types.DeployRequest, int, error) {
 	deploys, total, err := c.deployTaskStore.ListFinetunesByOwnerNamespace(ctx, req.CurrentUser, req.PageSize, req.Page)
 	if err != nil {
 		newError := fmt.Errorf("failed to get user instances error:%w", err)
 		return nil, 0, newError
 	}
 
-	var resDeploys []types.DeployRepo
+	var resDeploys []types.DeployRequest
 	for _, deploy := range deploys {
 		repoPath := strings.TrimPrefix(deploy.GitPath, "models_")
-		resDeploys = append(resDeploys, types.DeployRepo{
+		resDeploys = append(resDeploys, types.DeployRequest{
 			DeployID:         deploy.ID,
 			DeployName:       deploy.DeployName,
 			Path:             repoPath,

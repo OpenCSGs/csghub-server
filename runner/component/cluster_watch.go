@@ -125,17 +125,17 @@ func (w *clusterWatcher) getClusterAppEndpoint(configmapData map[string]string) 
 
 	svc, err := w.cluster.Client.CoreV1().Services("knative-serving").Get(ctx, "kourier", metav1.GetOptions{})
 	if err != nil {
-		slog.Warn("failed to get kourier-system/kourier service and use app endpoint input value", slog.Any("error", err))
+		slog.Warn("failed to get knative-serving/kourier service and use app endpoint input value", slog.Any("error", err))
 		return inputVal
 	}
 
 	ingress := svc.Status.LoadBalancer.Ingress
 
 	if len(ingress) < 1 {
-		slog.Warn("kourier-system/kourier service does not have external IP and try to read clusterIP", slog.Any("ingress", ingress))
+		slog.Warn("knative-serving/kourier service does not have external IP and try to read clusterIP", slog.Any("ingress", ingress))
 		clusterIP := svc.Spec.ClusterIP
 		if len(clusterIP) > 0 {
-			slog.Info("kourier-system/kourier service does not have external IP and use clusterIP", slog.Any("clusterIP", clusterIP))
+			slog.Info("knative-serving/kourier service does not have external IP and use clusterIP", slog.Any("clusterIP", clusterIP))
 			inputVal = fmt.Sprintf("http://%s", clusterIP)
 		}
 		return inputVal

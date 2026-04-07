@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 	mockbldmq "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/mq"
 	mockdb "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
-	mockmq "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/mq"
 	"opencsg.com/csghub-server/aigateway/token"
 	"opencsg.com/csghub-server/aigateway/types"
 
@@ -103,6 +102,65 @@ func TestFilterAndPaginateModels(t *testing.T) {
 		assert.Len(t, resp.Data, 1)
 		assert.Equal(t, "gpt-4o:svc4", resp.Data[0].ID)
 		assert.False(t, resp.HasMore)
+	})
+
+	t.Run("source filter csghub", func(t *testing.T) {
+		modelsWithSource := []types.Model{
+			{BaseModel: types.BaseModel{ID: "csghub-model:svc1", Object: "model", OwnedBy: "u1", Public: true}, InternalModelInfo: types.InternalModelInfo{CSGHubModelID: "user/model1"}},
+			{BaseModel: types.BaseModel{ID: "external-model", Object: "model", OwnedBy: "openai", Public: true}, ExternalModelInfo: types.ExternalModelInfo{Provider: "openai"}},
+			{BaseModel: types.BaseModel{ID: "csghub-model:svc2", Object: "model", OwnedBy: "u2", Public: false}, InternalModelInfo: types.InternalModelInfo{CSGHubModelID: "org/model2"}},
+		}
+		resp := filterAndPaginateModels(modelsWithSource, types.ListModelsReq{Source: string(types.ModelSourceCSGHub)})
+		assert.Equal(t, 2, resp.TotalCount)
+		assert.Len(t, resp.Data, 2)
+		assert.Equal(t, "csghub-model:svc1", resp.Data[0].ID)
+		assert.Equal(t, "csghub-model:svc2", resp.Data[1].ID)
+	})
+
+	t.Run("source filter external", func(t *testing.T) {
+		modelsWithSource := []types.Model{
+			{BaseModel: types.BaseModel{ID: "csghub-model:svc1", Object: "model", OwnedBy: "u1", Public: true}, InternalModelInfo: types.InternalModelInfo{CSGHubModelID: "user/model1"}},
+			{BaseModel: types.BaseModel{ID: "gpt-4", Object: "model", OwnedBy: "openai", Public: true}, ExternalModelInfo: types.ExternalModelInfo{Provider: "openai"}},
+			{BaseModel: types.BaseModel{ID: "claude", Object: "model", OwnedBy: "anthropic", Public: true}, ExternalModelInfo: types.ExternalModelInfo{Provider: "anthropic"}},
+		}
+		resp := filterAndPaginateModels(modelsWithSource, types.ListModelsReq{Source: string(types.ModelSourceExternal)})
+		assert.Equal(t, 2, resp.TotalCount)
+		assert.Len(t, resp.Data, 2)
+		assert.Equal(t, "gpt-4", resp.Data[0].ID)
+		assert.Equal(t, "claude", resp.Data[1].ID)
+	})
+
+	t.Run("source filter is case-insensitive", func(t *testing.T) {
+		modelsWithSource := []types.Model{
+			{BaseModel: types.BaseModel{ID: "csghub-model:svc1", Object: "model", OwnedBy: "u1", Public: true}, InternalModelInfo: types.InternalModelInfo{CSGHubModelID: "user/model1"}},
+			{BaseModel: types.BaseModel{ID: "gpt-4", Object: "model", OwnedBy: "openai", Public: true}, ExternalModelInfo: types.ExternalModelInfo{Provider: "openai"}},
+		}
+		resp := filterAndPaginateModels(modelsWithSource, types.ListModelsReq{Source: "CSGHub"})
+		assert.Equal(t, 1, resp.TotalCount)
+		assert.Len(t, resp.Data, 1)
+		assert.Equal(t, "csghub-model:svc1", resp.Data[0].ID)
+	})
+
+	t.Run("unknown source filter includes all", func(t *testing.T) {
+		modelsWithSource := []types.Model{
+			{BaseModel: types.BaseModel{ID: "csghub-model:svc1", Object: "model", OwnedBy: "u1", Public: true}, InternalModelInfo: types.InternalModelInfo{CSGHubModelID: "user/model1"}},
+			{BaseModel: types.BaseModel{ID: "gpt-4", Object: "model", OwnedBy: "openai", Public: true}, ExternalModelInfo: types.ExternalModelInfo{Provider: "openai"}},
+		}
+		resp := filterAndPaginateModels(modelsWithSource, types.ListModelsReq{Source: "unknown"})
+		assert.Equal(t, 2, resp.TotalCount)
+		assert.Len(t, resp.Data, 2)
+	})
+
+	t.Run("source filter combined with public filter", func(t *testing.T) {
+		modelsWithSource := []types.Model{
+			{BaseModel: types.BaseModel{ID: "csghub-public", Object: "model", OwnedBy: "u1", Public: true}, InternalModelInfo: types.InternalModelInfo{CSGHubModelID: "user/model1"}},
+			{BaseModel: types.BaseModel{ID: "csghub-private", Object: "model", OwnedBy: "u1", Public: false}, InternalModelInfo: types.InternalModelInfo{CSGHubModelID: "user/model2"}},
+			{BaseModel: types.BaseModel{ID: "external-public", Object: "model", OwnedBy: "openai", Public: true}, ExternalModelInfo: types.ExternalModelInfo{Provider: "openai"}},
+		}
+		resp := filterAndPaginateModels(modelsWithSource, types.ListModelsReq{Source: string(types.ModelSourceCSGHub), Public: "true"})
+		assert.Equal(t, 1, resp.TotalCount)
+		assert.Len(t, resp.Data, 1)
+		assert.Equal(t, "csghub-public", resp.Data[0].ID)
 	})
 }
 
@@ -365,12 +423,9 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 			},
 			wantError: false,
 			setupMock: func() {
-
-				mockMQ := mockmq.NewMockMessageQueue(t)
 				mockBLDMQ := mockbldmq.NewMockMessageQueue(t)
 
 				eventPub := &event.EventPublisher{
-					Connector:    mockMQ,
 					SyncInterval: 1,
 					MQ:           mockBLDMQ,
 					Cfg:          cfg,
@@ -441,11 +496,9 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 			wantError: false,
 			setupMock: func() {
 
-				mockMQ := mockmq.NewMockMessageQueue(t)
 				mockBLDMQ := mockbldmq.NewMockMessageQueue(t)
 
 				eventPub := &event.EventPublisher{
-					Connector:    mockMQ,
 					SyncInterval: 1,
 					MQ:           mockBLDMQ,
 					Cfg:          cfg,
@@ -503,11 +556,9 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 			},
 			wantError: false,
 			setupMock: func() {
-				mockMQ := mockmq.NewMockMessageQueue(t)
 				mockBLDMQ := mockbldmq.NewMockMessageQueue(t)
 
 				eventPub := &event.EventPublisher{
-					Connector:    mockMQ,
 					SyncInterval: 1,
 					MQ:           mockBLDMQ,
 					Cfg:          cfg,
@@ -561,10 +612,8 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 			},
 			wantError: true,
 			setupMock: func() {
-				mockMQ := mockmq.NewMockMessageQueue(t)
 				mockBLDMQ := mockbldmq.NewMockMessageQueue(t)
 				eventPub := &event.EventPublisher{
-					Connector:    mockMQ,
 					SyncInterval: 1,
 					MQ:           mockBLDMQ,
 				}
@@ -596,10 +645,8 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 			},
 			wantError: true,
 			setupMock: func() {
-				mockMQ := mockmq.NewMockMessageQueue(t)
 				mockBLDMQ := mockbldmq.NewMockMessageQueue(t)
 				eventPub := &event.EventPublisher{
-					Connector:    mockMQ,
 					SyncInterval: 1,
 					MQ:           mockBLDMQ,
 					Cfg:          cfg,
@@ -665,11 +712,9 @@ func TestOpenAIComponentImpl_RecordUsage_ExternalModel(t *testing.T) {
 			},
 			wantError: false,
 			setupMock: func() {
-				mockMQ := mockmq.NewMockMessageQueue(t)
 				mockBLDMQ := mockbldmq.NewMockMessageQueue(t)
 
 				eventPub := &event.EventPublisher{
-					Connector:    mockMQ,
 					SyncInterval: 1,
 					MQ:           mockBLDMQ,
 					Cfg:          cfg,
@@ -727,10 +772,8 @@ func TestOpenAIComponentImpl_RecordUsage_ExternalModel(t *testing.T) {
 			},
 			wantError: true,
 			setupMock: func() {
-				mockMQ := mockmq.NewMockMessageQueue(t)
 				mockBLDMQ := mockbldmq.NewMockMessageQueue(t)
 				eventPub := &event.EventPublisher{
-					Connector:    mockMQ,
 					SyncInterval: 1,
 					MQ:           mockBLDMQ,
 				}
@@ -758,10 +801,8 @@ func TestOpenAIComponentImpl_RecordUsage_ExternalModel(t *testing.T) {
 			},
 			wantError: true,
 			setupMock: func() {
-				mockMQ := mockmq.NewMockMessageQueue(t)
 				mockBLDMQ := mockbldmq.NewMockMessageQueue(t)
 				eventPub := &event.EventPublisher{
-					Connector:    mockMQ,
 					SyncInterval: 1,
 					MQ:           mockBLDMQ,
 					Cfg:          cfg,
@@ -794,11 +835,9 @@ func TestOpenAIComponentImpl_RecordUsage_ExternalModel(t *testing.T) {
 			},
 			wantError: false,
 			setupMock: func() {
-				mockMQ := mockmq.NewMockMessageQueue(t)
 				mockBLDMQ := mockbldmq.NewMockMessageQueue(t)
 
 				eventPub := &event.EventPublisher{
-					Connector:    mockMQ,
 					SyncInterval: 1,
 					MQ:           mockBLDMQ,
 					Cfg:          cfg,
@@ -888,10 +927,8 @@ func TestOpenAIComponentImpl_RecordUsage_WithSceneValue(t *testing.T) {
 			},
 			wantError: false,
 			setupMock: func() {
-				mockMQ := mockmq.NewMockMessageQueue(t)
 				mockBLDMQ := mockbldmq.NewMockMessageQueue(t)
 				eventPub := &event.EventPublisher{
-					Connector:    mockMQ,
 					SyncInterval: 1,
 					MQ:           mockBLDMQ,
 					Cfg:          cfg,
@@ -934,10 +971,8 @@ func TestOpenAIComponentImpl_RecordUsage_WithSceneValue(t *testing.T) {
 			},
 			wantError: false,
 			setupMock: func() {
-				mockMQ := mockmq.NewMockMessageQueue(t)
 				mockBLDMQ := mockbldmq.NewMockMessageQueue(t)
 				eventPub := &event.EventPublisher{
-					Connector:    mockMQ,
 					SyncInterval: 1,
 					MQ:           mockBLDMQ,
 					Cfg:          cfg,
@@ -990,10 +1025,8 @@ func TestOpenAIComponentImpl_RecordUsage_WithSceneValue(t *testing.T) {
 			},
 			wantError: false,
 			setupMock: func() {
-				mockMQ := mockmq.NewMockMessageQueue(t)
 				mockBLDMQ := mockbldmq.NewMockMessageQueue(t)
 				eventPub := &event.EventPublisher{
-					Connector:    mockMQ,
 					SyncInterval: 1,
 					MQ:           mockBLDMQ,
 					Cfg:          cfg,

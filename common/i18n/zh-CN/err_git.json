@@ -89,6 +89,9 @@
     "error.GIT-ERR-37": {
         "other": "在 xnet 启用的仓库中使用 git 失败"
     },
+    "error.GIT-ERR-38": {
+        "other": "获取仓库大小失败"
+    },
     "error.GIT-ERR-4": {
         "other": "查找提交失败"
     },

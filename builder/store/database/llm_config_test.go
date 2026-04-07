@@ -19,27 +19,33 @@ func TestLLMConfigStore_GetOptimization(t *testing.T) {
 	require.Nil(t, err)
 	store := database.NewLLMConfigStoreWithDB(db, config)
 	_, err = db.Core.NewInsert().Model(&database.LLMConfig{
-		Type:      1,
-		Enabled:   true,
-		ModelName: "c1",
+		Type:        1,
+		Enabled:     true,
+		ModelName:   "c1",
+		DisplayName: "c1",
+		Metadata:    map[string]any{"source": "test"},
 	}).Exec(ctx)
 	require.Nil(t, err)
 	_, err = db.Core.NewInsert().Model(&database.LLMConfig{
-		Type:      2,
-		Enabled:   true,
-		ModelName: "c2",
+		Type:        2,
+		Enabled:     true,
+		ModelName:   "c2",
+		DisplayName: "c2",
 	}).Exec(ctx)
 	require.Nil(t, err)
 	_, err = db.Core.NewInsert().Model(&database.LLMConfig{
-		Type:      1,
-		Enabled:   false,
-		ModelName: "c3",
+		Type:        1,
+		Enabled:     false,
+		ModelName:   "c3",
+		DisplayName: "c3",
 	}).Exec(ctx)
 	require.Nil(t, err)
 
 	cfg, err := store.GetOptimization(ctx)
 	require.Nil(t, err)
 	require.Equal(t, "c1", cfg.ModelName)
+	require.Equal(t, "c1", cfg.DisplayName)
+	require.Equal(t, map[string]any{"source": "test"}, cfg.Metadata)
 }
 
 func TestLLMConfigStore_GetModelForSummaryReadme(t *testing.T) {
@@ -50,9 +56,11 @@ func TestLLMConfigStore_GetModelForSummaryReadme(t *testing.T) {
 	require.Nil(t, err)
 	store := database.NewLLMConfigStoreWithDB(db, config)
 	_, err = db.Core.NewInsert().Model(&database.LLMConfig{
-		Type:      5,
-		Enabled:   true,
-		ModelName: "summary1",
+		Type:        5,
+		Enabled:     true,
+		ModelName:   "summary1",
+		DisplayName: "summary1",
+		Metadata:    map[string]any{"k": "v"},
 	}).Exec(ctx)
 	require.Nil(t, err)
 
@@ -74,6 +82,8 @@ func TestLLMConfigStore_GetModelForSummaryReadme(t *testing.T) {
 	require.Nil(t, err)
 	require.NotNil(t, cfg)
 	require.Equal(t, "summary1", cfg.ModelName)
+	require.Equal(t, "summary1", cfg.DisplayName)
+	require.Equal(t, map[string]any{"k": "v"}, cfg.Metadata)
 }
 
 func TestLLMConfigStore_GetByID(t *testing.T) {
@@ -85,9 +95,11 @@ func TestLLMConfigStore_GetByID(t *testing.T) {
 	store := database.NewLLMConfigStoreWithDB(db, config)
 
 	dbInput := database.LLMConfig{
-		Type:      5,
-		Enabled:   true,
-		ModelName: "summary1",
+		Type:        5,
+		Enabled:     true,
+		ModelName:   "summary1",
+		DisplayName: "summary1",
+		Metadata:    map[string]any{"k": "v"},
 	}
 	_, err = db.Core.NewInsert().Model(&dbInput).Exec(ctx)
 	require.Nil(t, err)
@@ -96,6 +108,8 @@ func TestLLMConfigStore_GetByID(t *testing.T) {
 	require.Nil(t, err)
 	require.NotNil(t, cfg)
 	require.Equal(t, "summary1", cfg.ModelName)
+	require.Equal(t, "summary1", cfg.DisplayName)
+	require.Equal(t, map[string]any{"k": "v"}, cfg.Metadata)
 }
 
 func TestLLMConfigStore_CRUD(t *testing.T) {
@@ -106,14 +120,18 @@ func TestLLMConfigStore_CRUD(t *testing.T) {
 	require.Nil(t, err)
 	store := database.NewLLMConfigStoreWithDB(db, config)
 	dbInput := database.LLMConfig{
-		Type:      5,
-		Enabled:   true,
-		ModelName: "summary1",
+		Type:        5,
+		Enabled:     true,
+		ModelName:   "summary1",
+		DisplayName: "summary1",
+		Metadata:    map[string]any{"k": "v"},
 	}
 	res, err := store.Create(ctx, dbInput)
 	require.Nil(t, err)
 	require.NotNil(t, res)
 	require.Equal(t, "summary1", res.ModelName)
+	require.Equal(t, "summary1", res.DisplayName)
+	require.Equal(t, map[string]any{"k": "v"}, res.Metadata)
 
 	searchType := 5
 	search := &types.SearchLLMConfig{
@@ -139,10 +157,10 @@ func TestLLMConfigStore_Search(t *testing.T) {
 
 	// Create test data with hyphens and letter-number combinations
 	testModels := []database.LLMConfig{
-		{Type: 1, Enabled: true, ModelName: "deepseek-v3"},
-		{Type: 1, Enabled: true, ModelName: "openai/gpt-4"},
-		{Type: 1, Enabled: true, ModelName: "claude3-opus"},
-		{Type: 1, Enabled: true, ModelName: "llama2-7b"},
+		{Type: 1, Enabled: true, ModelName: "deepseek-v3", DisplayName: "deepseek-v3"},
+		{Type: 1, Enabled: true, ModelName: "openai/gpt-4", DisplayName: "gpt-4"},
+		{Type: 1, Enabled: true, ModelName: "claude3-opus", DisplayName: "claude3-opus"},
+		{Type: 1, Enabled: true, ModelName: "llama2-7b", DisplayName: "llama2-7b"},
 	}
 
 	for _, model := range testModels {

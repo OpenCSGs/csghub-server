@@ -91,7 +91,7 @@ func NewDeployActivity(
 func (a *DeployActivity) Deploy(ctx context.Context, taskId int64) error {
 	task, err := a.ds.GetDeployTask(ctx, taskId)
 	if err != nil {
-		return fmt.Errorf("failed to get deploy task: %w", err)
+		return fmt.Errorf("failed to get deploy task %d in Deploy activity error: %w", taskId, err)
 	}
 	a.reportLog(types.DeployInProgress.String(), types.StepDeploying, task)
 
@@ -100,17 +100,16 @@ func (a *DeployActivity) Deploy(ctx context.Context, taskId int64) error {
 		if herr := a.handleRepoInfoError(ctx, task, err); herr != nil {
 			return herr
 		}
-
-		return fmt.Errorf("deploy failed to get repository info: %w", err)
+		return fmt.Errorf("deploy failed because of get repository info: %w", err)
 	}
 
 	deployRequest, err := a.createDeployRequest(ctx, task, repoInfo)
 	if err != nil {
-		return fmt.Errorf("failed to create deploy request: %w", err)
+		return fmt.Errorf("failed to create deploy task id %d request: %w", task.ID, err)
 	}
 
 	if deployRequest.ImageID == "" {
-		return fmt.Errorf("failed to deploy: image id is empty")
+		return fmt.Errorf("failed to deploy task id %d: image id is empty", task.ID)
 	}
 
 	if deployRequest.OrderDetailID != 0 {
@@ -121,7 +120,7 @@ func (a *DeployActivity) Deploy(ctx context.Context, taskId int64) error {
 
 	updatedTask, err := a.ds.GetDeployTask(ctx, task.ID)
 	if err != nil {
-		return fmt.Errorf("failed to get deploy task: %w", err)
+		return fmt.Errorf("failed to get deploy by task id %d error: %w", task.ID, err)
 	}
 
 	if updatedTask.Status == common.Pending {
@@ -131,7 +130,7 @@ func (a *DeployActivity) Deploy(ctx context.Context, taskId int64) error {
 			if herr := a.handleDeployError(task, err); herr != nil {
 				return herr
 			}
-			return fmt.Errorf("failed to call image runner: %w", err)
+			return fmt.Errorf("failed to call image runner by deploy task id %d error: %w", task.ID, err)
 		}
 		serviceName := runResponse.Message
 		if err := a.updateDeployTaskStatus(task, serviceName); err != nil {
@@ -145,7 +144,7 @@ func (a *DeployActivity) Deploy(ctx context.Context, taskId int64) error {
 func (a *DeployActivity) Build(ctx context.Context, taskId int64) error {
 	task, err := a.ds.GetDeployTask(ctx, taskId)
 	if err != nil {
-		return fmt.Errorf("failed to get deploy task: %w", err)
+		return fmt.Errorf("failed to get build task %d error: %w", taskId, err)
 	}
 	if task.Status == common.TaskStatusBuildSkip {
 		return nil
@@ -155,13 +154,12 @@ func (a *DeployActivity) Build(ctx context.Context, taskId int64) error {
 		if herr := a.handleRepoInfoError(ctx, task, err); herr != nil {
 			return herr
 		}
-
-		return fmt.Errorf("failed to get repository info: %w", err)
+		return fmt.Errorf("failed to get repository info for build task %d error: %w", taskId, err)
 	}
 
 	buildRequest, err := a.createBuildRequest(ctx, task, repoInfo)
 	if err != nil {
-		return fmt.Errorf("failed to create build request: %w", err)
+		return fmt.Errorf("failed to create build request for build task %d error: %w", taskId, err)
 	}
 
 	return a.pollBuildStatus(ctx, task, repoInfo, buildRequest)
@@ -176,7 +174,7 @@ func (a *DeployActivity) getLogger(ctx context.Context) log.Logger {
 
 // pollBuildStatus
 func (a *DeployActivity) pollBuildStatus(ctx context.Context, task *database.DeployTask, repoInfo common.RepoInfo, buildRequest *types.ImageBuilderRequest) error {
-	continueLoop, err := a.checkBuildStatus(ctx, task, buildRequest)
+	continueLoop, err := a.checkBuildTaskStatus(ctx, task, buildRequest)
 	if err != nil {
 		return err
 	}
@@ -193,17 +191,20 @@ func (a *DeployActivity) pollBuildStatus(ctx context.Context, task *database.Dep
 		select {
 		case <-ctx.Done():
 			a.getLogger(ctx).Info("Build activity cancelled before core logic", "task_id", task.ID)
+			// stop build task by call runner
 			go a.stopBuild(task, repoInfo)
-			return a.handleBuildCancelled(task)
+			// update deploy task status to cancelled
+			return a.handleBuildTaskCancelled(task)
 
 		case <-heartbeatTicker.C:
+			// probe if build task is cancelled
 			activity.RecordHeartbeat(ctx, task.ID)
 			if ctx.Err() != nil {
 				a.getLogger(ctx).Info("Build activity cancelled during heartbeat", "task_id", task.ID)
 				return a.handleBuildError(task, fmt.Errorf("build activity cancelled: %w", ctx.Err()))
 			}
 		case <-statusCheckTicker.C:
-			continueLoop, err := a.checkBuildStatus(ctx, task, buildRequest)
+			continueLoop, err := a.checkBuildTaskStatus(ctx, task, buildRequest)
 			if err != nil {
 				return err
 			}
@@ -214,26 +215,26 @@ func (a *DeployActivity) pollBuildStatus(ctx context.Context, task *database.Dep
 	}
 }
 
-func (a *DeployActivity) checkBuildStatus(ctx context.Context, task *database.DeployTask, buildRequest *types.ImageBuilderRequest) (bool, error) {
+func (a *DeployActivity) checkBuildTaskStatus(ctx context.Context, task *database.DeployTask, buildRequest *types.ImageBuilderRequest) (bool, error) {
 	updatedTask, err := a.ds.GetDeployTask(ctx, task.ID)
 	if err != nil {
-		return false, fmt.Errorf("failed to get deploy task: %w", err)
+		return false, fmt.Errorf("failed to get deploy task %d error: %w", task.ID, err)
 	}
 
 	switch {
 	case updatedTask.Status == common.TaskStatusBuildPending:
 		if err := a.ib.Build(ctx, buildRequest); err != nil {
 			if herr := a.handleBuildError(task, err); herr != nil {
-				a.getLogger(ctx).Error("Build failed", "task_id", task.ID, "error", err)
+				a.getLogger(ctx).Error("handle error status for failed to start pending build task", "task_id", task.ID, "error", err)
 				return false, herr
 			}
 
-			a.getLogger(ctx).Error("Build failed", "task_id", task.ID, "error", err)
+			a.getLogger(ctx).Error("start pending build task failed", "task_id", task.ID, "error", err)
 			a.reportLog(types.BuildFailed.String()+": \n"+err.Error(), types.StepBuildFailed, task)
-			return false, fmt.Errorf("build failed: %w", err)
+			return false, fmt.Errorf("start pending build task %d failed: %w", updatedTask.ID, err)
 		}
 		if err := a.handleBuildTaskToBuildInQueue(task); err != nil {
-			a.getLogger(ctx).Error("Failed to handle build task to build in queue", "task_id", task.ID, "error", err)
+			a.getLogger(ctx).Error("Failed to handle build task to build in queue status", "task_id", task.ID, "error", err)
 			return false, err
 		}
 		a.reportLog(types.BuildInProgress.String(), types.StepBuildInProgress, task)
@@ -277,7 +278,7 @@ func (a *DeployActivity) getRepositoryInfo(ctx context.Context, task *database.D
 	if task.Deploy.SpaceID > 0 {
 		space, err := a.ss.ByID(ctx, task.Deploy.SpaceID)
 		if err != nil {
-			return repoInfo, fmt.Errorf("failed to get space by ID: %w", err)
+			return repoInfo, fmt.Errorf("failed to get repo space by space ID %d: %w", task.Deploy.SpaceID, err)
 		}
 		return a.createSpaceRepoInfo(space, task.Deploy.ID), nil
 	}
@@ -285,7 +286,7 @@ func (a *DeployActivity) getRepositoryInfo(ctx context.Context, task *database.D
 	if task.Deploy.ModelID > 0 {
 		model, err := a.ms.ByID(ctx, task.Deploy.ModelID)
 		if err != nil {
-			return repoInfo, fmt.Errorf("failed to get model by ID: %w", err)
+			return repoInfo, fmt.Errorf("failed to get repo model by deploy ID %d: %w", task.Deploy.ID, err)
 		}
 		return a.createModelRepoInfo(model, task.Deploy.ID), nil
 	}
@@ -332,7 +333,7 @@ func (a *DeployActivity) handleRepoInfoError(ctx context.Context, task *database
 	if errors.Is(err, sql.ErrNoRows) {
 		return a.handleRepositoryNotFound(task)
 	}
-	return fmt.Errorf("failed to get repository info: %w", err)
+	return fmt.Errorf("failed to get repository for deploy id %d task id %d error: %w", task.Deploy.ID, task.ID, err)
 }
 
 func (a *DeployActivity) updateDeployTaskStatus(task *database.DeployTask, serviceName string) error {
@@ -349,7 +350,7 @@ func (a *DeployActivity) updateDeployTaskStatus(task *database.DeployTask, servi
 
 	lastTask, err := a.ds.GetLastTaskByType(ctx, task.Deploy.ID, task.TaskType)
 	if err != nil {
-		return fmt.Errorf("failed to get last task by type: %w", err)
+		return fmt.Errorf("failed to get last task by id %d and type %d: %w", task.ID, task.TaskType, err)
 	}
 	if lastTask.ID != task.ID {
 		// only update task
@@ -369,7 +370,7 @@ func (a *DeployActivity) updateTaskStatus(task *database.DeployTask) error {
 	defer cancel()
 	lastTask, err := a.ds.GetLastTaskByType(ctx, task.Deploy.ID, task.TaskType)
 	if err != nil {
-		return fmt.Errorf("failed to get last task by type: %w", err)
+		return fmt.Errorf("failed to get last task by deploy id %d by type %d: %w", task.Deploy.ID, task.TaskType, err)
 	}
 
 	if lastTask.ID != task.ID {
@@ -378,6 +379,7 @@ func (a *DeployActivity) updateTaskStatus(task *database.DeployTask) error {
 			return err
 		}
 	} else {
+		// update task and deploy status
 		if err := a.ds.UpdateInTx(ctx, []string{"status"}, []string{"status", "message"}, task.Deploy, task); err != nil {
 			return err
 		}
@@ -392,12 +394,12 @@ func (a *DeployActivity) handleRepositoryNotFound(task *database.DeployTask) err
 	task.Message = "repository not found, please check the repository path"
 	task.Deploy.Status = common.BuildFailed
 	if err := a.updateTaskStatus(task); err != nil {
-		return fmt.Errorf("handleRepositoryNotFound failed to update deploy task status: %w", err)
+		return fmt.Errorf("handleRepositoryNotFound failed to update deploy task %d status: %w", task.ID, err)
 	}
 	return nil
 }
 
-func (a *DeployActivity) handleBuildCancelled(task *database.DeployTask) error {
+func (a *DeployActivity) handleBuildTaskCancelled(task *database.DeployTask) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(5))
 	defer cancel()
 	task.Status = common.TaskStatusCancelled
@@ -440,7 +442,7 @@ func (a *DeployActivity) handleBuildTaskToBuildInQueue(task *database.DeployTask
 	task.Deploy.Status = common.BuildInQueue
 
 	if err := a.updateTaskStatus(task); err != nil {
-		return fmt.Errorf("handleBuildTaskToBuildInQueue failed to update deploy task status: %w", err)
+		return fmt.Errorf("handleBuildTaskToBuildInQueue failed to update build task %d status: %w", task.ID, err)
 	}
 
 	return nil
@@ -453,7 +455,7 @@ func (a *DeployActivity) handleDeployError(task *database.DeployTask, err error)
 	task.Deploy.Status = common.DeployFailed
 
 	if err := a.updateTaskStatus(task); err != nil {
-		return fmt.Errorf("handleDeployError failed to update deploy task status: %w", err)
+		return fmt.Errorf("handleDeployError failed to update deploy task %d status: %w", task.ID, err)
 	}
 	return nil
 }
@@ -488,7 +490,7 @@ func (a *DeployActivity) reportLog(message string, step types.Step, task *databa
 func (a *DeployActivity) createBuildRequest(ctx context.Context, task *database.DeployTask, repoInfo common.RepoInfo) (*types.ImageBuilderRequest, error) {
 	accessToken, err := a.ts.FindByUID(ctx, task.Deploy.UserID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get git access token: %w", err)
+		return nil, fmt.Errorf("failed to get git access for user id %d error: %w", task.Deploy.UserID, err)
 	}
 
 	pathParts := strings.Split(repoInfo.Path, "/")
@@ -504,7 +506,7 @@ func (a *DeployActivity) createBuildRequest(ctx context.Context, task *database.
 	}
 	lastCommit, err := a.gs.GetRepoLastCommit(ctx, lastCommitReq)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get repository last commit: %w", err)
+		return nil, fmt.Errorf("failed to get repository %s last commit: %w", repoInfo.Path, err)
 	}
 
 	return &types.ImageBuilderRequest{
@@ -535,12 +537,12 @@ func (a *DeployActivity) createDeployRequest(ctx context.Context, task *database
 
 	accessToken, err := a.ts.FindByUID(ctx, task.Deploy.UserID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get git access token: %w", err)
+		return nil, fmt.Errorf("failed to get git access token for user id %d error: %w", task.Deploy.UserID, err)
 	}
 
 	deployInfo, err := a.ds.GetDeployByID(ctx, task.DeployID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get deploy with error: %w", err)
+		return nil, fmt.Errorf("failed to get deploy info for deploy id %d error: %w", task.DeployID, err)
 	}
 
 	pathParts := strings.Split(repoInfo.Path, "/")
@@ -559,37 +561,38 @@ func (a *DeployActivity) createDeployRequest(ctx context.Context, task *database
 	if len(deployInfo.RuntimeFramework) > 0 {
 		framework, err := a.rfs.FindByImageID(ctx, deployInfo.ImageID)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get runtime framework by name %s: %w", deployInfo.RuntimeFramework, err)
+			return nil, fmt.Errorf("failed to get runtime framework by name %s for deploy task id %d error: %w", deployInfo.RuntimeFramework, task.ID, err)
 		}
 		trimmedEngineArgs := strings.TrimSpace(framework.EngineArgs)
 		if len(trimmedEngineArgs) > 0 {
 			if err := json.Unmarshal([]byte(trimmedEngineArgs), &engineArgsTemplates); err != nil {
-				return nil, fmt.Errorf("failed to unmarshal engine args: %w", err)
+				return nil, fmt.Errorf("failed to unmarshal engine args for deploy task id %d : %w", task.ID, err)
 			}
 		}
 		trimmedToolCallParsers := strings.TrimSpace(framework.ToolCallParsers)
 		if len(trimmedToolCallParsers) > 0 {
 			if err := json.Unmarshal([]byte(trimmedToolCallParsers), &toolCallParsers); err != nil {
-				logger.Error("Failed to unmarshal tool call parsers", "error", err)
+				logger.Error("Failed to unmarshal tool call parsers", slog.Any("taskid", task.ID), slog.Any("err", err))
 			}
 		}
 	}
 
 	annotationMap, err := utilcommon.JsonStrToMap(deployInfo.Annotation)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse deploy annotation: %w", err)
+		return nil, fmt.Errorf("failed to parse deploy annotation for deploy id %d error: %w", deployInfo.ID, err)
 	}
 	annotationMap[types.ResDeployID] = fmt.Sprintf("%v", deployInfo.ID)
 
 	var hardware types.HardWare
 	if err := json.Unmarshal([]byte(deployInfo.Hardware), &hardware); err != nil {
-		logger.Error("Deploy hardware is invalid format", "hardware", deployInfo.Hardware, "task_id", task.ID)
-		return nil, fmt.Errorf("failed to parse deploy hardware: %w", err)
+		logger.Error("Deploy hardware is invalid format", slog.Any("hardware", deployInfo.Hardware),
+			slog.Any("task_id", task.ID))
+		return nil, fmt.Errorf("failed to parse deploy hardware for deploy task id %d error: %w", task.ID, err)
 	}
 
 	envMap, err := a.makeDeployEnv(ctx, hardware, accessToken, deployInfo, engineArgsTemplates, toolCallParsers, repoInfo)
 	if err != nil {
-		return nil, fmt.Errorf("failed to make deploy env: %w", err)
+		return nil, fmt.Errorf("failed to make deploy env for deploy id %d task id %d error: %w", deployInfo.ID, task.ID, err)
 	}
 	targetID := deployInfo.SpaceID
 
@@ -599,7 +602,8 @@ func (a *DeployActivity) createDeployRequest(ctx context.Context, task *database
 
 	clusterNodes, err := a.cls.FindNodeByClusterID(ctx, deployInfo.ClusterID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get cluster %s nodes, error: %w", deployInfo.ClusterID, err)
+		return nil, fmt.Errorf("failed to get cluster %s nodes for deploy id %d task id %d, error: %w",
+			deployInfo.ClusterID, deployInfo.ID, task.ID, err)
 	}
 
 	requestNodes := []types.Node{}
@@ -661,7 +665,7 @@ func (a *DeployActivity) stopBuild(buildTask *database.DeployTask, repoInfo comm
 		ClusterID: buildTask.Deploy.ClusterID,
 	})
 	if err != nil {
-		slog.Error("Failed to stop build", slog.Any("error", err))
+		slog.ErrorContext(stopCtx, "Failed to stop repo build", slog.Any("Path", repoInfo.Path), slog.Any("error", err))
 		// Ignore the error of stopping the build, as it may be because the build has already been completed or does not exist
 	}
 }

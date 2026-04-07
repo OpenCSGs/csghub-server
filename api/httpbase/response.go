@@ -28,6 +28,26 @@ func OK(c *gin.Context, data interface{}) {
 	c.PureJSON(http.StatusOK, respData)
 }
 
+// Created responds the client with standard JSON (HTTP 201).
+//
+// Example:
+// * Created(c, createdResource)
+// * Created(c, nil)
+func Created(c *gin.Context, data interface{}) {
+	respData := R{
+		Msg:  "Created",
+		Data: data,
+	}
+	if c.Request == nil || c.Request.Header == nil {
+		c.PureJSON(http.StatusCreated, respData)
+		return
+	}
+	lang := c.GetHeader("Accept-Language")
+	modifiedData := i18n.TranslateInterface(data, lang)
+	respData.Data = modifiedData
+	c.PureJSON(http.StatusCreated, respData)
+}
+
 // OK responds the client with standard JSON.
 //
 // Example:

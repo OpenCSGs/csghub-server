@@ -206,7 +206,7 @@ func TestSpaceComponent_Show(t *testing.T) {
 		}, nil,
 	)
 
-	sc.mocks.deployer.EXPECT().GetReplica(ctx, types.DeployRepo{
+	sc.mocks.deployer.EXPECT().GetReplica(ctx, types.DeployRequest{
 		SpaceID:   1,
 		Namespace: "ns",
 		Name:      "n",
@@ -565,7 +565,7 @@ func TestSpaceComponent_Wakeup(t *testing.T) {
 			&database.Deploy{SvcName: "svc"}, nil,
 		)
 
-		sc.mocks.deployer.EXPECT().Wakeup(ctx, types.DeployRepo{
+		sc.mocks.deployer.EXPECT().Wakeup(ctx, types.DeployRequest{
 			SpaceID:   1,
 			Namespace: "ns",
 			Name:      "n",
@@ -601,7 +601,7 @@ func TestSpaceComponent_Stop(t *testing.T) {
 			&database.Deploy{SvcName: "svc", RepoID: 1, UserID: 2, ID: 3}, nil,
 		)
 
-		sc.mocks.deployer.EXPECT().Stop(ctx, types.DeployRepo{
+		sc.mocks.deployer.EXPECT().Stop(ctx, types.DeployRequest{
 			SpaceID:   1,
 			Namespace: "ns",
 			Name:      "n",
@@ -673,7 +673,7 @@ func TestSpaceComponent_Logs(t *testing.T) {
 		ID: 1,
 	}, nil)
 
-	sc.mocks.deployer.EXPECT().Logs(ctx, types.DeployRepo{
+	sc.mocks.deployer.EXPECT().Logs(ctx, types.DeployRequest{
 		SpaceID:   1,
 		Namespace: "ns",
 		Name:      "n",

@@ -6,12 +6,17 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/tests"
 	"opencsg.com/csghub-server/common/types"
 )
 
 func TestLLMServiceComponent_CreateLLMConfig(t *testing.T) {
 	ctx := context.TODO()
-	mc := initializeTestLLMServiceComponent(ctx, t)
+	stores := tests.NewMockStores(t)
+	mc := &llmServiceComponentImpl{
+		llmConfigStore:    stores.LLMConfig,
+		promptPrefixStore: stores.PromptPrefix,
+	}
 	req := &types.CreateLLMConfigReq{
 		ModelName:   "new-model",
 		ApiEndpoint: "http://new.endpoint",
@@ -27,7 +32,7 @@ func TestLLMServiceComponent_CreateLLMConfig(t *testing.T) {
 		Type:        666,
 		Enabled:     true,
 	}
-	mc.mocks.stores.LLMConfigMock().EXPECT().Create(ctx, database.LLMConfig{
+	stores.LLMConfigMock().EXPECT().Create(ctx, database.LLMConfig{
 		ModelName:   "new-model",
 		ApiEndpoint: "http://new.endpoint",
 		AuthHeader:  "Bearer token",
@@ -43,7 +48,11 @@ func TestLLMServiceComponent_CreateLLMConfig(t *testing.T) {
 
 func TestLLMServiceComponent_CreatePromptPrefix(t *testing.T) {
 	ctx := context.TODO()
-	mc := initializeTestLLMServiceComponent(ctx, t)
+	stores := tests.NewMockStores(t)
+	mc := &llmServiceComponentImpl{
+		llmConfigStore:    stores.LLMConfig,
+		promptPrefixStore: stores.PromptPrefix,
+	}
 	req := &types.CreatePromptPrefixReq{
 		ZH:   "zh",
 		EN:   "en",
@@ -55,7 +64,7 @@ func TestLLMServiceComponent_CreatePromptPrefix(t *testing.T) {
 		EN:   "en",
 		Kind: "kind",
 	}
-	mc.mocks.stores.PromptPrefixMock().EXPECT().Create(ctx, database.PromptPrefix{
+	stores.PromptPrefixMock().EXPECT().Create(ctx, database.PromptPrefix{
 		ZH:   "zh",
 		EN:   "en",
 		Kind: "kind",
@@ -67,7 +76,11 @@ func TestLLMServiceComponent_CreatePromptPrefix(t *testing.T) {
 }
 func TestLLMServiceComponent_IndexLLMConfig(t *testing.T) {
 	ctx := context.TODO()
-	mc := initializeTestLLMServiceComponent(ctx, t)
+	stores := tests.NewMockStores(t)
+	mc := &llmServiceComponentImpl{
+		llmConfigStore:    stores.LLMConfig,
+		promptPrefixStore: stores.PromptPrefix,
+	}
 	per := 1
 	page := 1
 	search := &types.SearchLLMConfig{
@@ -81,7 +94,7 @@ func TestLLMServiceComponent_IndexLLMConfig(t *testing.T) {
 		Type:        666,
 		Enabled:     true,
 	}
-	mc.mocks.stores.LLMConfigMock().EXPECT().Index(ctx, per, page, search).Return([]*database.LLMConfig{dbLLMConfig}, 1, nil)
+	stores.LLMConfigMock().EXPECT().Index(ctx, per, page, search).Return([]*database.LLMConfig{dbLLMConfig}, 1, nil)
 	res, total, err := mc.IndexLLMConfig(ctx, per, page, search)
 	require.Nil(t, err)
 	require.NotNil(t, res)
@@ -91,7 +104,11 @@ func TestLLMServiceComponent_IndexLLMConfig(t *testing.T) {
 
 func TestLLMServiceComponent_IndexPromptPrefix(t *testing.T) {
 	ctx := context.TODO()
-	mc := initializeTestLLMServiceComponent(ctx, t)
+	stores := tests.NewMockStores(t)
+	mc := &llmServiceComponentImpl{
+		llmConfigStore:    stores.LLMConfig,
+		promptPrefixStore: stores.PromptPrefix,
+	}
 	per := 1
 	page := 1
 	dbPromptPrefix := &database.PromptPrefix{
@@ -99,7 +116,7 @@ func TestLLMServiceComponent_IndexPromptPrefix(t *testing.T) {
 		ZH: "zh",
 	}
 	search := &types.SearchPromptPrefix{}
-	mc.mocks.stores.PromptPrefixMock().EXPECT().Index(ctx, per, page, search).Return([]*database.PromptPrefix{dbPromptPrefix}, 1, nil)
+	stores.PromptPrefixMock().EXPECT().Index(ctx, per, page, search).Return([]*database.PromptPrefix{dbPromptPrefix}, 1, nil)
 	res, total, err := mc.IndexPromptPrefix(ctx, per, page, search)
 	require.Nil(t, err)
 	require.NotNil(t, res)
@@ -109,7 +126,11 @@ func TestLLMServiceComponent_IndexPromptPrefix(t *testing.T) {
 
 func TestLLMServiceComponent_UpdateLLMConfig(t *testing.T) {
 	ctx := context.TODO()
-	mc := initializeTestLLMServiceComponent(ctx, t)
+	stores := tests.NewMockStores(t)
+	mc := &llmServiceComponentImpl{
+		llmConfigStore:    stores.LLMConfig,
+		promptPrefixStore: stores.PromptPrefix,
+	}
 	newName := "new-model"
 	req := &types.UpdateLLMConfigReq{
 		ID:        123,
@@ -119,8 +140,8 @@ func TestLLMServiceComponent_UpdateLLMConfig(t *testing.T) {
 		ID:        123,
 		ModelName: newName,
 	}
-	mc.mocks.stores.LLMConfigMock().EXPECT().GetByID(ctx, int64(123)).Return(dbLLMConfig, nil)
-	mc.mocks.stores.LLMConfigMock().EXPECT().Update(ctx, database.LLMConfig{
+	stores.LLMConfigMock().EXPECT().GetByID(ctx, int64(123)).Return(dbLLMConfig, nil)
+	stores.LLMConfigMock().EXPECT().Update(ctx, database.LLMConfig{
 		ID:        123,
 		ModelName: newName,
 	}).Return(dbLLMConfig, nil)
@@ -133,7 +154,11 @@ func TestLLMServiceComponent_UpdateLLMConfig(t *testing.T) {
 
 func TestLLMServiceComponent_UpdatePromptPrefix(t *testing.T) {
 	ctx := context.TODO()
-	mc := initializeTestLLMServiceComponent(ctx, t)
+	stores := tests.NewMockStores(t)
+	mc := &llmServiceComponentImpl{
+		llmConfigStore:    stores.LLMConfig,
+		promptPrefixStore: stores.PromptPrefix,
+	}
 	newKind := "new-kind"
 	req := &types.UpdatePromptPrefixReq{
 		ID:   123,
@@ -143,8 +168,8 @@ func TestLLMServiceComponent_UpdatePromptPrefix(t *testing.T) {
 		ID:   123,
 		Kind: newKind,
 	}
-	mc.mocks.stores.PromptPrefixMock().EXPECT().GetByID(ctx, int64(123)).Return(dbPromptPrefix, nil)
-	mc.mocks.stores.PromptPrefixMock().EXPECT().Update(ctx, database.PromptPrefix{
+	stores.PromptPrefixMock().EXPECT().GetByID(ctx, int64(123)).Return(dbPromptPrefix, nil)
+	stores.PromptPrefixMock().EXPECT().Update(ctx, database.PromptPrefix{
 		ID:   123,
 		Kind: newKind,
 	}).Return(dbPromptPrefix, nil)
@@ -157,16 +182,24 @@ func TestLLMServiceComponent_UpdatePromptPrefix(t *testing.T) {
 
 func TestLLMServiceComponent_DeleteLLMConfig(t *testing.T) {
 	ctx := context.TODO()
-	mc := initializeTestLLMServiceComponent(ctx, t)
-	mc.mocks.stores.LLMConfigMock().EXPECT().Delete(ctx, int64(123)).Return(nil)
+	stores := tests.NewMockStores(t)
+	mc := &llmServiceComponentImpl{
+		llmConfigStore:    stores.LLMConfig,
+		promptPrefixStore: stores.PromptPrefix,
+	}
+	stores.LLMConfigMock().EXPECT().Delete(ctx, int64(123)).Return(nil)
 	err := mc.DeleteLLMConfig(ctx, int64(123))
 	require.Nil(t, err)
 }
 
 func TestLLMServiceComponent_DeletePromptPrefix(t *testing.T) {
 	ctx := context.TODO()
-	mc := initializeTestLLMServiceComponent(ctx, t)
-	mc.mocks.stores.PromptPrefixMock().EXPECT().Delete(ctx, int64(123)).Return(nil)
+	stores := tests.NewMockStores(t)
+	mc := &llmServiceComponentImpl{
+		llmConfigStore:    stores.LLMConfig,
+		promptPrefixStore: stores.PromptPrefix,
+	}
+	stores.PromptPrefixMock().EXPECT().Delete(ctx, int64(123)).Return(nil)
 	err := mc.DeletePromptPrefix(ctx, int64(123))
 	require.Nil(t, err)
 }

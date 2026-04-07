@@ -5,33 +5,25 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/mock"
-	"go.temporal.io/sdk/client"
-	"go.temporal.io/sdk/mocks"
-	mocktemporal "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/temporal"
 	mockcomp "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/moderation/component"
 	"opencsg.com/csghub-server/builder/testutil"
-	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
-	"opencsg.com/csghub-server/moderation/workflow"
-	"opencsg.com/csghub-server/moderation/workflow/common"
+	"opencsg.com/csghub-server/moderation/component"
 )
 
 type RepoTester struct {
 	*testutil.GinTester
 	handler *RepoHandler
 	mocks   struct {
-		rc  *mockcomp.MockRepoComponent
-		cfg *config.Config
+		rc *mockcomp.MockRepoComponent
 	}
 }
 
 func newRepoTester(t *testing.T) *RepoTester {
 	tester := &RepoTester{GinTester: testutil.NewGinTester()}
 	tester.mocks.rc = mockcomp.NewMockRepoComponent(t)
-	tester.mocks.cfg = &config.Config{}
 	tester.handler = &RepoHandler{
-		rc:     tester.mocks.rc,
-		config: &config.Config{},
+		rc: tester.mocks.rc,
 	}
 	tester.WithParam("id", "1")
 	return tester
@@ -54,11 +46,15 @@ func TestRepoHandler_FullCheck(t *testing.T) {
 			RepoType:  types.ModelRepo,
 		}
 
-		tester.mocks.rc.EXPECT().GetNamespaceWhiteList(mock.Anything).Return([]string{"admin", "test"}, nil).Once()
+		tester.mocks.rc.EXPECT().RepoFullCheck(mock.Anything, component.RepoFullCheckRequest{
+			Namespace: req.Namespace,
+			Name:      req.Name,
+			RepoType:  req.RepoType,
+		}).Return(&types.RepoFullCheckResult{Skipped: true}, nil).Once()
 		tester.WithBody(t, req)
 		tester.Execute()
 
-		tester.ResponseEq(t, 200, "OK", nil)
+		tester.ResponseEq(t, 200, "OK", &types.RepoFullCheckResult{Skipped: true})
 	})
 
 	t.Run("request with namespace not in whitelist, trigger workflow", func(t *testing.T) {
@@ -71,26 +67,19 @@ func TestRepoHandler_FullCheck(t *testing.T) {
 			RepoType:  types.ModelRepo,
 		}
 
-		tester.mocks.rc.EXPECT().GetNamespaceWhiteList(mock.Anything).Return([]string{"admin", "test"}, nil).Once()
-
-		mockWorkflowClient := mocktemporal.NewMockClient(t)
-		workflow.SetWorkflowClient(mockWorkflowClient)
-		workflowOptions := client.StartWorkflowOptions{
-			TaskQueue: "moderation_repo_full_check_queue",
-		}
-		repo := common.Repo{
+		tester.mocks.rc.EXPECT().RepoFullCheck(mock.Anything, component.RepoFullCheckRequest{
 			Namespace: req.Namespace,
 			Name:      req.Name,
 			RepoType:  req.RepoType,
-		}
-		we := mocks.NewWorkflowRun(t)
-		we.On("GetID").Return("1").Once()
-		mockWorkflowClient.EXPECT().ExecuteWorkflow(mock.Anything, workflowOptions, mock.Anything, repo, tester.mocks.cfg).Return(we, nil).Once()
+		}).Return(&types.RepoFullCheckResult{
+			Skipped:    false,
+			WorkflowID: "1",
+		}, nil).Once()
 
 		tester.WithBody(t, req)
 		tester.Execute()
 
-		tester.ResponseEq(t, 200, "OK", nil)
+		tester.ResponseEq(t, 200, "OK", &types.RepoFullCheckResult{Skipped: false, WorkflowID: "1"})
 	})
 
 	t.Run("bad request", func(t *testing.T) {
