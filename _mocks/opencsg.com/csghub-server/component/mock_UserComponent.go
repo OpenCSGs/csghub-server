@@ -1112,24 +1112,24 @@ func (_c *MockUserComponent_LikesSpaces_Call) RunAndReturn(run func(context.Cont
 }
 
 // ListDeploys provides a mock function with given fields: ctx, repoType, req
-func (_m *MockUserComponent) ListDeploys(ctx context.Context, repoType types.RepositoryType, req *types.DeployReq) ([]types.DeployRepo, int, error) {
+func (_m *MockUserComponent) ListDeploys(ctx context.Context, repoType types.RepositoryType, req *types.DeployReq) ([]types.DeployRequest, int, error) {
 	ret := _m.Called(ctx, repoType, req)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ListDeploys")
 	}
 
-	var r0 []types.DeployRepo
+	var r0 []types.DeployRequest
 	var r1 int
 	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, types.RepositoryType, *types.DeployReq) ([]types.DeployRepo, int, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, types.RepositoryType, *types.DeployReq) ([]types.DeployRequest, int, error)); ok {
 		return rf(ctx, repoType, req)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, types.RepositoryType, *types.DeployReq) []types.DeployRepo); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, types.RepositoryType, *types.DeployReq) []types.DeployRequest); ok {
 		r0 = rf(ctx, repoType, req)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]types.DeployRepo)
+			r0 = ret.Get(0).([]types.DeployRequest)
 		}
 	}
 
@@ -1168,35 +1168,35 @@ func (_c *MockUserComponent_ListDeploys_Call) Run(run func(ctx context.Context, 
 	return _c
 }
 
-func (_c *MockUserComponent_ListDeploys_Call) Return(_a0 []types.DeployRepo, _a1 int, _a2 error) *MockUserComponent_ListDeploys_Call {
+func (_c *MockUserComponent_ListDeploys_Call) Return(_a0 []types.DeployRequest, _a1 int, _a2 error) *MockUserComponent_ListDeploys_Call {
 	_c.Call.Return(_a0, _a1, _a2)
 	return _c
 }
 
-func (_c *MockUserComponent_ListDeploys_Call) RunAndReturn(run func(context.Context, types.RepositoryType, *types.DeployReq) ([]types.DeployRepo, int, error)) *MockUserComponent_ListDeploys_Call {
+func (_c *MockUserComponent_ListDeploys_Call) RunAndReturn(run func(context.Context, types.RepositoryType, *types.DeployReq) ([]types.DeployRequest, int, error)) *MockUserComponent_ListDeploys_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // ListDeploysByNamespace provides a mock function with given fields: ctx, req
-func (_m *MockUserComponent) ListDeploysByNamespace(ctx context.Context, req *types.OrgRunDeploysReq) ([]types.DeployRepo, int, error) {
+func (_m *MockUserComponent) ListDeploysByNamespace(ctx context.Context, req *types.OrgRunDeploysReq) ([]types.DeployRequest, int, error) {
 	ret := _m.Called(ctx, req)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ListDeploysByNamespace")
 	}
 
-	var r0 []types.DeployRepo
+	var r0 []types.DeployRequest
 	var r1 int
 	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, *types.OrgRunDeploysReq) ([]types.DeployRepo, int, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *types.OrgRunDeploysReq) ([]types.DeployRequest, int, error)); ok {
 		return rf(ctx, req)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *types.OrgRunDeploysReq) []types.DeployRepo); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *types.OrgRunDeploysReq) []types.DeployRequest); ok {
 		r0 = rf(ctx, req)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]types.DeployRepo)
+			r0 = ret.Get(0).([]types.DeployRequest)
 		}
 	}
 
@@ -1234,12 +1234,12 @@ func (_c *MockUserComponent_ListDeploysByNamespace_Call) Run(run func(ctx contex
 	return _c
 }
 
-func (_c *MockUserComponent_ListDeploysByNamespace_Call) Return(_a0 []types.DeployRepo, _a1 int, _a2 error) *MockUserComponent_ListDeploysByNamespace_Call {
+func (_c *MockUserComponent_ListDeploysByNamespace_Call) Return(_a0 []types.DeployRequest, _a1 int, _a2 error) *MockUserComponent_ListDeploysByNamespace_Call {
 	_c.Call.Return(_a0, _a1, _a2)
 	return _c
 }
 
-func (_c *MockUserComponent_ListDeploysByNamespace_Call) RunAndReturn(run func(context.Context, *types.OrgRunDeploysReq) ([]types.DeployRepo, int, error)) *MockUserComponent_ListDeploysByNamespace_Call {
+func (_c *MockUserComponent_ListDeploysByNamespace_Call) RunAndReturn(run func(context.Context, *types.OrgRunDeploysReq) ([]types.DeployRequest, int, error)) *MockUserComponent_ListDeploysByNamespace_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1311,24 +1311,24 @@ func (_c *MockUserComponent_ListFinetunes_Call) RunAndReturn(run func(context.Co
 }
 
 // ListInstances provides a mock function with given fields: ctx, req
-func (_m *MockUserComponent) ListInstances(ctx context.Context, req *types.UserRepoReq) ([]types.DeployRepo, int, error) {
+func (_m *MockUserComponent) ListInstances(ctx context.Context, req *types.UserRepoReq) ([]types.DeployRequest, int, error) {
 	ret := _m.Called(ctx, req)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ListInstances")
 	}
 
-	var r0 []types.DeployRepo
+	var r0 []types.DeployRequest
 	var r1 int
 	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, *types.UserRepoReq) ([]types.DeployRepo, int, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *types.UserRepoReq) ([]types.DeployRequest, int, error)); ok {
 		return rf(ctx, req)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *types.UserRepoReq) []types.DeployRepo); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *types.UserRepoReq) []types.DeployRequest); ok {
 		r0 = rf(ctx, req)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]types.DeployRepo)
+			r0 = ret.Get(0).([]types.DeployRequest)
 		}
 	}
 
@@ -1366,12 +1366,12 @@ func (_c *MockUserComponent_ListInstances_Call) Run(run func(ctx context.Context
 	return _c
 }
 
-func (_c *MockUserComponent_ListInstances_Call) Return(_a0 []types.DeployRepo, _a1 int, _a2 error) *MockUserComponent_ListInstances_Call {
+func (_c *MockUserComponent_ListInstances_Call) Return(_a0 []types.DeployRequest, _a1 int, _a2 error) *MockUserComponent_ListInstances_Call {
 	_c.Call.Return(_a0, _a1, _a2)
 	return _c
 }
 
-func (_c *MockUserComponent_ListInstances_Call) RunAndReturn(run func(context.Context, *types.UserRepoReq) ([]types.DeployRepo, int, error)) *MockUserComponent_ListInstances_Call {
+func (_c *MockUserComponent_ListInstances_Call) RunAndReturn(run func(context.Context, *types.UserRepoReq) ([]types.DeployRequest, int, error)) *MockUserComponent_ListInstances_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1509,24 +1509,24 @@ func (_c *MockUserComponent_ListNotebooksByNamespace_Call) RunAndReturn(run func
 }
 
 // ListServerless provides a mock function with given fields: ctx, req
-func (_m *MockUserComponent) ListServerless(ctx context.Context, req types.DeployReq) ([]types.DeployRepo, int, error) {
+func (_m *MockUserComponent) ListServerless(ctx context.Context, req types.DeployReq) ([]types.DeployRequest, int, error) {
 	ret := _m.Called(ctx, req)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ListServerless")
 	}
 
-	var r0 []types.DeployRepo
+	var r0 []types.DeployRequest
 	var r1 int
 	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, types.DeployReq) ([]types.DeployRepo, int, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, types.DeployReq) ([]types.DeployRequest, int, error)); ok {
 		return rf(ctx, req)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, types.DeployReq) []types.DeployRepo); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, types.DeployReq) []types.DeployRequest); ok {
 		r0 = rf(ctx, req)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]types.DeployRepo)
+			r0 = ret.Get(0).([]types.DeployRequest)
 		}
 	}
 
@@ -1564,12 +1564,12 @@ func (_c *MockUserComponent_ListServerless_Call) Run(run func(ctx context.Contex
 	return _c
 }
 
-func (_c *MockUserComponent_ListServerless_Call) Return(_a0 []types.DeployRepo, _a1 int, _a2 error) *MockUserComponent_ListServerless_Call {
+func (_c *MockUserComponent_ListServerless_Call) Return(_a0 []types.DeployRequest, _a1 int, _a2 error) *MockUserComponent_ListServerless_Call {
 	_c.Call.Return(_a0, _a1, _a2)
 	return _c
 }
 
-func (_c *MockUserComponent_ListServerless_Call) RunAndReturn(run func(context.Context, types.DeployReq) ([]types.DeployRepo, int, error)) *MockUserComponent_ListServerless_Call {
+func (_c *MockUserComponent_ListServerless_Call) RunAndReturn(run func(context.Context, types.DeployReq) ([]types.DeployRequest, int, error)) *MockUserComponent_ListServerless_Call {
 	_c.Call.Return(run)
 	return _c
 }

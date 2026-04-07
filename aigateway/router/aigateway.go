@@ -65,6 +65,5 @@ func createMCPRoute(v1Group *gin.RouterGroup, mcpProxy handler.MCPProxyHandler) 
 	mcpGroup := v1Group.Group("mcp")
 	mcpGroup.GET("/resources", mcpProxy.Resources)
 
-	// todo: enable mcp server proxy later
 	mcpGroup.Any("/:servicename/*any", mcpProxy.ProxyToApi(""))
 }

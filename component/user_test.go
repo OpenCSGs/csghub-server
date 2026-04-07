@@ -530,7 +530,7 @@ func TestUserComponent_ListServeless(t *testing.T) {
 	data, total, err := uc.ListServerless(ctx, *req)
 	require.Nil(t, err)
 	require.Equal(t, 100, total)
-	require.Equal(t, []types.DeployRepo{
+	require.Equal(t, []types.DeployRequest{
 		{
 			Path: "models_foo/bar", Status: "Pending", GitPath: "models_foo/bar", Hardware: `{"memory": "foo"}`,
 			RepoID: 123, SvcName: "svc", ClusterID: "cluster", SKU: "sku",

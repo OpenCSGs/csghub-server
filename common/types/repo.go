@@ -192,7 +192,7 @@ type InstanceInfo struct {
 }
 
 // repo object(cover model/space/code/dataset) for deployer
-type DeployRepo struct {
+type DeployRequest struct {
 	DeployID            int64      `json:"deploy_id,omitempty"`
 	DeployName          string     `json:"deploy_name,omitempty"`
 	SpaceID             int64      `json:"space_id,omitempty"`
@@ -251,6 +251,11 @@ type DeployRepo struct {
 	Instance string `json:"instance,omitempty"`
 
 	DeployExtend
+
+	Sandbox struct {
+		Timeout    int64  `json:"timeout,omitempty"`
+		TemplateID string `json:"templateID,omitempty"`
+	}
 }
 
 type RuntimeFrameworkReq struct {

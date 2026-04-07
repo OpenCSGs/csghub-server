@@ -28,16 +28,16 @@ type DeployWorkflowFunc func(buildTask, runTask *database.DeployTask)
 var DeployWorkflow DeployWorkflowFunc
 
 type Deployer interface {
-	Deploy(ctx context.Context, dr types.DeployRepo) (deployID int64, err error)
-	Status(ctx context.Context, dr types.DeployRepo, needDetails bool) (srvName string, status int, instances []types.Instance, err error)
-	Logs(ctx context.Context, dr types.DeployRepo) (*MultiLogReader, error)
-	Stop(ctx context.Context, dr types.DeployRepo) (err error)
+	Deploy(ctx context.Context, dr types.DeployRequest) (deployID int64, err error)
+	Status(ctx context.Context, dr types.DeployRequest, needDetails bool) (srvName string, status int, instances []types.Instance, err error)
+	Logs(ctx context.Context, dr types.DeployRequest) (*MultiLogReader, error)
+	Stop(ctx context.Context, dr types.DeployRequest) (err error)
 	StopBuild(ctx context.Context, req types.ImageBuildStopReq) (err error)
-	Purge(ctx context.Context, dr types.DeployRepo) (err error)
-	Wakeup(ctx context.Context, dr types.DeployRepo) (err error)
-	Exist(ctx context.Context, dr types.DeployRepo) (bool, error)
-	GetReplica(ctx context.Context, dr types.DeployRepo) (int, int, []types.Instance, error)
-	InstanceLogs(ctx context.Context, dr types.DeployRepo) (*MultiLogReader, error)
+	Purge(ctx context.Context, dr types.DeployRequest) (err error)
+	Wakeup(ctx context.Context, dr types.DeployRequest) (err error)
+	Exist(ctx context.Context, dr types.DeployRequest) (bool, error)
+	GetReplica(ctx context.Context, dr types.DeployRequest) (int, int, []types.Instance, error)
+	InstanceLogs(ctx context.Context, dr types.DeployRequest) (*MultiLogReader, error)
 	ListCluster(ctx context.Context) ([]types.ClusterRes, error)
 	GetClusterById(ctx context.Context, clusterId string) (*types.ClusterRes, error)
 	UpdateCluster(ctx context.Context, data types.ClusterRequest) (*types.UpdateClusterResponse, error)
@@ -57,7 +57,7 @@ type Deployer interface {
 	LabelNode(ctx context.Context, req *types.NodeLabel) error
 }
 
-func (d *deployer) GenerateUniqueSvcName(dr types.DeployRepo) string {
+func (d *deployer) GenerateUniqueSvcName(dr types.DeployRequest) string {
 	uniqueSvcName := ""
 	switch dr.Type {
 	case types.SpaceType:
@@ -76,7 +76,7 @@ func (d *deployer) GenerateUniqueSvcName(dr types.DeployRepo) string {
 	return uniqueSvcName
 }
 
-func (d *deployer) serverlessDeploy(ctx context.Context, dr types.DeployRepo) (*database.Deploy, error) {
+func (d *deployer) serverlessDeploy(ctx context.Context, dr types.DeployRequest) (*database.Deploy, error) {
 	var (
 		deploy *database.Deploy
 		err    error
@@ -126,7 +126,7 @@ func (d *deployer) serverlessDeploy(ctx context.Context, dr types.DeployRepo) (*
 	return deploy, nil
 }
 
-func (d *deployer) dedicatedDeploy(ctx context.Context, dr types.DeployRepo) (*database.Deploy, error) {
+func (d *deployer) dedicatedDeploy(ctx context.Context, dr types.DeployRequest) (*database.Deploy, error) {
 	uniqueSvcName := d.GenerateUniqueSvcName(dr)
 	if len(uniqueSvcName) < 1 {
 		err := fmt.Errorf("failed to generate uuid for deploy")
@@ -175,7 +175,7 @@ func (d *deployer) dedicatedDeploy(ctx context.Context, dr types.DeployRepo) (*d
 	return deploy, err
 }
 
-func (d *deployer) buildDeploy(ctx context.Context, dr types.DeployRepo) (*database.Deploy, error) {
+func (d *deployer) buildDeploy(ctx context.Context, dr types.DeployRequest) (*database.Deploy, error) {
 	var deploy *database.Deploy = nil
 	var err error = nil
 	slog.Debug("do deployer.buildDeploy check type", slog.Any("dr.Type", dr.Type))
@@ -201,7 +201,7 @@ func (d *deployer) buildDeploy(ctx context.Context, dr types.DeployRepo) (*datab
 	return deploy, nil
 }
 
-func (d *deployer) Deploy(ctx context.Context, dr types.DeployRepo) (int64, error) {
+func (d *deployer) Deploy(ctx context.Context, dr types.DeployRequest) (int64, error) {
 	//check reserved resource
 	err := d.checkOrderDetail(ctx, dr)
 	if err != nil {
@@ -263,7 +263,7 @@ func (d *deployer) Deploy(ctx context.Context, dr types.DeployRepo) (int64, erro
 	return deploy.ID, nil
 }
 
-func (d *deployer) Status(ctx context.Context, dr types.DeployRepo, needDetails bool) (string, int, []types.Instance, error) {
+func (d *deployer) Status(ctx context.Context, dr types.DeployRequest, needDetails bool) (string, int, []types.Instance, error) {
 	deploy, err := d.deployTaskStore.GetDeployByID(ctx, dr.DeployID)
 	if err != nil || deploy == nil {
 		slog.Error("fail to get deploy by deploy id", slog.Any("DeployID", dr.DeployID), slog.Any("error", err))
@@ -279,7 +279,7 @@ func (d *deployer) Status(ctx context.Context, dr types.DeployRepo, needDetails 
 	return deploy.SvcName, deploy.Status, deploy.Instances, nil
 }
 
-func (d *deployer) Logs(ctx context.Context, dr types.DeployRepo) (*MultiLogReader, error) {
+func (d *deployer) Logs(ctx context.Context, dr types.DeployRequest) (*MultiLogReader, error) {
 	deploy, err := d.deployTaskStore.GetLatestDeployBySpaceID(ctx, dr.SpaceID)
 	if err != nil {
 		return nil, fmt.Errorf("can't get space latest deploy,%w", err)
@@ -354,7 +354,7 @@ func (d *deployer) readLogsFromLoki(ctx context.Context, params types.ReadLogReq
 	return log, nil
 }
 
-func (d *deployer) Stop(ctx context.Context, dr types.DeployRepo) error {
+func (d *deployer) Stop(ctx context.Context, dr types.DeployRequest) error {
 	targetID := dr.SpaceID // support space only one instance
 	if dr.SpaceID == 0 {
 		targetID = dr.DeployID // support model deploy with multi-instance
@@ -388,7 +388,7 @@ func (d *deployer) StopBuild(ctx context.Context, req types.ImageBuildStopReq) e
 	return nil
 }
 
-func (d *deployer) Purge(ctx context.Context, dr types.DeployRepo) error {
+func (d *deployer) Purge(ctx context.Context, dr types.DeployRequest) error {
 	targetID := dr.SpaceID // support space only one instance
 	if dr.SpaceID == 0 {
 		targetID = dr.DeployID // support model deploy with multi-instance
@@ -408,7 +408,7 @@ func (d *deployer) Purge(ctx context.Context, dr types.DeployRepo) error {
 	return err
 }
 
-func (d *deployer) Wakeup(ctx context.Context, dr types.DeployRepo) error {
+func (d *deployer) Wakeup(ctx context.Context, dr types.DeployRequest) error {
 	svcName := dr.SvcName
 	svcURL := fmt.Sprintf("http://%s.%s", svcName, d.internalRootDomain)
 
@@ -441,7 +441,7 @@ func (d *deployer) Wakeup(ctx context.Context, dr types.DeployRepo) error {
 
 	// Create a new HTTP client with a timeout
 	client := &http.Client{
-		Timeout: 20 * time.Second,
+		Timeout: 3 * time.Second,
 	}
 	// Send the request
 	resp, err := client.Do(req)
@@ -490,7 +490,7 @@ func (d *deployer) Wakeup(ctx context.Context, dr types.DeployRepo) error {
 	}
 }
 
-func (d *deployer) Exist(ctx context.Context, dr types.DeployRepo) (bool, error) {
+func (d *deployer) Exist(ctx context.Context, dr types.DeployRequest) (bool, error) {
 	targetID := dr.SpaceID // support space only one instance
 	if dr.SpaceID == 0 {
 		targetID = dr.DeployID // support model deploy with multi-instance
@@ -519,7 +519,7 @@ func (d *deployer) Exist(ctx context.Context, dr types.DeployRepo) (bool, error)
 	return true, nil
 }
 
-func (d *deployer) GetReplica(ctx context.Context, dr types.DeployRepo) (int, int, []types.Instance, error) {
+func (d *deployer) GetReplica(ctx context.Context, dr types.DeployRequest) (int, int, []types.Instance, error) {
 	targetID := dr.SpaceID // support space only one instance
 	if dr.SpaceID == 0 {
 		targetID = dr.DeployID // support model deploy with multi-instance
@@ -560,7 +560,7 @@ func parseSinceTime(since string) time.Time {
 	}
 }
 
-func (d *deployer) InstanceLogs(ctx context.Context, dr types.DeployRepo) (*MultiLogReader, error) {
+func (d *deployer) InstanceLogs(ctx context.Context, dr types.DeployRequest) (*MultiLogReader, error) {
 	slog.Debug("get logs for deploy", slog.Any("deploy", dr))
 
 	deploy, err := d.deployTaskStore.GetDeployByID(ctx, dr.DeployID)
