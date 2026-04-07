@@ -1354,6 +1354,7 @@ func createOrgRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware.
 		apiGroup.GET("/organization/:namespace/evaluations", orgHandler.Evaluations)
 		apiGroup.GET("/organization/:namespace/run/:repo_type", orgHandler.RunDeploys)
 		apiGroup.GET("/organization/:namespace/notebooks", orgHandler.Notebooks)
+		apiGroup.GET("/organization/:namespace/skills", orgHandler.Skills)
 	}
 
 	{
