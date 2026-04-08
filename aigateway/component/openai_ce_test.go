@@ -96,6 +96,7 @@ func TestOpenAIComponent_GetAvailableModels(t *testing.T) {
 					Created:     deploys[0].CreatedAt.Unix(),
 					Task:        "text-generation",
 					DisplayName: "model1",
+					Public:      true,
 					Metadata: map[string]any{
 						types.MetaKeyLLMType: types.ProviderTypeInference,
 					},
@@ -118,6 +119,7 @@ func TestOpenAIComponent_GetAvailableModels(t *testing.T) {
 					Object:  "model",
 					Created: deploys[1].CreatedAt.Unix(),
 					Task:    "text-to-image",
+					Public:  true,
 					Metadata: map[string]any{
 						types.MetaKeyLLMType: types.ProviderTypeServerless,
 					},
@@ -151,8 +153,10 @@ func TestOpenAIComponent_GetAvailableModels(t *testing.T) {
 		require.Len(t, models, 2)
 		assert.Equal(t, "model1:svc1", models[0].ID)
 		assert.Equal(t, "publicuser", models[0].OwnedBy)
+		assert.True(t, models[0].Public)
 		assert.Equal(t, "hf-model2:svc2", models[1].ID)
 		assert.Equal(t, "OpenCSG", models[1].OwnedBy)
+		assert.True(t, models[1].Public)
 		wg.Wait()
 	})
 
