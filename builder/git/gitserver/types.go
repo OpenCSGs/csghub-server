@@ -170,7 +170,9 @@ type GetRepoInfoByPathReq struct {
 	RepoType  types.RepositoryType `json:"repo_type"`
 	File      bool                 `json:"file"`
 	// limit file size, don't return file content if file size is greater than MaxFileSize
-	MaxFileSize int64 `json:"max_file_size"`
+	MaxFileSize                           int64    `json:"max_file_size"`
+	GitObjectDirectoryRelative            string   `json:"git_object_directory_relative"`
+	GitAlternateObjectDirectoriesRelative []string `json:"git_alternate_object_directories_relative"`
 }
 
 type GetRepoAllFilesReq struct {
