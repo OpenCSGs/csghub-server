@@ -82,7 +82,7 @@ func NewGitCallback(config *config.Config) (*gitCallbackComponentImpl, error) {
 	if err != nil {
 		return nil, err
 	}
-	svGen := NewSyncVersionGenerator()
+	svGen := NewSyncVersionGenerator(config)
 	rrf := database.NewRepositoriesRuntimeFramework()
 	rac, err := component.NewRuntimeArchitectureComponent(config)
 	if err != nil {
