@@ -53,7 +53,7 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error creating openai handler :%w", err)
 	}
-	v1Group.GET("/models", middlewareCollection.Auth.NeedLogin, openAIhandler.ListModels)
+	v1Group.GET("/models", openAIhandler.ListModels)
 	v1Group.GET("/models/:model", middlewareCollection.Auth.NeedLogin, openAIhandler.GetModel)
 	v1Group.POST("/chat/completions", middlewareCollection.Auth.NeedLogin, openAIhandler.Chat)
 	v1Group.POST("/embeddings", middlewareCollection.Auth.NeedLogin, openAIhandler.Embedding)
