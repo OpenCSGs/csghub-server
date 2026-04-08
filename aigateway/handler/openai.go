@@ -27,6 +27,7 @@ import (
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
 	commonType "opencsg.com/csghub-server/common/types"
+	"opencsg.com/csghub-server/common/utils/common"
 	apicomp "opencsg.com/csghub-server/component"
 )
 
@@ -146,16 +147,35 @@ type OpenAIHandlerImpl struct {
 // @Produce      json
 // @Param        model_id query string false "Model ID for fuzzy search"
 // @Param        public query bool false "Filter by public status (true for public models, false for private models)"
+// @Param        source query string false "Filter by source (csghub for CSGHub models, external for external models)" Enums(csghub, external)
 // @Param        per query int false "Models per page (default 20, max 100)"
 // @Param        page query int false "Page number (1-based, default 1)"
 // @Success      200  {object}  types.ModelList "OK"
+// @Failure      400  {object}  error "Invalid source parameter"
 // @Failure      500  {object}  error "Internal server error"
 // @Router       /v1/models [get]
 func (h *OpenAIHandlerImpl) ListModels(c *gin.Context) {
 	currentUser := httpbase.GetCurrentUser(c)
+
+	// Validate source parameter
+	source := strings.TrimSpace(c.Query("source"))
+	if source != "" {
+		sourceLower := strings.ToLower(source)
+		if sourceLower != string(types.ModelSourceCSGHub) && sourceLower != string(types.ModelSourceExternal) {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": types.Error{
+					Code:    "invalid_request_error",
+					Message: fmt.Sprintf("Invalid source parameter. Must be '%s' or '%s'", types.ModelSourceCSGHub, types.ModelSourceExternal),
+					Type:    "invalid_request_error",
+				}})
+			return
+		}
+	}
+
 	resp, err := h.openaiComponent.ListModels(c.Request.Context(), currentUser, types.ListModelsReq{
 		ModelID: c.Query("model_id"),
 		Public:  c.Query("public"),
+		Source:  source,
 		Per:     c.Query("per"),
 		Page:    c.Query("page"),
 	})
@@ -275,7 +295,17 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 	target := ""
 	host := ""
 	if len(model.SvcName) > 0 {
-		target, host, err = apicomp.ExtractDeployTargetAndHost(c.Request.Context(), h.clusterComp, targetReq)
+		cluster, errCls := h.clusterComp.GetClusterByID(c, targetReq.ClusterID)
+		if errCls != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": types.Error{
+					Code:    "cluster_not_found",
+					Message: fmt.Sprintf("cluster '%s' not found", model.ClusterID),
+					Type:    "invalid_request_error",
+				}})
+			return
+		}
+		target, host, _ = common.ExtractDeployTargetAndHost(c.Request.Context(), cluster, targetReq)
 	} else {
 		slog.DebugContext(c.Request.Context(), "external model", slog.Any("model", model))
 		target = model.Endpoint
@@ -450,7 +480,17 @@ func (h *OpenAIHandlerImpl) GenerateImage(c *gin.Context) {
 	target := ""
 	host := ""
 	if len(model.SvcName) > 0 {
-		target, host, err = apicomp.ExtractDeployTargetAndHost(ctx, h.clusterComp, targetReq)
+		cluster, errCls := h.clusterComp.GetClusterByID(c, targetReq.ClusterID)
+		if errCls != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": types.Error{
+					Code:    "cluster_not_found",
+					Message: fmt.Sprintf("cluster '%s' not found", model.ClusterID),
+					Type:    "invalid_request_error",
+				}})
+			return
+		}
+		target, host, _ = common.ExtractDeployTargetAndHost(ctx, cluster, targetReq)
 	} else {
 		target = model.Endpoint
 	}
@@ -537,6 +577,10 @@ func (h *OpenAIHandlerImpl) GenerateImage(c *gin.Context) {
 			slog.WarnContext(ctx, "endpoint has wrong struct", slog.String("model", modelName))
 		} else {
 			proxyToApi = uri.Path
+			if proxyToApi == "" {
+				// Spaces (HF Inference Toolkit) serve at root.
+				proxyToApi = "/"
+			}
 		}
 	}
 
@@ -623,7 +667,17 @@ func (h *OpenAIHandlerImpl) Embedding(c *gin.Context) {
 	target := ""
 	host := ""
 	if len(model.SvcName) > 0 {
-		target, host, err = apicomp.ExtractDeployTargetAndHost(c.Request.Context(), h.clusterComp, targetReq)
+		cluster, errCls := h.clusterComp.GetClusterByID(c, targetReq.ClusterID)
+		if errCls != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": types.Error{
+					Code:    "cluster_not_found",
+					Message: fmt.Sprintf("cluster '%s' not found", model.ClusterID),
+					Type:    "invalid_request_error",
+				}})
+			return
+		}
+		target, host, _ = common.ExtractDeployTargetAndHost(c.Request.Context(), cluster, targetReq)
 	} else {
 		target = model.Endpoint
 	}

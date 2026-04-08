@@ -30,7 +30,7 @@ type AccountingClient interface {
 	DeletePrice(currentUser string, id int64) (any, error)
 	ListMeteringsByUserIDAndTime(req types.ActStatementsReq) (any, error)
 	CreateOrder(currentUser string, req types.AcctOrderCreateReq) (any, error)
-	ListRechargeByUserIDAndTime(req types.AcctRechargeListReq) (any, error)
+	ListRecharge(req types.AcctRechargeListReq) (any, error)
 	ListRecharges(req types.RechargesIndexReq) (any, error)
 	StatementsIndex(req types.ActStatementsReq) (any, error)
 }

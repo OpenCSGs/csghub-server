@@ -251,6 +251,65 @@ func (_c *MockRepoComponent_GetRepo_Call) RunAndReturn(run func(context.Context,
 	return _c
 }
 
+// RepoFullCheck provides a mock function with given fields: ctx, req
+func (_m *MockRepoComponent) RepoFullCheck(ctx context.Context, req component.RepoFullCheckRequest) (*types.RepoFullCheckResult, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RepoFullCheck")
+	}
+
+	var r0 *types.RepoFullCheckResult
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, component.RepoFullCheckRequest) (*types.RepoFullCheckResult, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, component.RepoFullCheckRequest) *types.RepoFullCheckResult); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.RepoFullCheckResult)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, component.RepoFullCheckRequest) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockRepoComponent_RepoFullCheck_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RepoFullCheck'
+type MockRepoComponent_RepoFullCheck_Call struct {
+	*mock.Call
+}
+
+// RepoFullCheck is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req component.RepoFullCheckRequest
+func (_e *MockRepoComponent_Expecter) RepoFullCheck(ctx interface{}, req interface{}) *MockRepoComponent_RepoFullCheck_Call {
+	return &MockRepoComponent_RepoFullCheck_Call{Call: _e.mock.On("RepoFullCheck", ctx, req)}
+}
+
+func (_c *MockRepoComponent_RepoFullCheck_Call) Run(run func(ctx context.Context, req component.RepoFullCheckRequest)) *MockRepoComponent_RepoFullCheck_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(component.RepoFullCheckRequest))
+	})
+	return _c
+}
+
+func (_c *MockRepoComponent_RepoFullCheck_Call) Return(_a0 *types.RepoFullCheckResult, _a1 error) *MockRepoComponent_RepoFullCheck_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockRepoComponent_RepoFullCheck_Call) RunAndReturn(run func(context.Context, component.RepoFullCheckRequest) (*types.RepoFullCheckResult, error)) *MockRepoComponent_RepoFullCheck_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // UpdateRepoSensitiveCheckStatus provides a mock function with given fields: ctx, repoId, status
 func (_m *MockRepoComponent) UpdateRepoSensitiveCheckStatus(ctx context.Context, repoId int64, status types.SensitiveCheckStatus) error {
 	ret := _m.Called(ctx, repoId, status)

@@ -83,7 +83,7 @@ func (d *deployer) checkOrderDetailByID(ctx context.Context, id int64) error {
 	return nil
 }
 
-func (d *deployer) checkOrderDetail(ctx context.Context, dr types.DeployRepo) error {
+func (d *deployer) checkOrderDetail(ctx context.Context, dr types.DeployRequest) error {
 	return nil
 }
 
@@ -91,7 +91,7 @@ func (d *deployer) updateUserResourceByOrder(ctx context.Context, deploy *databa
 	return nil
 }
 
-func (d *deployer) releaseUserResourceByOrder(ctx context.Context, dr types.DeployRepo) error {
+func (d *deployer) releaseUserResourceByOrder(ctx context.Context, dr types.DeployRequest) error {
 	return nil
 }
 
@@ -161,5 +161,5 @@ func startAcctRequestFeeExtra(deploy database.Deploy, source string) string {
 	return ""
 }
 
-func updateDatabaseDeploy(dp *database.Deploy, dt types.DeployRepo) {
+func updateDatabaseDeploy(dp *database.Deploy, dt types.DeployRequest) {
 }

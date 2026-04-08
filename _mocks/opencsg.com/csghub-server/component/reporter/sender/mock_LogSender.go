@@ -26,6 +26,52 @@ func (_m *MockLogSender) EXPECT() *MockLogSender_Expecter {
 	return &MockLogSender_Expecter{mock: &_m.Mock}
 }
 
+// GenerateLabelQuery provides a mock function with given fields: labels
+func (_m *MockLogSender) GenerateLabelQuery(labels map[string]string) string {
+	ret := _m.Called(labels)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GenerateLabelQuery")
+	}
+
+	var r0 string
+	if rf, ok := ret.Get(0).(func(map[string]string) string); ok {
+		r0 = rf(labels)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	return r0
+}
+
+// MockLogSender_GenerateLabelQuery_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GenerateLabelQuery'
+type MockLogSender_GenerateLabelQuery_Call struct {
+	*mock.Call
+}
+
+// GenerateLabelQuery is a helper method to define mock.On call
+//   - labels map[string]string
+func (_e *MockLogSender_Expecter) GenerateLabelQuery(labels interface{}) *MockLogSender_GenerateLabelQuery_Call {
+	return &MockLogSender_GenerateLabelQuery_Call{Call: _e.mock.On("GenerateLabelQuery", labels)}
+}
+
+func (_c *MockLogSender_GenerateLabelQuery_Call) Run(run func(labels map[string]string)) *MockLogSender_GenerateLabelQuery_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(map[string]string))
+	})
+	return _c
+}
+
+func (_c *MockLogSender_GenerateLabelQuery_Call) Return(_a0 string) *MockLogSender_GenerateLabelQuery_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockLogSender_GenerateLabelQuery_Call) RunAndReturn(run func(map[string]string) string) *MockLogSender_GenerateLabelQuery_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetLastReportedTimestamp provides a mock function with given fields: ctx
 func (_m *MockLogSender) GetLastReportedTimestamp(ctx context.Context) (time.Time, error) {
 	ret := _m.Called(ctx)

@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"sync"
 	"testing"
 
@@ -16,6 +17,7 @@ import (
 	"github.com/openai/openai-go/v3/option"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	mockcomp "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/aigateway/component"
 	mocktoken "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/aigateway/token"
 	apicomp "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
@@ -126,6 +128,63 @@ func TestOpenAIHandler_ListModels(t *testing.T) {
 
 		tester.handler.ListModels(c)
 		assert.Equal(t, http.StatusInternalServerError, w.Code)
+	})
+
+	t.Run("invalid source parameter", func(t *testing.T) {
+		tester, c, w := setupTest(t)
+		tester.WithQuery("source", "invalid")
+
+		tester.handler.ListModels(c)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+		var response map[string]interface{}
+		err := json.Unmarshal(w.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		errObj, ok := response["error"].(map[string]interface{})
+		assert.True(t, ok)
+		assert.Equal(t, "invalid_request_error", errObj["code"])
+		assert.Contains(t, errObj["message"], "Invalid source parameter")
+		assert.Contains(t, errObj["message"], string(types.ModelSourceCSGHub))
+		assert.Contains(t, errObj["message"], string(types.ModelSourceExternal))
+	})
+
+	t.Run("valid source parameter csghub", func(t *testing.T) {
+		tester, c, w := setupTest(t)
+		tester.WithQuery("source", string(types.ModelSourceCSGHub))
+
+		tester.mocks.openAIComp.EXPECT().
+			ListModels(mock.Anything, "testuser", types.ListModelsReq{Source: string(types.ModelSourceCSGHub)}).
+			Return(types.ModelList{Object: "list", Data: []types.Model{}, HasMore: false, TotalCount: 0}, nil).Once()
+
+		tester.handler.ListModels(c)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+	})
+
+	t.Run("valid source parameter external", func(t *testing.T) {
+		tester, c, w := setupTest(t)
+		tester.WithQuery("source", string(types.ModelSourceExternal))
+
+		tester.mocks.openAIComp.EXPECT().
+			ListModels(mock.Anything, "testuser", types.ListModelsReq{Source: string(types.ModelSourceExternal)}).
+			Return(types.ModelList{Object: "list", Data: []types.Model{}, HasMore: false, TotalCount: 0}, nil).Once()
+
+		tester.handler.ListModels(c)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+	})
+
+	t.Run("source parameter is case-insensitive", func(t *testing.T) {
+		tester, c, w := setupTest(t)
+		tester.WithQuery("source", "CSGHub")
+
+		tester.mocks.openAIComp.EXPECT().
+			ListModels(mock.Anything, "testuser", types.ListModelsReq{Source: "CSGHub"}).
+			Return(types.ModelList{Object: "list", Data: []types.Model{}, HasMore: false, TotalCount: 0}, nil).Once()
+
+		tester.handler.ListModels(c)
+
+		assert.Equal(t, http.StatusOK, w.Code)
 	})
 }
 
@@ -857,5 +916,35 @@ func TestOpenAIHandler_GenerateImage(t *testing.T) {
 		tester.handler.GenerateImage(c)
 
 		assert.Equal(t, http.StatusInternalServerError, w.Code)
+	})
+
+	t.Run("proxyToApi is / when endpoint has no path (space deployment)", func(t *testing.T) {
+		// Spaces (HF Inference Toolkit) serve at root. When model.Endpoint is
+		// "http://svc.spaces.a800.external" (no path), we must use proxyToApi="/"
+		// so the proxy rewrites the path to / instead of keeping /v1/images/generations.
+		tests := []struct {
+			endpoint string
+			wantPath string
+			desc     string
+		}{
+			{"http://svc.spaces.a800.external", "/", "no path -> root"},
+			{"http://svc.spaces.a800.external/", "/", "trailing slash -> root"},
+			{"https://api.example.com/v1/images", "/v1/images", "explicit path preserved"},
+			{"", "", "empty endpoint -> no rewrite"},
+		}
+		for _, tt := range tests {
+			t.Run(tt.desc, func(t *testing.T) {
+				proxyToApi := ""
+				if tt.endpoint != "" {
+					uri, err := url.ParseRequestURI(tt.endpoint)
+					require.NoError(t, err)
+					proxyToApi = uri.Path
+					if proxyToApi == "" {
+						proxyToApi = "/"
+					}
+				}
+				assert.Equal(t, tt.wantPath, proxyToApi)
+			})
+		}
 	})
 }

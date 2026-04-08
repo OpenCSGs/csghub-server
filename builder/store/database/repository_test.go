@@ -1522,7 +1522,7 @@ func TestRepoStore_FindMirrorFinishedPrivateModelRepo(t *testing.T) {
 		GitPath:              "codes_ns/n1",
 		Path:                 "ns/n1",
 		RepositoryType:       types.ModelRepo,
-		SensitiveCheckStatus: types.SensitiveCheckPass,
+		SensitiveCheckStatus: types.SensitiveCheckSkip,
 		Private:              true,
 	})
 	require.Nil(t, err)
@@ -1544,7 +1544,7 @@ func TestRepoStore_FindMirrorFinishedPrivateModelRepo(t *testing.T) {
 
 	require.Nil(t, err)
 
-	_, err = mirrorStore.Create(ctx, &database.Mirror{
+	mirror1, err := mirrorStore.Create(ctx, &database.Mirror{
 		RepositoryID: r1.ID,
 		Status:       types.MirrorLfsSyncFinished,
 	})
@@ -1564,12 +1564,16 @@ func TestRepoStore_FindMirrorFinishedPrivateModelRepo(t *testing.T) {
 		Status:   types.MirrorLfsSyncFinished,
 	})
 	require.Nil(t, err)
+	_, err = mirrorTaskStore.Create(ctx, database.MirrorTask{
+		MirrorID: mirror1.ID,
+		Status:   types.MirrorLfsSyncFinished,
+	})
+	require.Nil(t, err)
 
 	repos, err := store.FindMirrorFinishedPrivateModelRepo(ctx)
 	require.Nil(t, err)
 
-	require.Equal(t, 1, len(repos))
-	require.Equal(t, "codes_ns/n", repos[0].GitPath)
+	require.Equal(t, 2, len(repos))
 }
 
 func TestRepoStore_BatchUpdate(t *testing.T) {

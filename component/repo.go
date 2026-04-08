@@ -150,9 +150,9 @@ type RepoComponent interface {
 	CreateRuntimeFramework(ctx context.Context, req *types.RuntimeFrameworkReq) (*types.RuntimeFramework, error)
 	UpdateRuntimeFramework(ctx context.Context, id int64, req *types.RuntimeFrameworkReq) (*types.RuntimeFramework, error)
 	DeleteRuntimeFramework(ctx context.Context, currentUser string, id int64) error
-	ListDeploy(ctx context.Context, repoType types.RepositoryType, namespace, name, currentUser string) ([]types.DeployRepo, error)
+	ListDeploy(ctx context.Context, repoType types.RepositoryType, namespace, name, currentUser string) ([]types.DeployRequest, error)
 	DeleteDeploy(ctx context.Context, delReq types.DeployActReq) error
-	DeployDetail(ctx context.Context, detailReq types.DeployActReq) (*types.DeployRepo, error)
+	DeployDetail(ctx context.Context, detailReq types.DeployActReq) (*types.DeployRequest, error)
 	DeployInstanceLogs(ctx context.Context, logReq types.DeployActReq) (*deploy.MultiLogReader, error)
 	// check access repo permission by repo id
 	AllowAccessByRepoID(ctx context.Context, repoID int64, username string) (bool, error)

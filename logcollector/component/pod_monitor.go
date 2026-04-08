@@ -4,10 +4,11 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"opencsg.com/csghub-server/common/config"
 	"strings"
 	"sync"
 	"time"
+
+	"opencsg.com/csghub-server/common/config"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -408,11 +409,7 @@ func (pm *PodMonitor) StopAllStreams() {
 // shouldMonitorPod determines if a pod should be monitored
 func (pm *PodMonitor) shouldMonitorPod(pod *corev1.Pod) bool {
 	// Skip system pods
-	if strings.HasPrefix(pod.Namespace, "kube-") {
-		return false
-	}
-
-	return true
+	return !strings.HasPrefix(pod.Namespace, "kube-")
 }
 
 // extractServiceName extracts service name from pod labels

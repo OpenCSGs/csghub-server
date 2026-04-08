@@ -390,7 +390,7 @@ func (c *spaceComponentImpl) Show(ctx context.Context, namespace, name, currentU
 
 	instList := []types.Instance{}
 	if spaceStatus.SvcName != "" {
-		req := types.DeployRepo{
+		req := types.DeployRequest{
 			DeployID:  spaceStatus.DeployID,
 			SpaceID:   space.ID,
 			Namespace: namespace,
@@ -461,6 +461,10 @@ func (c *spaceComponentImpl) Show(ctx context.Context, namespace, name, currentU
 		ClusterID:     space.ClusterID,
 		MinReplica:    space.MinReplica,
 		DriverVersion: space.DriverVersion,
+		RepoSize:      0,
+	}
+	if space.Repository.Statistics != nil {
+		resSpace.RepoSize = space.Repository.Statistics.TotalSize
 	}
 	if permission.CanAdmin {
 		resSpace.SensitiveCheckStatus = space.Repository.SensitiveCheckStatus.String()
@@ -1025,7 +1029,7 @@ func (c *spaceComponentImpl) Deploy(ctx context.Context, namespace, name, curren
 		}
 	}
 	// create deploy for space
-	dr := types.DeployRepo{
+	dr := types.DeployRequest{
 		SpaceID:       space.ID,
 		Path:          space.Repository.Path,
 		GitPath:       space.Repository.GitPath,
@@ -1068,7 +1072,7 @@ func (c *spaceComponentImpl) Deploy(ctx context.Context, namespace, name, curren
 func (c *spaceComponentImpl) Wakeup(ctx context.Context, namespace, name string) error {
 	s, err := c.spaceStore.FindByPath(ctx, namespace, name)
 	if err != nil {
-		slog.Error("can't wakeup space", slog.Any("error", err), slog.String("namespace", namespace), slog.String("name", name))
+		slog.ErrorContext(ctx, "No space found", slog.Any("error", err), slog.String("namespace", namespace), slog.String("name", name))
 		return err
 	}
 	if !s.HasAppFile {
@@ -1080,13 +1084,15 @@ func (c *spaceComponentImpl) Wakeup(ctx context.Context, namespace, name string)
 	// get latest Deploy for space
 	deploy, err := c.deployTaskStore.GetLatestDeployBySpaceID(ctx, s.ID)
 	if err != nil {
-		return fmt.Errorf("can't get space delopyment,%w", err)
+		return fmt.Errorf("can't get space deployment,%w", err)
 	}
-	return c.deployer.Wakeup(ctx, types.DeployRepo{
+	return c.deployer.Wakeup(ctx, types.DeployRequest{
 		SpaceID:   s.ID,
 		Namespace: namespace,
 		Name:      name,
 		SvcName:   deploy.SvcName,
+		Endpoint:  deploy.Endpoint,
+		ClusterID: deploy.ClusterID,
 	})
 }
 
@@ -1118,7 +1124,7 @@ func (c *spaceComponentImpl) stopSpaceDeploy(ctx context.Context, namespace, nam
 		return fmt.Errorf("can't get space deployment,%w", err)
 	}
 
-	dr := types.DeployRepo{
+	dr := types.DeployRequest{
 		SpaceID:   s.ID,
 		Namespace: namespace,
 		Name:      name,
@@ -1130,7 +1136,7 @@ func (c *spaceComponentImpl) stopSpaceDeploy(ctx context.Context, namespace, nam
 	if deploy.Status == deployCommon.Building {
 		deployTasks, err := c.deployTaskStore.GetDeployTasksOfDeploy(ctx, deploy.ID)
 		if err != nil {
-			return fmt.Errorf("can't get space delopyment,%w", err)
+			return fmt.Errorf("can't get space deployment,%w", err)
 		}
 
 		sort.Slice(deployTasks, func(i, j int) bool {
@@ -1138,7 +1144,7 @@ func (c *spaceComponentImpl) stopSpaceDeploy(ctx context.Context, namespace, nam
 		})
 
 		if len(deployTasks) < 2 {
-			return fmt.Errorf("can't get space delopyment")
+			return fmt.Errorf("can't get space deployment")
 		}
 		buildTask := deployTasks[1]
 
@@ -1197,7 +1203,7 @@ func (c *spaceComponentImpl) status(ctx context.Context, s *database.Space) (typ
 		}, fmt.Errorf("failed to get latest space deploy by space id %d, error: %w", s.ID, err)
 	}
 
-	svcName, statusCode, _, err := c.deployer.Status(ctx, types.DeployRepo{
+	svcName, statusCode, _, err := c.deployer.Status(ctx, types.DeployRequest{
 		DeployID: deploy.ID,
 	}, false)
 	if err != nil {
@@ -1287,7 +1293,7 @@ func (c *spaceComponentImpl) Logs(ctx context.Context, namespace, name, since, i
 	if err != nil {
 		return nil, fmt.Errorf("can't find space for logs, error: %w", err)
 	}
-	return c.deployer.Logs(ctx, types.DeployRepo{
+	return c.deployer.Logs(ctx, types.DeployRequest{
 		SpaceID:   s.ID,
 		Namespace: namespace,
 		Name:      name,
