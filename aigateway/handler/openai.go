@@ -336,7 +336,6 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 		}
 	}
 
-	sceneValue := c.Request.Header.Get(commonType.SceneHeaderKey)
 	// Check balance before processing request
 	if !model.SkipBalance() {
 		if err := h.openaiComponent.CheckBalance(c.Request.Context(), username, userUUID); err != nil {
@@ -415,7 +414,7 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 		usageCtx, cancel := context.WithTimeout(context.WithoutCancel(c.Request.Context()), 3*time.Second)
 		defer cancel()
 
-		err := h.openaiComponent.RecordUsage(usageCtx, userUUID, model, tokenCounter, sceneValue)
+		err := h.openaiComponent.RecordUsage(usageCtx, userUUID, model, tokenCounter)
 		if err != nil {
 			slog.ErrorContext(usageCtx, "failed to record token usage", slog.Any("error", err))
 		}
@@ -513,7 +512,6 @@ func (h *OpenAIHandlerImpl) GenerateImage(c *gin.Context) {
 		return
 	}
 
-	sceneValue := c.Request.Header.Get(commonType.SceneHeaderKey)
 	if err := h.openaiComponent.CheckBalance(ctx, username, userUUID); err != nil {
 		h.handleInsufficientBalance(c, false, username, modelID, err)
 		return
@@ -598,7 +596,7 @@ func (h *OpenAIHandlerImpl) GenerateImage(c *gin.Context) {
 	go func() {
 		usageCtx, cancel := context.WithTimeout(context.WithoutCancel(c.Request.Context()), 3*time.Second)
 		defer cancel()
-		if err := h.openaiComponent.RecordUsage(usageCtx, userUUID, model, imageCounter, sceneValue); err != nil {
+		if err := h.openaiComponent.RecordUsage(usageCtx, userUUID, model, imageCounter); err != nil {
 			slog.ErrorContext(usageCtx, "failed to record image usage", slog.Any("error", err))
 		}
 	}()
@@ -692,7 +690,6 @@ func (h *OpenAIHandlerImpl) Embedding(c *gin.Context) {
 		return
 	}
 
-	sceneValue := c.Request.Header.Get(commonType.SceneHeaderKey)
 	// Check balance before processing request
 	if err := h.openaiComponent.CheckBalance(c.Request.Context(), username, userUUID); err != nil {
 		h.handleInsufficientBalance(c, false, username, modelID, err)
@@ -723,7 +720,7 @@ func (h *OpenAIHandlerImpl) Embedding(c *gin.Context) {
 		usageCtx, cancel := context.WithTimeout(context.WithoutCancel(c.Request.Context()), 3*time.Second)
 		defer cancel()
 
-		err := h.openaiComponent.RecordUsage(usageCtx, userUUID, model, tokenCounter, sceneValue)
+		err := h.openaiComponent.RecordUsage(usageCtx, userUUID, model, tokenCounter)
 		if err != nil {
 			slog.ErrorContext(c, "failed to record embedding token usage", "error", err)
 		}

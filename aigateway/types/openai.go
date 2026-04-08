@@ -20,6 +20,19 @@ const (
 	MetaKeyTasks   = "tasks"
 )
 
+// Resource ID format strings for external LLM (provider, model ID) and CSGHub internal (path segment, repo path).
+const (
+	ExternalLLMResourceFmt = "%s://%s"
+	CSGHubResourceFmt      = "csghub://%s/%s"
+)
+
+// MeteringResource holds ResourceID, ResourceName, and CustomerID for metering events.
+type MeteringResource struct {
+	ResourceID   string
+	ResourceName string
+	CustomerID   string
+}
+
 // BaseModel represents the base model fields
 type BaseModel struct {
 	ID                  string         `json:"id"`
@@ -30,7 +43,6 @@ type BaseModel struct {
 	DisplayName         string         `json:"display_name"`
 	SupportFunctionCall bool           `json:"support_function_call,omitempty"` // whether the model supports function calling
 	IsPinned            *bool          `json:"is_pinned,omitempty"`             // whether the model is pinned
-	Public              bool           `json:"public,omitempty"`
 	Metadata            map[string]any `json:"metadata"`
 }
 
@@ -75,7 +87,6 @@ func (m Model) MarshalJSON() ([]byte, error) {
 			Task                string         `json:"task"`
 			DisplayName         string         `json:"display_name"`
 			SupportFunctionCall *bool          `json:"support_function_call,omitempty"`
-			Public              bool           `json:"public,omitempty"`
 			Endpoint            string         `json:"endpoint"`
 			Metadata            map[string]any `json:"metadata"`
 			CSGHubModelID       *string        `json:"csghub_model_id,omitempty"`
@@ -95,7 +106,6 @@ func (m Model) MarshalJSON() ([]byte, error) {
 			OwnedBy:            m.OwnedBy,
 			Task:               m.Task,
 			DisplayName:        m.DisplayName,
-			Public:             m.Public,
 			Endpoint:           m.Endpoint,
 			Metadata:           m.Metadata,
 			NeedSensitiveCheck: m.NeedSensitiveCheck,
@@ -145,7 +155,6 @@ func (m *Model) UnmarshalJSON(data []byte) error {
 		Task                string         `json:"task"`
 		DisplayName         string         `json:"display_name"`
 		SupportFunctionCall bool           `json:"support_function_call,omitempty"`
-		Public              bool           `json:"public,omitempty"`
 		Endpoint            string         `json:"endpoint"`
 		Metadata            map[string]any `json:"metadata"`
 		CSGHubModelID       string         `json:"csghub_model_id,omitempty"`
@@ -168,7 +177,6 @@ func (m *Model) UnmarshalJSON(data []byte) error {
 	m.OwnedBy = aux.OwnedBy
 	m.Task = aux.Task
 	m.DisplayName = aux.DisplayName
-	m.Public = aux.Public
 	m.SupportFunctionCall = aux.SupportFunctionCall
 	m.Endpoint = aux.Endpoint
 	m.Metadata = aux.Metadata
@@ -262,7 +270,7 @@ type ModelTokenPrice struct {
 	PricePerMillion float64 `json:"price_per_million,omitempty"`
 }
 
-// ModelScenePrice is Metadata["pricing"]: serverless sets input/output token prices; external_llm sets token_price.
+// ModelScenePrice is Metadata["pricing"]: serverless and external_llm use input/output token prices (SaaS serverless scene).
 type ModelScenePrice struct {
 	InputTokenPrice  *ModelTokenPrice `json:"input_token_price,omitempty"`
 	OutputTokenPrice *ModelTokenPrice `json:"output_token_price,omitempty"`
