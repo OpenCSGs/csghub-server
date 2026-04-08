@@ -49,7 +49,7 @@ func TestNotebookComponentImpl_CreateNotebook(t *testing.T) {
 		},
 	}, nil)
 
-	nc.mocks.deployer.EXPECT().Deploy(ctx, types.DeployRepo{
+	nc.mocks.deployer.EXPECT().Deploy(ctx, types.DeployRequest{
 		DeployName:       "notebook-deploy",
 		Hardware:         "{\"memory\": \"foo\"}",
 		ClusterID:        "1",
@@ -143,7 +143,7 @@ func TestNotebookComponentImpl_GetNotebookByID(t *testing.T) {
 		ClusterID:  "1",
 		Status:     23,
 	}
-	nc.mocks.deployer.EXPECT().GetReplica(ctx, types.DeployRepo{
+	nc.mocks.deployer.EXPECT().GetReplica(ctx, types.DeployRequest{
 		ClusterID: "1",
 		SvcName:   "notebook-svc",
 		DeployID:  1,
@@ -183,7 +183,7 @@ func TestNotebookComponentImpl_DeleteNotebook_Success(t *testing.T) {
 		Return(user, deploy, nil)
 
 	nc.mocks.deployer.EXPECT().
-		Purge(ctx, types.DeployRepo{
+		Purge(ctx, types.DeployRequest{
 			SpaceID:   0,
 			DeployID:  deploy.ID,
 			SvcName:   deploy.SvcName,
@@ -239,7 +239,7 @@ func TestNotebookComponentImpl_DeleteNotebook_PurgeFails(t *testing.T) {
 		Return(user, deploy, nil)
 
 	nc.mocks.deployer.EXPECT().
-		Purge(ctx, types.DeployRepo{
+		Purge(ctx, types.DeployRequest{
 			SpaceID:   0,
 			DeployID:  deploy.ID,
 			SvcName:   deploy.SvcName,
@@ -276,7 +276,7 @@ func TestNotebookComponentImpl_DeleteNotebook_DeleteDeployFails(t *testing.T) {
 		Return(user, deploy, nil)
 
 	nc.mocks.deployer.EXPECT().
-		Purge(ctx, types.DeployRepo{
+		Purge(ctx, types.DeployRequest{
 			SpaceID:   0,
 			DeployID:  deploy.ID,
 			SvcName:   deploy.SvcName,
@@ -320,7 +320,7 @@ func TestNotebookComponentImpl_UpdateNotebook_Success(t *testing.T) {
 		Return(user, deploy, nil)
 
 	nc.mocks.deployer.EXPECT().
-		Exist(ctx, types.DeployRepo{
+		Exist(ctx, types.DeployRequest{
 			DeployID:  deploy.ID,
 			SvcName:   deploy.SvcName,
 			ClusterID: deploy.ClusterID,
@@ -437,7 +437,7 @@ func TestNotebookComponentImpl_UpdateNotebook_DeployRunning(t *testing.T) {
 		Return(user, deploy, nil)
 
 	nc.mocks.deployer.EXPECT().
-		Exist(ctx, types.DeployRepo{
+		Exist(ctx, types.DeployRequest{
 			DeployID:  deploy.ID,
 			SvcName:   deploy.SvcName,
 			ClusterID: deploy.ClusterID,
@@ -471,7 +471,7 @@ func TestNotebookComponentImpl_UpdateNotebook_ResourceNotFound(t *testing.T) {
 		Return(user, deploy, nil)
 
 	nc.mocks.deployer.EXPECT().
-		Exist(ctx, types.DeployRepo{
+		Exist(ctx, types.DeployRequest{
 			DeployID:  deploy.ID,
 			SvcName:   deploy.SvcName,
 			ClusterID: deploy.ClusterID,
@@ -515,7 +515,7 @@ func TestNotebookComponentImpl_UpdateNotebook_ResourceUnavailable(t *testing.T) 
 		Return(user, deploy, nil)
 
 	nc.mocks.deployer.EXPECT().
-		Exist(ctx, types.DeployRepo{
+		Exist(ctx, types.DeployRequest{
 			DeployID:  deploy.ID,
 			SvcName:   deploy.SvcName,
 			ClusterID: deploy.ClusterID,
@@ -563,7 +563,7 @@ func TestNotebookComponentImpl_UpdateNotebook_MultiHostNotSupported(t *testing.T
 		Return(user, deploy, nil)
 
 	nc.mocks.deployer.EXPECT().
-		Exist(ctx, types.DeployRepo{
+		Exist(ctx, types.DeployRequest{
 			DeployID:  deploy.ID,
 			SvcName:   deploy.SvcName,
 			ClusterID: deploy.ClusterID,
@@ -610,7 +610,7 @@ func TestNotebookComponentImpl_UpdateNotebook_UpdateDeployFails(t *testing.T) {
 		Return(user, deploy, nil)
 
 	nc.mocks.deployer.EXPECT().
-		Exist(ctx, types.DeployRepo{
+		Exist(ctx, types.DeployRequest{
 			DeployID:  deploy.ID,
 			SvcName:   deploy.SvcName,
 			ClusterID: deploy.ClusterID,
@@ -658,7 +658,7 @@ func TestNotebookComponentImpl_StartNotebook_Success(t *testing.T) {
 		Return(user, deploy, nil)
 
 	nc.mocks.deployer.EXPECT().
-		Exist(ctx, types.DeployRepo{
+		Exist(ctx, types.DeployRequest{
 			DeployID:  deploy.ID,
 			SvcName:   deploy.SvcName,
 			ClusterID: deploy.ClusterID,
@@ -713,7 +713,7 @@ func TestNotebookComponentImpl_StartNotebook_AlreadyStarted(t *testing.T) {
 		Return(user, deploy, nil)
 
 	nc.mocks.deployer.EXPECT().
-		Exist(ctx, types.DeployRepo{
+		Exist(ctx, types.DeployRequest{
 			DeployID:  deploy.ID,
 			SvcName:   deploy.SvcName,
 			ClusterID: deploy.ClusterID,
@@ -746,7 +746,7 @@ func TestNotebookComponentImpl_StartNotebook_ExistCheckFails(t *testing.T) {
 		Return(user, deploy, nil)
 
 	nc.mocks.deployer.EXPECT().
-		Exist(ctx, types.DeployRepo{
+		Exist(ctx, types.DeployRequest{
 			DeployID:  deploy.ID,
 			SvcName:   deploy.SvcName,
 			ClusterID: deploy.ClusterID,
@@ -779,7 +779,7 @@ func TestNotebookComponentImpl_StartNotebook_StartDeployFails(t *testing.T) {
 		Return(user, deploy, nil)
 
 	nc.mocks.deployer.EXPECT().
-		Exist(ctx, types.DeployRepo{
+		Exist(ctx, types.DeployRequest{
 			DeployID:  deploy.ID,
 			SvcName:   deploy.SvcName,
 			ClusterID: deploy.ClusterID,
@@ -814,7 +814,7 @@ func TestNotebookComponentImpl_StopNotebook_Success(t *testing.T) {
 		}).
 		Return(user, deploy, nil)
 
-	deployRepo := types.DeployRepo{
+	deployRepo := types.DeployRequest{
 		DeployID:  deploy.ID,
 		SvcName:   deploy.SvcName,
 		ClusterID: deploy.ClusterID,
@@ -875,7 +875,7 @@ func TestNotebookComponentImpl_StopNotebook_StopFails(t *testing.T) {
 		}).
 		Return(user, deploy, nil)
 
-	deployRepo := types.DeployRepo{
+	deployRepo := types.DeployRequest{
 		DeployID:  deploy.ID,
 		SvcName:   deploy.SvcName,
 		ClusterID: deploy.ClusterID,
@@ -910,7 +910,7 @@ func TestNotebookComponentImpl_StopNotebook_ExistCheckFails(t *testing.T) {
 		}).
 		Return(user, deploy, nil)
 
-	deployRepo := types.DeployRepo{
+	deployRepo := types.DeployRequest{
 		DeployID:  deploy.ID,
 		SvcName:   deploy.SvcName,
 		ClusterID: deploy.ClusterID,
@@ -949,7 +949,7 @@ func TestNotebookComponentImpl_StopNotebook_StillExistsAfterStop(t *testing.T) {
 		}).
 		Return(user, deploy, nil)
 
-	deployRepo := types.DeployRepo{
+	deployRepo := types.DeployRequest{
 		DeployID:  deploy.ID,
 		SvcName:   deploy.SvcName,
 		ClusterID: deploy.ClusterID,
@@ -988,7 +988,7 @@ func TestNotebookComponentImpl_StopNotebook_StopDeployByIDFails(t *testing.T) {
 		}).
 		Return(user, deploy, nil)
 
-	deployRepo := types.DeployRepo{
+	deployRepo := types.DeployRequest{
 		DeployID:  deploy.ID,
 		SvcName:   deploy.SvcName,
 		ClusterID: deploy.ClusterID,
@@ -1047,7 +1047,7 @@ func TestNotebookComponentImpl_LogsNotebook(t *testing.T) {
 	}
 
 	m := &deployer.MultiLogReader{}
-	nc.mocks.deployer.EXPECT().InstanceLogs(ctx, types.DeployRepo{
+	nc.mocks.deployer.EXPECT().InstanceLogs(ctx, types.DeployRequest{
 		DeployID:     deploy.ID,
 		SvcName:      deploy.SvcName,
 		InstanceName: "instance-name",

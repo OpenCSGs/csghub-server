@@ -72,7 +72,7 @@ func (ac *accountingComponentImpl) CreateOrder(currentUser string, req types.Acc
 	return nil, nil
 }
 
-func (ac *accountingComponentImpl) ListRechargeByUserIDAndTime(ctx context.Context, req types.AcctRechargeListReq) (interface{}, error) {
+func (ac *accountingComponentImpl) ListRecharge(ctx context.Context, req types.AcctRechargeListReq) (interface{}, error) {
 	return nil, nil
 }
 

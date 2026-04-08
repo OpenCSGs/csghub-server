@@ -8,6 +8,9 @@
     "error.AUTH-ERR-10": {
         "other": "Phone number not verified"
     },
+    "error.AUTH-ERR-11": {
+        "other": "Need access token for authentication"
+    },
     "error.AUTH-ERR-2": {
         "other": "Access forbidden, insufficient permissions"
     },

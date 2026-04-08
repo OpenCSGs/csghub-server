@@ -21,7 +21,7 @@
         "other": "The commit id is empty."
     },
     "error.SERVERLESS-ERR-7": {
-        "other": "The traffic percent is invalid."
+        "other": "no other valid revision except"
     },
     "error.SERVERLESS-ERR-8": {
         "other": "The commit id is invalid."

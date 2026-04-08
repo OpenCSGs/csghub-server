@@ -2,6 +2,9 @@ package loki
 
 import "time"
 
+// loki max limit
+const MaxLimit int = 5000
+
 // LokiStream represents a Loki log stream
 type LokiStream struct {
 	Stream map[string]string `json:"stream"`

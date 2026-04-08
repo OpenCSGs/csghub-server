@@ -54,6 +54,7 @@ type Dataset struct {
 	XnetEnabled           bool                    `json:"xnet_enabled"`
 	XnetMigrationStatus   XnetMigrationTaskStatus `json:"xnet_migration_status"`
 	XnetMigrationProgress int                     `json:"xnet_migration_progress"`
+	RepoSize              int64                   `json:"repo_size"`
 }
 
 type DataViewerReq struct {

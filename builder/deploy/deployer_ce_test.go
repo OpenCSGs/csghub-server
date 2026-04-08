@@ -45,7 +45,7 @@ func newTestDeployer(t *testing.T) *testDepolyerWithMocks {
 }
 
 func TestDeployer_Stop(t *testing.T) {
-	dr := types.DeployRepo{
+	dr := types.DeployRequest{
 		SpaceID:  0,
 		DeployID: 1,
 		UserUUID: "1",

@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -41,7 +43,7 @@ type testDepolyerWithMocks struct {
 }
 
 func TestDeployer_GenerateUniqueSvcName(t *testing.T) {
-	dr := types.DeployRepo{
+	dr := types.DeployRequest{
 		Path: "namespace/name",
 	}
 
@@ -70,7 +72,7 @@ func TestDeployer_serverlessDeploy(t *testing.T) {
 		var oldDeploy database.Deploy
 		oldDeploy.ID = 1
 
-		dr := types.DeployRepo{
+		dr := types.DeployRequest{
 			SpaceID:          1,
 			Type:             types.SpaceType,
 			UserUUID:         "1",
@@ -144,7 +146,7 @@ func TestDeployer_serverlessDeploy(t *testing.T) {
 		var oldDeploy database.Deploy
 		oldDeploy.ID = 1
 
-		dr := types.DeployRepo{
+		dr := types.DeployRequest{
 			RepoID:           1,
 			Type:             types.InferenceType,
 			UserUUID:         "1",
@@ -216,7 +218,7 @@ func TestDeployer_serverlessDeploy(t *testing.T) {
 }
 
 func TestDeployer_dedicatedDeploy(t *testing.T) {
-	dr := types.DeployRepo{
+	dr := types.DeployRequest{
 		Path: "namespace/name",
 		Type: types.InferenceType,
 	}
@@ -238,7 +240,7 @@ func TestDeployer_dedicatedDeploy(t *testing.T) {
 func TestDeployer_Deploy(t *testing.T) {
 	DeployWorkflow = func(buildTask, runTask *database.DeployTask) {}
 	t.Run("use on-demand resource and skip build task", func(t *testing.T) {
-		dr := types.DeployRepo{
+		dr := types.DeployRequest{
 			UserUUID: "1",
 			Path:     "namespace/name",
 			Type:     types.InferenceType,
@@ -286,7 +288,7 @@ func TestDeployer_Deploy(t *testing.T) {
 
 func TestDeployer_Status(t *testing.T) {
 	t.Run("no deploy", func(t *testing.T) {
-		dr := types.DeployRepo{
+		dr := types.DeployRequest{
 			UserUUID: "1",
 			Path:     "namespace/name",
 			Type:     types.InferenceType,
@@ -307,7 +309,7 @@ func TestDeployer_Status(t *testing.T) {
 
 	})
 	t.Run("cache miss and running", func(t *testing.T) {
-		dr := types.DeployRepo{
+		dr := types.DeployRequest{
 			DeployID:  1,
 			UserUUID:  "1",
 			Path:      "namespace/name",
@@ -348,7 +350,7 @@ func TestDeployer_Status(t *testing.T) {
 	})
 
 	t.Run("cache miss and not running", func(t *testing.T) {
-		dr := types.DeployRepo{
+		dr := types.DeployRequest{
 			DeployID:  1,
 			UserUUID:  "1",
 			Path:      "namespace/name",
@@ -388,7 +390,7 @@ func TestDeployer_Status(t *testing.T) {
 	})
 
 	t.Run("cache hit and running", func(t *testing.T) {
-		dr := types.DeployRepo{
+		dr := types.DeployRequest{
 			DeployID:  1,
 			UserUUID:  "1",
 			Path:      "namespace/name",
@@ -436,7 +438,7 @@ func TestDeployer_Status(t *testing.T) {
 
 func TestDeployer_Logs(t *testing.T) {
 	t.Run("no deploy", func(t *testing.T) {
-		dr := types.DeployRepo{
+		dr := types.DeployRequest{
 			UserUUID: "1",
 			Path:     "namespace/name",
 			Type:     types.InferenceType,
@@ -457,7 +459,7 @@ func TestDeployer_Logs(t *testing.T) {
 
 	})
 	t.Run("get log reader", func(t *testing.T) {
-		dr := types.DeployRepo{
+		dr := types.DeployRequest{
 			SpaceID:  1,
 			DeployID: 1,
 			UserUUID: "1",
@@ -510,7 +512,7 @@ func TestDeployer_Logs(t *testing.T) {
 }
 
 func TestDeployer_Purge(t *testing.T) {
-	dr := types.DeployRepo{
+	dr := types.DeployRequest{
 		SpaceID:  0,
 		DeployID: 1,
 		UserUUID: "1",
@@ -529,7 +531,7 @@ func TestDeployer_Purge(t *testing.T) {
 }
 
 func TestDeployer_Exists(t *testing.T) {
-	dr := types.DeployRepo{
+	dr := types.DeployRequest{
 		SpaceID:  0,
 		DeployID: 1,
 		UserUUID: "1",
@@ -583,7 +585,7 @@ func TestDeployer_Exists(t *testing.T) {
 }
 
 func TestDeployer_GetReplica(t *testing.T) {
-	dr := types.DeployRepo{
+	dr := types.DeployRequest{
 		SpaceID:  0,
 		DeployID: 1,
 		UserUUID: "1",
@@ -635,7 +637,7 @@ func TestDeployer_GetReplica(t *testing.T) {
 }
 
 func TestDeployer_InstanceLogs(t *testing.T) {
-	dr := types.DeployRepo{
+	dr := types.DeployRequest{
 		SpaceID:   0,
 		DeployID:  1,
 		UserUUID:  "1",
@@ -968,6 +970,7 @@ func TestDeployer_GetWorkflowLogsNonStream(t *testing.T) {
 
 	sender := mockSender.NewMockLogSender(t)
 
+	sender.EXPECT().GenerateLabelQuery(mock.Anything).Return("test_query")
 	sender.EXPECT().QueryRange(mock.Anything, mock.Anything).Return(&loki.LokiQueryResponse{}, nil)
 
 	d := &deployer{
@@ -1087,5 +1090,154 @@ func TestDeployer_GetSharedModeResourceName(t *testing.T) {
 		}
 		name := d.GetSharedModeResourceName(config)
 		require.Equal(t, "nvidia.com/vgpu", name)
+	})
+}
+
+func TestDeployer_Wakeup(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("cluster with app endpoint uses app endpoint", func(t *testing.T) {
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		}))
+		defer ts.Close()
+
+		mockClusterStore := mockdb.NewMockClusterInfoStore(t)
+		mockClusterStore.EXPECT().ByClusterID(ctx, "cluster-1").Return(database.ClusterInfo{
+			ClusterID:   "cluster-1",
+			AppEndpoint: ts.URL,
+		}, nil)
+
+		d := &deployer{
+			internalRootDomain: "svc.cluster.local",
+			clusterStore:       mockClusterStore,
+		}
+
+		dr := types.DeployRequest{
+			SpaceID:   1,
+			Namespace: "test",
+			Name:      "space",
+			SvcName:   "test-svc",
+			ClusterID: "cluster-1",
+			Endpoint:  "http://test-svc.app.opencsg.com",
+		}
+
+		err := d.Wakeup(ctx, dr)
+		require.NoError(t, err)
+	})
+
+	t.Run("failed to get cluster returns error", func(t *testing.T) {
+		mockClusterStore := mockdb.NewMockClusterInfoStore(t)
+		mockClusterStore.EXPECT().ByClusterID(ctx, "cluster-1").Return(database.ClusterInfo{}, errors.New("cluster not found"))
+
+		d := &deployer{
+			internalRootDomain: "svc.cluster.local",
+			clusterStore:       mockClusterStore,
+		}
+
+		dr := types.DeployRequest{
+			SpaceID:   1,
+			Namespace: "test",
+			Name:      "space",
+			SvcName:   "test-svc",
+			ClusterID: "cluster-1",
+		}
+
+		err := d.Wakeup(ctx, dr)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "cluster not found")
+	})
+
+	t.Run("http request timeout returns nil", func(t *testing.T) {
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			time.Sleep(10 * time.Second)
+			w.WriteHeader(http.StatusOK)
+		}))
+		defer ts.Close()
+
+		mockClusterStore := mockdb.NewMockClusterInfoStore(t)
+		mockClusterStore.EXPECT().ByClusterID(ctx, "cluster-1").Return(database.ClusterInfo{
+			ClusterID:   "cluster-1",
+			AppEndpoint: ts.URL,
+		}, nil)
+
+		d := &deployer{
+			internalRootDomain: "svc.cluster.local",
+			clusterStore:       mockClusterStore,
+		}
+
+		dr := types.DeployRequest{
+			SpaceID:   1,
+			Namespace: "test",
+			Name:      "space",
+			SvcName:   "test-svc",
+			ClusterID: "cluster-1",
+			Endpoint:  "http://test-svc.app.opencsg.com",
+		}
+
+		err := d.Wakeup(ctx, dr)
+		require.NoError(t, err)
+	})
+
+	t.Run("http request error is handled asynchronously", func(t *testing.T) {
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			http.Error(w, "service unavailable", http.StatusServiceUnavailable)
+		}))
+		defer ts.Close()
+
+		mockClusterStore := mockdb.NewMockClusterInfoStore(t)
+		mockClusterStore.EXPECT().ByClusterID(ctx, "cluster-1").Return(database.ClusterInfo{
+			ClusterID:   "cluster-1",
+			AppEndpoint: ts.URL,
+		}, nil)
+
+		d := &deployer{
+			internalRootDomain: "svc.cluster.local",
+			clusterStore:       mockClusterStore,
+		}
+
+		dr := types.DeployRequest{
+			SpaceID:   1,
+			Namespace: "test",
+			Name:      "space",
+			SvcName:   "test-svc",
+			ClusterID: "cluster-1",
+			Endpoint:  "http://test-svc.app.opencsg.com",
+		}
+
+		err := d.Wakeup(ctx, dr)
+		require.NoError(t, err)
+		time.Sleep(100 * time.Millisecond)
+	})
+
+	t.Run("http status not found is handled asynchronously", func(t *testing.T) {
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusNotFound)
+		}))
+		defer ts.Close()
+
+		mockClusterStore := mockdb.NewMockClusterInfoStore(t)
+		mockClusterStore.EXPECT().ByClusterID(ctx, "cluster-1").Return(database.ClusterInfo{
+			ClusterID:   "cluster-1",
+			AppEndpoint: ts.URL,
+		}, nil)
+
+		d := &deployer{
+			internalRootDomain: "svc.cluster.local",
+			clusterStore:       mockClusterStore,
+		}
+
+		dr := types.DeployRequest{
+			SpaceID:   1,
+			Namespace: "test",
+			Name:      "space",
+			SvcName:   "test-svc",
+			ClusterID: "cluster-1",
+			Endpoint:  "http://test-svc.app.opencsg.com",
+		}
+
+		err := d.Wakeup(ctx, dr)
+		require.NoError(t, err)
+		time.Sleep(100 * time.Millisecond)
 	})
 }

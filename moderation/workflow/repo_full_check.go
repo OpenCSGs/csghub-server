@@ -30,11 +30,16 @@ func newRepoFullCheckWithDB(repoStore database.RepoStore) *repoFullCheck {
 	}
 }
 
-func RepoFullCheckWorkflow(ctx workflow.Context, repo common.Repo, config *config.Config) error {
-	return newRepoFullCheck().Execute(ctx, repo, config)
+// RepoFullCheckWorkflow has been moved to common.RepoFullCheckWorkflow for better dependency management
+func RepoFullCheckWorkflow(ctx workflow.Context, repo common.Repo, cfg *config.Config) error {
+	return newRepoFullCheck().Execute(ctx, repo, cfg)
 }
 
-func (rfc *repoFullCheck) Execute(ctx workflow.Context, repo common.Repo, config *config.Config) error {
+func init() {
+	common.RepoFullCheckWorkflow = RepoFullCheckWorkflow
+}
+
+func (rfc *repoFullCheck) Execute(ctx workflow.Context, repo common.Repo, cfg *config.Config) error {
 	logger := workflow.GetLogger(ctx)
 
 	retryPolicy := &temporal.RetryPolicy{
@@ -60,26 +65,26 @@ func (rfc *repoFullCheck) Execute(ctx workflow.Context, repo common.Repo, config
 	if err != nil {
 		return fmt.Errorf("failed to get repo, error: %w", err)
 	}
-	err = workflow.ExecuteActivity(actCtx, activity.RepoSensitiveCheckPending, repo, config).Get(ctx, nil)
+	err = workflow.ExecuteActivity(actCtx, activity.RepoSensitiveCheckPending, repo, cfg).Get(ctx, nil)
 	if err != nil {
 		logger.Error("failed to update repo sensitive check status", "error", err, "repo", repo, "status", types.SensitiveCheckPending)
 		return err
 	}
 
 	// 1. generate repo file list
-	err = workflow.ExecuteActivity(actCtx, activity.GenRepoFileList, dbRepo, config).Get(ctx, nil)
+	err = workflow.ExecuteActivity(actCtx, activity.GenRepoFileList, dbRepo, cfg).Get(ctx, nil)
 	if err != nil {
 		logger.Error("failed to generate repo file list", "error", err, "repo", repo)
 		return err
 	}
 	// 2. check repo file content
-	err = workflow.ExecuteActivity(actCtx, activity.CheckRepoFiles, dbRepo, config).Get(ctx, nil)
+	err = workflow.ExecuteActivity(actCtx, activity.CheckRepoFiles, dbRepo, cfg).Get(ctx, nil)
 	if err != nil {
 		logger.Error("failed to check repo files", "error", err, "repo", repo)
 		return err
 	}
 	// 3. update repo sensitive check status
-	err = workflow.ExecuteActivity(actCtx, activity.DetectRepoSensitiveCheckStatus, dbRepo, config).Get(ctx, nil)
+	err = workflow.ExecuteActivity(actCtx, activity.DetectRepoSensitiveCheckStatus, dbRepo, cfg).Get(ctx, nil)
 	if err != nil {
 		logger.Error("failed to detect repo sensitive check status", "error", err, "repo", repo)
 		return err

@@ -19,4 +19,5 @@ type LogSender interface {
 	// StreamAllLogs streams all logs from the backend
 	StreamAllLogs(ctx context.Context, id string, start time.Time, lables map[string]string, timeLoc *time.Location) (chan string, error)
 	QueryRange(ctx context.Context, params loki.QueryRangeParams) (*loki.LokiQueryResponse, error)
+	GenerateLabelQuery(labels map[string]string) string
 }

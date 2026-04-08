@@ -10,6 +10,7 @@ import (
 type RepoComponent interface {
 	GetRepo(ctx context.Context, repoType types.RepositoryType, namespace string, name string) (*database.Repository, error)
 	UpdateRepoSensitiveCheckStatus(ctx context.Context, repoId int64, status types.SensitiveCheckStatus) error
+	RepoFullCheck(ctx context.Context, req RepoFullCheckRequest) (*types.RepoFullCheckResult, error)
 	CheckRepoFiles(ctx context.Context, repoId int64, options CheckOption) error
 	CheckRequestV2(ctx context.Context, req types.SensitiveRequestV2) (bool, error)
 	GetNamespaceWhiteList(ctx context.Context) ([]string, error)
