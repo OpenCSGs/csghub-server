@@ -72,6 +72,7 @@ type AgentInstance struct {
 	IsRunning   bool            `json:"is_running"`                            // Whether the instance is running
 	BuiltIn     bool            `json:"built_in"`                              // Whether the instance is built-in
 	IsPinned    bool            `json:"is_pinned"`                             // Whether the instance is pinned by the user
+	Config      map[string]any  `json:"config,omitempty"`                      // Per-user instance configuration from user preferences
 	Metadata    *map[string]any `json:"metadata,omitempty"`                    // Instance metadata
 	Data        json.RawMessage `json:"-"`                                     // Request-only flow data; excluded from responses
 	CreatedAt   time.Time       `json:"created_at"`                            // When the instance was created
@@ -720,14 +721,16 @@ const (
 
 // AgentUserPreferenceAction represents the type of preference action
 const (
-	AgentUserPreferenceActionPin = "pin"
+	AgentUserPreferenceActionPin            = "pin"
+	AgentUserPreferenceActionConfigInstance = "config-instance"
 )
 
 // AgentUserPreferenceRequest represents a request to set or remove a preference
 type AgentUserPreferenceRequest struct {
-	EntityType string `json:"entity_type" binding:"required,oneof=agent_instance agent_knowledge_base agent_template agent_mcp_server agent_task agent_prompt agent_model agent_skill"`
-	EntityID   string `json:"entity_id" binding:"required"`
-	Preference string `json:"preference" binding:"required,oneof=pin"`
+	EntityType string         `json:"entity_type" binding:"required,oneof=agent_instance agent_knowledge_base agent_template agent_mcp_server agent_task agent_prompt agent_model agent_skill"`
+	EntityID   string         `json:"entity_id" binding:"required"`
+	Preference string         `json:"preference" binding:"required,oneof=pin config-instance"`
+	Value      map[string]any `json:"value,omitempty"` // JSON value for config-instance preferences
 }
 
 // AgentSkillListItem represents a skill in the agent skills list response.
