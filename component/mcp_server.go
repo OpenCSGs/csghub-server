@@ -382,12 +382,8 @@ func (m *mcpServerComponentImpl) Show(ctx context.Context, namespace string, nam
 		LaunchCmds:       mcpServer.LaunchCmds,
 		AvatarURL:        mcpServer.AvatarURL,
 		MirrorTaskStatus: mirrorTaskStatus,
-		RepoSize:         0,
-}
-if mcpServer.Repository.Statistics != nil {
-	res.RepoSize = mcpServer.Repository.Statistics.TotalSize
-}
-if permission.CanAdmin {
+	}
+	if permission.CanAdmin {
 		res.SensitiveCheckStatus = mcpServer.Repository.SensitiveCheckStatus.String()
 	}
 	if needOpWeight {

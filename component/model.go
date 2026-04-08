@@ -579,10 +579,6 @@ func (c *modelComponentImpl) Show(ctx context.Context, namespace, name, currentU
 		XnetEnabled:           model.Repository.XnetEnabled,
 		XnetMigrationStatus:   xnetMigrationStatus,
 		XnetMigrationProgress: xnetMigrationProgress,
-		RepoSize:              0,
-	}
-	if model.Repository.Statistics != nil {
-		resModel.RepoSize = model.Repository.Statistics.TotalSize
 	}
 	// admin user or owner can see the sensitive check status
 	if permission.CanAdmin {

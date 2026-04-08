@@ -201,3 +201,42 @@ func TestRepositoryStatisticsStore_BatchUpdate(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, updatedSize2, actualStats2.TotalSize)
 }
+
+func TestRepositoryStatisticsStore_FindByRepositoryIDAndBranch(t *testing.T) {
+	ctx := context.Background()
+	// Create a test database
+	db := tests.InitTestDB()
+	defer db.Close()
+
+	// Create a repository statistics store with test database
+	store := database.NewRepositoryStatisticsStoreWithDB(db)
+
+	// Create a test repository statistics with branch
+	expectedStats := &database.RepositoryStatistics{
+		RepositoryID: 7,
+		Branch:       "main",
+		TotalSize:    1024,
+		NonLfsSize:   512,
+		LfsSize:      512,
+		CreatedAt:    time.Now(),
+		UpdatedAt:    time.Now(),
+	}
+
+	// Create the statistics
+	err := store.Create(ctx, expectedStats)
+	assert.NoError(t, err)
+
+	// Test FindByRepositoryIDAndBranch method
+	actualStats, err := store.FindByRepositoryIDAndBranch(ctx, expectedStats.RepositoryID, expectedStats.Branch)
+	assert.NoError(t, err)
+	assert.NotNil(t, actualStats)
+	assert.Equal(t, expectedStats.RepositoryID, actualStats.RepositoryID)
+	assert.Equal(t, expectedStats.Branch, actualStats.Branch)
+	assert.Equal(t, expectedStats.TotalSize, actualStats.TotalSize)
+	assert.Equal(t, expectedStats.NonLfsSize, actualStats.NonLfsSize)
+	assert.Equal(t, expectedStats.LfsSize, actualStats.LfsSize)
+
+	// Test with non-existent branch
+	_, err = store.FindByRepositoryIDAndBranch(ctx, expectedStats.RepositoryID, "non-existent-branch")
+	assert.Error(t, err)
+}

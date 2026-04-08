@@ -2473,6 +2473,103 @@ func TestRepoComponent_RemoteTree(t *testing.T) {
 	require.Equal(t, []*types.File{{Name: "f1"}, {Name: "f2"}}, files)
 }
 
+func TestRepoComponent_GetRepoSizeByBranch(t *testing.T) {
+	t.Run("should return repo size when user has read permission", func(t *testing.T) {
+		ctx := context.TODO()
+		repoComp := initializeTestRepoComponent(ctx, t)
+
+		user := database.User{}
+		user.Username = "user_name"
+		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username).Return(user, nil)
+
+		ns := database.Namespace{}
+		ns.NamespaceType = "user"
+		ns.Path = "user_name"
+		repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(mock.Anything, ns.Path).Return(ns, nil)
+
+		repo := &database.Repository{
+			ID:      1,
+			Private: true,
+			User:    user,
+			Path:    fmt.Sprintf("%s/%s", ns.Path, "repo_name"),
+		}
+		repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(mock.Anything, types.ModelRepo, ns.Path, repo.Name).Return(repo, nil)
+
+		stats := database.RepositoryStatistics{TotalSize: 1024}
+		repoComp.mocks.stores.RepositoryStatisticsMock().EXPECT().FindByRepositoryIDAndBranch(mock.Anything, repo.ID, "main").Return(&stats, nil)
+
+		size, err := repoComp.GetRepoSizeByBranch(ctx, types.ModelRepo, ns.Path, repo.Name, "main", user.Username)
+		require.Nil(t, err)
+		require.Equal(t, int64(1024), size)
+	})
+
+	t.Run("should return error when repo not found", func(t *testing.T) {
+		ctx := context.TODO()
+		repoComp := initializeTestRepoComponent(ctx, t)
+
+		repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(mock.Anything, types.ModelRepo, "namespace", "name").Return(nil, errors.New("repo not found"))
+
+		size, err := repoComp.GetRepoSizeByBranch(ctx, types.ModelRepo, "namespace", "name", "main", "user_name")
+		require.Error(t, err)
+		require.Equal(t, int64(0), size)
+	})
+
+	t.Run("should return error when user has no read permission", func(t *testing.T) {
+		ctx := context.TODO()
+		repoComp := initializeTestRepoComponent(ctx, t)
+
+		user := database.User{}
+		user.Username = "user_name"
+		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username).Return(user, nil)
+
+		ns := database.Namespace{}
+		ns.NamespaceType = "user"
+		ns.Path = "other_user"
+		repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(mock.Anything, ns.Path).Return(ns, nil)
+
+		repo := &database.Repository{
+			ID:      1,
+			Private: true,
+			User:    database.User{Username: "other_user"},
+			Path:    fmt.Sprintf("%s/%s", ns.Path, "repo_name"),
+		}
+		repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(mock.Anything, types.ModelRepo, ns.Path, repo.Name).Return(repo, nil)
+
+		size, err := repoComp.GetRepoSizeByBranch(ctx, types.ModelRepo, ns.Path, repo.Name, "main", user.Username)
+		require.Error(t, err)
+		require.Equal(t, int64(0), size)
+	})
+
+	t.Run("should return error when repo statistics not found", func(t *testing.T) {
+		ctx := context.TODO()
+		repoComp := initializeTestRepoComponent(ctx, t)
+
+		user := database.User{}
+		user.Username = "user_name"
+		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username).Return(user, nil)
+
+		ns := database.Namespace{}
+		ns.NamespaceType = "user"
+		ns.Path = "user_name"
+		repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(mock.Anything, ns.Path).Return(ns, nil)
+
+		repo := &database.Repository{
+			ID:      1,
+			Private: true,
+			User:    user,
+			Path:    fmt.Sprintf("%s/%s", ns.Path, "repo_name"),
+		}
+		repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(mock.Anything, types.ModelRepo, ns.Path, repo.Name).Return(repo, nil)
+
+		repoComp.mocks.stores.RepositoryStatisticsMock().EXPECT().FindByRepositoryIDAndBranch(mock.Anything, repo.ID, "main").Return(nil, errorx.ErrNotFound)
+
+		size, err := repoComp.GetRepoSizeByBranch(ctx, types.ModelRepo, ns.Path, repo.Name, "main", user.Username)
+		require.Error(t, err)
+		require.Equal(t, int64(0), size)
+		require.True(t, errors.Is(err, errorx.ErrNotFound))
+	})
+}
+
 func TestRepoComponent_DiffBetweenTwoCommits(t *testing.T) {
 	ctx := context.TODO()
 	repoComp := initializeTestRepoComponent(ctx, t)

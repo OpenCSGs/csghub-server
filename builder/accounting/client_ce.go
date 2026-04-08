@@ -81,3 +81,7 @@ func (ac *accountingClientImpl) ListRecharges(req types.RechargesIndexReq) (any,
 func (ac *accountingClientImpl) StatementsIndex(req types.ActStatementsReq) (any, error) {
 	return nil, nil
 }
+
+func (ac *accountingClientImpl) ListPresents(req types.PresentsIndexReq) (any, error) {
+	return nil, nil
+}

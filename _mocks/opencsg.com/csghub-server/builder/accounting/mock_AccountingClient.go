@@ -607,6 +607,64 @@ func (_c *MockAccountingClient_ListMeteringsByUserIDAndTime_Call) RunAndReturn(r
 	return _c
 }
 
+// ListPresents provides a mock function with given fields: req
+func (_m *MockAccountingClient) ListPresents(req types.PresentsIndexReq) (any, error) {
+	ret := _m.Called(req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListPresents")
+	}
+
+	var r0 any
+	var r1 error
+	if rf, ok := ret.Get(0).(func(types.PresentsIndexReq) (any, error)); ok {
+		return rf(req)
+	}
+	if rf, ok := ret.Get(0).(func(types.PresentsIndexReq) any); ok {
+		r0 = rf(req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(any)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(types.PresentsIndexReq) error); ok {
+		r1 = rf(req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountingClient_ListPresents_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListPresents'
+type MockAccountingClient_ListPresents_Call struct {
+	*mock.Call
+}
+
+// ListPresents is a helper method to define mock.On call
+//   - req types.PresentsIndexReq
+func (_e *MockAccountingClient_Expecter) ListPresents(req interface{}) *MockAccountingClient_ListPresents_Call {
+	return &MockAccountingClient_ListPresents_Call{Call: _e.mock.On("ListPresents", req)}
+}
+
+func (_c *MockAccountingClient_ListPresents_Call) Run(run func(req types.PresentsIndexReq)) *MockAccountingClient_ListPresents_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(types.PresentsIndexReq))
+	})
+	return _c
+}
+
+func (_c *MockAccountingClient_ListPresents_Call) Return(_a0 any, _a1 error) *MockAccountingClient_ListPresents_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountingClient_ListPresents_Call) RunAndReturn(run func(types.PresentsIndexReq) (any, error)) *MockAccountingClient_ListPresents_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ListRecharge provides a mock function with given fields: req
 func (_m *MockAccountingClient) ListRecharge(req types.AcctRechargeListReq) (any, error) {
 	ret := _m.Called(req)

@@ -165,7 +165,6 @@ packages:
       AccountingUserComponent:
       AccountingStatementComponent:
       AccountingBillComponent:
-      AccountingPresentComponent:
       MeteringComponent:
       AccountingEventComponent:
       AccountingPriceComponent:
