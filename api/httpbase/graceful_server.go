@@ -65,3 +65,10 @@ func (s *GracefulServer) Run() {
 
 	slog.Info("Server stopped")
 }
+
+// RegisterOnShutdown registers a function to call on Shutdown.
+// This delegates to http.Server.RegisterOnShutdown and can be used
+// to clean up resources like MCP sessions during graceful shutdown.
+func (s *GracefulServer) RegisterOnShutdown(f func()) {
+	s.server.RegisterOnShutdown(f)
+}
