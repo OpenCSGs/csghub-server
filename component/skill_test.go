@@ -305,7 +305,6 @@ func TestSkillComponent_ShowWithStatistics(t *testing.T) {
 		SensitiveCheckStatus: "Pending",
 		MirrorTaskStatus:     types.MirrorRepoSyncStart,
 		SyncStatus:           types.SyncStatusInProgress,
-		RepoSize:             1024,
 	}, data)
 }
 

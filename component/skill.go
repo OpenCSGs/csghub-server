@@ -94,12 +94,24 @@ func (c *skillComponentImpl) GetUploadUrl(ctx context.Context) (string, string, 
 	// Create a new post policy
 	expires := time.Now().Add(24 * time.Hour)
 	policy := minio.NewPostPolicy()
-	policy.SetBucket(c.config.S3.Bucket)
-	policy.SetKey(objectKey)
-	policy.SetExpires(expires)
+	err := policy.SetBucket(c.config.S3.Bucket)
+	if err != nil {
+		slog.WarnContext(ctx, "skill set bucket failed", slog.String("error", err.Error()))
+	}
+	err = policy.SetKey(objectKey)
+	if err != nil {
+		slog.WarnContext(ctx, "skill set key failed", slog.String("error", err.Error()))
+	}
+	err = policy.SetExpires(expires)
+	if err != nil {
+		slog.WarnContext(ctx, "skill set expires failed", slog.String("error", err.Error()))
+	}
 
 	// Set content length range (1 byte to 10MB)
-	policy.SetContentLengthRange(1, 10*1024*1024)
+	err = policy.SetContentLengthRange(1, 10*1024*1024)
+	if err != nil {
+		slog.WarnContext(ctx, "skill set content length range failed", slog.String("error", err.Error()))
+	}
 
 	// Generate presigned POST URL and form data
 	url, formData, err := c.s3Client.PresignedPostPolicy(ctx, policy)
@@ -767,7 +779,10 @@ func (r *s3ReaderAt) ReadAt(p []byte, off int64) (n int, err error) {
 
 	// Create range option
 	opts := minio.GetObjectOptions{}
-	opts.SetRange(off, end)
+	err = opts.SetRange(off, end)
+	if err != nil {
+		return 0, err
+	}
 
 	// Get object with range
 	object, err := r.client.GetObject(r.ctx, r.bucket, r.key, opts)
