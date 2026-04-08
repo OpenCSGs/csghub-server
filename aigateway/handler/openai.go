@@ -338,11 +338,9 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 
 	sceneValue := c.Request.Header.Get(commonType.SceneHeaderKey)
 	// Check balance before processing request
-	if !model.SkipBalance() {
-		if err := h.openaiComponent.CheckBalance(c.Request.Context(), username, userUUID); err != nil {
-			h.handleInsufficientBalance(c, chatReq.Stream, username, modelID, err)
-			return
-		}
+	if err := h.openaiComponent.CheckBalance(c.Request.Context(), username, userUUID); err != nil {
+		h.handleInsufficientBalance(c, chatReq.Stream, username, modelID, err)
+		return
 	}
 
 	// marshal updated request map back to JSON bytes

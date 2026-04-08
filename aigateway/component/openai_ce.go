@@ -45,7 +45,7 @@ func parseScene(sceneValue string) common_types.SceneType {
 	return common_types.SceneModelServerless
 }
 
-func (e *extendOpenai) CheckBalance(ctx context.Context, username string, model *types.Model, sceneValue string) error {
+func (e *extendOpenai) CheckBalance(ctx context.Context, username string) error {
 	return nil
 }
 
