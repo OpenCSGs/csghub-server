@@ -39,6 +39,7 @@ func TestNamespaceComponent_GetInfo(t *testing.T) {
 			Path:   user.Username,
 			Type:   "user",
 			Avatar: user.Avatar,
+			NSType: "user",
 		}
 		require.EqualValues(t, expected, actual)
 	})
@@ -80,6 +81,7 @@ func TestNamespaceComponent_GetInfo(t *testing.T) {
 			Path:   org.Name,
 			Type:   org.OrgType,
 			Avatar: org.Logo,
+			NSType: "organization",
 		}
 		require.EqualValues(t, expected, actual)
 
@@ -117,6 +119,7 @@ func TestNamespaceComponent_GetInfoByUUID(t *testing.T) {
 			Type:   "user",
 			UUID:   namespaceUUID,
 			Avatar: user.Avatar,
+			NSType: "user",
 		}
 		require.EqualValues(t, expected, actual)
 	})
@@ -161,6 +164,7 @@ func TestNamespaceComponent_GetInfoByUUID(t *testing.T) {
 			Type:   org.OrgType,
 			UUID:   namespaceUUID,
 			Avatar: org.Logo,
+			NSType: "organization",
 		}
 		require.EqualValues(t, expected, actual)
 	})
