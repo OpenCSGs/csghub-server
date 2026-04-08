@@ -180,6 +180,15 @@ func (s *orgStoreImpl) Search(ctx context.Context, search string, per int, page 
 		Model(&orgs).Relation("Namespace")
 	if search != "" {
 		query.Where("LOWER(organization.name) like ? OR LOWER(organization.path) like ?", fmt.Sprintf("%%%s%%", search), fmt.Sprintf("%%%s%%", search))
+		query.OrderExpr(`
+			CASE
+				WHEN LOWER(organization.path) = ? THEN 0
+				WHEN LOWER(organization.path) LIKE ? THEN 1
+				WHEN LOWER(organization.name) = ? THEN 2
+				WHEN LOWER(organization.name) LIKE ? THEN 3
+				ELSE 4
+			END
+		`, search, fmt.Sprintf("%s%%", search), search, fmt.Sprintf("%s%%", search))
 	}
 	if orgType != "" {
 		query.Where("org_type = ?", orgType)
