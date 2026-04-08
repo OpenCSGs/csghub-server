@@ -60,8 +60,11 @@ func (m Model) MarshalJSON() ([]byte, error) {
 			Public              bool           `json:"public"`
 			Endpoint            string         `json:"endpoint"`
 			Metadata            map[string]any `json:"metadata"`
+			CSGHubModelID       *string        `json:"csghub_model_id,omitempty"`
+			OwnerUUID           *string        `json:"owner_uuid,omitempty"`
 			ClusterID           *string        `json:"cluster_id,omitempty"`
 			SvcName             *string        `json:"svc_name,omitempty"`
+			SvcType             *int           `json:"svc_type,omitempty"`
 			ImageID             *string        `json:"image_id,omitempty"`
 			AuthHead            *string        `json:"auth_head,omitempty"`
 			Provider            *string        `json:"provider,omitempty"`
@@ -82,6 +85,12 @@ func (m Model) MarshalJSON() ([]byte, error) {
 			supportFC := m.SupportFunctionCall
 			resp.SupportFunctionCall = &supportFC
 		}
+		if m.CSGHubModelID != "" {
+			resp.CSGHubModelID = &m.CSGHubModelID
+		}
+		if m.OwnerUUID != "" {
+			resp.OwnerUUID = &m.OwnerUUID
+		}
 		if m.Provider != "" {
 			resp.Provider = &m.Provider
 		}
@@ -93,6 +102,9 @@ func (m Model) MarshalJSON() ([]byte, error) {
 		}
 		if m.SvcName != "" {
 			resp.SvcName = &m.SvcName
+		}
+		if m.SvcType != 0 {
+			resp.SvcType = &m.SvcType
 		}
 		if m.ImageID != "" {
 			resp.ImageID = &m.ImageID
@@ -116,8 +128,11 @@ func (m *Model) UnmarshalJSON(data []byte) error {
 		Public              bool           `json:"public"`
 		Endpoint            string         `json:"endpoint"`
 		Metadata            map[string]any `json:"metadata"`
+		CSGHubModelID       string         `json:"csghub_model_id,omitempty"`
+		OwnerUUID           string         `json:"owner_uuid,omitempty"`
 		ClusterID           string         `json:"cluster_id,omitempty"`
 		SvcName             string         `json:"svc_name,omitempty"`
+		SvcType             int            `json:"svc_type,omitempty"`
 		ImageID             string         `json:"image_id,omitempty"`
 		AuthHead            string         `json:"auth_head,omitempty"`
 		Provider            string         `json:"provider,omitempty"`
@@ -136,8 +151,11 @@ func (m *Model) UnmarshalJSON(data []byte) error {
 	m.Public = aux.Public
 	m.Endpoint = aux.Endpoint
 	m.Metadata = aux.Metadata
+	m.CSGHubModelID = aux.CSGHubModelID
+	m.OwnerUUID = aux.OwnerUUID
 	m.ClusterID = aux.ClusterID
 	m.SvcName = aux.SvcName
+	m.SvcType = aux.SvcType
 	m.ImageID = aux.ImageID
 	m.AuthHead = aux.AuthHead
 	m.Provider = aux.Provider
