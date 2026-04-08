@@ -760,41 +760,6 @@ const (
 	MaxIndividualFileSize = 50 * 1024 * 1024
 )
 
-// s3ReaderAt implements io.ReaderAt using S3 Range requests
-type s3ReaderAt struct {
-	ctx    context.Context
-	client s3.Client
-	bucket string
-	key    string
-	size   int64
-}
-
-// ReadAt reads data from the S3 object starting at the given offset
-func (r *s3ReaderAt) ReadAt(p []byte, off int64) (n int, err error) {
-	// Calculate end offset
-	end := off + int64(len(p)) - 1
-	if end >= r.size {
-		end = r.size - 1
-	}
-
-	// Create range option
-	opts := minio.GetObjectOptions{}
-	err = opts.SetRange(off, end)
-	if err != nil {
-		return 0, err
-	}
-
-	// Get object with range
-	object, err := r.client.GetObject(r.ctx, r.bucket, r.key, opts)
-	if err != nil {
-		return 0, err
-	}
-	defer object.Close()
-
-	// Read data
-	return io.ReadFull(object, p)
-}
-
 // decompressZip decompresses a zip file and returns a list of CommitFile objects
 func decompressZip(reader io.ReaderAt, size int64) ([]types.CommitFile, error) {
 	zipReader, err := zip.NewReader(reader, size)
