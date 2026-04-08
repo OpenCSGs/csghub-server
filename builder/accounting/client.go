@@ -62,7 +62,6 @@ func (ac *accountingClientImpl) ListMeteringsByUserIDAndTime(req types.ActStatem
 // Helper method to execute the actual HTTP request and read the response.
 func (ac *accountingClientImpl) doRequest(method, subPath string, data any) (*http.Response, error) {
 	urlPath := fmt.Sprintf("%s%s%s", ac.remote, "/api/v1/accounting", subPath)
-	// slog.Info("call", slog.Any("urlPath", urlPath))
 	var buf io.Reader
 	if data != nil {
 		jsonData, err := json.Marshal(data)

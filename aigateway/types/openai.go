@@ -6,6 +6,20 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
+// Provider type values for Metadata[MetaKeyLLMType].
+const (
+	ProviderTypeServerless  = "serverless"
+	ProviderTypeInference   = "inference"
+	ProviderTypeExternalLLM = "external_llm"
+)
+
+// Metadata key constants used when enriching model metadata.
+const (
+	MetaKeyLLMType = "llm_type"
+	MetaKeyPricing = "pricing"
+	MetaKeyTasks   = "tasks"
+)
+
 // BaseModel represents the base model fields
 type BaseModel struct {
 	ID                  string         `json:"id"`
@@ -16,7 +30,6 @@ type BaseModel struct {
 	DisplayName         string         `json:"display_name"`
 	SupportFunctionCall bool           `json:"support_function_call,omitempty"` // whether the model supports function calling
 	IsPinned            *bool          `json:"is_pinned,omitempty"`             // whether the model is pinned
-	Public              bool           `json:"public"`                          // whether the model is public (false = private, true = public)
 	Metadata            map[string]any `json:"metadata"`
 }
 
@@ -36,6 +49,10 @@ type InternalModelInfo struct {
 type ExternalModelInfo struct {
 	Provider string `json:"-"` // external provider name, like openai, anthropic etc
 	AuthHead string `json:"-"` // the auth header to access the external model
+	// NeedSensitiveCheck controls whether requests for this model should go
+	// through sensitive content detection in aigateway. Set to false to skip
+	// the check (e.g. for guard models or trusted internal models).
+	NeedSensitiveCheck bool `json:"-"`
 }
 
 type Model struct {
@@ -57,7 +74,6 @@ func (m Model) MarshalJSON() ([]byte, error) {
 			Task                string         `json:"task"`
 			DisplayName         string         `json:"display_name"`
 			SupportFunctionCall *bool          `json:"support_function_call,omitempty"`
-			Public              bool           `json:"public"`
 			Endpoint            string         `json:"endpoint"`
 			Metadata            map[string]any `json:"metadata"`
 			ClusterID           *string        `json:"cluster_id,omitempty"`
@@ -65,17 +81,18 @@ func (m Model) MarshalJSON() ([]byte, error) {
 			ImageID             *string        `json:"image_id,omitempty"`
 			AuthHead            *string        `json:"auth_head,omitempty"`
 			Provider            *string        `json:"provider,omitempty"`
+			NeedSensitiveCheck  bool           `json:"need_sensitive_check"`
 		}
 		resp := internalModelResponse{
-			ID:          m.ID,
-			Object:      m.Object,
-			Created:     m.Created,
-			OwnedBy:     m.OwnedBy,
-			Task:        m.Task,
-			DisplayName: m.DisplayName,
-			Public:      m.Public,
-			Endpoint:    m.Endpoint,
-			Metadata:    m.Metadata,
+			ID:                 m.ID,
+			Object:             m.Object,
+			Created:            m.Created,
+			OwnedBy:            m.OwnedBy,
+			Task:               m.Task,
+			DisplayName:        m.DisplayName,
+			Endpoint:           m.Endpoint,
+			Metadata:           m.Metadata,
+			NeedSensitiveCheck: m.NeedSensitiveCheck,
 		}
 
 		if m.SupportFunctionCall {
@@ -113,7 +130,6 @@ func (m *Model) UnmarshalJSON(data []byte) error {
 		Task                string         `json:"task"`
 		DisplayName         string         `json:"display_name"`
 		SupportFunctionCall bool           `json:"support_function_call,omitempty"`
-		Public              bool           `json:"public"`
 		Endpoint            string         `json:"endpoint"`
 		Metadata            map[string]any `json:"metadata"`
 		ClusterID           string         `json:"cluster_id,omitempty"`
@@ -121,6 +137,7 @@ func (m *Model) UnmarshalJSON(data []byte) error {
 		ImageID             string         `json:"image_id,omitempty"`
 		AuthHead            string         `json:"auth_head,omitempty"`
 		Provider            string         `json:"provider,omitempty"`
+		NeedSensitiveCheck  bool           `json:"need_sensitive_check"`
 	}
 	var aux internalModelResponse
 	if err := json.Unmarshal(data, &aux); err != nil {
@@ -133,7 +150,6 @@ func (m *Model) UnmarshalJSON(data []byte) error {
 	m.Task = aux.Task
 	m.DisplayName = aux.DisplayName
 	m.SupportFunctionCall = aux.SupportFunctionCall
-	m.Public = aux.Public
 	m.Endpoint = aux.Endpoint
 	m.Metadata = aux.Metadata
 	m.ClusterID = aux.ClusterID
@@ -141,6 +157,7 @@ func (m *Model) UnmarshalJSON(data []byte) error {
 	m.ImageID = aux.ImageID
 	m.AuthHead = aux.AuthHead
 	m.Provider = aux.Provider
+	m.NeedSensitiveCheck = aux.NeedSensitiveCheck
 	return nil
 }
 
@@ -154,6 +171,19 @@ func (m *Model) ForInternalUse() *Model {
 func (m *Model) ForExternalResponse() *Model {
 	m.InternalUse = false
 	return m
+}
+
+// SkipBalance set the model for skip balance mode
+func (m *Model) SkipBalance() bool {
+	// MetaTaskKey values is array of strings, check if MetaTaskValGuard is in it
+	if tasks, ok := m.Metadata[MetaTaskKey].([]interface{}); ok {
+		for _, t := range tasks {
+			if task, ok := t.(string); ok && task == MetaTaskValGuard {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // ModelList represents the model list response
@@ -172,10 +202,10 @@ type ModelList struct {
 // filtering, and pagination behavior consistently.
 type ListModelsReq struct {
 	ModelID string `json:"model_id"`
-	Public  string `json:"public"`
 	Per     string `json:"per"`
 	Page    string `json:"page"`
 	Source  string `json:"source"` // filter by source (csghub for CSGHub models, external for external models)
+	Task    string `json:"task"`   // filter by task
 }
 
 // UserPreferenceRequest defines the request parameters for UserPreference method
@@ -188,7 +218,9 @@ type UserPreferenceRequest struct {
 const OpenCSGAppNameHeader string = "OpenCSG-App-Name"
 
 const (
-	AgenticHubApp = "Agentichub"
+	AgenticHubApp    = "Agentichub"
+	MetaTaskKey      = "task"
+	MetaTaskValGuard = "guard"
 )
 
 // ModelSource represents the source of a model
@@ -200,3 +232,16 @@ const (
 	// ModelSourceExternal represents models from external providers
 	ModelSourceExternal ModelSource = "external"
 )
+
+// ModelTokenPrice is currency plus per-million-token rate (major units, from accounting cents + sku_unit).
+type ModelTokenPrice struct {
+	Currency        string  `json:"currency,omitempty"`
+	PricePerMillion float64 `json:"price_per_million,omitempty"`
+}
+
+// ModelScenePrice is Metadata["pricing"]: serverless sets input/output token prices; external_llm sets token_price.
+type ModelScenePrice struct {
+	InputTokenPrice  *ModelTokenPrice `json:"input_token_price,omitempty"`
+	OutputTokenPrice *ModelTokenPrice `json:"output_token_price,omitempty"`
+	TokenPrice       *ModelTokenPrice `json:"token_price,omitempty"`
+}

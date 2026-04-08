@@ -161,5 +161,8 @@ func buildSearchLLMConfigQuery(
 	if search.Type != nil {
 		q.Where("llm_config.type = ?", *search.Type)
 	}
-
+	// Filter by Enabled if provided
+	if search.Enabled != nil {
+		q.Where("llm_config.enabled = ?", *search.Enabled)
+	}
 }

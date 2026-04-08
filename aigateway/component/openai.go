@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -59,6 +60,8 @@ func (m *openaiComponentImpl) GetAvailableModels(c context.Context, userName str
 	externalModels := m.getExternalModels(c)
 	models = append(models, externalModels...)
 
+	models = m.enrichModelsWithPrice(c, models)
+
 	// Save models to cache asynchronously
 	go func(modelList []types.Model) {
 		if len(modelList) == 0 {
@@ -92,56 +95,72 @@ func (m *openaiComponentImpl) ListModels(c context.Context, userName string, req
 	return filterAndPaginateModels(models, req), nil
 }
 
+type modelFilter func(m *types.Model) bool
+
+func filterByModelID(query string) modelFilter {
+	return func(m *types.Model) bool {
+		return strings.Contains(strings.ToLower(m.ID), query)
+	}
+}
+
+func filterBySource(source string) modelFilter {
+	return func(m *types.Model) bool {
+		switch source {
+		case string(types.ModelSourceCSGHub):
+			return m.CSGHubModelID != ""
+		case string(types.ModelSourceExternal):
+			return m.Provider != ""
+		default:
+			return true
+		}
+	}
+}
+
+func filterByTask(task string) modelFilter {
+	return func(m *types.Model) bool {
+		modelTasks := strings.FieldsFunc(strings.ToLower(m.Task), func(r rune) bool {
+			return r == ','
+		})
+		return slices.Contains(modelTasks, task)
+	}
+}
+
+func applyFilters(models []types.Model, filters []modelFilter) []types.Model {
+	if len(filters) == 0 {
+		return models
+	}
+	filtered := make([]types.Model, 0, len(models))
+	for i := range models {
+		m := &models[i]
+		keep := true
+		for _, f := range filters {
+			if !f(m) {
+				keep = false
+				break
+			}
+		}
+		if keep {
+			filtered = append(filtered, *m)
+		}
+	}
+	return filtered
+}
+
 func filterAndPaginateModels(models []types.Model, req types.ListModelsReq) types.ModelList {
-	// Apply fuzzy search filter if model_id is provided
-	searchQuery := req.ModelID
-	if searchQuery != "" {
-		filtered := make([]types.Model, 0, len(models))
-		sq := strings.ToLower(searchQuery)
-		for _, model := range models {
-			if strings.Contains(strings.ToLower(model.ID), sq) {
-				filtered = append(filtered, model)
-			}
-		}
-		models = filtered
+	var filters []modelFilter
+
+	if searchQuery := strings.ToLower(req.ModelID); searchQuery != "" {
+		filters = append(filters, filterByModelID(searchQuery))
+	}
+	if source := strings.ToLower(req.Source); source != "" {
+		filters = append(filters, filterBySource(source))
+	}
+	if task := strings.ToLower(req.Task); task != "" {
+		filters = append(filters, filterByTask(task))
 	}
 
-	// Apply public filter if provided and parseable
-	if req.Public != "" {
-		if isPublic, err := strconv.ParseBool(req.Public); err == nil {
-			filtered := make([]types.Model, 0, len(models))
-			for _, model := range models {
-				if model.Public == isPublic {
-					filtered = append(filtered, model)
-				}
-			}
-			models = filtered
-		}
-	}
+	models = applyFilters(models, filters)
 
-	// Apply source filter if provided
-	if req.Source != "" {
-		source := strings.ToLower(req.Source)
-		filtered := make([]types.Model, 0, len(models))
-		for _, model := range models {
-			switch source {
-			case string(types.ModelSourceCSGHub):
-				if model.CSGHubModelID != "" {
-					filtered = append(filtered, model)
-				}
-			case string(types.ModelSourceExternal):
-				if model.Provider != "" {
-					filtered = append(filtered, model)
-				}
-			default:
-				// Unknown source value, include all
-				filtered = append(filtered, model)
-			}
-		}
-		models = filtered
-	}
-
-	// Parse pagination parameters (defaults match previous handler behavior)
 	per := 20
 	page := 1
 	if req.Per != "" {
@@ -159,8 +178,7 @@ func filterAndPaginateModels(models []types.Model, req types.ListModelsReq) type
 	}
 
 	totalCount := len(models)
-	offset := (page - 1) * per
-	startIndex := offset
+	startIndex := (page - 1) * per
 	if startIndex > totalCount {
 		startIndex = totalCount
 	}
@@ -176,15 +194,26 @@ func filterAndPaginateModels(models []types.Model, req types.ListModelsReq) type
 		firstID = &paginated[0].ID
 		lastID = &paginated[len(paginated)-1].ID
 	}
-	hasMore := endIndex < totalCount
 
 	return types.ModelList{
 		Object:     "list",
 		Data:       paginated,
 		FirstID:    firstID,
 		LastID:     lastID,
-		HasMore:    hasMore,
+		HasMore:    endIndex < totalCount,
 		TotalCount: totalCount,
+	}
+}
+
+// providerTypeFromDeployType maps a deploy type integer to the LLM type string (MetaKeyLLMType).
+func providerTypeFromDeployType(t int) string {
+	switch t {
+	case commontypes.ServerlessType:
+		return types.ProviderTypeServerless
+	case commontypes.InferenceType:
+		return types.ProviderTypeInference
+	default:
+		return types.ProviderTypeInference
 	}
 }
 
@@ -201,11 +230,6 @@ func (m *openaiComponentImpl) getCSGHubModels(c context.Context, userID int64) (
 		}
 		// Check if engine_args contains tool-call-parser parameter
 		supportFunctionCall := strings.Contains(deploy.EngineArgs, "tool-call-parser")
-		// Determine public/private based on deployment type, ownership and secure level.
-		isPublic := true
-		if deploy.Type == commontypes.InferenceType && deploy.SecureLevel == commontypes.EndpointPrivate && deploy.UserID == userID {
-			isPublic = false // private - user's own deployment with private secure level
-		}
 		repoName := deploy.Repository.Name
 		m := types.Model{
 			BaseModel: types.BaseModel{
@@ -214,7 +238,9 @@ func (m *openaiComponentImpl) getCSGHubModels(c context.Context, userID int64) (
 				SupportFunctionCall: supportFunctionCall,
 				Task:                string(deploy.Task),
 				DisplayName:         repoName,
-				Public:              isPublic,
+				Metadata: map[string]any{
+					types.MetaKeyLLMType: providerTypeFromDeployType(deploy.Type),
+				},
 			},
 			InternalModelInfo: types.InternalModelInfo{
 				CSGHubModelID:    deploy.Repository.Path,
@@ -255,6 +281,8 @@ func (m *openaiComponentImpl) getExternalModels(c context.Context) []types.Model
 	search := &commontypes.SearchLLMConfig{}
 	searchType := 16
 	search.Type = &searchType
+	enabled := true
+	search.Enabled = &enabled
 
 	per := 50
 	page := 1
@@ -267,15 +295,31 @@ func (m *openaiComponentImpl) getExternalModels(c context.Context) []types.Model
 		}
 
 		for _, extModel := range extModels {
+			// Extract tasks from metadata if present
+			task := ""
+			if extModel.Metadata != nil {
+				if tasks, ok := extModel.Metadata[types.MetaKeyTasks].([]any); ok && len(tasks) > 0 {
+					tasksStrings := make([]string, 0, len(tasks))
+					for _, t := range tasks {
+						if s, ok := t.(string); ok {
+							tasksStrings = append(tasksStrings, s)
+						}
+					}
+					task = strings.Join(tasksStrings, ",")
+				}
+			}
+			if extModel.Metadata == nil {
+				extModel.Metadata = map[string]any{}
+			}
+			extModel.Metadata[types.MetaKeyLLMType] = types.ProviderTypeExternalLLM
 			m := types.Model{
 				BaseModel: types.BaseModel{
 					Object:      "model",
 					ID:          extModel.ModelName,
 					OwnedBy:     extModel.Provider,
 					DisplayName: extModel.DisplayName,
-					// Metadata is allowed to be nil; JSON will contain `null` for nil maps.
-					Metadata: extModel.Metadata,
-					Public:   true, // external models are always public
+					Metadata:    extModel.Metadata,
+					Task:        task,
 				},
 				Endpoint: extModel.ApiEndpoint,
 				ExternalModelInfo: types.ExternalModelInfo{

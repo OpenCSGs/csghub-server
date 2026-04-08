@@ -141,13 +141,13 @@ type OpenAIHandlerImpl struct {
 // ListModels godoc
 // @Security     ApiKey
 // @Summary      List available models
-// @Description  Returns a list of available models, supports fuzzy search by model_id query parameter and filtering by public status
+// @Description  Returns a list of available models, supports fuzzy search by model_id query parameter and filtering by source and task
 // @Tags         AIGateway
 // @Accept       json
 // @Produce      json
 // @Param        model_id query string false "Model ID for fuzzy search"
-// @Param        public query bool false "Filter by public status (true for public models, false for private models)"
 // @Param        source query string false "Filter by source (csghub for CSGHub models, external for external models)" Enums(csghub, external)
+// @Param        task query string false "Filter by task (e.g., text-generation, text-to-image)"
 // @Param        per query int false "Models per page (default 20, max 100)"
 // @Param        page query int false "Page number (1-based, default 1)"
 // @Success      200  {object}  types.ModelList "OK"
@@ -174,8 +174,8 @@ func (h *OpenAIHandlerImpl) ListModels(c *gin.Context) {
 
 	resp, err := h.openaiComponent.ListModels(c.Request.Context(), currentUser, types.ListModelsReq{
 		ModelID: c.Query("model_id"),
-		Public:  c.Query("public"),
 		Source:  source,
+		Task:    c.Query("task"),
 		Per:     c.Query("per"),
 		Page:    c.Query("page"),
 	})
@@ -207,6 +207,7 @@ func (h *OpenAIHandlerImpl) ListModels(c *gin.Context) {
 func (h *OpenAIHandlerImpl) GetModel(c *gin.Context) {
 	username := httpbase.GetCurrentUser(c)
 	modelID := c.Param("model")
+	modelID = strings.TrimPrefix(modelID, "/")
 	if modelID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": types.Error{
