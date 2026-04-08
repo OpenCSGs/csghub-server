@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/argoproj/argo-workflows/v3/pkg/apis/workflow/v1alpha1"
+	"github.com/uptrace/bun"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -24,6 +25,7 @@ type ArgoWorkFlowStore interface {
 	// delete workflow by id
 	DeleteWorkFlow(ctx context.Context, id int64) error
 	ListAllRunningEvaluations(ctx context.Context) (WorkFlows []ArgoWorkflow, err error)
+	ListRunningWorkflowsByUserUUID(ctx context.Context, userUUID string) (WorkFlows []ArgoWorkflow, err error)
 	GetClusterWorkflows(ctx context.Context, req types.ClusterWFReq) ([]ArgoWorkflow, int, error)
 	ListWorkflowsByTimeRange(ctx context.Context, req types.WorkflowTimeRangeReq) ([]ArgoWorkflow, int, error)
 }
@@ -145,7 +147,15 @@ func (s *argoWorkFlowStoreImpl) ListAllRunningEvaluations(ctx context.Context) (
 		Where("status = ?", v1alpha1.WorkflowRunning).
 		Scan(ctx)
 	return
+}
 
+func (s *argoWorkFlowStoreImpl) ListRunningWorkflowsByUserUUID(ctx context.Context, userUUID string) (WorkFlows []ArgoWorkflow, err error) {
+	err = s.db.Operator.Core.NewSelect().
+		Model(&WorkFlows).
+		Where("user_uuid = ?", userUUID).
+		Where("status in (?)", bun.In([]string{string(v1alpha1.WorkflowRunning), string(v1alpha1.WorkflowPending)})).
+		Scan(ctx)
+	return
 }
 
 func (s *argoWorkFlowStoreImpl) GetClusterWorkflows(ctx context.Context, req types.ClusterWFReq) ([]ArgoWorkflow, int, error) {

@@ -611,12 +611,12 @@ func (_c *MockAccountingComponent_ListMeteringsByUserIDAndTime_Call) RunAndRetur
 	return _c
 }
 
-// ListRechargeByUserIDAndTime provides a mock function with given fields: ctx, req
-func (_m *MockAccountingComponent) ListRechargeByUserIDAndTime(ctx context.Context, req types.AcctRechargeListReq) (interface{}, error) {
+// ListRecharge provides a mock function with given fields: ctx, req
+func (_m *MockAccountingComponent) ListRecharge(ctx context.Context, req types.AcctRechargeListReq) (interface{}, error) {
 	ret := _m.Called(ctx, req)
 
 	if len(ret) == 0 {
-		panic("no return value specified for ListRechargeByUserIDAndTime")
+		panic("no return value specified for ListRecharge")
 	}
 
 	var r0 interface{}
@@ -641,31 +641,31 @@ func (_m *MockAccountingComponent) ListRechargeByUserIDAndTime(ctx context.Conte
 	return r0, r1
 }
 
-// MockAccountingComponent_ListRechargeByUserIDAndTime_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListRechargeByUserIDAndTime'
-type MockAccountingComponent_ListRechargeByUserIDAndTime_Call struct {
+// MockAccountingComponent_ListRecharge_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListRecharge'
+type MockAccountingComponent_ListRecharge_Call struct {
 	*mock.Call
 }
 
-// ListRechargeByUserIDAndTime is a helper method to define mock.On call
+// ListRecharge is a helper method to define mock.On call
 //   - ctx context.Context
 //   - req types.AcctRechargeListReq
-func (_e *MockAccountingComponent_Expecter) ListRechargeByUserIDAndTime(ctx interface{}, req interface{}) *MockAccountingComponent_ListRechargeByUserIDAndTime_Call {
-	return &MockAccountingComponent_ListRechargeByUserIDAndTime_Call{Call: _e.mock.On("ListRechargeByUserIDAndTime", ctx, req)}
+func (_e *MockAccountingComponent_Expecter) ListRecharge(ctx interface{}, req interface{}) *MockAccountingComponent_ListRecharge_Call {
+	return &MockAccountingComponent_ListRecharge_Call{Call: _e.mock.On("ListRecharge", ctx, req)}
 }
 
-func (_c *MockAccountingComponent_ListRechargeByUserIDAndTime_Call) Run(run func(ctx context.Context, req types.AcctRechargeListReq)) *MockAccountingComponent_ListRechargeByUserIDAndTime_Call {
+func (_c *MockAccountingComponent_ListRecharge_Call) Run(run func(ctx context.Context, req types.AcctRechargeListReq)) *MockAccountingComponent_ListRecharge_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(context.Context), args[1].(types.AcctRechargeListReq))
 	})
 	return _c
 }
 
-func (_c *MockAccountingComponent_ListRechargeByUserIDAndTime_Call) Return(_a0 interface{}, _a1 error) *MockAccountingComponent_ListRechargeByUserIDAndTime_Call {
+func (_c *MockAccountingComponent_ListRecharge_Call) Return(_a0 interface{}, _a1 error) *MockAccountingComponent_ListRecharge_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockAccountingComponent_ListRechargeByUserIDAndTime_Call) RunAndReturn(run func(context.Context, types.AcctRechargeListReq) (interface{}, error)) *MockAccountingComponent_ListRechargeByUserIDAndTime_Call {
+func (_c *MockAccountingComponent_ListRecharge_Call) RunAndReturn(run func(context.Context, types.AcctRechargeListReq) (interface{}, error)) *MockAccountingComponent_ListRecharge_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -20,35 +20,9 @@ type EventConfig struct {
 	ConsumerName string // durable consumer name
 }
 
-type DLQEventConfig struct {
-	EventConfig
-	FeeSubjectName      string // subject of fee dlq
-	MeterSubjectName    string // subject of meter dlq
-	RechargeSubjectName string // subject of recharge dlq
-}
-
-type RequestSubject struct {
-	rechargeSucceed string //
-}
-
 var (
 	nats_connect_timeout time.Duration = 2 * time.Second  // second
 	nats_reconnect_wait  time.Duration = 10 * time.Second // second
-
-	dlqCfg = EventConfig{
-		StreamName:   bldmq.AccountingDlqGroup.StreamName, // DLQ
-		ConsumerName: bldmq.AccountingDlqGroup.ConsumerName,
-	}
-
-	dlq = DLQEventConfig{
-		EventConfig:         dlqCfg,
-		RechargeSubjectName: bldmq.DLQRechargeSubject,
-	}
-
-	rechargeCfg = EventConfig{
-		StreamName:   bldmq.RechargeGroup.StreamName,
-		ConsumerName: bldmq.RechargeGroup.ConsumerName,
-	}
 
 	highPriorityMsgCfg = EventConfig{
 		StreamName:   bldmq.HighPriorityMsgGroup.StreamName,
@@ -67,15 +41,9 @@ var (
 )
 
 type NatsHandler struct {
-	conn *nats.Conn
-
-	msgFetchTimeoutInSec int
-	rechargeReqSub       RequestSubject
-	rechargeEvtCfg       jetstream.StreamConfig
-	rechargeConsumerCfg  jetstream.ConsumerConfig
-
+	conn                      *nats.Conn
+	msgFetchTimeoutInSec      int
 	js                        jetstream.JetStream
-	rechargeJsc               jetstream.Consumer
 	highPriorityMsgJsc        jetstream.Consumer
 	normalPriorityMsgJsc      jetstream.Consumer
 	agentSessionHistoryMsgJsc jetstream.Consumer
@@ -109,8 +77,6 @@ func NewNats(config *config.Config) (*NatsHandler, error) {
 	if err != nil {
 		return nil, err
 	}
-	rechargeEC, rechargeCC := initStreamAndConsumerConfig(rechargeCfg,
-		[]string{bldmq.RechargeSucceedSubject})
 	highPriorityMsgEvtCfg, highPriorityMsgConsumerCfg := initStreamAndConsumerConfig(highPriorityMsgCfg,
 		[]string{bldmq.HighPriorityMsgSubject})
 	normalPriorityMsgEvtCfg, normalPriorityMsgConsumerCfg := initStreamAndConsumerConfig(normalPriorityMsgCfg,
@@ -118,13 +84,8 @@ func NewNats(config *config.Config) (*NatsHandler, error) {
 	agentSessionHistoryMsgEvtCfg, agentSessionHistoryMsgConsumerCfg := initStreamAndConsumerConfig(agentSessionHistoryMsgCfg,
 		[]string{bldmq.AgentSessionHistoryMsgSubject})
 	return &NatsHandler{
-		conn:                 nc,
-		msgFetchTimeoutInSec: config.Nats.MsgFetchTimeoutInSEC,
-		rechargeReqSub: RequestSubject{
-			rechargeSucceed: bldmq.RechargeSucceedSubject,
-		},
-		rechargeEvtCfg:                    rechargeEC,
-		rechargeConsumerCfg:               rechargeCC,
+		conn:                              nc,
+		msgFetchTimeoutInSec:              config.Nats.MsgFetchTimeoutInSEC,
 		highPriorityMsgEvtCfg:             highPriorityMsgEvtCfg,
 		highPriorityMsgConsumerCfg:        highPriorityMsgConsumerCfg,
 		normalPriorityMsgEvtCfg:           normalPriorityMsgEvtCfg,
@@ -180,20 +141,6 @@ func (nh *NatsHandler) BuildEventStreamAndConsumer(cfg EventConfig, streamCfg je
 	return jsc, nil
 }
 
-func (nh *NatsHandler) BuildRechargeEventStream() error {
-	jsc, err := nh.BuildEventStreamAndConsumer(rechargeCfg, nh.rechargeEvtCfg, nh.rechargeConsumerCfg)
-	if err != nil {
-		return err
-	}
-	nh.rechargeJsc = jsc
-	return nil
-}
-
-func (nh *NatsHandler) FetchRechargeEventMessages(batch int) (jetstream.MessageBatch, error) {
-	msgs, err := nh.rechargeJsc.Fetch(batch, jetstream.FetchMaxWait(time.Duration(nh.msgFetchTimeoutInSec)*time.Second))
-	return msgs, err
-}
-
 func (nh *NatsHandler) VerifyStreamByName(streamName string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -201,31 +148,11 @@ func (nh *NatsHandler) VerifyStreamByName(streamName string) error {
 	return err
 }
 
-func (nh *NatsHandler) VerifyRechargeStream() error {
-	return nh.VerifyStreamByName(rechargeCfg.StreamName)
-}
-
-func (nh *NatsHandler) VerifyDLQStream() error {
-	return nh.VerifyStreamByName(dlqCfg.StreamName)
-}
-
 func (nh *NatsHandler) PublishData(subject string, data []byte) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	_, err := nh.js.Publish(ctx, subject, data)
 	return err
-}
-
-func (nh *NatsHandler) PublishFeeDataToDLQ(data []byte) error {
-	return nh.PublishData(dlq.FeeSubjectName, data)
-}
-
-func (nh *NatsHandler) PublishRechargeDataToDLQ(data []byte) error {
-	return nh.PublishData(dlq.RechargeSubjectName, data)
-}
-
-func (nh *NatsHandler) PublishRechargeDurationData(data []byte) error {
-	return nh.PublishData(nh.rechargeReqSub.rechargeSucceed, data)
 }
 
 func (nh *NatsHandler) BuildHighPriorityMsgStream(conf *config.Config) error {

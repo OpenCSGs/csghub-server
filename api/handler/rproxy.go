@@ -15,6 +15,7 @@ import (
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
+	"opencsg.com/csghub-server/common/utils/common"
 	"opencsg.com/csghub-server/component"
 )
 
@@ -188,6 +189,11 @@ func (r *RProxyHandler) getSvcTargetAddress(ctx context.Context, appSvcName stri
 		SvcName:   appSvcName,
 	}
 
-	target, host, err := component.ExtractDeployTargetAndHost(ctx, r.clusterComp, req)
+	cluster, err := r.clusterComp.GetClusterByID(ctx, req.ClusterID)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to get cluster by id %s, error: %w", req.ClusterID, err)
+	}
+
+	target, host, err = common.ExtractDeployTargetAndHost(ctx, cluster, req)
 	return target, host, err
 }

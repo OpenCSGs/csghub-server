@@ -214,6 +214,7 @@ type Model struct {
 	XnetEnabled             bool                    `json:"xnet_enabled"`
 	XnetMigrationStatus     XnetMigrationTaskStatus `json:"xnet_migration_status"`
 	XnetMigrationProgress   int                     `json:"xnet_migration_progress"`
+	RepoSize                int64                   `json:"repo_size"`
 	MultiSource
 }
 
@@ -354,6 +355,7 @@ const (
 	EvaluationType = 4    // evaluation
 	NotebookType   = 5    // notebook
 	JobType        = 6    // job
+	SandboxType    = 7    // sandbox
 	UnknownType    = -1   // unknown case
 )
 

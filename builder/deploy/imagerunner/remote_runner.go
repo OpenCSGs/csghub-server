@@ -265,12 +265,8 @@ func (h *RemoteRunner) doRequest(ctx context.Context, method, url string, data i
 			err := fmt.Errorf("unexpected http status: %d, error: %w", resp.StatusCode, err)
 			return nil, errorx.RemoteSvcFail(err, nil)
 		} else {
-			err, ok := errorx.RunnerErrors[result.Code]
-			if ok {
-				return nil, err
-			}
-			err = fmt.Errorf("unexpected http status: %d, error: %w", resp.StatusCode, err)
-			return nil, errorx.RemoteSvcFail(err, nil)
+			slog.ErrorContext(ctx, "remote runner request failed", slog.Any("result", result))
+			return nil, errorx.RemoteSvcFail(err, errorx.Ctx().Set("err", result.Msg))
 		}
 	}
 
