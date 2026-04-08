@@ -2,7 +2,6 @@ package component
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	"github.com/google/uuid"
@@ -30,11 +29,10 @@ func TestOrganizationComponent_Create(t *testing.T) {
 	mockUserStore.EXPECT().FindByUsername(mock.Anything, req.Username).Return(database.User{
 		Username: "user1",
 	}, nil).Once()
-	// Mock FindByUUID to return not found (so UUID doesn't conflict)
-	mockUserStore.EXPECT().FindByUUID(mock.Anything, mock.Anything).Return(nil, errors.New("not found")).Once()
 
 	mockNamespaceStore := mockdb.NewMockNamespaceStore(t)
 	mockNamespaceStore.EXPECT().Exists(mock.Anything, req.Name).Return(false, nil).Once()
+	mockNamespaceStore.EXPECT().ExistsByUUID(mock.Anything, mock.Anything).Return(false, nil).Once()
 
 	mockGitServer := mockgit.NewMockGitServer(t)
 	mockGitServer.EXPECT().CreateOrganization(mock.Anything, mock.Anything).Return(&database.Organization{
@@ -204,4 +202,66 @@ func TestOrganizationComponent_Update(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Equal(t, "org1", returnOrg.Name)
+}
+
+func TestOrganizationComponent_Get(t *testing.T) {
+	dbOrg := database.Organization{
+		ID:       1,
+		Nickname: "org1",
+		Name:     "org_path",
+		Homepage: "https://org1.com",
+		Logo:     "https://org1.com/logo.png",
+		OrgType:  "company",
+		Verified: true,
+		Namespace: &database.Namespace{
+			ID:            1,
+			Path:          "org_path",
+			NamespaceType: database.OrgNamespace,
+			UUID:          "ns-uuid-1",
+		},
+	}
+	mockOrgStore := mockdb.NewMockOrgStore(t)
+	mockOrgStore.EXPECT().FindByPath(mock.Anything, "org_path").Return(dbOrg, nil)
+
+	c := &organizationComponentImpl{
+		orgStore: mockOrgStore,
+	}
+	org, err := c.Get(context.Background(), "org_path")
+	require.NoError(t, err)
+	require.Equal(t, "org_path", org.Name)
+	require.Equal(t, "org1", org.Nickname)
+	require.Equal(t, "https://org1.com", org.Homepage)
+	require.NotNil(t, org.Namespace)
+	require.Equal(t, "org1", org.Namespace.Path)
+}
+
+func TestOrganizationComponent_GetByUUID(t *testing.T) {
+	dbOrg := &database.Organization{
+		ID:       1,
+		Nickname: "org1",
+		Name:     "org_path",
+		Homepage: "https://org1.com",
+		Logo:     "https://org1.com/logo.png",
+		OrgType:  "company",
+		Verified: true,
+		Namespace: &database.Namespace{
+			ID:            1,
+			Path:          "org_path",
+			NamespaceType: database.OrgNamespace,
+			UUID:          "ns-uuid-1",
+		},
+	}
+	mockOrgStore := mockdb.NewMockOrgStore(t)
+	mockOrgStore.EXPECT().FindByUUID(mock.Anything, "org-uuid-123").Return(dbOrg, nil)
+
+	c := &organizationComponentImpl{
+		orgStore: mockOrgStore,
+	}
+	org, err := c.GetByUUID(context.Background(), "org-uuid-123")
+	require.NoError(t, err)
+	require.Equal(t, "org_path", org.Name)
+	require.Equal(t, "org1", org.Nickname)
+	require.Equal(t, "https://org1.com", org.Homepage)
+	require.NotNil(t, org.Namespace)
+	require.Equal(t, "org1", org.Namespace.Path)
 }

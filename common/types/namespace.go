@@ -10,4 +10,5 @@ type Namespace struct {
 	// namespace types like 'user' for normal user, and 'school', 'company' for orgs etc.
 	Type   string
 	Avatar string
+	UUID   string
 }

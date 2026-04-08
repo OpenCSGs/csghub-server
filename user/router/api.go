@@ -73,6 +73,7 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 		// org and members
 		apiV1Group.GET("/organizations", orgHandler.Index)
 		apiV1Group.GET("/organization/:namespace", orgHandler.Get)
+		apiV1Group.GET("/organization/uuid/:uuid", orgHandler.GetByUUID)
 		apiV1Group.GET("/organization/:namespace/members", memberCtrl.OrgMembers)
 	}
 
@@ -81,6 +82,7 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 		//organization
 		//namespace
 		apiV1Group.GET("/namespace/:path", needAPIKey, nsCtrl.GetInfo)
+		apiV1Group.GET("/namespace/uuid/:uuid", needAPIKey, nsCtrl.GetInfoByUUID)
 		//jwt
 		jwtGroup.POST("/token", needAPIKey, jwtHandler.Create)
 		jwtGroup.GET("/:token", needAPIKey, jwtHandler.Verify)
@@ -129,6 +131,7 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 	// routers for members
 	{
 		apiV1Group.GET("/organization/:namespace/members/:username", userMatch, memberCtrl.GetMemberRole)
+		apiV1Group.GET("/organization/uuid/:uuid/members/:username", userMatch, memberCtrl.GetMemberRoleByUUID)
 		apiV1Group.POST("/organization/:namespace/members", memberCtrl.Create)
 		apiV1Group.PUT("/organization/:namespace/members/:username", memberCtrl.Update)
 		apiV1Group.DELETE("/organization/:namespace/members/:username", memberCtrl.Delete)
