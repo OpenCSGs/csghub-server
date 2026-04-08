@@ -1462,6 +1462,11 @@ func createSkillRoutes(
 	repoCommonHandler *handler.RepoHandler,
 ) {
 	skillGroup := apiGroup.Group("/skills")
+
+	// Upload skill package endpoint - doesn't require existing repo
+	skillGroup.POST("/upload_url", middlewareCollection.Auth.NeedPhoneVerified, skillHandler.GetUploadUrl)
+
+	// Routes that require existing repo
 	skillGroup.Use(middleware.RepoType(types.SkillRepo), middlewareCollection.Repo.RepoExists)
 	{
 		skillGroup.POST("", middlewareCollection.Auth.NeedPhoneVerified, skillHandler.Create)

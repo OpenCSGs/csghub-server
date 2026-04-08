@@ -256,3 +256,8 @@ func ShortenCommitID7(fullCommitID string) (string, error) {
 	}
 	return commitID[:7], nil
 }
+
+// BuildSkillPackageObjectKey builds the object key for skill package in object storage
+func BuildSkillPackageObjectKey(sha256 string) string {
+	return fmt.Sprintf("skills/packages/%s", sha256)
+}
