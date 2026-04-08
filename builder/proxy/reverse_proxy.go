@@ -78,6 +78,9 @@ func (rp *reverseProxyImpl) ServeHTTP(w http.ResponseWriter, r *http.Request, ap
 		// remove duplicate X-Request-Id header from downstream response
 		// because it is already set by the gateway middleware
 		resp.Header.Del(trace.HeaderRequestID)
+		// allow upstream pages to be embedded in iframes by the parent app
+		resp.Header.Del("X-Frame-Options")
+		resp.Header.Del("Content-Security-Policy")
 
 		return nil
 	}
