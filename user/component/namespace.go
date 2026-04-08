@@ -44,9 +44,10 @@ func (c *namespaceComponentImpl) GetInfoByUUID(ctx context.Context, uuid string)
 
 func (c *namespaceComponentImpl) buildNamespace(ctx context.Context, dbns *database.Namespace) (*types.Namespace, error) {
 	ns := &types.Namespace{
-		Path: dbns.Path,
-		Type: string(dbns.NamespaceType),
-		UUID: dbns.UUID,
+		Path:   dbns.Path,
+		Type:   string(dbns.NamespaceType),
+		NSType: string(dbns.NamespaceType),
+		UUID:   dbns.UUID,
 	}
 	switch dbns.NamespaceType {
 	case database.UserNamespace:
