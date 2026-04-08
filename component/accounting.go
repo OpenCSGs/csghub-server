@@ -16,6 +16,7 @@ type accountingComponentImpl struct {
 	accountingClient      accounting.AccountingClient
 	userStore             database.UserStore
 	orgStore              database.OrgStore
+	namespaceStore        database.NamespaceStore
 	memberStore           database.MemberStore
 	deployTaskStore       database.DeployTaskStore
 	userSvcClient         rpc.UserSvcClient
@@ -64,7 +65,8 @@ func NewAccountingComponent(config *config.Config) (AccountingComponent, error) 
 		userSvcClient:    userRpcClient,
 		notificationSvcClient: rpc.NewNotificationSvcHttpClient(fmt.Sprintf("%s:%d", config.Notification.Host, config.Notification.Port),
 			rpc.AuthWithApiKey(config.APIToken)),
-		config: config,
+		config:         config,
+		namespaceStore: database.NewNamespaceStore(),
 	}, nil
 }
 
