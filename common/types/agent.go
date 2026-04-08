@@ -114,6 +114,7 @@ type AgentInstanceFilter struct {
 type UpdateAgentInstanceRequest struct {
 	Name        *string         `json:"name,omitempty"`
 	Description *string         `json:"description,omitempty"`
+	Public      *bool           `json:"public,omitempty"`
 	Metadata    *map[string]any `json:"metadata,omitempty"`
 }
 
@@ -334,8 +335,9 @@ type AgentStreamEvent struct {
 type CodeAgentSyncOperation string
 
 const (
-	CodeAgentSyncOperationUpdate CodeAgentSyncOperation = "update"
-	CodeAgentSyncOperationDelete CodeAgentSyncOperation = "delete"
+	CodeAgentSyncOperationUpdate     CodeAgentSyncOperation = "update"
+	CodeAgentSyncOperationDelete     CodeAgentSyncOperation = "delete"
+	CodeAgentSyncOperationVisibility CodeAgentSyncOperation = "visibility"
 )
 
 func (o CodeAgentSyncOperation) String() string {
