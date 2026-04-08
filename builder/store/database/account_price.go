@@ -21,6 +21,7 @@ type AccountPriceStore interface {
 	GetByID(ctx context.Context, id int64) (*AccountPrice, error)
 	GetLatestByTime(ctx context.Context, req types.AcctPriceQueryReq) (*AccountPrice, error)
 	ListBySkuType(ctx context.Context, req types.AcctPriceListDBReq) ([]AccountPrice, int, error)
+	ListBySkuTypeAndKinds(ctx context.Context, req types.AcctPriceListByKindsReq) ([]AccountPrice, error)
 	ListByIds(ctx context.Context, ids []int64) ([]*types.AcctPriceResp, error)
 }
 
@@ -181,4 +182,22 @@ func (a *accountPriceStoreImpl) ListByIds(ctx context.Context, ids []int64) ([]*
 	}
 
 	return res, nil
+}
+
+func (a *accountPriceStoreImpl) ListBySkuTypeAndKinds(ctx context.Context, req types.AcctPriceListByKindsReq) ([]AccountPrice, error) {
+	var result []AccountPrice
+	q := a.db.Core.NewSelect().Model(&result).
+		Where("sku_type = ?", req.SkuType).Where("sku_kind IN (?)", bun.In(req.SkuKinds))
+
+	if req.ResourceID != "" {
+		q.Where("resource_id = ?", req.ResourceID)
+	}
+
+	q = q.Order("resource_id ASC").Order("sku_kind ASC").Order("created_at DESC")
+
+	err := q.Scan(ctx, &result)
+	if err != nil {
+		return nil, fmt.Errorf("failed to select prices by sku type and kinds, error: %w", err)
+	}
+	return result, nil
 }

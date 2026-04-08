@@ -373,6 +373,65 @@ func (_c *MockAccountPriceStore_ListBySkuType_Call) RunAndReturn(run func(contex
 	return _c
 }
 
+// ListBySkuTypeAndKinds provides a mock function with given fields: ctx, req
+func (_m *MockAccountPriceStore) ListBySkuTypeAndKinds(ctx context.Context, req types.AcctPriceListByKindsReq) ([]database.AccountPrice, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListBySkuTypeAndKinds")
+	}
+
+	var r0 []database.AccountPrice
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.AcctPriceListByKindsReq) ([]database.AccountPrice, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.AcctPriceListByKindsReq) []database.AccountPrice); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.AccountPrice)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.AcctPriceListByKindsReq) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountPriceStore_ListBySkuTypeAndKinds_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListBySkuTypeAndKinds'
+type MockAccountPriceStore_ListBySkuTypeAndKinds_Call struct {
+	*mock.Call
+}
+
+// ListBySkuTypeAndKinds is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.AcctPriceListByKindsReq
+func (_e *MockAccountPriceStore_Expecter) ListBySkuTypeAndKinds(ctx interface{}, req interface{}) *MockAccountPriceStore_ListBySkuTypeAndKinds_Call {
+	return &MockAccountPriceStore_ListBySkuTypeAndKinds_Call{Call: _e.mock.On("ListBySkuTypeAndKinds", ctx, req)}
+}
+
+func (_c *MockAccountPriceStore_ListBySkuTypeAndKinds_Call) Run(run func(ctx context.Context, req types.AcctPriceListByKindsReq)) *MockAccountPriceStore_ListBySkuTypeAndKinds_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.AcctPriceListByKindsReq))
+	})
+	return _c
+}
+
+func (_c *MockAccountPriceStore_ListBySkuTypeAndKinds_Call) Return(_a0 []database.AccountPrice, _a1 error) *MockAccountPriceStore_ListBySkuTypeAndKinds_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountPriceStore_ListBySkuTypeAndKinds_Call) RunAndReturn(run func(context.Context, types.AcctPriceListByKindsReq) ([]database.AccountPrice, error)) *MockAccountPriceStore_ListBySkuTypeAndKinds_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Update provides a mock function with given fields: ctx, input
 func (_m *MockAccountPriceStore) Update(ctx context.Context, input database.AccountPrice) (*database.AccountPrice, error) {
 	ret := _m.Called(ctx, input)

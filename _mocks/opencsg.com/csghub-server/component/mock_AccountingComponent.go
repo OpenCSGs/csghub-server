@@ -552,6 +552,65 @@ func (_c *MockAccountingComponent_ListBillsByUserIDAndDate_Call) RunAndReturn(ru
 	return _c
 }
 
+// ListBillsDetailByUserID provides a mock function with given fields: ctx, req
+func (_m *MockAccountingComponent) ListBillsDetailByUserID(ctx context.Context, req types.AcctBillsDetailReq) (interface{}, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListBillsDetailByUserID")
+	}
+
+	var r0 interface{}
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.AcctBillsDetailReq) (interface{}, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.AcctBillsDetailReq) interface{}); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(interface{})
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.AcctBillsDetailReq) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountingComponent_ListBillsDetailByUserID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListBillsDetailByUserID'
+type MockAccountingComponent_ListBillsDetailByUserID_Call struct {
+	*mock.Call
+}
+
+// ListBillsDetailByUserID is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.AcctBillsDetailReq
+func (_e *MockAccountingComponent_Expecter) ListBillsDetailByUserID(ctx interface{}, req interface{}) *MockAccountingComponent_ListBillsDetailByUserID_Call {
+	return &MockAccountingComponent_ListBillsDetailByUserID_Call{Call: _e.mock.On("ListBillsDetailByUserID", ctx, req)}
+}
+
+func (_c *MockAccountingComponent_ListBillsDetailByUserID_Call) Run(run func(ctx context.Context, req types.AcctBillsDetailReq)) *MockAccountingComponent_ListBillsDetailByUserID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.AcctBillsDetailReq))
+	})
+	return _c
+}
+
+func (_c *MockAccountingComponent_ListBillsDetailByUserID_Call) Return(_a0 interface{}, _a1 error) *MockAccountingComponent_ListBillsDetailByUserID_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountingComponent_ListBillsDetailByUserID_Call) RunAndReturn(run func(context.Context, types.AcctBillsDetailReq) (interface{}, error)) *MockAccountingComponent_ListBillsDetailByUserID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ListMeteringsByUserIDAndTime provides a mock function with given fields: ctx, req
 func (_m *MockAccountingComponent) ListMeteringsByUserIDAndTime(ctx context.Context, req types.ActStatementsReq) (interface{}, error) {
 	ret := _m.Called(ctx, req)
@@ -1029,6 +1088,65 @@ func (_c *MockAccountingComponent_QueryPricesBySKUType_Call) Return(_a0 interfac
 }
 
 func (_c *MockAccountingComponent_QueryPricesBySKUType_Call) RunAndReturn(run func(string, types.AcctPriceListReq) (interface{}, error)) *MockAccountingComponent_QueryPricesBySKUType_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// QueryPricesBySkuTypeAndKinds provides a mock function with given fields: currentUser, req
+func (_m *MockAccountingComponent) QueryPricesBySkuTypeAndKinds(currentUser string, req types.AcctPriceListByKindsReq) (any, error) {
+	ret := _m.Called(currentUser, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for QueryPricesBySkuTypeAndKinds")
+	}
+
+	var r0 any
+	var r1 error
+	if rf, ok := ret.Get(0).(func(string, types.AcctPriceListByKindsReq) (any, error)); ok {
+		return rf(currentUser, req)
+	}
+	if rf, ok := ret.Get(0).(func(string, types.AcctPriceListByKindsReq) any); ok {
+		r0 = rf(currentUser, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(any)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(string, types.AcctPriceListByKindsReq) error); ok {
+		r1 = rf(currentUser, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountingComponent_QueryPricesBySkuTypeAndKinds_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'QueryPricesBySkuTypeAndKinds'
+type MockAccountingComponent_QueryPricesBySkuTypeAndKinds_Call struct {
+	*mock.Call
+}
+
+// QueryPricesBySkuTypeAndKinds is a helper method to define mock.On call
+//   - currentUser string
+//   - req types.AcctPriceListByKindsReq
+func (_e *MockAccountingComponent_Expecter) QueryPricesBySkuTypeAndKinds(currentUser interface{}, req interface{}) *MockAccountingComponent_QueryPricesBySkuTypeAndKinds_Call {
+	return &MockAccountingComponent_QueryPricesBySkuTypeAndKinds_Call{Call: _e.mock.On("QueryPricesBySkuTypeAndKinds", currentUser, req)}
+}
+
+func (_c *MockAccountingComponent_QueryPricesBySkuTypeAndKinds_Call) Run(run func(currentUser string, req types.AcctPriceListByKindsReq)) *MockAccountingComponent_QueryPricesBySkuTypeAndKinds_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(string), args[1].(types.AcctPriceListByKindsReq))
+	})
+	return _c
+}
+
+func (_c *MockAccountingComponent_QueryPricesBySkuTypeAndKinds_Call) Return(_a0 any, _a1 error) *MockAccountingComponent_QueryPricesBySkuTypeAndKinds_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountingComponent_QueryPricesBySkuTypeAndKinds_Call) RunAndReturn(run func(string, types.AcctPriceListByKindsReq) (any, error)) *MockAccountingComponent_QueryPricesBySkuTypeAndKinds_Call {
 	_c.Call.Return(run)
 	return _c
 }

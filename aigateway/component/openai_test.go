@@ -461,7 +461,7 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 					require.Equal(t, "test-model", evt.ResourceID)
 					require.Equal(t, "test-model", evt.ResourceName)
 					require.Equal(t, "test-service", evt.CustomerID)
-					require.True(t, evt.Scene == int(commontypes.SceneModelServerless) || evt.Scene == int(commontypes.SceneAgenticHub), "Scene should be either SceneModelServerless or SceneAgenticHub")
+					require.True(t, evt.Scene == int(commontypes.SceneModelServerless), "Scene should be either SceneModelServerless or SceneAgenticHub")
 					require.Equal(t, "test-user-uuid", evt.UserUUID)
 					require.Equal(t, commontypes.TokenNumberType, evt.ValueType)
 					require.Equal(t, int64(150), evt.Value)
@@ -523,7 +523,7 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 					require.Equal(t, "test-model", evt.ResourceID)
 					require.Equal(t, "test-model", evt.ResourceName)
 					require.Equal(t, "test-service", evt.CustomerID)
-					require.True(t, evt.Scene == int(commontypes.SceneModelServerless) || evt.Scene == int(commontypes.SceneAgenticHub), "Scene should be either SceneModelServerless or SceneAgenticHub")
+					require.True(t, evt.Scene == int(commontypes.SceneModelServerless), "Scene should be either SceneModelServerless or SceneAgenticHub")
 					require.Equal(t, "test-user-uuid", evt.UserUUID)
 					require.Equal(t, commontypes.TokenNumberType, evt.ValueType)
 					require.Equal(t, int64(150), evt.Value)
@@ -583,7 +583,7 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 					require.Equal(t, "test-model", evt.ResourceID)
 					require.Equal(t, "test-model", evt.ResourceName)
 					require.Equal(t, "test-service", evt.CustomerID)
-					require.True(t, evt.Scene == int(commontypes.SceneModelServerless) || evt.Scene == int(commontypes.SceneAgenticHub), "Scene should be either SceneModelServerless or SceneAgenticHub")
+					require.True(t, evt.Scene == int(commontypes.SceneModelServerless), "Scene should be either SceneModelServerless or SceneAgenticHub")
 					require.Equal(t, "test-user-uuid", evt.UserUUID)
 					require.Equal(t, commontypes.TokenNumberType, evt.ValueType)
 					require.Equal(t, int64(150), evt.Value)
@@ -742,7 +742,7 @@ func TestOpenAIComponentImpl_RecordUsage_ExternalModel(t *testing.T) {
 					require.Equal(t, "test-user-uuid", evt.UserUUID)
 					require.Equal(t, commontypes.TokenNumberType, evt.ValueType)
 					require.Equal(t, int64(300), evt.Value)
-					require.True(t, evt.Scene == int(commontypes.SceneModelServerless) || evt.Scene == int(commontypes.SceneAgenticHub), "Scene should be either SceneModelServerless or SceneAgenticHub")
+					require.True(t, evt.Scene == int(commontypes.SceneModelServerless), "Scene should be either SceneModelServerless or SceneAgenticHub")
 
 					var tokenUsageExtra struct {
 						PromptTokenNum     string                     `json:"prompt_token_num"`
@@ -950,7 +950,7 @@ func TestOpenAIComponentImpl_RecordUsage_WithSceneValue(t *testing.T) {
 					var evt commontypes.MeteringEvent
 					err := json.Unmarshal(data, &evt)
 					require.NoError(t, err)
-					require.True(t, evt.Scene == int(commontypes.SceneModelServerless) || evt.Scene == int(commontypes.SceneAgenticHub), "Scene should be either SceneModelServerless or SceneAgenticHub")
+					require.True(t, evt.Scene == int(commontypes.SceneModelServerless), "Scene should be either SceneModelServerless or SceneAgenticHub")
 					return nil
 				})
 			},
@@ -959,7 +959,7 @@ func TestOpenAIComponentImpl_RecordUsage_WithSceneValue(t *testing.T) {
 			name:          "agentichub scene with external model",
 			userUUID:      "test-user-uuid",
 			sceneValue:    commontypes.SceneHeaderAgenticHub,
-			expectedScene: int(commontypes.SceneAgenticHub),
+			expectedScene: int(commontypes.SceneModelServerless),
 			model: &types.Model{
 				BaseModel: types.BaseModel{
 					ID:      "gpt-4",
@@ -996,7 +996,7 @@ func TestOpenAIComponentImpl_RecordUsage_WithSceneValue(t *testing.T) {
 					require.NoError(t, err)
 					// In CE, parseScene always returns SceneModelServerless
 					// In EE, parseScene returns SceneAgenticHub for agentichub header
-					require.True(t, evt.Scene == int(commontypes.SceneModelServerless) || evt.Scene == int(commontypes.SceneAgenticHub))
+					require.True(t, evt.Scene == int(commontypes.SceneModelServerless))
 
 					var tokenUsageExtra struct {
 						PromptTokenNum     string                     `json:"prompt_token_num"`
@@ -1049,7 +1049,7 @@ func TestOpenAIComponentImpl_RecordUsage_WithSceneValue(t *testing.T) {
 					err := json.Unmarshal(data, &evt)
 					require.NoError(t, err)
 					// Empty scene should be parsed appropriately
-					require.True(t, evt.Scene == int(commontypes.SceneModelServerless) || evt.Scene == int(commontypes.SceneAgenticHub))
+					require.True(t, evt.Scene == int(commontypes.SceneModelServerless))
 					return nil
 				})
 			},

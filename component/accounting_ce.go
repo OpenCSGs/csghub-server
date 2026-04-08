@@ -28,6 +28,10 @@ func (ac *accountingComponentImpl) ListBillsByUserIDAndDate(ctx context.Context,
 	return nil, nil
 }
 
+func (ac *accountingComponentImpl) ListBillsDetailByUserID(ctx context.Context, req types.AcctBillsDetailReq) (interface{}, error) {
+	return nil, nil
+}
+
 func (ac *accountingComponentImpl) RechargeAccountingUser(ctx context.Context, userUUID string, req types.RechargeReq) (interface{}, error) {
 	return nil, nil
 }
@@ -49,6 +53,10 @@ func (ac *accountingComponentImpl) GetQuotaStatement(currentUser string, req typ
 }
 
 func (ac *accountingComponentImpl) QueryPricesBySKUType(currentUser string, req types.AcctPriceListReq) (interface{}, error) {
+	return nil, nil
+}
+
+func (ac *accountingComponentImpl) QueryPricesBySkuTypeAndKinds(currentUser string, req types.AcctPriceListByKindsReq) (any, error) {
 	return nil, nil
 }
 
