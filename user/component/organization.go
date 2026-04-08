@@ -186,7 +186,7 @@ func (c *organizationComponentImpl) Index(ctx context.Context, username, search 
 		}
 		if dborg.Namespace != nil {
 			org.Namespace = &types.Namespace{
-				Path: dborg.Nickname,
+				Path: dborg.Namespace.Path,
 				Type: string(dborg.Namespace.NamespaceType),
 				UUID: dborg.Namespace.UUID,
 			}

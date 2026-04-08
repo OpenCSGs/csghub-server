@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"slices"
 	"testing"
 	"time"
 
@@ -258,4 +259,86 @@ func TestOrganizationStore_FindByUUID(t *testing.T) {
 	org, err = store.FindByUUID(ctx, "invalid-uuid-format")
 	require.NotNil(t, err)
 	require.Nil(t, org)
+}
+
+func TestOrganizationStore_SearchOrder(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewOrgStoreWithDB(db)
+	orgsToCreate := []database.Organization{
+		{
+			Name:     "sss",
+			Nickname: "zzz org",
+			UUID:     uuid.New(),
+		},
+		{
+			Name:     "sss-team",
+			Nickname: "alpha org",
+			UUID:     uuid.New(),
+		},
+		{
+			Name:     "team-01",
+			Nickname: "sss",
+			UUID:     uuid.New(),
+		},
+		{
+			Name:     "team-02",
+			Nickname: "sss group",
+			UUID:     uuid.New(),
+		},
+		{
+			Name:     "team-03",
+			Nickname: "group sss",
+			UUID:     uuid.New(),
+		},
+	}
+
+	for _, org := range orgsToCreate {
+		err := store.Create(ctx, &org, &database.Namespace{Path: org.Name})
+		require.Nil(t, err)
+	}
+
+	orgs, total, err := store.Search(ctx, "sss", 10, 1, "", "")
+	require.Nil(t, err)
+	require.Equal(t, 5, total)
+
+	gotNames := make([]string, 0, len(orgs))
+	for _, org := range orgs {
+		gotNames = append(gotNames, org.Name)
+	}
+
+	require.Equal(t, []string{"sss", "sss-team", "team-01", "team-02", "team-03"}, gotNames)
+}
+
+func TestOrganizationStore_SearchOrderCaseInsensitive(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewOrgStoreWithDB(db)
+	err := store.Create(ctx, &database.Organization{
+		Name:     "SSS-Exact",
+		Nickname: "display",
+		UUID:     uuid.New(),
+	}, &database.Namespace{Path: "SSS-Exact"})
+	require.Nil(t, err)
+	err = store.Create(ctx, &database.Organization{
+		Name:     "other",
+		Nickname: "sss",
+		UUID:     uuid.New(),
+	}, &database.Namespace{Path: "other"})
+	require.Nil(t, err)
+
+	orgs, total, err := store.Search(ctx, "sss-exact", 10, 1, "", "")
+	require.Nil(t, err)
+	require.Equal(t, 1, total)
+	require.Len(t, orgs, 1)
+	require.Equal(t, "SSS-Exact", orgs[0].Name)
+
+	orgs, total, err = store.Search(ctx, "SSS", 10, 1, "", "")
+	require.Nil(t, err)
+	require.Equal(t, 2, total)
+	require.True(t, slices.Equal([]string{"SSS-Exact", "other"}, []string{orgs[0].Name, orgs[1].Name}))
 }
