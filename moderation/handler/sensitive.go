@@ -79,23 +79,14 @@ func (h *SensitiveHandler) Image(ctx *gin.Context) {
 }
 
 func (h *SensitiveHandler) LlmResp(ctx *gin.Context) {
-	type request struct {
-		Service           string `json:"Service"`
-		ServiceParameters struct {
-			Content   string `json:"content"`
-			SessionId string `json:"sessionId"`
-		} `json:"ServiceParameters"`
-	}
-	var (
-		r   request
-		err error
-	)
-	if err = ctx.ShouldBindJSON(&r); err != nil {
+	var req types.LLMCheckRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", slog.String("err", err.Error()))
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	result, err := h.c.PassStreamCheck(ctx, types.ScenarioLLMResModeration, r.ServiceParameters.Content, r.ServiceParameters.SessionId)
+
+	result, err := h.c.PassStreamCheck(ctx, &req)
 	if err != nil {
 		httpbase.ServerError(ctx, err)
 		return
@@ -104,26 +95,18 @@ func (h *SensitiveHandler) LlmResp(ctx *gin.Context) {
 }
 
 func (h *SensitiveHandler) LlmPrompt(ctx *gin.Context) {
-	type request struct {
-		Service           string `json:"Service"`
-		ServiceParameters struct {
-			Content   string `json:"content"`
-			AccountId string `json:"accountId"`
-		} `json:"ServiceParameters"`
-	}
-	var (
-		r   request
-		err error
-	)
-	if err = ctx.ShouldBindJSON(&r); err != nil {
+	var req types.LLMCheckRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
 		slog.Error("Bad request format", slog.String("err", err.Error()))
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	result, err := h.c.PassLLMQueryCheck(ctx, types.ScenarioLLMQueryModeration, r.ServiceParameters.Content, r.ServiceParameters.AccountId)
+
+	result, err := h.c.PassLLMQueryCheck(ctx, &req)
 	if err != nil {
 		httpbase.ServerError(ctx, err)
 		return
 	}
+
 	httpbase.OK(ctx, result)
 }

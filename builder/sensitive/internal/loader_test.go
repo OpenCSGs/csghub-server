@@ -21,19 +21,9 @@ func (to *testObserver) Update(data *SensitiveWordData) error {
 }
 
 func TestConfigLoader(t *testing.T) {
-	cfg := &config.Config{
-		SensitiveCheck: struct {
-			Enable          bool   `env:"STARHUB_SERVER_SENSITIVE_CHECK_ENABLE" default:"false"`
-			AccessKeyID     string `env:"STARHUB_SERVER_SENSITIVE_CHECK_ACCESS_KEY_ID"`
-			AccessKeySecret string `env:"STARHUB_SERVER_SENSITIVE_CHECK_ACCESS_KEY_SECRET"`
-			Region          string `env:"STARHUB_SERVER_SENSITIVE_CHECK_REGION"`
-			Endpoint        string `env:"STARHUB_SERVER_SENSITIVE_CHECK_ENDPOINT" default:"oss-cn-beijing.aliyuncs.com"`
-			EnableSSL       bool   `env:"STARHUB_SERVER_SENSITIVE_CHECK_ENABLE_SSL" default:"true"`
-			DictDir         string `env:"STARHUB_SERVER_SENSITIVE_CHECK_DICT_DIR" default:"/starhub-bin/vocabulary"`
-		}{
-			DictDir: "./config.yaml",
-		},
-	}
+	cfg := &config.Config{}
+	cfg.SensitiveCheck.DictDir = "./config.yaml"
+
 	loader := NewConfigLoader(cfg)
 	observer := &testObserver{}
 
@@ -58,19 +48,9 @@ func TestConfigLoader(t *testing.T) {
 }
 
 func TestMultipleObservers(t *testing.T) {
-	cfg := &config.Config{
-		SensitiveCheck: struct {
-			Enable          bool   `env:"STARHUB_SERVER_SENSITIVE_CHECK_ENABLE" default:"false"`
-			AccessKeyID     string `env:"STARHUB_SERVER_SENSITIVE_CHECK_ACCESS_KEY_ID"`
-			AccessKeySecret string `env:"STARHUB_SERVER_SENSITIVE_CHECK_ACCESS_KEY_SECRET"`
-			Region          string `env:"STARHUB_SERVER_SENSITIVE_CHECK_REGION"`
-			Endpoint        string `env:"STARHUB_SERVER_SENSITIVE_CHECK_ENDPOINT" default:"oss-cn-beijing.aliyuncs.com"`
-			EnableSSL       bool   `env:"STARHUB_SERVER_SENSITIVE_CHECK_ENABLE_SSL" default:"true"`
-			DictDir         string `env:"STARHUB_SERVER_SENSITIVE_CHECK_DICT_DIR" default:"/starhub-bin/vocabulary"`
-		}{
-			DictDir: "./config.yaml",
-		},
-	}
+	cfg := &config.Config{}
+	cfg.SensitiveCheck.DictDir = "./config.yaml"
+
 	loader := NewConfigLoader(cfg)
 
 	observer1 := &testObserver{}
@@ -94,19 +74,9 @@ func TestMultipleObservers(t *testing.T) {
 }
 
 func TestUnsubscribe(t *testing.T) {
-	cfg := &config.Config{
-		SensitiveCheck: struct {
-			Enable          bool   `env:"STARHUB_SERVER_SENSITIVE_CHECK_ENABLE" default:"false"`
-			AccessKeyID     string `env:"STARHUB_SERVER_SENSITIVE_CHECK_ACCESS_KEY_ID"`
-			AccessKeySecret string `env:"STARHUB_SERVER_SENSITIVE_CHECK_ACCESS_KEY_SECRET"`
-			Region          string `env:"STARHUB_SERVER_SENSITIVE_CHECK_REGION"`
-			Endpoint        string `env:"STARHUB_SERVER_SENSITIVE_CHECK_ENDPOINT" default:"oss-cn-beijing.aliyuncs.com"`
-			EnableSSL       bool   `env:"STARHUB_SERVER_SENSITIVE_CHECK_ENABLE_SSL" default:"true"`
-			DictDir         string `env:"STARHUB_SERVER_SENSITIVE_CHECK_DICT_DIR" default:"/starhub-bin/vocabulary"`
-		}{
-			DictDir: "./config.yaml",
-		},
-	}
+	cfg := &config.Config{}
+	cfg.SensitiveCheck.DictDir = "./config.yaml"
+
 	loader := NewConfigLoader(cfg)
 	observer := &testObserver{}
 
