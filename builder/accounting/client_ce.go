@@ -70,7 +70,7 @@ func (ac *accountingClientImpl) CreateOrder(currentUser string, req types.AcctOr
 	return nil, nil
 }
 
-func (ac *accountingClientImpl) ListRechargeByUserIDAndTime(req types.AcctRechargeListReq) (any, error) {
+func (ac *accountingClientImpl) ListRecharge(req types.AcctRechargeListReq) (any, error) {
 	return nil, nil
 }
 
@@ -79,5 +79,9 @@ func (ac *accountingClientImpl) ListRecharges(req types.RechargesIndexReq) (any,
 }
 
 func (ac *accountingClientImpl) StatementsIndex(req types.ActStatementsReq) (any, error) {
+	return nil, nil
+}
+
+func (ac *accountingClientImpl) ListPresents(req types.PresentsIndexReq) (any, error) {
 	return nil, nil
 }

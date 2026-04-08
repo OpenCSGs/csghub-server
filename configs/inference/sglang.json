@@ -67,6 +67,7 @@
         "Qwen3NextForCausalLM",
         "Qwen3_5MoeForConditionalGeneration",
         "Qwen3_5ForConditionalGeneration",
+        "Qwen3ForGuardModel",
         "Sarashina2VisionForCausalLM",
         "SmolLM3ForCausalLM",
         "SolarForCausalLM",

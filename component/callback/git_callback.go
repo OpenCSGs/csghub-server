@@ -29,6 +29,7 @@ type GitCallbackComponent interface {
 	UpdateRepoInfos(ctx context.Context, req *types.GiteaCallbackPushReq) error
 	SensitiveCheck(ctx context.Context, req *types.GiteaCallbackPushReq) error
 	MCPScan(ctx context.Context, req *types.GiteaCallbackPushReq) error
+	CalculateRepoSize(ctx context.Context, req *types.GiteaCallbackPushReq) error
 }
 
 type gitCallbackComponentImpl struct {
@@ -54,6 +55,7 @@ type gitCallbackComponentImpl struct {
 	promptPrefixStore         database.PromptPrefixStore
 	mcpScanResultStore        database.MCPScanResultStore
 	mcpScanner                component.MCPScannerComponent
+	repositoryStatisticsStore database.RepositoryStatisticsStore
 	// set visibility if file content is sensitive
 	setRepoVisibility bool
 	maxPromptFS       int64
@@ -80,7 +82,7 @@ func NewGitCallback(config *config.Config) (*gitCallbackComponentImpl, error) {
 	if err != nil {
 		return nil, err
 	}
-	svGen := NewSyncVersionGenerator()
+	svGen := NewSyncVersionGenerator(config)
 	rrf := database.NewRepositoriesRuntimeFramework()
 	rac, err := component.NewRuntimeArchitectureComponent(config)
 	if err != nil {
@@ -97,6 +99,7 @@ func NewGitCallback(config *config.Config) (*gitCallbackComponentImpl, error) {
 	promptPrefixStore := database.NewPromptPrefixStore(config)
 	mcpScanResultStore := database.NewMCPScanResultStore()
 	mcpScanner := component.NewMCPScannerComponent(config)
+	repositoryStatisticsStore := database.NewRepositoryStatisticsStore()
 	return &gitCallbackComponentImpl{
 		config:                    config,
 		gitServer:                 gs,
@@ -121,6 +124,7 @@ func NewGitCallback(config *config.Config) (*gitCallbackComponentImpl, error) {
 		promptPrefixStore:         promptPrefixStore,
 		mcpScanResultStore:        mcpScanResultStore,
 		mcpScanner:                mcpScanner,
+		repositoryStatisticsStore: repositoryStatisticsStore,
 	}, nil
 }
 
@@ -589,4 +593,84 @@ func getTagScopeByRepoType(repoType string) (types.TagScope, error) {
 
 	return tagScope, nil
 
+}
+
+func (c *gitCallbackComponentImpl) CalculateRepoSize(ctx context.Context, req *types.GiteaCallbackPushReq) error {
+	// split req.Repository.FullName by '/'
+	splits := strings.Split(req.Repository.FullName, "/")
+	fullNamespace, repoName := splits[0], splits[1]
+	repoType, namespace, _ := strings.Cut(fullNamespace, "_")
+	adjustedRepoType := types.RepositoryType(strings.TrimRight(repoType, "s"))
+
+	// Get repo by path
+	repo, err := c.repoStore.FindByPath(ctx, adjustedRepoType, namespace, repoName)
+	if err != nil {
+		slog.Error("failed to find repo", slog.Any("error", err), slog.Any("repo_type", adjustedRepoType), slog.String("namespace", namespace), slog.String("name", repoName))
+		return err
+	}
+
+	// Extract branch name from ref (e.g., "refs/heads/main" -> "main")
+	branchName := strings.TrimPrefix(req.Ref, "refs/heads/")
+
+	// Calculate size only for the modified branch
+	repoInfoReq := gitserver.GetRepoInfoByPathReq{
+		Namespace: namespace,
+		Name:      repoName,
+		Ref:       branchName,
+		Path:      "",
+		RepoType:  adjustedRepoType,
+		File:      false,
+	}
+
+	// Get non-LFS size (including LFS pointer files)
+	nonLfsSize, err := c.gitServer.GetRepoSize(ctx, repoInfoReq)
+	if err != nil {
+		slog.Error("failed to get repo size", slog.Any("error", err), slog.Any("repo_id", repo.ID), slog.String("branch", branchName))
+		return err
+	}
+
+	// Get LFS size
+	lfsSize, err := c.gitServer.GetRepoLfsSize(ctx, repoInfoReq)
+	if err != nil {
+		slog.Error("failed to get repo LFS size", slog.Any("error", err), slog.Any("repo_id", repo.ID), slog.String("branch", branchName))
+		return err
+	}
+
+	// Calculate total size
+	totalSize := nonLfsSize + lfsSize
+
+	// Check if repository statistics already exists for this branch
+	existingStats, err := c.repositoryStatisticsStore.FindByRepositoryIDAndBranch(ctx, repo.ID, branchName)
+	if err != nil || existingStats == nil {
+		// If not found, create a new record
+		stats := &database.RepositoryStatistics{
+			RepositoryID: repo.ID,
+			Branch:       branchName,
+			TotalSize:    totalSize,
+			NonLfsSize:   nonLfsSize,
+			LfsSize:      lfsSize,
+			CreatedAt:    time.Now(),
+			UpdatedAt:    time.Now(),
+		}
+		err = c.repositoryStatisticsStore.Create(ctx, stats)
+		if err != nil {
+			slog.Error("failed to create repository statistics", slog.Any("error", err), slog.Any("repo_id", repo.ID), slog.String("branch", branchName))
+			return err
+		}
+	} else {
+		// If exists, update the record
+		existingStats.TotalSize = totalSize
+		existingStats.NonLfsSize = nonLfsSize
+		existingStats.LfsSize = lfsSize
+		existingStats.UpdatedAt = time.Now()
+		err = c.repositoryStatisticsStore.Update(ctx, existingStats)
+		if err != nil {
+			slog.Error("failed to update repository statistics", slog.Any("error", err), slog.Any("repo_id", repo.ID), slog.String("branch", branchName))
+			return err
+		}
+	}
+
+	slog.Info("calculated repo size for branch", slog.Any("repo_id", repo.ID), slog.String("branch", branchName), slog.Any("total_size", totalSize), slog.Any("non_lfs_size", nonLfsSize), slog.Any("lfs_size", lfsSize))
+
+	return nil
 }

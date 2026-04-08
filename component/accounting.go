@@ -41,9 +41,10 @@ type AccountingComponent interface {
 	DeletePrice(currentUser string, id int64) (interface{}, error)
 	CreateOrder(currentUser string, req types.AcctOrderCreateReq) (interface{}, error)
 	ListMeteringsByUserIDAndTime(ctx context.Context, req types.ActStatementsReq) (interface{}, error)
-	ListRechargeByUserIDAndTime(ctx context.Context, req types.AcctRechargeListReq) (interface{}, error)
+	ListRecharge(ctx context.Context, req types.AcctRechargeListReq) (interface{}, error)
 	RechargesIndex(ctx context.Context, req types.RechargesIndexReq) ([]*types.RechargeIndexResp, int, error)
 	StatementsIndex(ctx context.Context, req types.ActStatementsReq) ([]types.AcctStatementsRes, int, error)
+	ListPresents(ctx context.Context, req types.PresentsIndexReq) ([]*types.PresentIndexResp, int, error)
 	WeeklyRecharges(ctx context.Context) error
 }
 

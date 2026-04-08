@@ -65,6 +65,7 @@ type repoComponentImpl struct {
 	repoStore              database.RepoStore
 	repoFileStore          database.RepoFileStore
 	repoRelationsStore     database.RepoRelationsStore
+	repoStatisticsStore    database.RepositoryStatisticsStore
 	mirrorStore            database.MirrorStore
 	git                    gitserver.GitServer
 	s3Client               s3.Client
@@ -150,9 +151,9 @@ type RepoComponent interface {
 	CreateRuntimeFramework(ctx context.Context, req *types.RuntimeFrameworkReq) (*types.RuntimeFramework, error)
 	UpdateRuntimeFramework(ctx context.Context, id int64, req *types.RuntimeFrameworkReq) (*types.RuntimeFramework, error)
 	DeleteRuntimeFramework(ctx context.Context, currentUser string, id int64) error
-	ListDeploy(ctx context.Context, repoType types.RepositoryType, namespace, name, currentUser string) ([]types.DeployRepo, error)
+	ListDeploy(ctx context.Context, repoType types.RepositoryType, namespace, name, currentUser string) ([]types.DeployRequest, error)
 	DeleteDeploy(ctx context.Context, delReq types.DeployActReq) error
-	DeployDetail(ctx context.Context, detailReq types.DeployActReq) (*types.DeployRepo, error)
+	DeployDetail(ctx context.Context, detailReq types.DeployActReq) (*types.DeployRequest, error)
 	DeployInstanceLogs(ctx context.Context, logReq types.DeployActReq) (*deploy.MultiLogReader, error)
 	// check access repo permission by repo id
 	AllowAccessByRepoID(ctx context.Context, repoID int64, username string) (bool, error)
@@ -193,6 +194,8 @@ type RepoComponent interface {
 	GetNamespaceBillingUUID(ctx context.Context, namespace string) (string, error)
 	DeletePendingDeletion(ctx context.Context) error
 	GetRepos(ctx context.Context, search, currentUser string, repoType types.RepositoryType) ([]string, error)
+	// GetRepoSizeByBranch gets the repository size for a specific branch
+	GetRepoSizeByBranch(ctx context.Context, repoType types.RepositoryType, namespace, name, branch, currentUser string) (int64, error)
 	advancedRepoInterface
 	communityRepoInterface
 }
@@ -3234,4 +3237,31 @@ func (c *repoComponentImpl) GetRepos(ctx context.Context, search, currentUser st
 		repoPaths = append(repoPaths, repo.Path)
 	}
 	return repoPaths, nil
+}
+
+// GetRepoSizeByBranch gets the repository size for a specific branch
+func (c *repoComponentImpl) GetRepoSizeByBranch(ctx context.Context, repoType types.RepositoryType, namespace, name, branch, currentUser string) (int64, error) {
+	repo, err := c.repoStore.FindByPath(ctx, repoType, namespace, name)
+	if err != nil {
+		return 0, fmt.Errorf("failed to find repo, error: %w", err)
+	}
+
+	permission, err := c.GetUserRepoPermission(ctx, currentUser, repo)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get user repo permission, error: %w", err)
+	}
+	if !permission.CanRead {
+		return 0, errorx.ErrForbiddenMsg("users do not have permission to get repo size in this repo")
+	}
+
+	// Get repository statistics from database
+	stats, err := c.repoStatisticsStore.FindByRepositoryIDAndBranch(ctx, repo.ID, branch)
+	if err != nil {
+		if errors.Is(err, errorx.ErrNotFound) {
+			return 0, errorx.ErrNotFound
+		}
+		return 0, fmt.Errorf("failed to get repo statistics, error: %w", err)
+	}
+
+	return stats.TotalSize, nil
 }

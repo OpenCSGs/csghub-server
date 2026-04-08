@@ -607,12 +607,70 @@ func (_c *MockAccountingClient_ListMeteringsByUserIDAndTime_Call) RunAndReturn(r
 	return _c
 }
 
-// ListRechargeByUserIDAndTime provides a mock function with given fields: req
-func (_m *MockAccountingClient) ListRechargeByUserIDAndTime(req types.AcctRechargeListReq) (any, error) {
+// ListPresents provides a mock function with given fields: req
+func (_m *MockAccountingClient) ListPresents(req types.PresentsIndexReq) (any, error) {
 	ret := _m.Called(req)
 
 	if len(ret) == 0 {
-		panic("no return value specified for ListRechargeByUserIDAndTime")
+		panic("no return value specified for ListPresents")
+	}
+
+	var r0 any
+	var r1 error
+	if rf, ok := ret.Get(0).(func(types.PresentsIndexReq) (any, error)); ok {
+		return rf(req)
+	}
+	if rf, ok := ret.Get(0).(func(types.PresentsIndexReq) any); ok {
+		r0 = rf(req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(any)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(types.PresentsIndexReq) error); ok {
+		r1 = rf(req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountingClient_ListPresents_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListPresents'
+type MockAccountingClient_ListPresents_Call struct {
+	*mock.Call
+}
+
+// ListPresents is a helper method to define mock.On call
+//   - req types.PresentsIndexReq
+func (_e *MockAccountingClient_Expecter) ListPresents(req interface{}) *MockAccountingClient_ListPresents_Call {
+	return &MockAccountingClient_ListPresents_Call{Call: _e.mock.On("ListPresents", req)}
+}
+
+func (_c *MockAccountingClient_ListPresents_Call) Run(run func(req types.PresentsIndexReq)) *MockAccountingClient_ListPresents_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(types.PresentsIndexReq))
+	})
+	return _c
+}
+
+func (_c *MockAccountingClient_ListPresents_Call) Return(_a0 any, _a1 error) *MockAccountingClient_ListPresents_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountingClient_ListPresents_Call) RunAndReturn(run func(types.PresentsIndexReq) (any, error)) *MockAccountingClient_ListPresents_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ListRecharge provides a mock function with given fields: req
+func (_m *MockAccountingClient) ListRecharge(req types.AcctRechargeListReq) (any, error) {
+	ret := _m.Called(req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListRecharge")
 	}
 
 	var r0 any
@@ -637,30 +695,30 @@ func (_m *MockAccountingClient) ListRechargeByUserIDAndTime(req types.AcctRechar
 	return r0, r1
 }
 
-// MockAccountingClient_ListRechargeByUserIDAndTime_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListRechargeByUserIDAndTime'
-type MockAccountingClient_ListRechargeByUserIDAndTime_Call struct {
+// MockAccountingClient_ListRecharge_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListRecharge'
+type MockAccountingClient_ListRecharge_Call struct {
 	*mock.Call
 }
 
-// ListRechargeByUserIDAndTime is a helper method to define mock.On call
+// ListRecharge is a helper method to define mock.On call
 //   - req types.AcctRechargeListReq
-func (_e *MockAccountingClient_Expecter) ListRechargeByUserIDAndTime(req interface{}) *MockAccountingClient_ListRechargeByUserIDAndTime_Call {
-	return &MockAccountingClient_ListRechargeByUserIDAndTime_Call{Call: _e.mock.On("ListRechargeByUserIDAndTime", req)}
+func (_e *MockAccountingClient_Expecter) ListRecharge(req interface{}) *MockAccountingClient_ListRecharge_Call {
+	return &MockAccountingClient_ListRecharge_Call{Call: _e.mock.On("ListRecharge", req)}
 }
 
-func (_c *MockAccountingClient_ListRechargeByUserIDAndTime_Call) Run(run func(req types.AcctRechargeListReq)) *MockAccountingClient_ListRechargeByUserIDAndTime_Call {
+func (_c *MockAccountingClient_ListRecharge_Call) Run(run func(req types.AcctRechargeListReq)) *MockAccountingClient_ListRecharge_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(types.AcctRechargeListReq))
 	})
 	return _c
 }
 
-func (_c *MockAccountingClient_ListRechargeByUserIDAndTime_Call) Return(_a0 any, _a1 error) *MockAccountingClient_ListRechargeByUserIDAndTime_Call {
+func (_c *MockAccountingClient_ListRecharge_Call) Return(_a0 any, _a1 error) *MockAccountingClient_ListRecharge_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockAccountingClient_ListRechargeByUserIDAndTime_Call) RunAndReturn(run func(types.AcctRechargeListReq) (any, error)) *MockAccountingClient_ListRechargeByUserIDAndTime_Call {
+func (_c *MockAccountingClient_ListRecharge_Call) RunAndReturn(run func(types.AcctRechargeListReq) (any, error)) *MockAccountingClient_ListRecharge_Call {
 	_c.Call.Return(run)
 	return _c
 }

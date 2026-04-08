@@ -1327,7 +1327,7 @@ func TestRepoComponent_ListDeploy(t *testing.T) {
 	ds, err := repo.ListDeploy(ctx, types.ModelRepo, "ns", "n", "user")
 	require.Nil(t, err)
 	require.Equal(t, 1, len(ds))
-	require.Equal(t, types.DeployRepo{
+	require.Equal(t, types.DeployRequest{
 		DeployID:   123,
 		DeployName: "foo",
 		RepoID:     123,
@@ -1340,7 +1340,7 @@ func TestRepoComponent_DeleteDeploy(t *testing.T) {
 	ctx := context.TODO()
 	repo := initializeTestRepoComponent(ctx, t)
 	mockUserRepoAdminPermission(ctx, repo.mocks.stores, "user")
-	dr := types.DeployRepo{
+	dr := types.DeployRequest{
 		SpaceID:   0,
 		DeployID:  3,
 		Namespace: "ns",
@@ -1391,14 +1391,14 @@ func TestRepoComponent_DeployDetail(t *testing.T) {
 		Status:        deployStatus.Running,
 	}, nil)
 
-	repo.mocks.deployer.EXPECT().GetReplica(ctx, types.DeployRepo{
+	repo.mocks.deployer.EXPECT().GetReplica(ctx, types.DeployRequest{
 		Namespace: "ns",
 		Name:      "n",
 		ClusterID: "cluster",
 		SvcName:   "svc",
 	}).Return(1, 2, []types.Instance{{Name: "i1"}}, nil)
 
-	repo.mocks.deployer.EXPECT().Status(ctx, types.DeployRepo{
+	repo.mocks.deployer.EXPECT().Status(ctx, types.DeployRequest{
 		DeployID:  0,
 		SpaceID:   0,
 		ModelID:   0,
@@ -1418,7 +1418,7 @@ func TestRepoComponent_DeployDetail(t *testing.T) {
 		InstanceName: "i1",
 	})
 	require.Nil(t, err)
-	require.Equal(t, types.DeployRepo{
+	require.Equal(t, types.DeployRequest{
 		RepoID:         1,
 		ActualReplica:  1,
 		DesiredReplica: 2,
@@ -1447,7 +1447,7 @@ func TestRepoComponent_DeployInstanceLogs(t *testing.T) {
 	}, nil)
 
 	m := &deploy.MultiLogReader{}
-	repo.mocks.deployer.EXPECT().InstanceLogs(ctx, types.DeployRepo{
+	repo.mocks.deployer.EXPECT().InstanceLogs(ctx, types.DeployRequest{
 		DeployID:     123,
 		Namespace:    "ns",
 		Name:         "n",
@@ -1534,7 +1534,7 @@ func TestRepoComponent_DeployStop(t *testing.T) {
 	ctx := context.TODO()
 	repo := initializeTestRepoComponent(ctx, t)
 
-	dr := types.DeployRepo{DeployID: 3, Namespace: "ns", Name: "n"}
+	dr := types.DeployRequest{DeployID: 3, Namespace: "ns", Name: "n"}
 	repo.mocks.deployer.EXPECT().Stop(ctx, dr).Return(nil)
 	repo.mocks.deployer.EXPECT().Exist(ctx, dr).Return(false, nil)
 	repo.mocks.stores.DeployTaskMock().EXPECT().StopDeploy(
@@ -1591,7 +1591,7 @@ func TestRepoComponent_DeployStatus(t *testing.T) {
 		SvcName:   "svc",
 		ClusterID: "cluster",
 	}, nil)
-	repo.mocks.deployer.EXPECT().Status(ctx, types.DeployRepo{
+	repo.mocks.deployer.EXPECT().Status(ctx, types.DeployRequest{
 		DeployID:  1,
 		SpaceID:   2,
 		ModelID:   3,
@@ -2471,6 +2471,103 @@ func TestRepoComponent_RemoteTree(t *testing.T) {
 		}
 	}
 	require.Equal(t, []*types.File{{Name: "f1"}, {Name: "f2"}}, files)
+}
+
+func TestRepoComponent_GetRepoSizeByBranch(t *testing.T) {
+	t.Run("should return repo size when user has read permission", func(t *testing.T) {
+		ctx := context.TODO()
+		repoComp := initializeTestRepoComponent(ctx, t)
+
+		user := database.User{}
+		user.Username = "user_name"
+		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username).Return(user, nil)
+
+		ns := database.Namespace{}
+		ns.NamespaceType = "user"
+		ns.Path = "user_name"
+		repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(mock.Anything, ns.Path).Return(ns, nil)
+
+		repo := &database.Repository{
+			ID:      1,
+			Private: true,
+			User:    user,
+			Path:    fmt.Sprintf("%s/%s", ns.Path, "repo_name"),
+		}
+		repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(mock.Anything, types.ModelRepo, ns.Path, repo.Name).Return(repo, nil)
+
+		stats := database.RepositoryStatistics{TotalSize: 1024}
+		repoComp.mocks.stores.RepositoryStatisticsMock().EXPECT().FindByRepositoryIDAndBranch(mock.Anything, repo.ID, "main").Return(&stats, nil)
+
+		size, err := repoComp.GetRepoSizeByBranch(ctx, types.ModelRepo, ns.Path, repo.Name, "main", user.Username)
+		require.Nil(t, err)
+		require.Equal(t, int64(1024), size)
+	})
+
+	t.Run("should return error when repo not found", func(t *testing.T) {
+		ctx := context.TODO()
+		repoComp := initializeTestRepoComponent(ctx, t)
+
+		repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(mock.Anything, types.ModelRepo, "namespace", "name").Return(nil, errors.New("repo not found"))
+
+		size, err := repoComp.GetRepoSizeByBranch(ctx, types.ModelRepo, "namespace", "name", "main", "user_name")
+		require.Error(t, err)
+		require.Equal(t, int64(0), size)
+	})
+
+	t.Run("should return error when user has no read permission", func(t *testing.T) {
+		ctx := context.TODO()
+		repoComp := initializeTestRepoComponent(ctx, t)
+
+		user := database.User{}
+		user.Username = "user_name"
+		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username).Return(user, nil)
+
+		ns := database.Namespace{}
+		ns.NamespaceType = "user"
+		ns.Path = "other_user"
+		repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(mock.Anything, ns.Path).Return(ns, nil)
+
+		repo := &database.Repository{
+			ID:      1,
+			Private: true,
+			User:    database.User{Username: "other_user"},
+			Path:    fmt.Sprintf("%s/%s", ns.Path, "repo_name"),
+		}
+		repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(mock.Anything, types.ModelRepo, ns.Path, repo.Name).Return(repo, nil)
+
+		size, err := repoComp.GetRepoSizeByBranch(ctx, types.ModelRepo, ns.Path, repo.Name, "main", user.Username)
+		require.Error(t, err)
+		require.Equal(t, int64(0), size)
+	})
+
+	t.Run("should return error when repo statistics not found", func(t *testing.T) {
+		ctx := context.TODO()
+		repoComp := initializeTestRepoComponent(ctx, t)
+
+		user := database.User{}
+		user.Username = "user_name"
+		repoComp.mocks.stores.UserMock().EXPECT().FindByUsername(mock.Anything, user.Username).Return(user, nil)
+
+		ns := database.Namespace{}
+		ns.NamespaceType = "user"
+		ns.Path = "user_name"
+		repoComp.mocks.stores.NamespaceMock().EXPECT().FindByPath(mock.Anything, ns.Path).Return(ns, nil)
+
+		repo := &database.Repository{
+			ID:      1,
+			Private: true,
+			User:    user,
+			Path:    fmt.Sprintf("%s/%s", ns.Path, "repo_name"),
+		}
+		repoComp.mocks.stores.RepoMock().EXPECT().FindByPath(mock.Anything, types.ModelRepo, ns.Path, repo.Name).Return(repo, nil)
+
+		repoComp.mocks.stores.RepositoryStatisticsMock().EXPECT().FindByRepositoryIDAndBranch(mock.Anything, repo.ID, "main").Return(nil, errorx.ErrNotFound)
+
+		size, err := repoComp.GetRepoSizeByBranch(ctx, types.ModelRepo, ns.Path, repo.Name, "main", user.Username)
+		require.Error(t, err)
+		require.Equal(t, int64(0), size)
+		require.True(t, errors.Is(err, errorx.ErrNotFound))
+	})
 }
 
 func TestRepoComponent_DiffBetweenTwoCommits(t *testing.T) {

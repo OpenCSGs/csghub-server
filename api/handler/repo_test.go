@@ -54,6 +54,47 @@ func (rt *RepoTester) WithHandleFunc(fn func(rp *RepoHandler) gin.HandlerFunc) *
 	return rt
 }
 
+func TestRepoHandler_GetRepoSizeByBranch(t *testing.T) {
+	tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+		return rp.GetRepoSizeByBranch
+	})
+	tester.WithUser()
+
+	// Set up parameters
+	tester.WithParam("branch", "main")
+	tester.WithKV("repo_type", types.ModelRepo)
+
+	// Set mock expectation
+	expectedSize := int64(1024)
+	tester.mocks.repo.EXPECT().GetRepoSizeByBranch(tester.Ctx(), types.ModelRepo, "u", "r", "main", "u").Return(expectedSize, nil)
+
+	// Execute request
+	tester.Execute()
+
+	// Verify response
+	tester.ResponseEq(t, http.StatusOK, tester.OKText, expectedSize)
+}
+
+func TestRepoHandler_GetRepoSizeByBranch_Error(t *testing.T) {
+	tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+		return rp.GetRepoSizeByBranch
+	})
+	tester.WithUser()
+
+	// Set up parameters
+	tester.WithParam("branch", "main")
+	tester.WithKV("repo_type", types.ModelRepo)
+
+	// Set mock expectation with error
+	tester.mocks.repo.EXPECT().GetRepoSizeByBranch(tester.Ctx(), types.ModelRepo, "u", "r", "main", "u").Return(int64(0), errors.New("failed to get repo size"))
+
+	// Execute request
+	tester.Execute()
+
+	// Verify response
+	tester.ResponseEqCode(t, http.StatusInternalServerError)
+}
+
 func TestRepoHandler_CreateFile(t *testing.T) {
 	tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
 		return rp.CreateFile
@@ -1015,10 +1056,10 @@ func TestRepoHandler_DeployList(t *testing.T) {
 	tester.WithKV("repo_type", types.ModelRepo)
 	tester.mocks.repo.EXPECT().ListDeploy(
 		tester.Ctx(), types.ModelRepo, "u", "r", "u",
-	).Return([]types.DeployRepo{{DeployName: "n"}}, nil)
+	).Return([]types.DeployRequest{{DeployName: "n"}}, nil)
 
 	tester.Execute()
-	tester.ResponseEq(t, 200, tester.OKText, []types.DeployRepo{{DeployName: "n"}})
+	tester.ResponseEq(t, 200, tester.OKText, []types.DeployRequest{{DeployName: "n"}})
 }
 
 func TestRepoHandler_DeployDetail(t *testing.T) {
@@ -1038,10 +1079,10 @@ func TestRepoHandler_DeployDetail(t *testing.T) {
 			DeployID:    1,
 			DeployType:  types.InferenceType,
 		},
-	).Return(&types.DeployRepo{DeployName: "n"}, nil)
+	).Return(&types.DeployRequest{DeployName: "n"}, nil)
 
 	tester.Execute()
-	tester.ResponseEq(t, 200, tester.OKText, &types.DeployRepo{DeployName: "n"})
+	tester.ResponseEq(t, 200, tester.OKText, &types.DeployRequest{DeployName: "n"})
 }
 
 func TestRepoHandler_DeployInstanceLogs(t *testing.T) {
@@ -1367,11 +1408,11 @@ func TestRepoHandler_ServerlessDetail(t *testing.T) {
 			DeployID:    1,
 			DeployType:  types.ServerlessType,
 		},
-	).Return(&types.DeployRepo{Name: "r"}, nil)
+	).Return(&types.DeployRequest{Name: "r"}, nil)
 
 	tester.Execute()
 	tester.ResponseEq(
-		t, 200, tester.OKText, &types.DeployRepo{Name: "r"},
+		t, 200, tester.OKText, &types.DeployRequest{Name: "r"},
 	)
 }
 

@@ -36,10 +36,15 @@ var cmdClearSyncVersion = &cobra.Command{
 	},
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := cmd.Context()
+		config, ok := ctx.Value("config").(*config.Config)
+		if !ok {
+			slog.Error("config not found in context")
+			return
+		}
 
 		syncVersionStore := database.NewSyncVersionStore()
 		repoStore := database.NewRepoStore()
-		repoFilter := filter.NewRepoFilter()
+		repoFilter := filter.NewRepoFilter(config)
 
 		var (
 			batch          int

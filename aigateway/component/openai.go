@@ -119,6 +119,28 @@ func filterAndPaginateModels(models []types.Model, req types.ListModelsReq) type
 		}
 	}
 
+	// Apply source filter if provided
+	if req.Source != "" {
+		source := strings.ToLower(req.Source)
+		filtered := make([]types.Model, 0, len(models))
+		for _, model := range models {
+			switch source {
+			case string(types.ModelSourceCSGHub):
+				if model.CSGHubModelID != "" {
+					filtered = append(filtered, model)
+				}
+			case string(types.ModelSourceExternal):
+				if model.Provider != "" {
+					filtered = append(filtered, model)
+				}
+			default:
+				// Unknown source value, include all
+				filtered = append(filtered, model)
+			}
+		}
+		models = filtered
+	}
+
 	// Parse pagination parameters (defaults match previous handler behavior)
 	per := 20
 	page := 1
@@ -173,6 +195,10 @@ func (m *openaiComponentImpl) getCSGHubModels(c context.Context, userID int64) (
 	}
 	var models []types.Model
 	for _, deploy := range runningDeploys {
+		if deploy.Repository == nil {
+			slog.WarnContext(c, "skip deploy with nil repository", "deploy_id", deploy.ID, "svc_name", deploy.SvcName)
+			continue
+		}
 		// Check if engine_args contains tool-call-parser parameter
 		supportFunctionCall := strings.Contains(deploy.EngineArgs, "tool-call-parser")
 		// Determine public/private based on deployment type, ownership and secure level.
@@ -180,12 +206,14 @@ func (m *openaiComponentImpl) getCSGHubModels(c context.Context, userID int64) (
 		if deploy.Type == commontypes.InferenceType && deploy.SecureLevel == commontypes.EndpointPrivate && deploy.UserID == userID {
 			isPublic = false // private - user's own deployment with private secure level
 		}
+		repoName := deploy.Repository.Name
 		m := types.Model{
 			BaseModel: types.BaseModel{
 				Object:              "model",
 				Created:             deploy.CreatedAt.Unix(),
 				SupportFunctionCall: supportFunctionCall,
 				Task:                string(deploy.Task),
+				DisplayName:         repoName,
 				Public:              isPublic,
 			},
 			InternalModelInfo: types.InternalModelInfo{
@@ -241,10 +269,13 @@ func (m *openaiComponentImpl) getExternalModels(c context.Context) []types.Model
 		for _, extModel := range extModels {
 			m := types.Model{
 				BaseModel: types.BaseModel{
-					Object:  "model",
-					ID:      extModel.ModelName,
-					OwnedBy: extModel.Provider,
-					Public:  true, // external models are always public
+					Object:      "model",
+					ID:          extModel.ModelName,
+					OwnedBy:     extModel.Provider,
+					DisplayName: extModel.DisplayName,
+					// Metadata is allowed to be nil; JSON will contain `null` for nil maps.
+					Metadata: extModel.Metadata,
+					Public:   true, // external models are always public
 				},
 				Endpoint: extModel.ApiEndpoint,
 				ExternalModelInfo: types.ExternalModelInfo{

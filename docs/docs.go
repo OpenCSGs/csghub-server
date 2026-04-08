@@ -17025,7 +17025,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/types.DeployRepo"
+                                            "$ref": "#/definitions/types.DeployRequest"
                                         }
                                     }
                                 }
@@ -20190,7 +20190,7 @@ const docTemplate = `{
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/types.DeployRepo"
+                                                "$ref": "#/definitions/types.DeployRequest"
                                             }
                                         },
                                         "total": {
@@ -27756,7 +27756,7 @@ const docTemplate = `{
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/types.DeployRepo"
+                                                "$ref": "#/definitions/types.DeployRequest"
                                             }
                                         },
                                         "total": {
@@ -27843,7 +27843,7 @@ const docTemplate = `{
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/types.DeployRepo"
+                                                "$ref": "#/definitions/types.DeployRequest"
                                             }
                                         },
                                         "total": {
@@ -29069,7 +29069,7 @@ const docTemplate = `{
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/types.DeployRepo"
+                                                "$ref": "#/definitions/types.DeployRequest"
                                             }
                                         },
                                         "total": {
@@ -29162,7 +29162,7 @@ const docTemplate = `{
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/types.DeployRepo"
+                                                "$ref": "#/definitions/types.DeployRequest"
                                             }
                                         },
                                         "total": {
@@ -29272,7 +29272,7 @@ const docTemplate = `{
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/types.DeployRepo"
+                                                "$ref": "#/definitions/types.DeployRequest"
                                             }
                                         },
                                         "total": {
@@ -33517,7 +33517,7 @@ const docTemplate = `{
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/types.DeployRepo"
+                                                "$ref": "#/definitions/types.DeployRequest"
                                             }
                                         }
                                     }
@@ -33610,7 +33610,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/types.DeployRepo"
+                                            "$ref": "#/definitions/types.DeployRequest"
                                         }
                                     }
                                 }
@@ -42055,7 +42055,7 @@ const docTemplate = `{
                 }
             }
         },
-        "types.DeployRepo": {
+        "types.DeployRequest": {
             "type": "object",
             "properties": {
                 "actual_replica": {

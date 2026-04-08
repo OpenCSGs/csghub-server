@@ -135,5 +135,6 @@ func NewTestRepoComponent(config *config.Config, stores *tests.MockStores, rpcUs
 		recomStore:             stores.Recom,
 		xnetClient:             xnetClient,
 		clusterComponent:       clusterComponent,
+		repoStatisticsStore:    stores.RepositoryStatistics,
 	}
 }

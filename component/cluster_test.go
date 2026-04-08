@@ -7,13 +7,14 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/accounting"
+	mockAccounting "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/accounting"
 	mockDeploy "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/deploy"
 	mockdb "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
-	"opencsg.com/csghub-server/builder/deploy/common"
+	deployCommon "opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
+	utilsCommon "opencsg.com/csghub-server/common/utils/common"
 )
 
 func TestClusterComponent_Index(t *testing.T) {
@@ -153,7 +154,7 @@ func TestClusterComponent_GetDeploys(t *testing.T) {
 			ID:         1,
 			ClusterID:  "cluster-1",
 			DeployName: "deploy-1",
-			Status:     common.Running,
+			Status:     deployCommon.Running,
 			UserID:     101,
 			UserUUID:   "user-uuid-1",
 			SvcName:    "service-1",
@@ -170,7 +171,7 @@ func TestClusterComponent_GetDeploys(t *testing.T) {
 	mockClusterStore := &mockdb.MockClusterInfoStore{}
 
 	// Create mock for acctClient
-	mockAcctClient := accounting.NewMockAccountingClient(t)
+	mockAcctClient := mockAccounting.NewMockAccountingClient(t)
 
 	// Create cluster component with mocks
 	c := &clusterComponentImpl{
@@ -246,7 +247,9 @@ func TestClusterComponent_ExtractDeployTargetAndHost1(t *testing.T) {
 		Target:    "t1",
 	}
 
-	endpoint, host, err := ExtractDeployTargetAndHost(ctx, cc, req)
+	cluster, err := cc.GetClusterByID(ctx, "c1")
+	require.Nil(t, err)
+	endpoint, host, err := utilsCommon.ExtractDeployTargetAndHost(ctx, cluster, req)
 	require.Nil(t, err)
 	require.Equal(t, "t1", endpoint)
 	require.Equal(t, "", host)
@@ -268,7 +271,9 @@ func TestClusterComponent_ExtractDeployTargetAndHost2(t *testing.T) {
 		Endpoint:  "http://127.0.0.1",
 	}
 
-	endpoint, host, err := ExtractDeployTargetAndHost(ctx, cc, req)
+	cluster, err := cc.GetClusterByID(ctx, "c1")
+	require.Nil(t, err)
+	endpoint, host, err := utilsCommon.ExtractDeployTargetAndHost(ctx, cluster, req)
 	require.Nil(t, err)
 	require.Equal(t, "remote", endpoint)
 	require.Equal(t, "127.0.0.1", host)

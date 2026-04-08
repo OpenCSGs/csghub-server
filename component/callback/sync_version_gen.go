@@ -2,6 +2,7 @@ package callback
 
 import (
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/filter"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -17,11 +18,11 @@ type syncVersionGeneratorImpl struct {
 	repoFilter     filter.RepoFilter
 }
 
-func NewSyncVersionGenerator() *syncVersionGeneratorImpl {
+func NewSyncVersionGenerator(config *config.Config) *syncVersionGeneratorImpl {
 	return &syncVersionGeneratorImpl{
 		multiSyncStore: database.NewMultiSyncStore(),
 		ruleStore:      database.NewRuleStore(),
 		repoStore:      database.NewRepoStore(),
-		repoFilter:     filter.NewRepoFilter(),
+		repoFilter:     filter.NewRepoFilter(config),
 	}
 }

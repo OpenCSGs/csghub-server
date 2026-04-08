@@ -18,6 +18,7 @@ const (
 	needUUID
 	needAPIKey
 	userPhoneNotVerified
+	needAccessToken
 )
 
 var (
@@ -164,6 +165,18 @@ var (
 	//
 	// zh-HK: 電話號碼未驗證
 	ErrUserPhoneNotVerified error = CustomError{prefix: errAuthPrefix, code: userPhoneNotVerified}
+	// request must be authenticated with an access token
+	//
+	// Description: The request must be authenticated with an access token.
+	//
+	// Description_ZH: 请求必须使用访问令牌进行身份验证。
+	//
+	// en-US: Need access token for authentication
+	//
+	// zh-CN: 需要访问令牌进行身份验证
+	//
+	// zh-HK: 需要訪問令牌進行身份驗證
+	ErrNeedAccessToken error = CustomError{prefix: errAuthPrefix, code: needAccessToken}
 )
 
 /*

@@ -195,6 +195,94 @@ func (c *Client) CopyRepository(ctx context.Context, req gitserver.CopyRepositor
 	return nil
 }
 
+func (c *Client) GetRepoSize(ctx context.Context, req gitserver.GetRepoInfoByPathReq) (int64, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
+
+	relativePath, err := c.BuildRelativePath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return 0, err
+	}
+
+	repository := &gitalypb.Repository{
+		StorageName:  c.config.GitalyServer.Storage,
+		RelativePath: relativePath,
+	}
+
+	// Use ListBlobs to get all blobs for the specified branch
+	listBlobsReq := &gitalypb.ListBlobsRequest{
+		Repository: repository,
+		WithPaths:  true,
+		Revisions:  []string{req.Ref},
+	}
+
+	result, err := c.blobClient.ListBlobs(ctx, listBlobsReq)
+	if err != nil {
+		return 0, errorx.ErrGitGetBlobsFailed(err, errorx.Ctx())
+	}
+
+	var totalSize int64
+	for {
+		allFilesResp, err := result.Recv()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return 0, errorx.ErrGitGetBlobsFailed(err, errorx.Ctx())
+		}
+		if allFilesResp != nil {
+			for _, blob := range allFilesResp.Blobs {
+				totalSize += blob.Size
+			}
+		}
+	}
+
+	return totalSize, nil
+}
+
+func (c *Client) GetRepoLfsSize(ctx context.Context, req gitserver.GetRepoInfoByPathReq) (int64, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
+
+	relativePath, err := c.BuildRelativePath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return 0, err
+	}
+
+	repository := &gitalypb.Repository{
+		StorageName:  c.config.GitalyServer.Storage,
+		RelativePath: relativePath,
+	}
+
+	pointersReq := &gitalypb.ListLFSPointersRequest{
+		Repository: repository,
+		Revisions:  []string{req.Ref},
+	}
+
+	allPointersStream, err := c.blobClient.ListLFSPointers(ctx, pointersReq)
+	if err != nil {
+		return 0, errorx.ErrGitGetLfsPointersFailed(err, errorx.Ctx())
+	}
+
+	var totalSize int64
+	for {
+		allPointersResp, err := allPointersStream.Recv()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return 0, errorx.ErrGitGetLfsPointersFailed(err, errorx.Ctx())
+		}
+		if allPointersResp != nil {
+			for _, pointer := range allPointersResp.LfsPointers {
+				totalSize += pointer.FileSize
+			}
+		}
+	}
+
+	return totalSize, nil
+}
+
 type ProjectStorageCloneRequest struct {
 	CurrentGitalyAddress string
 	CurrentGitalyToken   string

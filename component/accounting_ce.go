@@ -72,7 +72,7 @@ func (ac *accountingComponentImpl) CreateOrder(currentUser string, req types.Acc
 	return nil, nil
 }
 
-func (ac *accountingComponentImpl) ListRechargeByUserIDAndTime(ctx context.Context, req types.AcctRechargeListReq) (interface{}, error) {
+func (ac *accountingComponentImpl) ListRecharge(ctx context.Context, req types.AcctRechargeListReq) (interface{}, error) {
 	return nil, nil
 }
 
@@ -81,6 +81,10 @@ func (ac *accountingComponentImpl) RechargesIndex(ctx context.Context, req types
 }
 
 func (ac *accountingComponentImpl) StatementsIndex(ctx context.Context, req types.ActStatementsReq) ([]types.AcctStatementsRes, int, error) {
+	return nil, 0, nil
+}
+
+func (ac *accountingComponentImpl) ListPresents(ctx context.Context, req types.PresentsIndexReq) ([]*types.PresentIndexResp, int, error) {
 	return nil, 0, nil
 }
 
