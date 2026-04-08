@@ -938,12 +938,8 @@ func (c *promptComponentImpl) Show(ctx context.Context, namespace, name, current
 			MSPath:  prompt.Repository.MSPath,
 			CSGPath: prompt.Repository.CSGPath,
 		},
-		RepoSize: 0,
-}
-if prompt.Repository.Statistics != nil {
-	resPrompt.RepoSize = prompt.Repository.Statistics.TotalSize
-}
-if permission.CanAdmin {
+	}
+	if permission.CanAdmin {
 		resPrompt.SensitiveCheckStatus = prompt.Repository.SensitiveCheckStatus.String()
 	}
 
