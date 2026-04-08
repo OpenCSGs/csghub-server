@@ -192,8 +192,12 @@ func (c *skillComponentImpl) setupCreateRequest(req *types.CreateSkillReq) {
 	req.Readme = generateReadmeData(req.License)
 }
 
-// initializeCommitFiles initializes commit files with README and .gitattributes
+// initializeCommitFiles initializes commit files with README, .gitattributes, and SKILL.md
 func (c *skillComponentImpl) initializeCommitFiles(req *types.CreateSkillReq) []types.CommitFile {
+	skillsContent := fmt.Sprintf(`---
+name: %s
+description: %s
+---`, req.Name, req.Description)
 	return []types.CommitFile{
 		{
 			Content: req.Readme,
@@ -202,6 +206,10 @@ func (c *skillComponentImpl) initializeCommitFiles(req *types.CreateSkillReq) []
 		{
 			Content: skillGitattributesContent,
 			Path:    types.GitattributesFileName,
+		},
+		{
+			Content: skillsContent,
+			Path:    "SKILL.md",
 		},
 	}
 }
