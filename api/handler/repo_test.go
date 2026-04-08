@@ -54,6 +54,47 @@ func (rt *RepoTester) WithHandleFunc(fn func(rp *RepoHandler) gin.HandlerFunc) *
 	return rt
 }
 
+func TestRepoHandler_GetRepoSizeByBranch(t *testing.T) {
+	tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+		return rp.GetRepoSizeByBranch
+	})
+	tester.WithUser()
+
+	// Set up parameters
+	tester.WithParam("branch", "main")
+	tester.WithKV("repo_type", types.ModelRepo)
+
+	// Set mock expectation
+	expectedSize := int64(1024)
+	tester.mocks.repo.EXPECT().GetRepoSizeByBranch(tester.Ctx(), types.ModelRepo, "u", "r", "main", "u").Return(expectedSize, nil)
+
+	// Execute request
+	tester.Execute()
+
+	// Verify response
+	tester.ResponseEq(t, http.StatusOK, tester.OKText, expectedSize)
+}
+
+func TestRepoHandler_GetRepoSizeByBranch_Error(t *testing.T) {
+	tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+		return rp.GetRepoSizeByBranch
+	})
+	tester.WithUser()
+
+	// Set up parameters
+	tester.WithParam("branch", "main")
+	tester.WithKV("repo_type", types.ModelRepo)
+
+	// Set mock expectation with error
+	tester.mocks.repo.EXPECT().GetRepoSizeByBranch(tester.Ctx(), types.ModelRepo, "u", "r", "main", "u").Return(int64(0), errors.New("failed to get repo size"))
+
+	// Execute request
+	tester.Execute()
+
+	// Verify response
+	tester.ResponseEqCode(t, http.StatusInternalServerError)
+}
+
 func TestRepoHandler_CreateFile(t *testing.T) {
 	tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
 		return rp.CreateFile

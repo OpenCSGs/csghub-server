@@ -63,6 +63,7 @@ func NewTestGitCallbackComponent(config *config.Config, stores *tests.MockStores
 		runtimeFrameworkStore:     stores.RuntimeFramework,
 		tagStore:                  stores.Tag,
 		tagRuleStore:              stores.TagRule,
+		repositoryStatisticsStore: stores.RepositoryStatistics,
 	}
 }
 

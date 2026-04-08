@@ -55,5 +55,7 @@ func CreateMCPServerRoutes(
 		mcpGroup.POST("/:namespace/:name/upload_file", middlewareCollection.Auth.NeedLogin, repoCommonHandler.UploadFile)
 		mcpGroup.GET("/:namespace/:name/mirror", middlewareCollection.Auth.NeedLogin, repoCommonHandler.GetMirror)
 		mcpGroup.POST("/:namespace/:name/mirror/sync", middlewareCollection.Auth.NeedLogin, repoCommonHandler.SyncMirror)
+		// Get repo size by branch
+		mcpGroup.GET("/:namespace/:name/size/:branch", repoCommonHandler.GetRepoSizeByBranch)
 	}
 }

@@ -39,6 +39,7 @@ func NewRepoComponent(config *config.Config) (RepoComponent, error) {
 	c.repoStore = database.NewRepoStore()
 	c.repoFileStore = database.NewRepoFileStore()
 	c.repoRelationsStore = database.NewRepoRelationsStore()
+	c.repoStatisticsStore = database.NewRepositoryStatisticsStore()
 	c.userLikesStore = database.NewUserLikesStore()
 	c.mirrorStore = database.NewMirrorStore()
 	c.mirrorSourceStore = database.NewMirrorSourceStore()

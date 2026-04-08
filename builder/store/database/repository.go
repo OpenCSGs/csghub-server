@@ -177,7 +177,7 @@ type Repository struct {
 	Tags                       []Tag                      `bun:"m2m:repository_tags,join:Repository=Tag" json:"tags"`
 	Metadata                   Metadata                   `bun:"rel:has-one,join:id=repository_id" json:"metadata"`
 	Mirror                     Mirror                     `bun:"rel:has-one,join:id=repository_id" json:"mirror"`
-	Statistics                 *RepositoryStatistics      `bun:"rel:has-one,join:id=repository_id" json:"statistics"`
+	Statistics                 []RepositoryStatistics     `bun:"rel:has-many,join:id=repository_id" json:"statistics"`
 	RepositoryType             types.RepositoryType       `bun:",notnull" json:"repository_type"`
 	HTTPCloneURL               string                     `bun:",nullzero" json:"http_clone_url"`
 	SSHCloneURL                string                     `bun:",nullzero" json:"ssh_clone_url"`

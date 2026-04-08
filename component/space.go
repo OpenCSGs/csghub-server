@@ -461,10 +461,6 @@ func (c *spaceComponentImpl) Show(ctx context.Context, namespace, name, currentU
 		ClusterID:     space.ClusterID,
 		MinReplica:    space.MinReplica,
 		DriverVersion: space.DriverVersion,
-		RepoSize:      0,
-	}
-	if space.Repository.Statistics != nil {
-		resSpace.RepoSize = space.Repository.Statistics.TotalSize
 	}
 	if permission.CanAdmin {
 		resSpace.SensitiveCheckStatus = space.Repository.SensitiveCheckStatus.String()

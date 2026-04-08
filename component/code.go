@@ -358,11 +358,6 @@ func (c *codeComponentImpl) Show(ctx context.Context, namespace, name, currentUs
 
 	mirrorTaskStatus = c.repoComponent.GetMirrorTaskStatus(code.Repository)
 
-	var repoSize int64
-	if code.Repository.Statistics != nil {
-		repoSize = code.Repository.Statistics.TotalSize
-	}
-
 	resCode := &types.Code{
 		ID:            code.ID,
 		Name:          code.Repository.Name,
@@ -396,7 +391,6 @@ func (c *codeComponentImpl) Show(ctx context.Context, namespace, name, currentUs
 			CSGPath: code.Repository.CSGPath,
 		},
 		MirrorTaskStatus: mirrorTaskStatus,
-		RepoSize:         repoSize,
 		//RecomOpWeight: ,
 	}
 	if permission.CanAdmin {
