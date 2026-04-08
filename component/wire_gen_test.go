@@ -2725,7 +2725,8 @@ func initializeTestSkillComponent(ctx context.Context, t interface {
 	mockRepoComponent := component.NewMockRepoComponent(t)
 	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
 	mockGitServer := gitserver.NewMockGitServer(t)
-	componentSkillComponentImpl := NewTestSkillComponent(config, mockStores, mockRepoComponent, mockUserSvcClient, mockGitServer)
+	mockClient := s3.NewMockClient(t)
+	componentSkillComponentImpl := NewTestSkillComponent(config, mockStores, mockRepoComponent, mockUserSvcClient, mockGitServer, mockClient)
 	mockAccountingComponent := component.NewMockAccountingComponent(t)
 	mockTagComponent := component.NewMockTagComponent(t)
 	mockSpaceComponent := component.NewMockSpaceComponent(t)
@@ -2741,7 +2742,6 @@ func initializeTestSkillComponent(ctx context.Context, t interface {
 		sensitive:           mockSensitiveComponent,
 		cluster:             mockClusterComponent,
 	}
-	mockClient := s3.NewMockClient(t)
 	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
 	mockDeployer := deploy.NewMockDeployer(t)
 	mockCache := cache.NewMockCache(t)

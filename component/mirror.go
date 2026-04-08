@@ -44,6 +44,7 @@ type mirrorComponentImpl struct {
 	syncCache                   cache.Cache
 	mirrorTaskStore             database.MirrorTaskStore
 	mirrorNamespaceMappingStore database.MirrorNamespaceMappingStore
+	skillStore                  database.SkillStore
 }
 
 type MirrorComponent interface {
@@ -100,6 +101,7 @@ func NewMirrorComponent(config *config.Config) (MirrorComponent, error) {
 	c.userStore = database.NewUserStore()
 	c.mcpServerStore = database.NewMCPServerStore()
 	c.mirrorTaskStore = database.NewMirrorTaskStore()
+	c.skillStore = database.NewSkillStore()
 	c.saas = config.Saas
 	c.config = config
 	c.mirrorNamespaceMappingStore = database.NewMirrorNamespaceMappingStore()
@@ -263,6 +265,16 @@ func (c *mirrorComponentImpl) CreateMirrorRepo(ctx context.Context, req types.Cr
 			if err != nil {
 				return nil, fmt.Errorf("failed to add property to mcp server: %w", err)
 			}
+		}
+	case types.SkillRepo:
+		dbSkill := database.Skill{
+			Repository:   repo,
+			RepositoryID: repo.ID,
+		}
+
+		_, err := c.skillStore.CreateAndUpdateRepoPath(ctx, dbSkill, repoPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create skill, error: %w", err)
 		}
 	}
 

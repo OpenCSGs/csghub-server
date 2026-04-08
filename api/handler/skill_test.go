@@ -1,14 +1,19 @@
 package handler
 
 import (
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/alibabacloud-go/tea/tea"
 	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	mockcomponent "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
 	"opencsg.com/csghub-server/builder/testutil"
+	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -168,4 +173,75 @@ func TestSkillHandler_Relations(t *testing.T) {
 	tester.mocks.skill.EXPECT().Relations(tester.Ctx(), "u", "r", "u").Return(&types.Relations{}, nil)
 	tester.WithUser().Execute()
 	tester.ResponseEq(t, 200, tester.OKText, &types.Relations{})
+}
+
+func TestSkillHandler_GetUploadUrl(t *testing.T) {
+	// Setup test configuration
+	cfg := &config.Config{}
+	cfg.S3.Bucket = "test-bucket"
+
+	// Create mock components
+	mockSkillComponent := mockcomponent.NewMockSkillComponent(t)
+	mockSensitiveComponent := mockcomponent.NewMockSensitiveComponent(t)
+	mockRepoComponent := mockcomponent.NewMockRepoComponent(t)
+
+	// Expected upload URL, UUID, and form data
+	expectedURL := "http://example.com/upload"
+	expectedUUID := "test-uuid"
+	expectedFormData := map[string]string{
+		"key":             "skills/packages/test-uuid",
+		"policy":          "test-policy",
+		"x-amz-signature": "test-signature",
+	}
+
+	// Set up mock expectations
+	mockSkillComponent.EXPECT().GetUploadUrl(mock.Anything).Return(expectedURL, expectedUUID, expectedFormData, nil)
+
+	// Create skill handler with mock dependencies
+	handler := &SkillHandler{
+		skill:     mockSkillComponent,
+		sensitive: mockSensitiveComponent,
+		repo:      mockRepoComponent,
+		config:    cfg,
+	}
+
+	// Create a test HTTP request
+	req, err := http.NewRequest("POST", "/skills/upload_url", nil)
+	require.Nil(t, err)
+	// Set the current user header
+	req.Header.Set("X-User", "test-user")
+
+	// Create a test HTTP response recorder
+	w := httptest.NewRecorder()
+
+	// Create a gin context
+	ctx, _ := gin.CreateTestContext(w)
+	ctx.Request = req
+	// Set current user in context
+	ctx.Set("currentUser", "test-user")
+
+	// Call the GetUploadUrl method
+	handler.GetUploadUrl(ctx)
+
+	// Check the response
+	require.Equal(t, http.StatusOK, w.Code)
+
+	// Check the response body
+	var response struct {
+		Msg  string                 `json:"msg"`
+		Data map[string]interface{} `json:"data"`
+	}
+	err = json.Unmarshal(w.Body.Bytes(), &response)
+	require.Nil(t, err)
+	require.Equal(t, expectedURL, response.Data["url"])
+	require.Equal(t, expectedUUID, response.Data["uuid"])
+
+	// Convert formData to map[string]string for comparison
+	formData, ok := response.Data["formData"].(map[string]interface{})
+	require.True(t, ok)
+	expectedFormDataMap := make(map[string]interface{})
+	for k, v := range expectedFormData {
+		expectedFormDataMap[k] = v
+	}
+	require.Equal(t, expectedFormDataMap, formData)
 }

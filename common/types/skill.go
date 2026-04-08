@@ -4,6 +4,14 @@ import "time"
 
 type CreateSkillReq struct {
 	CreateRepoReq
+	// Skill package SHA256 hash
+	SkillPackageSHA256 string `json:"skill_file"`
+	// Git repository URL for mirroring
+	GitURL string `json:"git_url"`
+	// Git username for authentication
+	GitUsername string `json:"git_username"`
+	// Git password for authentication
+	GitPassword string `json:"git_password"`
 }
 
 type UpdateSkillReq struct {

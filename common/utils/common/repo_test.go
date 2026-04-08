@@ -373,3 +373,17 @@ func TestBuildHashedRelativePath(t *testing.T) {
 	res := BuildHashedRelativePath(1)
 	require.Equal(t, "@hashed_repos/6b/86/6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b.git", res)
 }
+
+func TestBuildSkillPackageObjectKey(t *testing.T) {
+	// Test with a sample SHA256 hash
+	sha256 := "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+	expectedObjectKey := "skills/packages/e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+	actualObjectKey := BuildSkillPackageObjectKey(sha256)
+	require.Equal(t, expectedObjectKey, actualObjectKey)
+
+	// Test with another SHA256 hash
+	sha256 = "5baa61e4c9b93f3f0682250b6cf8331b7ee68fd8"
+	expectedObjectKey = "skills/packages/5baa61e4c9b93f3f0682250b6cf8331b7ee68fd8"
+	actualObjectKey = BuildSkillPackageObjectKey(sha256)
+	require.Equal(t, expectedObjectKey, actualObjectKey)
+}
