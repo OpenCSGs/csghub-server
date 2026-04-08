@@ -276,7 +276,7 @@ func TestSkillComponent_ShowWithStatistics(t *testing.T) {
 
 	skill := &database.Skill{ID: 1, Repository: &database.Repository{
 		ID: 11, Name: "name", User: database.User{Username: "user"}, SyncStatus: types.SyncStatusInProgress,
-		Statistics: &database.RepositoryStatistics{TotalSize: 1024},
+		Statistics: []database.RepositoryStatistics{{TotalSize: 1024}},
 	}}
 	cc.mocks.stores.SkillMock().EXPECT().FindByPath(ctx, "ns", "n").Return(skill, nil)
 	cc.mocks.components.repo.EXPECT().GetUserRepoPermission(ctx, "user", skill.Repository).Return(
