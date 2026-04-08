@@ -611,6 +611,72 @@ func (_c *MockAccountingComponent_ListMeteringsByUserIDAndTime_Call) RunAndRetur
 	return _c
 }
 
+// ListPresents provides a mock function with given fields: ctx, req
+func (_m *MockAccountingComponent) ListPresents(ctx context.Context, req types.PresentsIndexReq) ([]*types.PresentIndexResp, int, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListPresents")
+	}
+
+	var r0 []*types.PresentIndexResp
+	var r1 int
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.PresentsIndexReq) ([]*types.PresentIndexResp, int, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.PresentsIndexReq) []*types.PresentIndexResp); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*types.PresentIndexResp)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.PresentsIndexReq) int); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, types.PresentsIndexReq) error); ok {
+		r2 = rf(ctx, req)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockAccountingComponent_ListPresents_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListPresents'
+type MockAccountingComponent_ListPresents_Call struct {
+	*mock.Call
+}
+
+// ListPresents is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.PresentsIndexReq
+func (_e *MockAccountingComponent_Expecter) ListPresents(ctx interface{}, req interface{}) *MockAccountingComponent_ListPresents_Call {
+	return &MockAccountingComponent_ListPresents_Call{Call: _e.mock.On("ListPresents", ctx, req)}
+}
+
+func (_c *MockAccountingComponent_ListPresents_Call) Run(run func(ctx context.Context, req types.PresentsIndexReq)) *MockAccountingComponent_ListPresents_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.PresentsIndexReq))
+	})
+	return _c
+}
+
+func (_c *MockAccountingComponent_ListPresents_Call) Return(_a0 []*types.PresentIndexResp, _a1 int, _a2 error) *MockAccountingComponent_ListPresents_Call {
+	_c.Call.Return(_a0, _a1, _a2)
+	return _c
+}
+
+func (_c *MockAccountingComponent_ListPresents_Call) RunAndReturn(run func(context.Context, types.PresentsIndexReq) ([]*types.PresentIndexResp, int, error)) *MockAccountingComponent_ListPresents_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ListRecharge provides a mock function with given fields: ctx, req
 func (_m *MockAccountingComponent) ListRecharge(ctx context.Context, req types.AcctRechargeListReq) (interface{}, error) {
 	ret := _m.Called(ctx, req)

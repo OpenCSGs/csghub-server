@@ -510,6 +510,15 @@ type RechargesIndexReq struct {
 	Page        int    `json:"page"`
 }
 
+type PresentsIndexReq struct {
+	UserUUID  string `json:"user_uuid"`
+	UserName  string `json:"user_name"`
+	StartDate string `json:"start_date"`
+	EndDate   string `json:"end_date"`
+	Per       int    `json:"per"`
+	Page      int    `json:"page"`
+}
+
 type RechargeIndexResp struct {
 	RechargeResp
 	Amount float64 `json:"amount"`
@@ -519,6 +528,27 @@ type RechargesIndexResp struct {
 	Data  []*RechargeIndexResp `json:"data"`
 	Total int                  `json:"total"`
 	Sum   int64                `json:"sum"` // Total recharge amount
+}
+
+type PresentIndexResp struct {
+	ID            int64     `json:"id"`
+	EventUUID     string    `json:"event_uuid"`
+	UserUUID      string    `json:"user_uuid"`
+	UserName      string    `json:"user_name"`
+	ActivityID    int64     `json:"activity_id"`
+	Value         float64   `json:"value"`
+	OpUID         string    `json:"op_uid"`
+	OpDesc        string    `json:"op_desc"`
+	ParticipantUUID string   `json:"participant_uuid"`
+	ExpireAt      time.Time `json:"expire_at"`
+	Status        AccountPresentStatus `json:"status"`
+	CreatedAt     time.Time `json:"created_at"`
+}
+
+type PresentsIndexResp struct {
+	Data  []*PresentIndexResp `json:"data"`
+	Total int                 `json:"total"`
+	Sum   int64               `json:"sum"` // Total present amount
 }
 
 type SetLowBalanceWarnReq struct {
