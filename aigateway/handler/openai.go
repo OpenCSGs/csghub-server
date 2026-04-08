@@ -139,7 +139,6 @@ type OpenAIHandlerImpl struct {
 }
 
 // ListModels godoc
-// @Security     ApiKey
 // @Summary      List available models
 // @Description  Returns a list of available models, supports fuzzy search by model_id query parameter and filtering by public status
 // @Tags         AIGateway

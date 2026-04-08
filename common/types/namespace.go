@@ -11,5 +11,4 @@ type Namespace struct {
 	Type   string
 	Avatar string
 	UUID   string
-	NSType string
 }

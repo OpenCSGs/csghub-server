@@ -112,4 +112,15 @@ const (
 
 const (
 	CSGHubAccessToken = "CSGHubAccessToken"
+
+	GatewayCapabilityCacheTTL = 1 * time.Hour
 )
+
+type GatewayMCPServerInspectTarget struct {
+	ServerID   int64          `json:"server_id"`
+	Name       string         `json:"name"`
+	Protocol   string         `json:"protocol"`
+	URL        string         `json:"url"`
+	Headers    map[string]any `json:"headers,omitempty"`
+	ConfigHash string         `json:"config_hash"`
+}
