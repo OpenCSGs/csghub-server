@@ -97,10 +97,7 @@ var cmdLaunch = &cobra.Command{
 		}
 
 		slog.Info("start moderation temporal workflow")
-		err = moderationworkflow.StartWorker(cfg)
-		if err != nil {
-			return fmt.Errorf("failed to start moderation worker, error: %w", err)
-		}
+		moderationworkflow.RegisterWorker(temporalClient)
 
 		slog.Info("start notification temporal workflow")
 		err = notificationworkflow.StartWorkflow(cfg)

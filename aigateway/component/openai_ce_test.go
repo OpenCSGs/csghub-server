@@ -176,6 +176,7 @@ func TestOpenAIComponent_GetAvailableModels(t *testing.T) {
 				SecureLevel: commontypes.EndpointPublic,
 				Repository: &database.Repository{
 					Name: "model1",
+					Name: "model1",
 					Path: "model1",
 				},
 				User: &database.User{

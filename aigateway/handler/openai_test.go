@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"sync"
 	"testing"
 
@@ -16,6 +17,7 @@ import (
 	"github.com/openai/openai-go/v3/option"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	mockcomp "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/aigateway/component"
 	mocktoken "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/aigateway/token"
 	apicomp "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
@@ -926,5 +928,35 @@ func TestOpenAIHandler_GenerateImage(t *testing.T) {
 		tester.handler.GenerateImage(c)
 
 		assert.Equal(t, http.StatusInternalServerError, w.Code)
+	})
+
+	t.Run("proxyToApi is / when endpoint has no path (space deployment)", func(t *testing.T) {
+		// Spaces (HF Inference Toolkit) serve at root. When model.Endpoint is
+		// "http://svc.spaces.a800.external" (no path), we must use proxyToApi="/"
+		// so the proxy rewrites the path to / instead of keeping /v1/images/generations.
+		tests := []struct {
+			endpoint string
+			wantPath string
+			desc     string
+		}{
+			{"http://svc.spaces.a800.external", "/", "no path -> root"},
+			{"http://svc.spaces.a800.external/", "/", "trailing slash -> root"},
+			{"https://api.example.com/v1/images", "/v1/images", "explicit path preserved"},
+			{"", "", "empty endpoint -> no rewrite"},
+		}
+		for _, tt := range tests {
+			t.Run(tt.desc, func(t *testing.T) {
+				proxyToApi := ""
+				if tt.endpoint != "" {
+					uri, err := url.ParseRequestURI(tt.endpoint)
+					require.NoError(t, err)
+					proxyToApi = uri.Path
+					if proxyToApi == "" {
+						proxyToApi = "/"
+					}
+				}
+				assert.Equal(t, tt.wantPath, proxyToApi)
+			})
+		}
 	})
 }

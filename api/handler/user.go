@@ -596,7 +596,7 @@ func (h *UserHandler) UserPermission(ctx *gin.Context) {
 // @Param        per query int false "per" default(50)
 // @Param        page query int false "page index" default(1)
 // @Param        current_user query string false "current user"
-// @Success      200  {object}  types.ResponseWithTotal{data=[]types.DeployRepo,total=int} "OK"
+// @Success      200  {object}  types.ResponseWithTotal{data=[]types.DeployRequest,total=int} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /user/{username}/run/{repo_type} [get]
@@ -659,7 +659,7 @@ func (h *UserHandler) GetRunDeploys(ctx *gin.Context) {
 // @Param        per query int false "per" default(50)
 // @Param        page query int false "page index" default(1)
 // @Param        current_user query string false "current user"
-// @Success      200  {object}  types.ResponseWithTotal{data=[]types.DeployRepo,total=int} "OK"
+// @Success      200  {object}  types.ResponseWithTotal{data=[]types.DeployRequest,total=int} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /user/{username}/finetune/instances [get]
@@ -702,7 +702,8 @@ func (h *UserHandler) GetFinetuneInstances(ctx *gin.Context) {
 // @Param        per query int false "per" default(50)
 // @Param        page query int false "page index" default(1)
 // @Param        current_user query string false "current user"
-// @Success      200  {object}  types.ResponseWithTotal{data=[]types.DeployRepo,total=int} "OK"
+// @Param        search query string false "search by path or deployname"
+// @Success      200  {object}  types.ResponseWithTotal{data=[]types.DeployRequest,total=int} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /user/{username}/run/serverless [get]
@@ -722,6 +723,7 @@ func (h *UserHandler) GetRunServerless(ctx *gin.Context) {
 	req.PageSize = per
 	req.RepoType = types.ModelRepo
 	req.DeployType = types.ServerlessType
+	req.Query = ctx.Query("search")
 	ds, total, err := h.user.ListServerless(ctx.Request.Context(), req)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Failed to get serverless list", slog.Any("error", err), slog.Any("req", req))
@@ -847,7 +849,7 @@ func (h *UserHandler) GetUserResource(ctx *gin.Context) {
 // @Param        username path string true "username"
 // @Param        per query int false "per" default(20)
 // @Param        page query int false "per page" default(1)
-// @Success      200  {object}  types.ResponseWithTotal{data=[]types.DeployRepo,total=int} "OK"
+// @Success      200  {object}  types.ResponseWithTotal{data=[]types.DeployRequest,total=int} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /user/{username}/prompts [get]
@@ -889,7 +891,7 @@ func (h *UserHandler) Prompts(ctx *gin.Context) {
 // @Param        username path string true "username"
 // @Param        per query int false "per" default(20)
 // @Param        page query int false "per page" default(1)
-// @Success      200  {object}  types.ResponseWithTotal{data=[]types.DeployRepo,total=int} "OK"
+// @Success      200  {object}  types.ResponseWithTotal{data=[]types.DeployRequest,total=int} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /user/{username}/evaluations [get]
@@ -1096,7 +1098,6 @@ func (h *UserHandler) LikesSkills(ctx *gin.Context) {
 // @Param        page query int false "page number"
 // @Param        size query int false "page size"
 // @Success      200  {object}  types.ResponseWithTotal{data=[]types.NotebookRes,total=int} "OK"
-// @Success      200  {array}  types.ResponseWithTotal{data=[]types.NotebookRes,total=int} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /user/{username}/notebooks [get]

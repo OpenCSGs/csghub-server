@@ -278,7 +278,7 @@ func TestModelHandler_DeployDedicated(t *testing.T) {
 
 		tester.WithBody(t, &types.ModelRunReq{DeployName: "test", MinReplica: 1, MaxReplica: 2, Revision: "main"}).Execute()
 
-		tester.ResponseEq(t, 200, tester.OKText, types.DeployRepo{DeployID: 123})
+		tester.ResponseEq(t, 200, tester.OKText, types.DeployRequest{DeployID: 123})
 	})
 
 	t.Run("error_badrequest", func(t *testing.T) {
@@ -329,7 +329,7 @@ func TestModelHandler_DeployDedicated(t *testing.T) {
 
 		tester.WithBody(t, &types.ModelRunReq{DeployName: "test", MinReplica: 1, MaxReplica: 2, Revision: "main", EngineArgs: "{\"sss\":\"sss\"}"}).Execute()
 
-		tester.ResponseEq(t, http.StatusOK, tester.OKText, types.DeployRepo{DeployID: 123})
+		tester.ResponseEq(t, http.StatusOK, tester.OKText, types.DeployRequest{DeployID: 123})
 	})
 	t.Run("error_badrequest_engine_args", func(t *testing.T) {
 		tester := NewModelTester(t).WithHandleFunc(func(h *ModelHandler) gin.HandlerFunc {
@@ -379,7 +379,7 @@ func TestModelHandler_DeployDedicated(t *testing.T) {
 		}, types.ModelRunReq{DeployName: "test", MinReplica: 1, MaxReplica: 2, Revision: "main", OwnerNamespace: "org1"}).Return(int64(123), nil)
 
 		tester.WithBody(t, &types.ModelRunReq{DeployName: "test", MinReplica: 1, MaxReplica: 2, Revision: "main", OwnerNamespace: "org1"}).Execute()
-		tester.ResponseEq(t, 200, tester.OKText, types.DeployRepo{DeployID: 123})
+		tester.ResponseEq(t, 200, tester.OKText, types.DeployRequest{DeployID: 123})
 	})
 	t.Run("owner_namespace_permission_error", func(t *testing.T) {
 		tester := NewModelTester(t).WithHandleFunc(func(h *ModelHandler) gin.HandlerFunc {
@@ -425,7 +425,7 @@ func TestModelHandler_FinetuneCreate(t *testing.T) {
 
 		tester.WithBody(t, &types.ModelRunReq{DeployName: "test", MinReplica: 1, MaxReplica: 2, Revision: "main"}).Execute()
 
-		tester.ResponseEq(t, 200, tester.OKText, types.DeployRepo{DeployID: 123})
+		tester.ResponseEq(t, 200, tester.OKText, types.DeployRequest{DeployID: 123})
 	})
 	t.Run("error_badrequest", func(t *testing.T) {
 		tester := NewModelTester(t).WithHandleFunc(func(h *ModelHandler) gin.HandlerFunc {
@@ -461,7 +461,7 @@ func TestModelHandler_FinetuneCreate(t *testing.T) {
 		}, types.ModelRunReq{DeployName: "test", MinReplica: 1, MaxReplica: 1, Revision: "main", SecureLevel: 2, OwnerNamespace: "org1"}).Return(int64(123), nil)
 
 		tester.WithBody(t, &types.InstanceRunReq{DeployName: "test", Revision: "main", OwnerNamespace: "org1"}).Execute()
-		tester.ResponseEq(t, 200, tester.OKText, types.DeployRepo{DeployID: 123})
+		tester.ResponseEq(t, 200, tester.OKText, types.DeployRequest{DeployID: 123})
 	})
 	t.Run("owner_namespace_permission_error", func(t *testing.T) {
 		tester := NewModelTester(t).WithHandleFunc(func(h *ModelHandler) gin.HandlerFunc {
@@ -729,7 +729,7 @@ func TestModelHandler_DeployServerless(t *testing.T) {
 
 		tester.WithBody(t, &types.ModelRunReq{DeployName: "test", MinReplica: 1, MaxReplica: 2, Revision: "main"}).Execute()
 
-		tester.ResponseEq(t, 200, tester.OKText, types.DeployRepo{DeployID: 123})
+		tester.ResponseEq(t, 200, tester.OKText, types.DeployRequest{DeployID: 123})
 	})
 
 	t.Run("error_badrequest", func(t *testing.T) {
@@ -792,10 +792,10 @@ func TestModelHandler_GetDeployServerless(t *testing.T) {
 		return h.GetDeployServerless
 	})
 
-	tester.mocks.model.EXPECT().GetServerless(tester.Ctx(), "u", "r", "u").Return(&types.DeployRepo{
+	tester.mocks.model.EXPECT().GetServerless(tester.Ctx(), "u", "r", "u").Return(&types.DeployRequest{
 		DeployID: 1,
 	}, nil)
 	tester.WithUser().Execute()
 
-	tester.ResponseEq(t, 200, tester.OKText, &types.DeployRepo{DeployID: 1})
+	tester.ResponseEq(t, 200, tester.OKText, &types.DeployRequest{DeployID: 1})
 }

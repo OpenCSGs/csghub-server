@@ -239,6 +239,10 @@ func (m *openaiComponentImpl) getCSGHubModels(c context.Context, userID int64) (
 			slog.WarnContext(c, "skip deploy with nil repository", "deploy_id", deploy.ID, "svc_name", deploy.SvcName)
 			continue
 		}
+		if deploy.Repository == nil {
+			slog.WarnContext(c, "skip deploy with nil repository", "deploy_id", deploy.ID, "svc_name", deploy.SvcName)
+			continue
+		}
 		// Check if engine_args contains tool-call-parser parameter
 		supportFunctionCall := strings.Contains(deploy.EngineArgs, "tool-call-parser")
 		repoName := deploy.Repository.Name

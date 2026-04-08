@@ -1015,10 +1015,10 @@ func TestRepoHandler_DeployList(t *testing.T) {
 	tester.WithKV("repo_type", types.ModelRepo)
 	tester.mocks.repo.EXPECT().ListDeploy(
 		tester.Ctx(), types.ModelRepo, "u", "r", "u",
-	).Return([]types.DeployRepo{{DeployName: "n"}}, nil)
+	).Return([]types.DeployRequest{{DeployName: "n"}}, nil)
 
 	tester.Execute()
-	tester.ResponseEq(t, 200, tester.OKText, []types.DeployRepo{{DeployName: "n"}})
+	tester.ResponseEq(t, 200, tester.OKText, []types.DeployRequest{{DeployName: "n"}})
 }
 
 func TestRepoHandler_DeployDetail(t *testing.T) {
@@ -1038,10 +1038,10 @@ func TestRepoHandler_DeployDetail(t *testing.T) {
 			DeployID:    1,
 			DeployType:  types.InferenceType,
 		},
-	).Return(&types.DeployRepo{DeployName: "n"}, nil)
+	).Return(&types.DeployRequest{DeployName: "n"}, nil)
 
 	tester.Execute()
-	tester.ResponseEq(t, 200, tester.OKText, &types.DeployRepo{DeployName: "n"})
+	tester.ResponseEq(t, 200, tester.OKText, &types.DeployRequest{DeployName: "n"})
 }
 
 func TestRepoHandler_DeployInstanceLogs(t *testing.T) {
@@ -1367,11 +1367,11 @@ func TestRepoHandler_ServerlessDetail(t *testing.T) {
 			DeployID:    1,
 			DeployType:  types.ServerlessType,
 		},
-	).Return(&types.DeployRepo{Name: "r"}, nil)
+	).Return(&types.DeployRequest{Name: "r"}, nil)
 
 	tester.Execute()
 	tester.ResponseEq(
-		t, 200, tester.OKText, &types.DeployRepo{Name: "r"},
+		t, 200, tester.OKText, &types.DeployRequest{Name: "r"},
 	)
 }
 

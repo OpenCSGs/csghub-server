@@ -24,6 +24,11 @@ func TestLLMConfigStore_GetOptimization(t *testing.T) {
 		ModelName:   "c1",
 		DisplayName: "c1",
 		Metadata:    map[string]any{"source": "test"},
+		Type:        1,
+		Enabled:     true,
+		ModelName:   "c1",
+		DisplayName: "c1",
+		Metadata:    map[string]any{"source": "test"},
 	}).Exec(ctx)
 	require.Nil(t, err)
 	_, err = db.Core.NewInsert().Model(&database.LLMConfig{
@@ -120,6 +125,11 @@ func TestLLMConfigStore_CRUD(t *testing.T) {
 	require.Nil(t, err)
 	store := database.NewLLMConfigStoreWithDB(db, config)
 	dbInput := database.LLMConfig{
+		Type:        5,
+		Enabled:     true,
+		ModelName:   "summary1",
+		DisplayName: "summary1",
+		Metadata:    map[string]any{"k": "v"},
 		Type:        5,
 		Enabled:     true,
 		ModelName:   "summary1",

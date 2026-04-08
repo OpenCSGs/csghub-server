@@ -204,7 +204,7 @@ func TestSpaceComponent_Deploy(t *testing.T) {
 		sc.mocks.components.repo.EXPECT().CheckAccountAndResource(ctx, "ns1", "", int64(0), &database.SpaceResource{
 			ID: 1,
 		}).Return(&types.CheckExclusiveResp{}, nil)
-		sc.mocks.deployer.EXPECT().Deploy(ctx, types.DeployRepo{
+		sc.mocks.deployer.EXPECT().Deploy(ctx, types.DeployRequest{
 			SpaceID:        1,
 			Path:           "foo1/bar1",
 			Annotation:     "{\"hub-deploy-user\":\"user1\",\"hub-res-name\":\"ns1/n1\",\"hub-res-type\":\"space\"}",
@@ -257,12 +257,12 @@ func TestSpaceComponent_Delete(t *testing.T) {
 	)
 	var wgstop sync.WaitGroup
 	wgstop.Add(1)
-	sc.mocks.deployer.EXPECT().Stop(mock.Anything, mock.MatchedBy(func(req types.DeployRepo) bool {
+	sc.mocks.deployer.EXPECT().Stop(mock.Anything, mock.MatchedBy(func(req types.DeployRequest) bool {
 		return req.SpaceID == 1 &&
 			req.Namespace == "ns" &&
 			req.Name == "n"
 	})).
-		RunAndReturn(func(ctx context.Context, req types.DeployRepo) error {
+		RunAndReturn(func(ctx context.Context, req types.DeployRequest) error {
 			wgstop.Done()
 			return nil
 		}).Once()

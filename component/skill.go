@@ -392,11 +392,11 @@ func (c *skillComponentImpl) Show(ctx context.Context, namespace, name, currentU
 		},
 		MirrorTaskStatus: mirrorTaskStatus,
 		RepoSize:         0,
-}
-if skill.Repository.Statistics != nil {
-	resSkill.RepoSize = skill.Repository.Statistics.TotalSize
-}
-if permission.CanAdmin {
+	}
+	if skill.Repository.Statistics != nil {
+		resSkill.RepoSize = skill.Repository.Statistics.TotalSize
+	}
+	if permission.CanAdmin {
 		resSkill.SensitiveCheckStatus = skill.Repository.SensitiveCheckStatus.String()
 	}
 	if needOpWeight {

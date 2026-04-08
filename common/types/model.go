@@ -355,6 +355,7 @@ const (
 	EvaluationType = 4    // evaluation
 	NotebookType   = 5    // notebook
 	JobType        = 6    // job
+	SandboxType    = 7    // sandbox
 	UnknownType    = -1   // unknown case
 )
 

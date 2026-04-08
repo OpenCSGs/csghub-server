@@ -30,6 +30,7 @@ type BaseModel struct {
 	DisplayName         string         `json:"display_name"`
 	SupportFunctionCall bool           `json:"support_function_call,omitempty"` // whether the model supports function calling
 	IsPinned            *bool          `json:"is_pinned,omitempty"`             // whether the model is pinned
+	Public              bool           `json:"public"`                          // whether the model is public (false = private, true = public)
 	Metadata            map[string]any `json:"metadata"`
 }
 
@@ -74,6 +75,7 @@ func (m Model) MarshalJSON() ([]byte, error) {
 			Task                string         `json:"task"`
 			DisplayName         string         `json:"display_name"`
 			SupportFunctionCall *bool          `json:"support_function_call,omitempty"`
+			Public              bool           `json:"public"`
 			Endpoint            string         `json:"endpoint"`
 			Metadata            map[string]any `json:"metadata"`
 			ClusterID           *string        `json:"cluster_id,omitempty"`
@@ -81,18 +83,17 @@ func (m Model) MarshalJSON() ([]byte, error) {
 			ImageID             *string        `json:"image_id,omitempty"`
 			AuthHead            *string        `json:"auth_head,omitempty"`
 			Provider            *string        `json:"provider,omitempty"`
-			NeedSensitiveCheck  bool           `json:"need_sensitive_check"`
 		}
 		resp := internalModelResponse{
-			ID:                 m.ID,
-			Object:             m.Object,
-			Created:            m.Created,
-			OwnedBy:            m.OwnedBy,
-			Task:               m.Task,
-			DisplayName:        m.DisplayName,
-			Endpoint:           m.Endpoint,
-			Metadata:           m.Metadata,
-			NeedSensitiveCheck: m.NeedSensitiveCheck,
+			ID:          m.ID,
+			Object:      m.Object,
+			Created:     m.Created,
+			OwnedBy:     m.OwnedBy,
+			Task:        m.Task,
+			DisplayName: m.DisplayName,
+			Public:      m.Public,
+			Endpoint:    m.Endpoint,
+			Metadata:    m.Metadata,
 		}
 
 		if m.SupportFunctionCall {
@@ -130,6 +131,7 @@ func (m *Model) UnmarshalJSON(data []byte) error {
 		Task                string         `json:"task"`
 		DisplayName         string         `json:"display_name"`
 		SupportFunctionCall bool           `json:"support_function_call,omitempty"`
+		Public              bool           `json:"public"`
 		Endpoint            string         `json:"endpoint"`
 		Metadata            map[string]any `json:"metadata"`
 		ClusterID           string         `json:"cluster_id,omitempty"`
@@ -137,7 +139,6 @@ func (m *Model) UnmarshalJSON(data []byte) error {
 		ImageID             string         `json:"image_id,omitempty"`
 		AuthHead            string         `json:"auth_head,omitempty"`
 		Provider            string         `json:"provider,omitempty"`
-		NeedSensitiveCheck  bool           `json:"need_sensitive_check"`
 	}
 	var aux internalModelResponse
 	if err := json.Unmarshal(data, &aux); err != nil {

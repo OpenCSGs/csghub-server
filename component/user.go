@@ -36,9 +36,9 @@ type UserComponent interface {
 	LikesCodes(ctx context.Context, req *types.UserModelsReq) ([]types.Code, int, error)
 	LikesModels(ctx context.Context, req *types.UserModelsReq) ([]types.Model, int, error)
 	LikesDatasets(ctx context.Context, req *types.UserDatasetsReq) ([]types.Dataset, int, error)
-	ListDeploys(ctx context.Context, repoType types.RepositoryType, req *types.DeployReq) ([]types.DeployRepo, int, error)
-	ListInstances(ctx context.Context, req *types.UserRepoReq) ([]types.DeployRepo, int, error)
-	ListServerless(ctx context.Context, req types.DeployReq) ([]types.DeployRepo, int, error)
+	ListDeploys(ctx context.Context, repoType types.RepositoryType, req *types.DeployReq) ([]types.DeployRequest, int, error)
+	ListInstances(ctx context.Context, req *types.UserRepoReq) ([]types.DeployRequest, int, error)
+	ListServerless(ctx context.Context, req types.DeployReq) ([]types.DeployRequest, int, error)
 	CreateUserResource(ctx context.Context, req types.CreateUserResourceReq) error
 	DeleteUserResource(ctx context.Context, username string, orderDetailId int64) error
 	// GetUserResource
@@ -53,7 +53,7 @@ type UserComponent interface {
 	ListFinetunes(ctx context.Context, req *types.UserEvaluationReq) ([]types.ArgoWorkFlowRes, int, error)
 	LikesSkills(ctx context.Context, req *types.UserMCPsReq) ([]types.Skill, int, error)
 	// ListDeploysByNamespace lists run deploys (e.g. inference) by owner namespace (org or user).
-	ListDeploysByNamespace(ctx context.Context, req *types.OrgRunDeploysReq) ([]types.DeployRepo, int, error)
+	ListDeploysByNamespace(ctx context.Context, req *types.OrgRunDeploysReq) ([]types.DeployRequest, int, error)
 	// ListNotebooksByNamespace lists notebooks by owner namespace (org or user).
 	ListNotebooksByNamespace(ctx context.Context, req *types.OrgNotebooksReq) ([]types.NotebookRes, int, error)
 }
@@ -555,7 +555,7 @@ func (c *userComponentImpl) LikesDatasets(ctx context.Context, req *types.UserDa
 	return resDatasets, total, nil
 }
 
-func (c *userComponentImpl) ListServerless(ctx context.Context, req types.DeployReq) ([]types.DeployRepo, int, error) {
+func (c *userComponentImpl) ListServerless(ctx context.Context, req types.DeployReq) ([]types.DeployRequest, int, error) {
 	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
 	if err != nil {
 		newError := fmt.Errorf("failed to check for the presence of the user:%s, error:%w", req.CurrentUser, err)
@@ -571,10 +571,10 @@ func (c *userComponentImpl) ListServerless(ctx context.Context, req types.Deploy
 		return nil, 0, newError
 	}
 
-	var resDeploys []types.DeployRepo
+	var resDeploys []types.DeployRequest
 	for _, deploy := range deploys {
 		repoPath := strings.TrimPrefix(deploy.GitPath, string(req.RepoType)+"s_")
-		resDeploys = append(resDeploys, types.DeployRepo{
+		resDeploys = append(resDeploys, types.DeployRequest{
 			DeployID:         deploy.ID,
 			DeployName:       deploy.DeployName,
 			Path:             repoPath,
@@ -601,7 +601,7 @@ func (c *userComponentImpl) ListServerless(ctx context.Context, req types.Deploy
 	return resDeploys, total, nil
 }
 
-func (c *userComponentImpl) ListDeploysByNamespace(ctx context.Context, req *types.OrgRunDeploysReq) ([]types.DeployRepo, int, error) {
+func (c *userComponentImpl) ListDeploysByNamespace(ctx context.Context, req *types.OrgRunDeploysReq) ([]types.DeployRequest, int, error) {
 	if req.CurrentUser != "" {
 		canRead, err := c.repoComponent.CheckCurrentUserPermission(ctx, req.CurrentUser, req.Namespace, membership.RoleRead)
 		if err != nil {
@@ -620,7 +620,7 @@ func (c *userComponentImpl) ListDeploysByNamespace(ctx context.Context, req *typ
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to get namespace deploys: %w", err)
 	}
-	var resDeploys []types.DeployRepo
+	var resDeploys []types.DeployRequest
 	for _, deploy := range deploys {
 		d := &database.Deploy{
 			SvcName:   deploy.SvcName,
@@ -637,7 +637,7 @@ func (c *userComponentImpl) ListDeploysByNamespace(ctx context.Context, req *typ
 		if len(tags) > 0 {
 			tag = tags[0].Name
 		}
-		resDeploys = append(resDeploys, types.DeployRepo{
+		resDeploys = append(resDeploys, types.DeployRequest{
 			DeployID:         deploy.ID,
 			DeployName:       deploy.DeployName,
 			Path:             repoPath,

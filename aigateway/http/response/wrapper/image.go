@@ -11,10 +11,11 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"opencsg.com/csghub-server/aigateway/component/adapter/text2image"
 	"opencsg.com/csghub-server/aigateway/component"
+	"opencsg.com/csghub-server/aigateway/component/adapter/text2image"
 	"opencsg.com/csghub-server/aigateway/token"
 	"opencsg.com/csghub-server/aigateway/types"
+	"opencsg.com/csghub-server/common/utils/common"
 )
 
 type ImageGeneration struct {
@@ -118,7 +119,7 @@ func (w *ImageGeneration) Finalize() error {
 			openaiResp.Data[0].URL = w.sensitiveDefaultImg
 			openaiResp.Data[0].B64JSON = ""
 		}
-		body, err = json.Marshal(openaiResp)
+		body, err = common.MarshalJSONWithoutHTMLEscape(openaiResp)
 		if err != nil {
 			w.internalWritter.Header().Set("Content-Type", "application/json")
 			w.internalWritter.WriteHeader(http.StatusInternalServerError)

@@ -1691,23 +1691,23 @@ func (_c *MockRepoComponent_DeleteRuntimeFramework_Call) RunAndReturn(run func(c
 }
 
 // DeployDetail provides a mock function with given fields: ctx, detailReq
-func (_m *MockRepoComponent) DeployDetail(ctx context.Context, detailReq types.DeployActReq) (*types.DeployRepo, error) {
+func (_m *MockRepoComponent) DeployDetail(ctx context.Context, detailReq types.DeployActReq) (*types.DeployRequest, error) {
 	ret := _m.Called(ctx, detailReq)
 
 	if len(ret) == 0 {
 		panic("no return value specified for DeployDetail")
 	}
 
-	var r0 *types.DeployRepo
+	var r0 *types.DeployRequest
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, types.DeployActReq) (*types.DeployRepo, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, types.DeployActReq) (*types.DeployRequest, error)); ok {
 		return rf(ctx, detailReq)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, types.DeployActReq) *types.DeployRepo); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, types.DeployActReq) *types.DeployRequest); ok {
 		r0 = rf(ctx, detailReq)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*types.DeployRepo)
+			r0 = ret.Get(0).(*types.DeployRequest)
 		}
 	}
 
@@ -1739,12 +1739,12 @@ func (_c *MockRepoComponent_DeployDetail_Call) Run(run func(ctx context.Context,
 	return _c
 }
 
-func (_c *MockRepoComponent_DeployDetail_Call) Return(_a0 *types.DeployRepo, _a1 error) *MockRepoComponent_DeployDetail_Call {
+func (_c *MockRepoComponent_DeployDetail_Call) Return(_a0 *types.DeployRequest, _a1 error) *MockRepoComponent_DeployDetail_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockRepoComponent_DeployDetail_Call) RunAndReturn(run func(context.Context, types.DeployActReq) (*types.DeployRepo, error)) *MockRepoComponent_DeployDetail_Call {
+func (_c *MockRepoComponent_DeployDetail_Call) RunAndReturn(run func(context.Context, types.DeployActReq) (*types.DeployRequest, error)) *MockRepoComponent_DeployDetail_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -3301,23 +3301,23 @@ func (_c *MockRepoComponent_LastCommit_Call) RunAndReturn(run func(context.Conte
 }
 
 // ListDeploy provides a mock function with given fields: ctx, repoType, namespace, name, currentUser
-func (_m *MockRepoComponent) ListDeploy(ctx context.Context, repoType types.RepositoryType, namespace string, name string, currentUser string) ([]types.DeployRepo, error) {
+func (_m *MockRepoComponent) ListDeploy(ctx context.Context, repoType types.RepositoryType, namespace string, name string, currentUser string) ([]types.DeployRequest, error) {
 	ret := _m.Called(ctx, repoType, namespace, name, currentUser)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ListDeploy")
 	}
 
-	var r0 []types.DeployRepo
+	var r0 []types.DeployRequest
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, types.RepositoryType, string, string, string) ([]types.DeployRepo, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, types.RepositoryType, string, string, string) ([]types.DeployRequest, error)); ok {
 		return rf(ctx, repoType, namespace, name, currentUser)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, types.RepositoryType, string, string, string) []types.DeployRepo); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, types.RepositoryType, string, string, string) []types.DeployRequest); ok {
 		r0 = rf(ctx, repoType, namespace, name, currentUser)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]types.DeployRepo)
+			r0 = ret.Get(0).([]types.DeployRequest)
 		}
 	}
 
@@ -3352,12 +3352,12 @@ func (_c *MockRepoComponent_ListDeploy_Call) Run(run func(ctx context.Context, r
 	return _c
 }
 
-func (_c *MockRepoComponent_ListDeploy_Call) Return(_a0 []types.DeployRepo, _a1 error) *MockRepoComponent_ListDeploy_Call {
+func (_c *MockRepoComponent_ListDeploy_Call) Return(_a0 []types.DeployRequest, _a1 error) *MockRepoComponent_ListDeploy_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockRepoComponent_ListDeploy_Call) RunAndReturn(run func(context.Context, types.RepositoryType, string, string, string) ([]types.DeployRepo, error)) *MockRepoComponent_ListDeploy_Call {
+func (_c *MockRepoComponent_ListDeploy_Call) RunAndReturn(run func(context.Context, types.RepositoryType, string, string, string) ([]types.DeployRequest, error)) *MockRepoComponent_ListDeploy_Call {
 	_c.Call.Return(run)
 	return _c
 }
