@@ -6,6 +6,20 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
+// Provider type values for Metadata[MetaKeyLLMType].
+const (
+	ProviderTypeServerless  = "serverless"
+	ProviderTypeInference   = "inference"
+	ProviderTypeExternalLLM = "external_llm"
+)
+
+// Metadata key constants used when enriching model metadata.
+const (
+	MetaKeyLLMType = "llm_type"
+	MetaKeyPricing = "pricing"
+	MetaKeyTasks   = "tasks"
+)
+
 // BaseModel represents the base model fields
 type BaseModel struct {
 	ID                  string         `json:"id"`
@@ -16,7 +30,7 @@ type BaseModel struct {
 	DisplayName         string         `json:"display_name"`
 	SupportFunctionCall bool           `json:"support_function_call,omitempty"` // whether the model supports function calling
 	IsPinned            *bool          `json:"is_pinned,omitempty"`             // whether the model is pinned
-	Public              bool           `json:"public"`                          // whether the model is public (false = private, true = public)
+	Public              bool           `json:"public,omitempty"`
 	Metadata            map[string]any `json:"metadata"`
 }
 
@@ -61,7 +75,7 @@ func (m Model) MarshalJSON() ([]byte, error) {
 			Task                string         `json:"task"`
 			DisplayName         string         `json:"display_name"`
 			SupportFunctionCall *bool          `json:"support_function_call,omitempty"`
-			Public              bool           `json:"public"`
+			Public              bool           `json:"public,omitempty"`
 			Endpoint            string         `json:"endpoint"`
 			Metadata            map[string]any `json:"metadata"`
 			ClusterID           *string        `json:"cluster_id,omitempty"`
@@ -119,7 +133,7 @@ func (m *Model) UnmarshalJSON(data []byte) error {
 		Task                string         `json:"task"`
 		DisplayName         string         `json:"display_name"`
 		SupportFunctionCall bool           `json:"support_function_call,omitempty"`
-		Public              bool           `json:"public"`
+		Public              bool           `json:"public,omitempty"`
 		Endpoint            string         `json:"endpoint"`
 		Metadata            map[string]any `json:"metadata"`
 		ClusterID           string         `json:"cluster_id,omitempty"`
@@ -139,8 +153,8 @@ func (m *Model) UnmarshalJSON(data []byte) error {
 	m.OwnedBy = aux.OwnedBy
 	m.Task = aux.Task
 	m.DisplayName = aux.DisplayName
-	m.SupportFunctionCall = aux.SupportFunctionCall
 	m.Public = aux.Public
+	m.SupportFunctionCall = aux.SupportFunctionCall
 	m.Endpoint = aux.Endpoint
 	m.Metadata = aux.Metadata
 	m.ClusterID = aux.ClusterID
@@ -193,10 +207,10 @@ type ModelList struct {
 // filtering, and pagination behavior consistently.
 type ListModelsReq struct {
 	ModelID string `json:"model_id"`
-	Public  string `json:"public"`
 	Per     string `json:"per"`
 	Page    string `json:"page"`
 	Source  string `json:"source"` // filter by source (csghub for CSGHub models, external for external models)
+	Task    string `json:"task"`   // filter by task
 }
 
 // UserPreferenceRequest defines the request parameters for UserPreference method
@@ -223,3 +237,16 @@ const (
 	// ModelSourceExternal represents models from external providers
 	ModelSourceExternal ModelSource = "external"
 )
+
+// ModelTokenPrice is currency plus per-million-token rate (major units, from accounting cents + sku_unit).
+type ModelTokenPrice struct {
+	Currency        string  `json:"currency,omitempty"`
+	PricePerMillion float64 `json:"price_per_million,omitempty"`
+}
+
+// ModelScenePrice is Metadata["pricing"]: serverless sets input/output token prices; external_llm sets token_price.
+type ModelScenePrice struct {
+	InputTokenPrice  *ModelTokenPrice `json:"input_token_price,omitempty"`
+	OutputTokenPrice *ModelTokenPrice `json:"output_token_price,omitempty"`
+	TokenPrice       *ModelTokenPrice `json:"token_price,omitempty"`
+}

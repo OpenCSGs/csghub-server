@@ -75,7 +75,7 @@ func TestOpenAIHandler_ListModels(t *testing.T) {
 	t.Run("successful passthrough", func(t *testing.T) {
 		tester, c, w := setupTest(t)
 		models := []types.Model{
-			{BaseModel: types.BaseModel{ID: "model1:svc1", Object: "model", OwnedBy: "testuser", Public: true}},
+			{BaseModel: types.BaseModel{ID: "model1:svc1", Object: "model", OwnedBy: "testuser"}},
 		}
 		expect := types.ModelList{
 			Object:     "list",
@@ -102,14 +102,12 @@ func TestOpenAIHandler_ListModels(t *testing.T) {
 		tester, c, w := setupTest(t)
 
 		tester.WithQuery("model_id", "gpt").
-			WithQuery("public", "true").
 			WithQuery("per", "2").
 			WithQuery("page", "3")
 
 		tester.mocks.openAIComp.EXPECT().
 			ListModels(mock.Anything, "testuser", types.ListModelsReq{
 				ModelID: "gpt",
-				Public:  "true",
 				Per:     "2",
 				Page:    "3",
 			}).
@@ -118,6 +116,36 @@ func TestOpenAIHandler_ListModels(t *testing.T) {
 		tester.handler.ListModels(c)
 
 		assert.Equal(t, http.StatusOK, w.Code)
+	})
+
+	t.Run("passes task query param to component", func(t *testing.T) {
+		tester, c, w := setupTest(t)
+
+		tester.WithQuery("task", "text-generation").
+			WithQuery("per", "10").
+			WithQuery("page", "1")
+
+		tester.mocks.openAIComp.EXPECT().
+			ListModels(mock.Anything, "testuser", types.ListModelsReq{
+				Task: "text-generation",
+				Per:  "10",
+				Page: "1",
+			}).
+			Return(types.ModelList{
+				Object:     "list",
+				Data:       []types.Model{{BaseModel: types.BaseModel{ID: "model1", Task: "text-generation"}}},
+				HasMore:    false,
+				TotalCount: 1,
+			}, nil).Once()
+
+		tester.handler.ListModels(c)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		var response types.ModelList
+		err := json.Unmarshal(w.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		assert.Equal(t, 1, response.TotalCount)
+		assert.Equal(t, "text-generation", response.Data[0].Task)
 	})
 
 	t.Run("component error", func(t *testing.T) {
@@ -199,7 +227,6 @@ func TestOpenAIHandler_ListModels_OpenaiSDK(t *testing.T) {
 				ID:      "gpt-4:svc1",
 				Object:  "model",
 				OwnedBy: "testuser",
-				Public:  true,
 			},
 		},
 		{
@@ -207,7 +234,6 @@ func TestOpenAIHandler_ListModels_OpenaiSDK(t *testing.T) {
 				ID:      "gpt-3.5-turbo:svc2",
 				Object:  "model",
 				OwnedBy: "testuser",
-				Public:  true,
 			},
 		},
 	}
@@ -300,6 +326,49 @@ func TestOpenAIHandler_GetModel(t *testing.T) {
 		tester.handler.GetModel(c)
 
 		assert.Equal(t, http.StatusBadRequest, w.Code)
+	})
+
+	t.Run("model with slash in name - trims leading slash", func(t *testing.T) {
+		tester, c, w := setupTest(t)
+		model := &types.Model{
+			BaseModel: types.BaseModel{
+				ID:      "xzgan001/gguf_model:fepjlx3v39xc",
+				Object:  "model",
+				OwnedBy: "testuser",
+			},
+		}
+		// Wildcard route adds leading slash
+		c.Params = []gin.Param{{Key: "model", Value: "/xzgan001/gguf_model:fepjlx3v39xc"}}
+		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "xzgan001/gguf_model:fepjlx3v39xc").Return(model, nil)
+
+		tester.handler.GetModel(c)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		var response types.Model
+		err := json.Unmarshal(w.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		assert.Equal(t, "xzgan001/gguf_model:fepjlx3v39xc", response.ID)
+	})
+
+	t.Run("model without leading slash - no trim needed", func(t *testing.T) {
+		tester, c, w := setupTest(t)
+		model := &types.Model{
+			BaseModel: types.BaseModel{
+				ID:      "simple-model:svc1",
+				Object:  "model",
+				OwnedBy: "testuser",
+			},
+		}
+		c.Params = []gin.Param{{Key: "model", Value: "simple-model:svc1"}}
+		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "simple-model:svc1").Return(model, nil)
+
+		tester.handler.GetModel(c)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		var response types.Model
+		err := json.Unmarshal(w.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		assert.Equal(t, "simple-model:svc1", response.ID)
 	})
 }
 

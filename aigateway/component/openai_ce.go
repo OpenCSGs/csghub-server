@@ -48,3 +48,7 @@ func parseScene(sceneValue string) common_types.SceneType {
 func (e *extendOpenai) CheckBalance(ctx context.Context, username, userUUID string) error {
 	return nil
 }
+
+func (e *extendOpenai) enrichModelsWithPrice(_ context.Context, models []types.Model) []types.Model {
+	return models
+}
