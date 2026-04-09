@@ -24,15 +24,10 @@ type CsgbotSvcClient interface {
 	DeleteKnowledgeBase(ctx context.Context, userUUID string, username string, token string, contentID string) error
 	UpdateKnowledgeBase(ctx context.Context, userUUID string, username string, token string, contentID string, req *types.UpdateAgentKnowledgeBaseRequest) error
 
-	// Chat sends a chat request to the csgbot agent and returns the response body for SSE streaming.
 	Chat(ctx context.Context, userUUID, username, token, agentName, sessionID string, req *CsgbotChatRequest) (io.ReadCloser, error)
-
-	// CreateOpenClaw creates a new OpenClaw sandbox instance.
-	// POST /api/v1/csgbot/openclaw/create
+	ChatLangflow(ctx context.Context, userUUID, username, token, flowID, sessionID string, req *LangflowSchedulerChatRequest) (io.ReadCloser, error)
+	ChatCodeAgent(ctx context.Context, userUUID, username, token string, req *CodeAgentSchedulerChatRequest) (io.ReadCloser, error)
 	CreateOpenClaw(ctx context.Context, userUUID, username, token string, req CreateOpenClawRequest) (*CreateOpenClawResponse, error)
-
-	// DeleteOpenClaw deletes an OpenClaw sandbox instance by content ID.
-	// DELETE /api/v1/csgbot/openclaw/{id}
 	DeleteOpenClaw(ctx context.Context, userUUID, username, token, contentID string) error
 }
 
@@ -44,6 +39,33 @@ type CsgbotChatMessage struct {
 type CsgbotChatRequest struct {
 	Messages []CsgbotChatMessage `json:"messages"`
 	Stream   bool                `json:"stream"`
+}
+
+// LangflowSchedulerChatRequest represents a chat request to langflow for scheduler
+type LangflowSchedulerChatRequest struct {
+	InputValue string `json:"input_value"`
+	InputType  string `json:"input_type"`
+	OutputType string `json:"output_type"`
+	SessionID  string `json:"session_id,omitempty"`
+}
+
+// CodeAgentSchedulerChatRequest represents a chat request to a custom code agent for scheduler
+type CodeAgentSchedulerChatRequest struct {
+	RequestID     string                     `json:"request_id"`
+	Query         string                     `json:"query"`
+	AgentName     string                     `json:"agent_name"`
+	Stream        bool                       `json:"stream"`
+	StreamMode    map[string]any             `json:"streamMode,omitempty"`
+	History       []CodeAgentChatHistoryItem `json:"history,omitempty"`
+	MaxLoop       int                        `json:"maxLoop,omitempty"`
+	SearchEngines []string                   `json:"search_engines,omitempty"`
+}
+
+// CodeAgentChatHistoryItem represents a history item for code agent chat
+type CodeAgentChatHistoryItem struct {
+	Content string `json:"content"`
+	Role    string `json:"role"`
+	File    any    `json:"file"`
 }
 
 type CreateKnowledgeBaseRequest struct {
@@ -122,8 +144,6 @@ func NewCsgbotSvcHttpClient(endpoint string, opts ...RequestOption) CsgbotSvcCli
 	}
 }
 
-// Delete workspace files for a code agent
-// DELETE /api/v1/csgbot/codeAgent/{agent_name}
 func (c *CsgbotSvcHttpClientImpl) DeleteWorkspaceFiles(ctx context.Context, userUUID string, username string, token string, agentName string) error {
 	rpcErrorCtx := map[string]any{
 		"user_uuid": userUUID,
@@ -156,8 +176,6 @@ func (c *CsgbotSvcHttpClientImpl) DeleteWorkspaceFiles(ctx context.Context, user
 	return nil
 }
 
-// Update workspace files for a code agent
-// POST /api/v1/csgbot/codeAgent/updateCode
 func (c *CsgbotSvcHttpClientImpl) UpdateWorkspaceFiles(ctx context.Context, userUUID string, username string, token string, agentName string) error {
 	rpcErrorCtx := map[string]any{
 		"user_uuid": userUUID,
@@ -200,8 +218,6 @@ func (c *CsgbotSvcHttpClientImpl) UpdateWorkspaceFiles(ctx context.Context, user
 	return nil
 }
 
-// Create knowledge base
-// POST /api/v1/csgbot/langflow/flows/rag
 func (c *CsgbotSvcHttpClientImpl) CreateKnowledgeBase(ctx context.Context, userUUID string, username string, token string, req *CreateKnowledgeBaseRequest) (*CreateKnowledgeBaseResponse, error) {
 	if req == nil {
 		return nil, errorx.BadRequest(errors.New("create knowledge base request is nil"), nil)
@@ -252,8 +268,6 @@ func (c *CsgbotSvcHttpClientImpl) CreateKnowledgeBase(ctx context.Context, userU
 	return &resp, nil
 }
 
-// Delete knowledge base
-// POST /api/v1/csgbot/langflow/flows/rag/delete
 func (c *CsgbotSvcHttpClientImpl) DeleteKnowledgeBase(ctx context.Context, userUUID string, username string, token string, contentID string) error {
 	rpcErrorCtx := map[string]any{
 		"user_uuid":  userUUID,
@@ -315,8 +329,6 @@ func (c *CsgbotSvcHttpClientImpl) DeleteKnowledgeBase(ctx context.Context, userU
 	return nil
 }
 
-// Update knowledge base
-// PATCH /api/v1/csgbot/langflow/flows/rag/{content_id}
 func (c *CsgbotSvcHttpClientImpl) UpdateKnowledgeBase(ctx context.Context, userUUID string, username string, token string, contentID string, req *types.UpdateAgentKnowledgeBaseRequest) error {
 	if req == nil {
 		return errorx.BadRequest(errors.New("update knowledge base request is nil"), nil)
@@ -366,22 +378,44 @@ func (c *CsgbotSvcHttpClientImpl) UpdateKnowledgeBase(ctx context.Context, userU
 	return nil
 }
 
-// Chat sends a chat request to the agent using the Anthropic request format.
-// POST /api/v1/csgbot/{agentName}/chat
 func (c *CsgbotSvcHttpClientImpl) Chat(ctx context.Context, userUUID, username, token, agentName, sessionID string, req *CsgbotChatRequest) (io.ReadCloser, error) {
 	if req == nil {
 		return nil, errorx.BadRequest(errors.New("chat request is nil"), nil)
 	}
 
-	rpcErrorCtx := map[string]any{
-		"user_uuid":  userUUID,
-		"agent_name": agentName,
-		"session_id": sessionID,
-		"service":    "csgbot",
-		"api":        "POST /api/v1/csgbot/{agentName}/chat",
+	headers := map[string]string{
+		types.CSGBotHeaderAgentName: agentName,
+		types.CSGBotHeaderSessionID: sessionID,
+	}
+	return c.doStreamChatRequest(ctx, "/api/v1/csgbot/"+agentName+"/chat", userUUID, username, token, req, req.Stream, headers)
+}
+
+func (c *CsgbotSvcHttpClientImpl) ChatLangflow(ctx context.Context, userUUID, username, token, flowID, sessionID string, req *LangflowSchedulerChatRequest) (io.ReadCloser, error) {
+	if req == nil {
+		return nil, errorx.BadRequest(errors.New("langflow chat request is nil"), nil)
 	}
 
-	path := c.hc.endpoint + "/api/v1/csgbot/" + agentName + "/chat"
+	headers := map[string]string{
+		types.CSGBotHeaderSessionID: sessionID,
+	}
+	return c.doStreamChatRequest(ctx, "/api/v1/csgbot/langflow/flows/run/"+flowID+"?stream=true", userUUID, username, token, req, true, headers)
+}
+
+func (c *CsgbotSvcHttpClientImpl) ChatCodeAgent(ctx context.Context, userUUID, username, token string, req *CodeAgentSchedulerChatRequest) (io.ReadCloser, error) {
+	if req == nil {
+		return nil, errorx.BadRequest(errors.New("code agent chat request is nil"), nil)
+	}
+
+	return c.doStreamChatRequest(ctx, "/api/v1/csgbot/codeAgent", userUUID, username, token, req, true, nil)
+}
+
+func (c *CsgbotSvcHttpClientImpl) doStreamChatRequest(ctx context.Context, path, userUUID, username, token string, req any, stream bool, extraHeaders map[string]string) (io.ReadCloser, error) {
+	const errMessage = "failed to call csgbot chat"
+	rpcErrorCtx := map[string]any{
+		"user_uuid": userUUID,
+		"service":   "csgbot",
+		"path":      path,
+	}
 
 	jsonData, err := json.Marshal(req)
 	if err != nil {
@@ -389,7 +423,7 @@ func (c *CsgbotSvcHttpClientImpl) Chat(ctx context.Context, userUUID, username, 
 	}
 	buf := bytes.NewBuffer(jsonData)
 
-	hreq, err := http.NewRequestWithContext(ctx, http.MethodPost, path, buf)
+	hreq, err := http.NewRequestWithContext(ctx, http.MethodPost, c.hc.endpoint+path, buf)
 	if err != nil {
 		return nil, errorx.InternalServerError(err, rpcErrorCtx)
 	}
@@ -399,30 +433,28 @@ func (c *CsgbotSvcHttpClientImpl) Chat(ctx context.Context, userUUID, username, 
 	hreq.Header.Set(types.CSGBotHeaderUserUUID, userUUID)
 	hreq.Header.Set(types.CSGBotHeaderUserName, username)
 	hreq.Header.Set(types.CSGBotHeaderUserToken, token)
-	hreq.Header.Set(types.CSGBotHeaderAgentName, agentName)
-	hreq.Header.Set(types.CSGBotHeaderSessionID, sessionID)
-
-	if req.Stream {
+	if stream {
 		hreq.Header.Set("Accept", "text/event-stream")
+	}
+	for key, value := range extraHeaders {
+		hreq.Header.Set(key, value)
 	}
 
 	hresp, err := c.hc.Do(hreq)
 	if err != nil {
-		slog.ErrorContext(ctx, "failed to call csgbot chat", "error", err, "rpc_error_ctx", rpcErrorCtx)
-		return nil, errorx.RemoteSvcFail(errors.New("failed to call csgbot chat"), rpcErrorCtx)
+		slog.ErrorContext(ctx, errMessage, "error", err, "rpc_error_ctx", rpcErrorCtx)
+		return nil, errorx.RemoteSvcFail(errors.New(errMessage), rpcErrorCtx)
 	}
 
 	if hresp.StatusCode != http.StatusOK {
 		defer hresp.Body.Close()
 		body, _ := io.ReadAll(hresp.Body)
-		return nil, errorx.RemoteSvcFail(fmt.Errorf("csgbot chat failed with status %d: %s", hresp.StatusCode, string(body)), rpcErrorCtx)
+		return nil, errorx.RemoteSvcFail(fmt.Errorf("%s with status %d: %s", errMessage, hresp.StatusCode, string(body)), rpcErrorCtx)
 	}
 
 	return hresp.Body, nil
 }
 
-// CreateOpenClaw creates a new OpenClaw sandbox instance.
-// POST /api/v1/csgbot/openclaw/create
 func (c *CsgbotSvcHttpClientImpl) CreateOpenClaw(ctx context.Context, userUUID, username, token string, req CreateOpenClawRequest) (*CreateOpenClawResponse, error) {
 	// Ensure req is not nil to avoid null JSON body
 	if req == nil {
@@ -478,8 +510,6 @@ func (c *CsgbotSvcHttpClientImpl) CreateOpenClaw(ctx context.Context, userUUID, 
 	return &resp, nil
 }
 
-// DeleteOpenClaw deletes an OpenClaw sandbox instance by content ID.
-// DELETE /api/v1/csgbot/openclaw/{id}
 func (c *CsgbotSvcHttpClientImpl) DeleteOpenClaw(ctx context.Context, userUUID, username, token, contentID string) error {
 	rpcErrorCtx := map[string]any{
 		"user_uuid":   userUUID,

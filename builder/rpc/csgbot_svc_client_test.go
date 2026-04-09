@@ -137,8 +137,12 @@ func TestNewCsgbotSvcHttpClient(t *testing.T) {
 	endpoint := "http://test-endpoint.com"
 	client := NewCsgbotSvcHttpClient(endpoint)
 
-	// Verify the client is created
 	assert.NotNil(t, client)
+
+	httpClient, ok := client.(*CsgbotSvcHttpClientImpl)
+	require.True(t, ok)
+	assert.Equal(t, endpoint, httpClient.hc.endpoint)
+	assert.Len(t, httpClient.hc.authOpts, 0)
 }
 
 func TestCreateKnowledgeBase_Success(t *testing.T) {
@@ -939,6 +943,153 @@ func TestChat_RequestBody(t *testing.T) {
 	defer body.Close()
 	data, _ := io.ReadAll(body)
 	assert.Equal(t, "ok", strings.TrimSpace(string(data)))
+}
+
+func TestChatLangflow_Success(t *testing.T) {
+	userUUID := "test-user-uuid"
+	username := "test-username"
+	token := "test-token"
+	flowID := "flow-123"
+	sessionID := "session-123"
+	req := &LangflowSchedulerChatRequest{
+		InputValue: "hello",
+		InputType:  "chat",
+		OutputType: "chat",
+		SessionID:  sessionID,
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/api/v1/csgbot/langflow/flows/run/"+flowID, r.URL.Path)
+		assert.Equal(t, "stream=true", r.URL.RawQuery)
+		assert.Equal(t, http.MethodPost, r.Method)
+		assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
+		assert.Equal(t, "text/event-stream", r.Header.Get("Accept"))
+		assert.NotEmpty(t, r.Header.Get(types.CSGBotHeaderRequestID))
+		assert.Equal(t, userUUID, r.Header.Get(types.CSGBotHeaderUserUUID))
+		assert.Equal(t, username, r.Header.Get(types.CSGBotHeaderUserName))
+		assert.Equal(t, token, r.Header.Get(types.CSGBotHeaderUserToken))
+		assert.Equal(t, sessionID, r.Header.Get(types.CSGBotHeaderSessionID))
+
+		var got LangflowSchedulerChatRequest
+		err := json.NewDecoder(r.Body).Decode(&got)
+		require.NoError(t, err)
+		assert.Equal(t, *req, got)
+
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("data: {\"answer\":\"hello\",\"isFinal\":true}\n\n"))
+	}))
+	defer server.Close()
+
+	client := setupTestCsgbotClient(server)
+
+	body, err := client.ChatLangflow(context.Background(), userUUID, username, token, flowID, sessionID, req)
+	require.NoError(t, err)
+	require.NotNil(t, body)
+	defer body.Close()
+
+	data, err := io.ReadAll(body)
+	require.NoError(t, err)
+	assert.Contains(t, string(data), "\"answer\":\"hello\"")
+}
+
+func TestChatLangflow_Non200Status(t *testing.T) {
+	req := &LangflowSchedulerChatRequest{
+		InputValue: "hello",
+		InputType:  "chat",
+		OutputType: "chat",
+		SessionID:  "session-123",
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadGateway)
+		_, _ = w.Write([]byte("bad gateway"))
+	}))
+	defer server.Close()
+
+	client := setupTestCsgbotClient(server)
+
+	body, err := client.ChatLangflow(context.Background(), "user", "name", "token", "flow-123", "session-123", req)
+	assert.Error(t, err)
+	assert.Nil(t, body)
+	assert.True(t, errors.Is(err, errorx.ErrRemoteServiceFail))
+	assert.Contains(t, err.Error(), "failed to call csgbot chat with status 502")
+}
+
+func TestChatCodeAgent_Success(t *testing.T) {
+	userUUID := "test-user-uuid"
+	username := "test-username"
+	token := "test-token"
+	req := &CodeAgentSchedulerChatRequest{
+		RequestID: "req-123",
+		Query:     "optimize code",
+		AgentName: "custom-agent",
+		Stream:    true,
+		StreamMode: map[string]any{
+			"mode": "general",
+		},
+		MaxLoop:       1,
+		SearchEngines: []string{},
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/api/v1/csgbot/codeAgent", r.URL.Path)
+		assert.Equal(t, http.MethodPost, r.Method)
+		assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
+		assert.Equal(t, "text/event-stream", r.Header.Get("Accept"))
+		assert.NotEmpty(t, r.Header.Get(types.CSGBotHeaderRequestID))
+		assert.Equal(t, userUUID, r.Header.Get(types.CSGBotHeaderUserUUID))
+		assert.Equal(t, username, r.Header.Get(types.CSGBotHeaderUserName))
+		assert.Equal(t, token, r.Header.Get(types.CSGBotHeaderUserToken))
+
+		var got CodeAgentSchedulerChatRequest
+		err := json.NewDecoder(r.Body).Decode(&got)
+		require.NoError(t, err)
+		assert.Equal(t, req.RequestID, got.RequestID)
+		assert.Equal(t, req.Query, got.Query)
+		assert.Equal(t, req.AgentName, got.AgentName)
+		assert.Equal(t, req.Stream, got.Stream)
+		assert.Equal(t, req.MaxLoop, got.MaxLoop)
+
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("data: {\"answer\":\"ok\",\"isFinal\":true}\n\n"))
+	}))
+	defer server.Close()
+
+	client := setupTestCsgbotClient(server)
+
+	body, err := client.ChatCodeAgent(context.Background(), userUUID, username, token, req)
+	require.NoError(t, err)
+	require.NotNil(t, body)
+	defer body.Close()
+
+	data, err := io.ReadAll(body)
+	require.NoError(t, err)
+	assert.Contains(t, string(data), "\"answer\":\"ok\"")
+}
+
+func TestChatCodeAgent_Non200Status(t *testing.T) {
+	req := &CodeAgentSchedulerChatRequest{
+		RequestID: "req-123",
+		Query:     "optimize code",
+		AgentName: "custom-agent",
+		Stream:    true,
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte("internal error"))
+	}))
+	defer server.Close()
+
+	client := setupTestCsgbotClient(server)
+
+	body, err := client.ChatCodeAgent(context.Background(), "user", "name", "token", req)
+	assert.Error(t, err)
+	assert.Nil(t, body)
+	assert.True(t, errors.Is(err, errorx.ErrRemoteServiceFail))
+	assert.Contains(t, err.Error(), "failed to call csgbot chat with status 500")
 }
 
 func TestCreateOpenClaw_Success(t *testing.T) {
