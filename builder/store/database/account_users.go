@@ -113,15 +113,15 @@ func (am *accountUserStoreImpl) SetLowBalanceWarnAtNow(ctx context.Context, user
 	return nil
 }
 
-func CheckUserAccount(ctx context.Context, tx bun.Tx, userUUID string) error {
+func CheckUserAccount(ctx context.Context, tx bun.Tx, userUUID string) (*AccountUser, error) {
 	var acctUser AccountUser
 	err := tx.NewSelect().Model(&acctUser).Where("user_uuid = ?", userUUID).Scan(ctx, &acctUser)
 	if err == nil {
-		return nil
+		return &acctUser, nil
 	}
 
 	if !errors.Is(err, sql.ErrNoRows) {
-		return errorx.HandleDBError(err, nil)
+		return nil, errorx.HandleDBError(err, nil)
 	}
 
 	newAcctUser := AccountUser{
@@ -133,9 +133,9 @@ func CheckUserAccount(ctx context.Context, tx bun.Tx, userUUID string) error {
 
 	err = assertAffectedOneRow(res, err)
 	if err != nil {
-		return errorx.HandleDBError(err, errorx.Ctx().Set("cause", "create user account"))
+		return nil, errorx.HandleDBError(err, errorx.Ctx().Set("cause", "create user account"))
 	}
-	return nil
+	return &newAcctUser, nil
 }
 
 func (am *accountUserStoreImpl) UpdateNegativeBalanceWarnAt(ctx context.Context, userUUID string, warnAt time.Time) error {
