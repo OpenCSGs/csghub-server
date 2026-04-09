@@ -145,9 +145,9 @@ func (_c *MockSensitiveChecker_PassImageURLCheck_Call) RunAndReturn(run func(con
 	return _c
 }
 
-// PassLLMCheck provides a mock function with given fields: ctx, scenario, text, sessionId, accountId
-func (_m *MockSensitiveChecker) PassLLMCheck(ctx context.Context, scenario types.SensitiveScenario, text string, sessionId string, accountId string) (*sensitive.CheckResult, error) {
-	ret := _m.Called(ctx, scenario, text, sessionId, accountId)
+// PassLLMCheck provides a mock function with given fields: ctx, req
+func (_m *MockSensitiveChecker) PassLLMCheck(ctx context.Context, req *types.LLMCheckRequest) (*sensitive.CheckResult, error) {
+	ret := _m.Called(ctx, req)
 
 	if len(ret) == 0 {
 		panic("no return value specified for PassLLMCheck")
@@ -155,19 +155,19 @@ func (_m *MockSensitiveChecker) PassLLMCheck(ctx context.Context, scenario types
 
 	var r0 *sensitive.CheckResult
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, types.SensitiveScenario, string, string, string) (*sensitive.CheckResult, error)); ok {
-		return rf(ctx, scenario, text, sessionId, accountId)
+	if rf, ok := ret.Get(0).(func(context.Context, *types.LLMCheckRequest) (*sensitive.CheckResult, error)); ok {
+		return rf(ctx, req)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, types.SensitiveScenario, string, string, string) *sensitive.CheckResult); ok {
-		r0 = rf(ctx, scenario, text, sessionId, accountId)
+	if rf, ok := ret.Get(0).(func(context.Context, *types.LLMCheckRequest) *sensitive.CheckResult); ok {
+		r0 = rf(ctx, req)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*sensitive.CheckResult)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, types.SensitiveScenario, string, string, string) error); ok {
-		r1 = rf(ctx, scenario, text, sessionId, accountId)
+	if rf, ok := ret.Get(1).(func(context.Context, *types.LLMCheckRequest) error); ok {
+		r1 = rf(ctx, req)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -182,17 +182,14 @@ type MockSensitiveChecker_PassLLMCheck_Call struct {
 
 // PassLLMCheck is a helper method to define mock.On call
 //   - ctx context.Context
-//   - scenario types.SensitiveScenario
-//   - text string
-//   - sessionId string
-//   - accountId string
-func (_e *MockSensitiveChecker_Expecter) PassLLMCheck(ctx interface{}, scenario interface{}, text interface{}, sessionId interface{}, accountId interface{}) *MockSensitiveChecker_PassLLMCheck_Call {
-	return &MockSensitiveChecker_PassLLMCheck_Call{Call: _e.mock.On("PassLLMCheck", ctx, scenario, text, sessionId, accountId)}
+//   - req *types.LLMCheckRequest
+func (_e *MockSensitiveChecker_Expecter) PassLLMCheck(ctx interface{}, req interface{}) *MockSensitiveChecker_PassLLMCheck_Call {
+	return &MockSensitiveChecker_PassLLMCheck_Call{Call: _e.mock.On("PassLLMCheck", ctx, req)}
 }
 
-func (_c *MockSensitiveChecker_PassLLMCheck_Call) Run(run func(ctx context.Context, scenario types.SensitiveScenario, text string, sessionId string, accountId string)) *MockSensitiveChecker_PassLLMCheck_Call {
+func (_c *MockSensitiveChecker_PassLLMCheck_Call) Run(run func(ctx context.Context, req *types.LLMCheckRequest)) *MockSensitiveChecker_PassLLMCheck_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(types.SensitiveScenario), args[2].(string), args[3].(string), args[4].(string))
+		run(args[0].(context.Context), args[1].(*types.LLMCheckRequest))
 	})
 	return _c
 }
@@ -202,7 +199,7 @@ func (_c *MockSensitiveChecker_PassLLMCheck_Call) Return(_a0 *sensitive.CheckRes
 	return _c
 }
 
-func (_c *MockSensitiveChecker_PassLLMCheck_Call) RunAndReturn(run func(context.Context, types.SensitiveScenario, string, string, string) (*sensitive.CheckResult, error)) *MockSensitiveChecker_PassLLMCheck_Call {
+func (_c *MockSensitiveChecker_PassLLMCheck_Call) RunAndReturn(run func(context.Context, *types.LLMCheckRequest) (*sensitive.CheckResult, error)) *MockSensitiveChecker_PassLLMCheck_Call {
 	_c.Call.Return(run)
 	return _c
 }

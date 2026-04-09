@@ -237,39 +237,40 @@ func (*AliyunGreenChecker) SplitTasks(text string) []map[string]string {
 	return tasks
 }
 
-func (c *AliyunGreenChecker) PassLLMCheck(ctx context.Context, scenario types.SensitiveScenario, text string, sessionId string, accountId string) (*CheckResult, error) {
+func (c *AliyunGreenChecker) PassLLMCheck(ctx context.Context, req *types.LLMCheckRequest) (*CheckResult, error) {
 	// Build parameter map
 	paramMap := map[string]interface{}{
-		"content": text,
+		"content": req.Text,
 	}
 	// Add different ID field based on idType
-	if sessionId != "" && accountId != "" {
+	if req.SessionId != "" && req.AccountId != "" {
 		return nil, fmt.Errorf("fail to call aliyun TextModerationPlusWithOptions, can't set sessionId and accountId both")
 	}
-	if sessionId != "" {
-		paramMap["sessionId"] = sessionId
+	if req.SessionId != "" {
+		paramMap["sessionId"] = req.SessionId
 	}
-	if accountId != "" {
-		if text == "" {
+	if req.AccountId != "" {
+		if req.Text == "" {
 			return &CheckResult{IsSensitive: false}, nil
 		}
-		paramMap["accountId"] = accountId
+		paramMap["accountId"] = req.AccountId
 	}
 
 	serviceParameters, _ := json.Marshal(paramMap)
 
-	req := &green20220302.TextModerationPlusRequest{
-		Service:           tea.String(string(scenario)),
+	request := &green20220302.TextModerationPlusRequest{
+		Service:           tea.String(string(req.Scenario)),
 		ServiceParameters: tea.String(string(serviceParameters)),
 	}
+
 	options := &util.RuntimeOptions{
 		ReadTimeout:    tea.Int(500),
 		ConnectTimeout: tea.Int(500),
 	}
-	resp, err := c.green2022.TextModerationPlusWithOptions(req, options)
+	resp, err := c.green2022.TextModerationPlusWithOptions(request, options)
 	if err != nil {
-		slog.Error("fail to call aliyun TextModerationPlusWithOptions", slog.String("content", text), slog.Any("error", err))
-		return nil, err
+		slog.Error("fail to call aliyun TextModerationPlusWithOptions", slog.String("content", req.Text), slog.Any("error", err))
+		return nil, fmt.Errorf("fail to call aliyun TextModerationPlusWithOptions: %w", err)
 	}
 
 	if *resp.StatusCode != http.StatusOK {
@@ -291,11 +292,10 @@ func (c *AliyunGreenChecker) PassLLMCheck(ctx context.Context, scenario types.Se
 		if !strings.Contains(*result.Label, "political") {
 			continue
 		}
-		slog.Info("sensitive content detected", slog.String("content", text), slog.String("reason", *result.RiskWords),
+		slog.Info("sensitive content detected", slog.String("content", req.Text), slog.String("reason", *result.RiskWords),
 			slog.String("label", *result.Label), slog.String("aliyun_request_id", *resp.Body.RequestId))
 		return &CheckResult{IsSensitive: true, Reason: fmt.Sprintf("label:%s,reason:%s,requestId:%s", *result.Label, *result.RiskWords, *resp.Body.RequestId)}, nil
 	}
-
 	return &CheckResult{IsSensitive: false}, nil
 }
 

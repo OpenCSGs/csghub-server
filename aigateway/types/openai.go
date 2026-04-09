@@ -36,6 +36,10 @@ type InternalModelInfo struct {
 type ExternalModelInfo struct {
 	Provider string `json:"-"` // external provider name, like openai, anthropic etc
 	AuthHead string `json:"-"` // the auth header to access the external model
+	// NeedSensitiveCheck controls whether requests for this model should go
+	// through sensitive content detection in aigateway. Set to false to skip
+	// the check (e.g. for guard models or trusted internal models).
+	NeedSensitiveCheck bool `json:"-"`
 }
 
 type Model struct {
@@ -65,17 +69,19 @@ func (m Model) MarshalJSON() ([]byte, error) {
 			ImageID             *string        `json:"image_id,omitempty"`
 			AuthHead            *string        `json:"auth_head,omitempty"`
 			Provider            *string        `json:"provider,omitempty"`
+			NeedSensitiveCheck  bool           `json:"need_sensitive_check"`
 		}
 		resp := internalModelResponse{
-			ID:          m.ID,
-			Object:      m.Object,
-			Created:     m.Created,
-			OwnedBy:     m.OwnedBy,
-			Task:        m.Task,
-			DisplayName: m.DisplayName,
-			Public:      m.Public,
-			Endpoint:    m.Endpoint,
-			Metadata:    m.Metadata,
+			ID:                 m.ID,
+			Object:             m.Object,
+			Created:            m.Created,
+			OwnedBy:            m.OwnedBy,
+			Task:               m.Task,
+			DisplayName:        m.DisplayName,
+			Public:             m.Public,
+			Endpoint:           m.Endpoint,
+			Metadata:           m.Metadata,
+			NeedSensitiveCheck: m.NeedSensitiveCheck,
 		}
 
 		if m.SupportFunctionCall {
@@ -121,6 +127,7 @@ func (m *Model) UnmarshalJSON(data []byte) error {
 		ImageID             string         `json:"image_id,omitempty"`
 		AuthHead            string         `json:"auth_head,omitempty"`
 		Provider            string         `json:"provider,omitempty"`
+		NeedSensitiveCheck  bool           `json:"need_sensitive_check"`
 	}
 	var aux internalModelResponse
 	if err := json.Unmarshal(data, &aux); err != nil {
@@ -141,6 +148,7 @@ func (m *Model) UnmarshalJSON(data []byte) error {
 	m.ImageID = aux.ImageID
 	m.AuthHead = aux.AuthHead
 	m.Provider = aux.Provider
+	m.NeedSensitiveCheck = aux.NeedSensitiveCheck
 	return nil
 }
 
@@ -154,6 +162,19 @@ func (m *Model) ForInternalUse() *Model {
 func (m *Model) ForExternalResponse() *Model {
 	m.InternalUse = false
 	return m
+}
+
+// SkipBalance set the model for skip balance mode
+func (m *Model) SkipBalance() bool {
+	// MetaTaskKey values is array of strings, check if MetaTaskValGuard is in it
+	if tasks, ok := m.Metadata[MetaTaskKey].([]interface{}); ok {
+		for _, t := range tasks {
+			if task, ok := t.(string); ok && task == MetaTaskValGuard {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // ModelList represents the model list response
@@ -188,7 +209,9 @@ type UserPreferenceRequest struct {
 const OpenCSGAppNameHeader string = "OpenCSG-App-Name"
 
 const (
-	AgenticHubApp = "Agentichub"
+	AgenticHubApp    = "Agentichub"
+	MetaTaskKey      = "task"
+	MetaTaskValGuard = "guard"
 )
 
 // ModelSource represents the source of a model

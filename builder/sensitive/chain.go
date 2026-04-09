@@ -52,6 +52,18 @@ func WithMutableACAutomaton(loader internal.Loader) ChainOption {
 	}
 }
 
+// WithOpenAILLMChecker adds an OpenAI LLM sensitive checker to the chain
+func WithOpenAILLMChecker() ChainOption {
+	return func(config *config.Config, c *chainImpl) {
+		if config.SensitiveCheck.LLM.Enable {
+			checker := NewOpenAILLMChecker(config)
+			c.checkers = append(c.checkers, checker)
+		} else {
+			slog.Warn("sensitive config for LLM moderation service not enabled")
+		}
+	}
+}
+
 // NewChainChecker create a chain sensitive checker
 //
 // It will run all checkers in order by the options provided
@@ -111,9 +123,9 @@ func (c *chainImpl) PassImageURLCheck(ctx context.Context, scenario types.Sensit
 	return &CheckResult{IsSensitive: false}, nil
 }
 
-func (c *chainImpl) PassLLMCheck(ctx context.Context, scenario types.SensitiveScenario, text string, sessionId string, accountId string) (*CheckResult, error) {
+func (c *chainImpl) PassLLMCheck(ctx context.Context, req *types.LLMCheckRequest) (*CheckResult, error) {
 	for _, checker := range c.checkers {
-		res, err := checker.PassLLMCheck(ctx, scenario, text, sessionId, accountId)
+		res, err := checker.PassLLMCheck(ctx, req)
 		if err != nil {
 			return nil, err
 		}

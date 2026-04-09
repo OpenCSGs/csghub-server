@@ -337,9 +337,11 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 
 	sceneValue := c.Request.Header.Get(commonType.SceneHeaderKey)
 	// Check balance before processing request
-	if err := h.openaiComponent.CheckBalance(c.Request.Context(), username, userUUID); err != nil {
-		h.handleInsufficientBalance(c, chatReq.Stream, username, modelID, err)
-		return
+	if !model.SkipBalance() {
+		if err := h.openaiComponent.CheckBalance(c.Request.Context(), username, userUUID); err != nil {
+			h.handleInsufficientBalance(c, chatReq.Stream, username, modelID, err)
+			return
+		}
 	}
 
 	// marshal updated request map back to JSON bytes
@@ -352,26 +354,26 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 		c.String(http.StatusInternalServerError, fmt.Errorf("failed to create reverse proxy:%w", err).Error())
 		return
 	}
+
+	var modComponent component.Moderation = nil
+	if model.NeedSensitiveCheck {
+		modComponent = h.modComponent
+		// Create a combined key using userUUID and modelID for caching and tracking
+		key := fmt.Sprintf("%s:%s", userUUID, modelID)
+		result, err := h.modComponent.CheckChatPrompts(c.Request.Context(), chatReq.Messages, key, chatReq.Stream)
+		if err != nil {
+			c.String(http.StatusInternalServerError, fmt.Errorf("failed to call moderation error:%w", err).Error())
+			return
+		}
+		if result.IsSensitive {
+			handleSensitiveResponse(c, chatReq.Stream, result)
+			return
+		}
+	}
+
 	slog.InfoContext(c.Request.Context(), "proxy chat request to model target", slog.Any("target", target), slog.Any("host", host),
 		slog.Any("user", username), slog.Any("model_name", modelName))
-	// Create a combined key using userUUID and modelID for caching and tracking
-	key := fmt.Sprintf("%s:%s", userUUID, modelID)
-	result, err := h.modComponent.CheckChatPrompts(c.Request.Context(), chatReq.Messages, key)
-	if err != nil {
-		c.String(http.StatusInternalServerError, fmt.Errorf("failed to call moderation error:%w", err).Error())
-		return
-	}
-	if result.IsSensitive {
-		slog.DebugContext(c.Request.Context(), "sensitive content", slog.String("reason", result.Reason))
-		errorChunk := generateSensitiveRespForPrompt()
-		errorChunkJson, _ := json.Marshal(errorChunk)
-		_, err := c.Writer.Write([]byte("data: " + string(errorChunkJson) + "\n\n" + "[DONE]"))
-		if err != nil {
-			slog.ErrorContext(c.Request.Context(), "write into resp error:", slog.String("err", err.Error()))
-		}
-		c.Writer.Flush()
-		return
-	}
+
 	tokenCounter := h.tokenCounterFactory.NewChat(token.CreateParam{
 		Endpoint: target,
 		Host:     host,
@@ -379,7 +381,8 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 		ImageID:  model.ImageID,
 		Provider: model.Provider,
 	})
-	w := NewResponseWriterWrapper(c.Writer, chatReq.Stream, h.modComponent, tokenCounter)
+
+	w := NewResponseWriterWrapper(c.Writer, chatReq.Stream, modComponent, tokenCounter)
 	defer w.ClearBuffer()
 
 	tokenCounter.AppendPrompts(chatReq.Messages)

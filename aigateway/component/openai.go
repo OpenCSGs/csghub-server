@@ -290,8 +290,9 @@ func (m *openaiComponentImpl) getExternalModels(c context.Context) []types.Model
 				},
 				Endpoint: extModel.ApiEndpoint,
 				ExternalModelInfo: types.ExternalModelInfo{
-					Provider: extModel.Provider,
-					AuthHead: extModel.AuthHeader,
+					Provider:           extModel.Provider,
+					AuthHead:           extModel.AuthHeader,
+					NeedSensitiveCheck: extModel.NeedSensitiveCheck,
 				},
 			}
 			models = append(models, m)
