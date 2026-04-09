@@ -24,17 +24,17 @@ func (_m *MockOpenAIComponent) EXPECT() *MockOpenAIComponent_Expecter {
 	return &MockOpenAIComponent_Expecter{mock: &_m.Mock}
 }
 
-// CheckBalance provides a mock function with given fields: ctx, username
-func (_m *MockOpenAIComponent) CheckBalance(ctx context.Context, username string) error {
-	ret := _m.Called(ctx, username)
+// CheckBalance provides a mock function with given fields: ctx, username, userUUID
+func (_m *MockOpenAIComponent) CheckBalance(ctx context.Context, username string, userUUID string) error {
+	ret := _m.Called(ctx, username, userUUID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CheckBalance")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) error); ok {
-		r0 = rf(ctx, username)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
+		r0 = rf(ctx, username, userUUID)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -50,13 +50,14 @@ type MockOpenAIComponent_CheckBalance_Call struct {
 // CheckBalance is a helper method to define mock.On call
 //   - ctx context.Context
 //   - username string
-func (_e *MockOpenAIComponent_Expecter) CheckBalance(ctx interface{}, username interface{}) *MockOpenAIComponent_CheckBalance_Call {
-	return &MockOpenAIComponent_CheckBalance_Call{Call: _e.mock.On("CheckBalance", ctx, username)}
+//   - userUUID string
+func (_e *MockOpenAIComponent_Expecter) CheckBalance(ctx interface{}, username interface{}, userUUID interface{}) *MockOpenAIComponent_CheckBalance_Call {
+	return &MockOpenAIComponent_CheckBalance_Call{Call: _e.mock.On("CheckBalance", ctx, username, userUUID)}
 }
 
-func (_c *MockOpenAIComponent_CheckBalance_Call) Run(run func(ctx context.Context, username string)) *MockOpenAIComponent_CheckBalance_Call {
+func (_c *MockOpenAIComponent_CheckBalance_Call) Run(run func(ctx context.Context, username string, userUUID string)) *MockOpenAIComponent_CheckBalance_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string))
+		run(args[0].(context.Context), args[1].(string), args[2].(string))
 	})
 	return _c
 }
@@ -66,7 +67,7 @@ func (_c *MockOpenAIComponent_CheckBalance_Call) Return(_a0 error) *MockOpenAICo
 	return _c
 }
 
-func (_c *MockOpenAIComponent_CheckBalance_Call) RunAndReturn(run func(context.Context, string) error) *MockOpenAIComponent_CheckBalance_Call {
+func (_c *MockOpenAIComponent_CheckBalance_Call) RunAndReturn(run func(context.Context, string, string) error) *MockOpenAIComponent_CheckBalance_Call {
 	_c.Call.Return(run)
 	return _c
 }

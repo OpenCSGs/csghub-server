@@ -30,7 +30,7 @@ type OpenAIComponent interface {
 	ListModels(c context.Context, user string, req types.ListModelsReq) (types.ModelList, error)
 	GetModelByID(c context.Context, username, modelID string) (*types.Model, error)
 	RecordUsage(c context.Context, userUUID string, model *types.Model, tokenCounter token.Counter, sceneValue string) error
-	CheckBalance(ctx context.Context, username string) error
+	CheckBalance(ctx context.Context, username, userUUID string) error
 }
 
 type openaiComponentImpl struct {

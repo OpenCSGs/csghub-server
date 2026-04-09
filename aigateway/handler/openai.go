@@ -337,7 +337,7 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 
 	sceneValue := c.Request.Header.Get(commonType.SceneHeaderKey)
 	// Check balance before processing request
-	if err := h.openaiComponent.CheckBalance(c.Request.Context(), username); err != nil {
+	if err := h.openaiComponent.CheckBalance(c.Request.Context(), username, userUUID); err != nil {
 		h.handleInsufficientBalance(c, chatReq.Stream, username, modelID, err)
 		return
 	}
@@ -510,7 +510,7 @@ func (h *OpenAIHandlerImpl) GenerateImage(c *gin.Context) {
 	}
 
 	sceneValue := c.Request.Header.Get(commonType.SceneHeaderKey)
-	if err := h.openaiComponent.CheckBalance(ctx, username); err != nil {
+	if err := h.openaiComponent.CheckBalance(ctx, username, userUUID); err != nil {
 		h.handleInsufficientBalance(c, false, username, modelID, err)
 		return
 	}
@@ -690,7 +690,7 @@ func (h *OpenAIHandlerImpl) Embedding(c *gin.Context) {
 
 	sceneValue := c.Request.Header.Get(commonType.SceneHeaderKey)
 	// Check balance before processing request
-	if err := h.openaiComponent.CheckBalance(c.Request.Context(), username); err != nil {
+	if err := h.openaiComponent.CheckBalance(c.Request.Context(), username, userUUID); err != nil {
 		h.handleInsufficientBalance(c, false, username, modelID, err)
 		return
 	}
