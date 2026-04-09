@@ -85,9 +85,9 @@ func (_c *MockModeration_CheckChatNonStreamResponse_Call) RunAndReturn(run func(
 	return _c
 }
 
-// CheckChatPrompts provides a mock function with given fields: ctx, messages, uuid
-func (_m *MockModeration) CheckChatPrompts(ctx context.Context, messages []openai.ChatCompletionMessageParamUnion, uuid string) (*rpc.CheckResult, error) {
-	ret := _m.Called(ctx, messages, uuid)
+// CheckChatPrompts provides a mock function with given fields: ctx, messages, uuid, isStream
+func (_m *MockModeration) CheckChatPrompts(ctx context.Context, messages []openai.ChatCompletionMessageParamUnion, uuid string, isStream bool) (*rpc.CheckResult, error) {
+	ret := _m.Called(ctx, messages, uuid, isStream)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CheckChatPrompts")
@@ -95,19 +95,19 @@ func (_m *MockModeration) CheckChatPrompts(ctx context.Context, messages []opena
 
 	var r0 *rpc.CheckResult
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, []openai.ChatCompletionMessageParamUnion, string) (*rpc.CheckResult, error)); ok {
-		return rf(ctx, messages, uuid)
+	if rf, ok := ret.Get(0).(func(context.Context, []openai.ChatCompletionMessageParamUnion, string, bool) (*rpc.CheckResult, error)); ok {
+		return rf(ctx, messages, uuid, isStream)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, []openai.ChatCompletionMessageParamUnion, string) *rpc.CheckResult); ok {
-		r0 = rf(ctx, messages, uuid)
+	if rf, ok := ret.Get(0).(func(context.Context, []openai.ChatCompletionMessageParamUnion, string, bool) *rpc.CheckResult); ok {
+		r0 = rf(ctx, messages, uuid, isStream)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*rpc.CheckResult)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, []openai.ChatCompletionMessageParamUnion, string) error); ok {
-		r1 = rf(ctx, messages, uuid)
+	if rf, ok := ret.Get(1).(func(context.Context, []openai.ChatCompletionMessageParamUnion, string, bool) error); ok {
+		r1 = rf(ctx, messages, uuid, isStream)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -124,13 +124,14 @@ type MockModeration_CheckChatPrompts_Call struct {
 //   - ctx context.Context
 //   - messages []openai.ChatCompletionMessageParamUnion
 //   - uuid string
-func (_e *MockModeration_Expecter) CheckChatPrompts(ctx interface{}, messages interface{}, uuid interface{}) *MockModeration_CheckChatPrompts_Call {
-	return &MockModeration_CheckChatPrompts_Call{Call: _e.mock.On("CheckChatPrompts", ctx, messages, uuid)}
+//   - isStream bool
+func (_e *MockModeration_Expecter) CheckChatPrompts(ctx interface{}, messages interface{}, uuid interface{}, isStream interface{}) *MockModeration_CheckChatPrompts_Call {
+	return &MockModeration_CheckChatPrompts_Call{Call: _e.mock.On("CheckChatPrompts", ctx, messages, uuid, isStream)}
 }
 
-func (_c *MockModeration_CheckChatPrompts_Call) Run(run func(ctx context.Context, messages []openai.ChatCompletionMessageParamUnion, uuid string)) *MockModeration_CheckChatPrompts_Call {
+func (_c *MockModeration_CheckChatPrompts_Call) Run(run func(ctx context.Context, messages []openai.ChatCompletionMessageParamUnion, uuid string, isStream bool)) *MockModeration_CheckChatPrompts_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].([]openai.ChatCompletionMessageParamUnion), args[2].(string))
+		run(args[0].(context.Context), args[1].([]openai.ChatCompletionMessageParamUnion), args[2].(string), args[3].(bool))
 	})
 	return _c
 }
@@ -140,7 +141,7 @@ func (_c *MockModeration_CheckChatPrompts_Call) Return(_a0 *rpc.CheckResult, _a1
 	return _c
 }
 
-func (_c *MockModeration_CheckChatPrompts_Call) RunAndReturn(run func(context.Context, []openai.ChatCompletionMessageParamUnion, string) (*rpc.CheckResult, error)) *MockModeration_CheckChatPrompts_Call {
+func (_c *MockModeration_CheckChatPrompts_Call) RunAndReturn(run func(context.Context, []openai.ChatCompletionMessageParamUnion, string, bool) (*rpc.CheckResult, error)) *MockModeration_CheckChatPrompts_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -320,6 +321,65 @@ func (_c *MockModeration_CheckImagePrompts_Call) Return(_a0 *rpc.CheckResult, _a
 }
 
 func (_c *MockModeration_CheckImagePrompts_Call) RunAndReturn(run func(context.Context, string, string) (*rpc.CheckResult, error)) *MockModeration_CheckImagePrompts_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// CloseStreamCheck provides a mock function with given fields: ctx, uuid
+func (_m *MockModeration) CloseStreamCheck(ctx context.Context, uuid string) (*rpc.CheckResult, error) {
+	ret := _m.Called(ctx, uuid)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CloseStreamCheck")
+	}
+
+	var r0 *rpc.CheckResult
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*rpc.CheckResult, error)); ok {
+		return rf(ctx, uuid)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *rpc.CheckResult); ok {
+		r0 = rf(ctx, uuid)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*rpc.CheckResult)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, uuid)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockModeration_CloseStreamCheck_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CloseStreamCheck'
+type MockModeration_CloseStreamCheck_Call struct {
+	*mock.Call
+}
+
+// CloseStreamCheck is a helper method to define mock.On call
+//   - ctx context.Context
+//   - uuid string
+func (_e *MockModeration_Expecter) CloseStreamCheck(ctx interface{}, uuid interface{}) *MockModeration_CloseStreamCheck_Call {
+	return &MockModeration_CloseStreamCheck_Call{Call: _e.mock.On("CloseStreamCheck", ctx, uuid)}
+}
+
+func (_c *MockModeration_CloseStreamCheck_Call) Run(run func(ctx context.Context, uuid string)) *MockModeration_CloseStreamCheck_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockModeration_CloseStreamCheck_Call) Return(_a0 *rpc.CheckResult, _a1 error) *MockModeration_CloseStreamCheck_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockModeration_CloseStreamCheck_Call) RunAndReturn(run func(context.Context, string) (*rpc.CheckResult, error)) *MockModeration_CloseStreamCheck_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -283,7 +283,11 @@ func TestChainImpl_AliYun_PassLLMCheck(t *testing.T) {
 		},
 	}, nil)
 
-	result, err := chain.PassLLMCheck(ctx, scenario, text, sessionId, "")
+	result, err := chain.PassLLMCheck(ctx, &types.LLMCheckRequest{
+		Scenario:  scenario,
+		Text:      text,
+		SessionId: sessionId,
+	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -338,7 +342,11 @@ func TestChainImpl_AliYun_PassLLMCheck_Sensitive(t *testing.T) {
 		},
 	}, nil)
 
-	result, err := chain.PassLLMCheck(ctx, scenario, text, sessionId, "")
+	result, err := chain.PassLLMCheck(ctx, &types.LLMCheckRequest{
+		Scenario:  scenario,
+		Text:      text,
+		SessionId: sessionId,
+	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

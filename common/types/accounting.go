@@ -473,6 +473,8 @@ type RechargeResp struct {
 	UpdatedAt      time.Time `json:"updated_at"`
 	Description    string    `json:"description"`
 	UserName       string    `json:"user_name"`
+	EntityType     string    `json:"entity_type"`
+	OrgName        string    `json:"org_name"`
 }
 
 const RechargeExtraType = "recharge"
@@ -555,18 +557,18 @@ type RechargesIndexResp struct {
 }
 
 type PresentIndexResp struct {
-	ID            int64     `json:"id"`
-	EventUUID     string    `json:"event_uuid"`
-	UserUUID      string    `json:"user_uuid"`
-	UserName      string    `json:"user_name"`
-	ActivityID    int64     `json:"activity_id"`
-	Value         float64   `json:"value"`
-	OpUID         string    `json:"op_uid"`
-	OpDesc        string    `json:"op_desc"`
-	ParticipantUUID string   `json:"participant_uuid"`
-	ExpireAt      time.Time `json:"expire_at"`
-	Status        AccountPresentStatus `json:"status"`
-	CreatedAt     time.Time `json:"created_at"`
+	ID              int64                `json:"id"`
+	EventUUID       string               `json:"event_uuid"`
+	UserUUID        string               `json:"user_uuid"`
+	UserName        string               `json:"user_name"`
+	ActivityID      int64                `json:"activity_id"`
+	Value           float64              `json:"value"`
+	OpUID           string               `json:"op_uid"`
+	OpDesc          string               `json:"op_desc"`
+	ParticipantUUID string               `json:"participant_uuid"`
+	ExpireAt        time.Time            `json:"expire_at"`
+	Status          AccountPresentStatus `json:"status"`
+	CreatedAt       time.Time            `json:"created_at"`
 }
 
 type PresentsIndexResp struct {
