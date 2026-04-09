@@ -2028,16 +2028,9 @@ func (c *repoComponentImpl) CheckCurrentUserPermission(ctx context.Context, user
 func (c *repoComponentImpl) GetNamespaceBillingUUID(ctx context.Context, namespace string) (string, error) {
 	ns, err := c.namespaceStore.FindByPath(ctx, namespace)
 	if err != nil {
-		return "", fmt.Errorf("fail to find namespace '%s', error: %w", namespace, err)
+		return "", fmt.Errorf("failed to find namespace '%s', error: %w", namespace, err)
 	}
-	if ns.NamespaceType == database.UserNamespace {
-		return ns.User.UUID, nil
-	}
-	org, err := c.userSvcClient.GetOrgByName(ctx, namespace)
-	if err != nil {
-		return "", fmt.Errorf("fail to get org '%s', error: %w", namespace, err)
-	}
-	return org.UUID.String(), nil
+	return ns.UUID, nil
 }
 
 func (c *repoComponentImpl) GetCommitWithDiff(ctx context.Context, req *types.GetCommitsReq) (*types.CommitResponse, error) {

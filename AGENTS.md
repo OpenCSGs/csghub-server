@@ -88,7 +88,7 @@ Folders relative to the root of the repository for each service:
 
 ## Testing
 
-- Use `make mock_gen GO_TAGS={go.buildTags}` to generate mock implementations for the interfaces.
+- Don't modify any code file under foler `_mocks`, use `make mock_gen GO_TAGS={go.buildTags}` to generate mock implementations for the interfaces.
 - Use `make test GO_TAGS={go.buildTags}` to run all tests in project.
 - Mock dependencies (e.g., database, RPC clients) using tools like `mockery`.
 

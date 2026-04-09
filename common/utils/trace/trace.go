@@ -19,6 +19,7 @@ const (
 	HeaderXB3          = "X-B3-TraceId"
 	HeaderKong         = "X-Kong-Request-Id"
 	HeaderXetSessionID = "X-Xet-Session-Id"
+	HeaderMcpSessionID = "Mcp-Session-Id"
 )
 
 type sessionIDContextKey struct{}
@@ -29,6 +30,19 @@ func SetSessionIDInContext(ctx context.Context, sessionID string) context.Contex
 
 func GetSessionIDFromContext(ctx context.Context) string {
 	if sessionID, ok := ctx.Value(sessionIDContextKey{}).(string); ok {
+		return sessionID
+	}
+	return ""
+}
+
+type mcpSessionIDContextKey struct{}
+
+func SetMcpSessionID(ctx context.Context, sessionID string) context.Context {
+	return context.WithValue(ctx, mcpSessionIDContextKey{}, sessionID)
+}
+
+func GetMcpSessionID(ctx context.Context) string {
+	if sessionID, ok := ctx.Value(mcpSessionIDContextKey{}).(string); ok {
 		return sessionID
 	}
 	return ""

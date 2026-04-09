@@ -246,7 +246,7 @@ type Config struct {
 		ExpiredPresentCronExpression string `env:"OPENCSG_ACCOUNTING_EXPIRED_PRESENT_CRON_EXPRESSION" default:"0 0 * * *"`
 		ThresholdOfStopDeploy        int    `env:"OPENCSG_ACCOUNTING_THRESHOLD_OF_STOP_DEPLOY" default:"5000"`
 		ThresholdOfStopLLMInference  int    `env:"OPENCSG_ACCOUNTING_THRESHOLD_OF_STOP_LLM_INFERENCE" default:"5000"`
-		LLMBalanceCheckCacheTTL      int    `env:"OPENCSG_ACCOUNTING_LLM_BALANCE_CHECK_CACHE_TTL" default:"86400"`
+		LLMBalanceCheckCacheTTL      int    `env:"OPENCSG_ACCOUNTING_LLM_BALANCE_CHECK_CACHE_TTL" default:"120"`
 	}
 
 	User struct {
@@ -424,6 +424,7 @@ type Config struct {
 
 	AIGateway struct {
 		Port                           int    `env:"OPENCSG_AIGATEWAY_PORT" default:"8094"`
+		AdvertiseAddr                  string `env:"OPENCSG_AIGATEWAY_ADVERTISE_ADDR" default:""`
 		ModerationBypassSensitiveCheck bool   `env:"OPENCSG_AIGATEWAY_MODERATION_BYPASS_SENSITIVE_CHECK" default:"false"`
 		SensitiveDefaultImg            string `env:"STARHUB_SERVER_AIGATEWAY_SENSITIVE_DEFAULT_IMG" default:""`
 		PresignExpirySeconds           int    `env:"OPENCSG_AIGATEWAY_PRESIGN_EXPIRY" default:"86400"`

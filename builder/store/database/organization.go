@@ -58,7 +58,7 @@ type Organization struct {
 	OrgType      string             `bun:"" json:"org_type"`
 	User         *User              `bun:"rel:belongs-to,join:user_id=id" json:"user"`
 	NamespaceID  int64              `bun:",notnull" json:"namespace_id"`
-	Namespace    *Namespace         `bun:"rel:has-one,join:namespace_id=id" json:"namespace"`
+	Namespace    *Namespace         `bun:"rel:has-one,join:path=path" json:"namespace"`
 	VerifyStatus types.VerifyStatus `bun:",notnull,default:'none'" json:"verify_status"` // none, pending, approved, rejected
 	UUID         uuid.UUID          `bun:"type:uuid,notnull,unique" json:"uuid"`
 	times
@@ -78,6 +78,11 @@ func (s *orgStoreImpl) Create(ctx context.Context, org *Organization, namepace *
 		if err != nil {
 			return err
 		}
+		// update org's namespace id
+		org.NamespaceID = namepace.ID
+		if err = assertAffectedOneRow(tx.NewUpdate().Model(org).WherePK().Exec(ctx)); err != nil {
+			return err
+		}
 		return nil
 	})
 	err = errorx.HandleDBError(err, nil)
@@ -88,6 +93,7 @@ func (s *orgStoreImpl) GetUserOwnOrgs(ctx context.Context, username string) (org
 	query := s.db.Operator.Core.
 		NewSelect().
 		Model(&orgs).
+		Relation("Namespace").
 		Relation("User")
 	if username != "" {
 		query = query.
@@ -138,8 +144,8 @@ func (s *orgStoreImpl) FindByPath(ctx context.Context, path string) (org Organiz
 	org.Nickname = path
 	err = s.db.Operator.Core.
 		NewSelect().
-		Model(&org).
-		Where("path =?", path).
+		Model(&org).Relation("Namespace").
+		Where("organization.path =?", path).
 		Scan(ctx)
 	return org, errorx.HandleDBError(err, nil)
 }
@@ -161,6 +167,7 @@ func (s *orgStoreImpl) GetUserBelongOrgs(ctx context.Context, userID int64) (org
 	err = s.db.Operator.Core.
 		NewSelect().
 		Model(&orgs).
+		Relation("Namespace").
 		Join("join members on members.organization_id = organization.id").
 		Where("members.user_id = ? and members.deleted_at is null", userID).
 		Scan(ctx, &orgs)
@@ -170,9 +177,9 @@ func (s *orgStoreImpl) GetUserBelongOrgs(ctx context.Context, userID int64) (org
 func (s *orgStoreImpl) Search(ctx context.Context, search string, per int, page int, orgType, verifyStatus string) (orgs []Organization, total int, err error) {
 	search = strings.ToLower(search)
 	query := s.db.Operator.Core.NewSelect().
-		Model(&orgs)
+		Model(&orgs).Relation("Namespace")
 	if search != "" {
-		query.Where("LOWER(name) like ? OR LOWER(path) like ?", fmt.Sprintf("%%%s%%", search), fmt.Sprintf("%%%s%%", search))
+		query.Where("LOWER(organization.name) like ? OR LOWER(organization.path) like ?", fmt.Sprintf("%%%s%%", search), fmt.Sprintf("%%%s%%", search))
 	}
 	if orgType != "" {
 		query.Where("org_type = ?", orgType)
@@ -227,8 +234,8 @@ func (s *orgStoreImpl) GetSharedOrgIDs(ctx context.Context, userIDs []int64) ([]
 func (s *orgStoreImpl) FindByUUID(ctx context.Context, uuid string) (*Organization, error) {
 	var org Organization
 	err := s.db.Operator.Core.NewSelect().
-		Model(&org).
-		Where("uuid = ?", uuid).
+		Model(&org).Relation("Namespace").
+		Where("organization.uuid = ?", uuid).
 		Scan(ctx)
 	if err == nil {
 		return &org, nil
