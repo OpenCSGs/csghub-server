@@ -26,7 +26,7 @@ func TestLicenseStore_CRUD(t *testing.T) {
 		Product:    "test",
 		Edition:    "standard",
 		MaxUser:    10,
-		StartTime:  time.Now(),
+		StartTime:  time.Now().Add(-1 * time.Minute),
 		ExpireTime: time.Now().Add(-1 * time.Hour),
 		UserUUID:   "test-user-uuid",
 		Issuer:     "tester",

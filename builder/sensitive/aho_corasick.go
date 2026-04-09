@@ -77,14 +77,14 @@ func (iac *ACAutomation) PassImageURLCheck(ctx context.Context, scenario types.S
 }
 
 // PassLLMCheck implements the SensitiveChecker interface for ImmutableAC
-func (iac *ACAutomation) PassLLMCheck(ctx context.Context, scenario types.SensitiveScenario, text string, sessionId string, accountId string) (*CheckResult, error) {
-	if scenario != types.ScenarioLLMQueryModeration && scenario != types.ScenarioLLMResModeration {
-		slog.WarnContext(ctx, "PassLLMCheck received unsupported scenario", slog.String("scenario", string(scenario)))
+func (iac *ACAutomation) PassLLMCheck(ctx context.Context, req *types.LLMCheckRequest) (*CheckResult, error) {
+	if req.Scenario != types.ScenarioLLMQueryModeration && req.Scenario != types.ScenarioLLMResModeration {
+		slog.WarnContext(ctx, "PassLLMCheck received unsupported scenario", slog.String("scenario", string(req.Scenario)))
 		return &CheckResult{
 			IsSensitive: false,
 		}, nil
 	}
-	detectResult := iac.detect(text)
+	detectResult := iac.detect(req.Text)
 	if detectResult != nil {
 		slog.InfoContext(ctx, "ACAutomation PassLLMCheck detected sensitive word",
 			slog.String("reason", *detectResult.Reason))

@@ -9,6 +9,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"opencsg.com/csghub-server/builder/rpc"
 	"strings"
 
 	"opencsg.com/csghub-server/common/types"
@@ -19,12 +20,12 @@ type LLMSvcClient interface {
 }
 
 type Client struct {
-	client *http.Client
+	client rpc.HttpDoer
 }
 
 func NewClient() *Client {
 	return &Client{
-		client: http.DefaultClient,
+		client: rpc.NewHttpClient("").WithRetry(2),
 	}
 }
 

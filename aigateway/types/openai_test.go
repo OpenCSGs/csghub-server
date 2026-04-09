@@ -2,6 +2,7 @@ package types
 
 import (
 	"encoding/json"
+	"github.com/stretchr/testify/require"
 	"strings"
 	"testing"
 )
@@ -164,5 +165,61 @@ func TestModelUnmarshal(t *testing.T) {
 	// verify that the unmarshaled results are correct
 	if modelList.Object != "list" || len(modelList.Data) != 1 || modelList.Data[0].ID != "model-1" {
 		t.Errorf("Model list unmarshal failed, got: %v", modelList)
+	}
+}
+
+func TestModel_SkipBalance(t *testing.T) {
+	tests := []struct {
+		name     string
+		metadata map[string]any
+		expected bool
+	}{
+		{
+			name:     "Metadata is nil",
+			metadata: nil,
+			expected: false,
+		},
+		{
+			name:     "Metadata does not have MetaTaskKey",
+			metadata: map[string]any{},
+			expected: false,
+		},
+		{
+			name:     "MetaTaskKey value is not a slice",
+			metadata: map[string]any{MetaTaskKey: "not a slice"},
+			expected: false,
+		},
+		{
+			name:     "MetaTaskKey value is slice but not of strings",
+			metadata: map[string]any{MetaTaskKey: []int{1, 2, 3}},
+			expected: false,
+		},
+		{
+			name:     "MetaTaskKey value is slice of strings but does not contain MetaTaskValGuard",
+			metadata: map[string]any{MetaTaskKey: []interface{}{"text-generation", "text-to-image"}},
+			expected: false,
+		},
+		{
+			name:     "MetaTaskKey value is slice of strings and contains MetaTaskValGuard",
+			metadata: map[string]any{MetaTaskKey: []interface{}{"text-generation", MetaTaskValGuard}},
+			expected: true,
+		},
+		{
+			name:     "MetaTaskKey value is slice of mixed types with MetaTaskValGuard",
+			metadata: map[string]any{MetaTaskKey: []interface{}{1, "text-generation", MetaTaskValGuard, 3.14}},
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			model := &Model{
+				BaseModel: BaseModel{
+					Metadata: tt.metadata,
+				},
+			}
+			result := model.SkipBalance()
+			require.Equal(t, tt.expected, result)
+		})
 	}
 }

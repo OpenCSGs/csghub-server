@@ -30,6 +30,7 @@ type BaseModel struct {
 	DisplayName         string         `json:"display_name"`
 	SupportFunctionCall bool           `json:"support_function_call,omitempty"` // whether the model supports function calling
 	IsPinned            *bool          `json:"is_pinned,omitempty"`             // whether the model is pinned
+	Public              bool           `json:"public,omitempty"`
 	Metadata            map[string]any `json:"metadata"`
 }
 
@@ -74,6 +75,7 @@ func (m Model) MarshalJSON() ([]byte, error) {
 			Task                string         `json:"task"`
 			DisplayName         string         `json:"display_name"`
 			SupportFunctionCall *bool          `json:"support_function_call,omitempty"`
+			Public              bool           `json:"public,omitempty"`
 			Endpoint            string         `json:"endpoint"`
 			Metadata            map[string]any `json:"metadata"`
 			ClusterID           *string        `json:"cluster_id,omitempty"`
@@ -90,6 +92,7 @@ func (m Model) MarshalJSON() ([]byte, error) {
 			OwnedBy:            m.OwnedBy,
 			Task:               m.Task,
 			DisplayName:        m.DisplayName,
+			Public:             m.Public,
 			Endpoint:           m.Endpoint,
 			Metadata:           m.Metadata,
 			NeedSensitiveCheck: m.NeedSensitiveCheck,
@@ -130,6 +133,7 @@ func (m *Model) UnmarshalJSON(data []byte) error {
 		Task                string         `json:"task"`
 		DisplayName         string         `json:"display_name"`
 		SupportFunctionCall bool           `json:"support_function_call,omitempty"`
+		Public              bool           `json:"public,omitempty"`
 		Endpoint            string         `json:"endpoint"`
 		Metadata            map[string]any `json:"metadata"`
 		ClusterID           string         `json:"cluster_id,omitempty"`
@@ -149,6 +153,7 @@ func (m *Model) UnmarshalJSON(data []byte) error {
 	m.OwnedBy = aux.OwnedBy
 	m.Task = aux.Task
 	m.DisplayName = aux.DisplayName
+	m.Public = aux.Public
 	m.SupportFunctionCall = aux.SupportFunctionCall
 	m.Endpoint = aux.Endpoint
 	m.Metadata = aux.Metadata

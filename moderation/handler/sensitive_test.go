@@ -224,21 +224,23 @@ func TestSensitiveHandler_LlmResp(t *testing.T) {
 
 	t.Run("success", func(t *testing.T) {
 		// Prepare request body
-		reqBody := map[string]interface{}{
-			"Service": "LLMResponseModeration",
-			"ServiceParameters": map[string]interface{}{
-				"content":   "This is a safe response",
-				"sessionId": "test-session-123",
-			},
+		reqBody := types.LLMCheckRequest{
+			Scenario:  types.ScenarioLLMResModeration,
+			Text:      "This is a safe response",
+			SessionId: "test-session-123",
 		}
 		reqBodyBytes, _ := json.Marshal(reqBody)
 
 		// Set mock expectation
 		mockSensitiveComponent.EXPECT().PassStreamCheck(
 			mock.Anything,
-			types.ScenarioLLMResModeration,
-			"This is a safe response",
-			"test-session-123",
+			&types.LLMCheckRequest{
+				Scenario:  types.ScenarioLLMResModeration,
+				Text:      "This is a safe response",
+				SessionId: "test-session-123",
+				MaxTokens: 0,
+				RawJSON:   "",
+			},
 		).Return(successResult, nil).Once()
 
 		// Create request
@@ -277,22 +279,25 @@ func TestSensitiveHandler_LlmResp(t *testing.T) {
 
 	t.Run("server error from sensitive component", func(t *testing.T) {
 		// Prepare request body
-		reqBody := map[string]interface{}{
-			"Service": "LLMResponseModeration",
-			"ServiceParameters": map[string]interface{}{
-				"content":   "This is a test response",
-				"sessionId": "test-session-123",
-			},
+		reqBody := types.LLMCheckRequest{
+			Scenario:  types.ScenarioLLMResModeration,
+			Text:      "This is a test response",
+			SessionId: "test-session-123",
 		}
 		reqBodyBytes, _ := json.Marshal(reqBody)
 
 		// Set mock expectation to return error
 		expectedErr := assert.AnError
+
 		mockSensitiveComponent.EXPECT().PassStreamCheck(
 			mock.Anything,
-			types.ScenarioLLMResModeration,
-			"This is a test response",
-			"test-session-123",
+			&types.LLMCheckRequest{
+				Scenario:  types.ScenarioLLMResModeration,
+				Text:      "This is a test response",
+				SessionId: "test-session-123",
+				MaxTokens: 0,
+				RawJSON:   "",
+			},
 		).Return(nil, expectedErr).Once()
 
 		// Create request
@@ -309,12 +314,10 @@ func TestSensitiveHandler_LlmResp(t *testing.T) {
 
 	t.Run("sensitive content detected", func(t *testing.T) {
 		// Prepare request body
-		reqBody := map[string]interface{}{
-			"Service": "LLMResponseModeration",
-			"ServiceParameters": map[string]interface{}{
-				"content":   "This is sensitive content",
-				"sessionId": "test-session-123",
-			},
+		reqBody := types.LLMCheckRequest{
+			Scenario:  types.ScenarioLLMResModeration,
+			Text:      "This is sensitive content",
+			SessionId: "test-session-123",
 		}
 		reqBodyBytes, _ := json.Marshal(reqBody)
 
@@ -327,9 +330,13 @@ func TestSensitiveHandler_LlmResp(t *testing.T) {
 		// Set mock expectation
 		mockSensitiveComponent.EXPECT().PassStreamCheck(
 			mock.Anything,
-			types.ScenarioLLMResModeration,
-			"This is sensitive content",
-			"test-session-123",
+			&types.LLMCheckRequest{
+				Scenario:  types.ScenarioLLMResModeration,
+				Text:      "This is sensitive content",
+				SessionId: "test-session-123",
+				MaxTokens: 0,
+				RawJSON:   "",
+			},
 		).Return(sensitiveResult, nil).Once()
 
 		// Create request
@@ -371,21 +378,23 @@ func TestSensitiveHandler_LlmPrompt(t *testing.T) {
 
 	t.Run("success", func(t *testing.T) {
 		// Prepare request body
-		reqBody := map[string]interface{}{
-			"Service": "LLMPromptModeration",
-			"ServiceParameters": map[string]interface{}{
-				"content":   "This is a safe prompt",
-				"accountId": "test-account-123",
-			},
+		reqBody := types.LLMCheckRequest{
+			Scenario:  types.ScenarioLLMQueryModeration,
+			Text:      "This is a safe prompt",
+			AccountId: "test-account-123",
 		}
 		reqBodyBytes, _ := json.Marshal(reqBody)
 
 		// Set mock expectation
 		mockSensitiveComponent.EXPECT().PassLLMQueryCheck(
 			mock.Anything,
-			types.ScenarioLLMQueryModeration,
-			"This is a safe prompt",
-			"test-account-123",
+			&types.LLMCheckRequest{
+				Scenario:  types.ScenarioLLMQueryModeration,
+				Text:      "This is a safe prompt",
+				AccountId: "test-account-123",
+				MaxTokens: 0,
+				RawJSON:   "",
+			},
 		).Return(successResult, nil).Once()
 
 		// Create request
@@ -424,12 +433,10 @@ func TestSensitiveHandler_LlmPrompt(t *testing.T) {
 
 	t.Run("server error from sensitive component", func(t *testing.T) {
 		// Prepare request body
-		reqBody := map[string]interface{}{
-			"Service": "LLMPromptModeration",
-			"ServiceParameters": map[string]interface{}{
-				"content":   "This is a test prompt",
-				"accountId": "test-account-123",
-			},
+		reqBody := types.LLMCheckRequest{
+			Scenario:  types.ScenarioLLMQueryModeration,
+			Text:      "This is a test prompt",
+			AccountId: "test-account-123",
 		}
 		reqBodyBytes, _ := json.Marshal(reqBody)
 
@@ -437,9 +444,13 @@ func TestSensitiveHandler_LlmPrompt(t *testing.T) {
 		expectedErr := assert.AnError
 		mockSensitiveComponent.EXPECT().PassLLMQueryCheck(
 			mock.Anything,
-			types.ScenarioLLMQueryModeration,
-			"This is a test prompt",
-			"test-account-123",
+			&types.LLMCheckRequest{
+				Scenario:  types.ScenarioLLMQueryModeration,
+				Text:      "This is a test prompt",
+				AccountId: "test-account-123",
+				MaxTokens: 0,
+				RawJSON:   "",
+			},
 		).Return(nil, expectedErr).Once()
 
 		// Create request
@@ -456,12 +467,10 @@ func TestSensitiveHandler_LlmPrompt(t *testing.T) {
 
 	t.Run("sensitive content detected", func(t *testing.T) {
 		// Prepare request body
-		reqBody := map[string]interface{}{
-			"Service": "LLMPromptModeration",
-			"ServiceParameters": map[string]interface{}{
-				"content":   "This is sensitive prompt",
-				"accountId": "test-account-123",
-			},
+		reqBody := types.LLMCheckRequest{
+			Scenario:  types.ScenarioLLMQueryModeration,
+			Text:      "This is sensitive prompt",
+			AccountId: "test-account-123",
 		}
 		reqBodyBytes, _ := json.Marshal(reqBody)
 
@@ -474,9 +483,13 @@ func TestSensitiveHandler_LlmPrompt(t *testing.T) {
 		// Set mock expectation
 		mockSensitiveComponent.EXPECT().PassLLMQueryCheck(
 			mock.Anything,
-			types.ScenarioLLMQueryModeration,
-			"This is sensitive prompt",
-			"test-account-123",
+			&types.LLMCheckRequest{
+				Scenario:  types.ScenarioLLMQueryModeration,
+				Text:      "This is sensitive prompt",
+				AccountId: "test-account-123",
+				MaxTokens: 0,
+				RawJSON:   "",
+			},
 		).Return(sensitiveResult, nil).Once()
 
 		// Create request

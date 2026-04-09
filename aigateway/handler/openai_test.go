@@ -298,9 +298,12 @@ func TestOpenAIHandler_GetModel(t *testing.T) {
 		tester, c, w := setupTest(t)
 		model := &types.Model{
 			BaseModel: types.BaseModel{
-				ID:      "model1:svc1",
-				Object:  "model",
-				OwnedBy: "testuser",
+				ID:                 "model1",
+				Object:             "model",
+				OwnedBy:            "testuser",
+				},
+			ExternalModelInfo: types.ExternalModelInfo{
+				NeedSensitiveCheck: true,
 			},
 		}
 		c.Params = []gin.Param{{Key: "model", Value: "model1:svc1"}}
@@ -414,13 +417,13 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 
 		model := &types.Model{
 			BaseModel: types.BaseModel{
-				ID:      "model1:svc1",
-				Object:  "model",
-				OwnedBy: "testuser",
-			},
+				ID:                 "model1",
+				Object:             "model",
+				OwnedBy:            "testuser",
+				},
 			InternalModelInfo: types.InternalModelInfo{
-				ClusterID:     "test-cls",
-				SvcName:       "test-svc",
+				ClusterID: "test-cls",
+				SvcName:   "test-svc",
 				CSGHubModelID: "model1",
 			},
 		}
@@ -456,6 +459,9 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 				SvcName:       "test-svc",
 				CSGHubModelID: "model1",
 			},
+			ExternalModelInfo: types.ExternalModelInfo{
+				NeedSensitiveCheck: true,
+			},
 			Endpoint: "test-endpoint",
 		}
 		tester.mocks.mockClsComp.EXPECT().GetClusterByID(mock.Anything, "test-cls").Return(&database.ClusterInfo{
@@ -465,7 +471,7 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuser", "testuuid").Return(nil)
 		expectReq := ChatCompletionRequest{}
 		_ = json.Unmarshal(body, &expectReq)
-		tester.mocks.moderationComp.EXPECT().CheckChatPrompts(mock.Anything, expectReq.Messages, "testuuid:"+model.ID).
+		tester.mocks.moderationComp.EXPECT().CheckChatPrompts(mock.Anything, expectReq.Messages, "testuuid:"+model.ID, false).
 			Return(&rpc.CheckResult{IsSensitive: true}, nil)
 		tester.handler.Chat(c)
 
@@ -501,6 +507,9 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 				SvcName:       "test-svc",
 				CSGHubModelID: "model1",
 			},
+			ExternalModelInfo: types.ExternalModelInfo{
+				NeedSensitiveCheck: true,
+			},
 			Endpoint: testServer.URL,
 		}
 		tester.mocks.mockClsComp.EXPECT().GetClusterByID(mock.Anything, "test-cls").Return(&database.ClusterInfo{
@@ -510,7 +519,7 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuser", "testuuid").Return(nil)
 		expectReq := ChatCompletionRequest{}
 		_ = json.Unmarshal(body, &expectReq)
-		tester.mocks.moderationComp.EXPECT().CheckChatPrompts(mock.Anything, expectReq.Messages, "testuuid:"+model.ID).
+		tester.mocks.moderationComp.EXPECT().CheckChatPrompts(mock.Anything, expectReq.Messages, "testuuid:"+model.ID, false).
 			Return(nil, errors.New("some error"))
 		tester.handler.Chat(c)
 
@@ -537,14 +546,17 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 
 		model := &types.Model{
 			BaseModel: types.BaseModel{
-				ID:      "model1:svc1",
-				Object:  "model",
-				OwnedBy: "testuser",
-			},
+				ID:                 "model1:svc1",
+				Object:             "model",
+				OwnedBy:            "testuser",
+				},
 			InternalModelInfo: types.InternalModelInfo{
 				ClusterID:     "test-cls",
 				SvcName:       "test-svc",
 				CSGHubModelID: "model1",
+			},
+			ExternalModelInfo: types.ExternalModelInfo{
+				NeedSensitiveCheck: true,
 			},
 			Endpoint: testServer.URL,
 		}
@@ -555,7 +567,7 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuser", "testuuid").Return(nil)
 		expectReq := ChatCompletionRequest{}
 		_ = json.Unmarshal(body, &expectReq)
-		tester.mocks.moderationComp.EXPECT().CheckChatPrompts(mock.Anything, expectReq.Messages, "testuuid:"+model.ID).
+		tester.mocks.moderationComp.EXPECT().CheckChatPrompts(mock.Anything, expectReq.Messages, "testuuid:"+model.ID, false).
 			Return(&rpc.CheckResult{IsSensitive: false}, nil)
 		llmTokenCounter := mocktoken.NewMockChatTokenCounter(t)
 		tester.mocks.tokenCounterFactory.EXPECT().NewChat(
@@ -564,6 +576,7 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 				Host:     "",
 				Model:    "model1",
 				ImageID:  model.ImageID,
+				Provider: model.Provider,
 			}).
 			Return(llmTokenCounter)
 		llmTokenCounter.EXPECT().AppendPrompts(expectReq.Messages).Return()
@@ -608,6 +621,9 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 				SvcName:       "test-svc",
 				CSGHubModelID: "model1",
 			},
+			ExternalModelInfo: types.ExternalModelInfo{
+				NeedSensitiveCheck: true,
+			},
 			Endpoint: testServer.URL,
 		}
 		tester.mocks.mockClsComp.EXPECT().GetClusterByID(mock.Anything, "test-cls").Return(&database.ClusterInfo{
@@ -617,7 +633,7 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuser", "testuuid").Return(nil)
 		expectReq := ChatCompletionRequest{}
 		_ = json.Unmarshal(body, &expectReq)
-		tester.mocks.moderationComp.EXPECT().CheckChatPrompts(mock.Anything, expectReq.Messages, "testuuid:"+model.ID).
+		tester.mocks.moderationComp.EXPECT().CheckChatPrompts(mock.Anything, expectReq.Messages, "testuuid:"+model.ID, false).
 			Return(&rpc.CheckResult{IsSensitive: false}, nil)
 		llmTokenCounter := mocktoken.NewMockChatTokenCounter(t)
 		tester.mocks.tokenCounterFactory.EXPECT().NewChat(
@@ -626,6 +642,7 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 				Host:     "",
 				Model:    "model1",
 				ImageID:  model.ImageID,
+				Provider: model.Provider,
 			}).
 			Return(llmTokenCounter)
 		llmTokenCounter.EXPECT().AppendPrompts(expectReq.Messages).Return()
@@ -666,13 +683,16 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 			InternalModelInfo: types.InternalModelInfo{
 				SvcName: "",
 			},
+			ExternalModelInfo: types.ExternalModelInfo{
+				NeedSensitiveCheck: true,
+			},
 			Endpoint: testServer.URL,
 		}
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "external-model-id").Return(model, nil)
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuser", "testuuid").Return(nil)
 		expectReq := ChatCompletionRequest{}
 		_ = json.Unmarshal(body, &expectReq)
-		tester.mocks.moderationComp.EXPECT().CheckChatPrompts(mock.Anything, expectReq.Messages, "testuuid:"+model.ID).
+		tester.mocks.moderationComp.EXPECT().CheckChatPrompts(mock.Anything, expectReq.Messages, "testuuid:"+model.ID, false).
 			Return(&rpc.CheckResult{IsSensitive: false}, nil)
 		llmTokenCounter := mocktoken.NewMockChatTokenCounter(t)
 		tester.mocks.tokenCounterFactory.EXPECT().NewChat(
@@ -681,6 +701,7 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 				Host:     "",
 				Model:    model.ID,
 				ImageID:  model.ImageID,
+				Provider: model.Provider,
 			}).
 			Return(llmTokenCounter)
 		llmTokenCounter.EXPECT().AppendPrompts(expectReq.Messages).Return()
@@ -812,9 +833,12 @@ func TestOpenAIHandler_Embedding(t *testing.T) {
 
 		model := &types.Model{
 			BaseModel: types.BaseModel{
-				ID:      "model1:svc1",
-				Object:  "model",
-				OwnedBy: "testuser",
+				ID:                 "model1:svc1",
+				Object:             "model",
+				OwnedBy:            "testuser",
+				},
+			ExternalModelInfo: types.ExternalModelInfo{
+				NeedSensitiveCheck: true,
 			},
 			InternalModelInfo: types.InternalModelInfo{
 				ClusterID: "test-cls",
