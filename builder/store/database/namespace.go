@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/uptrace/bun"
 	"opencsg.com/csghub-server/common/errorx"
 )
 
@@ -13,6 +14,7 @@ type NamespaceStore interface {
 	FindByUUID(ctx context.Context, uuid string) (Namespace, error)
 	Exists(ctx context.Context, path string) (bool, error)
 	ExistsByUUID(ctx context.Context, uuid string) (bool, error)
+	FindByUUIDs(ctx context.Context, uuids []string) ([]Namespace, error)
 }
 
 type NamespaceStoreImpl struct {
@@ -49,6 +51,7 @@ type Namespace struct {
 func (s *NamespaceStoreImpl) FindByPath(ctx context.Context, path string) (namespace Namespace, err error) {
 	namespace.Path = path
 	err = s.db.Operator.Core.NewSelect().Model(&namespace).Relation("User").Where("path = ?", path).Scan(ctx)
+	err = errorx.HandleDBError(err, errorx.Ctx().Set("namespace", path))
 	return
 }
 
@@ -80,4 +83,21 @@ func (s *NamespaceStoreImpl) FindByUUID(ctx context.Context, uuid string) (names
 		return namespace, errorx.HandleDBError(err, errorx.Ctx().Set("uuid", uuid))
 	}
 	return namespace, nil
+}
+
+func (s *NamespaceStoreImpl) FindByUUIDs(ctx context.Context, uuids []string) (namespaces []Namespace, err error) {
+	if len(uuids) == 0 {
+		return namespaces, nil
+	}
+
+	err = s.db.Operator.Core.
+		NewSelect().
+		Model(&namespaces).
+		Where("uuid IN (?)", bun.In(uuids)).
+		Scan(ctx)
+	if err != nil {
+		return namespaces, errorx.HandleDBError(err, errorx.Ctx().Set("uuids", uuids))
+	}
+
+	return namespaces, nil
 }
