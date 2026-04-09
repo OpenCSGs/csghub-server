@@ -24,6 +24,7 @@ import (
 	"opencsg.com/csghub-server/builder/proxy"
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/cache"
+	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
 	commonType "opencsg.com/csghub-server/common/types"
@@ -72,7 +73,8 @@ func NewOpenAIHandlerFromConfig(config *config.Config) (OpenAIHandler, error) {
 		return nil, fmt.Errorf("failed to create cluster component, error: %w", err)
 	}
 	storage, _ := component.NewStorage(config)
-	return newOpenAIHandler(modelService, repoComp, modComponent, clusterComp, token.NewCounterFactory(), text2image.NewRegistry(), config, storage), nil
+	whitelistRule := database.NewRepositoryFileCheckRuleStore()
+	return newOpenAIHandler(modelService, repoComp, modComponent, clusterComp, token.NewCounterFactory(), text2image.NewRegistry(), config, storage, whitelistRule), nil
 }
 
 func newOpenAIHandler(
@@ -84,6 +86,7 @@ func newOpenAIHandler(
 	t2iRegistry *text2image.Registry,
 	config *config.Config,
 	storage types.Storage,
+	whitelistRule database.RepositoryFileCheckRuleStore,
 ) *OpenAIHandlerImpl {
 	return &OpenAIHandlerImpl{
 		openaiComponent:     modelService,
@@ -94,6 +97,7 @@ func newOpenAIHandler(
 		t2iRegistry:         t2iRegistry,
 		config:              config,
 		storage:             storage,
+		whitelistRule:       whitelistRule,
 	}
 }
 
@@ -126,6 +130,60 @@ func (h *OpenAIHandlerImpl) handleInsufficientBalance(c *gin.Context, isStream b
 	}
 }
 
+func (h *OpenAIHandlerImpl) checkSensitive(ctx context.Context, model *types.Model, chatReq *ChatCompletionRequest, userUUID string, stream bool) (bool, *rpc.CheckResult, error) {
+	if !model.NeedSensitiveCheck {
+		return false, nil, nil
+	}
+
+	if exists, err := h.checkNamespaceWhitelist(ctx, model.OfficialName); err != nil {
+		return false, nil, err
+	} else if exists {
+		slog.DebugContext(ctx, "Skip Sensitive check with OfficialName in white list", slog.String("pattern", model.OfficialName))
+		return false, nil, nil
+	}
+
+	if exists, err := h.checkNamespaceWhitelist(ctx, model.ID); err != nil {
+		return false, nil, err
+	} else if exists {
+		slog.DebugContext(ctx, "Skip Sensitive check with modelID in white list", slog.String("pattern", model.ID))
+		return false, nil, nil
+	}
+
+	// Check model name regex match in white list
+	matched, err := h.whitelistRule.MatchRegex(ctx, database.RuleTypeModelName, model.ID)
+	if err != nil {
+		return false, nil, fmt.Errorf("failed to match model name regex: %w", err)
+	}
+	if matched {
+		slog.DebugContext(ctx, "Skip Sensitive check with MatchRegex in white list", slog.String("RuleTypeModelName", model.ID))
+		return false, nil, nil
+	}
+
+	key := fmt.Sprintf("%s:%s", userUUID, model.ID)
+	result, err := h.modComponent.CheckChatPrompts(ctx, chatReq.Messages, key, stream)
+	if err != nil {
+		return false, nil, fmt.Errorf("failed to call moderation error:%w", err)
+	}
+
+	return true, result, nil
+}
+
+func (h *OpenAIHandlerImpl) checkNamespaceWhitelist(ctx context.Context, modelPath string) (bool, error) {
+	namespace, _, err := common.GetNamespaceAndNameFromPath(modelPath)
+	if err != nil {
+		return false, nil
+	}
+	exists, err := h.whitelistRule.Exists(ctx, database.RuleTypeNamespace, namespace)
+	if err != nil {
+		return false, fmt.Errorf("failed to check namespace in white list: %w", err)
+	}
+	if exists {
+		slog.DebugContext(ctx, "Skip Sensitive check with namespace in white list", slog.String("namespace", namespace))
+		return true, nil
+	}
+	return false, nil
+}
+
 // OpenAIHandlerImpl implements the OpenAIHandler interface
 type OpenAIHandlerImpl struct {
 	openaiComponent     component.OpenAIComponent
@@ -136,17 +194,18 @@ type OpenAIHandlerImpl struct {
 	t2iRegistry         *text2image.Registry
 	config              *config.Config
 	storage             types.Storage
+	whitelistRule       database.RepositoryFileCheckRuleStore
 }
 
 // ListModels godoc
 // @Summary      List available models
-// @Description  Returns a list of available models, supports fuzzy search by model_id query parameter and filtering by public status
+// @Description  Returns a list of available models, supports fuzzy search by model_id query parameter and filtering by source and task
 // @Tags         AIGateway
 // @Accept       json
 // @Produce      json
 // @Param        model_id query string false "Model ID for fuzzy search"
-// @Param        public query bool false "Filter by public status (true for public models, false for private models)"
 // @Param        source query string false "Filter by source (csghub for CSGHub models, external for external models)" Enums(csghub, external)
+// @Param        task query string false "Filter by task (e.g., text-generation, text-to-image)"
 // @Param        per query int false "Models per page (default 20, max 100)"
 // @Param        page query int false "Page number (1-based, default 1)"
 // @Success      200  {object}  types.ModelList "OK"
@@ -173,8 +232,8 @@ func (h *OpenAIHandlerImpl) ListModels(c *gin.Context) {
 
 	resp, err := h.openaiComponent.ListModels(c.Request.Context(), currentUser, types.ListModelsReq{
 		ModelID: c.Query("model_id"),
-		Public:  c.Query("public"),
 		Source:  source,
+		Task:    c.Query("task"),
 		Per:     c.Query("per"),
 		Page:    c.Query("page"),
 	})
@@ -206,6 +265,7 @@ func (h *OpenAIHandlerImpl) ListModels(c *gin.Context) {
 func (h *OpenAIHandlerImpl) GetModel(c *gin.Context) {
 	username := httpbase.GetCurrentUser(c)
 	modelID := c.Param("model")
+	modelID = strings.TrimPrefix(modelID, "/")
 	if modelID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": types.Error{
@@ -335,11 +395,12 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 		}
 	}
 
-	sceneValue := c.Request.Header.Get(commonType.SceneHeaderKey)
 	// Check balance before processing request
-	if err := h.openaiComponent.CheckBalance(c.Request.Context(), username); err != nil {
-		h.handleInsufficientBalance(c, chatReq.Stream, username, modelID, err)
-		return
+	if !model.SkipBalance() {
+		if err := h.openaiComponent.CheckBalance(c.Request.Context(), username, userUUID); err != nil {
+			h.handleInsufficientBalance(c, chatReq.Stream, username, modelID, err)
+			return
+		}
 	}
 
 	// marshal updated request map back to JSON bytes
@@ -352,26 +413,26 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 		c.String(http.StatusInternalServerError, fmt.Errorf("failed to create reverse proxy:%w", err).Error())
 		return
 	}
+
+	var modComponent component.Moderation = nil
+	isCheck, result, err := h.checkSensitive(c.Request.Context(), model, chatReq, userUUID, chatReq.Stream)
+	if err != nil {
+		slog.ErrorContext(c.Request.Context(), "failed to check sensitive",
+			slog.String("model_id", modelID),
+			slog.String("username", username),
+			slog.Any("error", err))
+	}
+	if isCheck {
+		modComponent = h.modComponent
+		if result != nil && result.IsSensitive {
+			handleSensitiveResponse(c, chatReq.Stream, result)
+			return
+		}
+	}
+
 	slog.InfoContext(c.Request.Context(), "proxy chat request to model target", slog.Any("target", target), slog.Any("host", host),
 		slog.Any("user", username), slog.Any("model_name", modelName))
-	// Create a combined key using userUUID and modelID for caching and tracking
-	key := fmt.Sprintf("%s:%s", userUUID, modelID)
-	result, err := h.modComponent.CheckChatPrompts(c.Request.Context(), chatReq.Messages, key)
-	if err != nil {
-		c.String(http.StatusInternalServerError, fmt.Errorf("failed to call moderation error:%w", err).Error())
-		return
-	}
-	if result.IsSensitive {
-		slog.DebugContext(c.Request.Context(), "sensitive content", slog.String("reason", result.Reason))
-		errorChunk := generateSensitiveRespForPrompt()
-		errorChunkJson, _ := json.Marshal(errorChunk)
-		_, err := c.Writer.Write([]byte("data: " + string(errorChunkJson) + "\n\n" + "[DONE]"))
-		if err != nil {
-			slog.ErrorContext(c.Request.Context(), "write into resp error:", slog.String("err", err.Error()))
-		}
-		c.Writer.Flush()
-		return
-	}
+
 	tokenCounter := h.tokenCounterFactory.NewChat(token.CreateParam{
 		Endpoint: target,
 		Host:     host,
@@ -379,7 +440,8 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 		ImageID:  model.ImageID,
 		Provider: model.Provider,
 	})
-	w := NewResponseWriterWrapper(c.Writer, chatReq.Stream, h.modComponent, tokenCounter)
+
+	w := NewResponseWriterWrapper(c.Writer, chatReq.Stream, modComponent, tokenCounter)
 	defer w.ClearBuffer()
 
 	tokenCounter.AppendPrompts(chatReq.Messages)
@@ -411,7 +473,7 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 		usageCtx, cancel := context.WithTimeout(context.WithoutCancel(c.Request.Context()), 3*time.Second)
 		defer cancel()
 
-		err := h.openaiComponent.RecordUsage(usageCtx, userUUID, model, tokenCounter, sceneValue)
+		err := h.openaiComponent.RecordUsage(usageCtx, userUUID, model, tokenCounter)
 		if err != nil {
 			slog.ErrorContext(usageCtx, "failed to record token usage", slog.Any("error", err))
 		}
@@ -509,8 +571,7 @@ func (h *OpenAIHandlerImpl) GenerateImage(c *gin.Context) {
 		return
 	}
 
-	sceneValue := c.Request.Header.Get(commonType.SceneHeaderKey)
-	if err := h.openaiComponent.CheckBalance(ctx, username); err != nil {
+	if err := h.openaiComponent.CheckBalance(ctx, username, userUUID); err != nil {
 		h.handleInsufficientBalance(c, false, username, modelID, err)
 		return
 	}
@@ -594,7 +655,7 @@ func (h *OpenAIHandlerImpl) GenerateImage(c *gin.Context) {
 	go func() {
 		usageCtx, cancel := context.WithTimeout(context.WithoutCancel(c.Request.Context()), 3*time.Second)
 		defer cancel()
-		if err := h.openaiComponent.RecordUsage(usageCtx, userUUID, model, imageCounter, sceneValue); err != nil {
+		if err := h.openaiComponent.RecordUsage(usageCtx, userUUID, model, imageCounter); err != nil {
 			slog.ErrorContext(usageCtx, "failed to record image usage", slog.Any("error", err))
 		}
 	}()
@@ -688,9 +749,8 @@ func (h *OpenAIHandlerImpl) Embedding(c *gin.Context) {
 		return
 	}
 
-	sceneValue := c.Request.Header.Get(commonType.SceneHeaderKey)
 	// Check balance before processing request
-	if err := h.openaiComponent.CheckBalance(c.Request.Context(), username); err != nil {
+	if err := h.openaiComponent.CheckBalance(c.Request.Context(), username, userUUID); err != nil {
 		h.handleInsufficientBalance(c, false, username, modelID, err)
 		return
 	}
@@ -719,7 +779,7 @@ func (h *OpenAIHandlerImpl) Embedding(c *gin.Context) {
 		usageCtx, cancel := context.WithTimeout(context.WithoutCancel(c.Request.Context()), 3*time.Second)
 		defer cancel()
 
-		err := h.openaiComponent.RecordUsage(usageCtx, userUUID, model, tokenCounter, sceneValue)
+		err := h.openaiComponent.RecordUsage(usageCtx, userUUID, model, tokenCounter)
 		if err != nil {
 			slog.ErrorContext(c, "failed to record embedding token usage", "error", err)
 		}

@@ -90,13 +90,15 @@ func TestOpenAIComponent_GetAvailableModels(t *testing.T) {
 		expectModels := []types.Model{
 			{
 				BaseModel: types.BaseModel{
-					ID:          "model1:svc1",
-					OwnedBy:     "publicuser",
-					Object:      "model",
-					Created:     deploys[0].CreatedAt.Unix(),
-					Task:        "text-generation",
-					DisplayName: "model1",
-					Public:      true,
+					ID:           "model1:svc1",
+					OwnedBy:      "publicuser",
+					Object:       "model",
+					Created:      deploys[0].CreatedAt.Unix(),
+					Task:         "text-generation",
+					OfficialName: "model1",
+					Metadata: map[string]any{
+						types.MetaKeyLLMType: types.ProviderTypeInference,
+					},
 				},
 				Endpoint: "endpoint1",
 				InternalModelInfo: types.InternalModelInfo{
@@ -107,6 +109,9 @@ func TestOpenAIComponent_GetAvailableModels(t *testing.T) {
 					SvcType:       deploys[0].Type,
 					ImageID:       deploys[0].ImageID,
 				},
+				ExternalModelInfo: types.ExternalModelInfo{
+					NeedSensitiveCheck: true,
+				},
 				InternalUse: true,
 			},
 			{
@@ -116,7 +121,9 @@ func TestOpenAIComponent_GetAvailableModels(t *testing.T) {
 					Object:  "model",
 					Created: deploys[1].CreatedAt.Unix(),
 					Task:    "text-to-image",
-					Public:  true,
+					Metadata: map[string]any{
+						types.MetaKeyLLMType: types.ProviderTypeServerless,
+					},
 				},
 				Endpoint: "endpoint2",
 				InternalModelInfo: types.InternalModelInfo{
@@ -125,6 +132,9 @@ func TestOpenAIComponent_GetAvailableModels(t *testing.T) {
 					SvcName:   deploys[1].SvcName,
 					SvcType:   deploys[1].Type,
 					ImageID:   deploys[1].ImageID,
+				},
+				ExternalModelInfo: types.ExternalModelInfo{
+					NeedSensitiveCheck: true,
 				},
 				InternalUse: true,
 			},
@@ -147,10 +157,8 @@ func TestOpenAIComponent_GetAvailableModels(t *testing.T) {
 		require.Len(t, models, 2)
 		assert.Equal(t, "model1:svc1", models[0].ID)
 		assert.Equal(t, "publicuser", models[0].OwnedBy)
-		assert.True(t, models[0].Public)
 		assert.Equal(t, "hf-model2:svc2", models[1].ID)
 		assert.Equal(t, "OpenCSG", models[1].OwnedBy)
-		assert.True(t, models[1].Public)
 		wg.Wait()
 	})
 
@@ -206,19 +214,27 @@ func TestOpenAIComponent_GetAvailableModels(t *testing.T) {
 		expectModels := []types.Model{
 			{
 				BaseModel: types.BaseModel{
-					ID:          "model1:svc1",
-					OwnedBy:     "testuser",
-					Object:      "model",
-					Created:     deploys[0].CreatedAt.Unix(),
-					Task:        "text-generation",
-					DisplayName: "model1",
-					Public:      true,
+					ID:           "model1:svc1",
+					OwnedBy:      "testuser",
+					Object:       "model",
+					Created:      deploys[0].CreatedAt.Unix(),
+					Task:         "text-generation",
+					OfficialName: "model1",
+					Metadata: map[string]any{
+						types.MetaKeyLLMType: types.ProviderTypeInference,
+					},
 				},
 				Endpoint: "endpoint1",
 				InternalModelInfo: types.InternalModelInfo{
-					ClusterID: deploys[0].ClusterID,
-					SvcName:   deploys[0].SvcName,
-					ImageID:   deploys[0].ImageID,
+					CSGHubModelID: deploys[0].Repository.Path,
+					OwnerUUID:     deploys[0].User.UUID,
+					ClusterID:     deploys[0].ClusterID,
+					SvcName:       deploys[0].SvcName,
+					SvcType:       deploys[0].Type,
+					ImageID:       deploys[0].ImageID,
+				},
+				ExternalModelInfo: types.ExternalModelInfo{
+					NeedSensitiveCheck: true,
 				},
 				InternalUse: true,
 			},
@@ -229,13 +245,21 @@ func TestOpenAIComponent_GetAvailableModels(t *testing.T) {
 					Object:  "model",
 					Created: deploys[1].CreatedAt.Unix(),
 					Task:    "text-to-image",
-					Public:  true,
+					Metadata: map[string]any{
+						types.MetaKeyLLMType: types.ProviderTypeServerless,
+					},
 				},
 				Endpoint: "endpoint2",
 				InternalModelInfo: types.InternalModelInfo{
-					ClusterID: deploys[1].ClusterID,
-					SvcName:   deploys[1].SvcName,
-					ImageID:   deploys[1].ImageID,
+					CSGHubModelID: deploys[1].Repository.Path,
+					OwnerUUID:     deploys[1].User.UUID,
+					ClusterID:     deploys[1].ClusterID,
+					SvcName:       deploys[1].SvcName,
+					SvcType:       deploys[1].Type,
+					ImageID:       deploys[1].ImageID,
+				},
+				ExternalModelInfo: types.ExternalModelInfo{
+					NeedSensitiveCheck: true,
 				},
 				InternalUse: true,
 			},
@@ -309,19 +333,27 @@ func TestOpenAIComponent_GetAvailableModels(t *testing.T) {
 		expectModels := []types.Model{
 			{
 				BaseModel: types.BaseModel{
-					ID:          "model3:svc3",
-					OwnedBy:     "testuser",
-					Object:      "model",
-					Created:     deploys[0].CreatedAt.Unix(),
-					Task:        "text-generation",
-					DisplayName: "model3",
-					Public:      false,
+					ID:           "model3:svc3",
+					OwnedBy:      "testuser",
+					Object:       "model",
+					Created:      deploys[0].CreatedAt.Unix(),
+					Task:         "text-generation",
+					OfficialName: "model3",
+					Metadata: map[string]any{
+						types.MetaKeyLLMType: types.ProviderTypeInference,
+					},
 				},
 				Endpoint: "endpoint3",
 				InternalModelInfo: types.InternalModelInfo{
-					ClusterID: deploys[0].ClusterID,
-					SvcName:   deploys[0].SvcName,
-					ImageID:   deploys[0].ImageID,
+					CSGHubModelID: deploys[0].Repository.Path,
+					OwnerUUID:     deploys[0].User.UUID,
+					ClusterID:     deploys[0].ClusterID,
+					SvcName:       deploys[0].SvcName,
+					SvcType:       deploys[0].Type,
+					ImageID:       deploys[0].ImageID,
+				},
+				ExternalModelInfo: types.ExternalModelInfo{
+					NeedSensitiveCheck: true,
 				},
 				InternalUse: true,
 			},
@@ -344,7 +376,6 @@ func TestOpenAIComponent_GetAvailableModels(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Len(t, models, 1)
 		assert.Equal(t, "model3:svc3", models[0].ID)
-		assert.False(t, models[0].Public)
 		wg.Wait()
 	})
 
@@ -396,18 +427,26 @@ func TestOpenAIComponent_GetModelByID(t *testing.T) {
 		expectModels := []types.Model{
 			{
 				BaseModel: types.BaseModel{
-					ID:          "model1:svc1",
-					OwnedBy:     "testuser",
-					Object:      "model",
-					Created:     deploys[0].CreatedAt.Unix(),
-					DisplayName: "model1",
-					Public:      true,
+					ID:           "model1:svc1",
+					OwnedBy:      "testuser",
+					Object:       "model",
+					Created:      deploys[0].CreatedAt.Unix(),
+					OfficialName: "model1",
+					Metadata: map[string]any{
+						types.MetaKeyLLMType: types.ProviderTypeInference,
+					},
 				},
 				Endpoint: "endpoint1",
 				InternalModelInfo: types.InternalModelInfo{
-					ClusterID: deploys[0].ClusterID,
-					SvcName:   deploys[0].SvcName,
-					ImageID:   deploys[0].ImageID,
+					CSGHubModelID: deploys[0].Repository.Path,
+					OwnerUUID:     deploys[0].User.UUID,
+					ClusterID:     deploys[0].ClusterID,
+					SvcName:       deploys[0].SvcName,
+					SvcType:       deploys[0].Type,
+					ImageID:       deploys[0].ImageID,
+				},
+				ExternalModelInfo: types.ExternalModelInfo{
+					NeedSensitiveCheck: true,
 				},
 				InternalUse: true,
 			},
@@ -480,13 +519,15 @@ func TestOpenAIComponent_GetModelByID(t *testing.T) {
 		deploys[0].CreatedAt = now
 		expectModel := types.Model{
 			BaseModel: types.BaseModel{
-				ID:          "model1:svc1",
-				OwnedBy:     "testuser",
-				Object:      "model",
-				Created:     deploys[0].CreatedAt.Unix(),
-				Task:        "text-generation",
-				DisplayName: "model1",
-				Public:      true,
+				ID:           "model1:svc1",
+				OwnedBy:      "testuser",
+				Object:       "model",
+				Created:      deploys[0].CreatedAt.Unix(),
+				Task:         "text-generation",
+				OfficialName: "model1",
+				Metadata: map[string]any{
+					types.MetaKeyLLMType: types.ProviderTypeInference,
+				},
 			},
 			Endpoint: "endpoint1",
 		}
@@ -514,8 +555,10 @@ func TestOpenAIComponent_ExtGetAvailableModels_Error(t *testing.T) {
 		modelListCache: mockCache,
 	}
 	searchType := 16
+	enabled := true
 	search := &commontypes.SearchLLMConfig{
-		Type: &searchType,
+		Type:    &searchType,
+		Enabled: &enabled,
 	}
 	mockLLMConfigStore.EXPECT().Index(ctx, 50, 1, search).
 		Return(nil, 0, errors.New("test error")).Once()
@@ -563,7 +606,9 @@ func TestOpenAIComponent_ExtGetAvailableModels_SinglePage(t *testing.T) {
 				ID:      "test-model-1",
 				OwnedBy: "OpenAI",
 				Object:  "model",
-				Public:  true,
+				Metadata: map[string]any{
+					types.MetaKeyLLMType: types.ProviderTypeExternalLLM,
+				},
 			},
 			Endpoint: "http://test-endpoint-1.com",
 			ExternalModelInfo: types.ExternalModelInfo{
@@ -584,8 +629,10 @@ func TestOpenAIComponent_ExtGetAvailableModels_SinglePage(t *testing.T) {
 	mockDeployStore.EXPECT().RunningVisibleToUser(mock.Anything, user.ID).
 		Return([]database.Deploy{}, nil)
 	searchType := 16
+	enabled := true
 	search := &commontypes.SearchLLMConfig{
-		Type: &searchType,
+		Type:    &searchType,
+		Enabled: &enabled,
 	}
 	mockLLMConfigStore.EXPECT().Index(ctx, 50, 1, search).Return(mockModels, 1, nil)
 	mockCache.EXPECT().HSet(mock.Anything, modelCacheKey, "test-model-1", string(expectJson)).
@@ -603,40 +650,4 @@ func TestOpenAIComponent_ExtGetAvailableModels_SinglePage(t *testing.T) {
 	require.Len(t, models, 1)
 	require.Equal(t, "test-model-1", models[0].ID)
 	wg.Wait()
-}
-
-func TestParseScene(t *testing.T) {
-	tests := []struct {
-		name       string
-		sceneValue string
-		expected   commontypes.SceneType
-	}{
-		{
-			name:       "any scene value returns SceneModelServerless",
-			sceneValue: commontypes.SceneHeaderCSGHub,
-			expected:   commontypes.SceneModelServerless,
-		},
-		{
-			name:       "empty scene returns SceneModelServerless",
-			sceneValue: "",
-			expected:   commontypes.SceneModelServerless,
-		},
-		{
-			name:       "agentichub scene returns SceneModelServerless",
-			sceneValue: commontypes.SceneHeaderAgenticHub,
-			expected:   commontypes.SceneModelServerless,
-		},
-		{
-			name:       "unknown scene returns SceneModelServerless",
-			sceneValue: "unknown",
-			expected:   commontypes.SceneModelServerless,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := parseScene(tt.sceneValue)
-			assert.Equal(t, tt.expected, result)
-		})
-	}
 }

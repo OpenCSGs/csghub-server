@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -29,8 +30,8 @@ type OpenAIComponent interface {
 	GetAvailableModels(c context.Context, user string) ([]types.Model, error)
 	ListModels(c context.Context, user string, req types.ListModelsReq) (types.ModelList, error)
 	GetModelByID(c context.Context, username, modelID string) (*types.Model, error)
-	RecordUsage(c context.Context, userUUID string, model *types.Model, tokenCounter token.Counter, sceneValue string) error
-	CheckBalance(ctx context.Context, username string) error
+	RecordUsage(c context.Context, userUUID string, model *types.Model, tokenCounter token.Counter) error
+	CheckBalance(ctx context.Context, username, userUUID string) error
 }
 
 type openaiComponentImpl struct {
@@ -66,6 +67,8 @@ func (m *openaiComponentImpl) GetAvailableModels(c context.Context, userName str
 	models = csghubModels
 	externalModels := m.getExternalModels(c)
 	models = append(models, externalModels...)
+
+	models = m.enrichModelsWithPrice(c, models)
 
 	// Save models to cache asynchronously
 	go func(modelList []types.Model) {
@@ -103,56 +106,72 @@ func (m *openaiComponentImpl) ListModels(c context.Context, userName string, req
 	return filterAndPaginateModels(models, req), nil
 }
 
+type modelFilter func(m *types.Model) bool
+
+func filterByModelID(query string) modelFilter {
+	return func(m *types.Model) bool {
+		return strings.Contains(strings.ToLower(m.ID), query)
+	}
+}
+
+func filterBySource(source string) modelFilter {
+	return func(m *types.Model) bool {
+		switch source {
+		case string(types.ModelSourceCSGHub):
+			return m.CSGHubModelID != ""
+		case string(types.ModelSourceExternal):
+			return m.Provider != ""
+		default:
+			return true
+		}
+	}
+}
+
+func filterByTask(task string) modelFilter {
+	return func(m *types.Model) bool {
+		modelTasks := strings.FieldsFunc(strings.ToLower(m.Task), func(r rune) bool {
+			return r == ','
+		})
+		return slices.Contains(modelTasks, task)
+	}
+}
+
+func applyFilters(models []types.Model, filters []modelFilter) []types.Model {
+	if len(filters) == 0 {
+		return models
+	}
+	filtered := make([]types.Model, 0, len(models))
+	for i := range models {
+		m := &models[i]
+		keep := true
+		for _, f := range filters {
+			if !f(m) {
+				keep = false
+				break
+			}
+		}
+		if keep {
+			filtered = append(filtered, *m)
+		}
+	}
+	return filtered
+}
+
 func filterAndPaginateModels(models []types.Model, req types.ListModelsReq) types.ModelList {
-	// Apply fuzzy search filter if model_id is provided
-	searchQuery := req.ModelID
-	if searchQuery != "" {
-		filtered := make([]types.Model, 0, len(models))
-		sq := strings.ToLower(searchQuery)
-		for _, model := range models {
-			if strings.Contains(strings.ToLower(model.ID), sq) {
-				filtered = append(filtered, model)
-			}
-		}
-		models = filtered
+	var filters []modelFilter
+
+	if searchQuery := strings.ToLower(req.ModelID); searchQuery != "" {
+		filters = append(filters, filterByModelID(searchQuery))
+	}
+	if source := strings.ToLower(req.Source); source != "" {
+		filters = append(filters, filterBySource(source))
+	}
+	if task := strings.ToLower(req.Task); task != "" {
+		filters = append(filters, filterByTask(task))
 	}
 
-	// Apply public filter if provided and parseable
-	if req.Public != "" {
-		if isPublic, err := strconv.ParseBool(req.Public); err == nil {
-			filtered := make([]types.Model, 0, len(models))
-			for _, model := range models {
-				if model.Public == isPublic {
-					filtered = append(filtered, model)
-				}
-			}
-			models = filtered
-		}
-	}
+	models = applyFilters(models, filters)
 
-	// Apply source filter if provided
-	if req.Source != "" {
-		source := strings.ToLower(req.Source)
-		filtered := make([]types.Model, 0, len(models))
-		for _, model := range models {
-			switch source {
-			case string(types.ModelSourceCSGHub):
-				if model.CSGHubModelID != "" {
-					filtered = append(filtered, model)
-				}
-			case string(types.ModelSourceExternal):
-				if model.Provider != "" {
-					filtered = append(filtered, model)
-				}
-			default:
-				// Unknown source value, include all
-				filtered = append(filtered, model)
-			}
-		}
-		models = filtered
-	}
-
-	// Parse pagination parameters (defaults match previous handler behavior)
 	per := 20
 	page := 1
 	if req.Per != "" {
@@ -170,8 +189,7 @@ func filterAndPaginateModels(models []types.Model, req types.ListModelsReq) type
 	}
 
 	totalCount := len(models)
-	offset := (page - 1) * per
-	startIndex := offset
+	startIndex := (page - 1) * per
 	if startIndex > totalCount {
 		startIndex = totalCount
 	}
@@ -187,15 +205,26 @@ func filterAndPaginateModels(models []types.Model, req types.ListModelsReq) type
 		firstID = &paginated[0].ID
 		lastID = &paginated[len(paginated)-1].ID
 	}
-	hasMore := endIndex < totalCount
 
 	return types.ModelList{
 		Object:     "list",
 		Data:       paginated,
 		FirstID:    firstID,
 		LastID:     lastID,
-		HasMore:    hasMore,
+		HasMore:    endIndex < totalCount,
 		TotalCount: totalCount,
+	}
+}
+
+// providerTypeFromDeployType maps a deploy type integer to the LLM type string (MetaKeyLLMType).
+func providerTypeFromDeployType(t int) string {
+	switch t {
+	case commontypes.ServerlessType:
+		return types.ProviderTypeServerless
+	case commontypes.InferenceType:
+		return types.ProviderTypeInference
+	default:
+		return types.ProviderTypeInference
 	}
 }
 
@@ -212,11 +241,6 @@ func (m *openaiComponentImpl) getCSGHubModels(c context.Context, userID int64) (
 		}
 		// Check if engine_args contains tool-call-parser parameter
 		supportFunctionCall := strings.Contains(deploy.EngineArgs, "tool-call-parser")
-		// Determine public/private based on deployment type, ownership and secure level.
-		isPublic := true
-		if deploy.Type == commontypes.InferenceType && deploy.SecureLevel == commontypes.EndpointPrivate && deploy.UserID == userID {
-			isPublic = false // private - user's own deployment with private secure level
-		}
 		repoName := deploy.Repository.Name
 		m := types.Model{
 			BaseModel: types.BaseModel{
@@ -224,8 +248,10 @@ func (m *openaiComponentImpl) getCSGHubModels(c context.Context, userID int64) (
 				Created:             deploy.CreatedAt.Unix(),
 				SupportFunctionCall: supportFunctionCall,
 				Task:                string(deploy.Task),
-				DisplayName:         repoName,
-				Public:              isPublic,
+				OfficialName:        repoName,
+				Metadata: map[string]any{
+					types.MetaKeyLLMType: providerTypeFromDeployType(deploy.Type),
+				},
 			},
 			InternalModelInfo: types.InternalModelInfo{
 				CSGHubModelID:    deploy.Repository.Path,
@@ -235,6 +261,9 @@ func (m *openaiComponentImpl) getCSGHubModels(c context.Context, userID int64) (
 				SvcType:          deploy.Type,
 				ImageID:          deploy.ImageID,
 				RuntimeFramework: deploy.RuntimeFramework,
+			},
+			ExternalModelInfo: types.ExternalModelInfo{
+				NeedSensitiveCheck: true,
 			},
 		}
 		if deploy.Type == commontypes.ServerlessType {
@@ -266,6 +295,8 @@ func (m *openaiComponentImpl) getExternalModels(c context.Context) []types.Model
 	search := &commontypes.SearchLLMConfig{}
 	searchType := 16
 	search.Type = &searchType
+	enabled := true
+	search.Enabled = &enabled
 
 	per := 50
 	page := 1
@@ -278,20 +309,37 @@ func (m *openaiComponentImpl) getExternalModels(c context.Context) []types.Model
 		}
 
 		for _, extModel := range extModels {
+			// Extract tasks from metadata if present
+			task := ""
+			if extModel.Metadata != nil {
+				if tasks, ok := extModel.Metadata[types.MetaKeyTasks].([]any); ok && len(tasks) > 0 {
+					tasksStrings := make([]string, 0, len(tasks))
+					for _, t := range tasks {
+						if s, ok := t.(string); ok {
+							tasksStrings = append(tasksStrings, s)
+						}
+					}
+					task = strings.Join(tasksStrings, ",")
+				}
+			}
+			if extModel.Metadata == nil {
+				extModel.Metadata = map[string]any{}
+			}
+			extModel.Metadata[types.MetaKeyLLMType] = types.ProviderTypeExternalLLM
 			m := types.Model{
 				BaseModel: types.BaseModel{
-					Object:      "model",
-					ID:          extModel.ModelName,
-					OwnedBy:     extModel.Provider,
-					DisplayName: extModel.DisplayName,
-					// Metadata is allowed to be nil; JSON will contain `null` for nil maps.
-					Metadata: extModel.Metadata,
-					Public:   true, // external models are always public
+					Object:       "model",
+					ID:           extModel.ModelName,
+					OwnedBy:      extModel.Provider,
+					OfficialName: extModel.OfficialName,
+					Metadata:     extModel.Metadata,
+					Task:         task,
 				},
 				Endpoint: extModel.ApiEndpoint,
 				ExternalModelInfo: types.ExternalModelInfo{
-					Provider: extModel.Provider,
-					AuthHead: extModel.AuthHeader,
+					Provider:           extModel.Provider,
+					AuthHead:           extModel.AuthHeader,
+					NeedSensitiveCheck: extModel.NeedSensitiveCheck,
 				},
 			}
 			models = append(models, m)
@@ -397,88 +445,157 @@ func getSceneFromSvcType(svcType int) int {
 	}
 }
 
-func (m *openaiComponentImpl) RecordUsage(c context.Context, userUUID string, model *types.Model, counter token.Counter, sceneValue string) error {
-	usage, err := counter.Usage(c)
-	if err != nil {
-		return fmt.Errorf("failed to get token usage from counter,error:%w", err)
+// csghubMeteringLLMTypeFromModel returns metadata llm_type (e.g. serverless, inference) used as the path component in csghub://… metering URIs.
+func csghubMeteringLLMTypeFromModel(m *types.Model) (string, error) {
+	if m == nil {
+		return "", fmt.Errorf("model is nil")
 	}
+	if m.Metadata == nil {
+		return "", fmt.Errorf("model metadata is nil: cannot resolve %s for resource path", types.MetaKeyLLMType)
+	}
+	llmType, ok := m.Metadata[types.MetaKeyLLMType].(string)
+	if !ok {
+		return "", fmt.Errorf("model metadata %s missing or not a string", types.MetaKeyLLMType)
+	}
+	return llmType, nil
+}
 
-	scene := parseScene(sceneValue)
-	slog.DebugContext(c, "token usage", slog.Any("usage", usage), slog.Any("scene", scene))
-	var tokenUsageExtra = struct {
-		PromptTokenNum     string `json:"prompt_token_num"`
-		CompletionTokenNum string `json:"completion_token_num"`
-		// 0: external, 1: owner is user, 2: other user is inference, 3: serverless
-		OwnerType commontypes.TokenUsageType `json:"owner_type"`
-	}{
-		PromptTokenNum:     fmt.Sprintf("%d", usage.PromptTokens),
-		CompletionTokenNum: fmt.Sprintf("%d", usage.CompletionTokens),
+// meteringResourceFromModel builds a MeteringResource from an OpenAI gateway model (see types.MeteringResource).
+func meteringResourceFromModel(model *types.Model) (types.MeteringResource, error) {
+	if model == nil {
+		return types.MeteringResource{}, fmt.Errorf("model is nil")
+	}
+	if model.CSGHubModelID != "" {
+		llmType, err := csghubMeteringLLMTypeFromModel(model)
+		if err != nil {
+			return types.MeteringResource{}, err
+		}
+		id := fmt.Sprintf(types.CSGHubResourceFmt, llmType, model.CSGHubModelID)
+		return types.MeteringResource{
+			ResourceID:   id,
+			ResourceName: id,
+			CustomerID:   model.SvcName,
+		}, nil
+	}
+	if model.Provider != "" {
+		id := fmt.Sprintf(types.ExternalLLMResourceFmt, model.Provider, model.ID)
+		return types.MeteringResource{
+			ResourceID:   id,
+			ResourceName: id,
+			CustomerID:   id,
+		}, nil
+	}
+	return types.MeteringResource{}, nil
+}
+
+// tokenUsageMeteringExtra is serialized into MeteringEvent.Extra for token billing breakdown.
+type tokenUsageMeteringExtra struct {
+	PromptTokenNum     string                     `json:"prompt_token_num"`
+	CompletionTokenNum string                     `json:"completion_token_num"`
+	OwnerType          commontypes.TokenUsageType `json:"owner_type"`
+}
+
+func validateModelForUsageRecord(c context.Context, model *types.Model) error {
+	if model == nil {
+		return fmt.Errorf("record usage: model is nil")
 	}
 	if model.CSGHubModelID != "" && model.Provider != "" {
 		slog.WarnContext(c, "bad model info, both csghub model id and external model provider is set",
-			slog.Any("model info", model))
+			slog.Any("model", model))
+		return fmt.Errorf("record usage: conflicting csghub model id and external provider")
 	}
 	if model.CSGHubModelID == "" && model.Provider == "" {
 		slog.WarnContext(c, "bad model info, both csghub model id and external model provider is not set",
-			slog.Any("model info", model))
+			slog.Any("model", model))
+		return fmt.Errorf("record usage: model missing resource identifiers")
+	}
+	return nil
+}
+
+func (m *openaiComponentImpl) tokenUsageMeteringExtraAndScene(c context.Context, userUUID string, model *types.Model, usage *token.Usage) (tokenUsageMeteringExtra, commontypes.SceneType, error) {
+	scene := commontypes.SceneModelServerless
+	extra := tokenUsageMeteringExtra{
+		PromptTokenNum:     fmt.Sprintf("%d", usage.PromptTokens),
+		CompletionTokenNum: fmt.Sprintf("%d", usage.CompletionTokens),
 	}
 	if model.CSGHubModelID != "" {
 		switch model.SvcType {
 		case commontypes.ServerlessType:
-			tokenUsageExtra.OwnerType = commontypes.CSGHubServerlessInference
+			extra.OwnerType = commontypes.CSGHubServerlessInference
 		case commontypes.InferenceType:
 			if model.OwnerUUID == userUUID {
-				tokenUsageExtra.OwnerType = commontypes.CSGHubUserDeployedInference
+				extra.OwnerType = commontypes.CSGHubUserDeployedInference
 			} else {
 				belong, err := m.checkOrganization(c, userUUID, model.OwnerUUID)
 				if err != nil {
-					return fmt.Errorf("failed to check organization,error:%w", err)
+					return tokenUsageMeteringExtra{}, 0, fmt.Errorf("failed to check organization: %w", err)
 				}
 				if belong {
-					tokenUsageExtra.OwnerType = commontypes.CSGHubOrganFellowDeployedInference
+					extra.OwnerType = commontypes.CSGHubOrganFellowDeployedInference
 				} else {
-					tokenUsageExtra.OwnerType = commontypes.CSGHubOtherDeployedInference
+					extra.OwnerType = commontypes.CSGHubOtherDeployedInference
 				}
 			}
+			scene = commontypes.SceneModelInference
 		default:
-			slog.WarnContext(c, "bad model info, csghub model missing service type",
-				slog.Any("model info", model))
+			slog.ErrorContext(c, "bad model info, csghub model missing service type", slog.Any("model", model))
+			return tokenUsageMeteringExtra{}, 0, fmt.Errorf("record usage: csghub model has invalid or missing service type")
 		}
+	} else if model.Provider != "" {
+		extra.OwnerType = commontypes.ExternalInference
 	}
-	if model.Provider != "" {
-		tokenUsageExtra.OwnerType = commontypes.ExternalInference
-	}
+	return extra, scene, nil
+}
 
-	extraData, _ := json.Marshal(tokenUsageExtra)
+func (m *openaiComponentImpl) RecordUsage(c context.Context, userUUID string, model *types.Model, counter token.Counter) error {
+	usage, err := counter.Usage(c)
+	if err != nil {
+		return fmt.Errorf("failed to get token usage from counter: %w", err)
+	}
+	if err := validateModelForUsageRecord(c, model); err != nil {
+		return err
+	}
+	res, ridErr := meteringResourceFromModel(model)
+	if ridErr != nil {
+		slog.ErrorContext(c, "cannot record usage: invalid model for resource id", slog.Any("error", ridErr), slog.Any("model", model))
+		return fmt.Errorf("cannot record usage: %w", ridErr)
+	}
+	if res.ResourceID == "" {
+		slog.ErrorContext(c, "cannot record usage: empty resource id for model", slog.Any("model", model))
+		return fmt.Errorf("cannot record usage: empty resource id")
+	}
+	extra, scene, err := m.tokenUsageMeteringExtraAndScene(c, userUUID, model, usage)
+	if err != nil {
+		return err
+	}
+	extraData, err := json.Marshal(extra)
+	if err != nil {
+		return fmt.Errorf("failed to marshal token usage extra: %w", err)
+	}
 	event := commontypes.MeteringEvent{
-		Uuid:      uuid.New(),
-		UserUUID:  userUUID,
-		Value:     usage.TotalTokens,
-		ValueType: commontypes.TokenNumberType, // count by token
-		Scene:     int(scene),
-		OpUID:     "aigateway",
-		CreatedAt: time.Now(),
-		Extra:     string(extraData),
+		Uuid:         uuid.New(),
+		UserUUID:     userUUID,
+		Value:        usage.TotalTokens,
+		ValueType:    commontypes.TokenNumberType,
+		Scene:        int(scene),
+		OpUID:        "aigateway",
+		CreatedAt:    time.Now(),
+		Extra:        string(extraData),
+		ResourceID:   res.ResourceID,
+		ResourceName: res.ResourceName,
+		CustomerID:   res.CustomerID,
 	}
-	if model.CSGHubModelID != "" {
-		event.ResourceID = model.CSGHubModelID
-		event.ResourceName = model.CSGHubModelID
-		event.CustomerID = model.SvcName
+	eventData, err := json.Marshal(event)
+	if err != nil {
+		return fmt.Errorf("failed to marshal metering event: %w", err)
 	}
-	if model.Provider != "" {
-		extendModelKey := fmt.Sprintf("%s:%s", model.Provider, model.ID)
-		event.ResourceID = extendModelKey
-		event.ResourceName = extendModelKey
-		event.CustomerID = extendModelKey
-	}
-	eventData, _ := json.Marshal(event)
 	err = m.eventPub.PublishMeteringEvent(eventData)
 	if err != nil {
 		slog.ErrorContext(c, "failed to publish token usage event", slog.Any("event", event), slog.Any("error", err))
-		return fmt.Errorf("failed to publish token usage event,error:%w", err)
+		return fmt.Errorf("failed to publish token usage event: %w", err)
 	}
 
-	slog.InfoContext(c, "public token usage event success", slog.Any("event", event))
+	slog.InfoContext(c, "published token usage event success", slog.Any("event", event))
 	return nil
 }
 

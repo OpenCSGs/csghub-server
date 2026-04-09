@@ -18,7 +18,7 @@ type lLMConfigStoreImpl struct {
 type LLMConfig struct {
 	ID          int64          `bun:",pk,autoincrement" json:"id"`
 	ModelName   string         `bun:",notnull" json:"model_name"`
-	DisplayName string         `bun:"display_name,nullzero" json:"display_name"`
+	OfficialName string        `bun:"official_name,nullzero" json:"official_name"`
 	ApiEndpoint string         `bun:",notnull" json:"api_endpoint"`
 	AuthHeader  string         `bun:",notnull" json:"auth_header"`
 	Type        int            `bun:",notnull" json:"type"` // 1: optimization, 2: comparison, 4: summary readme, 8: mcp scan, 16: for aigateway call external llm

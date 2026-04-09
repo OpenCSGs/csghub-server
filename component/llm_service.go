@@ -67,7 +67,7 @@ func (s *llmServiceComponentImpl) ShowLLMConfig(ctx context.Context, id int64) (
 	llmConfig := &types.LLMConfig{
 		ID:          dbLlmConfig.ID,
 		ModelName:   dbLlmConfig.ModelName,
-		DisplayName: dbLlmConfig.DisplayName,
+		OfficialName: dbLlmConfig.OfficialName,
 		ApiEndpoint: dbLlmConfig.ApiEndpoint,
 		AuthHeader:  dbLlmConfig.AuthHeader,
 		Type:        dbLlmConfig.Type,
@@ -102,8 +102,8 @@ func (s *llmServiceComponentImpl) UpdateLLMConfig(ctx context.Context, req *type
 	if req.ModelName != nil {
 		llmConfig.ModelName = *req.ModelName
 	}
-	if req.DisplayName != nil {
-		llmConfig.DisplayName = *req.DisplayName
+	if req.OfficialName != nil {
+		llmConfig.OfficialName = *req.OfficialName
 	}
 	if req.ApiEndpoint != nil {
 		llmConfig.ApiEndpoint = *req.ApiEndpoint
@@ -130,7 +130,7 @@ func (s *llmServiceComponentImpl) UpdateLLMConfig(ctx context.Context, req *type
 	resLLMConfig := &types.LLMConfig{
 		ID:          updatedConfig.ID,
 		ModelName:   updatedConfig.ModelName,
-		DisplayName: updatedConfig.DisplayName,
+		OfficialName: updatedConfig.OfficialName,
 		ApiEndpoint: updatedConfig.ApiEndpoint,
 		AuthHeader:  updatedConfig.AuthHeader,
 		Type:        updatedConfig.Type,
@@ -173,7 +173,7 @@ func (s *llmServiceComponentImpl) UpdatePromptPrefix(ctx context.Context, req *t
 func (s *llmServiceComponentImpl) CreateLLMConfig(ctx context.Context, req *types.CreateLLMConfigReq) (*types.LLMConfig, error) {
 	dbLLMConfig := database.LLMConfig{
 		ModelName:   req.ModelName,
-		DisplayName: req.DisplayName,
+		OfficialName: req.OfficialName,
 		ApiEndpoint: req.ApiEndpoint,
 		AuthHeader:  req.AuthHeader,
 		Type:        req.Type,
@@ -188,7 +188,7 @@ func (s *llmServiceComponentImpl) CreateLLMConfig(ctx context.Context, req *type
 	resLLMConfig := &types.LLMConfig{
 		ID:          dbRes.ID,
 		ModelName:   dbRes.ModelName,
-		DisplayName: dbRes.DisplayName,
+		OfficialName: dbRes.OfficialName,
 		ApiEndpoint: dbRes.ApiEndpoint,
 		AuthHeader:  dbRes.AuthHeader,
 		Type:        dbRes.Type,
