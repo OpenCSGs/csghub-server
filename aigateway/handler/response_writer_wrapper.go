@@ -36,6 +36,7 @@ type ResponseWriterWrapper struct {
 	moderationComponent component.Moderation
 	eventStreamDecoder  *eventStreamDecoder
 	tokenCounter        token.ChatTokenCounter
+	recorder            component.LLMLogRecorder
 	id                  string
 }
 
@@ -44,21 +45,22 @@ func (rw *ResponseWriterWrapper) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	return rw.internalWritter.Hijack()
 }
 
-func NewResponseWriterWrapper(internalWritter gin.ResponseWriter, useStream bool, moderationComponent component.Moderation, tokenCounter token.ChatTokenCounter) CommonResponseWriter {
+func NewResponseWriterWrapper(internalWritter gin.ResponseWriter, useStream bool, moderationComponent component.Moderation, tokenCounter token.ChatTokenCounter, recorder component.LLMLogRecorder) CommonResponseWriter {
 	if useStream {
-		return newStreamResponseWriter(internalWritter, moderationComponent, tokenCounter)
+		return newStreamResponseWriter(internalWritter, moderationComponent, tokenCounter, recorder)
 	} else {
-		return newNonStreamResponseWriter(internalWritter, moderationComponent, tokenCounter)
+		return newNonStreamResponseWriter(internalWritter, moderationComponent, tokenCounter, recorder)
 	}
 }
 
-func newStreamResponseWriter(internalWritter gin.ResponseWriter, moderationComponent component.Moderation, tokenCounter token.ChatTokenCounter) *ResponseWriterWrapper {
+func newStreamResponseWriter(internalWritter gin.ResponseWriter, moderationComponent component.Moderation, tokenCounter token.ChatTokenCounter, recorder component.LLMLogRecorder) *ResponseWriterWrapper {
 	id := uuid.New().ID()
 	return &ResponseWriterWrapper{
 		internalWritter:     internalWritter,
 		moderationComponent: moderationComponent,
 		tokenCounter:        tokenCounter,
 		eventStreamDecoder:  &eventStreamDecoder{},
+		recorder:            recorder,
 		id:                  fmt.Sprint(id),
 	}
 }
@@ -112,6 +114,9 @@ func (rw *ResponseWriterWrapper) streamWrite(data []byte) (int, error) {
 		}
 		if rw.tokenCounter != nil {
 			rw.tokenCounter.AppendCompletionChunk(chunk)
+		}
+		if rw.recorder != nil {
+			rw.recorder.AppendCompletionChunk(chunk)
 		}
 		// call moderation service
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

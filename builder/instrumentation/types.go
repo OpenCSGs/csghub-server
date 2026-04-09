@@ -13,6 +13,7 @@ const (
 	Payment        = "payment"
 	Dataviewer     = "dataviewer"
 	Aigateway      = "aigateway"
+	LLMLog         = "llmlog"
 	Notification   = "notification"
 	TemporalWorker = "temporal-worker"
 )

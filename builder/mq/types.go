@@ -30,6 +30,7 @@ const (
 	NormalPriorityMsgSubject string = "notification.message.normal"
 
 	AgentSessionHistoryMsgSubject string = "agent.session.history.message"
+	LLMLogSubject                 string = "aigateway.llmlog"
 
 	LfsXnetProcessedSubject string = "xnet.lfs.processed"
 
@@ -91,6 +92,10 @@ var (
 	AgentSessionHistoryMsgGroup = MQGroup{
 		StreamName:   "agentSessionHistoryMsgStream",
 		ConsumerName: "agentSessionHistoryMsgConsumer",
+	}
+	LLMLogGroup = MQGroup{
+		StreamName:   "llmLogStream",
+		ConsumerName: "llmLogConsumer",
 	}
 	LfsXnetResultGroup = MQGroup{
 		StreamName:   "lfsResultStreamClient",
