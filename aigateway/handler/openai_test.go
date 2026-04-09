@@ -298,10 +298,10 @@ func TestOpenAIHandler_GetModel(t *testing.T) {
 		tester, c, w := setupTest(t)
 		model := &types.Model{
 			BaseModel: types.BaseModel{
-				ID:                 "model1",
-				Object:             "model",
-				OwnedBy:            "testuser",
-				},
+				ID:      "model1",
+				Object:  "model",
+				OwnedBy: "testuser",
+			},
 			ExternalModelInfo: types.ExternalModelInfo{
 				NeedSensitiveCheck: true,
 			},
@@ -417,13 +417,13 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 
 		model := &types.Model{
 			BaseModel: types.BaseModel{
-				ID:                 "model1",
-				Object:             "model",
-				OwnedBy:            "testuser",
-				},
+				ID:      "model1",
+				Object:  "model",
+				OwnedBy: "testuser",
+			},
 			InternalModelInfo: types.InternalModelInfo{
-				ClusterID: "test-cls",
-				SvcName:   "test-svc",
+				ClusterID:     "test-cls",
+				SvcName:       "test-svc",
 				CSGHubModelID: "model1",
 			},
 		}
@@ -546,10 +546,10 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 
 		model := &types.Model{
 			BaseModel: types.BaseModel{
-				ID:                 "model1:svc1",
-				Object:             "model",
-				OwnedBy:            "testuser",
-				},
+				ID:      "model1:svc1",
+				Object:  "model",
+				OwnedBy: "testuser",
+			},
 			InternalModelInfo: types.InternalModelInfo{
 				ClusterID:     "test-cls",
 				SvcName:       "test-svc",
@@ -582,8 +582,8 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 		llmTokenCounter.EXPECT().AppendPrompts(expectReq.Messages).Return()
 		var wg sync.WaitGroup
 		wg.Add(1)
-		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, "testuuid", model, llmTokenCounter, mock.Anything).
-			RunAndReturn(func(ctx context.Context, uuid string, model *types.Model, counter token.Counter, sceneValue string) error {
+		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, "testuuid", model, llmTokenCounter).
+			RunAndReturn(func(ctx context.Context, uuid string, model *types.Model, counter token.Counter) error {
 				wg.Done()
 				return nil
 			})
@@ -648,8 +648,8 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 		llmTokenCounter.EXPECT().AppendPrompts(expectReq.Messages).Return()
 		var wg sync.WaitGroup
 		wg.Add(1)
-		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, "testuuid", model, llmTokenCounter, mock.Anything).
-			RunAndReturn(func(ctx context.Context, uuid string, model *types.Model, counter token.Counter, sceneValue string) error {
+		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, "testuuid", model, llmTokenCounter).
+			RunAndReturn(func(ctx context.Context, uuid string, model *types.Model, counter token.Counter) error {
 				wg.Done()
 				return errors.New("record usage error")
 			})
@@ -708,8 +708,8 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 
 		var wg sync.WaitGroup
 		wg.Add(1)
-		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, "testuuid", model, llmTokenCounter, mock.Anything).
-			RunAndReturn(func(ctx context.Context, uuid string, model *types.Model, counter token.Counter, sceneValue string) error {
+		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, "testuuid", model, llmTokenCounter).
+			RunAndReturn(func(ctx context.Context, uuid string, model *types.Model, counter token.Counter) error {
 				wg.Done()
 				return nil
 			})
@@ -833,10 +833,10 @@ func TestOpenAIHandler_Embedding(t *testing.T) {
 
 		model := &types.Model{
 			BaseModel: types.BaseModel{
-				ID:                 "model1:svc1",
-				Object:             "model",
-				OwnedBy:            "testuser",
-				},
+				ID:      "model1:svc1",
+				Object:  "model",
+				OwnedBy: "testuser",
+			},
 			ExternalModelInfo: types.ExternalModelInfo{
 				NeedSensitiveCheck: true,
 			},
@@ -896,8 +896,8 @@ func TestOpenAIHandler_Embedding(t *testing.T) {
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1").
 			Return(model, nil)
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuser", "testuuid").Return(nil)
-		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, "testuuid", model, mock.Anything, mock.Anything).RunAndReturn(
-			func(ctx context.Context, userID string, model *types.Model, counter token.Counter, sceneValue string) error {
+		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, "testuuid", model, mock.Anything).RunAndReturn(
+			func(ctx context.Context, userID string, model *types.Model, counter token.Counter) error {
 				wg.Done()
 				return nil
 			})
