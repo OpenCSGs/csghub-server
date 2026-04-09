@@ -79,6 +79,63 @@ func (_c *MockNamespaceStore_Exists_Call) RunAndReturn(run func(context.Context,
 	return _c
 }
 
+// ExistsByUUID provides a mock function with given fields: ctx, uuid
+func (_m *MockNamespaceStore) ExistsByUUID(ctx context.Context, uuid string) (bool, error) {
+	ret := _m.Called(ctx, uuid)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ExistsByUUID")
+	}
+
+	var r0 bool
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (bool, error)); ok {
+		return rf(ctx, uuid)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) bool); ok {
+		r0 = rf(ctx, uuid)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, uuid)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockNamespaceStore_ExistsByUUID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ExistsByUUID'
+type MockNamespaceStore_ExistsByUUID_Call struct {
+	*mock.Call
+}
+
+// ExistsByUUID is a helper method to define mock.On call
+//   - ctx context.Context
+//   - uuid string
+func (_e *MockNamespaceStore_Expecter) ExistsByUUID(ctx interface{}, uuid interface{}) *MockNamespaceStore_ExistsByUUID_Call {
+	return &MockNamespaceStore_ExistsByUUID_Call{Call: _e.mock.On("ExistsByUUID", ctx, uuid)}
+}
+
+func (_c *MockNamespaceStore_ExistsByUUID_Call) Run(run func(ctx context.Context, uuid string)) *MockNamespaceStore_ExistsByUUID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockNamespaceStore_ExistsByUUID_Call) Return(_a0 bool, _a1 error) *MockNamespaceStore_ExistsByUUID_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockNamespaceStore_ExistsByUUID_Call) RunAndReturn(run func(context.Context, string) (bool, error)) *MockNamespaceStore_ExistsByUUID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // FindByPath provides a mock function with given fields: ctx, path
 func (_m *MockNamespaceStore) FindByPath(ctx context.Context, path string) (database.Namespace, error) {
 	ret := _m.Called(ctx, path)
@@ -132,6 +189,122 @@ func (_c *MockNamespaceStore_FindByPath_Call) Return(_a0 database.Namespace, _a1
 }
 
 func (_c *MockNamespaceStore_FindByPath_Call) RunAndReturn(run func(context.Context, string) (database.Namespace, error)) *MockNamespaceStore_FindByPath_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// FindByUUID provides a mock function with given fields: ctx, uuid
+func (_m *MockNamespaceStore) FindByUUID(ctx context.Context, uuid string) (database.Namespace, error) {
+	ret := _m.Called(ctx, uuid)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FindByUUID")
+	}
+
+	var r0 database.Namespace
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (database.Namespace, error)); ok {
+		return rf(ctx, uuid)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) database.Namespace); ok {
+		r0 = rf(ctx, uuid)
+	} else {
+		r0 = ret.Get(0).(database.Namespace)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, uuid)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockNamespaceStore_FindByUUID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindByUUID'
+type MockNamespaceStore_FindByUUID_Call struct {
+	*mock.Call
+}
+
+// FindByUUID is a helper method to define mock.On call
+//   - ctx context.Context
+//   - uuid string
+func (_e *MockNamespaceStore_Expecter) FindByUUID(ctx interface{}, uuid interface{}) *MockNamespaceStore_FindByUUID_Call {
+	return &MockNamespaceStore_FindByUUID_Call{Call: _e.mock.On("FindByUUID", ctx, uuid)}
+}
+
+func (_c *MockNamespaceStore_FindByUUID_Call) Run(run func(ctx context.Context, uuid string)) *MockNamespaceStore_FindByUUID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockNamespaceStore_FindByUUID_Call) Return(_a0 database.Namespace, _a1 error) *MockNamespaceStore_FindByUUID_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockNamespaceStore_FindByUUID_Call) RunAndReturn(run func(context.Context, string) (database.Namespace, error)) *MockNamespaceStore_FindByUUID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// FindByUUIDs provides a mock function with given fields: ctx, uuids
+func (_m *MockNamespaceStore) FindByUUIDs(ctx context.Context, uuids []string) ([]database.Namespace, error) {
+	ret := _m.Called(ctx, uuids)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FindByUUIDs")
+	}
+
+	var r0 []database.Namespace
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, []string) ([]database.Namespace, error)); ok {
+		return rf(ctx, uuids)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, []string) []database.Namespace); ok {
+		r0 = rf(ctx, uuids)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.Namespace)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, []string) error); ok {
+		r1 = rf(ctx, uuids)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockNamespaceStore_FindByUUIDs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindByUUIDs'
+type MockNamespaceStore_FindByUUIDs_Call struct {
+	*mock.Call
+}
+
+// FindByUUIDs is a helper method to define mock.On call
+//   - ctx context.Context
+//   - uuids []string
+func (_e *MockNamespaceStore_Expecter) FindByUUIDs(ctx interface{}, uuids interface{}) *MockNamespaceStore_FindByUUIDs_Call {
+	return &MockNamespaceStore_FindByUUIDs_Call{Call: _e.mock.On("FindByUUIDs", ctx, uuids)}
+}
+
+func (_c *MockNamespaceStore_FindByUUIDs_Call) Run(run func(ctx context.Context, uuids []string)) *MockNamespaceStore_FindByUUIDs_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].([]string))
+	})
+	return _c
+}
+
+func (_c *MockNamespaceStore_FindByUUIDs_Call) Return(_a0 []database.Namespace, _a1 error) *MockNamespaceStore_FindByUUIDs_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockNamespaceStore_FindByUUIDs_Call) RunAndReturn(run func(context.Context, []string) ([]database.Namespace, error)) *MockNamespaceStore_FindByUUIDs_Call {
 	_c.Call.Return(run)
 	return _c
 }

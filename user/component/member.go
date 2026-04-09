@@ -41,6 +41,7 @@ type MemberComponent interface {
 	AddMember(ctx context.Context, orgName, userName, operatorName string, role string) error
 	Delete(ctx context.Context, orgName, userName, operatorName string, role string) error
 	GetMember(ctx context.Context, orgName, userName string) (*database.Member, error)
+	GetMemberRoleByUUID(ctx context.Context, orgUUID, userName string) (membership.Role, error)
 }
 
 func NewMemberComponent(config *config.Config) (MemberComponent, error) {
@@ -426,6 +427,25 @@ func (c *memberComponentImpl) GetMember(ctx context.Context, orgName, userName s
 		return nil, fmt.Errorf("failed to find member:%w", err)
 	}
 	return m, err
+}
+
+func (c *memberComponentImpl) GetMemberRoleByUUID(ctx context.Context, orgUUID, userName string) (membership.Role, error) {
+	org, err := c.orgStore.FindByUUID(ctx, orgUUID)
+	if err != nil {
+		return membership.RoleUnknown, fmt.Errorf("failed to find org by uuid,caused by:%w", err)
+	}
+	user, err := c.userStore.FindByUsername(ctx, userName)
+	if err != nil {
+		return membership.RoleUnknown, fmt.Errorf("failed to find user,caused by:%w", err)
+	}
+	m, err := c.memberStore.Find(ctx, org.ID, user.ID)
+	if err != nil {
+		return membership.RoleUnknown, fmt.Errorf("failed to find member:%w", err)
+	}
+	if m == nil {
+		return membership.RoleUnknown, nil
+	}
+	return c.toGitRole(m.Role), nil
 }
 
 func (c *memberComponentImpl) sendMemberMsg(ctx context.Context, req types.OrgMemberReq) error {

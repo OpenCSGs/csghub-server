@@ -228,8 +228,20 @@ func (c *userComponentImpl) createFromSSOUser(ctx context.Context, cu *rpc.SSOUs
 		}
 	}
 
+	exist, err := c.nsStore.ExistsByUUID(ctx, cu.UUID)
+	if err != nil {
+		newError := fmt.Errorf("failed to check user uuid '%s' existence: %w", cu.UUID, err)
+		return nil, newError
+	}
+	// use user uuid as namespace uuid by default
+	newNSUUID := cu.UUID
+	if exist {
+		// if user uuid already exists, generate a new uuid
+		newNSUUID = uuid.New().String()
+	}
 	namespace := &database.Namespace{
 		Path: userName,
+		UUID: newNSUUID,
 	}
 	user := &database.User{
 		Username:    userName,
@@ -807,6 +819,14 @@ func (c *userComponentImpl) buildUserInfo(ctx context.Context, dbuser *database.
 		Tags:     tags,
 	}
 
+	for _, ns := range dbuser.Namespaces {
+		u.Namespaces = append(u.Namespaces, types.Namespace{
+			Path: ns.Path,
+			Type: string(ns.NamespaceType),
+			UUID: ns.UUID,
+		})
+	}
+
 	if !onlyBasicInfo {
 		u.ID = dbuser.ID
 		u.Email = dbuser.Email
@@ -828,7 +848,7 @@ func (c *userComponentImpl) buildUserInfo(ctx context.Context, dbuser *database.
 
 	if len(dborgs) > 0 {
 		for _, org := range dborgs {
-			u.Orgs = append(u.Orgs, types.Organization{
+			o := types.Organization{
 				Name:     org.Name,
 				Nickname: org.Nickname,
 				Homepage: org.Homepage,
@@ -836,7 +856,16 @@ func (c *userComponentImpl) buildUserInfo(ctx context.Context, dbuser *database.
 				OrgType:  org.OrgType,
 				Verified: org.Verified,
 				UserID:   org.UserID,
-			})
+				UUID:     org.UUID,
+			}
+			if org.Namespace != nil {
+				o.Namespace = &types.Namespace{
+					Path: org.Nickname,
+					Type: string(org.Namespace.NamespaceType),
+					UUID: org.Namespace.UUID,
+				}
+			}
+			u.Orgs = append(u.Orgs, o)
 		}
 	}
 
@@ -1043,11 +1072,19 @@ func (c *userComponentImpl) FindByUUIDs(ctx context.Context, uuids []string) ([]
 	}
 	for _, dbuser := range dbUsers {
 		if dbuser != nil {
-			usersRes = append(usersRes, &types.User{
+			u := &types.User{
 				ID:       dbuser.ID,
 				Username: dbuser.Username,
 				UUID:     dbuser.UUID,
-			})
+			}
+			for _, ns := range dbuser.Namespaces {
+				u.Namespaces = append(u.Namespaces, types.Namespace{
+					Path: ns.Path,
+					Type: string(ns.NamespaceType),
+					UUID: ns.UUID,
+				})
+			}
+			usersRes = append(usersRes, u)
 		}
 	}
 	return usersRes, nil

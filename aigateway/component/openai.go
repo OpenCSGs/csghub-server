@@ -30,7 +30,7 @@ type OpenAIComponent interface {
 	ListModels(c context.Context, user string, req types.ListModelsReq) (types.ModelList, error)
 	GetModelByID(c context.Context, username, modelID string) (*types.Model, error)
 	RecordUsage(c context.Context, userUUID string, model *types.Model, tokenCounter token.Counter, sceneValue string) error
-	CheckBalance(ctx context.Context, username string, model *types.Model, sceneValue string) error
+	CheckBalance(ctx context.Context, username string) error
 }
 
 type openaiComponentImpl struct {
@@ -47,11 +47,19 @@ type openaiComponentImpl struct {
 // GetAvailableModels returns a list of running models
 func (m *openaiComponentImpl) GetAvailableModels(c context.Context, userName string) ([]types.Model, error) {
 	var models []types.Model
-	user, err := m.userStore.FindByUsername(c, userName)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find user by username in db,error:%w", err)
+	var userID int64
+	var userUUID string
+	if strings.TrimSpace(userName) != "" {
+		user, err := m.userStore.FindByUsername(c, userName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to find user by username in db,error:%w", err)
+		}
+		userID = user.ID
+		userUUID = user.UUID
 	}
-	csghubModels, err := m.getCSGHubModels(c, user.ID)
+	var csghubModels []types.Model
+	var err error
+	csghubModels, err = m.getCSGHubModels(c, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -70,15 +78,18 @@ func (m *openaiComponentImpl) GetAvailableModels(c context.Context, userName str
 		}
 	}(models)
 
-	req := &types.UserPreferenceRequest{
-		UserUUID: user.UUID,
-		Models:   models,
-		Scenario: types.AgenticHubApp,
-	}
-	models, err = m.userPreference(c, req)
-	if err != nil {
-		slog.Warn("failed to apply user preference", "error", err)
-		// Continue with original models if user preference fails
+	if strings.TrimSpace(userUUID) != "" {
+		req := &types.UserPreferenceRequest{
+			UserUUID: userUUID,
+			Models:   models,
+			Scenario: types.AgenticHubApp,
+		}
+		var prefErr error
+		models, prefErr = m.userPreference(c, req)
+		if prefErr != nil {
+			slog.Warn("failed to apply user preference", "error", prefErr)
+			// Continue with original models if user preference fails
+		}
 	}
 
 	return models, nil

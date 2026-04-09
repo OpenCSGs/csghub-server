@@ -55,17 +55,20 @@ var cmdLaunch = &cobra.Command{
 			return fmt.Errorf("failed to init deploy: %w", err)
 		}
 
-		r, err := router.NewRouter(cfg)
+		r, cleanup, err := router.NewRouter(cfg)
 		if err != nil {
 			return fmt.Errorf("failed to init router: %w", err)
 		}
-		slog.Info("http server is running", slog.Any("port", cfg.AIGateway.Port))
 		server := httpbase.NewGracefulServer(
 			httpbase.GraceServerOpt{
 				Port: cfg.AIGateway.Port,
 			},
 			r,
 		)
+		if cleanup != nil {
+			server.RegisterOnShutdown(cleanup)
+		}
+		slog.Info("http server is running", slog.Any("port", cfg.AIGateway.Port))
 		server.Run()
 		_ = stopOtel(context.Background())
 		return nil

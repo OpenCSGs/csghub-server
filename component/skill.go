@@ -221,12 +221,6 @@ func (c *skillComponentImpl) handleSkillPackage(ctx context.Context, sha256 stri
 	obj := object
 	defer obj.Close()
 
-	// Get object info to get size for zip reader
-	objectInfo, err := c.s3Client.StatObject(ctx, c.config.S3.Bucket, objectKey, minio.StatObjectOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("failed to get object info: %w", err)
-	}
-
 	// Create a buffered reader to detect file format
 	bufReader := bufio.NewReader(object)
 	// Read first 8 bytes to detect file format
@@ -239,15 +233,14 @@ func (c *skillComponentImpl) handleSkillPackage(ctx context.Context, sha256 stri
 	// Decompress based on content detection (since objectKey has no extension)
 	// Try to detect format from content
 	if bytes.HasPrefix(magicBytes, []byte{0x50, 0x4B, 0x03, 0x04}) {
-		// ZIP format - use S3 Range + ReaderAt for streaming decompression
-		s3ReaderAt := &s3ReaderAt{
-			ctx:    ctx,
-			client: c.s3Client,
-			bucket: c.config.S3.Bucket,
-			key:    objectKey,
-			size:   objectInfo.Size,
+		// ZIP format - read entire file into memory
+		// Reset reader to start (including the magic bytes we already read)
+		r := io.MultiReader(bytes.NewReader(magicBytes), bufReader)
+		zipContent, err := io.ReadAll(r)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read zip file: %w", err)
 		}
-		return decompressZip(s3ReaderAt, objectInfo.Size)
+		return decompressZip(bytes.NewReader(zipContent), int64(len(zipContent)))
 	} else if bytes.HasPrefix(magicBytes, []byte{0x1F, 0x8B, 0x08}) {
 		// GZIP format (tar.gz) - use streaming decompression
 		// Reset reader to start (including the magic bytes we already read)
@@ -760,41 +753,6 @@ const (
 	MaxIndividualFileSize = 50 * 1024 * 1024
 )
 
-// s3ReaderAt implements io.ReaderAt using S3 Range requests
-type s3ReaderAt struct {
-	ctx    context.Context
-	client s3.Client
-	bucket string
-	key    string
-	size   int64
-}
-
-// ReadAt reads data from the S3 object starting at the given offset
-func (r *s3ReaderAt) ReadAt(p []byte, off int64) (n int, err error) {
-	// Calculate end offset
-	end := off + int64(len(p)) - 1
-	if end >= r.size {
-		end = r.size - 1
-	}
-
-	// Create range option
-	opts := minio.GetObjectOptions{}
-	err = opts.SetRange(off, end)
-	if err != nil {
-		return 0, err
-	}
-
-	// Get object with range
-	object, err := r.client.GetObject(r.ctx, r.bucket, r.key, opts)
-	if err != nil {
-		return 0, err
-	}
-	defer object.Close()
-
-	// Read data
-	return io.ReadFull(object, p)
-}
-
 // decompressZip decompresses a zip file and returns a list of CommitFile objects
 func decompressZip(reader io.ReaderAt, size int64) ([]types.CommitFile, error) {
 	zipReader, err := zip.NewReader(reader, size)
@@ -807,6 +765,11 @@ func decompressZip(reader io.ReaderAt, size int64) ([]types.CommitFile, error) {
 
 	for _, file := range zipReader.File {
 		if file.FileInfo().IsDir() {
+			continue
+		}
+
+		// Skip .git directory and files
+		if strings.Contains(file.Name, "/.git/") || strings.HasPrefix(file.Name, ".git/") || file.Name == ".git" {
 			continue
 		}
 
@@ -870,6 +833,11 @@ func decompressTarGz(reader io.Reader) ([]types.CommitFile, error) {
 		}
 
 		if header.Typeflag == tar.TypeDir {
+			continue
+		}
+
+		// Skip .git directory and files
+		if strings.Contains(header.Name, "/.git/") || strings.HasPrefix(header.Name, ".git/") || header.Name == ".git" {
 			continue
 		}
 
