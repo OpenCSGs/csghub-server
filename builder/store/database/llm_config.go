@@ -25,6 +25,10 @@ type LLMConfig struct {
 	Enabled     bool           `bun:",notnull" json:"enabled"`
 	Provider    string         `bun:"," json:"provider"`
 	Metadata    map[string]any `bun:",type:jsonb,nullzero" json:"metadata"`
+	// NeedSensitiveCheck controls whether requests for this model should go
+	// through sensitive content detection in aigateway. Set to false to skip
+	// the check (e.g. for guard models or trusted internal models).
+	NeedSensitiveCheck bool `bun:",notnull,default:true" json:"need_sensitive_check"`
 	times
 }
 
@@ -161,5 +165,8 @@ func buildSearchLLMConfigQuery(
 	if search.Type != nil {
 		q.Where("llm_config.type = ?", *search.Type)
 	}
-
+	// Filter by Enabled if provided
+	if search.Enabled != nil {
+		q.Where("llm_config.enabled = ?", *search.Enabled)
+	}
 }

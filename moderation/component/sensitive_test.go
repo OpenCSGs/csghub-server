@@ -48,30 +48,64 @@ func TestSensitiveComponentImpl_PassImageURLCheck(t *testing.T) {
 
 func TestSensitiveComponentImpl_PassLLMQueryCheck(t *testing.T) {
 	mockSeneitive := mock_sensitive.NewMockSensitiveChecker(t)
+	cfg := &config.Config{}
+	cfg.SensitiveCheck.LLM.GuardModel = "test-model"
 	component := SensitiveComponentImpl{
 		checker: mockSeneitive,
+		cfg:     cfg,
 	}
-	mockSeneitive.EXPECT().PassLLMCheck(mock.Anything, types.ScenarioNicknameDetection, "你好", "", "123").
+	mockSeneitive.EXPECT().PassLLMCheck(mock.Anything, &types.LLMCheckRequest{
+		Scenario:  types.ScenarioNicknameDetection,
+		Text:      "你好",
+		AccountId: "123",
+		MaxTokens: 0,
+		RawJSON:   "",
+		ModelName: "test-model",
+		Role:      "user",
+	}).
 		Return(&sensitive.CheckResult{
 			IsSensitive: false,
 		}, nil)
-	result, err := component.PassLLMQueryCheck(context.Background(),
-		types.ScenarioNicknameDetection, "你好", "123")
+	result, err := component.PassLLMQueryCheck(context.Background(), &types.LLMCheckRequest{
+		Scenario:  types.ScenarioNicknameDetection,
+		Text:      "你好",
+		AccountId: "123",
+		MaxTokens: 0,
+		RawJSON:   "",
+		Role:      "user",
+	})
 	assert.NoError(t, err)
 	assert.False(t, result.IsSensitive)
 }
 
 func TestSensitiveComponentImpl_PassStreamCheck(t *testing.T) {
 	mockSeneitive := mock_sensitive.NewMockSensitiveChecker(t)
+	cfg := &config.Config{}
+	cfg.SensitiveCheck.LLM.GuardStreamModel = "test-stream-model"
 	component := SensitiveComponentImpl{
 		checker: mockSeneitive,
+		cfg:     cfg,
 	}
-	mockSeneitive.EXPECT().PassLLMCheck(mock.Anything, types.ScenarioNicknameDetection, "你好", "123", "").
+	mockSeneitive.EXPECT().PassLLMCheck(mock.Anything, &types.LLMCheckRequest{
+		Scenario:  types.ScenarioNicknameDetection,
+		Text:      "你好",
+		SessionId: "123",
+		MaxTokens: 0,
+		RawJSON:   "",
+		ModelName: "test-stream-model",
+		Role:      "assistant",
+	}).
 		Return(&sensitive.CheckResult{
 			IsSensitive: false,
 		}, nil)
-	result, err := component.PassStreamCheck(context.Background(),
-		types.ScenarioNicknameDetection, "你好", "123")
+	result, err := component.PassStreamCheck(context.Background(), &types.LLMCheckRequest{
+		Scenario:  types.ScenarioNicknameDetection,
+		Text:      "你好",
+		SessionId: "123",
+		MaxTokens: 0,
+		RawJSON:   "",
+		Role:      "assistant",
+	})
 	assert.NoError(t, err)
 	assert.False(t, result.IsSensitive)
 }

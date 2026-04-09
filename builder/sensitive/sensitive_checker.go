@@ -10,7 +10,7 @@ type SensitiveChecker interface {
 	PassTextCheck(ctx context.Context, scenario types.SensitiveScenario, text string) (*CheckResult, error)
 	PassImageCheck(ctx context.Context, scenario types.SensitiveScenario, ossBucketName, ossObjectName string) (*CheckResult, error)
 	PassImageURLCheck(ctx context.Context, scenario types.SensitiveScenario, imageURL string) (*CheckResult, error)
-	PassLLMCheck(ctx context.Context, scenario types.SensitiveScenario, text string, sessionId string, accountId string) (*CheckResult, error)
+	PassLLMCheck(ctx context.Context, req *types.LLMCheckRequest) (*CheckResult, error)
 }
 
 type ImageCheckReq struct {

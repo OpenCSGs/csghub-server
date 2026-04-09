@@ -210,6 +210,64 @@ func (_c *MockUserSvcClient_GetMemberRole_Call) RunAndReturn(run func(context.Co
 	return _c
 }
 
+// GetMemberRoleByUUID provides a mock function with given fields: ctx, orgUUID, userName
+func (_m *MockUserSvcClient) GetMemberRoleByUUID(ctx context.Context, orgUUID string, userName string) (membership.Role, error) {
+	ret := _m.Called(ctx, orgUUID, userName)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetMemberRoleByUUID")
+	}
+
+	var r0 membership.Role
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) (membership.Role, error)); ok {
+		return rf(ctx, orgUUID, userName)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) membership.Role); ok {
+		r0 = rf(ctx, orgUUID, userName)
+	} else {
+		r0 = ret.Get(0).(membership.Role)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+		r1 = rf(ctx, orgUUID, userName)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockUserSvcClient_GetMemberRoleByUUID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetMemberRoleByUUID'
+type MockUserSvcClient_GetMemberRoleByUUID_Call struct {
+	*mock.Call
+}
+
+// GetMemberRoleByUUID is a helper method to define mock.On call
+//   - ctx context.Context
+//   - orgUUID string
+//   - userName string
+func (_e *MockUserSvcClient_Expecter) GetMemberRoleByUUID(ctx interface{}, orgUUID interface{}, userName interface{}) *MockUserSvcClient_GetMemberRoleByUUID_Call {
+	return &MockUserSvcClient_GetMemberRoleByUUID_Call{Call: _e.mock.On("GetMemberRoleByUUID", ctx, orgUUID, userName)}
+}
+
+func (_c *MockUserSvcClient_GetMemberRoleByUUID_Call) Run(run func(ctx context.Context, orgUUID string, userName string)) *MockUserSvcClient_GetMemberRoleByUUID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(string))
+	})
+	return _c
+}
+
+func (_c *MockUserSvcClient_GetMemberRoleByUUID_Call) Return(_a0 membership.Role, _a1 error) *MockUserSvcClient_GetMemberRoleByUUID_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockUserSvcClient_GetMemberRoleByUUID_Call) RunAndReturn(run func(context.Context, string, string) (membership.Role, error)) *MockUserSvcClient_GetMemberRoleByUUID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetNameSpaceInfo provides a mock function with given fields: ctx, path
 func (_m *MockUserSvcClient) GetNameSpaceInfo(ctx context.Context, path string) (*rpc.Namespace, error) {
 	ret := _m.Called(ctx, path)
@@ -265,6 +323,65 @@ func (_c *MockUserSvcClient_GetNameSpaceInfo_Call) Return(_a0 *rpc.Namespace, _a
 }
 
 func (_c *MockUserSvcClient_GetNameSpaceInfo_Call) RunAndReturn(run func(context.Context, string) (*rpc.Namespace, error)) *MockUserSvcClient_GetNameSpaceInfo_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetNameSpaceInfoByUUID provides a mock function with given fields: ctx, uuid
+func (_m *MockUserSvcClient) GetNameSpaceInfoByUUID(ctx context.Context, uuid string) (*rpc.Namespace, error) {
+	ret := _m.Called(ctx, uuid)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetNameSpaceInfoByUUID")
+	}
+
+	var r0 *rpc.Namespace
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*rpc.Namespace, error)); ok {
+		return rf(ctx, uuid)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *rpc.Namespace); ok {
+		r0 = rf(ctx, uuid)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*rpc.Namespace)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, uuid)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockUserSvcClient_GetNameSpaceInfoByUUID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetNameSpaceInfoByUUID'
+type MockUserSvcClient_GetNameSpaceInfoByUUID_Call struct {
+	*mock.Call
+}
+
+// GetNameSpaceInfoByUUID is a helper method to define mock.On call
+//   - ctx context.Context
+//   - uuid string
+func (_e *MockUserSvcClient_Expecter) GetNameSpaceInfoByUUID(ctx interface{}, uuid interface{}) *MockUserSvcClient_GetNameSpaceInfoByUUID_Call {
+	return &MockUserSvcClient_GetNameSpaceInfoByUUID_Call{Call: _e.mock.On("GetNameSpaceInfoByUUID", ctx, uuid)}
+}
+
+func (_c *MockUserSvcClient_GetNameSpaceInfoByUUID_Call) Run(run func(ctx context.Context, uuid string)) *MockUserSvcClient_GetNameSpaceInfoByUUID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockUserSvcClient_GetNameSpaceInfoByUUID_Call) Return(_a0 *rpc.Namespace, _a1 error) *MockUserSvcClient_GetNameSpaceInfoByUUID_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockUserSvcClient_GetNameSpaceInfoByUUID_Call) RunAndReturn(run func(context.Context, string) (*rpc.Namespace, error)) *MockUserSvcClient_GetNameSpaceInfoByUUID_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -384,6 +501,65 @@ func (_c *MockUserSvcClient_GetOrgByName_Call) Return(_a0 *types.Organization, _
 }
 
 func (_c *MockUserSvcClient_GetOrgByName_Call) RunAndReturn(run func(context.Context, string) (*types.Organization, error)) *MockUserSvcClient_GetOrgByName_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetOrgByUUID provides a mock function with given fields: ctx, orgUUID
+func (_m *MockUserSvcClient) GetOrgByUUID(ctx context.Context, orgUUID string) (*types.Organization, error) {
+	ret := _m.Called(ctx, orgUUID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetOrgByUUID")
+	}
+
+	var r0 *types.Organization
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*types.Organization, error)); ok {
+		return rf(ctx, orgUUID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *types.Organization); ok {
+		r0 = rf(ctx, orgUUID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.Organization)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, orgUUID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockUserSvcClient_GetOrgByUUID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetOrgByUUID'
+type MockUserSvcClient_GetOrgByUUID_Call struct {
+	*mock.Call
+}
+
+// GetOrgByUUID is a helper method to define mock.On call
+//   - ctx context.Context
+//   - orgUUID string
+func (_e *MockUserSvcClient_Expecter) GetOrgByUUID(ctx interface{}, orgUUID interface{}) *MockUserSvcClient_GetOrgByUUID_Call {
+	return &MockUserSvcClient_GetOrgByUUID_Call{Call: _e.mock.On("GetOrgByUUID", ctx, orgUUID)}
+}
+
+func (_c *MockUserSvcClient_GetOrgByUUID_Call) Run(run func(ctx context.Context, orgUUID string)) *MockUserSvcClient_GetOrgByUUID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockUserSvcClient_GetOrgByUUID_Call) Return(_a0 *types.Organization, _a1 error) *MockUserSvcClient_GetOrgByUUID_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockUserSvcClient_GetOrgByUUID_Call) RunAndReturn(run func(context.Context, string) (*types.Organization, error)) *MockUserSvcClient_GetOrgByUUID_Call {
 	_c.Call.Return(run)
 	return _c
 }

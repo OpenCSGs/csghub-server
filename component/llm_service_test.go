@@ -21,23 +21,29 @@ func TestLLMServiceComponent_CreateLLMConfig(t *testing.T) {
 		ModelName:   "new-model",
 		ApiEndpoint: "http://new.endpoint",
 		AuthHeader:  "Bearer token",
-		Type:        666,
+		Type:        16,
 		Enabled:     true,
+		Provider:    "test-provider",
+		Metadata:    map[string]any{"tasks": []any{"text-generation"}},
 	}
 	dbLLMConfig := &database.LLMConfig{
 		ID:          123,
 		ModelName:   "new-model",
 		ApiEndpoint: "http://new.endpoint",
 		AuthHeader:  "Bearer token",
-		Type:        666,
+		Type:        16,
 		Enabled:     true,
+		Provider:    "test-provider",
+		Metadata:    map[string]any{"tasks": []any{"text-generation"}},
 	}
 	stores.LLMConfigMock().EXPECT().Create(ctx, database.LLMConfig{
 		ModelName:   "new-model",
 		ApiEndpoint: "http://new.endpoint",
 		AuthHeader:  "Bearer token",
-		Type:        666,
+		Type:        16,
 		Enabled:     true,
+		Provider:    "test-provider",
+		Metadata:    map[string]any{"tasks": []any{"text-generation"}},
 	}).Return(dbLLMConfig, nil)
 	res, err := mc.CreateLLMConfig(ctx, req)
 	require.Nil(t, err)
@@ -132,18 +138,22 @@ func TestLLMServiceComponent_UpdateLLMConfig(t *testing.T) {
 		promptPrefixStore: stores.PromptPrefix,
 	}
 	newName := "new-model"
+	metadata := map[string]any{"tasks": []any{"text-to-image"}}
 	req := &types.UpdateLLMConfigReq{
-		ID:        123,
+		ID:       123,
 		ModelName: &newName,
+		Metadata: &metadata,
 	}
 	dbLLMConfig := &database.LLMConfig{
 		ID:        123,
 		ModelName: newName,
+		Metadata:  metadata,
 	}
 	stores.LLMConfigMock().EXPECT().GetByID(ctx, int64(123)).Return(dbLLMConfig, nil)
 	stores.LLMConfigMock().EXPECT().Update(ctx, database.LLMConfig{
 		ID:        123,
 		ModelName: newName,
+		Metadata:  metadata,
 	}).Return(dbLLMConfig, nil)
 	res, err := mc.UpdateLLMConfig(ctx, req)
 	require.Nil(t, err)

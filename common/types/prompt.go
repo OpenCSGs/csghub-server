@@ -49,6 +49,21 @@ type LLMReqBody struct {
 	Messages    []LLMMessage `json:"messages"`
 	Stream      bool         `json:"stream"`
 	Temperature float64      `json:"temperature"`
+	MaxTokens   int          `json:"max_tokens,omitempty"`
+	RawJSON     string       `json:"-"`
+}
+
+type LLMCheckRequest struct {
+	Scenario  SensitiveScenario `json:"scenario"`
+	Text      string            `json:"text"`
+	SessionId string            `json:"session_id,omitempty"`
+	AccountId string            `json:"account_id,omitempty"`
+	MaxTokens int               `json:"max_tokens,omitempty"`
+	RawJSON   string            `json:"raw_json,omitempty"`
+	Resumable bool              `json:"resumable,omitempty"`
+	ModelName string            `json:"-"`
+	Role      string            `json:"role,omitempty"`
+	Stream    bool              `json:"stream,omitempty"`
 }
 
 type ConversationMessageReq struct {

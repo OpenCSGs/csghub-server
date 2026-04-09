@@ -67,3 +67,11 @@ type ChatCompletionChunkChoiceDelta struct {
 type ChatCompletion struct {
 	openai.ChatCompletion
 }
+
+type Role string
+
+const (
+	RoleUser      Role = "user"
+	RoleAssistant Role = "assistant"
+	RoleSystem    Role = "system"
+)

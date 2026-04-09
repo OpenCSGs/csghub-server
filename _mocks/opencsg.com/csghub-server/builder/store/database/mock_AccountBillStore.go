@@ -24,6 +24,63 @@ func (_m *MockAccountBillStore) EXPECT() *MockAccountBillStore_Expecter {
 	return &MockAccountBillStore_Expecter{mock: &_m.Mock}
 }
 
+// ListBillsDetailByUserID provides a mock function with given fields: ctx, req
+func (_m *MockAccountBillStore) ListBillsDetailByUserID(ctx context.Context, req types.AcctBillsDetailReq) (database.AccountBillDetailRes, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListBillsDetailByUserID")
+	}
+
+	var r0 database.AccountBillDetailRes
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.AcctBillsDetailReq) (database.AccountBillDetailRes, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.AcctBillsDetailReq) database.AccountBillDetailRes); ok {
+		r0 = rf(ctx, req)
+	} else {
+		r0 = ret.Get(0).(database.AccountBillDetailRes)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.AcctBillsDetailReq) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountBillStore_ListBillsDetailByUserID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListBillsDetailByUserID'
+type MockAccountBillStore_ListBillsDetailByUserID_Call struct {
+	*mock.Call
+}
+
+// ListBillsDetailByUserID is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.AcctBillsDetailReq
+func (_e *MockAccountBillStore_Expecter) ListBillsDetailByUserID(ctx interface{}, req interface{}) *MockAccountBillStore_ListBillsDetailByUserID_Call {
+	return &MockAccountBillStore_ListBillsDetailByUserID_Call{Call: _e.mock.On("ListBillsDetailByUserID", ctx, req)}
+}
+
+func (_c *MockAccountBillStore_ListBillsDetailByUserID_Call) Run(run func(ctx context.Context, req types.AcctBillsDetailReq)) *MockAccountBillStore_ListBillsDetailByUserID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.AcctBillsDetailReq))
+	})
+	return _c
+}
+
+func (_c *MockAccountBillStore_ListBillsDetailByUserID_Call) Return(_a0 database.AccountBillDetailRes, _a1 error) *MockAccountBillStore_ListBillsDetailByUserID_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountBillStore_ListBillsDetailByUserID_Call) RunAndReturn(run func(context.Context, types.AcctBillsDetailReq) (database.AccountBillDetailRes, error)) *MockAccountBillStore_ListBillsDetailByUserID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ListByUserIDAndDate provides a mock function with given fields: ctx, req
 func (_m *MockAccountBillStore) ListByUserIDAndDate(ctx context.Context, req types.AcctBillsReq) (database.AccountBillRes, error) {
 	ret := _m.Called(ctx, req)

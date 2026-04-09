@@ -345,6 +345,64 @@ func (_c *MockMemberComponent_GetMemberRole_Call) RunAndReturn(run func(context.
 	return _c
 }
 
+// GetMemberRoleByUUID provides a mock function with given fields: ctx, orgUUID, userName
+func (_m *MockMemberComponent) GetMemberRoleByUUID(ctx context.Context, orgUUID string, userName string) (membership.Role, error) {
+	ret := _m.Called(ctx, orgUUID, userName)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetMemberRoleByUUID")
+	}
+
+	var r0 membership.Role
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) (membership.Role, error)); ok {
+		return rf(ctx, orgUUID, userName)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) membership.Role); ok {
+		r0 = rf(ctx, orgUUID, userName)
+	} else {
+		r0 = ret.Get(0).(membership.Role)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+		r1 = rf(ctx, orgUUID, userName)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockMemberComponent_GetMemberRoleByUUID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetMemberRoleByUUID'
+type MockMemberComponent_GetMemberRoleByUUID_Call struct {
+	*mock.Call
+}
+
+// GetMemberRoleByUUID is a helper method to define mock.On call
+//   - ctx context.Context
+//   - orgUUID string
+//   - userName string
+func (_e *MockMemberComponent_Expecter) GetMemberRoleByUUID(ctx interface{}, orgUUID interface{}, userName interface{}) *MockMemberComponent_GetMemberRoleByUUID_Call {
+	return &MockMemberComponent_GetMemberRoleByUUID_Call{Call: _e.mock.On("GetMemberRoleByUUID", ctx, orgUUID, userName)}
+}
+
+func (_c *MockMemberComponent_GetMemberRoleByUUID_Call) Run(run func(ctx context.Context, orgUUID string, userName string)) *MockMemberComponent_GetMemberRoleByUUID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(string))
+	})
+	return _c
+}
+
+func (_c *MockMemberComponent_GetMemberRoleByUUID_Call) Return(_a0 membership.Role, _a1 error) *MockMemberComponent_GetMemberRoleByUUID_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockMemberComponent_GetMemberRoleByUUID_Call) RunAndReturn(run func(context.Context, string, string) (membership.Role, error)) *MockMemberComponent_GetMemberRoleByUUID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // InitRoles provides a mock function with given fields: ctx, org
 func (_m *MockMemberComponent) InitRoles(ctx context.Context, org *database.Organization) error {
 	ret := _m.Called(ctx, org)

@@ -248,6 +248,65 @@ func (_c *MockOrganizationComponent_Get_Call) RunAndReturn(run func(context.Cont
 	return _c
 }
 
+// GetByUUID provides a mock function with given fields: ctx, uuid
+func (_m *MockOrganizationComponent) GetByUUID(ctx context.Context, uuid string) (*types.Organization, error) {
+	ret := _m.Called(ctx, uuid)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetByUUID")
+	}
+
+	var r0 *types.Organization
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*types.Organization, error)); ok {
+		return rf(ctx, uuid)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *types.Organization); ok {
+		r0 = rf(ctx, uuid)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.Organization)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, uuid)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockOrganizationComponent_GetByUUID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetByUUID'
+type MockOrganizationComponent_GetByUUID_Call struct {
+	*mock.Call
+}
+
+// GetByUUID is a helper method to define mock.On call
+//   - ctx context.Context
+//   - uuid string
+func (_e *MockOrganizationComponent_Expecter) GetByUUID(ctx interface{}, uuid interface{}) *MockOrganizationComponent_GetByUUID_Call {
+	return &MockOrganizationComponent_GetByUUID_Call{Call: _e.mock.On("GetByUUID", ctx, uuid)}
+}
+
+func (_c *MockOrganizationComponent_GetByUUID_Call) Run(run func(ctx context.Context, uuid string)) *MockOrganizationComponent_GetByUUID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockOrganizationComponent_GetByUUID_Call) Return(_a0 *types.Organization, _a1 error) *MockOrganizationComponent_GetByUUID_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockOrganizationComponent_GetByUUID_Call) RunAndReturn(run func(context.Context, string) (*types.Organization, error)) *MockOrganizationComponent_GetByUUID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Index provides a mock function with given fields: ctx, username, search, per, page, orgType, verifyStatus
 func (_m *MockOrganizationComponent) Index(ctx context.Context, username string, search string, per int, page int, orgType string, verifyStatus string) ([]types.Organization, int, error) {
 	ret := _m.Called(ctx, username, search, per, page, orgType, verifyStatus)

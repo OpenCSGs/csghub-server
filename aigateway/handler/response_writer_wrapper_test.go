@@ -61,6 +61,80 @@ func TestResponseWriterWrapper_StreamWrite(t *testing.T) {
 	}
 }
 
+func TestGenerateInsufficientBalanceResp(t *testing.T) {
+	frontendURL := "http://localhost:8080"
+	chunk := generateInsufficientBalanceResp(frontendURL)
+	assert.Len(t, chunk.Choices, 1)
+	assert.Equal(t, "insufficient_balance", chunk.Choices[0].FinishReason)
+	assert.Contains(t, chunk.Choices[0].Delta.Content, "**Insufficient balance**")
+	assert.Contains(t, chunk.Choices[0].Delta.Content, frontendURL+"/settings/recharge-payment")
+}
+
+func TestWriteSensitiveStreamResponse(t *testing.T) {
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	ctx.Request = httptest.NewRequest("GET", "/", nil)
+	resp := generateSensitiveRespForPrompt()
+
+	writeSensitiveStreamResponse(ctx, resp)
+
+	assert.Equal(t, 200, w.Code)
+	body := w.Body.String()
+	assert.Contains(t, body, "data: {")
+	assert.Contains(t, body, "sensitive")
+	assert.Contains(t, body, "[DONE]")
+}
+
+func TestWriteSensitiveJSONResponse(t *testing.T) {
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	ctx.Request = httptest.NewRequest("GET", "/", nil)
+	resp := generateSensitiveRespForPrompt()
+
+	writeSensitiveJSONResponse(ctx, resp)
+
+	assert.Equal(t, 200, w.Code)
+	body := w.Body.String()
+	assert.Contains(t, body, "sensitive")
+	var parsedResp openai.ChatCompletionChunk
+	err := json.Unmarshal([]byte(body), &parsedResp)
+	assert.NoError(t, err)
+	assert.Equal(t, "sensitive", parsedResp.Choices[0].FinishReason)
+}
+
+func TestHandleSensitiveResponse(t *testing.T) {
+	t.Run("stream", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		ctx, _ := gin.CreateTestContext(w)
+		ctx.Request = httptest.NewRequest("GET", "/", nil)
+		
+		checkResult := &rpc.CheckResult{Reason: "test reason"}
+		handleSensitiveResponse(ctx, true, checkResult)
+
+		assert.Equal(t, 200, w.Code)
+		body := w.Body.String()
+		assert.Contains(t, body, "data: {")
+		assert.Contains(t, body, "sensitive")
+		assert.Contains(t, body, "[DONE]")
+	})
+
+	t.Run("json", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		ctx, _ := gin.CreateTestContext(w)
+		ctx.Request = httptest.NewRequest("GET", "/", nil)
+		
+		checkResult := &rpc.CheckResult{Reason: "test reason"}
+		handleSensitiveResponse(ctx, false, checkResult)
+
+		assert.Equal(t, 200, w.Code)
+		body := w.Body.String()
+		var parsedResp openai.ChatCompletionChunk
+		err := json.Unmarshal([]byte(body), &parsedResp)
+		assert.NoError(t, err)
+		assert.Equal(t, "sensitive", parsedResp.Choices[0].FinishReason)
+	})
+}
+
 func TestResponseWriterWrapper_StreamWrite_WithWhiteSpace(t *testing.T) {
 	chunk := openai.ChatCompletionChunk{
 		ID: "test-id",

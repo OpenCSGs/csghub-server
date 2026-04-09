@@ -17,6 +17,7 @@ type AccountingClient interface {
 	QueryBalanceByUserID(userUUID string) (any, error)
 	ListStatementByUserIDAndTime(req types.ActStatementsReq) (any, error)
 	ListBillsByUserIDAndDate(req types.ActStatementsReq) (any, error)
+	ListBillsDetailByUserID(req types.AcctBillsDetailReq) (any, error)
 	RechargeAccountingUser(userID string, req types.RechargeReq) (any, error)
 	PresentAccountingUser(userID string, req types.ACTIVITY_REQ) (any, error)
 	CreateOrUpdateQuota(currentUser string, req types.AcctQuotaReq) (any, error)
@@ -24,6 +25,7 @@ type AccountingClient interface {
 	CreateQuotaStatement(currentUser string, req types.AcctQuotaStatementReq) (any, error)
 	GetQuotaStatement(currentUser string, req types.AcctQuotaStatementReq) (any, error)
 	QueryPricesBySKUType(currentUser string, req types.AcctPriceListReq) (any, error)
+	QueryPricesBySkuTypeAndKinds(currentUser string, req types.AcctPriceListByKindsReq) (any, error)
 	GetPriceByID(currentUser string, id int64) (any, error)
 	CreatePrice(currentUser string, req types.AcctPriceCreateReq) (any, error)
 	UpdatePrice(currentUser string, req types.AcctPriceCreateReq, id int64) (any, error)
@@ -62,7 +64,6 @@ func (ac *accountingClientImpl) ListMeteringsByUserIDAndTime(req types.ActStatem
 // Helper method to execute the actual HTTP request and read the response.
 func (ac *accountingClientImpl) doRequest(method, subPath string, data any) (*http.Response, error) {
 	urlPath := fmt.Sprintf("%s%s%s", ac.remote, "/api/v1/accounting", subPath)
-	// slog.Info("call", slog.Any("urlPath", urlPath))
 	var buf io.Reader
 	if data != nil {
 		jsonData, err := json.Marshal(data)

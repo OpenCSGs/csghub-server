@@ -10,8 +10,7 @@ func IsNeedCalculateBill(scene types.SceneType) bool {
 		types.SceneEvaluation,
 		types.SceneModelServerless,
 		types.SceneStarship,
-		types.SceneGuiAgent,
-		types.SceneAgenticHub:
+		types.SceneGuiAgent:
 		return true
 	default:
 		return false
@@ -36,8 +35,6 @@ func GetSkuUnitTypeByScene(scene types.SceneType) types.SkuUnitType {
 		return types.UnitToken
 	case types.SceneGuiAgent:
 		return types.UnitToken
-	case types.SceneAgenticHub:
-		return types.UnitToken
 	default:
 		return types.UnitMinute
 	}
@@ -61,8 +58,6 @@ func GetSKUTypeByScene(scene types.SceneType) types.SKUType {
 		return types.SKUStarship
 	case types.SceneGuiAgent:
 		return types.SKUStarship
-	case types.SceneAgenticHub:
-		return types.SKUAgenticHub
 	}
 	return types.SKUReserve
 }

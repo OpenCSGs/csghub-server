@@ -2,6 +2,7 @@ package types
 
 import (
 	"encoding/json"
+	"github.com/stretchr/testify/require"
 	"strings"
 	"testing"
 
