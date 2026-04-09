@@ -42,6 +42,118 @@ func TestOpenAIComponent_GetAvailableModels(t *testing.T) {
 		assert.Nil(t, models)
 	})
 
+	t.Run("anonymous user can see public CSGHub models", func(t *testing.T) {
+		now := time.Now()
+		deploys := []database.Deploy{
+			{
+				ID:          1,
+				SvcName:     "svc1",
+				Type:        commontypes.InferenceType,
+				UserID:      1,
+				SecureLevel: commontypes.EndpointPublic,
+				Repository: &database.Repository{
+					Name: "model1",
+					Path: "model1",
+				},
+				User: &database.User{
+					Username: "publicuser",
+					UUID:     "publicuser-uuid",
+				},
+				Endpoint: "endpoint1",
+				Task:     "text-generation",
+			},
+			{
+				ID:          2,
+				SvcName:     "svc2",
+				Type:        commontypes.ServerlessType,
+				UserID:      2,
+				SecureLevel: commontypes.EndpointPublic,
+				Repository: &database.Repository{
+					HFPath: "hf-model2",
+				},
+				User: &database.User{
+					Username: "serverless-owner",
+					UUID:     "serverless-owner-uuid",
+				},
+				Endpoint: "endpoint2",
+				Task:     "text-to-image",
+			},
+		}
+		deploys[0].CreatedAt = now
+		deploys[1].CreatedAt = now
+
+		mockDeployStore.EXPECT().RunningVisibleToUser(mock.Anything, int64(0)).
+			Return(deploys, nil).Once()
+		mockLLMConfigStore.EXPECT().Index(mock.Anything, 50, 1, mock.Anything).
+			Return([]*database.LLMConfig{}, 0, nil)
+
+		expectModels := []types.Model{
+			{
+				BaseModel: types.BaseModel{
+					ID:          "model1:svc1",
+					OwnedBy:     "publicuser",
+					Object:      "model",
+					Created:     deploys[0].CreatedAt.Unix(),
+					Task:        "text-generation",
+					DisplayName: "model1",
+					Public:      true,
+				},
+				Endpoint: "endpoint1",
+				InternalModelInfo: types.InternalModelInfo{
+					CSGHubModelID: deploys[0].Repository.Path,
+					OwnerUUID:     deploys[0].User.UUID,
+					ClusterID:     deploys[0].ClusterID,
+					SvcName:       deploys[0].SvcName,
+					SvcType:       deploys[0].Type,
+					ImageID:       deploys[0].ImageID,
+				},
+				InternalUse: true,
+			},
+			{
+				BaseModel: types.BaseModel{
+					ID:      "hf-model2:svc2",
+					OwnedBy: "OpenCSG",
+					Object:  "model",
+					Created: deploys[1].CreatedAt.Unix(),
+					Task:    "text-to-image",
+					Public:  true,
+				},
+				Endpoint: "endpoint2",
+				InternalModelInfo: types.InternalModelInfo{
+					OwnerUUID: deploys[1].User.UUID,
+					ClusterID: deploys[1].ClusterID,
+					SvcName:   deploys[1].SvcName,
+					SvcType:   deploys[1].Type,
+					ImageID:   deploys[1].ImageID,
+				},
+				InternalUse: true,
+			},
+		}
+		var wg sync.WaitGroup
+		wg.Add(1)
+		for _, model := range expectModels {
+			expectJson, _ := json.Marshal(model)
+			mockCache.EXPECT().HSet(mock.Anything, modelCacheKey, model.ID, string(expectJson)).
+				Return(nil).Once()
+		}
+		mockCache.EXPECT().Expire(mock.Anything, modelCacheKey, modelCacheTTL).
+			RunAndReturn(func(ctx context.Context, s string, d time.Duration) error {
+				wg.Done()
+				return nil
+			}).Once()
+
+		models, err := comp.GetAvailableModels(context.Background(), "")
+		require.NoError(t, err)
+		require.Len(t, models, 2)
+		assert.Equal(t, "model1:svc1", models[0].ID)
+		assert.Equal(t, "publicuser", models[0].OwnedBy)
+		assert.True(t, models[0].Public)
+		assert.Equal(t, "hf-model2:svc2", models[1].ID)
+		assert.Equal(t, "OpenCSG", models[1].OwnedBy)
+		assert.True(t, models[1].Public)
+		wg.Wait()
+	})
+
 	t.Run("successful case", func(t *testing.T) {
 		user := &database.User{
 			ID:       1,

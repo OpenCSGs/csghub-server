@@ -21,6 +21,12 @@ func Request() gin.HandlerFunc {
 			c.Request = c.Request.WithContext(ctx)
 		}
 
+		mcpSessionID := c.GetHeader(trace.HeaderMcpSessionID)
+		if mcpSessionID != "" {
+			ctx := trace.SetMcpSessionID(c.Request.Context(), mcpSessionID)
+			c.Request = c.Request.WithContext(ctx)
+		}
+
 		c.Next()
 	}
 }

@@ -238,3 +238,33 @@ func (h *MemberHandler) GetMemberRole(ctx *gin.Context) {
 
 	httpbase.OK(ctx, role)
 }
+
+// GetMemberRole   godoc
+// @Security     ApiKey
+// @Summary      Get user's role in an org by uuid and username
+// @Tags         Member
+// @Accept       json
+// @Produce      json
+// @Param        uuid path string true "org uuid"
+// @Param        username path string true "user name"
+// @Param        current_user query string false "the op user"
+// @Success      200  {object}  string "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /organization/uuid/{uuid}/members/{username} [get]
+func (h *MemberHandler) GetMemberRoleByUUID(ctx *gin.Context) {
+	orgUUID := ctx.Param("uuid")
+	userName := ctx.Param("username")
+	role, err := h.c.GetMemberRoleByUUID(ctx.Request.Context(), orgUUID, userName)
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "fail to get org member by uuid", slog.Any("org_uuid", orgUUID), slog.Any("member", userName), slog.Any("err", err))
+		if errors.Is(err, errorx.ErrDatabaseNoRows) {
+			httpbase.NotFoundError(ctx, err)
+		} else {
+			httpbase.ServerError(ctx, err)
+		}
+		return
+	}
+
+	httpbase.OK(ctx, role)
+}

@@ -564,6 +564,150 @@ func TestMemberComponent_GetMember(t *testing.T) {
 	require.Equal(t, m.UserID, user.ID)
 }
 
+func TestMemberComponent_GetMemberRoleByUUID(t *testing.T) {
+	t.Run("get member role by uuid for existing member with admin role", func(t *testing.T) {
+		config := &config.Config{}
+		orgUUID := "org-uuid-123"
+
+		org := &database.Organization{
+			ID:   1,
+			Name: "org1",
+		}
+		user := &database.User{
+			ID:       1,
+			Username: "user1",
+		}
+
+		mockOrgStore := mockdb.NewMockOrgStore(t)
+		mockOrgStore.EXPECT().FindByUUID(mock.Anything, orgUUID).Return(org, nil).Once()
+
+		mockUserStore := mockdb.NewMockUserStore(t)
+		mockUserStore.EXPECT().FindByUsername(mock.Anything, user.Username).Return(*user, nil).Once()
+
+		mockMemberStore := mockdb.NewMockMemberStore(t)
+		mockMemberStore.EXPECT().Find(mock.Anything, org.ID, user.ID).Return(&database.Member{
+			Role: string(membership.RoleAdmin),
+		}, nil).Once()
+
+		mc := &memberComponentImpl{
+			orgStore:    mockOrgStore,
+			userStore:   mockUserStore,
+			memberStore: mockMemberStore,
+			config:      config,
+		}
+
+		role, err := mc.GetMemberRoleByUUID(context.Background(), orgUUID, user.Username)
+		require.Empty(t, err)
+		require.Equal(t, membership.RoleAdmin, role)
+	})
+
+	t.Run("get member role by uuid for existing member with write role", func(t *testing.T) {
+		config := &config.Config{}
+		orgUUID := "org-uuid-456"
+
+		org := &database.Organization{
+			ID:   1,
+			Name: "org1",
+		}
+		user := &database.User{
+			ID:       1,
+			Username: "user1",
+		}
+
+		mockOrgStore := mockdb.NewMockOrgStore(t)
+		mockOrgStore.EXPECT().FindByUUID(mock.Anything, orgUUID).Return(org, nil).Once()
+
+		mockUserStore := mockdb.NewMockUserStore(t)
+		mockUserStore.EXPECT().FindByUsername(mock.Anything, user.Username).Return(*user, nil).Once()
+
+		mockMemberStore := mockdb.NewMockMemberStore(t)
+		mockMemberStore.EXPECT().Find(mock.Anything, org.ID, user.ID).Return(&database.Member{
+			Role: string(membership.RoleWrite),
+		}, nil).Once()
+
+		mc := &memberComponentImpl{
+			orgStore:    mockOrgStore,
+			userStore:   mockUserStore,
+			memberStore: mockMemberStore,
+			config:      config,
+		}
+
+		role, err := mc.GetMemberRoleByUUID(context.Background(), orgUUID, user.Username)
+		require.Empty(t, err)
+		require.Equal(t, membership.RoleWrite, role)
+	})
+
+	t.Run("get member role by uuid for existing member with read role", func(t *testing.T) {
+		config := &config.Config{}
+		orgUUID := "org-uuid-789"
+
+		org := &database.Organization{
+			ID:   1,
+			Name: "org1",
+		}
+		user := &database.User{
+			ID:       1,
+			Username: "user1",
+		}
+
+		mockOrgStore := mockdb.NewMockOrgStore(t)
+		mockOrgStore.EXPECT().FindByUUID(mock.Anything, orgUUID).Return(org, nil).Once()
+
+		mockUserStore := mockdb.NewMockUserStore(t)
+		mockUserStore.EXPECT().FindByUsername(mock.Anything, user.Username).Return(*user, nil).Once()
+
+		mockMemberStore := mockdb.NewMockMemberStore(t)
+		mockMemberStore.EXPECT().Find(mock.Anything, org.ID, user.ID).Return(&database.Member{
+			Role: string(membership.RoleRead),
+		}, nil).Once()
+
+		mc := &memberComponentImpl{
+			orgStore:    mockOrgStore,
+			userStore:   mockUserStore,
+			memberStore: mockMemberStore,
+			config:      config,
+		}
+
+		role, err := mc.GetMemberRoleByUUID(context.Background(), orgUUID, user.Username)
+		require.Empty(t, err)
+		require.Equal(t, membership.RoleRead, role)
+	})
+
+	t.Run("get member role by uuid for non-existing member", func(t *testing.T) {
+		config := &config.Config{}
+		orgUUID := "org-uuid-999"
+
+		org := &database.Organization{
+			ID:   1,
+			Name: "org1",
+		}
+		user := &database.User{
+			ID:       1,
+			Username: "user1",
+		}
+
+		mockOrgStore := mockdb.NewMockOrgStore(t)
+		mockOrgStore.EXPECT().FindByUUID(mock.Anything, orgUUID).Return(org, nil).Once()
+
+		mockUserStore := mockdb.NewMockUserStore(t)
+		mockUserStore.EXPECT().FindByUsername(mock.Anything, user.Username).Return(*user, nil).Once()
+
+		mockMemberStore := mockdb.NewMockMemberStore(t)
+		mockMemberStore.EXPECT().Find(mock.Anything, org.ID, user.ID).Return(nil, nil).Once()
+
+		mc := &memberComponentImpl{
+			orgStore:    mockOrgStore,
+			userStore:   mockUserStore,
+			memberStore: mockMemberStore,
+			config:      config,
+		}
+
+		role, err := mc.GetMemberRoleByUUID(context.Background(), orgUUID, user.Username)
+		require.Empty(t, err)
+		require.Equal(t, membership.RoleUnknown, role)
+	})
+}
+
 func TestMemberComponent_ChangeMemberRole(t *testing.T) {
 
 	t.Run("update other org member role", func(t *testing.T) {
