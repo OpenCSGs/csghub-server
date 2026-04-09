@@ -177,7 +177,7 @@ func (s *UserStoreImpl) IndexWithSearch(ctx context.Context, req types.UserListR
 func (s *UserStoreImpl) FindByUsername(ctx context.Context, username string) (user User, err error) {
 	user.Username = username
 	err = s.db.Operator.Core.NewSelect().
-		Model(&user).
+		Model(&user).Relation("Namespaces").
 		Where("username = ?", username).
 		Scan(ctx)
 	return user, errorx.HandleDBError(err, map[string]interface{}{"username": username})
@@ -309,7 +309,7 @@ func (s *UserStoreImpl) FindByGitAccessToken(ctx context.Context, token string) 
 func (s *UserStoreImpl) FindByUUID(ctx context.Context, uuid string) (*User, error) {
 	var user User
 	err := s.db.Operator.Core.NewSelect().
-		Model(&user).
+		Model(&user).Relation("Namespaces").
 		Where("uuid = ?", uuid).
 		Scan(ctx)
 	if err != nil {
@@ -463,7 +463,7 @@ func (s *UserStoreImpl) FindByUUIDs(ctx context.Context, uuids []string) ([]*Use
 	}
 
 	err := s.db.Operator.Core.NewSelect().
-		Model(&users).
+		Model(&users).Relation("Namespaces").
 		Where("uuid IN (?)", bun.In(uuids)).
 		Scan(ctx)
 	if err != nil {

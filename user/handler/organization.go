@@ -116,6 +116,39 @@ func (h *OrganizationHandler) Get(ctx *gin.Context) {
 	httpbase.OK(ctx, org)
 }
 
+// GetOrganizationByUUID godoc
+// @Security     ApiKey
+// @Summary      Get organization by UUID
+// @Description  get organization by UUID
+// @Tags         Organization
+// @Accept       json
+// @Produce      json
+// @Param        uuid path string true "organization uuid"
+// @Success      200  {object}  types.Response{data=types.Organization} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /organization/uuid/{uuid} [get]
+func (h *OrganizationHandler) GetByUUID(ctx *gin.Context) {
+	uuid := ctx.Param("uuid")
+	if len(uuid) == 0 {
+		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(errors.New("organization uuid is empty"), nil))
+		return
+	}
+	org, err := h.c.GetByUUID(ctx, uuid)
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get organization by UUID", slog.Any("error", err), slog.String("org_uuid", uuid))
+		if errors.Is(err, errorx.ErrDatabaseNoRows) {
+			httpbase.NotFoundError(ctx, err)
+		} else {
+			httpbase.ServerError(ctx, err)
+		}
+		return
+	}
+
+	slog.InfoContext(ctx.Request.Context(), "Get organization by UUID succeed", slog.String("org_uuid", uuid))
+	httpbase.OK(ctx, org)
+}
+
 // GetOrganizations godoc
 // @Security     ApiKey
 // @Summary      Get organizations
