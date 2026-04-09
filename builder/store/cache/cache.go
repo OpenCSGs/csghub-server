@@ -39,6 +39,7 @@ type RedisClient interface {
 	Exists(ctx context.Context, key string) (int64, error)
 	Expire(ctx context.Context, key string, expiration time.Duration) error
 	RunScript(ctx context.Context, scriptStr string, key []string, args ...any) (any, error)
+	Pipelined(ctx context.Context, fn func(redis.Pipeliner) error) ([]redis.Cmder, error)
 }
 
 type RedisConfig struct {
@@ -217,4 +218,8 @@ func (c *Cache) RunScript(ctx context.Context, scriptStr string, keys []string, 
 		return 0, err
 	}
 	return res, nil
+}
+
+func (c *Cache) Pipelined(ctx context.Context, fn func(redis.Pipeliner) error) ([]redis.Cmder, error) {
+	return c.core.Pipelined(ctx, fn)
 }

@@ -18,6 +18,7 @@ func TestNamespaceStore_All(t *testing.T) {
 
 	_, err := db.Core.NewInsert().Model(&database.Namespace{
 		Path: "foo/bar",
+		UUID: "test-uuid-123",
 	}).Exec(ctx)
 	require.Nil(t, err)
 
@@ -34,4 +35,17 @@ func TestNamespaceStore_All(t *testing.T) {
 	_, err = store.FindByPath(ctx, "foo/bar2")
 	require.NotNil(t, err)
 
+	exist, err = store.ExistsByUUID(ctx, "test-uuid-123")
+	require.Nil(t, err)
+	require.True(t, exist)
+	exist, err = store.ExistsByUUID(ctx, "non-existent-uuid")
+	require.Nil(t, err)
+	require.False(t, exist)
+
+	nsByUUID, err := store.FindByUUID(ctx, "test-uuid-123")
+	require.Nil(t, err)
+	require.Equal(t, "foo/bar", nsByUUID.Path)
+	require.Equal(t, "test-uuid-123", nsByUUID.UUID)
+	_, err = store.FindByUUID(ctx, "non-existent-uuid")
+	require.NotNil(t, err)
 }

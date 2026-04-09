@@ -42,3 +42,25 @@ func (h *NamespaceHandler) GetInfo(ctx *gin.Context) {
 	}
 	httpbase.OK(ctx, ns)
 }
+
+// GetInfoByUUID godoc
+// @Security     ApiKey
+// @Summary      Get namespace info by UUID [Internal Only].
+// @Description  get namespace info by uuid
+// @Tags         Namespace, InternalOnly
+// @Accept       json
+// @Produce      json
+// @Param        uuid path string true "namespace uuid"
+// @Success      200 {object} types.Response{data=types.Namespace} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /namespace/uuid/{uuid} [get]
+func (h *NamespaceHandler) GetInfoByUUID(ctx *gin.Context) {
+	uuid := ctx.Param("uuid")
+	ns, err := h.c.GetInfoByUUID(ctx, uuid)
+	if err != nil {
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	httpbase.OK(ctx, ns)
+}
