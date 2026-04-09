@@ -5,8 +5,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"strings"
 	"testing"
-
-	"github.com/stretchr/testify/require"
 )
 
 // TestModelSerialization tests the custom serialization of Model struct
