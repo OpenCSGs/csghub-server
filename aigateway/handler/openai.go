@@ -293,6 +293,7 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 	}
 	target := ""
 	host := ""
+	modelName := ""
 	if len(model.SvcName) > 0 {
 		cluster, errCls := h.clusterComp.GetClusterByID(c, targetReq.ClusterID)
 		if errCls != nil {
@@ -305,9 +306,11 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 			return
 		}
 		target, host, _ = common.ExtractDeployTargetAndHost(c.Request.Context(), cluster, targetReq)
+		modelName = model.CSGHubModelID
 	} else {
 		slog.DebugContext(c.Request.Context(), "external model", slog.Any("model", model))
 		target = model.Endpoint
+		modelName = model.ID
 	}
 	if err != nil || len(target) < 1 {
 		slog.ErrorContext(c.Request.Context(), "failed to get model target address", slog.Any("error", err),
@@ -322,12 +325,6 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 		return
 	}
 
-	modelName, _, err := (component.ModelIDBuilder{}).From(modelID)
-	if err != nil {
-		slog.ErrorContext(c.Request.Context(), "failed to process chat request", "error", err, "model_id", modelID)
-		c.String(http.StatusBadRequest, err.Error())
-		return
-	}
 	chatReq.Model = modelName
 	if chatReq.Stream {
 		c.Writer.Header().Set("Content-Type", "text/event-stream")
@@ -478,6 +475,7 @@ func (h *OpenAIHandlerImpl) GenerateImage(c *gin.Context) {
 	}
 	target := ""
 	host := ""
+	modelName := ""
 	if len(model.SvcName) > 0 {
 		cluster, errCls := h.clusterComp.GetClusterByID(c, targetReq.ClusterID)
 		if errCls != nil {
@@ -490,21 +488,15 @@ func (h *OpenAIHandlerImpl) GenerateImage(c *gin.Context) {
 			return
 		}
 		target, host, _ = common.ExtractDeployTargetAndHost(ctx, cluster, targetReq)
+		modelName = model.CSGHubModelID
 	} else {
 		target = model.Endpoint
+		modelName = model.ID
 	}
 	if err != nil || len(target) < 1 {
 		slog.ErrorContext(ctx, "failed to get model target address", slog.Any("error", err), slog.String("model_id", modelID))
 		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
 			Code: "model_not_running", Message: fmt.Sprintf("model '%s' not running", modelID), Type: "invalid_request_error",
-		}})
-		return
-	}
-
-	modelName, _, err := (component.ModelIDBuilder{}).From(modelID)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
-			Code: "invalid_model_id", Message: "invalid model ID: " + err.Error(), Type: "invalid_request_error",
 		}})
 		return
 	}
@@ -665,6 +657,7 @@ func (h *OpenAIHandlerImpl) Embedding(c *gin.Context) {
 	}
 	target := ""
 	host := ""
+	modelName := ""
 	if len(model.SvcName) > 0 {
 		cluster, errCls := h.clusterComp.GetClusterByID(c, targetReq.ClusterID)
 		if errCls != nil {
@@ -677,8 +670,10 @@ func (h *OpenAIHandlerImpl) Embedding(c *gin.Context) {
 			return
 		}
 		target, host, _ = common.ExtractDeployTargetAndHost(c.Request.Context(), cluster, targetReq)
+		modelName = model.CSGHubModelID
 	} else {
 		target = model.Endpoint
+		modelName = model.ID
 	}
 	if err != nil || len(target) < 1 {
 		slog.ErrorContext(c, "failed to get embedding target address", slog.Any("error", err),
@@ -700,12 +695,6 @@ func (h *OpenAIHandlerImpl) Embedding(c *gin.Context) {
 		return
 	}
 
-	modelName, _, err := (component.ModelIDBuilder{}).From(modelID)
-	if err != nil {
-		slog.ErrorContext(c, "failed to process chat request", "error", err, "model_id", modelID)
-		c.String(http.StatusBadRequest, err.Error())
-		return
-	}
 	req.Model = modelName
 	data, _ := json.Marshal(req)
 	c.Request.Body = io.NopCloser(bytes.NewReader(data))
