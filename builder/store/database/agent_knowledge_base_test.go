@@ -388,6 +388,7 @@ func TestAgentKnowledgeBaseStore_List_OrderByUpdatedAt(t *testing.T) {
 
 	// Create knowledge bases
 	kb1 := &database.AgentKnowledgeBase{
+		ID:          1,
 		UserUUID:    userUUID,
 		Name:        "First Knowledge Base",
 		Description: "First description",
@@ -398,6 +399,7 @@ func TestAgentKnowledgeBaseStore_List_OrderByUpdatedAt(t *testing.T) {
 	require.NoError(t, err)
 
 	kb2 := &database.AgentKnowledgeBase{
+		ID:          2,
 		UserUUID:    userUUID,
 		Name:        "Second Knowledge Base",
 		Description: "Second description",
