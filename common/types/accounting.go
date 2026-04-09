@@ -105,11 +105,11 @@ var (
 	SceneModelFinetune   SceneType = 12 // model finetune
 	SceneMultiSync       SceneType = 13 // multi source sync
 	SceneEvaluation      SceneType = 14 // model evaluation
-	SceneModelServerless SceneType = 15 // model serverless deploy
+	SceneModelServerless SceneType = 15 // serverless and external model from aigateway
 	// starship
-	SceneStarship   SceneType = 20 // starship
-	SceneGuiAgent   SceneType = 22 // gui agent
-	SceneAgenticHub SceneType = 30 // agentic hub
+	SceneStarship SceneType = 20 // starship
+	SceneGuiAgent SceneType = 22 // gui agent
+	// SceneAgenticHub SceneType = 30 // agentic hub
 	// unknow
 	SceneUnknow SceneType = 99 // unknow
 )
@@ -155,6 +155,8 @@ type AcctEventReq struct {
 	SubBillID        int64           `json:"sub_bill_id"`
 	Discount         float64         `json:"discount"`
 	RegularValue     float64         `json:"regular_value"`
+	PromptToken      float64         `json:"prompt_token"`
+	CompletionToken  float64         `json:"completion_token"`
 }
 
 // generate charge event from client
@@ -206,12 +208,24 @@ type ActStatementsReq struct {
 }
 
 type AcctBillsReq struct {
-	UserUUID  string `json:"user_id"`
-	Scene     int    `json:"scene"`
-	StartDate string `json:"start_date"`
-	EndDate   string `json:"end_date"`
-	Per       int    `json:"per"`
-	Page      int    `json:"page"`
+	CurrentUser string `json:"current_user"`
+	TargetUUID  string `json:"target_uuid"`
+	Scene       int    `json:"scene"`
+	StartDate   string `json:"start_date"`
+	EndDate     string `json:"end_date"`
+	Per         int    `json:"per"`
+	Page        int    `json:"page"`
+}
+
+type AcctBillsDetailReq struct {
+	CurrentUser  string `json:"current_user"`
+	TargetUUID   string `json:"target_uuid"`
+	Scene        int    `json:"scene"`
+	StartDate    string `json:"start_date"`
+	EndDate      string `json:"end_date"`
+	InstanceName string `json:"instance_name"`
+	Per          int    `json:"per"`
+	Page         int    `json:"page"`
 }
 
 type AcctStatementsRes struct {
@@ -271,21 +285,25 @@ type AcctQuotaStatementReq struct {
 }
 
 type AcctSummary struct {
-	Total            int     `json:"total"`
-	TotalValue       float64 `json:"total_value"`
-	TotalConsumption float64 `json:"total_consumption"`
+	Total                int     `json:"total"`
+	TotalValue           float64 `json:"total_value"`
+	TotalConsumption     float64 `json:"total_consumption"`
+	TotalPromptToken     float64 `json:"total_prompt_token"`
+	TotalCompletionToken float64 `json:"total_completion_token"`
 }
 
 type ITEM struct {
-	Consumption  float64   `json:"consumption"`
-	InstanceName string    `json:"instance_name"`
-	Value        float64   `json:"value"`
-	CreatedAt    time.Time `json:"created_at"`
-	Status       string    `json:"status"`
-	RepoPath     string    `json:"repo_path"`
-	DeployID     int64     `json:"deploy_id"`
-	DeployName   string    `json:"deploy_name"`
-	DeployUser   string    `json:"deploy_user"`
+	Consumption     float64   `json:"consumption"`
+	InstanceName    string    `json:"instance_name"`
+	Value           float64   `json:"value"`
+	CreatedAt       time.Time `json:"created_at"`
+	Status          string    `json:"status"`
+	RepoPath        string    `json:"repo_path"`
+	DeployID        int64     `json:"deploy_id"`
+	DeployName      string    `json:"deploy_name"`
+	DeployUser      string    `json:"deploy_user"`
+	PromptToken     float64   `json:"prompt_token"`
+	CompletionToken float64   `json:"completion_token"`
 }
 
 type BILLS struct {
@@ -384,6 +402,12 @@ type AcctPriceListDBReq struct {
 	SortOrder  string   `json:"sort_order"`
 	Per        int      `json:"per"`
 	Page       int      `json:"page"`
+}
+
+type AcctPriceListByKindsReq struct {
+	SkuType    SKUType   `json:"sku_type"`
+	SkuKinds   []SKUKind `json:"sku_kinds"`
+	ResourceID string    `json:"resource_id"`
 }
 
 // used for listing prices with pagination and filter
