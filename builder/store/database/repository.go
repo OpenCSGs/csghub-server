@@ -732,7 +732,7 @@ func (s *repoStoreImpl) PublicToUser(ctx context.Context, repoType types.Reposit
 	}
 
 	if len(filter.SpaceSDK) > 0 {
-		q.Where("spaces.sdk = ?", filter.SpaceSDK)
+		q.Where("EXISTS (SELECT 1 FROM spaces s WHERE s.repository_id = repository.id AND s.sdk = ?)", filter.SpaceSDK)
 	}
 
 	if len(filter.Tags) > 0 {
@@ -851,7 +851,7 @@ func (s *repoStoreImpl) publicToUserTrending(ctx context.Context, repoType types
 	}
 
 	if len(filter.SpaceSDK) > 0 {
-		q.Where("spaces.sdk = ?", filter.SpaceSDK)
+		q.Where("EXISTS (SELECT 1 FROM spaces s WHERE s.repository_id = r.id AND s.sdk = ?)", filter.SpaceSDK)
 	}
 
 	if len(filter.Tags) > 0 {

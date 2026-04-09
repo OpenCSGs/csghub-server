@@ -7,6 +7,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	mockgit "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/git/gitserver"
@@ -1054,4 +1055,263 @@ func TestUserComponent_StreamExportUsers(t *testing.T) {
 	}
 
 	require.Equal(t, 1, total)
+}
+
+func TestUserComponent_Get_WithFullInfo(t *testing.T) {
+	mockUserStore := mockdb.NewMockUserStore(t)
+	mockOrgStore := mockdb.NewMockOrgStore(t)
+	mockUserTagStore := mockdb.NewMockUserTagStore(t)
+
+	dbUser := database.User{
+		ID:        1,
+		UUID:      "user-uuid-123",
+		Username:  "testuser",
+		NickName:  "Test User",
+		Avatar:    "https://example.com/avatar.png",
+		Email:     "test@example.com",
+		Bio:       "Test bio",
+		Homepage:  "https://test.com",
+		PhoneArea: "+86",
+		Phone:     "13612345678",
+		Namespaces: []database.Namespace{
+			{
+				ID:            1,
+				Path:          "testuser",
+				NamespaceType: database.UserNamespace,
+				UUID:          "ns-uuid-123",
+			},
+		},
+	}
+
+	mockUserStore.EXPECT().FindByUsername(mock.Anything, "testuser").Return(dbUser, nil)
+	mockUserTagStore.EXPECT().GetUserTags(mock.Anything, dbUser.ID).Return([]*database.Tag{}, nil)
+	mockOrgStore.EXPECT().GetUserBelongOrgs(mock.Anything, dbUser.ID).Return([]database.Organization{}, nil)
+
+	uc := &userComponentImpl{
+		userStore: mockUserStore,
+		orgStore:  mockOrgStore,
+		uts:       mockUserTagStore,
+	}
+
+	user, err := uc.Get(context.Background(), "testuser", "testuser", false)
+	require.NoError(t, err)
+	require.Equal(t, "testuser", user.Username)
+	require.Equal(t, "Test User", user.Nickname)
+	require.Equal(t, "https://example.com/avatar.png", user.Avatar)
+	require.Equal(t, int64(1), user.ID)
+	require.Equal(t, "test@example.com", user.Email)
+	require.Equal(t, "user-uuid-123", user.UUID)
+	require.Equal(t, "Test bio", user.Bio)
+	require.Equal(t, "https://test.com", user.Homepage)
+	require.Equal(t, "+86", user.PhoneArea)
+	require.Equal(t, "13612345678", user.Phone)
+	require.Len(t, user.Namespaces, 1)
+	require.Equal(t, "testuser", user.Namespaces[0].Path)
+}
+
+func TestUserComponent_Get_WithAnonymousVisitor(t *testing.T) {
+	mockUserStore := mockdb.NewMockUserStore(t)
+	mockOrgStore := mockdb.NewMockOrgStore(t)
+	mockUserTagStore := mockdb.NewMockUserTagStore(t)
+
+	dbUser := database.User{
+		ID:        1,
+		UUID:      "user-uuid-123",
+		Username:  "testuser",
+		NickName:  "Test User",
+		Avatar:    "https://example.com/avatar.png",
+		Email:     "test@example.com",
+		Bio:       "Test bio",
+		Homepage:  "https://test.com",
+		PhoneArea: "+86",
+		Phone:     "13612345678",
+		Namespaces: []database.Namespace{
+			{
+				ID:            1,
+				Path:          "testuser",
+				NamespaceType: database.UserNamespace,
+				UUID:          "ns-uuid-123",
+			},
+		},
+	}
+
+	mockUserStore.EXPECT().FindByUsername(mock.Anything, "testuser").Return(dbUser, nil)
+	mockUserTagStore.EXPECT().GetUserTags(mock.Anything, dbUser.ID).Return([]*database.Tag{}, nil)
+	mockOrgStore.EXPECT().GetUserBelongOrgs(mock.Anything, dbUser.ID).Return([]database.Organization{}, nil)
+
+	uc := &userComponentImpl{
+		userStore: mockUserStore,
+		orgStore:  mockOrgStore,
+		uts:       mockUserTagStore,
+	}
+
+	user, err := uc.Get(context.Background(), "testuser", "", false)
+	require.NoError(t, err)
+	require.Equal(t, "testuser", user.Username)
+	require.Equal(t, "Test User", user.Nickname)
+	require.Equal(t, "https://example.com/avatar.png", user.Avatar)
+	require.Equal(t, int64(0), user.ID)
+	require.Empty(t, user.Email)
+	require.Empty(t, user.UUID)
+	require.Empty(t, user.Bio)
+	require.Empty(t, user.Homepage)
+	require.Empty(t, user.PhoneArea)
+	require.Empty(t, user.Phone)
+}
+
+func TestUserComponent_Get_WithOnlyBasicInfo(t *testing.T) {
+	mockUserStore := mockdb.NewMockUserStore(t)
+	mockOrgStore := mockdb.NewMockOrgStore(t)
+	mockUserTagStore := mockdb.NewMockUserTagStore(t)
+
+	dbUser := database.User{
+		ID:        1,
+		UUID:      "user-uuid-123",
+		Username:  "testuser",
+		NickName:  "Test User",
+		Avatar:    "https://example.com/avatar.png",
+		Email:     "test@example.com",
+		Bio:       "Test bio",
+		Homepage:  "https://test.com",
+		PhoneArea: "+86",
+		Phone:     "13612345678",
+		Namespaces: []database.Namespace{
+			{
+				ID:            1,
+				Path:          "testuser",
+				NamespaceType: database.UserNamespace,
+				UUID:          "ns-uuid-123",
+			},
+		},
+	}
+
+	mockUserStore.EXPECT().FindByUsername(mock.Anything, "testuser").Return(dbUser, nil)
+	mockUserStore.EXPECT().FindByUsername(mock.Anything, "otheruser").Return(database.User{Username: "otheruser"}, nil)
+	mockUserTagStore.EXPECT().GetUserTags(mock.Anything, dbUser.ID).Return([]*database.Tag{}, nil)
+	mockOrgStore.EXPECT().GetUserBelongOrgs(mock.Anything, dbUser.ID).Return([]database.Organization{}, nil)
+
+	uc := &userComponentImpl{
+		userStore: mockUserStore,
+		orgStore:  mockOrgStore,
+		uts:       mockUserTagStore,
+	}
+
+	user, err := uc.Get(context.Background(), "testuser", "otheruser", false)
+	require.NoError(t, err)
+	require.Equal(t, "testuser", user.Username)
+	require.Equal(t, "Test User", user.Nickname)
+	require.Equal(t, "https://example.com/avatar.png", user.Avatar)
+	require.Equal(t, int64(0), user.ID)
+	require.Empty(t, user.Email)
+	require.Empty(t, user.UUID)
+	require.Empty(t, user.Bio)
+	require.Empty(t, user.Homepage)
+	require.Empty(t, user.PhoneArea)
+	require.Empty(t, user.Phone)
+}
+
+func TestUserComponent_Get_WithOrgs(t *testing.T) {
+	mockUserStore := mockdb.NewMockUserStore(t)
+	mockOrgStore := mockdb.NewMockOrgStore(t)
+	mockUserTagStore := mockdb.NewMockUserTagStore(t)
+
+	dbUser := database.User{
+		ID:       1,
+		UUID:     "user-uuid-123",
+		Username: "testuser",
+		NickName: "Test User",
+		Avatar:   "https://example.com/avatar.png",
+		Namespaces: []database.Namespace{
+			{
+				ID:            1,
+				Path:          "testuser",
+				NamespaceType: database.UserNamespace,
+				UUID:          "ns-uuid-123",
+			},
+		},
+	}
+
+	dbOrgs := []database.Organization{
+		{
+			ID:       1,
+			UUID:     uuid.MustParse("11111111-1111-1111-1111-111111111111"),
+			Homepage: "https://org1.com",
+			Logo:     "https://org1.com/logo.png",
+			OrgType:  "company",
+			Verified: true,
+			Namespace: &database.Namespace{
+				ID:            2,
+				Path:          "org_path_1",
+				NamespaceType: database.OrgNamespace,
+				UUID:          "ns-org-1",
+			},
+		},
+		{
+			ID:       2,
+			UUID:     uuid.MustParse("22222222-2222-2222-2222-222222222222"),
+			Homepage: "https://org2.com",
+			Logo:     "https://org2.com/logo.png",
+			OrgType:  "school",
+			Verified: false,
+		},
+	}
+
+	mockUserStore.EXPECT().FindByUsername(mock.Anything, "testuser").Return(dbUser, nil)
+	mockUserTagStore.EXPECT().GetUserTags(mock.Anything, dbUser.ID).Return([]*database.Tag{}, nil)
+	mockOrgStore.EXPECT().GetUserBelongOrgs(mock.Anything, dbUser.ID).Return(dbOrgs, nil)
+
+	uc := &userComponentImpl{
+		userStore: mockUserStore,
+		orgStore:  mockOrgStore,
+		uts:       mockUserTagStore,
+	}
+
+	user, err := uc.Get(context.Background(), "testuser", "testuser", false)
+	require.NoError(t, err)
+	require.Len(t, user.Orgs, 2)
+
+	require.Equal(t, "https://org1.com", user.Orgs[0].Homepage)
+	require.Equal(t, "https://org1.com/logo.png", user.Orgs[0].Logo)
+	require.Equal(t, "company", user.Orgs[0].OrgType)
+	require.True(t, user.Orgs[0].Verified)
+
+	require.Equal(t, "https://org2.com", user.Orgs[1].Homepage)
+	require.Equal(t, "school", user.Orgs[1].OrgType)
+	require.False(t, user.Orgs[1].Verified)
+}
+
+func TestUserComponent_Get_WithTags(t *testing.T) {
+	mockUserStore := mockdb.NewMockUserStore(t)
+	mockOrgStore := mockdb.NewMockOrgStore(t)
+	mockUserTagStore := mockdb.NewMockUserTagStore(t)
+
+	dbUser := database.User{
+		ID:       1,
+		Username: "testuser",
+		NickName: "Test User",
+		Avatar:   "https://example.com/avatar.png",
+	}
+
+	tags := []*database.Tag{
+		{ID: 1, Name: "vip", Category: "label", Group: "user", BuiltIn: true, Scope: "user", I18nKey: "tag.vip"},
+		{ID: 2, Name: "developer", Category: "role", Group: "user", BuiltIn: false, Scope: "user", I18nKey: "tag.developer"},
+	}
+
+	mockUserStore.EXPECT().FindByUsername(mock.Anything, "testuser").Return(dbUser, nil)
+	mockUserTagStore.EXPECT().GetUserTags(mock.Anything, dbUser.ID).Return(tags, nil)
+	mockOrgStore.EXPECT().GetUserBelongOrgs(mock.Anything, dbUser.ID).Return([]database.Organization{}, nil)
+
+	uc := &userComponentImpl{
+		userStore: mockUserStore,
+		orgStore:  mockOrgStore,
+		uts:       mockUserTagStore,
+	}
+
+	user, err := uc.Get(context.Background(), "testuser", "testuser", false)
+	require.NoError(t, err)
+	require.Len(t, user.Tags, 2)
+	require.Equal(t, "vip", user.Tags[0].Name)
+	require.Equal(t, "label", user.Tags[0].Category)
+	require.Equal(t, "developer", user.Tags[1].Name)
+	require.Equal(t, "role", user.Tags[1].Category)
 }
