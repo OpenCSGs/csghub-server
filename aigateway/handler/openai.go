@@ -424,6 +424,12 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 	}
 	if isCheck {
 		modComponent = h.modComponent
+		// Create a combined key using userUUID and modelID for caching and tracking
+		key := fmt.Sprintf("%s:%s", userUUID, modelID)
+		result, err := h.modComponent.CheckChatPrompts(c.Request.Context(), chatReq.Messages, key, chatReq.Stream)
+		if err != nil {
+			slog.ErrorContext(c.Request.Context(), "failed to call moderation", slog.Any("error", err))
+		}
 		if result != nil && result.IsSensitive {
 			handleSensitiveResponse(c, chatReq.Stream, result)
 			return

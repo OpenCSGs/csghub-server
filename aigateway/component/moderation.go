@@ -21,10 +21,9 @@ import (
 )
 
 const (
-	// max content length
-	maxContentLength = 6144
-	// sliding window size
-	slidingWindowSize = 2000
+	// max content length for moderation
+	defaultMaxContentLength = 2000 // sliding window size
+	slidingWindowSize       = 2000
 	// cache ttl
 	cacheTTL = 24 * time.Hour
 	// moderation cache prefix
@@ -59,10 +58,11 @@ type StreamChecker interface {
 }
 
 type moderationImpl struct {
-	modSvcClient  rpc.ModerationSvcClient
-	cacheClient   cache.RedisClient
-	config        *config.Config
-	streamChecker StreamChecker
+	modSvcClient     rpc.ModerationSvcClient
+	cacheClient      cache.RedisClient
+	config           *config.Config
+	streamChecker    StreamChecker
+	maxContentLength int
 }
 
 type syncStreamChecker struct {
@@ -262,10 +262,15 @@ func NewModerationImpl(config *config.Config) Moderation {
 }
 
 func NewModerationImplWithClient(config *config.Config, modSvcClient rpc.ModerationSvcClient, cacheClient cache.RedisClient) Moderation {
+	maxContentLength := config.SensitiveCheck.MaxContentLength
+	if config.SensitiveCheck.MaxContentLength <= 0 {
+		maxContentLength = defaultMaxContentLength
+	}
 	modImpl := &moderationImpl{
-		modSvcClient: modSvcClient,
-		cacheClient:  cacheClient,
-		config:       config,
+		modSvcClient:     modSvcClient,
+		cacheClient:      cacheClient,
+		maxContentLength: maxContentLength,
+		config:           config,
 	}
 
 	initStreamChecker(modImpl)
@@ -478,7 +483,7 @@ func (modImpl *moderationImpl) CheckChatPrompts(ctx context.Context, messages []
 func (modImpl *moderationImpl) checkLLMPrompt(ctx context.Context, content, key string, isStream bool) (*rpc.CheckResult, error) {
 	content = strings.ReplaceAll(content, `\\n`, "\n")
 	content = strings.ReplaceAll(content, `\n`, "")
-	if len(content) < maxContentLength {
+	if len(content) < modImpl.maxContentLength {
 		return modImpl.checkSingleChunk(ctx, content, key, isStream)
 	}
 
@@ -544,7 +549,7 @@ func (modImpl *moderationImpl) checkLLMPrompt(ctx context.Context, content, key 
 			separatorLen = 1 // for "."
 		}
 
-		if buffer.Len()+separatorLen+len(chunk) > maxContentLength && buffer.Len() > 0 {
+		if buffer.Len()+separatorLen+len(chunk) > modImpl.maxContentLength && buffer.Len() > 0 {
 			result, err := modImpl.checkBuffer(ctx, buffer.String(), currentBufferChunks, key, isStream)
 			if err != nil {
 				return nil, fmt.Errorf("failed to call moderation on buffer: %w", err)

@@ -69,7 +69,7 @@ func (c *SkillFileChecker) Check(ctx context.Context, req types.GitalyAllowedReq
 	}
 
 	// Check if SKILL.md is in the correct YAML format with name and description
-	pattern := `^---\s*\nname:\s*.+\s*\ndescription:\s*.+\s*---$`
+	pattern := `^---\s*\nname:\s*.+\s*\ndescription:\s*.+\s*---*.`
 	matched, err := regexp.MatchString(pattern, skillsContent)
 	if err != nil {
 		return false, fmt.Errorf("failed to check SKILL.md format: %w", err)

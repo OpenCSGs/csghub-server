@@ -808,6 +808,46 @@ func TestChat_Success(t *testing.T) {
 	assert.Equal(t, expectedBody, string(data))
 }
 
+func TestChat_Success_IncludesModelInJSONBody(t *testing.T) {
+	userUUID := "test-user-uuid"
+	username := "test-username"
+	token := "test-token"
+	agentName := "test-agent"
+	sessionID := "session-123"
+	req := &CsgbotChatRequest{
+		Model: "gemini:infini-ai",
+		Messages: []CsgbotChatMessage{
+			{Role: "user", Content: "Hello"},
+		},
+		Stream: false,
+	}
+
+	expectedBody := `{"data":"hello response"}`
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var chatReq CsgbotChatRequest
+		err := json.NewDecoder(r.Body).Decode(&chatReq)
+		require.NoError(t, err)
+		assert.Equal(t, "gemini:infini-ai", chatReq.Model)
+		assert.Equal(t, req.Messages, chatReq.Messages)
+		assert.Equal(t, req.Stream, chatReq.Stream)
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(expectedBody))
+	}))
+	defer server.Close()
+
+	client := setupTestCsgbotClient(server)
+
+	body, err := client.Chat(context.Background(), userUUID, username, token, agentName, sessionID, req)
+	require.NoError(t, err)
+	require.NotNil(t, body)
+	defer body.Close()
+	data, err := io.ReadAll(body)
+	require.NoError(t, err)
+	assert.Equal(t, expectedBody, string(data))
+}
+
 func TestChat_Success_Stream(t *testing.T) {
 	userUUID := "test-user-uuid"
 	username := "test-username"
