@@ -2,6 +2,7 @@ package types
 
 import (
 	"encoding/json"
+	"github.com/stretchr/testify/require"
 	"strings"
 	"testing"
 )
@@ -17,10 +18,10 @@ func TestModelSerialization(t *testing.T) {
 			Task:    "text-generation",
 
 			SupportFunctionCall: true,
-			Public:              true,
 		},
 		InternalModelInfo: InternalModelInfo{
 			CSGHubModelID: "test/repo/path",
+			OwnerUUID:     "test-owner-uuid",
 			ClusterID:     "test-cluster-id",
 			SvcName:       "test-service",
 			SvcType:       1,
@@ -47,8 +48,8 @@ func TestModelSerialization(t *testing.T) {
 			t.Errorf("External response should not contain sensitive fields, got: %s", jsonStr)
 		}
 
-		if !contains(jsonStr, "test-model") || !contains(jsonStr, "model") || !contains(jsonStr, "test-owner") || !contains(jsonStr, "public") {
-			t.Errorf("External response should contain BaseModel fields including public, got: %s", jsonStr)
+		if !contains(jsonStr, "test-model") || !contains(jsonStr, "model") || !contains(jsonStr, "test-owner") {
+			t.Errorf("External response should contain BaseModel fields, got: %s", jsonStr)
 		}
 	})
 
@@ -60,8 +61,8 @@ func TestModelSerialization(t *testing.T) {
 			t.Fatalf("Failed to marshal model in internal use mode: %v", err)
 		}
 		jsonStr := string(jsonData)
-		if !contains(jsonStr, "endpoint") || !contains(jsonStr, "http://test-endpoint.com") || !contains(jsonStr, "test-model") || !contains(jsonStr, "public") {
-			t.Errorf("Internal response should contain base fields including public, got: %s", jsonStr)
+		if !contains(jsonStr, "endpoint") || !contains(jsonStr, "http://test-endpoint.com") || !contains(jsonStr, "test-model") {
+			t.Errorf("Internal response should contain base fields, got: %s", jsonStr)
 		}
 
 		if contains(jsonStr, "internal_model_info") {
@@ -78,6 +79,17 @@ func TestModelSerialization(t *testing.T) {
 		}
 		if !contains(jsonStr, "image_id") || !contains(jsonStr, "test-image-id") {
 			t.Errorf("Internal response should contain expanded InternalModelInfo fields, got: %s", jsonStr)
+		}
+		// csghub_model_id, owner_uuid, and svc_type must survive the Redis round-trip so
+		// that RecordUsage can populate resource_id for inference models.
+		if !contains(jsonStr, "csghub_model_id") || !contains(jsonStr, "test/repo/path") {
+			t.Errorf("Internal response should contain csghub_model_id, got: %s", jsonStr)
+		}
+		if !contains(jsonStr, "owner_uuid") {
+			t.Errorf("Internal response should contain owner_uuid, got: %s", jsonStr)
+		}
+		if !contains(jsonStr, "svc_type") {
+			t.Errorf("Internal response should contain svc_type, got: %s", jsonStr)
 		}
 	})
 
@@ -108,7 +120,6 @@ func TestModelListSerialization(t *testing.T) {
 				BaseModel: BaseModel{
 					ID:     "model-1",
 					Object: "model",
-					Public: true,
 				},
 				Endpoint:    "http://model-1.com",
 				InternalUse: false,
@@ -151,7 +162,6 @@ func TestModelUnmarshal(t *testing.T) {
 				"owned_by": "test-owner",
 				"task": "text-generation",
 				"support_function_call": true,
-				"public": true,
 				"endpoint": "http://model-1.com",
 				"internal_use": false
 			}
@@ -167,5 +177,100 @@ func TestModelUnmarshal(t *testing.T) {
 	// verify that the unmarshaled results are correct
 	if modelList.Object != "list" || len(modelList.Data) != 1 || modelList.Data[0].ID != "model-1" {
 		t.Errorf("Model list unmarshal failed, got: %v", modelList)
+	}
+}
+
+// TestInferenceModelRoundTrip verifies that CSGHubModelID, OwnerUUID, and SvcType
+// survive a Redis marshal→unmarshal cycle so that RecordUsage can always populate
+// resource_id for inference (llm_type=inference) models.
+func TestInferenceModelRoundTrip(t *testing.T) {
+	original := &Model{
+		BaseModel: BaseModel{
+			ID:      "Qwen/Qwen3Guard-Gen-0.6B:fgufi9nytc00",
+			Object:  "model",
+			Created: 1633046400,
+			OwnedBy: "Qwen",
+		},
+		InternalModelInfo: InternalModelInfo{
+			CSGHubModelID: "Qwen/Qwen3Guard-Gen-0.6B",
+			OwnerUUID:     "uuid-owner-123",
+			ClusterID:     "cluster-abc",
+			SvcName:       "fgufi9nytc00",
+			SvcType:       2,
+			ImageID:       "img-xyz",
+		},
+		Endpoint:    "http://inference.internal/v1",
+		InternalUse: true,
+	}
+
+	data, err := json.Marshal(original)
+	require.NoError(t, err, "marshal should not error")
+
+	var restored Model
+	require.NoError(t, json.Unmarshal(data, &restored), "unmarshal should not error")
+
+	require.Equal(t, original.CSGHubModelID, restored.CSGHubModelID, "CSGHubModelID must round-trip")
+	require.Equal(t, original.OwnerUUID, restored.OwnerUUID, "OwnerUUID must round-trip")
+	require.Equal(t, original.SvcType, restored.SvcType, "SvcType must round-trip")
+	require.Equal(t, original.ClusterID, restored.ClusterID, "ClusterID must round-trip")
+	require.Equal(t, original.SvcName, restored.SvcName, "SvcName must round-trip")
+	require.Equal(t, original.ImageID, restored.ImageID, "ImageID must round-trip")
+	require.Equal(t, original.ID, restored.ID, "ID must round-trip")
+	require.Equal(t, original.Endpoint, restored.Endpoint, "Endpoint must round-trip")
+}
+
+func TestModel_SkipBalance(t *testing.T) {
+	tests := []struct {
+		name     string
+		metadata map[string]any
+		expected bool
+	}{
+		{
+			name:     "Metadata is nil",
+			metadata: nil,
+			expected: false,
+		},
+		{
+			name:     "Metadata does not have MetaTaskKey",
+			metadata: map[string]any{},
+			expected: false,
+		},
+		{
+			name:     "MetaTaskKey value is not a slice",
+			metadata: map[string]any{MetaTaskKey: "not a slice"},
+			expected: false,
+		},
+		{
+			name:     "MetaTaskKey value is slice but not of strings",
+			metadata: map[string]any{MetaTaskKey: []int{1, 2, 3}},
+			expected: false,
+		},
+		{
+			name:     "MetaTaskKey value is slice of strings but does not contain MetaTaskValGuard",
+			metadata: map[string]any{MetaTaskKey: []interface{}{"text-generation", "text-to-image"}},
+			expected: false,
+		},
+		{
+			name:     "MetaTaskKey value is slice of strings and contains MetaTaskValGuard",
+			metadata: map[string]any{MetaTaskKey: []interface{}{"text-generation", MetaTaskValGuard}},
+			expected: true,
+		},
+		{
+			name:     "MetaTaskKey value is slice of mixed types with MetaTaskValGuard",
+			metadata: map[string]any{MetaTaskKey: []interface{}{1, "text-generation", MetaTaskValGuard, 3.14}},
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			model := &Model{
+				BaseModel: BaseModel{
+					Metadata: tt.metadata,
+				},
+			}
+			result := model.SkipBalance()
+			require.Equal(t, tt.expected, result)
+		})
 	}
 }

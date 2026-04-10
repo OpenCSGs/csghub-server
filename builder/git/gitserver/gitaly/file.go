@@ -43,6 +43,13 @@ func (c *Client) GetRepoFileRaw(ctx context.Context, req gitserver.GetRepoInfoBy
 		RelativePath: relativePath,
 	}
 
+	if req.GitAlternateObjectDirectoriesRelative != nil {
+		repository.GitAlternateObjectDirectories = req.GitAlternateObjectDirectoriesRelative
+	}
+	if req.GitObjectDirectoryRelative != "" {
+		repository.GitObjectDirectory = req.GitObjectDirectoryRelative
+	}
+
 	req.Path = strings.TrimPrefix(req.Path, "/")
 
 	if req.Ref == "" {

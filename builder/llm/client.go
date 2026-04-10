@@ -9,6 +9,8 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"opencsg.com/csghub-server/builder/rpc"
+	"strings"
 
 	"opencsg.com/csghub-server/common/types"
 )
@@ -18,18 +20,18 @@ type LLMSvcClient interface {
 }
 
 type Client struct {
-	client *http.Client
+	client rpc.HttpDoer
 }
 
 func NewClient() *Client {
 	return &Client{
-		client: http.DefaultClient,
+		client: rpc.NewHttpClient("").WithRetry(2),
 	}
 }
 
 func (c *Client) ChatStream(ctx context.Context, endpoint, host string, headers map[string]string, data types.LLMReqBody) (<-chan string, error) {
 	slog.Debug("chat with llm", slog.Any("endpoint", endpoint), slog.Any("data", data))
-	rc, err := c.doRequest(ctx, http.MethodPost, endpoint, host, headers, data)
+	rc, err := c.doRequest(ctx, http.MethodPost, strings.TrimSpace(endpoint), host, headers, data)
 	if err != nil {
 		return nil, fmt.Errorf("do llm stream request, error: %w", err)
 	}

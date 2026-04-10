@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/git/gitserver"
+	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
@@ -150,8 +151,14 @@ func TestSpaceComponent_Update(t *testing.T) {
 		RepoType:  types.SpaceRepo,
 	}).Return(
 		&database.Repository{
-			ID:   123,
-			Name: "repo",
+			ID:      123,
+			Name:    "repo",
+			Path:    "ns/n",
+			Private: false,
+			User: database.User{
+				UUID:     "user-uuid",
+				Username: "user",
+			},
 		}, nil,
 	)
 	sc.mocks.stores.SpaceMock().EXPECT().ByRepoID(ctx, int64(123)).Return(&database.Space{
@@ -176,6 +183,7 @@ func TestSpaceComponent_Update(t *testing.T) {
 	require.Equal(t, &types.Space{
 		ID:       321,
 		Name:     "repo",
+		Path:     "ns/n",
 		Hardware: `{"memory": "foo"}`,
 		SKU:      "12",
 	}, space)
@@ -186,8 +194,8 @@ func TestSpaceComponent_Deploy(t *testing.T) {
 	ctx := context.TODO()
 	sc := initializeTestSpaceComponent(ctx, t)
 
-	sc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
-		Username: "user1",
+	sc.mocks.userSvcClient.EXPECT().GetNameSpaceInfo(ctx, "user").Return(&rpc.Namespace{
+		Path: "ns1",
 	}, nil)
 	sc.mocks.stores.RuntimeFrameworkMock().EXPECT().FindSpaceLatestVersion(ctx, mock.Anything, mock.Anything).Return(&database.RuntimeFramework{}, nil)
 
@@ -207,7 +215,7 @@ func TestSpaceComponent_Deploy(t *testing.T) {
 		sc.mocks.deployer.EXPECT().Deploy(ctx, types.DeployRequest{
 			SpaceID:        1,
 			Path:           "foo1/bar1",
-			Annotation:     "{\"hub-deploy-user\":\"user1\",\"hub-res-name\":\"ns1/n1\",\"hub-res-type\":\"space\"}",
+			Annotation:     "{\"hub-deploy-user\":\"user\",\"hub-res-name\":\"ns1/n1\",\"hub-res-type\":\"space\"}",
 			ContainerPort:  8080,
 			SKU:            "1",
 			OwnerNamespace: "ns1",

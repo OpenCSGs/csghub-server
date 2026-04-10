@@ -75,7 +75,7 @@ func TestOpenAIHandler_ListModels(t *testing.T) {
 	t.Run("successful passthrough", func(t *testing.T) {
 		tester, c, w := setupTest(t)
 		models := []types.Model{
-			{BaseModel: types.BaseModel{ID: "model1:svc1", Object: "model", OwnedBy: "testuser", Public: true}},
+			{BaseModel: types.BaseModel{ID: "model1:svc1", Object: "model", OwnedBy: "testuser"}},
 		}
 		expect := types.ModelList{
 			Object:     "list",
@@ -102,14 +102,12 @@ func TestOpenAIHandler_ListModels(t *testing.T) {
 		tester, c, w := setupTest(t)
 
 		tester.WithQuery("model_id", "gpt").
-			WithQuery("public", "true").
 			WithQuery("per", "2").
 			WithQuery("page", "3")
 
 		tester.mocks.openAIComp.EXPECT().
 			ListModels(mock.Anything, "testuser", types.ListModelsReq{
 				ModelID: "gpt",
-				Public:  "true",
 				Per:     "2",
 				Page:    "3",
 			}).
@@ -118,6 +116,36 @@ func TestOpenAIHandler_ListModels(t *testing.T) {
 		tester.handler.ListModels(c)
 
 		assert.Equal(t, http.StatusOK, w.Code)
+	})
+
+	t.Run("passes task query param to component", func(t *testing.T) {
+		tester, c, w := setupTest(t)
+
+		tester.WithQuery("task", "text-generation").
+			WithQuery("per", "10").
+			WithQuery("page", "1")
+
+		tester.mocks.openAIComp.EXPECT().
+			ListModels(mock.Anything, "testuser", types.ListModelsReq{
+				Task: "text-generation",
+				Per:  "10",
+				Page: "1",
+			}).
+			Return(types.ModelList{
+				Object:     "list",
+				Data:       []types.Model{{BaseModel: types.BaseModel{ID: "model1", Task: "text-generation"}}},
+				HasMore:    false,
+				TotalCount: 1,
+			}, nil).Once()
+
+		tester.handler.ListModels(c)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		var response types.ModelList
+		err := json.Unmarshal(w.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		assert.Equal(t, 1, response.TotalCount)
+		assert.Equal(t, "text-generation", response.Data[0].Task)
 	})
 
 	t.Run("component error", func(t *testing.T) {
@@ -199,7 +227,6 @@ func TestOpenAIHandler_ListModels_OpenaiSDK(t *testing.T) {
 				ID:      "gpt-4:svc1",
 				Object:  "model",
 				OwnedBy: "testuser",
-				Public:  true,
 			},
 		},
 		{
@@ -207,7 +234,6 @@ func TestOpenAIHandler_ListModels_OpenaiSDK(t *testing.T) {
 				ID:      "gpt-3.5-turbo:svc2",
 				Object:  "model",
 				OwnedBy: "testuser",
-				Public:  true,
 			},
 		},
 	}
@@ -272,9 +298,12 @@ func TestOpenAIHandler_GetModel(t *testing.T) {
 		tester, c, w := setupTest(t)
 		model := &types.Model{
 			BaseModel: types.BaseModel{
-				ID:      "model1:svc1",
+				ID:      "model1",
 				Object:  "model",
 				OwnedBy: "testuser",
+			},
+			ExternalModelInfo: types.ExternalModelInfo{
+				NeedSensitiveCheck: true,
 			},
 		}
 		c.Params = []gin.Param{{Key: "model", Value: "model1:svc1"}}
@@ -297,6 +326,49 @@ func TestOpenAIHandler_GetModel(t *testing.T) {
 		tester.handler.GetModel(c)
 
 		assert.Equal(t, http.StatusBadRequest, w.Code)
+	})
+
+	t.Run("model with slash in name - trims leading slash", func(t *testing.T) {
+		tester, c, w := setupTest(t)
+		model := &types.Model{
+			BaseModel: types.BaseModel{
+				ID:      "xzgan001/gguf_model:fepjlx3v39xc",
+				Object:  "model",
+				OwnedBy: "testuser",
+			},
+		}
+		// Wildcard route adds leading slash
+		c.Params = []gin.Param{{Key: "model", Value: "/xzgan001/gguf_model:fepjlx3v39xc"}}
+		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "xzgan001/gguf_model:fepjlx3v39xc").Return(model, nil)
+
+		tester.handler.GetModel(c)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		var response types.Model
+		err := json.Unmarshal(w.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		assert.Equal(t, "xzgan001/gguf_model:fepjlx3v39xc", response.ID)
+	})
+
+	t.Run("model without leading slash - no trim needed", func(t *testing.T) {
+		tester, c, w := setupTest(t)
+		model := &types.Model{
+			BaseModel: types.BaseModel{
+				ID:      "simple-model:svc1",
+				Object:  "model",
+				OwnedBy: "testuser",
+			},
+		}
+		c.Params = []gin.Param{{Key: "model", Value: "simple-model:svc1"}}
+		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "simple-model:svc1").Return(model, nil)
+
+		tester.handler.GetModel(c)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		var response types.Model
+		err := json.Unmarshal(w.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		assert.Equal(t, "simple-model:svc1", response.ID)
 	})
 }
 
@@ -345,13 +417,14 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 
 		model := &types.Model{
 			BaseModel: types.BaseModel{
-				ID:      "model1:svc1",
+				ID:      "model1",
 				Object:  "model",
 				OwnedBy: "testuser",
 			},
 			InternalModelInfo: types.InternalModelInfo{
-				ClusterID: "test-cls",
-				SvcName:   "test-svc",
+				ClusterID:     "test-cls",
+				SvcName:       "test-svc",
+				CSGHubModelID: "model1",
 			},
 		}
 		tester.mocks.mockClsComp.EXPECT().GetClusterByID(mock.Anything, "test-cls").Return(&database.ClusterInfo{
@@ -382,8 +455,12 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 				OwnedBy: "testuser",
 			},
 			InternalModelInfo: types.InternalModelInfo{
-				ClusterID: "test-cls",
-				SvcName:   "test-svc",
+				ClusterID:     "test-cls",
+				SvcName:       "test-svc",
+				CSGHubModelID: "model1",
+			},
+			ExternalModelInfo: types.ExternalModelInfo{
+				NeedSensitiveCheck: true,
 			},
 			Endpoint: "test-endpoint",
 		}
@@ -391,10 +468,10 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 			ClusterID: "test-cls",
 		}, nil)
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1:svc1").Return(model, nil)
-		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuser", model, "").Return(nil)
+		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuser", "testuuid").Return(nil)
 		expectReq := ChatCompletionRequest{}
 		_ = json.Unmarshal(body, &expectReq)
-		tester.mocks.moderationComp.EXPECT().CheckChatPrompts(mock.Anything, expectReq.Messages, "testuuid:"+model.ID).
+		tester.mocks.moderationComp.EXPECT().CheckChatPrompts(mock.Anything, expectReq.Messages, "testuuid:"+model.ID, false).
 			Return(&rpc.CheckResult{IsSensitive: true}, nil)
 		tester.handler.Chat(c)
 
@@ -426,8 +503,12 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 				OwnedBy: "testuser",
 			},
 			InternalModelInfo: types.InternalModelInfo{
-				ClusterID: "test-cls",
-				SvcName:   "test-svc",
+				ClusterID:     "test-cls",
+				SvcName:       "test-svc",
+				CSGHubModelID: "model1",
+			},
+			ExternalModelInfo: types.ExternalModelInfo{
+				NeedSensitiveCheck: true,
 			},
 			Endpoint: testServer.URL,
 		}
@@ -435,10 +516,10 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 			ClusterID: "test-cls",
 		}, nil)
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1:svc1").Return(model, nil)
-		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuser", model, "").Return(nil)
+		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuser", "testuuid").Return(nil)
 		expectReq := ChatCompletionRequest{}
 		_ = json.Unmarshal(body, &expectReq)
-		tester.mocks.moderationComp.EXPECT().CheckChatPrompts(mock.Anything, expectReq.Messages, "testuuid:"+model.ID).
+		tester.mocks.moderationComp.EXPECT().CheckChatPrompts(mock.Anything, expectReq.Messages, "testuuid:"+model.ID, false).
 			Return(nil, errors.New("some error"))
 		llmTokenCounter := mocktoken.NewMockChatTokenCounter(t)
 		tester.mocks.tokenCounterFactory.EXPECT().NewChat(
@@ -453,8 +534,8 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 		llmTokenCounter.EXPECT().AppendPrompts(expectReq.Messages).Return()
 		var wg sync.WaitGroup
 		wg.Add(1)
-		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, "testuuid", model, llmTokenCounter, mock.Anything).
-			RunAndReturn(func(ctx context.Context, uuid string, model *types.Model, counter token.Counter, sceneValue string) error {
+		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, "testuuid", model, llmTokenCounter).
+			RunAndReturn(func(ctx context.Context, uuid string, model *types.Model, counter token.Counter) error {
 				wg.Done()
 				return nil
 			})
@@ -489,8 +570,12 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 				OwnedBy: "testuser",
 			},
 			InternalModelInfo: types.InternalModelInfo{
-				ClusterID: "test-cls",
-				SvcName:   "test-svc",
+				ClusterID:     "test-cls",
+				SvcName:       "test-svc",
+				CSGHubModelID: "model1",
+			},
+			ExternalModelInfo: types.ExternalModelInfo{
+				NeedSensitiveCheck: true,
 			},
 			Endpoint: testServer.URL,
 		}
@@ -498,10 +583,10 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 			ClusterID: "test-cls",
 		}, nil)
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1:svc1").Return(model, nil)
-		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuser", model, "").Return(nil)
+		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuser", "testuuid").Return(nil)
 		expectReq := ChatCompletionRequest{}
 		_ = json.Unmarshal(body, &expectReq)
-		tester.mocks.moderationComp.EXPECT().CheckChatPrompts(mock.Anything, expectReq.Messages, "testuuid:"+model.ID).
+		tester.mocks.moderationComp.EXPECT().CheckChatPrompts(mock.Anything, expectReq.Messages, "testuuid:"+model.ID, false).
 			Return(&rpc.CheckResult{IsSensitive: false}, nil)
 		llmTokenCounter := mocktoken.NewMockChatTokenCounter(t)
 		tester.mocks.tokenCounterFactory.EXPECT().NewChat(
@@ -510,13 +595,14 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 				Host:     "",
 				Model:    "model1",
 				ImageID:  model.ImageID,
+				Provider: model.Provider,
 			}).
 			Return(llmTokenCounter)
 		llmTokenCounter.EXPECT().AppendPrompts(expectReq.Messages).Return()
 		var wg sync.WaitGroup
 		wg.Add(1)
-		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, "testuuid", model, llmTokenCounter, mock.Anything).
-			RunAndReturn(func(ctx context.Context, uuid string, model *types.Model, counter token.Counter, sceneValue string) error {
+		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, "testuuid", model, llmTokenCounter).
+			RunAndReturn(func(ctx context.Context, uuid string, model *types.Model, counter token.Counter) error {
 				wg.Done()
 				return nil
 			})
@@ -550,8 +636,12 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 				OwnedBy: "testuser",
 			},
 			InternalModelInfo: types.InternalModelInfo{
-				ClusterID: "test-cls",
-				SvcName:   "test-svc",
+				ClusterID:     "test-cls",
+				SvcName:       "test-svc",
+				CSGHubModelID: "model1",
+			},
+			ExternalModelInfo: types.ExternalModelInfo{
+				NeedSensitiveCheck: true,
 			},
 			Endpoint: testServer.URL,
 		}
@@ -559,10 +649,10 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 			ClusterID: "test-cls",
 		}, nil)
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1:svc1").Return(model, nil)
-		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuser", model, "").Return(nil)
+		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuser", "testuuid").Return(nil)
 		expectReq := ChatCompletionRequest{}
 		_ = json.Unmarshal(body, &expectReq)
-		tester.mocks.moderationComp.EXPECT().CheckChatPrompts(mock.Anything, expectReq.Messages, "testuuid:"+model.ID).
+		tester.mocks.moderationComp.EXPECT().CheckChatPrompts(mock.Anything, expectReq.Messages, "testuuid:"+model.ID, false).
 			Return(&rpc.CheckResult{IsSensitive: false}, nil)
 		llmTokenCounter := mocktoken.NewMockChatTokenCounter(t)
 		tester.mocks.tokenCounterFactory.EXPECT().NewChat(
@@ -571,16 +661,78 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 				Host:     "",
 				Model:    "model1",
 				ImageID:  model.ImageID,
+				Provider: model.Provider,
 			}).
 			Return(llmTokenCounter)
 		llmTokenCounter.EXPECT().AppendPrompts(expectReq.Messages).Return()
 		var wg sync.WaitGroup
 		wg.Add(1)
-		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, "testuuid", model, llmTokenCounter, mock.Anything).
-			RunAndReturn(func(ctx context.Context, uuid string, model *types.Model, counter token.Counter, sceneValue string) error {
+		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, "testuuid", model, llmTokenCounter).
+			RunAndReturn(func(ctx context.Context, uuid string, model *types.Model, counter token.Counter) error {
 				wg.Done()
 				return errors.New("record usage error")
 			})
+		tester.handler.Chat(c)
+		wg.Wait()
+		assert.Equal(t, http.StatusOK, w.Code)
+	})
+	t.Run("external model uses model id as request model", func(t *testing.T) {
+		tester, c, w := setupTest(t)
+		chatReq := ChatCompletionRequest{
+			Model: "external-model-id",
+			Messages: []openai.ChatCompletionMessageParamUnion{
+				openai.UserMessage("Hello"),
+			},
+		}
+		body, _ := json.Marshal(chatReq)
+		c.Request.Method = http.MethodPost
+		c.Request.Body = io.NopCloser(bytes.NewReader(body))
+
+		testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		}))
+		defer testServer.Close()
+
+		model := &types.Model{
+			BaseModel: types.BaseModel{
+				ID:      "external-model-id",
+				Object:  "model",
+				OwnedBy: "testuser",
+			},
+			InternalModelInfo: types.InternalModelInfo{
+				SvcName: "",
+			},
+			ExternalModelInfo: types.ExternalModelInfo{
+				NeedSensitiveCheck: true,
+			},
+			Endpoint: testServer.URL,
+		}
+		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "external-model-id").Return(model, nil)
+		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuser", "testuuid").Return(nil)
+		expectReq := ChatCompletionRequest{}
+		_ = json.Unmarshal(body, &expectReq)
+		tester.mocks.moderationComp.EXPECT().CheckChatPrompts(mock.Anything, expectReq.Messages, "testuuid:"+model.ID, false).
+			Return(&rpc.CheckResult{IsSensitive: false}, nil)
+		llmTokenCounter := mocktoken.NewMockChatTokenCounter(t)
+		tester.mocks.tokenCounterFactory.EXPECT().NewChat(
+			token.CreateParam{
+				Endpoint: model.Endpoint,
+				Host:     "",
+				Model:    model.ID,
+				ImageID:  model.ImageID,
+				Provider: model.Provider,
+			}).
+			Return(llmTokenCounter)
+		llmTokenCounter.EXPECT().AppendPrompts(expectReq.Messages).Return()
+
+		var wg sync.WaitGroup
+		wg.Add(1)
+		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, "testuuid", model, llmTokenCounter).
+			RunAndReturn(func(ctx context.Context, uuid string, model *types.Model, counter token.Counter) error {
+				wg.Done()
+				return nil
+			})
+
 		tester.handler.Chat(c)
 		wg.Wait()
 		assert.Equal(t, http.StatusOK, w.Code)
@@ -704,6 +856,9 @@ func TestOpenAIHandler_Embedding(t *testing.T) {
 				Object:  "model",
 				OwnedBy: "testuser",
 			},
+			ExternalModelInfo: types.ExternalModelInfo{
+				NeedSensitiveCheck: true,
+			},
 			InternalModelInfo: types.InternalModelInfo{
 				ClusterID: "test-cls",
 				SvcName:   "test-svc",
@@ -759,9 +914,9 @@ func TestOpenAIHandler_Embedding(t *testing.T) {
 			Return(tokenCounter).Once()
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1").
 			Return(model, nil)
-		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuser", model, "").Return(nil)
-		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, "testuuid", model, mock.Anything, mock.Anything).RunAndReturn(
-			func(ctx context.Context, userID string, model *types.Model, counter token.Counter, sceneValue string) error {
+		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuser", "testuuid").Return(nil)
+		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, "testuuid", model, mock.Anything).RunAndReturn(
+			func(ctx context.Context, userID string, model *types.Model, counter token.Counter) error {
 				wg.Done()
 				return nil
 			})
@@ -896,7 +1051,7 @@ func TestOpenAIHandler_GenerateImage(t *testing.T) {
 			Endpoint: "https://api.example.com/images/generations",
 		}
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "test-model").Return(model, nil)
-		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuser", model, mock.Anything).Return(nil)
+		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuser", "testuuid").Return(nil)
 		tester.mocks.moderationComp.EXPECT().CheckImagePrompts(mock.Anything, "sensitive prompt", "testuuid").Return(&rpc.CheckResult{IsSensitive: true}, nil)
 
 		tester.handler.GenerateImage(c)
@@ -929,7 +1084,7 @@ func TestOpenAIHandler_GenerateImage(t *testing.T) {
 			Endpoint: "https://api.example.com/images/generations",
 		}
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "test-model").Return(model, nil)
-		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuser", model, mock.Anything).Return(nil)
+		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuser", "testuuid").Return(nil)
 		tester.mocks.moderationComp.EXPECT().CheckImagePrompts(mock.Anything, "test prompt", "testuuid").Return(nil, errors.New("moderation service error"))
 
 		tester.handler.GenerateImage(c)

@@ -89,7 +89,10 @@ func TestResponseWriterWrapper_Write_NormalContent(t *testing.T) {
 func TestResponseWriterWrapper_Write_DoneMessage(t *testing.T) {
 	w := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(w)
-	rw := newStreamResponseWriter(ctx.Writer, component.NewMockModeration(t), nil)
+	mockMod := component.NewMockModeration(t)
+	rw := newStreamResponseWriter(ctx.Writer, mockMod, nil)
+
+	mockMod.EXPECT().CloseStreamCheck(mock.Anything, rw.id).Return(&rpc.CheckResult{IsSensitive: false}, nil)
 
 	doneData := []byte("data: [DONE]\n\n")
 	_, err := rw.Write(doneData)
@@ -213,6 +216,89 @@ func TestResponseWriterWrapper_Write_ModerationServiceError(t *testing.T) {
 
 	if !bytes.Contains(w.Body.Bytes(), streamData) {
 		t.Error("Original data should be written when moderation service fails")
+	}
+}
+
+func TestResponseWriterWrapper_Write_NilModerationComponent(t *testing.T) {
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	rw := newStreamResponseWriter(ctx.Writer, nil, nil)
+
+	// Test CheckChatStreamResponse with nil component
+	normalChunk := types.ChatCompletionChunk{
+		ID: "test-id",
+		Choices: []types.ChatCompletionChunkChoice{
+			{
+				Delta: types.ChatCompletionChunkChoiceDelta{
+					Content: "normal content",
+				},
+			},
+		},
+	}
+	chunkJSON, _ := json.Marshal(normalChunk)
+	streamData := []byte("data: " + string(chunkJSON) + "\n\n")
+
+	n, err := rw.Write(streamData)
+	if err != nil {
+		t.Errorf("Write should not return error with nil moderation component: %v", err)
+	}
+	if n != len(streamData) {
+		t.Errorf("Expected to write %d bytes, got %d", len(streamData), n)
+	}
+	if !bytes.Contains(w.Body.Bytes(), streamData) {
+		t.Error("Original data should be written with nil moderation component")
+	}
+
+	// Test CloseStreamCheck with nil component
+	doneData := []byte("data: [DONE]\n\n")
+	n, err = rw.Write(doneData)
+	if err != nil {
+		t.Errorf("Write should not return error for DONE message with nil moderation component: %v", err)
+	}
+	if n != len(doneData) {
+		t.Errorf("Expected to write %d bytes, got %d", len(doneData), n)
+	}
+	if !bytes.Contains(w.Body.Bytes(), doneData) {
+		t.Error("DONE message should be written with nil moderation component")
+	}
+}
+
+func TestResponseWriterWrapper_Write_DoneMessageSensitive(t *testing.T) {
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	mockMod := component.NewMockModeration(t)
+	rw := newStreamResponseWriter(ctx.Writer, mockMod, nil)
+
+	mockMod.EXPECT().CloseStreamCheck(mock.Anything, rw.id).Return(&rpc.CheckResult{IsSensitive: true, Reason: "sensitive done"}, nil)
+
+	doneData := []byte("data: [DONE]\n\n")
+	_, err := rw.Write(doneData)
+	if !errors.Is(err, ErrSensitiveContent) {
+		t.Errorf("Write should return ErrSensitiveContent when done check is sensitive, got: %v", err)
+	}
+
+	responseBody := w.Body.String()
+	if !bytes.Contains([]byte(responseBody), []byte("The message includes inappropriate content")) {
+		t.Error("Response should include sensitive content warning")
+	}
+}
+
+func TestResponseWriterWrapper_Write_DoneMessageError(t *testing.T) {
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	mockMod := component.NewMockModeration(t)
+	rw := newStreamResponseWriter(ctx.Writer, mockMod, nil)
+
+	mockMod.EXPECT().CloseStreamCheck(mock.Anything, rw.id).Return(nil, errors.New("done check error"))
+
+	doneData := []byte("data: [DONE]\n\n")
+	_, err := rw.Write(doneData)
+	if err != nil {
+		t.Errorf("Write should not return error when done check fails, got: %v", err)
+	}
+
+	if !bytes.Contains(w.Body.Bytes(), doneData) {
+		t.Error("Response should include original done message when check fails")
 	}
 }
 

@@ -19,9 +19,10 @@ type SandboxRequest struct {
 	EnvVars     map[string]string     `json:"env_vars,omitempty"`
 	Labels      map[string]string     `json:"labels,omitempty"`
 	TemplateID  string                `json:"templateID,omitempty"`
-	Timeout     time.Duration         `json:"timeout,omitempty"`
+	Timeout     int                   `json:"timeout,omitempty"`
 	Volumes     []types.SandboxVolume `json:"volumes,omitempty"`
 	Port        int                   `json:"port,omitempty"`
+	DeployName  string                `json:"deploy_name,omitempty"`
 }
 
 type SandboxResponse struct {

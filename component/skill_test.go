@@ -49,6 +49,10 @@ func TestSkillComponent_Create(t *testing.T) {
 	crq.Readme = generateReadmeData(req.License)
 	crq.RepoType = types.SkillRepo
 	crq.DefaultBranch = "main"
+	skillsContent := fmt.Sprintf(`---
+name: %s
+description: %s
+---`, crq.Name, crq.Description)
 	crq.CommitFiles = []types.CommitFile{
 		{
 			Content: crq.Readme,
@@ -57,6 +61,10 @@ func TestSkillComponent_Create(t *testing.T) {
 		{
 			Content: skillGitattributesContent,
 			Path:    types.GitattributesFileName,
+		},
+		{
+			Content: skillsContent,
+			Path:    "SKILL.md",
 		},
 	}
 
@@ -384,6 +392,10 @@ func TestSkillComponent_CreateWithGitURL(t *testing.T) {
 	crq.Readme = generateReadmeData(req.License)
 	crq.RepoType = types.SkillRepo
 	crq.DefaultBranch = "main"
+	skillsContent := fmt.Sprintf(`---
+name: %s
+description: %s
+---`, crq.Name, crq.Description)
 	crq.CommitFiles = []types.CommitFile{
 		{
 			Content: crq.Readme,
@@ -392,6 +404,10 @@ func TestSkillComponent_CreateWithGitURL(t *testing.T) {
 		{
 			Content: skillGitattributesContent,
 			Path:    types.GitattributesFileName,
+		},
+		{
+			Content: skillsContent,
+			Path:    "SKILL.md",
 		},
 	}
 
@@ -497,7 +513,11 @@ func TestSkillComponent_CreateWithBatchCommit(t *testing.T) {
 	// In the actual code, the Create method creates commitFiles with README and .gitattributes
 	// Then appends req.CommitFiles to it, and sets req.CommitFiles = commitFiles
 	// So we need to create a CommitFilesReq with all these files
-	// First, create the initial files (README and .gitattributes)
+	// First, create the initial files (README, .gitattributes, and SKILL.md)
+	skillsContent := fmt.Sprintf(`---
+name: %s
+description: %s
+---`, crq.Name, crq.Description)
 	initialFiles := []types.CommitFile{
 		{
 			Content: crq.Readme,
@@ -506,6 +526,10 @@ func TestSkillComponent_CreateWithBatchCommit(t *testing.T) {
 		{
 			Content: skillGitattributesContent,
 			Path:    types.GitattributesFileName,
+		},
+		{
+			Content: skillsContent,
+			Path:    "SKILL.md",
 		},
 	}
 
@@ -524,7 +548,7 @@ func TestSkillComponent_CreateWithBatchCommit(t *testing.T) {
 	}
 
 	// In the actual code, the Create method sets req.CommitFiles = commitFiles
-	// where commitFiles is README + .gitattributes + req.CommitFiles
+	// where commitFiles is README + .gitattributes + SKILL.md + req.CommitFiles
 	// So we need to update crq.CommitFiles to match what will be passed to CreateRepo
 	crq.CommitFiles = allFiles
 
@@ -532,12 +556,12 @@ func TestSkillComponent_CreateWithBatchCommit(t *testing.T) {
 		nil, dbrepo, commitFilesReq, nil,
 	)
 
-	// Expect two calls to CommitFiles (one for first 50 files, one for remaining 2 files)
+	// Expect two calls to CommitFiles (one for first 50 files, one for remaining 3 files)
 	cc.mocks.gitServer.EXPECT().CommitFiles(ctx, mock.MatchedBy(func(req gitserver.CommitFilesReq) bool {
 		return len(req.Files) == 50
 	})).Return(nil)
 	cc.mocks.gitServer.EXPECT().CommitFiles(ctx, mock.MatchedBy(func(req gitserver.CommitFilesReq) bool {
-		return len(req.Files) == 2
+		return len(req.Files) == 3
 	})).Return(nil)
 	cc.mocks.stores.SkillMock().EXPECT().CreateAndUpdateRepoPath(ctx, database.Skill{
 		Repository:   dbrepo,

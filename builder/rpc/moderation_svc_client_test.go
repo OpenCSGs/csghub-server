@@ -104,18 +104,12 @@ func TestModerationSvcHttpClient_PassLLMRespCheck(t *testing.T) {
 		assert.Equal(t, "/api/v1/llmresp", r.URL.Path)
 		assert.Equal(t, http.MethodPost, r.Method)
 
-		var req struct {
-			Service           string `json:"Service"`
-			ServiceParameters struct {
-				Content   string `json:"content"`
-				SessionId string `json:"sessionId"`
-			} `json:"ServiceParameters"`
-		}
+		var req types.LLMCheckRequest
 		err := json.NewDecoder(r.Body).Decode(&req)
 		assert.NoError(t, err)
-		assert.Equal(t, string(types.ScenarioLLMResModeration), req.Service)
-		assert.Equal(t, "test_text", req.ServiceParameters.Content)
-		assert.Equal(t, "test_session", req.ServiceParameters.SessionId)
+		assert.Equal(t, types.ScenarioLLMResModeration, req.Scenario)
+		assert.Equal(t, "test_text", req.Text)
+		assert.Equal(t, "test_session", req.SessionId)
 
 		resp := httpbase.R{
 			Data: CheckResult{
@@ -137,7 +131,11 @@ func TestModerationSvcHttpClient_PassLLMRespCheck(t *testing.T) {
 	client := &ModerationSvcHttpClient{
 		hc: hc,
 	}
-	res, err := client.PassLLMRespCheck(context.Background(), "test_text", "test_session")
+	res, err := client.PassLLMRespCheck(context.Background(), types.LLMCheckRequest{
+		Scenario:  types.ScenarioLLMResModeration,
+		Text:      "test_text",
+		SessionId: "test_session",
+	})
 	assert.NoError(t, err)
 	assert.NotNil(t, res)
 	assert.True(t, res.IsSensitive)
@@ -149,18 +147,12 @@ func TestModerationSvcHttpClient_PassLLMPromptCheck(t *testing.T) {
 		assert.Equal(t, "/api/v1/llmprompt", r.URL.Path)
 		assert.Equal(t, http.MethodPost, r.Method)
 
-		var req struct {
-			Service           string `json:"Service"`
-			ServiceParameters struct {
-				Content   string `json:"content"`
-				SessionId string `json:"sessionId"`
-			} `json:"ServiceParameters"`
-		}
+		var req types.LLMCheckRequest
 		err := json.NewDecoder(r.Body).Decode(&req)
 		assert.NoError(t, err)
-		assert.Equal(t, "llm_query_moderation", req.Service)
-		assert.Equal(t, "test_prompt", req.ServiceParameters.Content)
-		assert.Equal(t, "test_account", req.ServiceParameters.SessionId)
+		assert.Equal(t, types.ScenarioLLMQueryModeration, req.Scenario)
+		assert.Equal(t, "test_prompt", req.Text)
+		assert.Equal(t, "test_account", req.AccountId)
 
 		resp := httpbase.R{
 			Data: CheckResult{
@@ -182,7 +174,12 @@ func TestModerationSvcHttpClient_PassLLMPromptCheck(t *testing.T) {
 	client := &ModerationSvcHttpClient{
 		hc: hc,
 	}
-	res, err := client.PassLLMPromptCheck(context.Background(), "test_prompt", "test_account")
+	res, err := client.PassLLMPromptCheck(context.Background(), types.LLMCheckRequest{
+		Scenario:  types.ScenarioLLMQueryModeration,
+		Text:      "test_prompt",
+		AccountId: "test_account",
+	})
+
 	assert.NoError(t, err)
 	assert.NotNil(t, res)
 	assert.False(t, res.IsSensitive)

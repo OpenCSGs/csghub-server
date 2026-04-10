@@ -2,7 +2,6 @@ package router
 
 import (
 	"fmt"
-
 	"net/http"
 
 	"opencsg.com/csghub-server/builder/instrumentation"
@@ -17,7 +16,7 @@ import (
 	"opencsg.com/csghub-server/common/i18n"
 )
 
-func NewRouter(config *config.Config) (*gin.Engine, error) {
+func NewRouter(config *config.Config) (*gin.Engine, func(), error) {
 	r := gin.New()
 	middleware.SetInfraMiddleware(r, config, instrumentation.Aigateway)
 	r.Use(cors.New(cors.Config{
@@ -37,8 +36,6 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 	r.Use(middleware.BuildJwtSession(config.JWT.SigningKey))
 	i18n.InitLocalizersFromEmbedFile()
 	r.Use(middleware.ModifyAcceptLanguageMiddleware(), middleware.LocalizedErrorMiddleware())
-	i18n.InitLocalizersFromEmbedFile()
-	r.Use(middleware.ModifyAcceptLanguageMiddleware(), middleware.LocalizedErrorMiddleware())
 	r.Use(middleware.Authenticator(config))
 	middlewareCollection := middleware.MiddlewareCollection{}
 	middlewareCollection.Auth.NeedLogin = middleware.MustLogin()
@@ -51,10 +48,10 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 
 	openAIhandler, err := handler.NewOpenAIHandlerFromConfig(config)
 	if err != nil {
-		return nil, fmt.Errorf("error creating openai handler :%w", err)
+		return nil, nil, fmt.Errorf("error creating openai handler :%w", err)
 	}
-	v1Group.GET("/models", middlewareCollection.Auth.NeedLogin, openAIhandler.ListModels)
-	v1Group.GET("/models/:model", middlewareCollection.Auth.NeedLogin, openAIhandler.GetModel)
+	v1Group.GET("/models", openAIhandler.ListModels)
+	v1Group.GET("/models/*model", middlewareCollection.Auth.NeedLogin, openAIhandler.GetModel)
 	v1Group.POST("/chat/completions", middlewareCollection.Auth.NeedLogin, openAIhandler.Chat)
 	v1Group.POST("/embeddings", middlewareCollection.Auth.NeedLogin, openAIhandler.Embedding)
 	v1Group.POST("/images/generations", middlewareCollection.Auth.NeedLogin, openAIhandler.GenerateImage)
@@ -64,15 +61,16 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 
 	mcpProxy, err := handler.NewMCPProxyHandler(config)
 	if err != nil {
-		return nil, fmt.Errorf("error creating mcp proxy handler :%w", err)
+		return nil, nil, fmt.Errorf("error creating mcp proxy handler :%w", err)
 	}
 	createMCPRoute(v1Group, mcpProxy)
 
-	if err := extendRoutes(v1Group, apiV1Group, adminGroup, middlewareCollection, config); err != nil {
-		return nil, fmt.Errorf("error creating extended routes :%w", err)
+	cleanup, err := extendRoutes(v1Group, apiV1Group, adminGroup, middlewareCollection, config)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error creating extended routes :%w", err)
 	}
 
-	return r, nil
+	return r, cleanup, nil
 }
 
 func createMCPRoute(v1Group *gin.RouterGroup, mcpProxy handler.MCPProxyHandler) {

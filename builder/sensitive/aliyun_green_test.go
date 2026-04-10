@@ -348,7 +348,11 @@ func TestSensitiveChecker_PassLLMCheck(t *testing.T) {
 					},
 				},
 			}, nil).Once()
-			result, err := checker.PassLLMCheck(context.Background(), "foo", "foo", id, "")
+			result, err := checker.PassLLMCheck(context.Background(), &types.LLMCheckRequest{
+				Scenario:  types.SensitiveScenario("foo"),
+				Text:      "foo",
+				SessionId: id,
+			})
 			require.Nil(t, err)
 			require.Equal(t, c.isSensitive, result.IsSensitive)
 			require.Equal(t, c.wantReason, result.Reason)
@@ -382,7 +386,11 @@ func TestSensitiveChecker_PassLLMCheck(t *testing.T) {
 					},
 				},
 			}, nil).Once()
-			result, err := checker.PassLLMCheck(context.Background(), "foo", "foo", "", id)
+			result, err := checker.PassLLMCheck(context.Background(), &types.LLMCheckRequest{
+				Scenario:  types.SensitiveScenario("foo"),
+				Text:      "foo",
+				AccountId: id,
+			})
 			require.Nil(t, err)
 			require.Equal(t, c.isSensitive, result.IsSensitive)
 			require.Equal(t, c.wantReason, result.Reason)

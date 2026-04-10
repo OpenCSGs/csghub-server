@@ -68,6 +68,7 @@ type Deploy struct {
 	Instances      []types.Instance     `bun:"type:jsonb" json:"instances"`
 	NodeAffinity   *corev1.NodeAffinity `json:"node_affinity,omitempty"`
 	Tolerations    []types.Toleration   `json:"tolerations,omitempty"`
+	Timeout        int                  `json:"timeout,omitempty"`
 	times
 }
 

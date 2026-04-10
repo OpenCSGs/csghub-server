@@ -21,6 +21,7 @@ type OrganizationComponent interface {
 	Create(ctx context.Context, req *types.CreateOrgReq) (*types.Organization, error)
 	Index(ctx context.Context, username, search string, per, page int, orgType, verifyStatus string) ([]types.Organization, int, error)
 	Get(ctx context.Context, orgName string) (*types.Organization, error)
+	GetByUUID(ctx context.Context, uuid string) (*types.Organization, error)
 	Delete(ctx context.Context, req *types.DeleteOrgReq) error
 	Update(ctx context.Context, req *types.EditOrgReq) (*database.Organization, error)
 }
@@ -98,15 +99,24 @@ func (c *organizationComponentImpl) Create(ctx context.Context, req *types.Creat
 	dbOrg.Logo = req.Logo
 	dbOrg.OrgType = req.OrgType
 	dbOrg.Verified = req.Verified
+	dbOrg.UUID = uuid.New()
+
+	exist, err := c.nsStore.ExistsByUUID(ctx, dbOrg.UUID.String())
+	if err != nil {
+		return nil, err
+	}
+
+	// use the org uuid as the namespace uuid by default
+	newNSUUID := dbOrg.UUID.String()
+	if exist {
+		// generate a new uuid if the uuid already exists
+		newNSUUID = uuid.New().String()
+	}
+
 	namespace := &database.Namespace{
 		Path:   dbOrg.Name,
 		UserID: user.ID,
-	}
-	dbOrg.UUID = uuid.New()
-
-	chkUser, err := c.userStore.FindByUUID(ctx, dbOrg.UUID.String())
-	if err == nil && chkUser != nil && chkUser.UUID == dbOrg.UUID.String() {
-		return nil, errorx.UUIDConflict(dbOrg.UUID.String())
+		UUID:   newNSUUID,
 	}
 	err = c.orgStore.Create(ctx, dbOrg, namespace)
 	if err != nil {
@@ -131,6 +141,11 @@ func (c *organizationComponentImpl) Create(ctx context.Context, req *types.Creat
 		OrgType:  dbOrg.OrgType,
 		Verified: dbOrg.Verified,
 		UUID:     dbOrg.UUID,
+		Namespace: &types.Namespace{
+			Path: dbOrg.Name,
+			Type: string(namespace.NamespaceType),
+			UUID: namespace.UUID,
+		},
 	}
 	return org, err
 }
@@ -169,6 +184,13 @@ func (c *organizationComponentImpl) Index(ctx context.Context, username, search 
 			VerifyStatus: string(dborg.VerifyStatus),
 			UUID:         dborg.UUID,
 		}
+		if dborg.Namespace != nil {
+			org.Namespace = &types.Namespace{
+				Path: dborg.Namespace.Path,
+				Type: string(dborg.Namespace.NamespaceType),
+				UUID: dborg.Namespace.UUID,
+			}
+		}
 		orgs = append(orgs, org)
 	}
 	return orgs, total, nil
@@ -187,6 +209,37 @@ func (c *organizationComponentImpl) Get(ctx context.Context, orgName string) (*t
 		OrgType:  dborg.OrgType,
 		Verified: dborg.Verified,
 		UUID:     dborg.UUID,
+	}
+	if dborg.Namespace != nil {
+		org.Namespace = &types.Namespace{
+			Path: dborg.Nickname,
+			Type: string(dborg.Namespace.NamespaceType),
+			UUID: dborg.Namespace.UUID,
+		}
+	}
+	return org, nil
+}
+
+func (c *organizationComponentImpl) GetByUUID(ctx context.Context, uuid string) (*types.Organization, error) {
+	dborg, err := c.orgStore.FindByUUID(ctx, uuid)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get organization by uuid, error: %w", err)
+	}
+	org := &types.Organization{
+		Name:     dborg.Name,
+		Nickname: dborg.Nickname,
+		Homepage: dborg.Homepage,
+		Logo:     dborg.Logo,
+		OrgType:  dborg.OrgType,
+		Verified: dborg.Verified,
+		UUID:     dborg.UUID,
+	}
+	if dborg.Namespace != nil {
+		org.Namespace = &types.Namespace{
+			Path: dborg.Nickname,
+			Type: string(dborg.Namespace.NamespaceType),
+			UUID: dborg.Namespace.UUID,
+		}
 	}
 	return org, nil
 }

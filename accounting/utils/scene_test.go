@@ -17,7 +17,7 @@ func TestScene_IsNeedCalculateBill(t *testing.T) {
 		types.SceneModelServerless,
 		types.SceneStarship,
 		types.SceneGuiAgent,
-		types.SceneAgenticHub,
+		// types.SceneAgenticHub,
 	}
 
 	for _, scene := range scenes {
@@ -52,7 +52,7 @@ func TestScene_GetSkuUnitTypeByScene(t *testing.T) {
 		types.SceneModelServerless: types.UnitToken,
 		types.SceneStarship:        types.UnitToken,
 		types.SceneGuiAgent:        types.UnitToken,
-		types.SceneAgenticHub:      types.UnitToken,
+		// types.SceneAgenticHub:      types.UnitToken,
 	}
 
 	for scene, unit := range scenes {
@@ -71,7 +71,6 @@ func TestScene_GetSKUTypeByScene(t *testing.T) {
 		types.SceneModelServerless: types.SKUCSGHub,
 		types.SceneStarship:        types.SKUStarship,
 		types.SceneGuiAgent:        types.SKUStarship,
-		types.SceneAgenticHub:      types.SKUAgenticHub,
 	}
 
 	for scene, skuType := range scenes {

@@ -77,22 +77,34 @@ func TestAC_PassLLMCheck(t *testing.T) {
 	ctx := context.Background()
 
 	// Test case 1: LLM query with sensitive word
-	result, err := checker.PassLLMCheck(ctx, types.ScenarioLLMQueryModeration, "test word1", "", "")
+	result, err := checker.PassLLMCheck(ctx, &types.LLMCheckRequest{
+		Scenario: types.ScenarioLLMQueryModeration,
+		Text:     "test word1",
+	})
 	assert.NoError(t, err)
 	assert.True(t, result.IsSensitive)
 
 	// Test case 2: LLM response with sensitive word
-	result, err = checker.PassLLMCheck(ctx, types.ScenarioLLMResModeration, "test word2", "", "")
+	result, err = checker.PassLLMCheck(ctx, &types.LLMCheckRequest{
+		Scenario: types.ScenarioLLMResModeration,
+		Text:     "test word2",
+	})
 	assert.NoError(t, err)
 	assert.True(t, result.IsSensitive)
 
 	// Test case 3: LLM query with no sensitive words
-	result, err = checker.PassLLMCheck(ctx, types.ScenarioLLMQueryModeration, "test word", "", "")
+	result, err = checker.PassLLMCheck(ctx, &types.LLMCheckRequest{
+		Scenario: types.ScenarioLLMQueryModeration,
+		Text:     "test word",
+	})
 	assert.NoError(t, err)
 	assert.False(t, result.IsSensitive)
 
 	// Test case 4: Unsupported scenario
-	result, err = checker.PassLLMCheck(ctx, "unsupported", "test word3", "", "")
+	result, err = checker.PassLLMCheck(ctx, &types.LLMCheckRequest{
+		Scenario: types.SensitiveScenario("unsupported"),
+		Text:     "test word3",
+	})
 	assert.NoError(t, err)
 	assert.False(t, result.IsSensitive)
 }

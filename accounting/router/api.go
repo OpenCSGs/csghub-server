@@ -13,10 +13,9 @@ import (
 	"opencsg.com/csghub-server/api/middleware"
 	bldmq "opencsg.com/csghub-server/builder/mq"
 	"opencsg.com/csghub-server/common/config"
-	"opencsg.com/csghub-server/mq"
 )
 
-func NewAccountRouter(config *config.Config, mqHandler mq.MessageQueue, mqFactory bldmq.MessageQueueFactory) (*gin.Engine, error) {
+func NewAccountRouter(config *config.Config, mqFactory bldmq.MessageQueueFactory) (*gin.Engine, error) {
 	r := gin.New()
 	middleware.SetInfraMiddleware(r, config, instrumentation.Account)
 	needAPIKey := middleware.NeedAPIKey(config)
@@ -36,7 +35,7 @@ func NewAccountRouter(config *config.Config, mqHandler mq.MessageQueue, mqFactor
 		return nil, fmt.Errorf("error creating multi sync handler, error: %w", err)
 	}
 	createMeteringRoutes(apiGroup, meterHandler)
-	err = createAdvancedRoutes(apiGroup, config, mqHandler, mqFactory)
+	err = createAdvancedRoutes(apiGroup, config, mqFactory)
 	if err != nil {
 		return nil, fmt.Errorf("error creating accounting advanced routes, error:%w", err)
 	}
