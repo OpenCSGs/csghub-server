@@ -107,7 +107,7 @@ func TestHandleSensitiveResponse(t *testing.T) {
 		w := httptest.NewRecorder()
 		ctx, _ := gin.CreateTestContext(w)
 		ctx.Request = httptest.NewRequest("GET", "/", nil)
-		
+
 		checkResult := &rpc.CheckResult{Reason: "test reason"}
 		handleSensitiveResponse(ctx, true, checkResult)
 
@@ -122,7 +122,7 @@ func TestHandleSensitiveResponse(t *testing.T) {
 		w := httptest.NewRecorder()
 		ctx, _ := gin.CreateTestContext(w)
 		ctx.Request = httptest.NewRequest("GET", "/", nil)
-		
+
 		checkResult := &rpc.CheckResult{Reason: "test reason"}
 		handleSensitiveResponse(ctx, false, checkResult)
 

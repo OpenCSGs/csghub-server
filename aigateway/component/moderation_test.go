@@ -2,10 +2,12 @@ package component
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
 	lru "github.com/hashicorp/golang-lru/v2"
+	"github.com/openai/openai-go/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"opencsg.com/csghub-server/aigateway/types"
@@ -393,5 +395,85 @@ func TestInitStreamChecker(t *testing.T) {
 		checker, ok := modImpl.streamChecker.(*asyncStreamChecker)
 		assert.True(t, ok)
 		assert.Equal(t, 100, checker.maxChars)
+	})
+}
+
+func TestModerationImpl_checkLLMPrompt(t *testing.T) {
+	ctx := context.Background()
+	mockSvcClient := new(MockModerationSvcClient)
+
+	modImpl := &moderationImpl{
+		modSvcClient:     mockSvcClient,
+		maxContentLength: 10,
+	}
+
+	t.Run("short content", func(t *testing.T) {
+		mockSvcClient.ExpectedCalls = nil
+		mockSvcClient.On("PassLLMPromptCheck", mock.Anything, mock.Anything).Return(&rpc.CheckResult{IsSensitive: false}, nil).Once()
+		
+		res, err := modImpl.checkLLMPrompt(ctx, "short", "test-key", false)
+		assert.NoError(t, err)
+		assert.False(t, res.IsSensitive)
+	})
+
+	t.Run("long content chunking", func(t *testing.T) {
+		mockSvcClient.ExpectedCalls = nil
+		// 20 chars, max length is 10, so it will be chunked
+		// splitContentIntoChunksByWindow logic: if chunk size is maxContentLength (10)?
+		// wait, splitContentIntoChunksByWindow splits by 2000! 
+		// Actually, splitContentIntoChunksByWindow has slidingWindowSize = 2000 hardcoded in moderation.go
+		
+		// If we use 3000 chars, it will be chunked
+		modImpl.maxContentLength = 2000
+		longText := strings.Repeat("a", 3000)
+		mockSvcClient.On("PassLLMPromptCheck", mock.Anything, mock.Anything).Return(&rpc.CheckResult{IsSensitive: false}, nil)
+		
+		res, err := modImpl.checkLLMPrompt(ctx, longText, "test-key", false)
+		assert.NoError(t, err)
+		assert.False(t, res.IsSensitive)
+	})
+}
+
+func TestModerationImpl_CheckChatPrompts(t *testing.T) {
+	ctx := context.Background()
+	mockSvcClient := new(MockModerationSvcClient)
+
+	modImpl := &moderationImpl{
+		modSvcClient:     mockSvcClient,
+		maxContentLength: 2000,
+	}
+
+	t.Run("nil modSvcClient", func(t *testing.T) {
+		emptyModImpl := &moderationImpl{modSvcClient: nil}
+		res, err := emptyModImpl.CheckChatPrompts(ctx, nil, "uuid", false)
+		assert.NoError(t, err)
+		assert.False(t, res.IsSensitive)
+	})
+
+	t.Run("normal message", func(t *testing.T) {
+		mockSvcClient.ExpectedCalls = nil
+		mockSvcClient.On("PassLLMPromptCheck", mock.Anything, mock.Anything).Return(&rpc.CheckResult{IsSensitive: false}, nil).Once()
+		
+		messages := []openai.ChatCompletionMessageParamUnion{
+			openai.UserMessage("Hello"),
+		}
+		
+		res, err := modImpl.CheckChatPrompts(ctx, messages, "uuid", false)
+		assert.NoError(t, err)
+		assert.False(t, res.IsSensitive)
+	})
+
+	t.Run("sensitive message", func(t *testing.T) {
+		mockSvcClient.ExpectedCalls = nil
+		mockSvcClient.On("PassLLMPromptCheck", mock.Anything, mock.Anything).Return(&rpc.CheckResult{IsSensitive: true, Reason: "toxic"}, nil).Once()
+		
+		messages := []openai.ChatCompletionMessageParamUnion{
+			openai.UserMessage("Bad words"),
+		}
+		
+		res, err := modImpl.CheckChatPrompts(ctx, messages, "uuid", false)
+		assert.NoError(t, err)
+		assert.True(t, res.IsSensitive)
+		assert.Equal(t, "toxic", res.Reason)
 	})
 }

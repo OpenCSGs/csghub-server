@@ -140,9 +140,9 @@ func TestLLMServiceComponent_UpdateLLMConfig(t *testing.T) {
 	newName := "new-model"
 	metadata := map[string]any{"tasks": []any{"text-to-image"}}
 	req := &types.UpdateLLMConfigReq{
-		ID:       123,
+		ID:        123,
 		ModelName: &newName,
-		Metadata: &metadata,
+		Metadata:  &metadata,
 	}
 	dbLLMConfig := &database.LLMConfig{
 		ID:        123,
