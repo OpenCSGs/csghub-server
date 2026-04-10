@@ -5,6 +5,11 @@ import (
 	"time"
 )
 
+const (
+	RuleTypeNamespace = "namespace"
+	RuleTypeModelName = "model_name"
+)
+
 type RepositoryFileCheckRule struct {
 	ID        int64     `bun:",pk,autoincrement"`
 	RuleType  string    `bun:"rule_type,notnull,unique:idx_rule_type_pattern"`
@@ -19,6 +24,7 @@ type RepositoryFileCheckRuleStore interface {
 	ListByRuleType(ctx context.Context, ruleType string) ([]RepositoryFileCheckRule, error)
 	Delete(ctx context.Context, ruleType, pattern string) error
 	Exists(ctx context.Context, ruleType, pattern string) (bool, error)
+	MatchRegex(ctx context.Context, ruleType, targetString string) (bool, error)
 }
 
 type repositoryFileCheckRuleStore struct {
@@ -63,6 +69,14 @@ func (s *repositoryFileCheckRuleStore) Exists(ctx context.Context, ruleType, pat
 	exists, err := s.db.Operator.Core.NewSelect().Model((*RepositoryFileCheckRule)(nil)).
 		Where("rule_type = ?", ruleType).
 		Where("pattern = ?", pattern).
+		Exists(ctx)
+	return exists, err
+}
+
+func (s *repositoryFileCheckRuleStore) MatchRegex(ctx context.Context, ruleType, targetString string) (bool, error) {
+	exists, err := s.db.Operator.Core.NewSelect().Model((*RepositoryFileCheckRule)(nil)).
+		Where("rule_type = ?", ruleType).
+		Where("? ~* pattern", targetString).
 		Exists(ctx)
 	return exists, err
 }

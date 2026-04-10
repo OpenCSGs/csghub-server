@@ -20,6 +20,7 @@ import (
 	"github.com/stretchr/testify/require"
 	mockcomp "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/aigateway/component"
 	mocktoken "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/aigateway/token"
+	mockdatabase "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
 	apicomp "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
 	"opencsg.com/csghub-server/aigateway/component/adapter/text2image"
 	"opencsg.com/csghub-server/aigateway/token"
@@ -39,6 +40,7 @@ type testerOpenAIHandler struct {
 		repoComp            *apicomp.MockRepoComponent
 		mockClsComp         *apicomp.MockClusterComponent
 		tokenCounterFactory *mocktoken.MockCounterFactory
+		whitelistRule       *mockdatabase.MockRepositoryFileCheckRuleStore
 	}
 
 	handler *OpenAIHandlerImpl
@@ -51,7 +53,8 @@ func setupTest(t *testing.T) (*testerOpenAIHandler, *gin.Context, *httptest.Resp
 	mockClsComp := apicomp.NewMockClusterComponent(t)
 	mockTokenCounterFactory := mocktoken.NewMockCounterFactory(t)
 	cfg := &config.Config{}
-	handler := newOpenAIHandler(mockOpenAI, mockRepo, mockModeration, mockClsComp, mockTokenCounterFactory, text2image.NewRegistry(), cfg, nil)
+	mockWhitelistRule := mockdatabase.NewMockRepositoryFileCheckRuleStore(t)
+	handler := newOpenAIHandler(mockOpenAI, mockRepo, mockModeration, mockClsComp, mockTokenCounterFactory, text2image.NewRegistry(), cfg, nil, mockWhitelistRule)
 
 	// Set test user
 	tester := &testerOpenAIHandler{

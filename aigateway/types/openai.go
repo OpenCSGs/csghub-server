@@ -40,7 +40,7 @@ type BaseModel struct {
 	Created             int64          `json:"created"` // organization-owner (e.g. openai)
 	OwnedBy             string         `json:"owned_by"`
 	Task                string         `json:"task"` // like text-generation, text-to-image etc
-	DisplayName         string         `json:"display_name"`
+	OfficialName        string         `json:"official_name"`
 	SupportFunctionCall bool           `json:"support_function_call,omitempty"` // whether the model supports function calling
 	IsPinned            *bool          `json:"is_pinned,omitempty"`             // whether the model is pinned
 	Metadata            map[string]any `json:"metadata"`
@@ -105,7 +105,7 @@ func (m Model) MarshalJSON() ([]byte, error) {
 			Created:            m.Created,
 			OwnedBy:            m.OwnedBy,
 			Task:               m.Task,
-			DisplayName:        m.DisplayName,
+			DisplayName:        m.OfficialName,
 			Endpoint:           m.Endpoint,
 			Metadata:           m.Metadata,
 			NeedSensitiveCheck: m.NeedSensitiveCheck,
@@ -176,7 +176,7 @@ func (m *Model) UnmarshalJSON(data []byte) error {
 	m.Created = aux.Created
 	m.OwnedBy = aux.OwnedBy
 	m.Task = aux.Task
-	m.DisplayName = aux.DisplayName
+	m.OfficialName = aux.DisplayName
 	m.SupportFunctionCall = aux.SupportFunctionCall
 	m.Endpoint = aux.Endpoint
 	m.Metadata = aux.Metadata

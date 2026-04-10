@@ -92,12 +92,12 @@ func TestOpenAIComponent_GetAvailableModels(t *testing.T) {
 		expectModels := []types.Model{
 			{
 				BaseModel: types.BaseModel{
-					ID:          "model1:svc1",
-					OwnedBy:     "publicuser",
-					Object:      "model",
-					Created:     deploys[0].CreatedAt.Unix(),
-					Task:        "text-generation",
-					DisplayName: deploys[0].Repository.Name,
+					ID:           "model1:svc1",
+					OwnedBy:      "publicuser",
+					Object:       "model",
+					Created:      deploys[0].CreatedAt.Unix(),
+					Task:         "text-generation",
+					OfficialName: deploys[0].Repository.Name,
 					Metadata: map[string]any{
 						types.MetaKeyLLMType: types.ProviderTypeInference,
 					},
@@ -115,12 +115,12 @@ func TestOpenAIComponent_GetAvailableModels(t *testing.T) {
 			},
 			{
 				BaseModel: types.BaseModel{
-					ID:          "hf-model2:svc2",
-					OwnedBy:     "OpenCSG",
-					Object:      "model",
-					Created:     deploys[1].CreatedAt.Unix(),
-					Task:        "text-to-image",
-					DisplayName: deploys[1].Repository.Name,
+					ID:           "hf-model2:svc2",
+					OwnedBy:      "OpenCSG",
+					Object:       "model",
+					Created:      deploys[1].CreatedAt.Unix(),
+					Task:         "text-to-image",
+					OfficialName: deploys[1].Repository.Name,
 					Metadata: map[string]any{
 						types.MetaKeyLLMType: types.ProviderTypeServerless,
 					},
@@ -211,12 +211,12 @@ func TestOpenAIComponent_GetAvailableModels(t *testing.T) {
 		expectModels := []types.Model{
 			{
 				BaseModel: types.BaseModel{
-					ID:          "model1:svc1",
-					OwnedBy:     "testuser",
-					Object:      "model",
-					Created:     deploys[0].CreatedAt.Unix(),
-					Task:        "text-generation",
-					DisplayName: deploys[0].Repository.Name,
+					ID:           "model1:svc1",
+					OwnedBy:      "testuser",
+					Object:       "model",
+					Created:      deploys[0].CreatedAt.Unix(),
+					Task:         "text-generation",
+					OfficialName: deploys[0].Repository.Name,
 					Metadata: map[string]any{
 						types.MetaKeyLLMType: types.ProviderTypeInference,
 					},
@@ -234,12 +234,12 @@ func TestOpenAIComponent_GetAvailableModels(t *testing.T) {
 			},
 			{
 				BaseModel: types.BaseModel{
-					ID:          "hf-model2:svc2",
-					OwnedBy:     "OpenCSG",
-					Object:      "model",
-					Created:     deploys[1].CreatedAt.Unix(),
-					Task:        "text-to-image",
-					DisplayName: deploys[1].Repository.Name,
+					ID:           "hf-model2:svc2",
+					OwnedBy:      "OpenCSG",
+					Object:       "model",
+					Created:      deploys[1].CreatedAt.Unix(),
+					Task:         "text-to-image",
+					OfficialName: deploys[1].Repository.Name,
 					Metadata: map[string]any{
 						types.MetaKeyLLMType: types.ProviderTypeServerless,
 					},
@@ -325,12 +325,12 @@ func TestOpenAIComponent_GetAvailableModels(t *testing.T) {
 		expectModels := []types.Model{
 			{
 				BaseModel: types.BaseModel{
-					ID:          "model3:svc3",
-					OwnedBy:     "testuser",
-					Object:      "model",
-					Created:     deploys[0].CreatedAt.Unix(),
-					Task:        "text-generation",
-					DisplayName: deploys[0].Repository.Name,
+					ID:           "model3:svc3",
+					OwnedBy:      "testuser",
+					Object:       "model",
+					Created:      deploys[0].CreatedAt.Unix(),
+					Task:         "text-generation",
+					OfficialName: deploys[0].Repository.Name,
 					Metadata: map[string]any{
 						types.MetaKeyLLMType: types.ProviderTypeInference,
 					},
@@ -416,12 +416,12 @@ func TestOpenAIComponent_GetModelByID(t *testing.T) {
 		expectModels := []types.Model{
 			{
 				BaseModel: types.BaseModel{
-					ID:          "model1:svc1",
-					OwnedBy:     "testuser",
-					Object:      "model",
-					Created:     deploys[0].CreatedAt.Unix(),
-					Task:        string(deploys[0].Task),
-					DisplayName: deploys[0].Repository.Name,
+					ID:           "model1:svc1",
+					OwnedBy:      "testuser",
+					Object:       "model",
+					Created:      deploys[0].CreatedAt.Unix(),
+					Task:         string(deploys[0].Task),
+					OfficialName: deploys[0].Repository.Name,
 					Metadata: map[string]any{
 						types.MetaKeyLLMType: types.ProviderTypeInference,
 					},
