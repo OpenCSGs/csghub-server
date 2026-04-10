@@ -90,6 +90,132 @@ func (_c *MockCsgbotSvcClient_Chat_Call) RunAndReturn(run func(context.Context, 
 	return _c
 }
 
+// ChatCodeAgent provides a mock function with given fields: ctx, userUUID, username, token, req
+func (_m *MockCsgbotSvcClient) ChatCodeAgent(ctx context.Context, userUUID string, username string, token string, req *rpc.CodeAgentSchedulerChatRequest) (io.ReadCloser, error) {
+	ret := _m.Called(ctx, userUUID, username, token, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ChatCodeAgent")
+	}
+
+	var r0 io.ReadCloser
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, *rpc.CodeAgentSchedulerChatRequest) (io.ReadCloser, error)); ok {
+		return rf(ctx, userUUID, username, token, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, *rpc.CodeAgentSchedulerChatRequest) io.ReadCloser); ok {
+		r0 = rf(ctx, userUUID, username, token, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(io.ReadCloser)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, *rpc.CodeAgentSchedulerChatRequest) error); ok {
+		r1 = rf(ctx, userUUID, username, token, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockCsgbotSvcClient_ChatCodeAgent_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ChatCodeAgent'
+type MockCsgbotSvcClient_ChatCodeAgent_Call struct {
+	*mock.Call
+}
+
+// ChatCodeAgent is a helper method to define mock.On call
+//   - ctx context.Context
+//   - userUUID string
+//   - username string
+//   - token string
+//   - req *rpc.CodeAgentSchedulerChatRequest
+func (_e *MockCsgbotSvcClient_Expecter) ChatCodeAgent(ctx interface{}, userUUID interface{}, username interface{}, token interface{}, req interface{}) *MockCsgbotSvcClient_ChatCodeAgent_Call {
+	return &MockCsgbotSvcClient_ChatCodeAgent_Call{Call: _e.mock.On("ChatCodeAgent", ctx, userUUID, username, token, req)}
+}
+
+func (_c *MockCsgbotSvcClient_ChatCodeAgent_Call) Run(run func(ctx context.Context, userUUID string, username string, token string, req *rpc.CodeAgentSchedulerChatRequest)) *MockCsgbotSvcClient_ChatCodeAgent_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string), args[4].(*rpc.CodeAgentSchedulerChatRequest))
+	})
+	return _c
+}
+
+func (_c *MockCsgbotSvcClient_ChatCodeAgent_Call) Return(_a0 io.ReadCloser, _a1 error) *MockCsgbotSvcClient_ChatCodeAgent_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockCsgbotSvcClient_ChatCodeAgent_Call) RunAndReturn(run func(context.Context, string, string, string, *rpc.CodeAgentSchedulerChatRequest) (io.ReadCloser, error)) *MockCsgbotSvcClient_ChatCodeAgent_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ChatLangflow provides a mock function with given fields: ctx, userUUID, username, token, flowID, sessionID, req
+func (_m *MockCsgbotSvcClient) ChatLangflow(ctx context.Context, userUUID string, username string, token string, flowID string, sessionID string, req *rpc.LangflowSchedulerChatRequest) (io.ReadCloser, error) {
+	ret := _m.Called(ctx, userUUID, username, token, flowID, sessionID, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ChatLangflow")
+	}
+
+	var r0 io.ReadCloser
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, string, string, *rpc.LangflowSchedulerChatRequest) (io.ReadCloser, error)); ok {
+		return rf(ctx, userUUID, username, token, flowID, sessionID, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, string, string, *rpc.LangflowSchedulerChatRequest) io.ReadCloser); ok {
+		r0 = rf(ctx, userUUID, username, token, flowID, sessionID, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(io.ReadCloser)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, string, string, *rpc.LangflowSchedulerChatRequest) error); ok {
+		r1 = rf(ctx, userUUID, username, token, flowID, sessionID, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockCsgbotSvcClient_ChatLangflow_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ChatLangflow'
+type MockCsgbotSvcClient_ChatLangflow_Call struct {
+	*mock.Call
+}
+
+// ChatLangflow is a helper method to define mock.On call
+//   - ctx context.Context
+//   - userUUID string
+//   - username string
+//   - token string
+//   - flowID string
+//   - sessionID string
+//   - req *rpc.LangflowSchedulerChatRequest
+func (_e *MockCsgbotSvcClient_Expecter) ChatLangflow(ctx interface{}, userUUID interface{}, username interface{}, token interface{}, flowID interface{}, sessionID interface{}, req interface{}) *MockCsgbotSvcClient_ChatLangflow_Call {
+	return &MockCsgbotSvcClient_ChatLangflow_Call{Call: _e.mock.On("ChatLangflow", ctx, userUUID, username, token, flowID, sessionID, req)}
+}
+
+func (_c *MockCsgbotSvcClient_ChatLangflow_Call) Run(run func(ctx context.Context, userUUID string, username string, token string, flowID string, sessionID string, req *rpc.LangflowSchedulerChatRequest)) *MockCsgbotSvcClient_ChatLangflow_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string), args[4].(string), args[5].(string), args[6].(*rpc.LangflowSchedulerChatRequest))
+	})
+	return _c
+}
+
+func (_c *MockCsgbotSvcClient_ChatLangflow_Call) Return(_a0 io.ReadCloser, _a1 error) *MockCsgbotSvcClient_ChatLangflow_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockCsgbotSvcClient_ChatLangflow_Call) RunAndReturn(run func(context.Context, string, string, string, string, string, *rpc.LangflowSchedulerChatRequest) (io.ReadCloser, error)) *MockCsgbotSvcClient_ChatLangflow_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CreateKnowledgeBase provides a mock function with given fields: ctx, userUUID, username, token, req
 func (_m *MockCsgbotSvcClient) CreateKnowledgeBase(ctx context.Context, userUUID string, username string, token string, req *rpc.CreateKnowledgeBaseRequest) (*rpc.CreateKnowledgeBaseResponse, error) {
 	ret := _m.Called(ctx, userUUID, username, token, req)
