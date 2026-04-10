@@ -151,8 +151,14 @@ func TestSpaceComponent_Update(t *testing.T) {
 		RepoType:  types.SpaceRepo,
 	}).Return(
 		&database.Repository{
-			ID:   123,
-			Name: "repo",
+			ID:      123,
+			Name:    "repo",
+			Path:    "ns/n",
+			Private: false,
+			User: database.User{
+				UUID:     "user-uuid",
+				Username: "user",
+			},
 		}, nil,
 	)
 	sc.mocks.stores.SpaceMock().EXPECT().ByRepoID(ctx, int64(123)).Return(&database.Space{
@@ -177,6 +183,7 @@ func TestSpaceComponent_Update(t *testing.T) {
 	require.Equal(t, &types.Space{
 		ID:       321,
 		Name:     "repo",
+		Path:     "ns/n",
 		Hardware: `{"memory": "foo"}`,
 		SKU:      "12",
 	}, space)

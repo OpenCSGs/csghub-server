@@ -329,3 +329,98 @@ func TestAccountPriceStore_ListByIds(t *testing.T) {
 		}
 	}
 }
+
+func TestAccountPriceStore_ListBySkuTypeAndKinds(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewAccountPriceStoreWithDB(db)
+
+	prices := []*database.AccountPrice{
+		{
+			SkuType: types.SKUCSGHub, SkuKind: types.SKUPackageAddon, ResourceID: "r1",
+			SkuUnitType: "u", SkuDesc: "a",
+		},
+		{
+			SkuType: types.SKUCSGHub, SkuKind: types.SKUPackageAddon, ResourceID: "r2",
+			SkuUnitType: "u", SkuDesc: "b",
+		},
+		{
+			SkuType: types.SKUCSGHub, SkuKind: types.SKUPayAsYouGo, ResourceID: "r1",
+			SkuUnitType: "u", SkuDesc: "c",
+		},
+		{
+			SkuType: types.SKUCSGHub, SkuKind: types.SKUPayAsYouGo, ResourceID: "r2",
+			SkuUnitType: "u", SkuDesc: "d",
+		},
+		{
+			SkuType: types.SKUReserve, SkuKind: types.SKUPackageAddon, ResourceID: "r1",
+			SkuUnitType: "u", SkuDesc: "e",
+		},
+	}
+
+	for _, p := range prices {
+		_, err := store.Create(ctx, *p)
+		require.Nil(t, err)
+	}
+
+	namesFunc := func(prices []database.AccountPrice) string {
+		names := []string{}
+		for _, p := range prices {
+			names = append(names, p.SkuDesc)
+		}
+		return strings.Join(names, "/")
+	}
+
+	t.Run("list by sku_type and multiple sku_kinds", func(t *testing.T) {
+		result, err := store.ListBySkuTypeAndKinds(ctx, types.AcctPriceListByKindsReq{
+			SkuType:  types.SKUCSGHub,
+			SkuKinds: []types.SKUKind{types.SKUPackageAddon, types.SKUPayAsYouGo},
+		})
+		require.Nil(t, err)
+		require.Equal(t, 4, len(result))
+		require.Equal(t, "c/a/d/b", namesFunc(result))
+	})
+
+	t.Run("list by sku_type and single sku_kind", func(t *testing.T) {
+		result, err := store.ListBySkuTypeAndKinds(ctx, types.AcctPriceListByKindsReq{
+			SkuType:  types.SKUCSGHub,
+			SkuKinds: []types.SKUKind{types.SKUPackageAddon},
+		})
+		require.Nil(t, err)
+		require.Equal(t, 2, len(result))
+		require.Equal(t, "a/b", namesFunc(result))
+	})
+
+	t.Run("list with resource_id filter", func(t *testing.T) {
+		result, err := store.ListBySkuTypeAndKinds(ctx, types.AcctPriceListByKindsReq{
+			SkuType:    types.SKUCSGHub,
+			SkuKinds:   []types.SKUKind{types.SKUPackageAddon, types.SKUPayAsYouGo},
+			ResourceID: "r1",
+		})
+		require.Nil(t, err)
+		require.Equal(t, 2, len(result))
+		require.Equal(t, "c/a", namesFunc(result))
+	})
+
+	t.Run("list by different sku_type", func(t *testing.T) {
+		result, err := store.ListBySkuTypeAndKinds(ctx, types.AcctPriceListByKindsReq{
+			SkuType:  types.SKUReserve,
+			SkuKinds: []types.SKUKind{types.SKUPackageAddon},
+		})
+		require.Nil(t, err)
+		require.Equal(t, 1, len(result))
+		require.Equal(t, "e", namesFunc(result))
+	})
+
+	t.Run("list with non-existent resource_id", func(t *testing.T) {
+		result, err := store.ListBySkuTypeAndKinds(ctx, types.AcctPriceListByKindsReq{
+			SkuType:    types.SKUCSGHub,
+			SkuKinds:   []types.SKUKind{types.SKUPackageAddon},
+			ResourceID: "non_existent",
+		})
+		require.Nil(t, err)
+		require.Equal(t, 0, len(result))
+	})
+}

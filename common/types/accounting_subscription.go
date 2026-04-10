@@ -39,7 +39,8 @@ const (
 
 type SubscriptionUpdateReq struct {
 	CurrentUser string      `json:"-"`
-	UserUUID    string      `json:"-"`
+	UserUUID    string      `json:"-"` // target user or org uuid
+	OpUserUUID  string      `json:"-"` // operator user uuid
 	EventUUID   uuid.UUID   `json:"-"`
 	SkuType     SKUType     `json:"sku_type" binding:"required,oneof=1 2"`
 	ResourceID  string      `json:"resource_id" binding:"required"`

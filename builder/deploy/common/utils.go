@@ -37,6 +37,8 @@ func GetValidSceneType(deployType int) types.SceneType {
 		return types.SceneModelServerless
 	case types.NotebookType:
 		return types.SceneModelInference
+	case types.SandboxType:
+		return types.SceneSpace
 	default:
 		return types.SceneUnknow
 	}

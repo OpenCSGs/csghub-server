@@ -6,6 +6,33 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
+// Provider type values for Metadata[MetaKeyLLMType].
+const (
+	ProviderTypeServerless  = "serverless"
+	ProviderTypeInference   = "inference"
+	ProviderTypeExternalLLM = "external_llm"
+)
+
+// Metadata key constants used when enriching model metadata.
+const (
+	MetaKeyLLMType = "llm_type"
+	MetaKeyPricing = "pricing"
+	MetaKeyTasks   = "tasks"
+)
+
+// Resource ID format strings for external LLM (provider, model ID) and CSGHub internal (path segment, repo path).
+const (
+	ExternalLLMResourceFmt = "%s://%s"
+	CSGHubResourceFmt      = "csghub://%s/%s"
+)
+
+// MeteringResource holds ResourceID, ResourceName, and CustomerID for metering events.
+type MeteringResource struct {
+	ResourceID   string
+	ResourceName string
+	CustomerID   string
+}
+
 // BaseModel represents the base model fields
 type BaseModel struct {
 	ID                  string         `json:"id"`
@@ -16,7 +43,6 @@ type BaseModel struct {
 	DisplayName         string         `json:"display_name"`
 	SupportFunctionCall bool           `json:"support_function_call,omitempty"` // whether the model supports function calling
 	IsPinned            *bool          `json:"is_pinned,omitempty"`             // whether the model is pinned
-	Public              bool           `json:"public"`                          // whether the model is public (false = private, true = public)
 	Metadata            map[string]any `json:"metadata"`
 }
 
@@ -61,11 +87,13 @@ func (m Model) MarshalJSON() ([]byte, error) {
 			Task                string         `json:"task"`
 			DisplayName         string         `json:"display_name"`
 			SupportFunctionCall *bool          `json:"support_function_call,omitempty"`
-			Public              bool           `json:"public"`
 			Endpoint            string         `json:"endpoint"`
 			Metadata            map[string]any `json:"metadata"`
+			CSGHubModelID       *string        `json:"csghub_model_id,omitempty"`
+			OwnerUUID           *string        `json:"owner_uuid,omitempty"`
 			ClusterID           *string        `json:"cluster_id,omitempty"`
 			SvcName             *string        `json:"svc_name,omitempty"`
+			SvcType             *int           `json:"svc_type,omitempty"`
 			ImageID             *string        `json:"image_id,omitempty"`
 			AuthHead            *string        `json:"auth_head,omitempty"`
 			Provider            *string        `json:"provider,omitempty"`
@@ -78,7 +106,6 @@ func (m Model) MarshalJSON() ([]byte, error) {
 			OwnedBy:            m.OwnedBy,
 			Task:               m.Task,
 			DisplayName:        m.DisplayName,
-			Public:             m.Public,
 			Endpoint:           m.Endpoint,
 			Metadata:           m.Metadata,
 			NeedSensitiveCheck: m.NeedSensitiveCheck,
@@ -87,6 +114,12 @@ func (m Model) MarshalJSON() ([]byte, error) {
 		if m.SupportFunctionCall {
 			supportFC := m.SupportFunctionCall
 			resp.SupportFunctionCall = &supportFC
+		}
+		if m.CSGHubModelID != "" {
+			resp.CSGHubModelID = &m.CSGHubModelID
+		}
+		if m.OwnerUUID != "" {
+			resp.OwnerUUID = &m.OwnerUUID
 		}
 		if m.Provider != "" {
 			resp.Provider = &m.Provider
@@ -99,6 +132,9 @@ func (m Model) MarshalJSON() ([]byte, error) {
 		}
 		if m.SvcName != "" {
 			resp.SvcName = &m.SvcName
+		}
+		if m.SvcType != 0 {
+			resp.SvcType = &m.SvcType
 		}
 		if m.ImageID != "" {
 			resp.ImageID = &m.ImageID
@@ -119,11 +155,13 @@ func (m *Model) UnmarshalJSON(data []byte) error {
 		Task                string         `json:"task"`
 		DisplayName         string         `json:"display_name"`
 		SupportFunctionCall bool           `json:"support_function_call,omitempty"`
-		Public              bool           `json:"public"`
 		Endpoint            string         `json:"endpoint"`
 		Metadata            map[string]any `json:"metadata"`
+		CSGHubModelID       string         `json:"csghub_model_id,omitempty"`
+		OwnerUUID           string         `json:"owner_uuid,omitempty"`
 		ClusterID           string         `json:"cluster_id,omitempty"`
 		SvcName             string         `json:"svc_name,omitempty"`
+		SvcType             int            `json:"svc_type,omitempty"`
 		ImageID             string         `json:"image_id,omitempty"`
 		AuthHead            string         `json:"auth_head,omitempty"`
 		Provider            string         `json:"provider,omitempty"`
@@ -140,11 +178,13 @@ func (m *Model) UnmarshalJSON(data []byte) error {
 	m.Task = aux.Task
 	m.DisplayName = aux.DisplayName
 	m.SupportFunctionCall = aux.SupportFunctionCall
-	m.Public = aux.Public
 	m.Endpoint = aux.Endpoint
 	m.Metadata = aux.Metadata
+	m.CSGHubModelID = aux.CSGHubModelID
+	m.OwnerUUID = aux.OwnerUUID
 	m.ClusterID = aux.ClusterID
 	m.SvcName = aux.SvcName
+	m.SvcType = aux.SvcType
 	m.ImageID = aux.ImageID
 	m.AuthHead = aux.AuthHead
 	m.Provider = aux.Provider
@@ -193,10 +233,10 @@ type ModelList struct {
 // filtering, and pagination behavior consistently.
 type ListModelsReq struct {
 	ModelID string `json:"model_id"`
-	Public  string `json:"public"`
 	Per     string `json:"per"`
 	Page    string `json:"page"`
 	Source  string `json:"source"` // filter by source (csghub for CSGHub models, external for external models)
+	Task    string `json:"task"`   // filter by task
 }
 
 // UserPreferenceRequest defines the request parameters for UserPreference method
@@ -223,3 +263,16 @@ const (
 	// ModelSourceExternal represents models from external providers
 	ModelSourceExternal ModelSource = "external"
 )
+
+// ModelTokenPrice is currency plus per-million-token rate (major units, from accounting cents + sku_unit).
+type ModelTokenPrice struct {
+	Currency        string  `json:"currency,omitempty"`
+	PricePerMillion float64 `json:"price_per_million,omitempty"`
+}
+
+// ModelScenePrice is Metadata["pricing"]: serverless and external_llm use input/output token prices (SaaS serverless scene).
+type ModelScenePrice struct {
+	InputTokenPrice  *ModelTokenPrice `json:"input_token_price,omitempty"`
+	OutputTokenPrice *ModelTokenPrice `json:"output_token_price,omitempty"`
+	TokenPrice       *ModelTokenPrice `json:"token_price,omitempty"`
+}

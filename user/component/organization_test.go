@@ -76,6 +76,10 @@ func TestOrganizationComponent_Index(t *testing.T) {
 		Logo:     "org-logo.png",
 		OrgType:  "school",
 		Verified: false,
+		Namespace: &database.Namespace{
+			Path:          "org1",
+			NamespaceType: database.OrgNamespace,
+		},
 	})
 	dbOrgs = append(dbOrgs, database.Organization{
 		ID:       2,
@@ -85,6 +89,10 @@ func TestOrganizationComponent_Index(t *testing.T) {
 		Logo:     "org-logo.png",
 		OrgType:  "school",
 		Verified: false,
+		Namespace: &database.Namespace{
+			Path:          "org2",
+			NamespaceType: database.OrgNamespace,
+		},
 	})
 	mockOrgStore := mockdb.NewMockOrgStore(t)
 	mockOrgStore.EXPECT().GetUserOwnOrgs(mock.Anything, "user1").Return(dbOrgs, len(dbOrgs), nil).Once()
@@ -123,6 +131,12 @@ func TestOrganizationComponent_Index(t *testing.T) {
 				return false
 			}
 			if expectedOrgs[i].Verified != dbOrgs[i].Verified {
+				return false
+			}
+			if expectedOrgs[i].Namespace == nil {
+				return false
+			}
+			if expectedOrgs[i].Namespace.Path != dbOrgs[i].Namespace.Path {
 				return false
 			}
 		}

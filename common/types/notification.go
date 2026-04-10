@@ -340,10 +340,12 @@ type EmailWeeklyRechargesNotification struct {
 }
 
 type SMSReq struct {
-	PhoneNumbers  []string `json:"phone_numbers"`
-	SignName      string   `json:"sign_name"`
-	TemplateCode  string   `json:"template_code"`
-	TemplateParam string   `json:"template_param"`
+	PhoneNumbers []string `json:"phone_numbers"`
+	SignName     string   `json:"sign_name"`
+	TemplateCode string   `json:"template_code"`
+
+	Params    []string          `json:"params"`
+	MapParams map[string]string `json:"map_params"`
 }
 
 type EmailInvoiceCreatedNotification struct {

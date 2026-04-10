@@ -10,7 +10,6 @@ import (
 	"opencsg.com/csghub-server/builder/store/cache"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
-	common_types "opencsg.com/csghub-server/common/types"
 )
 
 type extendOpenai struct{}
@@ -39,12 +38,10 @@ func (e *openaiComponentImpl) userPreference(ctx context.Context, req *types.Use
 	return req.Models, nil
 }
 
-// parseScene parses the scene value from the HTTP header
-// return SceneModelServerless
-func parseScene(sceneValue string) common_types.SceneType {
-	return common_types.SceneModelServerless
-}
-
 func (e *extendOpenai) CheckBalance(ctx context.Context, username, userUUID string) error {
 	return nil
+}
+
+func (e *extendOpenai) enrichModelsWithPrice(_ context.Context, models []types.Model) []types.Model {
+	return models
 }

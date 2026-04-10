@@ -2,7 +2,6 @@ package router
 
 import (
 	"fmt"
-
 	"net/http"
 
 	"opencsg.com/csghub-server/builder/instrumentation"
@@ -37,8 +36,6 @@ func NewRouter(config *config.Config) (*gin.Engine, func(), error) {
 	r.Use(middleware.BuildJwtSession(config.JWT.SigningKey))
 	i18n.InitLocalizersFromEmbedFile()
 	r.Use(middleware.ModifyAcceptLanguageMiddleware(), middleware.LocalizedErrorMiddleware())
-	i18n.InitLocalizersFromEmbedFile()
-	r.Use(middleware.ModifyAcceptLanguageMiddleware(), middleware.LocalizedErrorMiddleware())
 	r.Use(middleware.Authenticator(config))
 	middlewareCollection := middleware.MiddlewareCollection{}
 	middlewareCollection.Auth.NeedLogin = middleware.MustLogin()
@@ -54,7 +51,7 @@ func NewRouter(config *config.Config) (*gin.Engine, func(), error) {
 		return nil, nil, fmt.Errorf("error creating openai handler :%w", err)
 	}
 	v1Group.GET("/models", openAIhandler.ListModels)
-	v1Group.GET("/models/:model", middlewareCollection.Auth.NeedLogin, openAIhandler.GetModel)
+	v1Group.GET("/models/*model", middlewareCollection.Auth.NeedLogin, openAIhandler.GetModel)
 	v1Group.POST("/chat/completions", middlewareCollection.Auth.NeedLogin, openAIhandler.Chat)
 	v1Group.POST("/embeddings", middlewareCollection.Auth.NeedLogin, openAIhandler.Embedding)
 	v1Group.POST("/images/generations", middlewareCollection.Auth.NeedLogin, openAIhandler.GenerateImage)

@@ -66,8 +66,12 @@ func NewInternalComponent(config *config.Config) (InternalComponent, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create lfs exists checker: %w", err)
 	}
+	skillFileChecker, err := checker.NewSkillFileChecker(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create skill file checker: %w", err)
+	}
 
-	c.callbackCheckers = append(c.callbackCheckers, fileSizeChecker, lfsExistsChecker)
+	c.callbackCheckers = append(c.callbackCheckers, fileSizeChecker, lfsExistsChecker, skillFileChecker)
 	c.gitServer = git
 	return c, nil
 }
