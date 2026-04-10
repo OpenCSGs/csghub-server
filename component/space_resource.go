@@ -12,6 +12,13 @@ import (
 	"opencsg.com/csghub-server/common/types"
 )
 
+func maskNodeName(nodeName string) string {
+	if len(nodeName) <= 5 {
+		return "*****"
+	}
+	return nodeName[:1] + "***" + nodeName[len(nodeName)-3:]
+}
+
 type SpaceResourceComponent interface {
 	Index(ctx context.Context, req *types.SpaceResourceIndexReq) ([]types.SpaceResource, int, error)
 	Update(ctx context.Context, req *types.UpdateSpaceResourceReq) (*types.SpaceResource, error)
@@ -46,11 +53,15 @@ func (c *spaceResourceComponentImpl) Index(ctx context.Context, req *types.Space
 		for _, r := range databaseSpaceResources {
 			var isAvailable bool
 			var hardware types.HardWare
+			var availableStatusList []types.ResourceAvailableStatus
 			err := json.Unmarshal([]byte(r.Resources), &hardware)
 			if err != nil {
 				slog.ErrorContext(ctx, "invalid hardware setting", slog.Any("error", err), slog.String("hardware", r.Resources))
 			} else {
-				isAvailable = deploy.CheckResource(clusterResources, &hardware, c.config)
+				isAvailable, availableStatusList = deploy.CheckResource(clusterResources, &hardware, c.config)
+				for i := range availableStatusList {
+					availableStatusList[i].NodeName = maskNodeName(availableStatusList[i].NodeName)
+				}
 			}
 			if !c.deployAvailable(req.DeployType, hardware) {
 				// must have gpu for finetune
@@ -68,13 +79,14 @@ func (c *spaceResourceComponentImpl) Index(ctx context.Context, req *types.Space
 			}
 			resourceType := common.ResourceType(hardware)
 			singleClusterResult = append(singleClusterResult, types.SpaceResource{
-				ID:            r.ID,
-				ClusterID:     r.ClusterID,
-				ClusterRegion: clusterResources.Region,
-				Name:          r.Name,
-				Resources:     r.Resources,
-				IsAvailable:   isAvailable,
-				Type:          resourceType,
+				ID:                  r.ID,
+				ClusterID:           r.ClusterID,
+				ClusterRegion:       clusterResources.Region,
+				Name:                r.Name,
+				Resources:           r.Resources,
+				IsAvailable:         isAvailable,
+				Type:                resourceType,
+				AvailableStatusList: availableStatusList,
 			})
 			resourceCount++
 		}

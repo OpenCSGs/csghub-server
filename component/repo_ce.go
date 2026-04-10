@@ -119,7 +119,7 @@ func (c *repoComponentImpl) CheckAccountAndResource(ctx context.Context, userNam
 	if err != nil {
 		return nil, fmt.Errorf("invalid hardware setting, %w", err)
 	}
-	_, err = c.deployer.CheckResourceAvailable(ctx, clusterID, 0, &hardware)
+	_, _, err = c.deployer.CheckResourceAvailable(ctx, clusterID, 0, &hardware)
 	if err != nil {
 		return nil, fmt.Errorf("fail to check resource, %w", err)
 	}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
@@ -65,52 +66,58 @@ func (d *deployer) GetClusterById(ctx context.Context, clusterId string) (*types
 	return &result, err
 }
 
-func (d *deployer) CheckResourceAvailable(ctx context.Context, clusterId string, orderDetailID int64, hardWare *types.HardWare) (bool, error) {
+func (d *deployer) CheckResourceAvailable(ctx context.Context, clusterId string, orderDetailID int64, hardWare *types.HardWare) (bool, []types.ResourceAvailableStatus, error) {
 	// backward compatibility for old api
 	if clusterId == "" {
 		clusters, err := d.ListCluster(ctx)
 		if err != nil {
-			return false, err
+			return false, nil, err
 		}
 		if len(clusters) == 0 {
-			return false, fmt.Errorf("can not list clusters")
+			return false, nil, fmt.Errorf("can not list clusters")
 		}
 		clusterId = clusters[0].ClusterID
 	}
 	clusterResources, err := d.GetClusterById(ctx, clusterId)
 	if err != nil {
-		return false, err
+		return false, nil, err
 	}
 	err = d.checkOrderDetailByID(ctx, orderDetailID)
 	if err != nil {
-		return false, err
+		return false, nil, err
 	}
 
 	if clusterResources.Status == types.ClusterStatusUnavailable {
 		err := fmt.Errorf("failed to check cluster available resource due to cluster %s status is %s",
 			clusterId, clusterResources.Status)
-		return false, errorx.ClusterUnavailable(err, errorx.Ctx().
+		return false, nil, errorx.ClusterUnavailable(err, errorx.Ctx().
 			Set("cluster ID", clusterId).
 			Set("region", clusterResources.Region))
 	}
 
+	available, availableStatusList := CheckResource(clusterResources, hardWare, d.config)
 	if d.IsDefaultScheduler() &&
 		clusterResources.ResourceStatus != types.StatusUncertain &&
-		!CheckResource(clusterResources, hardWare, d.config) {
+		!available {
 		err := fmt.Errorf("required resource on cluster %s is not enough with resource status %s",
 			clusterId, clusterResources.ResourceStatus)
-		return false, errorx.NotEnoughResource(err, errorx.Ctx().
+		return false, availableStatusList, errorx.NotEnoughResource(err, errorx.Ctx().
 			Set("cluster ID", clusterId).
 			Set("region", clusterResources.Region))
 	}
 
-	return true, nil
+	return true, availableStatusList, nil
 }
 
-func CheckResource(clusterResources *types.ClusterRes, hardware *types.HardWare, config *config.Config) bool {
+func CheckResource(clusterResources *types.ClusterRes, hardware *types.HardWare, config *config.Config) (bool, []types.ResourceAvailableStatus) {
 	if hardware == nil {
 		slog.Error("hardware is empty for check resource", slog.Any("clusterResources", clusterResources))
-		return false
+		return false, []types.ResourceAvailableStatus{
+			{
+				Available: false,
+				Reason:    types.UnAvailableTypeInvalidHardware,
+			},
+		}
 	}
 	if hardware.Replicas > 1 {
 		return checkMultiNodeResource(clusterResources, hardware, config)
@@ -120,27 +127,31 @@ func CheckResource(clusterResources *types.ClusterRes, hardware *types.HardWare,
 }
 
 // check resource for sigle node
-func checkSingleNodeResource(clusterResources *types.ClusterRes, hardware *types.HardWare, config *config.Config) bool {
+func checkSingleNodeResource(clusterResources *types.ClusterRes, hardware *types.HardWare, config *config.Config) (bool, []types.ResourceAvailableStatus) {
+	var availableStatusList []types.ResourceAvailableStatus
 	for _, node := range clusterResources.Resources {
-		isAvailable := checkNodeResource(node, hardware, config)
-		if isAvailable {
+		availableStatus := checkNodeResource(node, hardware, config)
+		availableStatusList = append(availableStatusList, availableStatus)
+		if availableStatus.Available {
 			// if true return, otherwise continue check next node
-			return true
+			return true, availableStatusList
 		}
 	}
-	return false
+	return false, availableStatusList
 }
 
-func checkMultiNodeResource(clusterResources *types.ClusterRes, hardware *types.HardWare, config *config.Config) bool {
+func checkMultiNodeResource(clusterResources *types.ClusterRes, hardware *types.HardWare, config *config.Config) (bool, []types.ResourceAvailableStatus) {
+	var availableStatusList []types.ResourceAvailableStatus
 	ready := 0
 	for _, node := range clusterResources.Resources {
-		isAvailable := checkNodeResource(node, hardware, config)
-		if isAvailable {
+		availableStatus := checkNodeResource(node, hardware, config)
+		availableStatusList = append(availableStatusList, availableStatus)
+		if availableStatus.Available {
 			ready++
 			if ready >= hardware.Replicas {
-				return true
+				return true, availableStatusList
 			}
 		}
 	}
-	return false
+	return false, availableStatusList
 }

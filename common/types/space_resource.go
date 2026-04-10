@@ -36,17 +36,20 @@ var ResourceTypeValidator validator.Func = func(fl validator.FieldLevel) bool {
 }
 
 type SpaceResource struct {
-	ID            int64        `json:"id"`
-	Name          string       `json:"name"`
-	ClusterID     string       `json:"cluster_id"`
-	ClusterRegion string       `json:"cluster_region"`
-	Resources     string       `json:"resources"`
-	Price         float64      `json:"price"`
-	IsAvailable   bool         `json:"is_available"`
-	Type          ResourceType `json:"type"`
-	PayMode       PayMode      `json:"pay_mode"`
-	IsReserved    bool         `json:"is_reserved"`
-	OrderDetailId int64        `json:"order_detail_id"`
+	ID                  int64                     `json:"id"`
+	Name                string                    `json:"name"`
+	ClusterID           string                    `json:"cluster_id"`
+	ClusterRegion       string                    `json:"cluster_region"`
+	Resources           string                    `json:"resources"`
+	Price               float64                   `json:"price"`
+	PriceUnit           int64                     `json:"price_unit"`
+	PriceUnitType       SkuUnitType               `json:"price_unit_type"`
+	IsAvailable         bool                      `json:"is_available"`
+	Type                ResourceType              `json:"type"`
+	PayMode             PayMode                   `json:"pay_mode"`
+	IsReserved          bool                      `json:"is_reserved"`
+	OrderDetailId       int64                     `json:"order_detail_id"`
+	AvailableStatusList []ResourceAvailableStatus `json:"available_status_list"`
 }
 
 type CreateSpaceResourceReq struct {

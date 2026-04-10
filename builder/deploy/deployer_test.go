@@ -794,7 +794,7 @@ func TestDeployer_CheckResource(t *testing.T) {
 
 	for _, c := range cases {
 		c.hardware.Memory = "1Gi"
-		v := CheckResource(&types.ClusterRes{
+		v, _ := CheckResource(&types.ClusterRes{
 			Resources: []types.NodeResourceInfo{
 				{
 					NodeHardware: types.NodeHardware{

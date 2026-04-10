@@ -310,7 +310,7 @@ func TestCheckResource(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := CheckResource(tc.clusterResources, tc.hardware, cfg)
+			got, _ := CheckResource(tc.clusterResources, tc.hardware, cfg)
 			require.Equal(t, tc.want, got)
 		})
 	}
@@ -341,7 +341,7 @@ func TestCheckResourceAvailable(t *testing.T) {
 			},
 		}, nil)
 
-		available, err := d.CheckResourceAvailable(ctx, "c1", 0, &types.HardWare{
+		available, _, err := d.CheckResourceAvailable(ctx, "c1", 0, &types.HardWare{
 			Memory:   "10Gi",
 			Cpu:      types.CPU{Num: "8"},
 			Gpu:      types.Processor{Num: "1", Type: "NVIDIA-A100"},
@@ -384,7 +384,7 @@ func TestCheckResourceAvailable(t *testing.T) {
 			},
 		}, nil)
 
-		available, err := d.CheckResourceAvailable(ctx, "c1", 0, &types.HardWare{
+		available, _, err := d.CheckResourceAvailable(ctx, "c1", 0, &types.HardWare{
 			Memory:   "10Gi",
 			Cpu:      types.CPU{Num: "8"},
 			Gpu:      types.Processor{Num: "1", Type: "NVIDIA-A100"},
@@ -409,7 +409,7 @@ func TestCheckResourceAvailable(t *testing.T) {
 			Region:    "us-west-1",
 		}, nil)
 
-		available, err := d.CheckResourceAvailable(ctx, "c1", 0, &types.HardWare{
+		available, _, err := d.CheckResourceAvailable(ctx, "c1", 0, &types.HardWare{
 			Memory:   "10Gi",
 			Replicas: 1,
 		})
@@ -440,7 +440,7 @@ func TestCheckResourceAvailable(t *testing.T) {
 			},
 		}, nil)
 
-		available, err := d.CheckResourceAvailable(ctx, "c1", 0, &types.HardWare{
+		available, _, err := d.CheckResourceAvailable(ctx, "c1", 0, &types.HardWare{
 			Memory:   "10Gi",
 			Replicas: 1,
 		})
@@ -459,7 +459,7 @@ func TestCheckResourceAvailable(t *testing.T) {
 
 		mockStores.ClusterInfoMock().EXPECT().GetClusterResources(ctx, "c1").Return(nil, errors.New("db error"))
 
-		available, err := d.CheckResourceAvailable(ctx, "c1", 0, &types.HardWare{
+		available, _, err := d.CheckResourceAvailable(ctx, "c1", 0, &types.HardWare{
 			Memory:   "10Gi",
 			Replicas: 1,
 		})
@@ -490,7 +490,7 @@ func TestCheckResourceAvailable(t *testing.T) {
 		}, nil)
 
 		// When ResourceStatus is StatusUncertain, CheckResource is not called and it returns true
-		available, err := d.CheckResourceAvailable(ctx, "c1", 0, &types.HardWare{
+		available, _, err := d.CheckResourceAvailable(ctx, "c1", 0, &types.HardWare{
 			Memory:   "10Gi",
 			Replicas: 1,
 		})
@@ -619,7 +619,7 @@ func TestCheckSingleNodeResource(t *testing.T) {
 				ClusterID: "c1",
 				Resources: tc.resources,
 			}
-			result := checkSingleNodeResource(clusterRes, tc.hardware, cfg)
+			result, _ := checkSingleNodeResource(clusterRes, tc.hardware, cfg)
 			require.Equal(t, tc.expectedResult, result)
 		})
 	}
@@ -754,7 +754,7 @@ func TestCheckMultiNodeResource(t *testing.T) {
 				ClusterID: "c1",
 				Resources: tc.resources,
 			}
-			result := checkMultiNodeResource(clusterRes, tc.hardware, cfg)
+			result, _ := checkMultiNodeResource(clusterRes, tc.hardware, cfg)
 			require.Equal(t, tc.expectedResult, result)
 		})
 	}
