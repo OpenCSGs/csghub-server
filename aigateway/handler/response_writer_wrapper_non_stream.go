@@ -23,14 +23,16 @@ type nonStreamResponseWriter struct {
 	internalWritter     gin.ResponseWriter
 	moderationComponent component.Moderation
 	tokenCounter        token.ChatTokenCounter
+	recorder            component.LLMLogRecorder
 	buffer              bytes.Buffer
 }
 
-func newNonStreamResponseWriter(internalWritter gin.ResponseWriter, moderationComponent component.Moderation, tokenCounter token.ChatTokenCounter) *nonStreamResponseWriter {
+func newNonStreamResponseWriter(internalWritter gin.ResponseWriter, moderationComponent component.Moderation, tokenCounter token.ChatTokenCounter, recorder component.LLMLogRecorder) *nonStreamResponseWriter {
 	return &nonStreamResponseWriter{
 		internalWritter:     internalWritter,
 		moderationComponent: moderationComponent,
 		tokenCounter:        tokenCounter,
+		recorder:            recorder,
 	}
 }
 
@@ -86,6 +88,9 @@ func (nsw *nonStreamResponseWriter) nonStreamWrite(originData []byte) (int, erro
 	// Step 4: Count tokens if token counter is available
 	if nsw.tokenCounter != nil {
 		nsw.tokenCounter.Completion(completion)
+	}
+	if nsw.recorder != nil {
+		nsw.recorder.Completion(completion)
 	}
 
 	// Step 5: Handle case with empty choices array

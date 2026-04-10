@@ -20,7 +20,6 @@ import (
 	"opencsg.com/csghub-server/builder/store/database"
 
 	bldmq "opencsg.com/csghub-server/builder/mq"
-	"opencsg.com/csghub-server/common/config"
 	commontypes "opencsg.com/csghub-server/common/types"
 )
 
@@ -459,9 +458,6 @@ func TestOpenAIComponent_checkOrganization(t *testing.T) {
 }
 
 func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
-	cfg, err := config.LoadConfig()
-	require.Nil(t, err)
-
 	mockUserStore := &mockdb.MockUserStore{}
 	mockDeployStore := &mockdb.MockDeployTaskStore{}
 	mockOrgStore := &mockdb.MockOrgStore{}
@@ -505,7 +501,6 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 				eventPub := &event.EventPublisher{
 					SyncInterval: 1,
 					MQ:           mockBLDMQ,
-					Cfg:          cfg,
 				}
 				mockCounter = mocktoken.NewMockCounter(t)
 
@@ -583,7 +578,6 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 				eventPub := &event.EventPublisher{
 					SyncInterval: 1,
 					MQ:           mockBLDMQ,
-					Cfg:          cfg,
 				}
 				mockCounter = mocktoken.NewMockCounter(t)
 
@@ -648,7 +642,6 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 				eventPub := &event.EventPublisher{
 					SyncInterval: 1,
 					MQ:           mockBLDMQ,
-					Cfg:          cfg,
 				}
 				mockCounter = mocktoken.NewMockCounter(t)
 
@@ -700,7 +693,6 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 					eventPub: &event.EventPublisher{
 						SyncInterval: 1,
 						MQ:           mockbldmq.NewMockMessageQueue(t),
-						Cfg:          cfg,
 					},
 				}
 				mockCounter.EXPECT().Usage(mock.Anything).Return(&token.Usage{
@@ -728,7 +720,6 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 					eventPub: &event.EventPublisher{
 						SyncInterval: 1,
 						MQ:           mockbldmq.NewMockMessageQueue(t),
-						Cfg:          cfg,
 					},
 				}
 				mockCounter.EXPECT().Usage(mock.Anything).Return(&token.Usage{
@@ -751,7 +742,6 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 					eventPub: &event.EventPublisher{
 						SyncInterval: 1,
 						MQ:           mockbldmq.NewMockMessageQueue(t),
-						Cfg:          cfg,
 					},
 				}
 				mockCounter.EXPECT().Usage(mock.Anything).Return(&token.Usage{
@@ -783,7 +773,6 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 					eventPub: &event.EventPublisher{
 						SyncInterval: 1,
 						MQ:           mockbldmq.NewMockMessageQueue(t),
-						Cfg:          cfg,
 					},
 				}
 				mockCounter.EXPECT().Usage(mock.Anything).Return(&token.Usage{
@@ -850,7 +839,6 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 				eventPub := &event.EventPublisher{
 					SyncInterval: 1,
 					MQ:           mockBLDMQ,
-					Cfg:          cfg,
 				}
 				mockCounter = mocktoken.NewMockCounter(t)
 				comp = &openaiComponentImpl{
@@ -883,9 +871,6 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 }
 
 func TestOpenAIComponentImpl_RecordUsage_ExternalModel(t *testing.T) {
-	cfg, err := config.LoadConfig()
-	require.Nil(t, err)
-
 	mockUserStore := &mockdb.MockUserStore{}
 	mockDeployStore := &mockdb.MockDeployTaskStore{}
 
@@ -918,7 +903,6 @@ func TestOpenAIComponentImpl_RecordUsage_ExternalModel(t *testing.T) {
 				eventPub := &event.EventPublisher{
 					SyncInterval: 1,
 					MQ:           mockBLDMQ,
-					Cfg:          cfg,
 				}
 				mockCounter = mocktoken.NewMockCounter(t)
 
@@ -1006,7 +990,6 @@ func TestOpenAIComponentImpl_RecordUsage_ExternalModel(t *testing.T) {
 				eventPub := &event.EventPublisher{
 					SyncInterval: 1,
 					MQ:           mockBLDMQ,
-					Cfg:          cfg,
 				}
 				mockCounter = mocktoken.NewMockCounter(t)
 				comp = &openaiComponentImpl{
@@ -1041,7 +1024,6 @@ func TestOpenAIComponentImpl_RecordUsage_ExternalModel(t *testing.T) {
 				eventPub := &event.EventPublisher{
 					SyncInterval: 1,
 					MQ:           mockBLDMQ,
-					Cfg:          cfg,
 				}
 				mockCounter = mocktoken.NewMockCounter(t)
 

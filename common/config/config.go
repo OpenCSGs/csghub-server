@@ -430,6 +430,15 @@ type Config struct {
 		ModerationBypassSensitiveCheck bool   `env:"OPENCSG_AIGATEWAY_MODERATION_BYPASS_SENSITIVE_CHECK" default:"false"`
 		SensitiveDefaultImg            string `env:"STARHUB_SERVER_AIGATEWAY_SENSITIVE_DEFAULT_IMG" default:""`
 		PresignExpirySeconds           int    `env:"OPENCSG_AIGATEWAY_PRESIGN_EXPIRY" default:"86400"`
+		EnableLLMLog                   bool   `env:"OPENCSG_AIGATEWAY_LLMLOG_ENABLE" default:"true"`
+	}
+
+	LLMLog struct {
+		Bucket               string `env:"OPENCSG_LLMLOG_BUCKET" default:"opencsg-inference-logs"`
+		Prefix               string `env:"OPENCSG_LLMLOG_PREFIX" default:"llmlog"`
+		WorkerNum            int    `env:"OPENCSG_LLMLOG_WORKER_NUM" default:"10"`
+		BatchSize            int    `env:"OPENCSG_LLMLOG_BATCH_SIZE" default:"1000"`
+		FlushIntervalSeconds int    `env:"OPENCSG_LLMLOG_FLUSH_INTERVAL_SECONDS" default:"300"`
 	}
 
 	Integration struct {

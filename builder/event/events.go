@@ -17,7 +17,6 @@ var (
 type EventPublisher struct {
 	SyncInterval int //in minutes
 	MQ           bldmq.MessageQueue
-	Cfg          *config.Config
 }
 
 // NewNatsConnector initializes a new connection to the NATS server
@@ -34,7 +33,6 @@ func InitEventPublisher(cfg *config.Config) error {
 	DefaultEventPublisher = EventPublisher{
 		SyncInterval: cfg.Event.SyncInterval,
 		MQ:           mq,
-		Cfg:          cfg,
 	}
 	return nil
 }
@@ -74,6 +72,23 @@ func (ec *EventPublisher) PublishRechargeEvent(message []byte) error {
 
 	if err != nil {
 		return fmt.Errorf("failed to publish payment recharge event for 3 retries, %w", err)
+	}
+
+	return nil
+}
+
+func (ec *EventPublisher) PublishLLMLogTrainingEvent(message []byte) error {
+	var err error
+	for range 3 {
+		err = ec.MQ.Publish(bldmq.LLMLogSubject, message)
+		if err == nil {
+			break
+		}
+		time.Sleep(1 * time.Second)
+	}
+
+	if err != nil {
+		return fmt.Errorf("failed to publish llmlog training event for 3 retries, %w", err)
 	}
 
 	return nil

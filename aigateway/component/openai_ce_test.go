@@ -431,7 +431,8 @@ func TestOpenAIComponent_GetModelByID(t *testing.T) {
 					OwnedBy:      "testuser",
 					Object:       "model",
 					Created:      deploys[0].CreatedAt.Unix(),
-					OfficialName: "model1",
+					Task:         string(deploys[0].Task),
+					OfficialName: deploys[0].Repository.Name,
 					Metadata: map[string]any{
 						types.MetaKeyLLMType: types.ProviderTypeInference,
 					},

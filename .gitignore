@@ -33,7 +33,6 @@ run_dataviewer_local.sh
 run_notification_local.sh
 run_temporal_worker.sh
 local.toml
-CLAUDE.md
 loki-config.yml
 
 .data

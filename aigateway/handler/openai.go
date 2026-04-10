@@ -29,6 +29,7 @@ import (
 	"opencsg.com/csghub-server/common/errorx"
 	commonType "opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
+	"opencsg.com/csghub-server/common/utils/trace"
 	apicomp "opencsg.com/csghub-server/component"
 )
 
@@ -98,6 +99,7 @@ func newOpenAIHandler(
 		config:              config,
 		storage:             storage,
 		whitelistRule:       whitelistRule,
+		llmLogPublisher:     component.NewLLMLogPublisher(),
 	}
 }
 
@@ -195,6 +197,7 @@ type OpenAIHandlerImpl struct {
 	config              *config.Config
 	storage             types.Storage
 	whitelistRule       database.RepositoryFileCheckRuleStore
+	llmLogPublisher     component.LLMLogPublisher
 }
 
 // ListModels godoc
@@ -415,7 +418,7 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 	}
 
 	var modComponent component.Moderation = nil
-	isCheck, _, err := h.checkSensitive(c.Request.Context(), model, chatReq, userUUID, chatReq.Stream)
+	isCheck, result, err := h.checkSensitive(c.Request.Context(), model, chatReq, userUUID, chatReq.Stream)
 	if err != nil {
 		slog.ErrorContext(c.Request.Context(), "failed to check sensitive",
 			slog.String("model_id", modelID),
@@ -424,12 +427,6 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 	}
 	if isCheck {
 		modComponent = h.modComponent
-		// Create a combined key using userUUID and modelID for caching and tracking
-		key := fmt.Sprintf("%s:%s", userUUID, modelID)
-		result, err := h.modComponent.CheckChatPrompts(c.Request.Context(), chatReq.Messages, key, chatReq.Stream)
-		if err != nil {
-			slog.ErrorContext(c.Request.Context(), "failed to call moderation", slog.Any("error", err))
-		}
 		if result != nil && result.IsSensitive {
 			handleSensitiveResponse(c, chatReq.Stream, result)
 			return
@@ -447,7 +444,28 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 		Provider: model.Provider,
 	})
 
-	w := NewResponseWriterWrapper(c.Writer, chatReq.Stream, modComponent, tokenCounter)
+	logCapture, err := component.NewLLMLogRecorder(
+		trace.GetTraceIDInGinContext(c),
+		modelName,
+		userUUID,
+		commonType.LLMLogRequest{
+			Messages: chatReq.Messages,
+			Tools:    chatReq.Tools,
+			Stream:   chatReq.Stream,
+		},
+		map[string]any{
+			"source":   "aigateway",
+			"api":      "/v1/chat/completions",
+			"stream":   chatReq.Stream,
+			"provider": model.Provider,
+			"svc_name": model.SvcName,
+		},
+	)
+	if err != nil {
+		slog.WarnContext(c.Request.Context(), "failed to initialize llmlog training capture", slog.Any("error", err))
+	}
+
+	w := NewResponseWriterWrapper(c.Writer, chatReq.Stream, modComponent, tokenCounter, logCapture)
 	defer w.ClearBuffer()
 
 	tokenCounter.AppendPrompts(chatReq.Messages)
@@ -482,6 +500,28 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 		err := h.openaiComponent.RecordUsage(usageCtx, userUUID, model, tokenCounter)
 		if err != nil {
 			slog.ErrorContext(usageCtx, "failed to record token usage", slog.Any("error", err))
+		}
+	}()
+
+	go func() {
+		if !h.config.AIGateway.EnableLLMLog || logCapture == nil || h.llmLogPublisher == nil {
+			return
+		}
+		logCtx, cancel := context.WithTimeout(context.WithoutCancel(c.Request.Context()), 3*time.Second)
+		defer cancel()
+
+		record, recordErr := logCapture.Record()
+		if recordErr != nil {
+			slog.ErrorContext(logCtx, "failed to build llmlog training record", slog.Any("error", recordErr))
+			return
+		}
+		payload, marshalErr := json.Marshal(record)
+		if marshalErr != nil {
+			slog.ErrorContext(logCtx, "failed to marshal llmlog training record", slog.Any("error", marshalErr))
+			return
+		}
+		if publishErr := h.llmLogPublisher.PublishTrainingLog(payload); publishErr != nil {
+			slog.ErrorContext(logCtx, "failed to publish llmlog training record", slog.Any("error", publishErr))
 		}
 	}()
 }

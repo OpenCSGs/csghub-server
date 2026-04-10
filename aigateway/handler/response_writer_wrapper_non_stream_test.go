@@ -25,7 +25,7 @@ func TestNonStreamResponseWriter_Write(t *testing.T) {
 		w := httptest.NewRecorder()
 		ctx, _ := gin.CreateTestContext(w)
 		modComponent := component.NewMockModeration(t)
-		nsw := newNonStreamResponseWriter(ctx.Writer, modComponent, nil)
+		nsw := newNonStreamResponseWriter(ctx.Writer, modComponent, nil, nil)
 		// Execute write operation
 		data := []byte("Hello, World!")
 		n, err := nsw.Write(data)
@@ -41,7 +41,7 @@ func TestNonStreamResponseWriter_Write(t *testing.T) {
 		w.Header().Set("Content-Encoding", "")
 		ctx, _ := gin.CreateTestContext(w)
 		modComponent := component.NewMockModeration(t)
-		nsw := newNonStreamResponseWriter(ctx.Writer, modComponent, nil)
+		nsw := newNonStreamResponseWriter(ctx.Writer, modComponent, nil, nil)
 
 		// Create valid ChatCompletion data
 		completion := types.ChatCompletion{
@@ -73,7 +73,7 @@ func TestNonStreamResponseWriter_Write(t *testing.T) {
 		w := httptest.NewRecorder()
 		w.Header().Set("Content-Encoding", "")
 		ctx, _ := gin.CreateTestContext(w)
-		nsw := newNonStreamResponseWriter(ctx.Writer, nil, nil)
+		nsw := newNonStreamResponseWriter(ctx.Writer, nil, nil, nil)
 
 		completion := types.ChatCompletion{
 			ChatCompletion: openai.ChatCompletion{
@@ -100,7 +100,7 @@ func TestNonStreamResponseWriter_Write(t *testing.T) {
 		w.Header().Set("Content-Encoding", "")
 		ctx, _ := gin.CreateTestContext(w)
 		mockMod := component.NewMockModeration(t)
-		nsw := newNonStreamResponseWriter(ctx.Writer, mockMod, nil)
+		nsw := newNonStreamResponseWriter(ctx.Writer, mockMod, nil, nil)
 
 		// Create valid ChatCompletion data without choices
 		completion := types.ChatCompletion{
@@ -128,7 +128,7 @@ func TestNonStreamResponseWriter_WithModeration(t *testing.T) {
 		w.Header().Set("Content-Encoding", "")
 		ctx, _ := gin.CreateTestContext(w)
 		mockMod := component.NewMockModeration(t)
-		nsw := newNonStreamResponseWriter(ctx.Writer, mockMod, nil)
+		nsw := newNonStreamResponseWriter(ctx.Writer, mockMod, nil, nil)
 
 		// Create valid ChatCompletion data
 		completion := types.ChatCompletion{
@@ -162,7 +162,7 @@ func TestNonStreamResponseWriter_WithModeration(t *testing.T) {
 		w.Header().Set("Content-Encoding", "")
 		ctx, _ := gin.CreateTestContext(w)
 		mockMod := component.NewMockModeration(t)
-		nsw := newNonStreamResponseWriter(ctx.Writer, mockMod, nil)
+		nsw := newNonStreamResponseWriter(ctx.Writer, mockMod, nil, nil)
 
 		// Create valid ChatCompletion data
 		completion := types.ChatCompletion{
@@ -200,7 +200,7 @@ func TestNonStreamResponseWriter_compressedData(t *testing.T) {
 		w.Header().Set("Content-Encoding", "gzip")
 		ctx, _ := gin.CreateTestContext(w)
 		mockMod := component.NewMockModeration(t)
-		nsw := newNonStreamResponseWriter(ctx.Writer, mockMod, nil)
+		nsw := newNonStreamResponseWriter(ctx.Writer, mockMod, nil, nil)
 
 		// Create valid ChatCompletion data and compress
 		completion := types.ChatCompletion{
@@ -234,7 +234,7 @@ func TestNonStreamResponseWriter_compressedData(t *testing.T) {
 		w := httptest.NewRecorder()
 		w.Header().Set("Content-Encoding", "gzip")
 		ctx, _ := gin.CreateTestContext(w)
-		nsw := newNonStreamResponseWriter(ctx.Writer, component.NewMockModeration(t), nil)
+		nsw := newNonStreamResponseWriter(ctx.Writer, component.NewMockModeration(t), nil, nil)
 
 		// Create valid ChatCompletion data and compress
 		completion := types.ChatCompletion{
@@ -264,7 +264,7 @@ func TestNonStreamResponseWriter_compressedData(t *testing.T) {
 		w.Header().Set("Content-Encoding", "gzip")
 		ctx, _ := gin.CreateTestContext(w)
 		mockMod := component.NewMockModeration(t)
-		nsw := newNonStreamResponseWriter(ctx.Writer, mockMod, nil)
+		nsw := newNonStreamResponseWriter(ctx.Writer, mockMod, nil, nil)
 
 		// Create valid ChatCompletion data and compress
 		completion := types.ChatCompletion{
@@ -304,7 +304,7 @@ func TestNonStreamResponseWriter_multipleWrites(t *testing.T) {
 		w.Header().Set("Content-Encoding", "")
 		ctx, _ := gin.CreateTestContext(w)
 		mockMod := component.NewMockModeration(t)
-		nsw := newNonStreamResponseWriter(ctx.Writer, mockMod, nil)
+		nsw := newNonStreamResponseWriter(ctx.Writer, mockMod, nil, nil)
 
 		// Create valid ChatCompletion data
 		completion := types.ChatCompletion{
@@ -341,7 +341,7 @@ func TestNonStreamResponseWriter_ClearBuffer(t *testing.T) {
 		// Prepare test data
 		w := httptest.NewRecorder()
 		ctx, _ := gin.CreateTestContext(w)
-		nsw := newNonStreamResponseWriter(ctx.Writer, component.NewMockModeration(t), nil)
+		nsw := newNonStreamResponseWriter(ctx.Writer, component.NewMockModeration(t), nil, nil)
 
 		// Write some data without triggering processing
 		data := []byte("incomplete data")
@@ -363,7 +363,7 @@ func TestNonStreamResponseWriter_HeaderAndWriteHeader(t *testing.T) {
 		// Prepare test data
 		w := httptest.NewRecorder()
 		ctx, _ := gin.CreateTestContext(w)
-		nsw := newNonStreamResponseWriter(ctx.Writer, component.NewMockModeration(t), nil)
+		nsw := newNonStreamResponseWriter(ctx.Writer, component.NewMockModeration(t), nil, nil)
 
 		// Test Header method
 		header := nsw.Header()
