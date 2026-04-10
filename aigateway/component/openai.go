@@ -248,7 +248,7 @@ func (m *openaiComponentImpl) getCSGHubModels(c context.Context, userID int64) (
 				Created:             deploy.CreatedAt.Unix(),
 				SupportFunctionCall: supportFunctionCall,
 				Task:                string(deploy.Task),
-				DisplayName:         repoName,
+				OfficialName:        repoName,
 				Metadata: map[string]any{
 					types.MetaKeyLLMType: providerTypeFromDeployType(deploy.Type),
 				},
@@ -261,6 +261,9 @@ func (m *openaiComponentImpl) getCSGHubModels(c context.Context, userID int64) (
 				SvcType:          deploy.Type,
 				ImageID:          deploy.ImageID,
 				RuntimeFramework: deploy.RuntimeFramework,
+			},
+			ExternalModelInfo: types.ExternalModelInfo{
+				NeedSensitiveCheck: true,
 			},
 		}
 		if deploy.Type == commontypes.ServerlessType {
@@ -325,12 +328,12 @@ func (m *openaiComponentImpl) getExternalModels(c context.Context) []types.Model
 			extModel.Metadata[types.MetaKeyLLMType] = types.ProviderTypeExternalLLM
 			m := types.Model{
 				BaseModel: types.BaseModel{
-					Object:      "model",
-					ID:          extModel.ModelName,
-					OwnedBy:     extModel.Provider,
-					DisplayName: extModel.DisplayName,
-					Metadata:    extModel.Metadata,
-					Task:        task,
+					Object:       "model",
+					ID:           extModel.ModelName,
+					OwnedBy:      extModel.Provider,
+					OfficialName: extModel.OfficialName,
+					Metadata:     extModel.Metadata,
+					Task:         task,
 				},
 				Endpoint: extModel.ApiEndpoint,
 				ExternalModelInfo: types.ExternalModelInfo{

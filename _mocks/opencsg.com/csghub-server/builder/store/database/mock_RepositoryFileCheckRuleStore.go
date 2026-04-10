@@ -305,6 +305,64 @@ func (_c *MockRepositoryFileCheckRuleStore_ListByRuleType_Call) RunAndReturn(run
 	return _c
 }
 
+// MatchRegex provides a mock function with given fields: ctx, ruleType, targetString
+func (_m *MockRepositoryFileCheckRuleStore) MatchRegex(ctx context.Context, ruleType string, targetString string) (bool, error) {
+	ret := _m.Called(ctx, ruleType, targetString)
+
+	if len(ret) == 0 {
+		panic("no return value specified for MatchRegex")
+	}
+
+	var r0 bool
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) (bool, error)); ok {
+		return rf(ctx, ruleType, targetString)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) bool); ok {
+		r0 = rf(ctx, ruleType, targetString)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+		r1 = rf(ctx, ruleType, targetString)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockRepositoryFileCheckRuleStore_MatchRegex_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'MatchRegex'
+type MockRepositoryFileCheckRuleStore_MatchRegex_Call struct {
+	*mock.Call
+}
+
+// MatchRegex is a helper method to define mock.On call
+//   - ctx context.Context
+//   - ruleType string
+//   - targetString string
+func (_e *MockRepositoryFileCheckRuleStore_Expecter) MatchRegex(ctx interface{}, ruleType interface{}, targetString interface{}) *MockRepositoryFileCheckRuleStore_MatchRegex_Call {
+	return &MockRepositoryFileCheckRuleStore_MatchRegex_Call{Call: _e.mock.On("MatchRegex", ctx, ruleType, targetString)}
+}
+
+func (_c *MockRepositoryFileCheckRuleStore_MatchRegex_Call) Run(run func(ctx context.Context, ruleType string, targetString string)) *MockRepositoryFileCheckRuleStore_MatchRegex_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(string))
+	})
+	return _c
+}
+
+func (_c *MockRepositoryFileCheckRuleStore_MatchRegex_Call) Return(_a0 bool, _a1 error) *MockRepositoryFileCheckRuleStore_MatchRegex_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockRepositoryFileCheckRuleStore_MatchRegex_Call) RunAndReturn(run func(context.Context, string, string) (bool, error)) *MockRepositoryFileCheckRuleStore_MatchRegex_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // NewMockRepositoryFileCheckRuleStore creates a new instance of MockRepositoryFileCheckRuleStore. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewMockRepositoryFileCheckRuleStore(t interface {

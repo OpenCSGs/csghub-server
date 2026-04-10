@@ -168,7 +168,7 @@ func TestRepoComponent_SkipSensitiveCheckForWhiteList(t *testing.T) {
 			RepoType:  types.ModelRepo,
 		}
 
-		mockRuleStore.EXPECT().ListByRuleType(ctx, "namespace").Return([]database.RepositoryFileCheckRule{{Pattern: "admin"}}, nil).Once()
+		mockRuleStore.EXPECT().Exists(ctx, database.RuleTypeNamespace, req.Namespace).Return(true, nil).Once()
 		mockRepoStore.EXPECT().FindByPath(ctx, req.RepoType, req.Namespace, req.Name).Return(&database.Repository{ID: 10}, nil).Once()
 		mockRepoStore.EXPECT().UpdateRepoSensitiveCheckStatus(ctx, int64(10), types.SensitiveCheckSkip).Return(nil).Once()
 
@@ -191,7 +191,7 @@ func TestRepoComponent_SkipSensitiveCheckForWhiteList(t *testing.T) {
 			RepoType:  types.ModelRepo,
 		}
 
-		mockRuleStore.EXPECT().ListByRuleType(ctx, "namespace").Return([]database.RepositoryFileCheckRule{{Pattern: "admin"}}, nil).Once()
+		mockRuleStore.EXPECT().Exists(ctx, database.RuleTypeNamespace, req.Namespace).Return(false, nil).Once()
 
 		skipped, err := repoComp.SkipSensitiveCheckForWhiteList(ctx, req)
 		require.NoError(t, err)
@@ -216,7 +216,7 @@ func TestRepoComponent_RepoFullCheck(t *testing.T) {
 			RepoType:  types.ModelRepo,
 		}
 
-		mockRuleStore.EXPECT().ListByRuleType(ctx, "namespace").Return([]database.RepositoryFileCheckRule{{Pattern: "admin"}}, nil).Once()
+		mockRuleStore.EXPECT().Exists(ctx, database.RuleTypeNamespace, req.Namespace).Return(true, nil).Once()
 		mockRepoStore.EXPECT().FindByPath(ctx, req.RepoType, req.Namespace, req.Name).Return(&database.Repository{ID: 10}, nil).Once()
 		mockRepoStore.EXPECT().UpdateRepoSensitiveCheckStatus(ctx, int64(10), types.SensitiveCheckSkip).Return(nil).Once()
 
@@ -241,7 +241,7 @@ func TestRepoComponent_RepoFullCheck(t *testing.T) {
 			RepoType:  types.ModelRepo,
 		}
 
-		mockRuleStore.EXPECT().ListByRuleType(ctx, "namespace").Return([]database.RepositoryFileCheckRule{{Pattern: "admin"}}, nil).Once()
+		mockRuleStore.EXPECT().Exists(ctx, database.RuleTypeNamespace, req.Namespace).Return(false, nil).Once()
 		mockWorkflowClient := mocktemporal.NewMockClient(t)
 		temporal.Assign(mockWorkflowClient)
 		workflowOptions := client.StartWorkflowOptions{

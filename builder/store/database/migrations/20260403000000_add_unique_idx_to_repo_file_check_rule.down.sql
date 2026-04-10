@@ -1,0 +1,1 @@
+DROP INDEX IF EXISTS idx_rule_type_pattern;

@@ -24,6 +24,7 @@ import (
 	"opencsg.com/csghub-server/builder/proxy"
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/cache"
+	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
 	commonType "opencsg.com/csghub-server/common/types"
@@ -72,7 +73,8 @@ func NewOpenAIHandlerFromConfig(config *config.Config) (OpenAIHandler, error) {
 		return nil, fmt.Errorf("failed to create cluster component, error: %w", err)
 	}
 	storage, _ := component.NewStorage(config)
-	return newOpenAIHandler(modelService, repoComp, modComponent, clusterComp, token.NewCounterFactory(), text2image.NewRegistry(), config, storage), nil
+	whitelistRule := database.NewRepositoryFileCheckRuleStore()
+	return newOpenAIHandler(modelService, repoComp, modComponent, clusterComp, token.NewCounterFactory(), text2image.NewRegistry(), config, storage, whitelistRule), nil
 }
 
 func newOpenAIHandler(
@@ -84,6 +86,7 @@ func newOpenAIHandler(
 	t2iRegistry *text2image.Registry,
 	config *config.Config,
 	storage types.Storage,
+	whitelistRule database.RepositoryFileCheckRuleStore,
 ) *OpenAIHandlerImpl {
 	return &OpenAIHandlerImpl{
 		openaiComponent:     modelService,
@@ -94,6 +97,7 @@ func newOpenAIHandler(
 		t2iRegistry:         t2iRegistry,
 		config:              config,
 		storage:             storage,
+		whitelistRule:       whitelistRule,
 	}
 }
 
@@ -126,6 +130,60 @@ func (h *OpenAIHandlerImpl) handleInsufficientBalance(c *gin.Context, isStream b
 	}
 }
 
+func (h *OpenAIHandlerImpl) checkSensitive(ctx context.Context, model *types.Model, chatReq *ChatCompletionRequest, userUUID string, stream bool) (bool, *rpc.CheckResult, error) {
+	if !model.NeedSensitiveCheck {
+		return false, nil, nil
+	}
+
+	if exists, err := h.checkNamespaceWhitelist(ctx, model.OfficialName); err != nil {
+		return false, nil, err
+	} else if exists {
+		slog.DebugContext(ctx, "Skip Sensitive check with OfficialName in white list", slog.String("pattern", model.OfficialName))
+		return false, nil, nil
+	}
+
+	if exists, err := h.checkNamespaceWhitelist(ctx, model.ID); err != nil {
+		return false, nil, err
+	} else if exists {
+		slog.DebugContext(ctx, "Skip Sensitive check with modelID in white list", slog.String("pattern", model.ID))
+		return false, nil, nil
+	}
+
+	// Check model name regex match in white list
+	matched, err := h.whitelistRule.MatchRegex(ctx, database.RuleTypeModelName, model.ID)
+	if err != nil {
+		return false, nil, fmt.Errorf("failed to match model name regex: %w", err)
+	}
+	if matched {
+		slog.DebugContext(ctx, "Skip Sensitive check with MatchRegex in white list", slog.String("RuleTypeModelName", model.ID))
+		return false, nil, nil
+	}
+
+	key := fmt.Sprintf("%s:%s", userUUID, model.ID)
+	result, err := h.modComponent.CheckChatPrompts(ctx, chatReq.Messages, key, stream)
+	if err != nil {
+		return false, nil, fmt.Errorf("failed to call moderation error:%w", err)
+	}
+
+	return true, result, nil
+}
+
+func (h *OpenAIHandlerImpl) checkNamespaceWhitelist(ctx context.Context, modelPath string) (bool, error) {
+	namespace, _, err := common.GetNamespaceAndNameFromPath(modelPath)
+	if err != nil {
+		return false, nil
+	}
+	exists, err := h.whitelistRule.Exists(ctx, database.RuleTypeNamespace, namespace)
+	if err != nil {
+		return false, fmt.Errorf("failed to check namespace in white list: %w", err)
+	}
+	if exists {
+		slog.DebugContext(ctx, "Skip Sensitive check with namespace in white list", slog.String("namespace", namespace))
+		return true, nil
+	}
+	return false, nil
+}
+
 // OpenAIHandlerImpl implements the OpenAIHandler interface
 type OpenAIHandlerImpl struct {
 	openaiComponent     component.OpenAIComponent
@@ -136,6 +194,7 @@ type OpenAIHandlerImpl struct {
 	t2iRegistry         *text2image.Registry
 	config              *config.Config
 	storage             types.Storage
+	whitelistRule       database.RepositoryFileCheckRuleStore
 }
 
 // ListModels godoc
@@ -356,7 +415,14 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 	}
 
 	var modComponent component.Moderation = nil
-	if model.NeedSensitiveCheck {
+	isCheck, _, err := h.checkSensitive(c.Request.Context(), model, chatReq, userUUID, chatReq.Stream)
+	if err != nil {
+		slog.ErrorContext(c.Request.Context(), "failed to check sensitive",
+			slog.String("model_id", modelID),
+			slog.String("username", username),
+			slog.Any("error", err))
+	}
+	if isCheck {
 		modComponent = h.modComponent
 		// Create a combined key using userUUID and modelID for caching and tracking
 		key := fmt.Sprintf("%s:%s", userUUID, modelID)
