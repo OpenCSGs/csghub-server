@@ -32,10 +32,6 @@ func (f *DefaultSMSFactory) CreateSMSClient(config *config.Config) (client.SMSSe
 	switch provider {
 	case ProviderAliyun:
 		return createAliyunSMSClient(config)
-	case ProviderTencent:
-		return createTencentSMSClient(config)
-	case ProviderHuawei:
-		return createHuaweiSMSClient(config)
 	default:
 		slog.Warn("Unknown SMS provider, using default Aliyun", slog.String("provider", string(provider)))
 		return createAliyunSMSClient(config)
@@ -47,14 +43,4 @@ func createAliyunSMSClient(config *config.Config) (client.SMSService, error) {
 	// Call the existing NewAliyunSMSClient function
 	// Note: Need to update the existing NewAliyunSMSClient function to use new config fields
 	return client.NewAliyunSMSClient(config)
-}
-
-// createTencentSMSClient creates Tencent Cloud SMS client
-func createTencentSMSClient(config *config.Config) (client.SMSService, error) {
-	return client.NewTencentSMSClient(config)
-}
-
-// createHuaweiSMSClient creates Huawei Cloud SMS client
-func createHuaweiSMSClient(config *config.Config) (client.SMSService, error) {
-	return client.NewHuaweiSMSClient(config)
 }
