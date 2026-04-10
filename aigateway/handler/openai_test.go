@@ -521,9 +521,28 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 		_ = json.Unmarshal(body, &expectReq)
 		tester.mocks.moderationComp.EXPECT().CheckChatPrompts(mock.Anything, expectReq.Messages, "testuuid:"+model.ID, false).
 			Return(nil, errors.New("some error"))
+		llmTokenCounter := mocktoken.NewMockChatTokenCounter(t)
+		tester.mocks.tokenCounterFactory.EXPECT().NewChat(
+			token.CreateParam{
+				Endpoint: model.Endpoint,
+				Host:     "",
+				Model:    "model1",
+				ImageID:  model.ImageID,
+				Provider: model.Provider,
+			}).
+			Return(llmTokenCounter)
+		llmTokenCounter.EXPECT().AppendPrompts(expectReq.Messages).Return()
+		var wg sync.WaitGroup
+		wg.Add(1)
+		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, "testuuid", model, llmTokenCounter).
+			RunAndReturn(func(ctx context.Context, uuid string, model *types.Model, counter token.Counter) error {
+				wg.Done()
+				return nil
+			})
 		tester.handler.Chat(c)
+		wg.Wait()
 
-		assert.Equal(t, http.StatusInternalServerError, w.Code)
+		assert.Equal(t, http.StatusOK, w.Code)
 	})
 	t.Run("success", func(t *testing.T) {
 		tester, c, w := setupTest(t)

@@ -133,13 +133,15 @@ type Config struct {
 		CheckChain          []string `env:"STARHUB_SERVER_SENSITIVE_CHECK_CHECK_CHAIN" default:"[ac_automaton,mutable_ac_automaton,aliyun_green]"`
 		StreamCheckMode     string   `env:"STARHUB_SERVER_SENSITIVE_CHECK_STREAM_CHECK_MODE" default:"async"` // sync | async
 		AsyncBufferMaxChars int      `env:"STARHUB_SERVER_SENSITIVE_CHECK_ASYNC_BUFFER_MAX_CHARS" default:"50"`
+		// aliyun green max content length: 2000 | qwen guard max content length: 7000
+		MaxContentLength int `env:"STARHUB_SERVER_SENSITIVE_CHECK_MAX_CONTENT_LENGTH" default:"2000"`
 
 		LLM struct {
 			Enable           bool    `env:"STARHUB_SERVER_SENSITIVE_CHECK_LLM_ENABLE" default:"false"`
 			Endpoint         string  `env:"STARHUB_SERVER_SENSITIVE_CHECK_LLM_ENDPOINT"`
 			APIKey           string  `env:"STARHUB_SERVER_SENSITIVE_CHECK_LLM_API_KEY"`
 			GuardModel       string  `env:"STARHUB_SERVER_SENSITIVE_CHECK_LLM_GUARD_MODEL" default:"Qwen/Qwen3Guard-Gen-0.6B"`
-			GuardStreamModel string  `env:"STARHUB_SERVER_SENSITIVE_CHECK_LLM_GUARD_STREAM_MODEL" default:"Qwen/Qwen/Qwen3Guard-Gen-Stream-0.6B"`
+			GuardStreamModel string  `env:"STARHUB_SERVER_SENSITIVE_CHECK_LLM_GUARD_STREAM_MODEL" default:"Qwen/Qwen3Guard-Gen-Stream-0.6B"`
 			TimeoutMS        int     `env:"STARHUB_SERVER_SENSITIVE_CHECK_LLM_TIMEOUT_MS" default:"3000"`
 			MaxTokens        int     `env:"STARHUB_SERVER_SENSITIVE_CHECK_LLM_MAX_TOKENS" default:"128"`
 			Temperature      float64 `env:"STARHUB_SERVER_SENSITIVE_CHECK_LLM_TEMPERATURE" default:"0"`

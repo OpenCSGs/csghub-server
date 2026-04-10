@@ -112,7 +112,7 @@ func (c *OpenAILLMChecker) doCheck(ctx context.Context, req *types.LLMCheckReque
 	if c.config.SensitiveCheck.LLM.APIKey != "" {
 		headers["Authorization"] = "Bearer " + c.config.SensitiveCheck.LLM.APIKey
 	}
-	
+
 	// Retry mechanism for 429
 	var content string
 	var err error

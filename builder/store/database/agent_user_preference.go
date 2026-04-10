@@ -12,11 +12,12 @@ import (
 
 // AgentUserPreference represents a user's preference for an agent-related entity
 type AgentUserPreference struct {
-	ID         int64  `bun:",pk,autoincrement" json:"id"`
-	UserUUID   string `bun:",notnull" json:"user_uuid"`
-	EntityType string `bun:",notnull" json:"entity_type"`         // 'agent_instance', 'agent_knowledge_base', 'agent_template', etc.
-	EntityID   string `bun:",notnull,type:text" json:"entity_id"` // TEXT to support both integer IDs (as strings) and string IDs
-	Action     string `bun:",notnull" json:"action"`              // pin etc.
+	ID         int64          `bun:",pk,autoincrement" json:"id"`
+	UserUUID   string         `bun:",notnull" json:"user_uuid"`
+	EntityType string         `bun:",notnull" json:"entity_type"`                 // 'agent_instance', 'agent_knowledge_base', 'agent_template', etc.
+	EntityID   string         `bun:",notnull,type:text" json:"entity_id"`         // TEXT to support both integer IDs (as strings) and string IDs
+	Action     string         `bun:",notnull" json:"action"`                      // pin, config-instance, etc.
+	Value      map[string]any `bun:",type:jsonb,nullzero" json:"value,omitempty"` // JSONB value for config preferences
 	times
 }
 
@@ -63,13 +64,14 @@ func normalizeEntityID(entityID string) string {
 }
 
 // Create inserts a new AgentUserPreference into the database
+// Uses UPSERT for value-based preferences (updates value if already exists)
 func (s *agentUserPreferenceStoreImpl) Create(ctx context.Context, preference *AgentUserPreference) error {
 	// Normalize entityID before storing
 	preference.EntityID = normalizeEntityID(preference.EntityID)
 
 	_, err := s.db.Core.NewInsert().
 		Model(preference).
-		On("CONFLICT (user_uuid, action, entity_type, entity_id) DO NOTHING").
+		On("CONFLICT (user_uuid, action, entity_type, entity_id) DO UPDATE SET value = EXCLUDED.value").
 		Exec(ctx)
 	if err != nil {
 		return errorx.HandleDBError(err, map[string]any{

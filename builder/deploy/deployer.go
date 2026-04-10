@@ -434,6 +434,10 @@ func (d *deployer) Wakeup(ctx context.Context, dr types.DeployRequest) error {
 
 	// Spawn goroutine to handle HTTP request asynchronously
 	// This ensures the client.Timeout (20s) takes effect instead of the upstream context deadline
+	if len(cluster.AppEndpoint) < 1 {
+		// host is required for remote cluster with app endpoint
+		host = ""
+	}
 	go d.wakeUpDeploy(target, host, dr)
 
 	// Return immediately without waiting for the HTTP request to complete

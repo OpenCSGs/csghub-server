@@ -189,6 +189,7 @@ type InstanceInfo struct {
 	Message    string     `json:"message"`
 	Reason     string     `json:"reason"`
 	ReadyCount int        `json:"ready_count"`
+	IsCreating bool       `json:"is_creating"`
 }
 
 // repo object(cover model/space/code/dataset) for deployer

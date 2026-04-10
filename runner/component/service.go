@@ -365,6 +365,9 @@ func (s *serviceComponentImpl) getServicePodsWithStatus(ctx context.Context, clu
 				readyCount++
 			}
 		}
+		if !instanceInfo.IsCreating {
+			instanceInfo.IsCreating = isContainerCreating(&pod)
+		}
 	}
 	instanceInfo.Instances = podInstances
 	instanceInfo.ReadyCount = readyCount
@@ -929,7 +932,13 @@ func (s *serviceComponentImpl) getServiceStatus(ctx context.Context, ks v1.Servi
 	isActive, containerStatus := isUserContainerActive(instInfo.Instances)
 	switch {
 	case serviceCondition == nil, containerStatus == string(corev1.PodPending):
-		resp.Code = common.Pending
+		slog.DebugContext(ctx, "getServiceStatus for corev1.PodPending",
+			slog.Any("ksvc_name", ks.Name), slog.Any("instance info", instInfo))
+		if instInfo.IsCreating {
+			resp.Code = common.Deploying
+		} else {
+			resp.Code = common.Pending
+		}
 	case serviceCondition.Status == corev1.ConditionUnknown, serviceCondition.Status == corev1.ConditionFalse:
 		resp.Code = common.DeployFailed
 		if isActive && containerStatus == string(corev1.PodRunning) {
