@@ -42,6 +42,7 @@ type CsgbotChatMessage struct {
 }
 
 type CsgbotChatRequest struct {
+	Model    string              `json:"model,omitempty"`
 	Messages []CsgbotChatMessage `json:"messages"`
 	Stream   bool                `json:"stream"`
 }
@@ -482,10 +483,10 @@ func (c *CsgbotSvcHttpClientImpl) CreateOpenClaw(ctx context.Context, userUUID, 
 // DELETE /api/v1/csgbot/openclaw/{id}
 func (c *CsgbotSvcHttpClientImpl) DeleteOpenClaw(ctx context.Context, userUUID, username, token, contentID string) error {
 	rpcErrorCtx := map[string]any{
-		"user_uuid":   userUUID,
-		"content_id":  contentID,
-		"service":     "csgbot",
-		"api":         "DELETE /api/v1/csgbot/openclaw/{id}",
+		"user_uuid":  userUUID,
+		"content_id": contentID,
+		"service":    "csgbot",
+		"api":        "DELETE /api/v1/csgbot/openclaw/{id}",
 	}
 
 	path := c.hc.endpoint + "/api/v1/csgbot/openclaw/" + contentID

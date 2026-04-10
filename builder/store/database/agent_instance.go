@@ -41,6 +41,7 @@ type AgentInstance struct {
 	DeletedAt   time.Time      `bun:",soft_delete,nullzero" json:"deleted_at"`
 	IsPinned    bool           `bun:",scanonly" json:"is_pinned"` // Whether the instance is pinned (from LEFT JOIN, scanonly means not used in INSERT/UPDATE)
 	PinnedAt    *time.Time     `bun:",scanonly" json:"pinned_at"` // When the instance was pinned (from LEFT JOIN)
+	Config      map[string]any `bun:",scanonly" json:"config"`    // Per-user config from agent_user_preferences (config-instance action)
 	times
 }
 
@@ -315,6 +316,7 @@ func (s *agentInstanceStoreImpl) ListByUserUUID(ctx context.Context, userUUID st
 		ColumnExpr("ai.*").
 		ColumnExpr("(pin_pref.id IS NOT NULL) AS is_pinned").
 		ColumnExpr("pin_pref.created_at AS pinned_at").
+		ColumnExpr("config_pref.value AS config").
 		Join(`
         LEFT JOIN agent_user_preferences pin_pref
           ON pin_pref.user_uuid = ?
@@ -322,6 +324,13 @@ func (s *agentInstanceStoreImpl) ListByUserUUID(ctx context.Context, userUUID st
          AND pin_pref.entity_type = ?
          AND pin_pref.entity_id = CAST(ai.id AS TEXT)
     `, userUUID, types.AgentUserPreferenceActionPin, types.AgentUserPreferenceEntityTypeAgentInstance).
+		Join(`
+        LEFT JOIN agent_user_preferences config_pref
+          ON config_pref.user_uuid = ?
+         AND config_pref.action = ?
+         AND config_pref.entity_type = ?
+         AND config_pref.entity_id = CAST(ai.id AS TEXT)
+    `, userUUID, types.AgentUserPreferenceActionConfigInstance, types.AgentUserPreferenceEntityTypeAgentInstance).
 		Where("ai.deleted_at IS NULL").
 		Where("ai.user_uuid = ? OR ai.public = ?", userUUID, true)
 
