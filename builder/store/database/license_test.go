@@ -26,7 +26,7 @@ func TestLicenseStore_CRUD(t *testing.T) {
 		Product:    "test",
 		Edition:    "standard",
 		MaxUser:    10,
-		StartTime:  time.Now(),
+		StartTime:  time.Now().Add(-1 * time.Minute),
 		ExpireTime: time.Now().Add(-1 * time.Hour),
 		UserUUID:   "test-user-uuid",
 		Issuer:     "tester",
@@ -45,6 +45,12 @@ func TestLicenseStore_CRUD(t *testing.T) {
 	l.Company = "bar"
 	err = store.Update(ctx, *l)
 	require.Nil(t, err)
+
+	lVerify := &database.License{}
+	err = db.Core.NewSelect().Model(lVerify).Where("key=?", "key").Scan(ctx, lVerify)
+	require.Nil(t, err)
+	require.Equal(t, "bar", lVerify.Company)
+
 	l, err = store.GetByID(ctx, l.ID)
 	require.Nil(t, err)
 	require.Equal(t, "bar", l.Company)
@@ -56,9 +62,9 @@ func TestLicenseStore_CRUD(t *testing.T) {
 	err = store.Update(ctx, *l)
 	require.Nil(t, err)
 
-	l, err = store.GetLatestActive(ctx)
+	lVerify2 := &database.License{}
+	err = db.Core.NewSelect().Model(lVerify2).Where("key=?", "key").Scan(ctx, lVerify2)
 	require.Nil(t, err)
-	require.Equal(t, "bar", l.Company)
 
 	err = store.Delete(ctx, *l)
 	require.Nil(t, err)
@@ -111,7 +117,7 @@ func TestLicenseStore_List(t *testing.T) {
 					Email: "u1@foo.com", Remark: "foo",
 					MaxUser: 10, StartTime: time.Now(),
 					ExpireTime: time.Now().Add(time.Hour),
-					UserUUID: "user1",
+					UserUUID:   "user1",
 				},
 				{
 					Key: "k2", Product: "p2",
@@ -119,7 +125,7 @@ func TestLicenseStore_List(t *testing.T) {
 					Email: "u2@foo.com", Remark: "foo-v2",
 					MaxUser: 20, StartTime: time.Now(),
 					ExpireTime: time.Now().Add(time.Hour),
-					UserUUID: "user2",
+					UserUUID:   "user2",
 				},
 				{
 					Key: "k3", Product: "p3",
@@ -127,7 +133,7 @@ func TestLicenseStore_List(t *testing.T) {
 					Email: "u1@bar.com", Remark: "bar",
 					MaxUser: 30, StartTime: time.Now(),
 					ExpireTime: time.Now().Add(time.Hour),
-					UserUUID: "user3",
+					UserUUID:   "user3",
 				},
 				{
 					Key: "k4", Product: "p3",
@@ -135,7 +141,7 @@ func TestLicenseStore_List(t *testing.T) {
 					Email: "u1@bar.com", Remark: "bar",
 					MaxUser: 40, StartTime: time.Now(),
 					ExpireTime: time.Now().Add(time.Hour),
-					UserUUID: "user4",
+					UserUUID:   "user4",
 				},
 			}
 			for _, l := range ls {

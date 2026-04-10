@@ -373,6 +373,65 @@ func (_c *MockAccountingPriceComponent_ListPricesBySKUType_Call) RunAndReturn(ru
 	return _c
 }
 
+// ListPricesBySkuTypeAndKinds provides a mock function with given fields: ctx, req
+func (_m *MockAccountingPriceComponent) ListPricesBySkuTypeAndKinds(ctx context.Context, req types.AcctPriceListByKindsReq) ([]database.AccountPrice, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListPricesBySkuTypeAndKinds")
+	}
+
+	var r0 []database.AccountPrice
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.AcctPriceListByKindsReq) ([]database.AccountPrice, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.AcctPriceListByKindsReq) []database.AccountPrice); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.AccountPrice)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.AcctPriceListByKindsReq) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountingPriceComponent_ListPricesBySkuTypeAndKinds_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListPricesBySkuTypeAndKinds'
+type MockAccountingPriceComponent_ListPricesBySkuTypeAndKinds_Call struct {
+	*mock.Call
+}
+
+// ListPricesBySkuTypeAndKinds is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.AcctPriceListByKindsReq
+func (_e *MockAccountingPriceComponent_Expecter) ListPricesBySkuTypeAndKinds(ctx interface{}, req interface{}) *MockAccountingPriceComponent_ListPricesBySkuTypeAndKinds_Call {
+	return &MockAccountingPriceComponent_ListPricesBySkuTypeAndKinds_Call{Call: _e.mock.On("ListPricesBySkuTypeAndKinds", ctx, req)}
+}
+
+func (_c *MockAccountingPriceComponent_ListPricesBySkuTypeAndKinds_Call) Run(run func(ctx context.Context, req types.AcctPriceListByKindsReq)) *MockAccountingPriceComponent_ListPricesBySkuTypeAndKinds_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.AcctPriceListByKindsReq))
+	})
+	return _c
+}
+
+func (_c *MockAccountingPriceComponent_ListPricesBySkuTypeAndKinds_Call) Return(_a0 []database.AccountPrice, _a1 error) *MockAccountingPriceComponent_ListPricesBySkuTypeAndKinds_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountingPriceComponent_ListPricesBySkuTypeAndKinds_Call) RunAndReturn(run func(context.Context, types.AcctPriceListByKindsReq) ([]database.AccountPrice, error)) *MockAccountingPriceComponent_ListPricesBySkuTypeAndKinds_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // UpdatePrice provides a mock function with given fields: ctx, req, id
 func (_m *MockAccountingPriceComponent) UpdatePrice(ctx context.Context, req types.AcctPriceCreateReq, id int64) (*database.AccountPrice, error) {
 	ret := _m.Called(ctx, req, id)

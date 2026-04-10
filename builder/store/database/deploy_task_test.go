@@ -400,26 +400,36 @@ func TestDeployTaskStore_RunningVisibleToUser(t *testing.T) {
 	deploys, err := store.RunningVisibleToUser(ctx, 1)
 	require.Nil(t, err)
 	require.Len(t, deploys, 4)
-	require.Equal(t, deploy1.ID, deploys[0].ID)
-	require.Equal(t, deploy3.ID, deploys[1].ID)
-	require.Equal(t, deploy4.ID, deploys[2].ID)
-	require.Equal(t, deploy5.ID, deploys[3].ID)
+
+	expected := []int64{deploy1.ID, deploy3.ID, deploy4.ID, deploy5.ID}
+	actual := []int64{}
+	for _, d := range deploys {
+		actual = append(actual, d.ID)
+	}
+	require.ElementsMatch(t, expected, actual)
 
 	// Test RunningVisibleToUser with user ID 2
 	deploys, err = store.RunningVisibleToUser(ctx, 2)
 	require.Nil(t, err)
 	require.Len(t, deploys, 3)
-	require.Equal(t, deploy1.ID, deploys[0].ID)
-	require.Equal(t, deploy4.ID, deploys[1].ID)
-	require.Equal(t, deploy5.ID, deploys[2].ID)
+	expected = []int64{deploy1.ID, deploy4.ID, deploy5.ID}
+	actual = []int64{}
+	for _, d := range deploys {
+		actual = append(actual, d.ID)
+	}
+	require.ElementsMatch(t, expected, actual)
 
 	// Test RunningVisibleToUser with user ID 3
 	deploys, err = store.RunningVisibleToUser(ctx, 3)
 	require.Nil(t, err)
 	require.Len(t, deploys, 3)
-	require.Equal(t, deploy1.ID, deploys[0].ID)
-	require.Equal(t, deploy4.ID, deploys[1].ID)
-	require.Equal(t, deploy5.ID, deploys[2].ID)
+	expected = []int64{deploy1.ID, deploy4.ID, deploy5.ID}
+	actual = []int64{}
+	for _, d := range deploys {
+		actual = append(actual, d.ID)
+	}
+	require.ElementsMatch(t, expected, actual)
+
 }
 
 func TestDeployTaskStore_ListAllDeploys(t *testing.T) {

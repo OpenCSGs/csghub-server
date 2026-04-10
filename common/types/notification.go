@@ -185,6 +185,24 @@ const (
 	LarkMessageReceiveIDTypeChatID LarkMessageReceiveIDType = "chat_id"
 )
 
+func (t LarkMessageReceiveIDType) String() string {
+	return string(t)
+}
+
+func (t LarkMessageReceiveIDType) IsValid() bool {
+	switch t {
+	case LarkMessageReceiveIDTypeOpenID, LarkMessageReceiveIDTypeChatID:
+		return true
+	default:
+		return false
+	}
+}
+
+type LarkReceiver struct {
+	Type LarkMessageReceiveIDType `json:"type"`
+	ID   string                   `json:"id"`
+}
+
 type LarkMessage struct {
 	Priority      LarkMessagePriority      `json:"priority"`
 	MsgType       LarkMessageType          `json:"msg_type"`
@@ -322,8 +340,51 @@ type EmailWeeklyRechargesNotification struct {
 }
 
 type SMSReq struct {
-	PhoneNumbers  []string `json:"phone_numbers"`
-	SignName      string   `json:"sign_name"`
-	TemplateCode  string   `json:"template_code"`
-	TemplateParam string   `json:"template_param"`
+	PhoneNumbers []string `json:"phone_numbers"`
+	SignName     string   `json:"sign_name"`
+	TemplateCode string   `json:"template_code"`
+
+	Params    []string          `json:"params"`
+	MapParams map[string]string `json:"map_params"`
+}
+
+type EmailInvoiceCreatedNotification struct {
+	ReceiverEmail string `json:"receiver_email"`
+	UserUUID      string `json:"user_uuid"`
+	Amount        string `json:"amount"`
+}
+
+// EmailGitlabIssueFeedbackNotification gitlab issue feedback email notification parameters
+type EmailGitlabIssueFeedbackNotification struct {
+	UserEmail            string `json:"user_email"`
+	UserName             string `json:"user_name"`
+	Language             string `json:"language"`
+	EventType            string `json:"event_type"` // create, comment, close
+	IssueID              string `json:"issue_id"`
+	IssueTitle           string `json:"issue_title"`
+	Comment              string `json:"comment"`
+	ResolvedIssueVersion string `json:"resolved_issue_version"`
+}
+
+// ModelDatasetRecommendRequest model dataset recommend request
+type ModelDatasetRecommendRequest struct {
+	Models   []ModelRecommendInfo   `json:"models" binding:"required"`
+	Datasets []DatasetRecommendInfo `json:"datasets" binding:"required"`
+}
+
+// ModelRecommendInfo model recommend info
+type ModelRecommendInfo struct {
+	ID          string `json:"id"`
+	Description string `json:"description"`
+}
+
+// DatasetRecommendInfo dataset recommend info
+type DatasetRecommendInfo struct {
+	ID          string `json:"id"`
+	Description string `json:"description"`
+}
+
+// ModelDatasetRecommendResponse model dataset recommend response
+type ModelDatasetRecommendResponse struct {
+	MsgUUID string `json:"msg_uuid"`
 }

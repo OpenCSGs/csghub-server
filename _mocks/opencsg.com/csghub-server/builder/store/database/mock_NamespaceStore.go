@@ -250,6 +250,65 @@ func (_c *MockNamespaceStore_FindByUUID_Call) RunAndReturn(run func(context.Cont
 	return _c
 }
 
+// FindByUUIDs provides a mock function with given fields: ctx, uuids
+func (_m *MockNamespaceStore) FindByUUIDs(ctx context.Context, uuids []string) ([]database.Namespace, error) {
+	ret := _m.Called(ctx, uuids)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FindByUUIDs")
+	}
+
+	var r0 []database.Namespace
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, []string) ([]database.Namespace, error)); ok {
+		return rf(ctx, uuids)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, []string) []database.Namespace); ok {
+		r0 = rf(ctx, uuids)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.Namespace)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, []string) error); ok {
+		r1 = rf(ctx, uuids)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockNamespaceStore_FindByUUIDs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindByUUIDs'
+type MockNamespaceStore_FindByUUIDs_Call struct {
+	*mock.Call
+}
+
+// FindByUUIDs is a helper method to define mock.On call
+//   - ctx context.Context
+//   - uuids []string
+func (_e *MockNamespaceStore_Expecter) FindByUUIDs(ctx interface{}, uuids interface{}) *MockNamespaceStore_FindByUUIDs_Call {
+	return &MockNamespaceStore_FindByUUIDs_Call{Call: _e.mock.On("FindByUUIDs", ctx, uuids)}
+}
+
+func (_c *MockNamespaceStore_FindByUUIDs_Call) Run(run func(ctx context.Context, uuids []string)) *MockNamespaceStore_FindByUUIDs_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].([]string))
+	})
+	return _c
+}
+
+func (_c *MockNamespaceStore_FindByUUIDs_Call) Return(_a0 []database.Namespace, _a1 error) *MockNamespaceStore_FindByUUIDs_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockNamespaceStore_FindByUUIDs_Call) RunAndReturn(run func(context.Context, []string) ([]database.Namespace, error)) *MockNamespaceStore_FindByUUIDs_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // NewMockNamespaceStore creates a new instance of MockNamespaceStore. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewMockNamespaceStore(t interface {

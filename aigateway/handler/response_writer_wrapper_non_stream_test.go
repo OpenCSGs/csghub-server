@@ -69,6 +69,31 @@ func TestNonStreamResponseWriter_Write(t *testing.T) {
 		require.Equal(t, len(data), n)
 	})
 
+	t.Run("write with nil moderation component", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		w.Header().Set("Content-Encoding", "")
+		ctx, _ := gin.CreateTestContext(w)
+		nsw := newNonStreamResponseWriter(ctx.Writer, nil, nil)
+
+		completion := types.ChatCompletion{
+			ChatCompletion: openai.ChatCompletion{
+				Choices: []openai.ChatCompletionChoice{
+					{
+						Message: openai.ChatCompletionMessage{
+							Content: "This is a test response",
+						},
+					},
+				},
+			},
+		}
+
+		data, _ := json.Marshal(completion)
+		n, err := nsw.Write(data)
+
+		require.NoError(t, err)
+		require.Equal(t, len(data), n)
+	})
+
 	t.Run("write with empty choices", func(t *testing.T) {
 		// Prepare test data
 		w := httptest.NewRecorder()
