@@ -3,6 +3,7 @@ package database_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/builder/store/database"
@@ -145,7 +146,7 @@ func TestClusterStore_BatchUpdateStatus(t *testing.T) {
 		},
 	}
 
-	err = store.BatchUpdateStatus(ctx, statusEvent)
+	err = store.BatchUpdateStatus(ctx, statusEvent, time.Now())
 	require.Nil(t, err)
 
 	c1, err := store.ByClusterID(ctx, cls1.ClusterID)
@@ -167,6 +168,93 @@ func TestClusterStore_BatchUpdateStatus(t *testing.T) {
 	workflow1, err := workflowStore.FindByTaskID(ctx, "workflow-1")
 	require.Nil(t, err)
 	require.Equal(t, "node-3", workflow1.ClusterNode)
+}
+
+func TestClusterStore_UpdateByClusterID(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewClusterInfoStoreWithDB(db)
+
+	// Insert new cluster
+	clusterInfo1 := types.ClusterEvent{
+		ClusterID: "cluster-1",
+		Region:    "region-a",
+		Zone:      "zone-a",
+	}
+	err := store.UpdateByClusterID(ctx, clusterInfo1)
+	require.NoError(t, err)
+
+	// Verify insertion
+	persistedCluster1, err := store.ByClusterID(ctx, "cluster-1")
+	require.NoError(t, err)
+	require.Equal(t, "region-a", persistedCluster1.Region)
+	require.Equal(t, "zone-a", persistedCluster1.Zone)
+	require.True(t, persistedCluster1.Enable)
+
+	// Update existing cluster
+	clusterInfo2 := types.ClusterEvent{
+		ClusterID: "cluster-1",
+		Region:    "region-b",
+		Zone:      "zone-b",
+	}
+	err = store.UpdateByClusterID(ctx, clusterInfo2)
+	require.NoError(t, err)
+
+	// Verify update
+	persistedCluster2, err := store.ByClusterID(ctx, "cluster-1")
+	require.NoError(t, err)
+	require.Equal(t, "region-b", persistedCluster2.Region)
+	require.Equal(t, "zone-b", persistedCluster2.Zone)
+	require.True(t, persistedCluster2.Enable)
+}
+
+func TestClusterStore_BatchUpdateStatus_OfflineTimeout(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewClusterInfoStoreWithDB(db)
+
+	// Create a cluster
+	cluster, err := store.Add(ctx, "test-config", "test-region", types.ConnectModeKubeConfig)
+	require.NoError(t, err)
+
+	// Create a node with "Ready" status
+	node := &database.ClusterNode{
+		ClusterID: cluster.ClusterID,
+		Name:      "test-node",
+		Status:    "Ready",
+	}
+	_, err = db.Core.NewInsert().Model(node).Exec(ctx)
+	require.NoError(t, err)
+	require.NotZero(t, node.ID)
+
+	// Manually set the node's updated_at to more than 240 seconds ago
+	oldTime := time.Now().Add(-250 * time.Second)
+	_, err = db.Core.NewUpdate().Model(&database.ClusterNode{}).
+		Set("updated_at = ?", oldTime).
+		Where("id = ?", node.ID).
+		Exec(ctx)
+	require.NoError(t, err)
+
+	// Call BatchUpdateStatus (which should trigger the offline timeout logic)
+	// Even with empty status event, the timeout logic should run
+	statusEvent := []*types.ClusterRes{
+		{
+			ClusterID: cluster.ClusterID,
+			Status:    types.ClusterStatusRunning,
+			Resources: []types.NodeResourceInfo{},
+		},
+	}
+	err = store.BatchUpdateStatus(ctx, statusEvent, time.Now())
+	require.NoError(t, err)
+
+	// Verify the node status is updated to "Offline"
+	updatedNode, err := store.GetClusterNodeByID(ctx, node.ID)
+	require.NoError(t, err)
+	require.Equal(t, string(types.NodeStatusOffline), updatedNode.Status)
 }
 
 func TestClusterStore_ListAllNodes(t *testing.T) {

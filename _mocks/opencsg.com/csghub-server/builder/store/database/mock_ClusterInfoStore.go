@@ -8,6 +8,8 @@ import (
 	mock "github.com/stretchr/testify/mock"
 	database "opencsg.com/csghub-server/builder/store/database"
 
+	time "time"
+
 	types "opencsg.com/csghub-server/common/types"
 )
 
@@ -192,17 +194,17 @@ func (_c *MockClusterInfoStore_AddNodeOwnership_Call) RunAndReturn(run func(cont
 	return _c
 }
 
-// BatchUpdateStatus provides a mock function with given fields: ctx, statusEvent
-func (_m *MockClusterInfoStore) BatchUpdateStatus(ctx context.Context, statusEvent []*types.ClusterRes) error {
-	ret := _m.Called(ctx, statusEvent)
+// BatchUpdateStatus provides a mock function with given fields: ctx, statusEvent, cutoffTime
+func (_m *MockClusterInfoStore) BatchUpdateStatus(ctx context.Context, statusEvent []*types.ClusterRes, cutoffTime time.Time) error {
+	ret := _m.Called(ctx, statusEvent, cutoffTime)
 
 	if len(ret) == 0 {
 		panic("no return value specified for BatchUpdateStatus")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, []*types.ClusterRes) error); ok {
-		r0 = rf(ctx, statusEvent)
+	if rf, ok := ret.Get(0).(func(context.Context, []*types.ClusterRes, time.Time) error); ok {
+		r0 = rf(ctx, statusEvent, cutoffTime)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -218,13 +220,14 @@ type MockClusterInfoStore_BatchUpdateStatus_Call struct {
 // BatchUpdateStatus is a helper method to define mock.On call
 //   - ctx context.Context
 //   - statusEvent []*types.ClusterRes
-func (_e *MockClusterInfoStore_Expecter) BatchUpdateStatus(ctx interface{}, statusEvent interface{}) *MockClusterInfoStore_BatchUpdateStatus_Call {
-	return &MockClusterInfoStore_BatchUpdateStatus_Call{Call: _e.mock.On("BatchUpdateStatus", ctx, statusEvent)}
+//   - cutoffTime time.Time
+func (_e *MockClusterInfoStore_Expecter) BatchUpdateStatus(ctx interface{}, statusEvent interface{}, cutoffTime interface{}) *MockClusterInfoStore_BatchUpdateStatus_Call {
+	return &MockClusterInfoStore_BatchUpdateStatus_Call{Call: _e.mock.On("BatchUpdateStatus", ctx, statusEvent, cutoffTime)}
 }
 
-func (_c *MockClusterInfoStore_BatchUpdateStatus_Call) Run(run func(ctx context.Context, statusEvent []*types.ClusterRes)) *MockClusterInfoStore_BatchUpdateStatus_Call {
+func (_c *MockClusterInfoStore_BatchUpdateStatus_Call) Run(run func(ctx context.Context, statusEvent []*types.ClusterRes, cutoffTime time.Time)) *MockClusterInfoStore_BatchUpdateStatus_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].([]*types.ClusterRes))
+		run(args[0].(context.Context), args[1].([]*types.ClusterRes), args[2].(time.Time))
 	})
 	return _c
 }
@@ -234,7 +237,7 @@ func (_c *MockClusterInfoStore_BatchUpdateStatus_Call) Return(_a0 error) *MockCl
 	return _c
 }
 
-func (_c *MockClusterInfoStore_BatchUpdateStatus_Call) RunAndReturn(run func(context.Context, []*types.ClusterRes) error) *MockClusterInfoStore_BatchUpdateStatus_Call {
+func (_c *MockClusterInfoStore_BatchUpdateStatus_Call) RunAndReturn(run func(context.Context, []*types.ClusterRes, time.Time) error) *MockClusterInfoStore_BatchUpdateStatus_Call {
 	_c.Call.Return(run)
 	return _c
 }

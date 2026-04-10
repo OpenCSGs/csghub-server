@@ -7,6 +7,7 @@ bin
 .trae
 .cursor
 .claude
+.sisyphus
 
 .DS_Store
 .envrc
