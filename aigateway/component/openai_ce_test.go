@@ -87,8 +87,6 @@ func TestOpenAIComponent_GetAvailableModels(t *testing.T) {
 		mockLLMConfigStore.EXPECT().Index(mock.Anything, 50, 1, mock.Anything).
 			Return([]*database.LLMConfig{}, 0, nil)
 
-		// Must match JSON produced by saveModelsToCache (getCSGHubModels + ForInternalUse):
-		// DisplayName is Repository.Name; NeedSensitiveCheck is unset (false) on CSGHub models.
 		expectModels := []types.Model{
 			{
 				BaseModel: types.BaseModel{
@@ -97,7 +95,7 @@ func TestOpenAIComponent_GetAvailableModels(t *testing.T) {
 					Object:       "model",
 					Created:      deploys[0].CreatedAt.Unix(),
 					Task:         "text-generation",
-					OfficialName: deploys[0].Repository.Name,
+					OfficialName: "model1",
 					Metadata: map[string]any{
 						types.MetaKeyLLMType: types.ProviderTypeInference,
 					},
@@ -111,16 +109,18 @@ func TestOpenAIComponent_GetAvailableModels(t *testing.T) {
 					SvcType:       deploys[0].Type,
 					ImageID:       deploys[0].ImageID,
 				},
+				ExternalModelInfo: types.ExternalModelInfo{
+					NeedSensitiveCheck: true,
+				},
 				InternalUse: true,
 			},
 			{
 				BaseModel: types.BaseModel{
-					ID:           "hf-model2:svc2",
-					OwnedBy:      "OpenCSG",
-					Object:       "model",
-					Created:      deploys[1].CreatedAt.Unix(),
-					Task:         "text-to-image",
-					OfficialName: deploys[1].Repository.Name,
+					ID:      "hf-model2:svc2",
+					OwnedBy: "OpenCSG",
+					Object:  "model",
+					Created: deploys[1].CreatedAt.Unix(),
+					Task:    "text-to-image",
 					Metadata: map[string]any{
 						types.MetaKeyLLMType: types.ProviderTypeServerless,
 					},
@@ -132,6 +132,9 @@ func TestOpenAIComponent_GetAvailableModels(t *testing.T) {
 					SvcName:   deploys[1].SvcName,
 					SvcType:   deploys[1].Type,
 					ImageID:   deploys[1].ImageID,
+				},
+				ExternalModelInfo: types.ExternalModelInfo{
+					NeedSensitiveCheck: true,
 				},
 				InternalUse: true,
 			},
@@ -216,7 +219,7 @@ func TestOpenAIComponent_GetAvailableModels(t *testing.T) {
 					Object:       "model",
 					Created:      deploys[0].CreatedAt.Unix(),
 					Task:         "text-generation",
-					OfficialName: deploys[0].Repository.Name,
+					OfficialName: "model1",
 					Metadata: map[string]any{
 						types.MetaKeyLLMType: types.ProviderTypeInference,
 					},
@@ -230,16 +233,18 @@ func TestOpenAIComponent_GetAvailableModels(t *testing.T) {
 					SvcType:       deploys[0].Type,
 					ImageID:       deploys[0].ImageID,
 				},
+				ExternalModelInfo: types.ExternalModelInfo{
+					NeedSensitiveCheck: true,
+				},
 				InternalUse: true,
 			},
 			{
 				BaseModel: types.BaseModel{
-					ID:           "hf-model2:svc2",
-					OwnedBy:      "OpenCSG",
-					Object:       "model",
-					Created:      deploys[1].CreatedAt.Unix(),
-					Task:         "text-to-image",
-					OfficialName: deploys[1].Repository.Name,
+					ID:      "hf-model2:svc2",
+					OwnedBy: "OpenCSG",
+					Object:  "model",
+					Created: deploys[1].CreatedAt.Unix(),
+					Task:    "text-to-image",
 					Metadata: map[string]any{
 						types.MetaKeyLLMType: types.ProviderTypeServerless,
 					},
@@ -252,6 +257,9 @@ func TestOpenAIComponent_GetAvailableModels(t *testing.T) {
 					SvcName:       deploys[1].SvcName,
 					SvcType:       deploys[1].Type,
 					ImageID:       deploys[1].ImageID,
+				},
+				ExternalModelInfo: types.ExternalModelInfo{
+					NeedSensitiveCheck: true,
 				},
 				InternalUse: true,
 			},
@@ -330,7 +338,7 @@ func TestOpenAIComponent_GetAvailableModels(t *testing.T) {
 					Object:       "model",
 					Created:      deploys[0].CreatedAt.Unix(),
 					Task:         "text-generation",
-					OfficialName: deploys[0].Repository.Name,
+					OfficialName: "model3",
 					Metadata: map[string]any{
 						types.MetaKeyLLMType: types.ProviderTypeInference,
 					},
@@ -343,6 +351,9 @@ func TestOpenAIComponent_GetAvailableModels(t *testing.T) {
 					SvcName:       deploys[0].SvcName,
 					SvcType:       deploys[0].Type,
 					ImageID:       deploys[0].ImageID,
+				},
+				ExternalModelInfo: types.ExternalModelInfo{
+					NeedSensitiveCheck: true,
 				},
 				InternalUse: true,
 			},
@@ -435,6 +446,9 @@ func TestOpenAIComponent_GetModelByID(t *testing.T) {
 					SvcType:       deploys[0].Type,
 					ImageID:       deploys[0].ImageID,
 				},
+				ExternalModelInfo: types.ExternalModelInfo{
+					NeedSensitiveCheck: true,
+				},
 				InternalUse: true,
 			},
 		}
@@ -506,11 +520,12 @@ func TestOpenAIComponent_GetModelByID(t *testing.T) {
 		deploys[0].CreatedAt = now
 		expectModel := types.Model{
 			BaseModel: types.BaseModel{
-				ID:      "model1:svc1",
-				OwnedBy: "testuser",
-				Object:  "model",
-				Created: deploys[0].CreatedAt.Unix(),
-				Task:    "text-generation",
+				ID:           "model1:svc1",
+				OwnedBy:      "testuser",
+				Object:       "model",
+				Created:      deploys[0].CreatedAt.Unix(),
+				Task:         "text-generation",
+				OfficialName: "model1",
 				Metadata: map[string]any{
 					types.MetaKeyLLMType: types.ProviderTypeInference,
 				},

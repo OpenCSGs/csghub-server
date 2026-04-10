@@ -75,15 +75,12 @@ func (c *repoComponentImpl) UpdateRepoSensitiveCheckStatus(ctx context.Context, 
 }
 
 func (c *repoComponentImpl) SkipSensitiveCheckForWhiteList(ctx context.Context, req RepoFullCheckRequest) (bool, error) {
-	whiteList, err := c.GetNamespaceWhiteList(ctx)
+	exists, err := c.whitelistRule.Exists(ctx, database.RuleTypeNamespace, req.Namespace)
 	if err != nil {
-		return false, fmt.Errorf("failed to get namespace white list: %w", err)
+		return false, fmt.Errorf("failed to check namespace in white list: %w", err)
 	}
 
-	for _, rule := range whiteList {
-		if req.Namespace != rule {
-			continue
-		}
+	if exists {
 		repo, err := c.GetRepo(ctx, req.RepoType, req.Namespace, req.Name)
 		if err != nil {
 			return false, fmt.Errorf("failed to get repo for skip sensitive check, namespace: %s, name: %s, error: %w", req.Namespace, req.Name, err)
@@ -246,7 +243,7 @@ func (cc *repoComponentImpl) CheckRequestV2(ctx context.Context, req types.Sensi
 }
 
 func (c *repoComponentImpl) GetNamespaceWhiteList(ctx context.Context) ([]string, error) {
-	namespaceWhiteList, err := c.whitelistRule.ListByRuleType(ctx, "namespace")
+	namespaceWhiteList, err := c.whitelistRule.ListByRuleType(ctx, database.RuleTypeNamespace)
 	if err != nil {
 		return nil, err
 	}

@@ -262,6 +262,9 @@ func (m *openaiComponentImpl) getCSGHubModels(c context.Context, userID int64) (
 				ImageID:          deploy.ImageID,
 				RuntimeFramework: deploy.RuntimeFramework,
 			},
+			ExternalModelInfo: types.ExternalModelInfo{
+				NeedSensitiveCheck: true,
+			},
 		}
 		if deploy.Type == commontypes.ServerlessType {
 			m.BaseModel.OwnedBy = "OpenCSG"
@@ -328,7 +331,7 @@ func (m *openaiComponentImpl) getExternalModels(c context.Context) []types.Model
 					Object:       "model",
 					ID:           extModel.ModelName,
 					OwnedBy:      extModel.Provider,
-					OfficialName: extModel.DisplayName,
+					OfficialName: extModel.OfficialName,
 					Metadata:     extModel.Metadata,
 					Task:         task,
 				},

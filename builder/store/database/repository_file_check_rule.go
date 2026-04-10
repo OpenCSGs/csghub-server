@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"strings"
 	"time"
 )
 
@@ -40,6 +41,7 @@ func NewRepositoryFileCheckRuleStoreWithDB(db *DB) RepositoryFileCheckRuleStore 
 }
 
 func (s *repositoryFileCheckRuleStore) Create(ctx context.Context, ruleType, pattern string) (*RepositoryFileCheckRule, error) {
+	pattern = strings.ToLower(pattern)
 	rule := &RepositoryFileCheckRule{RuleType: ruleType, Pattern: pattern}
 	_, err := s.db.Operator.Core.NewInsert().Model(rule).Exec(ctx)
 	return rule, err
@@ -58,6 +60,7 @@ func (s *repositoryFileCheckRuleStore) ListByRuleType(ctx context.Context, ruleT
 }
 
 func (s *repositoryFileCheckRuleStore) Delete(ctx context.Context, ruleType, pattern string) error {
+	pattern = strings.ToLower(pattern)
 	_, err := s.db.Operator.Core.NewDelete().Model((*RepositoryFileCheckRule)(nil)).
 		Where("rule_type = ?", ruleType).
 		Where("pattern = ?", pattern).
@@ -66,6 +69,7 @@ func (s *repositoryFileCheckRuleStore) Delete(ctx context.Context, ruleType, pat
 }
 
 func (s *repositoryFileCheckRuleStore) Exists(ctx context.Context, ruleType, pattern string) (bool, error) {
+	pattern = strings.ToLower(pattern)
 	exists, err := s.db.Operator.Core.NewSelect().Model((*RepositoryFileCheckRule)(nil)).
 		Where("rule_type = ?", ruleType).
 		Where("pattern = ?", pattern).
