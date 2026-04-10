@@ -1,3 +1,5 @@
+//go:build !ee && !saas
+
 package factory
 
 import (
@@ -11,9 +13,7 @@ import (
 type ProviderType string
 
 const (
-	ProviderAliyun  ProviderType = "aliyun"
-	ProviderTencent ProviderType = "tencent"
-	ProviderHuawei  ProviderType = "huawei"
+	ProviderAliyun ProviderType = "aliyun"
 )
 
 type SMSFactory interface {

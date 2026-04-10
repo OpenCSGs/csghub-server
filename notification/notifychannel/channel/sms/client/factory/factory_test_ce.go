@@ -1,3 +1,5 @@
+//go:build !ee && !saas
+
 package factory
 
 import (
@@ -69,8 +71,6 @@ func TestProviderTypeConstants(t *testing.T) {
 		expected string
 	}{
 		{"Aliyun", ProviderAliyun, "aliyun"},
-		{"Tencent Cloud", ProviderTencent, "tencent"},
-		{"Huawei Cloud", ProviderHuawei, "huawei"},
 	}
 
 	for _, tt := range tests {
