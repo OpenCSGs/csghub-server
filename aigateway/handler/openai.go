@@ -137,27 +137,13 @@ func (h *OpenAIHandlerImpl) checkSensitive(ctx context.Context, model *types.Mod
 		return false, nil, nil
 	}
 
-	if exists, err := h.checkNamespaceWhitelist(ctx, model.OfficialName); err != nil {
-		return false, nil, err
-	} else if exists {
-		slog.DebugContext(ctx, "Skip Sensitive check with OfficialName in white list", slog.String("pattern", model.OfficialName))
-		return false, nil, nil
-	}
-
-	if exists, err := h.checkNamespaceWhitelist(ctx, model.ID); err != nil {
-		return false, nil, err
-	} else if exists {
-		slog.DebugContext(ctx, "Skip Sensitive check with modelID in white list", slog.String("pattern", model.ID))
-		return false, nil, nil
-	}
-
-	// Check model name regex match in white list
-	matched, err := h.whitelistRule.MatchRegex(ctx, database.RuleTypeModelName, model.ID)
+	namespaceTargets := buildNamespaceTargets(model.OfficialName, model.ID)
+	rules, err := h.whitelistRule.ListBySensitiveCheckTargets(ctx, namespaceTargets, model.ID)
 	if err != nil {
-		return false, nil, fmt.Errorf("failed to match model name regex: %w", err)
+		return false, nil, fmt.Errorf("failed to query white list rules: %w", err)
 	}
-	if matched {
-		slog.DebugContext(ctx, "Skip Sensitive check with MatchRegex in white list", slog.String("RuleTypeModelName", model.ID))
+	if len(rules) != 0 {
+		slog.DebugContext(ctx, "Skip Sensitive check with white list", slog.Any("rule", rules[0]))
 		return false, nil, nil
 	}
 
@@ -170,20 +156,38 @@ func (h *OpenAIHandlerImpl) checkSensitive(ctx context.Context, model *types.Mod
 	return true, result, nil
 }
 
-func (h *OpenAIHandlerImpl) checkNamespaceWhitelist(ctx context.Context, modelPath string) (bool, error) {
-	namespace, _, err := common.GetNamespaceAndNameFromPath(modelPath)
-	if err != nil {
-		return false, nil
+func buildNamespaceTargets(officialName, modelID string) []string {
+	targetSet := make(map[string]struct{}, 2)
+	targets := make([]string, 0, 2)
+	if namespace := extractNamespaceTarget(officialName); namespace != "" {
+		if _, exists := targetSet[namespace]; !exists {
+			targetSet[namespace] = struct{}{}
+			targets = append(targets, namespace)
+		}
 	}
-	exists, err := h.whitelistRule.Exists(ctx, database.RuleTypeNamespace, namespace)
-	if err != nil {
-		return false, fmt.Errorf("failed to check namespace in white list: %w", err)
+	if namespace := extractNamespaceTarget(modelID); namespace != "" {
+		if _, exists := targetSet[namespace]; !exists {
+			targetSet[namespace] = struct{}{}
+			targets = append(targets, namespace)
+		}
 	}
-	if exists {
-		slog.DebugContext(ctx, "Skip Sensitive check with namespace in white list", slog.String("namespace", namespace))
-		return true, nil
+	return targets
+}
+
+func extractNamespaceTarget(path string) string {
+	normalizedPath := strings.Trim(strings.TrimSpace(path), "/")
+	if normalizedPath == "" {
+		return ""
 	}
-	return false, nil
+	parts := strings.Split(normalizedPath, "/")
+	if len(parts) == 0 {
+		return ""
+	}
+	namespace := strings.ToLower(strings.TrimSpace(parts[0]))
+	if namespace == "" {
+		return ""
+	}
+	return namespace
 }
 
 // OpenAIHandlerImpl implements the OpenAIHandler interface

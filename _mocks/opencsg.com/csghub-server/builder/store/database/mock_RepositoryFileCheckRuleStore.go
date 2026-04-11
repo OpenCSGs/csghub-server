@@ -305,6 +305,66 @@ func (_c *MockRepositoryFileCheckRuleStore_ListByRuleType_Call) RunAndReturn(run
 	return _c
 }
 
+// ListBySensitiveCheckTargets provides a mock function with given fields: ctx, namespaces, modelID
+func (_m *MockRepositoryFileCheckRuleStore) ListBySensitiveCheckTargets(ctx context.Context, namespaces []string, modelID string) ([]database.RepositoryFileCheckRule, error) {
+	ret := _m.Called(ctx, namespaces, modelID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListBySensitiveCheckTargets")
+	}
+
+	var r0 []database.RepositoryFileCheckRule
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, []string, string) ([]database.RepositoryFileCheckRule, error)); ok {
+		return rf(ctx, namespaces, modelID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, []string, string) []database.RepositoryFileCheckRule); ok {
+		r0 = rf(ctx, namespaces, modelID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.RepositoryFileCheckRule)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, []string, string) error); ok {
+		r1 = rf(ctx, namespaces, modelID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockRepositoryFileCheckRuleStore_ListBySensitiveCheckTargets_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListBySensitiveCheckTargets'
+type MockRepositoryFileCheckRuleStore_ListBySensitiveCheckTargets_Call struct {
+	*mock.Call
+}
+
+// ListBySensitiveCheckTargets is a helper method to define mock.On call
+//   - ctx context.Context
+//   - namespaces []string
+//   - modelID string
+func (_e *MockRepositoryFileCheckRuleStore_Expecter) ListBySensitiveCheckTargets(ctx interface{}, namespaces interface{}, modelID interface{}) *MockRepositoryFileCheckRuleStore_ListBySensitiveCheckTargets_Call {
+	return &MockRepositoryFileCheckRuleStore_ListBySensitiveCheckTargets_Call{Call: _e.mock.On("ListBySensitiveCheckTargets", ctx, namespaces, modelID)}
+}
+
+func (_c *MockRepositoryFileCheckRuleStore_ListBySensitiveCheckTargets_Call) Run(run func(ctx context.Context, namespaces []string, modelID string)) *MockRepositoryFileCheckRuleStore_ListBySensitiveCheckTargets_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].([]string), args[2].(string))
+	})
+	return _c
+}
+
+func (_c *MockRepositoryFileCheckRuleStore_ListBySensitiveCheckTargets_Call) Return(_a0 []database.RepositoryFileCheckRule, _a1 error) *MockRepositoryFileCheckRuleStore_ListBySensitiveCheckTargets_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockRepositoryFileCheckRuleStore_ListBySensitiveCheckTargets_Call) RunAndReturn(run func(context.Context, []string, string) ([]database.RepositoryFileCheckRule, error)) *MockRepositoryFileCheckRuleStore_ListBySensitiveCheckTargets_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // MatchRegex provides a mock function with given fields: ctx, ruleType, targetString
 func (_m *MockRepositoryFileCheckRuleStore) MatchRegex(ctx context.Context, ruleType string, targetString string) (bool, error) {
 	ret := _m.Called(ctx, ruleType, targetString)

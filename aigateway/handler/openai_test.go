@@ -72,8 +72,7 @@ func setupTest(t *testing.T) (*testerOpenAIHandler, *gin.Context, *httptest.Resp
 	tester.mocks.tokenCounterFactory = mockTokenCounterFactory
 	tester.mocks.whitelistRule = mockWhitelistRule
 
-	tester.mocks.whitelistRule.EXPECT().Exists(mock.Anything, database.RuleTypeNamespace, mock.Anything).Return(false, nil).Maybe()
-	tester.mocks.whitelistRule.EXPECT().MatchRegex(mock.Anything, database.RuleTypeModelName, mock.Anything).Return(false, nil).Maybe()
+	tester.mocks.whitelistRule.EXPECT().ListBySensitiveCheckTargets(mock.Anything, mock.Anything, mock.Anything).Return([]database.RepositoryFileCheckRule{}, nil).Maybe()
 
 	return tester, c, w
 }
