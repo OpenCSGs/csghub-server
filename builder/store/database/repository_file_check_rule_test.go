@@ -107,3 +107,33 @@ func TestRepositoryFileCheckRuleStore_Exists(t *testing.T) {
 	require.NoError(t, err)
 	require.False(t, exists)
 }
+
+func TestRepositoryFileCheckRuleStore_ListBySensitiveCheckTargets(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	store := database.NewRepositoryFileCheckRuleStoreWithDB(db)
+	ctx := context.Background()
+
+	_, err := store.Create(ctx, database.RuleTypeNamespace, "unitns-a")
+	require.NoError(t, err)
+	_, err = store.Create(ctx, database.RuleTypeNamespace, "unitns-b")
+	require.NoError(t, err)
+	_, err = store.Create(ctx, database.RuleTypeModelName, "unitns-a/model-a")
+	require.NoError(t, err)
+	_, err = store.Create(ctx, "file_ext", ".unitzip")
+	require.NoError(t, err)
+
+	rules, err := store.ListBySensitiveCheckTargets(ctx, []string{"unitns-a", "meta"}, "unitns-a/model-a")
+	require.NoError(t, err)
+	require.Len(t, rules, 2)
+
+	result := map[string]bool{
+		database.RuleTypeNamespace + ":unitns-a":      false,
+		database.RuleTypeModelName + ":unitns-a/model-a": false,
+	}
+	for _, rule := range rules {
+		result[rule.RuleType+":"+rule.Pattern] = true
+	}
+	require.True(t, result[database.RuleTypeNamespace+":unitns-a"])
+	require.True(t, result[database.RuleTypeModelName+":unitns-a/model-a"])
+}

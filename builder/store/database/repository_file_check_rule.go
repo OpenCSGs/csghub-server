@@ -4,6 +4,8 @@ import (
 	"context"
 	"strings"
 	"time"
+
+	"github.com/uptrace/bun"
 )
 
 const (
@@ -26,6 +28,7 @@ type RepositoryFileCheckRuleStore interface {
 	Delete(ctx context.Context, ruleType, pattern string) error
 	Exists(ctx context.Context, ruleType, pattern string) (bool, error)
 	MatchRegex(ctx context.Context, ruleType, targetString string) (bool, error)
+	ListBySensitiveCheckTargets(ctx context.Context, namespaces []string, modelID string) ([]RepositoryFileCheckRule, error)
 }
 
 type repositoryFileCheckRuleStore struct {
@@ -83,4 +86,30 @@ func (s *repositoryFileCheckRuleStore) MatchRegex(ctx context.Context, ruleType,
 		Where("? ~* pattern", targetString).
 		Exists(ctx)
 	return exists, err
+}
+
+func (s *repositoryFileCheckRuleStore) ListBySensitiveCheckTargets(ctx context.Context, namespaces []string, modelID string) ([]RepositoryFileCheckRule, error) {
+	loweredNamespaces := make([]string, 0, len(namespaces))
+	for _, namespace := range namespaces {
+		namespace = strings.ToLower(strings.TrimSpace(namespace))
+		if namespace == "" {
+			continue
+		}
+		loweredNamespaces = append(loweredNamespaces, namespace)
+	}
+	modelID = strings.ToLower(strings.TrimSpace(modelID))
+	var rules []RepositoryFileCheckRule
+	query := s.db.Operator.Core.NewSelect().Model(&rules)
+	if len(loweredNamespaces) > 0 {
+		query = query.WhereGroup(" OR ", func(q *bun.SelectQuery) *bun.SelectQuery {
+			return q.Where("rule_type = ? AND pattern IN (?)", RuleTypeNamespace, bun.In(loweredNamespaces)).
+				WhereOr("rule_type = ? AND pattern = ?", RuleTypeModelName, modelID)
+		})
+	} else {
+		query = query.Where("rule_type = ? AND pattern = ?", RuleTypeModelName, modelID)
+	}
+	if err := query.Scan(ctx); err != nil {
+		return nil, err
+	}
+	return rules, nil
 }
