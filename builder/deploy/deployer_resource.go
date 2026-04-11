@@ -155,3 +155,20 @@ func checkMultiNodeResource(clusterResources *types.ClusterRes, hardware *types.
 	}
 	return false, availableStatusList
 }
+
+func isCPUOnlyWorkload(hardware *types.HardWare) bool {
+	if hardware == nil {
+		return false
+	}
+
+	return hardware.Gpu.Num == "" &&
+		hardware.Npu.Num == "" &&
+		hardware.Gcu.Num == "" &&
+		hardware.Mlu.Num == "" &&
+		hardware.Dcu.Num == "" &&
+		hardware.GPGpu.Num == ""
+}
+
+func isXPUNode(node types.NodeResourceInfo) bool {
+	return node.HasXPU()
+}

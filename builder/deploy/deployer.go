@@ -966,6 +966,7 @@ func (d *deployer) SubmitFinetuneJob(ctx context.Context, req types.FinetuneReq)
 		req.Nodes = append(req.Nodes, types.Node{
 			Name:       node.Name,
 			EnableVXPU: node.EnableVXPU,
+			HasXPU:     node.Hardware.HasXPU() || node.EnableVXPU,
 		})
 	}
 

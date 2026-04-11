@@ -179,6 +179,7 @@ func (c *evaluationComponentImpl) CreateEvaluation(ctx context.Context, req type
 		req.Nodes = append(req.Nodes, types.Node{
 			Name:       node.Name,
 			EnableVXPU: node.EnableVXPU,
+			HasXPU:     node.Hardware.HasXPU() || node.EnableVXPU,
 		})
 	}
 

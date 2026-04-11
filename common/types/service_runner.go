@@ -77,6 +77,7 @@ type (
 	Node struct {
 		Name       string
 		EnableVXPU bool
+		HasXPU     bool
 	}
 
 	RunResponse struct {
