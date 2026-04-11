@@ -29,13 +29,13 @@ func Test_handleAccelerator(t *testing.T) {
 		}
 	}{
 		{
-			name: "No XPU request - returns nil affinity",
+			name: "No XPU request - schedule on CPU-only nodes when available",
 			hardware: types.HardWare{
 				Cpu:    types.CPU{Num: "2"},
 				Memory: "4Gi",
 			},
 			nodes: []types.Node{
-				{Name: "node-1", EnableVXPU: true},
+				{Name: "node-1", EnableVXPU: true, HasXPU: true},
 				{Name: "node-2", EnableVXPU: false},
 			},
 			expected: struct {
@@ -46,8 +46,30 @@ func Test_handleAccelerator(t *testing.T) {
 			}{
 				hasResources: false,
 				resReqKeys:   []corev1.ResourceName{},
-				affinityType: "none",
-				nodeNames:    []string{},
+				affinityType: "cpu",
+				nodeNames:    []string{"node-1"},
+			},
+		},
+		{
+			name: "No XPU request - forbid scheduling on all-XPU clusters",
+			hardware: types.HardWare{
+				Cpu:    types.CPU{Num: "2"},
+				Memory: "4Gi",
+			},
+			nodes: []types.Node{
+				{Name: "node-1", HasXPU: true},
+				{Name: "node-2", EnableVXPU: true, HasXPU: true},
+			},
+			expected: struct {
+				hasResources bool
+				resReqKeys   []corev1.ResourceName
+				affinityType string
+				nodeNames    []string
+			}{
+				hasResources: false,
+				resReqKeys:   []corev1.ResourceName{},
+				affinityType: "cpu",
+				nodeNames:    []string{"node-1", "node-2"},
 			},
 		},
 		{
@@ -222,8 +244,8 @@ func Test_handleAccelerator(t *testing.T) {
 			}{
 				hasResources: false,
 				resReqKeys:   []corev1.ResourceName{},
-				affinityType: "none",
-				nodeNames:    []string{},
+				affinityType: "cpu",
+				nodeNames:    []string{"node-1"},
 			},
 		},
 		{
@@ -245,8 +267,8 @@ func Test_handleAccelerator(t *testing.T) {
 			}{
 				hasResources: false,
 				resReqKeys:   []corev1.ResourceName{},
-				affinityType: "none",
-				nodeNames:    []string{},
+				affinityType: "cpu",
+				nodeNames:    []string{"node-1"},
 			},
 		},
 		{
@@ -394,6 +416,9 @@ func Test_handleAccelerator(t *testing.T) {
 					}
 					require.ElementsMatch(t, enabledNodes, expr.Values, "Node names don't match for physical affinity (OpNotIn)")
 				}
+			} else if tt.expected.affinityType == "cpu" {
+				require.Equal(t, corev1.NodeSelectorOpNotIn, expr.Operator, "Expected OpNotIn operator for cpu affinity")
+				require.ElementsMatch(t, tt.expected.nodeNames, expr.Values, "Node names don't match for cpu affinity")
 			}
 		})
 	}

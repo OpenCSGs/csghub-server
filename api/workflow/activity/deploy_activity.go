@@ -611,6 +611,7 @@ func (a *DeployActivity) createDeployRequest(ctx context.Context, task *database
 		requestNodes = append(requestNodes, types.Node{
 			Name:       node.Name,
 			EnableVXPU: node.EnableVXPU,
+			HasXPU:     node.Hardware.HasXPU() || node.EnableVXPU,
 		})
 	}
 

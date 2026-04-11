@@ -171,6 +171,52 @@ func TestCheckResource(t *testing.T) {
 			want: false,
 		},
 		{
+			name: "single node - cpu only workload should be rejected on xpu node",
+			clusterResources: &types.ClusterRes{
+				ClusterID: "c1",
+				Resources: []types.NodeResourceInfo{
+					{
+						NodeName: "gpu-node-1",
+						NodeHardware: types.NodeHardware{
+							AvailableMem:     100,
+							AvailableCPU:     16,
+							AvailableXPU:     2,
+							TotalXPU:         2,
+							XPUModel:         "NVIDIA-A100",
+							XPUCapacityLabel: "nvidia.com/gpu",
+						},
+					},
+				},
+			},
+			hardware: &types.HardWare{
+				Memory:   "10Gi",
+				Cpu:      types.CPU{Num: "8"},
+				Replicas: 1,
+			},
+			want: false,
+		},
+		{
+			name: "single node - cpu only workload should pass on cpu-only node",
+			clusterResources: &types.ClusterRes{
+				ClusterID: "c1",
+				Resources: []types.NodeResourceInfo{
+					{
+						NodeName: "cpu-node-1",
+						NodeHardware: types.NodeHardware{
+							AvailableMem: 100,
+							AvailableCPU: 16,
+						},
+					},
+				},
+			},
+			hardware: &types.HardWare{
+				Memory:   "10Gi",
+				Cpu:      types.CPU{Num: "8"},
+				Replicas: 1,
+			},
+			want: true,
+		},
+		{
 			name: "multi node - resource sufficient",
 			clusterResources: &types.ClusterRes{
 				ClusterID: "c1",

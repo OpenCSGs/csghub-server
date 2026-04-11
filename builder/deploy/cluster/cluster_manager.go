@@ -427,6 +427,7 @@ func (cluster *Cluster) GetResourcesInCluster(config *config.Config) (map[string
 		cluster.Nodes = append(cluster.Nodes, types.Node{
 			Name:       nodeName,
 			EnableVXPU: nodeInfo.EnableVXPU,
+			HasXPU:     nodeInfo.HasXPU(),
 		})
 	}
 

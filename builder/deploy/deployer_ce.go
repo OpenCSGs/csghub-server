@@ -100,6 +100,14 @@ func (d *deployer) startAccounting() {
 }
 
 func checkNodeResource(node types.NodeResourceInfo, hardware *types.HardWare, config *config.Config) types.ResourceAvailableStatus {
+	if isCPUOnlyWorkload(hardware) && isXPUNode(node) {
+		return types.ResourceAvailableStatus{
+			Available: false,
+			NodeName:  node.NodeName,
+			Reason:    types.UnAvailableTypeInvalidHardware,
+		}
+	}
+
 	if hardware.Cpu.Num != "" {
 		requestedCPU, err := resource.ParseQuantity(hardware.Cpu.Num)
 		if err != nil {

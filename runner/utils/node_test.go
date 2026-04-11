@@ -50,7 +50,8 @@ func TestMergeNodeAffinity(t *testing.T) {
 
 		result := MergeNodeAffinity(a, b)
 		assert.NotNil(t, result)
-		assert.Len(t, result.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms, 2)
+		assert.Len(t, result.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms, 1)
+		assert.Len(t, result.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions, 2)
 		assert.Len(t, result.PreferredDuringSchedulingIgnoredDuringExecution, 1)
 	})
 
@@ -114,7 +115,8 @@ func TestFillAffinity(t *testing.T) {
 		FillAffinity(&target, target.NodeAffinity, source)
 
 		assert.NotNil(t, target.NodeAffinity)
-		assert.Len(t, target.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms, 2)
+		assert.Len(t, target.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms, 1)
+		assert.Len(t, target.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions, 2)
 	})
 }
 

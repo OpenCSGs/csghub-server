@@ -19,12 +19,15 @@ func MergeNodeAffinity(affinities ...*corev1.NodeAffinity) *corev1.NodeAffinity 
 		// Merge RequiredDuringSchedulingIgnoredDuringExecution
 		if affinity.RequiredDuringSchedulingIgnoredDuringExecution != nil {
 			if result.RequiredDuringSchedulingIgnoredDuringExecution == nil {
-				result.RequiredDuringSchedulingIgnoredDuringExecution = &corev1.NodeSelector{}
+				result.RequiredDuringSchedulingIgnoredDuringExecution = &corev1.NodeSelector{
+					NodeSelectorTerms: cloneNodeSelectorTerms(affinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms),
+				}
+			} else {
+				result.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms = andNodeSelectorTerms(
+					result.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms,
+					affinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms,
+				)
 			}
-			result.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms = append(
-				result.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms,
-				affinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms...,
-			)
 		}
 		// Merge PreferredDuringSchedulingIgnoredDuringExecution
 		if len(affinity.PreferredDuringSchedulingIgnoredDuringExecution) > 0 {
@@ -35,6 +38,53 @@ func MergeNodeAffinity(affinities ...*corev1.NodeAffinity) *corev1.NodeAffinity 
 		}
 	}
 	return result
+}
+
+func andNodeSelectorTerms(existing, incoming []corev1.NodeSelectorTerm) []corev1.NodeSelectorTerm {
+	if len(existing) == 0 {
+		return cloneNodeSelectorTerms(incoming)
+	}
+	if len(incoming) == 0 {
+		return cloneNodeSelectorTerms(existing)
+	}
+
+	merged := make([]corev1.NodeSelectorTerm, 0, len(existing)*len(incoming))
+	for _, left := range existing {
+		for _, right := range incoming {
+			merged = append(merged, corev1.NodeSelectorTerm{
+				MatchExpressions: append(
+					append([]corev1.NodeSelectorRequirement{}, left.MatchExpressions...),
+					right.MatchExpressions...,
+				),
+				MatchFields: append(
+					append([]corev1.NodeSelectorRequirement{}, left.MatchFields...),
+					right.MatchFields...,
+				),
+			})
+		}
+	}
+
+	return merged
+}
+
+func cloneNodeSelectorTerms(terms []corev1.NodeSelectorTerm) []corev1.NodeSelectorTerm {
+	if len(terms) == 0 {
+		return nil
+	}
+
+	cloned := make([]corev1.NodeSelectorTerm, 0, len(terms))
+	for _, term := range terms {
+		clonedTerm := corev1.NodeSelectorTerm{}
+		if len(term.MatchExpressions) > 0 {
+			clonedTerm.MatchExpressions = append([]corev1.NodeSelectorRequirement{}, term.MatchExpressions...)
+		}
+		if len(term.MatchFields) > 0 {
+			clonedTerm.MatchFields = append([]corev1.NodeSelectorRequirement{}, term.MatchFields...)
+		}
+		cloned = append(cloned, clonedTerm)
+	}
+
+	return cloned
 }
 
 func ToCoreV1Tolerations(tolerations []types.Toleration) []corev1.Toleration {

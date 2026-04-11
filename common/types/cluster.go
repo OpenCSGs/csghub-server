@@ -140,6 +140,10 @@ type NodeHardware struct {
 	MIGs map[string]*MIGResource `json:"migs"` // mig resources
 }
 
+func (h NodeHardware) HasXPU() bool {
+	return h.XPUCapacityLabel != "" || len(h.MIGs) > 0
+}
+
 type NodeResourceInfo struct {
 	NodeName   string `json:"node_name"`
 	NodeStatus string `json:"node_status"`
@@ -148,6 +152,10 @@ type NodeResourceInfo struct {
 	Labels     map[string]string `json:"labels"`    // labels of the node
 	EnableVXPU bool              `json:"enable_vxpu"`
 	UpdateAt   int64             `json:"update_at"`
+}
+
+func (n NodeResourceInfo) HasXPU() bool {
+	return n.NodeHardware.HasXPU() || n.EnableVXPU
 }
 
 type UpdateClusterResponse struct {
