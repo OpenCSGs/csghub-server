@@ -89,7 +89,7 @@ func (_c *MockDeployer_CheckHeartbeatTimeout_Call) RunAndReturn(run func(context
 }
 
 // CheckResourceAvailable provides a mock function with given fields: ctx, clusterId, orderDetailID, hardWare
-func (_m *MockDeployer) CheckResourceAvailable(ctx context.Context, clusterId string, orderDetailID int64, hardWare *types.HardWare) (bool, error) {
+func (_m *MockDeployer) CheckResourceAvailable(ctx context.Context, clusterId string, orderDetailID int64, hardWare *types.HardWare) (bool, []types.ResourceAvailableStatus, error) {
 	ret := _m.Called(ctx, clusterId, orderDetailID, hardWare)
 
 	if len(ret) == 0 {
@@ -97,8 +97,9 @@ func (_m *MockDeployer) CheckResourceAvailable(ctx context.Context, clusterId st
 	}
 
 	var r0 bool
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, int64, *types.HardWare) (bool, error)); ok {
+	var r1 []types.ResourceAvailableStatus
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, int64, *types.HardWare) (bool, []types.ResourceAvailableStatus, error)); ok {
 		return rf(ctx, clusterId, orderDetailID, hardWare)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, string, int64, *types.HardWare) bool); ok {
@@ -107,13 +108,21 @@ func (_m *MockDeployer) CheckResourceAvailable(ctx context.Context, clusterId st
 		r0 = ret.Get(0).(bool)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, int64, *types.HardWare) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, string, int64, *types.HardWare) []types.ResourceAvailableStatus); ok {
 		r1 = rf(ctx, clusterId, orderDetailID, hardWare)
 	} else {
-		r1 = ret.Error(1)
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).([]types.ResourceAvailableStatus)
+		}
 	}
 
-	return r0, r1
+	if rf, ok := ret.Get(2).(func(context.Context, string, int64, *types.HardWare) error); ok {
+		r2 = rf(ctx, clusterId, orderDetailID, hardWare)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
 // MockDeployer_CheckResourceAvailable_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CheckResourceAvailable'
@@ -137,12 +146,12 @@ func (_c *MockDeployer_CheckResourceAvailable_Call) Run(run func(ctx context.Con
 	return _c
 }
 
-func (_c *MockDeployer_CheckResourceAvailable_Call) Return(_a0 bool, _a1 error) *MockDeployer_CheckResourceAvailable_Call {
-	_c.Call.Return(_a0, _a1)
+func (_c *MockDeployer_CheckResourceAvailable_Call) Return(_a0 bool, _a1 []types.ResourceAvailableStatus, _a2 error) *MockDeployer_CheckResourceAvailable_Call {
+	_c.Call.Return(_a0, _a1, _a2)
 	return _c
 }
 
-func (_c *MockDeployer_CheckResourceAvailable_Call) RunAndReturn(run func(context.Context, string, int64, *types.HardWare) (bool, error)) *MockDeployer_CheckResourceAvailable_Call {
+func (_c *MockDeployer_CheckResourceAvailable_Call) RunAndReturn(run func(context.Context, string, int64, *types.HardWare) (bool, []types.ResourceAvailableStatus, error)) *MockDeployer_CheckResourceAvailable_Call {
 	_c.Call.Return(run)
 	return _c
 }

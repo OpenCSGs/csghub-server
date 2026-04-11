@@ -43,7 +43,7 @@ type Deployer interface {
 	UpdateCluster(ctx context.Context, data types.ClusterRequest) (*types.UpdateClusterResponse, error)
 	UpdateDeploy(ctx context.Context, dur *types.DeployUpdateReq, deploy *database.Deploy) error
 	StartDeploy(ctx context.Context, deploy *database.Deploy) error
-	CheckResourceAvailable(ctx context.Context, clusterId string, orderDetailID int64, hardWare *types.HardWare) (bool, error)
+	CheckResourceAvailable(ctx context.Context, clusterId string, orderDetailID int64, hardWare *types.HardWare) (bool, []types.ResourceAvailableStatus, error)
 	SubmitEvaluation(ctx context.Context, req types.EvaluationReq) (*types.ArgoWorkFlowRes, error)
 	DeleteEvaluation(ctx context.Context, req types.ArgoWorkFlowDeleteReq) error
 	GetEvaluation(ctx context.Context, req types.EvaluationGetReq) (*types.ArgoWorkFlowRes, error)
