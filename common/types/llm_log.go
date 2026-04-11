@@ -13,10 +13,11 @@ type LLMLogUsage struct {
 }
 
 type LLMLogMessage struct {
-	Role         string          `json:"role"`
-	Content      string          `json:"content,omitempty"`
-	ToolCalls    json.RawMessage `json:"tool_calls,omitempty"`
-	FinishReason string          `json:"finish_reason,omitempty"`
+	Role             string          `json:"role"`
+	Content          string          `json:"content,omitempty"`
+	ReasoningContent string          `json:"reasoning_content,omitempty"`
+	ToolCalls        json.RawMessage `json:"tool_calls,omitempty"`
+	FinishReason     string          `json:"finish_reason,omitempty"`
 }
 
 type LLMLogRecord struct {
