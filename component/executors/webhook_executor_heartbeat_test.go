@@ -6,9 +6,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"opencsg.com/csghub-server/builder/prometheus"
 	mockdb "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/builder/prometheus"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
@@ -48,7 +49,7 @@ func TestWebHookExecutorHeartbeat_ProcessEvent(t *testing.T) {
 	}
 
 	cs := mockdb.NewMockClusterInfoStore(t)
-	cs.EXPECT().BatchUpdateStatus(ctx, eventData).Return(nil)
+	cs.EXPECT().BatchUpdateStatus(ctx, eventData, mock.Anything).Return(nil)
 
 	exec := NewTestHeartBeatExecutor(cfg, cs)
 

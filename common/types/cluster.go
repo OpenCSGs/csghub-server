@@ -168,6 +168,13 @@ const (
 	ClusterStatusUnavailable ClusterStatus = "Unavailable"
 )
 
+// NodeStatus represents the status of a cluster node
+type NodeStatus string
+
+const (
+	NodeStatusOffline NodeStatus = "Offline"
+)
+
 type ClusterMode string
 
 const (

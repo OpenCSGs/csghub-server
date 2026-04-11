@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
@@ -27,7 +28,7 @@ type ClusterInfoStore interface {
 	ByClusterID(ctx context.Context, clusterId string) (clusterInfo ClusterInfo, err error)
 	ByClusterConfig(ctx context.Context, clusterConfig string) (clusterInfo ClusterInfo, err error)
 	List(ctx context.Context) ([]ClusterInfo, error)
-	BatchUpdateStatus(ctx context.Context, statusEvent []*types.ClusterRes) error
+	BatchUpdateStatus(ctx context.Context, statusEvent []*types.ClusterRes, cutoffTime time.Time) error
 	GetClusterResources(ctx context.Context, clusterID string) (*types.ClusterRes, error)
 	FindNodeByClusterID(ctx context.Context, clusterID string) ([]ClusterNode, error)
 	ListAllNodes(ctx context.Context) ([]ClusterNodeWithRegion, error)
@@ -222,7 +223,7 @@ func (s *clusterInfoStoreImpl) List(ctx context.Context) ([]ClusterInfo, error) 
 	return result, nil
 }
 
-func (s *clusterInfoStoreImpl) BatchUpdateStatus(ctx context.Context, statusEvent []*types.ClusterRes) error {
+func (s *clusterInfoStoreImpl) BatchUpdateStatus(ctx context.Context, statusEvent []*types.ClusterRes, cutoffTime time.Time) error {
 	err := s.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 
 		for _, cluster := range statusEvent {
@@ -277,6 +278,16 @@ func (s *clusterInfoStoreImpl) BatchUpdateStatus(ctx context.Context, statusEven
 					return errorx.HandleDBError(err, nil)
 				}
 			}
+		}
+
+		// Update nodes that haven't received heartbeat for more than timeoutSeconds to Offline
+		_, err := tx.NewUpdate().Model(&ClusterNode{}).
+			Set("status = ?", types.NodeStatusOffline).
+			Where("updated_at < ?", cutoffTime).
+			Where("status != ?", types.NodeStatusOffline).
+			Exec(ctx)
+		if err != nil {
+			return errorx.HandleDBError(err, nil)
 		}
 
 		return nil

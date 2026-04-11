@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"time"
+
 	"opencsg.com/csghub-server/builder/prometheus"
 
 	"opencsg.com/csghub-server/builder/store/database"
@@ -52,8 +54,9 @@ func (h *heartbeatExecutorImpl) ProcessEvent(ctx context.Context, event *types.W
 
 func (h *heartbeatExecutorImpl) UpdateClusterStatus(ctx context.Context, eventData []*types.ClusterRes) error {
 	slog.DebugContext(ctx, "heartbeat_event_received", slog.Any("event_body", eventData))
+	cutoffTime := time.Now().Add(-time.Duration(h.cfg.Runner.HearBeatIntervalInSec*2) * time.Second)
 	// update cluster status in database
-	err := h.clusterStore.BatchUpdateStatus(ctx, eventData)
+	err := h.clusterStore.BatchUpdateStatus(ctx, eventData, cutoffTime)
 	if err != nil {
 		return fmt.Errorf("failed to batch update cluster in heartbeat event error: %w", err)
 	}
