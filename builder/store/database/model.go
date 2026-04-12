@@ -330,7 +330,7 @@ func updateRepoPath(ctx context.Context, tx bun.Tx, repoType types.RepositoryTyp
 		Set("path = ?", repoPath).
 		Set("git_path = ?", fmt.Sprintf("%ss_%s", repoType, repoPath)).
 		Where("id = ?", repoID).
-		Returning("*", &repo).
+		Returning("*").
 		Scan(ctx, &repo)
 	if err != nil {
 		var pqErr pgdriver.Error

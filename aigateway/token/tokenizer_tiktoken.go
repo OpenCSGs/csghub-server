@@ -7,9 +7,35 @@ import (
 	"opencsg.com/csghub-server/aigateway/types"
 )
 
+// pieceEncoder counts tokens for a single text fragment (role string, message body, etc.).
+// Production uses cl100k_base via tiktoken; unit tests inject a local implementation.
+type pieceEncoder interface {
+	TokenCount(text string) int
+}
+
+type tiktokenPieceAdapter struct {
+	tk *tiktoken.Tiktoken
+}
+
+func (a *tiktokenPieceAdapter) TokenCount(text string) int {
+	if text == "" {
+		return 0
+	}
+	return len(a.tk.Encode(text, nil, nil))
+}
+
 // tiktokenTokenizerImpl implements Tokenizer using OpenAI-compatible rules
 type tiktokenTokenizerImpl struct {
-	tk *tiktoken.Tiktoken
+	enc pieceEncoder
+}
+
+// newTiktokenTokenizerForTest builds a tokenizer with the given encoder (same package tests only).
+// Passing nil returns nil.
+func newTiktokenTokenizerForTest(enc pieceEncoder) Tokenizer {
+	if enc == nil {
+		return nil
+	}
+	return &tiktokenTokenizerImpl{enc: enc}
 }
 
 // newTiktokenTokenizerImpl creates a tokenizer for billing / quota purpose.
@@ -24,7 +50,7 @@ func newTiktokenTokenizerImpl() Tokenizer {
 	}
 
 	return &tiktokenTokenizerImpl{
-		tk: tk,
+		enc: &tiktokenPieceAdapter{tk: tk},
 	}
 }
 
@@ -36,7 +62,7 @@ func newTiktokenTokenizerImpl() Tokenizer {
 //   - DOES NOT include assistant reply primer (+3)
 //     → caller must add it once per request
 func (t *tiktokenTokenizerImpl) Encode(message types.Message) (int64, error) {
-	if t.tk == nil {
+	if t.enc == nil {
 		return 0, errUnsupportedTokenizer
 	}
 
@@ -51,7 +77,7 @@ func (t *tiktokenTokenizerImpl) Encode(message types.Message) (int64, error) {
 
 	// Role
 	if message.Role != "" {
-		tokens += int64(len(t.tk.Encode(message.Role, nil, nil)))
+		tokens += int64(t.enc.TokenCount(message.Role))
 	}
 
 	// Content
@@ -59,7 +85,7 @@ func (t *tiktokenTokenizerImpl) Encode(message types.Message) (int64, error) {
 		switch v := message.Content.(type) {
 		case string:
 			if v != "" {
-				tokens += int64(len(t.tk.Encode(v, nil, nil)))
+				tokens += int64(t.enc.TokenCount(v))
 			}
 			// If multi-part content is supported in the future,
 			// extend handling here explicitly.
@@ -77,7 +103,7 @@ func (t *tiktokenTokenizerImpl) Encode(message types.Message) (int64, error) {
 // EmbeddingEncode calculates token usage for plain text content
 // (used by embeddings or streaming completion deltas).
 func (t *tiktokenTokenizerImpl) EmbeddingEncode(content string) (int64, error) {
-	if t.tk == nil {
+	if t.enc == nil {
 		return 0, errUnsupportedTokenizer
 	}
 
@@ -85,5 +111,5 @@ func (t *tiktokenTokenizerImpl) EmbeddingEncode(content string) (int64, error) {
 		return 0, nil
 	}
 
-	return int64(len(t.tk.Encode(content, nil, nil))), nil
+	return int64(t.enc.TokenCount(content)), nil
 }
