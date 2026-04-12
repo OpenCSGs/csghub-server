@@ -1,4 +1,4 @@
-FROM vllm/vllm-openai:v0.17.0-cu130
+FROM vllm/vllm-openai:v0.19.0-cu130
 RUN pip config set global.index-url https://mirrors.aliyun.com/pypi/simple
 RUN pip install --no-cache-dir csghub-sdk==0.7.3 ray supervisor
 RUN sed -i 's|http://archive.ubuntu.com/ubuntu|http://mirrors.aliyun.com/ubuntu|g' /etc/apt/sources.list && \
