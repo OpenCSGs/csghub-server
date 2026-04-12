@@ -8,7 +8,6 @@ package checker
 
 import (
 	"context"
-
 	"github.com/stretchr/testify/mock"
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/s3"
@@ -25,9 +24,11 @@ func initializeTestFileSizeChecker(ctx context.Context, t interface {
 	mockStores := tests.NewMockStores(t)
 	mockGitServer := gitserver.NewMockGitServer(t)
 	fileSizeChecker := NewTestFileSizeChecker(config, mockStores, mockGitServer)
+	mockClient := s3.NewMockClient(t)
 	mocks := &Mocks{
 		stores:    mockStores,
 		gitServer: mockGitServer,
+		s3Client:  mockClient,
 	}
 	checkerTestFileSizeCheckerWithMocks := &testFileSizeCheckerWithMocks{
 		FileSizeChecker: fileSizeChecker,
@@ -57,6 +58,25 @@ func initializeTestLFSExistsChecker(ctx context.Context, t interface {
 	return checkerTestLFSExistsCheckerWithMocks
 }
 
+func initializeTestSkillFileChecker(ctx context.Context, t interface {
+	Cleanup(func())
+	mock.TestingT
+}) *testSkillFileCheckerWithMocks {
+	config := ProvideTestConfig()
+	mockStores := tests.NewMockStores(t)
+	mockGitServer := gitserver.NewMockGitServer(t)
+	skillFileChecker := NewTestSkillFileChecker(config, mockStores, mockGitServer)
+	skillMocks := &SkillMocks{
+		stores:    mockStores,
+		gitServer: mockGitServer,
+	}
+	checkerTestSkillFileCheckerWithMocks := &testSkillFileCheckerWithMocks{
+		SkillFileChecker: skillFileChecker,
+		mocks:            skillMocks,
+	}
+	return checkerTestSkillFileCheckerWithMocks
+}
+
 // wire.go:
 
 type Mocks struct {
@@ -73,4 +93,14 @@ type testFileSizeCheckerWithMocks struct {
 type testLFSExistsCheckerWithMocks struct {
 	*LFSExistsChecker
 	mocks *Mocks
+}
+
+type SkillMocks struct {
+	stores    *tests.MockStores
+	gitServer *gitserver.MockGitServer
+}
+
+type testSkillFileCheckerWithMocks struct {
+	*SkillFileChecker
+	mocks *SkillMocks
 }
