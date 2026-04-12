@@ -31,6 +31,16 @@ func NewTestFileSizeChecker(config *config.Config, stores *tests.MockStores, git
 
 var FileSizeCheckerTestSet = wire.NewSet(NewTestFileSizeChecker)
 
+func NewTestSkillFileChecker(config *config.Config, stores *tests.MockStores, gitserver gitserver.GitServer) *SkillFileChecker {
+	return &SkillFileChecker{
+		repoStore: stores.Repo,
+		gitServer: gitserver,
+		config:    config,
+	}
+}
+
+var SkillFileCheckerTestSet = wire.NewSet(NewTestSkillFileChecker)
+
 var MockedStoreSet = wire.NewSet(
 	tests.NewMockStores,
 )
