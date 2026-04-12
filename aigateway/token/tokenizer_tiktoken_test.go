@@ -2,32 +2,45 @@ package token
 
 import (
 	"testing"
+	"unicode/utf8"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/aigateway/types"
 )
 
+// runeCountEncoder is a deterministic stand-in for cl100k in unit tests (no network, no BPE file).
+// It counts Unicode code points so behavior stays stable and offline.
+type runeCountEncoder struct{}
+
+func (runeCountEncoder) TokenCount(s string) int {
+	return utf8.RuneCountInString(s)
+}
+
+func testTiktokenTokenizer(t *testing.T) Tokenizer {
+	t.Helper()
+	tk := newTiktokenTokenizerForTest(runeCountEncoder{})
+	require.NotNil(t, tk)
+	return tk
+}
+
 func TestNewTiktokenTokenizerImpl(t *testing.T) {
-	t.Run("successfully creates tokenizer", func(t *testing.T) {
-		tk := newTiktokenTokenizerImpl()
+	t.Run("builds tokenizer with local encoder (no network)", func(t *testing.T) {
+		tk := newTiktokenTokenizerForTest(runeCountEncoder{})
 		require.NotNil(t, tk)
 
 		impl, ok := tk.(*tiktokenTokenizerImpl)
 		require.True(t, ok)
-		assert.NotNil(t, impl.tk)
+		assert.NotNil(t, impl.enc)
 	})
 
-	t.Run("returns nil when initialization fails", func(t *testing.T) {
-		// This test documents the behavior - in practice,
-		// tiktoken.GetEncoding("cl100k_base") rarely fails
-		// We test the nil handling in other methods
+	t.Run("returns nil when encoder is nil", func(t *testing.T) {
+		require.Nil(t, newTiktokenTokenizerForTest(nil))
 	})
 }
 
 func TestTiktokenTokenizerImpl_Encode(t *testing.T) {
-	tk := newTiktokenTokenizerImpl()
-	require.NotNil(t, tk)
+	tk := testTiktokenTokenizer(t)
 
 	t.Run("empty message returns overhead only", func(t *testing.T) {
 		msg := types.Message{}
@@ -43,8 +56,8 @@ func TestTiktokenTokenizerImpl_Encode(t *testing.T) {
 		}
 		count, err := tk.Encode(msg)
 		require.NoError(t, err)
-		// 3 (overhead) + len("user") tokens
-		assert.Greater(t, count, int64(3))
+		// 3 (overhead) + runeCount("user")
+		assert.Equal(t, int64(3+4), count)
 	})
 
 	t.Run("message with content only", func(t *testing.T) {
@@ -53,8 +66,7 @@ func TestTiktokenTokenizerImpl_Encode(t *testing.T) {
 		}
 		count, err := tk.Encode(msg)
 		require.NoError(t, err)
-		// 3 (overhead) + len("Hello") tokens
-		assert.Greater(t, count, int64(3))
+		assert.Equal(t, int64(3+5), count)
 	})
 
 	t.Run("message with role and content", func(t *testing.T) {
@@ -64,8 +76,7 @@ func TestTiktokenTokenizerImpl_Encode(t *testing.T) {
 		}
 		count, err := tk.Encode(msg)
 		require.NoError(t, err)
-		// 3 (overhead) + len("user") + len("Hello, world!")
-		assert.Greater(t, count, int64(3))
+		assert.Equal(t, int64(3+4+13), count)
 	})
 
 	t.Run("message with role, content and name", func(t *testing.T) {
@@ -76,8 +87,7 @@ func TestTiktokenTokenizerImpl_Encode(t *testing.T) {
 		}
 		count, err := tk.Encode(msg)
 		require.NoError(t, err)
-		// 3 (overhead) + len("user") + len("Hello") + 1 (name)
-		assert.Greater(t, count, int64(4))
+		assert.Equal(t, int64(3+4+5+1), count)
 	})
 
 	t.Run("empty content string is handled", func(t *testing.T) {
@@ -87,8 +97,7 @@ func TestTiktokenTokenizerImpl_Encode(t *testing.T) {
 		}
 		count, err := tk.Encode(msg)
 		require.NoError(t, err)
-		// 3 (overhead) + len("assistant")
-		assert.Greater(t, count, int64(3))
+		assert.Equal(t, int64(3+9), count)
 	})
 
 	t.Run("long content", func(t *testing.T) {
@@ -98,7 +107,6 @@ func TestTiktokenTokenizerImpl_Encode(t *testing.T) {
 		}
 		count, err := tk.Encode(msg)
 		require.NoError(t, err)
-		// Verify it's counting reasonably
 		assert.Greater(t, count, int64(10))
 	})
 
@@ -109,8 +117,7 @@ func TestTiktokenTokenizerImpl_Encode(t *testing.T) {
 		}
 		count, err := tk.Encode(msg)
 		require.NoError(t, err)
-		// 3 (overhead) + len("user")
-		assert.Greater(t, count, int64(3))
+		assert.Equal(t, int64(3+4), count)
 	})
 
 	t.Run("non-string content is ignored", func(t *testing.T) {
@@ -120,14 +127,12 @@ func TestTiktokenTokenizerImpl_Encode(t *testing.T) {
 		}
 		count, err := tk.Encode(msg)
 		require.NoError(t, err)
-		// 3 (overhead) + len("user"), content ignored
-		assert.Greater(t, count, int64(3))
+		assert.Equal(t, int64(3+4), count)
 	})
 }
 
 func TestTiktokenTokenizerImpl_EmbeddingEncode(t *testing.T) {
-	tk := newTiktokenTokenizerImpl()
-	require.NotNil(t, tk)
+	tk := testTiktokenTokenizer(t)
 
 	t.Run("empty string returns zero", func(t *testing.T) {
 		count, err := tk.EmbeddingEncode("")
@@ -138,16 +143,13 @@ func TestTiktokenTokenizerImpl_EmbeddingEncode(t *testing.T) {
 	t.Run("simple text", func(t *testing.T) {
 		count, err := tk.EmbeddingEncode("Hello, world!")
 		require.NoError(t, err)
-		// "Hello, world!" is typically 4 tokens
-		assert.Equal(t, int64(4), count)
+		assert.Equal(t, int64(13), count)
 	})
 
 	t.Run("longer text", func(t *testing.T) {
 		count, err := tk.EmbeddingEncode("The quick brown fox jumps over the lazy dog.")
 		require.NoError(t, err)
-		// Should be around 10 tokens
 		assert.Greater(t, count, int64(5))
-		assert.Less(t, count, int64(20))
 	})
 
 	t.Run("multiline text", func(t *testing.T) {
@@ -160,16 +162,15 @@ Line three`
 	})
 
 	t.Run("unicode text", func(t *testing.T) {
-		count, err := tk.EmbeddingEncode("Hello 世界 🌍")
+		count, err := tk.EmbeddingEncode("Hello 世界 \U0001F30D")
 		require.NoError(t, err)
-		// Unicode is handled by cl100k_base
-		assert.Greater(t, count, int64(0))
+		assert.Equal(t, int64(10), count)
 	})
 }
 
 func TestTiktokenTokenizerImpl_WithNilTokenizer(t *testing.T) {
 	t.Run("Encode returns error when tokenizer is nil", func(t *testing.T) {
-		impl := &tiktokenTokenizerImpl{tk: nil}
+		impl := &tiktokenTokenizerImpl{enc: nil}
 		msg := types.Message{
 			Role:    "user",
 			Content: "Hello",
@@ -181,7 +182,7 @@ func TestTiktokenTokenizerImpl_WithNilTokenizer(t *testing.T) {
 	})
 
 	t.Run("EmbeddingEncode returns error when tokenizer is nil", func(t *testing.T) {
-		impl := &tiktokenTokenizerImpl{tk: nil}
+		impl := &tiktokenTokenizerImpl{enc: nil}
 		count, err := impl.EmbeddingEncode("Hello")
 		assert.Error(t, err)
 		assert.Equal(t, int64(0), count)
@@ -190,8 +191,7 @@ func TestTiktokenTokenizerImpl_WithNilTokenizer(t *testing.T) {
 }
 
 func TestTiktokenTokenizerImpl_TokenCounts(t *testing.T) {
-	tk := newTiktokenTokenizerImpl()
-	require.NotNil(t, tk)
+	tk := testTiktokenTokenizer(t)
 
 	testCases := []struct {
 		name     string
@@ -199,10 +199,10 @@ func TestTiktokenTokenizerImpl_TokenCounts(t *testing.T) {
 		expected int64
 	}{
 		{"single char", "a", 1},
-		{"short word", "hello", 1},
-		{"two words", "hello world", 2},
-		{"common phrase", "Hello, world!", 4},
-		{"code snippet", "func main() {}", 4},
+		{"short word", "hello", 5},
+		{"two words", "hello world", 11},
+		{"common phrase", "Hello, world!", 13},
+		{"code snippet", "func main() {}", 14},
 	}
 
 	for _, tc := range testCases {
@@ -216,8 +216,7 @@ func TestTiktokenTokenizerImpl_TokenCounts(t *testing.T) {
 }
 
 func TestTiktokenTokenizerImpl_Consistency(t *testing.T) {
-	tk := newTiktokenTokenizerImpl()
-	require.NotNil(t, tk)
+	tk := testTiktokenTokenizer(t)
 
 	t.Run("same input produces same output", func(t *testing.T) {
 		msg := types.Message{
