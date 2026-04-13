@@ -40,6 +40,11 @@ func NewSensitiveComponentFromConfig(config *config.Config) SensitiveComponent {
 
 	for _, provider := range config.SensitiveCheck.CheckChain {
 		p := strings.TrimSpace(provider)
+		extendedOpts := sensitiveChainOption(config, p)
+		if len(extendedOpts) > 0 {
+			opts = append(opts, extendedOpts...)
+			continue
+		}
 		switch p {
 		case string(CheckProviderACAutomaton):
 			opts = append(opts, sensitive.WithACAutomaton(sensitive.LoadFromConfig(config)))
@@ -47,8 +52,6 @@ func NewSensitiveComponentFromConfig(config *config.Config) SensitiveComponent {
 			opts = append(opts, sensitive.WithMutableACAutomaton(sensitive.LoadFromDB()))
 		case string(CheckProviderAliyunGreen):
 			opts = append(opts, sensitive.WithAliYunChecker())
-		case string(CheckProviderLLMOpenAI):
-			opts = append(opts, sensitive.WithOpenAILLMChecker())
 		default:
 			if p != "" {
 				slog.Warn("unknown sensitive check provider ignored", slog.String("provider", p))

@@ -52,18 +52,6 @@ func WithMutableACAutomaton(loader internal.Loader) ChainOption {
 	}
 }
 
-// WithOpenAILLMChecker adds an OpenAI LLM sensitive checker to the chain
-func WithOpenAILLMChecker() ChainOption {
-	return func(config *config.Config, c *chainImpl) {
-		if config.SensitiveCheck.LLM.Enable {
-			checker := NewOpenAILLMChecker(config)
-			c.checkers = append(c.checkers, checker)
-		} else {
-			slog.Warn("sensitive config for LLM moderation service not enabled")
-		}
-	}
-}
-
 // NewChainChecker create a chain sensitive checker
 //
 // It will run all checkers in order by the options provided
