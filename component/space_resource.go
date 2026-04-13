@@ -67,7 +67,7 @@ func (c *spaceResourceComponentImpl) Index(ctx context.Context, req *types.Space
 				// must have gpu for finetune
 				continue
 			}
-			if req.DeployType != types.InferenceType && hardware.Replicas != 0 {
+			if req.DeployType != types.InferenceType && hardware.Replicas > 1 {
 				// only inference can have multi-node resources
 				continue
 			}
