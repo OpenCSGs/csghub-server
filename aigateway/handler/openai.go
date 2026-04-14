@@ -298,6 +298,10 @@ func (h *OpenAIHandlerImpl) GetModel(c *gin.Context) {
 		return
 	}
 
+	if model.FormatModelID != "" {
+		model.ID = model.FormatModelID
+	}
+
 	c.PureJSON(http.StatusOK, model)
 }
 

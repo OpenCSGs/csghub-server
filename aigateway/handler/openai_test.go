@@ -744,6 +744,77 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 		wg.Wait()
 		assert.Equal(t, http.StatusOK, w.Code)
 	})
+	t.Run("external formatted id request forwards base model id", func(t *testing.T) {
+		tester, c, w := setupTest(t)
+		chatReq := ChatCompletionRequest{
+			Model: "test-model-1(OpenAI)",
+			Messages: []openai.ChatCompletionMessageParamUnion{
+				openai.UserMessage("Hello"),
+			},
+		}
+		body, _ := json.Marshal(chatReq)
+		c.Request.Method = http.MethodPost
+		c.Request.Body = io.NopCloser(bytes.NewReader(body))
+
+		forwardedModel := ""
+		testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			defer r.Body.Close()
+			payload := map[string]any{}
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
+			if modelValue, ok := payload["model"].(string); ok {
+				forwardedModel = modelValue
+			}
+			w.WriteHeader(http.StatusOK)
+		}))
+		defer testServer.Close()
+
+		model := &types.Model{
+			BaseModel: types.BaseModel{
+				ID:      "test-model-1",
+				Object:  "model",
+				OwnedBy: "OpenAI",
+			},
+			InternalModelInfo: types.InternalModelInfo{
+				SvcName: "",
+			},
+			ExternalModelInfo: types.ExternalModelInfo{
+				Provider:           "OpenAI",
+				FormatModelID:      "test-model-1(OpenAI)",
+				NeedSensitiveCheck: true,
+			},
+			Endpoint: testServer.URL,
+		}
+		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "test-model-1(OpenAI)").Return(model, nil)
+		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuser", "testuuid").Return(nil)
+		expectReq := ChatCompletionRequest{}
+		_ = json.Unmarshal(body, &expectReq)
+		tester.mocks.moderationComp.EXPECT().CheckChatPrompts(mock.Anything, expectReq.Messages, "testuuid:"+model.ID, false).
+			Return(&rpc.CheckResult{IsSensitive: false}, nil)
+		llmTokenCounter := mocktoken.NewMockChatTokenCounter(t)
+		tester.mocks.tokenCounterFactory.EXPECT().NewChat(
+			token.CreateParam{
+				Endpoint: model.Endpoint,
+				Host:     "",
+				Model:    model.ID,
+				ImageID:  model.ImageID,
+				Provider: model.Provider,
+			}).
+			Return(llmTokenCounter)
+		llmTokenCounter.EXPECT().AppendPrompts(expectReq.Messages).Return()
+
+		var wg sync.WaitGroup
+		wg.Add(1)
+		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, "testuuid", model, llmTokenCounter).
+			RunAndReturn(func(ctx context.Context, uuid string, model *types.Model, counter token.Counter) error {
+				wg.Done()
+				return nil
+			})
+
+		tester.handler.Chat(c)
+		wg.Wait()
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.Equal(t, "test-model-1", forwardedModel)
+	})
 }
 
 func TestOpenAIHandler_Embedding(t *testing.T) {
