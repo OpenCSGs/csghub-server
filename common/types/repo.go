@@ -315,6 +315,8 @@ type RepoFilter struct {
 	SpaceSDK            string
 	XnetMigrationStatus *XnetMigrationTaskStatus
 	Status              string
+	DatasetType         string
+	UserPurchased       bool
 }
 
 type BatchGetFilter struct {
