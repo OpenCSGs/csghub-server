@@ -86,4 +86,6 @@ type GitServer interface {
 	GetRepoSize(ctx context.Context, req GetRepoInfoByPathReq) (int64, error)
 	// GetRepoLfsSize returns the total size of all LFS files in the repository
 	GetRepoLfsSize(ctx context.Context, req GetRepoInfoByPathReq) (int64, error)
+	// CreateFork creates a fork of a repository
+	CreateFork(ctx context.Context, req CreateForkReq) error
 }

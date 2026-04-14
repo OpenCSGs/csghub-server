@@ -18,6 +18,9 @@ type CreateDatasetReq struct {
 
 type UpdateDatasetReq struct {
 	UpdateRepoReq
+	DatasetType      string  `json:"dataset_type"`
+	RelatedDatasetID int64   `json:"related_dataset_id"`
+	Price            float64 `json:"price"`
 }
 
 type Dataset struct {
@@ -54,7 +57,12 @@ type Dataset struct {
 	XnetEnabled           bool                    `json:"xnet_enabled"`
 	XnetMigrationStatus   XnetMigrationTaskStatus `json:"xnet_migration_status"`
 	XnetMigrationProgress int                     `json:"xnet_migration_progress"`
-	RepoSize              int64                   `json:"repo_size"`
+	DatasetType           string                  `json:"dataset_type"`
+	RelatedDatasetID      int64                   `json:"related_dataset_id"`
+	Price                 float64                 `json:"price"`
+	Forked                bool                    `json:"forked"`
+	IsForSale             bool                    `json:"is_for_sale"`
+	UserPurchased         bool                    `json:"user_purchased"`
 }
 
 type DataViewerReq struct {
@@ -71,6 +79,20 @@ type QueryReq struct {
 	Search    string `json:"search"`
 	Where     string `json:"where"`
 	Orderby   string `json:"orderby"`
+}
+
+type BuyDatasetReq struct {
+	Namespace   string `json:"namespace" binding:"required"`
+	Name        string `json:"name" binding:"required"`
+	CurrentUser string `json:"current_user" binding:"required"`
+	TargetName  string `json:"target_name" binding:"omitempty"`
+}
+
+type BuyDatasetResp struct {
+	Success          bool    `json:"success"`
+	Message          string  `json:"message"`
+	Price            float64 `json:"price"`
+	RelatedDatasetID int64   `json:"related_dataset_id"`
 }
 
 var GitattributesFileName = ".gitattributes"

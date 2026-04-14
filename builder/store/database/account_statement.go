@@ -19,11 +19,12 @@ type accountStatementStoreImpl struct {
 }
 
 type AccountStatementStore interface {
-	Create(ctx context.Context, input AccountStatement) error
+	Create(ctx context.Context, input AccountStatement, checkBalance ...bool) error
 	ListByUserIDAndTime(ctx context.Context, req types.ActStatementsReq) (AccountStatementRes, error)
 	GetByEventID(ctx context.Context, eventID uuid.UUID) (AccountStatement, error)
 	ListRechargeByUserIDAndTime(ctx context.Context, req types.AcctRechargeListReq) (AccountStatementRes, error)
 	ListStatementByUserAndSku(ctx context.Context, req types.ActStatementsReq) ([]UserSkuStatement, int, error)
+	HasUserPurchasedDataset(ctx context.Context, userUUID string, datasetID int64) (bool, error)
 }
 
 func NewAccountStatementStore() AccountStatementStore {
@@ -77,11 +78,15 @@ type AccountStatementRes struct {
 	types.AcctSummary
 }
 
-func (as *accountStatementStoreImpl) Create(ctx context.Context, input AccountStatement) error {
+func (as *accountStatementStoreImpl) Create(ctx context.Context, input AccountStatement, checkBalance ...bool) error {
 	if input.Scene == types.ScenePortalCharge || input.Scene == types.SceneCashCharge {
 		return as.chargeFeeStatement(ctx, input)
 	} else {
-		return as.deductFeeStatement(ctx, input)
+		check := false
+		if len(checkBalance) > 0 && checkBalance[0] {
+			check = true
+		}
+		return as.deductFeeStatement(ctx, input, check)
 	}
 }
 
@@ -168,7 +173,7 @@ func (as *accountStatementStoreImpl) chargeFeeStatement(ctx context.Context, inp
 	return err
 }
 
-func (as *accountStatementStoreImpl) deductFeeStatement(ctx context.Context, input AccountStatement) error {
+func (as *accountStatementStoreImpl) deductFeeStatement(ctx context.Context, input AccountStatement, checkBalance bool) error {
 	err := as.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if input.Value > 0 {
 			return fmt.Errorf("deduct fee statement value must be negative or zero")
@@ -176,7 +181,7 @@ func (as *accountStatementStoreImpl) deductFeeStatement(ctx context.Context, inp
 
 		var err error
 
-		err = DeductAccountFee(ctx, tx, input)
+		err = DeductAccountFee(ctx, tx, input, checkBalance)
 		if err != nil {
 			if errors.Is(err, types.ErrDuplicatedEvent) {
 				slog.Warn("skip duplicated deduct fee by event uuid", slog.Any("input", input))
@@ -205,7 +210,7 @@ func (as *accountStatementStoreImpl) deductFeeStatement(ctx context.Context, inp
 	return err
 }
 
-func DeductAccountFee(ctx context.Context, tx bun.Tx, input AccountStatement) error {
+func DeductAccountFee(ctx context.Context, tx bun.Tx, input AccountStatement, checkBalance bool) error {
 	var err error
 	var acctUser AccountUser
 
@@ -222,6 +227,13 @@ func DeductAccountFee(ctx context.Context, tx bun.Tx, input AccountStatement) er
 			return err
 		}
 		return fmt.Errorf("check duplicated event failed, error: %w", err)
+	}
+
+	// Check balance if needed
+	if checkBalance && input.Value < 0 {
+		if acctUser.Balance+acctUser.CashBalance < -input.Value {
+			return fmt.Errorf("insufficient balance")
+		}
 	}
 
 	remainValue := input.Value
@@ -555,4 +567,25 @@ func (as *accountStatementStoreImpl) ListStatementByUserAndSku(ctx context.Conte
 	}
 
 	return results, totalCount, nil
+}
+
+func (as *accountStatementStoreImpl) HasUserPurchasedDataset(ctx context.Context, userUUID string, datasetID int64) (bool, error) {
+	if as == nil || as.db == nil {
+		return false, nil
+	}
+	var count int
+	err := as.db.Operator.Core.NewSelect().
+		Model((*AccountStatement)(nil)).
+		ColumnExpr("COUNT(*)").
+		Where("user_uuid = ?", userUUID).
+		Where("scene = ?", types.SceneDatasetPurchase).
+		Where("resource_id = ?", fmt.Sprintf("%d", datasetID)).
+		Where("resource_name = ?", "dataset").
+		Scan(ctx, &count)
+
+	if err != nil {
+		return false, fmt.Errorf("check if user purchased dataset error: %w", err)
+	}
+
+	return count > 0, nil
 }

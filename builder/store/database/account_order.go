@@ -78,7 +78,7 @@ func (aos *accountOrderStoreImpl) Create(ctx context.Context, order AccountOrder
 			}
 		}
 
-		err = DeductAccountFee(ctx, tx, input)
+		err = DeductAccountFee(ctx, tx, input, false)
 		if err != nil {
 			return fmt.Errorf("deduct account fee for order, error:%w", err)
 		}

@@ -386,3 +386,14 @@ type ReadLogRequest struct {
 	Labels       map[string]string `json:"labels"`
 	InstanceName string            `json:"instance_name"`
 }
+
+type CreateForkReq struct {
+	SourceRepoType  RepositoryType `json:"source_repo_type"`
+	SourceNamespace string         `json:"source_namespace"`
+	SourceName      string         `json:"source_name"`
+	TargetNamespace string         `json:"target_namespace"`
+	TargetName      string         `json:"target_name"`
+	CurrentUser     string         `json:"current_user"`
+	SourceRepoID    int64          `json:"source_repo_id"`
+	TargetRepoID    int64          `json:"target_repo_id"`
+}

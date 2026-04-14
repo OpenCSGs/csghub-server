@@ -45,6 +45,7 @@ const (
 	gitReplicateRepositoryFailed
 	gitUsingGitInXnetRepository
 	gitGetRepositorySizeFailed
+	gitCreateForkFailed
 )
 
 var (
@@ -718,6 +719,15 @@ func ErrGitCopyRepositoryFailed(err error, ctx context) error {
 	return CustomError{
 		prefix:  errGitPrefix,
 		code:    gitCopyRepositoryFailed,
+		err:     err,
+		context: ctx,
+	}
+}
+
+func ErrGitCreateForkFailed(err error, ctx context) error {
+	return CustomError{
+		prefix:  errGitPrefix,
+		code:    gitCreateForkFailed,
 		err:     err,
 		context: ctx,
 	}

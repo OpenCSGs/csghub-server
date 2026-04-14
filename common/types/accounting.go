@@ -110,6 +110,8 @@ var (
 	SceneStarship SceneType = 20 // starship
 	SceneGuiAgent SceneType = 22 // gui agent
 	// SceneAgenticHub SceneType = 30 // agentic hub
+	// dataset
+	SceneDatasetPurchase SceneType = 40 // dataset purchase
 	// unknow
 	SceneUnknow SceneType = 99 // unknow
 )

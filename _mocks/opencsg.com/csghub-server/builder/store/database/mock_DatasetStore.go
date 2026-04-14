@@ -22,6 +22,65 @@ func (_m *MockDatasetStore) EXPECT() *MockDatasetStore_Expecter {
 	return &MockDatasetStore_Expecter{mock: &_m.Mock}
 }
 
+// ByID provides a mock function with given fields: ctx, datasetID
+func (_m *MockDatasetStore) ByID(ctx context.Context, datasetID int64) (*database.Dataset, error) {
+	ret := _m.Called(ctx, datasetID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ByID")
+	}
+
+	var r0 *database.Dataset
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64) (*database.Dataset, error)); ok {
+		return rf(ctx, datasetID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, int64) *database.Dataset); ok {
+		r0 = rf(ctx, datasetID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.Dataset)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, int64) error); ok {
+		r1 = rf(ctx, datasetID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockDatasetStore_ByID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ByID'
+type MockDatasetStore_ByID_Call struct {
+	*mock.Call
+}
+
+// ByID is a helper method to define mock.On call
+//   - ctx context.Context
+//   - datasetID int64
+func (_e *MockDatasetStore_Expecter) ByID(ctx interface{}, datasetID interface{}) *MockDatasetStore_ByID_Call {
+	return &MockDatasetStore_ByID_Call{Call: _e.mock.On("ByID", ctx, datasetID)}
+}
+
+func (_c *MockDatasetStore_ByID_Call) Run(run func(ctx context.Context, datasetID int64)) *MockDatasetStore_ByID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64))
+	})
+	return _c
+}
+
+func (_c *MockDatasetStore_ByID_Call) Return(_a0 *database.Dataset, _a1 error) *MockDatasetStore_ByID_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockDatasetStore_ByID_Call) RunAndReturn(run func(context.Context, int64) (*database.Dataset, error)) *MockDatasetStore_ByID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ByOrgPath provides a mock function with given fields: ctx, namespace, per, page, onlyPublic
 func (_m *MockDatasetStore) ByOrgPath(ctx context.Context, namespace string, per int, page int, onlyPublic bool) ([]database.Dataset, int, error) {
 	ret := _m.Called(ctx, namespace, per, page, onlyPublic)

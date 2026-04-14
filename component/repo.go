@@ -105,6 +105,8 @@ type RepoComponent interface {
 	CreateRepo(ctx context.Context, req types.CreateRepoReq) (*gitserver.CreateRepoResp, *database.Repository, *gitserver.CommitFilesReq, error)
 	UpdateRepo(ctx context.Context, req types.UpdateRepoReq) (*database.Repository, error)
 	DeleteRepo(ctx context.Context, req types.DeleteRepoReq) (*database.Repository, error)
+	// CreateFork creates a fork of a repository
+	CreateFork(ctx context.Context, req types.CreateForkReq) (*database.Repository, error)
 	// PublicToUser gets visible repos of the given user and user's orgs
 	PublicToUser(ctx context.Context, repoType types.RepositoryType, userName string, filter *types.RepoFilter, per, page int) (repos []*database.Repository, count int, err error)
 	CreateFile(ctx context.Context, req *types.CreateFileReq) (*types.CreateFileResp, error)
@@ -501,6 +503,82 @@ func (c *repoComponentImpl) DeleteRepo(ctx context.Context, req types.DeleteRepo
 	return repo, nil
 }
 
+func (c *repoComponentImpl) CreateFork(ctx context.Context, req types.CreateForkReq) (*database.Repository, error) {
+	// 1. Verify source repository exists
+	sourceRepo, err := c.repoStore.FindByPath(ctx, req.SourceRepoType, req.SourceNamespace, req.SourceName)
+	if err != nil {
+		return nil, fmt.Errorf("source repository does not exist, error: %w", err)
+	}
+
+	// 2. Check if target repository path is already occupied
+	targetExists, _ := c.IsExists(ctx, req.SourceRepoType, req.TargetNamespace, req.TargetName)
+	if targetExists {
+		return nil, errorx.BadRequest(errors.New("target repository path is already occupied"), nil)
+	}
+
+	// 3. Create target repository in database
+	user, err := c.userStore.FindByUsername(ctx, req.CurrentUser)
+	if err != nil {
+		return nil, fmt.Errorf("user does not exist, error: %w", err)
+	}
+
+	temPath := strings.SplitN(uuid.NewString(), "-", 2)
+	dbRepo := database.Repository{
+		UserID:         user.ID,
+		Path:           path.Join(temPath[0], temPath[1]),
+		GitPath:        fmt.Sprintf("%ss_%s/%s", string(req.SourceRepoType), temPath[0], temPath[1]),
+		Name:           req.TargetName,
+		Nickname:       sourceRepo.Nickname,
+		Description:    sourceRepo.Description,
+		Private:        sourceRepo.Private,
+		License:        sourceRepo.License,
+		DefaultBranch:  sourceRepo.DefaultBranch,
+		RepositoryType: req.SourceRepoType,
+		StarCount:      0,
+		User:           user,
+	}
+
+	newDBRepo, err := c.repoStore.CreateRepo(ctx, dbRepo)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create database repo, error: %w", err)
+	}
+
+	err = c.recomStore.UpsertScore(ctx, []*database.RecomRepoScore{
+		{
+			RepositoryID: newDBRepo.ID,
+			Score:        0,
+			WeightName:   database.RecomWeightTotal,
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to upsert recom repo score, error: %w", err)
+	}
+
+	// 4. Call gitserver CreateFork
+	forkReq := gitserver.CreateForkReq{
+		SourceRepoType:  req.SourceRepoType,
+		SourceNamespace: req.SourceNamespace,
+		SourceName:      req.SourceName,
+		TargetRepoType:  req.SourceRepoType,
+		TargetNamespace: temPath[0],
+		TargetName:      temPath[1],
+		Revision:        sourceRepo.DefaultBranch,
+	}
+
+	err = c.git.CreateFork(ctx, forkReq)
+	if err != nil {
+		slog.Error("failed to create fork in git", slog.Any("req", forkReq), slog.String("error", err.Error()))
+		return nil, fmt.Errorf("failed to create fork in git, error: %w", err)
+	}
+
+	// 5. Copy LFS objects from source to target repository
+	if err := c.copyLfsObjects(ctx, sourceRepo.ID, newDBRepo.ID); err != nil {
+		slog.Error("failed to copy LFS objects", slog.Any("source_repo_id", sourceRepo.ID), slog.Any("target_repo_id", newDBRepo.ID), slog.String("error", err.Error()))
+	}
+
+	return newDBRepo, nil
+}
+
 func (c *repoComponentImpl) cleanLfsStorage(ctx context.Context, repoID int64, migrated bool, lfsMetas []database.LfsMetaObject) {
 	slog.Info("Cleaning LFS storage for repo", slog.Int64("repo_id", repoID), slog.Bool("migrated", migrated), slog.Int("file_count", len(lfsMetas)))
 
@@ -532,6 +610,52 @@ func (c *repoComponentImpl) cleanLfsStorage(ctx context.Context, repoID int64, m
 		slog.Error("Failed to remove LFS object", slog.String("key", rErr.ObjectName), slog.Any("error", rErr.Err))
 	}
 	slog.Info("Completed LFS storage cleanup for repo", slog.Int64("repo_id", repoID))
+}
+
+func (c *repoComponentImpl) copyLfsObjects(ctx context.Context, sourceRepoID, targetRepoID int64) error {
+	lfsMetas, err := c.lfsMetaObjectStore.FindByRepoID(ctx, sourceRepoID)
+	if err != nil {
+		return fmt.Errorf("failed to find LFS meta objects for source repo: %w", err)
+	}
+
+	if len(lfsMetas) == 0 {
+		return nil
+	}
+
+	// Get source and target repo information
+	sourceRepo, err := c.repoStore.FindById(ctx, sourceRepoID)
+	if err != nil {
+		return fmt.Errorf("failed to find source repo: %w", err)
+	}
+
+	targetRepo, err := c.repoStore.FindById(ctx, targetRepoID)
+	if err != nil {
+		return fmt.Errorf("failed to find target repo: %w", err)
+	}
+
+	slog.InfoContext(ctx, "Copying LFS objects", slog.Int64("source_repo_id", sourceRepoID), slog.Int64("target_repo_id", targetRepoID), slog.Int("count", len(lfsMetas)))
+
+	for _, meta := range lfsMetas {
+		sourceKey := common.BuildLfsPath(sourceRepoID, meta.Oid, sourceRepo.Migrated)
+		targetKey := common.BuildLfsPath(targetRepoID, meta.Oid, targetRepo.Migrated)
+
+		_, err := c.s3Client.CopyObject(ctx,
+			minio.CopyDestOptions{
+				Bucket: c.lfsBucket,
+				Object: targetKey,
+			},
+			minio.CopySrcOptions{
+				Bucket: c.lfsBucket,
+				Object: sourceKey,
+			})
+		if err != nil {
+			slog.ErrorContext(ctx, "Failed to copy LFS object", slog.String("source_key", sourceKey), slog.String("target_key", targetKey), slog.Any("error", err))
+			continue
+		}
+	}
+
+	slog.InfoContext(ctx, "Completed copying LFS objects", slog.Int64("source_repo_id", sourceRepoID), slog.Int64("target_repo_id", targetRepoID))
+	return nil
 }
 
 // PublicToUser gets visible repos of the given user and user's orgs

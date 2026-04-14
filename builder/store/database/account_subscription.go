@@ -724,7 +724,7 @@ func (a *accountSubscriptionStoreImpl) generateAcctStatement(ctx context.Context
 		EventValue:       amountValue,
 		Discount:         price.Discount,
 	}
-	err := DeductAccountFee(ctx, tx, statement)
+	err := DeductAccountFee(ctx, tx, statement, false)
 	if err != nil {
 		return errorx.HandleDBError(err, errorx.Ctx().Set("gen_acct_statement", userUUID))
 	}

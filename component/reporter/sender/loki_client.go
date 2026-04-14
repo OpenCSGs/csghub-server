@@ -339,7 +339,7 @@ func (c *lokiClient) GenerateLabelQuery(labels map[string]string) string {
 		if !first {
 			queryBuilder.WriteString(",")
 		}
-		fmt.Fprintf(&queryBuilder, "%s=\"%s\"", k, v)
+		fmt.Fprintf(&queryBuilder, `%s="%s"`, k, v)
 		first = false
 	}
 	queryBuilder.WriteString("}")
