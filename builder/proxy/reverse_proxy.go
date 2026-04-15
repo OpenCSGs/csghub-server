@@ -15,19 +15,36 @@ type ReverseProxy interface {
 }
 
 type reverseProxyImpl struct {
-	target *url.URL
+	target         *url.URL
+	acceptEncoding *string
 }
 
 var DefaultResponseStreamContentType openai.ChatCompletionChunk
 
-func NewReverseProxy(target string) (ReverseProxy, error) {
+type ReverseProxyOption func(*reverseProxyImpl)
+
+func WithAcceptEncoding(encoding string) ReverseProxyOption {
+	return func(rp *reverseProxyImpl) {
+		rp.acceptEncoding = &encoding
+	}
+}
+
+func WithoutAcceptEncoding() ReverseProxyOption {
+	return WithAcceptEncoding("identity")
+}
+
+func NewReverseProxy(target string, opts ...ReverseProxyOption) (ReverseProxy, error) {
 	url, err := url.Parse(target)
 	if err != nil {
 		return nil, err
 	}
-	return &reverseProxyImpl{
+	rp := &reverseProxyImpl{
 		target: url,
-	}, nil
+	}
+	for _, opt := range opts {
+		opt(rp)
+	}
+	return rp, nil
 }
 
 func (rp *reverseProxyImpl) ServeHTTP(w http.ResponseWriter, r *http.Request, api, svcHost string) {
@@ -58,7 +75,13 @@ func (rp *reverseProxyImpl) ServeHTTP(w http.ResponseWriter, r *http.Request, ap
 			req.URL.RawQuery = targetQuery + "&" + req.URL.RawQuery
 		}
 		// dont support br comporession
-		req.Header.Set("Accept-Encoding", "gzip")
+		if rp.acceptEncoding == nil {
+			req.Header.Set("Accept-Encoding", "gzip")
+		} else if *rp.acceptEncoding == "" {
+			req.Header.Del("Accept-Encoding")
+		} else {
+			req.Header.Set("Accept-Encoding", *rp.acceptEncoding)
+		}
 
 		// debug only
 		// {

@@ -1,5 +1,52 @@
 package proxy
 
+import (
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
+	"github.com/stretchr/testify/require"
+)
+
+func TestReverseProxy_AcceptEncodingDefaultGzip(t *testing.T) {
+	var downstreamAcceptEncoding string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		downstreamAcceptEncoding = r.Header.Get("Accept-Encoding")
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	rp, err := NewReverseProxy(server.URL)
+	require.NoError(t, err)
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	resp := httptest.NewRecorder()
+	rp.ServeHTTP(resp, req, "", "")
+
+	require.Equal(t, http.StatusOK, resp.Code)
+	require.Equal(t, "gzip", downstreamAcceptEncoding)
+}
+
+func TestReverseProxy_AcceptEncodingDisabled(t *testing.T) {
+	var downstreamAcceptEncoding string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		downstreamAcceptEncoding = r.Header.Get("Accept-Encoding")
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	rp, err := NewReverseProxy(server.URL, WithoutAcceptEncoding())
+	require.NoError(t, err)
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Accept-Encoding", "br")
+	resp := httptest.NewRecorder()
+	rp.ServeHTTP(resp, req, "", "")
+
+	require.Equal(t, http.StatusOK, resp.Code)
+	require.Equal(t, "identity", downstreamAcceptEncoding)
+}
+
 // import (
 // 	"bytes"
 // 	"io"

@@ -28,7 +28,6 @@ import (
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
 	commonType "opencsg.com/csghub-server/common/types"
-	"opencsg.com/csghub-server/common/utils/common"
 	"opencsg.com/csghub-server/common/utils/trace"
 	apicomp "opencsg.com/csghub-server/component"
 )
@@ -44,6 +43,8 @@ type OpenAIHandler interface {
 	Embedding(c *gin.Context)
 	// Generate image from text
 	GenerateImage(c *gin.Context)
+	// Transcribe audio to text
+	Transcription(c *gin.Context)
 }
 
 func NewOpenAIHandlerFromConfig(config *config.Config) (OpenAIHandler, error) {
@@ -338,68 +339,16 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 		return
 	}
 	modelID := chatReq.Model
-	model, err := h.openaiComponent.GetModelByID(c.Request.Context(), username, modelID)
+	modelTarget, err := h.resolveModelTarget(c.Request.Context(), username, modelID)
 	if err != nil {
-		slog.ErrorContext(c.Request.Context(), "failed to get model by id", "model_id", modelID, "error", err.Error())
-		c.String(http.StatusInternalServerError, fmt.Errorf("failed to get model by id '%s',error:%w", modelID, err).Error())
-		return
-	}
-	if model == nil {
-		slog.Error("model not found", "model_id", modelID)
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": types.Error{
-				Code:    "model_not_found",
-				Message: fmt.Sprintf("model '%s' not found", modelID),
-				Type:    "invalid_request_error",
-			}})
+		handleModelTargetError(c, c.Request.Context(), modelID, "failed to get model target address", err)
 		return
 	}
 
-	targetReq := commonType.EndpointReq{
-		ClusterID: model.ClusterID,
-		Target:    model.Endpoint,
-		Host:      "",
-		Endpoint:  model.Endpoint,
-		SvcName:   model.SvcName,
-	}
-	target := ""
-	host := ""
-	modelName := ""
-	if len(model.SvcName) > 0 {
-		cluster, errCls := h.clusterComp.GetClusterByID(c, targetReq.ClusterID)
-		if errCls != nil {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error": types.Error{
-					Code:    "cluster_not_found",
-					Message: fmt.Sprintf("cluster '%s' not found", model.ClusterID),
-					Type:    "invalid_request_error",
-				}})
-			return
-		}
-		target, host, _ = common.ExtractDeployTargetAndHost(c.Request.Context(), cluster, targetReq)
-		modelName = model.CSGHubModelID
-	} else {
-		slog.DebugContext(c.Request.Context(), "external model", slog.Any("model", model))
-		target = model.Endpoint
-		modelName = model.ID
-	}
-	if err != nil || len(target) < 1 {
-		slog.ErrorContext(c.Request.Context(), "failed to get model target address", slog.Any("error", err),
-			slog.Any("model", model), slog.Any("targetReq", targetReq), slog.Any("model_id", modelID),
-			slog.Any("target", target), slog.Any("host", host))
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": types.Error{
-				Code:    "model_not_running",
-				Message: fmt.Sprintf("model '%s' not running", modelID),
-				Type:    "invalid_request_error",
-			}})
-		return
-	}
-
-	chatReq.Model = modelName
+	chatReq.Model = modelTarget.ModelName
 	if chatReq.Stream {
 		c.Writer.Header().Set("Content-Type", "text/event-stream")
-		if !strings.Contains(model.ImageID, "vllm-cpu") {
+		if !strings.Contains(modelTarget.Model.ImageID, "vllm-cpu") {
 			chatReq.StreamOptions = &StreamOptions{
 				IncludeUsage: true,
 			}
@@ -407,7 +356,7 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 	}
 
 	// Check balance before processing request
-	if !model.SkipBalance() {
+	if !modelTarget.Model.SkipBalance() {
 		if err := h.openaiComponent.CheckBalance(c.Request.Context(), username, userUUID); err != nil {
 			h.handleInsufficientBalance(c, chatReq.Stream, username, modelID, err)
 			return
@@ -418,7 +367,7 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 	updatedBodyBytes, _ := json.Marshal(chatReq)
 	c.Request.Body = io.NopCloser(bytes.NewReader(updatedBodyBytes))
 	c.Request.ContentLength = int64(len(updatedBodyBytes))
-	rp, err := proxy.NewReverseProxy(target)
+	rp, err := proxy.NewReverseProxy(modelTarget.Target)
 	if err != nil {
 		slog.ErrorContext(c.Request.Context(), "failed to create reverse proxy", slog.Any("error", err))
 		c.String(http.StatusInternalServerError, fmt.Errorf("failed to create reverse proxy:%w", err).Error())
@@ -426,7 +375,7 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 	}
 
 	var modComponent component.Moderation = nil
-	isCheck, result, err := h.checkSensitive(c.Request.Context(), model, chatReq, userUUID, chatReq.Stream)
+	isCheck, result, err := h.checkSensitive(c.Request.Context(), modelTarget.Model, chatReq, userUUID, chatReq.Stream)
 	if err != nil {
 		slog.ErrorContext(c.Request.Context(), "failed to check sensitive",
 			slog.String("model_id", modelID),
@@ -441,20 +390,20 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 		}
 	}
 
-	slog.InfoContext(c.Request.Context(), "proxy chat request to model target", slog.Any("target", target), slog.Any("host", host),
-		slog.Any("user", username), slog.Any("model_name", modelName))
+	slog.InfoContext(c.Request.Context(), "proxy chat request to model target", slog.Any("target", modelTarget.Target), slog.Any("host", modelTarget.Host),
+		slog.Any("user", username), slog.Any("model_name", modelTarget.ModelName))
 
 	tokenCounter := h.tokenCounterFactory.NewChat(token.CreateParam{
-		Endpoint: target,
-		Host:     host,
-		Model:    modelName,
-		ImageID:  model.ImageID,
-		Provider: model.Provider,
+		Endpoint: modelTarget.Target,
+		Host:     modelTarget.Host,
+		Model:    modelTarget.ModelName,
+		ImageID:  modelTarget.Model.ImageID,
+		Provider: modelTarget.Model.Provider,
 	})
 
 	logCapture, err := component.NewLLMLogRecorder(
 		trace.GetTraceIDInGinContext(c),
-		modelName,
+		modelTarget.ModelName,
 		userUUID,
 		commonType.LLMLogRequest{
 			Messages: chatReq.Messages,
@@ -465,8 +414,8 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 			"source":   "aigateway",
 			"api":      "/v1/chat/completions",
 			"stream":   chatReq.Stream,
-			"provider": model.Provider,
-			"svc_name": model.SvcName,
+			"provider": modelTarget.Model.Provider,
+			"svc_name": modelTarget.Model.SvcName,
 		},
 	)
 	if err != nil {
@@ -479,33 +428,26 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 	tokenCounter.AppendPrompts(chatReq.Messages)
 
 	proxyToApi := ""
-	if model.Endpoint != "" {
-		uri, err := url.ParseRequestURI(model.Endpoint)
+	if modelTarget.Model.Endpoint != "" {
+		uri, err := url.ParseRequestURI(modelTarget.Model.Endpoint)
 		if err != nil {
-			slog.Warn("endpoint has wrong struct", slog.String("model", modelName))
+			slog.Warn("endpoint has wrong struct", slog.String("model", modelTarget.ModelName))
 		} else {
 			proxyToApi = uri.Path
 		}
 	}
 
-	if model.AuthHead != "" {
-		var authMap map[string]string
-		if err := json.Unmarshal([]byte(model.AuthHead), &authMap); err != nil {
-			slog.WarnContext(c.Request.Context(), "invalid auth head", slog.String("model", modelName))
-		} else {
-			for authKey, authVal := range authMap {
-				c.Request.Header.Set(authKey, authVal)
-			}
-		}
+	if err := applyModelAuthHeaders(c.Request.Header, modelTarget.Model); err != nil {
+		slog.WarnContext(c.Request.Context(), "invalid auth head", slog.String("model", modelTarget.ModelName), slog.Any("error", err))
 	}
 
-	rp.ServeHTTP(w, c.Request, proxyToApi, host)
+	rp.ServeHTTP(w, c.Request, proxyToApi, modelTarget.Host)
 
 	go func() {
 		usageCtx, cancel := context.WithTimeout(context.WithoutCancel(c.Request.Context()), 3*time.Second)
 		defer cancel()
 
-		err := h.openaiComponent.RecordUsage(usageCtx, userUUID, model, tokenCounter)
+		err := h.openaiComponent.RecordUsage(usageCtx, userUUID, modelTarget.Model, tokenCounter)
 		if err != nil {
 			slog.ErrorContext(usageCtx, "failed to record token usage", slog.Any("error", err))
 		}
@@ -567,57 +509,13 @@ func (h *OpenAIHandlerImpl) GenerateImage(c *gin.Context) {
 	}
 
 	modelID := req.Model
-	model, err := h.openaiComponent.GetModelByID(ctx, username, modelID)
+	modelTarget, err := h.resolveModelTarget(ctx, username, modelID)
 	if err != nil {
-		slog.ErrorContext(ctx, "failed to get model by id", slog.String("model_id", modelID), slog.Any("error", err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": types.Error{
-			Code: "internal_error", Message: err.Error(), Type: "internal_error",
-		}})
-		return
-	}
-	if model == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
-			Code: "model_not_found", Message: fmt.Sprintf("model '%s' not found", modelID), Type: "invalid_request_error",
-		}})
+		handleModelTargetError(c, ctx, modelID, "failed to get model target address", err)
 		return
 	}
 
-	targetReq := commonType.EndpointReq{
-		ClusterID: model.ClusterID,
-		Target:    model.Endpoint,
-		Host:      "",
-		Endpoint:  model.Endpoint,
-		SvcName:   model.SvcName,
-	}
-	target := ""
-	host := ""
-	modelName := ""
-	if len(model.SvcName) > 0 {
-		cluster, errCls := h.clusterComp.GetClusterByID(c, targetReq.ClusterID)
-		if errCls != nil {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error": types.Error{
-					Code:    "cluster_not_found",
-					Message: fmt.Sprintf("cluster '%s' not found", model.ClusterID),
-					Type:    "invalid_request_error",
-				}})
-			return
-		}
-		target, host, _ = common.ExtractDeployTargetAndHost(ctx, cluster, targetReq)
-		modelName = model.CSGHubModelID
-	} else {
-		target = model.Endpoint
-		modelName = model.ID
-	}
-	if err != nil || len(target) < 1 {
-		slog.ErrorContext(ctx, "failed to get model target address", slog.Any("error", err), slog.String("model_id", modelID))
-		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
-			Code: "model_not_running", Message: fmt.Sprintf("model '%s' not running", modelID), Type: "invalid_request_error",
-		}})
-		return
-	}
-
-	adapter := h.t2iRegistry.GetAdapter(model)
+	adapter := h.t2iRegistry.GetAdapter(modelTarget.Model)
 	if adapter == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
 			Code: "unsupported_model", Message: fmt.Sprintf("no adapter for model '%s'", modelID), Type: "invalid_request_error",
@@ -634,7 +532,7 @@ func (h *OpenAIHandlerImpl) GenerateImage(c *gin.Context) {
 		ImageGenerateParams: req.ImageGenerateParams,
 		RawJSON:             req.RawJSON,
 	}
-	typesReq.Model = modelName
+	typesReq.Model = modelTarget.ModelName
 	bodyBytes, err := adapter.TransformRequest(ctx, typesReq)
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to transform image request", slog.Any("error", err))
@@ -660,13 +558,13 @@ func (h *OpenAIHandlerImpl) GenerateImage(c *gin.Context) {
 
 	c.Request.Body = io.NopCloser(bytes.NewReader(bodyBytes))
 	c.Request.ContentLength = int64(len(bodyBytes))
-	for k, v := range adapter.GetHeaders(model, &typesReq) {
+	for k, v := range adapter.GetHeaders(modelTarget.Model, &typesReq) {
 		c.Request.Header.Set(k, v)
 	}
 
-	rp, _ := proxy.NewReverseProxy(target)
-	slog.InfoContext(ctx, "proxy image generation request to model target", slog.Any("target", target), slog.Any("host", host),
-		slog.Any("user", username), slog.Any("model_name", modelName))
+	rp, _ := proxy.NewReverseProxy(modelTarget.Target)
+	slog.InfoContext(ctx, "proxy image generation request to model target", slog.Any("target", modelTarget.Target), slog.Any("host", modelTarget.Host),
+		slog.Any("user", username), slog.Any("model_name", modelTarget.ModelName))
 
 	imageCounter := token.NewImageUsageCounter()
 	responseFormat := string(req.ResponseFormat)
@@ -677,10 +575,10 @@ func (h *OpenAIHandlerImpl) GenerateImage(c *gin.Context) {
 	var w http.ResponseWriter = imageWrapper
 
 	proxyToApi := ""
-	if model.Endpoint != "" {
-		uri, err := url.ParseRequestURI(model.Endpoint)
+	if modelTarget.Model.Endpoint != "" {
+		uri, err := url.ParseRequestURI(modelTarget.Model.Endpoint)
 		if err != nil {
-			slog.WarnContext(ctx, "endpoint has wrong struct", slog.String("model", modelName))
+			slog.WarnContext(ctx, "endpoint has wrong struct", slog.String("model", modelTarget.ModelName))
 		} else {
 			proxyToApi = uri.Path
 			if proxyToApi == "" {
@@ -690,18 +588,11 @@ func (h *OpenAIHandlerImpl) GenerateImage(c *gin.Context) {
 		}
 	}
 
-	if model.AuthHead != "" {
-		var authMap map[string]string
-		if err := json.Unmarshal([]byte(model.AuthHead), &authMap); err != nil {
-			slog.WarnContext(c.Request.Context(), "invalid auth head", slog.String("model", modelName))
-		} else {
-			for authKey, authVal := range authMap {
-				c.Request.Header.Set(authKey, authVal)
-			}
-		}
+	if err := applyModelAuthHeaders(c.Request.Header, modelTarget.Model); err != nil {
+		slog.WarnContext(ctx, "invalid auth head", slog.String("model", modelTarget.ModelName), slog.Any("error", err))
 	}
 
-	rp.ServeHTTP(w, c.Request, proxyToApi, host)
+	rp.ServeHTTP(w, c.Request, proxyToApi, modelTarget.Host)
 
 	if err := imageWrapper.Finalize(); err != nil {
 		slog.ErrorContext(ctx, "failed to finalize image response", slog.Any("error", err))
@@ -709,7 +600,7 @@ func (h *OpenAIHandlerImpl) GenerateImage(c *gin.Context) {
 	go func() {
 		usageCtx, cancel := context.WithTimeout(context.WithoutCancel(c.Request.Context()), 3*time.Second)
 		defer cancel()
-		if err := h.openaiComponent.RecordUsage(usageCtx, userUUID, model, imageCounter); err != nil {
+		if err := h.openaiComponent.RecordUsage(usageCtx, userUUID, modelTarget.Model, imageCounter); err != nil {
 			slog.ErrorContext(usageCtx, "failed to record image usage", slog.Any("error", err))
 		}
 	}()
@@ -748,58 +639,9 @@ func (h *OpenAIHandlerImpl) Embedding(c *gin.Context) {
 	modelID := req.Model
 	username := httpbase.GetCurrentUser(c)
 	userUUID := httpbase.GetCurrentUserUUID(c)
-	model, err := h.openaiComponent.GetModelByID(c.Request.Context(), username, modelID)
+	modelTarget, err := h.resolveModelTarget(c.Request.Context(), username, modelID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	if model == nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": types.Error{
-				Code:    "model_not_found",
-				Message: fmt.Sprintf("model '%s' not found", modelID),
-				Type:    "invalid_request_error",
-			}})
-		return
-	}
-
-	targetReq := commonType.EndpointReq{
-		ClusterID: model.ClusterID,
-		Target:    model.Endpoint,
-		Host:      "",
-		Endpoint:  model.Endpoint,
-		SvcName:   model.SvcName,
-	}
-	target := ""
-	host := ""
-	modelName := ""
-	if len(model.SvcName) > 0 {
-		cluster, errCls := h.clusterComp.GetClusterByID(c, targetReq.ClusterID)
-		if errCls != nil {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error": types.Error{
-					Code:    "cluster_not_found",
-					Message: fmt.Sprintf("cluster '%s' not found", model.ClusterID),
-					Type:    "invalid_request_error",
-				}})
-			return
-		}
-		target, host, _ = common.ExtractDeployTargetAndHost(c.Request.Context(), cluster, targetReq)
-		modelName = model.CSGHubModelID
-	} else {
-		target = model.Endpoint
-		modelName = model.ID
-	}
-	if err != nil || len(target) < 1 {
-		slog.ErrorContext(c, "failed to get embedding target address", slog.Any("error", err),
-			slog.Any("model", model), slog.Any("targetReq", targetReq), slog.Any("model_id", modelID),
-			slog.Any("target", target), slog.Any("host", host))
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": types.Error{
-				Code:    "model_not_running",
-				Message: fmt.Sprintf("model '%s' not running", modelID),
-				Type:    "invalid_request_error",
-			}})
+		handleModelTargetError(c, c.Request.Context(), modelID, "failed to get embedding target address", err)
 		return
 	}
 
@@ -809,33 +651,149 @@ func (h *OpenAIHandlerImpl) Embedding(c *gin.Context) {
 		return
 	}
 
-	req.Model = modelName
+	req.Model = modelTarget.ModelName
 	data, _ := json.Marshal(req)
 	c.Request.Body = io.NopCloser(bytes.NewReader(data))
 	c.Request.ContentLength = int64(len(data))
-	slog.InfoContext(c, "proxy embedding request to model endpoint", slog.Any("target", target), slog.Any("host", host),
+	if err := applyModelAuthHeaders(c.Request.Header, modelTarget.Model); err != nil {
+		slog.WarnContext(c.Request.Context(), "invalid auth head", slog.String("model", modelTarget.ModelName), slog.Any("error", err))
+	}
+	slog.InfoContext(c, "proxy embedding request to model endpoint", slog.Any("target", modelTarget.Target), slog.Any("host", modelTarget.Host),
 		slog.Any("user", username), slog.Any("model_id", modelID))
-	rp, _ := proxy.NewReverseProxy(target)
+	rp, _ := proxy.NewReverseProxy(modelTarget.Target)
 
 	tokenCounter := h.tokenCounterFactory.NewEmbedding(token.CreateParam{
-		Endpoint: target,
-		Host:     host,
-		Model:    modelName,
-		ImageID:  model.ImageID,
+		Endpoint: modelTarget.Target,
+		Host:     modelTarget.Host,
+		Model:    modelTarget.ModelName,
+		ImageID:  modelTarget.Model.ImageID,
+		Provider: modelTarget.Model.Provider,
 	})
 	w := NewResponseWriterWrapperEmbedding(c.Writer, tokenCounter)
 	if req.Input.OfString.String() != "" {
 		tokenCounter.Input(req.Input.OfString.Value)
 	}
 
-	rp.ServeHTTP(w, c.Request, "", host)
+	rp.ServeHTTP(w, c.Request, "", modelTarget.Host)
 	go func() {
 		usageCtx, cancel := context.WithTimeout(context.WithoutCancel(c.Request.Context()), 3*time.Second)
 		defer cancel()
 
-		err := h.openaiComponent.RecordUsage(usageCtx, userUUID, model, tokenCounter)
+		err := h.openaiComponent.RecordUsage(usageCtx, userUUID, modelTarget.Model, tokenCounter)
 		if err != nil {
 			slog.ErrorContext(c, "failed to record embedding token usage", "error", err)
+		}
+	}()
+}
+
+// Transcription godoc
+// @Security     ApiKey
+// @Summary      Transcribe audio to text
+// @Description  Sends an OpenAI-compatible multipart audio transcription request to the backend model
+// @Tags         AIGateway
+// @Accept       multipart/form-data
+// @Produce      json
+// @Param        model formData string true "Model ID"
+// @Param        file formData file true "Audio file"
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  error "Bad request"
+// @Failure      404  {object}  error "Model not found"
+// @Failure      500  {object}  error "Internal server error"
+// @Router       /v1/audio/transcriptions [post]
+func (h *OpenAIHandlerImpl) Transcription(c *gin.Context) {
+	username := httpbase.GetCurrentUser(c)
+	userUUID := httpbase.GetCurrentUserUUID(c)
+	ctx := c.Request.Context()
+
+	form, err := c.MultipartForm()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
+			Code:    "invalid_request_error",
+			Message: "invalid multipart form: " + err.Error(),
+			Type:    "invalid_request_error",
+		}})
+		return
+	}
+	if form == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
+			Code:    "invalid_request_error",
+			Message: "request must be multipart/form-data",
+			Type:    "invalid_request_error",
+		}})
+		return
+	}
+
+	modelID := strings.TrimSpace(firstMultipartValue(form, "model"))
+	if modelID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
+			Code:    "invalid_request_error",
+			Message: "Model cannot be empty",
+			Type:    "invalid_request_error",
+		}})
+		return
+	}
+	if len(form.File["file"]) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
+			Code:    "invalid_request_error",
+			Message: "File cannot be empty",
+			Type:    "invalid_request_error",
+		}})
+		return
+	}
+
+	modelTarget, err := h.resolveModelTarget(ctx, username, modelID)
+	if err != nil {
+		handleModelTargetError(c, ctx, modelID, "failed to get transcription target address", err)
+		return
+	}
+
+	if !modelTarget.Model.SkipBalance() {
+		if err := h.openaiComponent.CheckBalance(ctx, username, userUUID); err != nil {
+			h.handleInsufficientBalance(c, false, username, modelID, err)
+			return
+		}
+	}
+
+	body, contentType := rewriteMultipartModelStream(form, modelTarget.ModelName)
+	c.Request.Body = body
+	c.Request.ContentLength = -1
+	c.Request.Header.Set("Content-Type", contentType)
+	c.Request.Header.Del("Content-Length")
+
+	if err := applyModelAuthHeaders(c.Request.Header, modelTarget.Model); err != nil {
+		slog.WarnContext(ctx, "invalid auth head", slog.String("model", modelTarget.ModelName), slog.Any("error", err))
+	}
+
+	rp, err := proxy.NewReverseProxy(modelTarget.Target, proxy.WithoutAcceptEncoding())
+	if err != nil {
+		slog.ErrorContext(ctx, "failed to create reverse proxy", slog.Any("error", err))
+		c.String(http.StatusInternalServerError, fmt.Errorf("failed to create reverse proxy:%w", err).Error())
+		return
+	}
+
+	proxyToApi := ""
+	if modelTarget.Model.Endpoint != "" {
+		uri, err := url.ParseRequestURI(modelTarget.Model.Endpoint)
+		if err != nil {
+			slog.WarnContext(ctx, "endpoint has wrong struct", slog.String("model", modelTarget.ModelName))
+		} else {
+			proxyToApi = uri.Path
+		}
+	}
+
+	slog.InfoContext(ctx, "proxy audio transcription request to model endpoint", slog.Any("target", modelTarget.Target), slog.Any("host", modelTarget.Host),
+		slog.Any("user", username), slog.Any("model_id", modelID), slog.Any("model_name", modelTarget.ModelName))
+
+	audioCounter := token.NewAudioUsageCounter(token.NewTokenizerImpl(modelTarget.Target, modelTarget.Host, modelTarget.ModelName, modelTarget.Model.ImageID, modelTarget.Model.Provider))
+	w := NewResponseWriterWrapperAudio(c.Writer, audioCounter)
+	rp.ServeHTTP(w, c.Request, proxyToApi, modelTarget.Host)
+
+	go func() {
+		usageCtx, cancel := context.WithTimeout(context.WithoutCancel(c.Request.Context()), 3*time.Second)
+		defer cancel()
+
+		if err := h.openaiComponent.RecordUsage(usageCtx, userUUID, modelTarget.Model, audioCounter); err != nil {
+			slog.ErrorContext(usageCtx, "failed to record audio transcription usage", slog.Any("error", err))
 		}
 	}()
 }

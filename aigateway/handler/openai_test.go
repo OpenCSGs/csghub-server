@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -1002,6 +1003,138 @@ func TestOpenAIHandler_Embedding(t *testing.T) {
 		tester.handler.Embedding(c)
 		wg.Wait()
 	})
+}
+
+func TestOpenAIHandler_Transcription(t *testing.T) {
+	t.Run("successful multipart passthrough with rewritten model", func(t *testing.T) {
+		tester, c, w := setupTest(t)
+
+		var downstreamModel string
+		var downstreamPrompt string
+		var downstreamFile string
+		var downstreamAuth string
+		var downstreamAcceptEncoding string
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, "/v1/audio/transcriptions", r.URL.Path)
+			downstreamAuth = r.Header.Get("Authorization")
+			downstreamAcceptEncoding = r.Header.Get("Accept-Encoding")
+			require.NoError(t, r.ParseMultipartForm(32<<20))
+			downstreamModel = r.FormValue("model")
+			downstreamPrompt = r.FormValue("prompt")
+			file, _, err := r.FormFile("file")
+			require.NoError(t, err)
+			defer file.Close()
+			data, err := io.ReadAll(file)
+			require.NoError(t, err)
+			downstreamFile = string(data)
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"text":"hello world","usage":{"prompt_tokens":371,"completion_tokens":52,"total_tokens":423}}`))
+		}))
+		defer server.Close()
+
+		c.Request = newMultipartTranscriptionRequest(t, "model1", "audio-bytes", map[string]string{
+			"prompt": "meeting",
+		})
+		model := &types.Model{
+			BaseModel: types.BaseModel{
+				ID:       "backend-model",
+				Object:   "model",
+				Metadata: map[string]any{},
+			},
+			Endpoint: server.URL + "/v1/audio/transcriptions",
+			ExternalModelInfo: types.ExternalModelInfo{
+				Provider: "openai",
+				AuthHead: `{"Authorization":"Bearer provider-token"}`,
+			},
+		}
+
+		var wg sync.WaitGroup
+		wg.Add(1)
+		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1").Return(model, nil).Once()
+		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuser", "testuuid").Return(nil).Once()
+		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, "testuuid", model, mock.Anything).RunAndReturn(
+			func(ctx context.Context, userUUID string, model *types.Model, counter token.Counter) error {
+				usage, err := counter.Usage(ctx)
+				require.NoError(t, err)
+				require.Equal(t, int64(423), usage.TotalTokens)
+				require.Equal(t, int64(371), usage.PromptTokens)
+				require.Equal(t, int64(52), usage.CompletionTokens)
+				wg.Done()
+				return nil
+			}).Once()
+
+		tester.handler.Transcription(c)
+		wg.Wait()
+
+		require.Equal(t, http.StatusOK, w.Code)
+		require.JSONEq(t, `{"text":"hello world","usage":{"prompt_tokens":371,"completion_tokens":52,"total_tokens":423}}`, w.Body.String())
+		require.Equal(t, "backend-model", downstreamModel)
+		require.Equal(t, "meeting", downstreamPrompt)
+		require.Equal(t, "audio-bytes", downstreamFile)
+		require.Equal(t, "Bearer provider-token", downstreamAuth)
+		require.Equal(t, "identity", downstreamAcceptEncoding)
+	})
+
+	t.Run("missing model", func(t *testing.T) {
+		tester, c, w := setupTest(t)
+		c.Request = newMultipartTranscriptionRequest(t, "", "audio-bytes", nil)
+
+		tester.handler.Transcription(c)
+
+		require.Equal(t, http.StatusBadRequest, w.Code)
+		require.Contains(t, w.Body.String(), "Model cannot be empty")
+	})
+
+	t.Run("missing file", func(t *testing.T) {
+		tester, c, w := setupTest(t)
+		var body bytes.Buffer
+		writer := multipart.NewWriter(&body)
+		require.NoError(t, writer.WriteField("model", "model1"))
+		require.NoError(t, writer.Close())
+		c.Request = httptest.NewRequest(http.MethodPost, "/v1/audio/transcriptions", &body)
+		c.Request.Header.Set("Content-Type", writer.FormDataContentType())
+
+		tester.handler.Transcription(c)
+
+		require.Equal(t, http.StatusBadRequest, w.Code)
+		require.Contains(t, w.Body.String(), "File cannot be empty")
+	})
+
+	t.Run("model not found", func(t *testing.T) {
+		tester, c, w := setupTest(t)
+		c.Request = newMultipartTranscriptionRequest(t, "missing-model", "audio-bytes", nil)
+
+		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "missing-model").Return(nil, nil).Once()
+
+		tester.handler.Transcription(c)
+
+		require.Equal(t, http.StatusBadRequest, w.Code)
+		require.Contains(t, w.Body.String(), "model_not_found")
+	})
+}
+
+func newMultipartTranscriptionRequest(t *testing.T, model, fileContent string, fields map[string]string) *http.Request {
+	t.Helper()
+
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	if model != "" {
+		require.NoError(t, writer.WriteField("model", model))
+	}
+	for key, value := range fields {
+		require.NoError(t, writer.WriteField(key, value))
+	}
+	if fileContent != "" {
+		part, err := writer.CreateFormFile("file", "sample.wav")
+		require.NoError(t, err)
+		_, err = part.Write([]byte(fileContent))
+		require.NoError(t, err)
+	}
+	require.NoError(t, writer.Close())
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/audio/transcriptions", &body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	return req
 }
 
 func TestOpenAIHandler_GenerateImage(t *testing.T) {
