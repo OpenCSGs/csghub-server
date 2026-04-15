@@ -95,11 +95,13 @@ func TestEvaluationComponent_CreateFinetune(t *testing.T) {
 			},
 			Memory: "32Gi",
 		},
-		Image:    "lm-finetune:0.4.6",
-		RepoType: "model",
-		TaskType: "finetune",
-		Token:    "foo",
-		Epochs:   3,
+		Image:           "lm-finetune:0.4.6",
+		RepoType:        "model",
+		TaskType:        "finetune",
+		Token:           "foo",
+		Epochs:          3,
+		Revision:        "main",
+		DatasetRevision: "main",
 	}
 
 	resource, err := json.Marshal(req2.Hardware)
@@ -114,6 +116,14 @@ func TestEvaluationComponent_CreateFinetune(t *testing.T) {
 		ID:       1,
 		RoleMask: "admin",
 	}, nil).Once()
+
+	modelStore.EXPECT().FindByPath(ctx, "opencsg", "wukong").Return(&database.Model{
+		Repository: &database.Repository{DefaultBranch: "main"},
+	}, nil)
+
+	repoStore.EXPECT().FindByPath(ctx, types.DatasetRepo, "opencsg", "hellaswag").Return(&database.Repository{
+		DefaultBranch: "main",
+	}, nil)
 
 	tokenStore.EXPECT().FindByUID(ctx, int64(1)).Return(&database.AccessToken{Token: "foo"}, nil)
 
