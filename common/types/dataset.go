@@ -52,17 +52,18 @@ type Dataset struct {
 	MirrorLastUpdatedAt  time.Time            `json:"mirror_last_updated_at"`
 	URL                  string               `json:"url"`
 	MultiSource
-	RecomOpWeight         int                     `json:"recom_op_weight,omitempty"`
-	MirrorTaskStatus      MirrorTaskStatus        `json:"mirror_task_status"`
-	XnetEnabled           bool                    `json:"xnet_enabled"`
-	XnetMigrationStatus   XnetMigrationTaskStatus `json:"xnet_migration_status"`
-	XnetMigrationProgress int                     `json:"xnet_migration_progress"`
-	DatasetType           string                  `json:"dataset_type"`
-	RelatedDatasetID      int64                   `json:"related_dataset_id"`
-	Price                 float64                 `json:"price"`
-	Forked                bool                    `json:"forked"`
-	IsForSale             bool                    `json:"is_for_sale"`
-	UserPurchased         bool                    `json:"user_purchased"`
+	RecomOpWeight         int                       `json:"recom_op_weight,omitempty"`
+	MirrorTaskStatus      MirrorTaskStatus          `json:"mirror_task_status"`
+	XnetEnabled           bool                      `json:"xnet_enabled"`
+	XnetMigrationStatus   XnetMigrationTaskStatus   `json:"xnet_migration_status"`
+	XnetMigrationProgress int                       `json:"xnet_migration_progress"`
+	DatasetType           string                    `json:"dataset_type"`
+	RelatedDatasetID      int64                     `json:"related_dataset_id"`
+	Price                 float64                   `json:"price"`
+	Forked                bool                      `json:"forked"`
+	IsForSale             bool                      `json:"is_for_sale"`
+	UserPurchased         bool                      `json:"user_purchased"`
+	PurchaseTaskStatus    DatasetPurchaseTaskStatus `json:"purchase_task_status"`
 }
 
 type DataViewerReq struct {
@@ -88,11 +89,26 @@ type BuyDatasetReq struct {
 	TargetName  string `json:"target_name" binding:"omitempty"`
 }
 
+// DatasetPurchaseTaskStatus represents the status of a dataset purchase task
+type DatasetPurchaseTaskStatus string
+
+const (
+	// DatasetPurchaseTaskStatusPending means the task is waiting for execution
+	DatasetPurchaseTaskStatusPending DatasetPurchaseTaskStatus = "pending"
+	// DatasetPurchaseTaskStatusInProgress means the task is currently executing
+	DatasetPurchaseTaskStatusInProgress DatasetPurchaseTaskStatus = "in_progress"
+	// DatasetPurchaseTaskStatusCompleted means the task has completed successfully
+	DatasetPurchaseTaskStatusCompleted DatasetPurchaseTaskStatus = "completed"
+	// DatasetPurchaseTaskStatusFailed means the task has failed
+	DatasetPurchaseTaskStatusFailed DatasetPurchaseTaskStatus = "failed"
+)
+
 type BuyDatasetResp struct {
 	Success          bool    `json:"success"`
 	Message          string  `json:"message"`
 	Price            float64 `json:"price"`
 	RelatedDatasetID int64   `json:"related_dataset_id"`
+	TaskID           int64   `json:"task_id"`
 }
 
 var GitattributesFileName = ".gitattributes"

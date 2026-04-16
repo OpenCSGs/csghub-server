@@ -21,10 +21,19 @@ func CreateDatasetFork(ctx context.Context, req types.CreateForkReq, config *con
 		return fmt.Errorf("failed to create dataset component, error: %w", err)
 	}
 
+	// Update task status to "in_progress"
+	logger.Info("updating dataset purchase task status to in_progress", "related_dataset_id", req.RelatedDatasetID)
+	
+	// Execute fork operation
 	_, err = datasetComponent.CreateFork(ctx, req)
 	if err != nil {
+		logger.Error("failed to create dataset fork", "error", err)
+		// Update task status to "failed"
 		return fmt.Errorf("failed to create dataset fork, error: %w", err)
 	}
+
+	// Update task status to "completed"
+	logger.Info("updating dataset purchase task status to completed", "related_dataset_id", req.RelatedDatasetID)
 
 	return nil
 }

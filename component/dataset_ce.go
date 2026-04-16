@@ -5,6 +5,8 @@ package component
 import (
 	"context"
 	"fmt"
+	"path"
+	"time"
 
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/rpc"
@@ -252,6 +254,10 @@ func (c *datasetComponentImpl) Index(ctx context.Context, filter *types.RepoFilt
 	return c.commonIndex(ctx, filter, per, page, needOpWeight)
 }
 
+func (c *datasetComponentImpl) CreateFork(ctx context.Context, req types.CreateForkReq) (*types.Dataset, error) {
+	return c.createFork(ctx, req)
+}
+
 func (c *datasetComponentImpl) Refork(ctx context.Context, req types.CreateForkReq) (*types.Dataset, error) {
 	return nil, nil
 }
@@ -288,4 +294,47 @@ func NewDatasetComponent(config *config.Config) (DatasetComponent, error) {
 	c.gitServer = gs
 	c.config = config
 	return c, nil
+}
+
+func (c *datasetComponentImpl) createFork(ctx context.Context, req types.CreateForkReq) (*types.Dataset, error) {
+	// 1. Call repo component's CreateFork method
+	repo, err := c.repoComponent.CreateFork(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create fork repo, error: %w", err)
+	}
+
+	// 2. Create dataset record with forked=true and update repo path
+	dataset := database.Dataset{
+		RepositoryID:  repo.ID,
+		LastUpdatedAt: time.Now(),
+		DatasetType:   "normal",
+		Forked:        true,
+	}
+
+	finalPath := path.Join(req.TargetNamespace, req.TargetName)
+	newDataset, err := c.datasetStore.CreateAndUpdateRepoPath(ctx, dataset, finalPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create dataset record, error: %w", err)
+	}
+
+	// 3. Build and return types.Dataset
+	resDataset := &types.Dataset{
+		ID:               newDataset.ID,
+		Name:             repo.Name,
+		Nickname:         repo.Nickname,
+		Description:      repo.Description,
+		Likes:            repo.Likes,
+		Downloads:        repo.DownloadCount,
+		Path:             finalPath,
+		RepositoryID:     repo.ID,
+		Private:          repo.Private,
+		CreatedAt:        repo.CreatedAt,
+		UpdatedAt:        repo.UpdatedAt,
+		DatasetType:      newDataset.DatasetType,
+		RelatedDatasetID: newDataset.RelatedDatasetID,
+		Price:            newDataset.Price,
+		Forked:           newDataset.Forked,
+	}
+
+	return resDataset, nil
 }
