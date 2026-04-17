@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
 	"slices"
 	"strconv"
 	"strings"
@@ -77,7 +78,7 @@ func (m *openaiComponentImpl) GetAvailableModels(c context.Context, userName str
 	models = append(models, externalModels...)
 
 	models = m.enrichModelsWithPrice(c, models)
-
+	cacheModels := cloneModelsForCache(models)
 	// Save models to cache asynchronously
 	go func(modelList []types.Model) {
 		if len(modelList) == 0 {
@@ -87,7 +88,7 @@ func (m *openaiComponentImpl) GetAvailableModels(c context.Context, userName str
 			// Log error but don't affect the main request
 			slog.Error("failed to save models to cache", "error", err)
 		}
-	}(models)
+	}(cacheModels)
 
 	if strings.TrimSpace(userUUID) != "" {
 		req := &types.UserPreferenceRequest{
@@ -104,6 +105,25 @@ func (m *openaiComponentImpl) GetAvailableModels(c context.Context, userName str
 	}
 
 	return models, nil
+}
+
+func cloneModelsForCache(models []types.Model) []types.Model {
+	if len(models) == 0 {
+		return nil
+	}
+
+	clonedModels := slices.Clone(models)
+	for i := range clonedModels {
+		if clonedModels[i].Metadata != nil {
+			clonedModels[i].Metadata = maps.Clone(clonedModels[i].Metadata)
+		}
+		if clonedModels[i].IsPinned != nil {
+			isPinned := *clonedModels[i].IsPinned
+			clonedModels[i].IsPinned = &isPinned
+		}
+	}
+
+	return clonedModels
 }
 
 func (m *openaiComponentImpl) ListModels(c context.Context, userName string, req types.ListModelsReq) (types.ModelList, error) {
@@ -393,7 +413,7 @@ func (m *openaiComponentImpl) saveModelsToCache(models []types.Model) error {
 			return fmt.Errorf("failed to marshal model %s to JSON: %w", model.ID, err)
 		}
 		// Use model ID as the field name
-		err = m.modelListCache.HSet(ctx, modelCacheKey, model.ID, string(jsonBytes))
+		err = m.modelListCache.HSet(ctx, modelCacheKey, model.FormatModelID, string(jsonBytes))
 		if err != nil {
 			return fmt.Errorf("failed to set model %s in cache hash for key %s: %w", model.ID, modelCacheKey, err)
 		}
