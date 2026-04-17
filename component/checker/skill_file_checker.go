@@ -4,9 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"regexp"
 	"strings"
 
+	"github.com/goccy/go-yaml"
 	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/store/database"
@@ -69,13 +69,28 @@ func (c *SkillFileChecker) Check(ctx context.Context, req types.GitalyAllowedReq
 	}
 
 	// Check if SKILL.md is in the correct YAML format with name and description
-	pattern := `^---\s*\nname:\s*.+\s*\ndescription:\s*.+\s*---*.`
-	matched, err := regexp.MatchString(pattern, skillsContent)
-	if err != nil {
-		return false, fmt.Errorf("failed to check SKILL.md format: %w", err)
+	// Extract YAML front matter
+	yamlContent := skillsContent
+	if strings.HasPrefix(yamlContent, "---") {
+		parts := strings.SplitN(yamlContent, "---", 3)
+		if len(parts) >= 2 {
+			yamlContent = parts[1]
+		}
 	}
-	if !matched {
-		return false, fmt.Errorf("SKILL.md must be in YAML format with name and description fields")
+
+	// Parse YAML content
+	var metadata map[string]interface{}
+	err = yaml.Unmarshal([]byte(yamlContent), &metadata)
+	if err != nil {
+		return false, fmt.Errorf("SKILL.md must be in valid YAML format: %w", err)
+	}
+
+	// Check if required fields are present
+	if _, ok := metadata["name"]; !ok {
+		return false, fmt.Errorf("SKILL.md must have a 'name' field")
+	}
+	if _, ok := metadata["description"]; !ok {
+		return false, fmt.Errorf("SKILL.md must have a 'description' field")
 	}
 
 	return true, nil
