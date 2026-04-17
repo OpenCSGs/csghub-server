@@ -6,9 +6,9 @@
   "engine_images": [
     {
       "compute_type": "gpu",
-      "image": "opencsghq/amd-vllm:rocm7.0.0_vllm_0.17.1",
+      "image": "opencsghq/amd-vllm:rocm7.0.0_vllm_0.19.0",
       "driver_version": "7.0",
-      "engine_version": "0.17.1"
+      "engine_version": "0.19.0"
     }
   ],
   "engine_args": [
@@ -51,6 +51,11 @@
       "name": "cpu-offload-gb",
       "value": "0",
       "format": "--cpu-offload-gb %s"
+    },
+    {
+      "name": "data-parallel-size",
+      "value": "1",
+      "format": "--data-parallel-size %s"
     },
     {
       "name": "pipeline-parallel-size",
@@ -101,6 +106,11 @@
       "name": "enable-tool-calling",
       "value": "disable",
       "format": "--enable-auto-tool-choice"
+    },
+    {
+      "name": "enable-expert-parallel",
+      "value": "disable",
+      "format": "--enable-expert-parallel"
     },
     {
       "name": "limit-mm-per-prompt",
@@ -343,7 +353,24 @@
     "VoxtralRealtimeGeneration",
     "WhisperForConditionalGeneration",
     "XverseForCausalLM",
-    "Zamba2ForCausalLM"
+    "Zamba2ForCausalLM",
+    "Cheers",
+    "CheersForConditionalGeneration",
+    "CohereAsrForConditionalGeneration",
+    "Emu3ForConditionalGeneration",
+    "Ernie4_5_ForCausalLM",
+    "Exaone4_5_ForConditionalGeneration",
+    "FireRedLIDForConditionalGeneration",
+    "Gemma4ForCausalLM",
+    "Gemma4ForConditionalGeneration",
+    "HCXVisionV2ForCausalLM",
+    "HyperCLOVAXForCausalLM",
+    "MoonshotKimiaForCausalLM",
+    "Param2MoEForCausalLM",
+    "Phi4ForCausalLMV",
+    "SarvamMLAForCausalLM",
+    "SarvamMoEForCausalLM",
+    "TeleChat3ForCausalLM"
   ],
   "tool_call_parsers": {
     "DeepseekR1ForCausalLM": "deepseek_r1",
