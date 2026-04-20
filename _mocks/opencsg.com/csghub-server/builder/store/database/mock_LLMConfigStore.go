@@ -432,6 +432,74 @@ func (_c *MockLLMConfigStore_Index_Call) RunAndReturn(run func(context.Context, 
 	return _c
 }
 
+// IndexWithRepo provides a mock function with given fields: ctx, per, page, search
+func (_m *MockLLMConfigStore) IndexWithRepo(ctx context.Context, per int, page int, search *types.SearchLLMConfig) ([]*database.LLMConfig, int, error) {
+	ret := _m.Called(ctx, per, page, search)
+
+	if len(ret) == 0 {
+		panic("no return value specified for IndexWithRepo")
+	}
+
+	var r0 []*database.LLMConfig
+	var r1 int
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, int, int, *types.SearchLLMConfig) ([]*database.LLMConfig, int, error)); ok {
+		return rf(ctx, per, page, search)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, int, int, *types.SearchLLMConfig) []*database.LLMConfig); ok {
+		r0 = rf(ctx, per, page, search)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*database.LLMConfig)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, int, int, *types.SearchLLMConfig) int); ok {
+		r1 = rf(ctx, per, page, search)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, int, int, *types.SearchLLMConfig) error); ok {
+		r2 = rf(ctx, per, page, search)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockLLMConfigStore_IndexWithRepo_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'IndexWithRepo'
+type MockLLMConfigStore_IndexWithRepo_Call struct {
+	*mock.Call
+}
+
+// IndexWithRepo is a helper method to define mock.On call
+//   - ctx context.Context
+//   - per int
+//   - page int
+//   - search *types.SearchLLMConfig
+func (_e *MockLLMConfigStore_Expecter) IndexWithRepo(ctx interface{}, per interface{}, page interface{}, search interface{}) *MockLLMConfigStore_IndexWithRepo_Call {
+	return &MockLLMConfigStore_IndexWithRepo_Call{Call: _e.mock.On("IndexWithRepo", ctx, per, page, search)}
+}
+
+func (_c *MockLLMConfigStore_IndexWithRepo_Call) Run(run func(ctx context.Context, per int, page int, search *types.SearchLLMConfig)) *MockLLMConfigStore_IndexWithRepo_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int), args[2].(int), args[3].(*types.SearchLLMConfig))
+	})
+	return _c
+}
+
+func (_c *MockLLMConfigStore_IndexWithRepo_Call) Return(_a0 []*database.LLMConfig, _a1 int, _a2 error) *MockLLMConfigStore_IndexWithRepo_Call {
+	_c.Call.Return(_a0, _a1, _a2)
+	return _c
+}
+
+func (_c *MockLLMConfigStore_IndexWithRepo_Call) RunAndReturn(run func(context.Context, int, int, *types.SearchLLMConfig) ([]*database.LLMConfig, int, error)) *MockLLMConfigStore_IndexWithRepo_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Update provides a mock function with given fields: ctx, config
 func (_m *MockLLMConfigStore) Update(ctx context.Context, config database.LLMConfig) (*database.LLMConfig, error) {
 	ret := _m.Called(ctx, config)

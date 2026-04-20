@@ -308,3 +308,113 @@ func TestLLMConfigStore_Index_EnabledFilter(t *testing.T) {
 	require.Len(t, cfgsKeyword, 1)
 	require.Equal(t, "idx-en-on", cfgsKeyword[0].ModelName)
 }
+
+func TestLLMConfigStore_IndexWithRepo(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+	config, err := config.LoadConfig()
+	require.Nil(t, err)
+	store := database.NewLLMConfigStoreWithDB(db, config)
+
+	// Create a namespace and repository first
+	namespace := database.Namespace{
+		Path: "test-ns-indexwithrepo",
+	}
+	_, err = db.Core.NewInsert().Model(&namespace).Exec(ctx)
+	require.Nil(t, err)
+
+	user := database.User{
+		GitID:    12345,
+		Username: "test-user-indexwithrepo",
+		NickName: "Test User",
+		Email:    "test-indexwithrepo@example.com",
+	}
+	_, err = db.Core.NewInsert().Model(&user).Exec(ctx)
+	require.Nil(t, err)
+
+	repo := database.Repository{
+		Path:        "test-ns-indexwithrepo/test-repo",
+		Name:        "test-repo",
+		Nickname:    "Test Repo",
+		Description: "A test repository",
+		UserID:      user.ID,
+	}
+	_, err = db.Core.NewInsert().Model(&repo).Exec(ctx)
+	require.Nil(t, err)
+
+	// Create LLMConfigs with and without repo
+	llmType := 16
+	enabled := true
+
+	_, err = store.Create(ctx, database.LLMConfig{
+		ModelName:    "with-repo-model",
+		OfficialName: "With Repo Model",
+		Type:         llmType,
+		Enabled:      true,
+		ApiEndpoint:  "https://example.test/v1",
+		AuthHeader:   "{}",
+		Provider:     "test",
+		RepoID:       repo.ID,
+	})
+	require.Nil(t, err)
+
+	_, err = store.Create(ctx, database.LLMConfig{
+		ModelName:    "no-repo-model",
+		OfficialName: "No Repo Model",
+		Type:         llmType,
+		Enabled:      true,
+		ApiEndpoint:  "https://example.test/v1",
+		AuthHeader:   "{}",
+		Provider:     "test",
+		RepoID:       0,
+	})
+	require.Nil(t, err)
+
+	// Test IndexWithRepo
+	search := &types.SearchLLMConfig{
+		Type:    &llmType,
+		Enabled: &enabled,
+	}
+	cfgs, total, err := store.IndexWithRepo(ctx, 10, 1, search)
+	require.Nil(t, err)
+	require.Equal(t, 2, total)
+	require.Len(t, cfgs, 2)
+
+	var withRepo, withoutRepo *database.LLMConfig
+	for _, cfg := range cfgs {
+		if cfg.ModelName == "with-repo-model" {
+			withRepo = cfg
+		} else if cfg.ModelName == "no-repo-model" {
+			withoutRepo = cfg
+		}
+	}
+
+	require.NotNil(t, withRepo)
+	require.NotNil(t, withRepo.Repo)
+	require.Equal(t, repo.ID, withRepo.Repo.ID)
+	require.Equal(t, "test-repo", withRepo.Repo.Name)
+	require.Equal(t, "Test Repo", withRepo.Repo.Nickname)
+	require.Equal(t, "A test repository", withRepo.Repo.Description)
+
+	require.NotNil(t, withoutRepo)
+	require.Nil(t, withoutRepo.Repo)
+}
+
+func TestLLMConfigStore_IndexWithRepo_Empty(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+	config, err := config.LoadConfig()
+	require.Nil(t, err)
+	store := database.NewLLMConfigStoreWithDB(db, config)
+
+	llmType := 16
+	search := &types.SearchLLMConfig{
+		Type: &llmType,
+	}
+	cfgs, total, err := store.IndexWithRepo(ctx, 10, 1, search)
+	require.Nil(t, err)
+	require.Equal(t, 0, total)
+	require.Len(t, cfgs, 0)
+}
