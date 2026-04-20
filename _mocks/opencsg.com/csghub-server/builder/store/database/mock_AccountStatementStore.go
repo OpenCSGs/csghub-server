@@ -260,6 +260,79 @@ func (_c *MockAccountStatementStore_ListByUserIDAndTime_Call) RunAndReturn(run f
 	return _c
 }
 
+// ListPortalRecharges provides a mock function with given fields: ctx, req
+func (_m *MockAccountStatementStore) ListPortalRecharges(ctx context.Context, req types.AcctRechargeListReq) ([]database.AccountStatement, int, float64, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListPortalRecharges")
+	}
+
+	var r0 []database.AccountStatement
+	var r1 int
+	var r2 float64
+	var r3 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.AcctRechargeListReq) ([]database.AccountStatement, int, float64, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.AcctRechargeListReq) []database.AccountStatement); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.AccountStatement)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.AcctRechargeListReq) int); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, types.AcctRechargeListReq) float64); ok {
+		r2 = rf(ctx, req)
+	} else {
+		r2 = ret.Get(2).(float64)
+	}
+
+	if rf, ok := ret.Get(3).(func(context.Context, types.AcctRechargeListReq) error); ok {
+		r3 = rf(ctx, req)
+	} else {
+		r3 = ret.Error(3)
+	}
+
+	return r0, r1, r2, r3
+}
+
+// MockAccountStatementStore_ListPortalRecharges_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListPortalRecharges'
+type MockAccountStatementStore_ListPortalRecharges_Call struct {
+	*mock.Call
+}
+
+// ListPortalRecharges is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.AcctRechargeListReq
+func (_e *MockAccountStatementStore_Expecter) ListPortalRecharges(ctx interface{}, req interface{}) *MockAccountStatementStore_ListPortalRecharges_Call {
+	return &MockAccountStatementStore_ListPortalRecharges_Call{Call: _e.mock.On("ListPortalRecharges", ctx, req)}
+}
+
+func (_c *MockAccountStatementStore_ListPortalRecharges_Call) Run(run func(ctx context.Context, req types.AcctRechargeListReq)) *MockAccountStatementStore_ListPortalRecharges_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.AcctRechargeListReq))
+	})
+	return _c
+}
+
+func (_c *MockAccountStatementStore_ListPortalRecharges_Call) Return(_a0 []database.AccountStatement, _a1 int, _a2 float64, _a3 error) *MockAccountStatementStore_ListPortalRecharges_Call {
+	_c.Call.Return(_a0, _a1, _a2, _a3)
+	return _c
+}
+
+func (_c *MockAccountStatementStore_ListPortalRecharges_Call) RunAndReturn(run func(context.Context, types.AcctRechargeListReq) ([]database.AccountStatement, int, float64, error)) *MockAccountStatementStore_ListPortalRecharges_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ListRechargeByUserIDAndTime provides a mock function with given fields: ctx, req
 func (_m *MockAccountStatementStore) ListRechargeByUserIDAndTime(ctx context.Context, req types.AcctRechargeListReq) (database.AccountStatementRes, error) {
 	ret := _m.Called(ctx, req)

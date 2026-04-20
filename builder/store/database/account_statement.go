@@ -24,6 +24,7 @@ type AccountStatementStore interface {
 	GetByEventID(ctx context.Context, eventID uuid.UUID) (AccountStatement, error)
 	ListRechargeByUserIDAndTime(ctx context.Context, req types.AcctRechargeListReq) (AccountStatementRes, error)
 	ListStatementByUserAndSku(ctx context.Context, req types.ActStatementsReq) ([]UserSkuStatement, int, error)
+	ListPortalRecharges(ctx context.Context, req types.AcctRechargeListReq) ([]AccountStatement, int, float64, error)
 	HasUserPurchasedDataset(ctx context.Context, userUUID string, datasetID int64) (bool, error)
 }
 
@@ -463,26 +464,24 @@ func (as *accountStatementStoreImpl) ListRechargeByUserIDAndTime(ctx context.Con
 	var accountStatment []AccountStatement
 	q := as.db.Operator.Core.NewSelect().Model(&accountStatment).Relation("Present").
 		Where("account_statement.user_uuid = ?", req.TargetUUID).
-		Where("scene = ?", req.Scene).
-		Where("customer_id = ?", "").
+		Where("account_statement.scene = ?", req.Scene).
+		Where("account_statement.customer_id = ?", "").
 		Where("account_statement.created_at >= ? and account_statement.created_at <= ?", req.StartTime, req.EndTime)
 
 	if req.ActivityID > 0 {
-		q = q.Where("activity_id = ?", req.ActivityID)
+		q = q.Where("present.activity_id = ?", req.ActivityID)
 	}
 
 	count, err := q.Count(ctx)
 	if err != nil {
 		return AccountStatementRes{}, fmt.Errorf("count statement, error:%w", err)
 	}
-
 	var totalResult TotalResult
 	err = as.db.Operator.Core.NewSelect().With("grouped_items", q).TableExpr("grouped_items").ColumnExpr("SUM(value) AS total_value").Scan(ctx, &totalResult)
 	if err != nil {
 		return AccountStatementRes{}, fmt.Errorf("group statement, error:%w", err)
 	}
-
-	_, err = q.Order("id DESC").Limit(req.Per).Offset((req.Page-1)*req.Per).Exec(ctx, &accountStatment)
+	_, err = q.Order("account_statement.id DESC").Limit(req.Per).Offset((req.Page-1)*req.Per).Exec(ctx, &accountStatment)
 	if err != nil {
 		return AccountStatementRes{}, fmt.Errorf("list statement, error:%w", err)
 	}
@@ -567,6 +566,30 @@ func (as *accountStatementStoreImpl) ListStatementByUserAndSku(ctx context.Conte
 	}
 
 	return results, totalCount, nil
+}
+
+func (as *accountStatementStoreImpl) ListPortalRecharges(ctx context.Context, req types.AcctRechargeListReq) ([]AccountStatement, int, float64, error) {
+	var portalRecharges []AccountStatement
+	q := as.db.Operator.Core.NewSelect().Model((*AccountStatement)(nil)).Relation("Present").
+		Where("account_statement.scene = ?", req.Scene).
+		Where("account_statement.created_at >= ? AND account_statement.created_at <= ?", req.StartTime, req.EndTime)
+	if req.TargetUUID != "" {
+		q = q.Where("account_statement.user_uuid = ?", req.TargetUUID)
+	}
+	count, err := q.Count(ctx)
+	if err != nil {
+		return nil, 0, 0, fmt.Errorf("count portal recharges, error:%w", err)
+	}
+	var totalResult TotalResult
+	err = as.db.Operator.Core.NewSelect().With("grouped_items", q).TableExpr("grouped_items").ColumnExpr("SUM(value) AS total_value").Scan(ctx, &totalResult)
+	if err != nil {
+		return nil, 0, 0, fmt.Errorf("group portal recharges, error:%w", err)
+	}
+	_, err = q.Order("account_statement.id DESC").Limit(req.Per).Offset((req.Page-1)*req.Per).Exec(ctx, &portalRecharges)
+	if err != nil {
+		return nil, 0, 0, fmt.Errorf("list portal recharges, error:%w", err)
+	}
+	return portalRecharges, count, totalResult.TotalValue, nil
 }
 
 func (as *accountStatementStoreImpl) HasUserPurchasedDataset(ctx context.Context, userUUID string, datasetID int64) (bool, error) {

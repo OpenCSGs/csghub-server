@@ -121,6 +121,65 @@ func (_c *MockAccountPresentStore_CancelPresent_Call) RunAndReturn(run func(cont
 	return _c
 }
 
+// FindPresentByEventUUID provides a mock function with given fields: ctx, eventUUID
+func (_m *MockAccountPresentStore) FindPresentByEventUUID(ctx context.Context, eventUUID uuid.UUID) (*database.AccountPresent, error) {
+	ret := _m.Called(ctx, eventUUID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FindPresentByEventUUID")
+	}
+
+	var r0 *database.AccountPresent
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, uuid.UUID) (*database.AccountPresent, error)); ok {
+		return rf(ctx, eventUUID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, uuid.UUID) *database.AccountPresent); ok {
+		r0 = rf(ctx, eventUUID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.AccountPresent)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, uuid.UUID) error); ok {
+		r1 = rf(ctx, eventUUID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountPresentStore_FindPresentByEventUUID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindPresentByEventUUID'
+type MockAccountPresentStore_FindPresentByEventUUID_Call struct {
+	*mock.Call
+}
+
+// FindPresentByEventUUID is a helper method to define mock.On call
+//   - ctx context.Context
+//   - eventUUID uuid.UUID
+func (_e *MockAccountPresentStore_Expecter) FindPresentByEventUUID(ctx interface{}, eventUUID interface{}) *MockAccountPresentStore_FindPresentByEventUUID_Call {
+	return &MockAccountPresentStore_FindPresentByEventUUID_Call{Call: _e.mock.On("FindPresentByEventUUID", ctx, eventUUID)}
+}
+
+func (_c *MockAccountPresentStore_FindPresentByEventUUID_Call) Run(run func(ctx context.Context, eventUUID uuid.UUID)) *MockAccountPresentStore_FindPresentByEventUUID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(uuid.UUID))
+	})
+	return _c
+}
+
+func (_c *MockAccountPresentStore_FindPresentByEventUUID_Call) Return(_a0 *database.AccountPresent, _a1 error) *MockAccountPresentStore_FindPresentByEventUUID_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountPresentStore_FindPresentByEventUUID_Call) RunAndReturn(run func(context.Context, uuid.UUID) (*database.AccountPresent, error)) *MockAccountPresentStore_FindPresentByEventUUID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // FindPresentByUserAndActivity provides a mock function with given fields: ctx, userID, activityID, participantUUID
 func (_m *MockAccountPresentStore) FindPresentByUserAndActivity(ctx context.Context, userID string, activityID int64, participantUUID string) (*database.AccountPresent, error) {
 	ret := _m.Called(ctx, userID, activityID, participantUUID)
