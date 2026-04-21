@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	mockcomp "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/user/component"
+	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/builder/testutil"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
@@ -30,6 +31,17 @@ func NewAccessTokenTester(t *testing.T) *AccessTokenTester {
 
 func (t *AccessTokenTester) WithHandleFunc(fn func(h *AccessTokenHandler) gin.HandlerFunc) *AccessTokenTester {
 	t.Handler(fn(t.handler))
+	return t
+}
+
+func (t *AccessTokenTester) WithUserUUID() *AccessTokenTester {
+	t.Gctx().Set(httpbase.CurrentUserUUIDCtxVar, "user-uuid")
+	return t
+}
+
+func (t *AccessTokenTester) WithUserAndUUID() *AccessTokenTester {
+	t.GinTester.WithUser()
+	t.Gctx().Set(httpbase.CurrentUserUUIDCtxVar, "user-uuid")
 	return t
 }
 
@@ -206,5 +218,81 @@ func TestAccessTokenHandler_Refresh(t *testing.T) {
 			Execute()
 
 		tester.ResponseEq(t, 200, "OK", expectedResp)
+	})
+}
+
+func TestAccessTokenHandler_CreateAPIKey(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	t.Run("missing namespace uuid returns 400", func(t *testing.T) {
+		tester := NewAccessTokenTester(t).WithHandleFunc(func(h *AccessTokenHandler) gin.HandlerFunc {
+			return h.CreateAPIKey
+		})
+
+		tester.WithUserAndUUID().
+			Execute()
+
+		tester.ResponseEqCode(t, 400)
+	})
+
+	t.Run("invalid request body returns 400", func(t *testing.T) {
+		tester := NewAccessTokenTester(t).WithHandleFunc(func(h *AccessTokenHandler) gin.HandlerFunc {
+			return h.CreateAPIKey
+		})
+
+		tester.WithUserAndUUID().
+			WithParam("uuid", "namespace-uuid").
+			Execute()
+
+		tester.ResponseEqCode(t, 400)
+	})
+}
+
+func TestAccessTokenHandler_GetAPIKeys(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	t.Run("missing namespace uuid returns 400", func(t *testing.T) {
+		tester := NewAccessTokenTester(t).WithHandleFunc(func(h *AccessTokenHandler) gin.HandlerFunc {
+			return h.GetAPIKeys
+		})
+
+		tester.WithUserAndUUID().
+			Execute()
+
+		tester.ResponseEqCode(t, 400)
+	})
+}
+
+func TestAccessTokenHandler_UpdateAPIKey(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	t.Run("invalid id returns 400", func(t *testing.T) {
+		tester := NewAccessTokenTester(t).WithHandleFunc(func(h *AccessTokenHandler) gin.HandlerFunc {
+			return h.UpdateAPIKey
+		})
+
+		tester.WithUserAndUUID().
+			WithParam("uuid", "namespace-uuid").
+			WithParam("id", "invalid").
+			Execute()
+
+		tester.ResponseEqCode(t, 400)
+	})
+}
+
+func TestAccessTokenHandler_DeleteAPIKey(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	t.Run("invalid id returns 400", func(t *testing.T) {
+		tester := NewAccessTokenTester(t).WithHandleFunc(func(h *AccessTokenHandler) gin.HandlerFunc {
+			return h.DeleteAPIKey
+		})
+
+		tester.WithUserAndUUID().
+			WithParam("uuid", "namespace-uuid").
+			WithParam("id", "invalid").
+			Execute()
+
+		tester.ResponseEqCode(t, 400)
 	})
 }

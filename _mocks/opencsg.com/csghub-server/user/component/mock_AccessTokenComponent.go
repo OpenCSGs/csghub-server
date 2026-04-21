@@ -248,9 +248,9 @@ func (_c *MockAccessTokenComponent_GetOrCreateFirstAvaiToken_Call) RunAndReturn(
 	return _c
 }
 
-// GetTokens provides a mock function with given fields: ctx, username, app
-func (_m *MockAccessTokenComponent) GetTokens(ctx context.Context, username string, app string) ([]types.CheckAccessTokenResp, error) {
-	ret := _m.Called(ctx, username, app)
+// GetTokens provides a mock function with given fields: ctx, req
+func (_m *MockAccessTokenComponent) GetTokens(ctx context.Context, req *types.GetAccessTokenRequest) ([]types.CheckAccessTokenResp, error) {
+	ret := _m.Called(ctx, req)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetTokens")
@@ -258,19 +258,19 @@ func (_m *MockAccessTokenComponent) GetTokens(ctx context.Context, username stri
 
 	var r0 []types.CheckAccessTokenResp
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) ([]types.CheckAccessTokenResp, error)); ok {
-		return rf(ctx, username, app)
+	if rf, ok := ret.Get(0).(func(context.Context, *types.GetAccessTokenRequest) ([]types.CheckAccessTokenResp, error)); ok {
+		return rf(ctx, req)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) []types.CheckAccessTokenResp); ok {
-		r0 = rf(ctx, username, app)
+	if rf, ok := ret.Get(0).(func(context.Context, *types.GetAccessTokenRequest) []types.CheckAccessTokenResp); ok {
+		r0 = rf(ctx, req)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]types.CheckAccessTokenResp)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
-		r1 = rf(ctx, username, app)
+	if rf, ok := ret.Get(1).(func(context.Context, *types.GetAccessTokenRequest) error); ok {
+		r1 = rf(ctx, req)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -285,15 +285,14 @@ type MockAccessTokenComponent_GetTokens_Call struct {
 
 // GetTokens is a helper method to define mock.On call
 //   - ctx context.Context
-//   - username string
-//   - app string
-func (_e *MockAccessTokenComponent_Expecter) GetTokens(ctx interface{}, username interface{}, app interface{}) *MockAccessTokenComponent_GetTokens_Call {
-	return &MockAccessTokenComponent_GetTokens_Call{Call: _e.mock.On("GetTokens", ctx, username, app)}
+//   - req *types.GetAccessTokenRequest
+func (_e *MockAccessTokenComponent_Expecter) GetTokens(ctx interface{}, req interface{}) *MockAccessTokenComponent_GetTokens_Call {
+	return &MockAccessTokenComponent_GetTokens_Call{Call: _e.mock.On("GetTokens", ctx, req)}
 }
 
-func (_c *MockAccessTokenComponent_GetTokens_Call) Run(run func(ctx context.Context, username string, app string)) *MockAccessTokenComponent_GetTokens_Call {
+func (_c *MockAccessTokenComponent_GetTokens_Call) Run(run func(ctx context.Context, req *types.GetAccessTokenRequest)) *MockAccessTokenComponent_GetTokens_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string))
+		run(args[0].(context.Context), args[1].(*types.GetAccessTokenRequest))
 	})
 	return _c
 }
@@ -303,7 +302,7 @@ func (_c *MockAccessTokenComponent_GetTokens_Call) Return(_a0 []types.CheckAcces
 	return _c
 }
 
-func (_c *MockAccessTokenComponent_GetTokens_Call) RunAndReturn(run func(context.Context, string, string) ([]types.CheckAccessTokenResp, error)) *MockAccessTokenComponent_GetTokens_Call {
+func (_c *MockAccessTokenComponent_GetTokens_Call) RunAndReturn(run func(context.Context, *types.GetAccessTokenRequest) ([]types.CheckAccessTokenResp, error)) *MockAccessTokenComponent_GetTokens_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -364,6 +363,65 @@ func (_c *MockAccessTokenComponent_RefreshToken_Call) Return(_a0 types.CheckAcce
 }
 
 func (_c *MockAccessTokenComponent_RefreshToken_Call) RunAndReturn(run func(context.Context, string, string, string, time.Time) (types.CheckAccessTokenResp, error)) *MockAccessTokenComponent_RefreshToken_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// Update provides a mock function with given fields: ctx, req
+func (_m *MockAccessTokenComponent) Update(ctx context.Context, req *types.UpdateAPIKeyRequest) (*types.CheckAccessTokenResp, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Update")
+	}
+
+	var r0 *types.CheckAccessTokenResp
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *types.UpdateAPIKeyRequest) (*types.CheckAccessTokenResp, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *types.UpdateAPIKeyRequest) *types.CheckAccessTokenResp); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.CheckAccessTokenResp)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *types.UpdateAPIKeyRequest) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccessTokenComponent_Update_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Update'
+type MockAccessTokenComponent_Update_Call struct {
+	*mock.Call
+}
+
+// Update is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req *types.UpdateAPIKeyRequest
+func (_e *MockAccessTokenComponent_Expecter) Update(ctx interface{}, req interface{}) *MockAccessTokenComponent_Update_Call {
+	return &MockAccessTokenComponent_Update_Call{Call: _e.mock.On("Update", ctx, req)}
+}
+
+func (_c *MockAccessTokenComponent_Update_Call) Run(run func(ctx context.Context, req *types.UpdateAPIKeyRequest)) *MockAccessTokenComponent_Update_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*types.UpdateAPIKeyRequest))
+	})
+	return _c
+}
+
+func (_c *MockAccessTokenComponent_Update_Call) Return(_a0 *types.CheckAccessTokenResp, _a1 error) *MockAccessTokenComponent_Update_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccessTokenComponent_Update_Call) RunAndReturn(run func(context.Context, *types.UpdateAPIKeyRequest) (*types.CheckAccessTokenResp, error)) *MockAccessTokenComponent_Update_Call {
 	_c.Call.Return(run)
 	return _c
 }

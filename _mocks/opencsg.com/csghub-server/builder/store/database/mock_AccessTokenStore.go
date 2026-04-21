@@ -24,17 +24,17 @@ func (_m *MockAccessTokenStore) EXPECT() *MockAccessTokenStore_Expecter {
 	return &MockAccessTokenStore_Expecter{mock: &_m.Mock}
 }
 
-// Create provides a mock function with given fields: ctx, token
-func (_m *MockAccessTokenStore) Create(ctx context.Context, token *database.AccessToken) error {
-	ret := _m.Called(ctx, token)
+// Create provides a mock function with given fields: ctx, token, quota
+func (_m *MockAccessTokenStore) Create(ctx context.Context, token *database.AccessToken, quota []database.AccountAccessTokenQuota) error {
+	ret := _m.Called(ctx, token, quota)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Create")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, *database.AccessToken) error); ok {
-		r0 = rf(ctx, token)
+	if rf, ok := ret.Get(0).(func(context.Context, *database.AccessToken, []database.AccountAccessTokenQuota) error); ok {
+		r0 = rf(ctx, token, quota)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -50,23 +50,24 @@ type MockAccessTokenStore_Create_Call struct {
 // Create is a helper method to define mock.On call
 //   - ctx context.Context
 //   - token *database.AccessToken
-func (_e *MockAccessTokenStore_Expecter) Create(ctx interface{}, token interface{}) *MockAccessTokenStore_Create_Call {
-	return &MockAccessTokenStore_Create_Call{Call: _e.mock.On("Create", ctx, token)}
+//   - quota []database.AccountAccessTokenQuota
+func (_e *MockAccessTokenStore_Expecter) Create(ctx interface{}, token interface{}, quota interface{}) *MockAccessTokenStore_Create_Call {
+	return &MockAccessTokenStore_Create_Call{Call: _e.mock.On("Create", ctx, token, quota)}
 }
 
-func (_c *MockAccessTokenStore_Create_Call) Run(run func(ctx context.Context, token *database.AccessToken)) *MockAccessTokenStore_Create_Call {
+func (_c *MockAccessTokenStore_Create_Call) Run(run func(ctx context.Context, token *database.AccessToken, quota []database.AccountAccessTokenQuota)) *MockAccessTokenStore_Create_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(*database.AccessToken))
+		run(args[0].(context.Context), args[1].(*database.AccessToken), args[2].([]database.AccountAccessTokenQuota))
 	})
 	return _c
 }
 
-func (_c *MockAccessTokenStore_Create_Call) Return(err error) *MockAccessTokenStore_Create_Call {
-	_c.Call.Return(err)
+func (_c *MockAccessTokenStore_Create_Call) Return(_a0 error) *MockAccessTokenStore_Create_Call {
+	_c.Call.Return(_a0)
 	return _c
 }
 
-func (_c *MockAccessTokenStore_Create_Call) RunAndReturn(run func(context.Context, *database.AccessToken) error) *MockAccessTokenStore_Create_Call {
+func (_c *MockAccessTokenStore_Create_Call) RunAndReturn(run func(context.Context, *database.AccessToken, []database.AccountAccessTokenQuota) error) *MockAccessTokenStore_Create_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -116,6 +117,53 @@ func (_c *MockAccessTokenStore_Delete_Call) Return(err error) *MockAccessTokenSt
 }
 
 func (_c *MockAccessTokenStore_Delete_Call) RunAndReturn(run func(context.Context, string, string, string) error) *MockAccessTokenStore_Delete_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// DeleteByID provides a mock function with given fields: ctx, id
+func (_m *MockAccessTokenStore) DeleteByID(ctx context.Context, id int64) error {
+	ret := _m.Called(ctx, id)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteByID")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64) error); ok {
+		r0 = rf(ctx, id)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockAccessTokenStore_DeleteByID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteByID'
+type MockAccessTokenStore_DeleteByID_Call struct {
+	*mock.Call
+}
+
+// DeleteByID is a helper method to define mock.On call
+//   - ctx context.Context
+//   - id int64
+func (_e *MockAccessTokenStore_Expecter) DeleteByID(ctx interface{}, id interface{}) *MockAccessTokenStore_DeleteByID_Call {
+	return &MockAccessTokenStore_DeleteByID_Call{Call: _e.mock.On("DeleteByID", ctx, id)}
+}
+
+func (_c *MockAccessTokenStore_DeleteByID_Call) Run(run func(ctx context.Context, id int64)) *MockAccessTokenStore_DeleteByID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64))
+	})
+	return _c
+}
+
+func (_c *MockAccessTokenStore_DeleteByID_Call) Return(_a0 error) *MockAccessTokenStore_DeleteByID_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockAccessTokenStore_DeleteByID_Call) RunAndReturn(run func(context.Context, int64) error) *MockAccessTokenStore_DeleteByID_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -175,6 +223,66 @@ func (_c *MockAccessTokenStore_FindByID_Call) Return(token *database.AccessToken
 }
 
 func (_c *MockAccessTokenStore_FindByID_Call) RunAndReturn(run func(context.Context, int64) (*database.AccessToken, error)) *MockAccessTokenStore_FindByID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// FindByNsUUID provides a mock function with given fields: ctx, nsUUID, app
+func (_m *MockAccessTokenStore) FindByNsUUID(ctx context.Context, nsUUID string, app string) ([]database.AccessToken, error) {
+	ret := _m.Called(ctx, nsUUID, app)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FindByNsUUID")
+	}
+
+	var r0 []database.AccessToken
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) ([]database.AccessToken, error)); ok {
+		return rf(ctx, nsUUID, app)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) []database.AccessToken); ok {
+		r0 = rf(ctx, nsUUID, app)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.AccessToken)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+		r1 = rf(ctx, nsUUID, app)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccessTokenStore_FindByNsUUID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindByNsUUID'
+type MockAccessTokenStore_FindByNsUUID_Call struct {
+	*mock.Call
+}
+
+// FindByNsUUID is a helper method to define mock.On call
+//   - ctx context.Context
+//   - nsUUID string
+//   - app string
+func (_e *MockAccessTokenStore_Expecter) FindByNsUUID(ctx interface{}, nsUUID interface{}, app interface{}) *MockAccessTokenStore_FindByNsUUID_Call {
+	return &MockAccessTokenStore_FindByNsUUID_Call{Call: _e.mock.On("FindByNsUUID", ctx, nsUUID, app)}
+}
+
+func (_c *MockAccessTokenStore_FindByNsUUID_Call) Run(run func(ctx context.Context, nsUUID string, app string)) *MockAccessTokenStore_FindByNsUUID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(string))
+	})
+	return _c
+}
+
+func (_c *MockAccessTokenStore_FindByNsUUID_Call) Return(_a0 []database.AccessToken, _a1 error) *MockAccessTokenStore_FindByNsUUID_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccessTokenStore_FindByNsUUID_Call) RunAndReturn(run func(context.Context, string, string) ([]database.AccessToken, error)) *MockAccessTokenStore_FindByNsUUID_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -419,6 +527,65 @@ func (_c *MockAccessTokenStore_FindByUser_Call) RunAndReturn(run func(context.Co
 	return _c
 }
 
+// GetByID provides a mock function with given fields: ctx, id
+func (_m *MockAccessTokenStore) GetByID(ctx context.Context, id int64) (*database.AccessToken, error) {
+	ret := _m.Called(ctx, id)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetByID")
+	}
+
+	var r0 *database.AccessToken
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64) (*database.AccessToken, error)); ok {
+		return rf(ctx, id)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, int64) *database.AccessToken); ok {
+		r0 = rf(ctx, id)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.AccessToken)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, int64) error); ok {
+		r1 = rf(ctx, id)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccessTokenStore_GetByID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetByID'
+type MockAccessTokenStore_GetByID_Call struct {
+	*mock.Call
+}
+
+// GetByID is a helper method to define mock.On call
+//   - ctx context.Context
+//   - id int64
+func (_e *MockAccessTokenStore_Expecter) GetByID(ctx interface{}, id interface{}) *MockAccessTokenStore_GetByID_Call {
+	return &MockAccessTokenStore_GetByID_Call{Call: _e.mock.On("GetByID", ctx, id)}
+}
+
+func (_c *MockAccessTokenStore_GetByID_Call) Run(run func(ctx context.Context, id int64)) *MockAccessTokenStore_GetByID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64))
+	})
+	return _c
+}
+
+func (_c *MockAccessTokenStore_GetByID_Call) Return(_a0 *database.AccessToken, _a1 error) *MockAccessTokenStore_GetByID_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccessTokenStore_GetByID_Call) RunAndReturn(run func(context.Context, int64) (*database.AccessToken, error)) *MockAccessTokenStore_GetByID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetUserGitToken provides a mock function with given fields: ctx, username
 func (_m *MockAccessTokenStore) GetUserGitToken(ctx context.Context, username string) (*database.AccessToken, error) {
 	ret := _m.Called(ctx, username)
@@ -537,6 +704,65 @@ func (_c *MockAccessTokenStore_IsExist_Call) RunAndReturn(run func(context.Conte
 	return _c
 }
 
+// IsExistByUUID provides a mock function with given fields: ctx, uuid, tkName, app
+func (_m *MockAccessTokenStore) IsExistByUUID(ctx context.Context, uuid string, tkName string, app string) (bool, error) {
+	ret := _m.Called(ctx, uuid, tkName, app)
+
+	if len(ret) == 0 {
+		panic("no return value specified for IsExistByUUID")
+	}
+
+	var r0 bool
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) (bool, error)); ok {
+		return rf(ctx, uuid, tkName, app)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) bool); ok {
+		r0 = rf(ctx, uuid, tkName, app)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string) error); ok {
+		r1 = rf(ctx, uuid, tkName, app)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccessTokenStore_IsExistByUUID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'IsExistByUUID'
+type MockAccessTokenStore_IsExistByUUID_Call struct {
+	*mock.Call
+}
+
+// IsExistByUUID is a helper method to define mock.On call
+//   - ctx context.Context
+//   - uuid string
+//   - tkName string
+//   - app string
+func (_e *MockAccessTokenStore_Expecter) IsExistByUUID(ctx interface{}, uuid interface{}, tkName interface{}, app interface{}) *MockAccessTokenStore_IsExistByUUID_Call {
+	return &MockAccessTokenStore_IsExistByUUID_Call{Call: _e.mock.On("IsExistByUUID", ctx, uuid, tkName, app)}
+}
+
+func (_c *MockAccessTokenStore_IsExistByUUID_Call) Run(run func(ctx context.Context, uuid string, tkName string, app string)) *MockAccessTokenStore_IsExistByUUID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string))
+	})
+	return _c
+}
+
+func (_c *MockAccessTokenStore_IsExistByUUID_Call) Return(exists bool, err error) *MockAccessTokenStore_IsExistByUUID_Call {
+	_c.Call.Return(exists, err)
+	return _c
+}
+
+func (_c *MockAccessTokenStore_IsExistByUUID_Call) RunAndReturn(run func(context.Context, string, string, string) (bool, error)) *MockAccessTokenStore_IsExistByUUID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Refresh provides a mock function with given fields: ctx, token, newTokenValue, newExpiredAt
 func (_m *MockAccessTokenStore) Refresh(ctx context.Context, token *database.AccessToken, newTokenValue string, newExpiredAt time.Time) (*database.AccessToken, error) {
 	ret := _m.Called(ctx, token, newTokenValue, newExpiredAt)
@@ -594,6 +820,66 @@ func (_c *MockAccessTokenStore_Refresh_Call) Return(_a0 *database.AccessToken, _
 }
 
 func (_c *MockAccessTokenStore_Refresh_Call) RunAndReturn(run func(context.Context, *database.AccessToken, string, time.Time) (*database.AccessToken, error)) *MockAccessTokenStore_Refresh_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// UpdateTokenAndQuota provides a mock function with given fields: ctx, key, quota
+func (_m *MockAccessTokenStore) UpdateTokenAndQuota(ctx context.Context, key *database.AccessToken, quota *database.AccountAccessTokenQuota) (*database.AccessToken, error) {
+	ret := _m.Called(ctx, key, quota)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateTokenAndQuota")
+	}
+
+	var r0 *database.AccessToken
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *database.AccessToken, *database.AccountAccessTokenQuota) (*database.AccessToken, error)); ok {
+		return rf(ctx, key, quota)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *database.AccessToken, *database.AccountAccessTokenQuota) *database.AccessToken); ok {
+		r0 = rf(ctx, key, quota)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.AccessToken)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *database.AccessToken, *database.AccountAccessTokenQuota) error); ok {
+		r1 = rf(ctx, key, quota)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccessTokenStore_UpdateTokenAndQuota_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateTokenAndQuota'
+type MockAccessTokenStore_UpdateTokenAndQuota_Call struct {
+	*mock.Call
+}
+
+// UpdateTokenAndQuota is a helper method to define mock.On call
+//   - ctx context.Context
+//   - key *database.AccessToken
+//   - quota *database.AccountAccessTokenQuota
+func (_e *MockAccessTokenStore_Expecter) UpdateTokenAndQuota(ctx interface{}, key interface{}, quota interface{}) *MockAccessTokenStore_UpdateTokenAndQuota_Call {
+	return &MockAccessTokenStore_UpdateTokenAndQuota_Call{Call: _e.mock.On("UpdateTokenAndQuota", ctx, key, quota)}
+}
+
+func (_c *MockAccessTokenStore_UpdateTokenAndQuota_Call) Run(run func(ctx context.Context, key *database.AccessToken, quota *database.AccountAccessTokenQuota)) *MockAccessTokenStore_UpdateTokenAndQuota_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*database.AccessToken), args[2].(*database.AccountAccessTokenQuota))
+	})
+	return _c
+}
+
+func (_c *MockAccessTokenStore_UpdateTokenAndQuota_Call) Return(_a0 *database.AccessToken, _a1 error) *MockAccessTokenStore_UpdateTokenAndQuota_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccessTokenStore_UpdateTokenAndQuota_Call) RunAndReturn(run func(context.Context, *database.AccessToken, *database.AccountAccessTokenQuota) (*database.AccessToken, error)) *MockAccessTokenStore_UpdateTokenAndQuota_Call {
 	_c.Call.Return(run)
 	return _c
 }

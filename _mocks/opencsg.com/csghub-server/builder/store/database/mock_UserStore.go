@@ -340,6 +340,63 @@ func (_c *MockUserStore_FindByGitAccessToken_Call) RunAndReturn(run func(context
 	return _c
 }
 
+// FindByID provides a mock function with given fields: ctx, userID
+func (_m *MockUserStore) FindByID(ctx context.Context, userID int64) (database.User, error) {
+	ret := _m.Called(ctx, userID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FindByID")
+	}
+
+	var r0 database.User
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64) (database.User, error)); ok {
+		return rf(ctx, userID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, int64) database.User); ok {
+		r0 = rf(ctx, userID)
+	} else {
+		r0 = ret.Get(0).(database.User)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, int64) error); ok {
+		r1 = rf(ctx, userID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockUserStore_FindByID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindByID'
+type MockUserStore_FindByID_Call struct {
+	*mock.Call
+}
+
+// FindByID is a helper method to define mock.On call
+//   - ctx context.Context
+//   - userID int64
+func (_e *MockUserStore_Expecter) FindByID(ctx interface{}, userID interface{}) *MockUserStore_FindByID_Call {
+	return &MockUserStore_FindByID_Call{Call: _e.mock.On("FindByID", ctx, userID)}
+}
+
+func (_c *MockUserStore_FindByID_Call) Run(run func(ctx context.Context, userID int64)) *MockUserStore_FindByID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64))
+	})
+	return _c
+}
+
+func (_c *MockUserStore_FindByID_Call) Return(_a0 database.User, _a1 error) *MockUserStore_FindByID_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockUserStore_FindByID_Call) RunAndReturn(run func(context.Context, int64) (database.User, error)) *MockUserStore_FindByID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // FindByUUID provides a mock function with given fields: ctx, uuid
 func (_m *MockUserStore) FindByUUID(ctx context.Context, uuid string) (*database.User, error) {
 	ret := _m.Called(ctx, uuid)

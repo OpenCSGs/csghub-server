@@ -123,13 +123,19 @@ type UpdateUserResp struct {
 }
 
 type CreateUserTokenRequest struct {
+	ID        int64  `json:"-"`
 	Username  string `json:"-" `
+	OpUUID    string `json:"-"`
+	NSUUID    string `json:"-"`
 	TokenName string `json:"name"`
 	// default to csghub
 	Application AccessTokenApp `json:"application,omitempty"`
 	// default to empty, means full permission
-	Permission string    `json:"permission,omitempty"`
-	ExpiredAt  time.Time `json:"expired_at"`
+	Permission string                   `json:"permission,omitempty"`
+	ExpiredAt  time.Time                `json:"expired_at"`
+	QuotaType  AccountingQuotaType      `json:"quota_type"`
+	ValueType  AccountingQuotaValueType `json:"quota_value_type"`
+	Quota      float64                  `json:"quota"`
 }
 
 // CreateUserTokenRequest implements SensitiveRequestV2
@@ -154,14 +160,49 @@ type CheckAccessTokenReq struct {
 }
 
 type CheckAccessTokenResp struct {
+	ID          int64          `json:"id"`
 	Token       string         `json:"token"`
 	TokenName   string         `json:"token_name"`
 	Application AccessTokenApp `json:"application"`
 	Permission  string         `json:"permission,omitempty"`
 	// the login name
-	Username string    `json:"user_name"`
-	UserUUID string    `json:"user_uuid"`
-	ExpireAt time.Time `json:"expire_at"`
+	Username       string                   `json:"user_name"`
+	UserUUID       string                   `json:"user_uuid"`
+	ExpireAt       time.Time                `json:"expire_at"`
+	NSUUID         string                   `json:"ns_uuid"`
+	QuotaType      AccountingQuotaType      `json:"quota_type"`
+	QuotaValueType AccountingQuotaValueType `json:"quota_value_type"`
+	Quota          float64                  `json:"quota"`
+	LastUsedAt     *time.Time               `json:"last_used_at"`
+	CreatedAt      time.Time                `json:"created_at"`
+	UpdatedAt      time.Time                `json:"updated_at"`
+}
+
+type GetAccessTokenRequest struct {
+	Username    string         `json:"username"`
+	OpUUID      string         `json:"op_uuid"`
+	NSUUID      string         `json:"ns_uuid"`
+	Application AccessTokenApp `json:"application"`
+}
+
+type CreateAPIKeyRequest struct {
+	KeyName   string                   `json:"name" binding:"required"`
+	ExpiredAt *time.Time               `json:"expired_at"`
+	QuotaType AccountingQuotaType      `json:"quota_type" binding:"required"`
+	ValueType AccountingQuotaValueType `json:"quota_value_type" binding:"required"`
+	Quota     float64                  `json:"quota"`
+}
+
+type UpdateAPIKeyRequest struct {
+	CurrentUser string                    `json:"-"`
+	OpUUID      string                    `json:"-"`
+	NSUUID      string                    `json:"-"`
+	ID          int64                     `json:"-"`
+	KeyName     *string                   `json:"name"`
+	ExpiredAt   *time.Time                `json:"expired_at"`
+	QuotaType   *AccountingQuotaType      `json:"quota_type"`
+	ValueType   *AccountingQuotaValueType `json:"quota_value_type"`
+	Quota       *float64                  `json:"quota"`
 }
 
 type UserDatasetsReq struct {
@@ -265,6 +306,7 @@ const (
 	AccessTokenAppCSGHub                  = AccessTokenAppGit
 	AccessTokenAppMirror   AccessTokenApp = "mirror"
 	AccessTokenAppStarship AccessTokenApp = "starship"
+	AccessTokenAPIKey      AccessTokenApp = "aigateway"
 )
 
 type UserRepoPermission struct {

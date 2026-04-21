@@ -142,7 +142,15 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 		apiV1Group.PUT("/organization/verify/:id", mustLogin(), orgHandler.UpdateVerify)
 		apiV1Group.GET("/organization/verify/:namespace", orgHandler.GetVerify)
 	}
-	// routers for access tokens
+	keysGroup := apiV1Group.Group("/namespaces")
+	// routers for API keys
+	{
+		keysGroup.POST("/:uuid/apikeys", mustLogin(), acHandler.CreateAPIKey)
+		keysGroup.GET("/:uuid/apikeys", mustLogin(), acHandler.GetAPIKeys)
+		keysGroup.PUT("/:uuid/apikeys/:id", mustLogin(), acHandler.UpdateAPIKey)
+		keysGroup.DELETE("/:uuid/apikeys/:id", mustLogin(), acHandler.DeleteAPIKey)
+	}
+	// routers for access tokens and API keys
 	{
 		tokenGroup.POST("/:app/:token_name", acHandler.CreateAppToken)
 		tokenGroup.PUT("/:app/:token_name", acHandler.Refresh)

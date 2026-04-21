@@ -40,6 +40,7 @@ type UserStore interface {
 	GetUserUUIDs(ctx context.Context, per, page int) ([]string, int, error)
 	UpdatePhone(ctx context.Context, userID int64, phone string, phoneArea string) error
 	IndexWithCursor(ctx context.Context, req types.UserIndexReq) (ch chan Wrapper, err error)
+	FindByID(ctx context.Context, userID int64) (User, error)
 }
 
 // Implement the UserStore interface in UserStoreImpl
@@ -189,8 +190,8 @@ func (s *UserStoreImpl) FindByEmail(ctx context.Context, email string) (user Use
 	return user, errorx.HandleDBError(err, nil)
 }
 
-func (s *UserStoreImpl) FindByID(ctx context.Context, id int) (user User, err error) {
-	user.ID = int64(id)
+func (s *UserStoreImpl) FindByID(ctx context.Context, id int64) (user User, err error) {
+	user.ID = id
 	err = s.db.Operator.Core.NewSelect().Model(&user).WherePK().Scan(ctx)
 	err = errorx.HandleDBError(err, nil)
 	return

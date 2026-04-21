@@ -16,7 +16,7 @@ type accessTokenStoreImpl struct {
 }
 
 type AccessTokenStore interface {
-	Create(ctx context.Context, token *AccessToken) (err error)
+	Create(ctx context.Context, token *AccessToken, quota []AccountAccessTokenQuota) error
 	// Refresh will disable existing access token, and then generate new one
 	Refresh(ctx context.Context, token *AccessToken, newTokenValue string, newExpiredAt time.Time) (*AccessToken, error)
 	FindByID(ctx context.Context, id int64) (token *AccessToken, err error)
@@ -27,6 +27,14 @@ type AccessTokenStore interface {
 	FindByToken(ctx context.Context, tokenValue, app string) (*AccessToken, error)
 	FindByTokenName(ctx context.Context, username, tokenName, app string) (*AccessToken, error)
 	FindByUser(ctx context.Context, username, app string) ([]AccessToken, error)
+	GetByID(ctx context.Context, id int64) (*AccessToken, error)
+	IsExistByUUID(ctx context.Context, uuid string, tkName, app string) (exists bool, err error)
+	// UpdateAPIKey updates a gateway API key by id, only works for app=apikey
+	UpdateTokenAndQuota(ctx context.Context, key *AccessToken, quota *AccountAccessTokenQuota) (*AccessToken, error)
+	// DeleteByID deletes a  API key by id
+	DeleteByID(ctx context.Context, id int64) error
+	// FindByNsUUID finds gateway API keys by namespace uuid
+	FindByNsUUID(ctx context.Context, nsUUID string, app string) ([]AccessToken, error)
 }
 
 func NewAccessTokenStoreWithDB(db *DB) AccessTokenStore {
@@ -43,7 +51,7 @@ type AccessToken struct {
 	ID     int64  `bun:",pk,autoincrement" json:"id"`
 	GitID  int64  `bun:",notnull" json:"git_id"`
 	Name   string `bun:",notnull" json:"name"`
-	Token  string `bun:",notnull" json:"token"`
+	Token  string `bun:",notnull" json:"token"` // access token value or api key value
 	UserID int64  `bun:",notnull" json:"user_id"`
 	User   *User  `bun:"rel:belongs-to,join:user_id=id" json:"user"`
 	//example: csghub, starship
@@ -52,11 +60,29 @@ type AccessToken struct {
 	IsActive    bool                 `bun:",default:true" json:"is_active"`
 	ExpiredAt   time.Time            `bun:",nullzero" json:"expired_at"`
 	DeletedAt   time.Time            `bun:",soft_delete,nullzero"`
+	// namespace uuid for gateway api key
+	NsUUID string `bun:",nullzero" json:"ns_uuid"` // ns uuid
 	times
 }
 
-func (s *accessTokenStoreImpl) Create(ctx context.Context, token *AccessToken) (err error) {
-	err = s.db.Operator.Core.NewInsert().Model(token).Scan(ctx)
+func (s *accessTokenStoreImpl) Create(ctx context.Context, token *AccessToken, quotas []AccountAccessTokenQuota) error {
+	err := s.db.Core.RunInTx(ctx, &sql.TxOptions{}, func(ctx context.Context, tx bun.Tx) error {
+		// Insert access token
+		err := tx.NewInsert().Model(token).Scan(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to create access token, err:%w", err)
+		}
+
+		// Insert quota records
+		if len(quotas) > 0 {
+			err = tx.NewInsert().Model(&quotas).Scan(ctx)
+			if err != nil {
+				return fmt.Errorf("failed to create access token quota, err:%w", err)
+			}
+		}
+
+		return nil
+	})
 	return errorx.HandleDBError(err, nil)
 }
 
@@ -222,6 +248,73 @@ func (s *accessTokenStoreImpl) FindByUser(ctx context.Context, username, app str
 		q = q.Where("app = ?", app)
 	}
 	err := q.Scan(ctx)
+	if err != nil {
+		return nil, errorx.HandleDBError(err, nil)
+	}
+	return tokens, nil
+}
+
+func (s *accessTokenStoreImpl) GetByID(ctx context.Context, id int64) (*AccessToken, error) {
+	token := &AccessToken{}
+	err := s.db.Operator.Core.NewSelect().Model(token).WhereAllWithDeleted().Where("id = ?", id).Scan(ctx, token)
+	return token, errorx.HandleDBError(err, nil)
+}
+
+func (s *accessTokenStoreImpl) IsExistByUUID(ctx context.Context, uuid string, tkName, app string) (exists bool, err error) {
+	var token AccessToken
+	exists, err = s.db.Operator.Core.
+		NewSelect().
+		Model(&token).
+		Where("ns_uuid = ?", uuid).
+		Where("name = ? and app = ?", tkName, app).
+		Exists(ctx)
+	return exists, errorx.HandleDBError(err, nil)
+}
+
+// UpdateTokenAndQuota updates a access token by id, only works for app=apikey
+func (s *accessTokenStoreImpl) UpdateTokenAndQuota(ctx context.Context, key *AccessToken, quota *AccountAccessTokenQuota) (*AccessToken, error) {
+	err := s.db.Core.RunInTx(ctx, &sql.TxOptions{}, func(ctx context.Context, tx bun.Tx) error {
+		// Update access token
+		_, err := tx.NewUpdate().Model(key).WherePK().Exec(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to update api key, err:%w", err)
+		}
+
+		// Update quota record
+		if quota != nil {
+			_, err = tx.NewUpdate().Model(quota).WherePK().Exec(ctx)
+			if err != nil {
+				return fmt.Errorf("failed to update api key quota, err:%w", err)
+			}
+		}
+
+		return nil
+	})
+
+	return key, errorx.HandleDBError(err, nil)
+}
+
+// DeleteByID soft deletes a access token by id
+func (s *accessTokenStoreImpl) DeleteByID(ctx context.Context, id int64) error {
+	_, err := s.db.Operator.Core.
+		NewUpdate().
+		Model(&AccessToken{}).
+		Set("is_active = false").
+		Set("deleted_at = ?", time.Now()).
+		Where("id = ?", id).
+		Exec(ctx)
+	return errorx.HandleDBError(err, nil)
+}
+
+// FindAPIKeyByNsUUID finds gateway API keys by namespace uuid
+func (s *accessTokenStoreImpl) FindByNsUUID(ctx context.Context, nsUUID string, app string) ([]AccessToken, error) {
+	var tokens []AccessToken
+	err := s.db.Operator.Core.
+		NewSelect().
+		Model(&tokens).
+		Where("app = ? and ns_uuid = ? and is_active = true", app, nsUUID).
+		Order("id DESC").
+		Scan(ctx)
 	if err != nil {
 		return nil, errorx.HandleDBError(err, nil)
 	}

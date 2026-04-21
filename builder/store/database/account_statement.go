@@ -72,6 +72,7 @@ type AccountStatement struct {
 	RegularValue     float64               `json:"regular_value"`
 	PromptToken      float64               `json:"prompt_token"`
 	CompletionToken  float64               `json:"completion_token"`
+	APIKey           string                `bun:",notnull,default:''" json:"api_key"`
 }
 
 type AccountStatementRes struct {
@@ -385,23 +386,24 @@ func updateFeeBill(ctx context.Context, tx bun.Tx, input AccountStatement) error
 		Consumption:     input.Consumption,
 		PromptToken:     input.PromptToken,
 		CompletionToken: input.CompletionToken,
+		APIKey:          input.APIKey,
 	}
-	err := tx.NewSelect().Model(&bill).Where("bill_date = ? and user_uuid = ? and scene = ? and customer_id = ?", input.EventDate, input.UserUUID, input.Scene, input.CustomerID).For("UPDATE").Scan(ctx)
+	err := tx.NewSelect().Model(&bill).Where("bill_date = ? and user_uuid = ? and scene = ? and customer_id = ? and api_key = ?", input.EventDate, input.UserUUID, input.Scene, input.CustomerID, input.APIKey).For("UPDATE").Scan(ctx)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return fmt.Errorf("select statement, error:%w", err)
 	}
 	if errors.Is(err, sql.ErrNoRows) {
 		_, err = tx.NewInsert().Model(&bill).Exec(ctx)
 		if err != nil {
-			return fmt.Errorf("create statement, error:%w", err)
+			return fmt.Errorf("create bill for %s, error:%w", input.EventUUID, err)
 		}
 	} else {
 		_, err = tx.NewUpdate().Model(&bill).
-			Where("bill_date = ? and user_uuid = ? and scene = ? and customer_id = ?", input.EventDate, input.UserUUID, input.Scene, input.CustomerID).
+			Where("bill_date = ? and user_uuid = ? and scene = ? and customer_id = ? and api_key = ?", input.EventDate, input.UserUUID, input.Scene, input.CustomerID, input.APIKey).
 			Set("value = value + ?, consumption = consumption + ?, prompt_token = prompt_token + ?, completion_token = completion_token + ?, updated_at=current_timestamp", input.Value, input.Consumption, input.PromptToken, input.CompletionToken).
 			Exec(ctx)
 		if err != nil {
-			return fmt.Errorf("update statement, error:%w", err)
+			return fmt.Errorf("update bill for %s, error:%w", input.EventUUID, err)
 		}
 	}
 

@@ -10,6 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 	mockgit "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/git/gitserver"
 	mockdb "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
+	mockusermodule "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/user/component"
+	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
@@ -63,7 +65,7 @@ func TestAccessComponent_Create(t *testing.T) {
 			Permission:  "",
 			ExpiredAt:   time.Now().Add(time.Hour),
 		}
-		mockTokenStore.EXPECT().Create(mock.Anything, token).
+		mockTokenStore.EXPECT().Create(mock.Anything, token, mock.Anything).
 			Return(nil).Once()
 
 		mockGitServer := mockgit.NewMockGitServer(t)
@@ -229,7 +231,10 @@ func TestAccessTokenComponentImpl_GetTokens(t *testing.T) {
 			ts: mockTokenStore,
 		}
 
-		tokens, err := ac.GetTokens(context.Background(), "user1", "git")
+		tokens, err := ac.GetTokens(context.Background(), &types.GetAccessTokenRequest{
+			Username:    "user1",
+			Application: "git",
+		})
 
 		require.NoError(t, err)
 		require.Empty(t, tokens)
@@ -259,11 +264,19 @@ func TestAccessTokenComponentImpl_GetTokens(t *testing.T) {
 		mockTokenStore.EXPECT().FindByUser(mock.Anything, "user1", "git").
 			Return(mockTokens, nil).Once()
 
+		mockTokenQuotaStore := mockdb.NewMockAccountAccessTokenQuotaStore(t)
+		mockTokenQuotaStore.EXPECT().FindByAPIKey(mock.Anything, mock.Anything).
+			Return([]database.AccountAccessTokenQuota{}, nil).Maybe()
+
 		ac := &accessTokenComponentImpl{
-			ts: mockTokenStore,
+			ts:              mockTokenStore,
+			tokenQuotaStore: mockTokenQuotaStore,
 		}
 
-		tokens, err := ac.GetTokens(context.Background(), "user1", "git")
+		tokens, err := ac.GetTokens(context.Background(), &types.GetAccessTokenRequest{
+			Username:    "user1",
+			Application: "git",
+		})
 
 		require.NoError(t, err)
 		require.Len(t, tokens, 2)
@@ -358,12 +371,245 @@ func TestAccessTokenComponentImpl_GetOrCreateFirstAvaiToken(t *testing.T) {
 		mockTokenStore.EXPECT().FindByUser(mock.Anything, "user1", "git").
 			Return(mockTokens, nil).Once()
 
+		mockQuotaStore := mockdb.NewMockAccountAccessTokenQuotaStore(t)
+		mockQuotaStore.EXPECT().FindByAPIKey(mock.Anything, "existing-token").
+			Return([]database.AccountAccessTokenQuota{}, nil).Once()
+
 		ac := &accessTokenComponentImpl{
-			ts: mockTokenStore,
+			ts:              mockTokenStore,
+			tokenQuotaStore: mockQuotaStore,
 		}
 
 		token, err := ac.GetOrCreateFirstAvaiToken(context.Background(), "user1", "git", "first_token")
 		require.NoError(t, err)
 		require.Equal(t, "existing-token", token)
+	})
+}
+
+func TestAccessTokenComponentImpl_Update(t *testing.T) {
+	t.Run("token not found", func(t *testing.T) {
+		mockTokenStore := mockdb.NewMockAccessTokenStore(t)
+		mockTokenStore.EXPECT().GetByID(mock.Anything, int64(1)).
+			Return(nil, errorx.ErrDatabaseNoRows).Once()
+
+		ac := &accessTokenComponentImpl{
+			ts: mockTokenStore,
+		}
+
+		resp, err := ac.Update(context.Background(), &types.UpdateAPIKeyRequest{
+			ID:          1,
+			NSUUID:      "test-ns-uuid",
+			CurrentUser: "user1",
+		})
+		require.Error(t, err)
+		require.Nil(t, resp)
+	})
+
+	t.Run("nsuuid mismatch", func(t *testing.T) {
+		mockTokenStore := mockdb.NewMockAccessTokenStore(t)
+		mockTokenStore.EXPECT().GetByID(mock.Anything, int64(1)).
+			Return(&database.AccessToken{
+				ID:       1,
+				NsUUID:   "other-ns-uuid",
+				IsActive: true,
+			}, nil).Once()
+
+		ac := &accessTokenComponentImpl{
+			ts: mockTokenStore,
+		}
+
+		resp, err := ac.Update(context.Background(), &types.UpdateAPIKeyRequest{
+			ID:          1,
+			NSUUID:      "test-ns-uuid",
+			CurrentUser: "user1",
+		})
+		require.Error(t, err)
+		require.ErrorIs(t, err, errorx.ErrNotFound)
+		require.Nil(t, resp)
+	})
+
+	t.Run("token is inactive", func(t *testing.T) {
+		nsUUID := "test-ns-uuid"
+		mockTokenStore := mockdb.NewMockAccessTokenStore(t)
+		mockTokenStore.EXPECT().GetByID(mock.Anything, int64(1)).
+			Return(&database.AccessToken{
+				ID:       1,
+				NsUUID:   nsUUID,
+				IsActive: false,
+			}, nil).Once()
+
+		mockNsStore := mockdb.NewMockNamespaceStore(t)
+		mockNsStore.EXPECT().FindByUUID(mock.Anything, nsUUID).
+			Return(database.Namespace{
+				UUID:          nsUUID,
+				NamespaceType: database.UserNamespace,
+				Path:          "user1",
+			}, nil).Once()
+
+		mockUserStore := mockdb.NewMockUserStore(t)
+		mockUserStore.EXPECT().FindByUsername(mock.Anything, "user1").
+			Return(database.User{Username: "user1"}, nil).Once()
+
+		ac := &accessTokenComponentImpl{
+			ts:      mockTokenStore,
+			nsStore: mockNsStore,
+			us:      mockUserStore,
+		}
+
+		resp, err := ac.Update(context.Background(), &types.UpdateAPIKeyRequest{
+			ID:          1,
+			NSUUID:      nsUUID,
+			CurrentUser: "user1",
+		})
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "token is inactive")
+		require.Nil(t, resp)
+	})
+
+	t.Run("success update with user namespace", func(t *testing.T) {
+		nsUUID := "test-ns-uuid"
+		tokenValue := "test-token-value"
+		keyName := "updated-key-name"
+		expiredAt := time.Now().Add(48 * time.Hour)
+		quotaType := types.AccountingQuotaTypeMonthly
+		valueType := types.AccountingQuotaValueTypeFee
+		quota := float64(200.0)
+
+		mockTokenStore := mockdb.NewMockAccessTokenStore(t)
+		mockTokenStore.EXPECT().GetByID(mock.Anything, int64(1)).
+			Return(&database.AccessToken{
+				ID:          1,
+				Token:       tokenValue,
+				NsUUID:      nsUUID,
+				IsActive:    true,
+				Application: types.AccessTokenAPIKey,
+				Name:        "old-key-name",
+			}, nil).Once()
+
+		mockNsStore := mockdb.NewMockNamespaceStore(t)
+		mockNsStore.EXPECT().FindByUUID(mock.Anything, nsUUID).
+			Return(database.Namespace{
+				UUID:          nsUUID,
+				NamespaceType: database.UserNamespace,
+				Path:          "user1",
+			}, nil).Once()
+
+		mockUserStore := mockdb.NewMockUserStore(t)
+		mockUserStore.EXPECT().FindByUsername(mock.Anything, "user1").
+			Return(database.User{Username: "user1"}, nil).Once()
+
+		mockQuotaStore := mockdb.NewMockAccountAccessTokenQuotaStore(t)
+		mockQuotaStore.EXPECT().FindByAPIKey(mock.Anything, tokenValue).
+			Return([]database.AccountAccessTokenQuota{
+				{
+					ID:        1,
+					APIKey:    tokenValue,
+					QuotaType: quotaType,
+					ValueType: valueType,
+					Quota:     quota,
+				},
+			}, nil).Once()
+
+		mockTokenStore.EXPECT().UpdateTokenAndQuota(mock.Anything, mock.AnythingOfType("*database.AccessToken"), mock.AnythingOfType("*database.AccountAccessTokenQuota")).
+			Return(&database.AccessToken{
+				ID:          1,
+				Token:       tokenValue,
+				NsUUID:      nsUUID,
+				IsActive:    true,
+				Application: types.AccessTokenAPIKey,
+				Name:        keyName,
+				ExpiredAt:   expiredAt,
+			}, nil).Once()
+
+		ac := &accessTokenComponentImpl{
+			ts:              mockTokenStore,
+			nsStore:         mockNsStore,
+			us:              mockUserStore,
+			tokenQuotaStore: mockQuotaStore,
+		}
+
+		resp, err := ac.Update(context.Background(), &types.UpdateAPIKeyRequest{
+			ID:          1,
+			NSUUID:      nsUUID,
+			CurrentUser: "user1",
+			KeyName:     &keyName,
+			ExpiredAt:   &expiredAt,
+			QuotaType:   &quotaType,
+			ValueType:   &valueType,
+			Quota:       &quota,
+		})
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		require.Equal(t, keyName, resp.TokenName)
+		require.Equal(t, quotaType, resp.QuotaType)
+		require.Equal(t, valueType, resp.QuotaValueType)
+		require.Equal(t, quota, resp.Quota)
+	})
+
+	t.Run("success update with org namespace and admin user", func(t *testing.T) {
+		nsUUID := "org-ns-uuid"
+		tokenValue := "org-token-value"
+		keyName := "updated-org-key"
+
+		mockTokenStore := mockdb.NewMockAccessTokenStore(t)
+		mockTokenStore.EXPECT().GetByID(mock.Anything, int64(1)).
+			Return(&database.AccessToken{
+				ID:          1,
+				Token:       tokenValue,
+				NsUUID:      nsUUID,
+				IsActive:    true,
+				Application: types.AccessTokenAPIKey,
+				Name:        "old-org-key",
+			}, nil).Once()
+
+		mockNsStore := mockdb.NewMockNamespaceStore(t)
+		mockNsStore.EXPECT().FindByUUID(mock.Anything, nsUUID).
+			Return(database.Namespace{
+				UUID:          nsUUID,
+				NamespaceType: database.OrgNamespace,
+				Path:          "test-org",
+			}, nil).Once()
+
+		mockUserStore := mockdb.NewMockUserStore(t)
+		mockUserStore.EXPECT().FindByUsername(mock.Anything, "admin").
+			Return(database.User{Username: "admin"}, nil).Once()
+
+		mockMemberComponent := mockusermodule.NewMockMemberComponent(t)
+		mockMemberComponent.EXPECT().GetMemberRole(mock.Anything, "test-org", "admin").
+			Return(membership.RoleAdmin, nil).Once()
+
+		mockQuotaStore := mockdb.NewMockAccountAccessTokenQuotaStore(t)
+		mockQuotaStore.EXPECT().FindByAPIKey(mock.Anything, tokenValue).
+			Return([]database.AccountAccessTokenQuota{}, nil).Once()
+		mockQuotaStore.EXPECT().Create(mock.Anything, mock.AnythingOfType("*database.AccountAccessTokenQuota")).
+			Return(nil).Once()
+
+		mockTokenStore.EXPECT().UpdateTokenAndQuota(mock.Anything, mock.AnythingOfType("*database.AccessToken"), mock.AnythingOfType("*database.AccountAccessTokenQuota")).
+			Return(&database.AccessToken{
+				ID:          1,
+				Token:       tokenValue,
+				NsUUID:      nsUUID,
+				IsActive:    true,
+				Application: types.AccessTokenAPIKey,
+				Name:        keyName,
+			}, nil).Once()
+
+		ac := &accessTokenComponentImpl{
+			ts:              mockTokenStore,
+			nsStore:         mockNsStore,
+			us:              mockUserStore,
+			mc:              mockMemberComponent,
+			tokenQuotaStore: mockQuotaStore,
+		}
+
+		resp, err := ac.Update(context.Background(), &types.UpdateAPIKeyRequest{
+			ID:          1,
+			NSUUID:      nsUUID,
+			CurrentUser: "admin",
+			KeyName:     &keyName,
+		})
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		require.Equal(t, keyName, resp.TokenName)
 	})
 }

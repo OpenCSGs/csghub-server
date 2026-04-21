@@ -39,6 +39,8 @@ type AccountBill struct {
 	Consumption     float64         `bun:",notnull" json:"consumption"`
 	PromptToken     float64         `bun:",notnull" json:"prompt_token"`
 	CompletionToken float64         `bun:",notnull" json:"completion_token"`
+	APIKey          string          `bun:",notnull,default:''" json:"api_key"`
+	Count           float64         `bun:",notnull,default:0" json:"count"`
 	times
 }
 

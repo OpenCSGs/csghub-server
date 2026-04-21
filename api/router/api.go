@@ -980,6 +980,15 @@ func createSpaceRoutes(config *config.Config,
 }
 
 func createUserRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware.MiddlewareCollection, userProxyHandler *handler.InternalServiceProxyHandler, userHandler *handler.UserHandler) {
+	// api keys
+	keysGroup := apiGroup.Group("/namespaces")
+	keysGroup.Use(middlewareCollection.Auth.NeedLogin)
+	{
+		keysGroup.GET("/:uuid/apikeys", userProxyHandler.Proxy)
+		keysGroup.POST("/:uuid/apikeys", userProxyHandler.Proxy)
+		keysGroup.PUT("/:uuid/apikeys/:id", userProxyHandler.Proxy)
+		keysGroup.DELETE("/:uuid/apikeys/:id", userProxyHandler.Proxy)
+	}
 	// deprecated
 	{
 		apiGroup.POST("/users", userProxyHandler.ProxyToApi("/api/v1/user"))

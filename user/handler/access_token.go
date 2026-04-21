@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"time"
 
 	"opencsg.com/csghub-server/common/errorx"
@@ -331,7 +332,11 @@ func (h *AccessTokenHandler) GetUserTokens(ctx *gin.Context) {
 		return
 	}
 	app := ctx.Query("app")
-	resp, err := h.c.GetTokens(ctx, currentUser, app)
+	req := &types.GetAccessTokenRequest{
+		Username:    currentUser,
+		Application: types.AccessTokenApp(app),
+	}
+	resp, err := h.c.GetTokens(ctx, req)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Failed to get user access tokens", slog.Any("error", err), slog.Any("application", app), slog.String("current_user", currentUser))
 		httpbase.ServerError(ctx, err)
@@ -375,4 +380,214 @@ func (h *AccessTokenHandler) GetOrCreateFirstAvaiTokens(ctx *gin.Context) {
 	}
 
 	httpbase.OK(ctx, resp)
+}
+
+// CreateAPIKey godoc
+// @Security     ApiKey
+// @Summary      Create an API key for an organization or user
+// @Tags         API Key
+// @Accept       json
+// @Produce      json
+// @Param        uuid path string true "organization or user namespace uuid"
+// @Param        body body types.CreateAPIKeyRequest true "body"
+// @Success      200  {object}  types.Response{data=database.AccessToken} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      403  {object}  error "Forbidden - user is not org admin"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /namespaces/{uuid}/apikeys [post]
+func (h *AccessTokenHandler) CreateAPIKey(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	userUUID := httpbase.GetCurrentUserUUID(ctx)
+	nsUUID := ctx.Param("uuid")
+	if nsUUID == "" {
+		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(errors.New("namespace uuid is required"), nil))
+		return
+	}
+
+	var req types.CreateAPIKeyRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
+		httpbase.BadRequestWithExt(ctx, err)
+		return
+	}
+
+	apikeyReq := types.CreateUserTokenRequest{
+		Username:    currentUser,
+		OpUUID:      userUUID,
+		NSUUID:      nsUUID,
+		TokenName:   req.KeyName,
+		Application: types.AccessTokenAPIKey,
+		QuotaType:   req.QuotaType,
+		ValueType:   req.ValueType,
+		Quota:       req.Quota,
+	}
+
+	if req.ExpiredAt != nil {
+		apikeyReq.ExpiredAt = *req.ExpiredAt
+	}
+
+	key, err := h.c.Create(ctx, &apikeyReq)
+	if err != nil {
+		if errors.Is(err, errorx.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
+		slog.ErrorContext(ctx.Request.Context(), "Failed to create org API key", slog.Any("req", req), slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	httpbase.OK(ctx, key)
+}
+
+// GetAPIKeys godoc
+// @Security     ApiKey
+// @Summary      Get all API keys for an organization or user
+// @Tags         API Key
+// @Accept       json
+// @Produce      json
+// @Param        uuid path string true "organization or user namespace uuid"
+// @Success      200  {object}  types.Response{data=[]types.CheckAccessTokenResp} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /namespaces/{uuid}/apikeys [get]
+func (h *AccessTokenHandler) GetAPIKeys(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	userUUID := httpbase.GetCurrentUserUUID(ctx)
+
+	uuid := ctx.Param("uuid")
+	if uuid == "" {
+		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(errors.New("organization uuid is required"), nil))
+		return
+	}
+
+	req := &types.GetAccessTokenRequest{
+		Username:    currentUser,
+		OpUUID:      userUUID,
+		NSUUID:      uuid,
+		Application: types.AccessTokenAPIKey,
+	}
+
+	apikeys, err := h.c.GetTokens(ctx, req)
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get org API keys", slog.Any("req", req), slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	httpbase.OK(ctx, apikeys)
+}
+
+// UpdateAPIKey godoc
+// @Security     ApiKey
+// @Summary      Update an API key for an organization or user
+// @Tags         API Key
+// @Accept       json
+// @Produce      json
+// @Param        uuid path string true "organization or user namespace uuid"
+// @Param        id path string true "API key id"
+// @Param        body body types.UpdateAPIKeyRequest true "body"
+// @Success      200  {object}  types.Response{data=database.AccessToken} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      403  {object}  error "Forbidden - user is not org admin"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /namespaces/{uuid}/apikeys/{id} [put]
+func (h *AccessTokenHandler) UpdateAPIKey(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	userUUID := httpbase.GetCurrentUserUUID(ctx)
+
+	nsUUID := ctx.Param("uuid")
+	if nsUUID == "" {
+		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(errors.New("uuid is required"), nil))
+		return
+	}
+	id := ctx.Param("id")
+	if id == "" {
+		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(errors.New("id is required"), nil))
+		return
+	}
+	idInt, err := strconv.ParseInt(id, 10, 64)
+	if err != nil {
+		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(err, nil))
+		return
+	}
+
+	var req types.UpdateAPIKeyRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
+		httpbase.BadRequestWithExt(ctx, err)
+		return
+	}
+
+	req.ID = idInt
+	req.CurrentUser = currentUser
+	req.OpUUID = userUUID
+	req.NSUUID = nsUUID
+
+	token, err := h.c.Update(ctx, &req)
+	if err != nil {
+		if errors.Is(err, errorx.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
+		slog.ErrorContext(ctx.Request.Context(), "Failed to update API key", slog.Any("req", req), slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	httpbase.OK(ctx, token)
+}
+
+// DeleteAPIKey godoc
+// @Security     ApiKey
+// @Summary      Delete an API key for an organization or user
+// @Tags         API Key
+// @Accept       json
+// @Produce      json
+// @Param        id path string true "API key id"
+// @Success      200  {object}  types.Response{} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      403  {object}  error "Forbidden - user is not org admin"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /namespace/{uuid}/apikeys/{id} [delete]
+func (h *AccessTokenHandler) DeleteAPIKey(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	userUUID := httpbase.GetCurrentUserUUID(ctx)
+
+	nsUUID := ctx.Param("uuid")
+	if nsUUID == "" {
+		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(errors.New("organization uuid is required"), nil))
+		return
+	}
+	id := ctx.Param("id")
+	if id == "" {
+		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(errors.New("api_key_id is required"), nil))
+		return
+	}
+	idInt, err := strconv.ParseInt(id, 10, 64)
+	if err != nil {
+		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(err, nil))
+		return
+	}
+
+	req := &types.DeleteUserTokenRequest{
+		Username:    currentUser,
+		OpUUID:      userUUID,
+		NSUUID:      nsUUID,
+		ID:          idInt,
+		Application: types.AccessTokenAPIKey,
+	}
+
+	err = h.c.Delete(ctx, req)
+	if err != nil {
+		if errors.Is(err, errorx.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
+		slog.ErrorContext(ctx.Request.Context(), "Failed to delete API key", slog.String("org_uuid", nsUUID), slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	httpbase.OK(ctx, nil)
 }
