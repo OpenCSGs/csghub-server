@@ -116,28 +116,32 @@ func TestDatasetCompnent_Index(t *testing.T) {
 		{
 			ID: 11, RepositoryID: 2, Repository: &database.Repository{
 				User: database.User{Username: "user2"},
+				Path: "user2/dataset2",
 			},
 		},
 		{
 			ID: 12, RepositoryID: 1, Repository: &database.Repository{
 				User: database.User{Username: "user1"},
+				Path: "user1/dataset1",
 			},
 		},
 	}, nil)
+
+	dc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{UUID: "user-uuid"}, nil).Maybe()
 
 	data, total, err := dc.Index(ctx, filter, 10, 1, false)
 	require.Nil(t, err)
 	require.Equal(t, 100, total)
 	require.Equal(t, []*types.Dataset{
 		{ID: 12, RepositoryID: 1, Repository: types.Repository{
-			HTTPCloneURL: "/s/.git",
-			SSHCloneURL:  ":s/.git",
+			HTTPCloneURL: "/s/user1/dataset1.git",
+			SSHCloneURL:  ":s/user1/dataset1.git",
 		}, User: types.User{Username: "user1"},
 			Tags: []types.RepoTag{{Name: "t1"}},
 		},
 		{ID: 11, RepositoryID: 2, Repository: types.Repository{
-			HTTPCloneURL: "/s/.git",
-			SSHCloneURL:  ":s/.git",
+			HTTPCloneURL: "/s/user2/dataset2.git",
+			SSHCloneURL:  ":s/user2/dataset2.git",
 		}, User: types.User{Username: "user2"},
 		},
 	}, data)
@@ -163,14 +167,18 @@ func TestDatasetComponent_Index_HalfCreatedRepos(t *testing.T) {
 		{
 			ID: 11, RepositoryID: 2, Repository: &database.Repository{
 				User: database.User{Username: "user2"},
+				Path: "user2/dataset2",
 			},
 		},
 		{
 			ID: 12, RepositoryID: 1, Repository: &database.Repository{
 				User: database.User{Username: "user1"},
+				Path: "user1/dataset1",
 			},
 		},
 	}, nil)
+
+	dc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{UUID: "user-uuid"}, nil).Maybe()
 
 	data, total, err := dc.Index(ctx, filter, 10, 1, false)
 	require.Nil(t, err)
@@ -179,14 +187,14 @@ func TestDatasetComponent_Index_HalfCreatedRepos(t *testing.T) {
 
 	require.Equal(t, []*types.Dataset{
 		{ID: 12, RepositoryID: 1, Repository: types.Repository{
-			HTTPCloneURL: "/s/.git",
-			SSHCloneURL:  ":s/.git",
+			HTTPCloneURL: "/s/user1/dataset1.git",
+			SSHCloneURL:  ":s/user1/dataset1.git",
 		}, User: types.User{Username: "user1"},
 			Tags: []types.RepoTag{{Name: "t1"}},
 		},
 		{ID: 11, RepositoryID: 2, Repository: types.Repository{
-			HTTPCloneURL: "/s/.git",
-			SSHCloneURL:  ":s/.git",
+			HTTPCloneURL: "/s/user2/dataset2.git",
+			SSHCloneURL:  ":s/user2/dataset2.git",
 		}, User: types.User{Username: "user2"},
 		},
 	}, data)
@@ -278,6 +286,10 @@ func TestDatasetCompnent_Show(t *testing.T) {
 	dc.mocks.components.repo.EXPECT().GetUserRepoPermission(ctx, "user", dataset.Repository).Return(&types.UserRepoPermission{CanRead: true}, nil)
 	dc.mocks.components.repo.EXPECT().GetNameSpaceInfo(ctx, "ns").Return(&types.Namespace{}, nil)
 	dc.mocks.stores.UserLikesMock().EXPECT().IsExist(ctx, "user", int64(2)).Return(true, nil)
+	dc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
+		Username: "user",
+		UUID:     "user-uuid",
+	}, nil).Maybe()
 	dc.mocks.components.repo.EXPECT().GetMirrorTaskStatus(dataset.Repository).Return(
 		types.MirrorRepoSyncStart,
 	)
@@ -345,6 +357,10 @@ func TestDatasetCompnent_Show_Mirror(t *testing.T) {
 	dc.mocks.components.repo.EXPECT().GetUserRepoPermission(ctx, "user", dataset.Repository).Return(&types.UserRepoPermission{CanRead: true}, nil)
 	dc.mocks.components.repo.EXPECT().GetNameSpaceInfo(ctx, "ns").Return(&types.Namespace{}, nil)
 	dc.mocks.stores.UserLikesMock().EXPECT().IsExist(ctx, "user", int64(2)).Return(true, nil)
+	dc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
+		Username: "user",
+		UUID:     "user-uuid",
+	}, nil).Maybe()
 
 	dc.mocks.components.repo.EXPECT().GetMirrorTaskStatus(dataset.Repository).Return(
 		"",
@@ -390,6 +406,10 @@ func TestDatasetCompnent_Show_Repository(t *testing.T) {
 	dc.mocks.components.repo.EXPECT().GetUserRepoPermission(ctx, "user", dataset.Repository).Return(&types.UserRepoPermission{CanRead: true}, nil)
 	dc.mocks.components.repo.EXPECT().GetNameSpaceInfo(ctx, "ns").Return(&types.Namespace{}, nil)
 	dc.mocks.stores.UserLikesMock().EXPECT().IsExist(ctx, "user", int64(2)).Return(true, nil)
+	dc.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
+		Username: "user",
+		UUID:     "user-uuid",
+	}, nil).Maybe()
 	dc.mocks.components.repo.EXPECT().GetMirrorTaskStatus(dataset.Repository).Return(
 		"",
 	)

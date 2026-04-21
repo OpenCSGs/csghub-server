@@ -735,6 +735,37 @@ func (s *repoStoreImpl) PublicToUser(ctx context.Context, repoType types.Reposit
 		q.Where("EXISTS (SELECT 1 FROM spaces s WHERE s.repository_id = repository.id AND s.sdk = ?)", filter.SpaceSDK)
 	}
 
+	// Filter by dataset type for dataset repo
+	if repoType == types.DatasetRepo && filter.DatasetType != "" {
+		q.Where("datasets.dataset_type = ?", filter.DatasetType)
+	}
+
+	// Filter by user purchased datasets
+	if repoType == types.DatasetRepo && filter.UserPurchased && filter.Username != "" {
+		// First get all dataset IDs that the user has purchased
+		var purchasedDatasetIDs []int64
+		userUUIDQuery := s.db.Operator.Core.NewSelect().
+			Column("uuid").
+			Model(&User{}).
+			Where("username = ?", filter.Username)
+
+		err := s.db.Operator.Core.NewSelect().
+			ColumnExpr("CAST(resource_id AS bigint) as dataset_id").
+			Model(&AccountStatement{}).
+			Where("scene = ?", types.SceneDatasetPurchase).
+			Where("user_uuid = (?)", userUUIDQuery).
+			Where("value < 0"). // Negative value indicates purchase
+			Scan(ctx, &purchasedDatasetIDs)
+
+		if err == nil && len(purchasedDatasetIDs) > 0 {
+			// Filter datasets where related_dataset_id is in the purchased dataset IDs
+			q.Where("datasets.related_dataset_id IN (?)", bun.In(purchasedDatasetIDs))
+		} else {
+			// If no purchased datasets, return empty result
+			return []*Repository{}, 0, nil
+		}
+	}
+
 	if len(filter.Tags) > 0 {
 		for i, tag := range filter.Tags {
 			var asRepoTag = fmt.Sprintf("%s%d", "rt", i)
@@ -806,8 +837,43 @@ func (s *repoStoreImpl) publicToUserTrending(ctx context.Context, repoType types
 		TableExpr("recom_repo_scores AS rrs").
 		Join("JOIN repositories AS r ON r.id = rrs.repository_id").
 		Where("rrs.weight_name = ?", RecomWeightTotal).
-		Where("r.repository_type = ?", repoType).
-		Where("r.deleted_at IS NULL").
+		Where("r.repository_type = ?", repoType)
+
+	// Join with business table
+	q.Join(fmt.Sprintf("INNER JOIN %s ON %s.repository_id = r.id", bizTable, bizTable))
+
+	// Filter by dataset type for dataset repo
+	if repoType == types.DatasetRepo && filter.DatasetType != "" {
+		q.Where("datasets.dataset_type = ?", filter.DatasetType)
+	}
+
+	// Filter by user purchased datasets
+	if repoType == types.DatasetRepo && filter.UserPurchased && filter.Username != "" {
+		// First get all dataset IDs that the user has purchased
+		var purchasedDatasetIDs []int64
+		userUUIDQuery := s.db.Operator.Core.NewSelect().
+			Column("uuid").
+			Model(&User{}).
+			Where("username = ?", filter.Username)
+
+		err := s.db.Operator.Core.NewSelect().
+			ColumnExpr("CAST(resource_id AS bigint) as dataset_id").
+			Model(&AccountStatement{}).
+			Where("scene = ?", types.SceneDatasetPurchase).
+			Where("user_uuid = (?)", userUUIDQuery).
+			Where("value < 0"). // Negative value indicates purchase
+			Scan(ctx, &purchasedDatasetIDs)
+
+		if err == nil && len(purchasedDatasetIDs) > 0 {
+			// Filter datasets where related_dataset_id is in the purchased dataset IDs
+			q.Where("datasets.related_dataset_id IN (?)", bun.In(purchasedDatasetIDs))
+		} else {
+			// If no purchased datasets, return empty result
+			return []*Repository{}, 0, nil
+		}
+	}
+
+	q.Where("r.deleted_at IS NULL").
 		Where(fmt.Sprintf("EXISTS (SELECT 1 FROM %s m WHERE m.repository_id = r.id)", bizTable))
 
 	if !isAdmin {

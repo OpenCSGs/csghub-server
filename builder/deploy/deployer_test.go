@@ -871,6 +871,8 @@ func TestDeployer_SubmitFinetune(t *testing.T) {
 				"LEARNING_RATE":           "0",
 				"CUSTOM_ARGS":             "",
 				"EPOCHS":                  "0",
+				"REVISION":               "",
+				"DATASET_REVISION":        "",
 			}, awfr.Templates[0].Env)
 			return &types.ArgoWorkFlowRes{ID: 1}, nil
 		},

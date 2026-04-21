@@ -797,70 +797,6 @@ func initializeTestBroadcastComponent(ctx context.Context, t interface {
 	return componentTestBroadcastWithMocks
 }
 
-func initializeTestDatasetComponent(ctx context.Context, t interface {
-	Cleanup(func())
-	mock.TestingT
-}) *testDatasetWithMocks {
-	config := ProvideTestConfig()
-	mockStores := tests.NewMockStores(t)
-	mockRepoComponent := component.NewMockRepoComponent(t)
-	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
-	mockSensitiveComponent := component.NewMockSensitiveComponent(t)
-	mockGitServer := gitserver.NewMockGitServer(t)
-	componentDatasetComponentImpl := NewTestDatasetComponent(config, mockStores, mockRepoComponent, mockUserSvcClient, mockSensitiveComponent, mockGitServer)
-	mockAccountingComponent := component.NewMockAccountingComponent(t)
-	mockTagComponent := component.NewMockTagComponent(t)
-	mockSpaceComponent := component.NewMockSpaceComponent(t)
-	mockRuntimeArchitectureComponent := component.NewMockRuntimeArchitectureComponent(t)
-	mockClusterComponent := component.NewMockClusterComponent(t)
-	componentMockedComponents := &mockedComponents{
-		accounting:          mockAccountingComponent,
-		repo:                mockRepoComponent,
-		tag:                 mockTagComponent,
-		space:               mockSpaceComponent,
-		runtimeArchitecture: mockRuntimeArchitectureComponent,
-		sensitive:           mockSensitiveComponent,
-		cluster:             mockClusterComponent,
-	}
-	mockClient := s3.NewMockClient(t)
-	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
-	mockDeployer := deploy.NewMockDeployer(t)
-	mockCache := cache.NewMockCache(t)
-	mockAccountingClient := accounting.NewMockAccountingClient(t)
-	mockReader := parquet.NewMockReader(t)
-	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
-	mockKeysReader := rsa.NewMockKeysReader(t)
-	mockImporter := importer.NewMockImporter(t)
-	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
-	multisyncMockClient := multisync.NewMockClient(t)
-	mockCore := s3.NewMockCore(t)
-	mockGitCallbackChecker := checker.NewMockGitCallbackChecker(t)
-	mocks := &Mocks{
-		stores:           mockStores,
-		components:       componentMockedComponents,
-		gitServer:        mockGitServer,
-		userSvcClient:    mockUserSvcClient,
-		s3Client:         mockClient,
-		mirrorServer:     mockMirrorServer,
-		deployer:         mockDeployer,
-		cache:            mockCache,
-		accountingClient: mockAccountingClient,
-		preader:          mockReader,
-		moderationClient: mockModerationSvcClient,
-		rsaReader:        mockKeysReader,
-		importer:         mockImporter,
-		dataviewerClient: mockDataviewerClient,
-		multiSyncClient:  multisyncMockClient,
-		s3Core:           mockCore,
-		checker:          mockGitCallbackChecker,
-	}
-	componentTestDatasetWithMocks := &testDatasetWithMocks{
-		datasetComponentImpl: componentDatasetComponentImpl,
-		mocks:                mocks,
-	}
-	return componentTestDatasetWithMocks
-}
-
 func initializeTestCodeComponent(ctx context.Context, t interface {
 	Cleanup(func())
 	mock.TestingT
@@ -2780,7 +2716,78 @@ func initializeTestSkillComponent(ctx context.Context, t interface {
 	return componentTestSkillWithMocks
 }
 
+// Injectors from wire_ce.go:
+
+func initializeTestDatasetComponent(ctx context.Context, t interface {
+	Cleanup(func())
+	mock.TestingT
+}) *testDatasetWithMocks {
+	config := ProvideTestConfig()
+	mockStores := tests.NewMockStores(t)
+	mockRepoComponent := component.NewMockRepoComponent(t)
+	mockUserSvcClient := rpc.NewMockUserSvcClient(t)
+	mockSensitiveComponent := component.NewMockSensitiveComponent(t)
+	mockGitServer := gitserver.NewMockGitServer(t)
+	componentDatasetComponentImpl := NewTestDatasetComponent(config, mockStores, mockRepoComponent, mockUserSvcClient, mockSensitiveComponent, mockGitServer)
+	mockAccountingComponent := component.NewMockAccountingComponent(t)
+	mockTagComponent := component.NewMockTagComponent(t)
+	mockSpaceComponent := component.NewMockSpaceComponent(t)
+	mockRuntimeArchitectureComponent := component.NewMockRuntimeArchitectureComponent(t)
+	mockClusterComponent := component.NewMockClusterComponent(t)
+	componentMockedComponents := &mockedComponents{
+		accounting:          mockAccountingComponent,
+		repo:                mockRepoComponent,
+		tag:                 mockTagComponent,
+		space:               mockSpaceComponent,
+		runtimeArchitecture: mockRuntimeArchitectureComponent,
+		sensitive:           mockSensitiveComponent,
+		cluster:             mockClusterComponent,
+	}
+	mockClient := s3.NewMockClient(t)
+	mockMirrorServer := mirrorserver.NewMockMirrorServer(t)
+	mockDeployer := deploy.NewMockDeployer(t)
+	mockCache := cache.NewMockCache(t)
+	mockAccountingClient := accounting.NewMockAccountingClient(t)
+	mockReader := parquet.NewMockReader(t)
+	mockModerationSvcClient := rpc.NewMockModerationSvcClient(t)
+	mockKeysReader := rsa.NewMockKeysReader(t)
+	mockImporter := importer.NewMockImporter(t)
+	mockDataviewerClient := dataviewer.NewMockDataviewerClient(t)
+	multisyncMockClient := multisync.NewMockClient(t)
+	mockCore := s3.NewMockCore(t)
+	mockGitCallbackChecker := checker.NewMockGitCallbackChecker(t)
+	mocks := &Mocks{
+		stores:           mockStores,
+		components:       componentMockedComponents,
+		gitServer:        mockGitServer,
+		userSvcClient:    mockUserSvcClient,
+		s3Client:         mockClient,
+		mirrorServer:     mockMirrorServer,
+		deployer:         mockDeployer,
+		cache:            mockCache,
+		accountingClient: mockAccountingClient,
+		preader:          mockReader,
+		moderationClient: mockModerationSvcClient,
+		rsaReader:        mockKeysReader,
+		importer:         mockImporter,
+		dataviewerClient: mockDataviewerClient,
+		multiSyncClient:  multisyncMockClient,
+		s3Core:           mockCore,
+		checker:          mockGitCallbackChecker,
+	}
+	componentTestDatasetWithMocks := &testDatasetWithMocks{
+		datasetComponentImpl: componentDatasetComponentImpl,
+		mocks:                mocks,
+	}
+	return componentTestDatasetWithMocks
+}
+
 // wire.go:
+
+type testDatasetWithMocks struct {
+	*datasetComponentImpl
+	mocks *Mocks
+}
 
 type testRepoWithMocks struct {
 	*repoComponentImpl
@@ -2839,11 +2846,6 @@ type testCollectionWithMocks struct {
 
 type testBroadcastWithMocks struct {
 	*broadcastComponentImpl
-	mocks *Mocks
-}
-
-type testDatasetWithMocks struct {
-	*datasetComponentImpl
 	mocks *Mocks
 }
 

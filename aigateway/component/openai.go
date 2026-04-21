@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
 	"slices"
 	"strconv"
 	"strings"
@@ -35,14 +36,22 @@ type OpenAIComponent interface {
 }
 
 type openaiComponentImpl struct {
-	userStore   database.UserStore
-	organStore  database.OrgStore
-	deployStore database.DeployTaskStore
-	eventPub    *event.EventPublisher
-	extllmStore database.LLMConfigStore
-
+	userStore      database.UserStore
+	organStore     database.OrgStore
+	deployStore    database.DeployTaskStore
+	eventPub       *event.EventPublisher
+	extllmStore    database.LLMConfigStore
 	modelListCache cache.RedisClient
 	extendOpenai
+	modelIDFmt     string
+	modelIDBuilder ModelIDBuilder
+}
+
+func (m *openaiComponentImpl) getModelIDBuilder() ModelIDBuilder {
+	if m.modelIDBuilder == nil {
+		return NewModelIDBuilder()
+	}
+	return m.modelIDBuilder
 }
 
 // GetAvailableModels returns a list of running models
@@ -69,7 +78,7 @@ func (m *openaiComponentImpl) GetAvailableModels(c context.Context, userName str
 	models = append(models, externalModels...)
 
 	models = m.enrichModelsWithPrice(c, models)
-
+	cacheModels := cloneModelsForCache(models)
 	// Save models to cache asynchronously
 	go func(modelList []types.Model) {
 		if len(modelList) == 0 {
@@ -79,7 +88,7 @@ func (m *openaiComponentImpl) GetAvailableModels(c context.Context, userName str
 			// Log error but don't affect the main request
 			slog.Error("failed to save models to cache", "error", err)
 		}
-	}(models)
+	}(cacheModels)
 
 	if strings.TrimSpace(userUUID) != "" {
 		req := &types.UserPreferenceRequest{
@@ -98,12 +107,54 @@ func (m *openaiComponentImpl) GetAvailableModels(c context.Context, userName str
 	return models, nil
 }
 
+func cloneModelsForCache(models []types.Model) []types.Model {
+	if len(models) == 0 {
+		return nil
+	}
+
+	clonedModels := slices.Clone(models)
+	for i := range clonedModels {
+		if clonedModels[i].Metadata != nil {
+			clonedModels[i].Metadata = maps.Clone(clonedModels[i].Metadata)
+		}
+		if clonedModels[i].IsPinned != nil {
+			isPinned := *clonedModels[i].IsPinned
+			clonedModels[i].IsPinned = &isPinned
+		}
+	}
+
+	return clonedModels
+}
+
 func (m *openaiComponentImpl) ListModels(c context.Context, userName string, req types.ListModelsReq) (types.ModelList, error) {
 	models, err := m.GetAvailableModels(c, userName)
 	if err != nil {
 		return types.ModelList{}, err
 	}
-	return filterAndPaginateModels(models, req), nil
+	modelList := filterAndPaginateModels(models, req)
+	m.applyFormatModelIDToModelList(&modelList)
+	return modelList, nil
+}
+
+func (m *openaiComponentImpl) applyFormatModelIDToModelList(modelList *types.ModelList) {
+	if modelList == nil {
+		return
+	}
+
+	for i := range modelList.Data {
+		if modelList.Data[i].FormatModelID != "" {
+			modelList.Data[i].ID = modelList.Data[i].FormatModelID
+		}
+	}
+
+	if len(modelList.Data) == 0 {
+		modelList.FirstID = nil
+		modelList.LastID = nil
+		return
+	}
+
+	modelList.FirstID = &modelList.Data[0].ID
+	modelList.LastID = &modelList.Data[len(modelList.Data)-1].ID
 }
 
 type modelFilter func(m *types.Model) bool
@@ -228,15 +279,16 @@ func providerTypeFromDeployType(t int) string {
 	}
 }
 
-func (m *openaiComponentImpl) getCSGHubModels(c context.Context, userID int64) ([]types.Model, error) {
-	runningDeploys, err := m.deployStore.RunningVisibleToUser(c, userID)
+func (c *openaiComponentImpl) getCSGHubModels(ctx context.Context, userID int64) ([]types.Model, error) {
+	runningDeploys, err := c.deployStore.RunningVisibleToUser(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get running models visible to user,error:%w", err)
 	}
 	var models []types.Model
+	modelIDBuilder := c.getModelIDBuilder()
 	for _, deploy := range runningDeploys {
 		if deploy.Repository == nil {
-			slog.WarnContext(c, "skip deploy with nil repository", "deploy_id", deploy.ID, "svc_name", deploy.SvcName)
+			slog.WarnContext(ctx, "skip deploy with nil repository", "deploy_id", deploy.ID, "svc_name", deploy.SvcName)
 			continue
 		}
 		if deploy.User == nil {
@@ -270,24 +322,18 @@ func (m *openaiComponentImpl) getCSGHubModels(c context.Context, userID int64) (
 				NeedSensitiveCheck: true,
 			},
 		}
-		if deploy.Type == commontypes.ServerlessType {
-			m.BaseModel.OwnedBy = "OpenCSG"
-		} else {
-			m.BaseModel.OwnedBy = deploy.User.Username
-		}
+		m.BaseModel.OwnedBy = modelIDBuilder.GetModelOwner(deploy.Type, deploy.User.Username)
+
 		modelName := ""
 		if deploy.Repository.HFPath != "" {
 			modelName = deploy.Repository.HFPath
 		} else {
 			modelName = deploy.Repository.Path
 		}
-		m.ID = (ModelIDBuilder{}).To(modelName, deploy.SvcName)
-		// change owner of serverless deploys to OpenCSG
-		if deploy.Type == commontypes.ServerlessType {
-			m.OwnedBy = "OpenCSG"
-		} else {
-			m.OwnedBy = deploy.User.Username
-		}
+
+		baseModelID := modelIDBuilder.To(modelName, deploy.SvcName)
+		m.ID = baseModelID
+		m.FormatModelID = modelIDBuilder.BuildCompositeModelID(baseModelID, m.BaseModel.OwnedBy, c.modelIDFmt)
 		m.Endpoint = deploy.Endpoint
 		slog.Debug("running model", slog.Any("model", m), slog.Any("deploy", deploy))
 		models = append(models, m)
@@ -305,6 +351,7 @@ func (m *openaiComponentImpl) getExternalModels(c context.Context) []types.Model
 	per := 50
 	page := 1
 	var models []types.Model
+	modelIDBuilder := m.getModelIDBuilder()
 	for {
 		extModels, _, err := m.extllmStore.Index(c, per, page, search)
 		if err != nil {
@@ -330,7 +377,8 @@ func (m *openaiComponentImpl) getExternalModels(c context.Context) []types.Model
 				extModel.Metadata = map[string]any{}
 			}
 			extModel.Metadata[types.MetaKeyLLMType] = types.ProviderTypeExternalLLM
-			m := types.Model{
+			formatModelID := modelIDBuilder.BuildCompositeModelID(extModel.ModelName, extModel.Provider, m.modelIDFmt)
+			model := types.Model{
 				BaseModel: types.BaseModel{
 					Object:       "model",
 					ID:           extModel.ModelName,
@@ -343,10 +391,11 @@ func (m *openaiComponentImpl) getExternalModels(c context.Context) []types.Model
 				ExternalModelInfo: types.ExternalModelInfo{
 					Provider:           extModel.Provider,
 					AuthHead:           extModel.AuthHeader,
+					FormatModelID:      formatModelID,
 					NeedSensitiveCheck: extModel.NeedSensitiveCheck,
 				},
 			}
-			models = append(models, m)
+			models = append(models, model)
 		}
 		if len(extModels) < per {
 			break
@@ -368,10 +417,11 @@ func (m *openaiComponentImpl) saveModelsToCache(models []types.Model) error {
 			return fmt.Errorf("failed to marshal model %s to JSON: %w", model.ID, err)
 		}
 		// Use model ID as the field name
-		err = m.modelListCache.HSet(ctx, modelCacheKey, model.ID, string(jsonBytes))
+		err = m.modelListCache.HSet(ctx, modelCacheKey, model.FormatModelID, string(jsonBytes))
 		if err != nil {
 			return fmt.Errorf("failed to set model %s in cache hash for key %s: %w", model.ID, modelCacheKey, err)
 		}
+
 	}
 	// Set TTL for the entire hash
 	err := m.modelListCache.Expire(ctx, modelCacheKey, modelCacheTTL)
@@ -430,11 +480,13 @@ func (m *openaiComponentImpl) GetModelByID(c context.Context, username, modelID 
 	if err != nil {
 		return nil, err
 	}
+
 	for _, model := range models {
-		if model.ID == modelID {
+		if model.FormatModelID == modelID || model.ID == modelID {
 			return &model, nil
 		}
 	}
+
 	return nil, nil
 }
 
@@ -464,7 +516,6 @@ func csghubMeteringLLMTypeFromModel(m *types.Model) (string, error) {
 	return llmType, nil
 }
 
-// meteringResourceFromModel builds a MeteringResource from an OpenAI gateway model (see types.MeteringResource).
 func meteringResourceFromModel(model *types.Model) (types.MeteringResource, error) {
 	if model == nil {
 		return types.MeteringResource{}, fmt.Errorf("model is nil")
@@ -486,7 +537,7 @@ func meteringResourceFromModel(model *types.Model) (types.MeteringResource, erro
 		return types.MeteringResource{
 			ResourceID:   id,
 			ResourceName: id,
-			CustomerID:   id,
+			CustomerID:   model.ID,
 		}, nil
 	}
 	return types.MeteringResource{}, nil

@@ -110,6 +110,8 @@ var (
 	SceneStarship SceneType = 20 // starship
 	SceneGuiAgent SceneType = 22 // gui agent
 	// SceneAgenticHub SceneType = 30 // agentic hub
+	// dataset
+	SceneDatasetPurchase SceneType = 40 // dataset purchase
 	// unknow
 	SceneUnknow SceneType = 99 // unknow
 )
@@ -516,6 +518,26 @@ type AcctRecharge struct {
 	EventDate  time.Time `json:"event_date"`
 	ActivityID int64     `json:"activity_id"`
 	OpDesc     string    `json:"op_desc"`
+}
+
+type NonCashRechargeListResp struct {
+	Data       []NonCashRechargeResp `json:"data"`
+	Total      int                   `json:"total"`
+	TotalValue float64               `json:"total_value"`
+}
+
+type NonCashRechargeResp struct {
+	ID         int64     `json:"id"`
+	EventUUID  string    `json:"event_uuid"`
+	UserUUID   string    `json:"user_id"`
+	Value      float64   `json:"value"`
+	OpUID      string    `json:"op_uid"`
+	CreatedAt  time.Time `json:"created_at"`
+	EventDate  time.Time `json:"event_date"`
+	ActivityID int64     `json:"activity_id"`
+	OpDesc     string    `json:"op_desc"`
+	OpUserName string    `json:"op_user_name"`
+	UserName   string    `json:"user_name"`
 }
 
 type AcctRechargeListResp struct {

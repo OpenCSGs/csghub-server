@@ -99,6 +99,28 @@ func (c *finetuneComponentImpl) CreateFinetuneJob(ctx context.Context, req types
 		}
 	}
 
+	// Query model's default branch as revision
+	modelParts := strings.Split(req.ModelId, "/")
+	if len(modelParts) != 2 {
+		return nil, fmt.Errorf("invalid model id format: %s", req.ModelId)
+	}
+	model, err := c.modelStore.FindByPath(ctx, modelParts[0], modelParts[1])
+	if err != nil {
+		return nil, fmt.Errorf("cannot find model, %w", err)
+	}
+	req.Revision = model.Repository.DefaultBranch
+
+	// Query dataset's default branch as revision
+	datasetParts := strings.Split(req.DatasetId, "/")
+	if len(datasetParts) != 2 {
+		return nil, fmt.Errorf("invalid dataset id format: %s", req.DatasetId)
+	}
+	datasetRepo, err := c.repoStore.FindByPath(ctx, types.DatasetRepo, datasetParts[0], datasetParts[1])
+	if err != nil {
+		return nil, fmt.Errorf("cannot find dataset repo, %w", err)
+	}
+	req.DatasetRevision = datasetRepo.DefaultBranch
+
 	token, err := c.tokenStore.FindByUID(ctx, user.ID)
 	if err != nil {
 		return nil, fmt.Errorf("can not get git access token for finetune error: %w", err)

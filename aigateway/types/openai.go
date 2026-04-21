@@ -60,8 +60,9 @@ type InternalModelInfo struct {
 
 // ExternalModelInfo represents the external model fields
 type ExternalModelInfo struct {
-	Provider string `json:"-"` // external provider name, like openai, anthropic etc
-	AuthHead string `json:"-"` // the auth header to access the external model
+	Provider      string `json:"-"` // external provider name, like openai, anthropic etc
+	AuthHead      string `json:"-"` // the auth header to access the external model
+	FormatModelID string `json:"-"` // formatted model ID, e.g. model_name(provider), used for backward-compatible lookup
 	// NeedSensitiveCheck controls whether requests for this model should go
 	// through sensitive content detection in aigateway. Set to false to skip
 	// the check (e.g. for guard models or trusted internal models).

@@ -29,6 +29,8 @@ type LLMConfig struct {
 	// through sensitive content detection in aigateway. Set to false to skip
 	// the check (e.g. for guard models or trusted internal models).
 	NeedSensitiveCheck bool `bun:",notnull,default:true" json:"need_sensitive_check"`
+	RepoID           int64         `bun:",nullzero" json:"repo_id"`
+	Repo             *Repository   `bun:"rel:belongs-to,join:repo_id=id" json:"repo,omitempty"`
 	times
 }
 
@@ -48,6 +50,7 @@ type LLMConfigStore interface {
 	GetByType(ctx context.Context, llmType int) (*LLMConfig, error)
 	GetByID(ctx context.Context, id int64) (*LLMConfig, error)
 	Index(ctx context.Context, per, page int, search *types.SearchLLMConfig) ([]*LLMConfig, int, error)
+	IndexWithRepo(ctx context.Context, per, page int, search *types.SearchLLMConfig) ([]*LLMConfig, int, error)
 	Update(ctx context.Context, config LLMConfig) (*LLMConfig, error)
 	Create(ctx context.Context, config LLMConfig) (*LLMConfig, error)
 	Delete(ctx context.Context, id int64) error
@@ -131,6 +134,24 @@ func (s *lLMConfigStoreImpl) Index(ctx context.Context, per, page int, search *t
 	err := query.Scan(ctx)
 	if err != nil {
 		return nil, 0, fmt.Errorf("select batch llm config with search, %w", err)
+	}
+	total, err := query.Count(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return configs, total, nil
+}
+
+func (s *lLMConfigStoreImpl) IndexWithRepo(ctx context.Context, per, page int, search *types.SearchLLMConfig) ([]*LLMConfig, int, error) {
+	var configs []*LLMConfig
+	offset := (page - 1) * per
+
+	query := s.db.Operator.Core.NewSelect().Model(&configs).Relation("Repo").Limit(per).Offset(offset)
+	buildSearchLLMConfigQuery(search, query)
+	err := query.Scan(ctx)
+	if err != nil {
+		return nil, 0, fmt.Errorf("select batch llm config with repo, %w", err)
 	}
 	total, err := query.Count(ctx)
 	if err != nil {

@@ -310,3 +310,16 @@ type GetFilesByRevisionAndPathsReq struct {
 	Revision  string               `json:"revision"`
 	Paths     []string             `json:"paths"`
 }
+
+type CreateForkReq struct {
+	// Source repository information
+	SourceRepoType    types.RepositoryType `json:"source_repo_type"`
+	SourceNamespace   string               `json:"source_namespace"`
+	SourceName        string               `json:"source_name"`
+	// Target repository information
+	TargetRepoType    types.RepositoryType `json:"target_repo_type"`
+	TargetNamespace   string               `json:"target_namespace"`
+	TargetName        string               `json:"target_name"`
+	// Revision to fork from (optional)
+	Revision          string               `json:"revision"`
+}

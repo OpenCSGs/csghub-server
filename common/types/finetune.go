@@ -37,6 +37,8 @@ type FinetuneReq struct {
 	TaskType         TaskType `json:"-"`
 	DownloadEndpoint string   `json:"-"`
 	ResourceName     string   `json:"-"`
+	Revision         string   `json:"-"`
+	DatasetRevision  string   `json:"-"`
 
 	TaskName           string  `json:"task_name"`
 	TaskDesc           string  `json:"task_desc"`

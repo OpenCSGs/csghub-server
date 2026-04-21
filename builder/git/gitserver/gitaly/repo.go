@@ -283,6 +283,48 @@ func (c *Client) GetRepoLfsSize(ctx context.Context, req gitserver.GetRepoInfoBy
 	return totalSize, nil
 }
 
+func (c *Client) CreateFork(ctx context.Context, req gitserver.CreateForkReq) error {
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
+
+	// Build relative path for source repository
+	sourceRelativePath, err := c.BuildRelativePath(ctx, req.SourceRepoType, req.SourceNamespace, req.SourceName)
+	if err != nil {
+		return err
+	}
+
+	// Build relative path for target repository
+	targetRelativePath, err := c.BuildRelativePath(ctx, req.TargetRepoType, req.TargetNamespace, req.TargetName)
+	if err != nil {
+		return err
+	}
+
+	// Create gitaly fork request
+	gitalyReq := &gitalypb.CreateForkRequest{
+		Repository: &gitalypb.Repository{
+			StorageName:  c.config.GitalyServer.Storage,
+			RelativePath: targetRelativePath,
+		},
+		SourceRepository: &gitalypb.Repository{
+			StorageName:  c.config.GitalyServer.Storage,
+			RelativePath: sourceRelativePath,
+		},
+	}
+
+	// Set revision if provided
+	if req.Revision != "" {
+		gitalyReq.Revision = []byte("refs/heads/" + req.Revision)
+	}
+
+	// Call gitaly CreateFork method
+	_, err = c.repoClient.CreateFork(ctx, gitalyReq)
+	if err != nil {
+		return errorx.ErrGitCreateForkFailed(err, errorx.Ctx())
+	}
+
+	return nil
+}
+
 type ProjectStorageCloneRequest struct {
 	CurrentGitalyAddress string
 	CurrentGitalyToken   string

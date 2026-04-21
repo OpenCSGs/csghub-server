@@ -114,6 +114,8 @@ func (h *DatasetHandler) Create(ctx *gin.Context) {
 // @Param        sort query string false "sort by"
 // @Param        source query string false "source" Enums(opencsg, huggingface, local)
 // @Param        xnet_migration_status query string false "filter by xnet migration status" Enums(pending, running, completed, failed)
+// @Param        dataset_type query string false "filter by dataset type" Enums(commercial, normal)
+// @Param        user_purchased query bool false "filter by user purchased" default(false)
 // @Param        per query int false "per" default(20)
 // @Param        page query int false "per page" default(1)
 // @Success      200  {object}  types.ResponseWithTotal{data=[]types.Dataset,total=int} "OK"
@@ -357,6 +359,15 @@ func getFilterFromContext(ctx *gin.Context, filter *types.RepoFilter) *types.Rep
 			status == types.XnetMigrationTaskStatusFailed {
 			filter.XnetMigrationStatus = &status
 		}
+	}
+
+	// Add dataset type filter
+	filter.DatasetType = ctx.Query("dataset_type")
+
+	// Add user purchased filter
+	userPurchasedStr := ctx.Query("user_purchased")
+	if userPurchasedStr == "true" {
+		filter.UserPurchased = true
 	}
 
 	return filter

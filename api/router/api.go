@@ -774,6 +774,7 @@ func createDatasetRoutes(
 		datasetsGroup.DELETE("/:namespace/:name", middleware.MustLogin(), dsHandler.Delete)
 		datasetsGroup.GET("/:namespace/:name", cache.Cache(memoryStore, time.Minute*2, middleware.CacheRepoInfo()), dsHandler.Show)
 		datasetsGroup.GET("/:namespace/:name/relations", middleware.MustLogin(), dsHandler.Relations)
+
 		datasetsGroup.GET("/:namespace/:name/branches", middleware.MustLogin(), repoCommonHandler.Branches)
 		datasetsGroup.POST("/:namespace/:name/branches", middleware.MustLogin(), repoCommonHandler.CreateBranch)
 		datasetsGroup.DELETE("/:namespace/:name/branches/:branch", middleware.MustLogin(), repoCommonHandler.DeleteBranch)

@@ -10,6 +10,11 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
+type testDatasetWithMocks struct {
+	*datasetComponentImpl
+	mocks *Mocks
+}
+
 type testRepoWithMocks struct {
 	*repoComponentImpl
 	mocks *Mocks
@@ -200,22 +205,6 @@ func initializeTestBroadcastComponent(ctx context.Context, t interface {
 		wire.Struct(new(testBroadcastWithMocks), "*"),
 	)
 	return &testBroadcastWithMocks{}
-}
-
-type testDatasetWithMocks struct {
-	*datasetComponentImpl
-	mocks *Mocks
-}
-
-func initializeTestDatasetComponent(ctx context.Context, t interface {
-	Cleanup(func())
-	mock.TestingT
-}) *testDatasetWithMocks {
-	wire.Build(
-		MockSuperSet, DatasetComponentSet,
-		wire.Struct(new(testDatasetWithMocks), "*"),
-	)
-	return &testDatasetWithMocks{}
 }
 
 type testCodeWithMocks struct {

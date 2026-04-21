@@ -55,6 +55,7 @@ func NewRouter(config *config.Config) (*gin.Engine, func(), error) {
 	v1Group.POST("/chat/completions", middlewareCollection.Auth.NeedLogin, openAIhandler.Chat)
 	v1Group.POST("/embeddings", middlewareCollection.Auth.NeedLogin, openAIhandler.Embedding)
 	v1Group.POST("/images/generations", middlewareCollection.Auth.NeedLogin, openAIhandler.GenerateImage)
+	v1Group.POST("/audio/transcriptions", middlewareCollection.Auth.NeedLogin, openAIhandler.Transcription)
 
 	apiV1Group := r.Group("/api/v1")
 	adminGroup := apiV1Group.Group("/admin", middlewareCollection.Auth.NeedAdmin)

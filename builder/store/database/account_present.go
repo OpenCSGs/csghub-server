@@ -25,6 +25,7 @@ type AccountPresentStore interface {
 	MarkPresentAsUsed(ctx context.Context, eventUUID uuid.UUID) error
 	CancelPresent(ctx context.Context, eventUUID uuid.UUID) error
 	ListPresents(ctx context.Context, filter PresentFilter) ([]AccountPresent, int, error)
+	FindPresentByEventUUID(ctx context.Context, eventUUID uuid.UUID) (*AccountPresent, error)
 }
 
 type PresentFilter struct {
@@ -231,4 +232,12 @@ func (ap *accountPresentStoreImpl) ListPresents(ctx context.Context, filter Pres
 	}
 
 	return presents, total, nil
+}
+
+func (ap *accountPresentStoreImpl) FindPresentByEventUUID(ctx context.Context, eventUUID uuid.UUID) (*AccountPresent, error) {
+	var present AccountPresent
+	if err := ap.db.Operator.Core.NewSelect().Model(&present).Where("event_uuid = ?", eventUUID).Scan(ctx, &present); err != nil {
+		return nil, fmt.Errorf("get account present, event_uuid:%s, error:%w", eventUUID.String(), err)
+	}
+	return &present, nil
 }

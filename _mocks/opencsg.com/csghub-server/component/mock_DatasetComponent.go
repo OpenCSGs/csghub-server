@@ -22,6 +22,65 @@ func (_m *MockDatasetComponent) EXPECT() *MockDatasetComponent_Expecter {
 	return &MockDatasetComponent_Expecter{mock: &_m.Mock}
 }
 
+// BuyDataset provides a mock function with given fields: ctx, req
+func (_m *MockDatasetComponent) BuyDataset(ctx context.Context, req *types.BuyDatasetReq) (*types.BuyDatasetResp, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for BuyDataset")
+	}
+
+	var r0 *types.BuyDatasetResp
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *types.BuyDatasetReq) (*types.BuyDatasetResp, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *types.BuyDatasetReq) *types.BuyDatasetResp); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.BuyDatasetResp)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *types.BuyDatasetReq) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockDatasetComponent_BuyDataset_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BuyDataset'
+type MockDatasetComponent_BuyDataset_Call struct {
+	*mock.Call
+}
+
+// BuyDataset is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req *types.BuyDatasetReq
+func (_e *MockDatasetComponent_Expecter) BuyDataset(ctx interface{}, req interface{}) *MockDatasetComponent_BuyDataset_Call {
+	return &MockDatasetComponent_BuyDataset_Call{Call: _e.mock.On("BuyDataset", ctx, req)}
+}
+
+func (_c *MockDatasetComponent_BuyDataset_Call) Run(run func(ctx context.Context, req *types.BuyDatasetReq)) *MockDatasetComponent_BuyDataset_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*types.BuyDatasetReq))
+	})
+	return _c
+}
+
+func (_c *MockDatasetComponent_BuyDataset_Call) Return(_a0 *types.BuyDatasetResp, _a1 error) *MockDatasetComponent_BuyDataset_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockDatasetComponent_BuyDataset_Call) RunAndReturn(run func(context.Context, *types.BuyDatasetReq) (*types.BuyDatasetResp, error)) *MockDatasetComponent_BuyDataset_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Create provides a mock function with given fields: ctx, req
 func (_m *MockDatasetComponent) Create(ctx context.Context, req *types.CreateDatasetReq) (*types.Dataset, error) {
 	ret := _m.Called(ctx, req)
@@ -81,6 +140,65 @@ func (_c *MockDatasetComponent_Create_Call) RunAndReturn(run func(context.Contex
 	return _c
 }
 
+// CreateFork provides a mock function with given fields: ctx, req
+func (_m *MockDatasetComponent) CreateFork(ctx context.Context, req types.CreateForkReq) (*types.Dataset, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateFork")
+	}
+
+	var r0 *types.Dataset
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.CreateForkReq) (*types.Dataset, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.CreateForkReq) *types.Dataset); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.Dataset)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.CreateForkReq) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockDatasetComponent_CreateFork_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateFork'
+type MockDatasetComponent_CreateFork_Call struct {
+	*mock.Call
+}
+
+// CreateFork is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.CreateForkReq
+func (_e *MockDatasetComponent_Expecter) CreateFork(ctx interface{}, req interface{}) *MockDatasetComponent_CreateFork_Call {
+	return &MockDatasetComponent_CreateFork_Call{Call: _e.mock.On("CreateFork", ctx, req)}
+}
+
+func (_c *MockDatasetComponent_CreateFork_Call) Run(run func(ctx context.Context, req types.CreateForkReq)) *MockDatasetComponent_CreateFork_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.CreateForkReq))
+	})
+	return _c
+}
+
+func (_c *MockDatasetComponent_CreateFork_Call) Return(_a0 *types.Dataset, _a1 error) *MockDatasetComponent_CreateFork_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockDatasetComponent_CreateFork_Call) RunAndReturn(run func(context.Context, types.CreateForkReq) (*types.Dataset, error)) *MockDatasetComponent_CreateFork_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Delete provides a mock function with given fields: ctx, namespace, name, currentUser
 func (_m *MockDatasetComponent) Delete(ctx context.Context, namespace string, name string, currentUser string) error {
 	ret := _m.Called(ctx, namespace, name, currentUser)
@@ -126,6 +244,65 @@ func (_c *MockDatasetComponent_Delete_Call) Return(_a0 error) *MockDatasetCompon
 }
 
 func (_c *MockDatasetComponent_Delete_Call) RunAndReturn(run func(context.Context, string, string, string) error) *MockDatasetComponent_Delete_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetByID provides a mock function with given fields: ctx, datasetID
+func (_m *MockDatasetComponent) GetByID(ctx context.Context, datasetID int64) (*types.Dataset, error) {
+	ret := _m.Called(ctx, datasetID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetByID")
+	}
+
+	var r0 *types.Dataset
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64) (*types.Dataset, error)); ok {
+		return rf(ctx, datasetID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, int64) *types.Dataset); ok {
+		r0 = rf(ctx, datasetID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.Dataset)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, int64) error); ok {
+		r1 = rf(ctx, datasetID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockDatasetComponent_GetByID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetByID'
+type MockDatasetComponent_GetByID_Call struct {
+	*mock.Call
+}
+
+// GetByID is a helper method to define mock.On call
+//   - ctx context.Context
+//   - datasetID int64
+func (_e *MockDatasetComponent_Expecter) GetByID(ctx interface{}, datasetID interface{}) *MockDatasetComponent_GetByID_Call {
+	return &MockDatasetComponent_GetByID_Call{Call: _e.mock.On("GetByID", ctx, datasetID)}
+}
+
+func (_c *MockDatasetComponent_GetByID_Call) Run(run func(ctx context.Context, datasetID int64)) *MockDatasetComponent_GetByID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64))
+	})
+	return _c
+}
+
+func (_c *MockDatasetComponent_GetByID_Call) Return(_a0 *types.Dataset, _a1 error) *MockDatasetComponent_GetByID_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockDatasetComponent_GetByID_Call) RunAndReturn(run func(context.Context, int64) (*types.Dataset, error)) *MockDatasetComponent_GetByID_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -261,6 +438,65 @@ func (_c *MockDatasetComponent_OrgDatasets_Call) Return(_a0 []types.Dataset, _a1
 }
 
 func (_c *MockDatasetComponent_OrgDatasets_Call) RunAndReturn(run func(context.Context, *types.OrgDatasetsReq) ([]types.Dataset, int, error)) *MockDatasetComponent_OrgDatasets_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// Refork provides a mock function with given fields: ctx, req
+func (_m *MockDatasetComponent) Refork(ctx context.Context, req types.CreateForkReq) (*types.Dataset, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Refork")
+	}
+
+	var r0 *types.Dataset
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.CreateForkReq) (*types.Dataset, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.CreateForkReq) *types.Dataset); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.Dataset)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.CreateForkReq) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockDatasetComponent_Refork_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Refork'
+type MockDatasetComponent_Refork_Call struct {
+	*mock.Call
+}
+
+// Refork is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.CreateForkReq
+func (_e *MockDatasetComponent_Expecter) Refork(ctx interface{}, req interface{}) *MockDatasetComponent_Refork_Call {
+	return &MockDatasetComponent_Refork_Call{Call: _e.mock.On("Refork", ctx, req)}
+}
+
+func (_c *MockDatasetComponent_Refork_Call) Run(run func(ctx context.Context, req types.CreateForkReq)) *MockDatasetComponent_Refork_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.CreateForkReq))
+	})
+	return _c
+}
+
+func (_c *MockDatasetComponent_Refork_Call) Return(_a0 *types.Dataset, _a1 error) *MockDatasetComponent_Refork_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockDatasetComponent_Refork_Call) RunAndReturn(run func(context.Context, types.CreateForkReq) (*types.Dataset, error)) *MockDatasetComponent_Refork_Call {
 	_c.Call.Return(run)
 	return _c
 }

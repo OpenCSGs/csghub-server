@@ -26,17 +26,24 @@ func (_m *MockAccountStatementStore) EXPECT() *MockAccountStatementStore_Expecte
 	return &MockAccountStatementStore_Expecter{mock: &_m.Mock}
 }
 
-// Create provides a mock function with given fields: ctx, input
-func (_m *MockAccountStatementStore) Create(ctx context.Context, input database.AccountStatement) error {
-	ret := _m.Called(ctx, input)
+// Create provides a mock function with given fields: ctx, input, checkBalance
+func (_m *MockAccountStatementStore) Create(ctx context.Context, input database.AccountStatement, checkBalance ...bool) error {
+	_va := make([]interface{}, len(checkBalance))
+	for _i := range checkBalance {
+		_va[_i] = checkBalance[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, input)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Create")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, database.AccountStatement) error); ok {
-		r0 = rf(ctx, input)
+	if rf, ok := ret.Get(0).(func(context.Context, database.AccountStatement, ...bool) error); ok {
+		r0 = rf(ctx, input, checkBalance...)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -52,13 +59,21 @@ type MockAccountStatementStore_Create_Call struct {
 // Create is a helper method to define mock.On call
 //   - ctx context.Context
 //   - input database.AccountStatement
-func (_e *MockAccountStatementStore_Expecter) Create(ctx interface{}, input interface{}) *MockAccountStatementStore_Create_Call {
-	return &MockAccountStatementStore_Create_Call{Call: _e.mock.On("Create", ctx, input)}
+//   - checkBalance ...bool
+func (_e *MockAccountStatementStore_Expecter) Create(ctx interface{}, input interface{}, checkBalance ...interface{}) *MockAccountStatementStore_Create_Call {
+	return &MockAccountStatementStore_Create_Call{Call: _e.mock.On("Create",
+		append([]interface{}{ctx, input}, checkBalance...)...)}
 }
 
-func (_c *MockAccountStatementStore_Create_Call) Run(run func(ctx context.Context, input database.AccountStatement)) *MockAccountStatementStore_Create_Call {
+func (_c *MockAccountStatementStore_Create_Call) Run(run func(ctx context.Context, input database.AccountStatement, checkBalance ...bool)) *MockAccountStatementStore_Create_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(database.AccountStatement))
+		variadicArgs := make([]bool, len(args)-2)
+		for i, a := range args[2:] {
+			if a != nil {
+				variadicArgs[i] = a.(bool)
+			}
+		}
+		run(args[0].(context.Context), args[1].(database.AccountStatement), variadicArgs...)
 	})
 	return _c
 }
@@ -68,7 +83,7 @@ func (_c *MockAccountStatementStore_Create_Call) Return(_a0 error) *MockAccountS
 	return _c
 }
 
-func (_c *MockAccountStatementStore_Create_Call) RunAndReturn(run func(context.Context, database.AccountStatement) error) *MockAccountStatementStore_Create_Call {
+func (_c *MockAccountStatementStore_Create_Call) RunAndReturn(run func(context.Context, database.AccountStatement, ...bool) error) *MockAccountStatementStore_Create_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -130,6 +145,64 @@ func (_c *MockAccountStatementStore_GetByEventID_Call) RunAndReturn(run func(con
 	return _c
 }
 
+// HasUserPurchasedDataset provides a mock function with given fields: ctx, userUUID, datasetID
+func (_m *MockAccountStatementStore) HasUserPurchasedDataset(ctx context.Context, userUUID string, datasetID int64) (bool, error) {
+	ret := _m.Called(ctx, userUUID, datasetID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for HasUserPurchasedDataset")
+	}
+
+	var r0 bool
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, int64) (bool, error)); ok {
+		return rf(ctx, userUUID, datasetID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, int64) bool); ok {
+		r0 = rf(ctx, userUUID, datasetID)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, int64) error); ok {
+		r1 = rf(ctx, userUUID, datasetID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountStatementStore_HasUserPurchasedDataset_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'HasUserPurchasedDataset'
+type MockAccountStatementStore_HasUserPurchasedDataset_Call struct {
+	*mock.Call
+}
+
+// HasUserPurchasedDataset is a helper method to define mock.On call
+//   - ctx context.Context
+//   - userUUID string
+//   - datasetID int64
+func (_e *MockAccountStatementStore_Expecter) HasUserPurchasedDataset(ctx interface{}, userUUID interface{}, datasetID interface{}) *MockAccountStatementStore_HasUserPurchasedDataset_Call {
+	return &MockAccountStatementStore_HasUserPurchasedDataset_Call{Call: _e.mock.On("HasUserPurchasedDataset", ctx, userUUID, datasetID)}
+}
+
+func (_c *MockAccountStatementStore_HasUserPurchasedDataset_Call) Run(run func(ctx context.Context, userUUID string, datasetID int64)) *MockAccountStatementStore_HasUserPurchasedDataset_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(int64))
+	})
+	return _c
+}
+
+func (_c *MockAccountStatementStore_HasUserPurchasedDataset_Call) Return(_a0 bool, _a1 error) *MockAccountStatementStore_HasUserPurchasedDataset_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountStatementStore_HasUserPurchasedDataset_Call) RunAndReturn(run func(context.Context, string, int64) (bool, error)) *MockAccountStatementStore_HasUserPurchasedDataset_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ListByUserIDAndTime provides a mock function with given fields: ctx, req
 func (_m *MockAccountStatementStore) ListByUserIDAndTime(ctx context.Context, req types.ActStatementsReq) (database.AccountStatementRes, error) {
 	ret := _m.Called(ctx, req)
@@ -183,6 +256,79 @@ func (_c *MockAccountStatementStore_ListByUserIDAndTime_Call) Return(_a0 databas
 }
 
 func (_c *MockAccountStatementStore_ListByUserIDAndTime_Call) RunAndReturn(run func(context.Context, types.ActStatementsReq) (database.AccountStatementRes, error)) *MockAccountStatementStore_ListByUserIDAndTime_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ListPortalRecharges provides a mock function with given fields: ctx, req
+func (_m *MockAccountStatementStore) ListPortalRecharges(ctx context.Context, req types.AcctRechargeListReq) ([]database.AccountStatement, int, float64, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListPortalRecharges")
+	}
+
+	var r0 []database.AccountStatement
+	var r1 int
+	var r2 float64
+	var r3 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.AcctRechargeListReq) ([]database.AccountStatement, int, float64, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, types.AcctRechargeListReq) []database.AccountStatement); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.AccountStatement)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, types.AcctRechargeListReq) int); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, types.AcctRechargeListReq) float64); ok {
+		r2 = rf(ctx, req)
+	} else {
+		r2 = ret.Get(2).(float64)
+	}
+
+	if rf, ok := ret.Get(3).(func(context.Context, types.AcctRechargeListReq) error); ok {
+		r3 = rf(ctx, req)
+	} else {
+		r3 = ret.Error(3)
+	}
+
+	return r0, r1, r2, r3
+}
+
+// MockAccountStatementStore_ListPortalRecharges_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListPortalRecharges'
+type MockAccountStatementStore_ListPortalRecharges_Call struct {
+	*mock.Call
+}
+
+// ListPortalRecharges is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req types.AcctRechargeListReq
+func (_e *MockAccountStatementStore_Expecter) ListPortalRecharges(ctx interface{}, req interface{}) *MockAccountStatementStore_ListPortalRecharges_Call {
+	return &MockAccountStatementStore_ListPortalRecharges_Call{Call: _e.mock.On("ListPortalRecharges", ctx, req)}
+}
+
+func (_c *MockAccountStatementStore_ListPortalRecharges_Call) Run(run func(ctx context.Context, req types.AcctRechargeListReq)) *MockAccountStatementStore_ListPortalRecharges_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(types.AcctRechargeListReq))
+	})
+	return _c
+}
+
+func (_c *MockAccountStatementStore_ListPortalRecharges_Call) Return(_a0 []database.AccountStatement, _a1 int, _a2 float64, _a3 error) *MockAccountStatementStore_ListPortalRecharges_Call {
+	_c.Call.Return(_a0, _a1, _a2, _a3)
+	return _c
+}
+
+func (_c *MockAccountStatementStore_ListPortalRecharges_Call) RunAndReturn(run func(context.Context, types.AcctRechargeListReq) ([]database.AccountStatement, int, float64, error)) *MockAccountStatementStore_ListPortalRecharges_Call {
 	_c.Call.Return(run)
 	return _c
 }

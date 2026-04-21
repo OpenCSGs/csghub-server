@@ -915,6 +915,8 @@ func (d *deployer) SubmitFinetuneJob(ctx context.Context, req types.FinetuneReq)
 	env["EPOCHS"] = strconv.Itoa(req.Epochs)
 	env["LEARNING_RATE"] = strconv.FormatFloat(req.LearningRate, 'f', -1, 64)
 	env["CUSTOM_ARGS"] = req.CustomeArgs
+	env["REVISION"] = req.Revision
+	env["DATASET_REVISION"] = req.DatasetRevision
 	if len(finetunedModelName) > 0 {
 		env["FINETUNED_MODEL_NAME"] = finetunedModelName
 	}

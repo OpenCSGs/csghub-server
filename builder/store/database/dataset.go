@@ -26,6 +26,7 @@ type datasetStoreImpl struct {
 type DatasetStore interface {
 	ByRepoIDs(ctx context.Context, repoIDs []int64) (datasets []Dataset, err error)
 	ByRepoID(ctx context.Context, repoID int64) (*Dataset, error)
+	ByID(ctx context.Context, datasetID int64) (*Dataset, error)
 	ByUsername(ctx context.Context, username string, per, page int, onlyPublic bool) (datasets []Dataset, total int, err error)
 	UserLikesDatasets(ctx context.Context, userID int64, per, page int) (datasets []Dataset, total int, err error)
 	ByOrgPath(ctx context.Context, namespace string, per, page int, onlyPublic bool) (datasets []Dataset, total int, err error)
@@ -48,10 +49,14 @@ func NewDatasetStoreWithDB(db *DB) DatasetStore {
 }
 
 type Dataset struct {
-	ID            int64       `bun:",pk,autoincrement" json:"id"`
-	RepositoryID  int64       `bun:",notnull" json:"repository_id"`
-	Repository    *Repository `bun:"rel:belongs-to,join:repository_id=id" json:"repository"`
-	LastUpdatedAt time.Time   `bun:",notnull" json:"last_updated_at"`
+	ID               int64       `bun:",pk,autoincrement" json:"id"`
+	RepositoryID     int64       `bun:",notnull" json:"repository_id"`
+	Repository       *Repository `bun:"rel:belongs-to,join:repository_id=id" json:"repository"`
+	LastUpdatedAt    time.Time   `bun:",notnull" json:"last_updated_at"`
+	DatasetType      string      `bun:",default:normal" json:"dataset_type"`
+	RelatedDatasetID int64       `bun:"" json:"related_dataset_id"`
+	Price            float64     `bun:"" json:"price"`
+	Forked           bool        `bun:",default:false" json:"forked"`
 	times
 }
 
@@ -75,6 +80,20 @@ func (s *datasetStoreImpl) ByRepoID(ctx context.Context, repoID int64) (*Dataset
 		Scan(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to select dataset by repository id: %d, error: %w", repoID, err)
+	}
+
+	return &dataset, nil
+}
+
+func (s *datasetStoreImpl) ByID(ctx context.Context, datasetID int64) (*Dataset, error) {
+	var dataset Dataset
+	err := s.db.Operator.Core.NewSelect().
+		Model(&dataset).
+		Where("dataset.id = ?", datasetID).
+		Relation("Repository").
+		Scan(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to select dataset by id: %d, error: %w", datasetID, err)
 	}
 
 	return &dataset, nil

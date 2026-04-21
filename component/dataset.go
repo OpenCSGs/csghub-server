@@ -2,13 +2,13 @@ package component
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"path"
 	"slices"
 	"time"
 
-	"opencsg.com/csghub-server/builder/git"
 	"opencsg.com/csghub-server/builder/git/gitserver"
 	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/rpc"
@@ -19,47 +19,25 @@ import (
 	"opencsg.com/csghub-server/common/utils/common"
 )
 
+// DatasetComponent defines the interface for dataset operations
 type DatasetComponent interface {
 	Create(ctx context.Context, req *types.CreateDatasetReq) (*types.Dataset, error)
 	Index(ctx context.Context, filter *types.RepoFilter, per, page int, needOpWeight bool) ([]*types.Dataset, int, error)
 	Update(ctx context.Context, req *types.UpdateDatasetReq) (*types.Dataset, error)
 	Delete(ctx context.Context, namespace, name, currentUser string) error
 	Show(ctx context.Context, namespace, name, currentUser string, needOpWeight, needMultiSync bool) (*types.Dataset, error)
+	GetByID(ctx context.Context, datasetID int64) (*types.Dataset, error)
 	Relations(ctx context.Context, namespace, name, currentUser string) (*types.Relations, error)
 	OrgDatasets(ctx context.Context, req *types.OrgDatasetsReq) ([]types.Dataset, int, error)
+	// CreateFork creates a fork of a dataset repository
+	CreateFork(ctx context.Context, req types.CreateForkReq) (*types.Dataset, error)
+	// Refork creates a fork of a dataset repository after user deletion, requires purchase check
+	Refork(ctx context.Context, req types.CreateForkReq) (*types.Dataset, error)
+	// BuyDataset buys a dataset
+	BuyDataset(ctx context.Context, req *types.BuyDatasetReq) (*types.BuyDatasetResp, error)
 }
 
-func NewDatasetComponent(config *config.Config) (DatasetComponent, error) {
-	c := &datasetComponentImpl{}
-	c.tagStore = database.NewTagStore()
-	c.datasetStore = database.NewDatasetStore()
-	c.repoStore = database.NewRepoStore()
-	c.namespaceStore = database.NewNamespaceStore()
-	c.userStore = database.NewUserStore()
-	c.userLikesStore = database.NewUserLikesStore()
-	c.recomStore = database.NewRecomStore()
-	var err error
-	c.repoComponent, err = NewRepoComponentImpl(config)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create repo component, error: %w", err)
-	}
-	c.sensitiveComponent, err = NewSensitiveComponent(config)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create sensitive component, error: %w", err)
-	}
-	gs, err := git.NewGitServer(config)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create git server, error: %w", err)
-	}
-	c.userSvcClient = rpc.NewUserSvcHttpClient(fmt.Sprintf("%s:%d", config.User.Host, config.User.Port),
-		rpc.AuthWithApiKey(config.APIToken))
-	c.gitServer = gs
-	c.config = config
-	c.xnetMigrationTaskStore = database.NewXnetMigrationTaskStore()
-	c.lfsMetaObjectStore = database.NewLfsMetaObjectStore()
-	return c, nil
-}
-
+// datasetComponentImpl is the base implementation of DatasetComponent
 type datasetComponentImpl struct {
 	config                 *config.Config
 	repoComponent          RepoComponent
@@ -75,6 +53,61 @@ type datasetComponentImpl struct {
 	recomStore             database.RecomStore
 	xnetMigrationTaskStore database.XnetMigrationTaskStore
 	lfsMetaObjectStore     database.LfsMetaObjectStore
+	extendDatasetImpl
+}
+
+// getXnetMigrationProgress calculates the Xnet migration progress for a repository
+func (c *datasetComponentImpl) getXnetMigrationProgress(ctx context.Context, repo *database.Repository) int {
+	lfsMetaObjects, err := c.lfsMetaObjectStore.FindByRepoID(ctx, repo.ID)
+	if err != nil || len(lfsMetaObjects) == 0 {
+		return 0
+	}
+
+	var migratedCount int
+	for _, obj := range lfsMetaObjects {
+		if obj.XnetUsed {
+			migratedCount++
+		}
+	}
+
+	return (migratedCount * 100) / len(lfsMetaObjects)
+}
+
+func generateReadmeData(license string) string {
+	return `
+---
+license: ` + license + `
+---
+	`
+}
+
+// Common methods for datasetComponentImpl
+
+func (c *datasetComponentImpl) GetByID(ctx context.Context, datasetID int64) (*types.Dataset, error) {
+	// Get dataset by ID
+	dataset, err := c.datasetStore.ByID(ctx, datasetID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find dataset by ID, error: %w", err)
+	}
+
+	// Build and return types.Dataset
+	return &types.Dataset{
+		ID:               dataset.ID,
+		Name:             dataset.Repository.Name,
+		Nickname:         dataset.Repository.Nickname,
+		Description:      dataset.Repository.Description,
+		Likes:            dataset.Repository.Likes,
+		Downloads:        dataset.Repository.DownloadCount,
+		Path:             dataset.Repository.Path,
+		RepositoryID:     dataset.Repository.ID,
+		Private:          dataset.Repository.Private,
+		CreatedAt:        dataset.CreatedAt,
+		UpdatedAt:        dataset.Repository.UpdatedAt,
+		DatasetType:      dataset.DatasetType,
+		RelatedDatasetID: dataset.RelatedDatasetID,
+		Price:            dataset.Price,
+		Forked:           dataset.Forked,
+	}, nil
 }
 
 func (c *datasetComponentImpl) Create(ctx context.Context, req *types.CreateDatasetReq) (*types.Dataset, error) {
@@ -202,120 +235,31 @@ func (c *datasetComponentImpl) Create(ctx context.Context, req *types.CreateData
 	return resDataset, nil
 }
 
-func generateReadmeData(license string) string {
-	return `
----
-license: ` + license + `
----
-	`
-}
-
-func (c *datasetComponentImpl) Index(ctx context.Context, filter *types.RepoFilter, per, page int, needOpWeight bool) ([]*types.Dataset, int, error) {
-	return c.commonIndex(ctx, filter, per, page, needOpWeight)
-}
-
-func (c *datasetComponentImpl) commonIndex(ctx context.Context, filter *types.RepoFilter, per, page int, needOpWeight bool) ([]*types.Dataset, int, error) {
-	var (
-		err         error
-		resDatasets []*types.Dataset
-	)
-	repos, total, err := c.repoComponent.PublicToUser(ctx, types.DatasetRepo, filter.Username, filter, per, page)
-	if err != nil {
-		return nil, 0, fmt.Errorf("failed to get public dataset repos, error: %w", err)
-	}
-	var repoIDs []int64
-	for _, repo := range repos {
-		repoIDs = append(repoIDs, repo.ID)
-	}
-	datasets, err := c.datasetStore.ByRepoIDs(ctx, repoIDs)
-	if err != nil {
-		return nil, 0, fmt.Errorf("failed to get datasets by repo ids, error: %w", err)
-	}
-
-	// loop through repos to keep the repos in sort order
-	for _, repo := range repos {
-		var dataset *database.Dataset
-		for _, d := range datasets {
-			if repo.ID == d.RepositoryID {
-				dataset = &d
-				break
-			}
+func (c *datasetComponentImpl) validateDatasetUpdate(ctx context.Context, req *types.UpdateDatasetReq) error {
+	if req.DatasetType == "commercial" {
+		if req.RelatedDatasetID <= 0 {
+			return errorx.BadRequest(errors.New("related_dataset_id is required for commercial dataset"), errorx.Ctx().Set("related_dataset_id", req.RelatedDatasetID))
 		}
-		if dataset == nil {
-			continue
+		if req.Price <= 0 {
+			return errorx.BadRequest(errors.New("price must be greater than 0 for commercial dataset"), errorx.Ctx().Set("price", req.Price))
 		}
-		var (
-			tags                []types.RepoTag
-			mirrorTaskStatus    types.MirrorTaskStatus
-			xnetMigrationStatus types.XnetMigrationTaskStatus
-		)
-		for _, tag := range repo.Tags {
-			tags = append(tags, types.RepoTag{
-				Name:      tag.Name,
-				Category:  tag.Category,
-				Group:     tag.Group,
-				BuiltIn:   tag.BuiltIn,
-				ShowName:  tag.I18nKey, //ShowName:  tag.ShowName,
-				I18nKey:   tag.I18nKey,
-				CreatedAt: tag.CreatedAt,
-				UpdatedAt: tag.UpdatedAt,
-			})
+		// Check if related_dataset_id exists
+		_, err := c.datasetStore.ByID(ctx, req.RelatedDatasetID)
+		if err != nil {
+			return errorx.BadRequest(errors.New("related_dataset_id does not exist"), errorx.Ctx().Set("related_dataset_id", req.RelatedDatasetID))
 		}
-		if dataset.Repository.Mirror.CurrentTask != nil {
-			mirrorTaskStatus = dataset.Repository.Mirror.CurrentTask.Status
-		}
-		var xnetMigrationProgress int
-		if dataset.Repository.CurrentXnetMigrationTaskID != 0 {
-			task, err := c.xnetMigrationTaskStore.GetXnetMigrationTaskByID(ctx, dataset.Repository.CurrentXnetMigrationTaskID)
-			if err == nil && task != nil {
-				xnetMigrationStatus = task.Status
-				if xnetMigrationStatus == types.XnetMigrationTaskStatusRunning {
-					xnetMigrationProgress = c.getXnetMigrationProgress(ctx, repo)
-				}
-			}
-		}
-		resDatasets = append(resDatasets, &types.Dataset{
-			ID:           dataset.ID,
-			Name:         repo.Name,
-			Nickname:     repo.Nickname,
-			Description:  repo.Description,
-			Likes:        repo.Likes,
-			Downloads:    repo.DownloadCount,
-			Path:         repo.Path,
-			RepositoryID: repo.ID,
-			Private:      repo.Private,
-			Tags:         tags,
-			CreatedAt:    dataset.CreatedAt,
-			UpdatedAt:    repo.UpdatedAt,
-			Source:       repo.Source,
-			SyncStatus:   repo.SyncStatus,
-			License:      repo.License,
-			Repository:   common.BuildCloneInfo(c.config, dataset.Repository),
-			User: types.User{
-				Username: dataset.Repository.User.Username,
-				Nickname: dataset.Repository.User.NickName,
-				Email:    dataset.Repository.User.Email,
-				Avatar:   dataset.Repository.User.Avatar,
-			},
-			MultiSource: types.MultiSource{
-				HFPath:  dataset.Repository.HFPath,
-				MSPath:  dataset.Repository.MSPath,
-				CSGPath: dataset.Repository.CSGPath,
-			},
-			MirrorTaskStatus:      mirrorTaskStatus,
-			XnetMigrationStatus:   xnetMigrationStatus,
-			XnetMigrationProgress: xnetMigrationProgress,
-		})
 	}
-	if needOpWeight {
-		c.addOpWeightToDataset(ctx, repoIDs, resDatasets)
-	}
-
-	return resDatasets, total, nil
+	return nil
 }
 
 func (c *datasetComponentImpl) Update(ctx context.Context, req *types.UpdateDatasetReq) (*types.Dataset, error) {
 	req.RepoType = types.DatasetRepo
+
+	// Validation logic
+	if err := c.validateDatasetUpdate(ctx, req); err != nil {
+		return nil, err
+	}
+
 	dbRepo, err := c.repoComponent.UpdateRepo(ctx, req.UpdateRepoReq)
 	if err != nil {
 		return nil, err
@@ -326,24 +270,39 @@ func (c *datasetComponentImpl) Update(ctx context.Context, req *types.UpdateData
 		return nil, fmt.Errorf("failed to find dataset, error: %w", err)
 	}
 
-	// update times of dateset
+	// Update dataset fields
+	if req.DatasetType != "" {
+		dataset.DatasetType = req.DatasetType
+	}
+	if req.RelatedDatasetID > 0 {
+		dataset.RelatedDatasetID = req.RelatedDatasetID
+	}
+	if req.Price > 0 {
+		dataset.Price = req.Price
+	}
+
+	// Update dataset timestamp
 	err = c.datasetStore.Update(ctx, *dataset)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update database dataset, error: %w", err)
 	}
 
 	resDataset := &types.Dataset{
-		ID:           dataset.ID,
-		Name:         dbRepo.Name,
-		Nickname:     dbRepo.Nickname,
-		Description:  dbRepo.Description,
-		Likes:        dbRepo.Likes,
-		Downloads:    dbRepo.DownloadCount,
-		Path:         dbRepo.Path,
-		RepositoryID: dbRepo.ID,
-		Private:      dbRepo.Private,
-		CreatedAt:    dataset.CreatedAt,
-		UpdatedAt:    dataset.UpdatedAt,
+		ID:               dataset.ID,
+		Name:             dbRepo.Name,
+		Nickname:         dbRepo.Nickname,
+		Description:      dbRepo.Description,
+		Likes:            dbRepo.Likes,
+		Downloads:        dbRepo.DownloadCount,
+		Path:             dbRepo.Path,
+		RepositoryID:     dbRepo.ID,
+		Private:          dbRepo.Private,
+		CreatedAt:        dataset.CreatedAt,
+		UpdatedAt:        dataset.UpdatedAt,
+		DatasetType:      dataset.DatasetType,
+		RelatedDatasetID: dataset.RelatedDatasetID,
+		Price:            dataset.Price,
+		Forked:           dataset.Forked,
 	}
 
 	return resDataset, nil
@@ -386,121 +345,6 @@ func (c *datasetComponentImpl) Delete(ctx context.Context, namespace, name, curr
 	}()
 
 	return nil
-}
-
-func (c *datasetComponentImpl) Show(ctx context.Context, namespace, name, currentUser string, needOpWeight, needMultiSync bool) (*types.Dataset, error) {
-	var (
-		tags             []types.RepoTag
-		mirrorTaskStatus types.MirrorTaskStatus
-	)
-	dataset, err := c.datasetStore.FindByPath(ctx, namespace, name)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find dataset, error: %w", err)
-	}
-
-	permission, err := c.repoComponent.GetUserRepoPermission(ctx, currentUser, dataset.Repository)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get user repo permission, error: %w", err)
-	}
-	if !permission.CanRead {
-		return nil, errorx.ErrForbidden
-	}
-
-	ns, err := c.repoComponent.GetNameSpaceInfo(ctx, namespace)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get namespace info for dataset, error: %w", err)
-	}
-
-	for _, tag := range dataset.Repository.Tags {
-		tags = append(tags, types.RepoTag{
-			Name:      tag.Name,
-			Category:  tag.Category,
-			Group:     tag.Group,
-			BuiltIn:   tag.BuiltIn,
-			ShowName:  tag.I18nKey, //ShowName:  tag.ShowName,
-			I18nKey:   tag.I18nKey,
-			CreatedAt: tag.CreatedAt,
-			UpdatedAt: tag.UpdatedAt,
-		})
-	}
-
-	likeExists, err := c.userLikesStore.IsExist(ctx, currentUser, dataset.Repository.ID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to check for the presence of the user likes, error: %w", err)
-	}
-
-	mirrorTaskStatus = c.repoComponent.GetMirrorTaskStatus(dataset.Repository)
-
-	var xnetMigrationStatus types.XnetMigrationTaskStatus
-	var xnetMigrationProgress int
-	if dataset.Repository.CurrentXnetMigrationTaskID != 0 {
-		task, err := c.xnetMigrationTaskStore.GetXnetMigrationTaskByID(ctx, dataset.Repository.CurrentXnetMigrationTaskID)
-		if err == nil && task != nil {
-			xnetMigrationStatus = task.Status
-			if task.Status == types.XnetMigrationTaskStatusRunning {
-				xnetMigrationProgress = c.getXnetMigrationProgress(ctx, dataset.Repository)
-			}
-		}
-	}
-
-	resDataset := &types.Dataset{
-		ID:            dataset.ID,
-		Name:          dataset.Repository.Name,
-		Nickname:      dataset.Repository.Nickname,
-		Description:   dataset.Repository.Description,
-		Likes:         dataset.Repository.Likes,
-		Downloads:     dataset.Repository.DownloadCount,
-		Path:          dataset.Repository.Path,
-		RepositoryID:  dataset.Repository.ID,
-		DefaultBranch: dataset.Repository.DefaultBranch,
-		Repository:    common.BuildCloneInfo(c.config, dataset.Repository),
-		Tags:          tags,
-		User: types.User{
-			Username: dataset.Repository.User.Username,
-			Nickname: dataset.Repository.User.NickName,
-			Email:    dataset.Repository.User.Email,
-			Avatar:   dataset.Repository.User.Avatar,
-		},
-		Private:             dataset.Repository.Private,
-		CreatedAt:           dataset.CreatedAt,
-		UpdatedAt:           dataset.Repository.UpdatedAt,
-		UserLikes:           likeExists,
-		Source:              dataset.Repository.Source,
-		SyncStatus:          dataset.Repository.SyncStatus,
-		License:             dataset.Repository.License,
-		MirrorLastUpdatedAt: dataset.Repository.Mirror.LastUpdatedAt,
-		CanWrite:            permission.CanWrite,
-		CanManage:           permission.CanAdmin,
-		Namespace:           ns,
-		MultiSource: types.MultiSource{
-			HFPath:  dataset.Repository.HFPath,
-			MSPath:  dataset.Repository.MSPath,
-			CSGPath: dataset.Repository.CSGPath,
-		},
-		MirrorTaskStatus:      mirrorTaskStatus,
-		XnetEnabled:           dataset.Repository.XnetEnabled,
-		XnetMigrationStatus:   xnetMigrationStatus,
-		XnetMigrationProgress: xnetMigrationProgress,
-	}
-	if permission.CanAdmin {
-		resDataset.SensitiveCheckStatus = dataset.Repository.SensitiveCheckStatus.String()
-	}
-
-	if needOpWeight {
-		c.addOpWeightToDataset(ctx, []int64{resDataset.RepositoryID}, []*types.Dataset{resDataset})
-	}
-
-	// add recom_scores to model
-	if needMultiSync {
-		weightNames := []database.RecomWeightName{database.RecomWeightFreshness,
-			database.RecomWeightDownloads,
-			database.RecomWeightQuality,
-			database.RecomWeightOp,
-			database.RecomWeightTotal}
-		c.addWeightsToDataset(ctx, resDataset.RepositoryID, resDataset, weightNames)
-	}
-
-	return resDataset, nil
 }
 
 func (c *datasetComponentImpl) Relations(ctx context.Context, namespace, name, currentUser string) (*types.Relations, error) {
@@ -560,34 +404,50 @@ func (c *datasetComponentImpl) OrgDatasets(ctx context.Context, req *types.OrgDa
 
 	for _, data := range datasets {
 		resDatasets = append(resDatasets, types.Dataset{
-			ID:           data.ID,
-			Name:         data.Repository.Name,
-			Nickname:     data.Repository.Nickname,
-			Description:  data.Repository.Description,
-			Likes:        data.Repository.Likes,
-			Downloads:    data.Repository.DownloadCount,
-			Path:         data.Repository.Path,
-			RepositoryID: data.RepositoryID,
-			Private:      data.Repository.Private,
-			CreatedAt:    data.CreatedAt,
-			UpdatedAt:    data.Repository.UpdatedAt,
+			ID:               data.ID,
+			Name:             data.Repository.Name,
+			Nickname:         data.Repository.Nickname,
+			Description:      data.Repository.Description,
+			Likes:            data.Repository.Likes,
+			Downloads:        data.Repository.DownloadCount,
+			Path:             data.Repository.Path,
+			RepositoryID:     data.RepositoryID,
+			Private:          data.Repository.Private,
+			CreatedAt:        data.CreatedAt,
+			UpdatedAt:        data.Repository.UpdatedAt,
+			DatasetType:      data.DatasetType,
+			RelatedDatasetID: data.RelatedDatasetID,
+			Price:            data.Price,
+			Forked:           data.Forked,
 		})
 	}
 
 	return resDatasets, total, nil
 }
 
+func (c *datasetComponentImpl) updateWeightToDataset(dataset *types.Dataset, newScore types.WeightScore) {
+	for i := range len(dataset.Scores) {
+		if dataset.Scores[i].WeightName == newScore.WeightName {
+			dataset.Scores[i].Score = newScore.Score
+			return
+		}
+	}
+	dataset.Scores = append(dataset.Scores, newScore)
+}
+
 func (c *datasetComponentImpl) addWeightsToDataset(ctx context.Context, repoID int64, resDatasets *types.Dataset, weightNames []database.RecomWeightName) {
 	weights, err := c.recomStore.FindByRepoIDs(ctx, []int64{repoID})
 	if err == nil {
-		resDatasets.Scores = make([]types.WeightScore, 0)
+		if resDatasets.Scores == nil {
+			resDatasets.Scores = make([]types.WeightScore, 0)
+		}
 		for _, weight := range weights {
 			if slices.Contains(weightNames, weight.WeightName) {
 				score := types.WeightScore{
 					WeightName: string(weight.WeightName),
 					Score:      weight.Score,
 				}
-				resDatasets.Scores = append(resDatasets.Scores, score)
+				c.updateWeightToDataset(resDatasets, score)
 			}
 		}
 	}

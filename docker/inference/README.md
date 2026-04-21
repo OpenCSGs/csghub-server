@@ -18,6 +18,13 @@ docker buildx build --platform linux/amd64,linux/arm64 \
   -t ${OPENCSG_ACR}/opencsghq/vllm:${IMAGE_TAG} \
   -f Dockerfile.vllm \
   --push .
+
+# For amd-vllm: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/amd-vllm:rocm7.0.0_vllm_0.19.0
+export IMAGE_TAG=rocm7.0.0_vllm_0.19.0
+docker buildx build --platform linux/amd64 \
+  -t ${OPENCSG_ACR}/opencsghq/amd-vllm:${IMAGE_TAG} \
+  -f Dockerfile.vllm-amd \
+  --push .
   
 # For vllm cpu only: opencsg-registry.cn-beijing.cr.aliyuncs.com/opencsghq/vllm-cpu:2.3
 export IMAGE_TAG=2.4
