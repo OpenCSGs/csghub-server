@@ -259,6 +259,19 @@ type Config struct {
 		CodeSoulerJetBrainsRedirectURL string `env:"OPENCSG_USER_SERVER_CODESOULER_JETBRAINS_REDIRECT_URL" default:"http://127.0.0.1:37679/callback"`
 	}
 
+	Credential struct {
+		// Default decodes to "opencsg-credential-dev-key-00001" for local/dev use; override in production.
+		MasterKeyBase64                  string `env:"OPENCSG_CREDENTIAL_MASTER_KEY_BASE64" default:"b3BlbmNzZy1jcmVkZW50aWFsLWRldi1rZXktMDAwMDE="`
+		SecretBackend                    string `env:"OPENCSG_CREDENTIAL_SECRET_BACKEND" default:"postgres_encrypted"`
+		RuntimeSessionSigningKey         string `env:"OPENCSG_CREDENTIAL_RUNTIME_SESSION_SIGNING_KEY" default:"credential-runtime-signing-key"`
+		RuntimeSessionMaxDurationSeconds int    `env:"OPENCSG_CREDENTIAL_RUNTIME_SESSION_MAX_DURATION_SECONDS" default:"3600"`
+		VaultAddress                     string `env:"OPENCSG_CREDENTIAL_VAULT_ADDRESS" default:""`
+		VaultToken                       string `env:"OPENCSG_CREDENTIAL_VAULT_TOKEN" default:""`
+		VaultNamespace                   string `env:"OPENCSG_CREDENTIAL_VAULT_NAMESPACE" default:""`
+		VaultKVDefaultMount              string `env:"OPENCSG_CREDENTIAL_VAULT_KV_DEFAULT_MOUNT" default:"secret"`
+		VaultTimeoutSeconds              int    `env:"OPENCSG_CREDENTIAL_VAULT_TIMEOUT_SECONDS" default:"5"`
+	}
+
 	MultiSync struct {
 		SaasAPIDomain         string `env:"OPENCSG_SAAS_API_DOMAIN" default:"https://hub.opencsg.com"`
 		SaasSyncDomain        string `env:"OPENCSG_SAAS_SYNC_DOMAIN" default:"https://sync.opencsg.com"`

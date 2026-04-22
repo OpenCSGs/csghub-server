@@ -3,9 +3,11 @@ package handler
 import (
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/builder/proxy"
+	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/trace"
 )
 
@@ -24,7 +26,7 @@ func NewInternalServiceProxyHandler(remoteEndpoint string) (*InternalServiceProx
 // Proxy send request to backend service, without change the request path
 func (h *InternalServiceProxyHandler) Proxy(ctx *gin.Context) {
 	// Log the request URL and header
-	slog.Debug("http request", slog.Any("request", ctx.Request.URL), slog.Any("header", ctx.Request.Header))
+	slog.Debug("http request", slog.Any("request", ctx.Request.URL), slog.Any("header", sanitizedHeaders(ctx.Request.Header)))
 
 	// Propagate trace ID to backend service
 	trace.PropagateTrace(ctx.Request.Context(), ctx.Request.Header)
@@ -40,7 +42,7 @@ func (h *InternalServiceProxyHandler) Proxy(ctx *gin.Context) {
 // apiGroup.PUT("/users/:username", userProxyHandler.ProxyToApi("/api/v1/user/%v", "username"))
 func (h *InternalServiceProxyHandler) ProxyToApi(api string, originParams ...string) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		slog.Info("proxy user request", slog.Any("request", ctx.Request.URL), slog.Any("header", ctx.Request.Header))
+		slog.Info("proxy user request", slog.Any("request", ctx.Request.URL), slog.Any("header", sanitizedHeaders(ctx.Request.Header)))
 
 		// Propagate trace ID to backend service
 		trace.PropagateTrace(ctx.Request.Context(), ctx.Request.Header)
@@ -55,4 +57,16 @@ func (h *InternalServiceProxyHandler) ProxyToApi(api string, originParams ...str
 		}
 		h.rp.ServeHTTP(ctx.Writer, ctx.Request, finalApi, "")
 	}
+}
+
+func sanitizedHeaders(headers map[string][]string) map[string][]string {
+	result := make(map[string][]string, len(headers))
+	for k, v := range headers {
+		if strings.EqualFold(k, types.HeaderAuthorization) {
+			result[k] = []string{"[REDACTED]"}
+			continue
+		}
+		result[k] = v
+	}
+	return result
 }

@@ -114,6 +114,30 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Name:** `schedulerStartTimeInPast`
 - **Description:** The specified start time is in the past. One-time schedules must use a future date/time.
 
+---
+
+### `AGENT-ERR-10`
+
+- **Error Code:** `AGENT-ERR-10`
+- **Error Name:** `credentialNameAlreadyExists`
+- **Description:** You have a credential with the same name.
+
+---
+
+### `AGENT-ERR-11`
+
+- **Error Code:** `AGENT-ERR-11`
+- **Error Name:** `runtimeCredentialTokenInvalid`
+- **Description:** The runtime credential token is missing, invalid, or expired.
+
+---
+
+### `AGENT-ERR-12`
+
+- **Error Code:** `AGENT-ERR-12`
+- **Error Name:** `runtimeCredentialGrantUnavailable`
+- **Description:** The runtime credential token is valid, but the requested credential is not granted, revoked, expired, or unavailable.
+
 ## Auth Errors
 
 ### `AUTH-ERR-0`
@@ -1225,4 +1249,3 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Code:** `USER-ERR-19`
 - **Error Name:** `uuidConflict`
 - **Description:** The UUID generated for the organization already exists in the system.
-

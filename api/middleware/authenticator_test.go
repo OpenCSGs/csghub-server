@@ -219,6 +219,12 @@ func TestAuthenticator(t *testing.T) {
 			isJWTTest:      true,
 			inBlacklist:    false,
 		},
+		{
+			name:           "credential runtime token passes through",
+			authHeader:     "Bearer runtime-credential-token",
+			expectedStatus: http.StatusOK,
+			handlerCalled:  true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -226,15 +232,15 @@ func TestAuthenticator(t *testing.T) {
 			if tt.isJWTTest {
 				mockRedis := cache.NewMockRedisClient(t)
 				tokenStr := strings.TrimPrefix(tt.authHeader, "Bearer ")
-				
+
 				mockRedis.EXPECT().SIsMember(mock.Anything, "jwt_blacklist", tokenStr).Return(tt.inBlacklist, nil)
 
 				w := httptest.NewRecorder()
 				c, _ := gin.CreateTestContext(w)
 				c.Request = httptest.NewRequest("GET", "/test", nil)
-				
+
 				result := isValidJWTToken(c, cfg, tokenStr, mockRedis)
-				
+
 				if tt.expectedStatus == http.StatusOK {
 					assert.True(t, result)
 				} else {
@@ -245,12 +251,17 @@ func TestAuthenticator(t *testing.T) {
 				router.Use(Authenticator(cfg))
 
 				handlerCalled := false
-				router.GET("/test", func(c *gin.Context) {
+				path := "/test"
+				if tt.name == "credential runtime token passes through" {
+					path = "/api/v1/agent/credentials/runtime/github"
+				}
+
+				router.GET(path, func(c *gin.Context) {
 					handlerCalled = true
 					c.Status(http.StatusOK)
 				})
 
-				req := httptest.NewRequest(http.MethodGet, "/test", nil)
+				req := httptest.NewRequest(http.MethodGet, path, nil)
 				if tt.authHeader != "" {
 					req.Header.Set("Authorization", tt.authHeader)
 				}
@@ -261,6 +272,41 @@ func TestAuthenticator(t *testing.T) {
 				assert.Equal(t, tt.expectedStatus, w.Code)
 				assert.Equal(t, tt.handlerCalled, handlerCalled)
 			}
+		})
+	}
+}
+
+func TestUsesDelegatedAuth(t *testing.T) {
+	tests := []struct {
+		name string
+		path string
+		want bool
+	}{
+		{
+			name: "runtime credential get",
+			path: "/api/v1/agent/credentials/runtime/gitlab-devops",
+			want: true,
+		},
+		{
+			name: "runtime credential session revoke",
+			path: "/api/v1/agent/credentials/runtime/session/revoke",
+			want: true,
+		},
+		{
+			name: "management credential route",
+			path: "/api/v1/agent/credentials/gitlab-devops",
+			want: false,
+		},
+		{
+			name: "runtime prefix without child path",
+			path: "/api/v1/agent/credentials/runtime",
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, usesDelegatedAuth(tt.path))
 		})
 	}
 }

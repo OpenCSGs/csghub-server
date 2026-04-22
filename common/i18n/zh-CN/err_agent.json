@@ -5,6 +5,15 @@
     "error.AGENT-ERR-1": {
         "other": "您已存在相同名称的实例: {{.instance_name}}"
     },
+    "error.AGENT-ERR-10": {
+        "other": "您已存在相同名称的凭证: {{.credential_name}}"
+    },
+    "error.AGENT-ERR-11": {
+        "other": "运行时凭证令牌无效或已过期"
+    },
+    "error.AGENT-ERR-12": {
+        "other": "运行时凭证授权不可用"
+    },
     "error.AGENT-ERR-2": {
         "other": "您已存在相同名称的知识库: {{.knowledge_base_name}}"
     },

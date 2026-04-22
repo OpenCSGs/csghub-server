@@ -11,6 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/types"
 )
 
 const gitSuffix = ".git"
@@ -82,7 +83,7 @@ func ContentEncoding() gin.HandlerFunc {
 func GetCurrentUserFromHeader() gin.HandlerFunc {
 	userStore := database.NewUserStore()
 	return func(c *gin.Context) {
-		authHeader := c.Request.Header.Get("Authorization")
+		authHeader := c.Request.Header.Get(types.HeaderAuthorization)
 		if authHeader != "" && !strings.HasPrefix(authHeader, "X-OPENCSG-Sync-Token") {
 			var username, token string
 			if strings.HasPrefix(authHeader, "Basic ") {

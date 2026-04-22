@@ -114,6 +114,30 @@
 - **错误名:** `schedulerStartTimeInPast`
 - **描述:** 指定的开始时间已过去，一次性定时任务必须使用未来的日期/时间。
 
+---
+
+### `AGENT-ERR-10`
+
+- **错误代码:** `AGENT-ERR-10`
+- **错误名:** `credentialNameAlreadyExists`
+- **描述:** 您已存在相同名称的凭证。
+
+---
+
+### `AGENT-ERR-11`
+
+- **错误代码:** `AGENT-ERR-11`
+- **错误名:** `runtimeCredentialTokenInvalid`
+- **描述:** 运行时凭证令牌缺失、无效或已过期。
+
+---
+
+### `AGENT-ERR-12`
+
+- **错误代码:** `AGENT-ERR-12`
+- **错误名:** `runtimeCredentialGrantUnavailable`
+- **描述:** 运行时凭证令牌有效，但请求的凭证未授权、已撤销、已过期或不可用。
+
 ## Auth 错误
 
 ### `AUTH-ERR-0`
@@ -1225,4 +1249,3 @@
 - **错误代码:** `USER-ERR-19`
 - **错误名:** `uuidConflict`
 - **描述:** 组织生成的UUID已存在于系统中
-

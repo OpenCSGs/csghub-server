@@ -23,6 +23,10 @@ const (
 	jwtBlacklistKey = "jwt_blacklist"
 )
 
+var delegatedAuthPathPrefixes = []string{
+	"/api/v1/agent/credentials/runtime/",
+}
+
 // BuildJwtSession create and save session with jwt from query string
 func BuildJwtSession(jwtSignKey string) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -84,6 +88,11 @@ func Authenticator(config *config.Config) gin.HandlerFunc {
 	}
 
 	return func(c *gin.Context) {
+		if usesDelegatedAuth(c.Request.URL.Path) {
+			c.Next()
+			return
+		}
+
 		result := isValidBrowserSession(c)
 		if result {
 			c.Next()
@@ -91,7 +100,7 @@ func Authenticator(config *config.Config) gin.HandlerFunc {
 		}
 
 		// Get Auzhorization token
-		authHeader := c.Request.Header.Get("Authorization")
+		authHeader := c.Request.Header.Get(types.HeaderAuthorization)
 		if authHeader == "" {
 			c.Next()
 			return
@@ -118,7 +127,7 @@ func Authenticator(config *config.Config) gin.HandlerFunc {
 				return
 			}
 
-			slog.ErrorContext(c, "invalid Bearer token", slog.String("token", token),
+			slog.ErrorContext(c, "invalid Bearer token",
 				slog.String("ip", c.ClientIP()),
 				slog.String("method", c.Request.Method),
 				slog.String("url", c.Request.URL.RequestURI()),
@@ -133,7 +142,7 @@ func Authenticator(config *config.Config) gin.HandlerFunc {
 				return
 			}
 
-			slog.ErrorContext(c, "invalid Basic token", slog.String("token", token),
+			slog.ErrorContext(c, "invalid Basic token",
 				slog.String("ip", c.ClientIP()),
 				slog.String("method", c.Request.Method),
 				slog.String("url", c.Request.URL.RequestURI()),
@@ -147,17 +156,32 @@ func Authenticator(config *config.Config) gin.HandlerFunc {
 	}
 }
 
+func usesDelegatedAuth(path string) bool {
+	// Some routes use Authorization for route-specific tokens instead of user/API/access tokens.
+	// The route handler or component must validate those tokens before doing work.
+	for _, prefix := range delegatedAuthPathPrefixes {
+		if strings.HasPrefix(path, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
 func isValidBrowserSession(c *gin.Context) bool {
 	// check access from UI
 	sessionObj, sessionExists := c.Get(sessions.DefaultKey)
 	if sessionExists && sessionObj != nil {
 		session := sessions.Default(c)
 		sessionUserName := session.Get(httpbase.CurrentUserCtxVar)
+		sessionUserUUID := session.Get(httpbase.CurrentUserUUIDCtxVar)
 		if sessionUserName != nil {
 			slog.Debug("get username from session", slog.Any("session username", sessionUserName.(string)))
 			if len(sessionUserName.(string)) > 0 {
 				// login success on UI
 				httpbase.SetCurrentUser(c, sessionUserName.(string))
+				if sessionUserUUIDStr, ok := sessionUserUUID.(string); ok && sessionUserUUIDStr != "" {
+					httpbase.SetCurrentUserUUID(c, sessionUserUUIDStr)
+				}
 				httpbase.SetAuthType(c, httpbase.AuthTypeJwt)
 				return true
 			}
@@ -254,7 +278,7 @@ func isValidBasicToken(c *gin.Context, userSvcClient rpc.UserSvcClient, token st
 	var username, accessToken string
 	authInfo, err := base64.StdEncoding.DecodeString(token)
 	if err != nil {
-		slog.ErrorContext(c, "Failed to decode basic auth header", slog.Any("token", token), slog.Any("error", err))
+		slog.ErrorContext(c, "Failed to decode basic auth header", slog.Any("error", err))
 		return false
 	}
 	username = strings.Split(string(authInfo), ":")[0]
@@ -277,7 +301,7 @@ func NeedAPIKey(config *config.Config) gin.HandlerFunc {
 		apiToken := config.APIToken
 
 		// Get Authorization token
-		authHeader := c.Request.Header.Get("Authorization")
+		authHeader := c.Request.Header.Get(types.HeaderAuthorization)
 
 		// Check Authorization Header format
 		if authHeader == "" {

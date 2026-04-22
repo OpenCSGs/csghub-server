@@ -7,6 +7,7 @@ import (
 const (
 	CurrentUserCtxVar       = "currentUser"
 	CurrentUserUUIDCtxVar   = "currentUserUUID"
+	CurrentNamespaceUUIDVar = "currentNamespaceUUID"
 	AccessTokenCtxVar       = "accessToken"
 	AuthTypeCtxVar          = "authType"
 	CurrentUserQueryVar     = "current_user"
@@ -56,6 +57,14 @@ func GetCurrentUserUUID(ctx *gin.Context) string {
 
 func SetCurrentUserUUID(ctx *gin.Context, userUUID string) {
 	ctx.Set(CurrentUserUUIDCtxVar, userUUID)
+}
+
+func GetCurrentNamespaceUUID(ctx *gin.Context) string {
+	return ctx.GetString(CurrentNamespaceUUIDVar)
+}
+
+func SetCurrentNamespaceUUID(ctx *gin.Context, namespaceUUID string) {
+	ctx.Set(CurrentNamespaceUUIDVar, namespaceUUID)
 }
 
 func GetCurrentUserLanguage(ctx *gin.Context) string {

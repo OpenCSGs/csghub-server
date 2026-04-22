@@ -5,6 +5,15 @@
     "error.AGENT-ERR-1": {
         "other": "You have a instance with the same name: {{.instance_name}}"
     },
+    "error.AGENT-ERR-10": {
+        "other": "You have a credential with the same name: {{.credential_name}}"
+    },
+    "error.AGENT-ERR-11": {
+        "other": "Runtime credential token is invalid or expired"
+    },
+    "error.AGENT-ERR-12": {
+        "other": "Runtime credential grant is unavailable"
+    },
     "error.AGENT-ERR-2": {
         "other": "You have a knowledge base with the same name: {{.knowledge_base_name}}"
     },

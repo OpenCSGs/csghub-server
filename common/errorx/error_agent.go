@@ -13,6 +13,9 @@ const (
 	schedulerQuotaExceeded
 	schedulerInstanceNoCapability
 	schedulerStartTimeInPast
+	credentialNameAlreadyExists
+	runtimeCredentialTokenInvalid
+	runtimeCredentialGrantUnavailable
 )
 
 var (
@@ -145,6 +148,45 @@ var (
 	//
 	// zh-HK: 定時任務開始時間已過去，一次性任務請使用未來的日期/時間
 	ErrSchedulerStartTimeInPast error = CustomError{prefix: errAgentPrefix, code: schedulerStartTimeInPast}
+
+	// you have a credential with the same name
+	//
+	// Description: You have a credential with the same name.
+	//
+	// Description_ZH: 您已存在相同名称的凭证。
+	//
+	// en-US: You have a credential with the same name: {{.credential_name}}
+	//
+	// zh-CN: 您已存在相同名称的凭证: {{.credential_name}}
+	//
+	// zh-HK: 您已存在相同名稱的憑證: {{.credential_name}}
+	ErrCredentialNameAlreadyExists error = CustomError{prefix: errAgentPrefix, code: credentialNameAlreadyExists}
+
+	// runtime credential token is invalid
+	//
+	// Description: The runtime credential token is missing, invalid, or expired.
+	//
+	// Description_ZH: 运行时凭证令牌缺失、无效或已过期。
+	//
+	// en-US: Runtime credential token is invalid or expired
+	//
+	// zh-CN: 运行时凭证令牌无效或已过期
+	//
+	// zh-HK: 運行時憑證令牌無效或已過期
+	ErrRuntimeCredentialTokenInvalid error = CustomError{prefix: errAgentPrefix, code: runtimeCredentialTokenInvalid}
+
+	// runtime credential grant is unavailable
+	//
+	// Description: The runtime credential token is valid, but the requested credential is not granted, revoked, expired, or unavailable.
+	//
+	// Description_ZH: 运行时凭证令牌有效，但请求的凭证未授权、已撤销、已过期或不可用。
+	//
+	// en-US: Runtime credential grant is unavailable
+	//
+	// zh-CN: 运行时凭证授权不可用
+	//
+	// zh-HK: 運行時憑證授權不可用
+	ErrRuntimeCredentialGrantUnavailable error = CustomError{prefix: errAgentPrefix, code: runtimeCredentialGrantUnavailable}
 )
 
 func InstanceQuotaExceeded(err error, ctx context) error {
@@ -212,5 +254,32 @@ func SchedulerStartTimeInPast(err error, ctx context) error {
 		context: ctx,
 		err:     err,
 		code:    int(schedulerStartTimeInPast),
+	}
+}
+
+func CredentialNameAlreadyExists(err error, ctx context) error {
+	return CustomError{
+		prefix:  errAgentPrefix,
+		context: ctx,
+		err:     err,
+		code:    int(credentialNameAlreadyExists),
+	}
+}
+
+func RuntimeCredentialTokenInvalid(err error, ctx context) error {
+	return CustomError{
+		prefix:  errAgentPrefix,
+		context: ctx,
+		err:     err,
+		code:    int(runtimeCredentialTokenInvalid),
+	}
+}
+
+func RuntimeCredentialGrantUnavailable(err error, ctx context) error {
+	return CustomError{
+		prefix:  errAgentPrefix,
+		context: ctx,
+		err:     err,
+		code:    int(runtimeCredentialGrantUnavailable),
 	}
 }
