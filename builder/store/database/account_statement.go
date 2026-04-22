@@ -505,6 +505,7 @@ type UserSkuStatement struct {
 	CreatedAt        time.Time       `json:"created_at"`
 	TotalValue       float64         `json:"total_value"`
 	TotalConsumption float64         `json:"total_consumption"`
+	TotalCount       int             `json:"-"`
 }
 
 type GroupedStatementRes struct {
@@ -520,8 +521,7 @@ func (as *accountStatementStoreImpl) ListStatementByUserAndSku(ctx context.Conte
 		ColumnExpr("MIN(id) AS id").
 		ColumnExpr("MIN(created_at) AS created_at").
 		ColumnExpr("SUM(value) AS total_value").
-		ColumnExpr("SUM(consumption) AS total_consumption").
-		Group("user_uuid", "sku_id", "scene", "customer_id")
+		ColumnExpr("SUM(consumption) AS total_consumption")
 
 	if req.UserUUID != "" {
 		baseQuery = baseQuery.Where("user_uuid = ?", req.UserUUID)
@@ -539,22 +539,12 @@ func (as *accountStatementStoreImpl) ListStatementByUserAndSku(ctx context.Conte
 		baseQuery = baseQuery.Where("created_at >= ? AND created_at <= ?", req.StartTime, req.EndTime)
 	}
 
-	var totalCount int
-	countQuery := as.db.Operator.Core.NewSelect().
-		With("grouped_statements", baseQuery).
-		TableExpr("grouped_statements").
-		ColumnExpr("COUNT(*)")
-
-	err := countQuery.Scan(ctx, &totalCount)
-	if err != nil {
-		return results, 0, fmt.Errorf("count grouped statements error: %w", err)
-	}
+	baseQuery = baseQuery.Group("user_uuid", "sku_id", "scene", "customer_id")
 
 	selectQuery := as.db.Operator.Core.NewSelect().
-		With("grouped_statements", baseQuery).
-		TableExpr("grouped_statements").
+		TableExpr("(?) AS grouped", baseQuery).
 		Column("id", "user_uuid", "sku_id", "scene", "customer_id", "created_at", "total_value", "total_consumption").
-		OrderExpr("user_uuid ASC, sku_id ASC")
+		ColumnExpr("COUNT(*) OVER() AS total_count")
 
 	if req.Per > 0 {
 		selectQuery = selectQuery.
@@ -562,9 +552,14 @@ func (as *accountStatementStoreImpl) ListStatementByUserAndSku(ctx context.Conte
 			Offset((req.Page - 1) * req.Per)
 	}
 
-	err = selectQuery.Scan(ctx, &results)
+	err := selectQuery.Scan(ctx, &results)
 	if err != nil {
-		return results, totalCount, fmt.Errorf("list grouped statements error: %w", err)
+		return results, 0, fmt.Errorf("list grouped statements error: %w", err)
+	}
+
+	totalCount := 0
+	if len(results) > 0 {
+		totalCount = results[0].TotalCount
 	}
 
 	return results, totalCount, nil
