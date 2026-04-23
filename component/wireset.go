@@ -281,6 +281,7 @@ func NewTestAccountingComponent(stores *tests.MockStores, accountingClient accou
 		accountingClient: accountingClient,
 		userStore:        stores.User,
 		orgStore:         stores.Org,
+		namespaceStore:   stores.Namespace,
 		memberStore:      stores.Member,
 		deployTaskStore:  stores.DeployTask,
 	}

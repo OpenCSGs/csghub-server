@@ -548,6 +548,7 @@ type AcctRechargeListResp struct {
 
 type RechargesIndexReq struct {
 	UserName    string `json:"user_name"`
+	OrgName     string `json:"org_name"`
 	UserUUID    string `json:"user_uuid"`
 	OrderNo     string `json:"order_no"`
 	StartDate   string `json:"start_date"`
