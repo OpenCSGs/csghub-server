@@ -1845,6 +1845,66 @@ func (_c *MockRepoStore_GetReposBySearch_Call) RunAndReturn(run func(context.Con
 	return _c
 }
 
+// GetRepositoriesWithoutStatistics provides a mock function with given fields: ctx, limit, offset
+func (_m *MockRepoStore) GetRepositoriesWithoutStatistics(ctx context.Context, limit int, offset int) ([]*database.Repository, error) {
+	ret := _m.Called(ctx, limit, offset)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetRepositoriesWithoutStatistics")
+	}
+
+	var r0 []*database.Repository
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, int, int) ([]*database.Repository, error)); ok {
+		return rf(ctx, limit, offset)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, int, int) []*database.Repository); ok {
+		r0 = rf(ctx, limit, offset)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*database.Repository)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, int, int) error); ok {
+		r1 = rf(ctx, limit, offset)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockRepoStore_GetRepositoriesWithoutStatistics_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetRepositoriesWithoutStatistics'
+type MockRepoStore_GetRepositoriesWithoutStatistics_Call struct {
+	*mock.Call
+}
+
+// GetRepositoriesWithoutStatistics is a helper method to define mock.On call
+//   - ctx context.Context
+//   - limit int
+//   - offset int
+func (_e *MockRepoStore_Expecter) GetRepositoriesWithoutStatistics(ctx interface{}, limit interface{}, offset interface{}) *MockRepoStore_GetRepositoriesWithoutStatistics_Call {
+	return &MockRepoStore_GetRepositoriesWithoutStatistics_Call{Call: _e.mock.On("GetRepositoriesWithoutStatistics", ctx, limit, offset)}
+}
+
+func (_c *MockRepoStore_GetRepositoriesWithoutStatistics_Call) Run(run func(ctx context.Context, limit int, offset int)) *MockRepoStore_GetRepositoriesWithoutStatistics_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int), args[2].(int))
+	})
+	return _c
+}
+
+func (_c *MockRepoStore_GetRepositoriesWithoutStatistics_Call) Return(_a0 []*database.Repository, _a1 error) *MockRepoStore_GetRepositoriesWithoutStatistics_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockRepoStore_GetRepositoriesWithoutStatistics_Call) RunAndReturn(run func(context.Context, int, int) ([]*database.Repository, error)) *MockRepoStore_GetRepositoriesWithoutStatistics_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // IsMirrorRepo provides a mock function with given fields: ctx, repoType, namespace, name
 func (_m *MockRepoStore) IsMirrorRepo(ctx context.Context, repoType types.RepositoryType, namespace string, name string) (bool, error) {
 	ret := _m.Called(ctx, repoType, namespace, name)

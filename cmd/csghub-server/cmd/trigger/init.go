@@ -18,6 +18,7 @@ func init() {
 		updateRepoCmd,
 		fixRepoSourceCmd,
 		migrateRepoPathCmd,
+		calculateRepoSizeCmd,
 	)
 	addCommands()
 }

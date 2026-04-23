@@ -89,7 +89,7 @@ func StartWorkflowDI(
 
 		worker.RegisterWorkflow(HandlePushWorkflow)
 		worker.RegisterWorkflow(RuntimeFrameworkWorkflow)
-
+		worker.RegisterWorkflow(CalculateRepoSizeWorkflow)
 		RegisterCronWorker(cfg, temporalClient, act)
 		err := RegisterCronJobs(cfg, temporalClient)
 		if err != nil {

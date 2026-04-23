@@ -96,6 +96,8 @@ type RepoStore interface {
 	FindUnhashedRepos(ctx context.Context, batchSize int, lastID int64) ([]Repository, error)
 	UpdateRepoSensitiveCheckStatus(ctx context.Context, repoID int64, status types.SensitiveCheckStatus) error
 	GetReposBySearch(ctx context.Context, search string, repoType types.RepositoryType, page, pageSize int) ([]*Repository, int, error)
+	// GetRepositoriesWithoutStatistics returns repositories without associated RepositoryStatistics
+	GetRepositoriesWithoutStatistics(ctx context.Context, limit, offset int) ([]*Repository, error)
 }
 
 func (s *repoStoreImpl) UpdateRepoSensitiveCheckStatus(ctx context.Context, repoID int64, status types.SensitiveCheckStatus) error {
@@ -1649,4 +1651,24 @@ func (s *repoStoreImpl) GetReposBySearch(ctx context.Context, search string, rep
 		Limit(pageSize).
 		ScanAndCount(ctx)
 	return res, count, err
+}
+
+// GetRepositoriesWithoutStatistics returns repositories without associated RepositoryStatistics
+func (s *repoStoreImpl) GetRepositoriesWithoutStatistics(ctx context.Context, limit, offset int) ([]*Repository, error) {
+	var repos []*Repository
+
+	// Query repositories that don't have a corresponding RepositoryStatistics record
+	query := s.db.Operator.Core.NewSelect().
+		Model(&repos).
+		Where("NOT EXISTS (SELECT 1 FROM repository_statistics WHERE repository_statistics.repository_id = repository.id)").
+		Order("repository.id ASC").
+		Limit(limit).
+		Offset(offset)
+
+	err := query.Scan(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return repos, nil
 }
