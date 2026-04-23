@@ -379,7 +379,33 @@ Request:
 }
 ```
 
-`metadata` is merged into the existing metadata. A metadata key with `null` deletes that key. Updated metadata must still be valid for the credential provider and auth type.
+`metadata` supports partial updates. Only the keys in the request are changed.
+
+- A metadata key with a non-`null` value adds or updates that key.
+- A metadata key with `null` deletes that key.
+- Keys omitted from the request are preserved.
+- Updated metadata must still be valid for the credential provider and auth type after the merge.
+
+Partial metadata update example:
+
+```json
+{
+  "metadata": {
+    "base_url": "https://git-devops.opencsg.com/",
+    "timeout_secs": 30
+  }
+}
+```
+
+Metadata deletion example:
+
+```json
+{
+  "metadata": {
+    "timeout_secs": null
+  }
+}
+```
 
 Response:
 
@@ -418,6 +444,35 @@ Request:
 {
   "credential": {
     "token": "replace_with_new_provider_token"
+  }
+}
+```
+
+For `bearer_token`, `api_key`, and `custom_header`, rotate replaces the whole secret value.
+
+For `static_secret`, `credential` supports partial updates.
+
+- A key with a non-empty value adds or updates that key.
+- A key with an empty string value deletes that key.
+- Keys omitted from the request are preserved.
+- After merge and deletion, the final `static_secret` map must still be non-empty.
+
+Partial `static_secret` update example:
+
+```json
+{
+  "credential": {
+    "access_key_secret": "replace_with_new_access_key_secret"
+  }
+}
+```
+
+`static_secret` deletion example:
+
+```json
+{
+  "credential": {
+    "security_token": ""
   }
 }
 ```
