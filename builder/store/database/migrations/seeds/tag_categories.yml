@@ -66,3 +66,7 @@ categories:
   - name: runtime_framework
     scope: model
     enabled: false
+  - name: task
+    scope: skill
+    show_name: 任务
+    enabled: true
