@@ -87,12 +87,13 @@ type RepoFile struct {
 }
 
 type RepoFilesClass struct {
-	AllFiles      map[string]*RepoFile
-	ParquetFiles  map[string]*RepoFile
-	JsonlFiles    map[string]*RepoFile
-	CsvFiles      map[string]*RepoFile
-	TotalJsonSize int64
-	TotalCsvSize  int64
+	AllFiles         map[string]*RepoFile
+	ParquetFiles     map[string]*RepoFile
+	JsonlFiles       map[string]*RepoFile
+	CsvFiles         map[string]*RepoFile
+	TotalParquetSize int64
+	TotalJsonSize    int64
+	TotalCsvSize     int64
 }
 
 type DownloadCard struct {

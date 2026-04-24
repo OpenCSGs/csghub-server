@@ -130,12 +130,13 @@ func (dva *dataViewerActivityImpl) GetCardFromReadme(ctx context.Context, req ty
 
 func (dva *dataViewerActivityImpl) ScanRepoFiles(ctx context.Context, scanParam dvCom.ScanRepoFileReq) (*dvCom.RepoFilesClass, error) {
 	fileClass := dvCom.RepoFilesClass{
-		AllFiles:      make(map[string]*dvCom.RepoFile),
-		ParquetFiles:  make(map[string]*dvCom.RepoFile),
-		JsonlFiles:    make(map[string]*dvCom.RepoFile),
-		CsvFiles:      make(map[string]*dvCom.RepoFile),
-		TotalJsonSize: 0,
-		TotalCsvSize:  0,
+		AllFiles:         make(map[string]*dvCom.RepoFile),
+		ParquetFiles:     make(map[string]*dvCom.RepoFile),
+		JsonlFiles:       make(map[string]*dvCom.RepoFile),
+		CsvFiles:         make(map[string]*dvCom.RepoFile),
+		TotalParquetSize: 0,
+		TotalJsonSize:    0,
+		TotalCsvSize:     0,
 	}
 
 	var cursor string
@@ -155,7 +156,7 @@ func (dva *dataViewerActivityImpl) ScanRepoFiles(ctx context.Context, scanParam 
 
 		cursor = resp.Cursor
 		if err != nil {
-			return nil, fmt.Errorf("fail to scan repo %s/%s branch %s files error: %w", scanParam.Req.Namespace, scanParam.Req.Name, scanParam.Req.Branch, err)
+			return nil, fmt.Errorf("failed to scan repo %s/%s branch %s files error: %w", scanParam.Req.Namespace, scanParam.Req.Name, scanParam.Req.Branch, err)
 		}
 
 		for _, file := range resp.Files {

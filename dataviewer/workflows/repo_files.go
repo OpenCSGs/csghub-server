@@ -125,10 +125,28 @@ func appendFile(file *types.File, fileClass *dvCom.RepoFilesClass, limitSize int
 		File:         file,
 		DownloadSize: file.Size,
 	}
-	fileClass.AllFiles[file.Path] = repoFile
+
+	if fileClass.TotalParquetSize >= limitSize || fileClass.TotalJsonSize >= limitSize || fileClass.TotalCsvSize >= limitSize {
+		return
+	}
+
+	if IsValidParquetFile(file.Name) || IsValidJsonFile(file.Name) || IsValidCSVFile(file.Name) {
+		fileClass.AllFiles[file.Path] = repoFile
+	}
 
 	if IsValidParquetFile(file.Name) {
-		fileClass.ParquetFiles[file.Path] = repoFile
+		if fileClass.TotalParquetSize >= limitSize {
+			return
+		}
+		if fileClass.TotalParquetSize+file.Size > limitSize {
+			fileClass.ParquetFiles[file.Path] = &dvCom.RepoFile{
+				File:         file,
+				DownloadSize: limitSize - fileClass.TotalParquetSize,
+			}
+		} else {
+			fileClass.ParquetFiles[file.Path] = repoFile
+		}
+		fileClass.TotalParquetSize += fileClass.ParquetFiles[file.Path].DownloadSize
 		return
 	}
 
@@ -163,5 +181,4 @@ func appendFile(file *types.File, fileClass *dvCom.RepoFilesClass, limitSize int
 		fileClass.TotalCsvSize += fileClass.CsvFiles[file.Path].DownloadSize
 		return
 	}
-
 }
