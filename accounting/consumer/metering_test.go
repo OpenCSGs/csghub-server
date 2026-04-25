@@ -29,6 +29,7 @@ func NewTestConsumerMetering(
 		acctEvtComp:    acctEvtComp,
 		chargingEnable: config.Accounting.ChargingEnable,
 		bldMQ:          mq,
+		retryLimit:     config.Accounting.RetryLimit,
 	}
 	return meter
 }
@@ -414,6 +415,7 @@ func TestMeteringImpl_HandleMsgWithRetry_Success(t *testing.T) {
 		acctEvtComp:    mockAcctEvtComp,
 		chargingEnable: true,
 		bldMQ:          mockMQ,
+		retryLimit:     1,
 	}
 
 	event := createTestMeteringEvent()
@@ -442,6 +444,7 @@ func TestMeteringImpl_HandleMsgWithRetry_ParseError(t *testing.T) {
 		acctEvtComp:    mockAcctEvtComp,
 		chargingEnable: true,
 		bldMQ:          mockMQ,
+		retryLimit:     1,
 	}
 
 	invalidData := []byte(`{invalid json`)
@@ -465,6 +468,7 @@ func TestMeteringImpl_HandleMsgWithRetry_ChargingDisabled(t *testing.T) {
 		acctEvtComp:    mockAcctEvtComp,
 		chargingEnable: false,
 		bldMQ:          mockMQ,
+		retryLimit:     1,
 	}
 
 	event := createTestMeteringEvent()
@@ -492,6 +496,7 @@ func TestMeteringImpl_HandleMsgWithRetry_HandleFailed(t *testing.T) {
 		acctEvtComp:    mockAcctEvtComp,
 		chargingEnable: true,
 		bldMQ:          mockMQ,
+		retryLimit:     1,
 	}
 
 	event := createTestMeteringEvent()
@@ -520,6 +525,7 @@ func TestMeteringImpl_HandleMsgWithRetry_PubFeeFailed(t *testing.T) {
 		acctEvtComp:    mockAcctEvtComp,
 		chargingEnable: true,
 		bldMQ:          mockMQ,
+		retryLimit:     3,
 	}
 
 	event := createTestMeteringEvent()

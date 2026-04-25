@@ -249,6 +249,7 @@ type Config struct {
 		ThresholdOfStopDeploy        int    `env:"OPENCSG_ACCOUNTING_THRESHOLD_OF_STOP_DEPLOY" default:"5000"`
 		ThresholdOfStopLLMInference  int    `env:"OPENCSG_ACCOUNTING_THRESHOLD_OF_STOP_LLM_INFERENCE" default:"5000"`
 		LLMBalanceCheckCacheTTL      int    `env:"OPENCSG_ACCOUNTING_LLM_BALANCE_CHECK_CACHE_TTL" default:"120"`
+		RetryLimit                   int    `env:"OPENCSG_ACCOUNTING_RETRY_LIMIT" default:"1"`
 	}
 
 	User struct {

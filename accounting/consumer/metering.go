@@ -24,6 +24,7 @@ type MeteringImpl struct {
 	acctEvtComp    component.AccountingEventComponent
 	chargingEnable bool
 	bldMQ          bldmq.MessageQueue
+	retryLimit     int
 }
 
 func NewMetering(config *config.Config, mqFactory bldmq.MessageQueueFactory) (Metering, error) {
@@ -36,6 +37,7 @@ func NewMetering(config *config.Config, mqFactory bldmq.MessageQueueFactory) (Me
 		acctEvtComp:    component.NewAccountingEventComponent(),
 		chargingEnable: config.Accounting.ChargingEnable,
 		bldMQ:          mq,
+		retryLimit:     config.Accounting.RetryLimit,
 	}
 	return meter, nil
 }
@@ -63,7 +65,7 @@ func (m *MeteringImpl) handleMsgWithRetry(raw []byte, meta bldmq.MessageMeta) er
 	strData := string(raw)
 	slog.DebugContext(ctx, "Meter->received", slog.Any("msg.subject", meta.Topic), slog.Any("msg.data", strData))
 	// A maximum of 3 attempts
-	retryLimit := 3
+	retryLimit := m.retryLimit
 	var (
 		err error                = nil
 		evt *types.MeteringEvent = nil
@@ -73,7 +75,6 @@ func (m *MeteringImpl) handleMsgWithRetry(raw []byte, meta bldmq.MessageMeta) er
 		if err == nil {
 			break
 		}
-		time.Sleep(1 * time.Second)
 	}
 
 	if err != nil {
@@ -186,7 +187,6 @@ func (m *MeteringImpl) pubFeeEventWithReTry(raw []byte, evt *types.MeteringEvent
 		if err == nil {
 			break
 		}
-		time.Sleep(1 * time.Second)
 	}
 	return err
 }
@@ -199,7 +199,6 @@ func (m *MeteringImpl) moveMsgToDLQWithReTry(raw []byte, limit int) error {
 		if err == nil {
 			break
 		}
-		time.Sleep(1 * time.Second)
 	}
 	return err
 }
