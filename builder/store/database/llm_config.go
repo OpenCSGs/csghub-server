@@ -16,15 +16,17 @@ type lLMConfigStoreImpl struct {
 }
 
 type LLMConfig struct {
-	ID           int64          `bun:",pk,autoincrement" json:"id"`
-	ModelName    string         `bun:",notnull" json:"model_name"`
-	OfficialName string         `bun:"official_name,nullzero" json:"official_name"`
-	ApiEndpoint  string         `bun:",notnull" json:"api_endpoint"`
-	AuthHeader   string         `bun:",notnull" json:"auth_header"`
-	Type         int            `bun:",notnull" json:"type"` // 1: optimization, 2: comparison, 4: summary readme, 8: mcp scan, 16: for aigateway call external llm
-	Enabled      bool           `bun:",notnull" json:"enabled"`
-	Provider     string         `bun:"," json:"provider"`
-	Metadata     map[string]any `bun:",type:jsonb,nullzero" json:"metadata"`
+	ID            int64                  `bun:",pk,autoincrement" json:"id"`
+	ModelName     string                 `bun:",notnull" json:"model_name"`
+	OfficialName  string                 `bun:"official_name,nullzero" json:"official_name"`
+	ApiEndpoint   string                 `bun:",notnull" json:"api_endpoint"`
+	Upstreams     []types.UpstreamConfig `bun:",type:jsonb,nullzero" json:"upstreams"`
+	AuthHeader    string                 `bun:",notnull" json:"auth_header"`
+	Type          int                    `bun:",notnull" json:"type"` // 1: optimization, 2: comparison, 4: summary readme, 8: mcp scan, 16: for aigateway call external llm
+	Enabled       bool                   `bun:",notnull" json:"enabled"`
+	Provider      string                 `bun:"," json:"provider"`
+	RoutingPolicy types.RoutingPolicy    `bun:",type:jsonb,nullzero" json:"routing_policy"`
+	Metadata      map[string]any         `bun:",type:jsonb,nullzero" json:"metadata"`
 	// NeedSensitiveCheck controls whether requests for this model should go
 	// through sensitive content detection in aigateway. Set to false to skip
 	// the check (e.g. for guard models or trusted internal models).

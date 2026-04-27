@@ -3,7 +3,7 @@ package types
 import (
 	"encoding/json"
 
-	"opencsg.com/csghub-server/common/types"
+	commontypes "opencsg.com/csghub-server/common/types"
 )
 
 // Provider type values for Metadata[MetaKeyLLMType].
@@ -48,14 +48,14 @@ type BaseModel struct {
 
 // InternalModelInfo represents the internal model fields
 type InternalModelInfo struct {
-	CSGHubModelID    string         `json:"-"` // the internal model id (repo path) in CSGHub
-	OwnerUUID        string         `json:"-"` // the uuid of deploy owner
-	ClusterID        string         `json:"-"` // the deployed cluster id in CSGHub
-	SvcName          string         `json:"-"` // the internal service name in CSGHub
-	SvcType          int            `json:"-"` // the internal service type like dedicated or serverless in CSGHub
-	Hardware         types.HardWare `json:"-"` // the deployed hardware
-	RuntimeFramework string         `json:"-"` // the deployed framework
-	ImageID          string         `json:"-"` // the deployed image id in CSGHub
+	CSGHubModelID    string               `json:"-"` // the internal model id (repo path) in CSGHub
+	OwnerUUID        string               `json:"-"` // the uuid of deploy owner
+	ClusterID        string               `json:"-"` // the deployed cluster id in CSGHub
+	SvcName          string               `json:"-"` // the internal service name in CSGHub
+	SvcType          int                  `json:"-"` // the internal service type like dedicated or serverless in CSGHub
+	Hardware         commontypes.HardWare `json:"-"` // the deployed hardware
+	RuntimeFramework string               `json:"-"` // the deployed framework
+	ImageID          string               `json:"-"` // the deployed image id in CSGHub
 }
 
 // ExternalModelInfo represents the external model fields
@@ -71,34 +71,38 @@ type ExternalModelInfo struct {
 
 type Model struct {
 	BaseModel
-	InternalModelInfo        // internal model fields
-	ExternalModelInfo        // external model fields
-	Endpoint          string `json:"endpoint"`
-	InternalUse       bool   `json:"-"` // control whether the model is for internal use
+	InternalModelInfo                              // internal model fields
+	ExternalModelInfo                              // external model fields
+	Endpoint          string                       `json:"endpoint"`
+	Upstreams         []commontypes.UpstreamConfig `json:"upstreams,omitempty"`
+	RoutingPolicy     commontypes.RoutingPolicy    `json:"routing_policy"`
+	InternalUse       bool                         `json:"-"` // control whether the model is for internal use
 }
 
 func (m Model) MarshalJSON() ([]byte, error) {
 	if m.InternalUse {
 		// internalModelResponse
 		type internalModelResponse struct {
-			ID                  string         `json:"id"`
-			Object              string         `json:"object"`
-			Created             int64          `json:"created"`
-			OwnedBy             string         `json:"owned_by"`
-			Task                string         `json:"task"`
-			DisplayName         string         `json:"display_name"`
-			SupportFunctionCall *bool          `json:"support_function_call,omitempty"`
-			Endpoint            string         `json:"endpoint"`
-			Metadata            map[string]any `json:"metadata"`
-			CSGHubModelID       *string        `json:"csghub_model_id,omitempty"`
-			OwnerUUID           *string        `json:"owner_uuid,omitempty"`
-			ClusterID           *string        `json:"cluster_id,omitempty"`
-			SvcName             *string        `json:"svc_name,omitempty"`
-			SvcType             *int           `json:"svc_type,omitempty"`
-			ImageID             *string        `json:"image_id,omitempty"`
-			AuthHead            *string        `json:"auth_head,omitempty"`
-			Provider            *string        `json:"provider,omitempty"`
-			NeedSensitiveCheck  bool           `json:"need_sensitive_check"`
+			ID                  string                       `json:"id"`
+			Object              string                       `json:"object"`
+			Created             int64                        `json:"created"`
+			OwnedBy             string                       `json:"owned_by"`
+			Task                string                       `json:"task"`
+			DisplayName         string                       `json:"display_name"`
+			SupportFunctionCall *bool                        `json:"support_function_call,omitempty"`
+			Endpoint            string                       `json:"endpoint"`
+			Upstreams           []commontypes.UpstreamConfig `json:"upstreams,omitempty"`
+			RoutingPolicy       commontypes.RoutingPolicy    `json:"routing_policy,omitempty"`
+			Metadata            map[string]any               `json:"metadata"`
+			CSGHubModelID       *string                      `json:"csghub_model_id,omitempty"`
+			OwnerUUID           *string                      `json:"owner_uuid,omitempty"`
+			ClusterID           *string                      `json:"cluster_id,omitempty"`
+			SvcName             *string                      `json:"svc_name,omitempty"`
+			SvcType             *int                         `json:"svc_type,omitempty"`
+			ImageID             *string                      `json:"image_id,omitempty"`
+			AuthHead            *string                      `json:"auth_head,omitempty"`
+			Provider            *string                      `json:"provider,omitempty"`
+			NeedSensitiveCheck  bool                         `json:"need_sensitive_check"`
 		}
 		resp := internalModelResponse{
 			ID:                 m.ID,
@@ -108,6 +112,8 @@ func (m Model) MarshalJSON() ([]byte, error) {
 			Task:               m.Task,
 			DisplayName:        m.OfficialName,
 			Endpoint:           m.Endpoint,
+			Upstreams:          m.Upstreams,
+			RoutingPolicy:      m.RoutingPolicy,
 			Metadata:           m.Metadata,
 			NeedSensitiveCheck: m.NeedSensitiveCheck,
 		}
@@ -149,24 +155,26 @@ func (m Model) MarshalJSON() ([]byte, error) {
 
 func (m *Model) UnmarshalJSON(data []byte) error {
 	type internalModelResponse struct {
-		ID                  string         `json:"id"`
-		Object              string         `json:"object"`
-		Created             int64          `json:"created"`
-		OwnedBy             string         `json:"owned_by"`
-		Task                string         `json:"task"`
-		DisplayName         string         `json:"display_name"`
-		SupportFunctionCall bool           `json:"support_function_call,omitempty"`
-		Endpoint            string         `json:"endpoint"`
-		Metadata            map[string]any `json:"metadata"`
-		CSGHubModelID       string         `json:"csghub_model_id,omitempty"`
-		OwnerUUID           string         `json:"owner_uuid,omitempty"`
-		ClusterID           string         `json:"cluster_id,omitempty"`
-		SvcName             string         `json:"svc_name,omitempty"`
-		SvcType             int            `json:"svc_type,omitempty"`
-		ImageID             string         `json:"image_id,omitempty"`
-		AuthHead            string         `json:"auth_head,omitempty"`
-		Provider            string         `json:"provider,omitempty"`
-		NeedSensitiveCheck  bool           `json:"need_sensitive_check"`
+		ID                  string                       `json:"id"`
+		Object              string                       `json:"object"`
+		Created             int64                        `json:"created"`
+		OwnedBy             string                       `json:"owned_by"`
+		Task                string                       `json:"task"`
+		DisplayName         string                       `json:"display_name"`
+		SupportFunctionCall bool                         `json:"support_function_call,omitempty"`
+		Endpoint            string                       `json:"endpoint"`
+		Upstreams           []commontypes.UpstreamConfig `json:"upstreams,omitempty"`
+		RoutingPolicy       commontypes.RoutingPolicy    `json:"routing_policy,omitempty"`
+		Metadata            map[string]any               `json:"metadata"`
+		CSGHubModelID       string                       `json:"csghub_model_id,omitempty"`
+		OwnerUUID           string                       `json:"owner_uuid,omitempty"`
+		ClusterID           string                       `json:"cluster_id,omitempty"`
+		SvcName             string                       `json:"svc_name,omitempty"`
+		SvcType             int                          `json:"svc_type,omitempty"`
+		ImageID             string                       `json:"image_id,omitempty"`
+		AuthHead            string                       `json:"auth_head,omitempty"`
+		Provider            string                       `json:"provider,omitempty"`
+		NeedSensitiveCheck  bool                         `json:"need_sensitive_check"`
 	}
 	var aux internalModelResponse
 	if err := json.Unmarshal(data, &aux); err != nil {
@@ -180,6 +188,8 @@ func (m *Model) UnmarshalJSON(data []byte) error {
 	m.OfficialName = aux.DisplayName
 	m.SupportFunctionCall = aux.SupportFunctionCall
 	m.Endpoint = aux.Endpoint
+	m.Upstreams = aux.Upstreams
+	m.RoutingPolicy = aux.RoutingPolicy
 	m.Metadata = aux.Metadata
 	m.CSGHubModelID = aux.CSGHubModelID
 	m.OwnerUUID = aux.OwnerUUID

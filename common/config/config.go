@@ -445,6 +445,7 @@ type Config struct {
 		SensitiveDefaultImg            string `env:"STARHUB_SERVER_AIGATEWAY_SENSITIVE_DEFAULT_IMG" default:""`
 		PresignExpirySeconds           int    `env:"OPENCSG_AIGATEWAY_PRESIGN_EXPIRY" default:"86400"`
 		EnableLLMLog                   bool   `env:"OPENCSG_AIGATEWAY_LLMLOG_ENABLE" default:"true"`
+		ChatMaxFallbackAttempts        int    `env:"OPENCSG_AIGATEWAY_CHAT_MAX_FALLBACK_ATTEMPTS" default:"2"`
 		ModelIDFmt                     string `env:"OPENCSG_AIGATEWAY_MODEL_ID_FMT" default:"%s(%s)"`
 	}
 

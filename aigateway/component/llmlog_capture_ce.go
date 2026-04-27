@@ -20,6 +20,12 @@ func (c *logCaptureImpl) Completion(_ aitypes.ChatCompletion) {
 func (c *logCaptureImpl) AppendCompletionChunk(_ aitypes.ChatCompletionChunk) {
 }
 
+func (c *logCaptureImpl) SetModelID(_ string) {
+}
+
+func (c *logCaptureImpl) SetProvider(_ string) {
+}
+
 func (c *logCaptureImpl) Record() (*commontypes.LLMLogRecord, error) {
 	return nil, nil
 }

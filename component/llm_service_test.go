@@ -22,30 +22,54 @@ func TestLLMServiceComponent_CreateLLMConfig(t *testing.T) {
 	req := &types.CreateLLMConfigReq{
 		ModelName:   "new-model",
 		ApiEndpoint: "http://new.endpoint",
-		AuthHeader:  "Bearer token",
-		Type:        16,
-		Enabled:     true,
-		Provider:    "test-provider",
-		Metadata:    map[string]any{"tasks": []any{"text-generation"}},
+		Upstreams: []types.UpstreamConfig{
+			{URL: "http://new.endpoint", Enabled: true, Weight: 1},
+		},
+		AuthHeader: "Bearer token",
+		Type:       16,
+		Enabled:    true,
+		Provider:   "test-provider",
+		RoutingPolicy: types.RoutingPolicy{
+			Strategy:      "session_hash",
+			SessionHeader: "X-Session-ID",
+			HashReplicas:  128,
+		},
+		Metadata: map[string]any{"tasks": []any{"text-generation"}},
 	}
 	dbLLMConfig := &database.LLMConfig{
 		ID:          123,
 		ModelName:   "new-model",
 		ApiEndpoint: "http://new.endpoint",
-		AuthHeader:  "Bearer token",
-		Type:        16,
-		Enabled:     true,
-		Provider:    "test-provider",
-		Metadata:    map[string]any{"tasks": []any{"text-generation"}},
+		Upstreams: []types.UpstreamConfig{
+			{URL: "http://new.endpoint", Enabled: true, Weight: 1},
+		},
+		AuthHeader: "Bearer token",
+		Type:       16,
+		Enabled:    true,
+		Provider:   "test-provider",
+		RoutingPolicy: types.RoutingPolicy{
+			Strategy:      "session_hash",
+			SessionHeader: "X-Session-ID",
+			HashReplicas:  128,
+		},
+		Metadata: map[string]any{"tasks": []any{"text-generation"}},
 	}
 	stores.LLMConfigMock().EXPECT().Create(ctx, database.LLMConfig{
 		ModelName:   "new-model",
 		ApiEndpoint: "http://new.endpoint",
-		AuthHeader:  "Bearer token",
-		Type:        16,
-		Enabled:     true,
-		Provider:    "test-provider",
-		Metadata:    map[string]any{"tasks": []any{"text-generation"}},
+		Upstreams: []types.UpstreamConfig{
+			{URL: "http://new.endpoint", Enabled: true, Weight: 1},
+		},
+		AuthHeader: "Bearer token",
+		Type:       16,
+		Enabled:    true,
+		Provider:   "test-provider",
+		RoutingPolicy: types.RoutingPolicy{
+			Strategy:      "session_hash",
+			SessionHeader: "X-Session-ID",
+			HashReplicas:  128,
+		},
+		Metadata: map[string]any{"tasks": []any{"text-generation"}},
 	}).Return(dbLLMConfig, nil)
 	res, err := mc.CreateLLMConfig(ctx, req)
 	require.Nil(t, err)
@@ -141,27 +165,149 @@ func TestLLMServiceComponent_UpdateLLMConfig(t *testing.T) {
 	}
 	newName := "new-model"
 	metadata := map[string]any{"tasks": []any{"text-to-image"}}
+	endpoints := []types.UpstreamConfig{
+		{URL: "http://new-model.endpoint", Enabled: true, Weight: 1},
+	}
+	routingPolicy := types.RoutingPolicy{
+		Strategy:      "session_hash",
+		SessionHeader: "X-Session-ID",
+		HashReplicas:  128,
+	}
 	req := &types.UpdateLLMConfigReq{
-		ID:        123,
-		ModelName: &newName,
-		Metadata:  &metadata,
+		ID:            123,
+		ModelName:     &newName,
+		Upstreams:     &endpoints,
+		RoutingPolicy: &routingPolicy,
+		Metadata:      &metadata,
 	}
 	dbLLMConfig := &database.LLMConfig{
-		ID:        123,
-		ModelName: newName,
-		Metadata:  metadata,
+		ID:            123,
+		ModelName:     newName,
+		Upstreams:     endpoints,
+		RoutingPolicy: routingPolicy,
+		Metadata:      metadata,
 	}
 	stores.LLMConfigMock().EXPECT().GetByID(ctx, int64(123)).Return(dbLLMConfig, nil)
 	stores.LLMConfigMock().EXPECT().Update(ctx, database.LLMConfig{
-		ID:        123,
-		ModelName: newName,
-		Metadata:  metadata,
+		ID:            123,
+		ModelName:     newName,
+		ApiEndpoint:   "http://new-model.endpoint",
+		Upstreams:     endpoints,
+		RoutingPolicy: routingPolicy,
+		Metadata:      metadata,
 	}).Return(dbLLMConfig, nil)
 	res, err := mc.UpdateLLMConfig(ctx, req)
 	require.Nil(t, err)
 	require.NotNil(t, res)
 	require.Equal(t, res.ID, int64(123))
 	require.Equal(t, res.ModelName, "new-model")
+}
+
+func TestLLMServiceComponent_validateLLMEndpointConfig(t *testing.T) {
+	mc := &llmServiceComponentImpl{}
+	testCases := []struct {
+		name        string
+		apiEndpoint string
+		upstreams   []types.UpstreamConfig
+		wantErr     bool
+		errContains string
+	}{
+		{
+			name:        "api_endpoint and upstreams are both empty",
+			apiEndpoint: "",
+			upstreams:   nil,
+			wantErr:     true,
+			errContains: "api_endpoint or upstreams must be provided",
+		},
+		{
+			name:        "upstream url is empty",
+			apiEndpoint: "",
+			upstreams: []types.UpstreamConfig{
+				{URL: " ", Enabled: true},
+			},
+			wantErr:     true,
+			errContains: "upstream url cannot be empty",
+		},
+		{
+			name:        "all upstreams disabled and api_endpoint empty",
+			apiEndpoint: "",
+			upstreams: []types.UpstreamConfig{
+				{URL: "http://a", Enabled: false},
+				{URL: "http://b", Enabled: false},
+			},
+			wantErr:     true,
+			errContains: "at least one enabled upstream must be provided",
+		},
+		{
+			name:        "api_endpoint provided without upstreams",
+			apiEndpoint: "http://primary",
+			upstreams:   nil,
+			wantErr:     false,
+		},
+		{
+			name:        "valid enabled upstream",
+			apiEndpoint: "",
+			upstreams: []types.UpstreamConfig{
+				{URL: "http://a", Enabled: true},
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := mc.validateLLMEndpointConfig(tc.apiEndpoint, tc.upstreams)
+			if tc.wantErr {
+				require.Error(t, err)
+				require.ErrorContains(t, err, tc.errContains)
+				return
+			}
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestLLMServiceComponent_normalizePrimaryEndpoint(t *testing.T) {
+	mc := &llmServiceComponentImpl{}
+	testCases := []struct {
+		name        string
+		apiEndpoint string
+		upstreams   []types.UpstreamConfig
+		want        string
+	}{
+		{
+			name:        "keep api_endpoint when provided",
+			apiEndpoint: "http://primary",
+			upstreams: []types.UpstreamConfig{
+				{URL: "http://a", Enabled: true},
+			},
+			want: "http://primary",
+		},
+		{
+			name:        "pick first enabled upstream",
+			apiEndpoint: "",
+			upstreams: []types.UpstreamConfig{
+				{URL: "http://disabled", Enabled: false},
+				{URL: "http://enabled", Enabled: true},
+			},
+			want: "http://enabled",
+		},
+		{
+			name:        "return empty when no enabled upstream",
+			apiEndpoint: "",
+			upstreams: []types.UpstreamConfig{
+				{URL: "http://disabled", Enabled: false},
+			},
+			want: "",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := mc.normalizePrimaryEndpoint(tc.apiEndpoint, tc.upstreams)
+			require.Equal(t, tc.want, got)
+		})
+	}
 }
 
 func TestLLMServiceComponent_UpdatePromptPrefix(t *testing.T) {

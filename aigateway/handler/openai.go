@@ -45,6 +45,7 @@ type OpenAIHandler interface {
 	GenerateImage(c *gin.Context)
 	// Transcribe audio to text
 	Transcription(c *gin.Context)
+	SetChatAttemptFailureReporter(reporter ChatAttemptFailureReporter)
 }
 
 func NewOpenAIHandlerFromConfig(config *config.Config) (OpenAIHandler, error) {
@@ -91,16 +92,19 @@ func newOpenAIHandler(
 	whitelistRule database.RepositoryFileCheckRuleStore,
 ) *OpenAIHandlerImpl {
 	return &OpenAIHandlerImpl{
-		openaiComponent:     modelService,
-		repoComp:            repoComp,
-		modComponent:        modComponent,
-		clusterComp:         clusterComp,
-		tokenCounterFactory: tokenCounterFactory,
-		t2iRegistry:         t2iRegistry,
-		config:              config,
-		storage:             storage,
-		whitelistRule:       whitelistRule,
-		llmLogPublisher:     component.NewLLMLogPublisher(),
+		openaiComponent:            modelService,
+		repoComp:                   repoComp,
+		modComponent:               modComponent,
+		clusterComp:                clusterComp,
+		tokenCounterFactory:        tokenCounterFactory,
+		t2iRegistry:                t2iRegistry,
+		config:                     config,
+		storage:                    storage,
+		whitelistRule:              whitelistRule,
+		sensitivePolicy:            component.NewSensitivePolicy(modComponent, whitelistRule),
+		llmLogPublisher:            component.NewLLMLogPublisher(),
+		sessionRouter:              component.NewSessionRouter(),
+		chatAttemptFailureReporter: noopChatAttemptFailureReporter{},
 	}
 }
 
@@ -133,76 +137,61 @@ func (h *OpenAIHandlerImpl) handleInsufficientBalance(c *gin.Context, isStream b
 	}
 }
 
-func (h *OpenAIHandlerImpl) checkSensitive(ctx context.Context, model *types.Model, chatReq *ChatCompletionRequest, nsUUID string, stream bool) (bool, *rpc.CheckResult, error) {
-	if !model.NeedSensitiveCheck {
-		return false, nil, nil
+func (h *OpenAIHandlerImpl) handleUsageLimitExceeded(c *gin.Context, isStream bool, username, modelID string, err error) {
+	if !component.IsUsageLimitExceeded(err) {
+		slog.ErrorContext(c.Request.Context(), "usage limit check failed",
+			"user", username, "model", modelID, "error", err)
+		httpbase.ServerError(c, err)
+		return
 	}
 
-	namespaceTargets := buildNamespaceTargets(model.OfficialName, model.ID)
-	rules, err := h.whitelistRule.ListBySensitiveCheckTargets(ctx, namespaceTargets, model.ID)
-	if err != nil {
-		return false, nil, fmt.Errorf("failed to query white list rules: %w", err)
-	}
-	if len(rules) != 0 {
-		slog.DebugContext(ctx, "Skip Sensitive check with white list", slog.Any("rule", rules[0]))
-		return false, nil, nil
-	}
+	slog.WarnContext(c.Request.Context(), "usage limit exceeded for request",
+		"user", username, "model", modelID)
 
-	key := fmt.Sprintf("%s:%s", nsUUID, model.ID)
-	result, err := h.modComponent.CheckChatPrompts(ctx, chatReq.Messages, key, stream)
-	if err != nil {
-		return false, nil, fmt.Errorf("failed to call moderation error:%w", err)
+	payload := gin.H{
+		"error": gin.H{
+			"code":    "rate_limit_exceeded",
+			"message": "Usage quota exceeded for current window",
+			"type":    "rate_limit_error",
+		},
 	}
-
-	return true, result, nil
+	if isStream {
+		errorChunkJSON, _ := json.Marshal(payload)
+		_, writeErr := c.Writer.Write([]byte("data: " + string(errorChunkJSON) + "\n\ndata: [DONE]\n\n"))
+		if writeErr != nil {
+			slog.Error("failed to write rate limit error to stream", "error", writeErr)
+		}
+		c.Writer.Flush()
+		return
+	}
+	c.JSON(http.StatusTooManyRequests, payload)
 }
 
-func buildNamespaceTargets(officialName, modelID string) []string {
-	targetSet := make(map[string]struct{}, 2)
-	targets := make([]string, 0, 2)
-	if namespace := extractNamespaceTarget(officialName); namespace != "" {
-		if _, exists := targetSet[namespace]; !exists {
-			targetSet[namespace] = struct{}{}
-			targets = append(targets, namespace)
-		}
+func (h *OpenAIHandlerImpl) handleProxyError(c *gin.Context, isStream bool, username, modelID string, err error) {
+	if component.IsUsageLimitExceeded(err) {
+		h.handleUsageLimitExceeded(c, isStream, username, modelID, err)
+		return
 	}
-	if namespace := extractNamespaceTarget(modelID); namespace != "" {
-		if _, exists := targetSet[namespace]; !exists {
-			targetSet[namespace] = struct{}{}
-			targets = append(targets, namespace)
-		}
-	}
-	return targets
-}
-
-func extractNamespaceTarget(path string) string {
-	normalizedPath := strings.Trim(strings.TrimSpace(path), "/")
-	if normalizedPath == "" {
-		return ""
-	}
-	parts := strings.Split(normalizedPath, "/")
-	if len(parts) == 0 {
-		return ""
-	}
-	namespace := strings.ToLower(strings.TrimSpace(parts[0]))
-	if namespace == "" {
-		return ""
-	}
-	return namespace
+	slog.ErrorContext(c.Request.Context(), "failed to create reverse proxy",
+		slog.Any("error", err))
+	httpbase.ServerError(c, err)
 }
 
 // OpenAIHandlerImpl implements the OpenAIHandler interface
 type OpenAIHandlerImpl struct {
-	openaiComponent     component.OpenAIComponent
-	repoComp            apicomp.RepoComponent
-	modComponent        component.Moderation
-	clusterComp         apicomp.ClusterComponent
-	tokenCounterFactory token.CounterFactory
-	t2iRegistry         *text2image.Registry
-	config              *config.Config
-	storage             types.Storage
-	whitelistRule       database.RepositoryFileCheckRuleStore
-	llmLogPublisher     component.LLMLogPublisher
+	openaiComponent            component.OpenAIComponent
+	repoComp                   apicomp.RepoComponent
+	modComponent               component.Moderation
+	clusterComp                apicomp.ClusterComponent
+	tokenCounterFactory        token.CounterFactory
+	t2iRegistry                *text2image.Registry
+	config                     *config.Config
+	storage                    types.Storage
+	whitelistRule              database.RepositoryFileCheckRuleStore
+	sensitivePolicy            component.SensitivePolicy
+	llmLogPublisher            component.LLMLogPublisher
+	sessionRouter              component.SessionRouter
+	chatAttemptFailureReporter ChatAttemptFailureReporter
 }
 
 // ListModels godoc
@@ -340,7 +329,7 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 		return
 	}
 	modelID := chatReq.Model
-	modelTarget, err := h.resolveModelTarget(c.Request.Context(), username, modelID)
+	modelTarget, err := h.resolveModelTarget(c.Request.Context(), username, modelID, c.Request.Header)
 	if err != nil {
 		handleModelTargetError(c, c.Request.Context(), modelID, "failed to get model target address", err)
 		return
@@ -363,20 +352,8 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 			return
 		}
 	}
-
-	// marshal updated request map back to JSON bytes
-	updatedBodyBytes, _ := json.Marshal(chatReq)
-	c.Request.Body = io.NopCloser(bytes.NewReader(updatedBodyBytes))
-	c.Request.ContentLength = int64(len(updatedBodyBytes))
-	rp, err := proxy.NewReverseProxy(modelTarget.Target)
-	if err != nil {
-		slog.ErrorContext(c.Request.Context(), "failed to create reverse proxy", slog.Any("error", err))
-		c.String(http.StatusInternalServerError, fmt.Errorf("failed to create reverse proxy error:%w", err).Error())
-		return
-	}
-
 	var modComponent component.Moderation = nil
-	isCheck, result, err := h.checkSensitive(c.Request.Context(), modelTarget.Model, chatReq, nsUUID, chatReq.Stream)
+	isCheck, result, err := h.sensitivePolicy.CheckChatSensitive(c.Request.Context(), modelTarget.Model, chatReq.Messages, nsUUID, chatReq.Stream)
 	if err != nil {
 		slog.ErrorContext(c.Request.Context(), "failed to check sensitive",
 			slog.String("model_id", modelID),
@@ -391,9 +368,74 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 		}
 	}
 
-	slog.InfoContext(c.Request.Context(), "proxy chat request to model target", slog.Any("target", modelTarget.Target),
-		slog.Any("host", modelTarget.Host), slog.Any("ns_uuid", nsUUID), slog.Any("model_name", modelTarget.ModelName))
+	slog.InfoContext(c.Request.Context(), "proxy chat request to model target",
+		slog.Any("target", modelTarget.Target),
+		slog.Any("host", modelTarget.Host),
+		slog.Any("ns_uuid", nsUUID),
+		slog.Any("model_name", modelTarget.ModelName))
 
+	chatCtx := h.setupChatContext(
+		c.Request.Context(),
+		modelTarget,
+		chatReq,
+		modComponent,
+		c.Writer,
+		trace.GetTraceIDInGinContext(c),
+		nsUUID,
+	)
+	defer chatCtx.responseWriter.ClearBuffer()
+
+	chatCtx.tokenCounter.AppendPrompts(chatReq.Messages)
+
+	if err := applyModelAuthHeaders(c.Request.Header, modelTarget.Model); err != nil {
+		slog.WarnContext(c.Request.Context(), "invalid auth head",
+			slog.String("model", modelTarget.ModelName),
+			slog.Any("error", err))
+	}
+
+	primaryWriter, proxyErr := h.executeChatProxyAttempt(c, chatCtx.responseWriter, modelTarget, nsUUID, chatReq)
+	if proxyErr != nil {
+		h.handleProxyError(c, chatReq.Stream, username, modelID, proxyErr)
+		return
+	}
+
+	if err := h.executeChatWithFallback(c, chatCtx, modelTarget, nsUUID, chatReq, primaryWriter, username, modelID); err != nil {
+		h.handleProxyError(c, chatReq.Stream, username, modelID, err)
+		return
+	}
+
+	h.runChatPostProcessAsync(c.Request.Context(), chatPostProcessInput{
+		NSUUID:       nsUUID,
+		ApiKey:       apikey,
+		Model:        modelTarget.Model,
+		TokenCounter: chatCtx.tokenCounter,
+		LogCapture:   chatCtx.logCapture,
+	})
+}
+
+type chatPostProcessInput struct {
+	NSUUID       string
+	ApiKey       string
+	Model        *types.Model
+	TokenCounter token.Counter
+	LogCapture   component.LLMLogRecorder
+}
+
+type chatContext struct {
+	tokenCounter   token.ChatTokenCounter
+	logCapture     component.LLMLogRecorder
+	responseWriter CommonResponseWriter
+}
+
+func (h *OpenAIHandlerImpl) setupChatContext(
+	ctx context.Context,
+	modelTarget *resolvedModelTarget,
+	chatReq *ChatCompletionRequest,
+	modComponent component.Moderation,
+	ginWriter gin.ResponseWriter,
+	traceID string,
+	nsUUID string,
+) *chatContext {
 	tokenCounter := h.tokenCounterFactory.NewChat(token.CreateParam{
 		Endpoint: modelTarget.Target,
 		Host:     modelTarget.Host,
@@ -403,7 +445,7 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 	})
 
 	logCapture, err := component.NewLLMLogRecorder(
-		trace.GetTraceIDInGinContext(c),
+		traceID,
 		modelTarget.ModelName,
 		nsUUID,
 		commonType.LLMLogRequest{
@@ -420,62 +462,170 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 		},
 	)
 	if err != nil {
-		slog.WarnContext(c.Request.Context(), "failed to initialize llmlog training capture", slog.Any("error", err))
+		slog.WarnContext(ctx, "failed to initialize llmlog training capture", slog.Any("error", err))
 	}
 
-	w := NewResponseWriterWrapper(c.Writer, chatReq.Stream, modComponent, tokenCounter, logCapture)
-	defer w.ClearBuffer()
+	responseWriter := NewResponseWriterWrapper(ginWriter, chatReq.Stream, modComponent, tokenCounter, logCapture)
 
-	tokenCounter.AppendPrompts(chatReq.Messages)
+	return &chatContext{
+		tokenCounter:   tokenCounter,
+		logCapture:     logCapture,
+		responseWriter: responseWriter,
+	}
+}
 
-	proxyToApi := ""
-	if modelTarget.Model.Endpoint != "" {
-		uri, err := url.ParseRequestURI(strings.TrimSpace(modelTarget.Model.Endpoint))
-		if err != nil {
-			slog.Warn("endpoint has wrong struct", slog.String("model", modelTarget.ModelName),
-				slog.Any("endpoint", modelTarget.Model.Endpoint))
-		} else {
-			proxyToApi = uri.Path
+func (h *OpenAIHandlerImpl) executeChatWithFallback(
+	c *gin.Context,
+	chatCtx *chatContext,
+	modelTarget *resolvedModelTarget,
+	userUUID string,
+	chatReq *ChatCompletionRequest,
+	primaryWriter *chatRetryResponseWriter,
+	username string,
+	modelID string,
+) error {
+	primaryStatusCode := primaryWriter.StatusCode()
+	primaryStreamStarted := primaryWriter.StreamStarted()
+	primaryRetryable := shouldRetryChatAttempt(primaryStatusCode, primaryStreamStarted)
+
+	if shouldReportChatAttemptFailure(primaryStatusCode) {
+		h.reportChatAttemptFailure(c.Request.Context(), ChatAttemptFailureEvent{
+			Phase:          chatAttemptPhasePrimary,
+			ModelID:        modelTarget.Model.ID,
+			ModelName:      modelTarget.ModelName,
+			Provider:       modelTarget.Model.Provider,
+			Endpoint:       modelTarget.Endpoint.URL,
+			Target:         modelTarget.Target,
+			SessionKeyHash: modelTarget.SessionKeyHash,
+			StatusCode:     primaryStatusCode,
+			Retryable:      primaryRetryable,
+		})
+	}
+
+	hasFallbacks := len(modelTarget.AttemptTargets) > 1
+	if !primaryRetryable || !hasFallbacks {
+		if replayErr := primaryWriter.ReplayBufferedResponse(); replayErr != nil {
+			slog.WarnContext(c.Request.Context(), "failed to replay buffered response", slog.Any("error", replayErr))
+		}
+		return nil
+	}
+
+	slog.InfoContext(c.Request.Context(), "retry chat request with fallback endpoint",
+		slog.String("model_id", modelID),
+		slog.String("session_key_hash", modelTarget.SessionKeyHash),
+		slog.String("primary_endpoint", modelTarget.PrimaryTarget),
+		slog.String("next_fallback_endpoint", modelTarget.FallbackTarget),
+		slog.Int("available_fallback_attempts", len(modelTarget.AttemptTargets)-1),
+		slog.String("retry_reason", chatRetryReason(primaryStatusCode)),
+		slog.Int("status_code", primaryStatusCode))
+
+	retryErr := h.retryChatWithFallback(c, chatCtx.responseWriter, modelTarget, userUUID, chatReq, chatCtx.tokenCounter, chatCtx.logCapture)
+	if retryErr != nil {
+		if component.IsUsageLimitExceeded(retryErr) {
+			return retryErr
+		}
+		slog.ErrorContext(c.Request.Context(), "fallback chat retry failed", slog.Any("error", retryErr))
+		if replayErr := primaryWriter.ReplayBufferedResponse(); replayErr != nil {
+			slog.WarnContext(c.Request.Context(), "failed to replay buffered fallback response after retry error", slog.Any("error", replayErr))
 		}
 	}
+	return nil
+}
 
-	if err := applyModelAuthHeaders(c.Request.Header, modelTarget.Model); err != nil {
-		slog.WarnContext(c.Request.Context(), "invalid auth head", slog.String("model", modelTarget.ModelName), slog.Any("error", err))
-	}
-
-	rp.ServeHTTP(w, c.Request, proxyToApi, modelTarget.Host)
-
+func (h *OpenAIHandlerImpl) runChatPostProcessAsync(ctx context.Context, input chatPostProcessInput) {
 	go func() {
-		usageCtx, cancel := context.WithTimeout(context.WithoutCancel(c.Request.Context()), 3*time.Second)
+		usageCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 3*time.Second)
 		defer cancel()
 
-		err := h.openaiComponent.RecordUsage(usageCtx, nsUUID, modelTarget.Model, tokenCounter, apikey)
-		if err != nil {
+		if err := h.openaiComponent.CommitUsageLimit(usageCtx, input.NSUUID, input.Model, input.TokenCounter); err != nil {
+			slog.ErrorContext(usageCtx, "failed to commit usage limit", slog.Any("error", err))
+		}
+
+		if err := h.openaiComponent.RecordUsage(usageCtx, input.NSUUID, input.Model, input.TokenCounter, input.ApiKey); err != nil {
 			slog.ErrorContext(usageCtx, "failed to record token usage", slog.Any("error", err))
 		}
-	}()
 
-	go func() {
-		if !h.config.AIGateway.EnableLLMLog || logCapture == nil || h.llmLogPublisher == nil {
-			return
-		}
-		logCtx, cancel := context.WithTimeout(context.WithoutCancel(c.Request.Context()), 3*time.Second)
-		defer cancel()
-
-		record, recordErr := logCapture.Record()
-		if recordErr != nil {
-			slog.ErrorContext(logCtx, "failed to build llmlog training record", slog.Any("error", recordErr))
-			return
-		}
-		payload, marshalErr := json.Marshal(record)
-		if marshalErr != nil {
-			slog.ErrorContext(logCtx, "failed to marshal llmlog training record", slog.Any("error", marshalErr))
-			return
-		}
-		if publishErr := h.llmLogPublisher.PublishTrainingLog(payload); publishErr != nil {
-			slog.ErrorContext(logCtx, "failed to publish llmlog training record", slog.Any("error", publishErr))
+		if h.config.AIGateway.EnableLLMLog && input.LogCapture != nil && h.llmLogPublisher != nil {
+			record, recordErr := input.LogCapture.Record()
+			if recordErr != nil {
+				slog.ErrorContext(usageCtx, "failed to build llmlog training record", slog.Any("error", recordErr))
+				return
+			}
+			payload, marshalErr := json.Marshal(record)
+			if marshalErr != nil {
+				slog.ErrorContext(usageCtx, "failed to marshal llmlog training record", slog.Any("error", marshalErr))
+				return
+			}
+			if publishErr := h.llmLogPublisher.PublishTrainingLog(payload); publishErr != nil {
+				slog.ErrorContext(usageCtx, "failed to publish llmlog training record", slog.Any("error", publishErr))
+			}
 		}
 	}()
+}
+
+func (h *OpenAIHandlerImpl) executeChatProxyAttempt(c *gin.Context, w CommonResponseWriter, modelTarget *resolvedModelTarget, userUUID string, chatReq *ChatCompletionRequest) (*chatRetryResponseWriter, error) {
+	if err := h.openaiComponent.CheckUsageLimit(c.Request.Context(), userUUID, modelTarget.Model, modelTarget.Target); err != nil {
+		return nil, err
+	}
+	body, err := marshalChatRequestBody(chatReq, modelTarget.ModelName)
+	if err != nil {
+		return nil, err
+	}
+	proxyToAPI := resolveProxyPathFromModelEndpoint(modelTarget.Model.Endpoint, modelTarget.ModelName)
+	rp, err := proxy.NewReverseProxy(modelTarget.Target)
+	if err != nil {
+		return nil, err
+	}
+	c.Request.Body = io.NopCloser(bytes.NewReader(body))
+	c.Request.ContentLength = int64(len(body))
+	retryWriter := newChatRetryResponseWriter(w)
+	rp.ServeHTTP(retryWriter, c.Request, proxyToAPI, modelTarget.Host)
+	return retryWriter, nil
+}
+
+func (h *OpenAIHandlerImpl) retryChatWithFallback(c *gin.Context, w CommonResponseWriter, modelTarget *resolvedModelTarget, userUUID string, chatReq *ChatCompletionRequest, tokenCounter token.ChatTokenCounter, logCapture component.LLMLogRecorder) error {
+	if len(modelTarget.AttemptTargets) < 2 {
+		return nil
+	}
+	fallbackTargets := modelTarget.AttemptTargets[1:]
+	for idx, fallbackTarget := range fallbackTargets {
+		applyChatFallbackTarget(c.Request.Context(), c.Request.Header, modelTarget, fallbackTarget, tokenCounter, logCapture)
+		slog.DebugContext(c.Request.Context(), "retrying chat request with fallback endpoint",
+			slog.String("model_id", modelTarget.Model.ID),
+			slog.String("session_key_hash", modelTarget.SessionKeyHash),
+			slog.String("retry_endpoint", modelTarget.Model.Endpoint),
+			slog.String("retry_model_name", modelTarget.ModelName))
+		retryWriter, err := h.executeChatProxyAttempt(c, w, modelTarget, userUUID, chatReq)
+		if err != nil {
+			return err
+		}
+		statusCode := retryWriter.StatusCode()
+		streamStarted := retryWriter.StreamStarted()
+		retryable := shouldRetryChatAttempt(statusCode, streamStarted)
+		if shouldReportChatAttemptFailure(statusCode) {
+			h.reportChatAttemptFailure(c.Request.Context(), ChatAttemptFailureEvent{
+				Phase:           chatAttemptPhaseFallback,
+				ModelID:         modelTarget.Model.ID,
+				ModelName:       modelTarget.ModelName,
+				Provider:        modelTarget.Model.Provider,
+				Endpoint:        modelTarget.Endpoint.URL,
+				Target:          modelTarget.Target,
+				SessionKeyHash:  modelTarget.SessionKeyHash,
+				StatusCode:      statusCode,
+				Retryable:       retryable,
+				FallbackAttempt: idx + 1,
+			})
+		}
+		isLastFallback := idx == len(fallbackTargets)-1
+		// Stop when this attempt has produced a final result for the caller:
+		// - on the last fallback, replay any buffered 502/503/504 response because there is no next target;
+		// - on success or any non-retryable result, ReplayBufferedResponse becomes a no-op if the response
+		//   was already streamed/committed to downstream.
+		if isLastFallback || !retryable {
+			return retryWriter.ReplayBufferedResponse()
+		}
+	}
+	return nil
 }
 
 // GenerateImage godoc
@@ -512,7 +662,7 @@ func (h *OpenAIHandlerImpl) GenerateImage(c *gin.Context) {
 	}
 
 	modelID := req.Model
-	modelTarget, err := h.resolveModelTarget(ctx, username, modelID)
+	modelTarget, err := h.resolveModelTarget(ctx, username, modelID, c.Request.Header)
 	if err != nil {
 		handleModelTargetError(c, ctx, modelID, "failed to get model target address", err)
 		return
@@ -643,7 +793,7 @@ func (h *OpenAIHandlerImpl) Embedding(c *gin.Context) {
 	username := httpbase.GetCurrentUser(c)
 	nsUUID := httpbase.GetCurrentNamespaceUUID(c)
 	apikey := httpbase.GetAccessToken(c)
-	modelTarget, err := h.resolveModelTarget(c.Request.Context(), username, modelID)
+	modelTarget, err := h.resolveModelTarget(c.Request.Context(), username, modelID, c.Request.Header)
 	if err != nil {
 		handleModelTargetError(c, c.Request.Context(), modelID, "failed to get embedding target address", err)
 		return
@@ -745,7 +895,7 @@ func (h *OpenAIHandlerImpl) Transcription(c *gin.Context) {
 		return
 	}
 
-	modelTarget, err := h.resolveModelTarget(ctx, username, modelID)
+	modelTarget, err := h.resolveModelTarget(ctx, username, modelID, c.Request.Header)
 	if err != nil {
 		handleModelTargetError(c, ctx, modelID, "failed to get transcription target address", err)
 		return

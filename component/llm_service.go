@@ -2,7 +2,10 @@ package component
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"math"
+	"strings"
 
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
@@ -34,6 +37,8 @@ type llmServiceComponentImpl struct {
 	promptPrefixStore database.PromptPrefixStore
 	repoStore         database.RepoStore
 }
+
+var ErrInvalidLLMConfig = errors.New("invalid llm config")
 
 func NewLLMServiceComponent(config *config.Config) (LLMServiceComponent, error) {
 	llmConfigStore := database.NewLLMConfigStore(config)
@@ -70,18 +75,20 @@ func (s *llmServiceComponentImpl) ShowLLMConfig(ctx context.Context, id int64) (
 		return nil, err
 	}
 	llmConfig := &types.LLMConfig{
-		ID:           dbLlmConfig.ID,
-		ModelName:    dbLlmConfig.ModelName,
-		OfficialName: dbLlmConfig.OfficialName,
-		ApiEndpoint:  dbLlmConfig.ApiEndpoint,
-		AuthHeader:   dbLlmConfig.AuthHeader,
-		Type:         dbLlmConfig.Type,
-		Enabled:      dbLlmConfig.Enabled,
-		Provider:     dbLlmConfig.Provider,
-		Metadata:     dbLlmConfig.Metadata,
-		RepoID:       dbLlmConfig.RepoID,
-		CreatedAt:    dbLlmConfig.CreatedAt,
-		UpdatedAt:    dbLlmConfig.UpdatedAt,
+		ID:            dbLlmConfig.ID,
+		ModelName:     dbLlmConfig.ModelName,
+		OfficialName:  dbLlmConfig.OfficialName,
+		ApiEndpoint:   dbLlmConfig.ApiEndpoint,
+		Upstreams:     dbLlmConfig.Upstreams,
+		AuthHeader:    dbLlmConfig.AuthHeader,
+		Type:          dbLlmConfig.Type,
+		Enabled:       dbLlmConfig.Enabled,
+		Provider:      dbLlmConfig.Provider,
+		RoutingPolicy: dbLlmConfig.RoutingPolicy,
+		Metadata:      dbLlmConfig.Metadata,
+		RepoID:        dbLlmConfig.RepoID,
+		CreatedAt:     dbLlmConfig.CreatedAt,
+		UpdatedAt:     dbLlmConfig.UpdatedAt,
 	}
 	if dbLlmConfig.RepoID > 0 {
 		repo, err := s.repoStore.FindById(ctx, dbLlmConfig.RepoID)
@@ -126,6 +133,9 @@ func (s *llmServiceComponentImpl) UpdateLLMConfig(ctx context.Context, req *type
 	if req.ApiEndpoint != nil {
 		llmConfig.ApiEndpoint = *req.ApiEndpoint
 	}
+	if req.Upstreams != nil {
+		llmConfig.Upstreams = *req.Upstreams
+	}
 	if req.AuthHeader != nil {
 		llmConfig.AuthHeader = *req.AuthHeader
 	}
@@ -138,29 +148,38 @@ func (s *llmServiceComponentImpl) UpdateLLMConfig(ctx context.Context, req *type
 	if req.Provider != nil {
 		llmConfig.Provider = *req.Provider
 	}
+	if req.RoutingPolicy != nil {
+		llmConfig.RoutingPolicy = *req.RoutingPolicy
+	}
 	if req.Metadata != nil {
 		commonutils.MergeMapWithDeletion(&llmConfig.Metadata, *req.Metadata)
 	}
 	if req.RepoID != nil {
 		llmConfig.RepoID = *req.RepoID
 	}
-	updatedConfig, err := s.llmConfigStore.Update(ctx, *llmConfig)
-	if err != nil {
+	if err := s.validateLLMEndpointConfig(llmConfig.ApiEndpoint, llmConfig.Upstreams); err != nil {
 		return nil, err
 	}
+	llmConfig.ApiEndpoint = s.normalizePrimaryEndpoint(llmConfig.ApiEndpoint, llmConfig.Upstreams)
+	updatedConfig, updateErr := s.llmConfigStore.Update(ctx, *llmConfig)
+	if updateErr != nil {
+		return nil, updateErr
+	}
 	resLLMConfig := &types.LLMConfig{
-		ID:           updatedConfig.ID,
-		ModelName:    updatedConfig.ModelName,
-		OfficialName: updatedConfig.OfficialName,
-		ApiEndpoint:  updatedConfig.ApiEndpoint,
-		AuthHeader:   updatedConfig.AuthHeader,
-		Type:         updatedConfig.Type,
-		Provider:     updatedConfig.Provider,
-		Enabled:      updatedConfig.Enabled,
-		Metadata:     updatedConfig.Metadata,
-		RepoID:       updatedConfig.RepoID,
-		CreatedAt:    updatedConfig.CreatedAt,
-		UpdatedAt:    updatedConfig.UpdatedAt,
+		ID:            updatedConfig.ID,
+		ModelName:     updatedConfig.ModelName,
+		OfficialName:  updatedConfig.OfficialName,
+		ApiEndpoint:   updatedConfig.ApiEndpoint,
+		Upstreams:     updatedConfig.Upstreams,
+		AuthHeader:    updatedConfig.AuthHeader,
+		Type:          updatedConfig.Type,
+		Provider:      updatedConfig.Provider,
+		Enabled:       updatedConfig.Enabled,
+		RoutingPolicy: updatedConfig.RoutingPolicy,
+		Metadata:      updatedConfig.Metadata,
+		RepoID:        updatedConfig.RepoID,
+		CreatedAt:     updatedConfig.CreatedAt,
+		UpdatedAt:     updatedConfig.UpdatedAt,
 	}
 	return resLLMConfig, nil
 }
@@ -197,34 +216,41 @@ func (s *llmServiceComponentImpl) CreateLLMConfig(ctx context.Context, req *type
 	if req.RepoID != nil {
 		repoID = *req.RepoID
 	}
+	if err := s.validateLLMEndpointConfig(req.ApiEndpoint, req.Upstreams); err != nil {
+		return nil, err
+	}
 	dbLLMConfig := database.LLMConfig{
-		ModelName:    req.ModelName,
-		OfficialName: req.OfficialName,
-		ApiEndpoint:  req.ApiEndpoint,
-		AuthHeader:   req.AuthHeader,
-		Type:         req.Type,
-		Provider:     req.Provider,
-		Enabled:      req.Enabled,
-		Metadata:     req.Metadata,
-		RepoID:       repoID,
+		ModelName:     req.ModelName,
+		OfficialName:  req.OfficialName,
+		ApiEndpoint:   s.normalizePrimaryEndpoint(req.ApiEndpoint, req.Upstreams),
+		Upstreams:     req.Upstreams,
+		AuthHeader:    req.AuthHeader,
+		Type:          req.Type,
+		Provider:      req.Provider,
+		Enabled:       req.Enabled,
+		RoutingPolicy: req.RoutingPolicy,
+		Metadata:      req.Metadata,
+		RepoID:        repoID,
 	}
 	dbRes, err := s.llmConfigStore.Create(ctx, dbLLMConfig)
 	if err != nil {
 		return nil, err
 	}
 	resLLMConfig := &types.LLMConfig{
-		ID:           dbRes.ID,
-		ModelName:    dbRes.ModelName,
-		OfficialName: dbRes.OfficialName,
-		ApiEndpoint:  dbRes.ApiEndpoint,
-		AuthHeader:   dbRes.AuthHeader,
-		Type:         dbRes.Type,
-		Provider:     dbRes.Provider,
-		Enabled:      dbRes.Enabled,
-		Metadata:     dbRes.Metadata,
-		RepoID:       dbRes.RepoID,
-		CreatedAt:    dbRes.CreatedAt,
-		UpdatedAt:    dbRes.UpdatedAt,
+		ID:            dbRes.ID,
+		ModelName:     dbRes.ModelName,
+		OfficialName:  dbRes.OfficialName,
+		ApiEndpoint:   dbRes.ApiEndpoint,
+		Upstreams:     dbRes.Upstreams,
+		AuthHeader:    dbRes.AuthHeader,
+		Type:          dbRes.Type,
+		Provider:      dbRes.Provider,
+		Enabled:       dbRes.Enabled,
+		RoutingPolicy: dbRes.RoutingPolicy,
+		Metadata:      dbRes.Metadata,
+		RepoID:        dbRes.RepoID,
+		CreatedAt:     dbRes.CreatedAt,
+		UpdatedAt:     dbRes.UpdatedAt,
 	}
 	return resLLMConfig, nil
 }
@@ -261,6 +287,37 @@ func (s *llmServiceComponentImpl) DeletePromptPrefix(ctx context.Context, id int
 		return err
 	}
 	return nil
+}
+
+func (s *llmServiceComponentImpl) validateLLMEndpointConfig(apiEndpoint string, upstreams []types.UpstreamConfig) error {
+	if strings.TrimSpace(apiEndpoint) == "" && len(upstreams) == 0 {
+		return fmt.Errorf("%w: api_endpoint or upstreams must be provided", ErrInvalidLLMConfig)
+	}
+	enabledCount := 0
+	for _, upstream := range upstreams {
+		if strings.TrimSpace(upstream.URL) == "" {
+			return fmt.Errorf("%w: upstream url cannot be empty", ErrInvalidLLMConfig)
+		}
+		if upstream.Enabled {
+			enabledCount++
+		}
+	}
+	if len(upstreams) > 0 && enabledCount == 0 && strings.TrimSpace(apiEndpoint) == "" {
+		return fmt.Errorf("%w: at least one enabled upstream must be provided", ErrInvalidLLMConfig)
+	}
+	return nil
+}
+
+func (s *llmServiceComponentImpl) normalizePrimaryEndpoint(apiEndpoint string, upstreams []types.UpstreamConfig) string {
+	if strings.TrimSpace(apiEndpoint) != "" {
+		return apiEndpoint
+	}
+	for _, upstream := range upstreams {
+		if upstream.Enabled && strings.TrimSpace(upstream.URL) != "" {
+			return upstream.URL
+		}
+	}
+	return ""
 }
 
 func (s *llmServiceComponentImpl) ListExternalLLMs(ctx context.Context) ([]*types.LLMConfig, error) {

@@ -23,6 +23,7 @@ import (
 	mocktoken "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/aigateway/token"
 	mockdatabase "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
 	apicomp "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
+	comp "opencsg.com/csghub-server/aigateway/component"
 	"opencsg.com/csghub-server/aigateway/component/adapter/text2image"
 	"opencsg.com/csghub-server/aigateway/token"
 	"opencsg.com/csghub-server/aigateway/types"
@@ -45,6 +46,26 @@ type testerOpenAIHandler struct {
 	}
 
 	handler *OpenAIHandlerImpl
+}
+
+type testChatAttemptFailureReporterWithMutex struct {
+	mu     sync.Mutex
+	events []ChatAttemptFailureEvent
+}
+
+func (r *testChatAttemptFailureReporterWithMutex) ReportChatAttemptFailure(_ context.Context, event ChatAttemptFailureEvent) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.events = append(r.events, event)
+	return nil
+}
+
+func (r *testChatAttemptFailureReporterWithMutex) Events() []ChatAttemptFailureEvent {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	cp := make([]ChatAttemptFailureEvent, len(r.events))
+	copy(cp, r.events)
+	return cp
 }
 
 func setupTest(t *testing.T) (*testerOpenAIHandler, *gin.Context, *httptest.ResponseRecorder) {
@@ -74,6 +95,8 @@ func setupTest(t *testing.T) (*testerOpenAIHandler, *gin.Context, *httptest.Resp
 	tester.mocks.whitelistRule = mockWhitelistRule
 
 	tester.mocks.whitelistRule.EXPECT().ListBySensitiveCheckTargets(mock.Anything, mock.Anything, mock.Anything).Return([]database.RepositoryFileCheckRule{}, nil).Maybe()
+	tester.mocks.openAIComp.EXPECT().CheckUsageLimit(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
+	tester.mocks.openAIComp.EXPECT().CommitUsageLimit(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 
 	return tester, c, w
 }
@@ -553,6 +576,58 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, w.Code)
 	})
+	t.Run("usage limit exceeded", func(t *testing.T) {
+		tester, c, w := setupTest(t)
+		tester.mocks.openAIComp.ExpectedCalls = nil
+		chatReq := ChatCompletionRequest{
+			Model: "model1:svc1",
+			Messages: []openai.ChatCompletionMessageParamUnion{
+				openai.UserMessage("Hello"),
+			},
+		}
+		body, _ := json.Marshal(chatReq)
+		c.Request.Method = http.MethodPost
+		c.Request.Body = io.NopCloser(bytes.NewReader(body))
+
+		model := &types.Model{
+			BaseModel: types.BaseModel{
+				ID:      "model1:svc1",
+				Object:  "model",
+				OwnedBy: "testuser",
+			},
+			InternalModelInfo: types.InternalModelInfo{
+				ClusterID:     "test-cls",
+				SvcName:       "test-svc",
+				CSGHubModelID: "model1",
+			},
+			Endpoint: "http://example.com",
+		}
+		tester.mocks.mockClsComp.EXPECT().GetClusterByID(mock.Anything, "test-cls").Return(&database.ClusterInfo{
+			ClusterID: "test-cls",
+		}, nil)
+		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1:svc1").Return(model, nil)
+		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
+		tester.mocks.openAIComp.EXPECT().CheckUsageLimit(mock.Anything, "testuuid", model, mock.Anything).
+			Return(&comp.UsageLimitExceededError{Message: "usage quota exceeded"}).Once()
+		expectReq := ChatCompletionRequest{}
+		_ = json.Unmarshal(body, &expectReq)
+		llmTokenCounter := mocktoken.NewMockChatTokenCounter(t)
+		tester.mocks.tokenCounterFactory.EXPECT().NewChat(
+			token.CreateParam{
+				Endpoint: model.Endpoint,
+				Host:     "",
+				Model:    "model1",
+				ImageID:  model.ImageID,
+				Provider: model.Provider,
+			}).
+			Return(llmTokenCounter)
+		llmTokenCounter.EXPECT().AppendPrompts(expectReq.Messages).Return()
+
+		tester.handler.Chat(c)
+
+		assert.Equal(t, http.StatusTooManyRequests, w.Code)
+		assert.Contains(t, w.Body.String(), "rate_limit_exceeded")
+	})
 	t.Run("success", func(t *testing.T) {
 		tester, c, w := setupTest(t)
 		chatReq := ChatCompletionRequest{
@@ -729,7 +804,7 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 				Host:     "",
 				Model:    model.ID,
 				ImageID:  model.ImageID,
-				Provider: model.Provider,
+				Provider: "",
 			}).
 			Return(llmTokenCounter)
 		llmTokenCounter.EXPECT().AppendPrompts(expectReq.Messages).Return()
@@ -799,7 +874,7 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 				Host:     "",
 				Model:    model.ID,
 				ImageID:  model.ImageID,
-				Provider: model.Provider,
+				Provider: "",
 			}).
 			Return(llmTokenCounter)
 		llmTokenCounter.EXPECT().AppendPrompts(expectReq.Messages).Return()
@@ -816,6 +891,84 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 		wg.Wait()
 		assert.Equal(t, http.StatusOK, w.Code)
 		assert.Equal(t, "test-model-1", forwardedModel)
+	})
+	t.Run("report primary upstream http status failure for downstream processing", func(t *testing.T) {
+		tester, c, w := setupTest(t)
+		tester.mocks.openAIComp.ExpectedCalls = nil
+		reporter := &testChatAttemptFailureReporterWithMutex{}
+		tester.handler.SetChatAttemptFailureReporter(reporter)
+
+		chatReq := ChatCompletionRequest{
+			Model: "external-model-id",
+			Messages: []openai.ChatCompletionMessageParamUnion{
+				openai.UserMessage("Hello"),
+			},
+		}
+		body, _ := json.Marshal(chatReq)
+		c.Request.Method = http.MethodPost
+		c.Request.Body = io.NopCloser(bytes.NewReader(body))
+
+		testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusNotFound)
+			_, err := w.Write([]byte(`{"error":"not found"}`))
+			require.NoError(t, err)
+		}))
+		defer testServer.Close()
+
+		model := &types.Model{
+			BaseModel: types.BaseModel{
+				ID:      "external-model-id",
+				Object:  "model",
+				OwnedBy: "testuser",
+			},
+			ExternalModelInfo: types.ExternalModelInfo{
+				NeedSensitiveCheck: true,
+			},
+			Endpoint: testServer.URL,
+		}
+		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "external-model-id").Return(model, nil).Once()
+		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
+		tester.mocks.openAIComp.EXPECT().CheckUsageLimit(mock.Anything, "testuuid", model, testServer.URL).Return(nil).Once()
+		expectReq := ChatCompletionRequest{}
+		_ = json.Unmarshal(body, &expectReq)
+		tester.mocks.moderationComp.EXPECT().CheckChatPrompts(mock.Anything, expectReq.Messages, "testuuid:"+model.ID, false).
+			Return(&rpc.CheckResult{IsSensitive: false}, nil)
+		llmTokenCounter := mocktoken.NewMockChatTokenCounter(t)
+		tester.mocks.tokenCounterFactory.EXPECT().NewChat(
+			token.CreateParam{
+				Endpoint: model.Endpoint,
+				Host:     "",
+				Model:    model.ID,
+				ImageID:  model.ImageID,
+				Provider: model.Provider,
+			},
+		).Return(llmTokenCounter)
+		llmTokenCounter.EXPECT().AppendPrompts(expectReq.Messages).Return()
+		llmTokenCounter.EXPECT().Completion(mock.Anything).Return().Maybe()
+		var wg sync.WaitGroup
+		wg.Add(2)
+		tester.mocks.openAIComp.EXPECT().CommitUsageLimit(mock.Anything, "testuuid", model, llmTokenCounter).
+			RunAndReturn(func(ctx context.Context, userUUID string, model *types.Model, counter token.Counter) error {
+				wg.Done()
+				return nil
+			})
+		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, "testuuid", model, llmTokenCounter, mock.Anything).
+			RunAndReturn(func(ctx context.Context, userUUID string, model *types.Model, counter token.Counter, apikey string) error {
+				wg.Done()
+				return nil
+			})
+
+		tester.handler.Chat(c)
+		wg.Wait()
+
+		assert.Equal(t, http.StatusNotFound, w.Code)
+		events := reporter.Events()
+		require.Len(t, events, 1)
+		assert.Equal(t, chatAttemptPhasePrimary, events[0].Phase)
+		assert.Equal(t, "external-model-id", events[0].ModelID)
+		assert.Equal(t, testServer.URL, events[0].Target)
+		assert.Equal(t, http.StatusNotFound, events[0].StatusCode)
+		assert.False(t, events[0].Retryable)
 	})
 }
 

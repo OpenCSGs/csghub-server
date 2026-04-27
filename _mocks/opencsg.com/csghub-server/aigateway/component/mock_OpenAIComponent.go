@@ -71,6 +71,104 @@ func (_c *MockOpenAIComponent_CheckBalance_Call) RunAndReturn(run func(context.C
 	return _c
 }
 
+// CheckUsageLimit provides a mock function with given fields: ctx, userUUID, model, endpoint
+func (_m *MockOpenAIComponent) CheckUsageLimit(ctx context.Context, userUUID string, model *types.Model, endpoint string) error {
+	ret := _m.Called(ctx, userUUID, model, endpoint)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CheckUsageLimit")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, *types.Model, string) error); ok {
+		r0 = rf(ctx, userUUID, model, endpoint)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockOpenAIComponent_CheckUsageLimit_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CheckUsageLimit'
+type MockOpenAIComponent_CheckUsageLimit_Call struct {
+	*mock.Call
+}
+
+// CheckUsageLimit is a helper method to define mock.On call
+//   - ctx context.Context
+//   - userUUID string
+//   - model *types.Model
+//   - endpoint string
+func (_e *MockOpenAIComponent_Expecter) CheckUsageLimit(ctx interface{}, userUUID interface{}, model interface{}, endpoint interface{}) *MockOpenAIComponent_CheckUsageLimit_Call {
+	return &MockOpenAIComponent_CheckUsageLimit_Call{Call: _e.mock.On("CheckUsageLimit", ctx, userUUID, model, endpoint)}
+}
+
+func (_c *MockOpenAIComponent_CheckUsageLimit_Call) Run(run func(ctx context.Context, userUUID string, model *types.Model, endpoint string)) *MockOpenAIComponent_CheckUsageLimit_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(*types.Model), args[3].(string))
+	})
+	return _c
+}
+
+func (_c *MockOpenAIComponent_CheckUsageLimit_Call) Return(_a0 error) *MockOpenAIComponent_CheckUsageLimit_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockOpenAIComponent_CheckUsageLimit_Call) RunAndReturn(run func(context.Context, string, *types.Model, string) error) *MockOpenAIComponent_CheckUsageLimit_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// CommitUsageLimit provides a mock function with given fields: ctx, userUUID, model, tokenCounter
+func (_m *MockOpenAIComponent) CommitUsageLimit(ctx context.Context, userUUID string, model *types.Model, tokenCounter token.Counter) error {
+	ret := _m.Called(ctx, userUUID, model, tokenCounter)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CommitUsageLimit")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, *types.Model, token.Counter) error); ok {
+		r0 = rf(ctx, userUUID, model, tokenCounter)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockOpenAIComponent_CommitUsageLimit_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CommitUsageLimit'
+type MockOpenAIComponent_CommitUsageLimit_Call struct {
+	*mock.Call
+}
+
+// CommitUsageLimit is a helper method to define mock.On call
+//   - ctx context.Context
+//   - userUUID string
+//   - model *types.Model
+//   - tokenCounter token.Counter
+func (_e *MockOpenAIComponent_Expecter) CommitUsageLimit(ctx interface{}, userUUID interface{}, model interface{}, tokenCounter interface{}) *MockOpenAIComponent_CommitUsageLimit_Call {
+	return &MockOpenAIComponent_CommitUsageLimit_Call{Call: _e.mock.On("CommitUsageLimit", ctx, userUUID, model, tokenCounter)}
+}
+
+func (_c *MockOpenAIComponent_CommitUsageLimit_Call) Run(run func(ctx context.Context, userUUID string, model *types.Model, tokenCounter token.Counter)) *MockOpenAIComponent_CommitUsageLimit_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(*types.Model), args[3].(token.Counter))
+	})
+	return _c
+}
+
+func (_c *MockOpenAIComponent_CommitUsageLimit_Call) Return(_a0 error) *MockOpenAIComponent_CommitUsageLimit_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockOpenAIComponent_CommitUsageLimit_Call) RunAndReturn(run func(context.Context, string, *types.Model, token.Counter) error) *MockOpenAIComponent_CommitUsageLimit_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetAvailableModels provides a mock function with given fields: c, user
 func (_m *MockOpenAIComponent) GetAvailableModels(c context.Context, user string) ([]types.Model, error) {
 	ret := _m.Called(c, user)

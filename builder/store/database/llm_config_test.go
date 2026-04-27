@@ -19,24 +19,24 @@ func TestLLMConfigStore_GetOptimization(t *testing.T) {
 	require.Nil(t, err)
 	store := database.NewLLMConfigStoreWithDB(db, config)
 	_, err = db.Core.NewInsert().Model(&database.LLMConfig{
-		Type:        1,
-		Enabled:     true,
-		ModelName:   "c1",
+		Type:         1,
+		Enabled:      true,
+		ModelName:    "c1",
 		OfficialName: "c1",
-		Metadata:    map[string]any{"source": "test"},
+		Metadata:     map[string]any{"source": "test"},
 	}).Exec(ctx)
 	require.Nil(t, err)
 	_, err = db.Core.NewInsert().Model(&database.LLMConfig{
-		Type:        2,
-		Enabled:     true,
-		ModelName:   "c2",
+		Type:         2,
+		Enabled:      true,
+		ModelName:    "c2",
 		OfficialName: "c2",
 	}).Exec(ctx)
 	require.Nil(t, err)
 	_, err = db.Core.NewInsert().Model(&database.LLMConfig{
-		Type:        1,
-		Enabled:     false,
-		ModelName:   "c3",
+		Type:         1,
+		Enabled:      false,
+		ModelName:    "c3",
 		OfficialName: "c3",
 	}).Exec(ctx)
 	require.Nil(t, err)
@@ -56,11 +56,11 @@ func TestLLMConfigStore_GetModelForSummaryReadme(t *testing.T) {
 	require.Nil(t, err)
 	store := database.NewLLMConfigStoreWithDB(db, config)
 	_, err = db.Core.NewInsert().Model(&database.LLMConfig{
-		Type:        5,
-		Enabled:     true,
-		ModelName:   "summary1",
+		Type:         5,
+		Enabled:      true,
+		ModelName:    "summary1",
 		OfficialName: "summary1",
-		Metadata:    map[string]any{"k": "v"},
+		Metadata:     map[string]any{"k": "v"},
 	}).Exec(ctx)
 	require.Nil(t, err)
 
@@ -95,11 +95,11 @@ func TestLLMConfigStore_GetByID(t *testing.T) {
 	store := database.NewLLMConfigStoreWithDB(db, config)
 
 	dbInput := database.LLMConfig{
-		Type:        5,
-		Enabled:     true,
-		ModelName:   "summary1",
+		Type:         5,
+		Enabled:      true,
+		ModelName:    "summary1",
 		OfficialName: "summary1",
-		Metadata:    map[string]any{"k": "v"},
+		Metadata:     map[string]any{"k": "v"},
 	}
 	_, err = db.Core.NewInsert().Model(&dbInput).Exec(ctx)
 	require.Nil(t, err)
@@ -120,17 +120,27 @@ func TestLLMConfigStore_CRUD(t *testing.T) {
 	require.Nil(t, err)
 	store := database.NewLLMConfigStoreWithDB(db, config)
 	dbInput := database.LLMConfig{
-		Type:        5,
-		Enabled:     true,
-		ModelName:   "summary1",
+		Type:         5,
+		Enabled:      true,
+		ModelName:    "summary1",
 		OfficialName: "summary1",
-		Metadata:    map[string]any{"k": "v", "tasks": []interface{}{"text-generation", "text-to-image"}},
+		Upstreams: []types.UpstreamConfig{
+			{URL: "https://example.test/v1/chat/completions", Enabled: true, Weight: 1},
+		},
+		RoutingPolicy: types.RoutingPolicy{
+			Strategy:      "session_hash",
+			SessionHeader: "X-Session-ID",
+			HashReplicas:  128,
+		},
+		Metadata: map[string]any{"k": "v", "tasks": []interface{}{"text-generation", "text-to-image"}},
 	}
 	res, err := store.Create(ctx, dbInput)
 	require.Nil(t, err)
 	require.NotNil(t, res)
 	require.Equal(t, "summary1", res.ModelName)
 	require.Equal(t, "summary1", res.OfficialName)
+	require.Len(t, res.Upstreams, 1)
+	require.Equal(t, "https://example.test/v1/chat/completions", res.Upstreams[0].URL)
 	require.Equal(t, map[string]any{"k": "v", "tasks": []interface{}{"text-generation", "text-to-image"}}, res.Metadata)
 
 	searchType := 5
@@ -249,23 +259,23 @@ func TestLLMConfigStore_Index_EnabledFilter(t *testing.T) {
 		Provider:    "test",
 	}
 	_, err = store.Create(ctx, database.LLMConfig{
-		ModelName:   "idx-en-on",
+		ModelName:    "idx-en-on",
 		OfficialName: "idx-en-on",
-		Enabled:     true,
-		Type:        base.Type,
-		ApiEndpoint: base.ApiEndpoint,
-		AuthHeader:  base.AuthHeader,
-		Provider:    base.Provider,
+		Enabled:      true,
+		Type:         base.Type,
+		ApiEndpoint:  base.ApiEndpoint,
+		AuthHeader:   base.AuthHeader,
+		Provider:     base.Provider,
 	})
 	require.Nil(t, err)
 	_, err = store.Create(ctx, database.LLMConfig{
-		ModelName:   "idx-en-off",
+		ModelName:    "idx-en-off",
 		OfficialName: "idx-en-off",
-		Enabled:     false,
-		Type:        base.Type,
-		ApiEndpoint: base.ApiEndpoint,
-		AuthHeader:  base.AuthHeader,
-		Provider:    base.Provider,
+		Enabled:      false,
+		Type:         base.Type,
+		ApiEndpoint:  base.ApiEndpoint,
+		AuthHeader:   base.AuthHeader,
+		Provider:     base.Provider,
 	})
 	require.Nil(t, err)
 

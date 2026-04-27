@@ -8,6 +8,7 @@ import (
 	"github.com/openai/openai-go/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	comp "opencsg.com/csghub-server/aigateway/component"
 	"opencsg.com/csghub-server/aigateway/types"
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
@@ -27,7 +28,7 @@ func TestOpenAIHandler_checkSensitive(t *testing.T) {
 				NeedSensitiveCheck: false,
 			},
 		}
-		needCheck, result, err := tester.handler.checkSensitive(ctx, model, chatReq, userUUID, false)
+		needCheck, result, err := tester.handler.sensitivePolicy.CheckChatSensitive(ctx, model, chatReq.Messages, userUUID, false)
 		assert.NoError(t, err)
 		assert.False(t, needCheck)
 		assert.Nil(t, result)
@@ -51,7 +52,7 @@ func TestOpenAIHandler_checkSensitive(t *testing.T) {
 		}, nil).Once()
 		tester.mocks.moderationComp.EXPECT().CheckChatPrompts(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, nil).Maybe()
 
-		needCheck, result, err := tester.handler.checkSensitive(ctx, model, chatReq, userUUID, false)
+		needCheck, result, err := tester.handler.sensitivePolicy.CheckChatSensitive(ctx, model, chatReq.Messages, userUUID, false)
 		assert.NoError(t, err)
 		assert.False(t, needCheck)
 		assert.Nil(t, result)
@@ -75,7 +76,7 @@ func TestOpenAIHandler_checkSensitive(t *testing.T) {
 		tester.mocks.whitelistRule.EXPECT().ListBySensitiveCheckTargets(ctx, []string{"qwen", "another"}, "another/model").Return(nil, errors.New("db error")).Once()
 		tester.mocks.moderationComp.EXPECT().CheckChatPrompts(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, nil).Maybe()
 
-		needCheck, result, err := tester.handler.checkSensitive(ctx, model, chatReq, userUUID, false)
+		needCheck, result, err := tester.handler.sensitivePolicy.CheckChatSensitive(ctx, model, chatReq.Messages, userUUID, false)
 		assert.ErrorContains(t, err, "failed to query white list rules: db error")
 		assert.False(t, needCheck)
 		assert.Nil(t, result)
@@ -99,7 +100,7 @@ func TestOpenAIHandler_checkSensitive(t *testing.T) {
 		}, nil).Once()
 		tester.mocks.moderationComp.EXPECT().CheckChatPrompts(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, nil).Maybe()
 
-		needCheck, result, err := tester.handler.checkSensitive(ctx, model, chatReq, userUUID, false)
+		needCheck, result, err := tester.handler.sensitivePolicy.CheckChatSensitive(ctx, model, chatReq.Messages, userUUID, false)
 		assert.NoError(t, err)
 		assert.False(t, needCheck)
 		assert.Nil(t, result)
@@ -122,7 +123,7 @@ func TestOpenAIHandler_checkSensitive(t *testing.T) {
 		expectedResult := &rpc.CheckResult{IsSensitive: false}
 		tester.mocks.moderationComp.EXPECT().CheckChatPrompts(ctx, chatReq.Messages, "test-uuid:Qwen/Qwen3Guard", false).Return(expectedResult, nil).Once()
 
-		needCheck, result, err := tester.handler.checkSensitive(ctx, model, chatReq, userUUID, false)
+		needCheck, result, err := tester.handler.sensitivePolicy.CheckChatSensitive(ctx, model, chatReq.Messages, userUUID, false)
 		assert.NoError(t, err)
 		assert.True(t, needCheck)
 		assert.Equal(t, expectedResult, result)
@@ -146,7 +147,7 @@ func TestOpenAIHandler_checkSensitive(t *testing.T) {
 		expectedResult := &rpc.CheckResult{IsSensitive: true}
 		tester.mocks.moderationComp.EXPECT().CheckChatPrompts(ctx, chatReq.Messages, "test-uuid:Qwen/Qwen3Guard", false).Return(expectedResult, nil).Once()
 
-		needCheck, result, err := tester.handler.checkSensitive(ctx, model, chatReq, userUUID, false)
+		needCheck, result, err := tester.handler.sensitivePolicy.CheckChatSensitive(ctx, model, chatReq.Messages, userUUID, false)
 		assert.NoError(t, err)
 		assert.True(t, needCheck)
 		assert.Equal(t, expectedResult, result)
@@ -170,7 +171,7 @@ func TestOpenAIHandler_checkSensitive(t *testing.T) {
 		}, nil).Once()
 		tester.mocks.moderationComp.EXPECT().CheckChatPrompts(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, nil).Maybe()
 
-		needCheck, result, err := tester.handler.checkSensitive(ctx, model, chatReq, userUUID, false)
+		needCheck, result, err := tester.handler.sensitivePolicy.CheckChatSensitive(ctx, model, chatReq.Messages, userUUID, false)
 		assert.NoError(t, err)
 		assert.False(t, needCheck)
 		assert.Nil(t, result)
@@ -194,7 +195,7 @@ func TestOpenAIHandler_checkSensitive(t *testing.T) {
 		}, nil).Once()
 		tester.mocks.moderationComp.EXPECT().CheckChatPrompts(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, nil).Maybe()
 
-		needCheck, result, err := tester.handler.checkSensitive(ctx, model, chatReq, userUUID, false)
+		needCheck, result, err := tester.handler.sensitivePolicy.CheckChatSensitive(ctx, model, chatReq.Messages, userUUID, false)
 		assert.NoError(t, err)
 		assert.False(t, needCheck)
 		assert.Nil(t, result)
@@ -216,7 +217,7 @@ func TestOpenAIHandler_checkSensitive(t *testing.T) {
 		tester.mocks.whitelistRule.EXPECT().ListBySensitiveCheckTargets(ctx, []string{"qwen"}, "Qwen/Qwen3Guard").Return([]database.RepositoryFileCheckRule{}, nil).Once()
 		tester.mocks.moderationComp.EXPECT().CheckChatPrompts(ctx, chatReq.Messages, "test-uuid:Qwen/Qwen3Guard", false).Return(nil, errors.New("mod api error")).Once()
 
-		needCheck, result, err := tester.handler.checkSensitive(ctx, model, chatReq, userUUID, false)
+		needCheck, result, err := tester.handler.sensitivePolicy.CheckChatSensitive(ctx, model, chatReq.Messages, userUUID, false)
 		assert.ErrorContains(t, err, "failed to call moderation error:mod api error")
 		assert.False(t, needCheck)
 		assert.Nil(t, result)
@@ -263,7 +264,7 @@ func Test_extractNamespaceTarget(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			actual := extractNamespaceTarget(testCase.path)
+			actual := comp.ExtractNamespaceTarget(testCase.path)
 			assert.Equal(t, testCase.expected, actual)
 		})
 	}
@@ -271,12 +272,12 @@ func Test_extractNamespaceTarget(t *testing.T) {
 
 func Test_buildNamespaceTargets(t *testing.T) {
 	t.Run("deduplicate namespaces from official name and model id", func(t *testing.T) {
-		targets := buildNamespaceTargets("Qwen///Qwen3Guard", "///Qwen////model")
+		targets := comp.BuildNamespaceTargets("Qwen///Qwen3Guard", "///Qwen////model")
 		assert.Equal(t, []string{"qwen"}, targets)
 	})
 
 	t.Run("support one slash and special symbols", func(t *testing.T) {
-		targets := buildNamespaceTargets("/", "ns-_.+@123/model")
+		targets := comp.BuildNamespaceTargets("/", "ns-_.+@123/model")
 		assert.Equal(t, []string{"ns-_.+@123"}, targets)
 	})
 }

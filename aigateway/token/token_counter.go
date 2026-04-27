@@ -36,7 +36,10 @@ type Counter interface {
 }
 
 type Usage struct {
-	TotalTokens      int64
-	PromptTokens     int64
-	CompletionTokens int64
+	TotalTokens               int64
+	PromptTokens              int64
+	CompletionTokens          int64
+	CachedPromptTokens        int64
+	CacheCreationPromptTokens int64
+	ReasoningTokens           int64
 }

@@ -122,7 +122,7 @@ func TestChatTokenCounter_Usage_WithTokenizer(t *testing.T) {
 }
 
 func TestChatTokenCounter_Usage_WithoutTokenizer(t *testing.T) {
-	// Test that when tokenizer is nil, return error
+	// Test that when tokenizer is nil, fallback to approximate usage
 	userContent := "Hello, how are you?"
 	counter := token.NewLLMTokenCounter(nil)
 
@@ -141,9 +141,38 @@ func TestChatTokenCounter_Usage_WithoutTokenizer(t *testing.T) {
 
 	usage, err := counter.Usage(context.Background())
 
-	assert.Error(t, err)
-	assert.Nil(t, usage)
-	assert.Equal(t, "no usage found in completion, and tokenizer not set", err.Error())
+	assert.NoError(t, err)
+	assert.NotNil(t, usage)
+	assert.Greater(t, usage.PromptTokens, int64(0))
+	assert.Greater(t, usage.TotalTokens, int64(0))
+}
+
+func TestChatTokenCounter_Usage_WithCompletionWithoutUsage_FallbackTokenizer(t *testing.T) {
+	tokenizer := mocktoken.NewMockTokenizer(t)
+	counter := token.NewLLMTokenCounter(tokenizer)
+	tokenizer.EXPECT().Encode(mock.Anything).Return(int64(6), nil)
+
+	counter.AppendPrompts([]openai.ChatCompletionMessageParamUnion{
+		openai.UserMessage("hello"),
+	})
+	counter.Completion(types.ChatCompletion{
+		ChatCompletion: openai.ChatCompletion{
+			Usage: openai.CompletionUsage{},
+			Choices: []openai.ChatCompletionChoice{
+				{
+					Message: openai.ChatCompletionMessage{
+						Content: "fallback completion",
+					},
+				},
+			},
+		},
+	})
+
+	usage, err := counter.Usage(context.Background())
+	assert.NoError(t, err)
+	assert.Equal(t, int64(9), usage.PromptTokens)
+	assert.Equal(t, int64(6), usage.CompletionTokens)
+	assert.Equal(t, int64(15), usage.TotalTokens)
 }
 
 func TestChatTokenCounter_Usage_WithTextContentParts(t *testing.T) {

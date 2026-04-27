@@ -33,6 +33,8 @@ type OpenAIComponent interface {
 	GetModelByID(c context.Context, username, modelID string) (*types.Model, error)
 	RecordUsage(c context.Context, nsUUID string, model *types.Model, tokenCounter token.Counter, apikey string) error
 	CheckBalance(ctx context.Context, nsUUID string) error
+	CheckUsageLimit(ctx context.Context, userUUID string, model *types.Model, endpoint string) error
+	CommitUsageLimit(ctx context.Context, userUUID string, model *types.Model, tokenCounter token.Counter) error
 }
 
 type openaiComponentImpl struct {
@@ -45,6 +47,7 @@ type openaiComponentImpl struct {
 	extendOpenai
 	modelIDFmt     string
 	modelIDBuilder ModelIDBuilder
+	usageLimiter   UsageLimiter
 }
 
 func (m *openaiComponentImpl) getModelIDBuilder() ModelIDBuilder {
@@ -52,6 +55,13 @@ func (m *openaiComponentImpl) getModelIDBuilder() ModelIDBuilder {
 		return NewModelIDBuilder()
 	}
 	return m.modelIDBuilder
+}
+
+func (m *openaiComponentImpl) getUsageLimiter() UsageLimiter {
+	if m.usageLimiter == nil {
+		return NewUsageLimiter(m.modelListCache)
+	}
+	return m.usageLimiter
 }
 
 // GetAvailableModels returns a list of running models
@@ -377,6 +387,7 @@ func (m *openaiComponentImpl) getExternalModels(c context.Context) []types.Model
 				extModel.Metadata = map[string]any{}
 			}
 			extModel.Metadata[types.MetaKeyLLMType] = types.ProviderTypeExternalLLM
+			upstreams := normalizeUpstreamCatalog(extModel.ApiEndpoint, extModel.Upstreams)
 			formatModelID := modelIDBuilder.BuildCompositeModelID(extModel.ModelName, extModel.Provider, m.modelIDFmt)
 			model := types.Model{
 				BaseModel: types.BaseModel{
@@ -387,7 +398,9 @@ func (m *openaiComponentImpl) getExternalModels(c context.Context) []types.Model
 					Metadata:     extModel.Metadata,
 					Task:         task,
 				},
-				Endpoint: extModel.ApiEndpoint,
+				Endpoint:      firstEnabledUpstream(upstreams),
+				Upstreams:     upstreams,
+				RoutingPolicy: extModel.RoutingPolicy,
 				ExternalModelInfo: types.ExternalModelInfo{
 					Provider:           extModel.Provider,
 					AuthHead:           extModel.AuthHeader,
@@ -568,7 +581,7 @@ func validateModelForUsageRecord(c context.Context, model *types.Model) error {
 	return nil
 }
 
-func (m *openaiComponentImpl) tokenUsageMeteringExtraAndScene(c context.Context, nsUUID string, model *types.Model, usage *token.Usage) (tokenUsageMeteringExtra, commontypes.SceneType, error) {
+func (m *openaiComponentImpl) tokenUsageMeteringExtraAndScene(c context.Context, userUUID string, model *types.Model, usage *token.Usage) (tokenUsageMeteringExtra, commontypes.SceneType, error) {
 	scene := commontypes.SceneModelServerless
 	extra := tokenUsageMeteringExtra{
 		PromptTokenNum:     fmt.Sprintf("%d", usage.PromptTokens),
@@ -579,10 +592,10 @@ func (m *openaiComponentImpl) tokenUsageMeteringExtraAndScene(c context.Context,
 		case commontypes.ServerlessType:
 			extra.OwnerType = commontypes.CSGHubServerlessInference
 		case commontypes.InferenceType:
-			if model.OwnerUUID == nsUUID {
+			if model.OwnerUUID == userUUID {
 				extra.OwnerType = commontypes.CSGHubUserDeployedInference
 			} else {
-				belong, err := m.checkOrganization(c, nsUUID, model.OwnerUUID)
+				belong, err := m.checkOrganization(c, userUUID, model.OwnerUUID)
 				if err != nil {
 					return tokenUsageMeteringExtra{}, 0, fmt.Errorf("failed to check organization: %w", err)
 				}
@@ -656,20 +669,20 @@ func (m *openaiComponentImpl) RecordUsage(c context.Context, nsUUID string, mode
 	return nil
 }
 
-func (m *openaiComponentImpl) checkOrganization(c context.Context, nsUUID string, ownerUUID string) (bool, error) {
-	user, err := m.userStore.FindByUUID(c, nsUUID)
+func (m *openaiComponentImpl) checkOrganization(c context.Context, userUUID string, ownerUUID string) (bool, error) {
+	user, err := m.userStore.FindByUUID(c, userUUID)
 	if err != nil {
-		slog.ErrorContext(c, "Failed to find user", slog.Any("nsUUID", nsUUID), slog.Any("error", err))
+		slog.ErrorContext(c, "Failed to find user in db")
 		return false, err
 	}
 	owner, err := m.userStore.FindByUUID(c, ownerUUID)
 	if err != nil {
-		slog.ErrorContext(c, "Failed to find owner", slog.Any("ownerUUID", ownerUUID), slog.Any("error", err))
+		slog.ErrorContext(c, "Failed to find owner in db")
 		return false, err
 	}
 	userOrgs, err := m.organStore.GetUserBelongOrgs(c, user.ID)
 	if err != nil {
-		slog.ErrorContext(c, "Failed to find user organizations", slog.Any("userid", user.ID), slog.Any("error", err))
+		slog.ErrorContext(c, "Failed to find user organizations")
 		return false, err
 	}
 	if len(userOrgs) == 0 {
@@ -677,7 +690,7 @@ func (m *openaiComponentImpl) checkOrganization(c context.Context, nsUUID string
 	}
 	ownerOrgs, err := m.organStore.GetUserBelongOrgs(c, owner.ID)
 	if err != nil {
-		slog.ErrorContext(c, "Failed to find owner organizations", slog.Any("ownerUUID", ownerUUID), slog.Any("error", err))
+		slog.ErrorContext(c, "Failed to find owner organizations")
 		return false, err
 	}
 	if len(ownerOrgs) == 0 {

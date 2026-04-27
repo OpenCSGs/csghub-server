@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"math"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/openai/openai-go/v3"
 	"opencsg.com/csghub-server/aigateway/types"
@@ -37,6 +39,10 @@ func NewLLMTokenCounter(tokenizer Tokenizer) ChatTokenCounter {
 	}
 }
 
+func (l *chatTokenCounterImpl) SetCreateParam(param CreateParam) {
+	l.tokenizer = NewTokenizerImpl(param.Endpoint, param.Host, param.Model, param.ImageID, param.Provider)
+}
+
 // Completion implements LLMTokenCounter.
 func (l *chatTokenCounterImpl) Completion(completion types.ChatCompletion) {
 	l.completion = &completion
@@ -67,14 +73,27 @@ func (l *chatTokenCounterImpl) AppendCompletionChunk(chunk types.ChatCompletionC
 // Usage implements LLMTokenCounter.
 func (l *chatTokenCounterImpl) Usage(c context.Context) (*Usage, error) {
 	if l.completion != nil {
-		return &Usage{
-			PromptTokens:     l.completion.Usage.PromptTokens,
-			CompletionTokens: l.completion.Usage.CompletionTokens,
-			TotalTokens:      l.completion.Usage.TotalTokens,
-		}, nil
+		if l.completion.Usage.TotalTokens > 0 {
+			return &Usage{
+				PromptTokens:              l.completion.Usage.PromptTokens,
+				CompletionTokens:          l.completion.Usage.CompletionTokens,
+				TotalTokens:               l.completion.Usage.TotalTokens,
+				CachedPromptTokens:        l.completion.Usage.PromptTokensDetails.CachedTokens,
+				ReasoningTokens:           l.completion.Usage.CompletionTokensDetails.ReasoningTokens,
+				CacheCreationPromptTokens: 0,
+			}, nil
+		}
+		slog.WarnContext(c, "chat completion usage not found, fallback to local token estimate")
 	}
 
 	var contentBuf strings.Builder
+	if l.completion != nil {
+		for _, choice := range l.completion.Choices {
+			if choice.Message.Content != "" {
+				contentBuf.WriteString(choice.Message.Content)
+			}
+		}
+	}
 	for _, chunk := range l.chunks {
 		if len(chunk.Choices) != 0 {
 			if chunk.Choices[0].Delta.Content != "" {
@@ -88,15 +107,31 @@ func (l *chatTokenCounterImpl) Usage(c context.Context) (*Usage, error) {
 		if chunk.Usage.TotalTokens > 0 {
 			slog.Debug("llmTokenCounter generated", slog.String("content", contentBuf.String()))
 			return &Usage{
-				PromptTokens:     chunk.Usage.PromptTokens,
-				CompletionTokens: chunk.Usage.CompletionTokens,
-				TotalTokens:      chunk.Usage.TotalTokens,
+				PromptTokens:              chunk.Usage.PromptTokens,
+				CompletionTokens:          chunk.Usage.CompletionTokens,
+				TotalTokens:               chunk.Usage.TotalTokens,
+				CachedPromptTokens:        chunk.Usage.PromptTokensDetails.CachedTokens,
+				ReasoningTokens:           chunk.Usage.CompletionTokensDetails.ReasoningTokens,
+				CacheCreationPromptTokens: 0,
 			}, nil
 		}
 	}
 
 	if l.tokenizer == nil {
-		return nil, errors.New("no usage found in completion, and tokenizer not set")
+		promptTokens, completionTokens := approximatePromptAndCompletionTokens(l.prompts, contentBuf.String())
+		if promptTokens <= 0 && completionTokens <= 0 {
+			return nil, errors.New("no usage found in completion, and tokenizer not set")
+		}
+		totalTokens := promptTokens + completionTokens
+		slog.WarnContext(c, "tokenizer unavailable, using approximate token usage",
+			slog.Int64("prompt_tokens", promptTokens),
+			slog.Int64("completion_tokens", completionTokens),
+			slog.Int64("total_tokens", totalTokens))
+		return &Usage{
+			PromptTokens:     promptTokens,
+			CompletionTokens: completionTokens,
+			TotalTokens:      totalTokens,
+		}, nil
 	}
 
 	var totalTokens, completionTokens, promptTokens int64
@@ -191,4 +226,44 @@ func (l *chatTokenCounterImpl) Usage(c context.Context) (*Usage, error) {
 		PromptTokens:     promptTokens,
 		TotalTokens:      totalTokens,
 	}, nil
+}
+
+func approximatePromptAndCompletionTokens(prompts []openai.ChatCompletionMessageParamUnion, completion string) (int64, int64) {
+	var promptText strings.Builder
+	for _, msg := range prompts {
+		contentType := msg.GetContent().AsAny()
+		switch v := contentType.(type) {
+		case *string:
+			if v != nil {
+				promptText.WriteString(*v)
+			}
+		case *[]openai.ChatCompletionContentPartTextParam:
+			for _, part := range *v {
+				promptText.WriteString(part.Text)
+			}
+		case *[]openai.ChatCompletionContentPartUnionParam:
+			for _, part := range *v {
+				if part.OfText != nil && part.GetText() != nil {
+					promptText.WriteString(*part.GetText())
+				}
+			}
+		}
+		promptText.WriteByte('\n')
+	}
+	promptTokens := approxTokensByText(promptText.String())
+	if promptTokens > 0 {
+		promptTokens += 3
+	}
+	completionTokens := approxTokensByText(completion)
+	return promptTokens, completionTokens
+}
+
+func approxTokensByText(content string) int64 {
+	content = strings.TrimSpace(content)
+	if content == "" {
+		return 0
+	}
+	runeCount := utf8.RuneCountInString(content)
+	// A conservative approximation for CJK/mixed content: about 1 token ~= 4 chars.
+	return int64(math.Ceil(float64(runeCount) / 4.0))
 }
