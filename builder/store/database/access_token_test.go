@@ -216,7 +216,7 @@ func TestAccessTokenStore_IsExistByUUID(t *testing.T) {
 		Name:        "uuid-token",
 		Token:       "uuid-token-value",
 		UserID:      1,
-		Application: types.AccessTokenAPIKey,
+		Application: types.AccessTokenAppAIGateway,
 		NsUUID:      "test-ns-uuid",
 		IsActive:    true,
 	}
@@ -224,15 +224,15 @@ func TestAccessTokenStore_IsExistByUUID(t *testing.T) {
 	err := atStore.Create(ctx, token, nil)
 	require.Nil(t, err)
 
-	exists, err := atStore.IsExistByUUID(ctx, "test-ns-uuid", "uuid-token", string(types.AccessTokenAPIKey))
+	exists, err := atStore.IsExistByUUID(ctx, "test-ns-uuid", "uuid-token", string(types.AccessTokenAppAIGateway))
 	require.Nil(t, err)
 	require.True(t, exists)
 
-	exists, err = atStore.IsExistByUUID(ctx, "test-ns-uuid", "nonexistent-token", string(types.AccessTokenAPIKey))
+	exists, err = atStore.IsExistByUUID(ctx, "test-ns-uuid", "nonexistent-token", string(types.AccessTokenAppAIGateway))
 	require.Nil(t, err)
 	require.False(t, exists)
 
-	exists, err = atStore.IsExistByUUID(ctx, "nonexistent-uuid", "uuid-token", string(types.AccessTokenAPIKey))
+	exists, err = atStore.IsExistByUUID(ctx, "nonexistent-uuid", "uuid-token", string(types.AccessTokenAppAIGateway))
 	require.Nil(t, err)
 	require.False(t, exists)
 }
@@ -250,7 +250,7 @@ func TestAccessTokenStore_UpdateTokenAndQuota(t *testing.T) {
 		Name:        "update-token",
 		Token:       "update-token-value",
 		UserID:      1,
-		Application: types.AccessTokenAPIKey,
+		Application: types.AccessTokenAppAIGateway,
 		NsUUID:      "update-ns-uuid",
 		IsActive:    true,
 	}
@@ -334,7 +334,7 @@ func TestAccessTokenStore_FindByNsUUID(t *testing.T) {
 		Name:        "ns-token-1",
 		Token:       "ns-token-value-1",
 		UserID:      1,
-		Application: types.AccessTokenAPIKey,
+		Application: types.AccessTokenAppAIGateway,
 		NsUUID:      nsUUID,
 		IsActive:    true,
 	}
@@ -344,7 +344,7 @@ func TestAccessTokenStore_FindByNsUUID(t *testing.T) {
 		Name:        "ns-token-2",
 		Token:       "ns-token-value-2",
 		UserID:      1,
-		Application: types.AccessTokenAPIKey,
+		Application: types.AccessTokenAppAIGateway,
 		NsUUID:      nsUUID,
 		IsActive:    true,
 	}
@@ -355,7 +355,7 @@ func TestAccessTokenStore_FindByNsUUID(t *testing.T) {
 	require.Nil(t, err)
 
 	// Find tokens by namespace UUID
-	tokens, err := atStore.FindByNsUUID(ctx, nsUUID, string(types.AccessTokenAPIKey))
+	tokens, err := atStore.FindByNsUUID(ctx, nsUUID, string(types.AccessTokenAppAIGateway))
 	require.Nil(t, err)
 	require.Len(t, tokens, 2)
 
@@ -364,7 +364,7 @@ func TestAccessTokenStore_FindByNsUUID(t *testing.T) {
 	require.Equal(t, token1.ID, tokens[1].ID)
 
 	// Find with non-existent namespace UUID
-	tokens, err = atStore.FindByNsUUID(ctx, "nonexistent-uuid", string(types.AccessTokenAPIKey))
+	tokens, err = atStore.FindByNsUUID(ctx, "nonexistent-uuid", string(types.AccessTokenAppAIGateway))
 	require.Nil(t, err)
 	require.Empty(t, tokens)
 }

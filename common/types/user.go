@@ -172,10 +172,12 @@ type CheckAccessTokenResp struct {
 	NSUUID         string                   `json:"ns_uuid"`
 	QuotaType      AccountingQuotaType      `json:"quota_type"`
 	QuotaValueType AccountingQuotaValueType `json:"quota_value_type"`
+	Usage          float64                  `json:"usage"`
 	Quota          float64                  `json:"quota"`
 	LastUsedAt     *time.Time               `json:"last_used_at"`
 	CreatedAt      time.Time                `json:"created_at"`
 	UpdatedAt      time.Time                `json:"updated_at"`
+	TokenType      string                   `json:"token_type"`
 }
 
 type GetAccessTokenRequest struct {
@@ -190,7 +192,7 @@ type CreateAPIKeyRequest struct {
 	ExpiredAt *time.Time               `json:"expired_at"`
 	QuotaType AccountingQuotaType      `json:"quota_type" binding:"required"`
 	ValueType AccountingQuotaValueType `json:"quota_value_type" binding:"required"`
-	Quota     float64                  `json:"quota"`
+	Quota     float64                  `json:"quota" binding:"min=0"`
 }
 
 type UpdateAPIKeyRequest struct {
@@ -302,11 +304,18 @@ type UserRepoReq struct {
 type AccessTokenApp string
 
 const (
-	AccessTokenAppGit      AccessTokenApp = "git"
-	AccessTokenAppCSGHub                  = AccessTokenAppGit
-	AccessTokenAppMirror   AccessTokenApp = "mirror"
-	AccessTokenAppStarship AccessTokenApp = "starship"
-	AccessTokenAPIKey      AccessTokenApp = "aigateway"
+	AccessTokenAppGit       AccessTokenApp = "git"
+	AccessTokenAppCSGHub                   = AccessTokenAppGit
+	AccessTokenAppMirror    AccessTokenApp = "mirror"
+	AccessTokenAppStarship  AccessTokenApp = "starship"
+	AccessTokenAppAIGateway AccessTokenApp = "aigateway"
+)
+
+type AccessTokenType string
+
+const (
+	AccessTokenTypeBuiltIn AccessTokenType = "builtin"
+	AccessTokenTypeOwner   AccessTokenType = "owner"
 )
 
 type UserRepoPermission struct {
@@ -396,4 +405,13 @@ type UserListReq struct {
 	SortBy       string   `json:"sort_by"`
 	SortOrder    string   `json:"sort_order"`
 	ExactMatch   bool     `json:"exact_match"`
+}
+
+type RefreshTokenReq struct {
+	NSUUID       string    `json:"ns_uuid"`
+	OpUUID       string    `json:"op_uuid"`
+	Username     string    `json:"username"`
+	TokenName    string    `json:"token_name"`
+	App          string    `json:"app"`
+	NewExpiredAt time.Time `json:"new_expired_at"`
 }

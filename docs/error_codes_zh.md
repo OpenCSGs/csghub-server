@@ -234,6 +234,14 @@
 - **错误名:** `needAccessToken`
 - **描述:** 请求必须使用访问令牌进行身份验证。
 
+---
+
+### `AUTH-ERR-12`
+
+- **错误代码:** `AUTH-ERR-12`
+- **错误名:** `quotaExceeded`
+- **描述:** 请求限额已超过。
+
 ## Collection 错误
 
 ### `COLL-ERR-0`
@@ -577,6 +585,14 @@
 - **错误代码:** `GIT-ERR-38`
 - **错误名:** `gitGetRepositorySizeFailed`
 - **描述:** 获取仓库大小失败。这可能由网络问题、身份验证问题或指定的仓库不存在引起。
+
+---
+
+### `GIT-ERR-39`
+
+- **错误代码:** `GIT-ERR-39`
+- **错误名:** `gitCreateForkFailed`
+- **描述:** 
 
 ## Invitation 错误
 
@@ -1249,3 +1265,4 @@
 - **错误代码:** `USER-ERR-19`
 - **错误名:** `uuidConflict`
 - **描述:** 组织生成的UUID已存在于系统中
+

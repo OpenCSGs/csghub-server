@@ -11,6 +11,9 @@
     "error.AUTH-ERR-11": {
         "other": "需要訪問令牌進行身份驗證"
     },
+    "error.AUTH-ERR-12": {
+        "other": "請求限额已超過"
+    },
     "error.AUTH-ERR-2": {
         "other": "權限被拒絕"
     },

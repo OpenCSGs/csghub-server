@@ -13,15 +13,17 @@ const (
 	CurrentUserQueryVar     = "current_user"
 	CurrentUserUUIDQueryVar = "current_user_uuid"
 	HeaderLanguageKey       = "Accept-Language"
+	AccessTokenNameCtxVar   = "accessTokenName"
 )
 
 type AuthType string
 
 const (
-	AuthTypeApiKey         AuthType = "ApiKey"
+	AuthTypeSystemApiKey   AuthType = "ApiKey"
 	AuthTypeJwt            AuthType = "JWT"
 	AuthTypeAccessToken    AuthType = "AccessToken"
 	AuthTypeMultiSyncToken AuthType = "MultiSyncToken"
+	AuthTypeUserOrgApiKey  AuthType = "UserOrgApiKey"
 )
 
 // GetCurrentUser returns the current user name from the context.
@@ -69,4 +71,12 @@ func SetCurrentNamespaceUUID(ctx *gin.Context, namespaceUUID string) {
 
 func GetCurrentUserLanguage(ctx *gin.Context) string {
 	return ctx.GetHeader(HeaderLanguageKey)
+}
+
+func GetCurrentTokenName(ctx *gin.Context) string {
+	return ctx.GetString(AccessTokenNameCtxVar)
+}
+
+func SetCurrentTokenName(ctx *gin.Context, name string) {
+	ctx.Set(AccessTokenNameCtxVar, name)
 }

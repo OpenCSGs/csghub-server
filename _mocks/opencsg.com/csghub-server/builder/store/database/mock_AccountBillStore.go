@@ -8,6 +8,8 @@ import (
 	mock "github.com/stretchr/testify/mock"
 	database "opencsg.com/csghub-server/builder/store/database"
 
+	time "time"
+
 	types "opencsg.com/csghub-server/common/types"
 )
 
@@ -134,6 +136,122 @@ func (_c *MockAccountBillStore_ListByUserIDAndDate_Call) Return(_a0 database.Acc
 }
 
 func (_c *MockAccountBillStore_ListByUserIDAndDate_Call) RunAndReturn(run func(context.Context, types.AcctBillsReq) (database.AccountBillRes, error)) *MockAccountBillStore_ListByUserIDAndDate_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SumValueByAPIKey provides a mock function with given fields: ctx, tokenID
+func (_m *MockAccountBillStore) SumValueByAPIKey(ctx context.Context, tokenID int64) (float64, error) {
+	ret := _m.Called(ctx, tokenID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SumValueByAPIKey")
+	}
+
+	var r0 float64
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64) (float64, error)); ok {
+		return rf(ctx, tokenID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, int64) float64); ok {
+		r0 = rf(ctx, tokenID)
+	} else {
+		r0 = ret.Get(0).(float64)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, int64) error); ok {
+		r1 = rf(ctx, tokenID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountBillStore_SumValueByAPIKey_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SumValueByAPIKey'
+type MockAccountBillStore_SumValueByAPIKey_Call struct {
+	*mock.Call
+}
+
+// SumValueByAPIKey is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tokenID int64
+func (_e *MockAccountBillStore_Expecter) SumValueByAPIKey(ctx interface{}, tokenID interface{}) *MockAccountBillStore_SumValueByAPIKey_Call {
+	return &MockAccountBillStore_SumValueByAPIKey_Call{Call: _e.mock.On("SumValueByAPIKey", ctx, tokenID)}
+}
+
+func (_c *MockAccountBillStore_SumValueByAPIKey_Call) Run(run func(ctx context.Context, tokenID int64)) *MockAccountBillStore_SumValueByAPIKey_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64))
+	})
+	return _c
+}
+
+func (_c *MockAccountBillStore_SumValueByAPIKey_Call) Return(_a0 float64, _a1 error) *MockAccountBillStore_SumValueByAPIKey_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountBillStore_SumValueByAPIKey_Call) RunAndReturn(run func(context.Context, int64) (float64, error)) *MockAccountBillStore_SumValueByAPIKey_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SumValueByAPIKeyBetween provides a mock function with given fields: ctx, tokenID, start, end
+func (_m *MockAccountBillStore) SumValueByAPIKeyBetween(ctx context.Context, tokenID int64, start time.Time, end time.Time) (float64, error) {
+	ret := _m.Called(ctx, tokenID, start, end)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SumValueByAPIKeyBetween")
+	}
+
+	var r0 float64
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64, time.Time, time.Time) (float64, error)); ok {
+		return rf(ctx, tokenID, start, end)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, int64, time.Time, time.Time) float64); ok {
+		r0 = rf(ctx, tokenID, start, end)
+	} else {
+		r0 = ret.Get(0).(float64)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, int64, time.Time, time.Time) error); ok {
+		r1 = rf(ctx, tokenID, start, end)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountBillStore_SumValueByAPIKeyBetween_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SumValueByAPIKeyBetween'
+type MockAccountBillStore_SumValueByAPIKeyBetween_Call struct {
+	*mock.Call
+}
+
+// SumValueByAPIKeyBetween is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tokenID int64
+//   - start time.Time
+//   - end time.Time
+func (_e *MockAccountBillStore_Expecter) SumValueByAPIKeyBetween(ctx interface{}, tokenID interface{}, start interface{}, end interface{}) *MockAccountBillStore_SumValueByAPIKeyBetween_Call {
+	return &MockAccountBillStore_SumValueByAPIKeyBetween_Call{Call: _e.mock.On("SumValueByAPIKeyBetween", ctx, tokenID, start, end)}
+}
+
+func (_c *MockAccountBillStore_SumValueByAPIKeyBetween_Call) Run(run func(ctx context.Context, tokenID int64, start time.Time, end time.Time)) *MockAccountBillStore_SumValueByAPIKeyBetween_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64), args[2].(time.Time), args[3].(time.Time))
+	})
+	return _c
+}
+
+func (_c *MockAccountBillStore_SumValueByAPIKeyBetween_Call) Return(_a0 float64, _a1 error) *MockAccountBillStore_SumValueByAPIKeyBetween_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountBillStore_SumValueByAPIKeyBetween_Call) RunAndReturn(run func(context.Context, int64, time.Time, time.Time) (float64, error)) *MockAccountBillStore_SumValueByAPIKeyBetween_Call {
 	_c.Call.Return(run)
 	return _c
 }

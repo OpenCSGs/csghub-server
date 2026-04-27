@@ -45,7 +45,7 @@ func (e *openaiComponentImpl) userPreference(ctx context.Context, req *types.Use
 	return req.Models, nil
 }
 
-func (e *extendOpenai) CheckBalance(ctx context.Context, username, userUUID string) error {
+func (e *extendOpenai) CheckBalance(ctx context.Context, userUUID string) error {
 	return nil
 }
 

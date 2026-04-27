@@ -258,7 +258,15 @@ func (h *AccessTokenHandler) Refresh(ctx *gin.Context) {
 			return
 		}
 	}
-	resp, err := h.c.RefreshToken(ctx, currentUser, tokenName, app, expiredAt)
+
+	refreshReq := types.RefreshTokenReq{
+		Username:     currentUser,
+		TokenName:    tokenName,
+		App:          app,
+		NewExpiredAt: expiredAt,
+	}
+
+	resp, err := h.c.RefreshToken(ctx, &refreshReq)
 	if err != nil {
 		if errors.Is(err, errorx.ErrNotFound) {
 			httpbase.NotFoundError(ctx, err)
@@ -416,7 +424,7 @@ func (h *AccessTokenHandler) CreateAPIKey(ctx *gin.Context) {
 		OpUUID:      userUUID,
 		NSUUID:      nsUUID,
 		TokenName:   req.KeyName,
-		Application: types.AccessTokenAPIKey,
+		Application: types.AccessTokenAppAIGateway,
 		QuotaType:   req.QuotaType,
 		ValueType:   req.ValueType,
 		Quota:       req.Quota,
@@ -465,7 +473,7 @@ func (h *AccessTokenHandler) GetAPIKeys(ctx *gin.Context) {
 		Username:    currentUser,
 		OpUUID:      userUUID,
 		NSUUID:      uuid,
-		Application: types.AccessTokenAPIKey,
+		Application: types.AccessTokenAppAIGateway,
 	}
 
 	apikeys, err := h.c.GetTokens(ctx, req)
@@ -517,6 +525,13 @@ func (h *AccessTokenHandler) UpdateAPIKey(ctx *gin.Context) {
 		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, err)
 		return
+	}
+
+	if req.Quota != nil {
+		if *req.Quota < 0 {
+			httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(errors.New("quota must be non-negative"), nil))
+			return
+		}
 	}
 
 	req.ID = idInt
@@ -575,7 +590,7 @@ func (h *AccessTokenHandler) DeleteAPIKey(ctx *gin.Context) {
 		OpUUID:      userUUID,
 		NSUUID:      nsUUID,
 		ID:          idInt,
-		Application: types.AccessTokenAPIKey,
+		Application: types.AccessTokenAppAIGateway,
 	}
 
 	err = h.c.Delete(ctx, req)
@@ -590,4 +605,110 @@ func (h *AccessTokenHandler) DeleteAPIKey(ctx *gin.Context) {
 	}
 
 	httpbase.OK(ctx, nil)
+}
+
+// GetAPIKeyQuotas godoc
+// @Security     ApiKey
+// @Summary      Get all quotas for an API key
+// @Tags         Access token
+// @Accept       json
+// @Produce      json
+// @Param        token_value path string true "API key"
+// @Success      200  {object}  types.Response{data=[]database.AccountAccessTokenQuota} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /token/{token_value}/quotas [get]
+func (h *AccessTokenHandler) GetAPIKeyQuotas(ctx *gin.Context) {
+	apiKey := ctx.Param("token_value")
+	if apiKey == "" {
+		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(errors.New("api key is required"), nil))
+		return
+	}
+
+	quotas, err := h.c.GetAPIKeyQuotas(ctx.Request.Context(), apiKey)
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get API key quotas", slog.String("api_key", apiKey), slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	httpbase.OK(ctx, quotas)
+}
+
+// GetBuiltinKeys godoc
+// @Security     ApiKey
+// @Summary      Get or create builtin API key for an organization or user namespace
+// @Tags         API Key
+// @Accept       json
+// @Produce      json
+// @Param        uuid path string true "organization or user namespace uuid"
+// @Success      200  {object}  types.Response{data=types.CheckAccessTokenResp} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /namespaces/{uuid}/apikeys/builtin [get]
+func (h *AccessTokenHandler) GetBuiltinKeys(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	userUUID := httpbase.GetCurrentUserUUID(ctx)
+
+	nsUUID := ctx.Param("uuid")
+	if nsUUID == "" {
+		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(errors.New("namespace uuid is required"), nil))
+		return
+	}
+
+	req := &types.GetAccessTokenRequest{
+		Username:    currentUser,
+		OpUUID:      userUUID,
+		NSUUID:      nsUUID,
+		Application: types.AccessTokenAppAIGateway,
+	}
+
+	key, err := h.c.GetOrCreateBuiltinAPIKey(ctx.Request.Context(), req)
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get or create builtin API key", slog.Any("req", req), slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	httpbase.OK(ctx, key)
+}
+
+// RefreshBuiltinKey godoc
+// @Security     ApiKey
+// @Summary      Refresh builtin API key for an organization or user namespace
+// @Tags         API Key
+// @Accept       json
+// @Produce      json
+// @Param        uuid path string true "organization or user namespace uuid"
+// @Success      200  {object}  types.Response{data=types.CheckAccessTokenResp} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      403  {object}  error "Forbidden - user is not org admin"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /namespaces/{uuid}/apikeys/builtin/refresh [put]
+func (h *AccessTokenHandler) RefreshBuiltinKey(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	userUUID := httpbase.GetCurrentUserUUID(ctx)
+
+	nsUUID := ctx.Param("uuid")
+	if nsUUID == "" {
+		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(errors.New("namespace uuid is required"), nil))
+		return
+	}
+
+	req := &types.RefreshTokenReq{
+		NSUUID:    nsUUID,
+		OpUUID:    userUUID,
+		Username:  currentUser,
+		TokenName: string(types.AccessTokenTypeBuiltIn),
+		App:       string(types.AccessTokenAppAIGateway),
+	}
+
+	token, err := h.c.RefreshToken(ctx.Request.Context(), req)
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "Failed to refresh builtin API key", slog.Any("req", req), slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	httpbase.OK(ctx, token)
 }

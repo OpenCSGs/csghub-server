@@ -43,6 +43,7 @@ func NewRouter(config *config.Config) (*gin.Engine, func(), error) {
 	middlewareCollection.Auth.NeedPhoneVerified = middleware.NeedPhoneVerified(config)
 	middlewareCollection.Auth.NeedAccessToken = middleware.NeedAccessToken()
 	middlewareCollection.License.Check = middleware.CheckLicense(config)
+	middlewareCollection.Auth.MustUserOrgApiKey = middleware.MustUserOrgApiKey(config)
 
 	v1Group := r.Group("/v1")
 
@@ -51,11 +52,11 @@ func NewRouter(config *config.Config) (*gin.Engine, func(), error) {
 		return nil, nil, fmt.Errorf("error creating openai handler :%w", err)
 	}
 	v1Group.GET("/models", openAIhandler.ListModels)
-	v1Group.GET("/models/*model", middlewareCollection.Auth.NeedLogin, openAIhandler.GetModel)
-	v1Group.POST("/chat/completions", middlewareCollection.Auth.NeedLogin, openAIhandler.Chat)
-	v1Group.POST("/embeddings", middlewareCollection.Auth.NeedLogin, openAIhandler.Embedding)
-	v1Group.POST("/images/generations", middlewareCollection.Auth.NeedLogin, openAIhandler.GenerateImage)
-	v1Group.POST("/audio/transcriptions", middlewareCollection.Auth.NeedLogin, openAIhandler.Transcription)
+	v1Group.GET("/models/*model", openAIhandler.GetModel)
+	v1Group.POST("/chat/completions", middlewareCollection.Auth.MustUserOrgApiKey, openAIhandler.Chat)
+	v1Group.POST("/embeddings", middlewareCollection.Auth.MustUserOrgApiKey, openAIhandler.Embedding)
+	v1Group.POST("/images/generations", middlewareCollection.Auth.MustUserOrgApiKey, openAIhandler.GenerateImage)
+	v1Group.POST("/audio/transcriptions", middlewareCollection.Auth.MustUserOrgApiKey, openAIhandler.Transcription)
 
 	apiV1Group := r.Group("/api/v1")
 	adminGroup := apiV1Group.Group("/admin", middlewareCollection.Auth.NeedAdmin)

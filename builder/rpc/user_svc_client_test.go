@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/builder/git/membership"
+	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -549,4 +550,79 @@ func TestGetMemberRoleByUUID_DataConversionError(t *testing.T) {
 
 	assert.Error(t, err)
 	assert.Equal(t, membership.RoleUnknown, role)
+}
+
+func TestGetAPIKeyQuotas_Success(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/api/v1/token/test-key-name/quotas", r.URL.Path)
+		assert.Equal(t, http.MethodGet, r.Method)
+
+		resp := struct {
+			Msg  string                             `json:"msg"`
+			Data []database.AccountAccessTokenQuota `json:"data"`
+		}{
+			Data: []database.AccountAccessTokenQuota{
+				{QuotaType: types.AccountingQuotaTypeMonthly, ValueType: types.AccountingQuotaValueTypeFee, Usage: 50, Quota: 100},
+				{QuotaType: types.AccountingQuotaTotal, ValueType: types.AccountingQuotaValueTypeFee, Usage: 200, Quota: 1000},
+			},
+		}
+		err := json.NewEncoder(w).Encode(resp)
+		assert.NoError(t, err)
+	}))
+	defer server.Close()
+
+	client := setupTestClient(server)
+
+	quotas, err := client.GetTokenQuotas(context.Background(), "test-key-name")
+
+	assert.NoError(t, err)
+	assert.NotNil(t, quotas)
+	assert.Len(t, quotas, 2)
+	assert.Equal(t, types.AccountingQuotaTypeMonthly, quotas[0].QuotaType)
+	assert.Equal(t, types.AccountingQuotaValueTypeFee, quotas[0].ValueType)
+	assert.Equal(t, float64(50), quotas[0].Usage)
+	assert.Equal(t, float64(100), quotas[0].Quota)
+	assert.Equal(t, types.AccountingQuotaTotal, quotas[1].QuotaType)
+	assert.Equal(t, types.AccountingQuotaValueTypeFee, quotas[1].ValueType)
+	assert.Equal(t, float64(200), quotas[1].Usage)
+	assert.Equal(t, float64(1000), quotas[1].Quota)
+}
+
+func TestGetAPIKeyQuotas_Failure(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	client := setupTestClient(server)
+
+	quotas, err := client.GetTokenQuotas(context.Background(), "test-key-name")
+
+	assert.Error(t, err)
+	assert.Nil(t, quotas)
+}
+
+func TestGetAPIKeyQuotas_EmptyResult(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/api/v1/token/test-key/quotas", r.URL.Path)
+		assert.Equal(t, http.MethodGet, r.Method)
+
+		resp := struct {
+			Msg  string                             `json:"msg"`
+			Data []database.AccountAccessTokenQuota `json:"data"`
+		}{
+			Data: []database.AccountAccessTokenQuota{},
+		}
+		err := json.NewEncoder(w).Encode(resp)
+		assert.NoError(t, err)
+	}))
+	defer server.Close()
+
+	client := setupTestClient(server)
+
+	quotas, err := client.GetTokenQuotas(context.Background(), "test-key")
+
+	assert.NoError(t, err)
+	assert.NotNil(t, quotas)
+	assert.Len(t, quotas, 0)
 }

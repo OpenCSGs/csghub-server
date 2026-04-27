@@ -35,6 +35,10 @@ type AccessTokenStore interface {
 	DeleteByID(ctx context.Context, id int64) error
 	// FindByNsUUID finds gateway API keys by namespace uuid
 	FindByNsUUID(ctx context.Context, nsUUID string, app string) ([]AccessToken, error)
+	// FindBuiltinByNsUUID finds first builtin API key by namespace uuid
+	FindBuiltinByNsUUID(ctx context.Context, nsUUID string, app string) (*AccessToken, error)
+	// UpdateToken updates a gateway API key token value
+	UpdateToken(ctx context.Context, token *AccessToken) error
 }
 
 func NewAccessTokenStoreWithDB(db *DB) AccessTokenStore {
@@ -61,7 +65,8 @@ type AccessToken struct {
 	ExpiredAt   time.Time            `bun:",nullzero" json:"expired_at"`
 	DeletedAt   time.Time            `bun:",soft_delete,nullzero"`
 	// namespace uuid for gateway api key
-	NsUUID string `bun:",nullzero" json:"ns_uuid"` // ns uuid
+	NsUUID    string                `bun:",nullzero" json:"ns_uuid"` // ns uuid
+	TokenType types.AccessTokenType `bun:",notnull,default:''" json:"token_type"`
 	times
 }
 
@@ -313,10 +318,45 @@ func (s *accessTokenStoreImpl) FindByNsUUID(ctx context.Context, nsUUID string, 
 		NewSelect().
 		Model(&tokens).
 		Where("app = ? and ns_uuid = ? and is_active = true", app, nsUUID).
+		Order("token_type ASC").
 		Order("id DESC").
 		Scan(ctx)
 	if err != nil {
 		return nil, errorx.HandleDBError(err, nil)
 	}
 	return tokens, nil
+}
+
+func findByTokenValue(ctx context.Context, tx bun.Tx, tokenValue string) (*AccessToken, error) {
+	var token AccessToken
+	err := tx.NewSelect().Model(&token).Where("token = ?", tokenValue).Scan(ctx)
+	if err != nil {
+		return nil, errorx.HandleDBError(err, nil)
+	}
+	return &token, nil
+}
+
+// FindBuiltinByNsUUID finds first builtin API key by namespace uuid
+func (s *accessTokenStoreImpl) FindBuiltinByNsUUID(ctx context.Context, nsUUID string, app string) (*AccessToken, error) {
+	var token AccessToken
+	err := s.db.Operator.Core.
+		NewSelect().
+		Model(&token).
+		Where("app = ? and ns_uuid = ? and token_type = ? and is_active = true", app, nsUUID, types.AccessTokenTypeBuiltIn).
+		Limit(1).
+		Scan(ctx)
+	if err != nil {
+		return nil, errorx.HandleDBError(err, nil)
+	}
+	return &token, nil
+}
+
+// UpdateToken updates a gateway API key token value
+func (s *accessTokenStoreImpl) UpdateToken(ctx context.Context, token *AccessToken) error {
+	_, err := s.db.Operator.Core.
+		NewUpdate().
+		Model(token).
+		WherePK().
+		Exec(ctx)
+	return errorx.HandleDBError(err, nil)
 }

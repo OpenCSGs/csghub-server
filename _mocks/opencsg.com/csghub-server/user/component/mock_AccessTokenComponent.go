@@ -8,8 +8,6 @@ import (
 	mock "github.com/stretchr/testify/mock"
 	database "opencsg.com/csghub-server/builder/store/database"
 
-	time "time"
-
 	types "opencsg.com/csghub-server/common/types"
 )
 
@@ -189,6 +187,124 @@ func (_c *MockAccessTokenComponent_Delete_Call) RunAndReturn(run func(context.Co
 	return _c
 }
 
+// GetAPIKeyQuotas provides a mock function with given fields: ctx, apiKey
+func (_m *MockAccessTokenComponent) GetAPIKeyQuotas(ctx context.Context, apiKey string) ([]database.AccountAccessTokenQuota, error) {
+	ret := _m.Called(ctx, apiKey)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetAPIKeyQuotas")
+	}
+
+	var r0 []database.AccountAccessTokenQuota
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) ([]database.AccountAccessTokenQuota, error)); ok {
+		return rf(ctx, apiKey)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) []database.AccountAccessTokenQuota); ok {
+		r0 = rf(ctx, apiKey)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.AccountAccessTokenQuota)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, apiKey)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccessTokenComponent_GetAPIKeyQuotas_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetAPIKeyQuotas'
+type MockAccessTokenComponent_GetAPIKeyQuotas_Call struct {
+	*mock.Call
+}
+
+// GetAPIKeyQuotas is a helper method to define mock.On call
+//   - ctx context.Context
+//   - apiKey string
+func (_e *MockAccessTokenComponent_Expecter) GetAPIKeyQuotas(ctx interface{}, apiKey interface{}) *MockAccessTokenComponent_GetAPIKeyQuotas_Call {
+	return &MockAccessTokenComponent_GetAPIKeyQuotas_Call{Call: _e.mock.On("GetAPIKeyQuotas", ctx, apiKey)}
+}
+
+func (_c *MockAccessTokenComponent_GetAPIKeyQuotas_Call) Run(run func(ctx context.Context, apiKey string)) *MockAccessTokenComponent_GetAPIKeyQuotas_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockAccessTokenComponent_GetAPIKeyQuotas_Call) Return(_a0 []database.AccountAccessTokenQuota, _a1 error) *MockAccessTokenComponent_GetAPIKeyQuotas_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccessTokenComponent_GetAPIKeyQuotas_Call) RunAndReturn(run func(context.Context, string) ([]database.AccountAccessTokenQuota, error)) *MockAccessTokenComponent_GetAPIKeyQuotas_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetOrCreateBuiltinAPIKey provides a mock function with given fields: ctx, req
+func (_m *MockAccessTokenComponent) GetOrCreateBuiltinAPIKey(ctx context.Context, req *types.GetAccessTokenRequest) (*types.CheckAccessTokenResp, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetOrCreateBuiltinAPIKey")
+	}
+
+	var r0 *types.CheckAccessTokenResp
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *types.GetAccessTokenRequest) (*types.CheckAccessTokenResp, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *types.GetAccessTokenRequest) *types.CheckAccessTokenResp); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.CheckAccessTokenResp)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *types.GetAccessTokenRequest) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccessTokenComponent_GetOrCreateBuiltinAPIKey_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetOrCreateBuiltinAPIKey'
+type MockAccessTokenComponent_GetOrCreateBuiltinAPIKey_Call struct {
+	*mock.Call
+}
+
+// GetOrCreateBuiltinAPIKey is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req *types.GetAccessTokenRequest
+func (_e *MockAccessTokenComponent_Expecter) GetOrCreateBuiltinAPIKey(ctx interface{}, req interface{}) *MockAccessTokenComponent_GetOrCreateBuiltinAPIKey_Call {
+	return &MockAccessTokenComponent_GetOrCreateBuiltinAPIKey_Call{Call: _e.mock.On("GetOrCreateBuiltinAPIKey", ctx, req)}
+}
+
+func (_c *MockAccessTokenComponent_GetOrCreateBuiltinAPIKey_Call) Run(run func(ctx context.Context, req *types.GetAccessTokenRequest)) *MockAccessTokenComponent_GetOrCreateBuiltinAPIKey_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*types.GetAccessTokenRequest))
+	})
+	return _c
+}
+
+func (_c *MockAccessTokenComponent_GetOrCreateBuiltinAPIKey_Call) Return(_a0 *types.CheckAccessTokenResp, _a1 error) *MockAccessTokenComponent_GetOrCreateBuiltinAPIKey_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccessTokenComponent_GetOrCreateBuiltinAPIKey_Call) RunAndReturn(run func(context.Context, *types.GetAccessTokenRequest) (*types.CheckAccessTokenResp, error)) *MockAccessTokenComponent_GetOrCreateBuiltinAPIKey_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetOrCreateFirstAvaiToken provides a mock function with given fields: ctx, userName, app, tokenName
 func (_m *MockAccessTokenComponent) GetOrCreateFirstAvaiToken(ctx context.Context, userName string, app string, tokenName string) (string, error) {
 	ret := _m.Called(ctx, userName, app, tokenName)
@@ -307,9 +423,9 @@ func (_c *MockAccessTokenComponent_GetTokens_Call) RunAndReturn(run func(context
 	return _c
 }
 
-// RefreshToken provides a mock function with given fields: ctx, userName, tokenName, app, newExpiredAt
-func (_m *MockAccessTokenComponent) RefreshToken(ctx context.Context, userName string, tokenName string, app string, newExpiredAt time.Time) (types.CheckAccessTokenResp, error) {
-	ret := _m.Called(ctx, userName, tokenName, app, newExpiredAt)
+// RefreshToken provides a mock function with given fields: ctx, req
+func (_m *MockAccessTokenComponent) RefreshToken(ctx context.Context, req *types.RefreshTokenReq) (types.CheckAccessTokenResp, error) {
+	ret := _m.Called(ctx, req)
 
 	if len(ret) == 0 {
 		panic("no return value specified for RefreshToken")
@@ -317,17 +433,17 @@ func (_m *MockAccessTokenComponent) RefreshToken(ctx context.Context, userName s
 
 	var r0 types.CheckAccessTokenResp
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, time.Time) (types.CheckAccessTokenResp, error)); ok {
-		return rf(ctx, userName, tokenName, app, newExpiredAt)
+	if rf, ok := ret.Get(0).(func(context.Context, *types.RefreshTokenReq) (types.CheckAccessTokenResp, error)); ok {
+		return rf(ctx, req)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, time.Time) types.CheckAccessTokenResp); ok {
-		r0 = rf(ctx, userName, tokenName, app, newExpiredAt)
+	if rf, ok := ret.Get(0).(func(context.Context, *types.RefreshTokenReq) types.CheckAccessTokenResp); ok {
+		r0 = rf(ctx, req)
 	} else {
 		r0 = ret.Get(0).(types.CheckAccessTokenResp)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, time.Time) error); ok {
-		r1 = rf(ctx, userName, tokenName, app, newExpiredAt)
+	if rf, ok := ret.Get(1).(func(context.Context, *types.RefreshTokenReq) error); ok {
+		r1 = rf(ctx, req)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -342,17 +458,14 @@ type MockAccessTokenComponent_RefreshToken_Call struct {
 
 // RefreshToken is a helper method to define mock.On call
 //   - ctx context.Context
-//   - userName string
-//   - tokenName string
-//   - app string
-//   - newExpiredAt time.Time
-func (_e *MockAccessTokenComponent_Expecter) RefreshToken(ctx interface{}, userName interface{}, tokenName interface{}, app interface{}, newExpiredAt interface{}) *MockAccessTokenComponent_RefreshToken_Call {
-	return &MockAccessTokenComponent_RefreshToken_Call{Call: _e.mock.On("RefreshToken", ctx, userName, tokenName, app, newExpiredAt)}
+//   - req *types.RefreshTokenReq
+func (_e *MockAccessTokenComponent_Expecter) RefreshToken(ctx interface{}, req interface{}) *MockAccessTokenComponent_RefreshToken_Call {
+	return &MockAccessTokenComponent_RefreshToken_Call{Call: _e.mock.On("RefreshToken", ctx, req)}
 }
 
-func (_c *MockAccessTokenComponent_RefreshToken_Call) Run(run func(ctx context.Context, userName string, tokenName string, app string, newExpiredAt time.Time)) *MockAccessTokenComponent_RefreshToken_Call {
+func (_c *MockAccessTokenComponent_RefreshToken_Call) Run(run func(ctx context.Context, req *types.RefreshTokenReq)) *MockAccessTokenComponent_RefreshToken_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string), args[4].(time.Time))
+		run(args[0].(context.Context), args[1].(*types.RefreshTokenReq))
 	})
 	return _c
 }
@@ -362,7 +475,7 @@ func (_c *MockAccessTokenComponent_RefreshToken_Call) Return(_a0 types.CheckAcce
 	return _c
 }
 
-func (_c *MockAccessTokenComponent_RefreshToken_Call) RunAndReturn(run func(context.Context, string, string, string, time.Time) (types.CheckAccessTokenResp, error)) *MockAccessTokenComponent_RefreshToken_Call {
+func (_c *MockAccessTokenComponent_RefreshToken_Call) RunAndReturn(run func(context.Context, *types.RefreshTokenReq) (types.CheckAccessTokenResp, error)) *MockAccessTokenComponent_RefreshToken_Call {
 	_c.Call.Return(run)
 	return _c
 }

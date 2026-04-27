@@ -31,8 +31,8 @@ type OpenAIComponent interface {
 	GetAvailableModels(c context.Context, user string) ([]types.Model, error)
 	ListModels(c context.Context, user string, req types.ListModelsReq) (types.ModelList, error)
 	GetModelByID(c context.Context, username, modelID string) (*types.Model, error)
-	RecordUsage(c context.Context, userUUID string, model *types.Model, tokenCounter token.Counter) error
-	CheckBalance(ctx context.Context, username, userUUID string) error
+	RecordUsage(c context.Context, nsUUID string, model *types.Model, tokenCounter token.Counter, apikey string) error
+	CheckBalance(ctx context.Context, nsUUID string) error
 }
 
 type openaiComponentImpl struct {
@@ -548,6 +548,7 @@ type tokenUsageMeteringExtra struct {
 	PromptTokenNum     string                     `json:"prompt_token_num"`
 	CompletionTokenNum string                     `json:"completion_token_num"`
 	OwnerType          commontypes.TokenUsageType `json:"owner_type"`
+	APIKey             string                     `json:"api_key"`
 }
 
 func validateModelForUsageRecord(c context.Context, model *types.Model) error {
@@ -567,7 +568,7 @@ func validateModelForUsageRecord(c context.Context, model *types.Model) error {
 	return nil
 }
 
-func (m *openaiComponentImpl) tokenUsageMeteringExtraAndScene(c context.Context, userUUID string, model *types.Model, usage *token.Usage) (tokenUsageMeteringExtra, commontypes.SceneType, error) {
+func (m *openaiComponentImpl) tokenUsageMeteringExtraAndScene(c context.Context, nsUUID string, model *types.Model, usage *token.Usage) (tokenUsageMeteringExtra, commontypes.SceneType, error) {
 	scene := commontypes.SceneModelServerless
 	extra := tokenUsageMeteringExtra{
 		PromptTokenNum:     fmt.Sprintf("%d", usage.PromptTokens),
@@ -578,10 +579,10 @@ func (m *openaiComponentImpl) tokenUsageMeteringExtraAndScene(c context.Context,
 		case commontypes.ServerlessType:
 			extra.OwnerType = commontypes.CSGHubServerlessInference
 		case commontypes.InferenceType:
-			if model.OwnerUUID == userUUID {
+			if model.OwnerUUID == nsUUID {
 				extra.OwnerType = commontypes.CSGHubUserDeployedInference
 			} else {
-				belong, err := m.checkOrganization(c, userUUID, model.OwnerUUID)
+				belong, err := m.checkOrganization(c, nsUUID, model.OwnerUUID)
 				if err != nil {
 					return tokenUsageMeteringExtra{}, 0, fmt.Errorf("failed to check organization: %w", err)
 				}
@@ -602,7 +603,7 @@ func (m *openaiComponentImpl) tokenUsageMeteringExtraAndScene(c context.Context,
 	return extra, scene, nil
 }
 
-func (m *openaiComponentImpl) RecordUsage(c context.Context, userUUID string, model *types.Model, counter token.Counter) error {
+func (m *openaiComponentImpl) RecordUsage(c context.Context, nsUUID string, model *types.Model, counter token.Counter, apikey string) error {
 	usage, err := counter.Usage(c)
 	if err != nil {
 		return fmt.Errorf("failed to get token usage from counter: %w", err)
@@ -619,26 +620,27 @@ func (m *openaiComponentImpl) RecordUsage(c context.Context, userUUID string, mo
 		slog.ErrorContext(c, "cannot record usage: empty resource id for model", slog.Any("model", model))
 		return fmt.Errorf("cannot record usage: empty resource id")
 	}
-	extra, scene, err := m.tokenUsageMeteringExtraAndScene(c, userUUID, model, usage)
+	extra, scene, err := m.tokenUsageMeteringExtraAndScene(c, nsUUID, model, usage)
 	if err != nil {
 		return err
 	}
+	extra.APIKey = apikey
 	extraData, err := json.Marshal(extra)
 	if err != nil {
 		return fmt.Errorf("failed to marshal token usage extra: %w", err)
 	}
 	event := commontypes.MeteringEvent{
 		Uuid:         uuid.New(),
-		UserUUID:     userUUID,
+		UserUUID:     nsUUID,
 		Value:        usage.TotalTokens,
 		ValueType:    commontypes.TokenNumberType,
 		Scene:        int(scene),
-		OpUID:        "aigateway",
-		CreatedAt:    time.Now(),
-		Extra:        string(extraData),
+		OpUID:        string(commontypes.AccessTokenAppAIGateway),
 		ResourceID:   res.ResourceID,
 		ResourceName: res.ResourceName,
 		CustomerID:   res.CustomerID,
+		CreatedAt:    time.Now(),
+		Extra:        string(extraData),
 	}
 	eventData, err := json.Marshal(event)
 	if err != nil {
@@ -654,20 +656,20 @@ func (m *openaiComponentImpl) RecordUsage(c context.Context, userUUID string, mo
 	return nil
 }
 
-func (m *openaiComponentImpl) checkOrganization(c context.Context, userUUID string, ownerUUID string) (bool, error) {
-	user, err := m.userStore.FindByUUID(c, userUUID)
+func (m *openaiComponentImpl) checkOrganization(c context.Context, nsUUID string, ownerUUID string) (bool, error) {
+	user, err := m.userStore.FindByUUID(c, nsUUID)
 	if err != nil {
-		slog.ErrorContext(c, "Failed to find user in db")
+		slog.ErrorContext(c, "Failed to find user", slog.Any("nsUUID", nsUUID), slog.Any("error", err))
 		return false, err
 	}
 	owner, err := m.userStore.FindByUUID(c, ownerUUID)
 	if err != nil {
-		slog.ErrorContext(c, "Failed to find owner in db")
+		slog.ErrorContext(c, "Failed to find owner", slog.Any("ownerUUID", ownerUUID), slog.Any("error", err))
 		return false, err
 	}
 	userOrgs, err := m.organStore.GetUserBelongOrgs(c, user.ID)
 	if err != nil {
-		slog.ErrorContext(c, "Failed to find user organizations")
+		slog.ErrorContext(c, "Failed to find user organizations", slog.Any("userid", user.ID), slog.Any("error", err))
 		return false, err
 	}
 	if len(userOrgs) == 0 {
@@ -675,7 +677,7 @@ func (m *openaiComponentImpl) checkOrganization(c context.Context, userUUID stri
 	}
 	ownerOrgs, err := m.organStore.GetUserBelongOrgs(c, owner.ID)
 	if err != nil {
-		slog.ErrorContext(c, "Failed to find owner organizations")
+		slog.ErrorContext(c, "Failed to find owner organizations", slog.Any("ownerUUID", ownerUUID), slog.Any("error", err))
 		return false, err
 	}
 	if len(ownerOrgs) == 0 {

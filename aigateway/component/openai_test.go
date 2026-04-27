@@ -988,7 +988,7 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.setupMock()
 
-			err := comp.RecordUsage(context.Background(), tt.userUUID, tt.model, mockCounter)
+			err := comp.RecordUsage(context.Background(), tt.userUUID, tt.model, mockCounter, "")
 			if tt.wantError {
 				assert.Error(t, err)
 			} else {
@@ -1195,7 +1195,7 @@ func TestOpenAIComponentImpl_RecordUsage_ExternalModel(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.setupMock()
 
-			err := comp.RecordUsage(context.Background(), tt.userUUID, tt.model, mockCounter)
+			err := comp.RecordUsage(context.Background(), tt.userUUID, tt.model, mockCounter, "")
 			if tt.wantError {
 				assert.Error(t, err)
 			} else {

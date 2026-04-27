@@ -22,6 +22,7 @@ const (
 	PromptTokenNum     = "prompt_token_num"
 	CompletionTokenNum = "completion_token_num"
 	OwnerType          = "owner_type"
+	ConsumeApiKey      = "api_key"
 )
 
 type OrderStatus int
@@ -159,6 +160,7 @@ type AcctEventReq struct {
 	RegularValue     float64         `json:"regular_value"`
 	PromptToken      float64         `json:"prompt_token"`
 	CompletionToken  float64         `json:"completion_token"`
+	ApiKey           string          `json:"api_key"`
 }
 
 // generate charge event from client

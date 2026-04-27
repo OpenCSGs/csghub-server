@@ -8,6 +8,7 @@ import (
 
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/builder/git/membership"
+	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -27,6 +28,7 @@ type UserSvcClient interface {
 	FindByUUIDs(ctx context.Context, uuids []string) (map[string]*types.User, error)
 	GetUserUUIDs(ctx context.Context, per, page int) ([]string, int, error)
 	GetEmails(ctx context.Context, per, page int) ([]string, int, error)
+	GetTokenQuotas(ctx context.Context, keyName string) ([]database.AccountAccessTokenQuota, error)
 }
 
 //go:generate mockgen -destination=mocks/client.go -package=mocks . Client
@@ -308,4 +310,22 @@ func (c *UserSvcHttpClient) GetEmails(ctx context.Context, per, page int) ([]str
 				Set("page", page))
 	}
 	return resp.Data, resp.Total, nil
+}
+
+func (c *UserSvcHttpClient) GetTokenQuotas(ctx context.Context, keyName string) ([]database.AccountAccessTokenQuota, error) {
+	url := fmt.Sprintf("/api/v1/token/%s/quotas", keyName)
+	var resp struct {
+		Msg  string                             `json:"msg"`
+		Data []database.AccountAccessTokenQuota `json:"data"`
+	}
+	err := c.hc.Get(ctx, url, &resp)
+	if err != nil {
+		slog.ErrorContext(ctx, "call user service failed", slog.String("error", err.Error()))
+		return nil, errorx.RemoteSvcFail(err,
+			errorx.Ctx().
+				Set("service", "user service").
+				Set("action", "get API key quotas").
+				Set("keyName", keyName))
+	}
+	return resp.Data, nil
 }

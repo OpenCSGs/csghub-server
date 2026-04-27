@@ -106,18 +106,18 @@ func newOpenAIHandler(
 
 // handleInsufficientBalance handles the insufficient balance error response
 // for both stream and non-stream requests
-func (h *OpenAIHandlerImpl) handleInsufficientBalance(c *gin.Context, isStream bool, username, modelID string, err error) {
+func (h *OpenAIHandlerImpl) handleInsufficientBalance(c *gin.Context, isStream bool, nsUUID, modelID string, err error) {
 	// Check if the error is the standard insufficient balance error
 	if !errors.Is(err, errorx.ErrInsufficientBalance) {
 		// If it's a different error, log and return generic error
-		slog.ErrorContext(c.Request.Context(), "balance check failed",
-			"user", username, "model", modelID, "error", err)
+		slog.ErrorContext(c.Request.Context(), "balance check failed", slog.Any("ns_uuid", nsUUID),
+			slog.Any("model", modelID), slog.Any("error", err))
 		httpbase.ServerError(c, err)
 		return
 	}
 
 	slog.WarnContext(c.Request.Context(), "insufficient balance for request",
-		"user", username, "model", modelID)
+		slog.Any("ns_uuid", nsUUID), slog.Any("model", modelID))
 
 	if isStream {
 		// For stream requests, write error chunk
@@ -133,7 +133,7 @@ func (h *OpenAIHandlerImpl) handleInsufficientBalance(c *gin.Context, isStream b
 	}
 }
 
-func (h *OpenAIHandlerImpl) checkSensitive(ctx context.Context, model *types.Model, chatReq *ChatCompletionRequest, userUUID string, stream bool) (bool, *rpc.CheckResult, error) {
+func (h *OpenAIHandlerImpl) checkSensitive(ctx context.Context, model *types.Model, chatReq *ChatCompletionRequest, nsUUID string, stream bool) (bool, *rpc.CheckResult, error) {
 	if !model.NeedSensitiveCheck {
 		return false, nil, nil
 	}
@@ -148,7 +148,7 @@ func (h *OpenAIHandlerImpl) checkSensitive(ctx context.Context, model *types.Mod
 		return false, nil, nil
 	}
 
-	key := fmt.Sprintf("%s:%s", userUUID, model.ID)
+	key := fmt.Sprintf("%s:%s", nsUUID, model.ID)
 	result, err := h.modComponent.CheckChatPrompts(ctx, chatReq.Messages, key, stream)
 	if err != nil {
 		return false, nil, fmt.Errorf("failed to call moderation error:%w", err)
@@ -331,11 +331,12 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 		4.proxy request to running model endpoint
 	*/
 	username := httpbase.GetCurrentUser(c)
-	userUUID := httpbase.GetCurrentUserUUID(c)
+	nsUUID := httpbase.GetCurrentNamespaceUUID(c)
+	apikey := httpbase.GetAccessToken(c)
 	chatReq := &ChatCompletionRequest{}
 	if err := c.BindJSON(chatReq); err != nil {
-		slog.ErrorContext(c.Request.Context(), "invalid chat compoletion request body", "error", err.Error())
-		c.String(http.StatusBadRequest, fmt.Errorf("invalid chat compoletion request body:%w", err).Error())
+		slog.ErrorContext(c.Request.Context(), "invalid chat completion request body", slog.Any("error", err))
+		c.String(http.StatusBadRequest, fmt.Errorf("invalid chat completion request body:%w", err).Error())
 		return
 	}
 	modelID := chatReq.Model
@@ -357,8 +358,8 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 
 	// Check balance before processing request
 	if !modelTarget.Model.SkipBalance() {
-		if err := h.openaiComponent.CheckBalance(c.Request.Context(), username, userUUID); err != nil {
-			h.handleInsufficientBalance(c, chatReq.Stream, username, modelID, err)
+		if err := h.openaiComponent.CheckBalance(c.Request.Context(), nsUUID); err != nil {
+			h.handleInsufficientBalance(c, chatReq.Stream, nsUUID, modelID, err)
 			return
 		}
 	}
@@ -370,12 +371,12 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 	rp, err := proxy.NewReverseProxy(modelTarget.Target)
 	if err != nil {
 		slog.ErrorContext(c.Request.Context(), "failed to create reverse proxy", slog.Any("error", err))
-		c.String(http.StatusInternalServerError, fmt.Errorf("failed to create reverse proxy:%w", err).Error())
+		c.String(http.StatusInternalServerError, fmt.Errorf("failed to create reverse proxy error:%w", err).Error())
 		return
 	}
 
 	var modComponent component.Moderation = nil
-	isCheck, result, err := h.checkSensitive(c.Request.Context(), modelTarget.Model, chatReq, userUUID, chatReq.Stream)
+	isCheck, result, err := h.checkSensitive(c.Request.Context(), modelTarget.Model, chatReq, nsUUID, chatReq.Stream)
 	if err != nil {
 		slog.ErrorContext(c.Request.Context(), "failed to check sensitive",
 			slog.String("model_id", modelID),
@@ -390,8 +391,8 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 		}
 	}
 
-	slog.InfoContext(c.Request.Context(), "proxy chat request to model target", slog.Any("target", modelTarget.Target), slog.Any("host", modelTarget.Host),
-		slog.Any("user", username), slog.Any("model_name", modelTarget.ModelName))
+	slog.InfoContext(c.Request.Context(), "proxy chat request to model target", slog.Any("target", modelTarget.Target),
+		slog.Any("host", modelTarget.Host), slog.Any("ns_uuid", nsUUID), slog.Any("model_name", modelTarget.ModelName))
 
 	tokenCounter := h.tokenCounterFactory.NewChat(token.CreateParam{
 		Endpoint: modelTarget.Target,
@@ -404,7 +405,7 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 	logCapture, err := component.NewLLMLogRecorder(
 		trace.GetTraceIDInGinContext(c),
 		modelTarget.ModelName,
-		userUUID,
+		nsUUID,
 		commonType.LLMLogRequest{
 			Messages: chatReq.Messages,
 			Tools:    chatReq.Tools,
@@ -429,9 +430,10 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 
 	proxyToApi := ""
 	if modelTarget.Model.Endpoint != "" {
-		uri, err := url.ParseRequestURI(modelTarget.Model.Endpoint)
+		uri, err := url.ParseRequestURI(strings.TrimSpace(modelTarget.Model.Endpoint))
 		if err != nil {
-			slog.Warn("endpoint has wrong struct", slog.String("model", modelTarget.ModelName))
+			slog.Warn("endpoint has wrong struct", slog.String("model", modelTarget.ModelName),
+				slog.Any("endpoint", modelTarget.Model.Endpoint))
 		} else {
 			proxyToApi = uri.Path
 		}
@@ -447,7 +449,7 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 		usageCtx, cancel := context.WithTimeout(context.WithoutCancel(c.Request.Context()), 3*time.Second)
 		defer cancel()
 
-		err := h.openaiComponent.RecordUsage(usageCtx, userUUID, modelTarget.Model, tokenCounter)
+		err := h.openaiComponent.RecordUsage(usageCtx, nsUUID, modelTarget.Model, tokenCounter, apikey)
 		if err != nil {
 			slog.ErrorContext(usageCtx, "failed to record token usage", slog.Any("error", err))
 		}
@@ -491,7 +493,8 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 // @Router       /v1/images/generations [post]
 func (h *OpenAIHandlerImpl) GenerateImage(c *gin.Context) {
 	username := httpbase.GetCurrentUser(c)
-	userUUID := httpbase.GetCurrentUserUUID(c)
+	nsUUID := httpbase.GetCurrentNamespaceUUID(c)
+	apikey := httpbase.GetAccessToken(c)
 	ctx := c.Request.Context()
 
 	var req ImageGenerationRequest
@@ -523,8 +526,8 @@ func (h *OpenAIHandlerImpl) GenerateImage(c *gin.Context) {
 		return
 	}
 
-	if err := h.openaiComponent.CheckBalance(ctx, username, userUUID); err != nil {
-		h.handleInsufficientBalance(c, false, username, modelID, err)
+	if err := h.openaiComponent.CheckBalance(ctx, nsUUID); err != nil {
+		h.handleInsufficientBalance(c, false, nsUUID, modelID, err)
 		return
 	}
 
@@ -542,7 +545,7 @@ func (h *OpenAIHandlerImpl) GenerateImage(c *gin.Context) {
 		return
 	}
 
-	result, err := h.modComponent.CheckImagePrompts(ctx, req.Prompt, userUUID)
+	result, err := h.modComponent.CheckImagePrompts(ctx, req.Prompt, nsUUID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": types.Error{
 			Code: "moderation_error", Message: "failed to check image prompts: " + err.Error(), Type: "internal_error",
@@ -600,7 +603,7 @@ func (h *OpenAIHandlerImpl) GenerateImage(c *gin.Context) {
 	go func() {
 		usageCtx, cancel := context.WithTimeout(context.WithoutCancel(c.Request.Context()), 3*time.Second)
 		defer cancel()
-		if err := h.openaiComponent.RecordUsage(usageCtx, userUUID, modelTarget.Model, imageCounter); err != nil {
+		if err := h.openaiComponent.RecordUsage(usageCtx, nsUUID, modelTarget.Model, imageCounter, apikey); err != nil {
 			slog.ErrorContext(usageCtx, "failed to record image usage", slog.Any("error", err))
 		}
 	}()
@@ -638,7 +641,8 @@ func (h *OpenAIHandlerImpl) Embedding(c *gin.Context) {
 	}
 	modelID := req.Model
 	username := httpbase.GetCurrentUser(c)
-	userUUID := httpbase.GetCurrentUserUUID(c)
+	nsUUID := httpbase.GetCurrentNamespaceUUID(c)
+	apikey := httpbase.GetAccessToken(c)
 	modelTarget, err := h.resolveModelTarget(c.Request.Context(), username, modelID)
 	if err != nil {
 		handleModelTargetError(c, c.Request.Context(), modelID, "failed to get embedding target address", err)
@@ -646,8 +650,8 @@ func (h *OpenAIHandlerImpl) Embedding(c *gin.Context) {
 	}
 
 	// Check balance before processing request
-	if err := h.openaiComponent.CheckBalance(c.Request.Context(), username, userUUID); err != nil {
-		h.handleInsufficientBalance(c, false, username, modelID, err)
+	if err := h.openaiComponent.CheckBalance(c.Request.Context(), nsUUID); err != nil {
+		h.handleInsufficientBalance(c, false, nsUUID, modelID, err)
 		return
 	}
 
@@ -658,8 +662,7 @@ func (h *OpenAIHandlerImpl) Embedding(c *gin.Context) {
 	if err := applyModelAuthHeaders(c.Request.Header, modelTarget.Model); err != nil {
 		slog.WarnContext(c.Request.Context(), "invalid auth head", slog.String("model", modelTarget.ModelName), slog.Any("error", err))
 	}
-	slog.InfoContext(c, "proxy embedding request to model endpoint", slog.Any("target", modelTarget.Target), slog.Any("host", modelTarget.Host),
-		slog.Any("user", username), slog.Any("model_id", modelID))
+	slog.InfoContext(c, "proxy embedding request to model endpoint", slog.Any("target", modelTarget.Target), slog.Any("host", modelTarget.Host), slog.Any("user", username), slog.Any("model_id", modelID))
 	rp, _ := proxy.NewReverseProxy(modelTarget.Target)
 
 	tokenCounter := h.tokenCounterFactory.NewEmbedding(token.CreateParam{
@@ -679,7 +682,7 @@ func (h *OpenAIHandlerImpl) Embedding(c *gin.Context) {
 		usageCtx, cancel := context.WithTimeout(context.WithoutCancel(c.Request.Context()), 3*time.Second)
 		defer cancel()
 
-		err := h.openaiComponent.RecordUsage(usageCtx, userUUID, modelTarget.Model, tokenCounter)
+		err := h.openaiComponent.RecordUsage(usageCtx, nsUUID, modelTarget.Model, tokenCounter, apikey)
 		if err != nil {
 			slog.ErrorContext(c, "failed to record embedding token usage", "error", err)
 		}
@@ -702,7 +705,8 @@ func (h *OpenAIHandlerImpl) Embedding(c *gin.Context) {
 // @Router       /v1/audio/transcriptions [post]
 func (h *OpenAIHandlerImpl) Transcription(c *gin.Context) {
 	username := httpbase.GetCurrentUser(c)
-	userUUID := httpbase.GetCurrentUserUUID(c)
+	nsUUID := httpbase.GetCurrentNamespaceUUID(c)
+	apikey := httpbase.GetAccessToken(c)
 	ctx := c.Request.Context()
 
 	form, err := c.MultipartForm()
@@ -748,8 +752,8 @@ func (h *OpenAIHandlerImpl) Transcription(c *gin.Context) {
 	}
 
 	if !modelTarget.Model.SkipBalance() {
-		if err := h.openaiComponent.CheckBalance(ctx, username, userUUID); err != nil {
-			h.handleInsufficientBalance(c, false, username, modelID, err)
+		if err := h.openaiComponent.CheckBalance(ctx, nsUUID); err != nil {
+			h.handleInsufficientBalance(c, false, nsUUID, modelID, err)
 			return
 		}
 	}
@@ -781,8 +785,7 @@ func (h *OpenAIHandlerImpl) Transcription(c *gin.Context) {
 		}
 	}
 
-	slog.InfoContext(ctx, "proxy audio transcription request to model endpoint", slog.Any("target", modelTarget.Target), slog.Any("host", modelTarget.Host),
-		slog.Any("user", username), slog.Any("model_id", modelID), slog.Any("model_name", modelTarget.ModelName))
+	slog.InfoContext(ctx, "proxy audio transcription request to model endpoint", slog.Any("target", modelTarget.Target), slog.Any("host", modelTarget.Host), slog.Any("user", username), slog.Any("model_id", modelID), slog.Any("model_name", modelTarget.ModelName))
 
 	audioCounter := token.NewAudioUsageCounter(token.NewTokenizerImpl(modelTarget.Target, modelTarget.Host, modelTarget.ModelName, modelTarget.Model.ImageID, modelTarget.Model.Provider))
 	w := NewResponseWriterWrapperAudio(c.Writer, audioCounter)
@@ -792,7 +795,7 @@ func (h *OpenAIHandlerImpl) Transcription(c *gin.Context) {
 		usageCtx, cancel := context.WithTimeout(context.WithoutCancel(c.Request.Context()), 3*time.Second)
 		defer cancel()
 
-		if err := h.openaiComponent.RecordUsage(usageCtx, userUUID, modelTarget.Model, audioCounter); err != nil {
+		if err := h.openaiComponent.RecordUsage(usageCtx, nsUUID, modelTarget.Model, audioCounter, apikey); err != nil {
 			slog.ErrorContext(usageCtx, "failed to record audio transcription usage", slog.Any("error", err))
 		}
 	}()

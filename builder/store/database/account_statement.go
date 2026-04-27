@@ -73,6 +73,7 @@ type AccountStatement struct {
 	PromptToken      float64               `json:"prompt_token"`
 	CompletionToken  float64               `json:"completion_token"`
 	APIKey           string                `bun:",notnull,default:''" json:"api_key"`
+	TokenID          int64                 `bun:",notnull,default:0" json:"token_id"`
 }
 
 type AccountStatementRes struct {
@@ -182,6 +183,14 @@ func (as *accountStatementStoreImpl) deductFeeStatement(ctx context.Context, inp
 		}
 
 		var err error
+
+		if input.Scene == types.SceneModelServerless && len(input.APIKey) > 0 {
+			token, err := findByTokenValue(ctx, tx, input.APIKey)
+			if err != nil {
+				slog.WarnContext(ctx, "find token by value failed, error", slog.Any("error", err))
+			}
+			input.TokenID = token.ID
+		}
 
 		err = DeductAccountFee(ctx, tx, input, checkBalance)
 		if err != nil {
@@ -386,9 +395,10 @@ func updateFeeBill(ctx context.Context, tx bun.Tx, input AccountStatement) error
 		Consumption:     input.Consumption,
 		PromptToken:     input.PromptToken,
 		CompletionToken: input.CompletionToken,
-		APIKey:          input.APIKey,
+		Count:           1,
+		TokenID:         input.TokenID,
 	}
-	err := tx.NewSelect().Model(&bill).Where("bill_date = ? and user_uuid = ? and scene = ? and customer_id = ? and api_key = ?", input.EventDate, input.UserUUID, input.Scene, input.CustomerID, input.APIKey).For("UPDATE").Scan(ctx)
+	err := tx.NewSelect().Model(&bill).Where("bill_date = ? and user_uuid = ? and scene = ? and customer_id = ? and token_id = ?", input.EventDate, input.UserUUID, input.Scene, input.CustomerID, input.TokenID).For("UPDATE").Scan(ctx)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return fmt.Errorf("select statement, error:%w", err)
 	}
@@ -399,11 +409,18 @@ func updateFeeBill(ctx context.Context, tx bun.Tx, input AccountStatement) error
 		}
 	} else {
 		_, err = tx.NewUpdate().Model(&bill).
-			Where("bill_date = ? and user_uuid = ? and scene = ? and customer_id = ? and api_key = ?", input.EventDate, input.UserUUID, input.Scene, input.CustomerID, input.APIKey).
-			Set("value = value + ?, consumption = consumption + ?, prompt_token = prompt_token + ?, completion_token = completion_token + ?, updated_at=current_timestamp", input.Value, input.Consumption, input.PromptToken, input.CompletionToken).
+			Where("bill_date = ? and user_uuid = ? and scene = ? and customer_id = ? and token_id = ?", input.EventDate, input.UserUUID, input.Scene, input.CustomerID, input.TokenID).
+			Set("value = value + ?, consumption = consumption + ?, prompt_token = prompt_token + ?, completion_token = completion_token + ?, count = count + 1, updated_at=current_timestamp", input.Value, input.Consumption, input.PromptToken, input.CompletionToken).
 			Exec(ctx)
 		if err != nil {
 			return fmt.Errorf("update bill for %s, error:%w", input.EventUUID, err)
+		}
+	}
+
+	if len(input.APIKey) > 0 {
+		err := UpdateAPIKeyUsage(ctx, tx, input)
+		if err != nil {
+			slog.WarnContext(ctx, "failed to update api key usage", slog.Any("err", err), slog.String("api_key", input.APIKey))
 		}
 	}
 

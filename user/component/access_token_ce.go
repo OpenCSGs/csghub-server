@@ -44,3 +44,7 @@ func (c *accessTokenComponentImpl) updateAccessTokenQuota(ctx context.Context, k
 	}
 	return quota, nil
 }
+
+func (c *accessTokenComponentImpl) GetAPIKeyQuotas(ctx context.Context, apiKey string) ([]database.AccountAccessTokenQuota, error) {
+	return []database.AccountAccessTokenQuota{}, nil
+}

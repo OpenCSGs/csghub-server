@@ -298,8 +298,13 @@ func TestAccessTokenComponentImpl_RefreshToken(t *testing.T) {
 		ac := &accessTokenComponentImpl{
 			ts: mockTokenStore,
 		}
-
-		resp, err := ac.RefreshToken(context.Background(), "user1", "test_token_name", "git", time.Now().Add(time.Hour))
+		req := &types.RefreshTokenReq{
+			Username:     "user1",
+			TokenName:    "test_token_name",
+			App:          "git",
+			NewExpiredAt: time.Now().Add(time.Hour),
+		}
+		resp, err := ac.RefreshToken(context.Background(), req)
 		require.Error(t, err)
 		require.ErrorIs(t, err, errorx.ErrNotFound)
 		require.Empty(t, resp)
@@ -346,7 +351,14 @@ func TestAccessTokenComponentImpl_RefreshToken(t *testing.T) {
 			gs: mockGitServer,
 		}
 
-		resp, err := ac.RefreshToken(context.Background(), "user1", "test_token_name", "git", newToken.ExpiredAt)
+		req := &types.RefreshTokenReq{
+			Username:     "user1",
+			TokenName:    "test_token_name",
+			App:          "git",
+			NewExpiredAt: newToken.ExpiredAt,
+		}
+
+		resp, err := ac.RefreshToken(context.Background(), req)
 		require.NoError(t, err)
 		require.Equal(t, newTokenValue, resp.Token)
 		require.Equal(t, "test_token_name", resp.TokenName)
@@ -482,7 +494,7 @@ func TestAccessTokenComponentImpl_Update(t *testing.T) {
 				Token:       tokenValue,
 				NsUUID:      nsUUID,
 				IsActive:    true,
-				Application: types.AccessTokenAPIKey,
+				Application: types.AccessTokenAppAIGateway,
 				Name:        "old-key-name",
 			}, nil).Once()
 
@@ -510,22 +522,27 @@ func TestAccessTokenComponentImpl_Update(t *testing.T) {
 				},
 			}, nil).Once()
 
+		mockBillStore := mockdb.NewMockAccountBillStore(t)
+		mockBillStore.EXPECT().SumValueByAPIKeyBetween(mock.Anything, mock.AnythingOfType("int64"), mock.Anything, mock.Anything).
+			Return(float64(50.0), nil).Maybe()
+
 		mockTokenStore.EXPECT().UpdateTokenAndQuota(mock.Anything, mock.AnythingOfType("*database.AccessToken"), mock.AnythingOfType("*database.AccountAccessTokenQuota")).
 			Return(&database.AccessToken{
 				ID:          1,
 				Token:       tokenValue,
 				NsUUID:      nsUUID,
 				IsActive:    true,
-				Application: types.AccessTokenAPIKey,
+				Application: types.AccessTokenAppAIGateway,
 				Name:        keyName,
 				ExpiredAt:   expiredAt,
 			}, nil).Once()
 
 		ac := &accessTokenComponentImpl{
-			ts:              mockTokenStore,
-			nsStore:         mockNsStore,
-			us:              mockUserStore,
-			tokenQuotaStore: mockQuotaStore,
+			ts:               mockTokenStore,
+			nsStore:          mockNsStore,
+			us:               mockUserStore,
+			tokenQuotaStore:  mockQuotaStore,
+			accountBillStore: mockBillStore,
 		}
 
 		resp, err := ac.Update(context.Background(), &types.UpdateAPIKeyRequest{
@@ -558,7 +575,7 @@ func TestAccessTokenComponentImpl_Update(t *testing.T) {
 				Token:       tokenValue,
 				NsUUID:      nsUUID,
 				IsActive:    true,
-				Application: types.AccessTokenAPIKey,
+				Application: types.AccessTokenAppAIGateway,
 				Name:        "old-org-key",
 			}, nil).Once()
 
@@ -584,22 +601,25 @@ func TestAccessTokenComponentImpl_Update(t *testing.T) {
 		mockQuotaStore.EXPECT().Create(mock.Anything, mock.AnythingOfType("*database.AccountAccessTokenQuota")).
 			Return(nil).Once()
 
+		mockBillStore := mockdb.NewMockAccountBillStore(t)
+
 		mockTokenStore.EXPECT().UpdateTokenAndQuota(mock.Anything, mock.AnythingOfType("*database.AccessToken"), mock.AnythingOfType("*database.AccountAccessTokenQuota")).
 			Return(&database.AccessToken{
 				ID:          1,
 				Token:       tokenValue,
 				NsUUID:      nsUUID,
 				IsActive:    true,
-				Application: types.AccessTokenAPIKey,
+				Application: types.AccessTokenAppAIGateway,
 				Name:        keyName,
 			}, nil).Once()
 
 		ac := &accessTokenComponentImpl{
-			ts:              mockTokenStore,
-			nsStore:         mockNsStore,
-			us:              mockUserStore,
-			mc:              mockMemberComponent,
-			tokenQuotaStore: mockQuotaStore,
+			ts:               mockTokenStore,
+			nsStore:          mockNsStore,
+			us:               mockUserStore,
+			mc:               mockMemberComponent,
+			tokenQuotaStore:  mockQuotaStore,
+			accountBillStore: mockBillStore,
 		}
 
 		resp, err := ac.Update(context.Background(), &types.UpdateAPIKeyRequest{

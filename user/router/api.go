@@ -88,6 +88,7 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 		jwtGroup.GET("/:token", needAPIKey, jwtHandler.Verify)
 		// check token info
 		tokenGroup.GET("/:token_value", acHandler.Get)
+		tokenGroup.GET("/:token_value/quotas", acHandler.GetAPIKeyQuotas)
 		userGroup.GET("/user_uuids", needAPIKey, userHandler.GetUserUUIDs)
 
 		internalUserGroup.GET("/emails", userHandler.GetEmailsInternal)
@@ -146,6 +147,8 @@ func NewRouter(config *config.Config) (*gin.Engine, error) {
 	// routers for API keys
 	{
 		keysGroup.POST("/:uuid/apikeys", mustLogin(), acHandler.CreateAPIKey)
+		keysGroup.GET("/:uuid/apikeys/builtin", mustLogin(), acHandler.GetBuiltinKeys)
+		keysGroup.PUT("/:uuid/apikeys/builtin/refresh", mustLogin(), acHandler.RefreshBuiltinKey)
 		keysGroup.GET("/:uuid/apikeys", mustLogin(), acHandler.GetAPIKeys)
 		keysGroup.PUT("/:uuid/apikeys/:id", mustLogin(), acHandler.UpdateAPIKey)
 		keysGroup.DELETE("/:uuid/apikeys/:id", mustLogin(), acHandler.DeleteAPIKey)

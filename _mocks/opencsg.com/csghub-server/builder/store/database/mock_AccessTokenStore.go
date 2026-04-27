@@ -168,6 +168,66 @@ func (_c *MockAccessTokenStore_DeleteByID_Call) RunAndReturn(run func(context.Co
 	return _c
 }
 
+// FindBuiltinByNsUUID provides a mock function with given fields: ctx, nsUUID, app
+func (_m *MockAccessTokenStore) FindBuiltinByNsUUID(ctx context.Context, nsUUID string, app string) (*database.AccessToken, error) {
+	ret := _m.Called(ctx, nsUUID, app)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FindBuiltinByNsUUID")
+	}
+
+	var r0 *database.AccessToken
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) (*database.AccessToken, error)); ok {
+		return rf(ctx, nsUUID, app)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) *database.AccessToken); ok {
+		r0 = rf(ctx, nsUUID, app)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.AccessToken)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+		r1 = rf(ctx, nsUUID, app)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccessTokenStore_FindBuiltinByNsUUID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FindBuiltinByNsUUID'
+type MockAccessTokenStore_FindBuiltinByNsUUID_Call struct {
+	*mock.Call
+}
+
+// FindBuiltinByNsUUID is a helper method to define mock.On call
+//   - ctx context.Context
+//   - nsUUID string
+//   - app string
+func (_e *MockAccessTokenStore_Expecter) FindBuiltinByNsUUID(ctx interface{}, nsUUID interface{}, app interface{}) *MockAccessTokenStore_FindBuiltinByNsUUID_Call {
+	return &MockAccessTokenStore_FindBuiltinByNsUUID_Call{Call: _e.mock.On("FindBuiltinByNsUUID", ctx, nsUUID, app)}
+}
+
+func (_c *MockAccessTokenStore_FindBuiltinByNsUUID_Call) Run(run func(ctx context.Context, nsUUID string, app string)) *MockAccessTokenStore_FindBuiltinByNsUUID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(string))
+	})
+	return _c
+}
+
+func (_c *MockAccessTokenStore_FindBuiltinByNsUUID_Call) Return(_a0 *database.AccessToken, _a1 error) *MockAccessTokenStore_FindBuiltinByNsUUID_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccessTokenStore_FindBuiltinByNsUUID_Call) RunAndReturn(run func(context.Context, string, string) (*database.AccessToken, error)) *MockAccessTokenStore_FindBuiltinByNsUUID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // FindByID provides a mock function with given fields: ctx, id
 func (_m *MockAccessTokenStore) FindByID(ctx context.Context, id int64) (*database.AccessToken, error) {
 	ret := _m.Called(ctx, id)
@@ -820,6 +880,53 @@ func (_c *MockAccessTokenStore_Refresh_Call) Return(_a0 *database.AccessToken, _
 }
 
 func (_c *MockAccessTokenStore_Refresh_Call) RunAndReturn(run func(context.Context, *database.AccessToken, string, time.Time) (*database.AccessToken, error)) *MockAccessTokenStore_Refresh_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// UpdateToken provides a mock function with given fields: ctx, token
+func (_m *MockAccessTokenStore) UpdateToken(ctx context.Context, token *database.AccessToken) error {
+	ret := _m.Called(ctx, token)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateToken")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, *database.AccessToken) error); ok {
+		r0 = rf(ctx, token)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockAccessTokenStore_UpdateToken_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateToken'
+type MockAccessTokenStore_UpdateToken_Call struct {
+	*mock.Call
+}
+
+// UpdateToken is a helper method to define mock.On call
+//   - ctx context.Context
+//   - token *database.AccessToken
+func (_e *MockAccessTokenStore_Expecter) UpdateToken(ctx interface{}, token interface{}) *MockAccessTokenStore_UpdateToken_Call {
+	return &MockAccessTokenStore_UpdateToken_Call{Call: _e.mock.On("UpdateToken", ctx, token)}
+}
+
+func (_c *MockAccessTokenStore_UpdateToken_Call) Run(run func(ctx context.Context, token *database.AccessToken)) *MockAccessTokenStore_UpdateToken_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*database.AccessToken))
+	})
+	return _c
+}
+
+func (_c *MockAccessTokenStore_UpdateToken_Call) Return(_a0 error) *MockAccessTokenStore_UpdateToken_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockAccessTokenStore_UpdateToken_Call) RunAndReturn(run func(context.Context, *database.AccessToken) error) *MockAccessTokenStore_UpdateToken_Call {
 	_c.Call.Return(run)
 	return _c
 }

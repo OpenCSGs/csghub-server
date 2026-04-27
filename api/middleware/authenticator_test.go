@@ -85,7 +85,7 @@ func TestRestrictMultiSyncTokenToRead(t *testing.T) {
 		},
 		{
 			name:           "ApiKey with DELETE should pass",
-			authType:       httpbase.AuthTypeApiKey,
+			authType:       httpbase.AuthTypeSystemApiKey,
 			method:         "DELETE",
 			expectedStatus: http.StatusOK,
 			shouldAbort:    false,

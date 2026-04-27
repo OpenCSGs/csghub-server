@@ -234,6 +234,14 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Name:** `needAccessToken`
 - **Description:** The request must be authenticated with an access token.
 
+---
+
+### `AUTH-ERR-12`
+
+- **Error Code:** `AUTH-ERR-12`
+- **Error Name:** `quotaExceeded`
+- **Description:** The request quota limit has been exceeded.
+
 ## Collection Errors
 
 ### `COLL-ERR-0`
@@ -577,6 +585,14 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Code:** `GIT-ERR-38`
 - **Error Name:** `gitGetRepositorySizeFailed`
 - **Description:** Get repository size failed. This can be caused by network problems, authentication issues, or the specified repository does not exist.
+
+---
+
+### `GIT-ERR-39`
+
+- **Error Code:** `GIT-ERR-39`
+- **Error Name:** `gitCreateForkFailed`
+- **Description:** 
 
 ## Invitation Errors
 
@@ -1249,3 +1265,4 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Code:** `USER-ERR-19`
 - **Error Name:** `uuidConflict`
 - **Description:** The UUID generated for the organization already exists in the system.
+

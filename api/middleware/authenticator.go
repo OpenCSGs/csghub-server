@@ -107,8 +107,8 @@ func Authenticator(config *config.Config) gin.HandlerFunc {
 		}
 
 		switch {
-		case strings.HasPrefix(authHeader, "Bearer "):
-			token := strings.TrimPrefix(authHeader, "Bearer ")
+		case strings.HasPrefix(authHeader, types.HeaderBearerPrefix):
+			token := strings.TrimPrefix(authHeader, types.HeaderBearerPrefix)
 			result = isValidApiToken(c, config, token)
 			if result {
 				c.Next()
@@ -134,8 +134,8 @@ func Authenticator(config *config.Config) gin.HandlerFunc {
 			)
 			httpbase.UnauthorizedError(c, errorx.ErrInvalidAuthHeader)
 			c.Abort()
-		case strings.HasPrefix(authHeader, "Basic "):
-			token := strings.TrimPrefix(authHeader, "Basic ")
+		case strings.HasPrefix(authHeader, types.HeaderBasicPrefix):
+			token := strings.TrimPrefix(authHeader, types.HeaderBasicPrefix)
 			result = isValidBasicToken(c, userSvcClient, token)
 			if result {
 				c.Next()
@@ -202,7 +202,7 @@ func isValidApiToken(c *gin.Context, config *config.Config, token string) bool {
 		if len(currentUserUUID) > 0 {
 			httpbase.SetCurrentUserUUID(c, currentUserUUID)
 		}
-		httpbase.SetAuthType(c, httpbase.AuthTypeApiKey)
+		httpbase.SetAuthType(c, httpbase.AuthTypeSystemApiKey)
 		return true
 	}
 	return false
@@ -237,17 +237,31 @@ func isValidAccessToken(c *gin.Context, userSvcClient rpc.UserSvcClient, token s
 		return false
 	}
 	if user != nil {
-		if user.Application == types.AccessTokenAppCSGHub {
+		switch user.Application {
+		case types.AccessTokenAppCSGHub:
 			httpbase.SetCurrentUser(c, user.Username)
 			httpbase.SetCurrentUserUUID(c, user.UserUUID)
+			httpbase.SetCurrentNamespaceUUID(c, user.NSUUID)
 			httpbase.SetAccessToken(c, token)
 			httpbase.SetAuthType(c, httpbase.AuthTypeAccessToken)
+			httpbase.SetCurrentTokenName(c, user.TokenName)
 			return true
-		} else if user.Application == types.AccessTokenAppMirror {
+		case types.AccessTokenAppMirror:
+			httpbase.SetCurrentUser(c, user.Username)
+			httpbase.SetCurrentUserUUID(c, user.UserUUID)
+			httpbase.SetCurrentNamespaceUUID(c, user.NSUUID)
+			httpbase.SetAccessToken(c, token)
+			httpbase.SetAuthType(c, httpbase.AuthTypeMultiSyncToken)
+			httpbase.SetCurrentTokenName(c, user.TokenName)
+			return true
+		case types.AccessTokenAppAIGateway:
+			// user and org level API key
 			httpbase.SetCurrentUser(c, user.Username)
 			httpbase.SetCurrentUserUUID(c, user.UserUUID)
 			httpbase.SetAccessToken(c, token)
-			httpbase.SetAuthType(c, httpbase.AuthTypeMultiSyncToken)
+			httpbase.SetCurrentNamespaceUUID(c, user.NSUUID)
+			httpbase.SetAuthType(c, httpbase.AuthTypeUserOrgApiKey)
+			httpbase.SetCurrentTokenName(c, user.TokenName)
 			return true
 		}
 	}
@@ -443,7 +457,8 @@ type MiddlewareCollection struct {
 		// user must have phone verified
 		NeedPhoneVerified gin.HandlerFunc
 		// request must be authenticated with an access token
-		NeedAccessToken gin.HandlerFunc
+		NeedAccessToken   gin.HandlerFunc
+		MustUserOrgApiKey gin.HandlerFunc
 	}
 
 	Repo struct {

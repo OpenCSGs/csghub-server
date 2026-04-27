@@ -15,6 +15,8 @@ type accountBillStoreImpl struct {
 type AccountBillStore interface {
 	ListByUserIDAndDate(ctx context.Context, req types.AcctBillsReq) (AccountBillRes, error)
 	ListBillsDetailByUserID(ctx context.Context, req types.AcctBillsDetailReq) (AccountBillDetailRes, error)
+	SumValueByAPIKey(ctx context.Context, tokenID int64) (float64, error)
+	SumValueByAPIKeyBetween(ctx context.Context, tokenID int64, start, end time.Time) (float64, error)
 }
 
 func NewAccountBillStore() AccountBillStore {
@@ -41,6 +43,7 @@ type AccountBill struct {
 	CompletionToken float64         `bun:",notnull" json:"completion_token"`
 	APIKey          string          `bun:",notnull,default:''" json:"api_key"`
 	Count           float64         `bun:",notnull,default:0" json:"count"`
+	TokenID         int64           `bun:",notnull,default:0" json:"token_id"`
 	times
 }
 
@@ -118,4 +121,37 @@ func (s *accountBillStoreImpl) ListBillsDetailByUserID(ctx context.Context, req 
 		Data:  bills,
 		Total: count,
 	}, nil
+}
+
+func (s *accountBillStoreImpl) SumValueByAPIKey(ctx context.Context, tokenID int64) (float64, error) {
+	var result struct {
+		TotalValue float64 `bun:"total_value"`
+	}
+	err := s.db.Operator.Core.NewSelect().
+		Table("account_bills").
+		ColumnExpr("SUM(value) AS total_value").
+		Where("token_id = ?", tokenID).
+		Where("scene = ?", types.SceneModelServerless).
+		Scan(ctx, &result)
+	if err != nil {
+		return 0, errorx.HandleDBError(err, nil)
+	}
+	return result.TotalValue, nil
+}
+
+func (s *accountBillStoreImpl) SumValueByAPIKeyBetween(ctx context.Context, tokenID int64, start, end time.Time) (float64, error) {
+	var result struct {
+		TotalValue float64 `bun:"total_value"`
+	}
+	err := s.db.Operator.Core.NewSelect().
+		Table("account_bills").
+		ColumnExpr("SUM(value) AS total_value").
+		Where("token_id = ?", tokenID).
+		Where("scene = ?", types.SceneModelServerless).
+		Where("bill_date >= ? AND bill_date <= ?", start, end).
+		Scan(ctx, &result)
+	if err != nil {
+		return 0, errorx.HandleDBError(err, nil)
+	}
+	return result.TotalValue, nil
 }

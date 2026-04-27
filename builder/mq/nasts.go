@@ -70,7 +70,7 @@ func (n *Nats) Subscribe(params SubscribeParams) error {
 		if params.AutoACK {
 			action := ""
 			if err != nil && params.IsRedeliverForCBFailed {
-				err = msg.Nak()
+				err = msg.Ack()
 				action = "nak"
 			} else {
 				err = msg.Ack()

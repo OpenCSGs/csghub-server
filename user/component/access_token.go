@@ -28,9 +28,11 @@ type AccessTokenComponent interface {
 	Delete(ctx context.Context, req *types.DeleteUserTokenRequest) error
 	Check(ctx context.Context, req *types.CheckAccessTokenReq) (types.CheckAccessTokenResp, error)
 	GetTokens(ctx context.Context, req *types.GetAccessTokenRequest) ([]types.CheckAccessTokenResp, error)
-	RefreshToken(ctx context.Context, userName, tokenName, app string, newExpiredAt time.Time) (types.CheckAccessTokenResp, error)
+	RefreshToken(ctx context.Context, req *types.RefreshTokenReq) (types.CheckAccessTokenResp, error)
 	GetOrCreateFirstAvaiToken(ctx context.Context, userName, app, tokenName string) (string, error)
 	Update(ctx context.Context, req *types.UpdateAPIKeyRequest) (*types.CheckAccessTokenResp, error)
+	GetAPIKeyQuotas(ctx context.Context, apiKey string) ([]database.AccountAccessTokenQuota, error)
+	GetOrCreateBuiltinAPIKey(ctx context.Context, req *types.GetAccessTokenRequest) (*types.CheckAccessTokenResp, error)
 }
 
 func NewAccessTokenComponent(config *config.Config) (AccessTokenComponent, error) {
@@ -52,6 +54,7 @@ func NewAccessTokenComponent(config *config.Config) (AccessTokenComponent, error
 	c.config = config
 	c.mc, err = NewMemberComponent(config)
 	c.tokenQuotaStore = database.NewAccountAccessTokenQuotaStore()
+	c.accountBillStore = database.NewAccountBillStore()
 	if err != nil {
 		return nil, fmt.Errorf("fail to create member component,error:%w", err)
 	}
@@ -59,15 +62,16 @@ func NewAccessTokenComponent(config *config.Config) (AccessTokenComponent, error
 }
 
 type accessTokenComponentImpl struct {
-	ts              database.AccessTokenStore
-	us              database.UserStore
-	nsStore         database.NamespaceStore
-	orgStore        database.OrgStore
-	gs              gitserver.GitServer
-	acctClient      accounting.AccountingClient
-	config          *config.Config
-	mc              MemberComponent
-	tokenQuotaStore database.AccountAccessTokenQuotaStore
+	ts               database.AccessTokenStore
+	us               database.UserStore
+	nsStore          database.NamespaceStore
+	orgStore         database.OrgStore
+	gs               gitserver.GitServer
+	acctClient       accounting.AccountingClient
+	config           *config.Config
+	mc               MemberComponent
+	tokenQuotaStore  database.AccountAccessTokenQuotaStore
+	accountBillStore database.AccountBillStore
 }
 
 func (c *accessTokenComponentImpl) Create(ctx context.Context, req *types.CreateUserTokenRequest) (*database.AccessToken, error) {
@@ -105,7 +109,8 @@ func (c *accessTokenComponentImpl) Create(ctx context.Context, req *types.Create
 	var token *database.AccessToken
 	var quota *database.AccountAccessTokenQuota
 	// csghub token is shared with git server
-	if req.Application == types.AccessTokenAppGit {
+	switch req.Application {
+	case types.AccessTokenAppGit:
 		if c.gs != nil {
 			token, err = c.gs.CreateUserToken(req)
 			if err != nil {
@@ -124,7 +129,7 @@ func (c *accessTokenComponentImpl) Create(ctx context.Context, req *types.Create
 		}
 		token.UserID = user.ID
 		token.Application = req.Application
-	} else if req.Application == types.AccessTokenAPIKey {
+	case types.AccessTokenAppAIGateway:
 		// Generate token value
 		keyValue, err := generateOrgAPIKey("gk", 32)
 		if err != nil {
@@ -139,12 +144,13 @@ func (c *accessTokenComponentImpl) Create(ctx context.Context, req *types.Create
 			NsUUID:      req.NSUUID,
 			IsActive:    true,
 			UserID:      user.ID,
+			TokenType:   types.AccessTokenTypeOwner,
 		}
 		quota, err = c.buildNewAccessTokenQuota(ctx, token, req)
 		if err != nil {
 			return nil, fmt.Errorf("failed to build API key quota, error: %w", err)
 		}
-	} else {
+	default:
 		tokenValue := c.genUnique()
 		token = &database.AccessToken{
 			Name:        req.TokenName,
@@ -206,6 +212,9 @@ func (c *accessTokenComponentImpl) Delete(ctx context.Context, req *types.Delete
 		if req.NSUUID != token.NsUUID {
 			return errorx.ErrNotFound
 		}
+		if token.TokenType == types.AccessTokenTypeBuiltIn {
+			return errorx.ErrUnauthorized
+		}
 		// check api keys as namespace scoped
 		_, err = c.validateNamespacePermission(ctx, req)
 		if err != nil {
@@ -260,9 +269,15 @@ func (c *accessTokenComponentImpl) Check(ctx context.Context, req *types.CheckAc
 	resp.TokenName = t.Name
 	resp.Application = t.Application
 	resp.Permission = t.Permission
-	resp.Username = t.User.Username
-	resp.UserUUID = t.User.UUID
+	if t.User != nil {
+		resp.Username = t.User.Username
+		resp.UserUUID = t.User.UUID
+	}
 	resp.ExpireAt = t.ExpiredAt
+	resp.NSUUID = t.NsUUID
+	resp.CreatedAt = t.CreatedAt
+	resp.UpdatedAt = t.UpdatedAt
+	resp.TokenType = string(t.TokenType)
 	return resp, nil
 }
 
@@ -270,6 +285,7 @@ func (c *accessTokenComponentImpl) GetTokens(ctx context.Context, req *types.Get
 	var resps []types.CheckAccessTokenResp
 	var tokens []database.AccessToken
 	var err error
+	var user database.User
 
 	if len(req.NSUUID) > 0 {
 		// support api key tokens
@@ -279,10 +295,15 @@ func (c *accessTokenComponentImpl) GetTokens(ctx context.Context, req *types.Get
 			NSUUID:      req.NSUUID,
 			Application: req.Application,
 		}
+
 		// api keys as namespace scoped
-		_, err = c.validateNamespacePermission(ctx, checkReq)
+		user, err = c.validateNamespacePermission(ctx, checkReq)
 		if err != nil {
 			return nil, fmt.Errorf("failed to check namespace %s permission, error:%w", req.NSUUID, err)
+		}
+		_, err = c.checkOrCreateBuiltinAPIKey(ctx, req, user)
+		if err != nil {
+			return nil, err
 		}
 		tokens, err = c.ts.FindByNsUUID(ctx, req.NSUUID, string(req.Application))
 		if err != nil {
@@ -299,7 +320,11 @@ func (c *accessTokenComponentImpl) GetTokens(ctx context.Context, req *types.Get
 	for _, t := range tokens {
 		var resp types.CheckAccessTokenResp
 		resp.ID = t.ID
-		resp.Token = t.Token
+		if len(req.NSUUID) > 0 {
+			resp.Token = maskToken(t.Token)
+		} else {
+			resp.Token = t.Token
+		}
 		resp.TokenName = t.Name
 		resp.Application = t.Application
 		resp.Permission = t.Permission
@@ -311,6 +336,7 @@ func (c *accessTokenComponentImpl) GetTokens(ctx context.Context, req *types.Get
 		resp.NSUUID = t.NsUUID
 		resp.CreatedAt = t.CreatedAt
 		resp.UpdatedAt = t.UpdatedAt
+		resp.TokenType = string(t.TokenType)
 
 		quotas, err := c.tokenQuotaStore.FindByAPIKey(ctx, t.Token)
 		if err != nil {
@@ -319,6 +345,7 @@ func (c *accessTokenComponentImpl) GetTokens(ctx context.Context, req *types.Get
 		if len(quotas) > 0 {
 			resp.QuotaType = quotas[0].QuotaType
 			resp.QuotaValueType = quotas[0].ValueType
+			resp.Usage = quotas[0].Usage
 			resp.Quota = quotas[0].Quota
 			resp.LastUsedAt = quotas[0].LastUsedAt
 		}
@@ -327,19 +354,43 @@ func (c *accessTokenComponentImpl) GetTokens(ctx context.Context, req *types.Get
 	return resps, nil
 }
 
-func (c *accessTokenComponentImpl) RefreshToken(ctx context.Context, userName, tokenName, app string, newExpiredAt time.Time) (types.CheckAccessTokenResp, error) {
+func (c *accessTokenComponentImpl) RefreshToken(ctx context.Context, refreshReq *types.RefreshTokenReq) (types.CheckAccessTokenResp, error) {
 	var resp types.CheckAccessTokenResp
-	t, err := c.ts.FindByTokenName(ctx, userName, tokenName, app)
-	if err != nil {
-		if errors.Is(err, errorx.ErrDatabaseNoRows) {
-			return types.CheckAccessTokenResp{}, errorx.ErrNotFound
+	var newToken *database.AccessToken
+	var t *database.AccessToken
+	var err error
+
+	if len(refreshReq.NSUUID) > 0 {
+		checkReq := &types.CreateUserTokenRequest{
+			Username: refreshReq.Username,
+			OpUUID:   refreshReq.OpUUID,
+			NSUUID:   refreshReq.NSUUID,
 		}
-		return types.CheckAccessTokenResp{}, err
+		// Validate org namespace and admin permission
+		_, err := c.validateNamespacePermission(ctx, checkReq)
+		if err != nil {
+			return resp, err
+		}
+		t, err = c.ts.FindBuiltinByNsUUID(ctx, refreshReq.NSUUID, refreshReq.App)
+		if err != nil {
+			if errors.Is(err, errorx.ErrDatabaseNoRows) {
+				return types.CheckAccessTokenResp{}, errorx.ErrNotFound
+			}
+			return types.CheckAccessTokenResp{}, err
+		}
+	} else {
+		t, err = c.ts.FindByTokenName(ctx, refreshReq.Username, refreshReq.TokenName, refreshReq.App)
+		if err != nil {
+			if errors.Is(err, errorx.ErrDatabaseNoRows) {
+				return types.CheckAccessTokenResp{}, errorx.ErrNotFound
+			}
+			return types.CheckAccessTokenResp{}, err
+		}
 	}
 
 	var newTokenValue string
 	req := &types.CreateUserTokenRequest{
-		Username:    userName,
+		Username:    refreshReq.Username,
 		TokenName:   t.Name,
 		Application: t.Application,
 		Permission:  t.Permission,
@@ -349,7 +400,7 @@ func (c *accessTokenComponentImpl) RefreshToken(ctx context.Context, userName, t
 		// TODO:allow git client to refresh token
 		// git server cannot create tokens with the same nanme
 		err := c.gs.DeleteUserToken(&types.DeleteUserTokenRequest{
-			Username:  userName,
+			Username:  refreshReq.Username,
 			TokenName: t.Name,
 		})
 		if err != nil {
@@ -360,22 +411,41 @@ func (c *accessTokenComponentImpl) RefreshToken(ctx context.Context, userName, t
 			return resp, fmt.Errorf("fail to create git user access token,error:%w", err)
 		}
 		newTokenValue = newToken.Token
+	} else if req.Application == types.AccessTokenAppAIGateway {
+		keyValue, err := generateOrgAPIKey("gk", 32)
+		if err != nil {
+			return types.CheckAccessTokenResp{}, fmt.Errorf("failed to generate builtin api key, error: %w", err)
+		}
+		newTokenValue = keyValue
 	} else {
 		newTokenValue = c.genUnique()
 	}
 
-	newToken, err := c.ts.Refresh(ctx, t, newTokenValue, newExpiredAt)
+	if len(refreshReq.NSUUID) > 0 {
+		newToken = t
+		newToken.Token = newTokenValue
+		err = c.ts.UpdateToken(ctx, newToken)
+	} else {
+		newToken, err = c.ts.Refresh(ctx, t, newTokenValue, refreshReq.NewExpiredAt)
+	}
 	if err != nil {
-		return resp, fmt.Errorf("fail to refresh access token with new token value,error:%w", err)
+		return resp, fmt.Errorf("failed to update access token with new token value,error:%w", err)
 	}
 
+	resp.ID = newToken.ID
 	resp.Token = newToken.Token
 	resp.TokenName = newToken.Name
 	resp.Application = newToken.Application
 	resp.Permission = newToken.Permission
-	resp.Username = newToken.User.Username
-	resp.UserUUID = newToken.User.UUID
+	if newToken.User != nil {
+		resp.Username = newToken.User.Username
+		resp.UserUUID = newToken.User.UUID
+	}
 	resp.ExpireAt = newToken.ExpiredAt
+	resp.TokenType = string(newToken.TokenType)
+	resp.NSUUID = newToken.NsUUID
+	resp.CreatedAt = newToken.CreatedAt
+	resp.UpdatedAt = newToken.UpdatedAt
 
 	return resp, nil
 }
@@ -529,12 +599,14 @@ func (c *accessTokenComponentImpl) Update(ctx context.Context, req *types.Update
 		return nil, fmt.Errorf("token is inactive")
 	}
 
-	// Update fields
-	if req.KeyName != nil {
-		token.Name = *req.KeyName
-	}
-	if req.ExpiredAt != nil {
-		token.ExpiredAt = *req.ExpiredAt
+	if token.TokenType != types.AccessTokenTypeBuiltIn {
+		// Update fields except built-in token type
+		if req.KeyName != nil {
+			token.Name = *req.KeyName
+		}
+		if req.ExpiredAt != nil {
+			token.ExpiredAt = *req.ExpiredAt
+		}
 	}
 
 	quota, err := c.updateAccessTokenQuota(ctx, token, req)
@@ -549,18 +621,88 @@ func (c *accessTokenComponentImpl) Update(ctx context.Context, req *types.Update
 
 	resp := types.CheckAccessTokenResp{
 		ID:             result.ID,
-		Token:          result.Token,
+		Token:          maskToken(result.Token),
 		TokenName:      result.Name,
 		Application:    result.Application,
 		ExpireAt:       result.ExpiredAt,
 		NSUUID:         result.NsUUID,
 		QuotaType:      quota.QuotaType,
 		QuotaValueType: quota.ValueType,
+		Usage:          quota.Usage,
 		Quota:          quota.Quota,
 		LastUsedAt:     quota.LastUsedAt,
 		CreatedAt:      result.CreatedAt,
 		UpdatedAt:      result.UpdatedAt,
+		TokenType:      string(result.TokenType),
 	}
 
 	return &resp, nil
+}
+
+func maskToken(token string) string {
+	if len(token) <= 4 {
+		return "*****"
+	}
+	return token[:2] + "***" + token[len(token)-2:]
+}
+
+func (c *accessTokenComponentImpl) GetOrCreateBuiltinAPIKey(ctx context.Context, req *types.GetAccessTokenRequest) (*types.CheckAccessTokenResp, error) {
+	checkReq := &types.CreateUserTokenRequest{
+		Username: req.Username,
+		OpUUID:   req.OpUUID,
+		NSUUID:   req.NSUUID,
+	}
+
+	// Validate org namespace and admin permission
+	user, err := c.validateNamespacePermission(ctx, checkReq)
+	if err != nil {
+		return nil, err
+	}
+
+	defaultToken, err := c.checkOrCreateBuiltinAPIKey(ctx, req, user)
+	if err != nil {
+		return nil, err
+	}
+
+	resp := &types.CheckAccessTokenResp{
+		ID:          defaultToken.ID,
+		Token:       defaultToken.Token,
+		TokenName:   defaultToken.Name,
+		Application: defaultToken.Application,
+		NSUUID:      defaultToken.NsUUID,
+		CreatedAt:   defaultToken.CreatedAt,
+		UpdatedAt:   defaultToken.UpdatedAt,
+		TokenType:   string(defaultToken.TokenType),
+	}
+	return resp, nil
+}
+
+func (c *accessTokenComponentImpl) checkOrCreateBuiltinAPIKey(ctx context.Context, req *types.GetAccessTokenRequest, user database.User) (*database.AccessToken, error) {
+	// Try to find existing builtin API key
+	token, err := c.ts.FindBuiltinByNsUUID(ctx, req.NSUUID, string(types.AccessTokenAppAIGateway))
+	if err == nil && token != nil {
+		return token, nil
+	}
+
+	keyValue, err := generateOrgAPIKey("gk", 32)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate builtin api key, error: %w", err)
+	}
+
+	newToken := &database.AccessToken{
+		Name:        string(types.AccessTokenTypeBuiltIn),
+		Token:       keyValue,
+		Application: types.AccessTokenAppAIGateway,
+		NsUUID:      req.NSUUID,
+		IsActive:    true,
+		UserID:      user.ID,
+		TokenType:   types.AccessTokenTypeBuiltIn,
+	}
+
+	err = c.ts.Create(ctx, newToken, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create builtin api key, error: %w", err)
+	}
+
+	return newToken, nil
 }

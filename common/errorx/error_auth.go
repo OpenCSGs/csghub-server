@@ -19,6 +19,7 @@ const (
 	needAPIKey
 	userPhoneNotVerified
 	needAccessToken
+	quotaExceeded
 )
 
 var (
@@ -177,6 +178,19 @@ var (
 	//
 	// zh-HK: 需要訪問令牌進行身份驗證
 	ErrNeedAccessToken error = CustomError{prefix: errAuthPrefix, code: needAccessToken}
+
+	// request quota limit exceeded
+	//
+	// Description: The request quota limit has been exceeded.
+	//
+	// Description_ZH: 请求限额已超过。
+	//
+	// en-US: Request quota limit exceeded
+	//
+	// zh-CN: 请求限额已超过
+	//
+	// zh-HK: 請求限额已超過
+	ErrQuotaExceeded error = CustomError{prefix: errAuthPrefix, code: quotaExceeded}
 )
 
 /*

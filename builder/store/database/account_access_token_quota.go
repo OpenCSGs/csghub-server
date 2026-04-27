@@ -2,8 +2,10 @@ package database
 
 import (
 	"context"
+	"fmt"
 	"time"
 
+	"github.com/uptrace/bun"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -99,4 +101,42 @@ func (s *accountAccessTokenQuotaStoreImpl) DeleteByAPIKey(ctx context.Context, a
 		Where("api_key = ?", apiKey).
 		Exec(ctx)
 	return errorx.HandleDBError(err, nil)
+}
+
+func UpdateAPIKeyUsage(ctx context.Context, tx bun.Tx, input AccountStatement) error {
+	var quotas []AccountAccessTokenQuota
+	err := tx.NewSelect().Model(&quotas).Where("api_key = ?", input.APIKey).Scan(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get account access %s quota: %w", input.APIKey, err)
+	}
+	now := time.Now()
+	for _, quota := range quotas {
+		switch quota.QuotaType {
+		case types.AccountingQuotaTypeMonthly:
+			if now.Unix() < quota.PeriodStart || now.Unix() > quota.PeriodEnd {
+				quota.PeriodStart, quota.PeriodEnd = CalcCurrentMonthPeriod()
+				quota.Usage = 0
+			}
+		}
+
+		switch quota.ValueType {
+		case types.AccountingQuotaValueTypeFee:
+			quota.Usage += input.Value
+		}
+		quota.LastUsedAt = &now
+		_, err = tx.NewUpdate().Model(&quota).WherePK().Exec(ctx)
+		if err != nil {
+			return fmt.Errorf("update account access %s quota, error:%w", input.APIKey, err)
+		}
+	}
+	return nil
+}
+
+func CalcCurrentMonthPeriod() (int64, int64) {
+	now := time.Now()
+	// Start of current month
+	start := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
+	// End of current month (start of next month minus 1 nanosecond)
+	end := start.AddDate(0, 1, 0).Add(-1)
+	return start.Unix(), end.Unix()
 }

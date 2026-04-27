@@ -11,6 +11,9 @@
     "error.AUTH-ERR-11": {
         "other": "Need access token for authentication"
     },
+    "error.AUTH-ERR-12": {
+        "other": "Request quota limit exceeded"
+    },
     "error.AUTH-ERR-2": {
         "other": "Access forbidden, insufficient permissions"
     },

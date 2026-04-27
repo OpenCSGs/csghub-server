@@ -984,10 +984,12 @@ func createUserRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware
 	keysGroup := apiGroup.Group("/namespaces")
 	keysGroup.Use(middlewareCollection.Auth.NeedLogin)
 	{
+		keysGroup.GET("/:uuid/apikeys/builtin", userProxyHandler.Proxy)
 		keysGroup.GET("/:uuid/apikeys", userProxyHandler.Proxy)
 		keysGroup.POST("/:uuid/apikeys", userProxyHandler.Proxy)
 		keysGroup.PUT("/:uuid/apikeys/:id", userProxyHandler.Proxy)
 		keysGroup.DELETE("/:uuid/apikeys/:id", userProxyHandler.Proxy)
+		keysGroup.PUT("/:uuid/apikeys/builtin/refresh", userProxyHandler.Proxy)
 	}
 	// deprecated
 	{

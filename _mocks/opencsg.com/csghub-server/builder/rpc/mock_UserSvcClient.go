@@ -5,8 +5,10 @@ package rpc
 import (
 	context "context"
 
-	mock "github.com/stretchr/testify/mock"
 	membership "opencsg.com/csghub-server/builder/git/membership"
+	database "opencsg.com/csghub-server/builder/store/database"
+
+	mock "github.com/stretchr/testify/mock"
 
 	rpc "opencsg.com/csghub-server/builder/rpc"
 
@@ -560,6 +562,65 @@ func (_c *MockUserSvcClient_GetOrgByUUID_Call) Return(_a0 *types.Organization, _
 }
 
 func (_c *MockUserSvcClient_GetOrgByUUID_Call) RunAndReturn(run func(context.Context, string) (*types.Organization, error)) *MockUserSvcClient_GetOrgByUUID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetTokenQuotas provides a mock function with given fields: ctx, keyName
+func (_m *MockUserSvcClient) GetTokenQuotas(ctx context.Context, keyName string) ([]database.AccountAccessTokenQuota, error) {
+	ret := _m.Called(ctx, keyName)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetTokenQuotas")
+	}
+
+	var r0 []database.AccountAccessTokenQuota
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) ([]database.AccountAccessTokenQuota, error)); ok {
+		return rf(ctx, keyName)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) []database.AccountAccessTokenQuota); ok {
+		r0 = rf(ctx, keyName)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]database.AccountAccessTokenQuota)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, keyName)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockUserSvcClient_GetTokenQuotas_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetTokenQuotas'
+type MockUserSvcClient_GetTokenQuotas_Call struct {
+	*mock.Call
+}
+
+// GetTokenQuotas is a helper method to define mock.On call
+//   - ctx context.Context
+//   - keyName string
+func (_e *MockUserSvcClient_Expecter) GetTokenQuotas(ctx interface{}, keyName interface{}) *MockUserSvcClient_GetTokenQuotas_Call {
+	return &MockUserSvcClient_GetTokenQuotas_Call{Call: _e.mock.On("GetTokenQuotas", ctx, keyName)}
+}
+
+func (_c *MockUserSvcClient_GetTokenQuotas_Call) Run(run func(ctx context.Context, keyName string)) *MockUserSvcClient_GetTokenQuotas_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockUserSvcClient_GetTokenQuotas_Call) Return(_a0 []database.AccountAccessTokenQuota, _a1 error) *MockUserSvcClient_GetTokenQuotas_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockUserSvcClient_GetTokenQuotas_Call) RunAndReturn(run func(context.Context, string) ([]database.AccountAccessTokenQuota, error)) *MockUserSvcClient_GetTokenQuotas_Call {
 	_c.Call.Return(run)
 	return _c
 }

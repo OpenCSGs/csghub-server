@@ -267,7 +267,7 @@ func (h *UserHandler) Get(ctx *gin.Context) {
 	useUUID := ctx.Query("type") == "uuid"
 	var user *types.User
 	var err error
-	if authType == httpbase.AuthTypeApiKey {
+	if authType == httpbase.AuthTypeSystemApiKey {
 		user, err = h.c.GetInternal(ctx, userNameOrUUID, useUUID)
 	} else {
 		user, err = h.c.Get(ctx, userNameOrUUID, visitorName, useUUID)

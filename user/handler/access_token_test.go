@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	mockcomp "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/user/component"
 	"opencsg.com/csghub-server/api/httpbase"
+	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/testutil"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
@@ -181,8 +182,12 @@ func TestAccessTokenHandler_Refresh(t *testing.T) {
 		tester := NewAccessTokenTester(t).WithHandleFunc(func(h *AccessTokenHandler) gin.HandlerFunc {
 			return h.Refresh
 		})
-
-		tester.mocks.token.EXPECT().RefreshToken(tester.Gctx(), "u", "my-token", "git", time.Time{}).
+		refreshReq := &types.RefreshTokenReq{
+			Username:  "u",
+			TokenName: "my-token",
+			App:       "git",
+		}
+		tester.mocks.token.EXPECT().RefreshToken(tester.Gctx(), refreshReq).
 			Return(types.CheckAccessTokenResp{}, errorx.ErrNotFound)
 
 		tester.WithUser().
@@ -208,8 +213,13 @@ func TestAccessTokenHandler_Refresh(t *testing.T) {
 			UserUUID:    "user-uuid",
 			ExpireAt:    expiredAt,
 		}
-
-		tester.mocks.token.EXPECT().RefreshToken(tester.Gctx(), "u", "my-token", "git", time.Time{}).
+		refreshReq := &types.RefreshTokenReq{
+			Username:     "u",
+			TokenName:    "my-token",
+			App:          "git",
+			NewExpiredAt: time.Time{},
+		}
+		tester.mocks.token.EXPECT().RefreshToken(tester.Gctx(), refreshReq).
 			Return(expectedResp, nil)
 
 		tester.WithUser().
@@ -234,17 +244,74 @@ func TestAccessTokenHandler_CreateAPIKey(t *testing.T) {
 
 		tester.ResponseEqCode(t, 400)
 	})
+}
 
-	t.Run("invalid request body returns 400", func(t *testing.T) {
+func TestAccessTokenHandler_GetAPIKeyQuotas(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	t.Run("missing token value returns 400", func(t *testing.T) {
 		tester := NewAccessTokenTester(t).WithHandleFunc(func(h *AccessTokenHandler) gin.HandlerFunc {
-			return h.CreateAPIKey
+			return h.GetAPIKeyQuotas
 		})
 
-		tester.WithUserAndUUID().
-			WithParam("uuid", "namespace-uuid").
-			Execute()
+		tester.Execute()
 
 		tester.ResponseEqCode(t, 400)
+	})
+
+	t.Run("get quotas successfully returns 200", func(t *testing.T) {
+		tester := NewAccessTokenTester(t).WithHandleFunc(func(h *AccessTokenHandler) gin.HandlerFunc {
+			return h.GetAPIKeyQuotas
+		})
+
+		quotas := []database.AccountAccessTokenQuota{
+			{
+				ID:          1,
+				APIKey:      "test-api-key",
+				QuotaType:   types.AccountingQuotaTypeMonthly,
+				ValueType:   types.AccountingQuotaValueTypeFee,
+				Usage:       50.0,
+				Quota:       100.0,
+				PeriodStart: 1704067200,
+				PeriodEnd:   1735689600,
+			},
+		}
+
+		tester.mocks.token.EXPECT().GetAPIKeyQuotas(tester.Gctx().Request.Context(), "test-api-key").
+			Return(quotas, nil).Once()
+
+		tester.WithParam("token_value", "test-api-key").
+			Execute()
+
+		tester.ResponseEq(t, 200, "OK", quotas)
+	})
+
+	t.Run("get empty quotas returns 200", func(t *testing.T) {
+		tester := NewAccessTokenTester(t).WithHandleFunc(func(h *AccessTokenHandler) gin.HandlerFunc {
+			return h.GetAPIKeyQuotas
+		})
+
+		tester.mocks.token.EXPECT().GetAPIKeyQuotas(tester.Gctx().Request.Context(), "test-api-key").
+			Return([]database.AccountAccessTokenQuota{}, nil).Once()
+
+		tester.WithParam("token_value", "test-api-key").
+			Execute()
+
+		tester.ResponseEq(t, 200, "OK", []database.AccountAccessTokenQuota{})
+	})
+
+	t.Run("internal server error returns 500", func(t *testing.T) {
+		tester := NewAccessTokenTester(t).WithHandleFunc(func(h *AccessTokenHandler) gin.HandlerFunc {
+			return h.GetAPIKeyQuotas
+		})
+
+		tester.mocks.token.EXPECT().GetAPIKeyQuotas(tester.Gctx().Request.Context(), "test-api-key").
+			Return(nil, errorx.ErrInternalServerError).Once()
+
+		tester.WithParam("token_value", "test-api-key").
+			Execute()
+
+		tester.ResponseEqCode(t, 500)
 	})
 }
 

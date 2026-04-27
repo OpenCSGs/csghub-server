@@ -36,6 +36,6 @@
         "other": "Agent instance does not support scheduling"
     },
     "error.AGENT-ERR-9": {
-        "other": "Scheduler start time is in the past, use a future date/time for one-time schedules"
+        "other": "Scheduler start time is in the past; use a future date/time for one-time schedules"
     }
 }
