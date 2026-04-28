@@ -561,19 +561,19 @@ func (s *serviceComponentImpl) runInformer() {
 			slog.Error("cluster is unavailable", slog.Any("cluster config", cls.CID), slog.Any("error", err))
 			continue
 		}
-		wg.Add(2)
-		go func(cluster *cluster.Cluster) {
-			defer wg.Done()
-			s.runServiceInformer(stopCh, cluster)
-		}(cls)
-		go func(cluster *cluster.Cluster) {
-			defer wg.Done()
-			s.runPodInformer(stopCh, cluster)
-		}(cls)
-		go func(cluster *cluster.Cluster) {
-			defer wg.Done()
-			s.runRevisionInformer(stopCh, cluster)
-		}(cls)
+
+		// Using the wg.Go(func()) function (Go 1.25+) avoids panics caused by mismatched counts of manual wg.Add(n) and wg.Done() calls.
+		// In Go 1.22, there is no need to additionally create or pass the cls variable,
+		// see https://github.com/golang/go/issues/60078 (@rsc)
+		wg.Go(func() {
+			s.runServiceInformer(stopCh, cls)
+		})
+		wg.Go(func() {
+			s.runPodInformer(stopCh, cls)
+		})
+		wg.Go(func() {
+			s.runRevisionInformer(stopCh, cls)
+		})
 	}
 	wg.Wait()
 }
