@@ -52,21 +52,22 @@ type UsageLimitPolicy struct {
 }
 
 type LLMConfig struct {
-	ID            int64            `json:"id"`
-	ModelName     string           `json:"model_name"`
-	OfficialName  string           `json:"official_name"`
-	ApiEndpoint   string           `json:"api_endpoint"`
-	AuthHeader    string           `json:"auth_header"`
-	Type          int              `json:"type"` // 1: optimization, 2: comparison, 4: summary readme
-	Enabled       bool             `json:"enabled"`
-	Provider      string           `json:"provider"`
-	Upstreams     []UpstreamConfig `json:"upstreams"`
-	RoutingPolicy RoutingPolicy    `json:"routing_policy"`
-	Metadata      map[string]any   `json:"metadata"` // tasks stored as: {"tasks": ["text-generation", "text-to-image"]}
-	RepoID        int64            `json:"repo_id"`
-	Repo          *RepositoryLite  `json:"repo"`
-	CreatedAt     time.Time        `json:"created_at"`
-	UpdatedAt     time.Time        `json:"updated_at"`
+	ID                 int64            `json:"id"`
+	ModelName          string           `json:"model_name"`
+	OfficialName       string           `json:"official_name"`
+	ApiEndpoint        string           `json:"api_endpoint"`
+	AuthHeader         string           `json:"auth_header"`
+	Type               int              `json:"type"` // 1: optimization, 2: comparison, 4: summary readme
+	Enabled            bool             `json:"enabled"`
+	Provider           string           `json:"provider"`
+	Upstreams          []UpstreamConfig `json:"upstreams"`
+	RoutingPolicy      RoutingPolicy    `json:"routing_policy"`
+	Metadata           map[string]any   `json:"metadata"` // tasks stored as: {"tasks": ["text-generation", "text-to-image"]}
+	RepoID             int64            `json:"repo_id"`
+	Repo               *RepositoryLite  `json:"repo"`
+	NeedSensitiveCheck bool             `json:"need_sensitive_check"`
+	CreatedAt          time.Time        `json:"created_at"`
+	UpdatedAt          time.Time        `json:"updated_at"`
 }
 
 type PromptPrefix struct {
@@ -88,18 +89,19 @@ type SearchPromptPrefix struct {
 }
 
 type UpdateLLMConfigReq struct {
-	ID            int64             `json:"id"`
-	ModelName     *string           `json:"model_name"`
-	OfficialName  *string           `json:"official_name"`
-	ApiEndpoint   *string           `json:"api_endpoint"`
-	Upstreams     *[]UpstreamConfig `json:"upstreams"`
-	AuthHeader    *string           `json:"auth_header"`
-	Type          *int              `json:"type"` // 1: optimization, 2: comparison, 4: summary readme
-	Enabled       *bool             `json:"enabled"`
-	Provider      *string           `json:"provider"`
-	RoutingPolicy *RoutingPolicy    `json:"routing_policy"`
-	Metadata      *map[string]any   `json:"metadata"` // tasks stored as: {"tasks": ["text-generation", "text-to-image"]}
-	RepoID        *int64            `json:"repo_id"`
+	ID                 int64             `json:"id"`
+	ModelName          *string           `json:"model_name"`
+	OfficialName       *string           `json:"official_name"`
+	ApiEndpoint        *string           `json:"api_endpoint"`
+	Upstreams          *[]UpstreamConfig `json:"upstreams"`
+	AuthHeader         *string           `json:"auth_header"`
+	Type               *int              `json:"type"` // 1: optimization, 2: comparison, 4: summary readme
+	Enabled            *bool             `json:"enabled"`
+	Provider           *string           `json:"provider"`
+	RoutingPolicy      *RoutingPolicy    `json:"routing_policy"`
+	Metadata           *map[string]any   `json:"metadata"` // tasks stored as: {"tasks": ["text-generation", "text-to-image"]}
+	NeedSensitiveCheck *bool             `json:"need_sensitive_check"`
+	RepoID             *int64            `json:"repo_id"`
 }
 
 type UpdatePromptPrefixReq struct {
@@ -110,17 +112,18 @@ type UpdatePromptPrefixReq struct {
 }
 
 type CreateLLMConfigReq struct {
-	ModelName     string           `json:"model_name" binding:"required"`
-	OfficialName  string           `json:"official_name"`
-	ApiEndpoint   string           `json:"api_endpoint"`
-	Upstreams     []UpstreamConfig `json:"upstreams,omitempty"`
-	AuthHeader    string           `json:"auth_header"`
-	Type          int              `json:"type" binding:"required,oneof=1 2 4 8 16"` // 1: optimization, 2: comparison, 4: summary readme, 8: mcp scan, 16: for aigateway call external llm
-	Provider      string           `json:"provider" binding:"required"`
-	Enabled       bool             `json:"enabled"`
-	RoutingPolicy RoutingPolicy    `json:"routing_policy"`
-	Metadata      map[string]any   `json:"metadata"` // tasks stored as: {"tasks": ["text-generation", "text-to-image"]}
-	RepoID        *int64           `json:"repo_id"`
+	ModelName          string           `json:"model_name" binding:"required"`
+	OfficialName       string           `json:"official_name"`
+	ApiEndpoint        string           `json:"api_endpoint"`
+	Upstreams          []UpstreamConfig `json:"upstreams,omitempty"`
+	AuthHeader         string           `json:"auth_header"`
+	Type               int              `json:"type" binding:"required,oneof=1 2 4 8 16"` // 1: optimization, 2: comparison, 4: summary readme, 8: mcp scan, 16: for aigateway call external llm
+	Provider           string           `json:"provider" binding:"required"`
+	Enabled            bool             `json:"enabled"`
+	RoutingPolicy      RoutingPolicy    `json:"routing_policy"`
+	Metadata           map[string]any   `json:"metadata"` // tasks stored as: {"tasks": ["text-generation", "text-to-image"]}
+	RepoID             *int64           `json:"repo_id"`
+	NeedSensitiveCheck bool             `json:"need_sensitive_check"`
 }
 
 type CreatePromptPrefixReq struct {

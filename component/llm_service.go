@@ -75,20 +75,21 @@ func (s *llmServiceComponentImpl) ShowLLMConfig(ctx context.Context, id int64) (
 		return nil, err
 	}
 	llmConfig := &types.LLMConfig{
-		ID:            dbLlmConfig.ID,
-		ModelName:     dbLlmConfig.ModelName,
-		OfficialName:  dbLlmConfig.OfficialName,
-		ApiEndpoint:   dbLlmConfig.ApiEndpoint,
-		Upstreams:     dbLlmConfig.Upstreams,
-		AuthHeader:    dbLlmConfig.AuthHeader,
-		Type:          dbLlmConfig.Type,
-		Enabled:       dbLlmConfig.Enabled,
-		Provider:      dbLlmConfig.Provider,
-		RoutingPolicy: dbLlmConfig.RoutingPolicy,
-		Metadata:      dbLlmConfig.Metadata,
-		RepoID:        dbLlmConfig.RepoID,
-		CreatedAt:     dbLlmConfig.CreatedAt,
-		UpdatedAt:     dbLlmConfig.UpdatedAt,
+		ID:                 dbLlmConfig.ID,
+		ModelName:          dbLlmConfig.ModelName,
+		OfficialName:       dbLlmConfig.OfficialName,
+		ApiEndpoint:        dbLlmConfig.ApiEndpoint,
+		Upstreams:          dbLlmConfig.Upstreams,
+		AuthHeader:         dbLlmConfig.AuthHeader,
+		Type:               dbLlmConfig.Type,
+		Enabled:            dbLlmConfig.Enabled,
+		Provider:           dbLlmConfig.Provider,
+		RoutingPolicy:      dbLlmConfig.RoutingPolicy,
+		Metadata:           dbLlmConfig.Metadata,
+		RepoID:             dbLlmConfig.RepoID,
+		NeedSensitiveCheck: dbLlmConfig.NeedSensitiveCheck,
+		CreatedAt:          dbLlmConfig.CreatedAt,
+		UpdatedAt:          dbLlmConfig.UpdatedAt,
 	}
 	if dbLlmConfig.RepoID > 0 {
 		repo, err := s.repoStore.FindById(ctx, dbLlmConfig.RepoID)
@@ -157,6 +158,9 @@ func (s *llmServiceComponentImpl) UpdateLLMConfig(ctx context.Context, req *type
 	if req.RepoID != nil {
 		llmConfig.RepoID = *req.RepoID
 	}
+	if req.NeedSensitiveCheck != nil {
+		llmConfig.NeedSensitiveCheck = *req.NeedSensitiveCheck
+	}
 	if err := s.validateLLMEndpointConfig(llmConfig.ApiEndpoint, llmConfig.Upstreams); err != nil {
 		return nil, err
 	}
@@ -166,20 +170,21 @@ func (s *llmServiceComponentImpl) UpdateLLMConfig(ctx context.Context, req *type
 		return nil, updateErr
 	}
 	resLLMConfig := &types.LLMConfig{
-		ID:            updatedConfig.ID,
-		ModelName:     updatedConfig.ModelName,
-		OfficialName:  updatedConfig.OfficialName,
-		ApiEndpoint:   updatedConfig.ApiEndpoint,
-		Upstreams:     updatedConfig.Upstreams,
-		AuthHeader:    updatedConfig.AuthHeader,
-		Type:          updatedConfig.Type,
-		Provider:      updatedConfig.Provider,
-		Enabled:       updatedConfig.Enabled,
-		RoutingPolicy: updatedConfig.RoutingPolicy,
-		Metadata:      updatedConfig.Metadata,
-		RepoID:        updatedConfig.RepoID,
-		CreatedAt:     updatedConfig.CreatedAt,
-		UpdatedAt:     updatedConfig.UpdatedAt,
+		ID:                 updatedConfig.ID,
+		ModelName:          updatedConfig.ModelName,
+		OfficialName:       updatedConfig.OfficialName,
+		ApiEndpoint:        updatedConfig.ApiEndpoint,
+		Upstreams:          updatedConfig.Upstreams,
+		AuthHeader:         updatedConfig.AuthHeader,
+		Type:               updatedConfig.Type,
+		Provider:           updatedConfig.Provider,
+		Enabled:            updatedConfig.Enabled,
+		RoutingPolicy:      updatedConfig.RoutingPolicy,
+		Metadata:           updatedConfig.Metadata,
+		RepoID:             updatedConfig.RepoID,
+		NeedSensitiveCheck: updatedConfig.NeedSensitiveCheck,
+		CreatedAt:          updatedConfig.CreatedAt,
+		UpdatedAt:          updatedConfig.UpdatedAt,
 	}
 	return resLLMConfig, nil
 }
@@ -220,37 +225,39 @@ func (s *llmServiceComponentImpl) CreateLLMConfig(ctx context.Context, req *type
 		return nil, err
 	}
 	dbLLMConfig := database.LLMConfig{
-		ModelName:     req.ModelName,
-		OfficialName:  req.OfficialName,
-		ApiEndpoint:   s.normalizePrimaryEndpoint(req.ApiEndpoint, req.Upstreams),
-		Upstreams:     req.Upstreams,
-		AuthHeader:    req.AuthHeader,
-		Type:          req.Type,
-		Provider:      req.Provider,
-		Enabled:       req.Enabled,
-		RoutingPolicy: req.RoutingPolicy,
-		Metadata:      req.Metadata,
-		RepoID:        repoID,
+		ModelName:          req.ModelName,
+		OfficialName:       req.OfficialName,
+		ApiEndpoint:        s.normalizePrimaryEndpoint(req.ApiEndpoint, req.Upstreams),
+		Upstreams:          req.Upstreams,
+		AuthHeader:         req.AuthHeader,
+		Type:               req.Type,
+		Provider:           req.Provider,
+		Enabled:            req.Enabled,
+		RoutingPolicy:      req.RoutingPolicy,
+		Metadata:           req.Metadata,
+		RepoID:             repoID,
+		NeedSensitiveCheck: req.NeedSensitiveCheck,
 	}
 	dbRes, err := s.llmConfigStore.Create(ctx, dbLLMConfig)
 	if err != nil {
 		return nil, err
 	}
 	resLLMConfig := &types.LLMConfig{
-		ID:            dbRes.ID,
-		ModelName:     dbRes.ModelName,
-		OfficialName:  dbRes.OfficialName,
-		ApiEndpoint:   dbRes.ApiEndpoint,
-		Upstreams:     dbRes.Upstreams,
-		AuthHeader:    dbRes.AuthHeader,
-		Type:          dbRes.Type,
-		Provider:      dbRes.Provider,
-		Enabled:       dbRes.Enabled,
-		RoutingPolicy: dbRes.RoutingPolicy,
-		Metadata:      dbRes.Metadata,
-		RepoID:        dbRes.RepoID,
-		CreatedAt:     dbRes.CreatedAt,
-		UpdatedAt:     dbRes.UpdatedAt,
+		ID:                 dbRes.ID,
+		ModelName:          dbRes.ModelName,
+		OfficialName:       dbRes.OfficialName,
+		ApiEndpoint:        dbRes.ApiEndpoint,
+		Upstreams:          dbRes.Upstreams,
+		AuthHeader:         dbRes.AuthHeader,
+		Type:               dbRes.Type,
+		Provider:           dbRes.Provider,
+		Enabled:            dbRes.Enabled,
+		RoutingPolicy:      dbRes.RoutingPolicy,
+		Metadata:           dbRes.Metadata,
+		RepoID:             dbRes.RepoID,
+		NeedSensitiveCheck: dbRes.NeedSensitiveCheck,
+		CreatedAt:          dbRes.CreatedAt,
+		UpdatedAt:          dbRes.UpdatedAt,
 	}
 	return resLLMConfig, nil
 }

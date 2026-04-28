@@ -30,9 +30,9 @@ type LLMConfig struct {
 	// NeedSensitiveCheck controls whether requests for this model should go
 	// through sensitive content detection in aigateway. Set to false to skip
 	// the check (e.g. for guard models or trusted internal models).
-	NeedSensitiveCheck bool `bun:",notnull,default:true" json:"need_sensitive_check"`
-	RepoID           int64         `bun:",nullzero" json:"repo_id"`
-	Repo             *Repository   `bun:"rel:belongs-to,join:repo_id=id" json:"repo,omitempty"`
+	NeedSensitiveCheck bool        `bun:",notnull,default:false" json:"need_sensitive_check"`
+	RepoID             int64       `bun:",nullzero" json:"repo_id"`
+	Repo               *Repository `bun:"rel:belongs-to,join:repo_id=id" json:"repo,omitempty"`
 	times
 }
 
