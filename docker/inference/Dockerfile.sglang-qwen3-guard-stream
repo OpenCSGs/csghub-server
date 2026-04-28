@@ -1,0 +1,21 @@
+FROM opencsg-registry.cn-beijing.cr.aliyuncs.com/public/sglang/sglang:0.5.3rc0-qwen3-guard-stream
+
+RUN pip config set global.index-url https://mirrors.aliyun.com/pypi/simple
+RUN sed -i 's|http://archive.ubuntu.com/ubuntu|http://mirrors.aliyun.com/ubuntu|g' /etc/apt/sources.list && \
+    sed -i 's|http://security.ubuntu.com/ubuntu|http://mirrors.aliyun.com/ubuntu|g' /etc/apt/sources.list && \
+    apt-get update && \
+    apt-get install -y dumb-init && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir csghub-sdk==0.7.4 addict
+
+COPY ./sglang-guard-stream/ /etc/csghub/
+RUN chmod +x /etc/csghub/*.sh
+
+WORKDIR /workspace/
+ENV HUGGINGFACE_HUB_CACHE=/workspace/ \
+    HF_HUB_ENABLE_HF_TRANSFER=0
+ENV PORT=8000
+EXPOSE 8000
+
+ENTRYPOINT [ "/usr/bin/dumb-init", "--" ]
+CMD ["/etc/csghub/serve.sh"]
