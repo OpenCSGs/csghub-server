@@ -99,6 +99,7 @@ func (s *K8sHandler) UpdateService(c *gin.Context) {
 	if err != nil {
 		slog.ErrorContext(c.Request.Context(), "failed to update service", slog.Any("error", err), slog.Any("req", request))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
 	}
 	slog.Info("service updated", slog.String("svc_name", svcName))
 	resp.Code = 0

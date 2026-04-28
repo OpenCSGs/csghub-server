@@ -412,22 +412,16 @@ func (wc *workFlowComponentImpl) RunInformer(c *config.Config) {
 			continue
 		}
 		if wc.config.Cluster.ResourceQuotaNamespace != wc.config.Cluster.SpaceNamespace {
-			wg.Add(2)
-			go func(cluster *cluster.Cluster) {
-				defer wg.Done()
-				go wc.RunArgoInformer(stopCh, wc.config.Cluster.SpaceNamespace, cls)
-			}(cls)
-			go func(cluster *cluster.Cluster) {
-				defer wg.Done()
-				go wc.RunArgoInformer(stopCh, wc.config.Cluster.ResourceQuotaNamespace, cls)
-			}(cls)
-
+			wg.Go(func() {
+				wc.RunArgoInformer(stopCh, wc.config.Cluster.SpaceNamespace, cls)
+			})
+			wg.Go(func() {
+				wc.RunArgoInformer(stopCh, wc.config.Cluster.ResourceQuotaNamespace, cls)
+			})
 		} else {
-			wg.Add(1)
-			go func(cluster *cluster.Cluster) {
-				defer wg.Done()
-				go wc.RunArgoInformer(stopCh, wc.config.Cluster.SpaceNamespace, cls)
-			}(cls)
+			wg.Go(func() {
+				wc.RunArgoInformer(stopCh, wc.config.Cluster.SpaceNamespace, cls)
+			})
 		}
 	}
 	wg.Wait()
