@@ -117,6 +117,24 @@ var (
 	SceneUnknow SceneType = 99 // unknow
 )
 
+type RechargePurpose string
+
+const (
+	RechargePurposeMarket       RechargePurpose = "market"
+	RechargePurposeEmployeeCost RechargePurpose = "employee_cost"
+	RechargePurposeCustomerPOC  RechargePurpose = "customer_poc"
+	RechargePurposeOther        RechargePurpose = "other"
+)
+
+func (p RechargePurpose) IsValid() bool {
+	switch p {
+	case RechargePurposeMarket, RechargePurposeEmployeeCost, RechargePurposeCustomerPOC, RechargePurposeOther:
+		return true
+	default:
+		return false
+	}
+}
+
 type TokenUsageType string
 
 var (
@@ -161,6 +179,8 @@ type AcctEventReq struct {
 	PromptToken      float64         `json:"prompt_token"`
 	CompletionToken  float64         `json:"completion_token"`
 	ApiKey           string          `json:"api_key"`
+	Purpose          RechargePurpose `json:"purpose"`
+	PurposeDesc      string          `json:"purpose_desc"`
 }
 
 // generate charge event from client
@@ -272,9 +292,11 @@ type AcctStatementsResFiltered struct {
 }
 
 type RechargeReq struct {
-	Value float64   `json:"value" binding:"min=1"`
-	OpUID string    `json:"op_uid"`
-	Scene SceneType `json:"scene"`
+	Value       float64         `json:"value" binding:"min=1"`
+	OpUID       string          `json:"op_uid"`
+	Scene       SceneType       `json:"scene"`
+	Purpose     RechargePurpose `json:"purpose"`
+	PurposeDesc string          `json:"purpose_desc"`
 }
 
 type AcctQuotaReq struct {
@@ -510,16 +532,18 @@ type AcctRechargeListReq struct {
 }
 
 type AcctRecharge struct {
-	ID         int64     `json:"id"`
-	EventUUID  string    `json:"event_uuid"`
-	UserUUID   string    `json:"user_id"`
-	Value      float64   `json:"value"`
-	Scene      int       `json:"scene"`
-	OpUID      string    `json:"op_uid"`
-	CreatedAt  time.Time `json:"created_at"`
-	EventDate  time.Time `json:"event_date"`
-	ActivityID int64     `json:"activity_id"`
-	OpDesc     string    `json:"op_desc"`
+	ID          int64     `json:"id"`
+	EventUUID   string    `json:"event_uuid"`
+	UserUUID    string    `json:"user_id"`
+	Value       float64   `json:"value"`
+	Scene       int       `json:"scene"`
+	OpUID       string    `json:"op_uid"`
+	CreatedAt   time.Time `json:"created_at"`
+	EventDate   time.Time `json:"event_date"`
+	ActivityID  int64     `json:"activity_id"`
+	OpDesc      string    `json:"op_desc"`
+	Purpose     string    `json:"purpose"`
+	PurposeDesc string    `json:"purpose_desc"`
 }
 
 type NonCashRechargeListResp struct {
@@ -529,17 +553,19 @@ type NonCashRechargeListResp struct {
 }
 
 type NonCashRechargeResp struct {
-	ID         int64     `json:"id"`
-	EventUUID  string    `json:"event_uuid"`
-	UserUUID   string    `json:"user_id"`
-	Value      float64   `json:"value"`
-	OpUID      string    `json:"op_uid"`
-	CreatedAt  time.Time `json:"created_at"`
-	EventDate  time.Time `json:"event_date"`
-	ActivityID int64     `json:"activity_id"`
-	OpDesc     string    `json:"op_desc"`
-	OpUserName string    `json:"op_user_name"`
-	UserName   string    `json:"user_name"`
+	ID          int64     `json:"id"`
+	EventUUID   string    `json:"event_uuid"`
+	UserUUID    string    `json:"user_id"`
+	Value       float64   `json:"value"`
+	OpUID       string    `json:"op_uid"`
+	CreatedAt   time.Time `json:"created_at"`
+	EventDate   time.Time `json:"event_date"`
+	ActivityID  int64     `json:"activity_id"`
+	OpDesc      string    `json:"op_desc"`
+	OpUserName  string    `json:"op_user_name"`
+	UserName    string    `json:"user_name"`
+	Purpose     string    `json:"purpose"`
+	PurposeDesc string    `json:"purpose_desc"`
 }
 
 type AcctRechargeListResp struct {

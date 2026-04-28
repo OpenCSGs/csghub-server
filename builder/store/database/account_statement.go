@@ -74,6 +74,8 @@ type AccountStatement struct {
 	CompletionToken  float64               `json:"completion_token"`
 	APIKey           string                `bun:",notnull,default:''" json:"api_key"`
 	TokenID          int64                 `bun:",notnull,default:0" json:"token_id"`
+	Purpose          types.RechargePurpose `bun:",nullzero" json:"purpose"`
+	PurposeDesc      string                `bun:",nullzero" json:"purpose_desc"`
 }
 
 type AccountStatementRes struct {
