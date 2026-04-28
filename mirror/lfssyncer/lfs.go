@@ -603,11 +603,11 @@ func (w *LfsSyncWorker) downloadAndUploadLFSFile(
 	}
 
 	if pointer.DownloadURL == "" {
-		return fmt.Errorf(
-			"pointer download url is empty, repoPath: %s, repoType: %s",
-			repo.Path,
-			repo.RepositoryType,
+		slog.Info("pointer download url is empty",
+			slog.Any("repoPath", repo.Path),
+			slog.Any("repoType", repo.RepositoryType),
 		)
+		return nil
 	}
 
 	partSize := int64(w.config.Mirror.PartSize * 1024 * 1024)

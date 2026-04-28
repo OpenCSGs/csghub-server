@@ -631,8 +631,7 @@ func (suite *LfsSyncWorkerTestSuite) TestDownloadAndUploadLFSFile_EmptyDownloadU
 
 	err := suite.worker.downloadAndUploadLFSFile(ctx, repo, pointer)
 
-	assert.Error(suite.T(), err)
-	assert.Contains(suite.T(), err.Error(), "pointer download url is empty")
+	assert.Nil(suite.T(), err)
 }
 
 func (suite *LfsSyncWorkerTestSuite) TestSendMessage() {
