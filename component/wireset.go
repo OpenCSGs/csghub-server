@@ -157,15 +157,15 @@ var MockedCheckerSet = wire.NewSet(
 func ProvideTestConfig() *config.Config {
 	return &config.Config{
 		S3: struct {
-			AccessKeyID     string `env:"STARHUB_SERVER_S3_ACCESS_KEY_ID"`
-			AccessKeySecret string `env:"STARHUB_SERVER_S3_ACCESS_KEY_SECRET"`
-			Region          string `env:"STARHUB_SERVER_S3_REGION"`
-			Endpoint        string `env:"STARHUB_SERVER_S3_ENDPOINT" default:"localhost:9000"`
+			AccessKeyID      string `env:"STARHUB_SERVER_S3_ACCESS_KEY_ID"`
+			AccessKeySecret  string `env:"STARHUB_SERVER_S3_ACCESS_KEY_SECRET"`
+			Region           string `env:"STARHUB_SERVER_S3_REGION"`
+			Endpoint         string `env:"STARHUB_SERVER_S3_ENDPOINT" default:"localhost:9000"`
 			InternalEndpoint string `env:"STARHUB_SERVER_S3_INTERNAL_ENDPOINT"`
 			Bucket           string `env:"STARHUB_SERVER_S3_BUCKET" default:"opencsg-test"`
 			EnableSSL        bool   `env:"STARHUB_SERVER_S3_ENABLE_SSL" default:"false"`
-			BucketLookup string `env:"STARHUB_SERVER_S3_BUCKET_LOOKUP" default:"auto"`
-			PublicBucket string `env:"STARHUB_SERVER_S3_PUBLIC_BUCKET" default:"opencsg-public-resource"`
+			BucketLookup     string `env:"STARHUB_SERVER_S3_BUCKET_LOOKUP" default:"auto"`
+			PublicBucket     string `env:"STARHUB_SERVER_S3_PUBLIC_BUCKET" default:"opencsg-public-resource"`
 		}{
 			Bucket: "test-bucket",
 		},
@@ -271,6 +271,7 @@ func NewTestModelComponent(
 		mirrorStore:               stores.Mirror,
 		lfsMetaObjectStore:        stores.LfsMetaObject,
 		clusterComponent:          clusterComponent,
+		inferenceArchStore:        stores.InferenceArch,
 	}
 }
 

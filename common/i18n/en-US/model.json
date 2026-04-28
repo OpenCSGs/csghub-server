@@ -16,5 +16,8 @@
   },
   "model.disable_evaluation_reason.model_not_support_evaluation": {
     "other": "This model is not yet supported by the csghub evaluation engine"
+  },
+  "model.disable_inference_reason.model_not_been_filed": {
+    "other": "This model has not been filed to the csghub inference engine"
   }
 }

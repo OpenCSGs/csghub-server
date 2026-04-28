@@ -308,6 +308,7 @@ func TestModelComponent_Show(t *testing.T) {
 	mc.mocks.components.repo.EXPECT().GetNameSpaceInfo(ctx, "ns").Return(&types.Namespace{Path: "ns"}, nil)
 
 	mc.mocks.stores.UserLikesMock().EXPECT().IsExist(ctx, "user", int64(123)).Return(true, nil)
+	mc.mocks.stores.InferenceArchMock().EXPECT().IsAllowed(ctx, mock.Anything).Return(true, nil)
 	mc.mocks.stores.RuntimeArchMock().EXPECT().CheckEngineByArchModelNameAndType(
 		ctx, mock.Anything, "n", "safetensors", types.InferenceType,
 	).Return(true, nil)
@@ -352,6 +353,7 @@ func TestModelComponent_Show(t *testing.T) {
 		EnableFinetune:   true,
 		EnableEvaluation: true,
 		WidgetType:       types.ModelWidgetTypeGeneration,
+		ArchAllowed:      true,
 		/*Scores: []types.WeightScore{{
 			WeightName: string(database.RecomWeightTotal),
 			Score:      100,
@@ -403,6 +405,7 @@ func TestModelComponent_Show_Syncing(t *testing.T) {
 		types.MirrorRepoSyncStart,
 	)
 	mc.mocks.stores.UserLikesMock().EXPECT().IsExist(ctx, "user", int64(123)).Return(true, nil)
+	mc.mocks.stores.InferenceArchMock().EXPECT().IsAllowed(ctx, mock.Anything).Return(true, nil)
 	mc.mocks.stores.RuntimeArchMock().EXPECT().CheckEngineByArchModelNameAndType(
 		ctx, mock.Anything, "n", "safetensors", types.InferenceType,
 	).Return(true, nil)
@@ -439,6 +442,7 @@ func TestModelComponent_Show_Syncing(t *testing.T) {
 		WidgetType:       types.ModelWidgetTypeGeneration,
 		SyncStatus:       types.SyncStatusInProgress,
 		MirrorTaskStatus: types.MirrorRepoSyncStart,
+		ArchAllowed:      true,
 	}, model)
 }
 
@@ -475,6 +479,7 @@ func TestModelComponent_Show_Mirror(t *testing.T) {
 		"",
 	)
 	mc.mocks.stores.UserLikesMock().EXPECT().IsExist(ctx, "user", int64(123)).Return(true, nil)
+	mc.mocks.stores.InferenceArchMock().EXPECT().IsAllowed(ctx, mock.Anything).Return(true, nil)
 	mc.mocks.stores.RuntimeArchMock().EXPECT().CheckEngineByArchModelNameAndType(
 		ctx, mock.Anything, "n", "safetensors", types.InferenceType,
 	).Return(true, nil)
@@ -510,6 +515,7 @@ func TestModelComponent_Show_Mirror(t *testing.T) {
 		EnableEvaluation: true,
 		WidgetType:       types.ModelWidgetTypeGeneration,
 		SyncStatus:       types.SyncStatusInProgress,
+		ArchAllowed:      true,
 	}, model)
 }
 
@@ -546,6 +552,7 @@ func TestModelComponent_Show_Repository(t *testing.T) {
 	mc.mocks.components.repo.EXPECT().GetNameSpaceInfo(ctx, "ns").Return(&types.Namespace{Path: "ns"}, nil)
 
 	mc.mocks.stores.UserLikesMock().EXPECT().IsExist(ctx, "user", int64(123)).Return(true, nil)
+	mc.mocks.stores.InferenceArchMock().EXPECT().IsAllowed(ctx, mock.Anything).Return(true, nil)
 	mc.mocks.stores.RuntimeArchMock().EXPECT().CheckEngineByArchModelNameAndType(
 		ctx, mock.Anything, "n", "safetensors", types.InferenceType,
 	).Return(true, nil)
@@ -581,6 +588,7 @@ func TestModelComponent_Show_Repository(t *testing.T) {
 		EnableEvaluation: true,
 		WidgetType:       types.ModelWidgetTypeGeneration,
 		SyncStatus:       types.SyncStatusPending,
+		ArchAllowed:      true,
 	}, model)
 }
 
@@ -611,6 +619,7 @@ func TestModelComponent_Show_NonLocalRepo_WithSuccessfulMirrorTask(t *testing.T)
 	mc.mocks.components.repo.EXPECT().GetMirrorTaskStatus(repository).Return("")
 
 	mc.mocks.stores.UserLikesMock().EXPECT().IsExist(ctx, "user", int64(123)).Return(true, nil)
+	mc.mocks.stores.InferenceArchMock().EXPECT().IsAllowed(ctx, mock.Anything).Return(true, nil)
 	mc.mocks.stores.RuntimeArchMock().EXPECT().CheckEngineByArchModelNameAndType(
 		ctx, mock.Anything, "n", "safetensors", types.InferenceType,
 	).Return(true, nil)
@@ -662,6 +671,7 @@ func TestModelComponent_Show_NonLocalRepo_WithoutSuccessfulMirrorTask(t *testing
 	mc.mocks.components.repo.EXPECT().GetMirrorTaskStatus(repository).Return("")
 
 	mc.mocks.stores.UserLikesMock().EXPECT().IsExist(ctx, "user", int64(123)).Return(true, nil)
+	mc.mocks.stores.InferenceArchMock().EXPECT().IsAllowed(ctx, mock.Anything).Return(true, nil)
 	mc.mocks.stores.RuntimeArchMock().EXPECT().CheckEngineByArchModelNameAndType(
 		ctx, mock.Anything, "n", "safetensors", types.InferenceType,
 	).Return(true, nil)
@@ -714,6 +724,7 @@ func TestModelComponent_Show_NonLocalRepo_MirrorNotFound(t *testing.T) {
 	mc.mocks.components.repo.EXPECT().GetMirrorTaskStatus(repository).Return("")
 
 	mc.mocks.stores.UserLikesMock().EXPECT().IsExist(ctx, "user", int64(123)).Return(true, nil)
+	mc.mocks.stores.InferenceArchMock().EXPECT().IsAllowed(ctx, mock.Anything).Return(true, nil)
 	mc.mocks.stores.RuntimeArchMock().EXPECT().CheckEngineByArchModelNameAndType(
 		ctx, mock.Anything, "n", "safetensors", types.InferenceType,
 	).Return(true, nil)
@@ -759,6 +770,7 @@ func TestModelComponent_Show_LocalRepo_SkipMirrorCheck(t *testing.T) {
 	mc.mocks.components.repo.EXPECT().GetMirrorTaskStatus(repository).Return("")
 
 	mc.mocks.stores.UserLikesMock().EXPECT().IsExist(ctx, "user", int64(123)).Return(true, nil)
+	mc.mocks.stores.InferenceArchMock().EXPECT().IsAllowed(ctx, mock.Anything).Return(true, nil)
 	mc.mocks.stores.RuntimeArchMock().EXPECT().CheckEngineByArchModelNameAndType(
 		ctx, mock.Anything, "n", "safetensors", types.InferenceType,
 	).Return(true, nil)

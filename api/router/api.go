@@ -1066,6 +1066,9 @@ func createUserRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware
 
 	apiGroup.POST("/user/tags", middlewareCollection.Auth.NeedLogin, userProxyHandler.Proxy)
 
+	// Inference Arch
+	createInferenceArchRoutes(apiGroup, middlewareCollection)
+
 	createExtendedUserRoutes(apiGroup, middlewareCollection, userProxyHandler)
 }
 

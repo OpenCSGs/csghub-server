@@ -133,6 +133,7 @@ func NewModelComponent(config *config.Config) (ModelComponent, error) {
 	c.mirrorStore = database.NewMirrorStore()
 	c.xnetMigrationTaskStore = database.NewXnetMigrationTaskStore()
 	c.lfsMetaObjectStore = database.NewLfsMetaObjectStore()
+	c.inferenceArchStore = database.NewInferenceArchStore()
 
 	c.clusterComponent, err = NewClusterComponent(config)
 	if err != nil {
@@ -175,6 +176,7 @@ type modelComponentImpl struct {
 	xnetMigrationTaskStore    database.XnetMigrationTaskStore
 	lfsMetaObjectStore        database.LfsMetaObjectStore
 	clusterComponent          ClusterComponent
+	inferenceArchStore        database.InferenceArchStore
 }
 
 func (c *modelComponentImpl) Index(ctx context.Context, filter *types.RepoFilter, per, page int, needOpWeight bool) ([]*types.Model, int, error) {
@@ -600,6 +602,7 @@ func (c *modelComponentImpl) Show(ctx context.Context, namespace, name, currentU
 	modelFormat := model.Repository.Format()
 	archs := model.Repository.Archs()
 	oriName := model.Repository.OriginName()
+	resModel.ArchAllowed, _ = c.inferenceArchStore.IsAllowed(ctx, archs)
 	enableInference, _ := c.runtimeArchitecturesStore.CheckEngineByArchModelNameAndType(ctx, archs, oriName, modelFormat, types.InferenceType)
 	resModel.EnableInference = enableInference
 	enableFinetune, _ := c.runtimeArchitecturesStore.CheckEngineByArchModelNameAndType(ctx, archs, oriName, modelFormat, types.FinetuneType)
@@ -647,6 +650,10 @@ func updateDisabledReason(resModel *types.Model, archs []string) {
 	}
 	if !resModel.EnableEvaluation {
 		resModel.DisableEvaluationReason = "model_not_support_evaluation"
+	}
+	if !resModel.ArchAllowed {
+		resModel.DisableInferenceReason = "model_not_been_filed"
+		resModel.EnableInference = false
 	}
 }
 

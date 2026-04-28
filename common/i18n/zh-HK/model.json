@@ -16,5 +16,8 @@
   },
   "model.disable_evaluation_reason.model_not_support_evaluation": {
     "other": "csghub評估框架暫未支持該模型"
+  },
+  "model.disable_inference_reason.model_not_been_filed": {
+    "other": "該模型未备案"
   }
 }
