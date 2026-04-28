@@ -59,6 +59,7 @@ type CreateCategory struct {
 type UpdateCategory CreateCategory
 
 type TagScope string
+type TagSource string
 
 const (
 	ModelTagScope   TagScope = "model"
@@ -69,6 +70,11 @@ const (
 	MCPTagScope     TagScope = "mcp"
 	SkillTagScope   TagScope = "skill"
 	UnknownScope    TagScope = "unknown"
+)
+
+const (
+	TagSourceManual TagSource = "manual"
+	TagSourceAuto   TagSource = "auto"
 )
 
 type TagFilter struct {

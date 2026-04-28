@@ -298,11 +298,12 @@ func (r *Repository) SetSyncStatus(syncStatus types.RepositorySyncStatus) {
 }
 
 type RepositoryTag struct {
-	ID           int64       `bun:",pk,autoincrement" json:"id"`
-	RepositoryID int64       `bun:",notnull" json:"repository_id"`
-	TagID        int64       `bun:",notnull" json:"tag_id"`
-	Repository   *Repository `bun:"rel:belongs-to,join:repository_id=id"`
-	Tag          *Tag        `bun:"rel:belongs-to,join:tag_id=id"`
+	ID           int64           `bun:",pk,autoincrement" json:"id"`
+	RepositoryID int64           `bun:",notnull" json:"repository_id"`
+	TagID        int64           `bun:",notnull" json:"tag_id"`
+	Source       types.TagSource `bun:",notnull,default:'auto'" json:"source"`
+	Repository   *Repository     `bun:"rel:belongs-to,join:repository_id=id"`
+	Tag          *Tag            `bun:"rel:belongs-to,join:tag_id=id"`
 	/*
 		for meta tags parsed from README.md file, count is alway 1
 
@@ -642,7 +643,7 @@ func (s *repoStoreImpl) TagIDs(ctx context.Context, repoID int64, category strin
 	if len(category) > 0 {
 		query.Where("tags.category = ?", category)
 	}
-	query.Column("repository_tag.tag_id")
+	query.ColumnExpr("repository_tag.tag_id")
 	err = query.Scan(ctx, &tagIDs)
 	err = errorx.HandleDBError(err, errorx.Ctx().
 		Set("id", repoID),
@@ -1319,6 +1320,11 @@ func (s *repoStoreImpl) CleanRelationsByRepoID(ctx context.Context, repoId int64
 }
 
 func (s *repoStoreImpl) BatchCreateRepoTags(ctx context.Context, repoTags []RepositoryTag) error {
+	for i := range repoTags {
+		if repoTags[i].Source == "" {
+			repoTags[i].Source = types.TagSourceManual
+		}
+	}
 	result, err := s.db.Operator.Core.NewInsert().
 		Model(&repoTags).
 		Exec(ctx)

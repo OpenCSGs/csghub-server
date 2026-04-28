@@ -164,8 +164,7 @@ func TestTagComponent_UpdateRepoTagsByCategory(t *testing.T) {
 			{Name: "t1", ID: 2},
 		}, nil,
 	)
-	tc.mocks.stores.RepoMock().EXPECT().TagIDs(ctx, int64(1), "c").Return([]int64{1}, nil)
-	tc.mocks.stores.TagMock().EXPECT().UpsertRepoTags(ctx, int64(1), []int64{1}, []int64{2}).Return(nil)
+	tc.mocks.stores.TagMock().EXPECT().ReplaceRepoTagsByCategoryAndSource(ctx, int64(1), "c", types.TagSourceManual, []int64{2}).Return(nil)
 
 	err := tc.UpdateRepoTagsByCategory(ctx, types.DatasetTagScope, 1, "c", []string{"t1"})
 	require.Nil(t, err)

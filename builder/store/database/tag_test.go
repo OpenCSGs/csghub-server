@@ -687,6 +687,109 @@ func TestTagStore_RemoveRepoTagsByCategory(t *testing.T) {
 
 }
 
+func TestTagStore_ReplaceRepoTagsByCategoryAndSource_AutoKeepsManual(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	ts := database.NewTagStoreWithDB(db)
+	rs := database.NewRepoStoreWithDB(db)
+
+	tag1, err := ts.CreateTag(ctx, database.Tag{
+		Category: "industry",
+		Name:     "finance_" + uuid.NewString(),
+		Group:    "",
+		Scope:    types.DatasetTagScope,
+	})
+	require.NoError(t, err)
+	tag2, err := ts.CreateTag(ctx, database.Tag{
+		Category: "industry",
+		Name:     "healthcare_" + uuid.NewString(),
+		Group:    "",
+		Scope:    types.DatasetTagScope,
+	})
+	require.NoError(t, err)
+
+	repo, err := rs.CreateRepo(ctx, database.Repository{
+		UserID:         1,
+		Path:           fmt.Sprintf("user_%s/repo_%s", uuid.NewString(), uuid.NewString()),
+		GitPath:        fmt.Sprintf("datasets_user_%s/repo_%s", uuid.NewString(), uuid.NewString()),
+		Name:           "repo",
+		Nickname:       "",
+		Description:    "",
+		Private:        false,
+		RepositoryType: types.DatasetRepo,
+	})
+	require.NoError(t, err)
+
+	err = ts.UpsertRepoTags(ctx, repo.ID, nil, []int64{tag1.ID})
+	require.NoError(t, err)
+
+	err = ts.ReplaceRepoTagsByCategoryAndSource(ctx, repo.ID, "industry", types.TagSourceAuto, []int64{tag1.ID, tag2.ID})
+	require.NoError(t, err)
+
+	var repoTags []database.RepositoryTag
+	err = db.Core.NewSelect().
+		Model(&repoTags).
+		Where("repository_id = ?", repo.ID).
+		Order("tag_id ASC").
+		Scan(ctx)
+	require.NoError(t, err)
+	require.Len(t, repoTags, 2)
+	require.Equal(t, tag1.ID, repoTags[0].TagID)
+	require.Equal(t, types.TagSourceManual, repoTags[0].Source)
+	require.Equal(t, tag2.ID, repoTags[1].TagID)
+	require.Equal(t, types.TagSourceAuto, repoTags[1].Source)
+}
+
+func TestTagStore_ReplaceRepoTagsByCategoryAndSource_ManualPromotesAuto(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	ts := database.NewTagStoreWithDB(db)
+	rs := database.NewRepoStoreWithDB(db)
+
+	tag1, err := ts.CreateTag(ctx, database.Tag{
+		Category: "industry",
+		Name:     "finance_" + uuid.NewString(),
+		Group:    "",
+		Scope:    types.DatasetTagScope,
+	})
+	require.NoError(t, err)
+
+	repo, err := rs.CreateRepo(ctx, database.Repository{
+		UserID:         1,
+		Path:           fmt.Sprintf("user_%s/repo_%s", uuid.NewString(), uuid.NewString()),
+		GitPath:        fmt.Sprintf("datasets_user_%s/repo_%s", uuid.NewString(), uuid.NewString()),
+		Name:           "repo",
+		Nickname:       "",
+		Description:    "",
+		Private:        false,
+		RepositoryType: types.DatasetRepo,
+	})
+	require.NoError(t, err)
+
+	err = ts.ReplaceRepoTagsByCategoryAndSource(ctx, repo.ID, "industry", types.TagSourceAuto, []int64{tag1.ID})
+	require.NoError(t, err)
+
+	err = ts.ReplaceRepoTagsByCategoryAndSource(ctx, repo.ID, "industry", types.TagSourceManual, []int64{tag1.ID})
+	require.NoError(t, err)
+
+	var repoTag database.RepositoryTag
+	err = db.Core.NewSelect().
+		Model(&repoTag).
+		Where("repository_id = ?", repo.ID).
+		Where("tag_id = ?", tag1.ID).
+		Scan(ctx)
+	require.NoError(t, err)
+	require.Equal(t, types.TagSourceManual, repoTag.Source)
+}
+
 func TestTagStore_FindTagByID(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()

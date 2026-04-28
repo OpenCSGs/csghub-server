@@ -59,6 +59,7 @@ const (
 
 type repoComponentImpl struct {
 	tagComponent           TagComponent
+	industryTagComponent   IndustryTagComponent
 	userStore              database.UserStore
 	orgStore               database.OrgStore
 	namespaceStore         database.NamespaceStore
@@ -938,6 +939,17 @@ func (c *repoComponentImpl) createReadmeFile(ctx context.Context, req *types.Cre
 	if err != nil {
 		return fmt.Errorf("failed to update meta tags, cause: %w", err)
 	}
+	if c.industryTagComponent != nil {
+		err = c.industryTagComponent.RefreshRepoAutoIndustryTags(ctx, types.IdentifyIndustryTagsReq{
+			Namespace: req.Namespace,
+			Name:      req.Name,
+			RepoType:  req.RepoType,
+			Readme:    string(contentDecoded),
+		})
+		if err != nil {
+			return fmt.Errorf("failed to update repo industry tags, cause: %w", err)
+		}
+	}
 
 	err = c.git.CreateRepoFile(req)
 	if err != nil {
@@ -1153,6 +1165,16 @@ func (c *repoComponentImpl) updateReadmeFile(ctx context.Context, req *types.Upd
 }
 
 func (c *repoComponentImpl) deleteReadmeFile(ctx context.Context, req *types.DeleteFileReq) error {
+	if c.industryTagComponent != nil {
+		err := c.industryTagComponent.ClearRepoAutoIndustryTags(ctx, types.ClearRepoIndustryTagsReq{
+			Namespace: req.Namespace,
+			Name:      req.Name,
+			RepoType:  req.RepoType,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to clear repo industry tags, cause: %w", err)
+		}
+	}
 	err := c.changeReadmeFile(ctx, req.Content, req.Namespace, req.Name, req.RepoType)
 	if err != nil {
 		return fmt.Errorf("failed to update meta tags for delete readme, cause: %w", err)
@@ -1165,6 +1187,17 @@ func (c *repoComponentImpl) changeReadmeFile(ctx context.Context, content, names
 	_, err := c.tagComponent.UpdateMetaTags(ctx, getTagScopeByRepoType(repoType), namespace, name, string(contentDecoded))
 	if err != nil {
 		return fmt.Errorf("failed to update meta tags, cause: %w", err)
+	}
+	if c.industryTagComponent != nil {
+		err = c.industryTagComponent.RefreshRepoAutoIndustryTags(ctx, types.IdentifyIndustryTagsReq{
+			Namespace: namespace,
+			Name:      name,
+			RepoType:  repoType,
+			Readme:    string(contentDecoded),
+		})
+		if err != nil {
+			return fmt.Errorf("failed to update repo industry tags, cause: %w", err)
+		}
 	}
 	return err
 }

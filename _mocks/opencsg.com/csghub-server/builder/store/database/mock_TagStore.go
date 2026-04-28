@@ -1314,6 +1314,105 @@ func (_c *MockTagStore_RemoveRepoTagsByCategory_Call) RunAndReturn(run func(cont
 	return _c
 }
 
+// RemoveRepoTagsByCategoryAndSource provides a mock function with given fields: ctx, repoID, categories, source
+func (_m *MockTagStore) RemoveRepoTagsByCategoryAndSource(ctx context.Context, repoID int64, categories []string, source types.TagSource) error {
+	ret := _m.Called(ctx, repoID, categories, source)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RemoveRepoTagsByCategoryAndSource")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64, []string, types.TagSource) error); ok {
+		r0 = rf(ctx, repoID, categories, source)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockTagStore_RemoveRepoTagsByCategoryAndSource_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RemoveRepoTagsByCategoryAndSource'
+type MockTagStore_RemoveRepoTagsByCategoryAndSource_Call struct {
+	*mock.Call
+}
+
+// RemoveRepoTagsByCategoryAndSource is a helper method to define mock.On call
+//   - ctx context.Context
+//   - repoID int64
+//   - categories []string
+//   - source types.TagSource
+func (_e *MockTagStore_Expecter) RemoveRepoTagsByCategoryAndSource(ctx interface{}, repoID interface{}, categories interface{}, source interface{}) *MockTagStore_RemoveRepoTagsByCategoryAndSource_Call {
+	return &MockTagStore_RemoveRepoTagsByCategoryAndSource_Call{Call: _e.mock.On("RemoveRepoTagsByCategoryAndSource", ctx, repoID, categories, source)}
+}
+
+func (_c *MockTagStore_RemoveRepoTagsByCategoryAndSource_Call) Run(run func(ctx context.Context, repoID int64, categories []string, source types.TagSource)) *MockTagStore_RemoveRepoTagsByCategoryAndSource_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64), args[2].([]string), args[3].(types.TagSource))
+	})
+	return _c
+}
+
+func (_c *MockTagStore_RemoveRepoTagsByCategoryAndSource_Call) Return(_a0 error) *MockTagStore_RemoveRepoTagsByCategoryAndSource_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockTagStore_RemoveRepoTagsByCategoryAndSource_Call) RunAndReturn(run func(context.Context, int64, []string, types.TagSource) error) *MockTagStore_RemoveRepoTagsByCategoryAndSource_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ReplaceRepoTagsByCategoryAndSource provides a mock function with given fields: ctx, repoID, category, source, newTagIDs
+func (_m *MockTagStore) ReplaceRepoTagsByCategoryAndSource(ctx context.Context, repoID int64, category string, source types.TagSource, newTagIDs []int64) error {
+	ret := _m.Called(ctx, repoID, category, source, newTagIDs)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ReplaceRepoTagsByCategoryAndSource")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64, string, types.TagSource, []int64) error); ok {
+		r0 = rf(ctx, repoID, category, source, newTagIDs)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockTagStore_ReplaceRepoTagsByCategoryAndSource_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ReplaceRepoTagsByCategoryAndSource'
+type MockTagStore_ReplaceRepoTagsByCategoryAndSource_Call struct {
+	*mock.Call
+}
+
+// ReplaceRepoTagsByCategoryAndSource is a helper method to define mock.On call
+//   - ctx context.Context
+//   - repoID int64
+//   - category string
+//   - source types.TagSource
+//   - newTagIDs []int64
+func (_e *MockTagStore_Expecter) ReplaceRepoTagsByCategoryAndSource(ctx interface{}, repoID interface{}, category interface{}, source interface{}, newTagIDs interface{}) *MockTagStore_ReplaceRepoTagsByCategoryAndSource_Call {
+	return &MockTagStore_ReplaceRepoTagsByCategoryAndSource_Call{Call: _e.mock.On("ReplaceRepoTagsByCategoryAndSource", ctx, repoID, category, source, newTagIDs)}
+}
+
+func (_c *MockTagStore_ReplaceRepoTagsByCategoryAndSource_Call) Run(run func(ctx context.Context, repoID int64, category string, source types.TagSource, newTagIDs []int64)) *MockTagStore_ReplaceRepoTagsByCategoryAndSource_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64), args[2].(string), args[3].(types.TagSource), args[4].([]int64))
+	})
+	return _c
+}
+
+func (_c *MockTagStore_ReplaceRepoTagsByCategoryAndSource_Call) Return(_a0 error) *MockTagStore_ReplaceRepoTagsByCategoryAndSource_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockTagStore_ReplaceRepoTagsByCategoryAndSource_Call) RunAndReturn(run func(context.Context, int64, string, types.TagSource, []int64) error) *MockTagStore_ReplaceRepoTagsByCategoryAndSource_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // SaveTags provides a mock function with given fields: ctx, tags
 func (_m *MockTagStore) SaveTags(ctx context.Context, tags []*database.Tag) error {
 	ret := _m.Called(ctx, tags)
