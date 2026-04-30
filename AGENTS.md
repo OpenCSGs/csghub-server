@@ -88,7 +88,8 @@ Folders relative to the root of the repository for each service:
 
 ## Testing
 
-- Don't modify any code file under foler `_mocks`, use `make mock_gen GO_TAGS={go.buildTags}` to generate mock implementations for the interfaces.
+- Don't manually modify generated code files under folder `_mocks`; update mockery config files (`.mockery.yaml`, `.mockery_ee.yaml`, `.mockery_saas.yaml`) and run `make mock_gen GO_TAGS={go.buildTags}` instead.
+- Run `make mock_gen GO_TAGS={go.buildTags}` when adding mocks for new interfaces or refreshing mocks after mocked interfaces change.
 - Use `make test GO_TAGS={go.buildTags}` to run all tests in project.
 - Mock dependencies (e.g., database, RPC clients) using tools like `mockery`.
 

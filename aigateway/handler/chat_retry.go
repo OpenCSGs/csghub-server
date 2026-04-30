@@ -6,11 +6,11 @@ import (
 	"encoding/hex"
 	"log/slog"
 	"net/http"
-	"net/url"
 	"sort"
 	"strings"
 
 	commontypes "opencsg.com/csghub-server/common/types"
+	commonutils "opencsg.com/csghub-server/common/utils/common"
 )
 
 const defaultChatMaxFallbackAttempts = 2
@@ -217,14 +217,9 @@ func pickFallbackEndpoints(primaryTarget string, defaultModelName string, endpoi
 }
 
 func resolveProxyPathFromModelEndpoint(endpoint string, modelName string) string {
-	endpoint = strings.TrimSpace(endpoint)
-	if endpoint == "" {
-		return ""
-	}
-	uri, err := url.ParseRequestURI(endpoint)
-	if err != nil {
+	proxyPath := commonutils.ExtractURLPath(endpoint)
+	if strings.TrimSpace(endpoint) != "" && proxyPath == "" {
 		slog.Warn("endpoint has wrong struct", slog.String("model", modelName))
-		return ""
 	}
-	return uri.Path
+	return proxyPath
 }
