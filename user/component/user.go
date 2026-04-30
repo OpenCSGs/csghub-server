@@ -623,9 +623,9 @@ func (c *userComponentImpl) Delete(ctx context.Context, operator, username strin
 	audit := &database.AuditLog{
 		TableName:  "users",
 		Action:     enum.AuditActionDeletion,
-		OperatorID: opUser.ID,
-		Before:     string(before),
-		After:      "",
+		OperatorID: opUser.UUID,
+		Before:     before,
+		After:      json.RawMessage("null"),
 	}
 
 	// delete user from db
@@ -1106,8 +1106,8 @@ func (c *userComponentImpl) SoftDelete(ctx context.Context, operator, username s
 	audit := &database.AuditLog{
 		TableName:  "users",
 		Action:     enum.AuditActionSoftDeletion,
-		OperatorID: user.ID,
-		Before:     string(before),
+		OperatorID: user.UUID,
+		Before:     before,
 	}
 
 	err = c.userStore.SoftDeleteUserAndRelations(ctx, user, req)
@@ -1123,7 +1123,7 @@ func (c *userComponentImpl) SoftDelete(ctx context.Context, operator, username s
 	if err != nil {
 		return fmt.Errorf("failed to marshal user after delete")
 	}
-	audit.After = string(afterBytes)
+	audit.After = afterBytes
 
 	err = c.audit.Create(ctx, audit)
 	if err != nil {

@@ -30,6 +30,7 @@ import (
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
+	"opencsg.com/csghub-server/common/utils/common"
 )
 
 type RepoTester struct {
@@ -1331,7 +1332,7 @@ func TestRepoHandler_CreateRepo(t *testing.T) {
 					Path:        "u/test-model",
 				}
 				tester.mocks.model.EXPECT().Create(
-					tester.Ctx(), expectedModelReq,
+					common.GinContextToStdContext(tester.Gctx()), expectedModelReq,
 				).Return(expectedResponse, nil)
 			},
 			expectedStatus: http.StatusOK,
@@ -1380,7 +1381,7 @@ func TestRepoHandler_CreateRepo(t *testing.T) {
 					Path:        "u/test-dataset",
 				}
 				tester.mocks.dataset.EXPECT().Create(
-					tester.Ctx(), expectedDatasetReq,
+					common.GinContextToStdContext(tester.Gctx()), expectedDatasetReq,
 				).Return(expectedResponse, nil)
 			},
 			expectedStatus: http.StatusOK,

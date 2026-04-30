@@ -624,6 +624,11 @@ type Config struct {
 		PartSize                int64 `env:"STARHUB_SERVER_STORAGE_GATEWAY_PART_SIZE" default:"67108864"`              // 64MB
 		EnablePresignedURLProxy bool  `env:"STARHUB_SERVER_STORAGE_GATEWAY_ENABLE_PRESIGNED_URL_PROXY" default:"true"` // Enable presigned URL proxy through gateway
 	}
+
+	AuditLog struct {
+		Enabled      bool     `env:"STARHUB_SERVER_AUDIT_LOG_ENABLE" default:"false"`
+		RecordTables []string `env:"STARHUB_SERVER_AUDIT_LOG_RECORD_TABLES" default:"[model,repository,tag,tag_category]"`
+	}
 }
 
 type MemoryConfig struct {

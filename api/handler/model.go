@@ -134,21 +134,22 @@ func (h *ModelHandler) Create(ctx *gin.Context) {
 		req.Namespace = currentUser
 	}
 
-	_, err := h.sensitive.CheckRequestV2(ctx.Request.Context(), req)
+	stdCtx := common.GinContextToStdContext(ctx)
+	_, err := h.sensitive.CheckRequestV2(stdCtx, req)
 	if err != nil {
-		slog.ErrorContext(ctx.Request.Context(), "failed to check sensitive request", slog.Any("error", err))
+		slog.ErrorContext(stdCtx, "failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequestWithExt(ctx, errorx.ErrSensitiveInfoNotAllowed)
 		return
 	}
 
-	model, err := h.model.Create(ctx.Request.Context(), req)
+	model, err := h.model.Create(stdCtx, req)
 	if err != nil {
 		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
 		} else if errors.Is(err, errorx.ErrDatabaseDuplicateKey) || errors.Is(err, errorx.ErrRepoAlreadyExist) || errors.Is(err, errorx.ErrSpaceNameAlreadyExist) {
 			httpbase.BadRequestWithExt(ctx, err)
 		} else {
-			slog.ErrorContext(ctx.Request.Context(), "Failed to create model", slog.Any("error", err))
+			slog.ErrorContext(stdCtx, "Failed to create model", slog.Any("error", err))
 			httpbase.ServerError(ctx, err)
 		}
 		return
@@ -181,16 +182,17 @@ func (h *ModelHandler) Update(ctx *gin.Context) {
 		return
 	}
 
-	_, err := h.sensitive.CheckRequestV2(ctx.Request.Context(), req)
+	stdCtx := common.GinContextToStdContext(ctx)
+	_, err := h.sensitive.CheckRequestV2(stdCtx, req)
 	if err != nil {
-		slog.ErrorContext(ctx.Request.Context(), "failed to check sensitive request", slog.Any("error", err))
+		slog.ErrorContext(stdCtx, "failed to check sensitive request", slog.Any("error", err))
 		httpbase.BadRequestWithExt(ctx, errorx.ErrSensitiveInfoNotAllowed)
 		return
 	}
 
 	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
 	if err != nil {
-		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
+		slog.ErrorContext(stdCtx, "Bad request format", "error", err)
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
@@ -198,13 +200,13 @@ func (h *ModelHandler) Update(ctx *gin.Context) {
 	req.Name = name
 	req.Username = currentUser
 
-	model, err := h.model.Update(ctx.Request.Context(), req)
+	model, err := h.model.Update(stdCtx, req)
 	if err != nil {
 		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
-		slog.ErrorContext(ctx.Request.Context(), "Failed to update model", slog.Any("error", err))
+		slog.ErrorContext(stdCtx, "Failed to update model", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -235,13 +237,14 @@ func (h *ModelHandler) Delete(ctx *gin.Context) {
 		httpbase.BadRequestWithExt(ctx, err)
 		return
 	}
-	err = h.model.Delete(ctx.Request.Context(), namespace, name, currentUser)
+	stdCtx := common.GinContextToStdContext(ctx)
+	err = h.model.Delete(stdCtx, namespace, name, currentUser)
 	if err != nil {
 		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
-		slog.ErrorContext(ctx.Request.Context(), "Failed to delete model", slog.Any("error", err))
+		slog.ErrorContext(stdCtx, "Failed to delete model", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}

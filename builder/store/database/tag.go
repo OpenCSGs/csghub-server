@@ -539,15 +539,17 @@ func (ts *tagStoreImpl) UpdateTagByID(ctx context.Context, tag *Tag) (*Tag, erro
 
 func (ts *tagStoreImpl) DeleteTagByID(ctx context.Context, id int64) error {
 	err := ts.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		tag := &Tag{ID: id}
 		_, err := tx.NewDelete().
-			Model(&Tag{}).
+			Model(tag).
 			Where("id = ?", id).
 			Exec(ctx)
 		if err != nil {
 			return fmt.Errorf("delete tag by id %d error: %w", id, err)
 		}
+		repoTag := &RepositoryTag{TagID: id}
 		_, err = tx.NewDelete().
-			Model(&RepositoryTag{}).
+			Model(repoTag).
 			Where("tag_id = ?", id).
 			Exec(ctx)
 		if err != nil {
@@ -576,7 +578,8 @@ func (ts *tagStoreImpl) UpdateCategory(ctx context.Context, category TagCategory
 }
 
 func (ts *tagStoreImpl) DeleteCategory(ctx context.Context, id int64) error {
-	_, err := ts.db.Operator.Core.NewDelete().Model(&TagCategory{}).Where("id = ?", id).Exec(ctx)
+	tagCate := &TagCategory{ID: id}
+	_, err := ts.db.Operator.Core.NewDelete().Model(tagCate).Where("id = ?", id).Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("delete category by id %d, error: %w", id, err)
 	}

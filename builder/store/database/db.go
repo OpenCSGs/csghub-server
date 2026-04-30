@@ -115,6 +115,7 @@ func NewDB(ctx context.Context, config DBConfig) (db *DB, err error) {
 		bunotel.WithDBName("csghub"),
 		bunotel.WithFormattedQueries(true),
 	))
+	registerDatabaseHooks(bunDB)
 
 	err = bunDB.PingContext(ctx)
 	if err != nil {

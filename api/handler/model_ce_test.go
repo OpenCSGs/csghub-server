@@ -17,6 +17,7 @@ import (
 	"opencsg.com/csghub-server/builder/testutil"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
+	"opencsg.com/csghub-server/common/utils/common"
 )
 
 type ModelTester struct {
@@ -104,8 +105,8 @@ func TestModelHandler_Create(t *testing.T) {
 
 		req := &types.CreateModelReq{CreateRepoReq: types.CreateRepoReq{Username: "u"}}
 		expect_req := &types.CreateModelReq{CreateRepoReq: types.CreateRepoReq{Username: "u", Namespace: "u"}}
-		tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), expect_req).Return(true, nil)
-		tester.mocks.model.EXPECT().Create(tester.Ctx(), expect_req).Return(&types.Model{Name: "m"}, nil)
+		tester.mocks.sensitive.EXPECT().CheckRequestV2(common.GinContextToStdContext(tester.Gctx()), expect_req).Return(true, nil)
+		tester.mocks.model.EXPECT().Create(common.GinContextToStdContext(tester.Gctx()), expect_req).Return(&types.Model{Name: "m"}, nil)
 		tester.WithBody(t, req).Execute()
 
 		tester.ResponseEq(t, 200, tester.OKText, &types.Model{Name: "m"})
@@ -117,8 +118,8 @@ func TestModelHandler_Create(t *testing.T) {
 		tester.WithUser()
 
 		req := &types.CreateModelReq{CreateRepoReq: types.CreateRepoReq{Username: "u", Namespace: "u"}}
-		tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), req).Return(true, nil)
-		tester.mocks.model.EXPECT().Create(tester.Ctx(), req).Return(&types.Model{Name: "m"}, nil)
+		tester.mocks.sensitive.EXPECT().CheckRequestV2(common.GinContextToStdContext(tester.Gctx()), req).Return(true, nil)
+		tester.mocks.model.EXPECT().Create(common.GinContextToStdContext(tester.Gctx()), req).Return(&types.Model{Name: "m"}, nil)
 		tester.WithBody(t, req).Execute()
 
 		tester.ResponseEq(t, 200, tester.OKText, &types.Model{Name: "m"})
@@ -133,8 +134,8 @@ func TestModelHandler_Update(t *testing.T) {
 	tester.WithUser()
 
 	req := &types.UpdateModelReq{UpdateRepoReq: types.UpdateRepoReq{}}
-	tester.mocks.sensitive.EXPECT().CheckRequestV2(tester.Ctx(), req).Return(true, nil)
-	tester.mocks.model.EXPECT().Update(tester.Ctx(), &types.UpdateModelReq{
+	tester.mocks.sensitive.EXPECT().CheckRequestV2(common.GinContextToStdContext(tester.Gctx()), req).Return(true, nil)
+	tester.mocks.model.EXPECT().Update(common.GinContextToStdContext(tester.Gctx()), &types.UpdateModelReq{
 		UpdateRepoReq: types.UpdateRepoReq{
 			Namespace: "u",
 			Name:      "r",
@@ -152,7 +153,7 @@ func TestModelHandler_Delete(t *testing.T) {
 	})
 	tester.WithUser()
 
-	tester.mocks.model.EXPECT().Delete(tester.Ctx(), "u", "r", "u").Return(nil)
+	tester.mocks.model.EXPECT().Delete(common.GinContextToStdContext(tester.Gctx()), "u", "r", "u").Return(nil)
 	tester.Execute()
 
 	tester.ResponseEq(t, 200, tester.OKText, nil)

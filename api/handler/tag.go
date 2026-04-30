@@ -11,6 +11,7 @@ import (
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
+	"opencsg.com/csghub-server/common/utils/common"
 	"opencsg.com/csghub-server/component"
 )
 
@@ -129,6 +130,7 @@ func (t *TagsHandler) GetTagByID(ctx *gin.Context) {
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
 // @Router       /tags/{id} [put]
 func (t *TagsHandler) UpdateTag(ctx *gin.Context) {
+
 	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Bad request format", slog.Any("error", err))
@@ -141,9 +143,10 @@ func (t *TagsHandler) UpdateTag(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	tag, err := t.tag.UpdateTag(ctx.Request.Context(), id, req)
+	stdCtx := common.GinContextToStdContext(ctx)
+	tag, err := t.tag.UpdateTag(stdCtx, id, req)
 	if err != nil {
-		slog.ErrorContext(ctx.Request.Context(), "Failed to update tag", slog.Int64("id", id), slog.Any("error", err))
+		slog.ErrorContext(stdCtx, "Failed to update tag", slog.Int64("id", id), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -169,9 +172,10 @@ func (t *TagsHandler) DeleteTag(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	err = t.tag.DeleteTag(ctx.Request.Context(), id)
+	stdCtx := common.GinContextToStdContext(ctx)
+	err = t.tag.DeleteTag(stdCtx, id)
 	if err != nil {
-		slog.ErrorContext(ctx.Request.Context(), "Failed to delete tag", slog.Int64("id", id), slog.Any("error", err))
+		slog.ErrorContext(stdCtx, "Failed to delete tag", slog.Int64("id", id), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -256,13 +260,14 @@ func (t *TagsHandler) UpdateCategory(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	category, err := t.tag.UpdateCategory(ctx.Request.Context(), req, id)
+	stdCtx := common.GinContextToStdContext(ctx)
+	category, err := t.tag.UpdateCategory(stdCtx, req, id)
 	if err != nil {
 		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
-		slog.ErrorContext(ctx.Request.Context(), "Failed to update category", slog.Any("req", req), slog.Any("id", id), slog.Any("error", err))
+		slog.ErrorContext(stdCtx, "Failed to update category", slog.Any("req", req), slog.Any("id", id), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
@@ -288,13 +293,14 @@ func (t *TagsHandler) DeleteCategory(ctx *gin.Context) {
 		httpbase.BadRequest(ctx, err.Error())
 		return
 	}
-	err = t.tag.DeleteCategory(ctx.Request.Context(), id)
+	stdCtx := common.GinContextToStdContext(ctx)
+	err = t.tag.DeleteCategory(stdCtx, id)
 	if err != nil {
 		if errors.Is(err, errorx.ErrForbidden) {
 			httpbase.ForbiddenError(ctx, err)
 			return
 		}
-		slog.ErrorContext(ctx.Request.Context(), "Failed to delete category", slog.Any("id", id), slog.Any("error", err))
+		slog.ErrorContext(stdCtx, "Failed to delete category", slog.Any("id", id), slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
 	}
