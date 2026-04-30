@@ -148,6 +148,13 @@ func (m *Manager) Start() {
 }
 
 func (m *Manager) startWorker(id int, mt *database.MirrorTask) {
+	defer func() {
+		r := recover()
+		if r != nil {
+			slog.Error("start worker recovered from panic", slog.Any("panic", r))
+			m.conChan <- id
+		}
+	}()
 	lfsSyncWorker, err := mirror.NewLFSSyncWorker(m.config, id)
 	if err != nil {
 		slog.Error("failed to create lfs sync worker", slog.Any("error", err))
@@ -156,6 +163,7 @@ func (m *Manager) startWorker(id int, mt *database.MirrorTask) {
 
 	ctx := context.Background()
 	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	lfsSyncWorker.SetContext(ctx)
 
 	m.mu.Lock()
@@ -175,7 +183,15 @@ func (m *Manager) startWorker(id int, mt *database.MirrorTask) {
 	}
 	m.mu.Unlock()
 
+	// Ensure to clean up from the workers map before the function returns
+	defer func() {
+		m.mu.Lock()
+		delete(m.workers, id)
+		m.mu.Unlock()
+	}()
+
 	lfsSyncWorker.Run(mt)
+
 	m.conChan <- id
 }
 
