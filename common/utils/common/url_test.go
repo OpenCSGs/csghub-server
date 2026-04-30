@@ -161,3 +161,98 @@ func TestValidateURLFormat(t *testing.T) {
 		})
 	}
 }
+
+func TestExtractURLPath(t *testing.T) {
+	tests := []struct {
+		name     string
+		endpoint string
+		want     string
+	}{
+		{
+			name:     "endpoint with path",
+			endpoint: "https://api.example.com/v1/videos",
+			want:     "/v1/videos",
+		},
+		{
+			name:     "endpoint with path and query",
+			endpoint: "https://api.example.com/v1/videos?api-version=2026-01-01",
+			want:     "/v1/videos",
+		},
+		{
+			name:     "endpoint with surrounding spaces",
+			endpoint: "  https://api.example.com/v1/videos  ",
+			want:     "/v1/videos",
+		},
+		{
+			name:     "endpoint without path",
+			endpoint: "https://api.example.com",
+			want:     "",
+		},
+		{
+			name:     "empty endpoint",
+			endpoint: "",
+			want:     "",
+		},
+		{
+			name:     "invalid endpoint",
+			endpoint: "://bad-url",
+			want:     "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := ExtractURLPath(tt.endpoint); got != tt.want {
+				t.Errorf("ExtractURLPath() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestJoinURLPath(t *testing.T) {
+	tests := []struct {
+		name  string
+		base  string
+		elems []string
+		want  string
+	}{
+		{
+			name:  "append segments",
+			base:  "/v1/videos",
+			elems: []string{"vid_123", "content"},
+			want:  "/v1/videos/vid_123/content",
+		},
+		{
+			name:  "trim duplicate slashes",
+			base:  "/v1/videos/",
+			elems: []string{"/vid_123/", "/content/"},
+			want:  "/v1/videos/vid_123/content",
+		},
+		{
+			name:  "skip empty segments",
+			base:  "/v1/videos",
+			elems: []string{"", "vid_123"},
+			want:  "/v1/videos/vid_123",
+		},
+		{
+			name:  "empty base",
+			base:  "",
+			elems: []string{"vid_123"},
+			want:  "/vid_123",
+		},
+		{
+			name:  "empty result",
+			base:  "",
+			elems: []string{"", "/"},
+			want:  "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := JoinURLPath(tt.base, tt.elems...); got != tt.want {
+				t.Errorf("JoinURLPath() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}

@@ -5,11 +5,15 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"net/textproto"
 	"net/url"
+	"strconv"
+	"strings"
 	"sync"
 	"testing"
 
@@ -25,6 +29,7 @@ import (
 	apicomp "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
 	comp "opencsg.com/csghub-server/aigateway/component"
 	"opencsg.com/csghub-server/aigateway/component/adapter/text2image"
+	"opencsg.com/csghub-server/aigateway/component/adapter/text2video"
 	"opencsg.com/csghub-server/aigateway/token"
 	"opencsg.com/csghub-server/aigateway/types"
 	"opencsg.com/csghub-server/api/httpbase"
@@ -43,6 +48,7 @@ type testerOpenAIHandler struct {
 		mockClsComp         *apicomp.MockClusterComponent
 		tokenCounterFactory *mocktoken.MockCounterFactory
 		whitelistRule       *mockdatabase.MockRepositoryFileCheckRuleStore
+		aiGenerationStore   *mockdatabase.MockAIGenerationStore
 	}
 
 	handler *OpenAIHandlerImpl
@@ -76,7 +82,8 @@ func setupTest(t *testing.T) (*testerOpenAIHandler, *gin.Context, *httptest.Resp
 	mockTokenCounterFactory := mocktoken.NewMockCounterFactory(t)
 	cfg := &config.Config{}
 	mockWhitelistRule := mockdatabase.NewMockRepositoryFileCheckRuleStore(t)
-	handler := newOpenAIHandler(mockOpenAI, mockRepo, mockModeration, mockClsComp, mockTokenCounterFactory, text2image.NewRegistry(), cfg, nil, mockWhitelistRule)
+	mockAIGenerationStore := mockdatabase.NewMockAIGenerationStore(t)
+	handler := newOpenAIHandler(mockOpenAI, mockRepo, mockModeration, mockClsComp, mockTokenCounterFactory, text2image.NewRegistry(), text2video.NewRegistry(), cfg, nil, mockWhitelistRule, mockAIGenerationStore)
 
 	// Set test user
 	tester := &testerOpenAIHandler{
@@ -93,6 +100,7 @@ func setupTest(t *testing.T) (*testerOpenAIHandler, *gin.Context, *httptest.Resp
 	tester.mocks.mockClsComp = mockClsComp
 	tester.mocks.tokenCounterFactory = mockTokenCounterFactory
 	tester.mocks.whitelistRule = mockWhitelistRule
+	tester.mocks.aiGenerationStore = mockAIGenerationStore
 
 	tester.mocks.whitelistRule.EXPECT().ListBySensitiveCheckTargets(mock.Anything, mock.Anything, mock.Anything).Return([]database.RepositoryFileCheckRule{}, nil).Maybe()
 	tester.mocks.openAIComp.EXPECT().CheckUsageLimit(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
@@ -286,7 +294,7 @@ func TestOpenAIHandler_ListModels_OpenaiSDK(t *testing.T) {
 	// Add middleware to set current user (similar to how it's done in the actual router)
 	router.Use(func(c *gin.Context) {
 		httpbase.SetCurrentUser(c, "testuser")
-		httpbase.SetCurrentUserUUID(c, "testuuid")
+		httpbase.SetCurrentNamespaceUUID(c, "testuuid")
 		c.Next()
 	})
 
@@ -1486,4 +1494,746 @@ func TestOpenAIHandler_GenerateImage(t *testing.T) {
 			})
 		}
 	})
+}
+
+func TestOpenAIHandler_CreateVideo(t *testing.T) {
+	t.Run("create video with json request stores provider video id", func(t *testing.T) {
+		tester, c, w := setupTest(t)
+		var downstreamModel string
+		var createdGeneration database.AIGeneration
+
+		downstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, "/v1/videos", r.URL.Path)
+			var req map[string]any
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&req))
+			downstreamModel = req["model"].(string)
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"id":"vid_123","object":"video","status":"queued"}`))
+		}))
+		defer downstream.Close()
+
+		model := &types.Model{
+			BaseModel:         types.BaseModel{ID: "video-model", Task: "text-to-video"},
+			ExternalModelInfo: types.ExternalModelInfo{Provider: "openai"},
+			Endpoint:          downstream.URL + "/v1/videos",
+		}
+		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "video-model").Return(model, nil).Once()
+		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
+		tester.mocks.moderationComp.EXPECT().CheckImagePrompts(mock.Anything, "make a flying car", "testuuid").Return(&rpc.CheckResult{IsSensitive: false}, nil).Once()
+		tester.mocks.aiGenerationStore.EXPECT().Create(mock.Anything, mock.MatchedBy(func(generation database.AIGeneration) bool {
+			createdGeneration = generation
+			return generation.ResourceType == database.AIGenerationResourceTypeVideo &&
+				strings.HasPrefix(generation.ResourceID, "video_") &&
+				generation.ProviderResourceID == "vid_123" &&
+				generation.OwnerUUID == "testuuid" &&
+				generation.ModelID == "video-model" &&
+				generation.Status == "queued"
+		})).Return(&database.AIGeneration{}, nil).Once()
+
+		body := `{"model":"video-model","prompt":"make a flying car","seconds":5}`
+		c.Request = httptest.NewRequest(http.MethodPost, "/v1/videos", bytes.NewBufferString(body))
+		c.Request.Header.Set("Content-Type", "application/json")
+
+		tester.handler.CreateVideo(c)
+
+		require.Equal(t, http.StatusOK, w.Code)
+		var resp types.VideoObject
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+		require.NotEqual(t, "vid_123", resp.ID)
+		require.True(t, strings.HasPrefix(resp.ID, "video_"))
+		require.Equal(t, "queued", resp.Status)
+		generation := createdGeneration
+		require.Equal(t, resp.ID, generation.ResourceID)
+		require.Equal(t, "video-model", generation.ModelID)
+		require.Equal(t, "testuuid", generation.OwnerUUID)
+		require.Equal(t, "vid_123", generation.ProviderResourceID)
+		require.Equal(t, model.ID, downstreamModel)
+	})
+
+	t.Run("create video with json image_url input_reference for image-to-video task", func(t *testing.T) {
+		tester, c, w := setupTest(t)
+		var gotInputReference map[string]any
+
+		downstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, "/v1/videos", r.URL.Path)
+			var req map[string]any
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&req))
+			gotInputReference = req["input_reference"].(map[string]any)
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"id":"vid_img_url","object":"video","status":"queued"}`))
+		}))
+		defer downstream.Close()
+
+		model := &types.Model{
+			BaseModel:         types.BaseModel{ID: "image-video-model", Task: "image-to-video"},
+			ExternalModelInfo: types.ExternalModelInfo{Provider: "openai"},
+			Endpoint:          downstream.URL + "/v1/videos",
+		}
+		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "image-video-model").Return(model, nil).Once()
+		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
+		tester.mocks.moderationComp.EXPECT().CheckImagePrompts(mock.Anything, "animate this image", "testuuid").Return(&rpc.CheckResult{IsSensitive: false}, nil).Once()
+		tester.mocks.aiGenerationStore.EXPECT().Create(mock.Anything, mock.Anything).
+			Return(&database.AIGeneration{}, nil).Once()
+
+		body := `{"model":"image-video-model","prompt":"animate this image","input_reference":{"image_url":"https://example.com/frame.png"}}`
+		c.Request = httptest.NewRequest(http.MethodPost, "/v1/videos", bytes.NewBufferString(body))
+		c.Request.Header.Set("Content-Type", "application/json")
+
+		tester.handler.CreateVideo(c)
+
+		require.Equal(t, http.StatusOK, w.Code)
+		require.Equal(t, "https://example.com/frame.png", gotInputReference["image_url"])
+	})
+
+	t.Run("create video with json file_id input_reference", func(t *testing.T) {
+		tester, c, w := setupTest(t)
+		var gotInputReference map[string]any
+
+		downstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			var req map[string]any
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&req))
+			gotInputReference = req["input_reference"].(map[string]any)
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"id":"vid_file_id","object":"video","status":"queued"}`))
+		}))
+		defer downstream.Close()
+
+		model := &types.Model{
+			BaseModel:         types.BaseModel{ID: "video-model", Task: "text-to-video"},
+			ExternalModelInfo: types.ExternalModelInfo{Provider: "openai"},
+			Endpoint:          downstream.URL + "/v1/videos",
+		}
+		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "video-model").Return(model, nil).Once()
+		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
+		tester.mocks.moderationComp.EXPECT().CheckImagePrompts(mock.Anything, "animate this asset", "testuuid").Return(&rpc.CheckResult{IsSensitive: false}, nil).Once()
+		tester.mocks.aiGenerationStore.EXPECT().Create(mock.Anything, mock.Anything).
+			Return(&database.AIGeneration{}, nil).Once()
+
+		body := `{"model":"video-model","prompt":"animate this asset","input_reference":{"file_id":"file_123"}}`
+		c.Request = httptest.NewRequest(http.MethodPost, "/v1/videos", bytes.NewBufferString(body))
+		c.Request.Header.Set("Content-Type", "application/json")
+
+		tester.handler.CreateVideo(c)
+
+		require.Equal(t, http.StatusOK, w.Code)
+		require.Equal(t, "file_123", gotInputReference["file_id"])
+	})
+
+	t.Run("reject invalid json input_reference", func(t *testing.T) {
+		tester, c, w := setupTest(t)
+		body := `{"model":"video-model","prompt":"animate this asset","input_reference":{}}`
+		c.Request = httptest.NewRequest(http.MethodPost, "/v1/videos", bytes.NewBufferString(body))
+		c.Request.Header.Set("Content-Type", "application/json")
+
+		tester.handler.CreateVideo(c)
+
+		require.Equal(t, http.StatusBadRequest, w.Code)
+		require.Contains(t, w.Body.String(), "input_reference must include file_id or image_url")
+	})
+
+	t.Run("create video with multipart request", func(t *testing.T) {
+		tester, c, w := setupTest(t)
+		var gotModel string
+		var gotPrompt string
+		var createdGeneration database.AIGeneration
+
+		downstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			require.NoError(t, r.ParseMultipartForm(1024*1024))
+			gotModel = r.FormValue("model")
+			gotPrompt = r.FormValue("prompt")
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"id":"vid_456","object":"video","status":"queued"}`))
+		}))
+		defer downstream.Close()
+
+		model := &types.Model{
+			BaseModel:         types.BaseModel{ID: "video-model", Task: "text-to-video"},
+			ExternalModelInfo: types.ExternalModelInfo{Provider: "openai"},
+			Endpoint:          downstream.URL + "/v1/videos",
+		}
+		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "video-model").Return(model, nil).Once()
+		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
+		tester.mocks.moderationComp.EXPECT().CheckImagePrompts(mock.Anything, "make a boat", "testuuid").Return(&rpc.CheckResult{IsSensitive: false}, nil).Once()
+		tester.mocks.aiGenerationStore.EXPECT().Create(mock.Anything, mock.MatchedBy(func(generation database.AIGeneration) bool {
+			createdGeneration = generation
+			return strings.HasPrefix(generation.ResourceID, "video_") &&
+				generation.ModelID == "video-model" &&
+				generation.ProviderResourceID == "vid_456"
+		})).Return(&database.AIGeneration{}, nil).Once()
+
+		c.Request = newMultipartVideoRequest(t, "video-model", "make a boat", "image/png")
+
+		tester.handler.CreateVideo(c)
+
+		require.Equal(t, http.StatusOK, w.Code)
+		var resp types.VideoObject
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+		require.Equal(t, resp.ID, createdGeneration.ResourceID)
+		require.Equal(t, "video-model", createdGeneration.ModelID)
+		require.Equal(t, "vid_456", createdGeneration.ProviderResourceID)
+		require.Equal(t, "video-model", gotModel)
+		require.Equal(t, "make a boat", gotPrompt)
+	})
+
+	t.Run("create video with minimax adapter normalizes request and response", func(t *testing.T) {
+		tester, c, w := setupTest(t)
+		var gotReq map[string]any
+		var createdGeneration database.AIGeneration
+
+		downstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, "/v1/video_generation", r.URL.Path)
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&gotReq))
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"task_id":"task_123"}`))
+		}))
+		defer downstream.Close()
+
+		model := &types.Model{
+			BaseModel: types.BaseModel{
+				ID:       "video-model",
+				Task:     "image-to-video",
+				Metadata: map[string]any{"video_api": map[string]any{"type": "minimax"}},
+			},
+			ExternalModelInfo: types.ExternalModelInfo{Provider: "minimax"},
+			Endpoint:          downstream.URL + "/v1/video_generation",
+		}
+		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "video-model").Return(model, nil).Once()
+		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
+		tester.mocks.moderationComp.EXPECT().CheckImagePrompts(mock.Anything, "make a boat", "testuuid").Return(&rpc.CheckResult{IsSensitive: false}, nil).Once()
+		tester.mocks.aiGenerationStore.EXPECT().Create(mock.Anything, mock.MatchedBy(func(generation database.AIGeneration) bool {
+			createdGeneration = generation
+			return strings.HasPrefix(generation.ResourceID, "video_") &&
+				generation.ProviderResourceID == "task_123"
+		})).Return(&database.AIGeneration{}, nil).Once()
+
+		body := `{"model":"video-model","prompt":"make a boat","size":"1280x720","input_reference":{"image_url":"https://example.com/frame.png"}}`
+		c.Request = httptest.NewRequest(http.MethodPost, "/v1/videos", bytes.NewBufferString(body))
+		c.Request.Header.Set("Content-Type", "application/json")
+
+		tester.handler.CreateVideo(c)
+
+		require.Equal(t, http.StatusOK, w.Code)
+		var resp types.VideoObject
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+		require.True(t, strings.HasPrefix(resp.ID, "video_"))
+		require.Equal(t, resp.ID, createdGeneration.ResourceID)
+		require.Equal(t, "task_123", createdGeneration.ProviderResourceID)
+		require.Equal(t, "video-model", gotReq["model"])
+		require.Equal(t, "720P", gotReq["resolution"])
+		require.Equal(t, "https://example.com/frame.png", gotReq["first_frame_image"])
+	})
+
+	t.Run("create video with minimax adapter rejects unsupported openai size", func(t *testing.T) {
+		tester, c, w := setupTest(t)
+
+		model := &types.Model{
+			BaseModel: types.BaseModel{
+				ID:       "video-model",
+				Task:     "text-to-video",
+				Metadata: map[string]any{"video_api": map[string]any{"type": "minimax"}},
+			},
+			ExternalModelInfo: types.ExternalModelInfo{Provider: "minimax"},
+			Endpoint:          "https://api.minimax.example.com/v1/video_generation",
+		}
+		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "video-model").Return(model, nil).Once()
+		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
+		tester.mocks.moderationComp.EXPECT().CheckImagePrompts(mock.Anything, "make a boat", "testuuid").Return(&rpc.CheckResult{IsSensitive: false}, nil).Once()
+
+		body := `{"model":"video-model","prompt":"make a boat","size":"1024x1792"}`
+		c.Request = httptest.NewRequest(http.MethodPost, "/v1/videos", bytes.NewBufferString(body))
+		c.Request.Header.Set("Content-Type", "application/json")
+
+		tester.handler.CreateVideo(c)
+
+		require.Equal(t, http.StatusBadRequest, w.Code)
+		require.Contains(t, w.Body.String(), "MiniMax video backend does not support size")
+	})
+
+	t.Run("create video with minimax adapter surfaces downstream provider error message", func(t *testing.T) {
+		tester, c, w := setupTest(t)
+
+		downstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, "/v1/video_generation", r.URL.Path)
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{
+				"base_resp": {
+					"status_code": 1004,
+					"status_msg": "unsupported resolution for model"
+				}
+			}`))
+		}))
+		defer downstream.Close()
+
+		model := &types.Model{
+			BaseModel: types.BaseModel{
+				ID:       "video-model",
+				Task:     "text-to-video",
+				Metadata: map[string]any{"video_api": map[string]any{"type": "minimax"}},
+			},
+			ExternalModelInfo: types.ExternalModelInfo{Provider: "minimax"},
+			Endpoint:          downstream.URL + "/v1/video_generation",
+		}
+		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "video-model").Return(model, nil).Once()
+		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
+		tester.mocks.moderationComp.EXPECT().CheckImagePrompts(mock.Anything, "make a boat", "testuuid").Return(&rpc.CheckResult{IsSensitive: false}, nil).Once()
+
+		body := `{"model":"video-model","prompt":"make a boat","size":"1280x720"}`
+		c.Request = httptest.NewRequest(http.MethodPost, "/v1/videos", bytes.NewBufferString(body))
+		c.Request.Header.Set("Content-Type", "application/json")
+
+		tester.handler.CreateVideo(c)
+
+		require.Equal(t, http.StatusBadRequest, w.Code)
+		require.Contains(t, w.Body.String(), "unsupported resolution for model")
+		require.NotContains(t, w.Body.String(), "missing task_id")
+	})
+
+	t.Run("create video includes downstream top-level error message on parse failure", func(t *testing.T) {
+		tester, c, w := setupTest(t)
+
+		downstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, "/v1/video_generation", r.URL.Path)
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"error":"Failed to get product"}`))
+		}))
+		defer downstream.Close()
+
+		model := &types.Model{
+			BaseModel: types.BaseModel{
+				ID:       "video-model",
+				Task:     "text-to-video",
+				Metadata: map[string]any{"video_api": map[string]any{"type": "minimax"}},
+			},
+			ExternalModelInfo: types.ExternalModelInfo{Provider: "minimax"},
+			Endpoint:          downstream.URL + "/v1/video_generation",
+		}
+		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "video-model").Return(model, nil).Once()
+		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
+		tester.mocks.moderationComp.EXPECT().CheckImagePrompts(mock.Anything, "make a boat", "testuuid").Return(&rpc.CheckResult{IsSensitive: false}, nil).Once()
+
+		body := `{"model":"video-model","prompt":"make a boat"}`
+		c.Request = httptest.NewRequest(http.MethodPost, "/v1/videos", bytes.NewBufferString(body))
+		c.Request.Header.Set("Content-Type", "application/json")
+
+		tester.handler.CreateVideo(c)
+
+		require.Equal(t, http.StatusInternalServerError, w.Code)
+		require.Contains(t, w.Body.String(), "Failed to get product")
+		require.Contains(t, w.Body.String(), "missing task_id")
+	})
+
+	t.Run("create video with seedance adapter rejects unsupported openai size", func(t *testing.T) {
+		tester, c, w := setupTest(t)
+
+		model := &types.Model{
+			BaseModel: types.BaseModel{
+				ID:       "video-model",
+				Task:     "text-to-video",
+				Metadata: map[string]any{"video_api": map[string]any{"type": "seedance"}},
+			},
+			ExternalModelInfo: types.ExternalModelInfo{Provider: "seedance"},
+			Endpoint:          "https://ark.ap-southeast.bytepluses.com/api/v3",
+		}
+		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "video-model").Return(model, nil).Once()
+		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
+		tester.mocks.moderationComp.EXPECT().CheckImagePrompts(mock.Anything, "make a boat", "testuuid").Return(&rpc.CheckResult{IsSensitive: false}, nil).Once()
+
+		body := `{"model":"video-model","prompt":"make a boat","size":"1024x1792"}`
+		c.Request = httptest.NewRequest(http.MethodPost, "/v1/videos", bytes.NewBufferString(body))
+		c.Request.Header.Set("Content-Type", "application/json")
+
+		tester.handler.CreateVideo(c)
+
+		require.Equal(t, http.StatusBadRequest, w.Code)
+		require.Contains(t, w.Body.String(), "Seedance video backend does not support size")
+	})
+
+	t.Run("create video with lightx2v multipart request", func(t *testing.T) {
+		tester, c, w := setupTest(t)
+		var gotPrompt string
+		var gotWidth string
+		var gotHeight string
+		var gotDuration string
+		var gotImageFile bool
+		var createdGeneration database.AIGeneration
+
+		downstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, "/v1/tasks/video/form", r.URL.Path)
+			require.NoError(t, r.ParseMultipartForm(1024*1024))
+			gotPrompt = r.FormValue("prompt")
+			gotWidth = r.FormValue("width")
+			gotHeight = r.FormValue("height")
+			gotDuration = r.FormValue("video_duration")
+			files := r.MultipartForm.File["image_file"]
+			gotImageFile = len(files) == 1
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"task_id":"task_789","status":"submitted"}`))
+		}))
+		defer downstream.Close()
+
+		model := &types.Model{
+			BaseModel:         types.BaseModel{ID: "video-model", Task: "image-to-video"},
+			ExternalModelInfo: types.ExternalModelInfo{Provider: "opencsg"},
+			InternalModelInfo: types.InternalModelInfo{RuntimeFramework: "lightx2v", CSGHubModelID: "Wan-AI/Wan2.2-I2V-A14B"},
+			Endpoint:          downstream.URL,
+		}
+		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "video-model").Return(model, nil).Once()
+		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
+		tester.mocks.moderationComp.EXPECT().CheckImagePrompts(mock.Anything, "make a boat", "testuuid").Return(&rpc.CheckResult{IsSensitive: false}, nil).Once()
+		tester.mocks.aiGenerationStore.EXPECT().Create(mock.Anything, mock.MatchedBy(func(generation database.AIGeneration) bool {
+			createdGeneration = generation
+			return strings.HasPrefix(generation.ResourceID, "video_") &&
+				generation.ModelID == "video-model" &&
+				generation.ProviderResourceID == "task_789"
+		})).Return(&database.AIGeneration{}, nil).Once()
+
+		c.Request = newMultipartVideoRequestWithSize(t, "video-model", "make a boat", "1280x720", "image/png")
+
+		tester.handler.CreateVideo(c)
+
+		require.Equal(t, http.StatusOK, w.Code)
+		var resp types.VideoObject
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+		require.Equal(t, resp.ID, createdGeneration.ResourceID)
+		require.Equal(t, "task_789", createdGeneration.ProviderResourceID)
+		require.Equal(t, "make a boat", gotPrompt)
+		require.Equal(t, "1280", gotWidth)
+		require.Equal(t, "720", gotHeight)
+		require.Equal(t, "", gotDuration)
+		require.True(t, gotImageFile)
+	})
+
+	t.Run("create video with lightx2v rejects json file_id input_reference", func(t *testing.T) {
+		tester, c, w := setupTest(t)
+
+		model := &types.Model{
+			BaseModel:         types.BaseModel{ID: "video-model", Task: "image-to-video"},
+			ExternalModelInfo: types.ExternalModelInfo{Provider: "opencsg"},
+			InternalModelInfo: types.InternalModelInfo{RuntimeFramework: "lightx2v", CSGHubModelID: "Wan-AI/Wan2.2-I2V-A14B"},
+			Endpoint:          "https://lightx2v.internal",
+		}
+		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "video-model").Return(model, nil).Once()
+
+		body := `{"model":"video-model","prompt":"animate this asset","input_reference":{"file_id":"file_123"}}`
+		c.Request = httptest.NewRequest(http.MethodPost, "/v1/videos", bytes.NewBufferString(body))
+		c.Request.Header.Set("Content-Type", "application/json")
+
+		tester.handler.CreateVideo(c)
+
+		require.Equal(t, http.StatusBadRequest, w.Code)
+		require.Contains(t, w.Body.String(), "selected model does not support input_reference.file_id")
+	})
+
+	t.Run("create video with lightx2v multipart text-only request falls back to json create", func(t *testing.T) {
+		tester, c, w := setupTest(t)
+		var gotBody map[string]any
+		var createdGeneration database.AIGeneration
+
+		downstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, "/v1/tasks/video", r.URL.Path)
+			require.Equal(t, "application/json", strings.TrimSpace(strings.Split(r.Header.Get("Content-Type"), ";")[0]))
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&gotBody))
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"task_id":"task_t2v","status":"submitted"}`))
+		}))
+		defer downstream.Close()
+
+		model := &types.Model{
+			BaseModel:         types.BaseModel{ID: "video-model", Task: "text-to-video"},
+			ExternalModelInfo: types.ExternalModelInfo{Provider: "opencsg"},
+			InternalModelInfo: types.InternalModelInfo{RuntimeFramework: "lightx2v", CSGHubModelID: "Wan-AI/Wan2.2-T2V-A14B"},
+			Endpoint:          downstream.URL,
+		}
+		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "video-model").Return(model, nil).Once()
+		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
+		tester.mocks.moderationComp.EXPECT().CheckImagePrompts(mock.Anything, "make a boat", "testuuid").Return(&rpc.CheckResult{IsSensitive: false}, nil).Once()
+		tester.mocks.aiGenerationStore.EXPECT().Create(mock.Anything, mock.MatchedBy(func(generation database.AIGeneration) bool {
+			createdGeneration = generation
+			return strings.HasPrefix(generation.ResourceID, "video_") &&
+				generation.ModelID == "video-model" &&
+				generation.ProviderResourceID == "task_t2v"
+		})).Return(&database.AIGeneration{}, nil).Once()
+
+		c.Request = newMultipartTextOnlyVideoRequestWithSizeAndSeconds(t, "video-model", "make a boat", "1280x720", 5)
+
+		tester.handler.CreateVideo(c)
+
+		require.Equal(t, http.StatusOK, w.Code)
+		var resp types.VideoObject
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+		require.Equal(t, resp.ID, createdGeneration.ResourceID)
+		require.Equal(t, "task_t2v", createdGeneration.ProviderResourceID)
+		require.Equal(t, "make a boat", gotBody["prompt"])
+		require.Equal(t, float64(1280), gotBody["width"])
+		require.Equal(t, float64(720), gotBody["height"])
+		require.Equal(t, float64(5), gotBody["video_duration"])
+	})
+
+	t.Run("reject multipart input_reference with unsupported content type", func(t *testing.T) {
+		tester, c, w := setupTest(t)
+		c.Request = newMultipartVideoRequest(t, "video-model", "make a boat", "text/plain")
+
+		tester.handler.CreateVideo(c)
+
+		require.Equal(t, http.StatusBadRequest, w.Code)
+		require.Contains(t, w.Body.String(), "unsupported input_reference content type")
+	})
+}
+
+func TestOpenAIHandler_GetVideo(t *testing.T) {
+	tester, c, w := setupTest(t)
+	generation := database.AIGeneration{
+		ID:                 1,
+		ResourceType:       database.AIGenerationResourceTypeVideo,
+		ResourceID:         "video_gateway",
+		ProviderResourceID: "vid_123",
+		OwnerUUID:          "testuuid",
+		ModelID:            "video-model",
+		Status:             "queued",
+	}
+
+	downstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "/v1/videos/vid_123", r.URL.Path)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"vid_123","object":"video","status":"completed","created_at":123}`))
+	}))
+	defer downstream.Close()
+
+	model := &types.Model{
+		BaseModel:         types.BaseModel{ID: "video-model", Task: "text-to-video"},
+		ExternalModelInfo: types.ExternalModelInfo{Provider: "openai"},
+		Endpoint:          downstream.URL + "/v1/videos",
+	}
+	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "video-model").Return(model, nil).Once()
+	tester.mocks.aiGenerationStore.EXPECT().FindByResourceID(mock.Anything, database.AIGenerationResourceTypeVideo, "video_gateway").Return(&generation, nil).Once()
+	tester.mocks.aiGenerationStore.EXPECT().Update(mock.Anything, mock.MatchedBy(func(input database.AIGeneration) bool {
+		generation = input
+		return input.ResourceID == "video_gateway" && input.Status == "completed"
+	})).Return(&database.AIGeneration{}, nil).Once()
+
+	c.Request = httptest.NewRequest(http.MethodGet, "/v1/videos/video_gateway", nil)
+	c.Params = gin.Params{{Key: "video_id", Value: "video_gateway"}}
+
+	tester.handler.GetVideo(c)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	require.JSONEq(t, `{"id":"video_gateway","object":"video","status":"completed","created_at":123}`, w.Body.String())
+	require.Equal(t, "completed", generation.Status)
+}
+
+func TestOpenAIHandler_GetVideoContent(t *testing.T) {
+	tester, _, _ := setupTest(t)
+	generation := database.AIGeneration{
+		ID:                 1,
+		ResourceType:       database.AIGenerationResourceTypeVideo,
+		ResourceID:         "video_gateway",
+		ProviderResourceID: "vid_123",
+		OwnerUUID:          "testuuid",
+		ModelID:            "video-model",
+		Status:             "queued",
+	}
+
+	downstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "/v1/videos/vid_123/content", r.URL.Path)
+		require.Equal(t, "thumbnail", r.URL.Query().Get("variant"))
+		w.Header().Set("Content-Type", "video/mp4")
+		w.Header().Set("Content-Length", strconv.Itoa(len("video-bytes")))
+		_, _ = w.Write([]byte("video-bytes"))
+	}))
+	defer downstream.Close()
+
+	model := &types.Model{
+		BaseModel:         types.BaseModel{ID: "video-model", Task: "text-to-video"},
+		ExternalModelInfo: types.ExternalModelInfo{Provider: "openai"},
+		Endpoint:          downstream.URL + "/v1/videos",
+	}
+	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "video-model").Return(model, nil).Once()
+	tester.mocks.aiGenerationStore.EXPECT().FindByResourceID(mock.Anything, database.AIGenerationResourceTypeVideo, "video_gateway").Return(&generation, nil).Once()
+
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		httpbase.SetCurrentUser(c, "testuser")
+		httpbase.SetCurrentNamespaceUUID(c, "testuuid")
+		c.Next()
+	})
+	router.GET("/v1/videos/:video_id/content", tester.handler.GetVideoContent)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/v1/videos/video_gateway/content?variant=thumbnail", nil)
+	router.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	require.Equal(t, "video-bytes", w.Body.String())
+}
+
+func TestOpenAIHandler_GetVideoContent_MiniMaxResolvesDownloadURL(t *testing.T) {
+	tester, _, _ := setupTest(t)
+	generation := database.AIGeneration{
+		ID:                 1,
+		ResourceType:       database.AIGenerationResourceTypeVideo,
+		ResourceID:         "video_gateway",
+		ProviderResourceID: "task_123",
+		OwnerUUID:          "testuuid",
+		ModelID:            "video-model",
+		Status:             "completed",
+	}
+
+	download := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "video/mp4")
+		_, _ = w.Write([]byte("minimax-video-bytes"))
+	}))
+	defer download.Close()
+
+	downstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v1/query/video_generation":
+			require.Equal(t, "task_123", r.URL.Query().Get("task_id"))
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"task_id":"task_123","status":"Success","file_id":"file_123"}`))
+		case "/v1/files/retrieve":
+			require.Equal(t, "file_123", r.URL.Query().Get("file_id"))
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = fmt.Fprintf(w, `{"file":{"download_url":%q}}`, download.URL+"/video.mp4")
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	}))
+	defer downstream.Close()
+
+	model := &types.Model{
+		BaseModel: types.BaseModel{
+			ID:       "video-model",
+			Task:     "text-to-video",
+			Metadata: map[string]any{"video_api": map[string]any{"type": "minimax"}},
+		},
+		ExternalModelInfo: types.ExternalModelInfo{Provider: "minimax"},
+		Endpoint:          downstream.URL + "/v1/video_generation",
+	}
+	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "video-model").Return(model, nil).Once()
+	tester.mocks.aiGenerationStore.EXPECT().FindByResourceID(mock.Anything, database.AIGenerationResourceTypeVideo, "video_gateway").Return(&generation, nil).Once()
+	tester.mocks.aiGenerationStore.EXPECT().Update(mock.Anything, mock.MatchedBy(func(input database.AIGeneration) bool {
+		generation = input
+		return input.ResourceID == "video_gateway" && input.ProviderMetadata["file_id"] == "file_123"
+	})).Return(&database.AIGeneration{}, nil).Once()
+
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		httpbase.SetCurrentUser(c, "testuser")
+		httpbase.SetCurrentNamespaceUUID(c, "testuuid")
+		c.Next()
+	})
+	router.GET("/v1/videos/:video_id/content", tester.handler.GetVideoContent)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/v1/videos/video_gateway/content", nil)
+	router.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	require.Equal(t, "minimax-video-bytes", w.Body.String())
+	require.Equal(t, "file_123", generation.ProviderMetadata["file_id"])
+}
+
+func TestOpenAIHandler_GetVideoContent_LightX2VStreamsDirectly(t *testing.T) {
+	tester, _, _ := setupTest(t)
+	generation := database.AIGeneration{
+		ID:                 1,
+		ResourceType:       database.AIGenerationResourceTypeVideo,
+		ResourceID:         "video_gateway",
+		ProviderResourceID: "task_123",
+		OwnerUUID:          "testuuid",
+		ModelID:            "video-model",
+		Status:             "completed",
+	}
+
+	downstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "/v1/files/download/outputs/videos/task_123.mp4", r.URL.Path)
+		w.Header().Set("Content-Type", "video/mp4")
+		_, _ = w.Write([]byte("lightx2v-video-bytes"))
+	}))
+	defer downstream.Close()
+
+	model := &types.Model{
+		BaseModel:         types.BaseModel{ID: "video-model", Task: "text-to-video"},
+		ExternalModelInfo: types.ExternalModelInfo{Provider: "opencsg"},
+		InternalModelInfo: types.InternalModelInfo{RuntimeFramework: "lightx2v", CSGHubModelID: "Wan-AI/Wan2.2-T2V-A14B"},
+		Endpoint:          downstream.URL,
+	}
+	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "video-model").Return(model, nil).Once()
+	tester.mocks.aiGenerationStore.EXPECT().FindByResourceID(mock.Anything, database.AIGenerationResourceTypeVideo, "video_gateway").Return(&generation, nil).Once()
+
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		httpbase.SetCurrentUser(c, "testuser")
+		httpbase.SetCurrentNamespaceUUID(c, "testuuid")
+		c.Next()
+	})
+	router.GET("/v1/videos/:video_id/content", tester.handler.GetVideoContent)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/v1/videos/video_gateway/content", nil)
+	router.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	require.Equal(t, "lightx2v-video-bytes", w.Body.String())
+}
+
+func newMultipartVideoRequest(t *testing.T, model, prompt, fileContentType string) *http.Request {
+	return newMultipartVideoRequestWithSize(t, model, prompt, "", fileContentType)
+}
+
+func newMultipartTextOnlyVideoRequestWithSizeAndSeconds(t *testing.T, model, prompt, size string, seconds int) *http.Request {
+	t.Helper()
+
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	require.NoError(t, writer.WriteField("model", model))
+	require.NoError(t, writer.WriteField("prompt", prompt))
+	if size != "" {
+		require.NoError(t, writer.WriteField("size", size))
+	}
+	if seconds > 0 {
+		require.NoError(t, writer.WriteField("seconds", strconv.Itoa(seconds)))
+	}
+	require.NoError(t, writer.Close())
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/videos", &body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	return req
+}
+
+func newMultipartVideoRequestWithSize(t *testing.T, model, prompt, size, fileContentType string) *http.Request {
+	t.Helper()
+
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	require.NoError(t, writer.WriteField("model", model))
+	require.NoError(t, writer.WriteField("prompt", prompt))
+	if size != "" {
+		require.NoError(t, writer.WriteField("size", size))
+	}
+	part, err := writer.CreatePart(textproto.MIMEHeader{
+		"Content-Disposition": []string{`form-data; name="input_reference"; filename="frame.png"`},
+		"Content-Type":        []string{fileContentType},
+	})
+	require.NoError(t, err)
+	_, err = part.Write(testVideoInputReferenceBytes(fileContentType))
+	require.NoError(t, err)
+	require.NoError(t, writer.Close())
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/videos", &body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	return req
+}
+
+func testVideoInputReferenceBytes(contentType string) []byte {
+	switch contentType {
+	case "image/png":
+		return []byte{0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n'}
+	case "image/jpeg":
+		return []byte{0xff, 0xd8, 0xff, 0xdb}
+	case "image/webp":
+		return []byte{'R', 'I', 'F', 'F', 0x24, 0x00, 0x00, 0x00, 'W', 'E', 'B', 'P'}
+	default:
+		return []byte("image-bytes")
+	}
 }

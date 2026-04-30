@@ -9,7 +9,6 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
 
@@ -17,7 +16,7 @@ import (
 	"github.com/openai/openai-go/v3"
 	"opencsg.com/csghub-server/aigateway/component"
 	"opencsg.com/csghub-server/aigateway/component/adapter/text2image"
-	"opencsg.com/csghub-server/aigateway/http/response/wrapper"
+	"opencsg.com/csghub-server/aigateway/component/adapter/text2video"
 	"opencsg.com/csghub-server/aigateway/token"
 	"opencsg.com/csghub-server/aigateway/types"
 	"opencsg.com/csghub-server/api/httpbase"
@@ -40,11 +39,19 @@ type OpenAIHandler interface {
 	GetModel(c *gin.Context)
 	// Chat with backend model
 	Chat(c *gin.Context)
+	// Get embedding for a text
 	Embedding(c *gin.Context)
 	// Generate image from text
 	GenerateImage(c *gin.Context)
+	// Create a video generation
+	CreateVideo(c *gin.Context)
+	// Get a video generation
+	GetVideo(c *gin.Context)
+	// Download generated video content
+	GetVideoContent(c *gin.Context)
 	// Transcribe audio to text
 	Transcription(c *gin.Context)
+	// Set chat attempt failure reporter
 	SetChatAttemptFailureReporter(reporter ChatAttemptFailureReporter)
 }
 
@@ -77,7 +84,8 @@ func NewOpenAIHandlerFromConfig(config *config.Config) (OpenAIHandler, error) {
 	}
 	storage, _ := component.NewStorage(config)
 	whitelistRule := database.NewRepositoryFileCheckRuleStore()
-	return newOpenAIHandler(modelService, repoComp, modComponent, clusterComp, token.NewCounterFactory(), text2image.NewRegistry(), config, storage, whitelistRule), nil
+	aiGenerationStore := database.NewAIGenerationStore()
+	return newOpenAIHandler(modelService, repoComp, modComponent, clusterComp, token.NewCounterFactory(), text2image.NewRegistry(), text2video.NewRegistry(), config, storage, whitelistRule, aiGenerationStore), nil
 }
 
 func newOpenAIHandler(
@@ -87,9 +95,11 @@ func newOpenAIHandler(
 	clusterComp apicomp.ClusterComponent,
 	tokenCounterFactory token.CounterFactory,
 	t2iRegistry *text2image.Registry,
+	t2vRegistry *text2video.Registry,
 	config *config.Config,
 	storage types.Storage,
 	whitelistRule database.RepositoryFileCheckRuleStore,
+	aiGenerationStore database.AIGenerationStore,
 ) *OpenAIHandlerImpl {
 	return &OpenAIHandlerImpl{
 		openaiComponent:            modelService,
@@ -98,9 +108,11 @@ func newOpenAIHandler(
 		clusterComp:                clusterComp,
 		tokenCounterFactory:        tokenCounterFactory,
 		t2iRegistry:                t2iRegistry,
+		t2vRegistry:                t2vRegistry,
 		config:                     config,
 		storage:                    storage,
 		whitelistRule:              whitelistRule,
+		aiGenerationStore:          aiGenerationStore,
 		sensitivePolicy:            component.NewSensitivePolicy(modComponent, whitelistRule),
 		llmLogPublisher:            component.NewLLMLogPublisher(),
 		sessionRouter:              component.NewSessionRouter(),
@@ -185,9 +197,11 @@ type OpenAIHandlerImpl struct {
 	clusterComp                apicomp.ClusterComponent
 	tokenCounterFactory        token.CounterFactory
 	t2iRegistry                *text2image.Registry
+	t2vRegistry                *text2video.Registry
 	config                     *config.Config
 	storage                    types.Storage
 	whitelistRule              database.RepositoryFileCheckRuleStore
+	aiGenerationStore          database.AIGenerationStore
 	sensitivePolicy            component.SensitivePolicy
 	llmLogPublisher            component.LLMLogPublisher
 	sessionRouter              component.SessionRouter
@@ -628,137 +642,6 @@ func (h *OpenAIHandlerImpl) retryChatWithFallback(c *gin.Context, w CommonRespon
 	return nil
 }
 
-// GenerateImage godoc
-// @Security     ApiKey
-// @Summary      Generate image from text prompt
-// @Description  Generates images based on a text prompt
-// @Tags         AIGateway
-// @Accept       json
-// @Produce      json
-// @Param        request body  ImageGenerationRequest true "Image generation request"
-// @Success      200  {object}  types.ImageGenerationResponse "OK"
-// @Failure      400  {object}  error "Bad request or sensitive input"
-// @Failure      404  {object}  error "Model not found"
-// @Failure      500  {object}  error "Internal server error"
-// @Router       /v1/images/generations [post]
-func (h *OpenAIHandlerImpl) GenerateImage(c *gin.Context) {
-	username := httpbase.GetCurrentUser(c)
-	nsUUID := httpbase.GetCurrentNamespaceUUID(c)
-	apikey := httpbase.GetAccessToken(c)
-	ctx := c.Request.Context()
-
-	var req ImageGenerationRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
-			Code: "invalid_request_error", Message: err.Error(), Type: "invalid_request_error",
-		}})
-		return
-	}
-	if req.Prompt == "" || req.Model == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
-			Code: "invalid_request_error", Message: "Model and prompt cannot be empty", Type: "invalid_request_error",
-		}})
-		return
-	}
-
-	modelID := req.Model
-	modelTarget, err := h.resolveModelTarget(ctx, username, modelID, c.Request.Header)
-	if err != nil {
-		handleModelTargetError(c, ctx, modelID, "failed to get model target address", err)
-		return
-	}
-
-	adapter := h.t2iRegistry.GetAdapter(modelTarget.Model)
-	if adapter == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
-			Code: "unsupported_model", Message: fmt.Sprintf("no adapter for model '%s'", modelID), Type: "invalid_request_error",
-		}})
-		return
-	}
-
-	if err := h.openaiComponent.CheckBalance(ctx, nsUUID); err != nil {
-		h.handleInsufficientBalance(c, false, nsUUID, modelID, err)
-		return
-	}
-
-	typesReq := types.ImageGenerationRequest{
-		ImageGenerateParams: req.ImageGenerateParams,
-		RawJSON:             req.RawJSON,
-	}
-	typesReq.Model = modelTarget.ModelName
-	bodyBytes, err := adapter.TransformRequest(ctx, typesReq)
-	if err != nil {
-		slog.ErrorContext(ctx, "failed to transform image request", slog.Any("error", err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": types.Error{
-			Code: "internal_error", Message: err.Error(), Type: "internal_error",
-		}})
-		return
-	}
-
-	result, err := h.modComponent.CheckImagePrompts(ctx, req.Prompt, nsUUID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": types.Error{
-			Code: "moderation_error", Message: "failed to check image prompts: " + err.Error(), Type: "internal_error",
-		}})
-		return
-	}
-	if result != nil && result.IsSensitive {
-		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
-			Code: "content_policy_violation", Message: "Input data may contain inappropriate content.", Type: "invalid_request_error",
-		}})
-		return
-	}
-
-	c.Request.Body = io.NopCloser(bytes.NewReader(bodyBytes))
-	c.Request.ContentLength = int64(len(bodyBytes))
-	for k, v := range adapter.GetHeaders(modelTarget.Model, &typesReq) {
-		c.Request.Header.Set(k, v)
-	}
-
-	rp, _ := proxy.NewReverseProxy(modelTarget.Target)
-	slog.InfoContext(ctx, "proxy image generation request to model target", slog.Any("target", modelTarget.Target), slog.Any("host", modelTarget.Host),
-		slog.Any("user", username), slog.Any("model_name", modelTarget.ModelName))
-
-	imageCounter := token.NewImageUsageCounter()
-	responseFormat := string(req.ResponseFormat)
-	if responseFormat == "" {
-		responseFormat = "url"
-	}
-	imageWrapper := wrapper.NewImageGeneration(c.Writer, adapter, h.modComponent, h.config.AIGateway.SensitiveDefaultImg, imageCounter, responseFormat, h.storage, h.config.S3.Bucket)
-	var w http.ResponseWriter = imageWrapper
-
-	proxyToApi := ""
-	if modelTarget.Model.Endpoint != "" {
-		uri, err := url.ParseRequestURI(modelTarget.Model.Endpoint)
-		if err != nil {
-			slog.WarnContext(ctx, "endpoint has wrong struct", slog.String("model", modelTarget.ModelName))
-		} else {
-			proxyToApi = uri.Path
-			if proxyToApi == "" {
-				// Spaces (HF Inference Toolkit) serve at root.
-				proxyToApi = "/"
-			}
-		}
-	}
-
-	if err := applyModelAuthHeaders(c.Request.Header, modelTarget.Model); err != nil {
-		slog.WarnContext(ctx, "invalid auth head", slog.String("model", modelTarget.ModelName), slog.Any("error", err))
-	}
-
-	rp.ServeHTTP(w, c.Request, proxyToApi, modelTarget.Host)
-
-	if err := imageWrapper.Finalize(); err != nil {
-		slog.ErrorContext(ctx, "failed to finalize image response", slog.Any("error", err))
-	}
-	go func() {
-		usageCtx, cancel := context.WithTimeout(context.WithoutCancel(c.Request.Context()), 3*time.Second)
-		defer cancel()
-		if err := h.openaiComponent.RecordUsage(usageCtx, nsUUID, modelTarget.Model, imageCounter, apikey); err != nil {
-			slog.ErrorContext(usageCtx, "failed to record image usage", slog.Any("error", err))
-		}
-	}()
-}
-
 // Embedding godoc
 // @Security     ApiKey
 // @Summary      Get embedding for a text
@@ -835,118 +718,6 @@ func (h *OpenAIHandlerImpl) Embedding(c *gin.Context) {
 		err := h.openaiComponent.RecordUsage(usageCtx, nsUUID, modelTarget.Model, tokenCounter, apikey)
 		if err != nil {
 			slog.ErrorContext(c, "failed to record embedding token usage", "error", err)
-		}
-	}()
-}
-
-// Transcription godoc
-// @Security     ApiKey
-// @Summary      Transcribe audio to text
-// @Description  Sends an OpenAI-compatible multipart audio transcription request to the backend model
-// @Tags         AIGateway
-// @Accept       multipart/form-data
-// @Produce      json
-// @Param        model formData string true "Model ID"
-// @Param        file formData file true "Audio file"
-// @Success      200  {object}  types.Response{} "OK"
-// @Failure      400  {object}  error "Bad request"
-// @Failure      404  {object}  error "Model not found"
-// @Failure      500  {object}  error "Internal server error"
-// @Router       /v1/audio/transcriptions [post]
-func (h *OpenAIHandlerImpl) Transcription(c *gin.Context) {
-	username := httpbase.GetCurrentUser(c)
-	nsUUID := httpbase.GetCurrentNamespaceUUID(c)
-	apikey := httpbase.GetAccessToken(c)
-	ctx := c.Request.Context()
-
-	form, err := c.MultipartForm()
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
-			Code:    "invalid_request_error",
-			Message: "invalid multipart form: " + err.Error(),
-			Type:    "invalid_request_error",
-		}})
-		return
-	}
-	if form == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
-			Code:    "invalid_request_error",
-			Message: "request must be multipart/form-data",
-			Type:    "invalid_request_error",
-		}})
-		return
-	}
-
-	modelID := strings.TrimSpace(firstMultipartValue(form, "model"))
-	if modelID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
-			Code:    "invalid_request_error",
-			Message: "Model cannot be empty",
-			Type:    "invalid_request_error",
-		}})
-		return
-	}
-	if len(form.File["file"]) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": types.Error{
-			Code:    "invalid_request_error",
-			Message: "File cannot be empty",
-			Type:    "invalid_request_error",
-		}})
-		return
-	}
-
-	modelTarget, err := h.resolveModelTarget(ctx, username, modelID, c.Request.Header)
-	if err != nil {
-		handleModelTargetError(c, ctx, modelID, "failed to get transcription target address", err)
-		return
-	}
-
-	if !modelTarget.Model.SkipBalance() {
-		if err := h.openaiComponent.CheckBalance(ctx, nsUUID); err != nil {
-			h.handleInsufficientBalance(c, false, nsUUID, modelID, err)
-			return
-		}
-	}
-
-	body, contentType := rewriteMultipartModelStream(form, modelTarget.ModelName)
-	c.Request.Body = body
-	c.Request.ContentLength = -1
-	c.Request.Header.Set("Content-Type", contentType)
-	c.Request.Header.Del("Content-Length")
-
-	if err := applyModelAuthHeaders(c.Request.Header, modelTarget.Model); err != nil {
-		slog.WarnContext(ctx, "invalid auth head", slog.String("model", modelTarget.ModelName), slog.Any("error", err))
-	}
-
-	rp, err := proxy.NewReverseProxy(modelTarget.Target, proxy.WithoutAcceptEncoding())
-	if err != nil {
-		slog.ErrorContext(ctx, "failed to create reverse proxy", slog.Any("error", err))
-		c.String(http.StatusInternalServerError, fmt.Errorf("failed to create reverse proxy:%w", err).Error())
-		return
-	}
-
-	proxyToApi := ""
-	if modelTarget.Model.Endpoint != "" {
-		uri, err := url.ParseRequestURI(modelTarget.Model.Endpoint)
-		if err != nil {
-			slog.WarnContext(ctx, "endpoint has wrong struct", slog.String("model", modelTarget.ModelName))
-		} else {
-			proxyToApi = uri.Path
-		}
-	}
-
-	slog.InfoContext(ctx, "proxy audio transcription request to model endpoint", slog.Any("target", modelTarget.Target), slog.Any("host", modelTarget.Host), slog.Any("user", username), slog.Any("model_id", modelID), slog.Any("model_name", modelTarget.ModelName))
-
-	audioCounter := token.NewAudioUsageCounter(token.NewTokenizerImpl(modelTarget.Target, modelTarget.Host, modelTarget.ModelName, modelTarget.Model.ImageID, modelTarget.Model.Provider))
-	w := NewResponseWriterWrapperAudio(c.Writer, audioCounter)
-	rp.ServeHTTP(w, c.Request, proxyToApi, modelTarget.Host)
-
-	go func() {
-		usageCtx, cancel := context.WithTimeout(context.WithoutCancel(c.Request.Context()), 3*time.Second)
-		defer cancel()
-
-		if err := h.openaiComponent.RecordUsage(usageCtx, nsUUID, modelTarget.Model, audioCounter, apikey); err != nil {
-			slog.ErrorContext(usageCtx, "failed to record audio transcription usage", slog.Any("error", err))
 		}
 	}()
 }
