@@ -256,3 +256,55 @@ func TestJoinURLPath(t *testing.T) {
 		})
 	}
 }
+
+func TestExtractHostname(t *testing.T) {
+	tests := []struct {
+		name   string
+		target string
+		want   string
+	}{
+		{
+			name:   "https host without port",
+			target: "https://csgbot.example.com",
+			want:   "csgbot.example.com",
+		},
+		{
+			name:   "https host with port",
+			target: "https://csgbot.example.com:8070",
+			want:   "csgbot.example.com",
+		},
+		{
+			name:   "plain host",
+			target: "csgbot.internal",
+			want:   "csgbot.internal",
+		},
+		{
+			name:   "host with port and path",
+			target: "csgbot.example.com:8070/api/v1/chat",
+			want:   "csgbot.example.com",
+		},
+		{
+			name:   "host with path",
+			target: "csgbot.internal/chat",
+			want:   "csgbot.internal",
+		},
+		{
+			name:   "localhost with port",
+			target: "localhost:8070",
+			want:   "localhost",
+		},
+		{
+			name:   "empty host",
+			target: "",
+			want:   "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := ExtractHostname(tt.target); got != tt.want {
+				t.Errorf("ExtractHostname() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}

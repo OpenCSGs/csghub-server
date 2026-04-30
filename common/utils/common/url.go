@@ -2,6 +2,7 @@ package common
 
 import (
 	"fmt"
+	"net"
 	"net/url"
 	"strings"
 )
@@ -52,4 +53,42 @@ func JoinURLPath(base string, elems ...string) string {
 		return ""
 	}
 	return "/" + strings.Join(parts, "/")
+}
+
+func ExtractHostname(target string) string {
+	target = strings.TrimSpace(target)
+	if target == "" {
+		return ""
+	}
+
+	candidate := target
+	if !strings.Contains(candidate, "://") {
+		candidate = "//" + candidate
+	}
+
+	parsedURL, err := url.Parse(candidate)
+	if err != nil {
+		return ""
+	}
+
+	if hostname := parsedURL.Hostname(); hostname != "" {
+		return hostname
+	}
+
+	host := parsedURL.Host
+	if host == "" {
+		host = strings.Split(parsedURL.Path, "/")[0]
+	}
+
+	if host == "" {
+		return ""
+	}
+
+	if strings.Contains(host, ":") {
+		if parsedHost, _, err := net.SplitHostPort(host); err == nil {
+			return parsedHost
+		}
+	}
+
+	return host
 }
