@@ -520,13 +520,6 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	}
 	createDataflowRoutes(apiGroup, dataflowHandler)
 
-	// csgbot proxy
-	csgbotHandler, err := handler.NewCSGBotProxyHandler(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creating csgbot proxy handler:%w", err)
-	}
-	createCSGBotRoutes(apiGroup, csgbotHandler)
-
 	err = createAdvancedRoutes(apiGroup, adminGroup, middlewareCollection, config, mqFactory)
 	if err != nil {
 		return nil, fmt.Errorf("error creating advance routes:%w", err)
@@ -1295,11 +1288,6 @@ func createMemoryRoutes(apiGroup *gin.RouterGroup, middlewareCollection middlewa
 		memoryGroup.POST("/memories/delete", memoryHandler.DeleteMemories)
 		memoryGroup.GET("/health", memoryHandler.Health)
 	}
-}
-
-func createCSGBotRoutes(apiGroup *gin.RouterGroup, csgbotHandler *handler.CSGBotProxyHandler) {
-	csgbotGrp := apiGroup.Group("/csgbot")
-	csgbotGrp.Any("/*any", csgbotHandler.Proxy)
 }
 
 func createTagsRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware.MiddlewareCollection, tagHandler *handler.TagsHandler) {
