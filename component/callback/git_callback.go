@@ -36,6 +36,7 @@ type gitCallbackComponentImpl struct {
 	config                    *config.Config
 	gitServer                 gitserver.GitServer
 	tagComponent              component.TagComponent
+	industryTagComponent      component.IndustryTagComponent
 	modSvcClient              rpc.ModerationSvcClient
 	modelStore                database.ModelStore
 	datasetStore              database.DatasetStore
@@ -68,6 +69,10 @@ func NewGitCallback(config *config.Config) (*gitCallbackComponentImpl, error) {
 		return nil, err
 	}
 	tc, err := component.NewTagComponent(config)
+	if err != nil {
+		return nil, err
+	}
+	itc, err := component.NewIndustryTagComponent(config)
 	if err != nil {
 		return nil, err
 	}
@@ -104,6 +109,7 @@ func NewGitCallback(config *config.Config) (*gitCallbackComponentImpl, error) {
 		config:                    config,
 		gitServer:                 gs,
 		tagComponent:              tc,
+		industryTagComponent:      itc,
 		modelStore:                ms,
 		datasetStore:              ds,
 		spaceStore:                ss,
@@ -290,6 +296,16 @@ func (c *gitCallbackComponentImpl) removeFiles(ctx context.Context, repoType, na
 					slog.Any("error", err))
 				return fmt.Errorf("failed to clear met tags,cause: %w", err)
 			}
+			if c.industryTagComponent != nil {
+				err = c.industryTagComponent.ClearRepoAutoIndustryTags(ctx, types.ClearRepoIndustryTagsReq{
+					Namespace: namespace,
+					Name:      repoName,
+					RepoType:  adjustedRepoType,
+				})
+				if err != nil {
+					return fmt.Errorf("failed to clear repo industry tags,cause: %w", err)
+				}
+			}
 		} else {
 			tagScope, err := getTagScopeByRepoType(repoType)
 			if err != nil {
@@ -378,6 +394,18 @@ func (c *gitCallbackComponentImpl) updateMetaTags(ctx context.Context, repoType,
 			slog.String("content", content), slog.String("repo", repoName), slog.String("ref", ref),
 			slog.Any("error", err))
 		return fmt.Errorf("failed to update met tags, cause: %w", err)
+	}
+	if c.industryTagComponent != nil {
+		err = c.industryTagComponent.RefreshRepoAutoIndustryTags(ctx, types.IdentifyIndustryTagsReq{
+			Namespace: namespace,
+			Name:      repoName,
+			RepoType:  types.RepositoryType(strings.TrimSuffix(repoType, "s")),
+			Branch:    ref,
+			Readme:    content,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to update repo industry tags, cause: %w", err)
+		}
 	}
 	slog.Info("update meta tags success", slog.String("repo", path.Join(namespace, repoName)), slog.String("type", repoType))
 	return nil

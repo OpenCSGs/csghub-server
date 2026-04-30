@@ -22,6 +22,7 @@ type Activities struct {
 	multisync     component.MultiSyncComponent
 	rftScanner    component.RuntimeArchitectureComponent
 	repoComponent component.RepoComponent
+	industryTag   component.IndustryTagComponent
 	stores        stores
 }
 
@@ -34,6 +35,7 @@ func NewActivities(
 	syncClientSetting database.SyncClientSettingStore,
 	rftScanner component.RuntimeArchitectureComponent,
 	repoComponent component.RepoComponent,
+	industryTag component.IndustryTagComponent,
 ) *Activities {
 	stores := stores{
 		syncClientSetting: syncClientSetting,
@@ -48,5 +50,6 @@ func NewActivities(
 		stores:        stores,
 		rftScanner:    rftScanner,
 		repoComponent: repoComponent,
+		industryTag:   industryTag,
 	}
 }

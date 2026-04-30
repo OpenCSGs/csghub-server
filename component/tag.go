@@ -19,6 +19,8 @@ type TagComponent interface {
 	UpdateMetaTags(ctx context.Context, tagScope types.TagScope, namespace, name, content string) ([]*database.RepositoryTag, error)
 	UpdateLibraryTags(ctx context.Context, tagScope types.TagScope, namespace, name, oldFilePath, newFilePath string) error
 	UpdateRepoTagsByCategory(ctx context.Context, tagScope types.TagScope, repoID int64, category string, tagNames []string) error
+	ReplaceRepoTagsByCategoryAndSource(ctx context.Context, tagScope types.TagScope, repoID int64, category string, source types.TagSource, tagNames []string) error
+	RemoveRepoTagsByCategoryAndSource(ctx context.Context, repoID int64, categories []string, source types.TagSource) error
 	CreateTag(ctx context.Context, req types.CreateTag) (*database.Tag, error)
 	GetTagByID(ctx context.Context, id int64) (*database.Tag, error)
 	UpdateTag(ctx context.Context, id int64, req types.UpdateTag) (*database.Tag, error)
@@ -198,6 +200,10 @@ func (c *tagComponentImpl) UpdateLibraryTags(ctx context.Context, tagScope types
 }
 
 func (c *tagComponentImpl) UpdateRepoTagsByCategory(ctx context.Context, tagScope types.TagScope, repoID int64, category string, tagNames []string) error {
+	return c.ReplaceRepoTagsByCategoryAndSource(ctx, tagScope, repoID, category, types.TagSourceManual, tagNames)
+}
+
+func (c *tagComponentImpl) ReplaceRepoTagsByCategoryAndSource(ctx context.Context, tagScope types.TagScope, repoID int64, category string, source types.TagSource, tagNames []string) error {
 	filter := &types.TagFilter{
 		Scopes:     []types.TagScope{tagScope},
 		Categories: []string{},
@@ -223,12 +229,11 @@ func (c *tagComponentImpl) UpdateRepoTagsByCategory(ctx context.Context, tagScop
 		}
 	}
 
-	var oldTagIDs []int64
-	oldTagIDs, err = c.repoStore.TagIDs(ctx, repoID, category)
-	if err != nil {
-		return fmt.Errorf("failed to get old tag ids, error: %w", err)
-	}
-	return c.tagStore.UpsertRepoTags(ctx, repoID, oldTagIDs, tagIDs)
+	return c.tagStore.ReplaceRepoTagsByCategoryAndSource(ctx, repoID, category, source, tagIDs)
+}
+
+func (c *tagComponentImpl) RemoveRepoTagsByCategoryAndSource(ctx context.Context, repoID int64, categories []string, source types.TagSource) error {
+	return c.tagStore.RemoveRepoTagsByCategoryAndSource(ctx, repoID, categories, source)
 }
 
 func (c *tagComponentImpl) CreateTag(ctx context.Context, req types.CreateTag) (*database.Tag, error) {

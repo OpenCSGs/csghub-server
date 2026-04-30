@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"go.temporal.io/sdk/testsuite"
 	mock_git "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/git/gitserver"
+	mock_cache "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/cache"
 	mock_temporal "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/temporal"
 	mock_component "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
 	mock_callback "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component/callback"
@@ -16,6 +17,27 @@ import (
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/tests"
 )
+
+type workflowTester struct {
+	env       *testsuite.TestWorkflowEnvironment
+	cronEnv   *testsuite.TestWorkflowEnvironment
+	scheduler *temporal.TestScheduler
+	mocks     struct {
+		callback         *mock_callback.MockGitCallbackComponent
+		recom            *mock_component.MockRecomComponent
+		multisync        *mock_component.MockMultiSyncComponent
+		modeltree        *mock_component.MockModelTreeComponent
+		gitServer        *mock_git.MockGitServer
+		temporal         *mock_temporal.MockClient
+		stores           *tests.MockStores
+		mirrorComponent  *mock_component.MockMirrorComponent
+		statComponent    *mock_component.MockStatComponent
+		accountComponent *mock_component.MockAccountingComponent
+		repoComponent    *mock_component.MockRepoComponent
+		industryTag      *mock_component.MockIndustryTagComponent
+		cache            *mock_cache.MockRedisClient
+	}
+}
 
 func newWorkflowTester(t *testing.T) (*workflowTester, error) {
 	suite := testsuite.WorkflowTestSuite{}
@@ -39,6 +61,8 @@ func newWorkflowTester(t *testing.T) (*workflowTester, error) {
 
 	mrp := mock_component.NewMockRepoComponent(t)
 	tester.mocks.repoComponent = mrp
+	mit := mock_component.NewMockIndustryTagComponent(t)
+	tester.mocks.industryTag = mit
 
 	mg := mock_git.NewMockGitServer(t)
 	tester.mocks.gitServer = mg
@@ -53,7 +77,7 @@ func newWorkflowTester(t *testing.T) (*workflowTester, error) {
 	mtc.EXPECT().GetScheduleClient().Return(tester.scheduler)
 
 	err := workflow.StartWorkflowDI(
-		cfg, mcb, mr, mg, mm, tester.mocks.stores.SyncClientSettingMock(), mtc, scanner, mrp, true,
+		cfg, mcb, mr, mg, mm, tester.mocks.stores.SyncClientSettingMock(), mtc, scanner, mrp, mit, true,
 	)
 
 	if err != nil {

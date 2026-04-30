@@ -36,8 +36,10 @@ type TagStore interface {
 	SetMetaTags(ctx context.Context, repoType types.RepositoryType, namespace, name string, tags []*Tag) (repoTags []*RepositoryTag, err error)
 	SetLibraryTag(ctx context.Context, repoType types.RepositoryType, namespace, name string, newTag, oldTag *Tag) (err error)
 	UpsertRepoTags(ctx context.Context, repoID int64, oldTagIDs, newTagIDs []int64) (err error)
+	ReplaceRepoTagsByCategoryAndSource(ctx context.Context, repoID int64, category string, source types.TagSource, newTagIDs []int64) error
 	RemoveRepoTags(ctx context.Context, repoID int64, tagIDs []int64) (err error)
 	RemoveRepoTagsByCategory(ctx context.Context, repoID int64, category []string) (err error)
+	RemoveRepoTagsByCategoryAndSource(ctx context.Context, repoID int64, categories []string, source types.TagSource) error
 	FindOrCreate(ctx context.Context, tag Tag) (*Tag, error)
 	FindTag(ctx context.Context, name, scope, category string) (*Tag, error)
 	FindTagByID(ctx context.Context, id int64) (*Tag, error)
@@ -253,7 +255,14 @@ func (ts *tagStoreImpl) SetMetaTags(ctx context.Context, repoType types.Reposito
 			if tag.Category == "framework" {
 				return errors.New("found framework tag when set meta tag, tag name:" + tag.Name)
 			}
-			repoTag := &RepositoryTag{RepositoryID: repo.ID, TagID: tag.ID, Repository: repo, Tag: tag, Count: 1}
+			repoTag := &RepositoryTag{
+				RepositoryID: repo.ID,
+				TagID:        tag.ID,
+				Source:       types.TagSourceManual,
+				Repository:   repo,
+				Tag:          tag,
+				Count:        1,
+			}
 			repoTags = append(repoTags, repoTag)
 		}
 		// batch insert
@@ -301,6 +310,7 @@ func (ts *tagStoreImpl) SetLibraryTag(ctx context.Context, repoType types.Reposi
 				return err
 			}
 			if newRepoTag.ID == 0 {
+				newRepoTag.Source = types.TagSourceManual
 				newRepoTag.Count = 1
 				_, err = tx.NewInsert().Model(&newRepoTag).Exec(ctx)
 			} else {
@@ -338,10 +348,11 @@ func (ts *tagStoreImpl) UpsertRepoTags(ctx context.Context, repoID int64, oldTag
 				newRepoTag := RepositoryTag{
 					RepositoryID: repoID,
 					TagID:        tagID,
+					Source:       types.TagSourceManual,
 					Count:        1,
 				}
 				_, err = tx.NewInsert().Model(&newRepoTag).
-					On("CONFLICT (repository_id, tag_id) DO UPDATE SET count = repository_tag.count+1").
+					On("CONFLICT (repository_id, tag_id) DO UPDATE SET count = repository_tag.count+1, source = EXCLUDED.source").
 					Exec(ctx)
 
 				if err != nil {
@@ -354,6 +365,89 @@ func (ts *tagStoreImpl) UpsertRepoTags(ctx context.Context, repoID int64, oldTag
 	})
 
 	return err
+}
+
+func (ts *tagStoreImpl) ReplaceRepoTagsByCategoryAndSource(ctx context.Context, repoID int64, category string, source types.TagSource, newTagIDs []int64) error {
+	return ts.db.Operator.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		type repoTagRecord struct {
+			ID     int64
+			TagID  int64
+			Source types.TagSource
+		}
+
+		var existing []repoTagRecord
+		err := tx.NewSelect().
+			Model((*RepositoryTag)(nil)).
+			Column("repository_tag.id", "repository_tag.tag_id", "repository_tag.source").
+			Join("JOIN tags ON repository_tag.tag_id = tags.id").
+			Where("repository_tag.repository_id = ?", repoID).
+			Where("tags.category = ?", category).
+			Scan(ctx, &existing)
+		if err != nil {
+			return fmt.Errorf("failed to load existing repository tags,error:%w", err)
+		}
+
+		existingByTagID := make(map[int64]repoTagRecord, len(existing))
+		for _, repoTag := range existing {
+			existingByTagID[repoTag.TagID] = repoTag
+		}
+
+		newTagIDSet := make(map[int64]struct{}, len(newTagIDs))
+		for _, tagID := range newTagIDs {
+			newTagIDSet[tagID] = struct{}{}
+		}
+
+		for _, repoTag := range existing {
+			if repoTag.Source != source {
+				continue
+			}
+			if _, ok := newTagIDSet[repoTag.TagID]; ok {
+				continue
+			}
+			_, err = tx.NewDelete().
+				Model((*RepositoryTag)(nil)).
+				Where("id = ?", repoTag.ID).
+				Exec(ctx)
+			if err != nil {
+				return fmt.Errorf("failed to delete repository tags,error:%w", err)
+			}
+		}
+
+		for _, tagID := range newTagIDs {
+			existingTag, ok := existingByTagID[tagID]
+			if ok {
+				if existingTag.Source == source {
+					continue
+				}
+				if source == types.TagSourceManual && existingTag.Source == types.TagSourceAuto {
+					_, err = tx.NewUpdate().
+						Model((*RepositoryTag)(nil)).
+						Set("source = ?", source).
+						Where("id = ?", existingTag.ID).
+						Exec(ctx)
+					if err != nil {
+						return fmt.Errorf("failed to promote repository tag source,error:%w", err)
+					}
+				}
+				continue
+			}
+
+			newRepoTag := RepositoryTag{
+				RepositoryID: repoID,
+				TagID:        tagID,
+				Source:       source,
+				Count:        1,
+			}
+			_, err = tx.NewInsert().Model(&newRepoTag).
+				On("CONFLICT (repository_id, tag_id) DO UPDATE SET source = CASE WHEN repository_tag.source = 'manual' THEN repository_tag.source ELSE EXCLUDED.source END, count = repository_tag.count").
+				Exec(ctx)
+			if err != nil {
+				return fmt.Errorf("failed to replace repository tags,error:%w", err)
+			}
+		}
+
+		return nil
+	})
 }
 
 func (ts *tagStoreImpl) RemoveRepoTags(ctx context.Context, repoID int64, tagIDs []int64) (err error) {
@@ -373,6 +467,19 @@ func (ts *tagStoreImpl) RemoveRepoTagsByCategory(ctx context.Context, repoID int
 	_, err := ts.db.Operator.Core.NewDelete().
 		Model(&RepositoryTag{}).
 		Where("repository_id =? and tag_id in (select id from tags where category in (?))", repoID, bun.In(category)).
+		Exec(ctx)
+	return err
+}
+
+func (ts *tagStoreImpl) RemoveRepoTagsByCategoryAndSource(ctx context.Context, repoID int64, categories []string, source types.TagSource) error {
+	if len(categories) == 0 {
+		return nil
+	}
+	_, err := ts.db.Operator.Core.NewDelete().
+		Model(&RepositoryTag{}).
+		Where("repository_id = ?", repoID).
+		Where("source = ?", source).
+		Where("tag_id in (select id from tags where category in (?))", bun.In(categories)).
 		Exec(ctx)
 	return err
 }

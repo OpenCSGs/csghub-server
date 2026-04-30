@@ -69,6 +69,10 @@ func NewRepoComponent(config *config.Config) (RepoComponent, error) {
 		slog.Error(newError.Error())
 		return nil, newError
 	}
+	c.industryTagComponent, err = NewIndustryTagComponent(config)
+	if err != nil {
+		return nil, fmt.Errorf("fail to create industry tag component,error:%w", err)
+	}
 	c.s3Client, err = s3.NewMinio(config)
 	if err != nil {
 		newError := fmt.Errorf("fail to init s3 client for code,error:%w", err)

@@ -16,7 +16,10 @@ import (
 )
 
 type LLMSvcClient interface {
+	Chat(ctx context.Context, endpoint, host string, headers map[string]string, data types.LLMReqBody) (string, error)
+	ChatStream(ctx context.Context, endpoint, host string, headers map[string]string, data types.LLMReqBody) (<-chan string, error)
 	Tokenize(ctx context.Context, endpoint, host string, req interface{}) ([]byte, error)
+	EmbeddingTokenize(ctx context.Context, endpoint, host string, req interface{}) ([]byte, error)
 }
 
 type Client struct {

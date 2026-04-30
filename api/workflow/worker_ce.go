@@ -62,11 +62,15 @@ func StartWorkflow(cfg *config.Config, registerAsWorker bool) error {
 	if err != nil {
 		return err
 	}
+	industryTag, err := component.NewIndustryTagComponent(cfg)
+	if err != nil {
+		return err
+	}
 
 	return StartWorkflowDI(
 		cfg, gitcallback, recom,
 		gitserver, multisync, database.NewSyncClientSettingStore(), client,
-		rftScanner, repoComponent, registerAsWorker,
+		rftScanner, repoComponent, industryTag, registerAsWorker,
 	)
 }
 
@@ -80,16 +84,18 @@ func StartWorkflowDI(
 	temporalClient temporal.Client,
 	rftScanner component.RuntimeArchitectureComponent,
 	repoComponent component.RepoComponent,
+	industryTag component.IndustryTagComponent,
 	registerAsWorker bool,
 ) error {
 	if registerAsWorker {
 		worker := temporalClient.NewWorker(HandlePushQueueName, worker.Options{})
-		act := activity.NewActivities(cfg, callback, recom, gitServer, multisync, syncClientSetting, rftScanner, repoComponent)
+		act := activity.NewActivities(cfg, callback, recom, gitServer, multisync, syncClientSetting, rftScanner, repoComponent, industryTag)
 		worker.RegisterActivity(act)
 
 		worker.RegisterWorkflow(HandlePushWorkflow)
 		worker.RegisterWorkflow(RuntimeFrameworkWorkflow)
 		worker.RegisterWorkflow(CalculateRepoSizeWorkflow)
+		worker.RegisterWorkflow(ScanRepoIndustryTagsWorkflow)
 		RegisterCronWorker(cfg, temporalClient, act)
 		err := RegisterCronJobs(cfg, temporalClient)
 		if err != nil {

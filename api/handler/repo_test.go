@@ -18,9 +18,14 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"go.temporal.io/sdk/client"
+	temporal_mock "go.temporal.io/sdk/mocks"
+	workflow_mock "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/temporal"
 	mockcomponent "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
+	"opencsg.com/csghub-server/api/workflow"
 	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/builder/temporal"
 	"opencsg.com/csghub-server/builder/testutil"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
@@ -31,9 +36,10 @@ type RepoTester struct {
 	*testutil.GinTester
 	handler *RepoHandler
 	mocks   struct {
-		repo    *mockcomponent.MockRepoComponent
-		model   *mockcomponent.MockModelComponent
-		dataset *mockcomponent.MockDatasetComponent
+		repo     *mockcomponent.MockRepoComponent
+		model    *mockcomponent.MockModelComponent
+		dataset  *mockcomponent.MockDatasetComponent
+		workflow *workflow_mock.MockClient
 	}
 }
 
@@ -42,7 +48,15 @@ func NewRepoTester(t *testing.T) *RepoTester {
 	tester.mocks.repo = mockcomponent.NewMockRepoComponent(t)
 	tester.mocks.model = mockcomponent.NewMockModelComponent(t)
 	tester.mocks.dataset = mockcomponent.NewMockDatasetComponent(t)
-	tester.handler = &RepoHandler{tester.mocks.repo, tester.mocks.model, tester.mocks.dataset, 0, &config.Config{}}
+	tester.mocks.workflow = workflow_mock.NewMockClient(t)
+	temporal.Assign(tester.mocks.workflow)
+	tester.handler = &RepoHandler{
+		c:        tester.mocks.repo,
+		m:        tester.mocks.model,
+		d:        tester.mocks.dataset,
+		temporal: tester.mocks.workflow,
+		config:   &config.Config{},
+	}
 	tester.WithParam("name", "r")
 	tester.WithParam("namespace", "u")
 	return tester
@@ -73,6 +87,89 @@ func TestRepoHandler_GetRepoSizeByBranch(t *testing.T) {
 
 	// Verify response
 	tester.ResponseEq(t, http.StatusOK, tester.OKText, expectedSize)
+}
+
+func TestRepoHandler_ScanIndustryTags(t *testing.T) {
+	t.Run("dataset success", func(t *testing.T) {
+		tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+			return rp.ScanIndustryTags
+		})
+		tester.WithParam("repo_type", "dataset")
+		run := &temporal_mock.WorkflowRun{}
+		tester.mocks.workflow.EXPECT().ExecuteWorkflow(
+			tester.Ctx(),
+			client.StartWorkflowOptions{
+				TaskQueue: workflow.HandlePushQueueName,
+				ID:        "repo-industry-scan-dataset-u-r",
+			},
+			mock.Anything,
+			types.ScanRepoIndustryTagsReq{
+				Namespace: "u",
+				Name:      "r",
+				RepoType:  types.DatasetRepo,
+			},
+		).Return(run, nil)
+
+		tester.Execute()
+		tester.ResponseEq(t, http.StatusOK, tester.OKText, nil)
+	})
+
+	t.Run("model success", func(t *testing.T) {
+		tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+			return rp.ScanIndustryTags
+		})
+		tester.WithParam("repo_type", "model")
+		run := &temporal_mock.WorkflowRun{}
+		tester.mocks.workflow.EXPECT().ExecuteWorkflow(
+			tester.Ctx(),
+			client.StartWorkflowOptions{
+				TaskQueue: workflow.HandlePushQueueName,
+				ID:        "repo-industry-scan-model-u-r",
+			},
+			mock.Anything,
+			types.ScanRepoIndustryTagsReq{
+				Namespace: "u",
+				Name:      "r",
+				RepoType:  types.ModelRepo,
+			},
+		).Return(run, nil)
+
+		tester.Execute()
+		tester.ResponseEq(t, http.StatusOK, tester.OKText, nil)
+	})
+
+	t.Run("invalid repo type", func(t *testing.T) {
+		tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+			return rp.ScanIndustryTags
+		})
+		tester.WithParam("repo_type", "space")
+
+		tester.Execute()
+		tester.ResponseEqCode(t, http.StatusBadRequest)
+	})
+
+	t.Run("workflow error", func(t *testing.T) {
+		tester := NewRepoTester(t).WithHandleFunc(func(rp *RepoHandler) gin.HandlerFunc {
+			return rp.ScanIndustryTags
+		})
+		tester.WithParam("repo_type", "dataset")
+		tester.mocks.workflow.EXPECT().ExecuteWorkflow(
+			tester.Ctx(),
+			client.StartWorkflowOptions{
+				TaskQueue: workflow.HandlePushQueueName,
+				ID:        "repo-industry-scan-dataset-u-r",
+			},
+			mock.Anything,
+			types.ScanRepoIndustryTagsReq{
+				Namespace: "u",
+				Name:      "r",
+				RepoType:  types.DatasetRepo,
+			},
+		).Return(nil, errors.New("workflow failed"))
+
+		tester.Execute()
+		tester.ResponseEqCode(t, http.StatusInternalServerError)
+	})
 }
 
 func TestRepoHandler_GetRepoSizeByBranch_Error(t *testing.T) {

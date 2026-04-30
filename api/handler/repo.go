@@ -17,7 +17,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/cast"
+	"go.temporal.io/sdk/client"
 	"opencsg.com/csghub-server/api/httpbase"
+	"opencsg.com/csghub-server/api/workflow"
+	"opencsg.com/csghub-server/builder/temporal"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
@@ -43,6 +46,7 @@ func NewRepoHandler(config *config.Config) (*RepoHandler, error) {
 		c:                         uc,
 		m:                         m,
 		d:                         d,
+		temporal:                  temporal.GetClient(),
 		deployStatusCheckInterval: time.Duration(config.Model.DeployStatusCheckInterval) * time.Second,
 		config:                    config,
 	}, nil
@@ -52,8 +56,65 @@ type RepoHandler struct {
 	c                         component.RepoComponent
 	m                         component.ModelComponent
 	d                         component.DatasetComponent
+	temporal                  temporal.Client
 	deployStatusCheckInterval time.Duration
 	config                    *config.Config
+}
+
+// ScanIndustryTags godoc
+// @Security     ApiKey
+// @Summary      Trigger repository industry tag scan
+// @Tags         Repository
+// @Accept       json
+// @Produce      json
+// @Param        repo_type path string true "repo type" Enums(dataset,model)
+// @Param        namespace path string true "repo owner name"
+// @Param        name path string true "repo name"
+// @Success      200  {object}  types.Response "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /admin/{repo_type}/{namespace}/{name}/industry_tags/scan [post]
+func (h *RepoHandler) ScanIndustryTags(ctx *gin.Context) {
+	repoType, err := parseIndustryScanRepoType(ctx.Param("repo_type"))
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	workflowOptions := client.StartWorkflowOptions{
+		TaskQueue: workflow.HandlePushQueueName,
+		ID:        fmt.Sprintf("repo-industry-scan-%s-%s-%s", repoType, namespace, name),
+	}
+
+	_, err = h.temporal.ExecuteWorkflow(ctx.Request.Context(), workflowOptions, workflow.ScanRepoIndustryTagsWorkflow, types.ScanRepoIndustryTagsReq{
+		Namespace: namespace,
+		Name:      name,
+		RepoType:  repoType,
+	})
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "Failed to trigger repo industry tag scan", slog.Any("error", err), slog.String("namespace", namespace), slog.String("name", name), slog.String("repo_type", string(repoType)))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	httpbase.OK(ctx, nil)
+}
+
+func parseIndustryScanRepoType(raw string) (types.RepositoryType, error) {
+	switch types.RepositoryType(raw) {
+	case types.DatasetRepo, types.ModelRepo:
+		return types.RepositoryType(raw), nil
+	default:
+		return "", fmt.Errorf("unsupported repo type: %s", raw)
+	}
 }
 
 // CreateRepo godoc
