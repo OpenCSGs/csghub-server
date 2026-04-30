@@ -129,6 +129,7 @@ func (c *skillComponentImpl) Create(ctx context.Context, req *types.CreateSkillR
 
 	// Start with README and .gitattributes files
 	commitFiles := c.initializeCommitFiles(req)
+	skillMetaFile := commitFiles[2]
 
 	// Handle skill package if SHA256 is provided
 	if req.SkillPackageSHA256 != "" {
@@ -140,8 +141,11 @@ func (c *skillComponentImpl) Create(ctx context.Context, req *types.CreateSkillR
 		commitFiles = decompressedFiles
 	}
 
+	commitFiles = ensureSkillMetadataFile(commitFiles, skillMetaFile)
+
 	// Add any additional commit files from the request
 	commitFiles = append(commitFiles, req.CommitFiles...)
+	commitFiles = moveSkillMetadataToFront(commitFiles)
 	req.CommitFiles = commitFiles
 
 	// Create repository first
@@ -278,7 +282,7 @@ func (c *skillComponentImpl) createSkillRecord(ctx context.Context, req *types.C
 // commitFilesInBatches commits files in batches to avoid overloading the git server
 func (c *skillComponentImpl) commitFilesInBatches(ctx context.Context, commitFilesReq *gitserver.CommitFilesReq) error {
 	const batchSize = 50
-	files := commitFilesReq.Files
+	files := moveSkillMetadataGitFilesToFront(commitFilesReq.Files)
 	if len(files) == 0 {
 		return nil
 	}
@@ -298,6 +302,47 @@ func (c *skillComponentImpl) commitFilesInBatches(ctx context.Context, commitFil
 	}
 
 	return nil
+}
+
+func ensureSkillMetadataFile(files []types.CommitFile, defaultSkillFile types.CommitFile) []types.CommitFile {
+	for _, file := range files {
+		if file.Path == "SKILL.md" {
+			return files
+		}
+	}
+	return append([]types.CommitFile{defaultSkillFile}, files...)
+}
+
+func moveSkillMetadataToFront(files []types.CommitFile) []types.CommitFile {
+	for i, file := range files {
+		if file.Path == "SKILL.md" {
+			if i == 0 {
+				return files
+			}
+			reordered := make([]types.CommitFile, 0, len(files))
+			reordered = append(reordered, file)
+			reordered = append(reordered, files[:i]...)
+			reordered = append(reordered, files[i+1:]...)
+			return reordered
+		}
+	}
+	return files
+}
+
+func moveSkillMetadataGitFilesToFront(files []gitserver.CommitFile) []gitserver.CommitFile {
+	for i, file := range files {
+		if file.Path == "SKILL.md" {
+			if i == 0 {
+				return files
+			}
+			reordered := make([]gitserver.CommitFile, 0, len(files))
+			reordered = append(reordered, file)
+			reordered = append(reordered, files[:i]...)
+			reordered = append(reordered, files[i+1:]...)
+			return reordered
+		}
+	}
+	return files
 }
 
 // createMirrorIfNeeded creates a mirror if Git URL is provided

@@ -55,16 +55,16 @@ description: %s
 ---`, crq.Name, crq.Description)
 	crq.CommitFiles = []types.CommitFile{
 		{
+			Content: skillsContent,
+			Path:    "SKILL.md",
+		},
+		{
 			Content: crq.Readme,
 			Path:    types.ReadmeFileName,
 		},
 		{
 			Content: skillGitattributesContent,
 			Path:    types.GitattributesFileName,
-		},
-		{
-			Content: skillsContent,
-			Path:    "SKILL.md",
 		},
 	}
 
@@ -398,16 +398,16 @@ description: %s
 ---`, crq.Name, crq.Description)
 	crq.CommitFiles = []types.CommitFile{
 		{
+			Content: skillsContent,
+			Path:    "SKILL.md",
+		},
+		{
 			Content: crq.Readme,
 			Path:    types.ReadmeFileName,
 		},
 		{
 			Content: skillGitattributesContent,
 			Path:    types.GitattributesFileName,
-		},
-		{
-			Content: skillsContent,
-			Path:    "SKILL.md",
 		},
 	}
 
@@ -513,12 +513,16 @@ func TestSkillComponent_CreateWithBatchCommit(t *testing.T) {
 	// In the actual code, the Create method creates commitFiles with README and .gitattributes
 	// Then appends req.CommitFiles to it, and sets req.CommitFiles = commitFiles
 	// So we need to create a CommitFilesReq with all these files
-	// First, create the initial files (README, .gitattributes, and SKILL.md)
+	// First, create the initial files (SKILL.md, README, and .gitattributes)
 	skillsContent := fmt.Sprintf(`---
 name: %s
 description: %s
 ---`, crq.Name, crq.Description)
 	initialFiles := []types.CommitFile{
+		{
+			Content: skillsContent,
+			Path:    "SKILL.md",
+		},
 		{
 			Content: crq.Readme,
 			Path:    types.ReadmeFileName,
@@ -526,10 +530,6 @@ description: %s
 		{
 			Content: skillGitattributesContent,
 			Path:    types.GitattributesFileName,
-		},
-		{
-			Content: skillsContent,
-			Path:    "SKILL.md",
 		},
 	}
 
@@ -548,7 +548,7 @@ description: %s
 	}
 
 	// In the actual code, the Create method sets req.CommitFiles = commitFiles
-	// where commitFiles is README + .gitattributes + SKILL.md + req.CommitFiles
+	// where commitFiles is SKILL.md + README + .gitattributes + req.CommitFiles
 	// So we need to update crq.CommitFiles to match what will be passed to CreateRepo
 	crq.CommitFiles = allFiles
 
@@ -586,6 +586,59 @@ description: %s
 		Tags: []types.RepoTag{{Name: "t1"}},
 	}, resp)
 	wg.Wait()
+}
+
+func TestEnsureSkillMetadataFile(t *testing.T) {
+	defaultSkillFile := types.CommitFile{
+		Path:    "SKILL.md",
+		Content: "---\nname: skill\ndescription: desc\n---",
+	}
+
+	files := []types.CommitFile{
+		{Path: "a.txt", Content: "a"},
+	}
+
+	updated := ensureSkillMetadataFile(files, defaultSkillFile)
+	require.Len(t, updated, 2)
+	require.Equal(t, "SKILL.md", updated[0].Path)
+}
+
+func TestEnsureSkillMetadataFile_KeepWhenExists(t *testing.T) {
+	defaultSkillFile := types.CommitFile{
+		Path:    "SKILL.md",
+		Content: "---\nname: skill\ndescription: desc\n---",
+	}
+
+	files := []types.CommitFile{
+		{Path: "a.txt", Content: "a"},
+		{Path: "SKILL.md", Content: "existing"},
+	}
+
+	updated := ensureSkillMetadataFile(files, defaultSkillFile)
+	require.Len(t, updated, 2)
+	require.Equal(t, "existing", updated[1].Content)
+}
+
+func TestMoveSkillMetadataToFront(t *testing.T) {
+	files := []types.CommitFile{
+		{Path: "a.txt", Content: "a"},
+		{Path: "b.txt", Content: "b"},
+		{Path: "SKILL.md", Content: "skill"},
+	}
+
+	updated := moveSkillMetadataToFront(files)
+	require.Equal(t, "SKILL.md", updated[0].Path)
+}
+
+func TestMoveSkillMetadataGitFilesToFront(t *testing.T) {
+	files := []gitserver.CommitFile{
+		{Path: "a.txt", Content: "a"},
+		{Path: "b.txt", Content: "b"},
+		{Path: "SKILL.md", Content: "skill"},
+	}
+
+	updated := moveSkillMetadataGitFilesToFront(files)
+	require.Equal(t, "SKILL.md", updated[0].Path)
 }
 
 // Helper function to create a test zip file
