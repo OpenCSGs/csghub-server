@@ -3,7 +3,9 @@ package component
 import (
 	"context"
 	"fmt"
+	"os"
 	"path"
+	"path/filepath"
 	"strconv"
 	"sync"
 	"testing"
@@ -323,7 +325,6 @@ func TestMCPServerComponent_Index_HalfCreatedRepos(t *testing.T) {
 		Email:    "foo@bar.com",
 	}
 
-	// Create two repositories, one with complete data and one half-created
 	repo1 := &database.Repository{
 		ID:       321,
 		User:     user,
@@ -348,11 +349,9 @@ func TestMCPServerComponent_Index_HalfCreatedRepos(t *testing.T) {
 		Username: "user",
 	}
 
-	// PublicToUser returns both repositories
 	mc.mocks.components.repo.EXPECT().PublicToUser(ctx, types.MCPServerRepo, "user", filter, 10, 1).
 		Return([]*database.Repository{repo1, repo2}, 2, nil)
 
-	// ByRepoIDs returns only 1 MCP server (no MCP server for repo2)
 	mc.mocks.stores.MCPServerMock().EXPECT().ByRepoIDs(ctx, []int64{321, 322}).Return([]database.MCPServer{
 		{
 			RepositoryID: 321,
@@ -363,8 +362,8 @@ func TestMCPServerComponent_Index_HalfCreatedRepos(t *testing.T) {
 	res, total, err := mc.Index(ctx, filter, 10, 1, false)
 	require.Nil(t, err)
 	require.NotNil(t, res)
-	require.Equal(t, total, 2) // Total should match PublicToUser's return value
-	require.Len(t, res, 1)     // But only 1 MCP server should be returned
+	require.Equal(t, total, 2)
+	require.Len(t, res, 1)
 }
 
 func TestMCPServerComponent_Properties(t *testing.T) {
@@ -490,6 +489,14 @@ func TestMCPServerComponent_CheckDeployBranch(t *testing.T) {
 	ctx := context.TODO()
 	mc := initializeTestMCPServerComponent(ctx, t)
 
+	templatePath := filepath.Join("docker", "spaces", "templates", "mcp_deploy")
+	err := os.MkdirAll(templatePath, 0755)
+	require.NoError(t, err)
+	defer os.RemoveAll(templatePath)
+
+	err = os.WriteFile(filepath.Join(templatePath, "app.py"), []byte("print('hello')"), 0644)
+	require.NoError(t, err)
+
 	req := &types.DeployMCPServerReq{
 		CurrentUser: "user",
 		MCPRepo: types.RepoRequest{
@@ -566,7 +573,7 @@ func TestMCPServerComponent_CheckDeployBranch(t *testing.T) {
 		Secrets:       "",
 		Variables:     "",
 		Template:      "",
-		SKU:           strconv.FormatInt(1, 10), // space resource id
+		SKU:           strconv.FormatInt(1, 10),
 		ClusterID:     req.ClusterID,
 	}).Return(nil)
 
@@ -578,10 +585,9 @@ func TestMCPServerComponent_CheckDeployBranch(t *testing.T) {
 
 	mc.mocks.gitServer.EXPECT().UpdateRepoFile(mock.Anything).Return(nil)
 
-	mc.mocks.gitServer.EXPECT().DeleteRepo(mock.Anything, mock.Anything).Return(nil)
+	mc.mocks.gitServer.EXPECT().CommitFiles(ctx, mock.Anything).Return(nil)
 
-	mc.mocks.stores.MCPServerMock().EXPECT().DeleteSpaceAndRepoForDeploy(mock.Anything, int64(0), int64(0)).Return(nil)
-
-	_, err := mc.Deploy(ctx, req)
-	require.NotNil(t, err)
+	res, err := mc.Deploy(ctx, req)
+	require.Nil(t, err)
+	require.NotNil(t, res)
 }

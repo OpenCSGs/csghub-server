@@ -325,8 +325,9 @@ func (s *modelStoreImpl) CreateAndUpdateRepoPath(ctx context.Context, input Mode
 
 func updateRepoPath(ctx context.Context, tx bun.Tx, repoType types.RepositoryType, repoPath string, repoID int64) (Repository, error) {
 	var repo Repository
+	repo.ID = repoID
 	err := tx.NewUpdate().
-		Model(&Repository{}).
+		Model(&repo).
 		Set("path = ?", repoPath).
 		Set("git_path = ?", fmt.Sprintf("%ss_%s", repoType, repoPath)).
 		Where("id = ?", repoID).

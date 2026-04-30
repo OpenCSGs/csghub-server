@@ -93,6 +93,7 @@ func Authenticator(config *config.Config) gin.HandlerFunc {
 			return
 		}
 
+		httpbase.SetIPAddress(c, c.ClientIP())
 		result := isValidBrowserSession(c)
 		if result {
 			c.Next()
@@ -222,6 +223,7 @@ func isValidJWTToken(c *gin.Context, config *config.Config, token string, rc cac
 			httpbase.SetCurrentUser(c, claims.CurrentUser)
 			httpbase.SetCurrentUserUUID(c, claims.UUID)
 			httpbase.SetAuthType(c, httpbase.AuthTypeJwt)
+			httpbase.SetAccessToken(c, token)
 			return true
 		} else {
 			slog.ErrorContext(c.Request.Context(), "verify jwt token error", slog.Any("error", err))

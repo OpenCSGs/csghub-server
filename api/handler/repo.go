@@ -142,12 +142,13 @@ func (h *RepoHandler) CreateRepo(ctx *gin.Context) {
 
 	req.Username = userName
 	req.Namespace = userName
+	stdCtx := common.GinContextToStdContext(ctx)
 	switch req.RepoType {
 	case types.ModelRepo:
 		modelReq := &types.CreateModelReq{
 			CreateRepoReq: *req,
 		}
-		resp, err := h.m.Create(ctx.Request.Context(), modelReq)
+		resp, err := h.m.Create(stdCtx, modelReq)
 		if err != nil {
 			if errors.Is(err, errorx.ErrRepoAlreadyExist) || errors.Is(err, errorx.ErrSpaceNameAlreadyExist) || strings.Contains(err.Error(), "duplicate key") {
 				resp := &types.Model{
@@ -156,7 +157,7 @@ func (h *RepoHandler) CreateRepo(ctx *gin.Context) {
 				ctx.JSON(http.StatusConflict, resp)
 				return
 			}
-			slog.ErrorContext(ctx.Request.Context(), "Failed to create model repo", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err), slog.Any("req", req))
+			slog.ErrorContext(stdCtx, "Failed to create model repo", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err), slog.Any("req", req))
 			httpbase.ServerError(ctx, err)
 			return
 		}
@@ -165,7 +166,7 @@ func (h *RepoHandler) CreateRepo(ctx *gin.Context) {
 		datasetReq := &types.CreateDatasetReq{
 			CreateRepoReq: *req,
 		}
-		resp, err := h.d.Create(ctx.Request.Context(), datasetReq)
+		resp, err := h.d.Create(stdCtx, datasetReq)
 		if err != nil {
 			if errors.Is(err, errorx.ErrRepoAlreadyExist) || errors.Is(err, errorx.ErrSpaceNameAlreadyExist) || strings.Contains(err.Error(), "duplicate key") {
 				resp := &types.Dataset{
@@ -174,14 +175,14 @@ func (h *RepoHandler) CreateRepo(ctx *gin.Context) {
 				ctx.JSON(http.StatusConflict, resp)
 				return
 			}
-			slog.ErrorContext(ctx.Request.Context(), "Failed to create dataset repo", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err), slog.Any("req", req))
+			slog.ErrorContext(stdCtx, "Failed to create dataset repo", slog.String("repo_type", string(req.RepoType)), slog.Any("error", err), slog.Any("req", req))
 			httpbase.ServerError(ctx, err)
 			return
 		}
 		ctx.JSON(http.StatusOK, resp)
 	default:
 		// Unsupported repo type
-		slog.ErrorContext(ctx.Request.Context(), "Unsupported repo type", slog.String("repo_type", string(req.RepoType)))
+		slog.ErrorContext(stdCtx, "Unsupported repo type", slog.String("repo_type", string(req.RepoType)))
 		httpbase.BadRequest(ctx, fmt.Sprintf("Unsupported repo type: %s", req.RepoType))
 		return
 	}

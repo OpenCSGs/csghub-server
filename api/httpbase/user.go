@@ -14,6 +14,7 @@ const (
 	CurrentUserUUIDQueryVar = "current_user_uuid"
 	HeaderLanguageKey       = "Accept-Language"
 	AccessTokenNameCtxVar   = "accessTokenName"
+	IPctxVar                = "ip_address"
 )
 
 type AuthType string
@@ -79,4 +80,12 @@ func GetCurrentTokenName(ctx *gin.Context) string {
 
 func SetCurrentTokenName(ctx *gin.Context, name string) {
 	ctx.Set(AccessTokenNameCtxVar, name)
+}
+
+func SetIPAddress(ctx *gin.Context, ip string) {
+	ctx.Set(IPctxVar, ip)
+}
+
+func GetIPAddress(ctx *gin.Context) string {
+	return ctx.GetString(IPctxVar)
 }
