@@ -60,6 +60,47 @@ func Test_ProcessReadme(t *testing.T) {
 		t.Fail()
 	}
 }
+
+// Test_processTags_BuiltInCrossCategory verifies that when a tag name appears under a
+// different category in the README frontmatter (e.g. "jax" under "tags" which maps to
+// "task"), the processor reuses the existing built-in tag from the correct category
+// ("framework") instead of creating a new tag with the wrong category.
+func Test_processTags_BuiltInCrossCategory(t *testing.T) {
+	p := new(tagProcessor)
+	p.tagScope = types.ModelTagScope
+
+	existingCategoryTagMap := make(map[string]map[string]*database.Tag)
+
+	existingCategoryTagMap[categoryNameTask] = make(map[string]*database.Tag)
+	existingCategoryTagMap[categoryNameTask]["text-generation"] = &database.Tag{Name: "text-generation", Category: categoryNameTask, BuiltIn: true}
+
+	existingCategoryTagMap[categoryNameFramework] = make(map[string]*database.Tag)
+	existingCategoryTagMap[categoryNameFramework]["jax"] = &database.Tag{Name: "jax", Category: categoryNameFramework, BuiltIn: true}
+
+	// "tags" key in frontmatter maps to "task" category, but "jax" is a framework tag
+	categoryTagMap := make(map[string][]string)
+	categoryTagMap[categoryNameTask] = []string{"text-generation", "jax"}
+
+	tagsMatched, tagsToCreate := p.processTags(existingCategoryTagMap, categoryTagMap)
+
+	if len(tagsToCreate) != 0 {
+		t.Logf("expected no new tags, got %d: %+v", len(tagsToCreate), tagsToCreate)
+		t.FailNow()
+	}
+
+	if len(tagsMatched) != 2 {
+		t.Logf("expected 2 matched tags, got %d", len(tagsMatched))
+		t.FailNow()
+	}
+
+	if !slices.ContainsFunc(tagsMatched, func(e *database.Tag) bool {
+		return e.Name == "jax" && e.Category == categoryNameFramework
+	}) {
+		t.Logf("expected matched tag framework/jax, not found in matched: %+v", tagsMatched)
+		t.FailNow()
+	}
+}
+
 func Test_processTags(t *testing.T) {
 	p := new(tagProcessor)
 	p.tagScope = types.DatasetTagScope

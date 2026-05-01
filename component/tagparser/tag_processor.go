@@ -124,13 +124,23 @@ func (p *tagProcessor) processTags(existingCategoryTagMap map[string]map[string]
 		}
 		for _, tagName := range tagNames {
 			if tag, ok := existingTaskTags[tagName]; !ok {
-				tagsToCreate = append(tagsToCreate, &database.Tag{
-					Name:     tagName,
-					Category: category,
-					Scope:    p.tagScope,
-					BuiltIn:  false, // new tag is absolutely not built-in
-					Group:    "",    // keep empty
-				})
+				// Before creating a new tag, search for an existing built-in tag with the
+				// same name across all categories. This handles the case where a tag like
+				// "jax" (framework) appears under the generic "tags" frontmatter key, which
+				// gets mapped to the "task" category by formatCategoryName. Without this
+				// lookup, the system would incorrectly create a new task-category tag
+				// instead of reusing the existing built-in framework tag.
+				if builtIn := findBuiltInTagByName(existingCategoryTagMap, tagName); builtIn != nil {
+					tagsMatched = append(tagsMatched, builtIn)
+				} else {
+					tagsToCreate = append(tagsToCreate, &database.Tag{
+						Name:     tagName,
+						Category: category,
+						Scope:    p.tagScope,
+						BuiltIn:  false, // new tag is absolutely not built-in
+						Group:    "",    // keep empty
+					})
+				}
 			} else {
 				tagsMatched = append(tagsMatched, tag)
 			}
@@ -139,6 +149,17 @@ func (p *tagProcessor) processTags(existingCategoryTagMap map[string]map[string]
 	}
 
 	return tagsMatched, tagsToCreate
+}
+
+// findBuiltInTagByName searches for a built-in tag with the given name across all categories.
+// Returns the first built-in tag found, or nil if none exists.
+func findBuiltInTagByName(existingCategoryTagMap map[string]map[string]*database.Tag, name string) *database.Tag {
+	for _, tags := range existingCategoryTagMap {
+		if tag, ok := tags[name]; ok && tag.BuiltIn {
+			return tag
+		}
+	}
+	return nil
 }
 
 func (p *tagProcessor) mapCategoryTag(tags []*database.Tag) map[string]map[string]*database.Tag {
