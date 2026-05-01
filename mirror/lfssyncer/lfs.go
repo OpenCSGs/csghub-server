@@ -428,7 +428,7 @@ func (w *LfsSyncWorker) getSyncPointers(
 	var toBeUpdateLfsMetaObjects []database.LfsMetaObject
 	for _, lfsMetaObject := range lfsMetaObjects {
 		objectKey := common.BuildLfsPath(repo.ID, lfsMetaObject.Oid, repo.Migrated)
-		exists, err := w.CheckIfLFSFileExists(ctx, objectKey)
+		exists, err := w.CheckIfLFSFileExists(ctx, objectKey, lfsMetaObject.Size)
 		if err != nil {
 			slog.Error(
 				"failed to check if lfs file exists",
@@ -567,7 +567,7 @@ func (w *LfsSyncWorker) downloadAndUploadLFSFile(
 ) error {
 	var uploadID string
 	objectKey := common.BuildLfsPath(repo.ID, pointer.Oid, repo.Migrated)
-	exists, err := w.CheckIfLFSFileExists(ctx, objectKey)
+	exists, err := w.CheckIfLFSFileExists(ctx, objectKey, pointer.Size)
 	if err != nil {
 		slog.Error(
 			"failed to check if lfs file exists",
@@ -1206,8 +1206,9 @@ func (w *LfsSyncWorker) downloadRange(
 func (w *LfsSyncWorker) CheckIfLFSFileExists(
 	ctx context.Context,
 	objectKey string,
+	size int64,
 ) (bool, error) {
-	_, err := w.ossClient.StatObject(ctx, w.config.S3.Bucket, objectKey, minio.StatObjectOptions{})
+	objInfo, err := w.ossClient.StatObject(ctx, w.config.S3.Bucket, objectKey, minio.StatObjectOptions{})
 	if err != nil {
 		// Check if it's a "not found" error
 		if strings.Contains(err.Error(), "NoSuchKey") || strings.Contains(err.Error(), "not found") {
@@ -1215,6 +1216,16 @@ func (w *LfsSyncWorker) CheckIfLFSFileExists(
 		}
 		return false, err
 	}
+
+	// Check if the file size matches the expected size
+	if objInfo.Size != size {
+		// Delete the mismatched object
+		if err := w.ossClient.RemoveObject(ctx, w.config.S3.Bucket, objectKey, minio.RemoveObjectOptions{}); err != nil {
+			return false, fmt.Errorf("failed to remove mismatched object: %w", err)
+		}
+		return false, nil
+	}
+
 	return true, nil
 }
 

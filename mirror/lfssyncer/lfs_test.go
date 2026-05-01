@@ -544,29 +544,60 @@ func (suite *LfsSyncWorkerTestSuite) TestGetSyncPointers() {
 }
 
 func (suite *LfsSyncWorkerTestSuite) TestCheckIfLFSFileExists() {
-	objectKey := "test-object-key"
+	oid := "test-object-oid"
 
 	tests := []struct {
 		name           string
 		statError      error
+		objectSize     int64
+		expectedSize   int64
+		expectDelete   bool
+		deleteError    error
 		expectedExists bool
 		expectedError  bool
 	}{
 		{
-			name:           "file exists",
+			name:           "file exists and size matches",
 			statError:      nil,
+			objectSize:     1024,
+			expectedSize:   1024,
+			expectDelete:   false,
 			expectedExists: true,
 			expectedError:  false,
 		},
 		{
+			name:           "file exists but size mismatch",
+			statError:      nil,
+			objectSize:     2048,
+			expectedSize:   1024,
+			expectDelete:   true,
+			deleteError:    nil,
+			expectedExists: false,
+			expectedError:  false,
+		},
+		{
+			name:           "file exists but size mismatch with delete error",
+			statError:      nil,
+			objectSize:     2048,
+			expectedSize:   1024,
+			expectDelete:   true,
+			deleteError:    errors.New("delete error"),
+			expectedExists: false,
+			expectedError:  true,
+		},
+		{
 			name:           "file not found",
 			statError:      errors.New("NoSuchKey"),
+			expectedSize:   1024,
+			expectDelete:   false,
 			expectedExists: false,
 			expectedError:  false,
 		},
 		{
 			name:           "other error",
 			statError:      errors.New("network error"),
+			expectedSize:   1024,
+			expectDelete:   false,
 			expectedExists: false,
 			expectedError:  true,
 		},
@@ -578,12 +609,15 @@ func (suite *LfsSyncWorkerTestSuite) TestCheckIfLFSFileExists() {
 			worker, mocks := newTestLfsSyncWorker(t, "")
 
 			if tt.statError == nil {
-				mocks.ossClient.EXPECT().StatObject(suite.ctx, worker.config.S3.Bucket, objectKey, mock.Anything).Return(minio.ObjectInfo{}, nil)
+				mocks.ossClient.EXPECT().StatObject(suite.ctx, worker.config.S3.Bucket, oid, mock.Anything).Return(minio.ObjectInfo{Size: tt.objectSize}, nil)
+				if tt.expectDelete {
+					mocks.ossClient.EXPECT().RemoveObject(suite.ctx, worker.config.S3.Bucket, oid, mock.Anything).Return(tt.deleteError)
+				}
 			} else {
-				mocks.ossClient.EXPECT().StatObject(suite.ctx, worker.config.S3.Bucket, objectKey, mock.Anything).Return(minio.ObjectInfo{}, tt.statError)
+				mocks.ossClient.EXPECT().StatObject(suite.ctx, worker.config.S3.Bucket, oid, mock.Anything).Return(minio.ObjectInfo{}, tt.statError)
 			}
 
-			exists, err := worker.CheckIfLFSFileExists(suite.ctx, objectKey)
+			exists, err := worker.CheckIfLFSFileExists(suite.ctx, oid, tt.expectedSize)
 
 			if tt.expectedError {
 				assert.Error(t, err)
