@@ -30,7 +30,7 @@ import (
 	userworkflow "opencsg.com/csghub-server/user/workflow"
 )
 
-var initVersionWorker = func(cfg *config.Config) error {
+var initVersionWorker = func(cfg *config.Config, temporalClient temporal.Client) error {
 	return nil
 }
 
@@ -143,7 +143,7 @@ var cmdLaunch = &cobra.Command{
 			return fmt.Errorf("failed to start deploy worker, error: %w", err)
 		}
 
-		if err := initVersionWorker(cfg); err != nil {
+		if err := initVersionWorker(cfg, temporalClient); err != nil {
 			return fmt.Errorf("failed to start user worker, error: %w", err)
 		}
 

@@ -1,0 +1,29 @@
+{
+  "endpoint": "https://localhost:8094",
+  "request_template": {
+    "api_path": "/v1/chat/completions",
+    "method": "POST",
+    "headers": {
+      "Content-Type": "application/json",
+      "Authorization": "Bearer your_token"
+    },
+    "request_body": {
+      "model": "Qwen/Qwen3-0.6B",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Hello, please introduce yourself in one paragraph."
+        }
+      ],
+      "stream": true,
+      "temperature": 0
+    }
+  },
+  "config": {
+    "warmup_requests": 1,
+    "duration_seconds": 20,
+    "concurrency": 10,
+    "timeout_seconds": 60,
+    "enable_stream": true
+  }
+}

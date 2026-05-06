@@ -27,6 +27,14 @@ type DeployWorkflowFunc func(buildTask, runTask *database.DeployTask)
 
 var DeployWorkflow DeployWorkflowFunc
 
+type DeployRunningCallbackFunc func(ctx context.Context, deploy *database.Deploy, sourceDeployTaskID int64) error
+
+var DeployRunningCallback DeployRunningCallbackFunc
+
+type LaunchDeployBenchmarkFunc func(ctx context.Context, req types.DeployBenchmarkLaunchReq) (*types.DeployBenchmarkTriggerResp, error)
+
+var LaunchDeployBenchmark LaunchDeployBenchmarkFunc
+
 type Deployer interface {
 	Deploy(ctx context.Context, dr types.DeployRequest) (deployID int64, err error)
 	Status(ctx context.Context, dr types.DeployRequest, needDetails bool) (srvName string, status int, instances []types.Instance, err error)

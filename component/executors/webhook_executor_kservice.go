@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	deploybuilder "opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
@@ -136,17 +137,27 @@ func (k *kserviceExecutorImpl) updateDeployStatus(ctx context.Context, event *ty
 	}
 
 	if event.Status == common.Running && oldStatus != common.Running {
-		go func() {
-			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-			defer cancel()
-			err := k.sendNotification(ctx, deploy)
-			if err != nil {
-				slog.Error("failed to send notification", slog.Any("err", err))
-			}
-		}()
+		go k.handleDeployRunning(event.TaskID, deploy)
 	}
 
 	return nil
+}
+
+func (k *kserviceExecutorImpl) handleDeployRunning(sourceDeployTaskID int64, deploy *database.Deploy) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	if err := k.sendNotification(ctx, deploy); err != nil {
+		slog.Error("failed to send notification", slog.Any("err", err))
+	}
+
+	if deploybuilder.DeployRunningCallback == nil {
+		return
+	}
+
+	if err := deploybuilder.DeployRunningCallback(ctx, deploy, sourceDeployTaskID); err != nil {
+		slog.Error("failed to execute deploy running callback", slog.Any("deploy_id", deploy.ID), slog.Any("source_task_id", sourceDeployTaskID), slog.Any("err", err))
+	}
 }
 
 func (k *kserviceExecutorImpl) sendNotification(ctx context.Context, deploy *database.Deploy) error {
