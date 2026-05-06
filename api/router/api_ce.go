@@ -59,4 +59,8 @@ func createRepoRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware
 	mcpGroup := apiGroup.Group("/mcps")
 	mcpGroup.Use(middleware.RepoType(types.MCPServerRepo), middlewareCollection.Repo.RepoExists)
 	mcpGroup.POST("/:namespace/:name/mirror_from_saas", middlewareCollection.Auth.NeedLogin, repoHandler.MirrorFromSaas)
+
+	skillGroup := apiGroup.Group("/skills")
+	skillGroup.Use(middleware.RepoType(types.MCPServerRepo), middlewareCollection.Repo.RepoExists)
+	skillGroup.POST("/:namespace/:name/mirror_from_saas", middlewareCollection.Auth.NeedLogin, repoHandler.MirrorFromSaas)
 }
