@@ -140,7 +140,7 @@ func (s *InternalMessageChannel) sendInternalMessageToUsers(ctx context.Context,
 
 func extractMessageFromData(data any) (title, content string) {
 	v := reflect.ValueOf(data)
-	if v.Kind() == reflect.Ptr {
+	if v.Kind() == reflect.Pointer {
 		v = v.Elem()
 	}
 	if v.Kind() == reflect.Struct {
