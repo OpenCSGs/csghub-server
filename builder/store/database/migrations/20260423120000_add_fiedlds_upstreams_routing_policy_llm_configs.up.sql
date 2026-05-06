@@ -49,6 +49,8 @@ BEGIN
                 jsonb_strip_nulls(
                     jsonb_build_object(
                         'url', trim(api_endpoint),
+                        'model_name', NULLIF(trim(model_name), ''),
+                        'provider', NULLIF(trim(provider), ''),
                         'weight', 1,
                         'enabled', true,
                         'auth_header', NULLIF(trim(auth_header), '')
@@ -62,10 +64,14 @@ BEGIN
         ELSE
             UPDATE llm_configs
             SET upstreams = jsonb_build_array(
-                jsonb_build_object(
-                    'url', trim(api_endpoint),
-                    'weight', 1,
-                    'enabled', true
+                jsonb_strip_nulls(
+                    jsonb_build_object(
+                        'url', trim(api_endpoint),
+                        'model_name', NULLIF(trim(model_name), ''),
+                        'provider', NULLIF(trim(provider), ''),
+                        'weight', 1,
+                        'enabled', true
+                    )
                 )
             )
             WHERE (
