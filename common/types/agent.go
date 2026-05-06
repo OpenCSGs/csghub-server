@@ -738,19 +738,20 @@ type AgentUserPreferenceRequest struct {
 // AgentSkillListItem represents a skill in the agent skills list response.
 // Used for both bun scan (List query) and API JSON; Private is scan-only, Public is set after scan.
 type AgentSkillListItem struct {
-	ID          int64     `bun:",scanonly" json:"id"`
-	Name        string    `bun:",scanonly" json:"name"`
-	Description string    `bun:",scanonly" json:"description"`
-	Path        string    `bun:",scanonly" json:"path"`
-	Private     bool      `bun:",scanonly" json:"-"`                   // from DB; Public is derived as !Private
-	Public      bool      `json:"public"`                              // set after scan
-	IsPinned    bool      `bun:",scanonly" json:"is_pinned"`           // true if pinned by user
-	PinnedAt    time.Time `bun:",scanonly" json:"pinned_at,omitempty"` // when pinned (optional in API)
-	BuiltIn     bool      `bun:",scanonly" json:"built_in"`            // true if platform skill (has agentichub-skills tag)
-	Owner       string    `bun:",scanonly" json:"owner,omitempty"`
-	OwnerAvatar string    `bun:",scanonly" json:"owner_avatar,omitempty"`
-	CreatedAt   time.Time `bun:",scanonly" json:"created_at"`
-	UpdatedAt   time.Time `bun:",scanonly" json:"updated_at"`
+	ID          int64      `bun:",scanonly" json:"id"`
+	Name        string     `bun:",scanonly" json:"name"`
+	Description string     `bun:",scanonly" json:"description"`
+	Path        string     `bun:",scanonly" json:"path"`
+	Repository  Repository `json:"repository"`
+	Private     bool       `bun:",scanonly" json:"-"`                   // from DB; Public is derived as !Private
+	Public      bool       `json:"public"`                              // set after scan
+	IsPinned    bool       `bun:",scanonly" json:"is_pinned"`           // true if pinned by user
+	PinnedAt    time.Time  `bun:",scanonly" json:"pinned_at,omitempty"` // when pinned (optional in API)
+	BuiltIn     bool       `bun:",scanonly" json:"built_in"`            // true if platform skill (has agentichub-skills tag)
+	Owner       string     `bun:",scanonly" json:"owner,omitempty"`
+	OwnerAvatar string     `bun:",scanonly" json:"owner_avatar,omitempty"`
+	CreatedAt   time.Time  `bun:",scanonly" json:"created_at"`
+	UpdatedAt   time.Time  `bun:",scanonly" json:"updated_at"`
 }
 
 // AgentSkillFilter for list filtering

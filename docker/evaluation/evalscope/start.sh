@@ -71,8 +71,8 @@ export HF_TOKEN=$ACCESS_TOKEN
 mkdir -p /workspace/data
 
 # Ensure NLTK resources are available for BLEU and other metrics
-echo "Checking NLTK resources..."
-python -c "import nltk; nltk.download('punkt_tab', quiet=True)" 2>&1 || echo "[WARNING] Failed to download NLTK punkt_tab resource"
+#echo "Checking NLTK resources..."
+#python -c "import nltk; nltk.download('punkt_tab', quiet=True)" 2>&1 || echo "[WARNING] Failed to download NLTK punkt_tab resource"
 
 # Register custom datasets
 echo "Registering custom datasets..."

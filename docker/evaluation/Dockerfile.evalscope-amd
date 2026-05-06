@@ -1,0 +1,28 @@
+FROM docker.1ms.run/rocm/pytorch:rocm7.2.2_ubuntu22.04_py3.10_pytorch_release_2.10.0
+
+RUN sed -i 's|http://archive.ubuntu.com/ubuntu|http://mirrors.aliyun.com/ubuntu|g' /etc/apt/sources.list && \
+    sed -i 's|http://security.ubuntu.com/ubuntu|http://mirrors.aliyun.com/ubuntu|g' /etc/apt/sources.list && \
+    sed -i 's|http://ports.ubuntu.com/ubuntu-ports|https://mirrors.aliyun.com/ubuntu-ports/|g' /etc/apt/sources.list && \
+    apt-get update && apt-get -y install dumb-init \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir minio oss2 openpyxl csghub-sdk==0.7.2
+RUN pip install -U --no-cache-dir evalscope==1.6.0 accelerate
+
+# Download NLTK resources required for BLEU and other metrics
+RUN python -c "from evalscope.utils.resource_utils import check_nltk_data; check_nltk_data('punkt_tab')"
+
+COPY ./evalscope/ /etc/csghub/
+
+RUN ln -sf /usr/bin/python3 /usr/bin/python && \
+    chmod +x /etc/csghub/*.sh && \
+    chmod +x /etc/csghub/*.py
+
+WORKDIR /workspace/
+
+ENV HUGGINGFACE_HUB_CACHE=/workspace/ \
+    HF_HUB_ENABLE_HF_TRANSFER=0 \
+    HF_HUB_DOWNLOAD_TIMEOUT=30
+
+ENTRYPOINT [ "/usr/bin/dumb-init", "--" ]
+CMD ["/etc/csghub/start.sh"]
