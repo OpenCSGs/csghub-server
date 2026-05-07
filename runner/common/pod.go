@@ -3,8 +3,8 @@ package common
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
-	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,8 +29,7 @@ func GetPod(ctx context.Context, client kubernetes.Interface, podName string, na
 	return pod, nil
 }
 
-func GetPodLogStream(ctx context.Context, client kubernetes.Interface, podName string, namespace string, container string) (chan []byte, string, error) {
-
+func GetPodLogStream(ctx context.Context, client kubernetes.Interface, podName string, namespace string, container string) (stream io.ReadCloser, message string, err error) {
 	pod, err := GetPod(ctx, client, podName, namespace)
 	if err != nil {
 		return nil, "", err
@@ -45,46 +44,13 @@ func GetPodLogStream(ctx context.Context, client kubernetes.Interface, podName s
 	if pod.Status.Phase == "Pending" {
 		for _, condition := range pod.Status.Conditions {
 			if condition.Type == "PodScheduled" && condition.Status == "False" {
-				message := fmt.Sprintf("Pod is pending due to reason: %s, message: %s", condition.Reason, condition.Message)
+				message = fmt.Sprintf("Pod is pending due to reason: %s, message: %s", condition.Reason, condition.Message)
 				return nil, message, nil
 			}
 		}
 	}
-
-	ch := make(chan []byte)
-	buf := make([]byte, 32*1024)
-
-	stream, err := logs.Stream(context.Background())
-	if err != nil {
-		return nil, "", err
-	}
-
-	go func() {
-		defer close(ch)
-		defer stream.Close()
-		for {
-			select {
-			case <-ctx.Done():
-				slog.Info("logs request context done", slog.Any("error", ctx.Err()))
-				return
-			default:
-				n, err := stream.Read(buf)
-				if err != nil {
-					slog.Error("read pod logs failed", slog.Any("error", err))
-					return
-				}
-				if n == 0 {
-					time.Sleep(5 * time.Second)
-				}
-
-				if n > 0 {
-					ch <- buf[:n]
-				}
-			}
-		}
-	}()
-
-	return ch, "", nil
+	stream, err = logs.Stream(ctx)
+	return stream, message, err
 }
 
 // get container name
