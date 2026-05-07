@@ -3,17 +3,26 @@ package handler
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	mockcomponent "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/runner/component"
+	"opencsg.com/csghub-server/builder/deploy/cluster"
+	"opencsg.com/csghub-server/common/errorx"
+	"opencsg.com/csghub-server/common/types"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	mockcomponent "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/runner/component"
-	"opencsg.com/csghub-server/common/errorx"
-	"opencsg.com/csghub-server/common/types"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes/fake"
+	testcore "k8s.io/client-go/testing"
+	knativefake "knative.dev/serving/pkg/client/clientset/versioned/fake"
 )
 
 func TestK8sHandler_CreateRevisions_Success(t *testing.T) {
@@ -272,4 +281,131 @@ func TestK8sHandler_DeleteKsvcVersion_ServiceComponentError(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	require.Equal(t, http.StatusConflict, w.Code)
+}
+
+//type fakeRespWrapper struct {
+//	reader io.ReadCloser
+//}
+//
+//func (f *fakeRespWrapper) Stream(ctx context.Context) (io.ReadCloser, error) {
+//	return f.reader, nil
+//}
+//
+//func (f *fakeRespWrapper) DoRaw(ctx context.Context) ([]byte, error) {
+//	return io.ReadAll(f.reader)
+//}
+//
+//type streamReadCloser struct {
+//	buffs [][]byte // test, miss lock
+//	err   error    // set error
+//}
+//
+//func (s *streamReadCloser) Read(p []byte) (n int, err error) {
+//	if s.err != nil {
+//		return 0, s.err
+//	}
+//
+//	if len(s.buffs) == 0 {
+//		return 0, io.EOF
+//	}
+//
+//	buff := s.buffs[0]
+//	if len(p) >= len(buff) {
+//		n = copy(p, buff)
+//		copy(s.buffs, s.buffs[1:])
+//		s.buffs = s.buffs[:len(s.buffs)-1]
+//	} else {
+//		n = copy(p, buff)
+//		copy(buff, buff[n:])
+//		buff = buff[:len(buff)-n]
+//		s.buffs[0] = buff
+//	}
+//
+//	return n, nil
+//}
+//func (s *streamReadCloser) Close() error {
+//	s.err = io.EOF
+//	return nil
+//}
+
+func Test_readPodLogsFromCluster(t *testing.T) {
+	client := fake.NewClientset()
+
+	status := corev1.PodStatus{
+		Phase: corev1.PodRunning,
+		Conditions: []corev1.PodCondition{
+			{
+				Type:   corev1.PodReady,
+				Status: corev1.ConditionTrue,
+			},
+		},
+	}
+	var setErr error = nil
+	client.PrependReactor("get", "pods", func(action testcore.Action) (handled bool, ret runtime.Object, err error) {
+		if action.GetSubresource() == "log" {
+			// TODO Based on the code submitted in https://github.com/kubernetes/kubernetes/pull/91485,
+			// the GetLogs() method does not support custom objects; instead, it creates an internal fakerest.RESTClient.
+			// Tests for this functionality will be added once Kubernetes provides native support.
+			return false, nil, nil
+		}
+		pod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "fake-pod",
+				Namespace: "default",
+			},
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{
+					{
+						Name:  "app",
+						Image: "image-test",
+					},
+				},
+			},
+			Status: status,
+		}
+		return true, pod, setErr
+	})
+
+	gin.SetMode(gin.TestMode)
+
+	hfn := func() (*httptest.ResponseRecorder, *gin.Context) {
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = &http.Request{}
+		return w, c
+	}
+
+	w, c := hfn()
+	h := &K8sHandler{
+		k8sNameSpace: "test-ns",
+	}
+	testCluster := &cluster.Cluster{
+		CID:           "stream-log",
+		ID:            "test",
+		Client:        client,
+		KnativeClient: knativefake.NewSimpleClientset(),
+	}
+
+	h.readPodLogsFromCluster(c, testCluster, "pod-test", "svc-test")
+	require.Equal(t, http.StatusOK, w.Code)
+
+	// test pod PodPending
+	status = corev1.PodStatus{
+		Phase: corev1.PodPending,
+		Conditions: []corev1.PodCondition{
+			{
+				Type:   corev1.PodScheduled,
+				Status: corev1.ConditionFalse,
+			},
+		},
+	}
+	w, c = hfn()
+	h.readPodLogsFromCluster(c, testCluster, "pod-test", "svc-test")
+	require.Equal(t, http.StatusBadRequest, w.Code)
+
+	// set error
+	setErr = errors.New("test error")
+	w, c = hfn()
+	h.readPodLogsFromCluster(c, testCluster, "pod-test", "svc-test")
+	require.Equal(t, http.StatusInternalServerError, w.Code)
 }
