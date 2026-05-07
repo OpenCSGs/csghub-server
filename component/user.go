@@ -42,7 +42,7 @@ type UserComponent interface {
 	CreateUserResource(ctx context.Context, req types.CreateUserResourceReq) error
 	DeleteUserResource(ctx context.Context, username string, orderDetailId int64) error
 	// GetUserResource
-	GetUserResource(ctx context.Context, req types.GetUserResourceReq) ([]types.UserResourcesResp, int, error)
+	GetUserResource(ctx context.Context, req types.GetUserResourceReq) ([]types.UserResourcesResp, int, float64, error)
 	GetUserByName(ctx context.Context, userName string) (*database.User, error)
 	Prompts(ctx context.Context, req *types.UserPromptsReq) ([]types.PromptRes, int, error)
 	Evaluations(ctx context.Context, req *types.UserEvaluationReq) ([]types.ArgoWorkFlowRes, int, error)

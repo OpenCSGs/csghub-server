@@ -537,7 +537,7 @@ func (_c *MockUserComponent_GetUserByName_Call) RunAndReturn(run func(context.Co
 }
 
 // GetUserResource provides a mock function with given fields: ctx, req
-func (_m *MockUserComponent) GetUserResource(ctx context.Context, req types.GetUserResourceReq) ([]types.UserResourcesResp, int, error) {
+func (_m *MockUserComponent) GetUserResource(ctx context.Context, req types.GetUserResourceReq) ([]types.UserResourcesResp, int, float64, error) {
 	ret := _m.Called(ctx, req)
 
 	if len(ret) == 0 {
@@ -546,8 +546,9 @@ func (_m *MockUserComponent) GetUserResource(ctx context.Context, req types.GetU
 
 	var r0 []types.UserResourcesResp
 	var r1 int
-	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, types.GetUserResourceReq) ([]types.UserResourcesResp, int, error)); ok {
+	var r2 float64
+	var r3 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.GetUserResourceReq) ([]types.UserResourcesResp, int, float64, error)); ok {
 		return rf(ctx, req)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, types.GetUserResourceReq) []types.UserResourcesResp); ok {
@@ -564,13 +565,19 @@ func (_m *MockUserComponent) GetUserResource(ctx context.Context, req types.GetU
 		r1 = ret.Get(1).(int)
 	}
 
-	if rf, ok := ret.Get(2).(func(context.Context, types.GetUserResourceReq) error); ok {
+	if rf, ok := ret.Get(2).(func(context.Context, types.GetUserResourceReq) float64); ok {
 		r2 = rf(ctx, req)
 	} else {
-		r2 = ret.Error(2)
+		r2 = ret.Get(2).(float64)
 	}
 
-	return r0, r1, r2
+	if rf, ok := ret.Get(3).(func(context.Context, types.GetUserResourceReq) error); ok {
+		r3 = rf(ctx, req)
+	} else {
+		r3 = ret.Error(3)
+	}
+
+	return r0, r1, r2, r3
 }
 
 // MockUserComponent_GetUserResource_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetUserResource'
@@ -592,12 +599,12 @@ func (_c *MockUserComponent_GetUserResource_Call) Run(run func(ctx context.Conte
 	return _c
 }
 
-func (_c *MockUserComponent_GetUserResource_Call) Return(_a0 []types.UserResourcesResp, _a1 int, _a2 error) *MockUserComponent_GetUserResource_Call {
-	_c.Call.Return(_a0, _a1, _a2)
+func (_c *MockUserComponent_GetUserResource_Call) Return(_a0 []types.UserResourcesResp, _a1 int, _a2 float64, _a3 error) *MockUserComponent_GetUserResource_Call {
+	_c.Call.Return(_a0, _a1, _a2, _a3)
 	return _c
 }
 
-func (_c *MockUserComponent_GetUserResource_Call) RunAndReturn(run func(context.Context, types.GetUserResourceReq) ([]types.UserResourcesResp, int, error)) *MockUserComponent_GetUserResource_Call {
+func (_c *MockUserComponent_GetUserResource_Call) RunAndReturn(run func(context.Context, types.GetUserResourceReq) ([]types.UserResourcesResp, int, float64, error)) *MockUserComponent_GetUserResource_Call {
 	_c.Call.Return(run)
 	return _c
 }

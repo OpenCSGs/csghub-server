@@ -30,10 +30,11 @@ func TestUserResourcesStore_CRUD(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, "o1", ur.OrderId)
 
-	urs, total, err := store.GetUserResourcesByUserUID(ctx, 10, 1, "u1")
+	urs, total, totalPrice, err := store.GetUserResourcesByUserUID(ctx, 10, 1, "u1", "", "")
 	require.Nil(t, err)
 	require.Equal(t, 1, total)
 	require.Equal(t, "o1", urs[0].OrderId)
+	require.Equal(t, 0.0, totalPrice)
 
 	ur, err = store.FindUserResourcesByOrderDetailId(ctx, "u1", 123)
 	require.Nil(t, err)

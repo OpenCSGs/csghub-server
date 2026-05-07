@@ -3,8 +3,9 @@ package database
 import (
 	"context"
 	"fmt"
-	"opencsg.com/csghub-server/common/errorx"
 	"time"
+
+	"opencsg.com/csghub-server/common/errorx"
 )
 
 type userResourcesStoreImpl struct {
@@ -15,7 +16,7 @@ type UserResourcesStore interface {
 	// add user resources
 	AddUserResources(ctx context.Context, userResources *UserResources) error
 	// get user resources by user uid
-	GetUserResourcesByUserUID(ctx context.Context, per, page int, userId string) (userResources []UserResources, total int, err error)
+	GetUserResourcesByUserUID(ctx context.Context, per, page int, userId string, startTime, endTime string) (userResources []UserResources, total int, totalPrice float64, err error)
 	// get need reserved user resources which is not deployed and not expired
 	GetReservedUserResources(ctx context.Context, userId string, clusterId string) ([]UserResources, error)
 	// update deploy id
@@ -65,26 +66,41 @@ func (s *userResourcesStoreImpl) AddUserResources(ctx context.Context, userResou
 }
 
 // get user resources by user uid
-func (s *userResourcesStoreImpl) GetUserResourcesByUserUID(ctx context.Context, per, page int, userId string) (userResources []UserResources, total int, err error) {
+func (s *userResourcesStoreImpl) GetUserResourcesByUserUID(ctx context.Context, per, page int, userId string, startTime, endTime string) (userResources []UserResources, total int, totalPrice float64, err error) {
 
-	query := s.db.Operator.Core.
+	baseQuery := s.db.Operator.Core.
 		NewSelect().
 		Model(&userResources).
-		Relation("SpaceResource").
-		Relation("Deploy").
 		Where("user_resources.user_uid = ?", userId)
 
-	query = query.Order("user_resources.created_at DESC").
+	if startTime != "" {
+		baseQuery = baseQuery.Where("user_resources.created_at >= ?", startTime)
+	}
+	if endTime != "" {
+		baseQuery = baseQuery.Where("user_resources.created_at <= ?", endTime)
+	}
+
+	// Calculate total price before pagination (separate query without relations)
+	err = baseQuery.Clone().ColumnExpr("COALESCE(SUM(price), 0)").Scan(ctx, &totalPrice)
+	if err != nil {
+		return userResources, 0, 0, errorx.HandleDBError(err, nil)
+	}
+
+	// Get paginated data with relations
+	query := baseQuery.
+		Relation("SpaceResource").
+		Relation("Deploy").
+		Order("user_resources.created_at DESC").
 		Limit(per).
 		Offset((page - 1) * per)
 
 	err = query.Scan(ctx)
 	if err != nil {
-		return userResources, 0, errorx.HandleDBError(err, nil)
+		return userResources, 0, 0, errorx.HandleDBError(err, nil)
 	}
 	total, err = query.Count(ctx)
 	if err != nil {
-		return userResources, total, errorx.HandleDBError(err, nil)
+		return userResources, total, totalPrice, errorx.HandleDBError(err, nil)
 	}
 	return
 }

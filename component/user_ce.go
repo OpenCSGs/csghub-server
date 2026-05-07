@@ -113,8 +113,8 @@ func (c *userComponentImpl) DeleteUserResource(ctx context.Context, username str
 }
 
 // GetUserResource
-func (c *userComponentImpl) GetUserResource(ctx context.Context, req types.GetUserResourceReq) ([]types.UserResourcesResp, int, error) {
-	return nil, 0, nil
+func (c *userComponentImpl) GetUserResource(ctx context.Context, req types.GetUserResourceReq) ([]types.UserResourcesResp, int, float64, error) {
+	return nil, 0, 0, nil
 }
 
 func (c *userComponentImpl) ListNotebooks(ctx context.Context, req *types.DeployReq) ([]types.NotebookRes, int, error) {

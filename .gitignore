@@ -33,6 +33,8 @@ cmd/csghub-server/__debug_*
 run_dataviewer_local.sh
 run_notification_local.sh
 run_temporal_worker.sh
+run_logcollector_local.sh
+
 local.toml
 loki-config.yml
 

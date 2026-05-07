@@ -50,6 +50,7 @@ type AccountingComponent interface {
 	StatementsIndex(ctx context.Context, req types.ActStatementsReq) ([]types.AcctStatementsRes, int, error)
 	ListPresents(ctx context.Context, req types.PresentsIndexReq) ([]*types.PresentIndexResp, int, error)
 	WeeklyRecharges(ctx context.Context) error
+	GetOrderDetailByID(ctx context.Context, currentUser string, id int64) (*database.AccountOrderDetail, error)
 }
 
 func NewAccountingComponent(config *config.Config) (AccountingComponent, error) {
