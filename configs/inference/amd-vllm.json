@@ -326,7 +326,6 @@
     "Qwen3VLMoeForConditionalGeneration",
     "Qwen3_5ForConditionalGeneration",
     "Qwen3_5MoeForConditionalGeneration",
-    "Qwen3ForGuardModel",
     "QwenVLForConditionalGeneration",
     "RForConditionalGeneration",
     "RWForCausalLM",
