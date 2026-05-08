@@ -3,11 +3,11 @@ import requests
 from openai import OpenAI
 
 def check_violation(content):
-    """调用大模型判断内容进行合法性判断"""
+    """Call LLM to judge the content for legality."""
     
     client = OpenAI(
         api_key=os.environ.get("LLM_API_KEY"),
-        base_url="https://api.deepseek.com" # 或替换为智谱 GLM 等其他 API
+        base_url="https://api.deepseek.com" # GLM , MiniMax or other LLM  API
     )
     
     prompt = f"""
@@ -38,7 +38,7 @@ def check_violation(content):
         return False
 
 def add_comment(repo, issue_number, token, message):
-    """向指定的 Issue 添加回复"""
+    """add comment to specific Issue"""
     url = f"https://api.github.com/repos/{repo}/issues/{issue_number}/comments"
     headers = {
         "Authorization": f"Bearer {token}",
@@ -49,7 +49,7 @@ def add_comment(repo, issue_number, token, message):
     print("已成功发送礼貌回复。")
 
 def close_issue(repo, issue_number, token):
-    """关闭 Issue"""
+    ""close Issue"""
     url = f"https://api.github.com/repos/{repo}/issues/{issue_number}"
     headers = {
         "Authorization": f"Bearer {token}",
@@ -59,7 +59,7 @@ def close_issue(repo, issue_number, token):
     print(f"Issue #{issue_number} 已关闭。")
 
 def delete_comment(repo, comment_id, token):
-    """删除指定的 Comment"""
+    """Delete Comment"""
     url = f"https://api.github.com/repos/{repo}/issues/comments/{comment_id}"
     headers = {
         "Authorization": f"Bearer {token}",
@@ -81,7 +81,7 @@ if __name__ == "__main__":
     print(f"触发事件类型: {event_name}")
 
     if event_name == "issues":
-        # 处理新建 Issue
+        # for new Issue
         title = os.environ.get("ISSUE_TITLE", "")
         body = os.environ.get("ISSUE_BODY", "")
         content_to_check = f"标题: {title}\n内容: {body}"
@@ -95,7 +95,7 @@ if __name__ == "__main__":
             print("判定结果：正常 Issue，放行。")
 
     elif event_name == "issue_comment":
-        # 处理新增 Comment
+        # for new Comment
         comment_id = os.environ.get("COMMENT_ID")
         comment_body = os.environ.get("COMMENT_BODY", "")
         content_to_check = f"评论内容: {comment_body}"
