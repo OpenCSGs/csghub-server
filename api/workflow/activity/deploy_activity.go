@@ -705,13 +705,16 @@ func (a *DeployActivity) makeDeployEnv(ctx context.Context, hardware types.HardW
 		if err != nil {
 			return nil, err
 		}
-		commitID, err := utilcommon.ShortenCommitID7(commit.ID)
-		if err != nil {
-			return nil, errorx.ErrInvalidCommitID
+		revision := strings.TrimSpace(varMap["REVISION"])
+		if revision == "" {
+			revision, err = utilcommon.ShortenCommitID7(commit.ID)
+			if err != nil {
+				return nil, errorx.ErrInvalidCommitID
+			}
 		}
 		envMap["HTTPCloneURL"] = a.getHttpCloneURLWithToken(repoInfo.HTTPCloneURL, accessToken.User.Username, accessToken.Token)
 		envMap["REPO_ID"] = repoInfo.Path // "namespace/name"
-		envMap["REVISION"] = commitID     // branch
+		envMap["REVISION"] = revision     // branch
 	} else {
 		envMap["HTTPCloneURL"] = ""
 		envMap["REPO_ID"] = ""
