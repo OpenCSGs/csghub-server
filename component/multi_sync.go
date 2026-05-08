@@ -1056,8 +1056,8 @@ func (c *multiSyncComponentImpl) createLocalSkill(ctx context.Context, m *types.
 				Category: tag.Category,
 				Group:    tag.Group,
 				BuiltIn:  tag.BuiltIn,
-				I18nKey:  tag.ShowName, // ShowName: tag.ShowName,
-				Scope:    types.CodeTagScope,
+				I18nKey:  tag.I18nKey,
+				Scope:    types.SkillTagScope,
 			}
 			t, err := c.tagStore.FindOrCreate(ctx, dbTag)
 			if err != nil {

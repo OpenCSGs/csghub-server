@@ -270,7 +270,7 @@ func TestMultiSyncComponent_SyncAsClient(t *testing.T) {
 	mc.mocks.stores.RepoMock().EXPECT().UpdateOrCreateRepo(ctx, *dbrepo).Return(dbrepo, nil)
 	dbrepo.ID = 3
 	mc.mocks.stores.TagMock().EXPECT().FindOrCreate(ctx, database.Tag{
-		Name: "t3", Scope: types.CodeTagScope,
+		Name: "t3", Scope: types.SkillTagScope,
 	}).Return(
 		&database.Tag{Name: "t3", ID: 13}, nil,
 	)
