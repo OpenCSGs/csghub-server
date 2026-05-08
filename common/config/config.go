@@ -436,6 +436,8 @@ type Config struct {
 		RepoDataMigrateEnable  bool   `env:"STARHUB_SERVER_GIT_REPO_DATA_MIGRATE_ENABLE" default:"false"`
 		LimitLfsFileUploadSize bool   `env:"STARHUB_SERVER_GIT_LIMIT_LFS_FILE_UPLOAD_SIZE " default:"true"`
 		TreeOperationTimeout   int    `env:"STARHUB_SERVER_GIT_TREE_OPERATION_TIMEOUT" default:"3"`
+		// Welcome message displayed after git push
+		WelcomeMessage string `env:"STARHUB_SERVER_GIT_WELCOME_MESSAGE" default:"Welcome to OpenCSG!"`
 	}
 
 	AIGateway struct {

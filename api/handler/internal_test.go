@@ -175,6 +175,7 @@ func TestInternalHandler_PostReceive(t *testing.T) {
 	tester := NewInternalTester(t).WithHandleFunc(func(h *InternalHandler) gin.HandlerFunc {
 		return h.PostReceive
 	})
+	tester.handler.config.Git.WelcomeMessage = "Welcome to OpenCSG!"
 
 	tester.mocks.internal.EXPECT().GetCommitDiff(tester.Ctx(), types.GetDiffBetweenTwoCommitsReq{
 		LeftCommitId:  "foo",
