@@ -425,14 +425,14 @@ func (s *deployTaskStoreImpl) GetDeployBySvcName(ctx context.Context, svcName st
 
 func (s *deployTaskStoreImpl) StopDeploy(ctx context.Context, repoType types.RepositoryType, repoID, userID int64, deployID int64) error {
 	// only stop the deploy of specific repo was triggered by current login user
-	res, err := s.db.BunDB.Exec("Update deploys set status=?,updated_at=current_timestamp where id = ? and repo_id = ? and user_id = ?", common.Stopped, deployID, repoID, userID)
+	res, err := s.db.BunDB.Exec("Update deploys set status=?,updated_at=current_timestamp,instances='[]'::jsonb where id = ? and repo_id = ? and user_id = ?", common.Stopped, deployID, repoID, userID)
 	err = assertAffectedOneRow(res, err)
 	err = errorx.HandleDBError(err, nil)
 	return err
 }
 func (s *deployTaskStoreImpl) StopDeployByID(ctx context.Context, userID int64, deployID int64) error {
 	// only stop the deploy of specific repo was triggered by current login user
-	res, err := s.db.BunDB.Exec("Update deploys set status=?,updated_at=current_timestamp where id = ? and user_id = ?", common.Stopped, deployID, userID)
+	res, err := s.db.BunDB.Exec("Update deploys set status=?,updated_at=current_timestamp,instances='[]'::jsonb where id = ? and user_id = ?", common.Stopped, deployID, userID)
 	err = assertAffectedOneRow(res, err)
 	err = errorx.HandleDBError(err, nil)
 	return err

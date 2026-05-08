@@ -49,4 +49,5 @@ docs/swagger.json
 docs/swagger.yaml
 docs/docs.go
 pgdata15/
+.prd/
 
