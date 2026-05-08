@@ -194,11 +194,15 @@ func (h *InternalHandler) PreReceive(ctx *gin.Context) {
 }
 
 func (h *InternalHandler) PostReceive(ctx *gin.Context) {
+	welcomeMessage := h.config.Git.WelcomeMessage
+	if welcomeMessage == "" {
+		welcomeMessage = "Welcome to OpenCSG!"
+	}
 	successResp := gin.H{
 		"reference_counter_decreased": true,
 		"messages": []Messages{
 			{
-				Message: "Welcome to OpenCSG!",
+				Message: welcomeMessage,
 				Type:    "alert",
 			},
 		},
