@@ -58,11 +58,13 @@ type Deployer interface {
 	CheckHeartbeatTimeout(ctx context.Context, clusterId string) (bool, error)
 	SubmitFinetuneJob(ctx context.Context, req types.FinetuneReq) (*types.ArgoWorkFlowRes, error)
 	DeleteFinetuneJob(ctx context.Context, req types.ArgoWorkFlowDeleteReq) error
-	GetWorkflowLogsInStream(ctx context.Context, req types.FinetuneLogReq) (*MultiLogReader, error)
-	GetWorkflowLogsNonStream(ctx context.Context, req types.FinetuneLogReq) (*loki.LokiQueryResponse, error)
+	GetWorkflowLogsInStream(ctx context.Context, req types.WorkflowLogReq, labels map[string]string) (*MultiLogReader, error)
+	GetWorkflowLogsNonStream(ctx context.Context, req types.WorkflowLogReq, labels map[string]string) (*loki.LokiQueryResponse, error)
 	IsDefaultScheduler() bool
 	GetSharedModeResourceName(config *config.Config) string
 	LabelNode(ctx context.Context, req *types.NodeLabel) error
+	CreateDataflowJob(ctx context.Context, req *types.DataflowArgoJobReq) (*types.DataflowArgoJobResp, error)
+	DeleteDataflowJob(ctx context.Context, req *types.DataflowArgoReq) error
 }
 
 func (d *deployer) GenerateUniqueSvcName(dr types.DeployRequest) string {
@@ -992,11 +994,7 @@ func (d *deployer) DeleteFinetuneJob(ctx context.Context, req types.ArgoWorkFlow
 	return nil
 }
 
-func (d *deployer) GetWorkflowLogsInStream(ctx context.Context, req types.FinetuneLogReq) (*MultiLogReader, error) {
-	slog.Info("GetWorkflowLogsInStream", slog.Any("req", req))
-	labels := map[string]string{
-		types.StreamKeyInstanceName: req.PodName,
-	}
+func (d *deployer) GetWorkflowLogsInStream(ctx context.Context, req types.WorkflowLogReq, labels map[string]string) (*MultiLogReader, error) {
 
 	var startTime = req.SubmitTime
 	if len(req.Since) > 0 {
@@ -1016,10 +1014,8 @@ func (d *deployer) GetWorkflowLogsInStream(ctx context.Context, req types.Finetu
 	return NewMultiLogReader(nil, runLog), nil
 }
 
-func (d *deployer) GetWorkflowLogsNonStream(ctx context.Context, req types.FinetuneLogReq) (*loki.LokiQueryResponse, error) {
-	labels := map[string]string{
-		types.StreamKeyInstanceName: req.PodName,
-	}
+func (d *deployer) GetWorkflowLogsNonStream(ctx context.Context, req types.WorkflowLogReq, labels map[string]string) (*loki.LokiQueryResponse, error) {
+
 	query := d.lokiClient.GenerateLabelQuery(labels)
 	var startTime = req.SubmitTime
 	if req.Since != "" {

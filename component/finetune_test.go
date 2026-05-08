@@ -322,7 +322,7 @@ func TestFinetuneComponent_ReadJobLogsNonStream(t *testing.T) {
 		}, nil)
 
 		expectedLogs := &loki.LokiQueryResponse{}
-		mockDeployer.EXPECT().GetWorkflowLogsNonStream(ctx, mock.Anything).Return(expectedLogs, nil)
+		mockDeployer.EXPECT().GetWorkflowLogsNonStream(ctx, mock.Anything, mock.Anything).Return(expectedLogs, nil)
 
 		logs, err := c.ReadJobLogsNonStream(ctx, req)
 		require.NoError(t, err)
@@ -364,7 +364,7 @@ func TestFinetuneComponent_ReadJobLogsNonStream(t *testing.T) {
 		}, nil)
 
 		expectedErr := errors.New("failed to get logs")
-		mockDeployer.EXPECT().GetWorkflowLogsNonStream(ctx, mock.Anything).Return(nil, expectedErr)
+		mockDeployer.EXPECT().GetWorkflowLogsNonStream(ctx, mock.Anything, mock.Anything).Return(nil, expectedErr)
 
 		_, err := c.ReadJobLogsNonStream(ctx, req)
 		require.NotNil(t, err)
@@ -393,7 +393,7 @@ func TestFinetuneComponent_ReadJobLogsInStream(t *testing.T) {
 		}, nil)
 
 		expectedReader := &deploy.MultiLogReader{}
-		mockDeployer.EXPECT().GetWorkflowLogsInStream(ctx, mock.Anything).Return(expectedReader, nil)
+		mockDeployer.EXPECT().GetWorkflowLogsInStream(ctx, mock.Anything, mock.Anything).Return(expectedReader, nil)
 
 		reader, err := c.ReadJobLogsInStream(ctx, req)
 		require.NoError(t, err)

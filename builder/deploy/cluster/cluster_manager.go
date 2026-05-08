@@ -309,6 +309,8 @@ func buildCluster(kubeconfig *rest.Config, id string, index int, connectMode typ
 		return nil, fmt.Errorf("failed to add cluster info to db error: %w", err)
 	}
 	if !cluster.Enable {
+		slog.Info("cluster is disabled, will not be used", slog.String("cluster_id", cluster.ClusterID),
+			slog.String("config", cluster.ClusterConfig), slog.String("region", region))
 		return nil, nil
 	}
 
@@ -620,7 +622,7 @@ func getXPULabel(labels map[string]string, config *config.Config) (string, strin
 		return "enflame.com/gcu.count", "enflame.com/gcu.model", []string{"enflame.com/gcu.mem"}
 	}
 	if _, found := labels["amd.com/gpu"]; found {
-		//for enflame gcu
+		//for amd gpu
 		return "amd.com/gpu", "amd.com/gpu.product-name", []string{"amd.com/gpu.vram"}
 	}
 	//check custom gpu model label

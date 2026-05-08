@@ -156,6 +156,112 @@ func (_c *MockDeployer_CheckResourceAvailable_Call) RunAndReturn(run func(contex
 	return _c
 }
 
+// CreateDataflowJob provides a mock function with given fields: ctx, req
+func (_m *MockDeployer) CreateDataflowJob(ctx context.Context, req *types.DataflowArgoJobReq) (*types.DataflowArgoJobResp, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateDataflowJob")
+	}
+
+	var r0 *types.DataflowArgoJobResp
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *types.DataflowArgoJobReq) (*types.DataflowArgoJobResp, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *types.DataflowArgoJobReq) *types.DataflowArgoJobResp); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.DataflowArgoJobResp)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *types.DataflowArgoJobReq) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockDeployer_CreateDataflowJob_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateDataflowJob'
+type MockDeployer_CreateDataflowJob_Call struct {
+	*mock.Call
+}
+
+// CreateDataflowJob is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req *types.DataflowArgoJobReq
+func (_e *MockDeployer_Expecter) CreateDataflowJob(ctx interface{}, req interface{}) *MockDeployer_CreateDataflowJob_Call {
+	return &MockDeployer_CreateDataflowJob_Call{Call: _e.mock.On("CreateDataflowJob", ctx, req)}
+}
+
+func (_c *MockDeployer_CreateDataflowJob_Call) Run(run func(ctx context.Context, req *types.DataflowArgoJobReq)) *MockDeployer_CreateDataflowJob_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*types.DataflowArgoJobReq))
+	})
+	return _c
+}
+
+func (_c *MockDeployer_CreateDataflowJob_Call) Return(_a0 *types.DataflowArgoJobResp, _a1 error) *MockDeployer_CreateDataflowJob_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockDeployer_CreateDataflowJob_Call) RunAndReturn(run func(context.Context, *types.DataflowArgoJobReq) (*types.DataflowArgoJobResp, error)) *MockDeployer_CreateDataflowJob_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// DeleteDataflowJob provides a mock function with given fields: ctx, req
+func (_m *MockDeployer) DeleteDataflowJob(ctx context.Context, req *types.DataflowArgoReq) error {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteDataflowJob")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, *types.DataflowArgoReq) error); ok {
+		r0 = rf(ctx, req)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockDeployer_DeleteDataflowJob_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteDataflowJob'
+type MockDeployer_DeleteDataflowJob_Call struct {
+	*mock.Call
+}
+
+// DeleteDataflowJob is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req *types.DataflowArgoReq
+func (_e *MockDeployer_Expecter) DeleteDataflowJob(ctx interface{}, req interface{}) *MockDeployer_DeleteDataflowJob_Call {
+	return &MockDeployer_DeleteDataflowJob_Call{Call: _e.mock.On("DeleteDataflowJob", ctx, req)}
+}
+
+func (_c *MockDeployer_DeleteDataflowJob_Call) Run(run func(ctx context.Context, req *types.DataflowArgoReq)) *MockDeployer_DeleteDataflowJob_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*types.DataflowArgoReq))
+	})
+	return _c
+}
+
+func (_c *MockDeployer_DeleteDataflowJob_Call) Return(_a0 error) *MockDeployer_DeleteDataflowJob_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockDeployer_DeleteDataflowJob_Call) RunAndReturn(run func(context.Context, *types.DataflowArgoReq) error) *MockDeployer_DeleteDataflowJob_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // DeleteEvaluation provides a mock function with given fields: ctx, req
 func (_m *MockDeployer) DeleteEvaluation(ctx context.Context, req types.ArgoWorkFlowDeleteReq) error {
 	ret := _m.Called(ctx, req)
@@ -601,9 +707,9 @@ func (_c *MockDeployer_GetSharedModeResourceName_Call) RunAndReturn(run func(*co
 	return _c
 }
 
-// GetWorkflowLogsInStream provides a mock function with given fields: ctx, req
-func (_m *MockDeployer) GetWorkflowLogsInStream(ctx context.Context, req types.FinetuneLogReq) (*deploy.MultiLogReader, error) {
-	ret := _m.Called(ctx, req)
+// GetWorkflowLogsInStream provides a mock function with given fields: ctx, req, labels
+func (_m *MockDeployer) GetWorkflowLogsInStream(ctx context.Context, req types.WorkflowLogReq, labels map[string]string) (*deploy.MultiLogReader, error) {
+	ret := _m.Called(ctx, req, labels)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetWorkflowLogsInStream")
@@ -611,19 +717,19 @@ func (_m *MockDeployer) GetWorkflowLogsInStream(ctx context.Context, req types.F
 
 	var r0 *deploy.MultiLogReader
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, types.FinetuneLogReq) (*deploy.MultiLogReader, error)); ok {
-		return rf(ctx, req)
+	if rf, ok := ret.Get(0).(func(context.Context, types.WorkflowLogReq, map[string]string) (*deploy.MultiLogReader, error)); ok {
+		return rf(ctx, req, labels)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, types.FinetuneLogReq) *deploy.MultiLogReader); ok {
-		r0 = rf(ctx, req)
+	if rf, ok := ret.Get(0).(func(context.Context, types.WorkflowLogReq, map[string]string) *deploy.MultiLogReader); ok {
+		r0 = rf(ctx, req, labels)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*deploy.MultiLogReader)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, types.FinetuneLogReq) error); ok {
-		r1 = rf(ctx, req)
+	if rf, ok := ret.Get(1).(func(context.Context, types.WorkflowLogReq, map[string]string) error); ok {
+		r1 = rf(ctx, req, labels)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -638,14 +744,15 @@ type MockDeployer_GetWorkflowLogsInStream_Call struct {
 
 // GetWorkflowLogsInStream is a helper method to define mock.On call
 //   - ctx context.Context
-//   - req types.FinetuneLogReq
-func (_e *MockDeployer_Expecter) GetWorkflowLogsInStream(ctx interface{}, req interface{}) *MockDeployer_GetWorkflowLogsInStream_Call {
-	return &MockDeployer_GetWorkflowLogsInStream_Call{Call: _e.mock.On("GetWorkflowLogsInStream", ctx, req)}
+//   - req types.WorkflowLogReq
+//   - labels map[string]string
+func (_e *MockDeployer_Expecter) GetWorkflowLogsInStream(ctx interface{}, req interface{}, labels interface{}) *MockDeployer_GetWorkflowLogsInStream_Call {
+	return &MockDeployer_GetWorkflowLogsInStream_Call{Call: _e.mock.On("GetWorkflowLogsInStream", ctx, req, labels)}
 }
 
-func (_c *MockDeployer_GetWorkflowLogsInStream_Call) Run(run func(ctx context.Context, req types.FinetuneLogReq)) *MockDeployer_GetWorkflowLogsInStream_Call {
+func (_c *MockDeployer_GetWorkflowLogsInStream_Call) Run(run func(ctx context.Context, req types.WorkflowLogReq, labels map[string]string)) *MockDeployer_GetWorkflowLogsInStream_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(types.FinetuneLogReq))
+		run(args[0].(context.Context), args[1].(types.WorkflowLogReq), args[2].(map[string]string))
 	})
 	return _c
 }
@@ -655,14 +762,14 @@ func (_c *MockDeployer_GetWorkflowLogsInStream_Call) Return(_a0 *deploy.MultiLog
 	return _c
 }
 
-func (_c *MockDeployer_GetWorkflowLogsInStream_Call) RunAndReturn(run func(context.Context, types.FinetuneLogReq) (*deploy.MultiLogReader, error)) *MockDeployer_GetWorkflowLogsInStream_Call {
+func (_c *MockDeployer_GetWorkflowLogsInStream_Call) RunAndReturn(run func(context.Context, types.WorkflowLogReq, map[string]string) (*deploy.MultiLogReader, error)) *MockDeployer_GetWorkflowLogsInStream_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// GetWorkflowLogsNonStream provides a mock function with given fields: ctx, req
-func (_m *MockDeployer) GetWorkflowLogsNonStream(ctx context.Context, req types.FinetuneLogReq) (*loki.LokiQueryResponse, error) {
-	ret := _m.Called(ctx, req)
+// GetWorkflowLogsNonStream provides a mock function with given fields: ctx, req, labels
+func (_m *MockDeployer) GetWorkflowLogsNonStream(ctx context.Context, req types.WorkflowLogReq, labels map[string]string) (*loki.LokiQueryResponse, error) {
+	ret := _m.Called(ctx, req, labels)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetWorkflowLogsNonStream")
@@ -670,19 +777,19 @@ func (_m *MockDeployer) GetWorkflowLogsNonStream(ctx context.Context, req types.
 
 	var r0 *loki.LokiQueryResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, types.FinetuneLogReq) (*loki.LokiQueryResponse, error)); ok {
-		return rf(ctx, req)
+	if rf, ok := ret.Get(0).(func(context.Context, types.WorkflowLogReq, map[string]string) (*loki.LokiQueryResponse, error)); ok {
+		return rf(ctx, req, labels)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, types.FinetuneLogReq) *loki.LokiQueryResponse); ok {
-		r0 = rf(ctx, req)
+	if rf, ok := ret.Get(0).(func(context.Context, types.WorkflowLogReq, map[string]string) *loki.LokiQueryResponse); ok {
+		r0 = rf(ctx, req, labels)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*loki.LokiQueryResponse)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, types.FinetuneLogReq) error); ok {
-		r1 = rf(ctx, req)
+	if rf, ok := ret.Get(1).(func(context.Context, types.WorkflowLogReq, map[string]string) error); ok {
+		r1 = rf(ctx, req, labels)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -697,14 +804,15 @@ type MockDeployer_GetWorkflowLogsNonStream_Call struct {
 
 // GetWorkflowLogsNonStream is a helper method to define mock.On call
 //   - ctx context.Context
-//   - req types.FinetuneLogReq
-func (_e *MockDeployer_Expecter) GetWorkflowLogsNonStream(ctx interface{}, req interface{}) *MockDeployer_GetWorkflowLogsNonStream_Call {
-	return &MockDeployer_GetWorkflowLogsNonStream_Call{Call: _e.mock.On("GetWorkflowLogsNonStream", ctx, req)}
+//   - req types.WorkflowLogReq
+//   - labels map[string]string
+func (_e *MockDeployer_Expecter) GetWorkflowLogsNonStream(ctx interface{}, req interface{}, labels interface{}) *MockDeployer_GetWorkflowLogsNonStream_Call {
+	return &MockDeployer_GetWorkflowLogsNonStream_Call{Call: _e.mock.On("GetWorkflowLogsNonStream", ctx, req, labels)}
 }
 
-func (_c *MockDeployer_GetWorkflowLogsNonStream_Call) Run(run func(ctx context.Context, req types.FinetuneLogReq)) *MockDeployer_GetWorkflowLogsNonStream_Call {
+func (_c *MockDeployer_GetWorkflowLogsNonStream_Call) Run(run func(ctx context.Context, req types.WorkflowLogReq, labels map[string]string)) *MockDeployer_GetWorkflowLogsNonStream_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(types.FinetuneLogReq))
+		run(args[0].(context.Context), args[1].(types.WorkflowLogReq), args[2].(map[string]string))
 	})
 	return _c
 }
@@ -714,7 +822,7 @@ func (_c *MockDeployer_GetWorkflowLogsNonStream_Call) Return(_a0 *loki.LokiQuery
 	return _c
 }
 
-func (_c *MockDeployer_GetWorkflowLogsNonStream_Call) RunAndReturn(run func(context.Context, types.FinetuneLogReq) (*loki.LokiQueryResponse, error)) *MockDeployer_GetWorkflowLogsNonStream_Call {
+func (_c *MockDeployer_GetWorkflowLogsNonStream_Call) RunAndReturn(run func(context.Context, types.WorkflowLogReq, map[string]string) (*loki.LokiQueryResponse, error)) *MockDeployer_GetWorkflowLogsNonStream_Call {
 	_c.Call.Return(run)
 	return _c
 }
