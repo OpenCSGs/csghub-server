@@ -698,8 +698,20 @@ func (c *accessTokenComponentImpl) checkOrCreateBuiltinAPIKey(ctx context.Contex
 		UserID:      user.ID,
 		TokenType:   types.AccessTokenTypeBuiltIn,
 	}
-
-	err = c.ts.Create(ctx, newToken, nil)
+	quotaReq := &types.CreateUserTokenRequest{
+		QuotaType: types.AccountingQuotaTypeUnlimited,
+		ValueType: types.AccountingQuotaValueTypeFee,
+		Quota:     0,
+	}
+	quota, err := c.buildNewAccessTokenQuota(ctx, newToken, quotaReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build API key quota, error: %w", err)
+	}
+	var quotas []database.AccountAccessTokenQuota
+	if quota != nil {
+		quotas = []database.AccountAccessTokenQuota{*quota}
+	}
+	err = c.ts.Create(ctx, newToken, quotas)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create builtin api key, error: %w", err)
 	}
