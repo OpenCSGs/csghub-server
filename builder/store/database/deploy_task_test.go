@@ -52,6 +52,7 @@ func TestDeployTaskStore_CRUD(t *testing.T) {
 	dp, err = store.GetDeployByID(ctx, dp.ID)
 	require.Nil(t, err)
 	require.Equal(t, dp.Status, common.Stopped)
+	require.Empty(t, dp.Instances)
 
 	err = store.CreateDeploy(ctx, &database.Deploy{
 		DeployName: "dp2", SvcName: "s2",

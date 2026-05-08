@@ -1168,7 +1168,7 @@ func (c *spaceComponentImpl) stopSpaceDeploy(ctx context.Context, namespace, nam
 
 	err = c.deployTaskStore.StopDeploy(ctx, types.SpaceRepo, deploy.RepoID, deploy.UserID, deploy.ID)
 	if err != nil {
-		return fmt.Errorf("fail to update space deploy status to stopped for deploy ID '%d', %w", deploy.ID, err)
+		return fmt.Errorf("failed to update space deploy status to stopped for deploy ID '%d', %w", deploy.ID, err)
 	}
 	return nil
 }
