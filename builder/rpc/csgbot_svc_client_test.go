@@ -43,9 +43,9 @@ func TestDeleteWorkspaceFiles_Success(t *testing.T) {
 
 		// Verify headers
 		assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
-		assert.Equal(t, userUUID, r.Header.Get("user_uuid"))
-		assert.Equal(t, username, r.Header.Get("user_name"))
-		assert.Equal(t, token, r.Header.Get("user_token"))
+		assert.Equal(t, userUUID, r.Header.Get(types.CSGBotHeaderUserUUID))
+		assert.Equal(t, username, r.Header.Get(types.CSGBotHeaderUserName))
+		assert.Equal(t, token, r.Header.Get(types.CSGBotHeaderUserToken))
 
 		// Return success
 		w.WriteHeader(http.StatusOK)
@@ -94,9 +94,9 @@ func TestUpdateWorkspaceFiles_Success(t *testing.T) {
 		assert.Equal(t, http.MethodPost, r.Method)
 
 		assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
-		assert.Equal(t, userUUID, r.Header.Get("user_uuid"))
-		assert.Equal(t, username, r.Header.Get("user_name"))
-		assert.Equal(t, token, r.Header.Get("user_token"))
+		assert.Equal(t, userUUID, r.Header.Get(types.CSGBotHeaderUserUUID))
+		assert.Equal(t, username, r.Header.Get(types.CSGBotHeaderUserName))
+		assert.Equal(t, token, r.Header.Get(types.CSGBotHeaderUserToken))
 
 		var req UpdateWorkspaceFilesRequest
 		err := json.NewDecoder(r.Body).Decode(&req)
@@ -175,9 +175,9 @@ func TestCreateKnowledgeBase_Success(t *testing.T) {
 
 		// Verify headers
 		assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
-		assert.Equal(t, userUUID, r.Header.Get("user_uuid"))
-		assert.Equal(t, username, r.Header.Get("user_name"))
-		assert.Equal(t, token, r.Header.Get("user_token"))
+		assert.Equal(t, userUUID, r.Header.Get(types.CSGBotHeaderUserUUID))
+		assert.Equal(t, username, r.Header.Get(types.CSGBotHeaderUserName))
+		assert.Equal(t, token, r.Header.Get(types.CSGBotHeaderUserToken))
 
 		// Return success with response
 		w.Header().Set("Content-Type", "application/json")
@@ -245,9 +245,9 @@ func TestCreateKnowledgeBase_DescriptionIsEmpty(t *testing.T) {
 
 		// Verify headers
 		assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
-		assert.Equal(t, userUUID, r.Header.Get("user_uuid"))
-		assert.Equal(t, username, r.Header.Get("user_name"))
-		assert.Equal(t, token, r.Header.Get("user_token"))
+		assert.Equal(t, userUUID, r.Header.Get(types.CSGBotHeaderUserUUID))
+		assert.Equal(t, username, r.Header.Get(types.CSGBotHeaderUserName))
+		assert.Equal(t, token, r.Header.Get(types.CSGBotHeaderUserToken))
 
 		// Return success with response
 		w.Header().Set("Content-Type", "application/json")
@@ -371,9 +371,9 @@ func TestDeleteKnowledgeBase_Success(t *testing.T) {
 
 		// Verify headers
 		assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
-		assert.Equal(t, userUUID, r.Header.Get("user_uuid"))
-		assert.Equal(t, username, r.Header.Get("user_name"))
-		assert.Equal(t, token, r.Header.Get("user_token"))
+		assert.Equal(t, userUUID, r.Header.Get(types.CSGBotHeaderUserUUID))
+		assert.Equal(t, username, r.Header.Get(types.CSGBotHeaderUserName))
+		assert.Equal(t, token, r.Header.Get(types.CSGBotHeaderUserToken))
 
 		// Verify request body
 		var reqBody DeleteKnowledgeBaseRequest
@@ -564,9 +564,9 @@ func TestUpdateKnowledgeBase_Success(t *testing.T) {
 
 		// Verify headers
 		assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
-		assert.Equal(t, userUUID, r.Header.Get("user_uuid"))
-		assert.Equal(t, username, r.Header.Get("user_name"))
-		assert.Equal(t, token, r.Header.Get("user_token"))
+		assert.Equal(t, userUUID, r.Header.Get(types.CSGBotHeaderUserUUID))
+		assert.Equal(t, username, r.Header.Get(types.CSGBotHeaderUserName))
+		assert.Equal(t, token, r.Header.Get(types.CSGBotHeaderUserToken))
 
 		// Verify request body
 		var reqBody UpdateKnowledgeBaseRequest
@@ -607,9 +607,9 @@ func TestUpdateKnowledgeBase_SuccessWithNameOnly(t *testing.T) {
 
 		// Verify headers
 		assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
-		assert.Equal(t, userUUID, r.Header.Get("user_uuid"))
-		assert.Equal(t, username, r.Header.Get("user_name"))
-		assert.Equal(t, token, r.Header.Get("user_token"))
+		assert.Equal(t, userUUID, r.Header.Get(types.CSGBotHeaderUserUUID))
+		assert.Equal(t, username, r.Header.Get(types.CSGBotHeaderUserName))
+		assert.Equal(t, token, r.Header.Get(types.CSGBotHeaderUserToken))
 
 		// Verify request body
 		var reqBody UpdateKnowledgeBaseRequest
@@ -650,9 +650,9 @@ func TestUpdateKnowledgeBase_SuccessWithDescriptionOnly(t *testing.T) {
 
 		// Verify headers
 		assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
-		assert.Equal(t, userUUID, r.Header.Get("user_uuid"))
-		assert.Equal(t, username, r.Header.Get("user_name"))
-		assert.Equal(t, token, r.Header.Get("user_token"))
+		assert.Equal(t, userUUID, r.Header.Get(types.CSGBotHeaderUserUUID))
+		assert.Equal(t, username, r.Header.Get(types.CSGBotHeaderUserName))
+		assert.Equal(t, token, r.Header.Get(types.CSGBotHeaderUserToken))
 
 		// Verify request body
 		var reqBody UpdateKnowledgeBaseRequest
@@ -690,9 +690,9 @@ func TestUpdateKnowledgeBase_SuccessWithEmptyRequest(t *testing.T) {
 
 		// Verify headers
 		assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
-		assert.Equal(t, userUUID, r.Header.Get("user_uuid"))
-		assert.Equal(t, username, r.Header.Get("user_name"))
-		assert.Equal(t, token, r.Header.Get("user_token"))
+		assert.Equal(t, userUUID, r.Header.Get(types.CSGBotHeaderUserUUID))
+		assert.Equal(t, username, r.Header.Get(types.CSGBotHeaderUserName))
+		assert.Equal(t, token, r.Header.Get(types.CSGBotHeaderUserToken))
 
 		// Verify request body is empty
 		var reqBody UpdateKnowledgeBaseRequest
