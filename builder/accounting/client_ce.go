@@ -93,3 +93,7 @@ func (ac *accountingClientImpl) StatementsIndex(req types.ActStatementsReq) (any
 func (ac *accountingClientImpl) ListPresents(req types.PresentsIndexReq) (any, error) {
 	return nil, nil
 }
+
+func (ac *accountingClientImpl) GetOrderDetailByID(currentUser string, id int64) (any, error) {
+	return nil, nil
+}

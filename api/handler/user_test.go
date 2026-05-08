@@ -455,13 +455,14 @@ func TestUserHandler_GetUserResource(t *testing.T) {
 			Page:     1,
 			PageSize: 10,
 		},
-	}).Return([]types.UserResourcesResp{{ID: 123}}, 100, nil)
+	}).Return([]types.UserResourcesResp{{ID: 123}}, 100, 50.0, nil)
 	tester.WithParam("username", "u").AddPagination(1, 10).Execute()
 
 	tester.ResponseEqSimple(t, 200, gin.H{
-		"message": "OK",
-		"data":    []types.UserResourcesResp{{ID: 123}},
-		"total":   100,
+		"message":     "OK",
+		"data":        []types.UserResourcesResp{{ID: 123}},
+		"total":       100,
+		"total_price": 50.0,
 	})
 }
 

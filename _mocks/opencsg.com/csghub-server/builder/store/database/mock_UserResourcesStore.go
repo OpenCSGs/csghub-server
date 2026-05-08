@@ -237,9 +237,9 @@ func (_c *MockUserResourcesStore_GetReservedUserResources_Call) RunAndReturn(run
 	return _c
 }
 
-// GetUserResourcesByUserUID provides a mock function with given fields: ctx, per, page, userId
-func (_m *MockUserResourcesStore) GetUserResourcesByUserUID(ctx context.Context, per int, page int, userId string) ([]database.UserResources, int, error) {
-	ret := _m.Called(ctx, per, page, userId)
+// GetUserResourcesByUserUID provides a mock function with given fields: ctx, per, page, userId, startTime, endTime
+func (_m *MockUserResourcesStore) GetUserResourcesByUserUID(ctx context.Context, per int, page int, userId string, startTime string, endTime string) ([]database.UserResources, int, float64, error) {
+	ret := _m.Called(ctx, per, page, userId, startTime, endTime)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetUserResourcesByUserUID")
@@ -247,31 +247,38 @@ func (_m *MockUserResourcesStore) GetUserResourcesByUserUID(ctx context.Context,
 
 	var r0 []database.UserResources
 	var r1 int
-	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, int, int, string) ([]database.UserResources, int, error)); ok {
-		return rf(ctx, per, page, userId)
+	var r2 float64
+	var r3 error
+	if rf, ok := ret.Get(0).(func(context.Context, int, int, string, string, string) ([]database.UserResources, int, float64, error)); ok {
+		return rf(ctx, per, page, userId, startTime, endTime)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, int, int, string) []database.UserResources); ok {
-		r0 = rf(ctx, per, page, userId)
+	if rf, ok := ret.Get(0).(func(context.Context, int, int, string, string, string) []database.UserResources); ok {
+		r0 = rf(ctx, per, page, userId, startTime, endTime)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]database.UserResources)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, int, int, string) int); ok {
-		r1 = rf(ctx, per, page, userId)
+	if rf, ok := ret.Get(1).(func(context.Context, int, int, string, string, string) int); ok {
+		r1 = rf(ctx, per, page, userId, startTime, endTime)
 	} else {
 		r1 = ret.Get(1).(int)
 	}
 
-	if rf, ok := ret.Get(2).(func(context.Context, int, int, string) error); ok {
-		r2 = rf(ctx, per, page, userId)
+	if rf, ok := ret.Get(2).(func(context.Context, int, int, string, string, string) float64); ok {
+		r2 = rf(ctx, per, page, userId, startTime, endTime)
 	} else {
-		r2 = ret.Error(2)
+		r2 = ret.Get(2).(float64)
 	}
 
-	return r0, r1, r2
+	if rf, ok := ret.Get(3).(func(context.Context, int, int, string, string, string) error); ok {
+		r3 = rf(ctx, per, page, userId, startTime, endTime)
+	} else {
+		r3 = ret.Error(3)
+	}
+
+	return r0, r1, r2, r3
 }
 
 // MockUserResourcesStore_GetUserResourcesByUserUID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetUserResourcesByUserUID'
@@ -284,23 +291,25 @@ type MockUserResourcesStore_GetUserResourcesByUserUID_Call struct {
 //   - per int
 //   - page int
 //   - userId string
-func (_e *MockUserResourcesStore_Expecter) GetUserResourcesByUserUID(ctx interface{}, per interface{}, page interface{}, userId interface{}) *MockUserResourcesStore_GetUserResourcesByUserUID_Call {
-	return &MockUserResourcesStore_GetUserResourcesByUserUID_Call{Call: _e.mock.On("GetUserResourcesByUserUID", ctx, per, page, userId)}
+//   - startTime string
+//   - endTime string
+func (_e *MockUserResourcesStore_Expecter) GetUserResourcesByUserUID(ctx interface{}, per interface{}, page interface{}, userId interface{}, startTime interface{}, endTime interface{}) *MockUserResourcesStore_GetUserResourcesByUserUID_Call {
+	return &MockUserResourcesStore_GetUserResourcesByUserUID_Call{Call: _e.mock.On("GetUserResourcesByUserUID", ctx, per, page, userId, startTime, endTime)}
 }
 
-func (_c *MockUserResourcesStore_GetUserResourcesByUserUID_Call) Run(run func(ctx context.Context, per int, page int, userId string)) *MockUserResourcesStore_GetUserResourcesByUserUID_Call {
+func (_c *MockUserResourcesStore_GetUserResourcesByUserUID_Call) Run(run func(ctx context.Context, per int, page int, userId string, startTime string, endTime string)) *MockUserResourcesStore_GetUserResourcesByUserUID_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(int), args[2].(int), args[3].(string))
+		run(args[0].(context.Context), args[1].(int), args[2].(int), args[3].(string), args[4].(string), args[5].(string))
 	})
 	return _c
 }
 
-func (_c *MockUserResourcesStore_GetUserResourcesByUserUID_Call) Return(userResources []database.UserResources, total int, err error) *MockUserResourcesStore_GetUserResourcesByUserUID_Call {
-	_c.Call.Return(userResources, total, err)
+func (_c *MockUserResourcesStore_GetUserResourcesByUserUID_Call) Return(userResources []database.UserResources, total int, totalPrice float64, err error) *MockUserResourcesStore_GetUserResourcesByUserUID_Call {
+	_c.Call.Return(userResources, total, totalPrice, err)
 	return _c
 }
 
-func (_c *MockUserResourcesStore_GetUserResourcesByUserUID_Call) RunAndReturn(run func(context.Context, int, int, string) ([]database.UserResources, int, error)) *MockUserResourcesStore_GetUserResourcesByUserUID_Call {
+func (_c *MockUserResourcesStore_GetUserResourcesByUserUID_Call) RunAndReturn(run func(context.Context, int, int, string, string, string) ([]database.UserResources, int, float64, error)) *MockUserResourcesStore_GetUserResourcesByUserUID_Call {
 	_c.Call.Return(run)
 	return _c
 }

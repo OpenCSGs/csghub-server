@@ -315,6 +315,65 @@ func (_c *MockAccountingClient_DeletePrice_Call) RunAndReturn(run func(string, i
 	return _c
 }
 
+// GetOrderDetailByID provides a mock function with given fields: currentUser, id
+func (_m *MockAccountingClient) GetOrderDetailByID(currentUser string, id int64) (any, error) {
+	ret := _m.Called(currentUser, id)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetOrderDetailByID")
+	}
+
+	var r0 any
+	var r1 error
+	if rf, ok := ret.Get(0).(func(string, int64) (any, error)); ok {
+		return rf(currentUser, id)
+	}
+	if rf, ok := ret.Get(0).(func(string, int64) any); ok {
+		r0 = rf(currentUser, id)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(any)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(string, int64) error); ok {
+		r1 = rf(currentUser, id)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAccountingClient_GetOrderDetailByID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetOrderDetailByID'
+type MockAccountingClient_GetOrderDetailByID_Call struct {
+	*mock.Call
+}
+
+// GetOrderDetailByID is a helper method to define mock.On call
+//   - currentUser string
+//   - id int64
+func (_e *MockAccountingClient_Expecter) GetOrderDetailByID(currentUser interface{}, id interface{}) *MockAccountingClient_GetOrderDetailByID_Call {
+	return &MockAccountingClient_GetOrderDetailByID_Call{Call: _e.mock.On("GetOrderDetailByID", currentUser, id)}
+}
+
+func (_c *MockAccountingClient_GetOrderDetailByID_Call) Run(run func(currentUser string, id int64)) *MockAccountingClient_GetOrderDetailByID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(string), args[1].(int64))
+	})
+	return _c
+}
+
+func (_c *MockAccountingClient_GetOrderDetailByID_Call) Return(_a0 any, _a1 error) *MockAccountingClient_GetOrderDetailByID_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAccountingClient_GetOrderDetailByID_Call) RunAndReturn(run func(string, int64) (any, error)) *MockAccountingClient_GetOrderDetailByID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetPriceByID provides a mock function with given fields: currentUser, id
 func (_m *MockAccountingClient) GetPriceByID(currentUser string, id int64) (any, error) {
 	ret := _m.Called(currentUser, id)

@@ -81,6 +81,10 @@ func (ac *accountingComponentImpl) CreateOrder(currentUser string, req types.Acc
 	return nil, nil
 }
 
+func (ac *accountingComponentImpl) GetOrderDetailByID(ctx context.Context, currentUser string, id int64) (*database.AccountOrderDetail, error) {
+	return nil, nil
+}
+
 func (ac *accountingComponentImpl) ListRecharge(ctx context.Context, req types.AcctRechargeListReq) (interface{}, error) {
 	return nil, nil
 }

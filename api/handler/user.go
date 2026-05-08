@@ -825,16 +825,19 @@ func (h *UserHandler) GetUserResource(ctx *gin.Context) {
 	req.CurrentUser = currentUser
 	req.Page = page
 	req.PageSize = per
-	ds, total, err := h.user.GetUserResource(ctx.Request.Context(), req)
+	req.StartTime = ctx.Query("start_time")
+	req.EndTime = ctx.Query("end_time")
+	ds, total, totalPrice, err := h.user.GetUserResource(ctx.Request.Context(), req)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "failed to get user's resource", slog.Any("error", err), slog.Any("username", username))
 		httpbase.ServerError(ctx, err)
 		return
 	}
 	respData := gin.H{
-		"message": "OK",
-		"data":    ds,
-		"total":   total,
+		"message":     "OK",
+		"data":        ds,
+		"total":       total,
+		"total_price": totalPrice,
 	}
 	ctx.JSON(http.StatusOK, respData)
 }

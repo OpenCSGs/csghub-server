@@ -11,6 +11,8 @@ type CreateUserResourceReq struct {
 type GetUserResourceReq struct {
 	CurrentUser string `json:"current_user"`
 	UserUID     string `json:"-"`
+	StartTime   string `json:"-"`
+	EndTime     string `json:"-"`
 	PageOpts
 }
 
@@ -31,4 +33,5 @@ type UserResourcesResp struct {
 	DeployID      int64     `json:"deploy_id"`
 	ResourceType  string    `json:"resource_type"`
 	DeployType    int       `json:"deploy_type"`
+	OrderCount    int       `json:"order_count"`
 }

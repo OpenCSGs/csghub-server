@@ -36,6 +36,7 @@ type AccountingClient interface {
 	ListRecharges(req types.RechargesIndexReq) (any, error)
 	StatementsIndex(req types.ActStatementsReq) (any, error)
 	ListPresents(req types.PresentsIndexReq) (any, error)
+	GetOrderDetailByID(currentUser string, id int64) (any, error)
 }
 type accountingClientImpl struct {
 	remote    *url.URL
