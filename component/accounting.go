@@ -75,7 +75,7 @@ func NewAccountingComponent(config *config.Config) (AccountingComponent, error) 
 }
 
 func (ac *accountingComponentImpl) ListMeteringsByUserIDAndTime(ctx context.Context, req types.ActStatementsReq) (interface{}, error) {
-	if err := ac.allowQueryData(ctx, req.CurrentUser, req.UserUUID); err != nil {
+	if _, err := checkOwnerOrOrgMemberPermission(ctx, ac.userSvcClient, req.CurrentUser, req.UserUUID); err != nil {
 		return nil, errorx.Forbidden(err, map[string]any{
 			"user": req.CurrentUser,
 		})
@@ -88,30 +88,30 @@ func (ac *accountingComponentImpl) ListMeteringsByUserIDAndTime(ctx context.Cont
 // 1. Current user is the same as the target user (querying own data)
 // 2. Current user is an admin
 // 3. Current user is a member of the organization that owns the target user's namespace
-func (ac *accountingComponentImpl) allowQueryData(ctx context.Context, currentUser, targetUUID string) error {
-	user, err := ac.userSvcClient.GetUserByName(ctx, currentUser)
+func checkOwnerOrOrgMemberPermission(ctx context.Context, userSvcClient rpc.UserSvcClient, currentUser, targetUUID string) (*rpc.Namespace, error) {
+	user, err := userSvcClient.GetUserByName(ctx, currentUser)
 	if err != nil {
-		return fmt.Errorf("current user not found: %w", err)
+		return nil, fmt.Errorf("current user not found: %w", err)
+	}
+
+	ns, err := userSvcClient.GetNameSpaceInfoByUUID(ctx, targetUUID)
+	if err != nil {
+		return ns, fmt.Errorf("target namespace not found: %w", err)
 	}
 
 	if user.IsAdmin() || user.UUID == targetUUID {
-		return nil
-	}
-
-	ns, err := ac.userSvcClient.GetNameSpaceInfoByUUID(ctx, targetUUID)
-	if err != nil {
-		return fmt.Errorf("target namespace not found: %w", err)
+		return ns, nil
 	}
 
 	if ns.NSType != string(database.OrgNamespace) {
-		return fmt.Errorf("do not have permission to query the target org's data: %w", err)
+		return ns, fmt.Errorf("do not have permission to query the target org's data: %w", err)
 	}
 
 	// Check if current user is member of org that owns target user's namespace
-	role, err := ac.userSvcClient.GetMemberRoleByUUID(ctx, ns.UUID, currentUser)
+	role, err := userSvcClient.GetMemberRoleByUUID(ctx, ns.UUID, currentUser)
 	if err != nil || role == membership.RoleUnknown {
-		return fmt.Errorf("do not have permission to query the target org's data: %w", err)
+		return ns, fmt.Errorf("do not have permission to query the target org's data: %w", err)
 	}
 
-	return nil
+	return ns, nil
 }

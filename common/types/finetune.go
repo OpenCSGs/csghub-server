@@ -85,7 +85,9 @@ type FinetuneRes struct {
 	ResultURL    string    `json:"result_url"`
 }
 
-type FinetuneLogReq struct {
+type FinetuneLogReq = WorkflowLogReq
+
+type WorkflowLogReq struct {
 	CurrentUser string
 	Since       string
 	ID          int64

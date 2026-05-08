@@ -41,6 +41,7 @@ const (
 	TaskTypeComparison  TaskType = "comparison"
 	TaskTypeLeaderBoard TaskType = "leaderboard"
 	TaskTypeFinetune    TaskType = "finetune"
+	TaskTypeDataflow    TaskType = "dataflow"
 )
 
 type EvaluationReq struct {
@@ -84,6 +85,7 @@ type ArgoFlowTemplate struct {
 	HardWare   HardWare          `json:"hardware,omitempty"`
 	Env        map[string]string `json:"env,omitempty"`
 	Annotation map[string]string `json:"annotation,omitempty"`
+	Parameters []string          `json:"parameters"`
 }
 
 type ArgoWorkFlowReq struct {

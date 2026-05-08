@@ -21,6 +21,12 @@ const (
 
 	RunnerWorkflowCreate WebHookEventType = "runner.evaluation.create"
 	RunnerWorkflowChange WebHookEventType = "runner.evaluation.change"
+
+	RunnerDataflowChange WebHookEventType = "runner.dataflow.change"
+	RunnerDataflowDelete WebHookEventType = "runner.dataflow.delete"
+
+	RunnerDataflowPodUpdate WebHookEventType = "runner.dataflow.pod.update"
+	RunnerDataflowPodDelete WebHookEventType = "runner.dataflow.pod.delete"
 )
 
 type WebHookDataType string

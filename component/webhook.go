@@ -57,6 +57,24 @@ func NewWebHookComponent(config *config.Config, mqFactory bldmq.MessageQueueFact
 		return nil, fmt.Errorf("failed to create kservice executor error: %w", err)
 	}
 
+	// init dataflow executor
+	_, err = executors.NewDataflowExecutor(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create dataflow executor error: %w", err)
+	}
+
+	// init dataflow pod executor
+	_, err = executors.NewDataflowPodExecutor(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create dataflow pod executor error: %w", err)
+	}
+
+	// // init sandbox executor
+	// _, err = executors.NewSandboxExecutor(config)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("failed to create sandbox executor error: %w", err)
+	// }
+
 	mq, err := mqFactory.GetInstance()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get mq instance error: %w", err)

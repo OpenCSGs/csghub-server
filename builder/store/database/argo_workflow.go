@@ -16,7 +16,7 @@ type argoWorkFlowStoreImpl struct {
 
 type ArgoWorkFlowStore interface {
 	FindByID(ctx context.Context, id int64) (WorkFlow ArgoWorkflow, err error)
-	FindByTaskID(ctx context.Context, id string) (WorkFlow ArgoWorkflow, err error)
+	FindByTaskID(ctx context.Context, id string) (*ArgoWorkflow, error)
 	FindByUsername(ctx context.Context, username string, taskType types.TaskType, per, page int) (WorkFlows []ArgoWorkflow, total int, err error)
 	CreateWorkFlow(ctx context.Context, workFlow ArgoWorkflow) (*ArgoWorkflow, error)
 	UpdateWorkFlowByTaskID(ctx context.Context, workFlow ArgoWorkflow) (*ArgoWorkflow, error)
@@ -68,22 +68,27 @@ type ArgoWorkflow struct {
 	FailuresURL  string                 `bun:"," json:"failures_url"`
 	ClusterNode  string                 `bun:"," json:"cluster_node"`
 	QueueName    string                 `bun:"," json:"queue_name"`
+	DagTasks     string                 `bun:"," json:"dag_tasks"`
+	DeletedAt    time.Time              `bun:",soft_delete,nullzero" json:"deleted_at"`
 }
 
 func (s *argoWorkFlowStoreImpl) FindByID(ctx context.Context, id int64) (WorkFlow ArgoWorkflow, err error) {
-	err = s.db.Operator.Core.NewSelect().Model(&WorkFlow).Where("id = ?", id).Scan(ctx, &WorkFlow)
+	err = s.db.Operator.Core.NewSelect().Model(&WorkFlow).WhereAllWithDeleted().Where("id = ?", id).Scan(ctx, &WorkFlow)
 	if err != nil {
 		return
 	}
 	return
 }
 
-func (s *argoWorkFlowStoreImpl) FindByTaskID(ctx context.Context, id string) (WorkFlow ArgoWorkflow, err error) {
-	err = s.db.Operator.Core.NewSelect().Model(&WorkFlow).Where("task_id = ?", id).Scan(ctx, &WorkFlow)
+func (s *argoWorkFlowStoreImpl) FindByTaskID(ctx context.Context, id string) (*ArgoWorkflow, error) {
+	var err error
+	workFlow := &ArgoWorkflow{}
+	q := s.db.Operator.Core.NewSelect().Model(workFlow).WhereAllWithDeleted()
+	err = q.Where("task_id = ?", id).Scan(ctx, workFlow)
 	if err != nil {
-		return
+		return nil, err
 	}
-	return
+	return workFlow, nil
 }
 
 func (s *argoWorkFlowStoreImpl) FindByUsername(ctx context.Context, username string, taskType types.TaskType, per, page int) (WorkFlows []ArgoWorkflow, total int, err error) {
@@ -112,7 +117,7 @@ func (s *argoWorkFlowStoreImpl) CreateWorkFlow(ctx context.Context, workFlow Arg
 	wf, err := s.FindByTaskID(ctx, workFlow.TaskId)
 	if err == nil && wf.ID != 0 {
 		// already exists
-		return &wf, nil
+		return wf, nil
 	}
 	res, err := s.db.Core.NewInsert().Model(&workFlow).Exec(ctx, &workFlow)
 	if err := assertAffectedOneRow(res, err); err != nil {

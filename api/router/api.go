@@ -518,7 +518,12 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error creating data flow proxy handler:%w", err)
 	}
-	createDataflowRoutes(apiGroup, dataflowHandler)
+	// platform dataflow
+	platformDFHandler, err := handler.NewPlatformDataflowHandler(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating platform dataflow handler:%w", err)
+	}
+	createDataflowRoutes(apiGroup, dataflowHandler, platformDFHandler)
 
 	err = createAdvancedRoutes(apiGroup, adminGroup, middlewareCollection, config, mqFactory)
 	if err != nil {
@@ -1270,10 +1275,18 @@ func createPromptRoutes(
 	promptInfoGrp.GET("/:namespace/:name", promptHandler.PromptDetail)
 }
 
-func createDataflowRoutes(apiGroup *gin.RouterGroup, dataflowHandler *handler.DataflowProxyHandler) {
+func createDataflowRoutes(apiGroup *gin.RouterGroup, dataflowHandler *handler.DataflowProxyHandler, platformDFHandler *handler.PlatformDataflowHandler) {
 	dataflowGrp := apiGroup.Group("/dataflow")
 	dataflowGrp.Use(middleware.MustLogin())
 	dataflowGrp.Any("/*any", dataflowHandler.Proxy)
+
+	platformGrp := apiGroup.Group("/platform")
+	platformDFGrp := platformGrp.Group("/dataflow")
+	platformDFGrp.Use(middleware.MustLogin())
+	platformDFGrp.POST("/:uuid/jobs", platformDFHandler.CreateJob)
+	platformDFGrp.DELETE("/:uuid/jobs/:task_id", platformDFHandler.DeleteJob)
+	platformDFGrp.GET("/:uuid/jobs/:task_id", platformDFHandler.GetJob)
+	platformDFGrp.GET("/:uuid/jobs/:task_id/logs", platformDFHandler.GetLogs)
 }
 
 func createMemoryRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware.MiddlewareCollection, memoryHandler *handler.MemoryHandler) {

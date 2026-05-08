@@ -578,3 +578,36 @@ func (h *RemoteRunner) DeleteSandbox(ctx context.Context, req *runnerTypes.Sandb
 	defer response.Body.Close()
 	return nil
 }
+
+func (h *RemoteRunner) CreateDataflowWorkflow(ctx context.Context, req *types.DataflowArgoJobReq) (*types.DataflowArgoJobResp, error) {
+	remote, err := h.GetRemoteRunnerHost(ctx, req.ClusterID)
+	if err != nil {
+		return nil, err
+	}
+	url := fmt.Sprintf("%s/api/v1/dataflow/jobs", remote)
+	response, err := h.doRequest(ctx, http.MethodPost, url, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create dataflow workflow, %w", err)
+	}
+	defer response.Body.Close()
+
+	var res types.DataflowArgoJobResp
+	if err := json.NewDecoder(response.Body).Decode(&res); err != nil {
+		return nil, errorx.InternalServerError(err, nil)
+	}
+	return &res, nil
+}
+
+func (h *RemoteRunner) DeleteDataflowWorkflow(ctx context.Context, req *types.DataflowArgoReq) error {
+	remote, err := h.GetRemoteRunnerHost(ctx, req.ClusterID)
+	if err != nil {
+		return err
+	}
+	url := fmt.Sprintf("%s/api/v1/dataflow/jobs/%s?cluster_id=%s", remote, req.ArgoTaskID, req.ClusterID)
+	response, err := h.doRequest(ctx, http.MethodDelete, url, nil)
+	if err != nil {
+		return fmt.Errorf("failed to delete dataflow workflow, %w", err)
+	}
+	defer response.Body.Close()
+	return nil
+}

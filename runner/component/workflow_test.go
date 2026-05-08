@@ -125,7 +125,7 @@ func TestArgoComponent_UpdateWorkflow(t *testing.T) {
 			ArgoClient:    argofake.NewSimpleClientset(),
 		}
 
-		existingWf := database.ArgoWorkflow{
+		existingWf := &database.ArgoWorkflow{
 			ID:           1,
 			TaskId:       "test-task",
 			Username:     "test-user",
@@ -184,7 +184,7 @@ func TestArgoComponent_UpdateWorkflow(t *testing.T) {
 			ArgoClient:    argofake.NewSimpleClientset(),
 		}
 
-		existingWf := database.ArgoWorkflow{
+		existingWf := &database.ArgoWorkflow{
 			ID:           1,
 			TaskId:       "test-task",
 			Username:     "test-user",
@@ -254,7 +254,7 @@ func TestArgoComponent_UpdateWorkflow(t *testing.T) {
 			ArgoClient:    argofake.NewSimpleClientset(),
 		}
 
-		existingWf := database.ArgoWorkflow{
+		existingWf := &database.ArgoWorkflow{
 			ID:           1,
 			TaskId:       "test-task",
 			Username:     "test-user",
@@ -312,7 +312,7 @@ func TestArgoComponent_UpdateWorkflow(t *testing.T) {
 			ArgoClient:    argofake.NewSimpleClientset(),
 		}
 
-		existingWf := database.ArgoWorkflow{
+		existingWf := &database.ArgoWorkflow{
 			ID:           1,
 			TaskId:       "test-task",
 			Username:     "test-user",
@@ -368,7 +368,7 @@ func TestArgoComponent_UpdateWorkflow(t *testing.T) {
 			ArgoClient:    argofake.NewSimpleClientset(),
 		}
 
-		existingWf := database.ArgoWorkflow{
+		existingWf := &database.ArgoWorkflow{
 			ID:           1,
 			TaskId:       "test-task",
 			Username:     "test-user",
@@ -457,7 +457,7 @@ func TestArgoComponent_UpdateWorkflow(t *testing.T) {
 			},
 		}
 
-		argoStore.EXPECT().FindByTaskID(ctx, "new-task").Return(database.ArgoWorkflow{}, sql.ErrNoRows)
+		argoStore.EXPECT().FindByTaskID(ctx, "new-task").Return(&database.ArgoWorkflow{}, sql.ErrNoRows)
 		argoStore.EXPECT().CreateWorkFlow(ctx, mock.Anything).Return(nil, errors.New("create error"))
 
 		_, err := wfc.UpdateWorkflow(ctx, updateWf, cluster)

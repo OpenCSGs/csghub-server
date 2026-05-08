@@ -49,9 +49,9 @@ func TestArgoWorkflowStore_CRUD(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, "task-new", flowfind.TaskName)
 
-	flowfind, err = store.FindByTaskID(ctx, "tid")
+	flowfind2, err := store.FindByTaskID(ctx, "tid")
 	require.Nil(t, err)
-	require.Equal(t, "task-new", flowfind.TaskName)
+	require.Equal(t, "task-new", flowfind2.TaskName)
 
 	_, err = store.CreateWorkFlow(ctx, database.ArgoWorkflow{
 		Username:   "user",
@@ -74,7 +74,7 @@ func TestArgoWorkflowStore_CRUD(t *testing.T) {
 	err = store.DeleteWorkFlow(ctx, dbflow.ID)
 	require.Nil(t, err)
 	_, err = store.FindByID(ctx, dbflow.ID)
-	require.NotNil(t, err)
+	require.Nil(t, err)
 
 }
 

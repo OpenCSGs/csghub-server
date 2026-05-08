@@ -188,22 +188,24 @@ func (_c *MockArgoWorkFlowStore_FindByID_Call) RunAndReturn(run func(context.Con
 }
 
 // FindByTaskID provides a mock function with given fields: ctx, id
-func (_m *MockArgoWorkFlowStore) FindByTaskID(ctx context.Context, id string) (database.ArgoWorkflow, error) {
+func (_m *MockArgoWorkFlowStore) FindByTaskID(ctx context.Context, id string) (*database.ArgoWorkflow, error) {
 	ret := _m.Called(ctx, id)
 
 	if len(ret) == 0 {
 		panic("no return value specified for FindByTaskID")
 	}
 
-	var r0 database.ArgoWorkflow
+	var r0 *database.ArgoWorkflow
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) (database.ArgoWorkflow, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*database.ArgoWorkflow, error)); ok {
 		return rf(ctx, id)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string) database.ArgoWorkflow); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string) *database.ArgoWorkflow); ok {
 		r0 = rf(ctx, id)
 	} else {
-		r0 = ret.Get(0).(database.ArgoWorkflow)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*database.ArgoWorkflow)
+		}
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
@@ -234,12 +236,12 @@ func (_c *MockArgoWorkFlowStore_FindByTaskID_Call) Run(run func(ctx context.Cont
 	return _c
 }
 
-func (_c *MockArgoWorkFlowStore_FindByTaskID_Call) Return(WorkFlow database.ArgoWorkflow, err error) *MockArgoWorkFlowStore_FindByTaskID_Call {
-	_c.Call.Return(WorkFlow, err)
+func (_c *MockArgoWorkFlowStore_FindByTaskID_Call) Return(_a0 *database.ArgoWorkflow, _a1 error) *MockArgoWorkFlowStore_FindByTaskID_Call {
+	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockArgoWorkFlowStore_FindByTaskID_Call) RunAndReturn(run func(context.Context, string) (database.ArgoWorkflow, error)) *MockArgoWorkFlowStore_FindByTaskID_Call {
+func (_c *MockArgoWorkFlowStore_FindByTaskID_Call) RunAndReturn(run func(context.Context, string) (*database.ArgoWorkflow, error)) *MockArgoWorkFlowStore_FindByTaskID_Call {
 	_c.Call.Return(run)
 	return _c
 }
