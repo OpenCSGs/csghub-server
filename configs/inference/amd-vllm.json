@@ -6,9 +6,9 @@
   "engine_images": [
     {
       "compute_type": "gpu",
-      "image": "opencsghq/amd-vllm:rocm7.0.0_vllm_0.19.0",
-      "driver_version": "7.0",
-      "engine_version": "0.19.0"
+      "image": "opencsghq/amd-vllm:rocm7.2.1_vllm_0.20.1",
+      "driver_version": "7.2.1",
+      "engine_version": "0.20.1"
     }
   ],
   "engine_args": [
@@ -369,13 +369,18 @@
     "Phi4ForCausalLMV",
     "SarvamMLAForCausalLM",
     "SarvamMoEForCausalLM",
-    "TeleChat3ForCausalLM"
+    "TeleChat3ForCausalLM",
+    "DeepseekV4ForCausalLM",
+    "Rnj1ForCausalLM",
+    "HYV3ForCausalLM",
+    "Ministral3ForCausalLM"
   ],
   "tool_call_parsers": {
     "DeepseekR1ForCausalLM": "deepseek_r1",
     "DeepseekV3ForCausalLM": "deepseek_v3",
     "DeepseekV31ForCausalLM": "deepseek_v31",
     "DeepseekV32ForCausalLM": "deepseek_v32",
+    "DeepseekV4ForCausalLM": "deepseek_v4",
     "Ernie4_5ForCausalLM": "ernie45",
     "Glm4ForCausalLM": "glm47",
     "Glm4MoeForCausalLM": "glm45",

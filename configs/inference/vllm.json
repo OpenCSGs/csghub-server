@@ -6,9 +6,9 @@
   "engine_images": [
     {
       "compute_type": "gpu",
-      "image": "opencsghq/vllm:v0.19.0",
+      "image": "opencsghq/vllm:v0.20.1",
       "driver_version": "13.0",
-      "engine_version": "v0.19.0",
+      "engine_version": "v0.20.1",
       "extra_archs": [
         "AXK1ForCausalLM",
         "ApertusForCausalLM",
@@ -180,7 +180,11 @@
         "UltravoxModel",
         "VoxtralForConditionalGeneration",
         "VoxtralRealtimeGeneration",
-        "WhisperForConditionalGeneration"
+        "WhisperForConditionalGeneration",
+        "DeepseekV4ForCausalLM",
+        "Rnj1ForCausalLM",
+        "HYV3ForCausalLM",
+        "Ministral3ForCausalLM"
       ]
     },
     {
@@ -393,13 +397,18 @@
     "TeleChat2ForCausalLM",
     "TeleFLMForCausalLM",
     "XverseForCausalLM",
-    "Zamba2ForCausalLM"
+    "Zamba2ForCausalLM",
+    "DeepseekV4ForCausalLM",
+    "Rnj1ForCausalLM",
+    "HYV3ForCausalLM",
+    "Ministral3ForCausalLM"
   ],
   "tool_call_parsers": {
     "DeepseekR1ForCausalLM": "deepseek_r1",
     "DeepseekV3ForCausalLM": "deepseek_v3",
     "DeepseekV31ForCausalLM": "deepseek_v31",
     "DeepseekV32ForCausalLM": "deepseek_v32",
+    "DeepseekV4ForCausalLM": "deepseek_v4",
     "Ernie4_5ForCausalLM": "ernie45",
     "Glm4ForCausalLM": "glm47",
     "Glm4MoeForCausalLM": "glm45",
