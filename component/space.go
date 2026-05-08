@@ -1584,4 +1584,5 @@ const (
 	RepoStatusDeleted      = "Deleted"
 	SpaceStatusNoNGINXConf = "NoNGINXConf"
 	ResourceUnhealthy      = "ResourceUnhealthy"
+	BenchmarkRunning       = "BenchmarkRunning"
 )

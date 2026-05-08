@@ -4,19 +4,18 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/hashicorp/go-version"
 	"log/slog"
 	"net/url"
-	"slices"
-	"strconv"
-	"strings"
-
-	"github.com/hashicorp/go-version"
 	"opencsg.com/csghub-server/builder/deploy"
 	deployStatus "opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
+	"slices"
+	"strconv"
+	"strings"
 )
 
 // get runtime framework list with type
@@ -622,6 +621,8 @@ func deployStatusCodeToString(code int) string {
 		txt = RepoStatusDeleted
 	case 28:
 		txt = ResourceUnhealthy
+	case 29:
+		txt = BenchmarkRunning
 	default:
 		txt = SpaceStatusStopped
 	}

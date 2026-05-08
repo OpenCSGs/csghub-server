@@ -46,4 +46,5 @@ const (
 	Deleted      = 27 // end user trigger delete action for deploy
 
 	ResourceUnhealthy = 28 // cluster resource unhealthy
+	BenchmarkRunning  = 29 // deploy is running benchmark test
 )

@@ -737,6 +737,8 @@ func createModelRoutes(config *config.Config,
 		modelsServerlessGroup.GET("/:namespace/:name/serverless/:id/logs", middlewareCollection.Auth.NeedAdmin, repoCommonHandler.ServerlessLogs)
 		modelsServerlessGroup.GET("/:namespace/:name/serverless/:id/versions/:commit_id", middlewareCollection.Auth.NeedAdmin, repoCommonHandler.ServerlessVersionLogs)
 		modelsServerlessGroup.PUT("/:namespace/:name/serverless/:id", middlewareCollection.Auth.NeedAdmin, repoCommonHandler.ServerlessUpdate)
+		registerServerlessBenchmarkRoutes(modelsServerlessGroup, middlewareCollection, repoCommonHandler)
+
 	}
 	{
 		// serverless monitor

@@ -72,10 +72,6 @@ func StartDeployWorker(
 
 	w.RegisterActivity(act)
 	w.RegisterWorkflow(DeployWorkflow)
-	err := temporalClient.Start()
-	if err != nil {
-		return fmt.Errorf("failed to start worker:  %w", err)
-	}
 	return nil
 }
 
