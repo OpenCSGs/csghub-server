@@ -18,3 +18,5 @@ type APIBadRequest struct{}
 type APIUnauthorized struct{}
 
 type APIForbidden struct{}
+
+type APINotFound struct{}
