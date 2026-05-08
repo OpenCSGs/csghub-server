@@ -127,7 +127,7 @@ func (wc *workFlowComponentImpl) CreateWorkflow(ctx context.Context, req types.A
 		if findErr != nil {
 			return nil, fmt.Errorf("failed to check workflow %s in db for create action, error: %w", argowf.TaskId, findErr)
 		}
-		wf = &wfObj
+		wf = wfObj
 	}
 
 	wc.addKServiceWithEvent(ctx, types.RunnerWorkflowCreate, argowf)
@@ -171,15 +171,15 @@ func (wc *workFlowComponentImpl) GetWorkflow(ctx context.Context, id int64, user
 // Update workflow
 func (wc *workFlowComponentImpl) UpdateWorkflow(ctx context.Context, update *v1alpha1.Workflow, cluster *cluster.Cluster) (*database.ArgoWorkflow, error) {
 	oldwf, err := wc.wf.FindByTaskID(ctx, update.Name)
-	slog.InfoContext(ctx, "get-UpdateWorkflow-from-db", slog.Any("oldwf.TaskId", oldwf.TaskId), slog.Any("result-url", oldwf.ResultURL))
+	slog.InfoContext(ctx, "get-UpdateWorkflow-from-db", slog.Any("oldwf", oldwf), slog.Any("err", err))
 	if errors.Is(err, sql.ErrNoRows) {
-		oldwf = *wc.getWorkflowFromLabels(ctx, update)
-		wf, err := wc.wf.CreateWorkFlow(ctx, oldwf)
+		oldwf = wc.getWorkflowFromLabels(ctx, update)
+		wf, err := wc.wf.CreateWorkFlow(ctx, *oldwf)
 		if err != nil {
 			slog.ErrorContext(ctx, "failed to create workflow in db", slog.Any("error", err))
 			return nil, fmt.Errorf("failed to create workflow in db: %v", err)
 		}
-		oldwf = *wf
+		oldwf = wf
 	}
 	if err != nil {
 		return nil, err
@@ -228,11 +228,11 @@ func (wc *workFlowComponentImpl) UpdateWorkflow(ctx context.Context, update *v1a
 	}
 
 	slog.InfoContext(ctx, "UpdateWorkflow-report", slog.Any("name", oldwf.TaskId), slog.Any("result-url", oldwf.ResultURL))
-	wc.addKServiceWithEvent(ctx, types.RunnerWorkflowChange, &oldwf)
+	wc.addKServiceWithEvent(ctx, types.RunnerWorkflowChange, oldwf)
 	if lastStatus != oldwf.Status {
-		wc.reportWorFlowLog(types.WorkflowUpdated.String(), &oldwf)
+		wc.reportWorFlowLog(types.WorkflowUpdated.String(), oldwf)
 	}
-	return wc.wf.UpdateWorkFlow(ctx, oldwf)
+	return wc.wf.UpdateWorkFlow(ctx, *oldwf)
 }
 
 // DeleteWorkflowInargo
@@ -242,17 +242,17 @@ func (wc *workFlowComponentImpl) DeleteWorkflowInargo(ctx context.Context, delet
 		return fmt.Errorf("failed to get workflow by id: %v", err)
 	}
 
-	wc.reportWorFlowLog(types.WorkflowDeleted.String(), &wf)
+	wc.reportWorFlowLog(types.WorkflowDeleted.String(), wf)
 	// for deleted case,check if the workflow did not finish
 	if wf.Status == v1alpha1.WorkflowPending || wf.Status == v1alpha1.WorkflowRunning {
 		wf.Status = v1alpha1.WorkflowFailed
 		wf.Reason = "deleted by system, please check if your required resources are sufficient or if your account has enough credit"
 		slog.InfoContext(ctx, "DeleteWorkflowInargo-report", slog.Any("name", wf.TaskId), slog.Any("result-url", wf.ResultURL))
-		_, err = wc.wf.UpdateWorkFlow(ctx, wf)
+		_, err = wc.wf.UpdateWorkFlow(ctx, *wf)
 		if err != nil {
 			return err
 		}
-		wc.addKServiceWithEvent(ctx, types.RunnerWorkflowChange, &wf)
+		wc.addKServiceWithEvent(ctx, types.RunnerWorkflowChange, wf)
 		return nil
 	}
 	return nil

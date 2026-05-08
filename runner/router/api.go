@@ -82,6 +82,18 @@ func NewHttpServer(ctx context.Context, config *config.Config) (*gin.Engine, err
 		workflows.GET("/:id", argoHandler.GetWorkflow)
 	}
 
+	// dataflow
+	dataflowHandler, err := handler.NewDataflowHandler(config, clusterPool)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build NewDataflowHandler error: %w", err)
+	}
+	dataflowGroup := apiGroup.Group("/dataflow/jobs")
+	{
+		dataflowGroup.POST("", dataflowHandler.CreateDataflowWorkflow)
+		dataflowGroup.GET("/:task_id", dataflowHandler.GetDataflowStatus)
+		dataflowGroup.DELETE("/:task_id", dataflowHandler.DeleteDataflowWorkflow)
+	}
+
 	// image builder
 	imagebuilderHandler, err := handler.NewImagebuilderHandler(ctx, config, clusterPool, logReporter)
 	if err != nil {

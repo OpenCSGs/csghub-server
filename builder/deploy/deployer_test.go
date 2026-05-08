@@ -938,7 +938,7 @@ func TestDeployer_DeleteEvaluation_Error(t *testing.T) {
 
 func TestDeployer_GetWorkflowLogsInStream(t *testing.T) {
 	now := time.Now()
-	req := types.FinetuneLogReq{
+	req := types.WorkflowLogReq{
 		CurrentUser: "test-user",
 		PodName:     "pod1",
 		SubmitTime:  now,
@@ -954,7 +954,7 @@ func TestDeployer_GetWorkflowLogsInStream(t *testing.T) {
 		deployTaskStore: mockDeployTaskStore,
 		lokiClient:      sender,
 	}
-	lreader, err := d.GetWorkflowLogsInStream(context.TODO(), req)
+	lreader, err := d.GetWorkflowLogsInStream(context.TODO(), req, nil)
 	require.Nil(t, err)
 	require.Nil(t, lreader.buildLogs)
 	require.NotNil(t, lreader.RunLog())
@@ -962,7 +962,7 @@ func TestDeployer_GetWorkflowLogsInStream(t *testing.T) {
 
 func TestDeployer_GetWorkflowLogsNonStream(t *testing.T) {
 	now := time.Now()
-	req := types.FinetuneLogReq{
+	req := types.WorkflowLogReq{
 		CurrentUser: "test-user",
 		PodName:     "pod1",
 		SubmitTime:  now,
@@ -979,7 +979,7 @@ func TestDeployer_GetWorkflowLogsNonStream(t *testing.T) {
 		deployTaskStore: mockDeployTaskStore,
 		lokiClient:      sender,
 	}
-	resp, err := d.GetWorkflowLogsNonStream(context.TODO(), req)
+	resp, err := d.GetWorkflowLogsNonStream(context.TODO(), req, nil)
 	require.Nil(t, err)
 	require.NotNil(t, resp)
 }

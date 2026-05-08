@@ -310,15 +310,19 @@ func (c *finetuneComponentImpl) CheckUserPermission(ctx context.Context, req typ
 func (c *finetuneComponentImpl) ReadJobLogsNonStream(ctx context.Context, req types.FinetuneLogReq) (string, error) {
 	wf, err := c.workflowStore.FindByID(ctx, req.ID)
 	if err != nil {
-		return "", fmt.Errorf("fail to find finetune workflow by id %d error: %w", req.ID, err)
+		return "", fmt.Errorf("fail to find argo workflow by id %d error: %w", req.ID, err)
 	}
 
 	req.PodName = wf.TaskId
 	req.SubmitTime = wf.SubmitTime
 
-	lokiResp, err := c.deployer.GetWorkflowLogsNonStream(ctx, req)
+	labels := map[string]string{
+		types.StreamKeyInstanceName: req.PodName,
+	}
+
+	lokiResp, err := c.deployer.GetWorkflowLogsNonStream(ctx, req, labels)
 	if err != nil {
-		return "", fmt.Errorf("failed to read finetune job logs, error:%w", err)
+		return "", fmt.Errorf("failed to read workflow job logs, error:%w", err)
 	}
 
 	return c.formatLogs(lokiResp), nil
@@ -333,7 +337,11 @@ func (c *finetuneComponentImpl) ReadJobLogsInStream(ctx context.Context, req typ
 	req.PodName = wf.TaskId
 	req.SubmitTime = wf.SubmitTime
 
-	return c.deployer.GetWorkflowLogsInStream(ctx, req)
+	labels := map[string]string{
+		types.StreamKeyInstanceName: req.PodName,
+	}
+
+	return c.deployer.GetWorkflowLogsInStream(ctx, req, labels)
 }
 
 func (c *finetuneComponentImpl) formatLogs(lokiLog *loki.LokiQueryResponse) string {

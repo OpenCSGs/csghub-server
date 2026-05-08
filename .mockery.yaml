@@ -266,6 +266,7 @@ packages:
       WorkFlowComponent:
       ServiceComponent:
       ClusterComponent:
+      DataflowComponent:
   opencsg.com/csghub-server/logcollector/component:
     config:
       all: true

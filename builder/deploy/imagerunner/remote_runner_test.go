@@ -659,3 +659,211 @@ func TestRemoteRunner_SetVersionsTraffic_HTTPError(t *testing.T) {
 		t.Errorf("expected error message to contain 'failed to update traffic', got %v", err)
 	}
 }
+
+func TestRemoteRunner_CreateDataflowWorkflow_Success(t *testing.T) {
+	req := &types.DataflowArgoJobReq{
+		ClusterID:    "test-cluster",
+		ArgoTaskID:   "test-argo-task",
+		ResourceName: "test-resource",
+		JobID:        "test-job",
+		JobName:      "test-job-name",
+	}
+
+	expectedResp := &types.DataflowArgoJobResp{
+		ID:         1,
+		ArgoTaskID: "test-argo-task",
+		JobID:      "test-job",
+		JobName:    "test-job-name",
+		Status:     "Running",
+		Message:    "Workflow created successfully",
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/dataflow/jobs" {
+			t.Errorf("expected path /api/v1/dataflow/jobs, got %s", r.URL.Path)
+		}
+		if r.Method != http.MethodPost {
+			t.Errorf("expected method POST, got %s", r.Method)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		err := json.NewEncoder(w).Encode(expectedResp)
+		require.Nil(t, err)
+	}))
+	defer server.Close()
+
+	mockClusterStore := mockdb.NewMockClusterInfoStore(t)
+	mockClusterStore.EXPECT().ByClusterID(mock.Anything, req.ClusterID).Return(database.ClusterInfo{
+		Mode:           types.ConnectModeInCluster,
+		RunnerEndpoint: server.URL,
+	}, nil).Once()
+
+	remoteURL, _ := url.Parse(server.URL)
+	runner := &RemoteRunner{
+		remote:       remoteURL,
+		client:       server.Client(),
+		clusterStore: mockClusterStore,
+	}
+
+	got, err := runner.CreateDataflowWorkflow(context.Background(), req)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !reflect.DeepEqual(got, expectedResp) {
+		t.Errorf("expected response %v, got %v", expectedResp, got)
+	}
+}
+
+func TestRemoteRunner_CreateDataflowWorkflow_ClusterStoreError(t *testing.T) {
+	req := &types.DataflowArgoJobReq{
+		ClusterID:  "test-cluster",
+		ArgoTaskID: "test-argo-task",
+	}
+
+	expectedErr := errors.New("database error")
+	mockClusterStore := mockdb.NewMockClusterInfoStore(t)
+	mockClusterStore.EXPECT().ByClusterID(mock.Anything, req.ClusterID).Return(database.ClusterInfo{}, expectedErr).Once()
+
+	remoteURL, _ := url.Parse("http://default.runner")
+	runner := &RemoteRunner{
+		remote:       remoteURL,
+		client:       &http.Client{},
+		clusterStore: mockClusterStore,
+	}
+
+	_, err := runner.CreateDataflowWorkflow(context.Background(), req)
+	if err == nil {
+		t.Fatal("expected an error, but got nil")
+	}
+	if !errors.Is(err, expectedErr) {
+		t.Errorf("expected error %v, got %v", expectedErr, err)
+	}
+}
+
+func TestRemoteRunner_CreateDataflowWorkflow_HTTPError(t *testing.T) {
+	req := &types.DataflowArgoJobReq{
+		ClusterID:  "test-cluster",
+		ArgoTaskID: "test-argo-task",
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	mockClusterStore := mockdb.NewMockClusterInfoStore(t)
+	mockClusterStore.EXPECT().ByClusterID(mock.Anything, req.ClusterID).Return(database.ClusterInfo{
+		Mode:           types.ConnectModeInCluster,
+		RunnerEndpoint: server.URL,
+	}, nil).Once()
+
+	remoteURL, _ := url.Parse(server.URL)
+	runner := &RemoteRunner{
+		remote:       remoteURL,
+		client:       server.Client(),
+		clusterStore: mockClusterStore,
+	}
+
+	_, err := runner.CreateDataflowWorkflow(context.Background(), req)
+	if err == nil {
+		t.Fatal("expected an error, but got nil")
+	}
+	if !strings.Contains(err.Error(), "failed to create dataflow workflow") {
+		t.Errorf("expected error message to contain 'failed to create dataflow workflow', got %v", err)
+	}
+}
+
+func TestRemoteRunner_DeleteDataflowWorkflow_Success(t *testing.T) {
+	req := &types.DataflowArgoReq{
+		ClusterID:  "test-cluster",
+		ArgoTaskID: "test-argo-task",
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		expectedPath := "/api/v1/dataflow/jobs/test-argo-task"
+		if r.URL.Path != expectedPath {
+			t.Errorf("expected path %s, got %s", expectedPath, r.URL.Path)
+		}
+		if r.Method != http.MethodDelete {
+			t.Errorf("expected method DELETE, got %s", r.Method)
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	mockClusterStore := mockdb.NewMockClusterInfoStore(t)
+	mockClusterStore.EXPECT().ByClusterID(mock.Anything, req.ClusterID).Return(database.ClusterInfo{
+		Mode:           types.ConnectModeInCluster,
+		RunnerEndpoint: server.URL,
+	}, nil).Once()
+
+	remoteURL, _ := url.Parse(server.URL)
+	runner := &RemoteRunner{
+		remote:       remoteURL,
+		client:       server.Client(),
+		clusterStore: mockClusterStore,
+	}
+
+	err := runner.DeleteDataflowWorkflow(context.Background(), req)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestRemoteRunner_DeleteDataflowWorkflow_ClusterStoreError(t *testing.T) {
+	req := &types.DataflowArgoReq{
+		ClusterID:  "test-cluster",
+		ArgoTaskID: "test-argo-task",
+	}
+
+	expectedErr := errors.New("database error")
+	mockClusterStore := mockdb.NewMockClusterInfoStore(t)
+	mockClusterStore.EXPECT().ByClusterID(mock.Anything, req.ClusterID).Return(database.ClusterInfo{}, expectedErr).Once()
+
+	remoteURL, _ := url.Parse("http://default.runner")
+	runner := &RemoteRunner{
+		remote:       remoteURL,
+		client:       &http.Client{},
+		clusterStore: mockClusterStore,
+	}
+
+	err := runner.DeleteDataflowWorkflow(context.Background(), req)
+	if err == nil {
+		t.Fatal("expected an error, but got nil")
+	}
+	if !errors.Is(err, expectedErr) {
+		t.Errorf("expected error %v, got %v", expectedErr, err)
+	}
+}
+
+func TestRemoteRunner_DeleteDataflowWorkflow_HTTPError(t *testing.T) {
+	req := &types.DataflowArgoReq{
+		ClusterID:  "test-cluster",
+		ArgoTaskID: "test-argo-task",
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	mockClusterStore := mockdb.NewMockClusterInfoStore(t)
+	mockClusterStore.EXPECT().ByClusterID(mock.Anything, req.ClusterID).Return(database.ClusterInfo{
+		Mode:           types.ConnectModeInCluster,
+		RunnerEndpoint: server.URL,
+	}, nil).Once()
+
+	remoteURL, _ := url.Parse(server.URL)
+	runner := &RemoteRunner{
+		remote:       remoteURL,
+		client:       server.Client(),
+		clusterStore: mockClusterStore,
+	}
+
+	err := runner.DeleteDataflowWorkflow(context.Background(), req)
+	if err == nil {
+		t.Fatal("expected an error, but got nil")
+	}
+	if !strings.Contains(err.Error(), "failed to delete dataflow workflow") {
+		t.Errorf("expected error message to contain 'failed to delete dataflow workflow', got %v", err)
+	}
+}
