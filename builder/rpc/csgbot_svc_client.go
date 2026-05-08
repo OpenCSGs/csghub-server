@@ -139,6 +139,12 @@ type CsgbotSvcHttpClientImpl struct {
 	hc *HttpClient
 }
 
+func setCSGBotUserHeaders(hreq *http.Request, userUUID string, username string, token string) {
+	hreq.Header.Set(types.CSGBotHeaderUserUUID, userUUID)
+	hreq.Header.Set(types.CSGBotHeaderUserName, username)
+	hreq.Header.Set(types.CSGBotHeaderUserToken, token)
+}
+
 func NewCsgbotSvcHttpClient(endpoint string, opts ...RequestOption) CsgbotSvcClient {
 	return &CsgbotSvcHttpClientImpl{
 		hc: NewHttpClient(endpoint, opts...),
@@ -158,9 +164,7 @@ func (c *CsgbotSvcHttpClientImpl) DeleteWorkspaceFiles(ctx context.Context, user
 		return errorx.InternalServerError(err, rpcErrorCtx)
 	}
 	hreq.Header.Set("Content-Type", "application/json")
-	hreq.Header.Set("user_uuid", userUUID)
-	hreq.Header.Set("user_name", username)
-	hreq.Header.Set("user_token", token)
+	setCSGBotUserHeaders(hreq, userUUID, username, token)
 
 	hresp, err := c.hc.Do(hreq)
 	if err != nil {
@@ -200,9 +204,7 @@ func (c *CsgbotSvcHttpClientImpl) UpdateWorkspaceFiles(ctx context.Context, user
 	}
 
 	hreq.Header.Set("Content-Type", "application/json")
-	hreq.Header.Set("user_uuid", userUUID)
-	hreq.Header.Set("user_name", username)
-	hreq.Header.Set("user_token", token)
+	setCSGBotUserHeaders(hreq, userUUID, username, token)
 
 	hresp, err := c.hc.Do(hreq)
 	if err != nil {
@@ -241,9 +243,7 @@ func (c *CsgbotSvcHttpClientImpl) CreateKnowledgeBase(ctx context.Context, userU
 		return nil, errorx.InternalServerError(err, rpcErrorCtx)
 	}
 	hreq.Header.Set("Content-Type", "application/json")
-	hreq.Header.Set("user_uuid", userUUID)
-	hreq.Header.Set("user_name", username)
-	hreq.Header.Set("user_token", token)
+	setCSGBotUserHeaders(hreq, userUUID, username, token)
 
 	hresp, err := c.hc.Do(hreq)
 	if err != nil {
@@ -293,9 +293,7 @@ func (c *CsgbotSvcHttpClientImpl) DeleteKnowledgeBase(ctx context.Context, userU
 	}
 
 	hreq.Header.Set("Content-Type", "application/json")
-	hreq.Header.Set("user_uuid", userUUID)
-	hreq.Header.Set("user_name", username)
-	hreq.Header.Set("user_token", token)
+	setCSGBotUserHeaders(hreq, userUUID, username, token)
 
 	hresp, err := c.hc.Do(hreq)
 	if err != nil {
@@ -361,9 +359,7 @@ func (c *CsgbotSvcHttpClientImpl) UpdateKnowledgeBase(ctx context.Context, userU
 		return errorx.InternalServerError(err, rpcErrorCtx)
 	}
 	hreq.Header.Set("Content-Type", "application/json")
-	hreq.Header.Set("user_uuid", userUUID)
-	hreq.Header.Set("user_name", username)
-	hreq.Header.Set("user_token", token)
+	setCSGBotUserHeaders(hreq, userUUID, username, token)
 
 	hresp, err := c.hc.Do(hreq)
 	if err != nil {
@@ -431,9 +427,7 @@ func (c *CsgbotSvcHttpClientImpl) doStreamChatRequest(ctx context.Context, path,
 
 	hreq.Header.Set("Content-Type", "application/json")
 	hreq.Header.Set(types.CSGBotHeaderRequestID, uuid.New().String())
-	hreq.Header.Set(types.CSGBotHeaderUserUUID, userUUID)
-	hreq.Header.Set(types.CSGBotHeaderUserName, username)
-	hreq.Header.Set(types.CSGBotHeaderUserToken, token)
+	setCSGBotUserHeaders(hreq, userUUID, username, token)
 	if stream {
 		hreq.Header.Set("Accept", "text/event-stream")
 	}
@@ -480,9 +474,7 @@ func (c *CsgbotSvcHttpClientImpl) CreateOpenClaw(ctx context.Context, userUUID, 
 	}
 
 	hreq.Header.Set("Content-Type", "application/json")
-	hreq.Header.Set(types.CSGBotHeaderUserUUID, userUUID)
-	hreq.Header.Set(types.CSGBotHeaderUserName, username)
-	hreq.Header.Set(types.CSGBotHeaderUserToken, token)
+	setCSGBotUserHeaders(hreq, userUUID, username, token)
 
 	hresp, err := c.hc.Do(hreq)
 	if err != nil {
@@ -526,9 +518,7 @@ func (c *CsgbotSvcHttpClientImpl) DeleteOpenClaw(ctx context.Context, userUUID, 
 	}
 
 	hreq.Header.Set("Content-Type", "application/json")
-	hreq.Header.Set(types.CSGBotHeaderUserUUID, userUUID)
-	hreq.Header.Set(types.CSGBotHeaderUserName, username)
-	hreq.Header.Set(types.CSGBotHeaderUserToken, token)
+	setCSGBotUserHeaders(hreq, userUUID, username, token)
 
 	hresp, err := c.hc.Do(hreq)
 	if err != nil {
