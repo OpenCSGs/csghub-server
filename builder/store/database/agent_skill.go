@@ -95,6 +95,7 @@ func (s *agentSkillStoreImpl) ListForAgent(ctx context.Context, userUUID string,
 			AND pin_pref.entity_id = CAST(s.id AS TEXT)
 		`, userUUID, types.AgentUserPreferenceActionPin, types.AgentUserPreferenceEntityTypeAgentSkill).
 		Where("r.id IS NOT NULL").
+		Where("(COALESCE(r.sync_status, '') = '' OR r.sync_status = ?)", types.SyncStatusCompleted).
 		Where("r.repository_type = ?", types.SkillRepo)
 
 	// Apply filters
