@@ -383,6 +383,7 @@ type Config struct {
 		DeletePendingDeletionCronExpression      string `env:"STARHUB_SERVER_CRON_JOB_DELETE_PENDING_DELETION_CRON_EXPRESSION" default:"0 16-20 * * *"`
 		ReleaseInvitationCreditCronExpression    string `env:"STARHUB_SERVER_CRON_JOB_RELEASE_INVITATION_CREDIT_CRON_EXPRESSION" default:"0 0 5 * *"`
 		MCPInspectCronExpression                 string `env:"STARHUB_SERVER_CRON_JOB_MCP_INSPECT_CRON_EXPRESSION" default:"*/5 * * * *"`
+		SyncLLMLogsToDatasetCronExpression       string `env:"STARHUB_SERVER_SYNC_LLMLOGS_TO_DATASET_CRON_EXPRESSION" default:"0 0 * * *"`
 	}
 
 	Agent struct {
@@ -457,6 +458,13 @@ type Config struct {
 		WorkerNum            int    `env:"OPENCSG_LLMLOG_WORKER_NUM" default:"10"`
 		BatchSize            int    `env:"OPENCSG_LLMLOG_BATCH_SIZE" default:"1000"`
 		FlushIntervalSeconds int    `env:"OPENCSG_LLMLOG_FLUSH_INTERVAL_SECONDS" default:"300"`
+		Sync                 struct {
+			Enable            bool   `env:"STARHUB_SERVER_LLMLOG_SYNC_ENABLE" default:"false"`
+			Username          string `env:"STARHUB_SERVER_LLMLOG_SYNC_USERNAME" default:""`
+			DatasetNamespace  string `env:"STARHUB_SERVER_LLMLOG_SYNC_DATASET_NAMESPACE" default:""`
+			DatasetName       string `env:"STARHUB_SERVER_LLMLOG_SYNC_DATASET_NAME" default:""`
+			MaxShardSizeBytes int64  `env:"STARHUB_SERVER_LLMLOG_SYNC_MAX_SHARD_SIZE_BYTES" default:"67108864"` // 64 MiB
+		}
 	}
 
 	Integration struct {
