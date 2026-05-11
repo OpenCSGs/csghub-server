@@ -25,7 +25,7 @@ func MustUserOrgApiKey(config *config.Config) gin.HandlerFunc {
 			currentNamespaceUUID = httpbase.GetCurrentUserUUID(ctx)
 			httpbase.SetCurrentNamespaceUUID(ctx, currentNamespaceUUID)
 		}
-		if authType != httpbase.AuthTypeUserOrgApiKey && authType != httpbase.AuthTypeAccessToken {
+		if authType != httpbase.AuthTypeUserOrgApiKey {
 			slog.ErrorContext(ctx.Request.Context(), "invalid auth type", slog.Any("authType", authType), slog.Any("nsuuid", currentNamespaceUUID), slog.String("tokenName", tokenName))
 			httpbase.UnauthorizedError(ctx, fmt.Errorf("token %s invalid auth type", tokenName))
 			ctx.Abort()
