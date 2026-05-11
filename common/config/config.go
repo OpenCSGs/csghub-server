@@ -383,7 +383,7 @@ type Config struct {
 		DeletePendingDeletionCronExpression      string `env:"STARHUB_SERVER_CRON_JOB_DELETE_PENDING_DELETION_CRON_EXPRESSION" default:"0 16-20 * * *"`
 		ReleaseInvitationCreditCronExpression    string `env:"STARHUB_SERVER_CRON_JOB_RELEASE_INVITATION_CREDIT_CRON_EXPRESSION" default:"0 0 5 * *"`
 		MCPInspectCronExpression                 string `env:"STARHUB_SERVER_CRON_JOB_MCP_INSPECT_CRON_EXPRESSION" default:"*/5 * * * *"`
-		SyncLLMLogsToDatasetCronExpression       string `env:"STARHUB_SERVER_SYNC_LLMLOGS_TO_DATASET_CRON_EXPRESSION" default:"0 0 * * *"`
+		SyncLLMLogsToDatasetCronExpression       string `env:"STARHUB_SERVER_SYNC_LLMLOGS_TO_DATASET_CRON_EXPRESSION" default:"0 1 * * *"`
 	}
 
 	Agent struct {
