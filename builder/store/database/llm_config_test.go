@@ -171,6 +171,7 @@ func TestLLMConfigStore_Search(t *testing.T) {
 		{Type: 1, Enabled: true, ModelName: "openai/gpt-4", OfficialName: "gpt-4"},
 		{Type: 1, Enabled: true, ModelName: "claude3-opus", OfficialName: "claude3-opus"},
 		{Type: 1, Enabled: true, ModelName: "llama2-7b", OfficialName: "llama2-7b"},
+		{Type: 1, Enabled: true, ModelName: "Qwen/Qwen3Guard-Gen-0.6B", OfficialName: "Qwen3Guard"},
 	}
 
 	for _, model := range testModels {
@@ -241,6 +242,22 @@ func TestLLMConfigStore_Search(t *testing.T) {
 		}
 	}
 	require.True(t, found, "Should find gpt-4 when searching for gpt-4")
+
+	// Test case 5: Search should be case-insensitive
+	search5 := &types.SearchLLMConfig{
+		Keyword: "qwen",
+	}
+	cfgs5, total5, err := store.Index(ctx, 10, 1, search5)
+	require.Nil(t, err)
+	require.GreaterOrEqual(t, total5, 1)
+	found = false
+	for _, cfg := range cfgs5 {
+		if cfg.ModelName == "Qwen/Qwen3Guard-Gen-0.6B" {
+			found = true
+			break
+		}
+	}
+	require.True(t, found, "Should find Qwen model when searching for qwen")
 }
 
 func TestLLMConfigStore_Index_EnabledFilter(t *testing.T) {
