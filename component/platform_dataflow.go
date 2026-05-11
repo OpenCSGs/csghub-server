@@ -69,6 +69,16 @@ func (c *platformDataflowComponentImpl) CreateJob(ctx context.Context, req *type
 		return nil, err
 	}
 
+	// Get or create user's access token for dataflow job
+	token, err := c.userSvcClient.GetOrCreateFirstAvaiTokens(ctx, req.Username, req.Username, string(types.AccessTokenAppGit), "dataflow")
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user access token: %w", err)
+	}
+	if len(token) == 0 {
+		return nil, fmt.Errorf("no available access token for user %s", req.Username)
+	}
+	req.AccessToken = token
+
 	var hardware types.HardWare
 
 	resource, err := c.spaceResourceStore.FindByID(ctx, req.ResourceId)

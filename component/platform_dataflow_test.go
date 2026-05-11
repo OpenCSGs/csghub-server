@@ -126,6 +126,7 @@ func TestPlatformDataflowComponent_CreateJob(t *testing.T) {
 
 		c.mocks.userSvcClient.EXPECT().GetUserByName(ctx, req.Username).Return(user, nil)
 		c.mocks.userSvcClient.EXPECT().GetNameSpaceInfoByUUID(ctx, req.NSUUID).Return(ns, nil)
+		c.mocks.userSvcClient.EXPECT().GetOrCreateFirstAvaiTokens(ctx, req.Username, req.Username, string(types.AccessTokenAppGit), "dataflow").Return("test-token", nil)
 		c.mocks.spaceResourceStore.EXPECT().FindByID(ctx, req.ResourceId).Return(resource, nil)
 		c.mocks.repoComponent.EXPECT().CheckAccountAndResource(ctx, ns.Path, resource.ClusterID, int64(0), resource).Return(&types.CheckExclusiveResp{}, nil)
 		c.mocks.clusterStore.EXPECT().FindNodeByClusterID(ctx, resource.ClusterID).Return(clusterNodes, nil)
@@ -135,7 +136,7 @@ func TestPlatformDataflowComponent_CreateJob(t *testing.T) {
 				wf.Username == req.Username
 		})).Return(createdWF, nil)
 		c.mocks.deployer.EXPECT().CreateDataflowJob(ctx, mock.MatchedBy(func(r *types.DataflowArgoJobReq) bool {
-			return r.ID == createdWF.ID && r.ArgoTaskID == createdWF.TaskId
+			return r.ID == createdWF.ID && r.ArgoTaskID == createdWF.TaskId && r.AccessToken == "test-token"
 		})).Return(deployResp, nil)
 
 		resp, err := c.CreateJob(ctx, req)
@@ -204,6 +205,7 @@ func TestPlatformDataflowComponent_CreateJob(t *testing.T) {
 
 		c.mocks.userSvcClient.EXPECT().GetUserByName(ctx, req.Username).Return(user, nil)
 		c.mocks.userSvcClient.EXPECT().GetNameSpaceInfoByUUID(ctx, req.NSUUID).Return(ns, nil)
+		c.mocks.userSvcClient.EXPECT().GetOrCreateFirstAvaiTokens(ctx, req.Username, req.Username, string(types.AccessTokenAppGit), "dataflow").Return("test-token", nil)
 		c.mocks.spaceResourceStore.EXPECT().FindByID(ctx, req.ResourceId).Return(nil, errors.New("resource not found"))
 
 		resp, err := c.CreateJob(ctx, req)
@@ -239,6 +241,7 @@ func TestPlatformDataflowComponent_CreateJob(t *testing.T) {
 
 		c.mocks.userSvcClient.EXPECT().GetUserByName(ctx, req.Username).Return(user, nil)
 		c.mocks.userSvcClient.EXPECT().GetNameSpaceInfoByUUID(ctx, req.NSUUID).Return(ns, nil)
+		c.mocks.userSvcClient.EXPECT().GetOrCreateFirstAvaiTokens(ctx, req.Username, req.Username, string(types.AccessTokenAppGit), "dataflow").Return("test-token", nil)
 		c.mocks.spaceResourceStore.EXPECT().FindByID(ctx, req.ResourceId).Return(resource, nil)
 		c.mocks.repoComponent.EXPECT().CheckAccountAndResource(ctx, ns.Path, resource.ClusterID, int64(0), resource).Return(nil, errors.New("resource unavailable"))
 
@@ -275,6 +278,7 @@ func TestPlatformDataflowComponent_CreateJob(t *testing.T) {
 
 		c.mocks.userSvcClient.EXPECT().GetUserByName(ctx, req.Username).Return(user, nil)
 		c.mocks.userSvcClient.EXPECT().GetNameSpaceInfoByUUID(ctx, req.NSUUID).Return(ns, nil)
+		c.mocks.userSvcClient.EXPECT().GetOrCreateFirstAvaiTokens(ctx, req.Username, req.Username, string(types.AccessTokenAppGit), "dataflow").Return("test-token", nil)
 		c.mocks.spaceResourceStore.EXPECT().FindByID(ctx, req.ResourceId).Return(resource, nil)
 		c.mocks.repoComponent.EXPECT().CheckAccountAndResource(ctx, ns.Path, resource.ClusterID, int64(0), resource).Return(&types.CheckExclusiveResp{}, nil)
 		c.mocks.clusterStore.EXPECT().FindNodeByClusterID(ctx, resource.ClusterID).Return(nil, errors.New("cluster not found"))
@@ -313,6 +317,7 @@ func TestPlatformDataflowComponent_CreateJob(t *testing.T) {
 
 		c.mocks.userSvcClient.EXPECT().GetUserByName(ctx, req.Username).Return(user, nil)
 		c.mocks.userSvcClient.EXPECT().GetNameSpaceInfoByUUID(ctx, req.NSUUID).Return(ns, nil)
+		c.mocks.userSvcClient.EXPECT().GetOrCreateFirstAvaiTokens(ctx, req.Username, req.Username, string(types.AccessTokenAppGit), "dataflow").Return("test-token", nil)
 		c.mocks.spaceResourceStore.EXPECT().FindByID(ctx, req.ResourceId).Return(resource, nil)
 		c.mocks.repoComponent.EXPECT().CheckAccountAndResource(ctx, ns.Path, resource.ClusterID, int64(0), resource).Return(&types.CheckExclusiveResp{}, nil)
 		c.mocks.clusterStore.EXPECT().FindNodeByClusterID(ctx, resource.ClusterID).Return([]database.ClusterNode{}, nil)
@@ -358,6 +363,7 @@ func TestPlatformDataflowComponent_CreateJob(t *testing.T) {
 
 		c.mocks.userSvcClient.EXPECT().GetUserByName(ctx, req.Username).Return(user, nil)
 		c.mocks.userSvcClient.EXPECT().GetNameSpaceInfoByUUID(ctx, req.NSUUID).Return(ns, nil)
+		c.mocks.userSvcClient.EXPECT().GetOrCreateFirstAvaiTokens(ctx, req.Username, req.Username, string(types.AccessTokenAppGit), "dataflow").Return("test-token", nil)
 		c.mocks.spaceResourceStore.EXPECT().FindByID(ctx, req.ResourceId).Return(resource, nil)
 		c.mocks.repoComponent.EXPECT().CheckAccountAndResource(ctx, ns.Path, resource.ClusterID, int64(0), resource).Return(&types.CheckExclusiveResp{}, nil)
 		c.mocks.clusterStore.EXPECT().FindNodeByClusterID(ctx, resource.ClusterID).Return([]database.ClusterNode{}, nil)
@@ -411,6 +417,7 @@ func TestPlatformDataflowComponent_CreateJob(t *testing.T) {
 		c.mocks.userSvcClient.EXPECT().GetUserByName(ctx, req.Username).Return(user, nil)
 		c.mocks.userSvcClient.EXPECT().GetNameSpaceInfoByUUID(ctx, req.NSUUID).Return(ns, nil)
 		c.mocks.userSvcClient.EXPECT().GetMemberRoleByUUID(ctx, ns.UUID, req.Username).Return(membership.RoleAdmin, nil)
+		c.mocks.userSvcClient.EXPECT().GetOrCreateFirstAvaiTokens(ctx, req.Username, req.Username, string(types.AccessTokenAppGit), "dataflow").Return("test-token", nil)
 		c.mocks.spaceResourceStore.EXPECT().FindByID(ctx, req.ResourceId).Return(resource, nil)
 		c.mocks.repoComponent.EXPECT().CheckAccountAndResource(ctx, ns.Path, resource.ClusterID, int64(0), resource).Return(&types.CheckExclusiveResp{}, nil)
 		c.mocks.clusterStore.EXPECT().FindNodeByClusterID(ctx, resource.ClusterID).Return([]database.ClusterNode{}, nil)

@@ -259,6 +259,19 @@ func (d *dataflowComponentImpl) buildRuntimeTemplate(
 		},
 	)
 
+	// Build environment variables from template.Env, req.Env and AccessToken
+	environments := []corev1.EnvVar{}
+	// Inject env variables from template
+	if req.Template.Env != nil {
+		for key, value := range req.Template.Env {
+			environments = append(environments, corev1.EnvVar{Name: key, Value: value})
+		}
+	}
+	// Inject user's access token into pod environment
+	if len(req.AccessToken) > 0 {
+		environments = append(environments, corev1.EnvVar{Name: types.AccessTokenEnvKey, Value: req.AccessToken})
+	}
+
 	runtimeTemp := &v1alpha1.Template{
 		Name: req.Template.Name, // "echo"
 		Inputs: v1alpha1.Inputs{
@@ -281,6 +294,7 @@ func (d *dataflowComponentImpl) buildRuntimeTemplate(
 			Image:   containerImg,
 			Command: req.Template.Command, // []string{"sh", "-c"},
 			Args:    req.Template.Args,    // []string{"{{inputs.parameters.cmd}}"},
+			Env:     environments,
 			VolumeMounts: []corev1.VolumeMount{
 				{Name: volumeName, MountPath: "/data/dataflow_data"},
 			},

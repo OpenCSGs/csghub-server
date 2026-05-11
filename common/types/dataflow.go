@@ -2,6 +2,7 @@ package types
 
 import "time"
 
+const AccessTokenEnvKey = "ACCESS_TOKEN"
 const DFPVCNamePrefix = "df-"
 const DFParamDagTaskIDKey = "bld_dag_task_id"
 const DFParamDagTaskNameKey = "bld_dag_task_name"
@@ -47,8 +48,9 @@ type DataflowArgoJobReq struct {
 	Template    ArgoFlowTemplate `json:"template" binding:"required"`     // from dataflow
 	DagTasks    []ArgoDagTask    `json:"dag_tasks" binding:"required"`    // from dataflow
 
-	Nodes     []Node     `json:"nodes"`
-	Scheduler *Scheduler `json:"scheduler,omitempty"`
+	Nodes       []Node     `json:"nodes"`
+	Scheduler   *Scheduler `json:"scheduler,omitempty"`
+	AccessToken string     `json:"access_token,omitempty"` // user's access token for pod env
 	DeployExtend
 }
 
