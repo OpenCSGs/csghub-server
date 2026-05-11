@@ -26,6 +26,7 @@ func (d *deployer) CreateDataflowJob(ctx context.Context, req *types.DataflowCre
 		Entrypoint:  req.Entrypoint,
 		Template:    req.Template,
 		DagTasks:    req.DagTasks,
+		AccessToken: req.AccessToken,
 		// extra
 		Nodes:     req.Nodes,
 		Scheduler: d.kubeScheduler,
