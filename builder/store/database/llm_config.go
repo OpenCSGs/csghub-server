@@ -182,7 +182,7 @@ func buildSearchLLMConfigQuery(
 		return
 	}
 	if search.Keyword != "" {
-		q.Where("llm_config.model_name like ?", "%"+search.Keyword+"%")
+		q.Where("LOWER(llm_config.model_name) LIKE LOWER(?)", "%"+search.Keyword+"%")
 	}
 	// Filter by Type if provided
 	if search.Type != nil {
