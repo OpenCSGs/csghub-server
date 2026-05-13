@@ -43,32 +43,23 @@ if [ ! -d "$EXPORT_DIR" ]; then
     exit 1
 fi
 
-# Detect model type if not provided
-if [ -z "$MODEL_TYPE" ]; then
-    echo "Detecting model type..."
-    if [ -n "$MODEL_ID" ]; then
-        MODEL_NAME=$(echo "$MODEL_ID" | cut -d'/' -f2)
-        model_template=`python /etc/csghub/get_model_info_clean.py $MODEL_NAME`
-        echo "Model template info: $model_template"
-        IFS=',' read -ra item_types <<< $model_template
-        MODEL_TYPE=${item_types[0]}
-        echo "Detected model type: $MODEL_TYPE"
-    else
-        echo "Error: MODEL_TYPE not provided and MODEL_ID not available for detection"
-        exit 1
-    fi
+MODEL_TYPE_ARG=()
+if [ -n "${MODEL_TYPE:-}" ]; then
+    MODEL_TYPE_ARG=(--model_type "$MODEL_TYPE")
+    echo "Using model type: $MODEL_TYPE"
+else
+    echo "MODEL_TYPE not provided; ms-swift will auto-detect it from model config"
 fi
 
 # Export the model using swift export command with API endpoint
 echo "Exporting model to CSGHUB ..."
-echo "Using model type: $MODEL_TYPE"
 swift export \
     --model "$MODEL_ID" \
-    --ckpt_dir "$EXPORT_DIR" \
-    --model_type "$MODEL_TYPE" \
+    --adapters "$EXPORT_DIR" \
+    "${MODEL_TYPE_ARG[@]}" \
     --merge_lora true \
     --push_to_hub true \
-    --output_dir $REPO_NAME \
+    --output_dir "$REPO_NAME" \
     --hub_model_id "$FULL_REPO_NAME" \
     --commit_message "$HF_COMMIT_MESSAGE" \
     --use_hf true \

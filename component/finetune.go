@@ -110,7 +110,7 @@ func (c *finetuneComponentImpl) CreateFinetuneJob(ctx context.Context, req types
 	}
 	req.Revision = model.Repository.DefaultBranch
 
-	// Query dataset's default branch as revision
+	// Query dataset repo so an omitted dataset revision can fall back to its default branch.
 	datasetParts := strings.Split(req.DatasetId, "/")
 	if len(datasetParts) != 2 {
 		return nil, fmt.Errorf("invalid dataset id format: %s", req.DatasetId)
@@ -119,7 +119,10 @@ func (c *finetuneComponentImpl) CreateFinetuneJob(ctx context.Context, req types
 	if err != nil {
 		return nil, fmt.Errorf("cannot find dataset repo, %w", err)
 	}
-	req.DatasetRevision = datasetRepo.DefaultBranch
+	req.DatasetRevision = strings.TrimSpace(req.DatasetRevision)
+	if req.DatasetRevision == "" {
+		req.DatasetRevision = datasetRepo.DefaultBranch
+	}
 
 	token, err := c.tokenStore.FindByUID(ctx, user.ID)
 	if err != nil {
