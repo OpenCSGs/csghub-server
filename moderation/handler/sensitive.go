@@ -94,7 +94,7 @@ func (h *SensitiveHandler) LlmResp(ctx *gin.Context) {
 		return
 	}
 
-	result, err := h.c.PassStreamCheck(ctx, &req)
+	result, err := h.c.PassStreamCheck(ctx.Request.Context(), &req)
 	if err != nil {
 		req.Text = utils.TruncStringByRune(req.Text, PRINT_STRING_LEN)
 		slog.ErrorContext(ctx, "Failed to pass LLM stream check", slog.String("err", err.Error()), slog.Any("req", req))
@@ -112,7 +112,7 @@ func (h *SensitiveHandler) LlmPrompt(ctx *gin.Context) {
 		return
 	}
 
-	result, err := h.c.PassLLMQueryCheck(ctx, &req)
+	result, err := h.c.PassLLMQueryCheck(ctx.Request.Context(), &req)
 	if err != nil {
 		req.Text = utils.TruncStringByRune(req.Text, PRINT_STRING_LEN)
 		slog.ErrorContext(ctx, "Failed to pass LLM query check", slog.String("err", err.Error()), slog.Any("req", req))

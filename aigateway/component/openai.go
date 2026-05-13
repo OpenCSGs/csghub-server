@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"maps"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -26,6 +27,8 @@ const (
 	modelCacheKey = "aigateway:models"
 	modelCacheTTL = 1 * time.Minute
 )
+
+var apiKeyJSONFieldRegex = regexp.MustCompile(`"api_key"\s*:\s*"[^"]*"`)
 
 type OpenAIComponent interface {
 	GetAvailableModels(c context.Context, user string) ([]types.Model, error)
@@ -564,6 +567,15 @@ type tokenUsageMeteringExtra struct {
 	APIKey             string                     `json:"api_key"`
 }
 
+func sanitizeMeteringEventForLog(event commontypes.MeteringEvent) commontypes.MeteringEvent {
+	sanitized := event
+	if strings.TrimSpace(event.Extra) == "" {
+		return sanitized
+	}
+	sanitized.Extra = apiKeyJSONFieldRegex.ReplaceAllString(event.Extra, `"api_key":""`)
+	return sanitized
+}
+
 func validateModelForUsageRecord(c context.Context, model *types.Model) error {
 	if model == nil {
 		return fmt.Errorf("record usage: model is nil")
@@ -661,11 +673,11 @@ func (m *openaiComponentImpl) RecordUsage(c context.Context, nsUUID string, mode
 	}
 	err = m.eventPub.PublishMeteringEvent(eventData)
 	if err != nil {
-		slog.ErrorContext(c, "failed to publish token usage event", slog.Any("event", event), slog.Any("error", err))
+		slog.ErrorContext(c, "failed to publish token usage event", slog.Any("event", sanitizeMeteringEventForLog(event)), slog.Any("error", err))
 		return fmt.Errorf("failed to publish token usage event: %w", err)
 	}
 
-	slog.InfoContext(c, "published token usage event success", slog.Any("event", event))
+	slog.InfoContext(c, "published token usage event success", slog.Any("event", sanitizeMeteringEventForLog(event)))
 	return nil
 }
 

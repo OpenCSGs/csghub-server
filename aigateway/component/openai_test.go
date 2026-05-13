@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -234,6 +235,19 @@ func TestFilterAndPaginateModels(t *testing.T) {
 		assert.Len(t, resp.Data, 1)
 		assert.Equal(t, "csghub-gen", resp.Data[0].ID)
 	})
+}
+
+func TestSanitizeMeteringEventForLog(t *testing.T) {
+	event := commontypes.MeteringEvent{
+		Extra: `{"prompt_token_num":"12","completion_token_num":"8","owner_type":"x","api_key":"sk-test-secret"}`,
+	}
+
+	sanitized := sanitizeMeteringEventForLog(event)
+	require.NotEqual(t, event.Extra, sanitized.Extra)
+	require.Contains(t, sanitized.Extra, `"api_key":""`)
+	require.NotContains(t, sanitized.Extra, "sk-test-secret")
+	require.True(t, strings.Contains(sanitized.Extra, `"prompt_token_num":"12"`))
+	require.True(t, strings.Contains(sanitized.Extra, `"completion_token_num":"8"`))
 }
 
 func TestOpenAIComponentImpl_getCSGHubModels_SkipsDeploysWithMissingRelations(t *testing.T) {
