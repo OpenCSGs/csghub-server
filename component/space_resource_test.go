@@ -97,3 +97,36 @@ func TestSpaceResourceComponent_ListHardwareTypes(t *testing.T) {
 		require.Nil(t, types)
 	})
 }
+
+func TestSpaceResourceComponent_ListAll(t *testing.T) {
+	t.Run("list all resources", func(t *testing.T) {
+		ctx := context.TODO()
+		sc := initializeTestSpaceResourceComponent(ctx, t)
+
+		sc.mocks.stores.SpaceResourceMock().EXPECT().FindAll(ctx).Return(
+			[]database.SpaceResource{
+				{ID: 1, Name: "resource1", ClusterID: "c1", Resources: "{}"},
+				{ID: 2, Name: "resource2", ClusterID: "c2", Resources: "{}"},
+			}, nil,
+		)
+
+		resources, err := sc.ListAll(ctx)
+		require.Nil(t, err)
+		require.Equal(t, []types.SpaceResource{
+			{ID: 1, Name: "resource1", ClusterID: "c1", Resources: "{}"},
+			{ID: 2, Name: "resource2", ClusterID: "c2", Resources: "{}"},
+		}, resources)
+	})
+	t.Run("error listing all resources", func(t *testing.T) {
+		ctx := context.TODO()
+		sc := initializeTestSpaceResourceComponent(ctx, t)
+		assertError := errors.New("database error")
+		sc.mocks.stores.SpaceResourceMock().EXPECT().FindAll(ctx).Return(
+			nil, assertError,
+		)
+
+		resources, err := sc.ListAll(ctx)
+		require.NotNil(t, err)
+		require.Nil(t, resources)
+	})
+}

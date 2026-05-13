@@ -184,3 +184,28 @@ func TestSpaceResourceHandler_ListHardwareTypes(t *testing.T) {
 		tester.ResponseEq(t, 500, "database error", nil)
 	})
 }
+
+func TestSpaceResourceHandler_ListAll(t *testing.T) {
+	t.Run("200", func(t *testing.T) {
+		tester := NewSpaceResourceTester(t).WithHandleFunc(func(h *SpaceResourceHandler) gin.HandlerFunc {
+			return h.ListAll
+		})
+		tester.mocks.spaceResource.EXPECT().ListAll(tester.Ctx()).Return(
+			[]types.SpaceResource{{ID: 1, Name: "resource1", ClusterID: "c1"}}, nil,
+		)
+		tester.WithUser().Execute()
+
+		tester.ResponseEq(t, 200, tester.OKText, []types.SpaceResource{{ID: 1, Name: "resource1", ClusterID: "c1"}})
+	})
+	t.Run("error", func(t *testing.T) {
+		tester := NewSpaceResourceTester(t).WithHandleFunc(func(h *SpaceResourceHandler) gin.HandlerFunc {
+			return h.ListAll
+		})
+		tester.mocks.spaceResource.EXPECT().ListAll(tester.Ctx()).Return(
+			nil, errors.New("database error"),
+		)
+		tester.WithUser().Execute()
+
+		tester.ResponseEq(t, 500, "database error", nil)
+	})
+}

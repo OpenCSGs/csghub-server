@@ -219,3 +219,24 @@ func (h *SpaceResourceHandler) ListHardwareTypes(ctx *gin.Context) {
 	slog.Info("List hardware types successfully")
 	httpbase.OK(ctx, types)
 }
+
+// ListAllSpaceResources godoc
+// @Security     ApiKey
+// @Summary      List all space resources for admin
+// @Description  list all space resources from database for admin
+// @Tags         SpaceReource
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  types.Response{data=[]types.SpaceResource} "OK"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /admin/space_resources [get]
+func (h *SpaceResourceHandler) ListAll(ctx *gin.Context) {
+	resources, err := h.spaceResource.ListAll(ctx.Request.Context())
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "Failed to list all space resources", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+	slog.Info("List all space resources successfully")
+	httpbase.OK(ctx, resources)
+}

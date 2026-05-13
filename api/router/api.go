@@ -193,6 +193,8 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		return nil, fmt.Errorf("error create validator, error: %w", err)
 	}
 	apiGroup := r.Group("/api/v1")
+	adminGrp := apiGroup.Group("/admin")
+	adminGrp.Use(middleware.NeedAdmin(config))
 
 	versionHandler := handler.NewVersionHandler()
 	apiGroup.GET("/version", versionHandler.Version)
@@ -273,6 +275,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		spaceResource.DELETE("/:id", middlewareCollection.License.Check, middlewareCollection.Auth.NeedAdmin, spaceResourceHandler.Delete)
 		spaceResource.GET("/hardware_types", spaceResourceHandler.ListHardwareTypes)
 	}
+	adminGrp.GET("/space_resources", spaceResourceHandler.ListAll)
 
 	spaceSdkHandler, err := handler.NewSpaceSdkHandler(config)
 	if err != nil {
@@ -391,7 +394,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		collections.PUT("/:id/repos/:repo_id", middlewareCollection.Auth.NeedLogin, collectionHandler.UpdateCollectionRepo)
 	}
 
-	err = createClusterRoutes(apiGroup, middlewareCollection, config)
+	err = createClusterRoutes(apiGroup, adminGrp, middlewareCollection, config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating cluster routes:%w", err)
 	}
@@ -1446,7 +1449,7 @@ func createCustomValidator() error {
 	}
 }
 
-func createClusterRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware.MiddlewareCollection, config *config.Config) error {
+func createClusterRoutes(apiGroup *gin.RouterGroup, adminGrp *gin.RouterGroup, middlewareCollection middleware.MiddlewareCollection, config *config.Config) error {
 	// cluster infos
 	clusterHandler, err := handler.NewClusterHandler(config)
 	if err != nil {
@@ -1462,8 +1465,7 @@ func createClusterRoutes(apiGroup *gin.RouterGroup, middlewareCollection middlew
 		clusterGrp.PUT("/:id", middlewareCollection.Auth.NeedAdmin, clusterHandler.Update)
 		clusterGrp.GET("/public", clusterHandler.GetClusterPublic)
 	}
-	adminGrp := apiGroup.Group("/admin")
-	adminGrp.Use(middleware.NeedAdmin(config))
+
 	err = createComputingRoutes(adminGrp, clusterHandler)
 	if err != nil {
 		return fmt.Errorf("error creating computing routes: %w", err)

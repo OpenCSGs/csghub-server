@@ -1,6 +1,8 @@
 package common
 
 import (
+	"log/slog"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	rtypes "opencsg.com/csghub-server/runner/types"
@@ -17,6 +19,10 @@ func GenerateResources(params rtypes.ResourceGeneratorParams) *rtypes.GeneratedR
 	// Helper function to process labels
 	addLabels := func(labels map[string]string) {
 		for key, value := range labels {
+			if len(key) < 1 || len(value) < 1 {
+				slog.Warn("ignore empty label or value", slog.String("key", key), slog.String("value", value))
+				continue
+			}
 			nodeSelector[key] = value
 		}
 	}
