@@ -863,7 +863,7 @@ func TestDeployer_SubmitFinetune(t *testing.T) {
 			require.Equal(t, map[string]string{
 				"MODEL_ID":                "m1",
 				"ACCESS_TOKEN":            "k",
-				"DATASET_ID":              "",
+				"DATASET_ID":              "d1",
 				"HF_ENDPOINT":             "dl/hf",
 				"HF_HUB_DOWNLOAD_TIMEOUT": "30",
 				"HF_TOKEN":                "k",
@@ -871,8 +871,8 @@ func TestDeployer_SubmitFinetune(t *testing.T) {
 				"LEARNING_RATE":           "0",
 				"CUSTOM_ARGS":             "",
 				"EPOCHS":                  "0",
-				"REVISION":               "",
-				"DATASET_REVISION":        "",
+				"REVISION":                "main",
+				"DATASET_REVISION":        "dev",
 			}, awfr.Templates[0].Env)
 			return &types.ArgoWorkFlowRes{ID: 1}, nil
 		},
@@ -886,8 +886,11 @@ func TestDeployer_SubmitFinetune(t *testing.T) {
 
 	resp, err := tester.SubmitFinetuneJob(ctx, types.FinetuneReq{
 		ModelId:          "m1",
+		DatasetId:        "d1",
 		Token:            "k",
 		DownloadEndpoint: "dl",
+		Revision:         "main",
+		DatasetRevision:  "dev",
 	})
 	require.NoError(t, err)
 	require.Equal(t, &types.ArgoWorkFlowRes{ID: 1}, resp)

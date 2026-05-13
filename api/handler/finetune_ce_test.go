@@ -49,6 +49,7 @@ func TestFinetuneHandler_Run(t *testing.T) {
 		ResourceId:         4,
 		ModelId:            "u/m",
 		DatasetId:          "u/d",
+		DatasetRevision:    "dev",
 		Agent:              "{\"type\":\"code\",\"id\":\"123\",\"request_id\":\"123\"}",
 	}).Return(true, nil)
 	tester.mocks.finetune.EXPECT().CreateFinetuneJob(tester.Ctx(), types.FinetuneReq{
@@ -58,6 +59,7 @@ func TestFinetuneHandler_Run(t *testing.T) {
 		ResourceId:         4,
 		ModelId:            "u/m",
 		DatasetId:          "u/d",
+		DatasetRevision:    "dev",
 		LearningRate:       0.0001,
 		Agent:              "{\"type\":\"code\",\"id\":\"123\",\"request_id\":\"123\"}",
 	}).Return(&types.ArgoWorkFlowRes{ID: 1, TaskId: "task-123"}, nil)
@@ -67,6 +69,7 @@ func TestFinetuneHandler_Run(t *testing.T) {
 		ResourceId:         4,
 		ModelId:            "u/m",
 		DatasetId:          "u/d",
+		DatasetRevision:    "dev",
 		Agent:              "{\"type\":\"code\",\"id\":\"123\",\"request_id\":\"123\"}",
 	}).Execute()
 

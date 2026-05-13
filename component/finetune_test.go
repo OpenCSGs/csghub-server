@@ -151,6 +151,74 @@ func TestEvaluationComponent_CreateFinetune(t *testing.T) {
 	require.Nil(t, err)
 }
 
+func TestFinetuneComponent_CreateFinetuneJob_UsesRequestedDatasetRevision(t *testing.T) {
+	req := types.FinetuneReq{
+		Username:           "testuser",
+		TaskName:           "testtask",
+		RuntimeFrameworkId: 1,
+		ModelId:            "opencsg/wukong",
+		DatasetId:          "opencsg/hellaswag",
+		DatasetRevision:    " dev ",
+	}
+
+	ctx := context.TODO()
+	cfg := &config.Config{}
+	cfg.Argo.QuotaGPUNumber = "1"
+
+	mockDeployer := mockdeploy.NewMockDeployer(t)
+	mockUser := mockdb.NewMockUserStore(t)
+	modelStore := mockdb.NewMockModelStore(t)
+	spaceResStore := mockdb.NewMockSpaceResourceStore(t)
+	datasetStore := mockdb.NewMockDatasetStore(t)
+	mirrorStore := mockdb.NewMockMirrorStore(t)
+	tokenStore := mockdb.NewMockAccessTokenStore(t)
+	repoStore := mockdb.NewMockRepoStore(t)
+	frameStore := mockdb.NewMockRuntimeFrameworksStore(t)
+	argoStore := mockdb.NewMockArgoWorkFlowStore(t)
+	acctComp := mockComps.NewMockAccountingComponent(t)
+	repoComp := mockComps.NewMockRepoComponent(t)
+
+	c := NewTestFinetuneComponent(cfg, mockDeployer, mockUser, modelStore, spaceResStore, datasetStore, mirrorStore,
+		tokenStore, repoStore, frameStore, argoStore, acctComp, repoComp, nil)
+
+	mockUser.EXPECT().FindByUsername(ctx, req.Username).Return(database.User{
+		Username: req.Username,
+		UUID:     req.Username,
+		ID:       1,
+		RoleMask: "admin",
+	}, nil).Once()
+
+	modelStore.EXPECT().FindByPath(ctx, "opencsg", "wukong").Return(&database.Model{
+		Repository: &database.Repository{DefaultBranch: "main"},
+	}, nil)
+
+	repoStore.EXPECT().FindByPath(ctx, types.DatasetRepo, "opencsg", "hellaswag").Return(&database.Repository{
+		DefaultBranch: "main",
+	}, nil)
+
+	tokenStore.EXPECT().FindByUID(ctx, int64(1)).Return(&database.AccessToken{Token: "foo"}, nil)
+
+	frameStore.EXPECT().FindEnabledByID(ctx, int64(1)).Return(&database.RuntimeFramework{
+		ID:          1,
+		FrameImage:  "lm-finetune:0.4.6",
+		ComputeType: string(types.ResourceTypeCPU),
+	}, nil)
+
+	mockDeployer.EXPECT().SubmitFinetuneJob(ctx, mock.MatchedBy(func(req types.FinetuneReq) bool {
+		return req.DatasetRevision == "dev" &&
+			req.Revision == "main" &&
+			req.ResourceName == "4 vCPU · 32Gi"
+	})).Return(&types.ArgoWorkFlowRes{
+		ID:       1,
+		TaskName: "test",
+	}, nil)
+
+	e, err := c.CreateFinetuneJob(ctx, req)
+	require.NoError(t, err)
+	require.NotNil(t, e)
+	require.Equal(t, "test", e.TaskName)
+}
+
 func TestFinetuneComponent_CreateFinetuneJob_NonAdminNamespace(t *testing.T) {
 	ctx := context.TODO()
 	cfg := &config.Config{}
