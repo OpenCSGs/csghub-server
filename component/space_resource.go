@@ -25,6 +25,7 @@ type SpaceResourceComponent interface {
 	Create(ctx context.Context, req *types.CreateSpaceResourceReq) (*types.SpaceResource, error)
 	Delete(ctx context.Context, id int64) error
 	ListHardwareTypes(ctx context.Context, clusterId string) ([]string, error)
+	ListAll(ctx context.Context) ([]types.SpaceResource, error)
 }
 
 func (c *spaceResourceComponentImpl) Index(ctx context.Context, req *types.SpaceResourceIndexReq) ([]types.SpaceResource, int, error) {
@@ -177,4 +178,24 @@ func (c *spaceResourceComponentImpl) ListHardwareTypes(ctx context.Context, clus
 		return nil, err
 	}
 	return types, nil
+}
+
+func (c *spaceResourceComponentImpl) ListAll(ctx context.Context) ([]types.SpaceResource, error) {
+	dbResources, err := c.spaceResourceStore.FindAll(ctx)
+	if err != nil {
+		slog.Error("error listing all space resources", slog.Any("error", err))
+		return nil, err
+	}
+
+	result := make([]types.SpaceResource, 0, len(dbResources))
+	for _, r := range dbResources {
+		result = append(result, types.SpaceResource{
+			ID:        r.ID,
+			Name:      r.Name,
+			ClusterID: r.ClusterID,
+			Resources: r.Resources,
+		})
+	}
+
+	return result, nil
 }

@@ -194,6 +194,64 @@ func (_c *MockSpaceResourceComponent_Index_Call) RunAndReturn(run func(context.C
 	return _c
 }
 
+// ListAll provides a mock function with given fields: ctx
+func (_m *MockSpaceResourceComponent) ListAll(ctx context.Context) ([]types.SpaceResource, error) {
+	ret := _m.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListAll")
+	}
+
+	var r0 []types.SpaceResource
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context) ([]types.SpaceResource, error)); ok {
+		return rf(ctx)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context) []types.SpaceResource); ok {
+		r0 = rf(ctx)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]types.SpaceResource)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockSpaceResourceComponent_ListAll_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListAll'
+type MockSpaceResourceComponent_ListAll_Call struct {
+	*mock.Call
+}
+
+// ListAll is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *MockSpaceResourceComponent_Expecter) ListAll(ctx interface{}) *MockSpaceResourceComponent_ListAll_Call {
+	return &MockSpaceResourceComponent_ListAll_Call{Call: _e.mock.On("ListAll", ctx)}
+}
+
+func (_c *MockSpaceResourceComponent_ListAll_Call) Run(run func(ctx context.Context)) *MockSpaceResourceComponent_ListAll_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context))
+	})
+	return _c
+}
+
+func (_c *MockSpaceResourceComponent_ListAll_Call) Return(_a0 []types.SpaceResource, _a1 error) *MockSpaceResourceComponent_ListAll_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockSpaceResourceComponent_ListAll_Call) RunAndReturn(run func(context.Context) ([]types.SpaceResource, error)) *MockSpaceResourceComponent_ListAll_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ListHardwareTypes provides a mock function with given fields: ctx, clusterId
 func (_m *MockSpaceResourceComponent) ListHardwareTypes(ctx context.Context, clusterId string) ([]string, error) {
 	ret := _m.Called(ctx, clusterId)
