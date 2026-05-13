@@ -9,6 +9,7 @@ const (
 	multiHostNotebookNotSupported
 	notEnoughResource
 	clusterUnavailable
+	resourceStatusUncertain
 )
 
 var (
@@ -87,6 +88,18 @@ var (
 	//
 	// zh-HK: 集群當前不可用
 	ErrClusterUnavailable = CustomError{prefix: errTaskPrefix, code: clusterUnavailable}
+	// resource status is uncertain, cannot verify availability
+	//
+	// Description: The resource availability could not be determined because the cluster lacks ClusterRole permissions to query node resources and no ResourceQuota is configured in the namespace. This error occurs when the system cannot verify if enough resources are available for the task.
+	//
+	// Description_ZH: 无法确定资源可用性，因为集群缺少 ClusterRole 权限来查询节点资源，且命名空间中未配置 ResourceQuota。当系统无法验证是否有足够资源运行任务时，会出现此错误。
+	//
+	// en-US: Resource status uncertain, cannot verify availability
+	//
+	// zh-CN: 无法确定资源状态
+	//
+	// zh-HK: 無法確定資源狀態
+	ErrResourceStatusUncertain = CustomError{prefix: errTaskPrefix, code: resourceStatusUncertain}
 )
 
 func NoEntryFile(err error, ctx context) error {
@@ -113,5 +126,14 @@ func ClusterUnavailable(err error, ctx context) error {
 		context: ctx,
 		err:     err,
 		code:    clusterUnavailable,
+	}
+}
+
+func ResourceStatusUncertain(err error, ctx context) error {
+	return CustomError{
+		prefix:  errTaskPrefix,
+		context: ctx,
+		err:     err,
+		code:    resourceStatusUncertain,
 	}
 }
