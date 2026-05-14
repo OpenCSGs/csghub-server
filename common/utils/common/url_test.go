@@ -4,6 +4,68 @@ import (
 	"testing"
 )
 
+func TestValidateHeader(t *testing.T) {
+	tests := []struct {
+		name        string
+		key         string
+		value       string
+		expectError bool
+		errorMsg    string
+	}{
+		{
+			name:  "valid header",
+			key:   "X-API-Key",
+			value: "secret",
+		},
+		{
+			name:        "invalid header name",
+			key:         "Bad Header",
+			value:       "secret",
+			expectError: true,
+			errorMsg:    "invalid header name",
+		},
+		{
+			name:        "invalid header value",
+			key:         "X-API-Key",
+			value:       "bad\r\nvalue",
+			expectError: true,
+			errorMsg:    "invalid header value",
+		},
+		{
+			name:        "unsafe header",
+			key:         "Host",
+			value:       "example.com",
+			expectError: true,
+			errorMsg:    "unsafe header",
+		},
+		{
+			name:        "unsafe header with whitespace",
+			key:         " Transfer-Encoding ",
+			value:       "chunked",
+			expectError: true,
+			errorMsg:    "unsafe header",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateHeader(tt.key, tt.value)
+			if tt.expectError {
+				if err == nil {
+					t.Fatalf("ValidateHeader() expected error but got none")
+				}
+				if tt.errorMsg != "" && err.Error() != tt.errorMsg {
+					t.Fatalf("ValidateHeader() error = %q, want %q", err.Error(), tt.errorMsg)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("ValidateHeader() unexpected error = %v", err)
+			}
+		})
+	}
+}
+
 func TestValidateURLFormat(t *testing.T) {
 	tests := []struct {
 		name        string

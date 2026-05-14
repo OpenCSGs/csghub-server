@@ -101,6 +101,22 @@ func BadRequestWithExt(c *gin.Context, err error) {
 	})
 }
 
+func UnprocessableEntityWithExt(c *gin.Context, err error) {
+	err, ok := errorx.GetFirstCustomError(err)
+	if ok {
+		customErr := err.(errorx.CustomError)
+		c.PureJSON(http.StatusUnprocessableEntity, R{
+			Code:    customErr.Code(),
+			Msg:     customErr.Error(),
+			Context: customErr.Context(),
+		})
+		return
+	}
+	c.PureJSON(http.StatusUnprocessableEntity, R{
+		Msg: err.Error(),
+	})
+}
+
 // ServerError responds with a JSON-formatted error message.
 //
 // Example:

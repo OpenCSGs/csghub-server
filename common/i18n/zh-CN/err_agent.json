@@ -14,6 +14,15 @@
     "error.AGENT-ERR-12": {
         "other": "运行时凭证授权不可用"
     },
+    "error.AGENT-ERR-13": {
+        "other": "凭证验证 URL 无效"
+    },
+    "error.AGENT-ERR-14": {
+        "other": "凭证令牌无效"
+    },
+    "error.AGENT-ERR-15": {
+        "other": "凭证验证失败"
+    },
     "error.AGENT-ERR-2": {
         "other": "您已存在相同名称的知识库: {{.knowledge_base_name}}"
     },

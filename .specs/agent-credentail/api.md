@@ -87,15 +87,83 @@ Response:
       ],
       "metadata_fields": [
         {"name": "base_url", "required": true}
-      ]
+      ],
+      "verify_enabled": true
     },
     {
       "name": "generic",
-      "auth_types": ["bearer_token", "api_key", "custom_header", "static_secret"]
+      "auth_types": ["bearer_token", "api_key", "custom_header", "static_secret"],
+      "verify_enabled": false
     }
   ]
 }
 ```
+
+### Verify Credential
+
+```http
+POST /api/v1/agent/credentials/verify
+Authorization: Bearer <user_auth_token>
+Content-Type: application/json
+```
+
+GitLab request:
+
+```json
+{
+  "provider": "gitlab",
+  "auth_type": "bearer_token",
+  "credential": {
+    "token": "replace_with_gitlab_token"
+  },
+  "metadata": {
+    "base_url": "https://git-devops.opencsg.com"
+  }
+}
+```
+
+Success response:
+
+```json
+{
+  "msg": "OK"
+}
+```
+
+Invalid credential response (`422 Unprocessable Entity`):
+
+```json
+{
+  "code": "AGENT-ERR-14",
+  "msg": "AGENT-ERR-14: Credential token is invalid"
+}
+```
+
+Invalid GitLab URL/API endpoint response (`422 Unprocessable Entity`):
+
+```json
+{
+  "code": "AGENT-ERR-13",
+  "msg": "AGENT-ERR-13: Credential verification URL is invalid"
+}
+```
+
+Verification failed response (`422 Unprocessable Entity`):
+
+```json
+{
+  "code": "AGENT-ERR-15",
+  "msg": "AGENT-ERR-15: Credential verification failed"
+}
+```
+
+Notes:
+
+- This endpoint does not persist the credential.
+- `gitlab` verification calls `GET /api/v4/user` on the provided `metadata.base_url`.
+- Verification failures return HTTP `422`; malformed StarHub verify API requests still return HTTP `400`.
+- Error `msg` is localized by `Accept-Language`; clients should use `code` for stable branching.
+- `generic` credentials are validated structurally, but live verification is not supported and returns `AGENT-ERR-15`.
 
 ## Secret Backend
 
@@ -733,6 +801,7 @@ The agent receives a normalized `credential` map and non-secret `metadata` for t
 | `POST` | `/api/v1/agent/credentials` | User token |
 | `GET` | `/api/v1/agent/credentials?per=&page=` | User token |
 | `GET` | `/api/v1/agent/credentials/providers` | User token |
+| `POST` | `/api/v1/agent/credentials/verify` | User token |
 | `GET` | `/api/v1/agent/credentials/{credential_name}` | User token |
 | `PATCH` | `/api/v1/agent/credentials/{credential_name}` | User token |
 | `POST` | `/api/v1/agent/credentials/{credential_name}/rotate` | User token |
