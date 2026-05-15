@@ -319,7 +319,7 @@ func (c *tagComponentImpl) AllCategories(ctx context.Context) ([]types.RepoTagCa
 		categories = append(categories, types.RepoTagCategory{
 			ID:       cat.ID,
 			Name:     cat.Name,
-			ShowName: cat.Name,
+			ShowName: cat.ShowName,
 			Scope:    cat.Scope,
 			Enabled:  cat.Enabled,
 		})

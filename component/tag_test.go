@@ -172,13 +172,28 @@ func TestTagComponent_UpdateRepoTagsByCategory(t *testing.T) {
 
 func TestTagComponent_AllCategories(t *testing.T) {
 	ctx := context.TODO()
-	tc := initializeTestTagComponent(ctx, t)
 
-	tc.mocks.stores.TagMock().EXPECT().AllCategories(ctx, types.TagScope("")).Return([]database.TagCategory{}, nil)
+	t.Run("empty", func(t *testing.T) {
+		tc := initializeTestTagComponent(ctx, t)
+		tc.mocks.stores.TagMock().EXPECT().AllCategories(ctx, types.TagScope("")).Return([]database.TagCategory{}, nil)
 
-	categories, err := tc.AllCategories(ctx)
-	require.Nil(t, err)
-	require.Equal(t, []types.RepoTagCategory{}, categories)
+		categories, err := tc.AllCategories(ctx)
+		require.Nil(t, err)
+		require.Equal(t, []types.RepoTagCategory{}, categories)
+	})
+
+	t.Run("preserve show_name", func(t *testing.T) {
+		tc := initializeTestTagComponent(ctx, t)
+		tc.mocks.stores.TagMock().EXPECT().AllCategories(ctx, types.TagScope("")).Return([]database.TagCategory{
+			{ID: 1, Name: "test", ShowName: "测试中文名称", Scope: types.ModelTagScope, Enabled: true},
+		}, nil)
+
+		categories, err := tc.AllCategories(ctx)
+		require.Nil(t, err)
+		require.Equal(t, []types.RepoTagCategory{
+			{ID: 1, Name: "test", ShowName: "测试中文名称", Scope: types.ModelTagScope, Enabled: true},
+		}, categories)
+	})
 }
 
 func TestTagComponent_CreateCategory(t *testing.T) {
