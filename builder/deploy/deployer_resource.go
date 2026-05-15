@@ -96,9 +96,15 @@ func (d *deployer) CheckResourceAvailable(ctx context.Context, clusterId string,
 	}
 
 	available, availableStatusList := CheckResource(clusterResources, hardWare, d.config)
-	if d.IsDefaultScheduler() &&
-		clusterResources.ResourceStatus != types.StatusUncertain &&
-		!available {
+	if d.IsDefaultScheduler() && clusterResources.ResourceStatus == types.StatusUncertain {
+		err := fmt.Errorf("resource status on cluster %s is uncertain, cannot verify resource availability. Please ensure ClusterRole permissions or ResourceQuota is configured",
+			clusterId)
+		return false, availableStatusList, errorx.ResourceStatusUncertain(err, errorx.Ctx().
+			Set("cluster ID", clusterId).
+			Set("region", clusterResources.Region))
+	}
+
+	if d.IsDefaultScheduler() && !available {
 		err := fmt.Errorf("required resource on cluster %s is not enough with resource status %s",
 			clusterId, clusterResources.ResourceStatus)
 		return false, availableStatusList, errorx.NotEnoughResource(err, errorx.Ctx().

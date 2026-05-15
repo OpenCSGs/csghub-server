@@ -9,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/tests"
 	"opencsg.com/csghub-server/common/types"
 )
@@ -514,7 +515,7 @@ func TestCheckResourceAvailable(t *testing.T) {
 		require.False(t, available)
 	})
 
-	t.Run("uncertain resource status - should pass check", func(t *testing.T) {
+	t.Run("uncertain resource status - should fail check", func(t *testing.T) {
 		mockStores := tests.NewMockStores(t)
 		d := &deployer{
 			clusterStore: mockStores.ClusterInfo,
@@ -535,14 +536,14 @@ func TestCheckResourceAvailable(t *testing.T) {
 			},
 		}, nil)
 
-		// When ResourceStatus is StatusUncertain, CheckResource is not called and it returns true
 		available, _, err := d.CheckResourceAvailable(ctx, "c1", 0, &types.HardWare{
 			Memory:   "10Gi",
 			Replicas: 1,
 		})
 
-		require.NoError(t, err)
-		require.True(t, available)
+		require.Error(t, err)
+		require.False(t, available)
+		require.True(t, errors.Is(err, errorx.ErrResourceStatusUncertain))
 	})
 }
 
