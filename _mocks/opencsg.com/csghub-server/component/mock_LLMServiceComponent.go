@@ -343,24 +343,24 @@ func (_c *MockLLMServiceComponent_DeleteUpstream_Call) RunAndReturn(run func(con
 }
 
 // IndexLLMConfig provides a mock function with given fields: ctx, per, page, search
-func (_m *MockLLMServiceComponent) IndexLLMConfig(ctx context.Context, per int, page int, search *types.SearchLLMConfig) ([]*database.LLMConfig, int, error) {
+func (_m *MockLLMServiceComponent) IndexLLMConfig(ctx context.Context, per int, page int, search *types.SearchLLMConfig) ([]*types.LLMConfig, int, error) {
 	ret := _m.Called(ctx, per, page, search)
 
 	if len(ret) == 0 {
 		panic("no return value specified for IndexLLMConfig")
 	}
 
-	var r0 []*database.LLMConfig
+	var r0 []*types.LLMConfig
 	var r1 int
 	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, int, int, *types.SearchLLMConfig) ([]*database.LLMConfig, int, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, int, int, *types.SearchLLMConfig) ([]*types.LLMConfig, int, error)); ok {
 		return rf(ctx, per, page, search)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, int, int, *types.SearchLLMConfig) []*database.LLMConfig); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, int, int, *types.SearchLLMConfig) []*types.LLMConfig); ok {
 		r0 = rf(ctx, per, page, search)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]*database.LLMConfig)
+			r0 = ret.Get(0).([]*types.LLMConfig)
 		}
 	}
 
@@ -400,12 +400,12 @@ func (_c *MockLLMServiceComponent_IndexLLMConfig_Call) Run(run func(ctx context.
 	return _c
 }
 
-func (_c *MockLLMServiceComponent_IndexLLMConfig_Call) Return(_a0 []*database.LLMConfig, _a1 int, _a2 error) *MockLLMServiceComponent_IndexLLMConfig_Call {
+func (_c *MockLLMServiceComponent_IndexLLMConfig_Call) Return(_a0 []*types.LLMConfig, _a1 int, _a2 error) *MockLLMServiceComponent_IndexLLMConfig_Call {
 	_c.Call.Return(_a0, _a1, _a2)
 	return _c
 }
 
-func (_c *MockLLMServiceComponent_IndexLLMConfig_Call) RunAndReturn(run func(context.Context, int, int, *types.SearchLLMConfig) ([]*database.LLMConfig, int, error)) *MockLLMServiceComponent_IndexLLMConfig_Call {
+func (_c *MockLLMServiceComponent_IndexLLMConfig_Call) RunAndReturn(run func(context.Context, int, int, *types.SearchLLMConfig) ([]*types.LLMConfig, int, error)) *MockLLMServiceComponent_IndexLLMConfig_Call {
 	_c.Call.Return(run)
 	return _c
 }

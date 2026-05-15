@@ -21,9 +21,13 @@ type UpstreamConfig struct {
 	HealthCheckEnabled    bool   `json:"health_check_enabled"`
 	CircuitBreakerEnabled bool   `json:"circuit_breaker_enabled"`
 	// HealthState is populated for admin views from the health state table.
-	HealthState  string `json:"health_state,omitempty"`
+	HealthState string `json:"health_state,omitempty"`
 	// CircuitState is populated for admin views from the circuit state table.
 	CircuitState string `json:"circuit_state,omitempty"`
+	// IsAvailable is the computed overall availability for this upstream.
+	IsAvailable bool `json:"is_available"`
+	// AvailabilityStatus is a readable aggregate status: available/degraded/unavailable/disabled.
+	AvailabilityStatus string `json:"availability_status,omitempty"`
 	// ModelName overrides the upstream request model ID when this endpoint uses
 	// a provider-specific model identifier. It falls back to the logical model ID when omitted.
 	ModelName string `json:"model_name,omitempty"`
@@ -61,18 +65,21 @@ type UsageLimitPolicy struct {
 type LLMConfig struct {
 	ID                 int64            `json:"id"`
 	ModelName          string           `json:"model_name"`
-	OfficialName       string           `json:"official_name"`
-	ApiEndpoint        string           `json:"api_endpoint"`
-	AuthHeader         string           `json:"auth_header"`
+	OfficialName       string           `json:"-"`    // deprecated: derived from upstream
+	ApiEndpoint        string           `json:"-"`    // deprecated: derived from upstream
+	AuthHeader         string           `json:"-"`    // deprecated: moved to upstream
 	Type               int              `json:"type"` // 1: optimization, 2: comparison, 4: summary readme
 	Enabled            bool             `json:"enabled"`
-	Provider           string           `json:"provider"`
+	Provider           string           `json:"-"` // deprecated: moved to upstream
 	Upstreams          []UpstreamConfig `json:"upstreams"`
 	RoutingPolicy      RoutingPolicy    `json:"routing_policy"`
 	Metadata           map[string]any   `json:"metadata"` // tasks stored as: {"tasks": ["text-generation", "text-to-image"]}
 	RepoID             int64            `json:"repo_id"`
 	Repo               *RepositoryLite  `json:"repo"`
 	NeedSensitiveCheck bool             `json:"need_sensitive_check"`
+	ModelSizeB         float64          `json:"model_size_b,omitempty"`
+	IsAvailable        bool             `json:"is_available"`
+	AvailabilityReason string           `json:"availability_reason,omitempty"`
 	CreatedAt          time.Time        `json:"created_at"`
 	UpdatedAt          time.Time        `json:"updated_at"`
 }
@@ -98,13 +105,9 @@ type SearchPromptPrefix struct {
 type UpdateLLMConfigReq struct {
 	ID                 int64             `json:"id"`
 	ModelName          *string           `json:"model_name"`
-	OfficialName       *string           `json:"official_name"`
-	ApiEndpoint        *string           `json:"api_endpoint"`
 	Upstreams          *[]UpstreamConfig `json:"upstreams"`
-	AuthHeader         *string           `json:"auth_header"`
 	Type               *int              `json:"type"` // 1: optimization, 2: comparison, 4: summary readme
 	Enabled            *bool             `json:"enabled"`
-	Provider           *string           `json:"provider"`
 	RoutingPolicy      *RoutingPolicy    `json:"routing_policy"`
 	Metadata           *map[string]any   `json:"metadata"` // tasks stored as: {"tasks": ["text-generation", "text-to-image"]}
 	NeedSensitiveCheck *bool             `json:"need_sensitive_check"`
@@ -120,12 +123,8 @@ type UpdatePromptPrefixReq struct {
 
 type CreateLLMConfigReq struct {
 	ModelName          string           `json:"model_name" binding:"required"`
-	OfficialName       string           `json:"official_name"`
-	ApiEndpoint        string           `json:"api_endpoint"`
 	Upstreams          []UpstreamConfig `json:"upstreams,omitempty"`
-	AuthHeader         string           `json:"auth_header"`
 	Type               int              `json:"type" binding:"required,oneof=1 2 4 8 16"` // 1: optimization, 2: comparison, 4: summary readme, 8: mcp scan, 16: for aigateway call external llm
-	Provider           string           `json:"provider" binding:"required"`
 	Enabled            bool             `json:"enabled"`
 	RoutingPolicy      RoutingPolicy    `json:"routing_policy"`
 	Metadata           map[string]any   `json:"metadata"` // tasks stored as: {"tasks": ["text-generation", "text-to-image"]}
@@ -139,18 +138,17 @@ type CreatePromptPrefixReq struct {
 	Kind string `json:"kind"`
 }
 
-
 // CreateUpstreamReq is the request to add a new upstream to an existing LLM config.
 type CreateUpstreamReq struct {
-	LLMConfigID           int64            `json:"llm_config_id" binding:"required"`
-	URL                   string           `json:"url" binding:"required"`
-	Weight                int              `json:"weight,omitempty"`
-	Enabled               bool             `json:"enabled"`
-	ModelName             string           `json:"model_name,omitempty"`
-	AuthHeader            string           `json:"auth_header,omitempty"`
-	Provider              string           `json:"provider,omitempty"`
-	HealthCheckEnabled    bool             `json:"health_check_enabled"`
-	CircuitBreakerEnabled bool             `json:"circuit_breaker_enabled"`
+	LLMConfigID           int64             `json:"llm_config_id" binding:"required"`
+	URL                   string            `json:"url" binding:"required"`
+	Weight                int               `json:"weight,omitempty"`
+	Enabled               bool              `json:"enabled"`
+	ModelName             string            `json:"model_name,omitempty"`
+	AuthHeader            string            `json:"auth_header,omitempty"`
+	Provider              string            `json:"provider,omitempty"`
+	HealthCheckEnabled    bool              `json:"health_check_enabled"`
+	CircuitBreakerEnabled bool              `json:"circuit_breaker_enabled"`
 	LimitPolicy           *UsageLimitPolicy `json:"limit_policy,omitempty"`
 	Tags                  map[string]string `json:"tags,omitempty"`
 }
@@ -158,15 +156,15 @@ type CreateUpstreamReq struct {
 // UpdateUpstreamReq is the request to update an existing upstream.
 // Only non-nil fields will be updated.
 type UpdateUpstreamReq struct {
-	ID                    int64             `json:"id"`
-	URL                   *string           `json:"url"`
-	Weight                *int              `json:"weight"`
-	Enabled               *bool             `json:"enabled"`
-	ModelName             *string           `json:"model_name"`
-	AuthHeader            *string           `json:"auth_header"`
-	Provider              *string           `json:"provider"`
-	HealthCheckEnabled    *bool             `json:"health_check_enabled"`
-	CircuitBreakerEnabled *bool             `json:"circuit_breaker_enabled"`
+	ID                    int64              `json:"id"`
+	URL                   *string            `json:"url"`
+	Weight                *int               `json:"weight"`
+	Enabled               *bool              `json:"enabled"`
+	ModelName             *string            `json:"model_name"`
+	AuthHeader            *string            `json:"auth_header"`
+	Provider              *string            `json:"provider"`
+	HealthCheckEnabled    *bool              `json:"health_check_enabled"`
+	CircuitBreakerEnabled *bool              `json:"circuit_breaker_enabled"`
 	LimitPolicy           **UsageLimitPolicy `json:"limit_policy"`
 	Tags                  *map[string]string `json:"tags"`
 }
