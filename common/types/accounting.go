@@ -634,8 +634,10 @@ type SetLowBalanceWarnReq struct {
 }
 
 type AccInvoiceTitleReq struct {
-	UserUUID string `json:"-"`
-	UserName string `json:"-"`
+	TargetUUID  string `json:"-"` // target user or org uuid
+	CurrentUser string `json:"-"` // current user for permission check
+	UserUUID    string `json:"-"`
+	UserName    string `json:"-"`
 
 	Title        string `json:"title" binding:"required"`      // Invoice title name
 	TitleType    string `json:"title_type" binding:"required"` // Invoice title type
@@ -667,7 +669,9 @@ type AccInvoiceTitleResp struct {
 }
 
 type AccInvoiceTitleListReq struct {
-	UserUUID string `json:"-"`
+	TargetUUID  string `json:"-"`
+	CurrentUser string `json:"-"` // current user for permission check
+	UserUUID    string `json:"-"`
 
 	Page     int    `json:"page" binding:"min=1"`              // Current page number
 	PageSize int    `json:"page_size" binding:"min=1,max=100"` // Number of items per page
@@ -680,7 +684,8 @@ type AccInvoiceTitleListResp struct {
 }
 
 type AccInvoiceListReq struct {
-	UserUUID string `json:"-"`
+	TargetUUID  string `json:"-"`
+	CurrentUser string `json:"-"` // current user for permission check
 
 	Page     int    `json:"page" binding:"min=1"`              // Current page number
 	PageSize int    `json:"page_size" binding:"min=1,max=100"` // Number of items per page
@@ -725,26 +730,28 @@ type AccInvoiceDashboardResp struct {
 }
 
 type AccInvoiceDashboardReq struct {
-	UserUUID string `json:"-"`
+	TargetUUID  string `json:"-"`
+	CurrentUser string `json:"-"` // current user for permission check
 
 	StartMonth string `json:"start_month" binding:"required"`
 	EndMonth   string `json:"end_month" binding:"required"`
 }
 
 type AccInvoiceCreateReq struct {
-	UserUUID      string  `json:"-"`
-	UserName      string  `json:"-"`
-	TitleID       int64   `json:"title_id" binding:"required"`
-	BillCycle     string  `json:"bill_cycle" binding:"required"`
+	TargetUUID  string  `json:"-"`
+	CurrentUser string  `json:"-"` // current user for permission check
+	TitleID     int64   `json:"title_id" binding:"required"`
+	BillCycle   string  `json:"bill_cycle" binding:"required"`
 	InvoiceAmount float64 `json:"invoice_amount" binding:"required"`
 }
 
 type AccInvoicableReq struct {
-	UserUUID   string `json:"-"`
-	Page       int    `json:"page" binding:"min=1"`              // Current page number
-	PageSize   int    `json:"page_size" binding:"min=1,max=100"` // Number of items per page
-	StartMonth string `json:"start_month"`
-	EndMonth   string `json:"end_month"`
+	TargetUUID  string `json:"-"`
+	CurrentUser string `json:"-"` // current user for permission check
+	Page        int    `json:"page" binding:"min=1"`              // Current page number
+	PageSize    int    `json:"page_size" binding:"min=1,max=100"` // Number of items per page
+	StartMonth  string `json:"start_month"`
+	EndMonth    string `json:"end_month"`
 }
 type AccInvoicableResp struct {
 	Data  []AccInvoicable `json:"data"`
