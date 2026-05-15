@@ -982,7 +982,9 @@ func (s *repoStoreImpl) publicToUserTrending(ctx context.Context, repoType types
 		tagMap := make(map[int64][]Tag, len(repos))
 		for i := range repoTags {
 			rt := &repoTags[i]
-			tagMap[rt.RepositoryID] = append(tagMap[rt.RepositoryID], *rt.Tag)
+			if rt.Tag != nil {
+				tagMap[rt.RepositoryID] = append(tagMap[rt.RepositoryID], *rt.Tag)
+			}
 		}
 		for i := range repos {
 			repos[i].Tags = tagMap[repos[i].ID]

@@ -1042,6 +1042,65 @@ func (_c *MockGitServer_FixUserData_Call) RunAndReturn(run func(context.Context,
 	return _c
 }
 
+// GetArchive provides a mock function with given fields: ctx, req
+func (_m *MockGitServer) GetArchive(ctx context.Context, req gitserver.GetArchiveReq) ([]byte, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetArchive")
+	}
+
+	var r0 []byte
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, gitserver.GetArchiveReq) ([]byte, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, gitserver.GetArchiveReq) []byte); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]byte)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, gitserver.GetArchiveReq) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockGitServer_GetArchive_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetArchive'
+type MockGitServer_GetArchive_Call struct {
+	*mock.Call
+}
+
+// GetArchive is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req gitserver.GetArchiveReq
+func (_e *MockGitServer_Expecter) GetArchive(ctx interface{}, req interface{}) *MockGitServer_GetArchive_Call {
+	return &MockGitServer_GetArchive_Call{Call: _e.mock.On("GetArchive", ctx, req)}
+}
+
+func (_c *MockGitServer_GetArchive_Call) Run(run func(ctx context.Context, req gitserver.GetArchiveReq)) *MockGitServer_GetArchive_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(gitserver.GetArchiveReq))
+	})
+	return _c
+}
+
+func (_c *MockGitServer_GetArchive_Call) Return(_a0 []byte, _a1 error) *MockGitServer_GetArchive_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockGitServer_GetArchive_Call) RunAndReturn(run func(context.Context, gitserver.GetArchiveReq) ([]byte, error)) *MockGitServer_GetArchive_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetCommitDiff provides a mock function with given fields: ctx, req
 func (_m *MockGitServer) GetCommitDiff(ctx context.Context, req gitserver.GetRepoLastCommitReq) ([]byte, error) {
 	ret := _m.Called(ctx, req)

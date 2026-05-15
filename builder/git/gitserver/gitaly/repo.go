@@ -1,6 +1,8 @@
 package gitaly
 
 import (
+	"archive/zip"
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -136,6 +138,95 @@ func (c *Client) GetRepo(ctx context.Context, req gitserver.GetRepoReq) (*gitser
 	}
 
 	return &gitserver.CreateRepoResp{DefaultBranch: string(resp.Name)}, nil
+}
+
+func (c *Client) GetArchive(ctx context.Context, req gitserver.GetArchiveReq) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
+
+	relativePath, err := c.BuildRelativePath(ctx, req.RepoType, req.Namespace, req.Name)
+	if err != nil {
+		return nil, err
+	}
+
+	stream, err := c.repoClient.GetArchive(ctx, &gitalypb.GetArchiveRequest{
+		Repository: &gitalypb.Repository{
+			StorageName:  c.config.GitalyServer.Storage,
+			RelativePath: relativePath,
+		},
+		CommitId:        req.Revision,
+		Prefix:          req.Name,
+		Format:          gitalypb.GetArchiveRequest_ZIP,
+		Path:            []byte("."),
+		IncludeLfsBlobs: true,
+	})
+	if err != nil {
+		return nil, errorx.GetArchiveFailed(err, errorx.Ctx().Set("namespace", req.Namespace).Set("name", req.Name).Set("revision", req.Revision))
+	}
+
+	buf := bytes.NewBuffer(nil)
+	for {
+		resp, err := stream.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, errorx.GetArchiveFailed(err, errorx.Ctx().Set("namespace", req.Namespace).Set("name", req.Name).Set("revision", req.Revision))
+		}
+		buf.Write(resp.GetData())
+	}
+
+	return stripZipPrefix(buf.Bytes(), req.Name)
+}
+
+func stripZipPrefix(zipData []byte, prefix string) ([]byte, error) {
+	zipReader, err := zip.NewReader(bytes.NewReader(zipData), int64(len(zipData)))
+	if err != nil {
+		return nil, errorx.GetArchiveFailed(err, errorx.Ctx().Set("prefix", prefix))
+	}
+
+	var outBuf bytes.Buffer
+	zipWriter := zip.NewWriter(&outBuf)
+
+	prefixDir := prefix + "/"
+
+	for _, file := range zipReader.File {
+		path := strings.TrimPrefix(file.Name, "/")
+		if path == "" {
+			continue
+		}
+
+		path = strings.TrimPrefix(path, prefixDir)
+		if path == "" {
+			continue
+		}
+
+		writer, err := zipWriter.Create(path)
+		if err != nil {
+			zipWriter.Close()
+			return nil, errorx.GetArchiveFailed(err, errorx.Ctx().Set("prefix", prefix).Set("entry", path))
+		}
+
+		rc, err := file.Open()
+		if err != nil {
+			zipWriter.Close()
+			return nil, errorx.GetArchiveFailed(err, errorx.Ctx().Set("prefix", prefix).Set("entry", file.Name))
+		}
+
+		_, err = io.Copy(writer, rc)
+		rc.Close()
+		if err != nil {
+			zipWriter.Close()
+			return nil, errorx.GetArchiveFailed(err, errorx.Ctx().Set("prefix", prefix).Set("entry", file.Name))
+		}
+	}
+
+	err = zipWriter.Close()
+	if err != nil {
+		return nil, errorx.GetArchiveFailed(err, errorx.Ctx().Set("prefix", prefix))
+	}
+
+	return outBuf.Bytes(), nil
 }
 
 func (c *Client) CopyRepository(ctx context.Context, req gitserver.CopyRepositoryReq) error {

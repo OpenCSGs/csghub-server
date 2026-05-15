@@ -18,7 +18,7 @@ type skillStoreImpl struct {
 }
 
 type SkillStore interface {
-	ByRepoIDs(ctx context.Context, repoIDs []int64) (skills []Skill, err error)
+	ByRepoIDs(ctx context.Context, repoIDs []int64, onlyPublished bool) (skills []Skill, err error)
 	ByRepoID(ctx context.Context, repoID int64) (*Skill, error)
 	BySkillID(ctx context.Context, skillID int64) (*Skill, error)
 	ByUsername(ctx context.Context, username string, per, page int, onlyPublic bool) (skills []Skill, total int, err error)
@@ -49,14 +49,17 @@ type Skill struct {
 	times
 }
 
-func (s *skillStoreImpl) ByRepoIDs(ctx context.Context, repoIDs []int64) (skills []Skill, err error) {
-	err = s.db.Operator.Core.NewSelect().
+func (s *skillStoreImpl) ByRepoIDs(ctx context.Context, repoIDs []int64, onlyPublished bool) (skills []Skill, err error) {
+	query := s.db.Operator.Core.NewSelect().
 		Model(&skills).
 		Relation("Repository").
 		Relation("Repository.Mirror").
 		Relation("Repository.Mirror.CurrentTask").
-		Where("skill.repository_id in (?)", bun.In(repoIDs)).
-		Scan(ctx)
+		Where("skill.repository_id in (?)", bun.In(repoIDs))
+	if onlyPublished {
+		query = query.Where("EXISTS (SELECT 1 FROM skill_versions sv WHERE sv.skill_id = skill.id)")
+	}
+	err = query.Scan(ctx)
 
 	return
 }

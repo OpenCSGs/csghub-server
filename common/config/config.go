@@ -649,6 +649,11 @@ type Config struct {
 		Enabled      bool     `env:"STARHUB_SERVER_AUDIT_LOG_ENABLE" default:"false"`
 		RecordTables []string `env:"STARHUB_SERVER_AUDIT_LOG_RECORD_TABLES" default:"[model,repository,tag,tag_category]"`
 	}
+
+	Skill struct {
+		MaxPublishFileCount int   `env:"STARHUB_SERVER_SKILL_MAX_PUBLISH_FILE_COUNT" default:"100"`
+		MaxPublishFileSize  int64 `env:"STARHUB_SERVER_SKILL_MAX_PUBLISH_FILE_SIZE" default:"10485760"` // 10MB
+	}
 }
 
 type MemoryConfig struct {

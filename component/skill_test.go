@@ -110,6 +110,124 @@ description: %s
 	wg.Wait()
 }
 
+func TestSkillComponent_Create_NormalizesVersionSuffixInNameAndNickname(t *testing.T) {
+	ctx := context.TODO()
+	cc := initializeTestSkillComponent(ctx, t)
+
+	req := &types.CreateSkillReq{
+		CreateRepoReq: types.CreateRepoReq{
+			Username:  "user",
+			Namespace: "ns",
+			Name:      "x-search-1.0.0",
+			Nickname:  "x-search-1.0.0",
+			License:   "l",
+		},
+	}
+	dbrepo := &database.Repository{
+		ID:       2,
+		Path:     "ns/x-search",
+		Nickname: "x-search",
+		User:     database.User{Username: "user", UUID: "user-uuid"},
+	}
+
+	expectedReq := req.CreateRepoReq
+	expectedReq.Name = "x-search"
+	expectedReq.Nickname = "x-search"
+	expectedReq.Readme = generateReadmeData(req.License)
+	expectedReq.RepoType = types.SkillRepo
+	expectedReq.DefaultBranch = "main"
+	expectedReq.CommitFiles = []types.CommitFile{
+		{
+			Content: fmt.Sprintf(`---
+name: %s
+description: %s
+---`, expectedReq.Name, expectedReq.Description),
+			Path: "SKILL.md",
+		},
+		{
+			Content: expectedReq.Readme,
+			Path:    types.ReadmeFileName,
+		},
+		{
+			Content: skillGitattributesContent,
+			Path:    types.GitattributesFileName,
+		},
+	}
+
+	cc.mocks.components.repo.EXPECT().CreateRepo(ctx, expectedReq).Return(
+		nil, dbrepo, &gitserver.CommitFilesReq{}, nil,
+	)
+	cc.mocks.stores.SkillMock().EXPECT().CreateAndUpdateRepoPath(ctx, database.Skill{
+		Repository:   dbrepo,
+		RepositoryID: 2,
+	}, "ns/x-search").Return(&database.Skill{
+		RepositoryID: 2,
+		Repository:   dbrepo,
+	}, nil)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	cc.mocks.components.repo.EXPECT().
+		SendAssetManagementMsg(mock.Anything, mock.MatchedBy(func(req types.RepoNotificationReq) bool {
+			return req.RepoType == types.SkillRepo &&
+				req.Operation == types.OperationCreate &&
+				req.RepoPath == "ns/x-search" &&
+				req.UserUUID == "user-uuid"
+		})).
+		RunAndReturn(func(ctx context.Context, req types.RepoNotificationReq) error {
+			wg.Done()
+			return nil
+		}).Once()
+
+	resp, err := cc.Create(ctx, req)
+
+	require.NoError(t, err)
+	require.Equal(t, int64(2), resp.RepositoryID)
+	require.Equal(t, "ns/x-search", resp.Path)
+	wg.Wait()
+}
+
+func TestNormalizeSkillCreateIdentity(t *testing.T) {
+	testCases := []struct {
+		name             string
+		nickname         string
+		expectedName     string
+		expectedNickname string
+	}{
+		{
+			name:             "x-search-1.0.0",
+			nickname:         "x-search-1.0.0",
+			expectedName:     "x-search",
+			expectedNickname: "x-search",
+		},
+		{
+			name:             "x-search",
+			nickname:         "x-search-1-0-0",
+			expectedName:     "x-search",
+			expectedNickname: "x-search",
+		},
+		{
+			name:             "self-improving-agent-3-0-21",
+			nickname:         "self-improving-agent-3-0-21",
+			expectedName:     "self-improving-agent",
+			expectedNickname: "self-improving-agent",
+		},
+		{
+			name:             "csghub-server-api",
+			nickname:         "CSGHub Server API",
+			expectedName:     "csghub-server-api",
+			expectedNickname: "CSGHub Server API",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name+"/"+tc.nickname, func(t *testing.T) {
+			name, nickname := normalizeSkillCreateIdentity(tc.name, tc.nickname)
+			require.Equal(t, tc.expectedName, name)
+			require.Equal(t, tc.expectedNickname, nickname)
+		})
+	}
+}
+
 func TestSkillComponent_Index(t *testing.T) {
 	ctx := context.TODO()
 	cc := initializeTestSkillComponent(ctx, t)
@@ -123,13 +241,13 @@ func TestSkillComponent_Index(t *testing.T) {
 	cc.mocks.components.repo.EXPECT().PublicToUser(ctx, types.SkillRepo, "user", filter, 10, 1).Return(
 		repos, 100, nil,
 	)
-	cc.mocks.stores.SkillMock().EXPECT().ByRepoIDs(ctx, []int64{1, 2, 5}).Return([]database.Skill{
+	cc.mocks.stores.SkillMock().EXPECT().ByRepoIDs(ctx, []int64{1, 2, 5}, false).Return([]database.Skill{
 		{ID: 11, RepositoryID: 2, Repository: &database.Repository{ID: 2, Name: "r2", Mirror: database.Mirror{}}},
 		{ID: 12, RepositoryID: 1, Repository: &database.Repository{ID: 2, Name: "r2", Mirror: database.Mirror{}}},
 		{ID: 13, RepositoryID: 6},
 	}, nil)
 
-	data, total, err := cc.Index(ctx, filter, 10, 1, false)
+	data, total, err := cc.Index(ctx, filter, 10, 1, false, false)
 	require.Nil(t, err)
 	require.Equal(t, 100, total)
 	require.Equal(t, []*types.Skill{
@@ -153,12 +271,12 @@ func TestSkillComponent_Index_HalfCreatedRepos(t *testing.T) {
 	)
 
 	// ByRepoIDs returns only 2 skills (no skill for repo ID 3)
-	cc.mocks.stores.SkillMock().EXPECT().ByRepoIDs(ctx, []int64{1, 2, 3}).Return([]database.Skill{
+	cc.mocks.stores.SkillMock().EXPECT().ByRepoIDs(ctx, []int64{1, 2, 3}, false).Return([]database.Skill{
 		{ID: 11, RepositoryID: 2, Repository: &database.Repository{ID: 2, Name: "r2", Mirror: database.Mirror{}}},
 		{ID: 12, RepositoryID: 1, Repository: &database.Repository{ID: 1, Name: "r1", Mirror: database.Mirror{}}},
 	}, nil)
 
-	data, total, err := cc.Index(ctx, filter, 10, 1, false)
+	data, total, err := cc.Index(ctx, filter, 10, 1, false, false)
 	require.Nil(t, err)
 	require.Equal(t, 3, total) // Total should match PublicToUser's return value
 	require.Len(t, data, 2)    // But only 2 skills should be returned
@@ -257,6 +375,8 @@ func TestSkillComponent_Show(t *testing.T) {
 	cc.mocks.components.repo.EXPECT().GetMirrorTaskStatus(skill.Repository).Return(
 		types.MirrorRepoSyncStart,
 	)
+	// Mock skill version store - return empty versions
+	cc.mocks.stores.SkillVersionMock().EXPECT().BySkillID(ctx, int64(1)).Return(nil, nil)
 	data, err := cc.Show(ctx, "ns", "n", "user", false, false)
 	require.Nil(t, err)
 	require.Equal(t, &types.Skill{
@@ -274,7 +394,6 @@ func TestSkillComponent_Show(t *testing.T) {
 		SensitiveCheckStatus: "Pending",
 		MirrorTaskStatus:     types.MirrorRepoSyncStart,
 		SyncStatus:           types.SyncStatusInProgress,
-		RepoSize:             0,
 	}, data)
 }
 
@@ -296,6 +415,7 @@ func TestSkillComponent_ShowWithStatistics(t *testing.T) {
 	cc.mocks.components.repo.EXPECT().GetMirrorTaskStatus(skill.Repository).Return(
 		types.MirrorRepoSyncStart,
 	)
+	cc.mocks.stores.SkillVersionMock().EXPECT().BySkillID(ctx, int64(1)).Return(nil, nil)
 	data, err := cc.Show(ctx, "ns", "n", "user", false, false)
 	require.Nil(t, err)
 	require.Equal(t, &types.Skill{

@@ -47,7 +47,35 @@ type Skill struct {
 	Scores               []WeightScore        `json:"scores"`
 	MultiSource
 	MirrorTaskStatus MirrorTaskStatus `json:"mirror_task_status"`
-	RepoSize         int64            `json:"repo_size"`
+	// Version information
+	LatestVersion string         `json:"latest_version,omitempty"`
+	Versions      []SkillVersion `json:"versions,omitempty"`
+}
+
+// SkillVersion represents a skill version
+type SkillVersion struct {
+	Version   string    `json:"version"`
+	Commit    string    `json:"commit,omitempty"`
+	Changelog string    `json:"changelog,omitempty"`
+	License   string    `json:"license,omitempty"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+type PublishSkillVersionReq struct {
+	Namespace string `json:"-"`
+	Name      string `json:"-"`
+	Username  string `json:"-"`
+	Version   string `json:"version"`
+	Changelog string `json:"changelog"`
+	License   string `json:"license,omitempty"`
+}
+
+type PublishSkillVersionResp struct {
+	Ok        bool   `json:"ok"`
+	SkillID   string `json:"skillId"`
+	VersionID string `json:"versionId"`
+	Version   string `json:"version"`
+	Commit    string `json:"commit,omitempty"`
 }
 
 type OrgSkillsReq struct {

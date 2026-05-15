@@ -113,6 +113,10 @@ func (c *Client) GetRepo(ctx context.Context, req gitserver.GetRepoReq) (*gitser
 	return resp, nil
 }
 
+func (c *Client) GetArchive(ctx context.Context, req gitserver.GetArchiveReq) ([]byte, error) {
+	return nil, nil
+}
+
 func (c *Client) CopyRepository(ctx context.Context, req gitserver.CopyRepositoryReq) error {
 	return nil
 }

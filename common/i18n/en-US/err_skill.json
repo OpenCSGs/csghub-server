@@ -1,0 +1,32 @@
+{
+    "error.SKILL-ERR-0": {
+        "other": "Skill not found"
+    },
+    "error.SKILL-ERR-1": {
+        "other": "Skill version not found"
+    },
+    "error.SKILL-ERR-2": {
+        "other": "Failed to publish skill"
+    },
+    "error.SKILL-ERR-3": {
+        "other": "Failed to download skill"
+    },
+    "error.SKILL-ERR-4": {
+        "other": "Failed to resolve skill"
+    },
+    "error.SKILL-ERR-5": {
+        "other": "User not found for skill operation"
+    },
+    "error.SKILL-ERR-6": {
+        "other": "Failed to create skill version"
+    },
+    "error.SKILL-ERR-7": {
+        "other": "Failed to update skill version"
+    },
+    "error.SKILL-ERR-8": {
+        "other": "Too many files in skill publish request"
+    },
+    "error.SKILL-ERR-9": {
+        "other": "Total file size too large in skill publish request"
+    }
+}

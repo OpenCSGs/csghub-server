@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
@@ -30,6 +31,10 @@ func NewSkillHandler(config *config.Config) (*SkillHandler, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error creating repo component:%w", err)
 	}
+	publisher, err := component.NewSkillPublishComponent(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating skill publish component:%w", err)
+	}
 	s3Client, err := s3.NewMinio(config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating s3 client:%w", err)
@@ -38,6 +43,7 @@ func NewSkillHandler(config *config.Config) (*SkillHandler, error) {
 		skill:     tc,
 		sensitive: sc,
 		repo:      repo,
+		publisher: publisher,
 		s3Client:  s3Client,
 		config:    config,
 	}, nil
@@ -47,6 +53,7 @@ type SkillHandler struct {
 	skill     component.SkillComponent
 	sensitive component.SensitiveComponent
 	repo      component.RepoComponent
+	publisher component.SkillPublishComponent
 	s3Client  s3.Client
 	config    *config.Config
 }
@@ -159,7 +166,7 @@ func (h *SkillHandler) Index(ctx *gin.Context) {
 		needOpWeight = false
 	}
 
-	skills, total, err := h.skill.Index(ctx.Request.Context(), filter, per, page, needOpWeight)
+	skills, total, err := h.skill.Index(ctx.Request.Context(), filter, per, page, needOpWeight, false)
 	if err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Failed to get skills", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
@@ -312,6 +319,63 @@ func (h *SkillHandler) Show(ctx *gin.Context) {
 
 	slog.Info("Get skill succeed", slog.String("skill", name))
 	httpbase.OK(ctx, detail)
+}
+
+// PublishSkillVersion godoc
+// @Security     ApiKey
+// @Summary      Publish a skill version
+// @Description  publish current skill repository commit as an installable version
+// @Tags         Skill
+// @Accept       json
+// @Produce      json
+// @Param        namespace path string true "namespace"
+// @Param        name path string true "name"
+// @Param        body body types.PublishSkillVersionReq true "body"
+// @Success      200  {object}  types.Response{data=types.PublishSkillVersionResp} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      403  {object}  types.APIForbidden "Forbidden"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /skills/{namespace}/{name}/publish [post]
+func (h *SkillHandler) Publish(ctx *gin.Context) {
+	currentUser := httpbase.GetCurrentUser(ctx)
+	namespace, name, err := common.GetNamespaceAndNameFromContext(ctx)
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+
+	req := new(types.PublishSkillVersionReq)
+	if err := ctx.ShouldBindJSON(req); err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "Bad request format", "error", err)
+		httpbase.BadRequest(ctx, err.Error())
+		return
+	}
+	req.Namespace = namespace
+	req.Name = name
+	req.Username = currentUser
+	if strings.TrimSpace(req.Version) == "" {
+		httpbase.BadRequest(ctx, "missing version parameter")
+		return
+	}
+
+	response, err := h.publisher.Publish(ctx.Request.Context(), req)
+	if err != nil {
+		if errors.Is(err, errorx.ErrForbidden) {
+			httpbase.ForbiddenError(ctx, err)
+			return
+		}
+		if errors.Is(err, errorx.ErrDatabaseDuplicateKey) {
+			httpbase.BadRequestWithExt(ctx, err)
+			return
+		}
+		slog.ErrorContext(ctx.Request.Context(), "Failed to publish skill version", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	slog.Info("Publish skill version succeed", slog.String("skill", name), slog.String("version", response.Version))
+	httpbase.OK(ctx, response)
 }
 
 // SkillRelations      godoc

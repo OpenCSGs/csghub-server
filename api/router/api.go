@@ -528,6 +528,12 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	}
 	createDataflowRoutes(apiGroup, dataflowHandler, platformDFHandler)
 
+	// ClawHub Registry
+	err = createClawHubRoutes(r, apiGroup, config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating clawhub routes:%w", err)
+	}
+
 	err = createAdvancedRoutes(apiGroup, adminGroup, middlewareCollection, config, mqFactory)
 	if err != nil {
 		return nil, fmt.Errorf("error creating advance routes:%w", err)
@@ -1494,6 +1500,7 @@ func createSkillRoutes(
 		skillGroup.PUT("/:namespace/:name", middlewareCollection.Auth.NeedLogin, skillHandler.Update)
 		skillGroup.DELETE("/:namespace/:name", middlewareCollection.Auth.NeedLogin, skillHandler.Delete)
 		skillGroup.GET("/:namespace/:name", skillHandler.Show)
+		skillGroup.POST("/:namespace/:name/publish", middlewareCollection.Auth.NeedPhoneVerified, skillHandler.Publish)
 		skillGroup.GET("/:namespace/:name/branches", repoCommonHandler.Branches)
 		skillGroup.POST("/:namespace/:name/branches", middleware.MustLogin(), repoCommonHandler.CreateBranch)
 		skillGroup.DELETE("/:namespace/:name/branches/:branch", middleware.MustLogin(), repoCommonHandler.DeleteBranch)

@@ -52,7 +52,7 @@ func TestSkillStore_CRUD(t *testing.T) {
 	require.NotNil(t, skByID.Repository)
 	require.Equal(t, "foo/bar", skByID.Repository.Path)
 
-	skills, err := store.ByRepoIDs(ctx, []int64{repo.ID})
+	skills, err := store.ByRepoIDs(ctx, []int64{repo.ID}, false)
 	require.Nil(t, err)
 	require.Equal(t, 1, len(skills))
 	require.Equal(t, repo.ID, skills[0].RepositoryID)
@@ -177,4 +177,41 @@ func TestSkillStore_BySkillID_NotFound(t *testing.T) {
 	_, err := store.BySkillID(ctx, 99999)
 	require.Error(t, err)
 	require.True(t, errors.Is(err, errorx.ErrDatabaseNoRows))
+}
+
+func TestSkillStore_ByRepoIDs_OnlyPublished(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewSkillStoreWithDB(db)
+	repoWithVersion, err := database.NewRepoStoreWithDB(db).CreateRepo(ctx, database.Repository{
+		Name:    "with-version",
+		Path:    "foo/with-version",
+		GitPath: "skills_foo/with-version",
+	})
+	require.Nil(t, err)
+	repoDraft, err := database.NewRepoStoreWithDB(db).CreateRepo(ctx, database.Repository{
+		Name:    "draft",
+		Path:    "foo/draft",
+		GitPath: "skills_foo/draft",
+	})
+	require.Nil(t, err)
+
+	skillWithVersion, err := store.Create(ctx, database.Skill{RepositoryID: repoWithVersion.ID})
+	require.Nil(t, err)
+	_, err = store.Create(ctx, database.Skill{RepositoryID: repoDraft.ID})
+	require.Nil(t, err)
+
+	version := database.SkillVersion{
+		SkillID: skillWithVersion.ID,
+		Version: "v1.0.0",
+	}
+	_, err = db.Core.NewInsert().Model(&version).Exec(ctx)
+	require.Nil(t, err)
+
+	skills, err := store.ByRepoIDs(ctx, []int64{repoWithVersion.ID, repoDraft.ID}, true)
+	require.Nil(t, err)
+	require.Len(t, skills, 1)
+	require.Equal(t, repoWithVersion.ID, skills[0].RepositoryID)
 }

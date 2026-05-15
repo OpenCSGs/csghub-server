@@ -202,9 +202,9 @@ func (_c *MockSkillComponent_GetUploadUrl_Call) RunAndReturn(run func(context.Co
 	return _c
 }
 
-// Index provides a mock function with given fields: ctx, filter, per, page, needOpWeight
-func (_m *MockSkillComponent) Index(ctx context.Context, filter *types.RepoFilter, per int, page int, needOpWeight bool) ([]*types.Skill, int, error) {
-	ret := _m.Called(ctx, filter, per, page, needOpWeight)
+// Index provides a mock function with given fields: ctx, filter, per, page, needOpWeight, onlyPublished
+func (_m *MockSkillComponent) Index(ctx context.Context, filter *types.RepoFilter, per int, page int, needOpWeight bool, onlyPublished bool) ([]*types.Skill, int, error) {
+	ret := _m.Called(ctx, filter, per, page, needOpWeight, onlyPublished)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Index")
@@ -213,25 +213,25 @@ func (_m *MockSkillComponent) Index(ctx context.Context, filter *types.RepoFilte
 	var r0 []*types.Skill
 	var r1 int
 	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, *types.RepoFilter, int, int, bool) ([]*types.Skill, int, error)); ok {
-		return rf(ctx, filter, per, page, needOpWeight)
+	if rf, ok := ret.Get(0).(func(context.Context, *types.RepoFilter, int, int, bool, bool) ([]*types.Skill, int, error)); ok {
+		return rf(ctx, filter, per, page, needOpWeight, onlyPublished)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *types.RepoFilter, int, int, bool) []*types.Skill); ok {
-		r0 = rf(ctx, filter, per, page, needOpWeight)
+	if rf, ok := ret.Get(0).(func(context.Context, *types.RepoFilter, int, int, bool, bool) []*types.Skill); ok {
+		r0 = rf(ctx, filter, per, page, needOpWeight, onlyPublished)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]*types.Skill)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *types.RepoFilter, int, int, bool) int); ok {
-		r1 = rf(ctx, filter, per, page, needOpWeight)
+	if rf, ok := ret.Get(1).(func(context.Context, *types.RepoFilter, int, int, bool, bool) int); ok {
+		r1 = rf(ctx, filter, per, page, needOpWeight, onlyPublished)
 	} else {
 		r1 = ret.Get(1).(int)
 	}
 
-	if rf, ok := ret.Get(2).(func(context.Context, *types.RepoFilter, int, int, bool) error); ok {
-		r2 = rf(ctx, filter, per, page, needOpWeight)
+	if rf, ok := ret.Get(2).(func(context.Context, *types.RepoFilter, int, int, bool, bool) error); ok {
+		r2 = rf(ctx, filter, per, page, needOpWeight, onlyPublished)
 	} else {
 		r2 = ret.Error(2)
 	}
@@ -250,13 +250,14 @@ type MockSkillComponent_Index_Call struct {
 //   - per int
 //   - page int
 //   - needOpWeight bool
-func (_e *MockSkillComponent_Expecter) Index(ctx interface{}, filter interface{}, per interface{}, page interface{}, needOpWeight interface{}) *MockSkillComponent_Index_Call {
-	return &MockSkillComponent_Index_Call{Call: _e.mock.On("Index", ctx, filter, per, page, needOpWeight)}
+//   - onlyPublished bool
+func (_e *MockSkillComponent_Expecter) Index(ctx interface{}, filter interface{}, per interface{}, page interface{}, needOpWeight interface{}, onlyPublished interface{}) *MockSkillComponent_Index_Call {
+	return &MockSkillComponent_Index_Call{Call: _e.mock.On("Index", ctx, filter, per, page, needOpWeight, onlyPublished)}
 }
 
-func (_c *MockSkillComponent_Index_Call) Run(run func(ctx context.Context, filter *types.RepoFilter, per int, page int, needOpWeight bool)) *MockSkillComponent_Index_Call {
+func (_c *MockSkillComponent_Index_Call) Run(run func(ctx context.Context, filter *types.RepoFilter, per int, page int, needOpWeight bool, onlyPublished bool)) *MockSkillComponent_Index_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(*types.RepoFilter), args[2].(int), args[3].(int), args[4].(bool))
+		run(args[0].(context.Context), args[1].(*types.RepoFilter), args[2].(int), args[3].(int), args[4].(bool), args[5].(bool))
 	})
 	return _c
 }
@@ -266,7 +267,7 @@ func (_c *MockSkillComponent_Index_Call) Return(_a0 []*types.Skill, _a1 int, _a2
 	return _c
 }
 
-func (_c *MockSkillComponent_Index_Call) RunAndReturn(run func(context.Context, *types.RepoFilter, int, int, bool) ([]*types.Skill, int, error)) *MockSkillComponent_Index_Call {
+func (_c *MockSkillComponent_Index_Call) RunAndReturn(run func(context.Context, *types.RepoFilter, int, int, bool, bool) ([]*types.Skill, int, error)) *MockSkillComponent_Index_Call {
 	_c.Call.Return(run)
 	return _c
 }

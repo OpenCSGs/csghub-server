@@ -35,7 +35,7 @@ const skillGitattributesContent = modelGitattributesContent
 
 type SkillComponent interface {
 	Create(ctx context.Context, req *types.CreateSkillReq) (*types.Skill, error)
-	Index(ctx context.Context, filter *types.RepoFilter, per, page int, needOpWeight bool) ([]*types.Skill, int, error)
+	Index(ctx context.Context, filter *types.RepoFilter, per, page int, needOpWeight bool, onlyPublished bool) ([]*types.Skill, int, error)
 	Update(ctx context.Context, req *types.UpdateSkillReq) (*types.Skill, error)
 	Delete(ctx context.Context, namespace, name, currentUser string) error
 	Show(ctx context.Context, namespace, name, currentUser string, needOpWeight bool, needMultiSync bool) (*types.Skill, error)
@@ -54,6 +54,7 @@ func NewSkillComponent(config *config.Config) (SkillComponent, error) {
 	c.skillStore = database.NewSkillStore()
 	c.repoStore = database.NewRepoStore()
 	c.recomStore = database.NewRecomStore()
+	c.skillVersionStore = database.NewSkillVersionStore()
 	gs, err := git.NewGitServer(config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create git server, error: %w", err)
@@ -73,15 +74,16 @@ func NewSkillComponent(config *config.Config) (SkillComponent, error) {
 }
 
 type skillComponentImpl struct {
-	config         *config.Config
-	repoComponent  RepoComponent
-	skillStore     database.SkillStore
-	repoStore      database.RepoStore
-	userLikesStore database.UserLikesStore
-	gitServer      gitserver.GitServer
-	userSvcClient  rpc.UserSvcClient
-	recomStore     database.RecomStore
-	s3Client       s3.Client
+	config            *config.Config
+	repoComponent     RepoComponent
+	skillStore        database.SkillStore
+	repoStore         database.RepoStore
+	userLikesStore    database.UserLikesStore
+	gitServer         gitserver.GitServer
+	userSvcClient     rpc.UserSvcClient
+	recomStore        database.RecomStore
+	s3Client          s3.Client
+	skillVersionStore database.SkillVersionStore
 }
 
 func (c *skillComponentImpl) GetUploadUrl(ctx context.Context) (string, string, map[string]string, error) {
@@ -181,6 +183,10 @@ func (c *skillComponentImpl) Create(ctx context.Context, req *types.CreateSkillR
 
 // setupCreateRequest sets up the create request with default values
 func (c *skillComponentImpl) setupCreateRequest(req *types.CreateSkillReq) {
+	normalizedName, normalizedNickname := normalizeSkillCreateIdentity(req.Name, req.Nickname)
+	req.Name = normalizedName
+	req.Nickname = normalizedNickname
+
 	// Set nickname if not provided
 	if req.Nickname == "" {
 		req.Nickname = req.Name
@@ -194,6 +200,22 @@ func (c *skillComponentImpl) setupCreateRequest(req *types.CreateSkillReq) {
 	// Set repo type and generate README
 	req.RepoType = types.SkillRepo
 	req.Readme = generateReadmeData(req.License)
+}
+
+func normalizeSkillCreateIdentity(name, nickname string) (string, string) {
+	normalizedName, _ := parseSkillNameAndVersion(name)
+	if normalizedName == "" {
+		normalizedName = name
+	}
+
+	normalizedNickname := nickname
+	if normalizedNickname == "" || normalizedNickname == name {
+		normalizedNickname = normalizedName
+	} else if parsedNickname, _ := parseSkillNameAndVersion(normalizedNickname); parsedNickname != normalizedNickname {
+		normalizedNickname = parsedNickname
+	}
+
+	return normalizedName, normalizedNickname
 }
 
 // initializeCommitFiles initializes commit files with README, .gitattributes, and SKILL.md
@@ -438,7 +460,7 @@ func (c *skillComponentImpl) sendCreateNotification(dbRepo *database.Repository,
 	}()
 }
 
-func (c *skillComponentImpl) Index(ctx context.Context, filter *types.RepoFilter, per, page int, needOpWeight bool) ([]*types.Skill, int, error) {
+func (c *skillComponentImpl) Index(ctx context.Context, filter *types.RepoFilter, per, page int, needOpWeight bool, onlyPublished bool) ([]*types.Skill, int, error) {
 	var (
 		err       error
 		resSkills []*types.Skill
@@ -452,7 +474,7 @@ func (c *skillComponentImpl) Index(ctx context.Context, filter *types.RepoFilter
 	for _, repo := range repos {
 		repoIDs = append(repoIDs, repo.ID)
 	}
-	skills, err := c.skillStore.ByRepoIDs(ctx, repoIDs)
+	skills, err := c.skillStore.ByRepoIDs(ctx, repoIDs, onlyPublished)
 	if err != nil {
 		newError := fmt.Errorf("failed to get skills by repo ids,error:%w", err)
 		return nil, 0, newError
@@ -634,6 +656,24 @@ func (c *skillComponentImpl) Show(ctx context.Context, namespace, name, currentU
 
 	mirrorTaskStatus = c.repoComponent.GetMirrorTaskStatus(skill.Repository)
 
+	// Get skill versions
+	var latestVersion string
+	var skillVersions []types.SkillVersion
+	versions, err := c.skillVersionStore.BySkillID(ctx, skill.ID)
+	if err == nil && len(versions) > 0 {
+		for _, v := range versions {
+			skillVersions = append(skillVersions, types.SkillVersion{
+				Version:   v.Version,
+				Commit:    v.Hash,
+				Changelog: v.Changelog,
+				License:   v.License,
+				CreatedAt: v.CreatedAt,
+			})
+		}
+		// Latest version is the first one (sorted by created_at DESC)
+		latestVersion = versions[0].Version
+	}
+
 	resSkill := &types.Skill{
 		ID:            skill.ID,
 		Name:          skill.Repository.Name,
@@ -651,16 +691,18 @@ func (c *skillComponentImpl) Show(ctx context.Context, namespace, name, currentU
 			Nickname: skill.Repository.User.NickName,
 			Email:    skill.Repository.User.Email,
 		},
-		Private:    skill.Repository.Private,
-		CreatedAt:  skill.CreatedAt,
-		UpdatedAt:  skill.Repository.UpdatedAt,
-		UserLikes:  likeExists,
-		Source:     skill.Repository.Source,
-		SyncStatus: skill.Repository.SyncStatus,
-		License:    skill.Repository.License,
-		CanWrite:   permission.CanWrite,
-		CanManage:  permission.CanAdmin,
-		Namespace:  ns,
+		Private:       skill.Repository.Private,
+		CreatedAt:     skill.CreatedAt,
+		UpdatedAt:     skill.Repository.UpdatedAt,
+		UserLikes:     likeExists,
+		Source:        skill.Repository.Source,
+		SyncStatus:    skill.Repository.SyncStatus,
+		License:       skill.Repository.License,
+		CanWrite:      permission.CanWrite,
+		CanManage:     permission.CanAdmin,
+		Namespace:     ns,
+		LatestVersion: latestVersion,
+		Versions:      skillVersions,
 		MultiSource: types.MultiSource{
 			HFPath:  skill.Repository.HFPath,
 			MSPath:  skill.Repository.MSPath,

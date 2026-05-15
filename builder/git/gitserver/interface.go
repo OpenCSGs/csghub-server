@@ -35,6 +35,7 @@ type GitServer interface {
 	GetRepoLastCommit(ctx context.Context, req GetRepoLastCommitReq) (*types.Commit, error)
 	GetSingleCommit(ctx context.Context, req GetRepoLastCommitReq) (*types.CommitResponse, error)
 	GetCommitDiff(ctx context.Context, req GetRepoLastCommitReq) ([]byte, error)
+	GetArchive(ctx context.Context, req GetArchiveReq) ([]byte, error)
 	GetRepoFileTree(ctx context.Context, req GetRepoInfoByPathReq) ([]*types.File, error)
 	GetTree(ctx context.Context, req types.GetTreeRequest) (*types.GetRepoFileTreeResp, error)
 	GetLogsTree(ctx context.Context, req types.GetLogsTreeRequest) (*types.LogsTreeResp, error)
