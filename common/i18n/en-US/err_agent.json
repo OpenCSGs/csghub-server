@@ -14,6 +14,15 @@
     "error.AGENT-ERR-12": {
         "other": "Runtime credential grant is unavailable"
     },
+    "error.AGENT-ERR-13": {
+        "other": "Credential verification URL is invalid"
+    },
+    "error.AGENT-ERR-14": {
+        "other": "Credential token is invalid"
+    },
+    "error.AGENT-ERR-15": {
+        "other": "Credential verification failed"
+    },
     "error.AGENT-ERR-2": {
         "other": "You have a knowledge base with the same name: {{.knowledge_base_name}}"
     },

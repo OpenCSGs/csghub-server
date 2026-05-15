@@ -14,6 +14,15 @@
     "error.AGENT-ERR-12": {
         "other": "運行時憑證授權不可用"
     },
+    "error.AGENT-ERR-13": {
+        "other": "憑證驗證 URL 無效"
+    },
+    "error.AGENT-ERR-14": {
+        "other": "憑證令牌無效"
+    },
+    "error.AGENT-ERR-15": {
+        "other": "憑證驗證失敗"
+    },
     "error.AGENT-ERR-2": {
         "other": "您已存在相同名稱的知識庫: {{.knowledge_base_name}}"
     },

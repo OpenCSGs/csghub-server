@@ -28,6 +28,7 @@ type CredentialProviderDefinition struct {
 	AuthTypes        []string                  `json:"auth_types"`
 	CredentialFields []CredentialProviderField `json:"credential_fields,omitempty"`
 	MetadataFields   []CredentialProviderField `json:"metadata_fields,omitempty"`
+	VerifyEnabled    bool                      `json:"verify_enabled"`
 }
 
 type CredentialProviderField struct {
@@ -43,6 +44,13 @@ type CreateCredentialRequest struct {
 	Description    string            `json:"description,omitempty"`
 	Credential     map[string]string `json:"credential" binding:"required"`
 	Metadata       map[string]any    `json:"metadata,omitempty"`
+}
+
+type VerifyCredentialRequest struct {
+	Provider   string            `json:"provider" binding:"required"`
+	AuthType   string            `json:"auth_type" binding:"required"`
+	Credential map[string]string `json:"credential" binding:"required"`
+	Metadata   map[string]any    `json:"metadata,omitempty"`
 }
 
 type UpdateCredentialRequest struct {

@@ -16,6 +16,9 @@ const (
 	credentialNameAlreadyExists
 	runtimeCredentialTokenInvalid
 	runtimeCredentialGrantUnavailable
+	credentialVerifyURLInvalid
+	credentialVerifyTokenInvalid
+	credentialVerifyFailed
 )
 
 var (
@@ -187,6 +190,45 @@ var (
 	//
 	// zh-HK: 運行時憑證授權不可用
 	ErrRuntimeCredentialGrantUnavailable error = CustomError{prefix: errAgentPrefix, code: runtimeCredentialGrantUnavailable}
+
+	// credential verification URL is invalid
+	//
+	// Description: The credential verification URL or API endpoint is invalid.
+	//
+	// Description_ZH: 凭证验证 URL 或 API 端点无效。
+	//
+	// en-US: Credential verification URL is invalid
+	//
+	// zh-CN: 凭证验证 URL 无效
+	//
+	// zh-HK: 憑證驗證 URL 無效
+	ErrCredentialVerifyURLInvalid error = CustomError{prefix: errAgentPrefix, code: credentialVerifyURLInvalid}
+
+	// credential token is invalid
+	//
+	// Description: The credential token is invalid, expired, or missing required permissions.
+	//
+	// Description_ZH: 凭证令牌无效、已过期或缺少所需权限。
+	//
+	// en-US: Credential token is invalid
+	//
+	// zh-CN: 凭证令牌无效
+	//
+	// zh-HK: 憑證令牌無效
+	ErrCredentialVerifyTokenInvalid error = CustomError{prefix: errAgentPrefix, code: credentialVerifyTokenInvalid}
+
+	// credential verification failed
+	//
+	// Description: Credential verification failed.
+	//
+	// Description_ZH: 凭证验证失败。
+	//
+	// en-US: Credential verification failed
+	//
+	// zh-CN: 凭证验证失败
+	//
+	// zh-HK: 憑證驗證失敗
+	ErrCredentialVerifyFailed error = CustomError{prefix: errAgentPrefix, code: credentialVerifyFailed}
 )
 
 func InstanceQuotaExceeded(err error, ctx context) error {
@@ -281,5 +323,32 @@ func RuntimeCredentialGrantUnavailable(err error, ctx context) error {
 		context: ctx,
 		err:     err,
 		code:    int(runtimeCredentialGrantUnavailable),
+	}
+}
+
+func CredentialVerifyURLInvalid(err error, ctx context) error {
+	return CustomError{
+		prefix:  errAgentPrefix,
+		context: ctx,
+		err:     err,
+		code:    int(credentialVerifyURLInvalid),
+	}
+}
+
+func CredentialVerifyTokenInvalid(err error, ctx context) error {
+	return CustomError{
+		prefix:  errAgentPrefix,
+		context: ctx,
+		err:     err,
+		code:    int(credentialVerifyTokenInvalid),
+	}
+}
+
+func CredentialVerifyFailed(err error, ctx context) error {
+	return CustomError{
+		prefix:  errAgentPrefix,
+		context: ctx,
+		err:     err,
+		code:    int(credentialVerifyFailed),
 	}
 }

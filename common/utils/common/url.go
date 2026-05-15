@@ -1,11 +1,28 @@
 package common
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"net/url"
 	"strings"
+
+	"golang.org/x/net/http/httpguts"
 )
+
+var unsafeHTTPHeaders = map[string]struct{}{
+	"connection":          {},
+	"content-length":      {},
+	"host":                {},
+	"keep-alive":          {},
+	"proxy-authenticate":  {},
+	"proxy-authorization": {},
+	"proxy-connection":    {},
+	"te":                  {},
+	"trailer":             {},
+	"transfer-encoding":   {},
+	"upgrade":             {},
+}
 
 func ValidateURLFormat(urlString string) error {
 	if urlString == "" {
@@ -22,6 +39,20 @@ func ValidateURLFormat(urlString string) error {
 	}
 	if u.Host == "" {
 		return fmt.Errorf("url must have a host")
+	}
+	return nil
+}
+
+func ValidateHeader(key, value string) error {
+	key = strings.TrimSpace(key)
+	if !httpguts.ValidHeaderFieldName(key) {
+		return errors.New("invalid header name")
+	}
+	if !httpguts.ValidHeaderFieldValue(value) {
+		return errors.New("invalid header value")
+	}
+	if _, ok := unsafeHTTPHeaders[strings.ToLower(key)]; ok {
+		return errors.New("unsafe header")
 	}
 	return nil
 }
