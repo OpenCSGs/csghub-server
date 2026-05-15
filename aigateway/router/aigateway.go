@@ -2,7 +2,9 @@ package router
 
 import (
 	"fmt"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"net/http"
+	bldprometheus "opencsg.com/csghub-server/builder/prometheus"
 
 	"opencsg.com/csghub-server/builder/instrumentation"
 
@@ -37,6 +39,10 @@ func NewRouter(config *config.Config) (*gin.Engine, func(), error) {
 	i18n.InitLocalizersFromEmbedFile()
 	r.Use(middleware.ModifyAcceptLanguageMiddleware(), middleware.LocalizedErrorMiddleware())
 	r.Use(middleware.Authenticator(config))
+
+	bldprometheus.InitMetrics()
+	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
+
 	middlewareCollection := middleware.MiddlewareCollection{}
 	middlewareCollection.Auth.NeedLogin = middleware.MustLogin()
 	middlewareCollection.Auth.NeedAdmin = middleware.NeedAdmin(config)

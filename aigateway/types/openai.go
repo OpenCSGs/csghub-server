@@ -73,10 +73,24 @@ type Model struct {
 	BaseModel
 	InternalModelInfo                              // internal model fields
 	ExternalModelInfo                              // external model fields
-	Endpoint          string                       `json:"endpoint"`
-	Upstreams         []commontypes.UpstreamConfig `json:"upstreams,omitempty"`
-	RoutingPolicy     commontypes.RoutingPolicy    `json:"routing_policy"`
-	InternalUse       bool                         `json:"-"` // control whether the model is for internal use
+	Endpoint               string                       `json:"endpoint"`
+	Upstreams              []commontypes.UpstreamConfig `json:"upstreams,omitempty"`
+	RoutingPolicy          commontypes.RoutingPolicy    `json:"routing_policy"`
+	Availability           *ModelAvailability           `json:"availability,omitempty"`
+	UpstreamAvailabilities []UpstreamAvailability       `json:"upstream_availabilities,omitempty"`
+	InternalUse            bool                         `json:"-"` // control whether the model is for internal use
+}
+
+type UpstreamAvailability struct {
+	UpstreamID      int64         `json:"upstream_id,omitempty"`
+	URL          string         `json:"url"`
+	ModelName    string         `json:"model_name,omitempty"`
+	Provider     string         `json:"provider,omitempty"`
+	IsAvailable  bool           `json:"is_available"`
+	HealthState  HealthState    `json:"health_state,omitempty"`
+	CircuitState CircuitState   `json:"circuit_state,omitempty"`
+	Reason       string         `json:"reason,omitempty"`
+	RawStatus    map[string]any `json:"-"`
 }
 
 func (m Model) MarshalJSON() ([]byte, error) {
@@ -93,6 +107,8 @@ func (m Model) MarshalJSON() ([]byte, error) {
 			Endpoint            string                       `json:"endpoint"`
 			Upstreams           []commontypes.UpstreamConfig `json:"upstreams,omitempty"`
 			RoutingPolicy       commontypes.RoutingPolicy    `json:"routing_policy,omitempty"`
+			Availability        *ModelAvailability           `json:"availability,omitempty"`
+			UpstreamStatus      []UpstreamAvailability       `json:"upstream_availabilities,omitempty"`
 			Metadata            map[string]any               `json:"metadata"`
 			CSGHubModelID       *string                      `json:"csghub_model_id,omitempty"`
 			OwnerUUID           *string                      `json:"owner_uuid,omitempty"`
@@ -114,6 +130,8 @@ func (m Model) MarshalJSON() ([]byte, error) {
 			Endpoint:           m.Endpoint,
 			Upstreams:          m.Upstreams,
 			RoutingPolicy:      m.RoutingPolicy,
+			Availability:       m.Availability,
+			UpstreamStatus:     m.UpstreamAvailabilities,
 			Metadata:           m.Metadata,
 			NeedSensitiveCheck: m.NeedSensitiveCheck,
 		}
@@ -149,7 +167,16 @@ func (m Model) MarshalJSON() ([]byte, error) {
 
 		return json.Marshal(resp)
 	} else {
-		return json.Marshal(m.BaseModel)
+		type externalModelResponse struct {
+			BaseModel
+			Availability   *ModelAvailability     `json:"availability,omitempty"`
+			UpstreamStatus []UpstreamAvailability `json:"upstream_availabilities,omitempty"`
+		}
+		return json.Marshal(externalModelResponse{
+			BaseModel:      m.BaseModel,
+			Availability:   m.Availability,
+			UpstreamStatus: m.UpstreamAvailabilities,
+		})
 	}
 }
 
@@ -165,6 +192,8 @@ func (m *Model) UnmarshalJSON(data []byte) error {
 		Endpoint            string                       `json:"endpoint"`
 		Upstreams           []commontypes.UpstreamConfig `json:"upstreams,omitempty"`
 		RoutingPolicy       commontypes.RoutingPolicy    `json:"routing_policy,omitempty"`
+		Availability        *ModelAvailability           `json:"availability,omitempty"`
+		UpstreamStatus      []UpstreamAvailability       `json:"upstream_availabilities,omitempty"`
 		Metadata            map[string]any               `json:"metadata"`
 		CSGHubModelID       string                       `json:"csghub_model_id,omitempty"`
 		OwnerUUID           string                       `json:"owner_uuid,omitempty"`
@@ -190,6 +219,8 @@ func (m *Model) UnmarshalJSON(data []byte) error {
 	m.Endpoint = aux.Endpoint
 	m.Upstreams = aux.Upstreams
 	m.RoutingPolicy = aux.RoutingPolicy
+	m.Availability = aux.Availability
+	m.UpstreamAvailabilities = aux.UpstreamStatus
 	m.Metadata = aux.Metadata
 	m.CSGHubModelID = aux.CSGHubModelID
 	m.OwnerUUID = aux.OwnerUUID
@@ -286,4 +317,12 @@ type ModelScenePrice struct {
 	InputTokenPrice  *ModelTokenPrice `json:"input_token_price,omitempty"`
 	OutputTokenPrice *ModelTokenPrice `json:"output_token_price,omitempty"`
 	TokenPrice       *ModelTokenPrice `json:"token_price,omitempty"`
+}
+
+// ModelAvailability represents the availability information for a model
+type ModelAvailability struct {
+	IsAvailable  bool         `json:"is_available"`
+	HealthState  HealthState  `json:"health_state,omitempty"`
+	CircuitState CircuitState `json:"circuit_state,omitempty"`
+	Reason       string       `json:"reason,omitempty"`
 }

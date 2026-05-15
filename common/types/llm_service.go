@@ -14,9 +14,16 @@ type RepositoryLite struct {
 // UpstreamConfig describes one upstream endpoint for a logical LLM model.
 // Weight is reserved for future weighted routing and defaults to 1 when omitted.
 type UpstreamConfig struct {
-	URL     string `json:"url"`
-	Weight  int    `json:"weight,omitempty"`
-	Enabled bool   `json:"enabled"`
+	ID                    int64  `json:"id,omitempty"`
+	URL                   string `json:"url"`
+	Weight                int    `json:"weight,omitempty"`
+	Enabled               bool   `json:"enabled"`
+	HealthCheckEnabled    bool   `json:"health_check_enabled"`
+	CircuitBreakerEnabled bool   `json:"circuit_breaker_enabled"`
+	// HealthState is populated for admin views from the health state table.
+	HealthState  string `json:"health_state,omitempty"`
+	// CircuitState is populated for admin views from the circuit state table.
+	CircuitState string `json:"circuit_state,omitempty"`
 	// ModelName overrides the upstream request model ID when this endpoint uses
 	// a provider-specific model identifier. It falls back to the logical model ID when omitted.
 	ModelName string `json:"model_name,omitempty"`
@@ -130,4 +137,36 @@ type CreatePromptPrefixReq struct {
 	ZH   string `json:"zh"`
 	EN   string `json:"en"`
 	Kind string `json:"kind"`
+}
+
+
+// CreateUpstreamReq is the request to add a new upstream to an existing LLM config.
+type CreateUpstreamReq struct {
+	LLMConfigID           int64            `json:"llm_config_id" binding:"required"`
+	URL                   string           `json:"url" binding:"required"`
+	Weight                int              `json:"weight,omitempty"`
+	Enabled               bool             `json:"enabled"`
+	ModelName             string           `json:"model_name,omitempty"`
+	AuthHeader            string           `json:"auth_header,omitempty"`
+	Provider              string           `json:"provider,omitempty"`
+	HealthCheckEnabled    bool             `json:"health_check_enabled"`
+	CircuitBreakerEnabled bool             `json:"circuit_breaker_enabled"`
+	LimitPolicy           *UsageLimitPolicy `json:"limit_policy,omitempty"`
+	Tags                  map[string]string `json:"tags,omitempty"`
+}
+
+// UpdateUpstreamReq is the request to update an existing upstream.
+// Only non-nil fields will be updated.
+type UpdateUpstreamReq struct {
+	ID                    int64             `json:"id"`
+	URL                   *string           `json:"url"`
+	Weight                *int              `json:"weight"`
+	Enabled               *bool             `json:"enabled"`
+	ModelName             *string           `json:"model_name"`
+	AuthHeader            *string           `json:"auth_header"`
+	Provider              *string           `json:"provider"`
+	HealthCheckEnabled    *bool             `json:"health_check_enabled"`
+	CircuitBreakerEnabled *bool             `json:"circuit_breaker_enabled"`
+	LimitPolicy           **UsageLimitPolicy `json:"limit_policy"`
+	Tags                  *map[string]string `json:"tags"`
 }

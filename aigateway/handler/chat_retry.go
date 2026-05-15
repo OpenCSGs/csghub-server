@@ -159,59 +159,52 @@ func sessionKeyDigest(sessionKey string) string {
 }
 
 func normalizeChatMaxFallbackAttempts(maxFallbackAttempts int) int {
-	if maxFallbackAttempts < 0 {
+	if maxFallbackAttempts <= 0 {
 		return defaultChatMaxFallbackAttempts
 	}
 	return maxFallbackAttempts
 }
 
-func buildChatAttemptTargets(primaryTarget string, defaultModelName string, endpoints []commontypes.UpstreamConfig, maxFallbackAttempts int) []chatAttemptTarget {
-	primaryEndpoint := commontypes.UpstreamConfig{URL: strings.TrimSpace(primaryTarget)}
-	for _, endpoint := range endpoints {
-		if strings.TrimSpace(endpoint.URL) == strings.TrimSpace(primaryTarget) {
-			primaryEndpoint = endpoint
+func buildChatAttemptTargets(primary commontypes.UpstreamConfig, endpoints []commontypes.UpstreamConfig, maxFallbackAttempts int) []chatAttemptTarget {
+	primaryURL := strings.TrimSpace(primary.URL)
+	primary.URL = primaryURL
+	targets := []chatAttemptTarget{{
+		Upstream: primary,
+	}}
+
+	// Collect remaining endpoints as fallback candidates, excluding
+	// the primary by ID (not URL — same URL with different ModelName
+	// is a valid fallback).
+	candidates := collectFallbackCandidates(primary.ID, endpoints)
+	maxTargets := maxFallbackAttempts + 1 // +1 for the primary entry
+	for _, c := range candidates {
+		if len(targets) >= maxTargets {
 			break
 		}
-	}
-	targets := []chatAttemptTarget{{
-		Target:    strings.TrimSpace(primaryTarget),
-		Endpoint:  primaryEndpoint,
-		ModelName: resolveEndpointModelName(defaultModelName, primaryEndpoint),
-	}}
-	fallbacks := pickFallbackEndpoints(primaryTarget, defaultModelName, endpoints)
-	if len(fallbacks) == 0 || maxFallbackAttempts == 0 {
-		return targets
-	}
-
-	targets = append(targets, fallbacks...)
-	maxTargets := normalizeChatMaxFallbackAttempts(maxFallbackAttempts) + 1
-	if len(targets) > maxTargets {
-		targets = targets[:maxTargets]
+		targets = append(targets, c)
 	}
 	return targets
 }
 
-func pickFallbackEndpoints(primaryTarget string, defaultModelName string, endpoints []commontypes.UpstreamConfig) []chatAttemptTarget {
-	primaryTarget = strings.TrimSpace(primaryTarget)
-	candidates := make([]chatAttemptTarget, 0, len(endpoints))
+// collectFallbackCandidates returns sorted endpoints excluding the primary
+// (matched by ID) and deduplicating by URL.
+func collectFallbackCandidates(primaryID int64, endpoints []commontypes.UpstreamConfig) []chatAttemptTarget {
 	seen := make(map[string]struct{}, len(endpoints))
-	for _, endpoint := range endpoints {
-		url := strings.TrimSpace(endpoint.URL)
-		if url == "" || !endpoint.Enabled || url == primaryTarget {
+	candidates := make([]chatAttemptTarget, 0, len(endpoints))
+	for _, ep := range endpoints {
+		url := strings.TrimSpace(ep.URL)
+		if url == "" || ep.ID == primaryID {
 			continue
 		}
 		if _, ok := seen[url]; ok {
 			continue
 		}
 		seen[url] = struct{}{}
-		candidates = append(candidates, chatAttemptTarget{
-			Target:    url,
-			Endpoint:  endpoint,
-			ModelName: resolveEndpointModelName(defaultModelName, endpoint),
-		})
+		ep.URL = url
+		candidates = append(candidates, chatAttemptTarget{Upstream: ep})
 	}
 	sort.Slice(candidates, func(i, j int) bool {
-		return candidates[i].Target < candidates[j].Target
+		return candidates[i].Upstream.URL < candidates[j].Upstream.URL
 	})
 	return candidates
 }

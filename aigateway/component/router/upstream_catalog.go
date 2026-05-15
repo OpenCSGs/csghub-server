@@ -1,4 +1,4 @@
-package component
+package router
 
 import (
 	"strings"
@@ -6,7 +6,7 @@ import (
 	commontypes "opencsg.com/csghub-server/common/types"
 )
 
-func normalizeUpstreamCatalog(apiEndpoint string, upstreams []commontypes.UpstreamConfig) []commontypes.UpstreamConfig {
+func NormalizeUpstreamCatalog(apiEndpoint string, upstreams []commontypes.UpstreamConfig) []commontypes.UpstreamConfig {
 	if len(upstreams) == 0 && strings.TrimSpace(apiEndpoint) != "" {
 		upstreams = []commontypes.UpstreamConfig{
 			{
@@ -32,7 +32,7 @@ func normalizeUpstreamCatalog(apiEndpoint string, upstreams []commontypes.Upstre
 	return normalized
 }
 
-func firstEnabledUpstream(upstreams []commontypes.UpstreamConfig) string {
+func FirstEnabledUpstream(upstreams []commontypes.UpstreamConfig) string {
 	for _, upstream := range upstreams {
 		if upstream.Enabled && strings.TrimSpace(upstream.URL) != "" {
 			return upstream.URL

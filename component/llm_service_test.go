@@ -6,7 +6,9 @@ import (
 	"math"
 	"testing"
 
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	mockdatabase "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/tests"
 	"opencsg.com/csghub-server/common/types"
@@ -15,20 +17,20 @@ import (
 func TestLLMServiceComponent_CreateLLMConfig(t *testing.T) {
 	ctx := context.TODO()
 	stores := tests.NewMockStores(t)
+	upstreamStore := mockdatabase.NewMockUpstreamStore(t)
+	upstreamStore.EXPECT().Create(ctx, mock.Anything).Return(nil).Maybe()
 	mc := &llmServiceComponentImpl{
 		llmConfigStore:    stores.LLMConfig,
 		promptPrefixStore: stores.PromptPrefix,
+		upstreamStore:     upstreamStore,
 	}
 	req := &types.CreateLLMConfigReq{
-		ModelName:   "new-model",
-		ApiEndpoint: "http://new.endpoint",
+		ModelName: "new-model",
+		Type:      16,
+		Enabled:   true,
 		Upstreams: []types.UpstreamConfig{
-			{URL: "http://new.endpoint", Enabled: true, Weight: 1},
+			{URL: "http://upstream.example.com/v1", Enabled: true, Weight: 1},
 		},
-		AuthHeader: "Bearer token",
-		Type:       16,
-		Enabled:    true,
-		Provider:   "test-provider",
 		RoutingPolicy: types.RoutingPolicy{
 			Strategy:      "session_hash",
 			SessionHeader: "X-Session-ID",
@@ -39,14 +41,8 @@ func TestLLMServiceComponent_CreateLLMConfig(t *testing.T) {
 	dbLLMConfig := &database.LLMConfig{
 		ID:          123,
 		ModelName:   "new-model",
-		ApiEndpoint: "http://new.endpoint",
-		Upstreams: []types.UpstreamConfig{
-			{URL: "http://new.endpoint", Enabled: true, Weight: 1},
-		},
-		AuthHeader: "Bearer token",
 		Type:       16,
 		Enabled:    true,
-		Provider:   "test-provider",
 		RoutingPolicy: types.RoutingPolicy{
 			Strategy:      "session_hash",
 			SessionHeader: "X-Session-ID",
@@ -56,14 +52,8 @@ func TestLLMServiceComponent_CreateLLMConfig(t *testing.T) {
 	}
 	stores.LLMConfigMock().EXPECT().Create(ctx, database.LLMConfig{
 		ModelName:   "new-model",
-		ApiEndpoint: "http://new.endpoint",
-		Upstreams: []types.UpstreamConfig{
-			{URL: "http://new.endpoint", Enabled: true, Weight: 1},
-		},
-		AuthHeader: "Bearer token",
 		Type:       16,
 		Enabled:    true,
-		Provider:   "test-provider",
 		RoutingPolicy: types.RoutingPolicy{
 			Strategy:      "session_hash",
 			SessionHeader: "X-Session-ID",
@@ -121,8 +111,6 @@ func TestLLMServiceComponent_IndexLLMConfig(t *testing.T) {
 	dbLLMConfig := &database.LLMConfig{
 		ID:          123,
 		ModelName:   "new-model",
-		ApiEndpoint: "http://new.endpoint",
-		AuthHeader:  "Bearer token",
 		Type:        666,
 		Enabled:     true,
 	}
@@ -159,15 +147,15 @@ func TestLLMServiceComponent_IndexPromptPrefix(t *testing.T) {
 func TestLLMServiceComponent_UpdateLLMConfig(t *testing.T) {
 	ctx := context.TODO()
 	stores := tests.NewMockStores(t)
+	upstreamStore := mockdatabase.NewMockUpstreamStore(t)
+	upstreamStore.EXPECT().ListByLLMConfigID(ctx, int64(123)).Return([]*database.Upstream{}, nil).Maybe()
 	mc := &llmServiceComponentImpl{
 		llmConfigStore:    stores.LLMConfig,
 		promptPrefixStore: stores.PromptPrefix,
+		upstreamStore:     upstreamStore,
 	}
 	newName := "new-model"
 	metadata := map[string]any{"tasks": []any{"text-to-image"}}
-	endpoints := []types.UpstreamConfig{
-		{URL: "http://new-model.endpoint", Enabled: true, Weight: 1},
-	}
 	routingPolicy := types.RoutingPolicy{
 		Strategy:      "session_hash",
 		SessionHeader: "X-Session-ID",
@@ -176,14 +164,12 @@ func TestLLMServiceComponent_UpdateLLMConfig(t *testing.T) {
 	req := &types.UpdateLLMConfigReq{
 		ID:            123,
 		ModelName:     &newName,
-		Upstreams:     &endpoints,
 		RoutingPolicy: &routingPolicy,
 		Metadata:      &metadata,
 	}
 	dbLLMConfig := &database.LLMConfig{
 		ID:            123,
 		ModelName:     newName,
-		Upstreams:     endpoints,
 		RoutingPolicy: routingPolicy,
 		Metadata:      metadata,
 	}
@@ -191,8 +177,6 @@ func TestLLMServiceComponent_UpdateLLMConfig(t *testing.T) {
 	stores.LLMConfigMock().EXPECT().Update(ctx, database.LLMConfig{
 		ID:            123,
 		ModelName:     newName,
-		ApiEndpoint:   "http://new-model.endpoint",
-		Upstreams:     endpoints,
 		RoutingPolicy: routingPolicy,
 		Metadata:      metadata,
 	}).Return(dbLLMConfig, nil)
@@ -203,25 +187,90 @@ func TestLLMServiceComponent_UpdateLLMConfig(t *testing.T) {
 	require.Equal(t, res.ModelName, "new-model")
 }
 
+func TestLLMServiceComponent_CreateUpstream(t *testing.T) {
+	ctx := context.TODO()
+	stores := tests.NewMockStores(t)
+	upstreamStore := mockdatabase.NewMockUpstreamStore(t)
+	upstreamStore.EXPECT().Create(ctx, mock.Anything).Return(nil).Maybe()
+	stores.LLMConfigMock().EXPECT().GetByID(ctx, int64(100)).Return(&database.LLMConfig{ID: 100}, nil)
+	mc := &llmServiceComponentImpl{
+		llmConfigStore:    stores.LLMConfig,
+		promptPrefixStore: stores.PromptPrefix,
+		upstreamStore:     upstreamStore,
+	}
+	req := &types.CreateUpstreamReq{
+		LLMConfigID: 100,
+		URL:          "http://upstream.example.com/v1",
+		Weight:       2,
+		Enabled:      true,
+		Provider:     "test-provider",
+	}
+	res, err := mc.CreateUpstream(ctx, req)
+	require.Nil(t, err)
+	require.NotNil(t, res)
+	require.Equal(t, "http://upstream.example.com/v1", res.URL)
+	require.Equal(t, 2, res.Weight)
+}
+
+func TestLLMServiceComponent_UpdateUpstream(t *testing.T) {
+	ctx := context.TODO()
+	stores := tests.NewMockStores(t)
+	upstreamStore := mockdatabase.NewMockUpstreamStore(t)
+	upstreamStore.EXPECT().GetByID(ctx, int64(10)).Return(&database.Upstream{
+		ID:          10,
+		LLMConfigID: 100,
+		URL:         "http://old-endpoint",
+		Weight:      1,
+		Enabled:     true,
+	}, nil)
+	upstreamStore.EXPECT().Update(ctx, mock.Anything).Return(nil).Maybe()
+	mc := &llmServiceComponentImpl{
+		llmConfigStore:    stores.LLMConfig,
+		promptPrefixStore: stores.PromptPrefix,
+		upstreamStore:     upstreamStore,
+	}
+	newURL := "http://new-endpoint"
+	newWeight := 3
+	req := &types.UpdateUpstreamReq{
+		ID:     10,
+		URL:    &newURL,
+		Weight: &newWeight,
+	}
+	res, err := mc.UpdateUpstream(ctx, req)
+	require.Nil(t, err)
+	require.NotNil(t, res)
+	require.Equal(t, int64(10), res.ID)
+	require.Equal(t, "http://new-endpoint", res.URL)
+	require.Equal(t, 3, res.Weight)
+}
+
+func TestLLMServiceComponent_DeleteUpstream(t *testing.T) {
+	ctx := context.TODO()
+	upstreamStore := mockdatabase.NewMockUpstreamStore(t)
+	upstreamStore.EXPECT().Delete(ctx, int64(10)).Return(nil)
+	mc := &llmServiceComponentImpl{
+		upstreamStore: upstreamStore,
+	}
+	err := mc.DeleteUpstream(ctx, 10)
+	require.Nil(t, err)
+}
+
 func TestLLMServiceComponent_validateLLMEndpointConfig(t *testing.T) {
 	mc := &llmServiceComponentImpl{}
 	testCases := []struct {
 		name        string
-		apiEndpoint string
 		upstreams   []types.UpstreamConfig
 		wantErr     bool
 		errContains string
 	}{
 		{
 			name:        "api_endpoint and upstreams are both empty",
-			apiEndpoint: "",
 			upstreams:   nil,
 			wantErr:     true,
-			errContains: "api_endpoint or upstreams must be provided",
+			errContains: "upstreams must be provided",
 		},
 		{
 			name:        "upstream url is empty",
-			apiEndpoint: "",
 			upstreams: []types.UpstreamConfig{
 				{URL: " ", Enabled: true},
 			},
@@ -230,7 +279,6 @@ func TestLLMServiceComponent_validateLLMEndpointConfig(t *testing.T) {
 		},
 		{
 			name:        "all upstreams disabled and api_endpoint empty",
-			apiEndpoint: "",
 			upstreams: []types.UpstreamConfig{
 				{URL: "http://a", Enabled: false},
 				{URL: "http://b", Enabled: false},
@@ -240,13 +288,12 @@ func TestLLMServiceComponent_validateLLMEndpointConfig(t *testing.T) {
 		},
 		{
 			name:        "api_endpoint provided without upstreams",
-			apiEndpoint: "http://primary",
 			upstreams:   nil,
-			wantErr:     false,
+			wantErr:     true,
+			errContains: "upstreams must be provided",
 		},
 		{
 			name:        "valid enabled upstream",
-			apiEndpoint: "",
 			upstreams: []types.UpstreamConfig{
 				{URL: "http://a", Enabled: true},
 			},
@@ -256,56 +303,13 @@ func TestLLMServiceComponent_validateLLMEndpointConfig(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			err := mc.validateLLMEndpointConfig(tc.apiEndpoint, tc.upstreams)
+			err := mc.validateLLMEndpointConfig(tc.upstreams)
 			if tc.wantErr {
 				require.Error(t, err)
 				require.ErrorContains(t, err, tc.errContains)
 				return
 			}
 			require.NoError(t, err)
-		})
-	}
-}
-
-func TestLLMServiceComponent_normalizePrimaryEndpoint(t *testing.T) {
-	mc := &llmServiceComponentImpl{}
-	testCases := []struct {
-		name        string
-		apiEndpoint string
-		upstreams   []types.UpstreamConfig
-		want        string
-	}{
-		{
-			name:        "keep api_endpoint when provided",
-			apiEndpoint: "http://primary",
-			upstreams: []types.UpstreamConfig{
-				{URL: "http://a", Enabled: true},
-			},
-			want: "http://primary",
-		},
-		{
-			name:        "pick first enabled upstream",
-			apiEndpoint: "",
-			upstreams: []types.UpstreamConfig{
-				{URL: "http://disabled", Enabled: false},
-				{URL: "http://enabled", Enabled: true},
-			},
-			want: "http://enabled",
-		},
-		{
-			name:        "return empty when no enabled upstream",
-			apiEndpoint: "",
-			upstreams: []types.UpstreamConfig{
-				{URL: "http://disabled", Enabled: false},
-			},
-			want: "",
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			got := mc.normalizePrimaryEndpoint(tc.apiEndpoint, tc.upstreams)
-			require.Equal(t, tc.want, got)
 		})
 	}
 }
@@ -341,9 +345,12 @@ func TestLLMServiceComponent_UpdatePromptPrefix(t *testing.T) {
 func TestLLMServiceComponent_DeleteLLMConfig(t *testing.T) {
 	ctx := context.TODO()
 	stores := tests.NewMockStores(t)
+	upstreamStore := mockdatabase.NewMockUpstreamStore(t)
+	upstreamStore.EXPECT().DeleteByLLMConfigID(ctx, int64(123)).Return(nil)
 	mc := &llmServiceComponentImpl{
 		llmConfigStore:    stores.LLMConfig,
 		promptPrefixStore: stores.PromptPrefix,
+		upstreamStore:     upstreamStore,
 	}
 	stores.LLMConfigMock().EXPECT().Delete(ctx, int64(123)).Return(nil)
 	err := mc.DeleteLLMConfig(ctx, int64(123))
@@ -388,7 +395,6 @@ func TestLLMServiceComponent_ListExternalLLMs(t *testing.T) {
 		ModelName:   "external-model",
 		Type:        typeVal,
 		Enabled:     true,
-		Provider:    "test-provider",
 		RepoID:      456,
 		Repo:        dbRepo,
 	}
@@ -439,7 +445,6 @@ func TestLLMServiceComponent_ListExternalLLMs_NoRepo(t *testing.T) {
 		ModelName:   "external-model-no-repo",
 		Type:        typeVal,
 		Enabled:     true,
-		Provider:    "test-provider",
 		RepoID:      0,
 		Repo:        nil,
 	}

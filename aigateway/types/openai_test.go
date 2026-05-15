@@ -28,8 +28,8 @@ func TestModelSerialization(t *testing.T) {
 			ImageID:       "test-image-id",
 		},
 		ExternalModelInfo: ExternalModelInfo{
-			AuthHead: "Bearer test-token",
 			Provider: "test-provider",
+			AuthHead: "Bearer test-token",
 		},
 		Endpoint:    "http://test-endpoint.com",
 		InternalUse: false,

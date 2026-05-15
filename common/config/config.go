@@ -450,6 +450,16 @@ type Config struct {
 		EnableLLMLog                   bool   `env:"OPENCSG_AIGATEWAY_LLMLOG_ENABLE" default:"true"`
 		ChatMaxFallbackAttempts        int    `env:"OPENCSG_AIGATEWAY_CHAT_MAX_FALLBACK_ATTEMPTS" default:"2"`
 		ModelIDFmt                     string `env:"OPENCSG_AIGATEWAY_MODEL_ID_FMT" default:"%s(%s)"`
+		HealthCheckEnabled             bool   `env:"OPENCSG_AIGATEWAY_HEALTH_CHECK_ENABLED" default:"true"`
+		HealthCheckL7APIEnabled        bool   `env:"OPENCSG_AIGATEWAY_HEALTH_CHECK_L7_API_ENABLED" default:"true"`
+		HealthCheckL7APIInterval       int    `env:"OPENCSG_AIGATEWAY_HEALTH_CHECK_L7_API_INTERVAL" default:"60"`
+		HealthCheckL7APITimeout        int    `env:"OPENCSG_AIGATEWAY_HEALTH_CHECK_L7_API_TIMEOUT" default:"5"`
+		HealthCheckConsecutiveFailures int    `env:"OPENCSG_AIGATEWAY_HEALTH_CHECK_CONSECUTIVE_FAILURES" default:"3"`
+		HealthCheckLatencyDegradedMs   int    `env:"OPENCSG_AIGATEWAY_HEALTH_CHECK_LATENCY_DEGRADED_MS" default:"5000"`
+		CircuitBreakerEnabled          bool   `env:"OPENCSG_AIGATEWAY_CIRCUIT_BREAKER_ENABLED" default:"true"`
+		CircuitBreakerFailureThreshold int    `env:"OPENCSG_AIGATEWAY_CIRCUIT_BREAKER_FAILURE_THRESHOLD" default:"3"`
+		CircuitBreakerOpenDuration     int    `env:"OPENCSG_AIGATEWAY_CIRCUIT_BREAKER_OPEN_DURATION" default:"30"`
+		CircuitBreakerHalfOpenMax      int    `env:"OPENCSG_AIGATEWAY_CIRCUIT_BREAKER_HALF_OPEN_MAX" default:"1"`
 	}
 
 	LLMLog struct {

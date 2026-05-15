@@ -64,6 +64,7 @@ type MockStores struct {
 	Member                 database.MemberStore
 	RepositoryStatistics   database.RepositoryStatisticsStore
 	InferenceArch          database.InferenceArchStore
+	Upstream               database.UpstreamStore
 }
 
 func NewMockStores(t interface {
@@ -128,6 +129,7 @@ func NewMockStores(t interface {
 		Member:                 mockdb.NewMockMemberStore(t),
 		RepositoryStatistics:   mockdb.NewMockRepositoryStatisticsStore(t),
 		InferenceArch:          mockdb.NewMockInferenceArchStore(t),
+		Upstream:               mockdb.NewMockUpstreamStore(t),
 	}
 }
 
@@ -357,4 +359,8 @@ func (s *MockStores) RepositoryStatisticsMock() *mockdb.MockRepositoryStatistics
 
 func (s *MockStores) InferenceArchMock() *mockdb.MockInferenceArchStore {
 	return s.InferenceArch.(*mockdb.MockInferenceArchStore)
+}
+
+func (s *MockStores) UpstreamMock() *mockdb.MockUpstreamStore {
+	return s.Upstream.(*mockdb.MockUpstreamStore)
 }

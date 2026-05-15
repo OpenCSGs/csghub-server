@@ -12,11 +12,14 @@ import (
 	"strings"
 	"time"
 
+	"opencsg.com/csghub-server/aigateway/component/router"
+
 	"github.com/gin-gonic/gin"
 	"github.com/openai/openai-go/v3"
 	"opencsg.com/csghub-server/aigateway/component"
 	"opencsg.com/csghub-server/aigateway/component/adapter/text2image"
 	"opencsg.com/csghub-server/aigateway/component/adapter/text2video"
+	"opencsg.com/csghub-server/aigateway/component/availability"
 	"opencsg.com/csghub-server/aigateway/token"
 	"opencsg.com/csghub-server/aigateway/types"
 	"opencsg.com/csghub-server/api/httpbase"
@@ -85,7 +88,19 @@ func NewOpenAIHandlerFromConfig(config *config.Config) (OpenAIHandler, error) {
 	storage, _ := component.NewStorage(config)
 	whitelistRule := database.NewRepositoryFileCheckRuleStore()
 	aiGenerationStore := database.NewAIGenerationStore()
-	return newOpenAIHandler(modelService, repoComp, modComponent, clusterComp, token.NewCounterFactory(), text2image.NewRegistry(), text2video.NewRegistry(), config, storage, whitelistRule, aiGenerationStore), nil
+	handler := newOpenAIHandler(modelService, repoComp, modComponent, clusterComp, token.NewCounterFactory(), text2image.NewRegistry(), text2video.NewRegistry(), config, storage, whitelistRule, aiGenerationStore)
+
+	availabilityManager, avErr := availability.NewAvailabilityManagerFromConfig(config)
+	if avErr != nil {
+		slog.Warn("failed to initialize availability manager", "error", avErr)
+		return handler, nil
+	}
+	if startErr := availabilityManager.Start(context.Background()); startErr != nil {
+		slog.Warn("failed to start availability manager", "error", startErr)
+	} else {
+		handler.availabilityManager = availabilityManager
+	}
+	return handler, nil
 }
 
 func newOpenAIHandler(
@@ -115,7 +130,7 @@ func newOpenAIHandler(
 		aiGenerationStore:          aiGenerationStore,
 		sensitivePolicy:            component.NewSensitivePolicy(modComponent, whitelistRule),
 		llmLogPublisher:            component.NewLLMLogPublisher(),
-		sessionRouter:              component.NewSessionRouter(),
+		sessionRouter:              router.NewSessionRouter(),
 		chatAttemptFailureReporter: noopChatAttemptFailureReporter{},
 	}
 }
@@ -204,7 +219,8 @@ type OpenAIHandlerImpl struct {
 	aiGenerationStore          database.AIGenerationStore
 	sensitivePolicy            component.SensitivePolicy
 	llmLogPublisher            component.LLMLogPublisher
-	sessionRouter              component.SessionRouter
+	sessionRouter              router.SessionRouter
+	availabilityManager        availability.AvailabilityManager
 	chatAttemptFailureReporter ChatAttemptFailureReporter
 }
 
@@ -258,6 +274,7 @@ func (h *OpenAIHandlerImpl) ListModels(c *gin.Context) {
 			}})
 		return
 	}
+
 	c.PureJSON(http.StatusOK, resp)
 }
 
@@ -348,7 +365,6 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 		handleModelTargetError(c, c.Request.Context(), modelID, "failed to get model target address", err)
 		return
 	}
-
 	chatReq.Model = modelTarget.ModelName
 	if chatReq.Stream {
 		c.Writer.Header().Set("Content-Type", "text/event-stream")
@@ -502,19 +518,19 @@ func (h *OpenAIHandlerImpl) executeChatWithFallback(
 	primaryStreamStarted := primaryWriter.StreamStarted()
 	primaryRetryable := shouldRetryChatAttempt(primaryStatusCode, primaryStreamStarted)
 
-	if shouldReportChatAttemptFailure(primaryStatusCode) {
-		h.reportChatAttemptFailure(c.Request.Context(), ChatAttemptFailureEvent{
-			Phase:          chatAttemptPhasePrimary,
-			ModelID:        modelTarget.Model.ID,
-			ModelName:      modelTarget.ModelName,
-			Provider:       modelTarget.Model.Provider,
-			Endpoint:       modelTarget.Endpoint.URL,
-			Target:         modelTarget.Target,
-			SessionKeyHash: modelTarget.SessionKeyHash,
-			StatusCode:     primaryStatusCode,
-			Retryable:      primaryRetryable,
-		})
-	}
+	h.reportChatAttemptResult(c.Request.Context(), chatAttemptReportParams{
+		UpstreamID:     modelTarget.Upstream.ID,
+		Phase:          chatAttemptPhasePrimary,
+		RequestModelID: modelID,
+		ModelName:      modelTarget.ModelName,
+		Provider:       modelTarget.Model.Provider,
+		Endpoint:       modelTarget.Upstream.URL,
+		Target:         modelTarget.Target,
+		SessionKeyHash: modelTarget.SessionKeyHash,
+		StatusCode:     primaryStatusCode,
+		Retryable:      primaryRetryable,
+		Model:          modelTarget.Model,
+	})
 
 	hasFallbacks := len(modelTarget.AttemptTargets) > 1
 	if !primaryRetryable || !hasFallbacks {
@@ -616,20 +632,19 @@ func (h *OpenAIHandlerImpl) retryChatWithFallback(c *gin.Context, w CommonRespon
 		statusCode := retryWriter.StatusCode()
 		streamStarted := retryWriter.StreamStarted()
 		retryable := shouldRetryChatAttempt(statusCode, streamStarted)
-		if shouldReportChatAttemptFailure(statusCode) {
-			h.reportChatAttemptFailure(c.Request.Context(), ChatAttemptFailureEvent{
-				Phase:           chatAttemptPhaseFallback,
-				ModelID:         modelTarget.Model.ID,
-				ModelName:       modelTarget.ModelName,
-				Provider:        modelTarget.Model.Provider,
-				Endpoint:        modelTarget.Endpoint.URL,
-				Target:          modelTarget.Target,
-				SessionKeyHash:  modelTarget.SessionKeyHash,
-				StatusCode:      statusCode,
-				Retryable:       retryable,
-				FallbackAttempt: idx + 1,
-			})
-		}
+		h.reportChatAttemptResult(c.Request.Context(), chatAttemptReportParams{
+			UpstreamID:      modelTarget.Upstream.ID,
+			Phase:           chatAttemptPhaseFallback,
+			ModelName:       modelTarget.ModelName,
+			Provider:        modelTarget.Model.Provider,
+			Endpoint:        modelTarget.Upstream.URL,
+			Target:          modelTarget.Target,
+			SessionKeyHash:  modelTarget.SessionKeyHash,
+			StatusCode:      statusCode,
+			Retryable:       retryable,
+			FallbackAttempt: idx + 1,
+			Model:           modelTarget.Model,
+		})
 		isLastFallback := idx == len(fallbackTargets)-1
 		// Stop when this attempt has produced a final result for the caller:
 		// - on the last fallback, replay any buffered 502/503/504 response because there is no next target;
@@ -640,6 +655,19 @@ func (h *OpenAIHandlerImpl) retryChatWithFallback(c *gin.Context, w CommonRespon
 		}
 	}
 	return nil
+}
+
+func resolveFailureEventModelID(requestModelID string, model *types.Model) string {
+	if trimmed := strings.TrimSpace(requestModelID); trimmed != "" {
+		return trimmed
+	}
+	if model == nil {
+		return ""
+	}
+	if trimmed := strings.TrimSpace(model.FormatModelID); trimmed != "" {
+		return trimmed
+	}
+	return strings.TrimSpace(model.ID)
 }
 
 // Embedding godoc

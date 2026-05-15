@@ -35,6 +35,9 @@ func TestIndustryTagComponent_IdentifyIndustryTags(t *testing.T) {
 		ModelName:   "mock",
 		ApiEndpoint: "http://llm",
 		AuthHeader:  "{}",
+		Upstreams: []database.Upstream{
+			{URL: "http://llm", Enabled: true, AuthHeader: "{}"},
+		},
 	}, nil)
 	llmClient.EXPECT().Chat(ctx, "http://llm", "", map[string]string{}, types.LLMReqBody{
 		Model: "mock",
@@ -94,6 +97,9 @@ func TestIndustryTagComponent_RefreshRepoAutoIndustryTags(t *testing.T) {
 		ModelName:   "mock",
 		ApiEndpoint: "http://llm",
 		AuthHeader:  "{}",
+		Upstreams: []database.Upstream{
+			{URL: "http://llm", Enabled: true, AuthHeader: "{}"},
+		},
 	}, nil)
 	llmClient.EXPECT().Chat(ctx, "http://llm", "", map[string]string{}, types.LLMReqBody{
 		Model: "mock",
@@ -147,6 +153,9 @@ func TestIndustryTagComponent_IdentifyIndustryTags_ModelRepo(t *testing.T) {
 		ModelName:   "mock",
 		ApiEndpoint: "http://llm",
 		AuthHeader:  "{}",
+		Upstreams: []database.Upstream{
+			{URL: "http://llm", Enabled: true, AuthHeader: "{}"},
+		},
 	}, nil)
 	llmClient.EXPECT().Chat(ctx, "http://llm", "", map[string]string{}, types.LLMReqBody{
 		Model: "mock",
@@ -200,6 +209,9 @@ func TestIndustryTagComponent_IdentifyIndustryTags_ChineseDescriptionMatchesEngl
 		ModelName:   "mock",
 		ApiEndpoint: "http://llm",
 		AuthHeader:  "{}",
+		Upstreams: []database.Upstream{
+			{URL: "http://llm", Enabled: true, AuthHeader: "{}"},
+		},
 	}, nil)
 	llmClient.EXPECT().Chat(ctx, "http://llm", "", map[string]string{}, types.LLMReqBody{
 		Model: "mock",

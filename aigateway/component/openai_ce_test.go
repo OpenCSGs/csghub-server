@@ -373,24 +373,21 @@ func TestOpenAIComponent_ListModels_CacheUsesOriginalIDWhenFormatModelIDApplied(
 			{
 				ID:                 1,
 				ModelName:          "test-model-1",
-				OfficialName:       "Test Model 1",
-				ApiEndpoint:        "http://test-endpoint-1.com",
-				AuthHeader:         "Bearer test-token-1",
-				Provider:           "OpenAI",
 				Type:               16,
 				Enabled:            true,
+				Provider:           "OpenAI",
+				ApiEndpoint:        "http://test-endpoint-1.com",
+				AuthHeader:         "Bearer test-token-1",
 				Metadata:           map[string]any{types.MetaKeyTasks: []any{"text-generation"}},
 				NeedSensitiveCheck: true,
 			},
 			{
 				ID:                 2,
 				ModelName:          "test-model-2",
-				OfficialName:       "Test Model 2",
-				ApiEndpoint:        "http://test-endpoint-2.com",
-				AuthHeader:         "Bearer test-token-2",
-				Provider:           "Anthropic",
 				Type:               16,
 				Enabled:            true,
+				Provider:           "Anthropic",
+				ApiEndpoint:        "http://test-endpoint-2.com",
 				Metadata:           map[string]any{types.MetaKeyTasks: []any{"text-generation"}},
 				NeedSensitiveCheck: true,
 			},
@@ -525,6 +522,51 @@ func TestOpenAIComponent_GetModelByID(t *testing.T) {
 		assert.Nil(t, model)
 	})
 
+	t.Run("cache key exists but field miss should fallback to reload", func(t *testing.T) {
+		user := &database.User{
+			ID:       1,
+			Username: "testuser",
+		}
+		mockUserStore.EXPECT().FindByUsername(mock.Anything, "testuser").
+			Return(*user, nil).Once()
+		mockCache.EXPECT().Exists(mock.Anything, modelCacheKey).
+			Return(1, nil).Once()
+		mockCache.EXPECT().HGet(mock.Anything, modelCacheKey, "model-reload(OpenAI)").
+			Return("", redis.Nil).Once()
+		mockDeployStore.EXPECT().RunningVisibleToUser(mock.Anything, int64(1)).Return([]database.Deploy{}, nil).Once()
+		searchType := 16
+		enabled := true
+		search := &commontypes.SearchLLMConfig{
+			Type:    &searchType,
+			Enabled: &enabled,
+		}
+		mockLLMConfigStore.EXPECT().Index(mock.Anything, 50, 1, search).
+			Return([]*database.LLMConfig{
+				{
+					ID:        1,
+					ModelName: "model-reload",
+					Type:      16,
+					Enabled:   true,
+					Provider:  "OpenAI",
+				},
+			}, 1, nil).Once()
+		var wg sync.WaitGroup
+		wg.Add(1)
+		mockCache.EXPECT().HSet(mock.Anything, modelCacheKey, "model-reload(OpenAI)", mock.Anything).
+			Return(nil).Once()
+		mockCache.EXPECT().Expire(mock.Anything, modelCacheKey, modelCacheTTL).
+			RunAndReturn(func(ctx context.Context, s string, d time.Duration) error {
+				wg.Done()
+				return nil
+			}).Once()
+
+		model, err := comp.GetModelByID(context.Background(), "testuser", "model-reload(OpenAI)")
+		assert.NoError(t, err)
+		assert.NotNil(t, model)
+		assert.Equal(t, "model-reload", model.ID)
+		wg.Wait()
+	})
+
 	t.Run("model found", func(t *testing.T) {
 		user := &database.User{
 			ID:       1,
@@ -554,12 +596,11 @@ func TestOpenAIComponent_GetModelByID(t *testing.T) {
 		deploys[0].CreatedAt = now
 		expectModel := types.Model{
 			BaseModel: types.BaseModel{
-				ID:           "model1:svc1",
-				OwnedBy:      "testuser",
-				Object:       "model",
-				Created:      deploys[0].CreatedAt.Unix(),
-				Task:         "text-generation",
-				OfficialName: "model1",
+				ID:      "model1:svc1",
+				OwnedBy: "testuser",
+				Object:  "model",
+				Created: deploys[0].CreatedAt.Unix(),
+				Task:    "text-generation",
 				Metadata: map[string]any{
 					types.MetaKeyLLMType: types.ProviderTypeInference,
 				},
@@ -599,13 +640,11 @@ func TestOpenAIComponent_GetModelByID(t *testing.T) {
 		mockLLMConfigStore.EXPECT().Index(mock.Anything, 50, 1, search).
 			Return([]*database.LLMConfig{
 				{
-					ID:          1,
-					ModelName:   "test-model-1",
-					ApiEndpoint: "http://test-endpoint-1.com",
-					AuthHeader:  "Bearer test-token-1",
-					Provider:    "OpenAI",
-					Type:        16,
-					Enabled:     true,
+					ID:        1,
+					ModelName: "test-model-1",
+					Type:      16,
+					Enabled:   true,
+					Provider:  "OpenAI",
 				},
 			}, 1, nil).Once()
 
@@ -635,10 +674,9 @@ func TestOpenAIComponent_saveModelsToCache(t *testing.T) {
 		models := []types.Model{
 			{
 				BaseModel: types.BaseModel{
-					ID:           "base-model-id",
-					Object:       "model",
-					OwnedBy:      "openai",
-					OfficialName: "gpt-4o",
+					ID:      "base-model-id",
+					Object:  "model",
+					OwnedBy: "openai",
 					Metadata: map[string]any{
 						types.MetaKeyLLMType: types.ProviderTypeExternalLLM,
 					},
@@ -691,10 +729,9 @@ func TestOpenAIComponent_loadModelFromCache(t *testing.T) {
 
 		cachedModel := types.Model{
 			BaseModel: types.BaseModel{
-				ID:           "test-model",
-				Object:       "model",
-				OwnedBy:      "OpenAI",
-				OfficialName: "test-model",
+				ID:      "test-model",
+				Object:  "model",
+				OwnedBy: "OpenAI",
 				Metadata: map[string]any{
 					types.MetaKeyLLMType: types.ProviderTypeExternalLLM,
 				},
@@ -720,6 +757,19 @@ func TestOpenAIComponent_loadModelFromCache(t *testing.T) {
 		assert.Equal(t, "test-model", model.ID)
 		assert.Equal(t, "OpenAI", model.Provider)
 		assert.Equal(t, "Bearer test-token", model.AuthHead)
+	})
+
+	t.Run("hget redis nil returns cache miss without error", func(t *testing.T) {
+		mockCache := mockcache.NewMockRedisClient(t)
+		comp := &openaiComponentImpl{modelListCache: mockCache}
+
+		mockCache.EXPECT().Exists(mock.Anything, modelCacheKey).Return(1, nil).Once()
+		mockCache.EXPECT().HGet(mock.Anything, modelCacheKey, "test-model(OpenAI)").
+			Return("", redis.Nil).Once()
+
+		model, err := comp.loadModelFromCache(context.Background(), "test-model(OpenAI)")
+		require.NoError(t, err)
+		assert.Nil(t, model)
 	})
 }
 
@@ -774,13 +824,11 @@ func TestOpenAIComponent_ExtGetAvailableModels_SinglePage(t *testing.T) {
 	}
 	mockModels := []*database.LLMConfig{
 		{
-			ID:          1,
-			ModelName:   "test-model-1",
-			ApiEndpoint: "http://test-endpoint-1.com",
-			AuthHeader:  "Bearer test-token-1",
-			Provider:    "OpenAI",
-			Type:        16,
-			Enabled:     true,
+			ID:        1,
+			ModelName: "test-model-1",
+			Type:      16,
+			Enabled:   true,
+			Provider:  "OpenAI",
 		},
 	}
 	user := &database.User{

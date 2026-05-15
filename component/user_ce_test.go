@@ -45,9 +45,8 @@ func TestUserComponent_ListDeploys(t *testing.T) {
 	require.Equal(t, []types.DeployRequest{
 		{
 			Path: "foo/bar", Status: "Pending", GitPath: "models_foo/bar", Hardware: `{"memory": "foo"}`,
-			RepoID: 123, SvcName: "svc", Endpoint: "endpoint", ClusterID: "cluster",
-			Provider: "foo", RepoTag: "tag1",
-			ResourceType: "cpu",
+			RepoID: 123, SvcName: "svc", Endpoint: "endpoint", ClusterID: "cluster", RepoTag: "tag1",
+			ResourceType: "cpu", Provider: "foo",
 		},
 	}, data)
 

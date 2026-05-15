@@ -92,7 +92,6 @@ func TestClusterComponent_GetClusterUsages(t *testing.T) {
 		Status:    types.ClusterStatusRunning,
 		Region:    "us-west-1",
 		Zone:      "zone-a",
-		Provider:  "aws",
 		Resources: []types.NodeResourceInfo{
 			{
 				NodeName:   "node-1",
@@ -118,7 +117,6 @@ func TestClusterComponent_GetClusterUsages(t *testing.T) {
 		Status:    types.ClusterStatusRunning,
 		Region:    "us-east-1",
 		Zone:      "zone-b",
-		Provider:  "gcp",
 		Resources: []types.NodeResourceInfo{
 			{
 				NodeName:   "node-2",

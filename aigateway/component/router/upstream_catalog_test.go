@@ -1,4 +1,4 @@
-package component
+package router
 
 import (
 	"testing"
@@ -158,7 +158,7 @@ func TestNormalizeUpstreamCatalog(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := normalizeUpstreamCatalog(tt.apiEndpoint, tt.upstreams)
+			result := NormalizeUpstreamCatalog(tt.apiEndpoint, tt.upstreams)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -205,7 +205,7 @@ func TestFirstEnabledUpstream(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := firstEnabledUpstream(tt.upstreams)
+			result := FirstEnabledUpstream(tt.upstreams)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
