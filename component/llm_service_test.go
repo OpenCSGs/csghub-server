@@ -39,10 +39,10 @@ func TestLLMServiceComponent_CreateLLMConfig(t *testing.T) {
 		Metadata: map[string]any{"tasks": []any{"text-generation"}},
 	}
 	dbLLMConfig := &database.LLMConfig{
-		ID:          123,
-		ModelName:   "new-model",
-		Type:       16,
-		Enabled:    true,
+		ID:        123,
+		ModelName: "new-model",
+		Type:      16,
+		Enabled:   true,
 		RoutingPolicy: types.RoutingPolicy{
 			Strategy:      "session_hash",
 			SessionHeader: "X-Session-ID",
@@ -51,9 +51,9 @@ func TestLLMServiceComponent_CreateLLMConfig(t *testing.T) {
 		Metadata: map[string]any{"tasks": []any{"text-generation"}},
 	}
 	stores.LLMConfigMock().EXPECT().Create(ctx, database.LLMConfig{
-		ModelName:   "new-model",
-		Type:       16,
-		Enabled:    true,
+		ModelName: "new-model",
+		Type:      16,
+		Enabled:   true,
 		RoutingPolicy: types.RoutingPolicy{
 			Strategy:      "session_hash",
 			SessionHeader: "X-Session-ID",
@@ -109,16 +109,16 @@ func TestLLMServiceComponent_IndexLLMConfig(t *testing.T) {
 		Keyword: "",
 	}
 	dbLLMConfig := &database.LLMConfig{
-		ID:          123,
-		ModelName:   "new-model",
-		Type:        666,
-		Enabled:     true,
+		ID:        123,
+		ModelName: "new-model",
+		Type:      666,
+		Enabled:   true,
 	}
 	stores.LLMConfigMock().EXPECT().Index(ctx, per, page, search).Return([]*database.LLMConfig{dbLLMConfig}, 1, nil)
 	res, total, err := mc.IndexLLMConfig(ctx, per, page, search)
 	require.Nil(t, err)
 	require.NotNil(t, res)
-	require.Equal(t, res, []*database.LLMConfig{dbLLMConfig})
+	require.Equal(t, []*types.LLMConfig{{ID: 123, ModelName: "new-model", OfficialName: "new-model", Type: 666, Enabled: true, IsAvailable: true, Upstreams: []types.UpstreamConfig{}}}, res)
 	require.Equal(t, total, 1)
 }
 
@@ -200,10 +200,10 @@ func TestLLMServiceComponent_CreateUpstream(t *testing.T) {
 	}
 	req := &types.CreateUpstreamReq{
 		LLMConfigID: 100,
-		URL:          "http://upstream.example.com/v1",
-		Weight:       2,
-		Enabled:      true,
-		Provider:     "test-provider",
+		URL:         "http://upstream.example.com/v1",
+		Weight:      2,
+		Enabled:     true,
+		Provider:    "test-provider",
 	}
 	res, err := mc.CreateUpstream(ctx, req)
 	require.Nil(t, err)
@@ -270,7 +270,7 @@ func TestLLMServiceComponent_validateLLMEndpointConfig(t *testing.T) {
 			errContains: "upstreams must be provided",
 		},
 		{
-			name:        "upstream url is empty",
+			name: "upstream url is empty",
 			upstreams: []types.UpstreamConfig{
 				{URL: " ", Enabled: true},
 			},
@@ -278,7 +278,7 @@ func TestLLMServiceComponent_validateLLMEndpointConfig(t *testing.T) {
 			errContains: "upstream url cannot be empty",
 		},
 		{
-			name:        "all upstreams disabled and api_endpoint empty",
+			name: "all upstreams disabled and api_endpoint empty",
 			upstreams: []types.UpstreamConfig{
 				{URL: "http://a", Enabled: false},
 				{URL: "http://b", Enabled: false},
@@ -293,7 +293,7 @@ func TestLLMServiceComponent_validateLLMEndpointConfig(t *testing.T) {
 			errContains: "upstreams must be provided",
 		},
 		{
-			name:        "valid enabled upstream",
+			name: "valid enabled upstream",
 			upstreams: []types.UpstreamConfig{
 				{URL: "http://a", Enabled: true},
 			},
@@ -391,12 +391,12 @@ func TestLLMServiceComponent_ListExternalLLMs(t *testing.T) {
 	typeVal := database.LLMTypeAigatewayExternal
 	enabled := true
 	dbLLMConfig := &database.LLMConfig{
-		ID:          123,
-		ModelName:   "external-model",
-		Type:        typeVal,
-		Enabled:     true,
-		RepoID:      456,
-		Repo:        dbRepo,
+		ID:        123,
+		ModelName: "external-model",
+		Type:      typeVal,
+		Enabled:   true,
+		RepoID:    456,
+		Repo:      dbRepo,
 	}
 
 	// Mock search params
@@ -441,12 +441,12 @@ func TestLLMServiceComponent_ListExternalLLMs_NoRepo(t *testing.T) {
 	typeVal := database.LLMTypeAigatewayExternal
 	enabled := true
 	dbLLMConfig := &database.LLMConfig{
-		ID:          123,
-		ModelName:   "external-model-no-repo",
-		Type:        typeVal,
-		Enabled:     true,
-		RepoID:      0,
-		Repo:        nil,
+		ID:        123,
+		ModelName: "external-model-no-repo",
+		Type:      typeVal,
+		Enabled:   true,
+		RepoID:    0,
+		Repo:      nil,
 	}
 
 	search := &types.SearchLLMConfig{

@@ -186,7 +186,7 @@ func (s *lLMConfigStoreImpl) GetByModelName(ctx context.Context, modelName strin
 
 func (s *lLMConfigStoreImpl) GetByID(ctx context.Context, id int64) (*LLMConfig, error) {
 	var config LLMConfig
-	err := s.db.Operator.Core.NewSelect().Model(&config).Relation("Upstreams").Where("id = ?", id).Limit(1).Scan(ctx)
+	err := s.db.Operator.Core.NewSelect().Model(&config).Relation("Upstreams").Relation("Upstreams.HealthState").Relation("Upstreams.CircuitState").Where("id = ?", id).Limit(1).Scan(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("select llm config by id %d, %w", id, err)
 	}

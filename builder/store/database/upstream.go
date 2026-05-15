@@ -84,13 +84,13 @@ func (s *upstreamStoreImpl) Update(ctx context.Context, upstream *Upstream) erro
 }
 
 func (s *upstreamStoreImpl) Delete(ctx context.Context, id int64) error {
-	_, err := s.db.Core.NewDelete().Model((*Upstream)(nil)).Where("id = ?", id).Exec(ctx)
+	_, err := s.db.Core.NewDelete().Model((*Upstream)(nil)).Where("upstream.id = ?", id).Exec(ctx)
 	return err
 }
 
 func (s *upstreamStoreImpl) GetByID(ctx context.Context, id int64) (*Upstream, error) {
 	var u Upstream
-	err := s.db.Core.NewSelect().Model(&u).Where("id = ?", id).Scan(ctx)
+	err := s.db.Core.NewSelect().Model(&u).Where("upstream.id = ?", id).Relation("HealthState").Relation("CircuitState").Scan(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("get upstream by id: %w", err)
 	}
@@ -99,7 +99,7 @@ func (s *upstreamStoreImpl) GetByID(ctx context.Context, id int64) (*Upstream, e
 
 func (s *upstreamStoreImpl) ListByLLMConfigID(ctx context.Context, llmConfigID int64) ([]*Upstream, error) {
 	var upstreams []*Upstream
-	err := s.db.Core.NewSelect().Model(&upstreams).Where("llm_config_id = ?", llmConfigID).Order("id ASC").Scan(ctx)
+	err := s.db.Core.NewSelect().Model(&upstreams).Where("upstream.llm_config_id = ?", llmConfigID).Relation("HealthState").Relation("CircuitState").Order("upstream.id ASC").Scan(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list upstreams by llm_config_id: %w", err)
 	}

@@ -15,6 +15,24 @@ const (
 	HealthStateUnhealthy HealthState = "unhealthy"
 )
 
+// UpstreamStatus represents the computed availability status of an upstream.
+type UpstreamStatus string
+
+const (
+	UpstreamStatusDisabled    UpstreamStatus = "disabled"
+	UpstreamStatusUnavailable UpstreamStatus = "unavailable"
+	UpstreamStatusDegraded    UpstreamStatus = "degraded"
+	UpstreamStatusAvailable   UpstreamStatus = "available"
+)
+
+// Reason strings for upstream/LLM unavailability.
+const (
+	ReasonUpstreamDisabled        = "upstream is disabled"
+	ReasonCircuitBreakerOpen      = "circuit breaker is open"
+	ReasonHealthStateUnhealthy    = "health state is unhealthy"
+	ReasonAllUpstreamsUnavailable = "all upstreams unavailable"
+)
+
 // CircuitState represents the circuit breaker state
 type CircuitState string
 
@@ -172,10 +190,10 @@ func IsUpstreamCircuitOpen(u commontypes.UpstreamConfig) bool {
 // a reason when the upstream should be excluded from routing.
 func IsUpstreamUnavailable(u commontypes.UpstreamConfig) (bool, string) {
 	if IsUpstreamCircuitOpen(u) {
-		return true, "circuit breaker is open"
+		return true, ReasonCircuitBreakerOpen
 	}
 	if IsUpstreamUnhealthy(u) {
-		return true, "health state is unhealthy"
+		return true, ReasonHealthStateUnhealthy
 	}
 	return false, ""
 }

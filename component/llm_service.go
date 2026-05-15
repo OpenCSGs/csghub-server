@@ -7,6 +7,7 @@ import (
 	"math"
 	"strings"
 
+	aigatewaytypes "opencsg.com/csghub-server/aigateway/types"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
@@ -15,7 +16,7 @@ import (
 // LLMServiceComponent is an interface that defines methods for interacting with LLM configurations.
 type LLMServiceComponent interface {
 	// IndexLLMConfig retrieves a batch of LLM configurations.
-	IndexLLMConfig(ctx context.Context, per, page int, search *types.SearchLLMConfig) ([]*database.LLMConfig, int, error)
+	IndexLLMConfig(ctx context.Context, per, page int, search *types.SearchLLMConfig) ([]*types.LLMConfig, int, error)
 	IndexPromptPrefix(ctx context.Context, per, page int, search *types.SearchPromptPrefix) ([]*database.PromptPrefix, int, error)
 	ShowLLMConfig(ctx context.Context, id int64) (*types.LLMConfig, error)
 	ShowPromptConfig(ctx context.Context, id int64) (*types.PromptPrefix, error)
@@ -60,10 +61,32 @@ func NewLLMServiceComponent(config *config.Config) (LLMServiceComponent, error) 
 	return llmServiceComp, nil
 }
 
-func (s *llmServiceComponentImpl) IndexLLMConfig(ctx context.Context, per, page int, search *types.SearchLLMConfig) ([]*database.LLMConfig, int, error) {
-	llmConfigs, total, err := s.llmConfigStore.Index(ctx, per, page, search)
+func (s *llmServiceComponentImpl) IndexLLMConfig(ctx context.Context, per, page int, search *types.SearchLLMConfig) ([]*types.LLMConfig, int, error) {
+	dbLLMConfigs, total, err := s.llmConfigStore.Index(ctx, per, page, search)
 	if err != nil {
 		return nil, 0, err
+	}
+
+	llmConfigs := make([]*types.LLMConfig, 0, len(dbLLMConfigs))
+	for _, cfg := range dbLLMConfigs {
+		upstreams := buildUpstreamConfigs(cfg.Upstreams)
+		isAvailable, reason := computeLLMAvailability(upstreams)
+		llmConfigs = append(llmConfigs, &types.LLMConfig{
+			ID:                 cfg.ID,
+			ModelName:          cfg.ModelName,
+			OfficialName:       cfg.PrimaryOfficialName(),
+			Upstreams:          upstreams,
+			Type:               cfg.Type,
+			Enabled:            cfg.Enabled,
+			RoutingPolicy:      cfg.RoutingPolicy,
+			Metadata:           cfg.Metadata,
+			RepoID:             cfg.RepoID,
+			NeedSensitiveCheck: cfg.NeedSensitiveCheck,
+			IsAvailable:        cfg.Enabled && isAvailable,
+			AvailabilityReason: reason,
+			CreatedAt:          cfg.CreatedAt,
+			UpdatedAt:          cfg.UpdatedAt,
+		})
 	}
 
 	return llmConfigs, total, nil
@@ -85,17 +108,12 @@ func (s *llmServiceComponentImpl) ShowLLMConfig(ctx context.Context, id int64) (
 	// Build upstream configs from relational upstreams with health/circuit state
 	upstreams := buildUpstreamConfigs(dbLlmConfig.Upstreams)
 	// Derive deprecated API-level fields from the first enabled upstream
-	officialName, provider, apiEndpoint, authHeader := deriveFromUpstreams(upstreams, dbLlmConfig.ModelName)
 	llmConfig := &types.LLMConfig{
 		ID:                 dbLlmConfig.ID,
 		ModelName:          dbLlmConfig.ModelName,
-		OfficialName:       officialName,
-		ApiEndpoint:        apiEndpoint,
 		Upstreams:          upstreams,
-		AuthHeader:         authHeader,
 		Type:               dbLlmConfig.Type,
 		Enabled:            dbLlmConfig.Enabled,
-		Provider:           provider,
 		RoutingPolicy:      dbLlmConfig.RoutingPolicy,
 		Metadata:           dbLlmConfig.Metadata,
 		RepoID:             dbLlmConfig.RepoID,
@@ -103,6 +121,9 @@ func (s *llmServiceComponentImpl) ShowLLMConfig(ctx context.Context, id int64) (
 		CreatedAt:          dbLlmConfig.CreatedAt,
 		UpdatedAt:          dbLlmConfig.UpdatedAt,
 	}
+	isAvailable, reason := computeLLMAvailability(upstreams)
+	llmConfig.IsAvailable = llmConfig.Enabled && isAvailable
+	llmConfig.AvailabilityReason = reason
 	if dbLlmConfig.RepoID > 0 {
 		repo, err := s.repoStore.FindById(ctx, dbLlmConfig.RepoID)
 		if err == nil && repo != nil {
@@ -168,17 +189,12 @@ func (s *llmServiceComponentImpl) UpdateLLMConfig(ctx context.Context, req *type
 		return nil, fmt.Errorf("failed to read upstreams: %w", err)
 	}
 	upstreams := buildUpstreamConfigs(upstreamPtrsToValues(dbUpstreams))
-	officialName, provider, apiEndpoint, authHeader := deriveFromUpstreams(upstreams, updatedConfig.ModelName)
 	resLLMConfig := &types.LLMConfig{
 		ID:                 updatedConfig.ID,
 		ModelName:          updatedConfig.ModelName,
-		OfficialName:       officialName,
-		ApiEndpoint:        apiEndpoint,
 		Upstreams:          upstreams,
-		AuthHeader:         authHeader,
 		Type:               updatedConfig.Type,
 		Enabled:            updatedConfig.Enabled,
-		Provider:           provider,
 		RoutingPolicy:      updatedConfig.RoutingPolicy,
 		Metadata:           updatedConfig.Metadata,
 		RepoID:             updatedConfig.RepoID,
@@ -186,6 +202,9 @@ func (s *llmServiceComponentImpl) UpdateLLMConfig(ctx context.Context, req *type
 		CreatedAt:          updatedConfig.CreatedAt,
 		UpdatedAt:          updatedConfig.UpdatedAt,
 	}
+	isAvailable, reason := computeLLMAvailability(upstreams)
+	resLLMConfig.IsAvailable = resLLMConfig.Enabled && isAvailable
+	resLLMConfig.AvailabilityReason = reason
 	return resLLMConfig, nil
 }
 
@@ -266,16 +285,11 @@ func (s *llmServiceComponentImpl) CreateLLMConfig(ctx context.Context, req *type
 		}
 	}
 	upstreams := buildUpstreamConfigs(createdUpstreams)
-	officialName, provider, apiEndpoint, authHeader := deriveFromUpstreams(upstreams, req.ModelName)
 	resLLMConfig := &types.LLMConfig{
 		ID:                 dbRes.ID,
 		ModelName:          dbRes.ModelName,
-		OfficialName:       officialName,
-		ApiEndpoint:        apiEndpoint,
 		Upstreams:          upstreams,
-		AuthHeader:         authHeader,
 		Type:               dbRes.Type,
-		Provider:           provider,
 		Enabled:            dbRes.Enabled,
 		RoutingPolicy:      dbRes.RoutingPolicy,
 		Metadata:           dbRes.Metadata,
@@ -284,6 +298,9 @@ func (s *llmServiceComponentImpl) CreateLLMConfig(ctx context.Context, req *type
 		CreatedAt:          dbRes.CreatedAt,
 		UpdatedAt:          dbRes.UpdatedAt,
 	}
+	isAvailable, reason := computeLLMAvailability(upstreams)
+	resLLMConfig.IsAvailable = resLLMConfig.Enabled && isAvailable
+	resLLMConfig.AvailabilityReason = reason
 	return resLLMConfig, nil
 }
 
@@ -504,26 +521,47 @@ func buildUpstreamConfigs(dbUpstreams []database.Upstream) []types.UpstreamConfi
 		if u.CircuitState != nil {
 			uc.CircuitState = u.CircuitState.CircuitState
 		}
+		uc.IsAvailable, _ = computeUpstreamAvailability(uc)
+		uc.AvailabilityStatus = computeUpstreamAvailabilityStatus(uc)
 		result = append(result, uc)
 	}
 	return result
 }
 
-// deriveFromUpstreams derives deprecated top-level fields from the first enabled upstream.
-func deriveFromUpstreams(upstreams []types.UpstreamConfig, fallbackModelName string) (officialName, provider, apiEndpoint, authHeader string) {
-	for _, u := range upstreams {
-		if u.Enabled && strings.TrimSpace(u.URL) != "" {
-			apiEndpoint = u.URL
-			authHeader = u.AuthHeader
-			provider = u.Provider
-			if u.ModelName != "" {
-				officialName = u.ModelName
-			}
-			return
+func computeUpstreamAvailability(u types.UpstreamConfig) (bool, string) {
+	if !u.Enabled {
+		return false, aigatewaytypes.ReasonUpstreamDisabled
+	}
+	if unavailable, reason := aigatewaytypes.IsUpstreamUnavailable(u); unavailable {
+		return false, reason
+	}
+	return true, ""
+}
+
+func computeUpstreamAvailabilityStatus(u types.UpstreamConfig) string {
+	if !u.Enabled {
+		return string(aigatewaytypes.UpstreamStatusDisabled)
+	}
+	if u.CircuitBreakerEnabled && u.CircuitState == string(aigatewaytypes.CircuitStateOpen) {
+		return string(aigatewaytypes.UpstreamStatusUnavailable)
+	}
+	if u.HealthCheckEnabled && u.HealthState == string(aigatewaytypes.HealthStateUnhealthy) {
+		return string(aigatewaytypes.UpstreamStatusUnavailable)
+	}
+	if u.HealthCheckEnabled && u.HealthState == string(aigatewaytypes.HealthStateDegraded) {
+		return string(aigatewaytypes.UpstreamStatusDegraded)
+	}
+	return string(aigatewaytypes.UpstreamStatusAvailable)
+}
+
+func computeLLMAvailability(upstreams []types.UpstreamConfig) (bool, string) {
+	if len(upstreams) == 0 {
+		return true, ""
+	}
+	for _, upstream := range upstreams {
+		if available, _ := computeUpstreamAvailability(upstream); available {
+			return true, ""
 		}
 	}
-	if officialName == "" {
-		officialName = fallbackModelName
-	}
-	return
+	return false, aigatewaytypes.ReasonAllUpstreamsUnavailable
 }
