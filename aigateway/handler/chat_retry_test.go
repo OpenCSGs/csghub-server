@@ -19,52 +19,49 @@ func TestShouldRetryChatAttempt(t *testing.T) {
 
 func TestBuildChatAttemptTargets(t *testing.T) {
 	targets := buildChatAttemptTargets(
-		"https://api.example.com/node-b/v1/chat/completions",
-		"logical-model",
+		commontypes.UpstreamConfig{ID: 1, URL: "https://api.example.com/node-b/v1/chat/completions", Enabled: true, ModelName: "provider-model-b"},
 		[]commontypes.UpstreamConfig{
-			{URL: "https://api.example.com/node-b/v1/chat/completions", Enabled: true, ModelName: "provider-model-b"},
-			{URL: "https://api.example.com/node-a/v1/chat/completions", Enabled: true, ModelName: "provider-model-a"},
+			{ID: 1, URL: "https://api.example.com/node-b/v1/chat/completions", Enabled: true, ModelName: "provider-model-b"},
+			{ID: 2, URL: "https://api.example.com/node-a/v1/chat/completions", Enabled: true, ModelName: "provider-model-a"},
 		},
 		2,
 	)
 	require.Equal(t, []chatAttemptTarget{
-		{Target: "https://api.example.com/node-b/v1/chat/completions", Endpoint: commontypes.UpstreamConfig{URL: "https://api.example.com/node-b/v1/chat/completions", Enabled: true, ModelName: "provider-model-b"}, ModelName: "provider-model-b"},
-		{Target: "https://api.example.com/node-a/v1/chat/completions", Endpoint: commontypes.UpstreamConfig{URL: "https://api.example.com/node-a/v1/chat/completions", Enabled: true, ModelName: "provider-model-a"}, ModelName: "provider-model-a"},
+		{Upstream: commontypes.UpstreamConfig{ID: 1, URL: "https://api.example.com/node-b/v1/chat/completions", Enabled: true, ModelName: "provider-model-b"}},
+		{Upstream: commontypes.UpstreamConfig{ID: 2, URL: "https://api.example.com/node-a/v1/chat/completions", Enabled: true, ModelName: "provider-model-a"}},
 	}, targets)
 }
 
 func TestBuildChatAttemptTargets_RespectMaxFallbackAttempts(t *testing.T) {
 	targets := buildChatAttemptTargets(
-		"https://api.example.com/node-d/v1/chat/completions",
-		"logical-model",
+		commontypes.UpstreamConfig{ID: 1, URL: "https://api.example.com/node-d/v1/chat/completions", Enabled: true},
 		[]commontypes.UpstreamConfig{
-			{URL: "https://api.example.com/node-d/v1/chat/completions", Enabled: true},
-			{URL: "https://api.example.com/node-c/v1/chat/completions", Enabled: true, ModelName: "provider-model-c"},
-			{URL: "https://api.example.com/node-b/v1/chat/completions", Enabled: true},
-			{URL: "https://api.example.com/node-a/v1/chat/completions", Enabled: true},
-			{URL: "https://api.example.com/node-a/v1/chat/completions", Enabled: true},
+			{ID: 1, URL: "https://api.example.com/node-d/v1/chat/completions", Enabled: true},
+			{ID: 2, URL: "https://api.example.com/node-c/v1/chat/completions", Enabled: true, ModelName: "provider-model-c"},
+			{ID: 3, URL: "https://api.example.com/node-b/v1/chat/completions", Enabled: true},
+			{ID: 4, URL: "https://api.example.com/node-a/v1/chat/completions", Enabled: true},
+			{ID: 5, URL: "https://api.example.com/node-a/v1/chat/completions", Enabled: true},
 		},
 		2,
 	)
 	require.Equal(t, []chatAttemptTarget{
-		{Target: "https://api.example.com/node-d/v1/chat/completions", Endpoint: commontypes.UpstreamConfig{URL: "https://api.example.com/node-d/v1/chat/completions", Enabled: true}, ModelName: "logical-model"},
-		{Target: "https://api.example.com/node-a/v1/chat/completions", Endpoint: commontypes.UpstreamConfig{URL: "https://api.example.com/node-a/v1/chat/completions", Enabled: true}, ModelName: "logical-model"},
-		{Target: "https://api.example.com/node-b/v1/chat/completions", Endpoint: commontypes.UpstreamConfig{URL: "https://api.example.com/node-b/v1/chat/completions", Enabled: true}, ModelName: "logical-model"},
+		{Upstream: commontypes.UpstreamConfig{ID: 1, URL: "https://api.example.com/node-d/v1/chat/completions", Enabled: true}},
+		{Upstream: commontypes.UpstreamConfig{ID: 4, URL: "https://api.example.com/node-a/v1/chat/completions", Enabled: true}},
+		{Upstream: commontypes.UpstreamConfig{ID: 3, URL: "https://api.example.com/node-b/v1/chat/completions", Enabled: true}},
 	}, targets)
 }
 
 func TestBuildChatAttemptTargets_DisableFallbacks(t *testing.T) {
 	targets := buildChatAttemptTargets(
-		"https://api.example.com/node-b/v1/chat/completions",
-		"logical-model",
+		commontypes.UpstreamConfig{ID: 1, URL: "https://api.example.com/node-b/v1/chat/completions", Enabled: true},
 		[]commontypes.UpstreamConfig{
-			{URL: "https://api.example.com/node-b/v1/chat/completions", Enabled: true},
-			{URL: "https://api.example.com/node-a/v1/chat/completions", Enabled: true},
+			{ID: 1, URL: "https://api.example.com/node-b/v1/chat/completions", Enabled: true},
+			{ID: 2, URL: "https://api.example.com/node-a/v1/chat/completions", Enabled: true},
 		},
 		0,
 	)
 	require.Equal(t, []chatAttemptTarget{
-		{Target: "https://api.example.com/node-b/v1/chat/completions", Endpoint: commontypes.UpstreamConfig{URL: "https://api.example.com/node-b/v1/chat/completions", Enabled: true}, ModelName: "logical-model"},
+		{Upstream: commontypes.UpstreamConfig{ID: 1, URL: "https://api.example.com/node-b/v1/chat/completions", Enabled: true}},
 	}, targets)
 }
 

@@ -142,6 +142,65 @@ func (_c *MockLLMServiceComponent_CreatePromptPrefix_Call) RunAndReturn(run func
 	return _c
 }
 
+// CreateUpstream provides a mock function with given fields: ctx, req
+func (_m *MockLLMServiceComponent) CreateUpstream(ctx context.Context, req *types.CreateUpstreamReq) (*types.UpstreamConfig, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateUpstream")
+	}
+
+	var r0 *types.UpstreamConfig
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *types.CreateUpstreamReq) (*types.UpstreamConfig, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *types.CreateUpstreamReq) *types.UpstreamConfig); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.UpstreamConfig)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *types.CreateUpstreamReq) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockLLMServiceComponent_CreateUpstream_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateUpstream'
+type MockLLMServiceComponent_CreateUpstream_Call struct {
+	*mock.Call
+}
+
+// CreateUpstream is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req *types.CreateUpstreamReq
+func (_e *MockLLMServiceComponent_Expecter) CreateUpstream(ctx interface{}, req interface{}) *MockLLMServiceComponent_CreateUpstream_Call {
+	return &MockLLMServiceComponent_CreateUpstream_Call{Call: _e.mock.On("CreateUpstream", ctx, req)}
+}
+
+func (_c *MockLLMServiceComponent_CreateUpstream_Call) Run(run func(ctx context.Context, req *types.CreateUpstreamReq)) *MockLLMServiceComponent_CreateUpstream_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*types.CreateUpstreamReq))
+	})
+	return _c
+}
+
+func (_c *MockLLMServiceComponent_CreateUpstream_Call) Return(_a0 *types.UpstreamConfig, _a1 error) *MockLLMServiceComponent_CreateUpstream_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockLLMServiceComponent_CreateUpstream_Call) RunAndReturn(run func(context.Context, *types.CreateUpstreamReq) (*types.UpstreamConfig, error)) *MockLLMServiceComponent_CreateUpstream_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // DeleteLLMConfig provides a mock function with given fields: ctx, id
 func (_m *MockLLMServiceComponent) DeleteLLMConfig(ctx context.Context, id int64) error {
 	ret := _m.Called(ctx, id)
@@ -232,6 +291,53 @@ func (_c *MockLLMServiceComponent_DeletePromptPrefix_Call) Return(_a0 error) *Mo
 }
 
 func (_c *MockLLMServiceComponent_DeletePromptPrefix_Call) RunAndReturn(run func(context.Context, int64) error) *MockLLMServiceComponent_DeletePromptPrefix_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// DeleteUpstream provides a mock function with given fields: ctx, id
+func (_m *MockLLMServiceComponent) DeleteUpstream(ctx context.Context, id int64) error {
+	ret := _m.Called(ctx, id)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteUpstream")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64) error); ok {
+		r0 = rf(ctx, id)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockLLMServiceComponent_DeleteUpstream_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteUpstream'
+type MockLLMServiceComponent_DeleteUpstream_Call struct {
+	*mock.Call
+}
+
+// DeleteUpstream is a helper method to define mock.On call
+//   - ctx context.Context
+//   - id int64
+func (_e *MockLLMServiceComponent_Expecter) DeleteUpstream(ctx interface{}, id interface{}) *MockLLMServiceComponent_DeleteUpstream_Call {
+	return &MockLLMServiceComponent_DeleteUpstream_Call{Call: _e.mock.On("DeleteUpstream", ctx, id)}
+}
+
+func (_c *MockLLMServiceComponent_DeleteUpstream_Call) Run(run func(ctx context.Context, id int64)) *MockLLMServiceComponent_DeleteUpstream_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(int64))
+	})
+	return _c
+}
+
+func (_c *MockLLMServiceComponent_DeleteUpstream_Call) Return(_a0 error) *MockLLMServiceComponent_DeleteUpstream_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockLLMServiceComponent_DeleteUpstream_Call) RunAndReturn(run func(context.Context, int64) error) *MockLLMServiceComponent_DeleteUpstream_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -662,6 +768,65 @@ func (_c *MockLLMServiceComponent_UpdatePromptPrefix_Call) Return(_a0 *types.Pro
 }
 
 func (_c *MockLLMServiceComponent_UpdatePromptPrefix_Call) RunAndReturn(run func(context.Context, *types.UpdatePromptPrefixReq) (*types.PromptPrefix, error)) *MockLLMServiceComponent_UpdatePromptPrefix_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// UpdateUpstream provides a mock function with given fields: ctx, req
+func (_m *MockLLMServiceComponent) UpdateUpstream(ctx context.Context, req *types.UpdateUpstreamReq) (*types.UpstreamConfig, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateUpstream")
+	}
+
+	var r0 *types.UpstreamConfig
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *types.UpdateUpstreamReq) (*types.UpstreamConfig, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *types.UpdateUpstreamReq) *types.UpstreamConfig); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.UpstreamConfig)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *types.UpdateUpstreamReq) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockLLMServiceComponent_UpdateUpstream_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateUpstream'
+type MockLLMServiceComponent_UpdateUpstream_Call struct {
+	*mock.Call
+}
+
+// UpdateUpstream is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req *types.UpdateUpstreamReq
+func (_e *MockLLMServiceComponent_Expecter) UpdateUpstream(ctx interface{}, req interface{}) *MockLLMServiceComponent_UpdateUpstream_Call {
+	return &MockLLMServiceComponent_UpdateUpstream_Call{Call: _e.mock.On("UpdateUpstream", ctx, req)}
+}
+
+func (_c *MockLLMServiceComponent_UpdateUpstream_Call) Run(run func(ctx context.Context, req *types.UpdateUpstreamReq)) *MockLLMServiceComponent_UpdateUpstream_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*types.UpdateUpstreamReq))
+	})
+	return _c
+}
+
+func (_c *MockLLMServiceComponent_UpdateUpstream_Call) Return(_a0 *types.UpstreamConfig, _a1 error) *MockLLMServiceComponent_UpdateUpstream_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockLLMServiceComponent_UpdateUpstream_Call) RunAndReturn(run func(context.Context, *types.UpdateUpstreamReq) (*types.UpstreamConfig, error)) *MockLLMServiceComponent_UpdateUpstream_Call {
 	_c.Call.Return(run)
 	return _c
 }

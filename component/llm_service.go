@@ -10,7 +10,6 @@ import (
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
-	commonutils "opencsg.com/csghub-server/common/utils/common"
 )
 
 // LLMServiceComponent is an interface that defines methods for interacting with LLM configurations.
@@ -30,10 +29,17 @@ type LLMServiceComponent interface {
 	// DeletePromptPrefix deletes the prompt prefix by ID.
 	DeletePromptPrefix(ctx context.Context, id int64) error
 	ListExternalLLMs(ctx context.Context) ([]*types.LLMConfig, error)
+	// CreateUpstream adds a new upstream to an existing LLM config.
+	CreateUpstream(ctx context.Context, req *types.CreateUpstreamReq) (*types.UpstreamConfig, error)
+	// UpdateUpstream updates an existing upstream by ID.
+	UpdateUpstream(ctx context.Context, req *types.UpdateUpstreamReq) (*types.UpstreamConfig, error)
+	// DeleteUpstream deletes an upstream by ID.
+	DeleteUpstream(ctx context.Context, id int64) error
 }
 
 type llmServiceComponentImpl struct {
 	llmConfigStore    database.LLMConfigStore
+	upstreamStore     database.UpstreamStore
 	promptPrefixStore database.PromptPrefixStore
 	repoStore         database.RepoStore
 }
@@ -44,8 +50,10 @@ func NewLLMServiceComponent(config *config.Config) (LLMServiceComponent, error) 
 	llmConfigStore := database.NewLLMConfigStore(config)
 	promptPrefixStore := database.NewPromptPrefixStore(config)
 	repoStore := database.NewRepoStore()
+	upstreamStore := database.NewUpstreamStore(config)
 	llmServiceComp := &llmServiceComponentImpl{
 		llmConfigStore:    llmConfigStore,
+		upstreamStore:     upstreamStore,
 		promptPrefixStore: promptPrefixStore,
 		repoStore:         repoStore,
 	}
@@ -74,16 +82,20 @@ func (s *llmServiceComponentImpl) ShowLLMConfig(ctx context.Context, id int64) (
 	if err != nil {
 		return nil, err
 	}
+	// Build upstream configs from relational upstreams with health/circuit state
+	upstreams := buildUpstreamConfigs(dbLlmConfig.Upstreams)
+	// Derive deprecated API-level fields from the first enabled upstream
+	officialName, provider, apiEndpoint, authHeader := deriveFromUpstreams(upstreams, dbLlmConfig.ModelName)
 	llmConfig := &types.LLMConfig{
 		ID:                 dbLlmConfig.ID,
 		ModelName:          dbLlmConfig.ModelName,
-		OfficialName:       dbLlmConfig.OfficialName,
-		ApiEndpoint:        dbLlmConfig.ApiEndpoint,
-		Upstreams:          dbLlmConfig.Upstreams,
-		AuthHeader:         dbLlmConfig.AuthHeader,
+		OfficialName:       officialName,
+		ApiEndpoint:        apiEndpoint,
+		Upstreams:          upstreams,
+		AuthHeader:         authHeader,
 		Type:               dbLlmConfig.Type,
 		Enabled:            dbLlmConfig.Enabled,
-		Provider:           dbLlmConfig.Provider,
+		Provider:           provider,
 		RoutingPolicy:      dbLlmConfig.RoutingPolicy,
 		Metadata:           dbLlmConfig.Metadata,
 		RepoID:             dbLlmConfig.RepoID,
@@ -128,32 +140,17 @@ func (s *llmServiceComponentImpl) UpdateLLMConfig(ctx context.Context, req *type
 	if req.ModelName != nil {
 		llmConfig.ModelName = *req.ModelName
 	}
-	if req.OfficialName != nil {
-		llmConfig.OfficialName = *req.OfficialName
-	}
-	if req.ApiEndpoint != nil {
-		llmConfig.ApiEndpoint = *req.ApiEndpoint
-	}
-	if req.Upstreams != nil {
-		llmConfig.Upstreams = *req.Upstreams
-	}
-	if req.AuthHeader != nil {
-		llmConfig.AuthHeader = *req.AuthHeader
-	}
 	if req.Type != nil {
 		llmConfig.Type = *req.Type
 	}
 	if req.Enabled != nil {
 		llmConfig.Enabled = *req.Enabled
 	}
-	if req.Provider != nil {
-		llmConfig.Provider = *req.Provider
-	}
 	if req.RoutingPolicy != nil {
 		llmConfig.RoutingPolicy = *req.RoutingPolicy
 	}
 	if req.Metadata != nil {
-		commonutils.MergeMapWithDeletion(&llmConfig.Metadata, *req.Metadata)
+		llmConfig.Metadata = *req.Metadata
 	}
 	if req.RepoID != nil {
 		llmConfig.RepoID = *req.RepoID
@@ -161,24 +158,27 @@ func (s *llmServiceComponentImpl) UpdateLLMConfig(ctx context.Context, req *type
 	if req.NeedSensitiveCheck != nil {
 		llmConfig.NeedSensitiveCheck = *req.NeedSensitiveCheck
 	}
-	if err := s.validateLLMEndpointConfig(llmConfig.ApiEndpoint, llmConfig.Upstreams); err != nil {
-		return nil, err
-	}
-	llmConfig.ApiEndpoint = s.normalizePrimaryEndpoint(llmConfig.ApiEndpoint, llmConfig.Upstreams)
 	updatedConfig, updateErr := s.llmConfigStore.Update(ctx, *llmConfig)
 	if updateErr != nil {
 		return nil, updateErr
 	}
+	// Re-read upstreams from DB to include IDs and any DB-side defaults
+	dbUpstreams, err := s.upstreamStore.ListByLLMConfigID(ctx, updatedConfig.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read upstreams: %w", err)
+	}
+	upstreams := buildUpstreamConfigs(upstreamPtrsToValues(dbUpstreams))
+	officialName, provider, apiEndpoint, authHeader := deriveFromUpstreams(upstreams, updatedConfig.ModelName)
 	resLLMConfig := &types.LLMConfig{
 		ID:                 updatedConfig.ID,
 		ModelName:          updatedConfig.ModelName,
-		OfficialName:       updatedConfig.OfficialName,
-		ApiEndpoint:        updatedConfig.ApiEndpoint,
-		Upstreams:          updatedConfig.Upstreams,
-		AuthHeader:         updatedConfig.AuthHeader,
+		OfficialName:       officialName,
+		ApiEndpoint:        apiEndpoint,
+		Upstreams:          upstreams,
+		AuthHeader:         authHeader,
 		Type:               updatedConfig.Type,
-		Provider:           updatedConfig.Provider,
 		Enabled:            updatedConfig.Enabled,
+		Provider:           provider,
 		RoutingPolicy:      updatedConfig.RoutingPolicy,
 		Metadata:           updatedConfig.Metadata,
 		RepoID:             updatedConfig.RepoID,
@@ -221,17 +221,12 @@ func (s *llmServiceComponentImpl) CreateLLMConfig(ctx context.Context, req *type
 	if req.RepoID != nil {
 		repoID = *req.RepoID
 	}
-	if err := s.validateLLMEndpointConfig(req.ApiEndpoint, req.Upstreams); err != nil {
+	if err := s.validateLLMEndpointConfig(req.Upstreams); err != nil {
 		return nil, err
 	}
 	dbLLMConfig := database.LLMConfig{
 		ModelName:          req.ModelName,
-		OfficialName:       req.OfficialName,
-		ApiEndpoint:        s.normalizePrimaryEndpoint(req.ApiEndpoint, req.Upstreams),
-		Upstreams:          req.Upstreams,
-		AuthHeader:         req.AuthHeader,
 		Type:               req.Type,
-		Provider:           req.Provider,
 		Enabled:            req.Enabled,
 		RoutingPolicy:      req.RoutingPolicy,
 		Metadata:           req.Metadata,
@@ -242,15 +237,45 @@ func (s *llmServiceComponentImpl) CreateLLMConfig(ctx context.Context, req *type
 	if err != nil {
 		return nil, err
 	}
+	// Create upstreams in the relational table (bun auto-fills ID after insert)
+	createdUpstreams := make([]database.Upstream, 0, len(req.Upstreams))
+	for _, u := range req.Upstreams {
+		if strings.TrimSpace(u.URL) == "" {
+			continue
+		}
+		dbUp := &database.Upstream{
+			LLMConfigID:           dbRes.ID,
+			URL:                   strings.TrimSpace(u.URL),
+			Weight:                u.Weight,
+			Enabled:               u.Enabled,
+			ModelName:             u.ModelName,
+			AuthHeader:            u.AuthHeader,
+			Provider:              u.Provider,
+			HealthCheckEnabled:    u.HealthCheckEnabled,
+			CircuitBreakerEnabled: u.CircuitBreakerEnabled,
+			Tags:                  u.Tags,
+			LimitPolicy:           u.LimitPolicy,
+		}
+		if dbUp.Weight <= 0 {
+			dbUp.Weight = 1
+		}
+		if err := s.upstreamStore.Create(ctx, dbUp); err != nil {
+			return nil, fmt.Errorf("create upstream: %w", err)
+		} else {
+			createdUpstreams = append(createdUpstreams, *dbUp)
+		}
+	}
+	upstreams := buildUpstreamConfigs(createdUpstreams)
+	officialName, provider, apiEndpoint, authHeader := deriveFromUpstreams(upstreams, req.ModelName)
 	resLLMConfig := &types.LLMConfig{
 		ID:                 dbRes.ID,
 		ModelName:          dbRes.ModelName,
-		OfficialName:       dbRes.OfficialName,
-		ApiEndpoint:        dbRes.ApiEndpoint,
-		Upstreams:          dbRes.Upstreams,
-		AuthHeader:         dbRes.AuthHeader,
+		OfficialName:       officialName,
+		ApiEndpoint:        apiEndpoint,
+		Upstreams:          upstreams,
+		AuthHeader:         authHeader,
 		Type:               dbRes.Type,
-		Provider:           dbRes.Provider,
+		Provider:           provider,
 		Enabled:            dbRes.Enabled,
 		RoutingPolicy:      dbRes.RoutingPolicy,
 		Metadata:           dbRes.Metadata,
@@ -282,6 +307,8 @@ func (s *llmServiceComponentImpl) CreatePromptPrefix(ctx context.Context, req *t
 }
 
 func (s *llmServiceComponentImpl) DeleteLLMConfig(ctx context.Context, id int64) error {
+	// Clean up relational upstreams
+	_ = s.upstreamStore.DeleteByLLMConfigID(ctx, id)
 	err := s.llmConfigStore.Delete(ctx, id)
 	if err != nil {
 		return err
@@ -296,9 +323,9 @@ func (s *llmServiceComponentImpl) DeletePromptPrefix(ctx context.Context, id int
 	return nil
 }
 
-func (s *llmServiceComponentImpl) validateLLMEndpointConfig(apiEndpoint string, upstreams []types.UpstreamConfig) error {
-	if strings.TrimSpace(apiEndpoint) == "" && len(upstreams) == 0 {
-		return fmt.Errorf("%w: api_endpoint or upstreams must be provided", ErrInvalidLLMConfig)
+func (s *llmServiceComponentImpl) validateLLMEndpointConfig(upstreams []types.UpstreamConfig) error {
+	if len(upstreams) == 0 {
+		return fmt.Errorf("%w: upstreams must be provided", ErrInvalidLLMConfig)
 	}
 	enabledCount := 0
 	for _, upstream := range upstreams {
@@ -309,22 +336,10 @@ func (s *llmServiceComponentImpl) validateLLMEndpointConfig(apiEndpoint string, 
 			enabledCount++
 		}
 	}
-	if len(upstreams) > 0 && enabledCount == 0 && strings.TrimSpace(apiEndpoint) == "" {
+	if len(upstreams) > 0 && enabledCount == 0 {
 		return fmt.Errorf("%w: at least one enabled upstream must be provided", ErrInvalidLLMConfig)
 	}
 	return nil
-}
-
-func (s *llmServiceComponentImpl) normalizePrimaryEndpoint(apiEndpoint string, upstreams []types.UpstreamConfig) string {
-	if strings.TrimSpace(apiEndpoint) != "" {
-		return apiEndpoint
-	}
-	for _, upstream := range upstreams {
-		if upstream.Enabled && strings.TrimSpace(upstream.URL) != "" {
-			return upstream.URL
-		}
-	}
-	return ""
 }
 
 func (s *llmServiceComponentImpl) ListExternalLLMs(ctx context.Context) ([]*types.LLMConfig, error) {
@@ -343,7 +358,7 @@ func (s *llmServiceComponentImpl) ListExternalLLMs(ctx context.Context) ([]*type
 		item := &types.LLMConfig{
 			ID:           cfg.ID,
 			ModelName:    cfg.ModelName,
-			OfficialName: cfg.OfficialName,
+			OfficialName: cfg.PrimaryOfficialName(),
 			Type:         cfg.Type,
 			Enabled:      cfg.Enabled,
 			Provider:     cfg.Provider,
@@ -373,4 +388,142 @@ func (s *llmServiceComponentImpl) ListExternalLLMs(ctx context.Context) ([]*type
 		result = append(result, item)
 	}
 	return result, nil
+}
+
+func (s *llmServiceComponentImpl) CreateUpstream(ctx context.Context, req *types.CreateUpstreamReq) (*types.UpstreamConfig, error) {
+	if strings.TrimSpace(req.URL) == "" {
+		return nil, fmt.Errorf("%w: upstream url cannot be empty", ErrInvalidLLMConfig)
+	}
+	// Verify the LLM config exists
+	_, err := s.llmConfigStore.GetByID(ctx, req.LLMConfigID)
+	if err != nil {
+		return nil, fmt.Errorf("llm config not found: %w", err)
+	}
+	dbUp := &database.Upstream{
+		LLMConfigID:           req.LLMConfigID,
+		URL:                   strings.TrimSpace(req.URL),
+		Weight:                req.Weight,
+		Enabled:               req.Enabled,
+		ModelName:             req.ModelName,
+		AuthHeader:            req.AuthHeader,
+		Provider:              req.Provider,
+		HealthCheckEnabled:    req.HealthCheckEnabled,
+		CircuitBreakerEnabled: req.CircuitBreakerEnabled,
+		Tags:                  req.Tags,
+		LimitPolicy:           req.LimitPolicy,
+	}
+	if dbUp.Weight <= 0 {
+		dbUp.Weight = 1
+	}
+	if err := s.upstreamStore.Create(ctx, dbUp); err != nil {
+		return nil, fmt.Errorf("failed to create upstream: %w", err)
+	}
+	res := buildUpstreamConfigs([]database.Upstream{*dbUp})
+	return &res[0], nil
+}
+
+func (s *llmServiceComponentImpl) UpdateUpstream(ctx context.Context, req *types.UpdateUpstreamReq) (*types.UpstreamConfig, error) {
+	dbUp, err := s.upstreamStore.GetByID(ctx, req.ID)
+	if err != nil {
+		return nil, fmt.Errorf("upstream not found: %w", err)
+	}
+	// Apply partial updates
+	if req.URL != nil {
+		dbUp.URL = strings.TrimSpace(*req.URL)
+	}
+	if req.Weight != nil {
+		dbUp.Weight = *req.Weight
+	}
+	if req.Enabled != nil {
+		dbUp.Enabled = *req.Enabled
+	}
+	if req.ModelName != nil {
+		dbUp.ModelName = *req.ModelName
+	}
+	if req.AuthHeader != nil {
+		dbUp.AuthHeader = *req.AuthHeader
+	}
+	if req.Provider != nil {
+		dbUp.Provider = *req.Provider
+	}
+	if req.HealthCheckEnabled != nil {
+		dbUp.HealthCheckEnabled = *req.HealthCheckEnabled
+	}
+	if req.CircuitBreakerEnabled != nil {
+		dbUp.CircuitBreakerEnabled = *req.CircuitBreakerEnabled
+	}
+	if req.LimitPolicy != nil {
+		dbUp.LimitPolicy = *req.LimitPolicy
+	}
+	if req.Tags != nil {
+		dbUp.Tags = *req.Tags
+	}
+	if dbUp.Weight <= 0 {
+		dbUp.Weight = 1
+	}
+	if err := s.upstreamStore.Update(ctx, dbUp); err != nil {
+		return nil, fmt.Errorf("failed to update upstream: %w", err)
+	}
+	res := buildUpstreamConfigs([]database.Upstream{*dbUp})
+	return &res[0], nil
+}
+
+func (s *llmServiceComponentImpl) DeleteUpstream(ctx context.Context, id int64) error {
+	return s.upstreamStore.Delete(ctx, id)
+}
+
+// upstreamPtrsToValues converts a slice of upstream pointers to a slice of values.
+func upstreamPtrsToValues(ptrs []*database.Upstream) []database.Upstream {
+	result := make([]database.Upstream, 0, len(ptrs))
+	for _, p := range ptrs {
+		result = append(result, *p)
+	}
+	return result
+}
+
+// buildUpstreamConfigs converts database.Upstream slice to types.UpstreamConfig slice.
+func buildUpstreamConfigs(dbUpstreams []database.Upstream) []types.UpstreamConfig {
+	result := make([]types.UpstreamConfig, 0, len(dbUpstreams))
+	for _, u := range dbUpstreams {
+		uc := types.UpstreamConfig{
+			ID:                    u.ID,
+			URL:                   u.URL,
+			Weight:                u.Weight,
+			Enabled:               u.Enabled,
+			ModelName:             u.ModelName,
+			AuthHeader:            u.AuthHeader,
+			Provider:              u.Provider,
+			HealthCheckEnabled:    u.HealthCheckEnabled,
+			CircuitBreakerEnabled: u.CircuitBreakerEnabled,
+			Tags:                  u.Tags,
+			LimitPolicy:           u.LimitPolicy,
+		}
+		if u.HealthState != nil {
+			uc.HealthState = u.HealthState.HealthState
+		}
+		if u.CircuitState != nil {
+			uc.CircuitState = u.CircuitState.CircuitState
+		}
+		result = append(result, uc)
+	}
+	return result
+}
+
+// deriveFromUpstreams derives deprecated top-level fields from the first enabled upstream.
+func deriveFromUpstreams(upstreams []types.UpstreamConfig, fallbackModelName string) (officialName, provider, apiEndpoint, authHeader string) {
+	for _, u := range upstreams {
+		if u.Enabled && strings.TrimSpace(u.URL) != "" {
+			apiEndpoint = u.URL
+			authHeader = u.AuthHeader
+			provider = u.Provider
+			if u.ModelName != "" {
+				officialName = u.ModelName
+			}
+			return
+		}
+	}
+	if officialName == "" {
+		officialName = fallbackModelName
+	}
+	return
 }

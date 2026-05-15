@@ -12,6 +12,13 @@ var (
 	WebhookRequestDuration *prometheus.HistogramVec
 
 	ClusterHeartbeatLastTimestamp *prometheus.GaugeVec
+
+	// AIGateway upstream health metrics
+	AIGatewayUpstreamHealthState *prometheus.GaugeVec
+	// AIGateway upstream circuit breaker metrics
+	AIGatewayUpstreamCircuitState *prometheus.GaugeVec
+	// AIGateway upstream health check latency
+	AIGatewayUpstreamHealthLatency *prometheus.GaugeVec
 )
 
 func InitMetrics() {
@@ -35,4 +42,24 @@ func InitMetrics() {
 		Name: "csghub_cluster_heartbeat_last_timestamp_seconds",
 		Help: "Timestamp of the last cluster heartbeat received",
 	}, []string{"cluster_id", "region"})
+
+	// AIGateway upstream health state gauge
+	// Labels: upstream_id, model_name, provider, url, state
+	AIGatewayUpstreamHealthState = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "csghub_aigateway_upstream_health_state",
+		Help: "Health state of aigateway upstreams (0=unhealthy, 1=degraded, 2=healthy)",
+	}, []string{"upstream_id", "model_name", "provider", "url", "state"})
+
+	// AIGateway upstream circuit state gauge
+	// Labels: upstream_id, circuit_state
+	AIGatewayUpstreamCircuitState = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "csghub_aigateway_upstream_circuit_state",
+		Help: "Circuit breaker state of aigateway upstreams (0=open, 1=half_open, 2=closed)",
+	}, []string{"upstream_id", "circuit_state"})
+
+	// AIGateway upstream health check latency
+	AIGatewayUpstreamHealthLatency = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "csghub_aigateway_upstream_health_latency_ms",
+		Help: "Last health check latency in milliseconds for aigateway upstreams",
+	}, []string{"upstream_id", "url"})
 }

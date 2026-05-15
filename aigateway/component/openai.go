@@ -15,6 +15,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
+	"opencsg.com/csghub-server/aigateway/component/router"
 	"opencsg.com/csghub-server/aigateway/token"
 	"opencsg.com/csghub-server/aigateway/types"
 	"opencsg.com/csghub-server/builder/event"
@@ -25,7 +26,7 @@ import (
 
 const (
 	modelCacheKey = "aigateway:models"
-	modelCacheTTL = 1 * time.Minute
+	modelCacheTTL = 30 * time.Second
 )
 
 var apiKeyJSONFieldRegex = regexp.MustCompile(`"api_key"\s*:\s*"[^"]*"`)
@@ -88,7 +89,7 @@ func (m *openaiComponentImpl) GetAvailableModels(c context.Context, userName str
 	}
 	models = csghubModels
 	externalModels := m.getExternalModels(c)
-	models = append(models, externalModels...)
+	models = append(externalModels, models...)
 
 	models = m.enrichModelsWithPrice(c, models)
 	cacheModels := cloneModelsForCache(models)
@@ -145,6 +146,7 @@ func (m *openaiComponentImpl) ListModels(c context.Context, userName string, req
 		return types.ModelList{}, err
 	}
 	modelList := filterAndPaginateModels(models, req)
+	computeModelListAvailability(&modelList)
 	m.applyFormatModelIDToModelList(&modelList)
 	return modelList, nil
 }
@@ -168,6 +170,36 @@ func (m *openaiComponentImpl) applyFormatModelIDToModelList(modelList *types.Mod
 
 	modelList.FirstID = &modelList.Data[0].ID
 	modelList.LastID = &modelList.Data[len(modelList.Data)-1].ID
+}
+
+// computeModelListAvailability sets ModelAvailability.IsAvailable for each model
+// based on the already-loaded upstream health/circuit state (no extra DB call).
+func computeModelListAvailability(modelList *types.ModelList) {
+	if modelList == nil || len(modelList.Data) == 0 {
+		return
+	}
+	for idx := range modelList.Data {
+		model := &modelList.Data[idx]
+		available := modelUpstreamsAvailable(model.Upstreams)
+		model.Availability = &types.ModelAvailability{
+			IsAvailable: available,
+		}
+	}
+}
+
+// modelUpstreamsAvailable returns true if at least one upstream is not unavailable
+// based on the inline health/circuit state carried on UpstreamConfig.
+func modelUpstreamsAvailable(upstreams []commontypes.UpstreamConfig) bool {
+	if len(upstreams) == 0 {
+		// No upstreams configured: model is available (legacy behavior, uses model.Endpoint directly).
+		return true
+	}
+	for _, u := range upstreams {
+		if unavailable, _ := types.IsUpstreamUnavailable(u); !unavailable {
+			return true
+		}
+	}
+	return false
 }
 
 type modelFilter func(m *types.Model) bool
@@ -390,23 +422,25 @@ func (m *openaiComponentImpl) getExternalModels(c context.Context) []types.Model
 				extModel.Metadata = map[string]any{}
 			}
 			extModel.Metadata[types.MetaKeyLLMType] = types.ProviderTypeExternalLLM
-			upstreams := normalizeUpstreamCatalog(extModel.ApiEndpoint, extModel.Upstreams)
-			formatModelID := modelIDBuilder.BuildCompositeModelID(extModel.ModelName, extModel.Provider, m.modelIDFmt)
+			// Convert relational upstreams to types.UpstreamConfig for routing
+			upstreams := dbUpstreamsToConfigs(extModel.Upstreams)
+			provider := extModel.PrimaryProvider()
+			formatModelID := modelIDBuilder.BuildCompositeModelID(extModel.ModelName, provider, m.modelIDFmt)
 			model := types.Model{
 				BaseModel: types.BaseModel{
 					Object:       "model",
 					ID:           extModel.ModelName,
-					OwnedBy:      extModel.Provider,
-					OfficialName: extModel.OfficialName,
+					OwnedBy:      provider,
+					OfficialName: extModel.PrimaryOfficialName(),
 					Metadata:     extModel.Metadata,
 					Task:         task,
 				},
-				Endpoint:      firstEnabledUpstream(upstreams),
+				Endpoint:      router.FirstEnabledUpstream(upstreams),
 				Upstreams:     upstreams,
 				RoutingPolicy: extModel.RoutingPolicy,
 				ExternalModelInfo: types.ExternalModelInfo{
-					Provider:           extModel.Provider,
-					AuthHead:           extModel.AuthHeader,
+					Provider:           provider,
+					AuthHead:           extModel.PrimaryAuthHeader(),
 					FormatModelID:      formatModelID,
 					NeedSensitiveCheck: extModel.NeedSensitiveCheck,
 				},
@@ -467,6 +501,10 @@ func (m *openaiComponentImpl) loadModelFromCache(ctx context.Context, modelID st
 	// Get model from Redis hash using HGET
 	modelJSON, err := m.modelListCache.HGet(ctx, modelCacheKey, modelID)
 	if err != nil {
+		if errors.Is(err, redis.Nil) {
+			// Hash exists but model field does not exist: treat as cache miss.
+			return nil, nil
+		}
 		return nil, fmt.Errorf("failed to get model %s from cache hash for key %s: %w", modelID, modelCacheKey, err)
 	}
 
@@ -484,11 +522,9 @@ func (m *openaiComponentImpl) loadModelFromCache(ctx context.Context, modelID st
 func (m *openaiComponentImpl) GetModelByID(c context.Context, username, modelID string) (*types.Model, error) {
 	model, err := m.loadModelFromCache(c, modelID)
 	if err != nil {
-		if !errors.Is(err, redis.Nil) {
-			return nil, err
-		}
-		// redis.Nil: no cache yet; fall through to fetch from GetAvailableModels (and allow cache to be populated)
-	} else if model != nil {
+		return nil, err
+	}
+	if model != nil {
 		return model, nil
 	}
 	// Cache miss or cache expired: fetch full list (which also triggers saveModelsToCache)
@@ -718,4 +754,37 @@ func (m *openaiComponentImpl) checkOrganization(c context.Context, userUUID stri
 		}
 	}
 	return false, nil
+}
+
+// dbUpstreamsToConfigs converts database.Upstream slice to types.UpstreamConfig slice for routing.
+func dbUpstreamsToConfigs(dbUpstreams []database.Upstream) []commontypes.UpstreamConfig {
+	result := make([]commontypes.UpstreamConfig, 0, len(dbUpstreams))
+	for _, u := range dbUpstreams {
+		uc := commontypes.UpstreamConfig{
+			ID:                    u.ID,
+			URL:                   u.URL,
+			Weight:                u.Weight,
+			Enabled:               u.Enabled,
+			ModelName:             u.ModelName,
+			AuthHeader:            u.AuthHeader,
+			Provider:              u.Provider,
+			HealthCheckEnabled:    u.HealthCheckEnabled,
+			CircuitBreakerEnabled: u.CircuitBreakerEnabled,
+			Tags:                  u.Tags,
+			LimitPolicy:           u.LimitPolicy,
+		}
+		// Carry health/circuit state from DB so the proxy path can use
+		// inline availability checks without a separate cache call.
+		if u.HealthState != nil {
+			uc.HealthState = u.HealthState.HealthState
+		}
+		if u.CircuitState != nil {
+			uc.CircuitState = u.CircuitState.CircuitState
+		}
+		if uc.Weight <= 0 {
+			uc.Weight = 1
+		}
+		result = append(result, uc)
+	}
+	return result
 }

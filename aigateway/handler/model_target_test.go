@@ -8,9 +8,10 @@ import (
 	"strings"
 	"testing"
 
+	"opencsg.com/csghub-server/aigateway/component/router"
+
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"opencsg.com/csghub-server/aigateway/component"
 	"opencsg.com/csghub-server/aigateway/types"
 	"opencsg.com/csghub-server/builder/store/database"
 	commontypes "opencsg.com/csghub-server/common/types"
@@ -58,7 +59,7 @@ func TestResolveModelTarget_ExternalModelSessionHash(t *testing.T) {
 			{URL: "https://api.example.com/node-b/v1/chat/completions", Enabled: true},
 		},
 		RoutingPolicy: commontypes.RoutingPolicy{
-			Strategy:     component.RoutingStrategySessionHash,
+			Strategy:     router.RoutingStrategySessionHash,
 			HashReplicas: 64,
 		},
 	}
@@ -88,7 +89,7 @@ func TestResolveModelTarget_ExternalModelSessionHash_FallbackToUsername(t *testi
 			{URL: "https://api.example.com/node-b/v1/chat/completions", Enabled: true},
 		},
 		RoutingPolicy: commontypes.RoutingPolicy{
-			Strategy:     component.RoutingStrategySessionHash,
+			Strategy:     router.RoutingStrategySessionHash,
 			HashReplicas: 64,
 		},
 	}
@@ -115,7 +116,7 @@ func TestResolveModelTarget_ExternalModelFallsBackToFirstEnabledEndpoint(t *test
 			{URL: "https://api.example.com/node-b/v1/chat/completions", Enabled: true},
 		},
 		RoutingPolicy: commontypes.RoutingPolicy{
-			Strategy: component.RoutingStrategySingle,
+			Strategy: router.RoutingStrategySingle,
 		},
 	}
 	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1").Return(model, nil).Once()
@@ -132,15 +133,14 @@ func TestResolveModelTarget_EndpointOverridesAuthAndProvider(t *testing.T) {
 			ID: "backend-model",
 		},
 		ExternalModelInfo: types.ExternalModelInfo{
-			Provider: "model-level-provider",
 			AuthHead: "Bearer model-level-token",
 		},
 		Upstreams: []commontypes.UpstreamConfig{
 			{
 				URL:        "https://api.example.com/node-a/v1/chat/completions",
 				Enabled:    true,
-				AuthHeader: "Bearer endpoint-level-token",
 				Provider:   "endpoint-provider",
+				AuthHeader: "Bearer endpoint-level-token",
 			},
 			{
 				URL:     "https://api.example.com/node-b/v1/chat/completions",
@@ -148,7 +148,7 @@ func TestResolveModelTarget_EndpointOverridesAuthAndProvider(t *testing.T) {
 			},
 		},
 		RoutingPolicy: commontypes.RoutingPolicy{
-			Strategy: component.RoutingStrategySingle,
+			Strategy: router.RoutingStrategySingle,
 		},
 	}
 	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1").Return(model, nil).Once()
@@ -175,7 +175,7 @@ func TestResolveModelTarget_EndpointOverridesModelName(t *testing.T) {
 			},
 		},
 		RoutingPolicy: commontypes.RoutingPolicy{
-			Strategy: component.RoutingStrategySingle,
+			Strategy: router.RoutingStrategySingle,
 		},
 	}
 	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "model1").Return(model, nil).Once()
@@ -184,7 +184,7 @@ func TestResolveModelTarget_EndpointOverridesModelName(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "provider-specific-model", resolved.ModelName)
 	require.Len(t, resolved.AttemptTargets, 1)
-	require.Equal(t, "provider-specific-model", resolved.AttemptTargets[0].ModelName)
+	require.Equal(t, "provider-specific-model", resolved.AttemptTargets[0].Upstream.ModelName)
 }
 
 func TestResolveModelTarget_GetModelByIDError(t *testing.T) {
@@ -314,7 +314,7 @@ func TestResolveEndpointModelTarget_SameSessionKeyStableAcrossCalls(t *testing.T
 				{URL: "https://api.example.com/node-b/v1/chat/completions", Enabled: true},
 			},
 			RoutingPolicy: commontypes.RoutingPolicy{
-				Strategy:     component.RoutingStrategySessionHash,
+				Strategy:     router.RoutingStrategySessionHash,
 				HashReplicas: 64,
 			},
 		}
@@ -329,16 +329,16 @@ func TestResolveEndpointModelTarget_SameSessionKeyStableAcrossCalls(t *testing.T
 		require.NoError(t, err)
 		require.NotNil(t, result)
 		require.NotEmpty(t, result.Target)
-		require.NotEmpty(t, result.Endpoint.URL)
+		require.NotEmpty(t, result.Upstream.URL)
 
 		if i == 0 {
 			firstTarget = result.Target
-			firstEndpointURL = result.Endpoint.URL
+			firstEndpointURL = result.Upstream.URL
 			firstSessionKeyHash = result.SessionKeyHash
 			continue
 		}
 		require.Equal(t, firstTarget, result.Target)
-		require.Equal(t, firstEndpointURL, result.Endpoint.URL)
+		require.Equal(t, firstEndpointURL, result.Upstream.URL)
 		require.Equal(t, firstSessionKeyHash, result.SessionKeyHash)
 	}
 }
@@ -396,7 +396,6 @@ func TestExtractSessionKeyForModel(t *testing.T) {
 func TestApplyEndpointOverrides(t *testing.T) {
 	model := &types.Model{
 		ExternalModelInfo: types.ExternalModelInfo{
-			Provider: "model-provider",
 			AuthHead: "model-token",
 		},
 	}
@@ -444,4 +443,156 @@ func TestHandleModelTargetError(t *testing.T) {
 		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 		require.Equal(t, "model_not_running", resp.Error.Code)
 	})
+}
+
+func TestFilterAvailableUpstreams_EmptyUpstreams(t *testing.T) {
+	h := &OpenAIHandlerImpl{}
+	result, err := h.filterAvailableUpstreams(context.Background(), &types.Model{}, nil)
+	require.NoError(t, err)
+	require.Nil(t, result)
+}
+
+func TestFilterAvailableUpstreams_NilModel(t *testing.T) {
+	h := &OpenAIHandlerImpl{}
+	upstreams := []commontypes.UpstreamConfig{
+		{URL: "https://api.example.com/v1", Enabled: true},
+	}
+	result, err := h.filterAvailableUpstreams(context.Background(), nil, upstreams)
+	require.NoError(t, err)
+	require.Equal(t, upstreams, result)
+}
+
+func TestFilterAvailableUpstreams_FiltersUnhealthy(t *testing.T) {
+	h := &OpenAIHandlerImpl{}
+	upstreams := []commontypes.UpstreamConfig{
+		{URL: "https://api.example.com/healthy", Enabled: true, HealthCheckEnabled: true, HealthState: "healthy"},
+		{URL: "https://api.example.com/unhealthy", Enabled: true, HealthCheckEnabled: true, HealthState: "unhealthy"},
+		{URL: "https://api.example.com/no_check", Enabled: true, HealthCheckEnabled: false, HealthState: "unhealthy"},
+	}
+
+	result, err := h.filterAvailableUpstreams(context.Background(), &types.Model{}, upstreams)
+	require.NoError(t, err)
+	require.Len(t, result, 2)
+	require.Equal(t, "https://api.example.com/healthy", result[0].URL)
+	require.Equal(t, "https://api.example.com/no_check", result[1].URL) // not checked, passes
+}
+
+func TestFilterAvailableUpstreams_FiltersCircuitOpen(t *testing.T) {
+	h := &OpenAIHandlerImpl{}
+	upstreams := []commontypes.UpstreamConfig{
+		{URL: "https://api.example.com/closed", Enabled: true, CircuitBreakerEnabled: true, CircuitState: "closed"},
+		{URL: "https://api.example.com/open", Enabled: true, CircuitBreakerEnabled: true, CircuitState: "open"},
+		{URL: "https://api.example.com/cb_disabled", Enabled: true, CircuitBreakerEnabled: false, CircuitState: "open"},
+	}
+
+	result, err := h.filterAvailableUpstreams(context.Background(), &types.Model{}, upstreams)
+	require.NoError(t, err)
+	require.Len(t, result, 2)
+	require.Equal(t, "https://api.example.com/closed", result[0].URL)
+	require.Equal(t, "https://api.example.com/cb_disabled", result[1].URL) // CB disabled, passes
+}
+
+func TestFilterAvailableUpstreams_AllUnavailableReturnsError(t *testing.T) {
+	h := &OpenAIHandlerImpl{}
+	upstreams := []commontypes.UpstreamConfig{
+		{URL: "https://api.example.com/dead1", Enabled: true, HealthCheckEnabled: true, HealthState: "unhealthy"},
+		{URL: "https://api.example.com/dead2", Enabled: true, CircuitBreakerEnabled: true, CircuitState: "open"},
+	}
+
+	result, err := h.filterAvailableUpstreams(context.Background(),
+		&types.Model{BaseModel: types.BaseModel{ID: "test-model"}}, upstreams)
+	require.Error(t, err)
+	require.Nil(t, result)
+	targetErr, ok := err.(*modelTargetError)
+	require.True(t, ok)
+	require.Equal(t, "model_unavailable", targetErr.APIError.Code)
+	require.Equal(t, http.StatusServiceUnavailable, targetErr.Status)
+}
+
+func TestFilterAvailableUpstreams_DegradedStillPasses(t *testing.T) {
+	h := &OpenAIHandlerImpl{}
+	upstreams := []commontypes.UpstreamConfig{
+		{URL: "https://api.example.com/degraded", Enabled: true, HealthCheckEnabled: true, HealthState: "degraded"},
+	}
+
+	result, err := h.filterAvailableUpstreams(context.Background(), &types.Model{}, upstreams)
+	require.NoError(t, err)
+	require.Len(t, result, 1) // degraded still passes
+}
+
+func TestFilterAvailableUpstreams_AllEnabledDefaults(t *testing.T) {
+	// No HealthState/CircuitState set and no checks enabled — defaults to available.
+	h := &OpenAIHandlerImpl{}
+	upstreams := []commontypes.UpstreamConfig{
+		{URL: "https://api.example.com/v1", Enabled: true},
+		{URL: "https://api.example.com/v2", Enabled: true},
+	}
+
+	result, err := h.filterAvailableUpstreams(context.Background(), &types.Model{}, upstreams)
+	require.NoError(t, err)
+	require.Len(t, result, 2)
+}
+
+type stubGetCircuitState struct {
+	state *types.ProviderCircuitStatus
+	err   error
+}
+
+func (s *stubGetCircuitState) Start(_ context.Context) error                        { return nil }
+func (s *stubGetCircuitState) Stop() error                                          { return nil }
+func (s *stubGetCircuitState) RecordRequestResult(_ context.Context, _ int64, _ string, _ bool, _ error) error {
+	return nil
+}
+func (s *stubGetCircuitState) GetCircuitState(_ context.Context, _ int64) (*types.ProviderCircuitStatus, error) {
+	return s.state, s.err
+}
+
+func TestFilterAvailableUpstreams_DBCircuitOpen_RTCacheClosed_AllowsUpstream(t *testing.T) {
+	h := &OpenAIHandlerImpl{
+		availabilityManager: &stubGetCircuitState{
+			state: &types.ProviderCircuitStatus{CircuitState: types.CircuitStateClosed},
+		},
+	}
+	upstreams := []commontypes.UpstreamConfig{
+		{ID: 1, URL: "https://api.example.com/cb_open", Enabled: true, CircuitBreakerEnabled: true, CircuitState: "open"},
+	}
+
+	result, err := h.filterAvailableUpstreams(context.Background(), &types.Model{}, upstreams)
+	require.NoError(t, err)
+	require.Len(t, result, 1)
+	require.Equal(t, "https://api.example.com/cb_open", result[0].URL)
+}
+
+func TestFilterAvailableUpstreams_DBCircuitOpen_RTCacheOpen_SkipsUpstream(t *testing.T) {
+	h := &OpenAIHandlerImpl{
+		availabilityManager: &stubGetCircuitState{
+			state: &types.ProviderCircuitStatus{CircuitState: types.CircuitStateOpen},
+		},
+	}
+	upstreams := []commontypes.UpstreamConfig{
+		{ID: 1, URL: "https://api.example.com/cb_open", Enabled: true, CircuitBreakerEnabled: true, CircuitState: "open"},
+		{URL: "https://api.example.com/healthy", Enabled: true, HealthCheckEnabled: true, HealthState: "healthy"},
+	}
+
+	result, err := h.filterAvailableUpstreams(context.Background(), &types.Model{}, upstreams)
+	require.NoError(t, err)
+	require.Len(t, result, 1)
+	require.Equal(t, "https://api.example.com/healthy", result[0].URL)
+}
+
+func TestFilterAvailableUpstreams_DBCircuitOpen_RTCacheError_SkipsUpstream(t *testing.T) {
+	h := &OpenAIHandlerImpl{
+		availabilityManager: &stubGetCircuitState{
+			err: errors.New("redis unreachable"),
+		},
+	}
+	upstreams := []commontypes.UpstreamConfig{
+		{ID: 1, URL: "https://api.example.com/cb_open", Enabled: true, CircuitBreakerEnabled: true, CircuitState: "open"},
+		{URL: "https://api.example.com/healthy", Enabled: true, HealthCheckEnabled: true, HealthState: "healthy"},
+	}
+
+	result, err := h.filterAvailableUpstreams(context.Background(), &types.Model{}, upstreams)
+	require.NoError(t, err)
+	require.Len(t, result, 1)
+	require.Equal(t, "https://api.example.com/healthy", result[0].URL)
 }

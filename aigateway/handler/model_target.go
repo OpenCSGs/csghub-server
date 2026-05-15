@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"opencsg.com/csghub-server/aigateway/component"
+	"opencsg.com/csghub-server/aigateway/component/router"
 	"opencsg.com/csghub-server/aigateway/types"
 	commonType "opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
@@ -17,7 +17,7 @@ import (
 
 type resolvedModelTarget struct {
 	Model          *types.Model
-	Endpoint       commonType.UpstreamConfig
+	Upstream       commonType.UpstreamConfig
 	TargetReq      commonType.EndpointReq
 	Target         string
 	Host           string
@@ -72,7 +72,7 @@ type endpointTargetResolveInput struct {
 }
 
 type endpointTargetResolveResult struct {
-	Endpoint       commonType.UpstreamConfig
+	Upstream       commonType.UpstreamConfig
 	Target         string
 	ModelName      string
 	SessionKeyHash string
@@ -82,9 +82,7 @@ type endpointTargetResolveResult struct {
 }
 
 type chatAttemptTarget struct {
-	Target    string
-	Endpoint  commonType.UpstreamConfig
-	ModelName string
+	Upstream commonType.UpstreamConfig
 }
 
 func (h *OpenAIHandlerImpl) chatMaxFallbackAttempts() int {
@@ -169,7 +167,7 @@ func (h *OpenAIHandlerImpl) resolveModelTarget(ctx context.Context, username, mo
 		if err != nil {
 			return nil, err
 		}
-		resolved.Endpoint = result.Endpoint
+		resolved.Upstream = result.Upstream
 		resolved.Target = result.Target
 		resolved.ModelName = result.ModelName
 		resolved.SessionKeyHash = result.SessionKeyHash
@@ -222,13 +220,36 @@ func (h *OpenAIHandlerImpl) resolveEndpointModelTarget(
 	sessionKey := extractSessionKeyForModel(input.Model, input.Headers, input.Username)
 	sessionKeyHash := sessionKeyDigest(sessionKey)
 
-	endpoint, err := h.sessionRouter.PickEndpoint(
+	// normalizedUpstreams filter enable upstream
+	normalizedUpstreams := router.NormalizeEnabledUpstreams(input.Model.Upstreams)
+	// filterAvailableUpstreams filter healthy statues upstream
+	availableUpstreams, availabilityErr := h.filterAvailableUpstreams(ctx, input.Model, normalizedUpstreams)
+	if availabilityErr != nil {
+		return nil, availabilityErr
+	}
+	input.Model.Upstreams = availableUpstreams
+
+	// PickUpstream by router strategy
+	upstream, err := h.sessionRouter.PickUpstream(
 		input.Model.ID,
 		sessionKey,
 		input.Model.Upstreams,
 		input.Model.RoutingPolicy,
 	)
-	slog.InfoContext(ctx, "picked endpoint", "session_key", sessionKey, "endpoint", endpoint, "routing_policy", input.Model.RoutingPolicy)
+	slog.InfoContext(
+		ctx,
+		"picked upstream",
+		"session_key",
+		sessionKey,
+		"upstream",
+		upstream.URL,
+		"upstream_provider",
+		upstream.Provider,
+		"upstream_weight",
+		upstream.Weight,
+		"routing_policy",
+		input.Model.RoutingPolicy,
+	)
 	if err != nil && input.Model.Endpoint == "" {
 		return nil, newInvalidRequestModelTargetError(
 			"model_not_running",
@@ -241,37 +262,74 @@ func (h *OpenAIHandlerImpl) resolveEndpointModelTarget(
 		)
 	}
 
-	target := input.Model.Endpoint
-	selectedEndpoint := commonType.UpstreamConfig{}
-	if endpoint.URL != "" {
-		selectedEndpoint = endpoint
-		target = endpoint.URL
-	} else if target != "" {
-		selectedEndpoint = component.EndpointByTarget(input.Model.Upstreams, target)
+	// Use the picked upstream; fall back to model.Endpoint for legacy
+	// models that have no upstreams configured.
+	target := upstream.URL
+	if target == "" {
+		target = input.Model.Endpoint
 	}
-
 	input.TargetReq.Target = target
 	input.TargetReq.Endpoint = target
 	input.Model.Endpoint = target
-	applyEndpointOverrides(input.Model, selectedEndpoint)
+	if upstream.URL != "" {
+		applyEndpointOverrides(input.Model, upstream)
+	}
 
-	modelName := resolveEndpointModelName(input.Model.ID, selectedEndpoint)
-	attemptTargets := buildChatAttemptTargets(target, input.Model.ID, input.Model.Upstreams, h.chatMaxFallbackAttempts())
-	primaryTarget := target
+	modelName := resolveEndpointModelName(input.Model.ID, upstream)
+	attemptTargets := buildChatAttemptTargets(upstream, availableUpstreams, h.chatMaxFallbackAttempts())
 	fallbackTarget := ""
 	if len(attemptTargets) > 1 {
-		fallbackTarget = attemptTargets[1].Target
+		fallbackTarget = attemptTargets[1].Upstream.URL
 	}
 
 	return &endpointTargetResolveResult{
-		Endpoint:       selectedEndpoint,
+		Upstream:       upstream,
 		Target:         target,
 		ModelName:      modelName,
 		SessionKeyHash: sessionKeyHash,
 		AttemptTargets: attemptTargets,
-		PrimaryTarget:  primaryTarget,
+		PrimaryTarget:  target,
 		FallbackTarget: fallbackTarget,
 	}, nil
+}
+
+func (h *OpenAIHandlerImpl) filterAvailableUpstreams(
+	ctx context.Context,
+	model *types.Model,
+	upstreams []commonType.UpstreamConfig,
+) ([]commonType.UpstreamConfig, error) {
+	if len(upstreams) == 0 || model == nil {
+		return upstreams, nil
+	}
+
+	filtered := make([]commonType.UpstreamConfig, 0, len(upstreams))
+	for _, u := range upstreams {
+		if types.IsUpstreamCircuitOpen(u) {
+			if h.availabilityManager != nil {
+				if rtState, err := h.availabilityManager.GetCircuitState(ctx, u.ID); err == nil && rtState.CircuitState != types.CircuitStateOpen {
+					slog.DebugContext(ctx, "circuit state from cache differs from DB, allowing upstream",
+						"upstream_id", u.ID, "db_state", types.CircuitStateOpen, "rt_state", rtState.CircuitState)
+				} else {
+					continue
+				}
+			} else {
+				continue
+			}
+		} else if types.IsUpstreamUnhealthy(u) {
+			continue
+		}
+		filtered = append(filtered, u)
+	}
+	if len(filtered) == 0 {
+		return nil, newModelTargetError(modelTargetErrorParams{
+			Status:  http.StatusServiceUnavailable,
+			Code:    "model_unavailable",
+			Message: fmt.Sprintf("model '%s' has no available upstream endpoint", model.ID),
+			Type:    "service_unavailable_error",
+			Options: modelTargetErrorOptions{Model: model},
+		})
+	}
+	return filtered, nil
 }
 
 func resolveEndpointModelName(defaultModelName string, upstream commonType.UpstreamConfig) string {

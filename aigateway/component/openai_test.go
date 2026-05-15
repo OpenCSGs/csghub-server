@@ -850,8 +850,7 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 					CSGHubModelID: "m",
 				},
 				ExternalModelInfo: types.ExternalModelInfo{
-					Provider: "openai",
-				},
+					},
 			},
 			wantError: true,
 			setupMock: func() {

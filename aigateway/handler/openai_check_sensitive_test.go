@@ -41,14 +41,13 @@ func TestOpenAIHandler_checkSensitive(t *testing.T) {
 		model := &types.Model{
 			BaseModel: types.BaseModel{
 				ID:           "another/model",
-				OfficialName: "Qwen/Qwen3Guard",
 			},
 			ExternalModelInfo: types.ExternalModelInfo{
 				NeedSensitiveCheck: true,
 			},
 		}
-		tester.mocks.whitelistRule.EXPECT().ListBySensitiveCheckTargets(ctx, []string{"qwen", "another"}, "another/model").Return([]database.RepositoryFileCheckRule{
-			{RuleType: database.RuleTypeNamespace, Pattern: "qwen"},
+		tester.mocks.whitelistRule.EXPECT().ListBySensitiveCheckTargets(ctx, []string{"another"}, "another/model").Return([]database.RepositoryFileCheckRule{
+			{RuleType: database.RuleTypeNamespace, Pattern: "another"},
 		}, nil).Once()
 		tester.mocks.moderationComp.EXPECT().CheckChatPrompts(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, nil).Maybe()
 
@@ -67,13 +66,12 @@ func TestOpenAIHandler_checkSensitive(t *testing.T) {
 		model := &types.Model{
 			BaseModel: types.BaseModel{
 				ID:           "another/model",
-				OfficialName: "Qwen/Qwen3Guard",
 			},
 			ExternalModelInfo: types.ExternalModelInfo{
 				NeedSensitiveCheck: true,
 			},
 		}
-		tester.mocks.whitelistRule.EXPECT().ListBySensitiveCheckTargets(ctx, []string{"qwen", "another"}, "another/model").Return(nil, errors.New("db error")).Once()
+		tester.mocks.whitelistRule.EXPECT().ListBySensitiveCheckTargets(ctx, []string{"another"}, "another/model").Return(nil, errors.New("db error")).Once()
 		tester.mocks.moderationComp.EXPECT().CheckChatPrompts(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, nil).Maybe()
 
 		needCheck, result, err := tester.handler.sensitivePolicy.CheckChatSensitive(ctx, model, chatReq.Messages, userUUID, false)
@@ -92,7 +90,6 @@ func TestOpenAIHandler_checkSensitive(t *testing.T) {
 			},
 			ExternalModelInfo: types.ExternalModelInfo{
 				NeedSensitiveCheck: true,
-				Provider:           "",
 			},
 		}
 		tester.mocks.whitelistRule.EXPECT().ListBySensitiveCheckTargets(ctx, []string{"qwen"}, "Qwen/Qwen3Guard").Return([]database.RepositoryFileCheckRule{
@@ -116,7 +113,6 @@ func TestOpenAIHandler_checkSensitive(t *testing.T) {
 			},
 			ExternalModelInfo: types.ExternalModelInfo{
 				NeedSensitiveCheck: true,
-				Provider:           "",
 			},
 		}
 		tester.mocks.whitelistRule.EXPECT().ListBySensitiveCheckTargets(ctx, []string{"qwen"}, "Qwen/Qwen3Guard").Return([]database.RepositoryFileCheckRule{}, nil).Once()
@@ -139,7 +135,6 @@ func TestOpenAIHandler_checkSensitive(t *testing.T) {
 			},
 			ExternalModelInfo: types.ExternalModelInfo{
 				NeedSensitiveCheck: true,
-				Provider:           "",
 			},
 		}
 		tester.mocks.whitelistRule.EXPECT().ListBySensitiveCheckTargets(ctx, []string{"qwen"}, "Qwen/Qwen3Guard").Return([]database.RepositoryFileCheckRule{}, nil).Once()
@@ -163,7 +158,6 @@ func TestOpenAIHandler_checkSensitive(t *testing.T) {
 			},
 			ExternalModelInfo: types.ExternalModelInfo{
 				NeedSensitiveCheck: true,
-				Provider:           "",
 			},
 		}
 		tester.mocks.whitelistRule.EXPECT().ListBySensitiveCheckTargets(ctx, []string{"qwen"}, "Qwen/Qwen3Guard").Return([]database.RepositoryFileCheckRule{
@@ -187,7 +181,6 @@ func TestOpenAIHandler_checkSensitive(t *testing.T) {
 			},
 			ExternalModelInfo: types.ExternalModelInfo{
 				NeedSensitiveCheck: true,
-				Provider:           "",
 			},
 		}
 		tester.mocks.whitelistRule.EXPECT().ListBySensitiveCheckTargets(ctx, []string{"qwen"}, "Qwen/Qwen3Guard").Return([]database.RepositoryFileCheckRule{
@@ -211,7 +204,6 @@ func TestOpenAIHandler_checkSensitive(t *testing.T) {
 			},
 			ExternalModelInfo: types.ExternalModelInfo{
 				NeedSensitiveCheck: true,
-				Provider:           "",
 			},
 		}
 		tester.mocks.whitelistRule.EXPECT().ListBySensitiveCheckTargets(ctx, []string{"qwen"}, "Qwen/Qwen3Guard").Return([]database.RepositoryFileCheckRule{}, nil).Once()

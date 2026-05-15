@@ -1380,7 +1380,6 @@ func TestRepoComponent_DeployDetail(t *testing.T) {
 
 	repo.mocks.stores.ClusterInfoMock().EXPECT().ByClusterID(ctx, "cluster").Return(database.ClusterInfo{
 		Zone:     "z",
-		Provider: "p",
 	}, nil)
 	repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(1)).Return(&database.Deploy{
 		RepoID:        1,

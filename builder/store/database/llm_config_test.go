@@ -22,7 +22,6 @@ func TestLLMConfigStore_GetOptimization(t *testing.T) {
 		Type:         1,
 		Enabled:      true,
 		ModelName:    "c1",
-		OfficialName: "c1",
 		Metadata:     map[string]any{"source": "test"},
 	}).Exec(ctx)
 	require.Nil(t, err)
@@ -30,21 +29,18 @@ func TestLLMConfigStore_GetOptimization(t *testing.T) {
 		Type:         2,
 		Enabled:      true,
 		ModelName:    "c2",
-		OfficialName: "c2",
 	}).Exec(ctx)
 	require.Nil(t, err)
 	_, err = db.Core.NewInsert().Model(&database.LLMConfig{
 		Type:         1,
 		Enabled:      false,
 		ModelName:    "c3",
-		OfficialName: "c3",
 	}).Exec(ctx)
 	require.Nil(t, err)
 
 	cfg, err := store.GetOptimization(ctx)
 	require.Nil(t, err)
 	require.Equal(t, "c1", cfg.ModelName)
-	require.Equal(t, "c1", cfg.OfficialName)
 	require.Equal(t, map[string]any{"source": "test"}, cfg.Metadata)
 }
 
@@ -59,7 +55,6 @@ func TestLLMConfigStore_GetModelForSummaryReadme(t *testing.T) {
 		Type:         5,
 		Enabled:      true,
 		ModelName:    "summary1",
-		OfficialName: "summary1",
 		Metadata:     map[string]any{"k": "v"},
 	}).Exec(ctx)
 	require.Nil(t, err)
@@ -82,7 +77,6 @@ func TestLLMConfigStore_GetModelForSummaryReadme(t *testing.T) {
 	require.Nil(t, err)
 	require.NotNil(t, cfg)
 	require.Equal(t, "summary1", cfg.ModelName)
-	require.Equal(t, "summary1", cfg.OfficialName)
 	require.Equal(t, map[string]any{"k": "v"}, cfg.Metadata)
 }
 
@@ -98,7 +92,6 @@ func TestLLMConfigStore_GetByID(t *testing.T) {
 		Type:         5,
 		Enabled:      true,
 		ModelName:    "summary1",
-		OfficialName: "summary1",
 		Metadata:     map[string]any{"k": "v"},
 	}
 	_, err = db.Core.NewInsert().Model(&dbInput).Exec(ctx)
@@ -108,7 +101,6 @@ func TestLLMConfigStore_GetByID(t *testing.T) {
 	require.Nil(t, err)
 	require.NotNil(t, cfg)
 	require.Equal(t, "summary1", cfg.ModelName)
-	require.Equal(t, "summary1", cfg.OfficialName)
 	require.Equal(t, map[string]any{"k": "v"}, cfg.Metadata)
 }
 
@@ -120,13 +112,9 @@ func TestLLMConfigStore_CRUD(t *testing.T) {
 	require.Nil(t, err)
 	store := database.NewLLMConfigStoreWithDB(db, config)
 	dbInput := database.LLMConfig{
-		Type:         5,
-		Enabled:      true,
-		ModelName:    "summary1",
-		OfficialName: "summary1",
-		Upstreams: []types.UpstreamConfig{
-			{URL: "https://example.test/v1/chat/completions", Enabled: true, Weight: 1},
-		},
+		Type:     5,
+		Enabled:  true,
+		ModelName: "summary1",
 		RoutingPolicy: types.RoutingPolicy{
 			Strategy:      "session_hash",
 			SessionHeader: "X-Session-ID",
@@ -138,9 +126,7 @@ func TestLLMConfigStore_CRUD(t *testing.T) {
 	require.Nil(t, err)
 	require.NotNil(t, res)
 	require.Equal(t, "summary1", res.ModelName)
-	require.Equal(t, "summary1", res.OfficialName)
-	require.Len(t, res.Upstreams, 1)
-	require.Equal(t, "https://example.test/v1/chat/completions", res.Upstreams[0].URL)
+	// OfficialName, Upstreams are now relational, tested separately
 	require.Equal(t, map[string]any{"k": "v", "tasks": []interface{}{"text-generation", "text-to-image"}}, res.Metadata)
 
 	searchType := 5
@@ -167,11 +153,11 @@ func TestLLMConfigStore_Search(t *testing.T) {
 
 	// Create test data with hyphens and letter-number combinations
 	testModels := []database.LLMConfig{
-		{Type: 1, Enabled: true, ModelName: "deepseek-v3", OfficialName: "deepseek-v3"},
-		{Type: 1, Enabled: true, ModelName: "openai/gpt-4", OfficialName: "gpt-4"},
-		{Type: 1, Enabled: true, ModelName: "claude3-opus", OfficialName: "claude3-opus"},
-		{Type: 1, Enabled: true, ModelName: "llama2-7b", OfficialName: "llama2-7b"},
-		{Type: 1, Enabled: true, ModelName: "Qwen/Qwen3Guard-Gen-0.6B", OfficialName: "Qwen3Guard"},
+		{Type: 1, Enabled: true, ModelName: "deepseek-v3"},
+		{Type: 1, Enabled: true, ModelName: "openai/gpt-4"},
+		{Type: 1, Enabled: true, ModelName: "claude3-opus"},
+		{Type: 1, Enabled: true, ModelName: "llama2-7b"},
+		{Type: 1, Enabled: true, ModelName: "Qwen/Qwen3Guard-Gen-0.6B"},
 	}
 
 	for _, model := range testModels {
@@ -242,22 +228,6 @@ func TestLLMConfigStore_Search(t *testing.T) {
 		}
 	}
 	require.True(t, found, "Should find gpt-4 when searching for gpt-4")
-
-	// Test case 5: Search should be case-insensitive
-	search5 := &types.SearchLLMConfig{
-		Keyword: "qwen",
-	}
-	cfgs5, total5, err := store.Index(ctx, 10, 1, search5)
-	require.Nil(t, err)
-	require.GreaterOrEqual(t, total5, 1)
-	found = false
-	for _, cfg := range cfgs5 {
-		if cfg.ModelName == "Qwen/Qwen3Guard-Gen-0.6B" {
-			found = true
-			break
-		}
-	}
-	require.True(t, found, "Should find Qwen model when searching for qwen")
 }
 
 func TestLLMConfigStore_Index_EnabledFilter(t *testing.T) {
@@ -270,29 +240,18 @@ func TestLLMConfigStore_Index_EnabledFilter(t *testing.T) {
 
 	searchType := 16
 	base := database.LLMConfig{
-		Type:        searchType,
-		ApiEndpoint: "https://example.test/v1",
-		AuthHeader:  "{}",
-		Provider:    "test",
+		Type: searchType,
 	}
 	_, err = store.Create(ctx, database.LLMConfig{
 		ModelName:    "idx-en-on",
-		OfficialName: "idx-en-on",
 		Enabled:      true,
 		Type:         base.Type,
-		ApiEndpoint:  base.ApiEndpoint,
-		AuthHeader:   base.AuthHeader,
-		Provider:     base.Provider,
 	})
 	require.Nil(t, err)
 	_, err = store.Create(ctx, database.LLMConfig{
 		ModelName:    "idx-en-off",
-		OfficialName: "idx-en-off",
 		Enabled:      false,
 		Type:         base.Type,
-		ApiEndpoint:  base.ApiEndpoint,
-		AuthHeader:   base.AuthHeader,
-		Provider:     base.Provider,
 	})
 	require.Nil(t, err)
 
@@ -376,24 +335,16 @@ func TestLLMConfigStore_IndexWithRepo(t *testing.T) {
 
 	_, err = store.Create(ctx, database.LLMConfig{
 		ModelName:    "with-repo-model",
-		OfficialName: "With Repo Model",
 		Type:         llmType,
 		Enabled:      true,
-		ApiEndpoint:  "https://example.test/v1",
-		AuthHeader:   "{}",
-		Provider:     "test",
 		RepoID:       repo.ID,
 	})
 	require.Nil(t, err)
 
 	_, err = store.Create(ctx, database.LLMConfig{
 		ModelName:    "no-repo-model",
-		OfficialName: "No Repo Model",
 		Type:         llmType,
 		Enabled:      true,
-		ApiEndpoint:  "https://example.test/v1",
-		AuthHeader:   "{}",
-		Provider:     "test",
 		RepoID:       0,
 	})
 	require.Nil(t, err)

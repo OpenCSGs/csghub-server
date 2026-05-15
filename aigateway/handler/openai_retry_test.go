@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
@@ -24,12 +25,41 @@ type testCommonResponseWriter struct {
 }
 
 type testChatAttemptFailureReporter struct {
+	mu     sync.Mutex
+	doneCh chan struct{}
 	events []ChatAttemptFailureEvent
 }
 
+func newTestChatAttemptFailureReporter() *testChatAttemptFailureReporter {
+	return &testChatAttemptFailureReporter{
+		doneCh: make(chan struct{}, 10),
+	}
+}
+
 func (r *testChatAttemptFailureReporter) ReportChatAttemptFailure(_ context.Context, event ChatAttemptFailureEvent) error {
+	r.mu.Lock()
 	r.events = append(r.events, event)
+	r.mu.Unlock()
+	r.doneCh <- struct{}{}
 	return nil
+}
+
+func (r *testChatAttemptFailureReporter) Wait() {
+	<-r.doneCh
+}
+
+func (r *testChatAttemptFailureReporter) Events() []ChatAttemptFailureEvent {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	cp := make([]ChatAttemptFailureEvent, len(r.events))
+	copy(cp, r.events)
+	return cp
+}
+
+func (r *testChatAttemptFailureReporter) Len() int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return len(r.events)
 }
 
 func newTestCommonResponseWriter() *testCommonResponseWriter {
@@ -65,17 +95,13 @@ func TestApplyChatFallbackTarget(t *testing.T) {
 			ExternalModelInfo: types.ExternalModelInfo{AuthHead: `{"Authorization":"Bearer primary-token"}`, Provider: "primary-provider"},
 			Upstreams: []commontypes.UpstreamConfig{
 				{
-					URL:        "https://primary.example.com/v1/chat/completions",
-					Enabled:    true,
-					AuthHeader: `{"Authorization":"Bearer primary-token"}`,
-					Provider:   "primary-provider",
+					URL:     "https://primary.example.com/v1/chat/completions",
+					Enabled: true,
 				},
 				{
-					URL:        "https://fallback.example.com/v1/chat/completions",
-					Enabled:    true,
-					ModelName:  "fallback-model",
-					AuthHeader: `{"Authorization":"Bearer fallback-token"}`,
-					Provider:   "fallback-provider",
+					URL:       "https://fallback.example.com/v1/chat/completions",
+					Enabled:   true,
+					ModelName: "fallback-model",
 				},
 			},
 		},
@@ -84,20 +110,18 @@ func TestApplyChatFallbackTarget(t *testing.T) {
 	}
 
 	applyChatFallbackTarget(context.Background(), headers, modelTarget, chatAttemptTarget{
-		Target: "https://fallback.example.com/v1/chat/completions",
-		Endpoint: commontypes.UpstreamConfig{
+		Upstream: commontypes.UpstreamConfig{
 			URL:        "https://fallback.example.com/v1/chat/completions",
 			Enabled:    true,
-			ModelName:  "fallback-model",
-			AuthHeader: `{"Authorization":"Bearer fallback-token"}`,
 			Provider:   "fallback-provider",
+			AuthHeader: `{"Authorization":"Bearer fallback-token"}`,
+			ModelName:  "fallback-model",
 		},
-		ModelName: "fallback-model",
 	}, nil, nil)
 
 	require.Equal(t, "https://fallback.example.com/v1/chat/completions", modelTarget.Target)
 	require.Equal(t, "https://fallback.example.com/v1/chat/completions", modelTarget.Model.Endpoint)
-	require.Equal(t, "https://fallback.example.com/v1/chat/completions", modelTarget.Endpoint.URL)
+	require.Equal(t, "https://fallback.example.com/v1/chat/completions", modelTarget.Upstream.URL)
 	require.Equal(t, "fallback-model", modelTarget.ModelName)
 	require.Equal(t, "fallback-provider", modelTarget.Model.Provider)
 	require.Equal(t, `{"Authorization":"Bearer fallback-token"}`, modelTarget.Model.AuthHead)
@@ -196,7 +220,7 @@ func TestRetryChatWithFallback_ReturnsNilWithoutFallbackTargets(t *testing.T) {
 		},
 		ModelName:      "test-model",
 		Target:         "https://primary.example.com/v1/chat/completions",
-		AttemptTargets: []chatAttemptTarget{{Target: "https://primary.example.com/v1/chat/completions", ModelName: "test-model"}},
+		AttemptTargets: []chatAttemptTarget{{Upstream: commontypes.UpstreamConfig{URL: "https://primary.example.com/v1/chat/completions", Enabled: true}}},
 	}
 
 	err := tester.handler.retryChatWithFallback(c, newTestCommonResponseWriter(), modelTarget, "user-1", &ChatCompletionRequest{Model: "test-model"}, nil, nil)
@@ -224,11 +248,11 @@ func TestRetryChatWithFallback_ReplaysLastRetryableFallbackResponse(t *testing.T
 				{URL: lastFallbackURL, Enabled: true},
 			},
 		},
-		ModelName:      "test-model",
-		Target:         "https://primary.example.com/v1/chat/completions",
+		ModelName: "test-model",
+		Target:    "https://primary.example.com/v1/chat/completions",
 		AttemptTargets: []chatAttemptTarget{
-			{Target: "https://primary.example.com/v1/chat/completions", ModelName: "test-model"},
-			{Target: lastFallbackURL, Endpoint: commontypes.UpstreamConfig{URL: lastFallbackURL, Enabled: true}, ModelName: "test-model"},
+			{Upstream: commontypes.UpstreamConfig{URL: "https://primary.example.com/v1/chat/completions", Enabled: true}},
+			{Upstream: commontypes.UpstreamConfig{URL: lastFallbackURL, Enabled: true}},
 		},
 	}
 	tester.mocks.openAIComp.EXPECT().
@@ -279,9 +303,9 @@ func TestRetryChatWithFallback_ContinuesUntilNextFallbackSucceeds(t *testing.T) 
 		ModelName: "test-model",
 		Target:    "https://primary.example.com/v1/chat/completions",
 		AttemptTargets: []chatAttemptTarget{
-			{Target: "https://primary.example.com/v1/chat/completions", ModelName: "test-model"},
-			{Target: firstFallbackURL, Endpoint: commontypes.UpstreamConfig{URL: firstFallbackURL, Enabled: true}, ModelName: "test-model"},
-			{Target: secondFallbackURL, Endpoint: commontypes.UpstreamConfig{URL: secondFallbackURL, Enabled: true}, ModelName: "test-model"},
+			{Upstream: commontypes.UpstreamConfig{URL: "https://primary.example.com/v1/chat/completions", Enabled: true}},
+			{Upstream: commontypes.UpstreamConfig{URL: firstFallbackURL, Enabled: true}},
+			{Upstream: commontypes.UpstreamConfig{URL: secondFallbackURL, Enabled: true}},
 		},
 	}
 	tester.mocks.openAIComp.EXPECT().
@@ -340,8 +364,8 @@ func TestRetryChatWithFallback_UsesFallbackModelName(t *testing.T) {
 		ModelName: "logical-model",
 		Target:    "https://primary.example.com/v1/chat/completions",
 		AttemptTargets: []chatAttemptTarget{
-			{Target: "https://primary.example.com/v1/chat/completions", ModelName: "logical-model"},
-			{Target: fallbackURL, Endpoint: commontypes.UpstreamConfig{URL: fallbackURL, Enabled: true, ModelName: "provider-fallback-model"}, ModelName: "provider-fallback-model"},
+			{Upstream: commontypes.UpstreamConfig{URL: "https://primary.example.com/v1/chat/completions", Enabled: true}},
+			{Upstream: commontypes.UpstreamConfig{URL: fallbackURL, Enabled: true, ModelName: "provider-fallback-model"}},
 		},
 	}
 	tester.mocks.openAIComp.EXPECT().
@@ -368,7 +392,7 @@ func TestRetryChatWithFallback_UsesFallbackModelName(t *testing.T) {
 func TestRetryChatWithFallback_ReportsFallbackAttemptFailure(t *testing.T) {
 	tester, c, _ := setupTest(t)
 	tester.mocks.openAIComp.ExpectedCalls = nil
-	reporter := &testChatAttemptFailureReporter{}
+	reporter := newTestChatAttemptFailureReporter()
 	tester.handler.SetChatAttemptFailureReporter(reporter)
 
 	fallback := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -386,8 +410,8 @@ func TestRetryChatWithFallback_ReportsFallbackAttemptFailure(t *testing.T) {
 		ModelName: "logical-model",
 		Target:    "https://primary.example.com/v1/chat/completions",
 		AttemptTargets: []chatAttemptTarget{
-			{Target: "https://primary.example.com/v1/chat/completions", ModelName: "logical-model"},
-			{Target: fallbackURL, Endpoint: commontypes.UpstreamConfig{URL: fallbackURL, Enabled: true}, ModelName: "logical-model"},
+			{Upstream: commontypes.UpstreamConfig{URL: "https://primary.example.com/v1/chat/completions", Enabled: true}},
+			{Upstream: commontypes.UpstreamConfig{URL: fallbackURL, Enabled: true}},
 		},
 	}
 	tester.mocks.openAIComp.EXPECT().
@@ -407,10 +431,12 @@ func TestRetryChatWithFallback_ReportsFallbackAttemptFailure(t *testing.T) {
 	)
 
 	require.NoError(t, err)
-	require.Len(t, reporter.events, 1)
-	require.Equal(t, chatAttemptPhaseFallback, reporter.events[0].Phase)
-	require.Equal(t, 1, reporter.events[0].FallbackAttempt)
-	require.Equal(t, fallbackURL, reporter.events[0].Target)
-	require.Equal(t, http.StatusServiceUnavailable, reporter.events[0].StatusCode)
-	require.True(t, reporter.events[0].Retryable)
+	reporter.Wait()
+	events := reporter.Events()
+	require.Len(t, events, 1)
+	require.Equal(t, chatAttemptPhaseFallback, events[0].Phase)
+	require.Equal(t, 1, events[0].FallbackAttempt)
+	require.Equal(t, fallbackURL, events[0].Target)
+	require.Equal(t, http.StatusServiceUnavailable, events[0].StatusCode)
+	require.True(t, events[0].Retryable)
 }

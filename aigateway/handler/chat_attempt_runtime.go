@@ -50,11 +50,12 @@ func updateChatAttemptRuntime(tokenCounter token.ChatTokenCounter, logCapture co
 }
 
 func applyChatFallbackTarget(ctx context.Context, headers http.Header, modelTarget *resolvedModelTarget, target chatAttemptTarget, tokenCounter token.ChatTokenCounter, logCapture component.LLMLogRecorder) {
-	modelTarget.Target = target.Target
-	modelTarget.Model.Endpoint = target.Target
-	modelTarget.Endpoint = target.Endpoint
-	modelTarget.ModelName = target.ModelName
-	applyEndpointOverrides(modelTarget.Model, modelTarget.Endpoint)
+	targetURL := target.Upstream.URL
+	modelTarget.Target = targetURL
+	modelTarget.Model.Endpoint = targetURL
+	modelTarget.Upstream = target.Upstream
+	modelTarget.ModelName = resolveEndpointModelName(modelTarget.Model.ID, target.Upstream)
+	applyEndpointOverrides(modelTarget.Model, modelTarget.Upstream)
 	if err := applyModelAuthHeaders(headers, modelTarget.Model); err != nil {
 		slog.WarnContext(ctx, "invalid fallback auth head", slog.String("model", modelTarget.ModelName), slog.Any("error", err))
 	}

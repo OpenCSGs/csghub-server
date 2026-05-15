@@ -56,14 +56,20 @@ type testerOpenAIHandler struct {
 
 type testChatAttemptFailureReporterWithMutex struct {
 	mu     sync.Mutex
+	doneCh chan struct{}
 	events []ChatAttemptFailureEvent
 }
 
 func (r *testChatAttemptFailureReporterWithMutex) ReportChatAttemptFailure(_ context.Context, event ChatAttemptFailureEvent) error {
 	r.mu.Lock()
-	defer r.mu.Unlock()
 	r.events = append(r.events, event)
+	r.mu.Unlock()
+	r.doneCh <- struct{}{}
 	return nil
+}
+
+func (r *testChatAttemptFailureReporterWithMutex) Wait() {
+	<-r.doneCh
 }
 
 func (r *testChatAttemptFailureReporterWithMutex) Events() []ChatAttemptFailureEvent {
@@ -812,7 +818,6 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 				Host:     "",
 				Model:    model.ID,
 				ImageID:  model.ImageID,
-				Provider: "",
 			}).
 			Return(llmTokenCounter)
 		llmTokenCounter.EXPECT().AppendPrompts(expectReq.Messages).Return()
@@ -863,7 +868,6 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 				SvcName: "",
 			},
 			ExternalModelInfo: types.ExternalModelInfo{
-				Provider:           "OpenAI",
 				FormatModelID:      "test-model-1(OpenAI)",
 				NeedSensitiveCheck: true,
 			},
@@ -882,7 +886,6 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 				Host:     "",
 				Model:    model.ID,
 				ImageID:  model.ImageID,
-				Provider: "",
 			}).
 			Return(llmTokenCounter)
 		llmTokenCounter.EXPECT().AppendPrompts(expectReq.Messages).Return()
@@ -903,7 +906,7 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 	t.Run("report primary upstream http status failure for downstream processing", func(t *testing.T) {
 		tester, c, w := setupTest(t)
 		tester.mocks.openAIComp.ExpectedCalls = nil
-		reporter := &testChatAttemptFailureReporterWithMutex{}
+		reporter := &testChatAttemptFailureReporterWithMutex{doneCh: make(chan struct{}, 10)}
 		tester.handler.SetChatAttemptFailureReporter(reporter)
 
 		chatReq := ChatCompletionRequest{
@@ -970,6 +973,7 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 		wg.Wait()
 
 		assert.Equal(t, http.StatusNotFound, w.Code)
+		reporter.Wait()
 		events := reporter.Events()
 		require.Len(t, events, 1)
 		assert.Equal(t, chatAttemptPhasePrimary, events[0].Phase)
@@ -1205,7 +1209,6 @@ func TestOpenAIHandler_Transcription(t *testing.T) {
 			},
 			Endpoint: server.URL + "/v1/audio/transcriptions",
 			ExternalModelInfo: types.ExternalModelInfo{
-				Provider: "openai",
 				AuthHead: `{"Authorization":"Bearer provider-token"}`,
 			},
 		}
