@@ -415,6 +415,7 @@ func TestSkillComponent_ShowWithStatistics(t *testing.T) {
 	cc.mocks.components.repo.EXPECT().GetMirrorTaskStatus(skill.Repository).Return(
 		types.MirrorRepoSyncStart,
 	)
+	cc.mocks.stores.SkillVersionMock().EXPECT().BySkillID(ctx, int64(1)).Return(nil, nil)
 	data, err := cc.Show(ctx, "ns", "n", "user", false, false)
 	require.Nil(t, err)
 	require.Equal(t, &types.Skill{
