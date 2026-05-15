@@ -61,6 +61,7 @@ type MockStores struct {
 	MirrorTaskStore        database.MirrorTaskStore
 	MirrorNamespaceMapping database.MirrorNamespaceMappingStore
 	Skill                  database.SkillStore
+	SkillVersion           database.SkillVersionStore
 	Member                 database.MemberStore
 	RepositoryStatistics   database.RepositoryStatisticsStore
 	InferenceArch          database.InferenceArchStore
@@ -126,6 +127,7 @@ func NewMockStores(t interface {
 		MirrorTaskStore:        mockdb.NewMockMirrorTaskStore(t),
 		MirrorNamespaceMapping: mockdb.NewMockMirrorNamespaceMappingStore(t),
 		Skill:                  mockdb.NewMockSkillStore(t),
+		SkillVersion:           mockdb.NewMockSkillVersionStore(t),
 		Member:                 mockdb.NewMockMemberStore(t),
 		RepositoryStatistics:   mockdb.NewMockRepositoryStatisticsStore(t),
 		InferenceArch:          mockdb.NewMockInferenceArchStore(t),
@@ -347,6 +349,10 @@ func (s *MockStores) MirrorNamespaceMappingMock() *mockdb.MockMirrorNamespaceMap
 
 func (s *MockStores) SkillMock() *mockdb.MockSkillStore {
 	return s.Skill.(*mockdb.MockSkillStore)
+}
+
+func (s *MockStores) SkillVersionMock() *mockdb.MockSkillVersionStore {
+	return s.SkillVersion.(*mockdb.MockSkillVersionStore)
 }
 
 func (s *MockStores) MemberMock() *mockdb.MockMemberStore {

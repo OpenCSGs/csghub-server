@@ -46,6 +46,7 @@ const (
 	gitUsingGitInXnetRepository
 	gitGetRepositorySizeFailed
 	gitCreateForkFailed
+	gitGetArchiveFailed
 )
 
 var (
@@ -484,6 +485,19 @@ var (
 	//
 	// zh-HK: 獲取倉庫大小失敗
 	ErrGitGetRepositorySizeFailed error = CustomError{prefix: errGitPrefix, code: gitGetRepositorySizeFailed}
+
+	// git get archive failed
+	//
+	// Description: Failed to get archive from git repository.
+	//
+	// Description_ZH: 从 git 仓库获取归档文件失败。
+	//
+	// en-US: Failed to get git archive
+	//
+	// zh-CN: 获取 git 归档文件失败
+	//
+	// zh-HK: 獲取 git 歸檔文件失敗
+	ErrGitGetArchiveFailed error = CustomError{prefix: errGitPrefix, code: gitGetArchiveFailed}
 	// --- GIT-ERR-xxx: Git/Upload, Download, Resource Synchronization ---
 	// using git in xnet-enabled repository error
 	//
@@ -737,6 +751,15 @@ func GetRepositorySizeFailed(err error, ctx context) error {
 	return CustomError{
 		prefix:  errGitPrefix,
 		code:    gitGetRepositorySizeFailed,
+		err:     err,
+		context: ctx,
+	}
+}
+
+func GetArchiveFailed(err error, ctx context) error {
+	return CustomError{
+		prefix:  errGitPrefix,
+		code:    gitGetArchiveFailed,
 		err:     err,
 		context: ctx,
 	}

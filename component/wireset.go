@@ -425,15 +425,16 @@ func NewTestCodeComponent(config *config.Config, stores *tests.MockStores, repoC
 
 func NewTestSkillComponent(config *config.Config, stores *tests.MockStores, repoComponent RepoComponent, userSvcClient rpc.UserSvcClient, gitServer gitserver.GitServer, s3Client s3.Client) *skillComponentImpl {
 	return &skillComponentImpl{
-		config:         config,
-		repoComponent:  repoComponent,
-		skillStore:     stores.Skill,
-		repoStore:      stores.Repo,
-		userLikesStore: stores.UserLikes,
-		gitServer:      gitServer,
-		userSvcClient:  userSvcClient,
-		recomStore:     stores.Recom,
-		s3Client:       s3Client,
+		config:            config,
+		repoComponent:     repoComponent,
+		skillStore:        stores.Skill,
+		repoStore:         stores.Repo,
+		userLikesStore:    stores.UserLikes,
+		gitServer:         gitServer,
+		userSvcClient:     userSvcClient,
+		recomStore:        stores.Recom,
+		s3Client:          s3Client,
+		skillVersionStore: stores.SkillVersion,
 	}
 }
 

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -16,6 +17,17 @@ import (
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 )
+
+type fakeSkillPublisher struct {
+	resp *types.PublishSkillVersionResp
+	err  error
+	req  *types.PublishSkillVersionReq
+}
+
+func (f *fakeSkillPublisher) Publish(ctx context.Context, req *types.PublishSkillVersionReq) (*types.PublishSkillVersionResp, error) {
+	f.req = req
+	return f.resp, f.err
+}
 
 type SkillTester struct {
 	*testutil.GinTester
@@ -102,7 +114,7 @@ func TestSkillHandler_Index(t *testing.T) {
 					Search: "foo",
 					Sort:   c.sort,
 					Source: c.source,
-				}, 10, 1, true).Return([]*types.Skill{
+				}, 10, 1, true, false).Return([]*types.Skill{
 					{Name: "ss"},
 				}, 100, nil)
 			}
@@ -163,6 +175,48 @@ func TestSkillHandler_Show(t *testing.T) {
 	tester.mocks.skill.EXPECT().Show(tester.Ctx(), "u", "r", "u", false, false).Return(&types.Skill{Name: "s"}, nil)
 	tester.WithUser().Execute()
 	tester.ResponseEq(t, 200, tester.OKText, &types.Skill{Name: "s"})
+}
+
+func TestSkillHandler_Publish(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		publisher := &fakeSkillPublisher{
+			resp: &types.PublishSkillVersionResp{
+				Ok:        true,
+				SkillID:   "1",
+				VersionID: "2",
+				Version:   "v1.0.0",
+				Commit:    "abc123",
+			},
+		}
+		tester := NewSkillTester(t).WithHandleFunc(func(h *SkillHandler) gin.HandlerFunc {
+			h.publisher = publisher
+			return h.Publish
+		})
+		tester.WithUser().WithBody(t, &types.PublishSkillVersionReq{
+			Version:   "v1.0.0",
+			Changelog: "Initial release",
+		}).Execute()
+
+		require.Equal(t, "u", publisher.req.Namespace)
+		require.Equal(t, "r", publisher.req.Name)
+		require.Equal(t, "u", publisher.req.Username)
+		require.Equal(t, "v1.0.0", publisher.req.Version)
+		tester.ResponseEq(t, 200, tester.OKText, publisher.resp)
+	})
+
+	t.Run("missing version", func(t *testing.T) {
+		publisher := &fakeSkillPublisher{}
+		tester := NewSkillTester(t).WithHandleFunc(func(h *SkillHandler) gin.HandlerFunc {
+			h.publisher = publisher
+			return h.Publish
+		})
+		tester.WithUser().WithBody(t, &types.PublishSkillVersionReq{
+			Changelog: "Initial release",
+		}).Execute()
+
+		require.Nil(t, publisher.req)
+		require.Equal(t, http.StatusBadRequest, tester.Response().Code)
+	})
 }
 
 func TestSkillHandler_Relations(t *testing.T) {

@@ -1,0 +1,32 @@
+{
+    "error.SKILL-ERR-0": {
+        "other": "技能未找到"
+    },
+    "error.SKILL-ERR-1": {
+        "other": "技能版本未找到"
+    },
+    "error.SKILL-ERR-2": {
+        "other": "发布技能失败"
+    },
+    "error.SKILL-ERR-3": {
+        "other": "下载技能失败"
+    },
+    "error.SKILL-ERR-4": {
+        "other": "解析技能失败"
+    },
+    "error.SKILL-ERR-5": {
+        "other": "未找到技能操作关联的用户"
+    },
+    "error.SKILL-ERR-6": {
+        "other": "创建技能版本失败"
+    },
+    "error.SKILL-ERR-7": {
+        "other": "更新技能版本失败"
+    },
+    "error.SKILL-ERR-8": {
+        "other": "技能发布文件数量超过上限"
+    },
+    "error.SKILL-ERR-9": {
+        "other": "技能发布文件总大小超过上限"
+    }
+}

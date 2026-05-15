@@ -146,6 +146,13 @@ type GetRepoLastCommitReq struct {
 	RepoType  types.RepositoryType `json:"repo_type"`
 }
 
+type GetArchiveReq struct {
+	Namespace string               `json:"namespace"`
+	Name      string               `json:"name"`
+	Revision  string               `json:"revision"`
+	RepoType  types.RepositoryType `json:"repo_type"`
+}
+
 type GetDiffBetweenTwoCommitsReq struct {
 	Namespace     string               `json:"namespace"`
 	Name          string               `json:"name"`
@@ -313,13 +320,13 @@ type GetFilesByRevisionAndPathsReq struct {
 
 type CreateForkReq struct {
 	// Source repository information
-	SourceRepoType    types.RepositoryType `json:"source_repo_type"`
-	SourceNamespace   string               `json:"source_namespace"`
-	SourceName        string               `json:"source_name"`
+	SourceRepoType  types.RepositoryType `json:"source_repo_type"`
+	SourceNamespace string               `json:"source_namespace"`
+	SourceName      string               `json:"source_name"`
 	// Target repository information
-	TargetRepoType    types.RepositoryType `json:"target_repo_type"`
-	TargetNamespace   string               `json:"target_namespace"`
-	TargetName        string               `json:"target_name"`
+	TargetRepoType  types.RepositoryType `json:"target_repo_type"`
+	TargetNamespace string               `json:"target_namespace"`
+	TargetName      string               `json:"target_name"`
 	// Revision to fork from (optional)
-	Revision          string               `json:"revision"`
+	Revision string `json:"revision"`
 }

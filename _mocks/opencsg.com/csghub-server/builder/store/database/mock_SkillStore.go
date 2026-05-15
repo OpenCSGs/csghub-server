@@ -150,9 +150,9 @@ func (_c *MockSkillStore_ByRepoID_Call) RunAndReturn(run func(context.Context, i
 	return _c
 }
 
-// ByRepoIDs provides a mock function with given fields: ctx, repoIDs
-func (_m *MockSkillStore) ByRepoIDs(ctx context.Context, repoIDs []int64) ([]database.Skill, error) {
-	ret := _m.Called(ctx, repoIDs)
+// ByRepoIDs provides a mock function with given fields: ctx, repoIDs, onlyPublished
+func (_m *MockSkillStore) ByRepoIDs(ctx context.Context, repoIDs []int64, onlyPublished bool) ([]database.Skill, error) {
+	ret := _m.Called(ctx, repoIDs, onlyPublished)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ByRepoIDs")
@@ -160,19 +160,19 @@ func (_m *MockSkillStore) ByRepoIDs(ctx context.Context, repoIDs []int64) ([]dat
 
 	var r0 []database.Skill
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, []int64) ([]database.Skill, error)); ok {
-		return rf(ctx, repoIDs)
+	if rf, ok := ret.Get(0).(func(context.Context, []int64, bool) ([]database.Skill, error)); ok {
+		return rf(ctx, repoIDs, onlyPublished)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, []int64) []database.Skill); ok {
-		r0 = rf(ctx, repoIDs)
+	if rf, ok := ret.Get(0).(func(context.Context, []int64, bool) []database.Skill); ok {
+		r0 = rf(ctx, repoIDs, onlyPublished)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]database.Skill)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, []int64) error); ok {
-		r1 = rf(ctx, repoIDs)
+	if rf, ok := ret.Get(1).(func(context.Context, []int64, bool) error); ok {
+		r1 = rf(ctx, repoIDs, onlyPublished)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -188,13 +188,14 @@ type MockSkillStore_ByRepoIDs_Call struct {
 // ByRepoIDs is a helper method to define mock.On call
 //   - ctx context.Context
 //   - repoIDs []int64
-func (_e *MockSkillStore_Expecter) ByRepoIDs(ctx interface{}, repoIDs interface{}) *MockSkillStore_ByRepoIDs_Call {
-	return &MockSkillStore_ByRepoIDs_Call{Call: _e.mock.On("ByRepoIDs", ctx, repoIDs)}
+//   - onlyPublished bool
+func (_e *MockSkillStore_Expecter) ByRepoIDs(ctx interface{}, repoIDs interface{}, onlyPublished interface{}) *MockSkillStore_ByRepoIDs_Call {
+	return &MockSkillStore_ByRepoIDs_Call{Call: _e.mock.On("ByRepoIDs", ctx, repoIDs, onlyPublished)}
 }
 
-func (_c *MockSkillStore_ByRepoIDs_Call) Run(run func(ctx context.Context, repoIDs []int64)) *MockSkillStore_ByRepoIDs_Call {
+func (_c *MockSkillStore_ByRepoIDs_Call) Run(run func(ctx context.Context, repoIDs []int64, onlyPublished bool)) *MockSkillStore_ByRepoIDs_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].([]int64))
+		run(args[0].(context.Context), args[1].([]int64), args[2].(bool))
 	})
 	return _c
 }
@@ -204,7 +205,7 @@ func (_c *MockSkillStore_ByRepoIDs_Call) Return(skills []database.Skill, err err
 	return _c
 }
 
-func (_c *MockSkillStore_ByRepoIDs_Call) RunAndReturn(run func(context.Context, []int64) ([]database.Skill, error)) *MockSkillStore_ByRepoIDs_Call {
+func (_c *MockSkillStore_ByRepoIDs_Call) RunAndReturn(run func(context.Context, []int64, bool) ([]database.Skill, error)) *MockSkillStore_ByRepoIDs_Call {
 	_c.Call.Return(run)
 	return _c
 }
