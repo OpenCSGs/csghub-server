@@ -39,8 +39,7 @@ type BaseModel struct {
 	Object              string         `json:"object"`
 	Created             int64          `json:"created"` // organization-owner (e.g. openai)
 	OwnedBy             string         `json:"owned_by"`
-	Task                string         `json:"task"` // like text-generation, text-to-image etc
-	OfficialName        string         `json:"official_name"`
+	Task                string         `json:"task"`                            // like text-generation, text-to-image etc
 	SupportFunctionCall bool           `json:"support_function_call,omitempty"` // whether the model supports function calling
 	IsPinned            *bool          `json:"is_pinned,omitempty"`             // whether the model is pinned
 	Metadata            map[string]any `json:"metadata"`
@@ -60,9 +59,8 @@ type InternalModelInfo struct {
 
 // ExternalModelInfo represents the external model fields
 type ExternalModelInfo struct {
-	Provider      string `json:"-"` // external provider name, like openai, anthropic etc
-	AuthHead      string `json:"-"` // the auth header to access the external model
-	FormatModelID string `json:"-"` // formatted model ID, e.g. model_name(provider), used for backward-compatible lookup
+	Provider string `json:"-"` // external provider name, like openai, anthropic etc
+	AuthHead string `json:"-"` // the auth header to access the external model
 	// NeedSensitiveCheck controls whether requests for this model should go
 	// through sensitive content detection in aigateway. Set to false to skip
 	// the check (e.g. for guard models or trusted internal models).
@@ -71,8 +69,8 @@ type ExternalModelInfo struct {
 
 type Model struct {
 	BaseModel
-	InternalModelInfo                              // internal model fields
-	ExternalModelInfo                              // external model fields
+	InternalModelInfo                                   // internal model fields
+	ExternalModelInfo                                   // external model fields
 	Endpoint               string                       `json:"endpoint"`
 	Upstreams              []commontypes.UpstreamConfig `json:"upstreams,omitempty"`
 	RoutingPolicy          commontypes.RoutingPolicy    `json:"routing_policy"`
@@ -82,7 +80,7 @@ type Model struct {
 }
 
 type UpstreamAvailability struct {
-	UpstreamID      int64         `json:"upstream_id,omitempty"`
+	UpstreamID   int64          `json:"upstream_id,omitempty"`
 	URL          string         `json:"url"`
 	ModelName    string         `json:"model_name,omitempty"`
 	Provider     string         `json:"provider,omitempty"`
@@ -102,7 +100,6 @@ func (m Model) MarshalJSON() ([]byte, error) {
 			Created             int64                        `json:"created"`
 			OwnedBy             string                       `json:"owned_by"`
 			Task                string                       `json:"task"`
-			DisplayName         string                       `json:"display_name"`
 			SupportFunctionCall *bool                        `json:"support_function_call,omitempty"`
 			Endpoint            string                       `json:"endpoint"`
 			Upstreams           []commontypes.UpstreamConfig `json:"upstreams,omitempty"`
@@ -126,7 +123,6 @@ func (m Model) MarshalJSON() ([]byte, error) {
 			Created:            m.Created,
 			OwnedBy:            m.OwnedBy,
 			Task:               m.Task,
-			DisplayName:        m.OfficialName,
 			Endpoint:           m.Endpoint,
 			Upstreams:          m.Upstreams,
 			RoutingPolicy:      m.RoutingPolicy,
@@ -214,7 +210,6 @@ func (m *Model) UnmarshalJSON(data []byte) error {
 	m.Created = aux.Created
 	m.OwnedBy = aux.OwnedBy
 	m.Task = aux.Task
-	m.OfficialName = aux.DisplayName
 	m.SupportFunctionCall = aux.SupportFunctionCall
 	m.Endpoint = aux.Endpoint
 	m.Upstreams = aux.Upstreams

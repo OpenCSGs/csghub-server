@@ -49,7 +49,6 @@ type openaiComponentImpl struct {
 	extllmStore    database.LLMConfigStore
 	modelListCache cache.RedisClient
 	extendOpenai
-	modelIDFmt     string
 	modelIDBuilder ModelIDBuilder
 	usageLimiter   UsageLimiter
 }
@@ -147,29 +146,7 @@ func (m *openaiComponentImpl) ListModels(c context.Context, userName string, req
 	}
 	modelList := filterAndPaginateModels(models, req)
 	computeModelListAvailability(&modelList)
-	m.applyFormatModelIDToModelList(&modelList)
 	return modelList, nil
-}
-
-func (m *openaiComponentImpl) applyFormatModelIDToModelList(modelList *types.ModelList) {
-	if modelList == nil {
-		return
-	}
-
-	for i := range modelList.Data {
-		if modelList.Data[i].FormatModelID != "" {
-			modelList.Data[i].ID = modelList.Data[i].FormatModelID
-		}
-	}
-
-	if len(modelList.Data) == 0 {
-		modelList.FirstID = nil
-		modelList.LastID = nil
-		return
-	}
-
-	modelList.FirstID = &modelList.Data[0].ID
-	modelList.LastID = &modelList.Data[len(modelList.Data)-1].ID
 }
 
 // computeModelListAvailability sets ModelAvailability.IsAvailable for each model
@@ -342,14 +319,12 @@ func (c *openaiComponentImpl) getCSGHubModels(ctx context.Context, userID int64)
 		}
 		// Check if engine_args contains tool-call-parser parameter
 		supportFunctionCall := strings.Contains(deploy.EngineArgs, "tool-call-parser")
-		repoName := deploy.Repository.Name
 		m := types.Model{
 			BaseModel: types.BaseModel{
 				Object:              "model",
 				Created:             deploy.CreatedAt.Unix(),
 				SupportFunctionCall: supportFunctionCall,
 				Task:                string(deploy.Task),
-				OfficialName:        repoName,
 				Metadata: map[string]any{
 					types.MetaKeyLLMType: providerTypeFromDeployType(deploy.Type),
 				},
@@ -378,7 +353,6 @@ func (c *openaiComponentImpl) getCSGHubModels(ctx context.Context, userID int64)
 
 		baseModelID := modelIDBuilder.To(modelName, deploy.SvcName)
 		m.ID = baseModelID
-		m.FormatModelID = modelIDBuilder.BuildCompositeModelID(baseModelID, m.BaseModel.OwnedBy, c.modelIDFmt)
 		m.Endpoint = deploy.Endpoint
 		slog.Debug("running model", slog.Any("model", m), slog.Any("deploy", deploy))
 		models = append(models, m)
@@ -396,7 +370,6 @@ func (m *openaiComponentImpl) getExternalModels(c context.Context) []types.Model
 	per := 50
 	page := 1
 	var models []types.Model
-	modelIDBuilder := m.getModelIDBuilder()
 	for {
 		extModels, _, err := m.extllmStore.Index(c, per, page, search)
 		if err != nil {
@@ -425,15 +398,13 @@ func (m *openaiComponentImpl) getExternalModels(c context.Context) []types.Model
 			// Convert relational upstreams to types.UpstreamConfig for routing
 			upstreams := dbUpstreamsToConfigs(extModel.Upstreams)
 			provider := extModel.PrimaryProvider()
-			formatModelID := modelIDBuilder.BuildCompositeModelID(extModel.ModelName, provider, m.modelIDFmt)
 			model := types.Model{
 				BaseModel: types.BaseModel{
-					Object:       "model",
-					ID:           extModel.ModelName,
-					OwnedBy:      provider,
-					OfficialName: extModel.PrimaryOfficialName(),
-					Metadata:     extModel.Metadata,
-					Task:         task,
+					Object:   "model",
+					ID:       extModel.ModelName,
+					OwnedBy:  provider,
+					Metadata: extModel.Metadata,
+					Task:     task,
 				},
 				Endpoint:      router.FirstEnabledUpstream(upstreams),
 				Upstreams:     upstreams,
@@ -441,7 +412,6 @@ func (m *openaiComponentImpl) getExternalModels(c context.Context) []types.Model
 				ExternalModelInfo: types.ExternalModelInfo{
 					Provider:           provider,
 					AuthHead:           extModel.PrimaryAuthHeader(),
-					FormatModelID:      formatModelID,
 					NeedSensitiveCheck: extModel.NeedSensitiveCheck,
 				},
 			}
@@ -467,7 +437,7 @@ func (m *openaiComponentImpl) saveModelsToCache(models []types.Model) error {
 			return fmt.Errorf("failed to marshal model %s to JSON: %w", model.ID, err)
 		}
 		// Use model ID as the field name
-		err = m.modelListCache.HSet(ctx, modelCacheKey, model.FormatModelID, string(jsonBytes))
+		err = m.modelListCache.HSet(ctx, modelCacheKey, model.ID, string(jsonBytes))
 		if err != nil {
 			return fmt.Errorf("failed to set model %s in cache hash for key %s: %w", model.ID, modelCacheKey, err)
 		}
@@ -534,7 +504,7 @@ func (m *openaiComponentImpl) GetModelByID(c context.Context, username, modelID 
 	}
 
 	for _, model := range models {
-		if model.FormatModelID == modelID || model.ID == modelID {
+		if model.ID == modelID {
 			return &model, nil
 		}
 	}

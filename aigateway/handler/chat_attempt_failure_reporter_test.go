@@ -109,7 +109,7 @@ func TestReportChatAttemptResult_FailureFallback(t *testing.T) {
 		StatusCode:      500,
 		Retryable:       false,
 		FallbackAttempt: 2,
-		Model:           &types.Model{BaseModel: types.BaseModel{ID: "fallback-model"}, ExternalModelInfo: types.ExternalModelInfo{FormatModelID: "fallback-model(fallback-provider)"}},
+		Model:           &types.Model{BaseModel: types.BaseModel{ID: "fallback-model"}},
 	})
 
 	reporter.wait(t)
@@ -117,7 +117,7 @@ func TestReportChatAttemptResult_FailureFallback(t *testing.T) {
 	require.Len(t, events, 1)
 	evt := events[0]
 	require.Equal(t, chatAttemptPhaseFallback, evt.Phase)
-	require.Equal(t, "fallback-model(fallback-provider)", evt.ModelID)
+	require.Equal(t, "fallback-model", evt.ModelID)
 	require.Equal(t, 500, evt.StatusCode)
 	require.False(t, evt.Retryable)
 	require.Equal(t, 2, evt.FallbackAttempt)
@@ -176,26 +176,6 @@ func TestReportChatAttemptResult_NilModel(t *testing.T) {
 	events := reporter.eventsSnapshot()
 	require.Len(t, events, 1)
 	require.Equal(t, "", events[0].ModelID)
-}
-
-func TestReportChatAttemptResult_EmptyRequestModelID_FallsBackToFormatModelID(t *testing.T) {
-	reporter := newAsyncTestChatAttemptFailureReporter()
-	h := &OpenAIHandlerImpl{
-		chatAttemptFailureReporter: reporter,
-	}
-
-	h.reportChatAttemptResult(context.Background(), chatAttemptReportParams{
-		UpstreamID:     1,
-		Phase:          chatAttemptPhasePrimary,
-		StatusCode:     500,
-		RequestModelID: "",
-		Model:          &types.Model{BaseModel: types.BaseModel{ID: "base-id"}, ExternalModelInfo: types.ExternalModelInfo{FormatModelID: "formatted-id"}},
-	})
-
-	reporter.wait(t)
-	events := reporter.eventsSnapshot()
-	require.Len(t, events, 1)
-	require.Equal(t, "formatted-id", events[0].ModelID)
 }
 
 func TestReportChatAttemptResult_EmptyRequestModelID_FallsBackToModelID(t *testing.T) {

@@ -254,7 +254,6 @@ func TestOpenAIComponentImpl_getCSGHubModels_SkipsDeploysWithMissingRelations(t 
 	mockDeployStore := mockdb.NewMockDeployTaskStore(t)
 	comp := &openaiComponentImpl{
 		deployStore: mockDeployStore,
-		modelIDFmt:  "%s(%s)",
 	}
 
 	now := time.Now()
@@ -307,74 +306,6 @@ func TestOpenAIComponentImpl_getCSGHubModels_SkipsDeploysWithMissingRelations(t 
 	assert.Equal(t, "valid-owner", models[0].OwnedBy)
 	assert.Equal(t, "valid-owner-uuid", models[0].OwnerUUID)
 	assert.Equal(t, "valid-endpoint", models[0].Endpoint)
-}
-
-func TestOpenAIComponentImpl_applyFormatModelIDToModelList(t *testing.T) {
-	comp := &openaiComponentImpl{}
-
-	t.Run("nil model list", func(t *testing.T) {
-		comp.applyFormatModelIDToModelList(nil)
-	})
-
-	t.Run("empty model list should keep first and last nil", func(t *testing.T) {
-		modelList := types.ModelList{
-			Object:     "list",
-			Data:       []types.Model{},
-			FirstID:    nil,
-			LastID:     nil,
-			HasMore:    false,
-			TotalCount: 0,
-		}
-
-		comp.applyFormatModelIDToModelList(&modelList)
-
-		assert.Nil(t, modelList.FirstID)
-		assert.Nil(t, modelList.LastID)
-		assert.Len(t, modelList.Data, 0)
-	})
-
-	t.Run("should override id with format model id and recalculate first and last", func(t *testing.T) {
-		modelList := types.ModelList{
-			Object: "list",
-			Data: []types.Model{
-				{
-					BaseModel: types.BaseModel{
-						ID: "gpt-4o",
-					},
-					ExternalModelInfo: types.ExternalModelInfo{
-						FormatModelID: "gpt-4o(openai)",
-					},
-				},
-				{
-					BaseModel: types.BaseModel{
-						ID: "llama3",
-					},
-				},
-				{
-					BaseModel: types.BaseModel{
-						ID: "claude-3",
-					},
-					ExternalModelInfo: types.ExternalModelInfo{
-						FormatModelID: "claude-3(anthropic)",
-					},
-				},
-			},
-			HasMore:    false,
-			TotalCount: 3,
-		}
-
-		comp.applyFormatModelIDToModelList(&modelList)
-
-		require.Len(t, modelList.Data, 3)
-		assert.Equal(t, "gpt-4o(openai)", modelList.Data[0].ID)
-		assert.Equal(t, "llama3", modelList.Data[1].ID)
-		assert.Equal(t, "claude-3(anthropic)", modelList.Data[2].ID)
-
-		require.NotNil(t, modelList.FirstID)
-		require.NotNil(t, modelList.LastID)
-		assert.Equal(t, "gpt-4o(openai)", *modelList.FirstID)
-		assert.Equal(t, "claude-3(anthropic)", *modelList.LastID)
-	})
 }
 
 func TestOpenAIComponent_checkOrganization(t *testing.T) {
@@ -849,8 +780,7 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 				InternalModelInfo: types.InternalModelInfo{
 					CSGHubModelID: "m",
 				},
-				ExternalModelInfo: types.ExternalModelInfo{
-					},
+				ExternalModelInfo: types.ExternalModelInfo{},
 			},
 			wantError: true,
 			setupMock: func() {

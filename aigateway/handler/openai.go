@@ -319,10 +319,6 @@ func (h *OpenAIHandlerImpl) GetModel(c *gin.Context) {
 		return
 	}
 
-	if model.FormatModelID != "" {
-		model.ID = model.FormatModelID
-	}
-
 	c.PureJSON(http.StatusOK, model)
 }
 
@@ -663,9 +659,6 @@ func resolveFailureEventModelID(requestModelID string, model *types.Model) strin
 	}
 	if model == nil {
 		return ""
-	}
-	if trimmed := strings.TrimSpace(model.FormatModelID); trimmed != "" {
-		return trimmed
 	}
 	return strings.TrimSpace(model.ID)
 }

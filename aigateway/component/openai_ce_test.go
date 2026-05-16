@@ -31,7 +31,6 @@ func TestOpenAIComponent_GetAvailableModels(t *testing.T) {
 		deployStore:    mockDeployStore,
 		extllmStore:    mockLLMConfigStore,
 		modelListCache: mockCache,
-		modelIDFmt:     "%s(%s)",
 	}
 
 	t.Run("user not found", func(t *testing.T) {
@@ -90,9 +89,9 @@ func TestOpenAIComponent_GetAvailableModels(t *testing.T) {
 
 		var wg sync.WaitGroup
 		wg.Add(1)
-		mockCache.EXPECT().HSet(mock.Anything, modelCacheKey, "model1:svc1(publicuser)", mock.Anything).
+		mockCache.EXPECT().HSet(mock.Anything, modelCacheKey, "model1:svc1", mock.Anything).
 			Return(nil).Once()
-		mockCache.EXPECT().HSet(mock.Anything, modelCacheKey, "hf-model2:svc2(OpenCSG)", mock.Anything).
+		mockCache.EXPECT().HSet(mock.Anything, modelCacheKey, "hf-model2:svc2", mock.Anything).
 			Return(nil).Once()
 		mockCache.EXPECT().Expire(mock.Anything, modelCacheKey, modelCacheTTL).
 			RunAndReturn(func(ctx context.Context, s string, d time.Duration) error {
@@ -161,9 +160,9 @@ func TestOpenAIComponent_GetAvailableModels(t *testing.T) {
 			Return(deploys, nil).Once()
 		var wg sync.WaitGroup
 		wg.Add(1)
-		mockCache.EXPECT().HSet(mock.Anything, modelCacheKey, "model1:svc1(testuser)", mock.Anything).
+		mockCache.EXPECT().HSet(mock.Anything, modelCacheKey, "model1:svc1", mock.Anything).
 			Return(nil).Once()
-		mockCache.EXPECT().HSet(mock.Anything, modelCacheKey, "hf-model2:svc2(OpenCSG)", mock.Anything).
+		mockCache.EXPECT().HSet(mock.Anything, modelCacheKey, "hf-model2:svc2", mock.Anything).
 			Return(nil).Once()
 		mockCache.EXPECT().Expire(mock.Anything, modelCacheKey, modelCacheTTL).
 			RunAndReturn(func(ctx context.Context, s string, d time.Duration) error {
@@ -226,7 +225,7 @@ func TestOpenAIComponent_GetAvailableModels(t *testing.T) {
 
 		var wg sync.WaitGroup
 		wg.Add(1)
-		mockCache.EXPECT().HSet(mock.Anything, modelCacheKey, "model3:svc3(testuser)", mock.Anything).
+		mockCache.EXPECT().HSet(mock.Anything, modelCacheKey, "model3:svc3", mock.Anything).
 			Return(nil).Once()
 		mockCache.EXPECT().Expire(mock.Anything, modelCacheKey, modelCacheTTL).
 			RunAndReturn(func(ctx context.Context, s string, d time.Duration) error {
@@ -252,7 +251,6 @@ func TestOpenAIComponent_GetAvailableModels_CacheUsesModelSnapshot(t *testing.T)
 		deployStore:    mockDeployStore,
 		extllmStore:    mockLLMConfigStore,
 		modelListCache: mockCache,
-		modelIDFmt:     "%s(%s)",
 	}
 
 	now := time.Now()
@@ -303,13 +301,13 @@ func TestOpenAIComponent_GetAvailableModels_CacheUsesModelSnapshot(t *testing.T)
 	continueFirstWrite := make(chan struct{})
 	cacheCompleted := make(chan struct{})
 
-	mockCache.EXPECT().HSet(mock.Anything, modelCacheKey, "model1:svc1(publicuser)", mock.Anything).
+	mockCache.EXPECT().HSet(mock.Anything, modelCacheKey, "model1:svc1", mock.Anything).
 		RunAndReturn(func(ctx context.Context, key string, field string, value any) error {
 			close(firstWriteStarted)
 			<-continueFirstWrite
 			return nil
 		}).Once()
-	mockCache.EXPECT().HSet(mock.Anything, modelCacheKey, "hf-model2:svc2(OpenCSG)", mock.Anything).
+	mockCache.EXPECT().HSet(mock.Anything, modelCacheKey, "hf-model2:svc2", mock.Anything).
 		RunAndReturn(func(ctx context.Context, key string, field string, value any) error {
 			valueString, ok := value.(string)
 			require.True(t, ok)
@@ -348,7 +346,7 @@ func TestOpenAIComponent_GetAvailableModels_CacheUsesModelSnapshot(t *testing.T)
 	}
 }
 
-func TestOpenAIComponent_ListModels_CacheUsesOriginalIDWhenFormatModelIDApplied(t *testing.T) {
+func TestOpenAIComponent_ListModels_CacheUsesOriginalID(t *testing.T) {
 	mockDeployStore := &mockdb.MockDeployTaskStore{}
 	mockLLMConfigStore := mockdb.NewMockLLMConfigStore(t)
 	mockCache := mockcache.NewMockRedisClient(t)
@@ -356,7 +354,6 @@ func TestOpenAIComponent_ListModels_CacheUsesOriginalIDWhenFormatModelIDApplied(
 		deployStore:    mockDeployStore,
 		extllmStore:    mockLLMConfigStore,
 		modelListCache: mockCache,
-		modelIDFmt:     "%s(%s)",
 	}
 
 	mockDeployStore.EXPECT().RunningVisibleToUser(mock.Anything, int64(0)).
@@ -397,13 +394,13 @@ func TestOpenAIComponent_ListModels_CacheUsesOriginalIDWhenFormatModelIDApplied(
 	continueFirstWrite := make(chan struct{})
 	cacheCompleted := make(chan struct{})
 
-	mockCache.EXPECT().HSet(mock.Anything, modelCacheKey, "test-model-1(OpenAI)", mock.Anything).
+	mockCache.EXPECT().HSet(mock.Anything, modelCacheKey, "test-model-1", mock.Anything).
 		RunAndReturn(func(ctx context.Context, key string, field string, value any) error {
 			close(firstWriteStarted)
 			<-continueFirstWrite
 			return nil
 		}).Once()
-	mockCache.EXPECT().HSet(mock.Anything, modelCacheKey, "test-model-2(Anthropic)", mock.Anything).
+	mockCache.EXPECT().HSet(mock.Anything, modelCacheKey, "test-model-2", mock.Anything).
 		RunAndReturn(func(ctx context.Context, key string, field string, value any) error {
 			valueString, ok := value.(string)
 			require.True(t, ok)
@@ -424,8 +421,8 @@ func TestOpenAIComponent_ListModels_CacheUsesOriginalIDWhenFormatModelIDApplied(
 	modelList, err := comp.ListModels(context.Background(), "", types.ListModelsReq{})
 	require.NoError(t, err)
 	require.Len(t, modelList.Data, 2)
-	assert.Equal(t, "test-model-1(OpenAI)", modelList.Data[0].ID)
-	assert.Equal(t, "test-model-2(Anthropic)", modelList.Data[1].ID)
+	assert.Equal(t, "test-model-1", modelList.Data[0].ID)
+	assert.Equal(t, "test-model-2", modelList.Data[1].ID)
 
 	select {
 	case <-firstWriteStarted:
@@ -452,7 +449,6 @@ func TestOpenAIComponent_GetModelByID(t *testing.T) {
 		deployStore:    mockDeployStore,
 		extllmStore:    mockLLMConfigStore,
 		modelListCache: mockCache,
-		modelIDFmt:     "%s(%s)",
 	}
 
 	t.Run("model cache expire", func(t *testing.T) {
@@ -486,7 +482,7 @@ func TestOpenAIComponent_GetModelByID(t *testing.T) {
 		deploys[0].CreatedAt = now
 		var wg sync.WaitGroup
 		wg.Add(1)
-		mockCache.EXPECT().HSet(mock.Anything, modelCacheKey, "model1:svc1(testuser)", mock.Anything).
+		mockCache.EXPECT().HSet(mock.Anything, modelCacheKey, "model1:svc1", mock.Anything).
 			Return(nil).Once()
 		mockCache.EXPECT().Expire(mock.Anything, modelCacheKey, modelCacheTTL).
 			RunAndReturn(func(ctx context.Context, s string, d time.Duration) error {
@@ -495,7 +491,7 @@ func TestOpenAIComponent_GetModelByID(t *testing.T) {
 			}).Once()
 		mockDeployStore.EXPECT().RunningVisibleToUser(mock.Anything, int64(1)).Return(deploys, nil).Once()
 
-		model, err := comp.GetModelByID(context.Background(), "testuser", "model1:svc1(testuser)")
+		model, err := comp.GetModelByID(context.Background(), "testuser", "model1:svc1")
 		assert.NoError(t, err)
 		assert.NotNil(t, model)
 		assert.Equal(t, "model1:svc1", model.ID)
@@ -531,7 +527,7 @@ func TestOpenAIComponent_GetModelByID(t *testing.T) {
 			Return(*user, nil).Once()
 		mockCache.EXPECT().Exists(mock.Anything, modelCacheKey).
 			Return(1, nil).Once()
-		mockCache.EXPECT().HGet(mock.Anything, modelCacheKey, "model-reload(OpenAI)").
+		mockCache.EXPECT().HGet(mock.Anything, modelCacheKey, "model-reload").
 			Return("", redis.Nil).Once()
 		mockDeployStore.EXPECT().RunningVisibleToUser(mock.Anything, int64(1)).Return([]database.Deploy{}, nil).Once()
 		searchType := 16
@@ -552,7 +548,7 @@ func TestOpenAIComponent_GetModelByID(t *testing.T) {
 			}, 1, nil).Once()
 		var wg sync.WaitGroup
 		wg.Add(1)
-		mockCache.EXPECT().HSet(mock.Anything, modelCacheKey, "model-reload(OpenAI)", mock.Anything).
+		mockCache.EXPECT().HSet(mock.Anything, modelCacheKey, "model-reload", mock.Anything).
 			Return(nil).Once()
 		mockCache.EXPECT().Expire(mock.Anything, modelCacheKey, modelCacheTTL).
 			RunAndReturn(func(ctx context.Context, s string, d time.Duration) error {
@@ -560,7 +556,7 @@ func TestOpenAIComponent_GetModelByID(t *testing.T) {
 				return nil
 			}).Once()
 
-		model, err := comp.GetModelByID(context.Background(), "testuser", "model-reload(OpenAI)")
+		model, err := comp.GetModelByID(context.Background(), "testuser", "model-reload")
 		assert.NoError(t, err)
 		assert.NotNil(t, model)
 		assert.Equal(t, "model-reload", model.ID)
@@ -626,7 +622,7 @@ func TestOpenAIComponent_GetModelByID(t *testing.T) {
 			Return(*user, nil).Once()
 		mockCache.EXPECT().Exists(mock.Anything, modelCacheKey).
 			Return(1, nil).Once()
-		mockCache.EXPECT().HGet(mock.Anything, modelCacheKey, "test-model-1(OpenAI)").
+		mockCache.EXPECT().HGet(mock.Anything, modelCacheKey, "test-model-1").
 			Return("", redis.Nil).Once()
 
 		mockDeployStore.EXPECT().RunningVisibleToUser(mock.Anything, int64(1)).
@@ -650,7 +646,7 @@ func TestOpenAIComponent_GetModelByID(t *testing.T) {
 
 		var wg sync.WaitGroup
 		wg.Add(1)
-		mockCache.EXPECT().HSet(mock.Anything, modelCacheKey, "test-model-1(OpenAI)", mock.Anything).
+		mockCache.EXPECT().HSet(mock.Anything, modelCacheKey, "test-model-1", mock.Anything).
 			Return(nil).Once()
 		mockCache.EXPECT().Expire(mock.Anything, modelCacheKey, modelCacheTTL).
 			RunAndReturn(func(ctx context.Context, s string, d time.Duration) error {
@@ -658,7 +654,7 @@ func TestOpenAIComponent_GetModelByID(t *testing.T) {
 				return nil
 			}).Once()
 
-		model, err := comp.GetModelByID(context.Background(), "testuser", "test-model-1(OpenAI)")
+		model, err := comp.GetModelByID(context.Background(), "testuser", "test-model-1")
 		assert.NoError(t, err)
 		assert.NotNil(t, model)
 		assert.Equal(t, "test-model-1", model.ID)
@@ -667,7 +663,7 @@ func TestOpenAIComponent_GetModelByID(t *testing.T) {
 }
 
 func TestOpenAIComponent_saveModelsToCache(t *testing.T) {
-	t.Run("uses format model id as hash field and sets ttl", func(t *testing.T) {
+	t.Run("uses model id as hash field and sets ttl", func(t *testing.T) {
 		mockCache := mockcache.NewMockRedisClient(t)
 		comp := &openaiComponentImpl{modelListCache: mockCache}
 
@@ -683,15 +679,14 @@ func TestOpenAIComponent_saveModelsToCache(t *testing.T) {
 				},
 				Endpoint: "http://test-endpoint",
 				ExternalModelInfo: types.ExternalModelInfo{
-					Provider:           "openai",
-					AuthHead:           "Bearer test-token",
-					FormatModelID:      "base-model-id(openai)",
-					NeedSensitiveCheck: true,
-				},
+				Provider:           "openai",
+				AuthHead:           "Bearer test-token",
+				NeedSensitiveCheck: true,
+			},
 			},
 		}
 
-		mockCache.EXPECT().HSet(mock.Anything, modelCacheKey, "base-model-id(openai)", mock.Anything).
+		mockCache.EXPECT().HSet(mock.Anything, modelCacheKey, "base-model-id", mock.Anything).
 			RunAndReturn(func(ctx context.Context, key string, field string, value interface{}) error {
 				valueString, ok := value.(string)
 				require.True(t, ok)
@@ -718,12 +713,12 @@ func TestOpenAIComponent_loadModelFromCache(t *testing.T) {
 
 		mockCache.EXPECT().Exists(mock.Anything, modelCacheKey).Return(0, nil).Once()
 
-		model, err := comp.loadModelFromCache(context.Background(), "test-model(OpenAI)")
+		model, err := comp.loadModelFromCache(context.Background(), "test-model")
 		require.NoError(t, err)
 		assert.Nil(t, model)
 	})
 
-	t.Run("load cached model by format model id", func(t *testing.T) {
+	t.Run("load cached model by model id", func(t *testing.T) {
 		mockCache := mockcache.NewMockRedisClient(t)
 		comp := &openaiComponentImpl{modelListCache: mockCache}
 
@@ -748,10 +743,10 @@ func TestOpenAIComponent_loadModelFromCache(t *testing.T) {
 		require.NoError(t, err)
 
 		mockCache.EXPECT().Exists(mock.Anything, modelCacheKey).Return(1, nil).Once()
-		mockCache.EXPECT().HGet(mock.Anything, modelCacheKey, "test-model(OpenAI)").
+		mockCache.EXPECT().HGet(mock.Anything, modelCacheKey, "test-model").
 			Return(string(cachedJSON), nil).Once()
 
-		model, err := comp.loadModelFromCache(context.Background(), "test-model(OpenAI)")
+		model, err := comp.loadModelFromCache(context.Background(), "test-model")
 		require.NoError(t, err)
 		require.NotNil(t, model)
 		assert.Equal(t, "test-model", model.ID)
@@ -764,10 +759,10 @@ func TestOpenAIComponent_loadModelFromCache(t *testing.T) {
 		comp := &openaiComponentImpl{modelListCache: mockCache}
 
 		mockCache.EXPECT().Exists(mock.Anything, modelCacheKey).Return(1, nil).Once()
-		mockCache.EXPECT().HGet(mock.Anything, modelCacheKey, "test-model(OpenAI)").
+		mockCache.EXPECT().HGet(mock.Anything, modelCacheKey, "test-model").
 			Return("", redis.Nil).Once()
 
-		model, err := comp.loadModelFromCache(context.Background(), "test-model(OpenAI)")
+		model, err := comp.loadModelFromCache(context.Background(), "test-model")
 		require.NoError(t, err)
 		assert.Nil(t, model)
 	})
@@ -784,7 +779,6 @@ func TestOpenAIComponent_ExtGetAvailableModels_Error(t *testing.T) {
 		deployStore:    mockDeployStore,
 		extllmStore:    mockLLMConfigStore,
 		modelListCache: mockCache,
-		modelIDFmt:     "%s(%s)",
 	}
 	searchType := 16
 	enabled := true
@@ -820,7 +814,6 @@ func TestOpenAIComponent_ExtGetAvailableModels_SinglePage(t *testing.T) {
 		deployStore:    mockDeployStore,
 		extllmStore:    mockLLMConfigStore,
 		modelListCache: mockCache,
-		modelIDFmt:     "%s(%s)",
 	}
 	mockModels := []*database.LLMConfig{
 		{
@@ -846,7 +839,7 @@ func TestOpenAIComponent_ExtGetAvailableModels_SinglePage(t *testing.T) {
 		Enabled: &enabled,
 	}
 	mockLLMConfigStore.EXPECT().Index(ctx, 50, 1, search).Return(mockModels, 1, nil)
-	mockCache.EXPECT().HSet(mock.Anything, modelCacheKey, "test-model-1(OpenAI)", mock.Anything).
+	mockCache.EXPECT().HSet(mock.Anything, modelCacheKey, "test-model-1", mock.Anything).
 		Return(nil).Once()
 	var wg sync.WaitGroup
 	wg.Add(1)
