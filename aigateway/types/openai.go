@@ -20,9 +20,9 @@ const (
 	MetaKeyTasks   = "tasks"
 )
 
-// Resource ID format strings for external LLM (provider, model ID) and CSGHub internal (path segment, repo path).
+// Resource ID format strings for external LLM (model ID) and CSGHub internal (path segment, repo path).
 const (
-	ExternalLLMResourceFmt = "%s://%s"
+	ExternalLLMResourceFmt = "thirdparty://%s"
 	CSGHubResourceFmt      = "csghub://%s/%s"
 )
 

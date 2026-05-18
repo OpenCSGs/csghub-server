@@ -13,6 +13,8 @@ import (
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	mocktoken "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/aigateway/token"
+	"opencsg.com/csghub-server/aigateway/token"
 	commontypes "opencsg.com/csghub-server/common/types"
 
 	"opencsg.com/csghub-server/aigateway/types"
@@ -387,6 +389,33 @@ func TestRetryChatWithFallback_UsesFallbackModelName(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "provider-fallback-model", fallbackModelName)
 	require.Equal(t, "provider-fallback-model", modelTarget.ModelName)
+
+	tokenCounter := mocktoken.NewMockCounter(t)
+	var wg sync.WaitGroup
+	wg.Add(2)
+	tester.mocks.openAIComp.EXPECT().
+		CommitUsageLimit(mock.Anything, "user-1", modelTarget.Model, tokenCounter).
+		RunAndReturn(func(ctx context.Context, userUUID string, model *types.Model, counter token.Counter) error {
+			wg.Done()
+			return nil
+		}).
+		Once()
+	tester.mocks.openAIComp.EXPECT().
+		RecordUsage(mock.Anything, "user-1", modelTarget.Model, "provider-fallback-model", tokenCounter, "api-key").
+		RunAndReturn(func(ctx context.Context, userUUID string, model *types.Model, targetModelName string, counter token.Counter, apikey string) error {
+			wg.Done()
+			return nil
+		}).
+		Once()
+
+	tester.handler.runChatPostProcessAsync(c.Request.Context(), chatPostProcessInput{
+		NSUUID:          "user-1",
+		ApiKey:          "api-key",
+		Model:           modelTarget.Model,
+		TargetModelName: modelTarget.ModelName,
+		TokenCounter:    tokenCounter,
+	})
+	wg.Wait()
 }
 
 func TestRetryChatWithFallback_ReportsFallbackAttemptFailure(t *testing.T) {

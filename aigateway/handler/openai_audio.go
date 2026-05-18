@@ -122,7 +122,7 @@ func (h *OpenAIHandlerImpl) Transcription(c *gin.Context) {
 		usageCtx, cancel := context.WithTimeout(context.WithoutCancel(c.Request.Context()), 3*time.Second)
 		defer cancel()
 
-		if err := h.openaiComponent.RecordUsage(usageCtx, nsUUID, modelTarget.Model, audioCounter, apikey); err != nil {
+		if err := h.openaiComponent.RecordUsage(usageCtx, nsUUID, modelTarget.Model, modelTarget.ModelName, audioCounter, apikey); err != nil {
 			slog.ErrorContext(usageCtx, "failed to record audio transcription usage", slog.Any("error", err))
 		}
 	}()
