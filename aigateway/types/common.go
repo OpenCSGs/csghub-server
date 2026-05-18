@@ -25,3 +25,11 @@ func ApplyRequestAuthHeaders(header http.Header, authHeadStr string) error {
 	}
 	return nil
 }
+
+// ShouldAttemptFailureStatus evaluates fail status codes to see if AIGateway should retry.
+// - 499 is a client-closed connection and should not be retried. 
+// - 400 indicates a client argument error and should not be retried.
+// Returns true for other status codes greater than 400.
+func ShouldAttemptFailureStatus(statusCode int) bool {
+	return statusCode > http.StatusBadRequest && statusCode != 499
+}

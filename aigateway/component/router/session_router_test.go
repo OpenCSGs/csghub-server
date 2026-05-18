@@ -32,8 +32,8 @@ func TestSessionRouter_PickUpstream_SessionHashStable(t *testing.T) {
 func TestSessionRouter_PickUpstream_FallbackToFirstEnabled(t *testing.T) {
 	router := NewSessionRouter()
 	upstreams := []commontypes.UpstreamConfig{
-		{URL: "https://node-b.example/v1/chat/completions", Enabled: false},
-		{URL: "https://node-a.example/v1/chat/completions", Enabled: true},
+		{URL: "https://node-b.example/v1/chat/completions", ModelName: "modelA", Enabled: false},
+		{URL: "https://node-a.example/v1/chat/completions", ModelName: "modelB", Enabled: true},
 	}
 
 	enabled := NormalizeEnabledUpstreams(upstreams)

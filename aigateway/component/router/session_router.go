@@ -70,7 +70,7 @@ func (r *sessionRouterImpl) PickUpstream(modelKey string, sessionKey string, ena
 func normalizeEnabledUpstreams(upstreams []commontypes.UpstreamConfig) []commontypes.UpstreamConfig {
 	filtered := make([]commontypes.UpstreamConfig, 0, len(upstreams))
 	for _, us := range upstreams {
-		if strings.TrimSpace(us.URL) == "" || !us.Enabled {
+		if strings.TrimSpace(us.URL) == "" || strings.TrimSpace(us.ModelName) == "" || !us.Enabled {
 			continue
 		}
 		if us.Weight <= 0 {

@@ -6,7 +6,7 @@ import (
 	"encoding/hex"
 	"log/slog"
 	"net/http"
-	"sort"
+	"opencsg.com/csghub-server/aigateway/types"
 	"strings"
 
 	commontypes "opencsg.com/csghub-server/common/types"
@@ -41,7 +41,7 @@ func (w *chatRetryResponseWriter) WriteHeader(statusCode int) {
 		return
 	}
 	w.statusCode = statusCode
-	if isChatRetryableStatus(statusCode) {
+	if types.ShouldAttemptFailureStatus(statusCode) {
 		w.buffering = true
 		return
 	}
@@ -53,7 +53,7 @@ func (w *chatRetryResponseWriter) Write(data []byte) (int, error) {
 		if w.statusCode == 0 {
 			w.statusCode = http.StatusOK
 		}
-		if isChatRetryableStatus(w.statusCode) {
+		if types.ShouldAttemptFailureStatus(w.statusCode) {
 			w.buffering = true
 		} else {
 			w.commit(w.statusCode)
@@ -117,23 +117,15 @@ func copyHeader(dst, src http.Header) {
 	}
 }
 
-func isChatRetryableStatus(statusCode int) bool {
-	switch statusCode {
-	case http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout:
-		return true
-	default:
-		return false
-	}
-}
-
 func shouldRetryChatAttempt(statusCode int, streamStarted bool) bool {
 	if streamStarted {
 		return false
 	}
-	if statusCode >= 400 && statusCode < 500 {
-		return false
-	}
-	return isChatRetryableStatus(statusCode)
+	// Chat fallback targets are independent upstreams. Before any bytes are sent to
+	// the client, any upstream failure can be caused by provider-specific auth,
+	// routing, model mapping, quota, or transient availability issues, so we
+	// continue trying the next configured upstream.
+	return types.ShouldAttemptFailureStatus(statusCode)
 }
 
 func chatRetryReason(statusCode int) string {
@@ -144,7 +136,26 @@ func chatRetryReason(statusCode int) string {
 		return "status_503"
 	case http.StatusGatewayTimeout:
 		return "status_504_or_timeout"
+	case http.StatusTooManyRequests:
+		return "status_429"
+	case http.StatusUnauthorized, http.StatusForbidden:
+		return "status_auth_error"
+	case http.StatusNotFound:
+		return "status_404_or_model_missing"
+	case http.StatusBadRequest:
+		return "status_400_or_request_incompatible"
+	case http.StatusUnprocessableEntity:
+		return "status_422_or_request_incompatible"
+	case http.StatusRequestTimeout:
+		return "status_408"
+	case http.StatusTooEarly:
+		return "status_425"
+	case http.StatusConflict:
+		return "status_409"
 	default:
+		if statusCode >= http.StatusBadRequest && statusCode < http.StatusInternalServerError {
+			return "status_4xx"
+		}
 		return "non_retryable"
 	}
 }
@@ -165,47 +176,22 @@ func normalizeChatMaxFallbackAttempts(maxFallbackAttempts int) int {
 	return maxFallbackAttempts
 }
 
-func buildChatAttemptTargets(primary commontypes.UpstreamConfig, endpoints []commontypes.UpstreamConfig, maxFallbackAttempts int) []chatAttemptTarget {
-	primaryURL := strings.TrimSpace(primary.URL)
-	primary.URL = primaryURL
-	targets := []chatAttemptTarget{{
-		Upstream: primary,
-	}}
-
-	// Collect remaining endpoints as fallback candidates, excluding
-	// the primary by ID (not URL — same URL with different ModelName
-	// is a valid fallback).
-	candidates := collectFallbackCandidates(primary.ID, endpoints)
-	maxTargets := maxFallbackAttempts + 1 // +1 for the primary entry
-	for _, c := range candidates {
-		if len(targets) >= maxTargets {
+func buildChatAttemptTargets(primary commontypes.UpstreamConfig, upstreams []commontypes.UpstreamConfig, maxFallbackAttempts int) []commontypes.UpstreamConfig {
+	if maxFallbackAttempts <= 0 || len(upstreams) <= 1 {
+		return []commontypes.UpstreamConfig{}
+	}
+	candidates := make([]commontypes.UpstreamConfig, 0, len(upstreams)-1)
+	for _, ep := range upstreams {
+		url := strings.TrimSpace(ep.URL)
+		if url == "" || ep.ID == primary.ID {
+			continue
+		}
+		ep.URL = url
+		candidates = append(candidates, ep)
+		if len(candidates) >= maxFallbackAttempts {
 			break
 		}
-		targets = append(targets, c)
 	}
-	return targets
-}
-
-// collectFallbackCandidates returns sorted endpoints excluding the primary
-// (matched by ID) and deduplicating by URL.
-func collectFallbackCandidates(primaryID int64, endpoints []commontypes.UpstreamConfig) []chatAttemptTarget {
-	seen := make(map[string]struct{}, len(endpoints))
-	candidates := make([]chatAttemptTarget, 0, len(endpoints))
-	for _, ep := range endpoints {
-		url := strings.TrimSpace(ep.URL)
-		if url == "" || ep.ID == primaryID {
-			continue
-		}
-		if _, ok := seen[url]; ok {
-			continue
-		}
-		seen[url] = struct{}{}
-		ep.URL = url
-		candidates = append(candidates, chatAttemptTarget{Upstream: ep})
-	}
-	sort.Slice(candidates, func(i, j int) bool {
-		return candidates[i].Upstream.URL < candidates[j].Upstream.URL
-	})
 	return candidates
 }
 

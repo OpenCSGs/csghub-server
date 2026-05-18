@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-
 	"opencsg.com/csghub-server/aigateway/types"
 )
 
@@ -56,7 +55,7 @@ func (h *OpenAIHandlerImpl) reportChatAttemptFailure(ctx context.Context, event 
 	if err := h.chatAttemptFailureReporter.ReportChatAttemptFailure(ctx, event); err != nil {
 		slog.WarnContext(ctx, "failed to report chat attempt failure", slog.Any("error", err), slog.Any("event", event))
 	}
-	if h.availabilityManager != nil && shouldReportChatAttemptFailure(event.StatusCode) {
+	if h.availabilityManager != nil && types.ShouldAttemptFailureStatus(event.StatusCode) {
 		recordErr := h.availabilityManager.RecordRequestResult(
 			ctx,
 			event.UpstreamID,
@@ -73,7 +72,6 @@ func (h *OpenAIHandlerImpl) reportChatAttemptFailure(ctx context.Context, event 
 		}
 	}
 }
-
 
 // reportChatAttemptSuccess reports a successful chat upstream attempt to the
 // circuit breaker so it can transition HalfOpen->Closed when appropriate.
@@ -106,7 +104,7 @@ type chatAttemptReportParams struct {
 
 func (h *OpenAIHandlerImpl) reportChatAttemptResult(ctx context.Context, p chatAttemptReportParams) {
 	bgCtx := context.WithoutCancel(ctx)
-	if shouldReportChatAttemptFailure(p.StatusCode) {
+	if types.ShouldAttemptFailureStatus(p.StatusCode) {
 		event := ChatAttemptFailureEvent{
 			UpstreamID:      p.UpstreamID,
 			Phase:           p.Phase,
@@ -126,8 +124,4 @@ func (h *OpenAIHandlerImpl) reportChatAttemptResult(ctx context.Context, p chatA
 		modelID := resolveFailureEventModelID(p.RequestModelID, p.Model)
 		go h.reportChatAttemptSuccess(bgCtx, upstreamID, modelID)
 	}
-}
-
-func shouldReportChatAttemptFailure(statusCode int) bool {
-	return statusCode >= 400
 }

@@ -28,14 +28,13 @@ type UpstreamConfig struct {
 	IsAvailable bool `json:"is_available"`
 	// AvailabilityStatus is a readable aggregate status: available/degraded/unavailable/disabled.
 	AvailabilityStatus string `json:"availability_status,omitempty"`
-	// ModelName overrides the upstream request model ID when this endpoint uses
-	// a provider-specific model identifier. It falls back to the logical model ID when omitted.
-	ModelName string `json:"model_name,omitempty"`
+	// ModelName overrides the upstream request model ID when this upstream uses
+	ModelName string `json:"model_name"`
 	// AuthHeader is endpoint-specific auth header value.
 	// It supports either a plain "Bearer xxx" string or JSON object string like {"Authorization":"Bearer xxx"}.
-	AuthHeader string `json:"auth_header,omitempty"`
+	AuthHeader string `json:"auth_header"`
 	// Provider identifies upstream provider for this specific endpoint.
-	Provider string `json:"provider,omitempty"`
+	Provider string `json:"provider"`
 	// LimitPolicy controls usage-based quota for this specific endpoint.
 	LimitPolicy *UsageLimitPolicy `json:"limit_policy,omitempty"`
 	Tags        map[string]string `json:"tags,omitempty"`
