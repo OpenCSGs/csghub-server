@@ -317,6 +317,10 @@ type RepoFilter struct {
 	Status              string
 	DatasetType         string
 	UserPurchased       bool
+	ModelParamsMin      *float64
+	ModelParamsMax      *float64
+	RepoSizeMin         *int64
+	RepoSizeMax         *int64
 }
 
 type BatchGetFilter struct {

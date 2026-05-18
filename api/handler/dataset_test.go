@@ -100,6 +100,43 @@ func TestDatasetHandler_Index(t *testing.T) {
 	}
 }
 
+func TestDatasetHandler_IndexRepoSizeRange(t *testing.T) {
+	tester := NewDatasetTester(t).WithHandleFunc(func(h *DatasetHandler) gin.HandlerFunc {
+		return h.Index
+	})
+	repoSizeMin := int64(1_048_576)
+	repoSizeMax := int64(10_485_760)
+	tester.mocks.dataset.EXPECT().Index(tester.Ctx(), &types.RepoFilter{
+		Sort:        "recently_update",
+		RepoSizeMin: &repoSizeMin,
+		RepoSizeMax: &repoSizeMax,
+	}, 10, 1, false).Return([]*types.Dataset{{Name: "cc"}}, 1, nil)
+
+	tester.AddPagination(1, 10).
+		WithQuery("repo_size_min", "1048576").
+		WithQuery("repo_size_max", "10485760").
+		Execute()
+
+	tester.ResponseEqSimple(t, 200, gin.H{
+		"data":  []*types.Dataset{{Name: "cc"}},
+		"total": 1,
+		"msg":   "OK",
+	})
+}
+
+func TestDatasetHandler_IndexRepoSizeRangeInvalid(t *testing.T) {
+	tester := NewDatasetTester(t).WithHandleFunc(func(h *DatasetHandler) gin.HandlerFunc {
+		return h.Index
+	})
+
+	tester.AddPagination(1, 10).
+		WithQuery("repo_size_min", "10485760").
+		WithQuery("repo_size_max", "1048576").
+		Execute()
+
+	require.Equal(t, 400, tester.Response().Code)
+}
+
 func TestDatasetHandler_Update(t *testing.T) {
 	t.Run("forbidden", func(t *testing.T) {
 		tester := NewDatasetTester(t).WithHandleFunc(func(h *DatasetHandler) gin.HandlerFunc {
