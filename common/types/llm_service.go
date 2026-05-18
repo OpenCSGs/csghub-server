@@ -43,11 +43,9 @@ type UpstreamConfig struct {
 
 // RoutingPolicy controls how a request selects one upstream from Upstreams.
 type RoutingPolicy struct {
-	Strategy        string `json:"strategy"`
-	SessionHeader   string `json:"session_header,omitempty"`
-	HashReplicas    int    `json:"hash_replicas,omitempty"`
-	RoutingGroup    string `json:"routing_group,omitempty"`
-	FallbackToFirst bool   `json:"fallback_to_first,omitempty"`
+	Strategy      string `json:"strategy"`
+	SessionHeader string `json:"session_header,omitempty"`
+	HashReplicas  int    `json:"hash_replicas,omitempty"`
 }
 
 // UsageLimitPolicy controls usage-based quota within one fixed time window.
