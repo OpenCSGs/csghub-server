@@ -742,6 +742,7 @@ func (s *repoStoreImpl) PublicToUser(ctx context.Context, repoType types.Reposit
 	if repoType == types.DatasetRepo && filter.DatasetType != "" {
 		q.Where("datasets.dataset_type = ?", filter.DatasetType)
 	}
+	applyRepoRangeFilters(q, repoType, "repository", filter)
 
 	// Filter by user purchased datasets
 	if repoType == types.DatasetRepo && filter.UserPurchased && filter.Username != "" {
@@ -849,6 +850,7 @@ func (s *repoStoreImpl) publicToUserTrending(ctx context.Context, repoType types
 	if repoType == types.DatasetRepo && filter.DatasetType != "" {
 		q.Where("datasets.dataset_type = ?", filter.DatasetType)
 	}
+	applyRepoRangeFilters(q, repoType, "r", filter)
 
 	// Filter by user purchased datasets
 	if repoType == types.DatasetRepo && filter.UserPurchased && filter.Username != "" {
@@ -1129,6 +1131,32 @@ func (s *repoStoreImpl) SearchRepoWithCache(ctx context.Context, q *bun.SelectQu
 	}
 
 	return orderedRepos, count, nil
+}
+
+func applyRepoRangeFilters(q *bun.SelectQuery, repoType types.RepositoryType, repoAlias string, filter *types.RepoFilter) {
+	if repoType == types.ModelRepo && (filter.ModelParamsMin != nil || filter.ModelParamsMax != nil) {
+		q.Join(fmt.Sprintf("INNER JOIN metadata AS range_metadata ON range_metadata.repository_id = %s.id", repoAlias))
+		if filter.ModelParamsMin != nil {
+			q.Where("range_metadata.model_params >= ?", *filter.ModelParamsMin)
+		}
+		if filter.ModelParamsMax != nil {
+			q.Where("range_metadata.model_params <= ?", *filter.ModelParamsMax)
+		}
+	}
+
+	if repoType == types.DatasetRepo && (filter.RepoSizeMin != nil || filter.RepoSizeMax != nil) {
+		q.Join(fmt.Sprintf(
+			"INNER JOIN repository_statistics AS range_repository_statistics ON range_repository_statistics.repository_id = %s.id AND range_repository_statistics.branch = %s.default_branch",
+			repoAlias,
+			repoAlias,
+		))
+		if filter.RepoSizeMin != nil {
+			q.Where("range_repository_statistics.total_size >= ?", *filter.RepoSizeMin)
+		}
+		if filter.RepoSizeMax != nil {
+			q.Where("range_repository_statistics.total_size <= ?", *filter.RepoSizeMax)
+		}
+	}
 }
 
 func buildLikeQuery(q *bun.SelectQuery, filter *types.RepoFilter, limit int) {

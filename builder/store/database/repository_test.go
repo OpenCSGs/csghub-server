@@ -798,6 +798,124 @@ func TestRepoStore_PublicToUser(t *testing.T) {
 	}
 }
 
+func TestRepoStore_PublicToUserRangeFilters(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+
+	store := database.NewRepoStoreWithDB(db)
+	modelStore := database.NewModelStoreWithDB(db)
+	datasetStore := database.NewDatasetStoreWithDB(db)
+
+	smallModel, err := store.CreateRepo(ctx, database.Repository{
+		Name:           "small-model",
+		Path:           "test/small-model",
+		GitPath:        "models_test/small-model",
+		UserID:         123,
+		RepositoryType: types.ModelRepo,
+	})
+	require.Nil(t, err)
+	_, err = modelStore.Create(ctx, database.Model{RepositoryID: smallModel.ID})
+	require.Nil(t, err)
+	_, err = db.Core.NewInsert().Model(&database.Metadata{
+		RepositoryID: smallModel.ID,
+		ModelParams:  1.5,
+	}).Exec(ctx)
+	require.Nil(t, err)
+
+	largeModel, err := store.CreateRepo(ctx, database.Repository{
+		Name:           "large-model",
+		Path:           "test/large-model",
+		GitPath:        "models_test/large-model",
+		UserID:         123,
+		RepositoryType: types.ModelRepo,
+	})
+	require.Nil(t, err)
+	_, err = modelStore.Create(ctx, database.Model{RepositoryID: largeModel.ID})
+	require.Nil(t, err)
+	_, err = db.Core.NewInsert().Model(&database.Metadata{
+		RepositoryID: largeModel.ID,
+		ModelParams:  7,
+	}).Exec(ctx)
+	require.Nil(t, err)
+
+	modelParamsMin := 2.0
+	modelParamsMax := 8.0
+	repos, count, err := store.PublicToUser(ctx, types.ModelRepo, []int64{123}, &types.RepoFilter{
+		Sort:           "recently_update",
+		ModelParamsMin: &modelParamsMin,
+		ModelParamsMax: &modelParamsMax,
+	}, 10, 1, false)
+	require.Nil(t, err)
+	require.Equal(t, 1, count)
+	require.Equal(t, "large-model", repos[0].Name)
+
+	smallDataset, err := store.CreateRepo(ctx, database.Repository{
+		Name:           "small-dataset",
+		Path:           "test/small-dataset",
+		GitPath:        "datasets_test/small-dataset",
+		UserID:         123,
+		RepositoryType: types.DatasetRepo,
+		DefaultBranch:  "main",
+	})
+	require.Nil(t, err)
+	_, err = datasetStore.Create(ctx, database.Dataset{RepositoryID: smallDataset.ID})
+	require.Nil(t, err)
+	_, err = db.Core.NewInsert().Model(&database.RepositoryStatistics{
+		RepositoryID: smallDataset.ID,
+		Branch:       "main",
+		TotalSize:    100,
+	}).Exec(ctx)
+	require.Nil(t, err)
+
+	largeDataset, err := store.CreateRepo(ctx, database.Repository{
+		Name:           "large-dataset",
+		Path:           "test/large-dataset",
+		GitPath:        "datasets_test/large-dataset",
+		UserID:         123,
+		RepositoryType: types.DatasetRepo,
+		DefaultBranch:  "main",
+	})
+	require.Nil(t, err)
+	_, err = datasetStore.Create(ctx, database.Dataset{RepositoryID: largeDataset.ID})
+	require.Nil(t, err)
+	_, err = db.Core.NewInsert().Model(&database.RepositoryStatistics{
+		RepositoryID: largeDataset.ID,
+		Branch:       "main",
+		TotalSize:    12_032,
+	}).Exec(ctx)
+	require.Nil(t, err)
+
+	nonDefaultBranchDataset, err := store.CreateRepo(ctx, database.Repository{
+		Name:           "non-default-branch-dataset",
+		Path:           "test/non-default-branch-dataset",
+		GitPath:        "datasets_test/non-default-branch-dataset",
+		UserID:         123,
+		RepositoryType: types.DatasetRepo,
+		DefaultBranch:  "main",
+	})
+	require.Nil(t, err)
+	_, err = datasetStore.Create(ctx, database.Dataset{RepositoryID: nonDefaultBranchDataset.ID})
+	require.Nil(t, err)
+	_, err = db.Core.NewInsert().Model(&database.RepositoryStatistics{
+		RepositoryID: nonDefaultBranchDataset.ID,
+		Branch:       "dev",
+		TotalSize:    12_032,
+	}).Exec(ctx)
+	require.Nil(t, err)
+
+	repoSizeMin := int64(1000)
+	repoSizeMax := int64(20000)
+	repos, count, err = store.PublicToUser(ctx, types.DatasetRepo, []int64{123}, &types.RepoFilter{
+		Sort:        "recently_update",
+		RepoSizeMin: &repoSizeMin,
+		RepoSizeMax: &repoSizeMax,
+	}, 10, 1, false)
+	require.Nil(t, err)
+	require.Equal(t, 1, count)
+	require.Equal(t, "large-dataset", repos[0].Name)
+}
+
 func TestRepoStore_IsMirrorRepo(t *testing.T) {
 	db := tests.InitTestDB()
 	defer db.Close()

@@ -116,6 +116,8 @@ func (h *DatasetHandler) Create(ctx *gin.Context) {
 // @Param        xnet_migration_status query string false "filter by xnet migration status" Enums(pending, running, completed, failed)
 // @Param        dataset_type query string false "filter by dataset type" Enums(commercial, normal)
 // @Param        user_purchased query bool false "filter by user purchased" default(false)
+// @Param        repo_size_min query int false "minimum repository size in bytes"
+// @Param        repo_size_max query int false "maximum repository size in bytes"
 // @Param        per query int false "per" default(20)
 // @Param        page query int false "per page" default(1)
 // @Success      200  {object}  types.ResponseWithTotal{data=[]types.Dataset,total=int} "OK"
@@ -133,6 +135,12 @@ func (h *DatasetHandler) Index(ctx *gin.Context) {
 		return
 	}
 	filter = getFilterFromContext(ctx, filter)
+	filter.RepoSizeMin, filter.RepoSizeMax, err = parseInt64RangeFromContext(ctx, "repo_size_min", "repo_size_max")
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "Bad repo size range request format,", slog.Any("error", err))
+		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(err, errorx.Ctx().Set("query", "repo_size_range")))
+		return
+	}
 	if !slices.Contains(types.Sorts, filter.Sort) {
 		err = fmt.Errorf("sort parameter must be one of %v", types.Sorts)
 		err = errorx.ReqParamInvalid(err, errorx.Ctx().Set("query", "sort_filter"))

@@ -41,6 +41,8 @@ import (
 // @Param        page query int false "per page" default(1)
 // @Param        model_tree query string false "example: base_model:finetune:1"
 // @Param        list_serverless query bool false "list serverless" default(false)
+// @Param        model_params_min query number false "minimum model parameters in billions"
+// @Param        model_params_max query number false "maximum model parameters in billions"
 // @Success      200  {object}  types.ResponseWithTotal{data=[]types.Model,total=int} "OK"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
@@ -63,6 +65,12 @@ func (h *ModelHandler) Index(ctx *gin.Context) {
 		return
 	}
 	filter = getFilterFromContext(ctx, filter)
+	filter.ModelParamsMin, filter.ModelParamsMax, err = parseFloatRangeFromContext(ctx, "model_params_min", "model_params_max")
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "Bad model params range request format,", slog.Any("error", err))
+		httpbase.BadRequestWithExt(ctx, errorx.ReqParamInvalid(err, errorx.Ctx().Set("query", "model_params_range")))
+		return
+	}
 	if !slices.Contains(types.Sorts, filter.Sort) {
 		msg := fmt.Sprintf("sort parameter must be one of %v", types.Sorts)
 		err := errorx.ReqParamInvalid(errors.New(msg),
