@@ -10,8 +10,6 @@ import (
 	"github.com/spf13/cobra"
 	"opencsg.com/csghub-server/aigateway/router"
 	"opencsg.com/csghub-server/api/httpbase"
-	"opencsg.com/csghub-server/builder/deploy"
-	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/event"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
@@ -47,12 +45,6 @@ var cmdLaunch = &cobra.Command{
 		err = event.InitEventPublisher(cfg)
 		if err != nil {
 			return fmt.Errorf("fail to initialize message queue, %w", err)
-		}
-
-		slog.Info("init deployer for space service")
-		err = deploy.Init(common.BuildDeployConfig(cfg), cfg, false)
-		if err != nil {
-			return fmt.Errorf("failed to init deploy: %w", err)
 		}
 
 		r, cleanup, err := router.NewRouter(cfg)
