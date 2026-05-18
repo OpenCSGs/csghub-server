@@ -4,8 +4,6 @@ package component
 
 import (
 	"context"
-	"fmt"
-	"strings"
 
 	"opencsg.com/csghub-server/aigateway/types"
 	"opencsg.com/csghub-server/builder/event"
@@ -25,9 +23,6 @@ func NewOpenAIComponentFromConfig(config *config.Config) (OpenAIComponent, error
 	if err != nil {
 		return nil, err
 	}
-	if len(strings.TrimSpace(config.AIGateway.ModelIDFmt)) == 0 {
-		return nil, fmt.Errorf("modelIDFmt is empty")
-	}
 	return &openaiComponentImpl{
 		userStore:      database.NewUserStore(),
 		organStore:     database.NewOrgStore(),
@@ -36,7 +31,6 @@ func NewOpenAIComponentFromConfig(config *config.Config) (OpenAIComponent, error
 		extllmStore:    database.NewLLMConfigStore(config),
 		modelListCache: cacheClient,
 		extendOpenai:   extendOpenai{},
-		modelIDFmt:     config.AIGateway.ModelIDFmt,
 		modelIDBuilder: NewModelIDBuilder(),
 	}, nil
 }

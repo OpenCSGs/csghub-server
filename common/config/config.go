@@ -449,7 +449,6 @@ type Config struct {
 		PresignExpirySeconds           int    `env:"OPENCSG_AIGATEWAY_PRESIGN_EXPIRY" default:"86400"`
 		EnableLLMLog                   bool   `env:"OPENCSG_AIGATEWAY_LLMLOG_ENABLE" default:"true"`
 		ChatMaxFallbackAttempts        int    `env:"OPENCSG_AIGATEWAY_CHAT_MAX_FALLBACK_ATTEMPTS" default:"2"`
-		ModelIDFmt                     string `env:"OPENCSG_AIGATEWAY_MODEL_ID_FMT" default:"%s(%s)"`
 		HealthCheckEnabled             bool   `env:"OPENCSG_AIGATEWAY_HEALTH_CHECK_ENABLED" default:"true"`
 		HealthCheckL7APIEnabled        bool   `env:"OPENCSG_AIGATEWAY_HEALTH_CHECK_L7_API_ENABLED" default:"true"`
 		HealthCheckL7APIInterval       int    `env:"OPENCSG_AIGATEWAY_HEALTH_CHECK_L7_API_INTERVAL" default:"60"`

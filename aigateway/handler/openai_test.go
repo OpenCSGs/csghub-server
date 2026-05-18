@@ -868,7 +868,6 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 				SvcName: "",
 			},
 			ExternalModelInfo: types.ExternalModelInfo{
-				FormatModelID:      "test-model-1(OpenAI)",
 				NeedSensitiveCheck: true,
 			},
 			Endpoint: testServer.URL,

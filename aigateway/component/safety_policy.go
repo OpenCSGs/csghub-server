@@ -35,7 +35,7 @@ func (s *sensitivePolicyImpl) CheckChatSensitive(ctx context.Context, model *typ
 	}
 
 	if s.whitelistRule != nil {
-		namespaceTargets := BuildNamespaceTargets(model.OfficialName, model.ID)
+		namespaceTargets := BuildNamespaceTargets(model.ID)
 		rules, err := s.whitelistRule.ListBySensitiveCheckTargets(ctx, namespaceTargets, model.ID)
 		if err != nil {
 			return false, nil, fmt.Errorf("failed to query white list rules: %w", err)
@@ -54,15 +54,9 @@ func (s *sensitivePolicyImpl) CheckChatSensitive(ctx context.Context, model *typ
 	return true, result, nil
 }
 
-func BuildNamespaceTargets(officialName, modelID string) []string {
+func BuildNamespaceTargets(modelID string) []string {
 	targetSet := make(map[string]struct{}, 2)
 	targets := make([]string, 0, 2)
-	if namespace := ExtractNamespaceTarget(officialName); namespace != "" {
-		if _, exists := targetSet[namespace]; !exists {
-			targetSet[namespace] = struct{}{}
-			targets = append(targets, namespace)
-		}
-	}
 	if namespace := ExtractNamespaceTarget(modelID); namespace != "" {
 		if _, exists := targetSet[namespace]; !exists {
 			targetSet[namespace] = struct{}{}

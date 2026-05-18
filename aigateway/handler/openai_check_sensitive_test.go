@@ -263,13 +263,13 @@ func Test_extractNamespaceTarget(t *testing.T) {
 }
 
 func Test_buildNamespaceTargets(t *testing.T) {
-	t.Run("deduplicate namespaces from official name and model id", func(t *testing.T) {
-		targets := comp.BuildNamespaceTargets("Qwen///Qwen3Guard", "///Qwen////model")
+	t.Run("deduplicate namespaces from model id", func(t *testing.T) {
+		targets := comp.BuildNamespaceTargets("///Qwen////model")
 		assert.Equal(t, []string{"qwen"}, targets)
 	})
 
 	t.Run("support one slash and special symbols", func(t *testing.T) {
-		targets := comp.BuildNamespaceTargets("/", "ns-_.+@123/model")
+		targets := comp.BuildNamespaceTargets("ns-_.+@123/model")
 		assert.Equal(t, []string{"ns-_.+@123"}, targets)
 	})
 }
