@@ -611,13 +611,91 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 					require.Equal(t, commontypes.TokenNumberType, evt.ValueType)
 					require.Equal(t, int64(150), evt.Value)
 					var tokenUsageExtra struct {
-						PromptTokenNum     string `json:"prompt_token_num"`
-						CompletionTokenNum string `json:"completion_token_num"`
+						PromptTokenNum     string                     `json:"prompt_token_num"`
+						CompletionTokenNum string                     `json:"completion_token_num"`
+						OwnerType          commontypes.TokenUsageType `json:"owner_type"`
+						Provider           string                     `json:"provider"`
+						ModelName          string                     `json:"model_name"`
 					}
 					err = json.Unmarshal([]byte(evt.Extra), &tokenUsageExtra)
 					require.NoError(t, err)
 					require.Equal(t, "100", tokenUsageExtra.PromptTokenNum)
 					require.Equal(t, "50", tokenUsageExtra.CompletionTokenNum)
+					require.Equal(t, commontypes.CSGHubOtherDeployedInference, tokenUsageExtra.OwnerType)
+					require.Empty(t, tokenUsageExtra.Provider)
+					require.Equal(t, "target-model-name", tokenUsageExtra.ModelName)
+					return nil
+				})
+			},
+		},
+		{
+			name:     "successful record - dedicated inference by same organization user",
+			userUUID: "test-user-uuid",
+			model: &types.Model{
+				BaseModel: types.BaseModel{
+					Metadata: map[string]any{
+						types.MetaKeyLLMType: types.ProviderTypeInference,
+					},
+				},
+				InternalModelInfo: types.InternalModelInfo{
+					CSGHubModelID: "test-model",
+					SvcName:       "test-service",
+					SvcType:       commontypes.InferenceType,
+					OwnerUUID:     "owner-user-uuid",
+				},
+			},
+			usage: &openai.CompletionUsage{
+				PromptTokens:     100,
+				CompletionTokens: 50,
+				TotalTokens:      150,
+			},
+			wantError: false,
+			setupMock: func() {
+				mockBLDMQ := mockbldmq.NewMockMessageQueue(t)
+
+				eventPub := &event.EventPublisher{
+					SyncInterval: 1,
+					MQ:           mockBLDMQ,
+				}
+				mockCounter = mocktoken.NewMockCounter(t)
+
+				comp = &openaiComponentImpl{
+					userStore:   mockUserStore,
+					deployStore: mockDeployStore,
+					eventPub:    eventPub,
+					organStore:  mockOrgStore,
+				}
+				mockCounter.EXPECT().Usage(mock.Anything).Return(&token.Usage{
+					PromptTokens:     100,
+					CompletionTokens: 50,
+					TotalTokens:      150,
+				}, nil)
+				user := &database.User{
+					ID:       1,
+					Username: "testuser",
+				}
+				owner := &database.User{
+					ID:       2,
+					Username: "owneruser",
+				}
+				sharedOrg := database.Organization{ID: 100, Name: "shared-org"}
+				mockUserStore.EXPECT().FindByUUID(mock.Anything, "test-user-uuid").Return(user, nil).Once()
+				mockUserStore.EXPECT().FindByUUID(mock.Anything, "owner-user-uuid").Return(owner, nil).Once()
+				mockOrgStore.EXPECT().GetUserBelongOrgs(mock.Anything, user.ID).Return([]database.Organization{sharedOrg}, nil).Once()
+				mockOrgStore.EXPECT().GetUserBelongOrgs(mock.Anything, owner.ID).Return([]database.Organization{sharedOrg}, nil).Once()
+				mockBLDMQ.EXPECT().Publish(bldmq.MeterDurationSendSubject, mock.Anything).RunAndReturn(func(topic string, data []byte) error {
+					var evt commontypes.MeteringEvent
+					err := json.Unmarshal(data, &evt)
+					require.NoError(t, err)
+					require.Equal(t, "csghub://inference/test-model", evt.ResourceID)
+					require.Equal(t, int(commontypes.SceneModelInference), evt.Scene)
+
+					var tokenUsageExtra struct {
+						OwnerType commontypes.TokenUsageType `json:"owner_type"`
+					}
+					err = json.Unmarshal([]byte(evt.Extra), &tokenUsageExtra)
+					require.NoError(t, err)
+					require.Equal(t, commontypes.CSGHubOrganFellowDeployedInference, tokenUsageExtra.OwnerType)
 					return nil
 				})
 			},
@@ -677,13 +755,19 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 					require.Equal(t, commontypes.TokenNumberType, evt.ValueType)
 					require.Equal(t, int64(150), evt.Value)
 					var tokenUsageExtra struct {
-						PromptTokenNum     string `json:"prompt_token_num"`
-						CompletionTokenNum string `json:"completion_token_num"`
+						PromptTokenNum     string                     `json:"prompt_token_num"`
+						CompletionTokenNum string                     `json:"completion_token_num"`
+						OwnerType          commontypes.TokenUsageType `json:"owner_type"`
+						Provider           string                     `json:"provider"`
+						ModelName          string                     `json:"model_name"`
 					}
 					err = json.Unmarshal([]byte(evt.Extra), &tokenUsageExtra)
 					require.NoError(t, err)
 					require.Equal(t, "100", tokenUsageExtra.PromptTokenNum)
 					require.Equal(t, "50", tokenUsageExtra.CompletionTokenNum)
+					require.Equal(t, commontypes.CSGHubUserDeployedInference, tokenUsageExtra.OwnerType)
+					require.Empty(t, tokenUsageExtra.Provider)
+					require.Equal(t, "target-model-name", tokenUsageExtra.ModelName)
 					return nil
 				})
 			},
@@ -741,13 +825,19 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 					require.Equal(t, commontypes.TokenNumberType, evt.ValueType)
 					require.Equal(t, int64(150), evt.Value)
 					var tokenUsageExtra struct {
-						PromptTokenNum     string `json:"prompt_token_num"`
-						CompletionTokenNum string `json:"completion_token_num"`
+						PromptTokenNum     string                     `json:"prompt_token_num"`
+						CompletionTokenNum string                     `json:"completion_token_num"`
+						OwnerType          commontypes.TokenUsageType `json:"owner_type"`
+						Provider           string                     `json:"provider"`
+						ModelName          string                     `json:"model_name"`
 					}
 					err = json.Unmarshal([]byte(evt.Extra), &tokenUsageExtra)
 					require.NoError(t, err)
 					require.Equal(t, "100", tokenUsageExtra.PromptTokenNum)
 					require.Equal(t, "50", tokenUsageExtra.CompletionTokenNum)
+					require.Equal(t, commontypes.CSGHubServerlessInference, tokenUsageExtra.OwnerType)
+					require.Empty(t, tokenUsageExtra.Provider)
+					require.Equal(t, "target-model-name", tokenUsageExtra.ModelName)
 					return nil
 
 				})
@@ -774,7 +864,7 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 			},
 		},
 		{
-			name:     "conflicting csghub id and external provider",
+			name:     "missing llm type metadata",
 			userUUID: "test-user-uuid",
 			model: &types.Model{
 				InternalModelInfo: types.InternalModelInfo{
@@ -799,7 +889,7 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 			},
 		},
 		{
-			name:     "missing csghub id and provider",
+			name:     "missing llm type metadata and resource identifiers",
 			userUUID: "test-user-uuid",
 			model: &types.Model{
 				BaseModel: types.BaseModel{ID: "orphan"},
@@ -821,18 +911,17 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 			},
 		},
 		{
-			name:     "csghub model with invalid service type",
+			name:     "unsupported llm type",
 			userUUID: "test-user-uuid",
 			model: &types.Model{
 				BaseModel: types.BaseModel{
 					Metadata: map[string]any{
-						types.MetaKeyLLMType: types.ProviderTypeInference,
+						types.MetaKeyLLMType: "unknown",
 					},
 				},
 				InternalModelInfo: types.InternalModelInfo{
 					CSGHubModelID: "test-model",
 					SvcName:       "test-service",
-					SvcType:       2,
 				},
 			},
 			wantError: true,
@@ -931,7 +1020,7 @@ func TestOpenAIComponentImpl_RecordUsage(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.setupMock()
 
-			err := comp.RecordUsage(context.Background(), tt.userUUID, tt.model, mockCounter, "")
+			err := comp.RecordUsage(context.Background(), tt.userUUID, tt.model, "target-model-name", mockCounter, "")
 			if tt.wantError {
 				assert.Error(t, err)
 			} else {
@@ -962,6 +1051,9 @@ func TestOpenAIComponentImpl_RecordUsage_ExternalModel(t *testing.T) {
 				BaseModel: types.BaseModel{
 					ID:      "gpt-4(openai)",
 					OwnedBy: "openai",
+					Metadata: map[string]any{
+						types.MetaKeyLLMType: types.ProviderTypeExternalLLM,
+					},
 				},
 				ExternalModelInfo: types.ExternalModelInfo{
 					Provider: "openai",
@@ -992,8 +1084,8 @@ func TestOpenAIComponentImpl_RecordUsage_ExternalModel(t *testing.T) {
 					var evt commontypes.MeteringEvent
 					err := json.Unmarshal(data, &evt)
 					require.NoError(t, err)
-					require.Equal(t, "openai://gpt-4(openai)", evt.ResourceID)
-					require.Equal(t, "openai://gpt-4(openai)", evt.ResourceName)
+					require.Equal(t, "thirdparty://gpt-4(openai)", evt.ResourceID)
+					require.Equal(t, "thirdparty://gpt-4(openai)", evt.ResourceName)
 					require.Equal(t, "gpt-4(openai)", evt.CustomerID)
 					require.Equal(t, "test-user-uuid", evt.UserUUID)
 					require.Equal(t, commontypes.TokenNumberType, evt.ValueType)
@@ -1004,12 +1096,16 @@ func TestOpenAIComponentImpl_RecordUsage_ExternalModel(t *testing.T) {
 						PromptTokenNum     string                     `json:"prompt_token_num"`
 						CompletionTokenNum string                     `json:"completion_token_num"`
 						OwnerType          commontypes.TokenUsageType `json:"owner_type"`
+						Provider           string                     `json:"provider"`
+						ModelName          string                     `json:"model_name"`
 					}
 					err = json.Unmarshal([]byte(evt.Extra), &tokenUsageExtra)
 					require.NoError(t, err)
 					require.Equal(t, "200", tokenUsageExtra.PromptTokenNum)
 					require.Equal(t, "100", tokenUsageExtra.CompletionTokenNum)
 					require.Equal(t, commontypes.ExternalInference, tokenUsageExtra.OwnerType)
+					require.Equal(t, "openai", tokenUsageExtra.Provider)
+					require.Equal(t, "target-model-name", tokenUsageExtra.ModelName)
 					return nil
 				})
 			},
@@ -1021,6 +1117,9 @@ func TestOpenAIComponentImpl_RecordUsage_ExternalModel(t *testing.T) {
 				BaseModel: types.BaseModel{
 					ID:      "gpt-3.5-turbo",
 					OwnedBy: "openai",
+					Metadata: map[string]any{
+						types.MetaKeyLLMType: types.ProviderTypeExternalLLM,
+					},
 				},
 				ExternalModelInfo: types.ExternalModelInfo{
 					Provider: "openai",
@@ -1050,6 +1149,9 @@ func TestOpenAIComponentImpl_RecordUsage_ExternalModel(t *testing.T) {
 				BaseModel: types.BaseModel{
 					ID:      "gemini-pro",
 					OwnedBy: "google",
+					Metadata: map[string]any{
+						types.MetaKeyLLMType: types.ProviderTypeExternalLLM,
+					},
 				},
 				ExternalModelInfo: types.ExternalModelInfo{
 					Provider: "google",
@@ -1083,6 +1185,9 @@ func TestOpenAIComponentImpl_RecordUsage_ExternalModel(t *testing.T) {
 				BaseModel: types.BaseModel{
 					ID:      "test-model(test-provider)",
 					OwnedBy: "test-provider",
+					Metadata: map[string]any{
+						types.MetaKeyLLMType: types.ProviderTypeExternalLLM,
+					},
 				},
 				ExternalModelInfo: types.ExternalModelInfo{
 					Provider: "test-provider",
@@ -1113,8 +1218,8 @@ func TestOpenAIComponentImpl_RecordUsage_ExternalModel(t *testing.T) {
 					var evt commontypes.MeteringEvent
 					err := json.Unmarshal(data, &evt)
 					require.NoError(t, err)
-					require.Equal(t, "test-provider://test-model(test-provider)", evt.ResourceID)
-					require.Equal(t, "test-provider://test-model(test-provider)", evt.ResourceName)
+					require.Equal(t, "thirdparty://test-model(test-provider)", evt.ResourceID)
+					require.Equal(t, "thirdparty://test-model(test-provider)", evt.ResourceName)
 					require.Equal(t, "test-model(test-provider)", evt.CustomerID)
 					require.Equal(t, int64(0), evt.Value)
 
@@ -1122,12 +1227,16 @@ func TestOpenAIComponentImpl_RecordUsage_ExternalModel(t *testing.T) {
 						PromptTokenNum     string                     `json:"prompt_token_num"`
 						CompletionTokenNum string                     `json:"completion_token_num"`
 						OwnerType          commontypes.TokenUsageType `json:"owner_type"`
+						Provider           string                     `json:"provider"`
+						ModelName          string                     `json:"model_name"`
 					}
 					err = json.Unmarshal([]byte(evt.Extra), &tokenUsageExtra)
 					require.NoError(t, err)
 					require.Equal(t, "0", tokenUsageExtra.PromptTokenNum)
 					require.Equal(t, "0", tokenUsageExtra.CompletionTokenNum)
 					require.Equal(t, commontypes.ExternalInference, tokenUsageExtra.OwnerType)
+					require.Equal(t, "test-provider", tokenUsageExtra.Provider)
+					require.Equal(t, "target-model-name", tokenUsageExtra.ModelName)
 					return nil
 				})
 			},
@@ -1138,7 +1247,7 @@ func TestOpenAIComponentImpl_RecordUsage_ExternalModel(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.setupMock()
 
-			err := comp.RecordUsage(context.Background(), tt.userUUID, tt.model, mockCounter, "")
+			err := comp.RecordUsage(context.Background(), tt.userUUID, tt.model, "target-model-name", mockCounter, "")
 			if tt.wantError {
 				assert.Error(t, err)
 			} else {

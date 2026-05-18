@@ -346,17 +346,17 @@ func (_c *MockOpenAIComponent_ListModels_Call) RunAndReturn(run func(context.Con
 	return _c
 }
 
-// RecordUsage provides a mock function with given fields: c, nsUUID, model, tokenCounter, apikey
-func (_m *MockOpenAIComponent) RecordUsage(c context.Context, nsUUID string, model *types.Model, tokenCounter token.Counter, apikey string) error {
-	ret := _m.Called(c, nsUUID, model, tokenCounter, apikey)
+// RecordUsage provides a mock function with given fields: c, nsUUID, model, targetModelName, tokenCounter, apikey
+func (_m *MockOpenAIComponent) RecordUsage(c context.Context, nsUUID string, model *types.Model, targetModelName string, tokenCounter token.Counter, apikey string) error {
+	ret := _m.Called(c, nsUUID, model, targetModelName, tokenCounter, apikey)
 
 	if len(ret) == 0 {
 		panic("no return value specified for RecordUsage")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, *types.Model, token.Counter, string) error); ok {
-		r0 = rf(c, nsUUID, model, tokenCounter, apikey)
+	if rf, ok := ret.Get(0).(func(context.Context, string, *types.Model, string, token.Counter, string) error); ok {
+		r0 = rf(c, nsUUID, model, targetModelName, tokenCounter, apikey)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -373,15 +373,16 @@ type MockOpenAIComponent_RecordUsage_Call struct {
 //   - c context.Context
 //   - nsUUID string
 //   - model *types.Model
+//   - targetModelName string
 //   - tokenCounter token.Counter
 //   - apikey string
-func (_e *MockOpenAIComponent_Expecter) RecordUsage(c interface{}, nsUUID interface{}, model interface{}, tokenCounter interface{}, apikey interface{}) *MockOpenAIComponent_RecordUsage_Call {
-	return &MockOpenAIComponent_RecordUsage_Call{Call: _e.mock.On("RecordUsage", c, nsUUID, model, tokenCounter, apikey)}
+func (_e *MockOpenAIComponent_Expecter) RecordUsage(c interface{}, nsUUID interface{}, model interface{}, targetModelName interface{}, tokenCounter interface{}, apikey interface{}) *MockOpenAIComponent_RecordUsage_Call {
+	return &MockOpenAIComponent_RecordUsage_Call{Call: _e.mock.On("RecordUsage", c, nsUUID, model, targetModelName, tokenCounter, apikey)}
 }
 
-func (_c *MockOpenAIComponent_RecordUsage_Call) Run(run func(c context.Context, nsUUID string, model *types.Model, tokenCounter token.Counter, apikey string)) *MockOpenAIComponent_RecordUsage_Call {
+func (_c *MockOpenAIComponent_RecordUsage_Call) Run(run func(c context.Context, nsUUID string, model *types.Model, targetModelName string, tokenCounter token.Counter, apikey string)) *MockOpenAIComponent_RecordUsage_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(*types.Model), args[3].(token.Counter), args[4].(string))
+		run(args[0].(context.Context), args[1].(string), args[2].(*types.Model), args[3].(string), args[4].(token.Counter), args[5].(string))
 	})
 	return _c
 }
@@ -391,7 +392,7 @@ func (_c *MockOpenAIComponent_RecordUsage_Call) Return(_a0 error) *MockOpenAICom
 	return _c
 }
 
-func (_c *MockOpenAIComponent_RecordUsage_Call) RunAndReturn(run func(context.Context, string, *types.Model, token.Counter, string) error) *MockOpenAIComponent_RecordUsage_Call {
+func (_c *MockOpenAIComponent_RecordUsage_Call) RunAndReturn(run func(context.Context, string, *types.Model, string, token.Counter, string) error) *MockOpenAIComponent_RecordUsage_Call {
 	_c.Call.Return(run)
 	return _c
 }

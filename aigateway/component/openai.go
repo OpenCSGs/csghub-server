@@ -35,7 +35,7 @@ type OpenAIComponent interface {
 	GetAvailableModels(c context.Context, user string) ([]types.Model, error)
 	ListModels(c context.Context, user string, req types.ListModelsReq) (types.ModelList, error)
 	GetModelByID(c context.Context, username, modelID string) (*types.Model, error)
-	RecordUsage(c context.Context, nsUUID string, model *types.Model, tokenCounter token.Counter, apikey string) error
+	RecordUsage(c context.Context, nsUUID string, model *types.Model, targetModelName string, tokenCounter token.Counter, apikey string) error
 	CheckBalance(ctx context.Context, nsUUID string) error
 	CheckUsageLimit(ctx context.Context, userUUID string, model *types.Model, endpoint string) error
 	CommitUsageLimit(ctx context.Context, userUUID string, model *types.Model, tokenCounter token.Counter) error
@@ -523,46 +523,91 @@ func getSceneFromSvcType(svcType int) int {
 	}
 }
 
-// csghubMeteringLLMTypeFromModel returns metadata llm_type (e.g. serverless, inference) used as the path component in csghub://… metering URIs.
-func csghubMeteringLLMTypeFromModel(m *types.Model) (string, error) {
+// llmTypeFromModel returns metadata llm_type used to classify usage metering records.
+func llmTypeFromModel(m *types.Model) (string, error) {
 	if m == nil {
 		return "", fmt.Errorf("model is nil")
 	}
 	if m.Metadata == nil {
-		return "", fmt.Errorf("model metadata is nil: cannot resolve %s for resource path", types.MetaKeyLLMType)
+		return "", fmt.Errorf("model metadata is nil: cannot resolve %s", types.MetaKeyLLMType)
 	}
 	llmType, ok := m.Metadata[types.MetaKeyLLMType].(string)
-	if !ok {
+	if !ok || strings.TrimSpace(llmType) == "" {
 		return "", fmt.Errorf("model metadata %s missing or not a string", types.MetaKeyLLMType)
 	}
 	return llmType, nil
 }
 
-func meteringResourceFromModel(model *types.Model) (types.MeteringResource, error) {
+type usageMeteringInfo struct {
+	Resource  types.MeteringResource
+	Scene     commontypes.SceneType
+	OwnerType commontypes.TokenUsageType
+}
+
+func (m *openaiComponentImpl) resolveUsageMeteringInfo(c context.Context, nsUUID string, model *types.Model) (usageMeteringInfo, error) {
 	if model == nil {
-		return types.MeteringResource{}, fmt.Errorf("model is nil")
+		return usageMeteringInfo{}, fmt.Errorf("model is nil")
 	}
-	if model.CSGHubModelID != "" {
-		llmType, err := csghubMeteringLLMTypeFromModel(model)
-		if err != nil {
-			return types.MeteringResource{}, err
+	llmType, err := llmTypeFromModel(model)
+	if err != nil {
+		return usageMeteringInfo{}, err
+	}
+	switch llmType {
+	case types.ProviderTypeServerless, types.ProviderTypeInference:
+		if model.CSGHubModelID == "" {
+			return usageMeteringInfo{}, fmt.Errorf("model metadata %s=%s requires csghub model id", types.MetaKeyLLMType, llmType)
 		}
 		id := fmt.Sprintf(types.CSGHubResourceFmt, llmType, model.CSGHubModelID)
-		return types.MeteringResource{
-			ResourceID:   id,
-			ResourceName: id,
-			CustomerID:   model.SvcName,
+		meteringInfo := usageMeteringInfo{
+			Resource: types.MeteringResource{
+				ResourceID:   id,
+				ResourceName: id,
+				CustomerID:   model.SvcName,
+			},
+			Scene: commontypes.SceneModelServerless,
+		}
+		if llmType == types.ProviderTypeInference {
+			meteringInfo.Scene = commontypes.SceneModelInference
+			ownerType, err := m.resolveUsageOwnerType(c, nsUUID, model)
+			if err != nil {
+				return usageMeteringInfo{}, err
+			}
+			meteringInfo.OwnerType = ownerType
+		} else {
+			meteringInfo.OwnerType = commontypes.CSGHubServerlessInference
+		}
+		return meteringInfo, nil
+	case types.ProviderTypeExternalLLM:
+		if model.ID == "" {
+			return usageMeteringInfo{}, fmt.Errorf("model metadata %s=%s requires model id", types.MetaKeyLLMType, llmType)
+		}
+		id := fmt.Sprintf(types.ExternalLLMResourceFmt, model.ID)
+		return usageMeteringInfo{
+			Resource: types.MeteringResource{
+				ResourceID:   id,
+				ResourceName: id,
+				CustomerID:   model.ID,
+			},
+			Scene:     commontypes.SceneModelServerless,
+			OwnerType: commontypes.ExternalInference,
 		}, nil
+	default:
+		return usageMeteringInfo{}, fmt.Errorf("model metadata %s has unsupported value %s", types.MetaKeyLLMType, llmType)
 	}
-	if model.Provider != "" {
-		id := fmt.Sprintf(types.ExternalLLMResourceFmt, model.Provider, model.ID)
-		return types.MeteringResource{
-			ResourceID:   id,
-			ResourceName: id,
-			CustomerID:   model.ID,
-		}, nil
+}
+
+func (m *openaiComponentImpl) resolveUsageOwnerType(c context.Context, nsUUID string, model *types.Model) (commontypes.TokenUsageType, error) {
+	if model.OwnerUUID == nsUUID {
+		return commontypes.CSGHubUserDeployedInference, nil
 	}
-	return types.MeteringResource{}, nil
+	belong, err := m.checkOrganization(c, nsUUID, model.OwnerUUID)
+	if err != nil {
+		return "", fmt.Errorf("failed to check organization: %w", err)
+	}
+	if belong {
+		return commontypes.CSGHubOrganFellowDeployedInference, nil
+	}
+	return commontypes.CSGHubOtherDeployedInference, nil
 }
 
 // tokenUsageMeteringExtra is serialized into MeteringEvent.Extra for token billing breakdown.
@@ -571,6 +616,8 @@ type tokenUsageMeteringExtra struct {
 	CompletionTokenNum string                     `json:"completion_token_num"`
 	OwnerType          commontypes.TokenUsageType `json:"owner_type"`
 	APIKey             string                     `json:"api_key"`
+	Provider           string                     `json:"provider"`
+	ModelName          string                     `json:"model_name"`
 }
 
 func sanitizeMeteringEventForLog(event commontypes.MeteringEvent) commontypes.MeteringEvent {
@@ -582,96 +629,52 @@ func sanitizeMeteringEventForLog(event commontypes.MeteringEvent) commontypes.Me
 	return sanitized
 }
 
-func validateModelForUsageRecord(c context.Context, model *types.Model) error {
-	if model == nil {
-		return fmt.Errorf("record usage: model is nil")
-	}
-	if model.CSGHubModelID != "" && model.Provider != "" {
-		slog.WarnContext(c, "bad model info, both csghub model id and external model provider is set",
-			slog.Any("model", model))
-		return fmt.Errorf("record usage: conflicting csghub model id and external provider")
-	}
-	if model.CSGHubModelID == "" && model.Provider == "" {
-		slog.WarnContext(c, "bad model info, both csghub model id and external model provider is not set",
-			slog.Any("model", model))
-		return fmt.Errorf("record usage: model missing resource identifiers")
-	}
-	return nil
-}
-
-func (m *openaiComponentImpl) tokenUsageMeteringExtraAndScene(c context.Context, userUUID string, model *types.Model, usage *token.Usage) (tokenUsageMeteringExtra, commontypes.SceneType, error) {
-	scene := commontypes.SceneModelServerless
+func buildTokenUsageExtraData(usageModel *types.Model, upstreamModelName string, usage *token.Usage, apikey string, meteringInfo usageMeteringInfo) (string, error) {
 	extra := tokenUsageMeteringExtra{
 		PromptTokenNum:     fmt.Sprintf("%d", usage.PromptTokens),
 		CompletionTokenNum: fmt.Sprintf("%d", usage.CompletionTokens),
+		OwnerType:          meteringInfo.OwnerType,
+		APIKey:             apikey,
+		Provider:           usageModel.Provider,
+		ModelName:          upstreamModelName,
 	}
-	if model.CSGHubModelID != "" {
-		switch model.SvcType {
-		case commontypes.ServerlessType:
-			extra.OwnerType = commontypes.CSGHubServerlessInference
-		case commontypes.InferenceType:
-			if model.OwnerUUID == userUUID {
-				extra.OwnerType = commontypes.CSGHubUserDeployedInference
-			} else {
-				belong, err := m.checkOrganization(c, userUUID, model.OwnerUUID)
-				if err != nil {
-					return tokenUsageMeteringExtra{}, 0, fmt.Errorf("failed to check organization: %w", err)
-				}
-				if belong {
-					extra.OwnerType = commontypes.CSGHubOrganFellowDeployedInference
-				} else {
-					extra.OwnerType = commontypes.CSGHubOtherDeployedInference
-				}
-			}
-			scene = commontypes.SceneModelInference
-		default:
-			slog.ErrorContext(c, "bad model info, csghub model missing service type", slog.Any("model", model))
-			return tokenUsageMeteringExtra{}, 0, fmt.Errorf("record usage: csghub model has invalid or missing service type")
-		}
-	} else if model.Provider != "" {
-		extra.OwnerType = commontypes.ExternalInference
+	extraData, err := json.Marshal(extra)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal token usage extra: %w", err)
 	}
-	return extra, scene, nil
+	return string(extraData), nil
 }
 
-func (m *openaiComponentImpl) RecordUsage(c context.Context, nsUUID string, model *types.Model, counter token.Counter, apikey string) error {
+func (m *openaiComponentImpl) RecordUsage(c context.Context, nsUUID string, model *types.Model, targetModelName string, counter token.Counter, apikey string) error {
 	usage, err := counter.Usage(c)
 	if err != nil {
 		return fmt.Errorf("failed to get token usage from counter: %w", err)
 	}
-	if err := validateModelForUsageRecord(c, model); err != nil {
-		return err
+	meteringInfo, err := m.resolveUsageMeteringInfo(c, nsUUID, model)
+	if err != nil {
+		slog.ErrorContext(c, "cannot record usage: invalid model for resource id", slog.Any("error", err), slog.Any("model", model))
+		return fmt.Errorf("cannot record usage: %w", err)
 	}
-	res, ridErr := meteringResourceFromModel(model)
-	if ridErr != nil {
-		slog.ErrorContext(c, "cannot record usage: invalid model for resource id", slog.Any("error", ridErr), slog.Any("model", model))
-		return fmt.Errorf("cannot record usage: %w", ridErr)
-	}
-	if res.ResourceID == "" {
+	if meteringInfo.Resource.ResourceID == "" {
 		slog.ErrorContext(c, "cannot record usage: empty resource id for model", slog.Any("model", model))
 		return fmt.Errorf("cannot record usage: empty resource id")
 	}
-	extra, scene, err := m.tokenUsageMeteringExtraAndScene(c, nsUUID, model, usage)
+	extraData, err := buildTokenUsageExtraData(model, targetModelName, usage, apikey, meteringInfo)
 	if err != nil {
 		return err
-	}
-	extra.APIKey = apikey
-	extraData, err := json.Marshal(extra)
-	if err != nil {
-		return fmt.Errorf("failed to marshal token usage extra: %w", err)
 	}
 	event := commontypes.MeteringEvent{
 		Uuid:         uuid.New(),
 		UserUUID:     nsUUID,
 		Value:        usage.TotalTokens,
 		ValueType:    commontypes.TokenNumberType,
-		Scene:        int(scene),
+		Scene:        int(meteringInfo.Scene),
 		OpUID:        string(commontypes.AccessTokenAppAIGateway),
-		ResourceID:   res.ResourceID,
-		ResourceName: res.ResourceName,
-		CustomerID:   res.CustomerID,
+		ResourceID:   meteringInfo.Resource.ResourceID,
+		ResourceName: meteringInfo.Resource.ResourceName,
+		CustomerID:   meteringInfo.Resource.CustomerID,
 		CreatedAt:    time.Now(),
-		Extra:        string(extraData),
+		Extra:        extraData,
 	}
 	eventData, err := json.Marshal(event)
 	if err != nil {
