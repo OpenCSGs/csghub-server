@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"bytes"
 	"net/http"
 	"testing"
 
@@ -8,13 +9,63 @@ import (
 	commontypes "opencsg.com/csghub-server/common/types"
 )
 
+type testRetryResponseWriter struct {
+	headers    http.Header
+	body       bytes.Buffer
+	statusCode int
+}
+
+func newTestRetryResponseWriter() *testRetryResponseWriter {
+	return &testRetryResponseWriter{
+		headers: make(http.Header),
+	}
+}
+
+func (w *testRetryResponseWriter) Header() http.Header {
+	return w.headers
+}
+
+func (w *testRetryResponseWriter) WriteHeader(statusCode int) {
+	w.statusCode = statusCode
+}
+
+func (w *testRetryResponseWriter) Write(data []byte) (int, error) {
+	if w.statusCode == 0 {
+		w.statusCode = http.StatusOK
+	}
+	return w.body.Write(data)
+}
+
+func (w *testRetryResponseWriter) Flush() {}
+
+func (w *testRetryResponseWriter) ClearBuffer() {}
+
 func TestShouldRetryChatAttempt(t *testing.T) {
+	require.False(t, shouldRetryChatAttempt(http.StatusOK, false))
+	require.False(t, shouldRetryChatAttempt(http.StatusBadRequest, false))
+	require.True(t, shouldRetryChatAttempt(http.StatusUnauthorized, false))
+	require.True(t, shouldRetryChatAttempt(http.StatusNotFound, false))
+	require.True(t, shouldRetryChatAttempt(http.StatusTooManyRequests, false))
 	require.True(t, shouldRetryChatAttempt(http.StatusBadGateway, false))
 	require.True(t, shouldRetryChatAttempt(http.StatusServiceUnavailable, false))
 	require.True(t, shouldRetryChatAttempt(http.StatusGatewayTimeout, false))
-	require.False(t, shouldRetryChatAttempt(http.StatusNotFound, false))
-	require.False(t, shouldRetryChatAttempt(http.StatusBadRequest, false))
 	require.False(t, shouldRetryChatAttempt(http.StatusBadGateway, true))
+}
+
+func TestChatRetryResponseWriter_BuffersFailedAttemptUntilReplay(t *testing.T) {
+	downstream := newTestRetryResponseWriter()
+	writer := newChatRetryResponseWriter(downstream)
+
+	writer.WriteHeader(http.StatusBadGateway)
+	_, err := writer.Write([]byte(`gateway error body`))
+
+	require.NoError(t, err)
+	require.Equal(t, 0, downstream.statusCode)
+	require.Empty(t, downstream.body.String())
+	require.False(t, writer.StreamStarted())
+	require.NoError(t, writer.ReplayBufferedResponse())
+	require.Equal(t, http.StatusBadGateway, downstream.statusCode)
+	require.Equal(t, `gateway error body`, downstream.body.String())
 }
 
 func TestBuildChatAttemptTargets(t *testing.T) {
@@ -26,9 +77,8 @@ func TestBuildChatAttemptTargets(t *testing.T) {
 		},
 		2,
 	)
-	require.Equal(t, []chatAttemptTarget{
-		{Upstream: commontypes.UpstreamConfig{ID: 1, URL: "https://api.example.com/node-b/v1/chat/completions", Enabled: true, ModelName: "provider-model-b"}},
-		{Upstream: commontypes.UpstreamConfig{ID: 2, URL: "https://api.example.com/node-a/v1/chat/completions", Enabled: true, ModelName: "provider-model-a"}},
+	require.Equal(t, []commontypes.UpstreamConfig{
+		{ID: 2, URL: "https://api.example.com/node-a/v1/chat/completions", Enabled: true, ModelName: "provider-model-a"},
 	}, targets)
 }
 
@@ -44,10 +94,9 @@ func TestBuildChatAttemptTargets_RespectMaxFallbackAttempts(t *testing.T) {
 		},
 		2,
 	)
-	require.Equal(t, []chatAttemptTarget{
-		{Upstream: commontypes.UpstreamConfig{ID: 1, URL: "https://api.example.com/node-d/v1/chat/completions", Enabled: true}},
-		{Upstream: commontypes.UpstreamConfig{ID: 4, URL: "https://api.example.com/node-a/v1/chat/completions", Enabled: true}},
-		{Upstream: commontypes.UpstreamConfig{ID: 3, URL: "https://api.example.com/node-b/v1/chat/completions", Enabled: true}},
+	require.Equal(t, []commontypes.UpstreamConfig{
+		{ID: 2, URL: "https://api.example.com/node-c/v1/chat/completions", Enabled: true, ModelName: "provider-model-c"},
+		{ID: 3, URL: "https://api.example.com/node-b/v1/chat/completions", Enabled: true},
 	}, targets)
 }
 
@@ -60,9 +109,7 @@ func TestBuildChatAttemptTargets_DisableFallbacks(t *testing.T) {
 		},
 		0,
 	)
-	require.Equal(t, []chatAttemptTarget{
-		{Upstream: commontypes.UpstreamConfig{ID: 1, URL: "https://api.example.com/node-b/v1/chat/completions", Enabled: true}},
-	}, targets)
+	require.Empty(t, targets)
 }
 
 func TestSessionKeyDigest(t *testing.T) {

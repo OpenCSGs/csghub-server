@@ -522,13 +522,12 @@ func (h *OpenAIHandlerImpl) executeChatWithFallback(
 		Provider:       modelTarget.Model.Provider,
 		Endpoint:       modelTarget.Upstream.URL,
 		Target:         modelTarget.Target,
-		SessionKeyHash: modelTarget.SessionKeyHash,
 		StatusCode:     primaryStatusCode,
 		Retryable:      primaryRetryable,
 		Model:          modelTarget.Model,
 	})
 
-	hasFallbacks := len(modelTarget.AttemptTargets) > 1
+	hasFallbacks := len(modelTarget.AttemptTargets) > 0
 	if !primaryRetryable || !hasFallbacks {
 		if replayErr := primaryWriter.ReplayBufferedResponse(); replayErr != nil {
 			slog.WarnContext(c.Request.Context(), "failed to replay buffered response", slog.Any("error", replayErr))
@@ -538,10 +537,8 @@ func (h *OpenAIHandlerImpl) executeChatWithFallback(
 
 	slog.InfoContext(c.Request.Context(), "retry chat request with fallback endpoint",
 		slog.String("model_id", modelID),
-		slog.String("session_key_hash", modelTarget.SessionKeyHash),
-		slog.String("primary_endpoint", modelTarget.PrimaryTarget),
-		slog.String("next_fallback_endpoint", modelTarget.FallbackTarget),
-		slog.Int("available_fallback_attempts", len(modelTarget.AttemptTargets)-1),
+		slog.String("user_name", username),
+		slog.Int("available_fallback_attempts", len(modelTarget.AttemptTargets)),
 		slog.String("retry_reason", chatRetryReason(primaryStatusCode)),
 		slog.Int("status_code", primaryStatusCode))
 
@@ -610,15 +607,14 @@ func (h *OpenAIHandlerImpl) executeChatProxyAttempt(c *gin.Context, w CommonResp
 }
 
 func (h *OpenAIHandlerImpl) retryChatWithFallback(c *gin.Context, w CommonResponseWriter, modelTarget *resolvedModelTarget, userUUID string, chatReq *ChatCompletionRequest, tokenCounter token.ChatTokenCounter, logCapture component.LLMLogRecorder) error {
-	if len(modelTarget.AttemptTargets) < 2 {
+	if len(modelTarget.AttemptTargets) < 1 {
 		return nil
 	}
-	fallbackTargets := modelTarget.AttemptTargets[1:]
+	fallbackTargets := modelTarget.AttemptTargets
 	for idx, fallbackTarget := range fallbackTargets {
 		applyChatFallbackTarget(c.Request.Context(), c.Request.Header, modelTarget, fallbackTarget, tokenCounter, logCapture)
 		slog.DebugContext(c.Request.Context(), "retrying chat request with fallback endpoint",
 			slog.String("model_id", modelTarget.Model.ID),
-			slog.String("session_key_hash", modelTarget.SessionKeyHash),
 			slog.String("retry_endpoint", modelTarget.Model.Endpoint),
 			slog.String("retry_model_name", modelTarget.ModelName))
 		retryWriter, err := h.executeChatProxyAttempt(c, w, modelTarget, userUUID, chatReq)
@@ -635,7 +631,6 @@ func (h *OpenAIHandlerImpl) retryChatWithFallback(c *gin.Context, w CommonRespon
 			Provider:        modelTarget.Model.Provider,
 			Endpoint:        modelTarget.Upstream.URL,
 			Target:          modelTarget.Target,
-			SessionKeyHash:  modelTarget.SessionKeyHash,
 			StatusCode:      statusCode,
 			Retryable:       retryable,
 			FallbackAttempt: idx + 1,

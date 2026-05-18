@@ -109,15 +109,14 @@ func TestApplyChatFallbackTarget(t *testing.T) {
 		Target:    "https://primary.example.com/v1/chat/completions",
 	}
 
-	applyChatFallbackTarget(context.Background(), headers, modelTarget, chatAttemptTarget{
-		Upstream: commontypes.UpstreamConfig{
+	applyChatFallbackTarget(context.Background(), headers, modelTarget,
+		commontypes.UpstreamConfig{
 			URL:        "https://fallback.example.com/v1/chat/completions",
 			Enabled:    true,
 			Provider:   "fallback-provider",
 			AuthHeader: `{"Authorization":"Bearer fallback-token"}`,
 			ModelName:  "fallback-model",
-		},
-	}, nil, nil)
+		}, nil, nil)
 
 	require.Equal(t, "https://fallback.example.com/v1/chat/completions", modelTarget.Target)
 	require.Equal(t, "https://fallback.example.com/v1/chat/completions", modelTarget.Model.Endpoint)
@@ -220,7 +219,7 @@ func TestRetryChatWithFallback_ReturnsNilWithoutFallbackTargets(t *testing.T) {
 		},
 		ModelName:      "test-model",
 		Target:         "https://primary.example.com/v1/chat/completions",
-		AttemptTargets: []chatAttemptTarget{{Upstream: commontypes.UpstreamConfig{URL: "https://primary.example.com/v1/chat/completions", Enabled: true}}},
+		AttemptTargets: nil,
 	}
 
 	err := tester.handler.retryChatWithFallback(c, newTestCommonResponseWriter(), modelTarget, "user-1", &ChatCompletionRequest{Model: "test-model"}, nil, nil)
@@ -250,9 +249,8 @@ func TestRetryChatWithFallback_ReplaysLastRetryableFallbackResponse(t *testing.T
 		},
 		ModelName: "test-model",
 		Target:    "https://primary.example.com/v1/chat/completions",
-		AttemptTargets: []chatAttemptTarget{
-			{Upstream: commontypes.UpstreamConfig{URL: "https://primary.example.com/v1/chat/completions", Enabled: true}},
-			{Upstream: commontypes.UpstreamConfig{URL: lastFallbackURL, Enabled: true}},
+		AttemptTargets: []commontypes.UpstreamConfig{
+			{URL: lastFallbackURL, Enabled: true},
 		},
 	}
 	tester.mocks.openAIComp.EXPECT().
@@ -302,10 +300,9 @@ func TestRetryChatWithFallback_ContinuesUntilNextFallbackSucceeds(t *testing.T) 
 		},
 		ModelName: "test-model",
 		Target:    "https://primary.example.com/v1/chat/completions",
-		AttemptTargets: []chatAttemptTarget{
-			{Upstream: commontypes.UpstreamConfig{URL: "https://primary.example.com/v1/chat/completions", Enabled: true}},
-			{Upstream: commontypes.UpstreamConfig{URL: firstFallbackURL, Enabled: true}},
-			{Upstream: commontypes.UpstreamConfig{URL: secondFallbackURL, Enabled: true}},
+		AttemptTargets: []commontypes.UpstreamConfig{
+			{URL: firstFallbackURL, Enabled: true},
+			{URL: secondFallbackURL, Enabled: true},
 		},
 	}
 	tester.mocks.openAIComp.EXPECT().
@@ -363,9 +360,8 @@ func TestRetryChatWithFallback_UsesFallbackModelName(t *testing.T) {
 		},
 		ModelName: "logical-model",
 		Target:    "https://primary.example.com/v1/chat/completions",
-		AttemptTargets: []chatAttemptTarget{
-			{Upstream: commontypes.UpstreamConfig{URL: "https://primary.example.com/v1/chat/completions", Enabled: true}},
-			{Upstream: commontypes.UpstreamConfig{URL: fallbackURL, Enabled: true, ModelName: "provider-fallback-model"}},
+		AttemptTargets: []commontypes.UpstreamConfig{
+			{URL: fallbackURL, Enabled: true, ModelName: "provider-fallback-model"},
 		},
 	}
 	tester.mocks.openAIComp.EXPECT().
@@ -409,9 +405,8 @@ func TestRetryChatWithFallback_ReportsFallbackAttemptFailure(t *testing.T) {
 		},
 		ModelName: "logical-model",
 		Target:    "https://primary.example.com/v1/chat/completions",
-		AttemptTargets: []chatAttemptTarget{
-			{Upstream: commontypes.UpstreamConfig{URL: "https://primary.example.com/v1/chat/completions", Enabled: true}},
-			{Upstream: commontypes.UpstreamConfig{URL: fallbackURL, Enabled: true}},
+		AttemptTargets: []commontypes.UpstreamConfig{
+			{URL: fallbackURL, Enabled: true},
 		},
 	}
 	tester.mocks.openAIComp.EXPECT().

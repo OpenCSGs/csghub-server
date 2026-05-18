@@ -37,6 +37,7 @@ import (
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/builder/testutil"
 	"opencsg.com/csghub-server/common/config"
+	commontypes "opencsg.com/csghub-server/common/types"
 )
 
 type testerOpenAIHandler struct {
@@ -804,6 +805,9 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 				NeedSensitiveCheck: true,
 			},
 			Endpoint: testServer.URL,
+			Upstreams: []commontypes.UpstreamConfig{
+				{URL: testServer.URL, Enabled: true, ModelName: "external-model-id"},
+			},
 		}
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "external-model-id").Return(model, nil)
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil)
@@ -871,6 +875,9 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 				NeedSensitiveCheck: true,
 			},
 			Endpoint: testServer.URL,
+			Upstreams: []commontypes.UpstreamConfig{
+				{URL: testServer.URL, Enabled: true, ModelName: "test-model-1"},
+			},
 		}
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "test-model-1(OpenAI)").Return(model, nil)
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil)
@@ -935,6 +942,9 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 				NeedSensitiveCheck: true,
 			},
 			Endpoint: testServer.URL,
+			Upstreams: []commontypes.UpstreamConfig{
+				{URL: testServer.URL, Enabled: true, ModelName: "external-model-id"},
+			},
 		}
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "external-model-id").Return(model, nil).Once()
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
@@ -979,7 +989,7 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 		assert.Equal(t, "external-model-id", events[0].ModelID)
 		assert.Equal(t, testServer.URL, events[0].Target)
 		assert.Equal(t, http.StatusNotFound, events[0].StatusCode)
-		assert.False(t, events[0].Retryable)
+		assert.True(t, events[0].Retryable)
 	})
 }
 
@@ -1142,6 +1152,9 @@ func TestOpenAIHandler_Embedding(t *testing.T) {
 				SvcName: "",
 			},
 			Endpoint: "https://api.example.com/embeddings",
+			Upstreams: []commontypes.UpstreamConfig{
+				{URL: "https://api.example.com/embeddings", Enabled: true, ModelName: "model1"},
+			},
 		}
 		var wg sync.WaitGroup
 		wg.Add(1)
@@ -1207,6 +1220,9 @@ func TestOpenAIHandler_Transcription(t *testing.T) {
 				Metadata: map[string]any{},
 			},
 			Endpoint: server.URL + "/v1/audio/transcriptions",
+			Upstreams: []commontypes.UpstreamConfig{
+				{URL: server.URL + "/v1/audio/transcriptions", Enabled: true, ModelName: "backend-model"},
+			},
 			ExternalModelInfo: types.ExternalModelInfo{
 				AuthHead: `{"Authorization":"Bearer provider-token"}`,
 			},
@@ -1424,6 +1440,9 @@ func TestOpenAIHandler_GenerateImage(t *testing.T) {
 				SvcName: "",
 			},
 			Endpoint: "https://api.example.com/images/generations",
+			Upstreams: []commontypes.UpstreamConfig{
+				{URL: "https://api.example.com/images/generations", Enabled: true, ModelName: "test-model"},
+			},
 		}
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "test-model").Return(model, nil)
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil)
@@ -1457,6 +1476,9 @@ func TestOpenAIHandler_GenerateImage(t *testing.T) {
 				SvcName: "",
 			},
 			Endpoint: "https://api.example.com/images/generations",
+			Upstreams: []commontypes.UpstreamConfig{
+				{URL: "https://api.example.com/images/generations", Enabled: true, ModelName: "test-model"},
+			},
 		}
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "test-model").Return(model, nil)
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil)
@@ -1518,6 +1540,9 @@ func TestOpenAIHandler_CreateVideo(t *testing.T) {
 			BaseModel:         types.BaseModel{ID: "video-model", Task: "text-to-video"},
 			ExternalModelInfo: types.ExternalModelInfo{Provider: "openai"},
 			Endpoint:          downstream.URL + "/v1/videos",
+			Upstreams: []commontypes.UpstreamConfig{
+				{URL: downstream.URL + "/v1/videos", Enabled: true, ModelName: "video-model"},
+			},
 		}
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "video-model").Return(model, nil).Once()
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
@@ -1570,6 +1595,9 @@ func TestOpenAIHandler_CreateVideo(t *testing.T) {
 			BaseModel:         types.BaseModel{ID: "image-video-model", Task: "image-to-video"},
 			ExternalModelInfo: types.ExternalModelInfo{Provider: "openai"},
 			Endpoint:          downstream.URL + "/v1/videos",
+			Upstreams: []commontypes.UpstreamConfig{
+				{URL: downstream.URL + "/v1/videos", Enabled: true, ModelName: "image-video-model"},
+			},
 		}
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "image-video-model").Return(model, nil).Once()
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
@@ -1604,6 +1632,9 @@ func TestOpenAIHandler_CreateVideo(t *testing.T) {
 			BaseModel:         types.BaseModel{ID: "video-model", Task: "text-to-video"},
 			ExternalModelInfo: types.ExternalModelInfo{Provider: "openai"},
 			Endpoint:          downstream.URL + "/v1/videos",
+			Upstreams: []commontypes.UpstreamConfig{
+				{URL: downstream.URL + "/v1/videos", Enabled: true, ModelName: "video-model"},
+			},
 		}
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "video-model").Return(model, nil).Once()
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
@@ -1652,6 +1683,9 @@ func TestOpenAIHandler_CreateVideo(t *testing.T) {
 			BaseModel:         types.BaseModel{ID: "video-model", Task: "text-to-video"},
 			ExternalModelInfo: types.ExternalModelInfo{Provider: "openai"},
 			Endpoint:          downstream.URL + "/v1/videos",
+			Upstreams: []commontypes.UpstreamConfig{
+				{URL: downstream.URL + "/v1/videos", Enabled: true, ModelName: "video-model"},
+			},
 		}
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "video-model").Return(model, nil).Once()
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
@@ -1698,6 +1732,9 @@ func TestOpenAIHandler_CreateVideo(t *testing.T) {
 			},
 			ExternalModelInfo: types.ExternalModelInfo{Provider: "minimax"},
 			Endpoint:          downstream.URL + "/v1/video_generation",
+			Upstreams: []commontypes.UpstreamConfig{
+				{URL: downstream.URL + "/v1/video_generation", Enabled: true, ModelName: "video-model"},
+			},
 		}
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "video-model").Return(model, nil).Once()
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
@@ -1736,6 +1773,9 @@ func TestOpenAIHandler_CreateVideo(t *testing.T) {
 			},
 			ExternalModelInfo: types.ExternalModelInfo{Provider: "minimax"},
 			Endpoint:          "https://api.minimax.example.com/v1/video_generation",
+			Upstreams: []commontypes.UpstreamConfig{
+				{URL: "https://api.minimax.example.com/v1/video_generation", Enabled: true, ModelName: "video-model"},
+			},
 		}
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "video-model").Return(model, nil).Once()
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
@@ -1774,6 +1814,9 @@ func TestOpenAIHandler_CreateVideo(t *testing.T) {
 			},
 			ExternalModelInfo: types.ExternalModelInfo{Provider: "minimax"},
 			Endpoint:          downstream.URL + "/v1/video_generation",
+			Upstreams: []commontypes.UpstreamConfig{
+				{URL: downstream.URL + "/v1/video_generation", Enabled: true, ModelName: "video-model"},
+			},
 		}
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "video-model").Return(model, nil).Once()
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
@@ -1808,6 +1851,9 @@ func TestOpenAIHandler_CreateVideo(t *testing.T) {
 			},
 			ExternalModelInfo: types.ExternalModelInfo{Provider: "minimax"},
 			Endpoint:          downstream.URL + "/v1/video_generation",
+			Upstreams: []commontypes.UpstreamConfig{
+				{URL: downstream.URL + "/v1/video_generation", Enabled: true, ModelName: "video-model"},
+			},
 		}
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "video-model").Return(model, nil).Once()
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
@@ -1835,6 +1881,9 @@ func TestOpenAIHandler_CreateVideo(t *testing.T) {
 			},
 			ExternalModelInfo: types.ExternalModelInfo{Provider: "seedance"},
 			Endpoint:          "https://ark.ap-southeast.bytepluses.com/api/v3",
+			Upstreams: []commontypes.UpstreamConfig{
+				{URL: "https://ark.ap-southeast.bytepluses.com/api/v3", Enabled: true, ModelName: "video-model"},
+			},
 		}
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "video-model").Return(model, nil).Once()
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
@@ -1878,6 +1927,9 @@ func TestOpenAIHandler_CreateVideo(t *testing.T) {
 			ExternalModelInfo: types.ExternalModelInfo{Provider: "opencsg"},
 			InternalModelInfo: types.InternalModelInfo{RuntimeFramework: "lightx2v", CSGHubModelID: "Wan-AI/Wan2.2-I2V-A14B"},
 			Endpoint:          downstream.URL,
+			Upstreams: []commontypes.UpstreamConfig{
+				{URL: downstream.URL, Enabled: true, ModelName: "video-model"},
+			},
 		}
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "video-model").Return(model, nil).Once()
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
@@ -1913,6 +1965,9 @@ func TestOpenAIHandler_CreateVideo(t *testing.T) {
 			ExternalModelInfo: types.ExternalModelInfo{Provider: "opencsg"},
 			InternalModelInfo: types.InternalModelInfo{RuntimeFramework: "lightx2v", CSGHubModelID: "Wan-AI/Wan2.2-I2V-A14B"},
 			Endpoint:          "https://lightx2v.internal",
+			Upstreams: []commontypes.UpstreamConfig{
+				{URL: "https://lightx2v.internal", Enabled: true, ModelName: "video-model"},
+			},
 		}
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "video-model").Return(model, nil).Once()
 
@@ -1945,6 +2000,9 @@ func TestOpenAIHandler_CreateVideo(t *testing.T) {
 			ExternalModelInfo: types.ExternalModelInfo{Provider: "opencsg"},
 			InternalModelInfo: types.InternalModelInfo{RuntimeFramework: "lightx2v", CSGHubModelID: "Wan-AI/Wan2.2-T2V-A14B"},
 			Endpoint:          downstream.URL,
+			Upstreams: []commontypes.UpstreamConfig{
+				{URL: downstream.URL, Enabled: true, ModelName: "video-model"},
+			},
 		}
 		tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "video-model").Return(model, nil).Once()
 		tester.mocks.openAIComp.EXPECT().CheckBalance(mock.Anything, "testuuid").Return(nil).Once()
@@ -2005,6 +2063,9 @@ func TestOpenAIHandler_GetVideo(t *testing.T) {
 		BaseModel:         types.BaseModel{ID: "video-model", Task: "text-to-video"},
 		ExternalModelInfo: types.ExternalModelInfo{Provider: "openai"},
 		Endpoint:          downstream.URL + "/v1/videos",
+		Upstreams: []commontypes.UpstreamConfig{
+			{URL: downstream.URL + "/v1/videos", Enabled: true, ModelName: "video-model"},
+		},
 	}
 	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "video-model").Return(model, nil).Once()
 	tester.mocks.aiGenerationStore.EXPECT().FindByResourceID(mock.Anything, database.AIGenerationResourceTypeVideo, "video_gateway").Return(&generation, nil).Once()
@@ -2048,6 +2109,9 @@ func TestOpenAIHandler_GetVideoContent(t *testing.T) {
 		BaseModel:         types.BaseModel{ID: "video-model", Task: "text-to-video"},
 		ExternalModelInfo: types.ExternalModelInfo{Provider: "openai"},
 		Endpoint:          downstream.URL + "/v1/videos",
+		Upstreams: []commontypes.UpstreamConfig{
+			{URL: downstream.URL + "/v1/videos", Enabled: true, ModelName: "video-model"},
+		},
 	}
 	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "video-model").Return(model, nil).Once()
 	tester.mocks.aiGenerationStore.EXPECT().FindByResourceID(mock.Anything, database.AIGenerationResourceTypeVideo, "video_gateway").Return(&generation, nil).Once()
@@ -2110,6 +2174,9 @@ func TestOpenAIHandler_GetVideoContent_MiniMaxResolvesDownloadURL(t *testing.T) 
 		},
 		ExternalModelInfo: types.ExternalModelInfo{Provider: "minimax"},
 		Endpoint:          downstream.URL + "/v1/video_generation",
+		Upstreams: []commontypes.UpstreamConfig{
+			{URL: downstream.URL + "/v1/video_generation", Enabled: true, ModelName: "video-model"},
+		},
 	}
 	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "video-model").Return(model, nil).Once()
 	tester.mocks.aiGenerationStore.EXPECT().FindByResourceID(mock.Anything, database.AIGenerationResourceTypeVideo, "video_gateway").Return(&generation, nil).Once()
@@ -2159,6 +2226,9 @@ func TestOpenAIHandler_GetVideoContent_LightX2VStreamsDirectly(t *testing.T) {
 		ExternalModelInfo: types.ExternalModelInfo{Provider: "opencsg"},
 		InternalModelInfo: types.InternalModelInfo{RuntimeFramework: "lightx2v", CSGHubModelID: "Wan-AI/Wan2.2-T2V-A14B"},
 		Endpoint:          downstream.URL,
+		Upstreams: []commontypes.UpstreamConfig{
+			{URL: downstream.URL, Enabled: true, ModelName: "video-model"},
+		},
 	}
 	tester.mocks.openAIComp.EXPECT().GetModelByID(mock.Anything, "testuser", "video-model").Return(model, nil).Once()
 	tester.mocks.aiGenerationStore.EXPECT().FindByResourceID(mock.Anything, database.AIGenerationResourceTypeVideo, "video_gateway").Return(&generation, nil).Once()

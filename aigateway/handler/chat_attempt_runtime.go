@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	commonType "opencsg.com/csghub-server/common/types"
 
 	"opencsg.com/csghub-server/aigateway/component"
 	"opencsg.com/csghub-server/aigateway/token"
@@ -49,12 +50,13 @@ func updateChatAttemptRuntime(tokenCounter token.ChatTokenCounter, logCapture co
 	}
 }
 
-func applyChatFallbackTarget(ctx context.Context, headers http.Header, modelTarget *resolvedModelTarget, target chatAttemptTarget, tokenCounter token.ChatTokenCounter, logCapture component.LLMLogRecorder) {
-	targetURL := target.Upstream.URL
+func applyChatFallbackTarget(ctx context.Context, headers http.Header, modelTarget *resolvedModelTarget, upstream commonType.UpstreamConfig, tokenCounter token.ChatTokenCounter, logCapture component.LLMLogRecorder) {
+	targetURL := upstream.URL
 	modelTarget.Target = targetURL
 	modelTarget.Model.Endpoint = targetURL
-	modelTarget.Upstream = target.Upstream
-	modelTarget.ModelName = resolveEndpointModelName(modelTarget.Model.ID, target.Upstream)
+	modelTarget.Upstream = upstream
+	modelTarget.ModelName = resolveEndpointModelName(modelTarget.Model.ID, upstream)
+	// orverride models's AuthHead, Provider with upstream
 	applyEndpointOverrides(modelTarget.Model, modelTarget.Upstream)
 	if err := applyModelAuthHeaders(headers, modelTarget.Model); err != nil {
 		slog.WarnContext(ctx, "invalid fallback auth head", slog.String("model", modelTarget.ModelName), slog.Any("error", err))

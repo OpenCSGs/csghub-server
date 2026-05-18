@@ -22,10 +22,7 @@ type resolvedModelTarget struct {
 	Target         string
 	Host           string
 	ModelName      string
-	SessionKeyHash string
-	AttemptTargets []chatAttemptTarget
-	PrimaryTarget  string
-	FallbackTarget string
+	AttemptTargets []commonType.UpstreamConfig
 }
 
 const maxSessionKeyLength = 256
@@ -75,14 +72,7 @@ type endpointTargetResolveResult struct {
 	Upstream       commonType.UpstreamConfig
 	Target         string
 	ModelName      string
-	SessionKeyHash string
-	AttemptTargets []chatAttemptTarget
-	PrimaryTarget  string
-	FallbackTarget string
-}
-
-type chatAttemptTarget struct {
-	Upstream commonType.UpstreamConfig
+	AttemptTargets []commonType.UpstreamConfig
 }
 
 func (h *OpenAIHandlerImpl) chatMaxFallbackAttempts() int {
@@ -148,7 +138,7 @@ func (h *OpenAIHandlerImpl) resolveModelTarget(ctx context.Context, username, mo
 	resolved := &resolvedModelTarget{
 		Model:          model,
 		TargetReq:      targetReq,
-		AttemptTargets: make([]chatAttemptTarget, 0, h.chatMaxFallbackAttempts()+1),
+		AttemptTargets: make([]commonType.UpstreamConfig, 0, h.chatMaxFallbackAttempts()+1),
 	}
 
 	if len(model.SvcName) > 0 {
@@ -170,10 +160,7 @@ func (h *OpenAIHandlerImpl) resolveModelTarget(ctx context.Context, username, mo
 		resolved.Upstream = result.Upstream
 		resolved.Target = result.Target
 		resolved.ModelName = result.ModelName
-		resolved.SessionKeyHash = result.SessionKeyHash
 		resolved.AttemptTargets = result.AttemptTargets
-		resolved.PrimaryTarget = result.PrimaryTarget
-		resolved.FallbackTarget = result.FallbackTarget
 	}
 
 	if len(resolved.Target) < 1 {
@@ -218,8 +205,6 @@ func (h *OpenAIHandlerImpl) resolveEndpointModelTarget(
 	input endpointTargetResolveInput,
 ) (*endpointTargetResolveResult, error) {
 	sessionKey := extractSessionKeyForModel(input.Model, input.Headers, input.Username)
-	sessionKeyHash := sessionKeyDigest(sessionKey)
-
 	// normalizedUpstreams filter enable upstream
 	normalizedUpstreams := router.NormalizeEnabledUpstreams(input.Model.Upstreams)
 	// filterAvailableUpstreams filter healthy statues upstream
@@ -262,34 +247,20 @@ func (h *OpenAIHandlerImpl) resolveEndpointModelTarget(
 		)
 	}
 
-	// Use the picked upstream; fall back to model.Endpoint for legacy
-	// models that have no upstreams configured.
 	target := upstream.URL
-	if target == "" {
-		target = input.Model.Endpoint
-	}
 	input.TargetReq.Target = target
 	input.TargetReq.Endpoint = target
 	input.Model.Endpoint = target
-	if upstream.URL != "" {
-		applyEndpointOverrides(input.Model, upstream)
-	}
-
+	// orverride models's AuthHead, Provider with upstream
+	applyEndpointOverrides(input.Model, upstream)
 	modelName := resolveEndpointModelName(input.Model.ID, upstream)
 	attemptTargets := buildChatAttemptTargets(upstream, availableUpstreams, h.chatMaxFallbackAttempts())
-	fallbackTarget := ""
-	if len(attemptTargets) > 1 {
-		fallbackTarget = attemptTargets[1].Upstream.URL
-	}
 
 	return &endpointTargetResolveResult{
 		Upstream:       upstream,
 		Target:         target,
 		ModelName:      modelName,
-		SessionKeyHash: sessionKeyHash,
 		AttemptTargets: attemptTargets,
-		PrimaryTarget:  target,
-		FallbackTarget: fallbackTarget,
 	}, nil
 }
 
@@ -304,18 +275,9 @@ func (h *OpenAIHandlerImpl) filterAvailableUpstreams(
 
 	filtered := make([]commonType.UpstreamConfig, 0, len(upstreams))
 	for _, u := range upstreams {
-		if types.IsUpstreamCircuitOpen(u) {
-			if h.availabilityManager != nil {
-				if rtState, err := h.availabilityManager.GetCircuitState(ctx, u.ID); err == nil && rtState.CircuitState != types.CircuitStateOpen {
-					slog.DebugContext(ctx, "circuit state from cache differs from DB, allowing upstream",
-						"upstream_id", u.ID, "db_state", types.CircuitStateOpen, "rt_state", rtState.CircuitState)
-				} else {
-					continue
-				}
-			} else {
-				continue
-			}
-		} else if types.IsUpstreamUnhealthy(u) {
+		if types.IsUpstreamUnhealthy(u) {
+			continue
+		} else if types.IsUpstreamCircuitOpen(u) && h.IsCacheUpstreamCircuitOpen(ctx, u) {
 			continue
 		}
 		filtered = append(filtered, u)
@@ -330,6 +292,39 @@ func (h *OpenAIHandlerImpl) filterAvailableUpstreams(
 		})
 	}
 	return filtered, nil
+}
+// IsCacheUpstreamCircuitOpen returns true only when the runtime circuit cache
+// explicitly reports this upstream as open.
+//
+// Design note:
+// - If the availability manager is not initialized, return false and allow the
+//   proxy request to proceed.
+// - If reading the runtime circuit state fails, return false and allow the
+//   proxy request to proceed.
+// - If the runtime cache reports a non-open state, return false and allow the
+//   proxy request to proceed even when the persisted upstream state says open.
+//
+// In short, we intentionally keep circuit filtering permissive here. We only
+// block an upstream when the runtime cache confirms it is truly open, so users
+// still have the best chance to reach a proxy target instead of being rejected
+// too early.
+func (h *OpenAIHandlerImpl) IsCacheUpstreamCircuitOpen(ctx context.Context, upstream commonType.UpstreamConfig) bool {
+	if h.availabilityManager == nil {
+		return false
+	}
+
+	rtState, err := h.availabilityManager.GetCircuitState(ctx, upstream.ID)
+	if err != nil {
+		slog.ErrorContext(ctx, "failed to get circuit state from cache",
+			"error", err)
+		return false
+	}
+	if rtState.CircuitState == types.CircuitStateOpen {
+		return true
+	}
+	slog.WarnContext(ctx, "circuit state from cache differs from DB, allowing upstream",
+		"upstream_id", upstream.ID, "db_state", types.CircuitStateOpen, "rt_state", rtState.CircuitState)
+	return false
 }
 
 func resolveEndpointModelName(defaultModelName string, upstream commonType.UpstreamConfig) string {
