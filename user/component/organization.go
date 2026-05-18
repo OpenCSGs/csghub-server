@@ -268,7 +268,7 @@ func (c *organizationComponentImpl) Delete(ctx context.Context, req *types.Delet
 func (c *organizationComponentImpl) Update(ctx context.Context, req *types.EditOrgReq) (*database.Organization, error) {
 	r, err := c.msc.GetMemberRole(ctx, req.Name, req.CurrentUser)
 	if err != nil {
-		slog.ErrorContext(ctx, "faild to get member role",
+		slog.ErrorContext(ctx, "failed to get member role",
 			slog.String("org", req.Name), slog.String("user", req.CurrentUser),
 			slog.String("error", err.Error()))
 	}
@@ -294,6 +294,9 @@ func (c *organizationComponentImpl) Update(ctx context.Context, req *types.EditO
 	}
 	if req.OrgType != nil {
 		org.OrgType = *req.OrgType
+	}
+	if req.Description != nil {
+		org.Description = *req.Description
 	}
 
 	if req.NewOwner != nil {

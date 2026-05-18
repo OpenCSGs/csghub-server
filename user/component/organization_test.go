@@ -159,6 +159,8 @@ func TestOrganizationComponent_Update(t *testing.T) {
 	mockOrgStore.EXPECT().FindByPath(mock.Anything, "org1").Return(org, nil)
 	mockOrgStore.EXPECT().Update(mock.Anything, mock.Anything).Return(nil)
 
+	newDesc := "org1 description"
+
 	mockUserStore := mockdb.NewMockUserStore(t)
 	user1 := database.User{
 		Username: "user1",
@@ -203,19 +205,26 @@ func TestOrganizationComponent_Update(t *testing.T) {
 		orgStore:    mockOrgStore,
 	}
 
+	mockGitServer := mockgit.NewMockGitServer(t)
+	mockGitServer.EXPECT().UpdateOrganization(mock.Anything, mock.Anything).Return(nil, nil).Once()
+
 	c := &organizationComponentImpl{
 		orgStore:  mockOrgStore,
 		userStore: mockUserStore,
 		msc:       mc,
+		gs:        mockGitServer,
 	}
+
 	returnOrg, err := c.Update(context.Background(), &types.EditOrgReq{
 		Name:        "org1",
 		NewOwner:    &user1.Username,
 		CurrentUser: operator.Username,
+		Description: &newDesc,
 	})
 
 	require.NoError(t, err)
 	require.Equal(t, "org1", returnOrg.Name)
+	require.Equal(t, newDesc, returnOrg.Description)
 }
 
 func TestOrganizationComponent_Get(t *testing.T) {
