@@ -261,3 +261,8 @@ func ShortenCommitID7(fullCommitID string) (string, error) {
 func BuildSkillPackageObjectKey(sha256 string) string {
 	return fmt.Sprintf("skills/packages/%s", sha256)
 }
+
+// BuildCodePackageObjectKey builds the object key for code package in object storage
+func BuildCodePackageObjectKey(sha256 string) string {
+	return fmt.Sprintf("codes/packages/%s", sha256)
+}

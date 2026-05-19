@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
+	"opencsg.com/csghub-server/builder/store/s3"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
@@ -29,10 +30,16 @@ func NewCodeHandler(config *config.Config) (*CodeHandler, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error creating repo component:%w", err)
 	}
+	s3Client, err := s3.NewMinio(config)
+	if err != nil {
+		return nil, fmt.Errorf("error creating s3 client:%w", err)
+	}
 	return &CodeHandler{
 		code:      tc,
 		sensitive: sc,
 		repo:      repo,
+		s3Client:  s3Client,
+		config:    config,
 	}, nil
 }
 
@@ -40,6 +47,8 @@ type CodeHandler struct {
 	code      component.CodeComponent
 	sensitive component.SensitiveComponent
 	repo      component.RepoComponent
+	s3Client  s3.Client
+	config    *config.Config
 }
 
 // CreateCode   godoc
@@ -342,4 +351,32 @@ func (h *CodeHandler) Relations(ctx *gin.Context) {
 	}
 
 	httpbase.OK(ctx, detail)
+}
+
+// UploadCodePackage godoc
+// @Security     ApiKey
+// @Summary      Get code package upload URL
+// @Description  Get a presigned URL and form data for uploading code package
+// @Tags         Code
+// @Produce      json
+// @Param        current_user query string false "current user"
+// @Success      200  {object}  types.Response{data=map[string]interface{}} "OK"
+// @Failure      400  {object}  types.APIBadRequest "Bad request"
+// @Failure      500  {object}  types.APIInternalServerError "Internal server error"
+// @Router       /codes/upload_url [post]
+func (h *CodeHandler) GetUploadUrl(ctx *gin.Context) {
+	// Call component to get upload URL, UUID, and form data
+	url, uuid, formData, err := h.code.GetUploadUrl(ctx.Request.Context())
+	if err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "Failed to get upload URL", slog.Any("error", err))
+		httpbase.ServerError(ctx, err)
+		return
+	}
+
+	// Return the upload URL, UUID, and form data
+	httpbase.OK(ctx, map[string]interface{}{
+		"url":      url,
+		"uuid":     uuid,
+		"formData": formData,
+	})
 }

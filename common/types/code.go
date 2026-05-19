@@ -10,6 +10,8 @@ type CodeTagCommit struct {
 
 type CreateCodeReq struct {
 	CreateRepoReq
+	// Code package SHA256 hash
+	CodePackageSHA256 string `json:"code_file"`
 }
 
 type UpdateCodeReq struct {
