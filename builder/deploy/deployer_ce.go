@@ -100,11 +100,11 @@ func (d *deployer) startAccounting() {
 }
 
 func checkNodeResource(node types.NodeResourceInfo, hardware *types.HardWare, config *config.Config) types.ResourceAvailableStatus {
-	if isCPUOnlyWorkload(hardware) && isXPUNode(node) {
+	if !config.Cluster.AllowCPUResScheduleToGPUNode && isCPUOnlyWorkload(hardware) && isXPUNode(node) {
 		return types.ResourceAvailableStatus{
 			Available: false,
 			NodeName:  node.NodeName,
-			Reason:    types.UnAvailableTypeInvalidHardware,
+			Reason:    types.UnAvailableTypeDisableScheduling,
 		}
 	}
 

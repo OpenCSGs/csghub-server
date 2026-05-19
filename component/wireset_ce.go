@@ -95,6 +95,7 @@ func NewTestSpaceResourceComponent(config *config.Config, stores *tests.MockStor
 		deployer:           deployer,
 		userStore:          stores.User,
 		accountComponent:   accountComponent,
+		config:             config,
 	}
 }
 
