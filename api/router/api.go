@@ -832,6 +832,7 @@ func createCodeRoutes(
 	codesGroup := apiGroup.Group("/codes")
 	codesGroup.Use(middleware.RepoType(types.CodeRepo), middlewareCollection.Repo.RepoExists)
 	{
+		codesGroup.POST("/upload_url", middlewareCollection.Auth.NeedPhoneVerified, codeHandler.GetUploadUrl)
 		codesGroup.POST("", middlewareCollection.Auth.NeedPhoneVerified, codeHandler.Create)
 		codesGroup.GET("", codeHandler.Index)
 		codesGroup.PUT("/:namespace/:name", middlewareCollection.Auth.NeedLogin, codeHandler.Update)
