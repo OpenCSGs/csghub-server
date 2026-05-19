@@ -180,7 +180,9 @@ func (c *codeComponentImpl) Create(ctx context.Context, req *types.CreateCodeReq
 		return nil, fmt.Errorf("failed to create database code, cause: %w", err)
 	}
 
-	_ = c.gitServer.CommitFiles(ctx, *commitFilesReq)
+	if commitFilesReq != nil {
+		_ = c.gitServer.CommitFiles(ctx, *commitFilesReq)
+	}
 
 	for _, tag := range code.Repository.Tags {
 		tags = append(tags, types.RepoTag{

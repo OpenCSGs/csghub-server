@@ -304,6 +304,10 @@ func (c *skillComponentImpl) createSkillRecord(ctx context.Context, req *types.C
 // commitFilesInBatches commits files in batches to avoid overloading the git server
 func (c *skillComponentImpl) commitFilesInBatches(ctx context.Context, commitFilesReq *gitserver.CommitFilesReq) error {
 	const batchSize = 50
+	if commitFilesReq == nil {
+		return nil
+	}
+
 	files := moveSkillMetadataGitFilesToFront(commitFilesReq.Files)
 	if len(files) == 0 {
 		return nil
