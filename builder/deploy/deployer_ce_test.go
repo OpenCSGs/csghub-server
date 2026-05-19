@@ -34,6 +34,7 @@ func newTestDeployer(t *testing.T) *testDepolyerWithMocks {
 			userStore:             mockStores.User,
 			snowflakeNode:         node,
 			clusterStore:          mockStores.ClusterInfo,
+			config:                &config.Config{},
 		},
 	}
 	s.mocks.stores = mockStores
@@ -144,10 +145,11 @@ func Test_CheckNodeResource(t *testing.T) {
 
 	baseNode := types.NodeResourceInfo{
 		NodeHardware: types.NodeHardware{
-			AvailableCPU: 16,
-			AvailableMem: 8, // 8 GiB
-			AvailableXPU: 2,
-			XPUModel:     "NVIDIA-A100",
+			AvailableCPU:      16,
+			AvailableMem:      8, // 8 GiB
+			AvailableXPU:      2,
+			XPUModel:          "NVIDIA-A100",
+			XPUCapacityLabel:  "nvidia.com/gpu",
 		},
 	}
 
@@ -211,6 +213,44 @@ func Test_CheckNodeResource(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Test_CheckNodeResource_AllowCPUScheduleToGPUNode(t *testing.T) {
+	baseNode := types.NodeResourceInfo{
+		NodeHardware: types.NodeHardware{
+			AvailableCPU:      16,
+			AvailableMem:      8,
+			AvailableXPU:      2,
+			XPUModel:          "NVIDIA-A100",
+			XPUCapacityLabel:  "nvidia.com/gpu",
+		},
+	}
+
+	t.Run("AllowCPUScheduleToGPUNode=true allows CPU-only workload on GPU node", func(t *testing.T) {
+		config := &config.Config{}
+		config.Cluster.AllowCPUResScheduleToGPUNode = true
+
+		hardware := &types.HardWare{
+			Cpu:    types.CPU{Num: "8"},
+			Memory: "4Gi",
+		}
+
+		got := checkNodeResource(baseNode, hardware, config)
+		require.True(t, got.Available, "Expected CPU-only workload to be allowed on GPU node when flag is enabled")
+	})
+
+	t.Run("AllowCPUScheduleToGPUNode=false (default) blocks CPU-only workload on GPU node", func(t *testing.T) {
+		config := &config.Config{}
+		config.Cluster.AllowCPUResScheduleToGPUNode = false
+
+		hardware := &types.HardWare{
+			Cpu:    types.CPU{Num: "8"},
+			Memory: "4Gi",
+		}
+
+		got := checkNodeResource(baseNode, hardware, config)
+		require.False(t, got.Available, "Expected CPU-only workload to be blocked on GPU node when flag is disabled")
+	})
 }
 
 func TestDeployer_GetClusterById(t *testing.T) {

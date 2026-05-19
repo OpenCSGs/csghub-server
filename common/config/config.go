@@ -559,8 +559,9 @@ type Config struct {
 		Region         string `env:"STARHUB_SERVER_CLUSTER_REGION" default:"region-0"`
 		SpaceNamespace string `env:"STARHUB_SERVER_CLUSTER_SPACES_NAMESPACE" default:"spaces"`
 		// for free saas users, limits resources
-		ResourceQuotaNamespace string `env:"STARHUB_SERVER_CLUSTER_RESOURCE_QUOTA_NAMESPACE" default:"spaces"`
-		QuotaName              string `env:"STARHUB_SERVER_CLUSTER_QUOTA_NAME" default:""`
+		ResourceQuotaNamespace       string `env:"STARHUB_SERVER_CLUSTER_RESOURCE_QUOTA_NAMESPACE" default:"spaces"`
+		QuotaName                    string `env:"STARHUB_SERVER_CLUSTER_QUOTA_NAME" default:""`
+		AllowCPUResScheduleToGPUNode bool   `env:"STARHUB_SERVER_CLUSTER_ALLOW_CPU_RESOURCE_SCHEDULE_TO_GPU_NODE" default:"false"`
 	}
 
 	Runner struct {

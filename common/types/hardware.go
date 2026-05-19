@@ -16,6 +16,7 @@ const (
 	UnAvailableTypeInsufficientVXPU     ResourceReasonType = "insufficient_vxpu"
 	UnAvailableTypeEnableVXPU           ResourceReasonType = "enable_vxpu"
 	UnAvailableTypeDisableVXPU          ResourceReasonType = "disable_vxpu"
+	UnAvailableTypeDisableScheduling    ResourceReasonType = "disable_scheduling"
 )
 
 type (
@@ -35,7 +36,7 @@ type (
 	}
 
 	HardWare struct {
-		Gpu              Processor `json:"gpu,omitempty"`   // nvidia
+		Gpu              Processor `json:"gpu,omitempty"`   // nvidia,amd
 		Npu              Processor `json:"npu,omitempty"`   // ascend
 		Gcu              Processor `json:"gcu,omitempty"`   // enflame
 		Mlu              Processor `json:"mlu,omitempty"`   // cambricon

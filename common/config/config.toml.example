@@ -230,6 +230,7 @@ region = "region-0"
 spaces_namespace = "spaces"
 resource_quota_namespace = "spaces"
 quota_name = ""
+allow_cpu_res_schedule_to_gpu_node = false
 
 [logcollector]
 port = 8096
