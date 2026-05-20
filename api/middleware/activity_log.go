@@ -104,6 +104,7 @@ func buildActivityLog(c *gin.Context, username, userUUID string, authType httpba
 
 	resourceName := c.Param("namespace")
 	if name := c.Param("name"); name != "" {
+		name = strings.TrimSuffix(name, ".git") // for git upload/download
 		resourceName = resourceName + "/" + name
 	}
 
