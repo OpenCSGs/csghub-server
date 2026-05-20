@@ -25,6 +25,7 @@ const (
 	AuthTypeAccessToken    AuthType = "AccessToken"
 	AuthTypeMultiSyncToken AuthType = "MultiSyncToken"
 	AuthTypeUserOrgApiKey  AuthType = "UserOrgApiKey"
+	AuthTypeGitAccessToken AuthType = "GitAccessToken"
 )
 
 // GetCurrentUser returns the current user name from the context.

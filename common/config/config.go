@@ -654,6 +654,10 @@ type Config struct {
 		MaxPublishFileCount int   `env:"STARHUB_SERVER_SKILL_MAX_PUBLISH_FILE_COUNT" default:"100"`
 		MaxPublishFileSize  int64 `env:"STARHUB_SERVER_SKILL_MAX_PUBLISH_FILE_SIZE" default:"10485760"` // 10MB
 	}
+
+	ActivityLog struct {
+		Enabled bool `env:"STARHUB_SERVER_ACTIVITY_LOG_ENABLE" default:"true"`
+	}
 }
 
 type MemoryConfig struct {

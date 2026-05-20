@@ -37,6 +37,8 @@ const (
 	LfsMigrationSubject string = "xnet.lfs.migrate"
 	LfsProgressSubject  string = "xnet.lfs.progress"
 	LfsResultSubject    string = "xnet.lfs.result"
+
+	ActivityLogSendSubject string = "activity.log.send"
 )
 
 type MQGroup struct {
@@ -108,6 +110,10 @@ var (
 	LfsXnetMigrateGroup = MQGroup{
 		StreamName:   "lfsMigrationStream",
 		ConsumerName: "lfsMigrationConsumer",
+	}
+	ActivityLogGroup = MQGroup{
+		StreamName:   "activityLogStream",
+		ConsumerName: "activityLogConsumer",
 	}
 )
 
