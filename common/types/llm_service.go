@@ -89,9 +89,11 @@ type PromptPrefix struct {
 }
 
 type SearchLLMConfig struct {
-	Keyword string `json:"keyword"` // Search keyword
-	Type    *int   `json:"type"`    // Type of search
-	Enabled *bool  `json:"enabled"` // Enabled filter
+	Keyword   string `json:"keyword"`    // Search keyword
+	Type      *int   `json:"type"`       // Type of search
+	Enabled   *bool  `json:"enabled"`    // Enabled filter
+	SortBy    string `json:"sort_by"`    // Sortable field: model_size_b | updated_at
+	SortOrder string `json:"sort_order"` // ASC | DESC
 }
 
 type SearchPromptPrefix struct {
@@ -109,6 +111,7 @@ type UpdateLLMConfigReq struct {
 	Metadata           *map[string]any   `json:"metadata"` // tasks stored as: {"tasks": ["text-generation", "text-to-image"]}
 	NeedSensitiveCheck *bool             `json:"need_sensitive_check"`
 	RepoID             *int64            `json:"repo_id"`
+	ModelSizeB         *float64          `json:"model_size_b"`
 }
 
 type UpdatePromptPrefixReq struct {
@@ -127,6 +130,7 @@ type CreateLLMConfigReq struct {
 	Metadata           map[string]any   `json:"metadata"` // tasks stored as: {"tasks": ["text-generation", "text-to-image"]}
 	RepoID             *int64           `json:"repo_id"`
 	NeedSensitiveCheck bool             `json:"need_sensitive_check"`
+	ModelSizeB         float64          `json:"model_size_b,omitempty"`
 }
 
 type CreatePromptPrefixReq struct {

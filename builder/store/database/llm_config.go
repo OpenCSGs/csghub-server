@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/uptrace/bun"
 	"opencsg.com/csghub-server/common/config"
@@ -35,6 +36,8 @@ type LLMConfig struct {
 	NeedSensitiveCheck bool        `bun:",notnull,default:false" json:"need_sensitive_check"`
 	RepoID             int64       `bun:",nullzero" json:"repo_id"`
 	Repo               *Repository `bun:"rel:belongs-to,join:repo_id=id" json:"repo,omitempty"`
+	// ModelSizeB is the parameter size of the model in billions. 0 means unknown.
+	ModelSizeB float64 `bun:"model_size_b,notnull,default:0" json:"model_size_b"`
 	times
 }
 
@@ -215,6 +218,24 @@ func buildSearchLLMConfigQuery(
 	if search.Enabled != nil {
 		q.Where("llm_config.enabled = ?", *search.Enabled)
 	}
+	applyLLMConfigSort(q, search.SortBy, search.SortOrder)
+}
+
+// applyLLMConfigSort applies an allow-listed sort to the query.
+// Defaults to updated_at DESC so that the most recently changed configs surface first.
+func applyLLMConfigSort(q *bun.SelectQuery, sortBy, sortOrder string) {
+	column := "llm_config.updated_at"
+	switch sortBy {
+	case "model_size_b":
+		column = "llm_config.model_size_b"
+	case "updated_at", "":
+		column = "llm_config.updated_at"
+	}
+	direction := "DESC"
+	if strings.EqualFold(sortOrder, "ASC") {
+		direction = "ASC"
+	}
+	q.OrderExpr(column + " " + direction)
 }
 
 // populateDerivedFields fills ApiEndpoint, AuthHeader, Provider from the best available upstream.

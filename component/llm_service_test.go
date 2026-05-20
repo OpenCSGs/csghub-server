@@ -36,7 +36,8 @@ func TestLLMServiceComponent_CreateLLMConfig(t *testing.T) {
 			SessionHeader: "X-Session-ID",
 			HashReplicas:  128,
 		},
-		Metadata: map[string]any{"tasks": []any{"text-generation"}},
+		Metadata:   map[string]any{"tasks": []any{"text-generation"}},
+		ModelSizeB: 7.5,
 	}
 	dbLLMConfig := &database.LLMConfig{
 		ID:        123,
@@ -48,7 +49,8 @@ func TestLLMServiceComponent_CreateLLMConfig(t *testing.T) {
 			SessionHeader: "X-Session-ID",
 			HashReplicas:  128,
 		},
-		Metadata: map[string]any{"tasks": []any{"text-generation"}},
+		Metadata:   map[string]any{"tasks": []any{"text-generation"}},
+		ModelSizeB: 7.5,
 	}
 	stores.LLMConfigMock().EXPECT().Create(ctx, database.LLMConfig{
 		ModelName: "new-model",
@@ -59,13 +61,15 @@ func TestLLMServiceComponent_CreateLLMConfig(t *testing.T) {
 			SessionHeader: "X-Session-ID",
 			HashReplicas:  128,
 		},
-		Metadata: map[string]any{"tasks": []any{"text-generation"}},
+		Metadata:   map[string]any{"tasks": []any{"text-generation"}},
+		ModelSizeB: 7.5,
 	}).Return(dbLLMConfig, nil)
 	res, err := mc.CreateLLMConfig(ctx, req)
 	require.Nil(t, err)
 	require.NotNil(t, res)
 	require.Equal(t, res.ID, int64(123))
 	require.Equal(t, res.ModelName, "new-model")
+	require.Equal(t, 7.5, res.ModelSizeB)
 }
 
 func TestLLMServiceComponent_CreatePromptPrefix(t *testing.T) {
@@ -161,17 +165,20 @@ func TestLLMServiceComponent_UpdateLLMConfig(t *testing.T) {
 		SessionHeader: "X-Session-ID",
 		HashReplicas:  128,
 	}
+	newSize := 13.0
 	req := &types.UpdateLLMConfigReq{
 		ID:            123,
 		ModelName:     &newName,
 		RoutingPolicy: &routingPolicy,
 		Metadata:      &metadata,
+		ModelSizeB:    &newSize,
 	}
 	dbLLMConfig := &database.LLMConfig{
 		ID:            123,
 		ModelName:     newName,
 		RoutingPolicy: routingPolicy,
 		Metadata:      metadata,
+		ModelSizeB:    newSize,
 	}
 	stores.LLMConfigMock().EXPECT().GetByID(ctx, int64(123)).Return(dbLLMConfig, nil)
 	stores.LLMConfigMock().EXPECT().Update(ctx, database.LLMConfig{
@@ -179,12 +186,14 @@ func TestLLMServiceComponent_UpdateLLMConfig(t *testing.T) {
 		ModelName:     newName,
 		RoutingPolicy: routingPolicy,
 		Metadata:      metadata,
+		ModelSizeB:    newSize,
 	}).Return(dbLLMConfig, nil)
 	res, err := mc.UpdateLLMConfig(ctx, req)
 	require.Nil(t, err)
 	require.NotNil(t, res)
 	require.Equal(t, res.ID, int64(123))
 	require.Equal(t, res.ModelName, "new-model")
+	require.Equal(t, 13.0, res.ModelSizeB)
 }
 
 func TestLLMServiceComponent_CreateUpstream(t *testing.T) {
