@@ -366,6 +366,8 @@ func (m *openaiComponentImpl) getExternalModels(c context.Context) []types.Model
 	search.Type = &searchType
 	enabled := true
 	search.Enabled = &enabled
+	search.SortBy = "model_size_b"
+	search.SortOrder = "desc"
 
 	per := 50
 	page := 1

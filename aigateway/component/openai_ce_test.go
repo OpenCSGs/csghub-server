@@ -362,8 +362,10 @@ func TestOpenAIComponent_ListModels_CacheUsesOriginalID(t *testing.T) {
 	searchType := 16
 	enabled := true
 	search := &commontypes.SearchLLMConfig{
-		Type:    &searchType,
-		Enabled: &enabled,
+		Type:      &searchType,
+		Enabled:   &enabled,
+		SortBy:    "model_size_b",
+		SortOrder: "desc",
 	}
 	mockLLMConfigStore.EXPECT().Index(mock.Anything, 50, 1, search).
 		Return([]*database.LLMConfig{
@@ -533,8 +535,10 @@ func TestOpenAIComponent_GetModelByID(t *testing.T) {
 		searchType := 16
 		enabled := true
 		search := &commontypes.SearchLLMConfig{
-			Type:    &searchType,
-			Enabled: &enabled,
+			Type:      &searchType,
+			Enabled:   &enabled,
+			SortBy:    "model_size_b",
+			SortOrder: "desc",
 		}
 		mockLLMConfigStore.EXPECT().Index(mock.Anything, 50, 1, search).
 			Return([]*database.LLMConfig{
@@ -630,8 +634,10 @@ func TestOpenAIComponent_GetModelByID(t *testing.T) {
 		searchType := 16
 		enabled := true
 		search := &commontypes.SearchLLMConfig{
-			Type:    &searchType,
-			Enabled: &enabled,
+			Type:      &searchType,
+			Enabled:   &enabled,
+			SortBy:    "model_size_b",
+			SortOrder: "desc",
 		}
 		mockLLMConfigStore.EXPECT().Index(mock.Anything, 50, 1, search).
 			Return([]*database.LLMConfig{
@@ -783,8 +789,10 @@ func TestOpenAIComponent_ExtGetAvailableModels_Error(t *testing.T) {
 	searchType := 16
 	enabled := true
 	search := &commontypes.SearchLLMConfig{
-		Type:    &searchType,
-		Enabled: &enabled,
+		Type:      &searchType,
+		Enabled:   &enabled,
+		SortBy:    "model_size_b",
+		SortOrder: "desc",
 	}
 	mockLLMConfigStore.EXPECT().Index(ctx, 50, 1, search).
 		Return(nil, 0, errors.New("test error")).Once()
@@ -835,8 +843,10 @@ func TestOpenAIComponent_ExtGetAvailableModels_SinglePage(t *testing.T) {
 	searchType := 16
 	enabled := true
 	search := &commontypes.SearchLLMConfig{
-		Type:    &searchType,
-		Enabled: &enabled,
+		Type:      &searchType,
+		Enabled:   &enabled,
+		SortBy:    "model_size_b",
+		SortOrder: "desc",
 	}
 	mockLLMConfigStore.EXPECT().Index(ctx, 50, 1, search).Return(mockModels, 1, nil)
 	mockCache.EXPECT().HSet(mock.Anything, modelCacheKey, "test-model-1", mock.Anything).

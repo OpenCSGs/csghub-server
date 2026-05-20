@@ -82,6 +82,7 @@ func (s *llmServiceComponentImpl) IndexLLMConfig(ctx context.Context, per, page 
 			Metadata:           cfg.Metadata,
 			RepoID:             cfg.RepoID,
 			NeedSensitiveCheck: cfg.NeedSensitiveCheck,
+			ModelSizeB:         cfg.ModelSizeB,
 			IsAvailable:        cfg.Enabled && isAvailable,
 			AvailabilityReason: reason,
 			CreatedAt:          cfg.CreatedAt,
@@ -118,6 +119,7 @@ func (s *llmServiceComponentImpl) ShowLLMConfig(ctx context.Context, id int64) (
 		Metadata:           dbLlmConfig.Metadata,
 		RepoID:             dbLlmConfig.RepoID,
 		NeedSensitiveCheck: dbLlmConfig.NeedSensitiveCheck,
+		ModelSizeB:         dbLlmConfig.ModelSizeB,
 		CreatedAt:          dbLlmConfig.CreatedAt,
 		UpdatedAt:          dbLlmConfig.UpdatedAt,
 	}
@@ -179,6 +181,9 @@ func (s *llmServiceComponentImpl) UpdateLLMConfig(ctx context.Context, req *type
 	if req.NeedSensitiveCheck != nil {
 		llmConfig.NeedSensitiveCheck = *req.NeedSensitiveCheck
 	}
+	if req.ModelSizeB != nil {
+		llmConfig.ModelSizeB = *req.ModelSizeB
+	}
 	updatedConfig, updateErr := s.llmConfigStore.Update(ctx, *llmConfig)
 	if updateErr != nil {
 		return nil, updateErr
@@ -199,6 +204,7 @@ func (s *llmServiceComponentImpl) UpdateLLMConfig(ctx context.Context, req *type
 		Metadata:           updatedConfig.Metadata,
 		RepoID:             updatedConfig.RepoID,
 		NeedSensitiveCheck: updatedConfig.NeedSensitiveCheck,
+		ModelSizeB:         updatedConfig.ModelSizeB,
 		CreatedAt:          updatedConfig.CreatedAt,
 		UpdatedAt:          updatedConfig.UpdatedAt,
 	}
@@ -251,6 +257,7 @@ func (s *llmServiceComponentImpl) CreateLLMConfig(ctx context.Context, req *type
 		Metadata:           req.Metadata,
 		RepoID:             repoID,
 		NeedSensitiveCheck: req.NeedSensitiveCheck,
+		ModelSizeB:         req.ModelSizeB,
 	}
 	dbRes, err := s.llmConfigStore.Create(ctx, dbLLMConfig)
 	if err != nil {
@@ -295,6 +302,7 @@ func (s *llmServiceComponentImpl) CreateLLMConfig(ctx context.Context, req *type
 		Metadata:           dbRes.Metadata,
 		RepoID:             dbRes.RepoID,
 		NeedSensitiveCheck: dbRes.NeedSensitiveCheck,
+		ModelSizeB:         dbRes.ModelSizeB,
 		CreatedAt:          dbRes.CreatedAt,
 		UpdatedAt:          dbRes.UpdatedAt,
 	}

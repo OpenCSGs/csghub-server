@@ -396,3 +396,57 @@ func TestLLMConfigStore_IndexWithRepo_Empty(t *testing.T) {
 	require.Equal(t, 0, total)
 	require.Len(t, cfgs, 0)
 }
+
+func TestLLMConfigStore_Index_SortByModelSizeB(t *testing.T) {
+	db := tests.InitTestDB()
+	defer db.Close()
+	ctx := context.TODO()
+	config, err := config.LoadConfig()
+	require.Nil(t, err)
+	store := database.NewLLMConfigStoreWithDB(db, config)
+
+	llmType := 16
+	_, err = store.Create(ctx, database.LLMConfig{
+		ModelName:  "size-small",
+		Type:       llmType,
+		Enabled:    true,
+		ModelSizeB: 0.5,
+	})
+	require.Nil(t, err)
+	_, err = store.Create(ctx, database.LLMConfig{
+		ModelName:  "size-large",
+		Type:       llmType,
+		Enabled:    true,
+		ModelSizeB: 70,
+	})
+	require.Nil(t, err)
+	_, err = store.Create(ctx, database.LLMConfig{
+		ModelName:  "size-medium",
+		Type:       llmType,
+		Enabled:    true,
+		ModelSizeB: 7,
+	})
+	require.Nil(t, err)
+
+	cfgsAsc, _, err := store.Index(ctx, 10, 1, &types.SearchLLMConfig{
+		Type:      &llmType,
+		SortBy:    "model_size_b",
+		SortOrder: "ASC",
+	})
+	require.Nil(t, err)
+	require.Len(t, cfgsAsc, 3)
+	require.Equal(t, "size-small", cfgsAsc[0].ModelName)
+	require.Equal(t, "size-medium", cfgsAsc[1].ModelName)
+	require.Equal(t, "size-large", cfgsAsc[2].ModelName)
+
+	cfgsDesc, _, err := store.Index(ctx, 10, 1, &types.SearchLLMConfig{
+		Type:      &llmType,
+		SortBy:    "model_size_b",
+		SortOrder: "DESC",
+	})
+	require.Nil(t, err)
+	require.Len(t, cfgsDesc, 3)
+	require.Equal(t, "size-large", cfgsDesc[0].ModelName)
+	require.Equal(t, "size-medium", cfgsDesc[1].ModelName)
+	require.Equal(t, "size-small", cfgsDesc[2].ModelName)
+}
