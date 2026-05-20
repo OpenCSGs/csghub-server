@@ -91,6 +91,22 @@ type Broadcast struct {
 	Status  string `bun:",notnull" json:"status"`
 }
 
+/* table for activity logs */
+type ActivityLog struct {
+	ID            int64     `bun:",pk,autoincrement" json:"id"`
+	UserUUID      string    `bun:",notnull" json:"user_uuid"`
+	Username      string    `bun:",notnull" json:"username"`
+	AuthType      string    `bun:",notnull" json:"auth_type"`
+	Action        string    `bun:",notnull" json:"action"`
+	ResourceType  string    `bun:",notnull" json:"resource_type"`
+	ResourceID    int64     `bun:",notnull" json:"resource_id"`
+	ResourceName  string    `bun:",notnull" json:"resource_name"`
+	IPAddress     string    `bun:",notnull" json:"ip_address"`
+	UserAgent     string    `bun:"," json:"user_agent"`
+	OperationTime time.Time `bun:",nullzero,notnull,skipupdate,default:current_timestamp" json:"operation_time"`
+	times
+}
+
 /* tables for on-premises repo synchronization */
 type SyncVersion struct {
 	Version        int64                `bun:",pk,autoincrement" json:"version"`

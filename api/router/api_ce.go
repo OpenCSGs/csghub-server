@@ -11,15 +11,21 @@ import (
 	bldmq "opencsg.com/csghub-server/builder/mq"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
+	"opencsg.com/csghub-server/component"
 )
 
 func useAdvancedMiddleware(r *gin.Engine, config *config.Config) {}
-func createAdvancedRoutes(apiGroup *gin.RouterGroup, adminGroup *gin.RouterGroup, middlewareCollection middleware.MiddlewareCollection, config *config.Config, mqFactory bldmq.MessageQueueFactory) error {
+func createAdvancedRoutes(apiGroup *gin.RouterGroup, adminGroup *gin.RouterGroup, middlewareCollection middleware.MiddlewareCollection, config *config.Config, mqFactory bldmq.MessageQueueFactory, activityLogComp component.ActivityLogComponent) error {
 	repoHandler, err := handler.NewRepoHandler(config)
 	if err != nil {
 		return fmt.Errorf("failed to create repo handler: %w", err)
 	}
 	createRepoRoutes(apiGroup, middlewareCollection, repoHandler)
+
+	err = createActivityLogRoutes(apiGroup, middlewareCollection, activityLogComp)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }

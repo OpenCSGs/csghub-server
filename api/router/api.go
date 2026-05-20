@@ -98,6 +98,11 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		return nil, fmt.Errorf("error creating message queue factory: %w", err)
 	}
 
+	activityLogComp, err := component.NewActivityLogComponent(config, mqFactory)
+	if err != nil {
+		return nil, fmt.Errorf("error creating activity log component: %w", err)
+	}
+
 	gitHTTPHandler, err := handler.NewGitHTTPHandler(config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating git http handler:%w", err)
@@ -106,6 +111,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	gitHTTP := r.Group("/:repo_type/:namespace/:name")
 	gitHTTP.Use(middleware.GitHTTPParamMiddleware())
 	gitHTTP.Use(middleware.GetCurrentUserFromHeader())
+	gitHTTP.Use(middleware.ActivityLog(config, activityLogComp))
 	{
 		gitHTTP.GET("/info/refs", gitHTTPHandler.InfoRefs)
 		gitHTTP.POST("/git-upload-pack", middleware.ContentEncoding(), gitHTTPHandler.GitUploadPack)
@@ -187,6 +193,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 
 	r.Use(middleware.LocalizedErrorMiddleware())
 	r.Use(middleware.Authenticator(config))
+	r.Use(middleware.ActivityLog(config, activityLogComp))
 	useAdvancedMiddleware(r, config)
 	err = createCustomValidator()
 	if err != nil {
@@ -534,7 +541,7 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 		return nil, fmt.Errorf("error creating clawhub routes:%w", err)
 	}
 
-	err = createAdvancedRoutes(apiGroup, adminGroup, middlewareCollection, config, mqFactory)
+	err = createAdvancedRoutes(apiGroup, adminGroup, middlewareCollection, config, mqFactory, activityLogComp)
 	if err != nil {
 		return nil, fmt.Errorf("error creating advance routes:%w", err)
 	}
@@ -583,6 +590,16 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	createFinetuneRoutes(apiGroup, middlewareCollection, finetuneJobHandler)
 
 	return r, nil
+}
+
+func createActivityLogRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware.MiddlewareCollection, comp component.ActivityLogComponent) error {
+	if err := comp.StartConsuming(); err != nil {
+		return fmt.Errorf("error starting activity log consumer: %w", err)
+	}
+
+	handler := handler.NewActivityLogHandler(comp)
+	apiGroup.GET("/activity_logs", middlewareCollection.Auth.NeedAPIKey, handler.List)
+	return nil
 }
 
 func createEvaluationRoutes(apiGroup *gin.RouterGroup, middlewareCollection middleware.MiddlewareCollection, evaluationHandler *handler.EvaluationHandler) {

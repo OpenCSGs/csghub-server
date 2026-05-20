@@ -104,6 +104,8 @@ func GetCurrentUserFromHeader() gin.HandlerFunc {
 				}
 				if user.Username == username {
 					httpbase.SetCurrentUser(c, username)
+					httpbase.SetCurrentUserUUID(c, user.UUID)
+					httpbase.SetAuthType(c, httpbase.AuthTypeGitAccessToken)
 				}
 			} else if strings.HasPrefix(authHeader, "Bearer ") {
 				token = strings.TrimPrefix(authHeader, "Bearer ")
@@ -114,6 +116,8 @@ func GetCurrentUserFromHeader() gin.HandlerFunc {
 					return
 				}
 				httpbase.SetCurrentUser(c, user.Username)
+				httpbase.SetCurrentUserUUID(c, user.UUID)
+				httpbase.SetAuthType(c, httpbase.AuthTypeGitAccessToken)
 			}
 		}
 
