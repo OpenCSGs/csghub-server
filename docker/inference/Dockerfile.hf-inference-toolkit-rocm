@@ -1,4 +1,4 @@
-FROM pytorch/pytorch:2.9.1-cuda12.8-cudnn9-devel
+FROM rocm/pytorch:rocm7.2.2_ubuntu22.04_py3.10_pytorch_release_2.10.0
 SHELL ["/bin/bash", "-c"]
 
 LABEL maintainer="opencsg"
@@ -6,9 +6,16 @@ LABEL maintainer="opencsg"
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Install required dependencies
-RUN apt-get update && \
-    apt-get install software-properties-common -y && \
-    add-apt-repository ppa:deadsnakes/ppa && \
+RUN for sourceFile in /etc/apt/sources.list /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources; do \
+        if [ -f "$sourceFile" ]; then \
+            sed -i \
+                -e 's|http://archive.ubuntu.com/ubuntu|http://mirrors.aliyun.com/ubuntu|g' \
+                -e 's|http://security.ubuntu.com/ubuntu|http://mirrors.aliyun.com/ubuntu|g' \
+                -e '/repo.radeon.com\/rocm\/apt/s|^|# |' \
+                "$sourceFile"; \
+        fi; \
+    done && \
+    apt-get update && \
     apt-get install -y \
     build-essential \
     bzip2 \
@@ -29,9 +36,11 @@ RUN apt-get update && \
 # Hugging Face Inference Toolkit
 WORKDIR /etc/csghub
 RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
+# [st] only: skip [torch] (use base image PyTorch) and [diffusers] (install 0.37.x separately)
 RUN git clone --depth 1 https://gitee.com/xzgan/huggingface-inference-toolkit.git --branch 0.5.5.2 --single-branch && \
-    cd huggingface-inference-toolkit && pip install --no-cache-dir -e ".[torch,st]"
+    cd huggingface-inference-toolkit && pip install --no-cache-dir -e ".[st]"
 
+# huggingface-inference-toolkit 0.5.x uses Starlette on_startup/on_shutdown; Starlette 1.0 removed them
 RUN pip install --no-cache-dir "starlette>=0.27,<1.0" diffusers==0.38.0 csghub-sdk==0.4.7 huggingface-hub==0.36.2 accelerate
 
 # copy entrypoint and change permissions
