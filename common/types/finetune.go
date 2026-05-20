@@ -93,4 +93,5 @@ type WorkflowLogReq struct {
 	ID          int64
 	PodName     string
 	SubmitTime  time.Time
+	TaskID      string
 }

@@ -12,12 +12,14 @@ import (
 	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/git/membership"
 	"opencsg.com/csghub-server/builder/loki"
+	"opencsg.com/csghub-server/builder/rpc"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/config"
 	"opencsg.com/csghub-server/common/types"
 
 	mockdeploy "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/deploy"
 	mockdb "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/store/database"
+	mockrpc "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/builder/rpc"
 	mockComps "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
 )
 
@@ -27,7 +29,8 @@ func NewTestFinetuneComponent(config *config.Config,
 	mirrorStore database.MirrorStore, tokenStore database.AccessTokenStore,
 	repoStore database.RepoStore, frameStore database.RuntimeFrameworksStore,
 	argoStore database.ArgoWorkFlowStore,
-	acctComp AccountingComponent, repoComp RepoComponent, deployTaskStore database.DeployTaskStore) FinetuneComponent {
+	acctComp AccountingComponent, repoComp RepoComponent, deployTaskStore database.DeployTaskStore,
+	userSvcClient rpc.UserSvcClient) FinetuneComponent {
 	c := &finetuneComponentImpl{}
 	c.deployer = deployer
 	c.userStore = userStore
@@ -43,6 +46,7 @@ func NewTestFinetuneComponent(config *config.Config,
 	c.config = config
 	c.repoComponent = repoComp
 	c.accountingComponent = acctComp
+	c.userSvcClient = userSvcClient
 	return c
 }
 
@@ -108,7 +112,7 @@ func TestEvaluationComponent_CreateFinetune(t *testing.T) {
 	require.Nil(t, err)
 
 	c := NewTestFinetuneComponent(cfg, mockDeployer, mockUser, modelStore, spaceResStore, datasetStore, mirrorStore,
-		tokenStore, repoStore, frameStore, argoStore, acctComp, repoComp, nil)
+		tokenStore, repoStore, frameStore, argoStore, acctComp, repoComp, nil, nil)
 
 	mockUser.EXPECT().FindByUsername(ctx, req.Username).Return(database.User{
 		Username: req.Username,
@@ -179,7 +183,7 @@ func TestFinetuneComponent_CreateFinetuneJob_UsesRequestedDatasetRevision(t *tes
 	repoComp := mockComps.NewMockRepoComponent(t)
 
 	c := NewTestFinetuneComponent(cfg, mockDeployer, mockUser, modelStore, spaceResStore, datasetStore, mirrorStore,
-		tokenStore, repoStore, frameStore, argoStore, acctComp, repoComp, nil)
+		tokenStore, repoStore, frameStore, argoStore, acctComp, repoComp, nil, nil)
 
 	mockUser.EXPECT().FindByUsername(ctx, req.Username).Return(database.User{
 		Username: req.Username,
@@ -250,7 +254,7 @@ func TestFinetuneComponent_CreateFinetuneJob_NonAdminNamespace(t *testing.T) {
 
 	t.Run("namespace_permission_error", func(t *testing.T) {
 		c := NewTestFinetuneComponent(cfg, mockDeployer, mockUser, modelStore, spaceResStore, datasetStore, mirrorStore,
-			tokenStore, repoStore, frameStore, argoStore, acctComp, repoComp, nil)
+			tokenStore, repoStore, frameStore, argoStore, acctComp, repoComp, nil, nil)
 		mockUser.EXPECT().FindByUsername(ctx, req.Username).Return(database.User{
 			Username: req.Username,
 			UUID:     req.Username,
@@ -264,7 +268,7 @@ func TestFinetuneComponent_CreateFinetuneJob_NonAdminNamespace(t *testing.T) {
 	})
 	t.Run("namespace_forbidden", func(t *testing.T) {
 		c := NewTestFinetuneComponent(cfg, mockDeployer, mockUser, modelStore, spaceResStore, datasetStore, mirrorStore,
-			tokenStore, repoStore, frameStore, argoStore, acctComp, repoComp, nil)
+			tokenStore, repoStore, frameStore, argoStore, acctComp, repoComp, nil, nil)
 		mockUser.EXPECT().FindByUsername(ctx, req.Username).Return(database.User{
 			Username: req.Username,
 			UUID:     req.Username,
@@ -303,7 +307,7 @@ func TestEvaluationComponent_GetFinetune(t *testing.T) {
 	}
 
 	c := NewTestFinetuneComponent(cfg, mockDeployer, mockUser, modelStore, spaceResStore, datasetStore, mirrorStore,
-		tokenStore, repoStore, frameStore, argoStore, acctComp, repoComp, nil)
+		tokenStore, repoStore, frameStore, argoStore, acctComp, repoComp, nil, nil)
 
 	argoStore.EXPECT().FindByID(ctx, int64(1)).Return(database.ArgoWorkflow{
 		ID:       1,
@@ -337,7 +341,7 @@ func TestEvaluationComponent_DeleteFinetune(t *testing.T) {
 	repoComp := mockComps.NewMockRepoComponent(t)
 
 	c := NewTestFinetuneComponent(cfg, mockDeployer, mockUser, modelStore, spaceResStore, datasetStore, mirrorStore,
-		tokenStore, repoStore, frameStore, argoStore, acctComp, repoComp, nil)
+		tokenStore, repoStore, frameStore, argoStore, acctComp, repoComp, nil, nil)
 
 	argoStore.EXPECT().FindByID(ctx, int64(1)).Return(database.ArgoWorkflow{
 		ID:        1,
@@ -375,18 +379,31 @@ func TestFinetuneComponent_ReadJobLogsNonStream(t *testing.T) {
 	t.Run("find-workflow-logs-success", func(t *testing.T) {
 		mockDeployer := mockdeploy.NewMockDeployer(t)
 		argoStore := mockdb.NewMockArgoWorkFlowStore(t)
+		mockUserSvcClient := mockrpc.NewMockUserSvcClient(t)
 
 		c := NewTestFinetuneComponent(cfg, mockDeployer, nil, nil, nil, nil, nil,
-			nil, nil, nil, argoStore, nil, nil, nil)
+			nil, nil, nil, argoStore, nil, nil, nil, mockUserSvcClient)
 
 		req := types.FinetuneLogReq{
-			ID: 1,
+			CurrentUser: "testuser",
+			ID:          1,
 		}
+
+		mockUserSvcClient.EXPECT().GetUserByName(ctx, "testuser").Return(&types.User{
+			UUID:  "testuser",
+			Roles: []string{"admin"},
+		}, nil)
 
 		argoStore.EXPECT().FindByID(ctx, int64(1)).Return(database.ArgoWorkflow{
 			ID:         1,
 			TaskId:     "test-task",
 			SubmitTime: time.Now(),
+			UserUUID:   "testuser",
+		}, nil)
+
+		mockUserSvcClient.EXPECT().GetNameSpaceInfoByUUID(ctx, "testuser").Return(&rpc.Namespace{
+			UUID:   "testuser",
+			NSType: "user",
 		}, nil)
 
 		expectedLogs := &loki.LokiQueryResponse{}
@@ -400,12 +417,14 @@ func TestFinetuneComponent_ReadJobLogsNonStream(t *testing.T) {
 	t.Run("find-workflow-logs-failed", func(t *testing.T) {
 		mockDeployer := mockdeploy.NewMockDeployer(t)
 		argoStore := mockdb.NewMockArgoWorkFlowStore(t)
+		mockUserSvcClient := mockrpc.NewMockUserSvcClient(t)
 
 		c := NewTestFinetuneComponent(cfg, mockDeployer, nil, nil, nil, nil, nil,
-			nil, nil, nil, argoStore, nil, nil, nil)
+			nil, nil, nil, argoStore, nil, nil, nil, mockUserSvcClient)
 
 		req := types.FinetuneLogReq{
-			ID: 1,
+			CurrentUser: "testuser",
+			ID:          1,
 		}
 
 		expectedErr := errors.New("not found")
@@ -418,17 +437,30 @@ func TestFinetuneComponent_ReadJobLogsNonStream(t *testing.T) {
 	t.Run("get-logs-failed", func(t *testing.T) {
 		mockDeployer := mockdeploy.NewMockDeployer(t)
 		argoStore := mockdb.NewMockArgoWorkFlowStore(t)
+		mockUserSvcClient := mockrpc.NewMockUserSvcClient(t)
 
 		c := NewTestFinetuneComponent(cfg, mockDeployer, nil, nil, nil, nil, nil,
-			nil, nil, nil, argoStore, nil, nil, nil)
+			nil, nil, nil, argoStore, nil, nil, nil, mockUserSvcClient)
 		req := types.FinetuneLogReq{
-			ID: 1,
+			CurrentUser: "testuser",
+			ID:          1,
 		}
+
+		mockUserSvcClient.EXPECT().GetUserByName(ctx, "testuser").Return(&types.User{
+			UUID:  "testuser",
+			Roles: []string{"admin"},
+		}, nil)
 
 		argoStore.EXPECT().FindByID(ctx, int64(1)).Return(database.ArgoWorkflow{
 			ID:         1,
 			TaskId:     "test-task",
 			SubmitTime: time.Now(),
+			UserUUID:   "testuser",
+		}, nil)
+
+		mockUserSvcClient.EXPECT().GetNameSpaceInfoByUUID(ctx, "testuser").Return(&rpc.Namespace{
+			UUID:   "testuser",
+			NSType: "user",
 		}, nil)
 
 		expectedErr := errors.New("failed to get logs")
@@ -446,18 +478,31 @@ func TestFinetuneComponent_ReadJobLogsInStream(t *testing.T) {
 	t.Run("wf-logs-success", func(t *testing.T) {
 		mockDeployer := mockdeploy.NewMockDeployer(t)
 		argoStore := mockdb.NewMockArgoWorkFlowStore(t)
+		mockUserSvcClient := mockrpc.NewMockUserSvcClient(t)
 
 		c := NewTestFinetuneComponent(cfg, mockDeployer, nil, nil, nil, nil, nil,
-			nil, nil, nil, argoStore, nil, nil, nil)
+			nil, nil, nil, argoStore, nil, nil, nil, mockUserSvcClient)
 
 		req := types.FinetuneLogReq{
-			ID: 1,
+			CurrentUser: "testuser",
+			ID:          1,
 		}
+
+		mockUserSvcClient.EXPECT().GetUserByName(ctx, "testuser").Return(&types.User{
+			UUID:  "testuser",
+			Roles: []string{"admin"},
+		}, nil)
 
 		argoStore.EXPECT().FindByID(ctx, int64(1)).Return(database.ArgoWorkflow{
 			ID:         1,
 			TaskId:     "test-task",
 			SubmitTime: time.Now(),
+			UserUUID:   "testuser",
+		}, nil)
+
+		mockUserSvcClient.EXPECT().GetNameSpaceInfoByUUID(ctx, "testuser").Return(&rpc.Namespace{
+			UUID:   "testuser",
+			NSType: "user",
 		}, nil)
 
 		expectedReader := &deploy.MultiLogReader{}
@@ -471,12 +516,14 @@ func TestFinetuneComponent_ReadJobLogsInStream(t *testing.T) {
 	t.Run("find workflow failed", func(t *testing.T) {
 		mockDeployer := mockdeploy.NewMockDeployer(t)
 		argoStore := mockdb.NewMockArgoWorkFlowStore(t)
+		mockUserSvcClient := mockrpc.NewMockUserSvcClient(t)
 
 		c := NewTestFinetuneComponent(cfg, mockDeployer, nil, nil, nil, nil, nil,
-			nil, nil, nil, argoStore, nil, nil, nil)
+			nil, nil, nil, argoStore, nil, nil, nil, mockUserSvcClient)
 
 		req := types.FinetuneLogReq{
-			ID: 1,
+			CurrentUser: "testuser",
+			ID:          1,
 		}
 
 		expectedErr := errors.New("not found")
@@ -501,7 +548,7 @@ func TestFinetuneComponent_OrgFinetunes(t *testing.T) {
 	mockDeployTask.EXPECT().ListDeployByOwnerNamespace(ctx, "org1", mock.Anything).Return([]database.Deploy{
 		{ID: 1, DeployName: "ft1", OwnerNamespace: "org1", RepoID: 101, Status: 1},
 	}, 1, nil)
-	c := NewTestFinetuneComponent(cfg, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, mockRepoComp, mockDeployTask)
+	c := NewTestFinetuneComponent(cfg, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, mockRepoComp, mockDeployTask, nil)
 	res, total, err := c.OrgFinetunes(ctx, req)
 	require.Nil(t, err)
 	require.Equal(t, 1, total)
