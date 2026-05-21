@@ -397,6 +397,57 @@ func (_c *MockOpenAIComponent_RecordUsage_Call) RunAndReturn(run func(context.Co
 	return _c
 }
 
+// RecordUsageFromTokenUsage provides a mock function with given fields: c, nsUUID, model, targetModelName, usage, apikey
+func (_m *MockOpenAIComponent) RecordUsageFromTokenUsage(c context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string) error {
+	ret := _m.Called(c, nsUUID, model, targetModelName, usage, apikey)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RecordUsageFromTokenUsage")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, *types.Model, string, *token.Usage, string) error); ok {
+		r0 = rf(c, nsUUID, model, targetModelName, usage, apikey)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockOpenAIComponent_RecordUsageFromTokenUsage_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RecordUsageFromTokenUsage'
+type MockOpenAIComponent_RecordUsageFromTokenUsage_Call struct {
+	*mock.Call
+}
+
+// RecordUsageFromTokenUsage is a helper method to define mock.On call
+//   - c context.Context
+//   - nsUUID string
+//   - model *types.Model
+//   - targetModelName string
+//   - usage *token.Usage
+//   - apikey string
+func (_e *MockOpenAIComponent_Expecter) RecordUsageFromTokenUsage(c interface{}, nsUUID interface{}, model interface{}, targetModelName interface{}, usage interface{}, apikey interface{}) *MockOpenAIComponent_RecordUsageFromTokenUsage_Call {
+	return &MockOpenAIComponent_RecordUsageFromTokenUsage_Call{Call: _e.mock.On("RecordUsageFromTokenUsage", c, nsUUID, model, targetModelName, usage, apikey)}
+}
+
+func (_c *MockOpenAIComponent_RecordUsageFromTokenUsage_Call) Run(run func(c context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string)) *MockOpenAIComponent_RecordUsageFromTokenUsage_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(*types.Model), args[3].(string), args[4].(*token.Usage), args[5].(string))
+	})
+	return _c
+}
+
+func (_c *MockOpenAIComponent_RecordUsageFromTokenUsage_Call) Return(_a0 error) *MockOpenAIComponent_RecordUsageFromTokenUsage_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockOpenAIComponent_RecordUsageFromTokenUsage_Call) RunAndReturn(run func(context.Context, string, *types.Model, string, *token.Usage, string) error) *MockOpenAIComponent_RecordUsageFromTokenUsage_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // NewMockOpenAIComponent creates a new instance of MockOpenAIComponent. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewMockOpenAIComponent(t interface {

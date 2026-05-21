@@ -10,6 +10,8 @@ import (
 	"net/http/httptest"
 	"sync"
 	"testing"
+	"testing/synctest"
+	"time"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -30,6 +32,70 @@ type testChatAttemptFailureReporter struct {
 	mu     sync.Mutex
 	doneCh chan struct{}
 	events []ChatAttemptFailureEvent
+}
+
+type testGenerationRecorderWithMutex struct {
+	mu         sync.Mutex
+	doneCh     chan struct{}
+	usage      *types.TokenUsage
+	response   *types.GenerationResponse
+	firstChunk *types.GenerationFirstChunk
+	errorCode  string
+	ended      bool
+	events     []string
+}
+
+func (r *testGenerationRecorderWithMutex) SetUsage(usage types.TokenUsage) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.usage = &usage
+	r.events = append(r.events, "usage")
+}
+
+func (r *testGenerationRecorderWithMutex) SetResponse(response types.GenerationResponse) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.response = &response
+	r.events = append(r.events, "response")
+}
+
+func (r *testGenerationRecorderWithMutex) SetFirstChunk(firstChunk types.GenerationFirstChunk) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.firstChunk = &firstChunk
+	r.events = append(r.events, "first_chunk")
+}
+
+func (r *testGenerationRecorderWithMutex) SetError(_ error, code string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.errorCode = code
+	r.events = append(r.events, "error")
+}
+
+func (r *testGenerationRecorderWithMutex) End() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.ended = true
+	r.events = append(r.events, "end")
+	if r.doneCh != nil {
+		close(r.doneCh)
+		r.doneCh = nil
+	}
+}
+
+func (r *testGenerationRecorderWithMutex) snapshot() (*types.TokenUsage, bool, []string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	events := append([]string(nil), r.events...)
+	return r.usage, r.ended, events
+}
+
+func (r *testGenerationRecorderWithMutex) traceSnapshot() (*types.GenerationResponse, *types.GenerationFirstChunk, string, bool, []string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	events := append([]string(nil), r.events...)
+	return r.response, r.firstChunk, r.errorCode, r.ended, events
 }
 
 func newTestChatAttemptFailureReporter() *testChatAttemptFailureReporter {
@@ -224,7 +290,7 @@ func TestRetryChatWithFallback_ReturnsNilWithoutFallbackTargets(t *testing.T) {
 		AttemptTargets: nil,
 	}
 
-	err := tester.handler.retryChatWithFallback(c, newTestCommonResponseWriter(), modelTarget, "user-1", &ChatCompletionRequest{Model: "test-model"}, nil, nil)
+	_, err := tester.handler.retryChatWithFallback(c, newTestCommonResponseWriter(), modelTarget, "user-1", &ChatCompletionRequest{Model: "test-model"}, nil, nil)
 
 	require.NoError(t, err)
 }
@@ -264,7 +330,7 @@ func TestRetryChatWithFallback_ReplaysLastRetryableFallbackResponse(t *testing.T
 	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(body))
 	writer := newTestCommonResponseWriter()
 
-	err := tester.handler.retryChatWithFallback(c, writer, modelTarget, "user-1", &ChatCompletionRequest{Model: "test-model"}, nil, nil)
+	_, err := tester.handler.retryChatWithFallback(c, writer, modelTarget, "user-1", &ChatCompletionRequest{Model: "test-model"}, nil, nil)
 
 	require.NoError(t, err)
 	require.Equal(t, http.StatusServiceUnavailable, writer.statusCode)
@@ -320,7 +386,7 @@ func TestRetryChatWithFallback_ContinuesUntilNextFallbackSucceeds(t *testing.T) 
 	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(body))
 	writer := newTestCommonResponseWriter()
 
-	err := tester.handler.retryChatWithFallback(c, writer, modelTarget, "user-1", &ChatCompletionRequest{Model: "test-model"}, nil, nil)
+	_, err := tester.handler.retryChatWithFallback(c, writer, modelTarget, "user-1", &ChatCompletionRequest{Model: "test-model"}, nil, nil)
 
 	require.NoError(t, err)
 	require.Equal(t, http.StatusOK, writer.statusCode)
@@ -372,7 +438,7 @@ func TestRetryChatWithFallback_UsesFallbackModelName(t *testing.T) {
 		Once()
 
 	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader([]byte(`{}`)))
-	err := tester.handler.retryChatWithFallback(
+	_, err := tester.handler.retryChatWithFallback(
 		c,
 		newTestCommonResponseWriter(),
 		modelTarget,
@@ -387,6 +453,10 @@ func TestRetryChatWithFallback_UsesFallbackModelName(t *testing.T) {
 	require.Equal(t, "provider-fallback-model", modelTarget.ModelName)
 
 	tokenCounter := mocktoken.NewMockCounter(t)
+	tokenCounter.EXPECT().
+		Usage(mock.Anything).
+		Return(&token.Usage{}, nil).
+		Once()
 	var wg sync.WaitGroup
 	wg.Add(2)
 	tester.mocks.openAIComp.EXPECT().
@@ -397,8 +467,8 @@ func TestRetryChatWithFallback_UsesFallbackModelName(t *testing.T) {
 		}).
 		Once()
 	tester.mocks.openAIComp.EXPECT().
-		RecordUsage(mock.Anything, "user-1", modelTarget.Model, "provider-fallback-model", tokenCounter, "api-key").
-		RunAndReturn(func(ctx context.Context, userUUID string, model *types.Model, targetModelName string, counter token.Counter, apikey string) error {
+		RecordUsageFromTokenUsage(mock.Anything, "user-1", modelTarget.Model, "provider-fallback-model", mock.Anything, "api-key").
+		RunAndReturn(func(ctx context.Context, userUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string) error {
 			wg.Done()
 			return nil
 		}).
@@ -412,6 +482,135 @@ func TestRetryChatWithFallback_UsesFallbackModelName(t *testing.T) {
 		TokenCounter:    tokenCounter,
 	})
 	wg.Wait()
+}
+
+func TestRunChatPostProcessAsync_RecordsTraceUsageBeforeAccounting(t *testing.T) {
+	tester, c, _ := setupTest(t)
+	tester.mocks.openAIComp.ExpectedCalls = nil
+
+	model := &types.Model{
+		BaseModel: types.BaseModel{
+			ID: "model-1",
+		},
+		ExternalModelInfo: types.ExternalModelInfo{
+			Provider: "deepseek",
+		},
+	}
+	tokenCounter := mocktoken.NewMockCounter(t)
+	tokenCounter.EXPECT().
+		Usage(mock.Anything).
+		Return(&token.Usage{
+			PromptTokens:     11,
+			CompletionTokens: 7,
+			TotalTokens:      18,
+			ReasoningTokens:  3,
+		}, nil).
+		Once()
+
+	recorder := &testGenerationRecorderWithMutex{}
+	var wg sync.WaitGroup
+	wg.Add(2)
+	tester.mocks.openAIComp.EXPECT().
+		CommitUsageLimit(mock.Anything, "user-1", model, tokenCounter).
+		RunAndReturn(func(ctx context.Context, userUUID string, model *types.Model, counter token.Counter) error {
+			usage, ended, events := recorder.snapshot()
+			require.True(t, ended)
+			require.Equal(t, []string{"usage", "end"}, events)
+			require.NotNil(t, usage)
+			require.Equal(t, int64(11), usage.InputTokens)
+			require.Equal(t, int64(7), usage.OutputTokens)
+			require.Equal(t, int64(18), usage.TotalTokens)
+			require.Equal(t, int64(3), usage.ReasoningTokens)
+			wg.Done()
+			return nil
+		}).
+		Once()
+	tester.mocks.openAIComp.EXPECT().
+		RecordUsageFromTokenUsage(mock.Anything, "user-1", model, "target-model", mock.Anything, "api-key").
+		RunAndReturn(func(ctx context.Context, userUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string) error {
+			wg.Done()
+			return nil
+		}).
+		Once()
+
+	tester.handler.runChatPostProcessAsync(c.Request.Context(), chatPostProcessInput{
+		NSUUID:          "user-1",
+		ApiKey:          "api-key",
+		Model:           model,
+		TargetModelName: "target-model",
+		TokenCounter:    tokenCounter,
+		Trace: chatTracePostProcessInput{
+			Recorder: recorder,
+		},
+	})
+	wg.Wait()
+}
+
+func TestRunChatPostProcessAsync_RecordsTraceCompletionBeforeUsage(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		tester, c, _ := setupTest(t)
+		tester.mocks.openAIComp.ExpectedCalls = nil
+
+		model := &types.Model{
+			BaseModel: types.BaseModel{
+				ID: "model-1",
+			},
+			ExternalModelInfo: types.ExternalModelInfo{
+				Provider: "deepseek",
+			},
+		}
+		tokenCounter := mocktoken.NewMockCounter(t)
+		tokenCounter.EXPECT().
+			Usage(mock.Anything).
+			Return(&token.Usage{
+				PromptTokens:     5,
+				CompletionTokens: 8,
+				TotalTokens:      13,
+			}, nil).
+			Once()
+
+		recorder := &testGenerationRecorderWithMutex{}
+		firstWriteAt := time.Now()
+		tester.mocks.openAIComp.EXPECT().
+			CommitUsageLimit(mock.Anything, "user-1", model, tokenCounter).
+			Return(nil).
+			Once()
+		tester.mocks.openAIComp.EXPECT().
+			RecordUsageFromTokenUsage(mock.Anything, "user-1", model, "target-model", mock.Anything, "api-key").
+			RunAndReturn(func(ctx context.Context, userUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string) error {
+				_, _, _, ended, events := recorder.traceSnapshot()
+				require.True(t, ended)
+				require.Equal(t, []string{"first_chunk", "response", "error", "usage", "end"}, events)
+				return nil
+			}).
+			Once()
+
+		tester.handler.runChatPostProcessAsync(c.Request.Context(), chatPostProcessInput{
+			NSUUID:          "user-1",
+			ApiKey:          "api-key",
+			Model:           model,
+			TargetModelName: "target-model",
+			TokenCounter:    tokenCounter,
+			Trace: chatTracePostProcessInput{
+				Recorder:     recorder,
+				Completion:   true,
+				Stream:       true,
+				FirstWriteAt: firstWriteAt,
+				StatusCode:   http.StatusBadGateway,
+			},
+		})
+		synctest.Wait()
+		response, firstChunk, errorCode, ended, events := recorder.traceSnapshot()
+		require.True(t, ended)
+		require.Equal(t, []string{"first_chunk", "response", "error", "usage", "end"}, events)
+		require.NotNil(t, response)
+		require.Equal(t, "deepseek", response.Provider)
+		require.Equal(t, "target-model", response.Model)
+		require.Equal(t, "target-model", response.ResponseModel)
+		require.NotNil(t, firstChunk)
+		require.Equal(t, firstWriteAt, firstChunk.At)
+		require.Equal(t, types.TraceErrUpstreamError, errorCode)
+	})
 }
 
 func TestRetryChatWithFallback_ReportsFallbackAttemptFailure(t *testing.T) {
@@ -444,7 +643,7 @@ func TestRetryChatWithFallback_ReportsFallbackAttemptFailure(t *testing.T) {
 		Once()
 
 	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader([]byte(`{}`)))
-	err := tester.handler.retryChatWithFallback(
+	_, err := tester.handler.retryChatWithFallback(
 		c,
 		newTestCommonResponseWriter(),
 		modelTarget,

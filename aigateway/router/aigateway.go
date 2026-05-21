@@ -1,6 +1,7 @@
 package router
 
 import (
+	"context"
 	"fmt"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"net/http"
@@ -80,8 +81,21 @@ func NewRouter(config *config.Config) (*gin.Engine, func(), error) {
 	if err != nil {
 		return nil, nil, fmt.Errorf("error creating extended routes :%w", err)
 	}
+	cleanup = combineCleanup(cleanup, func() {
+		_ = openAIhandler.Shutdown(context.Background())
+	})
 
 	return r, cleanup, nil
+}
+
+func combineCleanup(cleanups ...func()) func() {
+	return func() {
+		for _, cleanup := range cleanups {
+			if cleanup != nil {
+				cleanup()
+			}
+		}
+	}
 }
 
 func createMCPRoute(v1Group *gin.RouterGroup, mcpProxy handler.MCPProxyHandler) {

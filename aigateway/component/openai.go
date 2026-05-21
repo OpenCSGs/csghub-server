@@ -36,6 +36,7 @@ type OpenAIComponent interface {
 	ListModels(c context.Context, user string, req types.ListModelsReq) (types.ModelList, error)
 	GetModelByID(c context.Context, username, modelID string) (*types.Model, error)
 	RecordUsage(c context.Context, nsUUID string, model *types.Model, targetModelName string, tokenCounter token.Counter, apikey string) error
+	RecordUsageFromTokenUsage(c context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string) error
 	CheckBalance(ctx context.Context, nsUUID string) error
 	CheckUsageLimit(ctx context.Context, userUUID string, model *types.Model, endpoint string) error
 	CommitUsageLimit(ctx context.Context, userUUID string, model *types.Model, tokenCounter token.Counter) error
@@ -651,6 +652,13 @@ func (m *openaiComponentImpl) RecordUsage(c context.Context, nsUUID string, mode
 	usage, err := counter.Usage(c)
 	if err != nil {
 		return fmt.Errorf("failed to get token usage from counter: %w", err)
+	}
+	return m.RecordUsageFromTokenUsage(c, nsUUID, model, targetModelName, usage, apikey)
+}
+
+func (m *openaiComponentImpl) RecordUsageFromTokenUsage(c context.Context, nsUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string) error {
+	if usage == nil {
+		return fmt.Errorf("cannot record usage: nil token usage")
 	}
 	meteringInfo, err := m.resolveUsageMeteringInfo(c, nsUUID, model)
 	if err != nil {

@@ -19,6 +19,8 @@ var (
 	AIGatewayUpstreamCircuitState *prometheus.GaugeVec
 	// AIGateway upstream health check latency
 	AIGatewayUpstreamHealthLatency *prometheus.GaugeVec
+	// AIGateway chat upstream attempt count
+	AIGatewayChatUpstreamAttemptTotal *prometheus.CounterVec
 )
 
 func InitMetrics() {
@@ -62,4 +64,10 @@ func InitMetrics() {
 		Name: "csghub_aigateway_upstream_health_latency_ms",
 		Help: "Last health check latency in milliseconds for aigateway upstreams",
 	}, []string{"upstream_id", "url"})
+
+	// AIGateway chat upstream attempt count.
+	AIGatewayChatUpstreamAttemptTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "csghub_aigateway_chat_upstream_attempt_total",
+		Help: "Total number of AIGateway chat upstream attempts",
+	}, []string{"phase", "provider", "model_name", "status_class", "retryable"})
 }

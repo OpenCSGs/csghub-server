@@ -20,6 +20,7 @@ import (
 	"opencsg.com/csghub-server/aigateway/component/adapter/text2image"
 	"opencsg.com/csghub-server/aigateway/component/adapter/text2video"
 	"opencsg.com/csghub-server/aigateway/component/availability"
+	llmtrace "opencsg.com/csghub-server/aigateway/component/trace"
 	"opencsg.com/csghub-server/aigateway/token"
 	"opencsg.com/csghub-server/aigateway/types"
 	"opencsg.com/csghub-server/api/httpbase"
@@ -56,6 +57,8 @@ type OpenAIHandler interface {
 	Transcription(c *gin.Context)
 	// Set chat attempt failure reporter
 	SetChatAttemptFailureReporter(reporter ChatAttemptFailureReporter)
+	// Shutdown releases handler-owned resources.
+	Shutdown(ctx context.Context) error
 }
 
 func NewOpenAIHandlerFromConfig(config *config.Config) (OpenAIHandler, error) {
@@ -89,6 +92,17 @@ func NewOpenAIHandlerFromConfig(config *config.Config) (OpenAIHandler, error) {
 	whitelistRule := database.NewRepositoryFileCheckRuleStore()
 	aiGenerationStore := database.NewAIGenerationStore()
 	handler := newOpenAIHandler(modelService, repoComp, modComponent, clusterComp, token.NewCounterFactory(), text2image.NewRegistry(), text2video.NewRegistry(), config, storage, whitelistRule, aiGenerationStore)
+
+	if config.AIGateway.EnableLLMTrace {
+		llmTracer, traceErr := llmtrace.NewSigilTracer(llmtrace.SigilConfig{
+			ContentCapture: config.AIGateway.LLMTraceContentCapture,
+		})
+		if traceErr != nil {
+			slog.Warn("failed to create llm tracer", slog.Any("error", traceErr))
+		} else {
+			handler.llmTracer = llmTracer
+		}
+	}
 
 	availabilityManager, avErr := availability.NewAvailabilityManagerFromConfig(config)
 	if avErr != nil {
@@ -133,6 +147,13 @@ func newOpenAIHandler(
 		sessionRouter:              router.NewSessionRouter(),
 		chatAttemptFailureReporter: noopChatAttemptFailureReporter{},
 	}
+}
+
+func (h *OpenAIHandlerImpl) Shutdown(ctx context.Context) error {
+	if h == nil || h.llmTracer == nil {
+		return nil
+	}
+	return h.llmTracer.Shutdown(ctx)
 }
 
 // handleInsufficientBalance handles the insufficient balance error response
@@ -222,6 +243,7 @@ type OpenAIHandlerImpl struct {
 	sessionRouter              router.SessionRouter
 	availabilityManager        availability.AvailabilityManager
 	chatAttemptFailureReporter ChatAttemptFailureReporter
+	llmTracer                  llmtrace.LLMTracer
 }
 
 // ListModels godoc
@@ -346,19 +368,20 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 		3.find running model endpoint by model id
 		4.proxy request to running model endpoint
 	*/
+	ctx := c.Request.Context()
 	username := httpbase.GetCurrentUser(c)
 	nsUUID := httpbase.GetCurrentNamespaceUUID(c)
 	apikey := httpbase.GetAccessToken(c)
 	chatReq := &ChatCompletionRequest{}
 	if err := c.BindJSON(chatReq); err != nil {
-		slog.ErrorContext(c.Request.Context(), "invalid chat completion request body", slog.Any("error", err))
+		slog.ErrorContext(ctx, "invalid chat completion request body", slog.Any("error", err))
 		c.String(http.StatusBadRequest, fmt.Errorf("invalid chat completion request body:%w", err).Error())
 		return
 	}
 	modelID := chatReq.Model
-	modelTarget, err := h.resolveModelTarget(c.Request.Context(), username, modelID, c.Request.Header)
+	modelTarget, err := h.resolveModelTarget(ctx, username, modelID, c.Request.Header)
 	if err != nil {
-		handleModelTargetError(c, c.Request.Context(), modelID, "failed to get model target address", err)
+		handleModelTargetError(c, ctx, modelID, "failed to get model target address", err)
 		return
 	}
 	chatReq.Model = modelTarget.ModelName
@@ -371,17 +394,30 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 		}
 	}
 
+	traceCtx, generationRecorder := h.startChatTrace(
+		ctx,
+		c.Request.Header,
+		modelID,
+		modelTarget,
+		chatReq,
+		trace.GetTraceIDInGinContext(c),
+		nsUUID,
+	)
+	ctx = traceCtx
+	c.Request = c.Request.WithContext(traceCtx)
+
 	// Check balance before processing request
 	if !modelTarget.Model.SkipBalance() {
-		if err := h.openaiComponent.CheckBalance(c.Request.Context(), nsUUID); err != nil {
+		if err := h.openaiComponent.CheckBalance(ctx, nsUUID); err != nil {
+			finishChatTraceWithError(generationRecorder, err, types.TraceErrInsufficientBalance)
 			h.handleInsufficientBalance(c, chatReq.Stream, nsUUID, modelID, err)
 			return
 		}
 	}
 	var modComponent component.Moderation = nil
-	isCheck, result, err := h.sensitivePolicy.CheckChatSensitive(c.Request.Context(), modelTarget.Model, chatReq.Messages, nsUUID, chatReq.Stream)
+	isCheck, result, err := h.sensitivePolicy.CheckChatSensitive(ctx, modelTarget.Model, chatReq.Messages, nsUUID, chatReq.Stream)
 	if err != nil {
-		slog.ErrorContext(c.Request.Context(), "failed to check sensitive",
+		slog.ErrorContext(ctx, "failed to check sensitive",
 			slog.String("model_id", modelID),
 			slog.String("username", username),
 			slog.Any("error", err))
@@ -389,19 +425,20 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 	if isCheck {
 		modComponent = h.modComponent
 		if result != nil && result.IsSensitive {
+			finishChatTraceWithError(generationRecorder, ErrSensitiveContent, types.TraceErrSensitivePrompt)
 			handleSensitiveResponse(c, chatReq.Stream, result)
 			return
 		}
 	}
 
-	slog.InfoContext(c.Request.Context(), "proxy chat request to model target",
+	slog.InfoContext(ctx, "proxy chat request to model target",
 		slog.Any("target", modelTarget.Target),
 		slog.Any("host", modelTarget.Host),
 		slog.Any("ns_uuid", nsUUID),
 		slog.Any("model_name", modelTarget.ModelName))
 
 	chatCtx := h.setupChatContext(
-		c.Request.Context(),
+		ctx,
 		modelTarget,
 		chatReq,
 		modComponent,
@@ -414,29 +451,33 @@ func (h *OpenAIHandlerImpl) Chat(c *gin.Context) {
 	chatCtx.tokenCounter.AppendPrompts(chatReq.Messages)
 
 	if err := applyModelAuthHeaders(c.Request.Header, modelTarget.Model); err != nil {
-		slog.WarnContext(c.Request.Context(), "invalid auth head",
+		slog.WarnContext(ctx, "invalid auth head",
 			slog.String("model", modelTarget.ModelName),
 			slog.Any("error", err))
 	}
 
 	primaryWriter, proxyErr := h.executeChatProxyAttempt(c, chatCtx.responseWriter, modelTarget, nsUUID, chatReq)
 	if proxyErr != nil {
+		finishChatTraceWithError(generationRecorder, proxyErr, types.TraceErrUpstreamUnavailable)
 		h.handleProxyError(c, chatReq.Stream, username, modelID, proxyErr)
 		return
 	}
 
-	if err := h.executeChatWithFallback(c, chatCtx, modelTarget, nsUUID, chatReq, primaryWriter, username, modelID); err != nil {
+	finalWriter, err := h.executeChatWithFallback(c, chatCtx, modelTarget, nsUUID, chatReq, primaryWriter, username, modelID)
+	if err != nil {
+		finishChatTraceWithError(generationRecorder, err, types.TraceErrUpstreamUnavailable)
 		h.handleProxyError(c, chatReq.Stream, username, modelID, err)
 		return
 	}
 
-	h.runChatPostProcessAsync(c.Request.Context(), chatPostProcessInput{
+	h.runChatPostProcessAsync(ctx, chatPostProcessInput{
 		NSUUID:          nsUUID,
 		ApiKey:          apikey,
 		Model:           modelTarget.Model,
 		TargetModelName: modelTarget.ModelName,
 		TokenCounter:    chatCtx.tokenCounter,
 		LogCapture:      chatCtx.logCapture,
+		Trace:           newChatTracePostProcessInput(generationRecorder, chatReq, finalWriter),
 	})
 }
 
@@ -447,6 +488,7 @@ type chatPostProcessInput struct {
 	TargetModelName string
 	TokenCounter    token.Counter
 	LogCapture      component.LLMLogRecorder
+	Trace           chatTracePostProcessInput
 }
 
 type chatContext struct {
@@ -511,7 +553,7 @@ func (h *OpenAIHandlerImpl) executeChatWithFallback(
 	primaryWriter *chatRetryResponseWriter,
 	username string,
 	modelID string,
-) error {
+) (*chatRetryResponseWriter, error) {
 	primaryStatusCode := primaryWriter.StatusCode()
 	primaryStreamStarted := primaryWriter.StreamStarted()
 	primaryRetryable := shouldRetryChatAttempt(primaryStatusCode, primaryStreamStarted)
@@ -534,7 +576,7 @@ func (h *OpenAIHandlerImpl) executeChatWithFallback(
 		if replayErr := primaryWriter.ReplayBufferedResponse(); replayErr != nil {
 			slog.WarnContext(c.Request.Context(), "failed to replay buffered response", slog.Any("error", replayErr))
 		}
-		return nil
+		return primaryWriter, nil
 	}
 
 	slog.InfoContext(c.Request.Context(), "retry chat request with fallback endpoint",
@@ -544,30 +586,59 @@ func (h *OpenAIHandlerImpl) executeChatWithFallback(
 		slog.String("retry_reason", chatRetryReason(primaryStatusCode)),
 		slog.Int("status_code", primaryStatusCode))
 
-	retryErr := h.retryChatWithFallback(c, chatCtx.responseWriter, modelTarget, userUUID, chatReq, chatCtx.tokenCounter, chatCtx.logCapture)
+	retryWriter, retryErr := h.retryChatWithFallback(c, chatCtx.responseWriter, modelTarget, userUUID, chatReq, chatCtx.tokenCounter, chatCtx.logCapture)
 	if retryErr != nil {
 		if component.IsUsageLimitExceeded(retryErr) {
-			return retryErr
+			return nil, retryErr
 		}
 		slog.ErrorContext(c.Request.Context(), "fallback chat retry failed", slog.Any("error", retryErr))
 		if replayErr := primaryWriter.ReplayBufferedResponse(); replayErr != nil {
 			slog.WarnContext(c.Request.Context(), "failed to replay buffered fallback response after retry error", slog.Any("error", replayErr))
 		}
+		return primaryWriter, nil
 	}
-	return nil
+	return retryWriter, nil
 }
 
 func (h *OpenAIHandlerImpl) runChatPostProcessAsync(ctx context.Context, input chatPostProcessInput) {
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				slog.Error("panic in chat post-process", slog.Any("panic", r))
+				if input.Trace.Recorder != nil {
+					input.Trace.Recorder.End()
+				}
+			}
+		}()
+
 		usageCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 3*time.Second)
 		defer cancel()
+
+		var usage *token.Usage
+		if input.TokenCounter != nil {
+			var usageErr error
+			usage, usageErr = input.TokenCounter.Usage(usageCtx)
+			if usageErr != nil {
+				slog.ErrorContext(usageCtx, "failed to get chat token usage", slog.Any("error", usageErr))
+			}
+		}
+		if input.Trace.Recorder != nil {
+			provider := ""
+			if input.Model != nil {
+				provider = input.Model.Provider
+			}
+			recordChatTraceCompletion(input.Trace, provider, input.TargetModelName, usage)
+			input.Trace.Recorder.End()
+		}
 
 		if err := h.openaiComponent.CommitUsageLimit(usageCtx, input.NSUUID, input.Model, input.TokenCounter); err != nil {
 			slog.ErrorContext(usageCtx, "failed to commit usage limit", slog.Any("error", err))
 		}
 
-		if err := h.openaiComponent.RecordUsage(usageCtx, input.NSUUID, input.Model, input.TargetModelName, input.TokenCounter, input.ApiKey); err != nil {
-			slog.ErrorContext(usageCtx, "failed to record token usage", slog.Any("error", err))
+		if usage != nil {
+			if err := h.openaiComponent.RecordUsageFromTokenUsage(usageCtx, input.NSUUID, input.Model, input.TargetModelName, usage, input.ApiKey); err != nil {
+				slog.ErrorContext(usageCtx, "failed to record token usage", slog.Any("error", err))
+			}
 		}
 
 		if h.config.AIGateway.EnableLLMLog && input.LogCapture != nil && h.llmLogPublisher != nil {
@@ -608,9 +679,9 @@ func (h *OpenAIHandlerImpl) executeChatProxyAttempt(c *gin.Context, w CommonResp
 	return retryWriter, nil
 }
 
-func (h *OpenAIHandlerImpl) retryChatWithFallback(c *gin.Context, w CommonResponseWriter, modelTarget *resolvedModelTarget, userUUID string, chatReq *ChatCompletionRequest, tokenCounter token.ChatTokenCounter, logCapture component.LLMLogRecorder) error {
+func (h *OpenAIHandlerImpl) retryChatWithFallback(c *gin.Context, w CommonResponseWriter, modelTarget *resolvedModelTarget, userUUID string, chatReq *ChatCompletionRequest, tokenCounter token.ChatTokenCounter, logCapture component.LLMLogRecorder) (*chatRetryResponseWriter, error) {
 	if len(modelTarget.AttemptTargets) < 1 {
-		return nil
+		return nil, nil
 	}
 	fallbackTargets := modelTarget.AttemptTargets
 	for idx, fallbackTarget := range fallbackTargets {
@@ -621,7 +692,7 @@ func (h *OpenAIHandlerImpl) retryChatWithFallback(c *gin.Context, w CommonRespon
 			slog.String("retry_model_name", modelTarget.ModelName))
 		retryWriter, err := h.executeChatProxyAttempt(c, w, modelTarget, userUUID, chatReq)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		statusCode := retryWriter.StatusCode()
 		streamStarted := retryWriter.StreamStarted()
@@ -644,10 +715,10 @@ func (h *OpenAIHandlerImpl) retryChatWithFallback(c *gin.Context, w CommonRespon
 		// - on success or any non-retryable result, ReplayBufferedResponse becomes a no-op if the response
 		//   was already streamed/committed to downstream.
 		if isLastFallback || !retryable {
-			return retryWriter.ReplayBufferedResponse()
+			return retryWriter, retryWriter.ReplayBufferedResponse()
 		}
 	}
-	return nil
+	return nil, nil
 }
 
 func resolveFailureEventModelID(requestModelID string, model *types.Model) string {

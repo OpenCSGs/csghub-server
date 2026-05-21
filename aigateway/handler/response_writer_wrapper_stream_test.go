@@ -41,7 +41,7 @@ func TestResponseWriterWrapper_NewResponseWriterWrapper(t *testing.T) {
 func TestResponseWriterWrapper_Header_WriteHeader_Flush_ClearBuffer(t *testing.T) {
 	w := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(w)
-	rw := newStreamResponseWriter(ctx.Writer, component.NewMockModeration(t), nil, nil)
+	rw := newStreamResponseWriter(ctx.Writer, nil, nil, nil)
 
 	rw.WriteHeader(http.StatusOK)
 	if w.Code != http.StatusOK {

@@ -103,6 +103,8 @@ type chatAttemptReportParams struct {
 }
 
 func (h *OpenAIHandlerImpl) reportChatAttemptResult(ctx context.Context, p chatAttemptReportParams) {
+	recordChatAttemptMetrics(p)
+
 	bgCtx := context.WithoutCancel(ctx)
 	if types.ShouldAttemptFailureStatus(p.StatusCode) {
 		event := ChatAttemptFailureEvent{
