@@ -448,6 +448,8 @@ type Config struct {
 		SensitiveDefaultImg            string `env:"STARHUB_SERVER_AIGATEWAY_SENSITIVE_DEFAULT_IMG" default:""`
 		PresignExpirySeconds           int    `env:"OPENCSG_AIGATEWAY_PRESIGN_EXPIRY" default:"86400"`
 		EnableLLMLog                   bool   `env:"OPENCSG_AIGATEWAY_LLMLOG_ENABLE" default:"true"`
+		EnableLLMTrace                 bool   `env:"OPENCSG_AIGATEWAY_LLM_TRACE_ENABLE" default:"true"`
+		LLMTraceContentCapture         string `env:"OPENCSG_AIGATEWAY_LLM_TRACE_CONTENT_CAPTURE" default:"metadata_only"`
 		ChatMaxFallbackAttempts        int    `env:"OPENCSG_AIGATEWAY_CHAT_MAX_FALLBACK_ATTEMPTS" default:"2"`
 		HealthCheckEnabled             bool   `env:"OPENCSG_AIGATEWAY_HEALTH_CHECK_ENABLED" default:"true"`
 		HealthCheckL7APIEnabled        bool   `env:"OPENCSG_AIGATEWAY_HEALTH_CHECK_L7_API_ENABLED" default:"true"`

@@ -579,10 +579,11 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 			}).
 			Return(llmTokenCounter)
 		llmTokenCounter.EXPECT().AppendPrompts(expectReq.Messages).Return()
+		llmTokenCounter.EXPECT().Usage(mock.Anything).Return(&token.Usage{}, nil).Maybe()
 		var wg sync.WaitGroup
 		wg.Add(1)
-		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, "testuuid", model, mock.Anything, llmTokenCounter, "").
-			RunAndReturn(func(ctx context.Context, uuid string, model *types.Model, targetModelName string, counter token.Counter, apikey string) error {
+		tester.mocks.openAIComp.EXPECT().RecordUsageFromTokenUsage(mock.Anything, "testuuid", model, mock.Anything, mock.Anything, "").
+			RunAndReturn(func(ctx context.Context, uuid string, model *types.Model, targetModelName string, usage *token.Usage, apikey string) error {
 				wg.Done()
 				return nil
 			})
@@ -637,6 +638,7 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 			}).
 			Return(llmTokenCounter)
 		llmTokenCounter.EXPECT().AppendPrompts(expectReq.Messages).Return()
+		llmTokenCounter.EXPECT().Usage(mock.Anything).Return(&token.Usage{}, nil).Maybe()
 
 		tester.handler.Chat(c)
 
@@ -698,10 +700,11 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 			}).
 			Return(llmTokenCounter)
 		llmTokenCounter.EXPECT().AppendPrompts(expectReq.Messages).Return()
+		llmTokenCounter.EXPECT().Usage(mock.Anything).Return(&token.Usage{}, nil).Maybe()
 		var wg sync.WaitGroup
 		wg.Add(1)
-		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, "testuuid", model, mock.Anything, llmTokenCounter, "").
-			RunAndReturn(func(ctx context.Context, uuid string, model *types.Model, targetModelName string, counter token.Counter, apikey string) error {
+		tester.mocks.openAIComp.EXPECT().RecordUsageFromTokenUsage(mock.Anything, "testuuid", model, mock.Anything, mock.Anything, "").
+			RunAndReturn(func(ctx context.Context, uuid string, model *types.Model, targetModelName string, usage *token.Usage, apikey string) error {
 				wg.Done()
 				return nil
 			})
@@ -764,10 +767,11 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 			}).
 			Return(llmTokenCounter)
 		llmTokenCounter.EXPECT().AppendPrompts(expectReq.Messages).Return()
+		llmTokenCounter.EXPECT().Usage(mock.Anything).Return(&token.Usage{}, nil).Maybe()
 		var wg sync.WaitGroup
 		wg.Add(1)
-		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, "testuuid", model, mock.Anything, llmTokenCounter, "").
-			RunAndReturn(func(ctx context.Context, uuid string, model *types.Model, targetModelName string, counter token.Counter, apikey string) error {
+		tester.mocks.openAIComp.EXPECT().RecordUsageFromTokenUsage(mock.Anything, "testuuid", model, mock.Anything, mock.Anything, "").
+			RunAndReturn(func(ctx context.Context, uuid string, model *types.Model, targetModelName string, usage *token.Usage, apikey string) error {
 				wg.Done()
 				return errors.New("record usage error")
 			})
@@ -825,11 +829,12 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 			}).
 			Return(llmTokenCounter)
 		llmTokenCounter.EXPECT().AppendPrompts(expectReq.Messages).Return()
+		llmTokenCounter.EXPECT().Usage(mock.Anything).Return(&token.Usage{}, nil).Maybe()
 
 		var wg sync.WaitGroup
 		wg.Add(1)
-		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, "testuuid", model, mock.Anything, llmTokenCounter, "").
-			RunAndReturn(func(ctx context.Context, uuid string, model *types.Model, targetModelName string, counter token.Counter, apikey string) error {
+		tester.mocks.openAIComp.EXPECT().RecordUsageFromTokenUsage(mock.Anything, "testuuid", model, mock.Anything, mock.Anything, "").
+			RunAndReturn(func(ctx context.Context, uuid string, model *types.Model, targetModelName string, usage *token.Usage, apikey string) error {
 				wg.Done()
 				return nil
 			})
@@ -895,11 +900,12 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 			}).
 			Return(llmTokenCounter)
 		llmTokenCounter.EXPECT().AppendPrompts(expectReq.Messages).Return()
+		llmTokenCounter.EXPECT().Usage(mock.Anything).Return(&token.Usage{}, nil).Maybe()
 
 		var wg sync.WaitGroup
 		wg.Add(1)
-		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, "testuuid", model, mock.Anything, llmTokenCounter, "").
-			RunAndReturn(func(ctx context.Context, uuid string, model *types.Model, targetModelName string, counter token.Counter, apikey string) error {
+		tester.mocks.openAIComp.EXPECT().RecordUsageFromTokenUsage(mock.Anything, "testuuid", model, mock.Anything, mock.Anything, "").
+			RunAndReturn(func(ctx context.Context, uuid string, model *types.Model, targetModelName string, usage *token.Usage, apikey string) error {
 				wg.Done()
 				return nil
 			})
@@ -964,6 +970,7 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 			},
 		).Return(llmTokenCounter)
 		llmTokenCounter.EXPECT().AppendPrompts(expectReq.Messages).Return()
+		llmTokenCounter.EXPECT().Usage(mock.Anything).Return(&token.Usage{}, nil).Maybe()
 		llmTokenCounter.EXPECT().Completion(mock.Anything).Return().Maybe()
 		var wg sync.WaitGroup
 		wg.Add(2)
@@ -972,8 +979,8 @@ func TestOpenAIHandler_Chat(t *testing.T) {
 				wg.Done()
 				return nil
 			})
-		tester.mocks.openAIComp.EXPECT().RecordUsage(mock.Anything, "testuuid", model, mock.Anything, llmTokenCounter, mock.Anything).
-			RunAndReturn(func(ctx context.Context, userUUID string, model *types.Model, targetModelName string, counter token.Counter, apikey string) error {
+		tester.mocks.openAIComp.EXPECT().RecordUsageFromTokenUsage(mock.Anything, "testuuid", model, mock.Anything, mock.Anything, mock.Anything).
+			RunAndReturn(func(ctx context.Context, userUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string) error {
 				wg.Done()
 				return nil
 			})

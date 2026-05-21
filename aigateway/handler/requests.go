@@ -29,6 +29,7 @@ type ChatCompletionRequest struct {
 	Tools         []openai.ChatCompletionToolUnionParam `json:"tools,omitzero"`
 	Temperature   float64                               `json:"temperature,omitempty"`
 	MaxTokens     int                                   `json:"max_tokens,omitempty"`
+	TopP          float64                               `json:"top_p,omitempty"`
 	Stream        bool                                  `json:"stream,omitempty"`
 	StreamOptions *StreamOptions                        `json:"stream_options,omitempty"`
 	// RawJSON stores all unknown fields during unmarshaling
@@ -59,6 +60,7 @@ func (r *ChatCompletionRequest) UnmarshalJSON(data []byte) error {
 	delete(allFields, "tools")
 	delete(allFields, "temperature")
 	delete(allFields, "max_tokens")
+	delete(allFields, "top_p")
 	delete(allFields, "stream")
 	delete(allFields, "stream_options")
 

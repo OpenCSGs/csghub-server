@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"opencsg.com/csghub-server/aigateway/types"
 	"strings"
+	"time"
 
 	commontypes "opencsg.com/csghub-server/common/types"
 	commonutils "opencsg.com/csghub-server/common/utils/common"
@@ -22,6 +23,7 @@ type chatRetryResponseWriter struct {
 	buffering     bool
 	committed     bool
 	streamStarted bool
+	firstWriteAt  time.Time
 	bufferedBody  bytes.Buffer
 }
 
@@ -64,6 +66,9 @@ func (w *chatRetryResponseWriter) Write(data []byte) (int, error) {
 	}
 	if len(data) > 0 {
 		w.streamStarted = true
+		if w.firstWriteAt.IsZero() {
+			w.firstWriteAt = time.Now()
+		}
 	}
 	return w.downstream.Write(data)
 }
@@ -84,6 +89,10 @@ func (w *chatRetryResponseWriter) StatusCode() int {
 
 func (w *chatRetryResponseWriter) StreamStarted() bool {
 	return w.streamStarted
+}
+
+func (w *chatRetryResponseWriter) FirstWriteAt() time.Time {
+	return w.firstWriteAt
 }
 
 func (w *chatRetryResponseWriter) ReplayBufferedResponse() error {
