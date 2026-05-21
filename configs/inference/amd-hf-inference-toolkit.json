@@ -6,8 +6,8 @@
   "engine_images": [
     {
       "compute_type": "gpu",
-      "image": "opencsghq/hf-inference-toolkit:0.5.5",
-      "driver_version": "12.8",
+      "image": "opencsghq/hf-inference-toolkit-rocm:0.5.5",
+      "driver_version": "7.2.2",
       "engine_version": "0.5.5"
     }
   ],
