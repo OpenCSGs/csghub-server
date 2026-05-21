@@ -127,7 +127,7 @@ func (h *FinetuneHandler) DeleteFinetuneJob(ctx *gin.Context) {
 // @Tags         Finetune
 // @Accept       json
 // @Produce      json
-// @Param        id path string true "finetune job id"
+// @Param        id path string true "finetune job id or task id"
 // @Param        since query string false "since time. Optional values: 10mins, 30mins, 1hour, 6hours, 1day, 2days, 1week"
 // @Failure      400  {object}  types.APIBadRequest "Bad request"
 // @Failure      500  {object}  types.APIInternalServerError "Internal server error"
@@ -136,31 +136,32 @@ func (h *FinetuneHandler) GetLogs(ctx *gin.Context) {
 	since := ctx.Query("since")
 	currentUser := httpbase.GetCurrentUser(ctx)
 	stream := ctx.Query("stream")
-
-	id, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
-	if err != nil {
-		slog.Error("Bad request format for finetune job", "error", err)
-		httpbase.BadRequest(ctx, err.Error())
+	idStr := ctx.Param("id")
+	if len(idStr) < 1 {
+		httpbase.BadRequest(ctx, "id is required")
 		return
 	}
 
-	req := types.FinetuneLogReq{
+	req := &types.FinetuneLogReq{
 		CurrentUser: currentUser,
 		Since:       since,
-		ID:          id,
+		TaskID:      "", // default to empty string
+		ID:          0,  // default to 0
 	}
 
-	allow, err := h.ftComp.CheckUserPermission(ctx.Request.Context(), req)
-	if !allow {
-		slog.Error("user not allowed to read finetune job logs", slog.Any("error", err), slog.Any("req", req))
-		httpbase.ForbiddenError(ctx, errors.New("user not allowed to read finetune job logs"))
-		return
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		// task id
+		req.TaskID = idStr
+	} else {
+		// id
+		req.ID = id
 	}
 
 	if strings.Trim(stream, " ") == "true" {
-		h.readLogInStream(ctx, req)
+		h.readLogInStream(ctx, *req)
 	} else {
-		h.readLogNonStream(ctx, req)
+		h.readLogNonStream(ctx, *req)
 	}
 }
 

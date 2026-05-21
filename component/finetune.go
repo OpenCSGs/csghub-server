@@ -44,7 +44,7 @@ type FinetuneComponent interface {
 	GetFinetuneJob(ctx context.Context, req types.FinetineGetReq) (*types.FinetuneRes, error)
 	DeleteFinetuneJob(ctx context.Context, req types.ArgoWorkFlowDeleteReq) error
 	OrgFinetunes(ctx context.Context, req *types.OrgFinetunesReq) ([]types.ArgoWorkFlowRes, int, error)
-	CheckUserPermission(ctx context.Context, req types.FinetuneLogReq) (bool, error)
+	CheckUserPermission(ctx context.Context, req types.FinetuneLogReq) (bool, *database.ArgoWorkflow, error)
 	ReadJobLogsNonStream(ctx context.Context, req types.FinetuneLogReq) (string, error)
 	ReadJobLogsInStream(ctx context.Context, req types.FinetuneLogReq) (*deploy.MultiLogReader, error)
 }
@@ -289,31 +289,43 @@ func deployStatusToWorkflowPhase(status int) v1alpha1.WorkflowPhase {
 	}
 }
 
-func (c *finetuneComponentImpl) CheckUserPermission(ctx context.Context, req types.FinetuneLogReq) (bool, error) {
-	user, err := c.userSvcClient.GetUserByName(ctx, req.CurrentUser)
+func (c *finetuneComponentImpl) CheckUserPermission(ctx context.Context, req types.FinetuneLogReq) (bool, *database.ArgoWorkflow, error) {
+	var (
+		err   error
+		wf    *database.ArgoWorkflow
+		wfObj database.ArgoWorkflow
+	)
+
+	if len(req.TaskID) > 0 {
+		wf, err = c.workflowStore.FindByTaskID(ctx, req.TaskID)
+	} else if req.ID > 0 {
+		wfObj, err = c.workflowStore.FindByID(ctx, req.ID)
+		wf = &wfObj
+	} else {
+		return false, nil, nil
+	}
+
 	if err != nil {
-		slog.Error("failed to get user by name", slog.String("error", err.Error()))
-	}
-	if user == nil || user.UUID == "" {
-		return false, nil
+		return false, nil, fmt.Errorf("failed to find finetune workflow job by id %d or task id %s error: %w",
+			req.ID, req.TaskID, err)
 	}
 
-	wf, err := c.workflowStore.FindByID(ctx, req.ID)
+	_, err = checkOwnerOrOrgMemberPermission(ctx, c.userSvcClient, req.CurrentUser, wf.UserUUID)
 	if err != nil {
-		return false, fmt.Errorf("fail to find finetune workflow by id %d error: %w", req.ID, err)
+		return false, nil, errorx.ErrForbidden
 	}
 
-	if !user.IsAdmin() && wf.UserUUID != user.UUID {
-		return false, errorx.ErrForbidden
-	}
-
-	return true, nil
+	return true, wf, nil
 }
 
 func (c *finetuneComponentImpl) ReadJobLogsNonStream(ctx context.Context, req types.FinetuneLogReq) (string, error) {
-	wf, err := c.workflowStore.FindByID(ctx, req.ID)
+	allow, wf, err := c.CheckUserPermission(ctx, req)
 	if err != nil {
-		return "", fmt.Errorf("fail to find argo workflow by id %d error: %w", req.ID, err)
+		return "", err
+	}
+
+	if !allow {
+		return "", errorx.ErrForbidden
 	}
 
 	req.PodName = wf.TaskId
@@ -332,9 +344,12 @@ func (c *finetuneComponentImpl) ReadJobLogsNonStream(ctx context.Context, req ty
 }
 
 func (c *finetuneComponentImpl) ReadJobLogsInStream(ctx context.Context, req types.FinetuneLogReq) (*deploy.MultiLogReader, error) {
-	wf, err := c.workflowStore.FindByID(ctx, req.ID)
+	allow, wf, err := c.CheckUserPermission(ctx, req)
 	if err != nil {
-		return nil, fmt.Errorf("fail to find finetune workflow by id %d error: %w", req.ID, err)
+		return nil, err
+	}
+	if !allow {
+		return nil, errorx.ErrForbidden
 	}
 
 	req.PodName = wf.TaskId

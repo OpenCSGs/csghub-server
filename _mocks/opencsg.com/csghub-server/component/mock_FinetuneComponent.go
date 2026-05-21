@@ -5,8 +5,10 @@ package component
 import (
 	context "context"
 
-	mock "github.com/stretchr/testify/mock"
 	deploy "opencsg.com/csghub-server/builder/deploy"
+	database "opencsg.com/csghub-server/builder/store/database"
+
+	mock "github.com/stretchr/testify/mock"
 
 	types "opencsg.com/csghub-server/common/types"
 )
@@ -25,7 +27,7 @@ func (_m *MockFinetuneComponent) EXPECT() *MockFinetuneComponent_Expecter {
 }
 
 // CheckUserPermission provides a mock function with given fields: ctx, req
-func (_m *MockFinetuneComponent) CheckUserPermission(ctx context.Context, req types.FinetuneLogReq) (bool, error) {
+func (_m *MockFinetuneComponent) CheckUserPermission(ctx context.Context, req types.FinetuneLogReq) (bool, *database.ArgoWorkflow, error) {
 	ret := _m.Called(ctx, req)
 
 	if len(ret) == 0 {
@@ -33,8 +35,9 @@ func (_m *MockFinetuneComponent) CheckUserPermission(ctx context.Context, req ty
 	}
 
 	var r0 bool
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, types.FinetuneLogReq) (bool, error)); ok {
+	var r1 *database.ArgoWorkflow
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, types.FinetuneLogReq) (bool, *database.ArgoWorkflow, error)); ok {
 		return rf(ctx, req)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, types.FinetuneLogReq) bool); ok {
@@ -43,13 +46,21 @@ func (_m *MockFinetuneComponent) CheckUserPermission(ctx context.Context, req ty
 		r0 = ret.Get(0).(bool)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, types.FinetuneLogReq) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, types.FinetuneLogReq) *database.ArgoWorkflow); ok {
 		r1 = rf(ctx, req)
 	} else {
-		r1 = ret.Error(1)
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(*database.ArgoWorkflow)
+		}
 	}
 
-	return r0, r1
+	if rf, ok := ret.Get(2).(func(context.Context, types.FinetuneLogReq) error); ok {
+		r2 = rf(ctx, req)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
 // MockFinetuneComponent_CheckUserPermission_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CheckUserPermission'
@@ -71,12 +82,12 @@ func (_c *MockFinetuneComponent_CheckUserPermission_Call) Run(run func(ctx conte
 	return _c
 }
 
-func (_c *MockFinetuneComponent_CheckUserPermission_Call) Return(_a0 bool, _a1 error) *MockFinetuneComponent_CheckUserPermission_Call {
-	_c.Call.Return(_a0, _a1)
+func (_c *MockFinetuneComponent_CheckUserPermission_Call) Return(_a0 bool, _a1 *database.ArgoWorkflow, _a2 error) *MockFinetuneComponent_CheckUserPermission_Call {
+	_c.Call.Return(_a0, _a1, _a2)
 	return _c
 }
 
-func (_c *MockFinetuneComponent_CheckUserPermission_Call) RunAndReturn(run func(context.Context, types.FinetuneLogReq) (bool, error)) *MockFinetuneComponent_CheckUserPermission_Call {
+func (_c *MockFinetuneComponent_CheckUserPermission_Call) RunAndReturn(run func(context.Context, types.FinetuneLogReq) (bool, *database.ArgoWorkflow, error)) *MockFinetuneComponent_CheckUserPermission_Call {
 	_c.Call.Return(run)
 	return _c
 }

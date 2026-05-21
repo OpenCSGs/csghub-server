@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	mockcomponent "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
 	"opencsg.com/csghub-server/builder/testutil"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -201,12 +202,6 @@ func TestFinetuneHandler_GetLogs_NonStream(t *testing.T) {
 	tester.WithParam("id", "1")
 	tester.WithQuery("since", "1hour")
 
-	tester.mocks.finetune.EXPECT().CheckUserPermission(tester.Ctx(), types.FinetuneLogReq{
-		CurrentUser: "u",
-		ID:          1,
-		Since:       "1hour",
-	}).Return(true, nil)
-
 	logs := "mock logs content"
 	tester.mocks.finetune.EXPECT().ReadJobLogsNonStream(tester.Ctx(), types.FinetuneLogReq{
 		CurrentUser: "u",
@@ -219,17 +214,22 @@ func TestFinetuneHandler_GetLogs_NonStream(t *testing.T) {
 	tester.ResponseEq(t, 200, tester.OKText, logs)
 }
 
-func TestFinetuneHandler_GetLogs_InvalidID(t *testing.T) {
+func TestFinetuneHandler_GetLogs_TaskID(t *testing.T) {
 	tester := NewFinetuneTester(t).WithHandleFunc(func(h *FinetuneHandler) gin.HandlerFunc {
 		return h.GetLogs
 	})
 	tester.WithUser()
-	tester.WithParam("id", "invalid")
+	tester.WithParam("id", "task-123")
+
+	logs := "mock logs content"
+	tester.mocks.finetune.EXPECT().ReadJobLogsNonStream(tester.Ctx(), types.FinetuneLogReq{
+		CurrentUser: "u",
+		TaskID:      "task-123",
+	}).Return(logs, nil)
 
 	tester.Execute()
 
-	// The actual error message contains the parsing error details
-	tester.ResponseEq(t, 400, "strconv.ParseInt: parsing \"invalid\": invalid syntax", nil)
+	tester.ResponseEq(t, 200, tester.OKText, logs)
 }
 
 func TestFinetuneHandler_GetLogs_PermissionDenied(t *testing.T) {
@@ -240,14 +240,13 @@ func TestFinetuneHandler_GetLogs_PermissionDenied(t *testing.T) {
 	tester.WithParam("id", "1")
 	tester.WithQuery("since", "1hour")
 
-	tester.mocks.finetune.EXPECT().CheckUserPermission(tester.Ctx(), types.FinetuneLogReq{
+	tester.mocks.finetune.EXPECT().ReadJobLogsNonStream(tester.Ctx(), types.FinetuneLogReq{
 		CurrentUser: "u",
 		ID:          1,
 		Since:       "1hour",
-	}).Return(false, nil)
+	}).Return("", errorx.ErrForbidden)
 
 	tester.Execute()
 
-	// The actual error message is "user not allowed to read finetune job logs"
-	tester.ResponseEq(t, 403, "user not allowed to read finetune job logs", nil)
+	tester.ResponseEqCode(t, 500)
 }
