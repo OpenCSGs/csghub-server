@@ -31,9 +31,7 @@ const (
 type HealthChecker interface {
 	Start(ctx context.Context) error
 	Stop() error
-	CheckNow(ctx context.Context, upstreamID int64) (*types.HealthCheckResult, error)
 	GetHealthState(ctx context.Context, upstreamID int64) (*types.ProviderHealthStatus, error)
-	GetAllHealthStates(ctx context.Context) ([]types.ProviderHealthStatus, error)
 }
 
 type HealthCheckerConfig struct {
@@ -73,9 +71,6 @@ func NewHealthChecker(
 				Enabled:  cfg.AIGateway.HealthCheckL7APIEnabled,
 				Interval: time.Duration(cfg.AIGateway.HealthCheckL7APIInterval) * time.Second,
 				Timeout:  time.Duration(cfg.AIGateway.HealthCheckL7APITimeout) * time.Second,
-			},
-			InferenceCheck: types.InferenceCheckConfig{
-				Enabled: false,
 			},
 			HealthRules: types.HealthRulesConfig{
 				ConsecutiveFailuresForUnhealthy: cfg.AIGateway.HealthCheckConsecutiveFailures,
@@ -122,10 +117,6 @@ func (h *healthCheckerImpl) Start(ctx context.Context) error {
 	if h.config.Config.L7APICheck.Enabled {
 		h.wg.Add(1)
 		go h.runL7APICheckRoutine(ctx)
-	}
-	if h.config.Config.InferenceCheck.Enabled {
-		h.wg.Add(1)
-		go h.runInferenceCheckRoutine(ctx)
 	}
 	return nil
 }
@@ -208,37 +199,12 @@ func (h *healthCheckerImpl) runL7APICheckRoutine(ctx context.Context) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
-	h.performL7APIChecks(ctx)
 	for {
 		select {
 		case <-h.stopCh:
 			return
 		case <-ticker.C:
 			h.performL7APIChecks(ctx)
-		case <-ctx.Done():
-			return
-		}
-	}
-}
-
-func (h *healthCheckerImpl) runInferenceCheckRoutine(ctx context.Context) {
-	defer h.wg.Done()
-
-	interval := h.config.Config.InferenceCheck.Interval
-	if interval == 0 {
-		interval = 300 * time.Second
-	}
-
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-
-	h.performInferenceChecks(ctx)
-	for {
-		select {
-		case <-h.stopCh:
-			return
-		case <-ticker.C:
-			h.performInferenceChecks(ctx)
 		case <-ctx.Done():
 			return
 		}
@@ -261,30 +227,12 @@ func (h *healthCheckerImpl) performL7APIChecks(ctx context.Context) {
 		wg.Add(1)
 		go func(u *database.Upstream) {
 			defer wg.Done()
+			// Perform L7 API check (by requesting /models)
 			result := h.performL7APICheck(ctx, u)
-			h.updateHealthState(ctx, result)
-		}(upstream)
-	}
-	wg.Wait()
-}
-
-func (h *healthCheckerImpl) performInferenceChecks(ctx context.Context) {
-	if !h.isLeader.Load() {
-		return
-	}
-
-	upstreams, err := h.upstreamStore.ListHealthCheckEnabled(ctx)
-	if err != nil {
-		slog.ErrorContext(ctx, "Failed to get upstreams for inference check", "error", err)
-		return
-	}
-
-	var wg sync.WaitGroup
-	for _, upstream := range upstreams {
-		wg.Add(1)
-		go func(u *database.Upstream) {
-			defer wg.Done()
-			result := h.performInferenceCheck(ctx, u)
+			// deeper, precise validation of actual model inference
+			if result.Healthy {
+				result = h.performInferenceCheck(ctx, u)
+			}
 			h.updateHealthState(ctx, result)
 		}(upstream)
 	}
@@ -292,6 +240,9 @@ func (h *healthCheckerImpl) performInferenceChecks(ctx context.Context) {
 }
 
 func (h *healthCheckerImpl) performL7APICheck(ctx context.Context, upstream *database.Upstream) *types.HealthCheckResult {
+	checkCtx, cancel := context.WithTimeout(ctx, h.config.Config.L7APICheck.Timeout)
+	defer cancel()
+
 	startTime := time.Now()
 	result := &types.HealthCheckResult{
 		UpstreamID: upstream.ID,
@@ -308,7 +259,7 @@ func (h *healthCheckerImpl) performL7APICheck(ctx context.Context, upstream *dat
 	}
 
 	modelsURL := strings.TrimSuffix(upstream.URL, "/chat/completions") + "/models"
-	req, err := http.NewRequestWithContext(ctx, "GET", modelsURL, nil)
+	req, err := http.NewRequestWithContext(checkCtx, "GET", modelsURL, nil)
 	if err != nil {
 		slog.WarnContext(ctx, "Failed to create health check request", "upstream_id", upstream.ID, "url", modelsURL, "error", err)
 		result.Error = err.Error()
@@ -341,6 +292,10 @@ func (h *healthCheckerImpl) performL7APICheck(ctx context.Context, upstream *dat
 }
 
 func (h *healthCheckerImpl) performInferenceCheck(ctx context.Context, upstream *database.Upstream) *types.HealthCheckResult {
+	inferTimeout := h.config.Config.L7APICheck.Timeout * 2
+	checkCtx, cancel := context.WithTimeout(ctx, inferTimeout)
+	defer cancel()
+
 	startTime := time.Now()
 	result := &types.HealthCheckResult{
 		UpstreamID: upstream.ID,
@@ -367,7 +322,7 @@ func (h *healthCheckerImpl) performInferenceCheck(ctx context.Context, upstream 
 		return result
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", upstream.URL, bytes.NewReader(bodyBytes))
+	req, err := http.NewRequestWithContext(checkCtx, "POST", upstream.URL, bytes.NewReader(bodyBytes))
 	if err != nil {
 		slog.WarnContext(ctx, "Failed to create inference check request", "upstream_id", upstream.ID, "url", upstream.URL, "error", err)
 		result.Error = err.Error()
@@ -487,16 +442,6 @@ func (h *healthCheckerImpl) updateHealthState(ctx context.Context, result *types
 	}
 }
 
-func (h *healthCheckerImpl) CheckNow(ctx context.Context, upstreamID int64) (*types.HealthCheckResult, error) {
-	upstream, err := h.upstreamStore.GetByID(ctx, upstreamID)
-	if err != nil {
-		return nil, err
-	}
-	result := h.performL7APICheck(ctx, upstream)
-	h.updateHealthState(ctx, result)
-	return result, nil
-}
-
 func (h *healthCheckerImpl) GetHealthState(ctx context.Context, upstreamID int64) (*types.ProviderHealthStatus, error) {
 	if h.stateCache.Enabled() {
 		cached, err := h.stateCache.GetHealthState(ctx, upstreamID)
@@ -519,37 +464,4 @@ func (h *healthCheckerImpl) GetHealthState(ctx context.Context, upstreamID int64
 	}
 	_ = h.stateCache.SetHealthState(ctx, status, healthStateCacheTTL)
 	return status, nil
-}
-
-func (h *healthCheckerImpl) GetAllHealthStates(ctx context.Context) ([]types.ProviderHealthStatus, error) {
-	healthy, err := h.healthStore.GetAllHealthy(ctx)
-	if err != nil {
-		return nil, err
-	}
-	unhealthy, err := h.healthStore.GetAllUnhealthy(ctx)
-	if err != nil {
-		return nil, err
-	}
-	results := make([]types.ProviderHealthStatus, 0, len(healthy)+len(unhealthy))
-	for _, state := range healthy {
-		results = append(results, types.ProviderHealthStatus{
-			UpstreamID:          state.UpstreamID,
-			HealthState:         types.HealthState(state.HealthState),
-			LastCheckAt:         state.LastCheckAt,
-			LastError:           state.LastError,
-			ConsecutiveFailures: state.ConsecutiveFailures,
-			LatencyMs:           state.LatencyMs,
-		})
-	}
-	for _, state := range unhealthy {
-		results = append(results, types.ProviderHealthStatus{
-			UpstreamID:          state.UpstreamID,
-			HealthState:         types.HealthState(state.HealthState),
-			LastCheckAt:         state.LastCheckAt,
-			LastError:           state.LastError,
-			ConsecutiveFailures: state.ConsecutiveFailures,
-			LatencyMs:           state.LatencyMs,
-		})
-	}
-	return results, nil
 }

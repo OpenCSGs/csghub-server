@@ -140,7 +140,7 @@ func (c *circuitBreakerImpl) RecordSuccess(ctx context.Context, upstreamID int64
 	}
 
 	now := time.Now()
-	input := stateCacheRecordInput{
+	input := types.StateCacheRecordInput{
 		UpstreamID: upstreamID,
 		Now:        now,
 		TTL:        circuitStateCacheTTL,
@@ -176,7 +176,7 @@ func (c *circuitBreakerImpl) RecordFailure(ctx context.Context, upstreamID int64
 	}
 
 	now := time.Now()
-	input := stateCacheRecordInput{
+	input := types.StateCacheRecordInput{
 		UpstreamID: upstreamID,
 		Now:        now,
 		TTL:        circuitStateCacheTTL,

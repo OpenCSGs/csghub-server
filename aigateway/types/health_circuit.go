@@ -84,9 +84,6 @@ type HealthCheckConfig struct {
 	// L7 API check configuration
 	L7APICheck L7APICheckConfig `json:"l7_api_check"`
 	
-	// Inference check configuration
-	InferenceCheck InferenceCheckConfig `json:"inference_check"`
-	
 	// Health determination rules
 	HealthRules HealthRulesConfig `json:"health_rules"`
 }
@@ -171,9 +168,15 @@ type CircuitBreakerEvent struct {
 	Timestamp    time.Time    `json:"timestamp"`
 	FailureCount int          `json:"failure_count"`
 }
+
+// StateCacheRecordInput is the input parameter for cache RecordFailure/RecordSuccess operations.
+type StateCacheRecordInput struct {
+	UpstreamID int64
+	Now        time.Time
+	TTL        time.Duration
+}
+
 // IsUpstreamUnhealthy checks the inline health state carried on UpstreamConfig
-// (populated from DB at model-fetch time). Returns true when the upstream
-// should be excluded from routing due to unhealthy health state.
 func IsUpstreamUnhealthy(u commontypes.UpstreamConfig) bool {
 	return u.HealthCheckEnabled && u.HealthState == string(HealthStateUnhealthy)
 }
