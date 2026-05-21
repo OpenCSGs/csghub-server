@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/stretchr/testify/mock"
@@ -546,68 +547,70 @@ func TestRunChatPostProcessAsync_RecordsTraceUsageBeforeAccounting(t *testing.T)
 }
 
 func TestRunChatPostProcessAsync_RecordsTraceCompletionBeforeUsage(t *testing.T) {
-	tester, c, _ := setupTest(t)
-	tester.mocks.openAIComp.ExpectedCalls = nil
+	synctest.Test(t, func(t *testing.T) {
+		tester, c, _ := setupTest(t)
+		tester.mocks.openAIComp.ExpectedCalls = nil
 
-	model := &types.Model{
-		BaseModel: types.BaseModel{
-			ID: "model-1",
-		},
-		ExternalModelInfo: types.ExternalModelInfo{
-			Provider: "deepseek",
-		},
-	}
-	tokenCounter := mocktoken.NewMockCounter(t)
-	tokenCounter.EXPECT().
-		Usage(mock.Anything).
-		Return(&token.Usage{
-			PromptTokens:     5,
-			CompletionTokens: 8,
-			TotalTokens:      13,
-		}, nil).
-		Once()
+		model := &types.Model{
+			BaseModel: types.BaseModel{
+				ID: "model-1",
+			},
+			ExternalModelInfo: types.ExternalModelInfo{
+				Provider: "deepseek",
+			},
+		}
+		tokenCounter := mocktoken.NewMockCounter(t)
+		tokenCounter.EXPECT().
+			Usage(mock.Anything).
+			Return(&token.Usage{
+				PromptTokens:     5,
+				CompletionTokens: 8,
+				TotalTokens:      13,
+			}, nil).
+			Once()
 
-	doneCh := make(chan struct{})
-	recorder := &testGenerationRecorderWithMutex{doneCh: doneCh}
-	firstWriteAt := time.Now()
-	tester.mocks.openAIComp.EXPECT().
-		CommitUsageLimit(mock.Anything, "user-1", model, tokenCounter).
-		Return(nil).
-		Once()
-	tester.mocks.openAIComp.EXPECT().
-		RecordUsageFromTokenUsage(mock.Anything, "user-1", model, "target-model", mock.Anything, "api-key").
-		Return(nil).
-		Once()
+		recorder := &testGenerationRecorderWithMutex{}
+		firstWriteAt := time.Now()
+		tester.mocks.openAIComp.EXPECT().
+			CommitUsageLimit(mock.Anything, "user-1", model, tokenCounter).
+			Return(nil).
+			Once()
+		tester.mocks.openAIComp.EXPECT().
+			RecordUsageFromTokenUsage(mock.Anything, "user-1", model, "target-model", mock.Anything, "api-key").
+			RunAndReturn(func(ctx context.Context, userUUID string, model *types.Model, targetModelName string, usage *token.Usage, apikey string) error {
+				_, _, _, ended, events := recorder.traceSnapshot()
+				require.True(t, ended)
+				require.Equal(t, []string{"first_chunk", "response", "error", "usage", "end"}, events)
+				return nil
+			}).
+			Once()
 
-	tester.handler.runChatPostProcessAsync(c.Request.Context(), chatPostProcessInput{
-		NSUUID:          "user-1",
-		ApiKey:          "api-key",
-		Model:           model,
-		TargetModelName: "target-model",
-		TokenCounter:    tokenCounter,
-		Trace: chatTracePostProcessInput{
-			Recorder:     recorder,
-			Completion:   true,
-			Stream:       true,
-			FirstWriteAt: firstWriteAt,
-			StatusCode:   http.StatusBadGateway,
-		},
+		tester.handler.runChatPostProcessAsync(c.Request.Context(), chatPostProcessInput{
+			NSUUID:          "user-1",
+			ApiKey:          "api-key",
+			Model:           model,
+			TargetModelName: "target-model",
+			TokenCounter:    tokenCounter,
+			Trace: chatTracePostProcessInput{
+				Recorder:     recorder,
+				Completion:   true,
+				Stream:       true,
+				FirstWriteAt: firstWriteAt,
+				StatusCode:   http.StatusBadGateway,
+			},
+		})
+		synctest.Wait()
+		response, firstChunk, errorCode, ended, events := recorder.traceSnapshot()
+		require.True(t, ended)
+		require.Equal(t, []string{"first_chunk", "response", "error", "usage", "end"}, events)
+		require.NotNil(t, response)
+		require.Equal(t, "deepseek", response.Provider)
+		require.Equal(t, "target-model", response.Model)
+		require.Equal(t, "target-model", response.ResponseModel)
+		require.NotNil(t, firstChunk)
+		require.Equal(t, firstWriteAt, firstChunk.At)
+		require.Equal(t, types.TraceErrUpstreamError, errorCode)
 	})
-	select {
-	case <-doneCh:
-	case <-time.After(3 * time.Second):
-		t.Fatal("timed out waiting for trace recorder end")
-	}
-	response, firstChunk, errorCode, ended, events := recorder.traceSnapshot()
-	require.True(t, ended)
-	require.Equal(t, []string{"first_chunk", "response", "error", "usage", "end"}, events)
-	require.NotNil(t, response)
-	require.Equal(t, "deepseek", response.Provider)
-	require.Equal(t, "target-model", response.Model)
-	require.Equal(t, "target-model", response.ResponseModel)
-	require.NotNil(t, firstChunk)
-	require.Equal(t, firstWriteAt, firstChunk.At)
-	require.Equal(t, types.TraceErrUpstreamError, errorCode)
 }
 
 func TestRetryChatWithFallback_ReportsFallbackAttemptFailure(t *testing.T) {
