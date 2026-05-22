@@ -489,10 +489,16 @@ func TestMCPServerComponent_CheckDeployBranch(t *testing.T) {
 	ctx := context.TODO()
 	mc := initializeTestMCPServerComponent(ctx, t)
 
-	templatePath := filepath.Join("docker", "spaces", "templates", "mcp_deploy")
-	err := os.MkdirAll(templatePath, 0755)
+	// Use a temporary directory to avoid touching real project files.
+	tmpDir := t.TempDir()
+	origDir, err := os.Getwd()
 	require.NoError(t, err)
-	defer os.RemoveAll(templatePath)
+	require.NoError(t, os.Chdir(tmpDir))
+	defer func() { require.NoError(t, os.Chdir(origDir)) }()
+
+	templatePath := filepath.Join("docker", "spaces", "templates", "mcp_deploy")
+	err = os.MkdirAll(templatePath, 0755)
+	require.NoError(t, err)
 
 	err = os.WriteFile(filepath.Join(templatePath, "app.py"), []byte("print('hello')"), 0644)
 	require.NoError(t, err)
