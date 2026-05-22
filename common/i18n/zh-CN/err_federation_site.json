@@ -1,0 +1,11 @@
+{
+    "error.FS-ERR-0": {
+        "other": "联邦站点未找到"
+    },
+    "error.FS-ERR-1": {
+        "other": "所属组织未找到"
+    },
+    "error.FS-ERR-2": {
+        "other": "联邦站点不能将自身设为所属组织"
+    }
+}

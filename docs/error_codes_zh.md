@@ -274,6 +274,30 @@
 - **错误名:** `noValidParquetFile`
 - **描述:** 数据集中不包含任何有效的Parquet文件，而此操作需要该文件格式。
 
+## Federation_site 错误
+
+### `FS-ERR-0`
+
+- **错误代码:** `FS-ERR-0`
+- **错误名:** `codeFederationSiteNotFound`
+- **描述:** 未找到请求的联邦站点。
+
+---
+
+### `FS-ERR-1`
+
+- **错误代码:** `FS-ERR-1`
+- **错误名:** `codeFederationSiteOwnerOrgNotFound`
+- **描述:** 指定的所属组织（父站点）未找到。
+
+---
+
+### `FS-ERR-2`
+
+- **错误代码:** `FS-ERR-2`
+- **错误名:** `codeFederationSiteSelfReference`
+- **描述:** 联邦站点不能将自己设为所属组织。
+
 ## Git 错误
 
 ### `GIT-ERR-0`

@@ -16,4 +16,5 @@ const (
 	LLMLog         = "llmlog"
 	Notification   = "notification"
 	TemporalWorker = "temporal-worker"
+	TrustRegistry  = "trustregistry"
 )
