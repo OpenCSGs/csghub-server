@@ -84,12 +84,12 @@ func (_c *MockXnetSvcClient_FileExists_Call) RunAndReturn(run func(context.Conte
 	return _c
 }
 
-// GenerateWriteToken provides a mock function with given fields: ctx, req
-func (_m *MockXnetSvcClient) GenerateWriteToken(ctx context.Context, req *types.XnetTokenReq) (*types.XnetTokenResp, error) {
+// GenerateXnetToken provides a mock function with given fields: ctx, req
+func (_m *MockXnetSvcClient) GenerateXnetToken(ctx context.Context, req *types.XnetTokenReq) (*types.XnetTokenResp, error) {
 	ret := _m.Called(ctx, req)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GenerateWriteToken")
+		panic("no return value specified for GenerateXnetToken")
 	}
 
 	var r0 *types.XnetTokenResp
@@ -114,31 +114,31 @@ func (_m *MockXnetSvcClient) GenerateWriteToken(ctx context.Context, req *types.
 	return r0, r1
 }
 
-// MockXnetSvcClient_GenerateWriteToken_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GenerateWriteToken'
-type MockXnetSvcClient_GenerateWriteToken_Call struct {
+// MockXnetSvcClient_GenerateXnetToken_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GenerateXnetToken'
+type MockXnetSvcClient_GenerateXnetToken_Call struct {
 	*mock.Call
 }
 
-// GenerateWriteToken is a helper method to define mock.On call
+// GenerateXnetToken is a helper method to define mock.On call
 //   - ctx context.Context
 //   - req *types.XnetTokenReq
-func (_e *MockXnetSvcClient_Expecter) GenerateWriteToken(ctx interface{}, req interface{}) *MockXnetSvcClient_GenerateWriteToken_Call {
-	return &MockXnetSvcClient_GenerateWriteToken_Call{Call: _e.mock.On("GenerateWriteToken", ctx, req)}
+func (_e *MockXnetSvcClient_Expecter) GenerateXnetToken(ctx interface{}, req interface{}) *MockXnetSvcClient_GenerateXnetToken_Call {
+	return &MockXnetSvcClient_GenerateXnetToken_Call{Call: _e.mock.On("GenerateXnetToken", ctx, req)}
 }
 
-func (_c *MockXnetSvcClient_GenerateWriteToken_Call) Run(run func(ctx context.Context, req *types.XnetTokenReq)) *MockXnetSvcClient_GenerateWriteToken_Call {
+func (_c *MockXnetSvcClient_GenerateXnetToken_Call) Run(run func(ctx context.Context, req *types.XnetTokenReq)) *MockXnetSvcClient_GenerateXnetToken_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(context.Context), args[1].(*types.XnetTokenReq))
 	})
 	return _c
 }
 
-func (_c *MockXnetSvcClient_GenerateWriteToken_Call) Return(_a0 *types.XnetTokenResp, _a1 error) *MockXnetSvcClient_GenerateWriteToken_Call {
+func (_c *MockXnetSvcClient_GenerateXnetToken_Call) Return(_a0 *types.XnetTokenResp, _a1 error) *MockXnetSvcClient_GenerateXnetToken_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockXnetSvcClient_GenerateWriteToken_Call) RunAndReturn(run func(context.Context, *types.XnetTokenReq) (*types.XnetTokenResp, error)) *MockXnetSvcClient_GenerateWriteToken_Call {
+func (_c *MockXnetSvcClient_GenerateXnetToken_Call) RunAndReturn(run func(context.Context, *types.XnetTokenReq) (*types.XnetTokenResp, error)) *MockXnetSvcClient_GenerateXnetToken_Call {
 	_c.Call.Return(run)
 	return _c
 }

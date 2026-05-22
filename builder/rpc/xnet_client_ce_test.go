@@ -22,7 +22,7 @@ func TestXnetSvcHttpClient_OtherMethods_CE(t *testing.T) {
 	endpoint := "http://xnet-service"
 	client := NewXnetSvcHttpClient(endpoint)
 
-	respToken, errToken := client.GenerateWriteToken(context.Background(), nil)
+	respToken, errToken := client.GenerateXnetToken(context.Background(), nil)
 	assert.NoError(t, errToken)
 	assert.Nil(t, respToken)
 

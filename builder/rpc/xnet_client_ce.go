@@ -20,7 +20,7 @@ func NewXnetSvcHttpClient(endpoint string, opts ...RequestOption) XnetSvcClient 
 	}
 }
 
-func (c *XnetSvcHttpClient) GenerateWriteToken(ctx context.Context, req *types.XnetTokenReq) (*types.XnetTokenResp, error) {
+func (c *XnetSvcHttpClient) GenerateXnetToken(ctx context.Context, req *types.XnetTokenReq) (*types.XnetTokenResp, error) {
 	return nil, nil
 }
 
