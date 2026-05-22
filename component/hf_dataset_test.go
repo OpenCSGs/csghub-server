@@ -53,6 +53,7 @@ func TestHFDataset_GetDatasetTree(t *testing.T) {
 		Name:      "n",
 		Path:      "a/b",
 		RepoType:  types.DatasetRepo,
+		Ref:       "main",
 	}).Return([]*types.File{
 		{Type: "go", LastCommitSHA: "sha", Size: 5, Path: "foo"},
 	}, nil)

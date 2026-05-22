@@ -109,6 +109,7 @@ func (h *hFDatasetComponentImpl) GetDatasetTree(ctx context.Context, req types.P
 		Name:      req.Name,
 		Path:      req.Path,
 		RepoType:  types.DatasetRepo,
+		Ref:       req.Ref,
 	}
 	tree, err := h.gitServer.GetRepoFileTree(ctx, getRepoFileTree)
 	if err != nil {
