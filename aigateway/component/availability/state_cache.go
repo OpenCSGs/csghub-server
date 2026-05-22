@@ -122,20 +122,14 @@ return 1
 
 var errStateCacheMiss = errors.New("state cache miss")
 
-type stateCacheRecordInput struct {
-	UpstreamID int64
-	Now        time.Time
-	TTL        time.Duration
-}
-
 type StateCache interface {
 	Enabled() bool
 	GetCircuitState(ctx context.Context, upstreamID int64) (*types.ProviderCircuitStatus, error)
 	SetCircuitState(ctx context.Context, state *types.ProviderCircuitStatus, ttl time.Duration) error
 	TryTransitionToHalfOpen(ctx context.Context, upstreamID int64, now time.Time, ttl time.Duration) (bool, error)
 	TryAcquireHalfOpenSlot(ctx context.Context, upstreamID int64, maxRequests int, ttl time.Duration) (bool, int64, error)
-	RecordFailure(ctx context.Context, input stateCacheRecordInput, failureThreshold int, openDuration time.Duration) (*types.ProviderCircuitStatus, error)
-	RecordSuccess(ctx context.Context, input stateCacheRecordInput) (*types.ProviderCircuitStatus, error)
+	RecordFailure(ctx context.Context, input types.StateCacheRecordInput, failureThreshold int, openDuration time.Duration) (*types.ProviderCircuitStatus, error)
+	RecordSuccess(ctx context.Context, input types.StateCacheRecordInput) (*types.ProviderCircuitStatus, error)
 	GetHealthState(ctx context.Context, upstreamID int64) (*types.ProviderHealthStatus, error)
 	SetHealthState(ctx context.Context, state *types.ProviderHealthStatus, ttl time.Duration) error
 	TryAcquireLeader(ctx context.Context, electionKey, ownerID string, ttl time.Duration) (bool, error)
@@ -277,7 +271,7 @@ func (s *stateCacheImpl) TryAcquireHalfOpenSlot(ctx context.Context, upstreamID 
 	return allowed == 1, current, nil
 }
 
-func (s *stateCacheImpl) RecordFailure(ctx context.Context, input stateCacheRecordInput, failureThreshold int, openDuration time.Duration) (*types.ProviderCircuitStatus, error) {
+func (s *stateCacheImpl) RecordFailure(ctx context.Context, input types.StateCacheRecordInput, failureThreshold int, openDuration time.Duration) (*types.ProviderCircuitStatus, error) {
 	if !s.Enabled() {
 		return nil, errStateCacheMiss
 	}
@@ -310,7 +304,7 @@ func (s *stateCacheImpl) RecordFailure(ctx context.Context, input stateCacheReco
 	return s.parseCircuitScriptResult(input, result)
 }
 
-func (s *stateCacheImpl) RecordSuccess(ctx context.Context, input stateCacheRecordInput) (*types.ProviderCircuitStatus, error) {
+func (s *stateCacheImpl) RecordSuccess(ctx context.Context, input types.StateCacheRecordInput) (*types.ProviderCircuitStatus, error) {
 	if !s.Enabled() {
 		return nil, errStateCacheMiss
 	}
@@ -409,7 +403,7 @@ func (s *stateCacheImpl) GetLeader(ctx context.Context, electionKey string) (str
 }
 
 
-func (s *stateCacheImpl) parseCircuitScriptResult(input stateCacheRecordInput, result any) (*types.ProviderCircuitStatus, error) {
+func (s *stateCacheImpl) parseCircuitScriptResult(input types.StateCacheRecordInput, result any) (*types.ProviderCircuitStatus, error) {
 	values, ok := result.([]any)
 	if !ok || len(values) != 5 {
 		return nil, fmt.Errorf("invalid circuit script result type: %T", result)

@@ -61,7 +61,7 @@ func TestStateCache_RecordFailure(t *testing.T) {
 		Return([]any{"open", int64(0), int64(0), now.Unix(), now.Add(30 * time.Second).Unix()}, nil).
 		Once()
 
-	state, err := cache.RecordFailure(context.Background(), stateCacheRecordInput{
+	state, err := cache.RecordFailure(context.Background(), types.StateCacheRecordInput{
 		UpstreamID: int64(1),
 		Now:        now,
 		TTL:        10 * time.Second,
