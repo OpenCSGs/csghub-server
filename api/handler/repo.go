@@ -1225,8 +1225,9 @@ func (h *RepoHandler) HeadSDKDownload(ctx *gin.Context) {
 
 	slog.Debug("Head download repo file succeed", slog.String("repo_type", string(req.RepoType)), slog.String("name", name), slog.String("path", req.Path), slog.String("ref", req.Ref), slog.Int64("contentLength", file.Size))
 	if file.Lfs && file.XnetEnabled {
+		action := "read"
 		ctx.Header("X-Xet-Hash", file.LfsSHA256)
-		ctx.Header("X-Xet-Refresh-Route", h.xetRefreshRoute(req.RepoType, namespace, name, branch))
+		ctx.Header("X-Xet-Refresh-Route", h.xetRefreshRoute(req.RepoType, namespace, name, branch, action))
 	}
 	ctx.Header("Content-Length", strconv.Itoa(int(file.Size)))
 	ctx.Header("X-Repo-Commit", repoCommit)
@@ -1234,12 +1235,11 @@ func (h *RepoHandler) HeadSDKDownload(ctx *gin.Context) {
 	ctx.Status(http.StatusOK)
 }
 
-func (h *RepoHandler) xetRefreshRoute(repoType types.RepositoryType, namespace, name, ref string) string {
+func (h *RepoHandler) xetRefreshRoute(repoType types.RepositoryType, namespace, name, ref, action string) string {
 	if repoType == types.ModelRepo {
-		return fmt.Sprintf("%s/hf/%s/%s/xet-write-token/%s", h.config.Model.DownloadEndpoint, namespace, name, ref)
+		return fmt.Sprintf("%s/hf/%s/%s/xet-%s-token/%s", h.config.Model.DownloadEndpoint, namespace, name, action, ref)
 	}
-	return fmt.Sprintf("%s/hf/%ss/%s/%s/xet-write-token/%s", h.config.Model.DownloadEndpoint, repoType, namespace, name, ref)
-
+	return fmt.Sprintf("%s/hf/%ss/%s/%s/xet-%s-token/%s", h.config.Model.DownloadEndpoint, repoType, namespace, name, action, ref)
 }
 
 func (h *RepoHandler) handleDownload(ctx *gin.Context, isResolve bool) {
