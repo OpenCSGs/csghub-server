@@ -7,6 +7,7 @@ const DFPVCNamePrefix = "df-"
 const DFParamDagTaskIDKey = "bld_dag_task_id"
 const DFParamDagTaskNameKey = "bld_dag_task_name"
 
+const DataflowDataPathKey = "DATA_DIR"
 const DFLabelTagKey = "workflow-scope"
 const DFLabelTagValue = "csghub-dataflow"
 const DFLabelDagTaskIDKey = "csghub_df_dag_task_id"

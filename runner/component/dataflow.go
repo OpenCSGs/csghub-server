@@ -258,11 +258,15 @@ func (d *dataflowComponentImpl) buildRuntimeTemplate(
 			Name: types.DFParamDagTaskNameKey,
 		},
 	)
-
+	dataflowDataPath := "/data/dataflow_data"
 	// Build environment variables from template.Env, req.Env and AccessToken
 	environments := []corev1.EnvVar{}
 	// Inject env variables from template
 	if req.Template.Env != nil {
+		value, ok := req.Template.Env[types.DataflowDataPathKey]
+		if ok && len(value) > 0 {
+			dataflowDataPath = value
+		}
 		for key, value := range req.Template.Env {
 			environments = append(environments, corev1.EnvVar{Name: key, Value: value})
 		}
@@ -296,7 +300,7 @@ func (d *dataflowComponentImpl) buildRuntimeTemplate(
 			Args:    req.Template.Args,    // []string{"{{inputs.parameters.cmd}}"},
 			Env:     environments,
 			VolumeMounts: []corev1.VolumeMount{
-				{Name: volumeName, MountPath: "/data/dataflow_data"},
+				{Name: volumeName, MountPath: dataflowDataPath},
 			},
 			Resources:       resources,
 			ImagePullPolicy: corev1.PullAlways,
