@@ -611,6 +611,11 @@ type Config struct {
 		QueryLastReportTimeout int    `env:"STARHUB_SERVER_LOGCOLLECTOR_QUERY_LAST_REPORT_TIMEOUT" default:"10"`
 	}
 
+	TrustRegistry struct {
+		Host string `env:"STARHUB_SERVER_FEDERATION_REGISTRY_HOST" default:"http://localhost"`
+		Port int    `env:"STARHUB_SERVER_FEDERATION_REGISTRY_PORT" default:"8098"`
+	}
+
 	Temporal struct {
 		MaxConcurrentActivityExecutionSize      int `env:"OPENCSG_TEMPORAL_MAX_CONCURRENT_ACTIVITY_EXECUTION_SIZE" default:"5"`
 		MaxConcurrentLocalActivityExecutionSize int `env:"OPENCSG_TEMPORAL_MAX_CONCURRENT_LOCAL_ACTIVITY_EXECUTION_SIZE" default:"10"`

@@ -1,0 +1,11 @@
+{
+    "error.FS-ERR-0": {
+        "other": "Federation site not found"
+    },
+    "error.FS-ERR-1": {
+        "other": "Owner organization not found"
+    },
+    "error.FS-ERR-2": {
+        "other": "Federation site cannot reference itself as owner organization"
+    }
+}

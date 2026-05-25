@@ -274,6 +274,30 @@ This document lists all the custom error codes defined in the project, categoriz
 - **Error Name:** `noValidParquetFile`
 - **Description:** The dataset does not contain any valid Parquet files, which are required for this operation.
 
+## Federation_site Errors
+
+### `FS-ERR-0`
+
+- **Error Code:** `FS-ERR-0`
+- **Error Name:** `codeFederationSiteNotFound`
+- **Description:** The requested federation site was not found.
+
+---
+
+### `FS-ERR-1`
+
+- **Error Code:** `FS-ERR-1`
+- **Error Name:** `codeFederationSiteOwnerOrgNotFound`
+- **Description:** The specified owner organization (parent site) was not found.
+
+---
+
+### `FS-ERR-2`
+
+- **Error Code:** `FS-ERR-2`
+- **Error Name:** `codeFederationSiteSelfReference`
+- **Description:** A federation site cannot reference itself as its owner organization.
+
 ## Git Errors
 
 ### `GIT-ERR-0`

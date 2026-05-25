@@ -1,0 +1,11 @@
+{
+    "error.FS-ERR-0": {
+        "other": "聯邦站點未找到"
+    },
+    "error.FS-ERR-1": {
+        "other": "所屬組織未找到"
+    },
+    "error.FS-ERR-2": {
+        "other": "聯邦站點不能將自身設為所屬組織"
+    }
+}
