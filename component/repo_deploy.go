@@ -2,20 +2,22 @@ package component
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
-	"github.com/hashicorp/go-version"
 	"log/slog"
 	"net/url"
+	"slices"
+	"strconv"
+	"strings"
+
+	"github.com/hashicorp/go-version"
 	"opencsg.com/csghub-server/builder/deploy"
 	deployStatus "opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/store/database"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/common/utils/common"
-	"slices"
-	"strconv"
-	"strings"
 )
 
 // get runtime framework list with type
@@ -720,20 +722,24 @@ func (c *repoComponentImpl) DeployStop(ctx context.Context, stopReq types.Deploy
 	}
 
 	exist, err := c.deployer.Exist(ctx, deployRepo)
-	if err != nil {
-		// fail to check service
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		// failed to check service in cluster
 		return err
 	}
 
+	if errors.Is(err, sql.ErrNoRows) {
+		exist = false
+	}
+
 	if exist {
-		// fail to delete service
-		return errors.New("fail to stop deploy instance")
+		// failed to delete service in cluster
+		return errors.New("failed to stop deploy instance")
 	}
 
 	// update database deploy to stopped
 	err = c.deployTaskStore.StopDeploy(ctx, stopReq.RepoType, deploy.RepoID, deploy.UserID, stopReq.DeployID)
 	if err != nil {
-		return fmt.Errorf("fail to stop deploy instance, %w", err)
+		return fmt.Errorf("failed to stop deploy instance, %w", err)
 	}
 
 	return err

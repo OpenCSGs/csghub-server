@@ -533,15 +533,16 @@ func (d *deployer) Exist(ctx context.Context, dr types.DeployRequest) (bool, err
 	}
 	resp, err := d.imageRunner.Exist(ctx, req)
 	if err != nil {
-		slog.Error("fail to check deploy", slog.Any("req", req), slog.Any("error", err))
+		slog.Error("failed to check if deploy exists", slog.Any("req", req), slog.Any("error", err))
 		return true, err
 	}
 
-	if resp.Code == -1 {
+	switch resp.Code {
+	case -1:
 		// service check with error
 		slog.Warn("deploy exist check result", slog.Any("resp", resp))
-		return true, errors.New("fail to check deploy instance")
-	} else if resp.Code == common.Stopped {
+		return true, errors.New("fail to check deploy instance in cluster")
+	case common.Stopped:
 		// service not exist
 		return false, nil
 	}
