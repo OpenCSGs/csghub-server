@@ -224,9 +224,21 @@ func (c *gitCallbackComponentImpl) UpdateRepoInfos(ctx context.Context, req *typ
 
 	var err error
 	for _, commit := range commits {
-		err = errors.Join(err, c.modifyFiles(ctx, repoType, namespace, repoName, ref, commit.Modified))
-		err = errors.Join(err, c.removeFiles(ctx, repoType, namespace, repoName, ref, commit.Removed))
-		err = errors.Join(err, c.addFiles(ctx, repoType, namespace, repoName, ref, commit.Added))
+		err = c.modifyFiles(ctx, repoType, namespace, repoName, ref, commit.Modified)
+		if err != nil {
+			slog.Error("failed to update modified files", slog.Any("error", err), slog.Any("commit", commit))
+			return err
+		}
+		err = c.removeFiles(ctx, repoType, namespace, repoName, ref, commit.Removed)
+		if err != nil {
+			slog.Error("failed to update removed files", slog.Any("error", err), slog.Any("commit", commit))
+			return err
+		}
+		err = c.addFiles(ctx, repoType, namespace, repoName, ref, commit.Added)
+		if err != nil {
+			slog.Error("failed to update added files", slog.Any("error", err), slog.Any("commit", commit))
+			return err
+		}
 	}
 	err = c.updateDescriptionFromReadme(ctx, repoType, namespace, repoName, ref)
 	if err != nil {

@@ -939,17 +939,6 @@ func (c *repoComponentImpl) createReadmeFile(ctx context.Context, req *types.Cre
 	if err != nil {
 		return fmt.Errorf("failed to update meta tags, cause: %w", err)
 	}
-	if c.industryTagComponent != nil {
-		err = c.industryTagComponent.RefreshRepoAutoIndustryTags(ctx, types.IdentifyIndustryTagsReq{
-			Namespace: req.Namespace,
-			Name:      req.Name,
-			RepoType:  req.RepoType,
-			Readme:    string(contentDecoded),
-		})
-		if err != nil {
-			return fmt.Errorf("failed to update repo industry tags, cause: %w", err)
-		}
-	}
 
 	err = c.git.CreateRepoFile(req)
 	if err != nil {
@@ -1187,17 +1176,6 @@ func (c *repoComponentImpl) changeReadmeFile(ctx context.Context, content, names
 	_, err := c.tagComponent.UpdateMetaTags(ctx, getTagScopeByRepoType(repoType), namespace, name, string(contentDecoded))
 	if err != nil {
 		return fmt.Errorf("failed to update meta tags, cause: %w", err)
-	}
-	if c.industryTagComponent != nil {
-		err = c.industryTagComponent.RefreshRepoAutoIndustryTags(ctx, types.IdentifyIndustryTagsReq{
-			Namespace: namespace,
-			Name:      name,
-			RepoType:  repoType,
-			Readme:    string(contentDecoded),
-		})
-		if err != nil {
-			return fmt.Errorf("failed to update repo industry tags, cause: %w", err)
-		}
 	}
 	return err
 }

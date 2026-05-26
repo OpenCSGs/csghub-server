@@ -40,7 +40,12 @@ func (a *Activities) UpdateRepoInfos(ctx context.Context, req *types.GiteaCallba
 	logger := activity.GetLogger(ctx)
 	logger.Info("[git_callback] update repo infos start", slog.Any("req", req))
 	a.callback.SetRepoVisibility(true)
-	return a.callback.UpdateRepoInfos(ctx, req)
+	err := a.callback.UpdateRepoInfos(ctx, req)
+	if err != nil {
+		logger.Error("[git_callback] failed to update repo infos", slog.Any("error", err))
+		return err
+	}
+	return nil
 }
 
 func (a *Activities) SensitiveCheck(ctx context.Context, req *types.GiteaCallbackPushReq) error {
