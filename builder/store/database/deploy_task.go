@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"strings"
 	"time"
 
@@ -656,6 +657,9 @@ func (s *deployTaskStoreImpl) GetClusterDeploys(ctx context.Context, req types.C
 	}
 	if req.ResourceName != "" {
 		query = query.Where("hardware = ?", req.ResourceName)
+	}
+	if req.ResourceID > 0 {
+		query = query.Where("sku = ?", strconv.Itoa(req.ResourceID))
 	}
 	if req.Search != "" {
 		searchPattern := "%" + req.Search + "%"
