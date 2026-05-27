@@ -141,7 +141,7 @@ func TestAccountPriceStore_GetLatestByTime(t *testing.T) {
 		ResourceID:  "r",
 		PriceTime:   dt.Add(8 * time.Hour),
 		SkuKind:     types.SKUPackageAddon,
-		SkuUnitType: "u",
+		SkuUnitType: []string{"u"},
 	})
 	require.Nil(t, err)
 	require.Equal(t, "c", p.SkuDesc)

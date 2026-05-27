@@ -17,12 +17,15 @@ var (
 )
 
 const (
-	OrderDetailID      = "order_detail_id"
-	MeterFromSource    = "from_source"
-	PromptTokenNum     = "prompt_token_num"
-	CompletionTokenNum = "completion_token_num"
-	OwnerType          = "owner_type"
-	ConsumeApiKey      = "api_key"
+	OrderDetailID        = "order_detail_id"
+	MeterFromSource      = "from_source"
+	PromptTokenNum       = "prompt_token_num"
+	CompletionTokenNum   = "completion_token_num"
+	OwnerType            = "owner_type"
+	ConsumeApiKey        = "api_key"
+	CompletionDataType   = "completion_data_type"
+	CompletionResolution = "completion_resolution"
+	CompletionDuration   = "completion_duration"
 )
 
 type OrderStatus int
@@ -39,6 +42,7 @@ var (
 type SkuUnitType string
 
 var (
+	UnitSecond SkuUnitType = "second" // audio/video duration
 	UnitMinute SkuUnitType = "minute"
 	UnitDay    SkuUnitType = "day"
 	UnitWeek   SkuUnitType = "week"
@@ -47,6 +51,7 @@ var (
 	UnitToken  SkuUnitType = "token"
 	UnitRepo   SkuUnitType = "repository"
 	UnitByte   SkuUnitType = "byte"
+	UnitCount  SkuUnitType = "count" // count of image/audio/video
 )
 
 type ACCTStatus int
@@ -64,32 +69,26 @@ var (
 type SKUType int
 
 var (
-	SKUReserve    SKUType = 0 // system reserve
-	SKUCSGHub     SKUType = 1 // csghub server
-	SKUStarship   SKUType = 2 // starship
-	SKUAgenticHub SKUType = 3 // agentic hub
+	SKUReserve  SKUType = 0 // system reserve
+	SKUCSGHub   SKUType = 1 // csghub server
+	SKUStarship SKUType = 2 // starship
 )
 
 type SKUKind int
 
 var (
-	SKUPayAsYouGo      SKUKind = 1 // Time-based billing Pay-as-you-go
-	SKUTimeSpan        SKUKind = 2 // monthly or yearly billing
-	SKUPackageAddon    SKUKind = 3 // Package addon time-based billing
-	SKUPromptToken     SKUKind = 4 // Token-based billing of prompt
-	SKUCompletionToken SKUKind = 5 // Token-based billing of completion
+	SKUPayAsYouGo           SKUKind = 1 // Time-based billing Pay-as-you-go
+	SKUTimeSpan             SKUKind = 2 // monthly or yearly billing
+	SKUPackageAddon         SKUKind = 3 // Package addon time-based billing
+	SKUPromptToken          SKUKind = 4 // Token-based billing of prompt
+	SKUCompletionToken      SKUKind = 5 // Token-based billing of completion
+	SKUPromptMultiModal     SKUKind = 6 // Multi Model LLM Prompt for image/audio/video
+	SKUCompletionMultiModal SKUKind = 7 // Multi Model LLM completion for image/audio/video
 )
 
 var (
 	ChargeBalance     string = "balance"
 	ChargeCashBalance string = "cash_balance"
-)
-
-// HTTP Header constants for scene detection
-const (
-	SceneHeaderKey        = "X-Scene"    // HTTP header key for scene detection
-	SceneHeaderCSGHub     = "csghub"     // For SceneModelServerless (15)
-	SceneHeaderAgenticHub = "agentichub" // For SceneAgenticHub (30)
 )
 
 type SceneType int
@@ -101,16 +100,16 @@ var (
 	SceneCashCharge      SceneType = 3 // cash charge from user payment
 	ScenePaySubscription SceneType = 4 // pay subscription and reduce fee
 	// csghub
-	SceneModelInference  SceneType = 10 // model inference endpoint
-	SceneSpace           SceneType = 11 // csghub space
-	SceneModelFinetune   SceneType = 12 // model finetune
-	SceneMultiSync       SceneType = 13 // multi source sync
-	SceneEvaluation      SceneType = 14 // model evaluation
-	SceneModelServerless SceneType = 15 // serverless and external model from aigateway
+	SceneModelInference       SceneType = 10 // model inference endpoint
+	SceneSpace                SceneType = 11 // csghub space
+	SceneModelFinetune        SceneType = 12 // model finetune
+	SceneMultiSync            SceneType = 13 // multi source sync
+	SceneEvaluation           SceneType = 14 // model evaluation
+	SceneModelServerless      SceneType = 15 // serverless and external model from aigateway
+	SceneMultiModalServerless SceneType = 16 // Multi modal model from aigateway for image/audio/video
 	// starship
 	SceneStarship SceneType = 20 // starship
 	SceneGuiAgent SceneType = 22 // gui agent
-	// SceneAgenticHub SceneType = 30 // agentic hub
 	// dataset
 	SceneDatasetPurchase SceneType = 40 // dataset purchase
 	// unknow
@@ -151,6 +150,7 @@ var (
 	TimeDurationMinType ChargeValueType = 0
 	TokenNumberType     ChargeValueType = 1
 	QuotaNumberType     ChargeValueType = 2
+	CountNumberType     ChargeValueType = 3
 )
 
 type AcctEventReq struct {
@@ -181,6 +181,9 @@ type AcctEventReq struct {
 	ApiKey           string          `json:"api_key"`
 	Purpose          RechargePurpose `json:"purpose"`
 	PurposeDesc      string          `json:"purpose_desc"`
+	DataType         string          `json:"data_type"`
+	Resolution       string          `json:"resolution"`
+	Duration         float64         `json:"duration"`
 }
 
 // generate charge event from client
@@ -369,6 +372,7 @@ type AcctPriceCreateReq struct {
 	SkuPriceID       int64       `json:"sku_price_id"`
 	Discount         float64     `json:"discount" binding:"omitempty,min=0,max=1"`
 	UseLimitPrice    int64       `json:"use_limit_price"`
+	Resolution       string      `json:"resolution"`
 }
 
 type AcctPriceResp struct {
@@ -390,7 +394,8 @@ type AcctPriceQueryReq struct {
 	ResourceID  string    `json:"resource_id"`
 	PriceTime   time.Time `json:"price_time"`
 	SkuKind     SKUKind   `json:"sku_kind"`
-	SkuUnitType string    `json:"sku_unit_type"`
+	SkuUnitType []string  `json:"sku_unit_type"`
+	Resolution  string    `json:"resolution"`
 }
 
 type AcctOrderDetailReq struct {
@@ -738,16 +743,16 @@ type AccInvoiceDashboardReq struct {
 }
 
 type AccInvoiceCreateReq struct {
-	TargetUUID  string  `json:"-"`
-	CurrentUser string  `json:"-"` // current user for permission check
-	TitleID     int64   `json:"title_id" binding:"required"`
-	BillCycle   string  `json:"bill_cycle" binding:"required"`
+	TargetUUID    string  `json:"-"`
+	CurrentUser   string  `json:"-"` // current user for permission check
+	TitleID       int64   `json:"title_id" binding:"required"`
+	BillCycle     string  `json:"bill_cycle" binding:"required"`
 	InvoiceAmount float64 `json:"invoice_amount" binding:"required"`
 }
 
 type AccInvoicableReq struct {
 	TargetUUID  string `json:"-"`
-	CurrentUser string `json:"-"` // current user for permission check
+	CurrentUser string `json:"-"`                                 // current user for permission check
 	Page        int    `json:"page" binding:"min=1"`              // Current page number
 	PageSize    int    `json:"page_size" binding:"min=1,max=100"` // Number of items per page
 	StartMonth  string `json:"start_month"`

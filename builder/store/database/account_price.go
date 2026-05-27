@@ -51,6 +51,7 @@ type AccountPrice struct {
 	SkuPriceID       int64             `json:"sku_price_id"`
 	Discount         float64           `json:"discount"` // discount rate, e.g. 0.9 means 10% discount
 	UseLimitPrice    int64             `json:"use_limit_price"`
+	Resolution       string            `json:"resolution"`
 	times
 }
 
@@ -98,8 +99,9 @@ func (a *accountPriceStoreImpl) GetLatestByTime(ctx context.Context, req types.A
 		Where("sku_type = ?", req.SkuType).
 		Where("sku_kind = ?", req.SkuKind).
 		Where("resource_id = ?", req.ResourceID).
-		Where("sku_unit_type = ?", req.SkuUnitType).
+		Where("sku_unit_type IN (?)", bun.In(req.SkuUnitType)).
 		Where("created_at <= ?", req.PriceTime).
+		Where("resolution = ?", req.Resolution).
 		Order("created_at DESC").Limit(1).Scan(ctx, price)
 	if err != nil {
 		return nil, fmt.Errorf("select price by time, error: %w", err)
