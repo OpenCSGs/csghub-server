@@ -42,8 +42,11 @@ type runtimeArchitectureComponentImpl struct {
 	runtimeArchStore          database.RuntimeArchitecturesStore
 	runtimeFrameworksStore    database.RuntimeFrameworksStore
 	tagStore                  database.TagStore
+	tagComponent              TagComponent
 	resouceModelStore         database.ResourceModelStore
 	metadataStore             database.MetadataStore
+	llmConfigStore            database.LLMConfigStore
+	promptPrefixStore         database.PromptPrefixStore
 	gitServer                 gitserver.GitServer
 	cache                     cache.RedisClient
 	fileDownloadPath          string
@@ -74,11 +77,18 @@ func NewRuntimeArchitectureComponent(config *config.Config) (RuntimeArchitecture
 	c.tagStore = database.NewTagStore()
 	c.resouceModelStore = database.NewResourceModelStore()
 	c.metadataStore = database.NewMetadataStore()
+	c.llmConfigStore = database.NewLLMConfigStore(config)
+	c.promptPrefixStore = database.NewPromptPrefixStore(config)
 	repo, err := NewRepoComponentImpl(config)
 	if err != nil {
 		return nil, fmt.Errorf("fail to create repo component, %w", err)
 	}
 	c.repoComponent = repo
+	tagComponent, err := NewTagComponent(config)
+	if err != nil {
+		return nil, fmt.Errorf("fail to create tag component, %w", err)
+	}
+	c.tagComponent = tagComponent
 	c.repoStore = database.NewRepoStore()
 	c.repoRuntimeFrameworkStore = database.NewRepositoriesRuntimeFramework()
 	c.gitServer, err = git.NewGitServer(config)
@@ -160,6 +170,59 @@ func (c *runtimeArchitectureComponentImpl) ScanModel(ctx context.Context, curren
 	}
 	if !permission.CanWrite {
 		return errorx.ErrForbiddenMsg(fmt.Sprintf("user %s does not have permission to update metadata for %s ", currentUser, repo.Path))
+	}
+	if repo.Format() == string(types.Unknown) {
+		ref := repo.DefaultBranch
+		if ref == "" {
+			ref = types.MainBranch
+		}
+		readme, err := c.gitServer.GetRepoFileRaw(ctx, gitserver.GetRepoInfoByPathReq{
+			Namespace: namespace,
+			Name:      name,
+			Ref:       ref,
+			Path:      types.ReadmeFileName,
+			RepoType:  types.ModelRepo,
+		})
+		if err != nil {
+			slog.Warn("failed to get readme content for model tag update", slog.String("namespace", namespace), slog.String("name", name), slog.Any("error", err))
+		} else {
+			_, err = c.tagComponent.UpdateMetaTags(ctx, types.ModelTagScope, namespace, name, readme)
+			if err != nil {
+				return fmt.Errorf("fail to update model meta tags, %w", err)
+			}
+		}
+		files, err := getAllFiles(ctx, namespace, name, "", types.ModelRepo, ref, c.gitServer.GetTree)
+		if err != nil {
+			return fmt.Errorf("fail to get model files for tag update, %w", err)
+		}
+		for _, file := range files {
+			if file.Path == types.ReadmeFileName {
+				continue
+			}
+			err = c.tagComponent.UpdateLibraryTags(ctx, types.ModelTagScope, namespace, name, "", file.Path)
+			if err != nil {
+				return fmt.Errorf("fail to update model library tags for %s, %w", file.Path, err)
+			}
+		}
+		repo, err = c.repoStore.FindByPath(ctx, types.ModelRepo, namespace, name)
+		if err != nil {
+			return fmt.Errorf("fail to reload repository after updating model tags, %w", err)
+		}
+	}
+	if repo.Description == "" && (repo.HFPath != "" || repo.MSPath != "" || repo.GithubPath != "") {
+		err = UpdateRepoDescriptionFromReadme(ctx, UpdateRepoDescriptionFromReadmeReq{
+			RepoStore:         c.repoStore,
+			GitServer:         c.gitServer,
+			PromptPrefixStore: c.promptPrefixStore,
+			LLMConfigStore:    c.llmConfigStore,
+			RepoType:          types.ModelRepo,
+			Namespace:         namespace,
+			Name:              name,
+			Ref:               repo.DefaultBranch,
+		})
+		if err != nil {
+			return fmt.Errorf("fail to update model description, %w", err)
+		}
 	}
 	modelInfo, err := c.UpdateModelMetadata(ctx, repo)
 	if err != nil {

@@ -253,6 +253,49 @@ func TestRuntimeArchComponent_ScanModel_Success(t *testing.T) {
 	require.Contains(t, err.Error(), "fail to update model metadata")
 }
 
+func TestRuntimeArchComponent_ScanModel_UpdateTagsWhenModelFormatMissing(t *testing.T) {
+	ctx := context.TODO()
+	rc := initializeTestRuntimeArchComponent(ctx, t)
+	rc.tagComponent = rc.mocks.components.tag
+
+	currentUser := "testuser"
+	namespace := "testnamespace"
+	name := "testmodel"
+
+	repoWithoutFormat := &database.Repository{
+		ID:            1,
+		Path:          "testnamespace/testmodel",
+		DefaultBranch: "main",
+		Description:   "existing description",
+	}
+	repoWithFormat := &database.Repository{
+		ID:            1,
+		Path:          "testnamespace/testmodel",
+		DefaultBranch: "main",
+		Description:   "existing description",
+		Tags:          []database.Tag{{Name: "safetensors", Category: "framework"}},
+	}
+
+	rc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, namespace, name).Return(repoWithoutFormat, nil).Once()
+	rc.mocks.components.repo.EXPECT().GetUserRepoPermission(ctx, currentUser, repoWithoutFormat).Return(&types.UserRepoPermission{CanWrite: true}, nil)
+	rc.mocks.gitServer.EXPECT().GetRepoFileRaw(ctx, mock.Anything).Return("---\nlibrary_name: transformers\n---\nreadme", nil).Once()
+	rc.mocks.components.tag.EXPECT().UpdateMetaTags(ctx, types.ModelTagScope, namespace, name, "---\nlibrary_name: transformers\n---\nreadme").Return(nil, nil).Once()
+	rc.mocks.gitServer.EXPECT().GetTree(ctx, mock.Anything).Return(&types.GetRepoFileTreeResp{
+		Files: []*types.File{
+			{Name: types.ReadmeFileName, Path: types.ReadmeFileName},
+			{Name: "model.safetensors", Path: "model.safetensors"},
+		},
+	}, nil).Once()
+	rc.mocks.components.tag.EXPECT().UpdateLibraryTags(ctx, types.ModelTagScope, namespace, name, "", "model.safetensors").Return(nil).Once()
+	rc.mocks.stores.RepoMock().EXPECT().FindByPath(ctx, types.ModelRepo, namespace, name).Return(repoWithFormat, nil).Once()
+	rc.mocks.gitServer.EXPECT().GetTree(mock.Anything, mock.Anything).Return(nil, errors.New("metadata update not fully mocked")).Once()
+
+	err := rc.ScanModel(ctx, currentUser, namespace, name)
+
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "fail to update model metadata")
+}
+
 func TestRuntimeArchComponent_ScanModel_RepoNotFound(t *testing.T) {
 	ctx := context.TODO()
 	rc := initializeTestRuntimeArchComponent(ctx, t)
