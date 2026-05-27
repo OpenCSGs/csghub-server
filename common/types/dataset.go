@@ -67,6 +67,7 @@ type Dataset struct {
 	XnetMigrationProgress int                       `json:"xnet_migration_progress"`
 	DatasetType           DatasetType               `json:"dataset_type"`
 	RelatedDatasetID      int64                     `json:"related_dataset_id"`
+	RelatedDataset        *Dataset                  `json:"related_dataset,omitempty"`
 	Price                 float64                   `json:"price"`
 	Forked                bool                      `json:"forked"`
 	IsForSale             bool                      `json:"is_for_sale"`

@@ -133,6 +133,10 @@ func (s *datasetApplicationStoreImpl) FindByID(ctx context.Context, id int64) (*
 		Model(&app).
 		Where("dataset_application.id = ?", id).
 		Relation("Dataset.Repository").
+		Relation("Dataset.RelatedDataset").
+		Relation("Dataset.RelatedDataset.Repository").
+		Relation("RelatedDataset").
+		Relation("RelatedDataset.Repository").
 		Relation("Applicant").
 		Scan(ctx)
 	err = errorx.HandleDBError(err, errorx.Ctx().Set("id", id))
