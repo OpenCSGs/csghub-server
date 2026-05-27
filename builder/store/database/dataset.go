@@ -58,6 +58,7 @@ type Dataset struct {
 	LastUpdatedAt        time.Time           `bun:",notnull" json:"last_updated_at"`
 	DatasetType          types.DatasetType   `bun:",default:normal" json:"dataset_type"`
 	RelatedDatasetID     int64               `bun:"" json:"related_dataset_id"`
+	RelatedDataset       *Dataset            `bun:"rel:has-one,join:related_dataset_id=id" json:"related_dataset,omitempty"`
 	Price                float64             `bun:"" json:"price"`
 	Forked               bool                `bun:",default:false" json:"forked"`
 	Status               types.DatasetStatus `bun:",default:normal" json:"status"`
