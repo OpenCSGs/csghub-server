@@ -78,11 +78,12 @@ type Tag struct {
 
 // TagCategory represents the category of tags
 type TagCategory struct {
-	ID       int64          `bun:",pk,autoincrement" json:"id"`
-	Name     string         `bun:",notnull" json:"name" yaml:"name"`
-	ShowName string         `bun:"" json:"show_name" yaml:"show_name"`
-	Scope    types.TagScope `bun:",notnull" json:"scope" yaml:"scope"`
-	Enabled  bool           `bun:"default:true" json:"enabled" yaml:"enabled"`
+	ID           int64          `bun:",pk,autoincrement" json:"id"`
+	Name         string         `bun:",notnull" json:"name" yaml:"name"`
+	ShowName     string         `bun:"" json:"show_name" yaml:"show_name"`
+	Scope        types.TagScope `bun:",notnull" json:"scope" yaml:"scope"`
+	Enabled      bool           `bun:"default:true" json:"enabled" yaml:"enabled"`
+	AutoDetected bool           `bun:"default:false" json:"auto_detected" yaml:"auto_detected"`
 }
 
 // Alltags returns all tags in the database

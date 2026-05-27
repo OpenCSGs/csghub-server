@@ -29,11 +29,12 @@ const (
 )
 
 type RepoTagCategory struct {
-	ID       int64    `json:"id"`
-	Name     string   `json:"name"`
-	ShowName string   `json:"show_name" i18n:"tag_category.name"`
-	Scope    TagScope `json:"scope"`
-	Enabled  bool     `json:"enabled"`
+	ID           int64    `json:"id"`
+	Name         string   `json:"name"`
+	ShowName     string   `json:"show_name" i18n:"tag_category.name"`
+	Scope        TagScope `json:"scope"`
+	Enabled      bool     `json:"enabled"`
+	AutoDetected bool     `json:"auto_detected"`
 }
 
 type CreateTag struct {
@@ -50,10 +51,11 @@ type CreateTag struct {
 type UpdateTag CreateTag
 
 type CreateCategory struct {
-	Name     string `json:"name" binding:"required"`
-	Scope    string `json:"scope" binding:"required"`
-	ShowName string `json:"show_name"`
-	Enabled  bool   `json:"enabled"`
+	Name         string `json:"name" binding:"required"`
+	Scope        string `json:"scope" binding:"required"`
+	ShowName     string `json:"show_name"`
+	Enabled      bool   `json:"enabled"`
+	AutoDetected bool   `json:"auto_detected"`
 }
 
 type UpdateCategory CreateCategory
