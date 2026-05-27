@@ -155,6 +155,12 @@ func TestTagComponent_UpdateRepoTagsByCategory(t *testing.T) {
 	ctx := context.TODO()
 	tc := initializeTestTagComponent(ctx, t)
 
+	tc.mocks.stores.TagMock().EXPECT().AllCategories(ctx, types.DatasetTagScope).Return(
+		[]database.TagCategory{
+			{Name: "c", Scope: types.DatasetTagScope, AutoDetected: false},
+		}, nil,
+	)
+
 	filter := &types.TagFilter{
 		Categories: []string{"c"},
 		Scopes:     []types.TagScope{types.DatasetTagScope},
@@ -168,6 +174,21 @@ func TestTagComponent_UpdateRepoTagsByCategory(t *testing.T) {
 
 	err := tc.UpdateRepoTagsByCategory(ctx, types.DatasetTagScope, 1, "c", []string{"t1"})
 	require.Nil(t, err)
+}
+
+func TestTagComponent_UpdateRepoTagsByCategory_AutoDetectedBlocked(t *testing.T) {
+	ctx := context.TODO()
+	tc := initializeTestTagComponent(ctx, t)
+
+	tc.mocks.stores.TagMock().EXPECT().AllCategories(ctx, types.DatasetTagScope).Return(
+		[]database.TagCategory{
+			{Name: "framework", Scope: types.DatasetTagScope, AutoDetected: true},
+		}, nil,
+	)
+
+	err := tc.UpdateRepoTagsByCategory(ctx, types.DatasetTagScope, 1, "framework", []string{"t1"})
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "auto-detected and cannot be manually updated")
 }
 
 func TestTagComponent_AllCategories(t *testing.T) {

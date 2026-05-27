@@ -200,6 +200,18 @@ func (c *tagComponentImpl) UpdateLibraryTags(ctx context.Context, tagScope types
 }
 
 func (c *tagComponentImpl) UpdateRepoTagsByCategory(ctx context.Context, tagScope types.TagScope, repoID int64, category string, tagNames []string) error {
+	// Check if the category is auto-detected (not manually editable)
+	if category != "" {
+		categories, err := c.tagStore.AllCategories(ctx, tagScope)
+		if err != nil {
+			return fmt.Errorf("failed to get categories for scope `%s`, error: %w", tagScope, err)
+		}
+		for _, cat := range categories {
+			if cat.Name == category && cat.AutoDetected {
+				return fmt.Errorf("category `%s` is auto-detected and cannot be manually updated", category)
+			}
+		}
+	}
 	return c.ReplaceRepoTagsByCategoryAndSource(ctx, tagScope, repoID, category, types.TagSourceManual, tagNames)
 }
 
@@ -317,11 +329,12 @@ func (c *tagComponentImpl) AllCategories(ctx context.Context) ([]types.RepoTagCa
 	categories := []types.RepoTagCategory{}
 	for _, cat := range dbTagCategory {
 		categories = append(categories, types.RepoTagCategory{
-			ID:       cat.ID,
-			Name:     cat.Name,
-			ShowName: cat.ShowName,
-			Scope:    cat.Scope,
-			Enabled:  cat.Enabled,
+			ID:           cat.ID,
+			Name:         cat.Name,
+			ShowName:     cat.ShowName,
+			Scope:        cat.Scope,
+			Enabled:      cat.Enabled,
+			AutoDetected: cat.AutoDetected,
 		})
 	}
 	return categories, nil
@@ -329,10 +342,11 @@ func (c *tagComponentImpl) AllCategories(ctx context.Context) ([]types.RepoTagCa
 
 func (c *tagComponentImpl) CreateCategory(ctx context.Context, req types.CreateCategory) (*database.TagCategory, error) {
 	newCategory := database.TagCategory{
-		Name:     req.Name,
-		ShowName: req.ShowName,
-		Scope:    types.TagScope(req.Scope),
-		Enabled:  req.Enabled,
+		Name:         req.Name,
+		ShowName:     req.ShowName,
+		Scope:        types.TagScope(req.Scope),
+		Enabled:      req.Enabled,
+		AutoDetected: req.AutoDetected,
 	}
 
 	category, err := c.tagStore.CreateCategory(ctx, newCategory)
@@ -345,11 +359,12 @@ func (c *tagComponentImpl) CreateCategory(ctx context.Context, req types.CreateC
 
 func (c *tagComponentImpl) UpdateCategory(ctx context.Context, req types.UpdateCategory, id int64) (*database.TagCategory, error) {
 	newCategory := database.TagCategory{
-		ID:       id,
-		Name:     req.Name,
-		ShowName: req.ShowName,
-		Scope:    types.TagScope(req.Scope),
-		Enabled:  req.Enabled,
+		ID:           id,
+		Name:         req.Name,
+		ShowName:     req.ShowName,
+		Scope:        types.TagScope(req.Scope),
+		Enabled:      req.Enabled,
+		AutoDetected: req.AutoDetected,
 	}
 
 	category, err := c.tagStore.UpdateCategory(ctx, newCategory)
