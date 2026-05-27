@@ -787,6 +787,54 @@ func (_c *MockDatasetStore_Update_Call) RunAndReturn(run func(context.Context, d
 	return _c
 }
 
+// UpdateDatasetAndRepo provides a mock function with given fields: ctx, dataset, repo
+func (_m *MockDatasetStore) UpdateDatasetAndRepo(ctx context.Context, dataset database.Dataset, repo database.Repository) error {
+	ret := _m.Called(ctx, dataset, repo)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateDatasetAndRepo")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, database.Dataset, database.Repository) error); ok {
+		r0 = rf(ctx, dataset, repo)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockDatasetStore_UpdateDatasetAndRepo_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateDatasetAndRepo'
+type MockDatasetStore_UpdateDatasetAndRepo_Call struct {
+	*mock.Call
+}
+
+// UpdateDatasetAndRepo is a helper method to define mock.On call
+//   - ctx context.Context
+//   - dataset database.Dataset
+//   - repo database.Repository
+func (_e *MockDatasetStore_Expecter) UpdateDatasetAndRepo(ctx interface{}, dataset interface{}, repo interface{}) *MockDatasetStore_UpdateDatasetAndRepo_Call {
+	return &MockDatasetStore_UpdateDatasetAndRepo_Call{Call: _e.mock.On("UpdateDatasetAndRepo", ctx, dataset, repo)}
+}
+
+func (_c *MockDatasetStore_UpdateDatasetAndRepo_Call) Run(run func(ctx context.Context, dataset database.Dataset, repo database.Repository)) *MockDatasetStore_UpdateDatasetAndRepo_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(database.Dataset), args[2].(database.Repository))
+	})
+	return _c
+}
+
+func (_c *MockDatasetStore_UpdateDatasetAndRepo_Call) Return(_a0 error) *MockDatasetStore_UpdateDatasetAndRepo_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockDatasetStore_UpdateDatasetAndRepo_Call) RunAndReturn(run func(context.Context, database.Dataset, database.Repository) error) *MockDatasetStore_UpdateDatasetAndRepo_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // UserLikesDatasets provides a mock function with given fields: ctx, userID, per, page
 func (_m *MockDatasetStore) UserLikesDatasets(ctx context.Context, userID int64, per int, page int) ([]database.Dataset, int, error) {
 	ret := _m.Called(ctx, userID, per, page)

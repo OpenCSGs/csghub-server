@@ -2,10 +2,12 @@ package database
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
 
+	"github.com/looplab/fsm"
 	"github.com/uptrace/bun"
 	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
@@ -38,6 +40,7 @@ type DatasetStore interface {
 	ListByPath(ctx context.Context, paths []string) ([]Dataset, error)
 	CreateIfNotExist(ctx context.Context, input Dataset) (*Dataset, error)
 	CreateAndUpdateRepoPath(ctx context.Context, input Dataset, path string) (*Dataset, error)
+	UpdateDatasetAndRepo(ctx context.Context, dataset Dataset, repo Repository) error
 }
 
 func NewDatasetStore() DatasetStore {
@@ -49,15 +52,80 @@ func NewDatasetStoreWithDB(db *DB) DatasetStore {
 }
 
 type Dataset struct {
-	ID               int64       `bun:",pk,autoincrement" json:"id"`
-	RepositoryID     int64       `bun:",notnull" json:"repository_id"`
-	Repository       *Repository `bun:"rel:belongs-to,join:repository_id=id" json:"repository"`
-	LastUpdatedAt    time.Time   `bun:",notnull" json:"last_updated_at"`
-	DatasetType      string      `bun:",default:normal" json:"dataset_type"`
-	RelatedDatasetID int64       `bun:"" json:"related_dataset_id"`
-	Price            float64     `bun:"" json:"price"`
-	Forked           bool        `bun:",default:false" json:"forked"`
+	ID                   int64               `bun:",pk,autoincrement" json:"id"`
+	RepositoryID         int64               `bun:",notnull" json:"repository_id"`
+	Repository           *Repository         `bun:"rel:belongs-to,join:repository_id=id" json:"repository"`
+	LastUpdatedAt        time.Time           `bun:",notnull" json:"last_updated_at"`
+	DatasetType          types.DatasetType   `bun:",default:normal" json:"dataset_type"`
+	RelatedDatasetID     int64               `bun:"" json:"related_dataset_id"`
+	Price                float64             `bun:"" json:"price"`
+	Forked               bool                `bun:",default:false" json:"forked"`
+	Status               types.DatasetStatus `bun:",default:normal" json:"status"`
+	CurrentApplicationID int64               `bun:"current_application_id" json:"current_application_id"`
+	CurrentApplication   *DatasetApplication `bun:"rel:belongs-to,join:current_application_id=id" json:"current_application"`
 	times
+}
+
+// Dataset FSM events
+const (
+	DatasetEventList   = "list"
+	DatasetEventDelist = "delist"
+)
+
+type DatasetWithFSM struct {
+	dataset *Dataset
+	from    types.DatasetStatus
+	fsm     *fsm.FSM
+}
+
+func NewDatasetWithFSM(ds *Dataset) DatasetWithFSM {
+	return DatasetWithFSM{
+		dataset: ds,
+		from:    ds.Status,
+		fsm: fsm.NewFSM(
+			string(ds.Status),
+			fsm.Events{
+				{
+					Name: DatasetEventList,
+					Src: []string{
+						string(types.DatasetStatusNormal),
+						string(types.DatasetStatusListed),
+						string(types.DatasetStatusDelisted),
+					},
+					Dst: string(types.DatasetStatusListed),
+				},
+				{
+					Name: DatasetEventDelist,
+					Src: []string{
+						string(types.DatasetStatusListed),
+					},
+					Dst: string(types.DatasetStatusDelisted),
+				},
+			},
+			fsm.Callbacks{
+				"entry_state": func(ctx context.Context, event *fsm.Event) {
+					ds.Status = types.DatasetStatus(event.Dst)
+				},
+			},
+		),
+	}
+}
+
+func (d *DatasetWithFSM) SubmitEvent(ctx context.Context, event string) bool {
+	res := d.fsm.Event(ctx, event)
+	if res == nil {
+		return true
+	}
+	var noTrans fsm.NoTransitionError
+	return errors.As(res, &noTrans) && noTrans.Err == nil
+}
+
+func (d *DatasetWithFSM) Current() string {
+	return d.fsm.Current()
+}
+
+func (d *DatasetWithFSM) Can(event string) bool {
+	return d.fsm.Can(event)
 }
 
 func (s *datasetStoreImpl) ByRepoIDs(ctx context.Context, repoIDs []int64) (datasets []Dataset, err error) {
@@ -91,7 +159,9 @@ func (s *datasetStoreImpl) ByID(ctx context.Context, datasetID int64) (*Dataset,
 		Model(&dataset).
 		Where("dataset.id = ?", datasetID).
 		Relation("Repository").
+		Where("repository.id IS NOT NULL").
 		Scan(ctx)
+	err = errorx.HandleDBError(err, errorx.Ctx().Set("dataset_id", datasetID))
 	if err != nil {
 		return nil, fmt.Errorf("failed to select dataset by id: %d, error: %w", datasetID, err)
 	}
@@ -307,4 +377,17 @@ func (s *datasetStoreImpl) CreateAndUpdateRepoPath(ctx context.Context, input Da
 			Set("repository_id", input.RepositoryID).
 			Set("path", path))
 	return &input, err
+}
+
+func (s *datasetStoreImpl) UpdateDatasetAndRepo(ctx context.Context, dataset Dataset, repo Repository) error {
+	return s.db.Core.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		dataset.LastUpdatedAt = time.Now()
+		if _, err := tx.NewUpdate().Model(&dataset).WherePK().Exec(ctx); err != nil {
+			return fmt.Errorf("failed to update dataset: %w", err)
+		}
+		if _, err := tx.NewUpdate().Model(&repo).WherePK().Exec(ctx); err != nil {
+			return fmt.Errorf("failed to update repository: %w", err)
+		}
+		return nil
+	})
 }

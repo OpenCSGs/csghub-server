@@ -122,6 +122,7 @@ func (c *datasetComponentImpl) commonIndex(ctx context.Context, filter *types.Re
 			MirrorTaskStatus:      mirrorTaskStatus,
 			XnetMigrationStatus:   xnetMigrationStatus,
 			XnetMigrationProgress: xnetMigrationProgress,
+			Status:           dataset.Status,
 			// CE version doesn't support dataset purchase features
 			// So we don't set DatasetType, RelatedDatasetID, Price, Forked, IsForSale, UserPurchased fields
 		})
@@ -262,6 +263,23 @@ func (c *datasetComponentImpl) Refork(ctx context.Context, req types.CreateForkR
 	return nil, nil
 }
 
+func (c *datasetComponentImpl) CreateDatasetApplication(ctx context.Context, req *types.CreateDatasetApplicationReq) (*types.DatasetApplication, error) {
+	return nil, nil
+}
+
+func (c *datasetComponentImpl) GetDatasetApplication(ctx context.Context, namespace, name, currentUser string) (*types.DatasetApplication, error) {
+	return nil, nil
+}
+
+func (c *datasetComponentImpl) ReviewDatasetApplication(ctx context.Context, req *types.ReviewDatasetApplicationReq) (*types.DatasetApplication, error) {
+	return nil, nil
+}
+
+func (c *datasetComponentImpl) ListDatasetApplications(ctx context.Context, req *types.ListDatasetApplicationsReq) ([]*types.DatasetApplication, int, error) {
+	return nil, 0, nil
+}
+
+
 // NewDatasetComponent creates a new dataset component for CE version
 func NewDatasetComponent(config *config.Config) (DatasetComponent, error) {
 	c := &datasetComponentImpl{
@@ -273,8 +291,8 @@ func NewDatasetComponent(config *config.Config) (DatasetComponent, error) {
 		userLikesStore:         database.NewUserLikesStore(),
 		recomStore:             database.NewRecomStore(),
 		xnetMigrationTaskStore: database.NewXnetMigrationTaskStore(),
-		lfsMetaObjectStore:     database.NewLfsMetaObjectStore(),
-		extendDatasetImpl:      extendDatasetImpl{},
+		lfsMetaObjectStore:      database.NewLfsMetaObjectStore(),
+		extendDatasetImpl:       extendDatasetImpl{},
 	}
 	var err error
 	c.repoComponent, err = NewRepoComponentImpl(config)
@@ -309,6 +327,7 @@ func (c *datasetComponentImpl) createFork(ctx context.Context, req types.CreateF
 		LastUpdatedAt: time.Now(),
 		DatasetType:   "normal",
 		Forked:        true,
+		Status:        types.DatasetStatusNormal,
 	}
 
 	finalPath := path.Join(req.TargetNamespace, req.TargetName)
@@ -334,6 +353,7 @@ func (c *datasetComponentImpl) createFork(ctx context.Context, req types.CreateF
 		RelatedDatasetID: newDataset.RelatedDatasetID,
 		Price:            newDataset.Price,
 		Forked:           newDataset.Forked,
+		Status:           newDataset.Status,
 	}
 
 	return resDataset, nil

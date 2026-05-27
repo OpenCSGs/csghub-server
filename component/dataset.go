@@ -35,24 +35,32 @@ type DatasetComponent interface {
 	Refork(ctx context.Context, req types.CreateForkReq) (*types.Dataset, error)
 	// BuyDataset buys a dataset
 	BuyDataset(ctx context.Context, req *types.BuyDatasetReq) (*types.BuyDatasetResp, error)
+	// CreateDatasetApplication creates a dataset application (publish/unpublish)
+	CreateDatasetApplication(ctx context.Context, req *types.CreateDatasetApplicationReq) (*types.DatasetApplication, error)
+	// GetDatasetApplication gets the current application for a dataset
+	GetDatasetApplication(ctx context.Context, namespace, name, currentUser string) (*types.DatasetApplication, error)
+	// ReviewDatasetApplication reviews (approves/rejects) a dataset application
+	ReviewDatasetApplication(ctx context.Context, req *types.ReviewDatasetApplicationReq) (*types.DatasetApplication, error)
+	// ListDatasetApplications lists dataset applications
+	ListDatasetApplications(ctx context.Context, req *types.ListDatasetApplicationsReq) ([]*types.DatasetApplication, int, error)
 }
 
 // datasetComponentImpl is the base implementation of DatasetComponent
 type datasetComponentImpl struct {
-	config                 *config.Config
-	repoComponent          RepoComponent
-	tagStore               database.TagStore
-	datasetStore           database.DatasetStore
-	repoStore              database.RepoStore
-	namespaceStore         database.NamespaceStore
-	userStore              database.UserStore
-	sensitiveComponent     SensitiveComponent
-	gitServer              gitserver.GitServer
-	userLikesStore         database.UserLikesStore
-	userSvcClient          rpc.UserSvcClient
-	recomStore             database.RecomStore
-	xnetMigrationTaskStore database.XnetMigrationTaskStore
-	lfsMetaObjectStore     database.LfsMetaObjectStore
+	config                  *config.Config
+	repoComponent           RepoComponent
+	tagStore                database.TagStore
+	datasetStore            database.DatasetStore
+	repoStore               database.RepoStore
+	namespaceStore          database.NamespaceStore
+	userStore               database.UserStore
+	sensitiveComponent      SensitiveComponent
+	gitServer               gitserver.GitServer
+	userLikesStore          database.UserLikesStore
+	userSvcClient           rpc.UserSvcClient
+	recomStore              database.RecomStore
+	xnetMigrationTaskStore  database.XnetMigrationTaskStore
+	lfsMetaObjectStore      database.LfsMetaObjectStore
 	extendDatasetImpl
 }
 
@@ -107,6 +115,7 @@ func (c *datasetComponentImpl) GetByID(ctx context.Context, datasetID int64) (*t
 		RelatedDatasetID: dataset.RelatedDatasetID,
 		Price:            dataset.Price,
 		Forked:           dataset.Forked,
+		Status:           dataset.Status,
 	}, nil
 }
 
@@ -216,6 +225,7 @@ func (c *datasetComponentImpl) Create(ctx context.Context, req *types.CreateData
 		CreatedAt: dataset.CreatedAt,
 		UpdatedAt: dataset.UpdatedAt,
 		URL:       dataset.Repository.Path,
+		Status:    dataset.Status,
 	}
 
 	go func() {
@@ -236,7 +246,7 @@ func (c *datasetComponentImpl) Create(ctx context.Context, req *types.CreateData
 }
 
 func (c *datasetComponentImpl) validateDatasetUpdate(ctx context.Context, req *types.UpdateDatasetReq) error {
-	if req.DatasetType == "commercial" {
+	if req.DatasetType == types.DatasetTypeCommercial {
 		if req.RelatedDatasetID <= 0 {
 			return errorx.BadRequest(errors.New("related_dataset_id is required for commercial dataset"), errorx.Ctx().Set("related_dataset_id", req.RelatedDatasetID))
 		}
@@ -303,6 +313,7 @@ func (c *datasetComponentImpl) Update(ctx context.Context, req *types.UpdateData
 		RelatedDatasetID: dataset.RelatedDatasetID,
 		Price:            dataset.Price,
 		Forked:           dataset.Forked,
+		Status:           dataset.Status,
 	}
 
 	return resDataset, nil
@@ -419,6 +430,7 @@ func (c *datasetComponentImpl) OrgDatasets(ctx context.Context, req *types.OrgDa
 			RelatedDatasetID: data.RelatedDatasetID,
 			Price:            data.Price,
 			Forked:           data.Forked,
+			Status:           data.Status,
 		})
 	}
 

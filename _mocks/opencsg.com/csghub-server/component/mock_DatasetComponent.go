@@ -140,6 +140,65 @@ func (_c *MockDatasetComponent_Create_Call) RunAndReturn(run func(context.Contex
 	return _c
 }
 
+// CreateDatasetApplication provides a mock function with given fields: ctx, req
+func (_m *MockDatasetComponent) CreateDatasetApplication(ctx context.Context, req *types.CreateDatasetApplicationReq) (*types.DatasetApplication, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateDatasetApplication")
+	}
+
+	var r0 *types.DatasetApplication
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *types.CreateDatasetApplicationReq) (*types.DatasetApplication, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *types.CreateDatasetApplicationReq) *types.DatasetApplication); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.DatasetApplication)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *types.CreateDatasetApplicationReq) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockDatasetComponent_CreateDatasetApplication_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateDatasetApplication'
+type MockDatasetComponent_CreateDatasetApplication_Call struct {
+	*mock.Call
+}
+
+// CreateDatasetApplication is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req *types.CreateDatasetApplicationReq
+func (_e *MockDatasetComponent_Expecter) CreateDatasetApplication(ctx interface{}, req interface{}) *MockDatasetComponent_CreateDatasetApplication_Call {
+	return &MockDatasetComponent_CreateDatasetApplication_Call{Call: _e.mock.On("CreateDatasetApplication", ctx, req)}
+}
+
+func (_c *MockDatasetComponent_CreateDatasetApplication_Call) Run(run func(ctx context.Context, req *types.CreateDatasetApplicationReq)) *MockDatasetComponent_CreateDatasetApplication_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*types.CreateDatasetApplicationReq))
+	})
+	return _c
+}
+
+func (_c *MockDatasetComponent_CreateDatasetApplication_Call) Return(_a0 *types.DatasetApplication, _a1 error) *MockDatasetComponent_CreateDatasetApplication_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockDatasetComponent_CreateDatasetApplication_Call) RunAndReturn(run func(context.Context, *types.CreateDatasetApplicationReq) (*types.DatasetApplication, error)) *MockDatasetComponent_CreateDatasetApplication_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CreateFork provides a mock function with given fields: ctx, req
 func (_m *MockDatasetComponent) CreateFork(ctx context.Context, req types.CreateForkReq) (*types.Dataset, error) {
 	ret := _m.Called(ctx, req)
@@ -307,6 +366,67 @@ func (_c *MockDatasetComponent_GetByID_Call) RunAndReturn(run func(context.Conte
 	return _c
 }
 
+// GetDatasetApplication provides a mock function with given fields: ctx, namespace, name, currentUser
+func (_m *MockDatasetComponent) GetDatasetApplication(ctx context.Context, namespace string, name string, currentUser string) (*types.DatasetApplication, error) {
+	ret := _m.Called(ctx, namespace, name, currentUser)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetDatasetApplication")
+	}
+
+	var r0 *types.DatasetApplication
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) (*types.DatasetApplication, error)); ok {
+		return rf(ctx, namespace, name, currentUser)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) *types.DatasetApplication); ok {
+		r0 = rf(ctx, namespace, name, currentUser)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.DatasetApplication)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string) error); ok {
+		r1 = rf(ctx, namespace, name, currentUser)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockDatasetComponent_GetDatasetApplication_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetDatasetApplication'
+type MockDatasetComponent_GetDatasetApplication_Call struct {
+	*mock.Call
+}
+
+// GetDatasetApplication is a helper method to define mock.On call
+//   - ctx context.Context
+//   - namespace string
+//   - name string
+//   - currentUser string
+func (_e *MockDatasetComponent_Expecter) GetDatasetApplication(ctx interface{}, namespace interface{}, name interface{}, currentUser interface{}) *MockDatasetComponent_GetDatasetApplication_Call {
+	return &MockDatasetComponent_GetDatasetApplication_Call{Call: _e.mock.On("GetDatasetApplication", ctx, namespace, name, currentUser)}
+}
+
+func (_c *MockDatasetComponent_GetDatasetApplication_Call) Run(run func(ctx context.Context, namespace string, name string, currentUser string)) *MockDatasetComponent_GetDatasetApplication_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string))
+	})
+	return _c
+}
+
+func (_c *MockDatasetComponent_GetDatasetApplication_Call) Return(_a0 *types.DatasetApplication, _a1 error) *MockDatasetComponent_GetDatasetApplication_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockDatasetComponent_GetDatasetApplication_Call) RunAndReturn(run func(context.Context, string, string, string) (*types.DatasetApplication, error)) *MockDatasetComponent_GetDatasetApplication_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Index provides a mock function with given fields: ctx, filter, per, page, needOpWeight
 func (_m *MockDatasetComponent) Index(ctx context.Context, filter *types.RepoFilter, per int, page int, needOpWeight bool) ([]*types.Dataset, int, error) {
 	ret := _m.Called(ctx, filter, per, page, needOpWeight)
@@ -372,6 +492,72 @@ func (_c *MockDatasetComponent_Index_Call) Return(_a0 []*types.Dataset, _a1 int,
 }
 
 func (_c *MockDatasetComponent_Index_Call) RunAndReturn(run func(context.Context, *types.RepoFilter, int, int, bool) ([]*types.Dataset, int, error)) *MockDatasetComponent_Index_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ListDatasetApplications provides a mock function with given fields: ctx, req
+func (_m *MockDatasetComponent) ListDatasetApplications(ctx context.Context, req *types.ListDatasetApplicationsReq) ([]*types.DatasetApplication, int, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListDatasetApplications")
+	}
+
+	var r0 []*types.DatasetApplication
+	var r1 int
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, *types.ListDatasetApplicationsReq) ([]*types.DatasetApplication, int, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *types.ListDatasetApplicationsReq) []*types.DatasetApplication); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*types.DatasetApplication)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *types.ListDatasetApplicationsReq) int); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, *types.ListDatasetApplicationsReq) error); ok {
+		r2 = rf(ctx, req)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockDatasetComponent_ListDatasetApplications_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListDatasetApplications'
+type MockDatasetComponent_ListDatasetApplications_Call struct {
+	*mock.Call
+}
+
+// ListDatasetApplications is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req *types.ListDatasetApplicationsReq
+func (_e *MockDatasetComponent_Expecter) ListDatasetApplications(ctx interface{}, req interface{}) *MockDatasetComponent_ListDatasetApplications_Call {
+	return &MockDatasetComponent_ListDatasetApplications_Call{Call: _e.mock.On("ListDatasetApplications", ctx, req)}
+}
+
+func (_c *MockDatasetComponent_ListDatasetApplications_Call) Run(run func(ctx context.Context, req *types.ListDatasetApplicationsReq)) *MockDatasetComponent_ListDatasetApplications_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*types.ListDatasetApplicationsReq))
+	})
+	return _c
+}
+
+func (_c *MockDatasetComponent_ListDatasetApplications_Call) Return(_a0 []*types.DatasetApplication, _a1 int, _a2 error) *MockDatasetComponent_ListDatasetApplications_Call {
+	_c.Call.Return(_a0, _a1, _a2)
+	return _c
+}
+
+func (_c *MockDatasetComponent_ListDatasetApplications_Call) RunAndReturn(run func(context.Context, *types.ListDatasetApplicationsReq) ([]*types.DatasetApplication, int, error)) *MockDatasetComponent_ListDatasetApplications_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -558,6 +744,65 @@ func (_c *MockDatasetComponent_Relations_Call) Return(_a0 *types.Relations, _a1 
 }
 
 func (_c *MockDatasetComponent_Relations_Call) RunAndReturn(run func(context.Context, string, string, string) (*types.Relations, error)) *MockDatasetComponent_Relations_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ReviewDatasetApplication provides a mock function with given fields: ctx, req
+func (_m *MockDatasetComponent) ReviewDatasetApplication(ctx context.Context, req *types.ReviewDatasetApplicationReq) (*types.DatasetApplication, error) {
+	ret := _m.Called(ctx, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ReviewDatasetApplication")
+	}
+
+	var r0 *types.DatasetApplication
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *types.ReviewDatasetApplicationReq) (*types.DatasetApplication, error)); ok {
+		return rf(ctx, req)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *types.ReviewDatasetApplicationReq) *types.DatasetApplication); ok {
+		r0 = rf(ctx, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.DatasetApplication)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *types.ReviewDatasetApplicationReq) error); ok {
+		r1 = rf(ctx, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockDatasetComponent_ReviewDatasetApplication_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ReviewDatasetApplication'
+type MockDatasetComponent_ReviewDatasetApplication_Call struct {
+	*mock.Call
+}
+
+// ReviewDatasetApplication is a helper method to define mock.On call
+//   - ctx context.Context
+//   - req *types.ReviewDatasetApplicationReq
+func (_e *MockDatasetComponent_Expecter) ReviewDatasetApplication(ctx interface{}, req interface{}) *MockDatasetComponent_ReviewDatasetApplication_Call {
+	return &MockDatasetComponent_ReviewDatasetApplication_Call{Call: _e.mock.On("ReviewDatasetApplication", ctx, req)}
+}
+
+func (_c *MockDatasetComponent_ReviewDatasetApplication_Call) Run(run func(ctx context.Context, req *types.ReviewDatasetApplicationReq)) *MockDatasetComponent_ReviewDatasetApplication_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*types.ReviewDatasetApplicationReq))
+	})
+	return _c
+}
+
+func (_c *MockDatasetComponent_ReviewDatasetApplication_Call) Return(_a0 *types.DatasetApplication, _a1 error) *MockDatasetComponent_ReviewDatasetApplication_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockDatasetComponent_ReviewDatasetApplication_Call) RunAndReturn(run func(context.Context, *types.ReviewDatasetApplicationReq) (*types.DatasetApplication, error)) *MockDatasetComponent_ReviewDatasetApplication_Call {
 	_c.Call.Return(run)
 	return _c
 }
