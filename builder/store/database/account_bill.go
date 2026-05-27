@@ -44,6 +44,9 @@ type AccountBill struct {
 	APIKey          string          `bun:",notnull,default:''" json:"api_key"`
 	Count           float64         `bun:",notnull,default:0" json:"count"`
 	TokenID         int64           `bun:",notnull,default:0" json:"token_id"`
+	DataType        string          `bun:",notnull,default:''" json:"data_type"`
+	Resolution      string          `bun:",notnull,default:''" json:"resolution"`
+	Duration        float64         `bun:",notnull,default:0" json:"duration"`
 	times
 }
 

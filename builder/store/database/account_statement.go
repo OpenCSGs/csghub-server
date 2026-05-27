@@ -76,6 +76,9 @@ type AccountStatement struct {
 	TokenID          int64                 `bun:",notnull,default:0" json:"token_id"`
 	Purpose          types.RechargePurpose `bun:",nullzero" json:"purpose"`
 	PurposeDesc      string                `bun:",nullzero" json:"purpose_desc"`
+	DataType         string                `bun:",notnull,default:''" json:"data_type"`
+	Resolution       string                `bun:",notnull,default:''" json:"resolution"`
+	Duration         float64               `bun:",notnull,default:0" json:"duration"`
 }
 
 type AccountStatementRes struct {
@@ -186,7 +189,7 @@ func (as *accountStatementStoreImpl) deductFeeStatement(ctx context.Context, inp
 
 		var err error
 
-		if input.Scene == types.SceneModelServerless && len(input.APIKey) > 0 {
+		if utils.IsGetTokenID(input.Scene) && len(input.APIKey) > 0 {
 			token, err := findByTokenValue(ctx, tx, input.APIKey)
 			if err != nil {
 				slog.WarnContext(ctx, "find token by value failed, error", slog.Any("error", err))
@@ -399,8 +402,19 @@ func updateFeeBill(ctx context.Context, tx bun.Tx, input AccountStatement) error
 		CompletionToken: input.CompletionToken,
 		Count:           1,
 		TokenID:         input.TokenID,
+		DataType:        input.DataType,
+		Resolution:      input.Resolution,
+		Duration:        input.Duration,
 	}
-	err := tx.NewSelect().Model(&bill).Where("bill_date = ? and user_uuid = ? and scene = ? and customer_id = ? and token_id = ?", input.EventDate, input.UserUUID, input.Scene, input.CustomerID, input.TokenID).For("UPDATE").Scan(ctx)
+	err := tx.NewSelect().Model(&bill).
+		Where("bill_date = ?", input.EventDate).
+		Where("user_uuid = ?", input.UserUUID).
+		Where("scene = ?", input.Scene).
+		Where("customer_id = ?", input.CustomerID).
+		Where("token_id = ?", input.TokenID).
+		Where("data_type = ?", input.DataType).
+		Where("resolution = ?", input.Resolution).
+		For("UPDATE").Scan(ctx)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return fmt.Errorf("select statement, error:%w", err)
 	}
@@ -411,8 +425,20 @@ func updateFeeBill(ctx context.Context, tx bun.Tx, input AccountStatement) error
 		}
 	} else {
 		_, err = tx.NewUpdate().Model(&bill).
-			Where("bill_date = ? and user_uuid = ? and scene = ? and customer_id = ? and token_id = ?", input.EventDate, input.UserUUID, input.Scene, input.CustomerID, input.TokenID).
-			Set("value = value + ?, consumption = consumption + ?, prompt_token = prompt_token + ?, completion_token = completion_token + ?, count = count + 1, updated_at=current_timestamp", input.Value, input.Consumption, input.PromptToken, input.CompletionToken).
+			Where("bill_date = ?", input.EventDate).
+			Where("user_uuid = ?", input.UserUUID).
+			Where("scene = ?", input.Scene).
+			Where("customer_id = ?", input.CustomerID).
+			Where("token_id = ?", input.TokenID).
+			Where("data_type = ?", input.DataType).
+			Where("resolution = ?", input.Resolution).
+			Set("value = value + ?", input.Value).
+			Set("consumption = consumption + ?", input.Consumption).
+			Set("prompt_token = prompt_token + ?", input.PromptToken).
+			Set("completion_token = completion_token + ?", input.CompletionToken).
+			Set("count = count + 1").
+			Set("updated_at = current_timestamp").
+			Set("duration = duration + ?", input.Duration).
 			Exec(ctx)
 		if err != nil {
 			return fmt.Errorf("update bill for %s, error:%w", input.EventUUID, err)

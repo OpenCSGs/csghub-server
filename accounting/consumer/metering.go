@@ -177,7 +177,7 @@ func (m *MeteringImpl) pubFeeEventWithReTry(raw []byte, evt *types.MeteringEvent
 		switch evt.ValueType {
 		case types.TimeDurationMinType:
 			err = m.bldMQ.Publish(bldmq.FeeSendSubject, raw)
-		case types.TokenNumberType:
+		case types.TokenNumberType, types.CountNumberType:
 			err = m.bldMQ.Publish(bldmq.TokenSendSubject, raw)
 		case types.QuotaNumberType:
 			err = m.bldMQ.Publish(bldmq.QuotaSendSubject, raw)

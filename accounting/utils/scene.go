@@ -9,6 +9,7 @@ func IsNeedCalculateBill(scene types.SceneType) bool {
 		types.SceneModelFinetune,
 		types.SceneEvaluation,
 		types.SceneModelServerless,
+		types.SceneMultiModalServerless,
 		types.SceneStarship,
 		types.SceneGuiAgent:
 		return true
@@ -54,6 +55,8 @@ func GetSKUTypeByScene(scene types.SceneType) types.SKUType {
 		return types.SKUCSGHub
 	case types.SceneModelServerless:
 		return types.SKUCSGHub
+	case types.SceneMultiModalServerless:
+		return types.SKUCSGHub
 	case types.SceneStarship:
 		return types.SKUStarship
 	case types.SceneGuiAgent:
@@ -92,4 +95,13 @@ func IsNeedCheckUserSubscription(scene types.SceneType) bool {
 	default:
 		return false
 	}
+}
+
+func IsGetTokenID(scene types.SceneType) bool {
+	switch scene {
+	case types.SceneModelServerless,
+		types.SceneMultiModalServerless:
+		return true
+	}
+	return false
 }
