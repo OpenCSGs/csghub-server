@@ -1559,6 +1559,36 @@ func TestRepoComponent_DeployStop(t *testing.T) {
 
 }
 
+func TestRepoComponent_DeployStop_ErrNoRows(t *testing.T) {
+	ctx := context.TODO()
+	repo := initializeTestRepoComponent(ctx, t)
+
+	dr := types.DeployRequest{DeployID: 3, Namespace: "ns", Name: "n"}
+	repo.mocks.deployer.EXPECT().Stop(ctx, dr).Return(nil)
+	repo.mocks.deployer.EXPECT().Exist(ctx, dr).Return(false, sql.ErrNoRows)
+	repo.mocks.stores.DeployTaskMock().EXPECT().StopDeploy(
+		ctx, types.ModelRepo, int64(0), int64(2), int64(3),
+	).Return(nil)
+	repo.mocks.stores.UserMock().EXPECT().FindByUsername(ctx, "user").Return(database.User{
+		ID: 2,
+	}, nil)
+	repo.mocks.stores.DeployTaskMock().EXPECT().GetDeployByID(ctx, int64(3)).Return(&database.Deploy{
+		UserID: 2,
+	}, nil)
+
+	err := repo.DeployStop(ctx, types.DeployActReq{
+		RepoType:     types.ModelRepo,
+		Namespace:    "ns",
+		Name:         "n",
+		CurrentUser:  "user",
+		DeployID:     3,
+		DeployType:   1,
+		InstanceName: "i1",
+	})
+	require.Nil(t, err)
+
+}
+
 func TestRepoComponent_AllowReadAccessByDeployID(t *testing.T) {
 	ctx := context.TODO()
 	repo := initializeTestRepoComponent(ctx, t)
