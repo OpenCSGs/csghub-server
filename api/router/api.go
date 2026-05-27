@@ -421,7 +421,6 @@ func NewRouter(config *config.Config, enableSwagger bool) (*gin.Engine, error) {
 	// Admin user get repo path list
 	adminGroup.GET("/repos", repoCommonHandler.GetRepos)
 
-
 	// routes for broadcast
 	broadcastHandler, err := handler.NewBroadcastHandler()
 	if err != nil {
@@ -599,7 +598,7 @@ func createActivityLogRoutes(apiGroup *gin.RouterGroup, middlewareCollection mid
 	}
 
 	handler := handler.NewActivityLogHandler(comp)
-	apiGroup.GET("/activity_logs", middlewareCollection.Auth.NeedAPIKey, handler.List)
+	apiGroup.GET("/admin/activity_logs", middlewareCollection.Auth.NeedAdmin, handler.List)
 	return nil
 }
 
