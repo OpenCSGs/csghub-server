@@ -9,8 +9,9 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
-	"opencsg.com/csghub-server/builder/rpc"
 	"strings"
+
+	"opencsg.com/csghub-server/builder/rpc"
 
 	"opencsg.com/csghub-server/common/types"
 )
@@ -59,7 +60,7 @@ func (c *Client) doRequest(ctx context.Context, method, url, host string, header
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Connection", "keep-alive")
 	if len(host) > 0 {
-		req.Header.Set("Host", host)
+		req.Host = host
 	}
 
 	for k, v := range headers {
