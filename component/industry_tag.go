@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"opencsg.com/csghub-server/builder/git"
@@ -90,6 +91,9 @@ func (c *industryTagComponentImpl) RefreshRepoAutoIndustryTags(ctx context.Conte
 	if err != nil {
 		return err
 	}
+	if len(result.TagIDs) == 0 {
+		slog.Warn("no industry tags detected", slog.Any("reason", result.Reason))
+	}
 
 	return c.tagStore.ReplaceRepoTagsByCategoryAndSource(ctx, repo.ID, "industry", types.TagSourceAuto, result.TagIDs)
 }
@@ -133,7 +137,7 @@ func (c *industryTagComponentImpl) IdentifyIndustryTags(ctx context.Context, req
 	}
 	llmConfig, err := c.llmConfigStore.GetModelForSummaryReadme(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("load llm config for industry identification: %w", err)
+		return &types.IdentifyIndustryTagsResult{Reason: fmt.Sprintf("failed to load LLM config: %v", err)}, nil
 	}
 
 	var headers map[string]string
