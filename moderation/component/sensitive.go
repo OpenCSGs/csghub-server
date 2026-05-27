@@ -74,17 +74,15 @@ func (c SensitiveComponentImpl) PassImageCheck(ctx context.Context, scenario typ
 }
 
 func (c SensitiveComponentImpl) PassStreamCheck(ctx context.Context, req *types.LLMCheckRequest) (*sensitive.CheckResult, error) {
-	req.ModelName = c.cfg.SensitiveCheck.LLM.GuardStreamModel
+	req.Stream = true
 	req.IsAppendSystemPromot = false
 	req.Role = string(gwtype.RoleAssistant)
 	return c.checker.PassLLMCheck(ctx, req)
 }
 
 func (c SensitiveComponentImpl) PassLLMQueryCheck(ctx context.Context, req *types.LLMCheckRequest) (*sensitive.CheckResult, error) {
-	req.ModelName = c.cfg.SensitiveCheck.LLM.GuardModel
 	req.IsAppendSystemPromot = false
 	if req.Stream {
-		req.ModelName = c.cfg.SensitiveCheck.LLM.GuardStreamModel
 		req.IsAppendSystemPromot = true
 	}
 	req.Role = string(gwtype.RoleUser)

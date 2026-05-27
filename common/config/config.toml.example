@@ -82,6 +82,36 @@ region = ""
 endpoint = "oss-cn-beijing.aliyuncs.com"
 enable_ssl = true
 
+[sensitive_check.llm]
+enable = false
+timeout_ms = 1200
+max_tokens = 50
+temperature = 0.0
+response_mode = "json_or_text"
+
+# Model configurations - each model must have a type: "guard" or "guard_stream"
+# Type "guard" is used for non-streaming content checks
+# Type "guard_stream" is used for streaming content checks
+[[sensitive_check.llm.model_configs]]
+model = "Qwen/Qwen3Guard-Gen-0.6B"
+type = "guard"
+# Optional: override default endpoint for this model
+endpoint = "https://aigateway.prod.com/v1/chat/completions"
+# Optional: override default headers for this model
+[sensitive_check.llm.model_configs.headers]
+Authorization = "Bearer custom-token-1"
+Host = "custom-host1.example.com"
+
+[[sensitive_check.llm.model_configs]]
+model = "Qwen/Qwen3Guard-Stream-0.6B"
+type = "guard_stream"
+# Optional: override default endpoint for this model
+endpoint = "https://aigateway.stream.com/v1/chat/completions"
+# Optional: override default headers for this model
+[sensitive_check.llm.model_configs.headers]
+Authorization = "Bearer custom-token-2"
+Host = "custom-host2.example.com"
+
 [jwt]
 signing_key = "signing-key"
 valid_hour = 24
