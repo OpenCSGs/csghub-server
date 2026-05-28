@@ -17,6 +17,22 @@ import (
 
 var configFile = ""
 
+// ModelConfig represents per-model endpoint and header configuration.
+// Each guard model (Guard/GuardStream) can have its own endpoint and custom HTTP headers.
+type ModelConfig struct {
+	// Model is the model identifier sent in the LLM request body (e.g., "Qwen/Qwen3Guard-Gen-0.6B").
+	Model string `env:"MODEL" default:"Qwen/Qwen3Guard-Gen-0.6B"`
+	// Endpoint is the full URL of the LLM inference service (e.g., "https://ai.space.opencsg.com/v1/chat/completions").
+	Endpoint string `env:"ENDPOINT" default:"https://ai.space.opencsg.com"`
+	// Headers are custom HTTP headers sent with each request to this model.
+	// Common headers:
+	//   - "Authorization": API authentication, e.g., "Bearer <token>"
+	//   - "Host": virtual host for routing (e.g., "s-qwen-qwen3guard-gen-0-6b-c0v.spaces.a800.external")
+	//   - "X-Custom-Header": any other custom header required by the upstream service
+	// Note: "Host" is set via req.Host (not req.Header) to comply with Go's HTTP client behavior.
+	Headers map[string]string `env:"HEADERS" default:""`
+}
+
 type Config struct {
 	Saas          bool   `env:"STARHUB_SERVER_SAAS" default:"false"`
 	Oversea       bool   `env:"STARHUB_SERVER_OVERSEA" default:"false"`
@@ -137,16 +153,17 @@ type Config struct {
 		MaxContentLength int `env:"STARHUB_SERVER_SENSITIVE_CHECK_MAX_CONTENT_LENGTH" default:"2000"`
 
 		LLM struct {
-			Enable           bool    `env:"STARHUB_SERVER_SENSITIVE_CHECK_LLM_ENABLE" default:"false"`
-			Endpoint         string  `env:"STARHUB_SERVER_SENSITIVE_CHECK_LLM_ENDPOINT"`
-			APIKey           string  `env:"STARHUB_SERVER_SENSITIVE_CHECK_LLM_API_KEY"`
-			GuardModel       string  `env:"STARHUB_SERVER_SENSITIVE_CHECK_LLM_GUARD_MODEL" default:"Qwen/Qwen3Guard-Gen-0.6B"`
-			GuardStreamModel string  `env:"STARHUB_SERVER_SENSITIVE_CHECK_LLM_GUARD_STREAM_MODEL" default:"Qwen/Qwen3Guard-Gen-Stream-0.6B"`
-			TimeoutMS        int     `env:"STARHUB_SERVER_SENSITIVE_CHECK_LLM_TIMEOUT_MS" default:"3000"`
-			MaxTokens        int     `env:"STARHUB_SERVER_SENSITIVE_CHECK_LLM_MAX_TOKENS" default:"128"`
-			Temperature      float64 `env:"STARHUB_SERVER_SENSITIVE_CHECK_LLM_TEMPERATURE" default:"0"`
-			ResponseMode     string  `env:"STARHUB_SERVER_SENSITIVE_CHECK_LLM_RESPONSE_MODE" default:"json_or_text"`
-			SafetyRegex      string  `env:"STARHUB_SERVER_SENSITIVE_CHECK_LLM_SAFETY_REGEX" default:"Safety:\\s*(Safe|Unsafe|Controversial)"`
+			Enable       bool    `env:"STARHUB_SERVER_SENSITIVE_CHECK_LLM_ENABLE" default:"false"`
+			TimeoutMS    int     `env:"STARHUB_SERVER_SENSITIVE_CHECK_LLM_TIMEOUT_MS" default:"3000"`
+			MaxTokens    int     `env:"STARHUB_SERVER_SENSITIVE_CHECK_LLM_MAX_TOKENS" default:"128"`
+			Temperature  float64 `env:"STARHUB_SERVER_SENSITIVE_CHECK_LLM_TEMPERATURE" default:"0"`
+			ResponseMode string  `env:"STARHUB_SERVER_SENSITIVE_CHECK_LLM_RESPONSE_MODE" default:"json_or_text"`
+			SafetyRegex  string  `env:"STARHUB_SERVER_SENSITIVE_CHECK_LLM_SAFETY_REGEX" default:"Safety:\\s*(Safe|Unsafe|Controversial)"`
+			// Guard is the model config for non-stream sensitive checks.
+			// Each must have a Model and Endpoint. Headers (including Authorization) are per-model.
+			Guard ModelConfig `env:",prefix=STARHUB_SERVER_SENSITIVE_CHECK_LLM_GUARD_"`
+			// GuardStream is the model config for stream sensitive checks.
+			GuardStream ModelConfig `env:",prefix=STARHUB_SERVER_SENSITIVE_CHECK_LLM_GUARD_STREAM_"`
 		}
 
 		StreamContextCache struct {
@@ -722,11 +739,15 @@ func loadConfig() (*Config, error) {
 		Target:           cfg,
 		DefaultOverwrite: true,
 	})
+	if err != nil {
+		return nil, err
+	}
+
 	if len(cfg.UniqueServiceName) < 1 {
 		cfg.UniqueServiceName = genServiceName()
 	}
 
-	return cfg, err
+	return cfg, nil
 }
 
 func genServiceName() string {

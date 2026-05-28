@@ -49,7 +49,6 @@ func TestSensitiveComponentImpl_PassImageURLCheck(t *testing.T) {
 func TestSensitiveComponentImpl_PassLLMQueryCheck(t *testing.T) {
 	mockSeneitive := mock_sensitive.NewMockSensitiveChecker(t)
 	cfg := &config.Config{}
-	cfg.SensitiveCheck.LLM.GuardModel = "test-model"
 	component := SensitiveComponentImpl{
 		checker: mockSeneitive,
 		cfg:     cfg,
@@ -60,7 +59,6 @@ func TestSensitiveComponentImpl_PassLLMQueryCheck(t *testing.T) {
 		AccountId: "123",
 		MaxTokens: 0,
 		RawJSON:   "",
-		ModelName: "test-model",
 		Role:      "user",
 	}).
 		Return(&sensitive.CheckResult{
@@ -72,7 +70,38 @@ func TestSensitiveComponentImpl_PassLLMQueryCheck(t *testing.T) {
 		AccountId: "123",
 		MaxTokens: 0,
 		RawJSON:   "",
-		Role:      "user",
+	})
+	assert.NoError(t, err)
+	assert.False(t, result.IsSensitive)
+}
+
+func TestSensitiveComponentImpl_PassLLMQueryCheck_Stream(t *testing.T) {
+	mockSeneitive := mock_sensitive.NewMockSensitiveChecker(t)
+	cfg := &config.Config{}
+	component := SensitiveComponentImpl{
+		checker: mockSeneitive,
+		cfg:     cfg,
+	}
+	mockSeneitive.EXPECT().PassLLMCheck(mock.Anything, &types.LLMCheckRequest{
+		Scenario:             types.ScenarioNicknameDetection,
+		Text:                 "你好",
+		AccountId:            "123",
+		MaxTokens:            0,
+		RawJSON:              "",
+		Stream:               true,
+		IsAppendSystemPromot: true,
+		Role:                 "user",
+	}).
+		Return(&sensitive.CheckResult{
+			IsSensitive: false,
+		}, nil)
+	result, err := component.PassLLMQueryCheck(context.Background(), &types.LLMCheckRequest{
+		Scenario:  types.ScenarioNicknameDetection,
+		Text:      "你好",
+		AccountId: "123",
+		MaxTokens: 0,
+		RawJSON:   "",
+		Stream:    true,
 	})
 	assert.NoError(t, err)
 	assert.False(t, result.IsSensitive)
@@ -81,7 +110,6 @@ func TestSensitiveComponentImpl_PassLLMQueryCheck(t *testing.T) {
 func TestSensitiveComponentImpl_PassStreamCheck(t *testing.T) {
 	mockSeneitive := mock_sensitive.NewMockSensitiveChecker(t)
 	cfg := &config.Config{}
-	cfg.SensitiveCheck.LLM.GuardStreamModel = "test-stream-model"
 	component := SensitiveComponentImpl{
 		checker: mockSeneitive,
 		cfg:     cfg,
@@ -92,7 +120,7 @@ func TestSensitiveComponentImpl_PassStreamCheck(t *testing.T) {
 		SessionId: "123",
 		MaxTokens: 0,
 		RawJSON:   "",
-		ModelName: "test-stream-model",
+		Stream:    true,
 		Role:      "assistant",
 	}).
 		Return(&sensitive.CheckResult{
@@ -104,7 +132,6 @@ func TestSensitiveComponentImpl_PassStreamCheck(t *testing.T) {
 		SessionId: "123",
 		MaxTokens: 0,
 		RawJSON:   "",
-		Role:      "assistant",
 	})
 	assert.NoError(t, err)
 	assert.False(t, result.IsSensitive)
