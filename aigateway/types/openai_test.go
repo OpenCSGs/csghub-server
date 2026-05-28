@@ -20,12 +20,13 @@ func TestModelSerialization(t *testing.T) {
 			SupportFunctionCall: true,
 		},
 		InternalModelInfo: InternalModelInfo{
-			CSGHubModelID: "test/repo/path",
-			OwnerUUID:     "test-owner-uuid",
-			ClusterID:     "test-cluster-id",
-			SvcName:       "test-service",
-			SvcType:       1,
-			ImageID:       "test-image-id",
+			CSGHubModelID:    "test/repo/path",
+			OwnerUUID:        "test-owner-uuid",
+			ClusterID:        "test-cluster-id",
+			SvcName:          "test-service",
+			SvcType:          1,
+			ImageID:          "test-image-id",
+			RuntimeFramework: "hf-inference-toolkit",
 		},
 		ExternalModelInfo: ExternalModelInfo{
 			Provider: "test-provider",
@@ -79,6 +80,9 @@ func TestModelSerialization(t *testing.T) {
 		}
 		if !contains(jsonStr, "image_id") || !contains(jsonStr, "test-image-id") {
 			t.Errorf("Internal response should contain expanded InternalModelInfo fields, got: %s", jsonStr)
+		}
+		if !contains(jsonStr, "runtime_framework") || !contains(jsonStr, "hf-inference-toolkit") {
+			t.Errorf("Internal response should contain runtime_framework, got: %s", jsonStr)
 		}
 		// csghub_model_id, owner_uuid, and svc_type must survive the Redis round-trip so
 		// that RecordUsage can populate resource_id for inference models.
@@ -192,12 +196,13 @@ func TestInferenceModelRoundTrip(t *testing.T) {
 			OwnedBy: "Qwen",
 		},
 		InternalModelInfo: InternalModelInfo{
-			CSGHubModelID: "Qwen/Qwen3Guard-Gen-0.6B",
-			OwnerUUID:     "uuid-owner-123",
-			ClusterID:     "cluster-abc",
-			SvcName:       "fgufi9nytc00",
-			SvcType:       2,
-			ImageID:       "img-xyz",
+			CSGHubModelID:    "Qwen/Qwen3Guard-Gen-0.6B",
+			OwnerUUID:        "uuid-owner-123",
+			ClusterID:        "cluster-abc",
+			SvcName:          "fgufi9nytc00",
+			SvcType:          2,
+			ImageID:          "img-xyz",
+			RuntimeFramework: "hf-inference-toolkit",
 		},
 		Endpoint:    "http://inference.internal/v1",
 		InternalUse: true,
@@ -215,6 +220,7 @@ func TestInferenceModelRoundTrip(t *testing.T) {
 	require.Equal(t, original.ClusterID, restored.ClusterID, "ClusterID must round-trip")
 	require.Equal(t, original.SvcName, restored.SvcName, "SvcName must round-trip")
 	require.Equal(t, original.ImageID, restored.ImageID, "ImageID must round-trip")
+	require.Equal(t, original.RuntimeFramework, restored.RuntimeFramework, "RuntimeFramework must round-trip")
 	require.Equal(t, original.ID, restored.ID, "ID must round-trip")
 	require.Equal(t, original.Endpoint, restored.Endpoint, "Endpoint must round-trip")
 }
