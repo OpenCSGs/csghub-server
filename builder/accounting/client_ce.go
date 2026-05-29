@@ -66,7 +66,7 @@ func (ac *accountingClientImpl) CreatePrice(currentUser string, req types.AcctPr
 	return nil, nil
 }
 
-func (ac *accountingClientImpl) UpdatePrice(currentUser string, req types.AcctPriceCreateReq, id int64) (any, error) {
+func (ac *accountingClientImpl) UpdatePrice(currentUser string, req types.AcctPriceUpdateReq, id int64) (any, error) {
 	return nil, nil
 }
 

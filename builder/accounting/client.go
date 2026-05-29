@@ -9,6 +9,7 @@ import (
 	"net/url"
 
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -28,7 +29,7 @@ type AccountingClient interface {
 	QueryPricesBySkuTypeAndKinds(currentUser string, req types.AcctPriceListByKindsReq) (any, error)
 	GetPriceByID(currentUser string, id int64) (any, error)
 	CreatePrice(currentUser string, req types.AcctPriceCreateReq) (any, error)
-	UpdatePrice(currentUser string, req types.AcctPriceCreateReq, id int64) (any, error)
+	UpdatePrice(currentUser string, req types.AcctPriceUpdateReq, id int64) (any, error)
 	DeletePrice(currentUser string, id int64) (any, error)
 	ListMeteringsByUserIDAndTime(req types.ActStatementsReq) (any, error)
 	CreateOrder(currentUser string, req types.AcctOrderCreateReq) (any, error)
@@ -84,6 +85,9 @@ func (ac *accountingClientImpl) doRequest(method, subPath string, data any) (*ht
 	resp, err := ac.client.Do(req)
 	if err != nil {
 		return nil, err
+	}
+	if resp.StatusCode == 404 {
+		return nil, errorx.ErrDatabaseNoRows
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		var errData any

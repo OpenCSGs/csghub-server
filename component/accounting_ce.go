@@ -69,7 +69,7 @@ func (ac *accountingComponentImpl) CreatePrice(currentUser string, req types.Acc
 	return nil, nil
 }
 
-func (ac *accountingComponentImpl) UpdatePrice(currentUser string, req types.AcctPriceCreateReq, id int64) (interface{}, error) {
+func (ac *accountingComponentImpl) UpdatePrice(currentUser string, req types.AcctPriceUpdateReq, id int64) (interface{}, error) {
 	return nil, nil
 }
 

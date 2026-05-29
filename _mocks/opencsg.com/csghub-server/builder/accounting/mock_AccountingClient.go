@@ -1368,7 +1368,7 @@ func (_c *MockAccountingClient_StatementsIndex_Call) RunAndReturn(run func(types
 }
 
 // UpdatePrice provides a mock function with given fields: currentUser, req, id
-func (_m *MockAccountingClient) UpdatePrice(currentUser string, req types.AcctPriceCreateReq, id int64) (any, error) {
+func (_m *MockAccountingClient) UpdatePrice(currentUser string, req types.AcctPriceUpdateReq, id int64) (any, error) {
 	ret := _m.Called(currentUser, req, id)
 
 	if len(ret) == 0 {
@@ -1377,10 +1377,10 @@ func (_m *MockAccountingClient) UpdatePrice(currentUser string, req types.AcctPr
 
 	var r0 any
 	var r1 error
-	if rf, ok := ret.Get(0).(func(string, types.AcctPriceCreateReq, int64) (any, error)); ok {
+	if rf, ok := ret.Get(0).(func(string, types.AcctPriceUpdateReq, int64) (any, error)); ok {
 		return rf(currentUser, req, id)
 	}
-	if rf, ok := ret.Get(0).(func(string, types.AcctPriceCreateReq, int64) any); ok {
+	if rf, ok := ret.Get(0).(func(string, types.AcctPriceUpdateReq, int64) any); ok {
 		r0 = rf(currentUser, req, id)
 	} else {
 		if ret.Get(0) != nil {
@@ -1388,7 +1388,7 @@ func (_m *MockAccountingClient) UpdatePrice(currentUser string, req types.AcctPr
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(string, types.AcctPriceCreateReq, int64) error); ok {
+	if rf, ok := ret.Get(1).(func(string, types.AcctPriceUpdateReq, int64) error); ok {
 		r1 = rf(currentUser, req, id)
 	} else {
 		r1 = ret.Error(1)
@@ -1404,15 +1404,15 @@ type MockAccountingClient_UpdatePrice_Call struct {
 
 // UpdatePrice is a helper method to define mock.On call
 //   - currentUser string
-//   - req types.AcctPriceCreateReq
+//   - req types.AcctPriceUpdateReq
 //   - id int64
 func (_e *MockAccountingClient_Expecter) UpdatePrice(currentUser interface{}, req interface{}, id interface{}) *MockAccountingClient_UpdatePrice_Call {
 	return &MockAccountingClient_UpdatePrice_Call{Call: _e.mock.On("UpdatePrice", currentUser, req, id)}
 }
 
-func (_c *MockAccountingClient_UpdatePrice_Call) Run(run func(currentUser string, req types.AcctPriceCreateReq, id int64)) *MockAccountingClient_UpdatePrice_Call {
+func (_c *MockAccountingClient_UpdatePrice_Call) Run(run func(currentUser string, req types.AcctPriceUpdateReq, id int64)) *MockAccountingClient_UpdatePrice_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string), args[1].(types.AcctPriceCreateReq), args[2].(int64))
+		run(args[0].(string), args[1].(types.AcctPriceUpdateReq), args[2].(int64))
 	})
 	return _c
 }
@@ -1422,7 +1422,7 @@ func (_c *MockAccountingClient_UpdatePrice_Call) Return(_a0 any, _a1 error) *Moc
 	return _c
 }
 
-func (_c *MockAccountingClient_UpdatePrice_Call) RunAndReturn(run func(string, types.AcctPriceCreateReq, int64) (any, error)) *MockAccountingClient_UpdatePrice_Call {
+func (_c *MockAccountingClient_UpdatePrice_Call) RunAndReturn(run func(string, types.AcctPriceUpdateReq, int64) (any, error)) *MockAccountingClient_UpdatePrice_Call {
 	_c.Call.Return(run)
 	return _c
 }
