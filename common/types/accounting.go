@@ -86,6 +86,13 @@ var (
 	SKUCompletionMultiModal SKUKind = 7 // Multi Model LLM completion for image/audio/video
 )
 
+type SkuStatus int
+
+var (
+	SkuStatusEnabled  SkuStatus = 1 // price is enabled and active
+	SkuStatusDisabled SkuStatus = 9 // price is disabled/deprecated, 2~8 are reserved for future use
+)
+
 var (
 	ChargeBalance     string = "balance"
 	ChargeCashBalance string = "cash_balance"
@@ -303,9 +310,9 @@ type RechargeReq struct {
 }
 
 type AcctQuotaReq struct {
-	RepoCountLimit int64 `json:"repo_count_limit"`
-	SpeedLimit     int64 `json:"speed_limit"`
-	TrafficLimit   int64 `json:"traffic_limit"`
+	RepoCountLimit int64 `json:"repo_count_limit" binding:"required,min=0"`
+	SpeedLimit     int64 `json:"speed_limit" binding:"required,min=0"`
+	TrafficLimit   int64 `json:"traffic_limit" binding:"required,min=0"`
 }
 
 type AcctQuotaStatementReq struct {
@@ -360,33 +367,52 @@ type MeteringEvent struct {
 }
 
 type AcctPriceCreateReq struct {
-	SkuType          SKUType     `json:"sku_type"`
-	SkuPrice         int64       `json:"sku_price"`
-	SkuUnit          int64       `json:"sku_unit"`
-	SkuDesc          string      `json:"sku_desc"`
-	ResourceID       string      `json:"resource_id"`
-	SkuUnitType      SkuUnitType `json:"sku_unit_type"`
+	SkuType          SKUType     `json:"sku_type" binding:"required,oneof=1 2"`
+	SkuPrice         int64       `json:"sku_price" binding:"required,min=0"`
+	SkuUnit          int64       `json:"sku_unit" binding:"required,min=1"`
+	SkuDesc          string      `json:"sku_desc" binding:"required"`
+	ResourceID       string      `json:"resource_id" binding:"required"`
+	SkuUnitType      SkuUnitType `json:"sku_unit_type" binding:"required"`
 	SkuPriceCurrency string      `json:"sku_price_currency"`
-	SkuKind          SKUKind     `json:"sku_kind"`
+	SkuKind          SKUKind     `json:"sku_kind" binding:"required"`
 	Quota            string      `json:"quota"`
 	SkuPriceID       int64       `json:"sku_price_id"`
 	Discount         float64     `json:"discount" binding:"omitempty,min=0,max=1"`
 	UseLimitPrice    int64       `json:"use_limit_price"`
 	Resolution       string      `json:"resolution"`
+	SkuStatus        SkuStatus   `json:"sku_status" binding:"required,oneof=1 9"`
+}
+
+type AcctPriceUpdateReq struct {
+	SkuType          *SKUType     `json:"sku_type"`
+	SkuPrice         *int64       `json:"sku_price"`
+	SkuUnit          *int64       `json:"sku_unit"`
+	SkuDesc          *string      `json:"sku_desc"`
+	ResourceID       *string      `json:"resource_id"`
+	SkuUnitType      *SkuUnitType `json:"sku_unit_type"`
+	SkuPriceCurrency *string      `json:"sku_price_currency"`
+	SkuKind          *SKUKind     `json:"sku_kind"`
+	Quota            *string      `json:"quota"`
+	SkuPriceID       *int64       `json:"sku_price_id"`
+	Discount         *float64     `json:"discount"`
+	UseLimitPrice    *int64       `json:"use_limit_price"`
+	Resolution       *string      `json:"resolution"`
+	SkuStatus        *SkuStatus   `json:"sku_status"`
 }
 
 type AcctPriceResp struct {
-	Id               int64   `json:"id"`
-	SkuType          SKUType `json:"sku_type"`
-	SkuPrice         int64   `json:"sku_price"`
-	SkuUnit          int64   `json:"sku_unit"`
-	SkuDesc          string  `json:"sku_desc"`
-	ResourceID       string  `json:"resource_id"`
-	SkuUnitType      string  `json:"sku_unit_type"`
-	SkuPriceCurrency string  `json:"sku_price_currency"`
-	SkuKind          SKUKind `json:"sku_kind"`
-	Quota            string  `json:"quota"`
-	SkuPriceID       int64   `json:"sku_price_id"`
+	Id               int64     `json:"id"`
+	SkuType          SKUType   `json:"sku_type"`
+	SkuPrice         int64     `json:"sku_price"`
+	SkuUnit          int64     `json:"sku_unit"`
+	SkuDesc          string    `json:"sku_desc"`
+	ResourceID       string    `json:"resource_id"`
+	SkuUnitType      string    `json:"sku_unit_type"`
+	SkuPriceCurrency string    `json:"sku_price_currency"`
+	SkuKind          SKUKind   `json:"sku_kind"`
+	Quota            string    `json:"quota"`
+	SkuPriceID       int64     `json:"sku_price_id"`
+	SkuStatus        SkuStatus `json:"sku_status"`
 }
 
 type AcctPriceQueryReq struct {
@@ -426,13 +452,14 @@ type AcctOrderExpiredEvent struct {
 //
 // in accounting price DB
 type AcctPriceListDBReq struct {
-	SkuType    SKUType  `json:"sku_type"`
-	SkuKind    string   `json:"sku_kind"`
-	ResourceID []string `json:"resource_id"`
-	SortBy     string   `json:"sort_by"`
-	SortOrder  string   `json:"sort_order"`
-	Per        int      `json:"per"`
-	Page       int      `json:"page"`
+	SkuType    SKUType   `json:"sku_type"`
+	SkuKind    string    `json:"sku_kind"`
+	ResourceID []string  `json:"resource_id"`
+	SkuStatus  SkuStatus `json:"sku_status"`
+	SortBy     string    `json:"sort_by"`
+	SortOrder  string    `json:"sort_order"`
+	Per        int       `json:"per"`
+	Page       int       `json:"page"`
 }
 
 type AcctPriceListByKindsReq struct {
@@ -441,17 +468,15 @@ type AcctPriceListByKindsReq struct {
 	ResourceID string    `json:"resource_id"`
 }
 
-// used for listing prices with pagination and filter
-//
-// in accounting service and starhub server
 type AcctPriceListReq struct {
 	SkuType    SKUType             `json:"sku_type" form:"sku_type"`
 	SkuKind    string              `json:"sku_kind" form:"sku_kind"`
 	ResourceID []string            `json:"resource_id" form:"resource_id"`
+	SkuStatus  SkuStatus           `json:"sku_status" form:"sku_status,default=1"`
 	Filter     AcctPriceListFilter `json:"-"`
 	SortBy     string              `json:"sort_by" form:"sort_by" binding:"omitempty,oneof=resource_id"`
 	SortOrder  string              `json:"sort_order" form:"sort_order" binding:"omitempty,oneof=ASC DESC asc desc"`
-	Per        int                 `json:"per" form:"per,default=50" binding:"min=1,max=100"`
+	Per        int                 `json:"per" form:"per,default=50" binding:"min=1"`
 	Page       int                 `json:"page" form:"page,default=1" binding:"min=1"`
 }
 

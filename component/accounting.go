@@ -41,7 +41,7 @@ type AccountingComponent interface {
 	QueryPricesBySkuTypeAndKinds(currentUser string, req types.AcctPriceListByKindsReq) (any, error)
 	GetPriceByID(currentUser string, id int64) (interface{}, error)
 	CreatePrice(currentUser string, req types.AcctPriceCreateReq) (interface{}, error)
-	UpdatePrice(currentUser string, req types.AcctPriceCreateReq, id int64) (interface{}, error)
+	UpdatePrice(currentUser string, req types.AcctPriceUpdateReq, id int64) (interface{}, error)
 	DeletePrice(currentUser string, id int64) (interface{}, error)
 	CreateOrder(currentUser string, req types.AcctOrderCreateReq) (*database.AccountOrder, error)
 	ListMeteringsByUserIDAndTime(ctx context.Context, req types.ActStatementsReq) (interface{}, error)

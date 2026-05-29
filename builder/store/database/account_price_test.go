@@ -100,23 +100,23 @@ func TestAccountPriceStore_GetLatestByTime(t *testing.T) {
 	prices := []*database.AccountPrice{
 		{
 			SkuType: types.SKUCSGHub, SkuKind: types.SKUPackageAddon, ResourceID: "r",
-			SkuUnitType: "u", SkuDesc: "a",
+			SkuUnitType: "u", SkuDesc: "a", SkuStatus: types.SkuStatusEnabled,
 		},
 		{
 			SkuType: types.SKUReserve, SkuKind: types.SKUPackageAddon, ResourceID: "r",
-			SkuUnitType: "u", SkuDesc: "b",
+			SkuUnitType: "u", SkuDesc: "b", SkuStatus: types.SkuStatusEnabled,
 		},
 		{
 			SkuType: types.SKUCSGHub, SkuKind: types.SKUPackageAddon, ResourceID: "r",
-			SkuUnitType: "u", SkuDesc: "c",
+			SkuUnitType: "u", SkuDesc: "c", SkuStatus: types.SkuStatusEnabled,
 		},
 		{
 			SkuType: types.SKUCSGHub, SkuKind: types.SKUTimeSpan, ResourceID: "r",
-			SkuUnitType: "u", SkuDesc: "d",
+			SkuUnitType: "u", SkuDesc: "d", SkuStatus: types.SkuStatusEnabled,
 		},
 		{
 			SkuType: types.SKUCSGHub, SkuKind: types.SKUPackageAddon, ResourceID: "r",
-			SkuUnitType: "u", SkuDesc: "e",
+			SkuUnitType: "u", SkuDesc: "e", SkuStatus: types.SkuStatusEnabled,
 		},
 	}
 
@@ -158,27 +158,27 @@ func TestAccountPriceStore_ListBySkuType(t *testing.T) {
 	prices := []*database.AccountPrice{
 		{
 			SkuType: types.SKUCSGHub, SkuKind: types.SKUPackageAddon, ResourceID: "r",
-			SkuUnitType: "u", SkuDesc: "a",
+			SkuUnitType: "u", SkuDesc: "a", SkuStatus: types.SkuStatusEnabled,
 		},
 		{
 			SkuType: types.SKUCSGHub, SkuKind: types.SKUPackageAddon, ResourceID: "c",
-			SkuUnitType: "u", SkuDesc: "b",
+			SkuUnitType: "u", SkuDesc: "b", SkuStatus: types.SkuStatusEnabled,
 		},
 		{
 			SkuType: types.SKUCSGHub, SkuKind: types.SKUPayAsYouGo, ResourceID: "r",
-			SkuUnitType: "u", SkuDesc: "c",
+			SkuUnitType: "u", SkuDesc: "c", SkuStatus: types.SkuStatusEnabled,
 		},
 		{
 			SkuType: types.SKUCSGHub, SkuKind: types.SKUPayAsYouGo, ResourceID: "r",
-			SkuUnitType: "u", SkuDesc: "d",
+			SkuUnitType: "u", SkuDesc: "d", SkuStatus: types.SkuStatusDisabled,
 		},
 		{
 			SkuType: types.SKUCSGHub, SkuKind: types.SKUPayAsYouGo, ResourceID: "r",
-			SkuUnitType: "u", SkuDesc: "e",
+			SkuUnitType: "u", SkuDesc: "e", SkuStatus: types.SkuStatusDisabled,
 		},
 		{
 			SkuType: types.SKUReserve, SkuKind: types.SKUPackageAddon, ResourceID: "r",
-			SkuUnitType: "u", SkuDesc: "f",
+			SkuUnitType: "u", SkuDesc: "f", SkuStatus: types.SkuStatusEnabled,
 		},
 	}
 
@@ -196,9 +196,10 @@ func TestAccountPriceStore_ListBySkuType(t *testing.T) {
 	}
 
 	data, count, err := store.ListBySkuType(ctx, types.AcctPriceListDBReq{
-		SkuType: types.SKUCSGHub,
-		Page:    1,
-		Per:     10,
+		SkuType:   types.SKUCSGHub,
+		SkuStatus: types.SkuStatusEnabled,
+		Page:      1,
+		Per:       10,
 	})
 	require.Nil(t, err)
 	require.Equal(t, 3, count)
@@ -206,10 +207,11 @@ func TestAccountPriceStore_ListBySkuType(t *testing.T) {
 	require.Equal(t, "c/b/a", namesFunc(data))
 
 	data, count, err = store.ListBySkuType(ctx, types.AcctPriceListDBReq{
-		SkuType: types.SKUCSGHub,
-		SkuKind: cast.ToString(int(types.SKUPackageAddon)),
-		Page:    1,
-		Per:     10,
+		SkuType:   types.SKUCSGHub,
+		SkuKind:   cast.ToString(int(types.SKUPackageAddon)),
+		SkuStatus: types.SkuStatusEnabled,
+		Page:      1,
+		Per:       10,
 	})
 	require.Nil(t, err)
 	require.Equal(t, 2, count)
@@ -220,6 +222,7 @@ func TestAccountPriceStore_ListBySkuType(t *testing.T) {
 		SkuType:    types.SKUCSGHub,
 		SkuKind:    cast.ToString(int(types.SKUPackageAddon)),
 		ResourceID: []string{"r"},
+		SkuStatus:  types.SkuStatusEnabled,
 		Page:       1,
 		Per:        10,
 	})
@@ -240,15 +243,15 @@ func TestAccountPriceStore_ListBySkuType_WithSort(t *testing.T) {
 	prices := []*database.AccountPrice{
 		{
 			SkuType: types.SKUCSGHub, SkuKind: types.SKUPackageAddon, ResourceID: "r1",
-			SkuUnitType: "u", SkuDesc: "a",
+			SkuUnitType: "u", SkuDesc: "a", SkuStatus: types.SkuStatusEnabled,
 		},
 		{
 			SkuType: types.SKUCSGHub, SkuKind: types.SKUPackageAddon, ResourceID: "r3",
-			SkuUnitType: "u", SkuDesc: "b",
+			SkuUnitType: "u", SkuDesc: "b", SkuStatus: types.SkuStatusEnabled,
 		},
 		{
 			SkuType: types.SKUCSGHub, SkuKind: types.SKUPackageAddon, ResourceID: "r2",
-			SkuUnitType: "u", SkuDesc: "c",
+			SkuUnitType: "u", SkuDesc: "c", SkuStatus: types.SkuStatusEnabled,
 		},
 	}
 
@@ -340,23 +343,23 @@ func TestAccountPriceStore_ListBySkuTypeAndKinds(t *testing.T) {
 	prices := []*database.AccountPrice{
 		{
 			SkuType: types.SKUCSGHub, SkuKind: types.SKUPackageAddon, ResourceID: "r1",
-			SkuUnitType: "u", SkuDesc: "a",
+			SkuUnitType: "u", SkuDesc: "a", SkuStatus: types.SkuStatusEnabled,
 		},
 		{
 			SkuType: types.SKUCSGHub, SkuKind: types.SKUPackageAddon, ResourceID: "r2",
-			SkuUnitType: "u", SkuDesc: "b",
+			SkuUnitType: "u", SkuDesc: "b", SkuStatus: types.SkuStatusEnabled,
 		},
 		{
 			SkuType: types.SKUCSGHub, SkuKind: types.SKUPayAsYouGo, ResourceID: "r1",
-			SkuUnitType: "u", SkuDesc: "c",
+			SkuUnitType: "u", SkuDesc: "c", SkuStatus: types.SkuStatusEnabled,
 		},
 		{
 			SkuType: types.SKUCSGHub, SkuKind: types.SKUPayAsYouGo, ResourceID: "r2",
-			SkuUnitType: "u", SkuDesc: "d",
+			SkuUnitType: "u", SkuDesc: "d", SkuStatus: types.SkuStatusEnabled,
 		},
 		{
 			SkuType: types.SKUReserve, SkuKind: types.SKUPackageAddon, ResourceID: "r1",
-			SkuUnitType: "u", SkuDesc: "e",
+			SkuUnitType: "u", SkuDesc: "e", SkuStatus: types.SkuStatusEnabled,
 		},
 	}
 
