@@ -616,6 +616,10 @@ func (w *LfsSyncWorker) downloadAndUploadLFSFile(
 	}
 	repoPath := ctx.Value(rk).(string)
 
+	if pointer.Size <= partSize {
+		return w.downloadAndUploadSmallFile(ctx, repo, pointer, objectKey)
+	}
+
 	uploadID, err = w.syncCache.GetUploadID(ctx, repoPath, pointer.Oid, strconv.Itoa(w.config.Mirror.PartSize))
 	if err != nil {
 		slog.Error(
@@ -1063,6 +1067,59 @@ func (w *LfsSyncWorker) multipartUploadWithRetry(
 		slog.Any("objectKey", objectKey),
 		slog.Any("repoPath", repoPath),
 	)
+	return nil
+}
+
+func (w *LfsSyncWorker) downloadAndUploadSmallFile(
+	ctx context.Context,
+	repo *database.Repository,
+	pointer *types.Pointer,
+	objectKey string,
+) error {
+	slog.Info(
+		"downloading small file directly",
+		slog.Int("workerID", w.id),
+		slog.Any("oid", pointer.Oid),
+		slog.Any("size", pointer.Size),
+	)
+
+	resp, err := w.downloadRange(pointer.DownloadURL, 0, pointer.Size-1)
+	if err != nil {
+		return fmt.Errorf("failed to download small file: %w", err)
+	}
+	defer resp.Body.Close()
+
+	_, err = w.ossClient.PutObject(ctx, w.config.S3.Bucket, objectKey, resp.Body, pointer.Size, minio.PutObjectOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to put object: %w", err)
+	}
+
+	info, err := w.ossClient.StatObject(ctx, w.config.S3.Bucket, objectKey, minio.StatObjectOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to stat object %s: %w", objectKey, err)
+	}
+
+	if info.Size != pointer.Size {
+		err := w.ossClient.RemoveObject(ctx, w.config.S3.Bucket, objectKey, minio.RemoveObjectOptions{})
+		if err != nil {
+			slog.Warn("failed to remove mismatched object", slog.Int("workerID", w.id), slog.Any("error", err))
+		}
+		return fmt.Errorf(
+			"object size mismatch, oid: %s actually size %d, expect size %d",
+			pointer.Oid, info.Size, pointer.Size)
+	}
+
+	lmo := database.LfsMetaObject{
+		Size:         pointer.Size,
+		Oid:          pointer.Oid,
+		RepositoryID: repo.ID,
+		Existing:     true,
+	}
+	_, err = w.lfsMetaObjectStore.UpdateOrCreate(ctx, lmo)
+	if err != nil {
+		return fmt.Errorf("failed to update lfs meta object existing: %w", err)
+	}
+
 	return nil
 }
 

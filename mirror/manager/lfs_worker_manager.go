@@ -176,6 +176,11 @@ func (m *Manager) startWorker(id int, mt *database.MirrorTask) {
 	m.mu.Unlock()
 
 	lfsSyncWorker.Run(mt)
+	m.mu.Lock()
+	if w, ok := m.workers[id]; ok && w.Worker == lfsSyncWorker {
+		delete(m.workers, id)
+	}
+	m.mu.Unlock()
 	m.conChan <- id
 }
 
