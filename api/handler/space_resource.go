@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"opencsg.com/csghub-server/api/httpbase"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 	"opencsg.com/csghub-server/component"
 )
@@ -111,6 +112,10 @@ func (h *SpaceResourceHandler) Create(ctx *gin.Context) {
 	}
 	spaceResource, err := h.spaceResource.Create(ctx.Request.Context(), &req)
 	if err != nil {
+		if errors.Is(err, errorx.ErrBadRequest) {
+			httpbase.BadRequestWithExt(ctx, err)
+			return
+		}
 		slog.ErrorContext(ctx.Request.Context(), "Failed to create space resources", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return
@@ -153,6 +158,10 @@ func (h *SpaceResourceHandler) Update(ctx *gin.Context) {
 
 	spaceResource, err := h.spaceResource.Update(ctx.Request.Context(), req)
 	if err != nil {
+		if errors.Is(err, errorx.ErrBadRequest) {
+			httpbase.BadRequestWithExt(ctx, err)
+			return
+		}
 		slog.ErrorContext(ctx.Request.Context(), "Failed to update space resource", slog.Any("error", err))
 		httpbase.ServerError(ctx, err)
 		return

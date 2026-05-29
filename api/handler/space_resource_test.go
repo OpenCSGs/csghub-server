@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	mockcomponent "opencsg.com/csghub-server/_mocks/opencsg.com/csghub-server/component"
 	"opencsg.com/csghub-server/builder/testutil"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -117,15 +118,34 @@ func TestSpaceResourceHandler_Create(t *testing.T) {
 	tester.mocks.spaceResource.EXPECT().Create(tester.Ctx(), &types.CreateSpaceResourceReq{
 		ClusterID: "c",
 		Name:      "n",
-		Resources: "r",
+		Resources: `{"cpu":{"num":"2"}}`,
 	}).Return(
 		&types.SpaceResource{Name: "sp"}, nil,
 	)
 	tester.WithBody(t, &types.CreateSpaceResourceReq{
-		ClusterID: "c", Name: "n", Resources: "r",
+		ClusterID: "c", Name: "n", Resources: `{"cpu":{"num":"2"}}`,
 	}).WithUser().Execute()
 
 	tester.ResponseEq(t, 200, tester.OKText, &types.SpaceResource{Name: "sp"})
+}
+
+func TestSpaceResourceHandler_Create_InvalidResources(t *testing.T) {
+	tester := NewSpaceResourceTester(t).WithHandleFunc(func(h *SpaceResourceHandler) gin.HandlerFunc {
+		return h.Create
+	})
+
+	tester.mocks.spaceResource.EXPECT().Create(tester.Ctx(), &types.CreateSpaceResourceReq{
+		ClusterID: "c",
+		Name:      "n",
+		Resources: "invalid-json",
+	}).Return(
+		nil, errorx.BadRequest(errors.New("invalid json"), nil),
+	)
+	tester.WithBody(t, &types.CreateSpaceResourceReq{
+		ClusterID: "c", Name: "n", Resources: "invalid-json",
+	}).WithUser().Execute()
+
+	tester.ResponseEqCode(t, 400)
 }
 
 func TestSpaceResourceHandler_Update(t *testing.T) {
@@ -135,16 +155,35 @@ func TestSpaceResourceHandler_Update(t *testing.T) {
 
 	tester.mocks.spaceResource.EXPECT().Update(tester.Ctx(), &types.UpdateSpaceResourceReq{
 		Name:      "n",
-		Resources: "r",
+		Resources: `{"cpu":{"num":"2"}}`,
 		ID:        1,
 	}).Return(
 		&types.SpaceResource{Name: "sp"}, nil,
 	)
 	tester.WithBody(t, &types.UpdateSpaceResourceReq{
-		Name: "n", Resources: "r",
+		Name: "n", Resources: `{"cpu":{"num":"2"}}`,
 	}).WithUser().WithParam("id", "1").Execute()
 
 	tester.ResponseEq(t, 200, tester.OKText, &types.SpaceResource{Name: "sp"})
+}
+
+func TestSpaceResourceHandler_Update_InvalidResources(t *testing.T) {
+	tester := NewSpaceResourceTester(t).WithHandleFunc(func(h *SpaceResourceHandler) gin.HandlerFunc {
+		return h.Update
+	})
+
+	tester.mocks.spaceResource.EXPECT().Update(tester.Ctx(), &types.UpdateSpaceResourceReq{
+		Name:      "n",
+		Resources: "invalid-json",
+		ID:        1,
+	}).Return(
+		nil, errorx.BadRequest(errors.New("invalid json"), nil),
+	)
+	tester.WithBody(t, &types.UpdateSpaceResourceReq{
+		Name: "n", Resources: "invalid-json",
+	}).WithUser().WithParam("id", "1").Execute()
+
+	tester.ResponseEqCode(t, 400)
 }
 
 func TestSpaceResourceHandler_Delete(t *testing.T) {

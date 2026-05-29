@@ -3,12 +3,15 @@ package component
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"math"
+	"strings"
 
 	"opencsg.com/csghub-server/builder/deploy"
 	"opencsg.com/csghub-server/builder/deploy/common"
 	"opencsg.com/csghub-server/builder/store/database"
+	"opencsg.com/csghub-server/common/errorx"
 	"opencsg.com/csghub-server/common/types"
 )
 
@@ -26,6 +29,19 @@ type SpaceResourceComponent interface {
 	Delete(ctx context.Context, id int64) error
 	ListHardwareTypes(ctx context.Context, clusterId string) ([]string, error)
 	ListAll(ctx context.Context) ([]types.SpaceResource, error)
+}
+
+// validateResources checks that the Resources string is non-empty and valid
+// JSON that can be unmarshalled into a HardWare struct.
+func validateResources(resources string) error {
+	if strings.TrimSpace(resources) == "" {
+		return errorx.BadRequest(errors.New("resources is empty"), errorx.Ctx().Set("field", "resources"))
+	}
+	var hw types.HardWare
+	if err := json.Unmarshal([]byte(resources), &hw); err != nil {
+		return errorx.BadRequest(err, errorx.Ctx().Set("field", "resources"))
+	}
+	return nil
 }
 
 func (c *spaceResourceComponentImpl) Index(ctx context.Context, req *types.SpaceResourceIndexReq) ([]types.SpaceResource, int, error) {
@@ -112,6 +128,9 @@ func (c *spaceResourceComponentImpl) Index(ctx context.Context, req *types.Space
 }
 
 func (c *spaceResourceComponentImpl) Update(ctx context.Context, req *types.UpdateSpaceResourceReq) (*types.SpaceResource, error) {
+	if err := validateResources(req.Resources); err != nil {
+		return nil, err
+	}
 	sr, err := c.spaceResourceStore.FindByID(ctx, req.ID)
 	if err != nil {
 		slog.Error("error getting space resource", slog.Any("error", err))
@@ -136,6 +155,9 @@ func (c *spaceResourceComponentImpl) Update(ctx context.Context, req *types.Upda
 }
 
 func (c *spaceResourceComponentImpl) Create(ctx context.Context, req *types.CreateSpaceResourceReq) (*types.SpaceResource, error) {
+	if err := validateResources(req.Resources); err != nil {
+		return nil, err
+	}
 	sr := database.SpaceResource{
 		Name:      req.Name,
 		Resources: req.Resources,
