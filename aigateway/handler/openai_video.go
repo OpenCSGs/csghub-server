@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"mime/multipart"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -354,7 +355,7 @@ func (h *OpenAIHandlerImpl) GetVideoContent(c *gin.Context) {
 	if !ok {
 		return
 	}
-	rp, ok := newVideoReverseProxy(c, ctx, target.modelTarget)
+	rp, ok := newVideoReverseProxy(c, ctx, target.modelTarget, proxy.WithoutAcceptEncoding())
 	if !ok {
 		return
 	}
@@ -717,7 +718,7 @@ func applyVideoProviderRequest(req *http.Request, providerReq *text2video.Provid
 }
 
 func streamVideoDownloadURL(c *gin.Context, downloadURL string) {
-	req, err := http.NewRequestWithContext(c.Request.Context(), http.MethodGet, downloadURL, nil)
+	parsed, err := url.Parse(downloadURL)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": types.Error{
 			Code:    "internal_error",
@@ -726,24 +727,24 @@ func streamVideoDownloadURL(c *gin.Context, downloadURL string) {
 		}})
 		return
 	}
-	resp, err := http.DefaultClient.Do(req)
+	target := parsed.Scheme + "://" + parsed.Host
+	rp, err := proxy.NewReverseProxy(target)
 	if err != nil {
-		c.JSON(http.StatusBadGateway, gin.H{"error": types.Error{
-			Code:    "provider_error",
+		c.JSON(http.StatusInternalServerError, gin.H{"error": types.Error{
+			Code:    "internal_error",
 			Message: err.Error(),
-			Type:    "server_error",
+			Type:    "internal_error",
 		}})
 		return
 	}
-	defer resp.Body.Close()
 
-	for key, values := range resp.Header {
-		for _, value := range values {
-			c.Writer.Header().Add(key, value)
-		}
-	}
-	c.Status(resp.StatusCode)
-	_, _ = io.Copy(c.Writer, resp.Body)
+	req := c.Request.Clone(c.Request.Context())
+	req.Method = http.MethodGet
+	req.URL.RawQuery = parsed.RawQuery
+	req.Body = nil
+	req.ContentLength = 0
+
+	rp.ServeHTTP(videoStreamingWriter{w: c.Writer}, req, parsed.Path, parsed.Host)
 }
 
 func newGatewayResourceID() string {
