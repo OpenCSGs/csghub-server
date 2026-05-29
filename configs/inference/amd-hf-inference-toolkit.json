@@ -1,5 +1,5 @@
 {
-  "engine_name": "hf-inference-toolkit",
+  "engine_name": "amd-hf-inference-toolkit",
   "enabled": 1,
   "container_port": 8000,
   "model_format": "safetensors",
