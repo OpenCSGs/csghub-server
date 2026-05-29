@@ -113,6 +113,7 @@ func (m Model) MarshalJSON() ([]byte, error) {
 			SvcName             *string                      `json:"svc_name,omitempty"`
 			SvcType             *int                         `json:"svc_type,omitempty"`
 			ImageID             *string                      `json:"image_id,omitempty"`
+			RuntimeFramework    *string                      `json:"runtime_framework,omitempty"`
 			AuthHead            *string                      `json:"auth_head,omitempty"`
 			Provider            *string                      `json:"provider,omitempty"`
 			NeedSensitiveCheck  bool                         `json:"need_sensitive_check"`
@@ -160,6 +161,9 @@ func (m Model) MarshalJSON() ([]byte, error) {
 		if m.ImageID != "" {
 			resp.ImageID = &m.ImageID
 		}
+		if m.RuntimeFramework != "" {
+			resp.RuntimeFramework = &m.RuntimeFramework
+		}
 
 		return json.Marshal(resp)
 	} else {
@@ -197,6 +201,7 @@ func (m *Model) UnmarshalJSON(data []byte) error {
 		SvcName             string                       `json:"svc_name,omitempty"`
 		SvcType             int                          `json:"svc_type,omitempty"`
 		ImageID             string                       `json:"image_id,omitempty"`
+		RuntimeFramework    string                       `json:"runtime_framework,omitempty"`
 		AuthHead            string                       `json:"auth_head,omitempty"`
 		Provider            string                       `json:"provider,omitempty"`
 		NeedSensitiveCheck  bool                         `json:"need_sensitive_check"`
@@ -223,6 +228,7 @@ func (m *Model) UnmarshalJSON(data []byte) error {
 	m.SvcName = aux.SvcName
 	m.SvcType = aux.SvcType
 	m.ImageID = aux.ImageID
+	m.RuntimeFramework = aux.RuntimeFramework
 	m.AuthHead = aux.AuthHead
 	m.Provider = aux.Provider
 	m.NeedSensitiveCheck = aux.NeedSensitiveCheck
