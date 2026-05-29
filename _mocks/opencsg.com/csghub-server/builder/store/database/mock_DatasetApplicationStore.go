@@ -376,9 +376,9 @@ func (_c *MockDatasetApplicationStore_FindPendingByDatasetID_Call) RunAndReturn(
 	return _c
 }
 
-// List provides a mock function with given fields: ctx, status, per, page
-func (_m *MockDatasetApplicationStore) List(ctx context.Context, status string, per int, page int) ([]*database.DatasetApplication, int, error) {
-	ret := _m.Called(ctx, status, per, page)
+// List provides a mock function with given fields: ctx, status, search, per, page
+func (_m *MockDatasetApplicationStore) List(ctx context.Context, status string, search string, per int, page int) ([]*database.DatasetApplication, int, error) {
+	ret := _m.Called(ctx, status, search, per, page)
 
 	if len(ret) == 0 {
 		panic("no return value specified for List")
@@ -387,25 +387,25 @@ func (_m *MockDatasetApplicationStore) List(ctx context.Context, status string, 
 	var r0 []*database.DatasetApplication
 	var r1 int
 	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, int, int) ([]*database.DatasetApplication, int, error)); ok {
-		return rf(ctx, status, per, page)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, int, int) ([]*database.DatasetApplication, int, error)); ok {
+		return rf(ctx, status, search, per, page)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, int, int) []*database.DatasetApplication); ok {
-		r0 = rf(ctx, status, per, page)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, int, int) []*database.DatasetApplication); ok {
+		r0 = rf(ctx, status, search, per, page)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]*database.DatasetApplication)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, int, int) int); ok {
-		r1 = rf(ctx, status, per, page)
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, int, int) int); ok {
+		r1 = rf(ctx, status, search, per, page)
 	} else {
 		r1 = ret.Get(1).(int)
 	}
 
-	if rf, ok := ret.Get(2).(func(context.Context, string, int, int) error); ok {
-		r2 = rf(ctx, status, per, page)
+	if rf, ok := ret.Get(2).(func(context.Context, string, string, int, int) error); ok {
+		r2 = rf(ctx, status, search, per, page)
 	} else {
 		r2 = ret.Error(2)
 	}
@@ -421,15 +421,16 @@ type MockDatasetApplicationStore_List_Call struct {
 // List is a helper method to define mock.On call
 //   - ctx context.Context
 //   - status string
+//   - search string
 //   - per int
 //   - page int
-func (_e *MockDatasetApplicationStore_Expecter) List(ctx interface{}, status interface{}, per interface{}, page interface{}) *MockDatasetApplicationStore_List_Call {
-	return &MockDatasetApplicationStore_List_Call{Call: _e.mock.On("List", ctx, status, per, page)}
+func (_e *MockDatasetApplicationStore_Expecter) List(ctx interface{}, status interface{}, search interface{}, per interface{}, page interface{}) *MockDatasetApplicationStore_List_Call {
+	return &MockDatasetApplicationStore_List_Call{Call: _e.mock.On("List", ctx, status, search, per, page)}
 }
 
-func (_c *MockDatasetApplicationStore_List_Call) Run(run func(ctx context.Context, status string, per int, page int)) *MockDatasetApplicationStore_List_Call {
+func (_c *MockDatasetApplicationStore_List_Call) Run(run func(ctx context.Context, status string, search string, per int, page int)) *MockDatasetApplicationStore_List_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(int), args[3].(int))
+		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(int), args[4].(int))
 	})
 	return _c
 }
@@ -439,7 +440,7 @@ func (_c *MockDatasetApplicationStore_List_Call) Return(_a0 []*database.DatasetA
 	return _c
 }
 
-func (_c *MockDatasetApplicationStore_List_Call) RunAndReturn(run func(context.Context, string, int, int) ([]*database.DatasetApplication, int, error)) *MockDatasetApplicationStore_List_Call {
+func (_c *MockDatasetApplicationStore_List_Call) RunAndReturn(run func(context.Context, string, string, int, int) ([]*database.DatasetApplication, int, error)) *MockDatasetApplicationStore_List_Call {
 	_c.Call.Return(run)
 	return _c
 }

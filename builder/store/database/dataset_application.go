@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/looplab/fsm"
@@ -89,7 +90,7 @@ type DatasetApplicationStore interface {
 	FindByIDForUpdate(ctx context.Context, id int64) (*DatasetApplication, error)
 	FindByDatasetID(ctx context.Context, datasetID int64) ([]*DatasetApplication, error)
 	FindPendingByDatasetID(ctx context.Context, datasetID int64) (*DatasetApplication, error)
-	List(ctx context.Context, status string, per, page int) ([]*DatasetApplication, int, error)
+	List(ctx context.Context, status, search string, per, page int) ([]*DatasetApplication, int, error)
 	// CreateApplicationAndLinkDataset creates an application and updates dataset's CurrentApplicationID in a transaction with row lock
 	CreateApplicationAndLinkDataset(ctx context.Context, app DatasetApplication) (*DatasetApplication, error)
 	// ReviewApplication executes the full review in a transaction with row locks.
@@ -182,7 +183,7 @@ func (s *datasetApplicationStoreImpl) FindPendingByDatasetID(ctx context.Context
 	return &app, nil
 }
 
-func (s *datasetApplicationStoreImpl) List(ctx context.Context, status string, per, page int) ([]*DatasetApplication, int, error) {
+func (s *datasetApplicationStoreImpl) List(ctx context.Context, status, search string, per, page int) ([]*DatasetApplication, int, error) {
 	var apps []*DatasetApplication
 	query := s.db.Operator.Core.NewSelect().
 		Model(&apps).
@@ -191,6 +192,13 @@ func (s *datasetApplicationStoreImpl) List(ctx context.Context, status string, p
 		Relation("Dataset.Repository")
 	if status != "" {
 		query = query.Where("dataset_application.status = ?", status)
+	}
+	if search != "" {
+		query = query.
+			Join("JOIN datasets ON datasets.id = dataset_application.dataset_id").
+			Join("JOIN repositories ON repositories.id = datasets.repository_id").
+			Where("LOWER(repositories.name) LIKE ? OR LOWER(repositories.path) LIKE ?",
+				"%"+strings.ToLower(search)+"%", "%"+strings.ToLower(search)+"%")
 	}
 	query = query.Order("dataset_application.created_at DESC").
 		Limit(per).

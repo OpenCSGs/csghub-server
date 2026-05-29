@@ -290,7 +290,7 @@ func TestListDatasetApplications(t *testing.T) {
 		{ID: 1, Status: types.DatasetApplicationStatusPending, Action: types.DatasetApplicationActionInitial},
 		{ID: 2, Status: types.DatasetApplicationStatusApproved, Action: types.DatasetApplicationActionEdit},
 	}
-	appStore.On("List", ctx, "", 10, 1).Return(apps, 2, nil)
+	appStore.On("List", ctx, "", "", 10, 1).Return(apps, 2, nil)
 
 	req := &types.ListDatasetApplicationsReq{Per: 10, Page: 1}
 	result, total, err := c.ListDatasetApplications(ctx, req)
@@ -306,9 +306,25 @@ func TestListDatasetApplications_WithStatus(t *testing.T) {
 	apps := []*database.DatasetApplication{
 		{ID: 1, Status: types.DatasetApplicationStatusPending, Action: types.DatasetApplicationActionInitial},
 	}
-	appStore.On("List", ctx, "pending", 10, 1).Return(apps, 1, nil)
+	appStore.On("List", ctx, "pending", "", 10, 1).Return(apps, 1, nil)
 
 	req := &types.ListDatasetApplicationsReq{Per: 10, Page: 1, Status: "pending"}
+	result, total, err := c.ListDatasetApplications(ctx, req)
+	require.Nil(t, err)
+	require.Equal(t, 1, total)
+	require.Len(t, result, 1)
+}
+
+func TestListDatasetApplications_WithSearch(t *testing.T) {
+	ctx := context.TODO()
+	c, _, _, _, appStore := setupSaaSComponent(t)
+
+	apps := []*database.DatasetApplication{
+		{ID: 1, Status: types.DatasetApplicationStatusPending, Action: types.DatasetApplicationActionInitial},
+	}
+	appStore.On("List", ctx, "", "my-dataset", 10, 1).Return(apps, 1, nil)
+
+	req := &types.ListDatasetApplicationsReq{Per: 10, Page: 1, Search: "my-dataset"}
 	result, total, err := c.ListDatasetApplications(ctx, req)
 	require.Nil(t, err)
 	require.Equal(t, 1, total)

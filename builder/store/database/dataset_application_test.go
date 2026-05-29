@@ -162,20 +162,20 @@ func TestDatasetApplicationStore_List(t *testing.T) {
 	require.Nil(t, err)
 
 	// List all
-	apps, total, err := store.List(ctx, "", 10, 1)
+	apps, total, err := store.List(ctx, "", "", 10, 1)
 	require.Nil(t, err)
 	require.Equal(t, 3, total)
 	require.Len(t, apps, 3)
 
 	// Filter by status
-	apps, total, err = store.List(ctx, string(types.DatasetApplicationStatusPending), 10, 1)
+	apps, total, err = store.List(ctx, string(types.DatasetApplicationStatusPending), "", 10, 1)
 	require.Nil(t, err)
 	require.Equal(t, 1, total)
 	require.Len(t, apps, 1)
 	require.Equal(t, types.DatasetApplicationStatusPending, apps[0].Status)
 
 	// Pagination
-	apps, total, err = store.List(ctx, "", 2, 1)
+	apps, total, err = store.List(ctx, "", "", 2, 1)
 	require.Nil(t, err)
 	require.Equal(t, 3, total)
 	require.Len(t, apps, 2)
