@@ -1,3 +1,5 @@
+//go:build saas
+
 // Package errorx provides structured error types and error codes for the Federation Adapter module.
 // This file defines the FEDAP-ERR error code family used across the Federation Adapter service.
 //
