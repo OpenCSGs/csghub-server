@@ -3,10 +3,9 @@ package start
 import (
 	"fmt"
 
-	"opencsg.com/csghub-server/mq"
-
 	"github.com/spf13/cobra"
 	"opencsg.com/csghub-server/common/config"
+	"opencsg.com/csghub-server/mq"
 )
 
 func init() {

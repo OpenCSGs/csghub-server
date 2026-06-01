@@ -39,4 +39,18 @@ func TestConfig_loadConfig(t *testing.T) {
 		require.Equal(t, false, cfg.MirrorServer.Enable)
 		require.Equal(t, true, cfg.SensitiveCheck.EnableSSL)
 	})
+
+	t.Run("federation adapter env", func(t *testing.T) {
+		SetConfigFile("")
+		t.Setenv("STARHUB_SERVER_FEDERATION_ADAPTER_ENDPOINT", "https://10.10.3.100")
+		t.Setenv("STARHUB_SERVER_FEDERATION_ADAPTER_PORT", "9101")
+		t.Setenv("OPENCSG_CREDENTIAL_MASTER_KEY_BASE64", "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=")
+
+		cfg, err := loadConfig()
+		require.Nil(t, err)
+
+		require.Equal(t, "https://10.10.3.100", cfg.FederationAdapter.Host)
+		require.Equal(t, 9101, cfg.FederationAdapter.Port)
+		require.Equal(t, "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=", cfg.Credential.MasterKeyBase64)
+	})
 }

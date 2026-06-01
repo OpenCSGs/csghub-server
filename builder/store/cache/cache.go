@@ -16,6 +16,7 @@ type RedisClient interface {
 	SetEx(ctx context.Context, key string, value string, expiration time.Duration) error
 	SetNX(ctx context.Context, key string, value string, expiration time.Duration) (bool, error)
 	Get(ctx context.Context, key string) (string, error)
+	GetDel(ctx context.Context, key string) (string, error)
 	Del(ctx context.Context, keys ...string) error
 	SAdd(ctx context.Context, key string, members ...interface{}) error
 	SIsMember(ctx context.Context, key string, member interface{}) (bool, error)
@@ -129,6 +130,10 @@ func (c *Cache) SetNX(ctx context.Context, key string, value string, expiration 
 
 func (c *Cache) Get(ctx context.Context, key string) (string, error) {
 	return c.core.Get(ctx, key).Result()
+}
+
+func (c *Cache) GetDel(ctx context.Context, key string) (string, error) {
+	return c.core.GetDel(ctx, key).Result()
 }
 
 func (c *Cache) Del(ctx context.Context, keys ...string) error {

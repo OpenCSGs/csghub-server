@@ -1,0 +1,26 @@
+{
+  "error.FEDAP-ERR-0": {
+    "other": "Token expired, please re-authorize"
+  },
+  "error.FEDAP-ERR-1": {
+    "other": "Token exchange failed"
+  },
+  "error.FEDAP-ERR-2": {
+    "other": "Failed to get federation site"
+  },
+  "error.FEDAP-ERR-3": {
+    "other": "Federation site unavailable"
+  },
+  "error.FEDAP-ERR-4": {
+    "other": "OAuth authentication failed"
+  },
+  "error.FEDAP-ERR-5": {
+    "other": "Invalid token"
+  },
+  "error.FEDAP-ERR-6": {
+    "other": "Failed to fetch user information"
+  },
+  "error.FEDAP-ERR-7": {
+    "other": "Failed to process fedap proxy request"
+  }
+}
