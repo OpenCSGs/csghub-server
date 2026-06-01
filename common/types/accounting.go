@@ -659,7 +659,7 @@ type PresentsIndexResp struct {
 }
 
 type SetLowBalanceWarnReq struct {
-	LowBalanceWarn float64 `json:"low_balance_warn"`
+	LowBalanceWarn float64 `json:"low_balance_warn" binding:"required,gt=0"`
 	UserUUID       string  `json:"user_uuid"`
 }
 
