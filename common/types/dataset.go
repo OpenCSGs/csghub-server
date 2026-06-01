@@ -146,6 +146,7 @@ type ListDatasetApplicationsReq struct {
 	Status      string `json:"status"`
 	Per         int    `json:"per"`
 	Page        int    `json:"page"`
+	Search      string `json:"search"`
 }
 
 type DataViewerReq struct {
